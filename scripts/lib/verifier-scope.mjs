@@ -51,11 +51,14 @@ function rigaVerificato(sha, scartato) {
 
 // Il rebase dichiarato nel report che sul ramo non c'è (#2101). Sulla punta verificata il giro non ha niente da provare:
 // senza rilievi il lavoro torna alla fusione, che rifà il riallineamento se serve ancora.
+// La punta ancora al commit verificato basta da sola: il report può non nominare lo sha di main.
 function righeRebaseMancante(mancante, scartato) {
   const shas = (Array.isArray(mancante) ? mancante : []).map(soloSha).filter(Boolean);
-  if (!shas.length) return [];
+  if (!shas.length && scartato !== 'punta') return [];
   const nominati = shas.map((s) => `\`${s}\``).join(', ');
-  const testa = `**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su \`main\` (${nominati}), ma la punta non contiene quel commit.`;
+  const testa = shas.length
+    ? `**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su \`main\` (${nominati}), ma la punta non contiene quel commit.`
+    : '**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su `main`, ma la punta è ancora il commit verificato: nessun rebase l\'ha toccata.';
   if (scartato === 'punta') {
     return ['', testa,
       'La punta è ancora il commit che aveva passato la verifica: in questo giro non c\'è niente da verificare, e i controlli',
