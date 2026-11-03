@@ -46,12 +46,20 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
   await expect(page.locator('#mgParolaStato')).toHaveText('');
   await page.locator('#mgParolaSalva').click();
   await expect(page.locator('#mgParolaMsg')).toHaveText('Incolla la parola d’ordine: il campo è vuoto.');
-  await campo.fill(`${PAROLA}\nDiscutiamo la domanda D-1`);
-  await page.locator('#mgParolaSalva').click();
-  await expect(page.locator('#mgParolaMsg')).toContainText('una riga sola');
+  // Più righe incollate non diventano una parola sola attaccata: si rifiutano.
+  const incolla = async (testo) => {
+    await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), testo);
+    await campo.focus();
+    await page.keyboard.press('Control+V');
+  };
+  await incolla(`Parola d'ordine: ${PAROLA}\nDiscutiamo la domanda D-1`);
+  await expect(page.locator('#mgParolaMsg')).toHaveText('Hai incollato più righe: incolla solo la parola d’ordine.');
+  await expect(campo).toHaveValue('');
 
-  // Incollata con gli spazi e salvata con Invio.
-  await campo.fill(`  ${PAROLA}  `);
+  // La riga copiata con gli spazi e l'a capo entra pulita, e Invio la salva.
+  await incolla(`  ${PAROLA}  \n`);
+  await expect(campo).toHaveValue(PAROLA);
+  await expect(page.locator('#mgParolaMsg')).toHaveText('');
   await campo.press('Enter');
   await expect(page.locator('#mgParolaMsg')).toHaveText(cifra
     ? 'Salvata: «Discutiamone» la copia insieme alla riga.'
