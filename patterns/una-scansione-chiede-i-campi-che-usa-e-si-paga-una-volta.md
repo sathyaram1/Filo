@@ -55,17 +55,18 @@ una risposta che cambia quando l'owner tocca un interruttore.
 ## Quello che il database non sa filtrare
 
 Filtrare lato server abbassa il numero di documenti letti, che è la voce che si
-paga. Ma due filtri che sembrerebbero ovvi non si possono scrivere:
+paga. Ma Firestore non indicizza i campi assenti, e un filtro su un campo che non
+tutti hanno lascia fuori chi non ce l'ha senza dirlo:
 
-- **«solo quelli senza numero»** (il riordino della numerazione): Firestore non
-  indicizza i campi assenti, quindi nessun filtro seleziona i documenti a cui
-  manca `seq`. Il rimedio è il conteggio: se i numerati sono quanti i totali, non
-  c'è niente da numerare e la collezione non si tocca.
-- **«solo i risolti»** (l'archiviazione automatica): l'unico campo sempre in
-  chiaro che distingue un chiuso è `statusPublic`, e i documenti più vecchi della
-  sua introduzione non l'hanno. Filtrarci sopra li lascerebbe fuori dal verdetto —
-  un taglio silenzioso su una decisione, non su un elenco. Restano la proiezione e
-  il conteggio.
+- **«solo quelli senza numero»** (il riordino della numerazione): nessun filtro
+  seleziona i documenti a cui manca `seq`. Il rimedio è il conteggio: se i numerati
+  sono quanti i totali, non c'è niente da numerare e la collezione non si tocca.
+- **«solo i risolti»** (l'archiviazione automatica): l'unico campo in chiaro che
+  distingue un chiuso è `statusPublic`, e i documenti più vecchi della sua
+  introduzione possono non averlo. Il filtro `statusPublic == closed` si chiede al
+  database solo quando due conteggi (tutte, e quelle con `statusPublic`) dicono che
+  ce l'hanno tutte (#1335); altrimenti si leggono tutte, e l'uscita lo dice. Un
+  taglio silenzioso su una decisione no, un filtro che si è provato completo sì.
 
 ## Una copia in una cartella di tutti si difende da sola
 
