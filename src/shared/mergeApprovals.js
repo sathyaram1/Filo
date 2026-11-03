@@ -780,9 +780,11 @@
     card.appendChild(head);
 
     var tentativo = realignFailureText(req.realignReason);
+    var ria = riallineamentoDi(req, o);
+    card.dataset.riallineamento = ria.inCorso ? 'in_corso' : 'fallito';
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
-      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + howToRetry(req)
+      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
       + ' Quando il lavoro rifatto verrà fuso, questa scheda si toglie da sola.'));
 
     var status = el('p', 'sn-mac-status');
