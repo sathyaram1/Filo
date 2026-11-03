@@ -832,6 +832,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes', 'seq', 'subSeq']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const cambiataDaAllora = 'la pratica è cambiata da quando è stata letta per decidere: non la riscrivo';
+  if (opts.statoAtteso !== undefined && (doc.fields?.status?.stringValue || '') !== String(opts.statoAtteso || '')) {
+    return { ok: false, cambiata: true, motivo: cambiataDaAllora };
+  }
 
   const { from, leggibile } = await statoAttuale(doc);
   if (!leggibile) {
