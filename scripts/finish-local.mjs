@@ -194,7 +194,8 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const arrivati = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
   const risolti = arrivati.ok ? fileRiscritti(root, { prima: dal, base }) : { ok: false };
   if (!arrivati.ok || !risolti.ok) {
-    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
+    const perche = arrivati.ok ? `non riesco a confrontarlo con questa punta (${risolti.errore})` : 'qui non c\'è';
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} ${perche}: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
   const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
   const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
