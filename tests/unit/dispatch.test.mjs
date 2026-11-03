@@ -824,11 +824,13 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
     assert.equal(letta, critica, 'col ruolo fuori, il payload resta tutto da leggere');
   });
 
-  // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando.
+  // Il ruolo dopo non eredita il file di quello prima, e un ruolo che sta in stampa non porta il rimando. Il ruolo è
+  // finto e corto: quello vero cresce fino alla soglia e farebbe rossa la prova per un altro motivo (#2051).
+  writeFileSync(resolve(dir, 'resolver.md'), '# Ruolo: resolver\n\nUn ruolo corto, che sta in stampa.\n');
   const dopo = JSON.parse(stampa({ role: 'new-work', id: 'n', num: '#5' }, { feedback: { text: 'Un difetto.' } }));
   assert.ok(!existsSync(j.istruzioniFile), 'il file del ruolo di prima è sparito');
   assert.equal(dopo.istruzioniFile, undefined);
-  assert.match(dopo.instructions, /Contratto comune dei worker/);
+  assert.match(dopo.instructions, /^# Ruolo: resolver\n\nUn ruolo corto, che sta in stampa\.[\s\S]*Contratto comune dei worker/);
 });
 
 test('diffForBranch: dichiara la base remota su cui è calcolato, anche col main locale indietro', () => {
