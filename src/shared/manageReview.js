@@ -1923,14 +1923,14 @@
   // Ogni motivo che il server scrive nel registro (filo-security: policy.REJECT, gitToken.MOTIVO, compiti), detto
   // all'owner. Più i codici delle righe vecchie (stale, secaudit_stale, fault_declared, bad_ticket, routines_off).
   const MOTIVI_RIFIUTO = {
-    bad_passphrase: 'la parola d’ordine della routine è stata revocata mentre lavorava',
+    bad_passphrase: 'parola d’ordine non valida o revocata',
     bad_ticket: 'biglietto inesistente',
     dead_ticket: 'biglietto scaduto o già rilasciato',
-    role_forbids: 'azione che il ruolo non può fare',
+    role_forbids: 'azione fuori dal ruolo',
     branch_mismatch: 'ramo diverso da quello assegnato',
     illegal_transition: 'passaggio di stato non permesso',
-    rate_limited: 'troppe richieste in poco tempo',
-    malformed: 'richiesta incompleta o non interpretabile',
+    rate_limited: 'troppe richieste',
+    malformed: 'richiesta non interpretabile',
     routines_off: 'routine spente',
     l5_blocked: 'fusione fermata dai controlli di sicurezza',
     not_approved: 'fusione chiesta senza verifica e controllo di sicurezza superati',
@@ -2136,7 +2136,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniFermeInCima, statoFusione, fusioneDi, STATI_FUSIONE, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
+    fusioneInAttesa, fusioniFermeInCima, statoFusione, fusioneDi, STATI_FUSIONE, MOTIVI_RIFIUTO, testoRifiuto, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
     aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,

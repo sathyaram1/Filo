@@ -1433,21 +1433,10 @@
   // Tab «Log»: gli ultimi worker spawnati. Fonte config/automation.workerLog, scritto dal
   // server al rilascio di ogni biglietto; sola lettura via main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
-  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
-  const ROLE_LABELS = {
-    'new-work': 'Nuovo lavoro',
-    verifier:   'Verifica',
-    fixer:      'Correzione',
-    secaudit:   'Audit sicurezza',
-    risposta:   'Gestisci la risposta',
-    smistamento: 'Gestisci la domanda',
-    prober:     'Esplorazione',
-    idle:       'Fermo',
-    off:        'Routine spente',
-  };
+  // Il ruolo detto all'owner, mai l'id grezzo: la traduzione sta in mergeApprovals.etichettaRuolo, che serve anche la pagina da browser (#555).
   function roleLabel(role) {
-    const r = String(role || '').trim();
-    return ROLE_LABELS[r] || (r || 'Sconosciuto');
+    const UI = window.SN_MERGE_APPROVALS;
+    return (UI && UI.etichettaRuolo(role)) || String(role || '').trim() || 'Sconosciuto';
   }
   let logLoaded  = false;   // true dopo il primo caricamento riuscito
   let logLoading = false;
@@ -1488,7 +1477,9 @@
     if (!list.length) { setLogView('empty'); mgLogList.innerHTML = ''; return; }
     mgLogList.innerHTML = list.map((e) => {
       const role = roleLabel(e && e.role);
-      const num  = e && e.num ? ` · #${esc(String(e.num))}` : '';
+      // Il server scrive già «#500», le righe vecchie il numero nudo: un cancelletto solo in ogni caso (#512).
+      const n = String((e && e.num) || '').trim().replace(/^#+/, '');
+      const num  = n ? ` · #${esc(n)}` : '';
       const rel  = timeAgo(e && e.startedAt);
       const abs  = formatDateTime(e && e.startedAt);
       return `<li class="mg-log-row" title="${esc(abs)}">`
@@ -1535,19 +1526,7 @@
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
   const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
 
-  // Perché una richiesta è stata respinta, detto all'owner e non al codice.
-  const DENY_LABELS = {
-    bad_passphrase: 'parola d’ordine non valida o revocata',
-    bad_ticket: 'biglietto inesistente',
-    dead_ticket: 'biglietto scaduto o già rilasciato',
-    role_forbids: 'azione fuori dal ruolo',
-    branch_mismatch: 'ramo diverso da quello assegnato',
-    illegal_transition: 'passaggio di stato non permesso',
-    rate_limited: 'troppe richieste',
-    malformed: 'richiesta non interpretabile',
-    routines_off: 'routine spente',
-    l5_blocked: 'fusione fermata dai controlli di sicurezza',
-  };
+  // Perché una richiesta è stata respinta: la frase, col dettaglio del server accanto, sta in MR.testoRifiuto (#773.2).
   // Il numero del feedback viene subito dopo il motivo: da qui si deve leggere chi è fermo (#1653).
   const numDiRifiuto = (r) => { const n = String((r && r.num) || '').trim().replace(/^#+/, ''); return n ? ` · #${n}` : ''; };
   // Un blocco L5 su un lavoro che si fonde lo stesso (fidato o pre-approvato) si registra soltanto: non è un fermo.
@@ -1608,12 +1587,14 @@
     const rows = righeSenzaProva(prove).concat(righePostiLasciati(posti));
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
       if (bloccoCheSiFonde(r)) { rows.push(rigaBloccoRegistrato(r)); continue; }
+      const t = MR.testoRifiuto(r);
       rows.push({
         at: r && r.at,
         kind: 'deny',
         label: 'Respinto',
-        text: `${DENY_LABELS[String(r && r.reason)] || String((r && r.reason) || '—')}${numDiRifiuto(r)}`
+        text: `${t.frase}${numDiRifiuto(r)}`
           + `${r && r.slug ? ` · ${r.slug}` : ''}${r && r.action ? ` · ${r.action}` : ''}`,
+        dettaglio: t.dettaglio,
       });
     }
     for (const c of (Array.isArray(comparisons) ? comparisons : [])) {
@@ -1643,7 +1624,7 @@
       const cls = row.kind === 'deny' ? ' mg-log-role--deny' : '';
       return `<li class="mg-log-row" title="${esc(abs)}">`
         + `<span class="mg-log-role${cls}">${esc(row.label)}</span>`
-        + `<span class="mg-log-when">${esc(row.text)}</span>`
+        + `<span class="mg-log-when">${esc(row.text)}${row.dettaglio ? `<span class="mg-log-dettaglio">${esc(row.dettaglio)}</span>` : ''}</span>`
         + (abs ? `<span class="mg-log-abs">${esc(timeAgo(row.at))}</span>` : '')
         + `</li>`;
     }).join('');

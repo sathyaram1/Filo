@@ -336,7 +336,10 @@ describe('la provenienza della richiesta', () => {
 test('di un’automazione si dice il ruolo che lavorava, non "un accesso senza email"', () => {
   // Un'automazione un'email non ce l'ha: la frase pensata per una sessione
   // umana senza indirizzo, qui, è vera e inutile.
-  assert.equal(UI.requestedBy('secaudit · notturna', { origin: 'routine' }), 'chiesta da secaudit · notturna');
+  // Il ruolo detto come nel Log di Gestione (#555), non l'id grezzo.
+  assert.equal(UI.requestedBy('secaudit · notturna', { origin: 'routine' }), 'chiesta da Audit sicurezza · notturna');
+  assert.equal(UI.requestedBy('new-work', { origin: 'routine' }), 'chiesta da Nuovo lavoro');
+  assert.equal(UI.requestedBy('ruolo-nuovo · x', { origin: 'routine' }), 'chiesta da ruolo-nuovo · x');
   assert.match(UI.requestedBy('K3nD9xQw1aZ7mB2pL0rT', { origin: 'locale' }), /senza email/);
   assert.equal(UI.requestedBy('sathya@esempio.it', { origin: 'routine' }), 'chiesta da sathya@esempio.it');
 });
@@ -382,9 +385,12 @@ describe('il riallineamento fatto dal server', () => {
   });
 
   test('conflict + realignReason: aggiunge che il server ci ha provato, col motivo in italiano', () => {
-    const m = UI.outcomeMessage({ ok: true, result: 'conflict', realignReason: 'riallineamento automatico non riuscito: realign_branch_moved (genitori: abc)' }, { origin: 'routine' });
+    const req = { origin: 'routine', feedbackId: 'fb1' };
+    const m = UI.outcomeMessage({ ok: true, result: 'conflict', realignReason: 'riallineamento automatico non riuscito: realign_branch_moved (genitori: abc)' }, req);
     assert.equal(m.kind, 'warn');
-    assert.match(m.text, /giro nuovo dell’automazione/);
+    // Il giro parte da solo (#1328): la frase lo dice, come la scheda delle fusioni approvate e non avvenute.
+    assert.match(m.text, /torna da solo alla routine, che riallinea il ramo/);
+    assert.doesNotMatch(m.text, /serve un giro nuovo/);
     assert.match(m.text, /Il server ha provato a riallineare da sé, senza riuscirci: /);
     assert.match(m.text, /si era mosso/);
     assert.doesNotMatch(m.text, /realign_branch_moved/);
@@ -481,4 +487,24 @@ describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
     assert.match(UI.provaNote({ provaUnit: { esito: 'conflitto', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /conflitto/);
     assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
   });
+});
+
+// #1328 e #1425: dopo un sì finito in conflitto la frase dice chi riallinea, e se tocca all'owner cosa fare.
+test('dopoIlConflitto: il lavoro di una routine si riallinea da solo, il resto dice cosa fare', () => {
+  assert.equal(UI.siRiallineaDaSola({ origin: 'routine', feedbackId: 'x' }), true);
+  assert.equal(UI.siRiallineaDaSola({ origin: 'routine' }), false, 'senza pratica il server non la riallinea');
+  assert.equal(UI.siRiallineaDaSola({ origin: 'locale', feedbackId: 'x' }), false);
+  assert.match(UI.dopoIlConflitto({ origin: 'routine', feedbackId: 'x' }), /da solo/);
+  assert.match(UI.dopoIlConflitto({ origin: 'locale' }), /npm run finish/);
+  assert.match(UI.dopoIlConflitto({ origin: 'routine' }), /In coda/);
+  // L'esito al clic e la scheda delle fusioni non avvenute dicono la stessa cosa.
+  const m = UI.outcomeMessage({ ok: true, result: 'conflict' }, { origin: 'routine', feedbackId: 'x' });
+  assert.ok(m.text.includes(UI.RIALLINEA_DA_SOLA));
+});
+
+test('etichettaRuolo: i ruoli delle routine in italiano, uno sconosciuto com’è', () => {
+  assert.equal(UI.etichettaRuolo('secaudit'), 'Audit sicurezza');
+  assert.equal(UI.etichettaRuolo('verifier'), 'Verifica');
+  assert.equal(UI.etichettaRuolo('nuovo'), 'nuovo');
+  assert.equal(UI.etichettaRuolo(''), '');
 });

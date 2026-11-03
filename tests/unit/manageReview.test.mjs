@@ -2235,3 +2235,37 @@ test('segnoFermata: attesa_chiusa e origine_bloccata hanno un segno proprio (#14
   assert.doesNotMatch(bloccata.testo, giudici);
   assert.match(bloccata.testo, /bloccato/);
 });
+
+// #1327 punto 1 (#743.1): la fusione partita dal segno di un clic su Approva viene dal sì a una richiesta di prima.
+test('livelli L5: fusa col segno lasciato da un clic, non «avevi messo il segno» (#743.1)', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'mergeApprovals.js'));
+  const fb = { _id: 'p1', seq: 9, status: 'revision_security' };
+  const daClic = { id: 'r', feedbackId: 'p1', preapprovedBy: 'owner@esempio.it · approvazione ' + 'a'.repeat(24), preapprovedAt: '2026-10-01T10:00:00Z' };
+  const t = MR.livelloL5(fb, { fusioni: { preapproved: [daClic] } }).pannello.testo;
+  assert.match(t, /sì a una richiesta precedente/);
+  assert.doesNotMatch(t, /avevi messo il segno/);
+  const aMano = { id: 'r', feedbackId: 'p1', preapprovedBy: 'owner@esempio.it' };
+  assert.match(MR.livelloL5(fb, { fusioni: { preapproved: [aMano] } }).pannello.testo, /avevi messo il segno/);
+  const fidato = { id: 'r', feedbackId: 'p1', skippedL5: true, motivo: 'fiducia' };
+  assert.match(MR.livelloL5(fb, { fusioni: { preapproved: [fidato] } }).pannello.testo, /Lavoro fidato/);
+});
+
+// #1327 punto 2 (#773.2): ogni motivo che il server scrive ha la sua frase, col dettaglio accanto.
+test('testoRifiuto: frase per ogni motivo del server, dettaglio, e mai il solo codice', () => {
+  const delServer = ['dead_ticket', 'bad_passphrase', 'rate_limited', 'role_forbids', 'branch_mismatch', 'malformed',
+    'illegal_transition', 'no_critique', 'self_review', 'config_incomplete', 'fermata_senza_domanda', 'domanda_non_valida',
+    'domanda_troppo_grande', 'troppe_domande', 'domanda_doppia', 'risposta_non_valida', 'risposta_chiusa', 'domanda_cambiata',
+    'azione_vietata', 'smistamento_non_valido', 'smistamento_chiuso', 'fuori_ambito', 'fuori_ambiente', 'compito_inesistente',
+    'repo_non_ammesso', 'biglietto_non_vivo', 'biglietto_sporco', 'feedback_non_fidato', 'troppi_token', 'not_approved',
+    'server_error', 'l5_blocked', 'stale', 'secaudit_stale'];
+  for (const reason of delServer) {
+    const t = MR.testoRifiuto({ reason, detail: 'verifica: fail' });
+    assert.ok(!t.frase.includes(reason), `${reason}: la frase non deve essere il codice`);
+    assert.ok(t.frase.length > 8, `${reason} senza frase`);
+    assert.equal(t.dettaglio, 'verifica: fail');
+  }
+  const ignoto = MR.testoRifiuto({ reason: 'motivo_nuovo' });
+  assert.match(ignoto.frase, /non conosce/);
+  assert.match(ignoto.frase, /motivo_nuovo/);
+  assert.equal(ignoto.dettaglio, '');
+});

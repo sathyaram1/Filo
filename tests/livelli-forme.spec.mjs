@@ -506,7 +506,7 @@ test('quadrato rosso: dentro ci sono i blocchi, chi ha chiesto, ramo e commit, e
   await expect(corpo).toContainText(SHA.slice(0, 8));
   await expect(corpo).toContainText('Tocca aree protette');
   await expect(corpo).toContainText('firestore.rules');
-  await expect(corpo).toContainText('secaudit');
+  await expect(corpo).toContainText('chiesta da Audit sicurezza · notturna');
 
   // Approvare non parte al primo click: è irreversibile.
   const go = corpo.locator('.sn-mac-btn-go');
