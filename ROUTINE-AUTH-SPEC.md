@@ -215,6 +215,11 @@ diventa un **muro**.
 | `risposta` | la **sua domanda** (conversazione e note per gli agenti, allegati dell'owner aperti), numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5) | testi di feedback, diff, rami; nessun passaggio di stato, nessuna azione di consenso |
 | `smistamento` | la **sua domanda** appena nata (note per gli agenti comprese), il feedback da cui viene con conversazione e note, numero, stato e priorità dei feedback che nomina; il registro delle decisioni solo nell'ambiente dei riservati (SPEC-DOMANDE § 3.5, #1790) | diff, rami; le azioni fuori da `guasto`, `ricevuti`, `automatica` e `pubblica`; nessuna azione di consenso |
 
+Delle note di un feedback chi lo lavora riceve solo la spec di un pacchetto nato
+prima di #2033 (FEEDBACK-STATES.md § 3a, #2038): i turni «SPEC DEL PACCHETTO»,
+come ultimo dei `documents`, a `new-work`, `fixer` e `verifier`; mai a
+`secaudit`, che del feedback non riceve niente.
+
 **L'ambito della verifica.** Il payload del `verifier` porta `scope`, deciso dal
 server:
 
