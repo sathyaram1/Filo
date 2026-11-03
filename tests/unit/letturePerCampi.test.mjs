@@ -86,6 +86,35 @@ const GRAFIE = {
     'export const tutti = () => globalThis.SN_FEEDBACK.listAllPublicPaged({});',
     'export const tutti = () => globalThis.SN_FEEDBACK.listAllPublicPaged({ fields: ["votes"] });',
   ],
+  // #1335: le forme che passavano davanti al freno di #680.1.
+  'la domanda mandata come oggetto richiesta già pronto': [
+    `export const tutti = () => fetch(new Request("${BASE}:runQuery?key=k", { method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500 } }) }));`,
+    `export const tutti = () => fetch(new Request("${BASE}:runQuery?key=k", { method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500, select: { fields: [{ fieldPath: "seq" }] } } }) }));`,
+  ],
+  'il contenuto come blocco binario invece che testo': [
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: new TextEncoder().encode(JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500 } })).buffer });`,
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: new TextEncoder().encode(JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500, select: { fields: [{ fieldPath: "seq" }] } } })).buffer });`,
+  ],
+  'il contenuto come Blob': [
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: new Blob([JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500 } })]) });`,
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: new Blob([JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500, select: { fields: [{ fieldPath: "seq" }] } } })]) });`,
+  ],
+  'la scelta dei campi presente ma vuota': [
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500, select: { fields: [] } } }) });`,
+    `export const tutti = () => fetch("${BASE}:runQuery?key=k", { method: "POST",
+      body: JSON.stringify({ structuredQuery: { from: [{ collectionId: "feedback" }], limit: 500, select: { fields: [{ fieldPath: "seq" }] } } }) });`,
+  ],
+  'la maschera vuota nella lista REST': [
+    `export const tutti = () => fetch(\`${BASE}/feedback?key=k&pageSize=300&mask.fieldPaths=%20\`);`,
+    `export const tutti = () => fetch(\`${BASE}/feedback?key=k&pageSize=300&mask.fieldPaths=seq\`);`,
+  ],
 };
 
 for (const [come, [nudo, proiettato]] of Object.entries(GRAFIE)) {
