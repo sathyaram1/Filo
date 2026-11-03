@@ -917,6 +917,11 @@ module.exports = function register(on, ctx) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
     }
+    if (daUnire.length < V.USER_FIELDS.length) {
+      cards = (Array.isArray(cards) ? cards : []).map((c) => Object.fromEntries(
+        Object.entries(c || {}).filter(([k]) => k === '_id' || daUnire.includes(k)),
+      ));
+    }
     return V.mergeUserFields(rows, cards);
   }
 
