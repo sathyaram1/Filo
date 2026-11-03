@@ -765,10 +765,13 @@
     return `${base} il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}.`;
   }
 
+  // Una richiesta che è una decisione dell'owner: da approvare, o approvata e finita in conflitto senza che nessuno la
+  // riallinei (#1425). Quella che la routine sta riallineando resta dov'è.
   function richiestaInAttesa(fb, opts) {
     const f = opts && opts.fusioni;
-    const pending = f && Array.isArray(f.pending) ? f.pending : [];
-    return pending.some((r) => richiestaDiQuesto(r, fb));
+    const di = (k) => (f && Array.isArray(f[k]) ? f[k] : []).some((r) => richiestaDiQuesto(r, fb));
+    if (di('pending')) return true;
+    return di('failed') && statoFusione(fb, opts) === 'riallineamento_fallito';
   }
 
   // UNA tabella delle azioni dell'owner per tutte le superfici: sezione e status decidono
