@@ -14,6 +14,7 @@
     archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
     riapri: MSG.DOMANDA_RIAPRI || 'domanda_riapri',
     fiducia: MSG.DOMANDA_FIDUCIA || 'domanda_fiducia',
+    discuti: MSG.DISCUTIAMONE_COPIA || 'discutiamone_copia',
   };
   const MR = window.SN_MANAGE_REVIEW;
   const D = window.SN_DOMANDE;
