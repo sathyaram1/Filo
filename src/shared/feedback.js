@@ -1094,7 +1094,8 @@
   // pagine non mente — se scatta, la risposta lo dice.
   // `lista` (solo da una pagina): è il caricamento della Gestione, e il main ci
   // riunisce le schede e ci fa ripartire il giro (#676).
-  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false } = {}) {
+  // `uguale` ({ campo, valore }): solo le righe che il database trova uguali, filtrate da lui (#1335).
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false, uguale = null } = {}) {
     // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
     // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
     // lettura completa la fa il main e torna di là, col suo `complete`. Senza
@@ -1102,6 +1103,8 @@
     // alla prima riga (#496).
     const bridge = pageBridge();
     if (bridge) {
+      // Il main il filtro non lo riceve: senza questo rifiuto la pagina avrebbe tutte le righe credendole filtrate.
+      if (uguale) throw new Error('il filtro sul server non passa dalla porta delle pagine: chiedi le righe e filtrale qui');
       const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs, ...(fields ? { fields } : {}), ...(lista ? { lista: true } : {}) });
       return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false, readTime: String(r.readTime || '') };
     }
