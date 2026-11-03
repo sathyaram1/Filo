@@ -69,9 +69,9 @@ export function chiSpinge({ root, env = process.env } = {}) {
 const impronta = (ticket) => createHash('sha256').update(String(ticket)).digest('hex');
 
 /**
- * I commit che questa copia ha creato fra quelli che `locale` porta su `ramo`: non quelli raggiungibili da un ref remoto,
- * dalla punta che il remoto ha adesso (`remoto`), o da una che il ref remoto del ramo ha avuto (il suo storico): un
- * commit visto su origin l'ha spinto qualcun altro, anche se poi è stato tolto. → { commits, oltre } | null se git tace.
+ * I commit che `locale` porta su `ramo` e origin non ha mai mostrato: non quelli raggiungibili da un ref remoto, dalla
+ * punta che il remoto ha adesso (`remoto`), o da una che il ref remoto del ramo ha avuto (il suo storico). Sono i
+ * candidati: chi li ha fatti lo dice la traccia (perAutore). → { commits, oltre } | null se git tace.
  */
 export function commitPropri(root, { locale, remoto = '', ramo = '' } = {}) {
   const escludi = punteViste(root, { remoto, ramo });
