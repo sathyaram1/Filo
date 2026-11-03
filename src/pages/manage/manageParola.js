@@ -46,7 +46,7 @@
     const prima = stato.salvata;
     stato = { salvata: !!(r && r.salvata), suDisco: !!(r && r.salvata && r.suDisco) };
     if (statoEl) statoEl.textContent = stato.salvata ? (stato.suDisco ? '· salvata' : '· salvata fino alla chiusura di Filo') : '';
-    if (campo) campo.placeholder = stato.salvata ? 'Incollane un’altra per cambiarla' : 'Incolla qui la parola d’ordine';
+    if (campo) campo.placeholder = stato.salvata ? 'Incollane un’altra per cambiarla' : 'Incollala qui';
     if (togliBtn) togliBtn.hidden = !stato.salvata;
     if (!stato.salvata) disarma();
     if (prima !== stato.salvata) for (const fn of ascoltatori) { try { fn(stato.salvata); } catch (_) {} }

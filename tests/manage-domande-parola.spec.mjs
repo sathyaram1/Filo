@@ -131,7 +131,11 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
 test('un’altra pagina di Filo non la salva, non la toglie e non la mette negli appunti', async ({ app, openTab }) => {
   const gestione = await openTab(MANAGE);
   await gestione.waitForFunction(() => window.filo && window.filo.message);
+  expect(await gestione.evaluate(() => window.SN_MANAGE_PAROLA.salvata())).toBe(false);
   expect(await gestione.evaluate((p) => window.filo.message({ type: 'parola_owner_salva', parola: p }), PAROLA)).toMatchObject({ ok: true, salvata: true });
+  // Salvata da un'altra parte, la Gestione aperta lo sa dall'annuncio: l'hover di «Discutiamone» non resta vecchio.
+  await expect.poll(() => gestione.evaluate(() => window.SN_MANAGE_PAROLA.salvata())).toBe(true);
+  await expect(gestione.locator('#mgParolaStato')).toContainText('salvata');
 
   const altra = await openTab('filo://options/options.html');
   await altra.waitForFunction(() => window.filo && window.filo.message);

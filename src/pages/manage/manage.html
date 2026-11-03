@@ -1829,9 +1829,7 @@
     .mg-judge-spesa-testo { font-size: 13px; color: var(--sn-fg); }
     .mg-judge-spesa-nota { font-size: 12px; color: var(--sn-muted); }
     .mg-judge-spesa.is-pieno .mg-judge-spesa-nota { color: #c0392b; }
-    /* La parola d'ordine: il campo si stringe prima dei tasti, e in una colonna stretta vanno a capo i tasti. */
-    .mg-parola-riga { flex-wrap: wrap; }
-    .sn-page input.mg-auto-parola { width: auto; flex: 1 1 180px; min-width: 0; max-width: 340px; padding: 7px 10px; border-radius: 8px; }
+    .sn-page input.mg-auto-parola { max-width: 340px; padding: 7px 10px; border-radius: 8px; }
     .mg-parola-stato { font-weight: 400; font-size: 12px; color: var(--sn-muted); }
     /* Le istruzioni per chi corregge hanno la stessa pelle del campo numerico, ma larghe e a più righe. */
     .mg-auto-field-row--stack { flex-direction: column; align-items: stretch; gap: 8px; }
@@ -2733,12 +2731,15 @@
                   «Discutiamone» in Domande la copia insieme alla riga: una sola incollata apre la sessione dal telefono.
                   Resta su questo computer, cifrata.
                 </p>
-                <div class="mg-auto-field-row mg-parola-riga">
+                <!-- I tasti sotto il campo: «Confermi?» allarga «Togli» senza mandarlo a capo sotto il secondo clic. -->
+                <div class="mg-auto-field-row mg-auto-field-row--stack">
                   <input type="password" id="mgParola" class="mg-auto-parola" autocomplete="off" spellcheck="false"
-                    placeholder="Incolla qui la parola d’ordine" />
-                  <button type="button" class="sn-btn" id="mgParolaSalva">Salva</button>
-                  <button type="button" class="sn-btn sn-btn-secondary" id="mgParolaTogli" hidden>Togli</button>
-                  <span class="mg-action-msg" id="mgParolaMsg" role="status"></span>
+                    placeholder="Incollala qui" />
+                  <div class="mg-auto-field-row">
+                    <button type="button" class="sn-btn" id="mgParolaSalva">Salva</button>
+                    <button type="button" class="sn-btn sn-btn-secondary" id="mgParolaTogli" hidden>Togli</button>
+                    <span class="mg-action-msg" id="mgParolaMsg" role="status"></span>
+                  </div>
                 </div>
               </section>
             </div>
