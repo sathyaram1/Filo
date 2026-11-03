@@ -128,17 +128,24 @@ export function motivoLettura(input, ctx = {}) {
   }
   if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
   if (nome.startsWith('mcp__')) return mcpSenzaLettura(nome) ? '' : pulisci(nome, 160);
-  if (nome !== 'Read') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
-  const grezzo = String(dati.file_path || '').trim();
+  if (nome !== 'Read' && nome !== 'Grep') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
+  const grezzo = percorsoLetto(nome, dati);
   if (!grezzo) return '';
   const win = !!ctx.win;
   const P = win ? path.win32 : path.posix;
   const canonico = typeof ctx.canonico === 'function' ? ctx.canonico : (p) => p;
   const file = canonico(P.resolve(String(ctx.cwd || P.sep), grezzo));
+  const nomeFile = pulisci(P.basename(file), 80);
+  // La cartella di Claude prima delle altre: anche dentro una cartella fidata, lì decide l'elenco ammesso.
+  for (const c of ctx.claude || []) {
+    const rel = relativo(file, c, P, win);
+    if (rel === null) continue;
+    return ammessoInClaude(rel, { win, sessione: ctx.sessione }) ? '' : `${nome} dalla cartella di Claude (${nomeFile})`;
+  }
   if ((ctx.cartelle || []).some((c) => dentro(file, c, P, win))) return '';
   const uguale = (a) => (win ? a.toLowerCase() === file.toLowerCase() : a === file);
   if ((ctx.file || []).some(uguale)) return '';
-  return `Read fuori dal repo (${pulisci(P.basename(file), 80)})`;
+  return `${nome} fuori dal repo (${nomeFile})`;
 }
 
 // Il percorso vero, collegamenti e nomi corti di Windows risolti, anche di un file che non c'è più: vale la cartella
