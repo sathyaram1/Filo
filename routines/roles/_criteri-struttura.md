@@ -9,4 +9,5 @@
   l'app usa davvero: una prova che chiama un pezzo che l'app non usa non tiene
   niente. Il numero non decide: molte prove su una strada e nessuna sull'altra
   non bastano. Le conta `node scripts/conta-prove.mjs` (con `--base <commit>`
-  per una parte sola del lavoro).
+  per una parte sola del lavoro; in un lavoro server, con `--server <clone>`,
+  anche quelle del server, come le conta la lettura del diff).
