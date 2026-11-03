@@ -62,9 +62,10 @@ test('l’avvio, la sessione, le pagine, il disco e la memoria si contano; il se
     expect(s.sessione.schede).toEqual({ n5: 1 });
     expect(somma(s.sessione.vista)).toBe(1);
     expect(somma(s.sessione.coda)).toBe(1);
-    // Le pagine web hanno chiesto le loro risposte sincrone prima dei loro script.
-    expect(somma(s.ipcSincrono['fp-config'])).toBeGreaterThanOrEqual(2);
-    expect(somma(s.ipcSincrono['adblock-css'])).toBeGreaterThanOrEqual(2);
+    // Le pagine web hanno chiesto le loro risposte sincrone prima dei loro script. Letto una volta e non atteso: la
+    // sessione si conta solo a coda caricata, e una coda detta finita con l'ultima pagina appena partita qui dà 1 (#1337).
+    expect(somma(s.ipcSincrono['fp-config']), 'le due schede della sessione, entrambe caricate').toBeGreaterThanOrEqual(2);
+    expect(somma(s.ipcSincrono['adblock-css']), 'le due schede della sessione, entrambe caricate').toBeGreaterThanOrEqual(2);
     expect(s.storageEsito.lettura_ok).toBe(1);
 
     // Un rifiuto che nessuno gestisce: il nome della classe, mai il messaggio.
