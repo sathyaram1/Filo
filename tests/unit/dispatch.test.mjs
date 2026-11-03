@@ -793,7 +793,7 @@ test('emit: un ruolo che col payload già fuori passa ancora la soglia esce inte
   const dir = resolve(TMP, 'routines', 'roles');
   mkdirSync(dir, { recursive: true });
   for (const f of readdirSync(vere)) {
-    if (f === 'verifier.md' || f === 'resolver.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
+    if (f === 'verifier.md' || f.startsWith('_')) writeFileSync(resolve(dir, f), readFileSync(resolve(vere, f)));
   }
   const stampa = (bucket, ctx) => {
     let out = '';
