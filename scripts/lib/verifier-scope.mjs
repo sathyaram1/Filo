@@ -58,7 +58,7 @@ function righeRebaseMancante(mancante, scartato) {
   const nominati = shas.map((s) => `\`${s}\``).join(', ');
   const testa = shas.length
     ? `**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su \`main\` (${nominati}), ma la punta non contiene quel commit.`
-    : '**Il riallineamento non è su questo ramo.** Il report qui sotto dice di aver rifatto la base su `main`, ma la punta è ancora il commit verificato: nessun rebase l\'ha toccata.';
+    : '**Il riallineamento non è su questo ramo.** Nessun rebase ha toccato la punta, anche se il giro nasce da un riallineamento consegnato.';
   if (scartato === 'punta') {
     return ['', testa,
       'La punta è ancora il commit che aveva passato la verifica: in questo giro non c\'è niente da verificare, e i controlli',
