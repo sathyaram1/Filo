@@ -67,7 +67,7 @@ Object.assign(process.env, {
   CLAUDE_CONFIG_DIR: cartellaTemporanea('filo-claude-utente-'),
   TMPDIR: TEMP, TEMP, TMP: TEMP,
 });
-const { emit, serverCtx, riallineamentoMancante, perimetroNote } = await import('../../scripts/dispatch.mjs');
+const { emit, serverCtx, riallineamentoMancante, perimetroNote, puntaSuBaseVecchia } = await import('../../scripts/dispatch.mjs');
 
 test.after(() => { for (const d of [BASE, STRUMENTI, TEMP]) { try { togliCartella(d); } catch (_) {} } });
 
