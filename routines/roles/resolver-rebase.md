@@ -21,7 +21,7 @@ scrivi l'elenco dei test rossi dopo il rebase.
 
 <!-- includi: _cornice-feedback.md -->
 
-1. Due comandi, ognuno da solo nella sua chiamata, così come sono scritti:
+1. Due comandi, ognuno da solo nella sua chiamata:
 
    ```bash
    git fetch origin main
