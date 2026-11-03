@@ -303,8 +303,9 @@ async function apriInSecondoPiano(app, url, arrivo = url) {
   await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url, background: true }), url);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, arrivo) => BrowserWindow.getAllWindows()
     .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.view.webContents.getURL() === arrivo && !t.view.webContents.isLoading())), arrivo),
-  // Una pagina da 160 mila elementi qui ci mette tredici secondi a caricarsi, e su una macchina con due processori un minuto.
-  { timeout: 90_000 }).toBe(true);
+  // Una pagina da 160 mila elementi qui ci mette tredici secondi a caricarsi, e su una macchina con due processori o
+  // carica da altri lavori oltre un minuto e mezzo (#1907).
+  { timeout: 150_000 }).toBe(true);
 }
 const leggi = (app, azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
 
@@ -353,10 +354,10 @@ test('quello che Filo ha letto dalla scheda dell\'utente non esce in un indirizz
 });
 
 test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece di consegnarne metà', async ({ app, openTab, testServer }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const page = await openTab(NEWTAB);
-  // Oltre il tetto di elementi, ma nascosti: senza impaginarli la pagina si carica in pochi secondi anche su una macchina
-  // carica, dove 160 mila elementi visibili sforavano l'attesa e la prova diventava rossa a caso (#1907).
+  // Oltre il tetto di elementi, ma nascosti: contano lo stesso, e senza impaginarli la pagina si carica anche su una
+  // macchina carica, dove 160 mila elementi visibili sforavano l'attesa e la prova diventava rossa a caso (#1907).
   const url = testServer.html(`<!doctype html><html><head><title>Registro</title></head><body><main><h1>Registro</h1><p>Spedizioni del mese.</p><p>${'<b hidden>x</b>'.repeat(160000)}</p>
 <p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
   await apriInSecondoPiano(app, url);
@@ -427,9 +428,9 @@ test('oltre l\'ultimo pezzo di una scheda letta in parte, al modello non arriva 
 // #1307.3: la prima parte letta di una scheda troppo grande può non avere testo (una griglia enorme di celle vuote prima del
 // contenuto): al modello non arriva «la scheda non mostra testo», che gli fa rispondere che nella pagina non c'è niente.
 test('una scheda letta in parte con la prima parte senza testo lo dichiara al modello', async ({ app, openTab, testServer }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const page = await openTab(NEWTAB);
-  const url = testServer.html(`<!doctype html><html><head><title>Tabellone</title></head><body><main>${'<i></i>'.repeat(160000)}
+  const url = testServer.html(`<!doctype html><html><head><title>Tabellone</title></head><body><main>${'<i hidden></i>'.repeat(160000)}
 <p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
   await apriInSecondoPiano(app, url);
   await reteDiProva(app, { vietata: true });
