@@ -45,7 +45,7 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
   const V = globalThis.SN_VERIFIER_ROUND;
   const caps = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
   for (const critica of [
-    'Provato.\n[2i?] Il riquadro è freddo?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
+    'Provato.\n[2i?!] I dati salvati cambiano forma?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
     'Provato.\n[3i?] I dati escono?\n[2v?] Il titolo accanto è tagliato?\n[1e] Fuori.',
   ]) {
     const { findings } = V.parseFindings(critica);
