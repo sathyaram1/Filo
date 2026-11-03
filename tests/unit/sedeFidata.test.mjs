@@ -15,7 +15,8 @@ import * as L from '../../scripts/leggi-feedback.mjs';
 import { esegui as eseguiDomanda } from '../../scripts/domanda.mjs';
 import { esegui as eseguiCompito } from '../../scripts/compito.mjs';
 import * as M from '../../scripts/manutentore.mjs';
-import { rifiutoSchede } from '../../scripts/schede.mjs';
+import { rifiutoSchede, main as mainSchede } from '../../scripts/schede.mjs';
+import * as RD from '../../scripts/routine-domanda.mjs';
 import * as RC from '../../scripts/routine-channel.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
