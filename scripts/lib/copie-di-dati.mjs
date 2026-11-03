@@ -621,12 +621,25 @@ function installa(root, contenuto, gancio = 'pre-push') {
  */
 export function installaControlloSpedizione(root) {
   const esito = installa(root, PRE_PUSH);
-  try { installa(root, POST_COMMIT, 'post-commit'); } catch (_) { /* senza, i commit valgono di chi li spinge */ }
-  try { installa(root, POST_REWRITE, 'post-rewrite'); } catch (_) { /* senza, una copia riscritta vale di chi la spinge */ }
+  installaTraccia(root, 'app');
   return esito;
+}
+
+/**
+ * I ganci che scrivono la traccia dei commit nati nella copia di `root` (`repo`: 'app' o 'server'): senza, i suoi commit
+ * non li dichiara nessuno. Mai un'eccezione. → { 'post-commit': esito, … }, gli esiti di installaControlloSpedizione.
+ */
+export function installaTraccia(root, repo = 'app') {
+  const out = {};
+  for (const [gancio, modo] of [['post-commit', '--post-commit'], ['post-merge', '--post-merge'], ['post-rewrite', '--post-rewrite']]) {
+    try { out[gancio] = installa(root, traccia(modo, gancio === 'post-rewrite' ? '' : repo), gancio); } catch (_) { out[gancio] = 'guasto'; }
+  }
+  return out;
 }
 
 /** Lo stesso nel clone di filo-security di una sessione locale: le sue spinte si dichiarano come quelle di Filo (#1362). */
 export function installaSpinteServer(root) {
-  return installa(root, PRE_PUSH_SERVER);
+  const esito = installa(root, PRE_PUSH_SERVER);
+  installaTraccia(root, 'server');
+  return esito;
 }
