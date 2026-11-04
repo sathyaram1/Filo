@@ -5048,6 +5048,14 @@ const PREMI_PLAY_JS = `(async () => {
   try { await m.play(); return m.paused ? 'bloccato' : 'suona'; } catch (_) { return 'bloccato'; }
 })()`;
 
+const PREMI_PAUSA_JS = `(() => {
+  let n = 0;
+  for (const m of document.querySelectorAll('video, audio')) {
+    if (!m.paused && !m.ended) { try { m.pause(); n += 1; } catch (_) {} }
+  }
+  return n;
+})()`;
+
 // Senza il gesto dell'utente (#737.1): play() non ne ha bisogno, l'autoplay delle schede è libero.
 async function premiPlay(wc) {
   if (!wc || wc.isDestroyed()) return 'nessuno';
