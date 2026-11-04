@@ -11,10 +11,18 @@
   // Una password nota come tale (#2134) la sceglie l'utente, e 8-11 caratteri sono comuni: lì la soglia scende.
   const PASSWORD_MIN = 8;
 
+  // Chi custodisce una password la segna qui: vale col suo minimo anche dove arriva come semplice stringa.
+  const PASSWORD_NOTE = new Set();
+  function segnaPassword(v) {
+    const t = testo(v).trim();
+    if (t.length >= PASSWORD_MIN && PASSWORD_NOTE.size < 1000) PASSWORD_NOTE.add(t);
+  }
+
   // Un segreto è una stringa o { valore, password }.
   function segretoDi(x) {
     const oggetto = !!x && typeof x === 'object';
-    return { v: testo(oggetto ? x.valore : x).trim(), min: oggetto && x.password ? PASSWORD_MIN : SEGRETO_MIN };
+    const v = testo(oggetto ? x.valore : x).trim();
+    return { v, min: (oggetto && x.password) || PASSWORD_NOTE.has(v) ? PASSWORD_MIN : SEGRETO_MIN };
   }
 
   // Qui NON si indovina se un codice è una credenziale: si riconoscono solo le
