@@ -1140,8 +1140,9 @@
 
   // Utente e password di un proxy come li legge chi lo usa (proxyTab.endpointFor): lo schema davanti è facoltativo,
   // perché molti fornitori danno «utente:password@host:porta» (#905.1), e come per un URL valgono fino all'ultima @
-  // prima dell'host. `senza`: l'indirizzo senza credenziali. null se non ce ne sono. PURA.
-  const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)?([^/?#\s]+)@/i;
+  // prima dell'host; spazi compresi, che chi lo usa accetta nella password. `senza`: l'indirizzo senza credenziali. null
+  // se non ce ne sono. PURA.
+  const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)?([^/?#]+)@/i;
   function credenzialiProxy(v) {
     if (!pieno(v)) return null;
     const t = v.trim();
