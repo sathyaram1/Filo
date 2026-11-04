@@ -184,30 +184,24 @@ export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), se
   return daEnv;
 }
 
-// I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
-const TURNO_OWNER_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*.*?\s*---\s*$/;
-const TURNO_ALTRI_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*.*?\s*---\s*$/;
+// Oltre, i numeri delle note non fidate si contano soltanto: il motivo ha 300 caratteri sul server.
+const NOTE_NEL_MOTIVO = 12;
 
-/**
- * La conversazione contiene testo scritto da altri che dall'owner (routine, sessioni, Filo)? PURA. Il server sa se
- * l'ha scritto un biglietto sporco (`scrittoSporco`), da qui no: nel dubbio, chi la stampa si sporca.
- */
-export function noteConScrittiDiAltri(notes) {
-  let altri = true;
-  for (const riga of String(notes || '').split(/\r?\n/)) {
-    if (TURNO_OWNER_RE.test(riga)) { altri = false; continue; }
-    if (TURNO_ALTRI_RE.test(riga)) { altri = true; continue; }
-    if (riga.startsWith('@@filo-attachment ')) continue;
-    if (altri && riga.trim()) return true;
-  }
-  return false;
+/** I numeri (da 1) delle note non fidate della conversazione (#1919). `noteFidate` è il campo del server. */
+export async function noteNonFidate(notes, noteFidate) {
+  const turni = await globalThis.SN_FEEDBACK_THREAD.fiduciaDelleNote(notes, noteFidate);
+  return turni.filter((t) => !t.fidata).map((t) => t.numero);
 }
 
-/** Perché chi stampa questo feedback si sporca (§1.2): testo non fidato, o una conversazione scritta anche da altri. PURA. */
-export function motiviDiLettura({ fiducia, notes } = {}) {
+/** Perché chi stampa questo feedback si sporca (§1.2): il suo testo non fidato, e le note non fidate col loro numero. */
+export async function motiviDiLettura({ fiducia, notes, noteFidate } = {}) {
   const out = [];
   if (fiducia !== 'fidato') out.push('testo di un feedback non fidato');
-  if (noteConScrittiDiAltri(notes)) out.push('conversazione con scritti di routine o sessioni');
+  const nf = await noteNonFidate(notes, noteFidate);
+  if (nf.length) {
+    const altre = nf.length > NOTE_NEL_MOTIVO ? ` e altre ${nf.length - NOTE_NEL_MOTIVO}` : '';
+    out.push(`${nf.length === 1 ? 'nota non fidata' : 'note non fidate'} nella conversazione: ${nf.slice(0, NOTE_NEL_MOTIVO).join(', ')}${altre}`);
+  }
   return out;
 }
 
