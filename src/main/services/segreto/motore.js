@@ -86,6 +86,19 @@ function posizione(posto, N, j, c, r) {
   return crypto.createHmac('sha256', posto).update(m).digest().readUIntBE(0, 6) % N;
 }
 
+// Dopo le posizioni a caso la catena prosegue di seguito per tutto il contenitore, da un punto dato dalla chiave: arriva
+// anche all'ultimo posto libero, che a caso servirebbero in media N tentativi a trovare (#1271).
+function catena(posto, N, i) {
+  let da = -1;
+  return (r) => {
+    if (r < CATENA_MAX) return posizione(posto, N, i >> 1, i & 1, r);
+    if (da < 0) da = posizione(posto, N, i >> 1, i & 1, CATENA_MAX);
+    return (da + r - CATENA_MAX) % N;
+  };
+}
+
+const lunghezzaCatena = (N) => CATENA_MAX + N;
+
 function datoAssociato(p) {
   const b = Buffer.alloc(DOMINIO.length + 8);
   DOMINIO.copy(b);
