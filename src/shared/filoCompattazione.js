@@ -23,6 +23,10 @@
   const MAX_MEMORIE = 20;
   // Quanto tratto va al modello in una compattazione sola: il primo giro su giorni mai compattati si fa a pezzi.
   const MAX_INGRESSO = 80000;
+  // Un messaggio solo (una tesi incollata) non porta chi compatta oltre il listino: oltre questo ne vede testa e coda,
+  // il testo intero resta nella conversazione. Il margine copre righe, intestazioni e istruzioni.
+  const MAX_MESSAGGIO = 20000;
+  const MARGINE = 5000;
 
   const FC = () => global.SN_FILO_CONTESTO;
   const stringa = (s) => typeof s === 'string' && s.trim().length > 0;

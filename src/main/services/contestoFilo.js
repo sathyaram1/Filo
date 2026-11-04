@@ -118,6 +118,8 @@ function ricordaGiro(chat, ts, { messaggi, testo, reasoningDetails, azioni, segu
 // è comunque fredda (fermo da più della sua durata), o quando un cambio non si può dire con un'aggiunta.
 const fotografie = { normale: null, incognito: null };
 const DURATE_MS = { '5m': 5 * 60 * 1000, '1h': 60 * 60 * 1000 };
+// Quanto vive la cache: la fotografia fresca e la compattazione da fermo la leggono qui.
+const durataMs = (durata) => DURATE_MS[durata] || DURATE_MS['1h'];
 const epocaDi = (lato) => (fotografie[lato] ? fotografie[lato].epoca : 0);
 // Il tratto riparte quando il suo inizio si sposta, anche per una conversazione ripresa che entra davanti: il primo
 // messaggio di un tratto vuoto non sposta niente.
@@ -130,7 +132,7 @@ const stessaAncora = (prima, ora) => !prima || (!!ora && prima.ts === ora.ts && 
 function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', ora = Date.now(), segna = true } = {}) {
   const lato = incognito ? 'incognito' : 'normale';
   const f = fotografie[lato];
-  const fresca = f && ora - f.usata <= (DURATE_MS[durata] || DURATE_MS['1h']) && stessaAncora(f.ancora, ancora);
+  const fresca = f && ora - f.usata <= durataMs(durata) && stessaAncora(f.ancora, ancora);
   if (fresca) {
     const d = TV().confronta(f.viste, sezioni);
     if (!d.rifai) {
@@ -550,6 +552,6 @@ function riparti(incognito = false) {
 
 module.exports = {
   ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
-  senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, ultimaFotografia, riparti, eventiDa, diIncognito,
+  senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, ultimaFotografia, riparti, eventiDa, diIncognito, durataMs,
 };
 globalThis.SN_CONTESTO_FILO = module.exports;

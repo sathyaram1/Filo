@@ -1115,7 +1115,7 @@ async function maybeRunCompactor({ rilancia = false } = {}) {
 // la cache è comunque fredda, e riscriverlo costa uguale (SPEC-CONTESTO § La compattazione).
 function compattaDaFermo(incognito, tetti) {
   if (!tetti) return;
-  const cacheMs = (tetti.cache === '5m' ? 5 : 60) * 60 * 1000;
+  const cacheMs = ContestoFilo.durataMs(tetti.cache);
   Compattazione.programmaFermo(async () => {
     const tokenTratto = await Compattazione.tokenDelTratto(incognito, { tetti });
     const motivo = globalThis.SN_FILO_COMPATTAZIONE.motivo({ soglia: tetti.soglia, tokenTratto, ultimoUso: Date.now() - cacheMs - 1, cacheMs });
@@ -2303,12 +2303,7 @@ function segnalazioneConfermataPulita(sender, action) {
 // Ciò che una chat ha letto resta suo anche fuori dallo storico che la pagina rimanda a ogni turno (riaperta
 // dall'archivio, oltre gli ultimi venti messaggi): lo tiene il main, per la sessione e nell'archivio (#530).
 const fontiPerChat = new Map();   // chatId → fonti lette dalla chat
-// Una fonte il cui testo è uscito dal tratto con la compattazione non conta più (SPEC-CONTESTO § Il sospetto non passa nel
-// riassunto, punto 2): `ts` è l'ora della lettura, e la scadenza è il punto compattato del lato della chat.
-const fonteScaduta = (f, chatId) => {
-  const c = Compattazione.compattato(ContestoFilo.diIncognito(chatId));
-  return !!c && !!f && !(Date.parse(f.ts) >= Date.parse(c.a));
-};
+const fonteScaduta = (f, chatId) => Compattazione.fonteScaduta(f, ContestoFilo.diIncognito(chatId));
 async function fontiDellaChat(chatId) {
   if (!chatId) return [];
   if (!fontiPerChat.has(chatId)) {
@@ -6556,10 +6551,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const compattaSeServe = async (round) => {
     if (!filo || !tettiChat) return;
     let token = await stimaRichiesta();
-    const durataMs = (tettiChat.cache === '5m' ? 5 : 60) * 60 * 1000;
+    const ultimoUso = round === 1 && fotoPrima ? fotoPrima.usata : null;
+    // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
+    let tokenTratto = 0;
+    if (ultimoUso != null) { try { tokenTratto = await Compattazione.tokenDelTratto(incognitoTurno, { tetti: tettiChat }); } catch (_) {} }
     const motivo = LC.motivo({
-      token, soglia: tettiChat.soglia, tokenTratto: filo.token,
-      ultimoUso: round === 1 && fotoPrima ? fotoPrima.usata : null, cacheMs: durataMs,
+      token, soglia: tettiChat.soglia, tokenTratto, ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
     });
     if (motivo && compattazioniNelTurno < 2) {
       compattazioniNelTurno++;

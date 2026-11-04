@@ -76,8 +76,9 @@
       if (!c) return null;
       const prima = Array.isArray(c.fonti) ? c.fonti : [];
       // Una fonte scaduta alla compattazione e letta di nuovo si riscrive con l'ora nuova (filoEventi, CHAT_FONTI).
-      const comp = globalThis.SN_COMPATTAZIONE && globalThis.SN_COMPATTAZIONE.compattato();
-      const viva = (p) => !comp || Date.parse(p.ts) >= Date.parse(comp.a);
+      const C = globalThis.SN_COMPATTAZIONE;
+      const lato = !!(globalThis.SN_CONTESTO_FILO && globalThis.SN_CONTESTO_FILO.diIncognito(id));
+      const viva = (p) => !C || !C.fonteScaduta(p, lato);
       const nuove = (Array.isArray(fonti) ? fonti : []).filter((f) => f && Number.isInteger(f.classe)
         && !prima.some((p) => p && p.chiave === f.chiave && p.classe === f.classe && viva(p)));
       if (nuove.length) await t.scrivi([t.evento(T().CHAT_FONTI, { chat: id, fonti: nuove }, { autore: 'filo' })]);
