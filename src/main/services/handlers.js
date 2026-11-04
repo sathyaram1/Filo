@@ -6088,16 +6088,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // pagare un titolo a ogni ricaricamento per una conversazione in corso.
     if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
-    const archiviata = await appendToChatArchive(chatId, {
-      role: 'user',
-      text: String(userMessage || ''),
-      images: imageList.length,
-      ...(daModello ? { daModello: true } : {}),
-      ...(citazione.ref ? { rispostaA: citazione.ref } : {}),
+    const { archiviata, domanda } = await archiviaDomanda(chatId, {
+      testo: userMessage, immagini: imageList, daModello, ref: citazione.ref,
     }, { onboarding: onbActive });
-    // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
-    const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
-    if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
     const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
     if (eidDomanda) fontiTurno.push(eidDomanda);
   }
