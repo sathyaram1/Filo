@@ -55,6 +55,15 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
   await incolla(`Parola d'ordine: ${PAROLA}\nDiscutiamo la domanda D-1`);
   await expect(page.locator('#mgParolaMsg')).toHaveText('Hai incollato più righe: incolla solo la parola d’ordine.');
   await expect(campo).toHaveValue('');
+  // Anche per una strada che non è l'incolla (trascinato, inserito): gli a capo non diventano spazi.
+  await campo.focus();
+  await page.keyboard.insertText(`Parola d'ordine: ${PAROLA}\nDiscutiamo la domanda D-1`);
+  await expect(page.locator('#mgParolaMsg')).toHaveText('Hai incollato più righe: incolla solo la parola d’ordine.');
+  await expect(campo).toHaveValue('');
+  // Uno spazio scritto a mano resta: la parola può averne.
+  await page.keyboard.type('a b');
+  await expect(campo).toHaveValue('a b');
+  await campo.fill('');
 
   // La riga copiata con gli spazi e l'a capo entra pulita, e Invio la salva.
   await incolla(`  ${PAROLA}  \n`);
