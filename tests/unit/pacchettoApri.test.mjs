@@ -376,3 +376,45 @@ test('#1903.1: un\'attesa presa da una unita che chiude un giro con un\'altra un
   assert.equal(r.submit.length, 0);
   assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700 \(l'attesa di #815\): si aspetterebbero a vicenda/);
 });
+
+test('#1903.1 giro 1: una spec che mette prima un feedback che una unita aspetta già apre il pacchetto; a vuoto lo si dice', async () => {
+  const testo = '#812: la voce manca, solo dopo #700. Si prova aprendo il menu.\n#815: il hover, si prova passandoci sopra.';
+  const lette = { 812: seg('812', { attese: [{ id: 'id700', num: '700' }] }), 815: seg('815') };
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', testo, '--non-locale', '--pacchetto', '812,815']));
+  assert.equal(r.code, 0, r.err.join('\n'));
+  assert.deepEqual(r.submit[0].opts.waitsFor, [{ id: 'id700', num: '700' }], 'lo aspetta perché lo prende da #812');
+  const altro = await conRete({ lette }, () => SCRIPT.main(['t', `${testo}\n#1202 si fonde prima.`, '--non-locale', '--pacchetto', '812,815']));
+  assert.equal(altro.code, 1);
+  assert.equal(altro.submit.length, 0);
+  assert.match(altro.err.join('\n'), /il testo mette #1202 prima del pacchetto/);
+  assert.doesNotMatch(altro.err.join('\n'), /mette #700/);
+  const aVuoto = await conRete({ lette }, () => SCRIPT.main(['t', testo, '--non-locale', '--pacchetto', '812,815', '--dry-run']));
+  assert.equal(aVuoto.code, 1);
+  assert.match(aVuoto.err.join('\n'), /A vuoto non leggo le attese delle unite/);
+});
+
+test('#1903.1 giro 1: un giro a catena chiuso da un\'attesa del pacchetto si dice prima di aprire, con la catena', async () => {
+  // #815 aspetta #700, #700 aspetta #701, #701 aspetta #812: #701 dovrebbe aspettare il pacchetto, che aspetta #700.
+  const righe = [
+    { _id: 'id700', seq: 700, waitsFor: [{ id: 'id701', num: '701' }] },
+    { _id: 'id701', seq: 701, waitsFor: [{ id: 'id812', num: '812' }] },
+    { _id: 'id812', seq: 812, waitsFor: [] },
+    { _id: 'id815', seq: 815, waitsFor: [{ id: 'id700', num: '700' }] },
+  ];
+  const lette = { 812: seg('812'), 815: seg('815', { attese: [{ id: 'id700', num: '700' }] }) };
+  const unite = [lette[812], lette[815]];
+  const aspettanti = SCRIPT.chiAspetta(righe, unite);
+  assert.deepEqual(aspettanti.map((x) => x.num), ['701']);
+  const r = await conRete({ lette, attesi: aspettanti }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
+  assert.equal(r.code, 3, r.err.join('\n'));
+  assert.equal(r.submit.length, 0, 'nato, non potrebbe archiviare #812');
+  assert.match(r.err.join('\n'), /#701 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700 \(l'attesa di #815\), che aspetta #701: si aspetterebbero a vicenda/);
+  // Con --aspetta il giro a catena è lo stesso.
+  const conAspetta = await conRete({ lette: { 812: seg('812'), 815: seg('815') }, attesi: aspettanti },
+    () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815', '--aspetta', '700']));
+  assert.equal(conAspetta.code, 3);
+  assert.match(conAspetta.err.join('\n'), /il pacchetto aspetta #700 \(--aspetta\), che aspetta #701/);
+  // Una catena che non torna a chi aspetta le unite non è un giro.
+  const libero = SCRIPT.chiAspetta(righe.map((x) => (x._id === 'id701' ? { ...x, waitsFor: [{ id: 'id812', num: '812' }] } : x._id === 'id700' ? { ...x, waitsFor: [] } : x)), unite);
+  assert.deepEqual(SCRIPT.giriDelPacchetto([{ id: 'id700', num: '700' }], libero, ['id812', 'id815']), []);
+});

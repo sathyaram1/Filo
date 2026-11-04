@@ -693,7 +693,7 @@ export async function main(argvIn) {
   // messi prima si guardano qui solo a vuoto: aprendo, dopo aver letto le attese che il pacchetto prende dalle unite.
   const testoSpec = [testo, ...testoDegliAllegati(allegati)].join('\n');
   if (numeriUnite.numeri.length && String(testo || '').trim()) {
-    const difetti = difettiDellaSpec(testoSpec, { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, prerequisiti: !deposita, aVuoto: true });
+    const difetti = difettiDellaSpec(testoSpec, { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, prerequisiti: !deposita, aVuoto: dryRun });
     if (difetti.length) {
       console.error(`RIFIUTATO: --pacchetto, il testo va corretto e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.USO;
@@ -743,12 +743,12 @@ export async function main(argvIn) {
     const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti, pacchettiPerId });
     delPacchetto = atteseDelPacchetto(listaAttese, leggibili);
     if (delPacchetto.motivo) motivi.push(delPacchetto.motivo);
-    motivi.push(...prerequisitiMancanti(testoSpec, {
+    const delTesto = prerequisitiMancanti(testoSpec, {
       unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, ereditate: delPacchetto.ereditate.map((e) => e.num).filter(Boolean),
-    }));
-    if (motivi.length) {
-      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${motivi.map((m) => `  - ${m}`).join('\n')}`);
-      return EXIT.RIFIUTATO;
+    });
+    if (motivi.length || delTesto.length) {
+      console.error(`RIFIUTATO: --pacchetto, ${motivi.length ? '' : 'il testo va corretto e '}non ho aperto niente:\n${[...motivi, ...delTesto].map((m) => `  - ${m}`).join('\n')}`);
+      return motivi.length ? EXIT.RIFIUTATO : EXIT.USO;
     }
     unite = lette;
   }

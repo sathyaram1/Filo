@@ -353,7 +353,8 @@ insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una 
 manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
 un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
 «prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
-dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
+dà P da lavorare con quello fuori da main. Un'attesa che P prende da un'unita vale quanto `--aspetta`: aprendo,
+quel controllo si fa dopo aver letto le unite; a vuoto no, e il rifiuto lo dice. Il rimedio sta nel messaggio: la spec nel testo
 o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
 segnalazione qualunque racconta un problema, e può citare note e attese di altri.
 I pacchetti nati prima, con la spec nei turni delle note che cominciano con «SPEC DEL
@@ -385,7 +386,8 @@ restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel 
 aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
 una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
 per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
-P, anche per un'attesa presa da un'altra unita, si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
+P, anche per un'attesa presa da un'altra unita o a catena (P aspetta A, A aspetta lui), si rifiuta prima di
+aprire con la catena (si aspetterebbero a vicenda); P nato senza numero non
 archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
 nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
 dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
