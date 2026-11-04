@@ -244,8 +244,13 @@ function leggiTabella(bytes, L) {
     if (!v || typeof v.n !== 'string' || (!v.n && !v.x) || !Number.isSafeInteger(v.d) || v.d < 0 || !Array.isArray(v.e)) return null;
     const blocchi = v.e.reduce((n, x) => n + (Array.isArray(x) ? x[1] : 0), 0);
     const dentro = v.e.every((x) => Array.isArray(x) && Number.isInteger(x[0]) && Number.isInteger(x[1]) && x[0] >= 1 && x[1] >= 1 && x[0] + x[1] <= L);
-    if (!dentro || blocchi !== Math.ceil(v.d / CARICO)) return null;
-    t.set(v.n, { d: v.d, c: Number(v.c) || 0, m: Number(v.m) || 0, e: v.e.map((x) => [x[0], x[1]]), x: v.x ? 1 : 0 });
+    const pacco = v.o !== undefined;
+    if (!dentro) return null;
+    if (pacco && !(Number.isInteger(v.o) && v.o >= 0 && v.d >= 1 && v.o + v.d <= CARICO && blocchi === 1 && v.e.length === 1)) return null;
+    if (!pacco && blocchi !== Math.ceil(v.d / CARICO)) return null;
+    const voce = { d: v.d, c: Number(v.c) || 0, m: Number(v.m) || 0, e: v.e.map((x) => [x[0], x[1]]), x: v.x ? 1 : 0 };
+    if (pacco) voce.o = v.o;
+    t.set(v.n, voce);
   }
   return t;
 }
