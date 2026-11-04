@@ -242,7 +242,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
 // Chi tiene copie di quello che il tratto ha letto (le fonti delle chat) le pota quando il tratto si chiude.
 function suCompattazione(fn) { if (typeof fn === 'function') ascoltatori.add(fn); return () => ascoltatori.delete(fn); }
 
-// Il livello «giorni»: una riga per ogni giorno passato che ha ore e non ancora la sua riga.
+// Il livello «giorni»: una riga per ogni giorno passato, rifatta con tutte le sue ore se ne arrivano di nuove dopo.
 async function riassumiGiorni({ incognito = false, ora = Date.now() } = {}) {
   const s = await stato(incognito);
   if (typeof _dip.chiama !== 'function') return 0;
