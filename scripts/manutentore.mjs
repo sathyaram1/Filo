@@ -246,8 +246,9 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (da !== undefined && g !== undefined) return ko('o --da o --giorni, non tutti e due');
   if (a !== undefined && da === undefined && g === undefined) return ko('--a vuole l\'inizio: --da o --giorni');
   if (g !== undefined && !(/^\d{1,4}$/.test(String(g)) && Number(g) >= 1)) return ko('--giorni è un intero da 1 in su');
-  if (limite !== undefined && !(/^\d{1,3}$/.test(String(limite)) && Number(limite) >= 1 && Number(limite) <= 200)) return ko('--limite è un intero da 1 a 200: le pagine dopo arrivano col cursore, o tutte con --tutte');
-  if (cursore !== undefined && !/^[A-Za-z0-9_-]{1,128}$/.test(String(cursore))) return ko('--cursore è quello stampato dalla pagina prima');
+  // Il tetto della pagina e la forma del cursore li controlla solo il server, che li dice col numero quando rifiuta.
+  if (limite !== undefined && !(/^\d{1,6}$/.test(String(limite)) && Number(limite) >= 1)) return ko('--limite è un intero da 1 in su');
+  if (cursore !== undefined && !String(cursore).trim()) return ko('--cursore è quello stampato dalla pagina prima');
   const somma = argv.includes('--somma');
   const tutte = argv.includes('--tutte');
   if (somma && tutte) return ko('--somma dà solo il conto, senza pagine: --tutte non serve');
