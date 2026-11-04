@@ -78,7 +78,7 @@ import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
-import { difettiDellaSpec, testoDegliAllegati } from './lib/spec-del-pacchetto.mjs';
+import { difettiDellaSpec, prerequisitiMancanti, testoDegliAllegati } from './lib/spec-del-pacchetto.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
