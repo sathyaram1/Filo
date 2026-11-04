@@ -1367,13 +1367,18 @@ class Segreto {
     return { creato: S.creato, aperturaPrecedente: S.apertoPrima || null };
   }
 
-  spazio() {
+  // `usati`: i byte che il segreto occupa nel contenitore, copie comprese, non quelli dei file: è quello che toglie agli
+  // altri. `disponibili`: il file nuovo più grande che si riesce davvero a salvare adesso.
+  async spazio() {
     const s = this.#vivo();
-    let nome = 'nome-di-prova-di-un-file-nuovo.bin';
-    while (s.S.tabella.has(nome)) nome = `_${nome}`;
-    let usati = 0;
-    for (const [n, f] of s.S.tabella) if (n !== RISERVA) usati += f.d;
-    return { usati, disponibili: massimoScrivibile(s.S, s.N - s.mappa.vive, nome) };
+    return inCoda(s.chiave, async () => {
+      const { S, mappa, N } = this.#vivo();
+      let nome = 'nome-di-prova-di-un-file-nuovo.bin';
+      while (S.tabella.has(nome)) nome = `_${nome}`;
+      let occupati = 0;
+      for (let p = 0; p < N; p++) if (mappa.occ[p] === S.etichetta) occupati++;
+      return { usati: occupati * BLOCCO, disponibili: await massimoScrivibile(S, N - mappa.vive, nome) };
+    });
   }
 
   async leggiFile(nome) {
