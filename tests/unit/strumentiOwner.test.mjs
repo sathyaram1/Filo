@@ -191,3 +191,28 @@ test('«annulla» una risposta di sessione chiede al server di disfarla; un serv
   rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'op?', details: { reason: 'operazione_sconosciuta' } } } });
   assert.match((await chiama({ type: MSG.DOMANDA_ANNULLA, id: 'D-70' })).error, /non sa ancora annullare una risposta.*riaprirla/);
 });
+
+// Verifica #1926 giro 1, r4: il compito nato dalla risposta arriva alla pagina, che dice che non si disfa.
+test('«annulla» porta alla pagina il compito nato dalla risposta, e solo un numero di compito', async () => {
+  rispondi = () => ({ status: 200, body: { result: { ok: true, domanda: { id: 'D-71' }, ripristino: [], compito: 'C-12' } } });
+  assert.equal((await chiama({ type: MSG.DOMANDA_ANNULLA, id: 'D-71' })).compito, 'C-12');
+  rispondi = () => ({ status: 200, body: { result: { ok: true, domanda: { id: 'D-71' }, ripristino: [], compito: '<b>x</b>' } } });
+  assert.equal('compito' in (await chiama({ type: MSG.DOMANDA_ANNULLA, id: 'D-71' })), false);
+});
+
+// Verifica #1926 giro 1, r5: gli slot della domanda di fine sessione sono quelli del server (closing.js), non di più.
+test('slot della domanda di fine sessione: gli stessi che accetta il server', () => {
+  const { slotValido } = globalThis.SN_ROUTINE_CHIUSURA;
+  for (const s of ['tutti', 'worker', 'risposta', 'smistamento', 'manutentore', 'compito:riordino', 'compito:a1']) assert.equal(slotValido(s), true, s);
+  for (const s of ['compito:Riordino', 'compito:rio_rdino', 'compito:a', 'compito:1riordino', `compito:a${'b'.repeat(60)}`, 'Worker']) {
+    assert.equal(slotValido(s), false, s);
+  }
+});
+
+// Verifica #1926 giro 1, r6: i valori delle impostazioni di una chiave vivono in un posto solo.
+test('lo script delle chiavi prende i valori delle impostazioni dal pezzo condiviso, senza una sua copia', async () => {
+  const { readFileSync } = await import('node:fs');
+  const src = readFileSync(join(ROOT, 'scripts', 'routine-keys.mjs'), 'utf8');
+  assert.match(src, /validaImpostazione/);
+  for (const v of ['limitata', 'riservati', 'normali']) assert.doesNotMatch(src, new RegExp(`potere !== '${v}'`), v);
+});

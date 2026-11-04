@@ -46,7 +46,7 @@ test('routine-keys: rete e lavori si scrivono sul server, si vedono nell’elenc
       const x = await corri(args);
       assert.equal(x.code, 1, args.join(' '));
       assert.deepEqual(chiamate(x), [], `${args.join(' ')}: nessuna chiamata`);
-      assert.match(x.err, /Uso: node scripts\/routine-keys\.mjs (lavori <nome> <server\|normali>|rete <nome> <limitata\|aperta>)/);
+      assert.match(x.err, /Uso: node scripts\/routine-keys\.mjs (lavori <nome> <normali\|server>|rete <nome> <limitata\|aperta>)/);
     }
 
     const e = await corri(['elenco']);
