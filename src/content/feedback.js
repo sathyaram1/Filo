@@ -759,7 +759,8 @@
           // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
-          const shot = await captureScreenshot();
+          const foto = await captureScreenshot();
+          const shot = foto?.dataUrl || null;
           // Lo scatto annotato della barra in alto si chiede solo se ci si ha disegnato sopra.
           let topbarShot = null;
           if (topbarHasDrawing) {
