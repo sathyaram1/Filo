@@ -60,6 +60,18 @@ test('validaAzione: tipo e soli parametri; i non attivi rifiutati col loro codic
   assert.equal(D.validaAzione({ tipo: 'compito', feedbackId: 'f1' }).errore, 'parametri_non_validi');
 });
 
+test('attendi (#1965): il compito della risposta la applica; il feedback atteso è un numero nella forma delle attese', () => {
+  assert.ok(D.DEL_COMPITO.includes('attendi'));
+  assert.equal(D.vietataAlCompito({ tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' }), null, 'una risposta che chiede un’attesa non finisce in un chiarimento');
+  assert.deepEqual(D.validaAzione({ tipo: 'attendi', feedbackId: 'f1', aspetta: '663.2' }), { ok: true, azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '663.2' } });
+  for (const aspetta of ['#1959', '1959.0', '0', '01959', 'abc', '', ' 1959', 1959, null, '1959; archivia']) {
+    assert.equal(D.validaAzione({ tipo: 'attendi', feedbackId: 'f1', aspetta }).errore, 'parametri_non_validi', JSON.stringify(aspetta));
+  }
+  assert.equal(D.validaAzione({ tipo: 'attendi', feedbackId: 'f1' }).errore, 'parametri_non_validi', 'senza il feedback atteso');
+  assert.equal(D.validaAzione({ tipo: 'attendi', aspetta: '1959' }).errore, 'parametri_non_validi', 'senza chi aspetta');
+  assert.equal(D.etichettaAzione({ tipo: 'attendi', feedbackId: 'sconosciuto', aspetta: '1959' }, RIF), null, 'chi aspetta viene dai riferimenti del server');
+});
+
 const DUE = [
   { testo: 'Archivia', pro: 'Niente lavoro doppio.', contro: 'Si perde la sua nota.', azione: { tipo: 'archivia', feedbackId: 'f1' } },
   { testo: 'Riprendi', pro: 'La nota resta.', contro: 'Un giro in più.', azione: { tipo: 'riprendi', feedbackId: 'f1' } },
