@@ -40,7 +40,7 @@
     account: Object.freeze({ valori: Object.freeze(['A', 'B']), predefinito: '', etichetta: 'Account' }),
     rete: Object.freeze({ valori: Object.freeze(['limitata', 'aperta']), predefinito: 'aperta', etichetta: 'Rete' }),
     lavori: Object.freeze({ valori: Object.freeze(['normali', 'server']), predefinito: 'normali', etichetta: 'Lavori' }),
-    ambiente: Object.freeze({ valori: Object.freeze(['normale', 'riservati']), predefinito: 'normale', etichetta: 'Ambiente' }),
+    ambiente: Object.freeze({ valori: Object.freeze(['normale', 'riservati', 'rete_aperta']), predefinito: 'normale', etichetta: 'Ambiente' }),
   });
 
   // La regola del server sul nome (isValidSlug): qui si rifiuta prima, dicendo cosa cambiare.
