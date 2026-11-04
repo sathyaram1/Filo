@@ -12,7 +12,6 @@ const RADICE = fileURLToPath(new URL('../../', import.meta.url));
 
 const AMMESSI = {
   'src/main/services/fotoDellaPagina.js': 'il punto unico: la foto coperta per un modello, e quella intera per chi la tiene',
-  'src/main/services/handlers/misc.js': 'la barra in alto di Filo per il box del feedback: è la shell, non una pagina',
   'src/main/services/miniature.js': 'la miniatura di una pagina salvata, che vede solo l’utente',
   'src/main/tabs/anteprime.js': 'le anteprime delle schede, che vede solo l’utente',
   'src/main/shim/chrome-api.js': 'chrome.tabs.captureVisibleTab dei moduli portati: nessuno la manda a un modello',
