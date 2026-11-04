@@ -8,6 +8,7 @@ import { randomBytes } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { nomeSede, rifiutaNonFidati, rigaRifiuto } from './sede.mjs';
+import '../../src/shared/feedbackThread.js';
 
 export const CARTELLA = join('.claude', 'biglietti');
 export const ENV_FILE = 'FILO_BIGLIETTO_FILE';
