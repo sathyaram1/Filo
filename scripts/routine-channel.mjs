@@ -73,10 +73,9 @@
 //         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
 //         i suoi processi.
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
-//         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
-//         è così che il server smette di dare lavoro per il giro — le
-//         richieste di biglietto successive escono con 3 — e il pacemaker
-//         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
+//         `--guasto` DICHIARI un guasto al server (SPEC-MANUTENTORE.md §7):
+//         ferma solo il lavoro di questo biglietto, finché il manutentore non
+//         lo sblocca; gli altri lavori vanno avanti. Non "riportarlo" a parole:
 //         il tuo testo di ritorno non lo legge nessuna macchina.
 //         Prima di parlare col server committa quello che è rimasto fuori
 //         dai commit (un file nato da una shell non passa dall'hook) e
@@ -212,8 +211,7 @@ export async function call(path, payload, { attempts = 3, baseDelayMs = 1500, fe
       const text = await res.text();
       let body = {};
       try { body = text ? JSON.parse(text) : {}; } catch (_) { body = { ok: false, reason: 'malformed_response' }; }
-      // Un guasto DICHIARATO da un worker viaggia come 5xx (il giro si deve
-      // fermare), ma è una RISPOSTA deterministica, non un'interruzione che
+      // `fault_declared` viaggia come 5xx, ma è una RISPOSTA deterministica, non un'interruzione che
       // può passare da sola: ritentarla darebbe tre volte lo stesso no.
       if (res.status >= 500 && i < attempts && (body && body.reason) !== 'fault_declared') {
         last = { status: res.status, body }; await sleep(baseDelayMs * i); continue;
@@ -522,10 +520,9 @@ export async function heartbeat(t, opts = {}) {
 
 /**
  * Fine lavoro. `fault`, se presente, è il GUASTO DICHIARATO: il motivo per cui
- * questo giro non può lavorare, registrato AL CANALE invece che raccontato a
+ * questo lavoro non può andare avanti, registrato AL CANALE invece che raccontato a
  * parole (il testo di ritorno di un worker non lo legge nessuna macchina). Il
- * server lo tronca e non lo interpreta; da lì in poi l'emissione dei biglietti
- * risponde `fault_declared` per il periodo di rispetto.
+ * server lo tronca e non lo interpreta, e ferma quel solo lavoro (SPEC-MANUTENTORE.md §7).
  *
  * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
  * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
@@ -863,7 +860,7 @@ export function testoRiallineamentoNonSpedito(sped) {
     `Riallineamento NON consegnato: ${sped.reason}.`,
     'Il server non ha registrato niente: chi verifica dopo di te legge il ramo da origin, e senza il rebase lì troverebbe il commit già verificato.',
     sped.tipo === 'spedizione'
-      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro torna in coda sul suo ramo.'
+      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro resta sul suo ramo e riparte quando il manutentore lo sblocca.'
       : sped.tipo === 'base'
         ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.'
         : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
@@ -1325,7 +1322,7 @@ export const INTENTI_CONSEGNA = ['verdict', 'fixed', 'secaudit', 'status', 'note
 export function fermataSenzaDomanda(intento, data = {}) {
   if (intento !== 'status' || data.status !== 'design') return '';
   if (data.reason === 'guasto') {
-    return 'Un guasto non è una fermata e non è una domanda (#1790): il lavoro torna in coda da sé. Dichiaralo nel rilascio, '
+    return 'Un guasto non è una fermata e non è una domanda (#1790): il guasto arriva al manutentore, che sblocca il lavoro quando la causa è passata. Dichiaralo nel rilascio, '
       + 'col gruppo e il messaggio esatto: release <biglietto> --role <il tuo ruolo> --guasto "<gruppo>: <il messaggio esatto>". Non ho consegnato niente.';
   }
   if (data.reason === 'locale' || (data.domanda && typeof data.domanda === 'object')) return '';

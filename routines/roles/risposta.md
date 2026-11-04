@@ -105,5 +105,4 @@ terzo tentativo la domanda torna all'owner.
 
 ## Se si rompe qualcosa
 
-Vale la sezione sul guasto qui sotto: lo dichiari nel rilascio, e la risposta
-torna in coda da sé, come un rilascio senza chiusura.
+Vale la sezione sul guasto qui sotto.

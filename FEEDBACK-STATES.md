@@ -681,9 +681,10 @@ coda; fa eccezione il lavoro server fermato dal cancello del server, che una
 richiesta non ce l'ha e si rimanda in lavorazione o si archivia); (5) lavorazione
 arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
 corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`). Dal #1790
-un guasto non ferma più e non apre una domanda: si dichiara nel rilascio
+un guasto non porta più in `design` e non apre una domanda: si dichiara nel rilascio
 (`--guasto "<gruppo>: <messaggio>"`), il feedback torna `todo` sul suo ramo con
-la nota del guasto, e una consegna `design` + `guasto` si rifiuta; al terzo guasto
+la nota del guasto, fermo per il manutentore finché non lo sblocca (§ Guasti più
+sopra; a manutentore spento il fermo non c'è), e una consegna `design` + `guasto` si rifiuta; al terzo guasto
 uguale di seguito il server apre una domanda col conteggio, che smista il compito
 «Gestisci la domanda» (SPEC-DOMANDE §3.5, §3.8). Non è lavoro per regola: quello è
 `locale`, e la sua nota dice quale regola lo tiene fuori dalla cloud. La risposta dell'owner appende
