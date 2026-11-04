@@ -281,6 +281,8 @@
       if (o && o.testo) sotto.push(`scelta: ${o.testo}`);
       const da = principioUsato(d);
       if (da) sotto.push(`principio di ${da}`);
+      const attuata = attuataDa(d);
+      if (attuata) sotto.push(`attuata da ${attuata.num || 'un lavoro fuso'}`);
     } else if (tab === 'domande-smistamento') {
       const fermo = lavoroFermo(d);
       if (fermo) sotto.push(`ferma ${fermo}`);
@@ -570,7 +572,7 @@
   // La domanda chiusa di cui una risposta automatica ha usato il principio (§3.6): dall'esito, o dal testo che la cita.
   function principioUsato(d) {
     const e = d.esito && typeof d.esito === 'object' ? d.esito : null;
-    if (!e || !e.automatica) return '';
+    if (!e || !e.automatica || attuataDa(d)) return '';
     if (typeof e.principio === 'string' && D.numeroDi(e.principio) !== null) return e.principio.trim();
     const turni = Array.isArray(d.conversazione) ? d.conversazione : [];
     for (let i = turni.length - 1; i >= 0; i--) {
@@ -673,9 +675,21 @@
     return el('p', `mg-dq-esito${tipo ? ` mg-dq-esito--${tipo}` : ''}`, testo);
   }
 
+  // Chiusa dalla revisione perché un lavoro fuso l'ha attuata (#2006): { id, num }, o null.
+  function attuataDa(d) {
+    const a = d.esito && d.esito.automatica && d.esito.attuataDa;
+    return a && typeof a === 'object' ? a : null;
+  }
+
   // Una risposta automatica dice quale principio ha usato e lo fa leggere; la riapertura lo segna da rivedere (§3.6).
   function automatica(d) {
     if (!(d.esito && d.esito.automatica)) return null;
+    const attuata = attuataDa(d);
+    if (attuata) {
+      const p = el('p', 'mg-dq-esito');
+      p.append('Chiusa dalla revisione: l’ha attuata ', rif(attuata.id) ? legame('feedback', attuata.id) : String(attuata.num || 'un lavoro fuso'), '.');
+      return p;
+    }
     const da = principioUsato(d);
     const frase = el('p', 'mg-dq-esito');
     if (da) frase.append('Risposta automatica col principio di ', legame('domanda', da), '.');
@@ -843,6 +857,8 @@
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
+    const attuata = attuataDa(d);
+    if (attuata) return `Rimettila fra quelle da rispondere: la revisione l’aveva chiusa come attuata da ${attuata.num || 'un lavoro fuso'}`;
     const da = principioUsato(d);
     return `Rimettila fra quelle da rispondere: ${da ? `il principio di ${da}` : 'il principio usato'} resta da rivedere finché non rispondi`;
   }
