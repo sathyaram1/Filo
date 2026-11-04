@@ -944,10 +944,11 @@
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
     // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi, impostazioni] = await Promise.all([
+    const [proxy, permessi, impostazioni, chiuse] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
       senzaErrore(() => api.message({ type: 'get_settings' })),
+      senzaErrore(() => api.tabs.ciSonoChiuse()),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
