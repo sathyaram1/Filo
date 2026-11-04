@@ -223,7 +223,7 @@ test('fermo su un guasto suo il manutentore si accende solo al mattino, e il con
 // La soglia del controllo sul manutentore vive solo in SPEC-MANUTENTORE § 7: una copia altrove resta indietro, e lo
 // smistamento che riconoscesse la domanda dal numero la tratterebbe da guasto al primo cambio.
 test('la soglia del controllo sul manutentore è scritta in un posto solo', () => {
-  const soglia = /\b\d+\s*ore\b[^.]{0,60}(chius|taccuino)|(chius|taccuino)[^.]{0,60}\b\d+\s*ore\b|controllo delle \d+ ore/;
+  const soglia = /\b\d+\s*ore\b[^.]{0,60}(chiu[sd]|taccuino)|(chiu[sd]|taccuino)[^.]{0,60}\b\d+\s*ore\b|controllo delle \d+ ore/;
   for (const f of ['SPEC-DOMANDE.md', 'FEEDBACK-STATES.md', join('routines', 'roles', 'smistamento.md'), join('routines', 'roles', 'manutentore.md')]) {
     assert.doesNotMatch(readFileSync(join(ROOT, f), 'utf8').replace(/\s+/g, ' '), soglia, f);
   }
