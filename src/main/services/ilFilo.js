@@ -388,10 +388,11 @@ function creaFilo({ cartella, avvisa = avvisoDiFinestra } = {}) {
     return E().elencoChat(v.stato).filter(quali(opts)).map(E().copiaChat);
   }
 
+  // `ids`: anche l'evento di ogni messaggio (`eids`), per chi deve rimandare a un punto preciso del filo.
   async function chat(id, opts) {
     if (!id) return null;
     const v = await vista(opts);
-    return E().copiaChat(v.stato.chat.get(id));
+    return E().copiaChat(v.stato.chat.get(id), opts && opts.ids ? { ids: true } : undefined);
   }
 
   // Per la home (#869): tutte le chat col dispositivo di ogni messaggio, le pagine e il dispositivo di qui. `pos` cambia a
