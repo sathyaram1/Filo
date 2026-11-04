@@ -1563,7 +1563,9 @@ module.exports = function register(on, ctx) {
       if (!id) return { ok: false, error: 'Manca la domanda.' };
       const r = await chiamaDomande({ op, id });
       if (!r.ok) return r;
-      return { ok: true, domanda: r.domanda || null };
+      // Riaprire una risposta disfa quello che ha applicato dove si può (§3.6): il resto lo dice il server, e si legge.
+      const resoconto = typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
+      return resoconto ? { ok: true, domanda: r.domanda || null, resoconto } : { ok: true, domanda: r.domanda || null };
     }));
   }
 
