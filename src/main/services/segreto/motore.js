@@ -35,6 +35,9 @@ const RISERVA = '';
 const TENTATIVI_A_VUOTO = 32;
 const SCANSIONE_OLTRE = 1 / 4;
 const CATENA_MAX = 1 << 16;
+// Fino a mezzo blocco un file sta in un blocco condiviso con altri piccoli (`o`: dove comincia): uno a blocco, tremila
+// voci di cronologia prenderebbero 24 MB (#1271).
+const PICCOLO = CARICO >> 1;
 const BLOCCHI_PER_LETTURA = 256;
 const LETTURE_INSIEME = 8;
 const GRUPPI_PER_LOTTO = 64;
