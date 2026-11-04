@@ -373,7 +373,7 @@ export function argomentiLettura(argv) {
  */
 export async function dichiaraLettura(esito, { sporca = rigaSporco, riserva = rigaRiservato } = {}) {
   const righe = [];
-  if (esito.motivi.length) righe.push(await sporca(`letto #${esito.numero}`, esito.motivi));
+  if (esito.motivi.length) righe.push(await sporca(`letto #${esito.numero}`, esito.motivi, { letti: esito.letti || [] }));
   righe.push(await riserva(`letto #${esito.numero}`));
   return righe.filter(Boolean);
 }
@@ -417,7 +417,8 @@ async function main(argv) {
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
     const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq, ancheMaiGiudicato: a.ancheMaiGiudicato });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
-    for (const riga of await dichiaraLettura(esito)) console.error(riga);
+    // Il server legge le radici del testo e della conversazione: chi li ha scritti puliti non sporca (#1918).
+    for (const riga of await dichiaraLettura({ ...esito, letti: [{ tipo: 'feedback', id: r.id }] })) console.error(riga);
     console.log(esito.testo);
     return 0;
   } catch (e) {
