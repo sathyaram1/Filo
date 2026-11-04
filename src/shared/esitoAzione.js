@@ -255,6 +255,8 @@
     return senzaVuoti({
       type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, evento,
       partita: esito === FALLITO && partita(x),
+      // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
+      no: esito === FALLITO && !!(o && o.no),
       ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, type, x, x._confirm, x._domanda)),
     });
   }
