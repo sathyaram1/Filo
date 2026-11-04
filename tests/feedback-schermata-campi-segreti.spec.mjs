@@ -19,8 +19,16 @@ async function reteFinta(app) {
 }
 
 // Su http un modulo con password o carta apre l'avviso del sito sospetto: l'utente sceglie «Continua» prima di scrivere.
-async function superaAvviso(app) {
+// Senza `obbligatorio` si supera solo se compare: dipende dai campi che la pagina stessa dichiara.
+async function superaAvviso(app, { obbligatorio = true } = {}) {
   const coperta = async () => (await copertura(app).catch(() => null))?.coperta === true;
+  if (!obbligatorio) {
+    const fine = Date.now() + 4_000;
+    while (!(await coperta())) {
+      if (Date.now() > fine) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+  }
   await expect.poll(coperta, { timeout: 10_000 }).toBe(true);
   const avviso = await vistaAvviso(app);
   await avviso.getByRole('button', { name: 'Continua' }).click();
@@ -158,4 +166,54 @@ test('se la pagina sotto non dice dove stanno i suoi campi lo screenshot non par
   await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(1);
   expect(await app.evaluate(() => globalThis.__rete.payload[0].images.length), 'la foto scoperta non deve partire').toBe(0);
   await expect(strato.locator('.sn-toast').filter({ hasText: 'La schermata non è partita' })).toHaveCount(1, { timeout: 8_000 });
+});
+
+// Una cassa online tiene la carta nel riquadro di un servizio di pagamento, su un altro sito: dallo strato quei campi
+// li misura il main e la foto si copre con la vista della pagina sotto.
+test('nello screenshot del feedback è coperto il numero scritto nel riquadro di pagamento di un altro sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const riquadro = testServer.html(`<!doctype html><html><body style="margin:0;background:#fff">
+    <input id="n" autocomplete="cc-number" style="width:300px;font-size:20px;border:0;outline:0;caret-color:transparent"></body></html>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><meta charset="utf-8"><title>Cassa</title></head><body>
+    <h1>Pagamento</h1><label>Carta</label><iframe id="f" src="${riquadro}" style="width:340px;height:40px;border:0;padding:4px"></iframe></body></html>`);
+  const campo = page.frameLocator('#f').locator('#n');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  await superaAvviso(app, { obbligatorio: false });
+  await reteFinta(app);
+  const immagini = [];
+  for (const [i, carta] of ['4111 1111 1111 1111', '5500 0000 0000 0004'].entries()) {
+    await campo.fill(carta);
+    const strato = await mandaConSchermata(app, page, `Il pagamento non parte (${i + 1})`);
+    await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(i + 1);
+    await expect(strato.locator('.sn-fb-modal')).toHaveCount(0, { timeout: 8_000 });
+    const img = await app.evaluate(() => globalThis.__rete.payload.at(-1).images.map((x) => x.dataUrl));
+    expect(img, 'lo screenshot deve partire').toHaveLength(1);
+    immagini.push(img[0]);
+  }
+  const f = await page.locator('#f').boundingBox();
+  expect(await pixelDiversi(page, immagini, { left: f.x + 4, top: f.y + 4, width: 300, height: f.height - 8 }),
+    'il numero scritto nel riquadro di pagamento si legge nello screenshot del feedback').toBe(0);
+});
+
+// Una pagina piantata non dice dove stanno i suoi campi: la foto resta fuori, ma il motivo detto è quello vero.
+test('su una pagina bloccata senza campi riservati il feedback non dice che ce n’è uno', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><head><meta charset="utf-8"><title>Notizie</title></head>'
+    + '<body><h1>Notizie</h1><p>Un articolo qualunque, nessun modulo.</p></body></html>');
+  await reteFinta(app);
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  const strato = await paginaDelloStrato(app, page);
+  await expect(strato.locator('.sn-fb-modal')).toBeVisible();
+  await strato.locator('.sn-fb-text').fill('La pagina si è bloccata');
+  await strato.locator('.sn-fb-clear').click();
+  page.evaluate(() => { const fine = Date.now() + 8000; while (Date.now() < fine); }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 200));
+  await strato.locator('.sn-fb-send').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 20_000 }).toBe(1);
+  const avviso = strato.locator('.sn-toast').filter({ hasText: 'Feedback inviato' });
+  await expect(avviso).toHaveCount(1, { timeout: 8_000 });
+  const testo = await avviso.textContent();
+  expect(await app.evaluate(() => globalThis.__rete.payload[0].images.length), 'la foto senza copertura non deve partire').toBe(0);
+  expect(testo).not.toMatch(/campo riservato/);
+  expect(testo).toContain('la pagina non ha risposto in tempo');
 });
