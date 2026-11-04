@@ -28,7 +28,7 @@ la cartella.
   critica, e la registrazione (`dispatch.mjs --record-verifier`) rifiuta la critica che ne
   ha ancora una scritta in questa verifica. Quello che si sa già esce con la critica perché
   ogni commit dopo il verdetto è un passo in più che i cancelli devono controllare (lì si
-  può solo togliere). La fiducia del lavoro non lo perde: quel commit lo spedisce il
+  può solo togliere). Il lavoro non perde la fiducia per questo: quel commit lo spedisce il
   rilascio, che ne registra la punta nel registro del ramo (#2021). Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
   mette da parte, che la risposta del server elenca per numero: quelle non si possono
   sapere prima. Una critica con un `[3i?]` o un `[2i?!]` la cui domanda blocca ferma di
