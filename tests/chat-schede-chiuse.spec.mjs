@@ -168,3 +168,55 @@ test('una scheda chiusa trovata con la ricerca nel filo si riapre com\'era, col 
   await expect(chat.locator('.dash-activity').last()).toContainText('Riaperta', { timeout: 10_000 });
   await ripristina(app);
 });
+
+test('«riaprila» detto due volte non apre una seconda copia: la scheda già tornata viene messa davanti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const chat = await home(app);
+  await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche', PUBBLICO));
+  await tornaAllaHome(shell);
+  const orche = (await schede(shell)).find((x) => x.title === 'Le orche del Mediterraneo');
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), orche.id);
+  let id = null;
+  await expect.poll(async () => { id = ((await archivio(app)).find((t) => t.url === orche.url) || {}).id || null; return !!id; }, { timeout: 10_000 }).toBe(true);
+
+  for (const k of [1, 2]) {
+    await modelloFinto(app, [
+      { text: '', toolCalls: [{ id: `d${k}`, name: 'RIAPRI_SCHEDA', arguments: JSON.stringify({ id }) }] },
+      { text: `fatto ${k}` },
+    ]);
+    await tornaAllaHome(shell);
+    await chiedi(chat, 'riaprimi la pagina sulle orche');
+    await expect(chat.locator('.dash-activity', { hasText: 'Riaperta' })).toHaveCount(k, { timeout: 20_000 });
+    await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  }
+  await chat.waitForTimeout(1500);
+  expect((await schede(shell)).filter((t) => t.url === orche.url).length, 'una sola scheda delle orche').toBe(1);
+  await expect.poll(async () => { const x = await shell.evaluate(async () => window.filoShell.tabs.snapshot()); return x.tabs.find((t) => t.id === x.activeId).url; }).toBe(orche.url);
+  await ripristina(app);
+});
+
+test('una scheda con l\'indirizzo troppo lungo per essere salvato intero non si riapre: resta il riassunto', async ({ app, shell, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  const lungo = `${testServer.originPubblico}/pagina?q=${'x'.repeat(9000)}`;
+  const RIASSUNTO = 'Una pagina di ricerca sulle orche, con tre risultati.';
+  const id = await app.evaluate(async (_e, [url, riassunto]) => {
+    const e = await globalThis.SN_ARCHIVED_TABS.archive({ url, title: 'Ricerca sulle orche', closedAt: new Date().toISOString(), reason: 'manual' });
+    await globalThis.SN_ARCHIVED_TABS.update(e.id, { summary: riassunto });
+    return e.id;
+  }, [lungo, RIASSUNTO]);
+  expect((await archivio(app)).find((t) => t.id === id).url.length).toBeLessThan(lungo.length);
+  const prima = (await schede(shell)).length;
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 't1', name: 'RIAPRI_SCHEDA', arguments: JSON.stringify({ id }) }] },
+    { text: 'Non l\'ho riaperta: parlava di orche.' },
+  ]);
+  await chiedi(chat, 'riaprimi la ricerca sulle orche');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'parlava di orche' })).toBeVisible({ timeout: 20_000 });
+  const esito = await esitoPerIlModello(app, 't1');
+  expect(esito).toContain('troppo lungo');
+  expect(esito).toContain(RIASSUNTO);
+  expect((await schede(shell)).length, 'nessuna scheda aperta su un indirizzo monco').toBe(prima);
+  await ripristina(app);
+});
