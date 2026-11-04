@@ -189,9 +189,9 @@ const CONTA_COME_LA_RICERCA = `(function () {
     }
   }
   function giro(radice) {
-    var w = document.createTreeWalker(radice, 1 | 4 | 8 | 128), nodo = w.currentNode;
-    for (; nodo; nodo = w.nextNode()) {
-      if (nodo !== radice || radice.nodeType === 1) conta(nodo);
+    var w = document.createTreeWalker(radice, 1 | 4 | 8 | 128);
+    for (var nodo = w.currentNode; nodo; nodo = w.nextNode()) {
+      conta(nodo);
       if (nodo.nodeType === 1 && nodo.shadowRoot) giro(nodo.shadowRoot);
     }
   }
