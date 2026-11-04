@@ -163,7 +163,7 @@
     off_manutentore: 'ferma: routine spente dal manutentore',
     rete_off: 'spenta',
     rete_no_routine_id: 'ferma: manca l’id della routine su claude.ai',
-    rete_no_token: 'ferma: manca il segreto per accenderla',
+    rete_no_token: 'ferma: si accende solo a mano',
     rete_no_key: 'ferma: nessuna parola d’ordine a rete aperta',
     rete_account_off: 'ferma: il suo account è escluso',
     rete_crediti_riserva: 'ferma: il suo account ha i crediti in riserva',
