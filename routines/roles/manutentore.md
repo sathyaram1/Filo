@@ -229,7 +229,8 @@ npm run manutentore -- transizione [--applica]     # solo l'owner, una volta: le
 Il costo dei lavori sta sul server, senza limite di età. Il costo di un biglietto è quello della sessione più quello
 dell'orchestratore; un pacchetto lo conta tutto sul suo numero.
 
-- **Un feedback finora:** `leggi <N>` porta `scheda.costo`, che il server ricalcola a ogni rilascio. `rapporti <N>` dà il
+- **Un feedback finora:** `leggi <N>` porta `scheda.costo`, che il server ricalcola a ogni rilascio (`contatoOra` se il
+  feedback non ne ha più avuti, `oltre` se il conto si ferma al tetto dei biglietti). `rapporti <N>` dà il
   conto e i biglietti, dal più nuovo; `--sottonumeri` aggiunge i #N.M; `--somma` dà solo il conto.
 - **Una finestra:** `rapporti --giorni 7 --somma`, oppure `--da 2026-10-28 --a 2026-11-04` (`a` escluso): il totale, per
   area (dalle schede locali), per ruolo e per numero. Senza `--somma` le pagine sono da 50, con `--cursore` per la
