@@ -2135,6 +2135,8 @@
     const v = !!valore;
     if (v === soloNonFidate) return;
     soloNonFidate = v;
+    const esitoFidati = document.getElementById('mgFidatiMsg');
+    if (esitoFidati) esitoFidati.textContent = '';
     renderList();
     if (DOMANDE && typeof DOMANDE.ridisegna === 'function') DOMANDE.ridisegna();
   }
@@ -2786,6 +2788,7 @@
     updateReevalBar();
     // È QUI che l'owner mette in coda in blocco i blu (scrive `todo` su ciascuno).
     updateAlignedBar();
+    updateFidatiBar();
 
     // Svuota SEMPRE: se la lista torna vuota non deve restare la card vecchia in un contenitore
     // nascosto.
@@ -3096,6 +3099,73 @@
     renderList();
   }
   if (mgAlignedBtn) mgAlignedBtn.addEventListener('click', approveAllAligned);
+
+  // «Segna fidati» in blocco (#1926): sulla lista che l'owner ha filtrato, i non fidati, con un secondo clic per
+  // confermare. La fiducia la scrive il server, uno per uno; quelli che rifiuta restano non fidati col motivo.
+  const mgFidatiBar = document.getElementById('mgFidatiBar');
+  const mgFidatiBtn = document.getElementById('mgFidatiBtn');
+  const mgFidatiMsg = document.getElementById('mgFidatiMsg');
+  const FIDUCIA_SEGNA_BLOCCO = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA_BLOCCO) || 'fiducia_segna_blocco';
+  let fidatiConferma = null;
+  let fidatiInCorso = false;
+  function nonFidatiInLista() {
+    return (currentList || []).filter((fb) => fb && fb._id && !MR.isFidato(fb));
+  }
+  function updateFidatiBar() {
+    if (!mgFidatiBar || !mgFidatiBtn) return;
+    const n = nonFidatiInLista().length;
+    const show = isAdmin && soloNonFidate && !searchMode && (n > 0 || fidatiInCorso || !!(mgFidatiMsg && mgFidatiMsg.textContent));
+    mgFidatiBar.hidden = !show;
+    if (fidatiInCorso) return;
+    if (!n) { annullaConfermaFidati(); mgFidatiBtn.hidden = true; return; }
+    mgFidatiBtn.hidden = false;
+    mgFidatiBtn.textContent = fidatiConferma ? `Confermi? Sono ${n}` : `Segna fidati tutti (${n})`;
+    mgFidatiBtn.title = fidatiConferma ? 'Clicca di nuovo per segnarli fidati' : 'Segna fidati i feedback di questa lista: chiede conferma';
+  }
+  function annullaConfermaFidati() {
+    if (fidatiConferma) clearTimeout(fidatiConferma);
+    fidatiConferma = null;
+  }
+  async function segnaFidatiInBlocco() {
+    const lista = nonFidatiInLista();
+    if (!lista.length || fidatiInCorso) return;
+    if (!fidatiConferma) {
+      if (mgFidatiMsg) mgFidatiMsg.textContent = '';
+      // La conferma cade dove è caduto il primo clic: il tasto non cambia misura (PATTERNS: conferma sul posto).
+      mgFidatiBtn.style.minWidth = `${mgFidatiBtn.offsetWidth}px`;
+      fidatiConferma = setTimeout(() => { fidatiConferma = null; updateFidatiBar(); }, 6000);
+      updateFidatiBar();
+      return;
+    }
+    annullaConfermaFidati();
+    fidatiInCorso = true;
+    mgFidatiBtn.disabled = true;
+    mgFidatiBtn.textContent = `Segno fidati ${lista.length}…`;
+    const r = await sendToMain({ type: FIDUCIA_SEGNA_BLOCCO, feedbackIds: lista.map((fb) => fb._id) })
+      .catch((err) => ({ ok: false, error: err && err.message }));
+    fidatiInCorso = false;
+    mgFidatiBtn.disabled = false;
+    if (!r || r.ok === false) {
+      if (mgFidatiMsg) mgFidatiMsg.textContent = `Non riuscito: ${(r && r.error) || 'il server non ha risposto'}.`;
+      updateFidatiBar();
+      return;
+    }
+    const perId = new Map(lista.map((fb) => [fb._id, fb]));
+    const falliti = [];
+    let fatti = 0;
+    for (const e of Array.isArray(r.esiti) ? r.esiti : []) {
+      const fb = perId.get(e && e.feedbackId);
+      if (!fb) continue;
+      if (e.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; fatti += 1; } else falliti.push(e);
+    }
+    if (mgFidatiMsg) {
+      mgFidatiMsg.textContent = falliti.length
+        ? `${fatti} segnati fidati, ${falliti.length} no: ${falliti[0].error || 'rifiutato dal server'}.`
+        : `${fatti} segnati fidati.`;
+    }
+    renderList();
+  }
+  if (mgFidatiBtn) mgFidatiBtn.addEventListener('click', segnaFidatiInBlocco);
   function startCardEvaluating(id) {
     const card = mgList.querySelector(`.mg-item[data-id="${cssSel(id)}"]`);
     if (!card) return null;

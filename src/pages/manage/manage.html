@@ -2868,6 +2868,63 @@
           </div>
         </div>
 
+        <!-- Gli strumenti dell'owner che vivevano solo da terminale (#1926): manageAccessi.js. Le risposte di fine
+           sessione sono testo di sessioni che leggono testo di chiunque: entrano solo come testo. -->
+        <div class="mg-auto-main mg-ac" id="mgAccessi" hidden>
+          <h2 id="mgChiaviTitolo">Parole d’ordine</h2>
+          <section class="mg-auto-block" id="mgChiavi" aria-labelledby="mgChiaviTitolo">
+            <ul class="mg-ac-lista" id="mgChiaviLista"></ul>
+            <p class="mg-auto-block-desc" id="mgChiaviStato" role="status"></p>
+            <form class="mg-cp-scelte mg-ac-nuova" id="mgChiaveNuova" autocomplete="off" novalidate>
+              <label class="mg-cp-scelta">Nome
+                <input type="text" id="mgChiaveNome" class="mg-cp-campo" spellcheck="false" placeholder="pc-di-casa" /></label>
+              <label class="mg-cp-scelta">A cosa serve <select id="mgChiavePotere"></select></label>
+              <label class="mg-cp-scelta mg-ac-largo">Descrizione
+                <input type="text" id="mgChiaveDescr" class="mg-cp-campo" placeholder="facoltativa" /></label>
+              <button type="submit" class="sn-btn" id="mgChiaveCrea">Crea</button>
+              <span class="mg-action-msg" id="mgChiaveMsg" role="status"></span>
+            </form>
+            <div class="mg-ac-nata" id="mgChiaveNata" hidden>
+              <p class="mg-auto-field-label" id="mgChiaveNataTitolo"></p>
+              <div class="mg-auto-field-row">
+                <code class="mg-ac-parola" id="mgChiaveParola"></code>
+                <button type="button" class="sn-btn" id="mgChiaveCopia">Copia</button>
+                <button type="button" class="sn-btn sn-btn-secondary" id="mgChiaveFatto" title="Nascondila: non si potrà più rileggere">Fatto</button>
+              </div>
+              <p class="mg-auto-block-desc mg-ac-dove" id="mgChiaveDove"></p>
+            </div>
+          </section>
+
+          <h2 id="mgChiusuraTitolo">Domanda di fine sessione</h2>
+          <section class="mg-auto-block" id="mgChiusura" aria-labelledby="mgChiusuraTitolo">
+            <ul class="mg-ac-lista" id="mgChiusuraSlot"></ul>
+            <p class="mg-auto-block-desc mg-ac-ripiego" id="mgChiusuraRipiego"></p>
+            <form class="mg-cp-scelte mg-ac-nuova" id="mgChiusuraNuova" autocomplete="off" novalidate>
+              <label class="mg-cp-scelta">Per chi
+                <input type="text" id="mgChiusuraSlotNuovo" class="mg-cp-campo" list="mgChiusuraSlotNomi" spellcheck="false" placeholder="worker" /></label>
+              <datalist id="mgChiusuraSlotNomi"></datalist>
+              <label class="mg-cp-scelta mg-ac-largo">Domanda
+                <textarea id="mgChiusuraTesto" class="mg-cp-campo mg-ac-testo" rows="2"></textarea></label>
+              <button type="submit" class="sn-btn" id="mgChiusuraSalva">Imposta</button>
+              <span class="mg-action-msg" id="mgChiusuraMsg" role="status"></span>
+            </form>
+            <h3 class="mg-ac-sotto">Risposte</h3>
+            <ul class="mg-ac-lista mg-ac-risposte" id="mgChiusuraRisposte"></ul>
+            <p class="mg-auto-block-desc" id="mgChiusuraStato" role="status"></p>
+          </section>
+
+          <h2 id="mgOrdineTitolo">Ordine del manutentore</h2>
+          <section class="mg-auto-block" id="mgOrdine" aria-labelledby="mgOrdineTitolo">
+            <form class="mg-cp-scelte" id="mgOrdineForm" autocomplete="off" novalidate>
+              <label class="mg-cp-scelta mg-ac-largo"
+                title="I feedback che il pacemaker accende per primi, in quest’ordine. Vuoto: per priorità.">Numeri, in ordine
+                <input type="text" id="mgOrdineNumeri" class="mg-cp-campo" spellcheck="false" placeholder="812, 815, 815.2" /></label>
+              <button type="submit" class="sn-btn" id="mgOrdineSalva">Salva</button>
+              <span class="mg-action-msg" id="mgOrdineMsg" role="status"></span>
+            </form>
+          </section>
+        </div>
+
         <!-- Un selettore a catena per ciascuno slot di supporto. La scelta va nel doc Firestore config/supportModels,
            owner-gated, così la legge anche il backend filo-security. -->
         <div class="mg-support-models" id="mgSmSection">
