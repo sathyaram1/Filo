@@ -274,7 +274,6 @@ function campiSegretiNeiComponentiChiusi(webContents) {
 }
 
 async function misuraComponentiChiusi(webContents) {
-  const visti = quantiVistiDagliScript(webContents);
   const dbg = webContents.debugger;
   const nostro = !dbg.isAttached();
   if (nostro) { try { dbg.attach('1.3'); } catch (_) { return { campi: [], nonCoperti: false }; } }
