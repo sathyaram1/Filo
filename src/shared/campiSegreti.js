@@ -9,7 +9,9 @@
   // resta nella pagina (il content script), non la misura usa e getta del main.
   function crea(win, cartaValida, { ricorda = false } = {}) {
     const doc = win.document;
-    const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
+    // Da qui prende i nomi anche la ricerca del main nei componenti chiusi: un campo nuovo va aggiunto solo qui.
+    const NOMI_DEI_CAMPI = ['input', 'textarea', 'select'];
+    const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
     const PAROLE_SEGRETE = new RegExp(['pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code', 'passwort', 'kennwort',
