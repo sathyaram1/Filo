@@ -678,6 +678,7 @@ export async function main(argvIn) {
   }
   // Le segnalazioni del pacchetto si controllano tutte prima di aprire, e i motivi si dicono tutti insieme.
   let unite = [];
+  let delPacchetto = { attese: listaAttese, ereditate: [] };
   if (deposita && numeriUnite.numeri.length) {
     let lette;
     try { lette = await pacchetto.leggi(numeriUnite.numeri, cred.idToken); } catch (e) {
