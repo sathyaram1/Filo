@@ -22,6 +22,6 @@ test('r1 nella sede owner la risposta di una routine fidata si legge', async () 
     expect(codice).toBe(0);
     expect(out.join('\n'), err.join('\n')).toContain('RISPOSTA DI UNA ROUTINE FIDATA');
   } finally {
-    rmSync(dir, { recursive: true, force: true });
+    togliCartella(dir);
   }
 });
