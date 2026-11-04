@@ -197,7 +197,8 @@ chat con la chiave del manutentore (`FILO_MANUTENTORE_KEY`). Un rifiuto del serv
 ```bash
 npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo
 npm run manutentore -- stato | schede              # stato, segnali e N; tutte le schede in una riga
-npm run manutentore -- leggi <N> | rapporti [N]    # testi e note di un feedback; i rapporti dei biglietti
+npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
+npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]
 npm run manutentore -- rami | incroci <N>          # i rami vivi coi file, e chi tocca i file di N
 npm run manutentore -- ordine                      # com'è adesso, e quali numeri sono ancora aperti
 npm run manutentore -- accendi 812,815,820 | accendi --niente
@@ -224,6 +225,18 @@ npm run manutentore -- registro <parole>           # i principi delle domande ch
 npm run manutentore -- spesa                       # la spesa della settimana per account
 npm run manutentore -- transizione [--applica]     # solo l'owner, una volta: le 2 di prima scendono a 1
 ```
+
+Il costo dei lavori sta sul server, senza limite di età. Il costo di un biglietto è quello della sessione più quello
+dell'orchestratore; un pacchetto lo conta tutto sul suo numero.
+
+- **Un feedback finora:** `leggi <N>` porta `scheda.costo`, che il server ricalcola a ogni rilascio (`contatoOra` se il
+  feedback non ne ha più avuti, `oltre` se il conto si ferma al tetto dei biglietti). `rapporti <N>` dà il
+  conto e i biglietti, dal più nuovo; `--sottonumeri` aggiunge i #N.M; `--somma` dà solo il conto.
+- **Una finestra:** `rapporti --giorni 7 --somma`, oppure `--da 2026-10-28 --a 2026-11-04` (`a` escluso): il totale, per
+  area (dalle schede locali), per ruolo e per numero. Senza `--somma` le pagine sono da 50, con `--cursore` per la
+  pagina dopo; `--tutte` le segue fino all'ultima.
+
+Oltre un tetto il server rifiuta col numero: in quel caso si stringe la finestra.
 
 Un pacchetto con la spec è un `feedback` nuovo che dice per ogni segnalazione cosa cambia e come si verifica, seguito
 da `pacchetto <nuovo> <N,M,…>`; `pacchetto` da solo unisce senza spec nuova. La spec sta nel testo: le note del

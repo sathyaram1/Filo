@@ -200,7 +200,7 @@ async function domandeFerme(cred, indice, ordine = []) {
   }
 }
 
-const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche'];
+const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite'];
 
 /** Gli argomenti senza le opzioni né i loro valori: un `--ticket X` non deve finire in un testo scritto. PURA. */
 export function senzaOpzioni(args) {
@@ -222,6 +222,95 @@ function opzione(argv, nome) {
 
 const NUMERO_RE = /^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/;
 const numeroDi = (v) => (NUMERO_RE.test(String(v || '').trim()) ? String(v).trim().replace(/^#/, '') : '');
+
+// ── I rapporti e il costo dei lavori (#2083) ────────────────────────────────
+
+const GIORNO_MS = 24 * 60 * 60 * 1000;
+const DATA_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|[+-]\d{2}:?\d{2})?)?$/;
+// Le pagine che `--tutte` segue: 500 da 200 sono centomila biglietti, anni al ritmo di oggi.
+export const RAPPORTI_PAGINE_MAX = 500;
+
+/**
+ * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]`
+ * → { ok, dati (il corpo per il server), tutte, json } | { ok:false, motivo }. PURA.
+ */
+export function richiestaRapporti(argv, nowMs = Date.now()) {
+  const [n, altro] = senzaOpzioni((argv || []).slice(1));
+  const ko = (motivo) => ({ ok: false, motivo: `rapporti: ${motivo}` });
+  if (altro !== undefined) return ko(`un numero solo, «${String(altro).slice(0, 20)}» è di troppo`);
+  if (n !== undefined && !numeroDi(n)) return ko(`«${String(n).slice(0, 20)}» non è un numero di feedback`);
+  const [da, a, g, cursore, limite] = ['--da', '--a', '--giorni', '--cursore', '--limite'].map((o) => opzione(argv, o));
+  for (const [nome, v] of [['--da', da], ['--a', a]]) {
+    if (v !== undefined && (!DATA_RE.test(String(v)) || !Number.isFinite(Date.parse(v)))) return ko(`${nome} «${String(v).slice(0, 30)}» non è una data (2026-11-01 o 2026-11-01T08:00Z)`);
+  }
+  if (da !== undefined && g !== undefined) return ko('o --da o --giorni, non tutti e due');
+  if (a !== undefined && da === undefined && g === undefined) return ko('--a vuole l\'inizio: --da o --giorni');
+  if (g !== undefined && !(/^\d{1,4}$/.test(String(g)) && Number(g) >= 1)) return ko('--giorni è un intero da 1 in su');
+  // Il tetto della pagina e la forma del cursore li controlla solo il server, che li dice col numero quando rifiuta.
+  if (limite !== undefined && !(/^\d{1,6}$/.test(String(limite)) && Number(limite) >= 1)) return ko('--limite è un intero da 1 in su');
+  if (cursore !== undefined && !String(cursore).trim()) return ko('--cursore è quello stampato dalla pagina prima');
+  const somma = argv.includes('--somma');
+  const tutte = argv.includes('--tutte');
+  if (somma && tutte) return ko('--somma dà solo il conto, senza pagine: --tutte non serve');
+  if (argv.includes('--sottonumeri') && !n) return ko('--sottonumeri vuole il numero del feedback');
+  const dati = {};
+  if (n) dati.numero = numeroDi(n);
+  if (argv.includes('--sottonumeri')) dati.sottonumeri = true;
+  if (da !== undefined) dati.da = String(da);
+  if (a !== undefined) dati.a = String(a);
+  if (g !== undefined) dati.da = new Date((a !== undefined ? Date.parse(a) : nowMs) - Number(g) * GIORNO_MS).toISOString();
+  if (somma) dati.somma = true;
+  if (cursore !== undefined) dati.cursore = String(cursore);
+  if (limite !== undefined) dati.limite = Number(limite);
+  return { ok: true, dati, tutte, json: argv.includes('--json') };
+}
+
+const dollari = (n) => `${(Number(n) || 0).toFixed(2)} $`;
+const rigaConto = (x) => `${dollari(x.usd)} su ${Number(x.biglietti) || 0} biglietti (${Number(x.conRapporto) || 0} col rapporto)`;
+// Le righe per numero che la somma stampa: le altre si contano nella riga dopo, e --json le dà tutte.
+export const COSTO_RIGHE_MAX = 40;
+
+/** Il conto di `rapporti --somma` da leggere: totale, per area (dalle schede locali), per ruolo, per numero. PURA. */
+export function righeCosto(r, schede = []) {
+  const c = r.costo || {};
+  const quando = r.finestra ? ` dal ${r.finestra.da} al ${r.finestra.a}` : '';
+  const out = [`${r.numero ? `${r.numero}${r.sottonumeri ? ' coi suoi #N.M' : ''}` : 'Finestra'}${quando}: ${rigaConto(c)}`];
+  const per = Array.isArray(r.perNumero) ? r.perNumero : [];
+  if (r.numero) return out.concat(per.length > 1 ? per.map((x) => `  ${x.num}: ${rigaConto(x)}`) : []);
+  const locali = new Map((schede || []).map((s) => [`#${String(s.numero || '').replace(/^#/, '')}`, s]));
+  const areaDi = (num) => (String(num).startsWith('#') ? (unaRiga(locali.get(num) && locali.get(num).area) || '?') : '(senza feedback: compiti, domande, manutentore)');
+  const aree = new Map();
+  for (const x of per) {
+    const k = areaDi(x.num);
+    const g = aree.get(k) || { usd: 0, biglietti: 0, conRapporto: 0 };
+    aree.set(k, { usd: g.usd + (Number(x.usd) || 0), biglietti: g.biglietti + (Number(x.biglietti) || 0), conRapporto: g.conRapporto + (Number(x.conRapporto) || 0) });
+  }
+  out.push(`Per area${locali.size ? '' : ' (nessuna scheda locale: tutto in «?»)'}:`);
+  out.push(...[...aree].sort((x, y) => y[1].usd - x[1].usd).map(([k, g]) => `  ${k}: ${rigaConto(g)}`));
+  if (Array.isArray(r.perRuolo) && r.perRuolo.length) out.push('Per ruolo:', ...r.perRuolo.map((x) => `  ${unaRiga(x.ruolo) || '?'}: ${rigaConto(x)}`));
+  if (per.length) {
+    out.push('Per numero:', ...per.slice(0, COSTO_RIGHE_MAX).map((x) => `  ${unaRiga(x.num) || '(senza numero)'} [${areaDi(x.num)}]: ${rigaConto(x)}`));
+    const resto = per.slice(COSTO_RIGHE_MAX);
+    if (resto.length) out.push(`  e altri ${resto.length} numeri per ${dollari(resto.reduce((t, x) => t + (Number(x.usd) || 0), 0))}: --json per l'elenco intero`);
+  }
+  return out;
+}
+
+/** Le pagine di `rapporti --tutte`, col cursore, fino all'ultima: { ok, ...ultima, rapporti, pagine } | il rifiuto. */
+export async function tutteLePagine(chiamata, dati) {
+  let r = await chiamata(dati);
+  if (r.ok === false) return r;
+  const rapporti = [...(r.rapporti || [])];
+  let pagine = 1;
+  while (r.cursore) {
+    if (pagine >= RAPPORTI_PAGINE_MAX) return { ok: false, reason: 'troppe_pagine', detail: `oltre ${RAPPORTI_PAGINE_MAX} pagine: stringi la finestra (--da, --a)` };
+    r = await chiamata(Object.assign({}, dati, { cursore: r.cursore }));
+    if (r.ok === false) return r;
+    rapporti.push(...(r.rapporti || []));
+    pagine += 1;
+  }
+  return Object.assign({}, r, { rapporti, cursore: null, pagine });
+}
 
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
 export function richiestaSblocca(args) {
@@ -679,7 +768,8 @@ export const SOTTOCOMANDI = Object.freeze([
 ]);
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
-  contesto | sveglia | stato | schede | leggi <N> | rapporti [N]
+  contesto | sveglia | stato | schede | leggi <N>
+  rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
   ordine | accendi <N,M,…>|--niente | parallelo <N>
   priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…>
@@ -779,7 +869,15 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     case 'stato': { const r = await chiama(cred, 'stato'); return esito(r, (x) => righeStato(x).join('\n')); }
     case 'schede': { const r = await tutteLeSchede(cred); return esito(r, (x) => x.schede.map((s) => rigaSchedaServer(s)).join('\n') || 'Nessuna scheda aperta.'); }
     case 'leggi': { const r = await chiama(cred, 'leggi', { numero: numeroDi(arg) }); if (r.ok === false) return esito(r); stampaJson(r); return 0; }
-    case 'rapporti': { const r = await chiama(cred, 'rapporti', arg ? { numero: numeroDi(arg) } : {}); if (r.ok === false) return esito(r); stampaJson(r.rapporti); return 0; }
+    case 'rapporti': {
+      const q = richiestaRapporti(argv);
+      const r = q.tutte ? await tutteLePagine((d) => chiama(cred, 'rapporti', d), q.dati) : await chiama(cred, 'rapporti', q.dati);
+      if (r.ok === false) return esito(r);
+      if (q.dati.somma && !q.json) { console.log(righeCosto(r, leggiSchede(cartella)).join('\n')); return 0; }
+      const { ok, ...resto } = r;
+      stampaJson(resto);
+      return 0;
+    }
     case 'contesto': case 'sveglia': case 'chat': {
       const [st, tac, sc] = await Promise.all([chiama(cred, 'stato'), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
@@ -945,7 +1043,7 @@ export function controlliLocali(cmd, argv) {
   const num = (v, cosa) => (numeroDi(v) ? '' : `${cosa}: «${String(v ?? '').slice(0, 20)}» non è un numero di feedback`);
   switch (cmd) {
     case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
-    case 'rapporti': return a ? num(a, cmd) : '';
+    case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';
     case 'priorita': return num(a, cmd) || (controlloPriorita(null, b).ok ? '' : controlloPriorita(null, b).motivo);
