@@ -944,10 +944,11 @@
     ctxTabId = t.id;
     ctxMenuPos = { x: Math.round(x), y: Math.round(y) };
     // Le domande al main partono insieme: in fila, il menu aspettava la somma (#1090).
-    const [proxy, permessi, impostazioni] = await Promise.all([
+    const [proxy, permessi, impostazioni, chiuse] = await Promise.all([
       senzaErrore(() => api.tabs.proxyStatus()),
       senzaErrore(() => (api.tabs.permessi ? api.tabs.permessi(t.id) : null)),
       senzaErrore(() => api.message({ type: 'get_settings' })),
+      senzaErrore(() => api.tabs.ciSonoChiuse()),
     ]);
     // Un tasto destro più recente su un'altra scheda ha già il suo menu: questo arriverebbe dopo, con le voci sbagliate.
     if (mio !== ctxGiro) return;
@@ -999,11 +1000,33 @@
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
     }
-    entries.push(
-      { type: 'separator' },
-      { label: 'Chiudi', icon: 'close', action: 'tab-close' },
-    );
+    entries.push({ type: 'separator' }, { label: 'Chiudi', icon: 'close', action: 'tab-close' });
+    // #1695 — con una scheda sola non c'è niente da chiudere; senza chiuse la voce resta, spenta, dove la si cerca.
+    if (state.tabs.length > 1) entries.push({ label: 'Chiudi le altre schede', icon: 'tabs', action: 'tab-close-others' });
+    entries.push(vocePerRiaprire(chiuse));
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  const vocePerRiaprire = (ci) => (ci
+    ? { label: 'Riapri scheda chiusa', icon: 'undo', action: 'reopen-closed-tab' }
+    : { label: 'Riapri scheda chiusa', icon: 'undo', disabled: true });
+
+  // Il «+» ha il suo tasto destro (#1695): la scheda nuova e quella appena chiusa stanno nello stesso punto.
+  async function openNewTabContextMenu(x, y) {
+    const mio = ++ctxGiro;
+    const chiuse = await senzaErrore(() => api.tabs.ciSonoChiuse());
+    if (mio !== ctxGiro) return;
+    api.popupMenu([vocePerRiaprire(chiuse)], Math.round(x), Math.round(y));
+  }
+
+  async function chiudiLeAltre(id) {
+    let r = null;
+    try { r = await api.tabs.chiudiAltre(id); } catch (_) { r = null; }
+    const R = window.SN_RESTANO_APERTE;
+    const resto = r && R ? R.frase(R.conto(r.restano)) : '';
+    if (!resto) return;
+    const n = Number(r.chiuse) || 0;
+    showToast(`${n ? (n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`) : 'Nessuna scheda chiusa'}: ${resto}.`, 'altre_schede_restano');
   }
 
   // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
@@ -1063,16 +1086,19 @@
   // Il canale è globale: qui si prendono solo le azioni `tab-…`.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
+      // Dal menu della linguetta o del «+»: non riguarda una scheda.
+      if (action === 'reopen-closed-tab') { api.tabs.riapriChiusa('menu'); return; }
       const id = ctxTabId;
       if (!id) return;
-      // Quale voce si sceglie (#1470); «Chiudi» lo conta la chiusura, e il paese scelto non esce.
-      if (/^tab-/.test(action) && action !== 'tab-close' && !action.startsWith('tab-proxy-go:')) {
+      // Quale voce si sceglie (#1470); le chiusure le conta la chiusura, e il paese scelto non esce.
+      if (/^tab-/.test(action) && !/^tab-close/.test(action) && !action.startsWith('tab-proxy-go:')) {
         try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'voce-menu-scheda', id: action })).catch(() => {}); } catch (_) {}
       }
       if (action === 'tab-duplicate') api.tabs.duplicate(id);
       else if (action === 'tab-mute') api.tabs.setMuted(id);
       else if (action === 'tab-help') api.tabs.help(id);
       else if (action === 'tab-close') api.tabs.close(id, 'tasto_destro_scheda');
+      else if (action === 'tab-close-others') chiudiLeAltre(id);
       else if (action === 'tab-proxy-default') proxyTab(id);
       else if (action === 'tab-proxy-clear') api.tabs.clearProxy(id);
       else if (action === 'tab-proxy-pick') openProxyCountryMenu();
@@ -2538,6 +2564,10 @@
   }
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
+  newBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openNewTabContextMenu(e.clientX, e.clientY);
+  });
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });

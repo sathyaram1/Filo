@@ -689,18 +689,9 @@
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
   }
   // Perché qualche scheda non si è chiusa (#413): dopo «tutte» l'utente non ne ha indicata nessuna, e deve sapere il motivo.
-  const PERCHE_RESTANO = {
-    testo: (n) => (n === 1 ? 'una resta aperta col testo non inviato' : `${n} restano aperte col testo non inviato`),
-    sempre: (n) => (n === 1 ? 'una resta aperta, è di un sito tenuto sempre aperto' : `${n} restano aperte, sono di siti tenuti sempre aperti`),
-    nuova: (n) => (n === 1 ? 'una aperta dopo la richiesta resta' : `${n} aperte dopo la richiesta restano`),
-    chiusa: (n) => (n === 1 ? 'una era già chiusa' : `${n} erano già chiuse`),
-  };
   function restanoAperte(o) {
-    const r = Number(o && o.restano) || 0;
-    if (!r) return '';
-    const per = o.restanoPer && typeof o.restanoPer === 'object' ? o.restanoPer : null;
-    const parti = per ? Object.keys(PERCHE_RESTANO).filter((k) => Number(per[k]) > 0).map((k) => PERCHE_RESTANO[k](Number(per[k]))) : [];
-    return parti.length ? parti.join(', ') : (r === 1 ? 'una resta aperta' : `${r} restano aperte`);
+    const R = global.SN_RESTANO_APERTE;
+    return R ? R.frase(o) : '';
   }
   // «lunedì 28 set»: il giorno di una conversazione senza titolo.
   function quandoBreve(ts) {

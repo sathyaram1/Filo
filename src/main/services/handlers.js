@@ -5316,11 +5316,7 @@ const PERCHE_RESTA_APERTA = {
 };
 // Quante restano e perché, per la riga sotto la risposta: l'utente che ha detto «tutte» non ne ha indicata nessuna.
 function contoRestano(restano) {
-  const lista = Array.isArray(restano) ? restano : [];
-  if (!lista.length) return {};
-  const restanoPer = {};
-  for (const x of lista) restanoPer[x.perche] = (restanoPer[x.perche] || 0) + 1;
-  return { restano: lista.length, restanoPer };
+  return require('../../shared/restanoAperte.js').conto((Array.isArray(restano) ? restano : []).map((x) => x.perche));
 }
 function esitoChiusuraPerModello(action, o) {
   if (o.error) return `Nessuna scheda chiusa: ${o.error}. Correggi e riprova, o chiedi all'utente quali intende.`;

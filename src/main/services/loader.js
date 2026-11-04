@@ -55,6 +55,7 @@ require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e get
 require(path.join(SHARED, 'stessoSito.js')); // #876 — «stesso sito» e Public Suffix List: prima di eseguibili e preferences
 require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google sono un accesso solo (dopo stessoSito)
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
+require(path.join(SHARED, 'restanoAperte.js')); // #1695 — perché una scheda resta aperta dopo una chiusura in blocco
 require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
 require(path.join(SHARED, 'scaricamentiAvanzamento.js')); // #1287 — velocità e tempo che resta di uno scaricamento (logica pura)

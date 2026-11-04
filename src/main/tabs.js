@@ -65,6 +65,7 @@ const { StratoDeiRiquadri } = require('./stratoDeiRiquadri');
 const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
 const SchedeChiuse = require('./tabs/schedeChiuse');
+const ChiudiSchede = require('./services/chiudiSchede');
 
 // Le finestre normali ne hanno una sola, come Chrome: una scheda chiusa in una finestra si riapre da un'altra.
 // L'incognito ne tiene una per finestra, che muore con lei; quella normale dimentica ciò che l'archivio cancella.
@@ -1249,19 +1250,21 @@ class TabManager {
     this._broadcast();
   }
 
-  // Più schede in un colpo, chieste alla chat (#413): come closeTab per ognuna, con una sola attivazione alla fine,
-  // così una scheda che sta per chiudersi non si carica solo per passarci sopra. Torna gli id chiusi davvero.
-  chiudiSchede(ids) {
-    const via = new Set(Array.isArray(ids) ? ids : []);
-    const chiuse = this.tabs.filter((t) => via.has(t.id));
+  // Più schede in un colpo, dalla chat (#413) o da «Chiudi le altre schede» (#1695): come closeTab per ognuna, con una
+  // sola attivazione alla fine, così una scheda che sta per chiudersi non si carica solo per passarci sopra.
+  // `via` come in closeTab. Torna gli id chiusi davvero.
+  chiudiSchede(ids, { via = 'chat' } = {}) {
+    const prese = new Set(Array.isArray(ids) ? ids : []);
+    const chiuse = this.tabs.filter((t) => prese.has(t.id));
     if (!chiuse.length) return [];
     const eraAttiva = chiuse.some((t) => t.id === this.activeId);
-    Strade.misura('azione', 'closeTab', 'chat', { incognito: this.incognito });
+    const strada = via === 'chat' ? 'chat' : STRADA_DELLA_CHIUSURA[via];
+    if (strada) Strade.misura('azione', 'closeTab', strada, { incognito: this.incognito });
     for (const tab of chiuse) {
-      ContatoriFinestra.misura('chiusa', tab, 'chat', { incognito: this.incognito });
+      ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
       this._smontaScheda(tab);
     }
-    this.tabs = this.tabs.filter((t) => !via.has(t.id));
+    this.tabs = this.tabs.filter((t) => !prese.has(t.id));
     if (eraAttiva) {
       const next = this._mostRecentlyActiveTab() || this.tabs[0];
       if (next) this.activate(next.id);
@@ -1269,6 +1272,22 @@ class TabManager {
     }
     this._broadcast();
     return chiuse.map((t) => t.id);
+  }
+
+  // «Chiudi le altre schede» del menu della linguetta (#1695): è «tutte tranne questa» della chat, con la stessa scelta
+  // di chi resta. La tenuta diventa l'attiva prima, così nessuna delle chiuse passa davanti. Torna { chiuse, restano }.
+  async chiudiLeAltre(id, { via = 'tasto_destro_scheda' } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return { chiuse: [], restano: [] };
+    const motivo = await this.motiviPerRestare();
+    if (!this.tabs.includes(tab)) return { chiuse: [], restano: [] };
+    const viste = this.tabs.map((t) => t.id);
+    const scelta = ChiudiSchede.risolvi({ tutte: true, tranne: [viste.indexOf(id) + 1] },
+      { schede: this.tabs, viste, numerate: viste.length, resta: (t) => motivo(t) });
+    if (scelta.errore) return { chiuse: [], restano: [] };
+    if (this.activeId !== id) this.activate(id);
+    const chiuse = this.chiudiSchede(scelta.chiudere.map((t) => t.id), { via });
+    return { chiuse, restano: scelta.restano.map((x) => x.perche) };
   }
 
   // A «chiudile tutte» chiesto in chat (#413) restano il testo scritto e non inviato e i siti tenuti sempre aperti:
@@ -1525,6 +1544,11 @@ class TabManager {
       this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
     } catch (_) {}
     return null;
+  }
+
+  // Se `riapriChiusa` ridarebbe qualcosa adesso: la voce «Riapri scheda chiusa» è spenta senza (#1695).
+  async ciSonoChiuse() {
+    return this._pilaChiuse().quante > 0 || !!(await this._chiusaDallArchivio());
   }
 
   async _chiusaDallArchivio() {

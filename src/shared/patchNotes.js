@@ -14,6 +14,7 @@
         { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },
         { testo: 'Puoi aprire e chiudere la barra laterale chiedendolo a Filo da qualunque chat, anche dall\'Aiuto su una pagina.', segnalazione: 1292 },
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
+        { testo: 'Col tasto destro su una scheda chiudi tutte le altre o riapri l\'ultima che hai chiuso, con un clic. «Riapri scheda chiusa» c\'è anche col tasto destro sul pulsante +.', segnalazione: 1695 },
       ],
       fixes: [
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
