@@ -531,7 +531,8 @@ rispondere.
   risparmio sul modello.
 - Il biglietto nasce con la fiducia della domanda (§ 1.2).
 - Non lavora le domande dell'addetto comunicazioni: una risposta scritta su
-  una di quelle la riceve l'addetto stesso (§ 4.1).
+  una di quelle (o l'opzione che chiederebbe il compito) chiude la domanda e
+  resta lì per l'addetto stesso (§ 4.1), senza compito (#2001).
 - Legge la domanda con conversazione e note, i collegamenti e il registro
   delle decisioni, e poi fa una o più di queste cose:
   - apre o aggiorna feedback;
