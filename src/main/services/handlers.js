@@ -22,6 +22,7 @@ const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
 const FiloParla = require('./filoParla');
 const Schermo = require('./schermo').crea();
+const Foto = require('./fotoDellaPagina');
 const SempreAperte = require('./sempreAperte');
 const ChiudiSchede = require('./chiudiSchede');
 
