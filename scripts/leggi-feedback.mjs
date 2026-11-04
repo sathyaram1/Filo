@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
-import { motiviDiLettura, rigaRiservato, rigaSporco } from './lib/biglietto-locale.mjs';
+import { motiviDiLettura, noteFidateDaCampi, rigaRiservato, rigaSporco } from './lib/biglietto-locale.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
