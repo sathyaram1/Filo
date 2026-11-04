@@ -12,7 +12,7 @@ const comeLaMandaIlServer = (t) => ({ slug: t.slug || '', role: t.role || '', nu
   createdAtMs: t.createdAtMs || null, releasedAtMs: t.releasedAtMs || null, closing: t.closing || null });
 
 test('r1 nella sede owner la risposta di una routine fidata si legge', async () => {
-  const dir = mkdtempSync(join(tmpdir(), 'v2012-'));
+  const dir = cartellaTemporanea('v2012-');
   try {
     const out = [];
     const err = [];
