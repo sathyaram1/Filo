@@ -238,6 +238,8 @@
     FILO_LESSON: 'filo_lesson',
     // Compattatore: integra le lezioni nei moduli di memoria.
     FILO_COMPACT: 'filo_compact',
+    // La compattazione del filo (SPEC-CONTESTO fase 4): il tratto vivo più vecchio diventa righe delle ore.
+    FILO_COMPATTAZIONE: 'filo_compattazione',
     // §2.1 — triage tab: l'LLM decide in batch su tutte le schede, non una per una.
     FILO_TAB_TRIAGE: 'filo_tab_triage',
     // §3.1/§3.2 — riassunto di una pagina alla chiusura (per archivio + embedding).
@@ -355,6 +357,7 @@
     [ACTIONS.FILO_DASHBOARD]: 'Chat con Filo',
     [ACTIONS.FILO_LESSON]: 'Memoria di Filo',
     [ACTIONS.FILO_COMPACT]: 'Memoria di Filo',
+    [ACTIONS.FILO_COMPATTAZIONE]: 'Chat con Filo',
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SEARCH]: 'Gestione schede',
@@ -392,6 +395,7 @@
     [ACTIONS.FILO_DASHBOARD]: 'Dashboard Filo',
     [ACTIONS.FILO_LESSON]: 'Memoria di Filo',
     [ACTIONS.FILO_COMPACT]: 'Memoria di Filo',
+    [ACTIONS.FILO_COMPATTAZIONE]: 'Compattazione della chat',
     [ACTIONS.FILO_TAB_TRIAGE]: 'Gestione schede',
     [ACTIONS.FILO_TAB_SUMMARY]: 'Riassunto scheda',
     [ACTIONS.FILO_TAB_SEARCH]: 'Ricerca schede',
@@ -443,6 +447,8 @@
     [ACTIONS.FILO_DASHBOARD]: '',
     [ACTIONS.FILO_LESSON]: '',
     [ACTIONS.FILO_COMPACT]: '',
+    // Vuoto: quello della chat (handlers.js, Compattazione.imposta).
+    [ACTIONS.FILO_COMPATTAZIONE]: '',
     [ACTIONS.DECKS_CHAT]: '',
     [ACTIONS.DECKS_OPINION]: '',
     [ACTIONS.DECKS_AUTOTAG]: '',

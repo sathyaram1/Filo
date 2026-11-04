@@ -49,6 +49,8 @@ function dimenticaIncognito() {
   for (const c of chatIncognito) dimentica(c);
   chatIncognito.clear();
   fotografie.incognito = null;
+  ancore.incognito = null;
+  try { globalThis.SN_COMPATTAZIONE?.dimenticaIncognito(); } catch (_) {}
 }
 
 function ricordaImmagini(chat, ts, immagini) {
@@ -445,6 +447,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     return memo.riga.testo === m.text ? m : { ...m, text: memo.riga.testo };
   });
   const Comp = globalThis.SN_COMPATTAZIONE;
+  if (Comp) { try { await Comp.carica(); } catch (_) {} }
   const f = FC().finestra(nelTratto, {
     ora,
     dopo: Comp ? Comp.compattato(incognito) : null,
@@ -533,6 +536,7 @@ function preamboloPerCompattare(m) {
   const memo = preamboli.get(FC().chiave(m));
   return memo && memo.eventi ? memo.eventi.testo || '' : '';
 }
+const diIncognito = (chatId) => chatIncognito.has(chatId);
 function ultimaFotografia(incognito = false) {
   const f = fotografie[incognito ? 'incognito' : 'normale'];
   return f ? { testo: f.testo, usata: f.usata, epoca: f.epoca } : null;
@@ -546,6 +550,6 @@ function riparti(incognito = false) {
 
 module.exports = {
   ricordaEsiti, ricordaImmagini, ricordaGiro, fotografa, conFotoInMemoria, dimentica, dimenticaIncognito, messaggiDelFilo, messaggiDi, componi,
-  senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, ultimaFotografia, riparti, eventiDa,
+  senzaDomanda, codaDellaScheda, esitiDellaScheda, azzeraAncore, esitiPerCompattare, preamboloPerCompattare, ultimaFotografia, riparti, eventiDa, diIncognito,
 };
 globalThis.SN_CONTESTO_FILO = module.exports;

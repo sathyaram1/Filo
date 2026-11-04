@@ -12,6 +12,8 @@
   const TIPI = Object.freeze({
     conversazione: { prompt: 16000, completion: 900 },
     documento: { prompt: 8000, completion: 800 },
+    // La soglia di serie piena, meno il grezzo che resta: righe delle ore e qualche memoria in uscita.
+    compattazione: { prompt: 60000, completion: 1500 },
     traduzione: { prompt: 5000, completion: 5000 },
     testo: { prompt: 3000, completion: 500 },
     breve: { prompt: 1500, completion: 150 },
@@ -28,6 +30,7 @@
     [A.FILO_DASHBOARD]: ['documento', U('aggiornamento', 'aggiornamenti')],
     [A.FILO_LESSON]: ['documento', U('conversazione', 'conversazioni')],
     [A.FILO_COMPACT]: ['documento', U('riordino', 'riordini')],
+    [A.FILO_COMPATTAZIONE]: ['compattazione', U('compattazione', 'compattazioni')],
     [A.FILO_TAB_TRIAGE]: ['documento', U('riordino', 'riordini')],
     [A.FILO_TAB_SUMMARY]: ['documento', U('scheda', 'schede')],
     [A.EDITOR_SUMMARY]: ['documento', U('riassunto', 'riassunti')],

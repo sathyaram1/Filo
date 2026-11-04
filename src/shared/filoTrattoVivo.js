@@ -27,7 +27,7 @@
 
   function sezioniUtente({
     sistema, capacita = '', stile = '', modelName = '', profilo = '', preferenze = '', espansioni = '', lezioni = '',
-    statoSezioni = null, stato = '', cambi = '', files = '', filesList = null,
+    statoSezioni = null, stato = '', cambi = '', files = '', filesList = null, filo = '',
   } = {}) {
     const out = [];
     const metti = (chiave, testo, extra = {}) => {
@@ -42,6 +42,8 @@
     metti('MEMORIA', C().memoriaImbustata({ profilo, preferenze, espansioni, lezioni }), {
       righe: righeMemoria({ profilo, preferenze, espansioni, lezioni }),
     });
+    // Il filo compattato cambia solo alla compattazione e una volta al giorno: ogni cambio rifà la fotografia.
+    metti('FILO', String(filo || '').trim() ? E().imbusta({ tipo: 'FILO_COMPATTATO', testo: String(filo).trim(), conIntestazione: true }) : '', { rifai: true });
     const sezStato = Array.isArray(statoSezioni) ? statoSezioni : (stato ? [{ chiave: 'STATO', testo: stato }] : []);
     for (const x of sezStato) {
       if (x && stringa(x.chiave)) {

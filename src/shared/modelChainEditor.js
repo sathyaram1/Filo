@@ -44,6 +44,7 @@
       [A.EXPLAIN_LINK, 'options_action_explain_link'],
       [A.FILO_LESSON, 'options_action_filo_lesson'],
       [A.FILO_COMPACT, 'options_action_filo_compact'],
+      [A.FILO_COMPATTAZIONE, 'options_action_filo_compattazione'],
       [A.SAFEBROWSE_JUDGE, 'options_action_safebrowse_judge'],
       [A.GEOBLOCK_CLASSIFY, 'options_action_geoblock_classify'],
       [A.FEEDBACK_TITLE, 'options_action_feedback_title'],
@@ -287,7 +288,7 @@
         // fuori palette.
         inp.setAttribute('autocomplete', 'off');
         inp.value = ref;
-        inp.placeholder = i === 0 ? t('options_chain_primary') : t('options_chain_fallback');
+        inp.placeholder = i === 0 ? ((ctx && ctx.vuoto) || t('options_chain_primary')) : t('options_chain_fallback');
         fit(inp);
         // Gate di compatibilità modello↔funzione. Durante la digitazione si è
         // liberi (i valori parziali non sono nickname del registry, quindi non
@@ -396,6 +397,8 @@
   }
 
   // Ritorna una mappa { action: chain } per leggere i valori dopo.
+  // Le funzioni che senza modello non si fermano: prendono quello di un'altra, e il campo vuoto lo dice.
+  const VUOTI = { filo_compattazione: 'options_chain_come_chat' };
   function renderGrid(host, opts) {
     const o = opts || {};
     const models = o.models || {};
@@ -413,6 +416,7 @@
         costoDi: typeof o.costoDi === 'function' ? (ref) => o.costoDi(action, ref) : null,
         // Una pagina con due liste di soprannomi (Gestione) dice quale è la sua.
         readOptions: typeof o.readOptions === 'function' ? o.readOptions : null,
+        vuoto: VUOTI[action] ? t(VUOTI[action]) : null,
       });
       cell.appendChild(label);
       cell.appendChild(chain.el);

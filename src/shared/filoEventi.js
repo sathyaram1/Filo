@@ -321,10 +321,17 @@
         break;
       case TIPI.CHAT_FONTI: {
         if (!c) break;
+        // L'ora di una fonte è quella della sua ultima lettura: la compattazione fa scadere quelle uscite dal tratto
+        // (SPEC-CONTESTO § Il sospetto non passa nel riassunto), e una riletta dopo deve tornare a contare.
         const prima = Array.isArray(c.fonti) ? c.fonti : [];
-        const nuove = ev.fonti.filter((f) => f && typeof f === 'object' && Number.isInteger(f.classe)
-          && !prima.some((p) => p.chiave === f.chiave && p.classe === f.classe));
-        c.fonti = prima.concat(nuove.map((f) => ({ ...f })));
+        const valide = ev.fonti.filter((f) => f && typeof f === 'object' && Number.isInteger(f.classe));
+        const nuove = [];
+        for (const f of valide) {
+          const ts = typeof f.ts === 'string' ? f.ts : ev.ts;
+          const gia = prima.find((p) => p.chiave === f.chiave && p.classe === f.classe);
+          if (gia) { if (!(Date.parse(gia.ts) >= Date.parse(ts))) gia.ts = ts; } else nuove.push({ ...f, ts });
+        }
+        c.fonti = prima.concat(nuove);
         break;
       }
       case TIPI.NAVIGAZIONE:

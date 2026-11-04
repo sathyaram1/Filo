@@ -347,6 +347,8 @@ app.whenReady().then(async () => {
   // #866 — il filo si legge adesso, e alla prima partenza dopo l'aggiornamento le chat salvate diventano segmenti.
   try { require('./services/ilFilo').carica().catch(() => {}); } catch (_) {}
   try { require('./services/handlers').sweepPendingChats().catch(() => {}); } catch (_) {}
+  // SPEC-CONTESTO fase 4: una volta al giorno le righe delle ore di ieri diventano la riga del giorno.
+  try { require('./services/compattazioneFilo').avvia(); } catch (_) {}
 
   // #322 — le scadenze si controllano nel main: altrimenti una sveglia scatta
   // solo se la newtab è aperta.

@@ -38,6 +38,10 @@
       const immagini = out.filoTratto.reduce((n, m) => n + (Array.isArray(m && m.content) ? m.content.filter((p) => p && p.type === 'image_url').length : 0), 0);
       out.filoTratto = { messaggi: out.filoTratto.length, caratteri, ...(immagini ? { immagini } : {}) };
     }
+    // Il pezzo di filo dato alla compattazione (SPEC-CONTESTO fase 4) è già nel filo, come il tratto: qui la misura.
+    if (Array.isArray(out.daCompattare)) {
+      out.daCompattare = { messaggi: out.daCompattare.length, caratteri: out.daCompattare.reduce((n, m) => n + testoDi(m && m.content).length, 0) };
+    }
     return out;
   }
 

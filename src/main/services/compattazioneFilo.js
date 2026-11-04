@@ -250,6 +250,19 @@ async function sezione(incognito) {
   return L().rendiFiloCompattato({ ore, giorni });
 }
 
+// Quanto pesa il tratto vivo, senza comporlo: testi ed esiti dei messaggi dopo il punto compattato.
+async function tokenDelTratto(incognito, { ora = Date.now(), tetti = null } = {}) {
+  const lista = await daCompattare(!!incognito, { ora, tetti: tetti || FC().tetti(null, null) });
+  let caratteri = 0;
+  for (const m of lista) {
+    caratteri += String(m.text || '').length;
+    if (m.role !== 'user') {
+      for (const a of CF().esitiPerCompattare(m).azioni) { try { caratteri += JSON.stringify(a._output || '').length; } catch (_) {} }
+    }
+  }
+  return Math.ceil(caratteri / FC().CARATTERI_PER_TOKEN);
+}
+
 async function righe(incognito) {
   const s = await stato(inIncognito(incognito));
   return { ore: s.ore.slice(), giorni: s.giorni.slice(), da: s.da, a: s.a };
@@ -273,8 +286,11 @@ async function decidi(idProposta, tieni) {
 }
 
 // ── Le porte che non sono una richiesta: fermo e giorni ─────────────────────
+// `fn` null: un turno è cominciato, la compattazione da fermo non parte sotto di lui.
 function programmaFermo(fn, ms) {
   if (timerFermo) clearTimeout(timerFermo);
+  timerFermo = null;
+  if (typeof fn !== 'function') return;
   timerFermo = setTimeout(() => { timerFermo = null; Promise.resolve().then(fn).catch((e) => console.warn('[Filo] compattazione da fermo:', e?.message || e)); }, ms);
   if (timerFermo.unref) timerFermo.unref();
 }
@@ -293,7 +309,7 @@ function azzera() { stati.normale = null; stati.incognito = vuoto(); caricando =
 function imposta(dip) { Object.assign(_dip, dip || {}); }
 
 module.exports = {
-  _dip, imposta, carica, compattato, compatta, riassumiGiorni, sezione, righe, inAttesa, decidi, suCompattazione,
+  _dip, imposta, carica, compattato, compatta, riassumiGiorni, sezione, righe, tokenDelTratto, inAttesa, decidi, suCompattazione,
   programmaFermo, avvia, dimenticaIncognito, azzera,
 };
 globalThis.SN_COMPATTAZIONE = module.exports;
