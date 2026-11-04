@@ -205,9 +205,10 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   let scritte = 0;
   // Da un tratto sospetto le memorie si propongono soltanto (§ Il sospetto, punto 4); dall'incognito nessuna.
   if (!incognito) {
+    const fonti = sospetto && letto.memorie.length ? await eventiDeiMessaggi(sospette) : [];
     for (const m of letto.memorie) {
       if (sospetto) {
-        const p = { id: id(), testo: m, ts: new Date(ora).toISOString() };
+        const p = { id: id(), testo: m, ts: new Date(ora).toISOString(), fonti };
         s.inAttesa.push(p);
         inAttesa.push(p);
       } else {
