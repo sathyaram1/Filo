@@ -1357,7 +1357,7 @@
     const righeFile = [...file.map((f) => f.percorso), ...immagini.map((d) => percorsi.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
     clearImagePreviews();
-    if (righeFile.length) text = [text || (immagini.length ? 'Descrivi questa immagine.' : ''), ...righeFile].filter(Boolean).join('\n');
+    if (righeFile.length) text = [text || (immagini.length ? DOMANDA_SOLO_IMMAGINI : ''), ...righeFile].filter(Boolean).join('\n');
     // Svuota subito la textarea: la bolla utente è già visibile, niente attesa.
     inputEl.value = '';
     autoGrowInput();
