@@ -1345,6 +1345,8 @@
   }
   // Quello che parte col messaggio, preso dalla barra che si svuota. `scritto`, `file` e `percorsi` servono a
   // rimetterlo nella barra com'era (un seguito che non parte, #1296).
+  const DOMANDA_SOLO_IMMAGINI = 'Descrivi questa immagine.';
+  const domandaDi = (c) => c.text || DOMANDA_SOLO_IMMAGINI;
   function prendiComposizione(text) {
     // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
     const scritto = inputEl.value.trim() ? inputEl.value : String(text || '');
