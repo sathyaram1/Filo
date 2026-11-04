@@ -60,15 +60,13 @@ test('il blocco aperto dal ramo con un numero poi uscito sparisce, e le sue righ
 
 test('un elenco che si svuota resta vuoto, e un elenco in cima scritto in una riga si apre', () => {
   const main = [{ v: '0.2.259', features: ['In arrivo'] }, { v: '0.2.257', features: ['Uscita'] }];
-  const ramo = [main[0], { v: '0.2.257', features: ['Uscita'], fixes: [R2] }];
-  const testo = sorgente(ramo).replace("features: [\n        'In arrivo',\n      ],", "features: ['In arrivo'],");
-  const r = spostaInCima(testo, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.258' }, oggi: OGGI });
+  const ramo = sorgente([main[0], { v: '0.2.257', features: ['Uscita', 'Nuova'], fixes: [R2] }])
+    .replace("features: [\n        'In arrivo',\n      ],", "features: ['In arrivo'],");
+  const r = spostaInCima(ramo, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.258' }, oggi: OGGI });
   assert.equal(r.ok, true, r.motivo);
-  assert.match(r.src, /features: \[\n {8}'In arrivo',\n {8}'Una correzione del ramo',\n {6}\],/
-    .source ? new RegExp("features: \\[\\n {8}'In arrivo',\\n {6}\\],\\n {6}fixes: \\[\\n {8}'Una correzione del ramo',\\n {6}\\],") : /x/);
-  assert.match(r.src, /features: \['Uscita'\]|features: \[\n {8}'Uscita',\n {6}\],\n {6}fixes: \[\],/);
-  assert.deepEqual(registroDa(r.src).map((n) => [n.version, n.features, n.fixes]),
-    [['0.2.259', ['In arrivo'], ['Una correzione del ramo']], ['0.2.257', ['Uscita'], []]]);
+  const atteso = sorgente([{ v: '0.2.259', features: ['In arrivo', 'Nuova'], fixes: [R2] }, { v: '0.2.257', features: ['Uscita'], fixes: ['_'] }])
+    .replace("fixes: [\n        '_',\n      ],", 'fixes: [],');
+  assert.equal(r.src, atteso);
 });
 
 test('una riga scritta su più righe si sposta intera, e niente si sposta se il ramo non ha scritto sotto versioni uscite', () => {
@@ -78,17 +76,17 @@ test('una riga scritta su più righe si sposta intera, e niente si sposta se il 
   const r = spostaInCima(ramo, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.258' }, oggi: OGGI });
   assert.equal(r.ok, true, r.motivo);
   assert.ok(r.src.includes(`        'In arrivo',\n        ${lunga},\n      ],`), r.src);
-  assert.deepEqual(registroDa(r.src)[1].features, ['Uscita']);
+  assert.deepEqual([...registroDa(r.src)[1].features], ['Uscita']);
 
   const nessuna = sorgente([{ v: '0.2.259', features: ['In arrivo', 'Del ramo, al posto giusto'] }, main[1]]);
   const n = spostaInCima(nessuna, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.258' }, oggi: OGGI });
-  assert.deepEqual([n.ok, n.spostate, n.src === nessuna], [true, [], true]);
+  assert.deepEqual([n.ok, n.spostate.length, n.src === nessuna], [true, 0, true]);
 });
 
 test('quando il registro non torna lo dice e non scrive niente', () => {
   const main = [{ v: '0.2.257', features: ['Uscita'] }];
   const prima = registroDa(sorgente(main));
-  const doppio = spostaInCima(sorgente([{ v: '0.2.257', features: [R2] }, ...main]), { prima, manifesto: { version: '0.2.258' }, oggi: OGGI });
+  const doppio = spostaInCima(sorgente([{ v: '0.2.257', features: [R2, 'Altra'] }, ...main]), { prima, manifesto: { version: '0.2.258' }, oggi: OGGI });
   assert.equal(doppio.ok, false);
   assert.match(doppio.motivo, /0\.2\.257 compare due volte/);
   const sbagliato = spostaInCima(sorgente([{ v: '0.2.261', features: ['In cima col numero sbagliato'] }, { v: '0.2.257', features: ['Uscita', R2] }]),
@@ -101,7 +99,7 @@ test('sul registro vero: una riga aggiunta sotto l\'ultima versione uscita finis
   const vero = readFileSync(join(REPO, FILE_NOVITA), 'utf8');
   const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));
   const prima = registroDa(vero);
-  const uscito = prima.find((n) => n.features && n.features.length && n.version <= pkg.version && !(n.version > pkg.version));
+  const uscito = prima.find((n) => n.features && n.features.length && globalThis.SN_PATCH_NOTES.cmpVersion(n.version, pkg.version) <= 0);
   const i = vero.indexOf(`version: '${uscito.version}'`);
   const j = vero.indexOf('features: [\n', i) + 'features: [\n'.length;
   const conRiga = `${vero.slice(0, j)}        'Riga tardiva di prova',\n${vero.slice(j)}`;
@@ -113,7 +111,7 @@ test('sul registro vero: una riga aggiunta sotto l\'ultima versione uscita finis
   // Tutto il resto è com'era.
   const senza = JSON.parse(JSON.stringify(dopo));
   senza[0].features = senza[0].features.filter((t) => t !== 'Riga tardiva di prova');
-  assert.deepEqual(senza.filter((n) => n.features.length + (n.fixes || []).length), JSON.parse(JSON.stringify(prima)));
+  assert.deepEqual(senza.filter((n) => (n.features || []).length + (n.fixes || []).length), JSON.parse(JSON.stringify(prima)));
 });
 
 // ── Nel clone: lo strumento, e le due strade di consegna del riallineamento ──
