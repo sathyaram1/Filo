@@ -198,7 +198,7 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti };
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI };
   }
 
   // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
