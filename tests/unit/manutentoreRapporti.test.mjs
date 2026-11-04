@@ -47,7 +47,7 @@ test('le richieste storte si fermano prima del server, col perché', async (t) =
     [['rapporti', '--a', '2026-11-01'], /--a vuole l'inizio/],
     [['rapporti', '--da', '2026-11-01', '--giorni', '7'], /o --da o --giorni/],
     [['rapporti', '--giorni', '0'], /da 1 in su/],
-    [['rapporti', '--limite', '500'], /da 1 a 200/],
+    [['rapporti', '--limite', '0'], /da 1 in su/],
     [['rapporti', '--sottonumeri'], /vuole il numero/],
     [['rapporti', '--somma', '--tutte'], /--tutte non serve/],
   ];
