@@ -220,3 +220,23 @@ test('#413.2 — alla chat le schede arrivano nell\'ordine della barra («la sec
     globalThis.SN_CREDITS = prima.C;
   }
 });
+
+test('#823.1 — fra i siti tenuti sempre aperti il modello vede anche un nome della rete di casa senza punto («nas»)', async () => {
+  const prima = { chrome: globalThis.chrome, M: globalThis.SN_FILO_MEMORY, C: globalThis.SN_CREDITS };
+  globalThis.chrome = { tabs: { query: async () => [] } };
+  globalThis.SN_CREDITS = { getPublic: async () => ({ balance: 1 }) };
+  globalThis.SN_FILO_MEMORY = {
+    getSession: async () => ({}), listTimers: async () => [], listNotifications: async () => [],
+    getDashboardCache: async () => null,
+    listKeepOpen: async () => ({ nas: {}, 'youtube.com': {}, '<b>altro</b>': {} }),
+  };
+  try {
+    const { state, stateText } = await FS.assemble({ sistema: false });
+    assert.deepEqual(state.sempreAperte, ['nas', 'youtube.com']);
+    assert.match(stateText, /SITI SEMPRE APERTI[^\n]*\n[^\n]*nas, youtube\.com/);
+  } finally {
+    globalThis.chrome = prima.chrome;
+    globalThis.SN_FILO_MEMORY = prima.M;
+    globalThis.SN_CREDITS = prima.C;
+  }
+});
