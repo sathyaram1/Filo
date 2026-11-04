@@ -145,7 +145,8 @@ dei feedback, senza testo. Il biglietto di unione:
 - legge i genitori dal server, e si sporca se uno di loro è non fidato;
 - scrive il feedback unito con `genitori`.
 
-Il figlio è fidato se e solo se lo sono tutti i genitori. Lo stesso schema vale
+Il figlio porta l'unione delle radici dei genitori (§ 1.8): è fidato se e solo
+se lo sono tutti. Lo stesso schema vale
 ogni volta che un agente sporco deve far nascere qualcosa che può restare
 fidato: passa numeri e ruoli, mai testo.
 
