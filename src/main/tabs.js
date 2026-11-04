@@ -461,6 +461,14 @@ function ultimoSuono(tab) {
   return tab.audible && tab._suonaOra ? Date.now() : (tab.audioAt || 0);
 }
 
+// Una regola sola per «suona adesso»: un lettore in corsa E il motore che lo sente, qualunque dei due arrivi per ultimo.
+// Dopo una pausa breve o un cambio di brano il motore non ridice «suona» (#1686): lo stato si ricalcola a ogni evento.
+function aggiornaSuono(tab) {
+  const ora = !!(tab.audible && tab._mediaInCorso);
+  if (ora || tab._suonaOra) tab.audioAt = Date.now();
+  tab._suonaOra = ora;
+}
+
 class TabManager {
   constructor(window, shellView, { shellHeight = 88, incognito = false, partition = null } = {}) {
     this.win = window;
