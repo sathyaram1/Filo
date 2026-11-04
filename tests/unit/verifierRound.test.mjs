@@ -172,7 +172,7 @@ test('il segno ? → stop al livello 3 e su un 2 difficile da disfare, il 2 va a
   const dueQ = decide([f(2, 'quale strada?', true)]);
   assert.equal(dueQ.stop, false, 'un 2 col ? non ferma più');
   assert.equal(dueQ.fix.length, 1, 'chi corregge applica l\'opzione consigliata');
-  assert.deepEqual(dueQ.derived.map((x) => [x.priority, x.inCorrezione]), [[2, true]], 'e la domanda esce in un derivato');
+  assert.deepEqual(dueQ.derived.map((x) => [x.priority, x.inCorrezione]), [[1, true]], 'e la domanda esce in un derivato (un 2 nasce a 1)');
   const uno = decide([f(1, 'gusto?', true)]);
   assert.equal(uno.stop, false);
   assert.deepEqual(uno.fix, []);
