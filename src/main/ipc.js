@@ -351,13 +351,7 @@ function registerIpcHandlers() {
   };
 
   // Tetto, finestra e taglio viaggiano con l'errore: la frase e il tasto per le Preferenze si ricompongono da qui (#1097.3).
-  const dettagliDelTetto = (err) => (err ? {
-    ...(err.maxTokens ? { maxTokens: err.maxTokens } : {}),
-    ...(err.finestra ? { finestra: err.finestra } : {}),
-    ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
-    // Il modello che i crediti non pagano (#830) porta il tasto per la pagina Crediti.
-    ...(err.reason === 'crediti' ? { reason: 'crediti' } : {}),
-  } : {});
+  const dettagliDelTetto = (err) => globalThis.SN_CHAT_ERRORS.dettagliDelTetto(err);
 
   ipcMain.handle('filo:message', async (event, msg) => {
     const info = senderInfo(event);
