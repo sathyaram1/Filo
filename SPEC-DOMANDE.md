@@ -633,7 +633,7 @@ Come funziona oggi (#1152):
   leggere arriva `assente` col perché). Se un principio risponde, lo applica e
   lo cita.
 - **Risposte automatiche.** Le scrive il compito «Gestisci la domanda» alla
-  nascita (§ 3.5, passo 2), non una revisione quotidiana: `esito.automatica`
+  nascita (§ 3.5, passo 3), non una revisione quotidiana: `esito.automatica`
   le porta nella scheda «Risposte automatiche». L'owner può riaprirle: la
   riapertura rimette la domanda fra quelle da rispondere e segna il principio
   come da rivedere (`principioContestato` sulla domanda da cui viene), così il
