@@ -1128,27 +1128,44 @@ async function transazione(ctx, S, piano, dati) {
     })));
   }
   await ctx.fh.datasync();
+  const tabellaPrima = S.tabella;
   S.tabella = tabella;
   S.blocchiTabella = blocchiTabella;
   S.bytesTabella = Buffer.from(bytes);
   await scriviTestaGruppo(ctx, S, { nuovi: new Map([...dati].filter(([j]) => j < GRUPPO)), bytes });
-  await liberaEStringi(ctx, S, prima);
+  await liberaEStringi(ctx, S, prima, tabellaPrima);
 }
 
-// Azzera i blocchi che la testa nuova non usa più (il contenuto di un file cancellato non resta leggibile a chi ha il
-// nome) e accorcia il segreto se la coda è libera: prima si distrugge, poi la testa dice il numero nuovo.
-async function liberaEStringi(ctx, S, prima) {
+// I pacchi fuori dal gruppo della testa da cui la tabella nuova ha tolto un tratto che la vecchia teneva.
+function pacchiDaPulire(tabellaPrima, tabella, ora) {
+  const out = new Set();
+  if (!tabellaPrima) return out;
+  const adesso = pacchi(tabella);
+  for (const [j, p] of pacchi(tabellaPrima)) {
+    if (j < GRUPPO || !ora[j]) continue;
+    const restano = new Set((adesso.get(j) || { tratti: [] }).tratti.map(String));
+    if (p.tratti.some((t) => !restano.has(String(t)))) out.add(j);
+  }
+  return out;
+}
+
+// Azzera i blocchi che la testa nuova non usa più, e nei pacchi i tratti che non tiene più (il contenuto di un file
+// cancellato non resta leggibile a chi ha il nome); accorcia il segreto se la coda è libera: prima si distrugge, poi la
+// testa dice il numero nuovo.
+async function liberaEStringi(ctx, S, prima, tabellaPrima = null) {
   const ora = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const liberati = [];
   for (let j = 1; j < prima.length; j++) if (prima[j] && !ora[j]) liberati.push(j);
   let L3 = 1;
   for (let j = S.L - 1; j >= 1; j--) if (ora[j]) { L3 = j + 1; break; }
-  if (!liberati.length && L3 >= S.L) return;
+  const daPulire = pacchiDaPulire(tabellaPrima, S.tabella, ora);
+  if (!liberati.length && !daPulire.size && L3 >= S.L) return;
   const Lprima = S.L;
   const G3 = Math.ceil(L3 / GRUPPO);
-  const daRiscrivere = new Set(liberati.filter((j) => j >= GRUPPO && j < L3).map((j) => Math.floor(j / GRUPPO)));
+  const daRiscrivere = new Set([...liberati, ...daPulire].filter((j) => j >= GRUPPO && j < L3).map((j) => Math.floor(j / GRUPPO)));
   if (L3 < Lprima && L3 % GRUPPO && G3 - 1 >= 1) daRiscrivere.add(G3 - 1);
   const rovinati = blocchiRovinati(S.L, S.tabella);
+  const pz = pacchi(S.tabella);
   for (const lotto of aLotti([...daRiscrivere].sort((a, b) => a - b))) {
     // Un gruppo tutto liberato si riscrive a zero senza leggerlo: cancellare un file grosso non lo rilegge intero.
     const usaQualcosa = (g) => Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => ora[GRUPPO * g + s]).some(Boolean);
