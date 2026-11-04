@@ -70,6 +70,52 @@ test('T2 bottone ridato alla riapertura: un no resta un no e non richiama il mod
   } finally { await ripristina(app); togliCartella(dir); }
 });
 
+test('T2b bottone in diretta: un no non richiama il modello', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('g7-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: 'Creo la cartella.', toolCalls: [mkdir('c1', dir, 'sei')] }, { text: 'RIPARTITO' }]);
+    await chiedi(page, 'crea la cartella sei');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const bottone = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella sei' });
+    const prima = (await chiamateAlModello(app)).length;
+    await bottone.click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+    await clickConfirm(page, 'cancel');
+    await page.waitForTimeout(2500);
+    const ch = await chiamateAlModello(app);
+    console.log('T2b CHIAMATE', prima, ch.length, ch.length > prima ? JSON.stringify(ch[ch.length - 1].slice(-1)).slice(-800) : '');
+  } finally { await ripristina(app); togliCartella(dir); }
+});
+
+test('T2c riaperta: un no al bottone, cosa riceve il modello', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('g7-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: 'Creo la cartella.', toolCalls: [mkdir('c1', dir, 'sette')] }, { text: 'RIPARTITO' }]);
+    await chiedi(page, 'crea la cartella sette');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const chat = await chatCon(app, 'crea la cartella sette');
+    await riapri(app, page, chat.id);
+    const bottone = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella sette' });
+    await expect(bottone).toBeVisible({ timeout: 8_000 });
+    const prima = (await chiamateAlModello(app)).length;
+    await bottone.click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 5_000 });
+    await clickConfirm(page, 'cancel');
+    await page.waitForTimeout(2500);
+    const ch = await chiamateAlModello(app);
+    console.log('T2c CHIAMATE', prima, ch.length, ch.length > prima ? JSON.stringify(ch[ch.length - 1].slice(-2)).slice(-1500) : '');
+    console.log('T2c BOLLE', JSON.stringify(await page.locator('.dash-bubble-filo').allInnerTexts()));
+  } finally { await ripristina(app); togliCartella(dir); }
+});
+
 test('T3 azione non riuscita senza conferma: il perché resta dopo un riavvio', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await home(app);
