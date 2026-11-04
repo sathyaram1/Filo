@@ -465,6 +465,9 @@
     const orfani = [];
     // Le righe di ogni area all'ultima rilettura: tolta dalla pagina, un editor non le dà più.
     const righeViste = new WeakMap();
+    // Testo uscito dal campo senza una prova d'arrivo (un dialogo chiuso col nome ricomparso nella pagina): se il sito
+    // poi respinge la richiesta che lo porta, torna da proteggere (#1808). { t, righe }
+    const spariti = [];
     // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
     const partiti = new Set();
     let ultimoMandato = null;
@@ -593,7 +596,11 @@
     function ricomparsi() {
       for (let i = orfani.length - 1; i >= 0; i--) {
         const d = orfani[i].dialogo;
-        if (d && essenziale(orfani[i].t) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) orfani.splice(i, 1);
+        if (d && essenziale(orfani[i].t) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) {
+          const [o] = orfani.splice(i, 1);
+          spariti.push({ t: o.t, righe: o.righe });
+          if (spariti.length > 20) spariti.shift();
+        }
       }
       // Un dialogo chiuso senza toglierlo dalla pagina tiene il campo nascosto, col testo dentro.
       for (const area of inDialogo) {
@@ -605,14 +612,15 @@
     }
     // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
     // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
+    function porta(inviato, t, righe) {
+      const tutto = essenziale(t);
+      if (tutto && inviato.includes(tutto)) return true;
+      const r = righe.map(essenziale).filter(Boolean);
+      return r.length > 0 && r.every((x) => inviato.includes(x));
+    }
     function partito(inviato) {
       if (typeof inviato !== 'string' || !inviato) return;
-      const dentro = (t, righe) => {
-        const tutto = essenziale(t);
-        if (tutto && inviato.includes(tutto)) return true;
-        const r = righe.map(essenziale).filter(Boolean);
-        return r.length > 0 && r.every((x) => inviato.includes(x));
-      };
+      const dentro = (t, righe) => porta(inviato, t, righe);
       // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
       stato();
       for (const area of [...aree.keys()]) {
@@ -623,6 +631,26 @@
       }
       for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
       aggiorna(false);
+    }
+    // Una richiesta respinta dal sito che porta un testo già uscito dalla casella (svuotata dalla pagina, o il dialogo
+    // chiuso): quel testo non è arrivato, e torna a proteggere la scheda finché una richiesta riuscita non lo porta.
+    function respinto(inviato) {
+      if (typeof inviato !== 'string' || !inviato) return;
+      stato();
+      const candidati = spariti.splice(0);
+      for (const [area, base] of aree) {
+        const ora = viva(area) ? pulito(testo(area)) : '';
+        if (ora && ora !== pulito(base)) continue;
+        const righe = righeViste.get(area);
+        if (righe && righe.length) candidati.push({ t: righe.join(''), righe });
+      }
+      for (const c of candidati) {
+        if (!porta(inviato, c.t, c.righe)) continue;
+        if (!orfani.some((o) => o.t === c.t)) orfani.push({ t: c.t, righe: c.righe, dialogo: null });
+        if (orfani.length > 100) orfani.shift();
+      }
+      aggiorna(false);
+      mandaImpronte();
     }
     function impronta(s) {
       let h1 = 0xdeadbeef;
@@ -946,16 +974,21 @@
       ultimeImpronte = '';
       mandaImpronte();
     });
-    // Il testo partito su un collegamento sempre aperto a cui il server ha risposto: il main lo legge come una richiesta.
+    // Il testo partito su un collegamento sempre aperto e confermato dal server, o respinto: il main lo legge come una
+    // richiesta riuscita o respinta.
     const collegamento = globalThis.SN_COLLEGAMENTO_APERTO;
     if (typeof collegamento === 'string' && collegamento) {
       window.addEventListener(collegamento, (e) => {
         if ((!aree.size && !orfani.length) || typeof e.detail !== 'string' || !e.detail) return;
         invia({ type: MSG.TAB_ACTIVITY, collegamento: e.detail });
       }, true);
+      window.addEventListener(`${collegamento}:r`, (e) => {
+        if (!aree.size || typeof e.detail !== 'string' || !e.detail) return;
+        invia({ type: MSG.TAB_ACTIVITY, collegamentoRespinto: e.detail });
+      }, true);
     }
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
+      if (msg && msg.type === MSG.FORM_SENT) { try { if (msg.respinto === true) respinto(msg.testo); else partito(msg.testo); } catch (_) {} return; }
       if (!msg || msg.type !== MSG.FORM_RECHECK) return;
       osserva(window);
       stato();

@@ -64,8 +64,9 @@ test('le funzioni che Filo sostituisce non si distinguono dalle native, nemmeno 
     const suo = fw.Function.prototype.toString;
     const proprio = (fn) => Object.prototype.hasOwnProperty.call(fn, 'prototype');
     const out = {
-      prototipi: [navigator.credentials.get, window.chrome.runtime.connect, window.chrome.csi, Function.prototype.toString, suo].map(proprio),
-      dalRiquadro: [suo.call(navigator.credentials.get), suo.call(window.chrome.runtime.connect), suo.call(Function.prototype.toString)],
+      prototipi: [navigator.credentials.get, window.chrome.runtime.connect, window.chrome.csi, Function.prototype.toString, suo, WebSocket.prototype.send, EventTarget.prototype.addEventListener].map(proprio),
+      dalRiquadro: [suo.call(navigator.credentials.get), suo.call(window.chrome.runtime.connect), suo.call(Function.prototype.toString), suo.call(WebSocket.prototype.send), suo.call(EventTarget.prototype.addEventListener)],
+      dallaPagina: [WebSocket.prototype.send.toString(), Function.prototype.toString.call(WebSocket.prototype.send), WebSocket.prototype.send.length, WebSocket.prototype.send.name],
       prototipoDellaPagina: Function.prototype.toString.call(Function.prototype),
       leSueRestano: suo.call(fw.eval('(function mia(a) { return a; })')),
     };
@@ -73,8 +74,9 @@ test('le funzioni che Filo sostituisce non si distinguono dalle native, nemmeno 
     return out;
   });
   expect(r).toEqual({
-    prototipi: [false, false, false, false, false],
-    dalRiquadro: ['function get() { [native code] }', 'function connect() { [native code] }', 'function toString() { [native code] }'],
+    prototipi: [false, false, false, false, false, false, false],
+    dalRiquadro: ['function get() { [native code] }', 'function connect() { [native code] }', 'function toString() { [native code] }', 'function send() { [native code] }', 'function addEventListener() { [native code] }'],
+    dallaPagina: ['function send() { [native code] }', 'function send() { [native code] }', 1, 'send'],
     prototipoDellaPagina: 'function () { [native code] }',
     leSueRestano: 'function mia(a) { return a; }',
   });

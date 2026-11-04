@@ -144,6 +144,7 @@ module.exports = function register(on, ctx) {
         pwPrima: msg.pwPrima === true,
         invioRiquadro: typeof msg.invioRiquadro === 'string' ? msg.invioRiquadro.slice(0, 4096) : '',
         collegamento: typeof msg.collegamento === 'string' ? msg.collegamento.slice(0, LIMITE_CORPO) : '',
+        collegamentoRespinto: typeof msg.collegamentoRespinto === 'string' ? msg.collegamentoRespinto.slice(0, LIMITE_CORPO) : '',
       }, sender.frame);
     }
     return { ok: true };

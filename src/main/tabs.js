@@ -2494,6 +2494,12 @@ class TabManager {
       const corpo = Buffer.from(activity.collegamento, 'utf8').subarray(0, LIMITE_CORPO);
       if (sito) accodaRicevuta({ tab, w: this.win, sito, url: '', corpo });
     }
+    if (typeof activity.collegamentoRespinto === 'string' && activity.collegamentoRespinto && frame) {
+      let sito = null;
+      try { sito = Cookies.registrableOf(frame.url); } catch (_) {}
+      const corpo = Buffer.from(activity.collegamentoRespinto, 'utf8').subarray(0, LIMITE_CORPO);
+      if (sito) accodaRicevuta({ tab, w: this.win, sito, url: '', corpo, respinto: true });
+    }
     if (Array.isArray(activity.impronte)) {
       if (!tab._impronte) tab._impronte = new Map();
       const imp = activity.impronte.filter((x) => typeof x === 'string' && x.length <= 32).slice(0, 50);
@@ -4747,6 +4753,9 @@ Cookies.osservaRichieste((d) => {
   if (!r) return;
   inViaggio.delete(k);
   if (riuscita && d.statusCode >= 200 && d.statusCode < 400) for (const s of r.schede) accodaRicevuta({ ...s, sito: r.sito, url: r.url, corpo: r.corpo });
+  // Respinta: il testo che la pagina ha già tolto dalla casella torna da proteggere (#1808). Le pagine e i riquadri
+  // li segue già la navigazione; una richiesta annullata dalla pagina non è un no del sito.
+  else if (d.resourceType !== 'mainFrame' && d.resourceType !== 'subFrame' && d.error !== 'net::ERR_ABORTED') for (const s of r.schede) accodaRicevuta({ ...s, sito: r.sito, url: r.url, corpo: r.corpo, respinto: true });
 });
 // Una richiesta alla volta, cedendo il passo fra l'una e l'altra: una pagina che ne manda tante
 // non ferma Filo. Oltre la coda si lasciano andare, e nel dubbio la scheda resta protetta.
@@ -4764,7 +4773,7 @@ function leggiRicevuta() {
     const testo = testoDellaRichiesta(r);
     const type = globalThis.SN_MSG?.MSG?.FORM_SENT || 'form_sent';
     const inVista = !!(r.w._filoTabs && r.w._filoTabs.activeId === r.tab.id);
-    if (testo) spingiAllaScheda(r.tab.view.webContents, { type, testo }, { inVista, soloFrame: (url) => Cookies.registrableOf(url) === r.sito });
+    if (testo) spingiAllaScheda(r.tab.view.webContents, { type, testo, respinto: r.respinto === true }, { inVista, soloFrame: (url) => Cookies.registrableOf(url) === r.sito });
   } catch (_) {}
   setImmediate(leggiRicevuta);
 }
