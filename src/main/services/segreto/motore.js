@@ -731,11 +731,12 @@ async function decodificaGruppi(ctx, S, gruppi) {
 }
 
 // I carichi dei blocchi dentro L di ogni gruppo: null per quelli che la versione buona non copre o se il gruppo è perso.
+// Sempre Buffer: quelli ricostruiti dalla parità escono Uint8Array, che non sa `copy`.
 async function carichiGruppi(ctx, S, gruppi) {
   const dati = await decodificaGruppi(ctx, S, gruppi);
   return new Map(gruppi.map((g) => {
     const d = dati.get(g);
-    return [g, Array.from({ length: kAtteso(S, g) }, (_, s) => (d && s < d.length ? d[s] : null))];
+    return [g, Array.from({ length: kAtteso(S, g) }, (_, s) => (d && s < d.length ? comeBuffer(d[s]) : null))];
   }));
 }
 

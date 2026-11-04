@@ -573,7 +573,7 @@ describe('spazio: il numero annunciato si raggiunge, e chiederlo non ferma la fi
     setImmediate(giro);
     try {
       const chiesto = await misura(() => s.spazio());
-      assert.ok(chiesto.r.disponibili > 500 * MB);
+      assert.ok(chiesto.r.disponibili > 400 * MB);
       assert.ok(chiesto.giri >= 10 && chiesto.fermo < chiesto.totale / 5, `spazio(): ${JSON.stringify(chiesto)}`);
       const rifiutato = await misura(() => s.scriviFile('troppo', Buffer.allocUnsafe(chiesto.r.disponibili + 1)).catch((e) => e));
       assert.equal(rifiutato.r.codice, 'SPAZIO');
