@@ -3,6 +3,8 @@
 // (VEDI_SCHERMO); prove in tests/unit/vediSchermo.test.mjs e tests/vedi-schermo.spec.mjs.
 'use strict';
 
+const Foto = require('./fotoDellaPagina');
+
 // Il lato lungo chiesto al sistema e quello che va al modello: un 4K resta leggibile, una PNG da decine di MB no.
 const LATO_CATTURA = 2560;
 const LATO_MODELLO = 2000;
