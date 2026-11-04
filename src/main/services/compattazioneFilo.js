@@ -90,6 +90,13 @@ function compattato(incognito) {
   return s && s.a ? { da: s.da, a: s.a } : null;
 }
 
+// Una fonte letta prima del punto compattato del suo lato non conta più: il suo testo è uscito dal tratto (SPEC-CONTESTO
+// § Il sospetto non passa nel riassunto, punto 2). Una fonte senza ora vale scaduta.
+function fonteScaduta(f, incognito) {
+  const c = compattato(!!incognito);
+  return !!c && !!f && !(Date.parse(f.ts) >= Date.parse(c.a));
+}
+
 // Una lettura sopra la soglia di pulito del livello di autonomia: chi compatta non ne vede il testo (§ Il sospetto, punto 1).
 async function giudice() {
   const A = globalThis.SN_AUTONOMIA;
@@ -336,7 +343,7 @@ function azzera() { stati.normale = null; stati.incognito = vuoto(); caricando =
 function imposta(dip) { Object.assign(_dip, dip || {}); }
 
 module.exports = {
-  _dip, imposta, carica, compattato, compatta, riassumiGiorni, sezione, righe, tokenDelTratto, inAttesa, decidi, suCompattazione,
+  _dip, imposta, carica, compattato, fonteScaduta, compatta, riassumiGiorni, sezione, righe, tokenDelTratto, inAttesa, decidi, suCompattazione,
   programmaFermo, avvia, dimenticaIncognito, azzera,
 };
 globalThis.SN_COMPATTAZIONE = module.exports;
