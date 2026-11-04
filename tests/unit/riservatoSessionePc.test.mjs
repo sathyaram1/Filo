@@ -26,12 +26,12 @@ function localTicket({ rompi = false } = {}) {
   return { chiamate, deps: { fetchImpl, idToken: async () => 'token-finto' } };
 }
 
-function conBiglietto(fn) {
+async function conBiglietto(fn) {
   const dir = cartellaTemporanea('riservato-');
   try {
     const p = join(dir, '.claude', 'biglietti', 'sessione.json');
     B.scriviFile(p, { ticket: SEGRETO, fp: 'f'.repeat(64), natoIl: 1 });
-    return fn({ env: { FILO_BIGLIETTO_FILE: p }, cwd: dir });
+    return await fn({ env: { FILO_BIGLIETTO_FILE: p }, cwd: dir });
   } finally {
     togliCartella(dir);
   }
