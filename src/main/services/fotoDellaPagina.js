@@ -188,9 +188,13 @@ function rettangolo(r) {
  *  posizioni) e dai campi che misura il main. I riquadri per ultimi: restano pieni anche sopra un campo. PURA. */
 function coperture(misure, campiFuori = []) {
   const campi = [], ripetuti = [], riquadri = [];
+  // Puntini neutri e non del colore del testo: della scritta nel campo non resta niente, nemmeno la tinta.
   const campo = (c) => {
     const r = rettangolo(c);
-    if (r) campi.push({ ...r, colore: colore(c.sfondo) || [255, 255, 255], puntini: colore(c.testo) || [0, 0, 0] });
+    if (!r) return;
+    const fondo = colore(c.sfondo) || [255, 255, 255];
+    const chiaro = 0.299 * fondo[0] + 0.587 * fondo[1] + 0.114 * fondo[2] > 128;
+    campi.push({ ...r, colore: fondo, puntini: chiaro ? [60, 60, 60] : [200, 200, 200] });
   };
   for (const m of misure) {
     if (!m) continue;

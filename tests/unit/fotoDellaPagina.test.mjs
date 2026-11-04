@@ -105,12 +105,14 @@ test('col fattore 1,25 la pittura copre ogni pixel toccato, anche a metà, e ai 
   assert.equal(pixel(bordo, 0, 0)[3], 7, 'sopra il rettangolo la foto resta com’era');
 });
 
-test('un campo segreto si copre col suo sfondo e i puntini del suo testo', () => {
+test('un campo segreto si copre col suo sfondo e dei puntini neutri, mai del colore della scritta', () => {
   const lista = Foto.coperture([{ campi: [{ left: 0, top: 0, width: 20, height: 10, sfondo: 'rgb(250, 240, 230)', testo: 'rgba(1, 2, 3, 1)' }] }]);
   const b = Foto.dipingi(bitmap(), W, H, lista, { x: 1, y: 1 });
   const colori = new Set();
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) colori.add(pixel(b, x, y).join(','));
-  assert.deepEqual([...colori].sort(), ['230,240,250,255', '3,2,1,255'].sort());
+  assert.deepEqual([...colori].sort(), ['230,240,250,255', '60,60,60,255'].sort());
+  const scuro = Foto.coperture([{ campi: [{ left: 0, top: 0, width: 5, height: 5, sfondo: 'rgb(20, 20, 20)', testo: '#fff' }] }]);
+  assert.deepEqual(scuro[0].puntini, [200, 200, 200], 'su un campo scuro i puntini sono chiari');
 });
 
 test('le coperture: prima e dopo lo scatto, campi poi testo ripetuto poi riquadri, e niente di non numerico', () => {
