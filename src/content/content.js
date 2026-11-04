@@ -2861,6 +2861,10 @@
       try { Menu.close(); } catch (_) {}
       return;
     }
+    if (msg?.type === MSG.REDTEAM_VERIFICATO_CHANGED) {
+      refreshVoceAttacco(true);
+      return;
+    }
     // Azione di PAGINA dalla barra laterale, o scelta dal menu aperto dentro un riquadro: qui perché solo
     // il frame principale è «la pagina» (#405).
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
