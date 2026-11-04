@@ -1,5 +1,5 @@
 // #905.1 — col portachiavi la chiave di Safe Browsing e la password del proxy vanno sul disco cifrate come le chiavi
-// API, e tornano in chiaro alla riapertura; un file vecchio con segreti in chiaro si riscrive cifrato. Senza
+// API, e tornano in chiaro in memoria alla riapertura; un file vecchio con segreti in chiaro si riscrive cifrato. Senza
 // portachiavi l'avviso «in chiaro» parte anche se il solo segreto è uno di questi.
 
 import { test } from 'node:test';
@@ -7,8 +7,8 @@ import assert from 'node:assert/strict';
 import Module, { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, writeFileSync, rmSync } from 'node:fs';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -69,7 +69,7 @@ test('col portachiavi nessun segreto resta leggibile nel file, e alla riapertura
     const dopo = avvia(userData);
     assert.deepEqual((await dopo.get('settings')).settings, impostazioni());
   } finally {
-    rmSync(userData, { recursive: true, force: true });
+    togliCartella(userData);
   }
 });
 
@@ -86,7 +86,7 @@ test('un file con la chiave di Safe Browsing e il proxy in chiaro si riscrive ci
     for (const s of [SAFE, PASSWORD, CHIAVE]) assert.equal(testo.includes(s), false, `${s} è rimasto in chiaro`);
     assert.deepEqual((await avvia(userData).get('settings')).settings, impostazioni());
   } finally {
-    rmSync(userData, { recursive: true, force: true });
+    togliCartella(userData);
   }
 });
 
@@ -104,7 +104,7 @@ test('un valore riscritto in chiaro senza portachiavi vince sul blob vecchio all
     assert.equal(s.security.safeBrowse.safeBrowsingKey, 'AIzaSyD-scritta-dopo-in-chiaro');
     assert.equal(s.proxy.datacenter, PROXY);
   } finally {
-    rmSync(userData, { recursive: true, force: true });
+    togliCartella(userData);
   }
 });
 
@@ -123,7 +123,7 @@ test('senza portachiavi l\'avviso parte anche se l\'unico segreto è la password
       assert.deepEqual(JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8')).settings, settings, 'senza portachiavi niente si perde');
     } finally {
       cifraturaAccesa = true;
-      rmSync(userData, { recursive: true, force: true });
+      togliCartella(userData);
     }
   }
 });

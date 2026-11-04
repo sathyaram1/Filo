@@ -54,11 +54,12 @@ function contaDisco(cosa, dato) {
 
 const pieno = (v) => typeof v === 'string' && v.trim() !== '';
 const NOMI_VIETATI = new Set(['__proto__', 'constructor', 'prototype']);
+const leggi = (o, percorso) => percorso.reduce((x, k) => (x && typeof x === 'object' ? x[k] : undefined), o);
 
 // I segreti fuori da apiKeys, come coppie [percorso, valore]: sono quelli che vanno in CAMPO_SEGRETI_CIFRATI.
 function altriSegreti(s) {
   return costanti().percorsiSegreti(s).filter((p) => p[0] !== 'apiKeys')
-    .map((p) => [p, p.reduce((o, k) => o[k], s)]).filter(([, v]) => pieno(v));
+    .map((p) => [p, leggi(s, p)]).filter(([, v]) => pieno(v));
 }
 
 // Una copia di `s` col campo in fondo a `percorso` tolto (valore undefined) o messo: si copia solo la strada.
@@ -120,7 +121,7 @@ function deserializeFromDisk(data) {
       for (const [p, v] of Array.isArray(coppie) ? coppie : []) {
         const valido = Array.isArray(p) && p.length > 1 && p.every((k) => typeof k === 'string' && !NOMI_VIETATI.has(k));
         if (!valido || !pieno(v)) continue;
-        if (!pieno(p.slice(0, -1).reduce((o, k) => (o && typeof o === 'object' ? o[k] : undefined), ns)?.[p[p.length - 1]])) ns = conCampo(ns, p, v);
+        if (!pieno(leggi(ns, p))) ns = conCampo(ns, p, v);
       }
     } catch (_) {}
   }
