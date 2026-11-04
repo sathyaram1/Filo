@@ -41,6 +41,22 @@
     return null;
   }
 
+  // L'ultimo messaggio del filo prima della domanda di adesso (l'ultima dell'utente in `chat`), in ms; null senza.
+  function ultimaAttivita(messaggi, { chat = null } = {}) {
+    const lista = Array.isArray(messaggi) ? messaggi : [];
+    let fino = Infinity;
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const m = lista[i];
+      if (m && m.chat === chat) { if (m.role === 'user') fino = ms(m.ts); break; }
+    }
+    let out = null;
+    for (const m of lista) {
+      const t = m ? ms(m.ts) : NaN;
+      if (Number.isFinite(t) && t < fino && (out == null || t > out)) out = t;
+    }
+    return out;
+  }
+
   // Il giorno locale di un istante, `AAAA-MM-GG`: il livello «giorni» va per giorni di chi usa Filo, non di Greenwich.
   function giornoDi(ts) {
     const d = new Date(typeof ts === 'number' ? ts : ms(ts));
