@@ -172,25 +172,33 @@ function richiestaAperta(sopra) {
 // Le password scritte a mano fuori dal posto di un'etichetta (#1649): accanto al nome utente, dopo il nome della rete,
 // dopo «pw» o «la pass» in una frase, dopo «, è». Conta solo il posto del valore, mai le parole vicine all'etichetta: i
 // nomi di prodotto e il codice intorno restano (#1589). Prove: tests/unit/correttorePasswordAMano.test.mjs.
-const PW = '(?:password|passwd|pwd|psw|pw|pass|passphrase|passcode)';
+// Un nome della password si cerca largo (anche «parola chiave» e i refusi) e si conferma con nomeDiPassword.
+const PW = "(?:p\\p{L}{1,9}|parola\\s+(?:chiave|d['’]ordine))";
 const UTENTE = '(?:username|user|utente|nome\\s+utente|login|e-?mail|mail|account)';
+// Fra nome utente e password: la barra, la stanghetta o il trattino fra spazi («mario - Girasole2024»).
+const FRA = '(?:\\s*[/|]\\s*|\\s+[-–—]\\s+)';
+// I tratti senza spazi hanno un tetto: un campo lungo che ripete l'etichetta non rilegge la riga da capo a ogni volta.
 const LIBERE = {
   // «Username / Password: mario / Girasole2024»: il valore sta al posto dell'etichetta della password.
-  coppia: new RegExp(`(?<![\\p{L}\\p{N}])(${UTENTE}|${PW})\\s*/\\s*(${UTENTE}|${PW})\\s*[:=]\\s*(\\S+?)\\s*/\\s*(\\S+)`, 'gu'),
-  credenziali: /(?<![\p{L}\p{N}])(?:credenziali|credentials|dati\s+(?:di\s+)?(?:accesso|login))\s*[:=]\s*(\S+?)\s*\/\s*(\S+)/gu,
-  accedi: /(?<![\p{L}\p{N}])(?:accedi|entra|login|log\s*in|sign\s*in)\s+(?:con|with)\s*:?\s*(\S+?)\s*\/\s*(\S+)/gu,
-  // «Wi-Fi: CasaRossi - Faro7Blu55»: prima la rete, poi la chiave. Il nome della rete può avere spazi (32 caratteri al più).
-  rete: /(?<![\p{L}\p{N}])(?:wi-?fi|wlan|ssid)\s*[:=]\s*([^\n]{1,32}?)\s+[-–—/|]\s+(\S+)/gu,
+  coppia: new RegExp(`(?<![\\p{L}\\p{N}])(${UTENTE}|${PW})${FRA}(${UTENTE}|${PW})\\s*[:=]\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  credenziali: new RegExp(`(?<![\\p{L}\\p{N}])(?:credenziali|credentials|dati\\s+(?:di\\s+)?(?:accesso|login))\\s*[:=]?\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  // «Login: mario / Girasole2024»: etichette più generiche, il valore deve avere la forma di una password.
+  accesso: new RegExp(`(?<![\\p{L}\\p{N}])(?:login|account|accesso|utenza|access)\\s*[:=]\\s*(\\S{1,128}?)${FRA}(\\S+)`, 'gu'),
+  accedi: /(?<![\p{L}\p{N}])(?:accedi|entra|login|log\s*in|sign\s*in)\s+(?:con|with)\s*:?\s*(\S{1,128}?)\s*\/\s*(\S+)/gu,
+  // «Wi-Fi: CasaRossi - Faro7Blu55», «WiFi CasaRossi - …», «Rete: CasaRossi, …»: prima la rete (32 caratteri al più),
+  // poi la chiave. La virgola separa solo dopo i due punti: in una frase («il wifi non va, AX1800…») è altro.
+  rete: /(?<![\p{L}\p{N}])(?:(?:wi-?fi|wlan|ssid|rete|network)\s*[:=]\s*[^\n]{1,32}?(?:\s+[-–—/|]\s+|\s*,\s*)|(?:wi-?fi|wlan|ssid)\s+[^\n]{1,32}?\s+[-–—/|]\s+)(\S+)/gu,
   // «SSID: CasaRossi» e sotto «Key: Brezza7Mare», o sulla stessa riga.
-  chiaveRete: /(?<![\p{L}\p{N}])(?:ssid|nome\s+(?:della\s+)?rete|network(?:\s+name)?|wi-?fi|wlan)\s*[:=][^\n]*?(?:[^\S\n]*[,;|/][^\S\n]*|[^\S\n]+|[^\S\n]*\n(?:[^\S\n]*\n)?[^\S\n]*)(?:key|chiave(?:\s+(?:di\s+rete|wpa2?))?|password|pass|pw|psk|wpa2?(?:\s+key)?)\s*[:=]\s*(\S+)/gu,
+  chiaveRete: /(?<![\p{L}\p{N}])(?:ssid|nome\s+(?:della\s+)?rete|network(?:\s+name)?|wi-?fi|wlan)\s*[:=][^\n]{0,64}?(?:[^\S\n]*[,;|/][^\S\n]*|[^\S\n]+|[^\S\n]*\n(?:[^\S\n]*\n)?[^\S\n]*)(?:key|chiave(?:\s+(?:di\s+rete|wpa2?))?|password|pass|pw|psk|wpa2?(?:\s+key)?)\s*[:=]\s*(\S+)/gu,
   corte: new RegExp(ETICHETTE_CORTE, 'gu'),
   // «la password su whatsapp, (comunque) è Girasole2024»: il valore dopo la virgola.
-  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(?:${PW}|${ETICHETTE_CORTE})[^\\n.!?]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?(?:è|e'|e’|era|is|sarebbe)\\s+(\\S+)`, 'gu'),
+  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(${PW}|${ETICHETTE_CORTE})[^\\n.!?]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?${ANNUNCIO}\\s+(\\S+)`, 'gu'),
 };
-const SOLO_PW = new RegExp(`^${PW}$`, 'u');
+const SOLO_CORTE = new RegExp(`^${ETICHETTE_CORTE}$`, 'u');
+const nomePw = (s) => nomeDiPassword(s.replace(/\s+/g, ' '));
 // Dopo un'etichetta corta una parola qualunque è il resto della frase («la pass giornaliera», «il pw del documento»):
-// conta se ha la forma di una password, o se la presenta «è» o i due punti; dopo «pw» anche se viene subito.
-const PRESENTATA = /^\s*(?:(?:del(?:la)?|dell['’]|di)\s+[\p{L}\p{N}-]+\s*)?(?:[:=]|è|e['’]|era|is|sarebbe)\s*$/u;
+// conta se ha la forma di una password, o se la presenta un annuncio o i due punti; dopo «pw» anche se viene subito.
+const PRESENTATA = new RegExp(`^\\s*(?:(?:del(?:la)?|dell['’]|di)\\s+[\\p{L}\\p{N}-]+\\s*)?(?:[:=]|${ANNUNCIO})\\s*$`, 'u');
 const ACCANTO = /^\s*$/u;
 
 function formeLibere(testo) {
