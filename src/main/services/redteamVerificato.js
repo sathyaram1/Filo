@@ -68,4 +68,4 @@ async function assicura() {
   return noto();
 }
 
-module.exports = { leggiCon, ricorda, noto, assicura, SCADENZA_MS };
+module.exports = { leggiCon, ricorda, noto, assicura, suCambio, SCADENZA_MS };
