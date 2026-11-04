@@ -686,11 +686,23 @@ function registerIpcHandlers() {
     const newId = await win._filoTabs.duplicateTab(id);
     return { ok: !!newId, id: newId };
   });
-  // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476): solo la cornice.
-  ipcMain.handle('tabs:riapri-chiusa', async (event) => {
+  // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476): solo la cornice. `via: 'menu'`: le voci dei menu
+  // della linguetta e del «+» (#1695), che non sono il tasto.
+  ipcMain.handle('tabs:riapri-chiusa', async (event, { via } = {}) => {
     const win = finestraDellaBarra(event.sender);
     if (!win) return { ok: false };
-    return { ok: !!(await gesto(win, 'reopen-closed-tab', () => win._filoTabs.riapriChiusa({ tasto: 'ctrl_shift_t' }))) };
+    const tasto = via === 'menu' ? '' : 'ctrl_shift_t';
+    return { ok: !!(await gesto(win, 'reopen-closed-tab', () => win._filoTabs.riapriChiusa({ tasto }))) };
+  });
+  ipcMain.handle('tabs:ci-sono-chiuse', async (event) => {
+    const win = finestraDellaBarra(event.sender);
+    return !!(win && await win._filoTabs.ciSonoChiuse());
+  });
+  ipcMain.handle('tabs:chiudi-altre', async (event, { id } = {}) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return { ok: false, chiuse: 0, restano: [] };
+    const r = await gesto(win, 'close-tab', () => win._filoTabs.chiudiLeAltre(id));
+    return { ok: true, chiuse: r.chiuse.length, restano: r.restano };
   });
   ipcMain.handle('tabs:scrivi-indirizzo', async (event, { id } = {}) => {
     const win = finestraDellaBarra(event.sender);
