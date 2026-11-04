@@ -17,6 +17,18 @@
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
+  // Fuori da Electron chi carica questo modulo è uno strumento, e può scansionare le schede pubbliche senza credenziali:
+  // il freno sulle scansioni si installa qui, comunque il modulo sia stato nominato (#1335). Una copia del modulo fuori
+  // dal repo non ha il freno accanto, e va avanti senza.
+  if (typeof require === 'function' && typeof __dirname === 'string' && typeof process !== 'undefined'
+      && process.versions && process.versions.node && !process.versions.electron) {
+    try {
+      require(require('path').join(__dirname, '..', '..', 'scripts', 'lib', 'freno-letture.cjs'));
+    } catch (e) {
+      if (!e || e.code !== 'MODULE_NOT_FOUND') throw e;
+    }
+  }
+
   // L'uuid è ANCHE il segreto del percorso di un allegato: storage.rules concede la creazione
   // solo su un nome che lo contiene, quindi i bit vengono dal generatore crittografico.
   function uuid() {
@@ -971,7 +983,10 @@
   // sapere se vale la pena riunire le schede pubbliche e rimettere in pari la
   // bacheca (una lista vera sì, il giro leggero del battito no) — e la
   // domanda non si può dedurre dai campi senza indovinare.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list' } = {}) {
+  // `uguale` ({ campo, valore }): il filtro che il database applica da sé, solo nella lettura col cursore sul nome.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list', uguale = null } = {}) {
+    // Un filtro che la strada scelta non sa portare si rifiuta: ignorato, tornerebbe tutto in silenzio (#1335).
+    if (uguale && typeof afterName !== 'string') throw new Error('filtro sul server disponibile solo nella lettura completa');
     // Da una pagina filo:// la lettura passa dal main, che ha il token admin
     // (#583): qui non c'è nessuna credenziale, e la collezione non è più
     // pubblica. Il main torna le righe già decodificate.
@@ -983,7 +998,7 @@
       return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
-      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields, uguale });
       if (readTime) Object.defineProperty(rows, 'readTime', { value: readTime, enumerable: false });
       return marcaProiezione(rows, fields);
     }
@@ -1080,7 +1095,8 @@
   // pagine non mente — se scatta, la risposta lo dice.
   // `lista` (solo da una pagina): è il caricamento della Gestione, e il main ci
   // riunisce le schede e ci fa ripartire il giro (#676).
-  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false } = {}) {
+  // `uguale` ({ campo, valore }): solo le righe che il database trova uguali, filtrate da lui (#1335).
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false, uguale = null } = {}) {
     // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
     // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
     // lettura completa la fa il main e torna di là, col suo `complete`. Senza
@@ -1088,6 +1104,8 @@
     // alla prima riga (#496).
     const bridge = pageBridge();
     if (bridge) {
+      // Il main il filtro non lo riceve: senza questo rifiuto la pagina avrebbe tutte le righe credendole filtrate.
+      if (uguale) throw new Error('il filtro sul server non passa dalla porta delle pagine: chiedi le righe e filtrale qui');
       const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs, ...(fields ? { fields } : {}), ...(lista ? { lista: true } : {}) });
       return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false, readTime: String(r.readTime || '') };
     }
@@ -1100,7 +1118,7 @@
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
       // eslint-disable-next-line no-await-in-loop
-      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields });
+      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields, ...(uguale ? { uguale } : {}) });
       // Le pagine si leggono in momenti diversi: il giro della Gestione riparte dalla PRIMA (#676).
       if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
       const arr = Array.isArray(batch) ? batch : [];
@@ -1732,13 +1750,19 @@
   // righe non serve — ordina lui come gli pare. `idToken` serve per la
   // collezione vera, che senza credenziali non si legge (#583); la vista
   // pubblica lo lascia vuoto.
-  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null } = {}) {
+  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null, uguale = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
       from: [{ collectionId }],
       orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
       limit: pageSize,
     };
+    if (uguale) {
+      if (!uguale.campo || typeof uguale.valore !== 'string') throw new Error('filtro sul server senza campo o valore');
+      structuredQuery.where = {
+        fieldFilter: { field: { fieldPath: String(uguale.campo) }, op: 'EQUAL', value: { stringValue: uguale.valore } },
+      };
+    }
     // La proiezione vale anche qui: è la porta da cui passano le letture
     // COMPLETE (il cursore sul nome), cioè quelle che pagano di più. Senza,
     // chiedere tutta la collezione voleva dire scaricarne i documenti interi

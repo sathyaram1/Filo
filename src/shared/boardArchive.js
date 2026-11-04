@@ -16,8 +16,18 @@
   // farebbe decidere su un valore assente, senza errore: la sentinella
   // `tests/unit/letturePerCampi.test.mjs` confronta i due.
   const CAMPI_DECISIONE = Object.freeze([
-    'status', 'archiveOverride', 'resolvedAt', 'resolvedInVersion', 'votes',
+    'status', 'statusPublic', 'archiveOverride', 'resolvedAt', 'resolvedInVersion', 'votes',
   ]);
+
+  // Si decide solo sulle risolte: la stessa regola per righe filtrate dal database o lette tutte (#1335). Senza il
+  // modulo degli stati non si sa, e non si decide.
+  function risolta(fb) {
+    if (!global.SN_FB_STATUS && typeof require === 'function') {
+      try { require('./feedbackStatus.js'); } catch (_) { /* nelle pagine lo carica la pagina */ }
+    }
+    const FS = global.SN_FB_STATUS;
+    return Boolean(FS && typeof FS.isResolvedForUser === 'function' && FS.isResolvedForUser(fb));
+  }
 
   const DEFAULTS = {
     // Soglia bassa per l'alpha: con pochi votanti un 2 dice già «i pochi che hanno votato
@@ -75,6 +85,7 @@
     const now = toTime(o.now) || Date.now();
 
     if ((fb.status || '') === 'archived') return false;
+    if (!risolta(fb)) return false;
 
     const override = hasOwnerOverride(fb);
     if (override) return false; // 'archived' già fatto, 'keep_open' lo blocca
@@ -100,7 +111,7 @@
     const toArchive = [];
     const toFlag = [];
     for (const fb of list) {
-      if (!fb || !fb._id) continue;
+      if (!fb || !fb._id || !risolta(fb)) continue;
       if (shouldAutoArchive(fb, opts)) { toArchive.push(fb._id); continue; }
       if (usersSayBroken(fb, opts)) toFlag.push(fb._id);
     }

@@ -920,9 +920,12 @@ module.exports = function register(on, ctx) {
   // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
   const SCHEDE_MIRATE_MAX = 100;
 
-  async function mergeCardFields(rows, { mirate = false } = {}) {
+  // `campi`: quelli che la pagina ha chiesto. Riceve quelli (#1335): niente voti non chiesti, né schede lette per loro.
+  async function mergeCardFields(rows, { mirate = false, campi = null } = {}) {
     const V = PUBLIC_VIEW();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
+    const daUnire = Array.isArray(campi) ? V.USER_FIELDS.filter((f) => campi.includes(f)) : V.USER_FIELDS;
+    if (!daUnire.length) return rows;
     let cards;
     const FB = FEEDBACK();
     const ids = rows.map((r) => r && r._id).filter(Boolean);
@@ -933,6 +936,11 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
+    }
+    if (daUnire.length < V.USER_FIELDS.length) {
+      cards = (Array.isArray(cards) ? cards : []).map((c) => Object.fromEntries(
+        Object.entries(c || {}).filter(([k]) => k === '_id' || daUnire.includes(k)),
+      ));
     }
     return V.mergeUserFields(rows, cards);
   }
@@ -949,7 +957,7 @@ module.exports = function register(on, ctx) {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
-      return { ok: true, rows: await mergeCardFields(rows, { mirate: true }) };
+      return { ok: true, rows: await mergeCardFields(rows, { mirate: true, campi: soloCampi }) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
@@ -970,7 +978,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
       if (w && complete) w.allineato(startedAt, rows, readTime);
-      return { ok: true, rows: await mergeCardFields(rows), complete, readTime };
+      return { ok: true, rows: await mergeCardFields(rows, { campi: fields }), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
@@ -988,7 +996,7 @@ module.exports = function register(on, ctx) {
     // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
     // un attimo dopo.
     scheduleViewSync({ rows });
-    return { ok: true, rows: await mergeCardFields(rows) };
+    return { ok: true, rows: await mergeCardFields(rows, { campi: fields }) };
   }));
 
   // ── #676: il giro dei cambiati della Gestione, uno solo, qui nel main ────

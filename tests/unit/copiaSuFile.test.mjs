@@ -126,6 +126,7 @@ test('l\'applicazione riusa la lettura della prova a secco, e dopo aver scritto 
     now,
     dir,
     log: (r) => detto.push(r),
+    confronta: () => '',
     scansiona: async () => { letture += 1; return [{ _id: 'a' }, { _id: 'b' }]; },
   });
 
@@ -145,6 +146,35 @@ test('l\'applicazione riusa la lettura della prova a secco, e dopo aver scritto 
   dopoApplicazione('prova/segnalazioni', { dry: false, dir });
   await giro(false, t0 + 40_000);
   assert.equal(letture, 2, 'dopo un\'applicazione la copia deve essere buttata');
+});
+
+test('il riuso vuole un confronto col presente: senza, o con un «non so», si rilegge e la copia scartata torna', async () => {
+  // #680.2: un conteggio che non risponde faceva saltare il confronto, e il riuso passava.
+  const dir = cartellaTemporanea('copia-confronto-');
+  const t0 = 1_700_000_000_000;
+  const casi = {
+    'nessun confronto': undefined,
+    'un confronto che non risponde': () => undefined,
+    'un confronto che fallisce': () => { throw new Error('rete giù'); },
+    'il presente è diverso': () => 'le segnalazioni sono cambiate (5 → 6)',
+  };
+  for (const [come, confronta] of Object.entries(casi)) {
+    let letture = 0;
+    const detto = [];
+    const giro = (dry) => scansione({
+      nome: 'prova-confronto/segnalazioni', dry, now: t0, dir, log: (r) => detto.push(r), confronta,
+      scansiona: async () => { letture += 1; return [`lettura ${letture}`]; },
+    });
+    // eslint-disable-next-line no-await-in-loop
+    await giro(true);
+    // eslint-disable-next-line no-await-in-loop
+    const r = await giro(false);
+    assert.equal(letture, 2, `${come}: la copia è stata riusata`);
+    assert.equal(r.dallaCopia, false);
+    assert.deepEqual(r.dati, ['lettura 2']);
+    assert.deepEqual(r.scartata && r.scartata.dati, ['lettura 1'], `${come}: la copia scartata non torna a chi deve dire cosa è cambiato`);
+    assert.match(detto.join(' '), /non la riuso/, come);
+  }
 });
 
 test('una prova a secco non risponde con quello che ha letto un\'altra prova a secco', async () => {
