@@ -611,7 +611,10 @@ Come funziona oggi (#1152):
     l'ultima settimana), ognuna col riassunto del manutentore (titolo,
     stato, ultimo aggiornamento) e le domande aperte o in lavorazione
     collegate, per origine, collegamenti, azioni, fermo o perché gli
-    aggiornamenti le nominano. La chiusura è `domande.chiudi`, col
+    aggiornamenti le nominano. Il feedback intero (`feedback.leggi`) di un
+    lavoro fuso porta anche gli aggiornamenti, cioè cosa ha fatto: la
+    revisione decide su quello, non sulla sola richiesta, e chi li ha
+    scritti da sporco sporca anche lei. La chiusura è `domande.chiudi`, col
     resoconto, il principio quando c'è e il numero del lavoro, che il server
     vuole fuso e collegato alla domanda; non chiude una domanda che ferma un
     altro lavoro, una risposta che si sta applicando, né una provvisoria (la
