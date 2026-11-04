@@ -1702,10 +1702,16 @@
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
     if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
+    // Gli allegati della bozza, come il suo testo, vanno dopo quelli che tornano.
+    const bozzaImmagini = pendingImages.map((d) => [d, percorsiImmagini.get(d)]);
+    const bozzaFile = pendingFiles.map((f) => f.percorso);
+    clearImagePreviews();
     for (const c of tornati) {
       for (const d of c.immagini) addPendingImage(d, c.percorsi.get(d));
       for (const f of c.file) addPendingFile(f.percorso);
     }
+    for (const [d, p] of bozzaImmagini) addPendingImage(d, p);
+    for (const p of bozzaFile) addPendingFile(p);
     // Nel campo sta una citazione sola: torna quella del primo, se intanto l'utente non ne ha scelta un'altra.
     const citata = tornati.find((c) => c.citata);
     if (citata && !Rispondi.inCorso()) Rispondi.rimetti(citata.citata);
