@@ -611,6 +611,7 @@ module.exports = {
   restore,
   segreti,
   signIn,
+  lasciaStare,
   signOut,
   getIdToken,
   getUid,
