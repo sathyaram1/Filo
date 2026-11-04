@@ -606,7 +606,8 @@ describe('spazio: il numero annunciato si raggiunge, e chiederlo non ferma la fi
 
 // #1271: un file da 50 byte prendeva un blocco intero, 8 KB con la ridondanza.
 describe('file piccoli raccolti insieme', () => {
-  test('mille file da 50 byte stanno in pochi blocchi, si rileggono tutti, e cancellati restituiscono lo spazio', async () => {
+  // Mille salvataggi riscrivono mille volte l'elenco dei file: è la prova più lenta del file, ma è la misura chiesta.
+  test('mille file da 50 byte stanno in pochi blocchi e si rileggono tutti', async () => {
     const base = await contenitore(16 * MB);
     const s = await crea(base, 'Cronologia');
     const vuoto = await s.spazio();
@@ -624,8 +625,6 @@ describe('file piccoli raccolti insieme', () => {
     const r = (await apri(base, 'Cronologia')).segreto;
     for (const [n, d] of voci) assert.ok((await r.leggiFile(n)).equals(d), n);
     assert.equal(r.elencaFile().length, 1000);
-    for (const n of voci.keys()) await r.cancellaFile(n);
-    assert.deepEqual(await r.spazio(), vuoto);
     await r.chiudi();
     assert.ok(integra(await impronta(base, 'Cronologia')));
     rmSync(base.contenitore, { force: true });
@@ -635,6 +634,7 @@ describe('file piccoli raccolti insieme', () => {
   for (const davanti of [true, false]) test(`sostituire, ingrandire, rimpicciolire e togliere un file piccolo: gli altri del pacco restano, e del vecchio non resta un byte${davanti ? '' : ' (pacco accanto alla testa)'}`, async () => {
     const base = await contenitore(4 * MB);
     const s = await crea(base, 'Pacchi');
+    const vuoto = await s.spazio();
     const grande = randomBytes(12 * F.CARICO);
     const attesi = new Map();
     if (davanti) {
@@ -671,6 +671,8 @@ describe('file piccoli raccolti insieme', () => {
     await s.chiudi();
     const r = (await apri(base, 'Pacchi')).segreto;
     await controlla(r);
+    for (const n of attesi.keys()) await r.cancellaFile(n);
+    assert.deepEqual(await r.spazio(), vuoto, 'tolti tutti i file, i pacchi non hanno restituito il posto');
     await r.chiudi();
     assert.ok(integra(await impronta(base, 'Pacchi')));
     rmSync(base.contenitore, { force: true });
