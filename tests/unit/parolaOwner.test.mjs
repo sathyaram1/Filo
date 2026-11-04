@@ -96,6 +96,11 @@ test('un incollato sbagliato si rifiuta col motivo e lascia com’era quella sal
   assert.match(f.appunti.testi[0], new RegExp(`^Parola d'ordine: ${PAROLA}\n`));
 });
 
+test('la prima riga che «Discutiamone» copia, reincollata, torna la sola parola', () => {
+  const [prima] = D.testoDiscuti('D-8', PAROLA).split('\n');
+  assert.deepEqual(P.controlla(prima), { ok: true, parola: PAROLA });
+});
+
 test('la riga già copiata incollata di nuovo tiene la sola parola; emoji e spazi interni restano', () => {
   assert.deepEqual(P.controlla(`Parola d'ordine: ${PAROLA}`), { ok: true, parola: PAROLA });
   assert.deepEqual(P.controlla(`parola d’ordine:${PAROLA}  `), { ok: true, parola: PAROLA });
