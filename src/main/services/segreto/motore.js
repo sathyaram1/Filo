@@ -1575,6 +1575,7 @@ module.exports = {
   creaSegreto,
   // Per le prove: il formato su disco, per controllarlo da fuori senza passare dal motore.
   _formato: {
-    BLOCCO, CARICO, PREFISSO, GRUPPO, NONCE, posizione, apriBlocco, leggiPrefisso, leggiTesta, normalizzaNome,
+    BLOCCO, CARICO, PREFISSO, GRUPPO, NONCE, PICCOLO, posizione, catena, lunghezzaCatena, apriBlocco, leggiPrefisso, leggiTesta,
+    normalizzaNome,
   },
 };
