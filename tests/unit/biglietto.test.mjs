@@ -709,3 +709,26 @@ test('il gancio di fine è cablato in SessionEnd, esce sempre 0, e i processi in
     }
   } finally { togliCartella(dir); }
 });
+
+// #2027: una conversazione che continua con un biglietto nuovo porta quello che ha già letto, quindi il segno riservato.
+test('avvio: il biglietto nuovo di una conversazione che continua nasce riservato se il padre lo era o non si sa', async () => {
+  const dir = repo();
+  try {
+    const s = server({ [SEGRETO('r')]: { fiducia: 'fidato', chiuso: true, riservato: true }, [SEGRETO('q')]: { fiducia: 'fidato', chiuso: true } });
+    const riservato = scriviBiglietto(dir, 'padre-r', SEGRETO('r'), FP('5'));
+    await B.avvio({ input: { session_id: 'figlio-r', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: riservato }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    const pulito = scriviBiglietto(dir, 'padre-q', SEGRETO('q'), FP('6'));
+    await B.avvio({ input: { session_id: 'figlio-q', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: pulito }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    await B.avvio({ input: { session_id: 'figlio-x', source: 'startup' }, env: { FILO_BIGLIETTO_FILE: join(dir, 'sparito.json') }, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    await B.avvio({ input: { session_id: 'biforcata', source: 'fork' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    await B.avvio({ input: { session_id: 'nuova', source: 'startup' }, env: {}, cwd: dir, deps: s.deps, haCredenziale: conCredenziale });
+    const prese = s.chiamate.filter((c) => c.op === 'prendi').map((c) => [c.motivo || '', c.riservato === true]);
+    assert.deepEqual(prese, [
+      ['biglietto del padre chiuso', true],
+      ['biglietto del padre chiuso', false],
+      ['file del biglietto del padre illeggibile', true],
+      ['ripresa senza biglietto', true],
+      ['', false],
+    ]);
+  } finally { togliCartella(dir); }
+});
