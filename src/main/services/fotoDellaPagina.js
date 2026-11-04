@@ -1,9 +1,11 @@
-// A chi va la foto di una pagina, e in che forma: al frame principale di una pagina che si vede, e inquadra sé stessa (#589.5),
-// mai a una scheda di sfondo, a un riquadro o a un popup che ripiegava sulla finestra principale. Chi la manda a un modello la chiede leggera.
-// Prove: tests/foto-della-pagina.spec.mjs, tests/aiuto-foto-leggera.spec.mjs, tests/unit/fotoDellaPagina.test.mjs.
+// A chi va la foto di una pagina (#589.5) e, per un modello, l'unico punto che la scatta: coperta prima del JPEG (#1721).
+// Mai a una scheda di sfondo, a un riquadro o a un popup; una foto che non si riesce a coprire non parte.
+// Prove: tests/foto-al-modello-coperture.spec.mjs, tests/aiuto-foto-leggera.spec.mjs, tests/unit/fotoDellaPagina.test.mjs.
 'use strict';
 
 const { mittenteInVista } = require('./appuntiDaiSiti');
+const { riquadroArrivato } = require('./riquadroArrivato');
+const { campiSegretiFuoriPagina } = require('./campiNeiRiquadri');
 
 function framePrincipale(sender) {
   const f = sender && sender.frame;
