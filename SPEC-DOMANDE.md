@@ -781,8 +781,9 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
     massimo, così la cache (60 minuti) resta calda;
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
-- **Chi controlla lei:** se il server non la vede scrivere nel taccuino da 26
-  ore, apre una domanda.
+- **Chi controlla lei:** il server conta le sue sessioni chiuse bene, non le
+  scritture nel taccuino, e dopo 26 ore senza apre una domanda per l'owner
+  (SPEC-MANUTENTORE.md § 7).
 
 ### 4.4 Cosa minimizzare
 
