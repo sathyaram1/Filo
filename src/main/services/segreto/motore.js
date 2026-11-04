@@ -388,7 +388,7 @@ async function apriContenitore(percorso, dimensione) {
     await fh.close();
     throw errore('CONTENITORE', 'Il contenitore non ha la dimensione attesa.');
   }
-  return { fh, N: dimensione / BLOCCO, mappa: null, date: [st.atimeNs, st.mtimeNs] };
+  return { fh, N: dimensione / BLOCCO, mappa: null, date: [st.atimeNs, st.mtimeNs], calcoli: 0 };
 }
 
 // Le date si scrivono al microsecondo, la grana di libuv: col mezzo microsecondo in più il troncamento ridà lo stesso
