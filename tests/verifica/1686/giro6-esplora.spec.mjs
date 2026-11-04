@@ -16,7 +16,7 @@ const wav = (secondi, attacca) => `<script>
   const a = new Audio();
   a.src = URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
   ${attacca ? 'document.body.appendChild(a);' : ''}
-  window.__a = a;
+  window.__a = a; window.__plays = 0; a.addEventListener('play', () => { window.__plays += 1; });
   window.__pausa = () => a.paused;
 </script>`;
 const pagina = (titolo, secondi, attacca = true) => `<!doctype html><title>${titolo}</title><body>${wav(secondi, attacca)}</body>`;
@@ -63,7 +63,10 @@ test('suono di notifica in un\'altra scheda dopo la pausa della musica', async (
   ]);
   await chiedi(chat, 'rimettimi la musica');
   await expect(chat.locator('.dash-activity').last()).toContainText(/Musica|Posta/, { timeout: 25_000 });
-  console.log('ATTIVITA', await chat.locator('.dash-activity').last().innerText());
+  await chat.waitForTimeout(3000);
+  console.log('POSTA', await posta.evaluate(() => ({ plays: window.__plays, ended: window.__a.ended })));
+  console.log('MUSICA', await musica.evaluate(() => ({ t: window.__a.currentTime, paused: window.__a.paused })));
+  console.log('TOOLOUT', JSON.stringify(await app.evaluate(() => (globalThis.__chatFinta_calls || []).slice(1).map((c) => JSON.stringify(c).slice(-700)))));
   await expect.poll(() => musica.evaluate(() => window.__pausa()), { timeout: 15_000 }).toBe(false);
   await ripristina(app);
 });
