@@ -578,6 +578,7 @@
     parse,
     splitNotes,
     CAMPO_NOTE_FIDATE,
+    PREFISSO_OWNER_NON_FIDATO,
     improntaTurno,
     improntaDelTurnoAggiunto,
     fiduciaDelleNote,
