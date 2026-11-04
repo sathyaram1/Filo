@@ -38,7 +38,20 @@ const PROGETTO = 'filo-8b9cb';
 const INDIRIZZO = `https://${REGIONE}-${PROGETTO}.cloudfunctions.net/routineKeys`;
 
 // Dove va la parola appena nata: la stessa frase che mostra Gestione → Automazioni.
-const { DOVE_VA, POTERI } = globalThis.SN_ROUTINE_CHIAVI;
+const { DOVE_VA, POTERI, IMPOSTAZIONI, validaImpostazione } = globalThis.SN_ROUTINE_CHIAVI;
+
+const DETTO = {
+  account: (nome, v) => `"${nome}" gira sull'account ${v}: da adesso il suo consumo conta lì.`,
+  rete: (nome, v) => (v === 'limitata'
+    ? `"${nome}" è a rete limitata: i suoi biglietti possono nascere puliti. Vale solo se l'ambiente della routine su claude.ai ha davvero la rete limitata.`
+    : `"${nome}" è a rete aperta: i suoi biglietti nascono sporchi e non prende lavori server.`),
+  lavori: (nome, v) => (v === 'server'
+    ? `"${nome}" è la chiave della routine server: riceve solo lavori server fidati, e solo a rete limitata.`
+    : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata.`),
+  ambiente: (nome, v) => (v === 'riservati'
+    ? `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`
+    : `"${nome}" è in un ambiente normale: non riceve testo riservato.`),
+};
 
 async function chiama(data) {
   const refresh = findAdminRefreshToken();
