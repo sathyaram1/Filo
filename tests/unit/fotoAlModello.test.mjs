@@ -48,3 +48,49 @@ test('Aiuto, finestra guardata dalla chat e nome dello Screenshot prendono la fo
     assert.doesNotMatch(leggi(f), /fotoCoperta|campiSegretiInVista/, `${f}: la copertura non si rifà nella pagina`);
   }
 });
+
+// La foto intera resta chiamabile solo da chi risponde alle richieste delle pagine, che la dà a chi non chiede la copia
+// coperta: una seconda strada verso di lei è una cattura scoperta con un altro nome.
+test('la foto intera e quella della barra si chiedono solo dal gestore delle richieste di foto', () => {
+  const chi = {};
+  for (const p of sorgenti(join(RADICE, 'src'))) {
+    const rel = relative(RADICE, p).split('\\').join('/');
+    if (rel === 'src/main/services/fotoDellaPagina.js') continue;
+    const t = readFileSync(p, 'utf8');
+    const n = (t.match(/\bfotoPiena\s*\(/g) || []).length + (t.match(/\bfotoDellaBarra\s*\(/g) || []).length;
+    if (n) chi[rel] = n;
+  }
+  assert.deepEqual(chi, { 'src/main/services/handlers/misc.js': 2 });
+});
+
+// Chi chiede alla pagina la foto senza la copia coperta la riceve intera: lo fa solo chi non la manda a un modello.
+const RICHIESTE_INTERE = {
+  'src/content/feedback.js': 'lo screenshot allegato al feedback, che l’utente vede e manda all’owner',
+  'src/preload/internal-preload.js': 'chrome.tabs.captureVisibleTab delle pagine di Filo: nessuna la manda a un modello',
+};
+test('una richiesta di foto della pagina senza la copia coperta sta solo dove la foto non va a un modello', () => {
+  const fuori = [];
+  for (const dir of ['src/content', 'src/preload', 'src/pages', 'src/renderer']) {
+    for (const p of sorgenti(join(RADICE, dir))) {
+      const rel = relative(RADICE, p).split('\\').join('/');
+      const t = readFileSync(p, 'utf8');
+      for (const m of t.matchAll(/\{\s*type:\s*(?:MSG\.CAPTURE_VISIBLE_TAB|'capture_visible_tab')([^}]*)\}/g)) {
+        if (!/\b(?:perModello|copiaPerModello):\s*true/.test(m[1]) && !RICHIESTE_INTERE[rel]) fuori.push(rel);
+      }
+    }
+  }
+  assert.deepEqual(fuori, [], 'per un modello si chiede perModello (foto coperta) o copiaPerModello (intera più copia coperta)');
+});
+
+// Con copiaPerModello la pagina riceve anche la foto intera: verso un modello parte solo la copia coperta. L'eccezione
+// aperta è la Trascrizione di una zona, la cui scelta (coprire anche lì o no) aspetta l'owner (#1721, giro 1).
+const INTERE_A_UN_MODELLO = { 'src/content/actions.js': 1 };
+test('la foto intera di una pagina non entra in una richiesta a un modello, fuori dall’eccezione scritta', () => {
+  const chi = {};
+  for (const p of sorgenti(join(RADICE, 'src/content'))) {
+    const rel = relative(RADICE, p).split('\\').join('/');
+    const n = (readFileSync(p, 'utf8').match(/payload:\s*\{[^}]*\b(?:cap|region|regione|scatto)\.dataUrl/g) || []).length;
+    if (n) chi[rel] = n;
+  }
+  assert.deepEqual(chi, INTERE_A_UN_MODELLO);
+});
