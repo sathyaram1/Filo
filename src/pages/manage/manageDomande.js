@@ -756,10 +756,17 @@
     for (const t of turni) {
       const li = el('li', 'mg-dq-turno');
       const tipoAutore = (t.autore && t.autore.tipo) || '';
-      li.dataset.autore = tipoAutore;
+      // Dalla chat vale come tua (§3.6): «Tu», col segno di chi l'ha registrata al posto di quello della fiducia.
+      const daSessione = D.mittenteRisposta(t) === 'sessione';
+      li.dataset.autore = daSessione ? 'sessione' : tipoAutore;
       const head = el('div', 'mg-dq-turno-testa');
-      head.appendChild(el('span', 'mg-dq-turno-chi', autoreDi(t.autore)));
-      if (tipoAutore !== 'owner' && tipoAutore !== 'server' && !(t.autore && t.autore.fiducia === 'fidato')) {
+      head.appendChild(el('span', 'mg-dq-turno-chi', daSessione ? 'Tu' : autoreDi(t.autore)));
+      if (daSessione) {
+        const s = el('span', 'mg-dq-segno mg-dq-segno--sessione', 'registrata da una sessione');
+        s.title = `L’ha registrata una sessione dalla chat${t.autore && t.autore.fiducia === 'fidato' ? '' : ', che aveva letto testo non tuo'}. `
+          + 'Vale come tua: se non è quello che volevi, riapri la domanda.';
+        head.appendChild(s);
+      } else if (tipoAutore !== 'owner' && tipoAutore !== 'server' && !(t.autore && t.autore.fiducia === 'fidato')) {
         const f = el('span', 'mg-dq-fiducia mg-dq-fiducia--no', 'non fidato');
         f.title = TITOLO_NON_FIDATA;
         head.appendChild(f);

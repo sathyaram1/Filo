@@ -33,8 +33,8 @@ test('domanda.mjs mostra: la risposta di una sessione arriva al compito come del
       { autore: { tipo: 'biglietto', ruolo: 'risposta', fiducia: 'non_fidato' }, tipo: 'chiarimento', testo: 'Quale?', ora: 2 },
     ],
   }, {}, { quando: () => 'ora' });
-  assert.match(testo, /ora owner, registrata da una sessione \(non fidato\) · risposta/);
-  assert.match(testo, /ora biglietto risposta \(non fidato\) · chiarimento/);
+  assert.match(testo, /ora owner, registrata da una sessione \(non fidata\) · risposta/);
+  assert.match(testo, /ora biglietto risposta \(non fidata\) · chiarimento/);
 });
 
 test('il ruolo del compito tiene la regola: la risposta di una sessione non chiede conferma all\'owner', () => {
