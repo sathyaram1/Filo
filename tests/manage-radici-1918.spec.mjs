@@ -59,16 +59,21 @@ async function apri(page, lista, opts) {
 const LEGACY = { radice: 'legacy', tipo: 'legacy', valore: '', timbrata: false, testoUtente: false, daLeggere: false, timbrabile: true };
 const UTENTE = { radice: 'feedback:1916', tipo: 'feedback', valore: '1916', timbrata: false, testoUtente: true, daLeggere: true, timbrabile: true };
 const IGNOTA = { radice: 'ignota', tipo: 'ignota', valore: '', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: false };
+// Dichiarata da una sessione: sul documento il segno, il nome lo dà il server solo all'owner.
+const PAGINA = { radice: 'web:#0123456789abcdef', tipo: 'web', valore: '#0123456789abcdef', nome: 'web:https://esempio.it/pagina', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true };
+const SESSIONE = { radice: 'esterno:biglietto 0123456789abcdef', tipo: 'esterno', valore: 'biglietto 0123456789abcdef', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true };
 
 test('le radici stanno accanto a «Segna fidato», ognuna col suo nome e col suo perché', async ({ openTab }) => {
   const page = await openTab(MANAGE);
-  await apri(page, [fb()], { radici: [UTENTE, LEGACY, IGNOTA] });
+  await apri(page, [fb()], { radici: [UTENTE, LEGACY, IGNOTA, PAGINA, SESSIONE] });
   const chips = page.locator('#mgRadici .mg-radice');
   await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
-  await expect(chips).toHaveText(['#1916', 'nato prima', 'provenienza ignota']);
+  await expect(chips).toHaveText(['#1916', 'nato prima', 'provenienza ignota', 'esempio.it', 'sessione sporca']);
   await expect(chips.nth(0)).toHaveAttribute('title', /testo dell’utente di #1916: leggilo prima/);
   await expect(chips.nth(1)).toHaveAttribute('title', /timbra in blocco tutto ciò che è nato prima/);
   await expect(chips.nth(2)).toBeDisabled();
+  await expect(chips.nth(3)).toHaveAttribute('title', /^web:https:\/\/esempio\.it\/pagina: guardalo prima/);
+  await expect(chips.nth(4)).toHaveAttribute('title', /letto senza dire da dove/);
   await page.screenshot({ path: 'tests/.shots/manage-radici-1918.png' });
 });
 
