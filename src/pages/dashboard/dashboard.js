@@ -142,7 +142,7 @@
     archiviaAzione: (type, cambi, a, { chat = '', voce = null } = {}) => {
       const id = chat || chatDellaRiga();
       const ids = Array.isArray(cambi) ? cambi : [];
-      const riuscita = !voce || (voce.esito !== 'fallito' && voce.esito !== 'chiesto' && voce.type !== 'FERMATA');
+      const riuscita = !voce || (voce.type !== 'FERMATA' && window.SN_ESITO.conta(voce.esito));
       // Di una finestra guardata resta il nome e basta (#778).
       const guardata = riuscita && type === 'VEDI_SCHERMO' && a && a._output && typeof a._output.finestra === 'string' ? a._output.finestra : '';
       if (id) {
