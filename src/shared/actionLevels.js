@@ -246,6 +246,12 @@
     return t || SPIEGAZIONE_DI_FILO;
   }
   const SPIEGAZIONE_DI_FILO = 'Uso il terminale del computer';
+  const PERCHE_SENZA_CESTINO = 'cancella per sempre, senza passare dal cestino';
+  function cancellaColComando(a) {
+    const C = global.SN_CMD_CLASSIFY;
+    const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
+    return !!(C && C.cancellaPerSempre && C.cancellaPerSempre(cmd));
+  }
 
   function nomeLeggibile(n) {
     const N = global.SN_NOMI_FILE;
@@ -322,6 +328,23 @@
         const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
         const n = fatti ? fatti.length : (Array.isArray(a && a._proposte) ? a._proposte.length : 0);
         return n === 1 ? 'Rinominato un file (si rimette com\'era con «Annulla»)' : `Rinominati ${n} file (si rimettono com'erano con «Annulla»)`;
+      },
+    },
+    // #1909 — cancellare un file del computer vuol dire spostarlo nel cestino: si rimedia, costo 2, e chiede sempre con
+    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 3 e la parola a ogni livello. I file li trova il
+    // main (`_file`) prima del gate, mai il modello.
+    ELIMINA_FILE: {
+      costo: (a) => (perSempre(a) ? 3 : 2),
+      campo: 'file',
+      parola: (a) => perSempre(a),
+      perimetro: () => false,
+      describe: (a) => descriviEliminazione(a),
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const fatti = Array.isArray(o.eliminati) ? o.eliminati : [];
+        const via = o.perSempre ? 'Cancellato per sempre' : 'Spostato nel cestino';
+        if (fatti.length === 1) return `${via} «${fatti[0]}»`;
+        return o.perSempre ? `Cancellati per sempre ${fatti.length} elementi` : `Spostati nel cestino ${fatti.length} elementi`;
       },
     },
     SVEGLIA: {
@@ -949,6 +972,8 @@
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       campo: 'terminale',
+      // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
+      parola: (a) => cancellaColComando(a),
       fonte: (a, out) => {
         if (out.blocked) return null;
         const t = `${typeof out.stdout === 'string' ? out.stdout : ''}${typeof out.stderr === 'string' ? out.stderr : ''}`;
@@ -971,6 +996,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
+        if (cancellaColComando(a)) perche = PERCHE_SENZA_CESTINO;
         // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
         const sp = spiegazioneComando(a);
         return [sp === SPIEGAZIONE_DI_FILO ? sp : cit(sp, true), '\n\nIl comando, nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',
