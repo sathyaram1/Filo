@@ -31,7 +31,7 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
     'Approva l’ambito «lettore_code»: feedback.metadati; x.y', 'senza l’elenco delle operazioni caricato restano i nomi, mai il testo di chi propone');
   for (const [nome, spec] of Object.entries(D.TIPI)) {
     if (!spec.attivo) continue;
-    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {}, ambito: { nome: 'lettore_code', operazioni: ['feedback.metadati'], nonPuo: 'scrivere' } }[nome];
+    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, attendi: { feedbackId: 'f1', aspetta: '1959' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {}, ambito: { nome: 'lettore_code', operazioni: ['feedback.metadati'], nonPuo: 'scrivere' } }[nome];
     assert.ok(esempio, `il tipo attivo «${nome}» non ha un esempio in questo test`);
     assert.equal(typeof D.etichettaAzione({ tipo: nome, ...esempio }, RIF), 'string', nome);
   }
