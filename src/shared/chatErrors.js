@@ -332,10 +332,11 @@
       if (e && e.code === 'TETTO_RISPOSTA') {
         const n = Number(e.maxTokens);
         const tetto = Number.isFinite(n) && n > 0 ? ` di ${n.toLocaleString('it-IT', { useGrouping: true })} token` : '';
-        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava.
+        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava, o il fornitore non dà le misure.
         const f = Number(e.finestra);
-        if (Number.isFinite(f) && f > 0) {
-          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
+        if ((Number.isFinite(f) && f > 0) || e.memoria) {
+          const misura = Number.isFinite(f) && f > 0 ? ` (${f.toLocaleString('it-IT', { useGrouping: true })} token)` : '';
+          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto${misura}: accorcia il testo, abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
         }
         return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
