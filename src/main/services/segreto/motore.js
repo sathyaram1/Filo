@@ -1387,6 +1387,12 @@ class Segreto {
       const f = S.tabella.get(n);
       if (!f) throw errore('NESSUN_FILE', 'Nel segreto non c’è un file con questo nome.');
       if (f.x) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
+      if (f.o !== undefined) {
+        const j = f.e[0][0];
+        const c = (await carichiGruppo(ctx, S, Math.floor(j / GRUPPO)))[j % GRUPPO];
+        if (!c) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
+        return Buffer.from(c.subarray(f.o, f.o + f.d));
+      }
       // Senza azzerare: azzerare centinaia di MB di memoria riusata ferma il processo, e ogni byte lo riempie un blocco.
       const out = Buffer.allocUnsafeSlow(f.d);
       const blocchi = daEstensioni(f.e);
