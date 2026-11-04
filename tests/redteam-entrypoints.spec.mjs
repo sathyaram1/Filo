@@ -13,7 +13,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { statoDi } from './helpers/riquadri.mjs';
 import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
-import { apriRedteamATutti } from './helpers/redteam.mjs';
+import { apriRedteamATutti, fingiRedteamerVerificato } from './helpers/redteam.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
 const RT_URL = 'filo://redteam/redteam.html';
@@ -78,6 +78,7 @@ test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con
 
 test('il menu tasto destro ha "Invia attacco" che apre il pannello con i due campi', async ({ app, openTab, testServer }) => {
   await apriRedteamATutti(app);
+  await fingiRedteamerVerificato(app);
   // Su una pagina esterna i content script (menu + redteamAttack) sono iniettati.
   const url = testServer.html('<!doctype html><html><body><h1 id="t">pagina</h1></body></html>');
   const page = await openTab(url);

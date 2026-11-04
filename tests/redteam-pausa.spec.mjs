@@ -89,7 +89,8 @@ test.beforeAll(async () => {
           return setTimeout(() => json(res, 200, { result: { status: 'ok', attemptId: 'tentativo-lento' } }), invioLento);
         }
         if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'insufficient_credits', have: 0, needed: 50 } });
-        if (url === '/redteamState') return json(res, 200, { result: { verified: false } });
+        // La voce del tasto destro c'è solo per chi ha un codice (#991): qui ce l'hanno tutti.
+        if (url === '/redteamState') return json(res, 200, { result: { verified: true } });
         if (url === '/redteamLeaderboard') return json(res, 200, { result: { entries: [] } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });

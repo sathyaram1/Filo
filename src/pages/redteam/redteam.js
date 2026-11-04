@@ -953,6 +953,13 @@
   }
 
   function wire() {
+    const attackBtn = $('attackBtn');
+    if (attackBtn) {
+      const icona = attackBtn.querySelector('.rt-attack-icon');
+      try { if (icona && window.SN_ICONS?.redteam) icona.innerHTML = window.SN_ICONS.redteam(14); } catch (_) {}
+      attackBtn.addEventListener('click', () => window.SN_REDTEAM_ATTACK_UI?.open());
+    }
+
     const tabs = $('tabs');
     if (tabs) {
       tabs.addEventListener('click', (e) => {

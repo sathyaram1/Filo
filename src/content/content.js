@@ -2149,9 +2149,9 @@
 
     const spegni = buildSpegniFiloItem();
     sezione([buildFeedbackItem(), ...(spegni ? [spegni] : [])]);
-    // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
-    refreshRedteamVisibile();
-    if (redteamVisibile) items.push(buildRedteamAttackItem());
+    // Solo a chi ha un codice Red Team (#991), e in pausa (#896) solo se lo vede. Si richiede a ogni apertura: vale dalla successiva.
+    refreshVoceAttacco();
+    if (voceAttacco) items.push(buildRedteamAttackItem());
 
     const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory });
     if (fila) items.unshift(fila);
@@ -2182,15 +2182,16 @@
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
-  let redteamVisibile = false;
-  function refreshRedteamVisibile() {
+  // La prima domanda aspetta la lettura del main, così la voce c'è già al primo tasto destro.
+  let voceAttacco = false;
+  function refreshVoceAttacco(attendi = false) {
     try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY }))
-        .then((r) => { redteamVisibile = !!(r && r.ok && r.visible); })
+      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi }))
+        .then((r) => { voceAttacco = !!(r && r.ok && r.visible && r.verificato); })
         .catch(() => {});
     } catch (_) {}
   }
-  refreshRedteamVisibile();
+  refreshVoceAttacco(true);
 
   // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
   // il flusso feedback) con due campi separati (testo attacco + descrizione) e
@@ -2859,7 +2860,7 @@
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
-        else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
+        else if (msg.surface === 'redteam') { if (voceAttacco) self.SN_REDTEAM_ATTACK_UI?.open(); }
         else if (msg.surface === 'help') openHelpSidebar();
         else if (msg.surface === 'valuta') valutaDalRiquadro();
         else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
