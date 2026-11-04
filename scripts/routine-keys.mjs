@@ -135,51 +135,15 @@ async function main() {
     return;
   }
 
-  if (cmd === 'account') {
-    if (!nome || (potere !== 'A' && potere !== 'B') || resto.length) {
-      console.error('Uso: node scripts/routine-keys.mjs account <nome> <A|B>');
+  // Valori ammessi e richiesta al server: gli stessi di Gestione → Automazioni (SN_ROUTINE_CHIAVI.IMPOSTAZIONI).
+  if (Object.prototype.hasOwnProperty.call(IMPOSTAZIONI, cmd)) {
+    const v = validaImpostazione({ op: cmd, slug: nome, valore: potere });
+    if (!v.ok || resto.length) {
+      console.error(`Uso: node scripts/routine-keys.mjs ${cmd} <nome> <${IMPOSTAZIONI[cmd].valori.join('|')}>`);
       process.exit(1);
     }
-    await chiama({ op: 'account', slug: nome, account: potere });
-    console.log(`"${nome}" gira sull'account ${potere}: da adesso il suo consumo conta lì.`);
-    return;
-  }
-
-  if (cmd === 'rete') {
-    if (!nome || (potere !== 'limitata' && potere !== 'aperta') || resto.length) {
-      console.error('Uso: node scripts/routine-keys.mjs rete <nome> <limitata|aperta>');
-      process.exit(1);
-    }
-    await chiama({ op: 'rete', slug: nome, rete: potere });
-    console.log(potere === 'limitata'
-      ? `"${nome}" è a rete limitata: i suoi biglietti possono nascere puliti. Vale solo se l'ambiente della routine su claude.ai ha davvero la rete limitata.`
-      : `"${nome}" è a rete aperta: i suoi biglietti nascono sporchi e non prende lavori server.`);
-    return;
-  }
-
-  if (cmd === 'lavori') {
-    if (!nome || (potere !== 'server' && potere !== 'normali') || resto.length) {
-      console.error('Uso: node scripts/routine-keys.mjs lavori <nome> <server|normali>');
-      process.exit(1);
-    }
-    await chiama({ op: 'lavori', slug: nome, lavori: potere });
-    console.log(potere === 'server'
-      ? `"${nome}" è la chiave della routine server: riceve solo lavori server fidati, e solo a rete limitata.`
-      : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata.`);
-    return;
-  }
-
-  if (cmd === 'ambiente') {
-    if (!nome || !['riservati', 'rete_aperta', 'normale'].includes(potere) || resto.length) {
-      console.error('Uso: node scripts/routine-keys.mjs ambiente <nome> <riservati|rete_aperta|normale>');
-      process.exit(1);
-    }
-    await chiama({ op: 'ambiente', slug: nome, ambiente: potere });
-    console.log({
-      riservati: `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`,
-      rete_aperta: `"${nome}" è la chiave dell'ambiente a rete aperta: i suoi biglietti nascono sporchi, riceve solo compiti già non fidati e mai testo riservato né lavori server. Si spegne e si limita da Gestione → Automazioni, anche quando parte a mano.`,
-      normale: `"${nome}" è in un ambiente normale: non riceve testo riservato.`,
-    }[potere]);
+    await chiama(v.dati);
+    console.log(DETTO[cmd](nome, potere));
     return;
   }
 
