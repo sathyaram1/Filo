@@ -226,7 +226,7 @@
         if (activeRoot !== root) return;
         setStatus('');
         refreshSendState();
-        if (!sendBtn.disabled) setStatus('Sei dentro: premi Invia per mandare l’attacco.', 'ok');
+        if (!statusEl.classList.contains('sn-rt-status--err')) setStatus('Sei dentro: ora puoi inviare l’attacco.', 'ok');
         return;
       }
       setStatus((r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.', 'err');
