@@ -1132,18 +1132,30 @@
     return PROVIDER_ORDER.filter((p) => (apiKeys || {})[p]);
   }
 
-  // I posti dei segreti dell'utente nelle impostazioni, come [oggetto, campo]: l'esportazione li porta solo se
-  // chiesto (#905). Un proxy con utente e password nell'indirizzo vale quanto una chiave API. PURA.
-  const PROXY_CON_CREDENZIALI = /^[a-z][a-z0-9+.-]*:\/\/[^/@\s]+@/i;
   const oggetto = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
   const pieno = (v) => typeof v === 'string' && v.trim() !== '';
+
+  // Utente e password di un proxy come li legge chi lo usa (proxyTab.endpointFor): lo schema davanti è facoltativo,
+  // perché molti fornitori danno «utente:password@host:porta» (#905.1), e come per un URL valgono fino all'ultima @
+  // prima dell'host. `senza`: l'indirizzo senza credenziali. null se non ce ne sono. PURA.
+  const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)?([^/?#\s]+)@/i;
+  function credenzialiProxy(v) {
+    if (!pieno(v)) return null;
+    const t = v.trim();
+    const m = CREDENZIALI_PROXY.exec(t);
+    if (!m) return null;
+    const i = m[2].indexOf(':');
+    return { credenziali: m[2], password: i >= 0 ? m[2].slice(i + 1) : '', senza: (m[1] || '') + t.slice(m[0].length) };
+  }
+
+  // I posti dei segreti dell'utente nelle impostazioni, come [oggetto, campo]: l'esportazione li porta solo se
+  // chiesto (#905), i segreti custoditi li tengono fuori da uscite e prompt (#2134). Un proxy con utente e password
+  // vale quanto una chiave API. PURA.
   function campiSegreti(s) {
     const out = [];
     if (!oggetto(s)) return out;
     if (oggetto(s.apiKeys)) for (const k of Object.keys(s.apiKeys)) out.push([s.apiKeys, k]);
-    if (oggetto(s.proxy)) {
-      for (const k of ['datacenter', 'residential']) if (pieno(s.proxy[k]) && PROXY_CON_CREDENZIALI.test(s.proxy[k].trim())) out.push([s.proxy, k]);
-    }
+    if (oggetto(s.proxy)) for (const k of ['datacenter', 'residential']) if (credenzialiProxy(s.proxy[k])) out.push([s.proxy, k]);
     const sb = oggetto(s.security) ? s.security.safeBrowse : null;
     if (oggetto(sb) && 'safeBrowsingKey' in sb) out.push([sb, 'safeBrowsingKey']);
     return out;
