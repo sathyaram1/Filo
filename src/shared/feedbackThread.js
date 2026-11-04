@@ -305,6 +305,7 @@
   // ── La fiducia delle note (#1919, SPEC-DOMANDE §1.2) ──
   // Il testo delle note lo riscrive anche chi non è il server; `noteFidate`, le impronte dei turni scritti da un
   // biglietto pulito, solo il server. Una nota d'altri vale fidata solo se la sua impronta è lì.
+  // Il server ne tiene uno specchio, e la sua suite prova che le impronte siano queste: cambiarle è un lavoro server.
   const CAMPO_NOTE_FIDATE = 'noteFidate';
 
   async function improntaTurno(grezzo) {
