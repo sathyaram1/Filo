@@ -1000,11 +1000,33 @@
     if (permessi && Array.isArray(permessi.scelte) && permessi.scelte.length) {
       entries.push({ label: 'Azzera i permessi del sito', icon: 'lock', action: 'tab-permessi-azzera' });
     }
-    entries.push(
-      { type: 'separator' },
-      { label: 'Chiudi', icon: 'close', action: 'tab-close' },
-    );
+    entries.push({ type: 'separator' }, { label: 'Chiudi', icon: 'close', action: 'tab-close' });
+    // #1695 — con una scheda sola non c'è niente da chiudere; senza chiuse la voce resta, spenta, dove la si cerca.
+    if (state.tabs.length > 1) entries.push({ label: 'Chiudi le altre schede', icon: 'tabs', action: 'tab-close-others' });
+    entries.push(vocePerRiaprire(chiuse));
     api.popupMenu(entries, ctxMenuPos.x, ctxMenuPos.y);
+  }
+
+  const vocePerRiaprire = (ci) => (ci
+    ? { label: 'Riapri scheda chiusa', icon: 'undo', action: 'reopen-closed-tab' }
+    : { label: 'Riapri scheda chiusa', icon: 'undo', disabled: true });
+
+  // Il «+» ha il suo tasto destro (#1695): la scheda nuova e quella appena chiusa stanno nello stesso punto.
+  async function openNewTabContextMenu(x, y) {
+    const mio = ++ctxGiro;
+    const chiuse = await senzaErrore(() => api.tabs.ciSonoChiuse());
+    if (mio !== ctxGiro) return;
+    api.popupMenu([vocePerRiaprire(chiuse)], Math.round(x), Math.round(y));
+  }
+
+  async function chiudiLeAltre(id) {
+    let r = null;
+    try { r = await api.tabs.chiudiAltre(id); } catch (_) { r = null; }
+    const R = window.SN_RESTANO_APERTE;
+    const resto = r && R ? R.frase(R.conto(r.restano)) : '';
+    if (!resto) return;
+    const n = Number(r.chiuse) || 0;
+    showToast(`${n ? (n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`) : 'Nessuna scheda chiusa'}: ${resto}.`);
   }
 
   // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
