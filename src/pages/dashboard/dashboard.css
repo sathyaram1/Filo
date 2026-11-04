@@ -1709,6 +1709,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   --dash-centro: max(0px, (100% - 720px) / 2);
   margin: var(--dash-gap) max(var(--dash-centro), var(--filo-avvisi-barra-larga, 0px) / var(--sn-zoom, 1) - var(--dash-lato) - var(--dash-colonna) - var(--dash-gap)) 0 var(--dash-centro);
   max-width: 720px;
+  /* Senza, il minimo del suo contenuto (la textarea) vince sul margine e sotto gli 840px l'invio torna coperto. */
+  min-width: 0;
   box-sizing: border-box;
 }
 /* Un file trascinato sopra la home (#1623): il campo si accende, è lì che andrà a finire. */
