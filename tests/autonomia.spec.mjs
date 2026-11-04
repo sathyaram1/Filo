@@ -642,7 +642,8 @@ test('l\'Aiuto chiuso e riaperto è una conversazione nuova: non porta con sé l
   });
   const page = await openTab(PREFS);
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
-  const comando = { type: 'ESEGUI_COMANDO', comando: 'rm prova-inesistente-530-aiuto.txt' };
+  // Un comando che cancella vorrebbe la parola (#1909): qui serve un costo 3 che chiede soltanto un OK.
+  const comando = { type: 'ESEGUI_COMANDO', comando: 'node prova-inesistente-530-aiuto.js' };
   const lancia = () => page.evaluate((a) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RUN_ACTION, action: a }), comando);
 
   await page.evaluate(() => window.SN_SIDEBAR.open());

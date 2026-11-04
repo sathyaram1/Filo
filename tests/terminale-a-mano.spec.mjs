@@ -1,6 +1,6 @@
 // #892.1 — un comando scritto a mano nella home passa dagli stessi livelli di autonomia di quelli di Filo: una lettura
-// parte, una cancellazione chiede prima (e col no torna nella barra), e la shell non parte senza quel sì nemmeno
-// chiamata direttamente. Una / seguita da una parola che non è un programma resta un messaggio per Filo.
+// parte, una cancellazione senza cestino vuole la parola «conferma» (#1909; col no torna nella barra), e la shell non
+// parte senza quel sì nemmeno chiamata direttamente. Una / seguita da una parola che non è un programma resta un messaggio per Filo.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput, scrollConfirmToEnd } from './helpers/confirm.mjs';
@@ -31,8 +31,10 @@ function cartellaDaCancellare() {
 const rmDi = (cartella) => (process.platform === 'win32'
   ? `Remove-Item -Recurse -Force "${cartella}"`
   : `rm -rf "${cartella}"`);
+// Un costo 3 che non cancella: scritto a mano chiede un OK, incollato la parola (cancellare senza cestino la vuole sempre, #1909).
+const permessiDi = (cartella) => (process.platform === 'win32' ? `icacls "${cartella}"` : `chmod 700 "${cartella}"`);
 
-test('profilo nuovo: una cancellazione scritta a mano chiede prima, col no torna nella barra, col sì parte', async ({ app }) => {
+test('profilo nuovo: una cancellazione scritta a mano vuole la parola, col no torna nella barra, con la parola parte', async ({ app }) => {
   const bersaglio = cartellaDaCancellare();
   const page = await newtabPage(app);
   const input = page.locator('#input');
@@ -43,7 +45,7 @@ test('profilo nuovo: una cancellazione scritta a mano chiede prima, col no torna
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
   const st = await confirmState(page);
   expect(st.text, 'il popup mostra il comando che partirà').toContain(rmDi(bersaglio));
-  expect(st.hasInput, 'su un profilo nuovo (Normale) una cancellazione chiede un OK').toBe(false);
+  expect(st.hasInput, 'cancellare senza cestino è un «per sempre»: vuole la parola anche scritto a mano (#1909)').toBe(true);
   expect(st.fuori, 'fuori dal comando citato la domanda dice a parole cosa rischia chi preme OK').toMatch(/cancellare/);
   await page.screenshot({ path: 'tests/.shots/892-1-conferma.png' }).catch(() => {});
   expect(existsSync(bersaglio), 'mentre chiede non è partito niente').toBe(true);
@@ -55,7 +57,10 @@ test('profilo nuovo: una cancellazione scritta a mano chiede prima, col no torna
   expect(existsSync(bersaglio)).toBe(true);
 
   await input.press('Enter');
-  await clickConfirm(page, 'ok', { timeout: 10_000 });
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
   await expect(page.locator('.dash-term-cmd').last()).toContainText(rmDi(bersaglio), { timeout: 12_000 });
   await expect(page.locator('.dash-term-controls')).toHaveCount(0, { timeout: 12_000 });
   expect(existsSync(bersaglio), 'col sì la cartella è stata cancellata').toBe(false);
@@ -239,13 +244,13 @@ test('il percorso di un documento, di una cartella o una faccina dopo la barra v
   }
 });
 
-// #892.5 — una riga incollata, cancellata e riportata con Annulla è sempre incollata: la sua cancellazione vuole la
+// #892.5 — una riga incollata, cancellata e riportata con Annulla è sempre incollata: un comando che chiede vuole la
 // parola «conferma». Anche Ripeti la riporta incollata.
-test('incollata, svuotata e riportata con Annulla: la cancellazione vuole «conferma»', async ({ app }) => {
+test('incollata, svuotata e riportata con Annulla: un comando che chiede vuole «conferma»', async ({ app }) => {
   const bersaglio = cartellaDaCancellare();
   const page = await newtabPage(app);
   const input = page.locator('#input');
-  const comando = `/${rmDi(bersaglio)}`;
+  const comando = `/${permessiDi(bersaglio)}`;
   const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
   await app.evaluate(({ clipboard }, t) => clipboard.writeText(t), comando);
   await input.focus();
