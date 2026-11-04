@@ -114,6 +114,17 @@
     return '';
   }
 
+  // Il testo di un messaggio come lo vede chi compatta: oltre MAX_MESSAGGIO token, testa e coda e quante parole mancano.
+  function testoPerChiCompatta(testo) {
+    const t = String(testo == null ? '' : testo).trim();
+    const max = MAX_MESSAGGIO * FC().CARATTERI_PER_TOKEN;
+    if (t.length <= max) return t;
+    const testa = Math.floor(max * 0.7);
+    const coda = Math.floor(max * 0.25);
+    const mezzo = t.slice(testa, t.length - coda);
+    return `${t.slice(0, testa)}\n(… ${numero(parole(mezzo))} parole in mezzo non riportate qui: il testo intero resta nella conversazione …)\n${t.slice(t.length - coda)}`;
+  }
+
   // La riga che il codice scrive al posto di una lettura sospetta (SPEC-CONTESTO § Il sospetto non passa nel riassunto,
   // punto 1): ora, cosa, dove, titolo, lunghezza. Il testo letto non arriva a chi compatta.
   function rigaLettura(a, ts) {
