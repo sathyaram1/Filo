@@ -1273,6 +1273,22 @@ class TabManager {
     return chiuse.map((t) => t.id);
   }
 
+  // «Chiudi le altre schede» del menu della linguetta (#1695): è «tutte tranne questa» della chat, con la stessa scelta
+  // di chi resta. La tenuta diventa l'attiva prima, così nessuna delle chiuse passa davanti. Torna { chiuse, restano }.
+  async chiudiLeAltre(id, { via = 'tasto_destro_scheda' } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return { chiuse: [], restano: [] };
+    const motivo = await this.motiviPerRestare();
+    if (!this.tabs.includes(tab)) return { chiuse: [], restano: [] };
+    const viste = this.tabs.map((t) => t.id);
+    const scelta = ChiudiSchede.risolvi({ tutte: true, tranne: [viste.indexOf(id) + 1] },
+      { schede: this.tabs, viste, numerate: viste.length, resta: (t) => motivo(t) });
+    if (scelta.errore) return { chiuse: [], restano: [] };
+    if (this.activeId !== id) this.activate(id);
+    const chiuse = this.chiudiSchede(scelta.chiudere.map((t) => t.id), { via });
+    return { chiuse, restano: scelta.restano.map((x) => x.perche) };
+  }
+
   // A «chiudile tutte» chiesto in chat (#413) restano il testo scritto e non inviato e i siti tenuti sempre aperti:
   // la funzione che torna dice 'testo', 'sempre' o '' (si chiude).
   async motiviPerRestare() {
