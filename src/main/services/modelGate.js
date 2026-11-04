@@ -223,7 +223,7 @@
     function contaTolti(action, lista, toglie) {
       try {
         const perTipo = new Map();
-        for (const x of lista) perTipo.set(x.tipo, [...(perTipo.get(x.tipo) || []), x.valore]);
+        for (const x of lista) perTipo.set(x.tipo, [...(perTipo.get(x.tipo) || []), x]);
         const tipi = perTipo.size === 1 ? [...perTipo.keys()] : [...perTipo].filter(([, valori]) => toglie(valori)).map(([t]) => t);
         segretiTolti(action, tipi.length ? tipi : ['']);
       } catch (_) {}
