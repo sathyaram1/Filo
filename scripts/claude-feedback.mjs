@@ -755,9 +755,15 @@ export async function main(argvIn) {
       console.error(`RIFIUTATO: --pacchetto: non so chi aspetta le segnalazioni unite (${msg(e)}). Non ho aperto niente: rilancia.`);
       return codiceDi(e);
     }
-    const giri = aspettanti.filter((x) => numeriAttesa.numeri.includes(String(x.num)));
+    // Per id, e anche sulle attese ereditate: una unita che aspetta chi aspetta un'altra unita non sta nello stesso pacchetto.
+    const aspettate = new Set(delPacchetto.attese.map((w) => w.id));
+    const giri = aspettanti.filter((x) => aspettate.has(x.id));
     if (giri.length) {
-      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map((x) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta #${x.num}: si aspetterebbero a vicenda`).join('\n')}`);
+      const perche = (x) => {
+        const e = delPacchetto.ereditate.find((w) => w.id === x.id);
+        return e ? `l'attesa di ${e.da.map((n) => `#${n}`).join(', ')}` : '--aspetta';
+      };
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map((x) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta #${x.num} (${perche(x)}): si aspetterebbero a vicenda`).join('\n')}`);
       return EXIT.RIFIUTATO;
     }
   }
