@@ -84,6 +84,13 @@ ne scrive una da un biglietto pulito o da sé, aggiunge l'impronta del turno a
 feedback si sporca solo per il testo non fidato: quello del feedback, se non è
 fidato, e le note non fidate, dette col loro numero. Una nota senza impronta
 (anche una scritta prima del campo, o riscritta dopo) vale non fidata.
+Una sessione locale che scrive la nota da sé la fa segnare con l'op
+`notaFidata` del biglietto locale: il server la segna solo da un biglietto
+aperto e pulito, e solo per l'ultimo turno non dell'owner.
+Le routine, a cui la conversazione la consegna il server, restano per ora sul
+segno `scrittoSporco` (chi ha scritto da sporco tramite il server): con le
+note senza impronta non fidate, ogni lavoro già avviato nascerebbe sporco.
+Passano alla regola delle note col timbro delle note di prima (#1918).
 
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
