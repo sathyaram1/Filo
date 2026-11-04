@@ -577,6 +577,7 @@
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
       ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
+      ...(tettoSceso ? { tettoSceso } : {}),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
