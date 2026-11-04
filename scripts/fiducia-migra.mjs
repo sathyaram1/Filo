@@ -51,22 +51,8 @@ export function rigaConto(t) {
   return `${come}: ${t.fidati} fidati, ${t.nonFidati} non fidati, ${t.giaImpostati} avevano già la fiducia${errori}. Lotti: ${t.lotti}.`;
 }
 
-async function chiamaServer(data, { fetchImpl = fetch, url = OWNER_FIDUCIA_URL } = {}) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const refresh = findAdminRefreshToken();
-  if (!refresh) throw new Error('nessuna credenziale admin su questa macchina: node scripts/admin-login.mjs');
-  const idToken = await mintIdToken(refresh);
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data }),
-  });
-  let body = {};
-  try { body = await res.json(); } catch (_) { body = {}; }
-  if (res.status === 404) throw new Error('la funzione ownerFiducia non è ancora pubblicata sul server');
-  if (!res.ok) throw new Error((body.error && body.error.message) || `errore ${res.status}`);
-  return body.result || {};
-}
+// Un lotto scrive fino a 500 feedback: il tetto è quello della funzione sul server (nove minuti), non i 30 s di una richiesta.
+const TEMPO_LOTTO_MS = 9 * 60 * 1000;
 
 async function main() {
   const args = leggiArgomenti(process.argv.slice(2));
