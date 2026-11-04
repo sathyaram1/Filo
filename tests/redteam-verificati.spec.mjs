@@ -148,8 +148,10 @@ test('#991 — senza codice la voce non c’è nel tasto destro; il bottone dell
   // Chiudi chiude, e il bottone lo riapre.
   await riquadro.locator('.sn-rt-cancel').click();
   await expect(rt.locator('.sn-rt-overlay')).toHaveCount(0);
+  await rt.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
   await bottone.click();
   await expect(rt.locator('.sn-rt-overlay .sn-rt-attack')).toBeVisible();
+  await rt.screenshot({ path: 'tests/.shots/redteam-verificati-avviso-scuro.png' }).catch(() => {});
 });
 
 test('#991 — con il codice la voce c’è, apre il riquadro senza l’avviso; il bottone della pagina anche', async ({ app, openTab, testServer }) => {
@@ -161,7 +163,8 @@ test('#991 — con il codice la voce c’è, apre il riquadro senza l’avviso; 
   await expect(voce).toBeVisible();
   await voce.click();
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-attack'))?.visibile).toBe(true);
-  // L'avviso è per chi non ha il codice.
+  // L'avviso è per chi non ha il codice: nemmeno dopo la risposta del main.
+  await page.waitForTimeout(500);
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-avviso'))?.visibile).toBe(false);
 
   const rt = await openTab(RT_URL);
@@ -184,10 +187,6 @@ test('#991 — riscattato il codice dalla pagina, la voce compare nel tasto dest
   await rt.locator('#redeemBtn').click();
   await expect(rt.locator('#statsContent')).toBeVisible();
 
-  await page.bringToFront();
-  await expect.poll(async () => {
-    await page.keyboard.press('Escape');
-    const menu = await menuSulSito(page);
-    return menu.locator('.sn-menu-item', { hasText: 'Invia attacco' }).count();
-  }, { timeout: 8000 }).toBe(1);
+  const altro = await sito(openTab, testServer);
+  await expect((await menuSulSito(altro)).locator('.sn-menu-item', { hasText: 'Invia attacco' })).toBeVisible();
 });
