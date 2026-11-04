@@ -22,7 +22,8 @@ test('l\'intervallo delle sessioni è suo, non quello dei bilanci', () => {
 
 test('un documento senza i campi vale come il comportamento di oggi', () => {
   assert.deepEqual(RS.leggiDoc({}), {
-    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false, reteApertaOff: false, reteApertaTetto: 1,  });
+    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false, reteApertaOff: false, reteApertaTetto: 1,
+  });
   assert.deepEqual(RS.leggiDoc(null), RS.leggiDoc({}));
   assert.deepEqual(RS.leggiDoc(undefined), RS.leggiDoc({}));
 });
