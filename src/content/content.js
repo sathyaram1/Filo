@@ -2182,16 +2182,22 @@
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
-  // La prima domanda aspetta la lettura del main, così la voce c'è già al primo tasto destro.
+  // La prima domanda aspetta la lettura del main, così la voce c'è già al primo tasto destro; un cambio lo spinge il
+  // main (REDTEAM_VERIFICATO_CHANGED).
   let voceAttacco = false;
   function refreshVoceAttacco(attendi = false) {
     try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi }))
-        .then((r) => { voceAttacco = !!(r && r.ok && r.visible && r.verificato); })
-        .catch(() => {});
-    } catch (_) {}
+      return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi }))
+        .then((r) => { voceAttacco = !!(r && r.ok && r.visible && r.verificato); return voceAttacco; })
+        .catch(() => voceAttacco);
+    } catch (_) { return Promise.resolve(voceAttacco); }
   }
   refreshVoceAttacco(true);
+
+  // Scelta da un riquadro incorporato: decide la risposta di adesso, non la copia di questa pagina.
+  function apriAttaccoSeConsentito() {
+    refreshVoceAttacco(true).then((si) => { if (si) self.SN_REDTEAM_ATTACK_UI?.open(); });
+  }
 
   // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
   // il flusso feedback) con due campi separati (testo attacco + descrizione) e
