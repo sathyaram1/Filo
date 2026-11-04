@@ -104,7 +104,7 @@ una risposta che lo usava, e finché non risponde vale come assente. La
 risposta finisce fra le risposte automatiche, e l'owner può riaprirla. Le
 opzioni che vogliono un suo gesto il server le rifiuta.
 
-### 3. Decide l'owner: riscrivi la domanda per lui
+### 4. Decide l'owner: riscrivi la domanda per lui
 
 Riscrivi la domanda nella forma per l'owner e pubblicala: da lì è aperta, e lui
 la trova fra quelle da rispondere.
