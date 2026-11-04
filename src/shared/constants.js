@@ -1177,6 +1177,8 @@
     if (oggetto(sb) && 'safeBrowsingKey' in sb) out.push(['security', 'safeBrowse', 'safeBrowsingKey']);
     return out;
   }
+  // Sul disco i segreti fuori da apiKeys stanno cifrati in questo campo delle impostazioni (src/main/shim/storage.js).
+  const CAMPO_SEGRETI_CIFRATI = 'segretiEnc';
   // Gli stessi posti come [oggetto, campo], per chi li toglie o li sostituisce.
   function campiSegreti(s) {
     return percorsiSegreti(s).map((p) => [p.slice(0, -1).reduce((o, k) => o[k], s), p[p.length - 1]]);
@@ -3287,6 +3289,7 @@
     credenzialiProxy,
     segretiDelProxy,
     percorsiSegreti,
+    CAMPO_SEGRETI_CIFRATI,
     campiSegreti,
     haSegreti,
     canServeAction,

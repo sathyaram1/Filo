@@ -186,7 +186,7 @@ function togliSegreti(dati, filo) {
     o[k] = m.senza;
     proxy.push(k);
   }
-  if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
+  if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; delete s[costanti().CAMPO_SEGRETI_CIFRATI]; }
   // Il più lungo prima: l'indirizzo intero del proxy contiene la sua password.
   const G = guardiano();
   const daTogliere = [...segreti.values()].map((x) => G.segretoDi(x)).filter((x) => x.v.length >= x.min)
