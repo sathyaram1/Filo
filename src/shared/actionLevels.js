@@ -368,12 +368,12 @@
       parola: (a) => perSempre(a),
       perimetro: () => false,
       describe: (a) => descriviEliminazione(a),
+      // Senza i nomi: vengono dal disco, e questa frase torna al modello fuori dal recinto. Li dicono riga e bottone.
       describeDone: (a) => {
         const o = (a && a._output) || {};
-        const fatti = Array.isArray(o.eliminati) ? o.eliminati : [];
-        const via = o.perSempre ? 'Cancellato per sempre' : 'Spostato nel cestino';
-        if (fatti.length === 1) return `${via} «${fatti[0]}»`;
-        return o.perSempre ? `Cancellati per sempre ${fatti.length} elementi` : `Spostati nel cestino ${fatti.length} elementi`;
+        const n = Array.isArray(o.eliminati) ? o.eliminati.length : 0;
+        if (o.perSempre) return n === 1 ? 'Cancellato per sempre un elemento, senza cestino' : `Cancellati per sempre ${n} elementi, senza cestino`;
+        return n === 1 ? 'Spostato nel cestino un elemento (si rimette da lì)' : `Spostati nel cestino ${n} elementi (si rimettono da lì)`;
       },
     },
     SVEGLIA: {

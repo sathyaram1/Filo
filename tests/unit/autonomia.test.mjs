@@ -183,6 +183,32 @@ test('#1295 — TOGLI_CHAT: nascondere parte da sé a Normale (costo 1), il «pe
   assert.equal(AL.ingressi({ type: 'TOGLI_CHAT', id: 'c1' }, {}).parola, false);
 });
 
+test('#1909 — ELIMINA_FILE: il cestino chiede con un clic a ogni livello, anche dopo una lettura; il «per sempre» vuole la parola', () => {
+  const cestino = { type: 'ELIMINA_FILE', percorsi: ['~/Downloads/a.pdf'] };
+  const sempre = { ...cestino, per_sempre: true };
+  assert.equal(AL.costoFor(cestino), 2);
+  assert.equal(AL.costoFor(sempre), 3);
+  assert.equal(AL.campoFor(cestino), 'file');
+  for (const livello of ['conservativo', 'default', 'automatico']) {
+    assert.equal(risposta(cestino, { livello }), 'chiede', `${livello}, compito pulito`);
+    assert.equal(risposta(cestino, { livello, azioni: [ricercaFatta] }), 'chiede', `${livello}, dopo una lettura: mai la parola`);
+    assert.equal(risposta(cestino, { livello, paginaWeb: true }), 'chiede', `${livello}, dopo una pagina web`);
+    assert.equal(risposta(sempre, { livello }), 'conferma', `${livello}, per sempre`);
+  }
+  assert.equal(AL.ingressi(cestino, {}).parola, false);
+});
+
+test('#1909 — un comando che cancella senza cestino è un «per sempre»: la parola a ogni livello, a compito pulito', () => {
+  for (const comando of ['Remove-Item -LiteralPath "C:\\Users\\x\\Downloads\\a.pdf"', 'rm -rf build', 'del /f a.txt', 'rmdir /s /q vecchi']) {
+    for (const livello of ['conservativo', 'default', 'automatico']) {
+      assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando }, { livello }), 'conferma', `${livello}: ${comando}`);
+    }
+    assert.match(AL.describe({ type: 'ESEGUI_COMANDO', comando }), /Perché te lo chiedo: cancella per sempre, senza passare dal cestino/);
+  }
+  assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando: 'node build.js' }), 'chiede', 'un altro costo 3 resta un clic');
+  assert.equal(AL.ingressi({ type: 'ESEGUI_COMANDO', comando: 'ls' }, {}).parola, false);
+});
+
 test('sopra la tabella (d): abbassare una difesa vuole «conferma» a ogni livello', () => {
   for (const livello of Object.keys(A.TABELLA)) {
     for (const stato of ['pulito', 'contaminato']) {
@@ -383,13 +409,13 @@ test('a default, compito pulito: il costo 2 parte da solo, il 3 chiede', () => {
   assert.equal(risposta({ type: 'SALVA_LEZIONE', testo: 'L’utente preferisce il tu' }), 'si');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'la ricerca è lenta' }, { richiesta: 'segnala che la ricerca è lenta' }), 'si');
   assert.equal(risposta({ type: 'TIMER', seconds: 60 }), 'si');
-  assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), 'chiede');
+  assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando: 'node build.js' }), 'chiede');
 });
 
 test('a default, dopo aver letto cose scritte da altri: il costo 2 chiede, il 3 vuole «conferma»', () => {
   const dopo = { azioni: [ricercaFatta] };
   assert.equal(risposta({ type: 'SALVA_LEZIONE', testo: 'L’utente preferisce il tu' }, dopo), 'chiede');
-  assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }, dopo), 'conferma');
+  assert.equal(risposta({ type: 'ESEGUI_COMANDO', comando: 'node build.js' }, dopo), 'conferma');
   assert.equal(risposta({ type: 'TIMER', seconds: 60 }, dopo), 'si');
   assert.equal(risposta({ type: 'CERCA_WEB', query: 'altro' }, dopo), 'si', 'leggere di più è sempre libero');
   assert.equal(risposta({ type: 'INVIA_FEEDBACK', testo: 'x' }, { paginaWeb: true }), 'chiede', 'l’assistente su una pagina web');

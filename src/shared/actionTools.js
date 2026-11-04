@@ -508,7 +508,7 @@
       required: ['token', 'valore'],
     },
     ESEGUI_COMANDO: {
-      description: 'Esegue un comando shell. Se parte subito, chiede conferma o vuole "conferma" digitato lo decide il SISTEMA, dal comando e dal livello di autonomia scelto dall\'utente. L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
+      description: 'Esegue un comando shell. Se parte subito, chiede conferma o vuole "conferma" digitato lo decide il SISTEMA, dal comando e dal livello di autonomia scelto dall\'utente. L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi. Per cancellare file o cartelle non usarlo: c\'è ELIMINA_FILE, che li sposta nel cestino.',
       properties: {
         comando: S('Il comando shell esatto.'),
         spiegazione: S('Cosa fa il comando, in una frase semplice e in prima persona, per chi non sa cos\'è un terminale: «Misuro lo spazio libero sul disco», «Cancello la cartella build». È la prima cosa che l\'utente legge, sopra il comando: dice l\'effetto vero, anche quando cancella o cambia qualcosa. Non decide se il comando parte.'),

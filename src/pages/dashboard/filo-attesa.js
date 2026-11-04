@@ -25,6 +25,7 @@
     NAVIGA: ['Aperta una pagina', (k) => `Aperte ${n(k)} pagine`, 'pagina'],
     APRI_FILE: ['Mostrato un file', (k) => `Mostrati ${n(k)} file`, 'file'],
     RINOMINA_FILE: ['Dato un nome ai file', (k) => `Dato un nome ai file ${n(k)} volte`, 'nomi dei file'],
+    ELIMINA_FILE: ['Tolti dei file', (k) => `Tolti dei file ${n(k)} volte`, 'file tolti'],
     TIMER: ['Avviato un timer', (k) => `Avviati ${n(k)} timer`, 'timer'],
     SVEGLIA: ['Messa una sveglia', (k) => `Messe ${n(k)} sveglie`, 'sveglia'],
     CANCELLA_SVEGLIA: ['Tolta una sveglia', (k) => `Tolte ${n(k)} sveglie`, 'sveglia'],

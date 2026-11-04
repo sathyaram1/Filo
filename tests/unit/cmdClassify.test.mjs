@@ -1211,3 +1211,19 @@ test('git push — al remoto configurato si rimedia (2); a un indirizzo scritto 
     assert.equal(lvl(cmd), 3, `"${cmd}" (manda il codice a un server scelto nel comando) dovrebbe essere livello 3`);
   }
 });
+
+// #1909 — cancellare senza cestino si riconosce dal programma di ogni pezzo, anche nascosto dietro un altro comando.
+test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell', () => {
+  for (const cmd of [
+    'Remove-Item -LiteralPath "C:\\Users\\agenti AI\\Downloads\\bolletta.pdf"', 'ri x', 'rm -rf build', '/bin/rm x', 'sudo rm x',
+    'del /f /q a.txt', 'erase a.txt', 'rd /s /q vecchi', 'rmdir vuota', 'unlink a', 'shred -u a', 'cmd /c del x',
+    'bash -c "rm x"', 'powershell -NoProfile -Command Remove-Item x', 'ls && rm x', 'gci *.tmp | Remove-Item',
+    'gci | % { Remove-Item $_ }', 'gci | ForEach-Object { $_.Delete() }', '[System.IO.File]::Delete("a")',
+    'find . -name "*.log" -delete', 'find . -exec rm {} ;', 'ls | xargs rm', 'git clean -fdx', 'robocopy a b /MIR',
+    'Clear-RecycleBin -Force', 'r^m x', 'Re`move-Item x', 'env A=1 rm x', 'mkfs.ext4 /dev/sdb1',
+  ]) assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+  for (const cmd of ['ls', 'dir', 'grep del a.txt', 'echo rm', 'mv a b', 'git status', 'git rm --cached x', 'Get-ChildItem',
+    'Move-Item a b', 'cat rm.txt', 'mkdir rm', 'find . -name x', '', '   ']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
