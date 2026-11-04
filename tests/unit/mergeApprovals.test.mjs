@@ -511,7 +511,7 @@ test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il b
   assert.notEqual(ignoto, UI.RIALLINEA_DA_SOLA);
   assert.match(ignoto, /se in Gestione è ferma, rimettila In coda/);
   // Chi non si riallinea da solo dice cosa fare, qualunque cosa si sappia della pratica.
-  for (const s of [true, false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s === true ? null : s), /npm run finish/);
+  for (const s of [false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s), /npm run finish/);
   assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
   // Il quadrato di Gestione prende le stesse parole.
   require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
