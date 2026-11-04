@@ -389,7 +389,21 @@ async function mostraAccesso(f) {
     contaAccesso('browser', 'senza_scheda');
   }
   f.nelBrowser = true;
-  await apriBrowser(f.url);
+  await apriNelBrowser(f);
+}
+
+// Chi bussa a raffica (anche dal canale delle pagine) non apre una scheda del browser a ogni richiesta (#1132).
+const RIAPERTURA_BROWSER_MS = 10 * 1000;
+async function apriNelBrowser(f) {
+  const ora = Date.now();
+  if (f.browserAlle && ora - f.browserAlle < RIAPERTURA_BROWSER_MS) return;
+  f.browserAlle = ora;
+  try {
+    await apriBrowser(f.url);
+  } catch (e) {
+    f.browserAlle = 0;
+    throw e;
+  }
 }
 
 // Lo stesso indirizzo, quindi lo stesso codice e lo stesso loopback: l'accesso a Filo riesce comunque.
