@@ -16,13 +16,14 @@
 //   `routine` apre solo il chiedere lavoro. `build` apre solo la lettura delle
 //   chiavi da incastonare nella versione che si distribuisce. `manutentore` apre
 //   gli ordini del manutentore; `owner-non-fidato` quelli più le domande per
-//   l'owner, da una sede che legge testo di chiunque (#2011). Nessuna ne apre
+//   l'owner, da una sede che legge testo di chiunque (#2011); `sessione` il
+//   biglietto delle sessioni locali, al posto del token admin. Nessuna ne apre
 //   due, e va DICHIARATO: una credenziale che non dice a cosa serve non apre
-//   niente.
+//   niente. Le stesse cose si fanno da Gestione → Automazioni.
 //
 // USO
 //   node scripts/routine-keys.mjs elenco
-//   node scripts/routine-keys.mjs crea <nome> <routine|build|manutentore|owner-non-fidato> ["a cosa serve"]
+//   node scripts/routine-keys.mjs crea <nome> <routine|sessione|manutentore|owner-non-fidato|build> ["a cosa serve"]
 //   node scripts/routine-keys.mjs revoca <nome>
 //   node scripts/routine-keys.mjs account <nome> <A|B>
 //   node scripts/routine-keys.mjs rete <nome> <limitata|aperta>
@@ -30,26 +31,14 @@
 //   node scripts/routine-keys.mjs ambiente <nome> <riservati|rete_aperta|normale>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
+import '../src/shared/routineChiavi.js';
 
 const REGIONE = 'europe-west1';
 const PROGETTO = 'filo-8b9cb';
 const INDIRIZZO = `https://${REGIONE}-${PROGETTO}.cloudfunctions.net/routineKeys`;
 
-// Dove va la parola appena nata, per potere. Una di routine NON va nell'ambiente: lo eredita ogni lavoratore che parte
-// da lì; sta solo nel prompt della routine schedulata, l'unica cosa che l'orchestratore tiene per sé.
-const DOVE_VA = {
-  build: "Va nell'ambiente «rilascio» del repo (Settings → Environments → rilascio), come FILO_BUILD_PASSPHRASE: fra i segreti del repo non la legge nessuno.",
-  routine: 'Va nel PROMPT della routine schedulata: "routine automatica. <parola d\'ordine>".\n'
-    + "Mai nell'ambiente: da lì la erediterebbe ogni lavoratore che parte.",
-  // SPEC-MANUTENTORE § 3: serve alla chat e alla sessione locale; la sessione accesa dal pacemaker ha il suo biglietto.
-  manutentore: "È la chiave del manutentore: apre i suoi ordini sul server, mai fusioni, L5 o codice. Va nell'ambiente di QUESTO PC,\n"
-    + "come FILO_MANUTENTORE_KEY: la usano npm run manutentore e la sua chat. Mai nell'ambiente di una routine che lavora\n"
-    + "feedback: la sessione che il pacemaker accende per il manutentore non la vuole, ha il suo biglietto.",
-  'owner-non-fidato': "È la tua chiave da una sede non fidata: i poteri del manutentore più le domande per te (leggere, rispondere,\n"
-    + "archiviare, riaprire). Niente fusioni, L5, chiavi, interruttori, «segna fidato», abbassare una priorità 3.\n"
-    + "Mettila solo nella sede da cui lavori tu. Quello che scrive nasce non fidato: le risposte che registra le trovi\n"
-    + "segnate in Gestione → Domande, e quelle di ieri nel recap del mattino.",
-};
+// Dove va la parola appena nata: la stessa frase che mostra Gestione → Automazioni.
+const { DOVE_VA, POTERI } = globalThis.SN_ROUTINE_CHIAVI;
 
 async function chiama(data) {
   const refresh = findAdminRefreshToken();
@@ -122,7 +111,7 @@ async function main() {
 
   if (cmd === 'crea') {
     if (!nome || !potere) {
-      console.error('Uso: node scripts/routine-keys.mjs crea <nome> <routine|build|manutentore|owner-non-fidato> ["a cosa serve"]');
+      console.error(`Uso: node scripts/routine-keys.mjs crea <nome> <${POTERI.join('|')}> ["a cosa serve"]`);
       process.exit(1);
     }
     const r = await chiama({ op: 'issue', slug: nome, scope: potere, label: resto.join(' ') });
