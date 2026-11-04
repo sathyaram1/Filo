@@ -486,8 +486,8 @@
   }
 
   // #525 — riapertura di una chat archiviata (Cronologia, un link con ?chat=<id>, una carta della home): il filo va a
-  // quel punto, e si continua a scrivere DENTRO la stessa chat. I bottoni delle azioni non tornano: un'azione in attesa
-  // di conferma non si può ri-offrire tre giorni dopo come se fosse di adesso.
+  // quel punto, e si continua a scrivere DENTRO la stessa chat. Tornano i bottoni che la chat salvata sa ridisegnare
+  // (file, evento proposto, conferma rimasta senza risposta, #1294): il popup però non si riapre da solo.
   function chatIdFromUrl() {
     try { return new URLSearchParams(self.location.search).get('chat') || null; }
     catch (_) { return null; }
