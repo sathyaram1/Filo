@@ -165,9 +165,13 @@ test('smista mostra: le altre domande vive sullo stesso feedback, provvisorie co
     problema: 'Se scegliamo male\u001b[2J la chat costa il doppio.', notePerAgenti: 'SEGRETO-DELLE-NOTE',
     opzioni: [{ testo: 'Tenere Haiku' }, { testo: 'Passare a Kimi K3' }], consiglio: { opzione: 1, perche: 'x' },
   };
-  const f = finto({ smistamento: { outcome: 'ok', reply: { ...base, vive: [viva], viveAltre: 2 } } });
+  const rotta = { id: 'D-243', stato: 'aperta', fiducia: 'fidato', illeggibile: true };
+  const f = finto({ smistamento: { outcome: 'ok', reply: { ...base, vive: [viva, rotta], viveAltre: 2 } } });
   assert.equal(await esegui(['smista', 'mostra'], f.io), 0);
   const testo = f.out.join('\n');
+  assert.match(testo, /Contesto: Misurate cento chat: Kimi costa un terzo\./, 'chi smista legge il contesto della viva');
+  assert.match(testo, /D-243 \[aperta · illeggibile: il server non l'ha potuta aprire/, 'una illeggibile lo dice');
+  assert.ok(!testo.includes('D-243 (senza titolo)'));
   assert.ok(!/[\u0000-\u0008\u000b-\u001f\u007f]/.test(testo));
   assert.match(testo, /Altre domande vive sullo stesso feedback \(3, qui le 1 più recenti\)/);
   assert.match(testo, /D-244 Chat: tenere Haiku o passare a Kimi K3\? {2}\[aperta · non ferma il lavoro · provvisoria: opzione 1\]/);
