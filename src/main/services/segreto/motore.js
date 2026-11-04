@@ -553,8 +553,9 @@ function registra(ctx, S, p, pre) {
 // un altro segreto in mano) si salta senza leggerla: lì la copia cercata non può stare.
 async function cerca(ctx, S, ids, { pota = false } = {}) {
   const attivi = new Map();
-  for (const i of ids) if (!(S.pos[i] >= 0)) attivi.set(i, { r: 0, vuoti: 0 });
+  for (const i of ids) if (!(S.pos[i] >= 0)) attivi.set(i, { r: 0, vuoti: 0, at: catena(S.posto, ctx.N, i) });
   const occ = ctx.mappa.occ;
+  const fine = lunghezzaCatena(ctx.N);
   let calcoli = 0;
   const tetto = () => Math.max(TENTATIVI_A_VUOTO, 2 * S.catena);
   while (attivi.size && !S.scansionato) {
