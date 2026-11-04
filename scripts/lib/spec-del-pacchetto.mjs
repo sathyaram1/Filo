@@ -75,7 +75,7 @@ export function prerequisitiMancanti(testo, { unite = [], aspetta = [], ereditat
   const prima = prerequisitiNelTesto(testo, [...unite, ...aspetta, ...ereditate]);
   const conTutti = [...aspetta.map(norm), ...prima.map((p) => p.num)].join(',');
   const nota = aVuoto ? ' A vuoto non leggo le attese delle unite: se una aspetta già quel feedback, il pacchetto lo prende da lei e l\'apertura vera non lo rifiuta.' : '';
-  return prima.map(({ num, frase }) => `il testo mette #${num} prima del pacchetto («${citazione(frase)}»), ma il pacchetto non lo aspetta: il server lo darebbe da lavorare subito. Apri con --aspetta ${conTutti} (un feedback già su main non ferma niente), o riscrivi la frase se #${num} non deve fondersi prima.${nota}`);
+  return prima.map(({ num, frase }) => `il testo mette #${num} prima del pacchetto («${citazione(frase)}»), ma il pacchetto non lo aspetta: il server lo darebbe da lavorare subito. Apri con --aspetta ${conTutti} (un feedback già su main non ferma niente), o riscrivi la frase se #${num} non deve fondersi prima${nota ? `.${nota}` : ''}`);
 }
 
 /**
