@@ -70,8 +70,10 @@ export function schede(app) {
 export function apriEAspetta(app, url) {
   return app.evaluate(async ({ BrowserWindow }, url) => {
     const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito)._filoTabs;
-    const id = tm.openTab(url);
+    // Prima che la home abbia finito di nascere una scheda aperta da qui può trovare a metà i moduli del main.
     const t0 = Date.now();
+    while (Date.now() - t0 < 10_000 && !tm.tabs.some((t) => !t.loading)) await new Promise((r) => setTimeout(r, 100));
+    const id = tm.openTab(url);
     while (Date.now() - t0 < 10_000) {
       const tab = tm.tabs.find((t) => t.id === id);
       if (tab && tab.url === url && !tab.loading) break;
