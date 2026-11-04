@@ -84,7 +84,10 @@ Il server chiude questa e mette il testo intero di chi la chiedeva nelle note
 per gli agenti di D-k, così chi riprende dopo la risposta lo legge. Se questa
 fermava il lavoro e D-k no, il lavoro aspetta la risposta a D-k. D-k deve
 stare fra le `vive`: una domanda di un altro feedback, o già chiusa, il server
-la rifiuta. Una scelta solo vicina non è un doppione: se la nuova porta
+la rifiuta, e rifiuta anche una D-k che non può far aspettare il lavoro al
+posto di questa (già risposta, o senza un'opzione che lo riprende) o le cui
+note supererebbero il tetto. Davanti a un rifiuto pubblica questa (passo 4)
+nominando D-k nel contesto. Una scelta solo vicina non è un doppione: se la nuova porta
 un'opzione o un fatto che cambia la decisione, vai avanti coi passi dopo, e
 nel contesto della riscrittura nomini D-k.
 
