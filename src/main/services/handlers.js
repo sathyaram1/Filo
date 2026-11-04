@@ -6551,9 +6551,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   };
   const stimaRichiesta = async () => {
     const FC = globalThis.SN_FILO_CONTESTO;
-    try {
-      return Math.ceil((FC.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })) + caratteriStrumenti()) / FC.CARATTERI_PER_TOKEN);
-    } catch (_) { return 0; }
+    try { return Math.ceil((await caratteriRichiesta()) / FC.CARATTERI_PER_TOKEN); } catch (_) { return 0; }
   };
   const compattaSeServe = async (round) => {
     if (!filo || !tettiChat) return;
