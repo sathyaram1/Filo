@@ -537,6 +537,23 @@
     return Number.isFinite(n) && n > 0 ? { max_tokens: n } : {};
   }
 
+  // L'invio con l'errore già tradotto. Un rifiuto per il tetto non fa fallire: si rifà una volta col tetto che regge, o
+  // senza, e la risposta porta `tettoSceso` (#1302). Il rifiuto arriva prima di qualunque token: non costa niente.
+  async function postOppureErrore(body, apiKey, signal, providerRouting, { stream = false } = {}) {
+    const opts = { tools: !!body.tools, apiKey, model: body.model, providerRouting };
+    const first = await postChat(body, apiKey, signal, providerRouting);
+    if (first.res.ok && (!stream || first.res.body)) return first;
+    const err = await httpError(first.res, { ...opts, maxTokens: body.max_tokens });
+    if (err.tettoRetto == null || !body.max_tokens || (signal && signal.aborted)) throw err;
+    const { max_tokens: tettoChiesto, ...senza } = body;
+    const b2 = err.tettoRetto ? { ...senza, max_tokens: err.tettoRetto } : senza;
+    const second = await postChat(b2, first.keyUsed || apiKey, signal, providerRouting);
+    if (second.res.ok && (!stream || second.res.body)) {
+      return { ...second, tettoSceso: { chiesto: tettoChiesto, usato: err.tettoRetto || null } };
+    }
+    throw await httpError(second.res, { ...opts, maxTokens: b2.max_tokens, tettoProvato: tettoChiesto });
+  }
+
   async function complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
     // usage.include: OpenRouter aggiunge alla risposta il costo in dollari
     // della chiamata (`usage.cost`), quello che conta sul tetto della chiave
