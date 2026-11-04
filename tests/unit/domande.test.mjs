@@ -19,6 +19,8 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'riprendi', feedbackId: 'f1' }, RIF), 'Riprendi #813 con questa scelta');
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: 3 }, RIF), 'Priorità di #813: 1 → 3');
   assert.equal(D.etichettaAzione({ tipo: 'archivia', feedbackId: 'f2' }, RIF), 'Archivia #902.3');
+  assert.equal(D.etichettaAzione({ tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' }, RIF), '#813 aspetta #1959');
+  assert.equal(D.etichettaAzione({ tipo: 'attendi', feedbackId: 'f2', aspetta: '663.2' }, RIF), '#902.3 aspetta #663.2');
   assert.equal(D.etichettaAzione({ tipo: 'approva_locale', feedbackId: 'f1' }, RIF), null, 'il lavoro server non si affida più da una domanda (#1576)');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: false }, {}), 'Routine: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: true }, {}), 'Routine: accendi');
