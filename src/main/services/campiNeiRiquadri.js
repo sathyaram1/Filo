@@ -141,11 +141,18 @@ function radiciChiuse(radice) {
   return { chiuse, riquadri };
 }
 
+// I nomi dei campi delle regole comuni: la ricerca e il conto degli script non ne tengono una copia loro.
+let nomi = null;
+function nomiDeiCampi() {
+  if (!nomi) nomi = globalThis.SN_CAMPI_SEGRETI.crea({}, () => false).NOMI_DEI_CAMPI;
+  return nomi;
+}
+
 // L'albero intero di una pagina grande ferma Filo per secondi: si legge solo per un campo segreto compilato in un
 // componente chiuso (#810.18). Prima, a costo fisso, i risultati della ricerca del protocollo contro quelli che gli
-// script di ogni riquadro sanno contare con le sue regole: mai di più del vero, o nasconderebbe un campo chiuso.
-const CONTA_COME_LA_RICERCA = `(function () {
-  var nomi = ['input', 'textarea'], n = 0;
+// script di ogni riquadro sanno contare con le sue regole.
+const codiceConta = () => `(function () {
+  var nomi = ${JSON.stringify(nomiDeiCampi())}, n = 0;
   function conta(nodo) {
     var t = nodo.nodeType;
     if (t === 3 || t === 4 || t === 8) {
