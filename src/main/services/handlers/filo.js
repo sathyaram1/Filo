@@ -78,7 +78,7 @@ module.exports = function register(on, ctx) {
         const tipo = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.tipoErroreVisto(e);
         if (tipo && contatori()) contatori().erroreVisto(`chat:${tipo}`);
       } catch (_) {}
-      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto, ...taglio, ...crediti };
+      return { ok: false, error, code: (e && e.code) || 'UNKNOWN', status: Number(e && e.status) || 0, keyRefused, actions, ...tetto };
     } finally {
       fineLavoro();
     }
