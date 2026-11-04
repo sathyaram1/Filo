@@ -125,9 +125,11 @@ test('«riaprila» detto due volte non apre due copie della stessa scheda chiusa
     ]);
     await tornaAllaHome(shell);
     await chiedi(chat, 'riaprimi la pagina sulle orche');
-    await expect(chat.locator('.dash-bubble-filo', { hasText: `fatto ${k}` })).toBeVisible({ timeout: 20_000 });
+    await expect(chat.locator('.dash-activity', { hasText: 'Riaperta' })).toHaveCount(k, { timeout: 20_000 });
+    await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
   }
-  expect((await schede(shell)).tabs.filter((t) => t.url === orche.url).length).toBe(1);
+  await chat.waitForTimeout(1500);
+  expect((await schede(shell)).tabs.filter((t) => t.url === orche.url).length, 'una sola scheda delle orche').toBe(1);
   await ripristina(app);
 });
 
