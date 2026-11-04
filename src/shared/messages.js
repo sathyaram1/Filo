@@ -1244,6 +1244,9 @@
     REDTEAM_VISIBILITY: 'redteam_visibility',
     // Broadcast main → pagine di Filo: { visible } quando cambia.
     REDTEAM_VISIBILITY_CHANGED: 'redteam_visibility_changed',
+    // Broadcast main → tutte le schede, senza dati: la voce «Invia attacco» va richiesta di nuovo (codice riscattato,
+    // Red Team riaperto o in pausa). Chi riceve rifà REDTEAM_VISIBILITY.
+    REDTEAM_VERIFICATO_CHANGED: 'redteam_verificato_changed',
     // L'interruttore «Red Team aperto a tutti» di Gestione (SOLO owner, solo da Filo).
     //   GET { } → { ok, openToAll, letto } · SET { openToAll } → { ok, openToAll } | { ok:false, error }.
     REDTEAM_OPEN_GET: 'redteam_open_get',
