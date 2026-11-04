@@ -86,10 +86,13 @@
     });
   }
 
+  // La schermata esce dal computer: coi campi segreti coperti come la foto per un modello. `{ segreti: true }` se
+  // coprirli non riesce, e allora la pagina non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const r = await global.SN_EXTRACT.fotoSenzaSegreti();
+      if (r?.ok && r.dataUrl) return { dataUrl: r.dataUrl };
+      if (r?.code === 'segreti') return { segreti: true };
     } catch (_) {}
     return null;
   }
