@@ -2181,7 +2181,7 @@
           ? '✓ Eliminata definitivamente 1 scheda.'
           : `✓ Eliminate definitivamente ${quante(removed)}.`;
         segnaConfermata(a, { eliminate: removed }, activity, null, { chat });
-        proseguiQuandoLibero(chat, voceDellaConferma(a));
+        proseguiQuandoLibero(chat, voceDellaConferma(a), gruppo, a);
       });
       panel.appendChild(del);
     }
