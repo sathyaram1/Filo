@@ -187,6 +187,13 @@ export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), se
 // Oltre, i numeri delle note non fidate si contano soltanto: il motivo ha 300 caratteri sul server.
 const NOTE_NEL_MOTIVO = 12;
 
+/** Il campo `noteFidate` di un documento letto via REST (`doc.fields`), in lista di impronte. PURA. */
+export function noteFidateDaCampi(fields) {
+  const v = fields && fields[globalThis.SN_FEEDBACK_THREAD.CAMPO_NOTE_FIDATE];
+  const valori = (v && v.arrayValue && v.arrayValue.values) || [];
+  return valori.map((x) => x && x.stringValue).filter((s) => typeof s === 'string' && s);
+}
+
 /** I numeri (da 1) delle note non fidate della conversazione (#1919). `noteFidate` è il campo del server. */
 export async function noteNonFidate(notes, noteFidate) {
   const turni = await globalThis.SN_FEEDBACK_THREAD.fiduciaDelleNote(notes, noteFidate);
