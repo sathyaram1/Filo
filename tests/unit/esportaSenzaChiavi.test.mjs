@@ -131,3 +131,42 @@ test('quando ci sono segreti da includere: chiavi piene, proxy con utente e pass
   assert.equal(C.haSegreti({ security: { safeBrowse: { safeBrowsingKey: SAFE } } }), true);
   assert.equal(C.haSegreti(null), false);
 });
+
+// La scheda accetta il proxy anche senza schema (proxyTab.endpointFor): utente e password lì sono segreti uguali.
+test('un proxy «utente:password@host:porta», senza schema, esce col solo indirizzo', () => {
+  const dati = sorgente();
+  dati.settings.proxy.datacenter = 'utente-x:password-senza-schema@gate.example.com:7000';
+  const zip = buildExportZip(dati);
+  assert.equal(zip.includes(Buffer.from('password-senza-schema')), false);
+  assert.equal(readExportZip(zip).data.settings.proxy.datacenter, 'gate.example.com:7000');
+});
+
+// Gli stessi valori che i segreti custoditi tengono fuori da uscite e modelli (#2134): la password scritta in chiaro
+// altrove, anche se nell'indirizzo è codificata, e quella corta che l'utente si è scelto.
+test('l\'archivio senza chiavi toglie ovunque la password del proxy, decodificata e corta (#2134)', () => {
+  for (const [indirizzo, password] of [
+    ['http://mario:S3gr%40tissima99@gate.example.com:7000', 'S3gr@tissima99'],
+    ['http://mario.rossi:Kq7vRt2x@gate.example.com:7000', 'Kq7vRt2x'],
+  ]) {
+    const dati = sorgente();
+    dati.settings.proxy.datacenter = indirizzo;
+    dati.clipboardHistory.push({ id: 'c3', type: 'text', text: `la password del proxy è ${password}` });
+    const zip = buildExportZip(dati);
+    assert.equal(zip.includes(Buffer.from(password)), false, password);
+    assert.equal(readExportZip(zip).data.settings.proxy.datacenter, 'http://gate.example.com:7000');
+  }
+});
+
+test('un archivio col proxy senza schema e senza credenziali non cancella quello completo di qui (#905.1)', () => {
+  const completo = 'mario:password-di-qui@gate.example.com:7000';
+  const dati = sorgente();
+  dati.settings.proxy.datacenter = completo;
+  const parsed = readExportZip(buildExportZip(dati));
+  assert.equal(parsed.data.settings.proxy.datacenter, 'gate.example.com:7000');
+  assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
+  const qui = mergeImportedData({ settings: { proxy: { datacenter: completo } } }, parsed.data).merged;
+  assert.equal(qui.settings.proxy.datacenter, completo);
+  assert.deepEqual(proxyDaCompletare(qui, parsed.proxySenzaCredenziali), []);
+  const altrove = mergeImportedData({ settings: {} }, parsed.data).merged;
+  assert.deepEqual(proxyDaCompletare(altrove, parsed.proxySenzaCredenziali), ['datacenter'], 'la conferma deve dirlo');
+});

@@ -2378,7 +2378,7 @@ function azioneNelFilo(action, res, { via, chatId, incognito, url }) {
       }
     } catch (_) {}
     let segreti = [];
-    try { segreti = (await segretiCustoditi()).map((x) => x.valore); } catch (_) {}
+    try { segreti = await segretiCustoditi(); } catch (_) {}
     await require('./accaduti').azione(action, res, { via, chatId: typeof chatId === 'string' ? chatId : '', fatto, segreti, incognito, url });
   })().catch((e) => console.warn('[Filo] azione non entrata nel filo:', e?.message || e));
 }

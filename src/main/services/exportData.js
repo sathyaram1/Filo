@@ -133,7 +133,6 @@ const VOCE_FILO = 'filo/eventi.jsonl';
 
 // I segreti dell'utente (SN_CONST.campiSegreti) entrano nell'archivio solo se chi esporta lo chiede (#905).
 // Una chiave incollata in chat o copiata negli appunti è nell'archivio quanto quella delle Opzioni: si toglie ovunque.
-const SEGRETO_MIN = 12;
 const SEGRETO_TOLTO = '[chiave tolta dall’esportazione]';
 const CAMPI_PROXY = ['datacenter', 'residential'];
 const pieno = (v) => typeof v === 'string' && v.trim() !== '';
@@ -141,6 +140,10 @@ const pieno = (v) => typeof v === 'string' && v.trim() !== '';
 function costanti() {
   if (!globalThis.SN_CONST) require('../../shared/constants.js');
   return globalThis.SN_CONST;
+}
+function guardiano() {
+  if (!globalThis.SN_GUARDIANO_STATICO) require('../../shared/guardianoStatico.js');
+  return globalThis.SN_GUARDIANO_STATICO;
 }
 const campiSegreti = (settings) => costanti().campiSegreti(settings);
 const haSegreti = (storageData) => costanti().haSegreti(storageData && storageData.settings);
@@ -161,31 +164,33 @@ function oscura(nodo, segreti) {
 }
 
 // Del proxy il segreto è utente e password, non l'indirizzo: senza, l'archivio rimesso altrove perdeva il proxy (#905.1).
-const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)([^/@\s]+)@/i;
-const proxySenzaCredenziali = (v) => v.trim().replace(CREDENZIALI_PROXY, '$1');
-const haCredenziali = (v) => pieno(v) && CREDENZIALI_PROXY.test(v.trim());
+const credenzialiProxy = (v) => costanti().credenzialiProxy(v);
+const haCredenziali = (v) => !!credenzialiProxy(v);
 
 // Toglie i segreti da una copia dei dati, e dal filo. Il campo va via, non diventa vuoto: all'importazione un campo
 // assente lascia quello di chi importa. `proxy`: i campi del proxy rimasti col solo indirizzo.
 function togliSegreti(dati, filo) {
   const s = dati && dati.settings;
   const campi = campiSegreti(s);
-  const segreti = new Set();
+  const segreti = new Map();
+  const segna = (x) => { if (!segreti.has(x.valore)) segreti.set(x.valore, x); };
   const proxy = [];
   for (const [o, k] of campi) {
     if (!pieno(o[k])) { delete o[k]; continue; }
     const v = o[k].trim();
-    segreti.add(v);
-    const m = isPlainObject(s) && o === s.proxy ? CREDENZIALI_PROXY.exec(v) : null;
+    segna({ valore: v });
+    const m = isPlainObject(s) && o === s.proxy ? credenzialiProxy(v) : null;
     if (!m) { delete o[k]; continue; }
-    segreti.add(m[2]);
-    if (m[2].includes(':')) segreti.add(m[2].slice(m[2].indexOf(':') + 1));
-    o[k] = proxySenzaCredenziali(v);
+    // Gli stessi valori che i segreti custoditi tengono lontani da uscite e modelli.
+    for (const x of costanti().segretiDelProxy(v)) segna(x);
+    o[k] = m.senza;
     proxy.push(k);
   }
   if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
   // Il più lungo prima: l'indirizzo intero del proxy contiene la sua password.
-  const daTogliere = [...segreti].filter((v) => v.length >= SEGRETO_MIN).sort((a, b) => b.length - a.length);
+  const G = guardiano();
+  const daTogliere = [...segreti.values()].map((x) => G.segretoDi(x)).filter((x) => x.v.length >= x.min)
+    .map((x) => x.v).sort((a, b) => b.length - a.length);
   if (daTogliere.length) oscura(dati, daTogliere);
   if (!daTogliere.length || !filo || !filo.length) return { filo, proxy };
   return { filo: Buffer.from(sostituisci(Buffer.isBuffer(filo) ? filo.toString('utf8') : String(filo), daTogliere), 'utf8'), proxy };

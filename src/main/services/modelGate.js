@@ -206,7 +206,7 @@
       const G = global.SN_GUARDIANO_STATICO;
       if (!G || typeof G.oscuraSegreti !== 'function') return messages;
       const lista = await custoditi();
-      const fuori = G.oscuraSegreti(messages, lista.map((x) => x.valore));
+      const fuori = G.oscuraSegreti(messages, lista);
       if (fuori !== messages) contaTolti(action, lista, (valori) => G.oscuraSegreti(messages, valori) !== messages);
       return fuori;
     }
@@ -215,7 +215,7 @@
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
       return (Array.isArray(lista) ? lista : [])
-        .map((x) => (typeof x === 'string' ? { valore: x, tipo: '' } : { valore: String((x && x.valore) || ''), tipo: String((x && x.tipo) || '') }))
+        .map((x) => (typeof x === 'string' ? { valore: x, tipo: '' } : { valore: String((x && x.valore) || ''), tipo: String((x && x.tipo) || ''), password: !!(x && x.password) }))
         .filter((x) => x.valore);
     }
 
@@ -223,7 +223,7 @@
     function contaTolti(action, lista, toglie) {
       try {
         const perTipo = new Map();
-        for (const x of lista) perTipo.set(x.tipo, [...(perTipo.get(x.tipo) || []), x.valore]);
+        for (const x of lista) perTipo.set(x.tipo, [...(perTipo.get(x.tipo) || []), x]);
         const tipi = perTipo.size === 1 ? [...perTipo.keys()] : [...perTipo].filter(([, valori]) => toglie(valori)).map(([t]) => t);
         segretiTolti(action, tipi.length ? tipi : ['']);
       } catch (_) {}
@@ -470,7 +470,7 @@
       if (!Coda) throw codeError('Coda dei lavori non caricata', 'GATE_METHOD');
       const lista = await custoditi();
       const G = global.SN_GUARDIANO_STATICO;
-      const oscura = (v, valori = lista.map((x) => x.valore)) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
+      const oscura = (v, valori = lista) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
       const prima = (Array.isArray(requests) ? requests : []).map((r) => ({ state: r && r.state, questions: r && r.questions }));
       const richieste = prima.map((r) => ({ state: oscura(r.state), questions: oscura(r.questions) }));
       const toglie = (valori) => prima.some((r) => oscura(r.state, valori) !== r.state || oscura(r.questions, valori) !== r.questions);
