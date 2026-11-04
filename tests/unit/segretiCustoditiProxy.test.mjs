@@ -80,3 +80,25 @@ test('una password corta del proxy non esce e non arriva al modello; una chiave 
   const chiave = custoditi({ impostazioni: [{ apiKeys: { tavily: 'Kq7vRt2x' } }], env: {} });
   assert.deepEqual(chiave, [], 'una chiave corta non è una password nota');
 });
+
+test('il cancello dei modelli oscura la password corta del proxy (porta il segno di password fino al guardiano)', async () => {
+  require(join(ROOT, 'src', 'main', 'services', 'modelGate.js'));
+  const corta = 'Kq7vRt2x';
+  const lista = custoditi({ impostazioni: [{ proxy: { datacenter: `mario.rossi:${corta}@gate.example.net:7000` } }], env: {} });
+  const visti = [];
+  globalThis.SN_PROVIDERS = {
+    completeWithFallback: async ({ messages }) => { visti.push(messages); return { text: 'ok', usage: {} }; },
+    streamCompleteWithFallback: async ({ messages }) => { visti.push(messages); return { text: 'ok', usage: {} }; },
+    getProvider: () => null,
+  };
+  const gate = globalThis.SN_MODEL_GATE.create({
+    getSettings: async () => ({}),
+    buildChain: () => [{ provider: 'openrouter', apiKey: 'k', model: 'm' }],
+    modelFor: () => 'm',
+    costs: { isOverLimit: async () => false, record: async () => 0 },
+    segreti: async () => lista,
+  });
+  await gate.complete({ action: 'x', messages: [{ role: 'user', content: `la password è ${corta}` }] });
+  assert.equal(visti.length, 1);
+  assert.ok(!JSON.stringify(visti[0]).includes(corta), JSON.stringify(visti[0]));
+});
