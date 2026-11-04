@@ -49,14 +49,27 @@
     return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`;
   }
 
-  // I giorni prima di oggi che hanno righe delle ore e non ancora la loro riga dei giorni, dal più vecchio.
+  // Le righe delle ore che una riga dei giorni riassume. Una riga dei giorni senza elenco vale per tutto il suo giorno.
+  function coperte(ore, giorni) {
+    const ids = new Set();
+    const interi = new Set();
+    for (const g of Array.isArray(giorni) ? giorni : []) {
+      if (!g) continue;
+      if (Array.isArray(g.ore)) for (const id of g.ore) ids.add(id);
+      else interi.add(g.giorno);
+    }
+    return (r) => !!r && (ids.has(r.id) || interi.has(giornoDi(r.a)));
+  }
+
+  // I giorni prima di oggi con righe delle ore che nessuna riga dei giorni riassume, dal più vecchio: anche un giorno già
+  // riassunto, se la sua sera è stata compattata dopo (il grezzo che resta a mezzanotte esce dal tratto il giorno dopo).
   function giorniDaRiassumere(ore, giorni, ora = Date.now()) {
     const oggi = giornoDi(ora);
-    const fatti = new Set((Array.isArray(giorni) ? giorni : []).map((g) => g && g.giorno));
+    const dentro = coperte(ore, giorni);
     const out = new Set();
     for (const r of Array.isArray(ore) ? ore : []) {
       const g = giornoDi(r && r.a);
-      if (g && g < oggi && !fatti.has(g)) out.add(g);
+      if (g && g < oggi && !dentro(r)) out.add(g);
     }
     return [...out].sort();
   }
