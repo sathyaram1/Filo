@@ -22,7 +22,7 @@ test('l\'intervallo delle sessioni è suo, non quello dei bilanci', () => {
 
 test('un documento senza i campi vale come il comportamento di oggi', () => {
   assert.deepEqual(RS.leggiDoc({}), {
-    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false, reteApertaOff: false, reteApertaTetto: 1,
+    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false, riservatiOff: false, riservatiTetto: 20,
   });
   assert.deepEqual(RS.leggiDoc(null), RS.leggiDoc({}));
   assert.deepEqual(RS.leggiDoc(undefined), RS.leggiDoc({}));
@@ -30,8 +30,8 @@ test('un documento senza i campi vale come il comportamento di oggi', () => {
 
 test('il documento si legge com\'è, e un valore storto non fa esplodere la pagina', () => {
   assert.deepEqual(RS.leggiDoc({
-    maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, reteApertaOff: true, reteApertaTetto: 3,
-  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false, reteApertaOff: true, reteApertaTetto: 3 });
+    maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, riservatiOff: true, riservatiTetto: 3,
+  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false, riservatiOff: true, riservatiTetto: 3 });
   assert.equal(RS.leggiDoc({ manutentoreAcceso: true }).manutentoreAcceso, true);
   assert.equal(RS.leggiDoc({ manutentoreAcceso: 'sì' }).manutentoreAcceso, false, 'solo un vero booleano lo accende');
   assert.deepEqual(RS.valida({ manutentoreAcceso: true }), { ok: true, valori: { manutentoreAcceso: true } });
@@ -149,32 +149,34 @@ test('pause lunghe: domani, o la data; scadute o sporche non diventano una riga'
   assert.match(RS.pausaInParole('La routine server (account B)', { finoMs: ORA + ORE, perche: 'http_429', account: 'B', oggi: 4 }, ORA).dettaglio, /oggi su quell'account: 4/);
 });
 
-test('la routine a rete aperta (#2013): spenta solo con un vero booleano, e un tetto intero da 1 al massimo', () => {
-  assert.ok(RS.CHIAVI.includes('reteApertaOff') && RS.CHIAVI.includes('reteApertaTetto'), 'il main li inoltra e li rilegge');
-  assert.equal(RS.leggiDoc({ reteApertaOff: 'sì' }).reteApertaOff, false);
-  assert.equal(RS.leggiDoc({ reteApertaTetto: '4' }).reteApertaTetto, 4);
-  assert.equal(RS.leggiDoc({ reteApertaTetto: 0 }).reteApertaTetto, 1);
-  assert.equal(RS.leggiDoc({ reteApertaTetto: 99 }).reteApertaTetto, 20);
-  assert.deepEqual(RS.valida({ reteApertaOff: true, reteApertaTetto: '2' }), { ok: true, valori: { reteApertaOff: true, reteApertaTetto: 2 } });
+test('la routine riservati (#2069): spenta solo con un vero booleano, e un tetto intero da 1 al massimo', () => {
+  assert.ok(RS.CHIAVI.includes('riservatiOff') && RS.CHIAVI.includes('riservatiTetto'), 'il main li inoltra e li rilegge');
+  assert.ok(!RS.CHIAVI.some((k) => /reteAperta/.test(k)), 'la rete aperta non ha più posto in Gestione');
+  assert.equal(RS.leggiDoc({ riservatiOff: 'sì' }).riservatiOff, false);
+  assert.equal(RS.leggiDoc({ riservatiTetto: '4' }).riservatiTetto, 4);
+  assert.equal(RS.leggiDoc({ riservatiTetto: 0 }).riservatiTetto, 20, 'senza un tetto scritto vale quello comune');
+  assert.equal(RS.leggiDoc({ riservatiTetto: 99 }).riservatiTetto, 20);
+  assert.deepEqual(RS.valida({ riservatiOff: true, riservatiTetto: '2' }), { ok: true, valori: { riservatiOff: true, riservatiTetto: 2 } });
   for (const storto of [0, 21, 1.5, '', '   ', 'due', '<b>3</b>']) {
-    const r = RS.valida({ reteApertaTetto: storto });
+    const r = RS.valida({ riservatiTetto: storto });
     assert.equal(r.ok, false, String(storto));
-    assert.match(r.testo, /rete aperta: ci vuole un numero intero da 1 a 20\. Non salvato\./);
+    assert.match(r.testo, /riservati: ci vuole un numero intero da 1 a 20\. Non salvato\./);
   }
-  assert.equal(RS.valida({ reteApertaOff: 'true' }).ok, false);
+  assert.equal(RS.valida({ riservatiOff: 'true' }).ok, false);
 });
 
-test('lo stato della routine a rete aperta in una riga: cosa ha deciso il pacemaker e quante volte l’ha accesa oggi', () => {
-  assert.equal(RS.statoReteAperta(undefined), '', 'il pacemaker non ne ha ancora scritto niente');
-  assert.equal(RS.statoReteAperta({ perche: 'rete_work', oggi: 1 }), 'Accesa una volta oggi.');
-  assert.equal(RS.statoReteAperta({ perche: 'rete_work', oggi: 3 }), 'Accesa 3 volte oggi.');
-  assert.equal(RS.statoReteAperta({ perche: 'rete_no_token', oggi: 0 }), 'Ferma: si accende solo a mano; mai accesa oggi.');
-  assert.equal(RS.statoReteAperta({ perche: 'no_rete_work', oggi: 2 }), 'Nessun compito per lei; accesa 2 volte oggi.');
-  assert.equal(RS.statoReteAperta({ perche: 'motivo_nuovo' }), 'Ferma: stato non leggibile; mai accesa oggi.');
-  // La sua pausa conta le accensioni sue, non quelle di un account.
+test('lo stato della routine riservati in una riga: cosa ha deciso il pacemaker e quante volte l’ha accesa oggi', () => {
+  assert.equal(RS.statoRiservati(undefined), '', 'il pacemaker non ne ha ancora scritto niente');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_work', oggi: 1 }), 'Accesa una volta oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_work', oggi: 3 }), 'Accesa 3 volte oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_no_routine_id', oggi: 0 }), 'Ferma: manca l’id della routine su claude.ai; mai accesa oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_off', oggi: 0 }), 'Spenta: si usa la routine normale; mai accesa oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'no_riservati_work', oggi: 2 }), 'Nessun compito per lei; accesa 2 volte oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'motivo_nuovo' }), 'Ferma: stato non leggibile; mai accesa oggi.');
+  // La sua pausa conta le accensioni sue, non quelle dell'account.
   const ora = Date.parse('2026-11-01T10:00:00Z');
-  const p = RS.pausaInParole('La routine a rete aperta', { finoMs: ora + 3600000, perche: 'http_402', strikes: 1, oggi: 2 }, ora, { contoDi: 'routine' });
-  assert.match(p.testo, /^La routine a rete aperta in pausa fino alle .*crediti finiti/);
+  const p = RS.pausaInParole('La routine riservati dell’account A', { finoMs: ora + 3600000, perche: 'http_402', strikes: 1, account: 'A', oggi: 2 }, ora, { contoDi: 'routine' });
+  assert.match(p.testo, /^La routine riservati dell’account A in pausa fino alle .*crediti finiti/);
   assert.match(p.dettaglio, /Accensioni di oggi di questa routine: 2\./);
-  assert.doesNotMatch(p.dettaglio, /account/);
+  assert.doesNotMatch(p.dettaglio, /quell'account/);
 });

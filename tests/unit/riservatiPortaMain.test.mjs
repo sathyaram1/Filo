@@ -1,6 +1,6 @@
-// La routine a rete aperta (#2013) nella porta del main: spenta e tetto arrivano al documento delle routine e tornano
-// alla pagina, e l'ultima decisione del pacemaker passa dal server a Gestione insieme alle pause. Handler vero, rete
-// finta: le chiamate a Firestore e alle callable si leggono come partono.
+// La routine riservati (#2069) nella porta del main: spenta e tetto arrivano al documento delle routine e tornano alla
+// pagina, e l'ultima decisione del pacemaker passa dal server a Gestione insieme alle pause. Handler vero, rete finta:
+// le chiamate a Firestore e alle callable si leggono come partono.
 
 import { test, before, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -71,27 +71,31 @@ function chiama(msg) {
 
 test('spenta e tetto vanno al documento delle routine, soli, e tornano alla pagina riletti', async () => {
   doc = { maxSessions: 4, accountAOff: true };
-  const r = await chiama({ type: MSG.AUTOMATION_SESSIONS_SET, reteApertaOff: true, reteApertaTetto: '3' });
+  const r = await chiama({ type: MSG.AUTOMATION_SESSIONS_SET, riservatiOff: true, riservatiTetto: '3' });
   assert.equal(r.ok, true, JSON.stringify(r));
   const patch = chiamate.find((c) => c.method === 'PATCH');
   assert.ok(patch, 'nessuna scrittura partita');
-  assert.deepEqual(new URL(patch.url).searchParams.getAll('updateMask.fieldPaths').sort(), ['reteApertaOff', 'reteApertaTetto']);
-  assert.deepEqual([doc.reteApertaOff, doc.reteApertaTetto, doc.maxSessions, doc.accountAOff], [true, 3, 4, true]);
-  assert.deepEqual([r.reteApertaOff, r.reteApertaTetto, r.maxSessions], [true, 3, 4]);
+  assert.deepEqual(new URL(patch.url).searchParams.getAll('updateMask.fieldPaths').sort(), ['riservatiOff', 'riservatiTetto']);
+  assert.deepEqual([doc.riservatiOff, doc.riservatiTetto, doc.maxSessions, doc.accountAOff], [true, 3, 4, true]);
+  assert.deepEqual([r.riservatiOff, r.riservatiTetto, r.maxSessions], [true, 3, 4]);
   const letto = await chiama({ type: MSG.AUTOMATION_SESSIONS_GET });
-  assert.deepEqual([letto.reteApertaOff, letto.reteApertaTetto], [true, 3]);
+  assert.deepEqual([letto.riservatiOff, letto.riservatiTetto], [true, 3]);
   // Un tetto storto non parte.
-  const storto = await chiama({ type: MSG.AUTOMATION_SESSIONS_SET, reteApertaTetto: '0' });
+  const storto = await chiama({ type: MSG.AUTOMATION_SESSIONS_SET, riservatiTetto: '0' });
   assert.equal(storto.ok, false);
   assert.equal(chiamate.filter((c) => c.method === 'PATCH').length, 0);
 });
 
-test('l’ultima decisione del pacemaker sulla rete aperta arriva alla pagina insieme alle pause', async () => {
-  pausa = { pause: { reteAperta: { perche: 'http_402', finoMs: 5 } }, voci: { reteAperta: { perche: 'rete_no_token', oggi: 2, percheMs: 7 } }, oraMs: 9 };
+test('l’ultima decisione del pacemaker sulla riservati arriva alla pagina insieme alle pause di A e B', async () => {
+  pausa = {
+    pause: { riservatiA: { perche: 'http_402', finoMs: 5, account: 'A' }, riservatiB: { perche: 'http_429', finoMs: 6, account: 'B' } },
+    voci: { riservati: { perche: 'riservati_paused', oggi: 2, percheMs: 7, oggiPerAccount: { A: 1, B: 1 } } },
+    oraMs: 9,
+  };
   const r = await chiama({ type: MSG.AUTOMATION_PAUSE_GET });
   assert.equal(r.ok, true, JSON.stringify(r));
   assert.deepEqual(chiamate[0].body, { data: { op: 'pause' } });
-  assert.deepEqual(r.voci.reteAperta, { perche: 'rete_no_token', oggi: 2, percheMs: 7 });
-  assert.equal(r.pause.reteAperta.perche, 'http_402');
-  assert.match(globalThis.SN_ROUTINE_SESSIONI.statoReteAperta(r.voci.reteAperta), /^Ferma: si accende solo a mano; accesa 2 volte oggi\.$/);
+  assert.deepEqual(r.voci.riservati, { perche: 'riservati_paused', oggi: 2, percheMs: 7, oggiPerAccount: { A: 1, B: 1 } });
+  assert.deepEqual([r.pause.riservatiA.perche, r.pause.riservatiB.perche], ['http_402', 'http_429']);
+  assert.match(globalThis.SN_ROUTINE_SESSIONI.statoRiservati(r.voci.riservati), /^In pausa; accesa 2 volte oggi\.$/);
 });
