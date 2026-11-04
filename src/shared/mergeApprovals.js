@@ -1217,6 +1217,7 @@
     OROLOGIO_MS: OROLOGIO_MS,
     siRiallineaDaSola: siRiallineaDaSola,
     dopoIlConflitto: dopoIlConflitto,
+    testoRiallineamento: testoRiallineamento,
     RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
