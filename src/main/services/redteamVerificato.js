@@ -32,7 +32,10 @@ function leggiCon(fn) { leggi = typeof fn === 'function' ? fn : null; }
 // Solo una risposta del server col suo sì o no: un errore o la pausa non dicono niente.
 function ricorda(risposta, account = chi()) {
   if (account == null || !risposta || risposta.paused || risposta.error || typeof risposta.verified !== 'boolean') return;
+  const prima = !!copie.get(account)?.verificato;
   copie.set(account, { verificato: risposta.verified, letto: Date.now() });
+  if (prima === risposta.verified) return;
+  for (const fn of ascoltatori) { try { fn(risposta.verified); } catch (_) {} }
 }
 
 function rileggi() {
