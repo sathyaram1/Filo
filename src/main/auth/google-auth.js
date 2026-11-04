@@ -59,6 +59,7 @@ function erroreAccesso(code, message) {
 // l'accesso resterebbe in corso per sempre. Largo: consenso, scelta account, 2FA.
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
 let flussoInCorso = null;
+let flussoAttuale = null;
 
 // A tempo costante: un tentativo sbagliato non chiude più l'ascolto, quindi i tentativi sono illimitati.
 function stessoState(ricevuto, atteso) {
