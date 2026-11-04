@@ -26,7 +26,7 @@
   /** Uno slot che il server può accettare: uno fisso, o «compito:<ricorrente>». PURA. */
   function slotValido(s) {
     const t = String(s || '').trim();
-    return SLOT.includes(t) || /^compito:[a-z0-9][a-z0-9_-]{0,63}$/i.test(t);
+    return SLOT.includes(t) || SLOT_RICORRENTE.test(t);
   }
 
   /** Un istante in ms, o NaN se manca: il server scrive `null` per «non ancora», e `Number(null)` è 0. PURA. */
