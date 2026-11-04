@@ -68,12 +68,15 @@ function chiama(msg) {
 const RECAP = { ok: true, recap: [{ giorno: '2026-10-31', testo: 'Fusioni: 7.', at: '2026-10-31T07:00:00Z' }, { giorno: 'storto', testo: 'x' }, { giorno: '2026-10-30', testo: 3 }] };
 const STATO = { ok: true, parallelismo: 4, parallelismoEffettivo: 4, freno: 20, taccuino: 'mai alla pagina', segnali: [{ id: 's' }] };
 
-test('il recap e la N arrivano alla pagina; i fogli storti no, e lo stato porta solo i tre numeri', async () => {
+test('il recap e la N arrivano alla pagina; i fogli storti no, e lo stato porta solo i tre numeri e l’ordine', async () => {
   rispondi = (d) => ({ status: 200, body: { result: d.op === 'recap' ? RECAP : STATO } });
   const r = await chiama({ type: MSG.MANUTENTORE_RECAP_GET });
   assert.deepEqual(ricevute.map((x) => [x.path, x.data.op]).sort(), [['/ownerManutentore', 'recap'], ['/ownerManutentore', 'stato']]);
   assert.equal(ricevute.find((x) => x.data.op === 'recap').data.limite, 30);
-  assert.deepEqual(r, { ok: true, recap: [{ giorno: '2026-10-31', testo: 'Fusioni: 7.', at: '2026-10-31T07:00:00Z' }], stato: { parallelismo: 4, parallelismoEffettivo: 4, freno: 20 } });
+  assert.deepEqual(r, { ok: true, recap: [{ giorno: '2026-10-31', testo: 'Fusioni: 7.', at: '2026-10-31T07:00:00Z' }], stato: { parallelismo: 4, parallelismoEffettivo: 4, freno: 20, ordine: null } });
+  // L'ordine del manutentore (#1926) arriva quando il server lo manda: Gestione lo mostra e lo cambia.
+  rispondi = (d) => ({ status: 200, body: { result: d.op === 'recap' ? RECAP : Object.assign({}, STATO, { ordine: [812, '815.2'] }) } });
+  assert.deepEqual((await chiama({ type: MSG.MANUTENTORE_RECAP_GET })).stato.ordine, ['812', '815.2']);
 });
 
 test('senza la N il recap resta; senza il recap si dice perché; una funzione non pubblicata si dice', async () => {
