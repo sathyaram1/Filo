@@ -283,6 +283,7 @@
     if (res && res.reason === 'crediti') e.reason = 'crediti';
     if (res && Number(res.maxTokens) > 0) e.maxTokens = Number(res.maxTokens);
     if (res && Number(res.finestra) > 0) e.finestra = Number(res.finestra);
+    if (res && res.memoria) e.memoria = true;
     if (res && typeof res.finishReason === 'string' && res.finishReason) e.finishReason = res.finishReason;
     if (res && res.vuota) e.vuota = true;
     return e;
