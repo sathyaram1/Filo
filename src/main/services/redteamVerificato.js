@@ -32,17 +32,13 @@ function rileggi() {
   if (inCorso) return inCorso;
   const account = chi();
   if (account == null || !leggi || Date.now() - fallitaIl < RIPROVA_MS) return Promise.resolve();
-  inCorso = (async () => {
-    try {
-      const r = await leggi();
+  inCorso = Promise.resolve()
+    .then(() => leggi())
+    .then((r) => {
       if (r && typeof r.verified === 'boolean' && !r.paused) ricorda(r, account);
       else fallitaIl = Date.now();
-    } catch (_) {
-      fallitaIl = Date.now();
-    } finally {
-      inCorso = null;
-    }
-  })();
+    }, () => { fallitaIl = Date.now(); })
+    .finally(() => { inCorso = null; });
   return inCorso;
 }
 
