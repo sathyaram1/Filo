@@ -1920,7 +1920,7 @@
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
       if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) {
-        pannelloSenzaEsito(a, chat, { no: true });
+        pannelloSenzaEsito(a, chat, { no: true, gruppo });
         return;
       }
       btn.disabled = true;
