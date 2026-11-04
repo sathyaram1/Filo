@@ -41,8 +41,21 @@ scrivi l'elenco dei test rossi dopo il rebase.
    diventano `git -C`, perché un comando scritto diverso il controllo dei
    permessi lo giudica da capo. Se ti ferma, è un guasto (gruppo `guasto:
    permessi git`): niente `git merge` né altre strade al posto del rebase.
+
+   Finito il rebase, le righe di novità che il lavoro aveva scritto sotto una
+   versione uscita intanto si riportano nel blocco della prossima versione.
+   È un gesto meccanico, e lo fa lo strumento, che committa da sé:
+
+   ```bash
+   node scripts/novita-in-cima.mjs --commit
+   ```
+
+   La consegna lo rifà prima di spedire il ramo: se lo salti non succede
+   niente di male, ma gli unit del passo 3 ti darebbero un rosso che non c'è.
+   Se lo strumento dice che non riesce, il motivo va nel report.
 2. Non migliorare, non ritoccare, non aggiungere: ogni riga cambiata oltre il
-   conflitto è codice che nessuno ha verificato.
+   conflitto è codice che nessuno ha verificato. Le novità spostate dallo
+   strumento non contano: non cambiano niente oltre al blocco in cui stanno.
 3. Lancia `npm run test:unit` e gli spec delle aree in conflitto. Un rosso nato
    da come hai risolto un conflitto lo sistemi lì, nelle righe del conflitto;
    ogni altro rosso, compresi quelli elencati dal server, resta com'è e va nel

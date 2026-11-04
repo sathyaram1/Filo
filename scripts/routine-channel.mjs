@@ -788,9 +788,8 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
   // come nell'hook: una sentinella negli unit test la cerca lì.
   // Come l'hook: una copia dei dati del server nei commit da spedire si toglie dalla loro storia, o il ramo non parte (#1108).
   let copie = { stato: 'pulito', avviso: '' };
-  const routine = isRoutineInstance(root, { env });
   try {
-    copie = spedibileSenzaCopie(root, routine ? { nome: 'claude-routine', email: 'claude@routine' } : {});
+    copie = spedibileSenzaCopie(root, autoreDeiCommit(root, env));
   } catch (_) { /* senza elenco si spedisce come prima: la sentinella resta la seconda rete */ }
   if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
   try { installaControlloSpedizione(root); } catch (_) { /* il controllo qui sopra c'è già stato */ }
@@ -825,6 +824,29 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
  * La consegna di un riallineamento: il marcatore del correttore porta in `dal` il commit verificato. Una che si ferma
  * con una domanda che blocca non riallinea niente. Regola unica per dispatch --record-fixed e deliver fixed. PURA.
  */
+/** Chi firma i commit che fanno gli strumenti: la routine col suo nome; fuori, `fuori` ({} = l'identità di git). */
+export function autoreDeiCommit(root, env = process.env, fuori = {}) {
+  return isRoutineInstance(root, { env }) ? { nome: 'claude-routine', email: 'claude@routine' } : fuori;
+}
+
+/**
+ * Le righe di novità che il ramo ha sotto versioni già uscite, riportate in cima e committate (#2057): lo fa chi
+ * riallinea dopo il rebase, e lo rifà la consegna del riallineamento prima di spedire. Non ferma mai la consegna.
+ */
+export async function riportaNelClone(root, { commit = false, env = process.env } = {}) {
+  const { riportaInCima } = await import('./lib/novita-in-cima.mjs');
+  const autore = autoreDeiCommit(root, env);
+  return riportaInCima(root, { commit, aMeta: (r) => operazioneGitInCorso(r), identita: autore.nome ? autore : null });
+}
+
+/** Il riporto delle novità davanti alla spedizione di un riallineamento: dice solo quando ha fatto qualcosa o non ci è riuscito. */
+export async function novitaPrimaDiSpedire(root, log) {
+  const { testoRiportaInCima } = await import('./lib/novita-in-cima.mjs');
+  const r = await riportaNelClone(root, { commit: true });
+  if (!r.ok || r.spostate.length) for (const riga of testoRiportaInCima(r)) log(riga);
+  return r;
+}
+
 export function consegnaDiRiallineamento(marcatore, { ferma = false, domanda = null } = {}) {
   const siFerma = ferma === true || !!(domanda && typeof domanda === 'object' && domanda.blocca !== false);
   return !!(marcatore && marcatore.role === 'fixer' && marcatore.dal) && !siFerma;
@@ -926,9 +948,7 @@ export function commitRestante(root, { exec = execFileSync, env = process.env, p
     restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
     if (!restano.length) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
   }
-  const routine = isRoutineInstance(root, { env });
-  const nome = routine ? 'claude-routine' : 'claude-local';
-  const email = routine ? 'claude@routine' : 'claude@local';
+  const { nome, email } = autoreDeiCommit(root, env, { nome: 'claude-local', email: 'claude@local' });
   const elenco = `${restano.slice(0, 3).join(', ')}${restano.length > 3 ? ` (+${restano.length - 3} file)` : ''}`;
   const commit = run(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m', `auto: ${perche} — ${elenco}`]);
   if (!commit.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(commit.out) };
@@ -2074,6 +2094,7 @@ if (isMain) {
       if (intento === 'fixed') {
         const { readMarker } = await import('./lib/routine-role.mjs');
         if (consegnaDiRiallineamento(readMarker(ROOT), { ferma: data.stop, domanda: data.domanda })) {
+          await novitaPrimaDiSpedire(ROOT, (r) => console.error(r));
           const sped = spedisciRiallineamento(ROOT);
           if (!sped.ok) { console.error(testoRiallineamentoNonSpedito(sped)); process.exit(1); }
           if (sped.avviso) console.error(sped.avviso);
