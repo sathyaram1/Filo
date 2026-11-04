@@ -160,6 +160,8 @@ const SOLO_MIGRAZIONE = new Set(['fiducia-migra.mjs']);
 const SOLO_TOGLIE = new Set(['togli-fiducia.mjs']);
 // La sanatoria di un registro bucato (#2021): il server la concede solo se ogni commit ha già una voce fidata.
 const SOLO_SANA = new Set(['fiducia-sana.mjs']);
+// La chiamata comune (#2021.1) porta l'op che riceve e non ne scrive nessuna: la importano solo i tre qui sopra.
+const SOLO_CHIAMATA = new Set(['owner-fiducia.mjs']);
 test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
   const file = [];
   const giro = (dir) => {
