@@ -258,6 +258,10 @@ test('scheda: in volo la rotella gira accanto a una frase leggibile; il ruolo si
   expect(vista.opacita).toBe('1');
   expect(vista.colore).toBe(vista.testo);
   await expect(go).toBeDisabled();
+  // Il quadrato in cima dice quello che dicono lista e pannello: in volo non è più rosso «bloccato».
+  await expect(scheda(page, 'volo')).toContainText('in fusione');
+  await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).not.toHaveClass(/mg-forma--attack/);
+  await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).toHaveClass(/mg-forma--scelta/);
   await page.screenshot({ path: 'tests/.shots/fusioni-stato-volo.png' });
 });
 
