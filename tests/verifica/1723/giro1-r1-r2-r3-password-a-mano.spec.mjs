@@ -43,6 +43,7 @@ test('r3 una parola normale dopo «pw», «la pass» o «, è» non diventa una 
     ['Ho comprato la pass giornaliera, è carissima', 'carissima'],
     ['Ho comprato la pass giornaliera, è carissima', 'giornaliera'],
     ['Il pw del documento. Il documento è pronto', 'documento'],
+    ['il green pass, è scaduto', 'scaduto'],
   ]) {
     expect(parte(testo), testo).toContain(parola);
   }
