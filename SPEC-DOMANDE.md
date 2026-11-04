@@ -614,8 +614,13 @@ Come funziona oggi (#1152):
     aggiornamenti le nominano. La chiusura è `domande.chiudi`, col
     resoconto, il principio quando c'è e il numero del lavoro, che il server
     vuole fuso e collegato alla domanda; non chiude una domanda che ferma un
-    altro lavoro né una risposta che si sta applicando. Le chiuse così vanno
-    fra le «Risposte automatiche», con «attuata da #n», e l'owner le riapre.
+    altro lavoro, una risposta che si sta applicando, né una provvisoria (la
+    consigliata vale finché l'owner non sceglie, anche a lavoro fuso;
+    l'elenco la segna `provvisoria`). Alla prima lettura arrivano anche i
+    lavori fusi prima che le chiusure segnassero l'ora della fusione, datati
+    dal loro ultimo aggiornamento. Le chiuse così vanno fra le «Risposte
+    automatiche», con «attuata da #n», e l'owner le riapre: la riapertura
+    toglie il principio che la chiusura aveva scritto.
     Nel dubbio la domanda resta aperta e lo dice il rapporto, che elenca le
     chiuse col lavoro che le ha attuate.
 - **Risposte registrate da una sessione** (decisione dell'owner del 01/11,
