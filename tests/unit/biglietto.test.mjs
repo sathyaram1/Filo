@@ -43,7 +43,7 @@ function server(biglietti = {}, { rompi = false, status = 200 } = {}) {
     }
     const b = biglietti[data.ticket];
     if (!b) return ris({ ok: false, reason: 'biglietto_sconosciuto' });
-    if (data.op === 'stato') return ris({ ok: true, fiducia: b.chiuso ? 'non_fidato' : b.fiducia, sporcatoDa: b.sporcatoDa || [], chiuso: !!b.chiuso });
+    if (data.op === 'stato') return ris({ ok: true, fiducia: b.chiuso ? 'non_fidato' : b.fiducia, sporcatoDa: b.sporcatoDa || [], chiuso: !!b.chiuso, riservato: !!b.riservato });
     if (data.op === 'sporca') { b.fiducia = 'non_fidato'; return ris({ ok: true, fiducia: 'non_fidato' }); }
     if (data.op === 'chiudi') { b.chiuso = true; return ris({ ok: true }); }
     if (data.op === 'ramo') {
