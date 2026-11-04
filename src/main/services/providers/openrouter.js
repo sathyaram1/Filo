@@ -562,10 +562,9 @@
     const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto } = await postChat(body, apiKey, signal, providerRouting);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto, tettoSceso } = await postOppureErrore(body, apiKey, signal, providerRouting);
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
