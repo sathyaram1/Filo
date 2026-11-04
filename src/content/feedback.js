@@ -92,7 +92,7 @@
     try {
       const r = await global.SN_EXTRACT.fotoSenzaSegreti();
       if (r?.ok && r.dataUrl) return { dataUrl: r.dataUrl };
-      if (r?.code === 'segreti') return { segreti: true };
+      if (r?.code === 'segreti') return { segreti: true, ferma: r.ferma === true };
     } catch (_) {}
     return null;
   }
