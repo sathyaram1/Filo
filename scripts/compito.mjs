@@ -132,11 +132,12 @@ export async function esegui(argv, io = {}) {
       const v = K.validaNuovo(a.compito);
       if (!v.ok) { errore(`RIFIUTATO: ${v.testo} Non ho mandato niente.`); return 1; }
       const r = await chiama(Object.assign({ op: 'crea', compito: v.compito }, await daSessione()));
-      scrivi(`OK: compito ${visibile(r.id || '')} creato (${r.fiducia === 'fidato' ? 'fidato' : 'non fidato'}).`);
+      scrivi(`OK: compito ${visibile(r.id || '')} creato (${r.fiducia === 'fidato' ? 'fidato' : 'non fidato'}${r.riservato ? ', riservato' : ''}).`);
       return 0;
     }
     if (a.cmd === 'elenco') {
-      const r = await chiama({ op: 'elenco' });
+      // Col biglietto il server riconosce la sessione: un titolo riservato le dà il segno prima di uscire (#2027).
+      const r = await chiama(Object.assign({ op: 'elenco' }, await daSessione()));
       const nf = nonFidati([].concat(r.aperti || [], r.storico || []));
       if (nf.length) errore(await sporca('elenco dei compiti', [`titoli di compiti non fidati (${nf.slice(0, 10).join(', ')}${nf.length > 10 ? ', …' : ''})`]));
       scrivi(formattaElenco(r));

@@ -4,7 +4,7 @@
 
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { rigaSporco } from './lib/biglietto-locale.mjs';
+import { rigaRiservato, rigaSporco } from './lib/biglietto-locale.mjs';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
@@ -171,6 +171,9 @@ async function main() {
   const risposte = await chiama({ op: 'answers', limit: n });
   // Le risposte le scrivono le routine, che leggono testo d'utente: chi le stampa si sporca prima (#1148).
   console.error(await rigaSporco('risposte delle routine alla domanda di fine sessione', ['testo scritto dalle routine']));
+  // Sono registri delle sessioni, dati privati (SPEC-DOMANDE §5.1): anche il segno riservato, prima che escano.
+  const riservato = await rigaRiservato('risposte delle routine alla domanda di fine sessione');
+  if (riservato) console.error(riservato);
   console.log(formattaRisposte(risposte, { n }));
 }
 
