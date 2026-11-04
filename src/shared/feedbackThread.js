@@ -571,6 +571,10 @@
   global.SN_FEEDBACK_THREAD = {
     parse,
     splitNotes,
+    CAMPO_NOTE_FIDATE,
+    improntaTurno,
+    improntaDelTurnoAggiunto,
+    fiduciaDelleNote,
     explanationForReporter,
     reportUnreadable,
     isFromModel,
