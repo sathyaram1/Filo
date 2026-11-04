@@ -861,7 +861,7 @@ export function testoRiallineamentoNonSpedito(sped) {
     `Riallineamento NON consegnato: ${sped.reason}.`,
     'Il server non ha registrato niente: chi verifica dopo di te legge il ramo da origin, e senza il rebase lì troverebbe il commit già verificato.',
     sped.tipo === 'spedizione'
-      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro torna in coda sul suo ramo.'
+      ? 'Non spingere a mano: in cloud il controllo dei permessi ferma il push. Se la causa sta nel ramo (una copia dei dati nella storia, detta qui sopra) toglila e rilancia lo stesso comando; altrimenti è un guasto: fai la domanda di fine sessione e rilascia con --guasto "guasto: github: <il messaggio qui sopra>" --senza-push. Il lavoro resta sul suo ramo e riparte quando il manutentore lo sblocca.'
       : sped.tipo === 'base'
         ? 'Rifai la base sulla linea principale (`git fetch origin main`, poi `git rebase origin/main`), poi rilancia lo stesso comando.'
         : 'Riporta la cartella sul ramo del lavoro, a rebase finito, poi rilancia lo stesso comando.',
