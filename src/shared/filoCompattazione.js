@@ -344,7 +344,7 @@
   global.SN_FILO_COMPATTAZIONE = {
     LISTINO, ORE_GREZZE, TURNI_GREZZI, QUOTA_GRANDE, TETTO_COMPATTATO, PAUSA_DOPO_GUASTO_MS, MAX_MEMORIE, MAX_INGRESSO, ISTRUZIONI,
     MAX_MESSAGGIO, MARGINE, testoPerChiCompatta,
-    motivo, giornoDi, giorniDaRiassumere, puntoDiTaglio, rigaLettura, righePerChiCompatta, richiesta, richiestaGiorno,
+    motivo, ultimaAttivita, giornoDi, giorniDaRiassumere, puntoDiTaglio, rigaLettura, righePerChiCompatta, richiesta, richiestaGiorno,
     leggiRisposta, leggiGiorno, rendiFiloCompattato, senzaCancellate, USO, stimaSoglia, QUOTA_ANTICIPO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
