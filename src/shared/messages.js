@@ -1239,7 +1239,8 @@
     REDTEAM_REVOKE_CODE: 'redteam_revoke_code',
     // In pausa (#896) gli handler qui sopra rispondono { status:'paused', paused:true, error } (invio, riscatto)
     // o { paused:true, error, … } (stato, tentativo, classifica) a chi non vede il Red Team.
-    // REDTEAM_VISIBILITY: { attendi? } → { ok, visible } (a un sito) | { ok, visible, owner, openToAll, letto }.
+    // REDTEAM_VISIBILITY: { attendi? } → { ok, visible, verificato } (a un sito) | { …, owner, openToAll, letto }.
+    // `verificato`: chi lo usa ha riscattato un codice (#991), e decide la voce «Invia attacco» del tasto destro.
     REDTEAM_VISIBILITY: 'redteam_visibility',
     // Broadcast main → pagine di Filo: { visible } quando cambia.
     REDTEAM_VISIBILITY_CHANGED: 'redteam_visibility_changed',
