@@ -64,7 +64,7 @@ async function main() {
   if (args.errore) { console.error(args.errore); return 2; }
   console.log(args.dalVero ? 'Migrazione della fiducia, dal vero: scrivo solo dove manca.' : 'Migrazione della fiducia a secco: conto e basta (--dal-vero per scrivere).');
   const t = await migraTutto({
-    chiama: (data) => risultatoOwnerFiducia(data, { tempoMs: TEMPO_LOTTO_MS }),
+    chiama: (data) => chiamaLotto(data),
     dalVero: args.dalVero,
     ogniLotto: (tot) => console.log(`  lotto ${tot.lotti}: ${tot.fidati + tot.nonFidati + tot.giaImpostati} feedback visti finora`),
   });
