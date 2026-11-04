@@ -966,10 +966,13 @@ async function scriviTestaGruppo(ctx, S, { nuovi = new Map(), bytes = serializza
   const vecchi = await carichiGruppo(ctx, S, 0);
   const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const rovinati = blocchiRovinati(S.L, S.tabella);
+  // Un pacco qui sotto si scrive insieme alla testa nuova: può già perdere i tratti che lei non tiene più.
+  const pz = pacchi(S.tabella);
   const carichi = [null];
   for (let s = 1; s < ke; s++) {
     if (!nuovi.has(s) && usati[s] && !vecchi[s] && !rovinati[s]) throw daRiaprire();
     carichi[s] = nuovi.get(s) || (usati[s] && vecchi[s]) || ZERO;
+    if (pz.has(s) && carichi[s] !== ZERO) carichi[s] = pulito(carichi[s], pz.get(s).tratti);
   }
   carichi[0] = scriviTesta({
     L: S.L, creato: S.creato, aperto: S.aperto, contatore: S.contatore + 1, bytes, blocchiTabella: S.blocchiTabella,
