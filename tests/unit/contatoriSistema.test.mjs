@@ -543,7 +543,8 @@ test('storage.json: un salvataggio fallito per codice, il ritorno, la chiave che
 test('ogni passo dell’avvio, ogni canale sincrono e ogni passo degli aggiornamenti ha il suo aggancio nel codice', () => {
   const main = leggi('src', 'main', 'main.js');
   const finestra = leggi('src', 'main', 'window.js');
-  for (const p of C.PASSI_AVVIO) assert.ok(new RegExp(`passo(AvvioFino)?\\('${p}'`).test(main + finestra), `nessuno misura il passo «${p}»`);
+  // Gli init dell'avvio che partono insieme si misurano ognuno da sé, col nome dato a init() in main.js.
+  for (const p of C.PASSI_AVVIO) assert.ok(new RegExp(`(passo(AvvioFino)?|init)\\('${p}'`).test(main + finestra), `nessuno misura il passo «${p}»`);
   assert.match(main, /process\.on\('uncaughtExceptionMonitor'/, 'il monitor, non un gestore: un gestore toglierebbe l’avviso di Electron');
   assert.ok(!/process\.on\('uncaughtException'/.test(main));
   assert.match(main, /process\.on\('unhandledRejection'[\s\S]{0,120}console\.warn/, 'il rifiuto resta scritto come prima');
@@ -567,7 +568,8 @@ test('ogni passo dell’avvio, ogni canale sincrono e ogni passo degli aggiornam
     assert.ok(storage.includes(`contaDisco('${e}')`), `nessuno conta «${e}»`);
   }
   const tabs = leggi('src', 'main', 'tabs.js');
-  assert.match(tabs, /processoMorto\('scheda_in_recupero'/);
+  assert.match(tabs, /recuperaScheda\(tab,/);
+  assert.match(leggi('src', 'main', 'tabs', 'recuperoCrash.js'), /processoMorto\('scheda_in_recupero'/);
   for (const e of C.ESITI_SESSIONE) assert.ok(tabs.includes(`'${e}'`), `la sessione «${e}» non si conta`);
   assert.match(leggi('src', 'main', 'services', 'handlers', 'contatori.js'), /processoMorto\(details\.type, details\.reason\)/);
   assert.match(finestra, /seguiFinestra\(win\)/);

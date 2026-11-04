@@ -56,6 +56,7 @@ const { AnteprimeSchede } = require('./tabs/anteprime');
 const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
 const { VisiteSchede } = require('./tabs/visite');
 const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
+const { recuperaScheda } = require('./tabs/recuperoCrash');
 const CartaAnteprima = require('./popup-anteprima');
 const { AvvisoSito } = require('./avvisoSito');
 const { AvvisoSchermoPieno, partiDellAvviso } = require('./avvisoSchermoPieno');
@@ -437,6 +438,8 @@ class TabManager {
     // Incognito: sessione effimera e nessun ripristino su disco. Lo storage
     // filo:// è già coperto a monte dall'overlay in RAM dello shim.
     this.incognito = !!incognito;
+    // Finché non ha letto la sessione salvata non la scrive: chiuso Filo all'avvio, le schede di ieri si perdevano.
+    this._sessioneDaLeggere = !this.incognito;
     this.partition = partition || null;
     this.tabs = []; // [{ id, view, title, url, favicon, loading, canBack, canFwd }]
     this.activeId = null;
@@ -3225,13 +3228,7 @@ class TabManager {
       if (!NE || reason === 'clean-exit') return;
       const current = tab.url || '';
       if (!NE.isRetriableTarget(current) || NE.isErrorPageUrl(current)) return;
-      // Se muore di nuovo mentre stiamo recuperando, non si insiste a raffica; lo sanno i contatori anonimi (#1466).
-      const now = Date.now();
-      if (tab._crashRecoveryAt && now - tab._crashRecoveryAt < 2000) {
-        try { globalThis.SN_CONTATORI_MAIN?.processoMorto('scheda_in_recupero', reason, { incognito: !!this.incognito }); } catch (_) {}
-        return;
-      }
-      tab._crashRecoveryAt = now;
+      if (!recuperaScheda(tab, { motivo: reason, incognito: !!this.incognito })) return;
       // Si RICREA la vista: un loadURL sul processo appena morto fa crashare anche il renderer
       // nuovo quando c'è un preload, e si entra in un giro senza fine.
       setTimeout(() => {
@@ -4492,7 +4489,7 @@ class TabManager {
   // caricamento non cambiano la sessione: se è uguale a quella scritta non si riscrive (#1089).
   _persistSession() {
     if (this.incognito) return; // incognito: nessuna sessione salvata su disco
-    if (this._restoring) return; // non sovrascrivere mentre stiamo ripristinando
+    if (this._restoring || this._sessioneDaLeggere) return; // non sovrascrivere prima o durante il ripristino
     clearTimeout(this._sessionTimer);
     this._sessionTimer = null;
     if (JSON.stringify(this.sessionState()) === sessioneScritta) return;
@@ -4546,6 +4543,7 @@ class TabManager {
         if (Number.isInteger(saved.activeIndex)) activeIndex = saved.activeIndex;
       }
     } catch (_) { letturaFallita = true; }
+    this._sessioneDaLeggere = false;
     // L'esito della riapertura e i suoi tempi vanno ai contatori anonimi (#1466).
     if (!urls.length) {
       try { contatori?.sessione({ esito: letturaFallita ? 'lettura_fallita' : 'niente' }); } catch (_) {}

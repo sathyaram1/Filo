@@ -37,18 +37,45 @@ function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinest
 let inChiusura = false;
 try { require('electron').app.on('before-quit', () => { inChiusura = true; }); } catch (_) {}
 
+function finestraNormaleViva() {
+  return BrowserWindow.getAllWindows().find((w) => {
+    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
+  }) || null;
+}
+
 // Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
 // non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
 function assicuraFinestraNormale() {
-  const esistente = BrowserWindow.getAllWindows().find((w) => {
-    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
-  });
+  const esistente = finestraNormaleViva();
   if (esistente) return esistente;
   if (inChiusura) return null;
   const win = createMainWindow();
   for (const cb of osservatoriFinestraNormale) { try { cb(win); } catch (_) {} }
   return win;
 }
+
+// Chi vuole vedere Filo (seconda apertura, invito da fuori, clic sulla notifica) la finestra la chiede qui, mai a un
+// riferimento tenuto da parte: chiusa la principale con un'altra aperta, quello punta a una distrutta (#1606).
+function mostraFinestraNormale() {
+  const win = assicuraFinestraNormale();
+  if (!win || win.isDestroyed()) return null;
+  try { if (win.isMinimized()) win.restore(); } catch (_) {}
+  revealWindow(win);
+  return win;
+}
+
+// Su Mac riaprire Filo acceso (Dock, Launchpad, Finder) arriva come `activate`, non come seconda copia: chi clicca
+// l'icona vuole le sue schede anche con la finestrella di accesso aperta (#1606.1). Con la normale viva e qualcosa a
+// schermo il sistema porta davanti da sé.
+function riaperturaDaSistema(visibili) {
+  if (visibili && finestraNormaleViva()) return null;
+  return mostraFinestraNormale();
+}
+
+// Gli init che la prima scheda deve trovare fatti (ad-blocker, impronta, permessi…) li aspetta qualunque finestra
+// normale nata durante l'avvio, prima di riaprire le schede: la finestra intanto si apre e la barra si carica (#1092).
+let avvioPronto = Promise.resolve();
+function attendiAvvio(pronti) { avvioPronto = Promise.resolve(pronti).catch(() => {}); }
 
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
@@ -213,6 +240,8 @@ function createMainWindow() {
     // I passi dell'avvio (#1466) solo per la prima finestra del processo, come il tempo di avvio.
     const passo = (nome, t0) => { if (avvio) { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} } };
     passo('finestra_creata', tCrea);
+    await avvioPronto;
+    if (win.isDestroyed()) return;
     const tSessione = Date.now();
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
@@ -271,6 +300,8 @@ function createIncognitoWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
+    await avvioPronto;
+    if (win.isDestroyed()) return;
     // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
     if (!tabs.tabs.length) tabs.openTab('filo://newtab/');
     revealWindow(win);
@@ -296,5 +327,5 @@ function createIncognitoWindow() {
 
 module.exports = {
   createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
-  assicuraFinestraNormale, onFinestraNormale,
+  assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale, riaperturaDaSistema, attendiAvvio,
 };

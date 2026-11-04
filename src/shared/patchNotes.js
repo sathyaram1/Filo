@@ -21,6 +21,8 @@
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
         { testo: 'Il motore che apre le pagine web, e quello che fa parlare Filo coi suoi servizi, hanno le ultime correzioni di sicurezza.', segnalazione: 2115 },
         { testo: 'Utente e password del proxy sono protetti come le chiavi API: l\'assistente non li manda fuori e non li passa ai modelli, e l\'esportazione li toglie anche da un indirizzo scritto senza http:// o socks5:// davanti.', segnalazione: 2134 },
+        { testo: 'All\'avvio la finestra di Filo compare prima, e chiuderla subito non cancella più le schede da riaprire. Se Filo è già aperto e lo riapri dalla sua icona, viene davanti subito invece che dopo un secondo o due.', segnalazione: 1092 },
+        { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
       ],
     },
     {

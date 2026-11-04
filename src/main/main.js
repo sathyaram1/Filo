@@ -13,6 +13,13 @@ if (process.env.FILO_USER_DATA) {
   try { app.setPath('userData', process.env.FILO_USER_DATA); } catch (_) {}
 }
 
+// Il lucchetto vale per la cartella dei dati, quindi dopo userData e prima di ogni require pesante: la seconda copia
+// esce senza caricare shim e loader (#1092). Sentinella: tests/unit/secondaApertura.test.mjs.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+  return;
+}
+
 // «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
 try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
 
@@ -88,7 +95,7 @@ if (process.env.NODE_ENV === 'test') {
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
 const {
-  createMainWindow, revealWindow, assicuraFinestraNormale, onFinestraNormale,
+  createMainWindow, mostraFinestraNormale, onFinestraNormale, attendiAvvio, riaperturaDaSistema,
 } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
@@ -138,10 +145,12 @@ function apriInvito(code) {
   // Senza finestra (avvio a freddo: l'apertura è ancora a metà) l'invito
   // aspetta lì e parte appena la finestra c'è.
   if (!mainWindow) { invitoInAttesa = { code }; return true; }
-  try { revealWindow(mainWindow); } catch (_) {}
+  // Con la principale chiusa e Filo acceso (Mac, o un'altra finestra aperta) ne nasce una: Crediti si apre lì.
+  const win = mostraFinestraNormale();
+  if (!win) return true;
   // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
   // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
-  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, mainWindow); } catch (_) {}
+  try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, win); } catch (_) {}
   return true;
 }
 
@@ -211,8 +220,8 @@ app.whenReady().then(async () => {
   try { impostazioniAvvio = await globalThis.SN_STORAGE.getSettings(); } catch (_) {}
   passo('impostazioni_lette', t);
   try { if (await installaAllAvvioSeServe(impostazioniAvvio)) return; } catch (_) {}
-  // Com'era finita la volta prima e il segno di questa: solo la copia che tiene il lucchetto, e dopo l'installatore.
-  if (app.hasSingleInstanceLock()) { try { contatori()?.avvioProcesso().catch(() => {}); } catch (_) {} }
+  // Com'era finita la volta prima e il segno di questa: dopo l'installatore (il lucchetto è già in cima al file).
+  try { contatori()?.avvioProcesso().catch(() => {}); } catch (_) {}
   t = Date.now();
   await registerFiloProtocol();
   registerIpcHandlers();
@@ -222,36 +231,22 @@ app.whenReady().then(async () => {
   // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
 
-  const Storage = globalThis.SN_STORAGE;
+  // Le scelte che valgono dal primo istante si fissano qui, sincrone; gli init che leggono il disco partono dopo, insieme.
+  let s = impostazioniAvvio;
+  try { s = (await globalThis.SN_STORAGE.getSettings()) || impostazioniAvvio; } catch (_) {}
   try {
-    const s = await Storage.getSettings();
     syncNativeTheme(s.theme);
     try { require('./movimento').segui(s); } catch (_) {}
     // Gestione cookie: emetti GPC sulla sessione di default secondo la modalità.
-    const Cookies = require('./services/cookies');
-    Cookies.configureFromSettings(s);
+    require('./services/cookies').configureFromSettings(s);
     // Cookie dei contenuti incorporati di terzi (#758): va agganciato prima della prima scheda, è lui che vede
     // nascere i cookie dei riquadri.
     try { require('./services/cookieIncorporati').init(s); } catch (_) {}
     try { require('./services/accessoGoogle').init(); } catch (_) {}
     try { require('./services/riquadriRotti').init(s); } catch (_) {}
-    // Anti-fingerprinting: carica/genera il master secret persistente e fissa
-    // la modalità corrente (off/default/privacy) prima di aprire qualsiasi tab.
-    t = Date.now();
-    try { await require('./services/fingerprint').init(s); } catch (_) {}
-    passo('fingerprint', t);
-    try { await Cookies.wipeTrackerCookies(s); } catch (_) {}
-    t = Date.now();
-    try { await require('./services/adblock').init(s); } catch (_) {}
-    passo('adblock', t);
     try { require('./services/adSkip').configureFromSettings(s); } catch (_) {}
     // EasyList Cookie (banner da nascondere): cache su disco e aggiornamento settimanale in sottofondo.
     require('./services/cookieBanners').init(s).catch(() => {});
-    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
-    try { await require('./tabs/tabCookies').loadRemembered(); } catch (_) {}
-    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e
-    // la rinfresca in sottofondo quando è vecchia. Non blocca l'avvio.
-    try { await require('./services/firmatariC2pa').init(); } catch (_) {}
     // Blocco apertura siti in blacklist (#170.3): legge la config dalle
     // impostazioni (riusa le liste dell'ad-blocker + la blacklist dell'utente).
     try { require('./services/siteBlock').configureFromSettings(s); } catch (_) {}
@@ -261,13 +256,6 @@ app.whenReady().then(async () => {
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
-    // Le risposte date ai siti vanno lette prima della prima scheda: il controllo dei permessi è sincrono.
-    t = Date.now();
-    try { await require('./services/permessiPagine').carica(); } catch (_) {}
-    passo('permessi', t);
-    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
-    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
-    try { await require('./services/editorFiles').migrateNotesToEditor(); } catch (_) {}
     // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
     // Le icone delle voci rimaste senza copia (#1273), una volta sola e dopo l'avvio.
@@ -280,17 +268,51 @@ app.whenReady().then(async () => {
   try { require('./auth/google-auth').restore(); } catch (_) {}
   try { require('./auth/anon-auth').restore(); } catch (_) {}
 
-  // I tre in background non bloccano l'avvio: finché la config remota non
+  // I due in background non bloccano l'avvio: finché la config remota non
   // arriva valgono i default del codice, e senza chiavi resta l'analisi locale.
   try { require('./services/defaultsStore').refresh().catch(() => {}); } catch (_) {}
   // Le impostazioni già lette: i siti fidati (#967) devono valere prima che si apra la prima scheda.
   try { require('./services/handlers').wireSafebrowse(impostazioniAvvio).catch(() => {}); } catch (_) {}
-  try { require('./services/downloads').init().catch(() => {}); } catch (_) {}
+
+  // Quello che la prima scheda deve trovare pronto, insieme e mentre la finestra si apre (#1092, #1479): la riapertura
+  // delle schede li aspetta (attendiAvvio in window.js). Nessuno legge quello che scrive un altro.
+  const init = (nome, fn) => {
+    const t0 = Date.now();
+    return Promise.resolve().then(fn).catch(() => {}).then(() => { if (nome) passo(nome, t0); });
+  };
+  const pronti = Promise.all([
+    // Anti-fingerprinting: il master secret persistente e la modalità (off/default/privacy).
+    init('fingerprint', () => require('./services/fingerprint').init(s)),
+    init('adblock', () => require('./services/adblock').init(s)),
+    // Le risposte date ai siti: il controllo dei permessi è sincrono e una pagina riaperta chiede subito.
+    init('permessi', () => require('./services/permessiPagine').carica()),
+    // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.
+    init(null, () => require('./tabs/tabCookies').loadRemembered()),
+    // Lo storico e l'aggancio di will-download: uno scaricamento della prima scheda passa da Filo.
+    init(null, () => require('./services/downloads').init()),
+  ]);
+  attendiAvvio(pronti);
 
   // Una finestra normale può nascere anche senza di noi (la scadenza che deve
   // farsi sentire ne apre una): senza aggiornarlo, questo punta a una chiusa.
   onFinestraNormale((w) => { mainWindow = w; });
   mainWindow = createMainWindow();
+  // Nelle prove, quando è nata la finestra e quando la prima scheda ha potuto partire (tests/seconda-apertura.spec.mjs).
+  if (process.env.NODE_ENV === 'test') {
+    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null };
+    pronti.then(() => { globalThis.__filoAvvio.pronti = Date.now(); });
+  }
+
+  // Dopo la prima scheda: niente di questo cambia come si apre.
+  pronti.then(() => {
+    // I cookie dei tracker rimasti da una chiusura brusca (quella normale li toglie uscendo).
+    try { require('./services/cookies').wipeTrackerCookies(s).catch(() => {}); } catch (_) {}
+    // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e la rinfresca quando è vecchia.
+    try { require('./services/firmatariC2pa').init().catch(() => {}); } catch (_) {}
+    // Appunti → editor: sposta una-tantum i vecchi appunti dell'archivio in un
+    // file "Appunti" dell'editor (fine dell'archivio separato). Idempotente.
+    try { require('./services/editorFiles').migrateNotesToEditor().catch(() => {}); } catch (_) {}
+  });
   try { require('./cancellaTutto').annuncia(); } catch (_) {}
   // Chi è entrato in Filo quando l'accesso passava dal browser trova una volta l'invito a collegare YouTube, Gmail e
   // Drive nelle schede (#1123). Nei test no: comparirebbe in mezzo agli avvisi che gli spec contano.
@@ -461,9 +483,8 @@ app.whenReady().then(async () => {
     setTimeout(checkReady, 500);
   }
 
-  app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) assicuraFinestraNormale();
-  });
+  // Su Mac la riapertura di Filo acceso arriva qui, non come seconda copia: stessa regola (#1606.1).
+  app.on('activate', (_e, visibili) => { riaperturaDaSistema(visibili !== false); });
 });
 
 // Salvataggio SINCRONO delle schede aperte: quello normale ha un debounce, e
@@ -471,7 +492,8 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   try { contatori()?.inizioChiusura(); } catch (_) {}
   try {
-    const tm = mainWindow?._filoTabs;
+    // Una finestra che non ha ancora riaperto la sessione salvata non la riscrive (la regola sta in tabs.js).
+    const tm = mainWindow?._filoTabs?._sessioneDaLeggere ? null : mainWindow?._filoTabs;
     const Storage = require('./shim/storage');
     // L'ora dei contatori viaggia con le schede: dopo questa scrittura non ne parte un'altra (#1466).
     let contati = {};
@@ -552,21 +574,14 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// Single instance: la seconda apertura ridà focus all'esistente.
-const gotLock = app.requestSingleInstanceLock();
-if (!gotLock) {
-  app.quit();
-} else {
-  app.on('second-instance', (_event, argv) => {
-    try { contatori()?.secondaIstanza(); } catch (_) {}
-    if (mainWindow) {
-      if (mainWindow.isMinimized()) mainWindow.restore();
-      mainWindow.focus();
-    }
-    // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
-    // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
-    // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
-    // l'indirizzo si CERCA, mai si prende per indice.
-    apriInvitoDaArgv(argv);
-  });
-}
+// La seconda apertura porta davanti la finestra normale, e la rifà se Filo è rimasto acceso senza (#1606).
+app.on('second-instance', (_event, argv) => {
+  try { contatori()?.secondaIstanza(); } catch (_) {}
+  // Prima che l'avvio abbia la sua finestra non si crea niente: la farà l'avvio.
+  if (mainWindow) mostraFinestraNormale();
+  // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
+  // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
+  // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
+  // l'indirizzo si CERCA, mai si prende per indice.
+  apriInvitoDaArgv(argv);
+});
