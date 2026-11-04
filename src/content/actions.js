@@ -649,6 +649,8 @@
       // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
       if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      // Chiesta al tasto destro, è già aperta: interrotta, il tasto destro dopo la richiede.
+      entry.aperta = true;
       prefetchedExplain = entry;
       return entry.promise;
     };

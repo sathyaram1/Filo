@@ -70,10 +70,11 @@ test('chi usa la risposta come dato riceve un errore che nomina il tetto, mai un
   const esiti = await app.evaluate(async () => {
     const M = globalThis.SN_MSG.MSG;
     const C = globalThis.SN_CONST;
-    const chiedi = (action, extra = {}) => globalThis.SN_HANDLE_MESSAGE(
+    // Come la risposta che arriva alla pagina dal canale (src/main/ipc.js): un errore diventa ok:false col suo codice.
+    const chiedi = (action, extra = {}) => Promise.resolve(globalThis.SN_HANDLE_MESSAGE(
       { type: M.AI_REQUEST, action, payload: { messages: [{ role: 'user', content: 'riassumi' }] }, ...extra },
       { url: 'filo://editor/editor.html' },
-    );
+    )).catch((e) => ({ ok: false, error: e.message, code: e.code, ...globalThis.SN_CHAT_ERRORS.dettagliDelTetto(e) }));
     const intero = await chiedi(C.ACTIONS.EDITOR_SUMMARY, { intera: true });
     const mostrato = await chiedi(C.ACTIONS.EDITOR_SUMMARY);
     await globalThis.SN_FILO_MEMORY.appendLesson('Preferisce risposte brevi');

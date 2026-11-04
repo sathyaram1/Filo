@@ -728,7 +728,7 @@
 
     const parts = String(res.text || '').split(SEP_RE);
     // Fermata dal tetto (#1302): l'ultimo pezzo è a metà. Si dimezza come per i pezzi che non tornano; in fondo si
-    // tengono i pezzi interi, il blocco tagliato resta nell'originale e l'avviso lo dice.
+    // tengono i pezzi interi, e il blocco tagliato resta nell'originale con l'avviso che lo dice.
     if (res.tagliata) {
       if (units.length > 1 && depth < MAX_SPLIT_DEPTH) {
         const mid = Math.ceil(units.length / 2);
@@ -786,7 +786,7 @@
         Popup.ripiegoMostrato(Popup.showToast(ripiegoDelGiro, { duration: 7000 }).el);
       }
       const CE = global.SN_CHAT_ERRORS;
-      const tagliata = res?.ok && CE && CE.troncata(res.finishReason) ? CE.sentence(CE.erroreTagliata(res.finishReason)) : null;
+      const tagliata = res?.ok && CE && CE.troncata(res.finishReason) ? CE.erroreTagliata(res.finishReason) : null;
       if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text, ...(tagliata ? { tagliata } : {}) };
       answeredEmpty = !!(res && res.ok);
       if (attempt) return { ok: false, error: answeredEmpty ? null : errFrom(res) };

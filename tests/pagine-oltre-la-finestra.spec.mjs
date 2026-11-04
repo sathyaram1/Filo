@@ -35,6 +35,9 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       apiKeys: { openrouter: 'k-test' },
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
+      // Il fornitore finto sta sopra quello vero, che col tetto di serie (#1302) rifarebbe da sé la richiesta col tetto
+      // che ci sta: qui si prova la finestra delle pagine, con un tetto che lascia posto al testo.
+      lunghezzaRisposte: { conversazioni: 16384 },
     });
     const vero = globalThis.__fetchVeroListino || globalThis.fetch;
     globalThis.__fetchVeroListino = vero;

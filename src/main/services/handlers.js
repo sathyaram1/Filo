@@ -1250,8 +1250,8 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
 // L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
-const ARGOMENTI_TAGLIATI = 'non eseguita: la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione. '
-  + 'Se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni.';
+const ARGOMENTI_TAGLIATI = 'la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione; '
+  + 'se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni';
 // Letture (elenco in SN_ACTION_LEVELS.LETTURE): una che aspetta l'OK, o fermata per un segreto, ha già la sua parola
 // sotto la risposta.
 const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type)
