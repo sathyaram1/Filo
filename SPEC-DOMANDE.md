@@ -225,7 +225,9 @@ lo può scrivere anche un agente pulito.
   `src/shared/feedbackThread.js` (note di prima e di dopo la scrittura) e lo
   legge `fiduciaDelleNote`; il server ne tiene uno specchio, con la prova che
   dia le stesse impronte del modulo dell'app (incorporarlo col bake lo
-  renderebbe una fonte protetta). Scritto come `fiducia`.
+  renderebbe una fonte protetta). I casi fissati (impronte, fiducia e motivo)
+  stanno in `tests/fixtures/fiducia-note-casi.json`, provati dalle due parti.
+  Scritto come `fiducia`.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
   server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
   altri non fidati, `routine:residuo` compreso. I rami già in lavorazione
