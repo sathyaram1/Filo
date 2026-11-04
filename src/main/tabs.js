@@ -65,6 +65,7 @@ const { StratoDeiRiquadri } = require('./stratoDeiRiquadri');
 const { StratoDelMenu } = require('./stratoDelMenu');
 const Storia = require('./tabs/storia');
 const SchedeChiuse = require('./tabs/schedeChiuse');
+const ChiudiSchede = require('./services/chiudiSchede');
 
 // Le finestre normali ne hanno una sola, come Chrome: una scheda chiusa in una finestra si riapre da un'altra.
 // L'incognito ne tiene una per finestra, che muore con lei; quella normale dimentica ciò che l'archivio cancella.
