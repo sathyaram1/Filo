@@ -72,9 +72,7 @@ module.exports = function register(on, ctx) {
       const W = globalThis.SN_WALLET;
       const keyRefused = Boolean(W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(e));
       // Il tetto e il taglio decidono se accanto alla frase ci va il tasto per le Preferenze (#1097.3).
-      const tetto = Number(e && e.maxTokens) > 0 ? { maxTokens: Number(e.maxTokens) } : {};
-      const taglio = e && e.code === 'RISPOSTA_TAGLIATA' ? { finishReason: e.finishReason || null } : {};
-      const crediti = e && e.reason === 'crediti' ? { reason: 'crediti' } : {};
+      const tetto = globalThis.SN_CHAT_ERRORS.dettagliDelTetto(e);
       // La bolla d'errore la vede chi ha scritto: si conta il tipo, mai la frase (#1461).
       try {
         const tipo = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.tipoErroreVisto(e);
