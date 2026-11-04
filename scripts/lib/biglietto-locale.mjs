@@ -158,15 +158,23 @@ export async function consegnaSporchi(b, { deps = {}, nowMs = Date.now(), aggiun
   // Una voce che non dice cosa ha letto (un gancio, un motivo a mano) vale per sé: il server le dà la radice del biglietto.
   const senzaCosa = tutte.some((v) => !(v.radici && v.radici.length) && !(v.letti && v.letti.length));
   const c = cosaLetto({ radici: tutte.flatMap((v) => v.radici || []), letti: tutte.flatMap((v) => v.letti || []) });
-  let r;
+  // A pezzi sotto il tetto del server: l'elenco delle domande ne nomina fino a mille, e un rifiuto per numero
+  // lascerebbe le voci in attesa per sempre. Pulito solo se lo sono tutti i pezzi.
+  const pezzi = [];
+  for (let i = 0; i < c.letti.length; i += LETTI_PER_CHIAMATA) pezzi.push(c.letti.slice(i, i + LETTI_PER_CHIAMATA));
+  if (!pezzi.length) pezzi.push([]);
+  const motivo = motivoDaConsegnare(tutte, nowMs);
+  let pulito = true;
   try {
-    r = await chiama('sporca', Object.assign({ ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) },
-      c.radici.length ? { radici: c.radici } : {}, c.letti.length ? { letti: c.letti } : {}, senzaCosa ? { senzaCosa: true } : {}), deps);
+    for (const [i, letti] of pezzi.entries()) {
+      const r = await chiama('sporca', Object.assign({ ticket: b.ticket, motivo },
+        i === 0 && c.radici.length ? { radici: c.radici } : {}, letti.length ? { letti } : {}, i === 0 && senzaCosa ? { senzaCosa: true } : {}), deps);
+      pulito = pulito && !!(r && r.pulito === true && r.fiducia === 'fidato');
+    }
   } catch (e) {
     return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e) };
   }
   for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: un doppione non sporca di più */ } }
-  const pulito = !!(r && r.pulito === true && r.fiducia === 'fidato');
   if (!pulito) {
     try {
       mkdirSync(cartellaSporchi(b), { recursive: true });
