@@ -1038,23 +1038,29 @@
     return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, copiaPerModello: true });
   }
 
-  // Il pezzo `ritaglio` (pixel CSS della finestra) della copia coperta.
-  async function ritagliaCopia(dataUrl, ritaglio) {
-    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
-    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
-    const img = await createImageBitmap(new Blob([byte]));
-    const sx = img.width / window.innerWidth, sy = img.height / window.innerHeight;
+  // Il pezzo `ritaglio` (pixel CSS di una finestra larga `vista.w`) di una foto in pixel del dispositivo, su un canvas.
+  // Uno solo per la foto dell'utente e per la copia coperta: i due pezzi devono coincidere.
+  function tagliaInCanvas(img, larga, alta, ritaglio, vista) {
+    const sx = larga / vista.w, sy = alta / vista.h;
     const canvas = document.createElement('canvas');
     canvas.width = Math.max(1, Math.round(ritaglio.w * sx));
     canvas.height = Math.max(1, Math.round(ritaglio.h * sy));
-    canvas.getContext('2d').drawImage(img, ritaglio.x * sx, ritaglio.y * sy, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
-    return canvas.toDataURL('image/png');
+    canvas.getContext('2d').drawImage(img, Math.round(ritaglio.x * sx), Math.round(ritaglio.y * sy), canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  async function ritagliaCopia(dataUrl, ritaglio, vista) {
+    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
+    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([byte]));
+    return tagliaInCanvas(img, img.width, img.height, ritaglio, vista).toDataURL('image/png');
   }
 
   // Il nome del file lo sceglie un modello guardando la foto: gli arriva la copia coperta, o non gli arriva.
-  async function descrizioneCoperta(dataUrl, perModello, ritaglio = null) {
+  async function descrizioneCoperta(dataUrl, perModello, ritaglio = null, vista = null) {
     if (typeof perModello !== 'string' || !perModello) return null;
-    return requestImageDescription(ritaglio ? await ritagliaCopia(perModello, ritaglio) : perModello, dataUrl);
+    const pezzo = ritaglio ? await ritagliaCopia(perModello, ritaglio, vista || { w: window.innerWidth, h: window.innerHeight }) : perModello;
+    return requestImageDescription(pezzo, dataUrl);
   }
 
   function buildSavePayload() {
