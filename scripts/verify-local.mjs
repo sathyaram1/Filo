@@ -9,8 +9,8 @@
 //   li ha scritti chi ha anche scritto il bug.
 //
 //   In locale quel passaggio non esisteva: si lanciavano i test e si pubblicava.
-//   I test però li scrive la stessa istanza che ha fatto il lavoro, quindi
-//   condividono i suoi punti ciechi. Da qui in poi anche in locale si passa di
+//   I test però li scrive chi ha fatto il lavoro, quindi condividono i suoi
+//   punti ciechi. Da qui in poi anche in locale si passa di
 //   qui, e `npm run finish` non pubblica senza un esito positivo.
 //
 // IL GIRO (feedback #561)
@@ -39,8 +39,8 @@
 //     Lo lancia chi ha registrato una critica che manda a correggere e mette
 //     rilievi da parte, SUBITO dopo: registra il commit che toglie SOLO le
 //     loro prove del giro, se nessun caso rosso si è spento. Da lì la consegna
-//     blocca ogni prova tolta rossa. Una dimenticata esce anche dopo le
-//     correzioni: allora il commit della pulizia è l'ultimo, e da solo.
+//     blocca ogni prova tolta rossa. Una dimenticata esce più tardi con
+//     un'altra pulizia: il suo commit è l'ultimo, e da solo.
 //
 //   node scripts/verify-local.mjs corretto "<report della correzione>"
 //     Lo lancia chi ha corretto: chiude il giro e chiede un'altra verifica
