@@ -70,7 +70,25 @@ risponde.
 
   `--richiesta permesso` per un permesso o una chiave.
 
-### 2. Se il registro risponde, rispondi tu
+### 2. Un doppione lo chiudi sulla domanda viva
+
+Se una delle `vive` chiede all'owner la stessa scelta (le stesse strade,
+anche scritte con altre parole), questa è un doppione: l'owner risponde una
+volta sola, lì.
+
+```bash
+node scripts/domanda.mjs smista doppione --di D-<k> --testo "<perché è la stessa scelta di D-k>"
+```
+
+Il server chiude questa e mette il testo intero di chi la chiedeva nelle note
+per gli agenti di D-k, così chi riprende dopo la risposta lo legge. Se questa
+fermava il lavoro e D-k no, il lavoro aspetta la risposta a D-k. D-k deve
+stare fra le `vive`: una domanda di un altro feedback, o già chiusa, il server
+la rifiuta. Una scelta solo vicina non è un doppione: se la nuova porta
+un'opzione o un fatto che cambia la decisione, vai avanti coi passi dopo, e
+nel contesto della riscrittura nomini D-k.
+
+### 3. Se il registro risponde, rispondi tu
 
 Se un principio di una domanda chiusa copre questo caso, rispondi col
 principio: l'opzione che indica, e un testo che cita il principio e la domanda
