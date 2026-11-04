@@ -277,7 +277,7 @@ dall'owner e dal server. Campi:
 - `notePerAgenti`: testo privato per chi riprenderà la domanda (§ 3.2).
 - `gruppo`: il tema, per il raggruppamento.
 - `blocca` (#1577): una domanda legata a un feedback (un'opzione `riprendi`
-  lo riprende) dice se lo ferma; lo decide chi la apre, e col biglietto senza
+  o `attendi` lo riprende, #1965) dice se lo ferma; lo decide chi la apre, e col biglietto senza
   si rifiuta. Blocca se andare avanti con la consigliata, e poi l'owner sceglie
   altro, lascia un danno che un altro giro non rimedia (soldi, dati
   dell'utente, sicurezza e segreti, politica sui modelli, terzi, account e

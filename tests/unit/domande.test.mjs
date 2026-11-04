@@ -173,6 +173,13 @@ test('blocca: true o false, e serve quando un’opzione riprende il lavoro; senz
   assert.equal(D.riprende(base, 'f1'), true);
   assert.equal(D.riprende(base, 'f2'), false);
   assert.equal(D.riprende(base), true);
+  // #1965: «attendi» riprende il lavoro come «riprendi», per legame e blocco; la regola sta in un posto solo.
+  const conAttesa = D.validaDomanda({ ...base, opzioni: [conPro({ testo: 'Aspetta', azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' } }), conPro({ testo: 'Archivia', azione: { tipo: 'archivia', feedbackId: 'f1' } })], blocca: true }).domanda;
+  assert.equal(D.riprende(conAttesa, 'f1'), true);
+  assert.equal(D.controllaBlocca(conAttesa, 'f1'), null);
+  assert.deepEqual(D.AZIONI_CHE_RIPRENDONO.filter((t) => D.riprendeIlLavoro({ tipo: t })), ['riprendi', 'attendi']);
+  assert.equal(D.riprendeIlLavoro({ tipo: 'archivia', feedbackId: 'f1' }), false);
+  assert.match(D.controllaBlocca(aParte, 'f1').dettaglio, /«riprendi» o «attendi»/);
 });
 
 // #1790: il titolo dice di cosa si parla, un'opzione sola non è una domanda, ogni opzione ha pro e contro.
