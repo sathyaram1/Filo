@@ -817,12 +817,15 @@ async function segnaCaseVecchie(ctx, S) {
 
 // Saltate le case vecchie, si salta anche il primo posto estraneo che resta: la casa vecchia di una copia che, quando fu
 // scritta, trovò il primo posto preso da un'altra copia persa anche lei. La ricerca dopo paga una lettura o due.
-function colloca(ctx, S, i) {
+async function colloca(ctx, S, i) {
   const occ = ctx.mappa.occ;
   const vecchie = S.caseVecchie;
+  const at = catena(S.posto, ctx.N, i);
+  const fine = lunghezzaCatena(ctx.N);
   let saltato = false;
-  for (let r = 0; r < CATENA_MAX; r++) {
-    const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
+  for (let r = 0; r < fine; r++) {
+    if (++ctx.calcoli % 4096 === 0) await cedi();
+    const p = at(r);
     if (occ[p] || (vecchie && vecchie[p])) continue;
     if (vecchie && !saltato && S.letti[p]) {
       saltato = true;
