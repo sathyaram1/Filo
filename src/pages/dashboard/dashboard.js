@@ -1000,7 +1000,8 @@
     return h;
   }
 
-  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, rispostaA = null, activity = null }) {
+  // `composizione`: quello che l'utente aveva nella casella, per rimetterlo com'era se il messaggio non può partire.
+  async function runFiloTurn({ userMessage, images = [], internal = false, daModello = false, daFuori = false, rispostaA = null, activity = null, composizione = null }) {
     // Blocco di attività della domanda (#521): lo crea e lo chiude chi guida
     // la sequenza dei turni (runTurnAndContinue); qui ci si scrive dentro.
     const pending = activity || Att.create(bubblesEl);
@@ -1205,7 +1206,7 @@
       retry.className = 'dash-action-btn';
       retry.textContent = '↻ Riprova';
       retry.title = 'Rimanda lo stesso messaggio';
-      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(rispostaA ? { rispostaA } : {}) }));
+      retry.addEventListener('click', () => retryTurn(err, { userMessage, images, internal, ...(rispostaA ? { rispostaA } : {}), composizione }));
       // #598 — senza nessuna chiave «Riprova» non porta da nessuna parte: la
       // strada è la pagina Crediti, e sta qui sotto, non in un menu. Lo stesso
       // quando il servizio ha rifiutato la chiave (#629): è lì che si cambia.
@@ -1222,7 +1223,8 @@
       // Il tasto in evidenza è quello che toglie l'ostacolo (#828.1): finché c'è, «Riprova» rimanda lo stesso messaggio
       // allo stesso muro, e resta accanto per dopo, quando l'ostacolo è tolto.
       // #1596 — finestra piena anche dopo i tagli: lo stesso messaggio, qui, sbatte di nuovo contro lo stesso limite; in
-      // una chat nuova no. Il messaggio torna nel campo, da accorciare o mandare.
+      // una chat nuova no. Il messaggio torna nella casella com'era, davanti alla bozza, da accorciare o mandare; una
+      // volta sola, o un secondo clic lo raddoppia.
       if (r?.code === 'CONTESTO_PIENO' && !internal && !daModello) {
         const nuova = document.createElement('button');
         nuova.type = 'button';
@@ -1230,11 +1232,12 @@
         nuova.textContent = 'Chat nuova';
         nuova.title = 'Ricomincia in una chat nuova col messaggio già scritto';
         nuova.addEventListener('click', () => {
+          if (nuova.disabled) return;
+          nuova.disabled = true;
+          const bozza = inputEl.value;
           chiudiConversazione();
-          inputEl.value = String(userMessage || '');
-          autoGrowInput();
-          aggiornaTasto();
-          inputEl.focus();
+          inputEl.value = bozza;
+          rimettiNellaCasella([composizione || { scritto: String(userMessage || ''), immagini: images, file: [], percorsi: new Map() }]);
         });
         row.appendChild(nuova);
       } else if (pagina) {
@@ -1400,7 +1403,7 @@
     Coda.segnaGiorni();
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
 
-    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori, ...(rispostaA ? { rispostaA } : {}) });
+    await runTurnAndContinue({ userMessage: domanda, images: c.immagini, daModello, daFuori: c.daFuori, ...(rispostaA ? { rispostaA } : {}), composizione: c });
   }
 
   // Condiviso fra il primo invio e il «Riprova»: riprovare deve comportarsi come inviare.
@@ -1592,7 +1595,33 @@
     bubblesEl.appendChild(s.bolla);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     riarmaQuadrato();
+    serbaSeguito(s);
     affidaAlTurno(s, t);
+  }
+  // Un seguito in attesa sembra già mandato (#1296.1): il main lo serba finché parte, torna nella casella o il turno lo
+  // legge. Ricaricata, questa scheda lo riprende (`riprendiSeguitiOrfani`); chiusa, resta nella conversazione.
+  const PAGINA = `p${Date.now().toString(36)}${Math.random().toString(36).slice(2, 9)}`;
+  function serbaSeguito(s) {
+    const { c } = s;
+    let citata = null;
+    try { citata = c.citata ? JSON.parse(JSON.stringify(c.citata)) : null; } catch (_) { citata = null; }
+    const composizione = {
+      text: c.text, scritto: c.scritto, immagini: c.immagini.slice(), file: c.file.map((f) => ({ percorso: f.percorso, nome: f.nome })),
+      percorsi: [...c.percorsi.entries()], incollato: !!c.incollato, daFuori: !!c.daFuori, citata,
+    };
+    send({ type: MSG.FILO_CHAT_SEGUITO, id: s.id, serba: { chatId, pagina: PAGINA, composizione } }).catch(() => {});
+  }
+  async function riprendiSeguitiOrfani() {
+    const r = await send({ type: MSG.FILO_CHAT_SEGUITO, orfani: true, pagina: PAGINA });
+    const lista = Array.isArray(r?.seguiti) ? r.seguiti : [];
+    rimettiNellaCasella(lista.filter((c) => c && typeof c === 'object').map((c) => ({
+      scritto: String(c.scritto || ''),
+      immagini: Array.isArray(c.immagini) ? c.immagini.filter((d) => typeof d === 'string') : [],
+      file: Array.isArray(c.file) ? c.file.filter((f) => f && typeof f.percorso === 'string') : [],
+      percorsi: new Map(Array.isArray(c.percorsi) ? c.percorsi.filter((x) => Array.isArray(x) && x.length === 2) : []),
+      incollato: !!c.incollato,
+      citata: c.citata || null,
+    })));
   }
   // Mandare un seguito è un invio come il primo: la stessa pausa del quadrato, o il secondo Invio di un doppio colpo
   // trova la casella vuota e ferma il lavoro che il seguito doveva solo affiancare.
@@ -1629,6 +1658,7 @@
   async function partiSeguito() {
     const s = seguiti.shift();
     if (!s) return;
+    send({ type: MSG.FILO_CHAT_SEGUITO, id: s.id, togli: true }).catch(() => {});
     s.bolla.classList.remove('dash-bubble-attesa');
     s.bolla.removeAttribute('title');
     let bolla = s.bolla.isConnected ? s.bolla : null;
@@ -2949,6 +2979,7 @@
     // dice — finché l'utente non risponde a quella riga.
     else Accoglienza.refreshOnboardingNotice().catch(() => {});
     richiestaDellAvviso(!!onbState).catch((e) => console.warn('[Filo] richiesta dall\'avviso', e));
+    riprendiSeguitiOrfani().catch((e) => console.warn('[Filo] seguiti della pagina di prima', e));
     // Popup all'avvio, in sequenza per non sovrapporsi: prima il recap
     // aggiornamento (solo se c'è una versione precedente vista e note nuove),
     // POI il ringraziamento per i feedback risolti (C5). Se il recap non compare,

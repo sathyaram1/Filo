@@ -5816,9 +5816,12 @@ async function fermaFiloChat(reqId, wc) {
 // Un seguito scritto mentre il turno lavora (#1296) entra al suo passo dopo; se il turno non ne ha, lo manda la scheda a
 // turno finito. Lo prende solo il turno della scheda che lo scrive, non fermato, non chiuso, non dell'accoglienza (lei
 // tiene la conversazione nel suo stato, e il seguito la aspetta). `togli`: ritirato prima che il modello lo legga.
-function seguitoFiloChat({ reqId, id, testo, togli = false } = {}, wc) {
-  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+function seguitoFiloChat({ reqId, id, testo, togli = false, serba = null, orfani = false, pagina = '' } = {}, wc) {
+  if (orfani) return { seguiti: seguitiOrfani(wc, String(pagina || '')) };
   const chiave = String(id || '');
+  if (serba) return { serbato: serbaSeguito(chiave, serba, wc) };
+  if (togli) ritiraSerbato(chiave, wc);
+  const t = reqId ? turniInCorso.get(String(reqId)) : null;
   if (!t || t.wcId !== (wc && wc.id) || !chiave) return { accolto: false, tolto: !!togli };
   if (togli) {
     const i = t.seguiti.findIndex((s) => s.id === chiave);
