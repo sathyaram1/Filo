@@ -233,34 +233,61 @@
       for (let i = figli.length - 1; i >= 0; i--) pila.push(figli[i]);
     }
 
-    const out = [];
+    const corrisponde = (cifre) => {
+      for (const seq of cifre.match(/\d+/g) || []) {
+        if (interi.has(seq)) return true;
+        if (seq.length >= 6) for (const a of aghi) if (seq.includes(a)) return true;
+      }
+      return false;
+    };
+    const rettangolo = (n) => {
+      try {
+        const rg = (n.ownerDocument || doc).createRange();
+        rg.selectNodeContents(n);
+        const q = rg.getBoundingClientRect();
+        return q && q.width && q.height ? q : null;
+      } catch (_) { return null; }
+    };
+    // Pezzi affiancati sulla stessa riga sono un numero solo (un gruppo di cifre per <span>); due testi lontani no,
+    // anche se nel documento si toccano.
+    const affiancati = (p, q) => {
+      const alto = Math.min(p.height, q.height);
+      const insieme = Math.min(p.top + p.height, q.top + q.height) - Math.max(p.top, q.top);
+      const distanza = q.left - (p.left + p.width);
+      return insieme >= alto / 2 && distanza <= alto && distanza >= -alto;
+    };
     const area = (r) => r.width * r.height;
+    const out = [];
     const re = /\d+/g;
     for (let m = re.exec(flusso); m; m = re.exec(flusso)) {
-      const seq = m[0];
-      let trovata = interi.has(seq);
-      if (!trovata && seq.length >= 6) for (const a of aghi) if (seq.includes(a)) { trovata = true; break; }
-      if (!trovata) continue;
-      const da = m.index, a = da + seq.length;
-      const gruppo = nodi.filter((x) => x.a > da && x.da < a).map((x) => x.n);
-      let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
-      for (const n of gruppo) {
-        let q = null;
-        try { const rg = (n.ownerDocument || doc).createRange(); rg.selectNodeContents(n); q = rg.getBoundingClientRect(); } catch (_) {}
-        if (!q || !q.width || !q.height) continue;
-        l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.left + q.width); b = Math.max(b, q.top + q.height);
+      if (!corrisponde(m[0])) continue;
+      const da = m.index, a = da + m[0].length;
+      let pezzo = [];
+      const pezzi = [pezzo];
+      for (const x of nodi) {
+        if (x.a <= da || x.da >= a) continue;
+        if (x.r === undefined) x.r = rettangolo(x.n);
+        const prec = pezzo[pezzo.length - 1];
+        if (!x.r || (prec && !affiancati(prec.r, x.r))) { pezzo = []; pezzi.push(pezzo); }
+        if (x.r) pezzo.push(x);
       }
-      if (!(r > l && b > t)) continue;
-      let box = { left: l, top: t, width: r - l, height: b - t };
-      // L'elemento che tiene il numero, se non è molto più grande del testo: anche il suo sfondo è l'anteprima.
-      let su = gruppo[0] && gruppo[0].parentElement;
-      while (su && !gruppo.every((n) => su.contains(n))) su = su.parentElement;
-      const e = su && su.getBoundingClientRect ? su.getBoundingClientRect() : null;
-      if (e && e.left <= l && e.top <= t && e.left + e.width >= r && e.top + e.height >= b && area(e) <= 3 * area(box)) {
-        box = { left: e.left, top: e.top, width: e.width, height: e.height };
+      for (const p of pezzi) {
+        if (!p.length || !corrisponde(p.map((x) => flusso.slice(Math.max(x.da, da), Math.min(x.a, a))).join(''))) continue;
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        for (const { r: q } of p) {
+          l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.left + q.width); b = Math.max(b, q.top + q.height);
+        }
+        let box = { left: l, top: t, width: r - l, height: b - t };
+        // L'elemento che tiene il numero, se non è molto più grande del testo: anche il suo sfondo è l'anteprima.
+        let su = p[0].n.parentElement;
+        while (su && !p.every((x) => su.contains(x.n))) su = su.parentElement;
+        const e = su && su.getBoundingClientRect ? su.getBoundingClientRect() : null;
+        if (e && e.left <= l && e.top <= t && e.left + e.width >= r && e.top + e.height >= b && area(e) <= 3 * area(box)) {
+          box = { left: e.left, top: e.top, width: e.width, height: e.height };
+        }
+        if (box.left + box.width <= 0 || box.top + box.height <= 0 || box.left >= win.innerWidth || box.top >= win.innerHeight) continue;
+        out.push(box);
       }
-      if (box.left + box.width <= 0 || box.top + box.height <= 0 || box.left >= win.innerWidth || box.top >= win.innerHeight) continue;
-      out.push(box);
     }
     return out;
   }

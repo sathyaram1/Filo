@@ -102,3 +102,47 @@ test('le radici chiuse si trovano anche dentro i riquadri e i componenti aperti,
   assert.deepEqual(posa, { dx: 15, dy: 25, vista: { left: 15, top: 25, width: 100, height: 10 } });
   assert.equal(componi([{ left: 0, top: 50, width: 10, height: 10 }, { left: 0, top: 0, width: 10, height: 40 }]), null);
 });
+
+// #810.16 — il testo che ripete il valore di un campo segreto (l'anteprima della carta) si copre come il campo.
+function paginaFinta(testi) {
+  const rect = (i) => ({ left: 10, top: 20 + i * 30, width: 100, height: 20 });
+  const corpo = { nodeType: 1, tagName: 'BODY', childNodes: [], contains: () => false, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
+  const doc = {
+    createRange: () => { let n = null; return { selectNodeContents: (x) => { n = x; }, getBoundingClientRect: () => n._rect }; },
+  };
+  testi.forEach((t, i) => {
+    const span = { nodeType: 1, tagName: 'SPAN', childNodes: [], parentElement: corpo, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
+    const nodo = { nodeType: 3, nodeValue: t, parentElement: span, ownerDocument: doc, _rect: rect(i) };
+    span.childNodes.push(nodo);
+    span.contains = (x) => x === nodo;
+    corpo.childNodes.push(span);
+  });
+  return { win: { document: doc, innerWidth: 800, innerHeight: 600 }, corpo };
+}
+
+test('il testo che ripete il numero della carta si trova con spazi, trattini e da sei cifre; senza valore niente', () => {
+  const { win, corpo } = paginaFinta(['Totale 12,00 €', '4111 1111 1111 1111', '4111-1111-1111-1111', '4111 11', '•••• 1111', 'ordine 411']);
+  const r = (valori) => S.rettangoliRipetuti(win, valori, corpo).map((x) => x.top);
+  assert.deepEqual(r(['4111 1111 1111 1111']), [50, 80, 110], 'intero con spazi, con trattini, e le prime sei cifre');
+  assert.deepEqual(r(['4111111111111111']), [50, 80, 110]);
+  assert.deepEqual(r([]), [], 'nessun campo, nessun rettangolo');
+  assert.deepEqual(r(['5500 0000 0000 0004']), [], 'un valore che la pagina non ripete non copre niente');
+  assert.deepEqual(r(['']), []);
+  assert.deepEqual(r(['411']), [170], 'un codice corto si copre solo dove compare intero');
+  assert.deepEqual(r(['41']), [], 'due cifre non dicono niente');
+});
+
+test('le cifre divise in più pezzi di testo si ritrovano insieme', () => {
+  const { win, corpo } = paginaFinta(['4111', ' ', '1111', '1111', '1111']);
+  const tops = S.rettangoliRipetuti(win, ['4111 1111 1111 1111'], corpo);
+  assert.equal(tops.length, 1);
+  assert.deepEqual(tops[0], { left: 10, top: 20, width: 100, height: 140 }, 'il rettangolo tiene tutti i pezzi');
+});
+
+test('crea dà i valori dei campi segreti compilati, anche fuori vista', () => {
+  const carta = { ...campo({ name: 'number' }, '4111 1111 1111 1111'), getBoundingClientRect: () => ({ left: 0, top: -500, right: 10, bottom: -480, width: 10, height: 20 }) };
+  const nome = campo({ name: 'nome' }, 'Mario');
+  const finestra = { innerWidth: 800, innerHeight: 600, getComputedStyle: () => ({}), document: { querySelectorAll: (q) => (q === '*' ? [] : [carta, nome]), getElementById: () => null } };
+  const s = S.crea(finestra, G.cartaValida);
+  assert.deepEqual(s.valoriSegreti(), ['4111 1111 1111 1111']);
+});

@@ -73,3 +73,76 @@ test('senza mittente o senza finestra nessuna foto', () => {
   assert.equal(Foto.paginaDaFotografare({}), null);
   assert.equal(Foto.barraDaFotografare({}), null);
 });
+
+// #1721 — la foto per un modello si copre sul bitmap prima del JPEG, e non parte se un riquadro di un altro sito sfugge.
+
+const W = 20, H = 10;
+const bitmap = () => Buffer.alloc(W * H * 4, 7);
+const pixel = (b, x, y) => Array.from(b.subarray((y * W + x) * 4, (y * W + x) * 4 + 4));
+
+test('la pittura copre esattamente i pixel del rettangolo, in BGRA, e nient’altro', () => {
+  const b = Foto.dipingi(bitmap(), W, H, [{ left: 2, top: 3, width: 4, height: 2, colore: [10, 20, 30] }], { x: 1, y: 1 });
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const dentro = x >= 2 && x < 6 && y >= 3 && y < 5;
+      assert.deepEqual(pixel(b, x, y), dentro ? [30, 20, 10, 255] : [7, 7, 7, 7], `pixel ${x},${y}`);
+    }
+  }
+});
+
+test('col fattore 1,25 la pittura copre ogni pixel toccato, anche a metà, e ai bordi si ferma alla foto', () => {
+  const b = Foto.dipingi(bitmap(), W, H, [{ left: 1, top: 1, width: 3, height: 2 }], { x: 1.25, y: 1.25 });
+  // 1·1,25 = 1,25 → da 1; (1+3)·1,25 = 5 → fino a 5 escluso; (1+2)·1,25 = 3,75 → fino a 4 escluso.
+  for (let y = 0; y < H; y++) {
+    for (let x = 0; x < W; x++) {
+      const dentro = x >= 1 && x < 5 && y >= 1 && y < 4;
+      assert.equal(pixel(b, x, y)[3], dentro ? 255 : 7, `pixel ${x},${y}`);
+    }
+  }
+  const bordo = Foto.dipingi(bitmap(), W, H, [{ left: -5, top: 7, width: 100, height: 100 }], { x: 1.25, y: 1.25 });
+  for (let x = 0; x < W; x++) assert.equal(pixel(bordo, x, H - 1)[3], 255);
+  assert.equal(pixel(bordo, 0, 9)[0], Foto.GRIGIO[2], 'senza colore la copertura è grigia');
+  assert.equal(pixel(bordo, 0, 0)[3], 7, 'sopra il rettangolo la foto resta com’era');
+});
+
+test('un campo segreto si copre col suo sfondo e i puntini del suo testo', () => {
+  const lista = Foto.coperture([{ campi: [{ left: 0, top: 0, width: 20, height: 10, sfondo: 'rgb(250, 240, 230)', testo: 'rgba(1, 2, 3, 1)' }] }]);
+  const b = Foto.dipingi(bitmap(), W, H, lista, { x: 1, y: 1 });
+  const colori = new Set();
+  for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) colori.add(pixel(b, x, y).join(','));
+  assert.deepEqual([...colori].sort(), ['230,240,250,255', '3,2,1,255'].sort());
+});
+
+test('le coperture: prima e dopo lo scatto, campi poi testo ripetuto poi riquadri, e niente di non numerico', () => {
+  const prima = { campi: [{ left: 1, top: 1, width: 5, height: 5, sfondo: '#fff', testo: '#000' }], ripetuti: [{ left: 2, top: 2, width: 3, height: 3 }], riquadri: [{ left: 0, top: 0, width: 9, height: 9 }] };
+  const dopo = { campi: [], ripetuti: [], riquadri: [{ left: 0, top: 4, width: 9, height: 9 }, { left: NaN, top: 0, width: 1, height: 1 }, { left: 0, top: 0, width: 0, height: 3 }] };
+  const lista = Foto.coperture([prima, dopo], [{ left: 3, top: 3, width: 2, height: 2, sfondo: 'transparent', testo: '' }]);
+  assert.equal(lista.length, 5);
+  assert.deepEqual(lista.slice(-2).map((c) => c.top), [0, 4], 'si coprono le due posizioni del riquadro, per ultime');
+  assert.deepEqual(lista[1].colore, [255, 255, 255], 'uno sfondo che non si legge diventa bianco');
+});
+
+const frame = (origin, frames = [], url = origin + '/x') => ({ origin, url, frames, detached: false });
+
+test('il frame tree conta i riquadri di altre origini appesi alla pagina o a riquadri della sua origine', () => {
+  const albero = frame('http://a.test', [
+    frame('http://b.test', [frame('http://c.test')]),
+    frame('http://a.test', [frame('http://d.test'), frame('http://a.test', [frame('null')])]),
+    frame('', [], ''),
+  ]);
+  assert.equal(Foto.frameDiAltreOrigini(albero), 3, 'b, d e il sandbox; c sta dentro b, coperto con lui; quello in arrivo non mostra niente');
+  assert.equal(Foto.frameDiAltreOrigini(frame('null', [frame('null')])), 1, 'due origini opache non sono la stessa');
+  assert.equal(Foto.frameDiAltreOrigini(frame('http://a.test')), 0);
+});
+
+test('il confronto rifiuta la foto se un riquadro del frame tree non è stato misurato, o se la misura manca', () => {
+  const vista = { w: 800, h: 600 };
+  assert.equal(Foto.rifiutoDellaMisura({ vista, conFrame: 2, attesi: 2 }), null);
+  assert.equal(Foto.rifiutoDellaMisura({ vista, conFrame: 3, attesi: 2 }), null);
+  assert.equal(Foto.rifiutoDellaMisura({ vista, conFrame: 1, attesi: 2 }), 'riquadri');
+  assert.equal(Foto.rifiutoDellaMisura({ vista, conFrame: 5, attesi: Infinity }), 'riquadri', 'senza frame tree non si sa');
+  assert.equal(Foto.rifiutoDellaMisura(null), 'misura');
+  assert.equal(Foto.rifiutoDellaMisura({ vista: { w: 0, h: 600 }, conFrame: 0, attesi: 0 }), 'misura');
+  for (const c of ['riquadri', 'segreti', 'misura']) assert.ok(Foto.perche(c), `il modello deve sapere perché: ${c}`);
+  assert.equal(Foto.perche('__proto__'), '');
+});
