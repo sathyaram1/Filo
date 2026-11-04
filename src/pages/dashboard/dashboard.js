@@ -2061,6 +2061,14 @@
     inputEl.style.height = 'auto';
     inputEl.style.height = `${inputEl.scrollHeight}px`;
   }
+  // Il campo cambia larghezza anche senza che si scriva (finestra, pila degli avvisi accanto): le righe vanno ricontate.
+  let larghezzaCampo = 0;
+  new ResizeObserver(() => {
+    const w = inputEl.clientWidth;
+    if (w === larghezzaCampo) return;
+    larghezzaCampo = w;
+    if (inputEl.value) autoGrowInput();
+  }).observe(inputEl);
 
   // Chi entra nel campo o ci scrive manderà presto un turno: il saldo dei crediti si rilegge adesso, così il turno
   // non lo aspetta (#1353). Il main non rilegge una lettura di meno di un minuto.
