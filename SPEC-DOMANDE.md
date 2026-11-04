@@ -540,7 +540,7 @@ rispondere.
   `doppione` (`di`: la domanda viva, `testo`), `automatica` (`scelta`, `principio`: la domanda chiusa, `testo`), `pubblica`
   (`domanda`, controllata con la validazione comune e la forma per l'owner).
   Ognuna tranne `mostra` chiude il compito.
-- **Tentativi.** Un biglietto che finisce senza nessuna delle quattro rimette
+- **Tentativi.** Un biglietto che finisce senza nessuna delle cinque rimette
   il compito in attesa; al terzo la domanda esce com'è fra quelle da
   rispondere, con `smistamento: 'fallito'`. Niente resta nascosto. È anche la
   rete per un guasto che colpisce il compito stesso: un compito che non può
