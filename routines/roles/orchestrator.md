@@ -127,8 +127,8 @@ decidi SOLO così:
    - **exit 2** → niente da fare (coda vuota, "basta per oggi", interruttore
      spento, o gli strumenti di questa sessione sono indietro rispetto a
      `main`: una sessione vecchia non prende lavoro nuovo): chiudi il giro;
-   - **exit 3** → guasto (compresi i guasti che i worker dichiarano al canale
-     nel rilascio): chiudi, MAI rispawnare.
+   - **exit 3** → guasto: chiudi, MAI rispawnare. Il guasto che un worker
+     dichiara nel rilascio ferma solo il suo lavoro, non il giro.
 
 <!-- includi: _dopo-un-guasto.md -->
 
