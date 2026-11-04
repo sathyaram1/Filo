@@ -81,6 +81,15 @@ test('i tre punti di partenza: richiesta oltre la soglia, fermo oltre la cache c
   assert.equal(L.motivo({ ...fermo, tokenTratto: 30000 }), 'fermo');
   assert.equal(L.motivo({ ...fermo, tokenTratto: 5000 }), null, 'un tratto piccolo non si riscrive solo perché la cache è fredda');
   assert.equal(L.motivo({ ...fermo, tokenTratto: 30000, ultimoUso: ora - 10 * 60000 }), null, 'a cache calda si aspetta');
+  // Dopo un riavvio la pausa si misura dall'ultimo messaggio prima della domanda, di qualunque chat.
+  const filo = [
+    { chat: 'a', role: 'user', ts: new Date(ora - 3 * ORA_MS).toISOString() },
+    { chat: 'b', role: 'filo', ts: new Date(ora - 2 * ORA_MS).toISOString() },
+    { chat: 'a', role: 'user', ts: new Date(ora - 1000).toISOString() },
+  ];
+  assert.equal(L.ultimaAttivita(filo, { chat: 'a' }), ora - 2 * ORA_MS);
+  assert.equal(L.motivo({ ...fermo, tokenTratto: 30000, ultimoUso: L.ultimaAttivita(filo, { chat: 'a' }) }), 'fermo');
+  assert.equal(L.ultimaAttivita([], { chat: 'a' }), null);
   const ieri = new Date(ora - 24 * ORA_MS).toISOString();
   const oggi = new Date(ora - ORA_MS).toISOString();
   assert.deepEqual(L.giorniDaRiassumere([{ a: ieri }, { a: oggi }], [], ora), [L.giornoDi(ieri)]);
