@@ -1647,13 +1647,14 @@ class TabManager {
   // La scheda chiusa che ha suonato per ultima, dalla pila di questa sessione o dall'archivio: { voce | archivio, at, titolo,
   // url }, o null.
   async ultimaChiusaCheSuonava() {
-    const v = this._pilaChiuse().ultimaCheSuonava();
+    const pila = this._pilaChiuse();
+    const v = pila.ultimaCheSuonava();
     let e = null;
     const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
     if (A) {
       try {
         for (const x of await A.listMeta()) {
-          if (!x || x.urlTagliato || !/^https?:\/\//i.test(x.url || '') || !(Date.parse(x.audioAt) > 0)) continue;
+          if (!x || x.urlTagliato || !/^https?:\/\//i.test(x.url || '') || !(Date.parse(x.audioAt) > 0) || pila.eRiaperta(x.id)) continue;
           if (!e || Date.parse(x.audioAt) > Date.parse(e.audioAt)) e = x;
         }
       } catch (_) {}
