@@ -181,8 +181,8 @@
     if (!s.trim() && !link.length) return no;
 
     for (const seg of segreti) {
-      const v = testo(seg).trim();
-      if (v.length >= SEGRETO_MIN && s.includes(v)) {
+      const { v, min } = segretoDi(seg);
+      if (v.length >= min && s.includes(v)) {
         return { blocca: true, regola: 'segreto', motivo: 'conteneva un segreto che custodisco io' };
       }
     }
