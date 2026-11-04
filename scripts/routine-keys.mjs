@@ -56,7 +56,7 @@ const DETTO = {
 async function chiama(data) {
   const refresh = findAdminRefreshToken();
   if (!refresh) {
-    console.error('Non trovo le tue credenziali di proprietario (FILO_ADMIN_REFRESH_TOKEN).');
+    console.error('Non trovo le tue credenziali di proprietario (FILO_ADMIN_REFRESH_TOKEN): le stesse cose si fanno da Gestione → Automazioni.');
     process.exit(1);
   }
   const idToken = await mintIdToken(refresh);
