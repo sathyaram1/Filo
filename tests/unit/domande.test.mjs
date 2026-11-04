@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'domande.js'));
+require(join(ROOT, 'src', 'shared', 'feedbackAttese.js'));
 const D = globalThis.SN_DOMANDE;
 
 const RIF = { f1: { num: '#813', priorita: 1, stato: 'design', motivo: 'decisione' }, f2: { num: '#902.3', priorita: 0 } };

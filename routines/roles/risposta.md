@@ -53,6 +53,17 @@ Una o più di queste cose, poi chiudi o chiedi un chiarimento.
 
   Sugli stessi feedback valgono anche `priorita` (con `"valore"` da 0 a 3) e
   `archivia`, quando è la risposta a chiederli.
+- **Far aspettare un feedback della domanda** a un altro, quando la risposta
+  chiede un'attesa («#1382 aspetti #1959»): `attendi`, col feedback atteso per
+  numero, senza `#`. Il server controlla che esista e che le attese non
+  facciano un giro; l'attesa si aggiunge a quelle che ci sono. Il lavoro fermo
+  riparte da solo quando l'atteso si fonde: non serve anche riprenderlo.
+
+  ```bash
+  node scripts/domanda.mjs azione '{"tipo":"attendi","feedbackId":"<id>","aspetta":"1959"}' --testo - <<'FINE'
+  [la tua nota per chi riprende]
+  FINE
+  ```
 - **Aprire un feedback nuovo**, se la risposta chiede un lavoro che nessun
   feedback nominato copre: `node scripts/routine-channel.mjs deliver feedback
   --name "…" --text "…" --priority N`.

@@ -573,8 +573,11 @@ Come funziona oggi (#1152):
   il compito è fatto), `note`, `principio`, `azione`, `chiudi` (resoconto per
   l'owner e principio, la domanda si chiude). Chiarimento e chiusura si
   rifiutano se l'owner ha scritto dopo l'ultima lettura (`domanda_cambiata`).
-  `azione` applica solo `riprendi`, `priorita` e `archivia`, e solo sui
-  feedback che la domanda nomina: mai un'azione di consenso. `azione` non
+  `azione` applica solo `riprendi`, `priorita`, `archivia` e `attendi`
+  (#1965: una risposta che chiede un'attesa non finisce in un chiarimento), e
+  solo sui feedback che la domanda nomina; il feedback atteso da `attendi` è
+  uno qualunque, per numero, e il server lo valida come le attese di
+  Gestione. Mai un'azione di consenso. `azione` non
   chiude la domanda, nemmeno quando riprende o archivia il lavoro che la
   domanda ferma: quel lavoro esce dall'attesa per la risposta stessa, non per
   un'altra strada (§ 3.4 punto 2), e la domanda resta in lavorazione e
