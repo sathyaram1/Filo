@@ -170,3 +170,30 @@ test('un archivio col proxy senza schema e senza credenziali non cancella quello
   const altrove = mergeImportedData({ settings: {} }, parsed.data).merged;
   assert.deepEqual(proxyDaCompletare(altrove, parsed.proxySenzaCredenziali), ['datacenter'], 'la conferma deve dirlo');
 });
+
+// Molti fornitori danno il proxy come «utente:password@host:porta», senza schema: Filo lo usa, e la password resta un
+// segreto come quella scritta con http:// davanti (#905.1).
+test('il proxy scritto senza schema esce col solo indirizzo, e la password solo con la spunta', () => {
+  const SENZA_SCHEMA = 'mario:passwordsegreta@gate.esempio.com:8080';
+  const dati = { settings: { theme: 'dark', proxy: { datacenter: SENZA_SCHEMA } } };
+  assert.equal(C.haSegreti(dati.settings), true, 'la casella «Includi le chiavi» deve comparire');
+  const zip = buildExportZip(dati);
+  assert.equal(zip.includes(Buffer.from('passwordsegreta')), false);
+  const parsed = readExportZip(zip);
+  assert.equal(parsed.data.settings.proxy.datacenter, 'gate.esempio.com:8080');
+  assert.deepEqual(parsed.proxySenzaCredenziali, ['datacenter']);
+  assert.equal(mergeImportedData({ settings: { proxy: { datacenter: SENZA_SCHEMA } } }, parsed.data).merged.settings.proxy.datacenter,
+    SENZA_SCHEMA, 'importato qui non cancella la password di qui');
+  assert.equal(readExportZip(buildExportZip(dati, { chiavi: true })).data.settings.proxy.datacenter, SENZA_SCHEMA);
+});
+
+test('le credenziali del proxy valgono fino all\'ultima @ prima dell\'host, come per chi lo usa', () => {
+  assert.deepEqual(C.credenzialiProxy(' http://mario:pa@ss@gate.esempio.com:8080 '),
+    { credenziali: 'mario:pa@ss', password: 'pa@ss', senza: 'http://gate.esempio.com:8080' });
+  assert.equal(C.credenzialiProxy('mario@gate.esempio.com:8080').senza, 'gate.esempio.com:8080');
+  assert.equal(C.credenzialiProxy('gate.esempio.com:8080'), null);
+  assert.equal(C.credenzialiProxy('socks5://gate.esempio.com:1080/percorso@x'), null);
+  assert.equal(C.credenzialiProxy(''), null);
+  const zip = buildExportZip({ settings: { proxy: { datacenter: 'http://mario:pa@ss-lunghissima@gate.esempio.com:8080' } } });
+  assert.equal(zip.includes(Buffer.from('ss-lunghissima')), false);
+});
