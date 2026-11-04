@@ -95,6 +95,20 @@ test('quando il registro non torna lo dice e non scrive niente', () => {
   assert.match(sbagliato.motivo, /0\.2\.261.*0\.2\.259/);
 });
 
+test('un ramo che riscrive una riga già scritta e ne aggiunge una nello stesso blocco: niente spostamento, la versione uscita resta', () => {
+  // Spostarle tutte e due toglieva dal registro la versione uscita e ripresentava come nuova la riga già letta.
+  const prima = registroDa(sorgente([{ v: '0.2.257', features: ['La barra si apre'] }, { v: '0.2.256', fixes: ['Vecchia'] }]));
+  const ramo = sorgente([{ v: '0.2.257', features: ['La barra si apre anche con Ctrl+B', R1] }, { v: '0.2.256', fixes: ['Vecchia'] }]);
+  const r = spostaInCima(ramo, { prima, manifesto: { version: '0.2.257' }, oggi: OGGI });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /0\.2\.257.*riscritto.*0\.2\.258/);
+  // Solo riscritta, senza aggiunte: resta lecito e non si sposta niente.
+  const soloRiscritta = spostaInCima(sorgente([{ v: '0.2.257', features: ['La barra si apre anche con Ctrl+B'] }, { v: '0.2.256', fixes: ['Vecchia'] }]),
+    { prima, manifesto: { version: '0.2.257' }, oggi: OGGI });
+  assert.equal(soloRiscritta.ok, true, soloRiscritta.motivo);
+  assert.deepEqual(soloRiscritta.spostate, []);
+});
+
 test('sul registro vero: una riga aggiunta sotto l\'ultima versione uscita finisce nel blocco della prossima', () => {
   const vero = readFileSync(join(REPO, FILE_NOVITA), 'utf8');
   const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));

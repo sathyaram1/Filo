@@ -203,6 +203,9 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
   if (p.errore) return { ok: false, motivo: p.errore };
   const sposta = aggiunteSottoUscite(prima, dopo, uscita);
   if (!sposta.length) return { ok: true, src, spostate: [], verso: p.versione };
+  const versioni = dopo.map((n) => n.version);
+  const doppia = versioni.find((v, k) => versioni.indexOf(v) !== k);
+  if (doppia) return { ok: false, motivo: `il blocco ${doppia} compare due volte: sistemalo a mano, poi rilancia` };
   // Righe diverse da prima più di quelle in più: il ramo ne ha anche riscritta una già letta da chi ha quella versione,
   // e quale sia l'aggiunta non è meccanico. Spostarle tutte svuoterebbe un blocco uscito.
   for (const n of dopo) {
@@ -212,10 +215,6 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
       return { ok: false, motivo: `nel blocco ${n.version}, già uscito, il ramo ha anche riscritto righe che c'erano: sposta a mano nel blocco ${p.versione} solo quelle aggiunte` };
     }
   }
-
-  const versioni = dopo.map((n) => n.version);
-  const doppia = versioni.find((v, k) => versioni.indexOf(v) !== k);
-  if (doppia) return { ok: false, motivo: `il blocco ${doppia} compare due volte: sistemalo a mano, poi rilancia` };
   const sopra = dopo.filter((n) => cmpVersion(n.version, uscita) > 0);
   if (sopra.length > 1 || (sopra.length && (sopra[0] !== dopo[0] || sopra[0].version !== p.versione))) {
     return { ok: false, motivo: `sopra la versione ${uscita} ci sono i blocchi ${sopra.map((n) => n.version).join(', ')}: ne serve uno solo, ${p.versione}, in cima. Sistemalo a mano, poi rilancia` };
