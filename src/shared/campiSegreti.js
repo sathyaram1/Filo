@@ -189,8 +189,81 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista };
+    // I valori dei campi segreti compilati, anche fuori vista: un'anteprima della carta li ripete altrove (#810.16).
+    function valoriSegreti(radice = doc) {
+      const out = [];
+      for (const el of tuttiICampi(radice)) if (el.value && campoSegreto(el)) out.push(String(el.value));
+      return out;
+    }
+
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti };
   }
 
-  global.SN_CAMPI_SEGRETI = { crea };
+  // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
+  // mentre si scrive: sei cifre consecutive del valore lo identificano, un valore più corto solo se una sequenza di
+  // cifre del testo è lui intero («•••• 1234» resta). Autosufficiente come `crea`. Rettangoli nella finestra di `win`.
+  function rettangoliRipetuti(win, valori, radice) {
+    const doc = win.document;
+    const NORMA = /[\s   \-‐-―]/g;
+    const aghi = new Set();
+    const interi = new Set();
+    for (const v of valori || []) {
+      const t = String(v || '').replace(NORMA, '');
+      for (const seq of t.match(/\d+/g) || []) {
+        if (seq.length >= 6) for (let i = 0; i + 6 <= seq.length; i++) aghi.add(seq.slice(i, i + 6));
+        else if (seq.length >= 3 && seq === t) interi.add(seq);
+      }
+    }
+    if (!aghi.size && !interi.size) return [];
+
+    const SALTA = /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|TEXTAREA|SELECT|OPTION|INPUT)$/;
+    const nodi = [];
+    let flusso = '';
+    const pila = [radice || doc];
+    while (pila.length) {
+      const n = pila.pop();
+      if (n.nodeType === 3) {
+        const t = String(n.nodeValue || '').replace(NORMA, '');
+        if (t) { nodi.push({ n, da: flusso.length, a: flusso.length + t.length }); flusso += t; }
+        continue;
+      }
+      if (n.nodeType === 1 && SALTA.test(n.tagName)) continue;
+      const figli = Array.from(n.childNodes || []);
+      if (n.shadowRoot) figli.push(n.shadowRoot);
+      for (let i = figli.length - 1; i >= 0; i--) pila.push(figli[i]);
+    }
+
+    const out = [];
+    const area = (r) => r.width * r.height;
+    const re = /\d+/g;
+    for (let m = re.exec(flusso); m; m = re.exec(flusso)) {
+      const seq = m[0];
+      let trovata = interi.has(seq);
+      if (!trovata && seq.length >= 6) for (const a of aghi) if (seq.includes(a)) { trovata = true; break; }
+      if (!trovata) continue;
+      const da = m.index, a = da + seq.length;
+      const gruppo = nodi.filter((x) => x.a > da && x.da < a).map((x) => x.n);
+      let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+      for (const n of gruppo) {
+        let q = null;
+        try { const rg = (n.ownerDocument || doc).createRange(); rg.selectNodeContents(n); q = rg.getBoundingClientRect(); } catch (_) {}
+        if (!q || !q.width || !q.height) continue;
+        l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.left + q.width); b = Math.max(b, q.top + q.height);
+      }
+      if (!(r > l && b > t)) continue;
+      let box = { left: l, top: t, width: r - l, height: b - t };
+      // L'elemento che tiene il numero, se non è molto più grande del testo: anche il suo sfondo è l'anteprima.
+      let su = gruppo[0] && gruppo[0].parentElement;
+      while (su && !gruppo.every((n) => su.contains(n))) su = su.parentElement;
+      const e = su && su.getBoundingClientRect ? su.getBoundingClientRect() : null;
+      if (e && e.left <= l && e.top <= t && e.left + e.width >= r && e.top + e.height >= b && area(e) <= 3 * area(box)) {
+        box = { left: e.left, top: e.top, width: e.width, height: e.height };
+      }
+      if (box.left + box.width <= 0 || box.top + box.height <= 0 || box.left >= win.innerWidth || box.top >= win.innerHeight) continue;
+      out.push(box);
+    }
+    return out;
+  }
+
+  global.SN_CAMPI_SEGRETI = { crea, rettangoliRipetuti };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
