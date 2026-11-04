@@ -169,6 +169,23 @@ test('#1335: una segnalazione senza stato pubblico non sparisce dal verdetto: si
   assert.match(due.dette, /non ha saputo dire se ogni segnalazione ha lo stato pubblico/);
 });
 
+test('#1335: con o senza filtro sul server il verdetto è lo stesso: le aperte votate non si archiviano né si segnalano', async () => {
+  const conVotiSulleAperte = () => {
+    const c = collezione();
+    c['feedback-public'].push({ id: 'f-aperta', fields: { votes: voti('works') } }, { id: 'g-aperta', fields: { votes: voti('broken') } });
+    return c;
+  };
+  for (const rotti of [false, true]) {
+    const st = server(conVotiSulleAperte());
+    st.conteggiRotti = rotti;
+    // eslint-disable-next-line no-await-in-loop
+    const { r } = await giro(st, { dryRun: true, copiaDir: cartellaTemporanea('archivio-aperte-votate-') });
+    assert.equal(st.consegnate.length, rotti ? 7 : 3);
+    assert.deepEqual(r.toArchive.map((a) => a.id), ['c-archiviabile'], `conteggi ${rotti ? 'rotti' : 'buoni'}`);
+    assert.deepEqual(r.toFlag, ['d-rotta'], `conteggi ${rotti ? 'rotti' : 'buoni'}`);
+  }
+});
+
 test('#680.2: spostata a mano dopo la prova a secco, la segnalazione non si riscrive ed è fra le saltate', async () => {
   const st = server(collezione());
   const dir = cartellaTemporanea('archivio-a-mano-');
