@@ -232,7 +232,7 @@ function codiceInUnChiuso() {
   return false;
 }`;
 }
-async function campoInUnChiuso(cmd, sid) {
+async function campoInUnChiuso(cmd, sid, inUnChiuso) {
   const gruppo = 'filo-campi-cerca';
   try {
     await cmd('DOM.getDocument', { depth: 0 }, sid);
@@ -246,7 +246,7 @@ async function campoInUnChiuso(cmd, sid) {
     const esiti = await Promise.all(nodi.map(async (nodeId) => {
       const { object } = await cmd('DOM.resolveNode', { nodeId, objectGroup: gruppo }, sid);
       const { result } = await cmd('Runtime.callFunctionOn',
-        { objectId: object.objectId, functionDeclaration: IN_UN_CHIUSO, returnByValue: true }, sid);
+        { objectId: object.objectId, functionDeclaration: inUnChiuso, returnByValue: true }, sid);
       return !(result && result.value === false);
     }));
     return esiti.some(Boolean);
@@ -268,6 +268,7 @@ function campiSegretiNeiComponentiChiusi(webContents) {
 }
 
 async function misuraComponentiChiusi(webContents) {
+  const visti = quantiVistiDagliScript(webContents);
   const dbg = webContents.debugger;
   const nostro = !dbg.isAttached();
   if (nostro) { try { dbg.attach('1.3'); } catch (_) { return { campi: [], nonCoperti: false }; } }
@@ -284,7 +285,11 @@ async function misuraComponentiChiusi(webContents) {
   try {
     attese.push(segui(''));
     while (attese.length) await Promise.all(attese.splice(0));
-    const conCampi = await Promise.all(sessioni.map((s) => campoInUnChiuso(cmd, s.sid)));
+    const trovati = await Promise.all(sessioni.map((s) => quantiTrovaLaRicerca(cmd, s.sid)));
+    if (trovati.every((n) => n === 0)) return { campi: [], nonCoperti: false };
+    if (!trovati.includes(null) && trovati.reduce((a, b) => a + b, 0) <= await visti) return { campi: [], nonCoperti: false };
+    const inUnChiuso = codiceInUnChiuso();
+    const conCampi = await Promise.all(sessioni.map((s) => campoInUnChiuso(cmd, s.sid, inUnChiuso)));
     if (!conCampi.some(Boolean)) return { campi: [], nonCoperti: false };
     const alberi = await Promise.all(sessioni.map(async (s) => {
       try { return { ...s, ...radiciChiuse((await cmd('DOM.getDocument', { depth: -1, pierce: true }, s.sid)).root) }; }
