@@ -47,7 +47,8 @@ async function stubMain(page, { preapproved = [], pending = [], fiduciaErr = '' 
       if (t === 'feedback_update') { window.__updates.push(msg); return { ok: true }; }
       if (t === 'fiducia_segna') {
         window.__fiducia.push(msg);
-        return cfg.fiduciaErr ? { ok: false, error: cfg.fiduciaErr } : { ok: true, fiducia: 'fidato' };
+        // Come il server: la fiducia dopo il gesto, che la pagina mostra così com'è (#1918).
+        return cfg.fiduciaErr ? { ok: false, error: cfg.fiduciaErr } : { ok: true, fiducia: msg.fidato === false ? 'non_fidato' : 'fidato' };
       }
       if (t === 'merge_approvals_get') {
         return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: cfg.preapproved, ttlMs: 7 * 24 * 60 * 60 * 1000 };
