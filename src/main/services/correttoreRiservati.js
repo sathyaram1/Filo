@@ -229,7 +229,7 @@ function formeLibere(testo) {
       if (forma(s).length || PRESENTATA.test(fra) || (pw && ACCANTO.test(fra))) out.push(v);
     }
   }
-  for (const m of l.matchAll(LIBERE.virgola)) out.push(...forma(m[1]));
+  for (const m of l.matchAll(LIBERE.virgola)) if (nomePw(m[1]) || SOLO_CORTE.test(m[1])) out.push(...forma(m[2]));
   return out;
 }
 
