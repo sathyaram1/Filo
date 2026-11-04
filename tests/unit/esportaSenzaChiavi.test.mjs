@@ -197,3 +197,17 @@ test('le credenziali del proxy valgono fino all\'ultima @ prima dell\'host, come
   const zip = buildExportZip({ settings: { proxy: { datacenter: 'http://mario:pa@ss-lunghissima@gate.esempio.com:8080' } } });
   assert.equal(zip.includes(Buffer.from('ss-lunghissima')), false);
 });
+
+test('ogni proxy di cui Filo usa la password è un segreto: spazi, tabulazioni, caratteri codificati (#905.1)', () => {
+  const { endpointFor } = require(join(ROOT, 'src', 'main', 'services', 'proxyTab.js'));
+  for (const segno of [' ', '\t', '%20', '%2F', '@', '!', '[', '|', '{', ';']) {
+    const proxy = `mario:pass${segno}word-segreta@gate.esempio.com:8080`;
+    const usata = (endpointFor(proxy, 'it') || {}).auth;
+    if (!usata || !usata.password) continue;
+    assert.equal(C.haSegreti({ proxy: { datacenter: proxy } }), true, `${JSON.stringify(proxy)}: la casella deve comparire`);
+    const zip = buildExportZip({ settings: { proxy: { datacenter: proxy } }, filo_notes: [{ id: 'n', text: `la password è ${usata.password}` }] });
+    for (const forma of [`pass${segno}word-segreta`, usata.password]) {
+      assert.equal(zip.includes(Buffer.from(forma)), false, `${JSON.stringify(proxy)}: «${forma}» è uscita senza la spunta`);
+    }
+  }
+});
