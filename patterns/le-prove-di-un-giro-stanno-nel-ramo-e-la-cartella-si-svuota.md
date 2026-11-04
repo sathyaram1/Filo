@@ -26,9 +26,10 @@ la cartella.
 - **La pulizia che non dipende dall'esito sta prima del verdetto** (#1555). Gli esterni e i
   `?` che contano al più 1 escono in ogni esito: le loro prove si tolgono nel commit della
   critica, e la registrazione (`dispatch.mjs --record-verifier`) rifiuta la critica che ne
-  ha ancora una scritta in questa verifica. Un commit dopo il verdetto è una spinta che il
-  registro della fiducia non vede: la pratica fidata perde la fiducia e la fusione aspetta
-  l'owner. Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
+  ha ancora una scritta in questa verifica. Quello che si sa già esce con la critica perché
+  ogni commit dopo il verdetto è un passo in più che i cancelli devono controllare (lì si
+  può solo togliere). La fiducia del lavoro non lo perde: quel commit lo spedisce il
+  rilascio, che ne registra la punta nel registro del ramo (#2021). Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
   mette da parte, che la risposta del server elenca per numero: quelle non si possono
   sapere prima. Una critica con un `[3i?]` o un `[2i?!]` la cui domanda blocca ferma di
   sicuro il lavoro, e lì i `?` restano a chi riprende con la loro prova: esce solo quella
