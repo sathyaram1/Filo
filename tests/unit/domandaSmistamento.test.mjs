@@ -161,6 +161,7 @@ test('smista mostra: le altre domande vive sullo stesso feedback, provvisorie co
   };
   const viva = {
     id: 'D-244', stato: 'aperta', titolo: 'Chat: tenere Haiku o passare a Kimi K3?', blocca: false, provvisoria: 0,
+    contesto: 'Misurate cento chat: Kimi costa un terzo.',
     problema: 'Se scegliamo male\u001b[2J la chat costa il doppio.', notePerAgenti: 'SEGRETO-DELLE-NOTE',
     opzioni: [{ testo: 'Tenere Haiku' }, { testo: 'Passare a Kimi K3' }], consiglio: { opzione: 1, perche: 'x' },
   };
