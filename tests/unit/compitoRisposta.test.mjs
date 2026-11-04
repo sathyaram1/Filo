@@ -74,6 +74,9 @@ test('argomenti dei comandi del compito: forme ammesse, consenso rifiutato prima
   assert.deepEqual(leggiArgomenti(['azione', '{"tipo":"riprendi","feedbackId":"f1"}', '--testo', 'nota']), { cmd: 'azione', azione: { tipo: 'riprendi', feedbackId: 'f1' }, testo: 'nota' });
   assert.match(leggiArgomenti(['azione', '{"tipo":"approva_locale","feedbackId":"f1"}']).errore, /tipo_sconosciuto/, 'il lavoro server non si affida più da una domanda (#1576)');
   assert.match(leggiArgomenti(['azione', '{"tipo":"automazione","chiave":"routine.enabled","valore":false}']).errore, /azione_non_del_compito/);
+  assert.deepEqual(leggiArgomenti(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"1959"}']), { cmd: 'azione', azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' } },
+    'una risposta che chiede un’attesa la applica il compito (#1965)');
+  assert.match(leggiArgomenti(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"#1959"}']).errore, /parametri_non_validi.*aspetta/);
   assert.match(leggiArgomenti(['azione', '{tipo:']).errore, /non è JSON valido/);
   assert.ok(leggiArgomenti(['chiarimento']).errore, 'senza testo');
   assert.ok(leggiArgomenti(['note', '--principio', 'x']).errore, '--principio vale solo con chiudi');
