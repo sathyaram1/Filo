@@ -238,7 +238,14 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
   const motivi = motiviDiLettura({ fiducia: f.fiducia?.stringValue || '', notes: pieno.notes });
   fb.attese = await attese;
-  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
+  // `letti`: cosa si è letto, perché il server dia alla sessione le radici del testo e della conversazione (#1918).
+  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero, letti: [{ tipo: 'feedback', id: String(id) }] };
+}
+
+/** La riga dello sporco di una lettura riuscita, che nomina al server il feedback letto; '' se non sporca. */
+export async function rigaDellaLettura(esito, { riga = rigaSporco } = {}) {
+  if (!esito || !Array.isArray(esito.motivi) || !esito.motivi.length) return '';
+  return riga(`letto #${esito.numero}`, esito.motivi, { letti: esito.letti || [] });
 }
 
 async function main(argv) {
@@ -250,8 +257,8 @@ async function main(argv) {
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
     const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
-    // Il server legge le radici del testo e della conversazione: chi li ha scritti puliti non sporca (#1918).
-    if (esito.motivi.length) console.error(await rigaSporco(`letto #${esito.numero}`, esito.motivi, { letti: [{ tipo: 'feedback', id: r.id }] }));
+    const avviso = await rigaDellaLettura(esito);
+    if (avviso) console.error(avviso);
     console.log(esito.testo);
     return 0;
   } catch (e) {
