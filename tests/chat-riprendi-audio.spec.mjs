@@ -220,6 +220,79 @@ test('la musica chiusa mentre suonava vince su un video fermato dopo che lei era
   await ripristina(app);
 });
 
+test('la musica fermata e ripartita in un attimo (o al brano dopo), poi chiusa mentre suona, vince su un video fermato dopo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const chat = await home(app);
+  const inCorsa = (titolo) => app.evaluate(({ BrowserWindow }, t) => !!BrowserWindow.getAllWindows()
+    .find((w) => w._filoTabs)._filoTabs.tabs.find((x) => x.title === t)?._mediaInCorso, titolo);
+  const musica = await openTab(testServer.html(MUSICA));
+  const url = musica.url();
+  await musica.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => inCorsa('Musica')).toBe(true);
+  await suona(app, 'Musica', true);
+  // Pausa breve: il motore la sente ancora e non ridice «suona».
+  await musica.evaluate(() => document.getElementById('a').pause());
+  await expect.poll(() => inCorsa('Musica')).toBe(false);
+  await musica.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => inCorsa('Musica')).toBe(true);
+
+  await chat.waitForTimeout(1500);
+  const video = await openTab(testServer.html(MUSICA.replace('<title>Musica</title>', '<title>Video</title>')));
+  await video.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => inCorsa('Video')).toBe(true);
+  await suona(app, 'Video', true);
+  await video.evaluate(() => document.getElementById('a').pause());
+  await suona(app, 'Video', false);
+
+  await chat.waitForTimeout(1500);
+  await shell.evaluate((x) => window.filoShell.tabs.close(x), (await schede(shell)).tabs.find((t) => t.url === url).id);
+  await expect.poll(async () => (await schede(shell)).tabs.some((t) => t.url === url)).toBe(false);
+  await tornaAllaHome(shell);
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'r9', name: 'RIPRENDI_AUDIO', arguments: '{}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'rimettimi la musica');
+  await expect(chat.locator('.dash-activity').last()).toContainText('Musica', { timeout: 20_000 });
+  expect((await schede(shell)).tabs.filter((t) => t.url === url).length).toBe(1);
+  expect(await video.evaluate(() => window.__statoAudio().pausa)).toBe(true);
+  await ripristina(app);
+});
+
+test('la musica chiusa e riaperta con la scorciatoia riparte lei, senza una seconda copia', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const chat = await home(app);
+  const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
+  await musica.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => lettoreInCorsa(app)).toBe(true);
+  await suona(app, 'Musica', true);
+  await chat.waitForTimeout(500);
+  await shell.evaluate((x) => window.filoShell.tabs.close(x), (await schede(shell)).tabs.find((t) => t.url === url).id);
+  await expect.poll(() => app.evaluate(async (_e, u) => (await globalThis.SN_ARCHIVED_TABS.listMeta()).some((t) => t.url === u), url), { timeout: 10_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa());
+  await expect.poll(async () => (await schede(shell)).tabs.filter((t) => t.url === url).length, { timeout: 10_000 }).toBe(1);
+  await tornaAllaHome(shell);
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'r10', name: 'RIPRENDI_AUDIO', arguments: '{}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'rimettimi la musica');
+  const suonaUna = async () => {
+    for (const w of app.windows()) {
+      try { if (w.url() === url && !(await w.evaluate(() => window.__statoAudio().pausa))) return true; } catch (_) {}
+    }
+    return false;
+  };
+  await expect(chat.locator('.dash-activity').last()).toContainText('Musica', { timeout: 20_000 });
+  await expect.poll(suonaUna, { timeout: 15_000 }).toBe(true);
+  await chat.waitForTimeout(1500);
+  expect((await schede(shell)).tabs.filter((t) => t.url === url).length, 'una sola scheda della musica').toBe(1);
+  await ripristina(app);
+});
+
 test('«metti in pausa la musica» ferma la scheda che suona, senza chiuderla; «rimettimi la musica e portamici» la fa ripartire davanti', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
