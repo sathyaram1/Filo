@@ -26,6 +26,7 @@ function custoditi({ impostazioni = [], chiaveFeedback = null, env = process.env
     const v = typeof valore === 'string' ? valore.trim() : '';
     if (v.length < G.segretoDi({ valore: v, password }).min || visti.has(v)) return;
     visti.add(v);
+    if (password) G.segnaPassword(v);
     out.push(password ? { valore: v, tipo, password: true } : { valore: v, tipo });
   };
   // Prima i moduli che danno il nome giusto: la chiave personale sta anche fra le effettive.
