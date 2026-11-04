@@ -1468,6 +1468,21 @@
     .mg-fiducia-btn[aria-pressed="true"]:not(:disabled):hover {
       background: color-mix(in srgb, var(--sn-accent) 22%, var(--sn-bg, transparent));
     }
+    /* Le radici accanto a «Segna fidato»: piccole come un'etichetta; timbrata = la tinta della delega, piena. */
+    .mg-radici { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
+    .mg-radici[hidden] { display: none; }
+    .mg-radice {
+      all: unset; cursor: pointer; font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 999px;
+      border: 1px dashed var(--sn-border); color: var(--sn-muted);
+      transition: background var(--sn-dur, 120ms), border-color var(--sn-dur, 120ms), color var(--sn-dur, 120ms);
+    }
+    .mg-radice:not(:disabled):hover { border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover); }
+    .mg-radice:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
+    .mg-radice[aria-pressed="true"] {
+      border-style: solid; border-color: var(--sn-accent); color: var(--sn-accent);
+      background: color-mix(in srgb, var(--sn-accent) 12%, var(--sn-bg, transparent));
+    }
+    .mg-radice:disabled { cursor: default; opacity: .7; }
 
     /* «server»: la tinta del muted, perché non è un allarme né una delega, dice solo dove si lavora. */
     .mg-local-badge {
@@ -2167,6 +2182,8 @@
                     <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
                        premuto = fidato, e un clic la toglie. Testi e visibilità dal JS. -->
                     <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" aria-pressed="false" hidden>🤝 Segna fidato</button>
+                    <!-- Le radici della fiducia (#1918): i testi esterni da cui discende, ognuna si timbra da sé. Dal JS. -->
+                    <span class="mg-radici" id="mgRadici" hidden></span>
                   </div>
                 </div>
                 </div>

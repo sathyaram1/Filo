@@ -175,6 +175,7 @@
   // Preferito ⭐ (owner-only): flag in chiaro, indipendente dallo stato.
   const mgManage     = document.getElementById('mgManage');
   const mgFiduciaBtn = document.getElementById('mgFiduciaBtn');
+  const mgRadici = document.getElementById('mgRadici');
   const mgAtteseToggle = document.getElementById('mgAtteseToggle');
   const mgAttese       = document.getElementById('mgAttese');
   const mgAtteseLista  = document.getElementById('mgAtteseLista');
@@ -1575,6 +1576,7 @@
   const ROUTINE_LOG_GET = (window.SN_MSG?.MSG?.ROUTINE_LOG_GET) || 'routine_log_get';
   const MERGE_APPROVALS_GET = (window.SN_MSG?.MSG?.MERGE_APPROVALS_GET) || 'merge_approvals_get';
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
+  const FIDUCIA_RADICI = (window.SN_MSG?.MSG?.FIDUCIA_RADICI) || 'fiducia_radici';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
   const MERGE_APPROVAL_RIAPRI = (window.SN_MSG?.MSG?.MERGE_APPROVAL_RIAPRI) || 'merge_approval_riapri';
@@ -3783,6 +3785,89 @@
     mgFiduciaBtn.setAttribute('aria-pressed', on ? 'true' : 'false');
     mgFiduciaBtn.textContent = on ? '🤝 Fidato' : '🤝 Segna fidato';
     mgFiduciaBtn.title = on ? titoloTogliFiducia(fb) : titoloFiducia(fb);
+    reflectRadici(fb);
+  }
+
+  // ── Le radici della fiducia (#1918, SPEC-DOMANDE.md §1.8) ─────────────────
+  // Accanto a «Segna fidato»: i testi esterni da cui discende la pratica. Il timbro va sulla radice, una volta, e il
+  // server ricalcola tutto ciò che la porta. Le dice solo il server (i timbri non li legge un client).
+  const radiciLette = new Map();
+  function etichettaRadice(x) {
+    if (x.tipo === 'legacy') return 'nato prima';
+    if (x.tipo === 'ignota') return 'provenienza ignota';
+    if (x.tipo === 'feedback') return `#${x.valore}`;
+    if (x.tipo === 'web') {
+      try { return new URL(x.valore).hostname || 'pagina web'; } catch (_) { return 'ricerca web'; }
+    }
+    return { posta: 'posta', file: 'file esterno', mcp: `strumento ${x.valore}`, esterno: 'esterno' }[x.tipo] || x.tipo;
+  }
+  function titoloRadice(x) {
+    const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'
+      : x.tipo === 'ignota' ? 'Il server non sa da dove viene: nessun timbro la toglie.'
+        : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.valore}: leggilo prima di timbrarlo.`
+          : `${x.valore}: guardalo prima di timbrarlo.`;
+    if (x.tipo === 'ignota') return cosa;
+    const effetto = x.tipo === 'legacy' ? 'Un clic timbra in blocco tutto ciò che è nato prima' : 'Un clic la timbra per tutto ciò che la porta';
+    return x.timbrata ? `${cosa} Timbrata: un clic toglie il timbro, ovunque.` : `${cosa} ${effetto}.`;
+  }
+  function disegnaRadici(fb, lista) {
+    if (!mgRadici) return;
+    mgRadici.textContent = '';
+    for (const x of lista) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mg-radice';
+      b.dataset.radice = x.radice;
+      b.textContent = `${x.timbrata ? '✓ ' : ''}${etichettaRadice(x)}`;
+      b.title = titoloRadice(x);
+      b.setAttribute('aria-pressed', x.timbrata ? 'true' : 'false');
+      b.disabled = x.timbrabile === false;
+      b.addEventListener('click', () => timbraRadice(fb, x));
+      mgRadici.appendChild(b);
+    }
+    mgRadici.hidden = !lista.length;
+  }
+  async function reflectRadici(fb) {
+    if (!mgRadici) return;
+    if (!isAdmin || !fb || !mgFiduciaBtn || mgFiduciaBtn.hidden) { mgRadici.hidden = true; return; }
+    const id = fb._id;
+    const gia = radiciLette.get(id);
+    if (gia) { disegnaRadici(fb, gia); return; }
+    mgRadici.hidden = true;
+    const r = await sendToMain({ type: FIDUCIA_RADICI, feedbackId: id }).catch(() => null);
+    // Un server di prima non le sa dire: il cartellino non c'è, il tasto resta.
+    if (!r || r.ok === false || !Array.isArray(r.radici)) return;
+    radiciLette.set(id, r.radici);
+    if (selectedId !== id) return;
+    // Un timbro dato altrove può averla resa fidata (o tolta): la pagina lo dice subito, la rilettura porterà lo stesso.
+    const ora = allFeedbacks.find((f) => f._id === id) || fb;
+    if (MR.isFidato(ora) !== (r.fiducia === 'fidato')) {
+      ora.fiducia = r.fiducia;
+      reflectFiducia(ora);
+      renderList();
+      updateTabCounts();
+      return;
+    }
+    disegnaRadici(ora, r.radici);
+  }
+  async function timbraRadice(fb, x) {
+    if (!x || x.timbrabile === false) return;
+    const togli = x.timbrata === true;
+    const nome = etichettaRadice(x);
+    for (const b of mgRadici ? mgRadici.querySelectorAll('.mg-radice') : []) b.disabled = true;
+    setManageMsg(togli ? `Tolgo il timbro a «${nome}»…` : `Timbro «${nome}»…`, '');
+    try {
+      const r = await sendToMain(Object.assign({ type: FIDUCIA_SEGNA, radice: x.radice }, togli ? { fidato: false } : {}));
+      if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
+      const n = Object.values(r.cambiati || {}).reduce((a, v) => a + (Number(v) || 0), 0);
+      // Il ricalcolo tocca altre pratiche: le radici lette prima non valgono più, e la lista si rilegge.
+      radiciLette.clear();
+      setManageMsg(`${togli ? `Timbro tolto a «${nome}»` : `«${nome}» timbrata`}: ${n === 1 ? 'una cosa ha cambiato fiducia' : `${n} cose hanno cambiato fiducia`}.`, 'ok');
+    } catch (e) {
+      setManageMsg(`${togli ? 'Timbro non tolto' : 'Non timbrata'}: ${e.message || 'Errore'}`, 'err');
+    } finally {
+      if (selectedId === fb._id) reflectRadici(allFeedbacks.find((f) => f._id === fb._id) || fb);
+    }
   }
   async function impostaFiducia(id, valore) {
     const fb = allFeedbacks.find((f) => f._id === id);
@@ -3796,7 +3881,8 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
       // Il server l'ha scritto: la rilettura porterà lo stesso valore, intanto la pagina lo dice subito.
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
-      ora.fiducia = valore ? 'fidato' : 'non_fidato';
+      ora.fiducia = r.fiducia === 'fidato' || r.fiducia === 'non_fidato' ? r.fiducia : (valore ? 'fidato' : 'non_fidato');
+      radiciLette.delete(id);
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
       // Chi aspettava la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358).
       if (r.rimessoInCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
