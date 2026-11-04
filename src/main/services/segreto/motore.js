@@ -1416,19 +1416,17 @@ class Segreto {
     const n = normalizzaNomeFile(nome);
     const buf = comeBuffer(dati);
     return this.#op(async (ctx, S) => {
-      const ora = Date.now();
-      let piano = pianoScrittura(S, libere(ctx), n, buf.length, ora);
-      if (!piano && S.tabella.has(n) && pianoScrittura(S, libere(ctx), n, buf.length, ora, { senzaVecchio: true })) {
-        await cancellaDentro(ctx, S, n);
-        piano = pianoScrittura(S, libere(ctx), n, buf.length, ora);
-      }
-      if (!piano) {
-        const disponibili = massimoScrivibile(S, libere(ctx), n);
-        throw errore('SPAZIO', `Non c’è spazio: servono ${buf.length} byte, ne restano ${disponibili}.`, { servono: buf.length, disponibili, prima: true });
-      }
+      const piano = pianoScrittura(S, libere(ctx), n, buf.length, Date.now());
+      if (!piano) throw await rifiutoSpazio(ctx, S, n, buf.length);
       const dati2 = new Map();
-      piano.blocchiFile.forEach((j, x) => dati2.set(j, buf.subarray(x * CARICO, (x + 1) * CARICO)));
-      await transazione(ctx, S, piano, dati2);
+      if (piano.pacco) dati2.set(piano.pacco.j, await caricoPacco(ctx, S, piano.pacco, buf));
+      else piano.blocchiFile.forEach((j, x) => dati2.set(j, buf.subarray(x * CARICO, (x + 1) * CARICO)));
+      try {
+        await transazione(ctx, S, piano, dati2);
+      } catch (e) {
+        if (e.senzaNumeri) throw await rifiutoSpazio(ctx, S, n, buf.length);
+        throw e;
+      }
     });
   }
 
