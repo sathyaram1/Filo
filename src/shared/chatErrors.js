@@ -272,6 +272,19 @@
 
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
   // a mano perde il codice, e la frase già scritta torna generica (#663).
+  // Quello che di un errore viaggia verso le pagine perché fromResponse ricomponga frase e tasto: un posto solo, per
+  // ogni canale (ipc, chat della home).
+  function dettagliDelTetto(err) {
+    if (!err) return {};
+    return {
+      ...(Number(err.maxTokens) > 0 ? { maxTokens: Number(err.maxTokens) } : {}),
+      ...(Number(err.finestra) > 0 ? { finestra: Number(err.finestra) } : {}),
+      ...(err.memoria ? { memoria: true } : {}),
+      ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
+      ...(err.reason === 'crediti' ? { reason: 'crediti' } : {}),
+    };
+  }
+
   function fromResponse(res, fallbackMessage) {
     const e = new Error(String((res && res.error) || fallbackMessage || ''));
     if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
