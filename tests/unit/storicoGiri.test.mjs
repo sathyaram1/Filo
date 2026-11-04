@@ -1,5 +1,5 @@
 // Lo storico dei giri dei lavori chiusi (#795): lo script dell'owner stampa ogni giro coi suoi numeri e i totali per
-// livello e per esito; la finestra di date si legge senza sorprese; le app non leggono lo storico. Rete finta.
+// livello e per esito; la finestra di date si legge senza sorprese; nell'app lo legge solo l'owner, dal main. Rete finta.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
