@@ -243,6 +243,7 @@
         await leggiSaldo();
         if (activeRoot !== root) return;
         refreshSendState();
+        if (sendBtn.disabled) return;
       }
       const attackText = attackEl.value.trim();
       const description = descEl.value.trim();
