@@ -199,8 +199,16 @@ function formeLibere(testo) {
   for (const m of l.matchAll(LIBERE.accedi)) out.push(...forma(m[2]));
   for (const m of l.matchAll(LIBERE.rete)) out.push(...forma(m[2]));
   for (const m of l.matchAll(LIBERE.chiaveRete)) out.push(...valore(m[1]));
-  for (const m of l.matchAll(LIBERE.corte)) out.push(...X.segretiDetti(`password ${l.slice(m.index + m[0].length, m.index + m[0].length + 200)}`));
-  for (const m of l.matchAll(LIBERE.virgola)) out.push(...valore(m[1]));
+  for (const m of l.matchAll(LIBERE.corte)) {
+    const coda = l.slice(m.index + m[0].length, m.index + m[0].length + 200);
+    const pw = /^pw$/u.test(m[0]);
+    for (const v of X.segretiDetti(`password ${coda}`)) {
+      const s = valoreDi(v);
+      const fra = coda.slice(0, Math.max(0, coda.indexOf(s)));
+      if (forma(s).length || PRESENTATA.test(fra) || (pw && ACCANTO.test(fra))) out.push(v);
+    }
+  }
+  for (const m of l.matchAll(LIBERE.virgola)) out.push(...forma(m[1]));
   return out;
 }
 
