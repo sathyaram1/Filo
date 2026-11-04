@@ -470,7 +470,7 @@
       if (!Coda) throw codeError('Coda dei lavori non caricata', 'GATE_METHOD');
       const lista = await custoditi();
       const G = global.SN_GUARDIANO_STATICO;
-      const oscura = (v, valori = lista.map((x) => x.valore)) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
+      const oscura = (v, valori = lista) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
       const prima = (Array.isArray(requests) ? requests : []).map((r) => ({ state: r && r.state, questions: r && r.questions }));
       const richieste = prima.map((r) => ({ state: oscura(r.state), questions: oscura(r.questions) }));
       const toglie = (valori) => prima.some((r) => oscura(r.state, valori) !== r.state || oscura(r.questions, valori) !== r.questions);
