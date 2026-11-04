@@ -1148,6 +1148,20 @@
     return { credenziali: m[2], password: i >= 0 ? m[2].slice(i + 1) : '', senza: (m[1] || '') + t.slice(m[0].length) };
   }
 
+  // I valori segreti di un proxy, gli stessi per uscite, modelli ed esportazione (#2134): la coppia utente:password e
+  // la password com'è scritta e decodificata. `password: true` le dà la soglia di lunghezza delle password. PURA.
+  function segretiDelProxy(v) {
+    const c = credenzialiProxy(v);
+    if (!c) return [];
+    const out = [{ valore: c.credenziali }];
+    if (!c.password) return out;
+    out.push({ valore: c.password, password: true });
+    let chiara = c.password;
+    try { chiara = decodeURIComponent(c.password); } catch (_) {}
+    if (chiara !== c.password) out.push({ valore: chiara, password: true });
+    return out;
+  }
+
   // I posti dei segreti dell'utente nelle impostazioni, come [oggetto, campo]: l'esportazione li porta solo se
   // chiesto (#905), i segreti custoditi li tengono fuori da uscite e prompt (#2134). Un proxy con utente e password
   // vale quanto una chiave API. PURA.
