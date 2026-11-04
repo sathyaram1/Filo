@@ -722,24 +722,48 @@
       || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
     return { finestra, testo };
   }
+  // Il tetto più alto che l'host dice di reggere, quando lo scrive («max_tokens > 8192», «must be <= 4096»).
+  const LIMITE_DICHIARATO = /max[_ ]?(?:new[_ ])?tokens`?[^0-9]{0,40}?(?:>|<=|≤|at most|less than or equal to|up to|maximum (?:is|of)|limit (?:is|of))\s*([\d.,]+)/i;
   // Il tetto è la causa quando ne prende più di metà finestra, o quando il testo da solo ci starebbe: un rifiuto per
-  // un testo che da solo non ci sta resta di contesto. `stringibile`: la chat può anche accorciare la conversazione.
+  // un testo che da solo non ci sta resta di contesto. `stringibile`: la chat può anche accorciare la conversazione;
+  // `memoria`: testo più tetto superano la memoria del modello, anche senza le misure (#1302).
   function causaTetto(status, errText, maxTokens) {
     if (!maxTokens || ![400, 404, 413, 422].includes(status)) return null;
     const s = String(errText || '');
     if (/unsupported (?:parameter|value)/i.test(s)) return null;
     const sforo = sforoDiFinestra(s, maxTokens);
-    if (!sforo) return RIFIUTO_TETTO.test(s) ? {} : null;
+    if (!sforo) {
+      if (!RIFIUTO_TETTO.test(s)) return null;
+      const limite = numeroIn(s, LIMITE_DICHIARATO);
+      return { ...(limite && limite < maxTokens ? { limite } : {}), ...(/\btools?\b/i.test(s) ? { strumenti: true } : {}) };
+    }
     const { finestra, testo } = sforo;
-    if (finestra && maxTokens > finestra / 2) return { finestra };
-    if (finestra && testo && testo < finestra) return { finestra, stringibile: true };
+    if (!finestra) return { memoria: true, stringibile: true };
+    if (maxTokens > finestra / 2) return { finestra, memoria: true, ...(testo ? { testo } : {}) };
+    if (testo && testo < finestra) return { finestra, testo, memoria: true, stringibile: true };
     return null;
   }
 
-  // Un «nessun host per i parametri chiesti» con gli strumenti e un tetto: gli host dichiarati dicono quale dei due manca.
-  // false: nessun host ammesso regge gli strumenti, il tetto non c'entra; true: li reggono, ma nessuno fino a quel
-  // tetto; null: non si sa, e la frase li nomina tutti e due.
-  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey = false }) {
+  // Sotto questo tetto una risposta non vale la richiesta: meglio dirlo che rispondere a metà frase.
+  const TETTO_MINIMO = 1024;
+  // Quello che si toglie alla finestra oltre al testo: la stima del router e quella dell'host non coincidono al token.
+  const MARGINE_FINESTRA = 256;
+  // Il tetto con cui rifare una richiesta rifiutata per il tetto (#1302): il massimo che regge, invece di fallire.
+  // 0 = senza tetto (l'host usa il suo massimo); null = non si rifà. `hostMax`: il più alto degli host utili, se noto.
+  function tettoDaRiprovare(perTetto, maxTokens, hostMax) {
+    const sotto = (n) => (Number.isFinite(n) && n >= TETTO_MINIMO && n < maxTokens ? Math.floor(n) : null);
+    if (perTetto.limite) return sotto(perTetto.limite);
+    if (perTetto.memoria) {
+      if (perTetto.finestra && perTetto.testo) return sotto(perTetto.finestra - perTetto.testo - MARGINE_FINESTRA);
+      if (perTetto.finestra) return sotto(perTetto.finestra / 2);
+      return sotto(maxTokens / 4);
+    }
+    if (hostMax != null) return Number.isFinite(hostMax) ? sotto(hostMax) : null;
+    return 0;
+  }
+
+  // Gli host ammessi e utili (con gli strumenti, se servono) e cosa dicono di sé; null se l'elenco non si legge.
+  async function hostUtili({ apiKey, model, providerRouting, tools, ownKey = false }) {
     let hosts = null;
     try { hosts = await modelHosts({ apiKey, model }); } catch (_) { hosts = null; }
     if (!Array.isArray(hosts) || !hosts.length) return null;
@@ -747,10 +771,24 @@
     const excluded = excludedFor(providerRouting, ownKey);
     const ammessi = C && typeof C.hostPolicyViolation === 'function'
       ? hosts.filter((h) => !C.hostPolicyViolation(h, model, excluded)) : hosts;
-    if (ammessi.some((h) => h.tools == null || h.maxOut == null)) return null;
-    const utili = tools ? ammessi.filter((h) => h.tools) : ammessi;
-    if (!utili.length) return tools ? false : null;
-    return utili.every((h) => h.maxOut < maxTokens) ? true : (tools ? null : false);
+    const noti = ammessi.filter((h) => h.tools != null && h.maxOut != null);
+    const utili = tools ? noti.filter((h) => h.tools) : noti;
+    const maxOut = utili.length ? Math.max(...utili.map((h) => h.maxOut)) : null;
+    return { ammessi, utili, maxOut, tuttiNoti: noti.length === ammessi.length };
+  }
+
+  // Un «nessun host per i parametri chiesti» con un tetto: gli host dichiarati dicono di chi è la colpa.
+  // 'strumenti': nessun ammesso li regge; 'tetto': li reggono, ma nessuno fino a quel tetto; 'altro': uno regge
+  // strumenti e tetto, quindi il router rifiuta per un altro parametro; null: non si sa (elenco illeggibile, o un host
+  // che non dichiara cosa regge), e lo dice il tentativo senza tetto (#1302).
+  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey = false }) {
+    const h = await hostUtili({ apiKey, model, providerRouting, tools, ownKey });
+    if (!h) return { colpa: null, maxOut: null };
+    const reggono = h.utili.some((x) => x.maxOut >= maxTokens);
+    if (reggono) return { colpa: 'altro', maxOut: h.maxOut };
+    if (!h.tuttiNoti) return { colpa: null, maxOut: null };
+    if (!h.utili.length) return { colpa: tools ? 'strumenti' : null, maxOut: null };
+    return { colpa: 'tetto', maxOut: h.maxOut };
   }
 
   // L'host che ha dato l'errore, quando il router lo dice (`error.metadata.provider_name`): lo contano i contatori (#969).
