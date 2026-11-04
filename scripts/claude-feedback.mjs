@@ -302,7 +302,6 @@ export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiP
     if (dentro.length) motivi.push(`${n} è già nel pacchetto ${dentro.map((x) => `#${x}`).join(', ')}: due pacchetti farebbero lo stesso lavoro`);
     if (u.priorita === 3) motivi.push(`${n} ha priorità 3: si lavora subito e da sola, fuori dai pacchetti`);
     if (u.locale) motivi.push(`${n} è un lavoro locale: nessuna routine la prende, e nel pacchetto resterebbe ferma`);
-    if ((u.attese || []).length >= MAX) motivi.push(`${n} aspetta già ${MAX} feedback: un'attesa in più non ci sta`);
     if (aspetta.includes(String(u.num))) motivi.push(`${n} è anche fra quelli che il pacchetto aspetta: si aspetterebbero a vicenda`);
   }
   return motivi;
