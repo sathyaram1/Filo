@@ -9,8 +9,7 @@ import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import vm from 'node:vm';
-import { prossimaVersione, CAMPO } from '../helpers/prossimaVersione.mjs';
+import { prossimaVersione, CAMPO, aggiunteSottoUscite as aggiunte, registroDa } from '../../scripts/lib/novita-in-cima.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -45,24 +44,11 @@ const righeDi = (notes) => notes.flatMap(righe);
 function registroA(ref) {
   const src = execFileSync('git', ['show', `${ref}:src/shared/patchNotes.js`],
     { cwd: ROOT, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
-  const sandbox = {};
-  vm.runInNewContext(src, sandbox);
-  return sandbox.SN_PATCH_NOTES.NOTES;
+  return registroDa(src);
 }
 
-// Le righe che `dopo` aggiunge rispetto a `prima` sotto le versioni fino a `uscita` compresa. Si contano le righe
-// per blocco: riscrivere una riga già uscita o spostarla nel blocco della prossima versione resta lecito.
-function aggiunteSottoUscite(prima, dopo, uscita) {
-  const vecchie = new Map(prima.map((n) => [n.version, righe(n)]));
-  const out = [];
-  for (const n of dopo) {
-    if (PN.cmpVersion(n.version, uscita) > 0) continue;
-    const prec = vecchie.get(n.version) || [];
-    if (righe(n).length <= prec.length) continue;
-    for (const r of righe(n)) if (!prec.includes(r)) out.push({ version: n.version, riga: r });
-  }
-  return out;
-}
+// Il confronto delle righe vive con lo strumento che le riporta in cima: qui conta solo blocco e testo.
+const aggiunteSottoUscite = (prima, dopo, uscita) => aggiunte(prima, dopo, uscita).map(({ version, riga }) => ({ version, riga }));
 
 function conNote(notes, fn) {
   const salvate = PN.NOTES.splice(0, PN.NOTES.length, ...notes);
@@ -138,7 +124,8 @@ test('nessuna riga nuova sotto una versione già uscita (#432)', (t) => {
   const sbagliate = aggiunteSottoUscite(prima, PN.NOTES, pkg.version);
   assert.deepEqual(sbagliate, [],
     `righe aggiunte sotto versioni già uscite (l'app è alla ${pkg.version}): chi ha già quella versione non le vedrà mai. `
-    + `Spostale nel blocco ${prossimaVersione(pkg).versione || 'della prossima versione'} in cima al registro:\n`
+    + `Spostale nel blocco ${prossimaVersione(pkg).versione || 'della prossima versione'} in cima al registro `
+    + '(lo fa `node scripts/novita-in-cima.mjs --commit`):\n'
     + sbagliate.map((s) => `  ${s.version}: ${s.riga.slice(0, 100)}`).join('\n'));
 });
 

@@ -10,7 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { applicaVersione, applicaVersioneAlLock, confrontaVersioni } from '../../scripts/release-apply-version.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { prossimaVersione } from '../helpers/prossimaVersione.mjs';
+import { prossimaVersione } from '../../scripts/lib/novita-in-cima.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const PKG = readFileSync(join(ROOT, 'package.json'), 'utf8');
