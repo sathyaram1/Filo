@@ -3112,6 +3112,19 @@
              posteriori, con l'elenco intero. -->
           <div class="mg-merge-approvals-recent" id="mgMergeApprovalsPreapproved" hidden></div>
         </div>
+
+        <!-- Lo storico dei giri di verifica dei lavori chiusi (#795, #1926): solo numeri, mai il testo dei rilievi. -->
+        <div class="mg-log-col mg-gi" id="mgGiri" hidden>
+          <h2>Giri di verifica</h2>
+          <form class="mg-cp-scelte" id="mgGiriForm" autocomplete="off" novalidate>
+            <label class="mg-cp-scelta">Dal <input type="date" id="mgGiriDa" class="mg-cr-data" /></label>
+            <label class="mg-cp-scelta">Al <input type="date" id="mgGiriA" class="mg-cr-data" /></label>
+            <button type="submit" class="sn-btn sn-btn-secondary" id="mgGiriLeggi">Leggi</button>
+            <span class="mg-action-msg" id="mgGiriMsg" role="status"></span>
+          </form>
+          <div class="mg-gi-totali" id="mgGiriTotali"></div>
+          <ul class="mg-ac-lista" id="mgGiriLavori"></ul>
+        </div>
       </div>
     </section>
 
