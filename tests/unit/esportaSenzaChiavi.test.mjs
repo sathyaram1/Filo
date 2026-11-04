@@ -131,3 +131,12 @@ test('quando ci sono segreti da includere: chiavi piene, proxy con utente e pass
   assert.equal(C.haSegreti({ security: { safeBrowse: { safeBrowsingKey: SAFE } } }), true);
   assert.equal(C.haSegreti(null), false);
 });
+
+// La scheda accetta il proxy anche senza schema (proxyTab.endpointFor): utente e password lì sono segreti uguali.
+test('un proxy «utente:password@host:porta», senza schema, esce col solo indirizzo', () => {
+  const dati = sorgente();
+  dati.settings.proxy.datacenter = 'utente-x:password-senza-schema@gate.example.com:7000';
+  const zip = buildExportZip(dati);
+  assert.equal(zip.includes(Buffer.from('password-senza-schema')), false);
+  assert.equal(readExportZip(zip).data.settings.proxy.datacenter, 'gate.example.com:7000');
+});
