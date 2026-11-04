@@ -118,21 +118,6 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
   // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
   await entraFinto(app, shell);
   const page = await home(openTab);
-    const M = process.getBuiltinModule('module');
-    const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
-    const ga = M._cache[k].exports;
-    ga.isSignedIn = () => true;
-    ga.getUid = async () => 'uid-1';
-    ga.getProfile = () => ({ name: 'Mario Rossi', email: 'mario@example.it' });
-    ga.isRemembered = () => true;
-  });
-  await app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    w.webContents.send('filo:broadcast', {
-      type: 'auth_changed', signedIn: true, profile: { name: 'Mario Rossi', email: 'mario@example.it' },
-    });
-  });
-  const page = await home(openTab);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.setZoomFactor(1.5);
