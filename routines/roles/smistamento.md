@@ -135,5 +135,4 @@ rilascia senza esito, e al terzo tentativo la domanda arriva all'owner com'è.
 
 ## Se si rompe qualcosa
 
-Vale la sezione sul guasto qui sotto: lo dichiari nel rilascio, e la domanda
-torna in coda da sé, come un rilascio senza esito.
+Vale la sezione sul guasto qui sotto.
