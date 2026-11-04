@@ -4,6 +4,7 @@
 import { createServer } from 'node:http';
 import { test, expect } from '../../fixtures/electron.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
+import { statoDi } from '../../helpers/riquadri.mjs';
 
 const UTENTE_EMAIL = 'utente@prova.test';
 const RT_URL = 'filo://redteam/redteam.html';
@@ -90,4 +91,31 @@ test('r1 riscattato il codice, la scheda già aperta ha la voce al primo tasto d
   const menu = menuDi(page).locator('.sn-menu').first();
   await expect(menu).toBeVisible();
   await expect(menu.locator('.sn-menu-item', { hasText: 'Invia attacco' })).toBeVisible();
+});
+
+test('r1 riscattato il codice, «Invia attacco» dentro un riquadro incorporato apre il pannello', async ({ app, openTab, testServer }) => {
+  expect(await entra(app)).toBe(true);
+  const dentro = testServer.html('<!doctype html><html><body style="margin:0"><h1 id="t" style="height:150px">dentro</h1></body></html>');
+  const page = await openTab(testServer.html(`<!doctype html><html><body><h1 id="fuori">fuori</h1><iframe id="f" src="${dentro}" style="width:600px;height:300px"></iframe></body></html>`));
+  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
+  await page.waitForTimeout(800);
+
+  const rt = await openTab(RT_URL);
+  await rt.locator('#redeemCode').fill('ABCD-EFGH');
+  await rt.locator('#redeemHandle').fill('io');
+  await rt.locator('#redeemBtn').click();
+  await expect(rt.locator('#statsContent')).toBeVisible();
+
+  await page.bringToFront();
+  const fr = page.frameLocator('#f');
+  // Due volte: la voce c'è di sicuro, anche se la scheda l'ha saputo solo alla prima apertura.
+  await fr.locator('#t').click({ button: 'right' });
+  await page.waitForTimeout(500);
+  await page.keyboard.press('Escape');
+  await page.waitForTimeout(400);
+  await fr.locator('#t').click({ button: 'right' });
+  const voce = fr.locator('.sn-menu-item', { hasText: 'Invia attacco' });
+  await expect(voce).toBeVisible();
+  await voce.click();
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-attack'))?.visibile, { timeout: 5000 }).toBe(true);
 });
