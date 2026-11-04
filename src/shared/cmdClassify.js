@@ -80,11 +80,17 @@
   // Metacaratteri che rendono il comando composto o non riconoscibile → 3.
   const CHAIN_RE = /[|;&`<>]|\$\(|\$\{|\r|\n/;
 
+  // I programmi che cancellano senza cestino: un elenco solo, per il costo (sempre 3) e per la parola (#1909).
+  const CANCELLANO = new Set([
+    'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred', 'srm', 'wipe', 'rimraf',
+    'remove-item', 'ri', 'clear-recyclebin', 'format', 'diskpart',
+  ]);
+
   // Codice arbitrario o distruzione di stato: SEMPRE 3, controllati per primi, backstop
   // anche se finissero in una whitelist.
   const ALWAYS_3 = new Set([
-    'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred',
-    'format', 'mkfs', 'fdisk', 'diskpart', 'dd', 'shutdown', 'reboot',
+    ...CANCELLANO,
+    'mkfs', 'fdisk', 'diskpart', 'dd', 'shutdown', 'reboot',
     'restart', 'halt', 'poweroff', 'kill', 'killall', 'taskkill', 'pkill',
     'reg', 'regedit', 'sc', 'net', 'netsh', 'fsutil', 'bcdedit', 'mklink',
     'chmod', 'chown', 'chgrp', 'attrib', 'icacls', 'takeown',
@@ -1797,29 +1803,43 @@
   // Cancellare senza cestino (#1909): un comando che lo fa vuole la parola «conferma» a ogni livello, come ogni «per
   // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec` e negli scriptblock):
   // sbagliare per eccesso costa una parola da scrivere, per difetto il comando resta comunque al costo più alto.
-  const CANCELLANO = new Set([
-    'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred', 'srm', 'wipe', 'rimraf',
-    'remove-item', 'ri', 'clear-recyclebin', 'format', 'diskpart',
-  ]);
+  // Chi lancia un altro comando, e le parole di shell che lo precedono (`for …; do rm`, `if …; then rm`): dopo di loro si
+  // guarda il comando che segue.
   const DAVANTI = new Set(['sudo', 'doas', 'nohup', 'time', 'env', 'nice', 'ionice', 'xargs', 'command', 'builtin', 'exec',
-    'start', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call']);
+    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call',
+    'do', 'then', 'else']);
+  // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
+  const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
+  const nomeProgramma = (tok) => String(tok || '').split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
   function cancellaPerSempre(cmd) {
     if (typeof cmd !== 'string' || !cmd.trim()) return false;
     const t = cmd.replace(/[‘-‟'"`^]/g, '').toLowerCase();
-    if (/(?:\.|::)delete\s*\(/.test(t)) return true;
+    if (CANCELLA_IN_UNO_SCRIPT.test(t)) return true;
     for (const pezzo of t.split(/[;&|(){}\r\n]|\s-(?:exec|execdir|ok|okdir)\s/)) {
-      const tok = pezzo.trim().split(/\s+/).filter(Boolean);
+      // `$x = Remove-Item …`: l'assegnazione davanti non cambia il comando.
+      const tok = pezzo.replace(/^\s*(?:\[[\w.]+\]\s*)?\$[\w:]+\s*=\s*/, '').trim().split(/\s+/).filter(Boolean);
       let i = 0;
       while (i < tok.length) {
-        const prog = tok[i].split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
+        const prog = nomeProgramma(tok[i]);
         const resto = tok.slice(i + 1);
         if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
         if (prog === 'find' && resto.includes('-delete')) return true;
         if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
         if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
+        // `gci | ForEach-Object Delete`, `% Delete`: il metodo che cancella chiamato per nome.
+        if (/^(foreach-object|foreach|%)$/.test(prog) && resto.filter((x) => !x.startsWith('-'))[0] === 'delete') return true;
+        // forfiles lancia quello che sta dopo `/c`.
+        if (prog === 'forfiles') { const c = resto.indexOf('/c'); if (c < 0) break; i += c + 2; continue; }
         if (!DAVANTI.has(prog)) break;
         i += 1;
-        while (i < tok.length && (/^-|^\/[a-z?]{1,2}$/.test(tok[i]) || /^\w+=/.test(tok[i]))) i += 1;
+        let opzione = false;
+        while (i < tok.length && (/^-|^\/[a-z?]{1,2}$/.test(tok[i]) || /^\w+=/.test(tok[i]))) { opzione = true; i += 1; }
+        // `sudo -u root rm`: un'opzione può portarsi dietro un valore, e il comando viene dopo.
+        const dopo = nomeProgramma(tok[i]);
+        if (opzione && i + 1 < tok.length && !CANCELLANO.has(dopo) && !DAVANTI.has(dopo)) {
+          const poi = nomeProgramma(tok[i + 1]);
+          if (CANCELLANO.has(poi)) return true;
+        }
       }
     }
     return false;

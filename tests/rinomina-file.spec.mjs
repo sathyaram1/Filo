@@ -684,3 +684,14 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// Perché un file resta com'è: le stesse parole che usa il cestino. Un file nascosto non «sta fuori» dalla cartella personale.
+test('in chat, un file nascosto della cartella personale non si rinomina, e il perché dice che è nascosto', async ({ app }) => {
+  const dir = cartellaInCasa('filo-nomi-nascosto-');
+  const nascosto = join(dir, '.scan_00231.pdf');
+  writeFileSync(nascosto, BOLLETTA);
+  const r = await app.evaluate((_e, p) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'RINOMINA_FILE', percorsi: [p] }), nascosto);
+  expect(r.executed).toBe(false);
+  expect(r.output.saltati.map((x) => x.perche)).toEqual(['è un file nascosto o di un programma']);
+  expect(existsSync(nascosto)).toBe(true);
+});

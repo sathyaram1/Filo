@@ -3,11 +3,11 @@
 // «per sempre». Il modello è finto: chiama lo strumento col percorso che gli darebbe l'utente.
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
-import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
-import { cartellaInCasa } from './helpers/percorsi.mjs';
+import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
+import { cartellaInCasa, cartellaTemporanea } from './helpers/percorsi.mjs';
 import { writeFileSync, existsSync, rmSync, mkdirSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, basename } from 'node:path';
 
 const SHOTS = join(process.cwd(), 'tests', '.shots');
 const execAction = (app, action, opts) =>
@@ -156,4 +156,78 @@ test('un comando del terminale che cancella senza cestino vuole la parola «conf
   expect(r.needsConfirm, 'il riquadro grave, con la parola').toBe(3);
   expect(r.describe).toContain('Perché te lo chiedo: cancella per sempre, senza passare dal cestino');
   expect(existsSync(file)).toBe(true);
+});
+
+// All'OK si sposta solo quello che il riquadro ha mostrato, e ogni percorso si ricontrolla: un elenco cambiato dopo la
+// domanda non porta via un file fuori dalla cartella personale, nascosto o mai mostrato.
+test('all\'OK vale l\'elenco mostrato, ricontrollato: un percorso fuori, nascosto o cambiato dopo la domanda resta dov\'è', async ({ app }) => {
+  const dir = cartellaInCasa('filo-cestino-ok-');
+  const mostrato = join(dir, `mostrato ${Date.now()}.txt`);
+  const maiMostrato = join(dir, 'mai mostrato.txt');
+  const nascosto = join(dir, '.nascosto');
+  const fuoriDir = cartellaTemporanea('filo-cestino-fuori-');
+  const fuori = join(fuoriDir, 'fuori.txt');
+  for (const f of [mostrato, maiMostrato, nascosto, fuori]) writeFileSync(f, 'x');
+  const page = await home(app);
+  try {
+    const r = await execAction(app, { type: 'ELIMINA_FILE', percorsi: [mostrato] });
+    expect(r.needsConfirm).toBe(2);
+    // La conferma arriva con l'elenco mostrato a cui sono stati aggiunti altri file, e coi percorsi cambiati.
+    const forgiato = {
+      type: 'ELIMINA_FILE', percorsi: [maiMostrato],
+      _file: [{ percorso: mostrato, nome: 'mostrato.txt', tipo: 'file' }, { percorso: fuori, nome: 'fuori.txt', tipo: 'file' },
+        { percorso: nascosto, nome: '.nascosto', tipo: 'file' }, { percorso: 'relativo.txt', nome: 'relativo.txt', tipo: 'file' }],
+    };
+    const c = await page.evaluate((a) => chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), forgiato);
+    expect(existsSync(mostrato), 'il file mostrato va nel cestino').toBe(false);
+    expect(existsSync(fuori), 'fuori dalla cartella personale non si tocca').toBe(true);
+    expect(existsSync(nascosto), 'un file nascosto non si tocca').toBe(true);
+    expect(existsSync(maiMostrato), 'i percorsi cambiati dopo la domanda non contano').toBe(true);
+    expect(c.output.eliminati).toEqual([basename(mostrato)]);
+    const perche = c.output.falliti.map((x) => x.perche);
+    expect(perche).toHaveLength(2);
+    expect(perche).toEqual(expect.arrayContaining(['è un file nascosto o di un programma', 'sta fuori dalla tua cartella personale']));
+  } finally {
+    togliDalCestino(basename(mostrato));
+    rmSync(fuoriDir, { recursive: true, force: true });
+  }
+});
+
+// Riuscito, al giro dopo il modello sa che il file è nel cestino (non cancellato per sempre). Il file sparito fra la
+// domanda e il clic: il bottone lo dice.
+test('dopo il clic il modello sa che il file è nel cestino; un file sparito prima del clic dice «Non cancellato»', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaInCasa('filo-cestino-esito-');
+  const nome = `riuscito ${Date.now()}.txt`;
+  const file = join(dir, nome);
+  writeFileSync(file, 'x');
+  const page = await home(app);
+  try {
+    await modelloFinto(app, [elimina('e1', { percorsi: [file] }), { text: 'Va bene.' }]);
+    await chiedi(page, `cancella ${nome}`);
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+    await clickConfirm(page, 'ok');
+    await expect(page.locator('.dash-action-btn').filter({ hasText: `Nel cestino «${nome}»` })).toBeVisible({ timeout: 10_000 });
+    await chiedi(page, 'grazie');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15_000 }).toBeGreaterThan(1);
+    const ultimo = JSON.stringify((await chiamateAlModello(app)).at(-1));
+    expect(ultimo).toContain('Spostato nel cestino un elemento (si rimette da lì)');
+    expect(ultimo).not.toContain('Cancellato per sempre');
+  } finally {
+    await ripristina(app);
+    togliDalCestino(nome);
+  }
+
+  const sparisce = join(dir, `sparisce ${Date.now()}.txt`);
+  writeFileSync(sparisce, 'x');
+  try {
+    await modelloFinto(app, [elimina('e2', { percorsi: [sparisce] }), { text: 'Va bene.' }]);
+    await chiedi(page, `cancella ${basename(sparisce)}`);
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
+    rmSync(sparisce);
+    await clickConfirm(page, 'ok');
+    await expect(page.locator('.dash-action-btn').filter({ hasText: /Non cancellato: non c.è più/ })).toBeVisible({ timeout: 10_000 });
+  } finally {
+    await ripristina(app);
+  }
 });

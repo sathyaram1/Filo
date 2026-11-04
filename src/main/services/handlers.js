@@ -1907,6 +1907,12 @@ function esitoSistemaPerModello(o) {
   return `Collegato alla rete Wi-Fi:${acceso}\n${busta([nome])}`;
 }
 
+// Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello. Una lettura sola per
+// memorie, conversazioni e file, o una delle tre leggerebbe il «per sempre» diversamente.
+function perSempreDetto(v) {
+  return v === true || /^(true|s[iì]|1)$/i.test(String(v ?? '').trim());
+}
+
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
 function idDelCambio(action) {
   const id = String(action.id ?? action.cambio ?? action.evento ?? '').trim();
@@ -1916,12 +1922,17 @@ function idDelCambio(action) {
 // #1909 — cosa finisce nel cestino lo trova il main prima del gate: il popup nomina gli elementi veri, e all'OK si
 // tocca solo quello che ha mostrato. Fuori dal perimetro, su un altro computer o la cartella personale intera: mai.
 const LOTTO_ELIMINA = 200;
+// Perché un file resta dov'è, detto all'utente: la stessa frase per chi cancella e chi rinomina.
+function fraseFuori(m) {
+  if (/rete/.test(m)) return 'sta su un altro computer della rete';
+  return /nascost/.test(m) ? 'è un file nascosto o di un programma' : 'sta fuori dalla tua cartella personale';
+}
 const TETTO_CONTEGGIO = 10000;
 function motivoEliminazione(p, perimetro) {
   const C = globalThis.SN_CMD_CLASSIFY;
   if (!C) return 'non si sa dove sta';
   const m = C.fuoriPerimetro(p, perimetro);
-  if (m) return /rete/.test(m) ? 'sta su un altro computer della rete' : (/nascost/.test(m) ? 'è un file nascosto o di un programma' : 'sta fuori dalla tua cartella personale');
+  if (m) return fraseFuori(m);
   const nodePath = require('node:path');
   const full = String(C.pulisciPercorso(p));
   if (perimetro.home && nodePath.isAbsolute(full)) {
@@ -2013,7 +2024,7 @@ async function preparaRinomina(action, sender, avanzamento = null) {
     for (const p of ps) { const m = C.fuoriPerimetro(p, perimetro); if (m) return m; }
     return '';
   };
-  const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: /rete/.test(m) ? 'sta su un altro computer della rete' : 'sta fuori dalla tua cartella personale' });
+  const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: fraseFuori(m) });
   const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
     .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
     .filter((x) => typeof x === 'string' && x.trim());
@@ -2664,8 +2675,7 @@ async function eseguiAzioneFilo(action, {
       }
     } catch (_) {}
     action._righe = righeDaDimenticare.map((r) => r.testo);
-    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
-    action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+    action.per_sempre = perSempreDetto(action.per_sempre);
   }
 
   // #1295 — la conversazione la trova il main (l'id detto, o quella di adesso), prima del gate: il popup dice quale.
@@ -2683,8 +2693,7 @@ async function eseguiAzioneFilo(action, {
     action.id = chat.id;
     action._titolo = chat.title || ChatArchive.fallbackTitle(chat.messages);
     action._corrente = !!chatId && chat.id === chatId;
-    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
-    if (type === 'TOGLI_CHAT') action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+    if (type === 'TOGLI_CHAT') action.per_sempre = perSempreDetto(action.per_sempre);
   }
 
   // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
@@ -2839,7 +2848,7 @@ async function eseguiAzioneFilo(action, {
 
   // #1909 — il «per sempre» vale solo detto chiaro; gli elementi li trova il main, e all'OK valgono quelli mostrati.
   if (type === 'ELIMINA_FILE') {
-    action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+    action.per_sempre = perSempreDetto(action.per_sempre);
     if (!confirmed) {
       const prep = await preparaEliminazione(action, sender);
       action._file = prep.file;
@@ -3798,6 +3807,8 @@ async function eseguiAzioneFilo(action, {
           const nome = nodePath.basename(p);
           const m = motivoEliminazione(p, perimetro);
           if (m) { falliti.push({ nome, perche: m }); continue; }
+          // Il cestino del sistema rifiuta un file sparito senza dire perché: si guarda prima, o l'utente legge «non permesso».
+          try { await require('node:fs/promises').lstat(p); } catch (_) { falliti.push({ nome, perche: motivoNonEliminato({ code: 'ENOENT' }) }); continue; }
           try {
             if (per) await require('node:fs/promises').rm(p, { recursive: true });
             else await require('electron').shell.trashItem(p);
