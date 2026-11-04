@@ -13,7 +13,7 @@ function sorgenteSonda(nome) {
   return `(function(){
   'use strict';
   var WP = typeof WebSocket === 'function' && WebSocket.prototype;
-  if (!WP || typeof WP.send !== 'function' || WP.send.__filo) return;
+  if (!WP || typeof WP.send !== 'function') return;
   var NOME = ${n}, LIMITE = ${LIMITE}, IN_ATTESA = ${IN_ATTESA};
   var oSend = WP.send, oAdd = EventTarget.prototype.addEventListener, oDispatch = EventTarget.prototype.dispatchEvent;
   var CE = CustomEvent, decoder = null;
@@ -72,10 +72,10 @@ function sorgenteSonda(nome) {
 }
 
 // Nel frame che la carica, prima degli script del sito. Il nome segreto resta nel mondo di Filo, dove content.js lo legge.
-function installa({ webFrame, finestra = globalThis.window } = {}) {
+function installa({ webFrame } = {}) {
   const nome = `x${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
   try { webFrame.executeJavaScript(sorgenteSonda(nome), false).catch(() => {}); } catch (_) { return null; }
-  try { finestra.SN_COLLEGAMENTO_APERTO = nome; } catch (_) {}
+  globalThis.SN_COLLEGAMENTO_APERTO = nome;
   return nome;
 }
 

@@ -566,8 +566,42 @@
       if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
       if (ricevuti.get(area) === t || sostituito(area)) return;
       const viste = righeViste.get(area);
-      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
+      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t], dialogo: nelDialogo.get(area) || null });
       if (orfani.length > 100) orfani.shift();
+    }
+    // Un dialogo chiuso dopo «Crea» si porta via il campo, e la pagina mostra il nome come suo contenuto: quel testo
+    // non è più a rischio. Lo dice la pagina che lo mostra più volte di quando il dialogo era aperto; chiuso con
+    // Annulla non ricompare, e resta protetto. Solo i campi di una riga: un messaggio in un riepilogo non è partito.
+    const nelDialogo = new WeakMap();
+    const inDialogo = new Set();
+    const DIALOGO = 'dialog, [role="dialog" i], [role="alertdialog" i], [aria-modal="true" i]';
+    function volteNellaPagina(doc, ess) {
+      let s = '';
+      try { s = essenziale((doc.body && doc.body.innerText) || ''); } catch (_) { return 0; }
+      let n = 0;
+      for (let i = s.indexOf(ess); i >= 0; i = s.indexOf(ess, i + ess.length)) n++;
+      return n;
+    }
+    function fotografaDialoghi() {
+      for (const area of inDialogo) {
+        if (!aree.has(area) || !viva(area)) { inDialogo.delete(area); continue; }
+        if (!area.getClientRects().length) continue;
+        const ess = essenziale(testo(area));
+        if (ess) nelDialogo.set(area, { ess, volte: volteNellaPagina(area.ownerDocument, ess), doc: area.ownerDocument });
+      }
+    }
+    function ricomparsi() {
+      for (let i = orfani.length - 1; i >= 0; i--) {
+        const d = orfani[i].dialogo;
+        if (d && essenziale(orfani[i].t) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) orfani.splice(i, 1);
+      }
+      // Un dialogo chiuso senza toglierlo dalla pagina tiene il campo nascosto, col testo dentro.
+      for (const area of inDialogo) {
+        const d = nelDialogo.get(area);
+        if (!d || !aree.has(area) || !viva(area) || area.getClientRects().length) continue;
+        const ora = testo(area);
+        if (essenziale(ora) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) aree.set(area, ora);
+      }
     }
     // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
     // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
