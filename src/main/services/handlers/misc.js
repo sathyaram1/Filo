@@ -601,8 +601,7 @@ module.exports = function register(on, ctx) {
     try {
       const barH = win._filoTabs.topChromeHeight();
       if (barH <= 0) return { ok: false, error: 'no topbar' };
-      const [w] = win.getContentSize();
-      const img = await win.webContents.capturePage({ x: 0, y: 0, width: w, height: barH });
+      const img = await Foto.fotoDellaBarra(win, barH);
       return { ok: true, dataUrl: img.toDataURL(), barHeight: barH };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
