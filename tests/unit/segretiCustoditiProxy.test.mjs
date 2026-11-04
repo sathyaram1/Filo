@@ -78,7 +78,7 @@ test('una password corta del proxy non esce e non arriva al modello; una chiave 
   assert.equal(X.valutaUscita({ type: 'NAVIGA', url: `https://raccolta.example/?p=${corta}` }, { segreti: lista }).blocca, true);
   assert.ok(!G.oscuraSegreti(`password ${corta}`, lista).includes(corta));
   assert.ok(!G.oscuraSegreti(`password ${corta}`, valori(lista)).includes(corta), 'anche coi soli valori');
-  const chiave = custoditi({ impostazioni: [{ apiKeys: { tavily: 'Kq7vRt2x' } }], env: {} });
+  const chiave = custoditi({ impostazioni: [{ apiKeys: { tavily: 'Zp3wLm9c' } }], env: {} });
   assert.deepEqual(chiave, [], 'una chiave corta non è una password nota');
 });
 
