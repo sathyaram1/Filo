@@ -1674,6 +1674,8 @@ module.exports = function register(on, ctx) {
       const out = resoconto ? { ok: true, domanda: r.domanda || null, resoconto } : { ok: true, domanda: r.domanda || null };
       if (op !== 'annulla') return out;
       out.ripristino = (Array.isArray(r.ripristino) ? r.ripristino : []).map((x) => ({ ok: x?.ok === true, num: String(x?.num || '') }));
+      // Il compito nato dalla risposta non lo disfa «annulla»: la pagina lo deve dire.
+      if (/^C-\d{1,9}$/.test(String(r.compito || ''))) out.compito = String(r.compito);
       return out;
     }));
   }
