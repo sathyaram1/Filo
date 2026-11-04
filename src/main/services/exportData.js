@@ -161,9 +161,8 @@ function oscura(nodo, segreti) {
 }
 
 // Del proxy il segreto è utente e password, non l'indirizzo: senza, l'archivio rimesso altrove perdeva il proxy (#905.1).
-const CREDENZIALI_PROXY = /^([a-z][a-z0-9+.-]*:\/\/)([^/@\s]+)@/i;
-const proxySenzaCredenziali = (v) => v.trim().replace(CREDENZIALI_PROXY, '$1');
-const haCredenziali = (v) => pieno(v) && CREDENZIALI_PROXY.test(v.trim());
+const credenzialiProxy = (v) => costanti().credenzialiProxy(v);
+const haCredenziali = (v) => !!credenzialiProxy(v);
 
 // Toglie i segreti da una copia dei dati, e dal filo. Il campo va via, non diventa vuoto: all'importazione un campo
 // assente lascia quello di chi importa. `proxy`: i campi del proxy rimasti col solo indirizzo.
