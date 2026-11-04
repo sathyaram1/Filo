@@ -164,7 +164,8 @@
     descr.value = '';
     $('mgChiaveNataTitolo').textContent = `La parola d’ordine di «${r.slug}». Copiala adesso: non si potrà più rileggere.`;
     $('mgChiaveParola').textContent = r.passphrase;
-    $('mgChiaveDove').textContent = CH.DOVE_VA[r.scope] || '';
+    // Le frasi sono scritte anche per il terminale: qui gli a capo li decide la larghezza.
+    $('mgChiaveDove').textContent = (CH.DOVE_VA[r.scope] || '').replace(/\n/g, ' ');
     nata.hidden = false;
     caricaChiavi();
   });

@@ -147,7 +147,7 @@ test('domanda di fine sessione e ordine del manutentore si leggono e si cambiano
   expect(await page.evaluate(() => window.__srv.ordine)).toEqual(['815', '812']);
   await ordine.fill('815, ciao');
   await page.locator('#mgOrdineSalva').click();
-  await expect(page.locator('#mgOrdineMsg')).toHaveText(/non sono numeri di feedback: ciao/);
+  await expect(page.locator('#mgOrdineMsg')).toHaveText('Non sono numeri di feedback: ciao');
   await ordine.fill('');
   await page.locator('#mgOrdineSalva').click();
   await expect(page.locator('#mgOrdineMsg')).toHaveText('Svuotato: si accende per priorità.');

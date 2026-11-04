@@ -1,6 +1,6 @@
 // Le parole d'ordine del server (routineKeys, ROUTINE-AUTH-SPEC): i poteri, dove va la parola appena nata e le
 // impostazioni delle chiavi di routine. Logica pura, la usano Gestione → Automazioni, il main e routine-keys.mjs;
-// l'ultima parola resta al server. Prove: tests/unit/routineChiavi.test.mjs.
+// l'ultima parola resta al server. Prove: tests/unit/strumentiOwner.test.mjs.
 
 (function (global) {
   'use strict';
