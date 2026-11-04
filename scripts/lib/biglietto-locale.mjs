@@ -664,7 +664,9 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
         fiducia = s.fiducia === 'fidato' && !attesa ? 'fidato' : 'non_fidato';
       } else {
         const motivo = !ereditato ? 'file del biglietto del padre illeggibile' : s ? 'biglietto del padre chiuso' : 'biglietto del padre illeggibile';
-        const p = await prendi({ sporco: true, motivo, sessionId, trascrizione, cwd, nowMs, deps }).catch(() => null);
+        // La conversazione del padre ha forse letto dati privati: il segno riservato segue, e senza il padre si presume (#2027).
+        const riservato = !s || s.riservato === true;
+        const p = await prendi({ sporco: true, riservato, motivo, sessionId, trascrizione, cwd, nowMs, deps }).catch(() => null);
         if (!p && !ereditato) throw new Error(`${motivo}, e il server non dà un biglietto nato sporco`);
         path = p ? p.path : ereditato.path;
         fiducia = p ? p.fiducia : 'non_fidato';
