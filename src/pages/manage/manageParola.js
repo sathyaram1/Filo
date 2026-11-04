@@ -122,9 +122,12 @@
     campo.addEventListener('input', () => { if (msgEl && msgEl.classList.contains('mg-err')) dici(''); });
     // Un campo di una riga incolla più righe attaccate: due righe diventerebbero una parola sbagliata, senza dirlo.
     campo.addEventListener('paste', (e) => {
-      const testo = (e.clipboardData && e.clipboardData.getData('text/plain')) || '';
+      const tipo = e.inputType || '';
+      if (!tipo.startsWith('insert')) return;
+      const testo = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || e.data || '';
+      const incollato = /^insert(From|Replacement)/.test(tipo);
+      if (!/[\r\n]/.test(testo) && !(incollato && /^\s|\s$/.test(testo))) return;
       const righe = testo.split(/\r\n|\r|\n/).map((r) => r.trim()).filter(Boolean);
-      if (righe.length < 2 && !/^\s|\s$/.test(testo)) return;
       e.preventDefault();
       if (righe.length > 1) { dici('Hai incollato più righe: incolla solo la parola d’ordine.', 'err'); return; }
       campo.setRangeText(righe[0] || '', campo.selectionStart, campo.selectionEnd, 'end');
