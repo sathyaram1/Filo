@@ -1120,7 +1120,7 @@ function compattaDaFermo(incognito, tetti) {
     const tokenTratto = await Compattazione.tokenDelTratto(incognito, { tetti });
     const motivo = globalThis.SN_FILO_COMPATTAZIONE.motivo({ soglia: tetti.soglia, tokenTratto, ultimoUso: Date.now() - cacheMs - 1, cacheMs });
     if (motivo === 'fermo') await Compattazione.compatta({ incognito, motivo, tetti });
-  }, cacheMs + 60 * 1000);
+  }, cacheMs + 60 * 1000, incognito);
 }
 
 // La frase accanto alla soglia: costo al mese e attesa, coi prezzi di OpenRouter di adesso per i modelli scelti.
