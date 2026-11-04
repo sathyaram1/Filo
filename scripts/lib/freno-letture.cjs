@@ -169,6 +169,7 @@ function conFreno(vera) {
         }
       }
       for (const [collezione, quanti] of Object.entries(l.mirata)) presi.set(collezione, (presi.get(collezione) || 0) + quanti);
+      for (const n of l.nomi || []) letti.add(n);
     }
     return vera.call(this, input, init);
   };
