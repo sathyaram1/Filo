@@ -151,7 +151,8 @@ test('Conservativo: dopo una ricerca chiede anche un timer o un «dimentica»; i
 test('Conservativo: il no della tabella non dice «a nessun livello», dice cosa ha letto e le strade', async ({ app }) => {
   await home(app);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } }));
-  const comando = { type: 'ESEGUI_COMANDO', comando: 'rm prova-inesistente-530.txt' };
+  // Un comando che cancella vorrebbe la parola anche qui (#1909): la strada della conversazione nuova si prova con un altro costo 3.
+  const comando = { type: 'ESEGUI_COMANDO', comando: 'node prova-inesistente-530.js' };
   const r = await execAction(app, comando, { contesto: [ricercaFatta] });
   expect(r.executed).toBe(false);
   expect(r.no).toBe(true);
