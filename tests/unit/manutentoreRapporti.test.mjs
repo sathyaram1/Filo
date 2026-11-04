@@ -62,8 +62,9 @@ test('il tetto della pagina lo decide il server: una pagina più grande arriva a
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--limite', '500'], NOW).dati, { limite: 500 });
   assert.equal(M.controlliLocali('rapporti', ['rapporti', '--limite', '500', '--cursore', 'x.y']), '');
   const s = serverFinto(t, { rapporti: () => [200, { ok: false, reason: 'malformed', detail: 'limite è un intero da 1 a 200 (chiesto 500)' }] });
-  assert.equal(await M.main(['rapporti', '--limite', '500'], CHIAVE), 1);
+  assert.equal(await M.main(['rapporti', '--limite', '500'], CHIAVE), 4);
   assert.deepEqual(s.corpi.map((c) => c.dati), [{ limite: 500 }]);
+  assert.match(s.err.join('\n'), /da 1 a 200 \(chiesto 500\)/);
 });
 
 test('il conto di una settimana per area, per ruolo e per numero, con le aree delle schede locali', async (t) => {
