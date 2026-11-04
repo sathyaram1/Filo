@@ -176,7 +176,7 @@ async function main() {
 /**
  * Le risposte dietro il cancello della sede (#1148, SPEC-DOMANDE.md §1.2): le scrivono le routine, che leggono testo
  * d'utente. Chi le stampa si sporca prima; nella sede owner passano solo quelle che il server dà per fidate, e le altre
- * si dicono una per una. `opts` = quelli di primaDiStampare. → il codice d'uscita
+ * si dicono una per una, separando le non fidate da quelle di cui il server non manda la fiducia. → il codice d'uscita
  */
 export async function stampaRisposte(risposte, { n = 50, scrivi = (x) => console.log(x), errore = (x) => console.error(x), ...opts } = {}) {
   const r = risposte || {};
@@ -184,10 +184,18 @@ export async function stampaRisposte(risposte, { n = 50, scrivi = (x) => console
   const workers = (Array.isArray(r.workers) ? r.workers : []).filter((w) => w && w.closing);
   const fidata = (v) => !!v && v.fiducia === 'fidato';
   if (sedeRifiuta(opts)) {
-    const fuori = [...orch.filter((o) => !fidata(o)).map((o) => `orchestratore ${visibile(o.slug || '?')}`),
-      ...workers.filter((w) => !fidata(w)).map((w) => `${visibile(w.role || 'worker')}${w.num ? ` #${visibile(String(w.num).replace(/^#+/, ''))}` : ''}`)];
-    scrivi(formattaRisposte({ ...r, orchestrator: orch.filter(fidata), workers: workers.filter(fidata) }, { n }));
-    if (fuori.length) errore(rigaRifiuto(`risposte delle routine alla domanda di fine sessione (${elencoIds(fuori)})`, ['testo scritto da routine non fidate']));
+    const nome = (v) => (orch.includes(v) ? `orchestratore ${visibile(v.slug || '?')}` : `${visibile(v.role || 'worker')}${v.num ? ` #${visibile(String(v.num).replace(/^#+/, ''))}` : ''}`);
+    const fuori = [...orch, ...workers].filter((v) => !fidata(v));
+    const ignote = fuori.filter((v) => typeof v.fiducia !== 'string' || !v.fiducia).map(nome);
+    const nonFidate = fuori.filter((v) => typeof v.fiducia === 'string' && v.fiducia).map(nome);
+    const lette = { ...r, orchestrator: orch.filter(fidata), workers: workers.filter(fidata) };
+    // «Nessuna risposta.» direbbe che non ce ne sono: qui ci sono, e restano fuori.
+    scrivi(fuori.length && !lette.orchestrator.length && !lette.workers.length
+      ? `Nessuna risposta leggibile nella sede owner: ${fuori.length === 1 ? 'quella arrivata resta fuori' : `le ${fuori.length} arrivate restano fuori`}, il perché è sotto.`
+      : formattaRisposte(lette, { n }));
+    const cosa = (l) => `risposte delle routine alla domanda di fine sessione (${elencoIds(l)})`;
+    if (nonFidate.length) errore(rigaRifiuto(cosa(nonFidate), ['testo scritto da routine non fidate']));
+    if (ignote.length) errore(rigaRifiuto(cosa(ignote), ['il server non manda la fiducia di chi ha risposto, quindi da qui non si sa se era fidato']));
     return 0;
   }
   const quante = orch.length + workers.length;
