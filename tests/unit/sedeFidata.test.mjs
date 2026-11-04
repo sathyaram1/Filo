@@ -396,8 +396,15 @@ test('le risposte delle routine alla domanda di fine sessione: nella sede owner 
   assert.equal(await RD.stampaRisposte(risposte, { env: s.owner, cwd: s.dir, deps: s.deps, ...io }), 0);
   assert.match(io.out.join('\n'), /fidata ok/);
   assert.doesNotMatch(io.out.join('\n'), /ALTRUI/);
-  assert.match(io.err.join('\n'), /RIFIUTATO nella sede owner: risposte delle routine alla domanda di fine sessione \(orchestratore giro, fixer #41\)/);
+  assert.match(io.err.join('\n'), /RIFIUTATO nella sede owner: risposte delle routine alla domanda di fine sessione \(orchestratore giro, fixer #41\), il server non manda la fiducia/);
   assert.ok(s.pulito());
+  const soloAltrui = terminale();
+  const conNonFidata = { orchestrator: risposte.orchestrator, workers: [{ ...risposte.workers[1], fiducia: 'non_fidato' }] };
+  await RD.stampaRisposte(conNonFidata, { env: s.owner, cwd: s.dir, deps: s.deps, ...soloAltrui });
+  assert.doesNotMatch(soloAltrui.out.join('\n'), /^Nessuna risposta\.$/m, 'le risposte c\'erano: non si dice che non ce ne sono');
+  assert.match(soloAltrui.out.join('\n'), /le 2 arrivate restano fuori/);
+  assert.match(soloAltrui.err.join('\n'), /\(fixer #41\), testo scritto da routine non fidate/);
+  assert.match(soloAltrui.err.join('\n'), /\(orchestratore giro\), il server non manda la fiducia/);
   const fuori = terminale();
   assert.equal(await RD.stampaRisposte(risposte, { env: s.locale, cwd: s.dir, deps: s.deps, ...fuori }), 0);
   assert.match(fuori.out.join('\n'), /RISPOSTA ALTRUI/);
