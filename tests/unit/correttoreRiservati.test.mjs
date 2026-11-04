@@ -123,8 +123,10 @@ test('in chat la richiesta si riconosce anche senza punto di domanda e con le ab
     "what's the wifi password", 'can you send me the wifi password']) {
     assert.ok(!risposta('certo, Gatto2024 ', `Marco: ${domanda}`).nuovo.includes('Gatto2024'), domanda);
   }
-  // Un racconto, un ricordo, l'inglese «pass»: non chiedono niente.
-  for (const detto of ['ho cambiato la password del wifi', 'non mi ricordo la password', 'I need to pass the exam']) {
-    assert.equal(risposta('certo, alle 1830 al bar Gatto2024', `Marco: ${detto}`).nuovo, 'certo, alle 1830 al bar Gatto2024', detto);
+  // Un racconto o un ricordo nominano la password senza chiederla: la risposta perde solo le parole con cifre (#1446.4).
+  for (const detto of ['ho cambiato la password del wifi', 'non mi ricordo la password']) {
+    assert.equal(risposta('certo, alle venti al bar Gatto2024', `Marco: ${detto}`).nuovo, 'certo, alle venti al bar [dato riservato]', detto);
   }
+  // L'inglese «pass» non nomina nessuna password.
+  assert.equal(risposta('certo, alle 1830 al bar Gatto2024', 'Marco: I need to pass the exam').nuovo, 'certo, alle 1830 al bar Gatto2024');
 });
