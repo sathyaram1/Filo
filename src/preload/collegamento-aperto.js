@@ -3,8 +3,8 @@
 // dal nome segreto; senza una risposta del server non passa niente. Lo riceve content.js; regole in tests/tab-auto-archive.spec.mjs.
 'use strict';
 
-// Come il corpo di una richiesta letto dal main (src/main/services/testoInviato.js).
-const LIMITE = 256 * 1024;
+// Come il corpo di una richiesta letto dal main.
+const { LIMITE_CORPO: LIMITE } = require('../main/services/testoInviato.js');
 // Messaggi mandati e non ancora seguiti da una risposta, per collegamento: oltre si tengono gli ultimi.
 const IN_ATTESA = 20;
 
