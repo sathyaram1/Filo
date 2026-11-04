@@ -78,6 +78,24 @@ test('#1397 — la pila ridà la scheda chiusa che ha suonato per ultima, e una 
   assert.equal(SchedeChiuse.crea().ultimaCheSuonava(), null);
 });
 
+test('una pagina delicata esce in una forma sola, la stessa per la ricerca nel filo e per SCHEDE_CHIUSE', () => {
+  assert.deepEqual(C.soloSito('https://www.banca.example:8443/conto?id=1'), { sito: 'banca.example:8443', url: 'https://www.banca.example:8443/' });
+  assert.deepEqual(C.soloSito('non un indirizzo'), { sito: 'sito', url: '' });
+  const d = C.perModello(voce('banca', '2026-10-28T09:00:00', { url: 'https://www.banca.example:8443/conto' }), { delicata: true });
+  assert.deepEqual({ titolo: d.titolo, url: d.url }, { titolo: 'banca.example:8443', url: 'https://www.banca.example:8443/' });
+  const handlers = require('node:fs').readFileSync(new URL('../../src/main/services/handlers.js', import.meta.url), 'utf8');
+  assert.ok(!/https:\/\/\$\{sito\}\//.test(handlers), 'la ricerca nel filo non riscrive per conto suo il sito di una pagina delicata');
+});
+
+test('#1686 — riaperta dall\'archivio, la scheda porta con sé l\'ora in cui suonava; una voce già riaperta si sa', () => {
+  assert.equal(SchedeChiuse.daArchivio({ url: 'https://musica.example/', audioAt: '2026-10-28T09:00:00.000Z' }).audioAt, Date.parse('2026-10-28T09:00:00.000Z'));
+  assert.equal('audioAt' in SchedeChiuse.daArchivio({ url: 'https://news.example/' }), false);
+  const pila = SchedeChiuse.crea();
+  assert.equal(pila.eRiaperta('a1'), false);
+  pila.segnaRiaperta('a1');
+  assert.equal(pila.eRiaperta('a1'), true);
+});
+
 test('lo strumento offre al modello tutti e soli i motivi che la ricerca riconosce', () => {
   require('../../src/shared/actionTools.js');
   const offerti = globalThis.SN_ACTION_TOOLS.TOOLS.SCHEDE_CHIUSE.properties.motivo.enum;

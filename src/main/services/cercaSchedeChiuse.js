@@ -77,4 +77,4 @@ function perModello(v, { delicata = false } = {}) {
   };
 }
 
-module.exports = { MOTIVI, TETTO, motivoDi, richiesta, filtra, perModello };
+module.exports = { MOTIVI, TETTO, motivoDi, richiesta, filtra, perModello, soloSito };
