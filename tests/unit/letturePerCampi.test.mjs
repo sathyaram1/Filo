@@ -177,6 +177,23 @@ test('il freno ferma la lettura a gruppi per nome di tutti i documenti, presi i 
   }
 });
 
+test('il freno ferma anche la lettura uno per uno di tutti i documenti, presi i nomi; rileggerne uno non conta', async () => {
+  const nomi = Array.from({ length: 20 }, (_, i) => `feedback/f${i}`);
+  const strumento = (maschera) => `export const tutti = async () => {
+    for (const n of ${JSON.stringify(nomi)}) await fetch(\`${BASE}/\${n}?key=k${maschera}\`);
+  };`;
+  const senza = await sottoIlFreno(async () => (await modulo(strumento(''))).tutti());
+  assert.ok(senza.errore instanceof ScansioneSenzaCampi, `uno per uno senza campi passa: ${senza.errore && senza.errore.message}`);
+  assert.equal(senza.arrivate.length, DOCUMENTI_SENZA_CAMPI_MAX, 'documenti interi oltre i dieci sono arrivati alla rete');
+  const con = await sottoIlFreno(async () => (await modulo(strumento('&mask.fieldPaths=seq'))).tutti());
+  assert.equal(con.errore, null, con.errore && con.errore.message);
+  assert.equal(con.arrivate.length, 20);
+  // Il contatore e la configurazione si rileggono quanto serve: è sempre lo stesso documento.
+  const stesso = await sottoIlFreno(async () => { for (let i = 0; i < 30; i += 1) await fetch(`${BASE}/counters/feedbackSeq?key=k`); });
+  assert.equal(stesso.errore, null, stesso.errore && stesso.errore.message);
+  assert.equal(stesso.arrivate.length, 30);
+});
+
 test('il freno si installa per chiunque carichi il modulo delle segnalazioni, comunque lo nomini', () => {
   // Processi a parte, senza importare il freno: lo strumento carica solo il modulo, e scansiona le schede pubbliche.
   const prova = `process.stdout.write(String(Boolean(globalThis.fetch[Symbol.for('filo.frenoLetture')])));
