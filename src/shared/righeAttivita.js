@@ -58,6 +58,8 @@
       const quando = ev && ev.quando ? ` · ${ev.quando}` : '';
       const nome = `${(ev && ev.titolo) || a.titolo || a.title || ''}${quando}`;
       const fatto = a._output && a._output.fatto;
+      // Nessun programma ha aperto il file: l'evento c'è, ma nel calendario non ancora.
+      if (fatto && a._output.nonAperto) return { icon: '📅', text: `Evento salvato in un file, il calendario non si è aperto · ${nome}` };
       return { icon: '📅', text: `${fatto ? 'Evento aggiunto al calendario' : 'Evento proposto'} · ${nome}` };
     },
     // Impostazione applicata subito (livello 1, es. il tema): prima non
@@ -413,7 +415,7 @@
     if (a._confirm) {
       // Due parole, non l'intera spiegazione: quella sta nel popup, che è
       // aperto davanti all'utente proprio in quel momento.
-      let prima = String(a._confirm.text || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+      let prima = global.SN_ESITO.primaRigaConferma(a._confirm.text);
       if (prima.length > 60) prima = `${prima.slice(0, 57)}…`;
       return { icon: '❔', text: `Conferma chiesta · ${prima || String(a.type || '').toLowerCase()}`, failed: true };
     }

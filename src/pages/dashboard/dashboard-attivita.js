@@ -1461,6 +1461,7 @@
     // dell'utente l'azione parte davvero via MSG.FILO_CONFIRM_ACTION.
     if (a._confirm && a._confirm.level >= 2) {
       if (gruppo) gruppo.pendenti.add(a);
+      if (!a._rigaChiesta) a._rigaChiesta = primaRigaConferma(a);
       const btn = document.createElement('button');
       btn.className = 'dash-action-btn dash-action-btn-primary';
       btn.type = 'button';
@@ -1473,7 +1474,7 @@
       const fullText = String(a._confirm.text || '');
       // I due punti finali annunciano il testo che segue nel popup ("…a tuo
       // nome:"): sul bottone, dove quel testo non c'è, restano appesi nel vuoto.
-      const shortLabel = (fullText.split('\n')[0] || 'Esegui').replace(/\s*:\s*$/, '');
+      const shortLabel = global.SN_ESITO.primaRigaConferma(fullText) || 'Esegui';
       // Un comando dice prima a parole cosa fa, e sotto il comando vero (#892).
       const cosa = isCmd ? spiegazioneDi(a) : '';
       const segnaComando = (simbolo) => {
@@ -1524,6 +1525,9 @@
           // messaggio dopo, per non riproporla (#1373). I contatori lo contano (#1461).
           a._rifiutata = true;
           try { Promise.resolve(send({ type: MSG.FILO_CONFIRM_RIFIUTATA, action: a })).catch(() => {}); } catch (_) {}
+          // Il no resta nella conversazione del bottone, al posto della domanda: riaperta, chat e modello lo sanno.
+          const no = voceDellaConferma(a);
+          if (no) try { archiviaAzione(type, [], a, { chat, voce: { ...no, proposta: primaRigaConferma(a) } }); } catch (_) {}
           proseguiQuandoLibero(chat, null, gruppo, a);
           return;
         }
@@ -1775,7 +1779,7 @@
         btn.disabled = true;
         btn.textContent = '📅 Aggiungo…';
         const r = await send({ type: MSG.CALENDAR_ADD, evento: ev });
-        if (r && r.ok) segnaCompiuta(a, activity, { evento: ev }, chat);
+        if (r && r.ok) segnaCompiuta(a, activity, { evento: ev, ...(r.aperto ? {} : { nonAperto: true }) }, chat);
         if (r && r.ok && r.aperto) {
           btn.textContent = '✓ Aperto nel calendario';
           // Riapribile: chi chiude per sbaglio la finestra del calendario deve
@@ -1837,7 +1841,7 @@
 
   // Cosa chiedeva la conferma, prima che il sì la tolga: riaperta, la chat dice cosa non è riuscito.
   function primaRigaConferma(a) {
-    return String((a && a._confirm && a._confirm.text) || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
+    return global.SN_ESITO.primaRigaConferma(a && a._confirm && a._confirm.text);
   }
 
   // Com'è andata un'azione decisa dopo il turno entra nell'archivio, nella conversazione dove è nato il bottone (#1294):
@@ -1847,9 +1851,12 @@
     const type = String((a && a.type) || '').toUpperCase();
     const esito = E.esitoAzione(a);
     const row = activityRowFor(a);
+    // La riga del diario in diretta, coi suoi numeri: la frase «a cosa fatta» del main resta il ripiego.
     const voce = esito === E.FALLITO
       ? { type, esito, riga: chiesta, motivo: E.motivo(a) || (row && row.failed ? row.text : '') }
-      : { type, esito, riga: fatto || (row && !row.failed ? row.text : '') };
+      : { type, esito, riga: (row && !row.failed ? row.text : '') || fatto };
+    // Quale domanda chiude, fra quelle aperte della risposta che l'aveva proposta.
+    if (a && a._rigaChiesta) voce.proposta = a._rigaChiesta;
     if (a && a._output && a._output.blocked === 'segreto') {
       voce.type = 'FERMATA';
       voce.riga = String(a._output.frase || '');
@@ -2112,7 +2119,7 @@
   // #1294 — una risposta riletta dall'archivio racconta ogni azione con la sua riga, e i file col loro bottone. Oltre
   // `RIGHE_VISTE` voci le riuscite stanno nella frase riassunto, che le elenca al passaggio del mouse.
   const RIGHE_VISTE = 4;
-  function esitiArchiviati(voci) {
+  function esitiArchiviati(voci, { chat = '' } = {}) {
     const E = global.SN_ESITO;
     const lista = (Array.isArray(voci) ? voci : []).filter((v) => v && v.type);
     if (!lista.length) return { righe: null, nota: null };
@@ -2125,6 +2132,11 @@
       if (v.type === 'APRI_FILE' && v.file && percorsoLocale(v.file.percorso)) {
         wrap.appendChild(bottoneFile({ type: 'APRI_FILE', percorso: v.file.percorso, etichetta: v.file.etichetta || '', _executed: true }));
         continue;
+      }
+      // L'evento ancora da aggiungere ritrova il suo bottone, come nella risposta in diretta (#1685).
+      if (v.type === 'EVENTO_CALENDARIO' && v.esito === E.PROPOSTO && v.evento) {
+        const btn = renderActionButton({ type: 'EVENTO_CALENDARIO', _output: { proposta: true, evento: v.evento } }, { chat });
+        if (btn) { wrap.appendChild(btn); continue; }
       }
       const riga = E.rigaDellaVoce(v);
       if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo));
