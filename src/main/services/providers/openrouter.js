@@ -696,6 +696,7 @@
       text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason, servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
       ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
+      ...(tettoSceso ? { tettoSceso } : {}),
     };
   }
 
