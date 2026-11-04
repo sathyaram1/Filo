@@ -1951,7 +1951,7 @@
     let riga = '';
     try { riga = L ? E.primaRigaConferma(L.describe(a)) : ''; } catch (_) { riga = ''; }
     const voce = no
-      ? { type, esito: E.FALLITO, riga, motivo: E.MOTIVO_NO }
+      ? { type, esito: E.FALLITO, riga, motivo: E.MOTIVO_NO, no: true }
       : { type, esito: E.FALLITO, riga, motivo: String(motivo || '').slice(0, 200), riprova: true };
     a._voce = { ...voce };
     try { archiviaAzione(type, [], a, { chat, voce }); } catch (_) {}
