@@ -48,9 +48,11 @@ const DETTO = {
   lavori: (nome, v) => (v === 'server'
     ? `"${nome}" è la chiave della routine server: riceve solo lavori server fidati, e solo a rete limitata.`
     : `"${nome}" prende i lavori normali: mai un lavoro server, salvo il controllo di sicurezza a rete limitata.`),
-  ambiente: (nome, v) => (v === 'riservati'
-    ? `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`
-    : `"${nome}" è in un ambiente normale: non riceve testo riservato.`),
+  ambiente: (nome, v) => ({
+    riservati: `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`,
+    rete_aperta: `"${nome}" è la chiave dell'ambiente a rete aperta: i suoi biglietti nascono sporchi, riceve solo compiti già non fidati e mai testo riservato né lavori server. Si spegne e si limita da Gestione → Automazioni, anche quando parte a mano.`,
+    normale: `"${nome}" è in un ambiente normale: non riceve testo riservato.`,
+  }[v]),
 };
 
 async function chiama(data) {
