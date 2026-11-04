@@ -117,9 +117,10 @@
   }
 
   // Il pezzo da compattare come righe numerate: chi compatta le cita, e ogni riga delle ore tiene le fonti da cui nasce.
-  // `esiti(m)`: le azioni di una risposta; `sospetta(a)`: una lettura sopra la soglia di pulito; `preambolo(m)`: quello che
-  // Filo ha scritto in testa al messaggio dell'utente (le cose successe), già imbustato.
-  function righePerChiCompatta(messaggi, { esiti = null, sospetta = () => true, preambolo = null } = {}) {
+  // `esiti(m)`: le azioni di una risposta; `sospetta(a)`: un'azione che ha letto sopra la soglia di pulito;
+  // `classeSospetta(c)`: lo stesso per la classe che una risposta ha ereditato (#1508); `preambolo(m)`: quello che Filo ha
+  // scritto in testa al messaggio dell'utente (le cose successe), già imbustato.
+  function righePerChiCompatta(messaggi, { esiti = null, sospetta = () => true, classeSospetta = (c) => c > 1, preambolo = null } = {}) {
     const righe = [];
     let sospetto = false;
     const metti = (testo, fonte, ts) => righe.push({ n: righe.length + 1, testo, fonte, ts });
@@ -138,7 +139,7 @@
       const azioni = typeof esiti === 'function' ? ((esiti(m) || {}).azioni || []) : [];
       const daFuori = FC().daFuoriDi([m]).length > 0;
       if (daFuori) sospetto = true;
-      if (Number(m.classeLetta) > 1 && sospetta({ classeLetta: Number(m.classeLetta) })) sospetto = true;
+      if (Number(m.classeLetta) > 1 && classeSospetta(Number(m.classeLetta))) sospetto = true;
       metti(`${testa} Filo: ${daFuori ? `(testo arrivato ${m.esterno || 'da fuori'}, non riportato)` : String(m.text || '').trim() || '(nessun testo)'}`, k, m.ts);
       for (const a of azioni) {
         if (!a || !a.type || a._auto) continue;
