@@ -49,7 +49,7 @@ test('smista: operazioni e campi controllati prima del canale', () => {
   );
   assert.deepEqual(leggiArgomenti(['smista', 'automatica', '--scelta', '2', '--principio', 'D-41', '--testo', 'x']), { cmd: 'smista', op: 'automatica', scelta: 1, principio: 'D-41', testo: 'x' });
   assert.deepEqual(leggiArgomenti(['smista', 'ricevuti', '--richiesta', 'fiducia', '--testo', 'x']), { cmd: 'smista', op: 'ricevuti', richiesta: 'fiducia', testo: 'x' });
-  assert.match(leggiArgomenti(['smista']).errore, /un'operazione fra mostra, guasto, ricevuti, automatica, pubblica/);
+  assert.match(leggiArgomenti(['smista']).errore, /un'operazione fra mostra, guasto, doppione, ricevuti, automatica, pubblica/);
   assert.match(leggiArgomenti(['smista', 'guasto', '--chiave', 'x']).errore, /--titolo, --testo, --resoconto/);
   assert.match(leggiArgomenti(['smista', 'guasto', '--chiave', '  ', '--titolo', 't', '--testo', 't', '--resoconto', 'r']).errore, /--chiave/, 'un campo di soli spazi manca');
   assert.match(leggiArgomenti(['smista', 'ricevuti', '--richiesta', 'soldi', '--testo', 'x']).errore, /fiducia o permesso/);
@@ -59,6 +59,10 @@ test('smista: operazioni e campi controllati prima del canale', () => {
   assert.match(leggiArgomenti(['smista', 'mostra', '--testo', 'x']).errore, /non vuole altro/);
   assert.match(leggiArgomenti(['smista', 'guasto', '--chiave', 'k'.repeat(301), '--titolo', 't', '--testo', 't', '--resoconto', 'r']).errore, /301 caratteri, il massimo è 300/);
   assert.match(leggiArgomenti(['smista', 'pubblica']).errore, /file JSON della domanda riscritta/);
+  assert.deepEqual(leggiArgomenti(['smista', 'doppione', '--di', ' D-244 ', '--testo', '-']), { cmd: 'smista', op: 'doppione', di: 'D-244', testo: '-' });
+  assert.match(leggiArgomenti(['smista', 'doppione', '--di', '244', '--testo', 'x']).errore, /--di vuole la domanda ancora viva.*forma D-12/);
+  assert.match(leggiArgomenti(['smista', 'doppione', '--testo', 'x']).errore, /smista doppione vuole --di/);
+  assert.match(leggiArgomenti(['smista', 'doppione', '--di', 'D-2']).errore, /smista doppione vuole --testo/);
 });
 
 test('smista pubblica: la riscrittura passa la forma comune e quella corta per l\'owner, o non parte', async () => {
@@ -116,6 +120,15 @@ test('smista guasto, ricevuti, automatica: il testo da stdin, le uscite del cana
   const giu = finto({ smistamento: { outcome: 'down', reason: 'timeout' } });
   assert.equal(await esegui(['smista', 'mostra'], giu.io), 3);
 
+  // #1928: il doppione arriva al server con la domanda viva e il perché, e chi lo chiude legge dove risponde l'owner.
+  const dop = finto({ stdin: 'Stessa scelta: Haiku o Kimi K3.', smistamento: { outcome: 'ok', reply: { di: 'D-244', fermo: '#1398' } } });
+  assert.equal(await esegui(['smista', 'doppione', '--di', 'D-244', '--testo', '-'], dop.io), 0);
+  assert.deepEqual(dop.canale[0].data, { op: 'doppione', di: 'D-244', testo: 'Stessa scelta: Haiku o Kimi K3.' });
+  assert.match(dop.out.join('\n'), /chiusa come doppione di D-244: l'owner risponde lì.*#1398 ora aspetta la risposta a D-244\. Hai finito/);
+  const nonViva = finto({ smistamento: { outcome: 'refused', reason: 'doppione_non_vivo', detail: 'D-244 è chiusa' } });
+  assert.equal(await esegui(['smista', 'doppione', '--di', 'D-244', '--testo', 'x'], nonViva.io), 1);
+  assert.match(nonViva.err.join('\n'), /RIFIUTATO dal server: doppione_non_vivo: D-244 è chiusa/);
+
   const senza = finto({ biglietto: '' });
   assert.equal(await esegui(['smista', 'mostra'], senza.io), 1);
   assert.match(senza.err.join('\n'), /col biglietto del compito che gestisce una domanda appena nata/);
@@ -136,6 +149,33 @@ test('smista mostra: domanda, feedback d\'origine e registro, coi caratteri di c
   assert.match(testo, /D-41 Lavori server {2}\[contestato: non riusarlo\]/);
   assert.match(formattaFascicoloSmistamento({ affidata: false, motivo: 'superata' }), /non è più affidata a te \(superata\)/);
   assert.match(formattaFascicoloSmistamento({ domanda: { id: 'D-1' } }), /nessuno \(la domanda non viene da un lavoro\)/);
+  assert.doesNotMatch(formattaFascicoloSmistamento({ domanda: { id: 'D-1' } }), /domande vive/, 'senza feedback non ci sono domande sullo stesso feedback');
+});
+
+// #1928: D-245 era la stessa scelta di D-244, provvisoria e ancora aperta, e lo smistamento non la vedeva.
+test('smista mostra: le altre domande vive sullo stesso feedback, provvisorie comprese; senza il campo lo dice', async () => {
+  const base = {
+    domanda: { id: 'D-245', stato: 'in_smistamento', titolo: 'Chat: Haiku o Kimi K3?', opzioni: [] },
+    feedback: { num: '#1398', stato: 'revision_capability' },
+    registro: { voci: [] },
+  };
+  const viva = {
+    id: 'D-244', stato: 'aperta', titolo: 'Chat: tenere Haiku o passare a Kimi K3?', blocca: false, provvisoria: 0,
+    problema: 'Se scegliamo male\u001b[2J la chat costa il doppio.', notePerAgenti: 'SEGRETO-DELLE-NOTE',
+    opzioni: [{ testo: 'Tenere Haiku' }, { testo: 'Passare a Kimi K3' }], consiglio: { opzione: 1, perche: 'x' },
+  };
+  const f = finto({ smistamento: { outcome: 'ok', reply: { ...base, vive: [viva], viveAltre: 2 } } });
+  assert.equal(await esegui(['smista', 'mostra'], f.io), 0);
+  const testo = f.out.join('\n');
+  assert.ok(!/[\u0000-\u0008\u000b-\u001f\u007f]/.test(testo));
+  assert.match(testo, /Altre domande vive sullo stesso feedback \(3, qui le 1 più recenti\)/);
+  assert.match(testo, /D-244 Chat: tenere Haiku o passare a Kimi K3\? {2}\[aperta · non ferma il lavoro · provvisoria: opzione 1\]/);
+  assert.match(testo, /1\. Tenere Haiku\n {4}2\. Passare a Kimi K3 {2}\[consigliata\]/);
+  assert.ok(!testo.includes('SEGRETO-DELLE-NOTE'), 'le note per gli agenti di un\'altra domanda non si stampano');
+  assert.ok(testo.indexOf('Feedback d\'origine') < testo.indexOf('Altre domande vive') && testo.indexOf('Altre domande vive') < testo.indexOf('Registro'));
+
+  assert.match(formattaFascicoloSmistamento({ ...base, vive: [] }), /Altre domande vive sullo stesso feedback \(0\)\n {2}nessuna/);
+  assert.match(formattaFascicoloSmistamento(base), /il server non le ha mandate, non sai se ce ne sono/);
 });
 
 test('registro: col biglietto passa dal canale, da una sessione da ownerDomande e chi stampa un principio non fidato si sporca', async () => {
@@ -200,15 +240,16 @@ test('chiedi: la domanda storta si ferma col campo; quella buona dice che prima 
   assert.match(formattaDomanda({ id: 'D-1', stato: 'aperta', smistamento: 'fallito' }, {}, { quando: () => 'ora' }), /non riscritta/);
 });
 
-test('il ruolo «smistamento»: testo intero, i tre passi in ordine, i comandi del compito, il rilascio col suo nome', async () => {
+test('il ruolo «smistamento»: testo intero, i quattro passi in ordine, i comandi del compito, il rilascio col suo nome', async () => {
   const { readRoleInstructions, checkEnvelope, buildPayload } = await import('../../scripts/dispatch.mjs');
   const t = readRoleInstructions('smistamento');
   assert.ok(!/<!--\s*includi:/i.test(t), 'nessun richiamo rimasto dentro');
   assert.match(t, /Contratto comune dei worker/);
-  const passi = ['### 1. Un guasto lo tratti tu', '### 2. Se il registro risponde, rispondi tu', '### 3. Decide l\'owner: riscrivi la domanda per lui'];
+  const passi = ['### 1. Un guasto lo tratti tu', '### 2. Un doppione lo chiudi sulla domanda viva', '### 3. Se il registro risponde, rispondi tu',
+    '### 4. Decide l\'owner: riscrivi la domanda per lui'];
   const pos = passi.map((p) => t.indexOf(p));
-  assert.ok(pos.every((p) => p > 0) && pos[0] < pos[1] && pos[1] < pos[2], 'guasto, registro, owner: in quest\'ordine');
-  for (const cmd of ['smista guasto --chiave', 'smista ricevuti --richiesta fiducia', 'smista automatica --scelta N --principio D-<k>', 'smista pubblica <file.json>']) {
+  assert.ok(pos.every((p, i) => p > 0 && (i === 0 || pos[i - 1] < p)), 'guasto, doppione, registro, owner: in quest\'ordine');
+  for (const cmd of ['smista guasto --chiave', 'smista doppione --di D-<k>', 'smista ricevuti --richiesta fiducia', 'smista automatica --scelta N --principio D-<k>', 'smista pubblica <file.json>']) {
     assert.ok(t.includes(cmd), cmd);
   }
   assert.match(t, /release <biglietto> --role smistamento/);
