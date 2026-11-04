@@ -842,10 +842,11 @@
     } else if (refusal === 'PARAMS' && tettoProvato) {
       // Rifiutata anche col tetto sceso o senza: la causa è un'altra, e la frase non dice di abbassarlo.
       err.code = tools ? 'NO_TOOL_HOST' : 'PARAMETRI_HOST';
+    } else if (refusal === 'PARAMS' && !maxTokens) {
+      if (tools) err.code = 'NO_TOOL_HOST';
     } else if (refusal === 'PARAMS') {
       // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
-      const { colpa, maxOut } = maxTokens
-        ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey }) : { colpa: 'strumenti', maxOut: null };
+      const { colpa, maxOut } = await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey });
       if (colpa === 'altro') err.code = 'PARAMETRI_HOST';
       else if (colpa === 'strumenti') err.code = 'NO_TOOL_HOST';
       else {
