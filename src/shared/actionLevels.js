@@ -298,7 +298,7 @@
     const uno = file.length <= 1;
     t.push(per
       ? `\n\nNon ${uno ? 'passa' : 'passano'} dal cestino: non si ${uno ? 'potrà' : 'potranno'} più recuperare.`
-      : `\n\n${uno ? 'Lo ritrovi' : 'Li ritrovi'} nel cestino, se ${uno ? 'vuoi rimetterlo' : 'vuoi rimetterli'} al suo posto.`);
+      : `\n\n${uno ? 'Lo ritrovi nel cestino, se vuoi rimetterlo al suo posto.' : 'Li ritrovi nel cestino, se vuoi rimetterli al loro posto.'}`);
     return t;
   }
 
