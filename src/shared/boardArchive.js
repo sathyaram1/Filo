@@ -16,8 +16,15 @@
   // farebbe decidere su un valore assente, senza errore: la sentinella
   // `tests/unit/letturePerCampi.test.mjs` confronta i due.
   const CAMPI_DECISIONE = Object.freeze([
-    'status', 'archiveOverride', 'resolvedAt', 'resolvedInVersion', 'votes',
+    'status', 'statusPublic', 'archiveOverride', 'resolvedAt', 'resolvedInVersion', 'votes',
   ]);
+
+  // Si decide solo sulle risolte: la stessa regola per righe filtrate dal database o lette tutte (#1335). Senza il
+  // modulo degli stati non si sa, e non si decide.
+  function risolta(fb) {
+    const FS = global.SN_FB_STATUS;
+    return Boolean(FS && typeof FS.isResolvedForUser === 'function' && FS.isResolvedForUser(fb));
+  }
 
   const DEFAULTS = {
     // Soglia bassa per l'alpha: con pochi votanti un 2 dice già «i pochi che hanno votato
