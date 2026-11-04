@@ -1277,6 +1277,7 @@ async function riparaProprio(ctx, S) {
         carichi: blocchiDi(g).map((j, s) => {
           if (tab.has(j)) return tab.get(j);
           if (s < coperti && usati[j] && !vecchi[s]) throw errore('LETTURA', 'Il contenitore non si legge più come un attimo fa.');
+          if (usati[j] && vecchi[s] && pz.has(j)) return pulito(vecchi[s], pz.get(j).tratti);
           return (usati[j] && vecchi[s]) || ZERO;
         }),
       };
