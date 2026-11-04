@@ -196,8 +196,14 @@ describe('la riga di comando sta nel tetto di Windows', () => {
     assert.deepEqual(gruppiDiLancio(veri.map((f) => join(enorme, relative(REPO_ROOT, f))), { root: enorme }), gruppiDiLancio(veri));
   });
 
-  test('con la suite di oggi un gruppo solo: l’uscita resta quella di un `node --test` qualunque', () => {
-    assert.equal(gruppiDiLancio(collectTestFiles(), { flags: flagsConRiepilogo([], join(LUNGO, 'g.jsonl')) }).length, 1);
+  // Quanti gruppi servono dipende da quanto è cresciuta la suite, e oltre il primo i consumatori dell'uscita li
+  // contano già (#765): conta che giri tutta, ogni file una volta e nell'ordine.
+  test('la suite di oggi, in uno o più gruppi, gira tutta: ogni file una volta, nell’ordine', () => {
+    const veri = collectTestFiles();
+    const flags = flagsConRiepilogo([], join(LUNGO, 'g.jsonl'));
+    const gruppi = gruppiDiLancio(veri, { flags });
+    assert.deepEqual(gruppi.flat(), fileArgs(veri));
+    for (const g of gruppi) assert.ok(lunghezzaRiga(process.execPath, flags, g) <= TETTO_RIGA);
   });
 
   test('un file fuori dalla root resta assoluto, e le barre sono quelle normali', () => {
