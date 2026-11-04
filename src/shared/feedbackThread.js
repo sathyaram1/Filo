@@ -302,6 +302,34 @@
     return turns;
   }
 
+  // ── La fiducia delle note (#1919, SPEC-DOMANDE §1.2) ──
+  // Il testo delle note lo riscrive anche chi non è il server; `noteFidate`, le impronte dei turni scritti da un
+  // biglietto pulito, solo il server. Una nota d'altri vale fidata solo se la sua impronta è lì.
+  const CAMPO_NOTE_FIDATE = 'noteFidate';
+
+  async function improntaTurno(grezzo) {
+    const dati = new TextEncoder().encode(righe(grezzo).join('\n').trim());
+    const h = await globalThis.crypto.subtle.digest('SHA-256', dati);
+    return Array.from(new Uint8Array(h), (b) => b.toString(16).padStart(2, '0')).join('');
+  }
+
+  // Per chi scrive le note: l'impronta del turno che `dopo` aggiunge a `prima`, null se non ne aggiunge.
+  async function improntaDelTurnoAggiunto(prima, dopo) {
+    if (String(dopo == null ? '' : dopo) === String(prima == null ? '' : prima)) return null;
+    const turni = splitNotes(dopo);
+    return turni.length ? improntaTurno(turni[turni.length - 1].grezzo) : null;
+  }
+
+  // Ogni nota con `numero` (da 1) e `fidata`: un turno dell'owner, la riga fissa del taglio, o un'impronta del server.
+  // Senza il campo (note scritte prima) nessuna nota d'altri è fidata.
+  async function fiduciaDelleNote(notes, noteFidate) {
+    const fidate = new Set(Array.isArray(noteFidate) ? noteFidate.map(String) : []);
+    return Promise.all(splitNotes(notes).map(async (t, i) => Object.assign({}, t, {
+      numero: i + 1,
+      fidata: t.role === 'user' || t.grezzo === TRIM_MARK || fidate.has(await improntaTurno(t.grezzo)),
+    })));
+  }
+
   // Centralizzato qui così il parser e chi scrive restano allineati su una sola forma.
   function userTurnMarker(ts, label) {
     const when = ts || new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
