@@ -265,7 +265,7 @@
   // (#1685): riaperta, chat e modello leggono com'è finita lì. Ritorna le voci rimaste senza la loro e gli indici toccati.
   const MOTIVO_NO = 'detto no alla conferma';
   const aperta = (w, type) => !!w && w.type === type
-    && (w.esito === CHIESTO || w.esito === PROPOSTO || (w.esito === FALLITO && w.motivo === MOTIVO_NO));
+    && (w.esito === CHIESTO || w.esito === PROPOSTO || (w.esito === FALLITO && (w.motivo === MOTIVO_NO || w.riprova === true)));
   function unisciDopo(messaggi, voci) {
     const resto = [];
     const toccati = [];
@@ -300,7 +300,7 @@
       const perche = pulito(v.motivo);
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
       const R = global.SN_RIGHE_ATTIVITA;
-      const etichetta = R && Object.hasOwn(R.FAILED_LABELS, v.type) ? R.FAILED_LABELS[v.type] : '';
+      const etichetta = R ? R.etichettaFallita(v.type, v.partita === true) : '';
       return { icona: '⚠', testo: [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · '), fallita: true };
     }
     if (!riga) return null;
@@ -330,7 +330,7 @@
   }
 
   global.SN_ESITO = {
-    esitoAzione, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
+    esitoAzione, partita, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
     unisciDopo, primaRigaConferma: primaRiga, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
