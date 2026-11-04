@@ -21,8 +21,7 @@ test('il prezzo del tentativo si legge dal riquadro dell’attacco', () => {
 
 test('la capacità Red Team dice lo stesso prezzo del riquadro', () => {
   require(join(ROOT, 'src', 'shared', 'capabilities.js'));
-  const voce = globalThis.SN_CAPABILITIES.list({ redteam: true }).find((c) => c.id === 'red-team')
-    || globalThis.SN_CAPABILITIES.CAPABILITIES?.find?.((c) => c.id === 'red-team');
+  const voce = globalThis.SN_CAPABILITIES.CAPABILITIES.find((c) => c.id === 'red-team');
   assert.ok(voce, 'voce red-team non trovata');
   const detti = numeri(`${voce.desc} ${voce.invoke} ${voce.doesNot || ''}`);
   assert.ok(detti.length > 0, 'la capacità non dice più il prezzo: togli questa prova o rimettilo');
