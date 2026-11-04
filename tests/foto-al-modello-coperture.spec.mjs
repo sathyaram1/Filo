@@ -10,7 +10,6 @@ import { chiedi } from './helpers/chatFinta.mjs';
 
 const ROSA = [0xc9, 0x25, 0x85];
 const VERDE = [0x12, 0xab, 0x34];
-const BLU = [0x1e, 0x5f, 0xd6];
 
 async function preparaModelli(app) {
   await app.evaluate(async () => {
@@ -175,21 +174,27 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
   await page.fill('#c', '4111 1111 1111 1111');
   await page.locator('#c').blur();
 
-  // La seconda finestra, con la chat in vista: la si riconosce dal segno che il main le mette.
+  // La seconda finestra, con la chat in vista: la si riconosce dal segno che il main le mette. Può ripristinare le
+  // schede della prima: la chat si apre a parte, davanti.
   await app.evaluate(async ({ BrowserWindow }) => {
     const rq = process.mainModule.require;
     const prima = new Set(BrowserWindow.getAllWindows().map((w) => w.id));
-    rq(rq('node:path').join(process.cwd(), 'src/main/window.js')).createMainWindow();
-    const fine = Date.now() + 15_000;
-    for (;;) {
-      const w = BrowserWindow.getAllWindows().find((x) => !prima.has(x.id) && x._filoTabs);
-      const tm = w && w._filoTabs;
-      const tab = tm && tm.tabs.find((t) => t.id === tm.activeId);
-      const wc = tab && tab.view && tab.view.webContents;
-      if (wc && /^filo:\/\/newtab/.test(wc.getURL()) && !wc.isLoading()) { await wc.executeJavaScript('window.__secondaFinestra = true'); return; }
-      if (Date.now() > fine) throw new Error('la seconda finestra non ha aperto la chat');
-      await new Promise((r) => setTimeout(r, 150));
-    }
+    const win = rq(rq('node:path').join(process.cwd(), 'src/main/window.js')).createMainWindow();
+    const attendi = async (cond, cosa) => {
+      const fine = Date.now() + 15_000;
+      while (!cond()) {
+        if (Date.now() > fine) throw new Error(cosa);
+        await new Promise((r) => setTimeout(r, 150));
+      }
+    };
+    await attendi(() => !prima.has(win.id) && win._filoTabs && win._filoTabs.tabs.length > 0, 'la seconda finestra non ha schede');
+    const tm = win._filoTabs;
+    const scheda = tm.openTab('filo://newtab/');
+    const id = (scheda && scheda.id) || scheda;
+    if (id != null && tm.activeId !== id) tm.activate(id);
+    const wc = () => { const t = tm.tabs.find((x) => x.id === tm.activeId); return t && t.view && t.view.webContents; };
+    await attendi(() => wc() && /^filo:\/\/newtab/.test(wc().getURL()) && !wc().isLoading(), 'la seconda finestra non ha aperto la chat');
+    await wc().executeJavaScript('window.__secondaFinestra = true');
   });
   let chat = null;
   await expect.poll(async () => {
@@ -207,5 +212,4 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare la foto della finestra del pagamento').toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
-  void BLU;
 });
