@@ -320,7 +320,7 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
     cartella: dove,
   });
   // Chi stampa testo non fidato si sporca da sé (#1148): i motivi li dà questa lettura, e main sporca prima di stampare.
-  const motivi = motiviDiLettura({ fiducia: f.fiducia?.stringValue || '', notes: pieno.notes });
+  const motivi = await motiviDiLettura({ fiducia: f.fiducia?.stringValue || '', notes: pieno.notes, noteFidate: noteFidateDaCampi(f) });
   fb.attese = await attese;
   return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
 }
