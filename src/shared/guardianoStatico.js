@@ -8,6 +8,14 @@
   // Un segreto più corto di così è una parola, non una chiave: confrontarlo
   // fermerebbe avvisi innocui che la contengono per caso.
   const SEGRETO_MIN = 12;
+  // Una password nota come tale (#2134) la sceglie l'utente, e 8-11 caratteri sono comuni: lì la soglia scende.
+  const PASSWORD_MIN = 8;
+
+  // Un segreto è una stringa o { valore, password }.
+  function segretoDi(x) {
+    const oggetto = !!x && typeof x === 'object';
+    return { v: testo(oggetto ? x.valore : x).trim(), min: oggetto && x.password ? PASSWORD_MIN : SEGRETO_MIN };
+  }
 
   // Qui NON si indovina se un codice è una credenziale: si riconoscono solo le
   // forme che in una frase onesta non compaiono. Un codice «di verifica», «di
