@@ -2,7 +2,7 @@
 // conversazione scritta da biglietti puliti non sporca. Le regole del server stanno in filo-security (radiciLetture).
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { writeFileSync, existsSync, readdirSync } from 'node:fs';
+import { writeFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { motiviDiLettura, sporca, rigaSporco, cartellaSporchi, ENV_FILE } from '../../scripts/lib/biglietto-locale.mjs';
@@ -76,4 +76,49 @@ test('il gancio sa dire la radice di una pagina, di una ricerca, di un server MC
 
 test('le domande lette si nominano col loro numero; un id che non è una domanda non passa', () => {
   assert.deepEqual(lettiDi(['D-12', '?', 'D-x', 'D-3']), [{ tipo: 'domanda', id: 'D-12' }, { tipo: 'domanda', id: 'D-3' }]);
+});
+
+// Ogni strada che stampa testo nomina al server cosa ha stampato: se una smettesse, la sessione prenderebbe la radice
+// del solo biglietto, e il timbro sul testo vero non la ripulirebbe più.
+function spia() {
+  const sporcate = [];
+  return { sporcate, sporca: async (cosa, motivi, opts = {}) => { sporcate.push({ cosa, letti: opts.letti }); return 'sporcato'; } };
+}
+const D_NF = { id: 'D-2', numero: 2, titolo: 'Nata da un utente', priorita: 'importante', stato: 'aperta', fiducia: 'non_fidato', opzioni: [], conversazione: [] };
+const D_F = { id: 'D-1', numero: 1, titolo: 'Fidata', priorita: 'importante', stato: 'aperta', fiducia: 'fidato', opzioni: [], conversazione: [] };
+
+test('elenco, stampa e registro delle domande nominano al server le sole non fidate che stampano', async () => {
+  const { esegui } = await import('../../scripts/domanda.mjs');
+  const base = { biglietto: async () => '', bigliettoLocale: async () => '', scrivi: () => {}, errore: () => {} };
+  const casi = [
+    [['elenco'], { domande: [D_F, D_NF] }],
+    [['mostra', 'D-2'], { domanda: D_NF }],
+    [['registro', 'pizza'], { voci: [{ id: 'D-1', titolo: 't', principio: 'p', fiducia: 'fidato' }, { id: 'D-2', titolo: 't', principio: 'p', fiducia: 'non_fidato' }] }],
+  ];
+  for (const [argv, risposta] of casi) {
+    const s = spia();
+    assert.equal(await esegui(argv, Object.assign({}, base, { chiama: async () => Object.assign({ ok: true }, risposta), sporca: s.sporca })), 0, argv[0]);
+    assert.deepEqual(s.sporcate.map((x) => x.letti), [[{ tipo: 'domanda', id: 'D-2' }]], argv[0]);
+  }
+});
+
+test('l’elenco dei compiti nomina al server i soli compiti non fidati', async () => {
+  const { esegui } = await import('../../scripts/compito.mjs');
+  const s = spia();
+  const elenco = { ok: true, aperti: [
+    { id: 'C-8', tipo: 'manuale', titolo: 'pulito', fiducia: 'fidato', stato: 'aperto', aperto: true, urgenza: 30, biglietti: [] },
+    { id: 'C-9', tipo: 'manuale', titolo: 'esterno', fiducia: 'non_fidato', stato: 'aperto', aperto: true, urgenza: 30, biglietti: [] },
+  ], storico: [] };
+  assert.equal(await esegui(['elenco'], { chiama: async () => elenco, bigliettoLocale: async () => 's', sporca: s.sporca, scrivi: () => {}, errore: () => {} }), 0);
+  assert.deepEqual(s.sporcate.map((x) => x.letti), [[{ tipo: 'compito', id: 'C-9' }]]);
+});
+
+test('il gancio annota la radice della pagina letta accanto al biglietto, non solo il motivo', async () => {
+  const { gancio } = await import('../../scripts/lib/letture-esterne.mjs');
+  const { dir, file, b } = biglietto();
+  const avviati = [];
+  const r = gancio({ input: { tool_name: 'WebFetch', tool_input: { url: 'https://esempio.it/listino' }, cwd: dir }, env: { [ENV_FILE]: file }, avvia: (p) => avviati.push(p) });
+  assert.equal(r.esito, 'annotato', JSON.stringify(r));
+  const voci = readdirSync(cartellaSporchi(b)).map((n) => JSON.parse(readFileSync(join(cartellaSporchi(b), n), 'utf8')));
+  assert.deepEqual(voci.flatMap((v) => v.radici || []), ['web:https://esempio.it/listino']);
 });
