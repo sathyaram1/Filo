@@ -1752,7 +1752,7 @@
       return forma('l5', 'quadrato', titolo, fallito ? 'attack' : 'spam', fallito ? 'conflitto' : 'riallinea', {
         titolo,
         righe: [],
-        testo: fallito ? testoRiallineamentoFallito(failed) : STATI_FUSIONE.da_riallineare.testo,
+        testo: testoRiallineamento(failed, !fallito),
         azioni: [],
       }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: stato });
     }
