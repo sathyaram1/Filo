@@ -1483,8 +1483,10 @@
     // In attesa di conferma come le altre, ma la si dà dalla loro UI: il
     // bottone del riordino, il pannello con l'elenco da eliminare.
     if (permessoDaConcedere(a)) return bottonePermesso(a);
-    if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity, chat);
-    if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity, chat);
+    // I pannelli sono conferme della stessa risposta come i bottoni: la ripresa aspetta anche loro (#1685).
+    if ((type === 'PULISCI_TAB' || type === 'CANCELLA_ARCHIVIO') && gruppo) gruppo.pendenti.add(a);
+    if (type === 'PULISCI_TAB') return renderBottoneRiordino(a, activity, chat, gruppo);
+    if (type === 'CANCELLA_ARCHIVIO') return renderDeleteArchivePanel(a, activity, chat, gruppo);
     if (type === 'RIAPRI_SCHEDA' && a._output && (a._output.nonRaggiungibile || a._output.tagliato)) return cartaRiassunto(a._output);
     // Azione sospesa in attesa di conferma (#146.2): il main non l'ha eseguita
     // (livello 2 o 3) e ha allegato spiegazione + livello. Il bottone apre il
