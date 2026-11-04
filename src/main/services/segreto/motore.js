@@ -801,11 +801,13 @@ async function segnaCaseVecchie(ctx, S) {
   S.caseVecchie = new Uint8Array(ctx.N);
   const occ = ctx.mappa.occ;
   let calcoli = 0;
+  const fine = lunghezzaCatena(ctx.N);
   for (let i = 0; i < 2 * S.L; i++) {
     if (S.pos[i] >= 0) continue;
-    for (let r = 0; r < CATENA_MAX; r++) {
+    const at = catena(S.posto, ctx.N, i);
+    for (let r = 0; r < fine; r++) {
       if (++calcoli % 4096 === 0) await cedi();
-      const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
+      const p = at(r);
       if (occ[p]) continue;
       if (S.letti[p]) S.caseVecchie[p] = 1;
       break;
