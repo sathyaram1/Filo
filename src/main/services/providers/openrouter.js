@@ -820,18 +820,39 @@
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
-    const perTetto = causaTetto(res.status, errText, maxTokens);
+    const perTetto = causaTetto(res.status, errText, maxTokens || tettoProvato || 0);
+    const tetto = maxTokens || tettoProvato;
     if (perTetto && refusal !== 'PARAMS') {
-      err.code = 'TETTO_RISPOSTA';
-      err.maxTokens = maxTokens;
+      // Un host che nomina insieme strumenti e tetto («tools are not supported with max_tokens > 8192») lo dice la frase.
+      err.code = perTetto.strumenti && tools ? 'NO_TOOL_HOST' : 'TETTO_RISPOSTA';
+      err.maxTokens = tetto;
       if (perTetto.finestra) err.finestra = perTetto.finestra;
+      if (perTetto.memoria) err.memoria = true;
       if (perTetto.stringibile) err.stringibile = true;
+      if (maxTokens && !tettoProvato) {
+        let hostMax = null;
+        if (!perTetto.limite && !perTetto.memoria) {
+          const h = await hostUtili({ apiKey, model, providerRouting, tools, ownKey });
+          hostMax = h && h.tuttiNoti ? h.maxOut : null;
+        }
+        const n = tettoDaRiprovare(perTetto, maxTokens, hostMax);
+        if (n != null) err.tettoRetto = n;
+      }
+    } else if (refusal === 'PARAMS' && tettoProvato) {
+      // Rifiutata anche col tetto sceso o senza: la causa è un'altra, e la frase non dice di abbassarlo.
+      err.code = tools ? 'NO_TOOL_HOST' : 'PARAMETRI_HOST';
     } else if (refusal === 'PARAMS') {
       // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
-      const colpa = maxTokens ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey }) : false;
-      if (tools) err.code = 'NO_TOOL_HOST';
-      else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
-      if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
+      const { colpa, maxOut } = maxTokens
+        ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey }) : { colpa: 'strumenti', maxOut: null };
+      if (colpa === 'altro') err.code = 'PARAMETRI_HOST';
+      else if (colpa === 'strumenti') err.code = 'NO_TOOL_HOST';
+      else {
+        err.code = tools ? 'NO_TOOL_HOST' : 'TETTO_RISPOSTA';
+        err.maxTokens = maxTokens;
+        const n = colpa === 'tetto' ? tettoDaRiprovare({}, maxTokens, maxOut) : 0;
+        if (n != null) err.tettoRetto = n;
+      }
     } else if (refusal) err.code = refusal;
     // Un host che dice di non leggere quel contenuto è lo stesso rifiuto del router (#1345).
     if (!err.code && [400, 415, 422].includes(res.status) && ingressoDi(errText)) err.code = 'INGRESSO_NON_LETTO';
