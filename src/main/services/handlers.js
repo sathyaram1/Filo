@@ -4863,7 +4863,7 @@ async function bersaglioAudio(tm, action, schedeViste) {
   const ferma = tm.tabs.filter((t) => t.audioAt > 0 && !t.audible).sort((x, y) => y.audioAt - x.audioAt)[0] || null;
   const chiusa = await tm.ultimaChiusaCheSuonava();
   if (ferma && (!chiusa || ferma.audioAt >= chiusa.at)) return { tab: ferma };
-  if (chiusa) return { chiusa };
+  if (chiusa) { const aperta = tm.apertaCon(chiusa.url); return aperta ? { tab: aperta } : { chiusa }; }
   const suona = tm.tabs.find((t) => t.audible);
   return suona ? { giaSuona: suona } : { nessuna: true };
 }
