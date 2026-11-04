@@ -5897,9 +5897,9 @@ async function lasciaNellaConversazione(wcId) {
     if (s.wcId !== wcId) continue;
     seguitiSerbati.delete(id);
     const c = s.composizione;
-    const testo = c.text || (c.immagini.length ? 'Descrivi questa immagine.' : '');
-    if (!s.chatId || !testo) continue;
-    if (await appendToChatArchive(s.chatId, { role: 'user', text: testo, images: c.immagini.length })) scritti += 1;
+    if (!s.chatId || !c.text) continue;
+    const citazione = await citazioneDelMessaggio(c.rispostaA, s.chatId);
+    if ((await archiviaDomanda(s.chatId, { testo: c.text, immagini: c.immagini, ref: citazione.ref })).archiviata) scritti += 1;
   }
   if (scritti) { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} }
 }
