@@ -43,6 +43,7 @@ const USO = [
   '  smista mostra                         rilegge la domanda, il feedback da cui viene e il registro',
   '  smista guasto --chiave "<strumento>: <prima riga del rifiuto>" --titolo "…" --testo "…" | - --resoconto "…"',
   '                                        è un guasto: feedback del difetto aperto o riusato, il lavoro fermo lo aspetta',
+  '  smista doppione --di D-k --testo "…" | -   chiede la stessa scelta di D-k, ancora viva: si chiude lì',
   '  smista ricevuti --richiesta fiducia|permesso --testo "…" | -   serve l\'owner: il lavoro va nei Ricevuti',
   '  smista automatica --scelta N --principio D-k --testo "…" | -   risponde il principio di D-k con l\'opzione N',
   '  smista pubblica <file.json | ->       la domanda riscritta per l\'owner: da lì la vede lui',
