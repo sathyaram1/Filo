@@ -3603,6 +3603,8 @@ async function eseguiAzioneFilo(action, {
         const base = { titolo: v.perModello.titolo, url: v.perModello.url, chiusa: v.perModello.chiusa };
         // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: resta il riassunto, come per una pagina sparita.
         if (v.voce.urlTagliato) return { executed: false, kept: true, output: { ...base, riaperta: false, tagliato: true, riassunto: v.perModello.riassunto } };
+        const aperta = tm.apertaCon(v.voce.url);
+        if (aperta) { tm.activate(aperta.id); return { executed: true, kept: true, output: { ...base, riaperta: true, giaAperta: true } }; }
         // Dietro finché non si sa se la pagina c'è: se non c'è più, l'utente resta in chat, dove vede il riassunto.
         const id = await tm.riapri(voceDaArchivio(v.voce), { activate: false });
         if (!id) return { executed: false, kept: true, output: { ...base, riaperta: false } };
