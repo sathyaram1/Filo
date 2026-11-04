@@ -537,7 +537,7 @@ rispondere.
 - **Operazioni** (intento `smistamento` del canale, `domanda.mjs smista` col
   biglietto): `mostra` (il fascicolo), `guasto` (`chiave`, `titolo`, `testo`,
   `resoconto`), `ricevuti` (`richiesta`: `fiducia` o `permesso`, `testo`),
-  `automatica` (`scelta`, `principio`: la domanda chiusa, `testo`), `pubblica`
+  `doppione` (`di`: la domanda viva, `testo`), `automatica` (`scelta`, `principio`: la domanda chiusa, `testo`), `pubblica`
   (`domanda`, controllata con la validazione comune e la forma per l'owner).
   Ognuna tranne `mostra` chiude il compito.
 - **Tentativi.** Un biglietto che finisce senza nessuna delle quattro rimette
