@@ -25,7 +25,7 @@ async function homeConScala(app, scala) {
 }
 
 for (const scala of [1.25, 1.5]) {
-  test(`r1 testo ${scala * 100}% e finestra larga 1000, nessun avviso: nel campo della home si scrive su una riga vera`, async ({ app }, info) => {
+  test(`r1 testo ${scala * 100}% e finestra larga 1000, nessun avviso: nel campo della home si scrive su una riga vera`, async ({ app, shell }, info) => {
     await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((x) => x._filoTabs).setContentSize(1000, 760));
     const page = await homeConScala(app, scala);
     await page.waitForTimeout(400);
