@@ -25,8 +25,10 @@ contextBridge.exposeInMainWorld('filoShell', {
     // Toggle se `muted` è omesso.
     setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
     duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),
-    // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476).
-    riapriChiusa: () => ipcRenderer.invoke('tabs:riapri-chiusa'),
+    // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476); `via: 'menu'` dai menu della linguetta e del «+».
+    riapriChiusa: (via) => ipcRenderer.invoke('tabs:riapri-chiusa', { via }),
+    ciSonoChiuse: () => ipcRenderer.invoke('tabs:ci-sono-chiuse'),
+    chiudiAltre: (id) => ipcRenderer.invoke('tabs:chiudi-altre', { id }),
     scriviIndirizzo: (id) => ipcRenderer.invoke('tabs:scrivi-indirizzo', { id }),
     help: (id) => ipcRenderer.invoke('tabs:help', { id }),
     snapshot: () => ipcRenderer.invoke('tabs:snapshot'),
