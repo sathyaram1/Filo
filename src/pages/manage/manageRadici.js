@@ -56,5 +56,10 @@
     box.hidden = !lista.length;
   }
 
-  window.SN_MANAGE_RADICI = { etichetta, titolo, disegna };
+  // Un timbro ricalcola feedback e domande insieme: le radici lette prima, da qualunque sezione, valgono fino al prossimo.
+  let epoca = 0;
+  const invalida = () => { epoca += 1; };
+  const firma = (id, fiducia) => `${epoca}|${id}|${fiducia || ''}`;
+
+  window.SN_MANAGE_RADICI = { etichetta, titolo, disegna, invalida, firma };
 })();
