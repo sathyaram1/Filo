@@ -46,8 +46,8 @@
 //   Numeri inesistenti e più di venti si rifiutano prima di aprire.
 //
 //   `--pacchetto` (FEEDBACK-STATES.md § 3a, Pacchetti): il feedback è un pacchetto che unisce quelle segnalazioni, e il
-//   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e alla nascita le archivia; chi le aspettava
-//   aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
+//   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e le loro attese, e alla nascita le archivia; chi
+//   le aspettava aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
 //   Anche il testo, prima della rete: nomina ogni unita, non manda la spec nelle note, e chi mette prima è in --aspetta.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
