@@ -468,17 +468,48 @@ export function chiAspetta(righe, unite) {
   Object.defineProperty(out, 'grafo', { value: grafo });
   for (const r of Array.isArray(righe) ? righe : []) {
     const id = String((r && r._id) || '');
-    if (id) grafo.set(id, { num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || '', attese: globalThis.SN_FB_ATTESE.atteseDi(r) });
-    if (!id || perId.has(id)) continue;
+    if (!id) continue;
     const attese = globalThis.SN_FB_ATTESE.atteseDi(r);
+    const num = FB.formatNum(Number(r.seq), Number(r.subSeq)) || '';
+    grafo.set(id, { num, attese });
+    if (perId.has(id)) continue;
     const togli = attese.map((w) => w.id).filter((x) => perId.has(x));
     if (!togli.length) continue;
     out.push({
-      id, num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || id, togli, quali: togli.map((x) => perId.get(x)),
+      id, num: num || id, togli, quali: togli.map((x) => perId.get(x)),
       tenute: attese.filter((w) => !perId.has(w.id)).map((w) => w.num || w.id),
     });
   }
   return out;
+}
+
+/**
+ * I giri che il pacchetto chiuderebbe: chi aspetta una unita passa ad aspettare il pacchetto, quindi è un giro se lo si
+ * raggiunge dalle attese del pacchetto, direttamente o a catena (`aspettanti.grafo`, da chiAspetta). PURA.
+ * → [{ x, catena: [id] }]: `catena` va da un'attesa del pacchetto fino a x.
+ */
+export function giriDelPacchetto(attese, aspettanti, uniteIds = []) {
+  const lista = Array.isArray(aspettanti) ? aspettanti : [];
+  const grafo = lista.grafo instanceof Map ? lista.grafo : new Map();
+  const perId = new Map(lista.map((x) => [x.id, x]));
+  const dentro = new Set(uniteIds);
+  const padre = new Map();
+  const coda = [];
+  for (const w of Array.isArray(attese) ? attese : []) if (w && w.id && !padre.has(w.id)) { padre.set(w.id, null); coda.push(w.id); }
+  const giri = [];
+  for (let i = 0; i < coda.length; i += 1) {
+    const id = coda[i];
+    if (perId.has(id)) {
+      const catena = [];
+      for (let c = id; c != null; c = padre.get(c)) catena.unshift(c);
+      giri.push({ x: perId.get(id), catena });
+      continue;
+    }
+    // Le attese delle unite le prende il pacchetto: sono già fra i punti di partenza.
+    if (dentro.has(id)) continue;
+    for (const w of (grafo.get(id) || {}).attese || []) if (!padre.has(w.id)) { padre.set(w.id, id); coda.push(w.id); }
+  }
+  return giri;
 }
 
 /** Letture e scritture di un pacchetto. Oggetto: i test lo sostituiscono, il vero va in rete. */
