@@ -2015,6 +2015,7 @@
       panel.querySelectorAll('.dash-delete-list, .dash-action-btn').forEach((el) => el.remove());
       if (!query && !tutto) {
         note.textContent = 'Non so quali schede eliminare: dimmi di cosa parlano.';
+        senzaDomanda();
         return;
       }
       note.dataset.cerco = '1';
