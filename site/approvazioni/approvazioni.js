@@ -187,7 +187,10 @@
     async function salta(b) {
       var risposta;
       try {
-        risposta = await chiamaFunzione(FUNZIONE_SALTA, { feedbackId: String(b.feedbackId || '') });
+        // Il salto vale solo per il commit esaminato che la card ha mostrato (#1502).
+        var richiesta = { feedbackId: String(b.feedbackId || '') };
+        if (b.sha) richiesta.sha = String(b.sha);
+        risposta = await chiamaFunzione(FUNZIONE_SALTA, richiesta);
         if (!risposta) risposta = { ok: false, error: 'Il server non ha risposto.' };
         else if (risposta.ok === false) {
           // Un guasto (GitHub giù) ha la sua frase: il salto è già registrato, e lo si ripreme.
