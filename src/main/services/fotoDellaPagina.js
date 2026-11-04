@@ -277,8 +277,14 @@ function fotoPiena(wc) {
   return wc.capturePage();
 }
 
+/** La barra in alto di Filo alta `altezza`, per il box del feedback: è la shell, non una pagina, e va all'owner. */
+function fotoDellaBarra(win, altezza) {
+  const [w] = win.getContentSize();
+  return win.webContents.capturePage({ x: 0, y: 0, width: w, height: altezza });
+}
+
 module.exports = {
   paginaDaFotografare, barraDaFotografare, fattoreDiScala, fotoLeggera, QUALITA_LEGGERA,
-  fotoPerModello, fotoPiena, perche, frameDiAltreOrigini, rifiutoDellaMisura, coperture, dipingi, colore, codiceMisura,
+  fotoPerModello, fotoPiena, fotoDellaBarra, perche, frameDiAltreOrigini, rifiutoDellaMisura, coperture, dipingi, colore, codiceMisura,
   GRIGIO, PERCHE,
 };
