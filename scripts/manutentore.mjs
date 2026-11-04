@@ -434,10 +434,19 @@ export function righeSpesa(spesa) {
   if (!spesa || spesa.ok === false || !spesa.accounts) return [`Non letta${spesa && spesa.ok === false ? `: ${unaRiga(spesa.detail || spesa.reason || '')}` : ''}: decidi senza, e dillo nel recap.`];
   const usd = (v) => (Number.isFinite(Number(v)) ? `${Number(v).toFixed(2)} $` : '?');
   const quando = (ms) => (Number.isFinite(Number(ms)) && Number(ms) > 0 ? new Date(Number(ms)).toISOString().slice(0, 16).replace('T', ' ') : '?');
-  return Object.entries(spesa.accounts).sort(([a], [b]) => a.localeCompare(b)).map(([a, x]) => {
+  // #1787: un numero che il server non ha dato (conto delle accensioni partito dopo, storia corta) non compare, mai uno zero.
+  const num = (v) => (v !== null && v !== undefined && v !== '' && Number.isFinite(Number(v)) ? Number(v) : null);
+  const righe = Object.entries(spesa.accounts).sort(([a], [b]) => a.localeCompare(b)).map(([a, x]) => {
     const p = x && Number.isFinite(Number(x.pct)) ? `, ${Math.round(Number(x.pct))}% della quota` : '';
-    return `- ${unaRiga(a)}: ${usd(x && x.usdSettimana)} dal ${quando(x && x.settimanaDaMs)}${p}, rinnovo ${quando(x && x.rinnovoAtMs)}${x && x.fermo ? `, fermo: ${unaRiga(x.fermo)}` : ''}.`;
+    const s = x || {};
+    const resta = num(s.pct) !== null && num(s.limite) !== null ? `, resta ${Math.max(0, Math.round(num(s.limite) - num(s.pct)))}%` : '';
+    const giorno = num(s.usd24h) !== null ? `, ultime 24 ore ${usd(s.usd24h)}` : '';
+    const acc = [num(s.accensioniSettimana) !== null ? `${num(s.accensioniSettimana)} in settimana` : '',
+      num(s.accensioni24h) !== null ? `${num(s.accensioni24h)} nelle ultime 24 ore` : ''].filter(Boolean).join(', ');
+    return `- ${unaRiga(a)}: ${usd(x && x.usdSettimana)} dal ${quando(x && x.settimanaDaMs)}${p}${resta}${giorno}${acc ? `, accensioni: ${acc}` : ''}, rinnovo ${quando(x && x.rinnovoAtMs)}${x && x.fermo ? `, fermo: ${unaRiga(x.fermo)}` : ''}.`;
   });
+  if (spesa.freni === 'numeri_assenti') righe.push('Senza riserva di A né tetto di B i crediti non frenano: dosa tu sulla settimana.');
+  return righe;
 }
 
 // Il contesto piccolo di una sveglia (§ 4) sta sui ~25k token: questo è il tetto col margine. Oltre, la rosa è larga.

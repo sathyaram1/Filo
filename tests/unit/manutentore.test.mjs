@@ -418,3 +418,23 @@ test('la chat parte col file del contesto intero e dice dove vanno le indicazion
   assert.match(m, /npm run manutentore -- indicazione/);
   assert.doesNotMatch(m, /"/, 'niente virgolette: su Windows passa da una shell');
 });
+
+// #1787: la spesa del manutentore dice anche quanto resta, le ultime 24 ore, le accensioni e se i freni sono spenti.
+test('la spesa per account porta quanto resta, le ultime 24 ore e le accensioni; un numero mancante non compare', () => {
+  const settimana = Date.parse('2026-10-27T17:00:00Z');
+  const rinnovo = Date.parse('2026-11-03T17:00:00Z');
+  const righe = M.righeSpesa({
+    ok: true, freni: 'attivi',
+    accounts: {
+      B: { usdSettimana: 1620, pct: 81, limite: 80, settimanaDaMs: settimana, rinnovoAtMs: rinnovo, fermo: 'riserva', accensioni24h: 0 },
+      A: { usdSettimana: 800, pct: 40, limite: 90, usd24h: 95, accensioniSettimana: 12, accensioni24h: 4, settimanaDaMs: settimana, rinnovoAtMs: rinnovo },
+    },
+  });
+  assert.deepEqual(righe, [
+    '- A: 800.00 $ dal 2026-10-27 17:00, 40% della quota, resta 50%, ultime 24 ore 95.00 $, accensioni: 12 in settimana, 4 nelle ultime 24 ore, rinnovo 2026-11-03 17:00.',
+    '- B: 1620.00 $ dal 2026-10-27 17:00, 81% della quota, resta 0%, accensioni: 0 nelle ultime 24 ore, rinnovo 2026-11-03 17:00, fermo: riserva.',
+  ]);
+  const senzaFreni = M.righeSpesa({ ok: true, freni: 'numeri_assenti', accounts: { A: { usdSettimana: 5, pct: 1, usd24h: null, accensioniSettimana: null } } });
+  assert.doesNotMatch(senzaFreni[0], /ultime 24 ore|accensioni|resta/);
+  assert.match(senzaFreni[1], /non frenano: dosa tu sulla settimana/);
+});
