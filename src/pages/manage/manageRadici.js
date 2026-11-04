@@ -14,7 +14,7 @@
       if (/^ricerca /.test(valore)) return 'ricerca web';
       try { return new URL(valore).hostname || 'pagina web'; } catch (_) { return 'pagina web'; }
     }
-    if (x.tipo === 'esterno' && /^biglietto /.test(valore)) return 'sessione sporca';
+    if (x.sessione === true) return 'sessione sporca';
     return { posta: 'posta', file: 'file esterno', mcp: `strumento ${valore}`, esterno: 'esterno' }[x.tipo] || x.tipo;
   }
 
@@ -30,7 +30,7 @@
     const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'
       : x.tipo === 'ignota' ? 'Il server non sa da dove viene: nessun timbro la toglie.'
         : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.valore}: leggilo prima di timbrarlo.`
-          : x.tipo === 'esterno' && /^biglietto /.test(x.valore) ? letturaDellaSessione(x)
+          : x.sessione === true ? letturaDellaSessione(x)
             : `${x.nome || x.valore}: guardalo prima di timbrarlo.`;
     if (x.tipo === 'ignota') return cosa;
     const effetto = x.tipo === 'legacy' ? 'Un clic timbra in blocco tutto ciò che è nato prima' : 'Un clic la timbra per tutto ciò che la porta';
