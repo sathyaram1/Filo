@@ -33,8 +33,8 @@ export function rigaEsito(r, { dalVero } = {}) {
     : `Si può sanare (${conto}). Rilancia con --dal-vero per togliere il buco.`;
 }
 
-/** deps: { chiama(data) → risultato della callable, scrivi(riga) }. → codice d'uscita. */
-export async function sana(argv, { chiama = risultatoOwnerFiducia, scrivi = console.log } = {}) {
+/** deps: { chiama(data) → risultato della callable, scrivi(riga), rete (i deps della chiamata comune) }. → codice d'uscita. */
+export async function sana(argv, { rete = {}, chiama = (data) => risultatoOwnerFiducia(data, rete), scrivi = console.log } = {}) {
   const args = leggiArgomenti(argv);
   if (args.errore) { scrivi(args.errore); return 2; }
   let r;
