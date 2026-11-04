@@ -1955,7 +1955,7 @@
       : { type, esito: E.FALLITO, riga, motivo: String(motivo || '').slice(0, 200), riprova: true };
     a._voce = { ...voce };
     try { archiviaAzione(type, [], a, { chat, voce }); } catch (_) {}
-    if (!no) proseguiQuandoLibero(chat, { ...voce });
+    proseguiQuandoLibero(chat, no ? null : { ...voce }, gruppo, a);
   }
 
   // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
