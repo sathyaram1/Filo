@@ -411,13 +411,38 @@ export function formattaFeedbackOrigine(fb, { quando = dataOra } = {}) {
   return righe.join('\n');
 }
 
-/** Il fascicolo del compito «Gestisci la domanda»: la domanda, il feedback d'origine, il registro. PURA. */
+/**
+ * Le altre domande vive sul feedback d'origine (#1928): senza, un doppione di una provvisoria arriva all'owner due volte.
+ * Campo assente = server che non le manda: si dice, perché «nessuna» sarebbe una falsa certezza. PURA.
+ */
+export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
+  if (!conFeedback) return '';
+  if (!Array.isArray(vive)) return 'Altre domande vive sullo stesso feedback: il server non le ha mandate, non sai se ce ne sono.';
+  const n = vive.length + (Number(altre) > 0 ? Number(altre) : 0);
+  const righe = [`Altre domande vive sullo stesso feedback (${n}${altre > 0 ? `, qui le ${vive.length} più recenti` : ''})`];
+  if (!vive.length) righe.push('  nessuna');
+  for (const d of vive) {
+    const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
+    if (Number.isInteger(d.provvisoria)) segni.push(`provvisoria: opzione ${d.provvisoria + 1}`);
+    righe.push(`  ${visibile(d.id || '?')} ${visibile(d.titolo || '(senza titolo)')}  [${segni.join(' · ')}]`);
+    if (d.problema) righe.push(rientro(`Problema: ${d.problema}`, '    '));
+    (Array.isArray(d.opzioni) ? d.opzioni : []).forEach((o, i) => {
+      const consigliata = d.consiglio && d.consiglio.opzione === i ? '  [consigliata]' : '';
+      righe.push(rientro(`${i + 1}. ${o && o.testo ? o.testo : ''}${consigliata}`, '    '));
+    });
+  }
+  return righe.join('\n');
+}
+
+/** Il fascicolo del compito «Gestisci la domanda»: la domanda, il feedback d'origine con le sue domande vive, il registro. PURA. */
 export function formattaFascicoloSmistamento(f) {
   const x = f || {};
   if (x.affidata === false) {
     return `La domanda non è più affidata a te${x.motivo ? ` (${visibile(x.motivo)})` : ''}: non c'è niente da fare, rilascia il biglietto.`;
   }
-  return [formattaDomanda(x.domanda, x.riferimenti), '', formattaFeedbackOrigine(x.feedback), '', formattaRegistro(x.registro)].join('\n');
+  const conFeedback = !!(x.feedback && (x.feedback.num || x.feedback.id));
+  const vive = formattaVive(x.vive, { altre: x.viveAltre, conFeedback });
+  return [formattaDomanda(x.domanda, x.riferimenti), '', formattaFeedbackOrigine(x.feedback), ...(vive ? ['', vive] : []), '', formattaRegistro(x.registro)].join('\n');
 }
 
 /** Cosa stampa un'operazione dello smistamento andata a buon fine. PURA. */
