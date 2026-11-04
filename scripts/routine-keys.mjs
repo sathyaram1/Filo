@@ -188,7 +188,7 @@ async function main() {
     await chiama({ op: 'ambiente', slug: nome, ambiente: potere });
     console.log({
       riservati: `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`,
-      rete_aperta: `"${nome}" è la chiave dell'ambiente a rete aperta: i suoi biglietti nascono sporchi, riceve solo compiti già non fidati e mai testo riservato né lavori server. La accende la voce sua del pacemaker (Gestione → Automazioni).`,
+      rete_aperta: `"${nome}" è la chiave dell'ambiente a rete aperta: i suoi biglietti nascono sporchi, riceve solo compiti già non fidati e mai testo riservato né lavori server. Si spegne e si limita da Gestione → Automazioni, anche quando parte a mano.`,
       normale: `"${nome}" è in un ambiente normale: non riceve testo riservato.`,
     }[potere]);
     return;
