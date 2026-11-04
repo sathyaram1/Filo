@@ -1022,27 +1022,45 @@ function pianifica(S, fisicheLibere, modifica, { riusa = [] } = {}) {
   return { ...extra, tabella, bytes, blocchiTabella, L2 };
 }
 
+// Un file piccolo va nel primo buco di un pacco (prima quello dove già sta), se no in un blocco nuovo tutto suo. I
+// tratti della tabella vecchia restano dove sono, anche quello del file che si sostituisce: fino alla testa nuova vale lei.
 function pianoScrittura(S, fisicheLibere, nome, lunghezza, ora, { senzaVecchio = false } = {}) {
   const vecchio = S.tabella.get(nome);
-  const riusa = senzaVecchio && vecchio ? daEstensioni(vecchio.e) : [];
+  const riusa = senzaVecchio ? soloSuoi(S.tabella, nome) : [];
   return pianifica(S, fisicheLibere, (tabella, prendi) => {
     if (senzaVecchio) tabella.delete(nome);
-    const blocchiFile = Array.from({ length: Math.ceil(lunghezza / CARICO) }, prendi);
-    tabella.set(nome, { d: lunghezza, c: vecchio ? vecchio.c : ora, m: ora, e: estensioni(blocchiFile), x: 0 });
-    return { blocchiFile };
+    const voce = { d: lunghezza, c: vecchio ? vecchio.c : ora, m: ora, x: 0 };
+    if (lunghezza < 1 || lunghezza > PICCOLO) {
+      const blocchiFile = Array.from({ length: Math.ceil(lunghezza / CARICO) }, prendi);
+      tabella.set(nome, { ...voce, e: estensioni(blocchiFile) });
+      return { blocchiFile };
+    }
+    const pz = pacchi(tabella);
+    const suo = vecchio && vecchio.o !== undefined && !senzaVecchio ? vecchio.e[0][0] : -1;
+    const ordine = [...pz.keys()].filter((j) => !pz.get(j).rovinato).sort((a, b) => (a === suo ? -1 : b === suo ? 1 : a - b));
+    for (const j of ordine) {
+      const o = buco(pz.get(j).tratti, lunghezza);
+      if (o < 0) continue;
+      tabella.set(nome, { ...voce, e: [[j, 1]], o });
+      return { blocchiFile: [], pacco: { j, o } };
+    }
+    const j = prendi();
+    tabella.set(nome, { ...voce, e: [[j, 1]], o: 0 });
+    return { blocchiFile: [], pacco: { j, o: 0 } };
   }, { riusa });
 }
 
-// Il file più grande che ci sta adesso sotto quel nome, contando come libero quello che il file vecchio lascerebbe.
-function massimoScrivibile(S, fisicheLibere, nome) {
+// Il file più grande che ci sta adesso sotto quel nome; `senzaVecchio`: se prima si togliesse quello che c'è. Cede il
+// turno a ogni prova: il motore gira nel processo della finestra, e con un segreto grande una prova costa millisecondi.
+async function massimoScrivibile(S, fisicheLibere, nome, { senzaVecchio = false } = {}) {
   const ora = Date.now();
-  const ci = (n) => !!pianoScrittura(S, fisicheLibere, nome, n, ora, { senzaVecchio: true });
+  const ci = (n) => !!pianoScrittura(S, fisicheLibere, nome, n, ora, { senzaVecchio });
   if (!ci(0)) return 0;
-  const vecchio = S.tabella.get(nome);
   const liberi = S.L - blocchiUsati(S.L, S.tabella, S.blocchiTabella).reduce((a, b) => a + b, 0);
   let basso = 0;
-  let alto = (liberi + Math.floor(fisicheLibere / 2) + (vecchio ? daEstensioni(vecchio.e).length : 0)) * CARICO;
+  let alto = Math.max(PICCOLO, (liberi + Math.floor(fisicheLibere / 2) + (senzaVecchio ? soloSuoi(S.tabella, nome).length : 0)) * CARICO);
   while (basso < alto) {
+    await cedi();
     const m = Math.floor((basso + alto + 1) / 2);
     if (ci(m)) basso = m;
     else alto = m - 1;
