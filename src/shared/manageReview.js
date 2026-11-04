@@ -1692,9 +1692,7 @@
     pieno: 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
   };
   function specieFusa(r) {
-    const MA = global.SN_MERGE_APPROVALS;
-    if (MA && typeof MA.specieFusaSenzaChiedere === 'function') return MA.specieFusaSenzaChiedere(r);
-    return r && r.motivo === 'fiducia' ? 'fiducia' : r && r.skippedL5 === true ? 'locale' : 'pieno';
+    return schedaFusioni().specieFusaSenzaChiedere(r);
   }
 
   /**
