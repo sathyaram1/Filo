@@ -77,3 +77,48 @@ test('riquadro di un altro sito che si sposta ogni 5 ms', async ({ app, openTab,
   for (let i = 0; i < 16; i++) esiti.push(await fotoERosa(app));
   console.log('OSCILLA5', JSON.stringify(esiti));
 });
+
+test('pagina che scorre veloce con un riquadro piccolo di un altro sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo 1.234</body>`, { pubblico: true });
+  let righe = '';
+  for (let i = 0; i < 40; i++) righe += `<p style="height:150px;margin:0">riga ${i}</p><iframe src="${altro}" style="width:300px;height:40px;border:0;display:block"></iframe>`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0">
+    ${righe}
+    <script>let d = 15; setInterval(() => { if (scrollY > 5000) d = -15; if (scrollY <= 0) d = 15; scrollBy(0, d); }, 5);</script>
+    </body></html>`);
+  await page.waitForTimeout(1500);
+  const esiti = [];
+  for (let i = 0; i < 16; i++) esiti.push(await fotoERosa(app));
+  console.log('SCORRE', JSON.stringify(esiti.map((e) => `${e.coperta}/${e.piena}`)));
+});
+
+test('pagina che scorre SCORRE600 con un riquadro piccolo di un altro sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo 1.234</body>`, { pubblico: true });
+  let righe = '';
+  for (let i = 0; i < 40; i++) righe += `<p style="height:150px;margin:0">riga ${i}</p><iframe src="${altro}" style="width:300px;height:40px;border:0;display:block"></iframe>`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0">
+    ${righe}
+    <script>let d = 3; setInterval(() => { if (scrollY > 5000) d = -3; if (scrollY <= 0) d = 3; scrollBy(0, d); }, 5);</script>
+    </body></html>`);
+  await page.waitForTimeout(1500);
+  const esiti = [];
+  for (let i = 0; i < 16; i++) esiti.push(await fotoERosa(app));
+  console.log('SCORRE600', JSON.stringify(esiti.map((e) => `${e.coperta}/${e.piena}`)));
+});
+
+test('pagina che scorre SCORRE1200 con un riquadro piccolo di un altro sito', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo 1.234</body>`, { pubblico: true });
+  let righe = '';
+  for (let i = 0; i < 40; i++) righe += `<p style="height:150px;margin:0">riga ${i}</p><iframe src="${altro}" style="width:300px;height:40px;border:0;display:block"></iframe>`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0">
+    ${righe}
+    <script>let d = 6; setInterval(() => { if (scrollY > 5000) d = -6; if (scrollY <= 0) d = 6; scrollBy(0, d); }, 5);</script>
+    </body></html>`);
+  await page.waitForTimeout(1500);
+  const esiti = [];
+  for (let i = 0; i < 16; i++) esiti.push(await fotoERosa(app));
+  console.log('SCORRE1200', JSON.stringify(esiti.map((e) => `${e.coperta}/${e.piena}`)));
+});
