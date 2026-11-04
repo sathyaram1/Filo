@@ -73,7 +73,10 @@ test('nello screenshot del feedback la password e il numero della carta scritti 
 
   const immagini = [];
   for (const [i, [password, carta]] of [['Gatto.Rosso.77', '4111 1111 1111 1111'], ['ab1', '5500 0000 0000 0004']].entries()) {
+    // Coi puntini a schermo la password non si legge; si legge quando l'utente preme «mostra» e il sito la fa testo.
+    await page.evaluate(() => { document.querySelector('#p').type = 'password'; });
     await page.fill('#p', password);
+    await page.evaluate(() => { document.querySelector('#p').type = 'text'; });
     await page.fill('#c', carta);
     const strato = await mandaConSchermata(app, page, `Il tasto Accedi non risponde (${i + 1})`);
     await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(i + 1);
