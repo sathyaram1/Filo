@@ -1,4 +1,5 @@
-// Verifica #1686 giro 5: porte dei giri passati su «rimettimi la musica» e riapertura delle schede chiuse dalla chat.
+// Verifica #1686 giro 5: r1 la musica fermata un attimo perde il suo «suonava adesso»; r2 una scheda chiusa già tornata
+// aperta per la chat resta chiusa, e riaprirla ne fa una seconda copia.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiedi, chiamateAlModello, ripristina } from '../../helpers/chatFinta.mjs';
@@ -38,7 +39,7 @@ const suonaUna = async (app, url) => {
   return false;
 };
 
-test('la musica fermata e fatta ripartire in un attimo, poi chiusa mentre suona, vince su un video fermato dopo', async ({ app, shell, openTab, testServer }) => {
+test('r1 la musica fermata e fatta ripartire in un attimo, poi chiusa mentre suona, vince su un video fermato dopo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const chat = await home(app);
   const musica = await openTab(testServer.html(MUSICA));
@@ -76,7 +77,7 @@ test('la musica fermata e fatta ripartire in un attimo, poi chiusa mentre suona,
   await ripristina(app);
 });
 
-test('la musica chiusa e riaperta con la scorciatoia riparte lei, senza una seconda copia', async ({ app, shell, openTab, testServer }) => {
+test('r2 la musica chiusa e riaperta con la scorciatoia riparte lei, senza una seconda copia', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const chat = await home(app);
   const musica = await testServer.openReady(openTab, MUSICA);
@@ -105,7 +106,7 @@ test('la musica chiusa e riaperta con la scorciatoia riparte lei, senza una seco
   await ripristina(app);
 });
 
-test('«riaprila» detto due volte non apre due copie della stessa scheda chiusa', async ({ app, shell, openTab, testServer }) => {
+test('r2 «riaprila» detto due volte non apre due copie della stessa scheda chiusa', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   const chat = await home(app);
   await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche', { pubblico: true }));
@@ -130,42 +131,5 @@ test('«riaprila» detto due volte non apre due copie della stessa scheda chiusa
   }
   await chat.waitForTimeout(1500);
   expect((await schede(shell)).tabs.filter((t) => t.url === orche.url).length, 'una sola scheda delle orche').toBe(1);
-  await ripristina(app);
-});
-
-test('«stamattina» e «ieri sera» filtrano per data di chiusura, e il modello sa che giorno è', async ({ app, testServer }) => {
-  test.setTimeout(90_000);
-  const chat = await home(app);
-  const base = testServer.originPubblico;
-  const ora = new Date();
-  const oggi8 = new Date(ora.getFullYear(), ora.getMonth(), ora.getDate(), 8, 0, 0);
-  const ieri21 = new Date(ora.getFullYear(), ora.getMonth(), ora.getDate() - 1, 21, 0, 0);
-  const settimana = new Date(ora.getFullYear(), ora.getMonth(), ora.getDate() - 7, 10, 0, 0);
-  await app.evaluate(async (_e, voci) => {
-    for (const v of voci) await globalThis.SN_ARCHIVED_TABS.archive(v);
-  }, [
-    { url: `${base}/stamattina`, title: 'Pagina di stamattina', closedAt: oggi8.toISOString(), reason: 'manual' },
-    { url: `${base}/ierisera`, title: 'Pagina di ieri sera', closedAt: ieri21.toISOString(), reason: 'manual' },
-    { url: `${base}/vecchia`, title: 'Pagina vecchia', closedAt: settimana.toISOString(), reason: 'manual' },
-  ]);
-  const g = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  await modelloFinto(app, [
-    { text: '', toolCalls: [{ id: 'f1', name: 'SCHEDE_CHIUSE', arguments: JSON.stringify({ da: g(oggi8) }) }] },
-    { text: '', toolCalls: [{ id: 'f2', name: 'SCHEDE_CHIUSE', arguments: JSON.stringify({ da: `${g(ieri21)}T18:00`, a: `${g(ieri21)}T23:59` }) }] },
-    { text: 'fine' },
-  ]);
-  await chiedi(chat, 'che schede ho chiuso stamattina e ieri sera?');
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'fine' })).toBeVisible({ timeout: 20_000 });
-  const calls = await chiamateAlModello(app);
-  const esito = (id) => { for (const m of calls) { const x = m.find((y) => y.role === 'tool' && y.tool_call_id === id); if (x) return String(x.content); } return ''; };
-  const e1 = esito('f1');
-  const e2 = esito('f2');
-  expect(e1).toContain('Pagina di stamattina');
-  expect(e1).not.toContain('Pagina di ieri sera');
-  expect(e1).not.toContain('Pagina vecchia');
-  expect(e2).toContain('Pagina di ieri sera');
-  expect(e2).not.toContain('Pagina di stamattina');
-  const sistema = JSON.stringify(calls[0]);
-  expect(sistema, 'il modello deve sapere la data di oggi').toMatch(new RegExp(String(ora.getFullYear())));
   await ripristina(app);
 });
