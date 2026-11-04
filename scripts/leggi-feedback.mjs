@@ -250,7 +250,7 @@ async function main(argv) {
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
     const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
-    if (esito.motivi.length) console.error(await rigaSporco(`letto #${esito.numero}`, esito.motivi));
+    for (const riga of await dichiaraLettura(esito)) console.error(riga);
     console.log(esito.testo);
     return 0;
   } catch (e) {
