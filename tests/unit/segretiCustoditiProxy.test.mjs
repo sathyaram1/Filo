@@ -69,3 +69,14 @@ test('verso un modello il proxy arriva senza utente e password, con l\'host', ()
   assert.ok(m.content.includes(G.OSCURATO));
   assert.ok(m.content.includes('gate.fornitore.example:7000'), m.content);
 });
+
+// Molti fornitori fanno scegliere la password, e 8-11 caratteri sono comuni: sotto la soglia delle chiavi resta custodita.
+test('una password corta del proxy non esce e non arriva al modello; una chiave corta resta sotto soglia', () => {
+  const corta = 'Kq7vRt2x';
+  const lista = custoditi({ impostazioni: [{ proxy: { datacenter: `http://mario.rossi:${corta}@gate.example.net:7000` } }], env: {} });
+  assert.ok(lista.some((x) => x.valore === corta && x.password), JSON.stringify(lista));
+  assert.equal(X.valutaUscita({ type: 'NAVIGA', url: `https://raccolta.example/?p=${corta}` }, { segreti: lista }).blocca, true);
+  assert.ok(!G.oscuraSegreti(`password ${corta}`, lista).includes(corta));
+  const chiave = custoditi({ impostazioni: [{ apiKeys: { tavily: 'Kq7vRt2x' } }], env: {} });
+  assert.deepEqual(chiave, [], 'una chiave corta non è una password nota');
+});
