@@ -2047,10 +2047,12 @@
         again.textContent = 'Riprova';
         again.addEventListener('click', () => { cerca(); });
         panel.appendChild(again);
+        senzaDomanda();
         return;
       }
       if (!results.length) {
         note.textContent = tutto ? 'L’archivio è già vuoto.' : 'Nessuna scheda archiviata riguarda questa richiesta.';
+        senzaDomanda();
         return;
       }
       const quante = (n) => `${n} ${n === 1 ? 'scheda' : 'schede'}`;
