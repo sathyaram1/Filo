@@ -6031,6 +6031,8 @@ async function handleFiloChat(richiesta) {
   // dell'intervista, che non chiama il modello) non si conta.
   const conto = contaSe('turnoChat', ACTIONS.FILO_CHAT) || TURNO_MUTO;
   const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc), conto, esito: '' };
+  const scheda = idScheda(richiesta && richiesta.sender && richiesta.sender.wc);
+  turnoDellaScheda(scheda, 1);
   try {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
@@ -6043,6 +6045,7 @@ async function handleFiloChat(richiesta) {
     try { conto.fine(volo.esito); } catch (_) {}
     if (volo.accoglienza) onbTurniInVolo -= 1;
     togliTurno(reqId, volo.turno);
+    turnoDellaScheda(scheda, -1);
   }
 }
 
@@ -6422,6 +6425,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const leggiSeguiti = async () => {
     for (const s of turno.seguiti.splice(0)) {
       turno.letti.add(s.id);
+      seguitiSerbati.delete(s.id);
       seguitiLetti.push(s.id);
       testiDeiSeguiti.push(s.testo);
       threadMessages.push({ role: 'user', content: `${s.testo}\n\n${NOTA_SEGUITO}` });
