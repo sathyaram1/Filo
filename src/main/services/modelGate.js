@@ -215,7 +215,7 @@
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
       return (Array.isArray(lista) ? lista : [])
-        .map((x) => (typeof x === 'string' ? { valore: x, tipo: '' } : { valore: String((x && x.valore) || ''), tipo: String((x && x.tipo) || '') }))
+        .map((x) => (typeof x === 'string' ? { valore: x, tipo: '' } : { valore: String((x && x.valore) || ''), tipo: String((x && x.tipo) || ''), password: !!(x && x.password) }))
         .filter((x) => x.valore);
     }
 
