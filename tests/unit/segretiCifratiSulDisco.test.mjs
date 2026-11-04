@@ -80,10 +80,12 @@ test('un file con la chiave di Safe Browsing e il proxy in chiaro si riscrive ci
     writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: impostazioni(), altro: 1 }), 'utf8');
     const S = avvia(userData);
     assert.deepEqual((await S.get('settings')).settings, impostazioni());
-    await S.flushNow();
+    // Nessuna scrittura chiesta: deve bastare la lettura, anche per la copia di riserva.
     await S.whenSettled();
-    const testo = readFileSync(join(userData, 'storage.json'), 'utf8');
-    for (const s of [SAFE, PASSWORD, CHIAVE]) assert.equal(testo.includes(s), false, `${s} è rimasto in chiaro`);
+    for (const nome of ['storage.json', 'storage.json.bak']) {
+      const testo = readFileSync(join(userData, nome), 'utf8');
+      for (const s of [SAFE, PASSWORD, CHIAVE]) assert.equal(testo.includes(s), false, `${s} è rimasto in chiaro in ${nome}`);
+    }
     assert.deepEqual((await avvia(userData).get('settings')).settings, impostazioni());
   } finally {
     togliCartella(userData);
