@@ -272,6 +272,56 @@ function blocchiUsati(L, tabella, blocchiTabella) {
   return u;
 }
 
+// Per ogni blocco di file piccoli, i tratti [inizio, fine) che la tabella vi tiene, in ordine.
+function pacchi(tabella) {
+  const out = new Map();
+  for (const f of tabella.values()) {
+    if (f.o === undefined) continue;
+    const j = f.e[0][0];
+    if (!out.has(j)) out.set(j, { tratti: [], rovinato: false });
+    const p = out.get(j);
+    p.tratti.push([f.o, f.o + f.d]);
+    if (f.x) p.rovinato = true;
+  }
+  for (const p of out.values()) p.tratti.sort((a, b) => a[0] - b[0]);
+  return out;
+}
+
+function buco(tratti, d) {
+  let da = 0;
+  for (const [a, b] of tratti) {
+    if (a - da >= d) return da;
+    da = Math.max(da, b);
+  }
+  return CARICO - da >= d ? da : -1;
+}
+
+// Solo i tratti dei file che ci stanno: i byte di uno tolto non restano leggibili a chi ha il nome.
+function pulito(carico, tratti) {
+  const b = Buffer.alloc(CARICO);
+  for (const [a, z] of tratti) carico.copy(b, a, a, z);
+  return b;
+}
+
+function sporcoFuori(carico, tratti) {
+  let da = 0;
+  for (const [a, b] of [...tratti, [CARICO, CARICO]]) {
+    for (let x = da; x < a; x++) if (carico[x]) return true;
+    da = Math.max(da, b);
+  }
+  return false;
+}
+
+// I blocchi che quel file non divide con nessuno: quello di un pacco resta a chi ci sta ancora.
+function soloSuoi(tabella, nome) {
+  const f = tabella.get(nome);
+  if (!f) return [];
+  if (f.o !== undefined) {
+    for (const [n, g] of tabella) if (n !== nome && g.o !== undefined && g.e[0][0] === f.e[0][0]) return [];
+  }
+  return daEstensioni(f.e);
+}
+
 // I blocchi dei file già segnati rovinati: a loro manca il contenuto per definizione, e non è un motivo per fermarsi.
 function blocchiRovinati(L, tabella) {
   const u = new Uint8Array(L);
