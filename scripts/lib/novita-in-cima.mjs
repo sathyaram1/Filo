@@ -203,6 +203,15 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
   if (p.errore) return { ok: false, motivo: p.errore };
   const sposta = aggiunteSottoUscite(prima, dopo, uscita);
   if (!sposta.length) return { ok: true, src, spostate: [], verso: p.versione };
+  // Righe diverse da prima più di quelle in più: il ramo ne ha anche riscritta una già letta da chi ha quella versione,
+  // e quale sia l'aggiunta non è meccanico. Spostarle tutte svuoterebbe un blocco uscito.
+  for (const n of dopo) {
+    const quante = sposta.filter((s) => s.version === n.version).length;
+    const prec = prima.find((x) => x.version === n.version);
+    if (quante > righe(n).length - (prec ? righe(prec).length : 0)) {
+      return { ok: false, motivo: `nel blocco ${n.version}, già uscito, il ramo ha anche riscritto righe che c'erano: sposta a mano nel blocco ${p.versione} solo quelle aggiunte` };
+    }
+  }
 
   const versioni = dopo.map((n) => n.version);
   const doppia = versioni.find((v, k) => versioni.indexOf(v) !== k);
