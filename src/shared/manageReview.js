@@ -2126,7 +2126,7 @@
     fidata: Object.freeze({ classe: 'fidata', parola: 'Nota fidata',
       testo: 'Nota fidata: l’hai scritta tu, o un lavoro che non aveva letto niente di non fidato. Chi la legge resta pulito.' }),
     nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Nota non fidata',
-      testo: 'Nota non fidata: l’ha scritta un lavoro che aveva letto testo non fidato, o è di prima che il server segnasse la fiducia delle note. Chi la legge si sporca.' }),
+      testo: 'Nota non fidata: l’ha scritta, o registrata come tua risposta, chi aveva letto testo non fidato; oppure è di prima che il server segnasse la fiducia delle note. Chi la legge si sporca.' }),
   });
   /** Il segno della fiducia di una nota, da `fidata` di SN_FEEDBACK_THREAD.fiduciaDelleNote. PURA. */
   function segnoFiduciaNota(fidata) {
