@@ -249,17 +249,18 @@
   function splitNotes(notes) {
     const lines = righe(notes || '');
     const segments = [];
-    let current = { role: 'model', ts: null, lines: [], atts: [] };
+    let current = { role: 'model', ts: null, lines: [], atts: [], raw: [] };
     for (const line of lines) {
       const mu = USER_TURN_RE.exec(line);
       const mm = mu ? null : MODEL_TURN_RE.exec(line);
       if (mu) {
         segments.push(current);
-        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [] };
+        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [], raw: [] };
       } else if (mm) {
         segments.push(current);
-        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [] };
+        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [], raw: [] };
       } else {
+        current.raw.push(line);
         const att = parseAttachmentLine(line);
         if (att) current.atts.push(att);
         else current.lines.push(line);
@@ -267,7 +268,8 @@
     }
     segments.push(current);
     return segments
-      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts }))
+      // `grezzo`: il turno com'è sotto il suo marcatore, righe-allegato comprese; è il testo che l'impronta copre.
+      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts, grezzo: s.raw.join('\n').trim() }))
       // Si tiene anche il segmento di soli allegati: una risposta può essere una sola immagine.
       .filter((s) => s.body.length > 0 || s.attachments.length > 0);
   }
