@@ -356,7 +356,14 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   const motivi = await motiviDiLettura({ fiducia, notes: pieno.notes, noteFidate: noteFidateDaCampi(f) });
   fb.attese = await attese;
   const maiGiudicato = g.esito === 'mai_giudicato' ? g.motivo : '';
-  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove), { maiGiudicato }), ...allegati].join('\n'), motivi, numero };
+  // `letti`: cosa si è letto, perché il server dia alla sessione le radici del testo e della conversazione (#1918).
+  return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove), { maiGiudicato }), ...allegati].join('\n'), motivi, numero, letti: [{ tipo: 'feedback', id: String(id) }] };
+}
+
+/** La riga dello sporco di una lettura riuscita, che nomina al server il feedback letto; '' se non sporca. */
+export async function rigaDellaLettura(esito, { riga = rigaSporco } = {}) {
+  if (!esito || !Array.isArray(esito.motivi) || !esito.motivi.length) return '';
+  return riga(`letto #${esito.numero}`, esito.motivi, { letti: esito.letti || [] });
 }
 
 /** Gli argomenti: un riferimento, e l'opzione per un mai giudicato dei Ricevuti. null se non tornano. PURA. */
@@ -373,7 +380,7 @@ export function argomentiLettura(argv) {
  */
 export async function dichiaraLettura(esito, { sporca = rigaSporco, riserva = rigaRiservato } = {}) {
   const righe = [];
-  if (esito.motivi.length) righe.push(await sporca(`letto #${esito.numero}`, esito.motivi, { letti: esito.letti || [] }));
+  righe.push(await rigaDellaLettura(esito, { riga: sporca }));
   righe.push(await riserva(`letto #${esito.numero}`));
   return righe.filter(Boolean);
 }
@@ -417,8 +424,7 @@ async function main(argv) {
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
     const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq, ancheMaiGiudicato: a.ancheMaiGiudicato });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
-    // Il server legge le radici del testo e della conversazione: chi li ha scritti puliti non sporca (#1918).
-    for (const riga of await dichiaraLettura({ ...esito, letti: [{ tipo: 'feedback', id: r.id }] })) console.error(riga);
+    for (const riga of await dichiaraLettura(esito)) console.error(riga);
     console.log(esito.testo);
     return 0;
   } catch (e) {
