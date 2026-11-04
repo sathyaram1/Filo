@@ -2860,7 +2860,7 @@
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
-        else if (msg.surface === 'redteam') { if (voceAttacco) self.SN_REDTEAM_ATTACK_UI?.open(); }
+        else if (msg.surface === 'redteam') apriAttaccoSeConsentito();
         else if (msg.surface === 'help') openHelpSidebar();
         else if (msg.surface === 'valuta') valutaDalRiquadro();
         else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
