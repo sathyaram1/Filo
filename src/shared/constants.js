@@ -1165,17 +1165,21 @@
     return out;
   }
 
-  // I posti dei segreti dell'utente nelle impostazioni, come [oggetto, campo]: l'esportazione li porta solo se
-  // chiesto (#905), i segreti custoditi li tengono fuori da uscite e prompt (#2134). Un proxy con utente e password
-  // vale quanto una chiave API. PURA.
-  function campiSegreti(s) {
+  // I posti dei segreti dell'utente nelle impostazioni, come percorsi: l'esportazione li porta solo se chiesto (#905),
+  // i segreti custoditi li tengono fuori da uscite e prompt (#2134), e sul disco vanno cifrati col portachiavi
+  // (#905.1). Un proxy con utente e password vale quanto una chiave API. PURA.
+  function percorsiSegreti(s) {
     const out = [];
     if (!oggetto(s)) return out;
-    if (oggetto(s.apiKeys)) for (const k of Object.keys(s.apiKeys)) out.push([s.apiKeys, k]);
-    if (oggetto(s.proxy)) for (const k of ['datacenter', 'residential']) if (credenzialiProxy(s.proxy[k])) out.push([s.proxy, k]);
+    if (oggetto(s.apiKeys)) for (const k of Object.keys(s.apiKeys)) out.push(['apiKeys', k]);
+    if (oggetto(s.proxy)) for (const k of ['datacenter', 'residential']) if (credenzialiProxy(s.proxy[k])) out.push(['proxy', k]);
     const sb = oggetto(s.security) ? s.security.safeBrowse : null;
-    if (oggetto(sb) && 'safeBrowsingKey' in sb) out.push([sb, 'safeBrowsingKey']);
+    if (oggetto(sb) && 'safeBrowsingKey' in sb) out.push(['security', 'safeBrowse', 'safeBrowsingKey']);
     return out;
+  }
+  // Gli stessi posti come [oggetto, campo], per chi li toglie o li sostituisce.
+  function campiSegreti(s) {
+    return percorsiSegreti(s).map((p) => [p.slice(0, -1).reduce((o, k) => o[k], s), p[p.length - 1]]);
   }
   function haSegreti(s) {
     return campiSegreti(s).some(([o, k]) => pieno(o[k]));
