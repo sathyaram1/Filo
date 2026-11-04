@@ -163,9 +163,9 @@ function richiestaAperta(sopra) {
       || (r.fine === ultima.fine && r.tipo === ultima.tipo && r.chiesta && !ultima.chiesta);
     if (meglio) ultima = r;
   }
-  if (!ultima || l.slice(ultima.fine).trim().length > DOPO_LA_RICHIESTA || altroDopo(l, ultima)) return null;
+  if (!ultima || l.slice(ultima.fine).trim().length > DOPO_LA_RICHIESTA || chiusa(l, ultima)) return null;
   // Una richiesta vera prima di un sollecito che rinomina la password vale ancora: conta come chiesta.
-  const chiesta = tutte.some((r) => r.chiesta && r.tipo === ultima.tipo && !altroDopo(l, r));
+  const chiesta = tutte.some((r) => r.chiesta && r.tipo === ultima.tipo && !chiusa(l, r));
   return { tipo: ultima.tipo, chiesta };
 }
 
