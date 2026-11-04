@@ -92,6 +92,13 @@ lo vede:
   sul repo pubblico a ogni modifica. Quello che produce lo consegna al server
   come dati. Un canale che non passa dal server resta chiuso, anche uno nuovo.
   È l'unico ambiente a cui il server consegna testo riservato (§ 5.1);
+- **in cloud, l'ambiente a rete aperta** (#2013, decisione dell'owner del
+  01/11: «filo compiti», separato dalle sue sedi e senza i suoi segreti) ha
+  la rete aperta, quindi il server non sa cosa entra: i suoi biglietti
+  nascono sporchi per costruzione e prendono solo i compiti a cui lo sporco
+  non toglie niente (§ 5.2). Mai un lavoro su un feedback, nemmeno la
+  verifica o il controllo di sicurezza, mai un lavoro server, mai testo
+  riservato, compresa la domanda di fine turno del manutentore;
 - **in locale:** un gancio sporca il biglietto dopo ogni strumento, tranne un
   elenco chiuso di quelli che non portano dentro niente da fuori (la shell, le
   ricerche nel disco, le scritture, i sotto-agenti locali, i compiti); uno
@@ -1010,6 +1017,25 @@ i compiti che lo leggono aspettano, e la Gestione lo dice. Il pacemaker conta il
 lavoro di ogni account con rete e ambiente delle sue chiavi: un'istanza pronta
 accende la routine dei riservati anche a coda vuota, e un feedback non la
 accende mai.
+
+L'ambiente a rete aperta (§ 1.2, #2013) lo dichiara allo stesso modo la chiave
+(`routine-keys.mjs ambiente <nome> rete_aperta`), e il segno vince su `rete` e
+`lavori`: biglietti sempre sporchi, mai una chiave server. Riceve un compito
+solo se lo sporco non gli toglie niente: generico (scritto a mano o istanza di
+un ricorrente; unione, risposta e smistamento devono poter restare puliti),
+già non fidato, non riservato, con un ambito che non vede dati privati (la
+rete aperta porta già testo non fidato e un'uscita). Un compito scritto dal
+manutentore con la sua chiave o dall'ambiente dei riservati nasce riservato,
+perché il testo porta quello che ha letto: resta ai riservati, come i suoi
+esperimenti. La accende una voce sua del pacemaker: `routineIdReteAperta` e il
+segreto `CC_ROUTINE_FIRE_TOKEN_RETE_APERTA`, che per scelta dell'owner (D-257,
+sedi del 03/11/2026) il server non dichiara: finché resta così la voce sta su
+`rete_no_token` e la routine parte solo a mano. Spenta da `reteApertaOff`, col suo
+tetto `reteApertaTetto` (assente = 1) dentro quello comune delle sessioni, con
+la pausa e i freni degli account della sua chiave. Decide dopo le voci server
+e prima di A/B, che quando lei può accendere non contano i suoi compiti.
+Gestione → Automazioni la mostra (ultima decisione, accensioni di oggi,
+pausa) e la spegne.
 
 ### 5.3 Ambiti nuovi
 

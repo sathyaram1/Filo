@@ -1792,6 +1792,8 @@
     .mg-auto-field-row {
       display: flex; align-items: center; gap: 10px; margin-top: 12px;
     }
+    /* L'etichetta di un numero dentro un blocco che ha già il suo titolo (la routine a rete aperta). */
+    .sn-page .mg-auto-sub-label { margin: 0; font-size: 13px; color: var(--sn-muted); }
     .sn-page input.mg-auto-number {
       width: 72px; box-sizing: border-box;
       font: inherit; padding: 7px 10px; border-radius: 8px;
@@ -2611,6 +2613,26 @@
                   <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
                 </label>
                 <span class="mg-action-msg" id="mgManutentoreMsg" role="status"></span>
+              </section>
+
+              <!-- La routine dell'ambiente a rete aperta (#2013): la sua voce del pacemaker, il suo tetto, il suo stato. -->
+              <section class="mg-auto-block" id="mgReteApertaBlock">
+                <label class="mg-switch" id="mgReteApertaSwitch" title="Prende solo i compiti già non fidati che non leggono dati privati: mai feedback, lavori server o testi riservati. Spenta, non prende compiti, nemmeno partita a mano.">
+                  <span class="mg-switch-text">Routine a rete aperta</span>
+                  <input type="checkbox" id="mgReteAperta" checked />
+                  <span class="mg-switch-track"><span class="mg-switch-thumb"></span></span>
+                </label>
+                <span class="mg-action-msg" id="mgReteApertaMsg" role="status"></span>
+                <div class="mg-auto-field-row">
+                  <label class="mg-auto-sub-label" for="mgReteApertaTetto">Sessioni sue insieme</label>
+                  <input type="number" id="mgReteApertaTetto" class="mg-auto-number"
+                    min="1" max="20" step="1" inputmode="numeric" title="Contano anche fra le sessioni in parallelo" />
+                  <button type="button" class="sn-btn" id="mgReteApertaTettoSave">Salva</button>
+                  <span class="mg-action-msg" id="mgReteApertaTettoMsg" role="status"></span>
+                </div>
+                <!-- L'ultima decisione del pacemaker su di lei e la sua pausa: le scrive manage.js. -->
+                <p class="mg-auto-block-desc" id="mgReteApertaStato" role="status" hidden></p>
+                <div class="mg-auto-pause" id="mgReteApertaPausa" role="status" hidden></div>
               </section>
 
               <!-- Le tre scelte su COME partono le sessioni, manovrabili anche a routine spente. Il freno sta sopra la N

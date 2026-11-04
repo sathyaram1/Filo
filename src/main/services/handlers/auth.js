@@ -684,7 +684,7 @@ module.exports = function register(on, ctx) {
   // solo i campi scritti: gli altri restano ignoti invece di valere il default.
   const sessionsReply = (s) => {
     const r = { ok: true, letto: s.letto !== false };
-    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso']) {
+    for (const k of globalThis.SN_ROUTINE_SESSIONI.CHIAVI) {
       if (s[k] !== undefined) r[k] = s[k];
     }
     return r;
@@ -704,13 +704,9 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      return sessionsReply(await Defaults.setRoutineSessions({
-        maxSessions: msg.maxSessions,
-        priorityAccount: msg.priorityAccount,
-        accountAOff: msg.accountAOff,
-        accountBOff: msg.accountBOff,
-        manutentoreAcceso: msg.manutentoreAcceso,
-      }, idToken));
+      const patch = {};
+      for (const k of globalThis.SN_ROUTINE_SESSIONI.CHIAVI) patch[k] = msg[k];
+      return sessionsReply(await Defaults.setRoutineSessions(patch, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -771,13 +767,15 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
-  // Le pause in corso degli account e della routine server, col motivo (#996). Lo stato del pacemaker non lo legge
+  // Le pause in corso degli account e delle routine server e a rete aperta, col motivo (#996), e lo stato della rete
+  // aperta (#2013). Lo stato del pacemaker non lo legge
   // nessun client: passa dal registro delle routine, con le credenziali dell'owner (mai dalla callable dello storico).
   on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
     try {
       const r = await callSecurityFunction('routineLog', { op: 'pause' });
       const pause = r && r.pause && typeof r.pause === 'object' ? r.pause : {};
-      return { ok: true, pause, oraMs: Number(r && r.oraMs) || Date.now() };
+      const voci = r && r.voci && typeof r.voci === 'object' ? r.voci : {};
+      return { ok: true, pause, voci, oraMs: Number(r && r.oraMs) || Date.now() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }

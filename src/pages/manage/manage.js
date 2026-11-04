@@ -31,6 +31,13 @@
   const mgLavoriServer       = document.getElementById('mgLavoriServer');
   const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
   const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
+  // La routine a rete aperta (#2013): accesa o spenta, quante sessioni sue, e lo stato che scrive il pacemaker.
+  const mgReteAperta          = document.getElementById('mgReteAperta');
+  const mgReteApertaSwitch    = document.getElementById('mgReteApertaSwitch');
+  const mgReteApertaMsg       = document.getElementById('mgReteApertaMsg');
+  const mgReteApertaTetto     = document.getElementById('mgReteApertaTetto');
+  const mgReteApertaTettoSave = document.getElementById('mgReteApertaTettoSave');
+  const mgReteApertaTettoMsg  = document.getElementById('mgReteApertaTettoMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
   // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
   // per i soli 0; più il testo in coda alla risposta (fixInstructions).
@@ -666,8 +673,10 @@
     // accesa, perché si preparano prima di riaccendere (richiesta owner).
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
+    if (mgReteApertaSwitch) mgReteApertaSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
+      mgReteAperta, mgReteApertaTetto, mgReteApertaTettoSave,
       mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
       ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
@@ -885,11 +894,13 @@
   const sessionsInAttesa = [];
   // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
   let maxInScrittura = false;
+  let tettoInScrittura = false;
 
   // Righe che dicono di non aver riletto il resto, col testo che resta quando
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
   const avvisiLettura = new Map();
-  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']]];
+  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']],
+    [mgReteApertaMsg, ['reteApertaOff']], [mgReteApertaTettoMsg, ['reteApertaTetto']]];
   // Ultimo esito di ogni riga; l'avviso «non letto» non è un esito: lo decide mostraSessionsMsg.
   const esitiSessions = new Map();
   const sceltePendenti = () => Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
@@ -950,6 +961,8 @@
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
     if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
     if (mgManutentoreAcceso) mgManutentoreAcceso.checked = noto('manutentoreAcceso') && vista.manutentoreAcceso;
+    if (mgReteAperta) mgReteAperta.checked = !vista.reteApertaOff;
+    if (mgReteApertaTetto && !tettoInScrittura) mgReteApertaTetto.value = noto('reteApertaTetto') ? String(vista.reteApertaTetto) : '';
     // Esclusi tutti e due non parte niente; escluso il solo prioritario si
     // lavora sull'altro. Due stati che a guardare gli interruttori non si
     // capiscono, quindi si scrivono.
@@ -995,6 +1008,7 @@
       return Promise.resolve(false);
     }
     if ('maxSessions' in esito.valori) maxInScrittura = false;
+    if ('reteApertaTetto' in esito.valori) tettoInScrittura = false;
     const scelta = { valori: esito.valori, msgEl };
     sessionsInAttesa.push(scelta);
     // In coda dietro un'altra richiesta può aspettare: si vede che è partita.
@@ -1004,6 +1018,7 @@
     const confermaSessions = (testo, dopoLettura) => {
       if (sessionsInAttesa.some((s) => s.msgEl === msgEl)) return;
       if ('maxSessions' in esito.valori && mgMaxSessions && mgMaxSessions.value !== String(esito.valori.maxSessions)) return;
+      if ('reteApertaTetto' in esito.valori && mgReteApertaTetto && mgReteApertaTetto.value !== String(esito.valori.reteApertaTetto)) return;
       setSessionsMsg(msgEl, testo, 'ok', dopoLettura);
     };
     const scritti = Object.keys(esito.valori);
@@ -1067,21 +1082,38 @@
     mgManutentoreAcceso.addEventListener('change', () => saveSessions({ manutentoreAcceso: mgManutentoreAcceso.checked }, mgManutentoreMsg));
   }
 
-  for (const [el, campo] of [[mgAccountA, 'accountAOff'], [mgAccountB, 'accountBOff']]) {
+  for (const [el, campo, msg] of [[mgAccountA, 'accountAOff', mgAccountsMsg], [mgAccountB, 'accountBOff', mgAccountsMsg], [mgReteAperta, 'reteApertaOff', mgReteApertaMsg]]) {
     if (!el) continue;
     el.addEventListener('change', () => {
       // Acceso = in uso, quindi l'interruttore e il campo dicono l'opposto.
-      saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
+      saveSessions({ [campo]: !el.checked }, msg);
+    });
+  }
+
+  if (mgReteApertaTetto) {
+    const letto = () => (mgReteApertaTetto.validity && mgReteApertaTetto.validity.badInput ? 'NaN' : mgReteApertaTetto.value);
+    const salva = () => saveSessions({ reteApertaTetto: letto() }, mgReteApertaTettoMsg);
+    if (mgReteApertaTettoSave) mgReteApertaTettoSave.addEventListener('click', salva);
+    mgReteApertaTetto.addEventListener('input', () => {
+      tettoInScrittura = true;
+      setSessionsMsg(mgReteApertaTettoMsg, '', null);
+    });
+    mgReteApertaTetto.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || mgReteApertaTetto.disabled) return;
+      e.preventDefault();
+      salva();
     });
   }
 
   // ── Le pause in corso (#996) ───────────────────────────────────────────────
-  // Sola lettura dal server: A, B o la routine server fermi dopo un'accensione rifiutata, col motivo. Nessun tetto
-  // giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
+  // Sola lettura dal server: A, B, le routine server o quella a rete aperta fermi dopo un'accensione rifiutata, col
+  // motivo. Nessun tetto giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
   const PAUSE_GET = (window.SN_MSG?.MSG?.AUTOMATION_PAUSE_GET) || 'automation_pause_get';
   const mgAccountsPausa = document.getElementById('mgAccountsPausa');
   const mgServerPausa = document.getElementById('mgServerPausa');
-  // null = non chiesto o non per te; { errore } = non letto; { pause, scartoMs } = letto (scarto: orologio locale − server).
+  const mgReteApertaPausa = document.getElementById('mgReteApertaPausa');
+  const mgReteApertaStato = document.getElementById('mgReteApertaStato');
+  // null = non chiesto o non per te; { errore } = non letto; { pause, voci, scartoMs } = letto (scarto: orologio locale − server).
   let pauseLette = null;
   let pauseTick = 0;
   let pauseTimer = null;
@@ -1100,11 +1132,12 @@
     const ora = Date.now();
     const righe = [];
     const righeServer = [];
+    const righeRete = [];
     let prossima = Infinity;
-    const leggi = (chi, voce) => {
+    const leggi = (chi, voce, opzioni) => {
       if (!voce || typeof voce !== 'object') return null;
       const v = Object.assign({}, voce, { finoMs: Number(voce.finoMs) + pauseLette.scartoMs });
-      const p = RS.pausaInParole(chi, v, ora);
+      const p = RS.pausaInParole(chi, v, ora, opzioni);
       if (p) prossima = Math.min(prossima, v.finoMs);
       return p;
     };
@@ -1120,6 +1153,15 @@
         const p = leggi(`La routine server dell'account ${k}`, pauseLette.pause[`server${k}`]);
         if (p) righeServer.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
       }
+      // La routine a rete aperta (#2013) conta le accensioni sue, non quelle di un account.
+      const p = leggi('La routine a rete aperta', pauseLette.pause.reteAperta, { contoDi: 'routine' });
+      if (p) righeRete.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+    }
+    // Cosa ha deciso il pacemaker su di lei all'ultimo giro: senza, «accesa» sull'interruttore non dice se parte.
+    if (mgReteApertaStato) {
+      const stato = pauseLette && !pauseLette.errore ? RS.statoReteAperta(pauseLette.voci.reteAperta) : '';
+      mgReteApertaStato.textContent = stato;
+      mgReteApertaStato.hidden = !stato;
     }
     if (mgAccountsPausa) {
       mgAccountsPausa.replaceChildren(...righe);
@@ -1128,6 +1170,10 @@
     if (mgServerPausa) {
       mgServerPausa.replaceChildren(...righeServer);
       mgServerPausa.hidden = righeServer.length === 0;
+    }
+    if (mgReteApertaPausa) {
+      mgReteApertaPausa.replaceChildren(...righeRete);
+      mgReteApertaPausa.hidden = righeRete.length === 0;
     }
     // Una pausa che scade sparisce da sola, senza ricaricare la pagina.
     if (prossima < Infinity) pauseTimer = setTimeout(reflectPause, Math.min(Math.max(0, prossima - ora) + 1000, 2 ** 31 - 1));
@@ -1147,6 +1193,7 @@
         const oraServer = Number(r.oraMs);
         pauseLette = {
           pause: r.pause && typeof r.pause === 'object' ? r.pause : {},
+          voci: r.voci && typeof r.voci === 'object' ? r.voci : {},
           scartoMs: Number.isFinite(oraServer) && oraServer > 0 ? Date.now() - oraServer : 0,
         };
       }

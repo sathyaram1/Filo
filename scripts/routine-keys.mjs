@@ -27,7 +27,7 @@
 //   node scripts/routine-keys.mjs account <nome> <A|B>
 //   node scripts/routine-keys.mjs rete <nome> <limitata|aperta>
 //   node scripts/routine-keys.mjs lavori <nome> <server|normali>
-//   node scripts/routine-keys.mjs ambiente <nome> <riservati|normale>
+//   node scripts/routine-keys.mjs ambiente <nome> <riservati|rete_aperta|normale>
 
 import { findAdminRefreshToken, mintIdToken } from './lib/firestore-auth.mjs';
 
@@ -84,7 +84,7 @@ async function main() {
   // veniva ignorata in silenzio e la parola d'ordine revocata davvero
   // (feedback #565).
   const USO = 'Uso: node scripts/routine-keys.mjs [elenco | crea <nome> <potere> "<descrizione>" | revoca <nome> | account <nome> <A|B>'
-    + ' | rete <nome> <limitata|aperta> | lavori <nome> <server|normali> | ambiente <nome> <riservati|normale>]';
+    + ' | rete <nome> <limitata|aperta> | lavori <nome> <server|normali> | ambiente <nome> <riservati|rete_aperta|normale>]';
   // Chiedere aiuto non è un errore, e questo è lo strumento dove sbagliare
   // costa di più: l'aiuto si stampa e basta (feedback #565).
   if (process.argv.slice(2).some((a) => a === '--help' || a === '-h')) { console.log(USO); return; }
@@ -110,8 +110,9 @@ async function main() {
       // Solo a rete limitata i biglietti nascono puliti; la chiave server prende solo lavori server (#1253).
       const rete = k.scope === 'routine' ? `rete ${k.rete || 'aperta'}`.padEnd(14) : ''.padEnd(14);
       const lavori = k.scope === 'routine' && k.lavori === 'server' ? 'lavori server  ' : ''.padEnd(15);
-      // L'ambiente dei riservati (#1153): solo lì il server consegna testo riservato, e solo compiti.
-      const ambiente = k.scope === 'routine' && k.ambiente === 'riservati' ? 'riservati  ' : '';
+      // L'ambiente dei riservati (#1153): solo lì il server consegna testo riservato, e solo compiti. Quello a rete
+      // aperta (#2013): solo compiti che possono essere sporchi.
+      const ambiente = k.scope === 'routine' && (k.ambiente === 'riservati' || k.ambiente === 'rete_aperta') ? `${k.ambiente}  ` : '';
       console.log(`${String(k.slug).padEnd(24)} ${String(k.scope || '?').padEnd(16)} ${account} ${rete} ${lavori}${ambiente}${stato}`
         + (k.lastUsedAt ? `  ultimo uso ${quando(k.lastUsedAt)}` : '')
         + (k.label ? `  — ${k.label}` : ''));
@@ -180,14 +181,16 @@ async function main() {
   }
 
   if (cmd === 'ambiente') {
-    if (!nome || (potere !== 'riservati' && potere !== 'normale') || resto.length) {
-      console.error('Uso: node scripts/routine-keys.mjs ambiente <nome> <riservati|normale>');
+    if (!nome || !['riservati', 'rete_aperta', 'normale'].includes(potere) || resto.length) {
+      console.error('Uso: node scripts/routine-keys.mjs ambiente <nome> <riservati|rete_aperta|normale>');
       process.exit(1);
     }
     await chiama({ op: 'ambiente', slug: nome, ambiente: potere });
-    console.log(potere === 'riservati'
-      ? `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`
-      : `"${nome}" è in un ambiente normale: non riceve testo riservato.`);
+    console.log({
+      riservati: `"${nome}" è la chiave dell'ambiente dei riservati: riceve solo compiti, e lei sola il testo riservato. Vale solo se l'ambiente della routine su claude.ai esce davvero soltanto verso il server.`,
+      rete_aperta: `"${nome}" è la chiave dell'ambiente a rete aperta: i suoi biglietti nascono sporchi, riceve solo compiti già non fidati e mai testo riservato né lavori server. Si spegne e si limita da Gestione → Automazioni, anche quando parte a mano.`,
+      normale: `"${nome}" è in un ambiente normale: non riceve testo riservato.`,
+    }[potere]);
     return;
   }
 
