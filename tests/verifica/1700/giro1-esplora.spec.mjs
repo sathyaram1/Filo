@@ -88,7 +88,8 @@ test('Chat nuova sotto la finestra piena: torna testo, foto e documento, la bozz
   expect(testo).toContain('sentieri.pdf');
   expect((testo.match(/data:image\//g) || []).length).toBeGreaterThanOrEqual(2);
   // Chat nuova davvero: il messaggio fallito non c'è due volte.
-  expect((testo.match(/cerca sentieri come quello/g) || []).length).toBe(1);
+  const ruoli = JSON.parse(testo).map((m) => `${m.role}: ${JSON.stringify(m.content).replace(/data:image[^"]*/g, 'IMG').slice(0, 400)}`);
+  expect(ruoli.filter((r) => r.includes('cerca sentieri come quello')), ruoli.join('\n')).toHaveLength(1);
 });
 
 test('seguito con foto e documento, pagina ricaricata: torna nella casella com\'era', async ({ app, shell }) => {
