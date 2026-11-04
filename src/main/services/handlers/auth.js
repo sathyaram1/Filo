@@ -87,6 +87,21 @@ function erroreDomande(e, nonAncora) {
   return e?.message || 'Non riuscito.';
 }
 
+// Un errore delle callable riservate all'owner (#1926) detto all'owner. Un server più vecchio dell'app non ha la
+// callable (404 senza codice) o non conosce l'op: lo si dice con `nonAncora`, invece del codice grezzo.
+function erroreOwner(e, { cosa = 'Questa funzione', nonAncora = '' } = {}) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return `${cosa}: non ancora pubblicato sul server.`;
+  if (nonAncora && (/sconosciut/i.test(String(e?.reason || '')) || /operazione sconosciuta|unknown op/i.test(detail))) return nonAncora;
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può farlo: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
 // Un errore di ownerCrediti detto all'owner. Su un numero fuori misura la spiegazione è del server.
 function erroreCrediti(e) {
   const code = String(e?.code || '').toUpperCase();
