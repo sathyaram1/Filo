@@ -1466,9 +1466,35 @@ class Segreto {
   }
 }
 
+// Il vecchio non si toglie mai per far posto al nuovo: se poi il nuovo non arrivasse in fondo (spazio, corrente, disco)
+// non resterebbe nessuno dei due. Chi vuole sostituirlo così lo toglie prima lui, e il rifiuto gli dice quanto guadagna.
+async function rifiutoSpazio(ctx, S, nome, servono) {
+  const disponibili = await massimoScrivibile(S, libere(ctx), nome);
+  if (!S.tabella.has(nome)) {
+    return errore('SPAZIO', `Non c’è spazio: servono ${servono} byte, ne restano ${disponibili}.`, { servono, disponibili, prima: true });
+  }
+  const togliendoIlVecchio = await massimoScrivibile(S, libere(ctx), nome, { senzaVecchio: true });
+  return errore('SPAZIO', `Non c’è spazio per tenere il file vecchio finché il nuovo non è salvato: servono ${servono} byte, ne restano ${disponibili}; togliendo prima il vecchio ne resterebbero ${togliendoIlVecchio}.`, {
+    servono, disponibili, togliendoIlVecchio, prima: true,
+  });
+}
+
+// Il pacco si riscrive coi tratti della tabella vecchia ai loro posti, più il file nuovo nel suo buco: fino alla testa
+// nuova è la vecchia a dire dove sta ogni file.
+async function caricoPacco(ctx, S, { j, o }, buf) {
+  const b = Buffer.alloc(CARICO);
+  const prima = pacchi(S.tabella).get(j);
+  if (prima) {
+    const c = (await carichiGruppo(ctx, S, Math.floor(j / GRUPPO)))[j % GRUPPO];
+    if (!c) throw daRiaprire();
+    for (const [a, z] of prima.tratti) c.copy(b, a, a, z);
+  }
+  buf.copy(b, o);
+  return b;
+}
+
 async function cancellaDentro(ctx, S, nome) {
-  const vecchio = S.tabella.get(nome);
-  const piano = pianifica(S, libere(ctx), (t) => { t.delete(nome); }, { riusa: daEstensioni(vecchio.e) });
+  const piano = pianifica(S, libere(ctx), (t) => { t.delete(nome); }, { riusa: soloSuoi(S.tabella, nome) });
   if (!piano) throw errore('SPAZIO', 'Non c’è posto nemmeno per riscrivere l’elenco dei file.', { servono: 0, disponibili: 0, prima: true });
   await transazione(ctx, S, piano, new Map());
 }
