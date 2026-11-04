@@ -1662,7 +1662,7 @@
       const copied = await immagineNegliAppunti(cap.dataUrl, () => dataUrlToPngBlob(cap.dataUrl));
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
+      const desc = await descrizioneCoperta(cap.dataUrl, cap.perModello).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1785,7 +1785,7 @@
         canvas.toBlob((blob) => {
           if (!blob) { resolve(null); return; }
           const r = new FileReader();
-          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, campi: cap.campi });
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, perModello: cap.perModello });
           r.onerror = () => resolve(null);
           r.readAsDataURL(blob);
         }, 'image/png');
@@ -1830,7 +1830,7 @@
       const { dataUrl, blob } = region;
       const copied = await immagineNegliAppunti(dataUrl, async () => blob);
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
+      const desc = await descrizioneCoperta(dataUrl, region.perModello, region.rect).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
