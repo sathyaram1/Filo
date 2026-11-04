@@ -121,7 +121,7 @@ test('dispatch: la risposta dice di applicare l\'opzione consigliata, e la puliz
   // La prova dell'esterno è già uscita col commit della critica (#1555): qui non si elenca.
   assert.doesNotMatch(testo, /le prove con r2 nel nome/);
   assert.doesNotMatch(testo, /le prove con r1 nel nome/);
-  assert.match(testo, /#9\.2, priorità 2, interno, da decidere: intanto si applica l'opzione consigliata/);
+  assert.match(testo, /#9\.2, priorità 1, interno, da decidere: intanto si applica l'opzione consigliata/);
 });
 
 test('verifica locale: stessa regola, e la prova del 2 col ? non esce con la pulizia', async () => {
