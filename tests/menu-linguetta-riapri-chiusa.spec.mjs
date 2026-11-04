@@ -12,7 +12,6 @@ test('appena aperto Filo la voce c\'è ma è spenta, nella linguetta e nel +', a
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
   expect(voce(voci)).toEqual({ testo: VOCE, spenta: true });
 
-  await shell.keyboard.press('Escape');
   await tastoDestro(shell, '#tab-new');
   const piu = await aspettaMenu(app, (v) => v.length === 1 && v[0].testo === VOCE);
   expect(piu[0].spenta).toBe(true);
