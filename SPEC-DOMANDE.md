@@ -233,8 +233,12 @@ lo può scrivere anche un agente pulito.
   radici. Un feedback di un utente nato dal 24/10/2026 ha `feedback:<seq>`;
   tutto il resto (domande, note, feedback e biglietti senza provenienza, e i
   feedback degli utenti arrivati prima, che l'owner ha già letto) ha
-  `legacy`. I turni delle note scritti prima non hanno radici: valgono
-  `legacy`; uno senza radici scritto dopo vale `ignota`. La lancia l'owner
+  `legacy`. Ciò che discende da un feedback (il suo derivato, una domanda
+  che lo nomina, il compito di quella domanda, un biglietto o la sua
+  conversazione) prende in più le radici di quel feedback: il testo di un
+  utente dal 24/10 resta da timbrare anche lì. I turni delle note scritti
+  prima non hanno radici: valgono `legacy`, anche dopo che lo stato del giro
+  si azzera; uno senza radici scritto dopo vale `ignota`. La lancia l'owner
   (`npm run radici:migra`, a secco, poi `-- --dal-vero`); il timbro su
   `legacy` lo dà in Gestione.
 
