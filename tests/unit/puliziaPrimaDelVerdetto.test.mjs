@@ -1,5 +1,5 @@
-// #1555: la pulizia che non dipende dall'esito si fa PRIMA del verdetto. Dopo, il commit che toglie le prove è una
-// spinta che il registro della fiducia non vede, e una pratica fidata finisce ferma alla fusione ad aspettare l'owner.
+// #1555: la pulizia che non dipende dall'esito si fa PRIMA del verdetto, nel commit della critica. Dopo, il commit entra
+// nel registro della fiducia solo se lo spinge il rilascio (#2021): un commit in meno da far quadrare.
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';

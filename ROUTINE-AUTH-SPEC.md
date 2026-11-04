@@ -384,7 +384,13 @@ sempre, non fonde e passa la pratica all'azione (`result: 'server'`,
   sporco e si sporca quando il server gli consegna qualcosa di non fidato
   (`channel.fetchWork`, prima della consegna); ogni biglietto che può spingere
   sul ramo entra nel registro `routine-branches` con la sua fiducia e lo sha
-  (emissione, consegne `fixed`/`status`, riallineamenti del server). Al passo
+  (emissione, consegne `fixed`/`status`, rilascio che ha spinto, riallineamenti
+  del server). All'emissione una punta oltre l'ultimo sha registrato è un buco,
+  salvo che GitHub l'abbia vista arrivare mentre il biglietto dell'ultima voce
+  viveva (dalla nascita al rilascio): allora è sua, voce `finestra` (#2021).
+  Un registro bucato lo sana solo l'owner (`npm run fiducia:sana -- <ramo>`,
+  che chiama `ownerFiducia` op `sana`), se ogni commit oltre main è nato
+  mentre viveva un biglietto pulito registrato, la stessa finestra. Al passo
   4, se L5 blocca **e** il lavoro è fidato (feedback fidato, registro tutto
   fidato, nessun buco, la punta è l'ultimo sha registrato), il server **non
   apre la richiesta**: fonde lo sha esaminato con la sua identità e registra

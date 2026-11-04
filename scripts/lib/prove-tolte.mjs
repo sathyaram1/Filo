@@ -344,7 +344,7 @@ export function numeriDelNome(percorso) {
 
 /**
  * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, o un `?` che conta al più 1 (un vicino conta 0).
- * La sua prova esce PRIMA del verdetto: dopo, un commit è una spinta che il registro della fiducia non vede (#1555). PURA.
+ * La sua prova esce PRIMA del verdetto, col commit della critica (#1555): dopo, conta solo se la spinge il rilascio (#2021). PURA.
  */
 export function esceInOgniEsito(f) {
   const sede = String((f && f.sede) || 'i').toLowerCase();
@@ -385,7 +385,7 @@ export function testoProvePrimaDelVerdetto(fuori, findings) {
     ? `il rilievo ${n} è esterno` : `il rilievo ${n} chiede una decisione e conta al più 1`);
   return [
     'critica non registrata: queste prove sono di rilievi che escono dal giro in ogni esito, e vanno tolte PRIMA della critica,',
-    'nel suo commit: dopo il verdetto ogni commit è una spinta che il registro della fiducia non vede, e il lavoro fidato perde la fiducia (#1555).',
+    'nel suo commit: dopo il verdetto il ramo si muove solo col rilascio, che registra la punta per la fiducia del lavoro (#1555, #2021).',
     ...fuori.map(({ prova, numeri }) => `  · ${prova}: ${numeri.map(perche).join(', ')}`),
     'Toglile (`git rm`), poi `git commit` e registra la stessa critica. Una prova che copre anche un rilievo da correggere resta: le togli solo il caso di questi.',
   ].join('\n');

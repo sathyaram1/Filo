@@ -81,7 +81,8 @@
 //         dai commit (un file nato da una shell non passa dall'hook) e
 //         spedisce il ramo corrente su origin (--force-with-lease se la
 //         storia è stata riscritta): se il push fallisce NON rilascia ed
-//         esce diverso da zero. `--senza-push` dove non c'è un repo. Allega da solo il rapporto di fine sessione
+//         esce diverso da zero; riuscito, ramo e punta spinti viaggiano col rilascio, per il registro del ramo
+//         (#2021). `--senza-push` dove non c'è un repo. Allega da solo il rapporto di fine sessione
 //         (session-report.mjs; `--role <ruolo>` per firmarlo; `--senza-rapporto`
 //         per saltarlo).
 //
@@ -527,8 +528,11 @@ export async function heartbeat(t, opts = {}) {
  * `report`, se presente, è il rapporto di fine sessione (session-report.mjs):
  * viaggia nel corpo col nome `report`. Per la ritentata quando il server lo
  * rifiuta c'è releaseConRapporto, qui sotto.
+ *
+ * `spedito` ({ branch, sha }) è la punta che il rilascio ha appena spinto: il server la confronta con quella vera e la
+ * scrive nel registro del ramo con la fiducia del biglietto (#2021). Solo dopo una spinta riuscita.
  */
-export async function release(t, fault = '', opts, report = null) {
+export async function release(t, fault = '', opts, report = null, spedito = null) {
   const payload = { ticket: t };
   const motivo = String(fault || '').trim();
   if (motivo) payload.fault = motivo;
@@ -537,6 +541,10 @@ export async function release(t, fault = '', opts, report = null) {
   if (opts && opts.domandaAlRilascio === true) payload.domandaAlRilascio = true;
   const processo = String((opts && opts.processo) || '').trim();
   if (processo) payload.domandaProcesso = processo;
+  if (spedito && typeof spedito.branch === 'string' && spedito.branch && /^[0-9a-f]{40}$/.test(String(spedito.sha || ''))) {
+    payload.branch = spedito.branch;
+    payload.sha = spedito.sha;
+  }
   Object.assign(payload, creditiDi(opts));
   const { status, body } = await call('routineRelease', payload, opts);
   return { ok: status === 200 && !!(body && body.ok), reason: String((body && body.reason) || ''), status, body };
@@ -581,8 +589,8 @@ export function registrazioniDelRapporto(report) {
   return out;
 }
 
-export async function releaseConRapporto(t, fault, report, opts) {
-  const tenta = (rep) => release(t, fault, opts, rep);
+export async function releaseConRapporto(t, fault, report, opts, spedito = null) {
+  const tenta = (rep) => release(t, fault, opts, rep, spedito);
   if (!report || typeof report !== 'object') return { ...(await tenta(null)), rapporto: 'assente' };
   const malformato = (r) => r.status === 400 && r.reason === 'report_malformed';
   const troppoGrande = (r) => r.status === 413 && r.reason === 'report_too_big';
@@ -787,8 +795,13 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
   if (copie.stato === 'fermo') return { ok: false, skipped: false, branch: ramo, reason: copie.avviso };
   try { installaControlloSpedizione(root); } catch (_) { /* il controllo qui sopra c'è già stato */ }
   const avviso = copie.avviso ? { avviso: copie.avviso } : {};
+  // La punta spinta va al rilascio: senza, il registro della fiducia vede un commit fuori registro (#2021).
+  const spinta = () => {
+    const h = run(['rev-parse', 'HEAD']);
+    return h.ok && /^[0-9a-f]{40}$/.test(h.out) ? { punta: h.out } : {};
+  };
   const push = run(['push', 'origin', `HEAD:refs/heads/${ramo}`]);
-  if (push.ok) return { ok: true, skipped: false, branch: ramo, ...avviso };
+  if (push.ok) return { ok: true, skipped: false, branch: ramo, ...spinta(), ...avviso };
   // «! [remote rejected]» è il SERVER che dice di no (un pre-receive, una
   // regola del repo, il push protection): non è storia divergente, un rebase
   // non lo cura e il lease non si tenta (verifica del giro 4, stessa regola
@@ -802,7 +815,7 @@ export function pushRamoCorrente(root, { exec = execFileSync, env = process.env 
       return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e il rinvio con --force-with-lease non parte: su origin '${ramo}' è a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su '${ramo}'?)` };
     }
     const lease = run(['push', 'origin', `HEAD:refs/heads/${ramo}`, `--force-with-lease=refs/heads/${ramo}:${atteso}`]);
-    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...avviso };
+    if (lease.ok) return { ok: true, skipped: false, branch: ramo, forced: true, ...spinta(), ...avviso };
     return { ok: false, skipped: false, branch: ramo, reason: `storia divergente, e anche --force-with-lease è stato rifiutato (qualcun altro ha spinto su '${ramo}'?): ${pulisciGit(lease.out)}` };
   }
   return { ok: false, skipped: false, branch: ramo, reason: pulisciGit(push.out) };
@@ -1840,6 +1853,7 @@ if (isMain) {
     // contenitore. Se il push non riesce NON si rilascia: si stampa la causa e
     // si esce diverso da zero, il worker sistema e rilancia (il biglietto scade
     // da solo dopo 60 minuti se muore). `--senza-push` dove non c'è un repo.
+    let spedito = null;
     if (data['senza-push'] !== true && cartellaSua && !finito) {
       // Prima quello che è rimasto fuori dai commit (un file nato da una
       // shell non passa dall'hook): si committa qui, e si dice.
@@ -1862,6 +1876,7 @@ if (isMain) {
       }
       if (p.avviso) console.error(p.avviso);
       console.error(p.skipped ? `push saltato: ${p.reason}` : `ramo '${p.branch}' spedito su origin${p.forced ? ' (storia riscritta: --force-with-lease)' : ''}`);
+      if (!p.skipped && p.punta) spedito = { branch: p.branch, sha: p.punta };
     }
     // Il rapporto di fine sessione lo fa uno script, non l'agente, e parte da
     // solo qui. Se lo script fallisce si rilascia comunque, con la nota.
@@ -1885,7 +1900,7 @@ if (isMain) {
       ...(chiRilascia !== 'orchestrator' && cartellaSua ? { domandaAlRilascio: true } : {}),
       ...(processo ? { processo } : {}),
     };
-    const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined);
+    const r = await releaseConRapporto(args[0], guasto, rapporto, Object.keys(opzioniRilascio).length ? opzioniRilascio : undefined, spedito);
     if (r.avviso) console.error(r.avviso);
     // Col biglietto muore anche il battito. Ci arriverebbe da solo al giro dopo
     // (il server risponde `dead_ticket` e il ciclo esce), ma spegnerlo adesso

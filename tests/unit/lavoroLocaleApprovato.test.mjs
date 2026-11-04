@@ -158,6 +158,8 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
 const SOLO_MIGRAZIONE = new Set(['fiducia-migra.mjs']);
 // Toglierla sì (#1428): la chiede una nota scritta senza biglietto pulito. Darla resta dell'owner.
 const SOLO_TOGLIE = new Set(['togli-fiducia.mjs']);
+// La sanatoria di un registro bucato (#2021): il server la concede solo se ogni commit ha già una voce fidata.
+const SOLO_SANA = new Set(['fiducia-sana.mjs']);
 test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
   const file = [];
   const giro = (dir) => {
@@ -179,6 +181,9 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
     } else if (SOLO_TOGLIE.has(nome)) {
       assert.doesNotMatch(testo, /['"`](segna|migra)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve poter solo togliere la fiducia`);
       assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['togli'], `${f}: l'unica op è «togli»`);
+    } else if (SOLO_SANA.has(nome)) {
+      assert.doesNotMatch(testo, /['"`](segna|togli|migra)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve poter solo chiedere la sanatoria`);
+      assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['sana'], `${f}: l'unica op è «sana»`);
     } else {
       assert.doesNotMatch(testo, /ownerFiducia|fiducia_segna|fieldPaths=fiducia/, `${f} apre una strada alla fiducia`);
     }

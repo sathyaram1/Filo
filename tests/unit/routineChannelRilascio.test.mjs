@@ -364,7 +364,7 @@ describe('pushRamoCorrente', () => {
     g(work, ['checkout', '-q', '-b', 'worker/7']);
     commitFile(work, 'a.js');
     const primo = pushRamoCorrente(work);
-    assert.deepEqual(primo, { ok: true, skipped: false, branch: 'worker/7' });
+    assert.deepEqual(primo, { ok: true, skipped: false, branch: 'worker/7', punta: g(work, ['rev-parse', 'HEAD']) });
     assert.equal(remoteSha(origin, 'worker/7'), g(work, ['rev-parse', 'HEAD']));
     // Rebase: A sparisce, al suo posto C. Origin ha A.
     g(work, ['reset', '-q', '--hard', 'HEAD~1']);
@@ -374,6 +374,7 @@ describe('pushRamoCorrente', () => {
     assert.equal(secondo.forced, true);
     assert.equal(remoteSha(origin, 'worker/7'), g(work, ['rev-parse', 'HEAD']),
       'il commit finale del worker deve essere su origin: il contenitore muore dopo il rilascio');
+    assert.equal(secondo.punta, remoteSha(origin, 'worker/7'), 'anche dopo il lease la punta è quella spinta');
   });
 
   test('qualcun altro ha spinto nel frattempo: il lease rifiuta e il push non riesce, con la causa', () => {
@@ -405,6 +406,8 @@ describe('pushRamoCorrente', () => {
     g(work, ['checkout', '-q', '--detach', 'HEAD']);
     const staccata = pushRamoCorrente(work);
     assert.equal(staccata.ok, true); assert.equal(staccata.skipped, true); assert.match(staccata.reason, /staccata/);
+    assert.equal(suMain.punta, undefined, 'niente spinto, niente punta da registrare');
+    assert.equal(staccata.punta, undefined);
   });
 
   test('origin irraggiungibile: ok falso con il motivo di git', () => {
@@ -508,6 +511,43 @@ describe('release da riga di comando', () => {
       assert.equal(rilascio.body.report.role, 'resolver');
       assert.equal(rilascio.body.report.ticket, 'tkt-cli');
       assert.ok(Array.isArray(rilascio.body.report.notes) && rilascio.body.report.notes.length >= 1, 'senza transcript: la nota c\'è');
+      // #2021: la punta lasciata dal rilascio arriva al server, che la scrive nel registro del ramo.
+      assert.equal(rilascio.body.branch, 'worker/10');
+      assert.equal(rilascio.body.sha, remoteSha(origin, 'worker/10'));
+    } finally { srv.close(); }
+  });
+
+  // #2021: la pulizia dopo il verdetto la committa e la spinge il rilascio; se la sua punta non arriva al server, il
+  // registro del ramo trova all'emissione dopo un commit che nessuna voce copre e segna il buco per sempre.
+  test('il commit fatto dopo l\'ultima consegna parte col rilascio, e il rilascio porta la sua punta', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { origin, work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/10b']);
+      commitFile(work, 'prova-del-giro.spec.mjs');
+      g(work, ['push', '-q', 'origin', 'HEAD:refs/heads/worker/10b']);
+      const consegnato = g(work, ['rev-parse', 'HEAD']);
+      g(work, ['rm', '-q', 'prova-del-giro.spec.mjs']);
+      g(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'via le prove dei rilievi messi da parte']);
+      const r = await cli(['release', 'tkt-cli', '--role', 'verifier', '--senza-rapporto'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      const punta = remoteSha(origin, 'worker/10b');
+      assert.notEqual(punta, consegnato, 'la pulizia è arrivata su origin');
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', domandaAlRilascio: true, branch: 'worker/10b', sha: punta });
+    } finally { srv.close(); }
+  });
+
+  test('push saltato (ramo protetto): il rilascio non dichiara nessuna punta', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { work } = scena();
+    try {
+      const r = await cli(['release', 'tkt-cli', '--senza-rapporto'], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.match(r.se, /push saltato/);
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli', domandaAlRilascio: true });
     } finally { srv.close(); }
   });
 
@@ -621,7 +661,7 @@ describe('release da riga di comando', () => {
   // lo trovava col ripiego del «più recente». Qui la si ricrea anche fuori da una routine.
   test('una routine che lancia le prove non entra nel rilascio provato: né il suo consumo nel corpo, né il suo stato nella cartella', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
-    const { base, work } = scena();
+    const { base, origin, work } = scena();
     const config = resolve(base, 'claude-di-chi-lancia');
     const progetto = resolve(config, 'projects', slugProgetto(process.cwd()));
     mkdirSync(progetto, { recursive: true });
@@ -638,7 +678,8 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true, branch: 'worker/14', sha: remoteSha(origin, 'worker/14') },
+        'il consumo di chi lancia non è del rilascio provato');
       assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
       assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
     } finally {
