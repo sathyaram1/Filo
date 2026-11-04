@@ -3184,7 +3184,7 @@
       const coda = ripartiti ? `, ${ripartiti === 1 ? '1 è ripartito' : `${ripartiti} sono ripartiti`} In coda come lavoro server` : '';
       const fuori = fuoriDalBlocco();
       mgFidatiMsg.textContent = (falliti.length
-        ? `${fatti} segnati fidati${coda}, ${falliti.length} no: ${falliti[0].error || 'rifiutato dal server'}.`
+        ? `${fatti} segnati fidati${coda}, ${falliti.length} no: ${String(falliti[0].error || 'rifiutato dal server').replace(/[.\s]+$/, '')}.`
         : `${fatti} segnati fidati${coda}.`) + (fuori ? ` ${fuori}` : '');
     }
     if (ripartiti && selectedId && perId.has(selectedId)) openDetail(selectedId, { ridisegno: true });
