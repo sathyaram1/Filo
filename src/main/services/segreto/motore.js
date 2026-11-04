@@ -932,7 +932,7 @@ async function restauraMancanti(ctx, S, gruppi) {
       for (let i = base; i < base + 2 * n; i++) if (!valida(S, g, i)) mancanti.push(i);
       const par = RS.parita(dati, mancanti.filter((i) => i & 1).map((i) => (i >> 1) - GRUPPO * g));
       for (const i of mancanti) {
-        const p = S.pos[i] >= 0 ? S.pos[i] : colloca(ctx, S, i);
+        const p = S.pos[i] >= 0 ? S.pos[i] : await colloca(ctx, S, i);
         if (p < 0) continue;
         const s = (i >> 1) - GRUPPO * g;
         voci.push({ p, i, chiaro: componi({ k: info.k, c: i & 1, j: i >> 1, v: info.v, inc: S.inc }, i & 1 ? par[s] : dati[s]), v: info.v, k: info.k });
