@@ -2089,3 +2089,31 @@ test('riquadro con script dietro una finestrella da un pixel non si paga; uno ch
   await page.waitForTimeout(2000);
   expect(await sentText(app)).not.toContain('ZZTINY');
 });
+
+// #1302 — un pezzo che il modello ha fermato al tetto non si applica a metà: i blocchi interi sì, quello tagliato resta
+// nell'originale e l'avviso dice perché.
+const CUT_PAGE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <p id="ok">First paragraph of the body text, long enough to be picked up by the translation.</p>
+  <p id="cut">CUTME second paragraph, that the model stops writing halfway through.</p>
+</body></html>`;
+
+test('un blocco fermato dal tetto della risposta non resta tradotto a metà, e l’avviso lo dice', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    const traduci = P.completeWithFallback;
+    P.completeWithFallback = async (args) => {
+      const r = await traduci(args);
+      const i = String(r.text || '').indexOf('CUTME');
+      return i < 0 ? r : { ...r, text: `${r.text.slice(0, i)}CUTME seco`, finishReason: 'length' };
+    };
+  });
+  const page = await testServer.openReady(openTab, CUT_PAGE);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  const stopped = async () => (await toasts(page)).find((t) => t.startsWith('Traduzione interrotta')) || '';
+  await expect.poll(stopped, { timeout: 90000 }).toContain('lunghezza massima');
+  await expect(page.locator('#ok')).toHaveText(/^IT First paragraph/);
+  await expect(page.locator('#cut')).toHaveText('CUTME second paragraph, that the model stops writing halfway through.');
+});
