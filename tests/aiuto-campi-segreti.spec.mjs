@@ -530,6 +530,24 @@ async function misuraLaRicerca(app, percorso, volte = 3) {
   }, [percorso, volte]);
 }
 
+// Il conto costa uguale con tre o tremila campi; un componente chiuso senza niente di segreto non fa leggere l'albero.
+const PAGINA_SENZA_RIQUADRI = [
+  ['tremila caselle da spuntare', `<table>${'<tr><td><input type="checkbox"></td><td>ordine</td></tr>'.repeat(3000)}</table>`, 400, 150],
+  ['un componente chiuso con il solo campo di ricerca', `<cerca-chiuso></cerca-chiuso><script>customElements.define('cerca-chiuso', class extends HTMLElement {
+    constructor() { super(); this.attachShadow({ mode: 'closed' }).innerHTML = '<input type="search" value="scarpe">'; } });</script>`, 1000, 300],
+];
+for (const [nome, extra, attesa, fermo] of PAGINA_SENZA_RIQUADRI) {
+  test(`su una pagina grande con ${nome}, la foto per l’assistente non aspetta e Filo non si ferma`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Lunga</title></head><body>${extra}
+      <script>document.write('<div><p>testo <b>uno</b> <i>due</i></p><ul><li>a</li><li>b</li></ul></div>'.repeat(9000));</script></body></html>`);
+    const esito = await misuraLaRicerca(app, new URL(page.url()).pathname);
+    expect(esito.durate.every((d) => d.campi === 0)).toBe(true);
+    expect(Math.max(...esito.durate.map((d) => d.ms)), 'ogni foto dell’assistente aspetta la ricerca dei campi').toBeLessThan(attesa);
+    expect(esito.fermo, 'Filo resta fermo mentre cerca i campi').toBeLessThan(fermo);
+  });
+}
+
 // La scritta «<input>» o un riquadro dello stesso sito accanto a un componente chiuso non ne nascondono i campi.
 test('il campo di un componente chiuso si trova anche con la scritta «<input>» e in un riquadro dello stesso sito su un altro indirizzo', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
