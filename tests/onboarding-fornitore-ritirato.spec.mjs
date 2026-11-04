@@ -95,6 +95,19 @@ async function paginaDellaVista(app, wcId) {
   return trovata;
 }
 
+// La scheda nuova chiede «Filo è pronto?» una volta sola, aprendosi (#1120.1): la configurazione finta si mette a giro
+// d'avvio della home finito, e la scheda si apre quando il main, alla stessa domanda, risponde già sì.
+async function configuraPrimaDellaScheda(app) {
+  const prima = await newtabPage(app);
+  await expect(prima.locator('#homeMessage')).toContainText(/codice d.invito/i, { timeout: 15_000 });
+  await configCondivisa(app, { provider: 'gemini' });
+  await stubProviders(app);
+  await expect.poll(() => prima.evaluate(async () => {
+    const r = await chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_GET_ONBOARDING, peek: true });
+    return Boolean(r && r.ready);
+  }), { timeout: 10_000, message: 'la configurazione finta non è arrivata al main' }).toBe(true);
+}
+
 // Il «+» della barra, come fa l'utente: la scheda che arriva davanti, diversa da quella di prima.
 async function apriSchedaNuova(app, shell) {
   const vecchia = await vistaDavanti(app);
