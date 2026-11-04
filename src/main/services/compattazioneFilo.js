@@ -19,7 +19,7 @@ const stati = { normale: null, incognito: vuoto() };
 let caricando = null;
 const inCorso = { normale: null, incognito: null };
 const ascoltatori = new Set();
-let timerFermo = null;
+const timerFermo = { normale: null, incognito: null };
 let timerGiorni = null;
 
 // `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo)` → scrive una memoria. Li dà
