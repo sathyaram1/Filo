@@ -54,6 +54,19 @@ cifratura sta accecando i controlli, non gli estranei.**
 5. **In dubbio ci si ferma** (coerente con l'interruttore delle routine): se il
    server non risponde, il giro non lavora. Meglio un giro saltato che un giro
    che scrive senza controlli.
+6. **Una sessione, una fiducia** (#1419). Dentro lo stesso contenitore i worker
+   girano con lo stesso utente: uno può leggere i file dell'altro, compresi il
+   biglietto e la parola d'ordine (§ 3). Il server tratta i biglietti della
+   stessa sessione cloud come un gruppo solo:
+   - quando uno si sporca, nato così o sporcato dopo, si sporcano anche i
+     fratelli vivi e i loro token del server vengono revocati;
+   - una sessione che ha avuto un biglietto sporco non ne riceve altri
+     (`sessione_finita`): il clone del giro resta lo stesso fra un worker e
+     l'altro, e chi viene dopo eseguirebbe quello che lo sporco ha lasciato;
+   - una richiesta di biglietto senza sessione non aggira la regola: il
+     biglietto nasce sporco.
+
+   Prove: `functions/test/fiducia-sessione-1419.test.js` del server.
 
 ---
 
@@ -70,6 +83,12 @@ cifratura sta accecando i controlli, non gli estranei.**
 
 Una parola d'ordine **per routine schedulata**: si revoca la singola, e nel
 registro del server si vede quale ha fatto cosa.
+
+**La parola d'ordine non è fuori portata del worker.** Sta nel prompt della
+sessione, quindi nel transcript su disco, leggibile dallo stesso utente che fa
+girare i worker. Un worker sporco può chiedere da sé un biglietto nuovo: per
+questo la fiducia si condivide per sessione (§ 2, principio 6), con il limite
+detto in § 7.
 
 **La chiave di lettura sparisce dalle macchine delle routine.** È il cambiamento
 più importante di tutta la spec: oggi vive in tante copie, su computer che
@@ -259,6 +278,11 @@ rispettare.
 - **Il ramo principale non è protetto da questa spec**: continua a esserlo dal
   cancello di fusione e dalla regola che nessun salvataggio automatico ci fa
   atterrare niente.
+- **La sessione la dichiara chi chiede il biglietto** (#1419). Un worker sporco
+  che ha letto la parola d'ordine può presentarsi con l'id di una sessione
+  inventata, e il server non lo distingue ancora da una vera: la fiducia per
+  sessione (§ 2, principio 6) ferma chi usa la propria sessione o la toglie,
+  non chi la inventa. Aperto in #2044.
 
 ---
 
