@@ -19,7 +19,10 @@ function custoditi({ impostazioni = [], chiaveFeedback = null, env = process.env
   const G = guardiano();
   const out = [];
   const visti = new Set();
-  const metti = (valore, tipo, password = false) => {
+  // `segreto`: una stringa o { valore, password } (SN_CONST.segretiDelProxy).
+  const metti = (segreto, tipo) => {
+    const password = !!(segreto && segreto.password);
+    const valore = segreto && typeof segreto === 'object' ? segreto.valore : segreto;
     const v = typeof valore === 'string' ? valore.trim() : '';
     if (v.length < G.segretoDi({ valore: v, password }).min || visti.has(v)) return;
     visti.add(v);
