@@ -1175,8 +1175,10 @@ async function liberaEStringi(ctx, S, prima, tabellaPrima = null) {
       return {
         g,
         carichi: Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => {
-          if (ora[GRUPPO * g + s] && !vecchi[s] && !rovinati[GRUPPO * g + s]) throw daRiaprire();
-          return (ora[GRUPPO * g + s] && vecchi[s]) || ZERO;
+          const j = GRUPPO * g + s;
+          if (ora[j] && !vecchi[s] && !rovinati[j]) throw daRiaprire();
+          if (ora[j] && vecchi[s] && pz.has(j)) return pulito(vecchi[s], pz.get(j).tratti);
+          return (ora[j] && vecchi[s]) || ZERO;
         }),
       };
     }));
