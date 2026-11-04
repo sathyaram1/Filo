@@ -235,8 +235,10 @@ lo può scrivere anche un agente pulito.
   feedback degli utenti arrivati prima, che l'owner ha già letto) ha
   `legacy`. Ciò che discende da un feedback (il suo derivato, una domanda
   che lo nomina, il compito di quella domanda, un biglietto o la sua
-  conversazione) prende in più le radici di quel feedback: il testo di un
-  utente dal 24/10 resta da timbrare anche lì. I turni delle note scritti
+  conversazione) prende in più le radici di quel feedback, seguendo la catena
+  delle origini (una domanda nata da un'altra domanda o da un compito, il
+  biglietto che smista o esegue): il testo di un utente dal 24/10 resta da
+  timbrare anche lì. I turni delle note scritti
   prima non hanno radici: valgono `legacy`, anche dopo che lo stato del giro
   si azzera; uno senza radici scritto dopo vale `ignota`. La lancia l'owner
   (`npm run radici:migra`, a secco, poi `-- --dal-vero`); il timbro su
@@ -274,19 +276,26 @@ Le regole del calcolo, tutte sul server:
   fiducia di tutto ciò che porta quella radice, anche nato prima del timbro:
   feedback, domande, note, compiti, biglietti aperti. Togliere il timbro
   ricalcola allo stesso modo.
+- **Una lettura, una radice:** una pagina, un file, uno strumento o la posta
+  cambiano dopo il timbro, il testo di un utente no. Le radici dichiarate da
+  una sessione e quella del solo biglietto valgono per QUELLA lettura (il
+  biglietto e l'istante): il timbro copre il testo letto allora, e una lettura
+  dello stesso indirizzo dopo il timbro è una radice nuova.
 
 Il timbro lo dà solo `ownerFiducia`, dal clic dell'owner in Gestione (§ 1.4):
 `segna` e `togli` prendono una radice, e il tasto sta su feedback e domande.
 «Segna fidato» su un feedback timbra il suo testo (`feedback:<seq>`) e le radici
-solo sue; se ne restano altre (non `ignota`), il sì dell'owner fa fidato quel
+solo sue. Un derivato (#N.k) non ha un testo d'utente suo: `feedback:N` è il
+testo di #N, e il sì sul derivato non lo timbra. Se ne restano altre (non `ignota`), il sì dell'owner fa fidato quel
 feedback e le lascia scritte in `radiciSuperate`, senza timbrarle per gli altri.
 Una radice senza un ricalcolo che la trovi non esiste: chi abbassa la fiducia di
 un documento che ha radici gliene aggiunge una.
 Non esiste un comando da riga di comando, di proposito. Il cartellino accanto
 a «Segna fidato» mostra le radici di quella cosa, ognuna con la sua fonte: se
 nessuna è testo di un utente si timbra senza leggere, altrimenti si legge
-quel testo. Una radice del solo biglietto (`esterno:biglietto …`, una lettura
-che non ha saputo dire da dove viene) mostra cosa ha letto quella sessione,
+quel testo. Una radice del solo biglietto (una lettura che non ha saputo dire
+da dove viene; il server la segna `sessione` sul cartellino, che non ne rilegge
+la forma) mostra cosa ha letto quella sessione,
 come il server l'ha annotato quando si è sporcata. Su una domanda il
 cartellino c'è anche da fidata, se lo è per timbri dati: il timbro si toglie
 da dove si è messo.
@@ -297,8 +306,8 @@ più pulito ma tiene le sue radici; uno sparito, o non fidato senza radici, vale
 `ignota` (un feedback nuovo in quel caso è radice di sé). Ciò che il server
 scrive da solo a partire da un feedback (le domande di servizio, quella dopo
 tre guasti uguali) porta le radici di quel feedback; senza biglietto (il
-manutentore) una domanda o un compito porta una radice sua, che l'owner timbra
-dopo averlo letto.
+manutentore) una domanda, un compito o una nota su un feedback porta una radice
+sua, che l'owner timbra dopo averla letta.
 
 ## 2. Gestione: un posto solo per tutto Filo
 
