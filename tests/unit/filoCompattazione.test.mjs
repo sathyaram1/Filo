@@ -259,6 +259,22 @@ test('una conversazione cancellata porta via le sue righe del diario, anche dal 
   assert.equal(JSON.parse(readFileSync(join(cartella, 'filo', 'livelli.json'), 'utf8')).ore.length, 0);
 });
 
+test('una pagina visitata e poi cancellata porta via la riga del diario nata con lei', async () => {
+  azzera();
+  const ora = Date.now();
+  const t0 = ora - 5 * ORA_MS;
+  await scrivi('cd34', 'user', 'che si mangia stasera?', new Date(t0).toISOString());
+  const visita = await globalThis.SN_IL_FILO.registraVisita({ url: 'https://ricette.example/carbonara', titolo: 'Carbonara', ts: new Date(t0 + 500).toISOString() }, { incognito: false });
+  await scrivi('cd34', 'filo', 'Una carbonara.', new Date(t0 + 1000).toISOString());
+  await scrivi('cd34', 'user', 'grazie', new Date(t0 + 60000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  const riga = (await Comp.righe(false)).ore[0];
+  assert.ok(riga.fonti.includes(visita.id), 'la riga tiene la visita fra le sue fonti');
+  assert.match(await Comp.sezione(false), /gatti e di una ricetta/);
+  await globalThis.SN_IL_FILO.cancellaVisite([{ ts: visita.ts, url: 'https://ricette.example/carbonara' }], { incognito: false });
+  assert.equal(await Comp.sezione(false), '', 'la pagina cancellata non torna dal diario');
+});
+
 test('il livello «giorni»: una riga per ogni giorno passato che ha ore, una volta sola', async () => {
   let giri = 0;
   azzera({
@@ -299,7 +315,7 @@ test('un pezzo più grande di quanto va al modello in una volta si compatta a pe
   const { chiamate } = azzera();
   const ora = Date.now();
   const grande = 'parola '.repeat(Math.ceil((L.MAX_INGRESSO * FC.CARATTERI_PER_TOKEN) / 7 / 2));
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 6; i++) {
     await scrivi('ab12', 'user', `${i} ${grande}`, new Date(ora - (10 - i) * ORA_MS).toISOString());
     await scrivi('ab12', 'filo', `ok ${i}`, new Date(ora - (10 - i) * ORA_MS + 1000).toISOString());
   }
@@ -307,7 +323,7 @@ test('un pezzo più grande di quanto va al modello in una volta si compatta a pe
   assert.equal(r.fatto, true);
   assert.ok(FC.stimaToken(chiamate[0][1].content) < L.MAX_INGRESSO * 1.2, 'la chiamata sta nel tetto dell\'ingresso');
   const resta = (await componi(ora)).visti;
-  assert.ok(resta.length > 0 && resta.length < 8, 'il resto aspetta la compattazione dopo');
+  assert.ok(resta.length > 0 && resta.length < 12, 'il resto aspetta la compattazione dopo');
   assert.equal(resta[0].role, 'user', 'il pezzo finisce prima di una domanda, non a metà turno');
   await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
   assert.ok((await componi(ora)).visti.length < resta.length);
