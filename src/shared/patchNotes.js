@@ -19,6 +19,7 @@
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
         { testo: 'Il motore che apre le pagine web, e quello che fa parlare Filo coi suoi servizi, hanno le ultime correzioni di sicurezza.', segnalazione: 2115 },
+        { testo: 'Sulle pagine molto lunghe l\'assistente di pagina risponde senza farti aspettare e Filo non si blocca più, anche quando la pagina incorpora un modulo dello stesso sito o mostra del codice HTML d\'esempio.', segnalazione: 810 },
       ],
     },
     {
