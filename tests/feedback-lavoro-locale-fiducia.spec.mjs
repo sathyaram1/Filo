@@ -5,7 +5,7 @@ import { test, expect } from './fixtures/electron.mjs';
 
 const FEEDBACK_URL = 'filo://feedback/feedback.html';
 const RICEVUTI = [
-  { _id: 'r1', seq: 1916, status: 'unlabeled', name: 'Segnalazione di un utente', text: 'Il testo di un utente.',
+  { _id: 'r1', seq: 1916, status: 'design', statusReason: 'locale', name: 'Segnalazione di un utente', text: 'Il testo di un utente.',
     clientId: 'tester-uno', createdAt: '2026-10-30T10:00:00Z', fiducia: 'non_fidato' },
 ];
 
