@@ -606,9 +606,9 @@
     const chiavi = [];
     const finestre = new Set();
     for (const x of Array.isArray(segreti) ? segreti : []) {
-      const v = testo(x).trim();
+      const { v, min } = segretoDi(x);
       const p = partiSegreto(v);
-      if (v.length < SEGRETO_MIN || p.norm.length < SEGRETO_MIN) continue;
+      if (v.length < min || p.norm.length < min) continue;
       chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nuclei: p.nuclei, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
       for (const f of finestreSegreto(p)) finestre.add(f);
     }
