@@ -44,6 +44,23 @@ test('ogni ruolo che lavora dichiara il guasto nel rilascio, col gruppo e il mes
   }
 });
 
+// #1959.1: dal 31/10 un guasto ferma solo il suo lavoro, finché il manutentore non lo sblocca. Nessun testo per chi lavora
+// promette ancora il fermo del giro, il periodo di rispetto o il ritorno in coda da sé.
+test('i testi sul guasto descrivono il fermo del solo lavoro, sbloccato dal manutentore', async () => {
+  const VECCHIO = /smette di dare lavoro|periodo di\s+rispetto|àncora giornaliera|il lavoro torna in coda da sé|dichiarano al canale\s+nel rilascio\)|torna in coda sul suo ramo\./;
+  for (const [ruolo, opts] of [...CHI_RISOLVE, ...GLI_ALTRI, ['halt', {}]]) {
+    assert.doesNotMatch(piatto(readRoleInstructions(ruolo, opts)), VECCHIO, `${ruolo} ${JSON.stringify(opts)}`);
+  }
+  for (const f of readdirSync(RUOLI).filter((x) => x.endsWith('.md'))) assert.doesNotMatch(piatto(readFileSync(join(RUOLI, f), 'utf8')), VECCHIO, f);
+  const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-nel-rilascio.md'), 'utf8'));
+  assert.match(pezzo, /Gli altri lavori vanno avanti; il tuo resta fermo sul suo ramo finché il manutentore, che il guasto sveglia, non lo sblocca con una nota/);
+  assert.match(pezzo, /Col manutentore spento il fermo non c'è: il lavoro torna in coda/);
+  assert.match(piatto(readFileSync(join(RUOLI, '_dopo-un-guasto.md'), 'utf8')), /riparte quando il manutentore lo sblocca, o col prossimo giro se il manutentore è spento/);
+  assert.doesNotMatch(readFileSync(join(ROOT, 'scripts', 'routine-channel.mjs'), 'utf8'), VECCHIO, 'i messaggi del canale');
+  const { fermataSenzaDomanda } = await import('../../scripts/routine-channel.mjs');
+  assert.match(fermataSenzaDomanda('status', { status: 'design', reason: 'guasto' }), /arriva al manutentore, che sblocca il lavoro quando la causa è passata/);
+});
+
 // La sentinella della spec: i modelli di guasto non hanno più «Riprendere quando…» come unica opzione, da nessuna parte.
 test('nessun pezzo di ruolo porta il modello di una domanda di guasto', () => {
   const file = readdirSync(RUOLI).filter((f) => f.endsWith('.md'));
