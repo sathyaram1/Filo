@@ -45,7 +45,6 @@ const memorie = (app) => app.evaluate(async () => {
 });
 
 test('una pagina ostile nel tratto: dopo la compattazione il riassunto non porta la sua istruzione, nessuna memoria entra senza conferma e il sospetto finisce', async ({ app, testServer }) => {
-  test.fail(!FASE_4, 'manca la fase 4 di SPEC-CONTESTO: la compattazione');
   const url = testServer.html(PAGINA);
   const page = await home(app);
   // Lo scaricatore vero rifiuta 127.0.0.1.
