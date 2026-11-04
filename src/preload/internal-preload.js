@@ -309,6 +309,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'gestiContati.js')); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
   safe(path.join(SHARED, 'ricercaCampo.js')); // #824 — "è una ricerca?": PRIMA di content.js
+  safe(path.join(SHARED, 'accessoFisso.js')); // #1808 — la password dell'accesso fisso: PRIMA di content.js
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro

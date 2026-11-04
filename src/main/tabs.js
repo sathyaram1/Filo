@@ -337,10 +337,27 @@ const COLORI_TETTO_MS = 8000;
 // Oltre, la pagina che arriva non è più la risposta all'invio di un modulo (#824).
 const INVIO_PAGINA_MS = 120_000;
 const PAGINA_DI_ACCESSO = /(?:^|[^a-z])(?:log-?in|sign-?in|accedi|accesso|auth|anmelden|connexion|iniciar-sesion)(?:[^a-z]|$)/i;
-// La pagina d'accesso di una sessione scaduta: una password visibile fuori da testata e menu (l'accesso piccolo in
-// cima a ogni pagina del sito non lo è), il percorso e il titolo.
-const CONTROLLA_ACCESSO_JS = '(function(){try{return {pw:Array.prototype.some.call(document.querySelectorAll("input[type=password]"),function(e){'
-  + 'return e.getClientRects().length>0&&!e.closest("header,nav,[role=banner],[role=navigation]");}),dove:location.pathname,titolo:document.title};}catch(e){return {};}})()';
+require('../shared/accessoFisso');
+const { riquadroArrivato } = require('./services/riquadroArrivato');
+// Un invio col testo dell'utente che il sito non ha tenuto: errore, rete caduta, o la pagina d'accesso di una sessione
+// scaduta. Vale per la pagina e per i riquadri. `r`: { codice, fallito, accesso, pwPrima, prima: { dove, titolo } }.
+const invioRespinto = (r) => !!r && (r.fallito || !(r.codice >= 200 && r.codice < 400) || r.accesso === true);
+// Conta solo quello che nella pagina dell'invio non c'era: l'accesso fisso è in ogni pagina del sito (#824.3).
+function accessoNuovo(r, p) {
+  const prima = r.prima || {};
+  const nuovo = (ora, era) => PAGINA_DI_ACCESSO.test(String(ora || '')) && !PAGINA_DI_ACCESSO.test(String(era || ''));
+  return (!!p.pw && !r.pwPrima) || nuovo(p.dove, prima.dove) || nuovo(p.titolo, prima.titolo);
+}
+// La pagina che ha risposto, letta col tetto: una pagina bloccata non risponde.
+async function leggiAccesso(frame) {
+  if (!riquadroArrivato(frame)) return null;
+  try {
+    return await Promise.race([
+      frame.executeJavaScript(globalThis.SN_ACCESSO_FISSO.CONTROLLA_JS, false),
+      new Promise((r) => setTimeout(() => r(null), 1000)),
+    ]);
+  } catch (_) { return null; }
+}
 
 // webContents → sito di un «Apri comunque»: il sì vale anche per il blocco delle richieste.
 const permessiApriComunque = new Map();
@@ -1815,26 +1832,27 @@ class TabManager {
   }
 
   _invioNonTenuto(tab) {
-    if (tab._respintiRiquadri && tab._respintiRiquadri.size) return true;
-    const r = tab._invioRespinto;
-    return !!r && (r.fallito || !(r.codice >= 200 && r.codice < 400) || r.accesso === true);
+    if (tab._respintiRiquadri && [...tab._respintiRiquadri.values()].some(invioRespinto)) return true;
+    return invioRespinto(tab._invioRespinto);
   }
 
   // Un modulo col testo dell'utente mandato da un riquadro (anche di un altro sito): la risposta cambia pagina al
   // riquadro, e la si riconosce dal riquadro o dall'indirizzo del modulo (#824.4).
-  _invioDaRiquadro(tab, azione, frame) {
+  _invioDaRiquadro(tab, azione, frame, { pwPrima = false, titolo = '' } = {}) {
     const url = senzaAncora(indirizzoCanonico(azione));
     if (!/^https?:\/\//i.test(url)) return;
     let nodo = null;
+    let dove = '';
     try { nodo = frame.frameTreeNodeId ?? null; } catch (_) {}
+    try { dove = new URL(frame.url).pathname; } catch (_) {}
     const adesso = Date.now();
     const inv = (tab._inviiRiquadri || []).filter((x) => adesso - x.at < INVIO_PAGINA_MS && !(x.url === url && x.nodo === nodo));
-    inv.push({ at: adesso, url, nodo });
+    inv.push({ at: adesso, url, nodo, pwPrima: pwPrima === true, prima: { dove, titolo: String(titolo || '') } });
     tab._inviiRiquadri = inv.slice(-10);
   }
 
-  // Un errore o la rete caduta tengono il testo solo nella pagina di prima del riquadro (Indietro lo rimette);
-  // un'altra pagina del riquadro, o il riquadro tolto, lo portano via.
+  // Un errore, la rete caduta o la pagina d'accesso tengono il testo solo nella pagina di prima del riquadro (Indietro lo
+  // rimette); un'altra pagina del riquadro, o il riquadro tolto, lo portano via. L'accesso lo legge _ricontrollaModuli.
   _rispostaDelRiquadro(tab, nodo, url, codice, fallito = false) {
     const u = senzaAncora(url);
     const adesso = Date.now();
@@ -1844,8 +1862,8 @@ class TabManager {
     if (i >= 0) {
       const [x] = inv.splice(i, 1);
       const k = nodo != null ? nodo : x.nodo;
-      if (fallito || !(codice >= 200 && codice < 400)) respinti.set(k, u); else respinti.delete(k);
-    } else if (nodo != null && respinti.has(nodo) && respinti.get(nodo) !== u && !/^chrome-error:/i.test(String(url || ''))) {
+      respinti.set(k, { url: u, codice, fallito, accesso: null, pwPrima: !!x.pwPrima, prima: x.prima || null });
+    } else if (nodo != null && respinti.has(nodo) && respinti.get(nodo).url !== u && !/^chrome-error:/i.test(String(url || ''))) {
       respinti.delete(nodo);
     }
     tab._inviiRiquadri = inv.length ? inv : null;
@@ -1871,24 +1889,17 @@ class TabManager {
         for (const k of [...tab._respintiRiquadri.keys()]) if (k != null && !nodi.has(k)) tab._respintiRiquadri.delete(k);
         if (!tab._respintiRiquadri.size) tab._respintiRiquadri = null;
       }
+      // Il sito che a sessione scaduta rimanda all'accesso risponde come a un invio riuscito: nella pagina e nei riquadri.
       const inv = tab._invioRespinto;
-      if (inv && inv.accesso === null && !this._invioNonTenuto(tab)) {
-        // Il sito che a sessione scaduta rimanda all'accesso risponde come a un invio riuscito.
-        try {
-          const p = await Promise.race([
-            tab.view.webContents.executeJavaScript(
-              CONTROLLA_ACCESSO_JS,
-              false,
-            ),
-            new Promise((r) => setTimeout(() => r(null), 1000)),
-          ]);
-          // Conta solo quello che nella pagina dell'invio non c'era: l'accesso in testata è in ogni pagina del sito.
-          if (p) {
-            const prima = inv.prima || {};
-            const nuovo = (ora, era) => PAGINA_DI_ACCESSO.test(String(ora || '')) && !PAGINA_DI_ACCESSO.test(String(era || ''));
-            inv.accesso = (!!p.pw && !inv.pwPrima) || nuovo(p.dove, prima.dove) || nuovo(p.titolo, prima.titolo);
-          }
-        } catch (_) {}
+      if (inv && inv.accesso === null && !invioRespinto(inv)) {
+        const p = await leggiAccesso(tab.view.webContents.mainFrame);
+        if (p) inv.accesso = accessoNuovo(inv, p);
+      }
+      for (const [nodo, r] of tab._respintiRiquadri || []) {
+        if (r.accesso !== null || invioRespinto(r)) continue;
+        const f = frames.find((x) => { try { return x.frameTreeNodeId === nodo; } catch (_) { return false; } });
+        const p = f ? await leggiAccesso(f) : null;
+        if (p) r.accesso = accessoNuovo(r, p);
       }
       // Le impronte del documento di prima: la pagina nuova può mostrare il testo mandato al server.
       const impronte = tab._improntePrima || [];
@@ -2486,7 +2497,9 @@ class TabManager {
       try { dove = new URL(tab.url).pathname; } catch (_) {}
       tab._invioDa = { dove, titolo: String(tab.title || '') };
     }
-    if (typeof activity.invioRiquadro === 'string' && activity.invioRiquadro && frame) this._invioDaRiquadro(tab, activity.invioRiquadro, frame);
+    if (typeof activity.invioRiquadro === 'string' && activity.invioRiquadro && frame) {
+      this._invioDaRiquadro(tab, activity.invioRiquadro, frame, { pwPrima: activity.pwPrima === true, titolo: activity.titoloPrima });
+    }
     if (typeof activity.collegamento === 'string' && activity.collegamento && frame && tab.formDirty) {
       // Il testo arrivato al server su un collegamento sempre aperto si legge come il corpo di una richiesta riuscita.
       let sito = null;

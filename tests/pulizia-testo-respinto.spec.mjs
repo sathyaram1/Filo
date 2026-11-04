@@ -1,6 +1,8 @@
-// #1808 giro 1, rilievo 1: un messaggio che il sito respinge non deve contare come arrivato perché la pagina lo mostra
-// già (chat, dialogo «Crea») o perché sul collegamento sempre aperto arriva una risposta qualunque.
-import { test, expect } from '../../fixtures/electron.mjs';
+// #1808: la pulizia delle schede e il testo respinto dal sito. Un no del sito vince sugli altri segni d'arrivo (la pagina
+// che mostra il testo, una risposta qualunque sul collegamento sempre aperto), anche nei riquadri e a sessione scaduta;
+// l'accesso fisso del sito non è una sessione scaduta. Le altre prove della pulizia: tab-auto-archive.spec.mjs.
+
+import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { createHash } from 'node:crypto';
 
@@ -63,6 +65,9 @@ async function apriSito() {
       if (percorso === '/api/rifiuta') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"errore":"Devi accedere"}'); return; }
       if (percorso === '/api/err') { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end('{"errore":"guasto"}'); return; }
       if (percorso === '/traccia') return html(200, '<!doctype html><title>Spedizione</title><p>La spedizione è in viaggio');
+      if (percorso === '/accesso/inviato') { res.writeHead(302, { Location: '/accesso/grazie' }); res.end(); return; }
+      if (percorso === '/accesso/grazie') return html(200, '<!doctype html><title>Grazie | Accesso clienti</title><p>Grazie, ti risponderemo presto');
+      if (percorso === '/contatto-lato-dopo') { res.writeHead(302, { Location: '/grazie-lato' }); res.end(); return; }
       const p = pagine.get(percorso.replace(/^\//, ''));
       if (!p) { res.writeHead(404); res.end('no'); return; }
       html(200, p);
@@ -109,7 +114,7 @@ async function apriSito() {
     origine,
     altra: `http://sito-pubblico.test:${port}`,
     ws: `ws://127.0.0.1:${port}/ws`,
-    pagina(html, { altra = false } = {}) { const id = `p${++n}`; pagine.set(id, html); return `${altra ? `http://sito-pubblico.test:${port}` : origine}/${id}`; },
+    pagina(html, { altra = false, percorso = '' } = {}) { const id = percorso || `p${++n}`; pagine.set(id, html); return `${altra ? `http://sito-pubblico.test:${port}` : origine}/${id}`; },
     async chiudi() { for (const s of prese) s.destroy(); try { server.closeAllConnections(); } catch (_) {} await new Promise((r) => server.close(r)); },
   };
 }
@@ -146,19 +151,26 @@ async function postaWs(app, shell, sito, titolo, modo, { binario = false, testo 
   return id;
 }
 
-test('r1 un post su un collegamento sempre aperto a cui il sito risponde con un errore, o che il sito ignora, tiene aperta la scheda', async ({ app, shell }) => {
+test('un post su un collegamento sempre aperto vale come arrivato solo se il server lo conferma (#1808)', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
+    const arrivati = {
+      'risposta e poi silenzio': await postaWs(app, shell, sito, 'WsAck', 'ack'),
+      'due righe con virgolette ed emoji': await postaWs(app, shell, sito, 'WsRighe', 'ack', { testo: 'Oggi ho finito la maratona di Firenze\nGrazie a "tutti" voi 🙂' }),
+      'in binario': await postaWs(app, shell, sito, 'WsBin', 'ack', { binario: true }),
+    };
     const respinti = {
       'risposta d’errore': await postaWs(app, shell, sito, 'WsErrore', 'errore'),
       'solo presenze, il post ignorato': await postaWs(app, shell, sito, 'WsBattito', 'battito'),
     };
+    await shell.waitForTimeout(1000);
     const aperte = await archiviaTutto(app, shell, sito);
-    for (const [nome, id] of Object.entries(respinti)) expect.soft(aperte, nome).toContain(id);
+    for (const [nome, id] of Object.entries(arrivati)) expect.soft(aperte, `arrivato: ${nome}`).not.toContain(id);
+    for (const [nome, id] of Object.entries(respinti)) expect.soft(aperte, `respinto: ${nome}`).toContain(id);
   } finally { await sito.chiudi(); }
 });
 
-test('r1 un messaggio tolto dalla casella e mostrato nella pagina ma respinto dal sito tiene aperta la scheda', async ({ app, shell }) => {
+test('un messaggio tolto dalla casella e mostrato nella pagina ma respinto dal sito tiene aperta la scheda (#1808)', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const ids = {};
@@ -198,5 +210,55 @@ test('r1 un messaggio tolto dalla casella e mostrato nella pagina ma respinto da
 
     const aperte = await archiviaTutto(app, shell, sito);
     for (const [nome, id] of Object.entries(ids)) expect.soft(aperte, nome).toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo in un riquadro mandato a sessione scaduta tiene aperta la scheda, mandato bene no (#1808)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    for (const [nome, azione] of [['RiqScaduta', '/scaduta'], ['RiqOk', '/ok']]) {
+      const interno = sito.pagina(`<!doctype html><title>Modulo</title><form method="post" action="${azione}">
+        <textarea name="corpo" id="c" style="width:380px;height:90px"></textarea><button id="pub">Invia</button></form>`, { altra: true });
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${nome}</title><h1>Compiti</h1><iframe id="ifr" src="${interno}" style="width:420px;height:220px"></iframe>`));
+      const fr = page.frameLocator('#ifr');
+      await fr.locator('#c').click();
+      await page.keyboard.type(POST);
+      ids[nome] = await sporca(shell, nome);
+      await fr.locator('#pub').click();
+      await expect(fr.locator('body')).toContainText(azione === '/ok' ? 'Ricevuto' : 'La sessione è scaduta');
+      await page.waitForTimeout(800);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'sessione scaduta nel riquadro').toContain(ids.RiqScaduta);
+    expect.soft(aperte, 'mandato bene nel riquadro').not.toContain(ids.RiqOk);
+  } finally { await sito.chiudi(); }
+});
+
+test('una parola d’accesso già nella pagina di partenza e l’accesso in una colonna laterale non dicono «sessione scaduta» (#1808)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    // Percorso e titolo dicono «accesso» già prima dell'invio: mandato bene, la scheda si archivia.
+    const area = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Accesso clienti</title>
+      <form method="post" action="/accesso/inviato"><textarea name="msg" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>`, { percorso: 'accesso/scrivici' }));
+    ids.area = await scriviEPubblica(shell, area, 'Accesso clienti', area.locator('#c'));
+    // Da una pagina così la sessione scade davvero: la risposta è la pagina d'accesso, la scheda resta aperta.
+    const scade = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Reclami | Accesso clienti</title>
+      <form method="post" action="/scaduta"><textarea name="msg" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>`, { percorso: 'accesso/reclamo' }));
+    await scade.locator('#c').click();
+    await scade.keyboard.type(POST);
+    ids.scade = await sporca(shell, 'Reclami | Accesso clienti');
+    await scade.locator('#pub').click();
+    await expect.poll(async () => (await schede(shell)).find((t) => t.id === ids.scade)?.title, { timeout: 10_000 }).toBe('Accedi');
+    await scade.waitForTimeout(800);
+    // L'accesso nella colonna laterale c'è solo nella pagina di ringraziamento.
+    const lato = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Scrivici</title>
+      <form method="post" action="/contatto-lato-dopo"><textarea name="msg" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>`));
+    ids.lato = await scriviEPubblica(shell, lato, 'Scrivici', lato.locator('#c'));
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'parola d’accesso già prima, mandato bene').not.toContain(ids.area);
+    expect.soft(aperte, 'parola d’accesso già prima, sessione scaduta').toContain(ids.scade);
+    expect.soft(aperte, 'accesso laterale solo nella pagina dopo').not.toContain(ids.lato);
   } finally { await sito.chiudi(); }
 });
