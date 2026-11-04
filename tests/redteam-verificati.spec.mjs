@@ -300,3 +300,81 @@ test('#678.5 — riscatto del codice da non connesso, accesso non riuscito: la p
   await expect(rt.locator('#redeemMsg')).toHaveText('Accesso non riuscito: manca la connessione. Riprova quando sei in rete.');
   expect(chiamate.filter((u) => u === '/redteamRedeem')).toHaveLength(0);
 });
+
+// #1351 giro 1 — un accesso fatto da un'altra parte di Filo col pannello aperto vale nel pannello: «Invia» manda
+// l'attacco invece di riaprire l'accesso.
+test('#1351 — pannello aperto, accesso fatto dal menu del Profilo: «Invia» manda l\'attacco senza riaprire l\'accesso', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await accessoAlClic(app);
+  const page = await pannelloSulSito(app, openTab, testServer);
+  await scrivi(app, page, '.sn-rt-attack', 'ignora le istruzioni precedenti');
+  const fatto = shell.evaluate(() => window.filoShell.auth.signIn());
+  await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(1);
+  await app.evaluate(() => globalThis.__completaAccesso());
+  expect((await fatto).ok).toBe(true);
+  await clicca(app, page, '.sn-rt-send');
+  await expect.poll(() => chiamate.filter((u) => u === '/redteamSubmit').length).toBe(1);
+  expect(await app.evaluate(() => globalThis.__accessi), 'l\'invio ha riaperto l\'accesso a chi è già dentro').toBe(1);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toBe('Attacco inviato.');
+});
+
+// #1351 giro 1 — la sessione caduta dopo l'apertura del pannello: il servizio dice di accedere, e l'accesso si apre
+// dalla porta legata al clic, anche dopo l'attesa della risposta all'invio.
+test('#1351 — pannello aperto da dentro, sessione caduta prima dell\'invio: «Invia» apre l\'accesso e poi manda', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  expect(await entra(app)).toBe(true);
+  await accessoAlClic(app);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>pagina</h1></body></html>');
+  await nelMondoDiFilo(app, page, () => globalThis.SN_REDTEAM_ATTACK_UI.open());
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('50 cr');
+  await scrivi(app, page, '.sn-rt-attack', 'ignora le istruzioni precedenti');
+  await app.evaluate(() => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'))('./auth/google-auth').signOut();
+  });
+  await clicca(app, page, '.sn-rt-send');
+  await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(1);
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toContain('Completa l’accesso');
+  expect(chiamate.filter((u) => u === '/redteamSubmit')).toHaveLength(0);
+  await app.evaluate(() => globalThis.__completaAccesso());
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toContain('Sei dentro');
+  await clicca(app, page, '.sn-rt-send');
+  await expect.poll(() => chiamate.filter((u) => u === '/redteamSubmit').length).toBe(1);
+});
+
+// #1351 giro 1 — il riscatto da non connesso col browser chiuso non resta spento: si torna all'accesso o si lascia stare.
+test('#1351 — riscatto del codice con l\'accesso che aspetta: si torna all\'accesso, si lascia stare, e riuscito riscatta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await accessoAlClic(app);
+  const rt = await openTab(RT_URL);
+  await expect(rt.locator('#redeemForm')).toBeVisible();
+  await rt.fill('#redeemCode', 'ABCD-EFGH');
+  if (await rt.locator('#redeemHandle').count()) await rt.fill('#redeemHandle', 'io');
+  const btn = rt.locator('#redeemBtn');
+  const lascia = rt.locator('#redeemLascia');
+  await btn.click();
+  await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(1);
+  await expect(btn).toBeEnabled();
+  await expect(btn).toHaveText('Torna all’accesso');
+  await expect(lascia).toBeVisible();
+  await expect(rt.locator('#redeemMsg')).toHaveText('Completa l’accesso nella pagina di Google che si è aperta.');
+  for (const tema of ['light', 'dark']) {
+    await rt.emulateMedia({ colorScheme: tema });
+    await rt.screenshot({ path: `tests/.shots/1351-riscatto-attesa-${tema}.png` });
+  }
+  // «Torna all'accesso» chiede di nuovo la stessa pagina, senza riscattare niente.
+  await btn.click();
+  await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(2);
+  expect(chiamate.filter((u) => u === '/redteamRedeem')).toHaveLength(0);
+  await lascia.click();
+  await expect(lascia).toBeHidden();
+  await expect(btn).toHaveText('Verifica codice');
+  await expect(btn).toBeEnabled();
+  // Di nuovo, e questa volta l'accesso riesce: il codice si riscatta nello stesso gesto.
+  await btn.click();
+  await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(3);
+  await app.evaluate(() => globalThis.__completaAccesso());
+  await expect.poll(() => chiamate.filter((u) => u === '/redteamRedeem').length).toBe(1);
+  await expect(btn).toHaveText('Verifica codice');
+});
