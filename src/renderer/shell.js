@@ -1086,10 +1086,12 @@
   // Il canale è globale: qui si prendono solo le azioni `tab-…`.
   if (api.onMenuAction) {
     api.onMenuAction((action) => {
+      // Dal menu della linguetta o del «+»: non riguarda una scheda.
+      if (action === 'reopen-closed-tab') { api.tabs.riapriChiusa('menu'); return; }
       const id = ctxTabId;
       if (!id) return;
-      // Quale voce si sceglie (#1470); «Chiudi» lo conta la chiusura, e il paese scelto non esce.
-      if (/^tab-/.test(action) && action !== 'tab-close' && !action.startsWith('tab-proxy-go:')) {
+      // Quale voce si sceglie (#1470); le chiusure le conta la chiusura, e il paese scelto non esce.
+      if (/^tab-/.test(action) && !/^tab-close/.test(action) && !action.startsWith('tab-proxy-go:')) {
         try { Promise.resolve(api.message({ type: 'contatori_evento', misura: 'voce-menu-scheda', id: action })).catch(() => {}); } catch (_) {}
       }
       if (action === 'tab-duplicate') api.tabs.duplicate(id);
