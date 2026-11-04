@@ -164,6 +164,7 @@
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
+    ELIMINA_FILE: (a) => ({ icon: '🗑', text: testoEliminati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -332,7 +333,8 @@
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
-        sidebar: 'Barra laterale aperta', aiuto: 'Aiuto aperto',
+        sidebar: 'Barra laterale aperta', sidebar_close: 'Barra laterale chiusa',
+        sidebar_lock: 'Barra laterale bloccata aperta', sidebar_unlock: 'Barra laterale sbloccata', aiuto: 'Aiuto aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       // La home chiesta dalla home non ricarica niente (butterebbe via lavoro e
@@ -379,6 +381,7 @@
     TOGLI_CHAT: 'Conversazione non trovata', RIMETTI_CHAT: 'Conversazione nascosta non trovata',
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
+    ELIMINA_FILE: 'Niente cancellato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
@@ -433,7 +436,7 @@
   // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
   const NO_LABELS = {
     ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato', CORREGGI_MEMORIA: 'Non corretto',
-    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa',
+    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa', ELIMINA_FILE: 'Non cancellato',
     CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
@@ -549,6 +552,16 @@
     const quanti = n === 1 ? 'Rinominato un file' : `Rinominati ${n} file`;
     return no ? `${quanti} · ${no} non riusciti` : quanti;
   }
+  // #1909 — i nomi vengono dal disco: entrano solo come testo.
+  function testoEliminati(o) {
+    const fatti = o && Array.isArray(o.eliminati) ? o.eliminati.map(pulito) : [];
+    const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
+    const per = !!(o && o.perSempre);
+    const quanti = fatti.length === 1
+      ? `${per ? 'Cancellato per sempre' : 'Nel cestino'} «${fatti[0]}»`
+      : `${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`;
+    return no ? `${quanti} · ${no} non riusciti` : quanti;
+  }
 
   // Le azioni che in diretta sono solo il loro bottone: nella chat riaperta (#1294) una riga al passato con la cosa vera.
   const DOPO_IL_BOTTONE = {
@@ -573,7 +586,7 @@
   }
 
   global.SN_RIGHE_ATTIVITA = {
-    riga: rigaAttivita, rigaArchivio, pulito, FAILED_LABELS, etichettaFallita, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
-    rifiutataDallaRegola, sceltaContatori, sceltaAutonomia, testoRicercaDocumenti, testoRicercaSalvate, testoRinominati,
+    riga: rigaAttivita, rigaArchivio, pulito, FAILED_LABELS, etichettaFallita, etichettaNonFatta, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
+    rifiutataDallaRegola, sceltaContatori, sceltaAutonomia, testoRicercaDocumenti, testoRicercaSalvate, testoRinominati, testoEliminati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
