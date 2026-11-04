@@ -34,6 +34,9 @@ process.env.FILO_TEST_IN_PAUSA_APERTE = '1';
 // La home nascosta pronta per la scheda nuova (#1128) è una pagina in più che conta come home: le prove che contano o
 // cercano le viste partono senza; tests/riserva-nuova-scheda.spec.mjs la riaccende. `=1` la tiene accesa ovunque.
 if (process.env.FILO_RISERVA_NUOVA_SCHEDA !== '1') process.env.FILO_RISERVA_NUOVA_SCHEDA = '0';
+// Lo stesso per la voce del menu Impostazioni preparata a menu aperto (#1129): tests/riserva-menu-impostazioni.spec.mjs
+// la riaccende con `envInPiu`.
+if (process.env.FILO_PREPARA_IMPOSTAZIONI !== '1') process.env.FILO_PREPARA_IMPOSTAZIONI = '0';
 
 export default defineConfig({
   testDir: './tests',

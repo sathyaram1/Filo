@@ -21,6 +21,8 @@ const DiskStorage = require('./shim/storage');
 const { chiediConferma, ritiraConferma } = require('./confermeSopraPagina');
 const AzioniContate = require('./services/azioniContate');
 const Strade = require('./services/contatoriStrade');
+const VociMenuUsate = require('./services/vociMenuUsate');
+const { riserveDi } = require('./tabs/riservaNuovaScheda');
 const { vistaInterna } = require('./services/handlers/origine');
 
 const inFlightStreams = new Map(); // requestId → AbortController
@@ -61,14 +63,12 @@ function senderInfo(event) {
       if (t) { tab = t; win = w; break; }
     }
   }
-  // La home pronta per la scheda nuova (#1128) parla già come la scheda che diventerà, nella sua finestra: senza,
-  // in incognito leggerebbe e scriverebbe il disco, e nessuno saprebbe che non è davanti agli occhi.
+  // Una pagina pronta per la scheda nuova (#1128, #1129) parla già come la scheda che diventerà, nella sua finestra:
+  // senza, in incognito leggerebbe e scriverebbe il disco, e nessuno saprebbe che non è davanti agli occhi.
   let riserva = false;
-  if (!tab) {
-    for (const w of BrowserWindow.getAllWindows()) {
-      const r = w._filoTabs?.riserva;
-      if (r && r.possiede(wc)) { tab = { id: r.id, url: wc.getURL(), title: '' }; win = w; riserva = true; break; }
-    }
+  for (const w of tab ? [] : BrowserWindow.getAllWindows()) {
+    const r = riserveDi(w._filoTabs).find((x) => x.possiede(wc));
+    if (r) { tab = { id: r.id, url: wc.getURL(), title: '' }; win = w; riserva = true; break; }
   }
   const isShell = Boolean(finestraDellaBarra(wc));
   return {
@@ -811,10 +811,15 @@ function registerIpcHandlers() {
     };
   });
 
-  ipcMain.handle('shell:popup-menu', (event, { entries, x, y }) => {
+  // `prepara`: il nome del menu di cui preparare la voce più usata (#1129); solo dalla barra, che lo nomina.
+  ipcMain.handle('shell:popup-menu', (event, { entries, x, y, prepara } = {}) => {
     const win = winFor(event);
     if (!win?._filoTabs) return { ok: false };
+    const menu = prepara === 'impostazioni' && finestraDellaBarra(event.sender) ? prepara : '';
     showPopupMenu(win, entries, x, y, (value) => {
+      if (menu && typeof value === 'string' && /^filo:/i.test(value)) {
+        VociMenuUsate.servizio().conta(menu, globalThis.SN_URL_NAV.canonicalizeFiloUrl(value), { incognito: !!win._filoIncognito });
+      }
       // `@action:` torna al renderer che l'ha chiesto, tutto il resto è un url.
       if (typeof value === 'string' && value.startsWith('@action:')) {
         try { event.sender.send('shell:menu-action', value.slice('@action:'.length)); } catch (_) {}
@@ -824,6 +829,7 @@ function registerIpcHandlers() {
         win._filoTabs.openTab(value, finestraDellaBarra(event.sender) ? { origine: { tipo: 'filo' } } : {});
       }
     });
+    if (menu) win._filoTabs.preparaDalMenu(menu, entries);
     return { ok: true };
   });
 

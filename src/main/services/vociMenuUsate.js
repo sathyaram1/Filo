@@ -17,39 +17,40 @@ function scegli(conti, candidati, predefinita = '') {
 
 function crea({ leggi, scrivi } = {}) {
   // In memoria, così l'apertura del menu sceglie senza aspettare il disco; la tengono fresca le scritture di qui e
-  // `dimentica` (un backup importato).
+  // `allinea` (ogni altra scrittura della chiave, come un backup importato).
   let tutti = null;
-  let carica = null;
+  let inCorso = null;
 
   const valido = (v) => (v && typeof v === 'object' && !Array.isArray(v) ? v : {});
 
-  function carica_() {
+  function carica() {
     if (tutti) return Promise.resolve(tutti);
-    if (!carica) {
-      carica = Promise.resolve().then(() => leggi()).then((v) => { if (!tutti) tutti = valido(v); return tutti; }, () => {
+    if (!inCorso) {
+      inCorso = Promise.resolve().then(() => leggi()).then((v) => { if (!tutti) tutti = valido(v); return tutti; }, () => {
         if (!tutti) tutti = {};
         return tutti;
-      }).finally(() => { carica = null; });
+      }).finally(() => { inCorso = null; });
     }
-    return carica;
+    return inCorso;
   }
 
   function piuUsata(menu, candidati, predefinita) {
     return scegli(tutti ? valido(tutti[menu]) : {}, candidati, predefinita);
   }
 
-  async function conta(menu, url) {
-    if (!menu || typeof url !== 'string' || !url) return;
-    await carica_();
+  // Quello che si sceglie in incognito non lascia traccia sul disco.
+  async function conta(menu, url, { incognito = false } = {}) {
+    if (incognito || !menu || typeof url !== 'string' || !url) return;
+    await carica();
     const voci = { ...valido(tutti[menu]) };
     voci[url] = (Number(voci[url]) || 0) + 1;
     tutti = { ...tutti, [menu]: voci };
     try { await scrivi(tutti); } catch (_) {}
   }
 
-  function dimentica() { tutti = null; return carica_(); }
+  function allinea(v) { tutti = valido(v); }
 
-  return { carica: carica_, piuUsata, conta, dimentica };
+  return { carica, piuUsata, conta, allinea };
 }
 
 let predefinito = null;
@@ -63,13 +64,9 @@ function servizio() {
     scrivi: (v) => DiskStorage.runNormale(() => DiskStorage.set({ [chiave()]: v })),
   });
   DiskStorage.onChanged((changes) => {
-    const k = chiave();
-    if (changes && changes[k] && changes[k].newValue !== predefinito._ultima) predefinito.dimentica();
+    const c = changes && changes[chiave()];
+    if (c) predefinito.allinea(c.newValue);
   });
-  const conta = predefinito.conta;
-  predefinito.conta = async (menu, url) => {
-    await conta(menu, url);
-  };
   return predefinito;
 }
 
