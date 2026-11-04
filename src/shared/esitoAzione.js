@@ -97,6 +97,12 @@
       const quali = o.reason === 'lists' ? 'di pubblicità e tracciamento' : 'bloccati';
       return `${o.host || 'il sito'} è fra i siti ${quali}`;
     }
+    // Un comando partito e finito male: il perché è il suo codice d'uscita e la prima riga d'errore, come nel riquadro.
+    if (partita(a)) {
+      if (o.timedOut) return 'interrotto: ci metteva troppo';
+      const prima = String(o.stderr || o.stdout || '').split('\n').map((s) => s.trim()).find(Boolean) || '';
+      return `uscito con codice ${o.code}${prima ? `: ${pulito(prima)}` : ''}`;
+    }
     if (o.restyle === 'no-page') return 'nessuna pagina web aperta';
     if (o.proxy === 'non_disponibile') return 'non ancora disponibile';
     if (o.proxy === 'no_web_tab') return 'nessuna pagina web aperta';
