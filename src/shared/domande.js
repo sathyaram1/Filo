@@ -373,7 +373,7 @@
       return no('blocca_mancante', `manca «blocca»: la domanda riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}, dì se lo ferma finché l’owner non risponde. ${BLOCCA_REGOLA}`);
     }
     if (!lega && d.blocca === true) {
-      return no('blocca_senza_ripresa', `«blocca» vale per una domanda che riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}: aggiungi l’opzione «riprendi», o togli «blocca»`);
+      return no('blocca_senza_ripresa', `«blocca» vale per una domanda che riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}: aggiungi un’opzione ${AZIONI_CHE_RIPRENDONO.map((t) => `«${t}»`).join(' o ')}, o togli «blocca»`);
     }
     return null;
   }
