@@ -80,7 +80,10 @@ che il biglietto ha **in quel momento**.
 Vale anche per ogni **nota** della conversazione di un feedback (#1919):
 consegne delle routine, note delle sessioni locali, allarmi. Il server, quando
 ne scrive una da un biglietto pulito o da sé, aggiunge l'impronta del turno a
-`noteFidate`; le note dell'owner (i suoi turni) sono fidate. Chi legge un
+`noteFidate`; le note dell'owner (i suoi turni) sono fidate, tranne quelle che
+il server scrive come sue risposte per chi non è fidato (la chiave
+owner-non-fidato, una sessione sporca): di quelle l'impronta va nel campo col
+prefisso `!`, e valgono non fidate. Chi legge un
 feedback si sporca solo per il testo non fidato: quello del feedback, se non è
 fidato, e le note non fidate, dette col loro numero. Una nota senza impronta
 (anche una scritta prima del campo, o riscritta dopo) vale non fidata.

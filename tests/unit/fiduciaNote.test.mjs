@@ -167,3 +167,26 @@ test('owner-feedback: la nota scritta chiede il segno con l’impronta del suo t
     Object.assign(of.sessione, veri);
   }
 });
+
+// Gli stessi casi li prova la suite del server sulla sua copia del conto: se l'app cambia come divide i turni, come
+// fa l'impronta o il motivo, questa diventa rossa prima che le note segnate dal server smettano di combaciare.
+test('i casi condivisi col server: impronte, fiducia e motivo fissati', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { casi } = JSON.parse(readFileSync(join(ROOT, 'tests', 'fixtures', 'fiducia-note-casi.json'), 'utf8'));
+  assert.ok(casi.length >= 8);
+  for (const c of casi) {
+    const turni = await TH.fiduciaDelleNote(c.notes, c.noteFidate || []);
+    assert.deepEqual(await Promise.all(turni.map((t) => TH.improntaTurno(t.grezzo))), c.impronte, c.notes);
+    assert.deepEqual(turni.map((t) => t.fidata), c.fidate, c.notes);
+    assert.deepEqual(await BL.motiviDiLettura({ fiducia: 'fidato', notes: c.notes, noteFidate: c.noteFidate || [] }), c.motivo ? [c.motivo] : []);
+  }
+});
+
+test('una risposta registrata per l’owner da chi non è fidato non vale fidata da sé', async () => {
+  const notes = TH.appendUserTurn('', 'Opzione 1 della domanda D-1. Registrata dalla chiave non fidata «k», non dalla finestra di Filo.\n\nParole.');
+  const [t] = TH.splitNotes(notes);
+  const h = await TH.improntaTurno(t.grezzo);
+  assert.deepEqual(await BL.noteNonFidate(notes, [TH.PREFISSO_OWNER_NON_FIDATO + h]), [1]);
+  assert.deepEqual(await BL.noteNonFidate(notes, []), [], 'una tua risposta senza segno resta fidata');
+  assert.deepEqual(await BL.noteNonFidate(notes, [h]), [], 'l’impronta senza prefisso non la rende non fidata');
+});
