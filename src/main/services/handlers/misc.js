@@ -6,7 +6,6 @@ require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l
 const { perContoDellaScheda } = require('../perContoDellaScheda');
 const { avvisoNellaFinestra, avvisoQuandoPronta } = require('../avvisoFinestra');
 const { luogoDownload } = require('../contatoriFinestra');
-const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
