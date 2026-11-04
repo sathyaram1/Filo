@@ -524,7 +524,7 @@ rispondere.
      caso, risponde lui: l'opzione che il principio indica, e un testo che
      cita il principio e la domanda da cui viene. La domanda si chiude con
      `esito.automatica = true` (§ 3.6).
-  3. **Decide l'owner.** Riscrive la domanda nella forma per l'owner (§ 3.1:
+  4. **Decide l'owner.** Riscrive la domanda nella forma per l'owner (§ 3.1:
      titolo al più 10 parole, contesto al più 5 righe, problema al più 3, da 2
      a 4 opzioni con pro e contro di una riga e l'azione, consiglio con un
      motivo di una riga, unslop) e la pubblica: stato `aperta`. Se chi ha
