@@ -1962,7 +1962,7 @@
   }
 
   // Il riordino che la regola non fa partire da solo parte al clic, e chiede come dice `_domanda` (#530).
-  function renderBottoneRiordino(a, activity, chat = '') {
+  function renderBottoneRiordino(a, activity, chat = '', gruppo = null) {
     const btn = document.createElement('button');
     btn.className = 'dash-action-btn dash-action-btn-primary';
     btn.type = 'button';
