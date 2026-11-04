@@ -1,5 +1,6 @@
 // #2116 — lo screenshot del riquadro «Invia feedback» copre password e carta come la foto per un modello: due valori
-// diversi nel campo danno la stessa immagine. Se coprirli non riesce la pagina non parte, e il riquadro dice perché.
+// diversi nel campo danno la stessa immagine. Una password ancora coi puntini resta com'è, come per il modello: si
+// prova quella resa visibile. Se coprirli non riesce la pagina non parte, e il riquadro dice perché.
 // Finta è solo la rete (la submit nel main).
 
 import { test, expect } from './fixtures/electron.mjs';
