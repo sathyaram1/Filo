@@ -238,7 +238,8 @@
     if (diretta && diretta.failed) esito = FALLITO;
     let riga = '';
     if (esito === CHIESTO) riga = primaRiga(x._confirm && x._confirm.text) || (L ? frase(L.describe, x) : '');
-    else if (esito === FALLITO) riga = L ? frase(L.describe, x) : '';
+    // Non riuscita dopo un OK: la domanda a cui l'utente ha risposto, come la diceva il bottone.
+    else if (esito === FALLITO) riga = primaRiga(x._rigaChiesta) || (L ? frase(L.describe, x) : '');
     else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
     if (!riga && x._domanda && L) riga = frase(L.describe, x);
     if (SENZA_TITOLO[type]) riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1];
