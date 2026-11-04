@@ -1781,17 +1781,12 @@
         const w = maxX - minX, h = maxY - minY;
         cleanup();
         if (w < 4 || h < 4) { resolve(null); return; }
-        const sx = img.naturalWidth / vw;
-        const sy = img.naturalHeight / vh;
-        const cx = Math.round(minX * sx), cy = Math.round(minY * sy);
-        const cw = Math.round(w * sx), ch = Math.round(h * sy);
-        const canvas = document.createElement('canvas');
-        canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+        const rect = { x: minX, y: minY, w, h }, vista = { w: vw, h: vh };
+        const canvas = tagliaInCanvas(img, img.naturalWidth, img.naturalHeight, rect, vista);
         canvas.toBlob((blob) => {
           if (!blob) { resolve(null); return; }
           const r = new FileReader();
-          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, perModello: cap.perModello });
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect, vista, perModello: cap.perModello });
           r.onerror = () => resolve(null);
           r.readAsDataURL(blob);
         }, 'image/png');
