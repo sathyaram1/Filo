@@ -313,6 +313,56 @@ test('un pezzo più grande di quanto va al modello in una volta si compatta a pe
   assert.ok((await componi(ora)).visti.length < resta.length);
 });
 
+test('un testo enorme in un messaggio solo: chi compatta resta sotto il listino e ne vede testa e coda, la conversazione resta intera', async () => {
+  const { chiamate } = azzera();
+  const ora = Date.now();
+  const tesi = `inizio della tesi ${'le api danzano. '.repeat(Math.ceil((120000 * FC.CARATTERI_PER_TOKEN) / 16))} fine della tesi`;
+  await scrivi('ab12', 'user', tesi, new Date(ora - 5 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Letta.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  await scrivi('ab12', 'user', 'e adesso?', new Date(ora - 4 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Riassumo.', new Date(ora - 4 * ORA_MS + 1000).toISOString());
+  const r = await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.equal(r.fatto, true);
+  const ingresso = FC.caratteriDi(chiamate[0]) / FC.CARATTERI_PER_TOKEN;
+  assert.ok(ingresso < L.LISTINO, `la chiamata di chi compatta sta sotto i 100.000 token (${Math.round(ingresso)})`);
+  assert.match(chiamate[0][1].content, /inizio della tesi[\s\S]*parole in mezzo non riportate[\s\S]*fine della tesi/);
+  assert.equal((await Chats.get('ab12')).messages[0].text, tesi, 'il testo intero resta nella conversazione');
+});
+
+test('il primo turno da solo più grande del pezzo va da solo, non con tutto il tratto', async () => {
+  const { chiamate } = azzera();
+  const ora = Date.now();
+  const lungo = (i) => `${i} ${'parola '.repeat(Math.ceil((L.MAX_MESSAGGIO * FC.CARATTERI_PER_TOKEN) / 7))}`;
+  await scrivi('ab12', 'user', lungo('a'), new Date(ora - 10 * ORA_MS).toISOString());
+  for (let i = 0; i < 4; i++) await scrivi('ab12', 'filo', lungo(`r${i}`), new Date(ora - 10 * ORA_MS + (i + 1) * 1000).toISOString());
+  await scrivi('ab12', 'user', 'dopo', new Date(ora - 9 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', lungo('b'), new Date(ora - 9 * ORA_MS + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.doesNotMatch(chiamate[0][1].content, /Utente: dopo/, 'il turno dopo aspetta la compattazione dopo');
+  assert.equal((await componi(ora)).visti[0].text, 'dopo');
+});
+
+test('in incognito la compattazione tiene il diario solo in memoria e non scrive né propone memorie', async () => {
+  const { cartella, scritte } = azzera({ memorie: ['Ha due gatti, Miso e Pepe.'] });
+  const Disco = require('../../src/main/shim/storage.js');
+  const ora = Date.now();
+  await Disco.runIncognito(async () => {
+    await scrivi('in01', 'user', 'ho due gatti, Miso e Pepe', new Date(ora - 5 * ORA_MS).toISOString());
+    await scrivi('in01', 'filo', 'Che bei nomi.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  });
+  assert.equal((await globalThis.SN_IL_FILO.chats({ incognito: false })).length, 0, 'la chat in incognito non è nel filo del disco');
+  const r = await Comp.compatta({ incognito: true, ora, tetti: tettiDi() });
+  assert.equal(r.fatto, true);
+  assert.match(await Comp.sezione(true), /parlato di gatti/);
+  assert.equal(await Comp.sezione(false), '', 'il diario dell\'incognito non entra nel CONTESTO normale');
+  assert.equal(Comp.compattato(false), null);
+  assert.deepEqual(scritte, [], 'nessuna memoria scritta');
+  assert.deepEqual(await Comp.inAttesa(), [], 'nessuna memoria proposta');
+  assert.throws(() => readFileSync(join(cartella, 'filo', 'livelli.json'), 'utf8'), /ENOENT/, 'niente su disco');
+  Comp.dimenticaIncognito();
+  assert.equal(await Comp.sezione(true), '');
+});
+
 test('la stima accanto alla soglia: più bassa compatta più spesso, oltre i 100.000 token il listino di Haiku costa cinque volte', () => {
   require('../../src/shared/stimaCosto.js');
   const S = globalThis.SN_STIMA_COSTO;
