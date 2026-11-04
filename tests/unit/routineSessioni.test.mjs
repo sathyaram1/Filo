@@ -167,7 +167,7 @@ test('lo stato della routine a rete aperta in una riga: cosa ha deciso il pacema
   assert.equal(RS.statoReteAperta(undefined), '', 'il pacemaker non ne ha ancora scritto niente');
   assert.equal(RS.statoReteAperta({ perche: 'rete_work', oggi: 1 }), 'Accesa una volta oggi.');
   assert.equal(RS.statoReteAperta({ perche: 'rete_work', oggi: 3 }), 'Accesa 3 volte oggi.');
-  assert.equal(RS.statoReteAperta({ perche: 'rete_no_token', oggi: 0 }), 'Ferma: manca il segreto per accenderla; mai accesa oggi.');
+  assert.equal(RS.statoReteAperta({ perche: 'rete_no_token', oggi: 0 }), 'Ferma: si accende solo a mano; mai accesa oggi.');
   assert.equal(RS.statoReteAperta({ perche: 'no_rete_work', oggi: 2 }), 'Nessun compito per lei; accesa 2 volte oggi.');
   assert.equal(RS.statoReteAperta({ perche: 'motivo_nuovo' }), 'Ferma: stato non leggibile; mai accesa oggi.');
   // La sua pausa conta le accensioni sue, non quelle di un account.
