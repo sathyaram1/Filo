@@ -210,13 +210,15 @@ function formeLibere(testo) {
   const valore = (v) => X.segretiDetti(`password ${pulito(v)}`);
   const forma = (v) => (G && G.sembraPassword && G.sembraPassword(pulito(v)) ? [{ valore: pulito(v) }] : []);
   const out = [];
+  const utente = new RegExp(`^${UTENTE}$`, 'u');
   for (const m of l.matchAll(LIBERE.coppia)) {
-    const [a, b] = [SOLO_PW.test(m[1]), SOLO_PW.test(m[2])];
-    if (a !== b) out.push(...valore(b ? m[4] : m[3]));
+    const [a, b] = [nomePw(m[1]), nomePw(m[2])];
+    if (a !== b && utente.test(a ? m[2] : m[1])) out.push(...valore(b ? m[4] : m[3]));
   }
   for (const m of l.matchAll(LIBERE.credenziali)) out.push(...valore(m[2]));
+  for (const m of l.matchAll(LIBERE.accesso)) out.push(...forma(m[2]));
   for (const m of l.matchAll(LIBERE.accedi)) out.push(...forma(m[2]));
-  for (const m of l.matchAll(LIBERE.rete)) out.push(...forma(m[2]));
+  for (const m of l.matchAll(LIBERE.rete)) out.push(...forma(m[1]));
   for (const m of l.matchAll(LIBERE.chiaveRete)) out.push(...valore(m[1]));
   for (const m of l.matchAll(LIBERE.corte)) {
     const coda = l.slice(m.index + m[0].length, m.index + m[0].length + 200);
