@@ -23,11 +23,14 @@ test('la frase nomina ogni motivo col suo numero', () => {
 });
 
 test('chat e menu della linguetta usano lo stesso modulo, senza copie', () => {
-  const diario = readFileSync(new URL('../../src/pages/dashboard/dashboard-attivita.js', import.meta.url), 'utf8');
+  // Le parole del diario, in diretta e nella chat riaperta, le dice SN_ESITO (#1294).
+  const diario = readFileSync(new URL('../../src/shared/esitoAzione.js', import.meta.url), 'utf8');
   const handlers = readFileSync(new URL('../../src/main/services/handlers.js', import.meta.url), 'utf8');
   const shell = readFileSync(new URL('../../src/renderer/shell.js', import.meta.url), 'utf8');
   assert.match(diario, /SN_RESTANO_APERTE/);
-  assert.doesNotMatch(diario, /restano aperte col testo/);
+  for (const f of ['../../src/shared/esitoAzione.js', '../../src/shared/righeAttivita.js', '../../src/pages/dashboard/dashboard-attivita.js']) {
+    assert.doesNotMatch(readFileSync(new URL(f, import.meta.url), 'utf8'), /restano aperte col testo/, f);
+  }
   assert.match(handlers, /restanoAperte\.js'\)\.conto/);
   assert.match(shell, /SN_RESTANO_APERTE/);
 });
