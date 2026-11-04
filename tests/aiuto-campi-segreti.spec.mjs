@@ -490,6 +490,7 @@ const PAGINA_GRANDE = [
   ['senza altro', () => ''],
   ['con un riquadro dello stesso sito su un altro indirizzo con un campo', (altro) => `<iframe src="${altro}" width="300" height="80"></iframe>`],
   ['con la scritta «<input>» in un commento', () => '<!-- vecchio modulo: <input> --><p hidden>&lt;textarea&gt;</p>'],
+  ['con la scritta «<input>» nel valore di un attributo', () => '<div hidden data-modello="<input> <textarea> <select>"></div>'],
 ];
 for (const [nome, extra] of PAGINA_GRANDE) {
   test(`su una pagina grande senza componenti chiusi, ${nome}, la foto per l’assistente non aspetta e Filo non si ferma`, async ({ app, shell, openTab, testServer }) => {
