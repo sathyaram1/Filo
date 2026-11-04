@@ -852,6 +852,7 @@
 
   $('linkGoogleBtn').addEventListener('click', () => { collegaGoogle().catch(() => {}); });
   $('linkGoogleLascia').addEventListener('click', () => {
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN_LASCIA })).catch(() => {});
     collegaN++;
     collegaInCorso = false;
     esitoCollega = null;

@@ -235,9 +235,14 @@
     // ---- invio: costa crediti, parte solo dal clic dell'utente (#1071) ----
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
+      // Un accesso fatto altrove (menu del Profilo, un'altra scheda) col pannello aperto vale qui: si chiede adesso (#1351).
       if (!signedIn) {
-        accedi();
-        return;
+        try { const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }); signedIn = !!(a && a.signedIn); } catch (_) {}
+        if (activeRoot !== root) return;
+        if (!signedIn) { accedi(); return; }
+        await leggiSaldo();
+        if (activeRoot !== root) return;
+        refreshSendState();
       }
       const attackText = attackEl.value.trim();
       const description = descEl.value.trim();

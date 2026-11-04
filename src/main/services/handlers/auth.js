@@ -326,6 +326,7 @@ module.exports = function register(on, ctx) {
     }
     return accedi(origin, sender);
   });
+  on(MSG.AUTH_SIGNIN_LASCIA, soloFilo(() => { auth.lasciaStare(); return { ok: true }; }));
   async function accedi(origin, sender) {
     try {
       const profile = await auth.signIn();
