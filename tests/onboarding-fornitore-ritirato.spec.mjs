@@ -178,8 +178,7 @@ for (const indirizzo of ['filo://newtab/', 'filo://newtab/newtab.html']) {
   test(`lo stesso vale aprendo una scheda nuova su ${indirizzo}, senza ricaricare niente`, async ({ app, shell, openTab }) => {
     test.setTimeout(90_000);
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-    await configCondivisa(app, { provider: 'gemini' });
-    await stubProviders(app);
+    await configuraPrimaDellaScheda(app);
     const page = await openTab(indirizzo);
     await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
 
