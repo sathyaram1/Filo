@@ -606,6 +606,26 @@ Come funziona oggi (#1152):
     lavorazione, che quelle fusioni attuano, col principio e il numero del
     lavoro; dove il riassunto non basta, legge il feedback. Una decisione
     presa in chat e già fusa non deve restare aperta (è successo a D-250).
+    Le fusioni arrivano con `fusioni.elenco` (#2006): quelle dopo l'ultima
+    lettura di un'istanza che ha consegnato il rapporto (la prima volta,
+    l'ultima settimana), ognuna col riassunto del manutentore (titolo,
+    stato, ultimo aggiornamento) e le domande aperte o in lavorazione
+    collegate, per origine, collegamenti, azioni, fermo o perché gli
+    aggiornamenti le nominano. Il feedback intero (`feedback.leggi`) di un
+    lavoro fuso porta anche gli aggiornamenti, cioè cosa ha fatto: la
+    revisione decide su quello, non sulla sola richiesta, e chi li ha
+    scritti da sporco sporca anche lei. La chiusura è `domande.chiudi`, col
+    resoconto, il principio quando c'è e il numero del lavoro, che il server
+    vuole fuso e collegato alla domanda; non chiude una domanda che ferma un
+    altro lavoro, una risposta che si sta applicando, né una provvisoria (la
+    consigliata vale finché l'owner non sceglie, anche a lavoro fuso;
+    l'elenco la segna `provvisoria`). Alla prima lettura arrivano anche i
+    lavori fusi prima che le chiusure segnassero l'ora della fusione, datati
+    dal loro ultimo aggiornamento. Le chiuse così vanno fra le «Risposte
+    automatiche», con «attuata da #n», e l'owner le riapre: la riapertura
+    toglie il principio che la chiusura aveva scritto.
+    Nel dubbio la domanda resta aperta e lo dice il rapporto, che elenca le
+    chiuse col lavoro che le ha attuate.
 - **Risposte registrate da una sessione** (decisione dell'owner del 01/11,
   #2007). Una risposta che una sessione locale registra con `domanda.mjs
   rispondi` vale come dell'owner: viene dalla chat, che usa solo lui. Con
@@ -1015,7 +1035,7 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
 | `lavoro` | lavorare il suo feedback, spingere il suo ramo, chiedere la fusione, aprire feedback e domande | tutto il resto |
 | `coda` | leggere i feedback **in coda** (non quelli in Ricevuti né quelli fermi per attacco), cambiare priorità, chiedere un biglietto di unione (§ 1.3), archiviare, scrivere nel taccuino della gestione del lavoro | scrivere testi di feedback, cancellare, toccare Ricevuti |
 | `unisci` | leggere i genitori indicati, scrivere il figlio, chiudere i genitori col rimando | leggere altro |
-| `domande` | leggere le domande per l'owner, tranne quelle dell'addetto comunicazioni, e il registro; raggruppare, cambiare priorità, rispondere coi principi | rispondere senza un principio, cambiare i principi |
+| `domande` | leggere le domande per l'owner, tranne quelle dell'addetto comunicazioni, e il registro; leggere i lavori fusi dall'ultima revisione e i loro feedback; raggruppare, cambiare priorità, rispondere coi principi; chiudere le domande che un lavoro fuso attua, col suo numero | rispondere senza un principio; chiudere una domanda senza il lavoro fuso che la attua; cambiare i principi |
 | `opportunita` | cercare sul web attraverso il server; leggere la parte del suo taccuino scritta prima della casella e scriverci; aprire domande con bozze di mail, solo per l'owner; chiedere la casella, che passa il biglietto all'ambito `posta` (§ 5.1) | ricevere la casella e quello che ne è figlio (la parte del taccuino scritta dopo, il rapporto dell'istanza prima); mandare mail |
 | `posta` | ricevere dal server i messaggi della casella di Filo, con la parte del taccuino scritta dopo la casella e il rapporto dell'istanza prima; tenere il suo taccuino; aprire domande con bozze di mail, solo per l'owner; aprire feedback dalle mail degli utenti | uscire in rete, nemmeno attraverso il server; tornare all'ambito `opportunita`; mandare mail; vedere le credenziali della casella |
 | `gestione_lavoro` | leggere registri, sessioni, domande passate, feedback e rami; il suo taccuino; ricevere le segnalazioni, tranne quelle dell'addetto comunicazioni (§ 4.3), e le righe delle domande che fermano un feedback del suo ordine; far nascere per numero un feedback da una segnalazione; scrivere la curva del parallelismo (§ 4.5); anticipare riordino e potatura; lanciare esperimenti nel budget; cambiare la domanda di fine turno; spegnere, e riaccendere quello che ha spento lei; chiedere una sveglia; aprire domande e feedback | scrivere codice; cambiare feedback, priorità, criteri di verifica, prompt dei ruoli; smistare o rispondere alle domande (lo fa il compito della § 3.5); leggere dell'addetto comunicazioni altro che i numeri (domande, segnalazioni, sessioni, registri, taccuino, rapporti); riaccendere quello che ha spento l'owner |

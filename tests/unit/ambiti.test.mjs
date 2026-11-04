@@ -41,6 +41,11 @@ test('fuori ambito, sconosciuta e non ancora attiva sono rifiuti diversi; le uni
   assert.equal(A.consente(['posta'], 'posta.leggi').errore, 'fuori_ambito', 'un ambito non ancora attivo non dà niente');
   assert.deepEqual(A.consente(['domande'], 'domande.principio'), { ok: true }, 'la revisione risponde coi principi (#2003)');
   assert.equal(A.consente(['coda'], 'domande.principio').errore, 'fuori_ambito');
+  for (const op of ['fusioni.elenco', 'feedback.leggi', 'domande.chiudi']) {
+    assert.deepEqual(A.consente(['domande'], op), { ok: true }, `la revisione chiude le domande attuate dalle fusioni (#2006): ${op}`);
+  }
+  assert.equal(A.consente(['coda'], 'domande.chiudi').errore, 'fuori_ambito');
+  assert.equal(A.consente(['gestione_lavoro'], 'fusioni.elenco').errore, 'fuori_ambito');
   assert.deepEqual(A.consente([], 'segnala'), { ok: true });
   assert.deepEqual(A.consente(['lavoro'], 'rapporto'), { ok: true });
 });

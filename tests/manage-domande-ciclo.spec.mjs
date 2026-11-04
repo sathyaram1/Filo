@@ -127,6 +127,32 @@ test('le schede del nuovo ciclo: conteggi, sola lettura in smistamento, automati
   await expect(dq(page, 'D-41').locator('.mg-dq-principio .mg-dq-segno')).toHaveText('da rivedere');
 });
 
+// #2006: la revisione chiude una domanda attuata da un lavoro fuso. Nella conversazione un'altra domanda nominata non
+// diventa il «principio usato».
+test('una domanda chiusa come attuata da un lavoro fuso dice quale, senza un principio inventato, e si riapre', async ({ app, openTab }) => {
+  const ATTUATA = domanda(60, {
+    stato: 'chiusa', titolo: 'Un guasto ferma tutte le routine: restringere?',
+    esito: { ok: true, automatica: true, attuataDa: { id: 'fb-813', num: '#813', sha: 'a'.repeat(40) }, applicataIl: Date.now() },
+    conversazione: [{ autore: { tipo: 'biglietto', ruolo: 'revisione' }, testo: 'Chiusa dalla revisione delle domande: l’ha attuata #813, fuso su main.\nÈ il caso discusso in D-41: ora si ferma solo il lavoro guasto.', ora: Date.now() }],
+  });
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [FONTE, ATTUATA] });
+  await ancheLeAzioni(app);
+  const page = await openTab(MANAGE);
+  await apriDomande(page);
+  await tab(page, 'domande-automatiche').click();
+  await expect(riga(page, 'D-60').locator('.mg-domanda-sotto')).toHaveText('attuata da #813');
+  const a = dq(page, 'D-60');
+  await expect(a.locator('.mg-dq-esito').first()).toHaveText('Chiusa dalla revisione: l’ha attuata #813.');
+  await expect(a.locator('.mg-dq-esito').first().locator('[data-feedback-id="fb-813"]')).toHaveCount(1);
+  await expect(a.locator('.mg-dq-principio')).toHaveCount(0);
+  await a.screenshot({ path: 'tests/.shots/manage-domande-attuata.png' });
+  await expect(a.locator('button[data-fai="riapri"]')).toHaveAttribute('title', /attuata da #813/);
+  await a.locator('button[data-fai="riapri"]').click();
+  await expect(a.locator('.mg-dq-msg')).toHaveText('Riaperta: ora è fra quelle da rispondere.');
+  expect(await app.evaluate(() => globalThis.__mandati.at(-1))).toEqual({ type: 'domanda_riapri', id: 'D-60' });
+  await expect(tab(page, 'domande')).toHaveText('Da rispondere (1)');
+});
+
 test('«non riscritta», «Testo originale» in cima senza scorrere, niente pulsanti doppi, la riga sotto la casella', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForFunction(() => window.__mgTest && window.__mgTest.whenReady);
