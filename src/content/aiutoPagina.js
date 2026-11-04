@@ -81,23 +81,15 @@
     return { visibili: tutte.length, controllate: lette.length, esiti: lette.filter((e) => e.frase) };
   }
 
-  // I campi segreti leggibili a schermo arrivano al modello coperti dai puntini (#810.7): misurati prima e dopo lo
-  // scatto, se la pagina scorre nel frattempo; quelli dei riquadri e dei componenti chiusi li misura il main, che
-  // con campi da coprire manda la foto piena: coperta prima di diventare leggera, il JPEG non sparge le cifre attorno.
-  // Se coprirli non riesce, l'immagine non parte.
+  // La foto arriva dal main già coperta (services/fotoDellaPagina.js). Quando non si è potuta coprire non c'è, e
+  // `fotoMancante` dice al main perché, che lo scrive al modello.
   async function captureScreenshot() {
     try {
-      const prima = Extract.campiSegretiInVista();
-      const r = await chrome.runtime.sendMessage({
-        type: MSG.CAPTURE_VISIBLE_TAB, leggera: true, campiSegreti: true, campiNellaPagina: prima.length,
-      });
-      if (!r?.ok || !r.dataUrl) return null;
-      const campi = prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista());
-      if (!campi.length && !r.fattore) return r.dataUrl;
-      // `fattore` e `qualita` dal main quando la foto è arrivata piena: si rimpicciolisce come farebbe lui.
-      return await Extract.fotoCoperta(r.dataUrl, campi, r);
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, leggera: true, perModello: true });
+      if (r?.ok && r.dataUrl) return { screenshot: r.dataUrl };
+      return { screenshot: null, fotoMancante: r?.code === 'coperture' ? String(r.motivo || '') : '' };
     } catch (_) {}
-    return null;
+    return { screenshot: null, fotoMancante: '' };
   }
 
   // Le SPA cambiano contenuto e URL in modo asincrono: si esce quando l'URL è cambiato e il
