@@ -571,6 +571,7 @@
       'Gli ultimi giorni di conversazioni, di tutte le schede, entrano in ogni messaggio fino al minore dei due tetti. Vale per chi non li ha cambiati in Preferenze; un campo vuoto segue il codice.',
     admin_defaults_contesto_giorni: 'Giorni',
     admin_defaults_contesto_token: 'Tetto in token',
+    admin_defaults_contesto_soglia: 'Soglia di compattazione',
     admin_defaults_contesto_cache: 'Durata della cache',
     admin_defaults_contesto_cache_5m: '5 minuti',
     admin_defaults_contesto_cache_1h: 'un\'ora',

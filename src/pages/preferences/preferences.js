@@ -877,6 +877,7 @@
       case 'dictation.cancelSec': return dictationTimes({ cancelSec: $('dictationCancel').value }).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', $('contestoGiorni').value);
       case 'contestoFilo.token': return tettoContesto('token', $('contestoToken').value);
+      case 'contestoFilo.soglia': return tettoContesto('soglia', $('contestoSoglia').value);
       case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn($('contestoCache').value);
       case 'lunghezzaRisposte.conversazioni': return tettoRisposte($('lunghezzaConversazioni').value);
       case 'lunghezzaRisposte.testi': return tettoRisposte($('lunghezzaTesti').value);
@@ -977,6 +978,7 @@
       case 'dictation.cancelSec': return dictationTimes(s.dictation).cancelSec;
       case 'contestoFilo.giorni': return tettoContesto('giorni', s.contestoFilo && s.contestoFilo.giorni);
       case 'contestoFilo.token': return tettoContesto('token', s.contestoFilo && s.contestoFilo.token);
+      case 'contestoFilo.soglia': return tettoContesto('soglia', s.contestoFilo && s.contestoFilo.soglia);
       case 'contestoFilo.cache': return window.SN_FILO_CONTESTO.durataIn(s.contestoFilo && s.contestoFilo.cache);
       case 'lunghezzaRisposte.conversazioni':
       case 'lunghezzaRisposte.testi':
@@ -1021,10 +1023,10 @@
   function tettoContesto(k, v) {
     const FC = window.SN_FILO_CONTESTO;
     const c = FC.numeroIn(v, FC.LIMITI[k]);
-    return c != null && k === 'token' ? Math.round(c) : c;
+    return c != null && k !== 'giorni' ? Math.round(c) : c;
   }
   function canonContesto() {
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken']]) {
+    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken'], ['soglia', 'contestoSoglia']]) {
       const v = tettoContesto(k, $(id).value);
       $(id).value = v == null ? '' : String(v);
     }
@@ -1039,6 +1041,21 @@
     }
   }
 
+  // Accanto alla soglia di compattazione, la sua stima: costo al mese e attesa, coi prezzi di adesso (filo_design.txt).
+  let giroStimaSoglia = 0;
+  let attesaStimaSoglia = null;
+  function stimaSoglia() {
+    clearTimeout(attesaStimaSoglia);
+    attesaStimaSoglia = setTimeout(async () => {
+      const mio = ++giroStimaSoglia;
+      const v = $('contestoSoglia').value.trim() || $('contestoSoglia').placeholder;
+      let r = null;
+      try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia: v }); } catch (_) { r = null; }
+      if (mio !== giroStimaSoglia) return;
+      $('contestoSogliaStima').textContent = r && r.ok ? r.testo : '';
+    }, 250);
+  }
+
   // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
   async function segnapostiContesto() {
     try {
@@ -1046,6 +1063,8 @@
       const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
       if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
       if (d.token != null) $('contestoToken').placeholder = String(d.token);
+      if (d.soglia != null) $('contestoSoglia').placeholder = String(d.soglia);
+      stimaSoglia();
       if (d.cache) $('contestoCachePredefinita').textContent = `Come i predefiniti (${d.cache === '1h' ? 'un\'ora' : '5 minuti'})`;
       const l = { ...((r && r.lunghezzaRisposteDiSerie) || {}), ...((r && r.lunghezzaRisposte) || {}) };
       for (const [f, id] of CAMPI_LUNGHEZZA) if (l[f] != null) $(id).placeholder = String(l[f]);
@@ -1195,6 +1214,7 @@
     const cf = settings.contestoFilo || {};
     if (vuole('contestoFilo.giorni')) $('contestoGiorni').value = cf.giorni == null ? '' : String(cf.giorni);
     if (vuole('contestoFilo.token')) $('contestoToken').value = cf.token == null ? '' : String(cf.token);
+    if (vuole('contestoFilo.soglia')) $('contestoSoglia').value = cf.soglia == null ? '' : String(cf.soglia);
     if (vuole('contestoFilo.cache')) $('contestoCache').value = window.SN_FILO_CONTESTO.durataIn(cf.cache) || '';
     const lr = settings.lunghezzaRisposte || {};
     for (const [f, id] of CAMPI_LUNGHEZZA) {
@@ -1883,7 +1903,8 @@
       persist();
     });
     $('propostaEmailIncognito').addEventListener('change', persist);
-    for (const id of ['contestoGiorni', 'contestoToken']) {
+    $('contestoSoglia').addEventListener('input', stimaSoglia);
+    for (const id of ['contestoGiorni', 'contestoToken', 'contestoSoglia']) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
       $(id).addEventListener('blur', canonContesto);

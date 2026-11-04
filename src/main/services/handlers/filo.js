@@ -363,10 +363,27 @@ module.exports = function register(on, ctx) {
     const q = await FiloMem.quaderno();
     const moduli = [];
     for (const m of q.moduli) moduli.push({ nome: m.nome, righe: await Promise.all(m.righe.map(conFonti)) });
+    let inAttesa = [];
+    try { inAttesa = await require('../compattazioneFilo').inAttesa(); } catch (_) {}
     return {
       ok: true, moduli, lezioni: await Promise.all(q.lezioni.map(conFonti)),
       sempreAperte: q.sempreAperte, nascoste: await Promise.all(q.nascoste.map(conFonti)),
+      inAttesa: inAttesa.map((p) => ({ id: p.id, testo: p.testo, nata: p.ts })),
     };
+  });
+
+  // Da un tratto che aveva letto testo di fuori la compattazione propone memorie, non le scrive: le decide l'utente.
+  on(MSG.FILO_MEMORIA_PROPOSTA, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (!msg || typeof msg.id !== 'string' || typeof msg.tieni !== 'boolean') return { ok: false, error: 'bad_request' };
+    const r = await require('../compattazioneFilo').decidi(msg.id, msg.tieni);
+    if (r.ok) ctx.memoriaCambiata();
+    return r;
+  });
+
+  on(MSG.FILO_STIMA_SOGLIA, async (msg, sender, origin) => {
+    if (!isFilo(origin) && !sender?.isShell) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    try { return { ok: true, testo: await ctx.stimaSogliaCompattazione(msg && msg.soglia) }; } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   });
 
   const viaValida = (via) => !!via && ((via.lezione && typeof via.lezione === 'object'

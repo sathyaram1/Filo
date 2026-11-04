@@ -44,6 +44,7 @@
 
   const chiave = (it) => {
     if (it.tipo === 'nascosta') return `n:${it.id}`;
+    if (it.tipo === 'proposta') return `p:${it.id}`;
     if (it.tipo === 'sito') return `s:${it.host}`;
     if (it.via && it.via.lezione) return `l:${it.via.lezione.ts}|${it.via.lezione.text}`;
     return `m:${it.via.modulo}|${it.via.riga}`;
@@ -51,6 +52,11 @@
 
   function gruppi(d) {
     const out = [];
+    // Le memorie che la compattazione ha proposto da una conversazione che aveva letto testo di fuori: entrano solo col
+    // sì dell'utente (SPEC-CONTESTO § Il sospetto non passa nel riassunto), quindi stanno in cima.
+    if (d.inAttesa && d.inAttesa.length) {
+      out.push({ id: 'proposte', titolo: 'Da confermare', righe: d.inAttesa.map((p) => ({ ...p, tipo: 'proposta', fonti: [] })) });
+    }
     const posto = (n) => (n === 'PROFILO' ? 0 : n === 'PREFERENZE' ? 1 : 2);
     for (const m of [...(d.moduli || [])].sort((a, b) => posto(a.nome) - posto(b.nome))) {
       if (!m.righe || !m.righe.length) continue;
@@ -210,6 +216,9 @@
     if (it.tipo === 'riga') {
       tasti.append(tasto('pencil', 'Correggi', () => correggi(r)));
       tasti.append(tasto('close', 'Togli dalla memoria', () => togli(it), 'qd-via'));
+    } else if (it.tipo === 'proposta') {
+      tasti.append(tasto('check', 'Tienila in memoria', () => decidi(it, true)));
+      tasti.append(tasto('close', 'Non tenerla', () => decidi(it, false), 'qd-via'));
     } else if (it.tipo === 'sito') {
       tasti.append(tasto('close', 'Non tenerlo più aperto', () => togli(it), 'qd-via'));
     } else {
@@ -234,6 +243,13 @@
     e.hidden = false;
     clearTimeout(esito.t);
     esito.t = setTimeout(() => { e.hidden = true; }, id ? 9000 : 4000);
+  }
+
+  async function decidi(it, tieni) {
+    const r = await send({ type: MSG.FILO_MEMORIA_PROPOSTA, id: it.id, tieni });
+    if (r && r.ok) esito(tieni ? (r.scritta ? 'Tenuta in memoria.' : 'Non l\'ho scritta: somiglia a una riga che avevi tolto.') : 'Non la terrò.');
+    else esito('Non ci sono riuscito: riprova.');
+    await carica();
   }
 
   async function togli(it) {
@@ -387,7 +403,10 @@
     if (!r) return [];
     const it = r.it;
     const voci = [];
-    if (it.tipo === 'riga') {
+    if (it.tipo === 'proposta') {
+      voci.push({ type: 'item', icon: icona('check', 16), label: 'Tienila in memoria', onClick: () => { decidi(it, true).catch(() => {}); } });
+      voci.push({ type: 'item', icon: icona('close', 16), label: 'Non tenerla', onClick: () => { decidi(it, false).catch(() => {}); } });
+    } else if (it.tipo === 'riga') {
       voci.push({ type: 'item', icon: icona('pencil', 16), label: 'Correggi', onClick: () => correggi(r) });
       voci.push({ type: 'item', icon: icona('close', 16), label: 'Togli dalla memoria', onClick: () => { togli(it).catch(() => {}); } });
     } else if (it.tipo === 'sito') {

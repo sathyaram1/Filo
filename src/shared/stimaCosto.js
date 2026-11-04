@@ -98,7 +98,19 @@
     if (req) out.request = req;
     const cache = numeroListino(pricing.input_cache_read);
     if (cache != null) out.cacheRead = cache;
+    // Il listino a scaglioni (Haiku 5.5 sopra 100.000 token di prompt costa cinque volte tanto, su tutta la richiesta).
+    const sopra = (Array.isArray(pricing.overrides) ? pricing.overrides : [])
+      .map((o) => ({ da: numeroListino(o && o.min_prompt_tokens), p: prezzoDaCatalogo({ ...o, overrides: null }) }))
+      .filter((o) => o.da && o.p).sort((a, b) => a.da - b.da);
+    if (sopra.length) out.oltre = sopra.map((o) => ({ da: o.da, ...o.p }));
     return out;
+  }
+  // Il prezzo che vale per una richiesta di `token` token di prompt.
+  function prezzoPer(prezzo, token) {
+    if (!prezzo || !Array.isArray(prezzo.oltre)) return prezzo;
+    let p = prezzo;
+    for (const o of prezzo.oltre) if (token >= o.da) p = o;
+    return p;
   }
   // Il catalogo intero (le voci di `/api/v1/models`) → { id: prezzo }. Le voci senza prezzo leggibile restano fuori.
   function listinoDaCatalogo(voci) {
@@ -289,7 +301,7 @@
 
   global.SN_STIMA_COSTO = {
     TIPI, CAMPIONI_MINIMI, FINESTRA, SOGLIA_PREDEFINITA, SOGLIA_MAX,
-    funzione, aConsumo, listinoDaCatalogo, prezzoDaCatalogo, prezzoDi, aggiungiCampione, tokenTipici, costoUsd,
+    funzione, aConsumo, listinoDaCatalogo, prezzoDaCatalogo, prezzoDi, prezzoPer, aggiungiCampione, tokenTipici, costoUsd,
     stima, soglia, avviso, voceDi, valuta,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

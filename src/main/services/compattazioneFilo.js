@@ -196,7 +196,16 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
     return { fatto: false, motivo: 'disco' };
   }
   CF().riparti(incognito);
-  for (const fn of ascoltatori) { try { fn({ incognito, fino: s.a, motivo }); } catch (_) {} }
+  for (const fn of ascoltatori) { try { fn({ incognito, fino: s.a, motivo, inAttesa: inAttesa.length }); } catch (_) {} }
+  // Una proposta che aspetta e nessuno la vede aspetterebbe per sempre: lo si dice una volta, col salto al quaderno.
+  if (inAttesa.length) {
+    try {
+      require('./avvisoFinestra').avvisoQuandoPronta(
+        inAttesa.length === 1 ? 'Ho una cosa da ricordare che aspetta il tuo sì: è nel quaderno delle memorie.' : `Ho ${inAttesa.length} cose da ricordare che aspettano il tuo sì: sono nel quaderno delle memorie.`,
+        { chiave: 'memorie-in-attesa', tipo: 'memorie_in_attesa', azioni: [{ label: 'Apri il quaderno', openUrl: 'filo://quaderno/quaderno.html' }] },
+      );
+    } catch (_) {}
+  }
   try { globalThis.SN_CONTATORI_MAIN?.attivita('compattazioni_filo', { motivo, righe: letto.ore.length, memorie: scritte, inAttesa: inAttesa.length }); } catch (_) {}
   return {
     fatto: true, motivo, ricevuto: messages.map((x) => x.content).join('\n\n'), ore: letto.ore, memorie: letto.memorie, inAttesa, scritte,

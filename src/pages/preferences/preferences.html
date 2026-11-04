@@ -609,6 +609,10 @@
             <span>Tetto in token</span>
             <input type="number" id="contestoToken" min="2000" max="2000000" step="1000" style="width:160px;" />
           </label>
+          <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quando una richiesta della chat supererebbe questa misura, Filo riassume la parte più vecchia della conversazione in righe con l'ora prima di mandarla. Vuoto: il valore predefinito. Sopra i 100.000 token Haiku costa cinque volte tanto.">
+            <span>Soglia di compattazione</span>
+            <input type="number" id="contestoSoglia" min="5000" max="2000000" step="1000" style="width:160px;" />
+          </label>
           <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Quanto il modello tiene da parte le istruzioni fisse della chat, per rileggerle a prezzo basso. Un'ora costa il doppio a metterle da parte e regge le pause lunghe. Vale coi modelli Anthropic.">
             <span>Durata della cache</span>
             <select id="contestoCache" style="width:240px;">
@@ -618,6 +622,7 @@
             </select>
           </label>
         </div>
+        <p class="sn-muted" id="contestoSogliaStima" aria-live="polite"></p>
       </section>
 
       <section id="sec-lunghezza">

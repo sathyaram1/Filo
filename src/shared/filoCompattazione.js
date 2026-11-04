@@ -14,6 +14,9 @@
   // Il tratto è «grande» per la compattazione da fermo: a cache fredda riscriverlo costa uguale (SPEC-CONTESTO).
   const QUOTA_GRANDE = 0.3;
   const TETTO_COMPATTATO = 7000;
+  // Una risposta che ha già mandato più di questa parte della soglia fa partire la compattazione subito dopo, in
+  // sottofondo: la richiesta dopo la passerebbe, e così non aspetta (filo_design.txt § L'ATTESA è ATTRITO).
+  const QUOTA_ANTICIPO = 0.8;
   // Dopo un guasto del modello che compatta non si riprova a ogni messaggio: ogni tentativo è una chiamata pagata.
   const PAUSA_DOPO_GUASTO_MS = 10 * 60 * 1000;
   const MAX_MEMORIE = 20;
@@ -258,6 +261,33 @@
     return t;
   }
 
+  // ── La stima accanto alla soglia (filo_design.txt § GESTIONE DEI MODELLI) ───────────────────
+  // Un uso attivo: 600 messaggi al mese, ognuno porta nel tratto ~3.000 token (domanda, risposta, esiti). `base`: strumenti,
+  // parte fissa e CONTESTO. Fra una compattazione e l'altra il tratto cresce dal grezzo fino alla soglia.
+  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000 });
+  function stimaSoglia({ soglia, base, prezzoChat, prezzoCompattazione, prezzoPer = (p) => p, uso = USO } = {}) {
+    if (!prezzoChat || !prezzoCompattazione || !(soglia > 0)) return null;
+    const u = { ...USO, ...(uso || {}) };
+    const grezzo = TURNI_GREZZI * u.perMessaggio;
+    const spazio = Math.max(u.perMessaggio, soglia - base - grezzo);
+    const ogni = Math.max(1, Math.round(spazio / u.perMessaggio));
+    const ingresso = spazio + u.parteUtente;
+    const pc = prezzoPer(prezzoCompattazione, ingresso);
+    const unaCompattazione = ingresso * pc.prompt + u.uscitaCompattazione * pc.completion;
+    const medio = Math.max(base, Math.min(soglia, base + grezzo + spazio / 2));
+    const p = prezzoPer(prezzoChat, medio);
+    const lettura = p.cacheRead != null ? p.cacheRead : p.prompt;
+    const unMessaggio = (medio - u.perMessaggio) * lettura + u.perMessaggio * p.prompt + u.uscitaChat * p.completion;
+    const usd = (u.messaggiAlMese / ogni) * unaCompattazione + u.messaggiAlMese * unMessaggio;
+    // Ingresso letto a ~15.000 token al secondo, uscita a ~120: le misure di Haiku attraverso OpenRouter del 4/11/2026.
+    const secondi = Math.max(2, Math.round(1.5 + ingresso / 15000 + u.uscitaCompattazione / 120));
+    const cifra = usd < 0.1 ? usd.toLocaleString('it-IT', { maximumFractionDigits: 3 }) : usd.toLocaleString('it-IT', { maximumFractionDigits: 2 });
+    return {
+      usd, ogni, secondi, oltreListino: medio > LISTINO,
+      testo: `Circa ${cifra} $ al mese con ${u.messaggiAlMese} messaggi (chat e compattazioni): una compattazione ogni ${ogni} ${ogni === 1 ? 'messaggio' : 'messaggi'} circa, ${secondi} s, di solito mentre leggi la risposta.${medio > LISTINO ? ' Le richieste passano i 100.000 token: con Haiku costano cinque volte tanto.' : ''}`,
+    };
+  }
+
   // Le righe che portano un evento cancellato escono: quello che è cancellato non torna dal riassunto (#868.1).
   function senzaCancellate(righe, vivo) {
     if (typeof vivo !== 'function') return Array.isArray(righe) ? righe : [];
@@ -267,6 +297,6 @@
   global.SN_FILO_COMPATTAZIONE = {
     LISTINO, ORE_GREZZE, TURNI_GREZZI, QUOTA_GRANDE, TETTO_COMPATTATO, PAUSA_DOPO_GUASTO_MS, MAX_MEMORIE, ISTRUZIONI,
     motivo, giornoDi, giorniDaRiassumere, puntoDiTaglio, rigaLettura, righePerChiCompatta, richiesta, richiestaGiorno,
-    leggiRisposta, leggiGiorno, rendiFiloCompattato, senzaCancellate,
+    leggiRisposta, leggiGiorno, rendiFiloCompattato, senzaCancellate, USO, stimaSoglia, QUOTA_ANTICIPO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

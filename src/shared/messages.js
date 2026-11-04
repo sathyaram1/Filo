@@ -1068,6 +1068,12 @@
     FILO_MEMORY_RESTORE: 'filo_memory_restore',
     // Una riga nascosta si cancella per sempre: { id }. Risposta: { ok, cancellata }.
     FILO_MEMORY_FOREVER: 'filo_memory_forever',
+    // Una memoria proposta dalla compattazione di un tratto sospetto (SPEC-CONTESTO fase 4) che aspetta l'utente:
+    // { id, tieni }. Risposta: { ok, scritta }. Solo pagine filo://.
+    FILO_MEMORIA_PROPOSTA: 'filo_memoria_proposta',
+    // Quanto costa e quanto fa aspettare una soglia di compattazione: { soglia }. Risposta: { ok, testo } (la frase
+    // accanto al campo). Solo pagine filo://.
+    FILO_STIMA_SOGLIA: 'filo_stima_soglia',
     // Dov'è un evento del filo, per saltarci dalla home (#872): { id }. Risposta: { ok, dove: { tipo, chat, i, ts, app } | null }.
     FILO_DOVE: 'filo_dove',
     // Main → sole pagine filo://: la memoria è cambiata. Porta { moduli, lezioni }

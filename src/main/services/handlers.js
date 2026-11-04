@@ -1123,6 +1123,27 @@ function compattaDaFermo(incognito, tetti) {
   }, cacheMs + 60 * 1000);
 }
 
+// La frase accanto alla soglia: costo al mese e attesa, coi prezzi di OpenRouter di adesso per i modelli scelti.
+async function stimaSogliaCompattazione(valore) {
+  const FC = globalThis.SN_FILO_CONTESTO;
+  const S = globalThis.SN_STIMA_COSTO;
+  const settings = await getEffectiveSettings();
+  const tetti = FC.tetti(settings.contestoFilo, Defaults.get().contestoFilo);
+  const soglia = FC.numeroIn(valore, FC.LIMITI.soglia) ?? tetti.soglia;
+  const ctxCosto = await require('./costoModelli').contesto({ Defaults });
+  const primo = (action) => {
+    try { return (buildAttemptChain(settings, modelForAction(settings, action), action)[0] || {}).model || ''; } catch (_) { return ''; }
+  };
+  const chat = primo(ACTIONS.FILO_CHAT);
+  const comp = SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPATTAZIONE) ? primo(ACTIONS.FILO_COMPATTAZIONE) : chat;
+  const Tools = globalThis.SN_ACTION_TOOLS;
+  const base = FC.stimaToken(JSON.stringify(Tools ? Tools.definitions() : []) + PROMPTS.filoChatStatic()) + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente;
+  const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
+    soglia, base, prezzoChat: S.prezzoDi(ctxCosto.listino, chat), prezzoCompattazione: S.prezzoDi(ctxCosto.listino, comp), prezzoPer: S.prezzoPer,
+  });
+  return r ? r.testo : 'Il listino di OpenRouter adesso non dice il prezzo dei modelli scelti: Filo non stima il costo senza.';
+}
+
 // La compattazione del filo (SPEC-CONTESTO fase 4) chiama il modello scelto per lei, o quello della chat se nessuno l'ha
 // scelto: lo stesso modello che legge il tratto lo riassume.
 Compattazione.imposta({
@@ -6515,6 +6536,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // e la Cronologia AI lo segna. Il testo dell'utente non si taglia.
   const LC = globalThis.SN_FILO_COMPATTAZIONE;
   let compattazioniNelTurno = 0;
+  let ultimaStima = 0;
   const ricomponi = async () => {
     filo = await componiFilo(tettiChat);
     sezioniUtente = await sezioniCon();
@@ -6555,8 +6577,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       try { await ricomponi(); } catch (e) { console.warn('[Filo] tratto non ricomposto senza esiti:', e?.message || e); }
       token = await stimaRichiesta();
     }
-    if (token > LC.LISTINO) payloadBase.oltreListino = token;
-    else delete payloadBase.oltreListino;
+    ultimaStima = token;
+    if (token > LC.LISTINO) {
+      payloadBase.oltreListino = token;
+      console.warn(`[Filo] richiesta della chat oltre il listino anche dopo la compattazione: circa ${token} token`);
+    } else delete payloadBase.oltreListino;
   };
 
   // IL GIRO: il modello chiama le azioni, il main le esegue e gli rimanda gli esiti, finché
@@ -7224,7 +7249,12 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
         seguiti: seguitiNelFilo,
       });
     }
-    if (!internal && filo) compattaDaFermo(incognitoTurno, tettiChat);
+    if (!internal && filo) {
+      compattaDaFermo(incognitoTurno, tettiChat);
+      if (tettiChat && ultimaStima > tettiChat.soglia * LC.QUOTA_ANTICIPO) {
+        Compattazione.compatta({ incognito: incognitoTurno, motivo: 'anticipo', tetti: tettiChat }).catch((e) => console.warn('[Filo] compattazione in anticipo:', e?.message || e));
+      }
+    }
     const eidRisposta = risposta && risposta.role === 'filo' && dopo.eids ? dopo.eids[dopo.eids.length - 1] : '';
     if (eidRisposta) fontiTurno.push(eidRisposta);
     // La chat può essere finita mentre Filo stava ancora rispondendo: l'utente
@@ -7731,6 +7761,8 @@ function segnoDelGesto(type, msg, res) {
 
 const handlerCtx = {
   MSG,
+  stimaSogliaCompattazione,
+  memoriaCambiata: () => FiloMem.viewForUser().then((v) => broadcastToFiloPages({ type: MSG.FILO_MEMORY_CHANGED, ...v })).catch(() => {}),
   winOf,
   filoWin,
   broadcastToTabs,
@@ -8939,6 +8971,8 @@ globalThis.SN_HANDLE_MESSAGE = handleMessage;
 // Gli spec devono usare la funzione VERA: riscriverne una copia verificherebbe il test,
 // e qui la cosa da verificare è proprio CHI riceve.
 globalThis.SN_BROADCAST_FILO = broadcastToFiloPages;
+// Il quaderno mostra le memorie che una compattazione ha proposto: si rilegge quando ne arrivano.
+Compattazione.suCompattazione(({ inAttesa }) => { if (inAttesa) handlerCtx.memoriaCambiata(); });
 // Le Preferenze mostrano la memoria riga per riga (#592): a ogni scrittura il
 // main la rilegge una volta e la manda dentro l'avviso, alle sole pagine di Filo.
 try {
