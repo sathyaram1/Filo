@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import * as B from './lib/biglietto-locale.mjs';
 import { gancio } from './lib/letture-esterne.mjs';
 
-export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"] | sporca "<motivo>" | stato | chiudi';
+export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"] | sporca "<motivo>" | riservato "<cosa hai letto>" | stato | chiudi';
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, motivo?, sporco? } | { errore }} */
 export function leggiArgomenti(argv) {
