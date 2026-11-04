@@ -348,7 +348,7 @@ export function atteseDelPacchetto(proprie, unite) {
   return { attese, ereditate, motivo };
 }
 
-/** La priorità del pacchetto senza `--priorita`:la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
+/** La priorità del pacchetto senza `--priorita`: la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
 export function prioritaDelPacchetto(scelta, lette) {
   if (Number.isInteger(scelta)) return scelta;
   const note = (Array.isArray(lette) ? lette : []).map((u) => u && u.priorita).filter(Number.isInteger);

@@ -174,7 +174,7 @@ test('chi aspetta una unita ed è aspettato dal pacchetto chiuderebbe un giro: s
   }, () => SCRIPT.main(['t', spec('812'), '--non-locale', '--pacchetto', '812', '--aspetta', '700']));
   assert.equal(r.code, 3, r.err.join('\n'));
   assert.equal(r.submit.length, 0);
-  assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700: si aspetterebbero a vicenda/);
+  assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700 \(--aspetta\): si aspetterebbero a vicenda/);
 });
 
 test('un pacchetto nato senza numero non archivia niente, e dice i passi in ordine', async () => {
@@ -244,13 +244,12 @@ test('una segnalazione che non può entrare ferma tutto prima di aprire, e i mot
     2: seg('2', { priorita: 3 }),
     3: seg('3', { locale: true }),
     4: seg('4', { stato: '' }),
-    5: seg('5', { attese: Array.from({ length: 20 }, (_, i) => ({ id: `w${i}`, num: String(100 + i) })) }),
   };
-  const r = await conRete({ lette }, () => SCRIPT.main(['t', spec('1,2,3,4,5,6'), '--non-locale', '--pacchetto', '1,2,3,4,5,6']));
+  const r = await conRete({ lette }, () => SCRIPT.main(['t', spec('1,2,3,4,6'), '--non-locale', '--pacchetto', '1,2,3,4,6']));
   assert.equal(r.code, 3);
   assert.equal(r.submit.length, 0, 'non si apre niente');
   const testo = r.err.join('\n');
-  for (const atteso of [/#1 è «working»/, /#2 ha priorità 3/, /#3 è un lavoro locale/, /#4: lo stato non si legge/, /#5 aspetta già 20/, /#6: nessun feedback #6/]) {
+  for (const atteso of [/#1 è «working»/, /#2 ha priorità 3/, /#3 è un lavoro locale/, /#4: lo stato non si legge/, /#6: nessun feedback #6/]) {
     assert.match(testo, atteso);
   }
 });
@@ -272,7 +271,7 @@ test('--pacchetto senza numeri, o con numeri storti, è un errore d\'uso; a vuot
   const prova = await conRete({ lette: {} }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815', '--dry-run']));
   assert.equal(prova.code, 0);
   assert.equal(prova.submit.length, 0);
-  assert.match(prova.out.join('\n'), /come pacchetto che unisce #812, #815 \(coi loro allegati, e alla nascita le archivio\)/);
+  assert.match(prova.out.join('\n'), /come pacchetto che unisce #812, #815 \(coi loro allegati e le loro attese, e alla nascita le archivio\)/);
 });
 
 test('submit scrive `unisce` solo col token admin, nella forma delle attese', async () => {
@@ -334,4 +333,46 @@ test('una unita rimasta in coda col rimando a un pacchetto aperto non entra in u
   assert.doesNotMatch(testo, /#813|#814/, 'rimessa in coda dopo un pacchetto archiviato, o unita in un feedback che non è un pacchetto: entra');
   assert.deepEqual(SCRIPT.controllaUnite([seg('812', { unitoIn: 'id960', attese: [{ id: 'id960', num: '960' }] })], { pacchetti: ['960'], pacchettiPerId: { id960: '960' } }),
     ['#812 è già nel pacchetto #960: due pacchetti farebbero lo stesso lavoro'], 'attesa e rimando sullo stesso pacchetto: un motivo solo');
+});
+
+test('#1903.1: il pacchetto nasce con le attese delle unite, che archiviate non conterebbero più; quelle su un\'altra unita cadono', async () => {
+  const r = await conRete({
+    lette: {
+      812: seg('812', { attese: [{ id: 'id700', num: '700' }] }),
+      815: seg('815', { attese: [{ id: 'id700', num: '700' }, { id: 'id812', num: '812' }, { id: 'idx', num: '' }] }),
+    },
+  }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815', '--aspetta', '600']));
+  assert.equal(r.code, 0, r.err.join('\n'));
+  assert.deepEqual(r.submit[0].opts.waitsFor, [{ id: 'id600', num: '600' }, { id: 'id700', num: '700' }, { id: 'idx', num: '' }],
+    'nessuna routine lo prende prima che #700 sia fuso, come prima non prendeva #812');
+  assert.deepEqual(r.archiviate.map((a) => a.id), ['id812', 'id815']);
+  const out = r.out.join('\n');
+  assert.match(out, /Aspetta #600, #700, un feedback senza numero: nessuna routine lo prende/);
+  assert.match(out, /Attese prese dalle unite: #700 \(da #812, #815\), un feedback senza numero \(da #815\)\./);
+  const solo = await conRete({ lette: { 812: seg('812'), 815: seg('815') } }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
+  assert.equal(solo.submit[0].opts.waitsFor, undefined, 'senza attese il campo non si scrive');
+  assert.doesNotMatch(solo.out.join('\n'), /Attese prese/);
+});
+
+test('#1903.1: il tetto delle 20 attese si conta sul pacchetto, coi conti per unita; una unita con 20 attese da sola entra', async () => {
+  const tante = (da, quante) => Array.from({ length: quante }, (_, i) => ({ id: `w${da + i}`, num: String(da + i) }));
+  const venti = await conRete({ lette: { 5: seg('5', { attese: tante(100, 20) }) } }, () => SCRIPT.main(['t', spec('5'), '--non-locale', '--pacchetto', '5']));
+  assert.equal(venti.code, 0, venti.err.join('\n'));
+  assert.equal(venti.submit[0].opts.waitsFor.length, 20);
+  const troppe = await conRete({ lette: { 812: seg('812', { attese: tante(100, 15) }), 815: seg('815', { attese: tante(110, 10) }) } },
+    () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815', '--aspetta', '600']));
+  assert.equal(troppe.code, 3);
+  assert.equal(troppe.submit.length, 0, 'mai un taglio: non nasce');
+  assert.deepEqual(troppe.archiviate, []);
+  assert.match(troppe.err.join('\n'), /il pacchetto aspetterebbe 21 feedback \(1 di --aspetta, 20 dalle unite: #812: 15, #815: 10\), e un feedback ne aspetta al più 20: togline 1/);
+});
+
+test('#1903.1: un\'attesa presa da una unita che chiude un giro con un\'altra unita si dice prima di aprire', async () => {
+  const r = await conRete({
+    lette: { 812: seg('812'), 815: seg('815', { attese: [{ id: 'id700', num: '700' }] }) },
+    attesi: [{ id: 'id700', num: '700', togli: ['id812'], quali: ['812'], tenute: [] }],
+  }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
+  assert.equal(r.code, 3, r.err.join('\n'));
+  assert.equal(r.submit.length, 0);
+  assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700 \(l'attesa di #815\): si aspetterebbero a vicenda/);
 });
