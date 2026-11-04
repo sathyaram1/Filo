@@ -38,6 +38,8 @@ async function stubMain(page, fiduciaErr = '') {
       }
       if (t === 'fiducia_segna') {
         window.__fiducia.push(msg);
+        // `resta`: il server risponde sì ma lo lascia non fidato (una radice che nessun timbro toglie).
+        if (errore === 'resta') return { ok: true, fiducia: 'non_fidato' };
         return errore ? { ok: false, error: errore } : { ok: true, fiducia: 'fidato' };
       }
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: [], preapproved: [], ttlMs: 1 };
@@ -156,6 +158,18 @@ test('se il server non lo segna fidato, il lavoro server resta e il messaggio lo
   await tabBtn(page, 'queue').click();
   await page.locator('.mg-item').click();
   await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
+  await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
+});
+
+test('se il server lo lascia non fidato, la pratica non si dice fidata e il messaggio lo dice', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb()], 'inbox', 'resta');
+  await page.locator('.mg-item').click();
+  await page.locator('#mgAcceptLocalBtn').click();
+  await expect(tabBtn(page, 'queue')).toHaveText('In coda (1)');
+  await expect(page.locator('#mgToast')).toContainText('Resta non fidato');
+  await tabBtn(page, 'queue').click();
+  await page.locator('.mg-item').click();
   await expect(page.locator('#mgFiduciaBtn')).toHaveAttribute('aria-pressed', 'false');
 });
 

@@ -504,7 +504,8 @@
     const f = el('span', `mg-dq-fiducia${fidata ? '' : ' mg-dq-fiducia--no'}`, fidata ? 'Fidata' : 'Non fidata');
     f.title = !fidata ? TITOLO_NON_FIDATA : d.fidataDallOwner ? segnataDaTe(d) : TITOLO_FIDATA;
     meta.appendChild(f);
-    if (!fidata) meta.appendChild(cartellinoRadici(d));
+    // Anche da fidata, se lo è per timbri dati: come sui feedback, il timbro si toglie da dove si è messo.
+    if (!fidata || (Array.isArray(d.radici) && d.radici.length)) meta.appendChild(cartellinoRadici(d));
     const nata = quando(d.creataIl, true);
     if (nata) meta.appendChild(el('span', 'mg-dq-data', `chiesta ${nata}`));
     if (Number(d.modificataIl) > Number(d.creataIl || 0) + 60000) meta.appendChild(el('span', 'mg-dq-data', `aggiornata ${quando(d.modificataIl, true)}`));

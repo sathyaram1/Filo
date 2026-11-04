@@ -4262,7 +4262,10 @@
         let fiducia = '';
         if (!MR.isFidato(fb)) {
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
-          if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
+          // Il server può lasciarlo non fidato anche col sì dell'owner (una radice che nessun timbro toglie): vale la sua risposta.
+          if (f && f.ok && f.fiducia !== 'non_fidato') { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; }
+          else if (f && f.ok) fiducia = ' Resta non fidato: porta una radice che nessun timbro toglie, e alla fusione ti chiederà il via libera.';
+          else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
         toast(`${num ? `#${num}` : 'Il feedback'} è In coda come lavoro server.${fiducia}`, fiducia ? 'err' : 'ok');
       }

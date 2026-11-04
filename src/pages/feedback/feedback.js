@@ -725,7 +725,9 @@
       // Il sì come lavoro locale, dato leggendo il testo, è anche fiducia (#1148, come nella gemella): la scrive il server.
       if (payload.localApproval === true && item.fiducia !== 'fidato') {
         const f = await sendToMain({ type: (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna', feedbackId: id }).catch((err) => ({ ok: false, error: err?.message }));
-        if (f && f.ok) item.fiducia = 'fidato';
+        // Il server può lasciarlo non fidato anche col sì dell'owner (una radice che nessun timbro toglie): vale la sua risposta.
+        if (f && f.ok && f.fiducia !== 'non_fidato') item.fiducia = 'fidato';
+        else if (f && f.ok) alert('Nei Lavori server, ma resta non fidato: porta una radice che nessun timbro toglie. Alla fusione ti chiederà il via libera.');
         else alert(`Nei Lavori server, ma non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}. Alla fusione ti chiederà il via libera.`);
       }
       return true;

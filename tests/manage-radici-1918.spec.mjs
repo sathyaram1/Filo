@@ -7,7 +7,8 @@
 //      cambiato fiducia, e se la pratica è diventata fidata il tasto lo dice subito.
 //   3. Su una radice timbrata un clic toglie il timbro (si può togliere ciò che si mette); `ignota` non si clicca.
 //   4. Un server che non sa dire le radici non rompe niente: il cartellino non c'è, il tasto resta.
-//   5. Una radice dichiarata da una sessione mostra il suo nome (l'indirizzo), mai il segno che sta sul documento.
+//   5. Una radice dichiarata da una sessione mostra il suo nome (l'indirizzo), mai il segno che sta sul documento; quella
+//      del solo biglietto dice cosa ha letto la sessione.
 //   6. Le radici stanno in una riga loro, sotto i tasti: tante radici si vedono tutte, senza scorrere di lato.
 //   7. Se il server lascia non fidato un feedback segnato fidato (una radice che nessun timbro toglie), il messaggio lo dice.
 
@@ -68,7 +69,7 @@ const UTENTE = { radice: 'feedback:1916', tipo: 'feedback', valore: '1916', timb
 const IGNOTA = { radice: 'ignota', tipo: 'ignota', valore: '', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: false };
 // Dichiarata da una sessione: sul documento il segno, il nome lo dà il server solo all'owner.
 const PAGINA = { radice: 'web:#0123456789abcdef', tipo: 'web', valore: '#0123456789abcdef', nome: 'web:https://esempio.it/pagina', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true };
-const SESSIONE = { radice: 'esterno:biglietto 0123456789abcdef', tipo: 'esterno', valore: 'biglietto 0123456789abcdef', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true };
+const SESSIONE = { radice: 'esterno:biglietto 0123456789abcdef', tipo: 'esterno', valore: 'biglietto 0123456789abcdef', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true, letture: ['dichiarato: listino scaricato col terminale'] };
 
 test('le radici stanno accanto a «Segna fidato», ognuna col suo nome e col suo perché', async ({ openTab }) => {
   const page = await openTab(MANAGE);
@@ -80,7 +81,8 @@ test('le radici stanno accanto a «Segna fidato», ognuna col suo nome e col suo
   await expect(chips.nth(1)).toHaveAttribute('title', /timbra in blocco tutto ciò che è nato prima/);
   await expect(chips.nth(2)).toBeDisabled();
   await expect(chips.nth(3)).toHaveAttribute('title', /^web:https:\/\/esempio\.it\/pagina: guardalo prima/);
-  await expect(chips.nth(4)).toHaveAttribute('title', /letto senza dire da dove/);
+  // Cosa ha letto quella sessione, come l'ha annotato il server: l'owner sa cosa sta timbrando.
+  await expect(chips.nth(4)).toHaveAttribute('title', /letto senza dire da dove: «dichiarato: listino scaricato col terminale»/);
   await page.screenshot({ path: 'tests/.shots/manage-radici-1918.png' });
 });
 
