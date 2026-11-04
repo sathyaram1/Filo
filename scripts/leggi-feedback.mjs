@@ -25,7 +25,7 @@ const MR = globalThis.SN_MANAGE_REVIEW;
 const TH = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
 const IMG = globalThis.SN_FEEDBACK_IMAGE;
-const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval', 'fiducia', globalThis.SN_FB_ATTESE.CAMPO];
+const CAMPI = ['name', 'text', 'notes', 'url', 'clientId', 'senderProof', 'status', 'seq', 'subSeq', 'pipeline', 'files', 'images', 'localApproval', 'fiducia', TH.CAMPO_NOTE_FIDATE, globalThis.SN_FB_ATTESE.CAMPO];
 // Un documento testuale, o la conversazione, si stampa nella cornice fino a qui; oltre va in un file (con la cornice),
 // e la riga lo dice: una conversazione al suo tetto (400.000 byte) sarebbe un pieno di contesto a ogni turno.
 const MAX_IN_LINEA = 60000;
