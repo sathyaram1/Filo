@@ -40,8 +40,8 @@ const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
 // è il resto del messaggio. Quelle con cifre o simboli contano fino a RISPOSTA_MAX.
 const PAROLE_RISPOSTA = 12;
 const RISPOSTA_MAX = 2000;
-// Il campo risponde all'ultimo messaggio che nomina la password finché sotto non scrive qualcun altro e non c'è molto
-// altro: solleciti («ci sei?») e seconde domande dello stesso non sciolgono il legame (#1446.4). Nella pagina vera fra
+// Il campo risponde all'ultimo messaggio che nomina la password finché sopra non c'è già una risposta (chiusa) e non
+// c'è molto altro: solleciti, seconde domande e altre persone non sciolgono il legame (#1446.4). Nella pagina vera fra
 // i solleciti stanno orari e messaggi senza nome: il tetto regge una decina di messaggi.
 const DOPO_LA_RICHIESTA = 1000;
 const SOPRA_MAX = 1500;
