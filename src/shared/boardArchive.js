@@ -82,6 +82,7 @@
     const now = toTime(o.now) || Date.now();
 
     if ((fb.status || '') === 'archived') return false;
+    if (!risolta(fb)) return false;
 
     const override = hasOwnerOverride(fb);
     if (override) return false; // 'archived' già fatto, 'keep_open' lo blocca
