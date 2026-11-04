@@ -688,7 +688,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
         const s = await chiama('stato', { ticket: suo.ticket }, deps).catch(() => null);
         fiducia = s && s.fiducia === 'fidato' && s.chiuso !== true && !attesa ? 'fidato' : 'non_fidato';
       } else {
-        const p = await prendi({ sporco: true, motivo: 'ripresa senza biglietto', sessionId, trascrizione, cwd, nowMs, deps });
+        const p = await prendi({ sporco: true, riservato: true, motivo: 'ripresa senza biglietto', sessionId, trascrizione, cwd, nowMs, deps });
         path = p.path;
         fiducia = p.fiducia;
       }
