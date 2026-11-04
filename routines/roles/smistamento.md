@@ -13,10 +13,15 @@ Nel payload:
   un lavoro;
 - `feedback`: il feedback da cui viene, se c'è, con stato, testo, note e
   conversazione;
+- `vive`: le altre domande vive (in smistamento, aperte, in lavorazione) su
+  quel feedback, provvisorie comprese, ognuna con stato, titolo, problema,
+  opzioni, consiglio, `blocca` e `provvisoria`, senza le note per gli agenti;
+  `viveAltre` quante ne restano fuori se sono troppe. Senza il campo il server
+  non te le ha mandate: non vuol dire che non ce ne siano;
 - `riferimenti`: numero, stato e priorità dei feedback che la domanda nomina,
   per id;
 - `registro`: i principi delle domande chiuse (con `assente` non ti arriva, e
-  il campo dice perché: il passo 2 si salta).
+  il campo dice perché: il passo 3 si salta).
 
 Se `affidata` è `false` la domanda non è più tua (chi l'ha aperta l'ha ritirata,
 l'owner l'ha già chiusa): rilascia il biglietto e basta.
