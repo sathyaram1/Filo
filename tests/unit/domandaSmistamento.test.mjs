@@ -173,7 +173,7 @@ test('smista mostra: le altre domande vive sullo stesso feedback, provvisorie co
   assert.match(testo, /D-243 \[aperta · illeggibile: il server non l'ha potuta aprire/, 'una illeggibile lo dice');
   assert.ok(!testo.includes('D-243 (senza titolo)'));
   assert.ok(!/[\u0000-\u0008\u000b-\u001f\u007f]/.test(testo));
-  assert.match(testo, /Altre domande vive sullo stesso feedback \(3, qui le 1 più recenti\)/);
+  assert.match(testo, /Altre domande vive sullo stesso feedback \(4, qui le 2 più recenti\)/);
   assert.match(testo, /D-244 Chat: tenere Haiku o passare a Kimi K3\? {2}\[aperta · non ferma il lavoro · provvisoria: opzione 1\]/);
   assert.match(testo, /1\. Tenere Haiku\n {4}2\. Passare a Kimi K3 {2}\[consigliata\]/);
   assert.ok(!testo.includes('SEGRETO-DELLE-NOTE'), 'le note per gli agenti di un\'altra domanda non si stampano');
