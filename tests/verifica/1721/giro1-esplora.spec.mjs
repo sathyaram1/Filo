@@ -107,7 +107,7 @@ test('venti riquadri di altri siti (pubblicità): la foto parte e li copre tutti
 test('anteprima della carta con una cifra per elemento: il numero non si legge', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body>
-    <div id="anteprima" style="display:inline-block;padding:14px 18px;background:${tinta(ROSA)};color:#fff;font:22px monospace;width:420px;height:30px"></div>
+    <div id="anteprima" style="display:inline-block;padding:14px 18px;background:#fff;color:${tinta(ROSA)};font:bold 26px monospace;width:420px;height:34px"></div>
     <form><label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" style="width:280px;font-size:18px"></form>
     <script>document.getElementById('c').addEventListener('input', (e) => {
       const a = document.getElementById('anteprima'); a.textContent = '';
