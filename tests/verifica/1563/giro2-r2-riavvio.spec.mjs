@@ -5,7 +5,7 @@ import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from '../..
 
 const RIGA = '09:12 scritti appunti lunghi sulle api, discussi con Filo';
 
-test('r1 riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio compatta per «fermo»', async ({ app }) => {
+test('r2 riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio compatta per «fermo»', async ({ app }) => {
   const page = await home(app);
   const T = 30000;
   const { b } = await app.evaluate(async (_e, T) => {
