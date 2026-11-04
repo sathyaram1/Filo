@@ -20,10 +20,10 @@ function nelMenu(app, js) {
   }, js);
 }
 
-// [{ testo, spenta }] del menu in vista, o null se nessun menu è aperto.
+// [{ testo, spenta, icona }] del menu in vista, o null se nessun menu è aperto.
 export async function vociDelMenu(app) {
   const s = await nelMenu(app, `JSON.stringify([...document.querySelectorAll('.item')]
-    .map((e) => ({ testo: e.textContent.trim(), spenta: e.classList.contains('disabled') })))`);
+    .map((e) => ({ testo: e.textContent.trim(), spenta: e.classList.contains('disabled'), icona: !!e.querySelector('svg') })))`);
   return s ? JSON.parse(s) : null;
 }
 
@@ -45,6 +45,7 @@ export async function scegli(app, testo) {
 }
 
 export async function fotoDelMenu(app, percorso) {
+  await new Promise((r) => setTimeout(r, 500)); // la comparsa in dissolvenza
   const png = await app.evaluate(async ({ BrowserWindow }) => {
     const m = BrowserWindow.getAllWindows().find((w) => !w.isDestroyed() && w.isVisible() && w.webContents.getURL().startsWith('data:text/html'));
     return m ? (await m.webContents.capturePage()).toPNG().toString('base64') : null;

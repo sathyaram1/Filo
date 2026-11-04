@@ -27,6 +27,7 @@ test('chiude tutte le altre: resta la cliccata, attiva, e Ctrl+Shift+T riporta u
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
   const testi = voci.map((x) => x.testo);
   expect(testi.indexOf(VOCE)).toBe(testi.indexOf('Chiudi') + 1);
+  expect(voci.find((x) => x.testo === VOCE).icona).toBe(true);
   await scegli(app, VOCE);
 
   await expect.poll(() => schede(app).then((s) => s.ids), { timeout: 8_000 }).toEqual([idDue]);

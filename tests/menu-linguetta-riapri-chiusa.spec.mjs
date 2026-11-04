@@ -10,7 +10,7 @@ test('appena aperto Filo la voce c\'è ma è spenta, nella linguetta e nel +', a
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   await tastoDestro(shell, '.tab');
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
-  expect(voce(voci)).toEqual({ testo: VOCE, spenta: true });
+  expect(voce(voci)).toEqual({ testo: VOCE, spenta: true, icona: true });
 
   await tastoDestro(shell, '#tab-new');
   const piu = await aspettaMenu(app, (v) => v.length === 1 && v[0].testo === VOCE);
@@ -28,7 +28,7 @@ test('dal menu della linguetta riapre la scheda chiusa, con lo stesso indirizzo 
 
   await tastoDestro(shell, '.tab.active');
   const voci = await aspettaMenu(app, (v) => v.some((x) => x.testo === 'Duplica'));
-  expect(voce(voci)).toEqual({ testo: VOCE, spenta: false });
+  expect(voce(voci)).toEqual({ testo: VOCE, spenta: false, icona: true });
   // In fondo, vicino a «Chiudi»: le voci di prima restano al loro posto.
   const testi = voci.map((x) => x.testo);
   expect(testi.slice(0, 2)).toEqual(['Duplica', 'Muta']);
