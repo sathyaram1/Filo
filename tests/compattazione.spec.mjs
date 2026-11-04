@@ -2,6 +2,7 @@
 // rispondere, la richiesta dopo sta sotto i 100.000 token, il diario entra nel CONTESTO e la conversazione resta intera.
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
+import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 
 const ORA_MS = 60 * 60 * 1000;
 const RIGA = '09:12 incollati quattro capitoli della tesi sulle api, discussi con Filo';
@@ -254,4 +255,103 @@ test('oltre i 100.000 token senza niente da compattare escono gli esiti vecchi, 
     await rimettiCompattatore(app);
     await ripristina(app);
   }
+});
+
+// La strada vera di chi compatta: niente funzione sostituita, il fornitore finto risponde dietro il cancello dei modelli.
+const fornitoreDiChiCompatta = (app, riga) => app.evaluate((_e, riga) => {
+  const P = globalThis.SN_PROVIDERS;
+  globalThis.__completaVera = P.completeWithFallback;
+  globalThis.__compattazioniVere = [];
+  P.completeWithFallback = async ({ attempts, messages }) => {
+    globalThis.__compattazioniVere.push({ modello: attempts[0].model, messages: JSON.parse(JSON.stringify(messages)) });
+    return {
+      model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [], finishReason: 'stop',
+      text: JSON.stringify({ ore: [{ testo: riga }], memorie: [] }),
+    };
+  };
+}, riga);
+const rimettiFornitore = (app) => app.evaluate(() => {
+  if (globalThis.__completaVera) globalThis.SN_PROVIDERS.completeWithFallback = globalThis.__completaVera;
+});
+
+test('la compattazione vera passa dal cancello dei modelli: col suo modello vuoto usa quello della chat, e la Cronologia AI la segna', async ({ app }) => {
+  const page = await home(app);
+  expect(await scriviVecchi(app)).toBe(6);
+  await modelloFinto(app, [{ text: 'Sì, ricordo la tesi sulle api.' }]);
+  await fornitoreDiChiCompatta(app, RIGA);
+  try {
+    // Nell'app il modello della compattazione nasce vuoto: vale quello della chat.
+    const { scelto, chat } = await app.evaluate(async () => {
+      const prima = await globalThis.SN_STORAGE.getSettings();
+      await globalThis.SN_STORAGE.updateSettings({ models: { ...prima.models, filo_compattazione: '' } });
+      const s = await globalThis.SN_STORAGE.getSettings();
+      return { scelto: (s.models || {}).filo_compattazione || '', chat: globalThis.SN_TEST_MODELS.registry[s.models.filo_chat].model };
+    });
+    expect(scelto, 'nessun modello scelto per la compattazione').toBe('');
+    await chiedi(page, 'ti ricordi di cosa parlava la mia tesi?');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'ricordo la tesi sulle api' })).toBeVisible({ timeout: 20000 });
+    // Altre funzioni del turno (il titolo della chat) passano dallo stesso fornitore: contano solo le compattazioni.
+    const comp = (await app.evaluate(() => globalThis.__compattazioniVere))
+      .filter((c) => JSON.stringify(c.messages).includes('DA COMPATTARE'));
+    expect(comp.length).toBe(1);
+    expect(comp[0].modello, 'il modello della chat').toBe(chat);
+    expect(comp[0].messages[0].role).toBe('system');
+    expect(comp[0].messages[1].content).toContain('Capitolo 0 della tesi');
+    const [richiesta] = await chiamateAlModello(app);
+    expect(richiesta[0].content, 'la risposta letta dal cancello entra nel diario').toContain(RIGA);
+    const voce = await app.evaluate(async () => (await globalThis.SN_HISTORY.list()).find((v) => v.action === 'filo_compattazione') || null);
+    expect(voce, 'la compattazione ha la sua riga nella Cronologia AI').toBeTruthy();
+    expect(voce.model).toBe(chat);
+    expect(voce.input.daCompattare.messaggi).toBe(2);
+  } finally {
+    await rimettiFornitore(app);
+    await ripristina(app);
+  }
+});
+
+test('una domanda che da sola passa i 100.000 token parte intera, e la Cronologia AI segna il listino passato', async ({ app }) => {
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Letto tutto.' }]);
+  await compattatoreFinto(app, RIGA);
+  try {
+    const lunga = `rileggi questi appunti: ${'il favo è fatto di cera e le api lo scaldano. '.repeat(8000)}`;
+    await chiedi(page, lunga);
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Letto tutto.' })).toBeVisible({ timeout: 30000 });
+    const [richiesta] = await chiamateAlModello(app);
+    expect(await tokenDi(app, richiesta)).toBeGreaterThan(100000);
+    expect(JSON.stringify(richiesta.at(-1)), 'la domanda parte intera').toContain(lunga.slice(-200));
+    const voce = await app.evaluate(async () => (await globalThis.SN_HISTORY.list()).find((v) => v.action === 'filo_chat') || null);
+    expect(voce && voce.input && voce.input.oltreListino, 'la riga della chiamata dice di quanto').toBeGreaterThan(100000);
+  } finally {
+    await rimettiCompattatore(app);
+    await ripristina(app);
+  }
+});
+
+// La pagina dell'owner vuole un admin loggato: la configurazione condivisa è finta, la stima la dà il main vero.
+test('nei Modelli predefiniti l\'owner cambia la soglia di serie con la stima accanto, e il salvataggio la porta', async ({ openTab }) => {
+  const page = await openTab(GESTIONE);
+  await page.addInitScript(() => {
+    const config = () => ({
+      apiKeysPresent: { openrouter: true, tavily: false }, safeBrowsingKeyPresent: false, models: {}, modelRegistry: {},
+      excludedProviders: [], contestoFilo: { soglia: 50000 }, contestoFiloDiSerie: { giorni: 3, token: 100000, soglia: 70000, cache: '1h' },
+    });
+    window.__mandati = [];
+    const stub = async (msg) => {
+      if (msg.type === 'defaults_get') return { ok: true, config: config() };
+      if (msg.type === 'defaults_update') { window.__mandati.push(msg.config); return { ok: true, config: config() }; }
+      return window.__veroSend ? window.__veroSend(msg) : { ok: true };
+    };
+    window.__veroSend = window.chrome.runtime.sendMessage.bind(window.chrome.runtime);
+    window.chrome.runtime.sendMessage = stub;
+  });
+  await ricaricaSu(page, 'predefiniti');
+  const campo = page.locator('#contestoSoglia');
+  await expect(campo).toHaveValue('50000', { timeout: 10000 });
+  await expect(campo).toHaveAttribute('placeholder', '70000');
+  await expect(page.locator('#contestoSogliaStima')).toHaveText(/(al mese.*\d+ s)|(listino)/, { timeout: 15000 });
+  await campo.fill('45000');
+  await page.click('#saveBtn');
+  await expect.poll(() => page.evaluate(() => (window.__mandati.at(-1) || {}).contestoFilo || null), { timeout: 10000 })
+    .toEqual({ soglia: 45000 });
 });
