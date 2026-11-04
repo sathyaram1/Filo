@@ -454,6 +454,11 @@ export function testoDelloSmistamento(op, reply = {}) {
     const fermo = r.fermo ? `${visibile(r.fermo)} lo aspetta e riparte da solo quando si fonde` : 'nessun lavoro fermo da far aspettare';
     return `OK: guasto smistato, ${difetto}; ${fermo}. La domanda è chiusa e all'owner non arriva.${fine}`;
   }
+  if (op === 'doppione') {
+    const di = visibile(r.di || 'la domanda viva');
+    const fermo = r.fermo ? ` ${visibile(r.fermo)} ora aspetta la risposta a ${di}.` : '';
+    return `OK: chiusa come doppione di ${di}: l'owner risponde lì, e il testo di chi la chiedeva è nelle sue note per gli agenti.${fermo}${fine}`;
+  }
   if (op === 'ricevuti') return `OK: ${r.fermo ? visibile(r.fermo) : 'il lavoro'} va nei Ricevuti con la richiesta per l'owner; la domanda è chiusa.${fine}`;
   if (op === 'automatica') {
     const azione = r.etichetta ? `, applicata: ${visibile(r.etichetta)}` : '';
