@@ -5847,6 +5847,7 @@ function serbaSeguito(id, serba, wc) {
   const testi = (xs) => (Array.isArray(xs) ? xs.filter((x) => typeof x === 'string') : []);
   const composizione = {
     text: String(c.text || ''),
+    rispostaA: c.rispostaA && typeof c.rispostaA === 'object' ? c.rispostaA : null,
     scritto: String(c.scritto || ''),
     immagini: testi(c.immagini).filter((d) => d.startsWith('data:image/')),
     file: (Array.isArray(c.file) ? c.file : []).filter((f) => f && typeof f.percorso === 'string' && f.percorso)
