@@ -18,10 +18,10 @@ const FE = globalThis.SN_FILO_EVENTI;
 function chatDa(messaggi) {
   const stato = FE.nuovoStato();
   let t = Date.parse('2026-11-04T10:00:00Z');
-  FE.applica(stato, FE.crea(FE.TIPI.CHAT_APERTA, { chat: 'c1' }, { autore: 'utente', ts: new Date(t).toISOString() }));
+  FE.applica(stato, FE.crea(FE.TIPI.CHAT_APERTA, { chat: 'c1' }, { autore: 'utente', dispositivo: 'pc', ts: new Date(t).toISOString() }));
   for (const msg of messaggi) {
     t += 1000;
-    FE.applica(stato, FE.crea(FE.TIPI.MESSAGGIO, { chat: 'c1', msg }, { autore: msg.role === 'user' ? 'utente' : 'filo', ts: new Date(t).toISOString() }));
+    FE.applica(stato, FE.crea(FE.TIPI.MESSAGGIO, { chat: 'c1', msg }, { autore: msg.role === 'user' ? 'utente' : 'filo', dispositivo: 'pc', ts: new Date(t).toISOString() }));
   }
   return stato.chat.get('c1');
 }

@@ -1012,7 +1012,8 @@ async function chatConAzione(app, tipo) {
 async function raccontoRiaperto(openTab, id) {
   const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${id}`);
   await expect(riaperta.locator('.dash-bubble').first()).toBeVisible({ timeout: 10_000 });
-  return (await riaperta.locator('.dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
+  // Le righe nella bolla (un OK dato dopo chiude lì la sua domanda, #1685) e le note sotto.
+  return (await riaperta.locator('.dash-bubble-filo .dash-activity-row, .dash-bubble-note[data-replay="1"]').allTextContents()).join(' | ');
 }
 
 test('L — la conversazione riaperta racconta com’è andata, non solo cosa Filo aveva nominato', async ({ app, shell, openTab }) => {
