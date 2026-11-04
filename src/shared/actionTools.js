@@ -613,11 +613,26 @@
     },
     // #1397 — «rimettimi la musica» riprende quella che suonava, non ne cerca una nuova.
     RIPRENDI_AUDIO: {
-      description: 'Fa RIPARTIRE l\'audio che l\'utente stava ascoltando ("rimettimi la musica", "fai ripartire la canzone", "riprendi il podcast", "rimetti il video di prima"): la scheda che suonava riparte da dove era; se è stata chiusa si riapre lo stesso indirizzo e riparte. Senza `scheda` prende l\'ultima che ha suonato (in TAB APERTE è segnata [AUDIO FERMO], oppure una chiusa); con `scheda` quella col suo numero in TAB APERTE. Non cerca niente di nuovo: se l\'esito dice che non c\'è niente da riprendere, chiedi all\'utente cosa vuole ascoltare o cercalo con NAVIGA. La scheda resta dietro; esegue subito.',
+      description: 'Fa RIPARTIRE l\'audio che l\'utente stava ascoltando ("rimettimi la musica", "fai ripartire la canzone", "riprendi il podcast", "rimetti il video di prima"): la scheda che suonava riparte da dove era; se è stata chiusa si riapre lo stesso indirizzo e riparte. Senza `scheda` prende l\'ultima che ha suonato (in TAB APERTE è segnata [AUDIO FERMO], oppure una chiusa); con `scheda` quella col suo numero in TAB APERTE. Non cerca niente di nuovo: se l\'esito dice che non c\'è niente da riprendere, chiedi all\'utente cosa vuole ascoltare o cercalo con NAVIGA. La scheda resta dietro, se l\'utente non chiede di andarci ("rimettimi la musica e portamici"); esegue subito.',
       properties: {
         scheda: I('Il numero in TAB APERTE della scheda da far ripartire; ometti per l\'ultima che ha suonato.'),
+        vai: B('true porta l\'utente sulla scheda che riparte, solo se lo chiede.'),
       },
       required: [],
+    },
+    PAUSA_AUDIO: {
+      description: 'METTE IN PAUSA l\'audio o il video che suona in una scheda ("metti in pausa la musica", "ferma il video", "stop al podcast"). Senza `scheda` ferma tutte quelle segnate [SUONA] in TAB APERTE; con `scheda` quella col suo numero. Dopo, «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO. Non chiude niente; esegue subito.',
+      properties: {
+        scheda: I('Il numero in TAB APERTE della scheda da fermare; ometti per tutte quelle che suonano.'),
+      },
+      required: [],
+    },
+    MOSTRA_SCHEDA: {
+      description: 'PORTA L\'UTENTE su una scheda GIÀ APERTA ("portami alla musica", "torna alla scheda del meteo", "fammi vedere la seconda scheda"): la mette davanti, senza ricaricarla. Per una pagina già aperta usa questo, non NAVIGA, che ne aprirebbe un doppione. Esegue subito.',
+      properties: {
+        scheda: I('Il numero della scheda in TAB APERTE.'),
+      },
+      required: ['scheda'],
     },
     VOLUME: {
       description: 'Cambia il volume del COMPUTER (l\'uscita audio del sistema, come i tasti del volume della tastiera): "alza il volume al 40%", "abbassa un po\'", "metti muto", "togli il muto". Non è il volume di un video dentro un sito. Il volume di adesso è nella sezione SISTEMA dello STATO: usalo per capire "un po\' più alto" e passa il numero. Dare un livello o alzare toglie anche il muto, come fanno i tasti. Esegue subito; l\'esito ti dice il numero vero.',

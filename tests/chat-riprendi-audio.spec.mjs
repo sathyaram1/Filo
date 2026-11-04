@@ -219,3 +219,163 @@ test('la musica chiusa mentre suonava vince su un video fermato dopo che lei era
   expect(await video.evaluate(() => window.__statoAudio().pausa)).toBe(true);
   await ripristina(app);
 });
+
+test('«metti in pausa la musica» ferma la scheda che suona, senza chiuderla; «rimettimi la musica e portamici» la fa ripartire davanti', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
+  await musica.evaluate(() => document.getElementById('a').play());
+  await expect.poll(() => lettoreInCorsa(app)).toBe(true);
+  await suona(app, 'Musica', true);
+  await expect.poll(() => inPausa(app, url)).toBe(false);
+  const idHome = await tornaAllaHome(shell);
+  const prima = (await schede(shell)).tabs.length;
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'p1', name: 'PAUSA_AUDIO', arguments: '{}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'metti in pausa la musica');
+  await expect.poll(() => inPausa(app, url), { timeout: 15_000 }).toBe(true);
+  await expect(chat.locator('.dash-activity').last()).toContainText('In pausa', { timeout: 10_000 });
+  expect((await schede(shell)).tabs.length).toBe(prima);
+  expect((await schede(shell)).activeId).toBe(idHome);
+  await suona(app, 'Musica', false);
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'p2', name: 'RIPRENDI_AUDIO', arguments: '{"vai":true}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'rimettimi la musica e portamici');
+  await expect.poll(() => inPausa(app, url), { timeout: 15_000 }).toBe(false);
+  const dopo = await schede(shell);
+  expect(dopo.tabs.length).toBe(prima);
+  expect(dopo.tabs.find((t) => t.id === dopo.activeId).url).toBe(url);
+  await ripristina(app);
+});
+
+test('«portami alla musica» mette davanti la scheda già aperta col suo numero nella barra, senza aprirne un doppione', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
+  await openTab(testServer.html('<title>Lettura</title><p>lettura'));
+  await tornaAllaHome(shell);
+  const prima = await schede(shell);
+  const numero = prima.tabs.findIndex((t) => t.url === url) + 1;
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'm1', name: 'MOSTRA_SCHEDA', arguments: JSON.stringify({ scheda: numero }) }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'portami alla musica');
+  await expect.poll(async () => { const s = await schede(shell); return s.tabs.find((t) => t.id === s.activeId)?.url; }, { timeout: 15_000 }).toBe(url);
+  expect((await schede(shell)).tabs.length).toBe(prima.tabs.length);
+  const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
+  expect(prompt, 'il numero è quello della barra che il modello legge').toContain(`${numero}. Musica`);
+  await ripristina(app);
+});
+
+// Come dopo un riavvio: la memoria delle schede chiuse della sessione è vuota, resta l'archivio.
+const dimenticaLaSessione = (app) => app.evaluate(({ BrowserWindow }) => {
+  BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs._pilaChiuse().dimentica(null);
+});
+
+test('dopo un riavvio la musica chiusa si ritrova dall\'archivio, riaperta allo stesso indirizzo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
+  await ascoltataEFermata(app, musica, url);
+  const id = (await schede(shell)).tabs.find((t) => t.url === url).id;
+  await shell.evaluate((x) => window.filoShell.tabs.close(x), id);
+  await expect.poll(() => app.evaluate(async (_e, u) => (await globalThis.SN_ARCHIVED_TABS.listMeta())
+    .some((t) => t.url === u && Date.parse(t.audioAt) > 0), url), { timeout: 10_000 }).toBe(true);
+  await dimenticaLaSessione(app);
+  await tornaAllaHome(shell);
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'r6', name: 'RIPRENDI_AUDIO', arguments: '{}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'rimettimi la musica');
+  await expect.poll(async () => (await schede(shell)).tabs.filter((t) => t.url === url).length, { timeout: 10_000 }).toBe(1);
+  await expect.poll(() => inPausa(app, url), { timeout: 15_000 }).toBe(false);
+  await expect(chat.locator('.dash-activity').last()).toContainText('Riaperta e ripartita', { timeout: 10_000 });
+  await ripristina(app);
+});
+
+test('riaperto Filo, la scheda rimessa dalla sessione salvata sa di aver suonato e riparte lei, senza un doppione', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
+  await ascoltataEFermata(app, musica, url);
+  // La sessione come la salva Filo alla chiusura, poi la scheda se ne va e la riapertura la rilegge.
+  await app.evaluate(async ({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const s = tm.sessionState();
+    const i = s.tabs.indexOf(u);
+    const solo = (k) => (Array.isArray(s[k]) ? [s[k][i]] : undefined);
+    await globalThis.SN_STORAGE.setRaw(tm._sessionKey(), {
+      tabs: [u], activeIndex: 0, colors: solo('colors'), aperte: solo('aperte'), pagine: solo('pagine'), usate: solo('usate'), audio: solo('audio'),
+    });
+    tm.closeTab(tm.tabs.find((t) => t.url === u).id);
+  }, url);
+  await expect.poll(async () => (await schede(shell)).tabs.some((t) => t.url === url)).toBe(false);
+  // Aperta alla chiusura di Filo, la scheda sta nella sessione salvata e non nell'archivio.
+  await app.evaluate(async (_e, u) => {
+    const A = globalThis.SN_ARCHIVED_TABS;
+    await A.removeMany((await A.listMeta()).filter((t) => t.url === u).map((t) => t.id));
+  }, url);
+  await dimenticaLaSessione(app);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.restoreSession());
+  await expect.poll(async () => (await schede(shell)).tabs.filter((t) => t.url === url).length, { timeout: 10_000 }).toBe(1);
+  await tornaAllaHome(shell);
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'r7', name: 'RIPRENDI_AUDIO', arguments: '{}' }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, 'rimettimi la musica');
+  // La pagina chiusa può restare un attimo fra le finestre di Playwright: conta quella che suona.
+  const suonaUna = async () => {
+    for (const w of app.windows()) {
+      try { if (w.url() === url && !(await w.evaluate(() => window.__statoAudio().pausa))) return true; } catch (_) {}
+    }
+    return false;
+  };
+  await expect.poll(suonaUna, { timeout: 15_000 }).toBe(true);
+  const prompt = JSON.stringify((await chiamateAlModello(app))[0]);
+  // Rinviata, non ha ancora il titolo: nell'elenco c'è il suo indirizzo.
+  expect(prompt, 'la scheda rimessa porta l\'ora in cui suonava, letta dalla sessione').toMatch(/\[AUDIO FERMO\] (Musica|127\.0\.0\.1)/);
+  await expect(chat.locator('.dash-activity').last()).toContainText('Ripartita', { timeout: 10_000 });
+  expect((await schede(shell)).tabs.filter((t) => t.url === url).length).toBe(1);
+  await ripristina(app);
+});
+
+test('«fai ripartire la scheda tre» riprende quella col suo numero nella barra, non l\'ultima che ha suonato', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  const musica = await testServer.openReady(openTab, MUSICA);
+  const url = musica.url();
+  await ascoltataEFermata(app, musica, url);
+  await openTab(testServer.html('<title>Lettura</title><p>lettura'));
+  await tornaAllaHome(shell);
+  const numero = (await schede(shell)).tabs.findIndex((t) => t.url === url) + 1;
+  // Un'altra scheda ha suonato dopo: senza numero vincerebbe lei.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.tabs.find((x) => x.title === 'Lettura').audioAt = Date.now() + 60_000;
+  });
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'r8', name: 'RIPRENDI_AUDIO', arguments: JSON.stringify({ scheda: numero }) }] },
+    { text: 'Questa frase arriva solo da un secondo giro.' },
+  ]);
+  await chiedi(chat, `fai ripartire la scheda ${numero}`);
+  await expect.poll(() => inPausa(app, url), { timeout: 15_000 }).toBe(false);
+  await expect(chat.locator('.dash-activity').last()).toContainText('Musica', { timeout: 10_000 });
+  await ripristina(app);
+});

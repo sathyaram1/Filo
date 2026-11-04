@@ -77,3 +77,9 @@ test('#1397 — la pila ridà la scheda chiusa che ha suonato per ultima, e una 
   assert.equal(pila.ultimaCheSuonava().url, 'https://musica.example/c');
   assert.equal(SchedeChiuse.crea().ultimaCheSuonava(), null);
 });
+
+test('lo strumento offre al modello tutti e soli i motivi che la ricerca riconosce', () => {
+  require('../../src/shared/actionTools.js');
+  const offerti = globalThis.SN_ACTION_TOOLS.TOOLS.SCHEDE_CHIUSE.properties.motivo.enum;
+  assert.deepEqual([...offerti].sort(), [...C.MOTIVI].sort());
+});

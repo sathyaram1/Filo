@@ -936,6 +936,8 @@
     SCHEDE_CHIUSE: 'Cerco fra le schede chiuse…',
     RIAPRI_SCHEDA: 'Riapro la scheda…',
     RIPRENDI_AUDIO: 'Faccio ripartire la musica…',
+    PAUSA_AUDIO: 'Metto in pausa…',
+    MOSTRA_SCHEDA: 'Ti porto sulla scheda…',
     LEGGI_TRASPARENZA: 'Rileggo la pagina di trasparenza…',
     CAPACITA_DETTAGLIO: 'Verifico cosa so fare…',
     LEGGI_IMPOSTAZIONI: 'Leggo come sei impostato…',

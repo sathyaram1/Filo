@@ -19,6 +19,8 @@
     APRI_SALVATA: ['_titolo'],
     RIAPRI_SCHEDA: ['_titolo'],
     RIPRENDI_AUDIO: ['_titolo'],
+    PAUSA_AUDIO: ['_titolo'],
+    MOSTRA_SCHEDA: ['_titolo'],
     TOGLI_CHAT: ['_titolo'],
     RIMETTI_CHAT: ['_titolo'],
   };

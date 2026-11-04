@@ -2692,6 +2692,12 @@ async function eseguiAzioneFilo(action, {
     const b = tm ? await bersaglioAudio(tm, action, schedeViste) : null;
     if (b && (b.tab || b.chiusa)) action._titolo = (await nomeDellaScheda())(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
   }
+  if (type === 'PAUSA_AUDIO' || type === 'MOSTRA_SCHEDA') {
+    const tm = winOf(sender)?._filoTabs;
+    const b = tm ? (type === 'PAUSA_AUDIO' ? await bersaglioPausa(tm, action, schedeViste) : await schedaPerNumero(tm, action, schedeViste)) : null;
+    const tabs = b ? (b.tabs || (b.tab ? [b.tab] : [])) : [];
+    if (tabs.length) { const nome = await nomeDellaScheda(); action._titolo = tabs.map(nome).join(', '); }
+  }
 
   // «Cerca X sul sito Y» (#553): l'indirizzo lo costruisce Filo, dall'elenco dei siti o dal modulo di ricerca della home.
   if ((type === 'NAVIGA' || type === 'LEGGI_PAGINA') && provenienza && !confirmed && !soloConferma) {
@@ -2820,8 +2826,7 @@ async function eseguiAzioneFilo(action, {
       const ids = visti && Array.isArray(visti.targetIds) ? visti.targetIds : [];
       scelta = { chiudere: tm.tabs.filter((t) => ids.includes(t.id)), restano: [] };
     } else {
-      const viste = Array.isArray(schedeViste) ? schedeViste
-        : (await FiloState.listTabs({ windowId: winOf(sender)?.id ?? null })).map((t) => t.id);
+      const viste = await schedeNumerate(winOf(sender), schedeViste);
       const motivo = await tm.motiviPerRestare();
       // Un sito nominato si chiude anche se è tenuto sempre aperto: l'ha detto l'utente; il testo non inviato resta.
       const resta = (tab, modo) => { const m = motivo(tab); return m === 'sempre' && modo !== 'tutte' ? '' : m; };
@@ -3619,11 +3624,35 @@ async function eseguiAzioneFilo(action, {
         if (!id) return { executed: false, kept: true, output: { nessuna: true } };
         const titolo = nome(b.tab || { url: b.chiusa.url, title: b.chiusa.titolo });
         const esito = await tm.riprendiAudio(id);
+        if (action.vai === true) tm.activate(id);
         const numero = tm.tabs.findIndex((t) => t.id === id) + 1;
         return {
           executed: true, kept: true,
-          output: { titolo, riaperta: !b.tab, ...(numero > 0 ? { numero } : {}), ...(esito !== 'suona' ? { nonPartita: true, perche: esito } : {}) },
+          output: {
+            titolo, riaperta: !b.tab, ...(numero > 0 ? { numero } : {}), ...(action.vai === true ? { davanti: true } : {}),
+            ...(esito !== 'suona' ? { nonPartita: true, perche: esito } : {}),
+          },
         };
+      }
+      case 'PAUSA_AUDIO': {
+        const tm = winOf(sender)?._filoTabs;
+        if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+        const b = await bersaglioPausa(tm, action, schedeViste);
+        if (b.errore) return { executed: false, kept: true, output: { error: b.errore } };
+        const nome = await nomeDellaScheda();
+        const fermate = [];
+        for (const tab of b.tabs) if (await tm.pausaAudio(tab.id)) fermate.push(nome(tab));
+        if (!fermate.length) return { executed: false, kept: true, output: { nessuna: true } };
+        return { executed: true, kept: true, output: { titolo: fermate.join(', '), fermate: fermate.length } };
+      }
+      case 'MOSTRA_SCHEDA': {
+        const tm = winOf(sender)?._filoTabs;
+        if (!tm) return { executed: false, kept: true, output: { error: 'nessuna finestra con schede' } };
+        const b = await schedaPerNumero(tm, action, schedeViste);
+        if (!b) return { executed: false, kept: true, output: { error: 'manca il numero della scheda' } };
+        if (b.errore) return { executed: false, kept: true, output: { error: b.errore } };
+        tm.activate(b.tab.id);
+        return { executed: true, kept: true, output: { titolo: (await nomeDellaScheda())(b.tab) } };
       }
       case 'APRI_SALVATA': {
         // La porta delle uscite l'ha già guardata prima del gate, con l'indirizzo dell'elenco.
@@ -3733,8 +3762,7 @@ async function eseguiAzioneFilo(action, {
           let schede = [];
           try {
             const tutte = await globalThis.SN_FILO_STATE.listTabs({ windowId: winOf(sender)?.id ?? null });
-            // In chat l'elenco è quello del turno, nell'ordine della barra (#413.2).
-            schede = Array.isArray(schedeViste) ? schedeViste.map((id) => tutte.find((x) => x.id === id) || null) : tutte;
+            schede = (await schedeNumerate(winOf(sender), schedeViste)).map((id) => tutte.find((x) => x.id === id) || null);
           } catch (_) {}
           const t = schede[numero - 1];
           if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
@@ -4688,6 +4716,27 @@ function transparencyDocsForPrompt(actions) {
 // anche per contenuto, coi vettori della Cronologia. Una pagina delicata o di casa dice solo il sito (#1004).
 const MAX_PAGINE_CHAT = 8;
 const SOGLIA_PAGINA = 0.35;
+
+// Le schede chiuse si cercano con una regola sola per CERCA_CHAT e SCHEDE_CHIUSE: stesso testo, stessa soglia, e una
+// scheda delicata (#1004), per l'indirizzo o per come l'ha lasciata, non si cerca né si mostra per il suo riassunto.
+const chiusaDelicata = (it, fuori) => !!fuori(it.url) || restaQui(it, fuori);
+const testoDellaChiusa = (it, fuori) => [it.title, chiusaDelicata(it, fuori) ? '' : it.summary, it.url].filter(Boolean).join(' ');
+
+// Le voci di `voci` vicine per senso a `query`, dalla più vicina, oltre a quelle già `prese` per parole.
+async function chiusePerSenso(query, voci, { settings, fuori, prese = new Set() }) {
+  let emb = null;
+  try { emb = voci.length ? await embedTexts([query], settings) : null; } catch (_) { emb = null; }
+  const qv = emb && emb.vectors && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
+  if (!qv) return [];
+  const vicine = [];
+  for (const it of voci) {
+    if (prese.has(it) || chiusaDelicata(it, fuori) || !conVettoreDi(it, emb.model)) continue;
+    const sc = cosineInt(qv, it.embedding);
+    if (sc >= SOGLIA_PAGINA) vicine.push({ it, sc });
+  }
+  return vicine.sort((a, b) => b.sc - a.sc).map((x) => x.it);
+}
+
 async function paginePerChat(query) {
   const CA = ChatArchive;
   if (!CA.normalizeForSearch(query).trim()) return [];
@@ -4709,39 +4758,26 @@ async function paginePerChat(query) {
       id: `v${i}`, testo: `${v.titolo || ''} ${v.url}`,
       pagina: { url: v.url, title: v.titolo || '', date: v.ts, chiusa: false, _voce: v },
     })),
-    ...archivio.map((it, i) => {
-      const casa = restaQui(it, fuori);
-      return {
-        id: `a${i}`, testo: [it.title, casa ? '' : it.summary, it.url].filter(Boolean).join(' '),
-        pagina: { url: it.url, title: it.title || '', date: it.closedAt || null, chiusa: true, riassunto: casa ? '' : (it.summary || ''), _voce: it },
-      };
-    }),
+    ...archivio.map((it, i) => ({
+      id: `a${i}`, testo: testoDellaChiusa(it, fuori),
+      pagina: { url: it.url, title: it.title || '', date: it.closedAt || null, chiusa: true, riassunto: chiusaDelicata(it, fuori) ? '' : (it.summary || ''), _voce: it },
+    })),
   ];
   // Per parole, con gli stessi tre passi delle conversazioni: una parola in più nella domanda non fa sparire la pagina.
   const perParole = CA.searchWide(candidati, query, { testo: (c) => c.testo }).results;
   // Le schede chiuse anche per significato, se c'è l'indice.
-  const presi = new Set(perParole.map((c) => c.id));
-  let emb = null;
-  try { emb = archivio.length ? await embedTexts([query], settings) : null; } catch (_) { emb = null; }
-  const qv = emb && emb.vectors && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
-  const perSenso = [];
-  if (qv) {
-    archivio.forEach((it, i) => {
-      if (presi.has(`a${i}`) || restaQui(it, fuori) || !conVettoreDi(it, emb.model)) return;
-      const sc = cosineInt(qv, it.embedding);
-      if (sc >= SOGLIA_PAGINA) perSenso.push({ c: candidati[viste.size + i], sc });
-    });
-    perSenso.sort((a, b) => b.sc - a.sc);
-  }
+  const prese = new Set(perParole.filter((c) => c.pagina.chiusa).map((c) => c.pagina._voce));
+  const candidatoDi = new Map(archivio.map((it, i) => [it, candidati[viste.size + i]]));
+  const perSenso = (await chiusePerSenso(query, archivio, { settings, fuori, prese })).map((it) => candidatoDi.get(it));
   const trovate = new Map();
-  for (const { pagina: p } of [...perParole, ...perSenso.map((x) => x.c)]) {
+  for (const { pagina: p } of [...perParole, ...perSenso]) {
     if (trovate.size >= MAX_PAGINE_CHAT && !trovate.has(chiave(p.url))) continue;
     const prima = trovate.get(chiave(p.url));
     if (!prima || (p.chiusa && !prima.chiusa)) trovate.set(chiave(p.url), { ...prima, ...p });
   }
   const out = [];
   for (const p of [...trovate.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0))) {
-    const delicata = fuori(p.url) || (p.chiusa && restaQui(p._voce || {}, fuori));
+    const delicata = p.chiusa ? chiusaDelicata(p._voce || {}, fuori) : fuori(p.url);
     let sito = '';
     try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
     // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: al modello va il sito, detto come tale.
@@ -4767,26 +4803,12 @@ async function schedeChiusePerChat(action) {
   const fuori = await filtroDelicate(settings);
   const archivio = await ArchivedTabs.list().catch(() => []);
   const nelFiltro = CercaChiuse.filtra(archivio, r);
-  const delicata = (it) => !!fuori(it.url) || restaQui(it, fuori);
+  const delicata = (it) => chiusaDelicata(it, fuori);
   let scelte = nelFiltro;
   if (r.cerca) {
-    const CA = ChatArchive;
-    const candidati = nelFiltro.map((it) => ({ id: it.id, it, testo: [it.title, delicata(it) ? '' : it.summary, it.url].filter(Boolean).join(' ') }));
-    const perParole = CA.searchWide(candidati, r.cerca, { testo: (c) => c.testo }).results.map((c) => c.it);
-    const presi = new Set(perParole.map((it) => it.id));
-    let emb = null;
-    try { emb = nelFiltro.length ? await embedTexts([r.cerca], settings) : null; } catch (_) { emb = null; }
-    const qv = emb && emb.vectors && emb.vectors[0] && emb.vectors[0].length ? quantizeEmbedding(emb.vectors[0]) : null;
-    const perSenso = [];
-    if (qv) {
-      for (const it of nelFiltro) {
-        if (presi.has(it.id) || delicata(it) || !conVettoreDi(it, emb.model)) continue;
-        const sc = cosineInt(qv, it.embedding);
-        if (sc >= SOGLIA_PAGINA) perSenso.push({ it, sc });
-      }
-      perSenso.sort((a, b) => b.sc - a.sc);
-    }
-    scelte = [...perParole, ...perSenso.map((x) => x.it)];
+    const candidati = nelFiltro.map((it) => ({ id: it.id, it, testo: testoDellaChiusa(it, fuori) }));
+    const perParole = ChatArchive.searchWide(candidati, r.cerca, { testo: (c) => c.testo }).results.map((c) => c.it);
+    scelte = [...perParole, ...await chiusePerSenso(r.cerca, nelFiltro, { settings, fuori, prese: new Set(perParole) })];
   }
   return {
     schede: scelte.slice(0, CercaChiuse.TETTO).map((it) => CercaChiuse.perModello(it, { delicata: delicata(it) })),
@@ -4805,21 +4827,37 @@ async function voceChiusa(id) {
   try { voce = chiave ? (await ArchivedTabs.listMeta()).find((t) => t && t.id === chiave) || null : null; } catch (_) {}
   if (!voce) return {};
   const fuori = await filtroDelicate(await getEffectiveSettings());
-  return { voce, perModello: CercaChiuse.perModello(voce, { delicata: !!fuori(voce.url) || restaQui(voce, fuori) }) };
+  return { voce, perModello: CercaChiuse.perModello(voce, { delicata: chiusaDelicata(voce, fuori) }) };
+}
+
+// Gli id delle schede nell'ordine dei numeri letti dal modello, per ogni strumento che prende `scheda`: l'elenco del
+// turno o, senza (una conferma arrivata dopo), quello della barra, come lo conta l'utente (#413.2).
+async function schedeNumerate(win, schedeViste) {
+  if (Array.isArray(schedeViste)) return schedeViste;
+  try { return (await FiloState.listTabs({ windowId: win?.id ?? null, barra: true })).map((t) => t.id); } catch (_) { return []; }
+}
+
+// La scheda col numero `scheda` di TAB APERTE: { tab }, { errore } o null se il numero non c'è.
+async function schedaPerNumero(tm, action, schedeViste) {
+  const numero = Number(action.scheda ?? action.numero ?? 0);
+  if (!Number.isInteger(numero) || numero <= 0) return null;
+  const ids = await schedeNumerate(tm.win, schedeViste);
+  const tab = tm.tabs.find((t) => t.id === ids[numero - 1]);
+  return tab ? { tab } : { errore: `nell'elenco TAB APERTE non c'è la scheda numero ${numero}` };
+}
+
+// Cosa ferma «metti in pausa»: la scheda col suo numero, o tutte quelle che suonano.
+async function bersaglioPausa(tm, action, schedeViste) {
+  const perNumero = await schedaPerNumero(tm, action, schedeViste);
+  if (perNumero) return perNumero.tab ? { tabs: [perNumero.tab] } : perNumero;
+  return { tabs: tm.tabs.filter((t) => t.audible || t._mediaInCorso) };
 }
 
 // #1397 — la scheda che «rimettimi la musica» fa ripartire: quella col numero detto, o l'ultima che ha suonato e ora
 // tace, aperta o chiusa. { tab } | { chiusa } | { giaSuona } | { nessuna } | { errore }.
 async function bersaglioAudio(tm, action, schedeViste) {
-  const numero = Number(action.scheda ?? action.numero ?? 0);
-  if (Number.isInteger(numero) && numero > 0) {
-    let ids = Array.isArray(schedeViste) ? schedeViste : null;
-    if (!ids) {
-      try { ids = (await FiloState.listTabs({ windowId: tm.win?.id ?? null, barra: true })).map((t) => t.id); } catch (_) { ids = []; }
-    }
-    const tab = tm.tabs.find((t) => t.id === ids[numero - 1]);
-    return tab ? { tab } : { errore: `nell'elenco TAB APERTE non c'è la scheda numero ${numero}` };
-  }
+  const perNumero = await schedaPerNumero(tm, action, schedeViste);
+  if (perNumero) return perNumero;
   const ferma = tm.tabs.filter((t) => t.audioAt > 0 && !t.audible).sort((x, y) => y.audioAt - x.audioAt)[0] || null;
   const chiusa = await tm.ultimaChiusaCheSuonava();
   if (ferma && (!chiusa || ferma.audioAt >= chiusa.at)) return { tab: ferma };
@@ -5729,7 +5767,18 @@ function toolResultText({ action, res, rendered }, giro = null) {
     if (o.error) return `Musica NON ripartita: ${o.error}.`;
     const dove = o.numero ? ` la scheda ${o.numero}` : ' la scheda';
     if (o.nonPartita) return conTitolo(`${o.riaperta ? 'Ho riaperto' : 'Ho trovato'}${dove}, ma l'audio non è ripartito da solo (la pagina non ha un lettore pronto o l'ha rifiutato). Di' all'utente in una riga di premere play lì.`, o.titolo);
-    return conTitolo(`${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'}${dove}, dietro a quella che l'utente ha davanti. Dillo in una riga.`, o.titolo);
+    return conTitolo(`${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'}${dove}, ${o.davanti ? 'e l\'utente adesso ce l\'ha davanti' : 'dietro a quella che l\'utente ha davanti'}. Dillo in una riga.`, o.titolo);
+  }
+  if (type === 'PAUSA_AUDIO' && res.output && !res.needsConfirm) {
+    const o = res.output;
+    if (o.nessuna) return 'Niente messo in pausa: nessuna scheda sta suonando. Dillo all\'utente in una riga.';
+    if (o.error) return `Niente messo in pausa: ${o.error}.`;
+    return conTitolo('Messa in pausa. Dillo in una riga; «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO.', o.titolo);
+  }
+  if (type === 'MOSTRA_SCHEDA' && res.output && !res.needsConfirm) {
+    const o = res.output;
+    if (o.error) return `Scheda NON mostrata: ${o.error}.`;
+    return conTitolo('L\'utente adesso ha davanti la scheda. Dillo in una riga.', o.titolo);
   }
   if (type === 'RIAPRI_SCHEDA' && res.output && !res.needsConfirm && !res.output.nonRaggiungibile && !res.output.tagliato) {
     const o = res.output;

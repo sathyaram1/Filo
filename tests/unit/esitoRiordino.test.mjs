@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../../src/shared/messages.js';
 import '../../src/shared/esitoAzione.js';
+import '../../src/shared/tabTriage.js';
 import '../../src/pages/dashboard/dashboard-attivita.js';
 
 const { esitoRiordino } = globalThis.SN_DASH_ATTIVITA;
@@ -63,4 +64,12 @@ test('in incognito il riordino non parte e lo dice', () => {
 test('una risposta mancante o negata è un riordino non riuscito', () => {
   assert.equal(esitoRiordino(null).ok, false);
   assert.equal(esitoRiordino({ ok: false, archived: 0 }).ok, false);
+});
+
+test('senza la frase del main, la home dice il perché con la sua stessa regola, motivo compreso', () => {
+  const T = globalThis.SN_TAB_TRIAGE;
+  for (const r of [{ incognito: true }, { giaInCorso: true }, { giudizioMancato: true, motivo: 'I crediti sono finiti' }]) {
+    assert.equal(esitoRiordino(r).motivo, T.riordinoNonRiuscito(r));
+  }
+  assert.match(esitoRiordino({ giudizioMancato: true, archived: 2, motivo: 'I crediti sono finiti' }).motivo, /crediti sono finiti/);
 });

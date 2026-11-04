@@ -265,7 +265,7 @@
     {
       id: 'video-audio-controls', title: 'Comanda un video o un audio della pagina', category: 'media',
       desc: 'Sul tasto destro di un filmato o di un audio trovi le sue azioni: riproduci o metti in pausa, togli e rimetti l’audio, cambia velocità (l’etichetta mostra sempre quella attuale; un clic accelera di uno scatto, la freccia apre l’elenco da 0,25× a 2×), ripeti in continuo, mostra o nascondi i controlli del lettore. Funziona anche quando i comandi del player coprono il filmato.',
-      invoke: 'Clic destro sul video o sull’audio → la voce che ti serve. A parole: «rimettimi la musica» fa ripartire la scheda che suonava da dove era, anche se l’avevi chiusa o hai riaperto Filo, invece di cercarne una nuova.',
+      invoke: 'Clic destro sul video o sull’audio → la voce che ti serve. A parole: «rimettimi la musica» fa ripartire la scheda che suonava da dove era, anche se l’avevi chiusa o hai riaperto Filo, invece di cercarne una nuova; «metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un’altra.',
       doesNot: 'Non scarica i sottotitoli, non ritaglia il filmato e non tocca i lettori che non usano un vero video della pagina (per esempio quelli dentro contenuti incorporati protetti).',
     },
     {

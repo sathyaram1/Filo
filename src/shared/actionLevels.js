@@ -1450,6 +1450,23 @@
         return t ? ['Far ripartire ', cit(t)] : 'Far ripartire la musica di prima';
       },
     },
+    // Si disfa con RIPRENDI_AUDIO.
+    PAUSA_AUDIO: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Mettere in pausa ', cit(t)] : 'Mettere in pausa quello che suona';
+      },
+    },
+    MOSTRA_SCHEDA: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Portarti su ', cit(t)] : 'Portarti su una scheda aperta';
+      },
+    },
   };
 
   function voce(action) {
@@ -1509,6 +1526,8 @@
     ZOOM_PAGINA: senza('limitato'),
     VOLUME: senza('limitato'),
     RIPRENDI_AUDIO: senza('nonPartita'),
+    PAUSA_AUDIO: senza('nessuna'),
+    MOSTRA_SCHEDA: fatta,
     RIAPRI_SCHEDA: senza('nonRaggiungibile'),
     WIFI: accesaOSpenta,
     BLUETOOTH: accesaOSpenta,

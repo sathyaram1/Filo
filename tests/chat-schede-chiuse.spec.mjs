@@ -147,3 +147,24 @@ test('una pagina che non c\'è più si riapre dietro, sull\'errore, e in chat re
   await chat.screenshot({ path: 'tests/.shots/chat-schede-chiuse-riassunto-scuro.png' });
   await ripristina(app);
 });
+
+test('una scheda chiusa trovata con la ricerca nel filo si riapre com\'era, col suo id, senza un doppione', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche', PUBBLICO));
+  await tornaAllaHome(shell);
+  const orche = (await schede(shell)).find((x) => x.title === 'Le orche del Mediterraneo');
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), orche.id);
+  await expect.poll(async () => (await archivio(app)).some((t) => t.url === orche.url), { timeout: 10_000 }).toBe(true);
+
+  await modelloCheRiapre(app, [
+    { call: { id: 'f1', name: 'CERCA_CHAT', args: { query: 'orche' } } },
+    { call: { id: 'f2', name: 'RIAPRI_SCHEDA' }, riapri: true },
+    { text: 'Ho riaperto la pagina sulle orche.' },
+  ]);
+  await chiedi(chat, 'riaprimi quella pagina sulle orche');
+  await expect.poll(async () => (await schede(shell)).filter((t) => t.url === orche.url).length, { timeout: 15_000 }).toBe(1);
+  expect(await esitoPerIlModello(app, 'f1')).toContain('RIAPRI_SCHEDA');
+  await expect(chat.locator('.dash-activity').last()).toContainText('Riaperta', { timeout: 10_000 });
+  await ripristina(app);
+});

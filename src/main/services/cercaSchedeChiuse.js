@@ -5,7 +5,8 @@
 'use strict';
 
 // 'mano', 'pagina' (la pagina stessa o un crash), 'filo' (chiesto in chat), 'pulizia' (il riordino o l'inattività),
-// 'doppione'. Le voci di prima non lo scrivono: si legge dal `reason` di allora.
+// 'doppione'. Le voci di prima non lo scrivono: si legge dal `reason` di allora. Lo strumento li offre al modello
+// con lo stesso elenco: la sentinella in tests/unit/cercaSchedeChiuse.test.mjs li tiene uguali.
 const MOTIVI = ['mano', 'pagina', 'filo', 'pulizia', 'doppione'];
 const SINONIMI = {
   utente: 'mano', io: 'mano', manuale: 'mano', assistente: 'filo', chat: 'filo', tu: 'filo',

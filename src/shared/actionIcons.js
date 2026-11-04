@@ -25,6 +25,8 @@
     SCHEDE_CHIUSE: 'history',
     RIAPRI_SCHEDA: 'restore',
     RIPRENDI_AUDIO: 'volume',
+    PAUSA_AUDIO: 'volume',
+    MOSTRA_SCHEDA: 'openTab',
     ONBOARDING: 'checklist',
     CAPACITA_DETTAGLIO: 'clipboard',
     LEGGI_FILE: 'readDocument',

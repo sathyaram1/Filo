@@ -567,6 +567,8 @@
     SCHEDE_CHIUSE: (n) => (n > 1 ? `cercato fra le schede chiuse ${n} volte` : 'cercato fra le schede chiuse'),
     RIAPRI_SCHEDA: (n) => (n > 1 ? `riaperto ${n} schede chiuse` : 'riaperto una scheda chiusa'),
     RIPRENDI_AUDIO: () => 'fatto ripartire la musica',
+    PAUSA_AUDIO: () => 'messo in pausa la musica',
+    MOSTRA_SCHEDA: () => 'portato su una scheda',
     RINOMINA_FILE: () => 'dato un nome ai file',
     ELIMINA_FILE: () => 'tolto dei file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
@@ -827,6 +829,16 @@
       if (o.nonPartita) return { icon: '🎵', text: `${o.riaperta ? 'Riaperta' : 'Trovata'} «${t}» · non è ripartita da sola` };
       return { icon: '🎵', text: `${o.riaperta ? 'Riaperta e ripartita' : 'Ripartita'} «${t}»` };
     },
+    PAUSA_AUDIO: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo || a._titolo);
+      return { icon: '⏸', text: t ? `In pausa «${t}»` : 'Musica in pausa' };
+    },
+    MOSTRA_SCHEDA: (a) => {
+      const o = a._output || {};
+      const t = pulito(o.titolo || a._titolo) || 'la scheda';
+      return { icon: '↗', text: `Ti ho portato su «${t}»` };
+    },
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
@@ -1056,6 +1068,7 @@
     APRI_SALVATA: 'Pagina salvata non aperta',
     SCHEDE_CHIUSE: 'Ricerca fra le schede chiuse non riuscita', RIAPRI_SCHEDA: 'Scheda non riaperta',
     RIPRENDI_AUDIO: 'Musica non ripartita',
+    PAUSA_AUDIO: 'Niente messo in pausa', MOSTRA_SCHEDA: 'Scheda non trovata',
     CAPACITA_DETTAGLIO: 'Verifica non riuscita', NAVIGA: 'Link non aperto', LEGGI_IMPOSTAZIONI: 'Impostazioni non lette',
     TOGLI_PERMESSO_SITO: 'Permesso non tolto',
     IMPOSTA_PREFERENZA: 'Impostazione non applicata', IMPOSTA_ESTETICA: 'Aspetto non cambiato',
@@ -2357,15 +2370,11 @@
     return null;
   }
 
-  // Perché il riordino non è riuscito, o '' se è andato. La frase la compone il main (SN_TAB_TRIAGE.riordinoNonRiuscito):
-  // un giudizio mancato è un riordino non riuscito anche se i doppioni li ha chiusi (#1626).
+  // Perché il riordino non è riuscito, o '' se è andato: la frase del main, o la stessa regola quando arriva senza
+  // (#1626). I doppioni chiusi li dice già il titolo dell'esito.
   function motivoRiordinoMancato(r) {
-    if (!r || r.ok === false) return 'Filo non è riuscito a valutare le schede.';
-    if (r.error) return `${String(r.error).trim().replace(/\.+$/, '')}.`;
-    if (r.incognito) return 'In una finestra in incognito Filo non riordina le schede.';
-    if (r.giaInCorso) return 'Un riordino è già in corso.';
-    if (r.giudizioMancato) return 'Filo non è riuscito a valutare le schede.';
-    return '';
+    if (r && r.ok !== false && r.error) return `${String(r.error).trim().replace(/\.+$/, '')}.`;
+    return global.SN_TAB_TRIAGE.riordinoNonRiuscito(r && { ...r, archived: 0 });
   }
 
   // L'esito del riordino come lo legge l'utente. Una frase sola per le tre
