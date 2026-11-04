@@ -235,7 +235,7 @@
     // Un no alla conferma è un esito: chi rilegge sa che l'utente ha rifiutato, e il modello non la ripropone (#1373).
     if (x._confirm && x._rifiutata) {
       const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
-      return senzaVuoti({ type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO });
+      return senzaVuoti({ type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO, no: true });
     }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
     let esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
