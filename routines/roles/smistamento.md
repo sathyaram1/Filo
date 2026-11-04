@@ -142,8 +142,8 @@ Il file sta fuori dal repo, come ogni domanda.
 
 ## Come finisci
 
-Uno dei comandi qui sopra (`guasto`, `ricevuti`, `automatica`, `pubblica`)
-chiude il compito. Poi rilascia il biglietto:
+Uno dei comandi qui sopra (`guasto`, `ricevuti`, `doppione`, `automatica`,
+`pubblica`) chiude il compito. Poi rilascia il biglietto:
 
 ```bash
 node scripts/routine-channel.mjs release <biglietto> --role smistamento
