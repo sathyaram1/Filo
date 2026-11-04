@@ -58,8 +58,8 @@ test('un vicino da solo non fa partire il giro, nemmeno con cap0 sopra zero: esc
   assert.deepEqual(con.fix, [], 'cap0 è il bilancio degli 0 interni: i vicini non lo usano');
   assert.equal(con.consume, null);
   assert.deepEqual(con.counts, { count3: 0, count2: 0, count1: 0, count0: 0 }, 'nessun bilancio pagato');
-  assert.deepEqual(con.derived.map((x) => [x.level, x.sede, x.priority]), [[2, 'v', 2], [0, 'v', 0]]);
-  assert.deepEqual(R.derivedGroups(con).map((g) => [g.tipo, g.priority]), [['rimasti', 2]]);
+  assert.deepEqual(con.derived.map((x) => [x.level, x.sede, x.priority]), [[2, 'v', 1], [0, 'v', 0]], 'livello scritto, e un 2 nasce a 1');
+  assert.deepEqual(R.derivedGroups(con).map((g) => [g.tipo, g.priority]), [['rimasti', 1]]);
 });
 
 test('un vicino insieme a un interno da correggere entra nel giro, e non paga niente (#1202)', () => {
