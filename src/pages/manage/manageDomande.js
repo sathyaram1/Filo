@@ -839,7 +839,7 @@
     return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
   }
   function titoloRiapri(d) {
-    if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: un lavoro che la domanda ferma torna fermo finché non rispondi';
+    if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: quello che ha applicato si disfa dove si può, e un lavoro che la domanda ferma torna fermo finché non rispondi';
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
