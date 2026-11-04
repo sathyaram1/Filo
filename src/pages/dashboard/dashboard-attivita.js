@@ -1944,7 +1944,7 @@
   // Un pannello (riordino, eliminazione dall'archivio) chiuso con un no o finito male: lo sanno la conversazione del
   // bottone e il modello, come per le altre conferme (#1373). Un no non fa ripartire il lavoro; un guasto sì. Il
   // bottone resta: un nuovo tentativo prende il posto di questa voce.
-  function pannelloSenzaEsito(a, chat, { no = false, motivo = '' } = {}) {
+  function pannelloSenzaEsito(a, chat, { no = false, motivo = '', gruppo = null } = {}) {
     const E = global.SN_ESITO;
     const L = global.SN_ACTION_LEVELS;
     const type = String((a && a.type) || '').toUpperCase();
