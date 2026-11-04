@@ -170,3 +170,56 @@ test('un turno chiuso sugli esiti senza frase torna col suo giro e senza un turn
   const f = FC.finestra(lista, { ora: ORA, ...TETTI, chatCorrente: 'a', giro: (m) => (m.role === 'filo' ? giro : null) });
   assert.deepEqual(f.messaggi.slice(-2).map((m) => m.role), ['assistant', 'tool']);
 });
+
+// #1685 — un comando partito e uscito con errore non si racconta «non eseguito», e il suo perché resta: nella chat
+// riaperta e per il modello, come nel riquadro in diretta.
+test('un comando uscito con errore resta «non riuscito» col codice e la prima riga d\'errore', () => {
+  const a = { type: 'ESEGUI_COMANDO', comando: 'ls /no', _executed: false, _output: { command: 'ls /no', stdout: '', stderr: '\nls: cannot access \'/no\': No such file or directory\n', code: 2 } };
+  const v = E.voceArchivio(a);
+  assert.equal(v.esito, 'fallito');
+  assert.equal(v.partita, true);
+  assert.equal(v.motivo, 'uscito con codice 2: ls: cannot access \'/no\': No such file or directory');
+  const di = E.voceArchivio(JSON.parse(JSON.stringify(v)));
+  assert.equal(E.rigaDellaVoce(di).testo, 'Comando non riuscito · uscito con codice 2: ls: cannot access \'/no\': No such file or directory');
+  assert.match(E.perModello([di]), /NON riuscita: [^\n]*\(perché: uscito con codice 2: ls: cannot access/);
+  assert.equal(RA.riga(a).text, 'Comando non riuscito · uscito con codice 2: ls: cannot access \'/no\': No such file or directory', 'il diario in diretta dice lo stesso');
+  const lungo = E.voceArchivio({ ...a, _output: { command: 'sleep 999', timedOut: true, code: null } });
+  assert.equal(E.rigaDellaVoce(lungo).testo, 'Comando non riuscito · interrotto: ci metteva troppo');
+  const spento = E.voceArchivio({ type: 'ESEGUI_COMANDO', comando: 'ls', _executed: false, _output: { command: 'ls', blocked: 'disabled' } });
+  assert.equal(spento.partita, undefined);
+  assert.equal(E.rigaDellaVoce(spento).testo, 'Comando non eseguito · la modalità terminale è spenta', 'non partito resta «non eseguito»');
+});
+
+test('non riuscita dopo un OK: la riga è la domanda a cui l\'utente ha risposto, e il perché viaggia con lei', () => {
+  const v = E.voceArchivio({ type: 'INVIA_FEEDBACK', testo: 'x', _rigaChiesta: 'Inviare questo feedback a tuo nome', _executed: false, _output: { error: 'problema di rete' } });
+  assert.deepEqual(v, { type: 'INVIA_FEEDBACK', esito: 'fallito', riga: 'Inviare questo feedback a tuo nome', motivo: 'problema di rete' });
+});
+
+// #1685 — la conferma rimasta senza risposta porta con sé azione e domanda: riaperta, la chat ridisegna il bottone.
+test('una conferma ancora da dare tiene azione e domanda; chiusa com\'è finita, non le tiene più', () => {
+  const a = { type: 'ESEGUI_COMANDO', comando: 'mkdir tre', spiegazione: 'Creo la cartella tre', _confirm: { level: 2, text: 'Creo la cartella tre:\nmkdir tre' }, _executed: false };
+  const v = E.voceArchivio(a);
+  assert.equal(v.esito, 'chiesto');
+  assert.deepEqual(v.azione, { comando: 'mkdir tre', spiegazione: 'Creo la cartella tre' });
+  assert.deepEqual(v.conferma, { livello: 2, testo: 'Creo la cartella tre:\nmkdir tre' });
+  assert.deepEqual(E.voceArchivio(JSON.parse(JSON.stringify(v))), v, 'dal disco torna uguale');
+  assert.equal(E.voceArchivio({ ...v, conferma: { livello: 1, testo: 'x' } }).azione, undefined, 'una domanda fuori forma non ridisegna niente');
+  assert.equal(E.voceArchivio({ ...v, esito: 'fallito' }).azione, undefined);
+  assert.equal(E.voceArchivio({ ...a, comando: 'x'.repeat(20000) }).azione, undefined, 'troppo grande: resta la riga');
+});
+
+test('un riordino non riuscito lascia il posto al tentativo dopo, nella risposta che l\'aveva proposto', () => {
+  const messaggi = [{ role: 'filo', text: '', esiti: [{ type: 'PULISCI_TAB', esito: 'fallito', riga: 'Riordinare le schede', motivo: 'crediti finiti', riprova: true }] }];
+  const { resto } = E.unisciDopo(messaggi, [{ type: 'PULISCI_TAB', esito: 'fatto', riga: 'Archiviate 3 schede' }]);
+  assert.deepEqual(resto, []);
+  assert.deepEqual(messaggi[0].esiti, [{ type: 'PULISCI_TAB', esito: 'fatto', riga: 'Archiviate 3 schede' }]);
+  const fallito = [{ role: 'filo', text: '', esiti: [{ type: 'ESEGUI_COMANDO', esito: 'fallito', riga: 'ls', motivo: 'uscito con codice 2' }] }];
+  assert.equal(E.unisciDopo(fallito, [{ type: 'ESEGUI_COMANDO', esito: 'fatto', riga: 'pwd' }]).resto.length, 1, 'un fallimento vero non si sovrascrive');
+});
+
+test('al modello un turno passato racconta dall\'archivio solo quello che la scheda non ha già detto', () => {
+  const voci = [{ type: 'TIMER', esito: 'fatto', riga: 'Timer' }, { type: 'X_Y', esito: 'fallito', riga: 'x', motivo: E.MOTIVO_NO }, { type: 'Z_W', esito: 'chiesto', riga: 'z' }];
+  assert.equal(E.daRaccontare(voci, false).length, 3);
+  assert.deepEqual(E.daRaccontare(voci, true).map((v) => v.esito), ['chiesto']);
+  assert.deepEqual(E.daRaccontare(null, true), []);
+});

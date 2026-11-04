@@ -57,7 +57,9 @@
     vociDopoOk = [];
     prosegui(chat, voci);
   }
+  // La stessa voce che l'archivio ha appena scritto, se c'è: il modello che riparte legge la riga della chat riaperta.
   function voceDellaConferma(a) {
+    if (a && a._voce) return { ...a._voce };
     try { return global.SN_ESITO.voceArchivio(a); } catch (_) { return null; }
   }
 
@@ -1883,6 +1885,7 @@
     if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') voce.riga = chiesta;
     if (!voce.riga && fatto) voce.riga = fatto;
     // Quale domanda chiude, fra quelle aperte della risposta che l'aveva proposta.
+    if (a) a._voce = { ...voce };
     if (a && a._rigaChiesta) voce.proposta = a._rigaChiesta;
     try { archiviaAzione(type, cambi, a, { chat, voce }); } catch (_) {}
   }
@@ -1962,7 +1965,10 @@
     btn.textContent = '🧹 Riordina e archivia le schede';
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
-      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) return;
+      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) {
+        pannelloSenzaEsito(a, chat, { no: true });
+        return;
+      }
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE, da: 'chat' });
@@ -1979,6 +1985,7 @@
           btn.after(nota);
         }
         nota.textContent = e.motivo;
+        pannelloSenzaEsito(a, chat, { motivo: e.motivo });
         return;
       }
       if (nota) nota.remove();
@@ -1987,6 +1994,23 @@
       proseguiQuandoLibero(chat, voceDellaConferma(a));
     });
     return btn;
+  }
+
+  // Un pannello (riordino, eliminazione dall'archivio) chiuso con un no o finito male: lo sanno la conversazione del
+  // bottone e il modello, come per le altre conferme (#1373). Un no non fa ripartire il lavoro; un guasto sì. Il
+  // bottone resta: un nuovo tentativo prende il posto di questa voce.
+  function pannelloSenzaEsito(a, chat, { no = false, motivo = '' } = {}) {
+    const E = global.SN_ESITO;
+    const L = global.SN_ACTION_LEVELS;
+    const type = String((a && a.type) || '').toUpperCase();
+    let riga = '';
+    try { riga = L ? E.primaRigaConferma(L.describe(a)) : ''; } catch (_) { riga = ''; }
+    const voce = no
+      ? { type, esito: E.FALLITO, riga, motivo: E.MOTIVO_NO }
+      : { type, esito: E.FALLITO, riga, motivo: String(motivo || '').slice(0, 200), riprova: true };
+    a._voce = { ...voce };
+    try { archiviaAzione(type, [], a, { chat, voce }); } catch (_) {}
+    if (!no) proseguiQuandoLibero(chat, { ...voce });
   }
 
   // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
@@ -2128,7 +2152,8 @@
         if (!scelta.length) return;
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
         const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche, 'CANCELLA_ARCHIVIO');
-        if (!ok || del.disabled) return;
+        if (del.disabled) return;
+        if (!ok) { pannelloSenzaEsito(a, chat, { no: true }); return; }
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
         del.textContent = 'Elimino…';
@@ -2137,6 +2162,7 @@
           scelte.forEach((x) => { x.box.disabled = false; });
           etichetta();
           note.textContent = 'Eliminazione non riuscita: l’archivio è com’era. Riprova.';
+          pannelloSenzaEsito(a, chat, { motivo: 'l’archivio è rimasto com’era' });
           return;
         }
         const removed = res.removed || 0;
@@ -2190,6 +2216,14 @@
         const btn = renderActionButton({ type: 'EVENTO_CALENDARIO', _output: { proposta: true, evento: v.evento } }, { chat });
         if (btn) { wrap.appendChild(btn); continue; }
       }
+      // La conferma rimasta senza risposta ritrova il suo bottone: il popup richiede il sì come allora (#1685).
+      if (v.esito === E.CHIESTO && v.azione && v.conferma) {
+        const btn = renderActionButton({
+          ...v.azione, type: v.type, _confirm: { level: v.conferma.livello, text: v.conferma.testo }, _executed: false,
+          ...(v.conferma.domanda ? { _domanda: v.conferma.domanda } : {}),
+        }, { chat });
+        if (btn) { wrap.appendChild(btn); continue; }
+      }
       const riga = E.rigaDellaVoce(v);
       if (riga && (tutte || riga.fallita)) wrap.appendChild(makeActivityRow(riga.icona, riga.testo));
       else if (riga) riuscite.push(riga.testo);
@@ -2217,9 +2251,7 @@
     isType,
     esitoRiordino,
     // #525 — «Ha aperto una pagina e avviato un timer»: la stessa frase del
-    // diario del turno, per chi RIAPRE una chat archiviata. Lì i bottoni non
-    // si rimettono (un'azione da confermare non si può ri-offrire giorni
-    // dopo): resta il racconto di cosa Filo ha fatto.
+    // diario del turno, per chi RIAPRE una chat archiviata.
     summarizeActivity,
     riordinaSchede,
     activityRowFor,

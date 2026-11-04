@@ -138,7 +138,7 @@
         { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
       ],
       fixes: [
-        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni dei file e quello per aggiungere un evento al calendario.', segnalazione: 1294 },
+        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni dei file, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
         { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
         { testo: 'Dopo il tuo OK a un\'azione Filo fa da solo i passi che mancano, senza aspettare un tuo «vai avanti».', segnalazione: 1373 },
         { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
