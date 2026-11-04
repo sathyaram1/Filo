@@ -134,13 +134,13 @@
   // `origine`: le etichette delle immagini a vista, solo quando scrive l'utente.
   async function leggi({ attendi = false, daUrl = '', origine = false } = {}) {
     if (attendi) await waitForPageSettle({ initialUrl: String(daUrl || '') || location.href });
-    const [screenshot, origineImmagini] = await Promise.all([
+    const [{ screenshot, fotoMancante }, origineImmagini] = await Promise.all([
       captureScreenshot(),
       origine ? origineImmaginiVisibili().catch(() => null) : Promise.resolve(null),
     ]);
     const outline = (() => { try { return Extract?.extractInteractiveOutline?.() || ''; } catch (_) { return ''; } })();
     const viewport = (() => { try { return Extract?.viewportInfo?.() || null; } catch (_) { return null; } })();
-    return { url: location.href, titolo: document.title, outline, viewport, screenshot, origineImmagini };
+    return { url: location.href, titolo: document.title, outline, viewport, screenshot, fotoMancante, origineImmagini };
   }
 
   // ---------- Azioni SULLA PAGINA (parità col menu tasto destro) ----------
