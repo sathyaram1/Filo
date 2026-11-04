@@ -503,7 +503,24 @@ rispondere.
      stesso (`esito.smistata = 'ricevuti'`). All'owner non arriva mai una
      domanda di guasto. Quella del controllo sul manutentore non passa di
      qui: va diretta all'owner (SPEC-MANUTENTORE.md § 7).
-  2. **Il registro risponde.** Se il principio di una domanda chiusa copre il
+  2. **Un doppione** (#1928). Se una delle `vive` chiede all'owner la stessa
+     scelta, anche con altre parole, la domanda si chiude su quella: il
+     controllo dei titoli alla nascita (§ 3.1, `domanda_doppia`) non vede due
+     domande che dicono la stessa cosa con parole diverse, né una nata da
+     un'altra porta. Il server rifiuta se D-k è questa stessa domanda, non è
+     viva o non sta sullo stesso feedback d'origine. Altrimenti, in una sola
+     transazione: questa si chiude (`chiusa`, `esito = { ok: true, smistata:
+     'doppione', doppioneDi: 'D-k' }`, il testo dello smistamento nella sua
+     conversazione); il suo testo intero (titolo, contesto, problema, opzioni,
+     consiglio, note per gli agenti) si aggiunge alle note per gli agenti di
+     D-k, col numero, così chi riprende dopo la risposta lo legge; nella
+     conversazione del feedback una riga dice «D-n chiusa come doppione di
+     D-k». Se questa fermava il lavoro e D-k no, il lavoro aspetta D-k: l'id di
+     D-k prende il posto di questa fra le `domandeBloccanti` del feedback, e
+     la risposta a D-k lo libera come libera una bloccante. Le note di D-k
+     oltre il loro tetto non si tagliano: il server rifiuta col numero, e lo
+     smistamento pubblica (passo 4) nominando D-k.
+  3. **Il registro risponde.** Se il principio di una domanda chiusa copre il
      caso, risponde lui: l'opzione che il principio indica, e un testo che
      cita il principio e la domanda da cui viene. La domanda si chiude con
      `esito.automatica = true` (§ 3.6).
