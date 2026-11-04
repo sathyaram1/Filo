@@ -85,6 +85,7 @@ function startLoopback(expectedState, { dove = 'app' } = {}) {
     let resolveCode, rejectCode;
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
     codePromise.catch(() => {}); // un flusso interrotto prima di waitForCode non è un rifiuto orfano
+    let ricevuto = false;
     let attesa = null; // la risposta del ritorno vero, finché lo scambio non dice com'è andata
     let tetto = null;
     const concludi = (errore) => {
@@ -107,13 +108,14 @@ function startLoopback(expectedState, { dove = 'app' } = {}) {
       try { url = new URL(req.url, 'http://127.0.0.1'); } catch (_) { url = null; }
       // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
       // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
-      if (!url || attesa || !stessoState(url.searchParams.get('state'), expectedState)) {
+      if (!url || ricevuto || !stessoState(url.searchParams.get('state'), expectedState)) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Richiesta non riconosciuta.');
       }
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
       server.close();
+      ricevuto = true;
       attesa = res;
       if (error || !code) {
         const e = error
@@ -340,12 +342,10 @@ async function signIn() {
   }
   // Un accesso alla volta: chi lo chiede mentre uno aspetta riporta davanti la
   // STESSA pagina e ne condivide l'esito, così qualunque strada completi arriva a Filo.
+  // Riportarla davanti non allunga il tetto (#1132).
   if (flussoInCorso) {
     const f = await flussoInCorso;
-    if (f.aspettaBrowser) {
-      f.rinnovaAttesa();
-      await mostraAccesso(f);
-    }
+    if (f.aspettaBrowser) await mostraAccesso(f);
     return f.esito;
   }
   const prossimo = nuovoFlusso();
