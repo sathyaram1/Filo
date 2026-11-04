@@ -525,7 +525,7 @@
       const esiti = !isUser && Array.isArray(m.esiti) ? m.esiti.filter((v) => !(v && v.type === 'VEDI_SCHERMO' && guardate.length)) : [];
       // Un OK dato dopo il turno non è una risposta nuova: una riga discreta sotto, come nel diario.
       const dopo = !!m.confermaDopo;
-      const archiviati = esiti.length && !dopo ? Att.esitiArchiviati(esiti) : { righe: null, nota: null };
+      const archiviati = esiti.length && !dopo ? Att.esitiArchiviati(esiti, { chat: m.chat || '' }) : { righe: null, nota: null };
       // Finché Filo resta aperto le foto mandate stanno in memoria per il modello (#1166): tornano anche a schermo.
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length || archiviati.righe) {

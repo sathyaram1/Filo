@@ -122,6 +122,8 @@
   const MAX_MOTIVO = 200;
   const MAX_PERCORSO = 2000;
   const TIPO = /^[A-Z_]{2,40}$/;
+  // La prima riga di una domanda di conferma, senza i due punti che annunciano il testo sotto: la usano il bottone, il
+  // diario e la voce d'archivio, che devono dire la stessa cosa.
   const primaRiga = (s) => String(s || '').split('\n')[0].replace(/\s*:\s*$/, '').trim();
   function frase(fn, a) {
     try { return primaRiga(fn(a)); } catch (_) { return ''; }
@@ -139,11 +141,25 @@
     TOGLI_CHAT: ['Togliere una conversazione dal filo', 'Conversazione tolta dal filo'],
     RIMETTI_CHAT: ['Rimettere una conversazione nel filo', 'Conversazione rimessa nel filo'],
   };
+  // L'evento proposto col bottone (#1685): riaperta, la chat ridisegna «Aggiungi al calendario» con questi campi.
+  const CAMPI_EVENTO = ['data', 'ora', 'titolo', 'dettagli', 'luogo', 'durata_min', 'data_fine', 'ora_fine', 'quando'];
+  function eventoDi(x) {
+    const src = (x && x._output && x._output.evento) || (x && x.evento) || x || {};
+    const ev = {};
+    for (const k of CAMPI_EVENTO) {
+      const val = src[k];
+      if (typeof val === 'number' && Number.isFinite(val)) ev[k] = val;
+      else if (typeof val === 'string' && val.trim()) ev[k] = breve(val, 500);
+    }
+    return ev.data && ev.titolo ? ev : null;
+  }
   function senzaVuoti(v) {
     const out = { type: v.type, esito: v.esito };
     if (v.riga) out.riga = v.riga;
     if (v.motivo) out.motivo = v.motivo;
     if (v.file) out.file = v.file;
+    if (v.proposta) out.proposta = v.proposta;
+    if (v.evento) out.evento = v.evento;
     return out;
   }
   // `x`: l'azione del turno (coi campi `_` che Filo le scrive) o una voce già fatta, che torna ripulita.
@@ -157,15 +173,22 @@
       const generica = SENZA_TITOLO[type] ? SENZA_TITOLO[type][x.esito === CHIESTO ? 0 : 1] : '';
       return senzaVuoti({
         type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), motivo: breve(x.motivo, MAX_MOTIVO), file: f,
+        proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
+        evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
       });
     }
     // Un ricordo ripescato da solo sta col messaggio dell'utente, non fra le azioni di Filo.
     if (x._auto) return null;
     const o = x._output || {};
     if (o.blocked === 'segreto') return senzaVuoti({ type: 'FERMATA', esito: FALLITO, riga: breve(o.frase || '', MAX_RIGA) });
+    const L = global.SN_ACTION_LEVELS;
+    // Un no alla conferma è un esito: chi rilegge sa che l'utente ha rifiutato, e il modello non la ripropone (#1373).
+    if (x._confirm && x._rifiutata) {
+      const chiesta = SENZA_TITOLO[type] ? SENZA_TITOLO[type][0] : primaRiga(x._confirm.text) || (L ? frase(L.describe, x) : '');
+      return senzaVuoti({ type, esito: FALLITO, riga: breve(chiesta, MAX_RIGA), motivo: MOTIVO_NO });
+    }
     // Un pannello che aspetta il clic dell'utente (il riordino, l'elenco da eliminare) non è un'azione fallita.
     let esito = x._domanda && x._executed === false && !x._confirm ? CHIESTO : esitoAzione(x);
-    const L = global.SN_ACTION_LEVELS;
     // La riga del diario in diretta, coi suoi numeri: riaperta, la chat e il modello leggono la stessa frase.
     const diretta = esito === CHIESTO || esito === FALLITO ? null : rigaDelDiario(x);
     if (diretta && diretta.failed) esito = FALLITO;
@@ -177,7 +200,8 @@
     if (SENZA_TITOLO[type]) riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1];
     const file = type === 'APRI_FILE' && esito !== FALLITO && esito !== CHIESTO ? fileDi(x) : null;
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
-    return senzaVuoti({ type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file });
+    const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
+    return senzaVuoti({ type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, evento });
   }
   function rigaDelDiario(x) {
     const R = global.SN_RIGHE_ATTIVITA;
@@ -186,6 +210,35 @@
   // Tutte, senza tetto: un turno con cento letture le racconta tutte.
   function vociArchivio(lista) {
     return (Array.isArray(lista) ? lista : []).map(voceArchivio).filter(Boolean);
+  }
+
+  // Un sì o un no dato al bottone dopo il turno prende il posto della voce aperta nella risposta che l'aveva proposta
+  // (#1685): riaperta, chat e modello leggono com'è finita lì. Ritorna le voci rimaste senza la loro e gli indici toccati.
+  const MOTIVO_NO = 'detto no alla conferma';
+  const aperta = (w, type) => !!w && w.type === type
+    && (w.esito === CHIESTO || w.esito === PROPOSTO || (w.esito === FALLITO && w.motivo === MOTIVO_NO));
+  function unisciDopo(messaggi, voci) {
+    const resto = [];
+    const toccati = [];
+    for (const v of Array.isArray(voci) ? voci : []) {
+      if (!v || !v.type) continue;
+      let dove = null;
+      for (const stessaRiga of v.proposta ? [true, false] : [false]) {
+        for (let i = messaggi.length - 1; i >= 0 && !dove; i--) {
+          const m = messaggi[i];
+          if (!m || m.role !== 'filo' || m.confermaDopo || !Array.isArray(m.esiti)) continue;
+          const j = m.esiti.findIndex((w) => aperta(w, v.type) && (!stessaRiga || w.riga === v.proposta));
+          if (j >= 0) dove = { i, j };
+        }
+        if (dove) break;
+      }
+      const { proposta: _p, ...voce } = v;
+      if (!dove) { resto.push(voce); continue; }
+      const m = messaggi[dove.i];
+      messaggi[dove.i] = { ...m, esiti: m.esiti.map((w, k) => (k === dove.j ? voce : w)) };
+      if (!toccati.includes(dove.i)) toccati.push(dove.i);
+    }
+    return { resto, toccati };
   }
 
   // La riga che la chat riaperta mostra per una voce: la stessa forma del diario in diretta.
@@ -229,6 +282,6 @@
 
   global.SN_ESITO = {
     esitoAzione, conta, valido, voci, motivo, restanoAperte, voceArchivio, vociArchivio, rigaDellaVoce, perModello,
-    CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
+    unisciDopo, primaRigaConferma: primaRiga, MOTIVO_NO, CHIESTO, PROPOSTO, COMPIUTO, FALLITO, FATTO,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
