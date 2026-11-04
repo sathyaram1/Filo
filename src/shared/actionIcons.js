@@ -38,6 +38,7 @@
     CANCELLA_MEMORIA: 'eraser',
     DIMENTICA: 'eraser',
     TOGLI_CHAT: 'trash',
+    ELIMINA_FILE: 'trash',
     RIMETTI_CHAT: 'restore',
     CORREGGI_MEMORIA: 'pencil',
     CANCELLA_PAGINE: 'eraser',

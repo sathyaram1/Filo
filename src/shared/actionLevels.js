@@ -246,6 +246,12 @@
     return t || SPIEGAZIONE_DI_FILO;
   }
   const SPIEGAZIONE_DI_FILO = 'Uso il terminale del computer';
+  const PERCHE_SENZA_CESTINO = 'cancella per sempre, senza passare dal cestino';
+  function cancellaColComando(a) {
+    const C = global.SN_CMD_CLASSIFY;
+    const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
+    return !!(C && C.cancellaPerSempre && C.cancellaPerSempre(cmd));
+  }
 
   function nomeLeggibile(n) {
     const N = global.SN_NOMI_FILE;
@@ -264,6 +270,38 @@
     }
     if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
     t.push('\n\nL\'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».');
+    return t;
+  }
+
+  const perSempre = (a) => !!(a && a.per_sempre === true);
+  // Nomi e cartelle vengono dal disco: stanno nei riquadri, una voce per elemento.
+  function descriviEliminazione(a) {
+    const file = (Array.isArray(a && a._file) ? a._file : []).filter((f) => f && f.nome);
+    const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
+    const per = perSempre(a);
+    const quanti = (f) => (f.dentro > 0 ? `con ${f.oltre ? 'più di ' : ''}${f.dentro} ${f.dentro === 1 ? 'elemento' : 'elementi'} dentro` : 'vuota');
+    const verbo = per ? 'Cancellare per sempre' : 'Spostare nel cestino';
+    let t;
+    if (!file.length) t = [per ? 'Cancellare per sempre dei file' : 'Spostare dei file nel cestino'];
+    else if (file.length === 1) {
+      const f = file[0];
+      t = [`${verbo} ${f.tipo === 'cartella' ? `questa cartella, ${quanti(f)}` : 'questo file'}:\n`, cit(nomeLeggibile(f.nome)),
+        ...(f.cartella ? ['\nNella cartella:\n', cit(f.cartella, true)] : [])];
+    } else {
+      t = [`${verbo} questi ${file.length} elementi:\n`,
+        elenco(file.map((f) => `${f.percorso || nomeLeggibile(f.nome)}${f.tipo === 'cartella' ? ` (cartella ${quanti(f)})` : ''}`))];
+    }
+    if (saltati.length) {
+      t.push('\n\nRestano dove sono:\n', elenco(saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`)));
+    }
+    if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
+    const uno = file.length <= 1;
+    const cartella = uno && file.length === 1 && file[0].tipo === 'cartella';
+    let dopo = 'Li ritrovi nel cestino, se vuoi rimetterli al loro posto.';
+    if (uno) dopo = cartella ? 'La ritrovi nel cestino, se vuoi rimetterla al suo posto.' : 'Lo ritrovi nel cestino, se vuoi rimetterlo al suo posto.';
+    t.push(per
+      ? `\n\nNon ${uno ? 'passa' : 'passano'} dal cestino: non si ${uno ? 'potrà' : 'potranno'} più recuperare.`
+      : `\n\n${dopo}`);
     return t;
   }
 
@@ -322,6 +360,24 @@
         const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
         const n = fatti ? fatti.length : (Array.isArray(a && a._proposte) ? a._proposte.length : 0);
         return n === 1 ? 'Rinominato un file (si rimette com\'era con «Annulla»)' : `Rinominati ${n} file (si rimettono com'erano con «Annulla»)`;
+      },
+    },
+    // #1909 — cancellare un file del computer vuol dire spostarlo nel cestino: si rimedia, costo 2, e chiede sempre con
+    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 3 e la parola a ogni livello. I file li trova il
+    // main (`_file`) prima del gate, mai il modello.
+    ELIMINA_FILE: {
+      costo: (a) => (perSempre(a) ? 3 : 2),
+      campo: 'file',
+      parola: perSempre,
+      perimetro: () => false,
+      perchePerimetro: 'Te lo chiedo sempre, prima di toccare i tuoi file.',
+      describe: (a) => descriviEliminazione(a),
+      // Senza i nomi: vengono dal disco, e questa frase torna al modello fuori dal recinto. Li dicono riga e bottone.
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const n = Array.isArray(o.eliminati) ? o.eliminati.length : 0;
+        if (o.perSempre) return n === 1 ? 'Cancellato per sempre un elemento, senza cestino' : `Cancellati per sempre ${n} elementi, senza cestino`;
+        return n === 1 ? 'Spostato nel cestino un elemento (si rimette da lì)' : `Spostati nel cestino ${n} elementi (si rimettono da lì)`;
       },
     },
     SVEGLIA: {
@@ -949,6 +1005,8 @@
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       campo: 'terminale',
+      // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
+      parola: (a) => cancellaColComando(a),
       fonte: (a, out) => {
         if (out.blocked) return null;
         const t = `${typeof out.stdout === 'string' ? out.stdout : ''}${typeof out.stderr === 'string' ? out.stderr : ''}`;
@@ -971,6 +1029,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
+        if (cancellaColComando(a)) perche = PERCHE_SENZA_CESTINO;
         // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
         const sp = spiegazioneComando(a);
         return [sp === SPIEGAZIONE_DI_FILO ? sp : cit(sp, true), '\n\nIl comando, nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',

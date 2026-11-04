@@ -391,6 +391,20 @@
       required: [],
       risultato: true,
     },
+    ELIMINA_FILE: {
+      description: () => 'Cancella file o cartelle del computer dell\'utente spostandoli nel CESTINO del sistema, da dove l\'utente '
+        + 'li rimette: usalo per ogni «cancella», «elimina», «togli», «butta» su file e cartelle, mai il terminale. Il sistema '
+        + 'mostra all\'utente cosa sta per finire nel cestino e chiede l\'OK da sé: non chiederlo a parole e non dire di averlo '
+        + 'fatto prima dell\'esito. Con `per_sempre` li cancella senza cestino: solo se l\'utente lo dice con parole sue («per '
+        + 'sempre», «definitivamente», «che non si possa recuperare»), e allora il sistema gli fa scrivere «conferma». '
+        + `Il percorso prendilo da CERCA_DOCUMENTI, da un elenco o dalle parole dell'utente. Esempio di percorso: ${ESEMPIO_PERCORSO}.`,
+      properties: {
+        percorsi: { type: 'array', items: { type: 'string' }, description: 'I file o le cartelle da cancellare (percorso assoluto, o con ~ per la cartella dell\'utente).' },
+        per_sempre: B('true solo se l\'utente chiede di cancellarli per sempre, senza cestino.'),
+      },
+      required: ['percorsi'],
+      risultato: true,
+    },
     PULISCI_TAB: {
       description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede e lascia a Filo la scelta; per chiudere quelle che dice lui c\'è CHIUDI_SCHEDE.',
       properties: {},
@@ -494,7 +508,7 @@
       required: ['token', 'valore'],
     },
     ESEGUI_COMANDO: {
-      description: 'Esegue un comando shell. Se parte subito, chiede conferma o vuole "conferma" digitato lo decide il SISTEMA, dal comando e dal livello di autonomia scelto dall\'utente. L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi.',
+      description: 'Esegue un comando shell. Se parte subito, chiede conferma o vuole "conferma" digitato lo decide il SISTEMA, dal comando e dal livello di autonomia scelto dall\'utente. L\'output ti torna subito e lo vede anche l\'utente. Solo con modalità terminale attiva: se è spenta il sistema te lo dice, e tu proponi di attivarla (IMPOSTA_PREFERENZA modalita_terminale true). UN comando per chiamata, niente concatenazioni con && o ;. La cartella di lavoro è persistente: un "cd" resta valido per i comandi successivi. Per cancellare file o cartelle non usarlo: c\'è ELIMINA_FILE, che li sposta nel cestino.',
       properties: {
         comando: S('Il comando shell esatto.'),
         spiegazione: S('Cosa fa il comando, in una frase semplice e in prima persona, per chi non sa cos\'è un terminale: «Misuro lo spazio libero sul disco», «Cancello la cartella build». È la prima cosa che l\'utente legge, sopra il comando: dice l\'effetto vero, anche quando cancella o cambia qualcosa. Non decide se il comando parte.'),

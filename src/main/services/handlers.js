@@ -1382,7 +1382,7 @@ function recordPendingConfirm(sender, action) {
   for (const [k, rec] of pendingConfirms) if (rec.scade <= now) pendingConfirms.delete(k);
   pendingConfirms.set(pendingConfirmKey(sender, action), {
     scade: now + PENDING_CONFIRM_TTL,
-    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra },
+    mostrati: { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra, file: action._file },
   });
 }
 function consumePendingConfirm(sender, action) {
@@ -1404,7 +1404,7 @@ function chiaveSchermo(sender) {
 // Una pagina di Filo rimanda l'azione col popup che ha mostrato; per le altre
 // vale quello registrato alla richiesta di conferma.
 function bersagliMostrati(sender, action) {
-  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra };
+  if (daPaginaDiFilo(sender)) return { righe: action._righe, targetIds: action._targetIds, proposte: action._proposte, nome: action._nomeSistema, finestra: action._finestra, file: action._file };
   const rec = pendingConfirms.get(pendingConfirmKey(sender, action));
   return rec && rec.scade > Date.now() ? rec.mostrati : null;
 }
@@ -1907,10 +1907,97 @@ function esitoSistemaPerModello(o) {
   return `Collegato alla rete Wi-Fi:${acceso}\n${busta([nome])}`;
 }
 
+// Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello. Una lettura sola per
+// memorie, conversazioni e file, o una delle tre leggerebbe il «per sempre» diversamente.
+function perSempreDetto(v) {
+  return v === true || /^(true|s[iì]|1)$/i.test(String(v ?? '').trim());
+}
+
 // `parole` = ciò che l'utente ha scritto in chat: un codice scritto da lui può uscire.
 function idDelCambio(action) {
   const id = String(action.id ?? action.cambio ?? action.evento ?? '').trim();
   return id || null;
+}
+
+// #1909 — cosa finisce nel cestino lo trova il main prima del gate: il popup nomina gli elementi veri, e all'OK si
+// tocca solo quello che ha mostrato. Fuori dal perimetro, su un altro computer o la cartella personale intera: mai.
+const LOTTO_ELIMINA = 200;
+// Perché un file resta dov'è, detto all'utente: la stessa frase per chi cancella e chi rinomina.
+function fraseFuori(m) {
+  if (/rete/.test(m)) return 'sta su un altro computer della rete';
+  return /nascost/.test(m) ? 'è un file nascosto o di un programma' : 'sta fuori dalla tua cartella personale';
+}
+const TETTO_CONTEGGIO = 10000;
+function motivoEliminazione(p, perimetro) {
+  const C = globalThis.SN_CMD_CLASSIFY;
+  if (!C) return 'non si sa dove sta';
+  const m = C.fuoriPerimetro(p, perimetro);
+  if (m) return fraseFuori(m);
+  const nodePath = require('node:path');
+  const full = String(C.pulisciPercorso(p));
+  if (perimetro.home && nodePath.isAbsolute(full)) {
+    const rel = nodePath.relative(full, perimetro.home);
+    if (!rel || (!rel.startsWith('..') && !nodePath.isAbsolute(rel))) return 'è la tua cartella personale, o la contiene';
+  }
+  return '';
+}
+async function contaDentro(dir) {
+  const fsp = require('node:fs/promises');
+  const nodePath = require('node:path');
+  let n = 0;
+  const coda = [dir];
+  while (coda.length && n < TETTO_CONTEGGIO) {
+    const cur = coda.shift();
+    let voci = [];
+    try { voci = await fsp.readdir(cur, { withFileTypes: true }); } catch (_) { voci = []; }
+    for (const v of voci) {
+      n += 1;
+      if (v.isDirectory()) coda.push(nodePath.join(cur, v.name));
+    }
+  }
+  return { dentro: Math.min(n, TETTO_CONTEGGIO), oltre: n >= TETTO_CONTEGGIO };
+}
+async function preparaEliminazione(action, sender) {
+  const DR = require('./documentRead');
+  const fsp = require('node:fs/promises');
+  const nodePath = require('node:path');
+  const perimetro = perimetroLettura(sender);
+  const cwd = cartellaDelComando(getAssistantCwd(sender));
+  const stato = async (p) => { try { return await fsp.lstat(p); } catch (_) { return null; } };
+  const elenco = [].concat(action.percorsi ?? action.percorso ?? action.path ?? action.file ?? action.files ?? [])
+    .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
+    .filter((x) => typeof x === 'string' && x.trim());
+  if (!elenco.length) return { file: [], saltati: [], oltre: 0, errore: 'indica i file o le cartelle da cancellare, coi loro percorsi' };
+  let file = [];
+  const saltati = [];
+  const visti = new Set();
+  for (const x of elenco) {
+    let full = DR.normalizePath(x, cwd);
+    const nome = nodePath.basename(full) || String(x).trim();
+    const m = motivoEliminazione(x, perimetro) || motivoEliminazione(full, perimetro);
+    if (m) { saltati.push({ nome, perche: m }); continue; }
+    let st = await stato(full);
+    if (!st) {
+      let alt = null;
+      try { alt = await DR.risolviTollerante(full); } catch (_) { alt = null; }
+      if (alt && alt.path && !motivoEliminazione(alt.path, perimetro)) { full = alt.path; st = await stato(full); }
+    }
+    if (!st) { saltati.push({ nome, perche: 'non c\'è' }); continue; }
+    const chiave = perimetro.maiuscole ? full.toLowerCase() : full;
+    if (visti.has(chiave)) continue;
+    visti.add(chiave);
+    file.push({ percorso: full, nome: nodePath.basename(full), cartella: nodePath.dirname(full), tipo: st.isDirectory() ? 'cartella' : 'file' });
+  }
+  const oltre = Math.max(0, file.length - LOTTO_ELIMINA);
+  file = file.slice(0, LOTTO_ELIMINA);
+  for (const f of file) if (f.tipo === 'cartella') Object.assign(f, await contaDentro(f.percorso));
+  return { file, saltati, oltre, errore: '' };
+}
+function motivoNonEliminato(e) {
+  const c = e && e.code;
+  if (c === 'ENOENT') return 'non c\'è più';
+  if (c === 'EBUSY' || c === 'EPERM' || c === 'EACCES') return 'è aperto in un altro programma, o il sistema non lo lascia toccare';
+  return 'il sistema non l\'ha permesso';
 }
 
 // Ogni stato che l'azione scrive diventa un evento del filo nel salvataggio (registroCambi.js):
@@ -1937,7 +2024,7 @@ async function preparaRinomina(action, sender, avanzamento = null) {
     for (const p of ps) { const m = C.fuoriPerimetro(p, perimetro); if (m) return m; }
     return '';
   };
-  const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: /rete/.test(m) ? 'sta su un altro computer della rete' : 'sta fuori dalla tua cartella personale' });
+  const saltaFuori = (p, m) => ({ nome: nodePath.basename(p) || p, perche: fraseFuori(m) });
   const elenco = [].concat(action.percorsi ?? action.file ?? action.files ?? action.percorso ?? action.path ?? [])
     .map((x) => (x && typeof x === 'object' ? (x.percorso ?? x.path) : x))
     .filter((x) => typeof x === 'string' && x.trim());
@@ -2588,8 +2675,7 @@ async function eseguiAzioneFilo(action, {
       }
     } catch (_) {}
     action._righe = righeDaDimenticare.map((r) => r.testo);
-    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
-    action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+    action.per_sempre = perSempreDetto(action.per_sempre);
   }
 
   // #1295 — la conversazione la trova il main (l'id detto, o quella di adesso), prima del gate: il popup dice quale.
@@ -2607,8 +2693,7 @@ async function eseguiAzioneFilo(action, {
     action.id = chat.id;
     action._titolo = chat.title || ChatArchive.fallbackTitle(chat.messages);
     action._corrente = !!chatId && chat.id === chatId;
-    // Il «per sempre» alza il costo: vale solo detto chiaro, mai una stringa qualunque del modello.
-    if (type === 'TOGLI_CHAT') action.per_sempre = action.per_sempre === true || /^(true|s[iì]|1)$/i.test(String(action.per_sempre ?? '').trim());
+    if (type === 'TOGLI_CHAT') action.per_sempre = perSempreDetto(action.per_sempre);
   }
 
   // CORREGGI_MEMORIA (#872): la riga la trova il main come per DIMENTICA, e all'OK vale quella che il popup ha mostrato.
@@ -2758,6 +2843,21 @@ async function eseguiAzioneFilo(action, {
     if (!prep.proposte.length) {
       const errore = prep.errore || (prep.saltati.length ? 'nessuno dei file si può rinominare' : 'nessun file da rinominare');
       return { executed: false, kept: false, output: { error: errore, saltati: prep.saltati } };
+    }
+  }
+
+  // #1909 — il «per sempre» vale solo detto chiaro; gli elementi li trova il main, e all'OK valgono quelli mostrati.
+  if (type === 'ELIMINA_FILE') {
+    action.per_sempre = perSempreDetto(action.per_sempre);
+    if (!confirmed) {
+      const prep = await preparaEliminazione(action, sender);
+      action._file = prep.file;
+      action._saltati = prep.saltati;
+      action._oltre = prep.oltre;
+      if (!prep.file.length) {
+        const errore = prep.errore || (prep.saltati.length ? 'nessuno di questi si può cancellare' : 'niente da cancellare');
+        return { executed: false, kept: false, output: { error: errore, saltati: prep.saltati } };
+      }
     }
   }
 
@@ -3692,6 +3792,30 @@ async function eseguiAzioneFilo(action, {
           try { dove = await require('./documentiIndice').doveSta(DR.normalizePath(p)); } catch (_) {}
         }
         return { executed: true, kept: true, ...(dove ? { output: { dove } } : {}) };
+      }
+      case 'ELIMINA_FILE': {
+        const visti = confirmed ? bersagliMostrati(sender, action) : { file: action._file };
+        const lista = (visti && Array.isArray(visti.file) ? visti.file : []).slice(0, LOTTO_ELIMINA);
+        const nodePath = require('node:path');
+        const perimetro = perimetroLettura(sender);
+        const per = action.per_sempre === true;
+        const eliminati = [];
+        const falliti = [];
+        for (const f of lista) {
+          const p = f && typeof f.percorso === 'string' ? f.percorso : '';
+          if (!p || !nodePath.isAbsolute(p)) continue;
+          const nome = nodePath.basename(p);
+          const m = motivoEliminazione(p, perimetro);
+          if (m) { falliti.push({ nome, perche: m }); continue; }
+          // Il cestino del sistema rifiuta un file sparito senza dire perché: si guarda prima, o l'utente legge «non permesso».
+          try { await require('node:fs/promises').lstat(p); } catch (_) { falliti.push({ nome, perche: motivoNonEliminato({ code: 'ENOENT' }) }); continue; }
+          try {
+            if (per) await require('node:fs/promises').rm(p, { recursive: true });
+            else await require('electron').shell.trashItem(p);
+            eliminati.push(nome);
+          } catch (e) { falliti.push({ nome, perche: motivoNonEliminato(e) }); }
+        }
+        return { executed: eliminati.length > 0, kept: false, output: { eliminati, falliti, perSempre: per } };
       }
       case 'RINOMINA_FILE': {
         const visti = bersagliMostrati(sender, action);
@@ -5301,6 +5425,31 @@ function toolResultText({ action, res, rendered }, giro = null) {
       return `Rinominati ${r.length} file:\n${busta(r.map((x) => `${x.prima} → ${x.nome}`))}${f}${restano}\nSotto c'è «Annulla» per rimettere i nomi di prima.`;
     }
     return `Nessun file rinominato: ${o.error || 'niente da rinominare'}.${restano}\nDillo all'utente in una riga; non ripetere l'azione uguale.`;
+  }
+  // #1909 — i nomi vengono dal disco: tornano recintati.
+  if (type === 'ELIMINA_FILE') {
+    const E = globalThis.SN_ESTERNO;
+    const busta = (righe) => E.imbusta({ tipo: 'TESTO_SALVATO', testo: righe.map((r) => `- ${E.neutralizza(r, { unaRiga: true })}`).join('\n') });
+    const o = res.output || {};
+    const per = action.per_sempre === true;
+    const saltati = Array.isArray(o.saltati) ? o.saltati : (Array.isArray(action._saltati) ? action._saltati : []);
+    const restano = saltati.length ? `\nRestano dove sono:\n${busta(saltati.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+    if (res.needsConfirm) {
+      const f = Array.isArray(action._file) ? action._file : [];
+      const oltre = action._oltre > 0 ? `\nNe restano altri ${action._oltre} oltre a questi: si fanno con un'altra richiesta.` : '';
+      return `In attesa della conferma dell'utente: il sistema gli mostra cosa ${per ? 'sta per cancellare per sempre, senza cestino' : 'sta per spostare nel cestino'}:\n`
+        + `${busta(f.map((x) => x.percorso))}${restano}${oltre}\n`
+        + 'NON richiamare questa azione: la conferma è già in corso. Rispondi in una riga, senza dire di averlo già fatto.';
+    }
+    if (res.executed) {
+      const fatti = Array.isArray(o.eliminati) ? o.eliminati : [];
+      const f = Array.isArray(o.falliti) && o.falliti.length ? `\nNon riusciti:\n${busta(o.falliti.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+      return o.perSempre
+        ? `Cancellati per sempre, senza cestino:\n${busta(fatti)}${f}${restano}`
+        : `Spostati nel cestino del sistema (l'utente li ritrova lì e li rimette da lì; non dire che sono cancellati per sempre):\n${busta(fatti)}${f}${restano}`;
+    }
+    const f = Array.isArray(o.falliti) && o.falliti.length ? `\nNon riusciti:\n${busta(o.falliti.map((x) => `${x.nome}: ${x.perche}`))}` : '';
+    return `Niente cancellato: ${o.error || 'non è riuscito'}.${f}${restano}\nDillo all'utente in una riga; non ripetere l'azione uguale e non usare il terminale per cancellare.`;
   }
   if (type === 'NAVIGA' && res.output && res.output.blocked === 'site') {
     const sito = res.output.host || 'quel sito';
