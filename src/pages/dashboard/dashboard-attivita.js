@@ -1931,12 +1931,12 @@
         btn.disabled = false;
         btn.textContent = '🧹 Riordino non riuscito · riprova';
         btn.title = e.motivo;
-        pannelloSenzaEsito(a, chat, { motivo: e.motivo });
+        pannelloSenzaEsito(a, chat, { motivo: e.motivo, gruppo });
         return;
       }
       btn.textContent = `✓ ${e.testo}`;
       segnaConfermata(a, { archived: r.archived || 0 }, activity, null, { chat });
-      proseguiQuandoLibero(chat, voceDellaConferma(a));
+      proseguiQuandoLibero(chat, voceDellaConferma(a), gruppo, a);
     });
     return btn;
   }
