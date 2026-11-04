@@ -722,7 +722,12 @@
       aggiorna(true);
     }
     const iniziale = (a) => (/^(input|textarea)$/i.test(a.tagName) ? a.defaultValue || '' : '');
-    function onTocco(e) { ultimoTocco = bersaglio(e); }
+    // Il clic su «Crea» arriva col dialogo ancora aperto: l'ultimo momento per contare il nome nella pagina.
+    function onTocco(e) {
+      ultimoTocco = bersaglio(e);
+      if (inDialogo.size) fotografaDialoghi();
+    }
+    function onTasto(e) { if (e.key === 'Enter' && inDialogo.size) fotografaDialoghi(); }
     function onPrima(e) {
       if (!gesto(e)) return;
       const campo = campoDa(e);
