@@ -2564,6 +2564,10 @@
   }
 
   newBtn.addEventListener('click', () => api.tabs.open('filo://newtab/', 'pulsante_scheda'));
+  newBtn.addEventListener('contextmenu', (e) => {
+    e.preventDefault();
+    openNewTabContextMenu(e.clientX, e.clientY);
+  });
   backBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.back(a.id); });
   fwdBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.forward(a.id); });
   reloadBtn.addEventListener('click', () => { const a = activeTab(); if (a) api.tabs.reload(a.id); });
