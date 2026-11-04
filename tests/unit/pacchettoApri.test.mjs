@@ -208,15 +208,21 @@ test('i riferimenti agli allegati di una unita comprendono quelli della conversa
 test('le letture vere: allegati col documento e la conversazione, una conversazione che non si decifra ferma, una scansione a metà pure', async () => {
   const vero = globalThis.fetch;
   const viste = [];
-  const conversazione = (notes) => async (url) => {
+  const conversazione = (notes, noteFidate) => async (url) => {
     viste.push(String(url));
-    return { ok: true, status: 200, json: async () => ({ fields: { images: { arrayValue: { values: [{ stringValue: 'https://a/1' }] } }, notes: { stringValue: notes } } }) };
+    const fidate = noteFidate ? { noteFidate: { arrayValue: { values: noteFidate.map((s) => ({ stringValue: s })) } } } : {};
+    return { ok: true, status: 200, json: async () => ({ fields: { images: { arrayValue: { values: [{ stringValue: 'https://a/1' }] } }, notes: { stringValue: notes }, ...fidate } }) };
   };
   try {
-    globalThis.fetch = conversazione(TH.serializeAttachment({ kind: 'img', url: 'https://a/2' }));
+    const riga = TH.serializeAttachment({ kind: 'img', url: 'https://a/2' });
+    globalThis.fetch = conversazione(riga);
     const refs = await SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok');
-    assert.deepEqual(refs.map((a) => [a.url, a.conversazione]), [['https://a/1', false], ['https://a/2', true]]);
-    assert.match(viste[0], /feedback\/id812\?mask\.fieldPaths=images&mask\.fieldPaths=files&mask\.fieldPaths=notes$/, 'si chiedono solo i campi che servono');
+    assert.deepEqual(refs.map((a) => [a.url, a.conversazione, !!a.daAltri]), [['https://a/1', false, false], ['https://a/2', true, true]]);
+    assert.match(viste[0], /feedback\/id812\?mask\.fieldPaths=images&mask\.fieldPaths=files&mask\.fieldPaths=notes&mask\.fieldPaths=noteFidate$/, 'si chiedono solo i campi che servono');
+    // La nota che porta l'allegato l'ha scritta un biglietto pulito (#1919): l'allegato non è più «di altri».
+    globalThis.fetch = conversazione(riga, [await TH.improntaTurno(riga)]);
+    const pulite = await SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok');
+    assert.deepEqual(pulite.map((a) => [a.url, !!a.daAltri]), [['https://a/1', false], ['https://a/2', false]]);
     // Un cifrato che nessuna chiave apre: la prova non dipende da quale chiave ha la macchina che la lancia.
     globalThis.fetch = conversazione('FENC1:nessuna-chiave-lo-apre');
     await assert.rejects(SCRIPT.pacchetto.allegati({ id: 'id812', num: '812' }, 'tok'), (e) => e.definitivo === true && /la conversazione di #812 non si decifra/.test(e.message));
