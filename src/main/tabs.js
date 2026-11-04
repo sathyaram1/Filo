@@ -1677,6 +1677,13 @@ class TabManager {
     return this.riapri(SchedeChiuse.daArchivio(scelta.archivio), { activate: false });
   }
 
+  // La scheda aperta sulla stessa pagina di una chiusa: una chiusa già tornata non si riapre una seconda volta (#1686).
+  apertaCon(url) {
+    const pagina = (u) => String(u || '').split('#')[0];
+    const p = pagina(url);
+    return p ? this.tabs.find((t) => pagina(t.url) === p) || null : null;
+  }
+
   // Fa ripartire l'audio della scheda: la carica se era rinviata e preme play sul lettore fermo, anche dentro un
   // riquadro, finché la pagina non ne mostra uno o scade `tetto`. 'suona', 'nessuno' o 'bloccato' (rifiutato dalla pagina).
   async riprendiAudio(id, { tetto = 12_000 } = {}) {
