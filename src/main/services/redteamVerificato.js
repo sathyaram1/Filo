@@ -11,9 +11,16 @@ const SCADENZA_MS = 30 * 60_000;
 const RIPROVA_MS = 60_000;
 
 const copie = new Map();
+const ascoltatori = new Set();
 let leggi = null;
 let inCorso = null;
 let fallitaIl = 0;
+
+// Le schede già aperte tengono la loro copia: un cambio va detto a loro, non aspetta il loro tasto destro.
+function suCambio(fn) {
+  if (typeof fn === 'function') ascoltatori.add(fn);
+  return () => ascoltatori.delete(fn);
+}
 
 function chi() {
   if (!auth.isSignedIn()) return null;
