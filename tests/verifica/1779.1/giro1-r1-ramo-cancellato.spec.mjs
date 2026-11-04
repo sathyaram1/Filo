@@ -16,7 +16,6 @@ function commit(cwd, file, body) {
   git(cwd, 'commit', '-qm', file);
   return git(cwd, 'rev-parse', 'HEAD');
 }
-void dirname; void fileURLToPath;
 
 test('r1 ramo cancellato su origin: la cartella che lo ricorda non consegna il giro 2', () => {
   const base = cartellaTemporanea('filo-v1779-');
