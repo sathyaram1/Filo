@@ -27,14 +27,29 @@ function codiceMisuraRadice() {
     try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(this); } catch (_) { return []; } }`;
 }
 
-// Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno.
+// Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno. `sx`/`sy`:
+// quanto la pagina lo disegna più grande o più piccolo (transform), e le misure di dentro vanno in quella scala.
+// `storto`: ruotato, inclinato o capovolto, e una scala non basta a riportarle (#1721, giro 3).
 function misuraRiquadro(el) {
   const r = el.getBoundingClientRect();
-  const cs = el.ownerDocument.defaultView.getComputedStyle(el);
+  const win = el.ownerDocument.defaultView;
+  const cs = win.getComputedStyle(el);
   const pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
   const pr = parseFloat(cs.paddingRight) || 0, pb = parseFloat(cs.paddingBottom) || 0;
-  return { left: r.left + el.clientLeft + pl, top: r.top + el.clientTop + pt,
-    width: el.clientWidth - pl - pr, height: el.clientHeight - pt - pb };
+  const sx = el.offsetWidth > 0 ? r.width / el.offsetWidth : 1;
+  const sy = el.offsetHeight > 0 ? r.height / el.offsetHeight : 1;
+  let storto = false;
+  for (let n = el; n && n.nodeType === 1 && !storto; n = n.parentElement || (n.getRootNode() && n.getRootNode().host)) {
+    const s = win.getComputedStyle(n);
+    if ((s.rotate && s.rotate !== 'none') || (s.scale && /-/.test(s.scale))) { storto = true; break; }
+    if (!s.transform || s.transform === 'none') continue;
+    try {
+      const m = new win.DOMMatrixReadOnly(s.transform);
+      storto = !m.is2D || Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6 || m.a <= 0 || m.d <= 0;
+    } catch (_) { storto = true; }
+  }
+  return { left: r.left + (el.clientLeft + pl) * sx, top: r.top + (el.clientTop + pt) * sy,
+    width: (el.clientWidth - pl - pr) * sx, height: (el.clientHeight - pt - pb) * sy, sx, sy, storto };
 }
 
 // Il riquadro che contiene `figlio`, misurato nel documento che lo ospita: il genitore riconosce il mittente di
