@@ -820,8 +820,9 @@
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
+    // La frase nomina il tetto delle Preferenze, anche quando l'ultimo tentativo è partito con uno più basso.
+    const tetto = tettoProvato || maxTokens;
     const perTetto = causaTetto(res.status, errText, maxTokens || tettoProvato || 0);
-    const tetto = maxTokens || tettoProvato;
     if (perTetto && refusal !== 'PARAMS') {
       // Un host che nomina insieme strumenti e tetto («tools are not supported with max_tokens > 8192») lo dice la frase.
       err.code = perTetto.strumenti && tools ? 'NO_TOOL_HOST' : 'TETTO_RISPOSTA';
