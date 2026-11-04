@@ -41,6 +41,8 @@
 .rt-redeem { margin-top: 12px; max-width: 360px; }
 .rt-redeem label { margin-top: 10px; }
 .rt-redeem .sn-btn { margin-top: 14px; }
+.rt-redeem #redeemLascia { margin-left: 8px; }
+.rt-redeem #redeemLascia[hidden] { display: none; }
 .rt-redeem-msg {
   margin: 12px 0 0;
   font-size: 13px;

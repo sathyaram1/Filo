@@ -969,9 +969,35 @@
     }
 
     const redeemForm = $('redeemForm');
+    // Un accesso che aspetta un browser chiuso non spegne il riscatto (#1351): si torna alla pagina o si lascia stare,
+    // e l'esito di uno lasciato stare non parla più.
+    let accessoInAttesa = false;
+    let accessoN = 0;
+    function attesaAccesso(on) {
+      accessoInAttesa = on;
+      const btn = $('redeemBtn');
+      if (btn) { btn.disabled = false; btn.textContent = on ? 'Torna all\u2019accesso' : 'Verifica codice'; }
+      const lascia = $('redeemLascia');
+      if (lascia) lascia.hidden = !on;
+      const msg = $('redeemMsg');
+      if (msg && on) {
+        msg.hidden = false;
+        msg.textContent = 'Completa l\u2019accesso nella pagina di Google che si è aperta.';
+        msg.classList.remove('rt-redeem-msg--err', 'rt-redeem-msg--ok');
+      }
+    }
+    $('redeemLascia')?.addEventListener('click', () => {
+      send(MSG.AUTH_SIGNIN_LASCIA).catch(() => {});
+      accessoN++;
+      attesaAccesso(false);
+      const msg = $('redeemMsg');
+      if (msg) msg.hidden = true;
+    });
     if (redeemForm) {
       redeemForm.addEventListener('submit', async (e) => {
         e.preventDefault();
+        // Il main tiene un accesso solo: chiederlo di nuovo ne riporta davanti la pagina, e l'esito arriva alla prima richiesta.
+        if (accessoInAttesa) { Promise.resolve(send(MSG.AUTH_SIGNIN)).catch(() => {}); return; }
         const handle = ($('redeemHandle')?.value || '').trim();
         const code = ($('redeemCode')?.value || '').trim();
         const msg = $('redeemMsg');
@@ -980,12 +1006,12 @@
         // Da sloggato il codice non può legarsi a nessun account: prima accedi, poi riscatta nello
         // stesso gesto, così «dove inserire il codice» è chiaro fin da sloggati.
         if (!lastState.signedIn) {
-          if (msg) {
-            msg.hidden = false;
-            msg.textContent = 'Accesso in corso…';
-            msg.classList.remove('rt-redeem-msg--err', 'rt-redeem-msg--ok');
-          }
+          const n = ++accessoN;
+          attesaAccesso(true);
           const a = await send(MSG.AUTH_SIGNIN);
+          if (n !== accessoN) return;
+          attesaAccesso(false);
+          if (btn) btn.disabled = true;
           if (!a || !a.ok) {
             if (msg) {
               msg.hidden = false;

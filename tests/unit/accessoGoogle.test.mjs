@@ -275,3 +275,62 @@ test('riaprire il browser non allunga il tetto dei dieci minuti', async (t) => {
   t.mock.timers.tick(10 * 60 * 1000);
   assert.equal((await nuovo).code, 'scaduto');
 });
+
+// #1351 giro 1 — lo strumento da terminale con lo scambio fallito: la pagina dice il perché, non «completato».
+test('strumento da terminale, scambio fallito: la pagina dice il perché e non completato', async () => {
+  const loop = await _internals.startLoopback('stato-vero', { dove: 'terminale' });
+  const codice = loop.waitForCode();
+  const pagina = chiama(`${loop.redirectUri}/?code=c&state=stato-vero`);
+  assert.equal(await codice, 'c');
+  loop.concludi(new Error('scambio token Google fallito (503)'));
+  const r = await pagina;
+  assert.doesNotMatch(r.corpo, /completato/);
+  assert.match(r.corpo, /Il servizio di accesso non ha risposto/);
+  const fs = await import('node:fs');
+  const script = fs.readFileSync(new URL('../../scripts/admin-login.mjs', import.meta.url), 'utf8');
+  assert.match(script, /loop\.concludi\(e\)/);
+});
+
+// #1351 giro 1 — uno scambio che non finisce non lascia il browser a girare: dopo due minuti la pagina rimanda all'app.
+test('scambio che non finisce: dopo due minuti la pagina del browser risponde da sola', async (t) => {
+  t.mock.timers.enable({ apis: ['setTimeout'] });
+  const loop = await _internals.startLoopback('stato-vero');
+  const codice = loop.waitForCode();
+  const pagina = chiama(`${loop.redirectUri}/?code=c&state=stato-vero`);
+  assert.equal(await codice, 'c');
+  t.mock.timers.tick(2 * 60 * 1000);
+  const r = await pagina;
+  assert.match(r.corpo, /torna all&#39;app per sapere com&#39;è andato/);
+  loop.concludi();
+});
+
+// #1351 giro 1 — la richiesta frenata non si perde: la pagina si riapre allo scadere dei 10 secondi, una volta; dopo
+// «Lascia stare» il tentativo nuovo apre subito.
+test('una riapertura frenata arriva allo scadere dei 10 secondi, una volta per quante richieste', async (t) => {
+  orologioFinto(t);
+  const esiti = [auth.signIn().catch((e) => e)];
+  await finoA(() => aperture.length === 1);
+  t.mock.timers.tick(3000);
+  for (let i = 0; i < 5; i++) esiti.push(auth.signIn().catch((e) => e));
+  for (let i = 0; i < 20; i++) await giro();
+  assert.equal(aperture.length, 1);
+  t.mock.timers.tick(7000);
+  await finoA(() => aperture.length === 2);
+  for (let i = 0; i < 20; i++) await giro();
+  assert.equal(aperture.length, 2);
+  t.mock.timers.tick(10 * 60 * 1000);
+  for (const e of await Promise.all(esiti)) assert.equal(e && e.code, 'scaduto');
+});
+
+test('dopo «Lascia stare» un nuovo «Accedi» riapre subito la pagina dello stesso accesso', async (t) => {
+  orologioFinto(t);
+  const esiti = [auth.signIn().catch((e) => e)];
+  await finoA(() => aperture.length === 1);
+  t.mock.timers.tick(2000);
+  auth.lasciaStare();
+  esiti.push(auth.signIn().catch((e) => e));
+  await finoA(() => aperture.length === 2);
+  assert.equal(aperture[1], aperture[0]);
+  t.mock.timers.tick(10 * 60 * 1000);
+  for (const e of await Promise.all(esiti)) assert.equal(e && e.code, 'scaduto');
+});
