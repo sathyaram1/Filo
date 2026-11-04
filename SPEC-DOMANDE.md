@@ -218,7 +218,8 @@ lo può scrivere anche un agente pulito.
   `fiducia`.
 - `genitori: [id…]` sul feedback derivato.
 - `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
-- `noteFidate: [impronta…]` sul feedback (§ 1.2): lo SHA-256 esadecimale del
+- `noteFidate: [impronta… | !impronta…]` sul feedback (§ 1.2; `!` = turno
+  dell'owner registrato per chi non è fidato): lo SHA-256 esadecimale del
   turno sotto il suo marcatore, righe-allegato comprese, a capo in `\n` e senza
   spazi ai bordi. Lo calcola `improntaDelTurnoAggiunto` di
   `src/shared/feedbackThread.js` (note di prima e di dopo la scrittura) e lo
