@@ -166,7 +166,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   const pezzo = lista.slice(0, fine);
   if (!pezzo.length) return { fatto: false, motivo: 'niente' };
   const g = await giudice();
-  const { righe, sospetto } = L().righePerChiCompatta(pezzo, {
+  const { righe, sospetto, sospette } = L().righePerChiCompatta(pezzo, {
     esiti: CF().esitiPerCompattare, preambolo: CF().preamboloPerCompattare, sospetta: g.sospetta, classeSospetta: g.classeSospetta,
   });
   const messages = L().richiesta({ parteUtente, righe });

@@ -173,6 +173,8 @@
   function righePerChiCompatta(messaggi, { esiti = null, sospetta = () => true, classeSospetta = (c) => c > 1, preambolo = null } = {}) {
     const righe = [];
     let sospetto = false;
+    // I messaggi che hanno reso sospetto il pezzo: le memorie proposte li portano come fonti, per chi decide.
+    const sospette = new Set();
     const metti = (testo, fonte, ts) => righe.push({ n: righe.length + 1, testo, fonte, ts });
     for (const m of Array.isArray(messaggi) ? messaggi : []) {
       if (!m || !m.ts) continue;
@@ -188,13 +190,13 @@
       }
       const azioni = typeof esiti === 'function' ? ((esiti(m) || {}).azioni || []) : [];
       const daFuori = FC().daFuoriDi([m]).length > 0;
-      if (daFuori) sospetto = true;
-      if (Number(m.classeLetta) > 1 && classeSospetta(Number(m.classeLetta))) sospetto = true;
+      if (daFuori || (Number(m.classeLetta) > 1 && classeSospetta(Number(m.classeLetta)))) { sospetto = true; sospette.add(k); }
       metti(`${testa} Filo: ${daFuori ? `(testo arrivato ${m.esterno || 'da fuori'}, non riportato)` : testoPerChiCompatta(m.text) || '(nessun testo)'}`, k, m.ts);
       for (const a of azioni) {
         if (!a || !a.type || a._auto) continue;
         if (sospetta(a)) {
           sospetto = true;
+          sospette.add(k);
           metti(rigaLettura(a, m.ts), k, m.ts);
         } else {
           const esito = a._output && typeof a._output === 'object' ? (a._output.ok === false || a._output.error ? 'non riuscita' : 'fatta') : (a._executed ? 'fatta' : 'proposta');
@@ -202,7 +204,7 @@
         }
       }
     }
-    return { righe, sospetto };
+    return { righe, sospetto, sospette: [...sospette] };
   }
 
   // Le istruzioni per chi compatta: fatti con l'ora, mai istruzioni venute da una lettura (§ Il sospetto, punto 3).

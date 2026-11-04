@@ -80,15 +80,40 @@ test('una chat oltre la soglia compatta prima di rispondere: la richiesta sta so
   }
 });
 
+// Il listino di OpenRouter finto: ogni modello che l'app conosce, con un prezzo. Senza rete la stima direbbe solo che
+// il listino manca, e la prova non vedrebbe il collegamento fra modello scelto, prezzo e frase.
+const listinoFinto = (app) => app.evaluate(() => {
+  const ids = new Set();
+  const regs = [globalThis.SN_TEST_MODELS && globalThis.SN_TEST_MODELS.registry];
+  for (const r of regs) for (const v of Object.values(r || {})) if (v && v.model) ids.add(v.model);
+  const data = [...ids].map((id) => ({ id, pricing: { prompt: '0.000001', completion: '0.000005', input_cache_read: '0.0000001' } }));
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (input, init) => {
+    const url = String((input && input.url) || input);
+    if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
+      return new Response(JSON.stringify({ data: url.includes('output_modalities') ? [] : data }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }
+    return vero(input, init);
+  };
+});
+const STIMA = /^Circa [\d.,]+ \$ al mese con 600 messaggi .*\d+ s/;
+
 test('la soglia si cambia nelle Preferenze, con la stima accanto, e la chat la usa', async ({ app, openTab }) => {
+  await listinoFinto(app);
   const prefs = await openTab('filo://preferences/preferences.html');
   const campo = prefs.locator('#contestoSoglia');
   await expect(campo).toHaveAttribute('placeholder', '70000', { timeout: 10000 });
   await campo.fill('40000');
   await campo.blur();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.soglia), { timeout: 10000 }).toBe(40000);
-  // Senza listino in rete la frase lo dice; con il listino dice costo al mese e attesa.
-  await expect(prefs.locator('#contestoSogliaStima')).toHaveText(/(al mese.*\d+ s)|(listino)/, { timeout: 15000 });
+  // Col listino la frase dice costo al mese e attesa, coi prezzi del modello della chat.
+  await expect(prefs.locator('#contestoSogliaStima')).toHaveText(STIMA, { timeout: 15000 });
+  const piuAlta = await prefs.locator('#contestoSogliaStima').textContent();
+  await campo.fill('90000');
+  await expect(prefs.locator('#contestoSogliaStima'), 'la stima segue la soglia scritta').not.toHaveText(piuAlta, { timeout: 15000 });
+  await expect(prefs.locator('#contestoSogliaStima')).toHaveText(STIMA);
+  await campo.fill('40000');
+  await campo.blur();
   await prefs.locator('#sec-contesto').screenshot({ path: 'tests/.shots/compattazione-preferenze.png' });
   const tetti = await app.evaluate(async () => globalThis.SN_FILO_CONTESTO.tetti((await globalThis.SN_STORAGE.getSettings()).contestoFilo, null));
   expect(tetti.soglia).toBe(40000);
@@ -329,7 +354,8 @@ test('una domanda che da sola passa i 100.000 token parte intera, e la Cronologi
 });
 
 // La pagina dell'owner vuole un admin loggato: la configurazione condivisa è finta, la stima la dà il main vero.
-test('nei Modelli predefiniti l\'owner cambia la soglia di serie con la stima accanto, e il salvataggio la porta', async ({ openTab }) => {
+test('nei Modelli predefiniti l\'owner cambia la soglia di serie con la stima accanto, e il salvataggio la porta', async ({ app, openTab }) => {
+  await listinoFinto(app);
   const page = await openTab(GESTIONE);
   await page.addInitScript(() => {
     const config = () => ({
@@ -349,9 +375,43 @@ test('nei Modelli predefiniti l\'owner cambia la soglia di serie con la stima ac
   const campo = page.locator('#contestoSoglia');
   await expect(campo).toHaveValue('50000', { timeout: 10000 });
   await expect(campo).toHaveAttribute('placeholder', '70000');
-  await expect(page.locator('#contestoSogliaStima')).toHaveText(/(al mese.*\d+ s)|(listino)/, { timeout: 15000 });
+  await expect(page.locator('#contestoSogliaStima')).toHaveText(STIMA, { timeout: 15000 });
   await campo.fill('45000');
   await page.click('#saveBtn');
   await expect.poll(() => page.evaluate(() => (window.__mandati.at(-1) || {}).contestoFilo || null), { timeout: 10000 })
     .toEqual({ soglia: 45000 });
+});
+
+test('riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio compatta per la pausa', async ({ app }) => {
+  // L'app appena aperta non ha una richiesta precedente in memoria, come dopo un riavvio.
+  const page = await home(app);
+  const T = 30000;
+  const { soglia } = await app.evaluate(async (_e, T) => {
+    const FC = globalThis.SN_FILO_CONTESTO;
+    const b = FC.stimaToken(JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic());
+    // Una soglia che la richiesta non passa, nemmeno all'80% (niente compattazione in anticipo), col tratto oltre il 30%.
+    const soglia = Math.ceil((b + T + 6000) / 0.8 / 1000) * 1000;
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), soglia } });
+    const t0 = Date.now() - 3 * 60 * 60 * 1000;
+    for (let i = 0; i < 3; i++) {
+      await globalThis.SN_FILO_CHATS.append('vecchia9', { role: 'user', text: `Appunti ${i}: ${'il favo è fatto di cera. '.repeat(Math.ceil((T / 3) * 3.5 / 25))}`, ts: new Date(t0 + i * 60000).toISOString() });
+      await globalThis.SN_FILO_CHATS.append('vecchia9', { role: 'filo', text: 'Annotato.', ts: new Date(t0 + i * 60000 + 5000).toISOString() });
+    }
+    return { soglia };
+  }, T);
+  expect(T, 'il tratto è «grande»').toBeGreaterThan(0.3 * soglia);
+  await modelloFinto(app, [{ text: 'Bentornato.' }]);
+  await compattatoreFinto(app, RIGA);
+  try {
+    await chiedi(page, 'eccomi, riprendiamo');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Bentornato.' })).toBeVisible({ timeout: 20000 });
+    expect((await app.evaluate(() => globalThis.__compattazioni)).map((c) => c.motivo)).toEqual(['fermo']);
+    const [richiesta] = await chiamateAlModello(app);
+    expect(richiesta[0].content, 'la richiesta ha il diario al posto del tratto vecchio').toContain(RIGA);
+    expect(JSON.stringify(richiesta.slice(1))).not.toContain('il favo è fatto di cera');
+  } finally {
+    await rimettiCompattatore(app);
+    await ripristina(app);
+  }
 });
