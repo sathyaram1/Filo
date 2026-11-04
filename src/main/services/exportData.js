@@ -141,6 +141,10 @@ function costanti() {
   if (!globalThis.SN_CONST) require('../../shared/constants.js');
   return globalThis.SN_CONST;
 }
+function guardiano() {
+  if (!globalThis.SN_GUARDIANO_STATICO) require('../../shared/guardianoStatico.js');
+  return globalThis.SN_GUARDIANO_STATICO;
+}
 const campiSegreti = (settings) => costanti().campiSegreti(settings);
 const haSegreti = (storageData) => costanti().haSegreti(storageData && storageData.settings);
 
