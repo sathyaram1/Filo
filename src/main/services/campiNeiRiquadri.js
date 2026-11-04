@@ -165,11 +165,9 @@ function radiciChiuse(radice) {
   return { chiuse, riquadri };
 }
 
-// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se un campo segreto compilato sta
-// davvero in un componente chiuso (#810.18). Prima un conto che costa uguale con tre o tremila campi: i risultati
-// della ricerca del protocollo contro quelli che danno, contati dagli script di ogni riquadro, i campi, le scritte
-// «<input>» e gli attributi che la contengono. Il conto della pagina non deve mai superare il vero, o nasconderebbe
-// un campo chiuso: per questo conta solo ciò che la ricerca trova di sicuro, con le sue stesse regole.
+// L'albero intero di una pagina grande ferma Filo per secondi: si legge solo per un campo segreto compilato in un
+// componente chiuso (#810.18). Prima, a costo fisso, i risultati della ricerca del protocollo contro quelli che gli
+// script di ogni riquadro sanno contare con le sue regole: mai di più del vero, o nasconderebbe un campo chiuso.
 const CONTA_COME_LA_RICERCA = `(function () {
   var nomi = ['input', 'textarea'], n = 0;
   function conta(nodo) {
