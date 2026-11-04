@@ -147,8 +147,16 @@ I feedback arrivano spesso poco specificati. Il tuo lavoro è ricostruire
   cammini equivalenti (scorciatoia e menu) fanno la stessa cosa.
 - **Miglioramenti SENZA trade-off** (non costano servizi a pagamento, non
   complicano l'uso, non chiudono strade future): nel dubbio si fanno.
-- **Trade-off VERO** (velocità vs costo, semplicità vs potenza, dati
-  dell'utente, scelte di gusto): NON decidere tu, segnala all'owner.
+- **Trade-off di costo** (costo contro velocità, costo contro qualità): lo
+  decidi tu, coi numeri, senza chiedere. Il metodo sta in `filo_design.txt`
+  § GESTIONE DEI MODELLI: prezzi letti da OpenRouter al momento del lavoro, le
+  alternative confrontate diventano un'impostazione con la loro stima accanto,
+  tu scegli quella di partenza. Nel report all'owner una riga: la scelta di
+  partenza e dove stanno le alternative.
+- **Trade-off VERO**, quello che non si misura (dati dell'utente, gusto,
+  direzione di prodotto come semplicità contro potenza, un costo che non si
+  stima perché manca il dato: uso previsto ignoto, prezzo non disponibile):
+  NON decidere tu, segnala all'owner.
 
 Nel report: **elenca cosa hai aggiunto oltre il chiesto**, e **se hai fatto una
 cosa DIVERSA da quella chiesta dillo per primo, col perché** (anche per le

@@ -74,9 +74,12 @@ livello (un 2 nasce a 1: la 2 la mette solo il manutentore), e non ferma questo 
 suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
-rilievo chiede una decisione dell'owner: un trade-off vero, una scelta di
-prodotto o di gusto, e porta la sua domanda (più sotto). Un difetto non chiede
-decisioni.
+rilievo chiede una decisione dell'owner, su un trade-off che non si misura
+(prodotto, gusto, dati dell'utente, un costo senza il dato per stimarlo:
+CLAUDE.md § Iniziativa), e porta la sua
+domanda (più sotto). Non copre un trade-off di costo: deciso con la stima e le
+opzioni esposte non è un rilievo, altrimenti è un rilievo senza `?` (criteri
+di verifica, punto 8). Un difetto non chiede decisioni.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|
