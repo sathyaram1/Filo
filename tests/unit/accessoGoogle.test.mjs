@@ -1,5 +1,6 @@
 // #1086 — l'accesso con Google: il ritorno nel loopback lo decide solo lo state giusto, il consenso non si
 // ripropone a ogni accesso, e sul secondo computer (account già legato altrove) l'accesso riesce davvero.
+// #1351 — la pagina del ritorno dice l'esito vero, e le richieste a raffica non riaprono il browser né allungano il tetto.
 
 import { test, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
@@ -7,6 +8,17 @@ import { createRequire } from 'node:module';
 import http from 'node:http';
 
 const require = createRequire(import.meta.url);
+// Electron finto per signIn: nessuna finestra normale (l'accesso va nel browser) e un browser che registra le aperture.
+const aperture = [];
+const percorsoElectron = require.resolve('electron');
+require.cache[percorsoElectron] = {
+  id: percorsoElectron, filename: percorsoElectron, loaded: true,
+  exports: {
+    shell: { openExternal: async (u) => { aperture.push(String(u)); } },
+    net: { isOnline: () => true },
+    BrowserWindow: { getFocusedWindow: () => null, getAllWindows: () => [] },
+  },
+};
 const auth = require('../../src/main/auth/google-auth.js');
 const anon = require('../../src/main/auth/anon-auth.js');
 const cfg = require('../../src/main/auth/config.js');
@@ -212,4 +224,54 @@ test('un indirizzo malformato al ritorno riceve 400, senza errori sfuggiti', asy
     process.off('uncaughtException', spia);
   }
   assert.deepEqual(sfuggiti, []);
+});
+
+// #1132 — l'accesso che aspetta il browser: richieste ravvicinate, da qualunque mittente, aprono il browser una volta
+// ogni 10 secondi, e riaprirlo non allunga il tetto di dieci minuti.
+const giro = () => new Promise((r) => setImmediate(r));
+async function finoA(cond) {
+  for (let i = 0; i < 200 && !cond(); i++) await giro();
+  assert.ok(cond(), 'condizione mai arrivata');
+}
+function orologioFinto(t) {
+  aperture.length = 0;
+  t.mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.parse('2026-11-04T10:00:00Z') });
+  // Un accesso rimasto aperto da una prova rossa terrebbe vivo il server loopback: lo chiude il suo tetto.
+  t.after(() => t.mock.timers.tick(60 * 60 * 1000));
+}
+
+test('dieci richieste ravvicinate aprono il browser una volta sola', async (t) => {
+  orologioFinto(t);
+  const esiti = [];
+  for (let i = 0; i < 10; i++) esiti.push(auth.signIn().catch((e) => e));
+  await finoA(() => aperture.length >= 1);
+  for (let i = 0; i < 20; i++) await giro();
+  assert.equal(aperture.length, 1);
+  // Passati 10 secondi una nuova richiesta lo riapre, sulla stessa pagina.
+  t.mock.timers.tick(10_000);
+  esiti.push(auth.signIn().catch((e) => e));
+  await finoA(() => aperture.length === 2);
+  assert.equal(aperture[1], aperture[0]);
+  t.mock.timers.tick(10 * 60 * 1000);
+  for (const e of await Promise.all(esiti)) assert.equal(e && e.code, 'scaduto');
+});
+
+test('riaprire il browser non allunga il tetto dei dieci minuti', async (t) => {
+  orologioFinto(t);
+  const primo = auth.signIn().catch((e) => e);
+  await finoA(() => aperture.length === 1);
+  // Una riapertura a 9 minuti e mezzo: il tetto resta quello della prima richiesta.
+  t.mock.timers.tick(9.5 * 60 * 1000);
+  const riaperto = auth.signIn().catch((e) => e);
+  await finoA(() => aperture.length === 2);
+  t.mock.timers.tick(30 * 1000);
+  const [a, b] = await Promise.all([primo, riaperto]);
+  assert.equal(a && a.code, 'scaduto');
+  assert.equal(b && b.code, 'scaduto');
+  // Chiuso quell'accesso, la richiesta dopo ne apre uno nuovo, su un'altra pagina.
+  const nuovo = auth.signIn().catch((e) => e);
+  await finoA(() => aperture.length === 3);
+  assert.notEqual(aperture[2], aperture[0]);
+  t.mock.timers.tick(10 * 60 * 1000);
+  assert.equal((await nuovo).code, 'scaduto');
 });
