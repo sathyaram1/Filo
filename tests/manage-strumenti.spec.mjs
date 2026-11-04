@@ -92,10 +92,11 @@ test('la parola d’ordine di sessione nasce da Automazioni, si vede una volta c
   mkdirSync(SHOTS, { recursive: true });
   await page.locator('#mgAccessi').screenshot({ path: join(SHOTS, 'manage-strumenti-chiavi.png') });
 
-  // «Fatto» la toglie dal documento: non si rilegge più.
-  await page.locator('#mgChiaveFatto').click();
+  // Uscendo da Automazioni, come con «Fatto», la parola esce dal documento: tornando non si rilegge più.
+  await apriScheda(page, 'log');
+  await apriScheda(page, 'automation');
   await expect(page.locator('#mgChiaveNata')).toBeHidden();
-  expect(await page.evaluate(() => document.body.innerText.includes('pa-ro-la-123'))).toBe(false);
+  expect(await page.evaluate(() => document.documentElement.outerHTML.includes('pa-ro-la-123'))).toBe(false);
 
   // Revoca col secondo clic, sullo stesso tasto.
   const revoca = lista.locator('.mg-ac-riga[data-slug="pc-casa"] .mg-ac-revoca');
