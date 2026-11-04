@@ -800,7 +800,9 @@
     } catch (_) { return ''; }
   }
 
-  async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null } = {}) {
+  // `tettoProvato`: la richiesta è già il secondo tentativo, col tetto sceso o senza; se il router rifiuta ancora per i
+  // parametri, il tetto non c'entra. Sull'errore `tettoRetto` è il tetto con cui rifarla (vedi tettoDaRiprovare).
+  async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null, tettoProvato = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
