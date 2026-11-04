@@ -130,6 +130,26 @@ test('#810.16: il numero di carta ripetuto nell’anteprima della carta non si l
   expect(await pixelDelColore(app, immagine, ROSA), 'l’anteprima col numero si vede nella foto').toBeLessThan(20);
 });
 
+test('#810.16: l’anteprima coi gruppi di cifre sparsi sulla larghezza della carta disegnata non si legge nella foto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const gruppo = `<span style="background:${tinta(ROSA)};color:#fff">####</span>`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body>
+    <div style="width:380px;height:220px;border-radius:14px;background:#333;padding:24px;box-sizing:border-box">
+      <div id="numero" style="display:flex;justify-content:space-between;margin-top:90px;font:22px monospace">${gruppo.repeat(4)}</div></div>
+    <form><label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" style="width:280px;font-size:18px"></form>
+    <script>document.getElementById('c').addEventListener('input', (e) => {
+      const g = (e.target.value.replace(/\\D/g, '') + '################').slice(0, 16).match(/.{4}/g);
+      document.querySelectorAll('#numero span').forEach((s, i) => { s.textContent = g[i]; });
+    });</script></body></html>`);
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await expect(page.locator('#numero')).toContainText('4111');
+
+  const { immagine } = await chiediAllAiuto(app, shell, page);
+  expect(immagine, 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\/jpeg/);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nell’anteprima').toBeLessThan(20);
+});
+
 // La chat della seconda finestra: un giro chiede di guardare la prima, il secondo risponde. Il modello che legge
 // l'immagine tiene da parte quello che vede.
 async function chatCheGuarda(app, finestra) {
