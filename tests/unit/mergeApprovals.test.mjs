@@ -502,6 +502,29 @@ test('dopoIlConflitto: il lavoro di una routine si riallinea da solo, il resto d
   assert.ok(m.text.includes(UI.RIALLINEA_DA_SOLA));
 });
 
+// Chi non conosce la pratica (pagina da browser) non promette il riallineamento: Gestione potrebbe dirla ferma.
+test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il browser leggono la stessa frase', () => {
+  const ria = { origin: 'routine', feedbackId: 'x' };
+  assert.equal(UI.testoRiallineamento(ria, true), UI.RIALLINEA_DA_SOLA);
+  assert.match(UI.testoRiallineamento(ria, false), /non è andato: rimetti la sua pratica In coda/);
+  const ignoto = UI.testoRiallineamento(ria, null);
+  assert.notEqual(ignoto, UI.RIALLINEA_DA_SOLA);
+  assert.match(ignoto, /se in Gestione è ferma, rimettila In coda/);
+  // Chi non si riallinea da solo dice cosa fare, qualunque cosa si sappia della pratica.
+  for (const s of [true, false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s === true ? null : s), /npm run finish/);
+  assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
+  // Il quadrato di Gestione prende le stesse parole.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'domande.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'manageReview.js'));
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  const opts = { fusioni: { failed: [{ id: 'f', ...ria, used: true }] }, fusioniLette: true };
+  assert.ok(MR.livelloL5({ _id: 'x', status: 'revision_capability' }, opts).pannello.testo.includes(UI.RIALLINEA_DA_SOLA));
+  assert.ok(MR.livelloL5({ _id: 'x', status: 'design', statusReason: 'arenato' }, opts).pannello.testo.includes(UI.testoRiallineamento(ria, false)));
+  const senzaPratica = { fusioni: { failed: [{ id: 'g', origin: 'routine', feedbackId: 'y', num: '#5', used: true }] }, fusioniLette: true };
+  assert.ok(MR.livelloL5({ _id: 'y', seq: 5, status: 'todo' }, senzaPratica).pannello.testo.includes(UI.RIALLINEA_DA_SOLA));
+});
+
 test('etichettaRuolo: i ruoli delle routine in italiano, uno sconosciuto com’è', () => {
   assert.equal(UI.etichettaRuolo('secaudit'), 'Audit sicurezza');
   assert.equal(UI.etichettaRuolo('verifier'), 'Verifica');

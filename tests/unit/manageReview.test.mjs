@@ -1636,7 +1636,7 @@ test('fusione approvata e in conflitto, in riallineamento: non è una decisione 
   assert.match(f.titolo, /la routine lo riallinea/);
   const l5 = MR.livelloL5(fb, opts);
   assert.notEqual(l5.colore, MR.REASONS.attack.color);
-  assert.match(l5.pannello.testo, /la routine lo riallinea/);
+  assert.match(l5.pannello.testo, /torna da solo alla routine/);
   assert.equal(l5.richieste.length, 1, 'la scheda resta nel pannello');
   // Fuori dai Ricevuti (In coda) nessun segno, e la scheda non sale fra le decisioni.
   assert.equal(MR.manageTabFor(fb, opts), 'queue');
