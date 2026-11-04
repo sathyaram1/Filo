@@ -989,7 +989,7 @@
           if (!a || !a.ok) {
             if (msg) {
               msg.hidden = false;
-              msg.textContent = 'Accesso non riuscito. Riprova.';
+              msg.textContent = (a && typeof a.error === 'string' && a.error.trim()) || 'Accesso non riuscito: riprova.';
               msg.classList.remove('rt-redeem-msg--ok');
               msg.classList.add('rt-redeem-msg--err');
             }
