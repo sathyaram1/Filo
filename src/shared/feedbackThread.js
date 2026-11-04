@@ -243,6 +243,23 @@
     return String(s == null ? '' : s).split(A_CAPO_RE);
   }
 
+  // La sola divisione della conversazione in turni, col marcatore e le righe grezze (vuoti compresi): la usa chi mostra
+  // e chi decide di chi è un turno (la sede owner, scripts/lib/biglietto-locale.mjs). Il primo turno è senza marcatore.
+  function turniGrezzi(notes) {
+    const turni = [{ role: 'model', marcatore: '', ts: null, righe: [], allegati: [] }];
+    for (const line of righe(notes || '')) {
+      const m = USER_TURN_RE.exec(line) || MODEL_TURN_RE.exec(line);
+      if (m) turni.push({ role: USER_TURN_RE.test(line) ? 'user' : 'model', marcatore: line, ts: (m[1] || '').trim() || null, righe: [], allegati: [] });
+      else {
+        const att = parseAttachmentLine(line);
+        const t = turni[turni.length - 1];
+        if (att) t.allegati.push({ ...att, riga: line });
+        else t.righe.push(line);
+      }
+    }
+    return turni;
+  }
+
   // Spezza il blob `notes` nei suoi turni. Ritorna una lista di
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
