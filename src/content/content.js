@@ -708,7 +708,10 @@
     function scritto(area, base, campo) {
       if (!aree.has(area)) aree.set(area, base);
       if (aPiuRighe(area) || aPiuRighe(campo)) lunghe.add(area);
-      else digitati.set(area, essenziale(testo(area)));
+      else {
+        digitati.set(area, essenziale(testo(area)));
+        try { if (area.closest(DIALOGO)) inDialogo.add(area); } catch (_) {}
+      }
       aggiorna(true);
       aRiposo();
     }
