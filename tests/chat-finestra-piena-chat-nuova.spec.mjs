@@ -99,11 +99,14 @@ test('anche dopo un «Riprova» che sbatte di nuovo, «Chat nuova» rimette l\'i
     await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
     await page.locator('#input').fill('che posto è?');
     await page.locator('#sendBtn').click();
-    await page.locator('.dash-bubble-filo', { hasText: 'chat nuova' }).locator('button', { hasText: 'Riprova' }).click({ timeout: 40_000 });
     const errore = page.locator('.dash-bubble-filo', { hasText: 'chat nuova' });
+    await expect(errore).toBeVisible({ timeout: 40_000 });
+    const prima = await app.evaluate(() => globalThis.__richieste);
+    await errore.locator('button', { hasText: 'Riprova' }).click();
+    await expect.poll(() => app.evaluate(() => globalThis.__richieste), { timeout: 40_000 }).toBeGreaterThan(prima);
+    await expect(errore).toBeVisible({ timeout: 40_000 });
     await expect(errore).toHaveCount(1);
-    await expect.poll(() => app.evaluate(() => globalThis.__richieste), { timeout: 40_000 }).toBeGreaterThan(1);
-    await errore.locator('button', { hasText: 'Chat nuova' }).click({ timeout: 40_000 });
+    await errore.locator('button', { hasText: 'Chat nuova' }).click();
     await expect(page.locator('#input')).toHaveValue('che posto è?');
     await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1);
   } finally {
