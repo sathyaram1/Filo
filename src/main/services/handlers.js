@@ -6766,8 +6766,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (!finestra) return;
     const FC = globalThis.SN_FILO_CONTESTO;
     let caratteri = 0;
-    try { caratteri = FC.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) { return; }
-    const eccesso = FC.eccessoNellaFinestra({ finestra, caratteri: caratteri + caratteriStrumenti(), risposta: tettoRispostaChat, margine: FC.MARGINE_PAGINE });
+    try { caratteri = await caratteriRichiesta(); } catch (_) { return; }
+    const eccesso = FC.eccessoNellaFinestra({ finestra, caratteri, risposta: tettoRispostaChat, margine: FC.MARGINE_PAGINE });
     if (eccesso > 0 && eccesso <= altre) lasciaFuoriPagine(eccesso);
   };
   // Le pagine rimaste fuori a fine turno, per la frase sotto la risposta: non quelle rilette poi per intero.
