@@ -589,6 +589,7 @@
     CERCA_SALVATE: (n) => (n > 1 ? `cercato fra le pagine salvate ${n} volte` : 'cercato fra le pagine salvate'),
     APRI_SALVATA: (n) => (n > 1 ? `aperto ${n} pagine salvate` : 'aperto una pagina salvata'),
     RINOMINA_FILE: () => 'dato un nome ai file',
+    ELIMINA_FILE: () => 'tolto dei file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
@@ -704,7 +705,7 @@
   const RA = global.SN_RIGHE_ATTIVITA;
   const {
     pulito, FAILED_LABELS, rigaLetturaPagina, indirizzoLetto, rifiutataDallaRegola, sceltaContatori, sceltaAutonomia,
-    testoRicercaDocumenti, testoRinominati,
+    testoRicercaDocumenti, testoRinominati, testoEliminati,
   } = RA;
   const rigaAttivita = (a) => RA.riga(a);
   // Aspetta una risposta dell'utente, da un popup o dal pannello dell'azione: non è un'azione fallita, e il suo bottone resta.
@@ -1390,6 +1391,10 @@
     return box;
   }
 
+  function motivoNessunaEliminazione(o) {
+    const f = o && Array.isArray(o.falliti) && o.falliti[0];
+    return f && f.perche ? `Non cancellato: ${pulito(f.perche)}` : 'Non cancellato';
+  }
   function motivoNessunaRinomina(o) {
     const f = o && Array.isArray(o.falliti) && o.falliti[0];
     return f && f.perche ? `Non rinominati: ${f.perche}` : 'Non rinominati';
@@ -1509,7 +1514,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'ELIMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
@@ -1610,6 +1615,9 @@
         if (type === 'RINOMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
           if (r && r.executed) btn.after(bottoneRimettiNomi(a));
+        }
+        if (type === 'ELIMINA_FILE') {
+          btn.textContent = (r && r.executed) ? `✓ ${testoEliminati(r.output)}` : `✗ ${motivoNessunaEliminazione(r && r.output)}`;
         }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
