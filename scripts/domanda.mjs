@@ -56,6 +56,7 @@ const TESTO_SERVE = Object.freeze(['chiarimento', 'chiudi']);
 const DELLO_SMISTAMENTO = Object.freeze({
   mostra: { ammesse: [], servono: [] },
   guasto: { ammesse: ['chiave', 'titolo', 'testo', 'resoconto'], servono: ['chiave', 'titolo', 'testo', 'resoconto'] },
+  doppione: { ammesse: ['di', 'testo'], servono: ['di', 'testo'] },
   ricevuti: { ammesse: ['richiesta', 'testo'], servono: ['richiesta', 'testo'] },
   automatica: { ammesse: ['scelta', 'principio', 'testo'], servono: ['scelta', 'principio', 'testo'] },
   pubblica: { ammesse: [], servono: [] },
