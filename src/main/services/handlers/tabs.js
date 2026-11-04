@@ -142,7 +142,7 @@ module.exports = function register(on, ctx) {
         invioPagina: msg.invioPagina === true,
         pwPrima: msg.pwPrima === true,
         invioRiquadro: typeof msg.invioRiquadro === 'string' ? msg.invioRiquadro.slice(0, 4096) : '',
-        collegamento: typeof msg.collegamento === 'string' ? msg.collegamento : '',
+        collegamento: typeof msg.collegamento === 'string' ? msg.collegamento.slice(0, 256 * 1024) : '',
       }, sender.frame);
     }
     return { ok: true };
