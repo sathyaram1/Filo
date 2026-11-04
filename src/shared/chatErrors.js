@@ -477,7 +477,7 @@
   // `vuota`: il tetto è finito prima di una sola parola da mostrare, di solito nel ragionamento.
   function fraseTagliata(finishReason, { vuota = false } = {}) {
     if (finishReason === 'error') return 'il servizio AI si è fermato a metà della risposta, e un pezzo non basta a questa funzione. Riprova.';
-    return vuota
+    return vuota || finishReason === 'tetto_ragionamento'
       ? 'il modello ha speso tutta la lunghezza massima prima di scrivere la risposta, di solito ragionando: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.'
       : 'la risposta del modello ha raggiunto la lunghezza massima prima di finire, e un pezzo non basta a questa funzione: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.';
   }
