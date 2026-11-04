@@ -61,6 +61,24 @@ test('i testi sul guasto descrivono il fermo del solo lavoro, sbloccato dal manu
   assert.match(fermataSenzaDomanda('status', { status: 'design', reason: 'guasto' }), /arriva al manutentore, che sblocca il lavoro quando la causa è passata/);
 });
 
+// Chi smista una domanda o applica una risposta non ha ramo né fermo: il suo «dopo un guasto» sta nel pezzo comune e
+// basta, non in una copia del ruolo che contraddica quella comune.
+test('domande e risposte: cosa succede dopo un guasto è scritto una volta sola, nel pezzo comune', () => {
+  const pezzo = piatto(readFileSync(join(RUOLI, '_guasto-nel-rilascio.md'), 'utf8'));
+  assert.match(pezzo, /Una domanda da smistare o una risposta da applicare non hanno né ramo né fermo: tornano in coda da sé/);
+  for (const ruolo of ['risposta', 'smistamento']) {
+    const t = piatto(readRoleInstructions(ruolo, {}));
+    assert.equal(t.split(/torna(?:no)? in coda da sé/).length - 1, 1, `${ruolo}: il ritorno in coda dopo un guasto, detto una volta sola`);
+  }
+});
+
+// Fuori dai ruoli: la spec del canale e i commenti del canale non descrivono più il guasto come il giro che si ferma.
+test('spec e canale non contano più il guasto fra i freni del giro', () => {
+  const piattoCodice = (f) => readFileSync(join(ROOT, f), 'utf8').replace(/\/\/|\*/g, ' ').replace(/\s+/g, ' ');
+  assert.doesNotMatch(piattoCodice('ROUTINE-AUTH-SPEC.md'), /nessun guasto è stato dichiarato \(periodo di rispetto/);
+  assert.doesNotMatch(piattoCodice(join('scripts', 'routine-channel.mjs')), /il giro si deve fermare|questo giro non può lavorare/);
+});
+
 // La sentinella della spec: i modelli di guasto non hanno più «Riprendere quando…» come unica opzione, da nessuna parte.
 test('nessun pezzo di ruolo porta il modello di una domanda di guasto', () => {
   const file = readdirSync(RUOLI).filter((f) => f.endsWith('.md'));
