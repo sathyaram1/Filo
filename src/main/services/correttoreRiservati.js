@@ -211,10 +211,16 @@ function formeLibere(testo) {
   const forma = (v) => (G && G.sembraPassword && G.sembraPassword(pulito(v)) ? [{ valore: pulito(v) }] : []);
   const out = [];
   const utente = new RegExp(`^${UTENTE}$`, 'u');
-  for (const m of l.matchAll(LIBERE.coppia)) {
-    const [a, b] = [nomePw(m[1]), nomePw(m[2])];
-    if (a !== b && utente.test(a ? m[2] : m[1])) out.push(...valore(b ? m[4] : m[3]));
-  }
+  // Il nome della password si cerca largo: una parola scartata («per la password, è …») non deve coprire quella dopo.
+  const conNome = (re, ok, prendi) => {
+    const r = new RegExp(re.source, re.flags);
+    let m;
+    while ((m = r.exec(l))) {
+      if (ok(m)) prendi(m); else r.lastIndex = m.index + 1;
+    }
+  };
+  conNome(LIBERE.coppia, (m) => nomePw(m[1]) !== nomePw(m[2]) && utente.test(nomePw(m[1]) ? m[2] : m[1]),
+    (m) => out.push(...valore(nomePw(m[2]) ? m[4] : m[3])));
   for (const m of l.matchAll(LIBERE.credenziali)) out.push(...valore(m[2]));
   for (const m of l.matchAll(LIBERE.accesso)) out.push(...forma(m[2]));
   for (const m of l.matchAll(LIBERE.accedi)) out.push(...forma(m[2]));
