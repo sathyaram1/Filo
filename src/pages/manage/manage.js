@@ -5572,27 +5572,6 @@
     return n.status === 'design' && n.statusReason === 'secaudit';
   }
 
-  // Ogni esito del server detto in italiano. Uno che questo client non conosce si scrive
-  // grezzo: meglio grezzo che muto, e mai un «fatto» al posto di un guasto.
-  const SALTA_ESITI = {
-    fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
-    bloccato: { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' },
-    conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
-    ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
-    feedback_assente: { kind: 'err', text: 'Il server non trova questa segnalazione.' },
-    non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
-    non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
-    guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
-    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
-    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
-    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
-    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
-    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
-    // Il salto vale per la versione che verifica e audit hanno letto (#1040.1): niente fusione e niente richiesta.
-    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto, quindi non entra in main e non chiede il tuo via libera. Rimandala in lavorazione e un giro nuovo li leggerà.', giroNuovo: true },
-    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza quella il ramo non entra in main. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
-  };
-
   // Un esito che chiede un giro nuovo resta per pratica: la rilettura dopo l'esito ridisegna il pannello e
   // riproporrebbe il salto. Vale finché stato e audit sono quelli su cui il server ha risposto.
   const esitiSalta = new Map();
@@ -5650,12 +5629,13 @@
         const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
         if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
         // Bloccata senza richiesta: la pratica resta sul controllo di sicurezza, e il via libera sul quadrato non c'è (#1040).
+        // Il resto: le stesse frasi della pagina da browser; sul blocco del cancello conta lo stato della richiesta (#486).
         const m = (r.esito === 'bloccato' && !r.requestId)
-          ? { kind: 'err', text: 'Saltato, ma la richiesta per il tuo via libera non c’è. Il motivo è nella conversazione. Rilancia «Salta il controllo».' }
-          : SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+          ? { kind: 'err', text: 'Saltato, ma la richiesta di fusione non si è registrata: nessuna fusione è avvenuta. Il motivo è nella conversazione. Rilancia «Salta il controllo».' }
+          : window.SN_MERGE_APPROVALS.skipOutcomeMessage(r);
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
-        toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        toast(m.text, m.kind === 'ok' ? 'ok' : (m.kind === 'warn' ? '' : 'err'));
         if (m.giroNuovo) {
           esitiSalta.set(fb._id, { m, firma: firmaSalta(fb) });
           ridisegnaPannelloAperto();

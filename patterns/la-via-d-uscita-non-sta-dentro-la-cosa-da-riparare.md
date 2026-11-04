@@ -18,8 +18,10 @@ apposta, perché un'uscita d'emergenza che scavalca il muro è un buco nel muro.
 La strada giusta è stata una pagina statica raggiungibile da qualunque browser
 (`site/approvazioni`, pubblicata su Firebase Hosting del progetto) che:
 
-- accede con lo stesso account Google e chiama la stessa funzione del server
-  dell'app, che non distingue le due superfici e non concede niente di più;
+- accede con lo stesso account Google e chiama le stesse funzioni del server
+  dell'app, che non distinguono le due superfici e non concedono niente di più:
+  le fusioni ferme e, dal #489.2, «Salta il controllo» sulle bocciature del
+  controllo di sicurezza (un altro sì dell'owner che sblocca una pubblicazione);
 - disegna le stesse card dell'app, copiate dalla stessa sorgente da
   `scripts/build-approvazioni.mjs` (una sentinella pretende le copie allineate),
   così le due superfici non divergono;
