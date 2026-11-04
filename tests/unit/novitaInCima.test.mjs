@@ -152,7 +152,11 @@ function scena() {
   git(origin, ['init', '--bare', '-q', '--initial-branch=main']);
   git(work, ['init', '-q', '--initial-branch=main']);
   identita(work);
+  // Il default di Git for Windows, e la regola del repo vero che lo batte: senza, il rebase riscrive il registro a CRLF
+  // e il confronto è rosso solo su Windows (#2135).
+  git(work, ['config', 'core.autocrlf', 'true']);
   git(work, ['remote', 'add', 'origin', origin]);
+  scrivi(work, '.gitattributes', '* text=auto eol=lf\n');
   scrivi(work, '.gitignore', 'stato/\n.claude/\n');
   scrivi(work, 'package.json', '{\n  "name": "filo",\n  "version": "0.2.256"\n}\n');
   scrivi(work, FILE_NOVITA, sorgente([{ v: '0.2.257', features: ['Di main, in arrivo'] }, { v: '0.2.256', features: VECCHIE }]));
