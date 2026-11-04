@@ -152,6 +152,8 @@ function scena() {
   git(origin, ['init', '--bare', '-q', '--initial-branch=main']);
   git(work, ['init', '-q', '--initial-branch=main']);
   identita(work);
+  // Il default di Git for Windows: senza la regola del repo vero il rebase riscrive il registro a CRLF (#2135).
+  git(work, ['config', 'core.autocrlf', 'true']);
   git(work, ['remote', 'add', 'origin', origin]);
   scrivi(work, '.gitignore', 'stato/\n.claude/\n');
   scrivi(work, 'package.json', '{\n  "name": "filo",\n  "version": "0.2.256"\n}\n');
