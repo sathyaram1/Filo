@@ -117,7 +117,11 @@ function wireWindowCommon(win, tabs) {
 
   // Il menu a comparsa nasce con la barra pronta: il primo clic lo trova carico (#1090). Il setTimeout fa partire prima il ripristino delle schede.
   win.webContents.once('did-finish-load', () => {
-    setTimeout(() => { try { require('./popup-menu').preparaMenu(win); } catch (_) {} }, 0);
+    setTimeout(() => {
+      try { require('./popup-menu').preparaMenu(win); } catch (_) {}
+      // Il fumetto, uno per l'app, nasce con la prima barra pronta: il primo suggerimento è come i successivi (#871.4).
+      try { require('./popup-tooltip').preparaSuggerimento(win); } catch (_) {}
+    }, 0);
   });
 
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono

@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld('barra', {
   dentro: manda('barra:dentro'),
   fuori: manda('barra:fuori'),
   chiudi: manda('barra:chiudi'),
+  // Il lucchetto (#1431): il main scrive l'impostazione, la barra la riceve con lo stato.
+  lucchetto: manda('barra:lucchetto'),
   azione: manda('barra:azione'),
   sistema: manda('barra:sistema'),
   menu: manda('barra:menu'),

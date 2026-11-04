@@ -307,7 +307,7 @@ async function riquadri(app) {
       const leggi = (js) => w.webContents.executeJavaScript(js).catch(() => null);
       if (url === 'filo://shell/anteprima.html') {
         out.carta = { testo: await leggi("document.getElementById('titolo').textContent"), ...w.getBounds() };
-      } else if (url.startsWith('data:')) {
+      } else if (url === 'filo://src/renderer/fumetto.html') {
         const testo = await leggi("(document.getElementById('tip') || {}).textContent ?? null");
         if (testo != null) out.suggerimento = { testo, ...w.getBounds() };
       }
@@ -349,7 +349,7 @@ test('ogni controllo dentro la scheda ha il suo suggerimento di Filo, non il tit
   await app.evaluate(({ app: electronApp, BrowserWindow }) => {
     globalThis.__sopraLaCarta = 0;
     const segui = (w) => w.on('show', () => {
-      if (w.isDestroyed() || !w.webContents.getURL().startsWith('data:')) return;
+      if (w.isDestroyed() || w.webContents.getURL() !== 'filo://src/renderer/fumetto.html') return;
       if (BrowserWindow.getAllWindows().some((x) => !x.isDestroyed() && x.isVisible()
         && x.webContents.getURL() === 'filo://shell/anteprima.html')) globalThis.__sopraLaCarta++;
     });

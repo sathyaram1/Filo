@@ -62,7 +62,7 @@ html, body {
 .striscia:hover::before, .striscia.spinge::before, .striscia.bordo::before { opacity: 1; width: 4px; }
 /* Filo ha risposto a pannello chiuso o ridotto (#1432): accesa e ferma, piena d'accento, finché la risposta non si apre. */
 .striscia.risposta::before { opacity: 1; width: 4px; background: var(--accent); }
-/* Nascosta da Preferenze: il bordo resta vivo, e la striscia si accende solo mentre la si spinge o c'è una risposta. */
+/* Nascosta da Preferenze o a tutto schermo (#871.6): il bordo resta vivo, e si accende solo spinta o con una risposta. */
 html.senza-striscia .striscia:not(.spinge):not(.bordo):not(.risposta)::before { opacity: 0; }
 html.aperta .striscia { pointer-events: none; }
 html.aperta .striscia::before { opacity: 0; }
@@ -95,6 +95,19 @@ html.aperta .pannello {
   visibility: visible;
   transition: transform calc(var(--dur) * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
 }
+
+/* Bloccata accanto alla pagina (#1431): una colonna della finestra a tutta altezza, senza ombra né angoli. */
+html.accanto .pannello {
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  box-shadow: none;
+}
+/* Il lucchetto in cima, piccolo: chi non lo cerca legge prima le icone. */
+.testa { flex: none; display: flex; justify-content: center; padding: 0 0 2px; }
+.lucchetto { height: 24px; }
 
 .gruppo {
   display: flex;

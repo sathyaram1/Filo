@@ -2817,19 +2817,26 @@ class TabManager {
     return (this.chromeCompact ? this.tabRowHeight : this.shellHeight) + this.topInset;
   }
 
+  // Il posto della pagina: sotto la cornice, a destra della barra laterale bloccata che la spinge (#1431).
+  // Chi si allinea alla pagina legge i bounds della sua vista, non ricalcola.
+  _areaPagina() {
+    const [w, h] = this.win.getContentSize();
+    const top = this._altezzaCornice();
+    const x = Math.min(Math.max(0, w - 1), this.barra ? this.barra.spazio() : 0);
+    return { x, y: top, width: Math.max(0, w - x), height: Math.max(0, h - top) };
+  }
+
   layout() {
     const [w, h] = this.win.getContentSize();
     for (const tab of this.tabs) {
       if (tab.id === this.activeId) {
-        const top = this._altezzaCornice();
-        const b = { x: 0, y: top, width: w, height: Math.max(0, h - top) };
+        const b = this._areaPagina();
         tab.view.setBounds(b);
         if (process.env.FILO_SMOKE) {
           console.log(`[layout] tab ${tab.id.slice(0, 6)} active bounds`, JSON.stringify(b), 'win', w, 'x', h);
         }
       } else if (this.anteprime.inCattura(tab)) {
-        const top = this._altezzaCornice();
-        tab.view.setBounds({ x: 0, y: top, width: w, height: Math.max(0, h - top) });
+        tab.view.setBounds(this._areaPagina());
       } else {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }

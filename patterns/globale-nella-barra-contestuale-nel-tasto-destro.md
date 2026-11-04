@@ -46,6 +46,16 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   prima chiama `puntatoreCheSegue` (`tests/helpers/barra.mjs`): sennò il main
   legge il puntatore del sistema lontano e, se il pannello tarda a dire
   «dentro», chiude la barra appena aperta (#1216.2).
+- **A finestra staccata dal bordo dello schermo la fascia è una presa** (#1292).
+  Se subito a sinistra della finestra, all'altezza del puntatore, c'è ancora uno
+  schermo, il puntatore lì non si spinge contro niente: chi si ferma sulla fascia
+  sta per ridimensionare, e la spinta aspetta `ATTESA_STACCATA_MS` in più. Contro
+  il bordo dello schermo (o massimizzata) vale l'attesa scelta. Regola pura:
+  `staccataDalBordo` in `src/main/barraLaterale.js`. La spinta che vede la pagina
+  della barra conta l'attesa scelta: dove vale quella lunga decide la sonda.
+- **Bloccata, la barra nasce all'avvio**, a volte prima che la fila delle schede
+  si annunci: una prova che riavvia Filo bloccato apre la scheda dal main, non
+  dalla prima finestra.
 - **Il gruppo che scorre lo dice**: senza barra di scorrimento, sfuma dal lato
   dove ci sono altre icone, e l'icona appena arrivata si porta in vista.
 - **Tutto si regola** (Preferenze → Avanzate, a parole, tasto destro sulla
@@ -84,6 +94,22 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   si richiude con la barra; un'icona rilasciata sulla freccia chiusa va da parte,
   e durante un trascinamento la freccia c'è anche a cassetto vuoto. Il tasto
   destro su un'icona la sposta fra le due zone.
+- **Il lucchetto** (#1431, `barraLaterale.bloccata`, quindi anche in Preferenze
+  e a parole; tasto destro sul lucchetto, sul vuoto della barra, sulla striscia e
+  sulla linguetta; Ctrl+Alt+Shift+B): bloccata resta aperta e spinge la pagina.
+  Il posto della pagina lo dà una funzione sola, `_areaPagina` in
+  `src/main/tabs.js`, usata anche dalla riserva della nuova scheda; chi si
+  allinea alla pagina (avviso del sito, riquadri, conferme) legge i bounds della
+  sua vista. Accanto alla pagina la barra è una colonna della finestra: niente
+  ombra, vista larga quanto il pannello. Non si chiude da sola (uscita, clic e Esc
+  sulla pagina, una scelta fatta): `chiudi()` senza `forza` la lascia aperta e
+  rende la tastiera alla pagina; il tasto e la chat la chiudono lo stesso, e il
+  gesto dopo la riapre bloccata. A schermo intero vale da sbloccata (si chiude, e
+  torna uscendo), come il pannello di destra in una finestra stretta. Prova:
+  `tests/barra-laterale-lucchetto.spec.mjs`.
+- **Da ogni chat** (#1292): la home con `COMANDO_FINESTRA`, l'Aiuto con la sua
+  azione «shell»; i quattro comandi (apri, chiudi, blocca, sblocca) stanno in
+  `COMANDI_CHAT` e li esegue `comandoChat`.
 - **Esc chiude prima la barra, poi la modalità** ([Esc chiude prima il riquadro
   aperto, poi la modalità](esc-chiude-prima-il-riquadro-aperto-poi-la-modalita.md)):
   a schermo intero il primo Esc chiude la barra, il secondo esce.
@@ -142,6 +168,8 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
 - **Quello che l'utente sta usando non si muove sotto il puntatore quando la
   fila risale**: i menu e le finestrelle aperte dalla fila la tengono giù, e la
   barra laterale aperta sotto la fila resta dov'è finché non si chiude.
+- A schermo intero la striscia d'indizio è spenta come da Preferenze (#871.6,
+  D-11): sopra un film non resta una linea accesa; il bordo e il tasto aprono.
 - Si spegne con `barraLaterale.schede` (Preferenze, chat). Nelle prove il mouse
   va mosso con `page.mouse`: quello di `sendInputEvent` arriva col tasto sinistro
   premuto, e conta come una selezione (`tests/schermo-intero-schede.spec.mjs`).
@@ -198,7 +226,7 @@ porta fuori dal foglio e li riporta con un gesto; la chat è diventata l'Aiuto, 
   sulla pagina, barra di scorrimento compresa, chiude il pannello che non è bloccato.
 - **Due schermi**: il puntatore che passa sull'altro schermo è lontano, quello fermo negli ultimi pixel della finestra
   apre. La regola è la stessa del puntatore fermo, e vale anche per la barra di sinistra quando avrà il lucchetto
-  (#1431, che riusa le icone `lock` e `lockOpen`).
+  (#1431, con le icone `lock` e `lockOpen`).
 - **Il lucchetto** (`pannelloDestro.bloccato` nelle impostazioni, quindi anche in Preferenze e a parole): bloccato
   resta aperto e spinge il contenuto (`--pd-spinta`, che l'app aggiunge ai suoi margini: nell'Editor il foglio si
   stringe e la barra di scorrimento resta sul bordo); sbloccato si apre sopra il foglio senza spingerlo, così il testo

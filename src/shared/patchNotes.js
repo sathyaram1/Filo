@@ -9,6 +9,18 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.264', date: '2026-11-04',
+      features: [
+        { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },
+        { testo: 'Puoi aprire e chiudere la barra laterale chiedendolo a Filo da qualunque chat, anche dall\'Aiuto su una pagina.', segnalazione: 1292 },
+      ],
+      fixes: [
+        { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
+        { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
+        { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
+      ],
+    },
+    {
       version: '0.2.259', date: '2026-11-02',
       features: [
         { testo: 'In cima al menu del tasto destro c\'è una fila di icone con le azioni dell\'elemento che hai sotto il mouse: grassetto, corsivo, collegamento ed evidenziatore sul testo che scrivi, Traduci e Cerca sul testo di una pagina, Salva e Chiedi a Filo su un\'immagine. Il «+» tiene le altre, e le icone le sposti trascinandole, anche dalla barra laterale.', segnalazione: 1434 },

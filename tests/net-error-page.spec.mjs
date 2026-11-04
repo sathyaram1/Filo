@@ -123,8 +123,7 @@ test('renderer crashato: pagina d\'errore "scheda bloccata" invece del bianco', 
   // che ospita anche la shell).
   // SIGKILL al processo e non forcefullyCrashRenderer: il perché sta in tests/unit/chiusuraApp.test.mjs (#639).
   await app.evaluate(({ webContents, BrowserWindow }, target) => {
-    const shellWc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://shell/'));
-    const mainWin = BrowserWindow.fromWebContents(shellWc);
+    const mainWin = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito);
     const wc = webContents.getAllWebContents().find((w) =>
       w.getURL() === target && BrowserWindow.fromWebContents(w) === mainWin);
     if (!wc) throw new Error('webContents della scheda non trovato');

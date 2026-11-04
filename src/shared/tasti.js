@@ -311,6 +311,16 @@
     return String(ev.key || '').toLowerCase() === 'b';
   }
   function etichettaBarra(esplicita) { return etichetta(ACCEL_BARRA, esplicita); }
+  // Il lucchetto della barra (#1431): lo stesso tasto con Alt in più. Su Mac Opzione con Cmd non scrive accenti.
+  const ACCEL_LUCCHETTO_BARRA = 'Ctrl+Alt+Shift+B';
+  function comandoLucchettoBarra(ev) {
+    if (!ev || !modificatore(ev, 'alt') || !modificatore(ev, 'shift')) return false;
+    if (!(modificatore(ev, 'ctrl') || modificatore(ev, 'meta'))) return false;
+    const code = String(ev.code || '');
+    if (code) return code === 'KeyB';
+    return String(ev.key || '').toLowerCase() === 'b';
+  }
+  function etichettaLucchettoBarra(esplicita) { return etichetta(ACCEL_LUCCHETTO_BARRA, esplicita); }
 
   // ── Il pannello di destra delle app di Filo (#1433) ───────────────────────
   // Ctrl+\ era già il tasto che nell'Editor mostrava e nascondeva gli strumenti: ora li apre dal bordo destro in
@@ -426,6 +436,7 @@
     ['Alt+\u2190', 'torna alla pagina precedente'], ['Alt+\u2192', 'va alla pagina successiva'],
     // La barra laterale (src/main/barraLaterale.js), da qualunque vista abbia il fuoco.
     [ACCEL_BARRA, 'apre e chiude la barra laterale'],
+    [ACCEL_LUCCHETTO_BARRA, 'tiene aperta la barra laterale accanto alla pagina, o la sblocca'],
   ];
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
@@ -1046,7 +1057,7 @@
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
     indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
-    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
+    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoLucchettoBarra, etichettaLucchettoBarra, ACCEL_LUCCHETTO_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,

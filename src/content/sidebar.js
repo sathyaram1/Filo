@@ -1463,7 +1463,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // Output speciale: comando della shell di Filo (icone della barra in alto).
       // Eseguito in autonomia, senza coinvolgere l'utente. "close" è escluso.
       if (obj.action === 'shell' && typeof obj.command === 'string') {
-        const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
+        const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize', 'sidebar', 'sidebar_close', 'sidebar_lock', 'sidebar_unlock'];
         const cmd = obj.command.trim().toLowerCase();
         if (allowed.includes(cmd)) {
           return {

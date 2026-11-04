@@ -81,13 +81,13 @@ test('la shell, normale e in incognito, gira in sandbox e risponde', async ({ ap
 
 test('il fumetto dei pulsanti mostra il testo e prende la sua misura senza Node', async ({ app, shell }) => {
   await shell.evaluate(() => window.filoShell.tooltipShow('Indietro', 40, 40));
-  const fumetto = await aspettaFinestra(app, (w) => w.url().startsWith('data:text/html') && w.url().includes('fumetto'), 'il fumetto non è nato');
+  const fumetto = await aspettaFinestra(app, (w) => w.url() === 'filo://src/renderer/fumetto.html', 'il fumetto non è nato');
   await expect(fumetto.locator('#tip')).toHaveText('Indietro');
-  expect(await preferenze(app, { inizia: 'data:text/html', contiene: 'fumetto' })).toEqual(SANDBOX);
+  expect(await preferenze(app, { url: 'filo://src/renderer/fumetto.html' })).toEqual(SANDBOX);
   expect(await fumetto.evaluate(() => ({ require: typeof require, process: typeof process }))).toEqual({ require: 'undefined', process: 'undefined' });
   // La misura torna al main: la finestra lascia i 200 px di partenza per stare intorno alla scritta.
   await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL().startsWith('data:text/html') && x.webContents.getURL().includes('fumetto'));
+    const w = BrowserWindow.getAllWindows().find((x) => x.webContents.getURL() === 'filo://src/renderer/fumetto.html');
     return w ? w.getBounds().width : 0;
   })).toBeLessThan(200);
 });

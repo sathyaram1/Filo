@@ -238,7 +238,8 @@ module.exports = function register(on, ctx) {
     // in alto). "close" è ESCLUSO di proposito: l'AI non chiude finestra né
     // schede. Inoltriamo alla shell, che clicca il bottone reale, così si
     // riusa tutto il comportamento esistente (menu ancorati, toggle finestra…).
-    const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
+    const { COMANDI_CHAT } = require('../../barraLaterale');
+    const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize', ...Object.keys(COMANDI_CHAT)];
     const command = String(msg.command || '').trim().toLowerCase();
     if (!allowed.includes(command)) {
       return { ok: false, error: `comando shell non consentito: "${command}"` };
@@ -252,6 +253,13 @@ module.exports = function register(on, ctx) {
       return r;
     };
     if (!win) return nelFilo({ ok: false, error: 'nessuna finestra' });
+    // La barra laterale non è un bottone della shell: la comanda il main, e il lucchetto entra nel filo dell'Aiuto (#1292).
+    if (COMANDI_CHAT[command]) {
+      const barra = win._filoTabs && win._filoTabs.barra;
+      if (!barra) return nelFilo({ ok: false, error: 'nessuna barra laterale' });
+      await require('../registroCambi').con({ via: dellAiuto ? 'assistente' : 'interfaccia' }, () => barra.comandoChat(command));
+      return nelFilo({ ok: true });
+    }
     const anchor = isFilo(origin) ? ancoraNellaFinestra(win, sender && sender.wc, msg.anchor) : null;
     try { win.webContents.send('shell:trigger-button', anchor ? { command, anchor } : { command }); }
     catch (_) { return nelFilo({ ok: false, error: 'invio alla shell fallito' }); }

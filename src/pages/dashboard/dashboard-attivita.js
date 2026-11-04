@@ -984,7 +984,8 @@
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
-        sidebar: 'Barra laterale aperta', aiuto: 'Aiuto aperto',
+        sidebar: 'Barra laterale aperta', sidebar_close: 'Barra laterale chiusa',
+        sidebar_lock: 'Barra laterale bloccata aperta', sidebar_unlock: 'Barra laterale sbloccata', aiuto: 'Aiuto aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       // La home chiesta dalla home non ricarica niente (butterebbe via lavoro e

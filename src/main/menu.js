@@ -194,6 +194,11 @@ function barraLaterale(_voce, _win, ev) {
   try { win && win._filoTabs.barra.commuta('tasto', viaMenu(ev)); } catch (_) {}
 }
 
+function lucchettoBarra() {
+  const win = finestra();
+  try { if (win) win._filoTabs.barra.blocca(!win._filoTabs.barra.opzioni.bloccata); } catch (_) {}
+}
+
 // Il pannello degli strumenti dell'app davanti (#1433): il tasto lo ascolta la scheda, così sui siti resta loro.
 function pannelloStrumenti() {
   const win = finestra();
@@ -332,6 +337,7 @@ function template(piattaforma) {
       // Il tasto abituale di ogni sistema (F11, su Mac Control+Cmd+F): lo ascolta src/main/shortcuts.js ovunque.
       { label: 'Schermo intero', accelerator: globalThis.SN_TASTI.etichettaSchermoIntero(MAC ? 'darwin' : 'win32'), click: schermoIntero, ...SOLO_SCRITTA },
       { label: 'Barra laterale', accelerator: 'CommandOrControl+Shift+B', click: barraLaterale, ...SOLO_SCRITTA },
+      { label: 'Tieni aperta o sblocca la barra laterale', accelerator: tasto(globalThis.SN_TASTI.ACCEL_LUCCHETTO_BARRA), click: lucchettoBarra, ...SOLO_SCRITTA },
       { label: 'Pannello degli strumenti', accelerator: tasto('Ctrl+\\'), click: pannelloStrumenti, registerAccelerator: false },
     ],
   };
