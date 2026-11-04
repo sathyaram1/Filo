@@ -161,7 +161,7 @@
       const daFuori = FC().daFuoriDi([m]).length > 0;
       if (daFuori) sospetto = true;
       if (Number(m.classeLetta) > 1 && classeSospetta(Number(m.classeLetta))) sospetto = true;
-      metti(`${testa} Filo: ${daFuori ? `(testo arrivato ${m.esterno || 'da fuori'}, non riportato)` : String(m.text || '').trim() || '(nessun testo)'}`, k, m.ts);
+      metti(`${testa} Filo: ${daFuori ? `(testo arrivato ${m.esterno || 'da fuori'}, non riportato)` : testoPerChiCompatta(m.text) || '(nessun testo)'}`, k, m.ts);
       for (const a of azioni) {
         if (!a || !a.type || a._auto) continue;
         if (sospetta(a)) {
