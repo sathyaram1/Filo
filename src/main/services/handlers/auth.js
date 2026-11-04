@@ -729,7 +729,97 @@ module.exports = function register(on, ctx) {
       .map((f) => ({ giorno: String(f.giorno), testo: f.testo, at: typeof f.at === 'string' ? f.at : null }));
     const s = stato.status === 'fulfilled' && stato.value && stato.value.ok !== false ? stato.value : null;
     const intero = (v) => (Number.isInteger(v) ? v : null);
-    return { ok: true, recap: fogli, stato: s ? { parallelismo: intero(s.parallelismo), parallelismoEffettivo: intero(s.parallelismoEffettivo), freno: intero(s.freno) } : null };
+    const ordine = s && Array.isArray(s.ordine) ? s.ordine.map(String) : null;
+    return { ok: true, recap: fogli, stato: s ? { parallelismo: intero(s.parallelismo), parallelismoEffettivo: intero(s.parallelismoEffettivo), freno: intero(s.freno), ordine } : null };
+  }));
+
+  // Gli strumenti dell'owner che vivevano solo da terminale col token admin (#1926). Il main fa da tramite e rifà i
+  // controlli della pagina (src/shared); l'ultima parola resta al server, che li riserva al token dell'owner.
+  async function chiamaOwner(nome, data, { cosa, nonAncora } = {}) {
+    try {
+      const r = await callSecurityFunction(nome, data);
+      if (r && r.ok === false) return { ok: false, error: String(r.detail || r.message || r.reason || 'Il server ha rifiutato.') };
+      return { ok: true, r: r || {} };
+    } catch (e) {
+      return { ok: false, error: erroreOwner(e, { cosa, nonAncora }) };
+    }
+  }
+
+  on(MSG.MANUTENTORE_ORDINE_SET, ownerOnly(async (msg) => {
+    const grezzo = Array.isArray(msg?.ordine) ? msg.ordine.join(',') : '';
+    let ordine = [];
+    if (grezzo.trim()) {
+      const v = globalThis.SN_MANUTENTORE_ORDINE.leggiOrdine(grezzo);
+      if (!v.ok) return { ok: false, error: v.motivo };
+      ordine = v.numeri;
+    }
+    const x = await chiamaOwner('ownerManutentore', { op: 'ordine', ordine }, {
+      cosa: 'L’ordine del manutentore',
+      nonAncora: 'Il server non sa ancora prendere l’ordine da qui: arriva col prossimo aggiornamento del server.',
+    });
+    if (!x.ok) return x;
+    return { ok: true, ordine: Array.isArray(x.r.ordine) ? x.r.ordine.map(String) : ordine };
+  }));
+
+  const CHIAVI_NON_ANCORA = 'Il server non conosce ancora questa operazione sulle parole d’ordine: arriva col prossimo aggiornamento del server.';
+  on(MSG.ROUTINE_CHIAVI_ELENCO, ownerOnly(async () => {
+    const x = await chiamaOwner('routineKeys', { op: 'list' }, { cosa: 'Le parole d’ordine' });
+    if (!x.ok) return x;
+    return { ok: true, keys: globalThis.SN_ROUTINE_CHIAVI.ordina(x.r.keys) };
+  }));
+  on(MSG.ROUTINE_CHIAVE_CREA, ownerOnly(async (msg) => {
+    const v = globalThis.SN_ROUTINE_CHIAVI.validaNuova(msg);
+    if (!v.ok) return { ok: false, error: v.testo };
+    const x = await chiamaOwner('routineKeys', Object.assign({ op: 'issue' }, v.dati), { cosa: 'Le parole d’ordine', nonAncora: CHIAVI_NON_ANCORA });
+    if (!x.ok) return x;
+    const passphrase = typeof x.r.passphrase === 'string' ? x.r.passphrase : '';
+    if (!passphrase) return { ok: false, error: 'Il server non ha restituito la parola d’ordine.' };
+    return { ok: true, slug: String(x.r.slug || v.dati.slug), scope: String(x.r.scope || v.dati.scope), passphrase };
+  }));
+  on(MSG.ROUTINE_CHIAVE_REVOCA, ownerOnly(async (msg) => {
+    const slug = String(msg?.slug || '').trim();
+    if (!slug) return { ok: false, error: 'Manca la parola d’ordine da revocare.' };
+    const x = await chiamaOwner('routineKeys', { op: 'revoke', slug }, { cosa: 'Le parole d’ordine' });
+    return x.ok ? { ok: true } : x;
+  }));
+  on(MSG.ROUTINE_CHIAVE_IMPOSTA, ownerOnly(async (msg) => {
+    const v = globalThis.SN_ROUTINE_CHIAVI.validaImpostazione(msg);
+    if (!v.ok) return { ok: false, error: v.testo };
+    const x = await chiamaOwner('routineKeys', v.dati, { cosa: 'Le parole d’ordine', nonAncora: CHIAVI_NON_ANCORA });
+    return x.ok ? { ok: true } : x;
+  }));
+
+  on(MSG.ROUTINE_CHIUSURA_GET, ownerOnly(async () => {
+    const CH = globalThis.SN_ROUTINE_CHIUSURA;
+    const cosa = 'La domanda di fine sessione';
+    const [domande, risposte] = await Promise.all([
+      chiamaOwner('routineClosingAdmin', { op: 'get' }, { cosa }),
+      chiamaOwner('routineClosingAdmin', { op: 'answers', limit: 50 }, { cosa }),
+    ]);
+    if (!domande.ok) return domande;
+    const out = Object.assign({ ok: true, risposte: risposte.ok ? CH.vociRisposte(risposte.r) : [] }, CH.domandeImpostate(domande.r));
+    if (!risposte.ok) out.erroreRisposte = risposte.error;
+    return out;
+  }));
+  on(MSG.ROUTINE_CHIUSURA_SET, ownerOnly(async (msg) => {
+    const slot = String(msg?.slot || '').trim();
+    if (!globalThis.SN_ROUTINE_CHIUSURA.slotValido(slot)) return { ok: false, error: `«${slot || 'vuoto'}» non è uno slot: ${globalThis.SN_ROUTINE_CHIUSURA.SLOT.join(', ')} o compito:<ricorrente>.` };
+    const testo = typeof msg?.testo === 'string' ? msg.testo.trim() : '';
+    const data = testo ? { op: 'set', slot, text: testo } : { op: 'clear', slot };
+    const x = await chiamaOwner('routineClosingAdmin', data, { cosa: 'La domanda di fine sessione' });
+    return x.ok ? { ok: true } : x;
+  }));
+
+  // Lo storico dei giri (#795) lo legge solo l'owner, da qui: nessuna regola Firestore lo apre a un client.
+  on(MSG.STORICO_GIRI_GET, ownerOnly(async (msg) => {
+    const da = Number(msg?.da); const a = Number(msg?.a);
+    if (!Number.isFinite(da) || !Number.isFinite(a) || a <= da) return { ok: false, error: 'La fine della finestra deve venire dopo l’inizio.' };
+    const x = await chiamaOwner('routineStateAdmin', { op: 'giri', da, a }, {
+      cosa: 'Lo storico dei giri',
+      nonAncora: 'Il server non ha ancora lo storico dei giri: arriva col prossimo aggiornamento del server.',
+    });
+    if (!x.ok) return x;
+    return { ok: true, lavori: Array.isArray(x.r.lavori) ? x.r.lavori : [], troncato: x.r.troncato === true };
   }));
 
   // I numeri dell'owner sui crediti delle routine (#1356): il main fa da tramite verso ownerCrediti e rifà i
