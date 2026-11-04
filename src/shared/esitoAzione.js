@@ -30,6 +30,13 @@
     return FATTO;
   }
 
+  // Partita e finita male (un comando uscito con errore): non si racconta come «non eseguita».
+  function partita(a) {
+    const o = a && a._output;
+    return !!o && String(a.type || '').toUpperCase() === 'ESEGUI_COMANDO' && !o.blocked && !o.no
+      && (o.timedOut === true || (typeof o.code === 'number' && o.code !== 0));
+  }
+
   // Un esito che il riassunto può nominare. «Conferma chiesta» e i fallimenti
   // hanno la loro riga nel diario, ma in cima non si contano: «Ha cambiato
   // un'impostazione» su un'impostazione non cambiata è una bugia.
