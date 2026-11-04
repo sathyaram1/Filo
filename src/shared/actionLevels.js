@@ -273,6 +273,35 @@
     return t;
   }
 
+  const perSempre = (a) => !!(a && a.per_sempre === true);
+  // Nomi e cartelle vengono dal disco: stanno nei riquadri, una voce per elemento.
+  function descriviEliminazione(a) {
+    const file = (Array.isArray(a && a._file) ? a._file : []).filter((f) => f && f.nome);
+    const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
+    const per = perSempre(a);
+    const dentro = (f) => (f.tipo !== 'cartella' ? ''
+      : (f.dentro > 0 ? ` (una cartella, con ${f.oltre ? 'più di ' : ''}${f.dentro} ${f.dentro === 1 ? 'elemento' : 'elementi'} dentro)` : ' (una cartella vuota)'));
+    let t;
+    if (!file.length) t = [per ? 'Cancellare per sempre dei file' : 'Spostare dei file nel cestino'];
+    else if (file.length === 1) {
+      const f = file[0];
+      t = [per ? 'Cancellare per sempre ' : 'Spostare nel cestino ', cit(nomeLeggibile(f.nome)), `${dentro(f)}?`,
+        ...(f.cartella ? ['\nNella cartella:\n', cit(f.cartella, true)] : [])];
+    } else {
+      t = [`${per ? 'Cancellare per sempre' : 'Spostare nel cestino'} questi ${file.length} elementi?\n`,
+        elenco(file.map((f) => `${f.percorso || nomeLeggibile(f.nome)}${dentro(f)}`))];
+    }
+    if (saltati.length) {
+      t.push('\n\nRestano dove sono:\n', elenco(saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`)));
+    }
+    if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
+    const uno = file.length <= 1;
+    t.push(per
+      ? `\n\nNon ${uno ? 'passa' : 'passano'} dal cestino: non si ${uno ? 'potrà' : 'potranno'} più recuperare.`
+      : `\n\n${uno ? 'Lo ritrovi' : 'Li ritrovi'} nel cestino, se ${uno ? 'vuoi rimetterlo' : 'vuoi rimetterli'} al suo posto.`);
+    return t;
+  }
+
   const REGISTRY = {
     NAVIGA: {
       // Aprire un link è di norma innocuo → costo 1, diretto. ECCEZIONE
