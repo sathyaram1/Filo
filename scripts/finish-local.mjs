@@ -308,6 +308,15 @@ export function provaFusione(base, root = ROOT) {
   return leggiMergeTree(r.status, r.stdout);
 }
 
+// Le prove nell'app di una decisione presa in un file col nome di un altro: per nome restavano fuori, e una modifica a
+// cosa chiede un livello arrivava rossa su main (#600.1 il registro, #600.2 il punto del main che lo applica).
+const PROVE_AUTONOMIA = ['autonomia', 'filo-action-levels'];
+export const PROVE_DI_CHI_DECIDE = new Map([
+  ['src/shared/actionLevels.js', PROVE_AUTONOMIA],
+  ['src/shared/autonomia.js', PROVE_AUTONOMIA],
+  ['src/main/services/handlers.js', PROVE_AUTONOMIA],
+]);
+
 /**
  * Gli spec Playwright che toccano le aree modificate dal branch. Puro.
  *
@@ -327,10 +336,6 @@ export function provaFusione(base, root = ROOT) {
  * minuti, non le quasi sette ore della suite intera sulla macchina di chi
  * sviluppa Filo.
  */
-// Un file che decide il comportamento di un'area col nome di un altro: senza, il registro dei costi cambiava cosa
-// chiede ogni livello di autonomia e lo spec dell'autonomia restava fuori, rosso su main (#600.1).
-const AREE_DECISE_DA = new Map([['actionlevels', ['autonomia']]]);
-
 export function specsForChangedFiles(changed, tracked) {
   const files = Array.isArray(changed) ? changed : [];
   const specs = new Set();
@@ -369,10 +374,9 @@ export function specsForChangedFiles(changed, tracked) {
     // servizi non lanciavano niente pur avendo uno spec col loro stesso nome
     // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
-    if (n) {
-      aggiungi(n[1]);
-      for (const decisa of AREE_DECISE_DA.get(n[1].toLowerCase()) || []) aggiungi(decisa);
-    }
+    if (n) aggiungi(n[1]);
+    // Per nome esatto: come area, `filo-action-levels` si porterebbe dietro tutti gli spec `filo-*`.
+    for (const prova of PROVE_DI_CHI_DECIDE.get(f) || []) esatte.add(prova);
     // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
     // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
     if (f.startsWith('tests/') && !f.startsWith('tests/verifica/') && f.endsWith('.spec.mjs')) {
