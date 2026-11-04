@@ -2112,7 +2112,7 @@
           scelte.forEach((x) => { x.box.disabled = false; });
           etichetta();
           note.textContent = 'Eliminazione non riuscita: l’archivio è com’era. Riprova.';
-          pannelloSenzaEsito(a, chat, { motivo: 'l’archivio è rimasto com’era' });
+          pannelloSenzaEsito(a, chat, { motivo: 'l’archivio è rimasto com’era', gruppo });
           return;
         }
         const removed = res.removed || 0;
