@@ -591,7 +591,27 @@ Come funziona oggi (#1152):
     propone il ripensamento del sistema (le assorbite diventano `superata`).
     Una domanda che ferma un lavoro non si assorbe, perché solo la sua
     risposta lo riprende: si raggruppa con le altre del suo caso;
-  - rivede le priorità.
+  - rivede le priorità;
+  - legge i lavori fusi dall'ultima revisione (lo stesso riassunto dei
+    feedback che usa il manutentore) e chiude le domande, aperte o in
+    lavorazione, che quelle fusioni attuano, col principio e il numero del
+    lavoro; dove il riassunto non basta, legge il feedback. Una decisione
+    presa in chat e già fusa non deve restare aperta (è successo a D-250).
+- **Risposte registrate da una sessione** (decisione dell'owner del 01/11,
+  #2007). Una risposta che una sessione locale registra con `domanda.mjs
+  rispondi` vale come dell'owner: viene dalla chat, che usa solo lui. Con
+  `--scelta` il server applica l'opzione; col solo testo «Gestisci la
+  risposta» la tratta come le sue (applica, chiude, scrive il principio) e non
+  gli chiede di confermarla. Il mittente resta distinto (owner, sessione,
+  automatica): `SN_DOMANDE.mittenteRisposta` lo legge dal turno, e la domanda
+  porta `registrataDa: 'sessione'` con `rispostaDaSessione`. In Gestione la
+  scheda e la conversazione la segnano «registrata da una sessione» (nella
+  conversazione il turno è «Tu», col segno al posto di quello della fiducia).
+  L'owner la annulla da Gestione → Domande con «Riapri», come riapre una
+  risposta automatica: la domanda torna aperta e l'azione applicata si disfa
+  dove si può (una ripresa si richiude, una priorità torna quella di prima);
+  quello che resta il server lo dice nel `resoconto` della riapertura, che la
+  pagina mostra accanto alla conferma.
 
 ### 3.7 Ordine
 
