@@ -21,6 +21,10 @@ export function leggiArgomenti(argv) {
     const motivo = a.slice(1).join(' ').trim();
     return motivo ? { cmd, motivo } : { errore: `sporca vuole il motivo: cosa hai letto che il server non vede. ${USO}` };
   }
+  if (cmd === 'riservato') {
+    const motivo = a.slice(1).join(' ').trim();
+    return motivo ? { cmd, motivo } : { errore: `riservato vuole il motivo: quali dati privati hai letto. ${USO}` };
+  }
   if (cmd === 'prendi') {
     if (a.length === 1) return { cmd, sporco: false };
     if (a[1] === '--sporco') {
