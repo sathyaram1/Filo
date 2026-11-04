@@ -1249,19 +1249,21 @@ class TabManager {
     this._broadcast();
   }
 
-  // Più schede in un colpo, chieste alla chat (#413): come closeTab per ognuna, con una sola attivazione alla fine,
-  // così una scheda che sta per chiudersi non si carica solo per passarci sopra. Torna gli id chiusi davvero.
-  chiudiSchede(ids) {
-    const via = new Set(Array.isArray(ids) ? ids : []);
-    const chiuse = this.tabs.filter((t) => via.has(t.id));
+  // Più schede in un colpo, dalla chat (#413) o da «Chiudi le altre schede» (#1695): come closeTab per ognuna, con una
+  // sola attivazione alla fine, così una scheda che sta per chiudersi non si carica solo per passarci sopra.
+  // `via` come in closeTab. Torna gli id chiusi davvero.
+  chiudiSchede(ids, { via = 'chat' } = {}) {
+    const prese = new Set(Array.isArray(ids) ? ids : []);
+    const chiuse = this.tabs.filter((t) => prese.has(t.id));
     if (!chiuse.length) return [];
     const eraAttiva = chiuse.some((t) => t.id === this.activeId);
-    Strade.misura('azione', 'closeTab', 'chat', { incognito: this.incognito });
+    const strada = via === 'chat' ? 'chat' : STRADA_DELLA_CHIUSURA[via];
+    if (strada) Strade.misura('azione', 'closeTab', strada, { incognito: this.incognito });
     for (const tab of chiuse) {
-      ContatoriFinestra.misura('chiusa', tab, 'chat', { incognito: this.incognito });
+      ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
       this._smontaScheda(tab);
     }
-    this.tabs = this.tabs.filter((t) => !via.has(t.id));
+    this.tabs = this.tabs.filter((t) => !prese.has(t.id));
     if (eraAttiva) {
       const next = this._mostRecentlyActiveTab() || this.tabs[0];
       if (next) this.activate(next.id);
