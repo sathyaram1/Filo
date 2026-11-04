@@ -3110,6 +3110,13 @@
   let fidatiInCorso = false;
   // La regola del tasto della singola scheda (fiduciaCheck): una chiusa non si segna, e una segnalata come attacco o
   // spam si segna solo dopo averla guardata, quindi resta fuori dal blocco.
+  // Quello che il server ha appena scritto, detto subito dalla pagina: la rilettura porterà lo stesso. Chi aspettava
+  // la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358). Una per scheda e blocco.
+  function fiduciaScritta(fb, fidato, rimessoInCoda) {
+    fb.fiducia = fidato ? 'fidato' : 'non_fidato';
+    fb.fiduciaDa = { by: 'owner', at: Date.now() };
+    if (rimessoInCoda) Object.assign(fb, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
+  }
   function nonFidatiInLista() {
     return (currentList || []).filter((fb) => {
       if (!fb || !fb._id) return false;
@@ -3171,14 +3178,9 @@
       const fb = perId.get(e && e.feedbackId);
       if (!fb) continue;
       if (!e.ok) { falliti.push(e); continue; }
-      fb.fiducia = 'fidato';
-      fb.fiduciaDa = { by: 'owner', at: Date.now() };
+      fiduciaScritta(fb, true, e.rimessoInCoda);
       fatti += 1;
-      // Come il tasto della scheda: chi aspettava la fiducia per il server riparte nello stesso gesto (#1358).
-      if (e.rimessoInCoda) {
-        Object.assign(fb, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
-        ripartiti += 1;
-      }
+      if (e.rimessoInCoda) ripartiti += 1;
     }
     if (mgFidatiMsg) {
       const coda = ripartiti ? `, ${ripartiti === 1 ? '1 è ripartito' : `${ripartiti} sono ripartiti`} In coda come lavoro server` : '';
@@ -3890,12 +3892,8 @@
     try {
       const r = await sendToMain(valore ? { type: FIDUCIA_SEGNA, feedbackId: id } : { type: FIDUCIA_SEGNA, feedbackId: id, fidato: false });
       if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
-      // Il server l'ha scritto: la rilettura porterà lo stesso valore, intanto la pagina lo dice subito.
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
-      ora.fiducia = valore ? 'fidato' : 'non_fidato';
-      ora.fiduciaDa = { by: 'owner', at: Date.now() };
-      // Chi aspettava la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358).
-      if (r.rimessoInCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
+      fiduciaScritta(ora, valore, r.rimessoInCoda);
       if (selectedId === id) { if (r.rimessoInCoda) openDetail(id, { ridisegno: true }); else reflectManage(ora); }
       renderList();
       updateTabCounts();
@@ -4297,7 +4295,7 @@
         let fiducia = '';
         if (!MR.isFidato(fb)) {
           const f = await sendToMain({ type: FIDUCIA_SEGNA, feedbackId: id }).catch((err) => ({ ok: false, error: err.message }));
-          if (f && f.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; } else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
+          if (f && f.ok) fiduciaScritta(fb, true, false); else fiducia = ` Non segnato fidato: ${(f && f.error) || 'il server non ha risposto'}.`;
         }
         toast(`${num ? `#${num}` : 'Il feedback'} è In coda come lavoro server.${fiducia}`, fiducia ? 'err' : 'ok');
       }

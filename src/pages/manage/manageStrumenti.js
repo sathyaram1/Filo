@@ -379,19 +379,10 @@
   const giriLavori = $('mgGiriLavori');
   let giriLetti = false;
   const giornoIso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-  function mezzanotte(iso) {
-    const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(String(iso || ''));
-    return m ? new Date(Number(m[1]), Number(m[2]) - 1, Number(m[3])).getTime() : NaN;
-  }
   if (giriDa && giriA && SG) {
     const oggi = new Date();
     giriA.value = giornoIso(oggi);
     giriDa.value = giornoIso(new Date(oggi.getTime() - SG.FINESTRA_PREDEFINITA));
-  }
-  function numeroDi(l) {
-    const FB = window.SN_FEEDBACK;
-    const n = FB && FB.formatNum ? FB.formatNum(l && l.seq, l && l.subSeq) : '';
-    return n ? `#${n}` : String((l && l.feedbackId) || '?');
   }
   function disegnaGiri(r) {
     const lavori = Array.isArray(r.lavori) ? r.lavori : [];
@@ -420,7 +411,7 @@
       const giri = Array.isArray(l.rounds) ? l.rounds : [];
       const persi = Math.max(0, Number(l.roundsDropped) || 0);
       const li = el('li', 'mg-ac-riga');
-      li.appendChild(el('span', 'mg-ac-nome', numeroDi(l)));
+      li.appendChild(el('span', 'mg-ac-nome', SG.numeroDi(l)));
       li.appendChild(el('span', 'mg-ac-info', `chiuso ${quando(Number(l.chiusoMs))} · ${giri.length} ${giri.length === 1 ? 'giro' : 'giri'}${persi ? ` (più ${persi} vecchi)` : ''}`));
       giri.forEach((g, i) => {
         li.appendChild(el('p', 'mg-gi-giro', `giro ${persi + i + 1} · ${quando(g.at)} · trovati ${SG.elenco(g.found)} · esterni ${SG.elenco(g.external)}`
@@ -431,12 +422,10 @@
   }
   async function caricaGiri() {
     if (!giriForm || !SG) return;
-    const da = mezzanotte(giriDa.value);
-    const fine = mezzanotte(giriA.value);
+    const da = SG.giornoLocale(giriDa.value);
+    const fine = SG.giornoLocale(giriA.value);
     if (!Number.isFinite(da) || !Number.isFinite(fine)) { esito(giriMsg, 'Scegli le due date.', 'err'); return; }
-    // La fine comprende il giorno scelto: si ferma alla mezzanotte dopo, anche col cambio d'ora.
-    const d = new Date(fine);
-    const a = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+    const a = SG.fineDelGiorno(fine);
     if (a <= da) { esito(giriMsg, 'La fine deve venire dopo l’inizio.', 'err'); return; }
     esito(giriMsg, 'Leggo…');
     $('mgGiriLeggi').disabled = true;

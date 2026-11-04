@@ -15,18 +15,9 @@ const USO = 'Uso: node scripts/storico-giri.mjs [--da <data>] [--a <data>] [--js
   + '  <data>: AAAA-MM-GG, GG/MM/AAAA o GG/MM (anno in corso). --a comprende tutto quel giorno.\n'
   + '  Senza date: gli ultimi 30 giorni. --json stampa i dati per chi li rielabora.';
 
-/** Mezzanotte locale del giorno scritto, o NaN. PURA. */
-export function giornoLocale(testo, ora = Date.now()) {
-  const t = String(testo ?? '').trim();
-  let a; let m; let g;
-  let r = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
-  if (r) [, a, m, g] = r.map(Number);
-  else if ((r = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/.exec(t))) {
-    g = Number(r[1]); m = Number(r[2]); a = r[3] ? Number(r[3]) : new Date(ora).getFullYear();
-  } else return NaN;
-  const d = new Date(a, m - 1, g);
-  return d.getFullYear() === a && d.getMonth() === m - 1 && d.getDate() === g ? d.getTime() : NaN;
-}
+// La data, la fine del giorno e il numero sono quelli di Gestione → Routine → Log (SN_STORICO_GIRI).
+export const { giornoLocale, numeroDi } = globalThis.SN_STORICO_GIRI;
+const { fineDelGiorno } = globalThis.SN_STORICO_GIRI;
 
 /** Le parole della riga di comando. PURA. @returns {{ da, a, json } | { errore } | { aiuto: true }} */
 export function leggiArgomenti(argv, ora = Date.now()) {
@@ -42,19 +33,12 @@ export function leggiArgomenti(argv, ora = Date.now()) {
     const ms = giornoLocale(v, ora);
     if (!Number.isFinite(ms)) return { errore: `--${m[1]} vuole una data (AAAA-MM-GG, GG/MM/AAAA o GG/MM), non "${v ?? ''}".` };
     if (m[1] === 'da') da = ms;
-    // La fine comprende il giorno scritto: si ferma alla mezzanotte dopo, anche col cambio d'ora.
-    else { const d = new Date(ms); a = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime(); }
+    else a = fineDelGiorno(ms);
   }
   if (a === undefined) a = ora;
   if (da === undefined) da = a - FINESTRA_PREDEFINITA;
   if (a <= da) return { errore: 'La fine della finestra (--a) deve venire dopo l\'inizio (--da).' };
   return { da, a, json };
-}
-
-/** «#795», «#22.1» o l'id quando il feedback non ha numero. PURA. */
-export function numeroDi(lavoro) {
-  const n = globalThis.SN_FEEDBACK.formatNum(lavoro && lavoro.seq, lavoro && lavoro.subSeq);
-  return n ? `#${n}` : String((lavoro && lavoro.feedbackId) || '?');
 }
 
 /** I totali per livello e per esito (SN_STORICO_GIRI). PURA. */

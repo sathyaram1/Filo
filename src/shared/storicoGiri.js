@@ -44,5 +44,31 @@
     return /^cap[0-3]$/.test(String(c || '')) ? `dei ${String(c).slice(3)}` : '—';
   }
 
-  global.SN_STORICO_GIRI = Object.freeze({ LIVELLI, ESITI, FINESTRA_PREDEFINITA, livelli, totali, elenco, bilancio });
+  /** Mezzanotte locale del giorno scritto (AAAA-MM-GG, GG/MM/AAAA o GG/MM dell'anno in corso), o NaN. PURA. */
+  function giornoLocale(testo, ora = Date.now()) {
+    const t = String(testo == null ? '' : testo).trim();
+    let a; let m; let g;
+    let r = /^(\d{4})-(\d{1,2})-(\d{1,2})$/.exec(t);
+    if (r) { a = Number(r[1]); m = Number(r[2]); g = Number(r[3]); } else if ((r = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{4}))?$/.exec(t))) {
+      g = Number(r[1]); m = Number(r[2]); a = r[3] ? Number(r[3]) : new Date(ora).getFullYear();
+    } else return NaN;
+    const d = new Date(a, m - 1, g);
+    return d.getFullYear() === a && d.getMonth() === m - 1 && d.getDate() === g ? d.getTime() : NaN;
+  }
+
+  /** La fine di una finestra che comprende tutto il giorno di `ms`: la mezzanotte dopo, anche col cambio d'ora. PURA. */
+  function fineDelGiorno(ms) {
+    const d = new Date(ms);
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1).getTime();
+  }
+
+  /** «#795», «#22.1» o l'id quando il feedback non ha numero. PURA. */
+  function numeroDi(lavoro) {
+    const FB = global.SN_FEEDBACK;
+    const n = FB && FB.formatNum ? FB.formatNum(lavoro && lavoro.seq, lavoro && lavoro.subSeq) : '';
+    return n ? `#${n}` : String((lavoro && lavoro.feedbackId) || '?');
+  }
+
+  global.SN_STORICO_GIRI = Object.freeze({ LIVELLI, ESITI, FINESTRA_PREDEFINITA, livelli, totali, elenco, bilancio,
+    giornoLocale, fineDelGiorno, numeroDi });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

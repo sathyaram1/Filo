@@ -92,6 +92,19 @@ test('il numero del feedback, o l\'id quando non c\'è', () => {
   assert.equal(mod.numeroDi({ seq: null, feedbackId: 'abc' }), 'abc');
 });
 
+test('Gestione e script leggono date, fine del giorno e numero dallo stesso pezzo condiviso', () => {
+  const SG = globalThis.SN_STORICO_GIRI;
+  assert.equal(mod.giornoLocale, SG.giornoLocale);
+  assert.equal(mod.numeroDi, SG.numeroDi);
+  assert.equal(SG.fineDelGiorno(new Date(2026, 9, 25, 15).getTime()), new Date(2026, 9, 26).getTime());
+  const pagina = readFileSync(join(ROOT, 'src', 'pages', 'manage', 'manageStrumenti.js'), 'utf8');
+  assert.match(pagina, /SG\.giornoLocale\(/);
+  assert.match(pagina, /SG\.fineDelGiorno\(/);
+  assert.match(pagina, /SG\.numeroDi\(/);
+  assert.ok(!/getDate\(\) \+ 1/.test(pagina), 'la pagina non rifà da sé la fine del giorno');
+  assert.ok(!/formatNum/.test(pagina), 'la pagina non rifà da sé il numero del feedback');
+});
+
 test('--json: lavori col numero, totali e finestra, per chi rielabora', () => {
   const j = mod.comeJson(RISPOSTA, { da: Date.parse('2026-09-16T00:00:00Z'), a: Date.parse('2026-10-05T00:00:00Z') });
   assert.equal(j.da, '2026-09-16T00:00:00.000Z');
