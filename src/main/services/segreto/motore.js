@@ -35,6 +35,9 @@ const RISERVA = '';
 const TENTATIVI_A_VUOTO = 32;
 const SCANSIONE_OLTRE = 1 / 4;
 const CATENA_MAX = 1 << 16;
+// Fino a mezzo blocco un file sta in un blocco condiviso con altri piccoli (`o`: dove comincia): uno a blocco, tremila
+// voci di cronologia prenderebbero 24 MB (#1271).
+const PICCOLO = CARICO >> 1;
 const BLOCCHI_PER_LETTURA = 256;
 const LETTURE_INSIEME = 8;
 const GRUPPI_PER_LOTTO = 64;
@@ -82,6 +85,19 @@ function posizione(posto, N, j, c, r) {
   m.writeUInt32BE(r, 5);
   return crypto.createHmac('sha256', posto).update(m).digest().readUIntBE(0, 6) % N;
 }
+
+// Dopo le posizioni a caso la catena prosegue di seguito per tutto il contenitore, da un punto dato dalla chiave: arriva
+// anche all'ultimo posto libero, che a caso servirebbero in media N tentativi a trovare (#1271).
+function catena(posto, N, i) {
+  let da = -1;
+  return (r) => {
+    if (r < CATENA_MAX) return posizione(posto, N, i >> 1, i & 1, r);
+    if (da < 0) da = posizione(posto, N, i >> 1, i & 1, CATENA_MAX);
+    return (da + r - CATENA_MAX) % N;
+  };
+}
+
+const lunghezzaCatena = (N) => CATENA_MAX + N;
 
 function datoAssociato(p) {
   const b = Buffer.alloc(DOMINIO.length + 8);
@@ -209,7 +225,7 @@ function leggiTesta(carico) {
 
 // `x` (file rovinato) sempre scritto, 0 o 1: segnarlo non cambia la lunghezza della tabella, che si riscrive sul posto.
 function serializzaTabella(tabella) {
-  const f = [...tabella].map(([n, v]) => ({ n, d: v.d, c: v.c, m: v.m, e: v.e, x: v.x ? 1 : 0 }));
+  const f = [...tabella].map(([n, v]) => ({ n, d: v.d, c: v.c, m: v.m, e: v.e, x: v.x ? 1 : 0, o: v.o }));
   return Buffer.from(JSON.stringify({ f }), 'utf8');
 }
 
@@ -228,8 +244,13 @@ function leggiTabella(bytes, L) {
     if (!v || typeof v.n !== 'string' || (!v.n && !v.x) || !Number.isSafeInteger(v.d) || v.d < 0 || !Array.isArray(v.e)) return null;
     const blocchi = v.e.reduce((n, x) => n + (Array.isArray(x) ? x[1] : 0), 0);
     const dentro = v.e.every((x) => Array.isArray(x) && Number.isInteger(x[0]) && Number.isInteger(x[1]) && x[0] >= 1 && x[1] >= 1 && x[0] + x[1] <= L);
-    if (!dentro || blocchi !== Math.ceil(v.d / CARICO)) return null;
-    t.set(v.n, { d: v.d, c: Number(v.c) || 0, m: Number(v.m) || 0, e: v.e.map((x) => [x[0], x[1]]), x: v.x ? 1 : 0 });
+    const pacco = v.o !== undefined;
+    if (!dentro) return null;
+    if (pacco && !(Number.isInteger(v.o) && v.o >= 0 && v.d >= 1 && v.o + v.d <= CARICO && blocchi === 1 && v.e.length === 1)) return null;
+    if (!pacco && blocchi !== Math.ceil(v.d / CARICO)) return null;
+    const voce = { d: v.d, c: Number(v.c) || 0, m: Number(v.m) || 0, e: v.e.map((x) => [x[0], x[1]]), x: v.x ? 1 : 0 };
+    if (pacco) voce.o = v.o;
+    t.set(v.n, voce);
   }
   return t;
 }
@@ -249,6 +270,56 @@ function blocchiUsati(L, tabella, blocchiTabella) {
   for (const j of blocchiTabella) if (j < L) u[j] = 1;
   for (const f of tabella.values()) for (const [s, n] of f.e) for (let x = 0; x < n; x++) if (s + x < L) u[s + x] = 1;
   return u;
+}
+
+// Per ogni blocco di file piccoli, i tratti [inizio, fine) che la tabella vi tiene, in ordine.
+function pacchi(tabella) {
+  const out = new Map();
+  for (const f of tabella.values()) {
+    if (f.o === undefined) continue;
+    const j = f.e[0][0];
+    if (!out.has(j)) out.set(j, { tratti: [], rovinato: false });
+    const p = out.get(j);
+    p.tratti.push([f.o, f.o + f.d]);
+    if (f.x) p.rovinato = true;
+  }
+  for (const p of out.values()) p.tratti.sort((a, b) => a[0] - b[0]);
+  return out;
+}
+
+function buco(tratti, d) {
+  let da = 0;
+  for (const [a, b] of tratti) {
+    if (a - da >= d) return da;
+    da = Math.max(da, b);
+  }
+  return CARICO - da >= d ? da : -1;
+}
+
+// Solo i tratti dei file che ci stanno: i byte di uno tolto non restano leggibili a chi ha il nome.
+function pulito(carico, tratti) {
+  const b = Buffer.alloc(CARICO);
+  for (const [a, z] of tratti) carico.copy(b, a, a, z);
+  return b;
+}
+
+function sporcoFuori(carico, tratti) {
+  let da = 0;
+  for (const [a, b] of [...tratti, [CARICO, CARICO]]) {
+    for (let x = da; x < a; x++) if (carico[x]) return true;
+    da = Math.max(da, b);
+  }
+  return false;
+}
+
+// I blocchi che quel file non divide con nessuno: quello di un pacco resta a chi ci sta ancora.
+function soloSuoi(tabella, nome) {
+  const f = tabella.get(nome);
+  if (!f) return [];
+  if (f.o !== undefined) {
+    for (const [n, g] of tabella) if (n !== nome && g.o !== undefined && g.e[0][0] === f.e[0][0]) return [];
+  }
+  return daEstensioni(f.e);
 }
 
 // I blocchi dei file già segnati rovinati: a loro manca il contenuto per definizione, e non è un motivo per fermarsi.
@@ -317,7 +388,7 @@ async function apriContenitore(percorso, dimensione) {
     await fh.close();
     throw errore('CONTENITORE', 'Il contenitore non ha la dimensione attesa.');
   }
-  return { fh, N: dimensione / BLOCCO, mappa: null, date: [st.atimeNs, st.mtimeNs] };
+  return { fh, N: dimensione / BLOCCO, mappa: null, date: [st.atimeNs, st.mtimeNs], calcoli: 0 };
 }
 
 // Le date si scrivono al microsecondo, la grana di libuv: col mezzo microsecondo in più il troncamento ridà lo stesso
@@ -482,8 +553,9 @@ function registra(ctx, S, p, pre) {
 // un altro segreto in mano) si salta senza leggerla: lì la copia cercata non può stare.
 async function cerca(ctx, S, ids, { pota = false } = {}) {
   const attivi = new Map();
-  for (const i of ids) if (!(S.pos[i] >= 0)) attivi.set(i, { r: 0, vuoti: 0 });
+  for (const i of ids) if (!(S.pos[i] >= 0)) attivi.set(i, { r: 0, vuoti: 0, at: catena(S.posto, ctx.N, i) });
   const occ = ctx.mappa.occ;
+  const fine = lunghezzaCatena(ctx.N);
   let calcoli = 0;
   const tetto = () => Math.max(TENTATIVI_A_VUOTO, 2 * S.catena);
   while (attivi.size && !S.scansionato) {
@@ -503,9 +575,9 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
         continue;
       }
       let p = -1;
-      while (a.r < CATENA_MAX) {
+      while (a.r < fine) {
         if (++calcoli % 4096 === 0) await cedi();
-        const q = posizione(S.posto, ctx.N, i >> 1, i & 1, a.r);
+        const q = a.at(a.r);
         if (occ[q] || S.spazzatura.has(q)) {
           a.r++;
           continue;
@@ -659,11 +731,12 @@ async function decodificaGruppi(ctx, S, gruppi) {
 }
 
 // I carichi dei blocchi dentro L di ogni gruppo: null per quelli che la versione buona non copre o se il gruppo è perso.
+// Sempre Buffer: quelli ricostruiti dalla parità escono Uint8Array, che non sa `copy`.
 async function carichiGruppi(ctx, S, gruppi) {
   const dati = await decodificaGruppi(ctx, S, gruppi);
   return new Map(gruppi.map((g) => {
     const d = dati.get(g);
-    return [g, Array.from({ length: kAtteso(S, g) }, (_, s) => (d && s < d.length ? d[s] : null))];
+    return [g, Array.from({ length: kAtteso(S, g) }, (_, s) => (d && s < d.length ? comeBuffer(d[s]) : null))];
   }));
 }
 
@@ -729,11 +802,13 @@ async function segnaCaseVecchie(ctx, S) {
   S.caseVecchie = new Uint8Array(ctx.N);
   const occ = ctx.mappa.occ;
   let calcoli = 0;
+  const fine = lunghezzaCatena(ctx.N);
   for (let i = 0; i < 2 * S.L; i++) {
     if (S.pos[i] >= 0) continue;
-    for (let r = 0; r < CATENA_MAX; r++) {
+    const at = catena(S.posto, ctx.N, i);
+    for (let r = 0; r < fine; r++) {
       if (++calcoli % 4096 === 0) await cedi();
-      const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
+      const p = at(r);
       if (occ[p]) continue;
       if (S.letti[p]) S.caseVecchie[p] = 1;
       break;
@@ -743,12 +818,15 @@ async function segnaCaseVecchie(ctx, S) {
 
 // Saltate le case vecchie, si salta anche il primo posto estraneo che resta: la casa vecchia di una copia che, quando fu
 // scritta, trovò il primo posto preso da un'altra copia persa anche lei. La ricerca dopo paga una lettura o due.
-function colloca(ctx, S, i) {
+async function colloca(ctx, S, i) {
   const occ = ctx.mappa.occ;
   const vecchie = S.caseVecchie;
+  const at = catena(S.posto, ctx.N, i);
+  const fine = lunghezzaCatena(ctx.N);
   let saltato = false;
-  for (let r = 0; r < CATENA_MAX; r++) {
-    const p = posizione(S.posto, ctx.N, i >> 1, i & 1, r);
+  for (let r = 0; r < fine; r++) {
+    if (++ctx.calcoli % 4096 === 0) await cedi();
+    const p = at(r);
     if (occ[p] || (vecchie && vecchie[p])) continue;
     if (vecchie && !saltato && S.letti[p]) {
       saltato = true;
@@ -822,7 +900,7 @@ async function riscriviGruppi(ctx, S, voci) {
         for (const c of [0, 1]) {
           const i = base + 2 * s + c;
           const sopra = valida(S, g, i);
-          const p = S.pos[i] >= 0 ? S.pos[i] : colloca(ctx, S, i);
+          const p = S.pos[i] >= 0 ? S.pos[i] : await colloca(ctx, S, i);
           if (p < 0) continue;
           const chiaro = componi({ k, c, j: i >> 1, v, inc: S.inc }, c ? par[s] : pieni[s]);
           (sopra ? fase2 : fase1).push({ p, i, chiaro, v, k });
@@ -855,7 +933,7 @@ async function restauraMancanti(ctx, S, gruppi) {
       for (let i = base; i < base + 2 * n; i++) if (!valida(S, g, i)) mancanti.push(i);
       const par = RS.parita(dati, mancanti.filter((i) => i & 1).map((i) => (i >> 1) - GRUPPO * g));
       for (const i of mancanti) {
-        const p = S.pos[i] >= 0 ? S.pos[i] : colloca(ctx, S, i);
+        const p = S.pos[i] >= 0 ? S.pos[i] : await colloca(ctx, S, i);
         if (p < 0) continue;
         const s = (i >> 1) - GRUPPO * g;
         voci.push({ p, i, chiaro: componi({ k: info.k, c: i & 1, j: i >> 1, v: info.v, inc: S.inc }, i & 1 ? par[s] : dati[s]), v: info.v, k: info.k });
@@ -889,10 +967,13 @@ async function scriviTestaGruppo(ctx, S, { nuovi = new Map(), bytes = serializza
   const vecchi = await carichiGruppo(ctx, S, 0);
   const usati = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const rovinati = blocchiRovinati(S.L, S.tabella);
+  // Un pacco qui sotto si scrive insieme alla testa nuova: può già perdere i tratti che lei non tiene più.
+  const pz = pacchi(S.tabella);
   const carichi = [null];
   for (let s = 1; s < ke; s++) {
     if (!nuovi.has(s) && usati[s] && !vecchi[s] && !rovinati[s]) throw daRiaprire();
     carichi[s] = nuovi.get(s) || (usati[s] && vecchi[s]) || ZERO;
+    if (pz.has(s) && carichi[s] !== ZERO) carichi[s] = pulito(carichi[s], pz.get(s).tratti);
   }
   carichi[0] = scriviTesta({
     L: S.L, creato: S.creato, aperto: S.aperto, contatore: S.contatore + 1, bytes, blocchiTabella: S.blocchiTabella,
@@ -942,27 +1023,45 @@ function pianifica(S, fisicheLibere, modifica, { riusa = [] } = {}) {
   return { ...extra, tabella, bytes, blocchiTabella, L2 };
 }
 
+// Un file piccolo va nel primo buco di un pacco (prima quello dove già sta), se no in un blocco nuovo tutto suo. I
+// tratti della tabella vecchia restano dove sono, anche quello del file che si sostituisce: fino alla testa nuova vale lei.
 function pianoScrittura(S, fisicheLibere, nome, lunghezza, ora, { senzaVecchio = false } = {}) {
   const vecchio = S.tabella.get(nome);
-  const riusa = senzaVecchio && vecchio ? daEstensioni(vecchio.e) : [];
+  const riusa = senzaVecchio ? soloSuoi(S.tabella, nome) : [];
   return pianifica(S, fisicheLibere, (tabella, prendi) => {
     if (senzaVecchio) tabella.delete(nome);
-    const blocchiFile = Array.from({ length: Math.ceil(lunghezza / CARICO) }, prendi);
-    tabella.set(nome, { d: lunghezza, c: vecchio ? vecchio.c : ora, m: ora, e: estensioni(blocchiFile), x: 0 });
-    return { blocchiFile };
+    const voce = { d: lunghezza, c: vecchio ? vecchio.c : ora, m: ora, x: 0 };
+    if (lunghezza < 1 || lunghezza > PICCOLO) {
+      const blocchiFile = Array.from({ length: Math.ceil(lunghezza / CARICO) }, prendi);
+      tabella.set(nome, { ...voce, e: estensioni(blocchiFile) });
+      return { blocchiFile };
+    }
+    const pz = pacchi(tabella);
+    const suo = vecchio && vecchio.o !== undefined && !senzaVecchio ? vecchio.e[0][0] : -1;
+    const ordine = [...pz.keys()].filter((j) => !pz.get(j).rovinato).sort((a, b) => (a === suo ? -1 : b === suo ? 1 : a - b));
+    for (const j of ordine) {
+      const o = buco(pz.get(j).tratti, lunghezza);
+      if (o < 0) continue;
+      tabella.set(nome, { ...voce, e: [[j, 1]], o });
+      return { blocchiFile: [], pacco: { j, o } };
+    }
+    const j = prendi();
+    tabella.set(nome, { ...voce, e: [[j, 1]], o: 0 });
+    return { blocchiFile: [], pacco: { j, o: 0 } };
   }, { riusa });
 }
 
-// Il file più grande che ci sta adesso sotto quel nome, contando come libero quello che il file vecchio lascerebbe.
-function massimoScrivibile(S, fisicheLibere, nome) {
+// Il file più grande che ci sta adesso sotto quel nome; `senzaVecchio`: se prima si togliesse quello che c'è. Cede il
+// turno a ogni prova: il motore gira nel processo della finestra, e con un segreto grande una prova costa millisecondi.
+async function massimoScrivibile(S, fisicheLibere, nome, { senzaVecchio = false } = {}) {
   const ora = Date.now();
-  const ci = (n) => !!pianoScrittura(S, fisicheLibere, nome, n, ora, { senzaVecchio: true });
+  const ci = (n) => !!pianoScrittura(S, fisicheLibere, nome, n, ora, { senzaVecchio });
   if (!ci(0)) return 0;
-  const vecchio = S.tabella.get(nome);
   const liberi = S.L - blocchiUsati(S.L, S.tabella, S.blocchiTabella).reduce((a, b) => a + b, 0);
   let basso = 0;
-  let alto = (liberi + Math.floor(fisicheLibere / 2) + (vecchio ? daEstensioni(vecchio.e).length : 0)) * CARICO;
+  let alto = Math.max(PICCOLO, (liberi + Math.floor(fisicheLibere / 2) + (senzaVecchio ? soloSuoi(S.tabella, nome).length : 0)) * CARICO);
   while (basso < alto) {
+    await cedi();
     const m = Math.floor((basso + alto + 1) / 2);
     if (ci(m)) basso = m;
     else alto = m - 1;
@@ -976,13 +1075,14 @@ async function crescita(ctx, S, L2) {
   for (let i = 2 * S.L; i < 2 * L2; i++) {
     if (i % (8 * BLOCCHI_PER_CEDERE) === 0) await cedi();
     if (S.pos[i] >= 0) continue;
-    const p = colloca(ctx, S, i);
+    const p = await colloca(ctx, S, i);
     if (p < 0) {
       for (const q of posti) {
         libera(ctx, S.pos[q]);
         S.pos[q] = -1;
       }
-      throw errore('SPAZIO', 'Nel contenitore non resta un posto per i blocchi nuovi.', { servono: 0, disponibili: 0, prima: true });
+      // Chi scrive lo rifà coi numeri veri: qui non si sa quanto serviva in byte.
+      throw errore('SPAZIO', 'Nel contenitore non resta un posto per i blocchi nuovi.', { prima: true, senzaNumeri: true });
     }
     posti.push(i);
   }
@@ -1029,27 +1129,44 @@ async function transazione(ctx, S, piano, dati) {
     })));
   }
   await ctx.fh.datasync();
+  const tabellaPrima = S.tabella;
   S.tabella = tabella;
   S.blocchiTabella = blocchiTabella;
   S.bytesTabella = Buffer.from(bytes);
   await scriviTestaGruppo(ctx, S, { nuovi: new Map([...dati].filter(([j]) => j < GRUPPO)), bytes });
-  await liberaEStringi(ctx, S, prima);
+  await liberaEStringi(ctx, S, prima, tabellaPrima);
 }
 
-// Azzera i blocchi che la testa nuova non usa più (il contenuto di un file cancellato non resta leggibile a chi ha il
-// nome) e accorcia il segreto se la coda è libera: prima si distrugge, poi la testa dice il numero nuovo.
-async function liberaEStringi(ctx, S, prima) {
+// I pacchi fuori dal gruppo della testa da cui la tabella nuova ha tolto un tratto che la vecchia teneva.
+function pacchiDaPulire(tabellaPrima, tabella, ora) {
+  const out = new Set();
+  if (!tabellaPrima) return out;
+  const adesso = pacchi(tabella);
+  for (const [j, p] of pacchi(tabellaPrima)) {
+    if (j < GRUPPO || !ora[j]) continue;
+    const restano = new Set((adesso.get(j) || { tratti: [] }).tratti.map(String));
+    if (p.tratti.some((t) => !restano.has(String(t)))) out.add(j);
+  }
+  return out;
+}
+
+// Azzera i blocchi che la testa nuova non usa più, e nei pacchi i tratti che non tiene più (il contenuto di un file
+// cancellato non resta leggibile a chi ha il nome); accorcia il segreto se la coda è libera: prima si distrugge, poi la
+// testa dice il numero nuovo.
+async function liberaEStringi(ctx, S, prima, tabellaPrima = null) {
   const ora = blocchiUsati(S.L, S.tabella, S.blocchiTabella);
   const liberati = [];
   for (let j = 1; j < prima.length; j++) if (prima[j] && !ora[j]) liberati.push(j);
   let L3 = 1;
   for (let j = S.L - 1; j >= 1; j--) if (ora[j]) { L3 = j + 1; break; }
-  if (!liberati.length && L3 >= S.L) return;
+  const daPulire = pacchiDaPulire(tabellaPrima, S.tabella, ora);
+  if (!liberati.length && !daPulire.size && L3 >= S.L) return;
   const Lprima = S.L;
   const G3 = Math.ceil(L3 / GRUPPO);
-  const daRiscrivere = new Set(liberati.filter((j) => j >= GRUPPO && j < L3).map((j) => Math.floor(j / GRUPPO)));
+  const daRiscrivere = new Set([...liberati, ...daPulire].filter((j) => j >= GRUPPO && j < L3).map((j) => Math.floor(j / GRUPPO)));
   if (L3 < Lprima && L3 % GRUPPO && G3 - 1 >= 1) daRiscrivere.add(G3 - 1);
   const rovinati = blocchiRovinati(S.L, S.tabella);
+  const pz = pacchi(S.tabella);
   for (const lotto of aLotti([...daRiscrivere].sort((a, b) => a - b))) {
     // Un gruppo tutto liberato si riscrive a zero senza leggerlo: cancellare un file grosso non lo rilegge intero.
     const usaQualcosa = (g) => Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => ora[GRUPPO * g + s]).some(Boolean);
@@ -1059,8 +1176,10 @@ async function liberaEStringi(ctx, S, prima) {
       return {
         g,
         carichi: Array.from({ length: Math.min(GRUPPO, L3 - GRUPPO * g) }, (_, s) => {
-          if (ora[GRUPPO * g + s] && !vecchi[s] && !rovinati[GRUPPO * g + s]) throw daRiaprire();
-          return (ora[GRUPPO * g + s] && vecchi[s]) || ZERO;
+          const j = GRUPPO * g + s;
+          if (ora[j] && !vecchi[s] && !rovinati[j]) throw daRiaprire();
+          if (ora[j] && vecchi[s] && pz.has(j)) return pulito(vecchi[s], pz.get(j).tratti);
+          return (ora[j] && vecchi[s]) || ZERO;
         }),
       };
     }));
@@ -1123,6 +1242,15 @@ async function riparaProprio(ctx, S) {
   const daRifare = [];
   const blocchiDi = (g) => Array.from({ length: kAtteso(S, g) }, (_, s) => GRUPPO * g + s);
   const tab = caricoTabella(S);
+  // Un'interruzione fra la testa nuova e la pulizia lascia in un pacco i byte di un file tolto: si cercano qui.
+  const pz = pacchi(S.tabella);
+  const pacchiSporchi = new Set();
+  const gruppiPacchi = [...new Set([...pz.keys()].map((j) => Math.floor(j / GRUPPO)))].filter((g) => g >= 1 && g < G && S.gruppi[g]);
+  for (const lotto of aLotti(gruppiPacchi)) {
+    for (const [g, c] of await carichiGruppi(ctx, S, lotto)) {
+      if (blocchiDi(g).some((j, s) => pz.has(j) && c[s] && sporcoFuori(c[s], pz.get(j).tratti))) pacchiSporchi.add(g);
+    }
+  }
   for (let g = 1; g < G; g++) {
     const info = S.gruppi[g];
     if (!info) {
@@ -1130,7 +1258,7 @@ async function riparaProprio(ctx, S) {
       continue;
     }
     const blocchi = blocchiDi(g);
-    const sporco = blocchi.some((j) => !usati[j] && !(valida(S, g, 2 * j) && S.zero[j]));
+    const sporco = pacchiSporchi.has(g) || blocchi.some((j) => !usati[j] && !(valida(S, g, 2 * j) && S.zero[j]));
     const mancanti = blocchi.some((j) => !valida(S, g, 2 * j) || !valida(S, g, 2 * j + 1));
     if (info.k === blocchi.length && !sporco) {
       if (mancanti) parziali.push(g);
@@ -1150,6 +1278,7 @@ async function riparaProprio(ctx, S) {
         carichi: blocchiDi(g).map((j, s) => {
           if (tab.has(j)) return tab.get(j);
           if (s < coperti && usati[j] && !vecchi[s]) throw errore('LETTURA', 'Il contenitore non si legge più come un attimo fa.');
+          if (usati[j] && vecchi[s] && pz.has(j)) return pulito(vecchi[s], pz.get(j).tratti);
           return (usati[j] && vecchi[s]) || ZERO;
         }),
       };
@@ -1239,13 +1368,18 @@ class Segreto {
     return { creato: S.creato, aperturaPrecedente: S.apertoPrima || null };
   }
 
-  spazio() {
+  // `usati`: i byte che il segreto occupa nel contenitore, copie comprese, non quelli dei file: è quello che toglie agli
+  // altri. `disponibili`: il file nuovo più grande che si riesce davvero a salvare adesso.
+  async spazio() {
     const s = this.#vivo();
-    let nome = 'nome-di-prova-di-un-file-nuovo.bin';
-    while (s.S.tabella.has(nome)) nome = `_${nome}`;
-    let usati = 0;
-    for (const [n, f] of s.S.tabella) if (n !== RISERVA) usati += f.d;
-    return { usati, disponibili: massimoScrivibile(s.S, s.N - s.mappa.vive, nome) };
+    return inCoda(s.chiave, async () => {
+      const { S, mappa, N } = this.#vivo();
+      let nome = 'nome-di-prova-di-un-file-nuovo.bin';
+      while (S.tabella.has(nome)) nome = `_${nome}`;
+      let occupati = 0;
+      for (let p = 0; p < N; p++) if (mappa.occ[p] === S.etichetta) occupati++;
+      return { usati: occupati * BLOCCO, disponibili: await massimoScrivibile(S, N - mappa.vive, nome) };
+    });
   }
 
   async leggiFile(nome) {
@@ -1254,6 +1388,12 @@ class Segreto {
       const f = S.tabella.get(n);
       if (!f) throw errore('NESSUN_FILE', 'Nel segreto non c’è un file con questo nome.');
       if (f.x) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
+      if (f.o !== undefined) {
+        const j = f.e[0][0];
+        const c = (await carichiGruppo(ctx, S, Math.floor(j / GRUPPO)))[j % GRUPPO];
+        if (!c) throw errore('DANNEGGIATO', 'Questo file si è rovinato e non si può più leggere.');
+        return Buffer.from(c.subarray(f.o, f.o + f.d));
+      }
       // Senza azzerare: azzerare centinaia di MB di memoria riusata ferma il processo, e ogni byte lo riempie un blocco.
       const out = Buffer.allocUnsafeSlow(f.d);
       const blocchi = daEstensioni(f.e);
@@ -1277,19 +1417,17 @@ class Segreto {
     const n = normalizzaNomeFile(nome);
     const buf = comeBuffer(dati);
     return this.#op(async (ctx, S) => {
-      const ora = Date.now();
-      let piano = pianoScrittura(S, libere(ctx), n, buf.length, ora);
-      if (!piano && S.tabella.has(n) && pianoScrittura(S, libere(ctx), n, buf.length, ora, { senzaVecchio: true })) {
-        await cancellaDentro(ctx, S, n);
-        piano = pianoScrittura(S, libere(ctx), n, buf.length, ora);
-      }
-      if (!piano) {
-        const disponibili = massimoScrivibile(S, libere(ctx), n);
-        throw errore('SPAZIO', `Non c’è spazio: servono ${buf.length} byte, ne restano ${disponibili}.`, { servono: buf.length, disponibili, prima: true });
-      }
+      const piano = pianoScrittura(S, libere(ctx), n, buf.length, Date.now());
+      if (!piano) throw await rifiutoSpazio(ctx, S, n, buf.length);
       const dati2 = new Map();
-      piano.blocchiFile.forEach((j, x) => dati2.set(j, buf.subarray(x * CARICO, (x + 1) * CARICO)));
-      await transazione(ctx, S, piano, dati2);
+      if (piano.pacco) dati2.set(piano.pacco.j, await caricoPacco(ctx, S, piano.pacco, buf));
+      else piano.blocchiFile.forEach((j, x) => dati2.set(j, buf.subarray(x * CARICO, (x + 1) * CARICO)));
+      try {
+        await transazione(ctx, S, piano, dati2);
+      } catch (e) {
+        if (e.senzaNumeri) throw await rifiutoSpazio(ctx, S, n, buf.length);
+        throw e;
+      }
     });
   }
 
@@ -1329,9 +1467,36 @@ class Segreto {
   }
 }
 
+// Il vecchio non si toglie mai per far posto al nuovo: se poi il nuovo non arrivasse in fondo (spazio, corrente, disco)
+// non resterebbe nessuno dei due. Chi vuole sostituirlo così lo toglie prima lui, e il rifiuto gli dice quanto guadagna.
+async function rifiutoSpazio(ctx, S, nome, servono) {
+  const disponibili = await massimoScrivibile(S, libere(ctx), nome);
+  if (!S.tabella.has(nome)) {
+    return errore('SPAZIO', `Non c’è spazio: servono ${servono} byte, ne restano ${disponibili}.`, { servono, disponibili, prima: true });
+  }
+  const togliendoIlVecchio = await massimoScrivibile(S, libere(ctx), nome, { senzaVecchio: true });
+  const messaggio = togliendoIlVecchio >= servono
+    ? `Non c’è spazio per tenere il file vecchio finché il nuovo non è salvato: servono ${servono} byte, ne restano ${disponibili}; togliendo prima il vecchio ne resterebbero ${togliendoIlVecchio}.`
+    : `Non c’è spazio: servono ${servono} byte, ne restano ${disponibili} (${togliendoIlVecchio} togliendo prima il file vecchio).`;
+  return errore('SPAZIO', messaggio, { servono, disponibili, togliendoIlVecchio, prima: true });
+}
+
+// Il pacco si riscrive coi tratti della tabella vecchia ai loro posti, più il file nuovo nel suo buco: fino alla testa
+// nuova è la vecchia a dire dove sta ogni file.
+async function caricoPacco(ctx, S, { j, o }, buf) {
+  const b = Buffer.alloc(CARICO);
+  const prima = pacchi(S.tabella).get(j);
+  if (prima) {
+    const c = (await carichiGruppo(ctx, S, Math.floor(j / GRUPPO)))[j % GRUPPO];
+    if (!c) throw daRiaprire();
+    for (const [a, z] of prima.tratti) c.copy(b, a, a, z);
+  }
+  buf.copy(b, o);
+  return b;
+}
+
 async function cancellaDentro(ctx, S, nome) {
-  const vecchio = S.tabella.get(nome);
-  const piano = pianifica(S, libere(ctx), (t) => { t.delete(nome); }, { riusa: daEstensioni(vecchio.e) });
+  const piano = pianifica(S, libere(ctx), (t) => { t.delete(nome); }, { riusa: soloSuoi(S.tabella, nome) });
   if (!piano) throw errore('SPAZIO', 'Non c’è posto nemmeno per riscrivere l’elenco dei file.', { servono: 0, disponibili: 0, prima: true });
   await transazione(ctx, S, piano, new Map());
 }
@@ -1412,6 +1577,7 @@ module.exports = {
   creaSegreto,
   // Per le prove: il formato su disco, per controllarlo da fuori senza passare dal motore.
   _formato: {
-    BLOCCO, CARICO, PREFISSO, GRUPPO, NONCE, posizione, apriBlocco, leggiPrefisso, leggiTesta, normalizzaNome,
+    BLOCCO, CARICO, PREFISSO, GRUPPO, NONCE, PICCOLO, posizione, catena, lunghezzaCatena, apriBlocco, leggiPrefisso, leggiTesta,
+    normalizzaNome,
   },
 };

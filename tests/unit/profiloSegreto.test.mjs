@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { readFileSync, openSync, writeSync, closeSync, rmSync, writeFileSync, statSync, utimesSync } from 'node:fs';
+import { readFileSync, openSync, writeSync, closeSync, rmSync, writeFileSync, statSync, utimesSync, ftruncateSync } from 'node:fs';
 import { randomBytes, createHash } from 'node:crypto';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -53,6 +53,18 @@ async function impronta(base, nome) {
     if (i === 0) L = F.leggiTesta(pre.carico).L;
   }
   return { copie, L, chiavi: k };
+}
+
+// Tutti i byte che si aprono con la chiave del segreto, di ogni versione rimasta sul disco.
+async function chiaro(base, nome) {
+  const k = await K.derivaChiavi(F.normalizzaNome(nome), base.sale, PROVA);
+  const buf = readFileSync(base.contenitore);
+  const pezzi = [];
+  for (let p = 0; p < buf.length / F.BLOCCO; p++) {
+    const pre = F.leggiPrefisso(F.apriBlocco(k.cifra, p, blocco(buf, p)));
+    if (pre) pezzi.push(Buffer.from(pre.carico));
+  }
+  return Buffer.concat(pezzi);
 }
 
 // Tutta la ridondanza: ogni copia di ogni blocco logico c'è, e quelle di un gruppo hanno la stessa versione.
@@ -320,7 +332,7 @@ describe('segreti dichiarati', () => {
     await c.chiudi();
     const prima = await impronta(piccolo, 'C');
     const d = await crea(piccolo, 'D', ['C']);
-    const { disponibili } = d.spazio();
+    const { disponibili } = await d.spazio();
     // 512 blocchi: 2 per la testa di D, 2·76 per C (testa e 75 blocchi), due copie per ogni blocco di D.
     assert.equal(disponibili, Math.floor((512 - 2 - 2 * 76) / 2) * F.CARICO);
     const tutto = randomBytes(disponibili);
@@ -451,7 +463,7 @@ describe('spazio: rifiutato dicendo quanto serve e quanto c’è, mai troncato',
     const base = await contenitore(2 * MB);
     const s = await crea(base, 'S');
     const capienza = Math.floor((512 - 2) / 2) * F.CARICO;
-    assert.deepEqual(s.spazio(), { usati: 0, disponibili: capienza });
+    assert.deepEqual(await s.spazio(), { usati: 2 * F.BLOCCO, disponibili: capienza });
     const a = randomBytes(600_000);
     await s.scriviFile('a', a);
     let rifiuto;
@@ -471,17 +483,198 @@ describe('spazio: rifiutato dicendo quanto serve e quanto c’è, mai troncato',
     rmSync(base.contenitore, { force: true });
   });
 
-  test('sostituire un file conta lo spazio che il vecchio lascia; se nemmeno così ci sta, il vecchio resta com’era', async () => {
+  // #1271: togliere il vecchio prima di scrivere il nuovo, se il nuovo poi non arrivava in fondo, non lasciava nessuno dei due.
+  test('sostituire tiene il vecchio finché il nuovo non è scritto: se ci sta solo togliendolo prima, si rifiuta coi tre numeri', async () => {
     const base = await contenitore(2 * MB);
     const s = await crea(base, 'S');
     const capienza = Math.floor((512 - 2) / 2) * F.CARICO;
-    await s.scriviFile('a', randomBytes(600_000));
-    const nuovo = randomBytes(900_000);
+    await s.scriviFile('a', randomBytes(400_000));
+    const nuovo = randomBytes(500_000);
     await s.scriviFile('a', nuovo);
     assert.ok((await s.leggiFile('a')).equals(nuovo));
-    await assert.rejects(s.scriviFile('a', randomBytes(capienza + 1)), (e) => e.codice === 'SPAZIO' && e.disponibili === capienza);
+    let rifiuto;
+    await assert.rejects(s.scriviFile('a', randomBytes(700_000)), (e) => { rifiuto = e; return e.codice === 'SPAZIO'; });
+    assert.equal(rifiuto.servono, 700_000);
+    assert.ok(rifiuto.disponibili > 0 && rifiuto.disponibili < 700_000, String(rifiuto.disponibili));
+    assert.ok(rifiuto.togliendoIlVecchio >= 700_000, String(rifiuto.togliendoIlVecchio));
+    for (const n of [700_000, rifiuto.disponibili, rifiuto.togliendoIlVecchio]) assert.ok(rifiuto.message.includes(String(n)), rifiuto.message);
     assert.ok((await s.leggiFile('a')).equals(nuovo));
     await s.chiudi();
+    let r = (await apri(base, 'S')).segreto;
+    assert.ok((await r.leggiFile('a')).equals(nuovo), 'alla riapertura il file vecchio non c’è più');
+    // Il numero detto si raggiunge, tenendo il vecchio fino in fondo.
+    const giusto = randomBytes(rifiuto.disponibili);
+    await r.scriviFile('a', giusto);
+    assert.ok((await r.leggiFile('a')).equals(giusto));
+    // Chi vuole togliere prima il vecchio lo fa lui, e allora ci sta.
+    const grande = randomBytes(700_000);
+    await r.cancellaFile('a');
+    await r.scriviFile('a', grande);
+    await assert.rejects(r.scriviFile('a', randomBytes(capienza + 1)), (e) => e.codice === 'SPAZIO' && e.togliendoIlVecchio === capienza);
+    await r.chiudi();
+    r = (await apri(base, 'S')).segreto;
+    assert.ok((await r.leggiFile('a')).equals(grande));
+    await r.chiudi();
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+// #1271: nel contenitore da 1 GB gli ultimi posti liberi non stavano sulle 65536 posizioni a caso della catena di una
+// copia, e chi riempiva fino al numero annunciato veniva rifiutato con «servono 0, ne restano 0».
+describe('spazio: il numero annunciato si raggiunge, e chiederlo non ferma la finestra', () => {
+  test('in un contenitore da 1 GB la catena di una copia arriva anche ai posti liberi che le posizioni a caso saltano', () => {
+    const N = (1 << 30) / F.BLOCCO;
+    const posto = randomBytes(32);
+    const i = 2 * 7 + 1;
+    const aCaso = new Uint8Array(N);
+    for (let r = 0; r < 1 << 16; r++) aCaso[F.posizione(posto, N, i >> 1, i & 1, r)] = 1;
+    const fuori = [];
+    for (let p = 0; p < N && fuori.length < 3; p += 9973) if (!aCaso[p]) fuori.push(p);
+    assert.equal(fuori.length, 3);
+    const at = F.catena(posto, N, i);
+    const visti = new Uint8Array(N);
+    for (let r = 0; r < F.lunghezzaCatena(N); r++) visti[at(r)] = 1;
+    for (const libero of fuori) assert.equal(visti[libero], 1, `il posto ${libero} non è sulla catena`);
+    // Le prime posizioni restano quelle a caso: chi ha già scritto si ritrova.
+    for (let r = 0; r < 100; r++) assert.equal(at(r), F.posizione(posto, N, i >> 1, i & 1, r));
+  });
+
+  // Il motore gira nel processo della finestra: la ricerca del file più grande che ci sta prova una trentina di misure,
+  // ognuna di qualche millisecondo con un segreto grande. Il contenitore è un file rado: si scrivono solo i blocchi usati.
+  test('chiedere lo spazio, e il rifiuto che lo ricalcola, lasciano il turno: nessun tratto fermo lungo quanto il calcolo', async () => {
+    const percorso = join(dir, 'rado.bin');
+    const fd = openSync(percorso, 'w');
+    ftruncateSync(fd, 1 << 30);
+    closeSync(fd);
+    const base = { contenitore: percorso, dimensione: 1 << 30, sale: SALE, parametriChiave: PROVA };
+    const s = await crea(base, 'Grande');
+    await s.scriviFile('foto', randomBytes(8 * MB));
+    for (let x = 0; x < 50; x++) await s.scriviFile(`nota ${x}`, `una nota ${x}`);
+    let ultimo = 0;
+    let fermo = 0;
+    let giri = 0;
+    let acceso = true;
+    const giro = () => {
+      const t = performance.now();
+      fermo = Math.max(fermo, t - ultimo);
+      ultimo = t;
+      giri++;
+      if (acceso) setImmediate(giro);
+    };
+    const misura = async (fn) => {
+      await new Promise((ok) => setImmediate(ok));
+      fermo = 0;
+      giri = 0;
+      ultimo = performance.now();
+      const t0 = performance.now();
+      const r = await fn();
+      return { r, totale: performance.now() - t0, fermo, giri };
+    };
+    setImmediate(giro);
+    try {
+      const chiesto = await misura(() => s.spazio());
+      assert.ok(chiesto.r.disponibili > 400 * MB);
+      assert.ok(chiesto.giri >= 10 && chiesto.fermo < chiesto.totale / 5, `spazio(): ${JSON.stringify(chiesto)}`);
+      const rifiutato = await misura(() => s.scriviFile('troppo', Buffer.allocUnsafe(chiesto.r.disponibili + 1)).catch((e) => e));
+      assert.equal(rifiutato.r.codice, 'SPAZIO');
+      assert.equal(rifiutato.r.disponibili, chiesto.r.disponibili);
+      assert.ok(rifiutato.giri >= 10 && rifiutato.fermo < rifiutato.totale / 5, `rifiuto: ${JSON.stringify({ ...rifiutato, r: undefined })}`);
+    } finally {
+      acceso = false;
+    }
+    await s.chiudi();
+    rmSync(percorso, { force: true });
+  });
+
+  test('lo spazio usato è quello che il segreto occupa nel contenitore, copie comprese, non i byte dei file', async () => {
+    const base = await contenitore(16 * MB);
+    const s = await crea(base, 'Conto');
+    await s.scriviFile('grande', randomBytes(3 * F.CARICO + 5));
+    for (let x = 0; x < 30; x++) await s.scriviFile(`piccolo ${x}`, randomBytes(40));
+    await s.cancellaFile('piccolo 3');
+    const { usati } = await s.spazio();
+    const k = await K.derivaChiavi(F.normalizzaNome('Conto'), base.sale, PROVA);
+    const buf = readFileSync(base.contenitore);
+    let suoi = 0;
+    for (let p = 0; p < buf.length / F.BLOCCO; p++) if (F.leggiPrefisso(F.apriBlocco(k.cifra, p, blocco(buf, p)))) suoi++;
+    assert.equal(usati, suoi * F.BLOCCO);
+    assert.ok(usati >= 2 * 4 * F.BLOCCO, 'il file grande da solo ne prende otto');
+    await s.chiudi();
+    rmSync(base.contenitore, { force: true });
+  });
+});
+
+// #1271: un file da 50 byte prendeva un blocco intero, 8 KB con la ridondanza.
+describe('file piccoli raccolti insieme', () => {
+  // Mille salvataggi riscrivono mille volte l'elenco dei file: è la prova più lenta del file, ma è la misura chiesta.
+  test('mille file da 50 byte stanno in pochi blocchi e si rileggono tutti', async () => {
+    const base = await contenitore(16 * MB);
+    const s = await crea(base, 'Cronologia');
+    const vuoto = await s.spazio();
+    const voci = new Map();
+    for (let x = 0; x < 1000; x++) {
+      const d = randomBytes(50);
+      voci.set(`voce ${x}`, d);
+      await s.scriviFile(`voce ${x}`, d);
+    }
+    const pieno = await s.spazio();
+    // Un blocco a testa erano 1000 · 8 KB; adesso pacchi da ottanta file più la tabella, in due copie.
+    assert.ok(pieno.usati < 1 * MB, `mille file da 50 byte occupano ${pieno.usati} byte`);
+    assert.ok(vuoto.disponibili - pieno.disponibili < 1 * MB);
+    await s.chiudi();
+    const r = (await apri(base, 'Cronologia')).segreto;
+    for (const [n, d] of voci) assert.ok((await r.leggiFile(n)).equals(d), n);
+    assert.equal(r.elencaFile().length, 1000);
+    await r.chiudi();
+    assert.ok(integra(await impronta(base, 'Cronologia')));
+    rmSync(base.contenitore, { force: true });
+  });
+
+  // Col file grande davanti il pacco sta in un gruppo suo; senza, in quello della testa, che si riscrive con lei.
+  for (const davanti of [true, false]) test(`sostituire, ingrandire, rimpicciolire e togliere un file piccolo: gli altri del pacco restano, e del vecchio non resta un byte${davanti ? '' : ' (pacco accanto alla testa)'}`, async () => {
+    const base = await contenitore(4 * MB);
+    const s = await crea(base, 'Pacchi');
+    const vuoto = await s.spazio();
+    const grande = randomBytes(12 * F.CARICO);
+    const attesi = new Map();
+    if (davanti) {
+      await s.scriviFile('grande', grande);
+      attesi.set('grande', grande);
+    }
+    for (let x = 0; x < 20; x++) {
+      const d = randomBytes(100 + x);
+      attesi.set(`p${x}`, d);
+      await s.scriviFile(`p${x}`, d);
+    }
+    const tolti = [];
+    const cambia = async (n, d) => {
+      tolti.push(attesi.get(n));
+      if (d) attesi.set(n, d);
+      else attesi.delete(n);
+      if (d) await s.scriviFile(n, d);
+      else await s.cancellaFile(n);
+    };
+    await cambia('p3', randomBytes(80));
+    await cambia('p4', randomBytes(F.PICCOLO));
+    await cambia('p5', randomBytes(F.PICCOLO + 1));
+    await cambia('p6', null);
+    if (davanti) await cambia('grande', randomBytes(300));
+    await cambia('p7', Buffer.alloc(0));
+    await cambia('p5', randomBytes(64));
+    const controlla = async (seg) => {
+      for (const [n, d] of attesi) assert.ok((await seg.leggiFile(n)).equals(d), n);
+      assert.equal(seg.elencaFile().length, attesi.size);
+    };
+    await controlla(s);
+    const dentro = await chiaro(base, 'Pacchi');
+    for (const d of tolti) if (d.length >= 64) assert.equal(dentro.indexOf(d.subarray(0, 64)), -1, 'un file tolto si legge ancora nel contenitore');
+    await s.chiudi();
+    const r = (await apri(base, 'Pacchi')).segreto;
+    await controlla(r);
+    for (const n of attesi.keys()) await r.cancellaFile(n);
+    assert.deepEqual(await r.spazio(), vuoto, 'tolti tutti i file, i pacchi non hanno restituito il posto');
+    await r.chiudi();
+    assert.ok(integra(await impronta(base, 'Pacchi')));
     rmSync(base.contenitore, { force: true });
   });
 });
@@ -545,11 +738,11 @@ describe('usato male', () => {
 
   test('cancellare tutti i file riaccorcia il segreto: lo spazio torna tutto', async () => {
     const s = await crea(base, 'Corto');
-    const vuoto = s.spazio().disponibili;
+    const vuoto = (await s.spazio()).disponibili;
     for (let x = 0; x < 30; x++) await s.scriviFile(`f${x}`, randomBytes(20_000));
-    assert.ok(s.spazio().disponibili < vuoto);
+    assert.ok((await s.spazio()).disponibili < vuoto);
     for (let x = 0; x < 30; x++) await s.cancellaFile(`f${x}`);
-    assert.equal(s.spazio().disponibili, vuoto);
+    assert.equal((await s.spazio()).disponibili, vuoto);
     await s.chiudi();
     const imp = await impronta(base, 'Corto');
     assert.equal(imp.L, 1);
@@ -646,11 +839,13 @@ describe('danni', () => {
 
   // L'elenco dei file fuori dalla testa: perso il suo gruppo, prima si perdeva il segreto intero e la riparazione ne
   // cancellava ogni blocco.
+  const nota = (x) => `nota numero ${x}`.padEnd(F.PICCOLO + 1, '.');
   const conElenco = async (base, nome) => {
     const s = await crea(base, nome);
     const foto = randomBytes(2 * MB);
     await s.scriviFile('foto', foto);
-    for (let x = 0; x < 100; x++) await s.scriviFile(`nota-${x}.txt`, `nota numero ${x}`);
+    // Note da un blocco ciascuna, come i file di prima che i piccoli si raccogliessero insieme: un gruppo perso ne tocca poche.
+    for (let x = 0; x < 100; x++) await s.scriviFile(`nota-${x}.txt`, nota(x));
     await s.chiudi();
     const prima = await impronta(base, nome);
     const c0 = prima.copie.get(0);
@@ -676,7 +871,7 @@ describe('danni', () => {
       // Solo le note che stavano nel gruppo perso risultano rovinate, come per ogni gruppo perso.
       const sane = file.filter((f) => f.nome !== 'foto' && !f.danneggiato);
       assert.ok(sane.length >= 90, `note sane: ${sane.length}`);
-      for (const f of sane) assert.equal((await r.segreto.leggiFile(f.nome)).toString(), `nota numero ${f.nome.slice(5, -4)}`);
+      for (const f of sane) assert.equal((await r.segreto.leggiFile(f.nome)).toString(), nota(f.nome.slice(5, -4)));
       await r.segreto.chiudi();
       assert.ok(integra(await impronta(base, 'Elenco')), 'la riparazione non ha rimesso la copia persa dell’elenco');
     }
@@ -766,6 +961,53 @@ describe('interruzioni', () => {
       assert.ok(integra(await impronta(base, 'T')), `taglio dopo ${n}: ridondanza non tornata`);
       rmSync(base.contenitore, { force: true });
     }
+  });
+
+  // #1271: il vecchio si toglieva prima di scrivere il nuovo; un taglio dopo la cancellazione li perdeva tutti e due.
+  test('a ogni punto di taglio, una sostituzione che ci starebbe solo togliendo prima il vecchio lascia la foto com’era', async () => {
+    const foto = randomBytes(150 * F.CARICO);
+    for (const n of [0, 2, 8, 30, 100, 300, 1000]) {
+      const base = await contenitore(2 * MB);
+      const s = await crea(base, 'T');
+      await s.scriviFile('foto', foto);
+      await conTaglio(n, () => s.scriviFile('foto', randomBytes(200 * F.CARICO)).catch((e) => { if (e.codice !== 'SPAZIO') throw e; }));
+      const r = await apri(base, 'T');
+      assert.ok((await r.segreto.leggiFile('foto')).equals(foto), `taglio dopo ${n} scritture: la foto non è più quella`);
+      await r.segreto.chiudi();
+      rmSync(base.contenitore, { force: true });
+    }
+  });
+
+  test('a ogni punto di taglio, sostituendo e togliendo file piccoli di un pacco: i vicini restano, e di quello tolto non resta un byte', async () => {
+    const grande = randomBytes(12 * F.CARICO);
+    const vicini = Array.from({ length: 5 }, (_, x) => randomBytes(200 + x));
+    const vecchio = randomBytes(300);
+    const nuovo = randomBytes(310);
+    const via = randomBytes(250);
+    let tagliate = 0;
+    for (const n of [0, 1, 2, 3, 5, 8, 13, 21, 34, 55, 89, 144]) {
+      const base = await contenitore(4 * MB);
+      const s = await crea(base, 'T');
+      await s.scriviFile('grande', grande);
+      for (let x = 0; x < vicini.length; x++) await s.scriviFile(`v${x}`, vicini[x]);
+      await s.scriviFile('p', vecchio);
+      await s.scriviFile('via', via);
+      if (await conTaglio(n, async () => { await s.scriviFile('p', nuovo); await s.cancellaFile('via'); })) tagliate++;
+      const r = (await apri(base, 'T')).segreto;
+      for (let x = 0; x < vicini.length; x++) assert.ok((await r.leggiFile(`v${x}`)).equals(vicini[x]), `taglio dopo ${n}: «v${x}» cambiato`);
+      assert.ok((await r.leggiFile('grande')).equals(grande), `taglio dopo ${n}: «grande» cambiato`);
+      const p = await r.leggiFile('p');
+      assert.ok(p.equals(vecchio) || p.equals(nuovo), `taglio dopo ${n}: «p» non è né il vecchio né il nuovo`);
+      const resta = r.elencaFile().some((f) => f.nome === 'via');
+      if (resta) assert.ok((await r.leggiFile('via')).equals(via), `taglio dopo ${n}: «via» rovinato`);
+      await r.chiudi();
+      const dentro = await chiaro(base, 'T');
+      if (p.equals(nuovo)) assert.equal(dentro.indexOf(vecchio), -1, `taglio dopo ${n}: il vecchio «p» si legge ancora`);
+      if (!resta) assert.equal(dentro.indexOf(via), -1, `taglio dopo ${n}: «via» tolto si legge ancora`);
+      assert.ok(integra(await impronta(base, 'T')), `taglio dopo ${n}: ridondanza non tornata`);
+      rmSync(base.contenitore, { force: true });
+    }
+    assert.ok(tagliate >= 8, 'quasi nessun taglio è caduto dentro la scrittura: la prova non prova niente');
   });
 });
 
