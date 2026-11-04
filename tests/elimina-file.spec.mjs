@@ -1,6 +1,6 @@
 // #1909 — «cancella il file X» sposta il file nel cestino del sistema dopo un clic, anche dopo una lettura e mai col
 // riquadro da scrivere; «per sempre» vuole la parola «conferma»; un comando del terminale che cancella senza cestino è un
-// «per sempre». Il modello è finto: chiama lo strumento con il percorso che gli darebbe l'utente.
+// «per sempre». Il modello è finto: chiama lo strumento col percorso che gli darebbe l'utente.
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST, confirmState, clickConfirm, fillConfirmInput } from './helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
