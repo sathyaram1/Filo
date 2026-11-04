@@ -247,27 +247,8 @@
   // { role: 'model'|'user', ts: string|null, body: string } senza i segmenti
   // vuoti (es. note che iniziano direttamente con un marcatore di riapertura).
   function splitNotes(notes) {
-    const lines = righe(notes || '');
-    const segments = [];
-    let current = { role: 'model', ts: null, lines: [], atts: [] };
-    for (const line of lines) {
-      const mu = USER_TURN_RE.exec(line);
-      const mm = mu ? null : MODEL_TURN_RE.exec(line);
-      if (mu) {
-        segments.push(current);
-        current = { role: 'user', ts: (mu[1] || '').trim() || null, lines: [], atts: [] };
-      } else if (mm) {
-        segments.push(current);
-        current = { role: 'model', ts: (mm[1] || '').trim() || null, lines: [], atts: [] };
-      } else {
-        const att = parseAttachmentLine(line);
-        if (att) current.atts.push(att);
-        else current.lines.push(line);
-      }
-    }
-    segments.push(current);
-    return segments
-      .map((s) => ({ role: s.role, ts: s.ts, body: s.lines.join('\n').trim(), attachments: s.atts }))
+    return turniGrezzi(notes)
+      .map((s) => ({ role: s.role, ts: s.ts, body: s.righe.join('\n').trim(), attachments: s.allegati }))
       // Si tiene anche il segmento di soli allegati: una risposta può essere una sola immagine.
       .filter((s) => s.body.length > 0 || s.attachments.length > 0);
   }
