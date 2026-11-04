@@ -899,7 +899,7 @@ async function riscriviGruppi(ctx, S, voci) {
         for (const c of [0, 1]) {
           const i = base + 2 * s + c;
           const sopra = valida(S, g, i);
-          const p = S.pos[i] >= 0 ? S.pos[i] : colloca(ctx, S, i);
+          const p = S.pos[i] >= 0 ? S.pos[i] : await colloca(ctx, S, i);
           if (p < 0) continue;
           const chiaro = componi({ k, c, j: i >> 1, v, inc: S.inc }, c ? par[s] : pieni[s]);
           (sopra ? fase2 : fase1).push({ p, i, chiaro, v, k });
