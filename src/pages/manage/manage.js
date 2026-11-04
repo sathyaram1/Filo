@@ -3143,7 +3143,7 @@
     const lista = nonFidatiInLista();
     if (!lista.length || fidatiInCorso) return;
     if (!fidatiConferma) {
-      if (mgFidatiMsg) mgFidatiMsg.textContent = '';
+      if (mgFidatiMsg) mgFidatiMsg.textContent = fuoriDalBlocco();
       // La conferma cade dove è caduto il primo clic: il tasto non cambia misura (PATTERNS: conferma sul posto).
       mgFidatiBtn.style.minWidth = `${mgFidatiBtn.offsetWidth}px`;
       fidatiConferma = setTimeout(() => { fidatiConferma = null; updateFidatiBar(); }, 6000);
