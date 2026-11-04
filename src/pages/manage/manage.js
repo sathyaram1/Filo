@@ -2931,8 +2931,8 @@
     return `<span class="mg-local-badge" title="${esc(localSignText(fb))}">server</span>`;
   }
   // Lo scudo della fiducia (#1575): pieno se fidata, vuoto e tratteggiato se no; il colore lo ripete il bordo destro.
-  function fiduciaSegnoHtml(x) {
-    const s = MR.segnoFiducia(x);
+  function fiduciaSegnoHtml(x, segno) {
+    const s = segno || MR.segnoFiducia(x);
     return `<span class="mg-fiducia-segno mg-fiducia-segno--${s.classe}" title="${esc(s.testo)}" aria-label="${esc(s.parola)}" role="img">`
       + `<svg viewBox="0 0 16 16" aria-hidden="true"><path d="${FORME_SVG.scudo}"/></svg></span>`;
   }
@@ -5250,22 +5250,35 @@
     }
     if (noteAperte.id !== fb._id) noteAperte = { id: fb._id, chiavi: new Set() };
     const turni = TH.splitNotes(notes);
+    const bolle = [];
     turni.forEach((seg, i) => {
       const when = seg.ts ? ` — ${seg.ts}` : '';
       const who = seg.role === 'user' ? `Tu${when}` : `Filo (lavorazione${when})`;
       const corpo = seg.role === 'user' ? esc(seg.body) : markdownHtml(seg.body);
       const b = appendBubble(seg.role === 'user' ? 'user' : 'model', who, corpo, seg.attachments);
+      bolle.push(b);
       const chiave = `${i}:${seg.body.length}`;
       // L'ultima nota è quella che si legge: resta aperta, e resta aperta anche quando un turno nuovo
       // arriva mentre la si legge (niente che si richiude da solo).
       if (i === turni.length - 1) noteAperte.chiavi.add(chiave);
       else if (righeStimate(seg.body) > NOTA_RIGHE_MAX) ripiegaNota(b, chiave);
     });
+    segnaFiduciaNote(fb, notes, bolle);
     appendFraseBubble(fb);
     // La copia che si sta leggendo è rimasta indietro e il tentativo di
     // rileggerla non è tornato: si dice in coda alla conversazione, dove
     // l'owner sta già guardando.
     if (fb._dettaglioMancato) appendRiprovaDettaglio();
+  }
+
+  // Le impronte si calcolano dopo il disegno; una bolla che un ridisegno ha già tolto non si segna.
+  function segnaFiduciaNote(fb, notes, bolle) {
+    window.SN_FEEDBACK_THREAD.fiduciaDelleNote(notes, fb[window.SN_FEEDBACK_THREAD.CAMPO_NOTE_FIDATE]).then((turni) => {
+      turni.forEach((t, i) => {
+        const who = bolle[i] && bolle[i].isConnected ? bolle[i].querySelector('.mg-bubble-who') : null;
+        if (who) who.insertAdjacentHTML('beforeend', fiduciaSegnoHtml(null, MR.segnoFiduciaNota(t.fidata)));
+      });
+    }).catch(() => {});
   }
 
   // La riga che leggerà chi ha segnalato è l'ULTIMO turno: l'unica cosa che il mittente vede

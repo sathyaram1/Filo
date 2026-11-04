@@ -401,8 +401,8 @@ export function tettoAllegati(perUnita, propri = {}) {
 }
 
 /**
- * Le unite i cui allegati il pacchetto porta e che non sono fidate, o li hanno in una conversazione scritta anche da
- * altri (`daAltri`): con loro il pacchetto nasce non fidato, come un figlio di genitori non fidati. PURA. → ['#N']
+ * Le unite i cui allegati il pacchetto porta e che non sono fidate, o li hanno in una conversazione con note non
+ * fidate (`daAltri`): con loro il pacchetto nasce non fidato, come un figlio di genitori non fidati. PURA. → ['#N']
  */
 export function uniteNonFidate(perUnita) {
   return (Array.isArray(perUnita) ? perUnita : [])
@@ -521,7 +521,7 @@ export const pacchetto = {
   // I riferimenti agli allegati di una unita, compresi quelli della conversazione (cifrata: senza chiave non so se ce ne sono).
   async allegati(u, idToken) {
     const { FIRESTORE_BASE } = await import('./lib/firestore-auth.mjs');
-    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(u.id)}?mask.fieldPaths=images&mask.fieldPaths=files&mask.fieldPaths=notes`, {
+    const res = await fetch(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(u.id)}?mask.fieldPaths=images&mask.fieldPaths=files&mask.fieldPaths=notes&mask.fieldPaths=${THREAD.CAMPO_NOTE_FIDATE}`, {
       headers: { Authorization: `Bearer ${idToken}` },
     });
     if (!res.ok) throw new Error(`lettura degli allegati di #${u.num} fallita (${res.status})`);
@@ -534,8 +534,8 @@ export const pacchetto = {
         throw Object.assign(new Error(`la conversazione di #${u.num} non si decifra (manca la chiave privata?): senza non so se porta allegati`), { definitivo: true });
       }
     }
-    const { motiviDiLettura } = await import('./lib/biglietto-locale.mjs');
-    const daAltri = motiviDiLettura({ fiducia: 'fidato', notes: conversazione }).length > 0;
+    const { noteNonFidate, noteFidateDaCampi } = await import('./lib/biglietto-locale.mjs');
+    const daAltri = (await noteNonFidate(conversazione, noteFidateDaCampi(f))).length > 0;
     return riferimentiAllegati(f, conversazione).map((a) => (a.conversazione && daAltri ? { ...a, daAltri } : a));
   },
   async scarica(a) {

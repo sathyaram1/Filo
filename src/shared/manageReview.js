@@ -2121,6 +2121,17 @@
   function segnoFiducia(x) {
     return isFidato(x) ? SEGNI_FIDUCIA.fidata : SEGNI_FIDUCIA.nonfidata;
   }
+  // Lo stesso scudo su ogni nota della conversazione (#1919): chi la legge si sporca solo per quelle non fidate.
+  const SEGNI_FIDUCIA_NOTA = Object.freeze({
+    fidata: Object.freeze({ classe: 'fidata', parola: 'Nota fidata',
+      testo: 'Nota fidata: l’hai scritta tu, o un lavoro che non aveva letto niente di non fidato. Chi la legge resta pulito.' }),
+    nonfidata: Object.freeze({ classe: 'nonfidata', parola: 'Nota non fidata',
+      testo: 'Nota non fidata: l’ha scritta un lavoro che aveva letto testo non fidato, o è di prima che il server segnasse la fiducia delle note. Chi la legge si sporca.' }),
+  });
+  /** Il segno della fiducia di una nota, da `fidata` di SN_FEEDBACK_THREAD.fiduciaDelleNote. PURA. */
+  function segnoFiduciaNota(fidata) {
+    return fidata === true ? SEGNI_FIDUCIA_NOTA.fidata : SEGNI_FIDUCIA_NOTA.nonfidata;
+  }
 
   /** Il tasto «Frase» da chiuso, uguale in Gestione e nella pagina Feedback (#857): acceso se una
    *  frase c'è già, che si legge intera nell'hover. Soli spazi = nessuna frase. PURA. */
@@ -2161,7 +2172,7 @@
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,
     LIVELLI_RICEVUTI, FORMA_DI_LIVELLO, livelloRicevuti, filtraLivelli, contaLivelliRicevuti,
-    filtraFiducia, contaNonFidate, segnoFiducia,
+    filtraFiducia, contaNonFidate, segnoFiducia, segnoFiduciaNota,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
