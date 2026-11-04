@@ -321,14 +321,19 @@
     return turni.length ? improntaTurno(turni[turni.length - 1].grezzo) : null;
   }
 
-  // Ogni nota con `numero` (da 1) e `fidata`: un turno dell'owner, la riga fissa del taglio, o un'impronta del server.
-  // Senza il campo (note scritte prima) nessuna nota d'altri è fidata.
+  // Un turno da risposta dell'owner che il server ha scritto per chi non è fidato (la chiave owner-non-fidato, una
+  // sessione sporca) ha nel campo la sua impronta con questo prefisso: non vale fidato da sé.
+  const PREFISSO_OWNER_NON_FIDATO = '!';
+
+  // Ogni nota con `numero` (da 1) e `fidata`: un turno dell'owner non segnato col prefisso, la riga fissa del taglio, o
+  // un'impronta del server. Senza il campo (note scritte prima) nessuna nota d'altri è fidata.
   async function fiduciaDelleNote(notes, noteFidate) {
     const fidate = new Set(Array.isArray(noteFidate) ? noteFidate.map(String) : []);
-    return Promise.all(splitNotes(notes).map(async (t, i) => Object.assign({}, t, {
-      numero: i + 1,
-      fidata: t.role === 'user' || t.grezzo === TRIM_MARK || fidate.has(await improntaTurno(t.grezzo)),
-    })));
+    return Promise.all(splitNotes(notes).map(async (t, i) => {
+      const h = await improntaTurno(t.grezzo);
+      const owner = t.role === 'user' && !fidate.has(PREFISSO_OWNER_NON_FIDATO + h);
+      return Object.assign({}, t, { numero: i + 1, fidata: owner || t.grezzo === TRIM_MARK || fidate.has(h) });
+    }));
   }
 
   // Centralizzato qui così il parser e chi scrive restano allineati su una sola forma.
