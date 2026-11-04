@@ -1819,7 +1819,7 @@
         if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
         if (!DAVANTI.has(prog)) break;
         i += 1;
-        while (i < tok.length && (/^[-/]/.test(tok[i]) || tok[i].includes('='))) i += 1;
+        while (i < tok.length && (/^-|^\/[a-z?]{1,2}$/.test(tok[i]) || /^\w+=/.test(tok[i]))) i += 1;
       }
     }
     return false;
