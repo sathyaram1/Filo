@@ -23,7 +23,7 @@ const pagina = (titolo, secondi, attacca = true) => `<!doctype html><title>${tit
 
 const tm = (app, fn, arg) => app.evaluate(({ BrowserWindow }, [src, a]) => {
   const t = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-  return (0, eval)(src)(t, a);
+  return new Function('tm', 'x', `return (${src})(tm, x)`)(t, a);
 }, [fn.toString(), arg]);
 const suona = (app, titolo, audible) => tm(app, (t, [ti, a]) => {
   t.tabs.find((x) => x.title === ti).view.webContents.emit('audio-state-changed', { audible: a });
