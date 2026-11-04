@@ -317,9 +317,8 @@ async function misuraComponentiChiusi(webContents) {
     while (attese.length) await Promise.all(attese.splice(0));
     const trovati = await Promise.all(sessioni.map((s) => quantiTrovaLaRicerca(cmd, s.sid)));
     if (trovati.every((n) => n === 0)) return { campi: [], nonCoperti: false };
-    if (!trovati.includes(null) && trovati.reduce((a, b) => a + b, 0) <= await visti) return { campi: [], nonCoperti: false };
-    const inUnChiuso = codiceInUnChiuso();
-    const conCampi = await Promise.all(sessioni.map((s) => campoInUnChiuso(cmd, s.sid, inUnChiuso)));
+    if (await contiTornano(webContents, cmd, sessioni, trovati)) return { campi: [], nonCoperti: false };
+    const conCampi = await Promise.all(sessioni.map((s) => chiusiConSegreti(dbg, cmd, s.sid)));
     if (!conCampi.some(Boolean)) return { campi: [], nonCoperti: false };
     const alberi = await Promise.all(sessioni.map(async (s) => {
       try { return { ...s, ...radiciChiuse((await cmd('DOM.getDocument', { depth: -1, pierce: true }, s.sid)).root) }; }
