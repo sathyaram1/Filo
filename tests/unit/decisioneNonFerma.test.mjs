@@ -54,7 +54,7 @@ test('[2i?] non ferma: va nella correzione E nel derivato con la domanda; paga i
   assert.deepEqual(tag(d.fix), ['[2i?]']);
   assert.equal(d.derived.length, 1);
   assert.equal(d.derived[0].inCorrezione, true);
-  assert.equal(d.derived[0].priority, 2);
+  assert.equal(d.derived[0].priority, 1, 'un 2 nasce a 1');
   assert.equal(d.consume, 'cap2');
   assert.equal(d.counts.count2, 1);
   const g = R.derivedGroups(d);
