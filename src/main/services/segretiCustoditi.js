@@ -7,8 +7,9 @@ function costanti() {
   return globalThis.SN_CONST;
 }
 
-function decodifica(v) {
-  try { return decodeURIComponent(v); } catch (_) { return v; }
+function guardiano() {
+  if (!globalThis.SN_GUARDIANO_STATICO) require('../../shared/guardianoStatico.js');
+  return globalThis.SN_GUARDIANO_STATICO;
 }
 
 // `impostazioni`: le salvate e le effettive (queste aggiungono la chiave di fabbrica e la personale).
