@@ -771,7 +771,7 @@ export async function main(argvIn) {
   const r = await apri({
     titolo, testo: copie && copie.origine ? `${String(testo || '').trim()}\n\n${copie.origine}` : testo, url, priorita: prioritaScelta,
     allegati: copie ? [...allegati, ...copie.immagini, ...copie.documenti] : allegati,
-    dryRun, idToken: cred.idToken, locale, attese: listaAttese, unisce: unite,
+    dryRun, idToken: cred.idToken, locale, attese: delPacchetto.attese, unisce: unite,
     nonFidato: copie && copie.nonFidate.length ? `porta allegati di ${copie.nonFidate.join(', ')}, scritti da chi non è fidato` : '',
   });
   if (!r.ok) {
