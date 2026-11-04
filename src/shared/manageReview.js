@@ -1642,7 +1642,7 @@
     da_riallineare: {
       attende: false, chiusure: false, classe: 'spam', etichetta: 'da riallineare',
       titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e ti arriva una richiesta nuova solo se serve',
-      testo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e rifà i controlli, e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.',
+      testo: '',
     },
     riallineamento_fallito: {
       attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione non avvenuta',
