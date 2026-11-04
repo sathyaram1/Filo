@@ -66,7 +66,6 @@ test('la scheda col testo non inviato resta aperta, e un avviso dice perché', a
   await expect.poll(() => schede(app).then((s) => s.urls.length), { timeout: 8_000 }).toBe(2);
   const dopo = await schede(app);
   expect(dopo.activeId).toBe(idTenuta);
-  expect(dopo.urls.some((u) => /Bozza|bozza/.test(u)) || dopo.urls.length === 2).toBe(true);
   const titoli = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.title).sort());
   expect(titoli).toEqual(['Bozza', 'Tenuta']);
   const vista = await avvisi();
