@@ -30,8 +30,11 @@ const FRASE_MAX = 300;
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
   'grazie', 'scusa', 'scusami', 'aspetta', 'guarda', 'okay', 'sure', 'there', 'sorry', 'thanks', 'ecco']);
-// Dopo queste parole viene il dato, anche in fondo a una risposta lunga: «…non me la ricordo mai, è gattonero».
-const PRESENTA_DATO = new Set(['è', "e'", 'e’', 'is', '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
+// Le parole che annunciano il dato subito dopo («…non me la ricordo mai, era gattonero»): un elenco solo per la risposta
+// in chat e per le forme libere.
+const ANNUNCI = ['è', "e'", 'e’', 'era', 'sarebbe', 'is', 'was'];
+const ANNUNCIO = `(?:${ANNUNCI.map(esc).join('|')})`;
+const PRESENTA_DATO = new Set([...ANNUNCI, '=', 'ecco', 'eccola', 'eccolo', 'eccotela', 'eccotelo']);
 const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
 // Una parola di sole lettere conta come password solo nelle prime parole della risposta o dopo PRESENTA_DATO: più in là
 // è il resto del messaggio. Quelle con cifre o simboli contano fino a RISPOSTA_MAX.
