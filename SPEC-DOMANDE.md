@@ -513,13 +513,19 @@ rispondere.
      'doppione', doppioneDi: 'D-k' }`, il testo dello smistamento nella sua
      conversazione); il suo testo intero (titolo, contesto, problema, opzioni,
      consiglio, note per gli agenti) si aggiunge alle note per gli agenti di
-     D-k, col numero, così chi riprende dopo la risposta lo legge; nella
-     conversazione del feedback una riga dice «D-n chiusa come doppione di
-     D-k». Se questa fermava il lavoro e D-k no, il lavoro aspetta D-k: l'id di
-     D-k prende il posto di questa fra le `domandeBloccanti` del feedback, e
-     la risposta a D-k lo libera come libera una bloccante. Le note di D-k
-     oltre il loro tetto non si tagliano: il server rifiuta col numero, e lo
-     smistamento pubblica (passo 4) nominando D-k.
+     D-k, col numero, così chi riprende dopo la risposta lo legge, e D-k ne
+     prende la fiducia; nella conversazione del feedback una riga dice «D-n
+     chiusa come doppione di D-k» (scritta subito dopo la transazione: è una
+     scrittura del feedback a sé). Se questa fermava il lavoro e D-k no, il
+     lavoro aspetta D-k: D-k diventa bloccante (`blocca`, la provvisoria non
+     vale più), prende il posto di questa fra le `domandeBloccanti` del
+     feedback (e in `domandaId`, se il feedback nominava questa), e la
+     risposta a D-k lo libera come libera una bloccante. Per questo il server
+     rifiuta anche una D-k che il lavoro non potrebbe aspettare: una già
+     risposta (`in_lavorazione`) o una senza un'opzione che riprende il
+     lavoro. Le note di D-k oltre il loro tetto non si tagliano: il server
+     rifiuta col numero. Davanti a ogni rifiuto lo smistamento pubblica
+     (passo 4) nominando D-k.
   3. **Il registro risponde.** Se il principio di una domanda chiusa copre il
      caso, risponde lui: l'opzione che il principio indica, e un testo che
      cita il principio e la domanda da cui viene. La domanda si chiude con
