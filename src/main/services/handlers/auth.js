@@ -72,62 +72,57 @@ function erroreSegno(e) {
   return e?.message || 'Non riuscito.';
 }
 
-// Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
-// protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
+// Un errore di una callable dell'owner detto all'owner, uno per tutte. Prima del deploy la callable non esiste (404 senza
+// codice del protocollo): lo si dice, non «riprova»; un server più vecchio dell'app che non conosce l'op lo dice con
+// `nonAncora`. Un 404 col codice è una cosa che non c'è, e la frase è del server.
+function erroreCallable(e, { nonPubblicata, nonPuo, nonAncora = '', sconosciuta = () => false }) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return nonPubblicata;
+  if (nonAncora && sconosciuta(e, detail)) return nonAncora;
+  if (code === 'PERMISSION_DENIED') return nonPuo;
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
 function erroreDomande(e, nonAncora) {
-  const code = String(e?.code || '').toUpperCase();
-  const detail = String(e?.detail || '').trim();
-  if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
-  if (nonAncora && e?.reason === 'operazione_sconosciuta') return nonAncora;
-  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
-  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
-  if (detail) return detail;
-  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
-  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
-  return e?.message || 'Non riuscito.';
+  return erroreCallable(e, {
+    nonPubblicata: 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.',
+    nonPuo: 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.',
+    nonAncora, sconosciuta: (x) => x?.reason === 'operazione_sconosciuta',
+  });
 }
 
-// Un errore delle callable riservate all'owner (#1926) detto all'owner. Un server più vecchio dell'app non ha la
-// callable (404 senza codice) o non conosce l'op: lo si dice con `nonAncora`, invece del codice grezzo.
+// Le callable riservate all'owner (#1926). Un'op sconosciuta un server vecchio la dice in tre modi: col motivo, con la
+// frase, o (ownerManutentore) con l'elenco delle op che conosce, «op: a, b, c».
 function erroreOwner(e, { cosa = 'questa', nonAncora = '' } = {}) {
-  const code = String(e?.code || '').toUpperCase();
-  const detail = String(e?.detail || '').trim();
-  if (e?.httpStatus === 404 && !code) return `Il server non offre ancora questa funzione (${cosa}): arriva col prossimo aggiornamento del server.`;
-  if (nonAncora && (/sconosciut/i.test(String(e?.reason || '')) || /operazione sconosciuta|unknown op/i.test(detail))) return nonAncora;
-  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può farlo: serve quello del proprietario.';
-  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
-  if (detail) return detail;
-  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
-  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
-  return e?.message || 'Non riuscito.';
+  return erroreCallable(e, {
+    nonPubblicata: `Il server non offre ancora questa funzione (${cosa}): arriva col prossimo aggiornamento del server.`,
+    nonPuo: 'Il server dice che questo account non può farlo: serve quello del proprietario.',
+    nonAncora,
+    sconosciuta: (x, detail) => /sconosciut/i.test(String(x?.reason || '')) || /operazione sconosciuta|unknown op/i.test(detail)
+      || (x?.reason === 'malformed' && /^op: /.test(detail)),
+  });
 }
 
-// Un errore di ownerCrediti detto all'owner. Su un numero fuori misura la spiegazione è del server.
+// Su un numero fuori misura la spiegazione è del server.
 function erroreCrediti(e) {
-  const code = String(e?.code || '').toUpperCase();
-  const detail = String(e?.detail || '').trim();
-  if (e?.httpStatus === 404 && !code) return 'I crediti delle routine non sono ancora pubblicati sul server.';
-  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può toccare i crediti: serve quello del proprietario.';
-  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
-  if (detail) return detail;
-  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
-  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
-  return e?.message || 'Non riuscito.';
+  return erroreCallable(e, {
+    nonPubblicata: 'I crediti delle routine non sono ancora pubblicati sul server.',
+    nonPuo: 'Il server dice che questo account non può toccare i crediti: serve quello del proprietario.',
+  });
 }
 
-// Un errore di ownerCompiti detto all'owner. Prima del deploy la callable non esiste (404 senza codice), e un server
-// più vecchio dell'app non conosce l'op (`op_sconosciuta`): lo si dice, con `nonAncora` per le op nuove.
+// I compiti nuovi: un server più vecchio dell'app risponde `op_sconosciuta`.
 function erroreCompiti(e, nonAncora) {
-  const code = String(e?.code || '').toUpperCase();
-  const detail = String(e?.detail || '').trim();
-  if (e?.httpStatus === 404 && !code) return 'I compiti non sono ancora pubblicati sul server: arrivano col prossimo aggiornamento del server.';
-  if (nonAncora && e?.reason === 'op_sconosciuta') return nonAncora;
-  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere i compiti: serve quello del proprietario.';
-  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
-  if (detail) return detail;
-  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
-  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
-  return e?.message || 'Non riuscito.';
+  return erroreCallable(e, {
+    nonPubblicata: 'I compiti non sono ancora pubblicati sul server: arrivano col prossimo aggiornamento del server.',
+    nonPuo: 'Il server dice che questo account non può vedere i compiti: serve quello del proprietario.',
+    nonAncora, sconosciuta: (x) => x?.reason === 'op_sconosciuta',
+  });
 }
 
 // Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.

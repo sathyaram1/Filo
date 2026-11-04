@@ -164,8 +164,12 @@ test('ordine del manutentore: i numeri puliti vanno al server, vuoto lo svuota, 
   const n = await chiama({ type: MSG.MANUTENTORE_ORDINE_SET, ordine: ['812', 'ciao'] });
   assert.match(n.error, /non sono numeri di feedback: ciao/);
   assert.equal(ricevute.length, 0);
-  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'Operazione sconosciuta: ordine', details: { reason: 'operazione_sconosciuta' } } } });
+  // Un server senza l'op «ordine» risponde come il server vero di prima: motivo `malformed` e l'elenco delle op che conosce.
+  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'op: taccuino, taccuino.scrivi, indicazione, recap, stato, sveglia, transizione, sblocca', details: { reason: 'malformed' } } } });
   assert.match((await chiama({ type: MSG.MANUTENTORE_ORDINE_SET, ordine: ['812'] })).error, /non sa ancora prendere l’ordine da qui/);
+  // Un rifiuto vero del server resta suo.
+  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'ordine è una lista di numeri di feedback, anche vuota', details: { reason: 'malformed' } } } });
+  assert.equal((await chiama({ type: MSG.MANUTENTORE_ORDINE_SET, ordine: ['812'] })).error, 'ordine è una lista di numeri di feedback, anche vuota');
 });
 
 test('«segna fidati» in blocco: uno per feedback, un esito per ognuno, un tetto che si dice', async () => {
