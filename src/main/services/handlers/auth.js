@@ -316,9 +316,17 @@ module.exports = function register(on, ctx) {
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
-  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
-  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
-  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
+  // Ai siti la porta dell'accesso è chiusa (#1132): il pannello del red-team che gira sopra di loro chiede con
+  // AUTH_SIGNIN_CLIC, legato a un clic vero. A un sito torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, soloFilo((msg, sender, origin) => accedi(origin, sender)));
+  on(MSG.AUTH_SIGNIN_CLIC, async (msg, sender, origin) => {
+    const Permessi = require('../permessiPagine');
+    if (!daFilo(origin, sender) && !Permessi.gestoDellUtente(sender && sender.wc)) {
+      return { ok: false, code: 'gesto', error: 'Premi di nuovo per accedere.' };
+    }
+    return accedi(origin, sender);
+  });
+  async function accedi(origin, sender) {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
