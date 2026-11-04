@@ -495,6 +495,16 @@ export function lettiDi(ids) {
   return (Array.isArray(ids) ? ids : []).filter((id) => /^D-\d{1,9}$/.test(String(id))).map((id) => ({ tipo: 'domanda', id: String(id) }));
 }
 
+/**
+ * Gli id delle domande fidate per timbri (con radici, senza il sì dell'owner sul testo): non sporcano, ma il server
+ * lascia le loro radici alla sessione, perché un timbro tolto la raggiunga (#1918). PURA.
+ */
+export function fidatePerTimbri(domande) {
+  return (Array.isArray(domande) ? domande : [])
+    .filter((d) => d && d.fiducia === 'fidato' && Array.isArray(d.radici) && d.radici.length && !(d.fidataDallOwner && typeof d.fidataDallOwner === 'object'))
+    .map((d) => String(d.id || '?'));
+}
+
 /** Gli id delle domande il cui testo non è fidato (fiducia assente compresa). PURA. */
 export function nonFidate(domande) {
   return (Array.isArray(domande) ? domande : []).filter((d) => d && d.fiducia !== 'fidato').map((d) => String(d.id || '?'));
@@ -612,7 +622,7 @@ export async function esegui(argv, io = {}) {
       }
       const r = await chiama({ op: 'registro', parole: a.parole });
       const nf = nonFidate(r.voci);
-      if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)], { letti: lettiDi(nf) }));
+      if (nf.length || fidatePerTimbri(r.voci).length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [nf.length ? motivoNonFidate(nf) : 'domande fidate per timbri'], { letti: lettiDi(nf.concat(fidatePerTimbri(r.voci))) }));
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
       return 0;
     }
@@ -620,14 +630,14 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'mostra') {
       const r = await chiama({ op: 'mostra', id: a.id });
       const nf = nonFidate([r.domanda]);
-      if (nf.length) errore(await sporca(`letta ${visibile(a.id)}`, [motivoNonFidate(nf)], { letti: lettiDi(nf) }));
+      if (nf.length || fidatePerTimbri([r.domanda]).length) errore(await sporca(`letta ${visibile(a.id)}`, [nf.length ? motivoNonFidate(nf) : 'domande fidate per timbri'], { letti: lettiDi(nf.concat(fidatePerTimbri([r.domanda]))) }));
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
     }
     if (a.cmd === 'elenco') {
       const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
       const nf = nonFidate(r.domande);
-      if (nf.length) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)], { letti: lettiDi(nf) }));
+      if (nf.length || fidatePerTimbri(r.domande).length) errore(await sporca('elenco delle domande', [nf.length ? motivoNonFidate(nf) : 'domande fidate per timbri'], { letti: lettiDi(nf.concat(fidatePerTimbri(r.domande))) }));
       scrivi(formattaConteggi(conteggiDi(r.domande, r.conteggi)));
       scrivi('');
       scrivi(formattaElenco(r.domande));

@@ -41,12 +41,18 @@
   function disegna(box, lista, alClic) {
     if (!box) return;
     box.textContent = '';
+    // Una lettura una radice: tre pagine dello stesso sito sono tre chip, e senza un numero sembrerebbero uno.
+    const quante = new Map();
+    for (const x of lista) quante.set(etichetta(x), (quante.get(etichetta(x)) || 0) + 1);
+    const viste = new Map();
     for (const x of lista) {
+      const nome = etichetta(x);
+      viste.set(nome, (viste.get(nome) || 0) + 1);
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'mg-radice';
       b.dataset.radice = x.radice;
-      b.textContent = `${x.timbrata ? '✓ ' : ''}${etichetta(x)}`;
+      b.textContent = `${x.timbrata ? '✓ ' : ''}${nome}${quante.get(nome) > 1 ? ` ${viste.get(nome)}` : ''}`;
       b.title = titolo(x);
       b.setAttribute('aria-pressed', x.timbrata ? 'true' : 'false');
       b.disabled = x.timbrabile === false;
