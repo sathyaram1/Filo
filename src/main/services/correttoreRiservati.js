@@ -25,6 +25,7 @@ const ETICHETTE_CORTE = '(?<![\\p{L}\\p{N}])(?:pw|(?:l[ae]|mia|tua|sua)\\s+pass|
   + '|chiave\\s+(?:(?:del(?:la)?|di)\\s+)?(?:wi-?fi|rete|router))(?![\\p{L}\\p{N}])';
 const CHIESTA_IN_CHAT = `${ETICHETTE_CORTE}|(?<![\\p{L}\\p{N}])credenziali(?![\\p{L}\\p{N}])`;
 const FINE_FRASE = /[.!?]+(?=\s|$)|\n/g;
+const FRASE_MAX = 300;
 // Come apre una risposta, prima del dato: «certo, …», «eccola: …».
 const AVVII = new Set(['certo', 'certa', 'certamente', 'sicuro', 'sicura', 'ovvio', 'ovviamente', 'eccola', 'eccolo',
   'eccoti', 'eccotela', 'eccotelo', 'tieni', 'allora', 'dunque', 'comunque', 'subito', 'volentieri', 'figurati', 'prego',
@@ -79,11 +80,10 @@ function menzioni(l) {
 function richieste(l, tutte = false) {
   const out = [];
   for (const m of menzioni(l)) {
-    const fine = new RegExp(FINE_FRASE.source, 'g');
-    fine.lastIndex = m.j;
-    const f = fine.exec(l);
-    const a = f ? f.index + f[0].length : l.length;
-    const frase = () => l.slice(Math.max(0, m.i - 300), m.i).split(/[.!?]+\s|\n/).pop() + l.slice(m.i, a);
+    // La frase si cerca in un tratto corto: un testo lungo senza punti, con la parola ripetuta, non diventa quadratico.
+    const f = new RegExp(FINE_FRASE.source, 'g').exec(l.slice(m.j, m.j + FRASE_MAX));
+    const a = f ? m.j + f.index + f[0].length : Math.min(l.length, m.j + FRASE_MAX);
+    const frase = () => l.slice(Math.max(0, m.i - FRASE_MAX), m.i).split(/[.!?]+\s|\n/).pop() + l.slice(m.i, a);
     const chiesta = !!((f && f[0].includes('?')) || RICHIESTA.test(frase()));
     if (chiesta || (tutte && m.tipo === 'password')) out.push({ inizio: m.i, fine: a, tipo: m.tipo, chiesta });
   }
