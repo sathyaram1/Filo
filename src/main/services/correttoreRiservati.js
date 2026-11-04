@@ -38,8 +38,9 @@ const SALUTO = /^(?:ciao+|ehi|ehilà|hey|hi|hello|salve|buongiorno|buonasera)$/;
 const PAROLE_RISPOSTA = 12;
 const RISPOSTA_MAX = 2000;
 // Il campo risponde all'ultimo messaggio che nomina la password finché sotto non scrive qualcun altro e non c'è molto
-// altro: solleciti («ci sei?») e seconde domande dello stesso non sciolgono il legame (#1446.4).
-const DOPO_LA_RICHIESTA = 300;
+// altro: solleciti («ci sei?») e seconde domande dello stesso non sciolgono il legame (#1446.4). Nella pagina vera fra
+// i solleciti stanno orari e messaggi senza nome: il tetto regge una decina di messaggi.
+const DOPO_LA_RICHIESTA = 1000;
 const SOPRA_MAX = 1500;
 // «Marco: …» a inizio riga: chi scrive il messaggio.
 const PARLA = /^[^\S\n]*(\p{L}[\p{L}\p{N} ._'’-]{0,30}?)[^\S\n]*:\s/u;
