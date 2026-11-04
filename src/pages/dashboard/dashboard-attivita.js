@@ -1989,13 +1989,13 @@
           btn.after(nota);
         }
         nota.textContent = e.motivo;
-        pannelloSenzaEsito(a, chat, { motivo: e.motivo });
+        pannelloSenzaEsito(a, chat, { motivo: e.motivo, gruppo });
         return;
       }
       if (nota) nota.remove();
       btn.textContent = `✓ ${e.testo}`;
       segnaConfermata(a, { archived: r.archived || 0 }, activity, null, { chat });
-      proseguiQuandoLibero(chat, voceDellaConferma(a));
+      proseguiQuandoLibero(chat, voceDellaConferma(a), gruppo, a);
     });
     return btn;
   }
