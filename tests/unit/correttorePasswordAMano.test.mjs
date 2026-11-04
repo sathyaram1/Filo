@@ -104,3 +104,11 @@ test('#1649: le porte nuove non prendono nomi di prodotto, utenti, ticket e codi
     'SSID: CasaRossi\nCanale: 11',
   ]) assert.deepEqual(R.formeLibere(t), [], t);
 });
+
+// Un testo lungo senza punti, con la parola ripetuta, cercava la fine della frase da capo a ogni menzione: 200 mila
+// caratteri erano 17 secondi a ogni richiesta del correttore, e i refusi contati come menzioni li moltiplicavano.
+test('un testo lunghissimo che ripete la parola password senza punti si legge in fretta', () => {
+  const t0 = Date.now();
+  R.oscura('pasword passowrd password '.repeat(12000));
+  assert.ok(Date.now() - t0 < 5000, `${Date.now() - t0} ms`);
+});
