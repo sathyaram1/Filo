@@ -164,18 +164,9 @@ async function chatCheGuarda(app, finestra) {
   }, finestra);
 }
 
-test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scritto nel campo della carta arriva coperto', async ({ app, openTab, testServer }) => {
-  test.setTimeout(120_000);
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento con carta</title></head><body style="margin:0">
-    <div style="height:120px;background:${tinta(VERDE)}"></div>
-    <form style="padding:20px"><input id="c" name="q" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0"></form>
-    </body></html>`);
-  await superaAvvisoSeCe(app);
-  await page.fill('#c', '4111 1111 1111 1111');
-  await page.locator('#c').blur();
-
-  // La seconda finestra, con la chat in vista: la si riconosce dal segno che il main le mette. Può ripristinare le
-  // schede della prima: la chat si apre a parte, davanti.
+// La seconda finestra, con la chat in vista: la si riconosce dal segno che il main le mette. Può ripristinare le
+// schede della prima: la chat si apre a parte, davanti.
+async function secondaFinestraConChat(app) {
   await app.evaluate(async ({ BrowserWindow }) => {
     const rq = process.mainModule.require;
     const prima = new Set(BrowserWindow.getAllWindows().map((w) => w.id));
@@ -205,6 +196,20 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
     return false;
   }, { timeout: 15_000 }).toBe(true);
   await expect(chat.locator('#input')).toBeVisible({ timeout: 8_000 });
+  return chat;
+}
+
+test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scritto nel campo della carta arriva coperto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento con carta</title></head><body style="margin:0">
+    <div style="height:120px;background:${tinta(VERDE)}"></div>
+    <form style="padding:20px"><input id="c" name="q" style="width:420px;font:bold 34px monospace;color:${tinta(ROSA)};background:#fff;border:1px solid #999;caret-color:transparent;outline:0"></form>
+    </body></html>`);
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await page.locator('#c').blur();
+
+  const chat = await secondaFinestraConChat(app);
 
   await chatCheGuarda(app, 'Pagamento con carta');
   await chiedi(chat, 'cosa c’è nella finestra del pagamento?');
@@ -213,6 +218,26 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare la foto della finestra del pagamento').toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
 });
+
+// Lo Screenshot dal menu della scheda «Conto»: torna la foto che l'utente scarica.
+async function scattaScreenshot(app, page) {
+  let utente = null;
+  await expect.poll(async () => {
+    await page.mouse.click(5, 5);
+    utente = await app.evaluate(async ({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+      const tab = tm.tabs.find((t) => t.title === 'Conto');
+      return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `(async () => {
+        HTMLAnchorElement.prototype.click = function () { window.__foto = this.href; };
+        window.__foto = null;
+        await SN_ACTIONS.takeScreenshot();
+        return window.__foto;
+      })()` }], true);
+    });
+    return Boolean(utente);
+  }, { timeout: 20_000 }).toBe(true);
+  return utente;
+}
 
 // Lo Screenshot dal menu: l'utente tiene la foto intera, il modello che sceglie il nome del file la riceve coperta.
 test('#1537: nello Screenshot il modello che sceglie il nome vede il riquadro di un altro sito coperto, l’utente intero', async ({ app, openTab, testServer }) => {
@@ -229,21 +254,7 @@ test('#1537: nello Screenshot il modello che sceglie il nome vede il riquadro di
   });
   await aiutoFinto(app);
 
-  let utente = null;
-  await expect.poll(async () => {
-    await page.mouse.click(5, 5);
-    utente = await app.evaluate(async ({ BrowserWindow }) => {
-      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
-      const tab = tm.tabs.find((t) => t.title === 'Conto');
-      return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `(async () => {
-        HTMLAnchorElement.prototype.click = function () { window.__foto = this.href; };
-        window.__foto = null;
-        await SN_ACTIONS.takeScreenshot();
-        return window.__foto;
-      })()` }], true);
-    });
-    return Boolean(utente);
-  }, { timeout: 20_000 }).toBe(true);
+  const utente = await scattaScreenshot(app, page);
   const alModello = await app.evaluate(() => {
     const parte = globalThis.__visti.flatMap((m) => m).flatMap((m) => (Array.isArray(m.content) ? m.content : []))
       .find((p) => p.type === 'image_url');
@@ -252,4 +263,44 @@ test('#1537: nello Screenshot il modello che sceglie il nome vede il riquadro di
   expect(alModello, 'la foto deve arrivare al modello del nome').toMatch(/^data:image\//);
   expect(await pixelDelColore(app, alModello, ROSA), 'il riquadro dell’altro sito si vede nella foto per il modello').toBeLessThan(20);
   expect(await pixelDelColore(app, utente, ROSA), 'lo screenshot dell’utente resta intero').toBeGreaterThan(20_000);
+});
+
+// Un riquadro di un altro sito in un componente chiuso non si può coprire: le altre due strade non ripiegano sulla
+// foto intera.
+const CONTO_CHIUSO = (altro, titolo) => `<!doctype html><html><head><title>${titolo}</title></head><body style="margin:0">
+  <h1>Il tuo conto</h1><div id="ospite"></div>
+  <script>document.getElementById('ospite').attachShadow({ mode: 'closed' }).innerHTML =
+    '<iframe src="${altro}" style="width:300px;height:200px;border:0"></iframe>';</script></body></html>`;
+
+test('#810.17: la finestra guardata dalla chat con un riquadro che non si può coprire: al modello solo il perché', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo</body>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, CONTO_CHIUSO(altro, 'Estratto conto'));
+  await expect.poll(() => page.frames().some((f) => f.url().includes('sito-pubblico.test')), { timeout: 10_000 }).toBe(true);
+  const chat = await secondaFinestraConChat(app);
+  await chatCheGuarda(app, 'Estratto conto');
+  await chiedi(chat, 'cosa c’è nella finestra del conto?');
+  await expect.poll(() => app.evaluate(() => globalThis.__chat.length), { timeout: 30_000 }).toBeGreaterThan(1);
+  expect(await app.evaluate(() => globalThis.__occhio.length), 'la foto col riquadro scoperto non deve partire').toBe(0);
+  const secondo = await app.evaluate(() => globalThis.__chat[1]);
+  expect(secondo).toContain('la foto non è partita: un riquadro di un altro sito');
+});
+
+test('#1537: nello Screenshot con un riquadro che non si può coprire il modello del nome resta senza foto, l’utente la tiene', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo</body>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, CONTO_CHIUSO(altro, 'Conto'));
+  await expect.poll(() => page.frames().some((f) => f.url().includes('sito-pubblico.test')), { timeout: 10_000 }).toBe(true);
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models }, modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+    });
+  });
+  await aiutoFinto(app);
+  const utente = await scattaScreenshot(app, page);
+  expect(await pixelDelColore(app, utente, ROSA), 'lo screenshot dell’utente resta intero').toBeGreaterThan(20_000);
+  const immagini = await app.evaluate(() => globalThis.__visti.flatMap((m) => m)
+    .flatMap((m) => (Array.isArray(m.content) ? m.content : [])).filter((p) => p.type === 'image_url').length);
+  expect(immagini, 'la foto scoperta è arrivata al modello del nome').toBe(0);
 });
