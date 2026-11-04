@@ -477,10 +477,16 @@ rispondere.
   Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
-  d'origine con conversazione e note; il registro dei principi come per il
-  compito della risposta (fuori dall'ambiente dei riservati è `assente`, e il
-  passo 2 si salta). Il compito legge testo scritto da altri: è non fidato, e
-  quello che scrive nasce non fidato. La fiducia della domanda non cambia.
+  d'origine con conversazione e note; `vive`, le altre domande vive
+  (`in_smistamento`, `aperta`, `in_lavorazione`) sullo stesso feedback
+  d'origine, provvisorie comprese (#1928): dalla più recente, al più 20, con
+  `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
+  `titolo`, `contesto`, `problema`, `opzioni`, `consiglio`, `blocca`,
+  `provvisoria`, mai le note per gli agenti; senza feedback d'origine il campo
+  non c'è. Il registro dei principi come per il compito della risposta (fuori
+  dall'ambiente dei riservati è `assente`, e il passo 3 si salta). Il compito
+  legge testo scritto da altri: è non fidato, e quello che scrive nasce non
+  fidato. La fiducia della domanda non cambia.
 - **Cosa fa, in ordine** (`routines/roles/smistamento.md`):
   1. **Un guasto o un difetto di uno strumento** (dal gruppo «guasto: …» o dal
      contenuto: spinta rifiutata, permesso negato, clone che non parte,
