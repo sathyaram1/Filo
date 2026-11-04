@@ -1061,6 +1061,8 @@
   function fineDi(f) {
     const s = String(f == null ? '' : f).toLowerCase();
     if (s === 'content_filter') return 'filtro';
+    // Il tetto finito nel ragionamento (#1302) resta, per i contatori, un tetto raggiunto.
+    if (s === 'tetto_ragionamento') return 'length';
     return ['stop', 'length', 'tool_calls', 'error'].includes(s) ? s : ALTRO;
   }
   function tentativoDi(t) {

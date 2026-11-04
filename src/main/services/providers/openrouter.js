@@ -531,6 +531,12 @@
     }));
   }
 
+  // Un 'length' speso quasi tutto nel ragionamento si dice a parte (#1302): la regola sta in SN_CHAT_ERRORS.
+  const motivoFine = (fr, usage) => {
+    const CE = global.SN_CHAT_ERRORS;
+    return CE && typeof CE.motivoFine === 'function' ? CE.motivoFine(fr, usage) : fr;
+  };
+
   // Il tetto della risposta (#1097.3): un modello che si incarta si ferma lì, e `finish_reason: 'length'` lo dice.
   function maxTokensField(maxTokens) {
     const n = Math.round(Number(maxTokens));
@@ -569,11 +575,12 @@
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
     const usage = data.usage || {};
+    const fine = motivoFine(data.choices?.[0]?.finish_reason || null, { reasoningTokens: reasoningTokensOf(usage), completionTokens: usage.completion_tokens });
     return {
       text,
       toolCalls: flatToolCalls(message.tool_calls),
       reasoningDetails: Ragionamento.conImpronta(message.reasoning_details, inviati.impronta),
-      finishReason: data.choices?.[0]?.finish_reason || null,
+      finishReason: fine,
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
       ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
@@ -693,7 +700,7 @@
       throw err;
     }
     return {
-      text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason, servedBy,
+      text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason: motivoFine(finishReason, usage), servedBy,
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
       ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
       ...(tettoSceso ? { tettoSceso } : {}),

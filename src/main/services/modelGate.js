@@ -255,12 +255,20 @@
       }
     }
 
-    async function chainFor({ action, settings, attempts }) {
+    async function chainFor({ action, settings, attempts, messages }) {
       const s = settings || await getSettings();
-      const chain = attempts || buildChain(s, modelFor(s, action), action);
+      const chain = conSpazioPerIlSeguito(attempts || buildChain(s, modelFor(s, action), action), messages);
       await ensureUnderLimit(s);
       contaServizio('catena', action, chain);
       return { s, chain };
+    }
+
+    // Un «Continua» riparte con un tetto più largo (#1302): copie, perché la catena che arriva da fuori torna a ogni giro.
+    function conSpazioPerIlSeguito(chain, messages) {
+      const CE = globalThis.SN_CHAT_ERRORS;
+      const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+      if (!CE || !LR || !Array.isArray(chain) || !CE.chiedeIlSeguito(messages)) return chain;
+      return chain.map((a) => (a && a.maxTokens ? { ...a, maxTokens: LR.perSeguito(a.maxTokens) } : a));
     }
 
     async function settleChain(s, action, chain, r, m = MUTO) {
@@ -285,7 +293,7 @@
     }
 
     async function completeMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}, m) {
-      const { s, chain } = await chainFor({ action, settings, attempts });
+      const { s, chain } = await chainFor({ action, settings, attempts, messages });
       let r;
       try {
         const daMandare = await senzaSegreti(messages, action);
@@ -316,7 +324,7 @@
     }
 
     async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}, m) {
-      const { s, chain } = await chainFor({ action, settings, attempts });
+      const { s, chain } = await chainFor({ action, settings, attempts, messages });
       let r;
       try {
         const daMandare = await senzaSegreti(messages, action);

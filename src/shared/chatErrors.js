@@ -472,6 +472,21 @@
   }
   // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
   const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  // La home lo chiede con un messaggio interno, che l'utente non vede.
+  const CHIEDI_SEGUITO_HOME = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
+    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
+  // L'ultima domanda dell'utente in `messages` è la richiesta del seguito: il giro ha più spazio (#1302).
+  function chiedeIlSeguito(messages) {
+    const lista = Array.isArray(messages) ? messages : [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const m = lista[i];
+      if (!m || m.role !== 'user') continue;
+      const c = m.content;
+      const testo = typeof c === 'string' ? c : (Array.isArray(c) ? c.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('\n') : '');
+      return testo.includes(CHIEDI_SEGUITO) || testo.includes(CHIEDI_SEGUITO_HOME);
+    }
+    return false;
+  }
   const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
   // Per chi legge la risposta come dati (JSON, memoria riscritta, un nome): un pezzo non si usa, si dice.
   // `vuota`: il tetto è finito prima di una sola parola da mostrare, di solito nel ragionamento.
@@ -529,7 +544,7 @@
   }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };
