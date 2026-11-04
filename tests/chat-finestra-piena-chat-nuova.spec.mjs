@@ -113,3 +113,59 @@ test('anche dopo un «Riprova» che sbatte di nuovo, «Chat nuova» rimette l\'i
     await ripristina(app);
   }
 });
+
+// Il messaggio rimesso viene prima della bozza in tutto: la sua foto prima di quella incollata dopo l'errore.
+test('«Chat nuova»: la foto del messaggio rimesso viene prima di quella della bozza, come il suo testo', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    const page = await newtabPage(app);
+    await configureModel(app);
+    await finestraSemprePiena(app);
+    await incollaFoto(page, '#c0392b');
+    await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
+    await page.locator('#input').fill('cerca sentieri come quello della foto');
+    await page.locator('#sendBtn').click();
+    const errore = page.locator('.dash-bubble-filo', { hasText: 'chat nuova' });
+    await expect(errore).toBeVisible({ timeout: 40_000 });
+    const originale = await page.locator('.dash-bubble-user img.dash-bubble-img').first().getAttribute('src');
+    await page.locator('#input').fill('e questa foto?');
+    await incollaFoto(page, '#2980b9');
+    await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(1, { timeout: 5_000 });
+    await errore.locator('button', { hasText: 'Chat nuova' }).click();
+    await expect(page.locator('#input')).toHaveValue('cerca sentieri come quello della foto\ne questa foto?');
+    const anteprime = page.locator('#imgPreviews .dash-img-preview img');
+    await expect(anteprime).toHaveCount(2);
+    await expect(anteprime.first()).toHaveAttribute('src', originale);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+// Un messaggio partito senza passare dalla casella (la domanda dal tasto destro sull'avviso di un sito) torna lo stesso.
+test('«Chat nuova» rimette anche una domanda che non era stata scritta nella casella', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await configureModel(app);
+    await finestraSemprePiena(app);
+    const domanda = 'Filo mi ha avvisato che questo sito è sospetto: https://esempio.test. È davvero da evitare?';
+    await app.evaluate(({ BrowserWindow }, testo) => {
+      const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+      const id = tm.openTab('filo://newtab/', { allowDuplicate: true });
+      tm.tabs.find((t) => t.id === id)._richiestaCasa = { tipo: 'chiedi', testo };
+    }, domanda);
+    let page = null;
+    await expect.poll(() => {
+      page = app.windows().filter((w) => w.url().startsWith('filo://newtab')).pop() || null;
+      return app.windows().filter((w) => w.url().startsWith('filo://newtab')).length;
+    }, { timeout: 10_000 }).toBe(2);
+    const errore = page.locator('.dash-bubble-filo', { hasText: 'chat nuova' });
+    await expect(errore).toBeVisible({ timeout: 40_000 });
+    await expect(page.locator('#input')).toHaveValue('');
+    await errore.locator('button', { hasText: 'Chat nuova' }).click();
+    await expect(page.locator('#input')).toHaveValue(domanda);
+  } finally {
+    await ripristina(app);
+  }
+});
