@@ -275,3 +275,39 @@ test('il livello «giorni»: una riga per ogni giorno passato che ha ore, una vo
   assert.equal(giri, 1);
   assert.match(await Comp.sezione(false), /GIORNI:\n- 3\/11: gatti, carbonara/);
 });
+
+test('una fonte della chat scaduta alla compattazione e riletta dopo torna a contare, anche riaprendo il filo', async () => {
+  const { cartella } = azzera();
+  const ora = Date.now();
+  await scrivi('ab12', 'user', 'cerca il meteo', new Date(ora - 5 * ORA_MS).toISOString());
+  await scrivi('ab12', 'filo', 'Fatto.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  const ricerca = { classe: 5, campo: 'web', chiave: 'web:ricerca', motivo: 'ho fatto una ricerca sul web', ts: new Date(ora - 5 * ORA_MS).toISOString() };
+  await Chats.segnaFonti('ab12', [ricerca]);
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  const fino = Date.parse(Comp.compattato(false).a);
+  assert.ok(Date.parse((await Chats.get('ab12')).fonti[0].ts) < fino, 'la lettura vecchia sta prima del punto compattato');
+  // Riletta adesso: l'evento si riscrive con l'ora nuova, e il filo riaperto la ritrova viva.
+  await Chats.segnaFonti('ab12', [{ ...ricerca, ts: new Date(ora).toISOString() }]);
+  globalThis.SN_IL_FILO = creaFilo({ cartella });
+  const fonti = (await Chats.get('ab12')).fonti;
+  assert.equal(fonti.length, 1);
+  assert.ok(Date.parse(fonti[0].ts) >= fino);
+});
+
+test('un pezzo più grande di quanto va al modello in una volta si compatta a pezzi, dal più vecchio', async () => {
+  const { chiamate } = azzera();
+  const ora = Date.now();
+  const grande = 'parola '.repeat(Math.ceil((L.MAX_INGRESSO * FC.CARATTERI_PER_TOKEN) / 7 / 2));
+  for (let i = 0; i < 4; i++) {
+    await scrivi('ab12', 'user', `${i} ${grande}`, new Date(ora - (10 - i) * ORA_MS).toISOString());
+    await scrivi('ab12', 'filo', `ok ${i}`, new Date(ora - (10 - i) * ORA_MS + 1000).toISOString());
+  }
+  const r = await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.equal(r.fatto, true);
+  assert.ok(FC.stimaToken(chiamate[0][1].content) < L.MAX_INGRESSO * 1.2, 'la chiamata sta nel tetto dell\'ingresso');
+  const resta = (await componi(ora)).visti;
+  assert.ok(resta.length > 0 && resta.length < 8, 'il resto aspetta la compattazione dopo');
+  assert.equal(resta[0].role, 'user', 'il pezzo finisce prima di una domanda, non a metà turno');
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.ok((await componi(ora)).visti.length < resta.length);
+});

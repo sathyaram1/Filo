@@ -1007,7 +1007,7 @@ service cloud.firestore {
         'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
         'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
         'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
-        'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+        'filo-lesson', 'filo-compact', 'filo-compattazione', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
         'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
         'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
         'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'

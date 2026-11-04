@@ -143,6 +143,8 @@
     [A.HELP_INTENT_GUESS]: 'deepseek-flash, gemma-lite',
     [A.HELP_INTENT_JUDGE]: 'deepseek-flash, gemma-lite',
     [A.FILO_CHAT]: 'deepseek, gemma',
+    // Nell'app vuoto vuol dire «quello della chat»: qui lo stesso, scritto.
+    [A.FILO_COMPATTAZIONE]: 'deepseek, gemma',
     [A.FILO_DASHBOARD]: 'deepseek, gemma',
     [A.FILO_LESSON]: 'deepseek-flash, gemma-lite',
     [A.FILO_COMPACT]: 'deepseek, gemma',

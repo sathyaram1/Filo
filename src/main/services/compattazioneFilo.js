@@ -35,7 +35,7 @@ const _dip = {
   },
   livello: async () => {
     let aut = {};
-    try { aut = (await require('../shim/storage').getSettings()).autonomia || {}; } catch (_) {}
+    try { aut = (await globalThis.SN_STORAGE.getSettings()).autonomia || {}; } catch (_) {}
     return aut;
   },
   cartella: () => path.join(process.env.FILO_USER_DATA || require('electron').app.getPath('userData'), 'filo'),
@@ -135,7 +135,20 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   const t = tetti || FC().tetti(null, null);
   const lista = await daCompattare(incognito, { ora, tetti: t });
   const taglio = L().puntoDiTaglio(lista, { ora, ore: grezzo && grezzo.ore != null ? grezzo.ore : L().ORE_GREZZE, turni: grezzo && grezzo.turni != null ? grezzo.turni : L().TURNI_GREZZI });
-  const pezzo = lista.slice(0, taglio);
+  // Un pezzo enorme (il primo giro su giorni di filo mai compattati) va a pezzi: il resto lo prende la prossima.
+  let fine = 0;
+  let peso = 0;
+  while (fine < taglio) {
+    const m = lista[fine];
+    let p = String(m.text || '').length;
+    if (m.role !== 'user') for (const a of CF().esitiPerCompattare(m).azioni) p += 200 + String((a && a._output && a._output.titolo) || '').length;
+    if (fine > 0 && peso + p > L().MAX_INGRESSO * FC().CARATTERI_PER_TOKEN) break;
+    peso += p;
+    fine++;
+  }
+  while (fine > 0 && fine < taglio && lista[fine].role !== 'user') fine--;
+  if (fine === 0 && taglio > 0) fine = taglio;
+  const pezzo = lista.slice(0, fine);
   if (!pezzo.length) return { fatto: false, motivo: 'niente' };
   const g = await giudice();
   const { righe, sospetto } = L().righePerChiCompatta(pezzo, {
@@ -161,10 +174,10 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   // filo, la riga esce con loro.
   try {
     const eventi = await CF().eventiDa(pezzo[0].ts, incognito);
-    const fine = Date.parse(lista[taglio] ? lista[taglio].ts : pezzo[pezzo.length - 1].ts);
+    const limite = Date.parse(lista[fine] ? lista[fine].ts : pezzo[pezzo.length - 1].ts);
     for (const ev of eventi) {
       const t0 = Date.parse(ev && ev.ts);
-      if (!ev || !ev.id || !Number.isFinite(t0) || t0 >= fine || ev.tipo === 'cambio') continue;
+      if (!ev || !ev.id || !Number.isFinite(t0) || t0 >= limite || ev.tipo === 'cambio') continue;
       const r = letto.ore.find((o) => t0 <= Date.parse(o.a)) || letto.ore[letto.ore.length - 1];
       if (!r.fonti.includes(ev.id)) r.fonti.push(ev.id);
     }
@@ -172,7 +185,7 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   const prima = { a: s.a, da: s.da };
   s.ore.push(...letto.ore);
   s.da = s.da || letto.ore[0].da;
-  s.a = lista[taglio] ? lista[taglio].ts : new Date(Date.parse(pezzo[pezzo.length - 1].ts) + 1).toISOString();
+  s.a = lista[fine] ? lista[fine].ts : new Date(Date.parse(pezzo[pezzo.length - 1].ts) + 1).toISOString();
   s.guasto = 0;
   const inAttesa = [];
   let scritte = 0;
@@ -206,7 +219,6 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
       );
     } catch (_) {}
   }
-  try { globalThis.SN_CONTATORI_MAIN?.attivita('compattazioni_filo', { motivo, righe: letto.ore.length, memorie: scritte, inAttesa: inAttesa.length }); } catch (_) {}
   return {
     fatto: true, motivo, ricevuto: messages.map((x) => x.content).join('\n\n'), ore: letto.ore, memorie: letto.memorie, inAttesa, scritte,
     fino: s.a, sospetto,
@@ -243,10 +255,16 @@ async function sezione(incognito) {
   const s = await stato(incognito);
   if (!s.ore.length && !s.giorni.length) return '';
   const chats = new Set((await F().chats({ incognito })).map((c) => c && c.id));
-  const servonoEventi = [...s.ore, ...s.giorni].some((r) => (r.fonti || []).some((f) => !String(f).includes('|')));
-  let eventi = new Set();
-  if (servonoEventi && s.da) {
-    try { eventi = new Set((await CF().eventiDa(s.da, incognito)).map((ev) => ev && ev.id)); } catch (_) { eventi = null; }
+  // Le pagine e gli accaduti si rileggono solo dopo una cancellazione nuova; se non si leggono, non si toglie niente.
+  let eventi = null;
+  let tolte = null;
+  try { tolte = await F().cancellazioni({ incognito }); } catch (_) { tolte = null; }
+  if (tolte != null && tolte !== s.tolte && s.da) {
+    try {
+      const [acc, pag] = await Promise.all([F().accaduti({ da: s.da }, { incognito }), F().pagine({ da: s.da, a: null }, { incognito })]);
+      eventi = new Set([...acc, ...pag].map((ev) => ev && ev.id));
+      s.tolte = tolte;
+    } catch (_) { eventi = null; }
   }
   const vivo = (f) => (String(f).includes('|') ? chats.has(String(f).split('|')[0]) : (!eventi || eventi.has(f)));
   const ore = L().senzaCancellate(s.ore, vivo);

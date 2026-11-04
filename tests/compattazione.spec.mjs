@@ -6,12 +6,13 @@ import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './hel
 const ORA_MS = 60 * 60 * 1000;
 const RIGA = '09:12 incollati quattro capitoli della tesi sulle api, discussi con Filo';
 
-// Quattro scambi di tre ore fa in un'altra chat, ognuno da circa 25.000 token: insieme passano la soglia di serie.
+// Tre scambi di tre ore fa in un'altra chat, ognuno da circa 25.000 token: insieme passano la soglia di serie e il
+// listino, e stanno in una compattazione sola.
 const scriviVecchi = (app) => app.evaluate(async (_e, ore) => {
   const Chats = globalThis.SN_FILO_CHATS;
   const t0 = Date.now() - 3 * ore;
   const capitolo = (i) => `Capitolo ${i} della tesi sulle api. ${'Le api bottinatrici tornano all\'alveare e danzano. '.repeat(1700)}`;
-  for (let i = 0; i < 4; i++) {
+  for (let i = 0; i < 3; i++) {
     await Chats.append('vecchia1', { role: 'user', text: capitolo(i), ts: new Date(t0 + i * 60000).toISOString() });
     await Chats.append('vecchia1', { role: 'filo', text: `Letto il capitolo ${i}.`, ts: new Date(t0 + i * 60000 + 5000).toISOString() });
   }
@@ -40,7 +41,7 @@ const tokenDi = (app, messages) => app.evaluate((_e, messages) => {
 
 test('una chat oltre la soglia compatta prima di rispondere: la richiesta sta sotto i 100.000 token e niente si perde', async ({ app }) => {
   const page = await home(app);
-  expect(await scriviVecchi(app)).toBe(8);
+  expect(await scriviVecchi(app)).toBe(6);
   await modelloFinto(app, [{ text: 'Sì, ricordo la tesi sulle api.' }]);
   await compattatoreFinto(app, RIGA);
   try {
@@ -51,6 +52,7 @@ test('una chat oltre la soglia compatta prima di rispondere: la richiesta sta so
     expect(comp.length, 'una compattazione prima della risposta').toBe(1);
     expect(comp[0].motivo).toBe('soglia');
     expect(comp[0].testo).toContain('Capitolo 0 della tesi');
+    expect(comp[0].testo).toContain('Capitolo 2 della tesi');
 
     const [richiesta] = await chiamateAlModello(app);
     expect(await tokenDi(app, richiesta), 'la richiesta dopo la compattazione sta sotto il listino').toBeLessThan(100000);
@@ -61,14 +63,14 @@ test('una chat oltre la soglia compatta prima di rispondere: la richiesta sta so
 
     // Il filo non perde niente: la conversazione vecchia è intera, e la chat di adesso mostra domanda e risposta.
     const vecchia = await app.evaluate(async () => (await globalThis.SN_IL_FILO.chat('vecchia1')).messages.map((m) => m.text.length));
-    expect(vecchia.length).toBe(8);
+    expect(vecchia.length).toBe(6);
     expect(vecchia[0]).toBeGreaterThan(80000);
     await expect(page.locator('.dash-bubble').filter({ hasText: 'ti ricordi di cosa parlava la mia tesi?' })).toBeVisible();
 
     // Il turno dopo non ricompatta: il tratto riparte dal grezzo e sta sotto la soglia.
     await chiedi(page, 'e il titolo?');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(2);
-    expect((await app.evaluate(() => globalThis.__compattazioni)).length).toBe(1);
+    expect((await app.evaluate(() => globalThis.__compattazioni)).length).toBe(comp.length);
     const seconda = (await chiamateAlModello(app))[1];
     expect(seconda[0].content, 'il CONTESTO resta quello di prima: la cache lo riusa').toBe(sistema);
   } finally {
@@ -86,6 +88,7 @@ test('la soglia si cambia nelle Preferenze, con la stima accanto, e la chat la u
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).contestoFilo.soglia), { timeout: 10000 }).toBe(40000);
   // Senza listino in rete la frase lo dice; con il listino dice costo al mese e attesa.
   await expect(prefs.locator('#contestoSogliaStima')).toHaveText(/(al mese.*\d+ s)|(listino)/, { timeout: 15000 });
+  await prefs.locator('#sec-contesto').screenshot({ path: 'tests/.shots/compattazione-preferenze.png' });
   const tetti = await app.evaluate(async () => globalThis.SN_FILO_CONTESTO.tetti((await globalThis.SN_STORAGE.getSettings()).contestoFilo, null));
   expect(tetti.soglia).toBe(40000);
   expect(tetti.da.soglia).toBe('utente');
@@ -112,6 +115,7 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   const gruppo = q.locator('[data-gruppo="proposte"]');
   await expect(gruppo).toBeVisible({ timeout: 10000 });
   await expect(gruppo.locator('.qd-riga')).toHaveCount(2);
+  await q.screenshot({ path: 'tests/.shots/compattazione-quaderno.png' });
   const tieni = gruppo.locator('.qd-riga').filter({ hasText: 'Le piace cucinare.' });
   await tieni.hover();
   await tieni.getByRole('button', { name: 'Tienila in memoria' }).click();
@@ -123,5 +127,131 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   await expect(gruppo).toHaveCount(0, { timeout: 10000 });
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('x@y.z');
   expect(await app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.inAttesa()).length)).toBe(0);
-  await q.screenshot({ path: 'tests/.shots/compattazione-quaderno.png' });
+});
+
+// Quanto pesano strumenti e parte fissa: le soglie delle prove si misurano da lì, non da un numero scritto oggi.
+const base = (app) => app.evaluate(() => globalThis.SN_FILO_CONTESTO.stimaToken(
+  JSON.stringify(globalThis.SN_ACTION_TOOLS.definitions()) + globalThis.SN_CONST.PROMPTS.filoChatStatic()));
+const conSoglia = (app, soglia) => app.evaluate(async (_e, soglia) => {
+  const s = await globalThis.SN_STORAGE.getSettings();
+  await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), soglia } });
+}, soglia);
+// Una conversazione di tre ore fa da `token` token circa.
+const vecchiaDa = (app, token) => app.evaluate(async (_e, token) => {
+  const t0 = Date.now() - 3 * 60 * 60 * 1000;
+  await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'user', text: `Appunti sulle api: ${'il favo è fatto di cera. '.repeat(Math.ceil((token * 3.5) / 25))}`, ts: new Date(t0).toISOString() });
+  await globalThis.SN_FILO_CHATS.append('vecchia2', { role: 'filo', text: 'Annotato.', ts: new Date(t0 + 5000).toISOString() });
+}, token);
+
+test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la soglia compatta prima del giro dopo', async ({ app, testServer }) => {
+  const page = await home(app);
+  await vecchiaDa(app, 8000);
+  const url = testServer.html(`<!doctype html><title>Le api</title><p>${'Le api comunicano con la danza. '.repeat(3000)}</p>`);
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._dip.scarica = (u, o) => fetch(u, o); });
+  await modelloFinto(app, [
+    { text: 'Ciao.' },
+    { toolCalls: [{ id: 'p1', name: 'LEGGI_PAGINA', arguments: JSON.stringify({ url }) }] },
+    { text: 'Letta la pagina sulle api.' },
+  ]);
+  await compattatoreFinto(app, RIGA);
+  try {
+    // Il primo turno misura quanto pesa la richiesta qui; la soglia le sta poco sopra, sotto l'esito della pagina.
+    await chiedi(page, 'ciao');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Ciao.' })).toBeVisible({ timeout: 20000 });
+    await conSoglia(app, (await tokenDi(app, (await chiamateAlModello(app))[0])) + 4000);
+    await chiedi(page, `leggi ${url}`);
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Letta la pagina sulle api.' })).toBeVisible({ timeout: 20000 });
+    const comp = await app.evaluate(() => globalThis.__compattazioni);
+    expect(comp[0] && comp[0].motivo).toBe('soglia');
+    expect(comp[0].testo).toContain('il favo è fatto di cera');
+    const [, primo, secondo] = await chiamateAlModello(app);
+    expect(primo[0].content, 'il primo giro parte col tratto intero').not.toContain(RIGA);
+    expect(secondo[0].content, 'il secondo giro ha il diario').toContain(RIGA);
+    expect(JSON.stringify(secondo), 'l\'esito del giro resta').toContain('Le api comunicano con la danza');
+    expect(JSON.stringify(secondo)).not.toContain('il favo è fatto di cera');
+  } finally {
+    await rimettiCompattatore(app);
+    await ripristina(app);
+  }
+});
+
+test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; e da fermo, passata la cache', async ({ app }) => {
+  const page = await home(app);
+  const b = await base(app);
+  await conSoglia(app, b + 20000);
+  await vecchiaDa(app, 12000);
+  await modelloFinto(app, [{ text: 'Eccomi.' }]);
+  await compattatoreFinto(app, RIGA);
+  // Il timer della pausa: si prende la funzione che il turno lascia, per farla partire senza aspettare un'ora.
+  await app.evaluate(() => {
+    const C = globalThis.SN_COMPATTAZIONE;
+    globalThis.__fermoVero = C.programmaFermo;
+    globalThis.__fermo = [];
+    C.programmaFermo = (fn, ms) => { if (fn) globalThis.__fermo.push({ fn, ms }); return globalThis.__fermoVero(null); };
+  });
+  try {
+    await chiedi(page, 'ciao');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Eccomi.' })).toBeVisible({ timeout: 20000 });
+    expect((await chiamateAlModello(app))[0][0].content, 'la risposta non ha aspettato la compattazione').not.toContain(RIGA);
+    await expect.poll(() => app.evaluate(() => globalThis.__compattazioni.map((c) => c.motivo)), { timeout: 10000 }).toEqual(['anticipo']);
+
+    // Da fermo: il turno lascia il timer della durata della cache più un minuto; scattato, col tratto grande compatta.
+    await chiedi(page, `ci sei? ${'appunto lungo sulle api. '.repeat(3000)}`);
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(2);
+    expect((await chiamateAlModello(app))[1][0].content, 'il messaggio dopo ha il diario').toContain(RIGA);
+    expect(await app.evaluate(() => globalThis.__fermo.at(-1).ms)).toBe(61 * 60 * 1000);
+    const chiesti = await app.evaluate(async () => {
+      const C = globalThis.SN_COMPATTAZIONE;
+      const vera = C.compatta;
+      const motivi = [];
+      C.compatta = (o) => { motivi.push(o.motivo); return vera(o); };
+      try { await globalThis.__fermo.at(-1).fn(); } finally { C.compatta = vera; }
+      return motivi;
+    });
+    expect(chiesti).toEqual(['fermo']);
+  } finally {
+    await app.evaluate(() => { if (globalThis.__fermoVero) globalThis.SN_COMPATTAZIONE.programmaFermo = globalThis.__fermoVero; });
+    await rimettiCompattatore(app);
+    await ripristina(app);
+  }
+});
+
+test('oltre i 100.000 token senza niente da compattare escono gli esiti vecchi, il testo dell\'utente resta', async ({ app }) => {
+  const page = await home(app);
+  // Sette pagine lette dieci minuti fa, ancora nel grezzo: ognuna entra fino al tetto della sua busta (32 KB), e insieme
+  // portano la richiesta oltre il listino.
+  await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ contestoFilo: { ...(s.contestoFilo || {}), token: 400000 } });
+    const t0 = Date.now() - 10 * 60 * 1000;
+    const Chats = globalThis.SN_FILO_CHATS;
+    await Chats.append('lett1', { role: 'user', text: 'leggi la tesi', ts: new Date(t0).toISOString() });
+    const c = await Chats.append('lett1', { role: 'filo', text: 'Letta.', ts: new Date(t0 + 5000).toISOString(), actions: Array.from({ length: 7 }, () => ({ type: 'LEGGI_PAGINA' })) });
+    const testo = 'Il miele matura nelle celle opercolate. '.repeat(900);
+    globalThis.SN_CONTESTO_FILO.ricordaEsiti('lett1', c.messages.at(-1).ts, {
+      azioni: Array.from({ length: 7 }, (_, i) => {
+        const url = `https://api.example/tesi/${i}`;
+        return { type: 'LEGGI_PAGINA', _executed: true, params: { url }, _output: { ok: true, pageRead: url, url, titolo: `Tesi ${i}`, testo, da: 0, fino: testo.length, totale: testo.length } };
+      }),
+    });
+  });
+  await modelloFinto(app, [{ text: 'Va bene.' }]);
+  await compattatoreFinto(app, RIGA);
+  try {
+    const lunga = `adesso riassumila tenendo conto di questo: ${Array(200).fill('nota mia.').join(' ')}`;
+    await chiedi(page, lunga);
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Va bene.' })).toBeVisible({ timeout: 20000 });
+    expect(await app.evaluate(() => globalThis.__compattazioni.length), 'niente di compattabile: nessuna chiamata').toBe(0);
+    const [richiesta] = await chiamateAlModello(app);
+    const testo = JSON.stringify(richiesta);
+    // Le pagine c'erano davvero: messe a parte, la richiesta passerebbe il listino.
+    expect(await tokenDi(app, richiesta) + Math.ceil((7 * 36000) / 3.5)).toBeGreaterThan(100000);
+    expect(await tokenDi(app, richiesta), 'tolti gli esiti, la richiesta sta sotto il listino').toBeLessThan(100000);
+    expect(testo).not.toContain('celle opercolate');
+    expect(testo).toContain('esiti sono stati tolti per stare nel contesto');
+    expect(testo, 'il messaggio dell\'utente parte intero').toContain(lunga);
+  } finally {
+    await rimettiCompattatore(app);
+    await ripristina(app);
+  }
 });

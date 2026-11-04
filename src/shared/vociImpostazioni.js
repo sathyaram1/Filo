@@ -106,6 +106,7 @@
         DOCUMENTI_SCEGLI_CARTELLA: 'apre la finestra del sistema per scegliere una cartella: dalla chat la cartella si dice col suo percorso (cartelle_documenti)',
         FILO_GET_ONBOARDING: 'rilegge le interviste di benvenuto passate per mostrarle: non è un valore da cambiare',
         DEFAULT_MODELS_PUBLIC: 'legge i valori predefiniti dei tetti della chat e delle risposte per mostrarli accanto ai campi: non salva niente',
+        FILO_STIMA_SOGLIA: 'legge listino e modelli per stimare costo e attesa accanto alla soglia di compattazione: non salva niente',
         FILO_RESTART_ONBOARDING: 'PULSANTE_PREFERENZE',
         FILO_ONBOARDING_TOGLI: 'toglie per sempre un’intervista conservata, e cancellare per sempre lo fa solo l’utente: la chat gli apre la pagina lì',
         RESET_SETTINGS: 'PULSANTE_PREFERENZE',
