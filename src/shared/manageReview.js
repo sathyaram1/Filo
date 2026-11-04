@@ -1662,27 +1662,28 @@
     },
   };
 
-  // Approvata e finita in conflitto: la riallinea la routine solo per il lavoro di una routine legato alla sua pratica,
-  // finché la pratica è in lavorazione (functions/src/routine/mergeApprovals.js, routeRealignment). Il lavoro locale non
-  // ha riallineamento automatico; una pratica uscita dalla lavorazione (ferma, arenata) vuol dire che non è andato.
+  // Chi riallinea da sé, le sue frasi e la specie di una fusione senza richiesta stanno solo nel modulo della scheda di
+  // approvazione (copiato anche nella pagina da browser): qui si leggono da lì, senza copie che si separano.
+  function schedaFusioni() {
+    if (!global.SN_MERGE_APPROVALS && typeof require === 'function') require('./mergeApprovals.js');
+    return global.SN_MERGE_APPROVALS;
+  }
+
+  // Approvata e finita in conflitto: la routine riallinea da sé solo ciò che la scheda dice (siRiallineaDaSola), e solo
+  // finché la pratica è in lavorazione (routeRealignment del server). Uscita dalla lavorazione (ferma, arenata): non è andato.
   function riallineamentoDi(fb, failed) {
     const { status } = normalizeStatus(fb);
     const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
-    // La regola sta in mergeApprovals.siRiallineaDaSola; qui la copia per le pagine che non caricano quel modulo.
-    const MA = global.SN_MERGE_APPROVALS;
-    const daRoutine = MA && typeof MA.siRiallineaDaSola === 'function' ? MA.siRiallineaDaSola
-      : (r) => String((r && r.origin) || '') === 'routine' && !!String((r && r.feedbackId) || '').trim();
-    return inLavoro && failed.every(daRoutine) ? 'da_riallineare' : 'riallineamento_fallito';
+    return inLavoro && failed.every((r) => schedaFusioni().siRiallineaDaSola(r)) ? 'da_riallineare' : 'riallineamento_fallito';
   }
-  function testoRiallineamentoFallito(failed) {
-    const locale = failed.some((r) => String((r && r.origin) || '') !== 'routine');
-    return locale
-      ? 'Avevi detto sì, ma il ramo era in conflitto con main, e il lavoro locale non si riallinea da solo: rifai la base del ramo e rilancia npm run finish.'
-      : 'Avevi detto sì, ma il ramo era in conflitto con main e il riallineamento automatico non è andato: rimettila In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
+  function testoRiallineamento(failed, inCorso) {
+    const MA = schedaFusioni();
+    // La richiesta che decide la frase è quella che non si riallinea da sola, se c'è.
+    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed[0];
+    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, inCorso)}`;
   }
 
-  // Perché una fusione non ha chiesto, nel quadrato. La specie la legge mergeApprovals (specieFusaSenzaChiedere), lo
-  // stesso conto dell'elenco «Fuse senza chiedere»: il segno lasciato da un clic su Approva non è quello a mano (#743.1).
+  // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
   const TESTI_FUSA_SENZA_CHIEDERE = {
     fiducia: 'Lavoro fidato: controllo registrato nel Log.',
     locale: 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.',
