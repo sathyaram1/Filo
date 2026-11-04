@@ -290,7 +290,7 @@ test('una risposta registrata da una sessione si annulla da Gestione: torna aper
         globalThis.__annullate.push(msg.id);
         const x = globalThis.__mgFinto.domande.find((y) => y.id === msg.id);
         Object.assign(x, { stato: 'aperta', esito: null, registrataDa: '', rispostaDaSessione: null, modificataIl: Date.now() });
-        return { ok: true, domanda: JSON.parse(JSON.stringify(x)) };
+        return { ok: true, domanda: JSON.parse(JSON.stringify(x)), ripristino: [{ ok: true, num: '#813' }], compito: 'C-9' };
       }
       return sotto(event, msg);
     });
