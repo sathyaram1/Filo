@@ -260,6 +260,10 @@ Una **radice** è un testo esterno, scritto con tipo e valore:
 Le regole del calcolo, tutte sul server:
 
 - **Lettura:** il biglietto aggiunge alle sue le radici di ciò che legge.
+- **Nascita:** il biglietto nasce con le radici di ciò che riceverà (il
+  feedback, la sua conversazione, il ramo, il compito, la domanda): una
+  regola sola per ogni motivo di nascita. Un motivo che non le sa dire
+  prende la radice del solo biglietto, e il cartellino dice quale.
 - **Scrittura:** ciò che il biglietto scrive porta le radici che il biglietto
   ha in quel momento; un figlio con più genitori (§ 1.3) porta l'unione delle
   loro radici.
