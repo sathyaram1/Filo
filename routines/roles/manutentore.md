@@ -77,7 +77,7 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
   che tolgono lavoro, più il campione); in sottofondo, e lo aspetti prima del contesto. Un feedback rimasto senza
   scheda si decide sul titolo, e lo dici nel recap. Poi `npm run manutentore -- contesto` per la lettura intera, poi
   rosa, ordine, N, pacchetti e attese; il recap; il taccuino. Un'indicazione dell'owner che chiede la decisione **a
-  secco** vale per la mattina dopo: rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza
+  secco** vale per la prossima decisione del mattino: rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza
   applicarne nessuno, e togli l'indicazione dal taccuino.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
