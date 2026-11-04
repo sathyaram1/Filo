@@ -54,6 +54,11 @@ export function rigaConto(t) {
 // Un lotto scrive fino a 500 feedback: il tetto è quello della funzione sul server (nove minuti), non i 30 s di una richiesta.
 const TEMPO_LOTTO_MS = 9 * 60 * 1000;
 
+/** Un lotto al server, con la chiamata comune. rete: i suoi deps. → il `result`, o un Error col motivo a parole. */
+export function chiamaLotto(data, rete = {}) {
+  return risultatoOwnerFiducia(data, { tempoMs: TEMPO_LOTTO_MS, ...rete });
+}
+
 async function main() {
   const args = leggiArgomenti(process.argv.slice(2));
   if (args.errore) { console.error(args.errore); return 2; }
