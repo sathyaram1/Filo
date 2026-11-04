@@ -1058,7 +1058,7 @@
   // la porta; le dice e le timbra solo il server. I chip sono gli stessi dei feedback (manageRadici.js).
   const radiciLette = new Map();
   const radiciInVolo = new Set();
-  const firmaRadici = (d) => `${idDi(d)}|${d.fiducia}|${Number(d.modificataIl) || 0}`;
+  const firmaRadici = (d) => `${window.SN_MANAGE_RADICI ? window.SN_MANAGE_RADICI.firma(idDi(d), d.fiducia) : ''}|${Number(d.modificataIl) || 0}`;
 
   function cartellinoRadici(d) {
     const box = el('span', 'mg-radici mg-dq-radici');
@@ -1090,8 +1090,8 @@
     const r = await manda(id, Object.assign({ type: T.timbro, radice: x.radice }, togli ? { fidato: false } : {}),
       togli ? `Tolgo il timbro a «${nome}»…` : `Timbro «${nome}»…`);
     if (!r) return;
-    // Il ricalcolo tocca altre domande e altri feedback: le radici lette prima non valgono più.
-    radiciLette.clear();
+    // Il ricalcolo tocca altre domande e altri feedback: le radici lette prima, anche dalla sezione dei feedback, non valgono più.
+    window.SN_MANAGE_RADICI.invalida();
     const n = Object.values((r && r.cambiati) || {}).reduce((a, v) => a + (Number(v) || 0), 0);
     dopo(id, r, `${togli ? `Timbro tolto a «${nome}»` : `«${nome}» timbrata`}: ${n === 1 ? 'una cosa ha cambiato fiducia' : `${n} cose hanno cambiato fiducia`}.`);
   }

@@ -3801,13 +3801,14 @@
     if (!mgRadici) return;
     if (!isAdmin || !fb || !mgFiduciaBtn || mgFiduciaBtn.hidden) { mgRadici.hidden = true; return; }
     const id = fb._id;
+    // Valgono finché non cambia la fiducia della pratica né arriva un timbro, da qui o dalle Domande.
     const gia = radiciLette.get(id);
-    if (gia) { disegnaRadici(fb, gia); return; }
+    if (gia && gia.firma === RAD.firma(id, fb.fiducia)) { disegnaRadici(fb, gia.lista); return; }
     mgRadici.hidden = true;
     const r = await sendToMain({ type: FIDUCIA_RADICI, feedbackId: id }).catch(() => null);
     // Un server di prima non le sa dire: il cartellino non c'è, il tasto resta.
     if (!r || r.ok === false || !Array.isArray(r.radici)) return;
-    radiciLette.set(id, r.radici);
+    radiciLette.set(id, { firma: RAD.firma(id, r.fiducia), lista: r.radici });
     if (selectedId !== id) return;
     // Un timbro dato altrove può averla resa fidata (o tolta): la pagina lo dice subito, la rilettura porterà lo stesso.
     const ora = allFeedbacks.find((f) => f._id === id) || fb;
@@ -3830,8 +3831,8 @@
       const r = await sendToMain(Object.assign({ type: FIDUCIA_SEGNA, radice: x.radice }, togli ? { fidato: false } : {}));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'il server non ha risposto');
       const n = Object.values(r.cambiati || {}).reduce((a, v) => a + (Number(v) || 0), 0);
-      // Il ricalcolo tocca altre pratiche: le radici lette prima non valgono più, e la lista si rilegge.
-      radiciLette.clear();
+      // Il ricalcolo tocca altre pratiche e domande: le radici lette prima non valgono più, e la lista si rilegge.
+      RAD.invalida();
       setManageMsg(`${togli ? `Timbro tolto a «${nome}»` : `«${nome}» timbrata`}: ${n === 1 ? 'una cosa ha cambiato fiducia' : `${n} cose hanno cambiato fiducia`}.`, 'ok');
     } catch (e) {
       setManageMsg(`${togli ? 'Timbro non tolto' : 'Non timbrata'}: ${e.message || 'Errore'}`, 'err');
@@ -3852,7 +3853,7 @@
       // Il server l'ha scritto: la rilettura porterà lo stesso valore, intanto la pagina lo dice subito.
       const ora = allFeedbacks.find((f) => f._id === id) || fb;
       ora.fiducia = r.fiducia === 'fidato' || r.fiducia === 'non_fidato' ? r.fiducia : (valore ? 'fidato' : 'non_fidato');
-      radiciLette.delete(id);
+      RAD.invalida();
       ora.fiduciaDa = { by: 'owner', at: Date.now() };
       // Chi aspettava la fiducia per il server è ripartito nello stesso gesto, come lavoro server (#1358).
       if (r.rimessoInCoda) Object.assign(ora, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
