@@ -49,6 +49,8 @@
       vociDopoOk.push(...gruppo.voci);
       gruppo.voci = [];
     } else if (voce) vociDopoOk.push(voce);
+    // Senza un esito da portare (un no, anche al bottone ridato di una chat riaperta) il lavoro non riparte.
+    else return;
     if (filaPopup > 0) riprendiDopoFila = { chat };
     else riprendiOra(chat);
   }
