@@ -283,7 +283,9 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
     righe.push('', 'Conversazione');
     for (const t of turni) {
       const a = t.autore || {};
-      const chi = `${visibile(a.tipo || '?')}${a.ruolo ? ` ${visibile(a.ruolo)}` : ''} (${fiduciaDetta(a.fiducia)})`;
+      const daSessione = D.mittenteRisposta(t) === 'sessione';
+      const chi = daSessione ? `owner, registrata da una sessione (${fiduciaDetta(a.fiducia)})`
+        : `${visibile(a.tipo || '?')}${a.ruolo ? ` ${visibile(a.ruolo)}` : ''} (${fiduciaDetta(a.fiducia)})`;
       const scelta = Number.isInteger(t.scelta) ? `, opzione ${t.scelta + 1}${t.consiglio ? ' (il consiglio)' : ''}` : '';
       righe.push(`  ${quando(t.ora)} ${chi} · ${visibile(t.tipo || '')}${scelta}`);
       if (t.testo) righe.push(rientro(t.testo, '    '));

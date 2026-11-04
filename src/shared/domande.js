@@ -385,6 +385,17 @@
     return null;
   }
 
+  // §3.6: una risposta che una sessione locale registra dalla chat vale come dell'owner (decisione del 01/11, #2007).
+  // Il segno resta: 'owner' da qui, 'sessione' dalla chat; '' per chiunque altro, le cui parole restano materiale.
+  function mittenteRisposta(turno) {
+    if (!isOggetto(turno)) return '';
+    const a = isOggetto(turno.autore) ? turno.autore : {};
+    if (a.tipo === 'owner') return 'owner';
+    if (turno.tipo !== 'risposta') return '';
+    if (turno.registrataDa === 'sessione' || (a.tipo === 'biglietto' && a.ruolo === 'sessione')) return 'sessione';
+    return '';
+  }
+
   function riferimentoDi(riferimenti, id) {
     const r = isOggetto(riferimenti) && ha(riferimenti, id) ? riferimenti[id] : null;
     return r && typeof r.num === 'string' && /^#\d{1,9}(\.\d{1,6})?$/.test(r.num) ? r : null;
@@ -479,7 +490,7 @@
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
-    DEL_COMPITO, vietataAlCompito,
+    DEL_COMPITO, vietataAlCompito, mittenteRisposta,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

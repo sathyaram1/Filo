@@ -756,10 +756,17 @@
     for (const t of turni) {
       const li = el('li', 'mg-dq-turno');
       const tipoAutore = (t.autore && t.autore.tipo) || '';
-      li.dataset.autore = tipoAutore;
+      // Dalla chat vale come tua (§3.6): «Tu», col segno di chi l'ha registrata al posto di quello della fiducia.
+      const daSessione = D.mittenteRisposta(t) === 'sessione';
+      li.dataset.autore = daSessione ? 'sessione' : tipoAutore;
       const head = el('div', 'mg-dq-turno-testa');
-      head.appendChild(el('span', 'mg-dq-turno-chi', autoreDi(t.autore)));
-      if (tipoAutore !== 'owner' && tipoAutore !== 'server' && !(t.autore && t.autore.fiducia === 'fidato')) {
+      head.appendChild(el('span', 'mg-dq-turno-chi', daSessione ? 'Tu' : autoreDi(t.autore)));
+      if (daSessione) {
+        const s = el('span', 'mg-dq-segno mg-dq-segno--sessione', 'registrata da una sessione');
+        s.title = `L’ha registrata una sessione dalla chat${t.autore && t.autore.fiducia === 'fidato' ? '' : ', che aveva letto testo non tuo'}. `
+          + 'Vale come tua: se non è quello che volevi, riapri la domanda.';
+        head.appendChild(s);
+      } else if (tipoAutore !== 'owner' && tipoAutore !== 'server' && !(t.autore && t.autore.fiducia === 'fidato')) {
         const f = el('span', 'mg-dq-fiducia mg-dq-fiducia--no', 'non fidato');
         f.title = TITOLO_NON_FIDATA;
         head.appendChild(f);
@@ -832,7 +839,7 @@
     return !!(d.stato === 'chiusa' && d.esito && (d.esito.archiviata || d.esito.automatica || rispostaDaChiave(d) || rispostaDaSessione(d)));
   }
   function titoloRiapri(d) {
-    if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: un lavoro che la domanda ferma torna fermo finché non rispondi';
+    if (rispostaDaSessione(d)) return 'Rimettila fra quelle da rispondere: quello che ha applicato si disfa dove si può, e un lavoro che la domanda ferma torna fermo finché non rispondi';
     const r = rispostaDaChiave(d);
     if (r && !r.archiviata) return `Rimettila fra quelle da rispondere: quello che la risposta da «${r.slug}» ha applicato resta finché non rispondi`;
     if (!(d.esito && d.esito.automatica)) return 'Rimettila fra quelle da rispondere';
@@ -1105,7 +1112,9 @@
 
   async function archivia(id, riapri) {
     const r = await manda(id, { type: riapri ? T.riapri : T.archivia, id }, riapri ? 'Riapro…' : 'Archivio…');
-    if (r) dopo(id, r, riapri ? 'Riaperta: ora è fra quelle da rispondere.' : 'Archiviata.');
+    // Quello che la riapertura non ha potuto disfare lo dice il server (§3.6): resta accanto alla conferma.
+    const resto = riapri && r && typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
+    if (r) dopo(id, r, riapri ? `Riaperta: ora è fra quelle da rispondere.${resto ? ` ${resto}` : ''}` : 'Archiviata.');
   }
 
   async function segnaFidata(id, fidata) {
