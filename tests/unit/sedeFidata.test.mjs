@@ -186,8 +186,9 @@ test('feedback:leggi nella sede owner: il fidato passa; i turni scritti da altri
 });
 
 test('i turni dell\'owner: la stessa regola che dice se la conversazione ha scritti d\'altri', () => {
-  const n = '--- Aggiornamento dell\'agente del 01/11 ---\n@@filo-attachment {}\n--- La tua risposta del 02/11 ---\nok';
+  const n = '--- Aggiornamento dell\'agente del 01/11 ---\n@@filo-attachment {"kind":"image","url":"https://firebasestorage.googleapis.com/x"}\n--- La tua risposta del 02/11 ---\nok';
   assert.equal(B.noteConScrittiDiAltri(n), false, 'un turno d\'altri coi soli allegati non è uno scritto');
+  assert.equal(B.noteConScrittiDiAltri(n.replace(/\{.*\}/, '{}')), true, 'una riga d\'allegato che non si legge la conversazione la mostra come testo');
   assert.deepEqual(B.soloTurniDellOwner(n), { notes: '--- La tua risposta del 02/11 ---\nok', tolti: ['--- Aggiornamento dell\'agente del 01/11 ---'] });
   assert.deepEqual(B.soloTurniDellOwner(''), { notes: '', tolti: [] });
   assert.equal(B.noteConScrittiDiAltri(B.soloTurniDellOwner(`x\n${n}\n--- Filo ha risposto il 3/11 ---\ny`).notes), false);
