@@ -1,6 +1,6 @@
 // #1721 — la foto di una pagina che va a un modello passa per una copertura sola, qualunque strada la scatti: i riquadri
 // di altri siti (#1537), il numero della carta ripetuto fuori dal campo (#810.16), la finestra di Filo guardata dalla
-// chat (#810.17). Ogni prova dipinge la cosa da nascondere di un colore unico e cerca quel colore nella foto arrivata al
+// chat (#810.17), lo Screenshot del menu. Ogni prova dipinge la cosa da nascondere di un colore unico e cerca quel colore nella foto arrivata al
 // modello finto: senza il fix c'è.
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -212,4 +212,44 @@ test('#810.17: guardando dalla chat un’altra finestra di Filo, il numero scrit
   const [immagine] = await app.evaluate(() => globalThis.__occhio);
   expect(await pixelDelColore(app, immagine, VERDE), 'deve arrivare la foto della finestra del pagamento').toBeGreaterThan(20_000);
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
+});
+
+// Lo Screenshot dal menu: l'utente tiene la foto intera, il modello che sceglie il nome del file la riceve coperta.
+test('#1537: nello Screenshot il modello che sceglie il nome vede il riquadro di un altro sito coperto, l’utente intero', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo</body>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0">
+    <h1>Il tuo conto</h1><iframe id="altro" src="${altro}" style="width:300px;height:200px;border:0"></iframe></body></html>`);
+  await expect(page.frameLocator('#altro').locator('body')).toContainText('Saldo', { timeout: 10_000 });
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models }, modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+    });
+  });
+  await aiutoFinto(app);
+
+  let utente = null;
+  await expect.poll(async () => {
+    await page.mouse.click(5, 5);
+    utente = await app.evaluate(async ({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+      const tab = tm.tabs.find((t) => t.title === 'Conto');
+      return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `(async () => {
+        HTMLAnchorElement.prototype.click = function () { window.__foto = this.href; };
+        window.__foto = null;
+        await SN_ACTIONS.takeScreenshot();
+        return window.__foto;
+      })()` }], true);
+    });
+    return Boolean(utente);
+  }, { timeout: 20_000 }).toBe(true);
+  const alModello = await app.evaluate(() => {
+    const parte = globalThis.__visti.flatMap((m) => m).flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+      .find((p) => p.type === 'image_url');
+    return parte ? parte.image_url.url : null;
+  });
+  expect(alModello, 'la foto deve arrivare al modello del nome').toMatch(/^data:image\//);
+  expect(await pixelDelColore(app, alModello, ROSA), 'il riquadro dell’altro sito si vede nella foto per il modello').toBeLessThan(20);
+  expect(await pixelDelColore(app, utente, ROSA), 'lo screenshot dell’utente resta intero').toBeGreaterThan(20_000);
 });

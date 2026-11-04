@@ -6,8 +6,9 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
 import { join, relative } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const RADICE = new URL('../../', import.meta.url).pathname;
+const RADICE = fileURLToPath(new URL('../../', import.meta.url));
 
 const AMMESSI = {
   'src/main/services/fotoDellaPagina.js': 'il punto unico: la foto coperta per un modello, e quella intera per chi la tiene',
