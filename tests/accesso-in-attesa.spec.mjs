@@ -3,7 +3,7 @@
 // lasciano stare. Google finto rifiuta la scheda, così l'accesso continua nel browser di sistema, finto anche lui.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { googleFinto, rispondiAlLoopback } from './helpers/googleFinto.mjs';
+import { googleFinto, rispondiAlLoopback, risposteFinte } from './helpers/googleFinto.mjs';
 
 const RIAPERTURA_MS = 10_000;
 
@@ -111,4 +111,49 @@ test('posta delle segnalazioni da non owner: «Accedi» col browser chiuso dice 
   await expect(page.locator('#adminBannerText')).toHaveText('Accesso annullato: riprova quando vuoi.');
   await expect(accedi).toHaveText('Accedi');
   await expect(lascia).toBeHidden();
+});
+
+// #1351 giro 1 — «Lascia stare» poi di nuovo «Accedi» è un tentativo nuovo: la pagina si apre subito, anche entro i
+// 10 secondi; e «Torna all'accesso» premuto troppo presto non si perde, la pagina arriva allo scadere.
+test('Profilo: «Lascia stare» e di nuovo «Accedi con Google» riaprono subito; «Torna all\'accesso» troppo presto arriva dopo', async ({ app, shell, testServer }) => {
+  test.setTimeout(60_000);
+  await googleFinto(app, testServer, { rifiuta: true });
+  await (await menuProfilo(app, shell)).locator('.item', { hasText: 'Accedi con Google' }).click();
+  await expect.poll(() => aperture(app).then((a) => a.length)).toBe(1);
+  await (await menuProfilo(app, shell)).locator('.item', { hasText: 'Lascia stare' }).click();
+  await (await menuProfilo(app, shell)).locator('.item', { hasText: 'Accedi con Google' }).click();
+  await expect.poll(() => aperture(app).then((a) => a.length), { timeout: 3000 }).toBe(2);
+  const apertoAlle = Date.now();
+  await (await menuProfilo(app, shell)).locator('.item', { hasText: 'Torna all\'accesso' }).click();
+  await shell.waitForTimeout(500);
+  expect((await aperture(app)).length, 'riaperto il browser prima di 10 secondi').toBe(2);
+  await expect.poll(() => aperture(app).then((a) => a.length), { timeout: Math.max(1000, apertoAlle + RIAPERTURA_MS + 3000 - Date.now()) }).toBe(3);
+  const [a, b, c] = await aperture(app);
+  expect(b).toBe(a);
+  expect(c).toBe(a);
+  await chiudiPopup(app);
+  expect(await rispondiAlLoopback(a, 'error=access_denied')).toBe(200);
+});
+
+// #1351 giro 1 — la posta delle segnalazioni chiude la sua attesa quando l'accesso arriva da un'altra strada.
+test('posta delle segnalazioni: l\'accesso finito dal menu Profilo chiude l\'attesa del riquadro', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  await googleFinto(app, testServer, { rifiuta: true });
+  await risposteFinte(app, 'utente@prova.test');
+  const page = await openTab('filo://feedback/feedback.html');
+  await expect(page.locator('#adminBanner')).toBeVisible({ timeout: 15_000 });
+  await page.locator('#adminSignIn').click();
+  await expect.poll(() => aperture(app).then((a) => a.length)).toBe(1);
+  await page.locator('#adminLascia').click();
+  await expect(page.locator('#adminLascia')).toBeHidden();
+  // Di nuovo da qui, poi l'accesso lo finisce chi l'ha chiesto dal Profilo.
+  await page.locator('#adminSignIn').click();
+  await expect(page.locator('#adminLascia')).toBeVisible();
+  await (await menuProfilo(app, shell)).locator('.item', { hasText: 'Accedi con Google' }).click();
+  await chiudiPopup(app);
+  const [indirizzo] = await aperture(app);
+  expect(await rispondiAlLoopback(indirizzo)).toBe(200);
+  await expect(page.locator('#adminLascia')).toBeHidden();
+  await expect(page.locator('#adminSpin')).toBeHidden();
+  await expect(page.locator('#adminBannerText')).toHaveText('L\'account utente@prova.test non è un amministratore: i feedback li vede chi li gestisce.');
 });
