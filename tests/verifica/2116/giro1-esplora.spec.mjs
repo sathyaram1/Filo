@@ -142,3 +142,32 @@ test('carta con un disegno sopra la pagina', async ({ app, openTab, testServer }
   const b = await page.locator('#c').boundingBox();
   expect(await pixelDiversi(page, foto, dentro(b))).toBe(0);
 });
+
+test('su una pagina di Filo lo screenshot parte ancora', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://credits/credits.html');
+  await reteFinta(app);
+  await page.evaluate(() => globalThis.SN_FEEDBACK_UI.open());
+  await expect(page.locator('.sn-fb-modal')).toBeVisible({ timeout: 8_000 });
+  await page.locator('.sn-fb-text').fill('prova interna');
+  await page.locator('.sn-fb-clear').click();
+  await page.locator('.sn-fb-send').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(1);
+  expect(await app.evaluate(() => globalThis.__rete.payload[0].images.length)).toBe(1);
+});
+
+test('su una pagina occupata senza campi segreti', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>Notizie</h1><p>testo qualunque</p></body></html>');
+  await reteFinta(app);
+  await nelMondoDiFilo(app, page, () => globalThis.SN_FEEDBACK_UI.open());
+  const strato = await paginaDelloStrato(app, page);
+  await strato.locator('.sn-fb-text').fill('pagina lenta');
+  await strato.locator('.sn-fb-clear').click();
+  page.evaluate(() => { const t = Date.now() + 8000; while (Date.now() < t); }).catch(() => {});
+  await new Promise((r) => setTimeout(r, 200));
+  await strato.locator('.sn-fb-send').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 20_000 }).toBe(1);
+  const toast = await strato.locator('.sn-toast').allTextContents().catch(() => []);
+  console.log('TOAST', JSON.stringify(toast), 'IMMAGINI', await app.evaluate(() => globalThis.__rete.payload[0].images.length));
+});
