@@ -687,7 +687,10 @@
     const attuata = attuataDa(d);
     if (attuata) {
       const p = el('p', 'mg-dq-esito');
-      p.append('Chiusa dalla revisione: l’ha attuata ', rif(attuata.id) ? legame('feedback', attuata.id) : String(attuata.num || 'un lavoro fuso'), '.');
+      // Nella frase basta il numero da aprire: stato e mittente di un lavoro già fuso qui non servono.
+      const l = rif(attuata.id) ? legame('feedback', attuata.id) : null;
+      const numero = l ? (l.matches('.mg-dq-legame') ? l : l.querySelector('.mg-dq-legame')) : null;
+      p.append('Chiusa dalla revisione: l’ha attuata ', numero || String(attuata.num || 'un lavoro fuso'), '.');
       return p;
     }
     const da = principioUsato(d);
