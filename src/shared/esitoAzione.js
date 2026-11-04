@@ -173,7 +173,36 @@
     if (v.file) out.file = v.file;
     if (v.proposta) out.proposta = v.proposta;
     if (v.evento) out.evento = v.evento;
+    if (v.partita) out.partita = true;
+    if (v.riprova) out.riprova = true;
+    if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     return out;
+  }
+  // La conferma ancora da dare (#1685): riaperta, la chat ridisegna il suo bottone con l'azione e la domanda di allora.
+  // Solo dati semplici e corti: quello che non ci sta non si ridisegna, e resta la riga.
+  const MAX_AZIONE = 16000;
+  function azioneDi(x) {
+    const out = {};
+    for (const [k, v] of Object.entries(x || {})) {
+      if (k.startsWith('_') || k === 'type' || k === 'esito' || v == null) continue;
+      if (typeof v === 'function') return null;
+      out[k] = v;
+    }
+    let json = '';
+    try { json = JSON.stringify(out); } catch (_) { return null; }
+    return json.length <= MAX_AZIONE ? JSON.parse(json) : null;
+  }
+  function confermaDi(c) {
+    const livello = c && Number(c.level ?? c.livello);
+    const testo = String((c && (c.text ?? c.testo)) || '');
+    if (!(livello === 2 || livello === 3) || !testo.trim() || testo.length > MAX_AZIONE) return null;
+    return { livello, testo };
+  }
+  function bottoneDi(esito, azione, conferma) {
+    if (esito !== CHIESTO) return {};
+    const a = azioneDi(azione);
+    const c = confermaDi(conferma);
+    return a && c ? { azione: a, conferma: c } : {};
   }
   // `x`: l'azione del turno (coi campi `_` che Filo le scrive) o una voce già fatta, che torna ripulita.
   function voceArchivio(x) {
