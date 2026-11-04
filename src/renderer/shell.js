@@ -276,7 +276,8 @@
     return entries;
   }
   // Voci del menu Impostazioni (ingranaggio): uguali per tutti. Le impostazioni
-  // predefinite dell'owner stanno in Gestione (#1414).
+  // predefinite dell'owner stanno in Gestione (#1414). `predefinita`: la pagina che il main prepara finché l'utente
+  // non ne ha scelta più spesso un'altra (#1129).
   function buildSettings() {
     return [
       { label: 'Modelli', icon: 'models', url: 'filo://options/options.html' },
@@ -286,7 +287,7 @@
       { label: 'Trasparenza', icon: 'transparency', url: 'filo://transparency/transparency.html' },
       { label: 'Novità', icon: 'novita', url: 'filo://novita/novita.html' },
       { type: 'separator' },
-      { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html' },
+      { label: 'Preferenze', icon: 'colorPicker', url: 'filo://preferences/preferences.html', predefinita: true },
     ];
   }
 
@@ -294,7 +295,7 @@
   // WebContentsView native, stilizzato come il menu tasto destro.
   // Dove aprire il prossimo menu quando lo chiede la barra laterale: accanto alla sua icona.
   let ancoraMenu = null;
-  function showNativeMenu(btn, entries) {
+  function showNativeMenu(btn, entries, opzioni) {
     const r = btn.getBoundingClientRect();
     let x = Math.round(r.left);
     let y = Math.round(r.bottom + 4);
@@ -309,10 +310,10 @@
       x = Math.max(8, window.innerWidth - 250);
       y = 86;
     }
-    api.popupMenu(entries, x, y);
+    api.popupMenu(entries, x, y, opzioni);
   }
 
-  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings()));
+  settingsBtn.addEventListener('click', () => showNativeMenu(settingsBtn, buildSettings(), { prepara: 'impostazioni' }));
   // Lo stato di adesso; una copia scaduta il main la rilegge in sottofondo e annuncia il cambio.
   function rifletteInPausa(r) {
     if (!r || !r.ok) return;

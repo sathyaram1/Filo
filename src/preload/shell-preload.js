@@ -103,7 +103,7 @@ contextBridge.exposeInMainWorld('filoShell', {
       return () => ipcRenderer.removeListener('shell:download', wrapped);
     },
   },
-  popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
+  popupMenu: (entries, x, y, { prepara } = {}) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y, prepara }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
   onMenuAction: (fn) => {
     const wrapped = (_event, action) => { try { fn(action); } catch (_) {} };

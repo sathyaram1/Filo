@@ -53,7 +53,8 @@ const { BarraLaterale } = require('./barraLaterale');
 const { SchedeInAlto } = require('./schedeInAlto');
 const RisposteInAttesa = require('./risposteInAttesa');
 const { AnteprimeSchede } = require('./tabs/anteprime');
-const { RiservaNuovaScheda, vistePerAnnunci } = require('./tabs/riservaNuovaScheda');
+const { RiservaNuovaScheda, vistePerAnnunci, riserveDi } = require('./tabs/riservaNuovaScheda');
+const VociMenuUsate = require('./services/vociMenuUsate');
 const { VisiteSchede } = require('./tabs/visite');
 const { CodaRiapertura, perVicinanza } = require('./tabs/codaRiapertura');
 const { recuperaScheda } = require('./tabs/recuperoCrash');
@@ -477,9 +478,13 @@ class TabManager {
       suTolte: (ids) => CartaAnteprima.dimentica(window, ids),
     });
     this.riserva = new RiservaNuovaScheda(this);
+    // La voce più usata del menu Impostazioni, pronta solo finché il menu è aperto (#1129, preparaDalMenu).
+    this.preparata = new RiservaNuovaScheda(this, { url: null, rinasce: false, variabile: 'FILO_PREPARA_IMPOSTAZIONI' });
+    this._giroPreparata = 0;
+    VociMenuUsate.servizio().carica().catch(() => {});
     this.codaRiapertura = new CodaRiapertura({ carica: (tab) => this._caricaRinviata(tab) });
     if (window && typeof window.once === 'function') {
-      window.once('closed', () => { this.anteprime.chiudi(); this.riserva.spegni(); this.codaRiapertura.chiudi(); });
+      window.once('closed', () => { this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi(); });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
       dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); if (this.strato) this.strato.inCima(); },
@@ -1034,7 +1039,7 @@ class TabManager {
     const partition = adotta ? adotta.partition : this._partitionFor(url);
     // La home già pronta (#1128) vale per la scheda che si apre davanti e non ha niente da rifare al caricamento.
     const pronta = activate && !adotta && !bloccata && restoreScrollPct == null && restoreZoomLevel == null
-      ? this.riserva.prendi(url, this._sessionePer(partition))
+      ? this._prendiPronta(url, this._sessionePer(partition))
       : null;
     const id = pronta ? pronta.id : (idRimessa && !idInUso(idRimessa) ? idRimessa : randomUUID());
     const view = pronta ? pronta.vista : this._makeView(url, partition, { suppressAutoplay, webContents: adotta && adotta.webContents });
@@ -1155,8 +1160,40 @@ class TabManager {
     // nasce instradata da quel paese (ricrea la view nella partition proxata).
     if (!bloccata && !rinviata) this._maybeApplyDomainRule(tab, url);
     this._broadcast();
-    this.riserva.prepara(pronta ? { fra: 0 } : undefined);
+    this.riserva.prepara(pronta && pronta.daRiserva === this.riserva ? { fra: 0 } : undefined);
     return id;
+  }
+
+  // La pagina già pronta per `url`, staccata dalla sua riserva, o null.
+  _prendiPronta(url, ses) {
+    for (const r of riserveDi(this)) {
+      const presa = r.prendi(url, ses);
+      if (presa) return { ...presa, daRiserva: r };
+    }
+    return null;
+  }
+
+  // All'apertura di un menu (#1129): prepara nascosta la voce più scelta fra le sue pagine di Filo, se non è già una
+  // scheda; la scelta la consegna (openTab), la chiusura senza sceglierla la butta. `voci` come le riceve il menu.
+  preparaDalMenu(menu, voci) {
+    if (this.preparata.spenta || !this.win || this.win.isDestroyed()) return false;
+    const pagine = (Array.isArray(voci) ? voci : [])
+      .filter((e) => e && !e.disabled && !e.action && typeof e.url === 'string' && /^filo:\/\//i.test(e.url));
+    const candidati = pagine.map((e) => canonicalizeFiloUrl(e.url));
+    const i = pagine.findIndex((e) => e.predefinita === true);
+    const url = VociMenuUsate.servizio().piuUsata(menu, candidati, i >= 0 ? candidati[i] : '');
+    if (!url || !filoSingletonKey(url) || this.tabs.some((t) => filoSingletonKey(t.url) === filoSingletonKey(url))) {
+      this.preparata.scarta(this.preparata.url);
+      return false;
+    }
+    if (!this.preparata.preparaSubito(url)) return false;
+    // Chi sceglie la voce la prende subito dopo la chiusura, nello stesso giro: la si butta al giro dopo, e solo se
+    // nessun'altra apertura del menu l'ha fatta sua intanto.
+    const giro = ++this._giroPreparata;
+    require('./popup-menu').quandoChiuso(this.win, () => setImmediate(() => {
+      if (this._giroPreparata === giro) this.preparata.scarta(url);
+    }));
+    return true;
   }
 
   // Una scheda nata in attesa si carica una volta sola, dalla prima strada che ci arriva; la lista dei siti
@@ -1201,7 +1238,10 @@ class TabManager {
 
   // Una scheda che c'è, o la riserva che lo diventerà con questo id: quello che la pagina dice di sé vale per tutte e due.
   _perScheda(id) {
-    return this.tabs.find((t) => t.id === id) || this.riserva.campiPer(id);
+    const tab = id ? this.tabs.find((t) => t.id === id) : null;
+    if (tab) return tab;
+    for (const r of riserveDi(this)) { const c = r.campiPer(id); if (c) return c; }
+    return null;
   }
 
   // La sessione di una partizione come la vede una vista nata lì (null è quella di sempre).
@@ -2957,7 +2997,7 @@ class TabManager {
         tab.view.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       }
     }
-    this.riserva.posa();
+    for (const r of riserveDi(this)) r.posa();
     // L'ordine conta: l'avviso del sito sta sopra la scheda, gli avvisi della barra sopra di lui.
     this.avvisoSito.posa();
     this.riquadri.posa();
