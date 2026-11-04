@@ -2,6 +2,8 @@
 // script della pagina. Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
 // Il rumore è legato alla posizione del pixel nell'immagine: stesso pixel, stesso rumore, da ogni porta.
 
+const { SORGENTE: SEMBRA_NATIVA } = require('./sembraNativa.js');
+
 function buildGuardSource(seed, level) {
   const s = (seed >>> 0);
   const lvl = level | 0;
