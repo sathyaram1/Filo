@@ -313,7 +313,7 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   righe.push(visibile(x.titolo || '(senza titolo)'));
   righe.push(`creata il ${quando(x.creataIl)} · modificata il ${quando(x.modificataIl)}${x.gruppo ? ` · gruppo «${visibile(x.gruppo)}»` : ''}`);
   if (x.origine && x.origine.tipo) righe.push(`origine: ${visibile(x.origine.tipo)} ${visibile(x.origine.id || '')}`.trimEnd());
-  if (x.stato === 'in_smistamento') righe.push('la sta smistando un agente: arriva all\'owner riscritta, o si chiude da sola se è un guasto o se un principio la copre');
+  if (x.stato === 'in_smistamento') righe.push('la sta smistando un agente: arriva all\'owner riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora viva o se un principio la copre');
   if (x.smistamento === 'fallito') righe.push('non riscritta: il compito che la smista non ci è riuscito, ed è uscita come l\'aveva scritta chi chiedeva');
   if (x.legata) righe.push(`${x.blocca ? 'ferma' : 'non ferma'} il lavoro di ${visibile(riferimenti?.[x.legata]?.num || x.legata)}`);
   if (Array.isArray(x.collegamenti) && x.collegamenti.length) {
