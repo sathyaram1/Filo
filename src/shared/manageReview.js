@@ -566,7 +566,7 @@
     const shipped = status === 'done' ? isShipped(fb, opts && opts.releasedVersion) : false;
     const tab = FS().tabFor(status, { shipped });
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
-    // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
+    // non è arrivato al cancello. Una fallita per conflitto solo se la routine non la riallinea (richiestaInAttesa).
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
     if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
@@ -765,10 +765,23 @@
     return `${base} il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}.`;
   }
 
+  // Una richiesta che è una decisione dell'owner: da approvare, o approvata e finita in conflitto senza che nessuno la
+  // riallinei (#1425). Quella che la routine sta riallineando resta dov'è.
   function richiestaInAttesa(fb, opts) {
     const f = opts && opts.fusioni;
-    const pending = f && Array.isArray(f.pending) ? f.pending : [];
-    return pending.some((r) => richiestaDiQuesto(r, fb));
+    const di = (k) => (f && Array.isArray(f[k]) ? f[k] : []).some((r) => richiestaDiQuesto(r, fb));
+    if (di('pending')) return true;
+    return di('failed') && statoFusione(fb, opts) === 'riallineamento_fallito';
+  }
+
+  // Finché una richiesta aspetta l'owner, o il ramo approvato non è entrato in main, nessuna chiusura (Risolto,
+  // Archivia, le conferme) scavalca la fusione: sulla fusione si decide nel quadrato (#928). Senza `opts.fusioni`
+  // non si sa niente delle richieste, e la riga resta quella dello stato.
+  const AZIONI_CHE_CHIUDONO = ['done', 'archived', 'attack_confirmed', 'spam_confirmed'];
+  function senzaChiusureSullaFusione(fb, acts, opts) {
+    const f = fusioneDi(fb, opts);
+    if (!f || f.chiusure) return acts;
+    return acts.filter((a) => !AZIONI_CHE_CHIUDONO.includes(a.to));
   }
 
   // UNA tabella delle azioni dell'owner per tutte le superfici: sezione e status decidono
@@ -797,7 +810,7 @@
         acts.push({ key: 'confirm_spam', kind: 'reject', to: 'spam_confirmed', label: 'Conferma spam', primary: false });
       }
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
-      return acts;
+      return senzaChiusureSullaFusione(fb, acts, opts);
     }
     if (tab === 'queue' || tab === 'waiting') {
       // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
@@ -806,7 +819,7 @@
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
-      return acts;
+      return senzaChiusureSullaFusione(fb, acts, opts);
     }
     if (tab === 'resolved') {
       // Fix uscito: si archivia (verifica umana ok) o si riapre spiegando cosa
@@ -1566,19 +1579,20 @@
   const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
   const L5_SERVER = 'È un lavoro anche sul server. Qui non c’è una richiesta da approvare, e da qui non se ne riapre una. Il motivo dello stop è nella conversazione. Rimandala in lavorazione per farla rifare, o archiviala.';
   const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
-  // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
-  // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti. Il marcatore
-  // è nell'ora di chi scrive, senza fuso: il server scrive in UTC, gli strumenti dell'owner nella sua ora, e l'audit
-  // ha il fuso. Vale quindi la lettura più tarda delle due, o in Italia la nota del server sembra nata prima.
+  // Come il server apre la nota con cui ferma una pratica al cancello (functions/src/routine: fusioneServer notaOwner e
+  // notaPc, skipSecaudit, stall notaBlocco, unitFusione notaBloccoL5). Si riconosce dalla forma e non dall'ora, che nel
+  // marcatore non ha fuso: un report qualunque non diventa il motivo della fermata, in nessun fuso (#1556.2).
+  const NOTE_DEL_CANCELLO = [
+    /^Il cancello non fonde il ramo del server\b/,
+    /^Il cancello non porta il ramo su main di filo-security\b/,
+    /^Il cancello di fusione \(L5\) ha fermato\b/,
+    /^Verifica e controllo di sicurezza erano passati ma la fusione non era mai partita\b/,
+    /^Verifica e controllo di sicurezza sono passati, e [^\n]*\bcancello \(L5\) hanno fermato\b/,
+  ];
   function notaDelCancello(fb) {
     const nota = ultimaDomanda(fb);
-    const l4 = livelliOf(fb).l4;
-    const audit = Date.parse(String((l4 && l4.at) || ''));
-    const locale = nota && Date.parse(istanteDelTurno(nota.ts) || '');
-    if (!nota || !Number.isFinite(audit) || !Number.isFinite(locale)) return null;
-    const scritta = Math.max(locale, locale - new Date(locale).getTimezoneOffset() * 60000);
-    const minuto = (t) => Math.floor(t / 60000);
-    return minuto(scritta) >= minuto(audit) ? nota : null;
+    const testo = nota ? String(nota.body || '').trim() : '';
+    return testo && NOTE_DEL_CANCELLO.some((re) => re.test(testo)) ? nota : null;
   }
   function l5SenzaRichiesta(fb, opts) {
     const letto = !(opts && opts.dettaglioLetto === false);
@@ -1596,7 +1610,89 @@
       testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
       // A elenchi letti, una pratica senza richiesta viva (mai registrata, scaduta, scartata) si può riaprire (#1040).
       azioni: (lette && !server ? ['riapri_fusione'] : []).concat(['rimanda', 'archivia']),
-    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
+    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null, statoFusione: lette ? 'senza' : 'ferma' });
+  }
+
+  /**
+   * In che stato è la fusione di una pratica, in un posto solo (#1425, #1040.2): chip, ordine, segno, quadrato e riga
+   * dei tasti lo leggono da qui. `attende`: è una decisione dell'owner (rosso e in cima). `chiusure`: la riga dei tasti
+   * può chiudere la pratica (#928: mai mentre una richiesta aspetta o il ramo non è in main).
+   */
+  const STATI_FUSIONE = {
+    da_decidere: {
+      attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Una fusione aspetta il tuo via libera',
+      testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+    },
+    volo: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'in fusione',
+      titolo: 'Approvata: il server sta fondendo il ramo',
+      testo: 'Approvata: il server sta fondendo il ramo.',
+    },
+    decisa: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'fusione decisa',
+      titolo: 'Hai già deciso: esce da qui alla prossima rilettura',
+      testo: 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.',
+    },
+    fusa: {
+      attende: false, chiusure: true, classe: 'design', etichetta: 'approvata e fusa',
+      titolo: 'Approvata e fusa: esce da qui appena arriva il suo stato nuovo',
+      testo: 'Approvata e fusa: la pratica esce da qui appena arriva il suo stato nuovo.',
+    },
+    da_riallineare: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'da riallineare',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e ti arriva una richiesta nuova solo se serve',
+      testo: '',
+    },
+    riallineamento_fallito: {
+      attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione non avvenuta',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main e nessuno lo sta riallineando',
+      testo: '',
+    },
+    senza: {
+      attende: true, chiusure: true, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla',
+      testo: '',
+    },
+    // Ferma al cancello, con gli elenchi delle richieste non ancora letti: non si sa se aspetta un via libera.
+    ferma: {
+      attende: true, chiusure: true, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Ferma al cancello di fusione: le richieste non sono ancora arrivate a questa pagina',
+      testo: '',
+    },
+  };
+
+  // Chi riallinea da sé, le sue frasi e la specie di una fusione senza richiesta stanno solo nel modulo della scheda di
+  // approvazione (copiato anche nella pagina da browser): qui si leggono da lì, senza copie che si separano.
+  function schedaFusioni() {
+    if (!global.SN_MERGE_APPROVALS && typeof require === 'function') require('./mergeApprovals.js');
+    return global.SN_MERGE_APPROVALS;
+  }
+
+  // Approvata e finita in conflitto: la routine riallinea da sé solo ciò che la scheda dice (siRiallineaDaSola), e solo
+  // finché la pratica è in lavorazione (routeRealignment del server). Uscita dalla lavorazione (ferma, arenata): non è andato.
+  function riallineamentoDi(fb, failed) {
+    const { status } = normalizeStatus(fb);
+    const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
+    return inLavoro && failed.every((r) => schedaFusioni().siRiallineaDaSola(r)) ? 'da_riallineare' : 'riallineamento_fallito';
+  }
+  function testoRiallineamento(failed, inCorso) {
+    const MA = schedaFusioni();
+    // La richiesta che decide la frase è quella che non si riallinea da sola, se c'è.
+    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed[0];
+    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, inCorso)}`;
+  }
+
+  // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
+  const TESTI_FUSA_SENZA_CHIEDERE = {
+    fiducia: 'Lavoro fidato: controllo registrato nel Log.',
+    locale: 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.',
+    approvazione: 'Fusa senza chiedere: aveva solo blocchi che avevi già approvato, col tuo sì a una richiesta precedente su questa pratica.',
+    // Il segno a mano non nasce più (#1148): la frase resta per le fusioni di prima.
+    pieno: 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+  };
+  function specieFusa(r) {
+    return schedaFusioni().specieFusaSenzaChiedere(r);
   }
 
   /**
@@ -1617,8 +1713,8 @@
     // possono non essere arrivati, o essere vuoti su un altro computer, e il grigio mentirebbe.
     const fermaDaStato = status === 'design' && statusReason === 'l5';
 
-    // Una fusione approvata e mai avvenuta pesa quanto una richiesta ferma (vedi mergeApprovals).
-    const ferme = failed.concat(pending);
+    // Le richieste da decidere prima di quelle approvate e non avvenute: il pannello le mostra tutte.
+    const ferme = pending.concat(failed);
     if (!ferme.length && fermaDaStato) {
       // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
       // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
@@ -1627,33 +1723,38 @@
       const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
         && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
       if (fusa) {
-        return forma('l5', 'quadrato', titolo, 'attack', 'bloccato', {
+        return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
           titolo,
           righe: [],
-          testo: 'Approvata e fusa: la pratica esce da qui appena arriva il suo stato nuovo.',
+          testo: STATI_FUSIONE.fusa.testo,
           azioni: [],
-        }, { richiesta: null, richieste: [], conflitto: false });
+        }, { richiesta: null, richieste: [], conflitto: false, statoFusione: 'fusa' });
       }
       return l5SenzaRichiesta(fb, opts);
     }
-    if (ferme.length) {
-      const req = ferme[0];
-      const inConflitto = failed.length > 0;
+    if (pending.length) {
       // Una richiesta già mandata a fondere (tasto o segno), o già decisa, non aspetta più il via libera (#702).
       const statoDi = (opts && typeof opts.statoRichiesta === 'function') ? opts.statoRichiesta : () => null;
       const stati = pending.map((r) => statoDi(r));
-      const fusione = inConflitto || stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
+      const fusione = stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
         : (stati.includes('volo') ? 'volo' : 'decisa');
-      return forma('l5', 'quadrato', titolo, 'attack', inConflitto ? 'conflitto' : 'bloccato', {
+      const stato = fusione || 'da_decidere';
+      return forma('l5', 'quadrato', titolo, fusione ? 'spam' : 'attack', fusione ? 'attesa' : 'bloccato', {
         titolo,
         righe: [],
-        testo: inConflitto
-          ? 'Avevi detto sì, ma la fusione non è avvenuta: il ramo non entra in main finché non si sistema.'
-          : fusione === 'volo' ? 'Approvata: il server sta fondendo il ramo.'
-            : fusione === 'decisa' ? 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.'
-              : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+        testo: STATI_FUSIONE[stato].testo,
         azioni: [],
-      }, { richiesta: req, richieste: ferme, conflitto: inConflitto, fusione });
+      }, { richiesta: pending[0], richieste: ferme, conflitto: false, fusione, statoFusione: stato });
+    }
+    if (failed.length) {
+      const stato = riallineamentoDi(fb, failed);
+      const fallito = stato === 'riallineamento_fallito';
+      return forma('l5', 'quadrato', titolo, fallito ? 'attack' : 'spam', fallito ? 'conflitto' : 'riallinea', {
+        titolo,
+        righe: [],
+        testo: testoRiallineamento(failed, !fallito),
+        azioni: [],
+      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: stato });
     }
 
     const versione = String((fb && fb.resolvedInVersion) || '').trim();
@@ -1661,10 +1762,7 @@
       return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
-        testo: !preapproved.length ? 'Il lavoro è entrato in main.'
-          : preapproved[0].motivo === 'fiducia' ? 'Lavoro fidato: controllo registrato nel Log.'
-            : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.'
-              : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+        testo: !preapproved.length ? 'Il lavoro è entrato in main.' : TESTI_FUSA_SENZA_CHIEDERE[specieFusa(preapproved[0])],
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
     }
@@ -1697,11 +1795,22 @@
     return livelli(fb, opts).find((l) => l.key === String(key)) || null;
   }
 
-  // Questa segnalazione ha una fusione ferma che aspetta l'owner? È quello che fa diventare
+  /** La chiave di STATI_FUSIONE di questa pratica, o null se al cancello non c'è niente. PURA. */
+  function statoFusione(fb, opts) {
+    if (!fb) return null;
+    return livelloL5(fb, opts).statoFusione || null;
+  }
+  /** Lo stato della fusione con le sue parole ({ stato, attende, chiusure, classe, etichetta, titolo }), o null. PURA. */
+  function fusioneDi(fb, opts) {
+    const stato = statoFusione(fb, opts);
+    return stato ? Object.assign({ stato }, STATI_FUSIONE[stato]) : null;
+  }
+
+  // Questa segnalazione ha una fusione che aspetta una decisione dell'owner? È quello che fa diventare
   // rossa la scheda in lista e la porta in cima alle cose da decidere.
   function fusioneInAttesa(fb, opts) {
-    const l5 = livelloL5(fb, opts);
-    return l5.esito === 'bloccato' || l5.esito === 'conflitto';
+    const f = fusioneDi(fb, opts);
+    return !!(f && f.attende);
   }
 
   /** Le pratiche con una fusione ferma davanti, le altre nell'ordine che avevano (`sort` è stabile). PURA. */
@@ -1732,6 +1841,9 @@
     guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
     fidato:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_FIDATO },
+    // Lo scrive l'attesa delle routine (functions/src/routine/waits.js), non i giudici (#1425); `origine_bloccata`,
+    // che nomina l'origine, sta in segnoFermata.
+    attesa_chiusa: { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Aspettava un feedback che si è chiuso senza fusione: decidi tu se rifarlo o archiviarlo' },
   };
 
   /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
@@ -1745,24 +1857,23 @@
 
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
-   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null fuori
-   * dai Ricevuti o a stato illeggibile. PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
+   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null a stato
+   * illeggibile, e fuori dai Ricevuti salvo una fusione che aspetta l'owner (la porta lui nei Ricevuti, manageTabFor).
+   * PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
    */
   function segnoFermata(fb, opts) {
     if (!fb || statusUnreadable(fb)) return null;
     const out = (forma, livello, classe, testo) => ({ forma, livello, classe: classe || null, testo });
-    if (fusioneInAttesa(fb, opts)) {
-      const l5 = livelloL5(fb, opts);
-      return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
-        ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta. Decidi tu se rifarlo o archiviarlo'
-          : 'Fermo al cancello di fusione: aspetta il tuo via libera');
-    }
+    const fusione = fusioneDi(fb, opts);
+    if (fusione && fusione.attende) return out('quadrato', 'l5', fusione.classe, fusione.titolo);
     // Chi aspetta una domanda sta In coda col suo segno: non è un fermo dei Ricevuti.
     if (aspettaDomanda(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (!isRicevutiStatus(status)) return null;
+    // Al cancello, ma non per una decisione dell'owner (fusa, in volo, decisa): il quadrato col suo colore, mai rosso.
+    if (fusione && status === 'design' && statusReason === 'l5') return out('quadrato', 'l5', fusione.classe, fusione.titolo);
     if (status === 'design') {
+      if (statusReason === 'origine_bloccata') return out('rombo', 'l3', 'attack', `Bloccato perché ${origineText(fb)} è stato bloccato: decidi tu`);
       const s = SEGNO_DESIGN[String(statusReason || '')];
       if (s) return out(s.forma, s.livello, s.classe, s.testo);
       if (aspettaRisposta(fb)) return out('rombo', 'l3', 'design', SEGNO_DESIGN.clarify.testo);
@@ -1808,6 +1919,57 @@
     const list = Array.isArray(feedbacks) ? feedbacks : [];
     return (Array.isArray(richieste) ? richieste : [])
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
+  }
+
+  // ── Registro dei rifiuti delle routine (#773.2) ────────────────────────────
+  // Ogni motivo che il server scrive nel registro (filo-security: policy.REJECT, gitToken.MOTIVO, compiti), detto
+  // all'owner. Più i codici delle righe vecchie (stale, secaudit_stale, fault_declared, bad_ticket, routines_off).
+  const MOTIVI_RIFIUTO = {
+    bad_passphrase: 'parola d’ordine non valida o revocata',
+    bad_ticket: 'biglietto inesistente',
+    dead_ticket: 'biglietto scaduto o già rilasciato',
+    role_forbids: 'azione fuori dal ruolo',
+    branch_mismatch: 'ramo diverso da quello assegnato',
+    illegal_transition: 'passaggio di stato non permesso',
+    rate_limited: 'troppe richieste',
+    malformed: 'richiesta non interpretabile',
+    routines_off: 'routine spente',
+    l5_blocked: 'fusione fermata dai controlli di sicurezza',
+    not_approved: 'fusione chiesta senza verifica e controllo di sicurezza superati',
+    stale: 'il ramo è andato avanti dopo i controlli: niente fusione, si ricontrolla la punta',
+    secaudit_stale: 'il controllo di sicurezza valeva per un altro commit: si rifà',
+    no_critique: 'codice consegnato da un verificatore senza una critica registrata',
+    self_review: 'verdetto dato dallo stesso biglietto che aveva scritto la correzione',
+    config_incomplete: 'mancano i tetti di spesa delle routine in Automazioni',
+    fermata_senza_domanda: 'fermata senza la domanda scritta per te',
+    domanda_non_valida: 'domanda per te scritta male',
+    domanda_troppo_grande: 'domanda per te troppo lunga',
+    troppe_domande: 'troppe domande aperte da questo lavoro',
+    domanda_doppia: 'domanda già aperta con lo stesso titolo',
+    risposta_non_valida: 'risposta a una domanda scritta male',
+    risposta_chiusa: 'risposta a una domanda che non è più sua',
+    domanda_cambiata: 'hai scritto nella domanda dopo che la routine l’aveva letta',
+    azione_vietata: 'azione che una domanda non può chiedere',
+    smistamento_non_valido: 'smistamento di una domanda scritto male',
+    smistamento_chiuso: 'smistamento di una domanda che non è più sua',
+    fuori_ambito: 'operazione fuori da ciò che il biglietto permette',
+    fuori_ambiente: 'testo riservato chiesto fuori dall’ambiente riservato',
+    compito_inesistente: 'il compito del biglietto non esiste più',
+    repo_non_ammesso: 'credenziale chiesta per un repository non ammesso',
+    biglietto_non_vivo: 'credenziale chiesta con un biglietto non più valido',
+    biglietto_sporco: 'credenziale negata: il biglietto non è più pulito',
+    feedback_non_fidato: 'credenziale negata: il feedback non è fidato',
+    troppi_token: 'troppe credenziali chieste con lo stesso biglietto',
+    server_error: 'errore del server',
+    fault_declared: 'guasto dichiarato dalla routine',
+  };
+
+  /** Una riga del registro dei rifiuti in parole: { frase, dettaglio }. Mai il solo codice. PURA. */
+  function testoRifiuto(r) {
+    const codice = String((r && r.reason) || '').trim();
+    const frase = Object.hasOwn(MOTIVI_RIFIUTO, codice) ? MOTIVI_RIFIUTO[codice]
+      : codice ? `motivo che questa pagina non conosce (${codice})` : 'motivo non scritto';
+    return { frase, dettaglio: String((r && r.detail) || '').trim() };
   }
 
   // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────
@@ -1976,7 +2138,7 @@
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
+    fusioneInAttesa, fusioniFermeInCima, statoFusione, fusioneDi, STATI_FUSIONE, MOTIVI_RIFIUTO, testoRifiuto, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
     l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
     aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,

@@ -23,6 +23,7 @@
   <script src="filo://shared/feedbackAttachTypes.js"></script>
   <script src="filo://shared/feedbackAttese.js"></script>
   <script src="filo://shared/mittenti.js"></script>
+  <script src="filo://shared/mergeApprovals.js"></script>
   <script src="filo://shared/manageReview.js"></script>
   <script src="filo://shared/feedbackLive.js"></script>
   <script src="filo://shared/feedbackLivePagina.js"></script>
@@ -272,6 +273,8 @@
       font-size: 10.5px; line-height: 1; padding: 3px 6px; border-radius: 999px; white-space: nowrap;
       border: 1px solid color-mix(in srgb, #c0392b 55%, transparent); color: #c0392b;
     }
+    /* Una fusione che non aspetta l'owner (fusa, in volo, da riallineare): si dice, senza l'allarme. */
+    .fb-fusione--quieta { border-color: color-mix(in srgb, var(--sn-muted) 45%, transparent); color: var(--sn-muted); }
     /* «Aspetta #N» (#903): la forma del chip qui sopra, nella tinta d'accento come in Gestione. */
     .fb-attesa {
       display: inline-block; max-width: 100%; box-sizing: border-box;

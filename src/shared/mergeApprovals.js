@@ -101,6 +101,27 @@
     return '';
   }
 
+  // I ruoli delle routine in italiano, in un posto solo: li usano il Log di Gestione e le card, anche nella pagina da
+  // browser (#555). Un ruolo che questa tabella non conosce si scrive com'è.
+  var RUOLI = {
+    'new-work': 'Nuovo lavoro',
+    verifier: 'Verifica',
+    fixer: 'Correzione',
+    secaudit: 'Audit sicurezza',
+    risposta: 'Gestisci la risposta',
+    smistamento: 'Gestisci la domanda',
+    compito: 'Compito',
+    manutentore: 'Manutenzione',
+    prober: 'Esplorazione',
+    idle: 'Fermo',
+    off: 'Routine spente',
+  };
+  /** Il nome di un ruolo per l'owner; '' se manca. PURA. */
+  function etichettaRuolo(role) {
+    var r = String(role == null ? '' : role).trim();
+    return Object.prototype.hasOwnProperty.call(RUOLI, r) ? RUOLI[r] : r;
+  }
+
   // Chi ha chiesto la fusione: la superficie esiste per SEPARARE chi chiede da chi approva.
   // Un identificativo tecnico non si stampa: si dice «un accesso senza email». PURA.
   function requestedBy(who, req) {
@@ -108,8 +129,12 @@
     if (!s) return 'chi l’ha chiesta non risulta';
     if (s.indexOf('@') > 0) return 'chiesta da ' + s;
     // Un'automazione un'email non ce l'ha e non l'avrà mai: il server manda il ruolo che stava
-    // lavorando, e quello SÌ dice qualcosa a chi decide.
-    if (originOf(req) === 'routine') return 'chiesta da ' + s;
+    // lavorando («secaudit · slug»), e quello SÌ dice qualcosa a chi decide, detto come nel Log.
+    if (originOf(req) === 'routine') {
+      var parti = s.split(' · ');
+      parti[0] = etichettaRuolo(parti[0]);
+      return 'chiesta da ' + parti.join(' · ');
+    }
     return 'chiesta da un accesso senza email';
   }
 
@@ -254,6 +279,21 @@
       : 'Rilancia npm run finish.';
   }
 
+  // Dopo un sì finito in conflitto il lavoro di una routine torna da sé a riallinearsi (routeRealignment del server):
+  // l'owner non deve far partire niente (#1328, #1425).
+  var RIALLINEA_DA_SOLA = 'Il lavoro torna da solo alla routine, che riallinea il ramo e rifà i controlli: ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.';
+  /** Una fusione approvata e non avvenuta la riallinea il server da sé? Solo il lavoro di una routine con la sua pratica. PURA. */
+  function siRiallineaDaSola(req) {
+    return originOf(req) === 'routine' && !!String((req && req.feedbackId) || '').trim();
+  }
+  /** Cosa succede, o cosa fa l'owner, dopo un sì finito in conflitto. PURA. */
+  function dopoIlConflitto(req) {
+    if (siRiallineaDaSola(req)) return RIALLINEA_DA_SOLA;
+    return originOf(req) === 'routine'
+      ? 'Questo lavoro non si riallinea da solo: rimetti la sua pratica In coda per un giro nuovo.'
+      : 'Rifai la base del ramo e rilancia npm run finish.';
+  }
+
   // Il motivo del server porta un'etichetta tecnica: qui diventa una frase, il dettaglio fra
   // parentesi resta. Un'etichetta sconosciuta si stampa grezza: dice più di una nascosta.
   var REALIGN_REASONS = {
@@ -358,11 +398,9 @@
         : { kind: 'ok', text: 'Fatto: il lavoro è su main' + shaTxt + '.' };
     }
     if (r.result === 'conflict') {
-      var base = originOf(req) === 'routine'
-        ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
-        : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.';
       var tentativo = realignFailureText(r.realignReason);
-      return { kind: 'warn', text: tentativo ? base + ' ' + tentativo : base };
+      return { kind: 'warn', text: 'Main è andato avanti e le modifiche non si incastrano da sole. '
+        + (tentativo ? tentativo + ' ' : '') + dopoIlConflitto(req) };
     }
     if (r.result === 'stale') {
       // Riallineata dal server: la richiesta vecchia è consumata ma il lavoro non è perso e non
@@ -576,8 +614,11 @@
     who.title = 'La richiesta è arrivata con questa identità; approvarla è un gesto tuo, qui.';
     head.appendChild(who);
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
+    when.dataset.da = String(Number(req.createdAtMs) || '');
     head.appendChild(when);
     var exp = el('span', 'sn-mac-expiry', expiresIn(req.expiresAtMs, now));
+    exp.dataset.scade = String(Number(req.expiresAtMs) || 0);
+    card.classList.toggle('is-expired', exp.textContent === 'scaduta');
     // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro: mandare l'owner a
     // pubblicare in locale un ramo di un'automazione è un consiglio che non porta a niente.
     exp.title = 'Vale per il commit esaminato e per una settimana. Passata la scadenza, ' + lowerFirst(howToRetry(req));
@@ -735,6 +776,23 @@
     return card;
   }
 
+  // Chi la riallinea, e la frase che lo dice: la sola copia, letta anche dal quadrato di Gestione (manageReview).
+  // `inCorso` lo sa solo chi conosce la pratica (Gestione, dal suo stato); `null` = non si sa (pagina da browser, richiesta
+  // senza pratica in lista): allora la frase non promette niente e dice dove guardare.
+  var RIALLINEAMENTO_NON_ANDATO = 'Il riallineamento automatico non è andato: rimetti la sua pratica In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
+  var RIALLINEAMENTO_DA_GUARDARE = 'Se la sua pratica è ancora in lavorazione, la routine riallinea il ramo da sola e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto; se in Gestione è ferma, rimettila In coda per un giro nuovo.';
+  /** La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea. PURA. */
+  function testoRiallineamento(req, inCorso) {
+    if (inCorso === true) return RIALLINEA_DA_SOLA;
+    if (!siRiallineaDaSola(req)) return dopoIlConflitto(req);
+    return inCorso === false ? RIALLINEAMENTO_NON_ANDATO : RIALLINEAMENTO_DA_GUARDARE;
+  }
+  function riallineamentoDi(req, o) {
+    var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
+    var inCorso = dato ? !!dato.inCorso : null;
+    return { inCorso: inCorso, testo: testoRiallineamento(req, inCorso) };
+  }
+
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
   // può sparire: resta in vista finché non è fusa o finché l'owner non la segna sistemata.
   function buildFailedCard(req, opts) {
@@ -763,13 +821,18 @@
     sha.title = 'Il commit che avevi approvato: ' + String(req.sha || '');
     head.appendChild(sha);
     head.appendChild(el('span', 'sn-mac-who', requestedBy(req.who, req)));
-    head.appendChild(el('span', 'sn-mac-when', 'approvata ' + timeAgo(req.decidedAtMs || req.usedAtMs, now)));
+    var quando = el('span', 'sn-mac-when', 'approvata ' + timeAgo(req.decidedAtMs || req.usedAtMs, now));
+    quando.dataset.da = String(Number(req.decidedAtMs || req.usedAtMs) || '');
+    quando.dataset.prima = 'approvata ';
+    head.appendChild(quando);
     card.appendChild(head);
 
     var tentativo = realignFailureText(req.realignReason);
+    var ria = riallineamentoDi(req, o);
+    card.dataset.riallineamento = ria.inCorso === true ? 'in_corso' : ria.inCorso === false ? 'fallito' : 'da_guardare';
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
-      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + howToRetry(req)
+      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
       + ' Quando il lavoro rifatto verrà fuso, questa scheda si toglie da sola.'));
 
     var status = el('p', 'sn-mac-status');
@@ -801,8 +864,37 @@
     return card;
   }
 
+  // Il tempo sulle card cammina da solo (#487): si riscrivono solo le scritte, mai la card, così un «Confermi?»
+  // armato o una fusione in volo restano dove sono. Passata la scadenza la card dice «scaduta».
+  var OROLOGIO_MS = 15000;
+  function aggiornaTempi(root, nowMs) {
+    var r = root || global.document;
+    if (!r || !r.querySelectorAll) return;
+    var now = Number(nowMs) || Date.now();
+    var scadenze = r.querySelectorAll('.sn-mac-expiry[data-scade]');
+    for (var i = 0; i < scadenze.length; i++) {
+      var t = expiresIn(Number(scadenze[i].dataset.scade), now);
+      if (scadenze[i].textContent !== t) scadenze[i].textContent = t;
+      var card = scadenze[i].closest ? scadenze[i].closest('.sn-mac-card') : null;
+      if (card) card.classList.toggle('is-expired', t === 'scaduta');
+    }
+    var quando = r.querySelectorAll('.sn-mac-when[data-da]');
+    for (var k = 0; k < quando.length; k++) {
+      var fa = timeAgo(Number(quando[k].dataset.da), now);
+      var testo = (quando[k].dataset.prima || '') + fa;
+      if (fa && quando[k].textContent !== testo) quando[k].textContent = testo;
+    }
+  }
+  var orologio = null;
+  function avviaOrologio() {
+    if (orologio || typeof global.setInterval !== 'function' || !global.document) return;
+    orologio = global.setInterval(function () { aggiornaTempi(global.document); }, OROLOGIO_MS);
+    if (orologio && typeof orologio.unref === 'function') orologio.unref();
+  }
+
   function render(host, opts) {
     if (!host) return 0;
+    avviaOrologio();
     var o = opts || {};
     var list = Array.isArray(o.requests) ? o.requests : [];
     var failed = Array.isArray(o.failed) ? o.failed : [];
@@ -817,17 +909,18 @@
 
     // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
-      var fbox = el('section', 'sn-mac sn-mac-failed');
+      // Se le riallinea tutte la routine, il titolo non suona l'allarme: non c'è niente da fare (#1425).
+      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso === true; });
+      var fbox = el('section', 'sn-mac sn-mac-failed' + (tutteInCorso ? ' sn-mac-failed--in-corso' : ''));
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
       var ftitle = el('div', 'sn-mac-title');
       var fico = el('span', 'sn-mac-ico');
       var ficons = global.SN_ICONS;
       fico.innerHTML = (ficons && typeof ficons.lock === 'function') ? ficons.lock(18) : '';
       ftitle.appendChild(fico);
-      ftitle.appendChild(el('span', 'sn-mac-title-text',
-        failed.length === 1
-          ? 'Una fusione approvata non è avvenuta'
-          : failed.length + ' fusioni approvate non sono avvenute'));
+      ftitle.appendChild(el('span', 'sn-mac-title-text', tutteInCorso
+        ? (failed.length === 1 ? 'Una fusione approvata è da riallineare' : failed.length + ' fusioni approvate sono da riallineare')
+        : (failed.length === 1 ? 'Una fusione approvata non è avvenuta' : failed.length + ' fusioni approvate non sono avvenute')));
       fbox.appendChild(ftitle);
       for (var k = 0; k < failed.length; k++) fbox.appendChild(buildFailedCard(failed[k], o));
       host.appendChild(fbox);
@@ -1118,5 +1211,13 @@
     preapprovedMoreText: preapprovedMoreText,
     preapprovedIntro: preapprovedIntro,
     renderPreapproved: renderPreapproved,
+    specieFusaSenzaChiedere: specieFusaSenzaChiedere,
+    etichettaRuolo: etichettaRuolo,
+    aggiornaTempi: aggiornaTempi,
+    OROLOGIO_MS: OROLOGIO_MS,
+    siRiallineaDaSola: siRiallineaDaSola,
+    dopoIlConflitto: dopoIlConflitto,
+    testoRiallineamento: testoRiallineamento,
+    RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
