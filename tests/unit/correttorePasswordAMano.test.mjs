@@ -107,8 +107,59 @@ test('#1649: le porte nuove non prendono nomi di prodotto, utenti, ticket e codi
 
 // Un testo lungo senza punti, con la parola ripetuta, cercava la fine della frase da capo a ogni menzione: 200 mila
 // caratteri erano 17 secondi a ogni richiesta del correttore, e i refusi contati come menzioni li moltiplicavano.
+// Oggi costa qualche decina di unità, la versione quadratica più di mille.
 test('un testo lunghissimo che ripete la parola password senza punti si legge in fretta', () => {
-  const t0 = Date.now();
-  R.oscura('pasword passowrd password '.repeat(12000));
-  assert.ok(Date.now() - t0 < 5000, `${Date.now() - t0} ms`);
+  const c = costoInUnita(() => R.oscura('pasword passowrd password '.repeat(12000)), { tetto: 400 });
+  assert.ok(c.entro, c.come);
+});
+
+test('#1446.4: dopo una fila di solleciti dell\'altro la risposta resta legata alla richiesta', () => {
+  const sopra = [
+    'Marco: mi mandi la password del wifi?', '17:02', 'Marco: ci sei?', '17:03',
+    'Marco: sono sotto casa tua, ho finito i giga e devo scaricare il biglietto del treno', '17:04',
+    'Marco: il citofono non funziona, ho provato tre volte', '17:05',
+    'Marco: dai rispondi che fa freddo e sta per iniziare a piovere', '17:06', 'Marco: ??', '17:07',
+    'Marco: scusa se insisto ma il treno parte alle 18:40 e non riesco a fare il check-in senza internet', '17:08',
+  ].join('\n');
+  nascosto('Gatto2024', sopra, 'Gatto2024', 'solleciti');
+});
+
+test('#1446.4: la password in fondo a una risposta di oltre seicento caratteri non parte', () => {
+  const r = `${'aspetta che apro il cassetto della cucina dove tengo i fogli delle bollette e dei contratti, '.repeat(8)}eccola: Gatto2024`;
+  assert.ok(r.indexOf('Gatto2024') > 600);
+  nascosto(r, 'Marco: mi mandi la password del wifi?', 'Gatto2024', 'risposta di oltre seicento caratteri');
+  // Senza la richiesta sopra la stessa risposta parte intera: è il legame a toglierla.
+  assert.equal(alModello(r, 'Marco: ciao come stai?').nuovo, r);
+});
+
+test('#1649: le grafie vicine a quelle degli esempi non lasciano passare la chiave', () => {
+  for (const [t, v] of [
+    ['Wi-Fi: Casa Rossi - Faro7Blu55', 'Faro7Blu55'],
+    ['Wi-Fi: WIND3 HUB-123456 - Faro7Blu55', 'Faro7Blu55'],
+    ['SSID: CasaRossi, Key: Brezza7Mare', 'Brezza7Mare'],
+    ['SSID: CasaRossi Key: Brezza7Mare', 'Brezza7Mare'],
+    ['SSID: Casa Rossi\nKey: Brezza7Mare', 'Brezza7Mare'],
+    ['Ti ho mandato la password su whatsapp, comunque è Girasole2024', 'Girasole2024'],
+    ['Ti ho mandato la password su whatsapp, cmq è Girasole2024', 'Girasole2024'],
+  ]) nascosto(t, '', v, t);
+});
+
+// Dopo «pw», «la pass» o «, è» una parola qualunque resta parola: il modello la vede e la corregge.
+test('#1649: dopo le etichette corte e la virgola le parole normali restano', () => {
+  for (const [t, parola] of [
+    ['Ho cambiato la password ieri, è stato un casino. Il mio stato è sereno.', 'stato'],
+    ['Ho comprato la pass giornaliera, è carissima', 'giornaliera'],
+    ['Ho comprato la pass giornaliera, è carissima', 'carissima'],
+    ['ho comprato il pass, è bellissimo', 'bellissimo'],
+    ['il green pass, è scaduto', 'scaduto'],
+    ['Il pw del documento. Il documento è pronto', 'documento'],
+  ]) {
+    const fuori = alModello(t).nuovo;
+    assert.equal(fuori, t, `${t} → ${fuori}`);
+    assert.ok(fuori.includes(parola));
+  }
+  // Presentata da «è» o dai due punti, o subito dopo «pw», resta un dato anche di sole lettere.
+  for (const [t, v] of [['la pass è gattonero', 'gattonero'], ['la pass del wifi: gattonero', 'gattonero'], ['utente mario.rossi, pw pontegrigio', 'pontegrigio']]) {
+    nascosto(t, '', v, t);
+  }
 });
