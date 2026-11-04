@@ -67,18 +67,25 @@ più nessun permesso.
 ### 1.2 Biglietti che si sporcano
 
 Ogni sessione che lavora, in cloud o in locale, ha un **biglietto** del server.
-Il biglietto nasce pulito o sporco (pulito se il lavoro da cui nasce è
-fidato) e **si sporca** appena il server gli consegna qualcosa di non fidato:
+Il biglietto nasce con le radici del lavoro da cui nasce (nessuna se è
+fidato) e **accumula** le radici di quello che il server gli consegna:
 
-- il testo di un feedback, una domanda o una conversazione non fidati (il
-  server li decifra: sa cosa consegna);
-- la posta;
-- le pagine web che il server cerca per un compito (§ 5.1);
-- registri che possono citare testo di utenti;
-- un ramo scritto da un biglietto sporco.
+- il testo di un feedback, di una domanda o di una nota: le loro radici (il
+  server li decifra: sa cosa consegna). Una nota porta le radici del biglietto
+  che l'ha scritta, quindi una conversazione scritta da biglietti puliti non
+  aggiunge niente;
+- la posta: `posta:<id>`;
+- le pagine web che il server cerca per un compito (§ 5.1): `web:<indirizzo>`;
+- registri ed elenchi (il registro delle decisioni, l'elenco delle domande):
+  le radici delle sole voci non fidate che stampano;
+- un ramo: le radici dei biglietti che l'hanno scritto.
 
-Uno sporco non torna pulito. Quello che un biglietto scrive prende la fiducia
-che il biglietto ha **in quel momento**.
+Una radice non si perde leggendo: si toglie solo col timbro dell'owner
+(§ 1.8). Il biglietto è **pulito** quando tutte le sue radici sono timbrate;
+un timbro dato dopo lo ripulisce anche a sessione aperta. Quello che un
+biglietto scrive prende le radici che il biglietto ha **in quel momento**.
+Ogni riga dello sporco registrato sul biglietto («letta D-181») porta le
+radici che quella lettura ha aggiunto.
 
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
