@@ -217,6 +217,8 @@
         type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), motivo: breve(x.motivo, MAX_MOTIVO), file: f,
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
         evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
+        partita: x.esito === FALLITO && x.partita === true, riprova: x.esito === FALLITO && x.riprova === true,
+        ...(generica ? {} : bottoneDi(x.esito, x.azione, x.conferma)),
       });
     }
     // Un ricordo ripescato da solo sta col messaggio dell'utente, non fra le azioni di Filo.
