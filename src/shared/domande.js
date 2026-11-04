@@ -347,10 +347,15 @@
     return null;
   }
 
+  // Le azioni che scrivono la decisione nella conversazione del loro feedback e lo fanno ripartire se è fermo (#1965):
+  // legame, blocco, peso e fermate le contano da qui, nell'app e nel server.
+  const AZIONI_CHE_RIPRENDONO = Object.freeze(['riprendi', 'attendi']);
+  const riprendeIlLavoro = (azione) => isOggetto(azione) && AZIONI_CHE_RIPRENDONO.includes(azione.tipo);
+
   /** Un'opzione riprende il lavoro su `feedbackId` ('' = su qualunque feedback). PURA. */
   function riprende(domanda, feedbackId = '') {
     return (isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : [])
-      .some((o) => isOggetto(o) && isOggetto(o.azione) && o.azione.tipo === 'riprendi' && (!feedbackId || o.azione.feedbackId === feedbackId));
+      .some((o) => isOggetto(o) && riprendeIlLavoro(o.azione) && (!feedbackId || o.azione.feedbackId === feedbackId));
   }
 
   const BLOCCA_REGOLA = 'Blocca (true) se andare avanti con la consigliata, e poi l’owner sceglie altro, lascia un danno che un altro giro '
