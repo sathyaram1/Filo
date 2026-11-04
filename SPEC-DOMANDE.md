@@ -1509,7 +1509,9 @@ lavorano in locale.
 9. Gestione del lavoro (§ 4.3–4.8): taccuino, sveglie, controllo della
    gestione del lavoro, segnalazioni e domande di guasto che vanno a lei
    (campo `destinatario`, che manda all'owner i guasti dell'ambiente dei
-   riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto;
+   riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto,
+   e nessuna oltre al mattino mentre lei è ferma su un guasto suo; controllo
+   sulle sessioni chiuse bene;
    feedback per numero, azione `attendi`), la sua domanda di fine turno consegnata dopo
    l'ultima scrittura (§ 5.4), lanci per numeri, curva del parallelismo applicata dal
    server, indicatori, ambiti `esperimento` e `giudizio` con l'esito
