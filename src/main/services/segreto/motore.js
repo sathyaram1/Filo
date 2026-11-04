@@ -1474,9 +1474,10 @@ async function rifiutoSpazio(ctx, S, nome, servono) {
     return errore('SPAZIO', `Non c’è spazio: servono ${servono} byte, ne restano ${disponibili}.`, { servono, disponibili, prima: true });
   }
   const togliendoIlVecchio = await massimoScrivibile(S, libere(ctx), nome, { senzaVecchio: true });
-  return errore('SPAZIO', `Non c’è spazio per tenere il file vecchio finché il nuovo non è salvato: servono ${servono} byte, ne restano ${disponibili}; togliendo prima il vecchio ne resterebbero ${togliendoIlVecchio}.`, {
-    servono, disponibili, togliendoIlVecchio, prima: true,
-  });
+  const messaggio = togliendoIlVecchio >= servono
+    ? `Non c’è spazio per tenere il file vecchio finché il nuovo non è salvato: servono ${servono} byte, ne restano ${disponibili}; togliendo prima il vecchio ne resterebbero ${togliendoIlVecchio}.`
+    : `Non c’è spazio: servono ${servono} byte, ne restano ${disponibili} (${togliendoIlVecchio} togliendo prima il file vecchio).`;
+  return errore('SPAZIO', messaggio, { servono, disponibili, togliendoIlVecchio, prima: true });
 }
 
 // Il pacco si riscrive coi tratti della tabella vecchia ai loro posti, più il file nuovo nel suo buco: fino alla testa
