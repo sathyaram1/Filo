@@ -47,14 +47,15 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
   la bolla mostra quelle righe e i bottoni dei file e dell'evento da aggiungere, e il modello le legge. Un sì o un no
   dato al bottone dopo il turno chiude la voce aperta nella risposta che l'aveva proposta (`unisciDopo`, applicato da
   `src/shared/filoEventi.js` quando legge il filo): mai una risposta senza parole a parte, mai una conferma «non ancora
-  data» per una cosa fatta o rifiutata. Un turno senza niente da dire non va al modello. Sentinelle:
-  `tests/unit/esitiInArchivio.test.mjs`, `tests/unit/rispostaAlBottoneDopo.test.mjs`.
+  data» per una cosa fatta o rifiutata. Un turno senza niente da dire non va al modello. Sentinella:
+  `tests/unit/esitiInArchivio.test.mjs`.
 - **La conferma è una pausa del lavoro, non la sua fine** (#1373, decisione dell'owner: come gli harness di Anthropic,
   su cui i modelli Claude sono addestrati). Dopo un sì, riuscito o no, l'esito torna al modello in un turno interno
   (le voci di `esiti`, scritte dal main), e il modello continua coi passi che mancano o chiude muto: nessuna bolla e
   niente in archivio. Non c'è un caso per tipo e nessun campo che il modello dichiara. Un no non richiama il modello:
-  lo legge al messaggio dopo e non ripropone. Un segreto fermato non riprende. Le conferme di una stessa risposta sono
-  un passo solo: si riprende quando ognuna ha avuto la sua risposta, con gli esiti di tutte. Un OK dato mentre Filo
+  lo legge al messaggio dopo e non ripropone, anche quando arriva al bottone ridato di una chat riaperta. Un segreto
+  fermato non riprende. Le conferme di una stessa risposta, pannelli del riordino e dell'archivio compresi, sono un
+  passo solo: si riprende quando ognuna ha avuto la sua risposta, con gli esiti di tutte. Un OK dato mentre Filo
   risponde riparte a turno finito, se intanto l'utente non ha scritto né fermato.
   Chiusa altrove mentre qui si risponde, le bolle a schermo restano le sue: il filo non le ridisegna.
 - **All'apertura l'ultimo messaggio sta in cima** (#1487), col segno del suo giorno, e sotto è vuoto: chi apre una home

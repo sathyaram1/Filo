@@ -690,3 +690,101 @@ test('#1685 il riordino: un no resta un no, e un riordino che non riesce lo sann
     await ripristina(app);
   }
 });
+
+// Un no non fa ripartire il lavoro, anche quando arriva al bottone che la chat riaperta ha ridisegnato: il modello non
+// va richiamato con un «continua» che non sa del no.
+test('#1685 riaperta la chat, un no al bottone ridato non fa ripartire il lavoro', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('esiti-conferme-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: 'Creo la cartella.', toolCalls: [mkdir('c1', dir, 'sette')] }, { text: 'Aspetto il tuo OK.' }, { text: 'RIPARTITO DOPO IL NO' }]);
+    await chiedi(page, 'crea la cartella sette');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const chat = await chatCon(app, 'crea la cartella sette');
+    await riapri(app, page, chat.id);
+    const bottone = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella sette' });
+    await expect(bottone).toBeVisible({ timeout: 8_000 });
+    const prima = (await chiamateAlModello(app)).length;
+    await bottone.click();
+    await clickConfirm(page, 'cancel', { timeout: 5_000 });
+    await expect.poll(async () => (await chatCon(app, 'crea la cartella sette')).messages.flatMap((m) => m.esiti || []).map((v) => `${v.esito}:${v.motivo || ''}`), { timeout: 8_000 })
+      .toEqual(['fallito:detto no alla conferma']);
+    await page.waitForTimeout(1500);
+    expect(existsSync(join(dir, 'sette'))).toBe(false);
+    expect((await chiamateAlModello(app)).length, 'un no non richiama il modello, come in diretta').toBe(prima);
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'RIPARTITO DOPO IL NO' })).toHaveCount(0);
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+// Il pannello del riordino è una conferma della stessa risposta come i bottoni: la ripresa aspetta anche lui.
+test('#1685 riordino e comando nella stessa risposta: Filo riprende solo quando hanno risposto tutti e due', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('esiti-conferme-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'i1', name: 'PULISCI_TAB', arguments: '{}' }, mkdir('c1', dir, 'otto')] },
+      { text: 'Ti chiedo due conferme.' }, { text: 'RIPRESO CON TUTTO' },
+    ]);
+    await chiedi(page, 'riordina le schede e crea la cartella otto');
+    const riordino = page.locator('.dash-action-btn', { hasText: 'Riordina e archivia' });
+    await expect(riordino).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    expect((await chiamateAlModello(app)).length).toBe(2);
+    await okAlBottone(page, page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella otto' }));
+    await page.waitForTimeout(1500);
+    expect((await chiamateAlModello(app)).length, 'il riordino aspetta ancora la sua risposta').toBe(2);
+    await riordino.click();
+    await clickConfirm(page, 'cancel', { timeout: 10_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'RIPRESO CON TUTTO' })).toBeVisible({ timeout: 10_000 });
+    const ch = await chiamateAlModello(app);
+    expect(ch).toHaveLength(3);
+    expect(ultimoMessaggio(ch[2])).toMatch(/fatta: Comando eseguito[^\n]*otto/);
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+// L'eliminazione dall'archivio chiede col suo pannello: un no resta un no e non fa ripartire il lavoro, un'eliminazione
+// non riuscita resta scritta e torna al modello (#1373).
+test('#1685 eliminazione dall\'archivio: un no resta un no, e una non riuscita la sanno la chat e il modello', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(async () => {
+    const A = globalThis.SN_ARCHIVED_TABS;
+    for (const i of [1, 2]) await A.archive({ url: `https://archiviata-${i}.test/`, title: `Archiviata ${i}`, closedAt: new Date().toISOString() });
+    globalThis.__removeManyVero = A.removeMany;
+  });
+  try {
+    await modelloFinto(app, [{ toolCalls: [{ id: 'a1', name: 'CANCELLA_ARCHIVIO', arguments: '{"tutto":true}' }] }, { text: 'Ecco l\'archivio.' }, { text: 'NON ELIMINATE: riprova.' }]);
+    await chiedi(page, 'svuota l\'archivio');
+    const elimina = page.locator('.dash-delete-panel .dash-action-btn-danger');
+    await expect(elimina).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await elimina.click();
+    await clickConfirm(page, 'cancel', { timeout: 5_000 });
+    const esiti = async () => (await chatCon(app, 'svuota l\'archivio'))?.messages.flatMap((m) => m.esiti || []).map((v) => `${v.esito}:${v.motivo || ''}`);
+    await expect.poll(esiti, { timeout: 8_000 }).toEqual(['fallito:detto no alla conferma']);
+    await page.waitForTimeout(800);
+    expect((await chiamateAlModello(app)).length, 'un no non fa ripartire il lavoro').toBe(2);
+    await app.evaluate(() => { globalThis.SN_ARCHIVED_TABS.removeMany = async () => { throw new Error('disco pieno'); }; });
+    await elimina.click();
+    await clickConfirm(page, 'ok', { timeout: 5_000 });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'NON ELIMINATE' }), 'il guasto torna al modello').toBeVisible({ timeout: 10_000 });
+    expect(ultimoMessaggio((await chiamateAlModello(app))[2])).toMatch(/NON riuscita: [^\n]*\(perché: l’archivio è rimasto com’era/);
+    await expect.poll(esiti, { timeout: 8_000 }).toEqual(['fallito:l’archivio è rimasto com’era']);
+    expect(await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).length)).toBe(2);
+  } finally {
+    await app.evaluate(() => { if (globalThis.__removeManyVero) globalThis.SN_ARCHIVED_TABS.removeMany = globalThis.__removeManyVero; });
+    await ripristina(app);
+  }
+});
