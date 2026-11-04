@@ -34,23 +34,6 @@ export function rigaEsito(r, { dalVero } = {}) {
     : `Si può sanare (${conto}). Rilancia con --dal-vero per togliere il buco.`;
 }
 
-async function chiamaServer(data, { fetchImpl = fetch, url = OWNER_FIDUCIA_URL } = {}) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const refresh = findAdminRefreshToken();
-  if (!refresh) throw new Error('nessuna credenziale admin su questa macchina: node scripts/admin-login.mjs');
-  const idToken = await mintIdToken(refresh);
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data }),
-  });
-  let body = {};
-  try { body = await res.json(); } catch (_) { body = {}; }
-  if (res.status === 404) throw new Error('la funzione ownerFiducia non è ancora pubblicata sul server');
-  if (!res.ok) throw new Error((body.error && body.error.message) || `errore ${res.status}`);
-  return body.result || {};
-}
-
 /** deps: { chiama(data) → risultato della callable, scrivi(riga) }. → codice d'uscita. */
 export async function sana(argv, { chiama = chiamaServer, scrivi = console.log } = {}) {
   const args = leggiArgomenti(argv);
