@@ -160,7 +160,7 @@
 
     // Anche i campi dentro i componenti della pagina (ombra aperta): a schermo si vedono come gli altri.
     function tuttiICampi(radice, profondita = 0) {
-      const out = Array.from(radice.querySelectorAll('input, textarea, select'));
+      const out = Array.from(radice.querySelectorAll(NOMI_DEI_CAMPI.join(', ')));
       if (profondita > 8) return out;
       for (const n of radice.querySelectorAll('*')) {
         if (n.shadowRoot) out.push(...tuttiICampi(n.shadowRoot, profondita + 1));
