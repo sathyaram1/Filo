@@ -606,7 +606,9 @@ Come funziona oggi (#1152):
   risposta» la tratta come le sue (applica, chiude, scrive il principio) e non
   gli chiede di confermarla. Il mittente resta distinto (owner, sessione,
   automatica): `SN_DOMANDE.mittenteRisposta` lo legge dal turno, e la domanda
-  porta `registrataDa: 'sessione'` con `rispostaDaSessione`. In Gestione la
+  porta `registrataDa: 'sessione'` con `rispostaDaSessione` quando l'ultima
+  parola che la chiude è della sessione (una risposta dell'owner dalla
+  finestra toglie il segno). In Gestione la
   scheda e la conversazione la segnano «registrata da una sessione» (nella
   conversazione il turno è «Tu», col segno al posto di quello della fiducia).
   L'owner la annulla da Gestione → Domande con «Riapri», come riapre una
