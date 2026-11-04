@@ -202,26 +202,16 @@ export function percorsoDiChiLancia({ env = process.env, cwd = process.cwd(), se
   return daEnv;
 }
 
-// I marcatori dei turni della conversazione (gemelli di USER_TURN_RE e MODEL_TURN_RE in src/shared/feedbackThread.js).
-const TURNO_OWNER_RE = /^---\s*(?:Riaperto il|La tua risposta del)\s*.*?\s*---\s*$/;
-const TURNO_ALTRI_RE = /^---\s*(?:Aggiornamento dell'agente del|Filo ha risposto il)\s*.*?\s*---\s*$/;
-
-/** I turni della conversazione col loro marcatore; quello prima di ogni marcatore è d'altri. PURA. */
-function turniDi(notes) {
-  const turni = [{ owner: false, marcatore: '', righe: [] }];
-  for (const riga of String(notes || '').split(/\r?\n/)) {
-    if (TURNO_OWNER_RE.test(riga) || TURNO_ALTRI_RE.test(riga)) turni.push({ owner: TURNO_OWNER_RE.test(riga), marcatore: riga, righe: [] });
-    else turni[turni.length - 1].righe.push(riga);
-  }
-  return turni;
-}
+// La divisione in turni è quella di chi mostra la conversazione: una seconda copia potrebbe far passare un turno
+// d'altri per uno dell'owner. Quello prima di ogni marcatore è d'altri.
+const turniDi = (notes) => globalThis.SN_FEEDBACK_THREAD.turniGrezzi(notes).map((t) => ({ ...t, owner: t.role === 'user' }));
 
 /**
  * La conversazione contiene testo scritto da altri che dall'owner (routine, sessioni, Filo)? PURA. Il server sa se
  * l'ha scritto un biglietto sporco (`scrittoSporco`), da qui no: nel dubbio, chi la stampa si sporca.
  */
 export function noteConScrittiDiAltri(notes) {
-  return turniDi(notes).some((t) => !t.owner && t.righe.some((r) => r.trim() && !r.startsWith('@@filo-attachment ')));
+  return turniDi(notes).some((t) => !t.owner && t.righe.some((r) => r.trim()));
 }
 
 /**
