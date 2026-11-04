@@ -570,6 +570,19 @@ test('il campo di un componente chiuso si trova anche con la scritta «<input>»
   } finally { altro.s.close(); }
 });
 
+// I due conti dei campi non si prendono nello stesso istante: una pagina che toglie un campo fra l'uno e l'altro non
+// deve far saltare la ricerca nei componenti chiusi (#810.18).
+test('il numero della carta nel componente chiuso è coperto in ogni foto, anche con la pagina che ridisegna i suoi campi', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, modulo(`${componenteChiuso}<div id="z"></div>
+    <script>let on = false; setInterval(() => { on = !on; z.innerHTML = on ? '<input>'.repeat(50) : ''; }, 2);</script>`));
+  await expect.poll(() => page.evaluate(() => Boolean(window.__radice)), { timeout: 10_000 }).toBe(true);
+  await scriviNelComponente(page, '4111111111111111');
+  const esito = await misuraLaRicerca(app, new URL(page.url()).pathname, 30);
+  const scoperte = esito.durate.filter((d) => !d.nonCoperti && d.campi === 0).length;
+  expect(scoperte, 'foto con la carta scoperta, su trenta').toBe(0);
+});
+
 // Lo screenshot del menu: il nome del file lo sceglie un modello guardando la foto. La foto dell'utente resta intera.
 async function screenshotDellUtente(app, page) {
   let foto = null;
