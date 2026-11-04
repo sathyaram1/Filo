@@ -397,11 +397,13 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   await app.evaluate((_e, chatId) => globalThis.SN_CLOSE_FILO_CHAT(chatId), id);
   await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(id)}`);
   await expect(page.locator('.dash-bubble')).toHaveCount(2, { timeout: 8_000 });
-  // L'OK dato dopo il turno chiude la sua domanda, col numero vero (#1294, #1685); il riordino resta una conferma chiesta.
+  // L'OK dato dopo il turno chiude la sua domanda, col numero vero (#1294, #1685); il riordino mai premuto ritrova il
+  // suo bottone, che non è partito da solo.
   const racconto = (await page.locator('.dash-bubble-filo .dash-activity-row').allTextContents()).join(' | ');
   expect(racconto).toContain('Eliminate dall’archivio · 1 scheda');
   expect(racconto).not.toContain('riordinat');
-  await expect(page.locator('.dash-bubble-filo .dash-activity-row', { hasText: 'Conferma chiesta' })).toHaveCount(1);
+  await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Riordina e archivia' })).toHaveCount(1);
+  await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
 });
 
 test('indicizzazione giù: il pannello propone lo stesso le schede pertinenti', async ({ app, shell }) => {

@@ -6359,7 +6359,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const ES = globalThis.SN_ESITO;
       const voci = Array.isArray(m.esiti) && m.esiti.length ? m.esiti
         : ES.vociArchivio((Array.isArray(m.actions) ? m.actions : []).filter((a) => a && a._confirm));
-      const storia = m.confermaDopo ? '' : ES.perModello(voci);
+      const storia = m.confermaDopo ? '' : ES.perModello(ES.daRaccontare(voci, !!obs));
       if (storia) parts.push(storia);
       const extra = parts.join('\n\n');
       if (extra) msg.content = content ? `${content}\n\n${extra}` : extra;
