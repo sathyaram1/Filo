@@ -129,6 +129,48 @@ test('#1446.4: dopo una fila di solleciti dell\'altro la risposta resta legata a
   nascosto('Gatto2024', sopra, 'Gatto2024', 'solleciti');
 });
 
+// Le pagine di chat non mettono nomi: una riga «Parola: …» può essere un «PS:», un orario o un altro del gruppo.
+test('#1723: un altro del gruppo, un «PS:» o un sollecito che rinomina la password non sciolgono il legame', () => {
+  for (const sopra of [
+    'Marco: mi mandi la password del wifi?\nLuca: anche a me serve!',
+    'Marco: mi mandi la password del wifi?\nIndirizzo: via Roma 5',
+    'mi mandi la password del wifi?\n18:01\nPS: porta il vino\n18:02',
+    'mi mandi la password del wifi?\nOre 20: cena da me',
+  ]) nascosto('Gatto2024', sopra, 'Gatto2024', sopra);
+  nascosto('gattonero', 'Marco: mi mandi la password del wifi?\nMarco: dai la password', 'gattonero', 'sollecito che rinomina');
+});
+
+test('#1723: «era» e «sarebbe» annunciano il dato anche in fondo a una risposta lunga', () => {
+  for (const a of ['era', 'sarebbe']) {
+    const t = `certo aspetta che vado a vedere sul router perché non me la ricordo mai, ${a} gattonero`;
+    nascosto(t, 'Marco: mi mandi la password del wifi?', 'gattonero', t);
+  }
+});
+
+test('#1723: le varianti delle forme libere non lasciano passare la password', () => {
+  for (const [t, v] of [
+    ['Login: mario / Girasole2024', 'Girasole2024'],
+    ['Account: mario / Girasole2024', 'Girasole2024'],
+    ['Credenziali: mario - Girasole2024', 'Girasole2024'],
+    ['Utente / Parola chiave: mario / Girasole2024', 'Girasole2024'],
+    ['Username / Pasword: mario / Girasole2024', 'Girasole2024'],
+    ['WiFi CasaRossi - Faro7Blu55', 'Faro7Blu55'],
+    ['Rete: CasaRossi - Faro7Blu55', 'Faro7Blu55'],
+    ['Wi-Fi: CasaRossi, Faro7Blu55', 'Faro7Blu55'],
+    ['per la password su whatsapp, è Girasole2024', 'Girasole2024'],
+  ]) nascosto(t, '', v, t);
+  for (const t of ['il wifi non va, AX1800 è il router', 'poi, è Office365 che non va']) assert.equal(alModello(t).nuovo, t);
+});
+
+// Un'etichetta di rete ripetuta su una riga rileggeva la riga da capo a ogni volta: 48 mila caratteri erano più di cento
+// unità, su main meno di una.
+test('#1723: un campo lungo con tante etichette di rete su una riga si legge in fretta', () => {
+  for (const t of ['wifi: '.repeat(8000), 'ssid: a '.repeat(6000), 'wifi: a - '.repeat(5000)]) {
+    const c = costoInUnita(() => R.oscura(t), { tetto: 20 });
+    assert.ok(c.entro, `${t.slice(0, 10)}: ${c.come}`);
+  }
+});
+
 test('#1446.4: la password in fondo a una risposta di oltre seicento caratteri non parte', () => {
   const r = `${'aspetta che apro il cassetto della cucina dove tengo i fogli delle bollette e dei contratti, '.repeat(8)}eccola: Gatto2024`;
   assert.ok(r.indexOf('Gatto2024') > 600);
