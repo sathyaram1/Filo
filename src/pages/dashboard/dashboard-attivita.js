@@ -1569,6 +1569,8 @@
         // #1373 — la conferma è una pausa del lavoro, non la sua fine: com'è andata (fatta o no) torna al modello, che
         // continua o chiude. Un segreto fermato non torna: il modello cercherebbe un'altra strada per farlo uscire.
         const riprende = !!(r && !r.rejected && !(r.output && r.output.blocked === 'segreto'));
+        // Anche un OK finito male cambia il turno: il modello deve leggere l'esito, non la conferma ancora in corso.
+        a._rispostaDopo = true;
         try {
           esitoDellaConferma(r, { chiesta, chat });
         } finally {
@@ -1876,21 +1878,12 @@
     const E = global.SN_ESITO;
     const type = String((a && a.type) || '').toUpperCase();
     const esito = E.esitoAzione(a);
-    const row = activityRowFor(a);
-    // La riga del diario in diretta, coi suoi numeri: la frase «a cosa fatta» del main resta il ripiego.
-    const voce = esito === E.FALLITO
-      ? { type, esito, riga: chiesta, motivo: E.motivo(a) || (row && row.failed ? row.text : '') }
-      : { type, esito, riga: (row && !row.failed ? row.text : '') || fatto };
+    // La stessa voce che archivia il turno (le parole del diario coi numeri, il perché di un no): una regola sola.
+    const voce = E.voceArchivio(a) || { type, esito };
+    if (voce.esito === E.FALLITO && chiesta && voce.type !== 'FERMATA') voce.riga = chiesta;
+    if (!voce.riga && fatto) voce.riga = fatto;
     // Quale domanda chiude, fra quelle aperte della risposta che l'aveva proposta.
     if (a && a._rigaChiesta) voce.proposta = a._rigaChiesta;
-    if (a && a._output && a._output.blocked === 'segreto') {
-      voce.type = 'FERMATA';
-      voce.riga = String(a._output.frase || '');
-      delete voce.motivo;
-    }
-    if (type === 'APRI_FILE' && esito !== E.FALLITO && (a.percorso || a.path)) {
-      voce.file = { percorso: String(a.percorso || a.path), ...(a.etichetta || a.label ? { etichetta: String(a.etichetta || a.label) } : {}) };
-    }
     try { archiviaAzione(type, cambi, a, { chat, voce }); } catch (_) {}
   }
 

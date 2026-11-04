@@ -58,7 +58,8 @@ test('#1130.2 una proposta ferma sulla conferma, senza testo, resta nella chat r
   await expect(page.locator('.dash-bubble-user', { hasText: 'segnala che il timer non suona' })).toBeVisible({ timeout: 8_000 });
   const bolla = page.locator('.dash-bubble-filo');
   await expect(bolla, 'riaperta, la chat mostra la risposta di Filo a quel messaggio').toHaveCount(1);
-  await expect(bolla.locator('.dash-activity-row')).toHaveText(/Conferma chiesta · .*feedback/i);
+  // Annullato il popup, la proposta resta scritta come un no (#1685): cosa era, e che non è partita.
+  await expect(bolla.locator('.dash-activity-row')).toHaveText(/Segnalazione non inviata · detto no alla conferma/i);
   await page.screenshot({ path: 'tests/.shots/chat-esiti-proposta-riaperta.png' });
 
   const prima = (await chiamateAlModello(app)).length;
@@ -67,7 +68,7 @@ test('#1130.2 una proposta ferma sulla conferma, senza testo, resta nella chat r
   const ch = await chiamateAlModello(app);
   const storia = ch[ch.length - 1];
   expect(rispostaA(storia, 'segnala che il timer non suona'), 'il modello sa cosa aveva proposto, e che non è fatto')
-    .toMatch(/NON fatta: chiesta la conferma.*feedback/is);
+    .toMatch(/NON riuscita: [^\n]*feedback[^\n]*perché: detto no alla conferma/i);
   expect(turniVuoti(storia), 'nessun turno vuoto va al modello').toEqual([]);
   await ripristina(app);
 });
@@ -170,9 +171,13 @@ test('#1373 un comando secco confermato: Filo riparte con l\'esito e, a lavoro f
   await expect(page.locator('.dash-activity')).toHaveCount(1);
   const chat = await chatCon(app, 'accendi il terminale');
   expect(chat.messages.flatMap((m) => m.esiti || []).map((v) => `${v.type}:${v.esito}`))
-    .toEqual(['IMPOSTA_PREFERENZA:chiesto', 'IMPOSTA_PREFERENZA:fatto']);
+    .toEqual(['IMPOSTA_PREFERENZA:fatto']);
   expect(chat.messages.filter((m) => m.role === 'filo' && !String(m.text || '').trim() && !(m.esiti || []).length),
     'la ripresa muta non lascia un messaggio vuoto nella conversazione').toEqual([]);
+  // Nemmeno nella scheda: il messaggio dopo non porta al modello un turno vuoto, che alcuni fornitori rifiutano.
+  await chiedi(page, 'grazie');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(3);
+  expect(turniVuoti((await chiamateAlModello(app))[2]), 'nessun turno vuoto va al modello').toEqual([]);
   await ripristina(app);
 });
 
@@ -246,7 +251,7 @@ test('#1294 la conferma data dopo aver cambiato conversazione resta in quella do
   await expect.poll(async () => {
     const c = (await chatsDellaHome(app)).find((x) => x.id === nata.id);
     return c.messages.flatMap((m) => m.esiti || []).map((v) => v.esito);
-  }, { timeout: 5_000 }).toEqual(['chiesto', 'fatto']);
+  }, { timeout: 5_000 }).toEqual(['fatto']);
   const altre = (await chatsDellaHome(app)).filter((c) => c.id !== nata.id);
   expect(altre.flatMap((c) => c.messages.flatMap((m) => m.esiti || [])), 'nessuna conversazione nuova con dentro solo la conferma').toEqual([]);
   await ripristina(app);
@@ -371,5 +376,155 @@ test('#1685 chiusa in una home mentre l\'altra sta rispondendo dentro di essa: d
   await b.waitForTimeout(1500);
   await expect(b.locator('.dash-bubble-user', { hasText: 'come stai' })).toHaveCount(1);
   await expect(b.locator('.dash-bubble-filo', { hasText: 'Bene, grazie.' })).toHaveCount(1);
+  await ripristina(app);
+});
+
+// Un sì o un no dato al bottone dopo il turno chiude la domanda nella risposta che l'aveva fatta (#1685): riaperta dopo un
+// riavvio, la chat dice com'è finita con le parole del diario, e il modello non legge una conferma «non ancora data».
+test('#1685 comando confermato al bottone: riaperta dopo un riavvio, la riga dice fatto e il modello lo sa', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('esiti-conferme-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: 'Creo la cartella.', toolCalls: [mkdir('c1', dir, 'nuova')] }, { text: '' }, { text: 'Ok.' }]);
+    await chiedi(page, 'crea la cartella nuova');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await okAlBottone(page, page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella nuova' }));
+    await expect.poll(async () => (await chatCon(app, 'crea la cartella nuova'))?.messages.flatMap((m) => m.esiti || []).map((v) => v.esito), { timeout: 8_000 })
+      .toEqual(['fatto']);
+    const chat = await chatCon(app, 'crea la cartella nuova');
+    expect(chat.messages.filter((m) => m.role === 'filo' && !String(m.text || '').trim()), 'nessuna risposta senza parole a parte').toEqual([]);
+    await dimenticaLaMemoria(app, chat.id);
+    await riapri(app, page, chat.id);
+    const bolla = page.locator('.dash-bubble-filo', { hasText: 'Creo la cartella.' });
+    await expect(bolla.locator('.dash-activity-row')).toHaveText(/Comando eseguito.*mkdir.*nuova/, { timeout: 8_000 });
+    await expect(bolla).not.toContainText('Conferma chiesta');
+    const prima = (await chiamateAlModello(app)).length;
+    await chiedi(page, 'l\'hai creata?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBeGreaterThan(prima);
+    const ch = await chiamateAlModello(app);
+    const risposta = rispostaA(ch[ch.length - 1], 'crea la cartella nuova');
+    expect(risposta, 'dopo un riavvio il modello sa che è fatta').toMatch(/fatta: Comando eseguito[^\n]*nuova/);
+    expect(risposta).not.toMatch(/non l'aveva ancora data|azioni di questo turno/);
+    expect(turniVuoti(ch[ch.length - 1])).toEqual([]);
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
+test('#1685 un no al bottone resta un no: riaperta dopo un riavvio, la chat e il modello sanno che l\'utente ha rifiutato', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await terminaleSpento(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: 'Va bene.' }]);
+  await chiedi(page, 'accendi il terminale');
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
+  await clickConfirm(page, 'cancel');
+  await expect.poll(async () => (await chatCon(app, 'accendi il terminale'))?.messages.flatMap((m) => m.esiti || []).map((v) => v.esito), { timeout: 8_000 })
+    .toEqual(['fallito']);
+  const chat = await chatCon(app, 'accendi il terminale');
+  await dimenticaLaMemoria(app, chat.id);
+  await riapri(app, page, chat.id);
+  const riga = page.locator('.dash-bubble-filo .dash-activity-row');
+  await expect(riga).toHaveText(/detto no alla conferma/, { timeout: 8_000 });
+  await chiedi(page, 'come va?');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
+  const ch = await chiamateAlModello(app);
+  const risposta = rispostaA(ch[1], 'accendi il terminale');
+  expect(risposta).toMatch(/NON riuscita[^\n]*perché: detto no alla conferma/);
+  expect(risposta).not.toMatch(/non l'aveva ancora data/);
+  await ripristina(app);
+});
+
+test('#1685 un OK nel popup: riaperta, la riga dice quello che diceva il diario in diretta', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await terminaleSpento(app);
+  await modelloFinto(app, [{ text: '', toolCalls: [TERMINALE] }, { text: '' }]);
+  await chiedi(page, 'accendi il terminale');
+  await confermaScritta(page);
+  await expect(page.locator('.dash-action-btn', { hasText: /^✓/ })).toBeVisible({ timeout: 10_000 });
+  const righe = await page.locator('.dash-activity-row').allTextContents();
+  const detto = righe.map((t) => t.replace(/^[^A-Za-zÀ-ÿ]+/, '').trim()).find((t) => /terminale/i.test(t) && !/Conferma chiesta/.test(t));
+  expect(detto, `una riga del diario racconta il terminale acceso: ${righe.join(' | ')}`).toBeTruthy();
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  const chat = await chatCon(app, 'accendi il terminale');
+  await riapri(app, page, chat.id);
+  await expect(page.locator('.dash-bubble-filo .dash-activity-row').first(), 'le stesse parole del diario').toContainText(detto, { timeout: 8_000 });
+  await ripristina(app);
+});
+
+const EVENTO = { id: 'e1', name: 'EVENTO_CALENDARIO', arguments: '{"data":"2026-12-01","ora":"10:00","titolo":"Dentista"}' };
+
+test('#1685 un evento proposto: riaperta, il bottone c\'è ancora; aggiunto, la chat dice aggiunto e non torna «proposto»', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Ecco l\'evento.', toolCalls: [EVENTO] }, { text: 'Ok.' }]);
+  await chiedi(page, 'metti il dentista il primo dicembre');
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  const chat = await chatCon(app, 'metti il dentista il primo dicembre');
+  await riapri(app, page, chat.id);
+  const bottone = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Aggiungi al calendario' });
+  await expect(bottone, 'riaperta, l\'evento si aggiunge ancora col bottone').toBeVisible({ timeout: 8_000 });
+  await bottone.click();
+  await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: /^✓/ })).toBeVisible({ timeout: 10_000 });
+  await expect.poll(async () => (await chatCon(app, 'metti il dentista il primo dicembre'))?.messages.flatMap((m) => m.esiti || []).map((v) => v.esito), { timeout: 8_000 })
+    .toEqual(['compiuto']);
+  await dimenticaLaMemoria(app, chat.id);
+  await riapri(app, page, chat.id);
+  const bolla = page.locator('.dash-bubble-filo', { hasText: 'Ecco l\'evento.' });
+  await expect(bolla).toContainText('Evento aggiunto al calendario', { timeout: 8_000 });
+  await expect(bolla).not.toContainText('proposto');
+  await ripristina(app);
+});
+
+test('#1685 un evento che nessun programma apre: il diario, la chat salvata e il modello non lo dicono nel calendario', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(({ shell }) => {
+    globalThis.__openPathVero = shell.openPath;
+    shell.openPath = async () => 'nessuna applicazione';
+  });
+  try {
+    await modelloFinto(app, [{ text: 'Ecco l\'evento.', toolCalls: [EVENTO] }, { text: 'Ok.' }]);
+    await chiedi(page, 'metti il dentista il primo dicembre');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+    await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Evento salvato' })).toBeVisible({ timeout: 10_000 });
+    await expect.poll(async () => (await chatCon(app, 'metti il dentista il primo dicembre'))?.messages.flatMap((m) => m.esiti || []).map((v) => v.riga).join('|'), { timeout: 8_000 })
+      .toMatch(/il calendario non si è aperto/);
+    const chat = await chatCon(app, 'metti il dentista il primo dicembre');
+    expect(JSON.stringify(chat.messages)).not.toContain('Evento aggiunto al calendario');
+    await dimenticaLaMemoria(app, chat.id);
+    await riapri(app, page, chat.id);
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco l\'evento.' })).toContainText('il calendario non si è aperto', { timeout: 8_000 });
+    await chiedi(page, 'è in calendario?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
+    const ch = await chiamateAlModello(app);
+    expect(rispostaA(ch[1], 'metti il dentista il primo dicembre')).toMatch(/fatta: Evento salvato in un file, il calendario non si è aperto/);
+  } finally {
+    await app.evaluate(({ shell }) => { if (globalThis.__openPathVero) shell.openPath = globalThis.__openPathVero; });
+    await ripristina(app);
+  }
+});
+
+test('#1373 un comando che non riesce dopo l\'OK: il modello riceve il perché e lo dice in chat', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+  await livelloAutonomia(app, 'conservativo');
+  const comando = { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'mkdir /cartella-che-non-esiste-1685/sotto', spiegazione: 'Creo la sottocartella' }) };
+  await modelloFinto(app, [{ text: '', toolCalls: [comando] }, { text: 'NON È ANDATO: la cartella sopra non esiste.' }]);
+  await chiedi(page, 'crea la sottocartella');
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  await okAlBottone(page, page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la sottocartella' })).catch(() => {});
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'NON È ANDATO' }), 'il modello dice in chat cosa non è andato').toBeVisible({ timeout: 10_000 });
+  const ch = await chiamateAlModello(app);
+  expect(ch).toHaveLength(2);
+  expect(JSON.stringify(ch[1]), 'il modello riceve l\'esito vero').toMatch(/No such file or directory/);
+  expect(ultimoMessaggio(ch[1])).toMatch(/NON riuscita/);
   await ripristina(app);
 });

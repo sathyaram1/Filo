@@ -44,9 +44,11 @@ chiude una chat. Filo scrive di sua iniziativa solo quando è successo qualcosa,
 - **Com'è andata ogni azione** (#1294): la risposta archiviata porta `esiti`, una voce per azione (fatta coi numeri,
   non riuscita col perché, ferma sulla conferma, il file del bottone), scritta da `src/shared/esitoAzione.js` con le
   parole del diario in diretta (`src/shared/righeAttivita.js`, una tabella sola per la home e per l'archivio). Riletta,
-  la bolla mostra quelle righe e i bottoni dei file, e il modello le legge; un OK dato dopo si aggiunge come voce nella
-  conversazione dove era nato il bottone. Un turno senza niente da dire non va al modello. Sentinella:
-  `tests/unit/esitiInArchivio.test.mjs`.
+  la bolla mostra quelle righe e i bottoni dei file e dell'evento da aggiungere, e il modello le legge. Un sì o un no
+  dato al bottone dopo il turno chiude la voce aperta nella risposta che l'aveva proposta (`unisciDopo`, applicato da
+  `src/shared/filoEventi.js` quando legge il filo): mai una risposta senza parole a parte, mai una conferma «non ancora
+  data» per una cosa fatta o rifiutata. Un turno senza niente da dire non va al modello. Sentinelle:
+  `tests/unit/esitiInArchivio.test.mjs`, `tests/unit/rispostaAlBottoneDopo.test.mjs`.
 - **La conferma è una pausa del lavoro, non la sua fine** (#1373, decisione dell'owner: come gli harness di Anthropic,
   su cui i modelli Claude sono addestrati). Dopo un sì, riuscito o no, l'esito torna al modello in un turno interno
   (le voci di `esiti`, scritte dal main), e il modello continua coi passi che mancano o chiude muto: nessuna bolla e

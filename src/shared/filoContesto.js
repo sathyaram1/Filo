@@ -282,7 +282,9 @@
     // Com'è andata ogni azione, comprese la fallita e la proposta ferma sulla conferma (#1294, #1130.2): dal disco, quindi
     // uguale in ogni scheda e dopo un riavvio. Un OK dato dopo il turno lo dice già il filo davanti al messaggio dopo.
     const ES = global.SN_ESITO;
-    const storia = ES && !m.confermaDopo && Array.isArray(m.esiti) && m.esiti.length ? ES.perModello(m.esiti) : '';
+    // Gli esiti visti dalla scheda (`oss`) dicono già le azioni fatte o no coi dati veri: dall'archivio restano le ferme.
+    const voci = Array.isArray(m.esiti) ? m.esiti.filter((v) => !oss || (v && (v.esito === 'chiesto' || v.esito === 'proposto'))) : [];
+    const storia = ES && !m.confermaDopo && voci.length ? ES.perModello(voci) : '';
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
     else if (tipi.length && !storia) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);

@@ -269,6 +269,8 @@ function esitiDellaScheda(storia, chatMsgs) {
   for (let i = h.length - 1; i >= 0 && j >= 0; i--) {
     const m = h[i];
     if (!m || m.role !== 'filo' || m.interrotto) continue;
+    // Una ripresa chiusa muta non è un messaggio del filo: non deve prendere il posto della risposta che chiedeva l'OK.
+    if (!String(m.text || '').trim() && !(Array.isArray(m.actions) && m.actions.length)) continue;
     let k = j;
     while (k >= 0 && !stesso(m, chatMsgs[k])) k--;
     if (k < 0) continue;
@@ -429,7 +431,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
   const valido = (g) => !!g && senzaTolti(g.azioni) === g.azioni;
   const cambiataDopo = (k) => {
     const s = dallaScheda.get(k);
-    return !!s && s.azioni.some((a) => a && (a._confirmed || a._rifiutata || (a._output && a._output.dopo)));
+    return !!s && s.azioni.some((a) => a && (a._confirmed || a._rifiutata || a._rispostaDopo || (a._output && a._output.dopo)));
   };
   const giroDi = (m) => {
     const k = FC().chiave(m);
