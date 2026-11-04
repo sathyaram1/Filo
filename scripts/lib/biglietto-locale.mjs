@@ -339,6 +339,35 @@ export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() }
   return inAttesa ? Object.assign(out, { inAttesa }) : out;
 }
 
+/**
+ * Il segno riservato (SPEC-DOMANDE §5.1, #2027) per i dati privati che la sessione legge senza passare dal server (il
+ * feedback dal database): quello che scrive dopo lo porta. Mai un'eccezione.
+ * @returns {Promise<{ segnati: number, senzaBiglietto?: true, errori: string[] }>}
+ */
+export async function segnaRiservato(motivo, { env, cwd, deps = {} } = {}) {
+  const m = String(motivo || '').trim().slice(0, 300);
+  const out = { segnati: 0, errori: [] };
+  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
+  const trovati = trovaBiglietti({ env, cwd });
+  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
+  for (const b of trovati) {
+    try {
+      await chiama('riservato', { ticket: b.ticket, motivo: m }, deps);
+      out.segnati += 1;
+    } catch (e) {
+      out.errori.push(String((e && e.message) || e).slice(0, 200));
+    }
+  }
+  return out;
+}
+
+/** La riga per chi ha letto dati privati: '' se il segno è preso o non c'è un biglietto da segnare. */
+export async function rigaRiservato(cosa, opts = {}) {
+  const r = await segnaRiservato(cosa, opts);
+  if (r.segnati || r.senzaBiglietto) return '';
+  return `Segno riservato NON preso (${r.errori.join('; ')}): prima di scrivere compiti o feedback dichiaralo con node scripts/biglietto.mjs riservato "${cosa}".`;
+}
+
 /** Prende un biglietto e scrive il suo file. → { path, fp, fiducia }. */
 export async function prendi({ sporco = false, riservato = false, motivo = '', sessionId = '', trascrizione = '', cwd = process.cwd(), nowMs = Date.now(), deps = {} } = {}) {
   const radice = radiceCondivisa(cwd);
