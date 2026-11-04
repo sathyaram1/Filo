@@ -5833,7 +5833,83 @@ function seguitoFiloChat({ reqId, id, testo, togli = false, serba = null, orfani
   if (!t.seguiti.some((s) => s.id === chiave)) t.seguiti.push({ id: chiave, testo: parole });
   return { accolto: true };
 }
-const NOTA_SEGUITO = '[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
+
+// I seguiti in attesa, interi (#1296.1): sembrano già mandati, quindi non si perdono con la pagina. Una pagina
+// ricaricata nella stessa scheda riprende quelli della pagina di prima; a scheda chiusa, finiti i suoi turni, restano
+// nella conversazione come messaggi dell'utente. Solo in memoria: id → { wcId, pagina, chatId, composizione }.
+const seguitiSerbati = new Map();
+const turniDellaScheda = new Map();   // wcId → turni in volo
+const schedeSparite = new Set();      // wcId delle schede chiuse che aspettano la fine dei loro turni
+const schedeSeguite = new WeakSet();
+const idScheda = (wc) => { try { return wc && !wc.isDestroyed() ? wc.id : null; } catch (_) { return null; } };
+function serbaSeguito(id, serba, wc) {
+  const wcId = idScheda(wc);
+  const c = serba && serba.composizione;
+  if (!id || wcId == null || !c || typeof c !== 'object') return false;
+  const testi = (xs) => (Array.isArray(xs) ? xs.filter((x) => typeof x === 'string') : []);
+  const composizione = {
+    text: String(c.text || ''),
+    scritto: String(c.scritto || ''),
+    immagini: testi(c.immagini).filter((d) => d.startsWith('data:image/')),
+    file: (Array.isArray(c.file) ? c.file : []).filter((f) => f && typeof f.percorso === 'string' && f.percorso)
+      .map((f) => ({ percorso: f.percorso, nome: String(f.nome || '') })),
+    percorsi: (Array.isArray(c.percorsi) ? c.percorsi : []).filter((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'string')),
+    incollato: c.incollato === true,
+    daFuori: c.daFuori === true,
+    citata: c.citata && typeof c.citata === 'object' ? c.citata : null,
+  };
+  seguitiSerbati.set(id, { wcId, pagina: String(serba.pagina || ''), chatId: serba.chatId ? String(serba.chatId) : null, composizione });
+  if (!schedeSeguite.has(wc)) {
+    schedeSeguite.add(wc);
+    try { wc.once('destroyed', () => schedaSparita(wcId)); } catch (_) {}
+  }
+  return true;
+}
+function ritiraSerbato(id, wc) {
+  const s = id ? seguitiSerbati.get(id) : null;
+  if (s && s.wcId === idScheda(wc)) seguitiSerbati.delete(id);
+}
+// Quelli lasciati da un'altra pagina della stessa scheda: tolti anche dai turni che li aspettano, o arriverebbero due volte.
+function seguitiOrfani(wc, pagina) {
+  const wcId = idScheda(wc);
+  if (wcId == null) return [];
+  const presi = [];
+  for (const [id, s] of seguitiSerbati) {
+    if (s.wcId !== wcId || s.pagina === pagina) continue;
+    seguitiSerbati.delete(id);
+    for (const t of turniInCorso.values()) {
+      if (t.wcId !== wcId) continue;
+      const i = t.seguiti.findIndex((x) => x.id === id);
+      if (i >= 0) t.seguiti.splice(i, 1);
+    }
+    presi.push(s.composizione);
+  }
+  return presi;
+}
+function schedaSparita(wcId) {
+  if (turniDellaScheda.get(wcId)) schedeSparite.add(wcId);
+  else lasciaNellaConversazione(wcId).catch((e) => console.warn('[Filo] seguiti della scheda chiusa:', e?.message || e));
+}
+async function lasciaNellaConversazione(wcId) {
+  let scritti = 0;
+  for (const [id, s] of [...seguitiSerbati]) {
+    if (s.wcId !== wcId) continue;
+    seguitiSerbati.delete(id);
+    const c = s.composizione;
+    const testo = c.text || (c.immagini.length ? 'Descrivi questa immagine.' : '');
+    if (!s.chatId || !testo) continue;
+    if (await appendToChatArchive(s.chatId, { role: 'user', text: testo, images: c.immagini.length })) scritti += 1;
+  }
+  if (scritti) { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} }
+}
+function turnoDellaScheda(wcId, delta) {
+  if (wcId == null) return;
+  const n = (turniDellaScheda.get(wcId) || 0) + delta;
+  if (n > 0) { turniDellaScheda.set(wcId, n); return; }
+  turniDellaScheda.delete(wcId);
+  if (schedeSparite.delete(wcId)) lasciaNellaConversazione(wcId).catch((e) => console.warn('[Filo] seguiti della scheda chiusa:', e?.message || e));
+}
+const NOTA_SEGUITO ='[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
 
 // I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
 // modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
