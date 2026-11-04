@@ -5,7 +5,7 @@
 
 const { mittenteInVista } = require('./appuntiDaiSiti');
 const { riquadroArrivato } = require('./riquadroArrivato');
-const { campiSegretiFuoriPagina } = require('./campiNeiRiquadri');
+const { campiSegretiFuoriPagina, misuraRiquadro, interseca } = require('./campiNeiRiquadri');
 
 function framePrincipale(sender) {
   const f = sender && sender.frame;
@@ -86,20 +86,10 @@ function codiceMisura() {
   const crea = ${S.crea}; const rettangoliRipetuti = ${S.rettangoliRipetuti};
   const E = globalThis.SN_EXTRACT;
   const qui = E && E.segreti && typeof E.segreti.valoriSegreti === 'function' ? E.segreti : crea(window, cartaValida);
-  const interseca = (a, b) => {
-    if (!a || !b) return null;
-    const l = Math.max(a.left, b.left), t = Math.max(a.top, b.top);
-    const r = Math.min(a.left + a.width, b.left + b.width), d = Math.min(a.top + a.height, b.top + b.height);
-    return r > l && d > t ? { left: l, top: t, width: r - l, height: d - t } : null;
-  };
+  // Le stesse misure della copertura dei campi nei riquadri: i due conti non devono divergere.
+  const interseca = (a, b) => (a && b ? (${interseca})(a, b) : null);
   const sposta = (r, dx, dy) => ({ left: r.left + dx, top: r.top + dy, width: r.width, height: r.height });
-  const contenuto = (el) => {
-    const r = el.getBoundingClientRect();
-    const cs = el.ownerDocument.defaultView.getComputedStyle(el);
-    const pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
-    return { left: r.left + el.clientLeft + pl, top: r.top + el.clientTop + pt,
-      width: el.clientWidth - pl - (parseFloat(cs.paddingRight) || 0), height: el.clientHeight - pt - (parseFloat(cs.paddingBottom) || 0) };
-  };
+  const contenuto = ${misuraRiquadro};
   const out = { vista: { w: innerWidth, h: innerHeight }, campi: [], ripetuti: [], riquadri: [], conFrame: 0 };
   const documenti = [];
   // clip: la parte della finestra in cui il documento si vede; null se non si vede, ma i suoi riquadri contano.

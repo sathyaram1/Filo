@@ -30,7 +30,7 @@ function codiceMisuraRadice() {
 // Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno.
 function misuraRiquadro(el) {
   const r = el.getBoundingClientRect();
-  const cs = getComputedStyle(el);
+  const cs = el.ownerDocument.defaultView.getComputedStyle(el);
   const pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
   const pr = parseFloat(cs.paddingRight) || 0, pb = parseFloat(cs.paddingBottom) || 0;
   return { left: r.left + el.clientLeft + pl, top: r.top + el.clientTop + pt,
@@ -272,4 +272,7 @@ async function campiSegretiFuoriPagina(webContents) {
   return { campi: riquadri.campi.concat(chiusi.campi), nonCoperti: riquadri.nonCoperti || chiusi.nonCoperti };
 }
 
-module.exports = { campiSegretiFuoriPagina, campiSegretiNeiRiquadri, campiSegretiNeiComponentiChiusi, codiceMisura, radiciChiuse, componi };
+module.exports = {
+  campiSegretiFuoriPagina, campiSegretiNeiRiquadri, campiSegretiNeiComponentiChiusi, codiceMisura, radiciChiuse, componi,
+  misuraRiquadro, interseca,
+};
