@@ -99,8 +99,19 @@ test('le radici chiuse si trovano anche dentro i riquadri e i componenti aperti,
   assert.deepEqual(chiuse.map((c) => [c.id, c.catena]).sort((a, b) => a[0] - b[0]), [[5, []], [11, [8]]]);
   assert.deepEqual(Object.fromEntries(riquadri), { stesso: [8], altro: [8, 12] }, 'il documento non è un riquadro');
   const posa = componi([{ left: 10, top: 20, width: 100, height: 50 }, { left: 5, top: 5, width: 300, height: 30 }]);
-  assert.deepEqual(posa, { dx: 15, dy: 25, vista: { left: 15, top: 25, width: 100, height: 10 } });
+  assert.deepEqual(posa, { dx: 15, dy: 25, sx: 1, sy: 1, vista: { left: 15, top: 25, width: 100, height: 10 } });
   assert.equal(componi([{ left: 0, top: 50, width: 10, height: 10 }, { left: 0, top: 0, width: 10, height: 40 }]), null);
+});
+
+// #1721 giro 3: un riquadro che la pagina disegna più grande (transform) porta in scala anche le misure di dentro.
+test('dentro un riquadro ingrandito le coordinate si scalano, livello per livello', () => {
+  const { componi } = require('../../src/main/services/campiNeiRiquadri.js');
+  // Interno: a (10, 20) nel riquadro di mezzo, 100×50, scala 1. Di mezzo: a (5, 5) nella pagina, scala 2, 400×200.
+  const posa = componi([{ left: 10, top: 20, width: 100, height: 50, sx: 1, sy: 1 },
+    { left: 5, top: 5, width: 400, height: 200, sx: 2, sy: 2 }]);
+  assert.deepEqual(posa, { dx: 25, dy: 45, sx: 2, sy: 2, vista: { left: 25, top: 45, width: 200, height: 100 } });
+  // Un campo a (0, 0) di 30×10 nell'interno sta a (25, 45) di 60×20 nella pagina.
+  assert.deepEqual([posa.dx + 0 * posa.sx, posa.dy + 0 * posa.sy, 30 * posa.sx, 10 * posa.sy], [25, 45, 60, 20]);
 });
 
 // #810.16 — il testo che ripete il valore di un campo segreto (l'anteprima della carta) si copre come il campo.

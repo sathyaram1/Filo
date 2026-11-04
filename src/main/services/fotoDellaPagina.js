@@ -88,13 +88,14 @@ function codiceMisura() {
   const qui = E && E.segreti && typeof E.segreti.valoriSegreti === 'function' ? E.segreti : crea(window, cartaValida);
   // Le stesse misure della copertura dei campi nei riquadri: i due conti non devono divergere.
   const interseca = (a, b) => (a && b ? (${interseca})(a, b) : null);
-  const sposta = (r, dx, dy) => ({ left: r.left + dx, top: r.top + dy, width: r.width, height: r.height });
+  // p: dove sta il documento nella pagina principale e a che scala la pagina lo disegna.
+  const sposta = (r, p) => ({ left: p.dx + r.left * p.sx, top: p.dy + r.top * p.sy, width: r.width * p.sx, height: r.height * p.sy });
   const contenuto = ${misuraRiquadro};
   const out = { vista: { w: innerWidth, h: innerHeight }, campi: [], ripetuti: [], riquadri: [], conFrame: 0 };
   const documenti = [];
   // clip: la parte della finestra in cui il documento si vede; null se non si vede, ma i suoi riquadri contano.
-  const visita = (win, dx, dy, clip, prof) => {
-    documenti.push({ win, dx, dy, clip });
+  const visita = (win, p, clip, prof) => {
+    documenti.push({ win, p, clip });
     const radici = [win.document];
     for (let i = 0; i < radici.length; i++) {
       for (const el of radici[i].querySelectorAll('*')) {
@@ -104,16 +105,25 @@ function codiceMisura() {
         try { dentro = el.tagName === 'EMBED' ? null : el.contentDocument; } catch (_) { dentro = null; }
         if (dentro && dentro.defaultView && prof < ${PROFONDITA}) {
           const c = contenuto(el);
-          visita(dentro.defaultView, dx + c.left, dy + c.top, interseca(sposta(c, dx, dy), clip), prof + 1);
+          const fuori = sposta(c, p);
+          if (!c.storto) {
+            visita(dentro.defaultView, { dx: fuori.left, dy: fuori.top, sx: p.sx * c.sx, sy: p.sy * c.sy }, interseca(fuori, clip), prof + 1);
+            continue;
+          }
+          // Ruotato o capovolto: le misure di dentro non tornano al loro posto, si copre intero e dentro si contano
+          // solo i riquadri, per il confronto col frame tree.
+          const v = interseca(sposta(el.getBoundingClientRect(), p), clip);
+          if (v) out.riquadri.push(v);
+          visita(dentro.defaultView, { dx: 0, dy: 0, sx: 1, sy: 1 }, null, prof + 1);
           continue;
         }
         if (el.tagName !== 'EMBED' && el.contentWindow) out.conFrame += 1;
-        const v = interseca(sposta(el.getBoundingClientRect(), dx, dy), clip);
+        const v = interseca(sposta(el.getBoundingClientRect(), p), clip);
         if (v) out.riquadri.push(v);
       }
     }
   };
-  visita(window, 0, 0, { left: 0, top: 0, width: innerWidth, height: innerHeight }, 0);
+  visita(window, { dx: 0, dy: 0, sx: 1, sy: 1 }, { left: 0, top: 0, width: innerWidth, height: innerHeight }, 0);
   out.campi = qui.campiInVista();
   const valori = [];
   for (const d of documenti) valori.push(...(d.win === window ? qui : crea(d.win, cartaValida)).valoriSegreti());
@@ -121,7 +131,7 @@ function codiceMisura() {
     for (const d of documenti) {
       if (!d.clip) continue;
       for (const r of rettangoliRipetuti(d.win, valori)) {
-        const v = interseca(sposta(r, d.dx, d.dy), d.clip);
+        const v = interseca(sposta(r, d.p), d.clip);
         if (v) out.ripetuti.push(v);
       }
     }
