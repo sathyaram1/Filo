@@ -285,6 +285,48 @@ test('#1537: nello Screenshot il modello che sceglie il nome vede il riquadro di
   expect(await pixelDelColore(app, utente, ROSA), 'lo screenshot dell’utente resta intero').toBeGreaterThan(20_000);
 });
 
+// Lo Screenshot di una zona scelta col mouse: il modello del nome riceve lo stesso pezzo che tiene l'utente, coperto.
+test('#1537: nello Screenshot di una zona il modello del nome riceve lo stesso pezzo, col riquadro di un altro sito coperto', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo</body>`, { pubblico: true });
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0">
+    <div style="display:flex"><div style="width:300px;height:200px;background:${tinta(VERDE)}"></div>
+    <iframe id="altro" src="${altro}" style="width:300px;height:200px;border:0"></iframe></div></body></html>`);
+  await expect(page.frameLocator('#altro').locator('body')).toContainText('Saldo', { timeout: 10_000 });
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { ...globalThis.SN_TEST_MODELS.models }, modelRegistry: { ...globalThis.SN_TEST_MODELS.registry },
+    });
+  });
+  await aiutoFinto(app);
+  const nelMondo = (code) => app.evaluate(({ BrowserWindow }, c) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    return tm.tabs.find((t) => t.title === 'Conto').view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: c }], true);
+  }, code);
+  await nelMondo(`HTMLAnchorElement.prototype.click = function () { window.__foto = this.href; };
+    window.__foto = null; SN_ACTIONS.takePartialScreenshot(); true`);
+  await expect(page.locator('.sn-region-overlay')).toBeAttached({ timeout: 10_000 });
+  await page.mouse.move(20, 20);
+  await page.mouse.down();
+  await page.mouse.move(300, 100, { steps: 5 });
+  await page.mouse.move(580, 180, { steps: 5 });
+  await page.mouse.up();
+  let utente = null;
+  await expect.poll(async () => (utente = await nelMondo('window.__foto')), { timeout: 20_000 }).toBeTruthy();
+  const alModello = await app.evaluate(() => {
+    const parte = globalThis.__visti.flatMap((m) => m).flatMap((m) => (Array.isArray(m.content) ? m.content : []))
+      .find((p) => p.type === 'image_url');
+    return parte ? parte.image_url.url : null;
+  });
+  expect(alModello, 'il pezzo deve arrivare al modello del nome').toMatch(/^data:image\//);
+  expect(await pixelDelColore(app, utente, ROSA), 'lo screenshot dell’utente tiene il riquadro').toBeGreaterThan(20_000);
+  expect(await pixelDelColore(app, alModello, ROSA), 'il riquadro dell’altro sito si vede nel pezzo per il modello').toBeLessThan(20);
+  const [verdeUtente, verdeModello] = [await pixelDelColore(app, utente, VERDE), await pixelDelColore(app, alModello, VERDE)];
+  expect(verdeUtente).toBeGreaterThan(20_000);
+  expect(Math.abs(verdeModello - verdeUtente), 'il modello riceve un altro pezzo della pagina').toBeLessThan(verdeUtente * 0.05);
+});
+
 // Un riquadro di un altro sito in un componente chiuso non si può coprire: le altre due strade non ripiegano sulla
 // foto intera.
 const CONTO_CHIUSO = (altro, titolo) => `<!doctype html><html><head><title>${titolo}</title></head><body style="margin:0">
