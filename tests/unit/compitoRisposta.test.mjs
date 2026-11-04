@@ -105,6 +105,14 @@ test('col canale finto: azione e chiusura col principio, rifiuti e guasti con le
   assert.deepEqual(az.consegne[0].data, { op: 'azione', azione: { tipo: 'riprendi', feedbackId: 'f1' }, testo: 'per chi riprende' });
   assert.match(az.out.join('\n'), /riprendi applicata .*prossimo giro/);
 
+  const attesa = finto({ canale: { outcome: 'ok', reply: { outcome: 'applicata', azione: 'attendi' } } });
+  assert.equal(await esegui(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"1959"}', '--testo', 'aspetta la correzione della barra'], attesa.io), 0);
+  assert.deepEqual(attesa.consegne[0].data, { op: 'azione', azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' }, testo: 'aspetta la correzione della barra' });
+  assert.match(attesa.out.join('\n'), /attendi applicata\. Quando hai finito/);
+  const gia = finto({ canale: { outcome: 'ok', reply: { outcome: 'applicata', azione: 'attendi', gia: true } } });
+  assert.equal(await esegui(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"1959"}'], gia.io), 0);
+  assert.match(gia.out.join('\n'), /attendi applicata \(c'era già/);
+
   const chiudi = finto({ stdin: 'Ripreso #813.' });
   assert.equal(await esegui(['chiudi', '--testo', '-', '--principio', 'Un lavoro ripreso porta la risposta intera.'], chiudi.io), 0);
   assert.deepEqual(chiudi.consegne[0].data, { op: 'chiudi', testo: 'Ripreso #813.', principio: 'Un lavoro ripreso porta la risposta intera.' });
