@@ -9,7 +9,7 @@ import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquireBearer, FIRESTORE_BASE } from './lib/firestore-auth.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
-import { motiviDiLettura, rigaSporco } from './lib/biglietto-locale.mjs';
+import { motiviDiLettura, rigaRiservato, rigaSporco } from './lib/biglietto-locale.mjs';
 import '../src/shared/feedbackThread.js';
 import '../src/shared/feedbackPublicKey.js';
 import '../src/shared/feedbackCrypto.js';
@@ -241,6 +241,17 @@ export async function leggi(id, { bearer, base = FIRESTORE_BASE, fetchImpl = fet
   return { codice: 0, testo: [testoDaStampare(fb, s, salvaIn(dove)), ...allegati].join('\n'), motivi, numero };
 }
 
+/**
+ * Prima che il testo esca: sporco se non è fidato, e sempre il segno riservato, perché il testo di un feedback è un
+ * dato privato (SPEC-DOMANDE §5.1, #2027) e la lettura va al database, dove il server non la vede. → le righe da dire.
+ */
+export async function dichiaraLettura(esito, { sporca = rigaSporco, riserva = rigaRiservato } = {}) {
+  const righe = [];
+  if (esito.motivi.length) righe.push(await sporca(`letto #${esito.numero}`, esito.motivi));
+  righe.push(await riserva(`letto #${esito.numero}`));
+  return righe.filter(Boolean);
+}
+
 async function main(argv) {
   if (argv.length !== 1 || argv[0].startsWith('--')) { console.error('USO: npm run feedback:leggi -- <numero|id>   (testo, allegati e attese, ognuna col suo stato)'); return 1; }
   try {
@@ -250,7 +261,7 @@ async function main(argv) {
     const { decryptFeedbackFields } = await import('./lib/decrypt-feedback-fields.mjs');
     const esito = await leggi(r.id, { bearer, decifra: decryptFeedbackFields, seq: r.seq });
     if (esito.codice) { console.error(`RIFIUTATO: ${esito.errore}.`); return esito.codice; }
-    if (esito.motivi.length) console.error(await rigaSporco(`letto #${esito.numero}`, esito.motivi));
+    for (const riga of await dichiaraLettura(esito)) console.error(riga);
     console.log(esito.testo);
     return 0;
   } catch (e) {

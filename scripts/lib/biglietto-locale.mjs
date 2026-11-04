@@ -339,11 +339,40 @@ export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() }
   return inAttesa ? Object.assign(out, { inAttesa }) : out;
 }
 
+/**
+ * Il segno riservato (SPEC-DOMANDE §5.1, #2027) per i dati privati che la sessione legge senza passare dal server (il
+ * feedback dal database): quello che scrive dopo lo porta. Mai un'eccezione.
+ * @returns {Promise<{ segnati: number, senzaBiglietto?: true, errori: string[] }>}
+ */
+export async function segnaRiservato(motivo, { env, cwd, deps = {} } = {}) {
+  const m = String(motivo || '').trim().slice(0, 300);
+  const out = { segnati: 0, errori: [] };
+  if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
+  const trovati = trovaBiglietti({ env, cwd });
+  if (!trovati.length) return Object.assign(out, { senzaBiglietto: true });
+  for (const b of trovati) {
+    try {
+      await chiama('riservato', { ticket: b.ticket, motivo: m }, deps);
+      out.segnati += 1;
+    } catch (e) {
+      out.errori.push(String((e && e.message) || e).slice(0, 200));
+    }
+  }
+  return out;
+}
+
+/** La riga per chi ha letto dati privati: '' se il segno è preso o non c'è un biglietto da segnare. */
+export async function rigaRiservato(cosa, opts = {}) {
+  const r = await segnaRiservato(cosa, opts);
+  if (r.segnati || r.senzaBiglietto) return '';
+  return `Segno riservato NON preso (${r.errori.join('; ')}): prima di scrivere compiti o feedback dichiaralo con node scripts/biglietto.mjs riservato "${cosa}".`;
+}
+
 /** Prende un biglietto e scrive il suo file. → { path, fp, fiducia }. */
-export async function prendi({ sporco = false, motivo = '', sessionId = '', trascrizione = '', cwd = process.cwd(), nowMs = Date.now(), deps = {} } = {}) {
+export async function prendi({ sporco = false, riservato = false, motivo = '', sessionId = '', trascrizione = '', cwd = process.cwd(), nowMs = Date.now(), deps = {} } = {}) {
   const radice = radiceCondivisa(cwd);
   if (!radice) throw new Error('fuori da un repo: il biglietto vive nella cartella .claude della radice');
-  const r = await chiama('prendi', Object.assign({ sessione: String(sessionId || '').slice(0, 8) }, sporco ? { sporco: true, motivo: String(motivo || 'nato sporco') } : {}), deps);
+  const r = await chiama('prendi', Object.assign({ sessione: String(sessionId || '').slice(0, 8) }, sporco ? { sporco: true, motivo: String(motivo || 'nato sporco') } : {}, riservato ? { riservato: true } : {}), deps);
   if (!r.ticket || !FP_RE.test(String(r.fp || ''))) throw new Error('risposta del server senza biglietto');
   const path = join(cartellaBiglietti(radice), `${idDelFile(sessionId, nowMs)}.json`);
   scriviFile(path, { ticket: r.ticket, fp: r.fp, natoIl: nowMs, trascrizione });
@@ -664,7 +693,9 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
         fiducia = s.fiducia === 'fidato' && !attesa ? 'fidato' : 'non_fidato';
       } else {
         const motivo = !ereditato ? 'file del biglietto del padre illeggibile' : s ? 'biglietto del padre chiuso' : 'biglietto del padre illeggibile';
-        const p = await prendi({ sporco: true, motivo, sessionId, trascrizione, cwd, nowMs, deps }).catch(() => null);
+        // La conversazione del padre ha forse letto dati privati: il segno riservato segue, e senza il padre si presume (#2027).
+        const riservato = !s || s.riservato === true;
+        const p = await prendi({ sporco: true, riservato, motivo, sessionId, trascrizione, cwd, nowMs, deps }).catch(() => null);
         if (!p && !ereditato) throw new Error(`${motivo}, e il server non dà un biglietto nato sporco`);
         path = p ? p.path : ereditato.path;
         fiducia = p ? p.fiducia : 'non_fidato';
@@ -686,7 +717,7 @@ export async function avvio({ input = {}, env = process.env, cwd = process.cwd()
         const s = await chiama('stato', { ticket: suo.ticket }, deps).catch(() => null);
         fiducia = s && s.fiducia === 'fidato' && s.chiuso !== true && !attesa ? 'fidato' : 'non_fidato';
       } else {
-        const p = await prendi({ sporco: true, motivo: 'ripresa senza biglietto', sessionId, trascrizione, cwd, nowMs, deps });
+        const p = await prendi({ sporco: true, riservato: true, motivo: 'ripresa senza biglietto', sessionId, trascrizione, cwd, nowMs, deps });
         path = p.path;
         fiducia = p.fiducia;
       }

@@ -597,6 +597,12 @@ export async function esegui(argv, io = {}) {
       errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
     }
     // Il registro (§3.6): col biglietto delle routine passa dal canale, che lo dà solo a chi lo può leggere.
+    // Ogni lettura porta il biglietto della sessione: col token dell'owner è così che il server la riconosce, e le dà
+    // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027).
+    const lettura = async (data) => {
+      const s = await bigliettoLocale();
+      return chiama(s ? Object.assign(data, { biglietto: s }) : data);
+    };
     if (a.cmd === 'registro') {
       const t = await biglietto();
       if (t) {
@@ -605,7 +611,7 @@ export async function esegui(argv, io = {}) {
         if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
       }
-      const r = await chiama({ op: 'registro', parole: a.parole });
+      const r = await lettura({ op: 'registro', parole: a.parole });
       const nf = nonFidate(r.voci);
       if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)]));
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
@@ -613,14 +619,14 @@ export async function esegui(argv, io = {}) {
     }
     // Il testo di una domanda non fidata è testo esterno: la sessione si sporca PRIMA di stamparlo (#1148).
     if (a.cmd === 'mostra') {
-      const r = await chiama({ op: 'mostra', id: a.id });
+      const r = await lettura({ op: 'mostra', id: a.id });
       const nf = nonFidate([r.domanda]);
       if (nf.length) errore(await sporca(`letta ${visibile(a.id)}`, [motivoNonFidate(nf)]));
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
     }
     if (a.cmd === 'elenco') {
-      const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
+      const r = await lettura(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
       const nf = nonFidate(r.domande);
       if (nf.length) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)]));
       scrivi(formattaConteggi(conteggiDi(r.domande, r.conteggi)));
@@ -646,7 +652,7 @@ export async function esegui(argv, io = {}) {
       if (a.scelta === undefined && !conTesto) { errore(`RIFIUTATO: il testo per ${a.id} è vuoto e non hai scelto un'opzione. Non ho risposto.`); return 1; }
       let riferimenti = {};
       if (a.scelta !== undefined) {
-        const m = await chiama({ op: 'mostra', id: a.id });
+        const m = await lettura({ op: 'mostra', id: a.id });
         const o = m.domanda && Array.isArray(m.domanda.opzioni) ? m.domanda.opzioni[a.scelta] : null;
         if (!o) { errore(`RIFIUTATO: ${a.id} non ha l'opzione ${a.scelta + 1}. Non ho risposto.`); return 1; }
         if (soloDaFilo(o.azione)) {
@@ -671,7 +677,7 @@ export async function esegui(argv, io = {}) {
       const riferimentiDi = {};
       let rifiutate = 0;
       for (const id of a.ids) {
-        const { domanda, riferimenti } = await chiama({ op: 'mostra', id });
+        const { domanda, riferimenti } = await lettura({ op: 'mostra', id });
         riferimentiDi[id] = riferimenti || {};
         const c = domanda && domanda.consiglio;
         const o = c && Array.isArray(domanda.opzioni) ? domanda.opzioni[c.opzione] : null;
