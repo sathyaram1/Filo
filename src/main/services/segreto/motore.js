@@ -1053,13 +1053,14 @@ async function crescita(ctx, S, L2) {
   for (let i = 2 * S.L; i < 2 * L2; i++) {
     if (i % (8 * BLOCCHI_PER_CEDERE) === 0) await cedi();
     if (S.pos[i] >= 0) continue;
-    const p = colloca(ctx, S, i);
+    const p = await colloca(ctx, S, i);
     if (p < 0) {
       for (const q of posti) {
         libera(ctx, S.pos[q]);
         S.pos[q] = -1;
       }
-      throw errore('SPAZIO', 'Nel contenitore non resta un posto per i blocchi nuovi.', { servono: 0, disponibili: 0, prima: true });
+      // Chi scrive lo rifà coi numeri veri: qui non si sa quanto serviva in byte.
+      throw errore('SPAZIO', 'Nel contenitore non resta un posto per i blocchi nuovi.', { prima: true, senzaNumeri: true });
     }
     posti.push(i);
   }
