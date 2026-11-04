@@ -107,6 +107,11 @@ test('archivia e riapri: al server l’operazione e l’id, alla pagina la doman
   const r = await chiama({ type: MSG.DOMANDA_RIAPRI, id: 'D-5' });
   assert.equal(r.domanda.stato, 'aperta');
   assert.deepEqual(ricevute[0].data, { op: 'riapri', id: 'D-5' });
+  assert.equal('resoconto' in r, false);
+  // #2007: quello che la riapertura non ha potuto disfare arriva alla pagina.
+  rispondi = (data) => ({ status: 200, body: { result: { ok: true, domanda: { id: data.id, stato: 'aperta' }, resoconto: ' #813 era già fuso: resta. ' } } });
+  const disfatta = await chiama({ type: MSG.DOMANDA_RIAPRI, id: 'D-5' });
+  assert.deepEqual(disfatta, { ok: true, domanda: { id: 'D-5', stato: 'aperta' }, resoconto: '#813 era già fuso: resta.' });
 });
 
 test('fiducia (#2078): al server op, id e fidata; senza id non si chiama; un server vecchio si dice col nome', async () => {
