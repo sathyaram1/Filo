@@ -73,10 +73,9 @@
 //         battito, un salvataggio recente o un processo (`--forza` solo per il worker morto davvero), per un worker
 //         i suoi processi.
 //       → fine lavoro: il biglietto muore e il semaforo si libera. Con
-//         `--guasto` DICHIARI un guasto al server (SPEC-RIDISEGNO-MAX.md §12):
-//         è così che il server smette di dare lavoro per il giro — le
-//         richieste di biglietto successive escono con 3 — e il pacemaker
-//         rispetta una pausa prima di riaccendere. Non "riportarlo" a parole:
+//         `--guasto` DICHIARI un guasto al server (SPEC-MANUTENTORE.md §7):
+//         ferma solo il lavoro di questo biglietto, finché il manutentore non
+//         lo sblocca; gli altri lavori vanno avanti. Non "riportarlo" a parole:
 //         il tuo testo di ritorno non lo legge nessuna macchina.
 //         Prima di parlare col server committa quello che è rimasto fuori
 //         dai commit (un file nato da una shell non passa dall'hook) e
