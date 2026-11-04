@@ -2,7 +2,7 @@
 // diario: le sue righe delle ore stanno prima dell'ultimo giorno riassunto e quel giorno non si riassume più.
 import { test, expect } from '../../fixtures/electron.mjs';
 
-test('r2 la sera di ieri compattata dopo il riassunto del giorno resta nel diario', async ({ app }) => {
+test('r1 la sera di ieri compattata dopo il riassunto del giorno resta nel diario', async ({ app }) => {
   const r = await app.evaluate(async () => {
     const C = globalThis.SN_COMPATTAZIONE;
     const Chats = globalThis.SN_FILO_CHATS;
