@@ -30,6 +30,23 @@ test('una risposta in streaming rotta a metà porta con sé l\'id della generazi
   } finally { globalThis.fetch = orig; }
 });
 
+// #1302: il fornitore che si ferma per errore mentre il modello ragionava (niente testo) fa pagare il ragionamento.
+test('una risposta fermata per errore durante il ragionamento porta l\'id della generazione', async () => {
+  const enc = new TextEncoder();
+  const righe = [
+    { id: 'gen-pensava', choices: [{ delta: { reasoning: 'Sto pensando a lungo...' } }] },
+    { id: 'gen-pensava', choices: [{ delta: {}, finish_reason: 'error' }] },
+  ].map((o) => `data: ${JSON.stringify(o)}\n\n`).join('');
+  const orig = globalThis.fetch;
+  globalThis.fetch = async () => new Response(new Blob([enc.encode(righe)]).stream(), { status: 200 });
+  try {
+    await assert.rejects(
+      OR_VERO.streamComplete({ apiKey: 'k', model: 'm', messages: [{ role: 'user', content: 'ciao' }], onReasoning: () => {} }),
+      (err) => err.status === 502 && err.generationId === 'gen-pensava',
+    );
+  } finally { globalThis.fetch = orig; }
+});
+
 function cancelloConFornitoreFinto({ secondoRiesce }) {
   let tentativi = 0;
   globalThis.SN_PROVIDER_OPENROUTER = {
