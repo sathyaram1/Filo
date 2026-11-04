@@ -1028,7 +1028,9 @@ rete aperta porta già testo non fidato e un'uscita). Un compito scritto dal
 manutentore con la sua chiave o dall'ambiente dei riservati nasce riservato,
 perché il testo porta quello che ha letto: resta ai riservati, come i suoi
 esperimenti. La accende una voce sua del pacemaker: `routineIdReteAperta` e il
-segreto `CC_ROUTINE_FIRE_TOKEN_RETE_APERTA`, spenta da `reteApertaOff`, col suo
+segreto `CC_ROUTINE_FIRE_TOKEN_RETE_APERTA`, che per scelta dell'owner (D-257,
+sedi del 03/11/2026) il server non dichiara: finché resta così la voce sta su
+`rete_no_token` e la routine parte solo a mano. Spenta da `reteApertaOff`, col suo
 tetto `reteApertaTetto` (assente = 1) dentro quello comune delle sessioni, con
 la pausa e i freni degli account della sua chiave. Decide dopo le voci server
 e prima di A/B, che quando lei può accendere non contano i suoi compiti.
