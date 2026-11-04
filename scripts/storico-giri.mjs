@@ -6,12 +6,11 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import './lib/freno-letture.mjs';
 import '../src/shared/feedback.js';
+import '../src/shared/storicoGiri.js';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineStateAdmin';
-const GIORNO = 24 * 60 * 60 * 1000;
-const FINESTRA_PREDEFINITA = 30 * GIORNO;
-const LIVELLI = [3, 2, 1, 0];
-const ESITI = ['passa', 'corregge', 'corretto', 'fermato'];
+// Livelli, esiti e totali sono gli stessi che mostra Gestione → Routine → Log.
+const { LIVELLI, ESITI, FINESTRA_PREDEFINITA, totali: totaliGiri, elenco, bilancio } = globalThis.SN_STORICO_GIRI;
 const USO = 'Uso: node scripts/storico-giri.mjs [--da <data>] [--a <data>] [--json]\n'
   + '  <data>: AAAA-MM-GG, GG/MM/AAAA o GG/MM (anno in corso). --a comprende tutto quel giorno.\n'
   + '  Senza date: gli ultimi 30 giorni. --json stampa i dati per chi li rielabora.';
@@ -52,43 +51,19 @@ export function leggiArgomenti(argv, ora = Date.now()) {
   return { da, a, json };
 }
 
-function livelli(v) {
-  return (Array.isArray(v) ? v : []).map(Number).filter((n) => Number.isInteger(n) && n >= 0 && n <= 3);
-}
-
 /** «#795», «#22.1» o l'id quando il feedback non ha numero. PURA. */
 export function numeroDi(lavoro) {
   const n = globalThis.SN_FEEDBACK.formatNum(lavoro && lavoro.seq, lavoro && lavoro.subSeq);
   return n ? `#${n}` : String((lavoro && lavoro.feedbackId) || '?');
 }
 
-/** I totali per livello (trovati, esterni, corretti, giri pagati da quel bilancio) e per esito. PURA. */
-export function totali(lavori) {
-  const perLivello = Object.fromEntries(LIVELLI.map((l) => [l, { trovati: 0, esterni: 0, corretti: 0, pagati: 0 }]));
-  const perEsito = Object.fromEntries(ESITI.map((e) => [e, 0]));
-  let giri = 0; let nonRegistrati = 0; let senzaEsito = 0;
-  for (const l of Array.isArray(lavori) ? lavori : []) {
-    nonRegistrati += Math.max(0, Number(l && l.roundsDropped) || 0);
-    for (const g of Array.isArray(l && l.rounds) ? l.rounds : []) {
-      giri += 1;
-      for (const n of livelli(g.found)) perLivello[n].trovati += 1;
-      for (const n of livelli(g.external)) perLivello[n].esterni += 1;
-      for (const n of livelli(g.fixed)) perLivello[n].corretti += 1;
-      const pagato = /^cap([0-3])$/.exec(String(g.consumed || ''));
-      if (pagato) perLivello[Number(pagato[1])].pagati += 1;
-      if (ESITI.includes(g.outcome)) perEsito[g.outcome] += 1; else senzaEsito += 1;
-    }
-  }
-  return { lavori: (Array.isArray(lavori) ? lavori : []).length, giri, nonRegistrati, senzaEsito, perLivello, perEsito };
-}
+/** I totali per livello e per esito (SN_STORICO_GIRI). PURA. */
+export const totali = totaliGiri;
 
 function dataOra(ms) {
   if (!Number.isFinite(ms)) return '?';
   return new Date(ms).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 }
-
-const elenco = (v) => (livelli(v).length ? livelli(v).join(' ') : '—');
-const bilancio = (c) => (/^cap[0-3]$/.test(String(c || '')) ? `dei ${String(c).slice(3)}` : '—');
 
 function tabella(righe) {
   const larghe = righe[0].map((_, i) => Math.max(...righe.map((r) => String(r[i]).length)));
