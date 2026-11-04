@@ -78,6 +78,30 @@ test('portachiavi vero: segreti cifrati, tornano al riavvio, export senza spunta
   }
 });
 
+test('portachiavi finto: password con spazi e solo utente non restano in chiaro', async () => {
+  const userData = cartellaTemporanea('filo-v905c-');
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light' } }), 'utf8');
+  const app = await avvia(userData);
+  try {
+    await app.evaluate(({ safeStorage }) => {
+      safeStorage.isEncryptionAvailable = () => true;
+      safeStorage.encryptString = (s) => Buffer.from(String(s).split('').reverse().join(''), 'utf8');
+      safeStorage.decryptString = (b) => Buffer.from(b).toString('utf8').split('').reverse().join('');
+    });
+    const page = await apriSicurezza(app);
+    await page.evaluate(async (s) => {
+      await chrome.runtime.sendMessage({ type: 'update_settings', settings: { proxy: { datacenter: s.p, residential: s.r } } });
+    }, { p: PROXY, r: PROXY_RES });
+    await app.evaluate(() => globalThis.__filoStorage.whenSettled());
+    const disco = readFileSync(join(userData, 'storage.json'), 'utf8');
+    for (const s of [PW, TOKEN, encodeURIComponent(PW)]) expect(disco.includes(s), `disco: ${s}`).toBe(false);
+    expect(await app.evaluate(() => globalThis.__filoStorage.statoDisco().avvisi.filter((a) => a.chiave === 'chiavi-in-chiaro').length)).toBe(0);
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
 test('senza portachiavi: solo la password del proxy, l\'avviso parte', async () => {
   const userData = cartellaTemporanea('filo-v905b-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light' } }), 'utf8');
