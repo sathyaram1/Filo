@@ -3286,6 +3286,7 @@
     modelProvidersWithKey,
     credenzialiProxy,
     segretiDelProxy,
+    percorsiSegreti,
     campiSegreti,
     haSegreti,
     canServeAction,
