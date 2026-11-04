@@ -139,6 +139,9 @@ test('le cifre divise in più pezzi di testo si ritrovano insieme', () => {
   const tops = S.rettangoliRipetuti(win, ['4111 1111 1111 1111'], corpo);
   assert.equal(tops.length, 1);
   assert.deepEqual(tops[0], { left: 10, top: 20, width: 180, height: 20 }, 'il rettangolo tiene tutti i pezzi');
+  const carta = paginaFinta(['4111', '1111', '1111', '1111'], { inRiga: true, passo: 95 });
+  assert.deepEqual(S.rettangoliRipetuti(carta.win, ['4111 1111 1111 1111'], carta.corpo), [{ left: 10, top: 20, width: 330, height: 20 }],
+    'i gruppi sparsi sulla larghezza della carta disegnata sono un numero solo');
   const sparsi = paginaFinta(['41', '1111', '9'], { inRiga: false });
   assert.deepEqual(S.rettangoliRipetuti(sparsi.win, ['4111 1111 1111 1111'], sparsi.corpo), [],
     'cifre su righe diverse non fanno un numero solo');
