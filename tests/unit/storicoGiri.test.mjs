@@ -120,7 +120,8 @@ test('server non ancora pubblicato: il motivo dice il rimedio', () => {
   assert.match(mod.messaggioErrore(404, {}), /non esiste sul server/);
 });
 
-test('le app non leggono lo storico: nessuna regola lo apre e nessun file dell\'app lo nomina', () => {
+// #1926: Gestione lo mostra all'owner, attraverso il main e la callable del proprietario; nessun altro file dell'app.
+test('nell\'app lo storico lo legge solo l\'owner dal main: nessuna regola lo apre, nessun altro file lo nomina', () => {
   const regole = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
   assert.ok(!/routine-giri/.test(regole), 'routine-giri resta chiusa a ogni client (regola predefinita: niente)');
   assert.ok(!/match \/\{document=\*\*\}/.test(regole), 'nessuna regola generica apre le collezioni del server');
@@ -130,6 +131,13 @@ test('le app non leggono lo storico: nessuna regola lo apre e nessun file dell\'
   for (const f of file) {
     if (!/\.(m?js|html)$/.test(f)) continue;
     const t = readFileSync(f, 'utf8');
+    if (f === join(ROOT, 'src', 'main', 'services', 'handlers', 'auth.js')) continue;
     assert.ok(!/routine-giri|routineStateAdmin/.test(t), `${f} legge lo storico dei giri`);
   }
+  const auth = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'auth.js'), 'utf8');
+  assert.ok(!/routine-giri/.test(auth), 'il main non legge la collezione: passa dalla callable');
+  const chiamate = auth.match(/'routineStateAdmin',[^)]*/g) || [];
+  assert.equal(chiamate.length, 1, 'una sola chiamata allo stato delle routine nel main');
+  assert.match(chiamate[0], /op: 'giri'/, 'e solo per lo storico dei giri, in lettura');
+  assert.match(auth, /on\(MSG\.STORICO_GIRI_GET, ownerOnly\(/, 'riservata all\'owner');
 });
