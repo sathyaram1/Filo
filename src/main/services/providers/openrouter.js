@@ -667,6 +667,12 @@
       err.status = 502;
       err.provider = 'openrouter';
       if (servedBy) err.hostFallito = servedBy;
+      // Il ragionamento scritto prima dell'errore si paga lo stesso: senza l'id il suo costo spariva dai conti (#1302).
+      if (generationId) {
+        err.generationId = generationId;
+        err.keySource = keySource;
+        Object.defineProperty(err, 'keyUsed', { value: keyUsed, enumerable: false, configurable: true });
+      }
       produttoreNonRisponde(err, model);
       throw err;
     }
