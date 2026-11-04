@@ -6688,8 +6688,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const finestra = await finestraNota();
     if (!finestra) return FC.capRilettura({ tetto });
     let caratteri = 0;
-    try { caratteri = FC.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })); } catch (_) {}
-    try { caratteri += tools ? JSON.stringify(tools).length : 0; } catch (_) {}
+    try { caratteri = await caratteriRichiesta(); } catch (_) { caratteri = caratteriStrumenti(); }
     return FC.capRilettura({ tetto, finestra, occupati: Math.ceil(caratteri / FC.CARATTERI_PER_TOKEN), risposta: tettoRispostaChat });
   };
   // Le riletture di questo turno fra i messaggi per il modello: { x, i (posto in threadMessages), giro, coda }.
