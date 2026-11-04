@@ -3321,10 +3321,14 @@ async function eseguiAzioneFilo(action, {
               });
             } catch (_) {}
           }
-          return { executed: !!(r && r.id), kept: false };
+          if (r && r.id) return { executed: true, kept: false };
+          return { executed: false, kept: false, output: { error: 'il server delle segnalazioni non l\'ha presa' } };
         } catch (e) {
           console.warn('[Filo] invio feedback fallito', e?.message || e);
-          return { executed: false, kept: false };
+          // Il perché resta nel diario e arriva al modello (#1294): una frase, non il messaggio grezzo.
+          const CE = globalThis.SN_CHAT_ERRORS;
+          const frase = CE && typeof CE.friendly === 'function' ? CE.friendly(e) : '';
+          return { executed: false, kept: false, output: { error: frase || 'invio non riuscito' } };
         }
       }
       case 'IMPOSTA_PREFERENZA': {

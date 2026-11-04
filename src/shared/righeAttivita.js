@@ -404,6 +404,12 @@
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
   };
+  // Partita e finita male (un comando uscito con errore): «non eseguito» direbbe che non è nemmeno partita.
+  const FALLITE_DOPO_PARTENZA = { ESEGUI_COMANDO: 'Comando non riuscito' };
+  function etichettaFallita(type, partita) {
+    if (partita && Object.hasOwn(FALLITE_DOPO_PARTENZA, type)) return FALLITE_DOPO_PARTENZA[type];
+    return Object.hasOwn(FAILED_LABELS, type) ? FAILED_LABELS[type] : '';
+  }
   // Riordino e svuotamento dell'archivio chiedono col loro pannello: come chiedere lo porta `_domanda` (#530).
   const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
   function rigaAttivita(a) {
@@ -437,7 +443,7 @@
       // Un no della regola di autonomia non è un'azione andata a vuoto: «Niente da dimenticare» con le righe lì è falso.
       const cosa = rifiutataDallaRegola(a)
         ? (NO_LABELS[type] || FAILED_LABELS[type] || 'Non fatto')
-        : (FAILED_LABELS[type] || 'Azione non riuscita');
+        : (etichettaFallita(type, global.SN_ESITO.partita(a)) || 'Azione non riuscita');
       return { icon: '⚠', text: `${cosa}${perche ? ` · ${perche}` : ''}`, failed: true };
     }
     const fn = ACTIVITY_ROWS[type];
@@ -530,7 +536,7 @@
   }
 
   global.SN_RIGHE_ATTIVITA = {
-    riga: rigaAttivita, rigaArchivio, pulito, FAILED_LABELS, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
+    riga: rigaAttivita, rigaArchivio, pulito, FAILED_LABELS, etichettaFallita, NO_LABELS, SOLO_BOTTONE, DOMANDE_PANNELLO, rigaLetturaPagina, indirizzoLetto,
     rifiutataDallaRegola, sceltaContatori, sceltaAutonomia, testoRicercaDocumenti, testoRicercaSalvate, testoRinominati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
