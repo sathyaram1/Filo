@@ -165,14 +165,73 @@ function radiciChiuse(radice) {
   return { chiuse, riquadri };
 }
 
-// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se un campo sta davvero in un
-// componente chiuso. La ricerca del protocollo trova anche la scritta «<input>» in un testo o in un commento, e i
-// campi dei riquadri dello stesso sito di un altro indirizzo: ogni risultato si guarda da sé. Nel dubbio si legge.
-const IN_UN_CHIUSO = `function () {
+// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se un campo segreto compilato sta
+// davvero in un componente chiuso (#810.18). Prima un conto che costa uguale con tre o tremila campi: i risultati
+// della ricerca del protocollo contro quelli che danno, contati dagli script di ogni riquadro, i campi, le scritte
+// «<input>» e gli attributi che la contengono. Il conto della pagina non deve mai superare il vero, o nasconderebbe
+// un campo chiuso: per questo conta solo ciò che la ricerca trova di sicuro, con le sue stesse regole.
+const CONTA_COME_LA_RICERCA = `(function () {
+  var nomi = ['input', 'textarea'], n = 0;
+  function conta(nodo) {
+    var t = nodo.nodeType;
+    if (t === 3 || t === 4 || t === 8) {
+      var d = nodo.data;
+      if (d.indexOf('<') < 0) return;
+      d = d.toLowerCase();
+      for (var i = 0; i < nomi.length; i++) if (d.indexOf('<' + nomi[i] + '>') >= 0) n++;
+      return;
+    }
+    if (t !== 1) return;
+    var nome = nodo.nodeName.toLowerCase(), at = nodo.attributes;
+    for (var j = 0; j < nomi.length; j++) {
+      if (nome === nomi[j]) { n++; continue; }
+      for (var k = 0; k < at.length; k++) if (at[k].value.toLowerCase().indexOf('<' + nomi[j] + '>') >= 0) { n++; break; }
+    }
+  }
+  function giro(radice) {
+    var w = document.createTreeWalker(radice, 1 | 4 | 8 | 128), nodo = w.currentNode;
+    for (; nodo; nodo = w.nextNode()) {
+      if (nodo !== radice || radice.nodeType === 1) conta(nodo);
+      if (nodo.nodeType === 1 && nodo.shadowRoot) giro(nodo.shadowRoot);
+    }
+  }
+  if (document.documentElement) giro(document.documentElement);
+  return n;
+})()`;
+
+async function quantiVistiDagliScript(webContents) {
+  let cornici = [];
+  try { cornici = webContents.mainFrame.framesInSubtree.filter((f) => f === webContents.mainFrame || riquadroArrivato(f)); } catch (_) {}
+  const conti = await Promise.all(cornici.map((f) => entro(f.executeJavaScript(CONTA_COME_LA_RICERCA), ATTESA_MS)));
+  return conti.reduce((s, c) => s + (Number.isFinite(c) ? c : 0), 0);
+}
+
+// Null se la ricerca non risponde: nel dubbio si guarda campo per campo.
+async function quantiTrovaLaRicerca(cmd, sid) {
+  try {
+    await cmd('DOM.getDocument', { depth: 0 }, sid);
+    let n = 0;
+    for (const query of ['<input>', '<textarea>']) {
+      const { searchId, resultCount } = await cmd('DOM.performSearch', { query, includeUserAgentShadowDOM: false }, sid);
+      cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {});
+      n += resultCount;
+    }
+    return n;
+  } catch (_) { return null; }
+}
+
+// Quando i conti non tornano, risultato per risultato: un campo in un componente chiuso conta solo se il suo
+// componente ha un campo segreto compilato, con le stesse regole della misura.
+function codiceInUnChiuso() {
+  return `function () { ${preambolo()}
   if (this.nodeType !== 1 || !/^(input|textarea)$/i.test(this.localName)) return false;
-  for (var r = this.getRootNode(); r && r.host; r = r.host.getRootNode()) if (r.mode === 'closed') return true;
+  for (var r = this.getRootNode(); r && r.host; r = r.host.getRootNode()) {
+    if (r.mode !== 'closed') continue;
+    try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(this.getRootNode()).length > 0; } catch (_) { return true; }
+  }
   return false;
 }`;
+}
 async function campoInUnChiuso(cmd, sid) {
   const gruppo = 'filo-campi-cerca';
   try {
