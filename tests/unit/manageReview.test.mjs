@@ -1648,7 +1648,7 @@ test('fusione approvata e in conflitto, in riallineamento: non è una decisione 
   const ferma = { ...FB_412, status: 'design', statusReason: 'arenato' };
   assert.equal(MR.statoFusione(ferma, opts), 'riallineamento_fallito');
   assert.equal(MR.fusioneInAttesa(ferma, opts), true);
-  assert.match(MR.livelloL5(ferma, opts).pannello.testo, /rimettila In coda/);
+  assert.match(MR.livelloL5(ferma, opts).pannello.testo, /rimetti la sua pratica In coda/);
   assert.equal(MR.segnoFermata(ferma, opts).classe, 'attack');
 });
 

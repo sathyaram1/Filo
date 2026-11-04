@@ -777,14 +777,21 @@
     return card;
   }
 
-  // Chi la riallinea, e la frase che lo dice. La pagina che conosce la pratica lo dice con `o.riallineamento(req)` →
-  // { inCorso } (Gestione: dallo stato della pratica, manageReview.statoFusione); senza, vale la provenienza.
+  // Chi la riallinea, e la frase che lo dice: la sola copia, letta anche dal quadrato di Gestione (manageReview).
+  // `inCorso` lo sa solo chi conosce la pratica (Gestione, dal suo stato); `null` = non si sa (pagina da browser, richiesta
+  // senza pratica in lista): allora la frase non promette niente e dice dove guardare.
   var RIALLINEAMENTO_NON_ANDATO = 'Il riallineamento automatico non è andato: rimetti la sua pratica In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
+  var RIALLINEAMENTO_DA_GUARDARE = 'Se la sua pratica è ancora in lavorazione, la routine riallinea il ramo da sola e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto; se in Gestione è ferma, rimettila In coda per un giro nuovo.';
+  /** La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea. PURA. */
+  function testoRiallineamento(req, inCorso) {
+    if (inCorso === true) return RIALLINEA_DA_SOLA;
+    if (!siRiallineaDaSola(req)) return dopoIlConflitto(req);
+    return inCorso === false ? RIALLINEAMENTO_NON_ANDATO : RIALLINEAMENTO_DA_GUARDARE;
+  }
   function riallineamentoDi(req, o) {
     var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
-    var inCorso = dato ? !!dato.inCorso : siRiallineaDaSola(req);
-    if (inCorso) return { inCorso: true, testo: RIALLINEA_DA_SOLA };
-    return { inCorso: false, testo: siRiallineaDaSola(req) ? RIALLINEAMENTO_NON_ANDATO : dopoIlConflitto(req) };
+    var inCorso = dato ? !!dato.inCorso : null;
+    return { inCorso: inCorso, testo: testoRiallineamento(req, inCorso) };
   }
 
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
@@ -823,7 +830,7 @@
 
     var tentativo = realignFailureText(req.realignReason);
     var ria = riallineamentoDi(req, o);
-    card.dataset.riallineamento = ria.inCorso ? 'in_corso' : 'fallito';
+    card.dataset.riallineamento = ria.inCorso === true ? 'in_corso' : ria.inCorso === false ? 'fallito' : 'da_guardare';
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
       + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
@@ -904,7 +911,7 @@
     // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
       // Se le riallinea tutte la routine, il titolo non suona l'allarme: non c'è niente da fare (#1425).
-      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso; });
+      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso === true; });
       var fbox = el('section', 'sn-mac sn-mac-failed' + (tutteInCorso ? ' sn-mac-failed--in-corso' : ''));
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
       var ftitle = el('div', 'sn-mac-title');
@@ -1211,6 +1218,7 @@
     OROLOGIO_MS: OROLOGIO_MS,
     siRiallineaDaSola: siRiallineaDaSola,
     dopoIlConflitto: dopoIlConflitto,
+    testoRiallineamento: testoRiallineamento,
     RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
