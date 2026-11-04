@@ -104,8 +104,10 @@ test('le radici chiuse si trovano anche dentro i riquadri e i componenti aperti,
 });
 
 // #810.16 — il testo che ripete il valore di un campo segreto (l'anteprima della carta) si copre come il campo.
-function paginaFinta(testi) {
-  const rect = (i) => ({ left: 10, top: 20 + i * 30, width: 100, height: 20 });
+// Un testo per riga, o tutti sulla stessa riga uno accanto all'altro.
+function paginaFinta(testi, { inRiga = false } = {}) {
+  const pieni = (i) => testi.slice(0, i).filter((t) => t.trim()).length;
+  const rect = (i) => (inRiga ? { left: 10 + pieni(i) * 45, top: 20, width: 45, height: 20 } : { left: 10, top: 20 + i * 30, width: 100, height: 20 });
   const corpo = { nodeType: 1, tagName: 'BODY', childNodes: [], contains: () => false, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
   const doc = {
     createRange: () => { let n = null; return { selectNodeContents: (x) => { n = x; }, getBoundingClientRect: () => n._rect }; },
@@ -133,10 +135,13 @@ test('il testo che ripete il numero della carta si trova con spazi, trattini e d
 });
 
 test('le cifre divise in più pezzi di testo si ritrovano insieme', () => {
-  const { win, corpo } = paginaFinta(['4111', ' ', '1111', '1111', '1111']);
+  const { win, corpo } = paginaFinta(['4111', ' ', '1111', '1111', '1111'], { inRiga: true });
   const tops = S.rettangoliRipetuti(win, ['4111 1111 1111 1111'], corpo);
   assert.equal(tops.length, 1);
-  assert.deepEqual(tops[0], { left: 10, top: 20, width: 100, height: 140 }, 'il rettangolo tiene tutti i pezzi');
+  assert.deepEqual(tops[0], { left: 10, top: 20, width: 180, height: 20 }, 'il rettangolo tiene tutti i pezzi');
+  const sparsi = paginaFinta(['41', '1111', '9'], { inRiga: false });
+  assert.deepEqual(S.rettangoliRipetuti(sparsi.win, ['4111 1111 1111 1111'], sparsi.corpo), [],
+    'cifre su righe diverse non fanno un numero solo');
 });
 
 test('crea dà i valori dei campi segreti compilati, anche fuori vista', () => {

@@ -1,0 +1,50 @@
+// #1721 — ogni foto di una pagina che va a un modello passa da un punto solo, services/fotoDellaPagina.js, che la copre
+// (campi segreti, testo che li ripete, riquadri di altre origini). Una strada nuova che fotografa una pagina chiama lui,
+// o si scrive qui col perché la sua foto non va a un modello che può riportarne il contenuto al sito.
+
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative } from 'node:path';
+
+const RADICE = new URL('../../', import.meta.url).pathname;
+
+const AMMESSI = {
+  'src/main/services/fotoDellaPagina.js': 'il punto unico: la foto coperta per un modello, e quella intera per chi la tiene',
+  'src/main/services/handlers/misc.js': 'la barra in alto di Filo per il box del feedback: è la shell, non una pagina',
+  'src/main/services/miniature.js': 'la miniatura di una pagina salvata, che vede solo l’utente',
+  'src/main/tabs/anteprime.js': 'le anteprime delle schede, che vede solo l’utente',
+  'src/main/shim/chrome-api.js': 'chrome.tabs.captureVisibleTab dei moduli portati: nessuno la manda a un modello',
+  'src/main/main.js': 'le foto della prova smoke',
+  'src/main/services/riquadriRotti.js': 'il solo riquadro di terzi rotto (#760), a un modello che dà un verdetto e non scrive al sito',
+};
+
+function sorgenti(dir, out = []) {
+  for (const nome of readdirSync(dir)) {
+    const p = join(dir, nome);
+    if (statSync(p).isDirectory()) sorgenti(p, out);
+    else if (nome.endsWith('.js')) out.push(p);
+  }
+  return out;
+}
+
+test('capturePage() si chiama solo dai file che fotografano per un modello attraverso il punto unico, o per l’utente', () => {
+  const fuori = [];
+  for (const p of sorgenti(join(RADICE, 'src'))) {
+    const rel = relative(RADICE, p).split('\\').join('/');
+    if (/\bcapturePage\s*\(/.test(readFileSync(p, 'utf8')) && !AMMESSI[rel]) fuori.push(rel);
+  }
+  assert.deepEqual(fuori, [], 'una foto di pagina fuori da fotoDellaPagina.js: per un modello va presa da Foto.fotoPerModello');
+});
+
+test('Aiuto, finestra guardata dalla chat e nome dello Screenshot prendono la foto dal punto unico', () => {
+  const leggi = (f) => readFileSync(join(RADICE, f), 'utf8');
+  assert.match(leggi('src/main/services/schermo.js'), /Foto\.fotoPerModello\(/);
+  const misc = leggi('src/main/services/handlers/misc.js');
+  assert.equal((misc.match(/Foto\.fotoPerModello\(/g) || []).length, 2, 'perModello (Aiuto) e copiaPerModello (Screenshot)');
+  assert.match(leggi('src/content/aiutoPagina.js'), /perModello: true/);
+  assert.match(leggi('src/content/actions.js'), /copiaPerModello: true/);
+  for (const f of ['src/content/aiutoPagina.js', 'src/content/actions.js', 'src/content/extractContext.js']) {
+    assert.doesNotMatch(leggi(f), /fotoCoperta|campiSegretiInVista/, `${f}: la copertura non si rifà nella pagina`);
+  }
+});
