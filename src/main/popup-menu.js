@@ -48,6 +48,12 @@ const ICON_PATHS = {
 
   close:
     '<path d="M6 6l12 12"/><path d="M18 6L6 18"/>',
+  // `tabs` e `undo` come in src/shared/icons.js: «Chiudi le altre schede» e «Riapri scheda chiusa» (#1695).
+  tabs:
+    '<path d="M3 7.5h18v10.5a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' +
+    '<path d="M3 7.5V5.5A1.5 1.5 0 0 1 4.5 4h5A1.5 1.5 0 0 1 11 5.5v2"/><path d="M3 11.5h18"/>',
+  undo:
+    '<path d="M4 10h11a5 5 0 0 1 0 10h-4"/><path d="M8 6l-4 4 4 4"/>',
 
   // Freccia indietro: COPIA di `back` in src/shared/icons.js. Voce «Torna indietro» del menu dell'avviso del sito.
   back:
