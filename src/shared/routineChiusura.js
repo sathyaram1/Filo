@@ -1,6 +1,6 @@
 // La domanda di fine sessione delle routine (routineClosingAdmin, ROUTINE-AUTH-SPEC § 13): gli slot, le risposte di
 // orchestratori e worker in un elenco solo, e il testo coi caratteri di controllo resi visibili. Logica pura per
-// Gestione → Automazioni e scripts/routine-domanda.mjs. Prove: tests/unit/routineChiusura.test.mjs.
+// Gestione → Automazioni e scripts/routine-domanda.mjs. Prove: tests/unit/strumentiOwner.test.mjs, domandaChiusura.test.mjs.
 
 (function (global) {
   'use strict';
