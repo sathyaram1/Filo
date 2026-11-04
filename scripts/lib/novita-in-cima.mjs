@@ -329,8 +329,7 @@ export function riportaInCima(root, { commit = false, basi = ['origin/main', 'ma
   }
   if (!base) return no(`non trovo dove il ramo si stacca da ${basi.join(' o ')}`);
   let prima;
-  try { prima = registroDa(git(['show', `${base}:${FILE_NOVITA}`])); } catch (e) { return no(`non leggo il registro a ${base.slice(0, 9)}: ${String(e.message || e).split('\n')[0]}`); }
-  const percorso = join(root, FILE_NOVITA);
+  try { prima = registroDa(git(['show', `${base}:${FILE_NOVITA}`])); } catch (e) { return no(`non leggo il registro a ${base.slice(0, 9)}: ${String(e.stderr || e.message || e).trim().split('\n')[0]}`); }
   let manifesto;
   let src;
   try {
