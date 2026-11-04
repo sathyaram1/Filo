@@ -8,9 +8,10 @@
   const ORA_MS = 60 * 60 * 1000;
   // Sopra 100.000 token di prompt Haiku 5.5 costa cinque volte tanto, su tutta la richiesta (SPEC-CONTESTO § Perché).
   const LISTINO = 100000;
-  // Il grezzo che resta dopo la compattazione: le ultime ore o gli ultimi turni, quale dei due è più corto.
+  // Il grezzo che resta dopo la compattazione: le ultime ore o gli ultimi turni, quale dei due è più corto. Quattro turni
+  // da ~3.000 token lasciano spazio fra il grezzo e la soglia di serie (con la parte fissa di oggi, ~38.000 token).
   const ORE_GREZZE = 2;
-  const TURNI_GREZZI = 8;
+  const TURNI_GREZZI = 4;
   // Il tratto è «grande» per la compattazione da fermo: a cache fredda riscriverlo costa uguale (SPEC-CONTESTO).
   const QUOTA_GRANDE = 0.3;
   const TETTO_COMPATTATO = 7000;
@@ -20,6 +21,8 @@
   // Dopo un guasto del modello che compatta non si riprova a ogni messaggio: ogni tentativo è una chiamata pagata.
   const PAUSA_DOPO_GUASTO_MS = 10 * 60 * 1000;
   const MAX_MEMORIE = 20;
+  // Quanto tratto va al modello in una compattazione sola: il primo giro su giorni mai compattati si fa a pezzi.
+  const MAX_INGRESSO = 80000;
 
   const FC = () => global.SN_FILO_CONTESTO;
   const stringa = (s) => typeof s === 'string' && s.trim().length > 0;
@@ -94,7 +97,7 @@
     const t = String(testo == null ? '' : testo).trim();
     return t ? t.split(/\s+/).length : 0;
   }
-  const numero = (n) => Number(n).toLocaleString('it-IT');
+  const numero = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
   function dovDi(a, o) {
     const p = (a && a.params) || a || {};
     return String(o.url || o.pageRead || o.percorso || o.path || o.nome || o.query || p.url || p.query || p.percorso || p.path || p.nome || '').trim();
@@ -281,10 +284,10 @@
     const usd = (u.messaggiAlMese / ogni) * unaCompattazione + u.messaggiAlMese * unMessaggio;
     // Ingresso letto a ~15.000 token al secondo, uscita a ~120: le misure di Haiku attraverso OpenRouter del 4/11/2026.
     const secondi = Math.max(2, Math.round(1.5 + ingresso / 15000 + u.uscitaCompattazione / 120));
-    const cifra = usd < 0.1 ? usd.toLocaleString('it-IT', { maximumFractionDigits: 3 }) : usd.toLocaleString('it-IT', { maximumFractionDigits: 2 });
+    const cifra = usd.toLocaleString('it-IT', { useGrouping: true, maximumFractionDigits: usd < 0.1 ? 3 : 2 });
     return {
       usd, ogni, secondi, oltreListino: medio > LISTINO,
-      testo: `Circa ${cifra} $ al mese con ${u.messaggiAlMese} messaggi (chat e compattazioni): una compattazione ogni ${ogni} ${ogni === 1 ? 'messaggio' : 'messaggi'} circa, ${secondi} s, di solito mentre leggi la risposta.${medio > LISTINO ? ' Le richieste passano i 100.000 token: con Haiku costano cinque volte tanto.' : ''}`,
+      testo: `Circa ${cifra} $ al mese con ${u.messaggiAlMese} messaggi (chat e compattazioni): ${ogni === 1 ? 'una compattazione a ogni messaggio' : `una compattazione ogni ${ogni} messaggi circa`}, ${secondi} s, di solito mentre leggi la risposta.${medio > LISTINO ? ' Le richieste passano i 100.000 token: con Haiku costano cinque volte tanto.' : ''}`,
     };
   }
 
@@ -295,7 +298,7 @@
   }
 
   global.SN_FILO_COMPATTAZIONE = {
-    LISTINO, ORE_GREZZE, TURNI_GREZZI, QUOTA_GRANDE, TETTO_COMPATTATO, PAUSA_DOPO_GUASTO_MS, MAX_MEMORIE, ISTRUZIONI,
+    LISTINO, ORE_GREZZE, TURNI_GREZZI, QUOTA_GRANDE, TETTO_COMPATTATO, PAUSA_DOPO_GUASTO_MS, MAX_MEMORIE, MAX_INGRESSO, ISTRUZIONI,
     motivo, giornoDi, giorniDaRiassumere, puntoDiTaglio, rigaLettura, righePerChiCompatta, richiesta, richiestaGiorno,
     leggiRisposta, leggiGiorno, rendiFiloCompattato, senzaCancellate, USO, stimaSoglia, QUOTA_ANTICIPO,
   };

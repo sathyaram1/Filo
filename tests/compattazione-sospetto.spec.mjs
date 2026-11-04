@@ -10,6 +10,12 @@ import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs'
 const FASE_4 = {
   compatta: (app, { memorie }) => app.evaluate(async (_e, memorie) => {
     const C = globalThis.SN_COMPATTAZIONE;
+    // La bolla si vede prima che la risposta entri nel filo: si compatta il turno finito.
+    for (let i = 0; i < 100; i++) {
+      const chats = await globalThis.SN_IL_FILO.chats();
+      if (chats.some((c) => (c.messages || []).some((m) => m.role === 'filo' && m.text === 'Letta.'))) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
     const vero = C._dip.chiama;
     let ricevuto = '';
     C._dip.chiama = async ({ messages }) => {
@@ -53,7 +59,6 @@ test('una pagina ostile nel tratto: dopo la compattazione il riassunto non porta
     ]);
     await chiedi(page, `leggi ${url}`);
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Letta.' })).toBeVisible({ timeout: 15000 });
-    if (!FASE_4) throw new Error('la compattazione non c’è ancora');
 
     const { ricevuto, riassunto } = await FASE_4.compatta(app, { memorie: [MEMORIA_OSTILE] });
     expect(ricevuto, 'al posto della pagina, la riga scritta dal codice').toContain(TITOLO);
