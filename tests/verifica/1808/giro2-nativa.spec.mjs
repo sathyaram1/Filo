@@ -2,7 +2,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test('il sito non si accorge che l’invio sul collegamento sempre aperto è seguito', async ({ openTab, testServer }) => {
-  const page = await openTab(testServer.url('/'));
+  const page = await testServer.openReady(openTab, '<!doctype html><title>N</title><p>x');
   const v = await page.evaluate(() => {
     const s = WebSocket.prototype.send;
     const ts = Function.prototype.toString;
