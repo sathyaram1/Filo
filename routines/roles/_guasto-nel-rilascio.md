@@ -7,9 +7,11 @@ dell'owner) non lo è: è un passo dell'owner, che si chiede con una domanda.
 Un rifiuto di una tua consegna (exit 4) o il canale giù (exit 3) non lo sono.
 
 Un guasto non è una domanda: non c'è niente da decidere, e l'owner non lo
-vede. Non scrivi una domanda e non fermi il feedback: lo dichiari nel rilascio,
-col gruppo e il messaggio esatto, e il lavoro torna in coda da sé, sul suo
-ramo, per chi lo prende dopo.
+vede. Non scrivi una domanda e non ti fermi con `--status design`: lo dichiari
+nel rilascio, col gruppo e il messaggio esatto. Gli altri lavori vanno avanti;
+il tuo resta fermo sul suo ramo finché il manutentore, che il guasto sveglia,
+non lo sblocca con una nota quando la causa è passata. Col manutentore spento
+il fermo non c'è: il lavoro torna in coda, per chi lo prende dopo.
 
 1. La domanda di fine sessione, come sempre.
 2. `node scripts/routine-channel.mjs release <biglietto> --role <il tuo ruolo>
