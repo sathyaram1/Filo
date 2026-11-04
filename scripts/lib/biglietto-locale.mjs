@@ -220,8 +220,8 @@ export function noteConScrittiDiAltri(notes) {
  */
 export function soloTurniDellOwner(notes) {
   const turni = turniDi(notes);
-  const tolti = turni.filter((t) => !t.owner && t.righe.some((r) => r.trim())).map((t) => t.marcatore || '(il primo turno, senza marcatore)');
-  return { notes: turni.filter((t) => t.owner).map((t) => [t.marcatore, ...t.righe].join('\n')).join('\n'), tolti };
+  const tolti = turni.filter((t) => !t.owner && t.grezze.some((r) => r.trim())).map((t) => t.marcatore || '(il primo turno, senza marcatore)');
+  return { notes: turni.filter((t) => t.owner).map((t) => [t.marcatore, ...t.grezze].join('\n')).join('\n'), tolti };
 }
 
 /** Perché chi stampa questo feedback si sporca (§1.2): testo non fidato, o una conversazione scritta anche da altri. PURA. */
