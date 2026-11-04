@@ -418,8 +418,8 @@ export function formattaFeedbackOrigine(fb, { quando = dataOra } = {}) {
 export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
   if (!conFeedback) return '';
   if (!Array.isArray(vive)) return 'Altre domande vive sullo stesso feedback: il server non le ha mandate, non sai se ce ne sono.';
-  const n = vive.length + (Number(altre) > 0 ? Number(altre) : 0);
-  const righe = [`Altre domande vive sullo stesso feedback (${n}${altre > 0 ? `, qui le ${vive.length} più recenti` : ''})`];
+  const piu = Number.isInteger(altre) && altre > 0 ? altre : 0;
+  const righe = [`Altre domande vive sullo stesso feedback (${vive.length + piu}${piu ? `, qui le ${vive.length} più recenti` : ''})`];
   if (!vive.length) righe.push('  nessuna');
   for (const d of vive) {
     const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
