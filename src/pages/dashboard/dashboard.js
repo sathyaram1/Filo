@@ -1392,7 +1392,7 @@
     if (body.dataset.state !== 'thread') goThread();
 
     // Bolla utente. Nella storia lo stesso testo che parte: diverso, il main lo rimandava come un messaggio in più.
-    const domanda = c.text || 'Descrivi questa immagine.';
+    const domanda = domandaDi(c);
     const rispostaA = Rispondi.perIlMain(c.citata);
     const nelloStorico = Rispondi.perLoStorico(c.citata);
     threadHistory.push({
