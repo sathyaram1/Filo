@@ -260,12 +260,12 @@
   }
 
   // ── La sezione del CONTESTO ──────────────────────────────────────────────
-  // I giorni recenti e le ore dopo l'ultimo giorno riassunto, entro il tetto: oltre, escono prima i giorni più vecchi,
+  // I giorni recenti e le ore che nessun giorno riassume ancora, entro il tetto: oltre, escono prima i giorni più vecchi,
   // poi le ore più vecchie, e la sezione dice quante righe mancano e dove si cercano.
   function rendiFiloCompattato({ ore = [], giorni = [], tetto = TETTO_COMPATTATO } = {}) {
     const gg = (Array.isArray(giorni) ? giorni : []).filter((g) => g && stringa(g.testo)).slice().sort((a, b) => (a.giorno < b.giorno ? -1 : 1));
-    const ultimo = gg.length ? gg[gg.length - 1].giorno : '';
-    const oo = (Array.isArray(ore) ? ore : []).filter((r) => r && stringa(r.testo) && giornoDi(r.a) > ultimo)
+    const dentro = coperte(ore, gg);
+    const oo = (Array.isArray(ore) ? ore : []).filter((r) => r && stringa(r.testo) && !dentro(r))
       .slice().sort((a, b) => ms(a.da) - ms(b.da));
     if (!gg.length && !oo.length) return '';
     const rigaGiorno = (g) => `- ${g.testo}`;
