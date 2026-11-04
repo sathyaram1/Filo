@@ -123,6 +123,26 @@ async function daCompattare(incognito, { ora, tetti }) {
   return tutti.filter((m) => Date.parse(m.ts) >= inizio && Date.parse(m.ts) <= ora);
 }
 
+// Gli eventi del filo dei messaggi `chat|ts`: le fonti con cui il quaderno rimanda al punto da cui una proposta è nata.
+async function eventiDeiMessaggi(chiavi) {
+  const out = [];
+  const perChat = new Map();
+  for (const k of Array.isArray(chiavi) ? chiavi : []) {
+    const i = String(k).indexOf('|');
+    if (i <= 0) continue;
+    const chat = k.slice(0, i);
+    if (!perChat.has(chat)) perChat.set(chat, []);
+    perChat.get(chat).push(k.slice(i + 1));
+  }
+  for (const [chat, tss] of perChat) {
+    let c = null;
+    try { c = await F().chat(chat, { incognito: false, ids: true }); } catch (_) {}
+    if (!c || !Array.isArray(c.eids)) continue;
+    c.messages.forEach((m, i) => { if (m && tss.includes(m.ts) && c.eids[i]) out.push(c.eids[i]); });
+  }
+  return [...new Set(out)];
+}
+
 // Compatta il pezzo più vecchio del tratto vivo. `grezzo`: { ore, turni } che restano grezzi (le costanti di serie se
 // mancano). Ritorna { fatto, motivo, ricevuto, ore, memorie, inAttesa }. Due richieste insieme fanno una compattazione sola.
 function compatta(opts = {}) {
