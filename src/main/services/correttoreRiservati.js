@@ -134,14 +134,22 @@ function valoriRisposta(risposta, tipo, chiesta = true) {
 }
 
 const chiParla = (riga) => { const m = riga.match(PARLA); return m ? m[1].trim() : null; };
-// Dopo il messaggio di `r` ha scritto un altro (di solito chi sta rispondendo adesso).
-function altroDopo(l, r) {
-  const inizioRiga = l.lastIndexOf('\n', r.inizio - 1) + 1;
-  const fineRiga = l.indexOf('\n', r.inizio);
-  const chi = chiParla(l.slice(inizioRiga, fineRiga < 0 ? l.length : fineRiga));
+// Chi scrive il campo si firma così nelle conversazioni copiate; le pagine di chat non mettono nomi, e un altro nome
+// può essere chiunque del gruppo.
+const CHI_SCRIVE = new Set(['io', 'tu', 'me', 'you', 'i']);
+// Sotto la richiesta `r` c'è già la risposta: una riga di chi scrive, o una riga corta con un valore dalla forma di
+// password («gatto2024», «certo, gatto2024»). Un «PS:», un orario o un altro del gruppo non la chiudono (#1723).
+function chiusa(l, r) {
+  const G = globalThis.SN_GUARDIANO_STATICO;
   const righe = l.slice(r.fine).split('\n');
   if (r.fine > 0 && l[r.fine - 1] !== '\n') righe.shift();
-  return righe.some((riga) => { const c = chiParla(riga); return c !== null && c !== chi; });
+  return righe.some((riga) => {
+    const chi = chiParla(riga);
+    if (chi !== null && CHI_SCRIVE.has(chi)) return true;
+    const parole = (chi === null ? riga : riga.replace(PARLA, '')).split(/\s+/).filter(Boolean);
+    return !!(G && G.sembraPassword) && parole.length <= 4
+      && parole.some((w) => G.sembraPassword(w.replace(/[.,;:!?)\]»”"']+$/u, '')));
+  });
 }
 
 // Il messaggio sopra il campo a cui il campo risponde: { tipo, chiesta } o null.
