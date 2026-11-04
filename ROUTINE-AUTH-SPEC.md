@@ -314,7 +314,9 @@ deposita, mai lo interpreta. Da quel momento l'emissione dei biglietti risponde
 solo: il paracadute giornaliero deve sempre poter lavorare. Per il client
 `fault_declared` è un **guasto** (exit 3): l'orchestratore chiude senza
 rispawnare — con una causa deterministica i worker morirebbero in fila — e non
-lo ritenta, perché è una risposta, non un'interruzione di rete.
+lo ritenta, perché è una risposta, non un'interruzione di rete. Dal 31/10
+(SPEC-MANUTENTORE.md § 7) il periodo di rispetto non c'è più: il guasto ferma
+solo il lavoro che l'ha dichiarato, finché il manutentore non lo sblocca.
 
 **I giri li accende il pacemaker.** Una funzione schedulata nel progetto
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
