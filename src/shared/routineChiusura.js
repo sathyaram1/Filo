@@ -6,7 +6,10 @@
   'use strict';
 
   // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono al menu e all'aiuto.
-  const SLOT = Object.freeze(['tutti', 'orchestrator', 'worker', 'new-work', 'fixer', 'verifier', 'secaudit', 'compito']);
+  const SLOT = Object.freeze(['tutti', 'orchestrator', 'worker', 'new-work', 'fixer', 'verifier', 'secaudit', 'compito',
+    'risposta', 'smistamento', 'manutentore']);
+  // Come il server (closing.js): minuscole, cifre e trattino, da 2 a 60 caratteri, e comincia con una lettera.
+  const SLOT_RICORRENTE = /^compito:[a-z][a-z0-9-]{1,59}$/;
 
   /**
    * Il testo intero, coi caratteri di controllo resi visibili (tranne a capo e tab): le risposte vengono da sessioni
