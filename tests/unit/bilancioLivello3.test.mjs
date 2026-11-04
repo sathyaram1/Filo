@@ -83,7 +83,7 @@ test('un 2 interno col ? difficile da disfare ferma: la decisione dell\'owner no
   const q = decide([f(2, 'i', 'A o B?', true)], { count2: 4 });
   assert.equal(q.stop, false);
   assert.deepEqual(q.fix, []);
-  assert.deepEqual(q.derived.map((x) => [x.priority, x.decision, x.inCorrezione === true]), [[2, true, false]]);
+  assert.deepEqual(q.derived.map((x) => [x.priority, x.decision, x.inCorrezione === true]), [[1, true, false]], 'un 2 nasce a 1');
 });
 
 test('3 e 2 insieme: il giro si paga dal 3, e il 2 entra anche a bilancio dei 2 finito; a cap3 finito il 3 ferma e il 2 resta sospeso', () => {
