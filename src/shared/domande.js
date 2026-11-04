@@ -65,7 +65,7 @@
     operazioniAmbito: (v) => Array.isArray(v) && v.length >= 1 && v.length <= 30 && v.every((o) => typeof o === 'string' && /^[a-z_]{1,30}(\.[a-z_]{1,30})?$/.test(o)),
     testoAmbito: (v) => typeof v === 'string' && v.trim().length >= 1 && v.length <= 1000,
     // Il numero nella forma che scrivono le attese («1959», «663.2»): senza SN_FB_ATTESE caricato non passa niente.
-    numeroFeedback: (v) => typeof v === 'string' && !!global.SN_FB_ATTESE && global.SN_FB_ATTESE.normalizzaNumero(v) === v,
+    numeroFeedback: (v) => typeof v === 'string' && v !== '' && !!global.SN_FB_ATTESE && global.SN_FB_ATTESE.normalizzaNumero(v) === v,
   });
 
   // `bulk`: ammessa in «applica il consiglio» su più domande. `consenso`: vale solo da un gesto dell'owner nella finestra.
