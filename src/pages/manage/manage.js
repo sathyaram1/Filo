@@ -3808,7 +3808,8 @@
     const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'
       : x.tipo === 'ignota' ? 'Il server non sa da dove viene: nessun timbro la toglie.'
         : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.valore}: leggilo prima di timbrarlo.`
-          : `${x.valore}: guardalo prima di timbrarlo.`;
+          : x.tipo === 'esterno' && /^biglietto /.test(x.valore) ? `Quello che una sessione ha letto senza dire da dove (${x.valore}): guarda il suo sporco prima di timbrarlo.`
+            : `${x.nome || x.valore}: guardalo prima di timbrarlo.`;
     if (x.tipo === 'ignota') return cosa;
     const effetto = x.tipo === 'legacy' ? 'Un clic timbra in blocco tutto ciò che è nato prima' : 'Un clic la timbra per tutto ciò che la porta';
     return x.timbrata ? `${cosa} Timbrata: un clic toglie il timbro, ovunque.` : `${cosa} ${effetto}.`;
