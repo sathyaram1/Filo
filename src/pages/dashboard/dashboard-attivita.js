@@ -1991,7 +1991,9 @@
   // §5 — pannello di cancellazione retroattiva: propone TUTTE e SOLE le schede
   // archiviate pertinenti (le sceglie il main) e le elimina DEFINITIVAMENTE
   // dopo conferma esplicita.
-  function renderDeleteArchivePanel(a, activity, chat = '') {
+  function renderDeleteArchivePanel(a, activity, chat = '', gruppo = null) {
+    // Un pannello che non ha niente da chiedere non tiene ferma la ripresa delle altre conferme.
+    const senzaDomanda = () => proseguiQuandoLibero(chat, null, gruppo, a);
     // «Svuota l'archivio» (#1294): lo dice il modello con `tutto`, e il pannello propone tutte le schede senza cercare.
     const tutto = a.tutto === true;
     const query = tutto ? '' : String(a.query || a.testo || '').trim();
