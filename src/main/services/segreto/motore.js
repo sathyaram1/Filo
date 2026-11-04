@@ -575,9 +575,9 @@ async function cerca(ctx, S, ids, { pota = false } = {}) {
         continue;
       }
       let p = -1;
-      while (a.r < CATENA_MAX) {
+      while (a.r < fine) {
         if (++calcoli % 4096 === 0) await cedi();
-        const q = posizione(S.posto, ctx.N, i >> 1, i & 1, a.r);
+        const q = a.at(a.r);
         if (occ[q] || S.spazzatura.has(q)) {
           a.r++;
           continue;
