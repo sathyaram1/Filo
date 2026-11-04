@@ -279,11 +279,14 @@
         return;
       }
       setStatus(msg.text, 'err');
-      if (msg.needLogin) {
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-      }
       cancelBtn.disabled = false;
       sendBtn.disabled = false;
+      if (msg.needLogin) {
+        signedIn = false;
+        refreshSendState();
+        accedi();
+        return;
+      }
       refreshSendState();
     });
 
