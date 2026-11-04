@@ -208,6 +208,10 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_MEMORY_EDIT: 'filo-memory',
     FILO_MEMORY_RESTORE: 'filo-memory',
     FILO_MEMORY_FOREVER: 'filo-memory',
+    // #1563 — le memorie che la compattazione di un tratto sospetto propone soltanto: l'utente le tiene o no.
+    FILO_MEMORIA_PROPOSTA: 'filo-memory',
+    // #1563 — la stima accanto alla soglia di compattazione, in Preferenze e nei Modelli predefiniti.
+    FILO_STIMA_SOGLIA: 'filo-assistant',
     FILO_DOVE: 'filo-memory',
     // #525 — l'archivio delle chat: lo consulta la pagina Cronologia
     // (capacità "chat-archive"). La ricerca che fa FILO stesso passa dalle

@@ -68,6 +68,7 @@
         testoCampiGiorni: 'testoDeiCampi.giorni',
         contestoGiorni: 'contestoFilo.giorni',
         contestoToken: 'contestoFilo.token',
+        contestoSoglia: 'contestoFilo.soglia',
         contestoCache: 'contestoFilo.cache',
         lunghezzaConversazioni: 'lunghezzaRisposte.conversazioni',
         lunghezzaTesti: 'lunghezzaRisposte.testi',

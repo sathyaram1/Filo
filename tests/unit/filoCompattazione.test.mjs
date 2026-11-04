@@ -91,12 +91,15 @@ const msg = (chat, role, minFa, text, ora, extra = {}) => ({ chat, role, text, t
 test('il grezzo che resta: le ultime due ore o gli ultimi turni, il più corto, e una risposta resta con la domanda', () => {
   const ora = Date.parse('2026-11-04T18:00:00Z');
   const lista = [];
-  for (let i = 0; i < 12; i++) lista.push(msg('ab', 'user', 300 - i * 10, `d${i}`, ora), msg('ab', 'filo', 299 - i * 10, `r${i}`, ora));
-  // Tutti dentro le ultime cinque ore: per ore restano quelli delle ultime due, per turni gli ultimi otto: vince il più corto.
+  for (let i = 0; i < 12; i++) lista.push(msg('ab', 'user', 150 - i * 10, `d${i}`, ora), msg('ab', 'filo', 149 - i * 10, `r${i}`, ora));
+  // Nove turni nelle ultime due ore, otto per il tetto dei turni: vince il più corto.
   const k = L.puntoDiTaglio(lista, { ora, ore: 2, turni: 8 });
   const tenuti = lista.slice(k);
   assert.ok(tenuti.every((m) => Date.parse(m.ts) >= ora - 2 * ORA_MS), 'restano solo le ultime due ore');
+  assert.equal(tenuti.filter((m) => m.role === 'user').length, 8);
   assert.equal(tenuti[0].role, 'user');
+  // Con dieci turni concessi vincono le due ore: nove.
+  assert.equal(lista.slice(L.puntoDiTaglio(lista, { ora, ore: 2, turni: 10 })).filter((m) => m.role === 'user').length, 9);
   const k2 = L.puntoDiTaglio(lista, { ora, ore: 5, turni: 3 });
   assert.equal(lista.slice(k2).filter((m) => m.role === 'user').length, 3, 'con tre turni più corti delle cinque ore restano tre turni');
   // Il taglio per ore che cade su una risposta scende alla sua domanda.

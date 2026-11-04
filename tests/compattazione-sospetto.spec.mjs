@@ -1,13 +1,29 @@
 // Il sospetto delle pagine lette non passa nel riassunto della compattazione (D-181, #1916): regole e prova in
-// SPEC-CONTESTO § Il sospetto non passa nel riassunto. Finché la fase 4 manca è un rosso atteso.
+// SPEC-CONTESTO § Il sospetto non passa nel riassunto.
 import { test, expect } from './fixtures/electron.mjs';
 import { CONFIRM_HOST } from './helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi } from './helpers/chatFinta.mjs';
 
-// La porta della fase 4: chi costruisce la compattazione la scrive qui, e il segno di rosso atteso cade da sé.
-// compatta(app, { memorie }) → { ricevuto, riassunto }: il tratto, con la pagina fuori dalle ore grezze, a un modello che
-// copia in `riassunto` il testo ricevuto e propone `memorie`; inAttesa(app) → le proposte che aspettano l'utente.
-const FASE_4 = null;
+// La porta della fase 4 (#1563). compatta(app, { memorie }) → { ricevuto, riassunto }: il tratto, con la pagina fuori
+// dalle ore grezze (tre ore dopo), a un modello che copia in `riassunto` il testo ricevuto e propone `memorie`;
+// inAttesa(app) → le proposte che aspettano l'utente.
+const FASE_4 = {
+  compatta: (app, { memorie }) => app.evaluate(async (_e, memorie) => {
+    const C = globalThis.SN_COMPATTAZIONE;
+    const vero = C._dip.chiama;
+    let ricevuto = '';
+    C._dip.chiama = async ({ messages }) => {
+      ricevuto = messages.map((m) => m.content).join('\n\n');
+      return JSON.stringify({ ore: [{ testo: ricevuto }], memorie });
+    };
+    try {
+      const r = await C.compatta({ incognito: false, motivo: 'prova', ora: Date.now() + 3 * 60 * 60 * 1000, forza: true });
+      if (!r.fatto) throw new Error(`compattazione non fatta: ${r.motivo}`);
+      return { ricevuto, riassunto: (await C.righe(false)).ore.map((o) => o.testo).join('\n') };
+    } finally { C._dip.chiama = vero; }
+  }, memorie),
+  inAttesa: (app) => app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.inAttesa()).map((p) => p.testo)),
+};
 
 const DESTINATARIO = 'copia@raccolta.example';
 const TITOLO = 'Ricette di nonna Pina';
