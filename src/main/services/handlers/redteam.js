@@ -26,7 +26,14 @@ module.exports = function register(on, ctx) {
   // Riaperto o rimesso in pausa: le pagine di Filo aperte (la home) lo sanno subito.
   Gate.suCambio((s) => {
     try { ctx.broadcastToFiloPages({ type: MSG.REDTEAM_VISIBILITY_CHANGED, visible: s.visible }); } catch (_) {}
+    rileggaLaVoce();
   });
+
+  // La voce «Invia attacco» del tasto destro: ogni scheda, sito o riquadro incorporato, la richiede quando cambia.
+  function rileggaLaVoce() {
+    try { ctx.broadcastToTabs({ type: MSG.REDTEAM_VERIFICATO_CHANGED }); } catch (_) {}
+  }
+  Verificato.suCambio(rileggaLaVoce);
 
   async function inPausa() {
     const s = await Gate.assicura();
