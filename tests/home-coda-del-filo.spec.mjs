@@ -248,6 +248,8 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
     const t = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab')).pop();
     await window.filoShell.tabs.activate(t.id);
   });
+  // La visita nuova sta sul disco prima che sulla riga: tolta la vecchia prima del ridisegno, la riga restava senza.
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('4 pagine, fra cui balene');
   await riga.locator(`.dash-pagina[data-id="${visita}"]`).click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   // Via quella visita; la riga si rifà sul filo, dove c'è anche la visita nuova che il clic ha aperto.
