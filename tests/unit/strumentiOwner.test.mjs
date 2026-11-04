@@ -75,8 +75,17 @@ test('parola d’ordine di sessione: nasce da Gestione, si vede una volta, e dic
     assert.equal(n.ok, false);
     assert.equal(ricevute.length, 0, JSON.stringify(storta));
   }
-  const lungo = await chiama({ type: MSG.ROUTINE_CHIAVE_CREA, slug: 'x'.repeat(65), scope: 'routine' });
-  assert.match(lungo.error, /65 caratteri, il massimo è 64/);
+  const lungo = await chiama({ type: MSG.ROUTINE_CHIAVE_CREA, slug: 'x'.repeat(64), scope: 'routine' });
+  assert.match(lungo.error, /64 caratteri, il massimo è 63/);
+  // La regola del server sul nome (isValidSlug): quello che lui rifiuta, la pagina lo rifiuta prima dicendo cosa cambiare.
+  for (const slug of ['pc-città', 'pc/casa', '_pc', 'pc:casa']) {
+    const n = await chiama({ type: MSG.ROUTINE_CHIAVE_CREA, slug, scope: 'sessione' });
+    assert.match(n.error || '', /lettere senza accento/, slug);
+    assert.equal(ricevute.length, 0, slug);
+  }
+  for (const slug of ['pc_casa', 'pc.casa', 'x'.repeat(63)]) {
+    assert.equal(globalThis.SN_ROUTINE_CHIAVI.validaNuova({ slug, scope: 'sessione' }).ok, true, slug);
+  }
   // Il server che non restituisce la parola non lascia credere che sia nata.
   rispondi = () => ({ status: 200, body: { result: { slug: 'a', scope: 'sessione' } } });
   assert.equal((await chiama({ type: MSG.ROUTINE_CHIAVE_CREA, slug: 'a', scope: 'sessione' })).ok, false);

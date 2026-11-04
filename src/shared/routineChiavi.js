@@ -43,8 +43,9 @@
     ambiente: Object.freeze({ valori: Object.freeze(['normale', 'riservati']), predefinito: 'normale', etichetta: 'Ambiente' }),
   });
 
-  // Un nome lungo come una riga dell'elenco: oltre si rifiuta col numero, mai si taglia.
-  const NOME_MAX = 64;
+  // La regola del server sul nome (isValidSlug): qui si rifiuta prima, dicendo cosa cambiare.
+  const NOME_MAX = 63;
+  const NOME_RE = /^[a-z0-9][a-z0-9._-]*$/i;
   const DESCRIZIONE_MAX = 500;
 
   /** La richiesta di una parola nuova, controllata: { ok, dati: { slug, scope, label } } o { ok:false, testo }. PURA. */
@@ -55,6 +56,9 @@
     if (!slug) return { ok: false, testo: 'Dalle un nome: è quello con cui la ritrovi e la revochi.' };
     if (slug.length > NOME_MAX) return { ok: false, testo: `Il nome è di ${slug.length} caratteri, il massimo è ${NOME_MAX}.` };
     if (/\s/.test(slug)) return { ok: false, testo: 'Il nome non può avere spazi: usa un trattino.' };
+    if (!NOME_RE.test(slug)) {
+      return { ok: false, testo: 'Il nome comincia con una lettera o una cifra e poi ha solo lettere senza accento, cifre, punto, trattino basso o trattino.' };
+    }
     if (!POTERI.includes(scope)) return { ok: false, testo: 'Scegli a cosa serve.' };
     if (label.length > DESCRIZIONE_MAX) return { ok: false, testo: `La descrizione è di ${label.length} caratteri, il massimo è ${DESCRIZIONE_MAX}.` };
     return { ok: true, dati: { slug, scope, label } };
