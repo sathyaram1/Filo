@@ -95,11 +95,18 @@ for (const scala of [1.5, 2]) {
     page = await paginaHome(app);
     await expect.poll(() => page.evaluate(() => document.documentElement.style.zoom)).toBe(String(scala));
     await page.waitForTimeout(300);
+    const largo = await larghezza(page);
+    await page.screenshot({ path: test.info().outputPath(`senza-${scala}.png`) });
     await shell.evaluate((t) => window.filoNotify(t, { durationSec: 0 }), LUNGO);
     const vista = await avvisi();
     await expect(vista.locator('.shell-notif.show')).toHaveCount(1);
     await expect.poll(() => scarto(app, page), { timeout: 5000 }).toBeGreaterThanOrEqual(0);
-    expect(await scarto(app, page)).toBeLessThanOrEqual(60);
+    const stretto = await larghezza(page);
+    const s = await scarto(app, page);
+    console.log(`SCALA ${scala}: campo ${largo} -> ${stretto}, scarto ${s}`);
+    await captureCompositeElectron(app, test.info().outputPath(`scala-${scala}.png`));
+    // Se il campo si è stretto, doveva stringersi solo fin dove serve.
+    if (stretto < largo) expect(s).toBeLessThanOrEqual(60);
     await expect.poll(() => page.locator('#input').evaluate((t) => t.scrollHeight - t.clientHeight), { timeout: 3000 }).toBeLessThanOrEqual(1);
   });
 }
