@@ -246,16 +246,16 @@
   // La sola divisione della conversazione in turni, col marcatore e le righe grezze (vuoti compresi): la usa chi mostra
   // e chi decide di chi è un turno (la sede owner, scripts/lib/biglietto-locale.mjs). Il primo turno è senza marcatore.
   function turniGrezzi(notes) {
-    const turni = [{ role: 'model', marcatore: '', ts: null, righe: [], allegati: [] }];
+    const nuovo = (role, marcatore, ts) => ({ role, marcatore, ts, righe: [], allegati: [], grezze: [] });
+    const turni = [nuovo('model', '', null)];
     for (const line of righe(notes || '')) {
       const m = USER_TURN_RE.exec(line) || MODEL_TURN_RE.exec(line);
-      if (m) turni.push({ role: USER_TURN_RE.test(line) ? 'user' : 'model', marcatore: line, ts: (m[1] || '').trim() || null, righe: [], allegati: [] });
-      else {
-        const att = parseAttachmentLine(line);
-        const t = turni[turni.length - 1];
-        if (att) t.allegati.push({ ...att, riga: line });
-        else t.righe.push(line);
-      }
+      if (m) { turni.push(nuovo(USER_TURN_RE.test(line) ? 'user' : 'model', line, (m[1] || '').trim() || null)); continue; }
+      const t = turni[turni.length - 1];
+      const att = parseAttachmentLine(line);
+      if (att) t.allegati.push(att);
+      else t.righe.push(line);
+      t.grezze.push(line);
     }
     return turni;
   }
