@@ -76,11 +76,17 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
   `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
   `rileggi` (Opus: tutte quelle che tolgono lavoro, più il campione); in sottofondo, e lo aspetti prima del contesto.
   Un feedback rimasto senza scheda si decide sul titolo, e lo dici nel recap. Poi `npm run manutentore -- contesto`
-  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. Un'indicazione dell'owner
-  che chiede la decisione **a secco** vale per la prossima decisione del mattino: rosa, ordine, N, pacchetti e attese
-  li scrivi nel recap come proposta, senza applicarne nessuno, e togli l'indicazione dal taccuino.
+  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
+  (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
+
+**A secco.** Un'indicazione dell'owner che chiede la decisione **a secco** vale per ogni accensione finché sta nel
+taccuino, battiti e sveglie compresi, anche prima del mattino: leggi, indaghi e proponi, ma non scrivi niente che cambi
+il lavoro (ordine, N, priorità, pacchetti, attese, accensioni, sblocchi, note, feedback, archiviazioni, account,
+routine). Quello che avresti fatto va nel taccuino come proposta, e al mattino nel recap. La decisione del mattino a
+secco lascia l'indicazione al suo posto, segnata col giorno in cui l'ha applicata: la toglie la prima decisione del
+mattino di un giorno dopo, che torna a decidere dal vero, o l'owner.
 - **alla fine**: la domanda di fine sessione e il rilascio con `--role manutentore`, come ogni worker. Se segui un
   problema, prima del rilascio chiedi la sveglia (`sveglia-tra`).
 
