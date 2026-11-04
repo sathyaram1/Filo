@@ -108,7 +108,7 @@
     const toArchive = [];
     const toFlag = [];
     for (const fb of list) {
-      if (!fb || !fb._id) continue;
+      if (!fb || !fb._id || !risolta(fb)) continue;
       if (shouldAutoArchive(fb, opts)) { toArchive.push(fb._id); continue; }
       if (usersSayBroken(fb, opts)) toFlag.push(fb._id);
     }
