@@ -1682,6 +1682,22 @@ class TabManager {
     return esito;
   }
 
+  // Ferma ogni lettore che suona nella scheda, anche dentro un riquadro: quanti ne ha fermati.
+  async pausaAudio(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    let wc = null;
+    try { wc = tab && tab.view.webContents; } catch (_) {}
+    if (!wc || wc.isDestroyed()) return 0;
+    let riquadri = [];
+    try { riquadri = wc.mainFrame ? wc.mainFrame.framesInSubtree : []; } catch (_) {}
+    let n = 0;
+    for (const f of riquadri) {
+      if (!riquadroArrivato(f)) continue;
+      try { n += Number(await f.executeJavaScript(PREMI_PAUSA_JS, false)) || 0; } catch (_) {}
+    }
+    return n;
+  }
+
   // #884 — riaperta una scheda chiusa, la sua pagina c'è ancora? 'ok', 'sparita' (404, 410, server in errore, rete)
   // o 'attesa' se dopo `tetto` non si sa ancora.
   esitoRiapertura(id, { tetto = 15_000 } = {}) {
