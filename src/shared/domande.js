@@ -490,7 +490,7 @@
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
-    DEL_COMPITO, vietataAlCompito,
+    DEL_COMPITO, vietataAlCompito, mittenteRisposta,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
