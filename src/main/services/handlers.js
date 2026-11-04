@@ -6730,6 +6730,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const pagineVive = () => pagineLette.filter((p) => p.x.res.output.tenuti !== 0)
     .sort((a, b) => b.round - a.round || a.ordine - b.ordine);
   const caratteriStrumenti = () => { try { return tools ? JSON.stringify(tools).length : 0; } catch (_) { return 0; } };
+  // Il peso della richiesta di adesso, messaggi e strumenti: la sola misura di soglia, riletture e finestra.
+  const caratteriRichiesta = async () => globalThis.SN_FILO_CONTESTO.caratteriDi(await buildMessages(ACTIONS.FILO_CHAT, { ...payloadBase, threadMessages })) + caratteriStrumenti();
   // `tutte`: i caratteri delle pagine ancora davanti al modello; `altre`: quanto si libera togliendo tutte meno l'ultima
   // chiesta, che ha il posto anche a costo di stringere la conversazione (rileggere una pagina tolta deve riuscire).
   const misuraPagine = () => {
