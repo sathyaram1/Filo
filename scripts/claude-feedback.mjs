@@ -801,6 +801,9 @@ export async function main(argvIn) {
         : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
   if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
+  if (delPacchetto.ereditate.length) {
+    console.log(`Attese prese dalle unite: ${delPacchetto.ereditate.map((e) => `${globalThis.SN_FB_ATTESE.testoAttese([e])} (da ${e.da.map((n) => `#${n}`).join(', ')})`).join(', ')}.`);
+  }
   // Alla nascita le unite si archiviano, e chi le aspettava aspetta il pacchetto. Un passo che non riesce non è
   // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera, nell'ordine in cui va lanciata.
   let incompleto = false;
