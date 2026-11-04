@@ -62,6 +62,7 @@
         { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
         { testo: 'Nella home gli avvisi in basso a destra non coprono più il tasto Invia: finché ci sono, il campo si stringe e li lascia passare.', segnalazione: 1551 },
         { testo: 'Il correttore non manda più al modello le password che scrivi in chat a chi te le chiede, né quelle scritte accanto al nome utente o dopo il nome del wifi.', segnalazione: 1446 },
+        { testo: 'Nello screenshot che alleghi a un feedback i campi password e di carta escono coperti, come nelle immagini che vanno all\'assistente. Se uno non si riesce a coprire, la pagina resta fuori e il riquadro del feedback te lo dice.', segnalazione: 2116 },
       ],
     },
     {
