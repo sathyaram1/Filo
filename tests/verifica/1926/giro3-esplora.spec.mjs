@@ -41,6 +41,10 @@ test('esplora Automazioni al buio', async ({ openTab }) => {
   await page.locator('#mgAccessi').screenshot({ path: join(SHOTS, 'g3-accessi-scuro.png') });
   await page.emulateMedia({ colorScheme: 'light' });
   await page.locator('#mgAccessi').screenshot({ path: join(SHOTS, 'g3-accessi-chiaro.png') });
+  await page.locator('#mgChiaveCopia').click();
+  await page.waitForTimeout(300);
+  console.log('msg copia:', await page.locator('#mgChiaveMsg').innerText());
+  console.log('appunti:', await page.evaluate(() => navigator.clipboard.readText().catch((e) => 'ERR ' + e.message)));
   // Doppio clic veloce su Crea con lo stesso nome: quante nascono?
   await page.locator('#mgChiaveFatto').click();
   await page.locator('#mgChiaveNome').fill('doppia');
