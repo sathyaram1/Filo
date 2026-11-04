@@ -898,7 +898,9 @@
     // === Account "Accedi con Google" (vedi src/main/auth/) ===
     // Login/logout/stato. Tutto vive nel main process: i token non sono mai
     // esposti alle pagine. La risposta porta solo il profilo pubblico.
-    AUTH_SIGNIN: 'auth_signin',                    // → { ok, profile, isAdmin, remembered }; a un sito solo { ok, signedIn, isAdmin } | { ok: false, code, error: frase per l'utente }
+    AUTH_SIGNIN: 'auth_signin',                    // solo da Filo → { ok, profile, isAdmin, remembered } | { ok: false, code, error: frase per l'utente }
+    // Il pannello del red-team sopra un sito (#1132): passa solo a un clic vero dell'utente. A un sito { ok, signedIn, isAdmin }.
+    AUTH_SIGNIN_CLIC: 'auth_signin_clic',
     AUTH_SIGNOUT: 'auth_signout',                  // → { ok }
     AUTH_STATUS: 'auth_status',                    // { senzaRete? } → { ok, signedIn, isAdmin, profile|null, uid (non con senzaRete), remembered, googleNelleSchede }; a un sito solo { ok, signedIn, isAdmin }
     AUTH_COLLEGA_GOOGLE: 'auth_collega_google',    // solo da Filo: apre l'accesso web a Google in una scheda (#1123) → { ok } | { ok: false, error }
