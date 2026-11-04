@@ -430,6 +430,7 @@ export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
     const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
     if (Number.isInteger(d.provvisoria)) segni.push(`provvisoria: opzione ${d.provvisoria + 1}`);
     righe.push(`  ${visibile(d.id || '?')} ${visibile(d.titolo || '(senza titolo)')}  [${segni.join(' · ')}]`);
+    if (d.contesto) righe.push(rientro(`Contesto: ${d.contesto}`, '    '));
     if (d.problema) righe.push(rientro(`Problema: ${d.problema}`, '    '));
     (Array.isArray(d.opzioni) ? d.opzioni : []).forEach((o, i) => {
       const consigliata = d.consiglio && d.consiglio.opzione === i ? '  [consigliata]' : '';
