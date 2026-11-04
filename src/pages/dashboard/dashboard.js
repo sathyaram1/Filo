@@ -1343,7 +1343,8 @@
   // Quello che parte col messaggio, preso dalla barra che si svuota. `scritto`, `file` e `percorsi` servono a
   // rimetterlo nella barra com'era (un seguito che non parte, #1296).
   function prendiComposizione(text) {
-    const scritto = inputEl.value;
+    // Un messaggio che non viene dalla casella (una scelta cliccata, l'avviso di un sito) è scritto lo stesso.
+    const scritto = inputEl.value.trim() ? inputEl.value : String(text || '');
     const incollato = testoDaFuori;
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
