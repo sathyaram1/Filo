@@ -1031,23 +1031,30 @@
     });
   }
 
-  // La foto resta com'è per l'utente; `campi` sono i campi segreti da coprire nella copia che va a un modello (#810.7),
-  // null se non si sono potuti trovare tutti: quella copia allora non parte.
+  // La foto resta com'è per l'utente; `perModello` è la copia dello stesso scatto coperta dal main (#1721), null se non
+  // si è potuta coprire: allora al modello non parte niente.
   async function captureVisibleTab() {
     await attendiCompositor();
-    const prima = Extract.campiSegretiInVista();
-    const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true, campiNellaPagina: prima.length });
-    if (r?.ok) return { ...r, campi: prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista()) };
-    if (r?.code !== 'segreti') return r;
-    const pura = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-    return pura?.ok ? { ...pura, campi: null } : pura;
+    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, copiaPerModello: true });
   }
 
-  // Il nome del file lo sceglie un modello guardando la foto: gli arriva coi campi segreti coperti, o non gli arriva.
-  async function descrizioneCoperta(dataUrl, campi, ritaglio = null) {
-    if (!Array.isArray(campi)) return null;
-    const perModello = campi.length ? await Extract.fotoCoperta(dataUrl, campi, { ritaglio }) : dataUrl;
-    return requestImageDescription(perModello, dataUrl);
+  // Il pezzo `ritaglio` (pixel CSS della finestra) della copia coperta.
+  async function ritagliaCopia(dataUrl, ritaglio) {
+    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
+    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([byte]));
+    const sx = img.width / window.innerWidth, sy = img.height / window.innerHeight;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(ritaglio.w * sx));
+    canvas.height = Math.max(1, Math.round(ritaglio.h * sy));
+    canvas.getContext('2d').drawImage(img, ritaglio.x * sx, ritaglio.y * sy, canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+    return canvas.toDataURL('image/png');
+  }
+
+  // Il nome del file lo sceglie un modello guardando la foto: gli arriva la copia coperta, o non gli arriva.
+  async function descrizioneCoperta(dataUrl, perModello, ritaglio = null) {
+    if (typeof perModello !== 'string' || !perModello) return null;
+    return requestImageDescription(ritaglio ? await ritagliaCopia(perModello, ritaglio) : perModello, dataUrl);
   }
 
   function buildSavePayload() {
