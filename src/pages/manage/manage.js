@@ -3108,8 +3108,21 @@
   const FIDUCIA_SEGNA_BLOCCO = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA_BLOCCO) || 'fiducia_segna_blocco';
   let fidatiConferma = null;
   let fidatiInCorso = false;
+  // La regola del tasto della singola scheda (fiduciaCheck): una chiusa non si segna, e una segnalata come attacco o
+  // spam si segna solo dopo averla guardata, quindi resta fuori dal blocco.
   function nonFidatiInLista() {
-    return (currentList || []).filter((fb) => fb && fb._id && !MR.isFidato(fb));
+    return (currentList || []).filter((fb) => {
+      if (!fb || !fb._id) return false;
+      const c = MR.fiduciaCheck(fb);
+      return c.ok && !c.segnalato;
+    });
+  }
+  function fuoriDalBlocco() {
+    const s = (currentList || []).filter((fb) => fb && fb._id && MR.fiduciaCheck(fb).segnalato).length;
+    if (!s) return '';
+    return s === 1
+      ? '1 segnalato come attacco, spam o file sospetto resta fuori: guardalo e segnalo dalla sua scheda.'
+      : `${s} segnalati come attacco, spam o file sospetto restano fuori: guardali e segnali dalla loro scheda.`;
   }
   function updateFidatiBar() {
     if (!mgFidatiBar || !mgFidatiBtn) return;
