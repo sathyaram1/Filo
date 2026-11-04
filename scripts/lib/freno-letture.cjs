@@ -84,11 +84,13 @@ function letturaSenzaCampi(input, init = {}) {
   const { url, segmenti, azione, metodo } = r;
 
   if (!azione && metodo === 'GET') {
-    // Un numero pari di segmenti nomina un documento: una lettura sola.
-    if (segmenti.length % 2 === 0) return null;
-    const collezione = segmenti[segmenti.length - 1];
+    if (!segmenti.length) return null;
     const q = url.searchParams;
     if (q.getAll('mask.fieldPaths').some(nonVuoto)) return null;
+    // Un numero pari di segmenti nomina un documento: uno solo, ma intero, e conta nel giro come uno della lettura a
+    // gruppi; presi i nomi, leggerli uno per uno è la stessa scansione.
+    if (segmenti.length % 2 === 0) return { mirata: { [segmenti[segmenti.length - 2]]: 1 }, nomi: [segmenti.join('/')] };
+    const collezione = segmenti[segmenti.length - 1];
     const pagina = numeroDi(q.get('pageSize'));
     if (!q.get('pageToken') && pagina > 0 && pagina <= DOCUMENTI_SENZA_CAMPI_MAX) return { mirata: { [collezione]: pagina } };
     return { motivo: `Scansione della collezione «${collezione}» (lista REST) senza mask.fieldPaths` };
