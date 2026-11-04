@@ -150,6 +150,85 @@ test('#810.16: l’anteprima coi gruppi di cifre sparsi sulla larghezza della ca
   expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nell’anteprima').toBeLessThan(20);
 });
 
+// L'anteprima può stare in un componente aperto o in un riquadro dello stesso sito: la ricerca entra anche lì.
+const ANTEPRIMA = `<span id="a" style="display:inline-block;padding:6px 10px;background:${tinta(ROSA)};color:#fff;font:20px monospace">#### #### #### ####</span>`;
+
+test('#810.16: l’anteprima della carta dentro un componente aperto non si legge nella foto per l’Aiuto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body>
+    <div id="ospite"></div>
+    <form><label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" style="width:280px;font-size:18px"></form>
+    <script>const sr = document.getElementById('ospite').attachShadow({ mode: 'open' });
+    sr.innerHTML = '${ANTEPRIMA}';
+    document.getElementById('c').addEventListener('input', (e) => { sr.getElementById('a').textContent = e.target.value; });</script></body></html>`);
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  const { immagine } = await chiediAllAiuto(app, shell, page);
+  expect(immagine, 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\/jpeg/);
+  expect(await pixelDelColore(app, immagine, ROSA), 'l’anteprima col numero si vede nella foto').toBeLessThan(20);
+});
+
+test('#810.16: l’anteprima della carta in un riquadro dello stesso sito non si legge nella foto per l’Aiuto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const riquadro = testServer.html(`<!doctype html><body style="margin:0">${ANTEPRIMA}</body>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body>
+    <iframe id="carta" src="${riquadro}" style="width:320px;height:60px;border:0"></iframe>
+    <form><label for="c">Numero della carta</label> <input id="c" autocomplete="cc-number" style="width:280px;font-size:18px"></form>
+    <script>document.getElementById('c').addEventListener('input', (e) => {
+      document.getElementById('carta').contentDocument.getElementById('a').textContent = e.target.value;
+    });</script></body></html>`);
+  await expect(page.frameLocator('#carta').locator('#a')).toBeAttached({ timeout: 10_000 });
+  await superaAvvisoSeCe(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await expect(page.frameLocator('#carta').locator('#a')).toHaveText('4111 1111 1111 1111');
+  const { immagine } = await chiediAllAiuto(app, shell, page);
+  expect(immagine, 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\/jpeg/);
+  expect(await pixelDelColore(app, immagine, ROSA), 'l’anteprima col numero si vede nella foto').toBeLessThan(20);
+});
+
+// Un riquadro dello stesso sito che la pagina disegna più grande (transform): le coperture di dentro vanno in scala.
+test('#1537: un riquadro di un altro sito dentro un riquadro dello stesso sito ingrandito arriva coperto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo 1.234</body>`, { pubblico: true });
+  const stesso = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(VERDE)}"><iframe id="x" src="${altro}" style="width:100px;height:60px;border:0;display:block;margin:10px"></iframe></body>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0">
+    <h1>Il tuo conto</h1>
+    <iframe id="stesso" src="${stesso}" style="width:150px;height:100px;border:0;transform:scale(2.5);transform-origin:0 0"></iframe></body></html>`);
+  await expect(page.frameLocator('#stesso').frameLocator('#x').locator('body')).toContainText('Saldo', { timeout: 10_000 });
+  const { immagine } = await chiediAllAiuto(app, shell, page);
+  expect(immagine, 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\/jpeg/);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il riquadro dell’altro sito si vede nella foto').toBeLessThan(20);
+  expect(await pixelDelColore(app, immagine, VERDE), 'il riquadro dello stesso sito resta').toBeGreaterThan(20_000);
+});
+
+test('#810.16: il numero della carta in un riquadro dello stesso sito ingrandito arriva coperto', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const modulo = testServer.html(`<!doctype html><body style="margin:0"><form><input id="c" name="q" style="width:150px;font:bold 16px monospace;color:${tinta(ROSA)};background:#fff;border:0;outline:0;caret-color:transparent"></form></body>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body style="margin:0">
+    <h1>Pagamento</h1>
+    <iframe id="modulo" src="${modulo}" style="width:160px;height:40px;border:0;transform:scale(2.5);transform-origin:0 0"></iframe></body></html>`);
+  await superaAvvisoSeCe(app);
+  const campo = page.frameLocator('#modulo').locator('#c');
+  await campo.fill('4111 1111 1111 1111');
+  await campo.blur();
+  const { immagine } = await chiediAllAiuto(app, shell, page);
+  expect(immagine, 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\/jpeg/);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il numero della carta si legge nella foto').toBeLessThan(20);
+});
+
+// Ruotato, la scala non basta: il riquadro dello stesso sito si copre intero.
+test('#1537: un riquadro dello stesso sito ruotato, con dentro uno di un altro sito, arriva coperto intero', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const altro = testServer.html(`<!doctype html><body style="margin:0;background:${tinta(ROSA)}">Saldo</body>`, { pubblico: true });
+  const stesso = testServer.html(`<!doctype html><body style="margin:0"><iframe id="x" src="${altro}" style="width:150px;height:100px;border:0;display:block"></iframe></body>`);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Conto</title></head><body style="margin:0;padding:80px">
+    <iframe id="stesso" src="${stesso}" style="width:150px;height:100px;border:0;transform:rotate(30deg) scale(2)"></iframe></body></html>`);
+  await expect(page.frameLocator('#stesso').frameLocator('#x').locator('body')).toContainText('Saldo', { timeout: 10_000 });
+  const { immagine } = await chiediAllAiuto(app, shell, page);
+  expect(immagine, 'al modello deve arrivare la foto della pagina').toMatch(/^data:image\/jpeg/);
+  expect(await pixelDelColore(app, immagine, ROSA), 'il riquadro dell’altro sito si vede nella foto').toBeLessThan(20);
+});
+
 // La chat della seconda finestra: un giro chiede di guardare la prima, il secondo risponde. Il modello che legge
 // l'immagine tiene da parte quello che vede.
 async function chatCheGuarda(app, finestra) {
