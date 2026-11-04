@@ -206,7 +206,7 @@
       const G = global.SN_GUARDIANO_STATICO;
       if (!G || typeof G.oscuraSegreti !== 'function') return messages;
       const lista = await custoditi();
-      const fuori = G.oscuraSegreti(messages, lista.map((x) => x.valore));
+      const fuori = G.oscuraSegreti(messages, lista);
       if (fuori !== messages) contaTolti(action, lista, (valori) => G.oscuraSegreti(messages, valori) !== messages);
       return fuori;
     }
