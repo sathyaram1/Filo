@@ -7,6 +7,7 @@
 //      cambiato fiducia, e se la pratica è diventata fidata il tasto lo dice subito.
 //   3. Su una radice timbrata un clic toglie il timbro (si può togliere ciò che si mette); `ignota` non si clicca.
 //   4. Un server che non sa dire le radici non rompe niente: il cartellino non c'è, il tasto resta.
+//   5. Una radice dichiarata da una sessione mostra il suo nome (l'indirizzo), mai il segno che sta sul documento.
 
 import { test, expect } from './fixtures/electron.mjs';
 

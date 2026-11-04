@@ -154,8 +154,8 @@ test('--approva-locale e --riconosci non ci sono più: la riga di comando rifiut
 });
 
 // La prova del mittente nasce col documento: dopo non la scrive nessuno strumento (le regole: firestoreRulesSenderProof.test.mjs).
-// La migrazione chiede al server la sua regola fissa sui feedback senza fiducia: non sceglie chi diventa fidato.
-const SOLO_MIGRAZIONE = new Set(['fiducia-migra.mjs']);
+// Le migrazioni chiedono al server la sua regola fissa (fiducia #1148, radici #1918): non scelgono chi diventa fidato.
+const SOLO_MIGRAZIONE = new Map([['fiducia-migra.mjs', 'migra'], ['radici-migra.mjs', 'migraRadici']]);
 // Toglierla sì (#1428): la chiede una nota scritta senza biglietto pulito. Darla resta dell'owner.
 const SOLO_TOGLIE = new Set(['togli-fiducia.mjs']);
 test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la prova del mittente su un feedback esistente', () => {
@@ -175,7 +175,8 @@ test('nessuno strumento delle sessioni scrive il sì come lavoro locale, né la 
     const nome = f.split(/[\\/]/).pop();
     if (SOLO_MIGRAZIONE.has(nome)) {
       assert.doesNotMatch(testo, /['"`](segna|togli)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve chiedere solo la migrazione`);
-      assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['migra'], `${f}: l'unica op è «migra»`);
+      const op = SOLO_MIGRAZIONE.get(nome);
+      assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], [op], `${f}: l'unica op è «${op}»`);
     } else if (SOLO_TOGLIE.has(nome)) {
       assert.doesNotMatch(testo, /['"`](segna|migra)['"`]|fiducia_segna|fieldPaths=fiducia/, `${f} deve poter solo togliere la fiducia`);
       assert.deepEqual([...new Set([...testo.matchAll(/\bop:\s*['"`](\w+)['"`]/g)].map((m) => m[1]))], ['togli'], `${f}: l'unica op è «togli»`);

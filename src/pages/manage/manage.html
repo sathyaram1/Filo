@@ -1474,7 +1474,7 @@
     .mg-radice {
       all: unset; cursor: pointer; font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 999px;
       border: 1px dashed var(--sn-border); color: var(--sn-muted);
-      transition: background var(--sn-dur, 120ms), border-color var(--sn-dur, 120ms), color var(--sn-dur, 120ms);
+      transition: background calc(0.12s * var(--sn-motion, 1)), border-color calc(0.12s * var(--sn-motion, 1)), color calc(0.12s * var(--sn-motion, 1));
     }
     .mg-radice:not(:disabled):hover { border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover); }
     .mg-radice:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 1px; }
