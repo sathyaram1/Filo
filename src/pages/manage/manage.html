@@ -1761,7 +1761,7 @@
     .mg-rc-ambito-esito { margin: 4px 0 0; }
     /* Gli strumenti dell'owner (#1926): parole d'ordine, domanda di fine sessione, ordine, giri. Una riga per voce. */
     .mg-ac[hidden], .mg-gi[hidden] { display: none; }
-    .mg-ac > h2 + .mg-auto-block { margin-top: 0; }
+    .mg-ac { margin-top: 8px; }
     .mg-ac-lista { list-style: none; margin: 0; padding: 0; }
     .mg-ac-riga {
       display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 7px 8px; border-radius: 6px;
@@ -2908,11 +2908,10 @@
               </section>
             </div>
           </div>
-        </div>
 
         <!-- Gli strumenti dell'owner che vivevano solo da terminale (#1926): manageStrumenti.js. Le risposte di fine
            sessione sono testo di sessioni che leggono testo di chiunque: entrano solo come testo. -->
-        <div class="mg-auto-main mg-ac" id="mgAccessi" hidden>
+        <div class="mg-ac" id="mgAccessi" hidden>
           <h2 id="mgChiaviTitolo">Parole d’ordine</h2>
           <section class="mg-auto-block" id="mgChiavi" aria-labelledby="mgChiaviTitolo">
             <ul class="mg-ac-lista" id="mgChiaviLista"></ul>
@@ -2965,6 +2964,7 @@
               <span class="mg-action-msg" id="mgOrdineMsg" role="status"></span>
             </form>
           </section>
+        </div>
         </div>
 
         <!-- Un selettore a catena per ciascuno slot di supporto. La scelta va nel doc Firestore config/supportModels,
