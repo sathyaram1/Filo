@@ -743,6 +743,9 @@ export async function main(argvIn) {
     const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti, pacchettiPerId });
     delPacchetto = atteseDelPacchetto(listaAttese, leggibili);
     if (delPacchetto.motivo) motivi.push(delPacchetto.motivo);
+    motivi.push(...prerequisitiMancanti(testoSpec, {
+      unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, ereditate: delPacchetto.ereditate.map((e) => e.num).filter(Boolean),
+    }));
     if (motivi.length) {
       console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${motivi.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.RIFIUTATO;
