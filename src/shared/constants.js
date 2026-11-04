@@ -1784,6 +1784,8 @@
       const testa = `(Sistema: ${esterno().perCanaleSistema('nei messaggi precedenti di questa chat l’utente ha allegato immagini; qui sotto l’esito delle loro etichette di origine e dei marchi invisibili, letti allora dai byte del file (dall’immagine che vedi non si ricavano), dal messaggio più vecchio')}.)`;
       return [testa, ...lista.map((b, i) => `— Messaggio con immagini n. ${i + 1}:\n${b}`)].join('\n\n');
     },
+    // #1721 — la foto che non si è potuta coprire non parte: il modello sa che manca e perché, e non la chiede di nuovo.
+    fotoMancanteAiuto: (perche) => `(Sistema: in questo turno non c'è lo screenshot della pagina, perché ${perche}. Lavora con l'elenco degli elementi.)`,
     origineImmaginiAiuto: (o) => {
       if (!o || typeof o !== 'object') return '';
       const intero = (v) => Math.max(0, Math.min(10000, Math.floor(Number(v) || 0)));
