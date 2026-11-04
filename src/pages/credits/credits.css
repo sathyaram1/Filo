@@ -145,6 +145,7 @@
 .sn-wallet-link-google:hover:not(:disabled) { background: var(--sn-hover, rgba(0,0,0,.05)); border-color: var(--sn-accent); color: var(--sn-accent); }
 .sn-wallet-link-google:active:not(:disabled) { transform: scale(.97); }
 .sn-wallet-link-google:disabled { opacity: .6; cursor: progress; }
+.sn-wallet-link-google + .sn-wallet-link-google { margin-left: 8px; }
 
 /* I numeri che il server calcola (#652): si guardano, non si toccano. Valore
    grande, nome sotto, nessun bordo che li faccia sembrare campi. */
