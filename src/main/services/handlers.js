@@ -7864,6 +7864,21 @@ async function summarizeTab(title, content) {
 // disponibile), il turno di chat prosegue. Perdere una chat è brutto; perdere
 // la risposta che l'utente sta aspettando perché non si è potuta archiviare lo
 // è di più.
+// Un messaggio dell'utente entra nella conversazione da qui, che parta col turno o resti a scheda chiusa (#1700).
+// Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
+async function archiviaDomanda(chatId, { testo, immagini = [], daModello = false, ref = null }, meta) {
+  const archiviata = await appendToChatArchive(chatId, {
+    role: 'user',
+    text: String(testo || ''),
+    images: immagini.length,
+    ...(daModello ? { daModello: true } : {}),
+    ...(ref ? { rispostaA: ref } : {}),
+  }, meta);
+  const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
+  if (immagini.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, immagini);
+  return { archiviata, domanda };
+}
+
 async function appendToChatArchive(chatId, turn, meta) {
   if (!chatId || !FiloChats) return null;
   // Cancellata per sempre mentre il turno era in corso: la risposta non la fa rinascere con la stessa targa.
