@@ -474,29 +474,38 @@
   let accessoGoogle = false;
   let collegaInCorso = false;
   let esitoCollega = null;
+  // Un accesso che aspetta un browser chiuso non spegne il pulsante (#678.6): si torna alla pagina o si lascia stare,
+  // e l'esito di uno lasciato stare non parla più.
+  let collegaN = 0;
 
   function renderCollega() {
     const btn = $('linkGoogleBtn');
     const note = $('invitesLockedNote');
     btn.hidden = false;
-    btn.disabled = collegaInCorso;
+    btn.disabled = false;
     btn.textContent = collegaInCorso
-      ? 'Continua nella scheda di Google…'
+      ? 'Torna all’accesso'
       : (accessoGoogle ? 'Riprova a collegare Google' : 'Collega Google per dare i tuoi inviti');
-    const frase = esitoCollega || (accessoGoogle && !collegaInCorso
-      ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer. Gli inviti si danno da quella.'
-      : '');
+    $('linkGoogleLascia').hidden = !collegaInCorso;
+    const frase = collegaInCorso
+      ? 'Completa l’accesso nella pagina di Google che si è aperta.'
+      : (esitoCollega || (accessoGoogle
+        ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer. Gli inviti si danno da quella.'
+        : ''));
     note.textContent = frase;
     note.hidden = !frase;
   }
 
   async function collegaGoogle() {
-    if (collegaInCorso) return;
+    // Il main tiene un accesso solo: chiederlo di nuovo ne riporta davanti la pagina, e l'esito arriva alla prima richiesta.
+    if (collegaInCorso) { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN })).catch(() => {}); return; }
+    const n = ++collegaN;
     collegaInCorso = true;
     esitoCollega = null;
     renderCollega();
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) { r = null; }
+    if (n !== collegaN) return;
     collegaInCorso = false;
     if (!r || !r.ok) esitoCollega = (r && r.error) || 'L’accesso a Google non è riuscito: riprova.';
     else accessoGoogle = true;
@@ -509,6 +518,7 @@
   // di nuovo non cambierebbe niente.
   function renderGiaUsato() {
     $('linkGoogleBtn').hidden = true;
+    $('linkGoogleLascia').hidden = true;
     const note = $('invitesLockedNote');
     note.textContent = 'Il tuo account Google ha già dato i suoi inviti da un’altra copia di Filo: si danno da quella.';
     note.hidden = false;
@@ -841,6 +851,12 @@
   });
 
   $('linkGoogleBtn').addEventListener('click', () => { collegaGoogle().catch(() => {}); });
+  $('linkGoogleLascia').addEventListener('click', () => {
+    collegaN++;
+    collegaInCorso = false;
+    esitoCollega = null;
+    renderCollega();
+  });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa) e quando cambia l'accesso a
   // Google da un'altra porta (menu dell'account): collegarsi è ciò che sblocca gli inviti.

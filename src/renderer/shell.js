@@ -343,6 +343,8 @@
   // I token vivono nel main: qui arriva solo il profilo pubblico.
   let authProfile = null;
   let authBusy = false;
+  // «Lascia stare» chiude l'attesa qui: l'esito dell'accesso lasciato, se arriva, non parla più (#678.6).
+  let accessoN = 0;
   // Gate UX delle voci dell'owner nel menu App. La garanzia forte resta nel main
   // e nelle regole Firestore: qui decidiamo solo se mostrare la voce.
   let isAdmin = false;
@@ -413,16 +415,22 @@
   async function doSignIn() {
     // Con un accesso già aperto (lo chiede anche la chat, #1615) il main ne riporta davanti la pagina: l'esito resta al primo.
     if (authBusy) { Promise.resolve(api.auth.signIn()).catch(() => {}); return; }
+    const n = ++accessoN;
     authBusy = true; renderAccount();
-    try {
-      const r = await api.auth.signIn();
-      if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
-      else avvisoErrore((r && r.error) || 'Accesso non riuscito: riprova.', 'accesso_non_riuscito');
-    } catch (_) {
-      avvisoErrore('Accesso non riuscito: riprova.', 'accesso_non_riuscito');
-    } finally {
-      authBusy = false; renderAccount();
-    }
+    let r = null;
+    try { r = await api.auth.signIn(); } catch (_) { r = null; }
+    if (n !== accessoN) return;
+    authBusy = false;
+    if (r && r.ok) { authProfile = r.profile; isAdmin = !!r.isAdmin; authRemembered = r.remembered !== false; }
+    else avvisoErrore((r && r.error) || 'Accesso non riuscito: riprova.', 'accesso_non_riuscito');
+    renderAccount();
+  }
+
+  function lasciaStareAccesso() {
+    if (!authBusy) return;
+    accessoN++;
+    authBusy = false;
+    renderAccount();
   }
 
   // YouTube, Gmail e Drive nelle schede: l'accesso a Google si apre in una scheda, con l'email già scritta.
@@ -446,7 +454,18 @@
     // in entrambi gli stati. Da loggato mostra email + incognito + Esci; da
     // sloggato mostra "Accedi con Google" + incognito.
     accountBtn.addEventListener('click', async () => {
-      if (authBusy) return;
+      // Un accesso che aspetta il browser non spegne il menu (#678.6): lo dice, e si riapre o si lascia stare.
+      if (authBusy) {
+        showNativeMenu(accountBtn, [
+          { label: 'Completa l\'accesso nella pagina di Google', disabled: true },
+          { label: 'Torna all\'accesso', icon: 'user', action: 'auth-signin' },
+          { label: 'Lascia stare', icon: 'close', action: 'auth-lascia' },
+          { type: 'separator' },
+          { label: 'Crediti', icon: 'credits', url: 'filo://credits/credits.html' },
+          { label: 'Nuova finestra incognito', icon: 'incognito', action: 'open-incognito' },
+        ]);
+        return;
+      }
       // L'ancora la toglie chi aziona il bottone appena il clic torna: dopo l'attesa il menu finiva nell'angolo.
       const ancora = ancoraMenu;
       // Google nelle schede cambia senza avvisi (un accesso o un'uscita fatti in una scheda): si chiede adesso.
@@ -476,6 +495,7 @@
       api.onMenuAction((action) => {
         if (action === 'auth-signout') doSignOut();
         else if (action === 'auth-signin') doSignIn();
+        else if (action === 'auth-lascia') lasciaStareAccesso();
         else if (action === 'collega-google') collegaGoogle();
       });
     }
