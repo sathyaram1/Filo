@@ -160,3 +160,114 @@ test('doppio clic rapido sul bottone ridato', async ({ app }) => {
     console.log('MESSAGGI', JSON.stringify(c2.messages.map((m) => [m.role, m.text, (m.esiti || []).map((v) => `${v.esito}|${v.riga}`)])));
   } finally { await ripristina(app); togliCartella(dir); }
 });
+
+test('due home: conversazione cancellata, B scrive', async ({ app, shell, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Ciao a te.' }, { text: 'Di niente.' }]);
+  await chiedi(page, 'ciao filo');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ciao a te' })).toBeVisible({ timeout: 10_000 });
+  const id = (await chatCon(app, 'ciao filo')).id;
+  const b = await openTab('filo://newtab/');
+  await expect(b.locator('.dash-bubble-user', { hasText: 'ciao filo' })).toBeVisible({ timeout: 10_000 });
+  await app.evaluate((_e, c) => globalThis.SN_FILO_CHATS.remove(c), id);
+  await b.waitForTimeout(1500);
+  console.log('B dopo cancellazione', await b.locator('.dash-bubble-user, .dash-bubble-filo').allTextContents());
+  await chiedi(b, 'grazie');
+  await expect(b.locator('.dash-bubble-filo', { hasText: 'Di niente.' })).toBeVisible({ timeout: 10_000 });
+  for (const c of await chatsDellaHome(app)) console.log('CHAT', c.id === id ? 'CANCELLATA' : 'altra', JSON.stringify(c.messages.map((m) => [m.role, m.text])));
+  const ch = await chiamateAlModello(app);
+  console.log('ULTIMA', JSON.stringify(ch[ch.length - 1].map((m) => [m.role, String(m.content).slice(-80)])));
+  await ripristina(app);
+});
+
+test('comando lento confermato, poi /clear e un messaggio nuovo', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaTemporanea('g8-');
+  const f = join(dir, 'conta.txt');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    const lento = { id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: `sleep 4 && echo x >> "${f}"`, spiegazione: 'Accodo piano' }) };
+    await modelloFinto(app, [{ text: 'Accodo.', toolCalls: [lento] }, { text: 'Aspetto.' }, { text: 'RISPOSTA A1', ritardoMs: 100 }, { text: 'RISPOSTA B' }, { text: 'RISPOSTA C' }]);
+    await chiedi(page, 'accoda piano');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const nata = (await chatCon(app, 'accoda piano')).id;
+    await okAlBottone(page, page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Accodo piano' }));
+    await page.waitForTimeout(500);
+    await chiedi(page, '/clear');
+    await page.waitForTimeout(300);
+    await chiedi(page, 'nuovo argomento');
+    await expect.poll(() => righe(f), { timeout: 15_000 }).toBe(1);
+    await page.waitForTimeout(3000);
+    console.log('BOLLE', await page.locator('.dash-bubble-user, .dash-bubble-filo').allTextContents());
+    for (const c of await chatsDellaHome(app)) console.log('CHAT', c.id === nata ? 'NATA' : 'altra', JSON.stringify(c.messages.map((m) => [m.role, m.text, (m.esiti || []).map((v) => v.esito)])));
+    const ch = await chiamateAlModello(app);
+    console.log('N CHIAMATE', ch.length);
+    console.log('ULTIMA', JSON.stringify(ch[ch.length - 1].map((m) => [m.role, String(m.content).slice(-160)])));
+  } finally { await ripristina(app); togliCartella(dir); }
+});
+
+for (const [nome, call] of [
+  ['memoria', { id: 'm1', name: 'CANCELLA_MEMORIA', arguments: '{}' }],
+  ['pagine', { id: 'p1', name: 'CANCELLA_PAGINE', arguments: '{"periodo":"tutto"}' }],
+  ['pref', { id: 'q1', name: 'IMPOSTA_PREFERENZA', arguments: '{"chiave":"modalita_terminale","valore":true}' }],
+]) {
+  test(`pendente mai toccato: ${nome}`, async ({ app }) => {
+    test.setTimeout(60_000);
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: false } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: '', toolCalls: [call] }, { text: 'Aspetto.' }, { text: 'ok' }]);
+    await chiedi(page, `fai ${nome}`);
+    await page.waitForTimeout(2500);
+    const popup = await page.locator(CONFIRM_HOST).count();
+    console.log(nome, 'POPUP', popup, 'BOTTONI', await page.locator('.dash-bubble-filo .dash-action-btn').allTextContents(), 'RIGHE', await page.locator('.dash-activity-row').allTextContents());
+    const c = await chatCon(app, `fai ${nome}`);
+    await app.evaluate((_e, id) => globalThis.SN_CONTESTO_FILO.dimentica(id), c.id);
+    await app.evaluate((_e, id) => globalThis.SN_CLOSE_FILO_CHAT(id), c.id);
+    await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}`);
+    await page.waitForTimeout(2000);
+    console.log(nome, 'RIAP BOTTONI', await page.locator('.dash-bubble-filo .dash-action-btn').allTextContents(), 'RIAP RIGHE', await page.locator('.dash-activity-row').allTextContents());
+    await chiedi(page, 'allora?');
+    await page.waitForTimeout(2000);
+    const ch = await chiamateAlModello(app);
+    const u = ch[ch.length - 1];
+    console.log(nome, 'MODELLO', JSON.stringify(u.filter((m) => m.role !== 'system').map((m) => String(m.content).slice(0, 300))).slice(0, 1500));
+    await ripristina(app);
+  });
+}
+
+test('due conferme ridate dopo la riapertura', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaTemporanea('g8-');
+  const f = join(dir, 'conta.txt');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [{ text: 'Accodo due volte.', toolCalls: [accoda('c1', f, 'Accodo la prima'), accoda('c2', f, 'Accodo la seconda')] }, { text: 'Aspetto.' }, { text: 'RIPRESO' }, { text: 'RIPRESO2' }]);
+    await chiedi(page, 'accoda due righe');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const c = await chatCon(app, 'accoda due righe');
+    await app.evaluate((_e, id) => globalThis.SN_CONTESTO_FILO.dimentica(id), c.id);
+    await app.evaluate((_e, id) => globalThis.SN_CLOSE_FILO_CHAT(id), c.id);
+    await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}`);
+    const b1 = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Accodo la prima' });
+    const b2 = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Accodo la seconda' });
+    await expect(b1).toBeVisible({ timeout: 8_000 });
+    await expect(b2).toBeVisible({ timeout: 8_000 });
+    const n0 = (await chiamateAlModello(app)).length;
+    await okAlBottone(page, b1);
+    await page.waitForTimeout(2500);
+    console.log('dopo primo OK chiamate +', (await chiamateAlModello(app)).length - n0, await page.locator('.dash-bubble-filo').allTextContents());
+    await okAlBottone(page, b2);
+    await page.waitForTimeout(2500);
+    console.log('dopo secondo OK chiamate +', (await chiamateAlModello(app)).length - n0, 'righe', righe(f));
+    const ch = await chiamateAlModello(app);
+    console.log('ULTIMA', JSON.stringify(ch[ch.length - 1].slice(-2).map((m) => [m.role, String(m.content).slice(-400)])));
+    const c2 = await chatCon(app, 'accoda due righe');
+    console.log('MESSAGGI', JSON.stringify(c2.messages.map((m) => [m.role, m.text, (m.esiti || []).map((v) => v.esito)])));
+  } finally { await ripristina(app); togliCartella(dir); }
+});
