@@ -520,7 +520,7 @@ export async function heartbeat(t, opts = {}) {
 
 /**
  * Fine lavoro. `fault`, se presente, è il GUASTO DICHIARATO: il motivo per cui
- * questo giro non può lavorare, registrato AL CANALE invece che raccontato a
+ * questo lavoro non può andare avanti, registrato AL CANALE invece che raccontato a
  * parole (il testo di ritorno di un worker non lo legge nessuna macchina). Il
  * server lo tronca e non lo interpreta, e ferma quel solo lavoro (SPEC-MANUTENTORE.md §7).
  *
