@@ -410,6 +410,12 @@
     if (partita && Object.hasOwn(FALLITE_DOPO_PARTENZA, type)) return FALLITE_DOPO_PARTENZA[type];
     return Object.hasOwn(FAILED_LABELS, type) ? FAILED_LABELS[type] : '';
   }
+  // `no`: non è partita per un no (della regola di autonomia o dell'utente): «Niente da dimenticare» con le righe lì è
+  // falso. La stessa scelta per il diario in diretta e per la chat riaperta.
+  function etichettaNonFatta(type, { no = false, partita = false } = {}) {
+    if (no) return NO_LABELS[type] || FAILED_LABELS[type] || 'Non fatto';
+    return etichettaFallita(type, partita);
+  }
   // Riordino e svuotamento dell'archivio chiedono col loro pannello: come chiedere lo porta `_domanda` (#530).
   const DOMANDE_PANNELLO = { PULISCI_TAB: 'riordino delle schede', CANCELLA_ARCHIVIO: 'eliminazione dall’archivio' };
   function rigaAttivita(a) {
