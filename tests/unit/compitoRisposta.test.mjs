@@ -49,6 +49,7 @@ test('il ruolo riceve un testo intero, col contratto dei worker e i suoi comandi
   assert.match(t, /domanda\.mjs" chiudi --testo -|domanda\.mjs chiudi --testo -/);
   assert.match(t, /release <biglietto> --role risposta/);
   assert.match(t, /un gesto dell'owner/);
+  assert.match(t, /"tipo":"attendi","feedbackId":"<id>","aspetta":"1959"/, 'il ruolo sa applicare un’attesa chiesta a parole (#1965)');
   assert.doesNotMatch(t, /approvare un lavoro server/, 'il lavoro server non si affida più da una domanda (#1576)');
 });
 
