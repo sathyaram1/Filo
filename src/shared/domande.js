@@ -536,8 +536,13 @@
 
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
+<<<<<<< HEAD
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
     DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
+=======
+    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca,
+    AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
+>>>>>>> 94a6c105ae (auto: src/shared/domande.js)
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);
