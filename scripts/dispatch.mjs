@@ -690,7 +690,7 @@ const ROLE_FILE = {
   // Il manutentore acceso dal pacemaker (SPEC-MANUTENTORE § 4): niente feedback, il contesto piccolo dal server.
   manutentore: 'manutentore.md',
 };
-// Un halt che non è un guasto ha il suo testo: rilasciare con `--guasto` fermerebbe le routine per niente (#1796).
+// Un halt che non è un guasto ha il suo testo: un `--guasto` qualunque fermerebbe il lavoro per niente, fino allo sblocco del manutentore (#1796).
 const HALT_KIND_FILE = {
   strumenti_vecchi: 'halt-strumenti-vecchi.md',
 };
