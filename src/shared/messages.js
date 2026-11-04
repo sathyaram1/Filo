@@ -764,7 +764,7 @@
     // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).
     // Solo pagine `filo://`, solo il proprietario. Callable non ancora pubblicata → errore che lo dice.
     FIDUCIA_SEGNA: 'fiducia_segna', // { feedbackId | radice (#1918), fidato?: false per toglierla } → { ok, fiducia?, cambiati? } | { ok:false, error }
-    FIDUCIA_RADICI: 'fiducia_radici', // { feedbackId } → { ok, fiducia, radici:[{ radice, tipo, valore, timbrata, testoUtente, daLeggere, timbrabile }] } | { ok:false, error }
+    FIDUCIA_RADICI: 'fiducia_radici', // { feedbackId | domandaId } → { ok, fiducia, radici:[{ radice, tipo, valore, timbrata, testoUtente, daLeggere, timbrabile }] } | { ok:false, error }
     // I compiti delle routine (SPEC-DOMANDE.md §6), dalla callable ownerCompiti: quelli delle fasi li scrive solo il
     // server; a mano se ne crea e annulla uno senza feedback. Solo pagine `filo://`, solo il proprietario.
     COMPITI_ELENCO: 'compiti_elenco',   // { storico?:<n>, prima?:<ms> } → { ok, aperti:[…], storico:[…], altri, adesso } | { ok:false, error }

@@ -8,6 +8,8 @@
 //   3. Su una radice timbrata un clic toglie il timbro (si può togliere ciò che si mette); `ignota` non si clicca.
 //   4. Un server che non sa dire le radici non rompe niente: il cartellino non c'è, il tasto resta.
 //   5. Una radice dichiarata da una sessione mostra il suo nome (l'indirizzo), mai il segno che sta sul documento.
+//   6. Le radici stanno in una riga loro, sotto i tasti: tante radici si vedono tutte, senza scorrere di lato.
+//   7. Se il server lascia non fidato un feedback segnato fidato (una radice che nessun timbro toglie), il messaggio lo dice.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -21,8 +23,8 @@ function fb(over = {}) {
   }, over);
 }
 
-async function stubMain(page, { radici = null, dopo = null } = {}) {
-  await page.evaluate(({ radici, dopo }) => {
+async function stubMain(page, { radici = null, dopo = null, fiduciaDopoSegna = 'fidato' } = {}) {
+  await page.evaluate(({ radici, dopo, fiduciaDopoSegna }) => {
     window.__segna = [];
     window.__lette = 0;
     let timbrata = false;
@@ -36,6 +38,10 @@ async function stubMain(page, { radici = null, dopo = null } = {}) {
         const l = timbrata && dopo ? dopo : radici;
         return { ok: true, fiducia: l.every((x) => x.timbrata) ? 'fidato' : 'non_fidato', radici: l };
       }
+      if (t === 'fiducia_segna' && msg.feedbackId) {
+        window.__segna.push(msg);
+        return { ok: true, fiducia: fiduciaDopoSegna };
+      }
       if (t === 'fiducia_segna') {
         window.__segna.push(msg);
         timbrata = msg.fidato !== false;
@@ -44,7 +50,7 @@ async function stubMain(page, { radici = null, dopo = null } = {}) {
       if (t === 'merge_approvals_get') return { ok: true, pending: [], failed: [], recent: [], preapproved: [], ttlMs: 1 };
       return orig(msg);
     };
-  }, { radici, dopo });
+  }, { radici, dopo, fiduciaDopoSegna });
 }
 
 async function apri(page, lista, opts) {
@@ -109,4 +115,23 @@ test('un server che non sa dire le radici: niente cartellino, il tasto resta', a
   await expect(page.locator('#mgFiduciaBtn')).toBeVisible();
   await expect.poll(() => page.evaluate(() => window.__lette)).toBeGreaterThan(0);
   await expect(page.locator('#mgRadici')).toBeHidden();
+});
+
+test('tante radici stanno in una riga loro sotto i tasti: si vedono tutte, senza scorrere di lato', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb()], { radici: [UTENTE, LEGACY, IGNOTA, PAGINA, SESSIONE] });
+  const chips = page.locator('#mgRadici .mg-radice');
+  await expect(chips).toHaveCount(5);
+  for (let i = 0; i < 5; i += 1) await expect(chips.nth(i)).toBeInViewport({ ratio: 1 });
+  await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
+  await page.screenshot({ path: 'tests/.shots/manage-radici-1918-scuro.png' });
+});
+
+test('se il server lo lascia non fidato, «Segna fidato» non dice che lo è', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb()], { radici: [IGNOTA], fiduciaDopoSegna: 'non_fidato' });
+  await page.locator('#mgFiduciaBtn').click();
+  await expect.poll(() => page.evaluate(() => window.__segna)).toEqual([{ type: 'fiducia_segna', feedbackId: 'u-1916' }]);
+  await expect(page.locator('#mgManageMsg')).toContainText('Resta non fidato (#1916)');
+  await expect(page.locator('#mgManageMsg')).not.toContainText('è fidato');
 });

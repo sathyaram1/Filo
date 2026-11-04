@@ -3792,44 +3792,10 @@
   // Accanto a «Segna fidato»: i testi esterni da cui discende la pratica. Il timbro va sulla radice, una volta, e il
   // server ricalcola tutto ciò che la porta. Le dice solo il server (i timbri non li legge un client).
   const radiciLette = new Map();
-  function etichettaRadice(x) {
-    if (x.tipo === 'legacy') return 'nato prima';
-    if (x.tipo === 'ignota') return 'provenienza ignota';
-    if (x.tipo === 'feedback') return `#${x.valore}`;
-    // Quello che una sessione dichiara arriva come segno (#…), col nome a parte: sul cartellino il nome.
-    const valore = x.nome ? String(x.nome).slice(String(x.nome).indexOf(':') + 1) : x.valore;
-    if (x.tipo === 'web') {
-      try { return new URL(valore).hostname || 'pagina web'; } catch (_) { return 'pagina web'; }
-    }
-    if (x.tipo === 'esterno' && /^biglietto /.test(valore)) return 'sessione sporca';
-    return { posta: 'posta', file: 'file esterno', mcp: `strumento ${valore}`, esterno: 'esterno' }[x.tipo] || x.tipo;
-  }
-  function titoloRadice(x) {
-    const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'
-      : x.tipo === 'ignota' ? 'Il server non sa da dove viene: nessun timbro la toglie.'
-        : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.valore}: leggilo prima di timbrarlo.`
-          : x.tipo === 'esterno' && /^biglietto /.test(x.valore) ? `Quello che una sessione ha letto senza dire da dove (${x.valore}): guarda il suo sporco prima di timbrarlo.`
-            : `${x.nome || x.valore}: guardalo prima di timbrarlo.`;
-    if (x.tipo === 'ignota') return cosa;
-    const effetto = x.tipo === 'legacy' ? 'Un clic timbra in blocco tutto ciò che è nato prima' : 'Un clic la timbra per tutto ciò che la porta';
-    return x.timbrata ? `${cosa} Timbrata: un clic toglie il timbro, ovunque.` : `${cosa} ${effetto}.`;
-  }
+  const RAD = window.SN_MANAGE_RADICI;
+  const etichettaRadice = (x) => RAD.etichetta(x);
   function disegnaRadici(fb, lista) {
-    if (!mgRadici) return;
-    mgRadici.textContent = '';
-    for (const x of lista) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'mg-radice';
-      b.dataset.radice = x.radice;
-      b.textContent = `${x.timbrata ? '✓ ' : ''}${etichettaRadice(x)}`;
-      b.title = titoloRadice(x);
-      b.setAttribute('aria-pressed', x.timbrata ? 'true' : 'false');
-      b.disabled = x.timbrabile === false;
-      b.addEventListener('click', () => timbraRadice(fb, x));
-      mgRadici.appendChild(b);
-    }
-    mgRadici.hidden = !lista.length;
+    RAD.disegna(mgRadici, lista, (x) => timbraRadice(fb, x));
   }
   async function reflectRadici(fb) {
     if (!mgRadici) return;
@@ -3893,6 +3859,11 @@
       if (selectedId === id) { if (r.rimessoInCoda) openDetail(id, { ridisegno: true }); else reflectManage(ora); }
       renderList();
       updateTabCounts();
+      // Il server può dire di no anche al sì dell'owner: una radice che nessun timbro toglie la tiene non fidata.
+      if (valore && ora.fiducia !== 'fidato') {
+        setManageMsg(`Resta non fidato${chi}: porta una radice che nessun timbro toglie, la vedi qui sotto.`, 'err');
+        return;
+      }
       setManageMsg(valore
         ? (r.rimessoInCoda ? `Da ora${chi} è fidato, ed è ripartito In coda come lavoro server.` : `Da ora${chi} è fidato.`)
         : `Da ora${chi} non è più fidato: quello che nasce da qui passa dai giudici, e la fusione chiede il tuo sì.`, 'ok');

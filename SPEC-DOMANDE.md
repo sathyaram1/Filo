@@ -123,9 +123,11 @@ lo vede:
   può ingannare; col server giù lo sporco resta annotato accanto al biglietto,
   che intanto vale sporco, e parte alla prossima occasione. Il resto (un
   comando di shell che scarica qualcosa) lo dichiara la sessione
-  (`biglietto.mjs sporca "motivo"`), e gli strumenti che stampano testo
-  esterno lo fanno da soli, con le radici che il server consegna insieme al
-  testo. È un limite accettato: in locale c'è l'owner.
+  (`biglietto.mjs sporca "motivo"`), e prende una radice del solo biglietto.
+  Gli strumenti che stampano feedback, domande o compiti dicono al server
+  **cosa** hanno letto, mai le radici: il server le legge sui documenti (il
+  testo, e la conversazione se l'ha scritta un biglietto sporco), e con tutto
+  fidato non sporca. È un limite accettato: in locale c'è l'owner.
 
 Le sessioni locali prendono il biglietto all'avvio (hook), come le routine.
 Alla fine (hook) chiudono il biglietto se è sporco; uno pulito resta, perché la

@@ -1606,11 +1606,12 @@ module.exports = function register(on, ctx) {
     return Object.assign({ ok: true, fiducia }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
   }));
 
-  // Le radici di un feedback per il cartellino accanto a «Segna fidato» (#1918): le legge solo il server.
+  // Le radici di un feedback o di una domanda per il cartellino della fiducia (#1918): le legge solo il server.
   on(MSG.FIDUCIA_RADICI, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
-    if (!feedbackId) return { ok: false, error: 'Manca il feedback.' };
-    const { r, error } = await chiamaFiducia({ op: 'radici', feedbackId });
+    const domandaId = String(msg?.domandaId || '').trim();
+    if (!feedbackId && !domandaId) return { ok: false, error: 'Manca il feedback o la domanda.' };
+    const { r, error } = await chiamaFiducia(Object.assign({ op: 'radici' }, domandaId ? { domandaId } : { feedbackId }));
     if (error) return { ok: false, error };
     if (!r || r.ok === false) {
       if (r && r.reason === 'op_sconosciuta') return { ok: false, error: 'Il server non sa ancora dire le radici: arriva col prossimo aggiornamento del server.' };

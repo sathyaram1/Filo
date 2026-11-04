@@ -14,6 +14,8 @@
     archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
     riapri: MSG.DOMANDA_RIAPRI || 'domanda_riapri',
     fiducia: MSG.DOMANDA_FIDUCIA || 'domanda_fiducia',
+    radici: MSG.FIDUCIA_RADICI || 'fiducia_radici',
+    timbro: MSG.FIDUCIA_SEGNA || 'fiducia_segna',
   };
   const MR = window.SN_MANAGE_REVIEW;
   const D = window.SN_DOMANDE;
@@ -502,6 +504,7 @@
     const f = el('span', `mg-dq-fiducia${fidata ? '' : ' mg-dq-fiducia--no'}`, fidata ? 'Fidata' : 'Non fidata');
     f.title = !fidata ? TITOLO_NON_FIDATA : d.fidataDallOwner ? segnataDaTe(d) : TITOLO_FIDATA;
     meta.appendChild(f);
+    if (!fidata) meta.appendChild(cartellinoRadici(d));
     const nata = quando(d.creataIl, true);
     if (nata) meta.appendChild(el('span', 'mg-dq-data', `chiesta ${nata}`));
     if (Number(d.modificataIl) > Number(d.creataIl || 0) + 60000) meta.appendChild(el('span', 'mg-dq-data', `aggiornata ${quando(d.modificataIl, true)}`));
@@ -1047,6 +1050,49 @@
     disegnaConferma();
     carica();
     cambia();
+  }
+
+  // ── Le radici di una domanda non fidata (#1918, SPEC-DOMANDE.md §1.8) ─────
+  // Accanto a «Non fidata»: i testi esterni da cui viene. Un clic timbra la radice, e il server ricalcola tutto ciò che
+  // la porta; le dice e le timbra solo il server. I chip sono gli stessi dei feedback (manageRadici.js).
+  const radiciLette = new Map();
+  const radiciInVolo = new Set();
+  const firmaRadici = (d) => `${idDi(d)}|${d.fiducia}|${Number(d.modificataIl) || 0}`;
+
+  function cartellinoRadici(d) {
+    const box = el('span', 'mg-radici mg-dq-radici');
+    box.hidden = true;
+    const RAD = window.SN_MANAGE_RADICI;
+    if (!RAD || finte) return box;
+    const gia = radiciLette.get(idDi(d));
+    if (gia && gia.firma === firmaRadici(d)) RAD.disegna(box, gia.lista, (x) => timbraRadice(d, x));
+    else chiediRadici(d);
+    return box;
+  }
+
+  async function chiediRadici(d) {
+    const firma = firmaRadici(d);
+    if (radiciInVolo.has(firma)) return;
+    radiciInVolo.add(firma);
+    const r = await chiedi({ type: T.radici, domandaId: idDi(d) });
+    radiciInVolo.delete(firma);
+    // Un server di prima non le sa dire: il cartellino resta vuoto, e non si richiede a ogni disegno.
+    radiciLette.set(idDi(d), { firma, lista: r && r.ok && Array.isArray(r.radici) ? r.radici : [] });
+    if (r && r.ok && Array.isArray(r.radici) && r.radici.length) { firmaDettaglio = ''; disegnaDettaglio(); }
+  }
+
+  async function timbraRadice(d, x) {
+    if (!x || x.timbrabile === false) return;
+    const id = idDi(d);
+    const togli = x.timbrata === true;
+    const nome = window.SN_MANAGE_RADICI.etichetta(x);
+    const r = await manda(id, Object.assign({ type: T.timbro, radice: x.radice }, togli ? { fidato: false } : {}),
+      togli ? `Tolgo il timbro a «${nome}»…` : `Timbro «${nome}»…`);
+    if (!r) return;
+    // Il ricalcolo tocca altre domande e altri feedback: le radici lette prima non valgono più.
+    radiciLette.clear();
+    const n = Object.values((r && r.cambiati) || {}).reduce((a, v) => a + (Number(v) || 0), 0);
+    dopo(id, r, `${togli ? `Timbro tolto a «${nome}»` : `«${nome}» timbrata`}: ${n === 1 ? 'una cosa ha cambiato fiducia' : `${n} cose hanno cambiato fiducia`}.`);
   }
 
   // ── Risposte su una domanda ───────────────────────────────────────────────
