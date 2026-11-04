@@ -120,8 +120,9 @@
       salva();
     });
     campo.addEventListener('input', () => { if (msgEl && msgEl.classList.contains('mg-err')) dici(''); });
-    // Un campo di una riga incolla più righe attaccate: due righe diventerebbero una parola sbagliata, senza dirlo.
-    campo.addEventListener('paste', (e) => {
+    // Un campo di una riga cambia in spazi gli a capo, da qualunque strada arrivino (incolla, trascina, inserimento):
+    // due righe diventerebbero una parola sbagliata, senza dirlo. Gli spazi ai bordi si tolgono solo da un incollato.
+    campo.addEventListener('beforeinput', (e) => {
       const tipo = e.inputType || '';
       if (!tipo.startsWith('insert')) return;
       const testo = (e.dataTransfer && e.dataTransfer.getData('text/plain')) || e.data || '';
