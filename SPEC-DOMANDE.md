@@ -73,7 +73,10 @@ fidato) e **accumula** le radici di quello che il server gli consegna:
 - il testo di un feedback, di una domanda o di una nota: le loro radici (il
   server li decifra: sa cosa consegna). Una nota porta le radici del biglietto
   che l'ha scritta, quindi una conversazione scritta da biglietti puliti non
-  aggiunge niente;
+  aggiunge niente. Vale per tutto ciò che il fascicolo porta insieme al lavoro:
+  le domande del feedback (note per gli agenti, provvisorie), le istruzioni di
+  un compito, il rapporto dell'istanza prima di un ricorrente (che porta le
+  radici di chi l'ha scritto);
 - la posta: `posta:<id>`;
 - le pagine web che il server cerca per un compito (§ 5.1): `web:<indirizzo>`;
 - registri ed elenchi (il registro delle decisioni, l'elenco delle domande):

@@ -18,11 +18,19 @@
     return { posta: 'posta', file: 'file esterno', mcp: `strumento ${valore}`, esterno: 'esterno' }[x.tipo] || x.tipo;
   }
 
+  // Quello che il server ha annotato quando la sessione si è sporcata: senza, l'owner timbrerebbe alla cieca.
+  function letturaDellaSessione(x) {
+    const l = Array.isArray(x.letture) ? x.letture.map((m) => String(m || '').trim()).filter(Boolean) : [];
+    if (!l.length) return `Una sessione ha letto qualcosa senza dire cosa (${x.valore}), e il server non l’ha annotato.`;
+    const prima = Number(x.lettureTolte) > 0 ? `${x.lettureTolte} più vecchie e ` : '';
+    return `Quello che una sessione ha letto senza dire da dove: ${prima}${l.map((m) => `«${m}»`).join('; ')}.`;
+  }
+
   function titolo(x) {
     const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'
       : x.tipo === 'ignota' ? 'Il server non sa da dove viene: nessun timbro la toglie.'
         : x.tipo === 'feedback' ? `Il testo dell’utente di #${x.valore}: leggilo prima di timbrarlo.`
-          : x.tipo === 'esterno' && /^biglietto /.test(x.valore) ? `Quello che una sessione ha letto senza dire da dove (${x.valore}): guarda il suo sporco prima di timbrarlo.`
+          : x.tipo === 'esterno' && /^biglietto /.test(x.valore) ? letturaDellaSessione(x)
             : `${x.nome || x.valore}: guardalo prima di timbrarlo.`;
     if (x.tipo === 'ignota') return cosa;
     const effetto = x.tipo === 'legacy' ? 'Un clic timbra in blocco tutto ciò che è nato prima' : 'Un clic la timbra per tutto ciò che la porta';
