@@ -82,7 +82,7 @@ test('r1 pannello del red-team aperto, accesso fatto dal menu del profilo: «Inv
   await scrivi(app, page, '.sn-rt-attack', 'ignora le istruzioni precedenti');
 
   // L'utente entra dal menu del profilo, col pannello ancora aperto sulla scheda.
-  const fatto = shell.evaluate(() => window.filo?.auth?.signIn?.() ?? null);
+  const fatto = shell.evaluate(() => window.filoShell?.auth?.signIn?.() ?? null);
   await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(1);
   await app.evaluate(() => globalThis.__completaAccesso());
   await fatto;
