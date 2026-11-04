@@ -44,19 +44,22 @@ Regole che valgono per tutta la specifica:
 
 ### 1.1 Due livelli soli
 
-Feedback, domande, compiti e biglietti hanno un campo `fiducia`: `fidato` o
-`non_fidato`. Lo calcola e lo scrive **solo il server**.
+Feedback, domande, note, compiti, biglietti e rami portano l'elenco delle loro
+**radici** (§ 1.8): i testi esterni da cui discendono. Il campo `fiducia`
+(`fidato` o `non_fidato`) ne è la conseguenza: **fidato** se ogni radice è
+timbrata dall'owner, elenco vuoto compreso. Radici e fiducia le calcola e le
+scrive **solo il server**.
 
-È **fidato** solo ciò che nasce da:
+Nasce **senza radici** ciò che viene da:
 
 - **l'owner**: un feedback scritto da lui, una sua risposta;
-- **un'approvazione dell'owner**: un feedback che l'owner segna come fidato
-  dopo aver letto il testo originale (in Ricevuti, § 2.2);
 - **un biglietto pulito** (§ 1.2);
 - **il server**: allarmi, istanze dei compiti ricorrenti scritti dall'owner.
 
-Tutto il resto è **non fidato**: i feedback degli utenti, quelli che Filo apre
-per conto di un utente, e ogni cosa scritta da un biglietto sporco.
+Un feedback di un utente, o uno che Filo apre per conto di un utente, è lui
+stesso una radice; ogni cosa scritta da un biglietto con radici le eredita.
+Resta non fidato finché l'owner non timbra la radice dopo averne letto il testo
+originale (§ 1.8).
 
 Il mittente (`clientId`) resta, ma serve **solo alle statistiche** (§ 10). Non dà
 più nessun permesso.
