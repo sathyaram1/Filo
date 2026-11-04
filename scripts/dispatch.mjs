@@ -1709,12 +1709,16 @@ async function recordFixed(id, report = '', frase = '', ferma = false, domanda =
   // In un riallineamento dispatch ha scritto nel marcatore la punta ricevuta: si confronta la modifica del ramo di
   // allora con quella di adesso (regola 3), e lo si dice prima che decida il server.
   const marcatore = readMarker(ROOT);
-  const confronto = marcatore && marcatore.role === 'fixer' && marcatore.dal ? fileRiscritti(ROOT, { prima: marcatore.dal }) : null;
+  const riallinea = !!(marcatore && marcatore.role === 'fixer' && marcatore.dal);
+  const ch = riallinea ? await import('./routine-channel.mjs') : null;
+  const spedisce = !!(ch && ch.consegnaDiRiallineamento(marcatore, { ferma, domanda }));
+  // Prima del confronto: le novità riportate in cima (#2057) fanno parte della punta che il server confronta.
+  if (spedisce) await ch.novitaPrimaDiSpedire(ROOT, (r) => process.stderr.write(`${r}\n`));
+  const confronto = riallinea ? fileRiscritti(ROOT, { prima: marcatore.dal }) : null;
   const esito = esitoRiallineamento(confronto, motivo);
   if (esito.riga) process.stderr.write(`${esito.riga}\n`);
   // Il server rifà il confronto sulla punta presa da GitHub, e chi verifica dopo legge il ramo da lì: prima la spedizione.
-  const ch = confronto ? await import('./routine-channel.mjs') : null;
-  if (ch && ch.consegnaDiRiallineamento(marcatore, { ferma, domanda })) {
+  if (spedisce) {
     const sped = ch.spedisciRiallineamento(ROOT);
     if (!sped.ok) return { rejected: true, nonSpedito: true, message: ch.testoRiallineamentoNonSpedito(sped) };
     if (sped.avviso) process.stderr.write(`${sped.avviso}\n`);
