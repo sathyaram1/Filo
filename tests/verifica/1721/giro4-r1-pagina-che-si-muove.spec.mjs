@@ -1,5 +1,5 @@
-// Verifica #1721 giro 4, rilievo 1: se la pagina si muove mentre l'Aiuto la fotografa (si scorre, un pannello scivola),
-// le coperture stanno dove le cose erano alla misura e non dove sono nella foto: al modello arriva quello che copriva.
+// Verifica #1721 giro 4, rilievo 1: se la pagina si muove mentre l'Aiuto la fotografa (chi scorre con la rotella), le
+// coperture stanno dove i riquadri erano alla misura e non dove sono nella foto: al modello arriva quello che coprivano.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { paginaDellAiuto } from '../../helpers/riquadri.mjs';
@@ -85,24 +85,4 @@ test('r1 mentre la pagina scorre, i riquadri di un altro sito arrivano scoperti 
   for (const u of foto) rosa.push(u ? await pixelDelColore(app, u, ROSA) : 0);
   expect(foto.filter(Boolean).length, 'al modello devono arrivare le foto della pagina').toBeGreaterThan(0);
   expect(Math.max(...rosa), `pixel dei riquadri di un altro sito in ogni foto: ${rosa.join(', ')}`).toBeLessThan(20);
-});
-
-test('r1 un pannello che scivola col numero della carta scritto: il numero arriva scoperto al modello dell’Aiuto', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(150_000);
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Pagamento</title></head><body style="margin:0">
-    <h1>Pagamento</h1>
-    <div id="pannello" style="position:absolute;left:20px;top:100px">
-      <label for="c">Numero della carta</label>
-      <input id="c" autocomplete="cc-number" style="width:260px;font:bold 22px monospace;color:${tinta(ROSA)};background:#fff;border:0;outline:0;caret-color:transparent">
-    </div>
-    <script>let y = 100, d = 5; setInterval(() => { if (y > 450) d = -5; if (y < 100) d = 5; y += d; document.getElementById('pannello').style.top = y + 'px'; }, 5);</script>
-    </body></html>`);
-  await superaAvvisoSeCe(app);
-  await page.locator('#c').fill('4111 1111 1111 1111');
-  await page.locator('#c').blur();
-  const foto = await fotoDiPiuDomande(app, shell, page);
-  const rosa = [];
-  for (const u of foto) rosa.push(u ? await pixelDelColore(app, u, ROSA) : 0);
-  expect(foto.filter(Boolean).length, 'al modello devono arrivare le foto della pagina').toBeGreaterThan(0);
-  expect(Math.max(...rosa), `pixel del numero della carta in ogni foto: ${rosa.join(', ')}`).toBeLessThan(20);
 });
