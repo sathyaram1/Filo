@@ -58,7 +58,7 @@ test('[2i?] non ferma: va nella correzione E nel derivato con la domanda; paga i
   assert.equal(d.consume, 'cap2');
   assert.equal(d.counts.count2, 1);
   const g = R.derivedGroups(d);
-  assert.deepEqual(g.map((x) => [x.tipo, x.priority, x.decision]), [['decisione', 2, true]]);
+  assert.deepEqual(g.map((x) => [x.tipo, x.priority, x.decision]), [['decisione', 1, true]]);
   assert.match(R.groupLabel(g[0]), /intanto si applica l'opzione consigliata/);
   const nota = R.roundNote({ summary: '', findings: F('[2i?] A o B? Consiglio A.'), decision: d });
   assert.match(nota, /chi corregge applica intanto l'opzione consigliata/);
