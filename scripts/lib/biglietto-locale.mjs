@@ -104,11 +104,28 @@ const CODE = Object.freeze({
   riservato: { cartella: cartellaRiservati, op: 'riservato', predefinito: 'dati privati' },
 });
 
-function annotaInCoda(coda, b, motivo, nowMs) {
+/** Le radici dichiarate e le letture nominate, pulite per il server (SPEC-DOMANDE.md §1.2). PURA. */
+export function cosaLetto({ radici, letti } = {}) {
+  const r = [...new Set((Array.isArray(radici) ? radici : []).map((x) => String(x || '').trim()).filter(Boolean))];
+  const visti = new Set();
+  const l = [];
+  for (const v of Array.isArray(letti) ? letti : []) {
+    if (!v || typeof v !== 'object') continue;
+    const k = `${String(v.tipo || '')}/${String(v.id || '')}`;
+    if (!v.tipo || !v.id || visti.has(k)) continue;
+    visti.add(k);
+    l.push({ tipo: String(v.tipo), id: String(v.id) });
+  }
+  return { radici: r, letti: l };
+}
+
+function annotaInCoda(coda, b, motivo, nowMs, cosa = {}) {
   const dir = coda.cartella(b);
   mkdirSync(dir, { recursive: true });
   const nome = `${String(Math.round(Number(nowMs) || Date.now())).padStart(14, '0')}-${process.pid}-${randomBytes(4).toString('hex')}.json`;
-  writeFileSync(join(dir, nome), `${JSON.stringify({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() })}\n`, { encoding: 'utf8', mode: 0o600 });
+  const c = cosaLetto(cosa);
+  const voce = Object.assign({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() }, c.radici.length ? { radici: c.radici } : {}, c.letti.length ? { letti: c.letti } : {});
+  writeFileSync(join(dir, nome), `${JSON.stringify(voce)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
 function vociInCoda(coda, b) {
@@ -119,7 +136,7 @@ function vociInCoda(coda, b) {
     const file = join(dir, n);
     try {
       const d = JSON.parse(readFileSync(file, 'utf8'));
-      return { file, motivo: String((d && d.motivo) || '').trim() || coda.predefinito, at: Number(d && d.at) || 0 };
+      return Object.assign({ file, motivo: String((d && d.motivo) || '').trim() || coda.predefinito, at: Number(d && d.at) || 0 }, cosaLetto(d || {}));
     } catch (_) {
       return { file, motivo: `${coda.predefinito} (annotazione illeggibile)`, at: 0 };
     }
@@ -140,8 +157,8 @@ async function consegnaCoda(coda, b, { deps = {}, nowMs = Date.now(), aggiunta =
   return { consegnati: tutte.length, restano: vociInCoda(coda, b).length };
 }
 
-/** Annota la lettura su ogni biglietto della sessione e la consegna. → { fatti, inAttesa?, senzaBiglietto?, errori } */
-async function segnaInCoda(coda, consegna, motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
+/** Annota la lettura su ogni biglietto della sessione e la consegna. → { fatti, puliti?, inAttesa?, senzaBiglietto?, errori } */
+async function segnaInCoda(coda, consegna, motivo, { env, cwd, deps = {}, nowMs = Date.now(), radici = [], letti = [] } = {}) {
   const m = String(motivo || '').trim().slice(0, 300);
   const out = { fatti: 0, errori: [] };
   if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
@@ -150,9 +167,11 @@ async function segnaInCoda(coda, consegna, motivo, { env, cwd, deps = {}, nowMs 
   let inAttesa = 0;
   for (const b of trovati) {
     let aggiunta = '';
-    try { annotaInCoda(coda, b, m, nowMs); } catch (_) { aggiunta = m; }
-    const r = await consegna(b, { deps, nowMs, aggiunta });
-    if (!r.errore) out.fatti += 1;
+    try { annotaInCoda(coda, b, m, nowMs, { radici, letti }); } catch (_) { aggiunta = m; }
+    const r = await consegna(b, { deps, nowMs, aggiunta, cosa: { radici, letti } });
+    // Il server ha letto le radici di ciò che si è letto, e sono tutte fidate: niente da sporcare.
+    if (!r.errore && r.pulito) out.puliti = (out.puliti || 0) + 1;
+    else if (!r.errore) out.fatti += 1;
     else {
       out.errori.push(r.errore);
       if (r.restano) inAttesa += 1;
@@ -161,9 +180,9 @@ async function segnaInCoda(coda, consegna, motivo, { env, cwd, deps = {}, nowMs 
   return inAttesa ? Object.assign(out, { inAttesa }) : out;
 }
 
-/** Annota in locale una lettura esterna del biglietto `b`. Lancia se non riesce a scrivere. */
-export function annotaSporco(b, motivo, nowMs = Date.now()) {
-  annotaInCoda(CODE.sporco, b, motivo, nowMs);
+/** Annota in locale una lettura esterna del biglietto `b`, con cosa si è letto (`cosa`: { radici, letti }). Lancia se non riesce a scrivere. */
+export function annotaSporco(b, motivo, nowMs = Date.now(), cosa = {}) {
+  annotaInCoda(CODE.sporco, b, motivo, nowMs, cosa);
 }
 
 /** Le letture annotate e non ancora consegnate, dalla più vecchia. Una voce illeggibile conta lo stesso. */
@@ -190,15 +209,29 @@ export function motivoDaConsegnare(voci, nowMs = Date.now()) {
  * Consegna al server lo sporco annotato di `b`, più `aggiunta` se c'è (una lettura che non si è riuscita ad annotare).
  * Mai un'eccezione. → { consegnati, restano, errore? }: `restano` = voci ancora solo in locale.
  */
-export async function consegnaSporchi(b, opts = {}) {
-  const r = await consegnaCoda(CODE.sporco, b, opts);
-  if (r.consegnati && !r.errore) {
+export async function consegnaSporchi(b, { deps = {}, nowMs = Date.now(), aggiunta = '', cosa = {} } = {}) {
+  const voci = sporchiInAttesa(b);
+  const tutte = aggiunta ? voci.concat([Object.assign({ motivo: aggiunta, at: nowMs }, cosaLetto(cosa))]) : voci;
+  if (!tutte.length) return { consegnati: 0, restano: 0 };
+  // Una voce che non dice cosa ha letto (un gancio, un motivo a mano) vale per sé: il server le dà la radice del biglietto.
+  const senzaCosa = tutte.some((v) => !(v.radici && v.radici.length) && !(v.letti && v.letti.length));
+  const c = cosaLetto({ radici: tutte.flatMap((v) => v.radici || []), letti: tutte.flatMap((v) => v.letti || []) });
+  let r;
+  try {
+    r = await chiama('sporca', Object.assign({ ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) },
+      c.radici.length ? { radici: c.radici } : {}, c.letti.length ? { letti: c.letti } : {}, senzaCosa ? { senzaCosa: true } : {}), deps);
+  } catch (e) {
+    return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e).slice(0, 200) };
+  }
+  for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: un doppione non sporca di più */ } }
+  const pulito = !!(r && r.pulito === true && r.fiducia === 'fidato');
+  if (!pulito) {
     try {
       mkdirSync(cartellaSporchi(b), { recursive: true });
-      writeFileSync(join(cartellaSporchi(b), SEGNO_SUL_SERVER), `${opts.nowMs || Date.now()}\n`, 'utf8');
+      writeFileSync(join(cartellaSporchi(b), SEGNO_SUL_SERVER), `${nowMs}\n`, 'utf8');
     } catch (_) { /* il gancio richiamerà il server: costa una chiamata */ }
   }
-  return r;
+  return Object.assign({ consegnati: tutte.length, restano: sporchiInAttesa(b).length }, pulito ? { pulito: true } : {});
 }
 
 /** Annota in locale una lettura di dati privati del biglietto `b`. Lancia se non riesce a scrivere. */
@@ -384,6 +417,7 @@ export async function segretoPerScrivere(opts = {}) {
 export async function rigaSporco(cosa, motivi, opts = {}) {
   const testo = `${cosa}: ${motivi.join('; ')}`;
   const r = await sporca(testo, opts);
+  if (r.puliti && !r.sporcati && !r.errori.length) return `Biglietto della sessione NON sporcato: ${cosa} viene da testo fidato.`;
   if (r.senzaBiglietto) return `Nessun biglietto trovato da qui, quindi niente sporcato: ciò che scrivi da questo repo nasce non fidato, ma se la sessione ne ha uno in un altro repo dichiaralo da lì con node scripts/biglietto.mjs sporca "${cosa}".`;
   if (r.sporcati) return `Biglietto della sessione sporcato (${motivi.join('; ')}): da qui ciò che scrivi nasce non fidato.`;
   if (r.inAttesa) return `Server non raggiunto (${r.errori.join('; ')}): lo sporco (${motivi.join('; ')}) è annotato in locale e parte alla prossima chiamata; intanto ciò che scrivi da qui nasce non fidato.`;
