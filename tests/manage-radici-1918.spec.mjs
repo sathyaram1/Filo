@@ -111,6 +111,23 @@ test('su una radice timbrata un clic toglie il timbro', async ({ openTab }) => {
   await expect(page.locator('#mgManageMsg')).toContainText('Timbro tolto a «#1916»');
 });
 
+test('un timbro dato dalle Domande, o la fiducia cambiata da fuori, fa rileggere le radici del feedback', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [fb()], { radici: [LEGACY] });
+  await expect(page.locator('#mgRadici .mg-radice')).toHaveText('nato prima');
+  await expect.poll(() => page.evaluate(() => window.__lette)).toBe(1);
+  await page.locator('.mg-item').first().click();
+  await expect.poll(() => page.evaluate(() => window.__lette)).toBe(1);
+  // Quello che fa un timbro nella sezione Domande.
+  await page.evaluate(() => window.SN_MANAGE_RADICI.invalida());
+  await page.locator('.mg-item').first().click();
+  await expect.poll(() => page.evaluate(() => window.__lette)).toBe(2);
+  // La lista riletta porta la pratica fidata (un timbro dato da un'altra finestra): le radici si rileggono.
+  await page.evaluate((l) => window.__mgTest.setData(l), [fb({ fiducia: 'fidato' })]);
+  await page.locator('.mg-item').first().click();
+  await expect.poll(() => page.evaluate(() => window.__lette)).toBe(3);
+});
+
 test('un server che non sa dire le radici: niente cartellino, il tasto resta', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb()], { radici: null });
