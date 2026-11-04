@@ -1831,7 +1831,7 @@
       const { dataUrl, blob } = region;
       const copied = await immagineNegliAppunti(dataUrl, async () => blob);
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(dataUrl, region.perModello, region.rect).catch(() => null);
+      const desc = await descrizioneCoperta(dataUrl, region.perModello, region.rect, region.vista).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
