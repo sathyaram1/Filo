@@ -51,17 +51,23 @@ function filtra(voci, { periodo = { da: null, a: null }, motivo = '' } = {}) {
     .sort((x, y) => (Date.parse(y.closedAt) || 0) - (Date.parse(x.closedAt) || 0));
 }
 
+// Quello che esce di una pagina delicata o tagliata, in ogni ricerca fra le chiuse: il nome del sito e la sua radice.
+function soloSito(url) {
+  let origine = '';
+  try { origine = new URL(url).origin; } catch (_) {}
+  if (origine === 'null') origine = '';
+  return { sito: origine.replace(/^https?:\/\/(www\.)?/, '') || 'sito', url: origine ? `${origine}/` : '' };
+}
+
 // La voce come la vede il modello. `delicata`: una pagina delicata o di casa, di cui escono solo il sito e il quando
 // (#1004); un indirizzo tagliato alla misura (#1525) porterebbe altrove, e va solo il sito.
 function perModello(v, { delicata = false } = {}) {
-  let origine = '';
-  try { origine = new URL(v.url).origin; } catch (_) {}
-  const sito = origine.replace(/^https?:\/\/(www\.)?/, '');
+  const { sito, url: radice } = soloSito(v.url);
   const riassunto = delicata ? '' : String(v.summary || '').replace(/\s+/g, ' ').trim();
   return {
     id: v.id,
-    titolo: delicata ? (sito || 'sito') : String(v.title || '').slice(0, 200),
-    url: delicata || v.urlTagliato ? (origine ? `${origine}/` : '') : v.url,
+    titolo: delicata ? sito : String(v.title || '').slice(0, 200),
+    url: delicata || v.urlTagliato ? radice : v.url,
     ...(delicata ? { delicata: true } : {}),
     chiusa: v.closedAt || null,
     motivo: motivoDi(v),
