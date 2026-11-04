@@ -1,5 +1,5 @@
-// #1555: la pulizia che non dipende dall'esito si fa PRIMA del verdetto, nel commit della critica. Dopo, il commit entra
-// nel registro della fiducia solo se lo spinge il rilascio (#2021): un commit in meno da far quadrare.
+// #1555: la pulizia che non dipende dall'esito si fa PRIMA del verdetto, nel commit della critica: un commit in meno da far
+// quadrare ai cancelli dopo il verdetto. Il perché intero: routines/roles/_critica-e-livelli.md.
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';

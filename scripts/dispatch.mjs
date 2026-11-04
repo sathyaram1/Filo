@@ -1488,7 +1488,7 @@ async function recordVerifier(id, critiqueText, domande = []) {
   const parsed = VERIFIER_ROUND.parseFindings(critiqueText);
   const conDomande = rilieviConDomanda(parsed.findings, domande);
   if (!conDomande.ok) return { rejected: true, formatRejected: true, message: `critica non registrata: ${conDomande.errore}` };
-  // La pulizia che non dipende dall'esito esce col commit della critica (#1555): dopo, conta solo se la spinge il rilascio (#2021).
+  // La pulizia che non dipende dall'esito esce col commit della critica (#1555; il perché: routines/roles/_critica-e-livelli.md).
   const scritte = avvio ? proveScritteDa(avvio, ROOT) : [];
   const primaDelVerdetto = scritte.length ? proveDaToglierePrimaDelVerdetto(scritte, conDomande.findings, testiDelleProve(scritte, ROOT)) : [];
   if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, conDomande.findings) };
