@@ -229,7 +229,9 @@ lo può scrivere anche un agente pulito.
   tutto il resto (domande, note, feedback e biglietti senza provenienza, e i
   feedback degli utenti arrivati prima, che l'owner ha già letto) ha
   `legacy`. I turni delle note scritti prima non hanno radici: valgono
-  `legacy`.
+  `legacy`; uno senza radici scritto dopo vale `ignota`. La lancia l'owner
+  (`npm run radici:migra`, a secco, poi `-- --dal-vero`); il timbro su
+  `legacy` lo dà in Gestione.
 
 ### 1.8 Radici e timbro
 
@@ -244,6 +246,7 @@ Una **radice** è un testo esterno, scritto con tipo e valore:
 | `mcp:<server>` | uno strumento MCP |
 | `esterno:<motivo>` | uno sporco dichiarato a mano dalla sessione |
 | `legacy` | nato prima delle radici, senza provenienza (§ 1.7) |
+| `ignota` | provenienza che il server non sa nominare (una rete aperta, un ramo col buco, radici oltre il tetto): nessun timbro la toglie |
 
 Le regole del calcolo, tutte sul server:
 
@@ -261,6 +264,11 @@ Le regole del calcolo, tutte sul server:
 
 Il timbro lo dà solo `ownerFiducia`, dal clic dell'owner in Gestione (§ 1.4):
 `segna` e `togli` prendono una radice, e il tasto sta su feedback e domande.
+«Segna fidato» su un feedback timbra il suo testo (`feedback:<seq>`) e le radici
+solo sue; se ne restano altre (non `ignota`), il sì dell'owner fa fidato quel
+feedback e le lascia scritte in `radiciSuperate`, senza timbrarle per gli altri.
+Una radice senza un ricalcolo che la trovi non esiste: chi abbassa la fiducia di
+un documento che ha radici gliene aggiunge una.
 Non esiste un comando da riga di comando, di proposito. Il cartellino accanto
 a «Segna fidato» mostra le radici di quella cosa, ognuna con la sua fonte: se
 nessuna è testo di un utente si timbra senza leggere, altrimenti si legge

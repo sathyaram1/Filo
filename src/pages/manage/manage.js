@@ -3796,10 +3796,13 @@
     if (x.tipo === 'legacy') return 'nato prima';
     if (x.tipo === 'ignota') return 'provenienza ignota';
     if (x.tipo === 'feedback') return `#${x.valore}`;
+    // Quello che una sessione dichiara arriva come segno (#…), col nome a parte: sul cartellino il nome.
+    const valore = x.nome ? String(x.nome).slice(String(x.nome).indexOf(':') + 1) : x.valore;
     if (x.tipo === 'web') {
-      try { return new URL(x.valore).hostname || 'pagina web'; } catch (_) { return 'ricerca web'; }
+      try { return new URL(valore).hostname || 'pagina web'; } catch (_) { return 'pagina web'; }
     }
-    return { posta: 'posta', file: 'file esterno', mcp: `strumento ${x.valore}`, esterno: 'esterno' }[x.tipo] || x.tipo;
+    if (x.tipo === 'esterno' && /^biglietto /.test(valore)) return 'sessione sporca';
+    return { posta: 'posta', file: 'file esterno', mcp: `strumento ${valore}`, esterno: 'esterno' }[x.tipo] || x.tipo;
   }
   function titoloRadice(x) {
     const cosa = x.tipo === 'legacy' ? 'Nato prima delle radici (24/10), da catene che hai già letto.'

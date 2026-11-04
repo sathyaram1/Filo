@@ -42,6 +42,7 @@
     "feedback:schede": "node scripts/schede.mjs",
     "manutentore": "node scripts/manutentore.mjs",
     "fiducia:migra": "node scripts/fiducia-migra.mjs",
+    "radici:migra": "node scripts/radici-migra.mjs",
     "domande:migra": "node scripts/domande-migra.mjs",
     "mittenti:migra": "node scripts/mittenti-migra.mjs",
     "db:conta": "node scripts/conta-documenti.mjs"
