@@ -293,6 +293,40 @@ test('il livello «giorni»: una riga per ogni giorno passato che ha ore, una vo
   assert.match(await Comp.sezione(false), /GIORNI:\n- 3\/11: gatti, carbonara/);
 });
 
+test('la sera di ieri compattata dopo il riassunto del giorno resta nel diario, e il giorno si riassume di nuovo con lei', async () => {
+  const giorni = [];
+  azzera({
+    chiama: async ({ messages, motivo }) => {
+      const t = messages.map((m) => m.content).join('\n');
+      if (motivo === 'giorni') { giorni.push(t); return t.includes('Lisbona') ? 'ieri: mail al relatore, volo per Lisbona' : 'ieri: mail al relatore'; }
+      const ore = [];
+      if (t.includes('mail al relatore')) ore.push({ testo: '10:00 scritta la mail al relatore' });
+      if (t.includes('Lisbona')) ore.push({ testo: '23:00 prenotato il volo per Lisbona' });
+      return JSON.stringify({ ore, memorie: [] });
+    },
+  });
+  const ieri = new Date();
+  ieri.setDate(ieri.getDate() - 1);
+  const alle = (h, m = 0) => { const d = new Date(ieri); d.setHours(h, m, 0, 0); return d.getTime(); };
+  const iso = (t) => new Date(t).toISOString();
+  await scrivi('ab12', 'user', 'scrivo la mail al relatore', iso(alle(10)));
+  await scrivi('ab12', 'filo', 'Scritta.', iso(alle(10) + 5000));
+  await scrivi('ab12', 'user', 'prenota il volo per Lisbona', iso(alle(23)));
+  await scrivi('ab12', 'filo', 'Prenotato.', iso(alle(23) + 5000));
+  // Alle 23:30 la sera resta grezza; il giro dei giorni di stamattina riassume ieri senza di lei.
+  assert.equal((await Comp.compatta({ incognito: false, ora: alle(23, 30), tetti: tettiDi(), forza: true })).fatto, true);
+  assert.equal(await Comp.riassumiGiorni({ ora: Date.now() }), 1);
+  assert.equal((await Comp.compatta({ incognito: false, ora: Date.now(), tetti: tettiDi(), forza: true })).fatto, true);
+  assert.match(await Comp.sezione(false), /Lisbona/, 'prima del giro dopo, la riga della sera sta fra le ore');
+  assert.equal(await Comp.riassumiGiorni({ ora: Date.now() }), 1);
+  assert.match(giorni.at(-1), /mail al relatore[\s\S]*Lisbona/, 'il giorno si rifà con tutte le sue ore');
+  const sez = await Comp.sezione(false);
+  assert.match(sez, /GIORNI:\n- ieri: mail al relatore, volo per Lisbona/);
+  assert.doesNotMatch(sez, /ORE:/, 'le ore riassunte non si ripetono');
+  assert.equal((await Comp.righe(false)).giorni.length, 1, 'una riga per giorno');
+  assert.equal(await Comp.riassumiGiorni({ ora: Date.now() }), 0);
+});
+
 test('una fonte della chat scaduta alla compattazione e riletta dopo torna a contare, anche riaprendo il filo', async () => {
   const { cartella } = azzera();
   const ora = Date.now();
