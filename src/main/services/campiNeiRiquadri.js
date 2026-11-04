@@ -165,41 +165,36 @@ function radiciChiuse(radice) {
   return { chiuse, riquadri };
 }
 
-// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se la ricerca del protocollo, che
-// entra anche nei componenti chiusi, trova più campi di quanti ne vedano gli script della pagina. Nel dubbio si legge.
-const CAMPI_VISIBILI = `(function () {
-  var n = 0;
-  function radice(r, prof) {
-    n += r.querySelectorAll('input, textarea').length;
-    if (prof > 30) return;
-    var tutti = r.querySelectorAll('*');
-    for (var i = 0; i < tutti.length; i++) if (tutti[i].shadowRoot) radice(tutti[i].shadowRoot, prof + 1);
-  }
-  function finestra(w, prof) {
-    radice(w.document, 0);
-    for (var i = 0; prof < 12 && i < w.frames.length; i++) {
-      var f = w.frames[i];
-      try { if (!f.document) continue; } catch (e) { continue; }
-      finestra(f, prof + 1);
-    }
-  }
-  finestra(window, 0);
-  return n;
-})()`;
+// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se un campo sta davvero in un
+// componente chiuso. La ricerca del protocollo trova anche la scritta «<input>» in un testo o in un commento, e i
+// campi dei riquadri dello stesso sito di un altro indirizzo: ogni risultato si guarda da sé. Nel dubbio si legge.
+const IN_UN_CHIUSO = `function () {
+  if (this.nodeType !== 1 || !/^(input|textarea)$/i.test(this.localName)) return false;
+  for (var r = this.getRootNode(); r && r.host; r = r.host.getRootNode()) if (r.mode === 'closed') return true;
+  return false;
+}`;
 async function campoInUnChiuso(cmd, sid) {
+  const gruppo = 'filo-campi-cerca';
   try {
     await cmd('DOM.getDocument', { depth: 0 }, sid);
-    let trovati = 0;
+    const nodi = [];
     for (const query of ['<input>', '<textarea>']) {
       const { searchId, resultCount } = await cmd('DOM.performSearch', { query, includeUserAgentShadowDOM: false }, sid);
-      cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {});
-      trovati += resultCount;
+      try {
+        if (resultCount) nodi.push(...(await cmd('DOM.getSearchResults', { searchId, fromIndex: 0, toIndex: resultCount }, sid)).nodeIds);
+      } finally { cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {}); }
     }
-    if (!trovati) return false;
-    const { result } = await cmd('Runtime.evaluate', { expression: CAMPI_VISIBILI, returnByValue: true }, sid);
-    return !(result && result.value === trovati);
+    const esiti = await Promise.all(nodi.map(async (nodeId) => {
+      const { object } = await cmd('DOM.resolveNode', { nodeId, objectGroup: gruppo }, sid);
+      const { result } = await cmd('Runtime.callFunctionOn',
+        { objectId: object.objectId, functionDeclaration: IN_UN_CHIUSO, returnByValue: true }, sid);
+      return !(result && result.value === false);
+    }));
+    return esiti.some(Boolean);
   } catch (_) {
     return true;
+  } finally {
+    cmd('Runtime.releaseObjectGroup', { objectGroup: gruppo }, sid).catch(() => {});
   }
 }
 

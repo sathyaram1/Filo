@@ -36,6 +36,7 @@
         { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
         { testo: 'Nella home gli avvisi in basso a destra non coprono più il tasto Invia: finché ci sono, il campo si stringe e li lascia passare.', segnalazione: 1551 },
         { testo: 'Il correttore non manda più al modello le password che scrivi in chat a chi te le chiede, né quelle scritte accanto al nome utente o dopo il nome del wifi.', segnalazione: 1446 },
+        { testo: 'Sulle pagine molto lunghe l\'assistente di pagina risponde senza farti aspettare e Filo non si blocca più, anche quando la pagina incorpora un modulo dello stesso sito o mostra del codice HTML d\'esempio.', segnalazione: 810 },
       ],
     },
     {
