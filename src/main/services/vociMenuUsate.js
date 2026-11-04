@@ -1,5 +1,5 @@
 // Le voci scelte in un menu a comparsa, contate per chi usa Filo (#1129): la più usata si prepara all'apertura del menu.
-// Non prepara niente da sé (src/main/tabs.js, preparaDalMenu); l'incognito non conta. Prova: tests/unit/vociMenuUsate.test.mjs.
+// Non prepara niente da sé (tabs.js, preparaDalMenu); l'incognito non conta. Prova: tests/unit/riservaNuovaScheda.test.mjs.
 
 // La più scelta fra `candidati`; a pari conto vince `predefinita`, poi l'ordine del menu.
 function scegli(conti, candidati, predefinita = '') {
@@ -26,10 +26,9 @@ function crea({ leggi, scrivi } = {}) {
   function carica() {
     if (tutti) return Promise.resolve(tutti);
     if (!inCorso) {
-      inCorso = Promise.resolve().then(() => leggi()).then((v) => { if (!tutti) tutti = valido(v); return tutti; }, () => {
-        if (!tutti) tutti = {};
-        return tutti;
-      }).finally(() => { inCorso = null; });
+      // Una lettura fallita lascia vuoto e si ritenta: un conto scritto sopra il disco non letto lo cancellerebbe.
+      inCorso = Promise.resolve().then(() => leggi()).then((v) => { if (!tutti) tutti = valido(v); return tutti; }, () => tutti)
+        .finally(() => { inCorso = null; });
     }
     return inCorso;
   }
@@ -41,7 +40,7 @@ function crea({ leggi, scrivi } = {}) {
   // Quello che si sceglie in incognito non lascia traccia sul disco.
   async function conta(menu, url, { incognito = false } = {}) {
     if (incognito || !menu || typeof url !== 'string' || !url) return;
-    await carica();
+    if (!(await carica())) return;
     const voci = { ...valido(tutti[menu]) };
     voci[url] = (Number(voci[url]) || 0) + 1;
     tutti = { ...tutti, [menu]: voci };
@@ -54,7 +53,7 @@ function crea({ leggi, scrivi } = {}) {
 }
 
 let predefinito = null;
-// Quello dell'app, sul disco del profilo normale: anche una finestra in incognito sceglie dalle abitudini di sempre.
+// Quello dell'app, sul disco del profilo normale: anche la finestra in incognito sceglie dalle abitudini di sempre.
 function servizio() {
   if (predefinito) return predefinito;
   const DiskStorage = require('../shim/storage');
