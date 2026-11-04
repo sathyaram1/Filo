@@ -992,6 +992,8 @@ Gli agenti in cloud non hanno credenziali del database. Il biglietto porta un
     lavoro, l'audit, la revisione delle domande, «Gestisci la risposta», il
     riordino della coda, la potatura dei rami, gli esperimenti e il loro
     giudice (§ 4.6);
+    lo smistamento e la risposta (§ 3.5) di una domanda riservata, e il loro
+    biglietto prende il segno alla consegna (#2001);
     l'unione e i compiti figli (§ 12.2) quando uno dei testi che riceveranno è
     riservato, cosa che il server sa già quando li crea. Le eccezioni sono
     due, tutte e due limiti accettati dall'owner: il lavoro su un feedback,
