@@ -3273,6 +3273,7 @@
     PROVIDER_ORDER,
     modelProvidersWithKey,
     credenzialiProxy,
+    segretiDelProxy,
     campiSegreti,
     haSegreti,
     canServeAction,
