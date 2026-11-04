@@ -42,6 +42,14 @@ const messaggiDellaChat = (app, testo) => app.evaluate(async (_e, t) => {
   return [];
 }, testo);
 
+const idDellaChat = (app, testo) => app.evaluate(async (_e, t) => {
+  for (const c of await globalThis.SN_FILO_CHATS.list()) {
+    const chat = await globalThis.SN_FILO_CHATS.get(c.id);
+    if (chat && chat.messages.some((m) => m.text === t)) return c.id;
+  }
+  return null;
+}, testo);
+
 test('ricaricata la pagina, il seguito con un\'immagine torna nella casella com\'era', async ({ app, shell }) => {
   test.setTimeout(60_000);
   try {
@@ -96,6 +104,7 @@ test('chiusa la scheda, il seguito resta nella conversazione dopo la risposta di
     await copione(app, [LENTO, { testo: 'Risposta al seguito.' }]);
     const page = await openTab('filo://newtab/');
     await seguitoMentreLavora(page, 'seguito con la foto', { foto: true });
+    const foto = await page.locator('.dash-bubble-attesa img.dash-bubble-img').getAttribute('src');
     await app.evaluate(({ BrowserWindow }) => {
       const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
       tm.closeTab(tm.activeId);
@@ -103,6 +112,73 @@ test('chiusa la scheda, il seguito resta nella conversazione dopo la risposta di
     await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
     await expect.poll(() => messaggiDellaChat(app, 'prima domanda'), { timeout: 20_000 })
       .toEqual(['user: prima domanda', 'filo: Prima risposta.', 'user: seguito con la foto [1]']);
+    // Come un messaggio mandato: riaperta la conversazione, la foto è nella sua bolla, non «non conservata».
+    const id = await idDellaChat(app, 'prima domanda');
+    const riaperta = await openTab(`filo://dashboard/dashboard.html?chat=${id}`);
+    const bolla = riaperta.locator('.dash-bubble-user', { hasText: 'seguito con la foto' });
+    await expect(bolla.locator('img.dash-bubble-img')).toHaveAttribute('src', foto, { timeout: 10_000 });
+    await expect(riaperta.locator('.dash-thread')).not.toContainText('non conservata');
+  } finally {
+    await ripristina(app);
+  }
+});
+
+// Un seguito già partito non è più in attesa: né un ricaricamento né la scheda chiusa lo rimettono in giro.
+test('un seguito partito a turno finito non torna nella casella al ricaricamento, e a scheda chiusa non si ripete', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await configureModel(app);
+    await copione(app, [LENTO, { testo: 'Risposta al seguito.' }]);
+    const page = await openTab('filo://newtab/');
+    // Con la foto il turno non lo legge: parte dalla pagina quando il turno finisce.
+    await seguitoMentreLavora(page, 'seguito che parte dopo', { foto: true });
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta al seguito.' })).toBeVisible({ timeout: 15_000 });
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2_000);
+    await expect(page.locator('#input')).toHaveValue('');
+    await expect(page.locator('#imgPreviews .dash-img-preview img')).toHaveCount(0);
+    await app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+      tm.closeTab(tm.activeId);
+    });
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await new Promise((ok) => setTimeout(ok, 1_500));
+    expect((await messaggiDellaChat(app, 'prima domanda')).filter((m) => m.includes('seguito che parte dopo'))).toHaveLength(1);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('un seguito letto dal turno in corso non torna nella casella al ricaricamento, e a scheda chiusa non si ripete', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  try {
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await configureModel(app);
+    await copione(app, [
+      { pensa: ['Metto il timer. '], ogni: 200, dopoStrumenti: 2_000, strumenti: [{ id: 'b1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Pasta"}' }] },
+      { testo: 'Timer messo, e ho letto anche il seguito.' },
+    ]);
+    const page = await openTab('filo://newtab/');
+    await page.locator('#input').fill('metti un timer di due minuti');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('#stopBtn')).toBeVisible({ timeout: 5_000 });
+    await page.locator('#input').fill('e poi dimmi che ore sono');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'ho letto anche il seguito' })).toBeVisible({ timeout: 15_000 });
+    expect(await app.evaluate(() => globalThis.__messaggi.length)).toBe(2);
+    await page.reload();
+    await page.waitForLoadState('domcontentloaded');
+    await page.waitForTimeout(2_000);
+    await expect(page.locator('#input')).toHaveValue('');
+    await app.evaluate(({ BrowserWindow }) => {
+      const tm = BrowserWindow.getAllWindows().map((w) => w._filoTabs).find(Boolean);
+      tm.closeTab(tm.activeId);
+    });
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await new Promise((ok) => setTimeout(ok, 1_500));
+    expect((await messaggiDellaChat(app, 'metti un timer di due minuti')).filter((m) => m.includes('e poi dimmi che ore sono'))).toHaveLength(1);
   } finally {
     await ripristina(app);
   }
