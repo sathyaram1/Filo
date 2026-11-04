@@ -16,6 +16,7 @@
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
       ],
       fixes: [
+        { testo: 'La pulizia delle schede non chiude più una scheda col messaggio respinto dal sito, anche nei forum, nei moduli incorporati da un altro sito e nelle caselle con nomi insoliti. Chiude invece quelle il cui testo è già arrivato, come un post pubblicato o una lista appena creata.', segnalazione: 824 },
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
