@@ -1794,7 +1794,39 @@
     return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
   }
 
+  // Cancellare senza cestino (#1909): un comando che lo fa vuole la parola «conferma» a ogni livello, come ogni «per
+  // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec` e negli scriptblock):
+  // sbagliare per eccesso costa una parola da scrivere, per difetto il comando resta comunque al costo più alto.
+  const CANCELLANO = new Set([
+    'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred', 'srm', 'wipe', 'rimraf',
+    'remove-item', 'ri', 'clear-recyclebin', 'format', 'diskpart',
+  ]);
+  const DAVANTI = new Set(['sudo', 'doas', 'nohup', 'time', 'env', 'nice', 'ionice', 'xargs', 'command', 'builtin', 'exec',
+    'start', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call']);
+  function cancellaPerSempre(cmd) {
+    if (typeof cmd !== 'string' || !cmd.trim()) return false;
+    const t = cmd.replace(/[‘-‟'"`^]/g, '').toLowerCase();
+    if (/(?:\.|::)delete\s*\(/.test(t)) return true;
+    for (const pezzo of t.split(/[;&|(){}\r\n]|\s-(?:exec|execdir|ok|okdir)\s/)) {
+      const tok = pezzo.trim().split(/\s+/).filter(Boolean);
+      let i = 0;
+      while (i < tok.length) {
+        const prog = tok[i].split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
+        const resto = tok.slice(i + 1);
+        if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
+        if (prog === 'find' && resto.includes('-delete')) return true;
+        if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
+        if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
+        if (!DAVANTI.has(prog)) break;
+        i += 1;
+        while (i < tok.length && (/^[-/]/.test(tok[i]) || tok[i].includes('='))) i += 1;
+      }
+    }
+    return false;
+  }
+
   global.SN_CMD_CLASSIFY = {
+    cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
