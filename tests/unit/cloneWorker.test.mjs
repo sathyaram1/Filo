@@ -1,6 +1,6 @@
 // Un clone per worker (#1157): origin giusto per costruzione, node_modules collegato e mai attraversato, chiavi
-// d'accesso copiate senza stamparle, installazione privata solo se il lock cambia, rimozione che toglie prima il
-// collegamento. Più il marcatore del worker, che non deve mai finire in un commit.
+// d'accesso copiate senza stamparle, installazione privata se il lock o le versioni del principale non tornano,
+// rimozione che toglie prima il collegamento. Più il marcatore del worker, che non deve mai finire in un commit.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -50,6 +50,7 @@ function scena({ pacchetti = true } = {}) {
   if (pacchetti) {
     mkdirSync(resolve(principale, 'node_modules', 'pacchetto'), { recursive: true });
     writeFileSync(resolve(principale, 'node_modules', 'pacchetto', 'canarino.txt'), 'vivo\n', 'utf8');
+    writeFileSync(resolve(principale, 'node_modules', 'pacchetto', 'package.json'), '{"name":"pacchetto","version":"1.0.0"}\n', 'utf8');
     writeFileSync(resolve(principale, 'node_modules', '.package-lock.json'), '{}\n', 'utf8'); // npm lo scrive alla fine
   }
   const strumenti = resolve(base, 'strumenti-orchestratore');
@@ -154,6 +155,72 @@ test('package-lock diverso dal principale solo nel numero del progetto: stessi p
     writeFileSync(resolve(dest, 'package-lock.json'), lockDi('0.2.246', '2.0.0'), 'utf8');
     assert.equal(allineaPacchetti(dest, s.principale, { npmCi }).pacchetti, 'privati', 'un pacchetto diverso è un lock diverso');
     assert.equal(chiamate, 1);
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
+// Il principale può ricevere un lock nuovo senza reinstallare: lo stesso lock non dice cosa c'è davvero (#1141.8).
+for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { soloCollegati: true }]]) test(`stesso package-lock, ma il principale ha installato un altro Electron: il clone preparato ${strada} non lo eredita, installa per sé`, () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const lock = `${JSON.stringify({ name: 'filo', version: '1.0.0', lockfileVersion: 3, requires: true, packages: {
+      '': { name: 'filo', version: '1.0.0' }, 'node_modules/pacchetto': { version: '1.0.0' }, 'node_modules/electron': { version: '44.9.3', dev: true },
+    } }, null, 2)}\n`;
+    for (const d of [s.principale, dest]) writeFileSync(resolve(d, 'package-lock.json'), lock, 'utf8');
+    const electron = resolve(s.principale, 'node_modules', 'electron');
+    mkdirSync(electron, { recursive: true });
+    const installato = (v) => writeFileSync(resolve(electron, 'package.json'), `{"name":"electron","version":"${v}"}\n`, 'utf8');
+
+    installato('44.9.3');
+    const uguali = allineaPacchetti(dest, s.principale, { npmCi: npmMai, ...opzioni });
+    assert.deepEqual([uguali.pacchetti, uguali.lockDiverso], ['collegati', undefined], 'versioni uguali: collegati, senza avvisi');
+    assert.ok(collegato(dest));
+
+    installato('44.7.0');
+    const avvisi = [];
+    const npmCi = npmFinto();
+    const r = allineaPacchetti(dest, s.principale, { npmCi, avvisa: (m) => avvisi.push(m), ...opzioni });
+    assert.equal(r.pacchetti, 'privati', 'non «collegati»: il clone avrebbe il motore vecchio');
+    assert.equal(npmCi.chiamate, 1);
+    assert.ok(!collegato(dest) && existsSync(resolve(dest, 'node_modules', 'privato')), 'i pacchetti stanno nel clone');
+    assert.match(avvisi.join('\n'), /non ha installato le versioni che il package-lock fissa \(electron 44\.9\.3 \(c'è 44\.7\.0\)\)/);
+    assert.match(readFileSync(resolve(electron, 'package.json'), 'utf8'), /44\.7\.0/, 'il node_modules del principale non si tocca');
+    assert.ok(existsSync(s.canarino));
+  } finally {
+    togliCartella(s.base);
+  }
+});
+
+// Il contenitore col principale indietro di una libreria nuova: le prove del clone la aggiungono in secondi, un npm ci
+// nella preparazione costerebbe minuti a ogni giro. Una voce che manca dentro un pacchetto che c'è, invece, non si aggiunge.
+for (const [strada, opzioni] of [['a mano', {}], ['dal giro delle routine', { soloCollegati: true }]]) test(`stesso package-lock, al principale manca solo una libreria nuova: il clone preparato ${strada} resta collegato; manca una voce annidata: installa per sé`, () => {
+  const s = scena();
+  try {
+    const dest = resolve(s.base, 'lavori', '1');
+    assert.equal(preparaClone(s.principale, 1, { dest, strumentiDa: s.strumenti, basePin: s.basePin, npmCi: npmMai }).ok, true);
+    const scrivi = (voci) => {
+      const lock = `${JSON.stringify({ name: 'filo', version: '1.0.0', lockfileVersion: 3, requires: true, packages: {
+        '': { name: 'filo', version: '1.0.0' }, 'node_modules/pacchetto': { version: '1.0.0' }, ...voci,
+      } }, null, 2)}\n`;
+      for (const d of [s.principale, dest]) writeFileSync(resolve(d, 'package-lock.json'), lock, 'utf8');
+    };
+
+    scrivi({ 'node_modules/hash-wasm': { version: '4.12.0' }, 'node_modules/hash-wasm/node_modules/dentro': { version: '1.0.0' } });
+    const r = allineaPacchetti(dest, s.principale, { npmCi: npmMai, ...opzioni });
+    assert.deepEqual([r.pacchetti, r.lockDiverso], ['collegati', undefined], 'collegati: la libreria la aggiungono le prove');
+    assert.ok(collegato(dest));
+
+    scrivi({ 'node_modules/pacchetto/node_modules/dentro': { version: '1.0.0' } });
+    const npmCi = npmFinto();
+    const avvisi = [];
+    const annidata = allineaPacchetti(dest, s.principale, { npmCi, avvisa: (m) => avvisi.push(m), ...opzioni });
+    assert.equal(annidata.pacchetti, 'privati', 'le prove non aggiungono dentro un pacchetto che c\'è già');
+    assert.equal(npmCi.chiamate, 1);
+    assert.match(avvisi.join('\n'), /non ha installato le versioni che il package-lock fissa \(dentro 1\.0\.0\)/);
+    assert.ok(existsSync(s.canarino));
   } finally {
     togliCartella(s.base);
   }
