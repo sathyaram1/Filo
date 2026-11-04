@@ -2103,7 +2103,7 @@
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
         const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche, 'CANCELLA_ARCHIVIO');
         if (del.disabled) return;
-        if (!ok) { pannelloSenzaEsito(a, chat, { no: true }); return; }
+        if (!ok) { pannelloSenzaEsito(a, chat, { no: true, gruppo }); return; }
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
         del.textContent = 'Elimino…';
