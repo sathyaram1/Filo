@@ -118,10 +118,11 @@ comunque sia stato mandato: testo, blocco binario, `Blob`, dentro un oggetto
 Non è una scansione una lettura che porta via al massimo dieci documenti interi
 senza cursore (il massimo di `seq`), ma il conto vale per il **giro**, non per la
 richiesta: dieci pagine da dieci avanzate con un filtro sul numero invece del
-cursore, o i nomi presi con una proiezione e poi chiesti tutti a gruppi, sono cento
-documenti interi, e il pezzo che porta il giro oltre i dieci si ferma (#1335).
-Qualunque pagina con un cursore (`pageToken`, `startAt`) lo è subito. Un
-conteggio, una lettura per nome e le scritture passano. Chi sbatte contro il freno
+cursore, o i nomi presi con una proiezione e poi chiesti tutti a gruppi o uno per
+uno, sono cento documenti interi, e il pezzo che porta il giro oltre i dieci si
+ferma (#1335). Lo stesso documento riletto (il contatore, la configurazione) conta
+una volta sola. Qualunque pagina con un cursore (`pageToken`, `startAt`) lo è
+subito. Un conteggio, una lettura per nome con la maschera e le scritture passano. Chi sbatte contro il freno
 lo scopre alla prima prova a secco, e senza aver pagato niente.
 
 Il freno si installa da sé con `lib/firestore-auth.mjs`, l'unica strada per le
