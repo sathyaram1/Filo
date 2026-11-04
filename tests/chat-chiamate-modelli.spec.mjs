@@ -56,7 +56,7 @@ test('A — risposta fermata dal tetto: si vede interrotta, «Continua» la ripr
   const continua = bolla.locator('.dash-continua');
   await expect(continua).toHaveText('Continua');
   await expect(continua).toHaveAttribute('title', 'Continua la risposta da dove si è interrotta');
-  expect((await app.evaluate(() => globalThis.__callsA))[0].maxTokens).toBe(16384);
+  expect((await app.evaluate(() => globalThis.__callsA))[0].maxTokens).toBe(65536);
   await page.screenshot({ path: 'tests/.shots/1097-risposta-interrotta.png' });
 
   await continua.click();
@@ -64,10 +64,12 @@ test('A — risposta fermata dal tetto: si vede interrotta, «Continua» la ripr
   await expect(page.locator('.dash-continua')).toHaveCount(0);
   const seconda = (await app.evaluate(() => globalThis.__callsA))[1];
   expect(seconda.ultimo).toContain('continuare la tua ultima risposta');
+  // #1302: il seguito riparte con un tetto più largo, o un tetto finito nel ragionamento lo fermerebbe allo stesso punto.
+  expect(seconda.maxTokens).toBe(131072);
 
   // Preferenze: il segnaposto dice il valore che vale, e un tetto scritto lì arriva alla chiamata dopo.
   const pref = await openTab('filo://preferences/preferences.html');
-  await expect(pref.locator('#lunghezzaConversazioni')).toHaveAttribute('placeholder', '16384');
+  await expect(pref.locator('#lunghezzaConversazioni')).toHaveAttribute('placeholder', '65536');
   await pref.locator('#lunghezzaConversazioni').fill('4096');
   await pref.locator('#lunghezzaConversazioni').dispatchEvent('change');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).lunghezzaRisposte.conversazioni)).toBe(4096);
@@ -221,6 +223,39 @@ test('C2 — senza toccare il campo: muovere il mouse nella home sveglia il lett
   });
 });
 
+// #1302: tornati alla finestra (Alt+Tab) con una bozza, l'Invio arriva subito: il lettore parte al ritorno, non al tasto.
+test('C3 — il ritorno alla finestra con una bozza sveglia il lettore', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  const page = await newtabPage(app);
+  await expect(page.locator('#input')).toBeVisible();
+  await page.locator('#input').fill('quanta batteria ho?');
+  await page.evaluate(() => document.getElementById('input').blur());
+  await app.evaluate(async () => {
+    globalThis.__letture = 0;
+    await globalThis.SN_SISTEMA_MAIN._perProve.usaLettore(async () => {
+      globalThis.__letture += 1;
+      return { batteria: { livello: 64, inCarica: false, collegata: false }, rete: { online: true, tipo: 'wifi', nome: 'Casa' }, bluetooth: { acceso: false, dispositivi: [] } };
+    });
+    globalThis.SN_SISTEMA_MAIN._perProve.veglia(2_000);
+    globalThis.SN_SISTEMA_MAIN._perProve.inattivita('idle');
+  });
+  const attivo = () => app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.attivo());
+  const giro = await app.evaluate(() => globalThis.SN_SISTEMA_MAIN._perProve.GIRO_MS);
+  await expect.poll(attivo, { timeout: giro * 2 + 4_000 }).toBe(false);
+  await new Promise((r) => setTimeout(r, giro * 2 + 500));
+
+  const prima = await app.evaluate(() => globalThis.__letture);
+  // Alt+Tab: la finestra torna davanti (lo stato d'inattività resta quello di prima, che il sistema aggiorna dopo).
+  await page.evaluate(() => window.dispatchEvent(new Event('focus')));
+  await expect.poll(() => app.evaluate(() => globalThis.__letture), { timeout: 2_000 }).toBeGreaterThan(prima);
+
+  await app.evaluate(() => {
+    globalThis.SN_SISTEMA_MAIN._perProve.inattivita();
+    globalThis.SN_SISTEMA_MAIN._perProve.veglia(0);
+  });
+});
+
 test('D —riquadro della risposta fermato dal tetto: la riga lo dice, «Continua» chiede il seguito, e non resta in cache', async ({ app }) => {
   test.setTimeout(60_000);
   await app.evaluate(async () => {
@@ -238,7 +273,8 @@ test('D —riquadro della risposta fermato dal tetto: la riga lo dice, «Continu
       const ultimo = String(messages[messages.length - 1].content || '');
       globalThis.__callsD.push({ maxTokens: attempts[0].maxTokens, ultimo });
       const seguito = /Continua da dove ti sei interrotto/.test(ultimo);
-      const text = seguito ? 'e per questo si dice così.' : 'La parola viene dal latino';
+      // #1302: fermata dentro un blocco di codice, il seguito riparte da lì senza riaprirlo.
+      const text = seguito ? 'ino";\n```\nE per questo si dice così.' : 'La parola viene dal latino:\n\n```js\nconst radice = "lat';
       onDelta(text);
       return { text, usage: {}, finishReason: seguito ? 'stop' : 'length', model: attempts[0].model, provider: attempts[0].provider };
     };
@@ -255,11 +291,15 @@ test('D —riquadro della risposta fermato dal tetto: la riga lo dice, «Continu
   await apri();
   const nota = page.locator('.sn-popup .sn-risposta-interrotta');
   await expect(nota).toContainText('La risposta si è interrotta qui', { timeout: 8000 });
-  expect((await app.evaluate(() => globalThis.__callsD))[0].maxTokens).toBe(16384);
+  expect((await app.evaluate(() => globalThis.__callsD))[0].maxTokens).toBe(65536);
   await page.locator('.sn-popup').first().screenshot({ path: 'tests/.shots/1097-riquadro-interrotto.png' });
   await nota.locator('button', { hasText: 'Continua' }).click();
-  await expect(page.locator('.sn-popup')).toContainText('e per questo si dice così.', { timeout: 8000 });
+  await expect(page.locator('.sn-popup')).toContainText('E per questo si dice così.', { timeout: 8000 });
   await expect(nota.locator('button')).toHaveCount(0);
+  // Il seguito si legge come codice dentro il suo blocco, e «Continua» non è una domanda dell'utente.
+  await expect(page.locator('.sn-popup .sn-msg-assistant').last().locator('pre')).toContainText('ino";');
+  await expect(page.locator('.sn-popup .sn-msg-assistant').last().locator('pre')).not.toContainText('E per questo');
+  await expect(page.locator('.sn-popup .sn-msg-user')).toHaveCount(0);
 
   // Riaperta, la stessa domanda va di nuovo al modello: una risposta interrotta non si rilegge dalla cache.
   await page.keyboard.press('Escape');

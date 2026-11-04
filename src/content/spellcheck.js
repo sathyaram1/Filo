@@ -763,6 +763,8 @@
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
       baseRapido: '', baseRagionato: '',
       verdetti: new Map(), ignorate: new Map(), richiesti: new Set(), inViaggio: [], ascoltatori: new Set(),
+      // Le zone da rivedere per controllo (#1302): una risposta arrivata su un testo cambiato non vale, e il pezzo riparte.
+      riaperte: { rapido: null, ragionato: null },
       timerRapido: null, timerFine: null, timerRagionato: null, timerCodice: null, timerPassaggio: null,
       cambioDa: 0, ultimoTasto: 0, inviatiRapido: 0, inviatiRagionato: 0, restaParola: false,
       rimandati: new Set(), inVista: [],
@@ -1302,6 +1304,9 @@
       state.rifiutateQui = [];
       state.contate = [];
       state.ultimaAutomatica = null;
+      // Il testo che verrà è nuovo tutto: nessuna parola è già giudicata perché uguale a una di prima (#1302).
+      state.baseRapido = '';
+      state.baseRagionato = '';
     }
     if (state.modello.length) state.modello = riallineaIssues(state.modello, prima, ora).issues;
     if (state.lampi.length) state.lampi = riallineaIssues(state.lampi, prima, ora).issues;
@@ -1316,14 +1321,69 @@
     }
     // Il pezzo di un controllo in viaggio segue il testo come un segno: la risposta rinnova i segni di quel pezzo. Anche
     // il suo testo nuovo, se è più stretto del pezzo (il ragionato rilegge tutto).
+    // Un cambio nel testo davanti al pezzo che il rapido ha mandato come contesto («Marco » di «Marco è andato») cambia
+    // il giudizio quanto uno nel pezzo: la risposta non vale più, e il pezzo si rivede (#1302).
     if (state.inViaggio.length) {
       const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora).issues.map((v) => [v.id, v]));
+      const conContesto = state.inViaggio.filter((v) => v.contesto && !v.perso).map((v) => ({ ...v.contesto, id: v.id }));
+      const contesti = new Map(riallineaIssues(conContesto, prima, ora).issues.map((c) => [c.id, c]));
       for (const v of state.inViaggio) {
+        if (v.perso) { v.zonaPersa = zonaDopo(v.zonaPersa, prima, ora); continue; }
         const n = vivi.get(v.id);
-        if (n) { v.start = n.start; v.end = n.end; } else v.perso = true;
+        const c = v.contesto ? contesti.get(v.id) : null;
+        if (n && (!v.contesto || c)) {
+          v.start = n.start; v.end = n.end;
+          if (c) v.contesto = { start: c.start, end: c.end };
+        } else {
+          v.perso = true;
+          v.zonaPersa = zonaDopo(v.contesto ? { start: Math.min(v.contesto.start, v.start), end: Math.max(v.contesto.end, v.end) } : v, prima, ora);
+        }
         if (v.nuovo) v.nuovo = riallineaIssues([v.nuovo], prima, ora).issues[0] || null;
       }
     }
+    for (const f of ['rapido', 'ragionato']) if (state.riaperte[f]) state.riaperte[f] = zonaDopo(state.riaperte[f], prima, ora);
+  }
+
+  // Una zona che il cambio tocca si allarga a coprirlo; una che non tocca scorre. Sempre dentro il testo nuovo.
+  function zonaDopo(z, vecchio, nuovo) {
+    if (!z) return null;
+    vecchio = String(vecchio ?? '');
+    nuovo = String(nuovo ?? '');
+    const corto = Math.min(vecchio.length, nuovo.length);
+    let p = 0;
+    while (p < corto && vecchio[p] === nuovo[p]) p++;
+    let s = 0;
+    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
+    const fineVecchio = vecchio.length - s;
+    const delta = nuovo.length - vecchio.length;
+    let a;
+    let b;
+    if (z.end <= p) { a = z.start; b = z.end; } else if (z.start >= fineVecchio) { a = z.start + delta; b = z.end + delta; } else {
+      a = Math.min(z.start, p);
+      b = Math.max(z.end + delta, nuovo.length - s);
+    }
+    a = Math.max(0, Math.min(nuovo.length, a));
+    b = Math.max(a, Math.min(nuovo.length, b));
+    return { start: a, end: b };
+  }
+
+  // La risposta di un controllo il cui testo è cambiato nel frattempo non si posa (metterebbe segni su parole rimaste
+  // uguali, o toglierebbe quelli giusti): il suo pezzo torna da rivedere e il controllo riparte (#1302).
+  function riapri(state, fonte, zona) {
+    if (zona && zona.end > zona.start) {
+      const c = state.riaperte[fonte];
+      state.riaperte[fonte] = c ? { start: Math.min(c.start, zona.start), end: Math.max(c.end, zona.end) } : { ...zona };
+    }
+    if (fonte === 'rapido') programmaRapido(state, { gesto: true });
+    else programmaRagionato(state, { gesto: true });
+  }
+  // La zona da rivedere nelle coordinate del testo da controllare, o null.
+  function riapertaIn(state, fonte, d) {
+    const z = state.riaperte[fonte];
+    if (!z) return null;
+    const a = d.verso(z.start);
+    const b = d.verso(z.end);
+    return a >= 0 && b > a ? { start: a, end: b } : null;
   }
 
   // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
@@ -1623,14 +1683,16 @@
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     if (d.testo.trim().length < 2) return;
-    if (tornaAGiudicato(state, 'rapido', d)) return;
+    const riaperta = riapertaIn(state, 'rapido', d);
+    if (!riaperta && tornaAGiudicato(state, 'rapido', d)) return;
     const scrive = ignoraScrittura ? null : inScritturaNelTesto(state, d);
-    const regione = Rg.regioneNuova(state.baseRapido, d.testo);
+    const regione = Rg.conRiaperta(Rg.regioneNuova(state.baseRapido, d.testo), riaperta, d.testo);
     state.restaParola = !!(scrive && regione && scrive.start < regione.end && scrive.end > regione.start);
     const g = Rg.daGiudicare(state.baseRapido, d.testo, { inScrittura: scrive, regione });
     if (!g) return;
     const baseDiPrima = state.baseRapido;
     state.baseRapido = g.base;
+    state.riaperte.rapido = null;
     const numero = ++state.inviatiRapido;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const candidati = state.codiceT2.filter((c) => c.segno === 'errore' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
@@ -1639,9 +1701,10 @@
       ...pezziDa(d.testo, g.start, g.end, sopraIlCampo(state.el)),
       candidati: candidati.slice(0, 40).map((c) => ({ pezzo: c.segment, perche: perche(c) })),
     };
-    const [regioneCampo] = d.riporta([{ start: g.start, end: g.end }]);
+    const [regioneCampo, contestoCampo] = d.riporta([{ start: g.start, end: g.end }, { start: payload.campoDa, end: g.end }]);
     const viaggio = {
       id: `r${numero}`, start: regioneCampo ? regioneCampo.start : 0, end: regioneCampo ? regioneCampo.end : 0,
+      contesto: contestoCampo || null,
       candidati: candidati.slice(0, 40).map((c) => Rg.chiaveVerdetto(c)),
     };
     state.inViaggio.push(viaggio);
@@ -1653,6 +1716,8 @@
     } finally {
       state.inViaggio = state.inViaggio.filter((v) => v !== viaggio);
     }
+    seguiIlTesto(state);
+    if (viaggio.perso) { riapri(state, 'rapido', viaggio.zonaPersa); return; }
     if (!res || !res.ok || typeof res.text !== 'string') {
       // Il pezzo torna da giudicare al prossimo giro, se nel frattempo non ne è partito un altro.
       if (state.inviatiRapido === numero) state.baseRapido = baseDiPrima;
@@ -1670,7 +1735,8 @@
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     if (d.testo.trim().length < MIN_TESTO) return;
-    if (tornaAGiudicato(state, 'ragionato', d)) return;
+    const riaperta = riapertaIn(state, 'ragionato', d);
+    if (!riaperta && tornaAGiudicato(state, 'ragionato', d)) return;
     let finoA = null;
     if (fineFrase) {
       const pos = d.verso(cursoreNelCampo(state.el));
@@ -1679,10 +1745,11 @@
     }
     // Il campo intero, non le sole frasi cambiate (#1580, D3): contraddizioni e ripetizioni stanno anche fra una frase e
     // l'altra. Il campo parte intero anche verso il main, che ci cerca i dati riservati (correttoreRiservati.js).
-    const g = Rg.testoDaRileggere(state.baseRagionato, d.testo, { finoA });
+    const g = Rg.testoDaRileggere(state.baseRagionato, d.testo, { finoA, riapri: riaperta });
     if (!g) return;
     const baseDiPrima = state.baseRagionato;
     state.baseRagionato = g.base;
+    state.riaperte.ragionato = null;
     const numero = ++state.inviatiRagionato;
     if (state.codiceTesto !== d.testo) calcolaCodice(state);
     const candidati = state.codiceT2.filter((c) => c.segno === 'suggerimento' && c.dubbio && c.start >= g.start && c.end <= g.end && !verdetto(state, c));
@@ -1714,6 +1781,8 @@
     } finally {
       state.inViaggio = state.inViaggio.filter((v) => v !== viaggio);
     }
+    seguiIlTesto(state);
+    if (viaggio.perso) { riapri(state, 'ragionato', viaggio.zonaPersa); return; }
     if (!res || !res.ok || typeof res.text !== 'string') {
       if (state.inviatiRagionato === numero) state.baseRagionato = baseDiPrima;
       if (res && !res.ok) console.warn('[SN] correttore, controllo ragionato:', res.code, res.error);

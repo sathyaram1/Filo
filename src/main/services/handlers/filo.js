@@ -234,7 +234,7 @@ module.exports = function register(on, ctx) {
     // Chi sta scrivendo in chat sveglia il lettore per il turno che arriva, senza diventare una pagina che lo segue.
     // Una volta anche dopo una pausa lunga: il turno lo chiederebbe comunque, e lo aspetterebbe (#1097.1).
     if (msg && msg.perChat === true) {
-      if (davanti) Sistema.richiedi({ unaVolta: true });
+      if (davanti) Sistema.richiedi({ unaVolta: true, riscalda: msg.riscalda === true });
       return { ok: true, stato: Sistema.stato() };
     }
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
@@ -417,7 +417,10 @@ module.exports = function register(on, ctx) {
   // la soglia, per la chiusura dell'intervista e per «fissa adesso quello che hai imparato».
   on(MSG.FILO_COMPACT_MEMORY, async (msg, sender, origin) => {
     if (!isFilo(origin) && !sender?.isShell) return { ok: false, error: 'forbidden' };
-    const compacted = await maybeRunCompactor();
+    let compacted;
+    try { compacted = await maybeRunCompactor({ rilancia: true }); } catch (e) {
+      return { ok: false, error: (e && e.message) || String(e), code: (e && e.code) || 'UNKNOWN', ...globalThis.SN_CHAT_ERRORS.dettagliDelTetto(e) };
+    }
     return { ok: true, compacted: !!compacted, memory: await FiloMem.getMemory() };
   });
 

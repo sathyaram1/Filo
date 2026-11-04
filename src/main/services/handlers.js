@@ -1016,7 +1016,8 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
 
 // Compatta il buffer delle lezioni nei moduli di memoria. runCompactor() la forza subito:
 // alla fine dell'intervista le lezioni devono già essere in memoria per la prima home.
-async function maybeRunCompactor() {
+// `rilancia`: chi l'ha chiesta a mano riceve l'errore (un riordino fermato dal tetto non avviene, e lo si dice: #1302).
+async function maybeRunCompactor({ rilancia = false } = {}) {
   try {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
@@ -1057,6 +1058,7 @@ async function maybeRunCompactor() {
     return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
+    if (rilancia) throw e;
     return false;
   }
 }
@@ -6656,6 +6658,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let giroReplicabile = true;
   // La risposta si è fermata al tetto di lunghezza (#1097.3): lo si dice, e «Continua» la riprende.
   let interrotta = false;
+  // Il tetto ha tagliato i dati di un'azione: la risposta lo dice con la sua frase, che il modello rilegge (#1302).
+  let azioneTagliata = false;
   // Il primo giro che risponde porta nella cronologia anche l'attesa prima del modello: chi aspetta la vive (#1097.1).
   let tempiPrima = { preparazioneMs: Date.now() - inizioTurno, ...(attesePrimaDelModello || {}) };
   try {
@@ -6850,7 +6854,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           pagineLette.push({ x, i: threadMessages.length - 1, giro, coda, round, ordine: i });
         }
       });
-      if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
+      if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; azioneTagliata = true; break; }
     }
   } catch (e) {
     // Turno fallito: la prenotazione della ripresa si rilascia subito, o nessuna scheda potrà
@@ -6936,9 +6940,15 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     senzaRisposta = { passi, motivo: 'muto_dopo_letture' };
     textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
   }
+  // Il seguito di una risposta fermata dentro un blocco di codice lo riapre, o si leggerebbe come testo (#1302).
+  if (internal && String(userMessage || '') === globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO_HOME && textReply) {
+    const prima = (Array.isArray(threadHistory) ? threadHistory : []).filter((m) => m && m.role !== 'user').pop();
+    if (prima) textReply = globalThis.SN_CHAT_ERRORS.seguitoNelRecinto(String(prima.text || ''), textReply);
+  }
   if (interrotta && !senzaRisposta) {
     senzaRisposta = { passi, interrotta: true, motivo: 'tagliato' };
-    textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
+    const CE = globalThis.SN_CHAT_ERRORS;
+    textReply = unisciTesti([CE.chiudiRecinto(textReply), azioneTagliata ? CE.FRASE_AZIONE_TAGLIATA : CE.rispostaInterrotta(interrotta)]);
   }
   // #1596 — le pagine lette e rimaste fuori dalla finestra: lo sa l'utente, e lo sa il modello ai turni dopo.
   textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);

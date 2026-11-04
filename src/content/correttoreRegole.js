@@ -288,6 +288,19 @@
     return { start: a, end: b };
   }
 
+  // Una zona da rivedere (una risposta arrivata su un testo cambiato nel frattempo, #1302) si unisce al nuovo, a parole
+  // intere: la base la dava già per giudicata, e senza questo nessun controllo la riprenderebbe.
+  function conRiaperta(r, riapri, adesso) {
+    adesso = String(adesso ?? '');
+    if (!riapri || !(riapri.end > riapri.start)) return r;
+    let a = Math.max(0, Math.min(adesso.length, riapri.start));
+    let b = Math.max(a, Math.min(adesso.length, riapri.end));
+    while (a > 0 && diParola(adesso[a - 1])) a--;
+    while (b < adesso.length && diParola(adesso[b])) b++;
+    if (!conContenuto(adesso.slice(a, b))) return r;
+    return r ? { start: Math.min(r.start, a), end: Math.max(r.end, b) } : { start: a, end: b };
+  }
+
   // Il pezzo da mandare e la base per il giro dopo. La parola in scrittura, e quello che resta oltre il tetto, non vanno:
   // la base li perde, così il confronto dopo li ritrova nuovi. `null` se non c'è niente da mandare.
   function daGiudicare(base, adesso, { inScrittura = null, max = REGIONE_MAX, regione = null } = {}) {
@@ -338,9 +351,9 @@
   // Il controllo ragionato rilegge il campo intero, se qualcosa è cambiato: oltre `max` caratteri l'ultima parte, o la
   // parte che comincia con la frase cambiata se il cambio sta tutto prima. `finoA`: la frase aperta resta al giro dopo.
   // `nuovo`: quello che è cambiato davvero, dove si cerca un pezzo che la risposta cita più volte.
-  function testoDaRileggere(base, adesso, { finoA = null, max = TESTO_INTERO_MAX } = {}) {
+  function testoDaRileggere(base, adesso, { finoA = null, max = TESTO_INTERO_MAX, riapri = null } = {}) {
     adesso = String(adesso ?? '');
-    const r = regioneNuova(base, adesso);
+    const r = conRiaperta(regioneNuova(base, adesso), riapri, adesso);
     if (!r) return null;
     const fine = typeof finoA === 'number' ? Math.max(0, Math.min(adesso.length, finoA)) : adesso.length;
     if (r.start >= fine) return null;
@@ -647,7 +660,7 @@
 
   global.SN_CORRETTORE = {
     REGIONE_MAX, TESTO_INTERO_MAX, FISSI, chiudeVirgolette, ossatura, comeScritto, zoneEscluse, parole, candidatiDizionario, ripetizioni, erroriFissi,
-    senzaSovrapposti, parolaAlCursore, regioneNuova, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
+    senzaSovrapposti, parolaAlCursore, regioneNuova, conRiaperta, daGiudicare, aFrasiIntere, ultimaFineFrase, testoDaRileggere,
     leggiRighe, senzaRighe, trovaPezzo, restringi, segniDaRisposta, chiaveVerdetto, GRAMMATICALI, CERTO, segnaposti, xDelPezzo,
     valoreTrovato, chiaveRicerca, stessaFrase,
   };

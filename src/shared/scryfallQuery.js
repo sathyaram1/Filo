@@ -178,7 +178,8 @@
     };
   }
 
-  function parseAgentReply(text) {
+  // `finishReason`: solo una risposta fermata dal tetto si recupera dall'involucro (chatErrors.testoDaInvolucro).
+  function parseAgentReply(text, finishReason = null) {
     const none = {
       reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
       tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
@@ -239,7 +240,7 @@
       } catch (_) { /* prova il prossimo candidato */ }
     }
     // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata); di un involucro tagliato a metà, il suo testo.
-    const salvato = raw.includes('{') ? global.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(raw, ['reply']) : null;
+    const salvato = global.SN_CHAT_ERRORS?.testoDaInvolucro?.(raw, ['reply'], finishReason) ?? null;
     return { ...none, reply: salvato ?? raw };
   }
 

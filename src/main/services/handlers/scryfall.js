@@ -206,7 +206,9 @@ module.exports = function register(on, ctx) {
     const smettiDiGuardare = Chats && Chats.onLeave ? Chats.onLeave(wc, () => ac.abort()) : () => {};
     const fermata = () => ({ ok: false, stopped: true, error: 'fermata', ...(reasoning ? { reasoning } : {}) });
     // Ogni chiamata al modello del turno porta il segnale, compresi giudice, tag e pareri: fermato, non ne parte un'altra.
-    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError()) : handleAIRequest({ ...args, signal }));
+    // Il segnale di chi chiama (la ricerca che ha deciso che il servizio è giù) vale insieme a quello del turno.
+    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError())
+      : handleAIRequest({ ...args, signal: args && args.signal ? AbortSignal.any([args.signal, signal]) : signal }));
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
@@ -265,7 +267,7 @@ module.exports = function register(on, ctx) {
         onReasoning,
       });
       if (signal.aborted) return fermata();
-      const parsed = Q.parseAgentReply(r.text);
+      const parsed = Q.parseAgentReply(r.text, r.finishReason);
       // Svuotare la chat è della pagina, con la sua conferma: qui niente ricerche né modifiche al mazzo. Il testo è
       // di Filo, non del modello: resta vero anche se la conferma non arriva (Annulla, mazzo lasciato) o se il
       // modello scrive di averla già svuotata.
@@ -392,11 +394,13 @@ module.exports = function register(on, ctx) {
                   'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' +
                   (detail ? `\n\n${E.imbusta({ tipo: 'ESITO_SERVIZIO', testo: detail, conIntestazione: true, max: 2000 })}` : '') },
               ];
+              // La query corretta è un dato: fermata dal tetto non si usa, e si passa alla spiegazione qui sotto (#1302).
               const r2 = await ai({
                 action: ACTIONS.DECKS_CHAT,
                 payload: { messages: retryMessages },
                 origin: 'filo://decks',
                 onReasoning,
+                intera: true,
               });
               const p2 = Q.parseAgentReply(r2.text);
               // La reply del retry si accoda solo se aggiunge qualcosa: spesso ripete la prima.

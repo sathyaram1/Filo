@@ -1000,6 +1000,9 @@
     popup.activePort = port;
     let buf = '';
     let firstDelta = true;
+    // Il seguito di una risposta fermata dentro un blocco di codice riapre il blocco, o si leggerebbe come testo (#1302).
+    const riapri = (opts && opts.riapri) || '';
+    const conRecinto = (t) => (riapri && !/^\s*```/.test(t) ? `${riapri}\n${t}` : t);
 
     port.onMessage.addListener((m) => {
       if (m.type === 'meta') {
@@ -1018,7 +1021,7 @@
         // Ogni delta allunga il riquadro: la posa va rifatta subito, non al prossimo disegno
         // (#502), e la lettura resta dov'è se l'utente era tornato su a rileggere.
         scrollaConservando(popup, () => {
-          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf, { streaming: true }));
+          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(conRecinto(buf), { streaming: true }));
         });
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e si riparte su un ripiego: il testo parziale si
@@ -1044,8 +1047,8 @@
         // senza rimettere la posizione, chi stava rileggendo viene sbalzato dal clamp del browser.
         scrollaConservando(popup, () => {
           if (vuota) bubble.text.textContent = '';
-          const daMostrare = popup.action === ACTIONS.EXPLAIN
-            ? spiegazioneDaMostrare(resolved) : resolved;
+          const daMostrare = conRecinto(popup.action === ACTIONS.EXPLAIN
+            ? spiegazioneDaMostrare(resolved) : resolved);
           if (popup.action === ACTIONS.EXPLAIN && !daMostrare) {
             bubble.text.textContent = I18n.t('popup_no_explanation');
             bubble.wrap.classList.add('sn-msg-muted');
@@ -1094,20 +1097,25 @@
 
   // «Continua» sotto una risposta interrotta è una domanda come le altre, già scritta.
   const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  // La richiesta del seguito la scrive Filo, non chi legge: niente bolla sua (#1302).
   function continuaRisposta(popup) {
     if (!popup || popup.activePort) return;
-    chiedi(popup, CONTINUA_RISPOSTA);
+    const prima = [...popup.conversation].reverse().find((m) => m && m.role === 'assistant');
+    const CE = global.SN_CHAT_ERRORS;
+    const riapri = prima && CE && CE.recintoDaRiaprire ? CE.recintoDaRiaprire(String(prima.content || '')) : '';
+    chiedi(popup, CONTINUA_RISPOSTA, { nascosta: true, riapri });
   }
 
-  function chiedi(popup, txt) {
-    // Mostra bolla utente
-    const userBubble = appendBubble(popup, 'user');
-    userBubble.text.textContent = txt;
+  function chiedi(popup, txt, { nascosta = false, riapri = '' } = {}) {
+    if (!nascosta) {
+      const userBubble = appendBubble(popup, 'user');
+      userBubble.text.textContent = txt;
+    }
 
     popup.conversation.push({ role: 'user', content: txt });
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });
-    });
+    }, riapri ? { riapri } : undefined);
   }
 
   // Su un sito la risposta si apre nello strato sopra la scheda, mai nel suo documento (#1509.1).
@@ -1117,13 +1125,23 @@
     return qui();
   }
 
-  function apriRisposta({ action, payload, anchor, title }) {
+  // `seguito`: la risposta interrotta mostrata altrove (la spiegazione nel menu del tasto destro): il riquadro la riprende
+  // e chiede subito il resto (#1302).
+  function apriRisposta({ action, payload, anchor, title, seguito = '' }) {
     installEscOnce();
     const popup = createPopup({ title, anchor });
     popup.action = action;
 
     const initialPrompt = buildInitialPrompt(action, payload);
     popup.conversation.push({ role: 'user', content: initialPrompt });
+    if (seguito) {
+      const prima = appendBubble(popup, 'assistant');
+      prima.text.innerHTML = renderMarkdown(resolveCalcMarkers(String(seguito)));
+      popup.conversation.push({ role: 'assistant', content: String(seguito) });
+      popup.primaRisposta = true;
+      continuaRisposta(popup);
+      return;
+    }
 
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });

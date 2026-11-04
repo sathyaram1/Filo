@@ -487,7 +487,11 @@
     }
     return false;
   }
-  const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
+  // Il tetto ha tagliato i dati di un'azione della chat (#1302): la frase resta nella risposta salvata, e al turno dopo il
+  // modello sa che l'azione non è partita e come rifarla, invece di ripeterla uguale a ogni «Continua».
+  const FRASE_AZIONE_TAGLIATA = 'La risposta si è interrotta qui: i dati di un\'azione erano più lunghi della lunghezza massima, '
+    + 'e l\'azione non è partita. Continuando la rifaccio più corta, o divisa in più parti.';
+  const eFraseInterrotta = (s) => [...Object.values(FRASI_INTERROTTA), FRASE_AZIONE_TAGLIATA].includes(String(s || '').trim());
   // Per chi legge la risposta come dati (JSON, memoria riscritta, un nome): un pezzo non si usa, si dice.
   // `vuota`: il tetto è finito prima di una sola parola da mostrare, di solito nel ragionamento.
   function fraseTagliata(finishReason, { vuota = false } = {}) {
@@ -543,8 +547,37 @@
     return out;
   }
 
+  // Il blocco di codice dentro cui una risposta interrotta si era fermata, da riaprire in testa al seguito (#1302): la
+  // riga d'apertura (```js), o ''. `prima` è la risposta com'era, o com'è salvata nella home: chiusa da chiudiRecinto e
+  // con la frase dell'interruzione in fondo.
+  function recintoDaRiaprire(prima) {
+    let s = String(prima || '').replace(/\s+$/, '');
+    const paragrafi = s.split(/\n{2,}/);
+    const conNota = paragrafi.length > 1 && eFraseInterrotta(paragrafi[paragrafi.length - 1]);
+    if (conNota) s = paragrafi.slice(0, -1).join('\n\n').replace(/\s+$/, '');
+    let recinti = s.match(/^[ \t]*```.*$/gm) || [];
+    if (conNota && recinti.length && recinti.length % 2 === 0 && /\n[ \t]*```[ \t]*$/.test(s)) recinti = recinti.slice(0, -1);
+    return recinti.length % 2 ? recinti[recinti.length - 1].trim() : '';
+  }
+  function seguitoNelRecinto(prima, seguito) {
+    const r = recintoDaRiaprire(prima);
+    const t = String(seguito == null ? '' : seguito);
+    return r && !/^\s*```/.test(t) ? `${r}\n${t}` : t;
+  }
+
+  // Il testo da mostrare di una risposta che doveva essere un involucro JSON e non si legge (#1302). Solo se il tetto
+  // l'ha fermata e la risposta comincia dall'involucro: una risposta intera ma scritta male, o della prosa con un esempio
+  // fra graffe, si mostra com'è (null). Fermata prima del campo del testo: niente da mostrare (''), mai la graffa.
+  function testoDaInvolucro(raw, campi, finishReason) {
+    if (!troncata(finishReason)) return null;
+    const s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '');
+    if (!s.startsWith('{')) return null;
+    const t = campoDaJsonTagliato(s, campi);
+    return t == null ? '' : t;
+  }
+
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };

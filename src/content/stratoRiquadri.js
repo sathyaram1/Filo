@@ -44,6 +44,7 @@
     } else if (d.tipo === 'risposta') {
       global.SN_POPUP?.openStreaming({
         action: dati.action, payload: dati.payload || {}, anchor: dati.anchor || undefined, title: dati.title || '',
+        seguito: typeof dati.seguito === 'string' ? dati.seguito : '',
       });
     } else if (d.tipo === 'aiuto') {
       const SB = global.SN_SIDEBAR;

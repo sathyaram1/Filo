@@ -121,8 +121,24 @@ test('un taglio senza niente da mostrare è un errore che nomina il tetto; uno c
 test('un involucro JSON tagliato a metà mostra il testo che il modello aveva scritto', () => {
   assert.equal(CE.campoDaJsonTagliato('{"status":"done","text":"Prima riga\\nseconda \\"citata\\" \\u00e8 tagl', ['text']), 'Prima riga\nseconda "citata" è tagl');
   assert.equal(CE.campoDaJsonTagliato('niente involucro', ['text']), null);
-  const r = Q.parseAgentReply('{"reply":"Per questo mazzo servono più pescate:\\n1. Rhystic');
+  const r = Q.parseAgentReply('{"reply":"Per questo mazzo servono più pescate:\\n1. Rhystic', 'length');
   assert.equal(r.reply, 'Per questo mazzo servono più pescate:\n1. Rhystic');
+});
+
+// #1302: il recupero vale solo per una risposta che il tetto ha fermato e che comincia dall'involucro.
+test('una risposta intera scritta male, o della prosa con un esempio fra graffe, si mostra intera', () => {
+  const citazioni = '{"reply":"Ti consiglio "Sol Ring" e "Arcane Signet" per la rampa"}';
+  assert.equal(Q.parseAgentReply(citazioni, 'stop').reply, citazioni);
+  assert.equal(CE.testoDaInvolucro('{"text":"Clicca su "Salva" in alto"}', ['text'], 'stop'), null);
+  const prosa = 'Per cercare scrivi così: {"text": "esempio", "x": …} e poi premi Invio.';
+  assert.equal(CE.testoDaInvolucro(prosa, ['text'], 'length'), null);
+  assert.equal(Q.parseAgentReply('Puoi scrivere {"reply": "una prova" ... come esempio.', 'stop').reply, 'Puoi scrivere {"reply": "una prova" ... come esempio.');
+});
+
+test('fermata prima che il campo del testo cominci: niente involucro grezzo da mostrare', () => {
+  assert.equal(CE.testoDaInvolucro('{"action":"shell","command":"ls -', ['text'], 'length'), '');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste t:creature', 'length').reply, '');
+  assert.equal(CE.testoDaInvolucro('```json\n{"text":"Prima parte', ['text'], 'length'), 'Prima parte');
 });
 
 test('una risposta interrotta dentro un blocco di codice lo chiude prima della frase', () => {

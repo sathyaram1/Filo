@@ -86,8 +86,13 @@ test('Aiuto: la risposta interrotta offre «Continua», che chiede il seguito', 
   await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).not.toContainText('{');
   const continua = aiuto.locator('.sn-sidebar-choice', { hasText: 'Continua' });
   await expect(continua).toBeVisible();
+  // #1302: la bozza che si stava scrivendo resta, e la richiesta del seguito non diventa una bolla dell'utente.
+  await aiuto.fill('.sn-sidebar-input textarea', 'e dopo cosa');
   await continua.click();
   await expect(aiuto.locator('.sn-sidebar-msg-assistant').last()).toContainText('poi premi Invia.', { timeout: 10_000 });
+  await expect(aiuto.locator('.sn-sidebar-input textarea')).toHaveValue('e dopo cosa');
+  await expect(aiuto.locator('.sn-sidebar-msg-user', { hasText: 'Continua da dove' })).toHaveCount(0);
+  await expect(aiuto.locator('.sn-sidebar-msg-user', { hasText: 'come mi iscrivo?' })).toHaveCount(1);
 });
 
 test('Home: la riga «interrotta» dentro la bolla ha l\'aspetto di una nota, in chiaro e in scuro', async ({ app }) => {
@@ -127,8 +132,10 @@ async function casaFermata(app, risposta) {
       models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__giri = 0;
-    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+    globalThis.__inviati = [];
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta }) => {
       globalThis.__giri += 1;
+      globalThis.__inviati.push(JSON.stringify(messages));
       try { if (r.text) onDelta && onDelta(r.text); } catch (_) {}
       return { text: r.text, finishReason: 'length', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: r.toolCalls || [], reasoningDetails: [] };
     };
@@ -146,6 +153,34 @@ test('Home: interrotta dentro un blocco di codice, la riga resta una nota fuori 
   await expect(casa.locator('.dash-bubble-filo pre').last()).not.toContainText('interrotta');
 });
 
+// #1302: il seguito di una risposta fermata dentro un blocco di codice riparte dentro il blocco, non come testo.
+test('Home: «Continua» dentro un blocco di codice lo riapre', async ({ app }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.FILO_CHAT]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    globalThis.__giri = 0;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, onDelta }) => {
+      globalThis.__giri += 1;
+      const primo = globalThis.__giri === 1;
+      const text = primo ? 'Ecco lo script:\n\n```python\nfor i in range(10):\n    print(i' : ')\n    totale += i\n```\nFatto.';
+      try { onDelta && onDelta(text); } catch (_) {}
+      return { text, finishReason: primo ? 'length' : 'stop', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [] };
+    };
+  });
+  const casa = await home(app);
+  await casa.locator('#input').fill('scrivimi uno script');
+  await casa.locator('#sendBtn').click();
+  await casa.getByRole('button', { name: 'Continua' }).last().click({ timeout: 15_000 });
+  const seguito = casa.locator('.dash-bubble-filo', { hasText: 'Fatto.' });
+  await expect(seguito).toBeVisible({ timeout: 15_000 });
+  await expect(seguito.locator('pre')).toContainText('totale += i');
+  await expect(seguito.locator('pre')).not.toContainText('Fatto.');
+});
+
 test('Home: il tetto che taglia gli argomenti di un\'azione ferma il turno con «Continua», senza rifarla', async ({ app }) => {
   test.setTimeout(60_000);
   const casa = await casaFermata(app, {
@@ -154,7 +189,14 @@ test('Home: il tetto che taglia gli argomenti di un\'azione ferma il turno con �
   });
   await casa.locator('#input').fill('che tempo fa domani?');
   await casa.locator('#sendBtn').click();
-  await expect(casa.locator('.dash-bubble-filo .dash-bubble-interrotta')).toBeVisible({ timeout: 15_000 });
+  const frase = await app.evaluate(() => globalThis.SN_CHAT_ERRORS.FRASE_AZIONE_TAGLIATA);
+  await expect(casa.locator('.dash-bubble-filo .dash-bubble-interrotta')).toHaveText(frase, { timeout: 15_000 });
   await expect(casa.getByRole('button', { name: 'Continua' }).last()).toBeVisible();
   expect(await app.evaluate(() => globalThis.__giri)).toBe(1);
+  // #1302: al «Continua» il modello ritrova nella conversazione che l'azione non è partita e come rifarla.
+  await casa.getByRole('button', { name: 'Continua' }).last().click();
+  await expect.poll(() => app.evaluate(() => globalThis.__giri), { timeout: 15_000 }).toBe(2);
+  const secondo = await app.evaluate(() => globalThis.__inviati[1]);
+  expect(secondo).toContain('l\'azione non è partita');
+  expect(secondo).toContain('divisa in più parti');
 });

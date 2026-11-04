@@ -1428,9 +1428,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  function parseAssistantOutput(text) {
+  function parseAssistantOutput(text, finishReason = null) {
     // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
-    const salvato = String(text || '').includes('{') ? globalThis.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(text, ['text']) : null;
+    const salvato = globalThis.SN_CHAT_ERRORS?.testoDaInvolucro?.(text, ['text'], finishReason) ?? null;
     const fallback = { display: (salvato ?? (text || '')).trim(), highlight: null, choices: [], status: 'done', collapse: false };
     if (!text) return fallback;
     const trimmed = text.trim();
@@ -2018,9 +2018,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (userMessage || valuta) {
       fermataDetta = false;
       const bolla = valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : scritto;
-      immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
-      // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
-      nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
+      // «Continua» chiede il seguito con parole di Filo, non dell'utente: niente bolla sua (#1302).
+      const seguito = daScelta && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
+      if (!seguito) {
+        immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
+        // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
+        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
+      }
       // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
       if (testoCampo === null) {
         history.push({
@@ -2102,7 +2106,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       } else {
         ripiegoDetto = false;
       }
-      const parsed = parseAssistantOutput(res.text);
+      const parsed = parseAssistantOutput(res.text, res.finishReason);
       // Una ricerca chiesta dal modello è un turno a metà: il seguito lo dice il turno dopo.
       if (session) {
         session.esito = parsed.status === 'done' && !['web_search', 'documenti'].includes(parsed.kind) ? 'fatto' : null;
@@ -2302,12 +2306,18 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
-      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
+      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      // Fermata prima che il testo cominciasse: la bolla resta sospesa e la riga sotto dice perché (#1302).
+      // Il seguito di una risposta fermata dentro un blocco di codice lo riapre, o si leggerebbe come testo (#1302).
+      if (parsed.display && scritto && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO) {
+        const prima = [...history].reverse().find((m) => m && m.role === 'assistant');
+        parsed.display = globalThis.SN_CHAT_ERRORS.seguitoNelRecinto(prima ? String(prima.content || '') : '', parsed.display);
+      }
+      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : (interrotta ? '…' : '(risposta vuota)')));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
       // Quanta parte di un documento troppo lungo ha letto, sotto la risposta (#1475).
       if (letto && letto.tagliato && letto.nota) appendActionLog(letto.nota);
-      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
-      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       if (interrotta) appendActionLog(interrotta);
       if (interrotta && !(parsed.choices && parsed.choices.length)) {
         parsed.choices = [{ label: 'Continua', prompt: globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO }];

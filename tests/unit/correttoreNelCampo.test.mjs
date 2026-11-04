@@ -431,3 +431,64 @@ test('a scheda nascosta i controlli aspettano, e partono al ritorno', async () =
   await c.passa(10);
   assert.equal(c.rapide().length, 1, 'tornata davanti, il controllo chiesto parte');
 });
+
+// #1302 — una risposta arrivata su un testo cambiato nel frattempo non si posa: il suo pezzo si rivede, e il segno giusto
+// resta o torna. I passi sono quelli della segnalazione.
+const ERRORE_ANDATO = '[è andato][sono andati][soggetto plurale][errore]';
+async function rispondiATutte(c, dalla, testo) {
+  for (let i = dalla; i < c.rapide().length; i++) await c.risponde(c.rapide()[i], testo);
+}
+
+test('cancella, annulla e punto prima della risposta: il segno su «è andato» resta, o un controllo lo rimette', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'Marco e Luca è andato al mare ieri');
+  await c.passa(600);
+  await c.risponde(c.rapide()[0], ERRORE_ANDATO);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['è andato']);
+  c.scrive(el, 'Marco è andato al mare ieri');
+  await c.passa(1500);
+  const inViaggio = c.rapide().length - 1;
+  c.scrive(el, 'Marco e Luca è andato al mare ieri');
+  await c.passa(600);
+  c.scrive(el, 'Marco e Luca è andato al mare ieri.');
+  await c.passa(600);
+  await c.risponde(c.rapide()[inViaggio], '[][][][nessuno]');
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['è andato'], 'la risposta sul testo senza «e Luca» non toglie il segno');
+  await c.passa(1500);
+  await rispondiATutte(c, inViaggio + 1, ERRORE_ANDATO);
+  await c.passa(1500);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['è andato']);
+});
+
+test('una virgola nel pezzo prima della risposta: il controllo riparte e il segno torna', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'Marco e Luca è andato al mare ieri ');
+  await c.passa(600);
+  assert.equal(c.rapide().length, 1);
+  c.scrive(el, 'Marco e Luca è, andato al mare ieri ');
+  await c.risponde(c.rapide()[0], '[e Luca è andato][e Luca sono andati][soggetto plurale][errore]');
+  await c.passa(1500);
+  assert.ok(c.rapide().length >= 2, 'il pezzo cambiato si rivede');
+  await rispondiATutte(c, 1, '[è, andato][sono andati][soggetto plurale][errore]');
+  await c.passa(1500);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['è, andato']);
+});
+
+test('campo svuotato durante un controllo e testo nuovo subito: la risposta vecchia non mette segni', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'Marco e Luca è andato al mare ieri ');
+  await c.passa(600);
+  c.scrive(el, '');
+  c.scrive(el, 'Marco e Luca è partito per Roma ieri ');
+  await c.risponde(c.rapide()[0], '[Marco][Marcello][nome sbagliato][errore]');
+  assert.deepEqual(c.segni('sn-errore'), [], 'nessun segno dalla risposta del testo di prima');
+  await c.passa(1500);
+  const nuova = c.rapide()[c.rapide().length - 1];
+  assert.ok(nuova.payload.nuovo.includes('Marco e Luca'), 'il testo nuovo si controlla tutto, anche le parole uguali a prima');
+});

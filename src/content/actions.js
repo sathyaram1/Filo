@@ -437,6 +437,8 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
         payload: { dataUrl, automatica: true, ...(originale && originale !== dataUrl ? { originale } : {}) },
+        // Diventa il nome del file: una descrizione fermata dal tetto torna come «non descritta», mai a metà (#1302).
+        intera: true,
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
@@ -618,8 +620,10 @@
           contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
         }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
+        // Fermata dal tetto (#1302): la nota la dice, e già vista non torna al tasto destro dopo.
+        if (res?.ok && global.SN_CHAT_ERRORS?.troncata?.(res.finishReason)) entry.tagliata = true;
         return (res?.ok && typeof res.text === 'string')
-          ? { text: res.text, keyFallback: res.keyFallback || null }
+          ? { text: res.text, keyFallback: res.keyFallback || null, finishReason: res.finishReason || null }
           : { errore: res || {} };
       },
       (e) => { entry.arrivata = true; return { errore: { message: e?.message } }; },
@@ -659,8 +663,10 @@
       Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       return '';
     };
+    // Una spiegazione interrotta già mostrata si richiede: rimostrata, si leggerebbe la stessa metà (#1302).
+    const giaVistaTagliata = stessa && pre.tagliata && pre.aperta;
     if (stessa) pre.aperta = true;
-    if (stessa && !pre.fermata) {
+    if (stessa && !pre.fermata && !giaVistaTagliata) {
       const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
         if (pre.fermata) return chiedi(primaApertura ? fermata() : '');
@@ -740,7 +746,17 @@
           }
           body.innerHTML = Popup.renderMarkdown(daMostrare);
           Popup.notaRipiego(body, res.keyFallback);
-          Popup.notaInterrotta(body, res.finishReason);
+          // «Continua» porta la spiegazione nel riquadro di Spiega, che chiede il resto (#1302).
+          Popup.notaInterrotta(body, res.finishReason, () => {
+            try { global.SN_MENU?.close?.(); } catch (_) {}
+            Popup.openStreaming({
+              action: ACTIONS.EXPLAIN,
+              payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+              anchor: ancoraSelezione(deps.getLastMouseEvent()),
+              title: I18n.t('popup_explain_title'),
+              seguito: daMostrare,
+            });
+          });
         });
         // Il menu chiuso prima della spiegazione (#1465); passare ad Approfondisci non è lasciarla lì.
         return () => {

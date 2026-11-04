@@ -303,10 +303,13 @@ module.exports = function register(on, ctx) {
     const rigenera = msg && msg.rigenera === true && [SN_CONST.ACTIONS.EDITOR_TITLE, SN_CONST.ACTIONS.EDITOR_SUMMARY].includes(msg.action);
     const noCache = Boolean(msg && ((msg.riprova === true && DEL_CORRETTORE.has(msg.action)) || rigenera));
     const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
+    // `intera`: la pagina usa la risposta come dato (un riassunto salvato, un nome, una traduzione, una scelta) e un
+    // pezzo fermato dal tetto torna come errore che lo dice, mai come risposta (#1302).
+    const intera = msg && msg.intera === true;
     const chiedi = daSola
-      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera }))
       : valuta ? () => chiediValuta(msg.payload, origin, sender)
-        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache });
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
