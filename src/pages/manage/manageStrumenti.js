@@ -468,8 +468,10 @@
 
   document.addEventListener('mg-scheda', (e) => {
     const tab = e.detail && e.detail.tab;
-    if (tab === 'automation') apriAutomazioni();
-    else if (tab === 'log') apriLog();
+    if (tab === 'automation') { apriAutomazioni(); return; }
+    // Una parola nata e lasciata a schermo si toglie uscendo: si vede una volta, non a ogni ritorno.
+    $('mgChiaveFatto').click();
+    if (tab === 'log') apriLog();
   });
   if (window.filo && window.filo.onBroadcast) {
     window.filo.onBroadcast((m) => {
