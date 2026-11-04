@@ -277,7 +277,20 @@ un documento che ha radici gliene aggiunge una.
 Non esiste un comando da riga di comando, di proposito. Il cartellino accanto
 a «Segna fidato» mostra le radici di quella cosa, ognuna con la sua fonte: se
 nessuna è testo di un utente si timbra senza leggere, altrimenti si legge
-quel testo.
+quel testo. Una radice del solo biglietto (`esterno:biglietto …`, una lettura
+che non ha saputo dire da dove viene) mostra cosa ha letto quella sessione,
+come il server l'ha annotato quando si è sporcata. Su una domanda il
+cartellino c'è anche da fidata, se lo è per timbri dati: il timbro si toglie
+da dove si è messo.
+
+Chi scrive con un biglietto ne prende fiducia e radici con una regola sola
+(`radici.diChiScrive` in filo-security): un biglietto locale chiuso non vale
+più pulito ma tiene le sue radici; uno sparito, o non fidato senza radici, vale
+`ignota` (un feedback nuovo in quel caso è radice di sé). Ciò che il server
+scrive da solo a partire da un feedback (le domande di servizio, quella dopo
+tre guasti uguali) porta le radici di quel feedback; senza biglietto (il
+manutentore) una domanda o un compito porta una radice sua, che l'owner timbra
+dopo averlo letto.
 
 ## 2. Gestione: un posto solo per tutto Filo
 
