@@ -15,7 +15,7 @@
         { testo: 'Puoi aprire e chiudere la barra laterale chiedendolo a Filo da qualunque chat, anche dall\'Aiuto su una pagina.', segnalazione: 1292 },
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
         { testo: 'Col tasto destro su una scheda chiudi tutte le altre o riapri l\'ultima che hai chiuso, con un clic. «Riapri scheda chiusa» c\'è anche col tasto destro sul pulsante +.', segnalazione: 1695 },
-        { testo: 'Nel menu Impostazioni la pagina che apri più spesso, all\'inizio Preferenze, compare subito già pronta: Filo la prepara mentre il menu è aperto.', segnalazione: 1129 },
+        { testo: 'Dal menu Impostazioni la pagina che apri più spesso compare subito, già caricata. All\'inizio è Preferenze, poi Filo impara quale scegli tu.', segnalazione: 1129 },
       ],
       fixes: [
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
