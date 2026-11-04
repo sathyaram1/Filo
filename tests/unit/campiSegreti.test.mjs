@@ -105,9 +105,9 @@ test('le radici chiuse si trovano anche dentro i riquadri e i componenti aperti,
 
 // #810.16 — il testo che ripete il valore di un campo segreto (l'anteprima della carta) si copre come il campo.
 // Un testo per riga, o tutti sulla stessa riga uno accanto all'altro.
-function paginaFinta(testi, { inRiga = false } = {}) {
+function paginaFinta(testi, { inRiga = false, passo = 45 } = {}) {
   const pieni = (i) => testi.slice(0, i).filter((t) => t.trim()).length;
-  const rect = (i) => (inRiga ? { left: 10 + pieni(i) * 45, top: 20, width: 45, height: 20 } : { left: 10, top: 20 + i * 30, width: 100, height: 20 });
+  const rect = (i) => (inRiga ? { left: 10 + pieni(i) * passo, top: 20, width: 45, height: 20 } : { left: 10, top: 20 + i * 30, width: 100, height: 20 });
   const corpo = { nodeType: 1, tagName: 'BODY', childNodes: [], contains: () => false, getBoundingClientRect: () => ({ left: 0, top: 0, width: 800, height: 600 }) };
   const doc = {
     createRange: () => { let n = null; return { selectNodeContents: (x) => { n = x; }, getBoundingClientRect: () => n._rect }; },
