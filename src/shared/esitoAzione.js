@@ -308,7 +308,8 @@
       const perche = pulito(v.motivo);
       // Detta come la dice il diario in diretta («Sveglia non impostata»); senza etichetta, la cosa tentata.
       const R = global.SN_RIGHE_ATTIVITA;
-      const etichetta = R ? R.etichettaFallita(v.type, v.partita === true) : '';
+      const no = v.no === true || v.motivo === MOTIVO_NO;
+      const etichetta = R ? R.etichettaNonFatta(v.type, { no, partita: v.partita === true }) : '';
       return { icona: '⚠', testo: [etichetta || 'Non riuscita', etichetta ? '' : riga, perche].filter(Boolean).join(' · '), fallita: true };
     }
     if (!riga) return null;
