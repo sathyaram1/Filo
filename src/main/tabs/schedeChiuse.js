@@ -110,6 +110,7 @@ function crea({ tetto = TETTO } = {}) {
 
   return {
     ricorda, archiviata, prendi, riprendi, segnaRiaperta, dimentica, dallArchivio, ultimaCheSuonava,
+    eRiaperta: (id) => riaperte.has(id),
     get quante() { return pila.length; },
   };
 }
