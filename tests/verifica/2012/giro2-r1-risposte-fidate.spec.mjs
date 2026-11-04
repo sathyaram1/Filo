@@ -2,9 +2,7 @@
 // La risposta del server è costruita come la costruisce oggi l'operazione «answers» di routineClosingAdmin
 // (filo-security, functions/src/routine/closing.js): per ogni biglietto solo questi campi, la fiducia no.
 import { test, expect } from '@playwright/test';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
 import { stampaRisposte } from '../../../scripts/routine-domanda.mjs';
 
 /** Il biglietto come lo tiene il server, e la voce come la manda «answers». */
