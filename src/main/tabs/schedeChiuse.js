@@ -24,6 +24,7 @@ function daArchivio(e) {
     scroll: typeof e.scrollPosition === 'number' ? e.scrollPosition : null,
     proxy: e.proxy && e.proxy.country ? { country: e.proxy.country, tier: e.proxy.tier || null } : null,
     colore: e.identityColor || null,
+    ...(Date.parse(e.audioAt) > 0 ? { audioAt: Date.parse(e.audioAt) } : {}),
   };
 }
 
