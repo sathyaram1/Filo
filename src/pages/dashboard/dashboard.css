@@ -1738,7 +1738,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   /* L'altezza che il JS copia da scrollHeight comprende il padding: in content-box la casella cresce di una riga vuota. */
   box-sizing: border-box;
 }
-.dash-input::placeholder { color: var(--dash-ink-mute); }
+/* Su una riga anche nel campo stretto (avvisi accanto): a capo farebbe scorrere il campo vuoto. */
+.dash-input::placeholder { color: var(--dash-ink-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .dash-send {
   width: 36px;
   height: 36px;
