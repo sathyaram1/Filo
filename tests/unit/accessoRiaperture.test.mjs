@@ -23,7 +23,8 @@ beforeEach(() => {
   aperture.length = 0;
   mock.timers.enable({ apis: ['setTimeout', 'Date'], now: Date.parse('2026-11-04T10:00:00Z') });
 });
-afterEach(() => { mock.timers.reset(); });
+// Un accesso rimasto aperto da un test rosso terrebbe vivo il server loopback: lo chiude il suo tetto.
+afterEach(() => { mock.timers.tick(60 * 60 * 1000); mock.timers.reset(); });
 
 // Le promesse in sospeso fanno un giro: il flusso nasce con un server loopback vero.
 const giro = () => new Promise((r) => setImmediate(r));
