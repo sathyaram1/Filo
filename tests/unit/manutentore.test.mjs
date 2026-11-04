@@ -438,3 +438,13 @@ test('la spesa per account porta quanto resta, le ultime 24 ore e le accensioni;
   assert.doesNotMatch(senzaFreni[0], /ultime 24 ore|accensioni|resta/);
   assert.match(senzaFreni[1], /non frenano: dosa tu sulla settimana/);
 });
+
+test('la decisione del mattino parte dal censimento delle schede e sa fare la prova a secco (#1786)', () => {
+  const mattino = RUOLO.slice(RUOLO.indexOf('- **`mattino`**'), RUOLO.indexOf('- **gli altri motivi**'));
+  const posti = ['npm run feedback:schede -- elenca', '`scrivi` (Haiku', '`rileggi` (Opus', 'npm run manutentore -- contesto']
+    .map((p) => mattino.indexOf(p));
+  assert.ok(posti.every((p) => p >= 0), `passi mancanti: ${posti}`);
+  assert.deepEqual([...posti].sort((a, b) => a - b), posti, 'elenca, scrivi, rileggi, poi il contesto');
+  assert.match(mattino, /tolgono lavoro/);
+  assert.match(mattino.replace(/\s+/g, ' '), /a secco\*\* vale per la prossima decisione del mattino: .*nel recap come proposta, senza applicarne nessuno/);
+});
