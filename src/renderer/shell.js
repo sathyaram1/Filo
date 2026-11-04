@@ -1026,7 +1026,7 @@
     const resto = r && R ? R.frase(R.conto(r.restano)) : '';
     if (!resto) return;
     const n = Number(r.chiuse) || 0;
-    showToast(`${n ? (n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`) : 'Nessuna scheda chiusa'}: ${resto}.`);
+    showToast(`${n ? (n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`) : 'Nessuna scheda chiusa'}: ${resto}.`, 'altre_schede_restano');
   }
 
   // `sito`: la proposta dopo un accesso, che vale per il sito dove l'accesso è avvenuto anche se la scheda è andata altrove.
