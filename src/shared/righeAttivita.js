@@ -446,10 +446,7 @@
     // c'è stato (un documento inesistente diceva «Leggo il documento…»).
     if (a._executed === false) {
       const perche = global.SN_ESITO.motivo(a);
-      // Un no della regola di autonomia non è un'azione andata a vuoto: «Niente da dimenticare» con le righe lì è falso.
-      const cosa = rifiutataDallaRegola(a)
-        ? (NO_LABELS[type] || FAILED_LABELS[type] || 'Non fatto')
-        : (etichettaFallita(type, global.SN_ESITO.partita(a)) || 'Azione non riuscita');
+      const cosa = etichettaNonFatta(type, { no: rifiutataDallaRegola(a), partita: global.SN_ESITO.partita(a) }) || 'Azione non riuscita';
       return { icon: '⚠', text: `${cosa}${perche ? ` · ${perche}` : ''}`, failed: true };
     }
     const fn = ACTIVITY_ROWS[type];
