@@ -463,8 +463,12 @@ export function copieDegliAllegati(perUnita, { primaImmagini = 0 } = {}) {
 export function chiAspetta(righe, unite) {
   const perId = new Map((Array.isArray(unite) ? unite : []).map((u) => [u.id, String(u.num)]));
   const out = [];
+  // Le attese di tutti, lette nella stessa scansione: servono a trovare i giri a catena (giriDelPacchetto).
+  const grafo = new Map();
+  Object.defineProperty(out, 'grafo', { value: grafo });
   for (const r of Array.isArray(righe) ? righe : []) {
     const id = String((r && r._id) || '');
+    if (id) grafo.set(id, { num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || '', attese: globalThis.SN_FB_ATTESE.atteseDi(r) });
     if (!id || perId.has(id)) continue;
     const attese = globalThis.SN_FB_ATTESE.atteseDi(r);
     const togli = attese.map((w) => w.id).filter((x) => perId.has(x));
