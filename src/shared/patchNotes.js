@@ -16,6 +16,7 @@
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
       ],
       fixes: [
+        { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
