@@ -80,8 +80,11 @@ test('il ritorno senza lo state giusto non chiude né fa fallire l\'accesso', as
     assert.equal(r.status, 400, q);
     assert.equal(esito, 'in attesa', `«${q}» non deve chiudere l'accesso`);
   }
-  await chiama(`${loop.redirectUri}/?code=codice-vero&state=stato-vero`);
+  // La pagina del ritorno risponde a esito noto: qui lo dà il test.
+  const pagina = chiama(`${loop.redirectUri}/?code=codice-vero&state=stato-vero`);
   assert.equal(await loop.waitForCode(), 'codice-vero');
+  loop.concludi();
+  assert.equal((await pagina).status, 200);
 });
 
 test('lo state giusto con un errore di Google chiude l\'accesso col suo motivo', async () => {
@@ -131,4 +134,82 @@ test('senza nessuna sessione prima, un accesso senza token lascia fuori e non mo
   await assert.rejects(accedi());
   assert.equal(auth.isSignedIn(), false);
   assert.equal(auth.getProfile(), null);
+});
+
+// #678.6 — la pagina del ritorno dice «completato» solo a scambio riuscito; altrimenti dice il perché.
+async function ritornoDi(firebase) {
+  firebase();
+  const f = await _internals.nuovoFlusso();
+  f.esito.catch(() => {});
+  const state = new URL(f.url).searchParams.get('state');
+  const pagina = await chiama(`${f.loop.redirectUri}/?code=codice-google&state=${encodeURIComponent(state)}`);
+  return { pagina, esito: await f.esito.then(() => 'ok', (e) => e) };
+}
+
+test('scambio riuscito: la pagina del browser dice completato, e manda all\'app', async () => {
+  const { pagina, esito } = await ritornoDi(() => firebaseFinto());
+  assert.equal(esito, 'ok');
+  assert.match(pagina.corpo, /Accesso a Filo completato/);
+  assert.match(pagina.corpo, /tornare all&#39;app/);
+});
+
+test('scambio rifiutato dal servizio: la pagina del browser non dice completato, dice il perché', async () => {
+  const { pagina, esito } = await ritornoDi(() => {
+    globalThis.fetch = async () => new Response('servizio giù', { status: 503 });
+  });
+  assert.notEqual(esito, 'ok');
+  assert.doesNotMatch(pagina.corpo, /completato/);
+  assert.match(pagina.corpo, /Il servizio di accesso non ha risposto/);
+});
+
+test('l\'annullo su Google: la pagina lo dice con la frase dell\'app', async () => {
+  const loop = await _internals.startLoopback('stato-vero');
+  const attesa = loop.waitForCode().catch((e) => e);
+  const r = await chiama(`${loop.redirectUri}/?error=access_denied&state=stato-vero`);
+  assert.match(r.corpo, /Accesso annullato/);
+  assert.equal((await attesa).code, 'annullato');
+});
+
+// #1086.2 — lo strumento dell'owner da terminale usa lo stesso ritorno: la pagina manda al terminale.
+test('strumento da terminale: la pagina dice di tornare al terminale', async () => {
+  const loop = await _internals.startLoopback('stato-vero', { dove: 'terminale' });
+  const codice = loop.waitForCode();
+  const pagina = chiama(`${loop.redirectUri}/?code=c&state=stato-vero`);
+  assert.equal(await codice, 'c');
+  loop.concludi();
+  const r = await pagina;
+  assert.match(r.corpo, /tornare al terminale/);
+  assert.doesNotMatch(r.corpo, /app/);
+  const fs = await import('node:fs');
+  const script = fs.readFileSync(new URL('../../scripts/admin-login.mjs', import.meta.url), 'utf8');
+  assert.match(script, /startLoopback\(state, \{ dove: 'terminale' \}\)/);
+  assert.match(script, /loop\.concludi\(\)/);
+});
+
+// #1086.2 — un altro programma che chiede un indirizzo che non si legge riceve un rifiuto, e l'accesso resta in ascolto.
+test('un indirizzo malformato al ritorno riceve 400, senza errori sfuggiti', async () => {
+  const net = await import('node:net');
+  const sfuggiti = [];
+  const spia = (e) => sfuggiti.push(e);
+  process.on('uncaughtException', spia);
+  try {
+    const loop = await _internals.startLoopback('stato-vero');
+    const porta = new URL(loop.redirectUri).port;
+    const risposta = await new Promise((res, rej) => {
+      const s = net.connect(Number(porta), '127.0.0.1', () => s.write('GET http://[ HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: close\r\n\r\n'));
+      let dati = '';
+      s.setEncoding('utf8');
+      s.on('data', (c) => { dati += c; });
+      s.on('end', () => res(dati));
+      s.on('error', rej);
+    });
+    assert.match(risposta, /^HTTP\/1\.1 400/);
+    const pagina = chiama(`${loop.redirectUri}/?code=codice-vero&state=stato-vero`);
+    assert.equal(await loop.waitForCode(), 'codice-vero');
+    loop.concludi();
+    assert.equal((await pagina).status, 200);
+  } finally {
+    process.off('uncaughtException', spia);
+  }
+  assert.deepEqual(sfuggiti, []);
 });
