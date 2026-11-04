@@ -248,13 +248,12 @@
         return q && q.width && q.height ? q : null;
       } catch (_) { return null; }
     };
-    // Pezzi affiancati sulla stessa riga sono un numero solo (un gruppo di cifre per <span>); due testi lontani no,
-    // anche se nel documento si toccano.
+    // Pezzi consecutivi sulla stessa riga sono un numero solo anche sparsi sulla carta disegnata (un gruppo per
+    // <span>, distribuiti da un capo all'altro): nel documento fra loro ci sono solo spazi. Su righe diverse no.
     const affiancati = (p, q) => {
       const alto = Math.min(p.height, q.height);
       const insieme = Math.min(p.top + p.height, q.top + q.height) - Math.max(p.top, q.top);
-      const distanza = q.left - (p.left + p.width);
-      return insieme >= alto / 2 && distanza <= alto && distanza >= -alto;
+      return insieme >= alto / 2 && q.left - (p.left + p.width) >= -alto;
     };
     const area = (r) => r.width * r.height;
     const out = [];
