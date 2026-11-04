@@ -79,7 +79,7 @@ test('un clic su «nato prima» timbra legacy: al main va la radice, e la pratic
   await expect(chip).toHaveText('nato prima');
   await chip.click();
   await expect.poll(() => page.evaluate(() => window.__segna)).toEqual([{ type: 'fiducia_segna', radice: 'legacy' }]);
-  await expect(page.locator('#mgToast')).toContainText('«nato prima» timbrata: 3 cose hanno cambiato fiducia.');
+  await expect(page.locator('#mgManageMsg')).toContainText('«nato prima» timbrata: 3 cose hanno cambiato fiducia.');
   await expect(page.locator('#mgFiduciaBtn')).toHaveText('🤝 Fidato');
   await expect(page.locator('#mgRadici .mg-radice')).toHaveText('✓ nato prima');
   await expect(page.locator('#mgRadici .mg-radice')).toHaveAttribute('aria-pressed', 'true');
@@ -94,7 +94,7 @@ test('su una radice timbrata un clic toglie il timbro', async ({ openTab }) => {
   await expect(chip).toHaveAttribute('title', /un clic toglie il timbro, ovunque/);
   await chip.click();
   await expect.poll(() => page.evaluate(() => window.__segna)).toEqual([{ type: 'fiducia_segna', radice: 'feedback:1916', fidato: false }]);
-  await expect(page.locator('#mgToast')).toContainText('Timbro tolto a «#1916»');
+  await expect(page.locator('#mgManageMsg')).toContainText('Timbro tolto a «#1916»');
 });
 
 test('un server che non sa dire le radici: niente cartellino, il tasto resta', async ({ openTab }) => {
