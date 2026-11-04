@@ -69,7 +69,7 @@ const UTENTE = { radice: 'feedback:1916', tipo: 'feedback', valore: '1916', timb
 const IGNOTA = { radice: 'ignota', tipo: 'ignota', valore: '', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: false };
 // Dichiarata da una sessione: sul documento il segno, il nome lo dà il server solo all'owner.
 const PAGINA = { radice: 'web:#0123456789abcdef', tipo: 'web', valore: '#0123456789abcdef', nome: 'web:https://esempio.it/pagina', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true };
-const SESSIONE = { radice: 'esterno:biglietto 0123456789abcdef', tipo: 'esterno', valore: 'biglietto 0123456789abcdef', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true, letture: ['dichiarato: listino scaricato col terminale'] };
+const SESSIONE = { radice: 'esterno:biglietto 0123456789abcdef', tipo: 'esterno', valore: 'biglietto 0123456789abcdef', timbrata: false, testoUtente: false, daLeggere: true, timbrabile: true, sessione: true, letture: ['dichiarato: listino scaricato col terminale'] };
 
 test('le radici stanno accanto a «Segna fidato», ognuna col suo nome e col suo perché', async ({ openTab }) => {
   const page = await openTab(MANAGE);
