@@ -1129,9 +1129,12 @@
     const r = await manda(id, { type: T.annulla, id }, 'Annullo…');
     if (!r) return;
     const restati = Array.isArray(r.ripristino) ? r.ripristino.filter((x) => x && x.ok === false) : [];
-    dopo(id, r, restati.length
-      ? `Annullata: è di nuovo fra quelle da rispondere. Non sono tornati com’erano ${restati.map((x) => x.num || 'un feedback').join(', ')}: il perché è nella conversazione.`
-      : 'Annullata: è di nuovo fra quelle da rispondere, e i feedback sono com’erano.');
+    const feedback = restati.length
+      ? `Non sono tornati com’erano ${restati.map((x) => x.num || 'un feedback').join(', ')}: il perché è nella conversazione.`
+      : 'I feedback sono com’erano.';
+    // Quello che ha fatto il compito nato dalla risposta non torna indietro: si dice, con dove guardarlo.
+    const compito = r.compito ? ` Il compito ${r.compito}, nato da quella risposta, non si annulla da qui: quello che ha fatto resta, lo trovi in Compiti.` : '';
+    dopo(id, r, `Annullata: è di nuovo fra quelle da rispondere. ${feedback}${compito}`);
   }
 
   async function segnaFidata(id, fidata) {
