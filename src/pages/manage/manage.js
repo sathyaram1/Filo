@@ -5631,7 +5631,7 @@
         // Bloccata senza richiesta: la pratica resta sul controllo di sicurezza, e il via libera sul quadrato non c'è (#1040).
         // Il resto: le stesse frasi della pagina da browser; sul blocco del cancello conta lo stato della richiesta (#486).
         const m = (r.esito === 'bloccato' && !r.requestId)
-          ? { kind: 'err', text: 'Saltato, ma la richiesta per il tuo via libera non c’è. Il motivo è nella conversazione. Rilancia «Salta il controllo».' }
+          ? { kind: 'err', text: 'Saltato, ma la richiesta di fusione non si è registrata: nessuna fusione è avvenuta. Il motivo è nella conversazione. Rilancia «Salta il controllo».' }
           : window.SN_MERGE_APPROVALS.skipOutcomeMessage(r);
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
