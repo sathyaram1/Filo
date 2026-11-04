@@ -208,16 +208,62 @@ lo può scrivere anche un agente pulito.
 
 ### 1.7 Dati
 
-- `fiducia` su feedback, domande, compiti e biglietti. La scrive solo l'Admin
-  SDK; le regole la vietano ai client.
+- `radici: [radice…]` su feedback, domande, compiti, biglietti e su ogni turno
+  delle note scritto da un biglietto; `fiducia` accanto, ricalcolata dal
+  server a ogni timbro. Le scrive solo l'Admin SDK; le regole le vietano ai
+  client.
+- `radiciTimbrate/{radice}`: `{ timbrata: true, quando }`, scritto solo da
+  `ownerFiducia` (§ 1.8).
 - `riservato` su feedback, domande, compiti e biglietti (§ 5.1), scritto come
   `fiducia`.
 - `genitori: [id…]` sul feedback derivato.
-- `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
-- **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
-  server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
-  altri non fidati, `routine:residuo` compreso. I rami già in lavorazione
+- `scrittoDa: [{biglietto, radici}]` sul ramo di lavoro, per il § 1.5: la
+  fiducia del ramo si calcola al cancello coi timbri di quel momento.
+- **Migrazione (#1148):** fidati i feedback con mittente provato (`senderProof`
+  admin o server, prefisso owner/local) e quelli con `mergePreapproved`; tutti
+  gli altri non fidati, `routine:residuo` compreso. I rami già in lavorazione
   restano sotto L5 finché non si chiudono.
+- **Migrazione delle radici (#1918):** ogni cosa non fidata riceve le sue
+  radici. Un feedback di un utente nato dal 24/10/2026 ha `feedback:<seq>`;
+  tutto il resto (domande, note, feedback e biglietti senza provenienza, e i
+  feedback degli utenti arrivati prima, che l'owner ha già letto) ha
+  `legacy`. I turni delle note scritti prima non hanno radici: valgono
+  `legacy`.
+
+### 1.8 Radici e timbro
+
+Una **radice** è un testo esterno, scritto con tipo e valore:
+
+| radice | cosa |
+|---|---|
+| `feedback:<seq>` | il testo di un utente (il numero intero, senza la parte dopo il punto) |
+| `web:<indirizzo>` | una pagina o una ricerca web |
+| `posta:<id>` | un messaggio di posta |
+| `file:<percorso>` | un file fuori dal repo |
+| `mcp:<server>` | uno strumento MCP |
+| `esterno:<motivo>` | uno sporco dichiarato a mano dalla sessione |
+| `legacy` | nato prima delle radici, senza provenienza (§ 1.7) |
+
+Le regole del calcolo, tutte sul server:
+
+- **Lettura:** il biglietto aggiunge alle sue le radici di ciò che legge.
+- **Scrittura:** ciò che il biglietto scrive porta le radici che il biglietto
+  ha in quel momento; un figlio con più genitori (§ 1.3) porta l'unione delle
+  loro radici.
+- **Fiducia:** fidato se e solo se ogni radice è timbrata. Una radice non
+  timbrata basta a tenere non fidato chi la porta.
+- **Timbro:** l'owner timbra una **radice**, una volta, dopo averne letto il
+  testo originale (per `legacy` decide in blocco). Il server ricalcola la
+  fiducia di tutto ciò che porta quella radice, anche nato prima del timbro:
+  feedback, domande, note, compiti, biglietti aperti. Togliere il timbro
+  ricalcola allo stesso modo.
+
+Il timbro lo dà solo `ownerFiducia`, dal clic dell'owner in Gestione (§ 1.4):
+`segna` e `togli` prendono una radice, e il tasto sta su feedback e domande.
+Non esiste un comando da riga di comando, di proposito. Il cartellino accanto
+a «Segna fidato» mostra le radici di quella cosa, ognuna con la sua fonte: se
+nessuna è testo di un utente si timbra senza leggere, altrimenti si legge
+quel testo.
 
 ## 2. Gestione: un posto solo per tutto Filo
 
