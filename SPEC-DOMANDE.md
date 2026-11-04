@@ -116,12 +116,16 @@ lo vede:
   letto sporca solo fuori dal repo. Uno strumento che apre un canale da cui il
   testo arriva dopo, senza passare da uno strumento (un sotto-agente che gira
   nel cloud, un artefatto pubblicato che riceve commenti), sporca quando parte.
-  Il gancio non conta sulla sessione, che un testo malevolo può ingannare;
-  col server giù lo sporco resta annotato accanto al biglietto, che intanto
-  vale sporco, e parte alla prossima occasione. Il resto (un comando di shell
-  che scarica qualcosa) lo dichiara la sessione (`biglietto.mjs sporca
-  "motivo"`), e gli strumenti che stampano testo esterno lo fanno da soli. È un
-  limite accettato: in locale c'è l'owner.
+  Ogni sporco locale porta la sua radice: `web:<indirizzo>` per una pagina o
+  una ricerca, `file:<percorso>` per un file fuori dal repo, `mcp:<server>`
+  per uno strumento MCP, `esterno:<motivo>` per quello che la sessione
+  dichiara a mano. Il gancio non conta sulla sessione, che un testo malevolo
+  può ingannare; col server giù lo sporco resta annotato accanto al biglietto,
+  che intanto vale sporco, e parte alla prossima occasione. Il resto (un
+  comando di shell che scarica qualcosa) lo dichiara la sessione
+  (`biglietto.mjs sporca "motivo"`), e gli strumenti che stampano testo
+  esterno lo fanno da soli, con le radici che il server consegna insieme al
+  testo. È un limite accettato: in locale c'è l'owner.
 
 Le sessioni locali prendono il biglietto all'avvio (hook), come le routine.
 Alla fine (hook) chiudono il biglietto se è sporco; uno pulito resta, perché la
