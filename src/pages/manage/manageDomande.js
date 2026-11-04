@@ -1112,7 +1112,9 @@
 
   async function archivia(id, riapri) {
     const r = await manda(id, { type: riapri ? T.riapri : T.archivia, id }, riapri ? 'Riapro…' : 'Archivio…');
-    if (r) dopo(id, r, riapri ? 'Riaperta: ora è fra quelle da rispondere.' : 'Archiviata.');
+    // Quello che la riapertura non ha potuto disfare lo dice il server (§3.6): resta accanto alla conferma.
+    const resto = riapri && r && typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
+    if (r) dopo(id, r, riapri ? `Riaperta: ora è fra quelle da rispondere.${resto ? ` ${resto}` : ''}` : 'Archiviata.');
   }
 
   async function segnaFidata(id, fidata) {
