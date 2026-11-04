@@ -685,7 +685,7 @@ export async function esegui(argv, io = {}) {
           data.provvisoria = p;
         }
       }
-      for (const k of ['chiave', 'titolo', 'resoconto', 'richiesta', 'scelta', 'principio']) if (a[k] !== undefined) data[k] = a[k];
+      for (const k of ['chiave', 'titolo', 'resoconto', 'richiesta', 'scelta', 'principio', 'di']) if (a[k] !== undefined) data[k] = a[k];
       if (a.testo !== undefined) data.testo = a.testo === '-' ? await stdin() : a.testo;
       if (data.testo !== undefined && !String(data.testo).trim()) { errore(`RIFIUTATO: smista ${a.op} vuole un testo che non sia vuoto. Non ho mandato niente.`); return 1; }
       if (typeof data.testo === 'string' && data.testo.length > TETTI_SMISTA.testo) {
