@@ -44,3 +44,10 @@ export async function chiamaOwnerFiducia(data, deps = {}) {
     return { ok: false, motivo: descriviErroreDiRete(e) };
   }
 }
+
+/** Per chi preferisce l'eccezione: → il `result` del server, o un Error col motivo detto sopra. */
+export async function risultatoOwnerFiducia(data, deps = {}) {
+  const r = await chiamaOwnerFiducia(data, deps);
+  if (!r.ok) throw new Error(r.motivo);
+  return r.result;
+}
