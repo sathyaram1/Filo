@@ -175,6 +175,7 @@
     if (v.evento) out.evento = v.evento;
     if (v.partita) out.partita = true;
     if (v.riprova) out.riprova = true;
+    if (v.no) out.no = true;
     if (v.azione && v.conferma) { out.azione = v.azione; out.conferma = v.conferma; }
     return out;
   }
