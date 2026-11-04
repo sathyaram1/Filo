@@ -173,6 +173,8 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo riquadri] disposizioneIcone.js', e); }
   try { require(path.join(SHARED_DIR, 'gestiContati.js')); } catch (e) { console.error('[Filo riquadri] gestiContati.js', e); }
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo riquadri] campoTesto.js', e); }
+  try { require(path.join(SHARED_DIR, 'ricercaCampo.js')); } catch (e) { console.error('[Filo riquadri] ricercaCampo.js', e); }
+  try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo riquadri] accessoFisso.js', e); }
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo riquadri] urlNav.js', e); }
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo riquadri] nomiSito.js', e); }
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo riquadri] wallet.js', e); }

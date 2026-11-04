@@ -228,6 +228,13 @@ try {
   if (/^https?:/i.test(loc)) webFrame.executeJavaScript(require('./mondo-chrome.js').buildSource(), false).catch(() => {});
 } catch (_) { /* mai bloccare il caricamento */ }
 
+// Il testo mandato su un collegamento sempre aperto e a cui il server ha risposto è arrivato al sito (#824.4): la sonda
+// sta in preload/collegamento-aperto.js, il nome del suo evento lo legge content.js. In ogni frame http(s).
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./collegamento-aperto.js').installa({ webFrame });
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
 try {
@@ -920,6 +927,8 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'gestiContati.js')); } catch (e) { console.error('[Filo CS] gestiContati', e); } // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
+  try { require(path.join(SHARED_DIR, 'ricercaCampo.js')); } catch (e) { console.error('[Filo CS] ricercaCampo', e); } // #824 — "è una ricerca?": PRIMA di content.js
+  try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo CS] accessoFisso', e); } // #1808 — la password dell'accesso fisso: PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro

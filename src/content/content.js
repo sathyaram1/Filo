@@ -465,6 +465,11 @@
     const orfani = [];
     // Le righe di ogni area all'ultima rilettura: tolta dalla pagina, un editor non le dà più.
     const righeViste = new WeakMap();
+    // Testo uscito dal campo senza una prova d'arrivo (un dialogo chiuso col nome ricomparso nella pagina): se il sito
+    // poi respinge la richiesta che lo porta, torna da proteggere (#1808). { t, righe }
+    const spariti = [];
+    // Le ultime righe non vuote scritte in ogni area: la pagina può svuotarla prima della rilettura a riposo.
+    const ultimeRighe = new WeakMap();
     // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
     const partiti = new Set();
     let ultimoMandato = null;
@@ -483,15 +488,10 @@
       return t;
     }
     // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
-    // dato i risultati senza un invio da riconoscere.
+    // dato i risultati senza un invio da riconoscere. Senza la regola, nel dubbio è un messaggio.
     function diRicerca(el) {
-      const tag = el.tagName.toUpperCase();
-      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
-      if (/^searchbox$/i.test(el.getAttribute('role') || '') || el.closest('[role="search" i]')) return true;
-      if (/^(q|s|k|query|search|search_query|keywords?|field-keywords)$/i.test(el.name || '')) return true;
-      if (tag === 'TEXTAREA') return false;
-      if (String(el.type).toLowerCase() === 'search') return true;
-      return /(search|cerca|ricerca|busca|recherche|suche)/i.test(`${el.getAttribute('aria-label') || ''} ${el.placeholder || ''}`);
+      const R = globalThis.SN_RICERCA_CAMPO;
+      try { return !!R && R.eRicerca(R.trattiDi(el)); } catch (_) { return false; }
     }
     const grande = (el) => { try { const r = el.getBoundingClientRect(); return r.width >= 8 && r.height >= 8; } catch (_) { return true; } };
     function primoGrande(da, body) {
@@ -571,19 +571,58 @@
       if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
       if (ricevuti.get(area) === t || sostituito(area)) return;
       const viste = righeViste.get(area);
-      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
+      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t], dialogo: nelDialogo.get(area) || null });
       if (orfani.length > 100) orfani.shift();
+    }
+    // Un dialogo chiuso dopo «Crea» si porta via il campo, e la pagina mostra il nome come suo contenuto: quel testo
+    // non è più a rischio. Lo dice la pagina che lo mostra più volte di quando il dialogo era aperto; chiuso con
+    // Annulla non ricompare, e resta protetto. Solo i campi di una riga: un messaggio in un riepilogo non è partito.
+    const nelDialogo = new WeakMap();
+    const inDialogo = new Set();
+    const DIALOGO = 'dialog, [role="dialog" i], [role="alertdialog" i], [aria-modal="true" i]';
+    function volteNellaPagina(doc, ess) {
+      let s = '';
+      try { s = essenziale((doc.body && doc.body.innerText) || ''); } catch (_) { return 0; }
+      let n = 0;
+      for (let i = s.indexOf(ess); i >= 0; i = s.indexOf(ess, i + ess.length)) n++;
+      return n;
+    }
+    function fotografaDialoghi() {
+      for (const area of inDialogo) {
+        if (!aree.has(area) || !viva(area)) { inDialogo.delete(area); continue; }
+        if (!area.getClientRects().length) continue;
+        const ess = essenziale(testo(area));
+        if (ess) nelDialogo.set(area, { ess, volte: volteNellaPagina(area.ownerDocument, ess), doc: area.ownerDocument });
+      }
+    }
+    function ricomparsi() {
+      for (let i = orfani.length - 1; i >= 0; i--) {
+        const d = orfani[i].dialogo;
+        if (d && essenziale(orfani[i].t) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) {
+          const [o] = orfani.splice(i, 1);
+          spariti.push({ t: o.t, righe: o.righe });
+          if (spariti.length > 20) spariti.shift();
+        }
+      }
+      // Un dialogo chiuso senza toglierlo dalla pagina tiene il campo nascosto, col testo dentro.
+      for (const area of inDialogo) {
+        const d = nelDialogo.get(area);
+        if (!d || !aree.has(area) || !viva(area) || area.getClientRects().length) continue;
+        const ora = testo(area);
+        if (essenziale(ora) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) aree.set(area, ora);
+      }
     }
     // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
     // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
+    function porta(inviato, t, righe) {
+      const tutto = essenziale(t);
+      if (tutto && inviato.includes(tutto)) return true;
+      const r = righe.map(essenziale).filter(Boolean);
+      return r.length > 0 && r.every((x) => inviato.includes(x));
+    }
     function partito(inviato) {
       if (typeof inviato !== 'string' || !inviato) return;
-      const dentro = (t, righe) => {
-        const tutto = essenziale(t);
-        if (tutto && inviato.includes(tutto)) return true;
-        const r = righe.map(essenziale).filter(Boolean);
-        return r.length > 0 && r.every((x) => inviato.includes(x));
-      };
+      const dentro = (t, righe) => porta(inviato, t, righe);
       // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
       stato();
       for (const area of [...aree.keys()]) {
@@ -594,6 +633,28 @@
       }
       for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
       aggiorna(false);
+    }
+    // Una richiesta respinta dal sito che porta un testo già uscito dalla casella (svuotata dalla pagina, o il dialogo
+    // chiuso): quel testo non è arrivato, e torna a proteggere la scheda finché una richiesta riuscita non lo porta.
+    function respinto(inviato) {
+      if (typeof inviato !== 'string' || !inviato) return;
+      stato();
+      const candidati = spariti.splice(0);
+      for (const [area, base] of aree) {
+        const ora = viva(area) ? pulito(testo(area)) : '';
+        if (ora && ora !== pulito(base)) continue;
+        const righe = ultimeRighe.get(area);
+        if (righe && righe.length) candidati.push({ t: righe.join(''), righe });
+      }
+      for (const c of candidati) {
+        if (!porta(inviato, c.t, c.righe)) continue;
+        if (!orfani.some((o) => o.t === c.t)) orfani.push({ t: c.t, righe: c.righe, dialogo: null });
+        if (orfani.length > 100) orfani.shift();
+      }
+      // Un dialogo chiuso il cui nome il sito ha respinto: la pagina che lo mostra non basta più a dirlo arrivato.
+      for (const o of orfani) if (o.dialogo && porta(inviato, o.t, o.righe)) o.dialogo = null;
+      aggiorna(false);
+      mandaImpronte();
     }
     function impronta(s) {
       let h1 = 0xdeadbeef;
@@ -668,8 +729,14 @@
       clearTimeout(rilettura);
       rilettura = setTimeout(() => {
         stato();
-        for (const area of aree.keys()) righeViste.set(area, righeDi(area));
+        for (const area of aree.keys()) {
+          const r = righeDi(area);
+          righeViste.set(area, r);
+          if (r.length) ultimeRighe.set(area, r);
+        }
         adotta(null);
+        ricomparsi();
+        fotografaDialoghi();
         aggiorna(false);
         mandaImpronte();
       }, 400);
@@ -678,8 +745,12 @@
     const aPiuRighe = (el) => !!el && (el.tagName.toUpperCase() === 'TEXTAREA' || el.isContentEditable);
     function scritto(area, base, campo) {
       if (!aree.has(area)) aree.set(area, base);
+      if (/^(input|textarea)$/i.test(area.tagName)) { const r = righeDi(area); if (r.length) ultimeRighe.set(area, r); }
       if (aPiuRighe(area) || aPiuRighe(campo)) lunghe.add(area);
-      else digitati.set(area, essenziale(testo(area)));
+      else {
+        digitati.set(area, essenziale(testo(area)));
+        try { if (area.closest(DIALOGO)) inDialogo.add(area); } catch (_) {}
+      }
       aggiorna(true);
       aRiposo();
     }
@@ -690,7 +761,12 @@
       aggiorna(true);
     }
     const iniziale = (a) => (/^(input|textarea)$/i.test(a.tagName) ? a.defaultValue || '' : '');
-    function onTocco(e) { ultimoTocco = bersaglio(e); }
+    // Il clic su «Crea» arriva col dialogo ancora aperto: l'ultimo momento per contare il nome nella pagina.
+    function onTocco(e) {
+      ultimoTocco = bersaglio(e);
+      if (inDialogo.size) fotografaDialoghi();
+    }
+    function onTasto(e) { if (e.key === 'Enter' && inDialogo.size) fotografaDialoghi(); }
     function onPrima(e) {
       if (!gesto(e)) return;
       const campo = campoDa(e);
@@ -736,33 +812,50 @@
           const t = lunghe.has(a) ? ora : '';
           if (t && t !== pulito(base)) partiti.add(impronta(t));
         }
-        // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main).
         // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
         let dest = '';
+        let azione = '';
         try {
           if (form.querySelector('input[type=password]')) conTesto = false;
           dest = (e.submitter && e.submitter.getAttribute('formtarget')) || form.getAttribute('target') || '';
+          azione = (e.submitter && e.submitter.getAttribute('formaction')) || '';
         } catch (_) {}
-        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+        if (conTesto) segnalaInvio(form, dest, azione);
         aggiorna(false);
         mandaImpronte();
       }, 0);
     }
-    // L'accesso in testata c'è in ogni pagina del sito: nella pagina dopo non vuol dire sessione scaduta.
-    function passwordFuori(form) {
+    // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main). Da un
+    // riquadro cambia pagina il riquadro, e il main ne riconosce la risposta dall'indirizzo del modulo.
+    function segnalaInvio(form, dest, azione = '') {
+      let url = '';
       try {
-        return Array.prototype.some.call(document.querySelectorAll('input[type=password]'),
-          (el) => !form.contains(el) && el.getClientRects().length > 0);
-      } catch (_) { return false; }
+        if (/^dialog$/i.test(form.getAttribute('method') || '')) return;
+        url = new URL(azione || form.getAttribute('action') || '', form.ownerDocument.baseURI).href;
+      } catch (_) {}
+      const nelRiquadro = IS_SUBFRAME || form.ownerDocument !== document;
+      if (!nelRiquadro || /^_top$/i.test(dest)) {
+        if (/^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+      } else if (/^(|_self)$/i.test(dest) && /^https?:/i.test(url)) {
+        let titoloPrima = '';
+        try { titoloPrima = form.ownerDocument.title || ''; } catch (_) {}
+        invia({ type: MSG.TAB_ACTIVITY, invioRiquadro: url, pwPrima: passwordFuori(form), titoloPrima });
+      }
+    }
+    // Una password già nella pagina dell'invio, fuori dal modulo: nella pagina dopo non vuol dire sessione scaduta.
+    function passwordFuori(form) {
+      const A = globalThis.SN_ACCESSO_FISSO;
+      try { return !!A && A.passwordDiAccesso(form.ownerDocument, form); } catch (_) { return false; }
     }
     // Il modulo parte anche senza il suo bottone (uno script, un controllo antispam, un editor in un
     // riquadro che copia il testo nel modulo): conta quello che il modulo porta, non da dove si è scritto.
     function onDatiModulo(e) {
       const form = e.target;
-      if (IS_SUBFRAME || !form || !aree.size || !e.formData) return;
+      if (!form || !aree.size || !e.formData) return;
+      let dest = '';
       try {
         if (form.querySelector('input[type=password]')) return;
-        if (!/^(|_self|_top)$/i.test(form.getAttribute('target') || '')) return;
+        dest = form.getAttribute('target') || '';
       } catch (_) { return; }
       const valori = [];
       try {
@@ -778,7 +871,7 @@
         if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
         const ess = essenziale(ora);
         if (ess && valori.some((v) => v.includes(ess))) {
-          invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+          segnalaInvio(form, dest);
           return;
         }
       }
@@ -827,6 +920,7 @@
       segnaScrittureDiFilo(win);
       try {
         win.addEventListener('pointerdown', onTocco, o);
+        win.addEventListener('keydown', onTasto, o);
         win.addEventListener('beforeinput', onPrima, o);
         win.addEventListener('input', onFormInput, o);
         win.addEventListener('change', onFormInput, o);
@@ -889,12 +983,26 @@
       ultimeImpronte = '';
       mandaImpronte();
     });
+    // Il testo partito su un collegamento sempre aperto e confermato dal server, o respinto: il main lo legge come una
+    // richiesta riuscita o respinta.
+    const collegamento = globalThis.SN_COLLEGAMENTO_APERTO;
+    if (typeof collegamento === 'string' && collegamento) {
+      window.addEventListener(collegamento, (e) => {
+        if ((!aree.size && !orfani.length) || typeof e.detail !== 'string' || !e.detail) return;
+        invia({ type: MSG.TAB_ACTIVITY, collegamento: e.detail });
+      }, true);
+      window.addEventListener(`${collegamento}:r`, (e) => {
+        if (!aree.size || typeof e.detail !== 'string' || !e.detail) return;
+        invia({ type: MSG.TAB_ACTIVITY, collegamentoRespinto: e.detail });
+      }, true);
+    }
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
+      if (msg && msg.type === MSG.FORM_SENT) { try { if (msg.respinto === true) respinto(msg.testo); else partito(msg.testo); } catch (_) {} return; }
       if (!msg || msg.type !== MSG.FORM_RECHECK) return;
       osserva(window);
       stato();
       try { adotta(msg.impronte); } catch (_) {}
+      try { ricomparsi(); } catch (_) {}
       manda(stato(), false);
       mandaImpronte();
     });
