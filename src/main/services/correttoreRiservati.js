@@ -55,18 +55,18 @@ function presenta() {
 
 // «pasword», «passowrd», «pssword»: chi chiede in chat sbaglia la parola e non la corregge. Al più due errori, e la
 // parola resta quella che comincia per p e finisce per d («passport» no).
+const NOVITA = () => globalThis.SN_NOVITA || (require('../../shared/novita.js'), globalThis.SN_NOVITA);
 function refusoDiPassword(w) {
   if (w === 'password' || w.length < 6 || w.length > 10 || w[0] !== 'p' || !w.endsWith('d')) return false;
-  const a = 'password';
-  const d = Array.from({ length: w.length + 1 }, (_, i) => [i, ...Array(a.length).fill(0)]);
-  for (let j = 1; j <= a.length; j++) d[0][j] = j;
-  for (let i = 1; i <= w.length; i++) {
-    for (let j = 1; j <= a.length; j++) {
-      d[i][j] = Math.min(d[i - 1][j] + 1, d[i][j - 1] + 1, d[i - 1][j - 1] + (w[i - 1] === a[j - 1] ? 0 : 1));
-      if (i > 1 && j > 1 && w[i - 1] === a[j - 2] && w[i - 2] === a[j - 1]) d[i][j] = Math.min(d[i][j], d[i - 2][j - 2] + 1);
-    }
-  }
-  return d[w.length][a.length] <= 2;
+  return NOVITA().distanza(w, 'password', 2) <= 2;
+}
+
+// I nomi della password: quelli che il filtro riconosce già (urlExfil), «pw», «pass» e i refusi di «password».
+let soloNomePassword = null;
+function nomeDiPassword(w) {
+  const P = globalThis.SN_URL_EXFIL && globalThis.SN_URL_EXFIL.PRESENTA;
+  if (!soloNomePassword && P) soloNomePassword = new RegExp(`^(?:${P.password.replace(/^\\b|\\b$/g, '')}|pw|pass)$`, 'u');
+  return (soloNomePassword ? soloNomePassword.test(w) : w === 'password') || refusoDiPassword(w);
 }
 
 // Dove il testo (già minuscolo) nomina una password o un codice.
