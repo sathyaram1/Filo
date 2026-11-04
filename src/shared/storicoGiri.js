@@ -1,6 +1,6 @@
-// I giri di verifica dei lavori chiusi (#795, routineStateAdmin op giri): livelli trovati, esterni, corretti, bilancio
-// pagato ed esito, e i totali. Logica pura per Gestione → Routine → Log e scripts/storico-giri.mjs; solo numeri, mai il
-// testo dei rilievi. Prove: tests/unit/storicoGiri.test.mjs.
+// I giri di verifica dei lavori chiusi (#795): livelli trovati, esterni, corretti, bilancio pagato ed esito, e i totali.
+// Logica pura per Gestione → Routine → Log e scripts/storico-giri.mjs; solo numeri, mai il testo dei rilievi.
+// Prove: tests/unit/storicoGiri.test.mjs.
 
 (function (global) {
   'use strict';

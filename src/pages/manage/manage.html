@@ -1759,6 +1759,48 @@
     .mg-rc-nonpuo b, .mg-rc-usato b { font-weight: 600; }
     .sn-page .mg-rc-ambito-testa button.sn-btn { margin-left: auto; padding: 2px 10px; font-size: 11.5px; }
     .mg-rc-ambito-esito { margin: 4px 0 0; }
+    /* Gli strumenti dell'owner (#1926): parole d'ordine, domanda di fine sessione, ordine, giri. Una riga per voce. */
+    .mg-ac[hidden], .mg-gi[hidden] { display: none; }
+    .mg-ac > h2 + .mg-auto-block { margin-top: 0; }
+    .mg-ac-lista { list-style: none; margin: 0; padding: 0; }
+    .mg-ac-riga {
+      display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; padding: 7px 8px; border-radius: 6px;
+      font-size: 13px; transition: background calc(0.1s * var(--sn-motion, 1));
+    }
+    .mg-ac-riga:hover { background: var(--sn-hover); }
+    .mg-ac-nome { font-weight: 600; color: var(--sn-fg); overflow-wrap: anywhere; }
+    .mg-ac-info { font-size: 12px; color: var(--sn-muted); overflow-wrap: anywhere; }
+    .mg-ac-riga[data-revocata="true"] .mg-ac-nome { color: var(--sn-muted); text-decoration: line-through; }
+    .mg-ac-azioni { margin-left: auto; display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+    .sn-page .mg-ac-azioni button.sn-btn { padding: 4px 11px; font-size: 12px; }
+    .sn-page .mg-ac-azioni select { font: inherit; font-size: 12px; padding: 3px 6px; border-radius: 6px; }
+    .mg-ac-nuova { margin-top: 14px; }
+    .mg-ac-largo { flex: 1 1 260px; }
+    .sn-page .mg-ac-largo .mg-cp-campo { width: 100%; box-sizing: border-box; }
+    .mg-ac-testo { min-height: 44px; resize: vertical; }
+    /* La parola appena nata: in evidenza finché non si copia, selezionabile con un clic. */
+    .mg-ac-nata { margin-top: 14px; padding: 10px 12px; border-radius: 8px; border-left: 3px solid var(--sn-accent); background: var(--sn-hover); }
+    .mg-ac-nata[hidden] { display: none; }
+    .mg-ac-parola {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; padding: 5px 9px;
+      border-radius: 6px; background: var(--sn-bg); border: 1px solid var(--sn-border); color: var(--sn-fg);
+      user-select: all; overflow-wrap: anywhere;
+    }
+    .mg-ac-dove { white-space: pre-wrap; }
+    .mg-ac-domanda, .mg-ac-risposta, .mg-gi-giro {
+      flex: 1 0 100%; margin: 0; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 12.5px; color: var(--sn-fg);
+    }
+    .mg-ac-risposta { padding-left: 8px; border-left: 2px solid color-mix(in srgb, var(--sn-accent) 45%, transparent); }
+    .mg-gi-giro { color: var(--sn-muted); font-variant-numeric: tabular-nums; }
+    .mg-ac-sotto { font-size: 13px; font-weight: 600; margin: 18px 0 4px; color: var(--sn-fg); }
+    .mg-ac-risposte { max-height: 480px; overflow: auto; }
+    .mg-gi .mg-cp-scelte { margin: 0 0 12px; }
+    .mg-gi-testa { margin: 0 0 6px; font-size: 13px; color: var(--sn-fg); }
+    .mg-gi-avviso { margin: 0 0 6px; font-size: 12px; color: var(--sn-accent); }
+    .mg-gi-tabella { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; margin: 4px 0 6px; }
+    .mg-gi-tabella th, .mg-gi-tabella td { padding: 2px 12px 2px 0; text-align: left; }
+    .mg-gi-tabella th { font-weight: 600; color: var(--sn-muted); }
+    .mg-gi-esiti { margin: 0 0 12px; font-size: 12px; color: var(--sn-muted); }
     .mg-automation h2 {
       font-size: 15px; font-weight: 700; margin: 0 0 12px; color: var(--sn-fg);
     }
@@ -3333,6 +3375,7 @@
   <script src="manageInPausa.js"></script>
   <script src="manageCrediti.js"></script>
   <script src="manageManutentore.js"></script>
+  <script src="manageStrumenti.js"></script>
   <script src="manageUtenti.js"></script>
   <script src="manageContatori.js"></script>
   <script src="managePredefiniti.js"></script>

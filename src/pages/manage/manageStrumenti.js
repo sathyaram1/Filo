@@ -165,7 +165,6 @@
     $('mgChiaveNataTitolo').textContent = `La parola d’ordine di «${r.slug}». Copiala adesso: non si potrà più rileggere.`;
     $('mgChiaveParola').textContent = r.passphrase;
     $('mgChiaveDove').textContent = CH.DOVE_VA[r.scope] || '';
-    esito($('mgChiaveDove'), CH.DOVE_VA[r.scope] || '');
     nata.hidden = false;
     caricaChiavi();
   });
@@ -343,12 +342,10 @@
   const ordNumeri = $('mgOrdineNumeri');
   const ordSalva = $('mgOrdineSalva');
   const ordMsg = $('mgOrdineMsg');
-  let ordineLetto = null;
 
   async function caricaOrdine() {
     const r = await chiedi({ type: T.recap });
     const o = r.ok && r.stato && Array.isArray(r.stato.ordine) ? r.stato.ordine : null;
-    ordineLetto = o;
     // Un ordine che il server non manda non si inventa: il campo resta com'è, vuoto è «per priorità» solo se letto.
     if (o && document.activeElement !== ordNumeri) ordNumeri.value = o.join(', ');
     ordNumeri.placeholder = o && !o.length ? 'nessun ordine: per priorità' : '812, 815, 815.2';
@@ -368,7 +365,6 @@
     ordSalva.disabled = false;
     if (!r.ok) { esito(ordMsg, `Non riuscito: ${r.error}`, 'err'); return; }
     const o = Array.isArray(r.ordine) ? r.ordine : numeri;
-    ordineLetto = o;
     ordNumeri.value = o.join(', ');
     esito(ordMsg, o.length ? `Salvato: ${o.length === 1 ? 'si accende prima' : `si accendono prima, in quest’ordine,`} ${o.map((n) => `#${n}`).join(', ')}.` : 'Svuotato: si accende per priorità.', 'ok');
   });
