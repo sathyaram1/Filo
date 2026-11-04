@@ -3258,6 +3258,7 @@
     DEFAULT_PROVIDER,
     PROVIDER_ORDER,
     modelProvidersWithKey,
+    credenzialiProxy,
     campiSegreti,
     haSegreti,
     canServeAction,
