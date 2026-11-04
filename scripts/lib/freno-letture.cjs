@@ -160,7 +160,6 @@ function conFreno(vera) {
     if (l && l.motivo) throw new ScansioneSenzaCampi(l.motivo);
     // Lo stesso documento riletto (il contatore, la configurazione) non è una scansione: conta una volta sola.
     if (l && l.nomi && l.nomi.every((n) => letti.has(n))) return vera.call(this, input, init);
-    if (l && l.nomi) l.nomi.forEach((n) => letti.add(n));
     if (l && l.mirata) {
       for (const [collezione, quanti] of Object.entries(l.mirata)) {
         const gia = presi.get(collezione) || 0;
