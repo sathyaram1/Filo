@@ -1,6 +1,7 @@
 // La compattazione del filo (SPEC-CONTESTO fase 4, #1563): la soglia, i tre punti di partenza, il grezzo che resta, la
 // storia già mandata che non cambia, gli esiti vecchi tolti per primi oltre il listino, il sospetto che non passa nel
-// riassunto. Le due metà: la logica pura e il modulo del main sul filo vero, in una cartella temporanea.
+// riassunto, la stima accanto alla soglia. Le due metà: la logica pura e il modulo del main sul filo vero, in una
+// cartella temporanea.
 
 import { test, after } from 'node:test';
 import assert from 'node:assert/strict';
@@ -310,4 +311,35 @@ test('un pezzo più grande di quanto va al modello in una volta si compatta a pe
   assert.equal(resta[0].role, 'user', 'il pezzo finisce prima di una domanda, non a metà turno');
   await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
   assert.ok((await componi(ora)).visti.length < resta.length);
+});
+
+test('la stima accanto alla soglia: più bassa compatta più spesso, oltre i 100.000 token il listino di Haiku costa cinque volte', () => {
+  require('../../src/shared/stimaCosto.js');
+  const S = globalThis.SN_STIMA_COSTO;
+  const haiku = S.prezzoDaCatalogo({
+    prompt: '0.0000001', completion: '0.0000005', input_cache_read: '0.00000001',
+    overrides: [{ min_prompt_tokens: 100000, prompt: '0.0000005', completion: '0.0000025', input_cache_read: '0.00000005' }],
+  });
+  assert.equal(S.prezzoPer(haiku, 99999).prompt, 0.0000001);
+  assert.equal(S.prezzoPer(haiku, 100000).prompt, 0.0000005);
+  const stima = (soglia) => L.stimaSoglia({ soglia, base: 38500, prezzoChat: haiku, prezzoCompattazione: haiku, prezzoPer: S.prezzoPer });
+  assert.ok(stima(50000).ogni < stima(70000).ogni && stima(70000).ogni < stima(90000).ogni);
+  assert.match(stima(70000).testo, /^Circa \d+,\d+ \$ al mese con 600 messaggi .* \d+ s/);
+  assert.ok(stima(200000).oltreListino && stima(200000).usd > 3 * stima(70000).usd);
+  assert.match(stima(200000).testo, /cinque volte/);
+  assert.equal(L.stimaSoglia({ soglia: 70000, base: 38500, prezzoChat: null, prezzoCompattazione: haiku }), null, 'senza prezzo, niente stima inventata');
+});
+
+test('la soglia si cambia anche chiedendolo in chat, e il cambio si annulla con la sua frase', () => {
+  globalThis.self = globalThis;
+  for (const m of ['timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences']) require(`../../src/shared/${m}.js`);
+  const P = globalThis.SN_PREF;
+  const K = globalThis.SN_CAMBI;
+  const r = P.buildPreferencePartial('soglia di compattazione', '50 mila');
+  assert.deepEqual(r.partial, { contestoFilo: { soglia: 50000 } });
+  assert.equal(r.label, 'Soglia di compattazione della chat → 50.000');
+  assert.deepEqual(P.buildPreferencePartial('soglia_compattazione', 'predefinito').partial, { contestoFilo: { soglia: null } });
+  assert.equal(P.buildPreferencePartial('soglia_compattazione', '10').partial.contestoFilo.soglia, FC.LIMITI.soglia[0]);
+  assert.equal(K.fraseCambio({ chiave: 'contestoFilo.soglia', prima: null, dopo: 50000 }),
+    'soglia oltre la quale la chat compatta la conversazione: come i predefiniti → 50.000 token');
 });
