@@ -782,8 +782,8 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
 - **Chi controlla lei:** il server conta le sue sessioni chiuse bene, non le
-  scritture nel taccuino, e dopo 26 ore senza apre una domanda per l'owner
-  (SPEC-MANUTENTORE.md § 7).
+  scritture nel taccuino, e quando da troppo non ne vede una apre una domanda
+  per l'owner (la soglia sta in SPEC-MANUTENTORE.md § 7).
 
 ### 4.4 Cosa minimizzare
 
