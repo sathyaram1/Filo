@@ -46,7 +46,8 @@
       ruolo: (el.getAttribute && el.getAttribute('role')) || '',
       inRicerca,
       etichetta: `${(el.getAttribute && el.getAttribute('aria-label')) || ''} ${el.placeholder || ''}`,
-      righe: tag === 'TEXTAREA' ? righeDi(el) : 1,
+      // Misurare costa un calcolo della pagina a ogni tasto: serve solo a un'area col nome da ricerca.
+      righe: tag !== 'TEXTAREA' ? 1 : (NOMI.test(el.name || '') ? righeDi(el) : 0),
       lunghezza: String(el.value || '').trim().length,
     };
   }

@@ -141,6 +141,8 @@ module.exports = function register(on, ctx) {
         impronte: msg.impronte,
         invioPagina: msg.invioPagina === true,
         pwPrima: msg.pwPrima === true,
+        invioRiquadro: typeof msg.invioRiquadro === 'string' ? msg.invioRiquadro.slice(0, 4096) : '',
+        collegamento: typeof msg.collegamento === 'string' ? msg.collegamento : '',
       }, sender.frame);
     }
     return { ok: true };

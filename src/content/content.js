@@ -699,6 +699,8 @@
         stato();
         for (const area of aree.keys()) righeViste.set(area, righeDi(area));
         adotta(null);
+        ricomparsi();
+        fotografaDialoghi();
         aggiorna(false);
         mandaImpronte();
       }, 400);
@@ -773,17 +775,33 @@
           const t = lunghe.has(a) ? ora : '';
           if (t && t !== pulito(base)) partiti.add(impronta(t));
         }
-        // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main).
         // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
         let dest = '';
+        let azione = '';
         try {
           if (form.querySelector('input[type=password]')) conTesto = false;
           dest = (e.submitter && e.submitter.getAttribute('formtarget')) || form.getAttribute('target') || '';
+          azione = (e.submitter && e.submitter.getAttribute('formaction')) || '';
         } catch (_) {}
-        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+        if (conTesto) segnalaInvio(form, dest, azione);
         aggiorna(false);
         mandaImpronte();
       }, 0);
+    }
+    // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main). Da un
+    // riquadro cambia pagina il riquadro, e il main ne riconosce la risposta dall'indirizzo del modulo.
+    function segnalaInvio(form, dest, azione = '') {
+      let url = '';
+      try {
+        if (/^dialog$/i.test(form.getAttribute('method') || '')) return;
+        url = new URL(azione || form.getAttribute('action') || '', form.ownerDocument.baseURI).href;
+      } catch (_) {}
+      const nelRiquadro = IS_SUBFRAME || form.ownerDocument !== document;
+      if (!nelRiquadro || /^_top$/i.test(dest)) {
+        if (/^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+      } else if (/^(|_self)$/i.test(dest) && /^https?:/i.test(url)) {
+        invia({ type: MSG.TAB_ACTIVITY, invioRiquadro: url });
+      }
     }
     // L'accesso in testata c'è in ogni pagina del sito: nella pagina dopo non vuol dire sessione scaduta.
     function passwordFuori(form) {
@@ -796,10 +814,11 @@
     // riquadro che copia il testo nel modulo): conta quello che il modulo porta, non da dove si è scritto.
     function onDatiModulo(e) {
       const form = e.target;
-      if (IS_SUBFRAME || !form || !aree.size || !e.formData) return;
+      if (!form || !aree.size || !e.formData) return;
+      let dest = '';
       try {
         if (form.querySelector('input[type=password]')) return;
-        if (!/^(|_self|_top)$/i.test(form.getAttribute('target') || '')) return;
+        dest = form.getAttribute('target') || '';
       } catch (_) { return; }
       const valori = [];
       try {
@@ -815,7 +834,7 @@
         if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
         const ess = essenziale(ora);
         if (ess && valori.some((v) => v.includes(ess))) {
-          invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+          segnalaInvio(form, dest);
           return;
         }
       }
@@ -864,6 +883,7 @@
       segnaScrittureDiFilo(win);
       try {
         win.addEventListener('pointerdown', onTocco, o);
+        win.addEventListener('keydown', onTasto, o);
         win.addEventListener('beforeinput', onPrima, o);
         win.addEventListener('input', onFormInput, o);
         win.addEventListener('change', onFormInput, o);
@@ -926,12 +946,21 @@
       ultimeImpronte = '';
       mandaImpronte();
     });
+    // Il testo partito su un collegamento sempre aperto a cui il server ha risposto: il main lo legge come una richiesta.
+    const collegamento = globalThis.SN_COLLEGAMENTO_APERTO;
+    if (typeof collegamento === 'string' && collegamento) {
+      window.addEventListener(collegamento, (e) => {
+        if ((!aree.size && !orfani.length) || typeof e.detail !== 'string' || !e.detail) return;
+        invia({ type: MSG.TAB_ACTIVITY, collegamento: e.detail });
+      }, true);
+    }
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
       if (!msg || msg.type !== MSG.FORM_RECHECK) return;
       osserva(window);
       stato();
       try { adotta(msg.impronte); } catch (_) {}
+      try { ricomparsi(); } catch (_) {}
       manda(stato(), false);
       mandaImpronte();
     });
