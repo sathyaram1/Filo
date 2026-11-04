@@ -304,7 +304,9 @@ test('una risposta registrata da una sessione si annulla da Gestione: torna aper
   await expect(dett.locator('button[data-fai="annulla"]')).toBeVisible();
   await expect(dett.locator('button[data-fai="riapri"]')).toBeVisible();
   await dett.locator('button[data-fai="annulla"]').click();
-  await expect(dett.locator('.mg-dq-msg')).toHaveText(/Annullata: è di nuovo fra quelle da rispondere/);
+  await expect(dett.locator('.mg-dq-msg')).toHaveText(/Annullata: è di nuovo fra quelle da rispondere\. I feedback sono com’erano\./);
+  // Verifica #1926 giro 1, r4: il compito nato dalla risposta non si disfa, e la pagina lo dice.
+  await expect(dett.locator('.mg-dq-msg')).toContainText('Il compito C-9, nato da quella risposta, non si annulla da qui');
   expect(await app.evaluate(() => globalThis.__annullate)).toEqual(['D-72']);
   await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText(/\(1\)/);
 });
