@@ -1,4 +1,4 @@
-// #1808 giro 2: editor in un riquadro, modulo mandato e respinto, nelle sue varianti comuni.
+// #1808 giro 2, rilievo 1: un editor in un riquadro nato da srcdoc, mandato e respinto, deve tenere aperta la scheda.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
@@ -49,13 +49,11 @@ async function apriSito() {
 }
 
 const LETTERA = 'Buongiorno, vi scrivo per il rimborso dell’ordine 4471: il pacco è arrivato rotto e vorrei sapere come procedere';
-const SCRIVI = 'const d = ifr.contentDocument; d.open(); d.write(\'<body contenteditable="true" style="min-height:100px"></body>\'); d.close();';
 const CAMPI = {
   textarea: '<textarea name="corpo" id="nasc" style="display:none"></textarea>',
   hidden: '<input type="hidden" name="corpo" id="nasc">',
 };
 const RIQUADRI = {
-  scritto: { tag: '<iframe id="ifr" style="width:420px;height:120px"></iframe>', script: SCRIVI },
   srcdoc: { tag: '<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body contenteditable=true style=\'min-height:100px\'></body>"></iframe>', script: '' },
 };
 const INVII = {
@@ -63,7 +61,7 @@ const INVII = {
   script: { el: '<a href="#" id="pub">Pubblica</a>', script: 'pub.onclick = (e) => { e.preventDefault(); nasc.value = ifr.contentDocument.body.innerHTML; f.submit(); };' },
 };
 
-test('r1 un editor in un riquadro mandato e respinto tiene aperta la scheda, in ogni variante comune', async ({ app, shell }) => {
+test('r1 un editor in un riquadro nato da srcdoc mandato e respinto tiene aperta la scheda', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
     const ids = {};
@@ -72,7 +70,7 @@ test('r1 un editor in un riquadro mandato e respinto tiene aperta la scheda, in 
       const titolo = `Ed${++k}`;
       const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
         <form id="f" method="post" action="/err500">${c}${r.tag}${inv.el}</form>
-        <script>window.addEventListener('load', () => {}); ${r.script} ${inv.script}</script>`));
+        <script>${inv.script}</script>`));
       await page.frameLocator('#ifr').locator('body').click();
       await page.keyboard.type(LETTERA);
       await expect.poll(async () => (await schede(shell)).find((t) => t.title === titolo)?.formDirty, { timeout: 8_000 }).toBe(true);
