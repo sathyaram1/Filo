@@ -4780,17 +4780,14 @@ async function paginePerChat(query) {
   const out = [];
   for (const p of [...trovate.values()].sort((a, b) => Date.parse(b.date || 0) - Date.parse(a.date || 0))) {
     const delicata = p.chiusa ? chiusaDelicata(p._voce || {}, fuori) : fuori(p.url);
-    let sito = '';
-    try { sito = new URL(p.url).hostname.replace(/^www\./, ''); } catch (_) {}
-    // Un indirizzo tagliato alla misura (#1525) porterebbe altrove: al modello va il sito, detto come tale.
+    // Delicata, o tagliata alla misura (#1525) che porterebbe altrove: esce solo il sito, come da SCHEDE_CHIUSE.
     const tagliata = !!(p._voce && p._voce.urlTagliato);
-    let origine = '';
-    try { origine = new URL(p.url).origin; } catch (_) {}
+    const solo = CercaChiuse.soloSito(p.url);
     // Una scheda chiusa porta il suo id d'archivio: RIAPRI_SCHEDA la riapre com'era (#884).
     const idChiusa = p.chiusa && p._voce && typeof p._voce.id === 'string' ? { id: p._voce.id } : {};
     out.push(delicata
-      ? { url: sito ? `https://${sito}/` : '', title: sito || 'sito', date: p.date, chiusa: !!p.chiusa, delicata: true, ...idChiusa }
-      : { url: tagliata ? (origine ? `${origine}/` : '') : p.url, title: p.title, date: p.date, chiusa: !!p.chiusa, ...idChiusa,
+      ? { url: solo.url, title: solo.sito, date: p.date, chiusa: !!p.chiusa, delicata: true, ...idChiusa }
+      : { url: tagliata ? solo.url : p.url, title: p.title, date: p.date, chiusa: !!p.chiusa, ...idChiusa,
         ...(tagliata ? { tagliata: true } : {}), ...(p.riassunto ? { riassunto: String(p.riassunto).slice(0, 400) } : {}) });
   }
   return out.filter((p) => p.url);
