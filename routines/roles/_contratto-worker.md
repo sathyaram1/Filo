@@ -43,9 +43,8 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   Il rapporto porta già gli strumenti falliti (con cosa hai fatto dopo) e le
   attese sopra i 30 secondi, letti dal transcript: non riportarli a parole;
 - un guasto che ti impedisce di lavorare → il rilascio con `--guasto`, come
-  nella sezione qui sotto: è così che il server smette di dare lavoro per
-  questo giro e rimette il lavoro in coda. Non "riportarlo" a parole:
-  registralo.
+  nella sezione qui sotto: è così che il guasto arriva al manutentore e il
+  lavoro aspetta che la causa passi. Non "riportarlo" a parole: registralo.
 
 Se hai registrato tutto, la tua ultima frase non conta niente. Se non l'hai
 registrato, non esiste.
