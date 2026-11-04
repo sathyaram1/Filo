@@ -168,15 +168,19 @@ const LIBERE = {
   coppia: new RegExp(`(?<![\\p{L}\\p{N}])(${UTENTE}|${PW})\\s*/\\s*(${UTENTE}|${PW})\\s*[:=]\\s*(\\S+?)\\s*/\\s*(\\S+)`, 'gu'),
   credenziali: /(?<![\p{L}\p{N}])(?:credenziali|credentials|dati\s+(?:di\s+)?(?:accesso|login))\s*[:=]\s*(\S+?)\s*\/\s*(\S+)/gu,
   accedi: /(?<![\p{L}\p{N}])(?:accedi|entra|login|log\s*in|sign\s*in)\s+(?:con|with)\s*:?\s*(\S+?)\s*\/\s*(\S+)/gu,
-  // «Wi-Fi: CasaRossi - Faro7Blu55»: prima la rete, poi la chiave.
-  rete: /(?<![\p{L}\p{N}])(?:wi-?fi|wlan|ssid)\s*[:=]\s*(\S+)\s+[-–—/|]\s+(\S+)/gu,
-  // «SSID: CasaRossi» e sotto «Key: Brezza7Mare».
-  chiaveRete: /(?<![\p{L}\p{N}])(?:ssid|nome\s+(?:della\s+)?rete|network(?:\s+name)?|wi-?fi|wlan)\s*[:=][^\n]*\n(?:[^\S\n]*\n)?[^\S\n]*(?:key|chiave(?:\s+(?:di\s+rete|wpa2?))?|password|pass|pw|psk|wpa2?(?:\s+key)?)\s*[:=]\s*(\S+)/gu,
+  // «Wi-Fi: CasaRossi - Faro7Blu55»: prima la rete, poi la chiave. Il nome della rete può avere spazi (32 caratteri al più).
+  rete: /(?<![\p{L}\p{N}])(?:wi-?fi|wlan|ssid)\s*[:=]\s*([^\n]{1,32}?)\s+[-–—/|]\s+(\S+)/gu,
+  // «SSID: CasaRossi» e sotto «Key: Brezza7Mare», o sulla stessa riga.
+  chiaveRete: /(?<![\p{L}\p{N}])(?:ssid|nome\s+(?:della\s+)?rete|network(?:\s+name)?|wi-?fi|wlan)\s*[:=][^\n]*?(?:[^\S\n]*[,;|/][^\S\n]*|[^\S\n]+|[^\S\n]*\n(?:[^\S\n]*\n)?[^\S\n]*)(?:key|chiave(?:\s+(?:di\s+rete|wpa2?))?|password|pass|pw|psk|wpa2?(?:\s+key)?)\s*[:=]\s*(\S+)/gu,
   corte: new RegExp(ETICHETTE_CORTE, 'gu'),
-  // «la password su whatsapp, è Girasole2024»: il valore dopo la virgola.
-  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(?:${PW}|${ETICHETTE_CORTE})[^\\n.!?]{0,80}?,\\s*(?:è|e'|era|is|sarebbe)\\s+(\\S+)`, 'gu'),
+  // «la password su whatsapp, (comunque) è Girasole2024»: il valore dopo la virgola.
+  virgola: new RegExp(`(?<![\\p{L}\\p{N}])(?:${PW}|${ETICHETTE_CORTE})[^\\n.!?]{0,80}?,\\s*(?:[\\p{L}'’]+\\s+){0,2}?(?:è|e'|e’|era|is|sarebbe)\\s+(\\S+)`, 'gu'),
 };
 const SOLO_PW = new RegExp(`^${PW}$`, 'u');
+// Dopo un'etichetta corta una parola qualunque è il resto della frase («la pass giornaliera», «il pw del documento»):
+// conta se ha la forma di una password, o se la presenta «è» o i due punti; dopo «pw» anche se viene subito.
+const PRESENTATA = /^\s*(?:(?:del(?:la)?|dell['’]|di)\s+[\p{L}\p{N}-]+\s*)?(?:[:=]|è|e['’]|era|is|sarebbe)\s*$/u;
+const ACCANTO = /^\s*$/u;
 
 function formeLibere(testo) {
   const X = globalThis.SN_URL_EXFIL;
