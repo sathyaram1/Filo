@@ -246,7 +246,11 @@
     const file = type === 'APRI_FILE' && esito !== FALLITO && esito !== CHIESTO ? fileDi(x) : null;
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
     const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
-    return senzaVuoti({ type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, evento });
+    return senzaVuoti({
+      type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, evento,
+      partita: esito === FALLITO && partita(x),
+      ...(SENZA_TITOLO[type] || !x._confirm ? {} : bottoneDi(esito, x, x._confirm)),
+    });
   }
   function rigaDelDiario(x) {
     const R = global.SN_RIGHE_ATTIVITA;
