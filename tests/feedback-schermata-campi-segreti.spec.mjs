@@ -89,17 +89,22 @@ test('nello screenshot del feedback la password e il numero della carta scritti 
   const c = await page.locator('#c').boundingBox();
   expect(await pixelDiversi(page, immagini, dentro(p)), 'la password si legge nello screenshot del feedback').toBe(0);
   expect(await pixelDiversi(page, immagini, dentro(c)), 'il numero della carta si legge nello screenshot del feedback').toBe(0);
-  // Il resto della pagina c'è: il titolo si vede, non è una foto vuota.
+  // Il resto della pagina c'è: nella zona del titolo ci sono i colori del testo, non uno sfondo pieno.
   const h1 = await page.locator('h1').boundingBox();
-  const vuota = await pixelDiversi(page, [immagini[0], 'data:image/png;base64,' + await page.evaluate(() => {
+  const colori = await page.evaluate(async ([url, r]) => {
+    const byte = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([byte]));
     const cv = document.createElement('canvas');
-    cv.width = innerWidth; cv.height = innerHeight;
+    cv.width = img.width; cv.height = img.height;
     const ctx = cv.getContext('2d');
-    ctx.fillStyle = getComputedStyle(document.body).backgroundColor || '#fff';
-    ctx.fillRect(0, 0, cv.width, cv.height);
-    return cv.toDataURL('image/png').split(',')[1];
-  })], { left: h1.x, top: h1.y, width: Math.min(h1.width, 200), height: h1.height });
-  expect(vuota, 'nello screenshot si deve vedere la pagina').toBeGreaterThan(0);
+    ctx.drawImage(img, 0, 0);
+    const sx = img.width / window.innerWidth, sy = img.height / window.innerHeight;
+    const d = ctx.getImageData(Math.round(r.left * sx), Math.round(r.top * sy), Math.round(r.width * sx), Math.round(r.height * sy)).data;
+    const visti = new Set();
+    for (let i = 0; i < d.length; i += 4) visti.add(`${d[i]},${d[i + 1]},${d[i + 2]}`);
+    return visti.size;
+  }, [immagini[0], { left: h1.x, top: h1.y, width: Math.min(h1.width, 200), height: h1.height }]);
+  expect(colori, 'nello screenshot si deve vedere la pagina').toBeGreaterThan(2);
 });
 
 test('se un campo segreto non si riesce a coprire lo screenshot non parte e il riquadro dice perché', async ({ app, openTab, testServer }) => {
