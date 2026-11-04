@@ -12,6 +12,7 @@
 
 const auth = require('../../auth/google-auth');
 const Gate = require('../redteamGate');
+const Verificato = require('../redteamVerificato');
 const { daFilo, soloFilo } = require('./origine');
 
 // Region e progetto sono quelli del deploy di filo-security; override per i test via env.
@@ -25,7 +26,14 @@ module.exports = function register(on, ctx) {
   // Riaperto o rimesso in pausa: le pagine di Filo aperte (la home) lo sanno subito.
   Gate.suCambio((s) => {
     try { ctx.broadcastToFiloPages({ type: MSG.REDTEAM_VISIBILITY_CHANGED, visible: s.visible }); } catch (_) {}
+    rileggiLaVoce();
   });
+
+  // La voce «Invia attacco» del tasto destro: ogni scheda, sito o riquadro incorporato, la richiede quando cambia.
+  function rileggiLaVoce() {
+    try { ctx.broadcastToTabs({ type: MSG.REDTEAM_VERIFICATO_CHANGED }); } catch (_) {}
+  }
+  Verificato.suCambio(rileggiLaVoce);
 
   async function inPausa() {
     const s = await Gate.assicura();
@@ -64,6 +72,8 @@ module.exports = function register(on, ctx) {
     return body && body.result;
   }
 
+  Verificato.leggiCon(() => callable('redteamState', {}));
+
   on(MSG.REDTEAM_SUBMIT, async (msg) => {
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
@@ -84,6 +94,7 @@ module.exports = function register(on, ctx) {
     if (!auth.isSignedIn()) return { verified: false, signedIn: false, isOwner: false };
     try {
       const r = pausaDalServer(await callable('redteamState', {}));
+      Verificato.ricorda(r);
       return Object.assign({ signedIn: true, isOwner: auth.isAdmin() }, r);
     } catch (e) {
       if (e && e.paused) return { paused: true, error: e.message, verified: false, signedIn: true, isOwner: false };
@@ -118,10 +129,12 @@ module.exports = function register(on, ctx) {
     if (await inPausa()) return { status: 'paused', paused: true, error: PAUSA };
     if (!auth.isSignedIn()) return { status: 'not_signed_in' };
     try {
-      return await callable('redteamRedeem', {
+      const r = await callable('redteamRedeem', {
         code: String(msg?.code || ''),
         handle: String(msg?.handle || ''),
       });
+      if (r && (r.status === 'ok' || r.status === 'already_verified')) Verificato.ricorda({ verified: true });
+      return r;
     } catch (e) {
       if (e && e.paused) return { status: 'paused', paused: true, error: e.message };
       return { status: 'error', error: e?.message || String(e) };
@@ -162,12 +175,14 @@ module.exports = function register(on, ctx) {
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
-  // Il Red Team si mostra? A un sito visitato solo il sì/no: chi è owner lo chiede una superficie di Filo.
-  // Una copia scaduta si rilegge in sottofondo; `attendi` aspetta la prima lettura.
+  // Il Red Team si mostra? A un sito visitato solo il sì/no e se chi lo usa ha un codice (la voce del tasto destro,
+  // #991): chi è owner lo chiede una superficie di Filo. Una copia scaduta si rilegge in sottofondo; `attendi` aspetta.
   on(MSG.REDTEAM_VISIBILITY, async (msg, sender, origin) => {
-    const s = msg && msg.attendi ? await Gate.assicura() : Gate.aggiorna();
-    if (!daFilo(origin, sender)) return { ok: true, visible: s.visible };
-    return { ok: true, visible: s.visible, owner: s.owner, openToAll: s.openToAll, letto: s.letto };
+    const attendi = !!(msg && msg.attendi);
+    const s = attendi ? await Gate.assicura() : Gate.aggiorna();
+    const verificato = s.visible ? (attendi ? await Verificato.assicura() : Verificato.noto()) : false;
+    if (!daFilo(origin, sender)) return { ok: true, visible: s.visible, verificato };
+    return { ok: true, visible: s.visible, verificato, owner: s.owner, openToAll: s.openToAll, letto: s.letto };
   });
 
   // L'interruttore di Gestione: lettura fresca e scrittura, solo all'owner e solo da Filo.

@@ -528,3 +528,21 @@
   box-sizing: border-box;
 }
 .rt-pausa p { margin: 0; font-size: 18px; line-height: 1.5; color: var(--sn-muted); text-align: center; }
+
+/* Il bottone d'invio sta sulla riga del titolo: si vede da ogni scheda della pagina (#991). */
+/* Il margine del titolo passa alla riga, così titolo e bottone stanno sulla stessa linea. */
+.rt-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+.sn-page .rt-head h1 { margin: 0 auto 0 0; }
+.sn-page button.rt-attack-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.rt-attack-icon { display: inline-flex; }
+.rt-attack-icon svg { display: block; }

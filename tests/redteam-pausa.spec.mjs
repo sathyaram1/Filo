@@ -89,7 +89,8 @@ test.beforeAll(async () => {
           return setTimeout(() => json(res, 200, { result: { status: 'ok', attemptId: 'tentativo-lento' } }), invioLento);
         }
         if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'insufficient_credits', have: 0, needed: 50 } });
-        if (url === '/redteamState') return json(res, 200, { result: { verified: false } });
+        // La voce del tasto destro c'è solo per chi ha riscattato un codice (#991): qui l'hanno fatto tutti.
+        if (url === '/redteamState') return json(res, 200, { result: { verified: true } });
         if (url === '/redteamLeaderboard') return json(res, 200, { result: { entries: [] } });
       }
       json(res, 404, { error: { message: 'not found ' + url } });
@@ -332,10 +333,9 @@ test('#896 — invio dal pannello col server già in pausa: la frase resta scrit
   await preparaMain(app);
   redteamDoc = { openToAll: true };
   expect(await entra(app, 'utente')).toEqual({ admin: false, visible: true });
+  const { page, voce } = await vociDelTastoDestro(openTab, testServer);
   // L'owner l'ha appena rimesso in pausa: la copia locale dice ancora «aperto», il server no.
   serverInPausa = true;
-
-  const { page, voce } = await vociDelTastoDestro(openTab, testServer);
   await voce.click();
   // Su un sito il pannello sta nello strato sopra la scheda (#1509.1): si tocca coi tasti e i clic veri, lì.
   await expect.poll(() => statoDi(app, page, '.sn-rt-attack')).not.toBeNull();

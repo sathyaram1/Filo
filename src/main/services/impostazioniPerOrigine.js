@@ -66,6 +66,8 @@ const SPINTE_WEB = Object.freeze(new Set([
   'correttore_memorie',
   // Dove stanno le icone, per la fila del tasto destro (#1434): solo id di Filo, niente della persona.
   'icon_layout_changed',
+  // «Rileggi la voce Invia attacco» (#991): nessun dato, la risposta la chiede il content script.
+  'redteam_verificato_changed',
 ]));
 
 // Quelli che si mostrano una volta sola, nella pagina in vista: a un sito vanno

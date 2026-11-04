@@ -1,4 +1,4 @@
-// Pannello «Invia attacco» del canale Red-team (spec §8.1), dal tasto destro su una pagina.
+// Pannello «Invia attacco» del canale Red-team (spec §8.1): dal tasto destro (chi ha un codice) e dalla pagina Red Team.
 // Due campi separati: l'attacco va ai 4 giudici, la descrizione solo al giudice di validità.
 // Il backend può mancare: un REDTEAM_SUBMIT in errore diventa un messaggio, non un crash.
 
@@ -85,6 +85,7 @@
             <span class="sn-rt-head-icon">${icon('redteam', 18)}</span>
             <span class="sn-rt-head-title">Invia un attacco</span>
           </div>
+          <p class="sn-rt-avviso" hidden>Ogni tentativo costa ${COST} crediti, e senza un codice Red Team il risultato non lo vedi.</p>
           <label class="sn-rt-field">
             <span class="sn-rt-label">Testo dell’attacco</span>
             <textarea class="sn-rt-attack" rows="4" placeholder="Il prompt che prova a ingannare i giudici di sicurezza."></textarea>
@@ -114,9 +115,12 @@
     const statusEl = root.querySelector('.sn-rt-status');
     const sendBtn = root.querySelector('.sn-rt-send');
     const cancelBtn = root.querySelector('.sn-rt-cancel');
+    const avvisoEl = root.querySelector('.sn-rt-avviso');
 
     let signedIn = false;
     let balance = null; // null = sconosciuto (non blocchiamo finché non lo sappiamo)
+    // Chi non ha un codice (#991) legge prima il prezzo e che il risultato non lo vede. null = non ancora saputo.
+    let verificato = null;
 
     function sendLabel() {
       // Mostra SEMPRE il costo (spec §8.1, punto 3).
@@ -184,6 +188,14 @@
       }).catch(() => {});
     } catch (_) {}
 
+    (async function loadVerificato() {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi: true });
+        if (r && r.ok && typeof r.verificato === 'boolean') verificato = r.verificato;
+      } catch (_) {}
+      if (activeRoot === root) avvisoEl.hidden = verificato !== false;
+    })();
+
     (async function loadAuthAndBalance() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
@@ -222,6 +234,18 @@
         res = { status: 'error' };
       }
       const msg = submitStatusMessage(res);
+      if (msg.ok && res && res.attemptId && verificato === false) {
+        // Senza codice non c'è una pagina del risultato da aprire: il pannello resta, pronto per un altro.
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        clearDraft();
+        attackEl.value = '';
+        descEl.value = '';
+        cancelBtn.disabled = false;
+        refreshSendState();
+        setStatus('Attacco inviato.', 'ok');
+        return;
+      }
       if (msg.ok && res && res.attemptId) {
         clearTimeout(saveTimer);
         saveTimer = null;

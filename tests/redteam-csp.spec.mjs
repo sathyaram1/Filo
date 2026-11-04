@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
-import { apriRedteamATutti } from './helpers/redteam.mjs';
+import { apriRedteamATutti, fingiRedteamerVerificato } from './helpers/redteam.mjs';
 import { statoDi, neiRiquadri, tastieraDi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
@@ -28,6 +28,7 @@ test.afterAll(async () => { await new Promise((r) => server.close(r)); });
 
 test('su un sito con CSP il pannello "Invia attacco" aperto dal tasto destro è un riquadro di Filo sopra la pagina', async ({ app, shell }) => {
   await apriRedteamATutti(app);
+  await fingiRedteamerVerificato(app);
   const port = new URL(origin).port;
   await shell.evaluate((u) => window.filoShell.tabs.open(u), origin);
   let page = null;
