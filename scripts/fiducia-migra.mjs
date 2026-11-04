@@ -4,9 +4,8 @@
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { risultatoOwnerFiducia } from './lib/owner-fiducia.mjs';
 
-const BASE = process.env.FILO_FUNCTIONS_BASE || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
-export const OWNER_FIDUCIA_URL = `${BASE}/ownerFiducia`;
 // 500 per lotto (il server): 20.000 lotti sono dieci milioni di feedback. Oltre ci si ferma e lo si dice.
 export const TETTO_LOTTI = 20000;
 
