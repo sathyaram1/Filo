@@ -7,15 +7,14 @@ import { fileURLToPath } from 'node:url';
 import { rigaSporco } from './lib/biglietto-locale.mjs';
 import '../src/shared/routineChiusura.js';
 
-const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
-// Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
-const SLOT = 'tutti, orchestrator, worker, new-work, fixer, verifier, secaudit, compito, compito:<ricorrente> (per esempio compito:riordino)';
-const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
-  + `\nslot: ${SLOT}`;
-
-// Testo reso visibile e risposte in un elenco solo: le stesse regole di Gestione → Automazioni.
+// Slot, testo reso visibile e risposte in un elenco solo: le stesse regole di Gestione → Automazioni.
 const CH = globalThis.SN_ROUTINE_CHIUSURA;
 export const visibile = CH.visibile;
+
+const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
+const SLOT = `${CH.SLOT.join(', ')}, compito:<ricorrente> (per esempio compito:riordino)`;
+const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
+  + `\nslot: ${SLOT}`;
 
 /** Il motivo di un errore della callable, con l'elenco quando il server lo manda (`bad_slot`). PURA. */
 export function messaggioErrore(status, body) {
