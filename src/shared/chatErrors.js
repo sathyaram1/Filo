@@ -340,6 +340,10 @@
         }
         return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
+      // #1302: un host regge strumenti e tetto, eppure il router non ne trova uno per questa richiesta.
+      if (e && e.code === 'PARAMETRI_HOST') {
+        return `nessun fornitore ammesso per il modello scelto accetta tutte le opzioni di questa richiesta (il tetto di lunghezza non c'entra): scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
+      }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
         return `il modello scelto non è più disponibile sul servizio AI: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
