@@ -145,6 +145,7 @@
     MODEL_UNAVAILABLE: 'opzioni',
     DATA_POLICY: 'opzioni',
     NO_PROVIDER_ALLOWED: 'opzioni',
+    PARAMETRI_HOST: 'opzioni',
     INGRESSO_NON_LETTO: 'opzioni',
     ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
