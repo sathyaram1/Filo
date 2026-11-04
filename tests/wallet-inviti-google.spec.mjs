@@ -104,7 +104,8 @@ async function accessoFinto(page) {
     window.__accessi = [];
     window.__chiudiAccesso = (esito) => {
       if (esito && esito.ok) dentro = true;
-      window.__accessi[window.__accessi.length - 1].resolve(esito);
+      // Il main tiene un accesso solo: chi l'ha chiesto più volte riceve lo stesso esito.
+      for (const a of window.__accessi) a.resolve(esito);
     };
     window.filo.message = (msg) => {
       if (msg.type === MSG.AUTH_SIGNIN) return new Promise((resolve) => window.__accessi.push({ resolve }));
@@ -141,9 +142,14 @@ test('senza Google collegato i codici non ci sono: c\'è «Collega Google», e c
 
   await accessoFinto(page);
   await collega.click();
-  await expect(collega).toBeDisabled();
-  await expect(collega).toContainText('Continua nella scheda di Google');
+  // #678.6 — l'attesa si vede e non spegne il pulsante: riporta davanti la pagina d'accesso, o si lascia stare.
+  await expect(collega).toBeEnabled();
+  await expect(collega).toHaveText('Torna all’accesso');
+  await expect(page.locator('#invitesLockedNote')).toHaveText('Completa l’accesso nella pagina di Google che si è aperta.');
+  await expect(page.locator('#linkGoogleLascia')).toBeVisible();
   await page.waitForFunction(() => window.__accessi.length === 1);
+  await collega.click();
+  await page.waitForFunction(() => window.__accessi.length === 2);
 
   linked = true;
   await page.evaluate(() => window.__chiudiAccesso({ ok: true, profile: { email: 'io@example.com' } }));
@@ -151,6 +157,29 @@ test('senza Google collegato i codici non ci sono: c\'è «Collega Google», e c
   await expect(codici).toHaveCount(3, { timeout: 10000 });
   await expect(codici.nth(0).locator('.sn-wallet-code')).toHaveText('AAAA-2222');
   await expect(page.locator('#invitesLocked')).toBeHidden();
+});
+
+test('#678.6 — «Lascia stare» chiude l\'attesa dell\'accesso, e il suo esito tardivo non parla più', async ({ openTab }) => {
+  const page = await openTab('filo://credits/credits.html');
+  await entra(page);
+  await accessoFinto(page);
+  const collega = page.locator('#linkGoogleBtn');
+  const lascia = page.locator('#linkGoogleLascia');
+  const nota = page.locator('#invitesLockedNote');
+  await collega.click();
+  await expect(lascia).toBeVisible();
+  for (const tema of ['light', 'dark']) {
+    await page.emulateMedia({ colorScheme: tema });
+    await scatto(page, `678.6-crediti-attesa-${tema}`);
+  }
+  await lascia.click();
+  await expect(lascia).toBeHidden();
+  await expect(collega).toHaveText('Collega Google per dare i tuoi inviti');
+  await expect(nota).toBeHidden();
+  await page.evaluate(() => window.__chiudiAccesso({ ok: false, code: 'scaduto', error: 'L\'accesso non è stato completato: riprova.' }));
+  await page.waitForTimeout(300);
+  await expect(nota).toBeHidden();
+  await expect(collega).toHaveText('Collega Google per dare i tuoi inviti');
 });
 
 test('accesso fatto ma account Google legato a un\'altra copia di Filo: la pagina lo dice e propone di riprovare', async ({ openTab }) => {
