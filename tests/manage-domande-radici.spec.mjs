@@ -43,9 +43,12 @@ test('una domanda non fidata mostra le sue radici, e un clic timbra la radice', 
   await page.evaluate(() => document.documentElement.setAttribute('data-sn-theme', 'dark'));
   await k.screenshot({ path: 'tests/.shots/manage-domande-radici-scuro.png' });
   await page.evaluate(() => document.documentElement.removeAttribute('data-sn-theme'));
+  const firmaPrima = await page.evaluate(() => window.SN_MANAGE_RADICI.firma('u-1916', 'non_fidato'));
   await utente.click();
   await expect.poll(() => app.evaluate(() => globalThis.__mandati.filter((m) => m.type === 'fiducia_segna'))).toEqual([{ type: 'fiducia_segna', radice: 'feedback:1916' }]);
   await expect(k.locator('.mg-dq-msg')).toHaveText('«#1916» timbrata: 3 cose hanno cambiato fiducia.');
+  // Il timbro ricalcola anche i feedback: le radici che la sezione dei feedback aveva letto non valgono più.
+  expect(await page.evaluate(() => window.SN_MANAGE_RADICI.firma('u-1916', 'non_fidato'))).not.toBe(firmaPrima);
 });
 
 test('una domanda fidata non chiede le radici e non ha il cartellino', async ({ app, openTab }) => {
