@@ -539,6 +539,7 @@
   global.SN_FEEDBACK_THREAD = {
     parse,
     splitNotes,
+    turniGrezzi,
     explanationForReporter,
     reportUnreadable,
     isFromModel,
