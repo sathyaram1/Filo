@@ -11,15 +11,17 @@ const PREFERENZE = 'filo://preferences/preferences.html';
 const MODELLI = 'filo://options/options.html';
 
 // Da qui in poi il main annota quando ogni pagina finisce di caricarsi, quando la scheda scelta va davanti e quante
-// viste nascono.
+// viste di pagina nascono.
 function osserva(app) {
   return app.evaluate(({ app: a, webContents, BrowserWindow }) => {
     const o = { fine: new Map(), aperta: 0, nate: 0 };
     globalThis.__p1129 = o;
     const segui = (wc) => wc.on('did-finish-load', () => o.fine.set(wc.id, Date.now()));
     for (const wc of webContents.getAllWebContents()) segui(wc);
-    a.on('web-contents-created', (_e, wc) => { o.nate++; segui(wc); });
+    a.on('web-contents-created', (_e, wc) => segui(wc));
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    const crea = tm._makeView.bind(tm);
+    tm._makeView = (...args) => { o.nate++; return crea(...args); };
     const apri = tm.openTab.bind(tm);
     tm.openTab = (...args) => { const id = apri(...args); o.aperta = Date.now(); return id; };
   });
@@ -195,23 +197,24 @@ test('un\'apertura del menu prepara una pagina sola, e la riapertura col menu ap
 });
 
 test('scelta un\'altra voce, la preparata si butta; la voce più scelta diventa quella che si prepara', async ({ app, shell }) => {
-  for (let k = 0; k < 2; k++) {
-    const menu = await apriMenu(shell, app);
-    await aspettaPreparata(app, k === 0 ? PREFERENZE : PREFERENZE);
-    await scegliNelMenu(menu, 'Modelli');
-    await expect.poll(async () => (await stato(app)).schede.some((u) => u.startsWith(MODELLI)), { timeout: 5000 }).toBe(true);
-    await expect.poll(async () => (await stato(app)).preferenzeVive, { timeout: 5000, message: 'la Preferenze non scelta è rimasta viva' }).toBe(0);
-    await chiudiScheda(app, MODELLI);
-  }
-  // Modelli scelta due volte contro zero: è lei la voce più usata di questo utente, anche dopo il riavvio della scelta.
-  const menu = await apriMenu(shell, app);
-  await aspettaPreparata(app, MODELLI);
-  expect((await stato(app)).preferenzeVive).toBe(0);
+  await osserva(app);
+  let menu = await apriMenu(shell, app);
+  await aspettaPreparata(app, PREFERENZE);
   await scegliNelMenu(menu, 'Modelli');
   await expect.poll(async () => (await stato(app)).schede.some((u) => u.startsWith(MODELLI)), { timeout: 5000 }).toBe(true);
+  await expect.poll(async () => (await stato(app)).preferenzeVive, { timeout: 5000, message: 'la Preferenze non scelta è rimasta viva' }).toBe(0);
+  await chiudiScheda(app, MODELLI);
+
+  // Modelli scelta una volta contro zero: adesso è lei la voce più usata di questo utente, e la si prepara.
+  menu = await apriMenu(shell, app);
+  await aspettaPreparata(app, MODELLI);
+  expect((await stato(app)).preferenzeVive).toBe(0);
+  const m = await scegliEMisura(app, menu, 'Modelli', MODELLI);
+  expect(m.ms, 'Modelli preparata compare subito').toBeLessThan(150);
   expect((await stato(app)).modelliVive).toBe(1);
   const conti = await app.evaluate(async () => (await globalThis.__filoStorage.get('filo_voci_menu_usate')).filo_voci_menu_usate);
-  expect(conti.impostazioni[MODELLI]).toBe(3);
+  expect(conti.impostazioni[MODELLI]).toBe(2);
+  expect(conti.impostazioni[PREFERENZE] || 0).toBe(0);
 });
 
 test('con la pagina già aperta in una scheda il menu non ne prepara un doppione', async ({ app, shell, openTab }) => {
@@ -222,4 +225,35 @@ test('con la pagina già aperta in una scheda il menu non ne prepara un doppione
   expect(s.preparata).toBeNull();
   expect(s.preferenzeVive).toBe(1);
   await chiudiMenu(app, menu);
+});
+
+test('in incognito la pagina si prepara nella sessione della finestra e la scelta non lascia conti sul disco', async ({ app, shell }) => {
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  const finestra = () => app.evaluate(({ BrowserWindow, session }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoIncognito);
+    if (!w) return null;
+    const tm = w._filoTabs;
+    const wc = tm.preparata.webContents();
+    const ses = tm.partition ? session.fromPartition(tm.partition) : session.defaultSession;
+    const attiva = tm.tabs.find((t) => t.id === tm.activeId);
+    return {
+      preparata: wc ? { id: wc.id, url: wc.getURL(), caricando: wc.isLoading(), sessioneGiusta: wc.session === ses } : null,
+      attiva: attiva ? { url: attiva.url, wcId: attiva.view.webContents.id } : null,
+    };
+  });
+  await expect.poll(async () => !!(await finestra()), { timeout: 10_000 }).toBe(true);
+  await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoIncognito);
+    w.webContents.executeJavaScript("document.getElementById('nav-settings').click()");
+  });
+  const menu = await menuAperto(app);
+  expect(menu, 'il menu Impostazioni dell\'incognito non si è aperto').toBeTruthy();
+  let p = null;
+  await expect.poll(async () => { p = (await finestra()).preparata; return !!(p && p.url.startsWith(PREFERENZE) && !p.caricando); },
+    { timeout: 15_000, message: 'in incognito la pagina non è stata preparata' }).toBe(true);
+  expect(p.sessioneGiusta, 'la pagina preparata sta nella sessione della finestra in incognito').toBe(true);
+  await scegliNelMenu(menu, 'Preferenze');
+  await expect.poll(async () => (await finestra()).attiva, { timeout: 5000 }).toEqual({ url: PREFERENZE, wcId: p.id });
+  const conti = await app.evaluate(async () => (await globalThis.__filoStorage.get('filo_voci_menu_usate')).filo_voci_menu_usate ?? null);
+  expect(conti, 'una scelta in incognito non si conta').toBeNull();
 });
