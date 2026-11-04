@@ -350,7 +350,7 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
     }
-  });
+  }
 
   // L'uscita dall'account la chiede solo Filo: da un sito era un modo per buttare fuori
   // chi lo sta usando, e da lì posta delle segnalazioni e bacheca si fermano.
