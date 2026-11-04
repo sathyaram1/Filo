@@ -14,6 +14,7 @@
     archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
     riapri: MSG.DOMANDA_RIAPRI || 'domanda_riapri',
     fiducia: MSG.DOMANDA_FIDUCIA || 'domanda_fiducia',
+    discuti: MSG.DISCUTIAMONE_COPIA || 'discutiamone_copia',
   };
   const MR = window.SN_MANAGE_REVIEW;
   const D = window.SN_DOMANDE;
@@ -829,7 +830,7 @@
       tasti.appendChild(b);
     };
     if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
-    if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
+    if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', titoloDiscuti(idDi(d)));
     if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (riapribile(d)) tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
     if (fidabile(d)) tasto('Segna fidata', 'fidata', 'sn-btn-secondary', TITOLO_SEGNA_FIDATA);
@@ -928,7 +929,8 @@
     const fonti = ds.map((d) => principioUsato(d)).filter(Boolean).map((id) => { const f = trova(id); return f ? [id, f.principio, f.principioContestato] : [id]; });
     const firma = JSON.stringify([ds.map((d) => [d.id, d.stato, d.modificataIl, d.fiducia, d.fidabile, d.fidataDallOwner, d.esito, d.titolo, d.illeggibile, d.smistamento,
       d.principioContestato, ...(d.opzioni || []).map((o) => etichettaDi(o)), firmaLegami(d), lavoroFermo(d),
-      allegati.di(d.id).map((a) => a.url), allegati.caricando(d.id), originali.has(d.id)]), [...inCorso], [...avvisi], stato.lette, fonti]);
+      allegati.di(d.id).map((a) => a.url), allegati.caricando(d.id), originali.has(d.id)]), [...inCorso], [...avvisi], stato.lette, fonti,
+      parolaSalvata()]);
     if (firma === firmaDettaglio) return;
     firmaDettaglio = firma;
     // Chi stava scrivendo ritrova il cursore dov'era: il dettaglio si ridisegna anche per un esito altrui.
@@ -1118,13 +1120,25 @@
     dopo(id, fine, 'Mandata.');
   }
 
+  // La parola d'ordine non passa da qui: il testo lo compone e lo copia il main (services/parolaOwner.js).
+  function parolaSalvata() { return !!(window.SN_MANAGE_PAROLA && window.SN_MANAGE_PAROLA.salvata()); }
+  function titoloDiscuti(id) {
+    return parolaSalvata()
+      ? `Copia la parola d’ordine «owner non fidato» e «${D.rigaDiscuti(id)}», da incollare nella sessione dal telefono`
+      : `Copia «${D.rigaDiscuti(id)}» da incollare in una sessione locale`;
+  }
+  function voceDiscuti(id) {
+    return parolaSalvata() ? `Copia parola d’ordine e «${D.rigaDiscuti(id)}»` : `Copia «${D.rigaDiscuti(id)}»`;
+  }
+
   async function discuti(id) {
-    const testo = `Discutiamo la domanda ${id}`;
-    try {
-      await navigator.clipboard.writeText(testo);
-      avvisi.set(id, { testo: `Copiato: «${testo}»`, tipo: 'ok' });
-    } catch (_) {
-      avvisi.set(id, { testo: `Non riesco a copiare. La riga è: ${testo}`, tipo: 'err' });
+    const riga = D.rigaDiscuti(id);
+    const r = await chiedi({ type: T.discuti, id });
+    if (r.ok) {
+      if (window.SN_MANAGE_PAROLA) window.SN_MANAGE_PAROLA.vista(r.conParola);
+      avvisi.set(id, { testo: r.conParola ? `Copiato: la parola d’ordine e «${riga}»` : `Copiato: «${riga}»`, tipo: 'ok' });
+    } else {
+      avvisi.set(id, { testo: `Non riesco a copiare. La riga è: ${riga}`, tipo: 'err' });
     }
     disegnaDettaglio();
   }
@@ -1281,7 +1295,7 @@
       const voci = [{ testo: 'Apri', azione: () => { apri([d.id]); disegna(); } }];
       const et = d.stato === 'aperta' ? etichettaDi(consigliata(d)) : null;
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
-      if (d.stato !== 'in_smistamento') voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
+      if (d.stato !== 'in_smistamento') voci.push({ testo: voceDiscuti(d.id), titolo: titoloDiscuti(d.id), azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
       else if (riapribile(d)) voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
       // Il menu non mostra le note: apre la domanda con le note aperte, e la fiducia si dà dal tasto, dopo averle lette.
@@ -1330,6 +1344,8 @@
       disegnaTesta();
     });
   }
+  // L'hover di «Discutiamone» dice se copia anche la parola d'ordine.
+  if (window.SN_MANAGE_PAROLA) window.SN_MANAGE_PAROLA.alCambio(() => disegnaDettaglio());
 
   const det = $('mgDomandaDettaglio');
   if (det) {

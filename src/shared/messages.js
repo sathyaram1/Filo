@@ -761,6 +761,13 @@
     DOMANDA_ARCHIVIA: 'domanda_archivia',   // { id } → { ok, domanda } (chiusa senza azioni) | { ok:false, error }
     DOMANDA_RIAPRI: 'domanda_riapri',       // { id } → { ok, domanda } (un'archiviata senza azioni o una risposta automatica) | { ok:false, error }
     DOMANDA_FIDUCIA: 'domanda_fiducia',     // { id, fidata?: false per toglierla } → { ok, fiducia, domanda } (solo una chiusa, #2078) | { ok:false, error }
+    // La parola d'ordine «owner non fidato» che «Discutiamone» copia (SPEC-SEDI §4.5): resta nel main, alla pagina
+    // arriva solo se c'è. Solo dalla Gestione (services/parolaOwner.js).
+    PAROLA_OWNER_STATO: 'parola_owner_stato', // {} → { ok, salvata, suDisco }
+    PAROLA_OWNER_SALVA: 'parola_owner_salva', // { parola } → { ok, salvata, suDisco } | { ok:false, error }
+    PAROLA_OWNER_TOGLI: 'parola_owner_togli', // {} → { ok, salvata:false } | { ok:false, error }
+    DISCUTIAMONE_COPIA: 'discutiamone_copia', // { id:'D-n' } → { ok, conParola, riga } negli appunti di sistema | { ok:false, error }
+    PAROLA_OWNER_CAMBIATA: 'parola_owner_cambiata', // broadcast { salvata } alle pagine di Filo, mai la parola
     // «Segna fidato» (#1148, SPEC-DOMANDE.md §1.5): la fiducia la scrive solo il server (callable ownerFiducia).
     // Solo pagine `filo://`, solo il proprietario. Callable non ancora pubblicata → errore che lo dice.
     FIDUCIA_SEGNA: 'fiducia_segna', // { feedbackId, fidato?: false per toglierla } → { ok, fiducia } | { ok:false, error }
