@@ -86,6 +86,8 @@ export function scriviFile(path, { ticket, fp, natoIl, trascrizione }) {
 const SEGNO_SUL_SERVER = 'sul-server';
 // Oltre, il motivo dice quando è avvenuta la lettura: il server segna l'ora in cui lo riceve.
 const RITARDO_MS = 60 * 1000;
+// Sotto il tetto delle letture nominate in una chiamata (LETTI_MAX del server, 300).
+export const LETTI_PER_CHIAMATA = 250;
 
 export function cartellaSporchi(b) {
   return join(dirname(b.path), 'sporchi', b.fp);
