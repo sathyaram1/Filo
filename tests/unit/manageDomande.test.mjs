@@ -24,6 +24,7 @@ const ESEMPI = {
   nomeAmbito: 'lettore_code',
   operazioniAmbito: ['feedback.metadati'],
   testoAmbito: 'scrivere',
+  numeroFeedback: '1959',
 };
 const RIFERIMENTI = { fb902: { num: '#902', priorita: 1, stato: 'todo', motivo: '' } };
 
