@@ -1471,6 +1471,7 @@
     /* Le radici accanto a «Segna fidato»: piccole come un'etichetta; timbrata = la tinta della delega, piena. */
     .mg-radici { display: inline-flex; flex-wrap: wrap; gap: 4px; align-items: center; }
     .mg-radici[hidden] { display: none; }
+    .mg-radici--riga { display: flex; padding: 0 0 8px; }
     .mg-radice {
       all: unset; cursor: pointer; font-size: 11.5px; line-height: 1.5; padding: 0 7px; border-radius: 999px;
       border: 1px dashed var(--sn-border); color: var(--sn-muted);
@@ -2182,12 +2183,14 @@
                     <!-- «Segna fidato» (#1148): al posto di «Fondi senza chiedermelo» e di «È mio». Lo scrive il server;
                        premuto = fidato, e un clic la toglie. Testi e visibilità dal JS. -->
                     <button type="button" class="mg-star-btn mg-fiducia-btn" id="mgFiduciaBtn" aria-pressed="false" hidden>🤝 Segna fidato</button>
-                    <!-- Le radici della fiducia (#1918): i testi esterni da cui discende, ognuna si timbra da sé. Dal JS. -->
-                    <span class="mg-radici" id="mgRadici" hidden></span>
                   </div>
                 </div>
                 </div>
               </div>
+
+              <!-- Le radici della fiducia (#1918): i testi esterni da cui discende, ognuna si timbra da sé. Fuori dalla fila
+                 dei tasti, che scorre di lato: lì le ultime finivano fuori vista. Dal JS. -->
+              <div class="mg-radici mg-radici--riga" id="mgRadici" hidden></div>
 
               <!-- «Il segno era un errore» (#922): la conferma dice cosa cambia, subito sotto il tasto. Testi dal JS. -->
               <div class="mg-reopen mg-segno-conferma" id="mgSegnoConferma" hidden></div>
