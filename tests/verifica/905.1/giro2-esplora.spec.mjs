@@ -46,10 +46,10 @@ test('portachiavi vero: segreti cifrati, tornano al riavvio, export senza spunta
     console.log('isEncryptionAvailable', enc);
     const page = await apriSicurezza(app);
     await expect(page.locator('#sec-export-keys-row')).toBeHidden();
-    await app.evaluate(async (_e, s) => {
-      await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: s.p, residential: s.r }, security: { safeBrowse: { enabled: true, safeBrowsingKey: s.k } } });
-      await globalThis.__filoStorage.whenSettled();
+    await page.evaluate(async (s) => {
+      await chrome.runtime.sendMessage({ type: 'update_settings', settings: { proxy: { datacenter: s.p, residential: s.r }, security: { safeBrowse: { enabled: true, safeBrowsingKey: s.k } } } });
     }, { p: PROXY, r: PROXY_RES, k: SAFE });
+    await app.evaluate(() => globalThis.__filoStorage.whenSettled());
     await expect(page.locator('#sec-export-keys-row'), 'la casella compare senza ricaricare').toBeVisible();
     const disco = readFileSync(join(userData, 'storage.json'), 'utf8');
     const bak = existsSync(join(userData, 'storage.json.bak')) ? readFileSync(join(userData, 'storage.json.bak'), 'utf8') : '';
