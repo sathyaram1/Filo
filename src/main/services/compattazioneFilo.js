@@ -255,6 +255,7 @@ async function riassumiGiorni({ incognito = false, ora = Date.now() } = {}) {
       break;
     }
     if (!riga) continue;
+    s.giorni = s.giorni.filter((g) => !g || g.giorno !== giorno);
     s.giorni.push({ id: id(), giorno, testo: riga, ore: ore.map((r) => r.id), fonti: [...new Set(ore.flatMap((r) => r.fonti || []))] });
     fatti++;
   }
