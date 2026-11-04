@@ -100,9 +100,9 @@ async function segretoLocale() {
   return b && typeof b.ticket === 'string' ? b.ticket : '';
 }
 
-async function sporcaSessione(cosa, motivi) {
+async function sporcaSessione(cosa, motivi, opts = {}) {
   const { rigaSporco } = await import('./lib/biglietto-locale.mjs');
-  return rigaSporco(cosa, motivi);
+  return rigaSporco(cosa, motivi, opts);
 }
 
 async function leggiStdin() {
@@ -138,7 +138,8 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'elenco') {
       const r = await chiama({ op: 'elenco' });
       const nf = nonFidati([].concat(r.aperti || [], r.storico || []));
-      if (nf.length) errore(await sporca('elenco dei compiti', [`titoli di compiti non fidati (${nf.slice(0, 10).join(', ')}${nf.length > 10 ? ', …' : ''})`]));
+      // Il server legge le radici di ogni compito non fidato (#1918): il timbro su quelle ripulisce la sessione.
+      if (nf.length) errore(await sporca('elenco dei compiti', [`titoli di compiti non fidati (${nf.slice(0, 10).join(', ')}${nf.length > 10 ? ', …' : ''})`], { letti: nf.map((id) => ({ tipo: 'compito', id: String(id) })) }));
       scrivi(formattaElenco(r));
       return 0;
     }

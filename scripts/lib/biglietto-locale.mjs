@@ -91,12 +91,29 @@ export function cartellaSporchi(b) {
   return join(dirname(b.path), 'sporchi', b.fp);
 }
 
-/** Annota in locale una lettura esterna del biglietto `b`. Lancia se non riesce a scrivere. */
-export function annotaSporco(b, motivo, nowMs = Date.now()) {
+/** Le radici dichiarate e le letture nominate, pulite per il server (SPEC-DOMANDE.md §1.2). PURA. */
+export function cosaLetto({ radici, letti } = {}) {
+  const r = [...new Set((Array.isArray(radici) ? radici : []).map((x) => String(x || '').trim()).filter(Boolean))];
+  const visti = new Set();
+  const l = [];
+  for (const v of Array.isArray(letti) ? letti : []) {
+    if (!v || typeof v !== 'object') continue;
+    const k = `${String(v.tipo || '')}/${String(v.id || '')}`;
+    if (!v.tipo || !v.id || visti.has(k)) continue;
+    visti.add(k);
+    l.push({ tipo: String(v.tipo), id: String(v.id) });
+  }
+  return { radici: r, letti: l };
+}
+
+/** Annota in locale una lettura esterna del biglietto `b`, con cosa si è letto (`cosa`: { radici, letti }). Lancia se non riesce a scrivere. */
+export function annotaSporco(b, motivo, nowMs = Date.now(), cosa = {}) {
   const dir = cartellaSporchi(b);
   mkdirSync(dir, { recursive: true });
   const nome = `${String(Math.round(Number(nowMs) || Date.now())).padStart(14, '0')}-${process.pid}-${randomBytes(4).toString('hex')}.json`;
-  writeFileSync(join(dir, nome), `${JSON.stringify({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() })}\n`, { encoding: 'utf8', mode: 0o600 });
+  const c = cosaLetto(cosa);
+  const voce = Object.assign({ motivo: String(motivo || ''), at: Number(nowMs) || Date.now() }, c.radici.length ? { radici: c.radici } : {}, c.letti.length ? { letti: c.letti } : {});
+  writeFileSync(join(dir, nome), `${JSON.stringify(voce)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
 
 /** Le letture annotate e non ancora consegnate, dalla più vecchia. Una voce illeggibile conta lo stesso. */
@@ -108,7 +125,7 @@ export function sporchiInAttesa(b) {
     const file = join(dir, n);
     try {
       const d = JSON.parse(readFileSync(file, 'utf8'));
-      return { file, motivo: String((d && d.motivo) || '').trim() || 'lettura esterna', at: Number(d && d.at) || 0 };
+      return Object.assign({ file, motivo: String((d && d.motivo) || '').trim() || 'lettura esterna', at: Number(d && d.at) || 0 }, cosaLetto(d || {}));
     } catch (_) {
       return { file, motivo: 'lettura esterna (annotazione illeggibile)', at: 0 };
     }
@@ -134,21 +151,29 @@ export function motivoDaConsegnare(voci, nowMs = Date.now()) {
  * Consegna al server lo sporco annotato di `b`, più `aggiunta` se c'è (una lettura che non si è riuscita ad annotare).
  * Mai un'eccezione. → { consegnati, restano, errore? }: `restano` = voci ancora solo in locale.
  */
-export async function consegnaSporchi(b, { deps = {}, nowMs = Date.now(), aggiunta = '' } = {}) {
+export async function consegnaSporchi(b, { deps = {}, nowMs = Date.now(), aggiunta = '', cosa = {} } = {}) {
   const voci = sporchiInAttesa(b);
-  const tutte = aggiunta ? voci.concat([{ motivo: aggiunta, at: nowMs }]) : voci;
+  const tutte = aggiunta ? voci.concat([Object.assign({ motivo: aggiunta, at: nowMs }, cosaLetto(cosa))]) : voci;
   if (!tutte.length) return { consegnati: 0, restano: 0 };
+  // Una voce che non dice cosa ha letto (un gancio, un motivo a mano) vale per sé: il server le dà la radice del biglietto.
+  const senzaCosa = tutte.some((v) => !(v.radici && v.radici.length) && !(v.letti && v.letti.length));
+  const c = cosaLetto({ radici: tutte.flatMap((v) => v.radici || []), letti: tutte.flatMap((v) => v.letti || []) });
+  let r;
   try {
-    await chiama('sporca', { ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) }, deps);
+    r = await chiama('sporca', Object.assign({ ticket: b.ticket, motivo: motivoDaConsegnare(tutte, nowMs) },
+      c.radici.length ? { radici: c.radici } : {}, c.letti.length ? { letti: c.letti } : {}, senzaCosa ? { senzaCosa: true } : {}), deps);
   } catch (e) {
     return { consegnati: 0, restano: voci.length, errore: String((e && e.message) || e) };
   }
   for (const v of voci) { try { rmSync(v.file, { force: true }); } catch (_) { /* si riconsegna: un doppione non sporca di più */ } }
-  try {
-    mkdirSync(cartellaSporchi(b), { recursive: true });
-    writeFileSync(join(cartellaSporchi(b), SEGNO_SUL_SERVER), `${nowMs}\n`, 'utf8');
-  } catch (_) { /* il gancio richiamerà il server: costa una chiamata */ }
-  return { consegnati: tutte.length, restano: sporchiInAttesa(b).length };
+  const pulito = !!(r && r.pulito === true && r.fiducia === 'fidato');
+  if (!pulito) {
+    try {
+      mkdirSync(cartellaSporchi(b), { recursive: true });
+      writeFileSync(join(cartellaSporchi(b), SEGNO_SUL_SERVER), `${nowMs}\n`, 'utf8');
+    } catch (_) { /* il gancio richiamerà il server: costa una chiamata */ }
+  }
+  return Object.assign({ consegnati: tutte.length, restano: sporchiInAttesa(b).length }, pulito ? { pulito: true } : {});
 }
 
 /**
@@ -202,11 +227,15 @@ export function noteConScrittiDiAltri(notes) {
   return false;
 }
 
-/** Perché chi stampa questo feedback si sporca (§1.2): testo non fidato, o una conversazione scritta anche da altri. PURA. */
-export function motiviDiLettura({ fiducia, notes } = {}) {
+/**
+ * Perché chi stampa questo feedback PUÒ sporcarsi (§1.2): testo non fidato, o una conversazione scritta anche da altri.
+ * Se l'ha scritta un biglietto sporco lo sa solo il server, che lo decide con le radici (`scrittoSporco` noto: vale
+ * quello). PURA.
+ */
+export function motiviDiLettura({ fiducia, notes, scrittoSporco } = {}) {
   const out = [];
   if (fiducia !== 'fidato') out.push('testo di un feedback non fidato');
-  if (noteConScrittiDiAltri(notes)) out.push('conversazione con scritti di routine o sessioni');
+  if (scrittoSporco === true || (scrittoSporco !== false && noteConScrittiDiAltri(notes))) out.push('conversazione con scritti di routine o sessioni');
   return out;
 }
 
@@ -297,6 +326,7 @@ export async function trovaBiglietto({ env, cwd, deps = {} } = {}) {
 export async function rigaSporco(cosa, motivi, opts = {}) {
   const testo = `${cosa}: ${motivi.join('; ')}`;
   const r = await sporca(testo, opts);
+  if (r.puliti && !r.sporcati && !r.errori.length) return `Biglietto della sessione NON sporcato: ${cosa} viene da testo fidato.`;
   if (r.senzaBiglietto) return `Nessun biglietto trovato da qui, quindi niente sporcato: ciò che scrivi da questo repo nasce non fidato, ma se la sessione ne ha uno in un altro repo dichiaralo da lì con node scripts/biglietto.mjs sporca "${cosa}".`;
   if (r.sporcati) return `Biglietto della sessione sporcato (${motivi.join('; ')}): da qui ciò che scrivi nasce non fidato.`;
   if (r.inAttesa) return `Server non raggiunto (${r.errori.join('; ')}): lo sporco (${motivi.join('; ')}) è annotato in locale e parte alla prossima chiamata; intanto ciò che scrivi da qui nasce non fidato.`;
@@ -319,7 +349,7 @@ export async function fiduciaLocale(opts = {}) {
  * fermarsi per un guasto del server, e senza biglietto la sessione è già non fidata.
  * @returns {Promise<{ sporcati: number, inAttesa?: number, senzaBiglietto?: true, errori: string[] }>}
  */
-export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() } = {}) {
+export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now(), radici = [], letti = [] } = {}) {
   const m = String(motivo || '').trim().slice(0, 300);
   const out = { sporcati: 0, errori: [] };
   if (!m) { out.errori.push('il motivo è obbligatorio'); return out; }
@@ -328,9 +358,11 @@ export async function sporca(motivo, { env, cwd, deps = {}, nowMs = Date.now() }
   let inAttesa = 0;
   for (const b of trovati) {
     let aggiunta = '';
-    try { annotaSporco(b, m, nowMs); } catch (_) { aggiunta = m; }
-    const r = await consegnaSporchi(b, { deps, nowMs, aggiunta });
-    if (!r.errore) out.sporcati += 1;
+    try { annotaSporco(b, m, nowMs, { radici, letti }); } catch (_) { aggiunta = m; }
+    const r = await consegnaSporchi(b, { deps, nowMs, aggiunta, cosa: { radici, letti } });
+    // Il server ha letto le radici di ciò che si è letto, e sono tutte fidate: niente da sporcare.
+    if (!r.errore && r.pulito) out.puliti = (out.puliti || 0) + 1;
+    else if (!r.errore) out.sporcati += 1;
     else {
       out.errori.push(r.errore);
       if (r.restano) inAttesa += 1;

@@ -111,6 +111,29 @@ export function motivoLettura(input, ctx = {}) {
   return `Read fuori dal repo (${pulisci(P.basename(file), 80)})`;
 }
 
+/**
+ * La radice della lettura (SPEC-DOMANDE.md §1.8), '' se non la sa dire (e il server darà quella del biglietto): la
+ * pagina, la ricerca, il server MCP, il file. Va chiamata solo dopo un motivoLettura non vuoto. PURA.
+ */
+export function radiceLettura(input, ctx = {}) {
+  const nome = String((input && input.tool_name) || '');
+  const dati = (input && input.tool_input) || {};
+  if (nome === 'WebFetch') {
+    try { const u = new URL(String(dati.url || '')); return /^https?:$/.test(u.protocol) ? `web:${u.href}` : ''; } catch (_) { return ''; }
+  }
+  if (nome === 'WebSearch') return String(dati.query || '').trim() ? `web:ricerca ${String(dati.query).trim()}` : '';
+  const mcp = /^mcp__([^_]+(?:_[^_]+)*?)__/.exec(nome);
+  if (mcp) return `mcp:${mcp[1]}`;
+  if (nome === 'Read') {
+    const grezzo = String(dati.file_path || '').trim();
+    if (!grezzo) return '';
+    const P = ctx.win ? path.win32 : path.posix;
+    const canonico = typeof ctx.canonico === 'function' ? ctx.canonico : (p) => p;
+    return `file:${canonico(P.resolve(String(ctx.cwd || P.sep), grezzo))}`;
+  }
+  return '';
+}
+
 // Il percorso vero, collegamenti e nomi corti di Windows risolti, anche di un file che non c'è più: vale la cartella
 // esistente più vicina.
 function canonicoVero(p) {
@@ -200,11 +223,13 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
     if (!biglietti.length && progetto && progetto !== cwd) biglietti = B.trovaBiglietti({ env: envSessione, cwd: progetto });
     if (!biglietti.length) return { esito: 'senza biglietto' };
-    const motivo = subito ?? motivoLettura(input, contesto({ cwd, env, biglietti }));
+    const ctx = subito === null ? contesto({ cwd, env, biglietti }) : null;
+    const motivo = subito ?? motivoLettura(input, ctx);
     if (!motivo) return { esito: 'nessuna lettura esterna' };
+    const radice = radiceLettura(input, ctx || { cwd });
     for (const b of biglietti) {
       let annotato = true;
-      try { B.annotaSporco(b, motivo, nowMs); } catch (_) { annotato = false; }
+      try { B.annotaSporco(b, motivo, nowMs, radice ? { radici: [radice] } : {}); } catch (_) { annotato = false; }
       // Già sporco sul server la consegna aspetta la prossima occasione: niente processi per ogni lettura. L'annotazione
       // resta, e da sola tiene sporco il biglietto anche se il segno l'ha scritto chi non doveva.
       if (annotato && B.sporcoSulServer(b)) continue;

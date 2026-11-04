@@ -485,9 +485,14 @@ async function segretoLocale() {
   return b && typeof b.ticket === 'string' ? b.ticket : '';
 }
 
-async function sporcaSessione(cosa, motivi) {
+async function sporcaSessione(cosa, motivi, opts = {}) {
   const { rigaSporco } = await import('./lib/biglietto-locale.mjs');
-  return rigaSporco(cosa, motivi);
+  return rigaSporco(cosa, motivi, opts);
+}
+
+/** Le domande lette, per le radici che il server legge su ognuna (#1918). PURA. */
+export function lettiDi(ids) {
+  return (Array.isArray(ids) ? ids : []).filter((id) => /^D-\d{1,9}$/.test(String(id))).map((id) => ({ tipo: 'domanda', id: String(id) }));
 }
 
 /** Gli id delle domande il cui testo non è fidato (fiducia assente compresa). PURA. */
@@ -607,7 +612,7 @@ export async function esegui(argv, io = {}) {
       }
       const r = await chiama({ op: 'registro', parole: a.parole });
       const nf = nonFidate(r.voci);
-      if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)]));
+      if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)], { letti: lettiDi(nf) }));
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
       return 0;
     }
@@ -615,14 +620,14 @@ export async function esegui(argv, io = {}) {
     if (a.cmd === 'mostra') {
       const r = await chiama({ op: 'mostra', id: a.id });
       const nf = nonFidate([r.domanda]);
-      if (nf.length) errore(await sporca(`letta ${visibile(a.id)}`, [motivoNonFidate(nf)]));
+      if (nf.length) errore(await sporca(`letta ${visibile(a.id)}`, [motivoNonFidate(nf)], { letti: lettiDi(nf) }));
       scrivi(formattaDomanda(r.domanda, r.riferimenti));
       return 0;
     }
     if (a.cmd === 'elenco') {
       const r = await chiama(a.tutte ? { op: 'elenco', tutte: true } : { op: 'elenco' });
       const nf = nonFidate(r.domande);
-      if (nf.length) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)]));
+      if (nf.length) errore(await sporca('elenco delle domande', [motivoNonFidate(nf)], { letti: lettiDi(nf) }));
       scrivi(formattaConteggi(conteggiDi(r.domande, r.conteggi)));
       scrivi('');
       scrivi(formattaElenco(r.domande));
