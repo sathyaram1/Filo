@@ -181,6 +181,10 @@ function argomentiDelloSmistamento(resto) {
     if (D.numeroDi(out.principio) === null) return { errore: `--principio vuole la domanda chiusa da cui viene il principio, nella forma D-12.` };
     out.principio = out.principio.trim();
   }
+  if (op === 'doppione') {
+    if (D.numeroDi(out.di) === null) return { errore: '--di vuole la domanda ancora viva che chiede la stessa scelta, nella forma D-12.' };
+    out.di = out.di.trim();
+  }
   return out;
 }
 
