@@ -1545,6 +1545,11 @@ class TabManager {
     return null;
   }
 
+  // Se `riapriChiusa` ridarebbe qualcosa adesso: la voce «Riapri scheda chiusa» è spenta senza (#1695).
+  async ciSonoChiuse() {
+    return this._pilaChiuse().quante > 0 || !!(await this._chiusaDallArchivio());
+  }
+
   async _chiusaDallArchivio() {
     const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
     if (!A) return null;
