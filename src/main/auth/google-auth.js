@@ -470,6 +470,9 @@ async function nuovoFlusso() {
       code = await loop.waitForCode();
     } finally {
       clearTimeout(timer);
+      clearTimeout(f.riaperturaFrenata);
+      f.riaperturaFrenata = null;
+      if (flussoAttuale === f) flussoAttuale = null;
       f.aspettaBrowser = false;
       // Arrivato il codice (o finita l'attesa) la scheda resterebbe su una pagina morta del loopback.
       if (f.scheda) { f.scheda.chiudi(); f.scheda = null; }
