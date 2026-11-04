@@ -922,6 +922,38 @@ export function esaminaShaVerificato(sha, root = ROOT) {
   return c === punta ? 'punta' : '';
 }
 
+/**
+ * I commit di `origin/main` nominati nel report di chi ha rifatto la base che la punta non contiene (#2101): un rebase
+ * registrato senza arrivare su origin lascia il ramo al commit verificato. [] se non ce n'è o se git qui non risponde.
+ */
+export function riallineamentoMancante(report, root = ROOT) {
+  const g = (args) => {
+    try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 30000 }).trim().toLowerCase(); } catch (_) { return null; }
+  };
+  const nominati = [...new Set(String(report || '').toLowerCase().match(/\b[0-9a-f]{7,40}\b/g) || [])].slice(0, 50);
+  if (!nominati.length || !g(['rev-parse', '--verify', '--quiet', 'HEAD^{commit}']) || !g(['rev-parse', '--verify', '--quiet', 'refs/remotes/origin/main^{commit}'])) return [];
+  return nominati.filter((s) => {
+    const c = g(['rev-parse', '--verify', '--quiet', `${s}^{commit}`]);
+    return !!c && g(['merge-base', '--is-ancestor', c, 'refs/remotes/origin/main']) !== null && g(['merge-base', '--is-ancestor', c, 'HEAD']) === null;
+  });
+}
+
+/**
+ * Se la punta è nata quando su `origin/main` era già arrivato qualcosa che non contiene, con mezza giornata di margine
+ * (#2101). L'arrivo lo dice la catena delle fusioni del server (primo genitore): i commit fusi tengono la data loro, anche
+ * di giorni prima. Un rebase scrive la punta dopo aver scaricato main, quindi solo i minuti del rebase restano fuori.
+ */
+export function puntaSuBaseVecchia(root = ROOT, margine = 12 * 3600) {
+  const g = (args) => {
+    try { return execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 30000, maxBuffer: 64 * 1024 * 1024 }).trim(); } catch (_) { return null; }
+  };
+  const base = g(['merge-base', 'HEAD', 'refs/remotes/origin/main']);
+  const punta = Number(g(['log', '-1', '--format=%ct', 'HEAD']));
+  if (!base || !Number.isFinite(punta)) return false;
+  const date = (g(['log', '--first-parent', '--format=%ct', `${base}..refs/remotes/origin/main`]) || '').split('\n').map(Number).filter((n) => n > 0);
+  return date.length > 0 && punta - Math.min(...date) > margine;
+}
+
 export function readRoleInstructions(role, { scope, caso } = {}) {
   const name = role === 'verifier' ? VERIFIER_SCOPE_FILE[verifierScope(scope).scope]
     : role === 'fixer' ? (Object.hasOwn(FIXER_CASE_FILE, String(caso || '')) ? FIXER_CASE_FILE[String(caso)] : ROLE_FILE.fixer)
@@ -2498,6 +2530,10 @@ export function emit(bucket, ctx) {
   const verificato = ambito.scope === 'riallineamento' ? String(ctx?.perimetro?.shaVerificato || '') : '';
   const scartato = verificato ? esaminaShaVerificato(verificato) : '';
   if (scartato) process.stderr.write(`[dispatch] il commit verificato del perimetro (${unaRiga(verificato).slice(0, 12)}) ${scartato === 'punta' ? 'è la punta del ramo' : 'qui non c\'è'}: chi verifica il riallineamento non ha il confronto\n`);
+  const mancante = ambito.scope === 'riallineamento' ? riallineamentoMancante(ctx?.perimetro?.reportRebase) : [];
+  if (mancante.length) process.stderr.write(`[dispatch] il report del riallineamento nomina ${mancante.map((s) => s.slice(0, 10)).join(', ')} di main, che la punta del ramo non contiene: il rebase non è arrivato su origin\n`);
+  const baseVecchia = scartato === 'punta' && !mancante.length && puntaSuBaseVecchia();
+  if (baseVecchia) process.stderr.write('[dispatch] la punta verificata poggia su un main già superato quando è stata scritta: il rebase non è arrivato su origin\n');
   // Dopo un salto il server rimanda a chi riallinea il commit approvato, che un rebase ha già tolto dai rami: si scarica
   // come per chi verifica, o il confronto alla consegna fallisce.
   if (riallinea && ctx?.shaVerificato && esaminaShaVerificato(ctx.shaVerificato) === 'assente') {
@@ -2512,7 +2548,7 @@ export function emit(bucket, ctx) {
   // Nei giri stretti la serie non si consegna: inviterebbe alla ricerca larga
   // che il testo del ruolo dice di non rifare.
   const serial = ambito.scope && ambito.scope !== 'pieno'
-    ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato })
+    ? perimetroNote(ambito.scope, ctx && ctx.perimetro, { scartato, mancante, baseVecchia })
     : serialAwarenessNote(bucket.role, ctx && ctx.history, ctx && ctx.historyDropped);
   const base = readRoleInstructions(bucket.role, { scope: ambito.scope, caso: bucket.role === 'halt' ? bucket.kind : pieno && pieno.case });
   const server = ctx && ctx.lavoroServer ? testoLavoroServer({ clone: cartellaCloneServer() }).trim() : '';
