@@ -18,6 +18,7 @@
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
+        { testo: 'Il motore che apre le pagine web, e quello che fa parlare Filo coi suoi servizi, hanno le ultime correzioni di sicurezza.', segnalazione: 2115 },
       ],
     },
     {
