@@ -424,7 +424,9 @@ ripartire: la decisione si accoda e la bloccante resta aperta (#1577.2).
    D-123») da incollare in una sessione locale. La sessione legge la domanda con
    `domanda.mjs mostra` e risponde con `domanda.mjs rispondi`: `--scelta N` per
    l'opzione decisa (riprendere compreso), `--testo` da solo per una risposta a
-   parole (punto 2). Lo script dice cosa il server ha applicato.
+   parole (punto 2). Lo script dice cosa il server ha applicato. In entrambi i
+   casi la risposta vale come dell'owner (§ 3.6, «Risposte registrate da una
+   sessione»).
 5. **Letto**, sui resoconti senza opzioni nati prima di #1790: la domanda si
    chiude, senza agenti. Di nuovi non ne nascono (§ 3.1).
 
