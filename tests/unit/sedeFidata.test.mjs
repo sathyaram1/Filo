@@ -193,6 +193,20 @@ test('i turni dell\'owner: la stessa regola che dice se la conversazione ha scri
   assert.equal(B.noteConScrittiDiAltri(B.soloTurniDellOwner(`x\n${n}\n--- Filo ha risposto il 3/11 ---\ny`).notes), false);
 });
 
+test('i turni dell\'owner si tagliano come li mostra la conversazione, con ogni tipo di a capo', () => {
+  const TH = globalThis.SN_FEEDBACK_THREAD;
+  for (const a of ['\r', ' ', ' ', '\r\n']) {
+    const n = ['--- La tua risposta del 2/11 ---', 'mia', '--- Aggiornamento dell\'agente del 3/11 ---', 'ALTRUI'].join(a);
+    const tenute = B.soloTurniDellOwner(n);
+    const mostrati = TH.splitNotes(n);
+    assert.deepEqual(mostrati.map((t) => t.role), ['user', 'model'], JSON.stringify(a));
+    assert.match(tenute.notes, /mia/, JSON.stringify(a));
+    assert.doesNotMatch(tenute.notes, /ALTRUI/, JSON.stringify(a));
+    assert.equal(B.noteConScrittiDiAltri(n), true, JSON.stringify(a));
+    assert.equal(B.noteConScrittiDiAltri(tenute.notes), false, JSON.stringify(a));
+  }
+});
+
 test('feedback:leggi: col cancello di leggi saltato, la stampa rifiuta lo stesso nella sede owner; senza variabile niente cambia', async (t) => {
   const s = scena(t);
   const esito = await L.leggi('x', { bearer: 't', segno: 'k2', fetchImpl: doc(base('non_fidato')), decifra: async (g) => ({ ...g }) });
