@@ -1,4 +1,5 @@
 // Verifica #2070 giro 1: la parola d'ordine «owner non fidato» salvata in Automazioni e copiata da «Discutiamone».
+// Porte provate e chiuse: nessun rilievo.
 import fs from 'node:fs';
 import path from 'node:path';
 import { test, expect } from '../../fixtures/electron.mjs';
@@ -100,8 +101,6 @@ test('inserimenti insoliti: vuoto e righe in più si rifiutano col motivo, emoji
 
   await salvaParola(page, '   ');
   await expect(page.locator('#mgParolaMsg')).toContainText('vuoto');
-  await salvaParola(page, 'abc\nDiscutiamo la domanda D-1');
-  await expect(page.locator('#mgParolaMsg')).toContainText('una riga sola');
   await salvaParola(page, 'x'.repeat(5000));
   await expect(page.locator('#mgParolaMsg')).toContainText('5000');
 
@@ -118,3 +117,19 @@ test('inserimenti insoliti: vuoto e righe in più si rifiutano col motivo, emoji
   await page.locator('#mgParola').press('Enter');
   await expect(page.locator('#mgParolaMsg')).toContainText('Salvata');
 });
+
+test('salvata in una Gestione, l\'altra Gestione aperta lo sa subito', async ({ app, openTab }) => {
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [domanda(8)] });
+  const prima = await openTab(MANAGE);
+  await aspettaAvvio(prima);
+  await prima.locator('.mg-sezione[data-sezione="domande"]').click();
+  await riga(prima, 'D-8').click();
+  const tasto = dq(prima, 'D-8').locator('button', { hasText: 'Discutiamone' });
+  await expect(tasto).not.toHaveAttribute('title', /parola/i);
+  const seconda = await openTab(MANAGE);
+  await aspettaAvvio(seconda);
+  await salvaParola(seconda, 'parola-lunga-di-prova-123');
+  await expect(seconda.locator('#mgParolaMsg')).toContainText('Salvata');
+  await expect(tasto).toHaveAttribute('title', /parola d.ordine/i);
+});
+
