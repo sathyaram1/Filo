@@ -414,7 +414,7 @@ service cloud.firestore {
         && unisceValido(request.resource.data)
         // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
         // `riservato`, `tipo` e `unitoIn` (#1153): il segno che segue il testo riservato, la segnalazione, il rimando
-        // dell'unione. Come la fiducia, li scrive solo il server; così `noteFidate`, la fiducia delle note (#1919).
+        // dell'unione. Come la fiducia, li scrive solo il server. Anche `noteFidate`, la fiducia delle note (#1919).
         && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn', 'noteFidate'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
