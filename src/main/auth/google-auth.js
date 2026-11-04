@@ -396,7 +396,17 @@ async function mostraAccesso(f) {
 const RIAPERTURA_BROWSER_MS = 10 * 1000;
 async function apriNelBrowser(f) {
   const ora = Date.now();
-  if (f.browserAlle && ora - f.browserAlle < RIAPERTURA_BROWSER_MS) return;
+  const manca = f.browserAlle ? f.browserAlle + RIAPERTURA_BROWSER_MS - ora : 0;
+  if (manca > 0) {
+    // Una richiesta frenata non si perde in silenzio: la pagina si riapre allo scadere, una volta per quante ne arrivano.
+    if (!f.riaperturaFrenata) {
+      f.riaperturaFrenata = setTimeout(() => {
+        f.riaperturaFrenata = null;
+        if (f.aspettaBrowser && f.nelBrowser) apriNelBrowser(f).catch((e) => f.loop.abort(e));
+      }, manca);
+    }
+    return;
+  }
   f.browserAlle = ora;
   try {
     await apriBrowser(f.url);
