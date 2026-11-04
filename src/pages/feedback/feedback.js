@@ -1937,6 +1937,7 @@
   }
   if (adminLasciaBtn) {
     adminLasciaBtn.addEventListener('click', () => {
+      sendToMain({ type: 'auth_signin_lascia' }).catch(() => {});
       accessoN++;
       mostraAttesaAccesso(false);
       refreshAuth();

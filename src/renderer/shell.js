@@ -428,6 +428,7 @@
 
   function lasciaStareAccesso() {
     if (!authBusy) return;
+    Promise.resolve(api.message({ type: 'auth_signin_lascia' })).catch(() => {});
     accessoN++;
     authBusy = false;
     renderAccount();
