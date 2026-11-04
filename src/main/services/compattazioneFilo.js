@@ -328,13 +328,15 @@ async function decidi(idProposta, tieni) {
 }
 
 // ── Le porte che non sono una richiesta: fermo e giorni ─────────────────────
-// `fn` null: un turno è cominciato, la compattazione da fermo non parte sotto di lui.
-function programmaFermo(fn, ms) {
-  if (timerFermo) clearTimeout(timerFermo);
-  timerFermo = null;
+// `fn` null: un turno è cominciato, la compattazione da fermo non parte sotto di lui. Un timer per lato: un messaggio in
+// incognito non cancella la pausa della finestra normale.
+function programmaFermo(fn, ms, incognito = null) {
+  const k = lato(inIncognito(incognito));
+  if (timerFermo[k]) clearTimeout(timerFermo[k]);
+  timerFermo[k] = null;
   if (typeof fn !== 'function') return;
-  timerFermo = setTimeout(() => { timerFermo = null; Promise.resolve().then(fn).catch((e) => console.warn('[Filo] compattazione da fermo:', e?.message || e)); }, ms);
-  if (timerFermo.unref) timerFermo.unref();
+  timerFermo[k] = setTimeout(() => { timerFermo[k] = null; Promise.resolve().then(fn).catch((e) => console.warn('[Filo] compattazione da fermo:', e?.message || e)); }, ms);
+  if (timerFermo[k].unref) timerFermo[k].unref();
 }
 function avvia() {
   if (timerGiorni) return;
