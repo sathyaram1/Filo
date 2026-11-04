@@ -275,8 +275,8 @@ function avvisa(testo, chiave, durataSec = 0, detto, errore = '') {
   } catch (_) {}
 }
 
-// Senza portachiavi i segreti (chiavi, password del proxy) vanno sul disco in chiaro: lo si dice una volta per
-// installazione (#905), e la volta conta solo se una finestra l'ha mostrato. Il segno sta nello storage, così «Cancella tutto» lo porta via.
+// Senza portachiavi i segreti vanno sul disco in chiaro: lo si dice una volta per installazione (#905), contata solo se
+// una finestra l'ha mostrato. Il segno sta nello storage, così «Cancella tutto» lo porta via.
 const CHIAVE_IN_CHIARO = 'avvisoChiaviInChiaro';
 let inChiaroInCorso = false;
 
