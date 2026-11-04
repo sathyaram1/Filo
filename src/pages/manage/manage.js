@@ -1629,9 +1629,27 @@
     });
   }
 
-  function renderChannelLog(rejections, comparisons, prove = null, posti = null) {
+  // Chi ha letto schede e testi dei feedback dal cloud, o ne ha scritto una scheda (#1785). Solo le più recenti: tante
+  // letture non devono spingere fuori dall'elenco i rifiuti, che sono il segnale da vedere.
+  const LETTURE_IN_ELENCO = 10;
+  function righeLetture(letture) {
+    return (Array.isArray(letture) ? letture : []).slice(0, LETTURE_IN_ELENCO).map((l) => {
+      const numeri = (Array.isArray(l && l.numeri) ? l.numeri : []).map((n) => `#${String(n).replace(/^#+/, '')}`);
+      const quanti = Math.max(Number(l && l.quanti) || 0, numeri.length);
+      const cosa = l && l.op === 'scheda' ? 'scheda scritta' : l && l.testi ? 'testi letti' : l && l.schede ? 'schede lette' : 'indice letto';
+      const quali = l && l.aperti ? `tutti gli aperti (${quanti})` : `${numeri.slice(0, 8).join(', ')}${quanti > 8 ? ` e altri ${quanti - 8}` : ''}`;
+      return {
+        at: l && l.at,
+        kind: 'cmp',
+        label: 'Lettura',
+        text: `${cosa}: ${quali || '—'}${l && l.slug ? ` · ${l.slug}` : ''}${l && l.role && l.role !== l.slug ? ` · ${roleLabel(l.role)}` : ''}`,
+      };
+    });
+  }
+
+  function renderChannelLog(rejections, comparisons, prove = null, posti = null, letture = null) {
     if (!mgChannelSection || !mgChannelList) return;
-    const rows = righeSenzaProva(prove).concat(righePostiLasciati(posti));
+    const rows = righeSenzaProva(prove).concat(righePostiLasciati(posti), righeLetture(letture));
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
       if (bloccoCheSiFonde(r)) { rows.push(rigaBloccoRegistrato(r)); continue; }
       const t = MR.testoRifiuto(r);
@@ -1956,7 +1974,7 @@
     try {
       const r = await sendToMain({ type: ROUTINE_LOG_GET });
       if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
-      renderChannelLog(r.rejections, r.comparisons, r.proveFusione, r.postiLasciati);
+      renderChannelLog(r.rejections, r.comparisons, r.proveFusione, r.postiLasciati, r.letture);
     } catch (err) {
       console.error('[manage] caricamento registri canale fallito:', err);
       mgChannelSection.hidden = true;
