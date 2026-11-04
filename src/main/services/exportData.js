@@ -175,11 +175,11 @@ function togliSegreti(dati, filo) {
     if (!pieno(o[k])) { delete o[k]; continue; }
     const v = o[k].trim();
     segreti.add(v);
-    const m = isPlainObject(s) && o === s.proxy ? CREDENZIALI_PROXY.exec(v) : null;
+    const m = isPlainObject(s) && o === s.proxy ? credenzialiProxy(v) : null;
     if (!m) { delete o[k]; continue; }
-    segreti.add(m[2]);
-    if (m[2].includes(':')) segreti.add(m[2].slice(m[2].indexOf(':') + 1));
-    o[k] = proxySenzaCredenziali(v);
+    segreti.add(m.credenziali);
+    if (m.password) segreti.add(m.password);
+    o[k] = m.senza;
     proxy.push(k);
   }
   if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
