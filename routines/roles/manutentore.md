@@ -72,13 +72,13 @@ server le dà un biglietto col ruolo `manutentore`, e dispatch ti consegna quest
 motivo dell'accensione (`mattino`, `segnale`, `sveglia`, `battito`), lo stato coi segnali non letti, il taccuino con la
 sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo: basta per una sveglia.
 
-- **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te: `npm run feedback:schede
-  -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi `rileggi` (Opus: tutte quelle
-  che tolgono lavoro, più il campione); in sottofondo, e lo aspetti prima del contesto. Un feedback rimasto senza
-  scheda si decide sul titolo, e lo dici nel recap. Poi `npm run manutentore -- contesto` per la lettura intera, poi
-  rosa, ordine, N, pacchetti e attese; il recap; il taccuino. Un'indicazione dell'owner che chiede la decisione **a
-  secco** vale per la prossima decisione del mattino: rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza
-  applicarne nessuno, e togli l'indicazione dal taccuino.
+- **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te:
+  `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
+  `rileggi` (Opus: tutte quelle che tolgono lavoro, più il campione); in sottofondo, e lo aspetti prima del contesto.
+  Un feedback rimasto senza scheda si decide sul titolo, e lo dici nel recap. Poi `npm run manutentore -- contesto`
+  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. Un'indicazione dell'owner
+  che chiede la decisione **a secco** vale per la prossima decisione del mattino: rosa, ordine, N, pacchetti e attese
+  li scrivi nel recap come proposta, senza applicarne nessuno, e togli l'indicazione dal taccuino.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
 - **alla fine**: la domanda di fine sessione e il rilascio con `--role manutentore`, come ogni worker. Se segui un
