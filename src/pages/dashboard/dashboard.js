@@ -1607,8 +1607,9 @@
     const { c } = s;
     let citata = null;
     try { citata = c.citata ? JSON.parse(JSON.stringify(c.citata)) : null; } catch (_) { citata = null; }
+    // `text` è la domanda come partirebbe, `rispostaA` la citazione come la legge il main: a scheda chiusa la scrive lui.
     const composizione = {
-      text: c.text, scritto: c.scritto, immagini: c.immagini.slice(), file: c.file.map((f) => ({ percorso: f.percorso, nome: f.nome })),
+      text: domandaDi(c), rispostaA: Rispondi.perIlMain(c.citata), scritto: c.scritto, immagini: c.immagini.slice(), file: c.file.map((f) => ({ percorso: f.percorso, nome: f.nome })),
       percorsi: [...c.percorsi.entries()], incollato: !!c.incollato, daFuori: !!c.daFuori, citata,
     };
     send({ type: MSG.FILO_CHAT_SEGUITO, id: s.id, serba: { chatId, pagina: PAGINA, composizione } }).catch(() => {});
