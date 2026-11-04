@@ -380,7 +380,8 @@ Tipi ammessi:
 - `ambito` (approva un ambito nuovo, § 5.3);
 - `attendi` (il feedback fermo aspetta il feedback indicato, che ne corregge
   la causa: quando quello si fonde, il server anticipa l'istanza della
-  gestione del lavoro, che controlla e riprende, § 4.3);
+  gestione del lavoro, che controlla e riprende, § 4.3, tranne mentre è
+  ferma su un guasto suo: SPEC-MANUTENTORE.md § 7);
 - `esperimento` (approva un esperimento della gestione del lavoro oltre il suo
   budget, § 4.8);
 - `cancella_rami` (cancella i rami elencati nell'azione, § 4.7);
