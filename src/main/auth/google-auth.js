@@ -462,7 +462,8 @@ async function nuovoFlusso() {
     prompt: 'select_account',
   }).toString();
 
-  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false, browserAlle: 0 };
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false, browserAlle: 0, riaperturaFrenata: null };
+  flussoAttuale = f;
   const timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
   f.esito = (async () => {
     let code;
