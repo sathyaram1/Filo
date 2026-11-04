@@ -531,11 +531,17 @@ async function misuraLaRicerca(app, percorso, volte = 3) {
   }, [percorso, volte]);
 }
 
-// Il conto costa uguale con tre o tremila campi; un componente chiuso senza niente di segreto non fa leggere l'albero.
+// Il conto costa uguale con tre o tremila campi; un componente chiuso senza niente di segreto non fa leggere l'albero,
+// e quando i conti non tornano non si guardano tutti i campi della pagina uno per uno.
+const CASELLE = `<table>${'<tr><td><input type="checkbox"></td><td>ordine</td></tr>'.repeat(3000)}</table>`;
+const CERCA_CHIUSO = `<cerca-chiuso></cerca-chiuso><script>customElements.define('cerca-chiuso', class extends HTMLElement {
+    constructor() { super(); this.attachShadow({ mode: 'closed' }).innerHTML = '<input type="search" value="scarpe">'; } });</script>`;
 const PAGINA_SENZA_RIQUADRI = [
-  ['tremila caselle da spuntare', `<table>${'<tr><td><input type="checkbox"></td><td>ordine</td></tr>'.repeat(3000)}</table>`, 400, 150],
-  ['un componente chiuso con il solo campo di ricerca', `<cerca-chiuso></cerca-chiuso><script>customElements.define('cerca-chiuso', class extends HTMLElement {
-    constructor() { super(); this.attachShadow({ mode: 'closed' }).innerHTML = '<input type="search" value="scarpe">'; } });</script>`, 1000, 300],
+  ['tremila caselle da spuntare', CASELLE, 400, 150],
+  ['un componente chiuso con il solo campo di ricerca', CERCA_CHIUSO, 1000, 300],
+  ['tremila caselle e un componente chiuso con il solo campo di ricerca', CERCA_CHIUSO + CASELLE, 1000, 600],
+  ['tremila caselle e un riquadro con gli script spenti con un campo per l’email',
+    `<iframe sandbox srcdoc="<form>Iscriviti <input name='email'></form>" width="300" height="60"></iframe>${CASELLE}`, 1000, 600],
 ];
 for (const [nome, extra, attesa, fermo] of PAGINA_SENZA_RIQUADRI) {
   test(`su una pagina grande con ${nome}, la foto per l’assistente non aspetta e Filo non si ferma`, async ({ app, openTab, testServer }) => {
