@@ -16,14 +16,14 @@ function guardiano() {
 // `chiaveFeedback`: la privata dei feedback cifrati, se questo computer ce l'ha (chiaveFeedback.js).
 // `env`: il proxy dell'ambiente vince su quello delle impostazioni (proxyTab.configFrom), e le sue credenziali valgono uguale.
 function custoditi({ impostazioni = [], chiaveFeedback = null, env = process.env } = {}) {
-  const min = (globalThis.SN_GUARDIANO_STATICO && globalThis.SN_GUARDIANO_STATICO.SEGRETO_MIN) || 12;
+  const G = guardiano();
   const out = [];
   const visti = new Set();
-  const metti = (valore, tipo) => {
+  const metti = (valore, tipo, password = false) => {
     const v = typeof valore === 'string' ? valore.trim() : '';
-    if (v.length < min || visti.has(v)) return;
+    if (v.length < G.segretoDi({ valore: v, password }).min || visti.has(v)) return;
     visti.add(v);
-    out.push({ valore: v, tipo });
+    out.push(password ? { valore: v, tipo, password: true } : { valore: v, tipo });
   };
   // Prima i moduli che danno il nome giusto: la chiave personale sta anche fra le effettive.
   const da = (modulo, fn, tipo) => {
