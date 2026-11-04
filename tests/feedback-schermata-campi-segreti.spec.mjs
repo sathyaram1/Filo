@@ -1,6 +1,7 @@
 // #2116 — lo screenshot del riquadro «Invia feedback» copre password e carta come la foto per un modello: due valori
 // diversi nel campo danno la stessa immagine. Una password ancora coi puntini resta com'è, come per il modello: si
-// prova quella resa visibile. Se coprirli non riesce la pagina non parte, e il riquadro dice perché.
+// prova quella resa visibile. Se coprirli non riesce, o la pagina sotto lo strato non dice dove stanno, la pagina non
+// parte e il riquadro dice perché.
 // Finta è solo la rete (la submit nel main).
 
 import { test, expect } from './fixtures/electron.mjs';
@@ -137,6 +138,23 @@ test('se un campo segreto non si riesce a coprire lo screenshot non parte e il r
 
   // Col testo parte il feedback, senza la foto, e l'avviso d'invio lo dice.
   strato = await mandaConSchermata(app, page, 'Il tasto Accedi non risponde');
+  await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(1);
+  expect(await app.evaluate(() => globalThis.__rete.payload[0].images.length), 'la foto scoperta non deve partire').toBe(0);
+  await expect(strato.locator('.sn-toast').filter({ hasText: 'La schermata non è partita' })).toHaveCount(1, { timeout: 8_000 });
+});
+
+// Dallo strato i campi li misura la pagina sotto: se non risponde non si sa cosa coprire, e la foto non parte.
+test('se la pagina sotto non dice dove stanno i suoi campi lo screenshot non parte', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, MODULO);
+  await superaAvviso(app);
+  await reteFinta(app);
+  await page.fill('#c', '4111 1111 1111 1111');
+  await nelMondoDiFilo(app, page, () => {
+    globalThis.SN_EXTRACT.campiSegretiInVista = () => { throw new Error('pagina ferma'); };
+    return true;
+  });
+  const strato = await mandaConSchermata(app, page, 'Il tasto Accedi non risponde');
   await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(1);
   expect(await app.evaluate(() => globalThis.__rete.payload[0].images.length), 'la foto scoperta non deve partire').toBe(0);
   await expect(strato.locator('.sn-toast').filter({ hasText: 'La schermata non è partita' })).toHaveCount(1, { timeout: 8_000 });
