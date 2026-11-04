@@ -56,9 +56,13 @@ test('#1446.4: il valore si cerca in tutta la risposta, non solo nelle prime par
 });
 
 test('#1446.4: quando chi scrive ha già risposto, o l\'altro ha solo nominato la password, il resto parte', () => {
-  // Il legame finisce quando scrive qualcun altro.
+  // Il legame finisce quando chi scrive ha già scritto, o quando sotto la richiesta c'è già la risposta.
   const avanti = 'Marco: mi mandi la password del wifi?\nIo: arriva\nMarco: a che ora ci vediamo?';
   assert.equal(alModello('alle venti davanti al cinema 2024', avanti).nuovo, 'alle venti davanti al cinema 2024');
+  for (const risposta of ['Gatto2024', 'certo, Gatto2024']) {
+    const senzaNomi = `mi mandi la password del wifi?\n${risposta}\na che ora ci vediamo stasera?`;
+    assert.equal(alModello('alle venti davanti al cinema', senzaNomi).nuovo, 'alle venti davanti al cinema', senzaNomi);
+  }
   // Una password solo nominata lega le parole che ne hanno la forma, non le parole qualunque.
   assert.equal(alModello('ah ok, e adesso qual è? Gatto2024?', 'Marco: ho cambiato la password del wifi').nuovo, `ah ok, e adesso qual è? ${S}?`);
   assert.equal(alModello('certo, alle venti al bar', 'Marco: ho cambiato la password del wifi').nuovo, 'certo, alle venti al bar');
