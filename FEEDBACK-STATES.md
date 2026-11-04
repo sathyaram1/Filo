@@ -544,7 +544,10 @@ c'è più.
   blocchi (`skippedL5: true`, motivo `fiducia`), fonde senza chiedere e chiude la pratica.
   `verify-local start` e `finish` scrivono la voce col biglietto della sessione
   (`scripts/biglietto.mjs`). Manca una condizione → la richiesta aspetta il sì dell'owner in
-  Gestione, col motivo. I rami nati prima del registro, di pratiche migrate, seguono la
+  Gestione, col motivo, e porta con sé la pratica e le parti mancanti: al sì il server fonde e
+  chiude la pratica come qui sopra, con la nota «approvazione dell'owner», o la annota se
+  un'altra parte del lavoro manca ancora (#2004). Solo una pratica col segno locale, in
+  lavorazione; alla sua chiusura la richiesta locale non si scarta (alla riapertura sì). I rami nati prima del registro, di pratiche migrate, seguono la
   regola di prima (prova del mittente o `localApproval`) finché non si chiudono.
 
 ### 4c. Chi nasce senza giudici (#914)
