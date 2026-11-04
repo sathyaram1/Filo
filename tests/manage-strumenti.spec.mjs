@@ -185,7 +185,7 @@ test('«Segna fidati tutti» sulla lista filtrata: chiede conferma, poi li segna
     ipcMain.handle('filo:message', async (event, msg) => {
       if (msg && msg.type === 'fiducia_segna_blocco') {
         globalThis.__blocchi.push(msg.feedbackIds);
-        return { ok: true, esiti: msg.feedbackIds.map((id) => (id === 'fb-902' ? { feedbackId: id, ok: false, error: 'Segnalato come attacco.' } : { feedbackId: id, ok: true })) };
+        return { ok: true, esiti: msg.feedbackIds.map((id) => (id === 'fb-902' ? { feedbackId: id, ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' } : { feedbackId: id, ok: true })) };
       }
       return sotto(event, msg);
     });
