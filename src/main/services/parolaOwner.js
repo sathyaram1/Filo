@@ -9,7 +9,7 @@ const NOME_FILE = 'parola-owner.bin';
 // Largo: una parola d'ordine del server è di qualche decina di caratteri, oltre è un incollato con dentro altro.
 const MAX_CARATTERI = 1000;
 // Chi incolla la riga già copiata da «Discutiamone» porta con sé anche l'etichetta.
-const ETICHETTA = /^parola d['’]ordine\s*:\s*/i;
+const ETICHETTA = globalThis.SN_DOMANDE.ETICHETTA_PAROLA_RE;
 
 /** PURA. `testo` incollato → { ok, parola } | { ok:false, error } col motivo per l'owner. */
 function controlla(testo) {
