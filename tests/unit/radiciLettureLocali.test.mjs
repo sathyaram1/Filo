@@ -5,9 +5,9 @@ import assert from 'node:assert/strict';
 import { writeFileSync, existsSync, readdirSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { motiviDiLettura, sporca, rigaSporco, cartellaSporchi, ENV_FILE } from '../../scripts/lib/biglietto-locale.mjs';
+import { motiviDiLettura, sporca, rigaSporco, cartellaSporchi, ENV_FILE, LETTI_PER_CHIAMATA } from '../../scripts/lib/biglietto-locale.mjs';
 import { radiceLettura } from '../../scripts/lib/letture-esterne.mjs';
-import { lettiDi } from '../../scripts/domanda.mjs';
+import { lettiDi, fidatePerTimbri } from '../../scripts/domanda.mjs';
 
 const TURNO_ROUTINE = "--- Aggiornamento dell'agente del 1/11/2026 ---\nReport del lavoro.";
 
@@ -121,4 +121,26 @@ test('il gancio annota la radice della pagina letta accanto al biglietto, non so
   assert.equal(r.esito, 'annotato', JSON.stringify(r));
   const voci = readdirSync(cartellaSporchi(b)).map((n) => JSON.parse(readFileSync(join(cartellaSporchi(b), n), 'utf8')));
   assert.deepEqual(voci.flatMap((v) => v.radici || []), ['web:https://esempio.it/listino']);
+});
+
+test('mille domande lette in una volta partono a pezzi sotto il tetto del server, e pulito vale solo se lo sono tutti', async () => {
+  const { file } = biglietto();
+  const { mandati, deps } = server({ fiducia: 'fidato', pulito: true });
+  const letti = Array.from({ length: 1000 }, (_, i) => ({ tipo: 'domanda', id: `D-${i + 1}` }));
+  const r = await sporca('elenco delle domande', { env: { [ENV_FILE]: file }, deps, letti });
+  assert.equal(mandati.length, Math.ceil(1000 / LETTI_PER_CHIAMATA));
+  assert.ok(mandati.every((m) => m.letti.length <= LETTI_PER_CHIAMATA));
+  assert.equal(mandati.flatMap((m) => m.letti).length, 1000);
+  assert.equal(r.puliti, 1);
+  assert.deepEqual(r.errori, []);
+});
+
+test('le domande fidate per timbri si nominano anche loro: il timbro tolto dopo raggiunge la sessione che le ha lette', () => {
+  const domande = [
+    { id: 'D-1', fiducia: 'fidato', radici: ['legacy'] },
+    { id: 'D-2', fiducia: 'fidato', radici: [] },
+    { id: 'D-3', fiducia: 'fidato', radici: ['feedback:40'], fidataDallOwner: { il: 1 } },
+    { id: 'D-4', fiducia: 'non_fidato', radici: ['feedback:41'] },
+  ];
+  assert.deepEqual(fidatePerTimbri(domande), ['D-1']);
 });
