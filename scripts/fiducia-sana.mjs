@@ -34,7 +34,7 @@ export function rigaEsito(r, { dalVero } = {}) {
 }
 
 /** deps: { chiama(data) → risultato della callable, scrivi(riga) }. → codice d'uscita. */
-export async function sana(argv, { chiama = chiamaServer, scrivi = console.log } = {}) {
+export async function sana(argv, { chiama = risultatoOwnerFiducia, scrivi = console.log } = {}) {
   const args = leggiArgomenti(argv);
   if (args.errore) { scrivi(args.errore); return 2; }
   let r;
