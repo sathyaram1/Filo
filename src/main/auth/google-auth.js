@@ -67,32 +67,70 @@ function stessoState(ricevuto, atteso) {
   return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
 }
 
-// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
-function startLoopback(expectedState) {
+// La pagina del ritorno aspetta lo scambio del codice: «completato» lo scrive solo un accesso riuscito (#678.6).
+// Oltre il tetto risponde lo stesso, e l'esito lo dice chi ha chiesto l'accesso.
+const RISPOSTA_RITORNO_MS = 2 * 60 * 1000;
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function paginaRitorno(testo) {
+  return '<!doctype html><meta charset="utf-8"><title>Filo</title><body style="font-family:system-ui;padding:2rem">'
+    + escHtml(testo) + '</body>';
+}
+const fraseErrore = (e) => { try { return require('./esitoAccesso').spiegaErroreAccesso(e).error; } catch (_) { return 'Accesso non riuscito.'; } };
+
+// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, concludi, abort }. `dove` è dove torna
+// chi ha finito nel browser ('app', o 'terminale' per lo strumento dell'owner). `concludi(errore?)` scrive la pagina.
+function startLoopback(expectedState, { dove = 'app' } = {}) {
+  const torna = dove === 'terminale' ? 'al terminale' : 'all\'app';
   return new Promise((resolve, reject) => {
     let resolveCode, rejectCode;
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
     codePromise.catch(() => {}); // un flusso interrotto prima di waitForCode non è un rifiuto orfano
+    let attesa = null; // la risposta del ritorno vero, finché lo scambio non dice com'è andata
+    let tetto = null;
+    const concludi = (errore) => {
+      clearTimeout(tetto);
+      const res = attesa;
+      attesa = null;
+      if (!res) return;
+      try {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(paginaRitorno(errore
+          ? `${fraseErrore(errore)} Puoi chiudere questa scheda.`
+          : `Accesso a Filo completato. Puoi chiudere questa scheda e tornare ${torna}.`));
+      } catch (_) {}
+    };
 
     const server = http.createServer((req, res) => {
-      const url = new URL(req.url, 'http://127.0.0.1');
+      res.on('error', () => {});
+      let url = null;
+      // Un indirizzo che non si legge («http://[») da un altro programma è una richiesta qualunque, non un crollo (#1086.2).
+      try { url = new URL(req.url, 'http://127.0.0.1'); } catch (_) { url = null; }
       // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
       // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
-      if (!stessoState(url.searchParams.get('state'), expectedState)) {
+      if (!url || attesa || !stessoState(url.searchParams.get('state'), expectedState)) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Richiesta non riconosciuta.');
       }
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
-        + (error || !code
-          ? 'Accesso non riuscito. Puoi chiudere questa scheda.'
-          : 'Accesso a Filo completato. Puoi chiudere questa scheda e tornare all\'app.')
-        + '</body>');
       server.close();
-      if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
-      if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
+      attesa = res;
+      if (error || !code) {
+        const e = error
+          ? erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error)
+          : new Error('OAuth: nessun code nel redirect');
+        concludi(e);
+        return rejectCode(e);
+      }
+      tetto = setTimeout(() => {
+        const r = attesa;
+        attesa = null;
+        if (!r) return;
+        try {
+          r.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          r.end(paginaRitorno(`Puoi chiudere questa scheda: torna ${torna} per sapere com'è andato l'accesso.`));
+        } catch (_) {}
+      }, RISPOSTA_RITORNO_MS);
       resolveCode(code);
     });
 
@@ -100,8 +138,8 @@ function startLoopback(expectedState) {
     // porta 0 = il SO assegna una porta libera, solo su loopback.
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address();
-      const abort = (err) => { server.close(() => {}); rejectCode(err); };
-      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, abort });
+      const abort = (err) => { server.close(() => {}); concludi(err); rejectCode(err); };
+      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, concludi, abort });
     });
   });
 }
