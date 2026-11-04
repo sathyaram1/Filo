@@ -317,6 +317,9 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
 export function riportaInCima(root, { commit = false, basi = ['origin/main', 'main'], oggi = new Date().toISOString().slice(0, 10), aMeta = () => '', identita = null, exec = execFileSync } = {}) {
   const git = (args) => String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }));
   const no = (motivo) => ({ ok: false, spostate: [], verso: '', commit: '', motivo });
+  const percorso = join(root, FILE_NOVITA);
+  // Un deposito senza registro (le prove degli strumenti) non ha niente da spostare.
+  if (!existsSync(percorso)) return { ok: true, spostate: [], verso: '', commit: '', motivo: '' };
   const inCorso = aMeta(root);
   if (inCorso) return no(`${inCorso} è a metà: finiscila, poi rilancia`);
   let base = '';
