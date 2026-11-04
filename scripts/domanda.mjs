@@ -422,6 +422,11 @@ export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
   const righe = [`Altre domande vive sullo stesso feedback (${vive.length + piu}${piu ? `, qui le ${vive.length} più recenti` : ''})`];
   if (!vive.length) righe.push('  nessuna');
   for (const d of vive) {
+    // Una illeggibile non è «senza titolo»: chi smista deve sapere che non sa cosa chiede.
+    if (d.illeggibile) {
+      righe.push(`  ${visibile(d.id || '?')} [${visibile(d.stato || '?')} · illeggibile: il server non l'ha potuta aprire, non sai che scelta chiede]`);
+      continue;
+    }
     const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
     if (Number.isInteger(d.provvisoria)) segni.push(`provvisoria: opzione ${d.provvisoria + 1}`);
     righe.push(`  ${visibile(d.id || '?')} ${visibile(d.titolo || '(senza titolo)')}  [${segni.join(' · ')}]`);
