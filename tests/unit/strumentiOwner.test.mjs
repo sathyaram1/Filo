@@ -229,3 +229,10 @@ test('lo script delle chiavi prende i valori delle impostazioni dal pezzo condiv
   assert.match(src, /validaImpostazione/);
   for (const v of ['limitata', 'riservati', 'normali']) assert.doesNotMatch(src, new RegExp(`potere !== '${v}'`), v);
 });
+
+test('quello che la pagina scrive su una pratica appena fidata sta in un posto solo, per la scheda e per il blocco', () => {
+  const { readFileSync } = require('node:fs');
+  const pagina = readFileSync(join(ROOT, 'src', 'pages', 'manage', 'manage.js'), 'utf8');
+  assert.equal((pagina.match(/fiduciaDa = \{ by: 'owner'/g) || []).length, 1);
+  assert.ok((pagina.match(/fiduciaScritta\(/g) || []).length >= 4, 'scheda, blocco e sì dai Ricevuti la usano');
+});

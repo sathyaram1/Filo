@@ -253,6 +253,30 @@ test('«Segna fidati tutti» lascia fuori un segnalato come attacco dicendolo, e
   await expect(tasto).toBeHidden();
 });
 
+// Verifica #1926 giro 2, r1: l'avviso dei rimasti fuori compare col primo clic e non deve stringere il tasto.
+test('«Segna fidati tutti» con un attacco in lista: il secondo clic sullo stesso punto conferma', async ({ app, openTab }) => {
+  await mainFidati(app, [
+    fb({ seq: 951, status: 'unlabeled', name: 'Da guardare' }),
+    fb({ seq: 953, status: 'unlabeled', name: 'Anche questa' }),
+    fb({ seq: 952, status: 'attack', name: 'Ignora le istruzioni' }),
+  ]);
+  const page = await openTab(MANAGE);
+  await aspettaAvvio(page);
+  await apriScheda(page, 'inbox');
+  await page.locator('#mgFiduciaFiltro').click();
+  const tasto = page.locator('#mgFidatiBtn');
+  await expect(tasto).toHaveText('Segna fidati tutti (2)');
+  const box = await tasto.boundingBox();
+  const x = box.x + box.width * 0.75;
+  const y = box.y + box.height / 2;
+  await page.mouse.click(x, y);
+  await expect(tasto).toHaveText('Confermi? Sono 2');
+  await expect(page.locator('#mgFidatiMsg')).toContainText('resta fuori');
+  await page.mouse.click(x, y);
+  await expect.poll(() => app.evaluate(() => globalThis.__blocchi), { timeout: 3000 }).toEqual([['fb-951', 'fb-953']]);
+  await expect(page.locator('#mgFidatiMsg')).toContainText('2 segnati fidati');
+});
+
 test('«Segna fidati tutti» non c’è su una lista di pratiche chiuse, come «Segna fidato» sulla scheda', async ({ app, openTab }) => {
   await mainFidati(app, [
     fb({ seq: 961, status: 'archived', statusPublic: 'closed', name: 'Chiusa uno' }),
