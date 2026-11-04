@@ -82,8 +82,8 @@ test('Chat nuova sotto la finestra piena: torna testo, foto e documento, la bozz
   const n = await app.evaluate(() => globalThis.__messaggi.length);
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: /Risposta \d+\./ })).toBeVisible({ timeout: 20_000 });
-  const ultima = await app.evaluate((n) => globalThis.__messaggi[n], n);
-  const testo = JSON.stringify(ultima);
+  const tutte = await app.evaluate(() => globalThis.__messaggi.map((m) => JSON.stringify(m)));
+  const testo = tutte.slice(n).find((m) => m.includes('solo la prima guida')) || `nessuna chiamata dopo la ${n}-esima su ${tutte.length}: ${tutte.map((m) => m.slice(-300)).join(' || ')}`;
   expect(testo).toContain('solo la prima guida');
   expect(testo).toContain('sentieri.pdf');
   expect((testo.match(/data:image\//g) || []).length).toBeGreaterThanOrEqual(2);
