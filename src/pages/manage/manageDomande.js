@@ -13,6 +13,7 @@
     consiglio: MSG.DOMANDE_CONSIGLIO || 'domande_consiglio',
     archivia: MSG.DOMANDA_ARCHIVIA || 'domanda_archivia',
     riapri: MSG.DOMANDA_RIAPRI || 'domanda_riapri',
+    annulla: MSG.DOMANDA_ANNULLA || 'domanda_annulla',
     fiducia: MSG.DOMANDA_FIDUCIA || 'domanda_fiducia',
   };
   const MR = window.SN_MANAGE_REVIEW;
@@ -41,6 +42,7 @@
   const TITOLO_NON_FIDATA = 'Chi l’ha scritta ha letto testo che non viene da te: le parole possono essere manipolate. '
     + 'Ogni pulsante fa solo quello che c’è scritto sopra.';
   const TASTO_MANDA = window.SN_TASTI ? window.SN_TASTI.etichetta('Ctrl+Invio') : '';
+  const TITOLO_ANNULLA = 'Riaprila e rimetti com’erano prima i feedback che la risposta ha toccato';
   const TITOLO_FIDATA = 'Scritta da una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
   // Lo scudo in elenco è la fiducia della domanda, non del feedback da cui nasce.
   const SCUDO_FIDATA = 'Fidata. L’ha scritta una sessione che ha letto solo testo tuo o di altre sessioni pulite.';
@@ -738,7 +740,7 @@
   function daChiave(d) {
     if (rispostaDaSessione(d)) {
       const p = el('p', 'mg-dq-esito mg-dq-esito--chiave', 'Risposta registrata da una sessione locale, non da qui.');
-      p.title = 'L’ha registrata una sessione dalla chat. Se non è quello che volevi, riaprila: il lavoro torna fermo sulla domanda.';
+      p.title = 'L’ha registrata una sessione dalla chat. Se non è quello che volevi, annullala: i feedback che ha toccato tornano com’erano.';
       return p;
     }
     const r = rispostaDaChiave(d);
@@ -814,7 +816,10 @@
     if (rispondibile && !d.illeggibile) tasto(d.stato === 'aperta' ? 'Rispondi' : 'Aggiungi', 'testo', '', TASTO_MANDA ? `Manda il testo (${TASTO_MANDA})` : 'Manda il testo');
     if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
     if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
-    else if (riapribile(d)) tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
+    else if (riapribile(d)) {
+      if (rispostaDaSessione(d)) tasto('Annulla', 'annulla', 'sn-btn-secondary', TITOLO_ANNULLA);
+      tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
+    }
     if (fidabile(d)) tasto('Segna fidata', 'fidata', 'sn-btn-secondary', TITOLO_SEGNA_FIDATA);
     else if (sfidabile(d)) tasto('Togli fiducia', 'sfidata', 'sn-btn-secondary', TITOLO_TOGLI_FIDUCIA);
     box.appendChild(tasti);
@@ -1117,6 +1122,12 @@
     if (r) dopo(id, r, riapri ? `Riaperta: ora è fra quelle da rispondere.${resto ? ` ${resto}` : ''}` : 'Archiviata.');
   }
 
+  // Una risposta di una sessione si disfa intera (#1926): riaperta, e i feedback che ha toccato com'erano prima.
+  async function annulla(id) {
+    const r = await manda(id, { type: T.annulla, id }, 'Annullo…');
+    if (r) dopo(id, r, 'Annullata: è di nuovo fra quelle da rispondere, e i feedback sono com’erano.');
+  }
+
   async function segnaFidata(id, fidata) {
     const r = await manda(id, { type: T.fiducia, id, fidata }, fidata ? 'Segno fidata…' : 'Tolgo la fiducia…');
     if (r) dopo(id, r, fidata ? 'Fidata: chi riprende il lavoro riceve le note senza sporcarsi.' : 'Non è più fidata.');
@@ -1264,7 +1275,10 @@
       if (et) voci.push({ testo: `Applica il consiglio: ${et}`, azione: () => { apri([d.id]); disegna(); consiglioUna(d.id); } });
       if (d.stato !== 'in_smistamento') voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
-      else if (riapribile(d)) voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
+      else if (riapribile(d)) {
+        if (rispostaDaSessione(d)) voci.push({ testo: 'Annulla la risposta', titolo: TITOLO_ANNULLA, azione: () => { apri([d.id]); disegna(); annulla(d.id); } });
+        voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
+      }
       // Il menu non mostra le note: apre la domanda con le note aperte, e la fiducia si dà dal tasto, dopo averle lette.
       if (fidabile(d)) voci.push({ testo: 'Segna fidata…', titolo: 'Apre la domanda con le note per gli agenti: la segni fidata dopo averle lette', azione: () => { apri([d.id]); disegna(); } });
       else if (sfidabile(d)) voci.push({ testo: 'Togli fiducia', titolo: TITOLO_TOGLI_FIDUCIA, azione: () => { apri([d.id]); disegna(); segnaFidata(d.id, false); } });
@@ -1350,6 +1364,7 @@
       else if (fai === 'discuti') discuti(id);
       else if (fai === 'chiudi') archivia(id, false);
       else if (fai === 'riapri') archivia(id, true);
+      else if (fai === 'annulla') annulla(id);
       else if (fai === 'fidata') segnaFidata(id, true);
       else if (fai === 'sfidata') segnaFidata(id, false);
       else if (fai === 'originale') {

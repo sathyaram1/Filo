@@ -89,10 +89,10 @@ function erroreDomande(e, nonAncora) {
 
 // Un errore delle callable riservate all'owner (#1926) detto all'owner. Un server più vecchio dell'app non ha la
 // callable (404 senza codice) o non conosce l'op: lo si dice con `nonAncora`, invece del codice grezzo.
-function erroreOwner(e, { cosa = 'Questa funzione', nonAncora = '' } = {}) {
+function erroreOwner(e, { cosa = 'questa', nonAncora = '' } = {}) {
   const code = String(e?.code || '').toUpperCase();
   const detail = String(e?.detail || '').trim();
-  if (e?.httpStatus === 404 && !code) return `${cosa}: non ancora pubblicato sul server.`;
+  if (e?.httpStatus === 404 && !code) return `Il server non offre ancora questa funzione (${cosa}): arriva col prossimo aggiornamento del server.`;
   if (nonAncora && (/sconosciut/i.test(String(e?.reason || '')) || /operazione sconosciuta|unknown op/i.test(detail))) return nonAncora;
   if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può farlo: serve quello del proprietario.';
   if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
@@ -769,7 +769,7 @@ module.exports = function register(on, ctx) {
       ordine = v.numeri;
     }
     const x = await chiamaOwner('ownerManutentore', { op: 'ordine', ordine }, {
-      cosa: 'L’ordine del manutentore',
+      cosa: 'ordine del manutentore',
       nonAncora: 'Il server non sa ancora prendere l’ordine da qui: arriva col prossimo aggiornamento del server.',
     });
     if (!x.ok) return x;
@@ -778,14 +778,14 @@ module.exports = function register(on, ctx) {
 
   const CHIAVI_NON_ANCORA = 'Il server non conosce ancora questa operazione sulle parole d’ordine: arriva col prossimo aggiornamento del server.';
   on(MSG.ROUTINE_CHIAVI_ELENCO, ownerOnly(async () => {
-    const x = await chiamaOwner('routineKeys', { op: 'list' }, { cosa: 'Le parole d’ordine' });
+    const x = await chiamaOwner('routineKeys', { op: 'list' }, { cosa: 'parole d’ordine' });
     if (!x.ok) return x;
     return { ok: true, keys: globalThis.SN_ROUTINE_CHIAVI.ordina(x.r.keys) };
   }));
   on(MSG.ROUTINE_CHIAVE_CREA, ownerOnly(async (msg) => {
     const v = globalThis.SN_ROUTINE_CHIAVI.validaNuova(msg);
     if (!v.ok) return { ok: false, error: v.testo };
-    const x = await chiamaOwner('routineKeys', Object.assign({ op: 'issue' }, v.dati), { cosa: 'Le parole d’ordine', nonAncora: CHIAVI_NON_ANCORA });
+    const x = await chiamaOwner('routineKeys', Object.assign({ op: 'issue' }, v.dati), { cosa: 'parole d’ordine', nonAncora: CHIAVI_NON_ANCORA });
     if (!x.ok) return x;
     const passphrase = typeof x.r.passphrase === 'string' ? x.r.passphrase : '';
     if (!passphrase) return { ok: false, error: 'Il server non ha restituito la parola d’ordine.' };
@@ -794,19 +794,19 @@ module.exports = function register(on, ctx) {
   on(MSG.ROUTINE_CHIAVE_REVOCA, ownerOnly(async (msg) => {
     const slug = String(msg?.slug || '').trim();
     if (!slug) return { ok: false, error: 'Manca la parola d’ordine da revocare.' };
-    const x = await chiamaOwner('routineKeys', { op: 'revoke', slug }, { cosa: 'Le parole d’ordine' });
+    const x = await chiamaOwner('routineKeys', { op: 'revoke', slug }, { cosa: 'parole d’ordine' });
     return x.ok ? { ok: true } : x;
   }));
   on(MSG.ROUTINE_CHIAVE_IMPOSTA, ownerOnly(async (msg) => {
     const v = globalThis.SN_ROUTINE_CHIAVI.validaImpostazione(msg);
     if (!v.ok) return { ok: false, error: v.testo };
-    const x = await chiamaOwner('routineKeys', v.dati, { cosa: 'Le parole d’ordine', nonAncora: CHIAVI_NON_ANCORA });
+    const x = await chiamaOwner('routineKeys', v.dati, { cosa: 'parole d’ordine', nonAncora: CHIAVI_NON_ANCORA });
     return x.ok ? { ok: true } : x;
   }));
 
   on(MSG.ROUTINE_CHIUSURA_GET, ownerOnly(async () => {
     const CH = globalThis.SN_ROUTINE_CHIUSURA;
-    const cosa = 'La domanda di fine sessione';
+    const cosa = 'domanda di fine sessione';
     const [domande, risposte] = await Promise.all([
       chiamaOwner('routineClosingAdmin', { op: 'get' }, { cosa }),
       chiamaOwner('routineClosingAdmin', { op: 'answers', limit: 50 }, { cosa }),
@@ -821,7 +821,7 @@ module.exports = function register(on, ctx) {
     if (!globalThis.SN_ROUTINE_CHIUSURA.slotValido(slot)) return { ok: false, error: `«${slot || 'vuoto'}» non è uno slot: ${globalThis.SN_ROUTINE_CHIUSURA.SLOT.join(', ')} o compito:<ricorrente>.` };
     const testo = typeof msg?.testo === 'string' ? msg.testo.trim() : '';
     const data = testo ? { op: 'set', slot, text: testo } : { op: 'clear', slot };
-    const x = await chiamaOwner('routineClosingAdmin', data, { cosa: 'La domanda di fine sessione' });
+    const x = await chiamaOwner('routineClosingAdmin', data, { cosa: 'domanda di fine sessione' });
     return x.ok ? { ok: true } : x;
   }));
 
@@ -830,7 +830,7 @@ module.exports = function register(on, ctx) {
     const da = Number(msg?.da); const a = Number(msg?.a);
     if (!Number.isFinite(da) || !Number.isFinite(a) || a <= da) return { ok: false, error: 'La fine della finestra deve venire dopo l’inizio.' };
     const x = await chiamaOwner('routineStateAdmin', { op: 'giri', da, a }, {
-      cosa: 'Lo storico dei giri',
+      cosa: 'storico dei giri',
       nonAncora: 'Il server non ha ancora lo storico dei giri: arriva col prossimo aggiornamento del server.',
     });
     if (!x.ok) return x;
@@ -1660,11 +1660,14 @@ module.exports = function register(on, ctx) {
     return { ok: true, esiti: Array.isArray(r.esiti) ? r.esiti : [] };
   }));
 
-  for (const [tipo, op] of [[MSG.DOMANDA_ARCHIVIA, 'archivia'], [MSG.DOMANDA_RIAPRI, 'riapri']]) {
+  // «Annulla» (#1926) vale per una risposta registrata da una sessione: il server la riapre e rimette i feedback
+  // che aveva toccato com'erano prima.
+  const ANNULLA_NON_ANCORA = 'Il server non sa ancora annullare una risposta: arriva col prossimo aggiornamento del server. Intanto puoi riaprirla.';
+  for (const [tipo, op] of [[MSG.DOMANDA_ARCHIVIA, 'archivia'], [MSG.DOMANDA_RIAPRI, 'riapri'], [MSG.DOMANDA_ANNULLA, 'annulla']]) {
     on(tipo, ownerOnly(async (msg) => {
       const id = String(msg?.id || '').trim();
       if (!id) return { ok: false, error: 'Manca la domanda.' };
-      const r = await chiamaDomande({ op, id });
+      const r = await chiamaDomande({ op, id }, op === 'annulla' ? ANNULLA_NON_ANCORA : undefined);
       if (!r.ok) return r;
       // Riaprire una risposta disfa quello che ha applicato dove si può (§3.6): il resto lo dice il server, e si legge.
       const resoconto = typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
@@ -1683,9 +1686,7 @@ module.exports = function register(on, ctx) {
   }));
 
   // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
-  on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
-    const feedbackId = String(msg?.feedbackId || '').trim();
-    const togli = msg?.fidato === false;
+  async function segnaFidato(feedbackId, togli) {
     if (!feedbackId) return { ok: false, error: 'Manca il feedback da segnare fidato.' };
     let r;
     try {
@@ -1698,6 +1699,27 @@ module.exports = function register(on, ctx) {
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || (togli ? 'Il server non ha tolto la fiducia.' : 'Il server non l’ha segnato fidato.') };
     return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
+  }
+  on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => segnaFidato(String(msg?.feedbackId || '').trim(), msg?.fidato === false)));
+
+  // «Segna fidati» in blocco sui feedback filtrati in Gestione (#1926): uno per uno, come il tasto sulla scheda, e
+  // un esito per ognuno. Pochi alla volta: il server tiene un limite di richieste.
+  const BLOCCO_MAX = 2000;
+  on(MSG.FIDUCIA_SEGNA_BLOCCO, ownerOnly(async (msg) => {
+    const ids = [...new Set((Array.isArray(msg?.feedbackIds) ? msg.feedbackIds : []).map((x) => String(x || '').trim()).filter(Boolean))];
+    if (!ids.length) return { ok: false, error: 'Nessun feedback da segnare fidato.' };
+    if (ids.length > BLOCCO_MAX) return { ok: false, error: `${ids.length} feedback, il massimo in una volta è ${BLOCCO_MAX}: stringi il filtro.` };
+    const esiti = new Array(ids.length);
+    let prossimo = 0;
+    const lavora = async () => {
+      while (prossimo < ids.length) {
+        const i = prossimo++;
+        const r = await segnaFidato(ids[i], false);
+        esiti[i] = Object.assign({ feedbackId: ids[i], ok: !!r.ok }, r.ok ? (r.rimessoInCoda ? { rimessoInCoda: true } : {}) : { error: r.error });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, ids.length) }, lavora));
+    return { ok: true, esiti };
   }));
 
   // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
