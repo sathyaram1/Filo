@@ -306,7 +306,49 @@ export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiP
   return motivi;
 }
 
-/** La priorità del pacchetto senza `--priorita`: la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
+/**
+ * Le attese con cui nasce il pacchetto: quelle di `--aspetta` più quelle delle unite, che archiviate non contano più da
+ * nessuna parte; quelle su un'altra unita cadono. Il tetto di un feedback si conta qui, mai un taglio. PURA.
+ * `proprie`: [{ id, num }]; `unite`: [{ id, num, attese }]. → { attese: [{ id, num }], ereditate: [{ id, num, da: [num] }], motivo }
+ */
+export function atteseDelPacchetto(proprie, unite) {
+  const MAX = globalThis.SN_FB_ATTESE.MAX;
+  const lista = Array.isArray(unite) ? unite.filter(Boolean) : [];
+  const dentro = new Set(lista.map((u) => u.id));
+  const attese = [];
+  const ereditate = [];
+  const viste = new Map();
+  for (const w of Array.isArray(proprie) ? proprie : []) {
+    if (!w || !w.id || viste.has(w.id)) continue;
+    viste.set(w.id, null);
+    attese.push({ id: w.id, num: w.num || '' });
+  }
+  for (const u of lista) {
+    for (const w of u.attese || []) {
+      if (!w || !w.id || dentro.has(w.id)) continue;
+      if (!viste.has(w.id)) {
+        const e = { id: w.id, num: w.num || '', da: [] };
+        viste.set(w.id, e);
+        attese.push({ id: e.id, num: e.num });
+        ereditate.push(e);
+      }
+      const e = viste.get(w.id);
+      if (e && !e.da.includes(String(u.num))) e.da.push(String(u.num));
+    }
+  }
+  let motivo = '';
+  if (attese.length > MAX) {
+    const perUnita = lista.map((u) => [u.num, ereditate.filter((e) => e.da.includes(String(u.num))).length]).filter(([, k]) => k > 0);
+    const proprieN = attese.length - ereditate.length;
+    motivo = `il pacchetto aspetterebbe ${attese.length} feedback (${[
+      ...(proprieN ? [`${proprieN} di --aspetta`] : []),
+      `${ereditate.length} dalle unite: ${perUnita.map(([n, k]) => `#${n}: ${k}`).join(', ')}`,
+    ].join(', ')}), e un feedback ne aspetta al più ${MAX}: togline ${attese.length - MAX} dalle unite o da --aspetta, o dividi il pacchetto`;
+  }
+  return { attese, ereditate, motivo };
+}
+
+/** La priorità del pacchetto senza `--priorita`:la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
 export function prioritaDelPacchetto(scelta, lette) {
   if (Number.isInteger(scelta)) return scelta;
   const note = (Array.isArray(lette) ? lette : []).map((u) => u && u.priorita).filter(Number.isInteger);
