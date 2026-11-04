@@ -685,12 +685,12 @@
     //                    'A', 'B', oppure '' = si alternano (campo assente);
     //   accountAOff / accountBOff  account escluso: da lì non parte nessuna
     //                    sessione nuova (campo assente = in uso);
-    //   reteApertaOff / reteApertaTetto  la routine a rete aperta (#2013):
-    //                    spenta, e quante sessioni sue insieme (1–20; assente = 1).
+    //   riservatiOff / riservatiTetto  la routine riservati di ogni account (#2069):
+    //                    spenta, e quante sessioni sue insieme (1–20; assente = 20).
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     //   manutentoreAcceso il pacemaker accende il manutentore (campo assente = spento).
-    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff, manutentoreAcceso, reteApertaOff, reteApertaTetto } | { ok:false, error }
-    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff?, manutentoreAcceso?, reteApertaOff?, reteApertaTetto? } → come sopra | { ok:false, error }
+    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff, manutentoreAcceso, riservatiOff, riservatiTetto } | { ok:false, error }
+    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff?, manutentoreAcceso?, riservatiOff?, riservatiTetto? } → come sopra | { ok:false, error }
     // I numeri dell'owner sui crediti delle routine (ownerCrediti sul server, regole in src/shared/routineCrediti.js):
     // riserva di A, tetto di B, taratura, rinnovi; `null` toglie un numero. Lo stato dice per account percentuale,
     // limite, passo del giorno e rinnovo. Owner-only.
@@ -700,10 +700,10 @@
     MANUTENTORE_RECAP_GET: 'manutentore_recap_get', // → { ok, recap: [{ giorno, testo, at }], stato: { parallelismo, parallelismoEffettivo, freno } | null } | { ok:false, error }
     ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
     ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
-    // Le pause in corso di A, B, delle routine server e di quella a rete aperta, col motivo del rifiuto (#996), e
-    // l'ultima decisione del pacemaker sulla rete aperta (#2013): sola lettura, dal server (routineLog op:'pause').
+    // Le pause in corso di A, B, delle routine server e di quelle riservati, col motivo del rifiuto (#996), e
+    // l'ultima decisione del pacemaker sulla riservati (#2069): sola lettura, dal server (routineLog op:'pause').
     // Owner-only, solo pagine di Filo.
-    AUTOMATION_PAUSE_GET: 'automation_pause_get', // → { ok, pause: { A?, B?, serverA?, serverB?, reteAperta? }, voci: { reteAperta? }, oraMs } | { ok:false, error }
+    AUTOMATION_PAUSE_GET: 'automation_pause_get', // → { ok, pause: { A?, B?, serverA?, serverB?, riservatiA?, riservatiB? }, voci: { riservati? }, oraMs } | { ok:false, error }
     // Modello e sforzo del worker per fase (doc config/routines, campo
     // `roleModels` = { ruolo: { model?, effort? } }; regole in
     // src/shared/routineModelli.js). Una scrittura tocca UNA foglia; valore

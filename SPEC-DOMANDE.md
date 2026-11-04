@@ -1086,8 +1086,21 @@ sedi del 03/11/2026) il server non dichiara: finché resta così la voce sta su
 tetto `reteApertaTetto` (assente = 1) dentro quello comune delle sessioni, con
 la pausa e i freni degli account della sua chiave. Decide dopo le voci server
 e prima di A/B, che quando lei può accendere non contano i suoi compiti.
-Gestione → Automazioni la mostra (ultima decisione, accensioni di oggi,
-pausa) e la spegne.
+Gestione → Automazioni non la mostra più: il suo posto l'ha preso la voce
+riservati (#2069).
+
+La voce riservati (#2069, SPEC-SEDI § 2-3): una routine per account
+nell'ambiente «filo ricerca», `routineIdRiservati` e `routineIdRiservatiB` coi
+segreti `CC_ROUTINE_FIRE_TOKEN_RISERVATI` e `_B`. Con un id (voce non spenta da
+`riservatiOff`, account non escluso) i compiti senza feedback sono suoi: A/B non
+li contano e i biglietti delle chiavi normali non li danno; li accende lei,
+alternando gli account, con pausa, spenti e crediti come le voci server e il
+tetto `riservatiTetto` (assente = quello comune), anche per le sessioni partite
+a mano. La voce del manutentore accende la sua routine invece della normale, e
+la sessione prende l'ambiente dei riservati dal legame, qualunque chiave abbia
+nel prompt. Senza id, o spenta, tutto va come sopra. Gestione → Automazioni la
+mostra (ultima decisione sui compiti, accensioni di oggi, pause di A e B), la
+spegne e ne scrive il tetto.
 
 ### 5.3 Ambiti nuovi
 

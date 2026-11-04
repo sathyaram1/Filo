@@ -768,9 +768,9 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
-  // Le pause in corso degli account e delle routine server e a rete aperta, col motivo (#996), e lo stato della rete
-  // aperta (#2013). Lo stato del pacemaker non lo legge
-  // nessun client: passa dal registro delle routine, con le credenziali dell'owner (mai dalla callable dello storico).
+  // Le pause in corso degli account e delle routine server e riservati, col motivo (#996), e lo stato della riservati
+  // (#2069). Lo stato del pacemaker non lo legge nessun client: passa dal registro delle routine, con le credenziali
+  // dell'owner (mai dalla callable dello storico).
   on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
     try {
       const r = await callSecurityFunction('routineLog', { op: 'pause' });
