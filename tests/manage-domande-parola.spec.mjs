@@ -137,6 +137,24 @@ test('salvata in Automazioni, «Discutiamone» e il tasto destro copiano la paro
   await expect(menu.locator('.sn-select-option', { hasText: 'Discutiamo la domanda D-8' })).toHaveText('Copia «Discutiamo la domanda D-8»');
 });
 
+test('appunti che non rispondono: «Discutiamone» lo dice e mostra la riga da ricopiare, non un «Copiato» falso', async ({ app, openTab }) => {
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [domanda(8)] });
+  const page = await openTab(MANAGE);
+  await aspettaAvvio(page);
+  await app.evaluate(({ clipboard }) => {
+    globalThis.__scriviVero = clipboard.writeText;
+    clipboard.writeText = () => { throw new Error('occupati'); };
+  });
+  try {
+    await sezione(page, 'domande', '#panel-domande');
+    await riga(page, 'D-8').click();
+    await dq(page, 'D-8').locator('button[data-fai="discuti"]').click();
+    await expect(dq(page, 'D-8').locator('.mg-dq-msg')).toHaveText('Non riesco a copiare. La riga è: Discutiamo la domanda D-8');
+  } finally {
+    await app.evaluate(({ clipboard }) => { clipboard.writeText = globalThis.__scriviVero; });
+  }
+});
+
 test('un’altra pagina di Filo non la salva, non la toglie e non la mette negli appunti', async ({ app, openTab }) => {
   const gestione = await openTab(MANAGE);
   await gestione.waitForFunction(() => window.filo && window.filo.message);
