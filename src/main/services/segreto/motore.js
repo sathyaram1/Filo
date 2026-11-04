@@ -1241,6 +1241,15 @@ async function riparaProprio(ctx, S) {
   const daRifare = [];
   const blocchiDi = (g) => Array.from({ length: kAtteso(S, g) }, (_, s) => GRUPPO * g + s);
   const tab = caricoTabella(S);
+  // Un'interruzione fra la testa nuova e la pulizia lascia in un pacco i byte di un file tolto: si cercano qui.
+  const pz = pacchi(S.tabella);
+  const pacchiSporchi = new Set();
+  const gruppiPacchi = [...new Set([...pz.keys()].map((j) => Math.floor(j / GRUPPO)))].filter((g) => g >= 1 && g < G && S.gruppi[g]);
+  for (const lotto of aLotti(gruppiPacchi)) {
+    for (const [g, c] of await carichiGruppi(ctx, S, lotto)) {
+      if (blocchiDi(g).some((j, s) => pz.has(j) && c[s] && sporcoFuori(c[s], pz.get(j).tratti))) pacchiSporchi.add(g);
+    }
+  }
   for (let g = 1; g < G; g++) {
     const info = S.gruppi[g];
     if (!info) {
@@ -1248,7 +1257,7 @@ async function riparaProprio(ctx, S) {
       continue;
     }
     const blocchi = blocchiDi(g);
-    const sporco = blocchi.some((j) => !usati[j] && !(valida(S, g, 2 * j) && S.zero[j]));
+    const sporco = pacchiSporchi.has(g) || blocchi.some((j) => !usati[j] && !(valida(S, g, 2 * j) && S.zero[j]));
     const mancanti = blocchi.some((j) => !valida(S, g, 2 * j) || !valida(S, g, 2 * j + 1));
     if (info.k === blocchi.length && !sporco) {
       if (mancanti) parziali.push(g);
