@@ -790,15 +790,20 @@ export async function main(argvIn) {
       console.error(`RIFIUTATO: --pacchetto: non so chi aspetta le segnalazioni unite (${msg(e)}). Non ho aperto niente: rilancia.`);
       return codiceDi(e);
     }
-    // Per id, e anche sulle attese ereditate: una unita che aspetta chi aspetta un'altra unita non sta nello stesso pacchetto.
-    const aspettate = new Set(delPacchetto.attese.map((w) => w.id));
-    const giri = aspettanti.filter((x) => aspettate.has(x.id));
+    // Per id, anche sulle attese ereditate e a catena: dopo la nascita l'attesa che chiude il giro non si sposterebbe.
+    const giri = giriDelPacchetto(delPacchetto.attese, aspettanti, unite.map((u) => u.id));
     if (giri.length) {
-      const perche = (x) => {
-        const e = delPacchetto.ereditate.find((w) => w.id === x.id);
+      const perche = (id) => {
+        const e = delPacchetto.ereditate.find((w) => w.id === id);
         return e ? `l'attesa di ${e.da.map((n) => `#${n}`).join(', ')}` : '--aspetta';
       };
-      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map((x) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta #${x.num} (${perche(x)}): si aspetterebbero a vicenda`).join('\n')}`);
+      const numDi = (id) => {
+        const n = (aspettanti.find((x) => x.id === id) || {}).num || ((aspettanti.grafo && aspettanti.grafo.get(id)) || {}).num
+          || (delPacchetto.attese.find((w) => w.id === id) || {}).num;
+        return n ? `#${n}` : 'un feedback senza numero';
+      };
+      const riga = ({ x, catena }) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta ${numDi(catena[0])} (${perche(catena[0])})${catena.slice(1).map((id) => `, che aspetta ${numDi(id)}`).join('')}: si aspetterebbero a vicenda`;
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map(riga).join('\n')}`);
       return EXIT.RIFIUTATO;
     }
   }
