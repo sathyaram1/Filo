@@ -120,6 +120,18 @@ test('seguito con foto e documento, pagina ricaricata: torna nella casella com\'
   await page.waitForTimeout(13_000);
   const tutti = JSON.stringify(await app.evaluate(() => globalThis.__messaggi));
   expect(tutti).not.toContain('primo seguito');
+  // Mandato dalla casella, il seguito arriva al modello come seguito della domanda di prima, con la sua risposta.
+  await modello(app, 'lento', 300);
+  const n = await app.evaluate(() => globalThis.__messaggi.length);
+  await page.locator('#sendBtn').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__messaggi.length), { timeout: 20_000 }).toBeGreaterThan(n);
+  const dopo = await app.evaluate((n) => globalThis.__messaggi.slice(n).map((m) => JSON.stringify(m)), n);
+  const chiamata = dopo.find((m) => m.includes('seguito importante')) || '';
+  expect(chiamata).toContain('sentieri.pdf');
+  expect(chiamata).toContain('data:image/');
+  expect(chiamata).toContain('domanda lunga');
+  expect(chiamata).toMatch(/Risposta \d+\./);
+  await expect(page.locator('.dash-bubble-user', { hasText: 'domanda lunga' })).toBeVisible();
 });
 
 test('seguito a scheda chiusa: resta nella conversazione quando la si riapre', async ({ app, shell }) => {
