@@ -153,7 +153,7 @@
       if (m.role === 'user') {
         const pre = typeof preambolo === 'function' ? String(preambolo(m) || '').trim() : '';
         if (pre) metti(pre, k, m.ts);
-        const t = FC().daFuoriDi([m]).length ? `(testo arrivato ${m.esterno || 'da fuori'}, non riportato)` : String(m.text || '').trim();
+        const t = FC().daFuoriDi([m]).length ? `(testo arrivato ${m.esterno || 'da fuori'}, non riportato)` : testoPerChiCompatta(m.text);
         metti(`${testa} Utente: ${t}`, k, m.ts);
         continue;
       }
