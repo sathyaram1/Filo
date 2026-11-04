@@ -97,14 +97,16 @@ test('r1 uscito dall’account, la scheda già aperta non ha più la voce al pri
   await page.keyboard.press('Escape');
 
   // L'uscita dalla pagina Account.
-  const acc = await openTab('filo://account/account.html').catch(() => null);
-  await (acc || page).evaluate(async () => chrome.runtime.sendMessage({ type: 'AUTH_SIGNOUT' })).catch(() => {});
-  await app.evaluate(async () => {
+  const rt = await openTab('filo://redteam/redteam.html');
+  await rt.waitForFunction(() => !!window.SN_REDTEAM_ATTACK_UI, null, { timeout: 8000 });
+  const r = await rt.evaluate(async () => chrome.runtime.sendMessage({ type: 'auth_signout' }));
+  expect(r?.ok).toBe(true);
+  expect(await app.evaluate(() => {
     const Module = process.getBuiltinModule('module');
     const path = process.getBuiltinModule('path');
     const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
-    if (req('./auth/google-auth').isSignedIn()) req('./auth/google-auth').signOut();
-  });
+    return req('./auth/google-auth').isSignedIn();
+  })).toBe(false);
   await page.waitForTimeout(1500);
 
   await page.bringToFront();
