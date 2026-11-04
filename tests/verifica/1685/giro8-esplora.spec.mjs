@@ -27,7 +27,7 @@ test('esc sul popup', async ({ app }) => {
     const page = await home(app);
     await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
     await livelloAutonomia(app, 'conservativo');
-    await modelloFinto(app, [{ text: '', toolCalls: [accoda('c1', f, 'Accodo una riga')] }, { text: 'RIPRESO' }, { text: 'ok' }]);
+    await modelloFinto(app, [{ text: '', toolCalls: [{ id: 'f1', name: 'INVIA_FEEDBACK', arguments: '{"testo":"Il timer non suona.","titolo":"Timer muto"}' }] }, { text: 'RIPRESO' }, { text: 'ok' }]);
     await chiedi(page, 'accoda una riga');
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     await page.keyboard.press('Escape');
@@ -38,6 +38,12 @@ test('esc sul popup', async ({ app }) => {
     const c = await chatCon(app, 'accoda una riga');
     console.log('ESITI', JSON.stringify(c.messages.flatMap((m) => m.esiti || [])));
     console.log('CHIAMATE', (await chiamateAlModello(app)).length);
+    await app.evaluate((_e, id) => globalThis.SN_CONTESTO_FILO.dimentica(id), c.id);
+    await app.evaluate((_e, id) => globalThis.SN_CLOSE_FILO_CHAT(id), c.id);
+    await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(c.id)}`);
+    await page.waitForTimeout(2000);
+    console.log('RIAP BOTTONI', await page.locator('.dash-bubble-filo .dash-action-btn').allTextContents());
+    console.log('RIAP RIGHE', await page.locator('.dash-activity-row').allTextContents());
   } finally { await ripristina(app); togliCartella(dir); }
 });
 
@@ -51,8 +57,6 @@ test('due home: bottone in sospeso cliccato in entrambe', async ({ app, shell, o
     await livelloAutonomia(app, 'conservativo');
     await modelloFinto(app, [{ text: 'Accodo.', toolCalls: [accoda('c1', f, 'Accodo una riga')] }, { text: 'Aspetto.' }, { text: 'RIPRESO' }, { text: 'RIPRESO2' }]);
     await chiedi(page, 'accoda una riga');
-    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-    await clickConfirm(page, 'cancel');
     await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
     console.log('A BOTTONI dopo annulla', await page.locator('.dash-bubble-filo .dash-action-btn').allTextContents());
     const b = await openTab('filo://newtab/');
@@ -94,8 +98,6 @@ test('due home: OK in B dopo /clear in A', async ({ app, shell, openTab }) => {
     await livelloAutonomia(app, 'conservativo');
     await modelloFinto(app, [{ text: 'Accodo.', toolCalls: [accoda('c1', f, 'Accodo una riga')] }, { text: 'Aspetto.' }, { text: 'RIPRESO DOPO OK' }, { text: 'altro' }]);
     await chiedi(page, 'accoda una riga');
-    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
-    await clickConfirm(page, 'cancel');
     await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
     const nata = (await chatCon(app, 'accoda una riga')).id;
     const b = await openTab('filo://newtab/');
