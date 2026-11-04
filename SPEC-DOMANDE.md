@@ -172,8 +172,8 @@ detto».
 ### 1.5 La fiducia decide L5
 
 - **Lavoro fidato:** tutti i biglietti che hanno scritto sul ramo (primo
-  lavoro, correzioni, riallineamenti) sono rimasti puliti, e il feedback è
-  fidato. Non conta lo sporco della domanda di fine turno della gestione del
+  lavoro, correzioni, riallineamenti) hanno, al cancello, ogni radice
+  timbrata, e il feedback è fidato. Non conta lo sporco della domanda di fine turno della gestione del
   lavoro, che arriva quando il biglietto non scrive più sul ramo (§ 5.4). In
   questo caso **L5 non si applica**: il blocco si registra in
   Automazioni, non ferma. L'owner non legge il codice e non saprebbe
