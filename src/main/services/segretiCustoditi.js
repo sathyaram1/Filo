@@ -41,11 +41,8 @@ function custoditi({ impostazioni = [], chiaveFeedback = null, env = process.env
   for (const s of [...impostazioni, dalAmbiente]) {
     for (const [o, k] of C.campiSegreti(s)) {
       // Del proxy solo utente e password, non l'host: le finestre del confronto fermerebbero una visita al fornitore.
-      const p = o === s.proxy ? C.credenzialiProxy(o[k]) : null;
-      if (!p) { metti(o[k], 'chiave'); continue; }
-      metti(p.credenziali, 'chiave');
-      metti(p.password, 'chiave');
-      metti(decodifica(p.password), 'chiave');
+      const valori = o === s.proxy ? C.segretiDelProxy(o[k]) : [{ valore: o[k] }];
+      for (const x of valori) metti(x.valore, 'chiave', !!x.password);
     }
   }
   return out;
