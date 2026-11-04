@@ -18,7 +18,8 @@ async function ok(page) {
   await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
   if (await page.locator(`${CONFIRM_HOST} input`).count()) await fillConfirmInput(page, 'conferma');
   await scrollConfirmToEnd(page);
-  await clickConfirm(page, (await page.locator(`${CONFIRM_HOST}`).evaluate((h) => !!h.shadowRoot?.querySelector('[data-k="danger"], .danger'))) ? 'danger' : 'ok');
+  const fatto = await page.evaluate(() => window.SN_CONFIRM_UI._test.click('ok') || window.SN_CONFIRM_UI._test.click('danger'));
+  expect(fatto).toBe(true);
 }
 const turniVuoti = (storia) => storia.filter((m) => m.role === 'assistant' && !(Array.isArray(m.tool_calls) && m.tool_calls.length)
   && (!String(typeof m.content === 'string' ? m.content : '').trim() || m.content === '(nessun testo)'));
