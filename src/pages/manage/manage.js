@@ -1708,9 +1708,12 @@
   function opzioniLivelli(fb) {
     return { fusioni, fusioniLette: fusioniOk, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
   }
-  // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
+  // Una richiesta che parte, arriva o viene decisa cambia lista, quadrato in cima e testo del pannello insieme: un
+  // segno rimasto indietro direbbe «bloccato» su una fusione in volo.
   function statoFusioniCambiato() {
     if (dataLoaded) ridisegnaListaAlSuoPosto();
+    const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+    if (fb) renderLivelliRow(fb);
     aggiornaTestoQuadrato();
   }
 
