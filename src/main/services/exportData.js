@@ -183,6 +183,8 @@ function togliSegreti(dati, filo) {
     if (!m) { delete o[k]; continue; }
     // Gli stessi valori che i segreti custoditi tengono lontani da uscite e modelli.
     for (const x of costanti().segretiDelProxy(v)) segna(x);
+    // Anche come la usa chi si collega: decodificata e senza i ritorni a capo che l'indirizzo scarta.
+    try { if (m.password) segna({ valore: decodeURIComponent(m.password.replace(/[\t\n\r]/g, '')), password: true }); } catch (_) {}
     o[k] = m.senza;
     proxy.push(k);
   }
