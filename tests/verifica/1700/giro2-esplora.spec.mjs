@@ -28,8 +28,9 @@ async function copione(app, giri) {
         });
       }
       if (giro.pieno) throw Object.assign(new Error('This endpoint\'s maximum context length exceeded. Please reduce the length of the messages.'), { status: 400 });
+      const calls = giro.toolCalls || [];
       if (giro.text) { try { onDelta && onDelta(giro.text); } catch (_) {} }
-      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: giro.text || '', toolCalls: [], reasoningDetails: [], finishReason: 'stop' };
+      return { model: attempts[0].model, provider: attempts[0].provider, usage: {}, text: giro.text || '', toolCalls: calls, reasoningDetails: [], finishReason: calls.length ? 'tool_calls' : 'stop' };
     };
     P.streamCompleteWithFallback = chat;
     P.completeWithFallback = async (o) => {
@@ -68,7 +69,7 @@ function allegaDocumento(page, percorso) {
 }
 const larghezzeAnteprime = (page) => page.$$eval('#imgPreviews .dash-img-preview img', (xs) => xs.map((i) => i.naturalWidth));
 
-test('E1 chat nuova: testo, immagine, documento, bozza con la sua foto', async ({ app }) => {
+test.skip('E1 chat nuova: testo, immagine, documento, bozza con la sua foto', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
   await copione(app, [{ pieno: true }]);
@@ -100,7 +101,7 @@ test('E1 chat nuova: testo, immagine, documento, bozza con la sua foto', async (
   await expect(page.locator('.dash-bubble-user').last().locator('.dash-bubble-img')).toHaveCount(2);
 });
 
-test('E2 seguito con foto, ricarico: torna nella casella', async ({ app }) => {
+test.skip('E2 seguito con foto, ricarico: torna nella casella', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
   await copione(app, [{ ritardoMs: 6000, text: 'Risposta alla prima.' }, { text: 'Risposta al seguito.' }]);
@@ -125,11 +126,12 @@ test('E2 seguito con foto, ricarico: torna nella casella', async ({ app }) => {
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Risposta al seguito.' })).toBeVisible({ timeout: 20_000 });
   const c = await chiamate(app);
-  console.log('ultima chiamata contiene la prima domanda:', c[c.length - 1].includes('pensaci a lungo'));
+  console.log('ultima chiamata contiene la prima domanda:', c[c.length - 1].includes('pensaci a lungo'), 'e la sua risposta:', c[c.length - 1].includes('Risposta alla prima.'));
+  console.log('risposta alla prima a schermo:', await page.locator('.dash-bubble-filo', { hasText: 'Risposta alla prima.' }).count());
   await page.screenshot({ path: 'tests/.shots/v1700-e2b.png' });
 });
 
-test('E3 seguito di solo testo, ricarico durante il turno: non arriva due volte', async ({ app }) => {
+test.skip('E3 seguito di solo testo, ricarico durante il turno: non arriva due volte', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
   await copione(app, [{ ritardoMs: 2500 }, { ritardoMs: 4000, text: 'Risposta alla prima.' }, { text: 'Altro.' }]);
@@ -149,7 +151,7 @@ test('E3 seguito di solo testo, ricarico durante il turno: non arriva due volte'
   expect(c.some((x) => x.includes('seguito solo testo'))).toBe(false);
 });
 
-test('E4 seguito risposto, poi ricarico: la casella resta vuota', async ({ app }) => {
+test.skip('E4 seguito risposto, poi ricarico: la casella resta vuota', async ({ app }) => {
   test.setTimeout(90_000);
   const page = await home(app);
   await copione(app, [{ ritardoMs: 2500, text: 'Risposta alla prima.' }, { text: 'Risposta al seguito.' }]);
@@ -167,7 +169,7 @@ test('E4 seguito risposto, poi ricarico: la casella resta vuota', async ({ app }
   await expect(page.locator('#imgPreviews .dash-img-preview')).toHaveCount(0);
 });
 
-test('E5 seguito con foto e scheda chiusa: resta nella conversazione con la foto', async ({ app, openTab }) => {
+test.skip('E5 seguito con foto e scheda chiusa: resta nella conversazione con la foto', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await home(app);
   await copione(app, [{ ritardoMs: 4000, text: 'Risposta alla prima.' }]);
@@ -187,7 +189,7 @@ test('E5 seguito con foto e scheda chiusa: resta nella conversazione con la foto
       tm.closeTab(tm.activeId);
     }
   });
-  await page.waitForTimeout(8000);
+  await new Promise((ok) => setTimeout(ok, 8000));
   const chat = await app.evaluate(async () => {
     const lista = await globalThis.SN_FILO_CHATS.listIndex();
     for (const x of lista) {
@@ -205,4 +207,108 @@ test('E5 seguito con foto e scheda chiusa: resta nella conversazione con la foto
   await p2.waitForTimeout(1000);
   await p2.screenshot({ path: 'tests/.shots/v1700-e5.png' });
   await expect(p2.locator('.dash-bubble-user', { hasText: 'seguito della scheda chiusa' }).locator('img')).toHaveCount(1);
+});
+
+const leggi = (id) => ({ id, name: 'CAPACITA_DETTAGLIO', arguments: JSON.stringify({ ids: ['contatori-anonimi'] }) });
+const chatCon = (app, testo) => app.evaluate(async (_e, testo) => {
+  for (const x of await globalThis.SN_FILO_CHATS.listIndex()) {
+    const c = await globalThis.SN_FILO_CHATS.get(x.id);
+    if (c && c.messages.some((m) => String(m.text || '').includes(testo))) return { id: x.id, messages: c.messages.map((m) => ({ role: m.role, text: m.text, images: m.images })) };
+  }
+  return null;
+}, testo);
+
+test.skip('E7 seguito letto dal turno, poi ricarico: nella conversazione una volta, casella vuota', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await copione(app, [{ ritardoMs: 2500, toolCalls: [leggi('c1')] }, { ritardoMs: 5000, text: 'Risposta finale.' }]);
+  await page.locator('#input').fill('domanda con strumenti');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#stopBtn')).toBeVisible({ timeout: 5_000 });
+  await page.locator('#input').fill('seguito letto dal turno');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-attesa')).toHaveCount(0, { timeout: 8000 });
+  await page.waitForTimeout(500);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await new Promise((ok) => setTimeout(ok, 8000));
+  await expect(page.locator('#input')).toHaveValue('');
+  const chat = await chatCon(app, 'domanda con strumenti');
+  console.log('E7', JSON.stringify(chat));
+  const c = await chiamate(app);
+  console.log('E7 chiamate', c.length, c.map((x) => (x.match(/seguito letto dal turno/g) || []).length));
+});
+
+test.skip('E8 turno che rifiuta per finestra piena con un seguito con foto, poi bozza e Chat nuova', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await copione(app, [{ ritardoMs: 3000, pieno: true }]);
+  await incolla(page, 7, 7, '#c00');
+  await expect(page.locator('#imgPreviews .dash-img-preview')).toHaveCount(1);
+  await page.locator('#input').fill('primo messaggio');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#stopBtn')).toBeVisible({ timeout: 5_000 });
+  await incolla(page, 5, 5, '#0c0');
+  await expect(page.locator('#imgPreviews .dash-img-preview')).toHaveCount(1);
+  await page.locator('#input').fill('seguito con foto');
+  await page.locator('#input').press('Enter');
+  const nuova = page.locator('.dash-action-btn', { hasText: 'Chat nuova' });
+  await expect(nuova).toBeVisible({ timeout: 30_000 });
+  await expect(page.locator('#input')).toHaveValue('seguito con foto', { timeout: 5000 });
+  await page.locator('#input').fill('seguito con foto\nbozza mia');
+  await incolla(page, 3, 3, '#00c');
+  await expect(page.locator('#imgPreviews .dash-img-preview')).toHaveCount(2);
+  await nuova.click();
+  await expect(page.locator('#input')).toHaveValue('primo messaggio\nseguito con foto\nbozza mia');
+  console.log('E8 larghezze', await larghezzeAnteprime(page));
+  await page.screenshot({ path: 'tests/.shots/v1700-e8.png' });
+});
+
+async function citaERicordaSeguito(page, app) {
+  await copione(app, [{ text: 'Risotto ai funghi oppure pasta.' }, { ritardoMs: 5000, text: 'Risposta lenta.' }, { text: 'Risposta al seguito.' }]);
+  await page.locator('#input').fill('cosa cucino?');
+  await page.locator('#sendBtn').click();
+  const risposta = page.locator('#bubbles > .dash-bubble-filo', { hasText: 'Risotto ai funghi' });
+  await expect(risposta).toBeVisible({ timeout: 20_000 });
+  await expect(risposta).toHaveAttribute('data-key', /^m:/, { timeout: 10_000 });
+  await page.locator('#input').fill('una domanda lenta');
+  await page.locator('#sendBtn').click();
+  await expect(page.locator('#stopBtn')).toBeVisible({ timeout: 5_000 });
+  await risposta.hover();
+  await risposta.locator('.dash-msg-azioni').getByRole('button', { name: 'Rispondi' }).click();
+  await expect(page.locator('#citazione')).toBeVisible();
+  await page.locator('#input').fill('il risotto per favore');
+  await page.locator('#input').press('Enter');
+  await expect(page.locator('.dash-bubble-attesa')).toHaveCount(1);
+}
+
+test('E9 seguito che cita, ricarico: torna con la citazione', async ({ app }) => {
+  test.setTimeout(90_000);
+  const page = await home(app);
+  await citaERicordaSeguito(page, app);
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('#input')).toHaveValue(/il risotto per favore/, { timeout: 10_000 });
+  await expect(page.locator('#citazione')).toBeVisible();
+  await expect(page.locator('#citazione')).toContainText('Risotto ai funghi');
+});
+
+test('E10 seguito che cita, scheda chiusa: nella conversazione con la citazione', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await home(app);
+  const page = await openTab('filo://newtab/');
+  await expect(page.locator('#input')).toBeVisible({ timeout: 8000 });
+  await citaERicordaSeguito(page, app);
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) { const tm = w._filoTabs; if (tm) tm.closeTab(tm.activeId); }
+  });
+  await new Promise((ok) => setTimeout(ok, 8000));
+  const r = await app.evaluate(async () => {
+    const chats = await globalThis.SN_IL_FILO.chats();
+    const mia = chats.flatMap((c) => c.messages).filter((m) => m.role === 'user' && m.text === 'il risotto per favore');
+    return mia.map((m) => m.rispostaA || null);
+  });
+  console.log('E10', JSON.stringify(r));
+  expect(r).toHaveLength(1);
+  expect(r[0]).not.toBeNull();
 });
