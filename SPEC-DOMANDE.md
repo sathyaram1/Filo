@@ -77,6 +77,14 @@ fidato) e **si sporca** appena il server gli consegna qualcosa di non fidato:
 Uno sporco non torna pulito. Quello che un biglietto scrive prende la fiducia
 che il biglietto ha **in quel momento**.
 
+Vale anche per ogni **nota** della conversazione di un feedback (#1919):
+consegne delle routine, note delle sessioni locali, allarmi. Il server, quando
+ne scrive una da un biglietto pulito o da sé, aggiunge l'impronta del turno a
+`noteFidate`; le note dell'owner (i suoi turni) sono fidate. Chi legge un
+feedback si sporca solo per il testo non fidato: quello del feedback, se non è
+fidato, e le note non fidate, dette col loro numero. Una nota senza impronta
+(anche una scritta prima del campo, o riscritta dopo) vale non fidata.
+
 Quello che non passa dal server (pagine web, file fuori dal repo) il server non
 lo vede:
 
@@ -200,6 +208,11 @@ lo può scrivere anche un agente pulito.
   `fiducia`.
 - `genitori: [id…]` sul feedback derivato.
 - `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
+- `noteFidate: [impronta…]` sul feedback (§ 1.2): lo SHA-256 esadecimale del
+  turno sotto il suo marcatore, righe-allegato comprese, a capo in `\n` e senza
+  spazi ai bordi. Lo calcola `improntaDelTurnoAggiunto` di
+  `src/shared/feedbackThread.js` (note di prima e di dopo la scrittura) e lo
+  legge `fiduciaDelleNote`; il server usa le stesse due. Scritto come `fiducia`.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
   server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
   altri non fidati, `routine:residuo` compreso. I rami già in lavorazione

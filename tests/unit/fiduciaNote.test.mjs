@@ -1,5 +1,6 @@
 // La fiducia delle note di una conversazione (#1919): chi legge un feedback si sporca solo per le note non fidate.
-// Le note «scritte dal server» qui nascono come le scrive lui: mergeModelReport, poi l'impronta del turno aggiunto.
+// Le note «scritte dal server» qui nascono come le scrive lui: mergeModelReport, poi l'impronta del turno aggiunto;
+// quelle della sessione locale chiedono il segno al server col biglietto.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -98,4 +99,71 @@ test('leggi-feedback: un feedback fidato con sole note fidate si stampa senza sp
   assert.deepEqual(pulita.motivi, []);
   const vecchia = await LF.leggi('x', { bearer: 't', segno: 'n2', decifra: async (g) => ({ ...g }), fetchImpl: rete(null) });
   assert.deepEqual(vecchia.motivi, ['note non fidate nella conversazione: 1, 2']);
+});
+
+test('la sessione locale chiede il segno della sua nota col biglietto pulito, e mai da sporca', async () => {
+  const { writeFileSync } = await import('node:fs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const dir = cartellaTemporanea('fiducia-note-');
+  const file = join(dir, 'biglietto.json');
+  writeFileSync(file, JSON.stringify({ ticket: 't'.repeat(40), fp: 'f'.repeat(64), natoIl: 1 }));
+  const env = { FILO_BIGLIETTO_FILE: file };
+  const prova = async (fiducia) => {
+    const ops = [];
+    const fetchImpl = async (_u, init) => {
+      const data = JSON.parse(init.body).data;
+      ops.push(data);
+      return { ok: true, status: 200, json: async () => ({ result: data.op === 'stato' ? { fiducia } : { ok: true } }) };
+    };
+    const motivo = await BL.segnaNotaFidata('fb1', 'a'.repeat(64), { env, cwd: dir, deps: { fetchImpl, idToken: async () => 'tok' } });
+    return { motivo, ops };
+  };
+  const pulita = await prova('fidato');
+  assert.equal(pulita.motivo, '');
+  assert.deepEqual(pulita.ops.at(-1), { op: 'notaFidata', ticket: 't'.repeat(40), feedbackId: 'fb1', impronta: 'a'.repeat(64) });
+  const sporca = await prova('non_fidato');
+  assert.equal(sporca.motivo, 'il biglietto della sessione è sporco');
+  assert.ok(!sporca.ops.some((d) => d.op === 'notaFidata'));
+});
+
+test('owner-feedback: la nota scritta chiede il segno con l’impronta del suo turno, e dice quando resta non fidata', async () => {
+  const of = await import(pathToFileURL(join(ROOT, 'scripts', 'owner-feedback.mjs')).href);
+  const veri = { ...of.sessione };
+  const chieste = [];
+  let esito = '';
+  of.sessione.biglietto = async () => ({ ticket: 't'.repeat(40), fp: 'f'.repeat(64), fiducia: 'fidato' });
+  of.sessione.segnaNota = async (id, impronta) => { chieste.push([id, impronta]); return esito; };
+  const vero = globalThis.fetch;
+  const cifra = globalThis.SN_FEEDBACK_ENC_ENABLED;
+  globalThis.SN_FEEDBACK_ENC_ENABLED = false;
+  const prima = 'Report del primo lavoro.';
+  let scritte = '';
+  globalThis.fetch = async (url, init = {}) => {
+    if ((init.method || 'GET') === 'PATCH') { scritte = JSON.parse(init.body).fields.notes?.stringValue ?? scritte; return new Response('{}', { status: 200 }); }
+    return new Response(JSON.stringify({ name: 'projects/p/databases/(default)/documents/feedback/f1', fields: {
+      seq: { integerValue: '1919' }, clientId: { stringValue: 'local:claude' }, senderProof: { stringValue: 'admin' },
+      status: { stringValue: 'todo' }, statusPublic: { stringValue: 'open' }, notes: { stringValue: prima }, fiducia: { stringValue: 'fidato' },
+      localOnly: { mapValue: { fields: { by: { stringValue: 'local:claude' }, at: { integerValue: '1' } } } },
+    } }), { status: 200 });
+  };
+  try {
+    const r = await of.scrivi('f1', 'todo', 'Nota della sessione.', { bearer: 'tok' });
+    assert.equal(r.ok, true, r.motivo);
+    assert.equal(r.notaNonFidata, undefined);
+    assert.equal(chieste.length, 1);
+    assert.equal(chieste[0][0], 'f1');
+    assert.deepEqual(await BL.noteNonFidate(scritte, [chieste[0][1]]), [1], 'il segno copre la nota nuova, non il report di prima');
+    esito = 'il biglietto della sessione è sporco';
+    const r2 = await of.scrivi('f1', 'todo', 'Altra nota.', { bearer: 'tok' });
+    assert.equal(r2.notaNonFidata, 'il biglietto della sessione è sporco');
+    // Senza nota, o con la stessa già presente, non c'è niente da segnare.
+    const n = chieste.length;
+    await of.scrivi('f1', 'todo', '', { bearer: 'tok' });
+    await of.scrivi('f1', 'todo', prima, { bearer: 'tok' });
+    assert.equal(chieste.length, n);
+  } finally {
+    globalThis.fetch = vero;
+    globalThis.SN_FEEDBACK_ENC_ENABLED = cifra;
+    Object.assign(of.sessione, veri);
+  }
 });

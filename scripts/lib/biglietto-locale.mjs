@@ -305,6 +305,22 @@ export async function rigaSporco(cosa, motivi, opts = {}) {
   return `Biglietto NON sporcato (${r.errori.join('; ')}): dichiaralo con node scripts/biglietto.mjs sporca "${cosa}".`;
 }
 
+/**
+ * Chiede al server di segnare fidata la nota che questa sessione ha appena scritto (#1919): `noteFidate` lo scrive solo
+ * lui, da un biglietto pulito e per un'impronta che sta nelle note. → '' se l'ha segnata, altrimenti il motivo.
+ */
+export async function segnaNotaFidata(feedbackId, impronta, { env, cwd, deps = {} } = {}) {
+  try {
+    const b = await trovaBiglietto({ env, cwd, deps });
+    if (!b) return 'questa sessione non ha un biglietto';
+    if (b.fiducia !== 'fidato') return 'il biglietto della sessione è sporco';
+    await chiama('notaFidata', { ticket: b.ticket, feedbackId: String(feedbackId || ''), impronta: String(impronta || '') }, deps);
+    return '';
+  } catch (e) {
+    return String((e && e.message) || e);
+  }
+}
+
 /** 'fidato' solo con un biglietto pulito: senza biglietto, o con un guasto, 'non_fidato'. */
 export async function fiduciaLocale(opts = {}) {
   try {
