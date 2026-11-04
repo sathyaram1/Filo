@@ -286,7 +286,6 @@ export const attese = {
  */
 export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiPerId = {} } = {}) {
   const giaPacchetti = new Set(pacchetti.map((n) => String(n).replace(/^#/, '')));
-  const MAX = globalThis.SN_FB_ATTESE.MAX;
   const motivi = [];
   for (const u of Array.isArray(lette) ? lette : []) {
     const n = `#${u.num}`;
