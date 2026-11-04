@@ -1597,6 +1597,8 @@ class TabManager {
     const s = voce.storia;
     if (s && (s.prima.length || s.dopo.length)) tab.storia = { prima: s.prima.slice(), dopo: s.dopo.slice() };
     if (voce.colore) this.setTabIdentityColor(id, voce.colore);
+    // Tornata aperta resta la musica che suonava: «rimettimi la musica» riprende lei, non ne riapre una copia (#1686).
+    if (voce.audioAt > 0 && !(tab.audioAt >= voce.audioAt)) tab.audioAt = voce.audioAt;
     if (Number.isInteger(voce.indice) && voce.indice >= 0) this.moveTab(id, voce.indice, { trascinata: false });
     // La scheda era instradata da un altro paese: rinasce passando dallo stesso.
     if (voce.proxy && voce.proxy.country) {
