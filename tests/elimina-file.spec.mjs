@@ -39,9 +39,11 @@ test('a Normale «cancella il file in Download» lo sposta nel cestino dopo un c
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
     const s = await confirmState(page);
     expect(s.hasInput, 'il cestino si conferma con un clic, non con la parola').toBe(false);
-    expect(s.text).toContain(`Spostare nel cestino «${nome}»?`);
+    expect(s.text).toContain('Spostare nel cestino questo file:');
+    expect(s.text).toContain(nome);
     expect(s.text).toContain(dir);
     expect(s.text).toContain('Lo ritrovi nel cestino, se vuoi rimetterlo al suo posto.');
+    expect(s.text).toContain('Te lo chiedo sempre, prima di toccare i tuoi file.');
     mkdirSync(SHOTS, { recursive: true });
     await page.screenshot({ path: join(SHOTS, 'elimina-file-cestino.png') });
     expect(existsSync(file), 'prima del clic il file è ancora al suo posto').toBe(true);
@@ -78,8 +80,10 @@ test('dopo aver letto una pagina, «cancella X» chiede col riquadro leggero, ma
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
     const s = await confirmState(page);
     expect(s.hasInput, 'dopo una lettura il cestino chiede, ma non vuole la parola').toBe(false);
-    expect(s.text).toContain(`Spostare nel cestino «${nome}»?`);
-    expect(s.text).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
+    expect(s.text).toContain('Spostare nel cestino questo file:');
+    expect(s.text).toContain(nome);
+    expect(s.text).toContain('Te lo chiedo sempre, prima di toccare i tuoi file.');
+    expect(s.text).not.toContain('proposta');
     await clickConfirm(page, 'cancel');
     expect(existsSync(file), 'annullato, il file resta').toBe(true);
   } finally {
@@ -104,7 +108,8 @@ test('«cancellalo per sempre» vuole la parola «conferma», e il file non fini
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 10_000 });
     const s = await confirmState(page);
     expect(s.hasInput, 'per sempre vuole la parola').toBe(true);
-    expect(s.text).toContain(`Cancellare per sempre «${nome}»?`);
+    expect(s.text).toContain('Cancellare per sempre questo file:');
+    expect(s.text).toContain(nome);
     expect(s.text).toContain('Non passa dal cestino: non si potrà più recuperare.');
     expect(existsSync(file)).toBe(true);
     await fillConfirmInput(page, 'conferma');
@@ -126,7 +131,8 @@ test('una cartella dice quanti elementi contiene; fuori dalla cartella personale
   writeFileSync(join(sotto, 'mare', 'b.jpg'), 'b');
   const r = await execAction(app, { type: 'ELIMINA_FILE', percorsi: [sotto] });
   expect(r.needsConfirm).toBe(2);
-  expect(r.describe).toContain('Spostare nel cestino «foto vecchie» (una cartella, con 3 elementi dentro)?');
+  expect(r.describe).toContain('Spostare nel cestino questa cartella, con 3 elementi dentro:\n«foto vecchie»');
+  expect(r.describe).toContain('La ritrovi nel cestino, se vuoi rimetterla al suo posto.');
   expect(existsSync(sotto), 'senza il clic non si sposta niente').toBe(true);
 
   const fuori = process.platform === 'win32' ? 'C:\\Windows\\win.ini' : '/etc/hosts';
