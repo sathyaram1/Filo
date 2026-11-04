@@ -606,6 +606,14 @@ Come funziona oggi (#1152):
     lavorazione, che quelle fusioni attuano, col principio e il numero del
     lavoro; dove il riassunto non basta, legge il feedback. Una decisione
     presa in chat e già fusa non deve restare aperta (è successo a D-250).
+    Le fusioni arrivano con `fusioni.elenco` (#2006): quelle dopo l'ultima
+    revisione, ognuna col riassunto del manutentore (titolo, stato, ultimo
+    aggiornamento) e le domande aperte o in lavorazione collegate, per
+    origine, collegamenti o perché gli aggiornamenti le nominano. La chiusura
+    è `domande.chiudi`, col resoconto, il principio quando c'è e il numero
+    del lavoro, che il server vuole fuso e collegato alla domanda; nel
+    dubbio la domanda resta aperta e lo dice il rapporto, che elenca le
+    chiuse col lavoro che le ha attuate.
 - **Risposte registrate da una sessione** (decisione dell'owner del 01/11,
   #2007). Una risposta che una sessione locale registra con `domanda.mjs
   rispondi` vale come dell'owner: viene dalla chat, che usa solo lui. Con
