@@ -142,27 +142,34 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   const t = tetti || FC().tetti(null, null);
   const lista = await daCompattare(incognito, { ora, tetti: t });
   const taglio = L().puntoDiTaglio(lista, { ora, ore: grezzo && grezzo.ore != null ? grezzo.ore : L().ORE_GREZZE, turni: grezzo && grezzo.turni != null ? grezzo.turni : L().TURNI_GREZZI });
-  // Un pezzo enorme (il primo giro su giorni di filo mai compattati) va a pezzi: il resto lo prende la prossima.
+  // Un pezzo enorme (il primo giro su giorni di filo mai compattati) va a pezzi: il resto lo prende la prossima. Con la
+  // parte dell'utente davanti, chi compatta resta sotto il listino.
+  const foto = CF().ultimaFotografia(incognito);
+  const parteUtente = foto ? foto.testo : '';
+  const budget = Math.max(L().MAX_MESSAGGIO, Math.min(L().MAX_INGRESSO, L().LISTINO - L().MARGINE - FC().stimaToken(L().ISTRUZIONI + parteUtente)));
   let fine = 0;
   let peso = 0;
   while (fine < taglio) {
     const m = lista[fine];
-    let p = String(m.text || '').length;
+    let p = L().testoPerChiCompatta(m.text).length;
     if (m.role !== 'user') for (const a of CF().esitiPerCompattare(m).azioni) p += 200 + String((a && a._output && a._output.titolo) || '').length;
-    if (fine > 0 && peso + p > L().MAX_INGRESSO * FC().CARATTERI_PER_TOKEN) break;
+    if (fine > 0 && peso + p > budget * FC().CARATTERI_PER_TOKEN) break;
     peso += p;
     fine++;
   }
   while (fine > 0 && fine < taglio && lista[fine].role !== 'user') fine--;
-  if (fine === 0 && taglio > 0) fine = taglio;
+  // Il primo turno da solo passa il pezzo: va lui intero, domanda e risposte, non tutto il tratto.
+  if (fine === 0 && taglio > 0) {
+    fine = 1;
+    while (fine < taglio && lista[fine].role !== 'user') fine++;
+  }
   const pezzo = lista.slice(0, fine);
   if (!pezzo.length) return { fatto: false, motivo: 'niente' };
   const g = await giudice();
   const { righe, sospetto } = L().righePerChiCompatta(pezzo, {
     esiti: CF().esitiPerCompattare, preambolo: CF().preamboloPerCompattare, sospetta: g.sospetta, classeSospetta: g.classeSospetta,
   });
-  const foto = CF().ultimaFotografia(incognito);
-  const messages = L().richiesta({ parteUtente: foto ? foto.testo : '', righe });
+  const messages = L().richiesta({ parteUtente, righe });
   let testo = '';
   try {
     testo = String(await _dip.chiama({ messages, motivo, incognito }) || '');
