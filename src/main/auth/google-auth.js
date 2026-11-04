@@ -417,6 +417,16 @@ async function apriNelBrowser(f) {
   }
 }
 
+// «Lascia stare» (solo da Filo) toglie il freno: l'«Accedi» che segue è un tentativo nuovo e apre subito. L'accesso
+// resta in ascolto, così chi lo finisce comunque nel browser entra lo stesso.
+function lasciaStare() {
+  const f = flussoAttuale;
+  if (!f) return;
+  f.browserAlle = 0;
+  clearTimeout(f.riaperturaFrenata);
+  f.riaperturaFrenata = null;
+}
+
 // Lo stesso indirizzo, quindi lo stesso codice e lo stesso loopback: l'accesso a Filo riesce comunque.
 function passaAlBrowser(f, motivo) {
   f.scheda = null;
