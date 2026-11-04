@@ -22,6 +22,9 @@
   // Si decide solo sulle risolte: la stessa regola per righe filtrate dal database o lette tutte (#1335). Senza il
   // modulo degli stati non si sa, e non si decide.
   function risolta(fb) {
+    if (!global.SN_FB_STATUS && typeof require === 'function') {
+      try { require('./feedbackStatus.js'); } catch (_) { /* nelle pagine lo carica la pagina */ }
+    }
     const FS = global.SN_FB_STATUS;
     return Boolean(FS && typeof FS.isResolvedForUser === 'function' && FS.isResolvedForUser(fb));
   }
