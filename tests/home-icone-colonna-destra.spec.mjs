@@ -113,10 +113,11 @@ function sottoLIcona(m, i) {
   expect(m.right, 'il menu non sta sotto l\'icona').toBeGreaterThan(i.left);
 }
 
-test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona, anche con la home ingrandita', async ({ app, openTab }) => {
+test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona, anche con la home ingrandita', async ({ app, shell, openTab }) => {
   test.setTimeout(60_000);
   // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
-  await app.evaluate(() => {
+  await entraFinto(app, shell);
+  const page = await home(openTab);
     const M = process.getBuiltinModule('module');
     const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
     const ga = M._cache[k].exports;
