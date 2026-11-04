@@ -1671,7 +1671,10 @@ module.exports = function register(on, ctx) {
       if (!r.ok) return r;
       // Riaprire una risposta disfa quello che ha applicato dove si può (§3.6): il resto lo dice il server, e si legge.
       const resoconto = typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
-      return resoconto ? { ok: true, domanda: r.domanda || null, resoconto } : { ok: true, domanda: r.domanda || null };
+      const out = resoconto ? { ok: true, domanda: r.domanda || null, resoconto } : { ok: true, domanda: r.domanda || null };
+      if (op !== 'annulla') return out;
+      out.ripristino = (Array.isArray(r.ripristino) ? r.ripristino : []).map((x) => ({ ok: x?.ok === true, num: String(x?.num || '') }));
+      return out;
     }));
   }
 

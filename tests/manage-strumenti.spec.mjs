@@ -251,3 +251,42 @@ test('una risposta registrata da una sessione si annulla da Gestione: torna aper
   expect(await app.evaluate(() => globalThis.__annullate)).toEqual(['D-72']);
   await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText(/\(1\)/);
 });
+
+test('«Annulla» dice quali feedback non sono tornati, e su una risposta senza com’erano resta solo Riapri', async ({ app, openTab }) => {
+  const opzioni = [
+    { testo: 'Caldo', pro: 'È Filo.', contro: 'Meno contrasto.', azione: { tipo: 'riprendi', feedbackId: 'fb-813' } },
+    { testo: 'Freddo', pro: 'Più contrasto.', contro: 'Non è Filo.', azione: { tipo: 'riprendi', feedbackId: 'fb-813' } },
+  ];
+  const IERI = Date.now() - 20 * 3600 * 1000;
+  const chiusa = (n, extra) => domanda(n, Object.assign({
+    stato: 'chiusa', titolo: `Caldo o freddo ${n}?`, opzioni,
+    esito: { ok: true, azione: opzioni[0].azione, applicataIl: IERI },
+    registrataDa: 'sessione', rispostaDaSessione: { il: IERI, scelta: 0 },
+  }, extra));
+  await mainFinto(app, { feedbacks: PRATICHE, riferimenti: RIFERIMENTI, domande: [chiusa(73, { annullabile: true }), chiusa(74, { annullabile: false })] });
+  await app.evaluate(({ ipcMain }) => {
+    const sotto = ipcMain._invokeHandlers.get('filo:message');
+    ipcMain.removeHandler('filo:message');
+    ipcMain.handle('filo:message', async (event, msg) => {
+      if (msg && msg.type === 'domanda_annulla') {
+        const x = globalThis.__mgFinto.domande.find((y) => y.id === msg.id);
+        Object.assign(x, { stato: 'aperta', esito: null, registrataDa: '', rispostaDaSessione: null, annullabile: false, modificataIl: Date.now() });
+        return { ok: true, domanda: JSON.parse(JSON.stringify(x)), ripristino: [{ ok: false, num: '#813' }] };
+      }
+      return sotto(event, msg);
+    });
+  });
+  const page = await openTab(MANAGE);
+  await aspettaAvvio(page);
+  await page.locator('.mg-sezione[data-sezione="domande"]').click();
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-74"]').click();
+  const vecchia = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-74"]');
+  await expect(vecchia.locator('button[data-fai="riapri"]')).toBeVisible();
+  await expect(vecchia.locator('button[data-fai="annulla"]')).toHaveCount(0);
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-73"]').click();
+  const dett = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-73"]');
+  await dett.locator('button[data-fai="annulla"]').click();
+  await expect(dett.locator('.mg-dq-msg')).toHaveText(/Non sono tornati com’erano #813: il perché è nella conversazione/);
+  await page.screenshot({ path: 'tests/.shots/manage-annulla-in-parte.png' });
+});

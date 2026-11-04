@@ -736,6 +736,8 @@
     const r = d && d.registrataDa === 'sessione' ? d.rispostaDaSessione : null;
     return r && typeof r === 'object' ? r : null;
   }
+  // Senza com'erano i feedback (una risposta di prima del server che li salva) il server non annulla: resta Riapri.
+  const annullabile = (d) => !!rispostaDaSessione(d) && d.annullabile !== false;
 
   function daChiave(d) {
     if (rispostaDaSessione(d)) {
@@ -817,7 +819,7 @@
     if (!inSmistamento) tasto('Discutiamone', 'discuti', 'sn-btn-secondary', `Copia «Discutiamo la domanda ${idDi(d)}» da incollare in una sessione locale`);
     if (rispondibile || inSmistamento) tasto('Archivia', 'chiudi', 'sn-btn-secondary', 'Chiudi la domanda senza applicare niente; si può riaprire');
     else if (riapribile(d)) {
-      if (rispostaDaSessione(d)) tasto('Annulla', 'annulla', 'sn-btn-secondary', TITOLO_ANNULLA);
+      if (annullabile(d)) tasto('Annulla', 'annulla', 'sn-btn-secondary', TITOLO_ANNULLA);
       tasto('Riapri', 'riapri', 'sn-btn-secondary', titoloRiapri(d));
     }
     if (fidabile(d)) tasto('Segna fidata', 'fidata', 'sn-btn-secondary', TITOLO_SEGNA_FIDATA);
@@ -1125,7 +1127,11 @@
   // Una risposta di una sessione si disfa intera (#1926): riaperta, e i feedback che ha toccato com'erano prima.
   async function annulla(id) {
     const r = await manda(id, { type: T.annulla, id }, 'Annullo…');
-    if (r) dopo(id, r, 'Annullata: è di nuovo fra quelle da rispondere, e i feedback sono com’erano.');
+    if (!r) return;
+    const restati = Array.isArray(r.ripristino) ? r.ripristino.filter((x) => x && x.ok === false) : [];
+    dopo(id, r, restati.length
+      ? `Annullata: è di nuovo fra quelle da rispondere. Non sono tornati com’erano ${restati.map((x) => x.num || 'un feedback').join(', ')}: il perché è nella conversazione.`
+      : 'Annullata: è di nuovo fra quelle da rispondere, e i feedback sono com’erano.');
   }
 
   async function segnaFidata(id, fidata) {
@@ -1276,7 +1282,7 @@
       if (d.stato !== 'in_smistamento') voci.push({ testo: `Copia «Discutiamo la domanda ${d.id}»`, azione: () => { apri([d.id]); disegna(); discuti(d.id); } });
       if (['aperta', 'in_lavorazione', 'in_smistamento'].includes(d.stato)) voci.push({ testo: 'Archivia senza azioni', azione: () => { apri([d.id]); disegna(); archivia(d.id, false); } });
       else if (riapribile(d)) {
-        if (rispostaDaSessione(d)) voci.push({ testo: 'Annulla la risposta', titolo: TITOLO_ANNULLA, azione: () => { apri([d.id]); disegna(); annulla(d.id); } });
+        if (annullabile(d)) voci.push({ testo: 'Annulla la risposta', titolo: TITOLO_ANNULLA, azione: () => { apri([d.id]); disegna(); annulla(d.id); } });
         voci.push({ testo: 'Riapri', titolo: titoloRiapri(d), azione: () => { apri([d.id]); disegna(); archivia(d.id, true); } });
       }
       // Il menu non mostra le note: apre la domanda con le note aperte, e la fiducia si dà dal tasto, dopo averle lette.

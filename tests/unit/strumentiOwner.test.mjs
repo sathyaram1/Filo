@@ -182,8 +182,11 @@ test('«segna fidati» in blocco: uno per feedback, un esito per ognuno, un tett
 });
 
 test('«annulla» una risposta di sessione chiede al server di disfarla; un server vecchio lo dice', async () => {
-  rispondi = () => ({ status: 200, body: { result: { ok: true, domanda: { id: 'D-70', stato: 'aperta' } } } });
-  assert.deepEqual(await chiama({ type: MSG.DOMANDA_ANNULLA, id: 'D-70' }), { ok: true, domanda: { id: 'D-70', stato: 'aperta' } });
+  rispondi = () => ({ status: 200, body: { result: { ok: true, domanda: { id: 'D-70', stato: 'aperta' }, ripristino: [
+    { feedbackId: 'fb-1', num: '#813', ok: true, stato: 'design' }, { feedbackId: 'fb-2', num: '#814', ok: false, motivo: 'andato_avanti', stato: 'working' }] } } });
+  assert.deepEqual(await chiama({ type: MSG.DOMANDA_ANNULLA, id: 'D-70' }), {
+    ok: true, domanda: { id: 'D-70', stato: 'aperta' }, ripristino: [{ ok: true, num: '#813' }, { ok: false, num: '#814' }],
+  });
   assert.deepEqual(ricevute.map((x) => [x.path, x.data]), [['/ownerDomande', { op: 'annulla', id: 'D-70' }]]);
   rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'op?', details: { reason: 'operazione_sconosciuta' } } } });
   assert.match((await chiama({ type: MSG.DOMANDA_ANNULLA, id: 'D-70' })).error, /non sa ancora annullare una risposta.*riaprirla/);
