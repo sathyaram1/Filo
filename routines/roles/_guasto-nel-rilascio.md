@@ -11,7 +11,9 @@ vede. Non scrivi una domanda e non ti fermi con `--status design`: lo dichiari
 nel rilascio, col gruppo e il messaggio esatto. Gli altri lavori vanno avanti;
 il tuo resta fermo sul suo ramo finché il manutentore, che il guasto sveglia,
 non lo sblocca con una nota quando la causa è passata. Col manutentore spento
-il fermo non c'è: il lavoro torna in coda, per chi lo prende dopo.
+il fermo non c'è: il lavoro torna in coda, per chi lo prende dopo. Una domanda
+da smistare o una risposta da applicare non hanno né ramo né fermo: tornano in
+coda da sé, come un rilascio senza esito.
 
 1. La domanda di fine sessione, come sempre.
 2. `node scripts/routine-channel.mjs release <biglietto> --role <il tuo ruolo>
