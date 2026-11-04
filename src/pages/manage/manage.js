@@ -3166,17 +3166,30 @@
     const perId = new Map(lista.map((fb) => [fb._id, fb]));
     const falliti = [];
     let fatti = 0;
+    let ripartiti = 0;
     for (const e of Array.isArray(r.esiti) ? r.esiti : []) {
       const fb = perId.get(e && e.feedbackId);
       if (!fb) continue;
-      if (e.ok) { fb.fiducia = 'fidato'; fb.fiduciaDa = { by: 'owner', at: Date.now() }; fatti += 1; } else falliti.push(e);
+      if (!e.ok) { falliti.push(e); continue; }
+      fb.fiducia = 'fidato';
+      fb.fiduciaDa = { by: 'owner', at: Date.now() };
+      fatti += 1;
+      // Come il tasto della scheda: chi aspettava la fiducia per il server riparte nello stesso gesto (#1358).
+      if (e.rimessoInCoda) {
+        Object.assign(fb, { status: 'todo', statusReason: '', localOnly: { by: 'owner', at: Date.now() } });
+        ripartiti += 1;
+      }
     }
     if (mgFidatiMsg) {
-      mgFidatiMsg.textContent = falliti.length
-        ? `${fatti} segnati fidati, ${falliti.length} no: ${falliti[0].error || 'rifiutato dal server'}.`
-        : `${fatti} segnati fidati.`;
+      const coda = ripartiti ? `, ${ripartiti === 1 ? '1 è ripartito' : `${ripartiti} sono ripartiti`} In coda come lavoro server` : '';
+      const fuori = fuoriDalBlocco();
+      mgFidatiMsg.textContent = (falliti.length
+        ? `${fatti} segnati fidati${coda}, ${falliti.length} no: ${falliti[0].error || 'rifiutato dal server'}.`
+        : `${fatti} segnati fidati${coda}.`) + (fuori ? ` ${fuori}` : '');
     }
+    if (ripartiti && selectedId && perId.has(selectedId)) openDetail(selectedId, { ridisegno: true });
     renderList();
+    updateTabCounts();
   }
   if (mgFidatiBtn) mgFidatiBtn.addEventListener('click', segnaFidatiInBlocco);
   function startCardEvaluating(id) {
