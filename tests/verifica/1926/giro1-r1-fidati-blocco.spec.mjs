@@ -22,13 +22,6 @@ async function prepara(app, pratiche) {
   });
 }
 
-async function scheda(page, id) {
-  return page.evaluate((x) => {
-    const f = window.__mgTest && window.__mgTest.tabFor ? window.__mgTest.tabFor(x) : null;
-    return f;
-  }, id);
-}
-
 test('r1 in Ricevuti, coi non fidati filtrati, un segnalato come attacco non finisce fidato in blocco senza avviso', async ({ app, openTab }) => {
   await prepara(app, [
     fb({ seq: 951, status: 'unlabeled', name: 'Normale da guardare' }),
