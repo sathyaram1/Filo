@@ -10,11 +10,11 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 const piatto = (f) => readFileSync(join(ROOT, f), 'utf8').replace(/\/\/|\*/g, ' ').replace(/\s+/g, ' ');
 
 test('r2 i freni del pacemaker non contano più un guasto dichiarato col suo periodo di rispetto', () => {
-  expect(piatto('ROUTINE-AUTH-SPEC.md')).not.toMatch(/nessun guasto è stato dichiarato \(periodo di rispetto/);
+  expect(/nessun guasto è stato dichiarato \(periodo di rispetto/.test(piatto('ROUTINE-AUTH-SPEC.md')), 'la spec del canale, freni del pacemaker').toBe(false);
 });
 
 test('r2 il canale non descrive più il guasto come il giro che si ferma', () => {
   const t = piatto('scripts/routine-channel.mjs');
-  expect(t).not.toMatch(/il giro si deve fermare/);
-  expect(t).not.toMatch(/questo giro non può lavorare/);
+  expect(/il giro si deve fermare/.test(t), 'il canale: «il giro si deve fermare»').toBe(false);
+  expect(/questo giro non può lavorare/.test(t), 'il canale: «questo giro non può lavorare»').toBe(false);
 });
