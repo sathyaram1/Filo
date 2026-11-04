@@ -697,7 +697,19 @@
     // `freni`: 'attivi', o 'numeri_assenti' (senza riserva di A né tetto di B i crediti non frenano niente).
     // Il recap del manutentore, un foglio al giorno dal più nuovo, e la sua N sotto il freno (ownerManutentore,
     // SPEC-MANUTENTORE § 9). Sola lettura, owner-only. `stato: null` = N non letta (il recap resta).
-    MANUTENTORE_RECAP_GET: 'manutentore_recap_get', // → { ok, recap: [{ giorno, testo, at }], stato: { parallelismo, parallelismoEffettivo, freno } | null } | { ok:false, error }
+    MANUTENTORE_RECAP_GET: 'manutentore_recap_get', // → { ok, recap: [{ giorno, testo, at }], stato: { parallelismo, parallelismoEffettivo, freno, ordine } | null } | { ok:false, error }
+    // Gli strumenti dell'owner che vivevano solo da terminale (#1926), owner-only, regole in src/shared: l'ordine del
+    // manutentore (ownerManutentore), le parole d'ordine (routineKeys), la domanda di fine sessione
+    // (routineClosingAdmin), lo storico dei giri, «segna fidati» in blocco (ownerFiducia, uno per feedback).
+    MANUTENTORE_ORDINE_SET: 'manutentore_ordine_set', // { ordine:['812','815.2'] } ([] lo svuota) → { ok, ordine } | { ok:false, error }
+    ROUTINE_CHIAVI_ELENCO: 'routine_chiavi_elenco', // → { ok, keys:[{ slug, scope, label, revoked, lastUsedAt, account, rete, lavori, ambiente }] } | { ok:false, error }
+    ROUTINE_CHIAVE_CREA: 'routine_chiave_crea',     // { slug, scope, label? } → { ok, slug, scope, passphrase } (la parola si vede solo qui) | { ok:false, error }
+    ROUTINE_CHIAVE_REVOCA: 'routine_chiave_revoca', // { slug } → { ok } | { ok:false, error }
+    ROUTINE_CHIAVE_IMPOSTA: 'routine_chiave_imposta', // { op:'account'|'rete'|'lavori'|'ambiente', slug, valore } → { ok } | { ok:false, error }
+    ROUTINE_CHIUSURA_GET: 'routine_chiusura_get',   // → { ok, slots:[{ slot, testo }], ripiego, risposte:[{ t, chi, durata, domanda, answered, risposta }] } | { ok:false, error }
+    ROUTINE_CHIUSURA_SET: 'routine_chiusura_set',   // { slot, testo } (testo vuoto toglie lo slot) → { ok } | { ok:false, error }
+    STORICO_GIRI_GET: 'storico_giri_get',           // { da, a } (ms) → { ok, lavori:[…], troncato } | { ok:false, error }
+    FIDUCIA_SEGNA_BLOCCO: 'fiducia_segna_blocco',   // { feedbackIds:[…] } → { ok, esiti:[{ feedbackId, ok, error?, rimessoInCoda? }] } | { ok:false, error }
     ROUTINE_CREDITI_GET: 'routine_crediti_get', // → { ok, numeri, accounts: { A, B }, freni } | { ok:false, error }
     ROUTINE_CREDITI_SET: 'routine_crediti_set', // { riservaA?, tettoB?, usdPer100?, rinnovoA?, rinnovoB? } → { ok, numeri, accounts?, freni? } | { ok:false, error }
     // Le pause in corso di A, B, delle routine server e di quella a rete aperta, col motivo del rifiuto (#996), e

@@ -5,6 +5,7 @@
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { rigaSporco } from './lib/biglietto-locale.mjs';
+import '../src/shared/routineChiusura.js';
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/routineClosingAdmin';
 // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono solo all'aiuto.
@@ -12,18 +13,9 @@ const SLOT = 'tutti, orchestrator, worker, new-work, fixer, verifier, secaudit, 
 const USO = 'Uso: node scripts/routine-domanda.mjs [mostra | imposta <slot> "<testo>" (o il testo da stdin) | togli <slot> | risposte [--n N]]'
   + `\nslot: ${SLOT}`;
 
-/**
- * Il testo intero, coi caratteri di controllo resi visibili (tranne a capo e tab): le risposte
- * vengono da sessioni che leggono testo non fidato, e una sequenza ESC/OSC sul terminale
- * dell'owner scrive negli appunti, cambia il titolo o nasconde righe. PURA.
- */
-export function visibile(testo) {
-  const CONTROLLO = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g;
-  return String(testo ?? '').replace(CONTROLLO, (c) => {
-    const n = c.charCodeAt(0);
-    return n <= 0xff ? `\\x${n.toString(16).padStart(2, '0')}` : `\\u${n.toString(16).padStart(4, '0')}`;
-  });
-}
+// Testo reso visibile e risposte in un elenco solo: le stesse regole di Gestione → Automazioni.
+const CH = globalThis.SN_ROUTINE_CHIUSURA;
+export const visibile = CH.visibile;
 
 /** Il motivo di un errore della callable, con l'elenco quando il server lo manda (`bad_slot`). PURA. */
 export function messaggioErrore(status, body) {
@@ -71,32 +63,12 @@ function dataOra(ms) {
   return new Date(ms).toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-/** Un istante in ms, o NaN se manca: il server scrive `null` per «non ancora», e `Number(null)` è 0. PURA. */
-function istante(v) {
-  return v === null || v === undefined || v === '' ? NaN : Number(v);
-}
-
 /**
  * Le risposte di orchestratori e worker in un elenco solo, dal più recente, al
  * massimo `n` voci. Domanda e risposta sempre intere. PURA (`quando` formatta l'ora).
  */
 export function formattaRisposte(result, { n = 50, quando = dataOra } = {}) {
-  const r = result || {};
-  const voci = [];
-  for (const o of Array.isArray(r.orchestrator) ? r.orchestrator : []) {
-    voci.push({ t: istante(o.askedAtMs), testa: `orchestratore · ${visibile(o.slug || '?')}`, domanda: o.question, answered: !!o.answered, risposta: o.answer });
-  }
-  for (const w of Array.isArray(r.workers) ? r.workers : []) {
-    const c = w.closing;
-    if (!c || !Number.isFinite(istante(c.askedAtMs))) continue;
-    const inizio = istante(w.createdAtMs); const fine = istante(w.releasedAtMs);
-    const durata = Number.isFinite(inizio) && Number.isFinite(fine) ? `${Math.round((fine - inizio) / 60000)} min` : 'non rilasciato';
-    // Il server manda il numero già col cancelletto («#477»); uno solo in ogni caso.
-    const num = w.num ? ` #${visibile(String(w.num).replace(/^#+/, ''))}` : '';
-    const testa = `${visibile(w.role || 'worker')}${num} · ${durata} · ${visibile(w.slug || '?')}`;
-    voci.push({ t: istante(c.askedAtMs), testa, domanda: c.question, answered: typeof c.answer === 'string', risposta: c.answer });
-  }
-  voci.sort((x, y) => (y.t || 0) - (x.t || 0));
+  const voci = CH.vociRisposte(result).map((v) => ({ ...v, testa: v.durata ? v.chi.replace(' · ', ` · ${v.durata} · `) : v.chi }));
   const scelte = voci.slice(0, n);
   if (!scelte.length) return 'Nessuna risposta.';
   const righe = scelte.map((v) => [

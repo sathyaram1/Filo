@@ -12,22 +12,12 @@ import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
+import '../src/shared/manutentoreOrdine.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
-// Lo stesso tetto del server (functions/src/routine/accensioni.js, ORDINE_MAX): oltre si rifiuta col numero.
-export const ORDINE_MAX = 2000;
-
-/** «812, #815,815.2» → { ok, numeri } senza doppioni nell'ordine dato, o { ok:false, motivo }. PURA. */
-export function leggiOrdine(testo) {
-  const pezzi = String(testo || '').split(/[\s,]+/).map((x) => x.trim()).filter(Boolean);
-  if (!pezzi.length) return { ok: false, motivo: 'accendi vuole i numeri in ordine (accendi 812,815) o --niente per svuotare l\'ordine' };
-  const storti = pezzi.filter((x) => !/^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/.test(x));
-  if (storti.length) return { ok: false, motivo: `non sono numeri di feedback: ${storti.slice(0, 5).join(', ')}` };
-  const numeri = [...new Set(pezzi.map((x) => x.replace(/^#/, '')))];
-  if (numeri.length > ORDINE_MAX) return { ok: false, motivo: `${numeri.length} numeri, il massimo è ${ORDINE_MAX}` };
-  return { ok: true, numeri };
-}
+// Tetto e lettura dell'ordine sono gli stessi di Gestione → Automazioni.
+export const { ORDINE_MAX, leggiOrdine } = globalThis.SN_MANUTENTORE_ORDINE;
 
 // Ogni campo di una scheda viene dal testo di un feedback: una riga per scheda è ciò che lo tiene un dato.
 const unaRiga = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();

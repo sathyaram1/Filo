@@ -7,14 +7,13 @@
 
   // Gli slot li decide il server (gli altri li rifiuta con `bad_slot`): qui servono al menu e all'aiuto.
   const SLOT = Object.freeze(['tutti', 'orchestrator', 'worker', 'new-work', 'fixer', 'verifier', 'secaudit', 'compito']);
-  const TESTO_MAX = 4000;
 
   /**
    * Il testo intero, coi caratteri di controllo resi visibili (tranne a capo e tab): le risposte vengono da sessioni
    * che leggono testo non fidato, e una sequenza ESC/OSC o un segno di direzione nasconde o rigira righe. PURA.
    */
   function visibile(testo) {
-    const CONTROLLO = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f‎‏‪-‮⁦-⁩]/g;
+    const CONTROLLO = /[\u0000-\u0008\u000b-\u001f\u007f-\u009f\u200e\u200f\u202a-\u202e\u2066-\u2069]/g;
     return String(testo ?? '').replace(CONTROLLO, (c) => {
       const n = c.charCodeAt(0);
       return n <= 0xff ? `\\x${n.toString(16).padStart(2, '0')}` : `\\u${n.toString(16).padStart(4, '0')}`;
@@ -71,5 +70,5 @@
     };
   }
 
-  global.SN_ROUTINE_CHIUSURA = Object.freeze({ SLOT, TESTO_MAX, visibile, slotValido, istante, vociRisposte, domandeImpostate });
+  global.SN_ROUTINE_CHIUSURA = Object.freeze({ SLOT, visibile, slotValido, istante, vociRisposte, domandeImpostate });
 })(typeof globalThis !== 'undefined' ? globalThis : this);

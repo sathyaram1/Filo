@@ -119,6 +119,8 @@ require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'owner sui crediti: stesse regole in pagina e nel main
 require(path.join(SHARED, 'routineChiavi.js'));  // #1926 — le parole d'ordine del server: stesse regole in pagina, nel main e nello script
 require(path.join(SHARED, 'storicoGiri.js'));  // #1926 — i totali dei giri di verifica: stesse regole in pagina e nello script
+require(path.join(SHARED, 'routineChiusura.js'));  // #1926 — la domanda di fine sessione delle routine: in pagina, nel main e nello script
+require(path.join(SHARED, 'manutentoreOrdine.js'));  // #1926 — l'ordine del manutentore: in pagina, nel main e nello script
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
 require(path.join(SHARED, 'spesaGiudici.js'));  // #1515 — tetto di spesa dei giudici: stesse regole in pagina e nel main
 require(path.join(SHARED, 'compiti.js'));  // #1196 — i compiti delle routine: stesse regole in pagina, nel main e nello script
