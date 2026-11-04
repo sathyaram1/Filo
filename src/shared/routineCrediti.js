@@ -95,15 +95,48 @@
   }
   const pct = (v) => (numero(v) === null ? '–' : `${cifra(numero(v))}%`);
 
+  // Spazi che non vanno a capo: «≈ 935 $» resta intero in una colonna stretta.
+  const dollari = (n) => `≈\u00a0${cifra(Math.round(n), 0)}\u00a0$`;
+  const conta = (v) => {
+    const n = numero(v);
+    return n === null || n < 0 ? null : Math.round(n);
+  };
+
   /**
-   * Una riga per account dallo stato del server: dove è la settimana, quanto si è speso oggi sul passo, quando
-   * rinnova e se è fermo. Un numero che il server non ha dato resta un trattino, mai uno zero.
+   * Una riga per account dallo stato del server. Un numero che il server non ha dato resta un trattino o non compare,
+   * mai uno zero. Il dollaro di un punto è la taratura (dell'account dal server, poi `usdPer100`, poi la predefinita):
+   * i dollari delle routine diviso una percentuale letta dalla barra, che conta anche le sessioni locali, la sottostimano.
    */
-  function rigaAccount(account, a) {
+  function rigaAccount(account, a, { usdPer100 = null } = {}) {
     const s = a && typeof a === 'object' ? a : {};
-    const parti = [`${pct(s.pct)} della settimana${numero(s.limite) === null ? '' : `, limite ${pct(s.limite)}`}`];
+    const p = numero(s.pct);
+    const usd = numero(s.usdSettimana);
+    const positivo = (v) => (numero(v) !== null && numero(v) > 0 ? numero(v) : null);
+    const per100 = positivo(s.taratura) || positivo(usdPer100) || TARATURA_PREDEFINITA;
+    const usdDi = (punti) => (punti === null ? null : (punti * per100) / 100);
+    const letta = numero(s.lettura) !== null;
+    // Senza lettura la percentuale È i dollari delle routine; con la lettura quelli restano a parte, come routine.
+    const sett = !letta && usd !== null ? usd : usdDi(p);
+    const routine = letta && usd !== null ? `, routine ${dollari(usd)}` : '';
+    const parti = [`${pct(s.pct)} della settimana${sett === null ? '' : ` (${dollari(sett)}${routine})`}${numero(s.limite) === null ? '' : `, limite ${pct(s.limite)}`}`];
+    if (p !== null) {
+      const resta = Math.max(0, (numero(s.limite) === null ? 100 : numero(s.limite)) - p);
+      const usdResta = usdDi(resta);
+      parti.push(`resta ${pct(resta)}${usdResta === null ? '' : ` (${dollari(usdResta)})`}`);
+    }
     const passo = s.passo && typeof s.passo === 'object' ? s.passo : null;
-    if (passo) parti.push(`oggi ${pct(passo.spesoPct)} su ${pct(passo.quotaPct)}`);
+    if (passo) {
+      const spesoUsd = numero(passo.spesoUsd) !== null ? numero(passo.spesoUsd) : usdDi(numero(passo.spesoPct));
+      const quotaUsd = numero(passo.quotaUsd) !== null ? numero(passo.quotaUsd) : usdDi(numero(passo.quotaPct));
+      const inUsd = spesoUsd === null || quotaUsd === null ? '' : ` (${dollari(spesoUsd)} su ${dollari(quotaUsd)})`.replace(/ /g, ' ');
+      parti.push(`oggi ${pct(passo.spesoPct)} su ${pct(passo.quotaPct)}${inUsd}`);
+    }
+    if (numero(s.usd24h) !== null) parti.push(`ultime 24 ore ${dollari(numero(s.usd24h))}`);
+    const accSett = conta(s.accensioniSettimana);
+    const acc24 = conta(s.accensioni24h);
+    if (accSett !== null || acc24 !== null) {
+      parti.push(`accensioni: ${[accSett === null ? '' : `${accSett} in settimana`, acc24 === null ? '' : `${acc24} nelle ultime 24 ore`].filter(Boolean).join(', ')}`);
+    }
     parti.push(`rinnova ${quando(s.rinnovoAtMs)}`);
     if (s.fermo === 'riserva') parti.push(account === 'A' ? 'fermo: riserva raggiunta' : 'fermo: tetto raggiunto');
     else if (s.fermo === 'passo') {

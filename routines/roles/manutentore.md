@@ -104,7 +104,9 @@ Gestione → Automazioni.
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
 6. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
    non c'è più. Usa prima B, poi A: non c'è riserva su A, perché anche a quote finite Filo resta usabile coi crediti
-   API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%).
+   API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%). La spesa
+   della settimana nel contesto (o `spesa`) dà per account dollari e percentuale, quanto resta, le ultime 24 ore, le
+   accensioni e se è fermo: un account fermo non accende fino al rinnovo o al giorno dopo.
 
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
 e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta.

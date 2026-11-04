@@ -194,5 +194,18 @@ Fatto dalla parte del server (ramo omonimo di filo-security, da rideployare):
   dell'accensione; il biglietto che quella sessione riceve per il suo feedback e uno solo. Il prompt salvato della routine non cambia: la sessione accesa
   così è l'orchestratore cieco, ristretto dal server al suo feedback.
 
-Resta: fase 2, la spesa dell'account per il manutentore e l'operazione che dà schede e
-testi a chi ha la chiave delle routine.
+Spesa per account al manutentore (#1787, decisione D-227: un freno solo, quello di
+Crediti, letto dal manutentore; niente tetti in dollari nelle Automazioni).
+`npm run manutentore -- spesa` e la «Spesa della settimana» del contesto danno una riga
+per account con dollari e percentuale della settimana, quanto resta, ultime 24 ore,
+accensioni, rinnovo e perché è fermo, dall'operazione `spesa` dell'endpoint del
+manutentore (#1959). La scheda Crediti mostra gli stessi campi.
+Server (ramo omonimo di filo-security, da rideployare): `spesa` rimanda `accounts` (gli
+stessi campi di `ownerCrediti`, senza le sessioni), `numeri.usdPer100` e `freni`; per
+account, in entrambe, `usd24h` (i dollari contati sull'account nelle ultime 24 ore, dal
+rinnovo se è più vicino) e `accensioniSettimana`/`accensioni24h` (sessioni accese dal
+pacemaker, voce server compresa; mancano finché il conto, partito col deploy, non copre
+la finestra). Il freno che ferma un account resta `fermo` per account (`riserva`, che su
+B è il tetto, o `passo`).
+
+Resta: l'operazione che dà schede e testi a chi ha la chiave delle routine.
