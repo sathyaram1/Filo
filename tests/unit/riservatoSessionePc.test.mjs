@@ -50,7 +50,12 @@ test('segnaRiservato manda il motivo al server col biglietto della sessione; sen
     assert.match(riga, /node scripts\/biglietto\.mjs riservato "letto #813"/);
   });
   const vuoto = localTicket();
-  assert.deepEqual(await B.segnaRiservato('letto #813', { env: {}, cwd: cartellaTemporanea('senza-'), deps: vuoto.deps }), { segnati: 0, errori: [], senzaBiglietto: true });
+  const fuori = cartellaTemporanea('senza-');
+  try {
+    assert.deepEqual(await B.segnaRiservato('letto #813', { env: {}, cwd: fuori, deps: vuoto.deps }), { segnati: 0, errori: [], senzaBiglietto: true });
+  } finally {
+    togliCartella(fuori);
+  }
   assert.equal(vuoto.chiamate.length, 0);
 });
 
