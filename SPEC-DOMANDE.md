@@ -281,6 +281,12 @@ Le regole del calcolo, tutte sul server:
   una sessione e quella del solo biglietto valgono per QUELLA lettura (il
   biglietto e l'istante): il timbro copre il testo letto allora, e una lettura
   dello stesso indirizzo dopo il timbro è una radice nuova.
+- **Il timbro tolto raggiunge chi ha letto:** chi legge testo fidato per
+  timbri (un feedback, una domanda, un compito, una conversazione scritta da
+  un biglietto fidato per timbri) ne prende le radici senza sporcarsi
+  (`radici.ereditate` in filo-security); il sì dell'owner su quel testo
+  (`fidataDallOwner`, le radici superate) non ne lascia. Così togliere un
+  timbro rende non fidato anche chi l'aveva letto, e ciò che ha scritto dopo.
 
 Il timbro lo dà solo `ownerFiducia`, dal clic dell'owner in Gestione (§ 1.4):
 `segna` e `togli` prendono una radice, e il tasto sta su feedback e domande.

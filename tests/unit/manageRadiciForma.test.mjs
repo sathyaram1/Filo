@@ -29,3 +29,14 @@ test('la sessione sporca si riconosce dal campo del server, qualunque forma abbi
 test('il cartellino non rilegge a mano il formato delle radici speciali', () => {
   assert.doesNotMatch(sorgente, /biglietto \//, 'la forma della radice del biglietto la conosce solo il server');
 });
+
+test('radici con lo stesso nome sul cartellino portano un numero, e si distinguono senza passarci sopra', () => {
+  const bottoni = [];
+  const doc = { createElement: () => { const b = { dataset: {}, setAttribute() {}, addEventListener() {} }; return b; } };
+  const window = {};
+  vm.runInNewContext(sorgente, { window, URL, document: doc });
+  const box = { set textContent(v) { bottoni.length = 0; }, appendChild: (b) => bottoni.push(b), hidden: false };
+  const pagina = (n) => ({ radice: `web:#${String(n).repeat(16)}`, tipo: 'web', valore: `#${String(n).repeat(16)}`, nome: `web:https://github.com/p${n}`, timbrabile: true });
+  window.SN_MANAGE_RADICI.disegna(box, [pagina(1), pagina(2), { radice: 'legacy', tipo: 'legacy', valore: '', timbrabile: true }, pagina(3)], () => {});
+  assert.deepEqual(bottoni.map((b) => b.textContent), ['github.com 1', 'github.com 2', 'nato prima', 'github.com 3']);
+});
