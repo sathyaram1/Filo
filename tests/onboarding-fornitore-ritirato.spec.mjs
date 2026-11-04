@@ -124,8 +124,7 @@ async function apriSchedaNuova(app, shell) {
 test('lo stesso vale aprendo una scheda nuova, senza ricaricare niente', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
-  await configCondivisa(app, { provider: 'gemini' });
-  await stubProviders(app);
+  await configuraPrimaDellaScheda(app);
   const page = await apriSchedaNuova(app, shell);
 
   await expect(page.locator('body')).toHaveAttribute('data-state', 'thread', { timeout: 15_000 });
