@@ -1650,18 +1650,21 @@
   async function rimettiSeguiti(lista = seguiti.slice()) {
     const tornati = [];
     for (const s of lista) {
-      if (s.turno) {
-        const r = await send({ type: MSG.FILO_CHAT_SEGUITO, reqId: s.turno.reqId, id: s.id, togli: true }).catch(() => null);
-        if (r && r.letto) { seguitoLetto(s.id); continue; }
-      }
+      const r = await send({ type: MSG.FILO_CHAT_SEGUITO, ...(s.turno ? { reqId: s.turno.reqId } : {}), id: s.id, togli: true }).catch(() => null);
+      if (s.turno && r && r.letto) { seguitoLetto(s.id); continue; }
       const i = seguiti.indexOf(s);
       if (i < 0) continue;
       seguiti.splice(i, 1);
       s.bolla.remove();
       tornati.push(s.c);
     }
+    rimettiNellaCasella(tornati);
+  }
+  // Una composizione che non è partita torna nella casella com'era: i testi scritti prima della bozza, che resta, poi
+  // immagini, documenti e citazione. Vale per il seguito che non parte (#1296) e per «Chat nuova» (#1596).
+  function rimettiNellaCasella(tornati) {
     if (!tornati.length) return;
-    const testi = tornati.map((c) => c.scritto.trim()).filter(Boolean);
+    const testi = tornati.map((c) => String(c.scritto || '').trim()).filter(Boolean);
     const bozza = inputEl.value.trim() ? [inputEl.value] : [];
     inputEl.value = [...testi, ...bozza].join('\n');
     if (tornati.some((c) => c.incollato)) { testoDaFuori = true; ricordaDaFuori(inputEl.value); }
