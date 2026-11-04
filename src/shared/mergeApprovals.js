@@ -910,7 +910,7 @@
     // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
       // Se le riallinea tutte la routine, il titolo non suona l'allarme: non c'è niente da fare (#1425).
-      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso; });
+      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso === true; });
       var fbox = el('section', 'sn-mac sn-mac-failed' + (tutteInCorso ? ' sn-mac-failed--in-corso' : ''));
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
       var ftitle = el('div', 'sn-mac-title');
