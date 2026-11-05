@@ -64,6 +64,7 @@ async function apriSito() {
       if (percorso === '/contatto-lato') { res.writeHead(302, { Location: '/grazie-lato' }); res.end(); return; }
       if (percorso === '/grazie-lato') return html(200, `<!doctype html><title>Grazie</title>${LATO}<p>Grazie, ti risponderemo presto`);
       if (percorso === '/api/rifiuta') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"errore":"Devi accedere"}'); return; }
+      if (percorso === '/api/ok') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"id":991}'); return; }
       if (percorso === '/api/err') { res.writeHead(500, { 'Content-Type': 'application/json' }); res.end('{"errore":"guasto"}'); return; }
       if (percorso === '/traccia') return html(200, '<!doctype html><title>Spedizione</title><p>La spedizione è in viaggio');
       if (percorso === '/accesso/inviato') { res.writeHead(302, { Location: '/accesso/grazie' }); res.end(); return; }

@@ -542,3 +542,20 @@ test('in una chat che svuota la casella da sé, i messaggi tutti minuscoli già 
   await altro.keyboard.type('domani da marco ');
   await expect.poll(() => testoDi(altro, '#ta')).toBe('domani da Marco ');
 });
+
+// #1808.2: nell'editor di un riquadro il campo è il corpo stesso; il lampo dentro il corpo partirebbe col modulo.
+test('nell\'editor col corpo modificabile di un riquadro il lampo della correzione sta fuori dal testo', async ({ app, openTab, testServer }) => {
+  await apri(app, openTab, testServer);
+  const page = await testServer.openReady(openTab, `<!doctype html><meta charset="utf-8"><body style="margin:20px">
+    <iframe id="ifr" style="width:520px;height:140px;border:1px solid #bbb"
+      srcdoc="<body contenteditable=true lang=it style='margin:8px;min-height:100px;font:22px monospace'></body>"></iframe></body>`, { pubblico: true });
+  const corpo = page.frameLocator('#ifr').locator('body');
+  await corpo.click();
+  await page.keyboard.type('ok perchè');
+  await page.keyboard.type(' ');
+  await expect(corpo).toHaveText('ok perché');
+  const lampo = page.frameLocator('#ifr').locator('.sn-spell-lampo');
+  await expect(lampo.first()).toBeAttached({ timeout: 1000 });
+  expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-lampo'))).toBe(null);
+  expect(await corpo.evaluate((b) => b.innerHTML.replace(/&nbsp;/g, ' ').trim())).toBe('ok perché');
+});
