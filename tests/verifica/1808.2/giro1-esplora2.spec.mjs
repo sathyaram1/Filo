@@ -32,6 +32,7 @@ async function apriSito() {
     const [percorso] = req.url.split('?');
     req.on('data', () => {});
     req.on('end', () => {
+      if (percorso === '/err500') { res.writeHead(500, { 'Content-Type': 'text/html; charset=utf-8' }); res.end('<!doctype html><title>Errore</title><p>Errore del server'); return; }
       if (percorso === '/api/rifiuta') { res.writeHead(401, { 'Content-Type': 'application/json' }); res.end('{"errore":"Devi accedere"}'); return; }
       if (percorso === '/api/ok') { res.writeHead(200, { 'Content-Type': 'application/json' }); res.end('{"ok":true,"id":991}'); return; }
       const p = pagine.get(percorso.replace(/^\//, ''));
