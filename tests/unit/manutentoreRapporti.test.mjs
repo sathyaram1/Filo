@@ -1,5 +1,5 @@
 // `npm run manutentore -- rapporti` (#2083): il costo di un feedback e di una finestra chiesto al server, le pagine col
-// cursore, il conto per area dalle schede locali. La rete è finta (fetch sostituito); il server vero ha le sue prove.
+// cursore, il conto per area dalle schede locali, la cache per ruolo (#2121). La rete è finta (fetch sostituito); il server vero ha le sue prove.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,12 +31,12 @@ function serverFinto(t, risposte) {
 }
 
 test('la richiesta: numero, sotto-numeri, finestra per date o per giorni, pagine', () => {
-  assert.deepEqual(M.richiestaRapporti(['rapporti'], NOW), { ok: true, dati: {}, tutte: false, json: false });
+  assert.deepEqual(M.richiestaRapporti(['rapporti'], NOW), { ok: true, dati: {}, tutte: false, cache: false, json: false });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '#1790', '--sottonumeri', '--somma'], NOW).dati, { numero: '1790', sottonumeri: true, somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni', '7', '--somma'], NOW).dati, { da: '2026-10-28T12:00:00.000Z', somma: true });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--giorni=2', '--a', '2026-11-01'], NOW).dati, { da: '2026-10-30T00:00:00.000Z', a: '2026-11-01' });
   assert.deepEqual(M.richiestaRapporti(['rapporti', '--da', '2026-10-28', '--a', '2026-11-04T08:00Z', '--limite', '200', '--cursore', 'ab12', '--tutte'], NOW),
-    { ok: true, dati: { da: '2026-10-28', a: '2026-11-04T08:00Z', cursore: 'ab12', limite: 200 }, tutte: true, json: false });
+    { ok: true, dati: { da: '2026-10-28', a: '2026-11-04T08:00Z', cursore: 'ab12', limite: 200 }, tutte: true, cache: false, json: false });
 });
 
 test('le richieste storte si fermano prima del server, col perché', async (t) => {
@@ -120,4 +120,61 @@ test('un rifiuto del server a metà delle pagine arriva com è, e un cursore che
   const giro = await M.tutteLePagine(async () => ({ ok: true, rapporti: [], cursore: 'sempre' }), {});
   assert.equal(giro.reason, 'troppe_pagine');
   assert.match(giro.detail, new RegExp(`oltre ${M.RAPPORTI_PAGINE_MAX} pagine`));
+});
+
+// #2121: la misura della cache dei sotto-agenti deve costare un comando, perché il confronto si rifà ogni settimana.
+const BIGLIETTI_CACHE = [
+  {
+    ticket: 'v1', ruolo: 'verifier', attese: [{ cosa: 'Bash: unit', secondi: 424 }, { cosa: 'Bash: x', secondi: 299 }, { cosa: 'Bash: y', secondi: 300 }],
+    report: { role: 'verifier', models: ['claude-opus-5-5'], costUsd: 20, turns: 50, rewarmTurns: 2, rewarmTokens: 100000, tokens: { cacheWrite: 1000000 } },
+  },
+  { ticket: 'v2', ruolo: 'verifier', attese: [{ cosa: 'Bash: suite', secondi: 600 }] },
+  { ticket: 'm1', report: { role: 'manutentore', models: ['claude-fable-5-1'], costUsd: 4, turns: 10, rewarmTurns: 0, rewarmTokens: 0, tokens: { cacheWrite: 100000 } } },
+];
+
+test('rapporti --cache: per ruolo la cache scritta, i rewarm, le attese oltre i 5 minuti e il saldo dell ora ai prezzi del listino', () => {
+  const c = M.contoCache(BIGLIETTI_CACHE);
+  const v = c.perRuolo.find((g) => g.ruolo === 'verifier');
+  const m = c.perRuolo.find((g) => g.ruolo === 'manutentore');
+  assert.deepEqual(c.perRuolo.map((g) => g.ruolo), ['verifier', 'manutentore']);
+  assert.equal(v.biglietti, 2);
+  assert.equal(v.conRapporto, 1);
+  // Le attese dal biglietto, da 300 s in su: anche quelle di un biglietto senza rapporto.
+  assert.equal(v.attese, 3);
+  assert.equal(v.bigliettiConAttese, 2);
+  // Opus 5.5: scrittura 5 $/M, a un'ora 8 $/M, lettura 0,2 $/M.
+  const vicino = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} contro ${b}`);
+  vicino(v.cacheUsd, 5); vicino(v.sovrapprezzo, 3); vicino(v.risparmioMax, 0.48); vicino(v.saldo, -2.52); vicino(v.soglia, 0.625);
+  vicino(v.rewarmUsd, 0.5);
+  // Fable 5.1: 12,5 → 20 $/M, il ruolo letto dal rapporto quando il biglietto non lo porta.
+  vicino(m.cacheUsd, 1.25); vicino(m.sovrapprezzo, 0.75); vicino(m.risparmioMax, 0);
+  assert.equal(c.totale.biglietti, 3);
+  vicino(c.totale.usd, 24); vicino(c.totale.saldo, 0.48 - 3.75);
+});
+
+test('rapporti --cache legge tutte le pagine della finestra e stampa una riga per ruolo col totale; --json dà i numeri', async (t) => {
+  assert.equal(M.richiestaRapporti(['rapporti', '--giorni', '7', '--cache'], NOW).tutte, true);
+  assert.match(M.controlliLocali('rapporti', ['rapporti', '--cache', '--somma']), /--cache le legge tutte/);
+  assert.match(M.controlliLocali('rapporti', ['rapporti', '--cache', '--cursore', 'x']), /il cursore non serve/);
+  const finestra = { da: '2026-10-28T12:00:00.000Z', a: '2026-11-04T12:00:00.000Z' };
+  const pagine = {
+    '': { ok: true, finestra, rapporti: BIGLIETTI_CACHE.slice(0, 2), cursore: 'p2' },
+    p2: { ok: true, finestra, rapporti: BIGLIETTI_CACHE.slice(2), cursore: null },
+  };
+  const s = serverFinto(t, { rapporti: (b) => [200, pagine[b.dati.cursore || '']] });
+  assert.equal(await M.main(['rapporti', '--giorni', '7', '--cache'], CHIAVE), 0);
+  assert.equal(s.corpi.length, 2);
+  assert.equal(s.corpi[0].dati.somma, undefined);
+  const testo = s.out.join('\n');
+  assert.match(testo, /^Cache dei sotto-agenti dal 2026-10-28T12:00:00\.000Z al 2026-11-04T12:00:00\.000Z/);
+  assert.match(testo, /\n {2}verifier: 2 biglietti \(1 col rapporto\) · 20\.00 \$ · cache scritta 1\.00 M tok = 5\.00 \$ \(25\.0 % del costo\) · rewarm 2 su 50 turni, 0\.10 M tok = 0\.50 \$ \(10\.0 % della cache scritta\) · attese ≥300 s: 3 su 2 biglietti · ora: sovrapprezzo 3\.00 \$, risparmio max 0\.48 \$, saldo −2\.52 \$ \(conviene sopra il 62\.5 % di rewarm\)/);
+  assert.match(testo, /\n {2}manutentore: 1 biglietti/);
+  assert.match(testo, /\n {2}TOTALE: 3 biglietti \(2 col rapporto\) · 24\.00 \$[^\n]*saldo −3\.27 \$/);
+
+  const j = serverFinto(t, { rapporti: (b) => [200, pagine[b.dati.cursore || '']] });
+  assert.equal(await M.main(['rapporti', '--giorni', '7', '--cache', '--json'], CHIAVE), 0);
+  const o = JSON.parse(j.out.join('\n'));
+  assert.deepEqual(o.finestra, finestra);
+  assert.equal(o.totale.biglietti, 3);
+  assert.equal(o.perRuolo[0].ruolo, 'verifier');
 });
