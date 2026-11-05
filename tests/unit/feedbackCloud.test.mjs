@@ -399,8 +399,6 @@ test('una scheda oltre la misura che il server salva è da rifare subito, non al
 
 test('scrivi: un segnalato dell’indice non lancia l’agente e il comando chiude bene', async (t) => {
   if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
-  const { spawnSync } = await import('node:child_process');
-  const { chmodSync, existsSync } = await import('node:fs');
   const dir = cartellaTemporanea('schede-scrivi-segnalato-');
   try {
     const cartella = join(dir, 'schede');
