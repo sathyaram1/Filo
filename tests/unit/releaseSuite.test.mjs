@@ -366,7 +366,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         assert.deepEqual(chiaviDelRegistroUnit(registro, '/home/runner/work/Filo/Filo'), ['unit:tests/unit/x.test.mjs']);
       });
 
-      // #2148: i rossi di #2145 erano già corretti da una fusione arrivata mentre la suite girava.
+      // #2148: i rossi di #2145 li aveva già corretti una fusione arrivata mentre la suite girava.
       const REGISTRO_DUE = [
         "not ok 1 - a\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\a.test.mjs:3:1'",
         "not ok 2 - b\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\b.test.mjs:3:1'",
@@ -569,7 +569,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
     describe('il passo, fatto girare', { skip: !haBash && 'serve bash' }, () => {
       const PUNTA = 'cd'.padEnd(40, '2');
       const FINTO = "process.stdout.write(process.env.FINTO_VERDI || ''); process.exit(Number(process.env.FINTO_ESITO || 0));";
-      const gira = ({ registro = 'not ok 1\n', verdi = '', esito = 0 } = {}) => eseguiPasso(scriptDelPasso(rifai.corpo).replace(/^/, 'cd "$CARTELLA_PASSO"\n'), {
+      const gira = ({ registro = 'not ok 1\n', verdi = '', esito = 0 } = {}) => eseguiPasso(`cd "$CARTELLA_PASSO"\n${scriptDelPasso(rifai.corpo)}`, {
         env: { CARTELLA_PASSO: '{{dir}}', PUNTA, FINTO_VERDI: verdi, FINTO_ESITO: esito },
         file: { 'scripts/rossi-sulla-punta.mjs': FINTO, ...(registro ? { 'esiti-unit/unit.log': registro } : {}) },
       });
