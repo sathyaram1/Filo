@@ -26,7 +26,6 @@ const Foto = require('./fotoDellaPagina');
 const SempreAperte = require('./sempreAperte');
 const ChiudiSchede = require('./chiudiSchede');
 const CercaChiuse = require('./cercaSchedeChiuse');
-const { daArchivio: voceDaArchivio } = require('../tabs/schedeChiuse');
 
 const { SN_CONST, SN_MSG } = globalThis;
 const { ACTIONS, PROMPTS } = SN_CONST;
