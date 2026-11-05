@@ -138,6 +138,8 @@
   const MAX_PASSI_DA_SOLO = 20;
   let passiDaSolo = 0;
   let continuaAperto = null;
+  // Le scelte con «Continua» sotto l'ultima risposta interrotta: una risposta nuova o un gesto le spengono (#1302).
+  let seguitoAperto = null;
   // «Valuta» (#1449): il campo dell'ultima valutazione e il testo che il modello ne ha visto. Da lì la conversazione
   // risponde col modello della chat, e le correzioni proposte si scrivono in quel campo.
   let valutazione = null;
@@ -228,6 +230,7 @@
     aiPrefersOpen = true;
     passiDaSolo = 0;
     continuaAperto = null;
+    seguitoAperto = null;
     valutazione = null;
     docConversazione = '';
     session = newSession();
@@ -1042,7 +1045,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
-    if (role === 'assistant') rispostaArrivata();
+    if (role === 'assistant') { rispostaArrivata(); spegniSeguito(); }
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
     // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home;
@@ -1088,6 +1091,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (!afterEl || !choices || !choices.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'sn-sidebar-choices';
+    const chiedeSeguito = (c) => c.prompt === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
     choices.forEach((c) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -1095,15 +1099,24 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       btn.textContent = c.label;
       btn.addEventListener('click', (e) => {
         if (!gestoVero(e) || wrap.classList.contains('sn-sidebar-choices-used')) return;
+        // A turno in corso il seguito partirebbe insieme a quel turno: il tasto resta per dopo.
+        if (chiedeSeguito(c) && inVolo > 0) return;
         wrap.classList.add('sn-sidebar-choices-used');
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
         submit({ userMessage: c.prompt, daScelta: true });
       });
       wrap.appendChild(btn);
     });
+    if (choices.some(chiedeSeguito)) seguitoAperto = wrap;
     afterEl.insertAdjacentElement('afterend', wrap);
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+  function spegniSeguito() {
+    if (!seguitoAperto) return;
+    seguitoAperto.classList.add('sn-sidebar-choices-used');
+    seguitoAperto.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    seguitoAperto = null;
   }
 
   // Le correzioni di «Valuta» (#1449): un clic scrive la correzione nel campo valutato, un altro la toglie. Escono verso
@@ -1985,6 +1998,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (userMessage || daGesto) {
       passiDaSolo = 0;
       if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
+      spegniSeguito();
     } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
       if (session) session.esito = 'tetto_passi';
       fermaPassiDaSolo(userAction, esterno, dopoDocumenti);

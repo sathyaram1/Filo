@@ -130,6 +130,26 @@ test('il fornitore dice «tetto nel ragionamento» quando l\'uso lo mostra', asy
   } finally { globalThis.fetch = orig; }
 });
 
+// Le chat ricevono in streaming, e l'uso arriva in un pezzo a parte dopo quello che dice «length».
+test('anche in streaming il tetto speso ragionando si riconosce dall\'uso', async () => {
+  const enc = new TextEncoder();
+  const flusso = (reasoning) => [
+    { id: 'gen-s', choices: [{ delta: { reasoning: 'Ci penso a lungo...' } }] },
+    { id: 'gen-s', choices: [{ delta: { content: 'Comincio a' } }] },
+    { id: 'gen-s', choices: [{ delta: {}, finish_reason: 'length' }] },
+    { id: 'gen-s', choices: [], usage: { prompt_tokens: 50, completion_tokens: 16384, completion_tokens_details: { reasoning_tokens: reasoning } } },
+  ].map((o) => `data: ${JSON.stringify(o)}\n\n`).join('') + 'data: [DONE]\n\n';
+  const orig = globalThis.fetch;
+  try {
+    for (const [reasoning, atteso] of [[16000, 'tetto_ragionamento'], [300, 'length']]) {
+      globalThis.fetch = async () => new Response(new Blob([enc.encode(flusso(reasoning))]).stream(), { status: 200 });
+      const r = await OR_VERO.streamComplete({ apiKey: 'k', model: 'acme/m', messages: [{ role: 'user', content: 'difficile' }], maxTokens: 16384, onDelta: () => {}, onReasoning: () => {} });
+      assert.equal(r.text, 'Comincio a');
+      assert.equal(r.finishReason, atteso);
+    }
+  } finally { globalThis.fetch = orig; }
+});
+
 function cancelloColTetto() {
   const tetti = [];
   globalThis.SN_PROVIDER_OPENROUTER = {

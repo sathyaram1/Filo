@@ -910,7 +910,8 @@
       btn.className = 'sn-msg-rimedio';
       btn.textContent = 'Continua';
       btn.title = 'Continua la risposta da dove si è interrotta';
-      btn.addEventListener('click', () => { btn.remove(); onContinua(); });
+      // `false`: il seguito non è partito (un turno in corso), e il tasto resta per dopo.
+      btn.addEventListener('click', () => { if (onContinua() !== false) btn.remove(); });
       el.appendChild(btn);
     }
     parent.appendChild(el);
@@ -981,6 +982,8 @@
   function startTurn(popup, messages, onAssistantDone, opts) {
     // Disconnetti eventuale port precedente
     try { popup.activePort?.disconnect(); } catch (_) {}
+    // «Continua» vale solo sotto l'ultima risposta: un turno nuovo spegne quelli sotto le vecchie (#1302).
+    popup.root.querySelectorAll('.sn-risposta-interrotta .sn-msg-rimedio').forEach((b) => b.remove());
 
     const bubble = appendBubble(popup, 'assistant');
     const loading = document.createElement('span');
@@ -1001,8 +1004,8 @@
     let buf = '';
     let firstDelta = true;
     // Il seguito di una risposta fermata dentro un blocco di codice riapre il blocco, o si leggerebbe come testo (#1302).
-    const riapri = (opts && opts.riapri) || '';
-    const conRecinto = (t) => (riapri && !/^\s*```/.test(t) ? `${riapri}\n${t}` : t);
+    const prima = opts && typeof opts.prima === 'string' ? opts.prima : null;
+    const conRecinto = (t) => (prima !== null && global.SN_CHAT_ERRORS?.seguitoNelRecinto ? global.SN_CHAT_ERRORS.seguitoNelRecinto(prima, t) : t);
 
     port.onMessage.addListener((m) => {
       if (m.type === 'meta') {
@@ -1062,8 +1065,9 @@
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
         // non i marker, così l'LLM non si confonde nei turni successivi. Fermata prima del testo (#1302): la nota, perché
-        // un turno del modello vuoto alcuni host lo rifiutano al «Continua».
-        const salvata = String(resolved || '').trim() ? resolved : (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(m.finishReason) || resolved);
+        // un turno del modello vuoto alcuni host lo rifiutano al «Continua». Col blocco riaperto, o il «Continua» dopo
+        // cerca il blocco nel solo seguito.
+        const salvata = String(resolved || '').trim() ? conRecinto(resolved) : (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(m.finishReason) || resolved);
         try { onAssistantDone && onAssistantDone(salvata); } catch (_) {}
         popup.activePort = null;
       } else if (m.type === 'error') {
@@ -1101,14 +1105,13 @@
   const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   // La richiesta del seguito la scrive Filo, non chi legge: niente bolla sua (#1302).
   function continuaRisposta(popup) {
-    if (!popup || popup.activePort) return;
+    if (!popup || popup.activePort) return false;
     const prima = [...popup.conversation].reverse().find((m) => m && m.role === 'assistant');
-    const CE = global.SN_CHAT_ERRORS;
-    const riapri = prima && CE && CE.recintoDaRiaprire ? CE.recintoDaRiaprire(String(prima.content || '')) : '';
-    chiedi(popup, CONTINUA_RISPOSTA, { nascosta: true, riapri });
+    chiedi(popup, CONTINUA_RISPOSTA, { nascosta: true, prima: prima ? String(prima.content || '') : '' });
+    return true;
   }
 
-  function chiedi(popup, txt, { nascosta = false, riapri = '' } = {}) {
+  function chiedi(popup, txt, { nascosta = false, prima = null } = {}) {
     if (!nascosta) {
       const userBubble = appendBubble(popup, 'user');
       userBubble.text.textContent = txt;
@@ -1117,7 +1120,7 @@
     popup.conversation.push({ role: 'user', content: txt });
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });
-    }, riapri ? { riapri } : undefined);
+    }, prima !== null ? { prima } : undefined);
   }
 
   // Su un sito la risposta si apre nello strato sopra la scheda, mai nel suo documento (#1509.1).
