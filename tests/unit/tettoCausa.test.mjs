@@ -109,7 +109,7 @@ test('il testo ci sta da solo ma sotto non resta posto per una risposta: niente 
   assert.equal(esito.code, 'TETTO_RISPOSTA');
   assert.ok(laHomeAccorcia(esito));
   // Con posto per una risposta il tetto resta la cura: si rifà più basso e la home non accorcia.
-  const t = await OR.httpError(risposta(400, rifiutoOR(128000, 50000, 65536)), { tools: false, maxTokens: 65536 });
+  const t = await OR.httpError(risposta(400, rifiutoOR(128000, 100000, 65536)), { tools: false, maxTokens: 65536 });
   assert.equal(t.code, 'TETTO_RISPOSTA');
   assert.ok(t.tettoRetto > 0);
   assert.ok(!laHomeAccorcia(t));
