@@ -34,6 +34,15 @@ async function impostazioni(app, settings) {
     { url: 'filo://preferences/preferences.html' },
   ), settings);
 }
+// Il posto di un tasto DENTRO il campo, letto col campo nello stesso fotogramma: il campo si stringe quando compare
+// un avviso della barra (#1551; senza portachiavi di sistema ne arriva uno al primo invio), il tasto lo segue.
+async function postoNelCampo(page, sel) {
+  return page.evaluate((s) => {
+    const c = document.getElementById('inputForm').getBoundingClientRect();
+    const b = document.querySelector(s).getBoundingClientRect();
+    return { destra: c.right - b.right, basso: c.bottom - b.bottom, width: b.width, height: b.height };
+  }, sel);
+}
 const PENSIERO_1 = ['L\'utente vuole due timer, ', 'uno per la pasta e uno per l\'uovo. ', 'Li avvio insieme, ', 'sono indipendenti. '];
 
 test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitolo che si srotola', async ({ app, shell }) => {
@@ -197,7 +206,7 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
     { pensa: ['Cerco di capire cosa intende. ', 'Forse vuole un elenco lunghissimo, ', 'ci vorrà parecchio. ', 'Continuo a pensare. ', 'Ancora. ', 'Ancora un po\'. '], ogni: 900, testo: 'Non dovresti leggermi.' },
   ]);
   await page.locator('#input').fill('scrivimi un poema');
-  const posto = await page.locator('#sendBtn').boundingBox();
+  const posto = await postoNelCampo(page, '#sendBtn');
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity');
   await expect(blocco).toHaveAttribute('data-phase', 'reason', { timeout: 5_000 });
@@ -205,8 +214,8 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
   const ferma = page.locator('#stopBtn');
   await expect(ferma).toBeVisible();
   await expect(page.locator('#sendBtn')).toBeHidden();
-  const quadrato = await ferma.boundingBox();
-  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(quadrato[k] - posto[k])).toBeLessThan(3);
+  const quadrato = await postoNelCampo(page, '#stopBtn');
+  for (const k of ['destra', 'basso', 'width', 'height']) expect(Math.abs(quadrato[k] - posto[k])).toBeLessThan(3);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-quadrato.png' });
   await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('elenco', { timeout: 4_000 });
 
