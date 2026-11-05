@@ -507,7 +507,7 @@ export { lottiPerRigaDiComando };
  * Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. Nella cartella della
  * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
  */
-function runSpecsALotti(specs, label, albero, memoria = null) {
+export function runSpecsALotti(specs, label, albero, memoria = null) {
   if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
   const { restano, saltati } = memoria ? specDaRiprendere(specs, memoria.verdi) : { restano: specs, saltati: [] };
   if (saltati.length) {
