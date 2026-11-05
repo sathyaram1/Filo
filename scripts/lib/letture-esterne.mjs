@@ -149,7 +149,7 @@ export function motivoLettura(input, ctx = {}) {
   const win = !!ctx.win;
   const P = win ? path.win32 : path.posix;
   const canonico = typeof ctx.canonico === 'function' ? ctx.canonico : (p) => p;
-  const file = canonico(P.resolve(String(ctx.cwd || P.sep), grezzo));
+  const file = canonico(P.resolve(String(ctx.cwd || P.sep), conCasa(grezzo, ctx.casa, win)));
   const nomeFile = pulisci(P.basename(file), 80);
   // La cartella di Claude prima delle altre: anche dentro una cartella fidata, lì decide l'elenco ammesso.
   for (const c of ctx.claude || []) {
