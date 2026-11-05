@@ -365,19 +365,15 @@ export function esceInOgniEsito(f) {
   return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
 }
 
-// Senza «blocca» la domanda blocca (SPEC-DOMANDE § 3.1): solo un false esplicito lascia andare avanti il lavoro.
-const domandaCheBlocca = (f) => !(f && f.domanda && typeof f.domanda === 'object' && f.domanda.blocca === false);
-const nonBlocca = (f) => f && f.decision && String(f.sede || 'i').toLowerCase() === 'i' && Number(f.level) >= 2 && !domandaCheBlocca(f);
-
 /**
- * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202), la cui
- * domanda blocca: con `"blocca": false` il lavoro va avanti con la consigliata, e gli altri `?` escono come sempre (#1555.1).
+ * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202). La
+ * domanda non conta: su un rilievo «blocca» non si scrive, la registrazione lo respinge (#1202.2).
  * Copia di decisioneFerma (le ricette fissate non portano src/shared): una sentinella le tiene uguali. PURA.
  */
 export function fermaDiSicuro(findings) {
   return (Array.isArray(findings) ? findings : []).some((f) => f && f.decision === true
     && String(f.sede || 'i').toLowerCase() === 'i'
-    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)) && domandaCheBlocca(f));
+    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)));
 }
 
 // I titoli dei casi (anche dei describe) scritti come testo: un titolo composto a runtime non si legge, e non ferma.
