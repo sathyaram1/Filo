@@ -46,7 +46,8 @@ async function apriSito() {
   let n = 0;
   const server = createServer((req, res) => {
     const [percorso] = req.url.split('?');
-    req.on('data', () => {});
+    let corpo = '';
+    req.on('data', (d) => { if (corpo.length < 100_000) corpo += d; });
     req.on('end', () => {
       const html = (s, t) => { res.writeHead(s, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(t); };
       if (percorso === '/err500') return html(500, '<!doctype html><title>Errore</title><p>Errore del server');
