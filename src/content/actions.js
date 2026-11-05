@@ -606,6 +606,7 @@
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
+      conSeguito: true,
       // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
       ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
     }).then(
