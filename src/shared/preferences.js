@@ -2167,8 +2167,9 @@
       risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
         + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
         + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '
-        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, e la '
-        + 'spiegazione si prepara anche lì appena selezioni un testo.',
+        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, la '
+        + 'spiegazione si prepara anche lì appena selezioni un testo, e con le funzioni accese i file scaricati da lì '
+        + 'tornano al modello dei nomi e le pagine salvate a quello delle categorie con titolo e testo.',
     }),
     elenco({
       keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],

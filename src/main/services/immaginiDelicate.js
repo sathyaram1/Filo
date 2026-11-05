@@ -55,7 +55,13 @@ function crea({ impronta, storage, appunti, chiave = 'filo_immagini_delicate' })
     return Boolean(k) && viste.has(k);
   }
 
-  return { segna, daDelicata };
+  // La domanda dei lavori che partono da soli (descrizione, nome dei file): a regola delle delicate spenta, l'impronta non conta.
+  async function restaFuori(x, filtro) {
+    if (filtro && filtro.attivo === false) return false;
+    return daDelicata(x);
+  }
+
+  return { segna, daDelicata, restaFuori };
 }
 
 let diFilo = null;

@@ -2005,13 +2005,16 @@
     // rispondere con un nome di categoria. Bastava una riga nell'estratto per
     // dettargliela. Adesso entrano imbustati, come qualunque altro contenuto
     // esterno.
-    categorize: ({ url, title, description, excerpt, existing }) =>
-      `Categorizza la pagina descritta qui sotto.\n\n` +
-      esterno().imbustaCampi({
-        tipo: 'DATI_PAGINA',
-        campi: { URL: url, Titolo: title, Descrizione: description || '-' },
-        corpo: `Estratto:\n${excerpt || '-'}`,
-      }) + '\n\n' +
+    // #1545 — di una pagina delicata arriva solo `tipo` («posta», «banca»), che lo scrive Filo: fuori dalla busta.
+    categorize: ({ url, title, description, excerpt, existing, tipo }) =>
+      (tipo
+        ? `Categorizza una pagina che l'utente ha salvato per dopo. È una pagina delicata: di lei Filo ti dice solo il tipo, ${tipo}.\n\n`
+        : `Categorizza la pagina descritta qui sotto.\n\n` +
+          esterno().imbustaCampi({
+            tipo: 'DATI_PAGINA',
+            campi: { URL: url, Titolo: title, Descrizione: description || '-' },
+            corpo: `Estratto:\n${excerpt || '-'}`,
+          }) + '\n\n') +
       // Le categorie che l'utente ha già in casa sono roba sua, non del sito:
       // restano fuori dalla busta, perché è su quelle che deve scegliere.
       `Categorie esistenti (queste vengono da Filo, non dal sito): ${existing.length ? existing.map((c) => `"${c}"`).join(', ') : '(nessuna)'}.\n\n` +

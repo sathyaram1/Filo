@@ -96,8 +96,9 @@ async function scarica(nome, corpo, { shell, openTab, testServer }) {
     res.end(corpo);
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  const url = `http://127.0.0.1:${srv.address().port}/${nome}`;
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`);
+  // Pagina e file con un nome da internet: da 127.0.0.1, rete di casa, il nome automatico non parte (#1274.1).
+  const url = `http://sito-pubblico.test:${srv.address().port}/${nome}`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`, { pubblico: true });
   await page.locator('#dl').click();
   let rec = null;
   await expect.poll(async () => {

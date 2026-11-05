@@ -228,6 +228,21 @@ function paginaDi(webContents) {
   try { return webContents && !webContents.isDestroyed?.() ? String(webContents.getURL() || '') : ''; } catch (_) { return ''; }
 }
 
+// La pagina il cui link o window.open ha aperto la scheda che scarica: un estratto conto servito da un altro dominio in
+// una scheda nuova viene dalla banca (#1823). Si legge prima che la scheda-ponte si chiuda.
+function apertaDa(webContents) {
+  try {
+    if (!webContents || webContents.isDestroyed?.()) return '';
+    for (const w of electron().BrowserWindow.getAllWindows()) {
+      const t = ((w && w._filoTabs && w._filoTabs.tabs) || []).find((x) => x && x.view && x.view.webContents === webContents);
+      if (!t) continue;
+      const o = t._sbOrigine;
+      return o && o.tipo === 'link' && typeof o.da === 'string' ? o.da : String(t._sbApertaDa || '');
+    }
+  } catch (_) {}
+  return '';
+}
+
 // Un nome lunghissimo farebbe dell'avviso un riquadro enorme: si taglia in MEZZO, così
 // restano leggibili sia l'inizio sia l'estensione.
 function shortName(name, max = 44) {
@@ -724,8 +739,10 @@ async function nominaDaSolo(rec) {
   const NF = globalThis.SN_NOMI_FILE;
   if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
   if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
-  const Nomi = require('./nomiFile');
   const letto = rec.savePath;
+  // Una scelta, non un guasto: il file tiene il suo nome, senza avviso.
+  if (await restaFuoriDalModello(rec, letto, NF.tipoDi(rec.filename))) return;
+  const Nomi = require('./nomiFile');
   // Un nome dato dall'utente mentre il modello leggeva vince sempre su quello automatico.
   const superata = () => !records.has(rec.id) || rec.state !== 'completed' || rec.savePath !== letto;
   const p = await Nomi.proponi(letto);
@@ -754,6 +771,19 @@ async function nominaDaSolo(rec) {
       { label: 'Apri file', openDownloadId: rec.id },
     ],
   }, '');
+}
+
+// #1274.1 — un file nato su una pagina delicata o della rete di casa non va al modello dei nomi senza una richiesta per
+// lui: conta la pagina della scheda, quella che l'ha aperta e il primo indirizzo, non solo quello del file; un'immagine anche dalla sua impronta,
+// che uno screenshot fatto lì si porta dietro (immaginiDelicate.js). Nel dubbio resta fuori.
+async function restaFuoriDalModello(rec, percorso, tipo) {
+  const D = globalThis.SN_DELICATE;
+  if (!D) return true;
+  try {
+    if (await D.versoIlModello([rec._pagina, rec._apertaDa, rec._primo, rec.url])) return true;
+    if (tipo !== 'immagine') return false;
+    return await require('./immaginiDelicate').perFilo().restaFuori(await fs.promises.readFile(percorso), await D.filtroSicuro());
+  } catch (_) { return true; }
 }
 
 // Senza modello l'avviso arriva una volta per serie di fallimenti: ogni scaricamento ripeterebbe la stessa frase.
@@ -872,6 +902,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     siteUncertain: incerto,
     servedBy: servito,
     _pagina: paginaDi(webContents) || (ripresa ? ripresa._pagina || '' : ''),
+    _apertaDa: apertaDa(webContents) || (ripresa ? ripresa._apertaDa || '' : ''),
     _partitoDavanti: utenteDavanti(),
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
@@ -1664,5 +1695,6 @@ module.exports = {
   _testoZoneIdentifier: testoZoneIdentifier,
   _valoreQuarantena: valoreQuarantena,
   _daRaccontare: daRaccontare,
+  _nominaDaSolo: nominaDaSolo,
   DOWNLOAD_LUNGO_MS,
 };

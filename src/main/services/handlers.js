@@ -7555,24 +7555,10 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
   if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
-  const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '', intera: true });
-  const result = await Categorizer.categorize({
-    invokeAI,
-    page: {
-      url: savedEntry.url, title: savedEntry.title,
-      description: pageInput?.description || '', excerpt: pageInput?.excerpt || '',
-      thumbnail: savedEntry.thumbnail,
-    },
+  await require('./categoriaSalvata').categorizza(savedEntry, pageInput, {
+    settings,
+    chiedi: ({ action, payload, origin }) => handleAIRequest({ action, payload, origin, intera: true }),
   });
-  if (!result?.category) return;
-  const list = await SavedPages.list();
-  const idx = list.findIndex((p) => p.id === savedEntry.id);
-  if (idx >= 0) {
-    list[idx].category = result.category.name;
-    list[idx].categoryId = result.category.id;
-    list[idx].categoryConfidence = result.confidence;
-    await globalThis.chrome.storage.local.set({ [SN_CONST.STORAGE_KEYS.SAVED_PAGES]: list });
-  }
 }
 
 // Registro degli handler per dominio: ogni modulo sotto handlers/ registra i suoi tipi e
@@ -7711,27 +7697,11 @@ async function handleMessage(msg, sender = {}) {
 
 // Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591).
 const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
-async function isHomeNetworkUrlSettled(url) {
-  let host = '';
-  try { host = new URL(String(url)).hostname; } catch (_) {}
-  const pending = host && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.homeNetworkPending(host);
-  if (pending) await pending;
-  return isHomeNetworkUrl(url);
-}
+const isHomeNetworkUrlSettled = (url) => globalThis.SN_DELICATE.diCasa(url);
 
 // Le pagine delicate (posta, banca, sanità, con password) non mandano testo ai lavori automatici col modello (#1004).
 // `fuori(url)` dà il motivo o null; `fuori.voce(it)` vale anche per una scheda archiviata, che il motivo se lo porta dietro.
-async function filtroDelicate(settings) {
-  try {
-    const f = await globalThis.SN_DELICATE.filtro(settings);
-    if (typeof f === 'function') return f;
-  } catch (_) {}
-  // Senza la regola non si sa: nel dubbio, vale delicata (patterns/un-interruttore-che-promette-una-garanzia-non-ha-ripieghi.md).
-  const tutte = () => 'campi';
-  tutte.voce = () => 'campi';
-  tutte.guasto = true;
-  return tutte;
-}
+const filtroDelicate = (settings) => require('./pagineDelicate').filtroSicuro(settings, (s) => globalThis.SN_DELICATE.filtro(s));
 // Il riassunto delle schede chiuse (#1004): spento, di una scheda che si chiude non parte niente verso i modelli.
 const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
 // Una scheda archiviata che non va a nessun modello, nemmeno dopo: della rete di casa (#591), delicata, o chiusa col
