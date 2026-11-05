@@ -19,7 +19,17 @@ function accendi(app) {
 }
 
 function scrivi() {
-  try { if (accesa) Module.flushCompileCache?.(); } catch (_) {}
+  if (!accesa) return;
+  try { Module.flushCompileCache?.(); } catch (_) {}
+  // Ogni versione del motore ha la sua sottocartella (qualche MB): quelle di prima di un aggiornamento non servono più.
+  try {
+    const attuale = Module.getCompileCacheDir?.();
+    if (!attuale) return;
+    const radice = path.dirname(attuale);
+    for (const nome of fs.readdirSync(radice)) {
+      if (nome !== path.basename(attuale)) fs.rmSync(path.join(radice, nome), { recursive: true, force: true });
+    }
+  } catch (_) {}
 }
 
 module.exports = { accendi, scrivi, accesa: () => accesa };
