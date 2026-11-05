@@ -771,12 +771,10 @@ test('una scheda dell’agente che il server non ha preso va al feedback al giro
 test('una scheda rimasta nella cartella da un comando interrotto mentre salvava va al feedback, senza rifarla', async (t) => {
   if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
   const dir = cartellaTemporanea('schede-interrotta-');
-  const salvate = [];
-  const canale = await canaleFinto((b) => {
-    if (b.op !== 'scheda') return { status: 400, body: { ok: false, reason: 'bad_request' } };
-    salvate.push(b.numero);
-    return { body: salvataDalServer(b, '2026-10-29T12:00:00.000Z') };
-  });
+  const NOVE = '2026-10-29T09:00:00.000Z';
+  const canale = await canaleConStato({ 814: { updatedAt: NOVE,
+    scheda: { ...buona(814), _fonte: { id: 'f814', stato: 'todo', aggiornato: NOVE, at: NOVE, modello: 'haiku' }, _fiducia: 'fidato' } } });
+  const salvate = canale.scritte;
   try {
     const cartella = join(dir, 'schede');
     mkdirSync(cartella, { recursive: true });
