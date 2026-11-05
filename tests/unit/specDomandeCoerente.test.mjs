@@ -200,18 +200,27 @@ test('un guasto non anticipa l\'istanza di chi ci è caduto, e un compito che no
   assert.match(sezione('## 13').replace(/\s+/g, ' '), /`destinatario`, che manda all'owner i guasti dell'ambiente dei riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto/);
 });
 
-// #1249.3: fermo su un guasto suo, ogni accensione anticipata (battito, segnali, sveglia) cade sullo stesso guasto; e
-// un controllo sulle scritture nel taccuino non vede una sessione che scrive e poi cade.
-test('fermo su un guasto suo il manutentore si accende solo al mattino, e il controllo conta le sessioni chiuse bene', () => {
-  const man = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\r\n/g, '\n');
-  const s7 = man.slice(man.indexOf('\n## 7.'), man.indexOf('\n## 8.')).replace(/\s+/g, ' ');
+// #1249.3: fermo su un guasto suo, ogni accensione automatica (battito, segnali, sveglia) cade sullo stesso guasto; e
+// un controllo sulle scritture nel taccuino non vede una sessione che scrive e poi cade. #1249.4: l'owner che ha
+// sistemato l'ambiente lo riaccende subito, dalla chat o rispondendo al controllo, senza aspettare il mattino.
+const manutentore = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\r\n/g, '\n');
+const paragrafo7 = manutentore.slice(manutentore.indexOf('\n## 7.'), manutentore.indexOf('\n## 8.'));
+
+test('fermo su un guasto suo il manutentore lo accendono il mattino e l\'owner, e il controllo conta le sessioni chiuse bene', () => {
+  const man = manutentore;
+  const s7 = paragrafo7.replace(/\s+/g, ' ');
   assert.match(s7, /fermo fino alla prossima \*\*sessione chiusa bene\*\*, cioè arrivata al rilascio senza guasto/);
-  assert.match(s7, /non lo accende per nessun motivo: né il battito, né un segnale .{0,160}né una sveglia chiesta prima/);
-  assert.match(s7, /Resta la decisione del mattino/);
+  assert.match(s7, /non lo accende per nessun automatismo: né il battito, né un segnale .{0,200}né una sveglia chiesta prima/);
+  assert.match(s7, /Lo accendono solo: - la \*\*decisione del mattino\*\*/);
+  assert.match(s7, /- l'\*\*owner dalla chat\*\*, quando chiede di farlo ripartire .{0,80}: subito, senza aspettare il mattino/);
+  assert.match(s7, /- la risposta \*\*«lascialo riprovare»\*\* dell'owner alla domanda del controllo .{0,30}: subito anche lei/);
+  assert.match(s7, /lasciarlo riprovare \(azione `automazione`, che lo accende subito anche se è fermo\)/);
   assert.match(s7, /Contano le chiusure, non le scritture nel taccuino/);
   assert.match(s7, /Una domanda alla volta, e la prima sessione chiusa bene la rende superata/);
   const s4 = man.slice(man.indexOf('\n## 4.'), man.indexOf('\n## 5.')).replace(/\s+/g, ' ');
-  assert.match(s4, /Fermo su un guasto suo, invece, si accende solo al mattino \(§ 7\)/);
+  assert.match(s4, /Fermo su un guasto suo, invece, valgono solo le accensioni del § 7/);
+  // Il segnale dell'owner dalla chat sta nell'elenco del § 4: il rimando non deve toglierlo con un «solo il mattino».
+  assert.match(s4, /richiesta dell'owner dalla chat/);
   assert.doesNotMatch(sezione('### 4.3').replace(/\s+/g, ' '), /scrivere nel taccuino da 26 ore/);
   assert.match(sezione('### 4.3').replace(/\s+/g, ' '), /conta le sue sessioni chiuse bene, non le scritture nel taccuino/);
   assert.match(sezione('### 3.3').replace(/\s+/g, ' '), /`attendi`.{0,250}tranne mentre è ferma su un guasto suo/);
