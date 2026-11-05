@@ -212,7 +212,8 @@ test('«riaprila» su una pagina già aperta scritta con la barra finale o il si
     { text: 'È già aperta.' },
   ]);
   await chiedi(chat, 'riaprimi la pagina sulle orche');
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'È già aperta.' })).toBeVisible({ timeout: 20_000 });
+  await expect(chat.locator('.dash-activity', { hasText: 'Riaperta' })).toHaveCount(1, { timeout: 20_000 });
+  await expect(chat.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
   expect((await schede(shell)).length, 'nessun doppione delle orche').toBe(prima);
   await expect.poll(async () => { const x = await shell.evaluate(async () => window.filoShell.tabs.snapshot()); return x.tabs.find((t) => t.id === x.activeId).url; }).toBe(orche.url);
   await ripristina(app);
