@@ -523,26 +523,30 @@ export async function main(argv) {
     console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] [--da-zero] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
     return 1;
   }
-  if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
   // Una lettura sola di --solo per il fermo e per la scelta (#2181): un --solo senza numeri non è una scheda chiesta.
-  const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
+  const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => SS.numeroPulito(n)).filter(Boolean);
   if (cmd === 'scrivi' && !solo.length && argv.some((a) => a === '--solo' || a.startsWith('--solo='))) {
     console.error('RIFIUTATO: --solo senza nessun numero (per esempio --solo 812,815). Non ho lanciato niente.');
     return 1;
   }
+  const giro = await strada();
+  if (cmd !== 'stato' && !dryRun) {
+    const a = await allineaAlFeedback(cartella, giro);
+    if (a.codice !== undefined) return a.codice;
+    indice = a.indice;
+  }
+  if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
   if ((cmd === 'stato' || (cmd === 'scrivi' && !solo.length)) && !argv.includes('--da-zero')) {
-    const fermo = censimentoMancante({ via: (await strada()).via, indice, schede: leggiSchede(cartella) });
+    const fermo = censimentoMancante({ via: giro.via, indice, schede: leggiSchede(cartella) });
     if (fermo) { console.error(fermo); return 1; }
   }
   if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella)), null, 1)); return 0; }
   let restano = 0;
   if (!dryRun) {
-    const giro = await strada();
     const r = await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
     indice = indiceAggiornato(indice, r.aggiornati);
     diMandate(r);
     restano = r.restano;
-    scriviSegnalati(cartella, indice);
   }
   const schede = leggiSchede(cartella);
   // Un segnalato non va all'agente: non lo può leggere, e la sua scheda il server non la salva.
