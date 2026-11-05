@@ -134,6 +134,36 @@ test('finestra rinata chiusa subito dopo un cambio di scheda e una chiusura di s
   await expect.poll(async () => (await stato(app, base)).normale?.davanti || '', { timeout: 15000 }).toBe(attese.tabs[attese.activeIndex]);
 });
 
+test('dopo la chiusura della finestra rinata nessuna scrittura delle schede diversa da quelle a finestra chiusa', async ({ app, shell, openTab, testServer }) => {
+  const { base, salvate } = await filoSenzaFinestra(app, shell, openTab, testServer, 4);
+  for (let giro = 0; giro < 4; giro++) {
+    await app.evaluate(({ app: a }) => { a.emit('activate', {}, true); });
+    await expect.poll(async () => (await stato(app, base)).normale?.schede || [], { timeout: 15000 }).toEqual(expect.arrayContaining(salvate));
+    await new Promise((r) => setTimeout(r, 300 + giro * 300));
+    const nuova = testServer.html(`<title>N${giro}</title>`);
+    await app.evaluate(({ BrowserWindow }, u) => {
+      const S = globalThis.SN_STORAGE;
+      const key = globalThis.SN_CONST.STORAGE_KEYS.OPEN_TABS;
+      if (!S.__spia2191) {
+        const orig = S.setRaw.bind(S);
+        S.__spia2191 = [];
+        S.setRaw = (k, v) => { if (k === key) S.__spia2191.push({ t: Date.now(), tabs: v.tabs.slice(), dopo: !!globalThis.__chiusa2191 }); return orig(k, v); };
+      }
+      globalThis.__chiusa2191 = false;
+      const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+      w.once('closed', () => { globalThis.__chiusa2191 = true; globalThis.__allaChiusura2191 = w._filoTabs.tabs.map((t) => t.url); });
+      w._filoTabs.openTab(u, { activate: true });
+      w.close();
+    }, nuova);
+    await expect.poll(async () => (await stato(app, base)).normale, { timeout: 10000 }).toBeNull();
+    await new Promise((r) => setTimeout(r, 1500));
+    const dopo = await app.evaluate(() => globalThis.SN_STORAGE.__spia2191.filter((s) => s.dopo));
+    for (const s of dopo) expect(s.tabs, `giro ${giro}: una scrittura dopo la chiusura ha perso schede`).toEqual(expect.arrayContaining([...salvate, nuova]));
+    salvate.push(nuova);
+    await app.evaluate(() => { globalThis.SN_STORAGE.__spia2191.length = 0; });
+  }
+});
+
 test('Mac: finestra chiusa, poi esci da Filo: sul disco restano le schede della finestra chiusa', async ({ app, shell, openTab, testServer }) => {
   const { base, salvate } = await filoSenzaFinestra(app, shell, openTab, testServer);
   await app.evaluate(({ app: a }) => { a.emit('activate', {}, true); });
