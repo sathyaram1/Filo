@@ -637,7 +637,13 @@ module.exports = function register(on, ctx) {
   function portaDentroInvito(code, win) {
     // Il portafoglio è dell'installazione: da una finestra incognito si scrive sul disco lo stesso.
     Disco.runNormale(() => redeemFromInvite(code)).catch(() => {});
-    try { win?._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+    // Una finestra appena nata (avvio, o rinata da fuori) riapre ancora le sue schede: Crediti dopo, o finisce dietro (#2191).
+    let pronta;
+    try { pronta = require('../../window').quandoPronta(win); } catch (_) { pronta = Promise.resolve(win ? {} : null); }
+    Promise.resolve(pronta).then((ok) => {
+      if (!ok || !win || win.isDestroyed()) return;
+      try { win._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+    }).catch(() => {});
   }
 
   // Un collegamento d'invito cliccato davvero in una pagina, o «Riscatta
