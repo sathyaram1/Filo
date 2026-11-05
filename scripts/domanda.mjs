@@ -499,6 +499,32 @@ export async function chiamaOwner(data, { funzione = '' } = {}) {
   return body.result || {};
 }
 
+/** chiaveDomande (#2011) con la chiave owner-non-fidato: stesse risposte e stessi errori di chiamaOwner. */
+export async function chiamaConChiave(data, passphrase, { fetchImpl = fetch } = {}) {
+  const funzione = 'chiaveDomande';
+  const res = await fetchImpl(INDIRIZZO.replace(/ownerDomande$/, funzione), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: corpoChiave(data, passphrase) }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || (body.result && body.result.ok === false)) throw new Error(`Non riuscito: ${messaggioErrore(res.status, body, funzione)}`);
+  return body.result || {};
+}
+
+/** Il registro con una chiave di classe: l'operazione `registro` del canale del manutentore, che le accetta tutte e due. */
+async function registroConChiave(passphrase, parole) {
+  const [{ call }, { corpoManutentore }] = await Promise.all([import('./routine-channel.mjs'), import('./manutentore.mjs')]);
+  const { status, body } = await call('routineManutentore', corpoManutentore({ passphrase }, 'registro', { parole }));
+  if (status === 200 && body && body.ok !== false) return body;
+  throw new Error(`Non riuscito: ${visibile((body && (body.detail || body.reason)) || `errore ${status}`)}`);
+}
+
+async function credenzialeDelloAmbiente() {
+  const { findAdminRefreshToken } = await import('./lib/firestore-auth.mjs');
+  return credenzialeDomande({ env: process.env, tokenAdmin: findAdminRefreshToken() || '' });
+}
+
 async function bigliettoDelGiro() {
   const { readTicket } = await import('./lib/routine-ticket.mjs');
   const { pinnedRepoRoot } = await import('./lib/tools-pin.mjs');
