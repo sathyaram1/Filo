@@ -331,3 +331,59 @@ test('biglietto nuovo dopo un tentativo morto: si riparte dalla sua punta, e all
     togliCartella(base);
   }
 });
+
+test('giro vero, tentativi nati tutti da main: la busta nomina quelli che il ramo nuovo non contiene', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, port } = await fintoServer();
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    tentativo(casa, ramo('20261101T000000Z'), main, 2);
+    const ultimo = tentativo(casa, ramo('20261102T000000Z'), main, 1);
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+    assert.equal(git(casa, 'rev-parse', 'HEAD'), ultimo);
+    assert.deepEqual(r.json.payload.ripartenza,
+      { ramo: ramo('20261102T000000Z'), commit: 1, altri: [{ ramo: ramo('20261101T000000Z'), commit: 2 }] });
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
+
+test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è la base e se ne va da origin', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, port } = await fintoServer();
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    tentativo(casa, ramo('20261101T000000Z'), main, 3);
+    const fuso = tentativo(casa, ramo('20261102T000000Z'), main, 1);
+    git(casa, 'merge', '-q', '--no-ff', '--no-edit', fuso);
+    git(casa, 'push', '-q', 'origin', 'main');
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+    assert.equal(r.json.payload.ripartenza, undefined, 'niente da riprendere: il lavoro vivo è già su main');
+    assert.equal(git(casa, 'rev-parse', 'HEAD'), git(casa, 'rev-parse', 'origin/main'));
+    assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il superato è chiuso');
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
+
+test('giro vero, origin che non risponde: il lavoro non parte da main, si ferma', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, mondo, port } = await fintoServer();
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    tentativo(casa, ramo('20261101T000000Z'), main, 2);
+    git(casa, 'remote', 'set-url', 'origin', resolve(base, 'non-esiste.git'));
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'halt', `il giro si ferma (uscita ${r.code}): ${r.se}`);
+    assert.match(r.json.message, /tentativi precedenti/);
+    assert.equal(git(casa, 'rev-parse', '--abbrev-ref', 'HEAD'), 'main', 'nessun ramo nuovo nato da main');
+    assert.equal(mondo.legato, '', 'nessuna presa in carico');
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
