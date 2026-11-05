@@ -764,7 +764,7 @@ async function handleAIRequest({ intera = false, conSeguito = false, ...opts }) 
     ContatoriServizio.misura('maiPartita', opts.action, e);
     throw e;
   }
-  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera });
+  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera, senzaSeguito: !conSeguito });
   if (taglio) throw taglio;
   return r;
 }
