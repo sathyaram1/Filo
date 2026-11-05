@@ -1,5 +1,5 @@
 // #2113: finish:check interrotto dal tetto di un comando in sottofondo si rilancia e riprende dagli spec non ancora
-// verdi sullo stesso commit; su un commit diverso si rifà tutto.
+// verdi sullo stesso contenuto, anche con le prove del giro committate nel frattempo; su un altro contenuto si rifà tutto.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -38,8 +38,8 @@ test('ripresa: rilanciato sullo stesso commit salta i lotti già verdi, su un al
     const terzo = memoriaSpecVerdi(dir, nuovo);
     assert.deepEqual(specDaRiprendere(specs, terzo.verdi).restano, specs);
     terzo.segna(['tests/board']);
-    assert.deepEqual([...leggiSpecVerdi(terzo.file, nuovo)], ['tests/board']);
-    assert.deepEqual([...leggiSpecVerdi(terzo.file, sha)], []);
+    assert.deepEqual([...leggiSpecVerdi(terzo.file, terzo.chiave)], ['tests/board']);
+    assert.deepEqual([...leggiSpecVerdi(terzo.file, primo.chiave)], []);
   } finally {
     togliCartella(dir);
   }

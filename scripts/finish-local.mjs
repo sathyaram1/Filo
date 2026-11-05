@@ -62,13 +62,15 @@
 //   campanello per la pagina già aperta (src/main/services/mergeApprovalSignal.js).
 
 import { execFileSync, spawnSync } from 'node:child_process';
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { readFileSync } from 'node:fs';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState, registraNelRegistro } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
+import { leggiSpecVerdi, segnaSpecVerdi } from './lib/spec-verdi.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
@@ -503,44 +505,44 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
 export { lottiPerRigaDiComando };
 
+const REPORTER_VERDI = join(ROOT, 'scripts', 'lib', 'reporter-spec-verdi.mjs');
+
 /**
  * Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. Nella cartella della
- * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
+ * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe. Con la memoria, ogni
+ * spec si segna verde appena passa (reporter-spec-verdi): un lotto rosso o ucciso a metà tiene i suoi verdi.
  */
 export function runSpecsALotti(specs, label, albero, memoria = null) {
   if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
   const { restano, saltati } = memoria ? specDaRiprendere(specs, memoria.verdi) : { restano: specs, saltati: [] };
   if (saltati.length) {
-    console.log(`\n▸ ${label}: ${saltati.length} già verdi su questo commit in un lancio precedente, non li rifaccio; ne restano ${restano.length}.`);
+    console.log(`\n▸ ${label}: ${saltati.length} già verdi su questo contenuto in un lancio precedente, non li rifaccio; ne restano ${restano.length}.`);
   }
   const lotti = lottiPerRigaDiComando(restano.map((s) => `${s}.spec.mjs`));
+  // Percorso relativo: Playwright lo risolve dalla cartella della prova, senza i guai di un assoluto Windows in import.
+  const daAlbero = relative(albero.dir, REPORTER_VERDI).split(sep).join('/');
+  const reporter = memoria ? [`--reporter=list,${daAlbero.startsWith('.') || isAbsolute(daAlbero) ? daAlbero : `./${daAlbero}`}`] : [];
+  const env = (base) => (memoria ? { ...(base || process.env), FILO_SPEC_VERDI_FILE: memoria.file, FILO_SPEC_VERDI_CHIAVE: memoria.chiave, FILO_SPEC_VERDI_RADICE: albero.dir } : base);
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...lotto]);
-    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env, albero.dir)) ok = false;
-    else if (memoria) memoria.segna(lotto.map((f) => f.replace(/\.spec\.mjs$/, '')));
+    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...reporter, ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, env(l.env), albero.dir)) ok = false;
   });
   return ok;
 }
 
-/**
- * Gli spec già verdi su `sha` in un lancio precedente: un controllo che supera il tetto di un comando in sottofondo
- * si rilancia e riparte da dove era (#2113). Di un altro commit non vale niente.
- */
-export function leggiSpecVerdi(file, sha) {
-  try {
-    const j = JSON.parse(readFileSync(file, 'utf8'));
-    return new Set(j && j.sha === sha && Array.isArray(j.verdi) ? j.verdi.map(String) : []);
-  } catch (_) { return new Set(); }
-}
+export { leggiSpecVerdi, segnaSpecVerdi };
 
-/** La memoria di un altro commit si butta. Una scrittura fallita costa solo la ripresa, non il controllo. */
-export function segnaSpecVerdi(file, sha, specs) {
-  const verdi = leggiSpecVerdi(file, sha);
-  for (const s of specs || []) verdi.add(String(s));
-  try { writeFileSync(file, JSON.stringify({ sha, verdi: [...verdi].sort() })); } catch (_) { /* si riparte da capo */ }
-  return verdi;
+/**
+ * Il contenuto di `sha` al netto delle prove del giro: chi verifica le committa mentre il controllo gira, e un
+ * rilancio dopo il tetto deve ripartire dai verdi lo stesso (#2113). Senza git vale il commit.
+ */
+export function chiaveDelContenuto(root, sha) {
+  const r = git(['ls-tree', '-r', '--full-tree', sha], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+  if (!r.ok) return sha;
+  const righe = r.out.split('\n').filter((l) => !l.split('\t')[1]?.startsWith('tests/verifica/'));
+  return createHash('sha1').update(righe.join('\n')).digest('hex');
 }
 
 /** PURA. */
@@ -552,12 +554,13 @@ export function specDaRiprendere(specs, verdi) {
   return { restano, saltati };
 }
 
-/** La memoria dei verdi di `sha`, nella cartella git di `root`: fuori dall'albero, mai committata. */
+/** La memoria dei verdi sul contenuto di `sha`, nella cartella git di `root`: fuori dall'albero, mai committata. */
 export function memoriaSpecVerdi(root, sha) {
   const r = git(['rev-parse', '--git-path', 'filo-spec-verdi.json'], { cwd: root });
   if (!r.ok || !r.out) return null;
   const file = resolve(root, r.out);
-  return { file, verdi: leggiSpecVerdi(file, sha), segna(specs) { this.verdi = segnaSpecVerdi(file, sha, specs); } };
+  const chiave = chiaveDelContenuto(root, sha);
+  return { file, chiave, verdi: leggiSpecVerdi(file, chiave), segna(specs) { this.verdi = segnaSpecVerdi(file, chiave, specs); } };
 }
 
 function readKnownRed(root) {
