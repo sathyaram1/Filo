@@ -45,7 +45,11 @@ async function prepara(app, { risposte, senzaFoto = false, correttore = false })
         return fine(tutto.includes('alle 18') ? '[alle 18][][Alle 18 di quale giorno?][suggerimento]' : '[][][][nessuno]');
       }
       const conFoto = tutto.includes('image_url');
-      globalThis.__chiamate.push({ model: attempts[0].model, messages: JSON.parse(tutto), conFoto });
+      // Si contano solo le chiamate dell'Aiuto: la dashboard della home parte da sola col modello della chat e, se
+      // arriva prima, passava per la domanda all'Aiuto (#1903.2).
+      const dellAiuto = messages[0] && messages[0].role === 'system'
+        && String(messages[0].content).includes('aiuta l\'utente a navigare/usare la pagina');
+      if (dellAiuto) globalThis.__chiamate.push({ model: attempts[0].model, messages: JSON.parse(tutto), conFoto });
       if (senzaFoto && conFoto) throw Object.assign(new Error('This model does not support image input'), { status: 400 });
       const ultimo = JSON.stringify(messages[messages.length - 1]);
       const scelta = risposte.find(([parola]) => ultimo.includes(parola)) || risposte[risposte.length - 1];
