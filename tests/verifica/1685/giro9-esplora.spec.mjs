@@ -65,6 +65,51 @@ test('E1 OK dato durante un\'altra risposta, poi un seguito: il seguito sa dell\
   }
 });
 
+test('E3 la ripresa dopo l\'OK fallisce, Riprova: il modello non legge la ripresa due volte', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaTemporanea('g9-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { text: 'Creo la cartella.', toolCalls: [mkdir('c1', dir, 'cinque')] },
+      { text: 'Aspetto il tuo OK.' },
+      { text: 'Fatto, cartella creata.' },
+      { text: 'Prego.' },
+    ]);
+    await app.evaluate(() => {
+      const f = globalThis.SN_PROVIDERS.streamCompleteWithFallback;
+      let k = 0;
+      globalThis.SN_PROVIDERS.streamCompleteWithFallback = async (o) => {
+        k += 1;
+        if (k === 3) { globalThis.__chatFinta_calls.push(JSON.parse(JSON.stringify(o.messages))); const e = new Error('Servizio non disponibile'); e.status = 503; throw e; }
+        return f(o);
+      };
+    });
+    await chiedi(page, 'crea la cartella cinque');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Aspetto il tuo OK' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await okAlBottone(page, page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Creo la cartella cinque' }));
+    const riprova = page.locator('.dash-action-btn', { hasText: 'Riprova' });
+    await expect(riprova).toBeVisible({ timeout: 15_000 });
+    console.log('BOLLE3a', await page.locator('.dash-bubble').allInnerTexts());
+    await riprova.click();
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatto, cartella creata' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await chiedi(page, 'grazie');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Prego' })).toBeVisible({ timeout: 15_000 });
+    const ch = await chiamateAlModello(app);
+    console.log('CHIAMATE3', ch.length);
+    for (const c of ch.slice(2)) console.log('RICH3', JSON.stringify(c.filter((m) => m.role !== 'system').map((m) => `${m.role}: ${typeof m.content === 'string' ? m.content.slice(0, 400) : JSON.stringify(m.content).slice(0, 400)}`), null, 1));
+    console.log('ARCHIVIO3', JSON.stringify(await messaggi(app, 'crea la cartella cinque'), null, 1));
+    console.log('BOLLE3', await page.locator('.dash-bubble').allInnerTexts());
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
 test('E2 un seguito scritto durante la ripresa dopo l\'OK: risposta una volta, tutto nella conversazione', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = cartellaTemporanea('g9-');
