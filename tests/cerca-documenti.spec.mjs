@@ -12,6 +12,7 @@ import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
 import { cartellaDellaProva, BOLLETTA_MARZO } from './helpers/documentiFinti.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { quadratoPronto } from './helpers/copione.mjs';
 
 const RICHIESTA = 'Mi serve la bolletta della luce di marzo. Dov\'è?';
 
