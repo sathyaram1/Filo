@@ -44,9 +44,9 @@ export function giudizioDelTesto(status, pipeline, fiducia) {
  */
 export function vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato = false } = {}) {
   const s = String(status || '').trim();
-  if (!FS.isCanonical(s)) return 'stato non decifrabile: non so se è segnalato come attacco';
+  const segnalato = vietatoNellIndice(s, pipeline);
+  if (segnalato) return segnalato;
   const g = giudizioDelTesto(s, pipeline, fiducia);
-  if (g.esito === 'segnalato') return `${g.motivo}: per regola una sessione non lo legge`;
   if (g.esito !== 'mai_giudicato' || ancheMaiGiudicato || !MR.isRicevutiStatus(s)) return '';
   const strada = s === 'unlabeled' ? 'In Gestione «Ri-valuta i non filtrati» lo manda ai giudici' : 'Decide l’owner, in Gestione';
   return `nei Ricevuti e mai passato dai giudici (${g.motivo}): per regola una sessione non lo legge. ${strada}; per leggerlo lo stesso, rilancia con ${ANCHE_MAI_GIUDICATO}`;
