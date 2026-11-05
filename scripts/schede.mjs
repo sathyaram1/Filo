@@ -139,7 +139,48 @@ export function riepilogo(indice, schede) {
   const per = (k) => schede.reduce((m, s) => ({ ...m, [s[k] ?? '?']: (m[s[k] ?? '?'] || 0) + 1 }), {});
   const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
   const daFare = (indice || []).filter((f) => daScrivere(f, mappa.get(f.num)));
-  return { aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length, valido: per('valido'), area: per('area') };
+  return {
+    aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length,
+    nonSalvate: schede.filter((s) => s && s[NON_SALVATA] === true).length, valido: per('valido'), area: per('area'),
+  };
+}
+
+// «Centinaia di aperti e nessuna scheda» (#2181): sotto questa soglia riscriverle tutte costa poco e può essere un inizio vero.
+export const SOGLIA_CENSIMENTO = 50;
+
+/**
+ * In una routine, una cartella senza schede su tanti aperti vuol dire feedback senza schede salvate, non schede da
+ * riscrivere: Haiku le rifarebbe tutte alla cieca. → '' se si può andare avanti, altrimenti il motivo. PURA.
+ */
+export function censimentoMancante({ via, indice, schede }) {
+  if (via !== 'cloud') return '';
+  const aperti = (indice || []).filter((f) => f && !f.segnalato).length;
+  const vere = (schede || []).filter((s) => s && !s[SEGNALATA]).length;
+  if (aperti < SOGLIA_CENSIMENTO || vere > 0) return '';
+  return [
+    `FERMO: la lettura dal server non ha portato nessuna scheda su ${aperti} feedback aperti, quindi i feedback non ne hanno di salvate`,
+    '(il server le dà a questo biglietto: fuori dai riservati la lettura sarebbe stata rifiutata).',
+    'Il censimento si porta nei feedback dalla macchina dell\'owner (elenca, poi scrivi: le schede della sua cartella si salvano senza agente);',
+    `riscriverle tutte da qui (${aperti} agenti) si fa solo deciso, con --da-zero. Intanto si decide sui titoli, e lo si dice nel recap.`,
+  ].join(' ');
+}
+
+/**
+ * Le schede della cartella buone e fresche che il feedback non ha (il censimento della fase 0, o un salvataggio perso):
+ * si segnano da mandare, e il prossimo `scrivi` le salva senza agente. `salvate`: i numeri che la lettura ha portato con
+ * la scheda. → quante segnate.
+ */
+export function segnaNonSalvate(cartella, indice, salvate) {
+  const perNum = new Map((indice || []).filter((f) => f && !f.segnalato).map((f) => [f.num, f]));
+  let segnate = 0;
+  for (const s of leggiSchede(cartella)) {
+    const num = String(s.numero || '').replace(/^#/, '');
+    const f = perNum.get(num);
+    if (!f || salvate.has(num) || s[NON_SALVATA] || s[RIFIUTATA] || s[SEGNALATA] || daScrivere(f, s)) continue;
+    writeFileSync(fileScheda(cartella, num), `${JSON.stringify({ ...s, [NON_SALVATA]: true }, null, 1)}\n`);
+    segnate += 1;
+  }
+  return segnate;
 }
 
 /** Lancia gli agenti al più `paralleli` alla volta; `lavora(voce)` → esito. */
