@@ -379,7 +379,7 @@ test('giro vero, origin che non risponde: il lavoro non parte da main, si ferma'
     git(casa, 'remote', 'set-url', 'origin', resolve(base, 'non-esiste.git'));
     const r = await giro(casa, port);
     assert.equal(r.json && r.json.role, 'halt', `il giro si ferma (uscita ${r.code}): ${r.se}`);
-    assert.match(r.json.message, /tentativi precedenti/);
+    assert.match(r.se, /GUASTO \(transient\): non riesco a chiedere a origin i tentativi precedenti/);
     assert.equal(git(casa, 'rev-parse', '--abbrev-ref', 'HEAD'), 'main', 'nessun ramo nuovo nato da main');
     assert.equal(mondo.legato, '', 'nessuna presa in carico');
   } finally {
