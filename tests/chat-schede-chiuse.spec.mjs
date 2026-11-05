@@ -268,15 +268,6 @@ test('r1 una riapertura dalla chat che non riesce lascia la scheda riapribile: Â
   await expect.poll(async () => (await archivio(app)).some((t) => t.url === url), { timeout: 10_000 }).toBe(true);
 
   // La prima riapertura non nasce (un sito bloccato nel frattempo, una finestra che si chiude).
-  const riprova = () => app.evaluate(async ({ BrowserWindow }, guasta) => {
-    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
-    if (guasta) {
-      const vera = tm.riapri;
-      tm.riapri = async () => { tm.riapri = vera; return null; };
-    }
-    const scelta = await tm.ultimaChiusaCheSuonava();
-    return scelta ? !!(await tm.riapriCheSuonava(scelta)) : null;
-  }, guasta => guasta);
   expect(await app.evaluate(async ({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     const vera = tm.riapri;
