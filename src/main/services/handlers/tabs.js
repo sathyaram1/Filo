@@ -239,9 +239,8 @@ module.exports = function register(on, ctx) {
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
       // Scroll e paese come li aveva: la stessa porta di Ctrl+Shift+T, che dopo questa non la riapre di nuovo.
-      const px = voce ? voce.proxy : msg && msg.proxy;
-      const id = await win._filoTabs.riapri(voce ? daArchivio(voce) : daArchivio({ url, scrollPosition: msg.scrollPct, proxy: px }));
-      if (id && voce) win._filoTabs.tornata(voce);
+      if (voce) await win._filoTabs.riapriDallArchivio(voce);
+      else await win._filoTabs.riapri(daArchivio({ url, scrollPosition: msg.scrollPct, proxy: msg && msg.proxy }));
     }
     return { ok: true };
   }));
