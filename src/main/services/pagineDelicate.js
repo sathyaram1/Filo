@@ -101,6 +101,32 @@ async function filtro(settingsIn) {
   return f;
 }
 
+// Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591), a regola delle
+// delicate accesa o spenta. Un nome di casa ancora da risolvere si aspetta.
+async function diCasa(url) {
+  const N = globalThis.SN_URL_NAV;
+  if (!url || !N) return false;
+  let h = '';
+  try { h = new URL(String(url)).hostname; } catch (_) {}
+  const inAttesa = h && typeof N.homeNetworkPending === 'function' && N.homeNetworkPending(h);
+  if (inAttesa) { try { await inAttesa; } catch (_) {} }
+  return Boolean(N.isHomeNetworkUrl(url));
+}
+
+// «Queste pagine possono andare a un modello senza una richiesta?» per i lavori che partono da soli (#1545, #1274.1):
+// null se sì, { casa: true } o { motivo } se una sola non può. Senza la regola, nel dubbio una pagina web è delicata.
+async function versoIlModello(urls, settings) {
+  const lista = (Array.isArray(urls) ? urls : [urls]).filter((u) => typeof u === 'string' && u);
+  for (const u of lista) if (await diCasa(u)) return { casa: true };
+  let f = null;
+  try { f = await filtro(settings); } catch (_) { f = null; }
+  for (const u of lista) {
+    const motivo = f ? f(u) : (PD.host(u) ? 'campi' : null);
+    if (motivo) return { motivo };
+  }
+  return null;
+}
+
 // I siti segnati per un campo password o carta che restano anche dopo un riavvio: quelli che l'utente vede in Sicurezza.
 // Quelli visti solo in incognito non ci sono, e non escono.
 async function elencoCampi() {
