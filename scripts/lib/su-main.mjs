@@ -144,8 +144,8 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
   esclusi.altri = [];
-  // I tentativi superati sono morti; dei vivi di un feedback si mostrano quelli che nessun altro contiene, come li
-  // sceglie la ripresa del lavoro (la regola sta in tentativi.mjs).
+  // I tentativi superati sono morti; dei vivi di un feedback si mostra quello che la ripresa del lavoro sceglierebbe
+  // (la regola sta in tentativi.mjs).
   const tutti = git(root, ['for-each-ref', '--format=%(refname:short)%09%(objectname)', 'refs/remotes/origin/worker']).split('\n')
     .map((r) => r.trim().split('\t')).filter(([ramo, head]) => ramo && head).map(([ramo, head]) => ({ ramo, head }));
   const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
