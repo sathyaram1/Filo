@@ -97,6 +97,7 @@ const listinoFinto = (app) => app.evaluate(async () => {
     }
     return vero(input, init);
   };
+  await process.mainModule.require('./services/costoModelli').listino({ forza: true });
 });
 const STIMA = /^Circa [\d.,]+ \$ al mese con 600 messaggi .*\d+ s/;
 
