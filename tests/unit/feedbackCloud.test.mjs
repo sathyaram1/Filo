@@ -622,6 +622,33 @@ async function canaleFinto(rispondi) {
   return { url: `http://127.0.0.1:${server.address().port}`, chiudi: () => new Promise((r) => server.close(r)) };
 }
 
+/**
+ * Il canale finto che tiene i feedback: `fb` è num → { updatedAt, status?, rifiutato?, scheda? }; `leggi` dà quello che
+ * hanno adesso, e una scheda salvata prende l'ora sua e aggiorna il feedback. `rifiuta(corpo)` → una risposta al posto del salvataggio.
+ */
+async function canaleConStato(fb, { rifiuta = () => null } = {}) {
+  const scritte = [];
+  let tick = 0;
+  const canale = await canaleFinto((b) => {
+    if (b.op === 'leggi') {
+      return { body: { ok: true, resto: [], voci: Object.entries(fb).map(([num, f]) => {
+        const riga = { _id: `f${num}`, seq: Number(num), subSeq: 0, status: f.status || 'todo', priority: null, updatedAt: f.updatedAt, waitsFor: [], unisce: [] };
+        if (f.rifiutato) return { num, id: `f${num}`, riga, rifiutato: f.rifiutato };
+        return { num, id: `f${num}`, riga: { ...riga, ...(f.scheda ? { schedaAt: f.updatedAt } : {}) }, ...(f.scheda ? { scheda: f.scheda } : {}) };
+      }) } };
+    }
+    if (b.op !== 'scheda') return { status: 400, body: { ok: false, reason: 'bad_request' } };
+    scritte.push(b.numero);
+    const no = rifiuta(b);
+    if (no) return no;
+    tick += 1;
+    const r = salvataDalServer(b, `2026-11-05T15:00:${String(tick).padStart(2, '0')}.000Z`);
+    fb[b.numero] = { ...fb[b.numero], updatedAt: r.aggiornato, scheda: r.scheda };
+    return { body: r };
+  });
+  return { ...canale, scritte };
+}
+
 function lanciaSchede(args, env) {
   return new Promise((ok) => {
     const f = spawn(process.execPath, [join(ROOT, 'scripts', 'schede.mjs'), ...args], { cwd: ROOT, env });
