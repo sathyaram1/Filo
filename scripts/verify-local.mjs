@@ -1418,12 +1418,7 @@ if (isMain) {
       if (verifierScope(scope).scope === 'pieno') scriviRichiesta(ROOT, { ramo: b, richiesta: request, radiceServer: srvStart && srvStart.sha ? srvStart.radice : '' });
       else togliRichiesta(ROOT);
     } catch (e) { console.error(`La richiesta per la lettura del diff non si scrive (${e.message}): la lettura non si potrà fare.`); }
-    console.log(buildVerifierBrief({
-      request, branch: b, recipe: readRecipe(ROOT, scope), history: historyFromRounds(state[b].rounds),
-      scope, perimetro: state[b].chiusura, server: srvStart,
-      // Senza pratica la richiesta l'ha scritta chi ha lanciato start; con una pratica di cui non si sa la fiducia, no.
-      fidata: !state[b].feedbackId || state[b].fiducia === 'fidato',
-    }));
+    console.log(compitoDelGiro(state[b], { branch: b, recipe: readRecipe(ROOT, scope), scope, server: srvStart }));
     // I bilanci servono a chi guida, non a chi verifica: sapere prima quanti
     // giri restano per livello orienta il livello che si scrive. Vanno
     // sull'altro canale, fuori dal compito che si consegna.
