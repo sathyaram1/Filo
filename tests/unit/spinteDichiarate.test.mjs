@@ -10,7 +10,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 
 import { join, resolve } from 'node:path';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 import { aspettaChe, TETTO_ATTESA_MS } from '../helpers/attese.mjs';
-import { scene, togliScene, runHookRaw, stdinEdit } from '../helpers/scenaHook.mjs';
+import { scene, togliScene, runHook, runHookRaw, stdinEdit } from '../helpers/scenaHook.mjs';
 import * as S from '../../scripts/lib/spinte.mjs';
 import { installaControlloSpedizione, installaSpinteServer, SEGNO_PRE_PUSH } from '../../scripts/lib/copie-di-dati.mjs';
 import { conSpinteDichiarate, consegnaCheSpinge, dichiaraSpintaServer } from '../../scripts/routine-channel.mjs';
