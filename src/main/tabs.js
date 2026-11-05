@@ -1788,9 +1788,7 @@ class TabManager {
 
   // SINCRONO: lo chiama will-navigate, dove non si può attendere lo storage.
   _ruleForUrl(url) {
-    if (!url || url.startsWith('filo://') || !/^https?:\/\//i.test(url)) return null;
-    const dom = Sito.voceSalvata(url, Object.keys(this._proxyRules || {}));
-    return (dom && this._proxyRules[dom]) || null;
+    return ProxyTab.regolaPer(url, this._proxyRules);
   }
 
   // NON blocca la navigazione: senza un fornitore configurato la pagina resta diretta, mai
