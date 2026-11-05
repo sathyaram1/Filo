@@ -1,11 +1,12 @@
 // L'icona di un sito per la home e la chat (#848): la copia già vista in una scheda aperta, o quella che Filo tiene per le pagine
-// salvate e archiviate (#1273); solo per un sito che Filo non ha fra le sue voci, /favicon.ico del sito stesso, senza cookie.
-// Mai un servizio di icone di terzi. Prove: tests/unit/iconeSiti.test.mjs, tests/icone-dei-siti.spec.mjs.
+// salvate e archiviate (#1273); solo per un sito che Filo non ha fra le sue voci, /favicon.ico del sito stesso, senza cookie e
+// mai per un sito con la regola del paese (#1273.3). Mai un servizio di icone di terzi. Prove: tests/unit/iconeSiti.test.mjs.
 
 'use strict';
 
 const IconaScheda = require('./iconaScheda');
 const Copie = require('./copieIcone');
+const ProxyTab = require('./proxyTab');
 
 // Oltre le prime tre copie per lo stesso sito c'è quasi sempre la stessa icona.
 const MAX_COPIE = 3;
@@ -51,7 +52,7 @@ const Vecchie = () => require('./iconeVecchie');
 
 function crea({
   adesso = () => Date.now(), iconaPer = IconaScheda.iconaPer, leggiCopia = Copie.comeDato,
-  completaVoci = () => Vecchie().completa(), daChiedere = (v) => Vecchie().daChiedere(v),
+  completaVoci = () => Vecchie().completa(), daChiedere = (v) => Vecchie().daChiedere(v), regole = ProxyTab.leggiRegole,
 } = {}) {
   const ricordate = new Map();
   const inCorso = new Map();
@@ -77,6 +78,10 @@ function crea({
     const chiave = `${incognito ? 'i' : 'n'}|${sito.host}`;
     const nota = ricordate.get(chiave);
     if (nota && nota.dato) return nota.dato;
+    // Un sito con la regola del paese esce solo dal proxy: dalla connessione vera niente, restano le copie già in casa.
+    let conRegola = true;
+    try { conRegola = !!ProxyTab.regolaPer(url, await regole()); } catch (_) {}
+    if (conRegola) soloCopie = true;
     const proprieDi = async () => {
       try { return (await voci()).filter((v) => v && stessoSito(v.url, sito)); } catch (_) { return []; }
     };

@@ -1,11 +1,12 @@
 // Le icone delle voci rimaste senza copia (salvate o archiviate prima del #1273, un link salvato, una scheda chiusa prima
-// che l'icona arrivasse): si chiedono una volta sola, senza cookie, e poi si tengono; quelle nate da una scheda col proxy
-// mai. Un data: URL rimasto nei dati diventa una copia, senza rete. Regole: copieIcone.js; prove: tests/unit/copieIcone.test.mjs.
+// che l'icona arrivasse): si chiedono una volta, senza cookie, e poi si tengono; mai per una voce nata da una scheda col proxy
+// o di un sito con la regola del paese. Un data: URL rimasto diventa una copia. Prove: tests/unit/copieIcone.test.mjs.
 
 'use strict';
 
 const IconaScheda = require('./iconaScheda');
 const Copie = require('./copieIcone');
+const ProxyTab = require('./proxyTab');
 
 const IN_PARALLELO = 4;
 // L'avvio non aspetta le icone: partono dopo, e una voce nuova da completare si unisce al giro dopo qualche secondo.
@@ -39,6 +40,7 @@ function crea({
   inLinea = () => require('electron').net.isOnline(),
   salvate = () => globalThis.SN_SAVED_PAGES,
   archivio = () => globalThis.SN_ARCHIVED_TABS,
+  regole = ProxyTab.leggiRegole,
 } = {}) {
   let corsa = null;
   let seguente = null;
@@ -50,6 +52,9 @@ function crea({
     const gruppi = [[S, S ? await S.list() : [], new Map()], [A, A ? await A.list() : [], new Map()]];
     const perIndirizzo = new Map();
     const online = inLinea();
+    // Senza le regole dei siti non si sa chi esce solo dal proxy: si convertono i dati, e la rete aspetta il giro dopo.
+    let leRegole = null;
+    try { leRegole = await regole(); } catch (_) {}
     for (const [, voci, esiti] of gruppi) {
       for (const v of voci) {
         const prima = statoIcona(v);
@@ -57,6 +62,9 @@ function crea({
           esiti.set(v.id, { prima, a: await Copie.conserva(v.favicon) });
           continue;
         }
+        // Un sito con la regola del paese esce solo dal proxy, da qualunque scheda sia nata la voce; la voce resta com'è,
+        // da chiedere se la regola cade.
+        if (!v.proxy && (!leRegole || ProxyTab.regolaPer(v.url, leRegole))) continue;
         const u = daChiedere(v);
         // Un indirizzo di prima di una scheda passata dal proxy non si segue: si toglie, e resta l'icona generica.
         if (!u) { if (v.faviconDaChiedere) esiti.set(v.id, { prima, a: '' }); continue; }

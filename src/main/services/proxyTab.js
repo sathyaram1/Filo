@@ -164,7 +164,23 @@ function reteDellaSessione(ses) {
   return v && v.rete ? { ...v.rete, auth: v.auth } : null;
 }
 
+// La regola «apri sempre da un altro paese» (#152) che vale per `url`, o null: la sceglie qui sia la scheda che naviga sia
+// chi decide se un sito si può contattare dalla connessione vera (#1273.3).
+function regolaPer(url, regole) {
+  if (!regole || !/^https?:\/\//i.test(String(url || ''))) return null;
+  const dom = require('../../shared/stessoSito').voceSalvata(String(url), Object.keys(regole));
+  return (dom && regole[dom] && regole[dom].country && regole[dom]) || null;
+}
+
+// Le regole lette dalla memoria di Filo. Un errore si propaga: chi le chiede per contattare un sito, nel dubbio non lo contatta.
+async function leggiRegole() {
+  const FM = globalThis.SN_FILO_MEMORY;
+  return (FM && (await FM.listProxyRules())) || {};
+}
+
 module.exports = {
+  regolaPer,
+  leggiRegole,
   LOCATIONS,
   TIERS,
   normalizeCountry,
