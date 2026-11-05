@@ -2261,7 +2261,7 @@ function positionOnBranch(bucket) {
   // Un lavoro nuovo nasce dalla punta del tentativo precedente rimasto su origin, se c'è, se no dalla linea principale:
   // così non si rifà, e il ramo superato diventa antenato del nuovo e se ne va con lui alla fusione (#2152).
   // Le basi feature/N del Modello B restano abolite (SPEC-RIDISEGNO-MAX.md §1).
-  const precedenti = isNew ? tentativiPrecedenti({ root: ROOT, id: bucket.id, mainBranch: MAIN_BRANCH, escludi: branch }) : { ok: true, scelto: null, altri: [] };
+  const precedenti = isNew ? tentativiPrecedenti({ root: ROOT, id: bucket.id, num: bucket.num, mainBranch: MAIN_BRANCH, escludi: branch }) : { ok: true, scelto: null, altri: [] };
   if (!precedenti.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin i tentativi precedenti di ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${precedenti.errore}` };
   const res = prepareBranch({
     root: ROOT,
