@@ -229,8 +229,9 @@ test('la barra dei menu del Mac chiama la stessa porta', () => {
   const menu = sorgente('src', 'main', 'menu.js');
   assert.match(menu, /label: 'Indietro'/);
   assert.match(menu, /label: 'Avanti'/);
-  assert.match(menu, /navigaCronologia\('indietro'/);
-  assert.match(menu, /navigaCronologia\('avanti'/);
+  assert.match(menu, /c\.tabs\.navigaCronologia\(verso, c\.tab\.id\)/);
+  assert.match(menu, /muovi\('indietro', ev\)/);
+  assert.match(menu, /muovi\('avanti', ev\)/);
   // Il nome del tasto non si scrive a mano nemmeno qui.
   assert.match(menu, /acceleratoreElectron/);
 });

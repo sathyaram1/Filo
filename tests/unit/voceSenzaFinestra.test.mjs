@@ -1,5 +1,5 @@
 // #2031 — Su Mac, con Filo acceso senza finestre con schede, le voci della barra che aprono qualcosa la ridanno.
-// Qui la regola di src/main/window.js (rifaiFinestraPerUnaVoce, quandoPronta); il percorso vero: tests/seconda-apertura.spec.mjs.
+// Qui la regola di src/main/window.js (ridaiFinestraNormale, quandoPronta); il percorso vero: tests/seconda-apertura.spec.mjs.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -49,7 +49,7 @@ Module._load = origLoad;
 const carica = async (w) => { for (const cb of w.una['did-finish-load'] || []) await cb(); };
 
 test('prima che l\'avvio abbia fatto la sua finestra, una voce della barra non ne fa un\'altra', () => {
-  assert.equal(W.rifaiFinestraPerUnaVoce(), null);
+  assert.equal(W.ridaiFinestraNormale(), null);
   assert.equal(nate.length, 0, 'due finestre all\'avvio: quella della voce e quella dell\'avvio');
 });
 
@@ -58,7 +58,7 @@ test('chiusa la principale, la voce la ridà e aspetta le schede riaperte prima 
   finestre = [];
   nate.length = 0;
   daRidare = true;
-  const win = W.rifaiFinestraPerUnaVoce();
+  const win = W.ridaiFinestraNormale();
   assert.equal(nate.length, 1, 'senza finestre con schede la voce non fa niente');
   let esito = 'in attesa';
   W.quandoPronta(win).then((e) => { esito = e; });
@@ -67,13 +67,13 @@ test('chiusa la principale, la voce la ridà e aspetta le schede riaperte prima 
   await carica(win);
   await new Promise((r) => setImmediate(r));
   assert.deepEqual(esito, { ripristinata: true });
-  assert.equal(W.rifaiFinestraPerUnaVoce(), win, 'con la finestra viva non ne nasce un\'altra');
+  assert.equal(W.ridaiFinestraNormale(), win, 'con la finestra viva non ne nasce un\'altra');
 });
 
 test('senza schede da ridare la finestra nasce con la sua scheda nuova, e lo dice', async () => {
   finestre = [];
   daRidare = false;
-  const win = W.rifaiFinestraPerUnaVoce();
+  const win = W.ridaiFinestraNormale();
   await carica(win);
   assert.deepEqual(await W.quandoPronta(win), { ripristinata: false });
   assert.deepEqual(win._filoTabs.tabs, ['filo://newtab/']);
@@ -81,7 +81,7 @@ test('senza schede da ridare la finestra nasce con la sua scheda nuova, e lo dic
 
 test('chiusa prima di essere pronta, chi aspetta non resta appeso', async () => {
   finestre = [];
-  const win = W.rifaiFinestraPerUnaVoce();
+  const win = W.ridaiFinestraNormale();
   win.distrutta = true;
   for (const cb of win.una['win:closed'] || []) cb();
   assert.equal(await W.quandoPronta(win), null);

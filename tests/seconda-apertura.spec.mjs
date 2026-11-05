@@ -34,7 +34,8 @@ const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
   return {
     normali: normali.length,
     incognito: vive.filter((w) => w._filoIncognito).length,
-    accesso: base ? vive.filter((w) => !w._filoTabs && w.webContents.getURL().startsWith(base)).length : 0,
+    // Una finestrella a metà chiusura lancia a chi le chiede l'indirizzo: conta come chiusa.
+    accesso: base ? vive.filter((w) => { try { return !w._filoTabs && w.webContents.getURL().startsWith(base); } catch (_) { return false; } }).length : 0,
     normale: normale ? {
       visibile: normale.isVisible(),
       // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
@@ -220,7 +221,8 @@ test('su Mac, senza la finestra principale, «Riapri scheda chiusa» la ridà co
   expect((await stato(app, accesso)).normali).toBe(1);
 });
 
-for (const [voce, davanti] of [['Cronologia AI', /^filo:\/\/history\//], ['Vai a un indirizzo', null]]) {
+// La barra laterale e l'Aiuto sono della finestra, non della pagina: anche con la finestrella davanti la ridanno.
+for (const [voce, davanti] of [['Cronologia AI', /^filo:\/\/history\//], ['Barra laterale', null], ['Assistente laterale', null]]) {
   test(`su Mac, senza la finestra principale, «${voce}» la ridà con le sue schede`, async ({ app, shell, openTab, testServer }) => {
     const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
     await voceDellaBarra(app, voce);
@@ -229,6 +231,64 @@ for (const [voce, davanti] of [['Cronologia AI', /^filo:\/\/history\//], ['Vai a
     expect((await stato(app, accesso)).normali).toBe(1);
   });
 }
+
+const fuocoDavanti = (app) => app.evaluate(async ({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+  const t = w && w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId);
+  try { return await t.view.webContents.executeJavaScript('document.activeElement && document.activeElement.id', false); } catch (_) { return ''; }
+});
+
+test('su Mac, senza la finestra principale, «Vai a un indirizzo» la ridà e apre accanto la home col cursore nel campo', async ({ app, shell, openTab, testServer }) => {
+  const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+  await voceDellaBarra(app, 'Vai a un indirizzo');
+  await tornaLaFinestra(app, accesso, negozio, '«Vai a un indirizzo» senza finestra non ha ridato Filo con le sue schede');
+  await expect.poll(() => attiva(app), { message: 'davanti non c\'è la home dove si scrive l\'indirizzo', timeout: 10000 }).toMatch(/^filo:\/\/newtab\//);
+  await expect.poll(() => fuocoDavanti(app), { message: 'il cursore non è nel campo dove si scrive', timeout: 10000 }).toBe('input');
+  expect((await stato(app, accesso)).normale.schede, 'la scheda riaperta non deve sparire sotto la home').toContain(negozio);
+});
+
+// Chiusa anche la finestrella, le voci della scheda non hanno niente su cui agire: ridanno la finestra.
+for (const voce of ['Ricarica', 'Schermo intero', 'Indietro']) {
+  test(`su Mac, senza nessuna finestra, «${voce}» ridà Filo con le sue schede`, async ({ app, shell, openTab, testServer }) => {
+    const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+    // Come su Mac, dove chiusa l'ultima finestra Filo resta acceso.
+    await app.evaluate(({ app: a, BrowserWindow }) => {
+      a.removeAllListeners('window-all-closed');
+      a.on('window-all-closed', () => {});
+      for (const w of BrowserWindow.getAllWindows()) if (!w._filoTabs) w.close();
+    });
+    // Una finestrella a metà chiusura lancia a chi le chiede l'indirizzo: qui si contano solo le vive.
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .filter((w) => { try { return !w.isDestroyed() && !w._filoTabs; } catch (_) { return false; } }).length), { timeout: 10000 }).toBe(0);
+    await voceDellaBarra(app, voce);
+    await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [],
+      { message: `«${voce}» senza finestre non ha ridato Filo con le sue schede`, timeout: 15000 }).toContain(negozio);
+    expect((await stato(app, accesso)).errori).toEqual([]);
+  });
+}
+
+// Con la finestrella di accesso davanti le voci della scheda agiscono su di lei: il sito dietro aspetta l'accesso.
+test('su Mac, con la finestrella di accesso davanti, «Chiudi scheda» chiude lei e non il sito che aspetta', async ({ app, openTab, testServer }) => {
+  const { accesso, negozio: html } = negozioConAccesso(testServer);
+  await sentinella(app);
+  const page = await testServer.openReady(openTab, html);
+  const negozio = page.url();
+  await page.click('#b');
+  await expect.poll(async () => (await stato(app, accesso)).accesso, { timeout: 10000 }).toBe(1);
+  const davanti = (a) => app.evaluate(({ BrowserWindow }, b) => {
+    const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && w.webContents.getURL().startsWith(b));
+    f.show(); f.focus();
+    return BrowserWindow.getFocusedWindow() === f;
+  }, a);
+  await expect.poll(() => davanti(accesso), { message: 'la finestrella non è andata davanti', timeout: 5000 }).toBe(true);
+  for (const voce of ['Ricarica', 'Indietro', 'Annulla']) await voceDellaBarra(app, voce);
+  await new Promise((r) => setTimeout(r, 800));
+  expect((await stato(app, accesso)).normale.schede, 'una voce ha toccato il sito dietro la finestrella').toContain(negozio);
+  await voceDellaBarra(app, 'Chiudi scheda');
+  await expect.poll(async () => (await stato(app, accesso)).accesso, { message: 'Cmd+W non ha chiuso la finestrella davanti', timeout: 10000 }).toBe(0);
+  expect((await stato(app, accesso)).normale.schede, 'Cmd+W ha chiuso il sito dietro la finestrella').toContain(negozio);
+  expect((await stato(app, accesso)).errori).toEqual([]);
+});
 
 // La finestra ora c'è mentre gli init lavorano: chi la chiude subito non deve trovare la sessione svuotata.
 test('chiuso appena compare la finestra, prima che le schede tornino, Filo non perde le schede salvate', async () => {
