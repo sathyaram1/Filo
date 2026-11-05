@@ -69,6 +69,43 @@ test('al secondo avvio il codice del main arriva già compilato dalla cartella d
   }
 });
 
+// L'app installata gira dall'archivio app.asar, coi file che il pacchetto ci mette: la cache deve attecchire anche lì.
+async function archivio(base) {
+  const { createPackage } = require('@electron/asar');
+  const dentro = join(base, 'dentro');
+  const res = join(base, 'resources');
+  mkdirSync(res, { recursive: true });
+  for (const d of ['src', 'assets', 'generato']) {
+    if (existsSync(join(APP_ROOT, d))) cpSync(join(APP_ROOT, d), join(dentro, d), { recursive: true });
+  }
+  cpSync(join(APP_ROOT, 'package.json'), join(dentro, 'package.json'));
+  await createPackage(dentro, join(res, 'app.asar'));
+  // Le dipendenze accanto all'archivio: la risoluzione dei moduli ci arriva risalendo da dentro app.asar.
+  symlinkSync(join(APP_ROOT, 'node_modules'), join(res, 'node_modules'), 'junction');
+  return join(res, 'app.asar');
+}
+
+test('dall\'archivio del pacchetto il secondo avvio prende il codice già compilato', async () => {
+  test.setTimeout(240_000);
+  const base = cartellaTemporanea('filo-cache-asar-');
+  const userData = join(base, 'dati');
+  mkdirSync(userData, { recursive: true });
+  const dalLoaderNellArchivio = /V8 code cache for CommonJS [^\n]*app\.asar[\\/]src[\\/]main[\\/]services[\\/]loader\.js[^\n]*was accepted/;
+  let filo = null;
+  try {
+    const asar = await archivio(base);
+    filo = avvia(userData, asar);
+    await expect.poll(() => delLoader('scritto').test(filo.log()), { timeout: 90_000, message: 'il primo avvio dall\'archivio non ha scritto la cache' }).toBe(true);
+    await filo.chiudi();
+    filo = avvia(userData, asar);
+    await expect.poll(() => dalLoaderNellArchivio.test(filo.log()), { timeout: 90_000, message: 'il secondo avvio dall\'archivio ha ricompilato il loader' }).toBe(true);
+    await expect.poll(() => accettati(filo.log()), { timeout: 30_000, message: 'i moduli dell\'archivio vengono dalla cache' }).toBeGreaterThan(150);
+  } finally {
+    if (filo) await filo.chiudi();
+    togliCartella(base);
+  }
+});
+
 test('con NODE_DISABLE_COMPILE_CACHE la cache resta spenta e Filo parte lo stesso', async () => {
   test.setTimeout(120_000);
   const userData = cartellaTemporanea('filo-cache-spenta-');
