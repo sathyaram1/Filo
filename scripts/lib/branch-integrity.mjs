@@ -149,14 +149,16 @@ export function tentativiPrecedenti({ root, id, mainBranch = 'main', escludi = '
   const rami = String(elenco).split('\n').map((r) => r.trim().split(/\s+/)).filter((p) => p.length === 2)
     .map(([head, ref]) => ({ head, ramo: ref.replace(/^refs\/heads\//, '') }))
     .filter((t) => t.ramo !== escludi && stampoDelTentativo(t.ramo, id));
-  if (!rami.length) return { ok: true, scelto: null, altri: [] };
+  if (!rami.length) return { ok: true, scelto: null, altri: [], superati: [] };
   const g = gitIn(root);
   // Refspec esplicita: in un clone a ramo singolo `fetch origin <ramo>` scriverebbe solo FETCH_HEAD.
   const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`,
     ...rami.map((t) => `+refs/heads/${t.ramo}:refs/remotes/origin/${t.ramo}`)]);
   if (!f.ok) return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
   const main = `origin/${mainBranch}`;
-  const vivi = rami.filter((t) => !antenato(g, t.head, main)).map((t) => {
+  const conFusi = rami.map((t) => ({ ...t, fuso: antenato(g, t.head, main) }));
+  const superati = tentativiSuperati(conFusi);
+  const vivi = conFusi.filter((t) => !t.fuso && !superati.has(t.ramo)).map((t) => {
     const n = g(['rev-list', '--count', `${main}..${t.head}`]);
     return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
   });
