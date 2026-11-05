@@ -407,6 +407,8 @@ test('scrivi: un segnalato dell’indice non lancia l’agente e il comando chiu
     const bin = join(dir, 'claude');
     writeFileSync(bin, `#!/usr/bin/env node\nrequire('fs').writeFileSync(${JSON.stringify(segno)}, '1'); process.exit(1);\n`);
     chmodSync(bin, 0o755);
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f813', num: '813', stato: 'attack', priorita: null,
+      aggiornato: '2026-10-29T10:00:00.000Z', attese: [], unisce: [], segnalato: 'è segnalato come attacco («attack»)' }]));
     const canale = await canaleConStato({ 813: { updatedAt: '2026-10-29T10:00:00.000Z', status: 'attack', rifiutato: 'è segnalato come attacco («attack»)' } });
     const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_CLAUDE_BIN: bin, FILO_ROUTINE_API: canale.url };
     const r = await lanciaSchede(['scrivi', '--cartella', cartella], env);
