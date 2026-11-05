@@ -655,6 +655,30 @@
     return normalizeFindings(findings).some((f) => f.decision);
   }
 
+  // Le frasi sui bilanci stanno qui sole: le stampano anche dispatch e la verifica locale.
+  const RILIEVI_CHE_FERMANO = 'Rilievi interni che non si possono correggere da soli (un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3 o su una scelta difficile da disfare): decide l\'owner.';
+
+  /** La riga sui 2 interni messi da parte (finiti i bilanci dal 2 in giù), o ''. Un vicino scritto 2 non è il caso. PURA. */
+  function dueDaParteRiga(list) {
+    const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i' && f.decision !== true).length;
+    if (!n) return '';
+    return `I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: ${n === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${n} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`;
+  }
+
+  /**
+   * La riga che dice quale bilancio ha pagato il giro quando non è quello del
+   * rilievo interno più grave corretto (D88), o '': senza, un 2 corretto a
+   * bilancio dei 2 finito sembra un conto sbagliato. PURA.
+   */
+  function bilancioPagato(decision) {
+    const d = decision || {};
+    if (!CAP_KEYS.includes(d.consume)) return '';
+    const paga = Number(d.consume.slice(3));
+    const grave = livelloDegliInterni(d.fix);
+    if (grave === null || grave <= paga) return '';
+    return `Il giro lo paga il bilancio del livello ${paga}: ${grave - paga === 1 ? `quello del livello ${grave} è finito` : `quelli dei livelli da ${grave} a ${paga + 1} sono finiti`}.`;
+  }
+
   // La nota per la chat del feedback: zero rilievi = superata; altrimenti l'elenco, e cosa
   // ne è stato fatto.
   function roundNote({ summary, findings, decision } = {}) {
