@@ -703,7 +703,7 @@
   // Dentro il campo uno strato prende il cursore e il testo dell'utente, e parte col modulo: col corpo modificabile
   // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
   function casaDegliStrati(el) {
-    return radiceDi(el) || (el.contains(document.body) ? document.documentElement : document.body);
+    return radiceDi(el) || (el === document.body || el === document.documentElement ? document.documentElement : document.body);
   }
 
   // ============================================================================
