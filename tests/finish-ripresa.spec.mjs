@@ -76,7 +76,7 @@ test('un lotto ucciso a metà dal tetto del comando tiene gli spec già passati'
   test.setTimeout(240_000);
   const { dir, g } = alberoConDueSpec('lento');
   try {
-    const figlio = spawn(process.execPath, [scriptLancio(dir)], { cwd: dir, stdio: 'ignore', detached: true });
+    const figlio = spawn(process.execPath, [scriptLancio(dir)], { cwd: dir, stdio: 'ignore', detached: true, windowsHide: true });
     const scadenza = Date.now() + 150_000;
     while (!existsSync(join(dir, 'a-fatto')) && Date.now() < scadenza) await new Promise((r) => setTimeout(r, 500));
     expect(existsSync(join(dir, 'a-fatto')), 'lo spec verde ha girato').toBe(true);
