@@ -997,8 +997,7 @@ di decifratura, quindi li dà il server.
 - **Due strade, stessa uscita**: `npm run feedback:leggi` e `npm run
   feedback:schede` passano dal server in una routine (`isRoutineInstance`) col
   biglietto, dal token dell'owner altrimenti (`scripts/lib/feedback-cloud.mjs`).
-  Il server rimanda campi in chiaro e la cornice la mette l'app su tutte e due;
-  dal server le attese arrivano senza il loro stato, che si stampa «non letto».
+  Il server rimanda campi in chiaro e la cornice la mette l'app su tutte e due.
 - **La cartella delle schede è una copia**: quello che conta è la scheda nel
   feedback. `elenca` scrive nell'indice l'ora della scheda che ogni feedback ha
   (`nelFeedback`), ed `elenca`, `scrivi` e `rileggi` mandano, senza agente, le

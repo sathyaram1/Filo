@@ -221,11 +221,8 @@ const DAL_CLOUD = 'dal cloud arrivano solo gli allegati testuali';
 export function fbDaVoce(v) {
   const r = (v && v.riga) || {};
   const t = (v && v.testi) || {};
-  const ATT = globalThis.SN_FB_ATTESE;
   return {
     _id: String((v && v.id) || ''), seq: Number(r.seq) || null, subSeq: Number(r.subSeq) || 0, status: String(r.status || '').trim(),
-    // Dal server arrivano i numeri delle attese, non il loro stato: «stato non letto», come una lettura locale fallita.
-    attese: ATT.atteseDi({ [ATT.CAMPO]: r[ATT.CAMPO] }).map((w) => ({ ...w, stato: ATT.STATO.IGNOTO })),
     name: String(t.name || ''), url: String(t.url || ''), text: String(t.text || ''), notes: String(t.notes || ''),
     clientId: String(t.clientId || ''), senderProof: String(t.senderProof || ''),
     ...(t.localApproval && t.localApproval.by ? { localApproval: { by: String(t.localApproval.by) } } : {}),
