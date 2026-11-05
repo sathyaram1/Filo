@@ -50,7 +50,7 @@ export function vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato = 
   const g = giudizioDelTesto(s, pipeline, fiducia);
   if (g.esito !== 'mai_giudicato' || ancheMaiGiudicato || !MR.isRicevutiStatus(s)) return '';
   const strada = s === 'unlabeled' ? 'In Gestione «Ri-valuta i non filtrati» lo manda ai giudici' : 'Decide l’owner, in Gestione';
-  return `nei Ricevuti e mai passato dai giudici (${g.motivo}): per regola una sessione non lo legge. ${strada}; per leggerlo lo stesso, rilancia con ${ANCHE_MAI_GIUDICATO}`;
+  return `nei Ricevuti e mai passato dai giudici (${g.motivo}): per regola una sessione non lo legge. ${strada}`;
 }
 
 export const ANCHE_MAI_GIUDICATO = '--anche-mai-giudicato';
