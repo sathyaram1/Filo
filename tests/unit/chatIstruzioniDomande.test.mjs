@@ -41,6 +41,13 @@ test('una mancanza si ammette solo dopo aver chiamato lo strumento che legge que
 test('chiavi delle impostazioni e id delle capacità non finiscono nel testo per l\'utente', () => {
   const r = riga('Mai JSON nel testo');
   assert.match(r, /chiavi delle impostazioni, gli id fra parentesi quadre delle capacità/);
+  assert.match(r, /nemmeno fra parentesi accanto al nome giusto e nemmeno se l'utente sviluppa Filo/);
+  // Le chiavi il modello le legge negli strumenti delle impostazioni: lì il richiamo sta accanto all'elenco.
+  require('../../src/shared/actionLevels.js');
+  require('../../src/shared/actionTools.js');
+  const desc = (n) => globalThis.SN_ACTION_TOOLS.definitions().find((d) => d.function.name === n).function.description;
+  assert.match(desc('IMPOSTA_PREFERENZA'), /le chiavi servono alla chiamata, all'utente dici la voce a parole/);
+  assert.match(desc('LEGGI_IMPOSTAZIONI'), /la chiave serve alle tue chiamate: all'utente dici il nome della voce/);
   // L'esempio della regola è una chiave vera: se sparisse dall'elenco, l'esempio insegnerebbe un nome che non c'è.
   const esempio = r.match(/non «([a-z_]+)»/)[1];
   const chiavi = globalThis.SN_PREF.righeDescrizione({}).map((l) => (l.match(/^• ([^:]+):/) || [])[1]);

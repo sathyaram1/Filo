@@ -300,7 +300,7 @@
       risultato: true,
     },
     LEGGI_IMPOSTAZIONI: {
-      description: 'Legge com\'è impostato Filo ADESSO: il valore vero di ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro (anche i permessi dati ai siti), con la chiave per cambiarla. '
+      description: 'Legge com\'è impostato Filo ADESSO: il valore vero di ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro (anche i permessi dati ai siti), con la chiave per cambiarla (la chiave serve alle tue chiamate: all\'utente dici il nome della voce). '
         + 'Usalo SEMPRE prima di rispondere a «com\'è impostato X?», «è attivo il blocco della pubblicità?», «che tema ho?», «quali siti ho bloccato?», '
         + 'e prima di un cambio relativo («un po\' più veloce»): non rispondere a memoria né dai valori di serie. Sola lettura. '
         + 'Le chiavi API non tornano mai: solo se ci sono.',
@@ -484,7 +484,7 @@
         const righe = P && typeof P.righeDescrizione === 'function'
           ? P.righeDescrizione({ shellPref: SHELL_AMMESSE }) : [];
         return 'Modifica un\'impostazione dell\'app: ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro ha la sua chiave qui sotto. '
-          + 'Una sola chiave per chiamata (chiama più volte per più impostazioni). Per le impostazioni segnate [conferma] il sistema può '
+          + 'Una sola chiave per chiamata (chiama più volte per più impostazioni); le chiavi servono alla chiamata, all\'utente dici la voce a parole. Per le impostazioni segnate [conferma] il sistema può '
           + 'chiedere l\'OK all\'utente da sé: tu non chiederlo a parole. Il livello di autonomia di Filo non è fra queste: lo sceglie solo '
           + 'l\'utente, in Preferenze. Per un cambio relativo («un po\' più veloce») '
           + 'o per dire com\'era prima, leggi il valore attuale con LEGGI_IMPOSTAZIONI. Chiavi valide e valori ammessi:\n'
