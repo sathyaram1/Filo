@@ -125,6 +125,9 @@ test('sul registro vero: una riga aggiunta sotto l\'ultima versione uscita finis
   // Tutto il resto è com'era.
   const senza = JSON.parse(JSON.stringify(dopo));
   senza[0].features = senza[0].features.filter((t) => t !== 'Riga tardiva di prova');
+  // Un blocco in cima con le sole correzioni riceve da spostaInCima un `features` nuovo: tolta la riga, l'elenco non c'era (#2168).
+  const cimaPrima = prima.find((n) => n.version === senza[0].version);
+  if (!senza[0].features.length && !(cimaPrima && cimaPrima.features)) delete senza[0].features;
   assert.deepEqual(senza.filter((n) => (n.features || []).length + (n.fixes || []).length), JSON.parse(JSON.stringify(prima)));
 });
 
