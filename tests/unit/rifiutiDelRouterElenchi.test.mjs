@@ -63,10 +63,13 @@ test('ogni elenco che nomina NO_TOOL_HOST o TETTO_RISPOSTA nomina anche PARAMETR
 
 test('i contatori anonimi contano PARAMETRI_HOST come «nessun host», non come guasto generico', () => {
   require('../../src/shared/contatoriGiornalieri.js');
+  require('../../src/shared/contatoriServizio.js');
   const C = globalThis.SN_CONTATORI;
   const e = Object.assign(new Error('No endpoints found that can handle the requested parameters.'), { code: 'PARAMETRI_HOST', status: 404 });
   assert.equal(C.tipoErroreVisto(e), 'nessun_host');
   assert.equal(C.tipoErrore(e), 'nessun_host');
+  // Il contatore del servizio lo conta col suo motivo (firestore.rules lo ammette: tests/unit/firestoreRulesContatoriServizio).
+  assert.equal(globalThis.SN_CONTATORI_SERVIZIO.motivoNessunHost(e), 'parametri_host');
 });
 
 test('il filtro della ricerca dei mazzi non riprova un lotto che il router rifiuta per un parametro', async () => {

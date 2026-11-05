@@ -19,7 +19,7 @@
   // Il «nessun host ammesso»: i motivi di NO_ALLOWED_HOST (hostVerdict, nessunHostAmmesso, nessunHostZdr,
   // produttoreNonRisponde, erroreCrediti) e i codici del rifiuto del router, in minuscolo.
   const MOTIVI_HOST = Object.freeze(['excluded', 'mixed', 'unknown', 'zdr', 'zdrmixed', 'zdrunknown', 'produttore', 'crediti']);
-  const CODICI_HOST = Object.freeze(['data_policy', 'no_provider_allowed', 'model_unavailable', 'no_tool_host']);
+  const CODICI_HOST = Object.freeze(['data_policy', 'no_provider_allowed', 'model_unavailable', 'no_tool_host', 'parametri_host']);
   const MOTIVI_NESSUN_HOST = Object.freeze([...MOTIVI_HOST, ...CODICI_HOST, ALTRO]);
   const MOTIVI_ZDR = Object.freeze(['zdr', 'zdrmixed', 'zdrunknown']);
   // «Solo pesi aperti» (applyOpenWeightsPolicy e openWeightsBlockKind, src/shared/constants.js).
