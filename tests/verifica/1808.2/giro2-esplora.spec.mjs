@@ -111,7 +111,8 @@ test('forum rimandato indietro: varianti di invio e di testo', async ({ app, she
       await page.locator('#pub').click();
       await expect.poll(() => titoloDi(shell, id), { timeout: 10_000 }).toBe(`Rispondi${kk}`);
       await page.waitForTimeout(800);
-      const p2 = app.windows().find((w) => { try { return w.url().endsWith('/forum'); } catch (_) { return false; } });
+      let p2 = null;
+      for (const w of app.windows()) { try { if (w.url().endsWith('/forum') && (await w.title()) === `Rispondi${kk}`) p2 = w; } catch (_) {} }
       await p2.locator('#cap').click();
       await p2.keyboard.type('42');
       await p2.locator('#pub').click();
