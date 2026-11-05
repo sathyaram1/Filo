@@ -218,7 +218,7 @@ test('«riaprila» su una pagina già aperta scritta con la barra finale o il si
   await ripristina(app);
 });
 
-test('r2 una pagina delicata chiusa arriva al modello solo col sito, nella ricerca e nella riapertura', async ({ app, shell, openTab, testServer }) => {
+test('una pagina delicata chiusa arriva al modello solo col sito, nella ricerca e nella riapertura', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
   // 127.0.0.1 è della rete di casa: per Filo una pagina delicata, come la posta o la banca.
