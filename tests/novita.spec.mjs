@@ -56,7 +56,10 @@ test('sul registro vero: almeno due versioni dalla più recente, e una parola tr
   const trovata = riga(page, 'riapre l\'ultima scheda chiusa');
   await expect(trovata).toBeVisible();
   await expect(trovata.locator('xpath=ancestor::section[1]')).toHaveAttribute('data-versione', '0.2.251');
-  for (const t of await page.locator('.nv-riga').allInnerTexts()) expect(t.toLowerCase()).toContain('ultima scheda chiusa');
+  // Il filtro vuole tutte le parole, non la frase intera: il registro vero può avere altre righe con le stesse tre.
+  for (const t of await page.locator('.nv-riga').allInnerTexts()) {
+    for (const parola of ['ultima', 'scheda', 'chiusa']) expect(t.toLowerCase()).toContain(parola);
+  }
   expect(await page.locator('.nv-riga').count()).toBeLessThan(10);
   expect(await page.evaluate(() => CSS.highlights.get('nv-trovato')?.size || 0)).toBeGreaterThan(0);
   mkdirSync(SHOTS, { recursive: true });
