@@ -1,8 +1,13 @@
 // Verifica #2191, giro 1: invito su finestra rinata (Crediti davanti) e sessione non riscritta da una finestra chiusa.
 
-import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { test, expect, aspettaFinestra } from '../../fixtures/electron.mjs';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { _electron as electron } from '@playwright/test';
+import { test, expect, aspettaFinestra, argomentiScala, chiudiApp } from '../../fixtures/electron.mjs';
+import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
+
+const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..');
 
 const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
   const vive = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
