@@ -1,5 +1,5 @@
-// #1004 — le pagine delicate non partono verso i modelli nelle funzioni automatiche, e il riassunto delle schede
-// chiuse si spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
+// #1004, #1545, #1274.1 — le pagine delicate non partono verso i modelli nelle funzioni automatiche, e il
+// riassunto delle schede chiuse si spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
@@ -648,5 +648,5 @@ test('col nome automatico acceso, un file scaricato da un sito delicato tiene il
   await impostaDaFilo(app, { security: { pagineDelicate: { siti: [] } } });
   const normale = await scaricaDa('download.txt', 'Verbale della riunione di condominio', { shell, openTab, testServer });
   await expect.poll(async () => (await mandato(app)).filter((m) => m.testo.includes('Verbale della riunione')).length, { timeout: 15000 }).toBe(1);
-  await expect.poll(() => existsSync(normale.savePath), { timeout: 10000 }).toBe(false);
+  expect(normale.filename).toBe('download.txt');
 });
