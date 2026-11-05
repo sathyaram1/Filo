@@ -118,6 +118,11 @@ export function richiestaPerLaVerifica(p) {
   if (p.richiestaDa === 'owner') return richiestaArg(p.richiesta);
   return inBusta('Testo della segnalazione', p.richiesta, codiceNuovo(p.richiesta));
 }
+
+/** Gli argomenti del primo start: la richiesta, e se l'ha scritta l'owner verify-local lo sa (richiestaDellOwner). PURA. */
+export function argomentiDiStart(p) {
+  return [richiestaPerLaVerifica(p), ...(p.richiestaDa === 'owner' ? ['--richiesta-owner'] : []), '--feedback', String(p.num)];
+}
 const primaRiga = (t) => String(t || '').split('\n')[0];
 // Il lavoratore ha finito e ha lasciato solo file: tolti quelli, si riparte dalla verifica. Il testo riconosce anche le fermate scritte prima del segno.
 const MOTIVO_SPORCO = 'il lavoratore ha lasciato modifiche non salvate';
