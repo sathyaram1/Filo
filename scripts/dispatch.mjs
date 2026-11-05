@@ -592,10 +592,8 @@ export function rilieviConDomanda(findings, domande) {
   // del rilievo, e la pulizia prima del verdetto, che legge solo il segno, toglierebbe le prove sbagliate (#1202.2).
   const conBlocca = conSegno.filter((x, k) => d[k] && Object.prototype.hasOwnProperty.call(d[k], 'blocca'));
   if (conBlocca.length) {
-    return { ok: false, errore: `la domanda ${conBlocca.length === 1 ? `del rilievo ${conBlocca[0].n}` : `dei rilievi ${conBlocca.map((x) => x.n).join(', ')}`} `
-      + 'porta «blocca»: su un rilievo non si scrive, decidono il livello e il segno. Fermano il lavoro un interno [3i?] e una scelta '
-      + 'difficile da disfare [2i?!]; un [2i?] si corregge con l\'opzione che consigli e la domanda esce in un feedback suo; gli altri '
-      + 'col «?» vanno da parte con la loro domanda. Togli «blocca» dal JSON (e, se serve, cambia il segno). Non ho registrato niente.' };
+    const chi = `la domanda ${conBlocca.length === 1 ? `del rilievo ${conBlocca[0].n}` : `dei rilievi ${conBlocca.map((x) => x.n).join(', ')}`}`;
+    return { ok: false, errore: `${VERIFIER_ROUND.bloccaSuUnRilievo(chi)} Non ho registrato niente.` };
   }
   conSegno.forEach((x, k) => { lista[x.n - 1].domanda = d[k]; });
   return { ok: true, findings: lista };
