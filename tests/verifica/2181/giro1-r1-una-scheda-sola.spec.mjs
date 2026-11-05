@@ -29,7 +29,8 @@ test('r1 una scheda scritta con --solo non apre la riscrittura alla cieca di tut
     writeFileSync(join(cartella, '5.json'), JSON.stringify(scheda(5)));
     const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: 'http://127.0.0.1:9' };
     const r = spawnSync(process.execPath, [join(ROOT, 'scripts', 'schede.mjs'), 'scrivi', '--dry-run', '--cartella', cartella], { cwd: ROOT, env, encoding: 'utf8' });
-    expect(`${r.stdout}${r.stderr}`).not.toMatch(new RegExp(`${APERTI - 1} agenti`));
+    const agenti = Number((/(\d+) agenti/.exec(r.stdout) || [])[1] || 0);
+    expect(agenti, 'agenti lanciati alla cieca').toBeLessThan(APERTI - 1);
     expect(r.status).toBe(1);
     expect(r.stderr).toMatch(/FERMO/);
   } finally { togliCartella(dir); }
