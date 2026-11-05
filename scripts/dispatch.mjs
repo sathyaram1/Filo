@@ -1371,12 +1371,12 @@ async function recordVerifier(id, critiqueText, domande = []) {
   // Un livello fra parentesi quadre che non apre una riga («Rilievo [2]: …»)
   // non è un rilievo, e mandarlo così faceva passare un [2] in silenzio: si
   // ferma qui, prima del server, con la riga da sistemare.
-  const brutte = typeof VERIFIER_ROUND.unparsedLevelLines === 'function' ? VERIFIER_ROUND.unparsedLevelLines(critiqueText) : [];
-  if (brutte.length) {
+  const brutte = typeof VERIFIER_ROUND.testoRilieviNonRiconosciuti === 'function' ? VERIFIER_ROUND.testoRilieviNonRiconosciuti(critiqueText) : '';
+  if (brutte) {
     // Un rifiuto di FORMATO, non della guardia d'identità: il testo di quella
     // («la directory non corrisponde al branch») mandava il verificatore a
     // controllare ramo e cartella invece della riga (verifica del giro 4).
-    return { rejected: true, formatRejected: true, message: `critica non registrata: rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]». Il livello, fra 0 e 3, va a inizio riga seguito dalla sede — «i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro — e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${brutte.join('\n  ')}` };
+    return { rejected: true, formatRejected: true, message: `critica non registrata: ${brutte}` };
   }
   // Stesso tetto del server, detto QUI prima del viaggio e col numero: mai un
   // taglio silenzioso (CLAUDE.md § Limiti).
