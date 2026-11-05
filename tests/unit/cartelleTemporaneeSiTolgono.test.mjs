@@ -272,7 +272,7 @@ test('il globalSetup di una corsa annidata lascia la temporanea a quella di fuor
   }
   assert.equal(temp, fuori, 'la corsa annidata non usa quella che eredita');
   assert.ok(existsSync(join(fuori, 'di-fuori.txt')), 'la corsa annidata ha tolto la temporanea a quella di fuori');
-  assert.ok(mkdtempSync(join(fuori, 'dopo-')), 'le prove di fuori non riescono più a chiedere una cartella');
+  assert.doesNotThrow(() => mkdirSync(join(fuori, 'dopo')), 'le prove di fuori non riescono più a chiedere una cartella');
 });
 
 // Col disco pieno di resti la corsa nuova non nasce: se la pulizia viene dopo, non parte mai e il disco resta pieno.
