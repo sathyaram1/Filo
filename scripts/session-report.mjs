@@ -241,9 +241,16 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     falliti: [],
     attese: [],
     atteseOltre30: 0,
+    // La cache in dollari, ogni richiesta col suo listino: il conto della cache a un'ora (`manutentore rapporti
+    // --cache`, #2121) legge questi e non riprezza i token. Ora = se le scritture a 5 minuti fossero a un'ora.
+    cache: cacheVuota(),
     notes: [],
   };
 }
+
+/** Le voci in dollari di `rep.cache`: scritta, riscaldata, sovrapprezzo dell'ora, risparmio sui rewarm e su tutto. */
+export const CACHE_VOCI = Object.freeze(['scrittaUsd', 'rewarmUsd', 'sovrapprezzoOraUsd', 'risparmioOraUsd', 'risparmioSeTuttoUsd']);
+export const cacheVuota = () => Object.fromEntries(CACHE_VOCI.map((k) => [k, 0]));
 
 // Gli elenchi viaggiano fuori dal rapporto, nei campi che il server tiene sul biglietto fino a 200 voci
 // (manutentoreRegole.RILASCIO): il tetto qui è il suo, con un margine in byte che una sessione vera non tocca.
