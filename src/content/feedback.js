@@ -771,9 +771,11 @@
           }
           root.style.visibility = '';
           const full = (shot || topbarShot) ? await schermataAnnotata(shot, topbarShot) : null;
-          const perche = foto?.ferma
+          const perche = foto?.motivo === 'misura'
             ? 'la pagina non ha risposto in tempo, e senza sapere dove sono i campi password o carta non la mando.'
-            : 'nella pagina c’è un campo riservato (password o carta) che non sono riuscito a coprire.';
+            : foto?.motivo === 'riquadri'
+              ? 'nella pagina c’è un riquadro di un altro sito che non sono riuscito a coprire.'
+              : 'nella pagina c’è un campo riservato (password o carta) che non sono riuscito a coprire.';
           if (full) {
             outImages.push({ dataUrl: full, name: 'schermata annotata' });
             if (foto?.segreti) senzaSchermata = `Della schermata è partita solo la barra in alto: ${perche}`;
