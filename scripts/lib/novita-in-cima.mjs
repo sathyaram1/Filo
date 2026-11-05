@@ -364,11 +364,12 @@ export function riportaInCima(root, { commit = false, basi = ['origin/main', 'ma
   const inAttesa = sottoUsciteSuMain(prima, registroDa(r.src), manifesto, uscitaSuMain);
   const attesa = inAttesa.length ? { inAttesa, uscitaSuMain } : {};
   if (!r.spostate.length) return { ok: true, spostate: [], verso: r.verso, commit: '', motivo: '', ...attesa };
-  if (commit && git(['status', '--porcelain', '--', FILE_NOVITA]).trim()) {
+  // Senza `commit` si guarda soltanto: chi verifica lo lancia per riconoscere il caso, e il suo ramo non deve cambiare.
+  if (!commit) return { ok: true, spostate: r.spostate, verso: r.verso, commit: '', motivo: '', soloLettura: true, ...attesa };
+  if (git(['status', '--porcelain', '--', FILE_NOVITA]).trim()) {
     return no(`${FILE_NOVITA} ha già modifiche fuori dai commit: committale o toglile, poi rilancia`);
   }
   writeFileSync(percorso, r.src, 'utf8');
-  if (!commit) return { ok: true, spostate: r.spostate, verso: r.verso, commit: '', motivo: '', ...attesa };
   const chi = identita ? ['-c', `user.name=${identita.nome}`, '-c', `user.email=${identita.email}`] : [];
   try {
     git([...chi, 'commit', '-q', '-m', `novità: ${r.spostate.length === 1 ? 'una riga del ramo' : `${r.spostate.length} righe del ramo`} da versioni uscite al blocco ${r.verso}`, '--', FILE_NOVITA]);
