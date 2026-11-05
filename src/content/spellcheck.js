@@ -1370,9 +1370,8 @@
   }
 
   // La risposta di un controllo il cui testo è cambiato nel frattempo non si posa (metterebbe segni su parole rimaste
-  // uguali, o toglierebbe quelli giusti): il suo pezzo torna da rivedere e il controllo riparte (#1302).
-  // Riparte da sé solo se il cambio l'ha fatto l'utente: una pagina che cambia il campo durante ogni controllo ne
-  // pagherebbe uno a risposta (#1070). La zona resta da rivedere al prossimo controllo.
+  // uguali, o toglierebbe quelli giusti): il suo pezzo torna da rivedere (#1302). Riparte da sé solo se il cambio era
+  // un gesto dell'utente: una pagina che cambia il campo a ogni controllo ne pagherebbe uno a risposta (#1070).
   function riapri(state, fonte, viaggio) {
     const zona = viaggio.zonaPersa;
     if (zona && zona.end > zona.start) {
@@ -1696,7 +1695,7 @@
     const d = testoDaControllare(state.el);
     if (d.testo.trim().length < 2) return;
     const riaperta = riapertaIn(state, 'rapido', d);
-    if (!riaperta && tornaAGiudicato(state, 'rapido', d)) return;
+    if (tornaAGiudicato(state, 'rapido', d, { esatto: !!riaperta })) { state.riaperte.rapido = null; return; }
     const scrive = ignoraScrittura ? null : inScritturaNelTesto(state, d);
     const regione = Rg.conRiaperta(Rg.regioneNuova(state.baseRapido, d.testo), riaperta, d.testo);
     state.restaParola = !!(scrive && regione && scrive.start < regione.end && scrive.end > regione.start);
@@ -1729,7 +1728,7 @@
       state.inViaggio = state.inViaggio.filter((v) => v !== viaggio);
     }
     seguiIlTesto(state);
-    if (viaggio.perso) { riapri(state, 'rapido', viaggio.zonaPersa); return; }
+    if (viaggio.perso) { riapri(state, 'rapido', viaggio); return; }
     if (!res || !res.ok || typeof res.text !== 'string') {
       // Il pezzo torna da giudicare al prossimo giro, se nel frattempo non ne è partito un altro.
       if (state.inviatiRapido === numero) state.baseRapido = baseDiPrima;
@@ -1748,7 +1747,7 @@
     const d = testoDaControllare(state.el);
     if (d.testo.trim().length < MIN_TESTO) return;
     const riaperta = riapertaIn(state, 'ragionato', d);
-    if (!riaperta && tornaAGiudicato(state, 'ragionato', d)) return;
+    if (tornaAGiudicato(state, 'ragionato', d, { esatto: !!riaperta })) { state.riaperte.ragionato = null; return; }
     let finoA = null;
     if (fineFrase) {
       const pos = d.verso(cursoreNelCampo(state.el));
@@ -1794,7 +1793,7 @@
       state.inViaggio = state.inViaggio.filter((v) => v !== viaggio);
     }
     seguiIlTesto(state);
-    if (viaggio.perso) { riapri(state, 'ragionato', viaggio.zonaPersa); return; }
+    if (viaggio.perso) { riapri(state, 'ragionato', viaggio); return; }
     if (!res || !res.ok || typeof res.text !== 'string') {
       if (state.inviatiRagionato === numero) state.baseRagionato = baseDiPrima;
       if (res && !res.ok) console.warn('[SN] correttore, controllo ragionato:', res.code, res.error);
@@ -1917,11 +1916,11 @@
   }
 
   // Un annulla, o una correzione tolta, riporta a un testo già giudicato per intero: tornano i suoi segni, senza
-  // chiamata. Vero se ha fatto così.
-  function tornaAGiudicato(state, fonte, d) {
+  // chiamata. Vero se ha fatto così. `esatto`, con un pezzo da rivedere: lì una virgola cambiata può essere il motivo.
+  function tornaAGiudicato(state, fonte, d, { esatto = false } = {}) {
     const testo = getEditableText(state.el);
     const g = state.giudicati[fonte].get(R().ossatura(testo));
-    if (!g) return false;
+    if (!g || (esatto && g.testo !== testo)) return false;
     if (fonte === 'rapido') state.baseRapido = d.testo; else state.baseRagionato = d.testo;
     const segni = riallineaIssues(g.segni.map((x) => ({ ...x })), g.testo, testo).issues;
     state.modello = [...state.modello.filter((x) => x.fonte !== fonte), ...segni];
@@ -2950,6 +2949,7 @@
       }
       aggiornaCodice(state);
       if (cursorMode !== 'preserve' && state.attivo) {
+        persiDalGesto(state, { rapido: true, ragionato: true });
         programmaRapido(state, { gesto: true });
         programmaRagionato(state, { gesto: true });
       }

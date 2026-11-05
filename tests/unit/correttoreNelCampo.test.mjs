@@ -492,3 +492,65 @@ test('campo svuotato durante un controllo e testo nuovo subito: la risposta vecc
   const nuova = c.rapide()[c.rapide().length - 1];
   assert.ok(nuova.payload.nuovo.includes('Marco e Luca'), 'il testo nuovo si controlla tutto, anche le parole uguali a prima');
 });
+
+async function conIlSegnoSuAndato(c, el) {
+  c.scrive(el, 'Marco e Luca è andato al mare ieri');
+  await c.passa(600);
+  await rispondiATutte(c, 0, ERRORE_ANDATO);
+  await c.passa(4000);
+  await rispondiATutte(c, 1, ERRORE_ANDATO);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['è andato']);
+  c.scrive(el, 'Marco è andato al mare ieri');
+  await c.passa(1500);
+  return c.rapide().length;
+}
+
+test('annulla il taglio prima della risposta: il segno torna dal testo già giudicato, senza chiamate', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  const chieste = await conIlSegnoSuAndato(c, el);
+  c.scrive(el, 'Marco e Luca è andato al mare ieri', { inputType: 'historyUndo' });
+  await c.passa(300);
+  await rispondiATutte(c, chieste - 1, '[][][][nessuno]');
+  await c.passa(1500);
+  assert.equal(c.rapide().length, chieste, 'come l\'annulla dopo la risposta: nessuna chiamata');
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['è andato']);
+});
+
+test('il pezzo da rivedere si manda a frase intera: «Marco e Paolo è» senza «andato» non si giudica', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  const chieste = await conIlSegnoSuAndato(c, el);
+  c.scrive(el, 'Marco e Paolo è andato al mare ieri');
+  await c.passa(300);
+  await rispondiATutte(c, chieste - 1, '[][][][nessuno]');
+  await c.passa(1500);
+  const ricontrollo = c.rapide()[chieste];
+  assert.ok(ricontrollo, 'il pezzo cambiato si rivede');
+  assert.match(ricontrollo.payload.nuovo, /Marco e Paolo è andato al mare/);
+});
+
+test('la pagina cambia il campo durante ogni controllo, senza gesti: nessuna catena di chiamate (#1070)', async () => {
+  const c = correttore();
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'Marco e Luca è andato al mare ieri ');
+  await c.passa(600);
+  c.sb.SN_GESTO.prendi = () => false;
+  const chieste = c.rapide().length;
+  for (let k = 1; k <= 10; k++) {
+    const aperte = c.rapide().filter((r) => !r.fatto);
+    el.value = el.value.replace(/^Marco+/, `Marco${'o'.repeat(k)}`);
+    el.fire('input', { inputType: 'insertText' });
+    for (const r of aperte) { r.fatto = true; await c.risponde(r, '[][][][nessuno]'); }
+    await c.passa(700);
+  }
+  assert.equal(c.rapide().length, chieste);
+  c.sb.SN_GESTO.prendi = () => true;
+  c.scrive(el, 'Marcooooooooooo e Luca è andato al mare ieri. ');
+  await c.passa(600);
+  assert.equal(c.rapide().length, chieste + 1, 'il primo gesto dopo controlla, una volta');
+  assert.match(c.rapide()[chieste].payload.nuovo, /Marco+ e Luca è andato/);
+});
