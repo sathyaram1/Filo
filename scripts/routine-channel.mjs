@@ -1873,7 +1873,7 @@ if (isMain) {
         console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
         console.error(chiRilascia === 'orchestrator'
           ? 'Chiudi il giro senza rilasciare: chi lavora qui consegna e rilascia da sé, e un biglietto abbandonato scade da solo. --forza solo per un worker morto davvero (il gancio ti ha detto «Worker finito», o il canale dice che il suo battito è scaduto).'
-          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona), o fermali se non servono più, poi rilancia lo stesso comando.');
+          : `Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona: aspetta ${args[0]}), o fermali se non servono più, poi rilancia lo stesso comando.`);
         process.exit(USCITA_LAVORO_VIVO);
       }
     }
