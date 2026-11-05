@@ -537,6 +537,7 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
       assert.equal(valutaCondizione(se, corsa({ ref: 'refs/heads/prova' })), false);
       assert.equal(valutaCondizione(se, corsa({ cancellata: true })), false);
       assert.match(passiPunta[0].corpo, /actions\/checkout[\s\S]*ref:\s*main\s*$/m);
+      assert.match(passiPunta[0].corpo, /fetch-depth:\s*0\s*$/m, 'storia intera come la prima corsa: in una copia corta un unit che la legge si salta e passa');
       assert.doesNotMatch(punta, /secrets\.|environment:|build-alarm/, 'qui gira il codice della punta');
       assert.match(punta, /node scripts\/npm-ci-ritenta\.mjs/);
     });
