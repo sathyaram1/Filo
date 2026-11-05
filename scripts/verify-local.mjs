@@ -657,7 +657,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
     return { ok: false, reason: 'nessun giro di correzione aperto su questo ramo: la pulizia si fa subito dopo una critica che manda a correggere, prima della correzione.' };
   }
-  const parte = [prev.pending.derived, prev.pending.external].flatMap((l) => (Array.isArray(l) ? l : [])).filter(messoDaParte);
+  const parte = parteDelGiro(prev.pending);
   if (!parte.length) {
     return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
