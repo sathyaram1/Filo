@@ -1,11 +1,12 @@
 // L'icona di un sito per la home e la chat (#848): la copia già vista in una scheda aperta, o quella che Filo tiene per le pagine
-// salvate e archiviate (#1273); solo per un sito che Filo non ha fra le sue voci, /favicon.ico del sito stesso, senza cookie.
-// Mai un servizio di icone di terzi. Prove: tests/unit/iconeSiti.test.mjs, tests/icone-dei-siti.spec.mjs.
+// salvate e archiviate (#1273); solo per un sito che Filo non ha fra le sue voci, /favicon.ico del sito stesso, senza cookie e
+// mai per un sito con la regola del paese (#1273.3). Mai un servizio di icone di terzi. Prove: tests/unit/iconeSiti.test.mjs.
 
 'use strict';
 
 const IconaScheda = require('./iconaScheda');
 const Copie = require('./copieIcone');
+const ProxyTab = require('./proxyTab');
 
 // Oltre le prime tre copie per lo stesso sito c'è quasi sempre la stessa icona.
 const MAX_COPIE = 3;

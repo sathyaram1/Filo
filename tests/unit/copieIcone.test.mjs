@@ -190,6 +190,42 @@ test('senza rete il tentativo non conta; un link salvato si chiede una volta, da
   assert.match((await S.list()).find((p) => p.url === 'https://link.test/x').favicon, /^filo:\/\/icone\//);
 });
 
+test('un sito con la regola del paese: né il link salvato da una scheda normale né le sue voci di prima si chiedono fuori dal proxy', async () => {
+  require(join(ROOT, 'src', 'shared', 'filoMemory.js'));
+  const FM = globalThis.SN_FILO_MEMORY;
+  await FM.setProxyRule('regola.test', { country: 'us' });
+  try {
+    await registro.get(MSG.SAVE_LINK)({ type: MSG.SAVE_LINK, url: 'https://www.regola.test/link', title: 'Link' }, daScheda({ id: 5, url: 'https://da.test/' }), 'https://da.test/');
+    await chrome.storage.local.set({ [STORAGE_KEYS.SAVED_PAGES]: [...await S.list(),
+      { id: 'r1', url: 'https://regola.test/vecchia', title: 'Di prima', favicon: 'https://img.piattaforma.test/r.png', savedAt: '2026-01-01T00:00:00Z' },
+    ] });
+    await A.importa([{ id: 'r2', url: 'https://video.regola.test/', title: 'Archiviata', favicon: 'https://video.regola.test/i.png', closedAt: '2026-01-02T00:00:00Z' }]);
+    const chieste = [];
+    const iconaPer = async (s, l) => { chieste.push(l[0]); return { url: l[0], dato: dato(PNG2) }; };
+    const R = IconeVecchie.crea({ iconaPer, sessione: () => ({}), inLinea: () => true });
+    await R.completa();
+    assert.ok(!chieste.some((u) => /regola\.test|piattaforma\.test/.test(u)), `chieste fuori dal proxy: ${chieste.join(', ')}`);
+    const r1 = (await S.list()).find((p) => p.id === 'r1');
+    assert.equal(r1.faviconDaChiedere, 'https://img.piattaforma.test/r.png', 'la voce resta da completare, se la regola cade');
+    assert.equal(r1.iconaMancante, undefined);
+
+    // Senza poter leggere le regole non si sa chi esce solo dal proxy: niente rete.
+    await FM.removeProxyRule('regola.test');
+    const cieca = IconeVecchie.crea({ iconaPer, sessione: () => ({}), inLinea: () => true, regole: async () => { throw new Error('storage'); } });
+    await cieca.completa();
+    assert.ok(!chieste.some((u) => /regola\.test|piattaforma\.test/.test(u)));
+
+    // Tolta la regola, le voci si completano come le altre.
+    await R.completa();
+    assert.ok(chieste.includes('https://img.piattaforma.test/r.png'));
+    assert.ok(chieste.includes('https://www.regola.test/favicon.ico'));
+    assert.ok(chieste.includes('https://video.regola.test/i.png'));
+    assert.match((await S.list()).find((p) => p.id === 'r1').favicon, /^filo:\/\/icone\//);
+  } finally {
+    await FM.removeProxyRule('regola.test');
+  }
+});
+
 test('la foto del profilo Google è una copia: scaricata una volta per account, senza cookie, e alle pagine arriva solo lei', async () => {
   const auth = require(join(ROOT, 'src', 'main', 'auth', 'google-auth.js'));
   const store = require(join(ROOT, 'src', 'main', 'auth', 'token-store.js'));

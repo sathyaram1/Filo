@@ -1,11 +1,12 @@
 // Le icone delle voci rimaste senza copia (salvate o archiviate prima del #1273, un link salvato, una scheda chiusa prima
-// che l'icona arrivasse): si chiedono una volta sola, senza cookie, e poi si tengono; quelle nate da una scheda col proxy
-// mai. Un data: URL rimasto nei dati diventa una copia, senza rete. Regole: copieIcone.js; prove: tests/unit/copieIcone.test.mjs.
+// che l'icona arrivasse): si chiedono una volta, senza cookie, e poi si tengono; mai per una voce nata da una scheda col proxy
+// o di un sito con la regola del paese. Un data: URL rimasto diventa una copia. Prove: tests/unit/copieIcone.test.mjs.
 
 'use strict';
 
 const IconaScheda = require('./iconaScheda');
 const Copie = require('./copieIcone');
+const ProxyTab = require('./proxyTab');
 
 const IN_PARALLELO = 4;
 // L'avvio non aspetta le icone: partono dopo, e una voce nuova da completare si unisce al giro dopo qualche secondo.
