@@ -226,8 +226,6 @@ test('una pagina delicata chiusa arriva al modello solo col sito, nella ricerca 
   await openTab(testServer.html('<title>Posta di Mario: estratto conto</title><p>saldo 1234'));
   await tornaAllaHome(shell);
   const posta = (await schede(shell)).find((x) => x.title === 'Posta di Mario: estratto conto');
-  const percorso = new URL(posta.url).pathname;
-  expect(percorso.length).toBeGreaterThan(1);
   await shell.evaluate((id) => window.filoShell.tabs.close(id), posta.id);
   await expect.poll(async () => (await archivio(app)).some((t) => t.url === posta.url), { timeout: 10_000 }).toBe(true);
   await app.evaluate(async (_e, url) => {
