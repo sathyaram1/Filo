@@ -393,6 +393,11 @@ export function richiestaDellOwner(entry) {
   return e.richiestaOwner === true || !e.feedbackId || e.fiducia === 'fidato';
 }
 
+/** La pratica di start: il feedback risolto (`r`) con la fiducia del controllo `lavorabile` (praticaPerLaSessione). PURA. */
+export function praticaDelGiro(r, lavorabile) {
+  return { ...r, avviso: lavorabile.avviso, fiducia: lavorabile.fiducia };
+}
+
 /** Lo stato all'avvio di un giro, con la pratica com'è uscita dal controllo (praticaPerLaSessione). PURA. */
 export function statoDelGiro(state, branch, { request, sha, pratica = null, richiestaOwner, server = null }) {
   return withRequest(state, branch, {
