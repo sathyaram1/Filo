@@ -1679,5 +1679,6 @@ module.exports = {
   _testoZoneIdentifier: testoZoneIdentifier,
   _valoreQuarantena: valoreQuarantena,
   _daRaccontare: daRaccontare,
+  _nominaDaSolo: nominaDaSolo,
   DOWNLOAD_LUNGO_MS,
 };

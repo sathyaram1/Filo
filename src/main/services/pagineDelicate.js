@@ -116,7 +116,9 @@ async function diCasa(url) {
 // «Queste pagine possono andare a un modello senza una richiesta?» per i lavori che partono da soli (#1545, #1274.1):
 // null se sì, { casa: true } o { motivo } se una sola non può. Senza la regola, nel dubbio una pagina web è delicata.
 async function versoIlModello(urls, settings) {
-  const lista = (Array.isArray(urls) ? urls : [urls]).filter((u) => typeof u === 'string' && u);
+  // Un file che la pagina si fa da sé (blob:https://banca…) vale quanto la pagina.
+  const lista = (Array.isArray(urls) ? urls : [urls]).filter((u) => typeof u === 'string' && u)
+    .map((u) => u.replace(/^blob:/i, ''));
   for (const u of lista) if (await diCasa(u)) return { casa: true };
   let f = null;
   try { f = await filtro(settings); } catch (_) { f = null; }
