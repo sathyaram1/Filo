@@ -226,7 +226,7 @@ export function contestoLettura({ cwd = process.cwd(), env = process.env, sistem
   const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...temporanee].map((c) => canonicoVero(P.resolve(c)));
   const file = radici.map((r) => canonicoVero(P.join(P.dirname(P.resolve(r)), 'LOCAL.md')));
   return {
-    cwd, win, cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero,
+    cwd, win, casa: homedir(), cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero,
     claude: [...new Set(claude.map((c) => canonicoVero(P.resolve(c))))], sessione: String(sessione || '').trim(),
   };
 }
