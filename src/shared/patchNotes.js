@@ -13,6 +13,8 @@
       fixes: [
         { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega», «Approfondisci» o «Traduci», la pagina sotto non scatta più.', segnalazione: 2119 },
         { testo: 'Negli editor dei siti che stanno dentro un riquadro il correttore non cancella più le lettere mentre scrivi, e se il sito respinge il messaggio la pulizia delle schede lascia aperta la scheda, anche quando la pagina ha già svuotato l\'editor. Resta aperta anche nei forum che ti rimandano il testo con un errore quando pubblichi da un link invece che da un bottone.', segnalazione: 1808 },
+        { testo: 'Un collegamento d\'invito che apre Filo, o la sua finestra, mostra subito Crediti davanti alle schede riaperte, invece di lasciarla dietro.', segnalazione: 2191 },
+        { testo: 'Su Mac, chiudere la finestra subito dopo aver aperto o chiuso una scheda non fa più perdere schede quando la riapri dal Dock.', segnalazione: 2191 },
       ],
     },
     {

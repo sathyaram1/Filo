@@ -1,7 +1,6 @@
 // #2191 — La finestra principale che rinasce (invito da fuori, Dock) e quella che si chiude: Crediti arriva davanti alle
 // schede riaperte, e una finestra chiusa non riscrive più la sessione mentre le sue schede si smontano.
 
-import { createRequire } from 'node:module';
 import { writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -9,9 +8,7 @@ import { _electron as electron } from '@playwright/test';
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
-const require = createRequire(import.meta.url);
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
-void require;
 
 // La finestra normale viva: le sue schede (l'indirizzo che aspetta vale per una riaperta non ancora caricata) e quella davanti.
 const normale = (app) => app.evaluate(({ BrowserWindow }) => {
