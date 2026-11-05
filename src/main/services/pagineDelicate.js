@@ -140,6 +140,6 @@ function rileggi() {
   return carica();
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, rileggi, dimentica, elencoCampi };
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, rileggi, dimentica, elencoCampi, diCasa, versoIlModello };
 
 module.exports = globalThis.SN_DELICATE;
