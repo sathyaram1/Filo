@@ -1265,3 +1265,34 @@ test('la voce dell’owner nel compito la decide una regola sola: chi ha scritto
   assert.match(compito(st), OWNER);
   assert.match(compito(statoDelGiro(st, 'r', { request: 'altro testo', sha: 'c', richiestaOwner: false })), DATO);
 });
+
+test('start legge i suoi argomenti e la pratica coi pezzi che usa davvero: dagli argomenti dell’orchestratore fino al compito', async () => {
+  const { argomentiDiAvvio, praticaDelGiro, compitoDelGiro, statoDelGiro } = await import('../../scripts/verify-local.mjs');
+  const OWNER = /valgono come specifica insieme a lei/;
+  const DATO = /DI CHI È LA RICHIESTA: la pratica non è fidata/;
+  // Come start: argomenti → pratica (risolta e controllata) → stato del giro → compito stampato.
+  const giro = async (args, lavorabile, prima = {}) => {
+    const a = await argomentiDiAvvio(args);
+    assert.equal(a.errore, undefined, a.errore);
+    const pratica = a.feedbackRif !== null ? praticaDelGiro({ ok: true, id: 'F', seq: 7 }, lavorabile) : null;
+    const request = a.resto.join(' ').trim() || (prima.r && prima.r.request) || '';
+    const st = statoDelGiro(prima, 'r', { request, sha: 'a', pratica, richiestaOwner: a.richiestaOwner });
+    return { st, a, compito: compitoDelGiro(st.r, { branch: 'claude/x', recipe: '' }) };
+  };
+  const approvata = { ok: true, fiducia: 'non_fidato' };
+  const dallOwner = await giro(argomentiDiStart(nuovaPratica({ num: 7, richiesta: 'Solo il bottone.' })), approvata);
+  assert.deepEqual(dallOwner.a.resto, ['Solo il bottone.'], 'l’opzione non resta nella richiesta');
+  assert.equal(dallOwner.st.r.request, 'Solo il bottone.');
+  assert.match(dallOwner.compito, OWNER);
+  const dalFeedback = await giro(argomentiDiStart({ ...nuovaPratica({ num: 7 }), richiesta: 'Il tasto non va.', richiestaDa: 'feedback' }), approvata);
+  assert.equal(dalFeedback.st.r.fiducia, 'non_fidato', 'la fiducia del controllo arriva allo stato');
+  assert.match(dalFeedback.compito, DATO);
+  assert.doesNotMatch(dalFeedback.compito, OWNER);
+  const fidata = await giro(argomentiDiStart({ ...nuovaPratica({ num: 7 }), richiesta: 'Il tasto non va.', richiestaDa: 'feedback' }), { ok: true, fiducia: 'fidato' });
+  assert.match(fidata.compito, OWNER);
+  // Il giro dopo una correzione riparte senza argomenti: la richiesta e di chi è restano.
+  const dopo = await giro([], approvata, dalFeedback.st);
+  assert.equal(dopo.a.richiestaOwner, undefined);
+  assert.match(dopo.compito, DATO);
+  assert.match((await giro([], approvata, dallOwner.st)).compito, OWNER);
+});
