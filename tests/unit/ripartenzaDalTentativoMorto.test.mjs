@@ -46,7 +46,7 @@ function scena(base, { ruoli = false } = {}) {
 function tentativo(casa, nome, da, n) {
   git(casa, 'checkout', '-q', '-B', nome, da);
   let head = git(casa, 'rev-parse', 'HEAD');
-  for (let i = 0; i < n; i += 1) head = commit(casa, `${nome.replace(/\W/g, '_')}-${i}.txt`, `${i}\n`);
+  for (let i = 0; i < n; i += 1) head = commit(casa, `${nome.replace(/\W/g, '_')}-${head.slice(0, 7)}.txt`, `${i}\n`);
   git(casa, 'push', '-q', '-f', 'origin', `${nome}:refs/heads/${nome}`);
   git(casa, 'checkout', '-q', 'main');
   return head;
