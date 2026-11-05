@@ -38,7 +38,9 @@ test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, rice
   for (const n of [...L.STRUMENTI_SENZA_LETTURA, '', undefined]) {
     assert.equal(L.motivoLettura({ tool_name: n, tool_input: { file_path: '/etc/passwd', path: '/etc', url: 'https://x.it' } }, ctxPosix), '', String(n));
   }
-  for (const n of ['Bash', 'PowerShell', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'TaskCreate', 'TaskUpdate', 'Skill']) assert.ok(L.STRUMENTI_SENZA_LETTURA.includes(n), n);
+  for (const n of ['Bash', 'PowerShell', 'Glob', 'Edit', 'Write', 'NotebookEdit', 'TodoWrite', 'TaskCreate', 'TaskUpdate']) assert.ok(L.STRUMENTI_SENZA_LETTURA.includes(n), n);
+  // Le abilità e i comandi le decide il nome: quelli di un'estensione di terzi sporcano (#1867).
+  for (const n of ['Skill', 'SlashCommand']) assert.ok(!L.STRUMENTI_SENZA_LETTURA.includes(n), n);
   // Grep con le righe porta dentro il testo dei file: lo decide il percorso, come Read (#1211.3).
   assert.ok(!L.STRUMENTI_SENZA_LETTURA.includes('Grep'));
   assert.equal(L.motivoLettura(null), '');
