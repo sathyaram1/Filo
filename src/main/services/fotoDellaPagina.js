@@ -282,7 +282,7 @@ async function fotoPerModello(wc) {
   return { ok: true, img: nativeImage.createFromBitmap(bitmap, { width, height }), piena: img };
 }
 
-/** La foto intera, per chi la tiene (Screenshot, feedback): mai verso un modello. */
+/** La foto intera, per chi la tiene (Screenshot): mai verso un modello, né nel feedback, che la vuole coperta (#2116). */
 function fotoPiena(wc) {
   return wc.capturePage();
 }
