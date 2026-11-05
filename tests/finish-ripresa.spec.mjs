@@ -35,10 +35,17 @@ function alberoConDueSpec(secondo) {
     "import { writeFileSync } from 'node:fs';",
     `test('verde', () => { writeFileSync(${JSON.stringify(join(dir, 'a-fatto'))}, '1'); });`,
   ].join('\n'));
-  writeFileSync(join(dir, 'tests', 'b-altro.spec.mjs'), [
-    "import { test, expect } from '@playwright/test';",
-    secondo === 'rosso' ? "test('rosso', () => { expect(1).toBe(2); });" : "test('lento', async () => { await new Promise((r) => setTimeout(r, 120_000)); });",
-  ].join('\n'));
+  const corpi = {
+    rosso: ["import { test, expect } from '@playwright/test';", "test('rosso', () => { expect(1).toBe(2); });"],
+    lento: ["import { test } from '@playwright/test';", "test('lento', async () => { await new Promise((r) => setTimeout(r, 120_000)); });"],
+    // Il test passa, il lancio è rosso: l'errore arriva fuori da ogni test.
+    chiusura: [
+      "import { test as base } from '@playwright/test';",
+      "const test = base.extend({ w: [async ({}, use) => { await use(1); throw new Error('chiusura rotta'); }, { scope: 'worker' }] });",
+      "test('chiusura', ({ w }) => {});",
+    ],
+  };
+  writeFileSync(join(dir, 'tests', 'b-altro.spec.mjs'), corpi[secondo].join('\n'));
   g('add', '-A'); g('commit', '-qm', 'spec');
   return { dir, g };
 }
