@@ -127,7 +127,7 @@ function conCasa(p, casa, win) {
 
 /**
  * Il motivo con cui la chiamata sporca il biglietto, '' se non porta dentro testo esterno. `input` = lo stdin del
- * gancio; `ctx` = contestoLettura (cartelle e file fidati, cartelle di Claude, `sessione`, `win`, `canonico`). PURA
+ * gancio; `ctx` = contestoLettura (cartelle e file fidati, cartelle di Claude, `sessione`, `win`, `casa`, `canonico`). PURA
  * con un `canonico` puro.
  */
 export function motivoLettura(input, ctx = {}) {
