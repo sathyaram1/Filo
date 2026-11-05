@@ -12,6 +12,7 @@ import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
+import { famigliaPrezzo, PREZZI } from './session-report.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
