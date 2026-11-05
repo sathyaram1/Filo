@@ -46,7 +46,7 @@ DB3 esistente), poi "Risolti".
 
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
-`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `attesa_chiusa`, `guasto`, `locale`,
+`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `attesa_chiusa`, `guasto`, `locale`, `in_correzione` (§4c),
 `fidato` (§5, §4b), `worker` (attacco o spam giudicato da chi lavorava, §3),
 `attesa_origine`, `origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c),
 `legacy-ignored` (§8);
@@ -150,7 +150,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
   utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
   NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
-  feedback derivato con la domanda (dal 2026-10-12, #1202); —QUALUNQUE consegna con una
+  feedback derivato con la domanda (dal 2026-10-12, #1202), che aspetta il lavoro e si
+  chiude con la sua fusione (§4c); `blocca` sulla domanda di un rilievo si respinge: la
+  sorte la decidono livello e segno (#1202.2); —QUALUNQUE consegna con una
   domanda che blocca (`--domanda`: di chi risolve, di chi corregge, e la domanda di un
   rilievo interno di livello 3 o col `!` di chi verifica, in ogni esito)→ `design`
   (`statusReason: decisione`), senza bisogno di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
@@ -243,7 +245,8 @@ CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
 possibilità di crearne di nuovi. Dal ridisegno del lavoro (§3a) ci sono due porte
 dirette verso `done`, strette: `todo → done` della pipeline per una segnalazione unita a
-un pacchetto fuso, e `working → done` della routine per un feedback già risolto su main.
+un pacchetto fuso (o un derivato in correzione fuso col suo lavoro, `statusReason: in_correzione`,
+§4c), e `working → done` della routine per un feedback già risolto su main.
 Questa la tabella la permette a ogni routine, ma il server la accetta solo dal primo
 lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
 altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
@@ -600,6 +603,14 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     (`priorityManual`, 3): il giudice di priorità non la riscrive.
   - un derivato col `?` fa eccezione: dove gli altri andrebbero in coda o ad aspettare, lui va nei
     fermo sulla sua domanda (`design`, `decisione`, `domandaId`: §3, Pipeline; In coda col segno).
+  - salvo il derivato di un `[2i?]` che il lavoro corregge intanto con la consigliata (`inCorrezione`, #1202.2):
+    nasce con l'attesa sul lavoro (`waitsFor`) e la sua domanda non lo ferma (la consigliata è la provvisoria).
+    Va in coda, da fidato o, se i giudici lo dicono sicuro, da non fidato, senza aspettare l'origine né
+    l'owner: lo trattiene l'attesa. La fusione del lavoro lo chiude (`todo → done`, pipeline, `statusReason:
+    in_correzione`) prima di scrivere il lavoro in `done`, sulle stesse strade che chiudono le unite di un
+    pacchetto. La consigliata, data prima o dopo, lo lascia chiuso; un'altra scelta, o parole in più, prima
+    della fusione gli toglie il segno e dopo la fusione parte con lei, e dopo la fusione lo rimette in coda.
+    Il lavoro chiuso senza fusione lo manda all'owner come ogni attesa rotta (`attesa_chiusa`).
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
