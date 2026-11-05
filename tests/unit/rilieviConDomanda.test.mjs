@@ -126,7 +126,8 @@ test('il ruolo di chi verifica non spiega «blocca» come una scelta sua senza d
   const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
   const dir = join(ROOT, 'routines', 'roles');
   for (const nome of ['verifier.md', 'verifier-chiusura.md', 'verifier-riallineamento.md']) {
-    const ruolo = espandiInclusioni(readFileSync(join(dir, nome), 'utf8'), dir);
+    // Come lo consegna dispatch: il ruolo e, in coda, il contratto comune dei worker.
+    const ruolo = espandiInclusioni(`${readFileSync(join(dir, nome), 'utf8')}\n\n${readFileSync(join(dir, '_contratto-worker.md'), 'utf8')}`, dir);
     // Ogni paragrafo che insegna a scegliere «blocca» porta con sé l'eccezione del rilievo.
     const paragrafi = ruolo.split(/\n\s*\n/).filter((p) => /senza `blocca` blocca|lo decidi tu quando un'opzione lo riprende/.test(p));
     assert.ok(paragrafi.length >= 2, `${nome}: le due regole generali su «blocca» ci sono`);
