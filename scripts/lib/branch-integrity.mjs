@@ -34,6 +34,7 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync
 import { resolve, sep } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
+import { senzaToken } from './git-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 
@@ -512,16 +513,19 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
 
   // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
   // rinascerebbe da main accanto al lavoro già spinto (#1632).
+  let remoto = null;
   if (createIfMissing) {
-    const remoto = ramoSuOrigin(root, branch);
+    remoto = ramoSuOrigin(root, branch);
     if (remoto.errore) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin se ${branch} c'è: ${remoto.errore}` };
     create = !remoto.presente && !refExists(g, `refs/heads/${branch}`);
   }
 
   if (create) {
     const wanted = base || mainBranch;
-    g(['fetch', 'origin', wanted]);
-    g(['fetch', 'origin', mainBranch]);
+    for (const ref of new Set([wanted, mainBranch])) {
+      const s = scaricaDaOrigin(root, ref);
+      if (!s.ok) return { ok: false, kind: 'transient', message: `non riesco a scaricare ${ref} da origin, e la base sarebbe quella dell'ultimo scaricamento di questa cartella: ${s.errore}` };
+    }
     // Base: il branch chiesto se esiste, altrimenti la linea principale.
     // MAI HEAD: se il giro precedente ci ha lasciati su un
     // altro branch di lavoro, partire da HEAD erediterebbe il lavoro altrui.
@@ -541,7 +545,8 @@ export function prepareBranch({ root, branch, create = false, createIfMissing = 
   }
 
   // Branch esistente (verifier / fixer / secaudit).
-  g(['fetch', 'origin', branch]);
+  const scaricato = scaricaDaOrigin(root, branch, remoto);
+  if (!scaricato.ok) return { ok: false, kind: 'transient', message: `non riesco a scaricare ${branch} da origin, e la punta che questa cartella ricorda può essere di un giro passato: ${scaricato.errore}` };
   const hasLocal = refExists(g, `refs/heads/${branch}`);
   const hasRemote = refExists(g, `refs/remotes/origin/${branch}`);
   if (!hasLocal && !hasRemote) {
@@ -612,8 +617,26 @@ function ramoSuOrigin(root, branch) {
     return { presente: true };
   } catch (e) {
     if (e.status === 2) return { presente: false };
-    return { errore: `${e.stderr || ''}`.trim().split('\n').slice(-1)[0] || e.message };
+    return { errore: rigaDiErrore(e.stderr, e.message) };
   }
+}
+
+/**
+ * `fetch` di `ref`; un no passa solo se origin risponde che il ramo non c'è. Ogni altro no (rete, servizio) lascia la
+ * punta dell'ultimo scaricamento, magari di un giro passato, da non dare per l'ultima consegna (#1779.1).
+ */
+function scaricaDaOrigin(root, ref, noto = null) {
+  const f = gitIn(root)(['fetch', 'origin', ref]);
+  if (f.ok) return { ok: true };
+  if ((noto || ramoSuOrigin(root, ref)).presente === false) return { ok: true, assente: true };
+  return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+}
+
+/** La riga di git che dice il motivo, da ricopiare dentro le virgolette di `--guasto "…"` (il guasto di halt). PURA. */
+export function rigaDiErrore(testo, riserva = '') {
+  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean);
+  const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || riserva);
+  return riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
 }
 
 function antenato(g, a, b) {

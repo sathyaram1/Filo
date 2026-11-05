@@ -232,22 +232,25 @@ test('controllo di sicurezza: ramo e differenze, MAI il feedback', async () => {
 });
 
 test('controllo di sicurezza su un clone che non sa calcolare il diff → il giro si ferma, non consegna un diff vuoto (#740)', async () => {
-  // Il clone a ramo singolo delle routine: niente main, né locale né scaricato, e origin che non risponde.
-  const { json } = await giro({
+  // Il clone a ramo singolo delle routine: niente main, né locale né scaricato, e origin che non la dà. Origin muto del
+  // tutto ferma il giro prima, al posizionamento sul ramo (#1779.1), e il diff non si guarderebbe più.
+  const { json, stderr } = await giro({
     ok: true, role: 'secaudit', id: 'fid-740', num: '#740', branch: 'worker/740',
     payload: { role: 'secaudit', branch: 'worker/740' },
   }, [], (casa) => {
     const g = (...a) => execFileSync('git', a, { cwd: casa, stdio: ['ignore', 'pipe', 'pipe'] });
     g('checkout', '-q', 'worker/740');
     writeFileSync(resolve(casa, 'del-ramo.txt'), 'modifica da controllare\n', 'utf8');
-    g('add', '-A');
+    // Solo il file: con `add -A` il commit imbarcherebbe il finto origin, che sta nella cartella, e il ripristino del
+    // ramo gli rimetterebbe la main tolta qui sotto.
+    g('add', 'del-ramo.txt');
     g('commit', '-qm', 'lavoro del ramo');
     g('push', '-q', 'origin', 'worker/740');
     g('branch', '-D', 'main');
     g('update-ref', '-d', 'refs/remotes/origin/main');
-    g('remote', 'set-url', 'origin', resolve(casa, 'non-esiste.git'));
+    g('--git-dir', resolve(casa, 'altrove.git'), 'update-ref', '-d', 'refs/heads/main');
   });
-  assert.equal(json.role, 'halt', 'un diff che non si calcola non arriva al controllo come se fosse vuoto');
+  assert.equal(json.role, 'halt', `un diff che non si calcola non arriva al controllo come se fosse vuoto: ${stderr}`);
   assert.match(json.payload.message, /diff del ramo worker\/740 non si calcola[^]*origin\/main/);
 });
 

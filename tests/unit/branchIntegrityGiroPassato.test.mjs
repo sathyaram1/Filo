@@ -7,7 +7,7 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync, readFileSync, cpSync } from 'node:fs';
+import { mkdirSync, writeFileSync, readFileSync, cpSync, renameSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -166,6 +166,30 @@ describe('D-207 — la cartella riusata non riporta il ramo a un giro passato', 
     }
   });
 
+  test('origin muto mentre si prepara: chi verifica non riceve il giro 2, il giro si ferma col guasto (#1779.1)', async () => {
+    const base = cartellaTemporanea('filo-giro-passato-');
+    const { srv, port } = await fintoServer(LAVORO);
+    try {
+      const { casa, dirStato, B } = scena(base);
+      const origin = resolve(base, 'origin.git');
+      renameSync(origin, `${origin}.spento`);
+      const r = await esegui(casa, dirStato, port, ['--ticket', 'biglietto-di-prova']);
+      const json = JSON.parse(r.so.slice(r.so.indexOf('{'), r.so.lastIndexOf('}') + 1) || 'null');
+      assert.equal(json && json.role, 'halt', `con origin muto il giro doveva fermarsi (uscita ${r.code}): ${r.se}`);
+      assert.equal(json.payload.kind, 'transient', 'guasto temporaneo: il lavoro torna in coda');
+      assert.equal(r.code, 3);
+      assert.ok(json.payload.message.includes(RAMO), json.payload.message);
+      assert.doesNotMatch(json.payload.message, /["`$\\]/, 'si ricopia dentro le virgolette di --guasto');
+      assert.notEqual(git(casa, 'rev-parse', 'HEAD'), B, 'la cartella non resta pronta sul codice del giro 2');
+      const st = JSON.parse(readFileSync(resolve(dirStato, `${ID}.json`), 'utf8'));
+      assert.deepEqual(st.checkpoints.map((c) => c.sha).slice(-1), [B], 'nessun avvio registrato sul giro passato');
+      assert.equal(st.avvio, undefined);
+    } finally {
+      srv.close();
+      togliCartella(base);
+    }
+  });
+
   test('punto fermo uguale alla punta: come prima, lo stato resta (la pulizia dopo un «pass» lo consulta)', async () => {
     const base = cartellaTemporanea('filo-giro-passato-');
     const { srv, port } = await fintoServer(LAVORO);
@@ -241,6 +265,36 @@ describe('D-207 — prepareBranch: la punta pubblicata è l’ultima consegna', 
       assert.ok(r.discarded);
       assert.equal(git(work, 'rev-parse', r.discarded), monco);
       assert.equal(puntaSuOrigin(work), nuovo, 'origin non si tocca');
+    } finally { togliCartella(base); }
+  });
+
+  // Con origin muto la punta che la cartella ricorda è dell'ultimo scaricamento, cioè del giro passato (#1779.1).
+  test('origin che non risponde: niente giro passato dato per ultima consegna; tornato origin, si parte dalla punta', () => {
+    const { base, origin, work, vecchio } = repo();
+    try {
+      const nuovo = avantiAltrove(base, origin);
+      renameSync(origin, `${origin}.spento`);
+      const r = prepareBranch({ root: work, branch: RAMO, checkpoint: vecchio });
+      assert.equal(r.ok, false, `preparata su ${r.head} senza aver potuto chiedere a origin la punta`);
+      assert.equal(r.kind, 'transient', 'la rete torna: si riprova al giro dopo, il ramo non si dà per perso');
+      assert.ok(r.message.includes(RAMO), r.message);
+      assert.match(r.message, /origin\.git/, `il messaggio porta l'errore di git: ${r.message}`);
+      renameSync(`${origin}.spento`, origin);
+      const ancora = prepareBranch({ root: work, branch: RAMO, checkpoint: vecchio });
+      assert.equal(ancora.ok, true, ancora.message);
+      assert.equal(ancora.head, nuovo, 'le correzioni del giro 3 arrivano a chi lavora dopo');
+    } finally { togliCartella(base); }
+  });
+
+  test('ramo mai spedito, origin che risponde «non c\'è»: si riprende dal locale come prima', () => {
+    const { base, work } = repo();
+    try {
+      git(work, 'checkout', '-q', '-b', 'worker/mai-spedito');
+      const locale = commit(work, 'locale.txt', 'la spedizione non è mai riuscita\n');
+      git(work, 'checkout', '-q', 'main');
+      const r = prepareBranch({ root: work, branch: 'worker/mai-spedito', checkpoint: locale });
+      assert.equal(r.ok, true, r.message);
+      assert.equal(r.head, locale);
     } finally { togliCartella(base); }
   });
 

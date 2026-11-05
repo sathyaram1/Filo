@@ -59,6 +59,9 @@ lavorare: ce la mette.
 - Per `new-work` **crea** il branch e ci si posiziona.
 - **Fail closed**: se il checkout/creazione non riesce, non consegna il lavoro
   (vedi E per l'esito). Meglio un giro a vuoto che un giro sull'albero sbagliato.
+  Vale anche per lo scaricamento: un fetch che fallisce senza che origin dica
+  «il ramo non c'è» è un guasto passeggero, perché la punta che la cartella
+  ricorda è quella dell'ultimo scaricamento, magari di un giro passato (#1779.1).
 - Registra nello stato del branch l'**identità attesa del contenuto** (il commit
   SHA risultante). È il valore che C e D confronteranno.
 

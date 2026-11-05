@@ -26,7 +26,7 @@ import {
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
   ensureSessionExcludes, SESSION_MARKERS,
-  sealCurrentWork, findStateIdByBranch,
+  sealCurrentWork, findStateIdByBranch, rigaDiErrore,
 } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -163,6 +163,36 @@ describe('A — posizionarsi sul branch (prepareBranch)', () => {
     assert.equal(r.kind, 'transient', 'con la rete giù non si sa se il ramo c\'è: si riprova, non si rifà');
     assert.equal(currentBranch(work), 'main');
     assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
+  });
+
+  // Con origin muto la base sarebbe la linea principale dell'ultimo scaricamento, magari di giorni prima (#1779.1).
+  test('lavoro nuovo con origin che non risponde: guasto temporaneo, niente ramo nato da una main vecchia', () => {
+    const { work, base } = makeRepo();
+    git(work, ['remote', 'set-url', 'origin', resolve(base, 'non-esiste.git')]);
+    const branch = newWorkBranch('feed-muto');
+    const r = prepareBranch({ root: work, branch, create: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'transient');
+    assert.match(r.message, /main/);
+    assert.equal(currentBranch(work), 'main');
+    assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
+  });
+
+  test('rigaDiErrore: la riga del motivo, senza credenziali, ricopiabile dentro --guasto "…"', () => {
+    const stderr = 'warning: redirecting\nfatal: unable to access \'https://x-access-token:segreto@github.com/o/r.git/\': Could not resolve host: github.com\n';
+    const riga = rigaDiErrore(stderr);
+    assert.match(riga, /^fatal: unable to access/);
+    assert.ok(!riga.includes('segreto'), riga);
+    assert.equal(rigaDiErrore('fatal: \'C:\\Users\\agenti AI\\o.git\' "x" `y` $z'), 'fatal: \'C:/Users/agenti AI/o.git\' \'x\' \'y\' \'z');
+    assert.equal(rigaDiErrore('\n\n', 'fetch fallito'), 'fetch fallito');
+  });
+
+  test('lavoro nuovo da una base che su origin non c\'è: si ripiega sulla linea principale come prima', () => {
+    const { work } = makeRepo();
+    const branch = newWorkBranch('feed-base');
+    const r = prepareBranch({ root: work, branch, create: true, base: 'feature/sparita' });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.base, 'origin/main');
   });
 
   // Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
