@@ -232,8 +232,8 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|
 export const RAPPORTI_PAGINE_MAX = 500;
 
 /**
- * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]`
- * → { ok, dati (il corpo per il server), tutte, json } | { ok:false, motivo }. PURA.
+ * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma | --cache] [--cursore C] [--limite L] [--tutte] [--json]`
+ * → { ok, dati (il corpo per il server), tutte, cache, json } | { ok:false, motivo }. PURA.
  */
 export function richiestaRapporti(argv, nowMs = Date.now()) {
   const [n, altro] = senzaOpzioni((argv || []).slice(1));
