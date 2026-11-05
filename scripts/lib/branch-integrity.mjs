@@ -884,6 +884,9 @@ export const USCITA_LAVORO_VIVO = 5;
 // Il gancio rinnova il timbro al più ogni 5 minuti: 10 coprono un salvataggio e il successivo.
 export const TIMBRO_VIVO_MS = 10 * 60 * 1000;
 export const SEGNI_TUTTI = Object.freeze(['battito', 'timbro', 'processi']);
+// Ciò che fa rifiutare il rilascio di un worker: l'attesa `aspetta` legge questo stesso, o dice «finito» a un rilascio
+// che poi rifiuta e il worker gira in tondo (#2185).
+export const SEGNI_RILASCIO_WORKER = Object.freeze(['processi']);
 // Il battito si conta dal suo marcatore: i battiti singoli del gancio e il ciclo di un biglietto non sono lavoro.
 const COMANDO_BATTITO = /routine-channel\.mjs["']?\s+heartbeat\b/;
 
