@@ -233,6 +233,61 @@ jobs:
           grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: gli unit non sono partiti, guarda i passi sopra)"
           exit 1
 
+  # Gli unit rossi rifatti su Windows sulla punta di main, a fine suite: una fusione arrivata intanto può averli già
+  # corretti, e il feedback chiederebbe un lavoro fatto (#2148, come il cancello di pubblicazione per #1185). Qui gira
+  # il codice della punta: niente segreti. Senza esito (lavoro rosso, registro assente) l'avviso apre come prima.
+  unit-windows-punta:
+    needs: [suite, verdetto, unit-windows]
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && needs.unit-windows.result == 'failure'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      punta: ${{ steps.rifai.outputs.punta }}
+      gia_verdi: ${{ steps.rifai.outputs.gia_verdi }}
+      tutti: ${{ steps.rifai.outputs.tutti }}
+    steps:
+      - name: Checkout della punta di main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+
+      - name: Punta di main
+        id: punta
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Main fermo sul commit provato: i rossi sono già stati rifatti una volta dalla riprova, qui non c'è niente di nuovo.
+      - name: Setup Node
+        if: steps.punta.outputs.sha != github.sha
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        if: steps.punta.outputs.sha != github.sha
+        shell: bash
+        run: node scripts/npm-ci-ritenta.mjs
+
+      - name: Registro degli unit del commit provato
+        if: steps.punta.outputs.sha != github.sha
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-windows-registro
+          path: esiti-unit
+
+      - name: Rifai i rossi sulla punta
+        id: rifai
+        if: steps.punta.outputs.sha != github.sha
+        continue-on-error: true
+        env:
+          PUNTA: ${{ steps.punta.outputs.sha }}
+        shell: bash
+        run: |
+          if [ ! -s esiti-unit/unit.log ]; then echo "Nessun registro degli unit: niente da rifare."; exit 0; fi
+          if VERDI=$(node scripts/rossi-sulla-punta.mjs esiti-unit/unit.log); then TUTTI=true; else TUTTI=false; fi
+          { echo "punta=$PUNTA"; echo "gia_verdi=$(echo $VERDI)"; echo "tutti=$TUTTI"; } >> "$GITHUB_OUTPUT"
+
   # I feedback dei rossi su main, in un lavoro a parte: la parola della costruzione sta solo qui, nell'ambiente fisso,
   # lontano da npm ci e dalle prove (gli strumenti dell'avviso usano solo moduli di Node). Su un ramo il lavoro si salta
   # prima di arrivare all'ambiente, che lo respingerebbe (#1504).
