@@ -574,7 +574,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     // turni e lasciavano in ogni rapporto la nota del modello sconosciuto
     // (giro del 14/09, terza verifica: 36 righe così nei transcript di una
     // macchina sola).
-    if (e.type === 'assistant' && /^<[^>]*>$/.test(String(msg.model || ''))) continue;
+    if (e.type === 'assistant' && rigaSintetica(msg)) continue;
 
     if (e.type === 'assistant') {
       const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
