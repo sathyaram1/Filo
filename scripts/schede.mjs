@@ -28,7 +28,9 @@ const RILETTURA = [
   'hai cambiato ("confermata" se niente). Riscrivi il file intero, e rispondi con la riga del passo 4.',
 ].join(' ');
 
-const numeriDi = (lista) => (Array.isArray(lista) ? lista : []).map((w) => String((w && w.num) || '').replace(/^#/, '')).filter(Boolean);
+// Il numero senza cancelletto si chiede solo a SS.numeroPulito: una scheda e la sua voce d'indice devono riconoscersi ovunque.
+const numeroDi = (s) => SS.numeroPulito((s && s.numero) || '');
+const numeriDi = (lista) => (Array.isArray(lista) ? lista : []).map((w) => SS.numeroPulito((w && w.num) || '')).filter(Boolean);
 
 /** Uno stato che non si è decifrato (manca la chiave, o è sbagliata): con lui non si sa chi è aperto. PURA. */
 export function statoIllegibile(r) {
