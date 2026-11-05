@@ -164,6 +164,27 @@ test('dopo la chiusura della finestra rinata nessuna scrittura delle schede dive
   }
 });
 
+test('avvio a freddo da un collegamento d\'invito con schede salvate: Crediti davanti', async () => {
+  const userData = cartellaTemporanea('filo-2191-');
+  const salvate = ['http://127.0.0.1:9/a', 'http://127.0.0.1:9/b'];
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ sn_open_tabs: { tabs: salvate, activeIndex: 1 } }));
+  const app = await electron.launch({
+    args: [...argomentiScala, '.', 'filo://invito/ABCD'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test', FILO_TEST_ACCOLTO: '1' },
+  });
+  try {
+    await expect.poll(async () => (await stato(app)).normale?.davanti || '', { message: 'all\'avvio Crediti non è davanti', timeout: 30000 }).toMatch(/^filo:\/\/credits\//);
+    await new Promise((r) => setTimeout(r, 2500));
+    const s = await stato(app);
+    expect(s.normale.davanti).toMatch(/^filo:\/\/credits\//);
+    expect(s.normale.schede).toEqual(expect.arrayContaining(salvate));
+  } finally {
+    await chiudiApp(app);
+    togliCartella(userData);
+  }
+});
+
 test('Mac: finestra chiusa, poi esci da Filo: sul disco restano le schede della finestra chiusa', async ({ app, shell, openTab, testServer }) => {
   const { base, salvate } = await filoSenzaFinestra(app, shell, openTab, testServer);
   await app.evaluate(({ app: a }) => { a.emit('activate', {}, true); });
