@@ -73,7 +73,7 @@ export function rigaScheda(s, f = {}) {
 export function conNumeri(rami, indice) {
   const perId = new Map((indice || []).map((f) => [f.id, f.num]));
   return (rami || []).map((r) => {
-    const n = perId.get((/^worker\/([A-Za-z0-9]+)-\d{8}T\d{6}Z$/.exec(r.ramo) || [])[1]);
+    const n = perId.get((leggiTentativo(r.ramo) || {}).id);
     return n ? { ...r, feedback: [n, ...(r.feedback || []).filter((x) => x !== n)] } : r;
   });
 }
