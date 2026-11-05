@@ -658,12 +658,19 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
   for (const { u, model, effort } of usi.values()) {
-    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, oltreSoglia, velocita } = valutaUso(u, model);
+    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, cache, oltreSoglia, velocita } = valutaUso(u, model);
     rep.turns += 1;
     if (oltreSoglia) rep.oltreSoglia[chiaveSicura(model)] = (rep.oltreSoglia[chiaveSicura(model)] || 0) + 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
     if ((rep.turns > 1 || continua) && cr === 0 && cw >= 20000) rep.coldTurns += 1;
-    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
+    dollariCache.scrittaUsd += cache.scritta;
+    dollariCache.sovrapprezzoOraUsd += cache.sovrapprezzoOra;
+    dollariCache.risparmioSeTuttoUsd += cache.risparmioOra;
+    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) {
+      rep.rewarmTurns += 1; rep.rewarmTokens += cw;
+      dollariCache.rewarmUsd += cache.scritta;
+      dollariCache.risparmioOraUsd += cache.risparmioOra;
+    }
     rep.maxContextTokens = Math.max(rep.maxContextTokens, input + cw + cr);
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
