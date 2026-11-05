@@ -10,6 +10,7 @@ import { fileURLToPath } from 'node:url';
 const RADICE = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(join(RADICE, ...p), 'utf8').replace(/\r\n/g, '\n');
 const una = (s) => s.replace(/\s+/g, ' ');
+const { readRoleInstructions } = await import('../../scripts/dispatch.mjs');
 
 test('ogni worker sa dalla sua definizione che i comandi lunghi vanno in sottofondo, qualunque cosa dica il prompt', () => {
   for (const nome of ['routine-worker', 'routine-nuovo-lavoro', 'routine-secaudit']) {
