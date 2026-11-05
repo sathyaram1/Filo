@@ -161,9 +161,12 @@ test('un post su un collegamento sempre aperto vale come arrivato solo se il ser
       'risposta e poi silenzio': await postaWs(app, shell, sito, 'WsAck', 'ack'),
       'due righe con virgolette ed emoji': await postaWs(app, shell, sito, 'WsRighe', 'ack', { testo: 'Oggi ho finito la maratona di Firenze\nGrazie a "tutti" voi 🙂' }),
       'in binario': await postaWs(app, shell, sito, 'WsBin', 'ack', { binario: true }),
+      'casella svuotata, confermato': await postaWs(app, shell, sito, 'WsSvuotaAck', 'ack', { svuota: true }),
     };
     const respinti = {
       'risposta d’errore': await postaWs(app, shell, sito, 'WsErrore', 'errore'),
+      // Senza la casella tolta a fare da orfano, protegge solo il no del server.
+      'casella svuotata, risposta d’errore': await postaWs(app, shell, sito, 'WsSvuotaErrore', 'errore', { svuota: true }),
       'solo presenze, il post ignorato': await postaWs(app, shell, sito, 'WsBattito', 'battito'),
     };
     await shell.waitForTimeout(1000);
