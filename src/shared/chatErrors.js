@@ -531,10 +531,17 @@
     }
     if (inizio < 0) return null;
     const ESC = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', '"': '"', '\\': '\\', '/': '/' };
+    // Una " non escapata chiude il campo solo se dopo vengono la fine, una graffa o la chiave seguente: altrimenti è
+    // una citazione scritta male («Clicca su "Salva" in alto») e fa parte del testo.
+    const CHIUDE = /^\s*(?:$|[}\]]|,\s*(?:$|"[A-Za-z_$][\w$]*(?:"\s*(?::|$)|$)))/;
     let out = '';
     for (let i = inizio; i < s.length; i++) {
       const ch = s[i];
-      if (ch === '"') break;
+      if (ch === '"') {
+        if (CHIUDE.test(s.slice(i + 1, i + 80))) break;
+        out += ch;
+        continue;
+      }
       if (ch !== '\\') { out += ch; continue; }
       const nx = s[i + 1];
       if (nx === undefined) break;
@@ -569,19 +576,53 @@
     return r && !/^\s*```/.test(t) ? `${r}\n${t}` : t;
   }
 
+  // Dove si chiude l'oggetto che comincia in `da` (indice della graffa di chiusura), -1 se arriva in fondo aperto.
+  function fineOggetto(s, da) {
+    let prof = 0; let inStringa = false;
+    for (let i = da; i < s.length; i++) {
+      const ch = s[i];
+      if (inStringa) {
+        if (ch === '\\') i += 1;
+        else if (ch === '"') inStringa = false;
+      } else if (ch === '"') inStringa = true;
+      else if (ch === '{') prof += 1;
+      else if (ch === '}' && --prof === 0) return i;
+    }
+    return -1;
+  }
+
+  // L'involucro JSON di una risposta (Aiuto, mazzi), se la risposta è solo quello: attorno al più spazi o un recinto
+  // ```json. Della prosa con un esempio fra graffe è prosa, anche se l'esempio è JSON valido (#1302): null.
+  function involucroIntero(raw) {
+    const s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
+    if (!s.startsWith('{') || !s.endsWith('}')) return null;
+    try {
+      const o = JSON.parse(s);
+      return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+    } catch (_) { return null; }
+  }
+
   // Il testo da mostrare di una risposta che doveva essere un involucro JSON e non si legge (#1302). Solo se il tetto
-  // l'ha fermata e la risposta comincia dall'involucro: una risposta intera ma scritta male, o della prosa con un esempio
-  // fra graffe, si mostra com'è (null). Fermata prima del campo del testo: niente da mostrare (''), mai la graffa.
+  // l'ha fermata dentro l'involucro: una risposta intera ma scritta male, o della prosa con un esempio fra graffe chiuso,
+  // si mostra com'è (null). Fermata prima del campo del testo: niente da mostrare (''), mai la graffa.
   function testoDaInvolucro(raw, campi, finishReason) {
     if (!troncata(finishReason)) return null;
     const s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '');
-    if (!s.startsWith('{')) return null;
-    const t = campoDaJsonTagliato(s, campi);
-    return t == null ? '' : t;
+    const graffa = s.indexOf('{');
+    if (graffa < 0) return null;
+    const prima = s.slice(0, graffa).trim();
+    if (!prima) {
+      const t = campoDaJsonTagliato(s, campi);
+      return t == null ? '' : t;
+    }
+    // Una frase prima dell'involucro («Ecco la risposta: {"text":"…»): la frase e il testo, senza graffe.
+    if (fineOggetto(s, graffa) >= 0) return null;
+    const t = campoDaJsonTagliato(s.slice(graffa), campi);
+    return t == null ? null : [prima, t].filter(Boolean).join(' ');
   }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };

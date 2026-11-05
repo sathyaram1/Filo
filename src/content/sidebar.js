@@ -1433,13 +1433,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     const salvato = globalThis.SN_CHAT_ERRORS?.testoDaInvolucro?.(text, ['text'], finishReason) ?? null;
     const fallback = { display: (salvato ?? (text || '')).trim(), highlight: null, choices: [], status: 'done', collapse: false };
     if (!text) return fallback;
-    const trimmed = text.trim();
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start < 0 || end <= start) return fallback;
     try {
-      const obj = JSON.parse(trimmed.slice(start, end + 1));
-      if (!obj || typeof obj !== 'object') return fallback;
+      const obj = globalThis.SN_CHAT_ERRORS?.involucroIntero?.(text) ?? null;
+      if (!obj) return fallback;
       // Richiesta di ricerca web: scavalca il flusso normale, la processa submit() prima di
       // rendere la risposta in chat.
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
