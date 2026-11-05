@@ -139,7 +139,7 @@ export function leggiSchede(cartella) {
 /** Riassunto per `stato`. PURA. */
 export function riepilogo(indice, schede) {
   const per = (k) => schede.reduce((m, s) => ({ ...m, [s[k] ?? '?']: (m[s[k] ?? '?'] || 0) + 1 }), {});
-  const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
+  const mappa = new Map(schede.map((s) => [numeroDi(s), s]));
   const daFare = (indice || []).filter((f) => daScrivere(f, mappa.get(f.num)));
   const fuori = (indice || []).filter((f) => fuoriDalFeedback(f, mappa.get(f.num)));
   return {
