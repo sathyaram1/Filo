@@ -175,15 +175,15 @@
     // TUTTE le quadre della riga, non solo la prima: una frase fra quadre all'inizio nascondeva
     // il livello scritto più avanti. E il contenuto può essere lungo.
     const testo = String(riga || '');
-    // La quadra SPAIATA col contenuto lunghissimo: una parentesi dimenticata è lo stesso errore
-    // di battitura della virgoletta che manca, e non deve costare una bocciatura.
-    const spaiata = QUADRA_APERTA.exec(testo) || QUADRA_CHIUSA.exec(testo);
-    if (spaiata) return spaiata[0];
+    // Prima la quadra intera: è il pezzo da mostrare, la spaiata ne darebbe solo l'inizio.
     QUADRA_OVUNQUE.lastIndex = 0;
     for (let m = QUADRA_OVUNQUE.exec(testo); m; m = QUADRA_OVUNQUE.exec(testo)) {
       if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return m[0]; }
     }
-    return '';
+    // La quadra SPAIATA col contenuto lunghissimo: una parentesi dimenticata è lo stesso errore
+    // di battitura della virgoletta che manca, e non deve costare una bocciatura.
+    const spaiata = QUADRA_APERTA.exec(testo) || QUADRA_CHIUSA.exec(testo);
+    return spaiata ? spaiata[0] : '';
   }
 
   function pezzo(re, riga) {
@@ -215,13 +215,14 @@
 
   // Le righe che NON si possono registrare così: livello fuori posto o fuori scala, livello
   // SENZA testo (un «[2]» solo diventava un pass), più rilievi del tetto: si rifiuta.
-  function unparsedLevelLines(text) {
+  // `pezzo` è la parte della riga letta come livello, quando la ragione è quella (#2179).
+  function righeStorte(text) {
     const lines = normalizeCritique(text).split('\n');
     const out = [];
     let current = null;
     let count = 0;
     const flush = () => {
-      if (current && !current.text) out.push(`${current.line} (rilievo senza testo)`);
+      if (current && !current.text) out.push({ riga: `${current.line} (rilievo senza testo)`, pezzo: '' });
       current = null;
     };
     for (const raw of lines) {
@@ -231,14 +232,15 @@
         // primo, e un difetto di sicurezza spariva in coda a uno cosmetico.
         // Basta un a capo dimenticato, che è lo stesso errore della virgoletta
         // che manca (feedback #565).
-        if (quadraColLivello(m[5])) {
+        const doppio = quadraColLivello(m[5]);
+        if (doppio) {
           flush();
-          out.push(raw.trim());
+          out.push({ riga: raw.trim(), pezzo: doppio });
           continue;
         }
         if (segnoSenzaDecisione(m)) {
           flush();
-          out.push(`${raw.trim()} (${SPIEGAZIONE_SEGNO})`);
+          out.push({ riga: `${raw.trim()} (${SPIEGAZIONE_SEGNO})`, pezzo: '' });
           continue;
         }
         flush();
@@ -250,29 +252,44 @@
       // manca invece di lasciarla fra le righe «scritte male» senza motivo.
       if (FINDING_LINE_SENZA_SEDE.test(raw)) {
         flush();
-        out.push(`${raw.trim()} (${SPIEGAZIONE_SEDE})`);
+        out.push({ riga: `${raw.trim()} (${SPIEGAZIONE_SEDE})`, pezzo: '' });
         continue;
       }
       // La regola per intero sta su QUADRA_OVUNQUE: le quadre col livello dentro sono sempre un
       // rilievo; le altre parentesi valgono a inizio riga, dove uno le userebbe per aprirlo.
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
-      const parentesiStorta = (!!apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]))
+      const letto = pezzo(LEVEL_START, raw)
+        || (apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]) ? apertura[1].trim() : '')
         || quadraColLivello(raw)
-        || APRE_LIVELLO_SENZA_APERTURA.test(raw)
-        || PARENTESI_LIVELLO.test(raw)
-        || ETICHETTA_PRIMA.test(raw);
-      if (LEVEL_START.test(raw) || parentesiStorta || (!current && LEVEL_LABEL.test(raw))) {
+        || pezzo(APRE_LIVELLO_SENZA_APERTURA, raw)
+        || pezzo(PARENTESI_LIVELLO, raw)
+        || pezzo(ETICHETTA_PRIMA, raw)
+        || (!current ? pezzo(LEVEL_LABEL, raw) : '');
+      if (letto) {
         flush();
-        out.push(raw.trim());
+        out.push({ riga: raw.trim(), pezzo: letto });
         continue;
       }
       if (current && raw.trim()) current.text += raw.trim();
     }
     flush();
     if (count > MAX_FINDINGS) {
-      out.push(`troppi rilievi: ${count}, il massimo è ${MAX_FINDINGS} (raggruppa per causa: un rilievo per porta, non per sintomo)`);
+      out.push({ riga: `troppi rilievi: ${count}, il massimo è ${MAX_FINDINGS} (raggruppa per causa: un rilievo per porta, non per sintomo)`, pezzo: '' });
     }
     return out;
+  }
+
+  function unparsedLevelLines(text) {
+    return righeStorte(text).map((r) => r.riga);
+  }
+
+  // Il rifiuto di una critica con righe storte, vuoto se non ce ne sono: lo stampano
+  // dispatch e verify-local, e ogni riga dice quale suo pezzo è stato letto come livello.
+  function testoRilieviNonRiconosciuti(text) {
+    const storte = righeStorte(text);
+    if (!storte.length) return '';
+    const righe = storte.map((r) => (r.pezzo ? `${r.riga}\n    letto come livello: «${r.pezzo}»` : r.riga));
+    return `rilievi non riconosciuti. Le parentesi quadre con dentro un livello sono SEMPRE un rilievo, dovunque stiano nella riga: nel riassunto e nei passi un livello si cita a parole («il livello 2»), mai «[2i]»; lo stesso vale per una parentesi tonda o graffa con dentro una cifra sola («(2)»). Il livello, fra 0 e 3, va a inizio riga seguito dalla sede («i» se tocca a questo lavoro, «v» se è di un altro lavoro ma sta in un file che il ramo modifica già, «e» se è un altro lavoro) e dal testo del rilievo, una riga per rilievo («[2i] testo», «[1e?] testo», anche «- [2i]», «1. [2i]», «### [2i]»). Righe da sistemare:\n  ${righe.join('\n  ')}`;
   }
 
   /**
@@ -800,7 +817,7 @@
 
   global.SN_VERIFIER_ROUND = {
     LEVELS, SEDI, SPIEGAZIONE_SEDE, SPIEGAZIONE_SEGNO, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
-    capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, normalizeFindings, maxLevel, primaFrase,
+    capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, testoRilieviNonRiconosciuti, normalizeFindings, maxLevel, primaFrase,
     sedeDi, livelloDegliInterni, decisioneFerma, missingCaps, normalizeCaps, normalizeCounts,
     decideRound, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
