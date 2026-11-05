@@ -591,11 +591,19 @@
     return -1;
   }
 
-  // L'involucro JSON di una risposta (Aiuto, mazzi), se la risposta è solo quello: attorno al più spazi o un recinto
-  // ```json. Della prosa con un esempio fra graffe è prosa, anche se l'esempio è JSON valido (#1302): null.
+  // L'involucro JSON di una risposta (Aiuto, mazzi): da solo, su righe sue o in un recinto ```json, anche con una frase
+  // attorno («Certo!\n```json\n{…}\n```»). Un oggetto in mezzo a una frase è un esempio, e la risposta è prosa (#1302).
   function involucroIntero(raw) {
-    const s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '');
-    if (!s.startsWith('{') || !s.endsWith('}')) return null;
+    let s = String(raw || '').trim();
+    const recinto = /```(?:json)?[ \t]*\n([\s\S]*?)\n?[ \t]*```/i.exec(s);
+    if (recinto) s = recinto[1].trim();
+    const a = s.indexOf('{');
+    const b = s.lastIndexOf('}');
+    if (a < 0 || b < a) return null;
+    const prima = s.slice(0, a);
+    const dopo = s.slice(b + 1);
+    if ((prima.trim() && !/\n[ \t]*$/.test(prima)) || (dopo.trim() && !/^[ \t]*\n/.test(dopo))) return null;
+    s = s.slice(a, b + 1);
     try {
       const o = JSON.parse(s);
       return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
