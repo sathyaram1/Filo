@@ -139,6 +139,24 @@ test('forum rimandato indietro: varianti di invio e di testo', async ({ app, she
   } finally { await sito.chiudi(); }
 });
 
+test('forum dentro un riquadro, mandato da script e rimandato indietro', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const interno = sito.pagina(`<!doctype html><title>dentro</title><form id="f" method="post" action="/forum"><input type="hidden" name="k" value="77">
+      <textarea id="c" name="messaggio" style="width:400px;height:100px"></textarea><input id="cap" name="captcha"><a href="#" id="pub" onclick="f.submit();return false">Pubblica</a></form>`);
+    const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Cornice</title><iframe id="ifr" src="${interno}" style="width:600px;height:300px"></iframe>`));
+    const fr = page.frameLocator('#ifr');
+    await fr.locator('#c').click();
+    await page.keyboard.type(LETTERA);
+    const id = await sporca(shell, 'Cornice');
+    await fr.locator('#pub').click();
+    await expect(fr.locator('.err')).toBeVisible();
+    await page.waitForTimeout(1000);
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect(aperte).toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
 // Rilievo 1 della segnalazione: editor in un riquadro nato con srcdoc, varianti.
 test('editor in un riquadro nato col contenuto: varianti', async ({ app, shell }) => {
   const sito = await apriSito();
