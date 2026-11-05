@@ -188,7 +188,11 @@ sullo stesso guasto e ne dichiarerebbe un altro. Lo accendono solo:
 - l'**owner dalla chat**, quando chiede di farlo ripartire (di solito dopo aver
   sistemato l'ambiente): subito, senza aspettare il mattino;
 - la risposta **«lascialo riprovare»** dell'owner alla domanda del controllo
-  qui sotto: subito anche lei.
+  qui sotto: subito anche lei;
+- l'**interruttore** del manutentore (o quello delle routine) che l'owner
+  riporta da spento ad acceso, di solito dopo aver scelto «spegnilo» e
+  sistemato l'ambiente: vale come «lascialo riprovare», che scrive la stessa
+  impostazione.
 
 I segnali non letti restano per la prima sessione chiusa bene.
 
