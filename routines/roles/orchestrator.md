@@ -75,7 +75,7 @@ JSON di `ticket … --json`; vuoto = server vecchio, usa il worker generico):
 `subagent_type: routine-manutentore` se è `manutentore`, altrimenti
 `subagent_type: routine-worker` (definiti in `.claude/agents/`: di default il
 primo lavoro Opus a sforzo `xhigh`, gli altri due Opus a sforzo `high` —
-decisione owner 2026-10-02; il manutentore Fable, SPEC-MANUTENTORE § 1). Modello e sforzo del worker non li scegli tu: il
+decisione owner 2026-10-02; il manutentore Opus a sforzo `high`, SPEC-MANUTENTORE § 1). Modello e sforzo del worker non li scegli tu: il
 gancio che il preflight ha installato li mette al lancio come li ha decisi il
 server per quel biglietto, e toglie quelli che avessi scritto se il server non
 ne ha detti (vale la definizione dell'agente). Un lancio senza `--ticket

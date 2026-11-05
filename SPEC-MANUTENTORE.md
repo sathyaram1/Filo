@@ -22,8 +22,9 @@ Il suo contesto è testo scritto da chiunque, quindi è **non fidato**: non
 scrive codice, non fonde, non approva L5. Scrive ordini che il server applica
 e apre feedback che le routine lavorano.
 
-Modello: **Fable** (scelta dell'owner: compito aperto, serve giudizio; costa
-un po' di più di Opus).
+Modello: **Opus** a sforzo high (scelta dell'owner del 4 novembre: Fable
+consuma più in fretta il limite settimanale, quello che ferma le routine, e ha
+un suo tetto dentro il limite comune).
 
 ## 2. La scala delle priorità
 

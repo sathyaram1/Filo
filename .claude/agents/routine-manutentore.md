@@ -1,7 +1,7 @@
 ---
 name: routine-manutentore
-description: Il manutentore delle routine di Filo (ruolo manutentore): regia, pronto soccorso e ricerca sul sistema, acceso dal pacemaker. Fable a sforzo high (SPEC-MANUTENTORE § 1: compito aperto, serve giudizio).
-model: fable
+description: Il manutentore delle routine di Filo (ruolo manutentore): regia, pronto soccorso e ricerca sul sistema, acceso dal pacemaker. Opus a sforzo high (SPEC-MANUTENTORE § 1: compito aperto, serve giudizio).
+model: opus
 effort: high
 hooks:
   PreToolUse:
