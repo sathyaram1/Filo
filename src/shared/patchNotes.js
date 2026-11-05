@@ -23,6 +23,7 @@
     {
       version: '0.2.265', date: '2026-11-05',
       fixes: [
+        { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
         { testo: 'Un sito che hai chiesto di aprire sempre da un altro paese non riceve più la richiesta della sua icona dalla tua connessione, nemmeno per un suo link salvato da un\'altra scheda o per i suggerimenti della home e della chat.', segnalazione: 1273 },
         { testo: 'Quando Filo dà da solo un nome ai file scaricati o una categoria alle pagine salvate, il contenuto delle pagine di posta, banca e router non va più ai modelli. Una pagina salvata di posta o di banca prende la categoria dal solo tipo.', segnalazione: 1545 },
         { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
