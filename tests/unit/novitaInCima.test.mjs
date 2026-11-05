@@ -10,7 +10,7 @@ import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { aggiunteSottoUscite, registroDa, spostaInCima, FILE_NOVITA } from '../../scripts/lib/novita-in-cima.mjs';
+import { aggiunteSottoUscite, registroDa, sottoUsciteSuMain, spostaInCima, FILE_NOVITA } from '../../scripts/lib/novita-in-cima.mjs';
 import { riportaNelClone } from '../../scripts/routine-channel.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -145,7 +145,7 @@ const VECCHIE = ['Prima', 'Seconda', 'Terza', 'Quarta', 'Quinta'];
  * origin con main alla 0.2.256 e il ramo verificato, che scrive nel blocco 0.2.257 in cima; poi da un'altra cartella
  * esce la 0.2.257 e main apre il blocco 0.2.258. La cartella ha scaricato main e rifatto la base: niente conflitti.
  */
-function scena() {
+function scena({ rebase = true } = {}) {
   const base = cartellaTemporanea('novita-in-cima-');
   fatte.push(base);
   const origin = join(base, 'origin.git');
@@ -178,7 +178,7 @@ function scena() {
   committa(altro, 'apre il blocco 0.2.258');
   git(altro, ['push', '-q', 'origin', 'main']);
   git(work, ['fetch', '-q', 'origin', 'main']);
-  git(work, ['rebase', '-q', 'origin/main']);
+  if (rebase) git(work, ['rebase', '-q', 'origin/main']);
   return { origin, work, verificato };
 }
 const ATTESO = sorgente([{ v: '0.2.258', features: ['Di main, dopo', R1] }, { v: '0.2.257', features: ['Di main, in arrivo'] }, { v: '0.2.256', features: VECCHIE }]);
@@ -196,6 +196,54 @@ test('lo strumento dopo il rebase: sposta, committa solo il registro, e una seco
   assert.equal(git(s.work, ['show', '--name-only', '--format=', 'HEAD']), FILE_NOVITA);
   const ancora = await riportaNelClone(s.work, { commit: true, env: {} });
   assert.deepEqual([ancora.ok, ancora.spostate.length, ancora.commit], [true, 0, '']);
+});
+
+test('prima del rebase lo strumento riconosce la riga che finirà sotto la versione uscita su main, e non tocca il ramo (#2130)', async () => {
+  const s = scena({ rebase: false });
+  const sulRamo = readFileSync(join(s.work, FILE_NOVITA), 'utf8');
+  const base = git(s.work, ['merge-base', 'HEAD', 'origin/main']);
+  const prima = registroDa(git(s.work, ['show', `${base}:${FILE_NOVITA}`]));
+  assert.deepEqual(aggiunteSottoUscite(prima, registroDa(sulRamo), '0.2.256'), [], 'sul ramo da solo la sentinella è verde');
+  const cli = execFileSync(process.execPath, [join(REPO, 'scripts', 'novita-in-cima.mjs'), '--commit'],
+    { encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: s.work, FILO_ROUTINE: '' } });
+  assert.match(cli, /una riga del ramo sta sotto la 0\.2\.257, uscita su main dopo la partenza del ramo\. Dopo il rebase su main le sposta questo strumento/);
+  assert.match(cli, /in 0\.2\.257: Una novità del ramo/);
+  assert.doesNotMatch(cli, /nessuna riga del ramo/);
+  assert.equal(readFileSync(join(s.work, FILE_NOVITA), 'utf8'), sulRamo, 'il ramo com\'è resta com\'è');
+  assert.equal(git(s.work, ['rev-parse', 'HEAD']), s.verificato);
+  const r = await riportaNelClone(s.work, { commit: true, env: {} });
+  assert.deepEqual([r.ok, r.spostate.length, r.uscitaSuMain, r.inAttesa], [true, 0, '0.2.257', [{ version: '0.2.257', riga: 'Una novità del ramo' }]]);
+  // Il riallineamento: dopo il rebase la stessa riga si sposta, e l'avviso sparisce.
+  git(s.work, ['rebase', '-q', 'origin/main']);
+  const dopo = await riportaNelClone(s.work, { commit: true, env: {} });
+  assert.deepEqual([dopo.ok, dopo.spostate.length, dopo.verso, dopo.inAttesa], [true, 1, '0.2.258', undefined]);
+  assert.equal(readFileSync(join(s.work, FILE_NOVITA), 'utf8'), ATTESO);
+});
+
+test('senza --commit lo strumento dice cosa sposterebbe e non tocca il ramo, anche con una riga da spostare davvero', () => {
+  // Chi verifica lo lancia così per riconoscere il caso: la correzione nel suo ramo finirebbe col commit della verifica.
+  const s = scena();
+  const sulRamo = readFileSync(join(s.work, FILE_NOVITA), 'utf8');
+  const punta = git(s.work, ['rev-parse', 'HEAD']);
+  const cli = execFileSync(process.execPath, [join(REPO, 'scripts', 'novita-in-cima.mjs')],
+    { encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: s.work, FILO_ROUTINE: '' } });
+  assert.match(cli, /una riga del ramo sta sotto versioni già uscite alla partenza del ramo e va nel blocco 0\.2\.258\. Non ho toccato niente/);
+  assert.match(cli, /in 0\.2\.257: Una novità del ramo/);
+  assert.equal(readFileSync(join(s.work, FILE_NOVITA), 'utf8'), sulRamo);
+  assert.equal(git(s.work, ['status', '--porcelain']), '');
+  assert.equal(git(s.work, ['rev-parse', 'HEAD']), punta);
+});
+
+test('l\'avviso vale solo per una versione di main più alta di quella del ramo', () => {
+  const prima = [{ version: '0.2.257', features: ['in arrivo'] }, { version: '0.2.256', features: ['uscita'] }];
+  const dopo = [{ version: '0.2.257', features: ['in arrivo', 'del ramo'] }, { version: '0.2.256', features: ['uscita'] }];
+  const ramo = { version: '0.2.256' };
+  assert.deepEqual(sottoUsciteSuMain(prima, dopo, ramo, '0.2.257'), [{ version: '0.2.257', riga: 'del ramo' }]);
+  assert.deepEqual(sottoUsciteSuMain(prima, dopo, ramo, '0.2.30'), [], 'confronto fra numeri: 0.2.30 viene prima di 0.2.256');
+  for (const v of ['0.2.256', '0.2.255', '', 'v0.2.257', undefined]) assert.deepEqual(sottoUsciteSuMain(prima, dopo, ramo, v), [], String(v));
+  assert.deepEqual(sottoUsciteSuMain(prima, dopo, {}, '0.2.257'), []);
+  // Una riga scritta nel blocco ancora in arrivo anche su main non aspetta niente.
+  assert.deepEqual(sottoUsciteSuMain(prima, dopo, ramo, '0.2.256'), []);
 });
 
 test('lo strumento non tocca niente a metà di un rebase né con il registro già modificato', async () => {

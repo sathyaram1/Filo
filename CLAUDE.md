@@ -231,7 +231,9 @@ anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
   cima porta il numero della prossima versione (`package.json` + 1 patch, o il
   suo `prossimaVersione` se lo dichiara); se
   quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
-  versione uscita non la vede chi aggiorna. Sentinella:
+  versione uscita non la vede chi aggiorna. Se esce su main mentre il ramo
+  aspetta, le righe le sposta il riallineamento prima della fusione
+  (`scripts/novita-in-cima.mjs`, dopo il rebase): non si rincorre. Sentinella:
   `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
   nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col

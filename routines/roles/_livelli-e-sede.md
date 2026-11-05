@@ -66,6 +66,15 @@ dopo che il ramo è partito, e allora non è un rilievo. Ci rientra un test di
 logica rosso sul ramo che il controllo di fine lavoro trova verde sulla fusione
 con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
 
+Non lo è nemmeno il contrario: una riga di novità del ramo rimasta sotto una
+versione che main ha pubblicato DOPO la partenza del ramo. Sul ramo la
+sentinella è verde, sulla fusione è rossa, e la riga la sposta da sé il
+riallineamento che precede la fusione: spostarla adesso non regge alla
+pubblicazione seguente. La riconosce `node scripts/novita-in-cima.mjs`, dopo
+`git fetch origin main` («uscita su main dopo la partenza del ramo»). Resta un
+rilievo una riga scritta sotto una versione già uscita quando il ramo è
+partito: lì è rossa la sentinella del ramo stesso.
+
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
 resta un 3. Il giro lo decidono i rilievi interni: un vicino entra nella
 correzione solo se il giro parte comunque per loro, perché il suo file è già

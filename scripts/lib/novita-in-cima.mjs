@@ -67,6 +67,17 @@ export function aggiunteSottoUscite(prima, dopo, uscita) {
   return out;
 }
 
+/**
+ * Le righe che il ramo ha scritto sotto versioni uscite su main DOPO la sua partenza (#2130): sul ramo la sentinella è
+ * verde, sulla fusione rossa, e si spostano solo dopo il rebase. `versioneMain`: la versione del manifesto di main. PURA.
+ */
+export function sottoUsciteSuMain(prima, dopo, manifesto, versioneMain) {
+  const delRamo = String((manifesto && manifesto.version) || '');
+  const suMain = String(versioneMain || '');
+  if (!A_B_C.test(delRamo) || !A_B_C.test(suMain) || cmpVersion(suMain, delRamo) <= 0) return [];
+  return aggiunteSottoUscite(prima, dopo, suMain).map(({ version, riga }) => ({ version, riga }));
+}
+
 // ── Lettura del sorgente: dove comincia e finisce ogni elemento, senza un parser fuori dal repo ──
 
 function dopoStringa(src, i) {
@@ -318,9 +329,10 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
 }
 
 /**
- * Nel clone `root`: confronta il registro col punto in cui il ramo si stacca da main e, se serve, sposta e (con
- * `commit`) committa il solo registro. Non lavora a metà di un rebase o con il registro già modificato fuori dai commit.
- * → { ok, spostate, verso, commit, motivo }
+ * Nel clone `root`: confronta il registro col punto in cui il ramo si stacca da main e, con `commit`, sposta e committa
+ * il solo registro; senza, dice soltanto cosa sposterebbe (`soloLettura`). Non lavora a metà di un rebase o con il
+ * registro già modificato fuori dai commit.
+ * → { ok, spostate, verso, commit, motivo, soloLettura?, inAttesa?, uscitaSuMain? } (inAttesa: vedi sottoUsciteSuMain)
  */
 export function riportaInCima(root, { commit = false, basi = ['origin/main', 'main'], oggi = new Date().toISOString().slice(0, 10), aMeta = () => '', identita = null, exec = execFileSync } = {}) {
   const git = (args) => String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }));
@@ -331,9 +343,10 @@ export function riportaInCima(root, { commit = false, basi = ['origin/main', 'ma
   const inCorso = aMeta(root);
   if (inCorso) return no(`${inCorso} è a metà: finiscila, poi rilancia`);
   let base = '';
+  let refMain = '';
   for (const ref of basi) {
     try { base = git(['merge-base', 'HEAD', ref]).trim(); } catch (_) { base = ''; }
-    if (base) break;
+    if (base) { refMain = ref; break; }
   }
   if (!base) return no(`non trovo dove il ramo si stacca da ${basi.join(' o ')}`);
   let prima;
@@ -346,27 +359,48 @@ export function riportaInCima(root, { commit = false, basi = ['origin/main', 'ma
   } catch (e) { return no(`non leggo il registro o il manifesto: ${e.message}`); }
   const r = spostaInCima(src, { prima, manifesto, oggi });
   if (!r.ok) return no(r.motivo);
-  if (!r.spostate.length) return { ok: true, spostate: [], verso: r.verso, commit: '', motivo: '' };
-  if (commit && git(['status', '--porcelain', '--', FILE_NOVITA]).trim()) {
+  // Solo un avviso: un main illeggibile non ferma lo spostamento che sul ramo si può fare.
+  let uscitaSuMain = '';
+  try { uscitaSuMain = String(JSON.parse(git(['show', `${refMain}:package.json`])).version || ''); } catch (_) { uscitaSuMain = ''; }
+  const inAttesa = sottoUsciteSuMain(prima, registroDa(r.src), manifesto, uscitaSuMain);
+  const attesa = inAttesa.length ? { inAttesa, uscitaSuMain } : {};
+  if (!r.spostate.length) return { ok: true, spostate: [], verso: r.verso, commit: '', motivo: '', ...attesa };
+  // Senza `commit` si guarda soltanto: chi verifica lo lancia per riconoscere il caso, e il suo ramo non deve cambiare.
+  if (!commit) return { ok: true, spostate: r.spostate, verso: r.verso, commit: '', motivo: '', soloLettura: true, ...attesa };
+  if (git(['status', '--porcelain', '--', FILE_NOVITA]).trim()) {
     return no(`${FILE_NOVITA} ha già modifiche fuori dai commit: committale o toglile, poi rilancia`);
   }
   writeFileSync(percorso, r.src, 'utf8');
-  if (!commit) return { ok: true, spostate: r.spostate, verso: r.verso, commit: '', motivo: '' };
   const chi = identita ? ['-c', `user.name=${identita.nome}`, '-c', `user.email=${identita.email}`] : [];
   try {
     git([...chi, 'commit', '-q', '-m', `novità: ${r.spostate.length === 1 ? 'una riga del ramo' : `${r.spostate.length} righe del ramo`} da versioni uscite al blocco ${r.verso}`, '--', FILE_NOVITA]);
   } catch (e) {
     return { ok: false, spostate: r.spostate, verso: r.verso, commit: '', motivo: `spostate ma non committate: ${String(e.stderr || e.message || e).trim().split('\n')[0]}` };
   }
-  return { ok: true, spostate: r.spostate, verso: r.verso, commit: git(['rev-parse', 'HEAD']).trim(), motivo: '' };
+  return { ok: true, spostate: r.spostate, verso: r.verso, commit: git(['rev-parse', 'HEAD']).trim(), motivo: '', ...attesa };
 }
 
 /** Le righe da stampare per un esito di riportaInCima. PURA. */
 export function testoRiportaInCima(r) {
   if (!r.ok) return [`Novità: righe del ramo non spostate. ${r.motivo}`];
-  if (!r.spostate.length) return [`Novità: nessuna riga del ramo sotto una versione già uscita.`];
+  const attesa = Array.isArray(r.inAttesa) ? r.inAttesa : [];
+  const dopo = attesa.length ? [
+    `Novità: ${attesa.length === 1 ? 'una riga del ramo sta' : `${attesa.length} righe del ramo stanno`} sotto la ${r.uscitaSuMain}, uscita su main dopo la partenza del ramo. `
+      + `Dopo il rebase su main le sposta questo strumento, e in routine lo fa da sé il riallineamento che precede la fusione: sul ramo com'è non c'è niente da correggere.`,
+    ...attesa.map((s) => `  in ${s.version}: ${s.riga.slice(0, 100)}`),
+  ] : [];
+  if (!r.spostate.length) return dopo.length ? dopo : [`Novità: nessuna riga del ramo sotto una versione già uscita.`];
+  if (r.soloLettura) {
+    return [
+      `Novità: ${r.spostate.length === 1 ? 'una riga del ramo sta' : `${r.spostate.length} righe del ramo stanno`} sotto versioni già uscite alla partenza del ramo e ${r.spostate.length === 1 ? 'va' : 'vanno'} nel blocco ${r.verso}. `
+        + 'Non ho toccato niente: le sposta e le committa `node scripts/novita-in-cima.mjs --commit`.',
+      ...r.spostate.map((s) => `  in ${s.version}: ${s.riga.slice(0, 100)}`),
+      ...dopo,
+    ];
+  }
   return [
     `Novità: ${r.spostate.length === 1 ? 'una riga del ramo era' : `${r.spostate.length} righe del ramo erano`} sotto versioni già uscite, ora ${r.spostate.length === 1 ? 'sta' : 'stanno'} nel blocco ${r.verso}${r.commit ? ` (commit ${r.commit.slice(0, 9)})` : ''}:`,
     ...r.spostate.map((s) => `  da ${s.version}: ${s.riga.slice(0, 100)}`),
+    ...dopo,
   ];
 }
