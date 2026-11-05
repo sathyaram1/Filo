@@ -72,6 +72,12 @@ function riaperturaDaSistema(visibili) {
   return mostraFinestraNormale();
 }
 
+// Chi agisce su una finestra appena nata aspetta le sue schede: aperta prima, la sua scheda finirebbe dietro quelle
+// riaperte. Risolve `{ ripristinata }`, o null se la finestra si chiude prima.
+function quandoPronta(win) {
+  return (win && win._filoPronta) || Promise.resolve(win && !win.isDestroyed() ? { ripristinata: false } : null);
+}
+
 // Gli init che la prima scheda deve trovare fatti (ad-blocker, impronta, permessi…) li aspetta qualunque finestra
 // normale nata durante l'avvio, prima di riaprire le schede: la finestra intanto si apre e la barra si carica (#1092).
 let avvioPronto = Promise.resolve();
