@@ -174,16 +174,23 @@ a chi deve indagare e non si ripete da solo (#1589 si è guastato sette volte in
 una notte). Il caso «ambiente rotto per tutti» lo copre la pausa del pacemaker
 sulle accensioni nate morte.
 
-**Un guasto suo** (#1249.3). Una sessione del manutentore che si chiude con un
-guasto (`--guasto` nel rilascio) lo lascia fermo fino alla prossima **sessione
-chiusa bene**, cioè arrivata al rilascio senza guasto. Intanto il pacemaker non
-lo accende per nessun motivo: né il battito, né un segnale (i guasti degli
-altri lavori, la fusione di una correzione che un lavoro aspettava, una domanda
-di processo), né una sveglia chiesta prima, che non suona. Ognuna di quelle
-accensioni cadrebbe sullo stesso guasto e ne dichiarerebbe un altro. Resta la
-decisione del mattino, che è il tentativo del giorno; prima lo riaccende solo
-l'owner, dalla chat. I segnali non letti restano per la prima sessione chiusa
-bene.
+**Un guasto suo** (#1249.3, #1249.4). La regola intera sta qui: gli altri testi
+rimandano a questo paragrafo e non la riscrivono. Una sessione del manutentore
+che si chiude con un guasto (`--guasto` nel rilascio) lo lascia fermo fino alla
+prossima **sessione chiusa bene**, cioè arrivata al rilascio senza guasto.
+Intanto il pacemaker non lo accende per nessun automatismo: né il battito, né
+un segnale (i guasti degli altri lavori, la fusione di una correzione che un
+lavoro aspettava, una domanda di processo, un deploy o una suite rossi), né una
+sveglia chiesta prima, che non suona. Ognuna di quelle accensioni cadrebbe
+sullo stesso guasto e ne dichiarerebbe un altro. Lo accendono solo:
+
+- la **decisione del mattino**, che è il tentativo del giorno;
+- l'**owner dalla chat**, quando chiede di farlo ripartire (di solito dopo aver
+  sistemato l'ambiente): subito, senza aspettare il mattino;
+- la risposta **«lascialo riprovare»** dell'owner alla domanda del controllo
+  qui sotto: subito anche lei.
+
+I segnali non letti restano per la prima sessione chiusa bene.
 
 **Chi controlla il manutentore.** A interruttore acceso, se il server non vede
 una sua sessione chiusa bene da 26 ore (contate dall'ultima, o dall'accensione
