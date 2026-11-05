@@ -172,8 +172,8 @@ export function censimentoMancante({ via, indice, schede }) {
   const c = copertura({ indice, schede });
   if (!c.scarsa) return '';
   return [
-    `FERMO: la lettura dal server ha portato ${quanteSchede(c.vere)} su ${c.aperti} feedback aperti: il censimento non sta nei feedback`,
-    '(se elenca ne ha contate di illeggibili, è la lettura a non andare).',
+    `FERMO: la lettura dal server ha portato ${quanteSchede(c.vere)} su ${c.aperti} feedback aperti: il censimento non arriva dai feedback`,
+    '(elenca dice se sono i feedback a non averne o la lettura a non andare).',
     'Il censimento si porta nei feedback dalla macchina dell\'owner (elenca, poi scrivi: le schede della sua cartella si salvano senza agente);',
     `riscriverle tutte da qui (${c.mancano} agenti) si fa solo deciso, con --da-zero. Intanto si decide sui titoli, e lo si dice nel recap;`,
     'una scheda sola si scrive con scrivi --solo N.',
@@ -491,8 +491,13 @@ export async function main(argv) {
     return 1;
   }
   if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
-  const soloChiesti = Boolean(String(opzione(argv, '--solo') || '').trim());
-  if ((cmd === 'stato' || (cmd === 'scrivi' && !soloChiesti)) && !argv.includes('--da-zero')) {
+  // Una lettura sola di --solo per il fermo e per la scelta (#2181): un --solo senza numeri non è una scheda chiesta.
+  const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
+  if (cmd === 'scrivi' && !solo.length && argv.some((a) => a === '--solo' || a.startsWith('--solo='))) {
+    console.error('RIFIUTATO: --solo senza nessun numero (per esempio --solo 812,815). Non ho lanciato niente.');
+    return 1;
+  }
+  if ((cmd === 'stato' || (cmd === 'scrivi' && !solo.length)) && !argv.includes('--da-zero')) {
     const fermo = censimentoMancante({ via: (await strada()).via, indice, schede: leggiSchede(cartella) });
     if (fermo) { console.error(fermo); return 1; }
   }
@@ -515,7 +520,6 @@ export async function main(argv) {
   // Un segnalato non va all'agente: non lo può leggere, e la sua scheda il server non la salva.
   const perNum = new Map(indice.filter((f) => !f.segnalato).map((f) => [f.num, f]));
   if (cmd === 'scrivi') {
-    const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
     const segnalati = solo.filter((n) => indice.some((f) => f.num === n && f.segnalato));
     if (segnalati.length) console.log(`Segnalati, senza agente: ${segnalati.map((n) => `#${n}`).join(', ')} (scheda «non letto» col motivo).`);
     const ignoti = solo.filter((n) => !perNum.has(n) && !segnalati.includes(n));
