@@ -795,3 +795,95 @@ test('una scheda rimasta nella cartella da un comando interrotto mentre salvava 
     togliCartella(dir);
   }
 });
+
+// #1785.2 giro 2: scrivi e rileggi mandano su quello che il feedback ha adesso, non sull'indice dell'ultimo elenca.
+test('scrivi con l’indice di prima di #1785.2 non rimanda al feedback le schede che il feedback ha già', async (t) => {
+  if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
+  const dir = cartellaTemporanea('schede-indice-vecchio-');
+  const S1 = '2026-11-01T09:00:00.000Z';
+  const nelFeedback = { ...buona(7, { riletta: 'confermata' }), _fonte: { id: 'f7', stato: 'todo', aggiornato: S1, at: S1, modello: 'haiku' },
+    _riletta: { at: S1, modello: 'opus' }, _fiducia: 'non_fidato' };
+  const fb = { 7: { updatedAt: S1, scheda: nelFeedback } };
+  const canale = await canaleConStato(fb);
+  try {
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    // L'indice scritto da elenca prima che portasse l'ora della scheda salvata, con la copia della scheda del feedback.
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f7', num: '7', stato: 'todo', priorita: null, aggiornato: S1, attese: [], unisce: [] }]));
+    writeFileSync(join(cartella, '7.json'), JSON.stringify(nelFeedback));
+    const claude = claudeFinto(dir, buona(7));
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: canale.url, FILO_CLAUDE_BIN: claude.bin };
+    const r = await lanciaSchede(['scrivi', '--cartella', cartella], env);
+    assert.equal(r.code, 0, r.out);
+    assert.deepEqual(canale.scritte, [], 'il feedback l’ha già: non si riscrive a nome di chi lancia il comando');
+    assert.equal(fb[7].scheda._fiducia, 'non_fidato');
+    assert.equal(claude.lanci(), 0);
+  } finally {
+    await canale.chiudi();
+    togliCartella(dir);
+  }
+});
+
+test('una scheda della cartella non prende il posto di quella più nuova che il feedback ha avuto dopo l’ultimo elenca', async (t) => {
+  if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
+  const dir = cartellaTemporanea('schede-feedback-cambiato-');
+  const A = '2026-11-05T09:00:00.000Z';
+  const B = '2026-11-05T11:00:00.000Z';
+  // Alle 10 la scheda scritta qui non arriva al server; alle 11 il manutentore in cloud scrive la sua e la fa rileggere a Opus.
+  const dellaNuvola = { ...buona(9, { riletta: 'corretta l’area' }), _fonte: { id: 'f9', stato: 'todo', aggiornato: B, at: B, modello: 'haiku' },
+    _riletta: { at: B, modello: 'opus' }, _fiducia: 'fidato' };
+  const fb = { 9: { updatedAt: B, scheda: dellaNuvola } };
+  const canale = await canaleConStato(fb);
+  try {
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f9', num: '9', stato: 'todo', priorita: null, aggiornato: A, attese: [], unisce: [], nelFeedback: '' }]));
+    writeFileSync(join(cartella, '9.json'), JSON.stringify({ ...buona(9), _fonte: { id: 'f9', stato: 'todo', aggiornato: A, at: '2026-11-05T10:00:00.000Z', modello: 'haiku' } }));
+    const claude = claudeFinto(dir, buona(9));
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: canale.url, FILO_CLAUDE_BIN: claude.bin };
+    for (const cmd of ['scrivi', 'rileggi']) {
+      const r = await lanciaSchede([cmd, '--cartella', cartella], env);
+      assert.equal(r.code, 0, r.out);
+    }
+    assert.deepEqual(canale.scritte, [], 'niente sovrascrive la scheda delle 11');
+    assert.deepEqual(fb[9].scheda._riletta, { at: B, modello: 'opus' }, 'la rilettura di Opus resta nel feedback');
+    assert.equal(JSON.parse(readFileSync(join(cartella, '9.json'), 'utf8'))._riletta.modello, 'opus', 'e nella cartella');
+    assert.equal(claude.lanci(), 0);
+  } finally {
+    await canale.chiudi();
+    togliCartella(dir);
+  }
+});
+
+// Sopra la soglia del censimento: l'avviso «nessuna scheda» e l'esito di elenca dopo l'invio.
+test('elenca dopo aver mandato il censimento non dice che i feedback sono senza scheda; con schede rimaste fuori chiude con 3', async (t) => {
+  if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
+  const AGG = '2026-10-26T10:00:00.000Z';
+  const quanti = S.SOGLIA_CENSIMENTO + 10;
+  const scena = async (rifiuta) => {
+    const dir = cartellaTemporanea('schede-censimento-intero-');
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    const fb = {};
+    for (let n = 1; n <= quanti; n += 1) {
+      fb[n] = { updatedAt: AGG };
+      writeFileSync(join(cartella, `${n}.json`), JSON.stringify({ ...buona(n), _fonte: { id: `f${n}`, stato: 'todo', aggiornato: AGG, at: '2026-10-27T10:00:00.000Z', modello: 'haiku' } }));
+    }
+    const canale = await canaleConStato(fb, { rifiuta });
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: canale.url };
+    try {
+      return { ...(await lanciaSchede(['elenca', '--cartella', cartella], env)), scritte: canale.scritte.length };
+    } finally {
+      await canale.chiudi();
+      togliCartella(dir);
+    }
+  };
+  const tutte = await scena(() => null);
+  assert.equal(tutte.code, 0, tutte.out);
+  assert.equal(tutte.scritte, quanti);
+  assert.doesNotMatch(tutte.out, /una scheda salvata nel feedback/, 'le schede appena mandate il feedback le ha');
+  let n = 0;
+  const ferma = await scena(() => { n += 1; return n === 3 ? { status: 403, body: { ok: false, reason: 'fuori_ambito' } } : null; });
+  assert.equal(ferma.code, 3, ferma.out);
+  assert.match(ferma.out, new RegExp(`2 salvate adesso, ${quanti - 2} ancora fuori \\(fuori_ambito: rilancia lo stesso comando\\)`));
+});
