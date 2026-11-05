@@ -138,38 +138,79 @@ export function stampoDelTentativo(ramo, id) {
  * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
  * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene; `superati` quelli che la
  * regola dei tentativi dà per morti, da chiudere. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
+ * `num`, se c'è, aggiunge alla regola la fusione del feedback letta su main.
  */
-export function tentativiPrecedenti({ root, id, mainBranch = 'main', escludi = '' }) {
+export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', escludi = '' }) {
   const safe = idNelRamo(id);
   if (!safe) return { ok: true, scelto: null, altri: [], superati: [] };
-  let elenco;
-  try {
-    elenco = execFileSync('git', ['ls-remote', 'origin', `refs/heads/worker/${safe}-*`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
-  } catch (e) {
-    return { ok: false, errore: rigaDiErrore(e.stderr, e.message) };
-  }
-  const rami = String(elenco).split('\n').map((r) => r.trim().split(/\s+/)).filter((p) => p.length === 2)
-    .map(([head, ref]) => ({ head, ramo: ref.replace(/^refs\/heads\//, '') }))
-    .filter((t) => t.ramo !== escludi && stampoDelTentativo(t.ramo, id));
+  const elenco = tentativiSuOrigin(root, `refs/heads/worker/${safe}-*`);
+  if (!elenco.ok) return elenco;
+  const rami = elenco.rami.filter((t) => t.ramo !== escludi && stampoDelTentativo(t.ramo, id));
   if (!rami.length) return { ok: true, scelto: null, altri: [], superati: [] };
   const g = gitIn(root);
-  // Refspec esplicita: in un clone a ramo singolo `fetch origin <ramo>` scriverebbe solo FETCH_HEAD.
-  const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`,
-    ...rami.map((t) => `+refs/heads/${t.ramo}:refs/remotes/origin/${t.ramo}`)]);
-  if (!f.ok) return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+  const f = scaricaTentativi(g, mainBranch, rami);
+  if (!f.ok) return f;
   const main = `origin/${mainBranch}`;
-  const conFusi = rami.map((t) => ({ ...t, fuso: antenato(g, t.head, main) }));
-  const superati = tentativiSuperati(conFusi);
+  const conFusi = statoDeiTentativi(root, g, main, rami);
+  // La fusione del feedback letta su main regge anche quando la potatura ha già tolto il ramo fuso.
+  let fusioni = {};
+  try {
+    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main }) : '';
+    if (data) fusioni = { [safe]: attemptStamp(Date.parse(data)) };
+  } catch (_) { /* senza la storia di main resta la regola sui rami */ }
+  const superati = tentativiSuperati(conFusi, { fusioni });
   const vivi = conFusi.filter((t) => !t.fuso && !superati.has(t.ramo)).map((t) => {
     const n = g(['rev-list', '--count', `${main}..${t.head}`]);
     return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
   });
-  const contenuto = (a, b) => a.head !== b.head && antenato(g, a.head, b.head);
-  const massimi = vivi.filter((t) => !vivi.some((o) => contenuto(t, o)))
-    .sort((a, b) => stampoDelTentativo(b.ramo, id).localeCompare(stampoDelTentativo(a.ramo, id)));
-  const scelto = massimi[0] || null;
-  const altri = scelto ? massimi.slice(1).filter((t) => t.head !== scelto.head) : [];
+  const [scelto = null, ...altri] = viviInCima(vivi, (a, b) => antenato(g, a.head, b.head));
   return { ok: true, scelto, altri, superati: [...superati] };
+}
+
+/** I rami su origin che rispondono a `glob` → { ok, rami: [{ head, ramo }] }. */
+function tentativiSuOrigin(root, glob) {
+  try {
+    const out = execFileSync('git', ['ls-remote', 'origin', glob], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    const rami = String(out).split('\n').map((r) => r.trim().split(/\s+/)).filter((p) => p.length === 2)
+      .map(([head, ref]) => ({ head, ramo: ref.replace(/^refs\/heads\//, '') }));
+    return { ok: true, rami };
+  } catch (e) {
+    return { ok: false, errore: rigaDiErrore(e.stderr, e.message) };
+  }
+}
+
+function scaricaTentativi(g, mainBranch, rami) {
+  // Refspec esplicita: in un clone a ramo singolo `fetch origin <ramo>` scriverebbe solo FETCH_HEAD.
+  const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`,
+    ...rami.map((t) => `+refs/heads/${t.ramo}:refs/remotes/origin/${t.ramo}`)]);
+  return f.ok ? { ok: true } : { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+}
+
+/** `vuoto`: la punta sta sulla linea principale, cioè il tentativo è nato da main e non ci ha mai scritto. */
+function statoDeiTentativi(root, g, main, rami) {
+  const linea = lineaPrincipale(root, main);
+  return rami.map((t) => ({ ...t, fuso: antenato(g, t.head, main), vuoto: linea.has(t.head) }));
+}
+
+/**
+ * Chiude su origin i tentativi superati di tutti i feedback, non solo di quello che riparte: va fatto mentre il ramo
+ * fuso c'è ancora, prima che la potatura lo tolga, e un feedback chiuso non riparte più (#2152). Best-effort.
+ */
+export function chiudiSuperatiOvunque({ root, mainBranch = 'main' }) {
+  const elenco = tentativiSuOrigin(root, 'refs/heads/worker/*');
+  if (!elenco.ok) return { ok: false, chiusi: [], errore: elenco.errore };
+  const perId = new Map();
+  for (const t of elenco.rami) {
+    const l = leggiTentativo(t.ramo);
+    if (l) perId.set(l.id, [...(perId.get(l.id) || []), t]);
+  }
+  const candidati = [...perId.values()].filter((v) => v.length > 1).flat();
+  if (!candidati.length) return { ok: true, chiusi: [] };
+  const g = gitIn(root);
+  const f = scaricaTentativi(g, mainBranch, candidati);
+  if (!f.ok) return { ok: false, chiusi: [], errore: f.errore };
+  const superati = tentativiSuperati(statoDeiTentativi(root, g, `origin/${mainBranch}`, candidati));
+  return chiudiTentativi({ root, rami: [...superati] });
 }
 
 /**
