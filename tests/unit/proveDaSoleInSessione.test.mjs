@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { IDENTITA_SESSIONE, fileArgs, flagsConAvanzamento, lanciaSorvegliato, testoFermo, testoFileChiusi } from '../../scripts/run-unit-tests.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
+import { chiaviDelRegistroUnit } from '../../scripts/build-alarm.mjs';
 
 const QUI = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(QUI, '..', '..');
