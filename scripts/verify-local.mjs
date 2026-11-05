@@ -366,6 +366,31 @@ export function withRequest(state, branch, { request, sha, at, feedbackId, feedb
 }
 
 /**
+ * La richiesta del giro è la voce dell'owner (#1514)? PURA. Sì se l'ha scritta lui (l'orchestratore lo dice con
+ * --richiesta-owner), se non c'è pratica (l'ha scritta chi ha lanciato start), o se la pratica è fidata.
+ */
+export function richiestaDellOwner(entry) {
+  const e = entry || {};
+  return e.richiestaOwner === true || !e.feedbackId || e.fiducia === 'fidato';
+}
+
+/** Lo stato all'avvio di un giro, con la pratica com'è uscita dal controllo (praticaPerLaSessione). PURA. */
+export function statoDelGiro(state, branch, { request, sha, pratica = null, richiestaOwner, server = null }) {
+  return withRequest(state, branch, {
+    request, sha, feedbackId: pratica ? pratica.id : '', feedbackNum: pratica ? pratica.seq : '', fiducia: pratica ? pratica.fiducia : '',
+    richiestaOwner, server,
+  });
+}
+
+/** Il compito del giro dallo stato del ramo: la richiesta, e se è la voce dell'owner, dalla pratica registrata. PURA. */
+export function compitoDelGiro(entry, { branch, recipe, scope, server = null }) {
+  return buildVerifierBrief({
+    request: entry.request, branch, recipe, history: historyFromRounds(entry.rounds),
+    scope, perimetro: entry.chiusura, server, fidata: richiestaDellOwner(entry),
+  });
+}
+
+/**
  * Registra una critica sul contenuto `sha` e ne calcola l'esito coi bilanci
  * del lavoro. PURA. Ritorna { state, decision, outcome }:
  *   outcome 'pass' → verdict 'pass' (i rilievi rimasti si accodano a `derived`)
