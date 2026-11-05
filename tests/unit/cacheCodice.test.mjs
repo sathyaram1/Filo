@@ -100,7 +100,7 @@ test('la sottocartella di un motore vecchio se ne va, quella di adesso e il perc
   assert.equal(avvia(ud, dir).presa, true);
 });
 
-test('con una cartella di cache scelta nell\'ambiente Filo non cancella niente di suo', () => {
+test('con una cartella di cache scelta nell\'ambiente Filo non cancella niente di suo', OPZ, () => {
   const base = nuova('filo-cache-altrui-');
   const altrui = join(base, 'cache-mia');
   const sua = join(altrui, 'v0.0.0-x64-sua-0');
