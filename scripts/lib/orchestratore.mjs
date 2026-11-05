@@ -576,7 +576,7 @@ export function creaMotore(dep, opzioni = {}) {
     const wt = P.wt(p.slug);
     if ((await preStart(p, wt)) === 'riallinea') return riallinea(p, 'il merge di origin/main va in conflitto');
     const primo = !((dep.verifica(wt) || {}).entry || {}).request;
-    const args = ['scripts/verify-local.mjs', 'start', ...(primo ? [richiestaPerLaVerifica(p), '--feedback', String(p.num)] : [])];
+    const args = ['scripts/verify-local.mjs', 'start', ...(primo ? argomentiDiStart(p) : [])];
     let s;
     for (let t = 0; ; t += 1) {
       s = await node(wt, args);
