@@ -22,6 +22,10 @@ if (!app.requestSingleInstanceLock()) {
   return;
 }
 
+// Dopo userData, prima di ogni altro require: un modulo caricato prima non passa dalla cache (#2118).
+const cacheCodice = require('./cacheCodice');
+cacheCodice.accendi(app);
+
 // «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
 try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
 
