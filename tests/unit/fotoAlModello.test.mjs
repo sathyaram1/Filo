@@ -75,7 +75,7 @@ test('una richiesta di foto della pagina senza la copia coperta sta solo dove la
       const rel = relative(RADICE, p).split('\\').join('/');
       const t = readFileSync(p, 'utf8');
       for (const m of t.matchAll(/\{\s*type:\s*(?:MSG\.CAPTURE_VISIBLE_TAB|'capture_visible_tab')([^}]*)\}/g)) {
-        if (!/\b(?:perModello|copiaPerModello):\s*true/.test(m[1]) && !RICHIESTE_INTERE[rel]) fuori.push(rel);
+        if (!/\b(?:perModello|copiaPerModello|coperta):\s*true/.test(m[1]) && !RICHIESTE_INTERE[rel]) fuori.push(rel);
       }
     }
   }
