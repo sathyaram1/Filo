@@ -9,7 +9,7 @@ const PER_RAFFICA = 25;
 const PEZZI = RAFFICHE * PER_RAFFICA;
 
 async function preparaProvider(app) {
-  await app.evaluate(async ({ RAFFICHE, PER_RAFFICA }) => {
+  await app.evaluate(async (_electron, { RAFFICHE, PER_RAFFICA }) => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
