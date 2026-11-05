@@ -68,6 +68,7 @@ async function apriSito() {
       if (percorso === '/accesso/inviato') { res.writeHead(302, { Location: '/accesso/grazie' }); res.end(); return; }
       if (percorso === '/accesso/grazie') return html(200, '<!doctype html><title>Grazie | Accesso clienti</title><p>Grazie, ti risponderemo presto');
       if (percorso === '/contatto-lato-dopo') { res.writeHead(302, { Location: '/grazie-lato' }); res.end(); return; }
+      if (percorso === '/rifai') { const m = new URLSearchParams(corpo).get('messaggio') || ''; return html(200, `<!doctype html><title>Rispondi</title><p>Il codice di verifica non è corretto, riprova</p><form method="post" action="/rifai"><textarea name="messaggio" style="width:400px;height:100px">${m.replace(/</g, '&lt;')}</textarea><input name="captcha"><button>Invia</button></form>`); }
       const p = pagine.get(percorso.replace(/^\//, ''));
       if (!p) { res.writeHead(404); res.end('no'); return; }
       html(200, p);
