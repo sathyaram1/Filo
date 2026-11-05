@@ -327,9 +327,11 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
   const mandare = segnate ? `; ${segnate} schede della cartella mancano nel feedback: scrivi le salva senza agente` : '';
   const salvate = `${r.schede.length} schede salvate nei feedback${nonSiAprono}${dryRun ? '' : `, ${scritte} copiate nella cartella`}${mandare}`;
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
-  const daLeggere = indice.filter((f) => !f.segnalato).length;
-  if (!r.schede.length && !r.illeggibili && daLeggere >= SOGLIA_CENSIMENTO) {
-    console.log(`Nessuno dei ${daLeggere} aperti ha una scheda salvata nel feedback: la lettura è andata, sono i feedback a non averne.`);
+  const c = copertura({ indice, schede: r.schede });
+  if (c.scarsa) {
+    const chi = c.vere ? `Solo ${c.vere} dei ${c.aperti} aperti ha` : `Nessuno dei ${c.aperti} aperti ha`;
+    const perche = r.illeggibili ? `, e ${r.illeggibili} non si leggono: è la lettura a non andare` : ': la lettura è andata, sono i feedback a non averne';
+    console.log(`${chi} una scheda salvata nel feedback${perche}. In una routine stato e scrivi si fermano.`);
   }
   return 0;
 }
