@@ -25,6 +25,6 @@ async function preparaLaCorsa(radice) {
   Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });
   return async () => {
     await schermo.spegni();
-    try { togliCartella(temp, { tentativi: 2, attesa: 100 }); } catch (_) {}
+    chiudiLaCorsa(temp);
   };
 }
