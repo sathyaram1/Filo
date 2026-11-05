@@ -54,6 +54,17 @@ export function vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato = 
 
 export const ANCHE_MAI_GIUDICATO = '--anche-mai-giudicato';
 
+/**
+ * '' se il feedback entra nell'indice con la sua scheda, altrimenti il motivo: solo i segnalati, come la lettura senza
+ * testi del server (vietatoLeggere di functions/src/routine/schede.js). Il mai giudicato vale per il testo, non qui. PURA.
+ */
+export function vietatoNellIndice(status, pipeline) {
+  const s = String(status || '').trim();
+  if (!FS.isCanonical(s)) return 'stato non decifrabile: non so se è segnalato come attacco';
+  const segnalato = MR.segnalatoComeAttacco({ status: s, pipeline });
+  return segnalato ? `${segnalato}: per regola una sessione non lo legge` : '';
+}
+
 /** Il giudizio grezzo del documento: stringa (cifrata o JSON), mappa in chiaro, o niente. */
 function giudizioGrezzo(f) {
   const p = f && f.pipeline;
