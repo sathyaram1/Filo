@@ -64,8 +64,11 @@ let aiReply = '{}';
 let modelHangs = false;
 let cancello = null;
 const aiCalls = [];
+// `aiTurno`: un modello finto che sceglie la risposta chiamata per chiamata (n da 1), al posto di `aiReply`.
+let aiTurno = null;
 const handleAIRequest = async (args) => {
   aiCalls.push(args);
+  if (aiTurno) return aiTurno(args, aiCalls.length);
   if (cancello) await cancello;
   if (modelHangs) {
     await new Promise((_, reject) => {
