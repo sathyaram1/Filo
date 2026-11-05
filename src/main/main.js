@@ -499,9 +499,9 @@ app.on('before-quit', () => {
     let contati = {};
     try { contati = contatori()?.perLaChiusura() || {}; } catch (_) { contati = {}; }
     // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
-    if (tm && Storage?.setSync) {
+    if (stato && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
-      Storage.setSync({ [key]: tm.sessionState(), ...contati });
+      Storage.setSync({ [key]: stato, ...contati });
     } else if (Object.keys(contati).length && Storage?.setSync) Storage.setSync(contati);
     else Storage?.flushSync?.();
   } catch (_) {}
