@@ -2293,7 +2293,7 @@ function positionOnBranch(bucket) {
   if (dalBiglietto) {
     process.stderr.write(res.ripreso
       ? `[dispatch] ${branch}: il biglietto era già legato a questo ramo, si riprende dalla sua punta ${String(res.head).slice(0, 12)} (il lavoro di prima sta nei suoi commit)\n`
-      : `[dispatch] ${branch}: il biglietto era già legato a questo ramo, che non c'è da nessuna parte: nasce adesso con quel nome, dalla linea principale\n`);
+      : `[dispatch] ${branch}: il biglietto era già legato a questo ramo, che non c'è da nessuna parte: nasce adesso con quel nome${ripartito ? ', dal tentativo precedente' : ', dalla linea principale'}\n`);
   }
 
   // Identità attesa del contenuto, che transizioni (C) e ripristino (D) confronteranno. Lo stato di un'altra storia
