@@ -349,6 +349,8 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
     ['Musica', '<input id="q" type="search" placeholder="Cosa vuoi ascoltare?">'],
     ['Negozio', '<div role="search"><input id="q" type="text" aria-label="Cerca"></div>'],
     ['Motore', '<form role="search" onsubmit="event.preventDefault()"><textarea id="q" name="q"></textarea></form>'],
+    // Fuori da un modulo di ricerca e senza «rows»: la dice ricerca solo la misura delle righe che mostra.
+    ['Motore una riga', '<div><textarea id="q" name="q" style="width:480px;height:24px;line-height:24px;padding:4px;resize:none;overflow:hidden"></textarea></div>'],
   ]) {
     const page = await apriEsatta(app, shell, conRisultati(titolo, campo));
     await page.locator('#q').click();

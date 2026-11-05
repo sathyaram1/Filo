@@ -268,3 +268,67 @@ test('una parola d’accesso già nella pagina di partenza e l’accesso in una 
     expect.soft(aperte, 'accesso laterale solo nella pagina dopo').not.toContain(ids.lato);
   } finally { await sito.chiudi(); }
 });
+
+// Un editor classico in un riquadro nato con srcdoc ha il suo Filo, ma il modulo che ne porta il testo sta nella pagina.
+const EDITOR_SRCDOC = '<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body contenteditable=true style=\'min-height:100px\'></body>"></iframe>';
+const LETTERA = 'Buongiorno, vi scrivo per il rimborso dell’ordine 4471: il pacco è arrivato rotto e vorrei sapere come procedere';
+
+test('un editor in un riquadro nato con srcdoc, mandato e respinto, tiene aperta la scheda; mandato bene no (#1808.2)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const campi = {
+      'campo nascosto a più righe': '<textarea name="corpo" id="nasc" style="display:none"></textarea>',
+      'campo nascosto di una riga': '<input type="hidden" name="corpo" id="nasc">',
+    };
+    const invii = {
+      bottone: ['<button id="pub">Invia</button>', "f.addEventListener('submit', () => { nasc.value = ifr.contentDocument.body.innerHTML; });"],
+      script: ['<a href="#" id="pub">Pubblica</a>', "pub.onclick = (e) => { e.preventDefault(); nasc.value = ifr.contentDocument.body.innerHTML; f.submit(); };"],
+    };
+    const respinti = {};
+    const arrivati = {};
+    let k = 0;
+    for (const [azione, attesa, dove] of [['/err500', 'Errore', respinti], ['/ok', 'Fatto', arrivati]]) {
+      for (const [nc, campo] of Object.entries(campi)) for (const [ni, [el, script]] of Object.entries(invii)) {
+        if (dove === arrivati && nc !== 'campo nascosto a più righe') continue;
+        const titolo = `Editor${++k}`;
+        const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+          <form id="f" method="post" action="${azione}">${campo}${EDITOR_SRCDOC}${el}</form><script>${script}</script>`));
+        await page.frameLocator('#ifr').locator('body').click();
+        await page.keyboard.type(LETTERA);
+        const id = await sporca(shell, titolo);
+        await page.locator('#pub').click();
+        await expect.poll(async () => (await schede(shell)).find((t) => t.id === id)?.title, { timeout: 10_000 }).toBe(attesa);
+        await page.waitForTimeout(600);
+        dove[`${nc}, invio da ${ni}`] = id;
+      }
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    for (const [nome, id] of Object.entries(respinti)) expect.soft(aperte, `respinto: ${nome}`).toContain(id);
+    for (const [nome, id] of Object.entries(arrivati)) expect.soft(aperte, `arrivato: ${nome}`).not.toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo mandato da uno script e rimandato indietro col testo e un errore tiene aperta la scheda come dal bottone (#1808.2)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    let k = 0;
+    // L'invio subito dopo l'ultimo tasto: la pagina se ne va prima della rilettura a riposo.
+    for (const [nome, invio] of [
+      ['bottone', '<button id="pub">Invia</button>'],
+      ['script', '<a href="#" id="pub" onclick="f.submit();return false">Pubblica</a>'],
+    ]) {
+      const titolo = `Forum${++k}`;
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <form id="f" method="post" action="/rifai"><textarea id="c" name="messaggio" style="width:400px;height:100px"></textarea>${invio}</form>`));
+      await page.locator('#c').click();
+      await page.keyboard.type(LETTERA);
+      ids[nome] = await sporca(shell, titolo);
+      await page.locator('#pub').click();
+      await expect.poll(async () => (await schede(shell)).find((t) => t.id === ids[nome])?.title, { timeout: 10_000 }).toBe('Rispondi');
+      await page.waitForTimeout(800);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    for (const [nome, id] of Object.entries(ids)) expect.soft(aperte, `invio da ${nome}`).toContain(id);
+  } finally { await sito.chiudi(); }
+});
