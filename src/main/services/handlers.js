@@ -753,8 +753,9 @@ function createAnswerStreamer(onText) {
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
 // `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
-// Un taglio senza niente da mostrare è un errore per tutti: «qualcosa è andato storto» non direbbe del tetto.
-async function handleAIRequest({ intera = false, ...opts }) {
+// Un taglio senza niente da mostrare è un errore, salvo `conSeguito` (la superficie ha «Continua») col tetto finito nel
+// ragionamento: «qualcosa è andato storto» non direbbe del tetto, la nota col seguito sì (#1302).
+async function handleAIRequest({ intera = false, conSeguito = false, ...opts }) {
   let r;
   try {
     r = await chiamaIlModello(opts);
