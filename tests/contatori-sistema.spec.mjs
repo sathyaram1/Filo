@@ -54,7 +54,7 @@ test('l’avvio, la sessione, le pagine, il disco e la memoria si contano; il se
       s = await sistema(app);
       return s && Object.keys(s.avvioPasso).sort().join(',');
     }, { timeout: 60_000, message: 'ogni passo dell’avvio ha il suo tempo' })
-      .toBe(['adblock', 'finestra_creata', 'fingerprint', 'impostazioni_lette', 'permessi', 'prima_scheda_visibile', 'protocollo_ipc', 'sessione_ripristinata'].join(','));
+      .toBe(['adblock', 'finestra_creata', 'fingerprint', 'impostazioni_lette', 'moduli_caricati', 'permessi', 'prima_scheda_visibile', 'protocollo_ipc', 'sessione_ripristinata'].join(','));
     expect(s.avvioTipo).toEqual({ freddo: 1 });
     expect(s.uscitaPrecedente).toEqual({});
     // La sessione con le due schede: la scheda in vista caricata e la coda finita, ognuna nella sua fascia.

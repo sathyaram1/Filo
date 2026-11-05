@@ -17,6 +17,7 @@ const RESTA = Object.freeze({
   SingletonSocket: 'il segno di Chromium che tiene aperta una copia sola di Filo, non un dato',
   lockfile: 'il segno di Chromium che tiene aperta una copia sola di Filo (Windows), non un dato',
   'preload-pacchetto': 'il codice di Filo per le pagine web, ricomposto a ogni avvio: niente di chi usa l\'app',
+  'codice-compilato': 'il codice di Filo già compilato, che fa partire l\'app prima: niente di chi usa l\'app',
   Dictionaries: 'i dizionari delle lingue del correttore, uguali per tutti (le parole tue stanno altrove e se ne vanno)',
   adblock: 'le liste pubbliche contro la pubblicità, uguali per tutti',
   'firmatari-c2pa': 'l\'elenco pubblico dei firmatari delle credenziali sulle immagini, uguale per tutti',

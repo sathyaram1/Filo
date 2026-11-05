@@ -401,7 +401,7 @@
   // ── Gli elenchi chiusi del sistema (#1466) ────────────────────────────────
   // Un codice (il tipo di un processo, il nome di un'eccezione, l'errore del disco) si mappa sul suo elenco, e il resto
   // diventa «altro» o non esce: messaggi, stack, percorsi e chiavi dello storage non arrivano mai qui.
-  const PASSI_AVVIO = Object.freeze(['impostazioni_lette', 'protocollo_ipc', 'adblock', 'fingerprint', 'permessi',
+  const PASSI_AVVIO = Object.freeze(['moduli_caricati', 'impostazioni_lette', 'protocollo_ipc', 'adblock', 'fingerprint', 'permessi',
     'finestra_creata', 'prima_scheda_visibile', 'sessione_ripristinata']);
   const TIPI_AVVIO = Object.freeze(['freddo', 'dopo_aggiornamento', 'seconda_istanza']);
   // I processi che non sono schede come li nomina Electron (`details.type`), più la scheda rimorta mentre si recuperava.

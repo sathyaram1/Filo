@@ -18,6 +18,7 @@
         { testo: 'Se chiedi a Filo cosa sa fare, ti risponde invece di mandare una segnalazione. A «come scegli i modelli?» risponde dal documento scritto, e le impostazioni le chiama per nome, non con le sigle interne.', segnalazione: 1921 },
         { testo: 'Su Mac, con Filo acceso e nessuna sua finestra aperta, le voci della barra dei menu e le loro scorciatoie, come Cmd+T e Cmd+Shift+T, riaprono la finestra con le tue schede invece di non fare niente.', segnalazione: 2031 },
         { testo: 'Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W, Cmd+R e lo zoom agiscono su di lei e non più sulla scheda che aspetta l\'accesso.', segnalazione: 2031 },
+        { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
       ],
     },
     {

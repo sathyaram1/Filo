@@ -5,6 +5,8 @@
 //   - manager dei tab basato su WebContentsView
 //   - servizi (storage, providers AI, saved pages, ecc.)
 
+// Il passo «moduli_caricati» dei contatori d'avvio: da qui alla fine del codice in cima al file, prima di whenReady.
+const inizioModuli = Date.now();
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
 
@@ -19,6 +21,10 @@ if (!app.requestSingleInstanceLock()) {
   app.quit();
   return;
 }
+
+// Dopo userData, prima di ogni altro require: un modulo caricato prima non passa dalla cache (#2118).
+const cacheCodice = require('./cacheCodice');
+cacheCodice.accendi(app);
 
 // «Cancella tutti i dati di Filo» chiesto prima del riavvio (#850): prima che chiunque apra un file della cartella dei dati.
 try { require('./cancellaTutto').allAvvio(app); } catch (e) { console.error('[Filo] cancella tutto:', e?.message || e); }
@@ -206,9 +212,12 @@ function configureSpellchecker() {
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
 
+const msModuli = Date.now() - inizioModuli;
+
 app.whenReady().then(async () => {
   // I passi dell'avvio per i contatori anonimi (#1466): quanto pesa ognuno, non solo il tutto.
   const passo = (nome, t0) => { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} };
+  try { contatori()?.passoAvvio('moduli_caricati', msModuli); } catch (_) {}
   let t = Date.now();
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
   // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
@@ -297,12 +306,14 @@ app.whenReady().then(async () => {
   mainWindow = createMainWindow();
   // Nelle prove, quando è nata la finestra e quando la prima scheda ha potuto partire (tests/seconda-apertura.spec.mjs).
   if (process.env.NODE_ENV === 'test') {
-    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null };
+    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null, msModuli, cacheCodice: cacheCodice.accesa() };
     pronti.then(() => { globalThis.__filoAvvio.pronti = Date.now(); });
   }
 
   // Dopo la prima scheda: niente di questo cambia come si apre.
   pronti.then(() => {
+    // Qualche secondo dopo, per prendere anche i moduli che l'avvio carica in ritardo.
+    setTimeout(() => cacheCodice.scrivi(), 5000).unref?.();
     // I cookie dei tracker rimasti da una chiusura brusca (quella normale li toglie uscendo).
     try { require('./services/cookies').wipeTrackerCookies(s).catch(() => {}); } catch (_) {}
     // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e la rinfresca quando è vecchia.
