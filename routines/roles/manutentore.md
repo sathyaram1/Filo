@@ -172,9 +172,9 @@ Un esperimento dal vivo ha quattro paletti: **dichiarato nel taccuino** prima di
 **uno alla volta**; **reversibile con un comando**; **raccontato nel recap**. Niente esperimenti sui modelli che fanno
 il lavoro (provare un modello piccolo dal vivo no; cambiare un parametro di cache sì).
 
-Primo filone, la cache: quanti turni arrivano dopo un buco sopra i cinque minuti e quanto costano in riletture; se
-conviene un'ora per alcuni ruoli; se per te l'ora si può scegliere. Le chiamate di Filo stesso hanno la stessa
-domanda, e lì il TTL lo scegliamo noi.
+La cache a un'ora per i sotto-agenti è chiusa: si resta a cinque minuti, coi numeri in SPEC-MANUTENTORE.md § 6, e
+non si ripropone senza una misura nuova. Ogni settimana rifai `rapporti --giorni 7 --cache` e scrivi il confronto nel
+taccuino. Le chiamate di Filo stesso hanno la stessa domanda, e lì il TTL lo scegliamo noi.
 
 ## Le novità
 
