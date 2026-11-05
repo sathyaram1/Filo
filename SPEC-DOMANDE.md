@@ -648,7 +648,9 @@ Come funziona oggi (#1152):
     l'elenco la segna `provvisoria`). Di queste due, quando la revisione la
     dà per attuata, il server scrive nella domanda, coi soli dati, quale
     lavoro fuso la attua e perché la scelta resta all'owner, una volta per
-    lavoro: lui risponde in un clic. Una risposta, per qualunque strada
+    lavoro: lui risponde in un clic. Il giudizio è della revisione, quindi la
+    riga porta la fiducia del suo biglietto, come una chiusura: da sporco la
+    domanda diventa non fidata. Una risposta, per qualunque strada
     (finestra, consiglio, principio, compito), che sceglie la provvisoria su
     un lavoro già fuso non lo rimette in coda, e il suo esito dice «non
     serviva» invece del pulsante scelto. Alla prima lettura arrivano anche i
