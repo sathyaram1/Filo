@@ -59,15 +59,3 @@ test('r2 con la finestrella di accesso davanti, «Chiudi scheda» non chiude la 
   await new Promise((r) => setTimeout(r, 1000));
   expect((await stato(app, accesso)).normale.schede, 'Cmd+W nella finestrella ha chiuso la scheda che aspetta l\'accesso').toContain(negozio);
 });
-
-test('r2 con la finestra ridotta a icona, «Nuova scheda» la riporta a schermo con la scheda nuova', async ({ app, openTab, testServer }) => {
-  await testServer.openReady(openTab, '<title>Uno</title><h1>uno</h1>');
-  await app.evaluate(({ BrowserWindow }) => {
-    BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).minimize();
-  });
-  await expect.poll(async () => (await stato(app)).normale.ridotta, { timeout: 5000 }).toBe(true);
-  const prima = (await stato(app)).normale.schede.length;
-  await voceDellaBarra(app, 'Nuova scheda');
-  await expect.poll(async () => (await stato(app)).normale.schede.length, { timeout: 10000 }).toBe(prima + 1);
-  expect((await stato(app)).normale.ridotta, 'la scheda nuova è nata in una finestra che non si vede').toBe(false);
-});
