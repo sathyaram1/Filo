@@ -503,6 +503,20 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
   };
 }
 
+// Un worker solo: le parti della suite su GitHub vanno a 20-28 s per spec, e un ramo largo ne sceglie quasi duecento
+// (#2178): una durata fissa promessa nei ruoli faceva uccidere i controlli a metà da chi li aspettava.
+export const SECONDI_PER_SPEC = [20, 30];
+export const MINUTI_UNIT = [4, 8];
+
+/** La durata prevista dei controlli, da quanti spec lanceranno: la si stampa prima di partire. PURA. */
+export function stimaDurataControlli(nSpec) {
+  const n = Math.max(0, Math.floor(Number(nSpec) || 0));
+  const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
+  const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
+  const spec = n === 1 ? '1 spec' : `${n} spec`;
+  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (unit più ${spec}, circa mezzo minuto l'uno con un worker).` };
+}
+
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
 export { lottiPerRigaDiComando };
 
