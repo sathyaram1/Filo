@@ -16,7 +16,7 @@ test('i difetti rimasti di una verifica non nascono a priorità 2 in nessun test
   assert.match(leggi('FEEDBACK-STATES.md'), /un 2 che nasce a 1/);
 });
 
-test('il ruolo del manutentore non chiede una routine sua col modello Fable', () => {
+test('il ruolo del manutentore non chiede una routine sua', () => {
   const t = leggi('routines/roles/manutentore.md');
   assert.doesNotMatch(t, /routine su claude\.ai che il pacemaker accende per te/);
   assert.match(t, /Una routine tua su claude\.ai non c'è e non serve/);

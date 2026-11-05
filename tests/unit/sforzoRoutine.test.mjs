@@ -1,5 +1,6 @@
 // Sforzo degli agenti delle routine (decisione dell'owner del 2026-10-02): il primo lavoro a xhigh, verifica,
-// correzione, controllo di sicurezza e lettura del diff a high; la prosa dell'orchestratore dice lo stesso e sceglie l'agente per ruolo.
+// correzione, controllo di sicurezza e lettura del diff a high; il manutentore Opus a high, non Fable (decisione del
+// 4 novembre: Fable consuma prima il limite settimanale). La prosa dell'orchestratore dice lo stesso e sceglie l'agente per ruolo.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';

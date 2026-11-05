@@ -61,9 +61,9 @@ entra in nessun pacchetto: si lavora appena arriva.
 turni), i rami in corso con i loro file (da git, senza modello) e la spesa
 della settimana. Decide l'ordine, forma i pacchetti, sceglie cosa accendere in
 parallelo. Non fonde niente: legge testo scritto da altri, quindi è non fidato,
-e le fusioni restano ai controlli del server. Modello di frontiera (Opus o
-Fable: stesso costo di lettura dalla cache; prima scelta Fable, per l'ordine
-dei lavori).
+e le fusioni restano ai controlli del server. Modello di frontiera: Opus a
+sforzo high (decisione owner del 4 novembre: Fable consuma più in fretta il
+limite settimanale che ferma le routine).
 
 **Sessione di lavoro.** Una per feedback, accesa dal server col biglietto di
 quel feedback: niente orchestratore. Fa il primo lavoro con i sotto-agenti che

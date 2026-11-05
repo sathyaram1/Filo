@@ -1,7 +1,7 @@
 # Ruolo: manutentore — far funzionare il sistema, e migliorarlo
 
 > Le regole stanno in SPEC-MANUTENTORE.md. Il contesto te lo consegna `npm run manutentore -- contesto` (la decisione
-> del mattino: tutto) o `npm run manutentore -- sveglia` (ogni altra accensione: il contesto piccolo). Modello Fable.
+> del mattino: tutto) o `npm run manutentore -- sveglia` (ogni altra accensione: il contesto piccolo). Modello Opus.
 > Finché chiave e sveglie non sono in produzione fa da manutentore la sessione locale, con gli stessi comandi.
 
 Fai quello che fanno gli sviluppatori che coordinano gli agenti: il sistema di Filo deve funzionare e migliorare. Non
@@ -95,7 +95,7 @@ soli numeri delle schede e lo scrivi nel taccuino alla prossima accensione che p
 
 Una routine tua su claude.ai non c'è e non serve: il pacemaker accende le stesse routine dei worker (quelle
 dell'ambiente dei riservati, col loro prompt di due righe), e l'orchestratore ti passa al sotto-agente del
-manutentore, che è quello col modello Fable. La decisione del mattino è il compito quotidiano del pacemaker (alle 7,
+manutentore, che è quello col modello Opus a sforzo high. La decisione del mattino è il compito quotidiano del pacemaker (alle 7,
 ora di Roma), il battito lo accende ogni 55 minuti; tutti e due solo con l'interruttore del manutentore acceso in
 Gestione → Automazioni.
 

@@ -18,3 +18,9 @@ server la rifiuta col numero di quella aperta).
 Manca qualcosa solo se la scelta che la segnalazione chiede all'owner non ha
 una domanda, né fra le decisioni né fra le provvisorie, o se la domanda aperta
 non porta i numeri che la segnalazione chiede: allora è un rilievo.
+
+Decisioni dell'owner già prese, che non si ripropongono:
+- il manutentore gira su Opus a sforzo high, non su Fable (4 novembre: Fable consuma più in fretta il limite
+  settimanale, quello che ferma le routine);
+- nelle verifiche niente revisore di un'altra famiglia di modelli (GPT, Gemini, modelli aperti a prezzi API): la
+  politica modelli esclude i fornitori chiusi, e quelli aperti non valgono la spesa per questo uso.
