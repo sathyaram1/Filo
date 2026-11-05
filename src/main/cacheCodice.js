@@ -7,12 +7,14 @@ const Module = require('node:module');
 const path = require('node:path');
 
 let accesa = false;
+let cartella = '';
 
 function accendi(app) {
   try {
     if (typeof Module.enableCompileCache !== 'function') return false;
     // Fuori dalla cartella dei dati di Chromium («Code Cache» è quella delle pagine), e tenuta da «Cancella tutto».
-    const r = Module.enableCompileCache(path.join(app.getPath('userData'), 'codice-compilato'));
+    cartella = path.join(app.getPath('userData'), 'codice-compilato');
+    const r = Module.enableCompileCache(cartella);
     const S = Module.constants?.compileCacheStatus || {};
     accesa = !!r && (r.status === S.ENABLED || r.status === S.ALREADY_ENABLED);
   } catch (_) { accesa = false; }
@@ -25,8 +27,9 @@ function scrivi() {
   // Ogni versione del motore ha la sua sottocartella (qualche MB): quelle di prima di un aggiornamento non servono più.
   try {
     const attuale = Module.getCompileCacheDir?.();
-    if (!attuale) return;
-    const radice = path.dirname(attuale);
+    // Solo la nostra: con NODE_COMPILE_CACHE nell'ambiente la cache è di chi l'ha scelta.
+    const radice = attuale ? path.dirname(attuale) : '';
+    if (!cartella || path.resolve(radice) !== path.resolve(cartella)) return;
     for (const nome of fs.readdirSync(radice)) {
       if (nome !== path.basename(attuale)) fs.rmSync(path.join(radice, nome), { recursive: true, force: true });
     }

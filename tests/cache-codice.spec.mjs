@@ -1,10 +1,10 @@
-// #2118: il codice del processo principale compilato al primo avvio si ritrova al secondo, dalla cartella dei dati.
+// #2118: il codice del processo principale compilato al primo avvio si ritrova al secondo, nella cartella dei dati.
 // Filo si apre come lo apre chi lo usa (senza il debugger di Playwright, che cambia le opzioni del motore e quindi la
 // cache), e il registro di Node dice quale file ha preso dalla cache. Logica: src/main/cacheCodice.js.
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { existsSync, readdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { _electron as electron } from '@playwright/test';
@@ -45,11 +45,16 @@ const accettati = (log) => (log.match(/V8 code cache for CommonJS [^\n]* was acc
 test('al secondo avvio il codice del main arriva già compilato dalla cartella dei dati', async () => {
   test.setTimeout(180_000);
   const userData = cartellaTemporanea('filo-cache-codice-');
+  // Quella lasciata da una versione del motore di prima di un aggiornamento.
+  const vecchia = join(userData, CARTELLA, 'v0.0.0-x64-vecchia-0');
+  mkdirSync(vecchia, { recursive: true });
+  writeFileSync(join(vecchia, 'de1a5a82'), 'x');
   let filo = null;
   try {
     filo = avvia(userData);
     // Non serve chiudere bene: la cache si scrive da sé poco dopo l'avvio, anche se Filo poi viene ucciso.
     await expect.poll(() => delLoader('scritto').test(filo.log()), { timeout: 90_000, message: 'il primo avvio non ha scritto la cache' }).toBe(true);
+    await expect.poll(() => existsSync(vecchia), { message: 'la cache di un motore vecchio resta su disco' }).toBe(false);
     await filo.chiudi();
     filo = null;
     expect(file(join(userData, CARTELLA)), 'la cache sta nella cartella dei dati').toBeGreaterThan(50);

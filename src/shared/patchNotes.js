@@ -18,12 +18,12 @@
         { testo: 'Se chiedi a Filo cosa sa fare, ti risponde invece di mandare una segnalazione. A «come scegli i modelli?» risponde dal documento scritto, e le impostazioni le chiama per nome, non con le sigle interne.', segnalazione: 1921 },
         { testo: 'Su Mac, con Filo acceso e nessuna sua finestra aperta, le voci della barra dei menu e le loro scorciatoie, come Cmd+T e Cmd+Shift+T, riaprono la finestra con le tue schede invece di non fare niente.', segnalazione: 2031 },
         { testo: 'Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W, Cmd+R e lo zoom agiscono su di lei e non più sulla scheda che aspetta l\'accesso.', segnalazione: 2031 },
+        { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
       ],
     },
     {
       version: '0.2.265', date: '2026-11-05',
       fixes: [
-        { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
         { testo: 'Un sito che hai chiesto di aprire sempre da un altro paese non riceve più la richiesta della sua icona dalla tua connessione, nemmeno per un suo link salvato da un\'altra scheda o per i suggerimenti della home e della chat.', segnalazione: 1273 },
         { testo: 'Quando Filo dà da solo un nome ai file scaricati o una categoria alle pagine salvate, il contenuto delle pagine di posta, banca e router non va più ai modelli. Una pagina salvata di posta o di banca prende la categoria dal solo tipo.', segnalazione: 1545 },
         { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
