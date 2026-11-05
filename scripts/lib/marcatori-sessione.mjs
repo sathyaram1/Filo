@@ -64,7 +64,11 @@ export function ensureSessionExcludes(root) {
  */
 export function marcatoriFuoriDallaScena(root) {
   const tolti = git(root, ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR']).split('\0').filter(eMarcatore);
-  if (tolti.length) git(root, ['rm', '-q', '--cached', '--ignore-unmatch', '--', ...tolti]);
+  // Da stdin: centinaia di biglietti in fila superano la riga di comando di Windows.
+  if (tolti.length) {
+    execFileSync('git', ['rm', '-q', '--cached', '--ignore-unmatch', '--pathspec-from-file=-', '--pathspec-file-nul'],
+      { cwd: root, input: `${tolti.join('\0')}\0`, stdio: ['pipe', 'pipe', 'pipe'] });
+  }
   ensureSessionExcludes(root);
   return tolti;
 }
