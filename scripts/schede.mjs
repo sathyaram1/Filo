@@ -129,7 +129,6 @@ function leggiJson(f) {
   try { return JSON.parse(readFileSync(f, 'utf8')); } catch (_) { return null; }
 }
 const fileScheda = (cartella, num) => join(cartella, `${num}.json`);
-const numeroDi = (s) => String((s && s.numero) || '').replace(/^#/, '');
 
 /** Le schede che ci sono nella cartella, lette. */
 export function leggiSchede(cartella) {
