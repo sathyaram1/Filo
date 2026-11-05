@@ -17,7 +17,6 @@ const stato = (app, base = '') => app.evaluate(({ BrowserWindow }, b) => {
     accesso: b ? vive.filter((w) => !w._filoTabs && w.webContents.getURL().startsWith(b)).length : 0,
     normale: normale ? {
       visibile: normale.isVisible(),
-      ridotta: normale.isMinimized(),
       schede: normale._filoTabs.tabs.map((t) => t.url || ''),
     } : null,
   };
