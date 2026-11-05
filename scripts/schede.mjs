@@ -292,6 +292,9 @@ export async function letturaCloud(ticket, opz = {}) {
     segnalati: new Map(r.voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
     // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita.
     illeggibili: r.voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato)).length,
+    // Zero illeggibili vale «i feedback non ne hanno» solo se la risposta porta un segno della scheda (una scheda, il segno
+    // di illeggibile, l'ora di scrittura anche vuota): senza, da qui non si distingue un server che non le manda (#2181).
+    distingue: r.voci.some((v) => v.scheda || 'schedaIllegibile' in v || (v.riga && 'schedaAt' in v.riga)),
   };
 }
 
