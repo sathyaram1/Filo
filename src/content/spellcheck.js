@@ -1324,9 +1324,9 @@
     // Un cambio nel testo davanti al pezzo che il rapido ha mandato come contesto («Marco » di «Marco è andato») cambia
     // il giudizio quanto uno nel pezzo: la risposta non vale più, e il pezzo si rivede (#1302).
     if (state.inViaggio.length) {
-      const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora).issues.map((v) => [v.id, v]));
+      const vivi = new Map(riallineaIssues(state.inViaggio, prima, ora, { pezzi: true }).issues.map((v) => [v.id, v]));
       const conContesto = state.inViaggio.filter((v) => v.contesto && !v.perso).map((v) => ({ ...v.contesto, id: v.id }));
-      const contesti = new Map(riallineaIssues(conContesto, prima, ora).issues.map((c) => [c.id, c]));
+      const contesti = new Map(riallineaIssues(conContesto, prima, ora, { pezzi: true }).issues.map((c) => [c.id, c]));
       for (const v of state.inViaggio) {
         if (v.perso) { v.zonaPersa = zonaDopo(v.zonaPersa, prima, ora); continue; }
         const n = vivi.get(v.id);
