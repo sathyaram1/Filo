@@ -83,6 +83,13 @@ ripartito sullo stesso biglietto (una sessione ripresa) riceve quel ramo nella
 busta e lo riprende, o lo crea con quel nome se non c'è; una presa in carico
 rifiutata per il ramo ferma dispatch prima del lavoratore (#1632).
 
+Un biglietto nuovo dopo un tentativo morto prima di consegnare non porta ramo
+(il server lega il ramo al feedback solo alla consegna): il nome nuovo nasce
+dalla punta dell'ultimo tentativo `worker/<id>-*` rimasto su origin con commit
+fuori da main, e la busta lo dice al lavoratore (`payload.ripartenza`). Il ramo
+superato diventa antenato del nuovo e se ne va con lui alla fusione (#2152).
+Se origin non risponde, guasto temporaneo: non si rifà da main.
+
 ### Niente worktree separati nelle routine
 
 `routines/roles/new-work.md` istruisce oggi `git worktree add … -b worker/<id>`:
