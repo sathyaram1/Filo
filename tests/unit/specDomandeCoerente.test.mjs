@@ -226,9 +226,7 @@ test('fermo su un guasto suo il manutentore lo accendono il mattino e l\'owner, 
   assert.doesNotMatch(sezione('### 4.3').replace(/\s+/g, ' '), /scrivere nel taccuino da 26 ore/);
   assert.match(sezione('### 4.3').replace(/\s+/g, ' '), /conta le sue sessioni chiuse bene, non le scritture nel taccuino/);
   assert.match(sezione('### 3.3').replace(/\s+/g, ' '), /`attendi`.{0,250}tranne mentre è ferma su un guasto suo/);
-  assert.match(sezione('### 3.5').replace(/\s+/g, ' '), /tranne quella del controllo sul manutentore \(SPEC-MANUTENTORE\.md § 7\)/);
-  const smista = readFileSync(join(ROOT, 'routines', 'roles', 'smistamento.md'), 'utf8').replace(/\s+/g, ' ');
-  assert.match(smista, /domanda del server sul controllo del manutentore, .{0,140}qualunque sia la soglia: .{0,80}passa al punto 3/);
+  assert.match(sezione('### 3.5').replace(/\s+/g, ' '), /Quella del controllo sul manutentore non passa di qui: va diretta all'owner \(SPEC-MANUTENTORE\.md § 7\)/);
 });
 
 // La soglia del controllo sul manutentore vive solo in SPEC-MANUTENTORE § 7: una copia altrove resta indietro, e lo
