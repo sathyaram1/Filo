@@ -763,8 +763,12 @@
     }
     const { finestra, testo } = sforo;
     if (!finestra) return { memoria: true, stringibile: true };
-    if (maxTokens > finestra / 2) return { finestra, memoria: true, ...(testo ? { testo } : {}) };
-    if (testo && testo < finestra) return { finestra, testo, memoria: true, stringibile: true };
+    if (testo && testo >= finestra) return null;
+    if (maxTokens > finestra / 2) {
+      const senzaPosto = testo && finestra - testo - MARGINE_FINESTRA < TETTO_MINIMO;
+      return { finestra, memoria: true, ...(testo ? { testo } : {}), ...(senzaPosto ? { stringibile: true } : {}) };
+    }
+    if (testo) return { finestra, testo, memoria: true, stringibile: true };
     return null;
   }
 
