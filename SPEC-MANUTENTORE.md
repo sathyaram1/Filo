@@ -197,7 +197,8 @@ una sua sessione chiusa bene da 26 ore (contate dall'ultima, o dall'accensione
 dell'interruttore se è più recente), apre una domanda per l'owner coi fatti:
 l'ultima sessione chiusa bene, le accensioni da allora e come sono finite (il
 guasto col suo messaggio, o la caduta senza rilascio), e due strade, spegnerlo
-o lasciarlo riprovare (azione `automazione`). Contano le chiusure, non le
+o lasciarlo riprovare (azione `automazione`, che lo accende subito anche se è
+fermo). Contano le chiusure, non le
 scritture nel taccuino: una sessione che scrive all'inizio e poi cade
 (contesto esaurito, processo ucciso, limite di sessione) non è chiusa bene.
 Una domanda alla volta, e la prima sessione chiusa bene la rende superata. Il
