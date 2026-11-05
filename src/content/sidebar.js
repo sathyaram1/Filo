@@ -2074,6 +2074,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         action: ACTIONS.HELP,
         payload,
         diceRipiego: true,
+        conSeguito: true,
         // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
         // «Valuta» è una richiesta dell'utente come un messaggio scritto.
         ...(userMessage || valuta ? {} : { parteDiUnUso: true }),
