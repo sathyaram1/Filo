@@ -819,8 +819,8 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   contesto, una riga per ogni domanda aperta o in smistamento che ferma un
   feedback del suo ordine. Un guasto non anticipa mai l'istanza di chi ci è
   caduto, che cadrebbe di nuovo e ne aprirebbe un altro, in una fila di
-  accensioni senza fine; e mentre lei è ferma su un guasto suo non gliela
-  anticipa niente (SPEC-MANUTENTORE.md § 7).
+  accensioni senza fine. Mentre lei è ferma su un guasto suo, quali
+  accensioni restano lo dice SPEC-MANUTENTORE.md § 7.
 - **All'owner** arrivano solo le domande di prodotto e le sue, quando dopo
   l'indagine la scelta spetta a lui: soldi, sicurezza, permessi, gusto.
 - **Le sue leve:** ritmo e parallelismo (§ 4.5), quando lanciare riordino e
