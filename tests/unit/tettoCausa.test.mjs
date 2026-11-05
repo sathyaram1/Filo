@@ -87,6 +87,32 @@ test('un testo che da solo non sta nella memoria resta un rifiuto di contesto, n
   assert.notEqual(e.code, 'TETTO_RISPOSTA');
 });
 
+// #1302 — col tetto di serie oltre metà della memoria, i rifiuti per conversazione lunga restano curabili dalla home: la
+// regola è quella di stringiDopoRifiuto (handlers.js), che accorcia se non è il tetto o se è `stringibile`.
+const laHomeAccorcia = (e) => !!(e && (e.code !== 'TETTO_RISPOSTA' || e.stringibile) && globalThis.SN_FILO_CONTESTO.troppoLungo(e));
+const rifiutoOR = (finestra, testo, out) => `This endpoint's maximum context length is ${finestra} tokens. However, you requested about ${testo + out} tokens (${testo} of text input, ${out} in the output).`;
+
+test('conversazione più lunga della memoria col tetto di serie: rifiuto di contesto, la home accorcia e la frase non dice di abbassare il tetto', async () => {
+  const e = await OR.httpError(risposta(400, rifiutoOR(65536, 100000, 65536)), { tools: false, maxTokens: 65536 });
+  assert.notEqual(e.code, 'TETTO_RISPOSTA');
+  assert.equal(e.tettoRetto, undefined);
+  assert.ok(laHomeAccorcia(e));
+  assert.doesNotMatch(fraseDi(e), /abbassa/i);
+});
+
+test('il testo ci sta da solo ma sotto non resta posto per una risposta: niente tetto da riprovare, la home accorcia', async () => {
+  const { esito, corpi } = await conRouter({ rifiuta: (b) => (b.max_tokens && 127500 + b.max_tokens > 128000 ? [400, rifiutoOR(128000, 127500, b.max_tokens)] : null) },
+    () => chiedi().catch((e) => e));
+  assert.equal(corpi.length, 1, 'un tetto sotto il minimo non si prova');
+  assert.equal(esito.code, 'TETTO_RISPOSTA');
+  assert.ok(laHomeAccorcia(esito));
+  // Con posto per una risposta il tetto resta la cura: si rifà più basso e la home non accorcia.
+  const t = await OR.httpError(risposta(400, rifiutoOR(128000, 50000, 65536)), { tools: false, maxTokens: 65536 });
+  assert.equal(t.code, 'TETTO_RISPOSTA');
+  assert.ok(t.tettoRetto > 0);
+  assert.ok(!laHomeAccorcia(t));
+});
+
 test('le altre forme del rifiuto per il tetto si riconoscono; un parametro non supportato no', async () => {
   const casi = [
     [400, 'Input validation error: `inputs` tokens + `max_new_tokens` must be <= 32768. Given: 1000 `inputs` tokens and 262144 `max_new_tokens`'],
