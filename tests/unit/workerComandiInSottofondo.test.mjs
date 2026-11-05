@@ -85,6 +85,8 @@ test('ogni worker riceve le due regole: l’attesa è l’avviso di fine o Monit
     const lunghi = una(t.slice(t.indexOf('## Comandi lunghi'), t.indexOf('\n## ', t.indexOf('## Comandi lunghi') + 3)));
     assert.match(lunghi, /`run_in_background` della chiamata Bash/, ruolo);
     assert.match(lunghi, /strumento Monitor/, ruolo);
+    assert.match(lunghi, /Non chiudere il turno per aspettare/, ruolo);
+    assert.match(lunghi, /`node \S*scripts\/routine-channel\.mjs aspetta <biglietto>`/, ruolo);
     assert.match(lunghi, /\*\*Mai un'attesa scritta da te nella shell\*\*: `sleep`, un ciclo `until`/, ruolo);
     const file = una((REGOLA_FILE.exec(t) || [''])[0]);
     assert.match(file, /si crea con Write e si modifica con Edit/, ruolo);
