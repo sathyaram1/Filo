@@ -28,8 +28,10 @@ function alberoConDueSpec(secondo) {
   const { dir, g } = repoProva('finish-ripresa-');
   mkdirSync(join(dir, 'tests'), { recursive: true });
   symlinkSync(MODULI, join(dir, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
-  writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
-  writeFileSync(join(dir, 'playwright.config.mjs'), "export default { testDir: 'tests', workers: 1, timeout: 300_000, reporter: 'line' };\n");
+  writeFileSync(join(dir, '.gitignore'), 'node_modules\nb-avviato\n');
+  // Un nuovo tentativo per i rossi passeggeri, come la suite di Filo.
+  writeFileSync(join(dir, 'playwright.config.mjs'), "export default { testDir: 'tests', workers: 1, retries: 1, timeout: 300_000, reporter: 'line' };\n");
+  const passeggero = `if (!existsSync(${JSON.stringify(join(dir, 'b-avviato'))})) { writeFileSync(${JSON.stringify(join(dir, 'b-avviato'))}, '1'); throw new Error('avvio passeggero'); }`;
   writeFileSync(join(dir, 'tests', 'a-verde.spec.mjs'), [
     "import { test } from '@playwright/test';",
     "import { writeFileSync } from 'node:fs';",
@@ -43,6 +45,21 @@ function alberoConDueSpec(secondo) {
       "import { test as base } from '@playwright/test';",
       "const test = base.extend({ w: [async ({}, use) => { await use(1); throw new Error('chiusura rotta'); }, { scope: 'worker' }] });",
       "test('chiusura', ({ w }) => {});",
+    ],
+    // Il secondo test viene saltato perché qualcosa prima è caduto una volta, poi è rosso a ogni nuovo tentativo.
+    preparazione: [
+      "import { test, expect } from '@playwright/test';",
+      "import { existsSync, writeFileSync } from 'node:fs';",
+      `test.beforeAll(() => { ${passeggero} });`,
+      "test('si apre', () => {});",
+      "test('salva', () => { expect(1).toBe(2); });",
+    ],
+    fila: [
+      "import { test, expect } from '@playwright/test';",
+      "import { existsSync, writeFileSync } from 'node:fs';",
+      "test.describe.configure({ mode: 'serial' });",
+      `test('si apre', () => { ${passeggero} });`,
+      "test('salva', () => { expect(1).toBe(2); });",
     ],
   };
   writeFileSync(join(dir, 'tests', 'b-altro.spec.mjs'), corpi[secondo].join('\n'));
@@ -112,3 +129,16 @@ test('un lancio rosso per un errore fuori dai test resta rosso anche al rilancio
     expect(lancio(), 'il rilancio sullo stesso contenuto resta rosso').toContain('ESITO rosso');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+for (const caso of ['preparazione', 'fila']) {
+  test(`un test saltato per un errore prima di lui (${caso}) e poi rosso non fa saltare lo spec al rilancio`, async () => {
+    test.setTimeout(240_000);
+    const { dir, g } = alberoConDueSpec(caso);
+    try {
+      const lancio = () => execFileSync(process.execPath, [scriptLancio(dir)], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 150_000 });
+      expect(lancio(), 'il primo lancio è rosso').toContain('ESITO rosso');
+      expect([...(await verdiDopo(dir, g))], 'solo lo spec verde è nella memoria').toEqual(['tests/a-verde']);
+      expect(lancio(), 'il rilancio rifà lo spec rosso e resta rosso').toContain('ESITO rosso');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+}
