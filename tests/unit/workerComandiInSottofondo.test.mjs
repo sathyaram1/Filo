@@ -41,7 +41,8 @@ test('il contratto dei worker chiede i comandi lunghi in sottofondo, finish:chec
 // In cloud un'attesa scritta nella shell (#1685) e un file scritto da un interprete o da un heredoc (#1563) chiedono un
 // permesso che nessuno approva, e il worker muore in silenzio: nessun testo che un agente riceve li propone, li nomina
 // solo la regola che li vieta.
-const ATTESE = [/\bsleep\b/, /\btail\s+--pid/, /\buntil\b/, /\btimeout\s+\d+\s/];
+// `timeout N` solo in un comando: «(timeout 90 s)» in prosa è il parametro della chiamata Bash, che va bene.
+const ATTESE = [/\bsleep\b/, /\btail\s+--pid/, /\buntil\b/, /`[^`\n]*\btimeout\s+\d+\s[^`\n]*`/];
 const SCRITTURE = [/\b(?:python3?|perl|ruby)\s+(?:-\s*<<|-[cei]\b)/, /\bnode\s+-e\b/, /\bsed\s+-i\b/, /\bcat\s*>/, /<<-?\s*['"]?\w+['"]?\s*>/];
 const REGOLA_ATTESE = /\*\*Mai un'attesa scritta da te nella shell\*\*[^]*?\n\n/;
 const REGOLA_FILE = /## I file si scrivono con Edit e Write\n[^]*?(?=\n## )/;
