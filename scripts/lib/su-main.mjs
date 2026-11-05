@@ -144,15 +144,20 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
   esclusi.altri = [];
-  // I tentativi superati sono morti (la regola sta in tentativi.mjs); dei vivi di un feedback si mostra il più recente.
-  const tutti = git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()).filter(Boolean);
+  // I tentativi superati sono morti; dei vivi di un feedback si mostrano quelli che nessun altro contiene, come li
+  // sceglie la ripresa del lavoro (la regola sta in tentativi.mjs).
+  const tutti = git(root, ['for-each-ref', '--format=%(refname:short)%09%(objectname)', 'refs/remotes/origin/worker']).split('\n')
+    .map((r) => r.trim().split('\t')).filter(([ramo, head]) => ramo && head).map(([ramo, head]) => ({ ramo, head }));
   const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
-  const superati = tentativiSuperati(tutti.map((ramo) => ({ ramo, fuso: fusi.has(ramo) })));
-  const ultimo = new Map();
-  for (const ref of tutti) {
-    const t = leggiTentativo(ref);
-    if (t && !superati.has(ref) && !fusi.has(ref) && !(ultimo.get(t.id) >= t.stampo)) ultimo.set(t.id, t.stampo);
+  const linea = lineaPrincipale(root, base);
+  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })));
+  const perId = new Map();
+  for (const t of tutti) {
+    const l = leggiTentativo(t.ramo);
+    if (l && !superati.has(t.ramo) && !fusi.has(t.ramo)) perId.set(l.id, [...(perId.get(l.id) || []), t]);
   }
+  const contiene = (a, b) => { try { git(root, ['merge-base', '--is-ancestor', a.head, b.head]); return true; } catch (_) { return false; } };
+  const inCima = new Set([...perId.values()].flatMap((vivi) => (vivi.length > 1 ? viviInCima(vivi, contiene) : vivi)).map((t) => t.ramo));
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
   const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
   const rami = [];
