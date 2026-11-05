@@ -981,7 +981,9 @@ di decifratura, quindi li dà il server.
   col conteggio; i testi a pagine da sei milioni di caratteri, il resto in
   `resto`, un allegato che non ci sta torna `rinviato` e si chiede da solo con
   `allegato`. Il biglietto si sporca prima che esca testo, o una scheda, non
-  fidati.
+  fidati; con `testi` anche per la conversazione scritta da un biglietto
+  sporco, con la regola del payload e delle sessioni (#2166); la stessa regola
+  vale per un allegato della conversazione chiesto da solo.
 - **`routineFeedback` `{ ticket, op: 'scheda', numero, scheda, rilettura?, modello? }`**
   → `{ ok, scheda, aggiornato }`: la scheda validata con `src/shared/schede.js`,
   cifrata nel feedback (`scheda`) con la versione dello schema, la fonte e la
