@@ -1,5 +1,5 @@
 // Riporta nel blocco della prossima versione le righe di novità che il ramo ha sotto versioni già uscite (#2057).
-// Uso, dal clone: node scripts/novita-in-cima.mjs [--commit]. Esce con 0 anche quando non c'è niente da spostare.
+// Uso, dal clone: node scripts/novita-in-cima.mjs [--commit]: senza --commit dice cosa sposterebbe e non tocca niente.
 // Regole: scripts/lib/novita-in-cima.mjs; sentinella: tests/unit/novitaInCima.test.mjs.
 
 import { dirname, resolve } from 'node:path';
