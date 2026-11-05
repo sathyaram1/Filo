@@ -283,8 +283,8 @@ describe('quale tentativo precedente si riprende', () => {
 // ─── il giro vero di dispatch ────────────────────────────────────────────────
 
 /** Il server di oggi: un biglietto nuovo non porta ramo, e la presa in carico lega il biglietto al ramo dichiarato. */
-function fintoServer() {
-  const mondo = { legato: '', consegne: [] };
+function fintoServer({ legato = '' } = {}) {
+  const mondo = { legato, consegne: [] };
   const srv = createServer((req, res) => {
     let corpo = '';
     req.on('data', (c) => { corpo += c; });
