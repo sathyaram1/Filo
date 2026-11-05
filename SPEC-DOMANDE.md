@@ -486,9 +486,8 @@ rispondere.
      nei Ricevuti con la richiesta giusta (il rombo azzurro per la fiducia, il
      segno «chiede un permesso» per il resto), e la domanda si chiude lo
      stesso (`esito.smistata = 'ricevuti'`). All'owner non arriva mai una
-     domanda di guasto, tranne quella del controllo sul manutentore
-     (SPEC-MANUTENTORE.md § 7): il guasto è suo e nessun lavoro lo cura,
-     quindi passa al punto 3.
+     domanda di guasto. Quella del controllo sul manutentore non passa di
+     qui: va diretta all'owner (SPEC-MANUTENTORE.md § 7).
   2. **Il registro risponde.** Se il principio di una domanda chiusa copre il
      caso, risponde lui: l'opzione che il principio indica, e un testo che
      cita il principio e la domanda da cui viene. La domanda si chiude con
