@@ -14,6 +14,7 @@ const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 require(join(ROOT, 'src', 'shared', 'constants.js'));
+require(join(ROOT, 'src', 'shared', 'contenutoEsterno.js'));
 require(join(ROOT, 'src', 'shared', 'messages.js'));
 require(join(ROOT, 'src', 'shared', 'decks.js'));
 require(join(ROOT, 'src', 'shared', 'chatErrors.js'));
