@@ -276,7 +276,7 @@ describe('prima delle prove (verifica #1572 giro 1, r1)', () => {
     // Il lanciatore e la config di Playwright sono quelli dell'albero: la radice che danno al controllo è la sua (#1572.1).
     const finish = readFileSync(join(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
     assert.match(finish, /run\(process\.execPath, \[join\(albero\.dir, 'scripts', 'run-unit-tests\.mjs'\)\], 'Controlli di logica', undefined, albero\.dir\)/);
-    assert.match(finish, /run\(l\.cmd, l\.args, label \+ suffisso, l\.env, albero\.dir\)/);
+    assert.match(finish, /run\(l\.cmd, l\.args, label \+ suffisso, (?:env\()?l\.env\)?, albero\.dir\)/);
     const fusione = readFileSync(join(ROOT, 'scripts', 'lib', 'unit-sulla-fusione.mjs'), 'utf8');
     assert.match(fusione, /const runner = join\(dir, 'scripts', 'run-unit-tests\.mjs'\)/);
     assert.match(fusione, /spawnSync\(process\.execPath, args, \{ cwd: dir,/);

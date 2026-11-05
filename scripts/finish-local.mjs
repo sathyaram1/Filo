@@ -63,12 +63,15 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState, registraNelRegistro } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
+import { leggiSpecVerdi, segnaSpecVerdi } from './lib/spec-verdi.mjs';
+import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
@@ -503,20 +506,62 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
 export { lottiPerRigaDiComando };
 
+const REPORTER_VERDI = join(ROOT, 'scripts', 'lib', 'reporter-spec-verdi.mjs');
+
 /**
  * Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. Nella cartella della
- * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
+ * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe. Con la memoria, ogni
+ * spec si segna verde appena passa (reporter-spec-verdi): un lotto rosso o ucciso a metà tiene i suoi verdi.
  */
-function runSpecsALotti(specs, label, albero) {
+export function runSpecsALotti(specs, label, albero, memoria = null) {
   if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
-  const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
+  const { restano, saltati } = memoria ? specDaRiprendere(specs, memoria.verdi) : { restano: specs, saltati: [] };
+  if (saltati.length) {
+    console.log(`\n▸ ${label}: ${saltati.length} già verdi su questo contenuto in un lancio precedente, non li rifaccio; ne restano ${restano.length}.`);
+  }
+  const lotti = lottiPerRigaDiComando(restano.map((s) => `${s}.spec.mjs`));
+  // Percorso relativo: Playwright lo risolve dalla cartella della prova, senza i guai di un assoluto Windows in import.
+  const daAlbero = relative(albero.dir, REPORTER_VERDI).split(sep).join('/');
+  const reporter = memoria ? [`--reporter=list,${daAlbero.startsWith('.') || isAbsolute(daAlbero) ? daAlbero : `./${daAlbero}`}`] : [];
+  const env = (base) => (memoria ? { ...(base || process.env), FILO_SPEC_VERDI_FILE: memoria.file, FILO_SPEC_VERDI_CHIAVE: memoria.chiave, FILO_SPEC_VERDI_RADICE: albero.dir } : base);
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...lotto]);
-    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env, albero.dir)) ok = false;
+    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...reporter, ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, env(l.env), albero.dir)) ok = false;
   });
   return ok;
+}
+
+export { leggiSpecVerdi, segnaSpecVerdi };
+
+/**
+ * Il contenuto di `sha` al netto delle prove del giro: chi verifica le committa mentre il controllo gira, e un
+ * rilancio dopo il tetto deve ripartire dai verdi lo stesso (#2113). Senza git vale il commit.
+ */
+export function chiaveDelContenuto(root, sha) {
+  const r = git(['ls-tree', '-r', '--full-tree', sha], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+  if (!r.ok) return sha;
+  const righe = r.out.split('\n').filter((l) => !dentroProveGiro(l.split('\t')[1]));
+  return createHash('sha1').update(righe.join('\n')).digest('hex');
+}
+
+/** PURA. */
+export function specDaRiprendere(specs, verdi) {
+  const gia = verdi instanceof Set ? verdi : new Set(verdi || []);
+  const restano = [];
+  const saltati = [];
+  for (const s of specs || []) (gia.has(s) ? saltati : restano).push(s);
+  return { restano, saltati };
+}
+
+/** La memoria dei verdi sul contenuto di `sha`, nella cartella git di `root`: fuori dall'albero, mai committata. */
+export function memoriaSpecVerdi(root, sha) {
+  const r = git(['rev-parse', '--git-path', 'filo-spec-verdi.json'], { cwd: root });
+  if (!r.ok || !r.out) return null;
+  const file = resolve(root, r.out);
+  const chiave = chiaveDelContenuto(root, sha);
+  return { file, chiave, verdi: leggiSpecVerdi(file, chiave), segna(specs) { this.verdi = segnaSpecVerdi(file, chiave, specs); } };
 }
 
 function readKnownRed(root) {
@@ -763,8 +808,9 @@ async function main() {
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
+    const memoria = memoriaSpecVerdi(ROOT, shaProvato);
     if (blocking.length) {
-      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero)) {
+      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero, memoria)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
@@ -773,7 +819,7 @@ async function main() {
     if (informative.length) {
       // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
       // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero);
+      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero, memoria);
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
