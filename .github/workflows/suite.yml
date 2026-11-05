@@ -292,7 +292,7 @@ jobs:
   # lontano da npm ci e dalle prove (gli strumenti dell'avviso usano solo moduli di Node). Su un ramo il lavoro si salta
   # prima di arrivare all'ambiente, che lo respingerebbe (#1504).
   avviso:
-    needs: [suite, verdetto, unit-windows]
+    needs: [suite, verdetto, unit-windows, unit-windows-punta]
     if: always() && !cancelled() && github.ref == 'refs/heads/main' && (needs.suite.result != 'success' || needs.verdetto.result != 'success' || needs.unit-windows.result != 'success')
     runs-on: ubuntu-latest
     environment: rilascio
