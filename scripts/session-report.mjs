@@ -692,6 +692,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   if (Number.isFinite(ultimoMs)) rep.endedAt = new Date(ultimoMs).toISOString();
   if (Number.isFinite(primoMs) && Number.isFinite(ultimoMs)) rep.durationS = Math.round((ultimoMs - primoMs) / 1000);
   rep.costUsd = Math.round(costo * 10000) / 10000;
+  for (const k of CACHE_VOCI) rep.cache[k] = Math.round(dollariCache[k] * 10000) / 10000;
   for (const [m, key] of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa ${NOMI_TARIFFA[key]}`);
   for (const v of velocitaIgnote.values()) {
     const turni = v.turni === 1 ? '1 turno calcolato' : `${v.turni} turni calcolati`;
