@@ -76,6 +76,14 @@ test('un mai giudicato si stampa con l’avviso in prima riga: fuori dai Ricevut
   assert.doesNotMatch(giudicato.testo, /MAI PASSATO/);
 });
 
+test('chi scrive le schede tratta il rifiuto per mai giudicato come quello di un segnalato: «non letto», senza rilanciare', async () => {
+  const { readFileSync } = await import('node:fs');
+  const ruolo = readFileSync(join(ROOT, 'routines', 'roles', 'scheda.md'), 'utf8');
+  const riga = ruolo.split('\n').find((r) => /valido: "non letto"/.test(r)) || '';
+  assert.match(riga, /mai passato dai giudici/);
+  assert.match(riga, /non rilanciarlo/);
+});
+
 test('gli argomenti della lettura: un riferimento, e l’opzione per il mai giudicato', () => {
   assert.deepEqual(mod.argomentiLettura(['1514']), { rif: '1514', ancheMaiGiudicato: false });
   assert.deepEqual(mod.argomentiLettura(['--anche-mai-giudicato', '#1514']), { rif: '#1514', ancheMaiGiudicato: true });
