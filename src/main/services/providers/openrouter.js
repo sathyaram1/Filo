@@ -699,8 +699,11 @@
       produttoreNonRisponde(err, model);
       throw err;
     }
+    // Senza usage (interrotta dopo aver scritto, #1302) il costo si chiede dopo con l'id, come per i tentativi rotti.
+    const senzaConto = !(usage.costUsd > 0) && !usage.promptTokens && !usage.completionTokens;
     return {
       text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason: motivoFine(finishReason, usage), servedBy,
+      ...(senzaConto && generationId ? { generationId } : {}),
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
       ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
       ...(tettoSceso ? { tettoSceso } : {}),
