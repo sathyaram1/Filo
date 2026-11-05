@@ -239,8 +239,10 @@ export async function chiamaGrezzo(op, data = {}, deps = {}) {
     ...(signal ? { signal } : {}),
   });
   let body = {};
-  try { body = await res.json(); } catch (_) { body = {}; }
-  return { status: res.status, ok: res.ok, body };
+  let leggibile = true;
+  try { body = await res.json(); } catch (_) { body = {}; leggibile = false; }
+  if (!body || typeof body !== 'object') { body = {}; leggibile = false; }
+  return { status: res.status, ok: res.ok, body, leggibile };
 }
 
 /**

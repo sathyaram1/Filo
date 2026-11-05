@@ -481,27 +481,65 @@ function spinteDi(gruppo) {
   ));
 }
 
-/** Manda un gruppo. → { esito: 'ok' | 'rifiutata' | 'guasto' | 'attesa', motivo? }. */
+/**
+ * La risposta del server a una dichiarazione, per le due strade. Come il canale delle routine: una risposta che non si
+ * legge (la pagina d'errore di un proxy) o un 5xx/429 sono un guasto e le spinte restano in coda; solo un no del server
+ * le toglie, perché una dichiarazione buttata non si recupera più. `corpo` = null se non si è letto. PURA.
+ * → { esito: 'ok' | 'rifiutata' | 'guasto', motivo?, ritenta? }
+ */
+export function esitoDichiarazione({ status, corpo, locale = false } = {}) {
+  const nome = locale ? 'localTicket' : 'routineSpinte';
+  const st = Number(status) || 0;
+  const res = locale ? (corpo && corpo.result) : corpo;
+  if (st === 0 || st >= 500 || st === 429) return { esito: 'guasto', ritenta: true, motivo: `${nome}: ${(res && res.reason) || (st ? `http_${st}` : 'rete')}` };
+  // Un server di prima, senza l'indirizzo: niente a cui dichiarare (e niente che controlli).
+  if (st === 404 && !(res && res.reason)) return { esito: 'rifiutata', motivo: `${nome} non è ancora pubblicata sul server` };
+  if (locale && (st === 401 || st === 403)) return { esito: 'guasto', motivo: `${nome} ha risposto ${st}` };
+  if (!corpo || typeof corpo !== 'object') return { esito: 'guasto', ritenta: true, motivo: `${nome}: risposta illeggibile (http_${st})` };
+  if (st === 200 && res && (locale ? res.ok !== false : res.ok)) return { esito: 'ok' };
+  if (st === 200 && !res) return { esito: 'guasto', ritenta: true, motivo: `${nome}: risposta senza esito` };
+  return { esito: 'rifiutata', motivo: `${(res && res.reason) || `http_${st}`}${res && res.detail ? `: ${res.detail}` : ''}` };
+}
+
+const TENTATIVI = 3;
+
+/** Manda un gruppo, ritentando come il canale i guasti che passano da soli. → { esito: 'ok' | 'rifiutata' | 'guasto' | 'attesa', motivo? }. */
 async function manda(gruppo, deps = {}) {
   if (!deps.fetchImpl && process.env.NODE_TEST_CONTEXT) return { esito: 'guasto', motivo: 'niente server vero dentro una prova' };
-  if (gruppo.tipo === 'locale') {
+  const locale = gruppo.tipo === 'locale';
+  if (locale) {
     // Uno sporco annotato solo qui va al server prima: altrimenti le spinte entrerebbero pulite.
     const b = { ticket: gruppo.ticket, fp: gruppo.fp, path: gruppo.file };
     if (b.fp && b.path && sporchiInAttesa(b).length) {
       const { restano } = await consegnaSporchi(b, { deps });
       if (restano) return { esito: 'attesa', motivo: 'una lettura esterna è annotata solo qui: le spinte aspettano che il server la riceva' };
     }
-    let r;
-    try { r = await chiamaGrezzo('spinte', { ticket: gruppo.ticket, spinte: spinteDi(gruppo) }, deps); } catch (e) { return { esito: 'guasto', motivo: String((e && e.message) || e) }; }
-    const res = r.body && r.body.result;
-    if (r.status === 200 && res && res.ok !== false) return { esito: 'ok' };
-    if (r.status === 404) return { esito: 'rifiutata', motivo: 'la funzione localTicket non è ancora pubblicata sul server' };
-    if (r.status >= 500 || r.status === 401 || r.status === 403 || r.status === 429) return { esito: 'guasto', motivo: `localTicket ha risposto ${r.status}` };
-    return { esito: 'rifiutata', motivo: res ? `${res.reason || 'rifiuto'}${res.detail ? `: ${res.detail}` : ''}` : `localTicket ha risposto ${r.status}` };
   }
+  const ritardo = Number.isFinite(deps.ritardoMs) ? deps.ritardoMs : 1500;
+  let ultimo = null;
+  for (let i = 1; i <= TENTATIVI; i += 1) {
+    ultimo = locale ? await mandaLocale(gruppo, deps) : await mandaRoutine(gruppo, deps);
+    if (!ultimo.ritenta || i === TENTATIVI) break;
+    await (deps.sleep || dormi)(ritardo * i);
+  }
+  const { ritenta: _r, ...esito } = ultimo;
+  return esito;
+}
+
+async function mandaLocale(gruppo, deps) {
+  let r;
+  try { r = await chiamaGrezzo('spinte', { ticket: gruppo.ticket, spinte: spinteDi(gruppo) }, deps); } catch (e) {
+    // Senza credenziale non c'è niente da ritentare; la rete sì.
+    const motivo = String((e && e.message) || e);
+    return { esito: 'guasto', ritenta: !/credenziale|prova/.test(motivo), motivo };
+  }
+  return esitoDichiarazione({ status: r.status, corpo: r.leggibile === false ? null : r.body, locale: true });
+}
+
+async function mandaRoutine(gruppo, deps) {
   const fetchImpl = deps.fetchImpl || fetch;
   let status = 0;
-  let body = null;
+  let corpo = null;
   try {
     const res = await fetchImpl(`${deps.base || BASE_ROUTINE}/routineSpinte`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -509,15 +547,11 @@ async function manda(gruppo, deps = {}) {
       ...(typeof AbortSignal !== 'undefined' && AbortSignal.timeout ? { signal: AbortSignal.timeout(deps.tempoMs || 20000) } : {}),
     });
     status = res.status;
-    try { body = await res.json(); } catch (_) { body = null; }
+    try { corpo = await res.json(); } catch (_) { corpo = null; }
   } catch (e) {
-    return { esito: 'guasto', motivo: String((e && e.message) || e) };
+    return { esito: 'guasto', ritenta: true, motivo: String((e && e.message) || e) };
   }
-  if (status === 200 && body && body.ok) return { esito: 'ok' };
-  // Il server di prima non ha l'indirizzo: non c'è niente a cui dichiarare (e non controlla niente).
-  if (status === 404 && !(body && body.reason)) return { esito: 'rifiutata', motivo: 'routineSpinte non è ancora pubblicata sul server' };
-  if (status === 0 || status >= 500 || status === 429) return { esito: 'guasto', motivo: `routineSpinte: ${(body && body.reason) || `http_${status}`}` };
-  return { esito: 'rifiutata', motivo: `${(body && body.reason) || `http_${status}`}${body && body.detail ? `: ${body.detail}` : ''}` };
+  return esitoDichiarazione({ status, corpo });
 }
 
 const dormi = (ms) => new Promise((r) => setTimeout(r, ms));
