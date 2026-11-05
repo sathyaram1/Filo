@@ -75,9 +75,11 @@ test('r1 la musica chiusa mentre suona vince sul video fermato dopo, anche se su
   ]);
   await chiedi(chat, 'rimettimi la musica');
 
+  const riga = chat.locator('.dash-activity').last();
+  await expect(riga).toContainText(/Ripartita|Riaperta/, { timeout: 20_000 });
+  expect(await video.evaluate(() => window.__statoAudio().pausa), 'è ripartito il video, non la musica').toBe(true);
   await expect.poll(async () => (await schede(shell)).tabs.filter((t) => t.url === url).length, { timeout: 20_000 }).toBe(1);
   await expect.poll(() => inPausa(app, url), { timeout: 15_000 }).toBe(false);
-  expect(await video.evaluate(() => window.__statoAudio().pausa), 'il video resta fermo').toBe(true);
   await ripristina(app);
 });
 
