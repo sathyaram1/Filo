@@ -244,7 +244,7 @@ test('una pagina delicata chiusa arriva al modello solo col sito, nella ricerca 
     const esito = await esitoPerIlModello(app, k);
     expect(esito, k).toContain(new URL(posta.url).host);
     expect(esito, k).not.toContain('Posta di Mario');
-    expect(esito, k).not.toContain(percorso);
+    expect(esito, k).not.toContain(posta.url);
     expect(esito, k).not.toContain('1234');
   }
   expect(await esitoPerIlModello(app, 'p1')).toContain('pagina delicata');
