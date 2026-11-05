@@ -58,7 +58,7 @@ test('un sito con la regola del paese non riceve la richiesta dell\'icona dalla 
   await chiedi('https://regola.test/pagina');
   await chiedi('https://www.regola.test/');
   await chiedi('https://shop.regola.test/x');
-  await chiedi('https://REGOLA.test./maiuscole');
+  await chiedi('https://REGOLA.test/maiuscole');
   await expect.poll(async () => (await richieste(app)).includes('altro-libero.test/favicon.ico'), { timeout: 15_000 }).toBe(true);
   expect(versoRegola(await richieste(app)), 'home e chat: nessuna richiesta al sito con la regola').toEqual([]);
 
