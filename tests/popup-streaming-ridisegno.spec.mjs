@@ -1,6 +1,7 @@
 // #2119 — la risposta in streaming del riquadro si ridisegna al più una volta per fotogramma, non a ogni pezzo.
 // Ogni ridisegno rifà il markdown dell'intera risposta: a ogni pezzo il costo cresce col quadrato della lunghezza.
-// Si asserisce: la bolla cresce mentre arriva, con molti meno disegni che pezzi, e il testo finale è quello completo.
+// Si asserisce: la bolla cresce mentre arriva (anche dove rAF è fermo), con molti meno disegni che pezzi, e il testo
+// finale è quello completo; un errore arrivato col disegno in attesa resta scritto.
 
 import { test, expect } from './fixtures/electron.mjs';
 
@@ -91,7 +92,9 @@ test('la risposta lunga a tanti pezzi cresce mentre arriva, con un disegno per f
   });
 });
 
-test('un errore a metà risposta resta scritto: un disegno in ritardo non lo copre', async ({ app, openTab }) => {
+// La scheda che non disegna (rAF fermo, come in secondo piano) è il caso del timer di riserva: la risposta arriva lo
+// stesso, e un errore arrivato prima del disegno in attesa resta scritto, non coperto dal testo parziale.
+test('con la scheda che non disegna la risposta cresce lo stesso, e un errore a metà non viene coperto', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await openTab('filo://newtab/');
   await page.waitForFunction(() => !!window.SN_POPUP?.openStreaming, null, { timeout: 8000 });
@@ -103,17 +106,22 @@ test('un errore a metà risposta resta scritto: un disegno in ritardo non lo cop
       models: { [C.ACTIONS.EXPLAIN_DEEP]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
+    globalThis.__gateErr = new Promise((res) => { globalThis.__apriGateErr = res; });
     globalThis.__origProvErr = globalThis.SN_PROVIDER_OPENROUTER;
     globalThis.SN_PROVIDER_OPENROUTER = {
       ...globalThis.__origProvErr,
-      // I pezzi e l'errore nello stesso giro: il disegno chiesto dai pezzi è ancora in attesa quando arriva l'errore.
       streamComplete: async ({ onDelta }) => {
-        for (let i = 0; i < 40; i++) onDelta(`pezzo ${i} `);
+        for (let i = 0; i < 10; i++) onDelta(`pezzo ${i} `);
+        await globalThis.__gateErr;
+        // Gli ultimi pezzi e l'errore nello stesso giro: il disegno che chiedono è ancora in attesa quando arriva l'errore.
+        for (let i = 10; i < 40; i++) onDelta(`pezzo ${i} `);
         throw new Error('OpenRouter 500: guasto finto');
       },
     };
   });
   await page.evaluate(() => {
+    window.requestAnimationFrame = () => 0;
+    window.cancelAnimationFrame = () => {};
     window.SN_POPUP.openStreaming({
       action: window.SN_CONST.ACTIONS.EXPLAIN_DEEP,
       payload: { selection: 'parola', sentence: 'una frase con parola dentro' },
@@ -121,11 +129,15 @@ test('un errore a metà risposta resta scritto: un disegno in ritardo non lo cop
       title: 'Approfondisci',
     });
   });
+  const bolla = page.locator('.sn-popup .sn-msg-assistant .sn-msg-text').last();
+  await expect(bolla).toContainText('pezzo 9', { timeout: 20_000 });
+
+  await app.evaluate(() => { globalThis.__apriGateErr?.(); });
   const errore = page.locator('.sn-popup .sn-msg-assistant.sn-msg-error');
   await expect(errore).toHaveCount(1, { timeout: 20_000 });
   const testoErrore = await errore.locator('.sn-msg-text').innerText();
   expect(testoErrore.trim().length).toBeGreaterThan(0);
-  // Passati diversi fotogrammi e il timer di riserva, l'errore è ancora lì.
+  // Passato il timer di riserva, l'errore è ancora lì.
   await page.waitForTimeout(400);
   await expect(errore.locator('.sn-msg-text')).toHaveText(testoErrore);
   await expect(errore.locator('.sn-msg-text')).not.toContainText('pezzo 39');
