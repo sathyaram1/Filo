@@ -83,6 +83,16 @@ Un comando che il controllo dei permessi nega non si riprova in un'altra
 forma: o prendi una strada che non ne ha bisogno, come il test qui sopra, o è
 un guasto (`guasto: permessi <programma>`, col messaggio del rifiuto).
 
+## I file si scrivono con Edit e Write
+
+Un file, nel repo o fuori (un sorgente, una prova, il JSON di una domanda, la
+nota del controllo), si crea con Write e si modifica con Edit: non chiedono
+permessi. Mai dalla shell: né con un interprete (`python3`, `node -e`, `perl`,
+`sed -i`) né con un heredoc che scrive (`cat > f <<'EOF'`, `python3 - <<'EOF'`).
+In cloud chiedono un permesso che nessuno approva, e il worker resta fermo in
+silenzio (#1563). Un heredoc che passa un testo a uno script del canale, come
+`segnala` o `risposta`, è un'altra cosa: non scrive file e resta com'è.
+
 ## Sotto-agenti
 
 Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
