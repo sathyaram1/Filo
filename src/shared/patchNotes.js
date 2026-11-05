@@ -12,6 +12,8 @@
       version: '0.2.265', date: '2026-11-05',
       fixes: [
         { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
+        { testo: 'Un messaggio scritto mentre Filo sta ancora lavorando non si perde più se ricarichi la pagina: torna nella casella com\'era, con le immagini. Se chiudi la scheda resta nella conversazione.', segnalazione: 1296 },
+        { testo: '«Chat nuova», sotto l\'errore di una conversazione troppo lunga, rimette nella casella anche immagini e documenti del messaggio, e non cancella quello che avevi già scritto.', segnalazione: 1596 },
       ],
     },
     {

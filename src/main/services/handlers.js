@@ -5816,9 +5816,12 @@ async function fermaFiloChat(reqId, wc) {
 // Un seguito scritto mentre il turno lavora (#1296) entra al suo passo dopo; se il turno non ne ha, lo manda la scheda a
 // turno finito. Lo prende solo il turno della scheda che lo scrive, non fermato, non chiuso, non dell'accoglienza (lei
 // tiene la conversazione nel suo stato, e il seguito la aspetta). `togli`: ritirato prima che il modello lo legga.
-function seguitoFiloChat({ reqId, id, testo, togli = false } = {}, wc) {
-  const t = reqId ? turniInCorso.get(String(reqId)) : null;
+function seguitoFiloChat({ reqId, id, testo, togli = false, serba = null, orfani = false, pagina = '' } = {}, wc) {
+  if (orfani) return { seguiti: seguitiOrfani(wc, String(pagina || '')) };
   const chiave = String(id || '');
+  if (serba) return { serbato: serbaSeguito(chiave, serba, wc) };
+  if (togli) ritiraSerbato(chiave, wc);
+  const t = reqId ? turniInCorso.get(String(reqId)) : null;
   if (!t || t.wcId !== (wc && wc.id) || !chiave) return { accolto: false, tolto: !!togli };
   if (togli) {
     const i = t.seguiti.findIndex((s) => s.id === chiave);
@@ -5830,7 +5833,84 @@ function seguitoFiloChat({ reqId, id, testo, togli = false } = {}, wc) {
   if (!t.seguiti.some((s) => s.id === chiave)) t.seguiti.push({ id: chiave, testo: parole });
   return { accolto: true };
 }
-const NOTA_SEGUITO = '[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
+
+// I seguiti in attesa, interi (#1296.1): sembrano già mandati, quindi non si perdono con la pagina. Una pagina
+// ricaricata nella stessa scheda riprende quelli della pagina di prima; a scheda chiusa, finiti i suoi turni, restano
+// nella conversazione come messaggi dell'utente. Solo in memoria: id → { wcId, pagina, chatId, composizione }.
+const seguitiSerbati = new Map();
+const turniDellaScheda = new Map();   // wcId → turni in volo
+const schedeSparite = new Set();      // wcId delle schede chiuse che aspettano la fine dei loro turni
+const schedeSeguite = new WeakSet();
+const idScheda = (wc) => { try { return wc && !wc.isDestroyed() ? wc.id : null; } catch (_) { return null; } };
+function serbaSeguito(id, serba, wc) {
+  const wcId = idScheda(wc);
+  const c = serba && serba.composizione;
+  if (!id || wcId == null || !c || typeof c !== 'object') return false;
+  const testi = (xs) => (Array.isArray(xs) ? xs.filter((x) => typeof x === 'string') : []);
+  const composizione = {
+    text: String(c.text || ''),
+    rispostaA: c.rispostaA && typeof c.rispostaA === 'object' ? c.rispostaA : null,
+    scritto: String(c.scritto || ''),
+    immagini: testi(c.immagini).filter((d) => d.startsWith('data:image/')),
+    file: (Array.isArray(c.file) ? c.file : []).filter((f) => f && typeof f.percorso === 'string' && f.percorso)
+      .map((f) => ({ percorso: f.percorso, nome: String(f.nome || '') })),
+    percorsi: (Array.isArray(c.percorsi) ? c.percorsi : []).filter((x) => Array.isArray(x) && x.length === 2 && x.every((v) => typeof v === 'string')),
+    incollato: c.incollato === true,
+    daFuori: c.daFuori === true,
+    citata: c.citata && typeof c.citata === 'object' ? c.citata : null,
+  };
+  seguitiSerbati.set(id, { wcId, pagina: String(serba.pagina || ''), chatId: serba.chatId ? String(serba.chatId) : null, composizione });
+  if (!schedeSeguite.has(wc)) {
+    schedeSeguite.add(wc);
+    try { wc.once('destroyed', () => schedaSparita(wcId)); } catch (_) {}
+  }
+  return true;
+}
+function ritiraSerbato(id, wc) {
+  const s = id ? seguitiSerbati.get(id) : null;
+  if (s && s.wcId === idScheda(wc)) seguitiSerbati.delete(id);
+}
+// Quelli lasciati da un'altra pagina della stessa scheda: tolti anche dai turni che li aspettano, o arriverebbero due volte.
+function seguitiOrfani(wc, pagina) {
+  const wcId = idScheda(wc);
+  if (wcId == null) return [];
+  const presi = [];
+  for (const [id, s] of seguitiSerbati) {
+    if (s.wcId !== wcId || s.pagina === pagina) continue;
+    seguitiSerbati.delete(id);
+    for (const t of turniInCorso.values()) {
+      if (t.wcId !== wcId) continue;
+      const i = t.seguiti.findIndex((x) => x.id === id);
+      if (i >= 0) t.seguiti.splice(i, 1);
+    }
+    presi.push(s.composizione);
+  }
+  return presi;
+}
+function schedaSparita(wcId) {
+  if (turniDellaScheda.get(wcId)) schedeSparite.add(wcId);
+  else lasciaNellaConversazione(wcId).catch((e) => console.warn('[Filo] seguiti della scheda chiusa:', e?.message || e));
+}
+async function lasciaNellaConversazione(wcId) {
+  let scritti = 0;
+  for (const [id, s] of [...seguitiSerbati]) {
+    if (s.wcId !== wcId) continue;
+    seguitiSerbati.delete(id);
+    const c = s.composizione;
+    if (!s.chatId || !c.text) continue;
+    const citazione = await citazioneDelMessaggio(c.rispostaA, s.chatId);
+    if ((await archiviaDomanda(s.chatId, { testo: c.text, immagini: c.immagini, ref: citazione.ref })).archiviata) scritti += 1;
+  }
+  if (scritti) { try { broadcastToTabs({ type: MSG.FILO_CHATS_UPDATED }); } catch (_) {} }
+}
+function turnoDellaScheda(wcId, delta) {
+  if (wcId == null) return;
+  const n = (turniDellaScheda.get(wcId) || 0) + delta;
+  if (n > 0) { turniDellaScheda.set(wcId, n); return; }
+  turniDellaScheda.delete(wcId);
+  if (schedeSparite.delete(wcId)) lasciaNellaConversazione(wcId).catch((e) => console.warn('[Filo] seguiti della scheda chiusa:', e?.message || e));
+}
+const NOTA_SEGUITO ='[L\'utente ha scritto questo mentre lavoravi alla sua richiesta di prima.]';
 
 // I documenti trovati con CERCA_DOCUMENTI che la risposta nomina, come azioni APRI_FILE da aggiungere. Nessuna se il
 // modello ne ha già mostrato uno: la scelta è sua. Al massimo tre, nell'ordine in cui la risposta li nomina.
@@ -5954,6 +6034,8 @@ async function handleFiloChat(richiesta) {
   // dell'intervista, che non chiama il modello) non si conta.
   const conto = contaSe('turnoChat', ACTIONS.FILO_CHAT) || TURNO_MUTO;
   const volo = { accoglienza: false, turno: registraTurno(reqId, richiesta && richiesta.sender && richiesta.sender.wc), conto, esito: '' };
+  const scheda = idScheda(richiesta && richiesta.sender && richiesta.sender.wc);
+  turnoDellaScheda(scheda, 1);
   try {
     // Un messaggio è un uso solo per le stime di costo, anche con più giri di strumenti (#819).
     const Costi = global.SN_COSTS;
@@ -5966,6 +6048,7 @@ async function handleFiloChat(richiesta) {
     try { conto.fine(volo.esito); } catch (_) {}
     if (volo.accoglienza) onbTurniInVolo -= 1;
     togliTurno(reqId, volo.turno);
+    turnoDellaScheda(scheda, -1);
   }
 }
 
@@ -6007,16 +6090,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // pagare un titolo a ogni ricaricamento per una conversazione in corso.
     if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
-    const archiviata = await appendToChatArchive(chatId, {
-      role: 'user',
-      text: String(userMessage || ''),
-      images: imageList.length,
-      ...(daModello ? { daModello: true } : {}),
-      ...(citazione.ref ? { rispostaA: citazione.ref } : {}),
+    const { archiviata, domanda } = await archiviaDomanda(chatId, {
+      testo: userMessage, immagini: imageList, daModello, ref: citazione.ref,
     }, { onboarding: onbActive });
-    // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
-    const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
-    if (imageList.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, imageList);
     const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
     if (eidDomanda) fontiTurno.push(eidDomanda);
   }
@@ -6345,6 +6421,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const leggiSeguiti = async () => {
     for (const s of turno.seguiti.splice(0)) {
       turno.letti.add(s.id);
+      seguitiSerbati.delete(s.id);
       seguitiLetti.push(s.id);
       testiDeiSeguiti.push(s.testo);
       threadMessages.push({ role: 'user', content: `${s.testo}\n\n${NOTA_SEGUITO}` });
@@ -7787,6 +7864,21 @@ async function summarizeTab(title, content) {
 // disponibile), il turno di chat prosegue. Perdere una chat è brutto; perdere
 // la risposta che l'utente sta aspettando perché non si è potuta archiviare lo
 // è di più.
+// Un messaggio dell'utente entra nella conversazione da qui, che parta col turno o resti a scheda chiusa (#1700).
+// Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
+async function archiviaDomanda(chatId, { testo, immagini = [], daModello = false, ref = null }, meta) {
+  const archiviata = await appendToChatArchive(chatId, {
+    role: 'user',
+    text: String(testo || ''),
+    images: immagini.length,
+    ...(daModello ? { daModello: true } : {}),
+    ...(ref ? { rispostaA: ref } : {}),
+  }, meta);
+  const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
+  if (immagini.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, immagini);
+  return { archiviata, domanda };
+}
+
 async function appendToChatArchive(chatId, turn, meta) {
   if (!chatId || !FiloChats) return null;
   // Cancellata per sempre mentre il turno era in corso: la risposta non la fa rinascere con la stessa targa.
