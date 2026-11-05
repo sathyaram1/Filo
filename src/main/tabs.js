@@ -1621,10 +1621,7 @@ class TabManager {
       return attendi(this.riapri(voce));
     }
     const e = await this._chiusaDallArchivio();
-    if (e) {
-      this.tornata(e);
-      return attendi(this.riapri(SchedeChiuse.daArchivio(e)));
-    }
+    if (e) return attendi(this.riapriDallArchivio(e));
     try {
       this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
     } catch (_) {}
