@@ -192,7 +192,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     });
 
     test('gira su main a ogni rosso, anche con npm ci rosso prima della suite; salta una corsa verde, un ramo, una corsa annullata', () => {
-      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
+      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows,\s*unit-windows-punta\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
       const apre = {
         'rossi nuovi della suite': { verdetto: 'failure' },
         'npm ci rosso in una parte, prima della suite': { suite: 'failure', verdetto: 'failure' },
@@ -312,7 +312,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
           leggi: ['allarme.json'],
         });
         const argv = r.letti['allarme.json'] ? JSON.parse(r.letti['allarme.json']) : null;
-        return { stato: r.stato, registro: r.registro, titolo: argv?.[0], testo: argv?.[1] || '', chiavi: argv?.slice(2) };
+        return { stato: r.stato, registro: r.registro, riepilogo: r.riepilogo, titolo: argv?.[0], testo: argv?.[1] || '', chiavi: argv?.slice(2) };
       };
 
       test('suite senza allegato (npm ci rosso in una parte): feedback con la chiave «non partita»', () => {
@@ -364,6 +364,36 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         // Il registro è nato su Windows e lo legge Linux: le chiavi devono restare quelle del cancello.
         assert.deepEqual(chiaviDelRegistroUnit(registro, '/home/runner/work/Filo/Filo'), chiaviDelRegistroUnit(registro, 'D:\\a\\Filo\\Filo'));
         assert.deepEqual(chiaviDelRegistroUnit(registro, '/home/runner/work/Filo/Filo'), ['unit:tests/unit/x.test.mjs']);
+      });
+
+      // #2148: i rossi di #2145 erano già corretti da una fusione arrivata mentre la suite girava.
+      const REGISTRO_DUE = [
+        "not ok 1 - a\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\a.test.mjs:3:1'",
+        "not ok 2 - b\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\b.test.mjs:3:1'",
+      ].join('\n');
+      const PUNTA = 'fe'.padEnd(40, '1');
+
+      test('unit rossi tutti già verdi su Windows sulla punta: nessun feedback, e il riepilogo dice quali', () => {
+        const r = gira(allarmeUnit, {
+          file: { 'esiti-unit/unit.log': REGISTRO_DUE },
+          env: { PUNTA, GIA_VERDI: 'tests/unit/a.test.mjs tests/unit/b.test.mjs', TUTTI_GIA_VERDI: 'true' },
+        });
+        assert.equal(r.stato, 0, r.registro);
+        assert.equal(r.titolo, undefined, 'il feedback chiederebbe un lavoro già fuso');
+        assert.match(r.registro, /gia' verdi sulla punta di main \(fe11111111\)/);
+        assert.match(r.riepilogo, /- tests\/unit\/a\.test\.mjs\n- tests\/unit\/b\.test\.mjs/);
+      });
+
+      test('unit rossi verdi sulla punta solo in parte: feedback, che dice quali non correggere', () => {
+        const r = gira(allarmeUnit, {
+          file: { 'esiti-unit/unit.log': REGISTRO_DUE },
+          env: { PUNTA, GIA_VERDI: 'tests/unit/a.test.mjs', TUTTI_GIA_VERDI: 'false' },
+        });
+        assert.equal(r.stato, 0, r.registro);
+        assert.equal(r.titolo, 'Unit test rossi su Windows: commit non pubblicabile');
+        assert.deepEqual(r.chiavi, ['--chiavi-unit', 'esiti-unit/unit.log', '--commit', SHA_PROVATO]);
+        assert.match(r.testo, /Gia verdi su Windows sulla punta di main \(fe11111111\), da non correggere: tests\/unit\/a\.test\.mjs/);
+        assert.match(r.testo, /location: 'D:.*b\.test\.mjs/);
       });
     });
   });
