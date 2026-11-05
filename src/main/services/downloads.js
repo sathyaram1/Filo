@@ -780,7 +780,7 @@ async function restaFuoriDalModello(rec, percorso, tipo) {
   const D = globalThis.SN_DELICATE;
   if (!D) return true;
   try {
-    if (await D.versoIlModello([rec._pagina, rec._primo, rec.url])) return true;
+    if (await D.versoIlModello([rec._pagina, rec._apertaDa, rec._primo, rec.url])) return true;
     if (tipo !== 'immagine') return false;
     return await require('./immaginiDelicate').perFilo().restaFuori(await fs.promises.readFile(percorso), await D.filtroSicuro());
   } catch (_) { return true; }
