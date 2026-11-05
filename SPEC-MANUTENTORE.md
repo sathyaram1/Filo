@@ -106,7 +106,7 @@ la memoria nel taccuino (§ 5). Si accende:
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
 
-Fermo su un guasto suo, invece, si accende solo al mattino (§ 7).
+Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
 **Cache.** Il manutentore vuole la cache a **un'ora**: il battito ogni 55
 minuti la tiene calda a costo di una rilettura. Se le sessioni cloud non
