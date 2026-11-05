@@ -760,7 +760,7 @@
               payload: { selection: selInfo.selection, sentence: selInfo.sentence },
               anchor: ancoraSelezione(deps.getLastMouseEvent()),
               title: I18n.t('popup_explain_title'),
-              seguito: daMostrare,
+              seguito: daMostrare || nota,
             });
           });
         });
