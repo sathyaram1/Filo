@@ -101,6 +101,20 @@ async function filtro(settingsIn) {
   return f;
 }
 
+// Lo stesso filtro, ma senza guasti: se la regola non si legge, nel dubbio ogni pagina vale delicata, e `guasto` lo dice a
+// chi lo conta (patterns/un-interruttore-che-promette-una-garanzia-non-ha-ripieghi.md).
+async function filtroSicuro(settings, leggi = filtro) {
+  try {
+    const f = await leggi(settings);
+    if (typeof f === 'function') return f;
+  } catch (_) {}
+  const tutte = () => 'campi';
+  tutte.voce = () => 'campi';
+  tutte.attivo = true;
+  tutte.guasto = true;
+  return tutte;
+}
+
 // Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591), a regola delle
 // delicate accesa o spenta. Un nome di casa ancora da risolvere si aspetta.
 async function diCasa(url) {
@@ -114,18 +128,17 @@ async function diCasa(url) {
 }
 
 // «Queste pagine possono andare a un modello senza una richiesta?» per i lavori che partono da soli (#1545, #1274.1):
-// null se sì, { casa: true } o { motivo } se una sola non può. Senza la regola, nel dubbio una pagina web è delicata.
+// null se sì, { casa: true } o { motivo, guasto } se una sola non può.
 async function versoIlModello(urls, settings) {
   // Un file che la pagina si fa da sé (blob:https://banca…) vale quanto la pagina. Solo pagine web: «filo://newtab»,
   // un nome senza punto, passerebbe per la rete di casa.
   const lista = (Array.isArray(urls) ? urls : [urls]).filter((u) => typeof u === 'string' && u)
     .map((u) => u.replace(/^blob:/i, '')).filter((u) => /^https?:\/\//i.test(u));
   for (const u of lista) if (await diCasa(u)) return { casa: true };
-  let f = null;
-  try { f = await filtro(settings); } catch (_) { f = null; }
+  const f = await filtroSicuro(settings);
   for (const u of lista) {
-    const motivo = f ? f(u) : (PD.host(u) ? 'campi' : null);
-    if (motivo) return { motivo };
+    const motivo = f(u);
+    if (motivo) return { motivo, guasto: Boolean(f.guasto) };
   }
   return null;
 }
@@ -143,6 +156,6 @@ function rileggi() {
   return carica();
 }
 
-globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, carica, rileggi, dimentica, elencoCampi, diCasa, versoIlModello };
+globalThis.SN_DELICATE = { segnaCampi, haCampi, filtro, filtroSicuro, carica, rileggi, dimentica, elencoCampi, diCasa, versoIlModello };
 
 module.exports = globalThis.SN_DELICATE;

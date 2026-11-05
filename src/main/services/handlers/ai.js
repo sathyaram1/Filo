@@ -107,8 +107,7 @@ module.exports = function register(on, ctx) {
       if (typeof originale === 'string' && originale !== dataUrl) await Immagini.segna(originale, { incognito }).catch(() => {});
       return true;
     }
-    if (delicata.attivo === false) return false;
-    try { return await Immagini.daDelicata(dataUrl); } catch (_) { return true; }
+    try { return await Immagini.restaFuori(dataUrl, delicata); } catch (_) { return true; }
   }
 
   // Spenta in Preferenze (#1274), la descrizione di screenshot e immagini copiate non parte: il file prende data e ora.

@@ -611,6 +611,40 @@ test('salvata per dopo con le categorie accese: di una pagina di posta al modell
   expect(normale.testo).toContain('Il gatto domestico');
 });
 
+// Il segno dell'incognito arriva davvero dalla finestra: lo stesso salvataggio, dal tasto destro della scheda, nelle due finestre.
+test('salvata per dopo da una finestra in incognito con le categorie accese, al modello non parte niente; da una normale sì', async ({ app, shell, testServer }) => {
+  await modelliFinti(app);
+  await impostaDaFilo(app, { featureFlags: { categorize: true } });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
+    !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
+  const url = testServer.html('<!doctype html><title>Ricetta del pane</title><body><p>Farina, acqua e lievito madre.</p></body>', { pubblico: true });
+  const salvaDa = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => !!w._filoIncognito === incognito && w._filoTabs)._filoTabs;
+    const id = tm.openTab(url);
+    const t0 = Date.now();
+    let tab = null;
+    while (Date.now() - t0 < 10_000) {
+      tab = tm.tabs.find((t) => t.id === id);
+      const pronta = tab && tab.view && await tab.view.webContents.executeJavaScript(
+        'document.documentElement.dataset.filoContentReady === "1"').catch(() => false);
+      if (pronta) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const code = `chrome.runtime.sendMessage({ type: 'save_page', page: { url: location.href, title: document.title, description: '', excerpt: document.body.innerText } })`;
+    const res = await tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }], true);
+    return Boolean(res && res.ok);
+  }, { url, incognito });
+
+  expect(await salvaDa(true)).toBe(true);
+  await new Promise((r) => setTimeout(r, 2500));
+  expect(await categorizzazioni(app)).toEqual([]);
+
+  expect(await salvaDa(false)).toBe(true);
+  await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(1);
+  expect((await categorizzazioni(app))[0].testo).toContain('lievito madre');
+});
+
 async function scaricaDa(nome, corpo, { shell, openTab, testServer }) {
   const { createServer } = await import('node:http');
   const srv = createServer((req, res) => {
@@ -648,5 +682,9 @@ test('col nome automatico acceso, un file scaricato da un sito delicato tiene il
   await impostaDaFilo(app, { security: { pagineDelicate: { siti: [] } } });
   const normale = await scaricaDa('download.txt', 'Verbale della riunione di condominio', { shell, openTab, testServer });
   await expect.poll(async () => (await mandato(app)).filter((m) => m.testo.includes('Verbale della riunione')).length, { timeout: 15000 }).toBe(1);
-  expect(normale.filename).toBe('download.txt');
+  // Il nome lo dà il modello appena il file è sceso: si guarda dove arriva, non la foto presa a scaricamento finito.
+  await expect.poll(async () => {
+    const r = await shell.evaluate(() => window.filoShell.downloads.list());
+    return (((r && r.items) || []).find((it) => it.id === normale.id) || {}).filename;
+  }, { timeout: 15000 }).toBe('Riassunto finto della pagina.txt');
 });

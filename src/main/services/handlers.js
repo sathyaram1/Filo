@@ -7701,17 +7701,7 @@ const isHomeNetworkUrlSettled = (url) => globalThis.SN_DELICATE.diCasa(url);
 
 // Le pagine delicate (posta, banca, sanità, con password) non mandano testo ai lavori automatici col modello (#1004).
 // `fuori(url)` dà il motivo o null; `fuori.voce(it)` vale anche per una scheda archiviata, che il motivo se lo porta dietro.
-async function filtroDelicate(settings) {
-  try {
-    const f = await globalThis.SN_DELICATE.filtro(settings);
-    if (typeof f === 'function') return f;
-  } catch (_) {}
-  // Senza la regola non si sa: nel dubbio, vale delicata (patterns/un-interruttore-che-promette-una-garanzia-non-ha-ripieghi.md).
-  const tutte = () => 'campi';
-  tutte.voce = () => 'campi';
-  tutte.guasto = true;
-  return tutte;
-}
+const filtroDelicate = (settings) => require('./pagineDelicate').filtroSicuro(settings, (s) => globalThis.SN_DELICATE.filtro(s));
 // Il riassunto delle schede chiuse (#1004): spento, di una scheda che si chiude non parte niente verso i modelli.
 const riassuntoAcceso = (settings) => !(settings && settings.riassuntoSchede && settings.riassuntoSchede.enabled === false);
 // Una scheda archiviata che non va a nessun modello, nemmeno dopo: della rete di casa (#591), delicata, o chiusa col

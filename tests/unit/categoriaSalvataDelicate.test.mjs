@@ -35,7 +35,7 @@ const ESTRATTO = 'Saldo disponibile 12.345,67 euro. IBAN IT60X054281110100000012
 const DESCRIZIONE = 'Le tue email di Gmail';
 
 // Salva una pagina come fa il tasto destro (SAVE_PAGE) o un link (SAVE_LINK), e aspetta la categoria.
-async function salva({ settings = {}, incognito = false, tipo = MSG.SAVE_PAGE, page }) {
+async function salva({ settings = {}, incognito = false, tipo = MSG.SAVE_PAGE, page, sender = null }) {
   for (const k of Object.keys(disco)) delete disco[k];
   const chiamate = [];
   const pagine = [];
@@ -56,7 +56,7 @@ async function salva({ settings = {}, incognito = false, tipo = MSG.SAVE_PAGE, p
     maybeCategorizeAsync: (voce, pagina) => (lavoro = categorizza(voce, pagina, { settings, chiedi, inIncognito: () => incognito })),
   });
   const msg = tipo === MSG.SAVE_PAGE ? { type: tipo, page } : { type: tipo, url: page.url, title: page.title };
-  await registro.get(tipo)(msg, null, 'filo://newtab/');
+  await registro.get(tipo)(msg, sender, sender ? new URL(sender.tab.url).origin : 'filo://newtab/');
   await lavoro;
   return { chiamate, voce: (disco[KEY] || pagine).find((p) => p.id === 'p1') };
 }
@@ -120,4 +120,25 @@ test('da una finestra in incognito la categorizzazione non parte', async () => {
     const { chiamate } = await salva({ incognito: true, page });
     assert.equal(chiamate.length, 0, page.url);
   }
+});
+
+// #1823 — conta la pagina da cui si salva: il link di una mail porta con sé quello che la mail ha mostrato.
+test('un link salvato da dentro la posta, che porta a un sito qualunque: al modello va il tipo della posta', async () => {
+  const link = { url: 'https://esempio.org/reimposta?token=SEGRETO123', title: 'Conferma il bonifico a Mario Rossi' };
+  const daPosta = { tab: { id: 3, url: 'https://mail.google.com/mail/u/0/#inbox' } };
+  const { chiamate, voce } = await salva({ tipo: MSG.SAVE_LINK, page: link, sender: daPosta });
+  assert.equal(chiamate.length, 1);
+  assert.match(chiamate[0].prompt, /posta/);
+  for (const segreto of ['SEGRETO123', 'esempio.org', 'Mario Rossi']) assert.ok(!chiamate[0].prompt.includes(segreto), segreto);
+  assert.equal(voce.category, 'Comunicazioni');
+  const daRouter = await salva({ tipo: MSG.SAVE_LINK, page: link, sender: { tab: { id: 4, url: 'http://192.168.1.1/' } } });
+  assert.equal(daRouter.chiamate.length, 0, 'dalla rete di casa non parte niente');
+  const daWiki = await salva({ tipo: MSG.SAVE_LINK, page: link, sender: { tab: { id: 5, url: 'https://it.wikipedia.org/wiki/Torino' } } });
+  assert.match(daWiki.chiamate[0].prompt, /Mario Rossi/, 'da una pagina qualunque il link parte come prima');
+});
+
+test('una pagina che si dice salvata da un altro posto non toglie la provenienza vera', async () => {
+  const page = { url: 'https://esempio.org/x', title: 'Titolo del link', da: 'https://it.wikipedia.org/' };
+  const { chiamate } = await salva({ tipo: MSG.SAVE_PAGE, page, sender: { tab: { id: 3, url: 'https://mail.google.com/mail/u/0/' } } });
+  assert.ok(!chiamate[0].prompt.includes('Titolo del link'));
 });

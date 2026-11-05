@@ -72,3 +72,12 @@ test('senza aver letto il disco non lo sovrascrive', async () => {
   await I.segna('data:image/png;base64,SALDO');
   assert.equal(await I.daDelicata('data:image/png;base64,SALDO'), true);
 });
+
+test('i lavori che partono da soli chiedono la stessa cosa: impronta di una delicata fuori, a regola spenta dentro', async () => {
+  const { storage } = disco();
+  const I = crea({ impronta, storage: () => storage, appunti: async () => null });
+  await I.segna('data:image/png;base64,SALDO');
+  assert.equal(await I.restaFuori('data:image/png;base64,SALDO', { attivo: true }), true);
+  assert.equal(await I.restaFuori('data:image/png;base64,SALDO', { attivo: false }), false);
+  assert.equal(await I.restaFuori('data:image/png;base64,GATTO', { attivo: true }), false);
+});

@@ -4,7 +4,8 @@
 'use strict';
 
 /**
- * `voce` la voce salvata { id, url, title, thumbnail }; `pagina` quello che la pagina ha mandato { description, excerpt }.
+ * `voce` la voce salvata { id, url, title, thumbnail }; `pagina` quello che la pagina ha mandato { description, excerpt }
+ * e `da`, la pagina da cui si salva: conta quanto la salvata (#1823), un link preso dalla posta vale come la posta.
  * `chiedi({ action, payload, origin })` → { text }. Torna il risultato di categorize, o null se non è partito niente.
  */
 async function categorizza(voce, pagina, {
@@ -17,7 +18,7 @@ async function categorizza(voce, pagina, {
   SavedPages = globalThis.SN_SAVED_PAGES,
 } = {}) {
   if (!voce || inIncognito()) return null;
-  const fuori = await delicate.versoIlModello(voce.url, settings);
+  const fuori = await delicate.versoIlModello([pagina && pagina.da, voce.url], settings);
   if (fuori && fuori.casa) return null;
   // Una delicata si categorizza lo stesso: il tipo basta a metterla con la posta o con la banca.
   const tipo = fuori ? nome(fuori.motivo) : '';

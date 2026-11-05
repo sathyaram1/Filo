@@ -17,6 +17,9 @@ module.exports = function register(on, ctx) {
 
   const schedaDi = (sender) => sender?.win?._filoTabs?.tabs?.find((t) => t.id === sender?.tab?.id) || null;
   const origineDi = (u) => { try { return new URL(String(u || '')).origin; } catch (_) { return ''; } };
+  // La pagina da cui si salva conta quanto quella salvata (#1823): un link di una mail porta con sé quello che la mail
+  // ha mostrato. Dal mittente, mai dal messaggio.
+  const conProvenienza = (pagina, sender) => ({ ...(pagina || {}), da: String(sender?.tab?.url || sender?.url || '') });
 
   // L'icona è quella che la scheda ha già scaricato con la sua sessione (#1273): l'indirizzo che manda la pagina non si segue.
   // Senza mittente chiama il main stesso (la scorciatoia), che icona e proxy della scheda li passa già.
@@ -30,7 +33,7 @@ module.exports = function register(on, ctx) {
       proxy = tab ? tab.proxy : null;
     }
     const entry = await SavedPages.save(page, { proxy });
-    maybeCategorizeAsync(entry, msg.page).catch((e) => console.warn('[Filo] categorize failed', e));
+    maybeCategorizeAsync(entry, conProvenienza(msg.page, sender)).catch((e) => console.warn('[Filo] categorize failed', e));
     return { ok: true, entry: voceVerso(entry, origin) };
   });
 
@@ -39,7 +42,7 @@ module.exports = function register(on, ctx) {
   on(MSG.SAVE_LINK, async (msg, sender, origin) => {
     const tab = schedaDi(sender);
     const entry = await SavedPages.save({ url: msg.url, title: msg.title }, { proxy: tab ? tab.proxy : null });
-    maybeCategorizeAsync(entry, { url: msg.url, title: msg.title }).catch((e) => console.warn('[Filo] categorize failed', e));
+    maybeCategorizeAsync(entry, conProvenienza({ url: msg.url, title: msg.title }, sender)).catch((e) => console.warn('[Filo] categorize failed', e));
     return { ok: true, entry: voceVerso(entry, origin) };
   });
 
