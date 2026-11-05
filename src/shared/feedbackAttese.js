@@ -140,6 +140,57 @@
     return { ok: true, attese };
   }
 
+  /**
+   * Cosa passare a `valida`, calcolato sulle attese lette adesso (`prima`). `numeri` è l'elenco intero e sostituisce;
+   * senza, restano quelle lette tranne `togli` (id), per numero o per id quelle senza, e `aggiungi` si unisce. PURA.
+   * @returns {{ numeri: string[], tieni: string[] }}
+   */
+  function daScrivereSu(prima, { numeri, aggiungi = [], togli = [] } = {}) {
+    if (Array.isArray(numeri)) return { numeri: numeri.slice(), tieni: [] };
+    const via = new Set((Array.isArray(togli) ? togli : []).map(String));
+    const restano = atteseDi({ [CAMPO]: prima }).filter((w) => !via.has(w.id));
+    const nuovi = (Array.isArray(aggiungi) ? aggiungi : []).map(normalizzaNumero);
+    return {
+      numeri: [...new Set([...restano.map((w) => w.num).filter(Boolean), ...nuovi])],
+      tieni: restano.filter((w) => !w.num).map((w) => w.id),
+    };
+  }
+
+  // Le riletture concesse a una scrittura che trova il documento cambiato dopo averlo letto.
+  const RILETTURE = 8;
+  const pausaRilettura = (i) => new Promise((r) => setTimeout(r, Math.round(Math.min(1600, 100 * 2 ** (i - 1)) * (0.5 + Math.random()))));
+
+  /** La risposta di Firestore a una scrittura con la versione come condizione, quando il documento non è più quello letto. PURA. */
+  function conflittoDiScrittura(status, testo) {
+    if (status === 404 || status === 409 || status === 412) return true;
+    return status === 400 && /FAILED_PRECONDITION|ABORTED|base version/i.test(String(testo || ''));
+  }
+
+  /**
+   * Le attese si scrivono solo sull'elenco letto (#1756.1): chi le scrive ricalcola da quelle di adesso e scrive con la
+   * versione letta come condizione; se intanto un altro ha scritto, rilegge e ricalcola, invece di cancellargli la sua.
+   * `leggi()` → { versione, ... } o null; `calcola(letto)` → { fine: esito } per chiudere senza scrivere, o { scrivi: dati };
+   * `scrivi(dati, versione)` → l'esito, o { conflitto: true } se il documento non era più a quella versione.
+   */
+  async function scriviSullaLettura({ leggi, calcola, scrivi, tentativi = RILETTURE, pausa = pausaRilettura }) {
+    for (let i = 1; i <= tentativi; i++) {
+      // eslint-disable-next-line no-await-in-loop
+      const letto = await leggi();
+      // eslint-disable-next-line no-await-in-loop
+      const passo = await calcola(letto);
+      if (!passo || !('scrivi' in passo)) return passo ? passo.fine : { ok: false, motivo: 'niente da scrivere' };
+      if (!letto || !letto.versione) {
+        return { ok: false, motivo: 'la lettura non dice la versione del documento: non scrivo su un elenco che potrebbe essere cambiato' };
+      }
+      // eslint-disable-next-line no-await-in-loop
+      const esito = await scrivi(passo.scrivi, letto.versione);
+      if (!esito || !esito.conflitto) return esito;
+      // eslint-disable-next-line no-await-in-loop
+      if (i < tentativi) await pausa(i);
+    }
+    return { ok: false, conflitto: true, motivo: `le attese sono cambiate ${tentativi} volte di seguito mentre le scrivevo: non ho scritto niente, riprova` };
+  }
+
   /** Il percorso (numeri) da un'attesa diretta fino a un feedback che aspetta `selfId`, o null. */
   async function cercaGiro(selfId, attese, leggiAttese) {
     const prima = new Map();
@@ -256,6 +307,7 @@
   global.SN_FB_ATTESE = {
     CAMPO, MAX, STATO, ETICHETTA,
     normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, etichetta, testoAttese, valida,
+    daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
     prioritaDi, scattaEredita, ereditaPriorita, notaEredita,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

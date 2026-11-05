@@ -2501,7 +2501,7 @@
       if (ATT.atteseDi(fb).length) {
         voci.push({
           testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
-          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, () => []); },
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, togliTutte); },
         });
       }
     }
@@ -3903,34 +3903,28 @@
     }).join('');
   }
 
-  // Le attese da riscrivere, tranne `salvo`: per numero quelle di un aspettato che la pagina vede, per id le altre
-  // (cancellato, non letto, senza numero), che il main tiene come sono invece di rifiutarle cercandone il numero.
-  function atteseDaTenere(fb, salvo = '') {
-    return ATT.atteseDi(fb).filter((w) => w.id !== salvo).map((w) => {
-      const doc = trovaAtteso(w.id);
-      const n = doc && !doc.missing ? (w.num || numeroDi(doc)) : '';
-      return n || { id: w.id };
-    });
-  }
+  // Il gesto «togli tutte» toglie quelle che la pagina mostra: un'attesa scritta intanto da altri resta (#1756.1).
+  const togliTutte = (fb) => ({ togli: ATT.atteseDi(fb).map((w) => w.id) });
 
-  async function scriviAttese(id, voci) {
+  // Si manda il gesto, non l'elenco: il main lo applica alle attese di adesso, che la pagina può vedere in ritardo.
+  async function scriviAttese(id, gesto) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb || !ATT) return false;
     const num = numeroDi(fb);
     const chi = num ? `#${num}` : 'Il feedback';
-    const tieni = voci.filter((v) => v && typeof v === 'object').map((v) => v.id);
-    const lette = ATT.leggiNumeri(voci.filter((v) => typeof v === 'string'));
-    if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
-    const vuoto = !lette.numeri.length && !tieni.length;
+    const aggiungi = (gesto && gesto.aggiungi) || [];
+    const togli = (gesto && gesto.togli) || [];
+    const vuoto = !aggiungi.length && ATT.atteseDi(fb).every((w) => togli.includes(w.id));
     for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
     setManageMsg(vuoto ? 'Tolgo le attese…' : 'Scrivo le attese…', '');
     try {
-      const r = await sendToMain(Object.assign({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') }, tieni.length ? { waitsTieni: tieni } : {}));
+      const r = await sendToMain(Object.assign({ type: 'feedback_update', id },
+        aggiungi.length ? { waitsAggiungi: aggiungi.join(', ') } : { waitsTogli: togli }));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
-      // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
-      if (vuoto && atteseApertePer === id) atteseApertePer = '';
-      else if (!vuoto) atteseApertePer = id;
+      // Si chiude solo se non ne resta nessuna: una scritta intanto da altri, e mai vista qui, resta da guardare.
+      if (!fb.waitsFor && atteseApertePer === id) atteseApertePer = '';
+      else if (fb.waitsFor) atteseApertePer = id;
       renderList();
       if (selectedId === id) reflectAttese(fb);
       const dove = MR.manageTabFor(fb, opzSezioni());
@@ -3946,8 +3940,8 @@
     }
   }
 
-  // Una scrittura alla volta, e ciascuna calcola l'elenco solo quando tocca a lei: calcolato prima, un gesto fatto
-  // mentre la precedente è in volo riscriverebbe l'elenco vecchio e la cancellerebbe.
+  // Una scrittura alla volta, e ciascuna calcola il gesto solo quando tocca a lei: «togli tutte» toglie anche quelle
+  // aggiunte dal gesto in volo prima di lei.
   let codaAttese = Promise.resolve();
   function accodaAttese(id, calcola) {
     const giro = codaAttese.then(() => {
@@ -3974,7 +3968,7 @@
     // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
     const testo = mgAtteseInput.value;
     mgAtteseInput.value = '';
-    const ok = await accodaAttese(fb._id, (f) => [...atteseDaTenere(f), ...nuovi.numeri]);
+    const ok = await accodaAttese(fb._id, () => ({ aggiungi: nuovi.numeri }));
     if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
   }
   if (mgAtteseToggle) {
@@ -3999,7 +3993,7 @@
     });
   }
   if (mgAtteseTogliTutte) {
-    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, () => []); });
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, togliTutte); });
   }
   if (mgAtteseLista) {
     mgAtteseLista.addEventListener('click', (e) => {
@@ -4009,7 +4003,7 @@
       if (!fb) return;
       if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
       const via = li.dataset.id;
-      accodaAttese(fb._id, (f) => atteseDaTenere(f, via));
+      accodaAttese(fb._id, () => ({ togli: [via] }));
     });
   }
   // Dall'attesa alla pratica aspettata, nella sua sezione.

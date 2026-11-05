@@ -366,37 +366,60 @@ module.exports = function register(on, ctx) {
     }
   }));
 
-  // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
-  // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
-  // `tieni`: id delle attese già scritte che la pagina non sa rinumerare (aspettato cancellato o non letto): restano come sono.
-  async function prepareAttese(id, valore, idToken, tieni) {
+  // «Aspetta #N» (#903): la pagina manda il gesto, non l'elenco: `waitsAggiungi` (i numeri come li ha scritti l'owner) e
+  // `waitsTogli` (id). Il main li applica alle attese lette adesso col token (la pagina ne vede una finestra, magari vecchia).
+  function richiestaAttese(msg) {
+    const A = globalThis.SN_FB_ATTESE;
+    const letti = A.leggiNumeri(msg.waitsAggiungi == null ? '' : msg.waitsAggiungi);
+    if (!letti.ok) return letti;
+    const togli = msg.waitsTogli === undefined ? [] : msg.waitsTogli;
+    if (!Array.isArray(togli) || togli.length > A.MAX || togli.some((x) => typeof x !== 'string')) {
+      return { ok: false, motivo: 'elenco delle attese da togliere non valido' };
+    }
+    return { ok: true, aggiungi: letti.numeri, togli };
+  }
+
+  // Le attese insieme a `campi`, scritte solo sull'elenco letto (SN_FB_ATTESE.scriviSullaLettura). Regole: SN_FB_ATTESE.valida.
+  async function scriviAttese(id, richiesta, campi, idToken) {
     const A = globalThis.SN_FB_ATTESE;
     const FB = globalThis.SN_FEEDBACK;
-    const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
-    if (!letti.ok) return letti;
-    if (tieni !== undefined && (!Array.isArray(tieni) || tieni.length > A.MAX || tieni.some((x) => typeof x !== 'string'))) {
-      return { ok: false, motivo: 'elenco delle attese da tenere non valido' };
-    }
-    if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
-    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
-    if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
-    // Un numero di più feedback (#1517) non si lega al primo che capita: lo si dice all'owner, con gli id.
-    const v = A.valida({
-      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
-      risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
-      leggiAttese: async (ids) => {
-        const out = new Map();
-        for (let i = 0; i < ids.length; i += 100) {
-          // eslint-disable-next-line no-await-in-loop
-          const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
-          for (const r of righe) out.set(r._id, A.atteseDi(r));
-        }
-        return out;
+    return A.scriviSullaLettura({
+      leggi: async () => {
+        const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
+        return proprio ? { proprio, versione: proprio._updateTime || '' } : null;
       },
-    });
-    return v.catch((e) => {
-      if (e && Array.isArray(e.numeroDoppio)) return { ok: false, motivo: e.message };
-      throw e;
+      calcola: async (letto) => {
+        if (!letto) return { fine: { ok: false, motivo: 'il feedback non esiste più' } };
+        const gia = A.atteseDi(letto.proprio);
+        const { numeri, tieni } = A.daScrivereSu(gia, richiesta);
+        // Un numero di più feedback (#1517) non si lega al primo che capita: lo si dice all'owner, con gli id.
+        const v = await A.valida({
+          id, num: FB.formatNum(letto.proprio.seq, letto.proprio.subSeq), numeri, gia, tieni,
+          risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+          leggiAttese: async (ids) => {
+            const out = new Map();
+            for (let i = 0; i < ids.length; i += 100) {
+              // eslint-disable-next-line no-await-in-loop
+              const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+              for (const r of righe) out.set(r._id, A.atteseDi(r));
+            }
+            return out;
+          },
+        }).catch((e) => {
+          if (e && Array.isArray(e.numeroDoppio)) return { ok: false, motivo: e.message };
+          throw e;
+        });
+        return v.ok ? { scrivi: v.attese } : { fine: v };
+      },
+      scrivi: async (attese, versione) => {
+        try {
+          await FB.updateStatus(id, { ...campi, waitsFor: attese }, { idToken, versione });
+        } catch (e) {
+          if (e && e.conflitto) return { conflitto: true };
+          throw e;
+        }
+        return { ok: true, attese };
+      },
     });
   }
 
@@ -435,12 +458,8 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      let waitsFor;
-      if (msg.waitsFor !== undefined) {
-        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
-        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
-        waitsFor = r.attese;
-      }
+      const attese = msg.waitsAggiungi !== undefined || msg.waitsTogli !== undefined ? richiestaAttese(msg) : null;
+      if (attese && !attese.ok) return { ok: false, error: attese.motivo, rifiutato: true };
       // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
       // partenza si chiede al documento, non alla copia della pagina.
       const FB = globalThis.SN_FEEDBACK;
@@ -449,11 +468,15 @@ module.exports = function register(on, ctx) {
         const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
         if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
       }
-      await globalThis.SN_FEEDBACK.updateStatus(
-        id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
-        { idToken },
-      );
+      const campi = { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges };
+      let waitsFor;
+      if (attese) {
+        const r = await scriviAttese(id, attese, campi, idToken);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      } else {
+        await FB.updateStatus(id, campi, { idToken });
+      }
       // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
       // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
       await syncOneCard(id, idToken);

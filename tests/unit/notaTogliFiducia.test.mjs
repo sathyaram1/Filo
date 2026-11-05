@@ -23,7 +23,7 @@ function pratica(id, { fiducia = 'fidato', status = 'todo', notes = '' } = {}) {
     status: { stringValue: status }, statusPublic: { stringValue: 'open' }, notes: { stringValue: notes }, localOnly: SEGNO,
   };
   if (fiducia !== null) fields.fiducia = { stringValue: fiducia };
-  return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields };
+  return { name: `projects/p/databases/(default)/documents/feedback/${id}`, fields, updateTime: '2026-10-01T00:00:00.000001Z' };
 }
 
 // `ordine` tiene insieme le scritture e la fiducia tolta: la seconda deve venire prima della prima.

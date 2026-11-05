@@ -1987,6 +1987,7 @@
     }
     // Le attese (#903): [{ id, num }] già controllate da SN_FB_ATTESE.valida; vuota o null le toglie (campo cancellato).
     if (waitsFor !== undefined) {
+      if (!opts.versione) throw new Error('attese non scritte: si scrivono solo sulla versione letta (SN_FB_ATTESE.scriviSullaLettura)');
       const lista = attesePerScrittura(waitsFor);
       if (lista.length) fields.waitsFor = toFsValue(lista);
       mask.push('waitsFor');
@@ -2021,9 +2022,11 @@
     touchUpdatedAt(fields, mask);
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    // `opts.versione` (l'updateTime letto): si scrive solo se il documento è ancora quello (SN_FB_ATTESE.scriviSullaLettura).
+    const condizione = opts.versione ? `&currentDocument.updateTime=${encodeURIComponent(opts.versione)}` : '';
     const scrivi = () => {
       const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
-      const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+      const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}${condizione}&key=${API_KEY}`;
       return fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
     };
     let res = await scrivi();
@@ -2036,7 +2039,10 @@
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
+      const err = new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
+      const A = global.SN_FB_ATTESE;
+      if (condizione && A && A.conflittoDiScrittura(res.status, errText)) err.conflitto = true;
+      throw err;
     }
     return true;
   }
