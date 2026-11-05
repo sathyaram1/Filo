@@ -69,6 +69,8 @@ test('i campi che una riga mostra, ordina o filtra ci sono', () => {
     'name', 'text', 'seq', 'subSeq', 'createdAt', 'resolvedAt', 'resolvedInVersion',
     'clientId', 'userNote', 'votes', 'reopenRequests', 'blockReason',
     'reviewDecision', 'fiducia', 'stalls', 'workingResets', 'claimedBy', 'beatAt',
+    // Lo scrive il server (#2036): senza, Gestione non mostra il «Fermo: resta locale».
+    'restaLocale',
     // La classe del mittente (§10): le Statistiche la contano anche dalle righe aggiornate dal vivo.
     'mittenteClasse', 'mittenteRuolo',
   ]) {
