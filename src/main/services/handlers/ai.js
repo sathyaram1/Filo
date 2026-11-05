@@ -306,10 +306,12 @@ module.exports = function register(on, ctx) {
     // `intera`: la pagina usa la risposta come dato (un riassunto salvato, un nome, una traduzione, una scelta) e un
     // pezzo fermato dal tetto torna come errore che lo dice, mai come risposta (#1302).
     const intera = msg && msg.intera === true;
+    // `conSeguito`: la pagina ha «Continua» sotto la risposta, e una tagliata senza testo le arriva con la nota (#1302).
+    const conSeguito = !intera && msg && msg.conSeguito === true;
     const chiedi = daSola
-      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera }))
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera, conSeguito }))
       : valuta ? () => chiediValuta(msg.payload, origin, sender)
-        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera });
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
