@@ -483,7 +483,7 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
  * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
  * verificato sullo stesso contenuto? PURA.
  *
- * Sono la parte lunga della chiusura (da quindici a quarantacinque minuti), e
+ * Sono la parte lunga della chiusura (vedi stimaDurataControlli), e
  * chi verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui,
  * sullo stesso commit, è la stessa ora pagata due volte. Si saltano solo con un
  * verdetto valido in mano, che è già legato a quel contenuto — senza verifica
@@ -501,6 +501,19 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
     rilancia: false,
     nota: `▸ Spec delle aree toccate: li ha già corsi la verifica indipendente su ${dove}${tollerato ? ' (da lì il ramo si è mosso solo dentro le prove del giro)' : ''}, non li rifaccio.\n  La logica pura gira lo stesso: le prove del giro committate dopo quel controllo passano solo di qui.`,
   };
+}
+
+// Un worker solo: le parti della suite su GitHub vanno a 20-28 s per spec, e un ramo largo ne sceglie quasi duecento
+// (#2178): una durata fissa promessa nei ruoli faceva uccidere i controlli a metà da chi li aspettava.
+export const SECONDI_PER_SPEC = [20, 30];
+export const MINUTI_UNIT = [4, 8];
+
+/** La durata prevista dei controlli, da quanti spec lanceranno: la si stampa prima di partire. PURA. */
+export function stimaDurataControlli(nSpec) {
+  const n = Math.max(0, Math.floor(Number(nSpec) || 0));
+  const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
+  const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
+  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (unit più ${n} spec, circa mezzo minuto l'uno con un worker).` };
 }
 
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
@@ -790,6 +803,7 @@ async function main() {
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
     const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
+    console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
