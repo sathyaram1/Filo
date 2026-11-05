@@ -117,6 +117,14 @@ function percorsoLetto(nome, dati) {
   return null;
 }
 
+// Read e Grep di Claude Code leggono «~» e «~/…» dalla cartella di casa: risolto contro la cartella della chiamata,
+// un percorso scritto così sembrerebbe dentro il repo. Senza `casa` nota vale una cartella che non è fidata.
+function conCasa(p, casa, win) {
+  if (p !== '~' && !p.startsWith('~/') && !(win && p.startsWith('~\\'))) return p;
+  const c = String(casa || '').trim() || (win ? 'C:\\~' : '/~');
+  return p === '~' ? c : (win ? path.win32 : path.posix).join(c, p.slice(2));
+}
+
 /**
  * Il motivo con cui la chiamata sporca il biglietto, '' se non porta dentro testo esterno. `input` = lo stdin del
  * gancio; `ctx` = contestoLettura (cartelle e file fidati, cartelle di Claude, `sessione`, `win`, `canonico`). PURA
