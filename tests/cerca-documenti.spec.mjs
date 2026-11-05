@@ -172,6 +172,7 @@ test('l\'attesa dice cosa sta leggendo e quanti ne mancano, e il quadrato ferma 
     await expect(blocco.locator('.dash-activity-seg-head').first())
       .toHaveText(/Leggo i documenti nuovi… \d+ di 60 · doc_\d{3}\.txt/, { timeout: 10_000 });
     await page.screenshot({ path: 'tests/.shots/cerca-documenti-attesa.png' });
+    await quadratoPronto(page);
     await page.locator('#stopBtn').click();
     await expect(blocco).toHaveAttribute('data-fermato', '1', { timeout: 2_000 });
     await expect(page.locator('#sendBtn')).toHaveAttribute('aria-label', 'Riprendi', { timeout: 3_000 });
