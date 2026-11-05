@@ -12,6 +12,7 @@ import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
+import { famigliaPrezzo, PREZZI } from './session-report.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -231,8 +232,8 @@ const DATA_RE = /^\d{4}-\d{2}-\d{2}(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d{1,3})?)?(?:Z|
 export const RAPPORTI_PAGINE_MAX = 500;
 
 /**
- * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]`
- * → { ok, dati (il corpo per il server), tutte, json } | { ok:false, motivo }. PURA.
+ * `rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma | --cache] [--cursore C] [--limite L] [--tutte] [--json]`
+ * → { ok, dati (il corpo per il server), tutte, cache, json } | { ok:false, motivo }. PURA.
  */
 export function richiestaRapporti(argv, nowMs = Date.now()) {
   const [n, altro] = senzaOpzioni((argv || []).slice(1));
@@ -250,8 +251,10 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (limite !== undefined && !(/^\d{1,6}$/.test(String(limite)) && Number(limite) >= 1)) return ko('--limite è un intero da 1 in su');
   if (cursore !== undefined && !String(cursore).trim()) return ko('--cursore è quello stampato dalla pagina prima');
   const somma = argv.includes('--somma');
-  const tutte = argv.includes('--tutte');
-  if (somma && tutte) return ko('--somma dà solo il conto, senza pagine: --tutte non serve');
+  const cache = argv.includes('--cache');
+  const tutte = cache || argv.includes('--tutte');
+  if (somma && tutte) return ko(`--somma dà solo il conto, senza pagine: ${cache ? '--cache le legge tutte, va da solo' : '--tutte non serve'}`);
+  if (cache && cursore !== undefined) return ko('--cache legge la finestra intera: il cursore non serve');
   if (argv.includes('--sottonumeri') && !n) return ko('--sottonumeri vuole il numero del feedback');
   const dati = {};
   if (n) dati.numero = numeroDi(n);
@@ -262,7 +265,7 @@ export function richiestaRapporti(argv, nowMs = Date.now()) {
   if (somma) dati.somma = true;
   if (cursore !== undefined) dati.cursore = String(cursore);
   if (limite !== undefined) dati.limite = Number(limite);
-  return { ok: true, dati, tutte, json: argv.includes('--json') };
+  return { ok: true, dati, tutte, cache, json: argv.includes('--json') };
 }
 
 const dollari = (n) => `${(Number(n) || 0).toFixed(2)} $`;
@@ -310,6 +313,90 @@ export async function tutteLePagine(chiamata, dati) {
     pagine += 1;
   }
   return Object.assign({}, r, { rapporti, cursore: null, pagine });
+}
+
+// La durata della cache dei sotto-agenti: un'attesa che la supera fa riscrivere il contesto al turno dopo (#2121).
+export const SCADENZA_CACHE_S = 300;
+
+// I dollari della cache di un rapporto: quelli scritti dal rapporto, o la stima dei rapporti nati prima del campo.
+function dollariCache(rep, cw, rw) {
+  const c = rep.cache && typeof rep.cache === 'object' ? rep.cache : null;
+  if (c && Number.isFinite(c.scrittaUsd)) {
+    const n = (k) => Number(c[k]) || 0;
+    return {
+      cacheUsd: n('scrittaUsd'), rewarmUsd: n('rewarmUsd'), sovrapprezzo: n('sovrapprezzoOraUsd'),
+      risparmioMax: n('risparmioOraUsd'), risparmioSeTutto: n('risparmioSeTuttoUsd'),
+    };
+  }
+  const p = PREZZI[famigliaPrezzo((Array.isArray(rep.models) ? rep.models : [])[0]).key];
+  return {
+    stimati: 1, cacheUsd: cw * p.cacheWrite / 1e6, rewarmUsd: rw * p.cacheWrite / 1e6,
+    sovrapprezzo: cw * (p.cacheWrite1h - p.cacheWrite) / 1e6,
+    risparmioMax: rw * (p.cacheWrite - p.cacheRead) / 1e6,
+    risparmioSeTutto: cw * (p.cacheWrite - p.cacheRead) / 1e6,
+  };
+}
+
+/**
+ * Il conto di `rapporti --cache` per ruolo e in totale: costo della sessione, cache scritta, riscritture, attese oltre
+ * la scadenza e il saldo della cache a un'ora (risparmio MASSIMO sulle riscritture meno il sovrapprezzo su ogni
+ * scrittura). Il risparmio è un tetto: rewarmTurns conta ogni causa, non solo la pausa. I dollari sono quelli del
+ * rapporto (`report.cache`, ogni richiesta col suo listino); un rapporto che non li ha si stima al primo modello. PURA.
+ */
+export function contoCache(rapporti) {
+  const vuoto = () => ({
+    biglietti: 0, conRapporto: 0, usd: 0, turni: 0, cacheTok: 0, cacheUsd: 0, rewarmTurni: 0, rewarmTok: 0, rewarmUsd: 0,
+    attese: 0, bigliettiConAttese: 0, sovrapprezzo: 0, risparmioMax: 0, risparmioSeTutto: 0, stimati: 0,
+  });
+  const ruoli = new Map();
+  const totale = vuoto();
+  for (const b of Array.isArray(rapporti) ? rapporti : []) {
+    const rep = b && b.report && typeof b.report === 'object' ? b.report : null;
+    const ruolo = unaRiga((b && (b.ruolo || b.role)) || (rep && rep.role)) || '?';
+    if (!ruoli.has(ruolo)) ruoli.set(ruolo, vuoto());
+    // Le attese dal biglietto: il rapporto le tiene a budget.
+    const lunghe = (Array.isArray(b && b.attese) ? b.attese : []).filter((a) => Number(a && a.secondi) >= SCADENZA_CACHE_S).length;
+    const dati = { biglietti: 1, attese: lunghe, bigliettiConAttese: lunghe ? 1 : 0 };
+    if (rep) {
+      const cw = Number(rep.tokens && rep.tokens.cacheWrite) || 0;
+      const rw = Number(rep.rewarmTokens) || 0;
+      Object.assign(dati, {
+        conRapporto: 1, usd: Number(rep.costUsd) || 0, turni: Number(rep.turns) || 0,
+        cacheTok: cw, rewarmTurni: Number(rep.rewarmTurns) || 0, rewarmTok: rw,
+      }, dollariCache(rep, cw, rw));
+    }
+    for (const g of [ruoli.get(ruolo), totale]) for (const [k, v] of Object.entries(dati)) g[k] += v;
+  }
+  const chiudi = (g) => Object.assign(g, {
+    saldo: g.risparmioMax - g.sovrapprezzo,
+    // La quota della cache scritta che dovrebbe essere riscrittura da scadenza perché l'ora convenga.
+    soglia: g.risparmioSeTutto ? g.sovrapprezzo / g.risparmioSeTutto : 0,
+  });
+  return {
+    perRuolo: [...ruoli].map(([ruolo, g]) => ({ ruolo, ...chiudi(g) })).sort((x, y) => y.usd - x.usd),
+    totale: chiudi(totale),
+  };
+}
+
+/** `rapporti --cache` da leggere: una riga per ruolo, il totale, e il limite della stima. PURA. */
+export function righeCache(conto, finestra = null) {
+  const pct = (a, b) => (b ? `${(100 * a / b).toFixed(1)} %` : '0 %');
+  const mtok = (n) => `${((Number(n) || 0) / 1e6).toFixed(2)} M tok`;
+  const conSegno = (n) => `${n < 0 ? '−' : '+'}${dollari(Math.abs(n))}`;
+  const riga = (nome, g) => `  ${nome}: ${g.biglietti} biglietti (${g.conRapporto} col rapporto) · ${dollari(g.usd)}`
+    + ` · cache scritta ${mtok(g.cacheTok)} = ${dollari(g.cacheUsd)} (${pct(g.cacheUsd, g.usd)} del costo)`
+    + ` · rewarm ${g.rewarmTurni} su ${g.turni} turni, ${mtok(g.rewarmTok)} = ${dollari(g.rewarmUsd)} (${pct(g.rewarmTok, g.cacheTok)} della cache scritta)`
+    + ` · attese ≥${SCADENZA_CACHE_S} s: ${g.attese} su ${g.bigliettiConAttese} biglietti`
+    + ` · ora: sovrapprezzo ${dollari(g.sovrapprezzo)}, risparmio max ${dollari(g.risparmioMax)}, saldo ${conSegno(g.saldo)}`
+    + ` (conviene sopra il ${pct(g.soglia, 1)} di rewarm)`;
+  const quando = finestra ? ` dal ${finestra.da} al ${finestra.a}` : '';
+  return [
+    `Cache dei sotto-agenti${quando}, per ruolo (costo della sessione, senza l'orchestratore):`,
+    ...conto.perRuolo.map((g) => riga(g.ruolo, g)),
+    riga('TOTALE', conto.totale),
+    `Il risparmio è un tetto: il rewarm conta ogni causa, non solo le attese oltre ${SCADENZA_CACHE_S} s.`,
+    ...(conto.totale.stimati ? [`${conto.totale.stimati} rapporti senza i dollari della cache (nati prima del campo, o il server non lo tiene): stimati tutti al listino del primo modello, sotto-agenti compresi.`] : []),
+  ];
 }
 
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
@@ -779,6 +866,7 @@ export const SOTTOCOMANDI = Object.freeze([
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   contesto | sveglia | stato | schede | leggi <N>
   rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
+  rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
   ordine | accendi <N,M,…>|--niente | parallelo <N>
   priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…>
@@ -882,6 +970,12 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       const q = richiestaRapporti(argv);
       const r = q.tutte ? await tutteLePagine((d) => chiama(cred, 'rapporti', d), q.dati) : await chiama(cred, 'rapporti', q.dati);
       if (r.ok === false) return esito(r);
+      if (q.cache) {
+        const conto = contoCache(r.rapporti);
+        if (q.json) stampaJson({ finestra: r.finestra || null, ...conto });
+        else console.log(righeCache(conto, r.finestra).join('\n'));
+        return 0;
+      }
       if (q.dati.somma && !q.json) { console.log(righeCosto(r, leggiSchede(cartella)).join('\n')); return 0; }
       const { ok, ...resto } = r;
       stampaJson(resto);

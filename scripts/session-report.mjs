@@ -181,7 +181,13 @@ export function valutaUso(u, model) {
   const p = oltreSoglia ? listino.oltre : listino;
   const velocita = velocitaPrezzo(u, fam);
   const costo = velocita.molt * (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
-  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam, oltreSoglia, velocita };
+  // Le scritture già a un'ora non hanno né sovrapprezzo né risparmio: l'ora c'è già.
+  const cache = {
+    scritta: velocita.molt * (cw5m * p.cacheWrite + cw1h * p.cacheWrite1h) / 1e6,
+    sovrapprezzoOra: velocita.molt * cw5m * (p.cacheWrite1h - p.cacheWrite) / 1e6,
+    risparmioOra: velocita.molt * cw5m * (p.cacheWrite - p.cacheRead) / 1e6,
+  };
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, cache, fam, oltreSoglia, velocita };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
@@ -244,9 +250,16 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     falliti: [],
     attese: [],
     atteseOltre30: 0,
+    // La cache in dollari, ogni richiesta col suo listino: il conto della cache a un'ora (`manutentore rapporti
+    // --cache`, #2121) legge questi e non riprezza i token. Ora = se le scritture a 5 minuti fossero a un'ora.
+    cache: cacheVuota(),
     notes: [],
   };
 }
+
+/** Le voci in dollari di `rep.cache`: scritta, riscaldata, sovrapprezzo dell'ora, risparmio sui rewarm e su tutto. */
+export const CACHE_VOCI = Object.freeze(['scrittaUsd', 'rewarmUsd', 'sovrapprezzoOraUsd', 'risparmioOraUsd', 'risparmioSeTuttoUsd']);
+export const cacheVuota = () => Object.fromEntries(CACHE_VOCI.map((k) => [k, 0]));
 
 // Gli elenchi viaggiano fuori dal rapporto, nei campi che il server tiene sul biglietto fino a 200 voci
 // (manutentoreRegole.RILASCIO): il tetto qui è il suo, con un margine in byte che una sessione vera non tocca.
@@ -647,13 +660,21 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // I conti, a fine lettura, con l'ULTIMA usage di ogni messaggio (in ordine
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
+  const dollariCache = cacheVuota();
   for (const { u, model, effort } of usi.values()) {
-    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, oltreSoglia, velocita } = valutaUso(u, model);
+    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, cache, oltreSoglia, velocita } = valutaUso(u, model);
     rep.turns += 1;
     if (oltreSoglia) rep.oltreSoglia[chiaveSicura(model)] = (rep.oltreSoglia[chiaveSicura(model)] || 0) + 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
     if ((rep.turns > 1 || continua) && cr === 0 && cw >= 20000) rep.coldTurns += 1;
-    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
+    dollariCache.scrittaUsd += cache.scritta;
+    dollariCache.sovrapprezzoOraUsd += cache.sovrapprezzoOra;
+    dollariCache.risparmioSeTuttoUsd += cache.risparmioOra;
+    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) {
+      rep.rewarmTurns += 1; rep.rewarmTokens += cw;
+      dollariCache.rewarmUsd += cache.scritta;
+      dollariCache.risparmioOraUsd += cache.risparmioOra;
+    }
     rep.maxContextTokens = Math.max(rep.maxContextTokens, input + cw + cr);
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
@@ -674,6 +695,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   if (Number.isFinite(ultimoMs)) rep.endedAt = new Date(ultimoMs).toISOString();
   if (Number.isFinite(primoMs) && Number.isFinite(ultimoMs)) rep.durationS = Math.round((ultimoMs - primoMs) / 1000);
   rep.costUsd = Math.round(costo * 10000) / 10000;
+  for (const k of CACHE_VOCI) rep.cache[k] = Math.round(dollariCache[k] * 10000) / 10000;
   for (const [m, key] of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa ${NOMI_TARIFFA[key]}`);
   for (const v of velocitaIgnote.values()) {
     const turni = v.turni === 1 ? '1 turno calcolato' : `${v.turni} turni calcolati`;
@@ -822,6 +844,8 @@ export function sommaSottoAgente(rep, sub) {
   rep.coldTurns += Number(sub.coldTurns) || 0;
   rep.rewarmTurns += Number(sub.rewarmTurns) || 0;
   rep.rewarmTokens += Number(sub.rewarmTokens) || 0;
+  rep.cache = rep.cache || cacheVuota();
+  for (const k of CACHE_VOCI) rep.cache[k] = arrotonda((Number(rep.cache[k]) || 0) + (Number(sub.cache && sub.cache[k]) || 0));
   rep.maxContextTokens = Math.max(rep.maxContextTokens, Number(sub.maxContextTokens) || 0);
   for (const k of Object.keys(rep.tokens)) rep.tokens[k] += Number(sub.tokens && sub.tokens[k]) || 0;
   const st = sub.tools || {};

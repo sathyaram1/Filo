@@ -570,6 +570,7 @@ export async function release(t, fault = '', opts, report = null, spedito = null
 export const ENV_QUADRO_FERMO = 'FILO_VEGLIA_QUADRO';
 // I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
 export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
+export const CAMPI_NUOVI_DEL_RAPPORTO = Object.freeze(['listino', 'cache']);
 // Il server (manutentoreRegole.RILASCIO) tiene sul biglietto solo le attese sopra i 30 s, e rifiuta le altre.
 const ATTESA_SOPRA_S = 30;
 // Il tetto della domanda di processo sul server: oltre, il rilascio si rifiuta prima di partire.
@@ -620,13 +621,26 @@ export async function releaseConRapporto(t, fault, report, opts, spedito = null)
     if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
     return r2;
   };
-  const tentaRapporto = async (rep) => {
-    const r = await tenta(rep);
-    if (!malformato(r) || !haDati(rep)) return conListino(rep, r);
+  // I dollari della cache (#2121) escono per primi: un server che non li conosce ancora non deve costare strumenti
+  // falliti e attese, che ormai conosce.
+  const tentaRapporto = async (completo) => {
+    const r = await tenta(completo);
+    if (!malformato(r) || !Object.prototype.hasOwnProperty.call(completo, 'cache')) return restoDellaCatena(completo, r, r);
+    const { cache, ...rep } = completo;
+    const r1 = await tenta(rep);
+    if (r1.ok) avvisi.push(`il server non accetta il campo cache (report_malformed${dettaglioDi(r)}): allegato senza.`);
+    return restoDellaCatena(rep, r1, r);
+  };
+  // `primo` è il rifiuto da citare: quello del rapporto completo.
+  const restoDellaCatena = async (rep, r, primo) => {
+    if (!malformato(r) || !haDati(rep)) {
+      const r1 = await conListino(rep, r);
+      return malformato(r1) ? primo : r1;
+    }
     const senza = senzaDati(rep);
     const r2 = await conListino(senza, await tenta(senza));
-    if (malformato(r2)) return r;
-    if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(r)}): allegato senza.`);
+    if (malformato(r2)) return primo;
+    if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(primo)}): allegato senza.`);
     return r2;
   };
   const conAvvisi = (r, rapporto, avviso) => {
