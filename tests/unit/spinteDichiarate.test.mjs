@@ -530,6 +530,25 @@ test('il salvataggio automatico dichiara col biglietto della sessione che ha mod
   assert.deepEqual(v.commits, [g(s.work, ['rev-parse', 'HEAD'])]);
 });
 
+test('il diagnostico dei limiti di sessione dichiara il suo commit col biglietto della sessione (session_id dallo stdin)', () => {
+  const s = scene();
+  const sessione = 'sess-del-limite';
+  const fp = 'e'.repeat(64);
+  mkdirSync(join(s.work, '.claude', 'biglietti'), { recursive: true });
+  writeFileSync(join(s.work, '.claude', 'biglietti', `${sessione}.json`), JSON.stringify({ ticket: BIGLIETTO, fp, natoIl: 1 }));
+  writeFileSync(join(s.work, '.gitignore'), '.claude/biglietti/\n');
+  g(s.work, ['checkout', '-qb', 'claude/limite']);
+  assert.equal(installaControlloSpedizione(s.work), 'installato');
+  const stdin = JSON.stringify({ session_id: sessione, hook_event_name: 'StopFailure', error_type: 'rate_limit', error_message: 'usage limit' });
+  runHook(s.work, ambiente(s.origin), 'cap-observe.sh', stdin);
+  const punta = g(s.work, ['rev-parse', 'HEAD']);
+  assert.match(g(s.work, ['log', '-1', '--format=%s']), /cap-observe/);
+  const [v] = coda(s.work);
+  assert.ok(v, 'il commit della nota diagnostica non è in coda');
+  assert.deepEqual([v.tipo, v.ticket, v.fp, v.ramo], ['locale', BIGLIETTO, fp, 'claude/limite']);
+  assert.ok(v.commits.includes(punta));
+});
+
 /** Un server finto per l'invio: risponde come gli si dice e annota le chiamate. */
 function finto(risposte) {
   const chiamate = [];
