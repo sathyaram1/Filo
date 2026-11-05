@@ -53,6 +53,17 @@ export function fusioniCheCitano(root, num, { ref = 'origin/main', dopo = 0, max
     .sort((a, b) => Date.parse(b.data) - Date.parse(a.data)).slice(0, max);
 }
 
+/** I commit della linea principale di `ref` (i primi genitori): ci sta la punta di un ramo nato lì e mai scritto. */
+export function lineaPrincipale(root, ref = 'origin/main') {
+  return new Set(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean));
+}
+
+/** La data (ISO) della fusione più recente del lavoro stesso di #N su `ref` («merge-gate: #N …»), '' se non c'è. */
+export function ultimaFusionePropria(root, num, { ref = 'origin/main' } = {}) {
+  if (!numeroFeedback(num)) return '';
+  return git(root, ['log', '--first-parent', ref, '-E', `--grep=^merge-gate: ${regexCitazione(num)}`, '-n1', '--format=%cI']).trim();
+}
+
 /**
  * Una diff -U0 di git → Map file → le sole righe tolte e aggiunte, senza i numeri di riga: due versioni della stessa
  * modifica, prima e dopo un riallineamento, danno lo stesso testo. PURA.
