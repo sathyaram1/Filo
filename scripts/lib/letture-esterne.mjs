@@ -113,7 +113,7 @@ function richiamoDaEstensione(nome, dati) {
 // i soli nomi resta come Glob). null = la chiamata non legge un percorso.
 function percorsoLetto(nome, dati) {
   if (nome === 'Read') return String(dati.file_path || '').trim();
-  if (nome === 'Grep') return String(dati.output_mode || '') === 'content' ? String(dati.path || '').trim() || '.' : null;
+  if (nome === 'Grep') return GREP_MODI_CON_RIGHE.includes(String(dati.output_mode || '')) ?String(dati.path || '').trim() || '.' : null;
   return null;
 }
 
