@@ -206,6 +206,12 @@ compito che smista le domande non la tratta come un guasto da curare con un
 lavoro: chi lo curerebbe è il manutentore stesso, quindi arriva all'owner
 (SPEC-DOMANDE § 3.5, passo 1).
 
+**Stato: da costruire sul server** (§ 11). I due paragrafi qui sopra dicono
+come deve andare, non come va oggi: il pacemaker non conosce ancora il fermo e
+lo riaccende a ogni segnale, e il controllo guarda ancora le scritture nel
+taccuino. Chi costruisce la parte del server toglie questo paragrafo nello
+stesso lavoro, con le prove sul codice del pacemaker e del controllo.
+
 **Account.** Il manutentore spegne e riaccende; usa prima B; niente riserva
 su A. La spesa si dosa sulla settimana, più piena all'inizio; il limite delle
 5 ore non esiste più.
