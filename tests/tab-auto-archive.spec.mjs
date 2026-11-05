@@ -360,12 +360,14 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
   await expect.poll(() => moduloDi(shell, 'Musica'), { timeout: 2_000 }).toBe(false);
   expect(await moduloDi(shell, 'Negozio')).toBe(false);
   expect(await moduloDi(shell, 'Motore')).toBe(false);
+  expect(await moduloDi(shell, 'Motore una riga')).toBe(false);
 
   await pulisciTutto(app, shell, testServer);
   const aperte = await titoliAperti(shell);
   expect(aperte).not.toContain('Musica');
   expect(aperte).not.toContain('Negozio');
   expect(aperte).not.toContain('Motore');
+  expect(aperte).not.toContain('Motore una riga');
 });
 
 // Il testo dell'utente si segue per contenuto: quando la pagina lo sposta in un altro campo, o
