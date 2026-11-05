@@ -1829,9 +1829,8 @@ if (isMain) {
     if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
     const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
     const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
-    // Gli stessi processi che fanno rifiutare il rilascio di un worker: finita l'attesa, il rilascio passa.
     const esito = await aspettaCartella({
-      controlla: () => lavoroVivo(ROOT, { cosa: ['processi'] }),
+      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER }),
       sleep: defaultSleep,
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
