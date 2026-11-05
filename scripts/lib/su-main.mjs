@@ -148,8 +148,8 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   for (const riga of righe.filter(Boolean)) {
     const [ramo, data] = riga.split('\t');
     if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
-    const tentativo = /^origin\/worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(ramo);
-    if (tentativo && ultimo.get(tentativo[1]) !== tentativo[2]) continue;
+    const tentativo = leggiTentativo(ramo);
+    if (tentativo && ultimo.get(tentativo.id) !== tentativo.stampo) continue;
     // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
     if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(ramo.replace(/^origin\//, '')); continue; }
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }
