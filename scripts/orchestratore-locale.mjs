@@ -276,10 +276,10 @@ export function richiestaDaLettura(testo) {
 
 /**
  * La regola di verify-local start --feedback per il lavoro `num`, col rifiuto già scritto (#1514). Senza credenziali è un
- * no detto, non un'uscita del processo: l'orchestratore ferma la pratica e prosegue.
+ * no detto, non un'uscita del processo: l'orchestratore ferma la pratica e prosegue. `auth`: le prove ci mettono le credenziali finte.
  */
-async function praticaVera(num) {
-  const auth = await import('./lib/firestore-auth.mjs');
+export async function praticaVera(num, { auth: authFinto } = {}) {
+  const auth = authFinto || await import('./lib/firestore-auth.mjs');
   if (!auth.loadServiceAccount() && !auth.findAdminRefreshToken()) {
     return { ok: false, motivo: 'nessuna credenziale per leggere la pratica (FILO_ADMIN_REFRESH_TOKEN o service account): non so di chi è' };
   }
