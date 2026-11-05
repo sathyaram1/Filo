@@ -16,8 +16,8 @@ const ELECTRON = require('electron');
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CARTELLA = 'codice-compilato';
 
-function avvia(userData) {
-  const p = spawn(ELECTRON, [...argomentiScala, '.'], {
+function avvia(userData, app = '.') {
+  const p = spawn(ELECTRON, [...argomentiScala, app], {
     cwd: APP_ROOT,
     detached: process.platform !== 'win32',
     stdio: ['ignore', 'ignore', 'pipe'],
