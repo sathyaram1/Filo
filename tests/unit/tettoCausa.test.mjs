@@ -4,7 +4,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { readFileSync, readdirSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { join, relative, sep } from 'node:path';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/constants.js');
@@ -357,8 +357,10 @@ test('ogni elenco che nomina NO_TOOL_HOST o TETTO_RISPOSTA nomina anche PARAMETR
       const corpo = elencoAttorno(s, m.index);
       if (corpo == null || visti.has(corpo)) continue;
       visti.add(corpo);
-      trovati.push(relative(ROOT, f));
-      assert.match(corpo, /\bPARAMETRI_HOST\b/, `${relative(ROOT, f)}: ${corpo.trim().slice(0, 160)}`);
+      // Con le barre normali: su Windows `relative` dà `src\shared\…` e l'elenco atteso sotto non si trova più.
+      const rel = relative(ROOT, f).split(sep).join('/');
+      trovati.push(rel);
+      assert.match(corpo, /\bPARAMETRI_HOST\b/, `${rel}: ${corpo.trim().slice(0, 160)}`);
     }
   }
   for (const atteso of ['src/shared/contatoriGiornalieri.js', 'src/main/services/handlers/ai.js', 'src/main/services/deckOpinions.js', 'src/shared/chatErrors.js']) {
