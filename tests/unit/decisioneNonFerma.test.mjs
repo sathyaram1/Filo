@@ -1,6 +1,6 @@
 // Il «?» di livello 2 non ferma più il lavoro, il «!» marca una scelta difficile da disfare, e le segnalazioni
 // seguono la stessa regola (decisioni dell'owner del 2026-10-12, #1202). Stesse regole sul server, che incorpora
-// verifierRound.js al deploy, nello strumento delle routine e nella verifica locale.
+// verifierRound.js al deploy, nello strumento delle routine e nella verifica locale (una regola sola, #1202.2).
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -139,4 +139,35 @@ test('verifica locale: stessa regola, e la prova del 2 col ? non esce con la pul
   // Un vicino da solo non fa partire niente nemmeno qui, con cap0 sopra zero.
   const v = VL.withCritique(VL.withRequest({}, 'v', { request: 'x', sha: SHA }), 'v', { critique: 'Provato.\n[2v] nel file vicino', sha: SHA, caps: { ...CAPS, cap0: 3 } });
   assert.equal(v.outcome, 'pass');
+});
+
+test('una regola sola su cosa è messo da parte: anche la verifica locale riconosce dal numero il rilievo in correzione', async () => {
+  const VL = await import('../../scripts/verify-local.mjs');
+  const { rilieviMessiDaParte } = await import('../../scripts/lib/prove-tolte.mjs');
+  const SHA = 'b'.repeat(40);
+  const r = VL.withCritique(VL.withRequest({}, 'r', { request: 'x', sha: SHA }), 'r', { critique: 'Provato.\n[2i?] A o B? Consiglio A.\n[1i?] bordo caldo?', sha: SHA, caps: CAPS });
+  assert.equal(r.outcome, 'fix');
+  const p = r.state.r.pending;
+  // Uno stato scritto senza il segno (uno strumento vecchio, o un server che non lo manda): il numero basta.
+  const senzaSegno = { ...r.state.r, pending: { ...p, derived: p.derived.map(({ inCorrezione, ...f }) => f) } };
+  assert.deepEqual(VL.numeriMessiDaParte(senzaSegno), [2], 'la prova del 2 col ? in correzione non esce con la pulizia');
+  const coda = VL.codaText({ findings: p.findings, derived: senzaSegno.pending.derived, external: [], budgets: p.budgets, branch: 'r', instructions: 'CODA' });
+  const parte = coda.split('Rilievi messi da parte')[1].split('Rilievi esterni')[0];
+  assert.match(parte, /bordo caldo/);
+  assert.doesNotMatch(parte, /A o B/);
+  assert.deepEqual(rilieviMessiDaParte([{ n: 1, inCorrezione: true }, { n: 2 }, { n: 3 }, null], [{ n: 3 }]).map((f) => f.n), [2]);
+});
+
+test('il feedback a parte della verifica locale: la domanda su un 2 corretto con la consigliata non sembra un rilievo lasciato lì', async () => {
+  const { derivatiDaAprire } = await import('../../scripts/lib/orchestratore.mjs');
+  const d = decide('Provato.\n[2i?] A o B? Consiglio A.\n[1i?] bordo caldo?');
+  const aperti = derivatiDaAprire({ num: 7, slug: 'sette', derivatiAperti: [] }, d.derived);
+  const applicata = aperti.find((x) => x.titolo.startsWith('A o B'));
+  const lasciato = aperti.find((x) => x.titolo.startsWith('bordo'));
+  assert.match(applicata.testo, /^Domanda su un rilievo corretto con l’opzione consigliata nella verifica del lavoro locale #7/);
+  assert.match(applicata.testo, /Se scegli diversamente, questo feedback cambia il codice già fuso\./);
+  assert.match(applicata.testo, /interno, da decidere: intanto si applica l'opzione consigliata/);
+  assert.doesNotMatch(applicata.testo, /Rilievo messo da parte/);
+  assert.match(lasciato.testo, /^Rilievo messo da parte nella verifica del lavoro locale #7/);
+  assert.doesNotMatch(lasciato.testo, /codice già fuso/);
 });

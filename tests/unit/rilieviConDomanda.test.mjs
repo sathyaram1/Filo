@@ -97,3 +97,25 @@ test('chi verifica, in ogni giro, legge che un rilievo col «?» porta la sua do
     assert.doesNotMatch(t, /--segnala|la fa nascere dal server/, scope);
   }
 });
+
+test('«blocca» su una domanda di rilievo si rifiuta col numero: se il lavoro si ferma lo decidono livello e segno (#1202.2)', async () => {
+  const f = V.parseFindings('Provato.\n[3i?] A o B? Consiglio A.\n[1i?] Bordo caldo?\n[2i?!] Formato salvato: vecchio o nuovo?').findings;
+  const dir = cartellaTemporanea('filo-rilievi-blocca-');
+  try {
+    const file = join(dir, 'domande.json');
+    writeFileSync(file, JSON.stringify([{ ...domanda('A o B?'), blocca: false }, domanda('Bordo caldo?'), { ...domanda('Formato?'), blocca: false }]));
+    const lette = await leggiDomandeDaFile(file, { elenco: true });
+    assert.equal(lette.ok, true, lette.errore);
+    const r = rilieviConDomanda(f, lette.domande);
+    assert.equal(r.ok, false, 'un [3i?] che non blocca andava a correggere sul server, e la pulizia credeva che si fermasse');
+    assert.match(r.errore, /la domanda dei rilievi 1, 3 porta «blocca»/);
+    assert.match(r.errore, /Non ho registrato niente/);
+    const vera = rilieviConDomanda(f, [{ ...domanda('A o B?'), blocca: true }, domanda('Bordo caldo?'), domanda('Formato?')]);
+    assert.match(vera.errore, /la domanda del rilievo 1 porta «blocca»/, 'anche true: il segno basta');
+    const senza = rilieviConDomanda(f, [domanda('A o B?'), domanda('Bordo caldo?'), domanda('Formato?')]);
+    assert.equal(senza.ok, true, senza.errore);
+    assert.ok(senza.findings.every((x) => !x.domanda || !('blocca' in x.domanda)));
+  } finally {
+    togliCartella(dir);
+  }
+});
