@@ -129,6 +129,71 @@ test('lo script conta sul repo vero: casi aggiunti e toccati, uno spostamento no
   assert.match(testo.stdout, /prove aggiunte 1 \(unit 1, spec 0\), toccate 1, tolte 0/);
 });
 
+/** Il clone di filo-security di un lavoro server: il ramo omonimo con una prova in functions/test/, e main andato avanti. */
+function serverDiProva(ramo) {
+  const srv = cartellaTemporanea('filo-conta-prove-server-');
+  const g = (...a) => execFileSync('git', ['-c', 'core.autocrlf=false', ...a], { cwd: srv, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(srv, f)), { recursive: true }); writeFileSync(resolve(srv, f), t, 'utf8'); };
+  g('init', '-q', '-b', 'main');
+  g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  scrivi('functions/battito.js', 'module.exports = 1;\n');
+  scrivi('functions/test/vecchia.test.js', "it('resta com\\'era', () => {});\n");
+  g('add', '-A'); g('commit', '-qm', 'base del server');
+  g('checkout', '-q', '-b', ramo);
+  scrivi('functions/battito.js', 'module.exports = 2;\n');
+  scrivi('functions/test/battito.test.js', "it('la misura nuova sostituisce la vecchia', () => {});\ntest('e resta una sola', () => {});\n");
+  g('add', '-A'); g('commit', '-qm', 'lavoro del server');
+  g('checkout', '-q', 'main');
+  scrivi('functions/altro.js', 'module.exports = 3;\n');
+  scrivi('functions/test/altro.test.js', "it('di un altro lavoro', () => {});\n");
+  g('add', '-A'); g('commit', '-qm', 'main del server va avanti');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  return { srv, g };
+}
+
+test('con --server lo script conta anche le prove del server del ramo omonimo, come la lettura del diff (#2093)', (t) => {
+  const { casa, base } = repoDiProva();
+  const { srv, g: gs } = serverDiProva('claude/lavoro');
+  t.after(() => togliCartella(casa));
+  t.after(() => togliCartella(srv));
+  const conta = (...a) => spawnSync(process.execPath, [resolve(REPO, 'scripts', 'conta-prove.mjs'), '--base', base, ...a], {
+    env: { ...process.env, FILO_REPO_ROOT: casa }, encoding: 'utf8',
+  });
+  const j = conta('--server', srv, '--json');
+  assert.equal(j.status, 0, j.stderr);
+  const out = JSON.parse(j.stdout);
+  assert.deepEqual(out.conto.lavoro, { aggiunti: 1, toccati: 1, tolti: 0 }, 'il conto dell\'app resta quello di prima');
+  assert.equal(out.server.ramo, 'claude/lavoro');
+  assert.deepEqual(out.server.conto.lavoro, { aggiunti: 2, toccati: 0, tolti: 0 }, 'il main del server andato avanti non è il lavoro');
+  assert.deepEqual(out.server.codice, [{ percorso: 'functions/battito.js', aggiunte: 1, tolte: 1 }]);
+  assert.equal(out.server.diff, undefined, 'il conto non si porta dietro il diff');
+
+  const testo = conta('--server', srv);
+  assert.equal(testo.status, 0, testo.stderr);
+  assert.match(testo.stdout, /prove aggiunte 1 \(unit 1, spec 0\), toccate 1, tolte 0/);
+  const server = testo.stdout.slice(testo.stdout.indexOf('Server, ramo claude/lavoro di filo-security'));
+  assert.match(server, /^Server, ramo claude\/lavoro di filo-security, da [0-9a-f]{12} a [0-9a-f]{12}\.\nProve del lavoro, contate dallo script: prove aggiunte 2 \(unit 2, spec 0\)/);
+  assert.match(server, /functions\/test\/battito\.test\.js \(unit\): aggiunti 2: «la misura nuova sostituisce la vecchia», «e resta una sola»/);
+  assert.match(server, /Codice cambiato fuori da functions\/test\/: 1 file, \+1 −1 righe\.\n- functions\/battito\.js: \+1 −1/);
+  assert.doesNotMatch(conta().stdout, /Server/, 'senza --server il conto è solo dell\'app');
+
+  gs('checkout', '-q', '-b', 'claude/vuoto', 'main');
+  gs('branch', '-q', '-D', 'claude/lavoro');
+  const senzaRamo = conta('--server', srv);
+  assert.equal(senzaRamo.status, 3, 'chi chiede il server e non l\'ha non riceve un conto che sembra intero');
+  assert.match(senzaRamo.stdout, /prove aggiunte 1 \(unit 1, spec 0\)/, 'il conto dell\'app arriva lo stesso');
+  assert.match(senzaRamo.stdout, /Server: le prove di filo-security non si sono potute contare: in .* il ramo claude\/lavoro non c'è, né locale né scaricato da origin\./);
+  const nessunClone = conta('--server', resolve(srv, 'non-clonato'));
+  assert.equal(nessunClone.status, 3);
+  assert.match(nessunClone.stdout, /non si sono potute contare: il clone del server non c'è/);
+
+  gs('branch', '-q', 'claude/lavoro', 'main');
+  const vuoto = conta('--server', srv, '--json');
+  assert.equal(vuoto.status, 0, vuoto.stderr);
+  assert.match(JSON.parse(vuoto.stdout).server.vuoto, /non ha commit fuori dal main del server/);
+  assert.match(conta('--server', srv).stdout, /Server: il ramo claude\/lavoro del server non ha commit fuori dal main del server, nessuna prova da contare\./);
+});
+
 // La misura che ha fatto nascere #1363: nell'esperimento del 31/08 la versione finale di #500 aveva 48 prove.
 test('sul lavoro fuso di #500 il conto dà le 48 prove dell\'esperimento', (t) => {
   const c = ['10ffd0cd752e', '9f76fce171d6'];

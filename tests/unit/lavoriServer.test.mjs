@@ -57,6 +57,9 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
   assert.ok(!/credential\.|git-credenziali|--global/.test(t), 'niente aiutanti né configurazione di credenziali');
   assert.ok(!/git (-C "[^"]+" )?(clone|fetch|push|pull|ls-remote)\b/.test(t), 'nessun git di rete fuori da git-server');
   assert.match(t, /messaggio esatto/, 'un blocco del controllo dei permessi si riporta parola per parola');
+  // #2093: chi risolve conta anche le prove del server, con lo strumento messo da parte e non con quello del ramo.
+  const conta = `node "${REPO.split('\\').join('/')}/scripts/conta-prove.mjs" --server "/home/user/filo-security"`;
+  assert.ok(t.includes(conta), `il conto delle prove col clone vero: ${conta}`);
 });
 
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {

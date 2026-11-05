@@ -893,7 +893,8 @@ export function testoLavoroServer({ clone, canale = resolve(TOOLS_ROOT, 'scripts
   const f = resolve(ROLES_DIR, LAVORO_SERVER_FILE);
   if (!existsSync(f)) return '';
   const avanti = (p) => String(p).split('\\').join('/');
-  return readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+  const testo = readFileSync(f, 'utf8').split('<CLONE>').join(avanti(clone)).split('<CANALE>').join(avanti(canale));
+  return absolutizeRecipe(testo, TOOLS_ROOT, ROOT);
 }
 
 // L'ambito della verifica (payload.scope) sceglie il testo: lib/verifier-scope.mjs.
