@@ -954,6 +954,12 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       const q = richiestaRapporti(argv);
       const r = q.tutte ? await tutteLePagine((d) => chiama(cred, 'rapporti', d), q.dati) : await chiama(cred, 'rapporti', q.dati);
       if (r.ok === false) return esito(r);
+      if (q.cache) {
+        const conto = contoCache(r.rapporti);
+        if (q.json) stampaJson({ finestra: r.finestra || null, ...conto });
+        else console.log(righeCache(conto, r.finestra).join('\n'));
+        return 0;
+      }
       if (q.dati.somma && !q.json) { console.log(righeCosto(r, leggiSchede(cartella)).join('\n')); return 0; }
       const { ok, ...resto } = r;
       stampaJson(resto);
