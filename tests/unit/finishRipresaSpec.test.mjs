@@ -67,6 +67,16 @@ test('ripresa: le prove del giro committate mentre il controllo gira non buttano
   }
 });
 
+// Senza la memoria nei lanci veri il rilancio dopo il tetto rifà tutto, e lo spec e i test qui sopra restano verdi.
+test('ripresa: il controllo di fine lavoro passa la memoria dei verdi a ogni suo lancio di spec', () => {
+  const sorgente = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'finish-local.mjs'), 'utf8')
+    .split('\n').filter((r) => !/^\s*(\/\/|\*|\/\*)/.test(r)).join('\n');
+  const chiamate = sorgente.split('\n').filter((r) => r.includes('runSpecsALotti(') && !/function runSpecsALotti\(/.test(r));
+  assert.ok(chiamate.length >= 2, 'gli spec bloccanti e quelli fra i rossi noti');
+  for (const c of chiamate) assert.match(c, /, albero, memoria\)/, `lancio senza memoria: ${c.trim()}`);
+  assert.match(sorgente, /const memoria = memoriaSpecVerdi\(ROOT, shaProvato\);/);
+});
+
 test('ripresa: una memoria illeggibile o di forma sbagliata non salta niente', () => {
   const dir = cartellaTemporanea('ripresa-guasta-');
   try {
