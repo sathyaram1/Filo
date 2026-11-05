@@ -291,6 +291,8 @@ function reteConAttese(principale, altri) {
   return { fetchImpl, chieste };
 }
 const attesa = (id, num) => ({ mapValue: { fields: { id: { stringValue: id }, num: { stringValue: num } } } });
+// Un feedback vero dell'owner: fidato, coi giudici saltati alla nascita, si legge senza la riga del mai giudicato.
+const DELL_OWNER = { fiducia: { stringValue: 'fidato' }, pipeline: { mapValue: { fields: { skipped: { stringValue: 'fidato' } } } } };
 
 test('feedback:leggi stampa le attese una per riga, fuse o no, e la forma che aggiunge senza togliere', async () => {
   const principale = {

@@ -291,7 +291,8 @@ export function testoDaVoce(v, { segno, cartella } = {}) {
   const s = segno || randomBytes(6).toString('hex');
   const numero = fb.seq ? `${fb.seq}${fb.subSeq ? `.${fb.subSeq}` : ''}` : nomeSicuro(fb._id, 'feedback');
   const salva = salvaIn(cartella || join(tmpdir(), 'filo-feedback', `${numero}-${s}`));
-  return [testoDaStampare(fb, s, salva), ...righeDaAllegati(allegatiDaVoce(v), { salva, segno: s })].join('\n');
+  const maiGiudicato = String((v && v.maiGiudicato) || '').trim();
+  return [testoDaStampare(fb, s, salva, { maiGiudicato }), ...righeDaAllegati(allegatiDaVoce(v), { salva, segno: s })].join('\n');
 }
 
 /**
@@ -390,6 +391,8 @@ async function main(argv) {
   const { stradaDelGiro } = await import('./lib/feedback-cloud.mjs');
   const { via, ticket } = await stradaDelGiro(resolve(fileURLToPath(new URL('..', import.meta.url))));
   if (via === 'cloud') {
+    // Da una routine un mai giudicato dei Ricevuti non si legge comunque: lo decide il server, e l'opzione non arriva lì.
+    if (a.ancheMaiGiudicato) console.error(`${ANCHE_MAI_GIUDICATO}: in una routine non vale, decide il server.`);
     const esito = await leggiDalCloud(a.rif, { ticket });
     if (esito.codice) { console.error(esito.codice === 4 ? `${esito.errore}.` : `RIFIUTATO: ${esito.errore}.`); return esito.codice; }
     console.log(esito.testo);
