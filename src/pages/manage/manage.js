@@ -2975,6 +2975,12 @@
     if (attesa) {
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(attesa[1])}">${esc(attesa[0])}</span></div>`;
     }
+    const fermo = fb ? MR.restaLocale(fb) : null;
+    if (fermo) {
+      const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Riparte da solo quando il motivo passa.${dal}`;
+      return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
+    }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
     if (fb && MR.isLocalOnly(fb) && !(mgLavoriServer && mgLavoriServer.checked && MR.isFidato(fb))) {
       const dove = progress.status === 'working' ? 'In lavorazione' : 'In verifica';

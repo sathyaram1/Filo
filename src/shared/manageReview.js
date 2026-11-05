@@ -77,6 +77,14 @@
     if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
   }
+  // Un lavoro server che nessuna routine prende perché il suo biglietto nascerebbe non fidato (#2036): i motivi li
+  // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda.
+  function restaLocale(fb) {
+    const r = fb && fb.restaLocale;
+    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
+    const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
+    return motivi.length ? { motivi, atMs: Number(r.atMs) || 0 } : null;
+  }
   function inAttesaFusioneServer(fb) {
     return attesaServer(fb) === 'pc';
   }
@@ -2134,7 +2142,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco,
     panelComplete, judgesNote, reasonText,
