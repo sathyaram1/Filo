@@ -334,7 +334,9 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
   const c = copertura({ indice, schede: r.schede });
   if (c.scarsa) {
     const chi = c.vere ? `Solo ${c.vere} dei ${c.aperti} aperti ${c.vere === 1 ? 'ha' : 'hanno'}` : `Nessuno dei ${c.aperti} aperti ha`;
-    const perche = r.illeggibili ? `, e ${r.illeggibili} non si leggono: è la lettura a non andare` : ': la lettura è andata, sono i feedback a non averne';
+    const perche = r.illeggibili ? `, e ${r.illeggibili} non si leggono: è la lettura a non andare`
+      : r.distingue === false ? ': il server non dice se i feedback ne hanno, quindi da qui non si distingue se sono i feedback a non averne o la lettura a non portarle (elenca sulla macchina dell\'owner lo dice)'
+        : ': la lettura è andata, sono i feedback a non averne';
     console.log(`${chi} una scheda salvata nel feedback${perche}. In una routine stato e scrivi si fermano.`);
   }
   return 0;
