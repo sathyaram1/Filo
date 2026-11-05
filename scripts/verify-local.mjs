@@ -356,6 +356,9 @@ export function withRequest(state, branch, { request, sha, at, feedbackId, feedb
     const fid = feedbackId ? fiducia : prev.fiducia;
     if (fid) s[branch].fiducia = fid === 'fidato' ? 'fidato' : 'non_fidato';
   }
+  // Scritta dall'owner (--richiesta-owner): vale per i giri dopo finché la richiesta resta quella.
+  const owner = richiestaOwner === undefined ? prev.richiestaOwner === true && prev.request === s[branch].request : richiestaOwner === true;
+  if (owner) s[branch].richiestaOwner = true;
   // Il perimetro della chiusura vale per la verifica subito dopo una
   // correzione (anche rilanciata), e per nessun'altra.
   if (prev.chiusura && (prev.verdict === 'fixed' || !prev.verdict)) s[branch].chiusura = prev.chiusura;
