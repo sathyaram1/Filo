@@ -132,7 +132,7 @@ test('se un campo segreto non si riesce a coprire lo screenshot non parte e il r
   await nelloStrato(app, page, () => {
     const orig = chrome.runtime.sendMessage.bind(chrome.runtime);
     chrome.runtime.sendMessage = (m, ...r) => (m && m.type === 'capture_visible_tab'
-      ? Promise.resolve({ ok: false, code: 'segreti', error: 'campi segreti che non si riescono a coprire' }) : orig(m, ...r));
+      ? Promise.resolve({ ok: false, code: 'coperture', motivo: 'segreti', error: 'campi segreti che non si riescono a coprire' }) : orig(m, ...r));
     return true;
   });
 
