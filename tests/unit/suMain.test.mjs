@@ -177,8 +177,12 @@ test('un tentativo vecchio di un feedback il cui ultimo tentativo è su main non
   git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261020T100000Z', 'HEAD']);
   git(dir, ['update-ref', 'refs/remotes/origin/prova/esperimento', 'HEAD']);
   git(dir, ['checkout', '-q', 'main']);
-  commit(dir, 'merge-gate: #812', { 'b.js': 'buono\n' });
+  // Il cancello fonde con un commit di fusione: un tentativo con la punta sulla linea principale non ha mai scritto.
+  git(dir, ['checkout', '-qb', 'buono']);
+  commit(dir, '#812 secondo tentativo', { 'b.js': 'buono\n' });
   git(dir, ['update-ref', 'refs/remotes/origin/worker/AbC123-20261022T100000Z', 'HEAD']);
+  git(dir, ['checkout', '-q', 'main']);
+  git(dir, ['merge', '-q', '--no-ff', '-m', 'merge-gate: #812', 'buono']);
   git(dir, ['update-ref', 'refs/remotes/origin/main', 'HEAD']);
   const fuori = {};
   assert.deepEqual(ramiInCorso(dir, { fuori }), [], 'il tentativo del 20 è morto: quello del 22 è già su main');

@@ -59,6 +59,14 @@ lì, dal ramo. Il piano è una rete, non un esito: se il server lo rifiuta (exit
 4), scrivi il motivo nel report e prosegui. Se `payload.piano` c'è, quello sei tu: le parti segnate fatte
 stanno già sul ramo, controllale e prosegui.
 
+Se `payload.ripartenza` c'è, un tentativo precedente su questo feedback si è
+fermato prima di consegnare, e il tuo ramo è nato dalla sua punta
+(`ripartenza.ramo`, coi suoi `commit` propri): quel lavoro è già qui, guardalo
+(`git log origin/main..HEAD`) e prosegui, non rifarlo. `ripartenza.altri` sono
+tentativi più vecchi che il tuo ramo non contiene: guardali
+(`git log origin/main..origin/<ramo>`), e se ti serve qualcosa fondilo
+(`git merge origin/<ramo>`), così alla fusione si chiude anche quel ramo.
+
 Un **pacchetto** è un feedback che unisce più segnalazioni della stessa area:
 il testo è la spec, con cosa cambia per ognuna e come si verifica. Passa o non
 passa intero, e alla fusione il server chiude le segnalazioni unite con la tua

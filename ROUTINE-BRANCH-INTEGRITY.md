@@ -83,6 +83,22 @@ ripartito sullo stesso biglietto (una sessione ripresa) riceve quel ramo nella
 busta e lo riprende, o lo crea con quel nome se non c'è; una presa in carico
 rifiutata per il ramo ferma dispatch prima del lavoratore (#1632).
 
+Un biglietto nuovo dopo un tentativo morto prima di consegnare non porta ramo
+(il server lega il ramo al feedback solo alla consegna): il nome nuovo nasce
+dalla punta dell'ultimo tentativo `worker/<id>-*` rimasto su origin con commit
+fuori da main, e la busta lo dice al lavoratore (`payload.ripartenza`). Il ramo
+superato diventa antenato del nuovo e se ne va con lui alla fusione (#2152).
+Un tentativo più vecchio dell'ultimo lavoro dello stesso feedback arrivato su
+main è superato anche se nessuno l'ha fuso (un feedback riaperto): non si
+riprende. Arrivato è un tentativo fuso con commit suoi (uno nato da main e mai
+scritto ha la punta sulla linea principale e non conta) o la fusione
+`merge-gate: #N` letta su main, che regge anche dopo la potatura del ramo fuso.
+A ogni lavoro nuovo dispatch toglie da origin i superati di tutti i feedback,
+anche di quelli chiusi che non ripartiranno. La regola è una sola
+(`scripts/lib/tentativi.mjs`), con la scelta del tentativo vivo: l'elenco dei
+rami in corso del manutentore mostra quello che la ripresa sceglierebbe.
+Se origin non risponde, guasto temporaneo: non si rifà da main.
+
 ### Niente worktree separati nelle routine
 
 `routines/roles/new-work.md` istruisce oggi `git worktree add … -b worker/<id>`:

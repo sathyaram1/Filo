@@ -3,6 +3,7 @@
 // Test: tests/unit/suMain.test.mjs.
 
 import { execFileSync } from 'node:child_process';
+import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
 
 const git = (root, args) => execFileSync('git', ['-C', root, '-c', 'core.quotepath=off', ...args], {
   encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
@@ -50,6 +51,17 @@ export function fusioniCheCitano(root, num, { ref = 'origin/main', dopo = 0, max
   }
   return [...perFusione.values()].filter((f) => !dopo || Date.parse(f.data) > dopo)
     .sort((a, b) => Date.parse(b.data) - Date.parse(a.data)).slice(0, max);
+}
+
+/** I commit della linea principale di `ref` (i primi genitori): ci sta la punta di un ramo nato lì e mai scritto. */
+export function lineaPrincipale(root, ref = 'origin/main') {
+  return new Set(git(root, ['rev-list', '--first-parent', ref]).split('\n').filter(Boolean));
+}
+
+/** La data (ISO) della fusione più recente del lavoro stesso di #N su `ref` («merge-gate: #N …»), '' se non c'è. */
+export function ultimaFusionePropria(root, num, { ref = 'origin/main' } = {}) {
+  if (!numeroFeedback(num)) return '';
+  return git(root, ['log', '--first-parent', ref, '-E', `--grep=^merge-gate: ${regexCitazione(num)}`, '-n1', '--format=%cI']).trim();
 }
 
 /**
@@ -132,21 +144,28 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
   esclusi.altri = [];
-  // Di più tentativi dello stesso feedback (`worker/<id>-<ora>`) vale il più recente, fuso o no: se è arrivato su main,
-  // i tentativi prima di lui sono morti anche se non sono fusi.
-  const ultimo = new Map();
-  for (const ref of git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n')) {
-    const m = /^origin\/worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(ref.trim());
-    if (m && (!ultimo.has(m[1]) || ultimo.get(m[1]) < m[2])) ultimo.set(m[1], m[2]);
+  // I tentativi superati sono morti; dei vivi di un feedback si mostra quello che la ripresa del lavoro sceglierebbe
+  // (la regola sta in tentativi.mjs).
+  const tutti = git(root, ['for-each-ref', '--format=%(refname:short)%09%(objectname)', 'refs/remotes/origin/worker']).split('\n')
+    .map((r) => r.trim().split('\t')).filter(([ramo, head]) => ramo && head).map(([ramo, head]) => ({ ramo, head }));
+  const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
+  const linea = lineaPrincipale(root, base);
+  const superati = tentativiSuperati(tutti.map((t) => ({ ...t, fuso: fusi.has(t.ramo), vuoto: linea.has(t.head) })));
+  const perId = new Map();
+  for (const t of tutti) {
+    const l = leggiTentativo(t.ramo);
+    if (l && !superati.has(t.ramo) && !fusi.has(t.ramo)) perId.set(l.id, [...(perId.get(l.id) || []), t]);
   }
+  const contiene = (a, b) => { try { git(root, ['merge-base', '--is-ancestor', a.head, b.head]); return true; } catch (_) { return false; } };
+  const inCima = new Set([...perId.values()].map((vivi) => (vivi.length > 1 ? viviInCima(vivi, contiene)[0] : vivi[0]).ramo));
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
   const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
   const rami = [];
   for (const riga of righe.filter(Boolean)) {
     const [ramo, data] = riga.split('\t');
     if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
-    const tentativo = /^origin\/worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(ramo);
-    if (tentativo && ultimo.get(tentativo[1]) !== tentativo[2]) continue;
+    const tentativo = leggiTentativo(ramo);
+    if (tentativo && !inCima.has(ramo)) continue;
     // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
     if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(ramo.replace(/^origin\//, '')); continue; }
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }

@@ -37,6 +37,8 @@ import { ensureCommentChar } from './carattere-commento.mjs';
 import { senzaToken } from './git-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
+import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { lineaPrincipale, numeroFeedback, ultimaFusionePropria } from './su-main.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
@@ -115,9 +117,111 @@ export function attemptStamp(nowMs = Date.now()) {
  * poterlo ricalcolare.
  */
 export function newWorkBranch(id, nowMs = Date.now()) {
-  const safe = String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+  const safe = idNelRamo(id);
   if (!safe) throw new Error('newWorkBranch: id non valido');
   return `worker/${safe}-${attemptStamp(nowMs)}`;
+}
+
+function idNelRamo(id) {
+  return String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+}
+
+/** Lo stampo se `ramo` è un tentativo di lavoro nuovo su `id` (`worker/<id>-<stampo>`), se no ''. PURA. */
+export function stampoDelTentativo(ramo, id) {
+  const safe = idNelRamo(id);
+  const t = leggiTentativo(ramo);
+  return safe && t && t.id === safe ? t.stampo : '';
+}
+
+/**
+ * I tentativi di lavoro nuovo su `id` rimasti su origin con commit propri fuori dalla linea principale: uno morto prima
+ * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
+ * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene; `superati` quelli che la
+ * regola dei tentativi dà per morti, da chiudere. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
+ * `num`, se c'è, aggiunge alla regola la fusione del feedback letta su main.
+ */
+export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', escludi = '' }) {
+  const safe = idNelRamo(id);
+  if (!safe) return { ok: true, scelto: null, altri: [], superati: [] };
+  const elenco = tentativiSuOrigin(root, `refs/heads/worker/${safe}-*`);
+  if (!elenco.ok) return elenco;
+  const rami = elenco.rami.filter((t) => t.ramo !== escludi && stampoDelTentativo(t.ramo, id));
+  if (!rami.length) return { ok: true, scelto: null, altri: [], superati: [] };
+  const g = gitIn(root);
+  const f = scaricaTentativi(g, mainBranch, rami);
+  if (!f.ok) return f;
+  const main = `origin/${mainBranch}`;
+  const conFusi = statoDeiTentativi(root, g, main, rami);
+  // La fusione del feedback letta su main regge anche quando la potatura ha già tolto il ramo fuso.
+  let fusioni = {};
+  try {
+    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main }) : '';
+    if (data) fusioni = { [safe]: attemptStamp(Date.parse(data)) };
+  } catch (_) { /* senza la storia di main resta la regola sui rami */ }
+  const superati = tentativiSuperati(conFusi, { fusioni });
+  const vivi = conFusi.filter((t) => !t.fuso && !superati.has(t.ramo)).map((t) => {
+    const n = g(['rev-list', '--count', `${main}..${t.head}`]);
+    return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
+  });
+  const [scelto = null, ...altri] = viviInCima(vivi, (a, b) => antenato(g, a.head, b.head));
+  return { ok: true, scelto, altri, superati: [...superati] };
+}
+
+/** I rami su origin che rispondono a `glob` → { ok, rami: [{ head, ramo }] }. */
+function tentativiSuOrigin(root, glob) {
+  try {
+    const out = execFileSync('git', ['ls-remote', 'origin', glob], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    const rami = String(out).split('\n').map((r) => r.trim().split(/\s+/)).filter((p) => p.length === 2)
+      .map(([head, ref]) => ({ head, ramo: ref.replace(/^refs\/heads\//, '') }));
+    return { ok: true, rami };
+  } catch (e) {
+    return { ok: false, errore: rigaDiErrore(e.stderr, e.message) };
+  }
+}
+
+function scaricaTentativi(g, mainBranch, rami) {
+  // Refspec esplicita: in un clone a ramo singolo `fetch origin <ramo>` scriverebbe solo FETCH_HEAD.
+  const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`,
+    ...rami.map((t) => `+refs/heads/${t.ramo}:refs/remotes/origin/${t.ramo}`)]);
+  return f.ok ? { ok: true } : { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+}
+
+/** `vuoto`: la punta sta sulla linea principale, cioè il tentativo è nato da main e non ci ha mai scritto. */
+function statoDeiTentativi(root, g, main, rami) {
+  const linea = lineaPrincipale(root, main);
+  return rami.map((t) => ({ ...t, fuso: antenato(g, t.head, main), vuoto: linea.has(t.head) }));
+}
+
+/**
+ * Chiude su origin i tentativi superati di tutti i feedback, non solo di quello che riparte: va fatto mentre il ramo
+ * fuso c'è ancora, prima che la potatura lo tolga, e un feedback chiuso non riparte più (#2152). Best-effort.
+ */
+export function chiudiSuperatiOvunque({ root, mainBranch = 'main' }) {
+  const elenco = tentativiSuOrigin(root, 'refs/heads/worker/*');
+  if (!elenco.ok) return { ok: false, chiusi: [], errore: elenco.errore };
+  const perId = new Map();
+  for (const t of elenco.rami) {
+    const l = leggiTentativo(t.ramo);
+    if (l) perId.set(l.id, [...(perId.get(l.id) || []), t]);
+  }
+  const candidati = [...perId.values()].filter((v) => v.length > 1).flat();
+  if (!candidati.length) return { ok: true, chiusi: [] };
+  const g = gitIn(root);
+  const f = scaricaTentativi(g, mainBranch, candidati);
+  if (!f.ok) return { ok: false, chiusi: [], errore: f.errore };
+  const superati = tentativiSuperati(statoDeiTentativi(root, g, `origin/${mainBranch}`, candidati));
+  return chiudiTentativi({ root, rami: [...superati] });
+}
+
+/**
+ * Toglie da origin i tentativi superati: lasciati lì nessuno li fonde, e la potatura dei fusi non li vede mai (#2152).
+ * Best-effort: un no di origin lascia i rami come sono, e lo dice.
+ */
+export function chiudiTentativi({ root, rami }) {
+  const elenco = (Array.isArray(rami) ? rami : []).filter((r) => leggiTentativo(r));
+  if (!elenco.length) return { ok: true, chiusi: [] };
+  const p = gitIn(root)(['push', 'origin', ...elenco.map((r) => `:refs/heads/${r}`)]);
+  return p.ok ? { ok: true, chiusi: elenco } : { ok: false, chiusi: [], errore: rigaDiErrore(p.out, 'push fallito') };
 }
 
 // (Qui viveva preferredBase: col "Modello B" i pezzi #N.M di una feature

@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { incroci, ramiInCorso } from './lib/su-main.mjs';
+import { leggiTentativo } from './lib/tentativi.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
@@ -74,7 +75,7 @@ export function rigaScheda(s, f = {}) {
 export function conNumeri(rami, indice) {
   const perId = new Map((indice || []).map((f) => [f.id, f.num]));
   return (rami || []).map((r) => {
-    const n = perId.get((/^worker\/([A-Za-z0-9]+)-\d{8}T\d{6}Z$/.exec(r.ramo) || [])[1]);
+    const n = perId.get((leggiTentativo(r.ramo) || {}).id);
     return n ? { ...r, feedback: [n, ...(r.feedback || []).filter((x) => x !== n)] } : r;
   });
 }
