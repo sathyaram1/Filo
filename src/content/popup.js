@@ -1035,7 +1035,7 @@
     }));
 
     port.onMessage.addListener((m) => {
-      if (m.type !== 'delta') ridisegno.annulla();
+      if (m.type === 'reset' || m.type === 'done' || m.type === 'error') ridisegno.annulla();
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
         // Il prompt vero è quello composto dal main: le domande successive
