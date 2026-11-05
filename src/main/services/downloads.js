@@ -724,8 +724,10 @@ async function nominaDaSolo(rec) {
   const NF = globalThis.SN_NOMI_FILE;
   if (!NF || scopeOf(rec) || rec.exe || !rec.savePath) return;
   if (!NF.tipoDi(rec.filename) || !NF.nomeSenzaSenso(rec.filename)) return;
-  const Nomi = require('./nomiFile');
   const letto = rec.savePath;
+  // Una scelta, non un guasto: il file tiene il suo nome, senza avviso.
+  if (await restaFuoriDalModello(rec, letto, NF.tipoDi(rec.filename))) return;
+  const Nomi = require('./nomiFile');
   // Un nome dato dall'utente mentre il modello leggeva vince sempre su quello automatico.
   const superata = () => !records.has(rec.id) || rec.state !== 'completed' || rec.savePath !== letto;
   const p = await Nomi.proponi(letto);
