@@ -76,9 +76,10 @@ function voceDelServer({ clientId, senderProof, maiGiudicato = '' }) {
 
 test('lo stesso feedback dà lo stesso testo sulle due strade: cornici, mittente, conversazione e allegati', async () => {
   const casi = [
-    [{ clientId: 'owner:me', senderProof: 'admin' }, { clientId: 'owner:', senderProof: 'admin' }],
-    [{ clientId: 'routine:verifier', senderProof: 'server' }, { clientId: 'routine:verifier', senderProof: 'server' }],
-    [{ clientId: 'c-8f3a91', senderProof: '' }, { clientId: 'utente', senderProof: '' }],
+    [{ clientId: 'owner:me', senderProof: 'admin', saltati: 'fidato' }, { clientId: 'owner:', senderProof: 'admin' }],
+    [{ clientId: 'routine:verifier', senderProof: 'server', saltati: 'routine_proven' }, { clientId: 'routine:verifier', senderProof: 'server' }],
+    // Mai passato dai giudici (#1514): la riga che lo dice apre il testo su tutte e due le strade.
+    [{ clientId: 'c-8f3a91', senderProof: '' }, { clientId: 'utente', senderProof: '', maiGiudicato: 'nessun giudizio registrato' }],
   ];
   for (const [locale, server] of casi) {
     const cartella = cartellaTemporanea('due-strade-');
