@@ -205,10 +205,10 @@ o lasciarlo riprovare (azione `automazione`, che lo accende subito anche se è
 fermo). Contano le chiusure, non le
 scritture nel taccuino: una sessione che scrive all'inizio e poi cade
 (contesto esaurito, processo ucciso, limite di sessione) non è chiusa bene.
-Una domanda alla volta, e la prima sessione chiusa bene la rende superata. Il
-compito che smista le domande non la tratta come un guasto da curare con un
-lavoro: chi lo curerebbe è il manutentore stesso, quindi arriva all'owner
-(SPEC-DOMANDE § 3.5, passo 1).
+Una domanda alla volta, e la prima sessione chiusa bene la rende superata. Va
+diretta all'owner, senza passare dal compito che smista le domande: lì un
+guasto si chiude con un lavoro che lo cura, e questo lo curerebbe il
+manutentore stesso. Lo decide il server, non le istruzioni di un agente.
 
 **Account.** Il manutentore spegne e riaccende; usa prima B; niente riserva
 su A. La spesa si dosa sulla settimana, più piena all'inizio; il limite delle
