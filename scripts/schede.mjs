@@ -158,7 +158,7 @@ export const SOGLIA_CENSIMENTO = 50;
  */
 export function copertura({ indice, schede }) {
   const nums = new Set((indice || []).filter((f) => f && !f.segnalato).map((f) => String(f.num)));
-  const coperti = new Set((schede || []).filter((s) => s && !s[SEGNALATA]).map((s) => String(s.numero || '').replace(/^#/, '')).filter((n) => nums.has(n)));
+  const coperti = new Set((schede || []).filter((s) => s && !s[SEGNALATA]).map(numeroDi).filter((n) => nums.has(n)));
   const aperti = nums.size;
   const vere = coperti.size;
   return { aperti, vere, mancano: aperti - vere, scarsa: aperti - vere >= SOGLIA_CENSIMENTO && vere * 2 < aperti };
