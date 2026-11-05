@@ -542,7 +542,7 @@ export { leggiSpecVerdi, segnaSpecVerdi };
 export function chiaveDelContenuto(root, sha) {
   const r = git(['ls-tree', '-r', '--full-tree', sha], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
   if (!r.ok) return sha;
-  const righe = r.out.split('\n').filter((l) => !l.split('\t')[1]?.startsWith('tests/verifica/'));
+  const righe = r.out.split('\n').filter((l) => !dentroProveGiro(l.split('\t')[1]));
   return createHash('sha1').update(righe.join('\n')).digest('hex');
 }
 
