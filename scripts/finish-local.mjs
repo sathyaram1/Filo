@@ -507,16 +507,57 @@ export { lottiPerRigaDiComando };
  * Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. Nella cartella della
  * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
  */
-function runSpecsALotti(specs, label, albero) {
+function runSpecsALotti(specs, label, albero, memoria = null) {
   if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
-  const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
+  const { restano, saltati } = memoria ? specDaRiprendere(specs, memoria.verdi) : { restano: specs, saltati: [] };
+  if (saltati.length) {
+    console.log(`\n▸ ${label}: ${saltati.length} già verdi su questo commit in un lancio precedente, non li rifaccio; ne restano ${restano.length}.`);
+  }
+  const lotti = lottiPerRigaDiComando(restano.map((s) => `${s}.spec.mjs`));
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
     const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...lotto]);
     if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env, albero.dir)) ok = false;
+    else if (memoria) memoria.segna(lotto.map((f) => f.replace(/\.spec\.mjs$/, '')));
   });
   return ok;
+}
+
+/**
+ * Gli spec già verdi su `sha` in un lancio precedente: un controllo che supera il tetto di un comando in sottofondo
+ * si rilancia e riparte da dove era (#2113). Di un altro commit non vale niente.
+ */
+export function leggiSpecVerdi(file, sha) {
+  try {
+    const j = JSON.parse(readFileSync(file, 'utf8'));
+    return new Set(j && j.sha === sha && Array.isArray(j.verdi) ? j.verdi.map(String) : []);
+  } catch (_) { return new Set(); }
+}
+
+/** La memoria di un altro commit si butta. Una scrittura fallita costa solo la ripresa, non il controllo. */
+export function segnaSpecVerdi(file, sha, specs) {
+  const verdi = leggiSpecVerdi(file, sha);
+  for (const s of specs || []) verdi.add(String(s));
+  try { writeFileSync(file, JSON.stringify({ sha, verdi: [...verdi].sort() })); } catch (_) { /* si riparte da capo */ }
+  return verdi;
+}
+
+/** PURA. */
+export function specDaRiprendere(specs, verdi) {
+  const gia = verdi instanceof Set ? verdi : new Set(verdi || []);
+  const restano = [];
+  const saltati = [];
+  for (const s of specs || []) (gia.has(s) ? saltati : restano).push(s);
+  return { restano, saltati };
+}
+
+/** La memoria dei verdi di `sha`, nella cartella git di `root`: fuori dall'albero, mai committata. */
+export function memoriaSpecVerdi(root, sha) {
+  const r = git(['rev-parse', '--path-format=absolute', '--git-path', 'filo-spec-verdi.json'], { cwd: root });
+  if (!r.ok || !r.out) return null;
+  const file = r.out;
+  return { file, verdi: leggiSpecVerdi(file, sha), segna(specs) { this.verdi = segnaSpecVerdi(file, sha, specs); } };
 }
 
 function readKnownRed(root) {
