@@ -311,7 +311,7 @@ test('feedback:leggi stampa le attese una per riga, fuse o no, e la forma che ag
 });
 
 test('feedback:leggi senza attese lo dice in una riga; con una sola la elenca', async () => {
-  const base = { status: { stringValue: 'todo' }, seq: { integerValue: '903' }, text: { stringValue: 't' }, clientId: { stringValue: 'owner:me' }, senderProof: { stringValue: 'admin' } };
+  const base = { status: { stringValue: 'todo' }, seq: { integerValue: '903' }, text: { stringValue: 't' }, clientId: { stringValue: 'owner:me' }, senderProof: { stringValue: 'admin' }, ...DELL_OWNER };
   const senza = reteConAttese(base, {});
   const r0 = await mod.leggi('x', { bearer: 't', base: 'https://finto', segno: 'b1', decifra: async (g) => ({ ...g }), fetchImpl: senza.fetchImpl });
   assert.match(r0.testo, /^#903, da l’owner, stato «todo»\.\nNon aspetta nessun feedback\.\n/);
