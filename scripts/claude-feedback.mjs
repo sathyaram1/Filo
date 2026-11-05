@@ -46,8 +46,8 @@
 //   Numeri inesistenti e più di venti si rifiutano prima di aprire.
 //
 //   `--pacchetto` (FEEDBACK-STATES.md § 3a, Pacchetti): il feedback è un pacchetto che unisce quelle segnalazioni, e il
-//   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e alla nascita le archivia; chi le aspettava
-//   aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
+//   testo è la spec. Porta con sé i loro allegati (tutti, o non nasce) e le loro attese, e alla nascita le archivia; chi
+//   le aspettava aspetta il pacchetto. Si controllano prima di aprire: in coda e non ancora lavorate, non a priorità 3, non lavoro locale.
 //   Anche il testo, prima della rete: nomina ogni unita, non manda la spec nelle note, e chi mette prima è in --aspetta.
 //
 // USCITE (distinte apposta: chi lancia lo script deve poter distinguere
@@ -78,7 +78,7 @@ import '../src/shared/feedbackAttese.js';
 import './lib/freno-letture.mjs';
 import { risolviFeedback } from './lib/pratica-locale.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
-import { difettiDellaSpec, testoDegliAllegati } from './lib/spec-del-pacchetto.mjs';
+import { difettiDellaSpec, prerequisitiMancanti, testoDegliAllegati } from './lib/spec-del-pacchetto.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FB = globalThis.SN_FEEDBACK;
@@ -286,7 +286,6 @@ export const attese = {
  */
 export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiPerId = {} } = {}) {
   const giaPacchetti = new Set(pacchetti.map((n) => String(n).replace(/^#/, '')));
-  const MAX = globalThis.SN_FB_ATTESE.MAX;
   const motivi = [];
   for (const u of Array.isArray(lette) ? lette : []) {
     const n = `#${u.num}`;
@@ -302,10 +301,51 @@ export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiP
     if (dentro.length) motivi.push(`${n} è già nel pacchetto ${dentro.map((x) => `#${x}`).join(', ')}: due pacchetti farebbero lo stesso lavoro`);
     if (u.priorita === 3) motivi.push(`${n} ha priorità 3: si lavora subito e da sola, fuori dai pacchetti`);
     if (u.locale) motivi.push(`${n} è un lavoro locale: nessuna routine la prende, e nel pacchetto resterebbe ferma`);
-    if ((u.attese || []).length >= MAX) motivi.push(`${n} aspetta già ${MAX} feedback: un'attesa in più non ci sta`);
     if (aspetta.includes(String(u.num))) motivi.push(`${n} è anche fra quelli che il pacchetto aspetta: si aspetterebbero a vicenda`);
   }
   return motivi;
+}
+
+/**
+ * Le attese con cui nasce il pacchetto: quelle di `--aspetta` più quelle delle unite, che archiviate non contano più da
+ * nessuna parte; quelle su un'altra unita cadono. Il tetto di un feedback si conta qui, mai un taglio. PURA.
+ * `proprie`: [{ id, num }]; `unite`: [{ id, num, attese }]. → { attese: [{ id, num }], ereditate: [{ id, num, da: [num] }], motivo }
+ */
+export function atteseDelPacchetto(proprie, unite) {
+  const MAX = globalThis.SN_FB_ATTESE.MAX;
+  const lista = Array.isArray(unite) ? unite.filter(Boolean) : [];
+  const dentro = new Set(lista.map((u) => u.id));
+  const attese = [];
+  const ereditate = [];
+  const viste = new Map();
+  for (const w of Array.isArray(proprie) ? proprie : []) {
+    if (!w || !w.id || viste.has(w.id)) continue;
+    viste.set(w.id, null);
+    attese.push({ id: w.id, num: w.num || '' });
+  }
+  for (const u of lista) {
+    for (const w of u.attese || []) {
+      if (!w || !w.id || dentro.has(w.id)) continue;
+      if (!viste.has(w.id)) {
+        const e = { id: w.id, num: w.num || '', da: [] };
+        viste.set(w.id, e);
+        attese.push({ id: e.id, num: e.num });
+        ereditate.push(e);
+      }
+      const e = viste.get(w.id);
+      if (e && !e.da.includes(String(u.num))) e.da.push(String(u.num));
+    }
+  }
+  let motivo = '';
+  if (attese.length > MAX) {
+    const perUnita = lista.map((u) => [u.num, ereditate.filter((e) => e.da.includes(String(u.num))).length]).filter(([, k]) => k > 0);
+    const proprieN = attese.length - ereditate.length;
+    motivo = `il pacchetto aspetterebbe ${attese.length} feedback (${[
+      ...(proprieN ? [`${proprieN} di --aspetta`] : []),
+      `${ereditate.length} dalle unite: ${perUnita.map(([n, k]) => `#${n}: ${k}`).join(', ')}`,
+    ].join(', ')}), e un feedback ne aspetta al più ${MAX}: togline ${attese.length - MAX} dalle unite o da --aspetta, o dividi il pacchetto`;
+  }
+  return { attese, ereditate, motivo };
 }
 
 /** La priorità del pacchetto senza `--priorita`: la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
@@ -423,18 +463,53 @@ export function copieDegliAllegati(perUnita, { primaImmagini = 0 } = {}) {
 export function chiAspetta(righe, unite) {
   const perId = new Map((Array.isArray(unite) ? unite : []).map((u) => [u.id, String(u.num)]));
   const out = [];
+  // Le attese di tutti, lette nella stessa scansione: servono a trovare i giri a catena (giriDelPacchetto).
+  const grafo = new Map();
+  Object.defineProperty(out, 'grafo', { value: grafo });
   for (const r of Array.isArray(righe) ? righe : []) {
     const id = String((r && r._id) || '');
-    if (!id || perId.has(id)) continue;
+    if (!id) continue;
     const attese = globalThis.SN_FB_ATTESE.atteseDi(r);
+    const num = FB.formatNum(Number(r.seq), Number(r.subSeq)) || '';
+    grafo.set(id, { num, attese });
+    if (perId.has(id)) continue;
     const togli = attese.map((w) => w.id).filter((x) => perId.has(x));
     if (!togli.length) continue;
     out.push({
-      id, num: FB.formatNum(Number(r.seq), Number(r.subSeq)) || id, togli, quali: togli.map((x) => perId.get(x)),
+      id, num: num || id, togli, quali: togli.map((x) => perId.get(x)),
       tenute: attese.filter((w) => !perId.has(w.id)).map((w) => w.num || w.id),
     });
   }
   return out;
+}
+
+/**
+ * I giri che il pacchetto chiuderebbe: chi aspetta una unita passa ad aspettare il pacchetto, quindi è un giro se lo si
+ * raggiunge dalle attese del pacchetto, direttamente o a catena (`aspettanti.grafo`, da chiAspetta). PURA.
+ * → [{ x, catena: [id] }]: `catena` va da un'attesa del pacchetto fino a x.
+ */
+export function giriDelPacchetto(attese, aspettanti, uniteIds = []) {
+  const lista = Array.isArray(aspettanti) ? aspettanti : [];
+  const grafo = lista.grafo instanceof Map ? lista.grafo : new Map();
+  const perId = new Map(lista.map((x) => [x.id, x]));
+  const dentro = new Set(uniteIds);
+  const padre = new Map();
+  const coda = [];
+  for (const w of Array.isArray(attese) ? attese : []) if (w && w.id && !padre.has(w.id)) { padre.set(w.id, null); coda.push(w.id); }
+  const giri = [];
+  for (let i = 0; i < coda.length; i += 1) {
+    const id = coda[i];
+    if (perId.has(id)) {
+      const catena = [];
+      for (let c = id; c != null; c = padre.get(c)) catena.unshift(c);
+      giri.push({ x: perId.get(id), catena });
+      continue;
+    }
+    // Le attese delle unite le prende il pacchetto: sono già fra i punti di partenza.
+    if (dentro.has(id)) continue;
+    for (const w of (grafo.get(id) || {}).attese || []) if (!padre.has(w.id)) { padre.set(w.id, id); coda.push(w.id); }
+  }
+  return giri;
 }
 
 /** Letture e scritture di un pacchetto. Oggetto: i test lo sostituiscono, il vero va in rete. */
@@ -515,7 +590,7 @@ export const ambiente = {
 
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
-  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia gli allegati e le archivia, e chi le aspettava aspetta lui.');
+  console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia allegati e attese e le archivia, e chi le aspettava aspetta lui.');
   console.error('     La spec sta nel testo o in un --allega (le note non arrivano a chi lavora); un feedback che deve fondersi prima va in --aspetta.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
@@ -611,18 +686,19 @@ export async function main(argvIn) {
   let allegati;
   try { allegati = percorsiAllegati.map(leggiAllegato); }
   catch (e) { console.error(`USO: ${e.message}`); return EXIT.USO; }
-  // Prima della rete, così anche --dry-run lo dice: la spec che manca qui non la riceve nessuno (#2033).
+  // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
+  // un errore d'uso o una prova a vuoto non toccano la rete.
+  const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
+  // Prima della rete, così anche --dry-run lo dice: la spec che manca qui non la riceve nessuno (#2033). I feedback
+  // messi prima si guardano qui solo a vuoto: aprendo, dopo aver letto le attese che il pacchetto prende dalle unite.
+  const testoSpec = [testo, ...testoDegliAllegati(allegati)].join('\n');
   if (numeriUnite.numeri.length && String(testo || '').trim()) {
-    const difetti = difettiDellaSpec([testo, ...testoDegliAllegati(allegati)].join('\n'), { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri });
+    const difetti = difettiDellaSpec(testoSpec, { unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, prerequisiti: !deposita, aVuoto: dryRun });
     if (difetti.length) {
       console.error(`RIFIUTATO: --pacchetto, il testo va corretto e non ho aperto niente:\n${difetti.map((m) => `  - ${m}`).join('\n')}`);
       return EXIT.USO;
     }
   }
-
-  // La credenziale si chiede solo quando c'è davvero qualcosa da depositare:
-  // un errore d'uso o una prova a vuoto non toccano la rete.
-  const deposita = !dryRun && Boolean(String(titolo || '').trim() && String(testo || '').trim());
   const cred = deposita ? await credenziale.ottieni() : { idToken: '' };
   if (deposita && !cred.idToken) {
     console.error(`RIFIUTATO: ${cred.motivo || 'nessun token admin'}. Senza la prova del mittente non apro niente: node scripts/admin-login.mjs`);
@@ -638,6 +714,7 @@ export async function main(argvIn) {
   }
   // Le segnalazioni del pacchetto si controllano tutte prima di aprire, e i motivi si dicono tutti insieme.
   let unite = [];
+  let delPacchetto = { attese: listaAttese, ereditate: [] };
   if (deposita && numeriUnite.numeri.length) {
     let lette;
     try { lette = await pacchetto.leggi(numeriUnite.numeri, cred.idToken); } catch (e) {
@@ -664,9 +741,14 @@ export async function main(argvIn) {
       }
     }
     const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti, pacchettiPerId });
-    if (motivi.length) {
-      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${motivi.map((m) => `  - ${m}`).join('\n')}`);
-      return EXIT.RIFIUTATO;
+    delPacchetto = atteseDelPacchetto(listaAttese, leggibili);
+    if (delPacchetto.motivo) motivi.push(delPacchetto.motivo);
+    const delTesto = prerequisitiMancanti(testoSpec, {
+      unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, ereditate: delPacchetto.ereditate.map((e) => e.num).filter(Boolean),
+    });
+    if (motivi.length || delTesto.length) {
+      console.error(`RIFIUTATO: --pacchetto, ${motivi.length ? '' : 'il testo va corretto e '}non ho aperto niente:\n${[...motivi, ...delTesto].map((m) => `  - ${m}`).join('\n')}`);
+      return motivi.length ? EXIT.RIFIUTATO : EXIT.USO;
     }
     unite = lette;
   }
@@ -712,9 +794,20 @@ export async function main(argvIn) {
       console.error(`RIFIUTATO: --pacchetto: non so chi aspetta le segnalazioni unite (${msg(e)}). Non ho aperto niente: rilancia.`);
       return codiceDi(e);
     }
-    const giri = aspettanti.filter((x) => numeriAttesa.numeri.includes(String(x.num)));
+    // Per id, anche sulle attese ereditate e a catena: dopo la nascita l'attesa che chiude il giro non si sposterebbe.
+    const giri = giriDelPacchetto(delPacchetto.attese, aspettanti, unite.map((u) => u.id));
     if (giri.length) {
-      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map((x) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta #${x.num}: si aspetterebbero a vicenda`).join('\n')}`);
+      const perche = (id) => {
+        const e = delPacchetto.ereditate.find((w) => w.id === id);
+        return e ? `l'attesa di ${e.da.map((n) => `#${n}`).join(', ')}` : '--aspetta';
+      };
+      const numDi = (id) => {
+        const n = (aspettanti.find((x) => x.id === id) || {}).num || ((aspettanti.grafo && aspettanti.grafo.get(id)) || {}).num
+          || (delPacchetto.attese.find((w) => w.id === id) || {}).num;
+        return n ? `#${n}` : 'un feedback senza numero';
+      };
+      const riga = ({ x, catena }) => `  - #${x.num} aspetta ${x.quali.map((n) => `#${n}`).join(', ')}, che entra nel pacchetto, e il pacchetto aspetta ${numDi(catena[0])} (${perche(catena[0])})${catena.slice(1).map((id) => `, che aspetta ${numDi(id)}`).join('')}: si aspetterebbero a vicenda`;
+      console.error(`RIFIUTATO: --pacchetto, non ho aperto niente:\n${giri.map(riga).join('\n')}`);
       return EXIT.RIFIUTATO;
     }
   }
@@ -722,7 +815,7 @@ export async function main(argvIn) {
   const r = await apri({
     titolo, testo: copie && copie.origine ? `${String(testo || '').trim()}\n\n${copie.origine}` : testo, url, priorita: prioritaScelta,
     allegati: copie ? [...allegati, ...copie.immagini, ...copie.documenti] : allegati,
-    dryRun, idToken: cred.idToken, locale, attese: listaAttese, unisce: unite,
+    dryRun, idToken: cred.idToken, locale, attese: delPacchetto.attese, unisce: unite,
     nonFidato: copie && copie.nonFidate.length ? `porta allegati di ${copie.nonFidate.join(', ')}, scritti da chi non è fidato` : '',
   });
   if (!r.ok) {
@@ -733,7 +826,7 @@ export async function main(argvIn) {
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati, e alla nascita le archivio)` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati e le loro attese, e alla nascita le archivio)` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -752,6 +845,9 @@ export async function main(argvIn) {
         : 'Nessun biglietto della sessione: nasce non fidato (node scripts/biglietto.mjs stato).');
 
   if (r.attese && r.attese.length) console.log(`Aspetta ${globalThis.SN_FB_ATTESE.testoAttese(r.attese)}: nessuna routine lo prende finché non sono tutti fusi, poi entra in coda da solo.`);
+  if (delPacchetto.ereditate.length) {
+    console.log(`Attese prese dalle unite: ${delPacchetto.ereditate.map((e) => `${globalThis.SN_FB_ATTESE.testoAttese([e])} (da ${e.da.map((n) => `#${n}`).join(', ')})`).join(', ')}.`);
+  }
   // Alla nascita le unite si archiviano, e chi le aspettava aspetta il pacchetto. Un passo che non riesce non è
   // silenzioso: il pacchetto esiste già, e la riga per rimediare si stampa intera, nell'ordine in cui va lanciata.
   let incompleto = false;

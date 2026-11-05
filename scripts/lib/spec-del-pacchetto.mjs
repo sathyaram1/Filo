@@ -68,10 +68,22 @@ export function testoDegliAllegati(allegati = []) {
 const citazione = (f) => (f.length > 120 ? `${f.slice(0, 117)}...` : f);
 
 /**
- * Il testo di un pacchetto è la spec? I motivi del no, tutti insieme (vuoto = sì). `testo` comprende gli allegati di
- * testo; `unite` e `aspetta` sono i numeri di --pacchetto e --aspetta. PURA.
+ * I feedback che il testo mette prima del pacchetto e che il pacchetto non aspetta. `ereditate`: i numeri delle attese
+ * che il pacchetto prende dalle unite (#1903.1), che lo fermano quanto --aspetta; `aVuoto`: non sono state lette. PURA.
  */
-export function difettiDellaSpec(testo, { unite = [], aspetta = [] } = {}) {
+export function prerequisitiMancanti(testo, { unite = [], aspetta = [], ereditate = [], aVuoto = false } = {}) {
+  const prima = prerequisitiNelTesto(testo, [...unite, ...aspetta, ...ereditate]);
+  const conTutti = [...aspetta.map(norm), ...prima.map((p) => p.num)].join(',');
+  const nota = aVuoto ? ' A vuoto non leggo le attese delle unite: se una aspetta già quel feedback, il pacchetto lo prende da lei e l\'apertura vera non lo rifiuta.' : '';
+  return prima.map(({ num, frase }) => `il testo mette #${num} prima del pacchetto («${citazione(frase)}»), ma il pacchetto non lo aspetta: il server lo darebbe da lavorare subito. Apri con --aspetta ${conTutti} (un feedback già su main non ferma niente), o riscrivi la frase se #${num} non deve fondersi prima${nota ? `.${nota}` : ''}`);
+}
+
+/**
+ * Il testo di un pacchetto è la spec? I motivi del no, tutti insieme (vuoto = sì). `testo` comprende gli allegati di
+ * testo; `unite` e `aspetta` sono i numeri di --pacchetto e --aspetta. Con `prerequisiti: false` i feedback messi prima
+ * non si guardano: l'apertura li controlla dopo aver letto le attese delle unite (`prerequisitiMancanti`). PURA.
+ */
+export function difettiDellaSpec(testo, { unite = [], aspetta = [], prerequisiti = true, aVuoto = false } = {}) {
   const motivi = [];
   for (const f of rimandiAlleNote(testo)) {
     motivi.push(`il testo manda la spec nelle note («${citazione(f)}»): le note non arrivano a chi lavora il pacchetto, né a chi lo verifica. Scrivi la spec nel testo, o allegala con --allega spec.md; se la frase parla delle note come argomento, riscrivila senza mandare lì`);
@@ -80,10 +92,6 @@ export function difettiDellaSpec(testo, { unite = [], aspetta = [] } = {}) {
   if (mancano.length) {
     motivi.push(`la spec non nomina ${mancano.map((n) => `#${n}`).join(', ')}: per ogni segnalazione unita dice cosa cambia e come si verifica, nel testo o in un allegato di testo`);
   }
-  const prima = prerequisitiNelTesto(testo, [...unite, ...aspetta]);
-  const conTutti = [...aspetta.map(norm), ...prima.map((p) => p.num)].join(',');
-  for (const { num, frase } of prima) {
-    motivi.push(`il testo mette #${num} prima del pacchetto («${citazione(frase)}»), ma il pacchetto non lo aspetta: il server lo darebbe da lavorare subito. Apri con --aspetta ${conTutti} (un feedback già su main non ferma niente), o riscrivi la frase se #${num} non deve fondersi prima`);
-  }
+  if (prerequisiti) motivi.push(...prerequisitiMancanti(testo, { unite, aspetta, aVuoto }));
   return motivi;
 }

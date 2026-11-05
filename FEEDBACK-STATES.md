@@ -349,7 +349,7 @@ strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi 
 fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
 dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto o ne porta
 il rimando `unitoIn` (rimasta in coda perché l'archiviazione non è riuscita), chi è a
-priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
+priorità 3, un lavoro locale, chi P stesso aspetta. Area, tetto e
 urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
 o non passa intero.
@@ -360,7 +360,8 @@ insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una 
 manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
 un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
 «prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
-dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
+dà P da lavorare con quello fuori da main. Un'attesa che P prende da un'unita vale quanto `--aspetta`: aprendo,
+quel controllo si fa dopo aver letto le unite; a vuoto no, e il rifiuto lo dice. Il rimedio sta nel messaggio: la spec nel testo
 o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
 segnalazione qualunque racconta un problema, e può citare note e attese di altri.
 I pacchetti nati prima, con la spec nei turni delle note che cominciano con «SPEC DEL
@@ -381,14 +382,19 @@ della conversazione di una scritta anche da routine o sessioni, P nasce non fida
 da una sessione pulita (lo strumento non manda il biglietto), come un figlio di genitori
 non fidati (SPEC-DOMANDE.md § 1.3).
 
-*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). Chi aspettava una
+*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). P nasce con le
+attese delle unite insieme a quelle di `--aspetta` (#1903.1): archiviate, le loro non
+conterebbero più da nessuna parte, e P partirebbe prima di ciò che una di loro aspettava.
+Quelle su un'altra unita cadono; il tetto delle 20 si conta su P, e oltre non apre e dice i
+conti per unita. Chi aspettava una
 unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre
 restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel pacchetto
 #P: il lavoro continua lì», senza frase per chi l'ha segnalata. Prima le attese: un
 aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
 una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
 per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
-P si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
+P, anche per un'attesa presa da un'altra unita o a catena (P aspetta A, A aspetta lui), si rifiuta prima di
+aprire con la catena (si aspetterebbero a vicenda); P nato senza numero non
 archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
 nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
 dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
