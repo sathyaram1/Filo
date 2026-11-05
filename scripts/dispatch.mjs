@@ -76,7 +76,7 @@ import { basename, dirname, join, resolve, sep } from 'node:path';
 import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
-  prepareBranch, newWorkBranch, withCheckpoint,
+  prepareBranch, newWorkBranch, tentativiPrecedenti, withCheckpoint,
   lastCheckpoint, clearRejects, headSha, currentBranch,
   guardTransition, escalationNote,
   writeExpectation, clearExpectation, stateDir,
