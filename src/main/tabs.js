@@ -10,7 +10,6 @@ const Sito = require('../shared/stessoSito');
 const { spingiAllaScheda } = require('./services/impostazioniPerOrigine');
 const { testoDellaRichiesta, corpoDa, LIMITE_CORPO } = require('./services/testoInviato');
 const ProxyTab = require('./services/proxyTab');
-const { riquadroArrivato } = require('./services/riquadroArrivato');
 const { registerFiloProtocolForSession } = require('./protocol');
 const GeoBlock = require('./services/geoBlock');
 const GeoBlockRules = require('./services/geoBlockRules');
