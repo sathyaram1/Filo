@@ -46,6 +46,42 @@ test('classificatore: sporca ogni strumento tranne un elenco chiuso (shell, rice
   assert.equal(L.motivoLettura(null), '');
 });
 
+test('classificatore: un\'abilità o un comando dell\'owner non sporca, quelli di un\'estensione di terzi sì, come leggerne il file (#1867)', () => {
+  const richiama = (tool_name, tool_input) => L.motivoLettura({ tool_name, tool_input }, ctxPosix);
+  assert.equal(richiama('Skill', { skill: 'unslop' }), '');
+  assert.equal(richiama('Skill', { skill: 'apps/web:deploy' }), "Skill da un'estensione (apps/web:deploy)");
+  assert.equal(richiama('Skill', { skill: 'posta:leggi', args: 'x' }), "Skill da un'estensione (posta:leggi)");
+  assert.equal(richiama('SlashCommand', { command: '/rilascia --subito' }), '');
+  assert.equal(richiama('SlashCommand', { command: '/terzi:pubblica adesso' }), "SlashCommand da un'estensione (terzi:pubblica)");
+  // La stessa abilità letta dal disco sporca già: le due strade danno lo stesso esito.
+  assert.match(leggi('/home/o/.claude/plugins/cache/terzi/posta/1.0.0/skills/leggi/SKILL.md'), /cartella di Claude/);
+  assert.equal(leggi('/home/o/.claude/skills/unslop/SKILL.md'), '');
+  // Il cablaggio: il gancio parte anche per loro.
+  assert.ok(new RegExp(L.matcherDelGancio()).test('Skill') && new RegExp(L.matcherDelGancio()).test('SlashCommand'));
+});
+
+test('classificatore: Grep con le righe nelle cartelle ammesse della cartella di Claude non sporca, come leggerne i file (#1867)', () => {
+  const cerca = (path) => L.motivoLettura({ tool_name: 'Grep', tool_input: { pattern: 'x', path, output_mode: 'content' } }, ctxPosix);
+  for (const p of ['/home/o/.claude/projects/-casa-Filo/memory', '/home/o/.claude/projects/-casa-Filo/memory/', '/home/o/.claude/skills',
+    '/home/o/.claude/commands', '/home/o/.claude/agents', '/home/o/.claude/projects/-casa-Filo/sess-1']) {
+    assert.equal(cerca(p), '', p);
+  }
+  for (const p of ['/home/o/.claude', '/home/o/.claude/projects', '/home/o/.claude/projects/-casa-Filo', '/home/o/.claude/projects/-casa-Filo/sess-2',
+    '/home/o/.claude/plugins', '/home/o/.claude/todos']) {
+    assert.match(cerca(p), /^Grep dalla cartella di Claude/, p);
+  }
+  // Read su una cartella resta com'era: non è un file da leggere.
+  assert.match(leggi('/home/o/.claude/projects/-casa-Filo/memory'), /cartella di Claude/);
+});
+
+test('il salto veloce del gancio riconosce Grep con le righe con le stesse modalità del classificatore (#1867)', () => {
+  const sh = readFileSync(GANCIO, 'utf8');
+  const m = /^RE_RIGHE='"output_mode"\[\[:space:\]\]\*:\[\[:space:\]\]\*"(.*)"'$/m.exec(sh);
+  assert.ok(m, 'RE_RIGHE nel gancio');
+  const modi = m[1].replace(/^\(|\)$/g, '').split('|');
+  assert.deepEqual(modi.sort(), [...L.GREP_MODI_CON_RIGHE].sort(), 'il gancio e il classificatore devono dire le stesse modalità');
+});
+
 test('classificatore: Grep con le righe di un file fuori dal repo sporca come Read; coi soli nomi o i conteggi no (#1211.3)', () => {
   const cerca = (tool_input, ctx = ctxPosix) => L.motivoLettura({ tool_name: 'Grep', tool_input: { pattern: 'fattura', ...tool_input } }, ctx);
   assert.equal(cerca({ path: '/casa/Scaricati/pagina.html', output_mode: 'content' }), 'Grep fuori dal repo (pagina.html)');
