@@ -368,6 +368,23 @@ export function withRequest(state, branch, { request, sha, at, feedbackId, feedb
 export const RICHIESTA_OWNER = '--richiesta-owner';
 
 /**
+ * Gli argomenti di start: la richiesta (`resto`), --feedback e --richiesta-owner tolti. Una richiesta nuova senza
+ * l'opzione non è dell'owner; ripartire senza testo (undefined) tiene quello che si sapeva. → { errore } se non tornano.
+ */
+export async function argomentiDiAvvio(args) {
+  const owner = args.includes(RICHIESTA_OWNER);
+  const { estraiOpzioneFeedback, parseRiferimento } = await import('./lib/pratica-locale.mjs');
+  const o = estraiOpzioneFeedback(args.filter((a) => a !== RICHIESTA_OWNER));
+  if (o.errore) return { errore: o.errore };
+  if (o.valore !== null) {
+    const r = parseRiferimento(o.valore);
+    if (!r.ok) return { errore: r.motivo };
+  }
+  const testo = o.resto.join(' ').trim();
+  return { resto: o.resto, feedbackRif: o.valore, richiestaOwner: owner ? true : (testo ? false : undefined) };
+}
+
+/**
  * La richiesta del giro è la voce dell'owner (#1514)? PURA. Sì se l'ha scritta lui (l'orchestratore lo dice con
  * --richiesta-owner), se non c'è pratica (l'ha scritta chi ha lanciato start), o se la pratica è fidata.
  */
