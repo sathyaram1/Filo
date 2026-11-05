@@ -195,6 +195,38 @@ test('nello screenshot del feedback è coperto il numero scritto nel riquadro di
     'il numero scritto nel riquadro di pagamento si legge nello screenshot del feedback').toBe(0);
 });
 
+// Dalle pagine di Filo (la home) la foto passa per la stessa copertura: se la misura non riuscisse lì, non partirebbe.
+test('dalla home di Filo lo screenshot vero del feedback parte e mostra la pagina', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  await expect.poll(() => app.windows().some((w) => w.url().startsWith('filo://newtab')), { timeout: 10_000 }).toBe(true);
+  const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+  await home.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await reteFinta(app);
+  await home.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(home.locator('.sn-fb-modal')).toBeVisible();
+  await home.locator('.sn-fb-text').fill('La home non carica le scorciatoie');
+  await home.locator('.sn-fb-clear').click();
+  await home.locator('.sn-fb-send').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(1);
+  const img = await app.evaluate(() => globalThis.__rete.payload[0].images.map((x) => ({ name: x.name, dataUrl: x.dataUrl })));
+  expect(img, 'lo screenshot della home deve partire').toHaveLength(1);
+  expect(img[0].name).toBe('schermata annotata');
+  const colori = await home.evaluate(async (url) => {
+    const byte = Uint8Array.from(atob(url.slice(url.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const bmp = await createImageBitmap(new Blob([byte]));
+    const cv = document.createElement('canvas');
+    cv.width = bmp.width; cv.height = bmp.height;
+    const ctx = cv.getContext('2d');
+    ctx.drawImage(bmp, 0, 0);
+    const d = ctx.getImageData(0, 0, bmp.width, bmp.height).data;
+    const visti = new Set();
+    for (let i = 0; i < d.length; i += 16) visti.add(`${d[i]},${d[i + 1]},${d[i + 2]}`);
+    return visti.size;
+  }, img[0].dataUrl);
+  expect(colori, 'nello screenshot si deve vedere la home').toBeGreaterThan(20);
+});
+
 // Una pagina piantata non dice dove stanno i suoi campi: la foto resta fuori, ma il motivo detto è quello vero.
 test('su una pagina bloccata senza campi riservati il feedback non dice che ce n’è uno', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
