@@ -483,7 +483,7 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
  * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
  * verificato sullo stesso contenuto? PURA.
  *
- * Sono la parte lunga della chiusura (da quindici a quarantacinque minuti), e
+ * Sono la parte lunga della chiusura (vedi stimaDurataControlli), e
  * chi verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui,
  * sullo stesso commit, è la stessa ora pagata due volte. Si saltano solo con un
  * verdetto valido in mano, che è già legato a quel contenuto — senza verifica
