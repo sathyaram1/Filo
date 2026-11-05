@@ -869,16 +869,21 @@
           valori.push(essenziale(t));
         }
       } catch (_) {}
+      let conTesto = false;
       for (const [a, base] of aree) {
         if (!viva(a) || sostituito(a)) continue;
         const ora = testo(a);
         if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
         const ess = essenziale(ora);
         if (ess && valori.some((v) => v.includes(ess))) {
-          segnalaInvio(form, dest);
-          return;
+          inPartenza(a, base);
+          conTesto = true;
         }
       }
+      if (!conTesto) return;
+      // Senza il bottone non c'è onSubmit: le impronte partono qui, prima che la pagina se ne vada (#1808.2).
+      mandaImpronte();
+      segnalaInvio(form, dest);
     }
 
     // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
