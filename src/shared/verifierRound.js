@@ -142,6 +142,12 @@
   const PARENTESI_QUALUNQUE = '(?:\\[{1,2}|\\(|\\{)\\s*[^\\]\\)\\}\\n]{0,20}(?:\\]{1,2}|\\)|\\})';
   const APERTURA_PARENTESI = new RegExp(`^\\s*${PREFISSO_ELENCO}${GRASSETTO}(${PARENTESI_QUALUNQUE})`);
   const DENTRO_SEMBRA_LIVELLO = /\d|zero|uno|due|tre|livello|level|priorit/i;
+  // Nelle tonde e graffe la cifra conta come in SOLO_UN_LIVELLO, anche in testa alla riga: «(2865)»,
+  // «(10)», «(1.000)» sono numeri, «(2)», «(2.5)», «(2-3)» livelli (#2179).
+  const DENTRO_TONDA_SEMBRA_LIVELLO = /(?<![\d.,])\d(?:[.,]\d)?(?![\d.,]*\d)|zero|uno|due|tre|livello|level|priorit/i;
+  function aperturaSembraLivello(p) {
+    return (p.startsWith('[') ? DENTRO_SEMBRA_LIVELLO : DENTRO_TONDA_SEMBRA_LIVELLO).test(p);
+  }
   // La rete per tutte le altre aperture: se entro sei caratteri c'è un livello e il lettore
   // non legge la riga come rilievo, è un rilievo scritto male. Una frase vera ha più parole.
   const LIVELLO_VICINO = new RegExp(`^.{0,6}?(${PARENTESI_QUALUNQUE})`);
