@@ -279,7 +279,6 @@ test('r1 una riapertura dalla chat che non riesce lascia la scheda riapribile: Â
     .find((w) => w._filoTabs)._filoTabs.ultimaChiusaCheSuonava())), 'la musica resta da rimettere').toBe(true);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa());
   await expect.poll(async () => (await schede(shell)).filter((t) => t.url === url).length, { timeout: 10_000 }).toBe(1);
-  void riprova;
 });
 
 test('una scheda con l\'indirizzo troppo lungo per essere salvato intero non si riapre: resta il riassunto', async ({ app, shell, testServer }) => {
