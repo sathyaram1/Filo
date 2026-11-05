@@ -329,9 +329,10 @@ export function spostaInCima(src, { prima, manifesto, oggi }) {
 }
 
 /**
- * Nel clone `root`: confronta il registro col punto in cui il ramo si stacca da main e, se serve, sposta e (con
- * `commit`) committa il solo registro. Non lavora a metà di un rebase o con il registro già modificato fuori dai commit.
- * → { ok, spostate, verso, commit, motivo, inAttesa?, uscitaSuMain? } (inAttesa: vedi sottoUsciteSuMain)
+ * Nel clone `root`: confronta il registro col punto in cui il ramo si stacca da main e, con `commit`, sposta e committa
+ * il solo registro; senza, dice soltanto cosa sposterebbe (`soloLettura`). Non lavora a metà di un rebase o con il
+ * registro già modificato fuori dai commit.
+ * → { ok, spostate, verso, commit, motivo, soloLettura?, inAttesa?, uscitaSuMain? } (inAttesa: vedi sottoUsciteSuMain)
  */
 export function riportaInCima(root, { commit = false, basi = ['origin/main', 'main'], oggi = new Date().toISOString().slice(0, 10), aMeta = () => '', identita = null, exec = execFileSync } = {}) {
   const git = (args) => String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 64 * 1024 * 1024 }));
