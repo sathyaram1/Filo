@@ -261,9 +261,10 @@ export async function letturaLocale(dip = {}) {
   }
   const r = await leggiRighe();
   const righe = r.rows;
-  const schede = await schedeDaRighe(righe, { apri, vietato: vietatoLeggere });
+  const illeggibili = [];
+  const schede = await schedeDaRighe(righe, { apri, vietato: vietatoLeggere, illeggibili });
   const segnalati = new Map(righe.map((x) => [String(x._id || ''), vietatoLeggere(String(x.status || '').trim(), x.pipeline)]).filter(([id, m]) => id && m));
-  return { ok: true, righe, schede, segnalati, complete: r.complete !== false };
+  return { ok: true, righe, schede, segnalati, complete: r.complete !== false, illeggibili: illeggibili.length };
 }
 
 /** Righe e schede dal server, col biglietto della routine. `opz` passa a leggiDalServer (le prove ci mettono la rete finta). */
