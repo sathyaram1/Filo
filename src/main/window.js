@@ -72,6 +72,15 @@ function riaperturaDaSistema(visibili) {
   return mostraFinestraNormale();
 }
 
+// Su Mac la barra dei menu c'è prima della finestra dell'avvio: una voce premuta lì non ne fa una seconda.
+let finestraDellAvvio = false;
+
+// Le voci della barra che aprono qualcosa, con Filo acceso senza finestre con schede (#2031): la finestra rinasce
+// come dal Dock. Prima che sia nata quella dell'avvio non si crea niente: la fa l'avvio.
+function rifaiFinestraPerUnaVoce() {
+  return finestraDellAvvio ? mostraFinestraNormale() : null;
+}
+
 // Chi agisce su una finestra appena nata aspetta le sue schede: aperta prima, la sua scheda finirebbe dietro quelle
 // riaperte. Risolve `{ ripristinata }`, o null se la finestra si chiude prima.
 function quandoPronta(win) {
