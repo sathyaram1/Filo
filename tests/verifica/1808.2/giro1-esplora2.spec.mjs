@@ -51,6 +51,41 @@ async function apriSito() {
 const LETTERA = 'Buongiorno, vi scrivo per il rimborso dell’ordine 4471: il pacco è arrivato rotto e vorrei sapere come procedere';
 const RIQ = '<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body contenteditable=true style=\'min-height:100px\'></body>"></iframe>';
 
+const DM = {
+  srcdocDesignMode: ['<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body style=\'min-height:100px\'></body><script>document.designMode=\'on\'</script>"></iframe>', ''],
+  srcdocDesignModeDaFuori: ['<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body style=\'min-height:100px\'></body>"></iframe>', "ifr.addEventListener('load', () => { ifr.contentDocument.designMode = 'on'; });"],
+  scrittoDesignMode: ['<iframe id="ifr" style="width:420px;height:120px"></iframe>', "{ const d = ifr.contentDocument; d.open(); d.write(\"<body style='min-height:100px'></body>\"); d.close(); d.designMode = 'on'; }"],
+  vuotoDesignMode: ['<iframe id="ifr" style="width:420px;height:120px"></iframe>', "ifr.contentDocument.designMode = 'on';"],
+  srcdocContenteditable: ['<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body contenteditable=true style=\'min-height:100px\'></body>"></iframe>', ''],
+};
+
+test('editor designMode in un riquadro, mandato e respinto', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ris = {};
+    let k = 0;
+    for (const [nome, [riq, prep]] of Object.entries(DM)) {
+      const titolo = `Dm${++k}`;
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <form id="f" method="post" action="/err500"><textarea name="corpo" id="nasc" style="display:none"></textarea>${riq}<button id="pub">Invia</button></form>
+        <script>${prep} f.addEventListener('submit', () => { nasc.value = ifr.contentDocument.body.innerHTML; });</script>`));
+      await page.waitForTimeout(500);
+      await page.frameLocator('#ifr').locator('body').click();
+      await page.keyboard.type(LETTERA);
+      const testo = await page.frameLocator('#ifr').locator('body').innerText();
+      let id;
+      let sporca = true;
+      try { await expect.poll(async () => { const t = (await schede(shell)).find((x) => x.title === titolo); id = t?.id; return t?.formDirty; }, { timeout: 8_000 }).toBe(true); } catch (_) { sporca = false; }
+      await page.locator('#pub').click();
+      await expect.poll(async () => (await schede(shell)).find((t) => t.id === id)?.title, { timeout: 10_000 }).toBe('Errore');
+      await page.waitForTimeout(800);
+      ris[nome] = { id, sporca, testoOk: testo.trim() === LETTERA };
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    console.log('DESIGNMODE', JSON.stringify(Object.fromEntries(Object.entries(ris).map(([a, v]) => [a, { ...v, esito: aperte.includes(v.id) ? 'aperta' : 'archiviata' }])), null, 1));
+  } finally { await sito.chiudi(); }
+});
+
 test('editor srcdoc mandato con una richiesta della pagina', async ({ app, shell }) => {
   const sito = await apriSito();
   try {
