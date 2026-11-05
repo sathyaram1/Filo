@@ -17,6 +17,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 require(join(__dirname, '..', '..', 'src', 'shared', 'constants.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'decks.js'));
+require(join(__dirname, '..', '..', 'src', 'shared', 'chatErrors.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'scryfallQuery.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'deckImportExport.js'));
 

@@ -195,6 +195,8 @@ class StratoDeiRiquadri {
       payload: dati.payload && typeof dati.payload === 'object' ? dati.payload : {},
       title: testo(dati.title),
       anchor: ancora,
+      // La spiegazione interrotta del tasto destro, da riprendere nel riquadro (#1302): solo testo, mostrato come risposta.
+      ...(typeof dati.seguito === 'string' && dati.seguito ? { seguito: dati.seguito } : {}),
     };
   }
 

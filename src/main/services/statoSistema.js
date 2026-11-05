@@ -913,7 +913,8 @@ function dopoComando(parziale) {
 // senza tenere sveglio il lettore, che legge solo finché qualcuno guarda.
 // `segue: false` è una home che non mostra niente letto dal computer: riceve lo stato, non sveglia il lettore.
 // Con l'utente assente nessuna pagina lo tiene sveglio; `unaVolta` (un turno di chat, un avviso) legge comunque.
-function richiedi({ davanti = true, chi = null, segue = true, unaVolta = false } = {}) {
+// `riscalda`: un riscaldamento a tempo, non un gesto; con l'utente assente non legge, come una pagina che segue (#1302).
+function richiedi({ davanti = true, chi = null, segue = true, unaVolta = false, riscalda = false } = {}) {
   if (chi && typeof chi.id === 'number') {
     const id = chi.id;
     if (!segue) osservatori.delete(id);
@@ -924,6 +925,7 @@ function richiedi({ davanti = true, chi = null, segue = true, unaVolta = false }
   }
   if (!davanti || !segue) return;
   aggancia();
+  if (riscalda && !utenteCe()) return;
   if (!unaVolta && !utenteCe()) { aspettaRitorno(); return; }
   ultimaRichiesta = Date.now();
   if (giro) return;

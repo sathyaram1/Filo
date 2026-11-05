@@ -206,7 +206,9 @@ module.exports = function register(on, ctx) {
     const smettiDiGuardare = Chats && Chats.onLeave ? Chats.onLeave(wc, () => ac.abort()) : () => {};
     const fermata = () => ({ ok: false, stopped: true, error: 'fermata', ...(reasoning ? { reasoning } : {}) });
     // Ogni chiamata al modello del turno porta il segnale, compresi giudice, tag e pareri: fermato, non ne parte un'altra.
-    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError()) : handleAIRequest({ ...args, signal }));
+    // Il segnale di chi chiama (la ricerca che ha deciso che il servizio è giù) vale insieme a quello del turno.
+    const ai = (args) => (signal.aborted ? Promise.reject(stoppedError())
+      : handleAIRequest({ ...args, signal: args && args.signal ? AbortSignal.any([args.signal, signal]) : signal }));
     try {
       const text = String(msg?.text || '').trim();
       if (!text) return { ok: false, error: 'empty' };
@@ -263,9 +265,10 @@ module.exports = function register(on, ctx) {
         payload: { messages },
         origin: 'filo://decks',
         onReasoning,
+        conSeguito: true,
       });
       if (signal.aborted) return fermata();
-      const parsed = Q.parseAgentReply(r.text);
+      const parsed = Q.parseAgentReply(r.text, r.finishReason);
       // Svuotare la chat è della pagina, con la sua conferma: qui niente ricerche né modifiche al mazzo. Il testo è
       // di Filo, non del modello: resta vero anche se la conferma non arriva (Annulla, mazzo lasciato) o se il
       // modello scrive di averla già svuotata.
@@ -372,6 +375,8 @@ module.exports = function register(on, ctx) {
           const status = Number(e1 && e1.status);
           const detail = String((e1 && e1.details) || '');
           let explained = false;
+          // La correzione fermata dal tetto: la bolla dice quella causa, non di riformulare (#1302).
+          let tagliata = null;
           if (Number.isFinite(status) && status >= 400 && status < 500 && status !== 429) {
             try {
               // #593 (quarto giro di verifica) — IL MOTIVO DEL RIFIUTO LO
@@ -392,11 +397,13 @@ module.exports = function register(on, ctx) {
                   'Se la richiesta non è esprimibile in sintassi Scryfall, spiega il problema all\'utente in "reply" (in italiano, senza codici tecnici) e ometti "query".' +
                   (detail ? `\n\n${E.imbusta({ tipo: 'ESITO_SERVIZIO', testo: detail, conIntestazione: true, max: 2000 })}` : '') },
               ];
+              // La query corretta è un dato: fermata dal tetto non si usa, e si passa alla spiegazione qui sotto (#1302).
               const r2 = await ai({
                 action: ACTIONS.DECKS_CHAT,
                 payload: { messages: retryMessages },
                 origin: 'filo://decks',
                 onReasoning,
+                intera: true,
               });
               const p2 = Q.parseAgentReply(r2.text);
               // La reply del retry si accoda solo se aggiunge qualcosa: spesso ripete la prima.
@@ -418,12 +425,20 @@ module.exports = function register(on, ctx) {
             } catch (e2) {
               if (signal.aborted) throw e2;
               sr = null;
+              if (e2 && e2.code === 'RISPOSTA_TAGLIATA') tagliata = e2;
             }
           }
           if (!sr && !explained) {
             retryable = true;
             const rejected = Number.isFinite(status) && status >= 400 && status < 500 && status !== 429;
-            reply = [reply, rejected
+            const CE = globalThis.SN_CHAT_ERRORS;
+            if (tagliata && CE) {
+              const dove = rimedioDi(tagliata);
+              if (CE.rimedioPagina(dove)) rimedio = dove;
+            }
+            reply = [reply, tagliata && CE
+              ? `La query «${parsed.query}» non è stata accettata da Scryfall e ho provato a correggerla, ma ${CE.fraseTagliata(tagliata.finishReason, { vuota: !!tagliata.vuota })}`
+              : rejected
               ? `Ho provato a cercare su Scryfall ma la ricerca non è andata a buon fine (la query «${parsed.query}» non è stata accettata). Prova a riformulare la richiesta con parole diverse, o riprova tra poco.`
               : `La ricerca non è arrivata: ${scryfallDownText(e1)}. Riprova tra poco.`,
             ].filter(Boolean).join('\n');

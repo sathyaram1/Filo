@@ -145,6 +145,7 @@
     MODEL_UNAVAILABLE: 'opzioni',
     DATA_POLICY: 'opzioni',
     NO_PROVIDER_ALLOWED: 'opzioni',
+    PARAMETRI_HOST: 'opzioni',
     INGRESSO_NON_LETTO: 'opzioni',
     ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
@@ -271,6 +272,19 @@
 
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
   // a mano perde il codice, e la frase già scritta torna generica (#663).
+  // Quello che di un errore viaggia verso le pagine perché fromResponse ricomponga frase e tasto: un posto solo, per
+  // ogni canale (ipc, chat della home).
+  function dettagliDelTetto(err) {
+    if (!err) return {};
+    return {
+      ...(Number(err.maxTokens) > 0 ? { maxTokens: Number(err.maxTokens) } : {}),
+      ...(Number(err.finestra) > 0 ? { finestra: Number(err.finestra) } : {}),
+      ...(err.memoria ? { memoria: true } : {}),
+      ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
+      ...(err.reason === 'crediti' ? { reason: 'crediti' } : {}),
+    };
+  }
+
   function fromResponse(res, fallbackMessage) {
     const e = new Error(String((res && res.error) || fallbackMessage || ''));
     if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
@@ -283,6 +297,7 @@
     if (res && res.reason === 'crediti') e.reason = 'crediti';
     if (res && Number(res.maxTokens) > 0) e.maxTokens = Number(res.maxTokens);
     if (res && Number(res.finestra) > 0) e.finestra = Number(res.finestra);
+    if (res && res.memoria) e.memoria = true;
     if (res && typeof res.finishReason === 'string' && res.finishReason) e.finishReason = res.finishReason;
     if (res && res.vuota) e.vuota = true;
     return e;
@@ -331,12 +346,17 @@
       if (e && e.code === 'TETTO_RISPOSTA') {
         const n = Number(e.maxTokens);
         const tetto = Number.isFinite(n) && n > 0 ? ` di ${n.toLocaleString('it-IT', { useGrouping: true })} token` : '';
-        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava.
+        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava, o il fornitore non dà le misure.
         const f = Number(e.finestra);
-        if (Number.isFinite(f) && f > 0) {
-          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
+        if ((Number.isFinite(f) && f > 0) || e.memoria) {
+          const misura = Number.isFinite(f) && f > 0 ? ` (${f.toLocaleString('it-IT', { useGrouping: true })} token)` : '';
+          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto${misura}: accorcia il testo, abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
         }
         return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
+      }
+      // #1302: un host regge strumenti e tetto, eppure il router non ne trova uno per questa richiesta.
+      if (e && e.code === 'PARAMETRI_HOST') {
+        return `nessun fornitore ammesso per il modello scelto accetta tutte le opzioni di questa richiesta (il tetto di lunghezza non c'entra): scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
         return `il modello scelto non è più disponibile sul servizio AI: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
@@ -426,11 +446,23 @@
   // Una risposta che il modello ha dovuto fermare al tetto di lunghezza (finish_reason 'length', #1097.3): non è un
   // errore, ma chi la legge deve sapere che non è intera. La stessa frase su ogni superficie; '' se la risposta è intera.
   // Un 'error' a metà flusso è lo stesso taglio con un'altra causa: mai in cache, mai presentato come intero.
+  // `tetto_ragionamento`: il tetto è finito quasi tutto nel ragionamento (#1302). La frase non promette più spazio: compare
+  // anche dove «Continua» non c'è, e un host già al suo massimo fa ripartire il seguito col tetto di prima.
   const FRASI_INTERROTTA = {
     length: 'La risposta si è interrotta qui: ha raggiunto la lunghezza massima.',
+    tetto_ragionamento: 'La risposta si è interrotta qui: il modello ha speso quasi tutta la lunghezza massima ragionando.',
     error: 'La risposta si è interrotta qui: il servizio AI si è fermato a metà.',
   };
   const troncata = (finishReason) => Object.prototype.hasOwnProperty.call(FRASI_INTERROTTA, String(finishReason || ''));
+  // Il motivo della fine come lo legge Filo: un 'length' speso per più di metà nel ragionamento lo dice a parte.
+  function motivoFine(finishReason, usage) {
+    if (finishReason !== 'length') return finishReason || null;
+    const u = usage || {};
+    const pensati = Number(u.reasoningTokens);
+    const scritti = Number(u.completionTokens);
+    return Number.isFinite(pensati) && pensati > 0 && Number.isFinite(scritti) && scritti > 0 && pensati >= scritti / 2
+      ? 'tetto_ragionamento' : 'length';
+  }
   function rispostaInterrotta(finishReason) {
     return troncata(finishReason) ? FRASI_INTERROTTA[finishReason] : '';
   }
@@ -441,12 +473,31 @@
   }
   // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
   const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
-  const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
+  // La home lo chiede con un messaggio interno, che l'utente non vede.
+  const CHIEDI_SEGUITO_HOME = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
+    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
+  // L'ultima domanda dell'utente in `messages` è la richiesta del seguito: il giro ha più spazio (#1302).
+  function chiedeIlSeguito(messages) {
+    const lista = Array.isArray(messages) ? messages : [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const m = lista[i];
+      if (!m || m.role !== 'user') continue;
+      const c = m.content;
+      const testo = typeof c === 'string' ? c : (Array.isArray(c) ? c.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('\n') : '');
+      return testo.includes(CHIEDI_SEGUITO) || testo.includes(CHIEDI_SEGUITO_HOME);
+    }
+    return false;
+  }
+  // Il tetto ha tagliato i dati di un'azione della chat (#1302): la frase resta nella risposta salvata, e al turno dopo il
+  // modello sa che l'azione non è partita e come rifarla, invece di ripeterla uguale a ogni «Continua».
+  const FRASE_AZIONE_TAGLIATA = 'La risposta si è interrotta qui: i dati di un\'azione erano più lunghi della lunghezza massima, '
+    + 'e l\'azione non è partita. Continuando la rifaccio più corta, o divisa in più parti.';
+  const eFraseInterrotta = (s) => [...Object.values(FRASI_INTERROTTA), FRASE_AZIONE_TAGLIATA].includes(String(s || '').trim());
   // Per chi legge la risposta come dati (JSON, memoria riscritta, un nome): un pezzo non si usa, si dice.
   // `vuota`: il tetto è finito prima di una sola parola da mostrare, di solito nel ragionamento.
   function fraseTagliata(finishReason, { vuota = false } = {}) {
     if (finishReason === 'error') return 'il servizio AI si è fermato a metà della risposta, e un pezzo non basta a questa funzione. Riprova.';
-    return vuota
+    return vuota || finishReason === 'tetto_ragionamento'
       ? 'il modello ha speso tutta la lunghezza massima prima di scrivere la risposta, di solito ragionando: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.'
       : 'la risposta del modello ha raggiunto la lunghezza massima prima di finire, e un pezzo non basta a questa funzione: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.';
   }
@@ -459,11 +510,14 @@
     return e;
   }
   // Una risposta tagliata che non si può mostrare: chi la legge come dati (`intera`) non ne usa un pezzo, e un taglio
-  // senza testo né azioni non ha niente da mostrare a nessuno. null se la risposta si può usare.
-  function erroreDelTaglio(r, { intera = false } = {}) {
+  // senza testo né azioni non ha niente da mostrare. Salvo il tetto finito nel ragionamento dove c'è «Continua»: la nota
+  // e il seguito, che riparte con un tetto più largo, sono la strada (#1302); `senzaSeguito` dice che lì non c'è.
+  function erroreDelTaglio(r, { intera = false, senzaSeguito = false } = {}) {
     if (!r || !troncata(r.finishReason)) return null;
     const vuota = !String(r.text || '').trim() && !(Array.isArray(r.toolCalls) && r.toolCalls.length);
-    return intera || vuota ? erroreTagliata(r.finishReason, { vuota }) : null;
+    if (intera) return erroreTagliata(r.finishReason, { vuota });
+    if (!vuota || (r.finishReason === 'tetto_ragionamento' && !senzaSeguito)) return null;
+    return erroreTagliata(r.finishReason, { vuota });
   }
 
   // Il testo di un campo di una risposta JSON tagliata a metà (l'involucro dell'Aiuto o dei mazzi): quello che il
@@ -477,10 +531,17 @@
     }
     if (inizio < 0) return null;
     const ESC = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', '"': '"', '\\': '\\', '/': '/' };
+    // Una " non escapata chiude il campo solo se dopo vengono la fine, una graffa o la chiave seguente: altrimenti è
+    // una citazione scritta male («Clicca su "Salva" in alto») e fa parte del testo.
+    const CHIUDE = /^\s*(?:$|[}\]]|,\s*(?:$|"[A-Za-z_$][\w$]*(?:"\s*(?::|$)|$)))/;
     let out = '';
     for (let i = inizio; i < s.length; i++) {
       const ch = s[i];
-      if (ch === '"') break;
+      if (ch === '"') {
+        if (CHIUDE.test(s.slice(i + 1, i + 80))) break;
+        out += ch;
+        continue;
+      }
       if (ch !== '\\') { out += ch; continue; }
       const nx = s[i + 1];
       if (nx === undefined) break;
@@ -497,8 +558,79 @@
     return out;
   }
 
+  // Il blocco di codice dentro cui una risposta interrotta si era fermata, da riaprire in testa al seguito (#1302): la
+  // riga d'apertura (```js), o ''. `prima` è la risposta com'era, o com'è salvata nella home: chiusa da chiudiRecinto e
+  // con la frase dell'interruzione in fondo.
+  function recintoDaRiaprire(prima) {
+    let s = String(prima || '').replace(/\s+$/, '');
+    const paragrafi = s.split(/\n{2,}/);
+    const conNota = paragrafi.length > 1 && eFraseInterrotta(paragrafi[paragrafi.length - 1]);
+    if (conNota) s = paragrafi.slice(0, -1).join('\n\n').replace(/\s+$/, '');
+    let recinti = s.match(/^[ \t]*```.*$/gm) || [];
+    if (conNota && recinti.length && recinti.length % 2 === 0 && /\n[ \t]*```[ \t]*$/.test(s)) recinti = recinti.slice(0, -1);
+    return recinti.length % 2 ? recinti[recinti.length - 1].trim() : '';
+  }
+  function seguitoNelRecinto(prima, seguito) {
+    const r = recintoDaRiaprire(prima);
+    const t = String(seguito == null ? '' : seguito);
+    return r && !/^\s*```/.test(t) ? `${r}\n${t}` : t;
+  }
+
+  // Dove si chiude l'oggetto che comincia in `da` (indice della graffa di chiusura), -1 se arriva in fondo aperto.
+  function fineOggetto(s, da) {
+    let prof = 0; let inStringa = false;
+    for (let i = da; i < s.length; i++) {
+      const ch = s[i];
+      if (inStringa) {
+        if (ch === '\\') i += 1;
+        else if (ch === '"') inStringa = false;
+      } else if (ch === '"') inStringa = true;
+      else if (ch === '{') prof += 1;
+      else if (ch === '}' && --prof === 0) return i;
+    }
+    return -1;
+  }
+
+  // L'involucro JSON di una risposta (Aiuto, mazzi): da solo, su righe sue o in un recinto ```json, anche con una frase
+  // attorno («Certo!\n```json\n{…}\n```»). Un oggetto in mezzo a una frase è un esempio, e la risposta è prosa (#1302).
+  function involucroIntero(raw) {
+    let s = String(raw || '').trim();
+    const recinto = /```(?:json)?[ \t]*\n([\s\S]*?)\n?[ \t]*```/i.exec(s);
+    if (recinto) s = recinto[1].trim();
+    const a = s.indexOf('{');
+    const b = s.lastIndexOf('}');
+    if (a < 0 || b < a) return null;
+    const prima = s.slice(0, a);
+    const dopo = s.slice(b + 1);
+    if ((prima.trim() && !/\n[ \t]*$/.test(prima)) || (dopo.trim() && !/^[ \t]*\n/.test(dopo))) return null;
+    s = s.slice(a, b + 1);
+    try {
+      const o = JSON.parse(s);
+      return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+    } catch (_) { return null; }
+  }
+
+  // Il testo da mostrare di una risposta che doveva essere un involucro JSON e non si legge (#1302). Solo se il tetto
+  // l'ha fermata dentro l'involucro: una risposta intera ma scritta male, o della prosa con un esempio fra graffe chiuso,
+  // si mostra com'è (null). Fermata prima del campo del testo: niente da mostrare (''), mai la graffa.
+  function testoDaInvolucro(raw, campi, finishReason) {
+    if (!troncata(finishReason)) return null;
+    const s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '');
+    const graffa = s.indexOf('{');
+    if (graffa < 0) return null;
+    const prima = s.slice(0, graffa).trim();
+    if (!prima) {
+      const t = campoDaJsonTagliato(s, campi);
+      return t == null ? '' : t;
+    }
+    // Una frase prima dell'involucro aperto («Ecco la risposta: {"text":"…»): la frase e il testo, mai la graffa.
+    if (fineOggetto(s, graffa) >= 0) return null;
+    const t = campoDaJsonTagliato(s.slice(graffa), campi);
+    return [prima, t].filter(Boolean).join(' ');
+  }
+
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };

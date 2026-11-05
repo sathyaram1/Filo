@@ -138,6 +138,8 @@
   const MAX_PASSI_DA_SOLO = 20;
   let passiDaSolo = 0;
   let continuaAperto = null;
+  // Le scelte con «Continua» sotto l'ultima risposta interrotta: una risposta nuova o un gesto le spengono (#1302).
+  let seguitoAperto = null;
   // «Valuta» (#1449): il campo dell'ultima valutazione e il testo che il modello ne ha visto. Da lì la conversazione
   // risponde col modello della chat, e le correzioni proposte si scrivono in quel campo.
   let valutazione = null;
@@ -228,6 +230,7 @@
     aiPrefersOpen = true;
     passiDaSolo = 0;
     continuaAperto = null;
+    seguitoAperto = null;
     valutazione = null;
     docConversazione = '';
     session = newSession();
@@ -1042,7 +1045,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (nelFilo) nelFiloAiuto(role, text);
     const conv = convEl();
     if (!conv) return null;
-    if (role === 'assistant') rispostaArrivata();
+    if (role === 'assistant') { rispostaArrivata(); spegniSeguito(); }
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
     // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home;
@@ -1088,6 +1091,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (!afterEl || !choices || !choices.length) return;
     const wrap = document.createElement('div');
     wrap.className = 'sn-sidebar-choices';
+    const chiedeSeguito = (c) => c.prompt === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
     choices.forEach((c) => {
       const btn = document.createElement('button');
       btn.type = 'button';
@@ -1095,15 +1099,24 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       btn.textContent = c.label;
       btn.addEventListener('click', (e) => {
         if (!gestoVero(e) || wrap.classList.contains('sn-sidebar-choices-used')) return;
+        // A turno in corso il seguito partirebbe insieme a quel turno: il tasto resta per dopo.
+        if (chiedeSeguito(c) && inVolo > 0) return;
         wrap.classList.add('sn-sidebar-choices-used');
         wrap.querySelectorAll('button').forEach((b) => { b.disabled = true; });
         submit({ userMessage: c.prompt, daScelta: true });
       });
       wrap.appendChild(btn);
     });
+    if (choices.some(chiedeSeguito)) seguitoAperto = wrap;
     afterEl.insertAdjacentElement('afterend', wrap);
     const conv = convEl();
     if (conv) conv.scrollTop = conv.scrollHeight;
+  }
+  function spegniSeguito() {
+    if (!seguitoAperto) return;
+    seguitoAperto.classList.add('sn-sidebar-choices-used');
+    seguitoAperto.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+    seguitoAperto = null;
   }
 
   // Le correzioni di «Valuta» (#1449): un clic scrive la correzione nel campo valutato, un altro la toglie. Escono verso
@@ -1428,18 +1441,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     } catch (_) { /* fail silently — è telemetria best-effort */ }
   }
 
-  function parseAssistantOutput(text) {
+  function parseAssistantOutput(text, finishReason = null) {
     // Un involucro tagliato a metà (tetto, guasto) si mostra per quello che il modello aveva scritto, non come codice.
-    const salvato = String(text || '').includes('{') ? globalThis.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(text, ['text']) : null;
+    const salvato = globalThis.SN_CHAT_ERRORS?.testoDaInvolucro?.(text, ['text'], finishReason) ?? null;
     const fallback = { display: (salvato ?? (text || '')).trim(), highlight: null, choices: [], status: 'done', collapse: false };
     if (!text) return fallback;
-    const trimmed = text.trim();
-    const start = trimmed.indexOf('{');
-    const end = trimmed.lastIndexOf('}');
-    if (start < 0 || end <= start) return fallback;
     try {
-      const obj = JSON.parse(trimmed.slice(start, end + 1));
-      if (!obj || typeof obj !== 'object') return fallback;
+      const obj = globalThis.SN_CHAT_ERRORS?.involucroIntero?.(text) ?? null;
+      if (!obj) return fallback;
       // Richiesta di ricerca web: scavalca il flusso normale, la processa submit() prima di
       // rendere la risposta in chat.
       if (obj.action === 'web_search' && typeof obj.query === 'string' && obj.query.trim()) {
@@ -1989,6 +1998,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (userMessage || daGesto) {
       passiDaSolo = 0;
       if (continuaAperto) { continuaAperto.disabled = true; continuaAperto = null; }
+      spegniSeguito();
     } else if (++passiDaSolo > MAX_PASSI_DA_SOLO) {
       if (session) session.esito = 'tetto_passi';
       fermaPassiDaSolo(userAction, esterno, dopoDocumenti);
@@ -2018,9 +2028,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (userMessage || valuta) {
       fermataDetta = false;
       const bolla = valuta ? I18n.t('help_valuta_richiesta', estratto(valuta)) : scritto;
-      immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
-      // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
-      nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
+      // «Continua» chiede il seguito con parole di Filo, non dell'utente: niente bolla sua (#1302).
+      const seguito = daScelta && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
+      if (!seguito) {
+        immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
+        // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
+        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
+      }
       // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
       if (testoCampo === null) {
         history.push({
@@ -2070,6 +2084,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         action: ACTIONS.HELP,
         payload,
         diceRipiego: true,
+        conSeguito: true,
         // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
         // «Valuta» è una richiesta dell'utente come un messaggio scritto.
         ...(userMessage || valuta ? {} : { parteDiUnUso: true }),
@@ -2102,7 +2117,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       } else {
         ripiegoDetto = false;
       }
-      const parsed = parseAssistantOutput(res.text);
+      const parsed = parseAssistantOutput(res.text, res.finishReason);
       // Una ricerca chiesta dal modello è un turno a metà: il seguito lo dice il turno dopo.
       if (session) {
         session.esito = parsed.status === 'done' && !['web_search', 'documenti'].includes(parsed.kind) ? 'fatto' : null;
@@ -2302,12 +2317,18 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // mostriamo comunque una riga discreta in chat (es. "→ passo successivo")
       // così l'utente sa che la chat ha avuto una risposta, anche se silenziosa.
       const daMostrare = fileDaMostrare(parsed, dopoDocumenti);
-      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : '(risposta vuota)'));
+      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
+      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      // Fermata prima che il testo cominciasse: la bolla resta sospesa e la riga sotto dice perché (#1302).
+      // Il seguito di una risposta fermata dentro un blocco di codice lo riapre, o si leggerebbe come testo (#1302).
+      if (parsed.display && scritto && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO) {
+        const prima = [...history].reverse().find((m) => m && m.role === 'assistant');
+        parsed.display = globalThis.SN_CHAT_ERRORS.seguitoNelRecinto(prima ? String(prima.content || '') : '', parsed.display);
+      }
+      const displayText = parsed.display || (parsed.highlight ? '→ passo evidenziato sulla pagina' : (daMostrare.length ? 'Eccolo:' : (interrotta ? '…' : '(risposta vuota)')));
       assistantEl = appendChatMessage('assistant', displayText, { nelFilo: !!parsed.display });
       // Quanta parte di un documento troppo lungo ha letto, sotto la risposta (#1475).
       if (letto && letto.tagliato && letto.nota) appendActionLog(letto.nota);
-      // Fermata al tetto di lunghezza (#1097.3): la riga sotto lo dice, e «Continua» chiede il seguito come nelle altre chat.
-      const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
       if (interrotta) appendActionLog(interrotta);
       if (interrotta && !(parsed.choices && parsed.choices.length)) {
         parsed.choices = [{ label: 'Continua', prompt: globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO }];
@@ -2326,7 +2347,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
       const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
       if (valuta) contaValuta(conCorrezioni ? 'con_correzioni' : 'senza_correzioni');
-      history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text) });
+      // Fermata prima del testo: al «Continua» il modello ritrova la nota, non un turno vuoto che un host rifiuta.
+      history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text || interrotta) });
 
       if (parsed.choices && parsed.choices.length) {
         renderChoices(assistantEl, parsed.choices);

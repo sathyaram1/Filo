@@ -727,6 +727,19 @@
     if (!res.ok) return res.error || EMPTY_ANSWER;
 
     const parts = String(res.text || '').split(SEP_RE);
+    // Fermata dal tetto (#1302): l'ultimo pezzo è a metà. Si dimezza come per i pezzi che non tornano; in fondo si
+    // tengono i pezzi interi, e il blocco tagliato resta nell'originale con l'avviso che lo dice.
+    if (res.tagliata) {
+      if (units.length > 1 && depth < MAX_SPLIT_DEPTH) {
+        const mid = Math.ceil(units.length / 2);
+        const a = await translateGroup(units.slice(0, mid), depth + 1);
+        const b = await translateGroup(units.slice(mid), depth + 1);
+        return a || b;
+      }
+      const interi = Math.min(parts.length - 1, units.length);
+      for (let i = 0; i < interi; i++) applyTranslation(units[i], (parts[i] || '').trim());
+      return res.tagliata;
+    }
     if (units.length === 1) {
       applyTranslation(units[0], parts.join(' ').trim());
       return null;
@@ -772,7 +785,9 @@
         ripiegoDelGiro = res.keyFallback.line;
         Popup.ripiegoMostrato(Popup.showToast(ripiegoDelGiro, { duration: 7000 }).el);
       }
-      if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text };
+      const CE = global.SN_CHAT_ERRORS;
+      const tagliata = res?.ok && CE && CE.troncata(res.finishReason) ? CE.erroreTagliata(res.finishReason) : null;
+      if (res?.ok && String(res.text || '').trim()) return { ok: true, text: res.text, ...(tagliata ? { tagliata } : {}) };
       answeredEmpty = !!(res && res.ok);
       if (attempt) return { ok: false, error: answeredEmpty ? null : errFrom(res) };
     }

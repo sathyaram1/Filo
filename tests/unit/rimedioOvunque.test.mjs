@@ -60,7 +60,7 @@ test('descrizione delle immagini, «Leggi», titolo e riassunto dell\'Editor e f
   const editor = leggi('src/pages/editor/editor.js');
   assert.doesNotMatch(editor, /catch \([^)]*\) \{\s*if \([^)]*\) showEditorToast\('Non sono riuscito a generare il (titolo|riassunto)\.'\)/);
   assert.match(editor, /avvisoNonGenerato\('il titolo', r\)/);
-  assert.match(editor, /avvisoNonGenerato\('il riassunto', r\)/);
+  assert.match(editor, /avvisoNonGenerato\((?:manuale \? )?'il riassunto'(?: : 'il riassunto automatico')?, r\)/);
   assert.match(leggi('src/main/services/handlers/scryfall.js'), /\.\.\.\(rimedio \? \{ rimedio \} : \{\}\)/);
 });
 

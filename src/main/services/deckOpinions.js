@@ -16,14 +16,19 @@
   // Candidati per chiamata del giudice: i lotti partono insieme, e uno corto risponde prima e sbaglia meno.
   const FILTER_BATCH = 50;
   const FILTER_PARALLEL = 8;
-  // Errori che riprovare non cura: configurazione, e un lotto tagliato o rifiutato per il tetto della risposta.
-  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY', 'LIMIT_REACHED', 'RISPOSTA_TAGLIATA', 'TETTO_RISPOSTA']);
+  // Errori che riprovare non cura: configurazione, e un lotto tagliato, o rifiutato dal router per il tetto o un parametro.
+  const CONFIG_ERRORS = new Set(['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY', 'LIMIT_REACHED', 'RISPOSTA_TAGLIATA', 'TETTO_RISPOSTA', 'PARAMETRI_HOST']);
   // Un «troppe richieste» o un servizio sovraccarico si aspetta, con meno lotti insieme. Quando un lotto finisce
   // queste attese (15 s in tutto, contando anche quelle che ogni chiamata fa già da sé) il servizio è giù davvero,
   // e gli altri non aspettano più.
   const BUSY_WAITS_MS = [1000, 2000, 4000, 8000];
   const BUSY_TOTAL_MS = BUSY_WAITS_MS.reduce((a, b) => a + b, 0);
-  const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+  // Un'attesa che finisce prima se la ricerca ha già deciso che il servizio è giù.
+  const sleepFinoA = (ms, signal) => new Promise((r) => {
+    if (signal && signal.aborted) { r(); return; }
+    const t = setTimeout(r, ms);
+    if (signal) signal.addEventListener('abort', () => { clearTimeout(t); r(); }, { once: true });
+  });
 
   // Giudizi salvati: circa venti ricerche larghe. Oltre si perdono i più vecchi, e rifarne uno costa una chiamata
   // economica; senza tetto ogni ricerca lasciava decine di KB nel file di Filo, per sempre.
@@ -246,16 +251,22 @@
     let next = 0;
     let limit = Math.min(FILTER_PARALLEL, batches.length);
     let pauseUntil = 0;
-    let serviceDown = false;
+    let serviceDown = null;
+    // Deciso che il servizio è giù, i lotti rimasti non chiamano più e quelli in volo smettono di aspettare (#1302):
+    // le loro carte restano «non controllate», con lo stesso errore.
+    const giu = new AbortController();
+    const chiedi = (args) => handleAIRequest({ ...args, signal: giu.signal });
     const judgeWithWaits = async (i) => {
       const inizio = Date.now();
       for (let wait = 0; ; wait += 1) {
         const pause = pauseUntil - Date.now();
-        if (pause > 0) await sleep(pause);
-        const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest });
+        if (pause > 0 && !serviceDown) await sleepFinoA(pause, giu.signal);
+        if (serviceDown) return serviceDown;
+        const r = await judgeBatch({ criterion, context, ids: batches[i], cards, handleAIRequest: chiedi, signal: giu.signal });
+        if (serviceDown) return r.keep ? r : serviceDown;
         if (!r.busy) return r;
         const finite = wait >= BUSY_WAITS_MS.length || Date.now() - inizio + BUSY_WAITS_MS[wait] > BUSY_TOTAL_MS;
-        if (serviceDown || finite) { serviceDown = true; return r; }
+        if (finite) { serviceDown = r; giu.abort(); return r; }
         limit = Math.max(1, Math.ceil(limit / 2));
         pauseUntil = Math.max(pauseUntil, Date.now() + BUSY_WAITS_MS[wait]);
       }
@@ -299,7 +310,7 @@
   // Un lotto al giudice. Una risposta illeggibile si richiede una volta (le risposte del giudice non passano dalla
   // cache delle risposte); un errore di configurazione (niente modello, chiave, tetto) non migliora riprovando, e un
   // servizio occupato torna `busy` a chi sa aspettare.
-  async function judgeBatch({ criterion, context, ids, cards, handleAIRequest }) {
+  async function judgeBatch({ criterion, context, ids, cards, handleAIRequest, signal = null }) {
     const sys = PROMPTS.decksSearchFilter({
       criterion,
       context,
@@ -322,6 +333,7 @@
         });
       } catch (e) {
         if (isBusy(e)) return { error: e, busy: true };
+        if (signal && signal.aborted) return { error: e, busy: true };
         error = e;
         if (e && CONFIG_ERRORS.has(e.code)) break;
       }

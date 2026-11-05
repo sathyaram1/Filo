@@ -753,8 +753,9 @@ function createAnswerStreamer(onText) {
 // della chat», punto 1): senza numeri per turno ogni scelta sui modelli è a
 // occhio. `timing` finisce nella cronologia AI accanto al costo.
 // `intera`: chi legge la risposta come dati (JSON, memoria, etichette) non riceve mai un pezzo tagliato, ma un errore.
-// Un taglio senza niente da mostrare è un errore per tutti: «qualcosa è andato storto» non direbbe del tetto.
-async function handleAIRequest({ intera = false, ...opts }) {
+// Un taglio senza niente da mostrare è un errore, salvo `conSeguito` (la superficie ha «Continua») col tetto finito nel
+// ragionamento: «qualcosa è andato storto» non direbbe del tetto, la nota col seguito sì (#1302).
+async function handleAIRequest({ intera = false, conSeguito = false, ...opts }) {
   let r;
   try {
     r = await chiamaIlModello(opts);
@@ -763,7 +764,7 @@ async function handleAIRequest({ intera = false, ...opts }) {
     ContatoriServizio.misura('maiPartita', opts.action, e);
     throw e;
   }
-  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera });
+  const taglio = globalThis.SN_CHAT_ERRORS.erroreDelTaglio(r, { intera, senzaSeguito: !conSeguito });
   if (taglio) throw taglio;
   return r;
 }
@@ -800,35 +801,52 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
 
   const attempts = buildAttemptChain(settings, model, configurata);
 
+  const inCronologia = action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
+    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
+    && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
+    // Passaggio interno di una ricerca, non una richiesta dell'utente: fuori dalla cronologia.
+    && action !== ACTIONS.MANAGE_SEARCH
+    // Il giudice delle carte è il passaggio interno di una ricerca nel deck builder, fino a venti chiamate a ricerca
+    // col prompt intero: in cronologia buttava fuori tutto il resto in una dozzina di ricerche (#382).
+    && action !== ACTIONS.DECKS_SEARCH_FILTER;
+  const voce = voceDelTurno(inCronologia ? History : null);
+
   // Col ragionamento o la risposta in diretta si usa lo streaming: la risposta finale è
   // identica, accumulata dai delta. I tempi del turno si contano dalla partenza.
   const t0 = Date.now();
   const timing = { firstReasoningMs: null, firstTextMs: null, firstToolMs: null, totalMs: 0 };
   const mark = (k) => { if (timing[k] == null) timing[k] = Date.now() - t0; };
   const textStreamer = onText ? createAnswerStreamer(onText) : null;
-  const result = (onReasoning || onText || onToolCall)
-    ? await (async () => {
-        let acc = '';
-        const r = await Gate.stream({
-          action, settings, attempts, messages, tools, toolChoice, signal,
-          onDelta: (d) => {
-            acc += d;
-            mark('firstTextMs');
-            if (textStreamer) textStreamer.push(d);
-          },
-          onReasoning: (t) => { mark('firstReasoningMs'); try { onReasoning && onReasoning(t); } catch (_) {} },
-          onToolCall: (c) => { mark('firstToolMs'); try { onToolCall && onToolCall(c); } catch (_) {} },
-          // Provider caduto a metà stream: il buffer ha testo parziale del tentativo fallito e va
-          // azzerato, e anche il testo già in chat va riscritto, non accodato: si segnala il reset.
-          onReset: () => {
-            acc = '';
-            if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
-          },
-        });
-        if (textStreamer) textStreamer.flush();
-        return { ...r, text: r.text != null ? r.text : acc };
-      })()
-    : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
+  let result;
+  try {
+    result = (onReasoning || onText || onToolCall)
+      ? await (async () => {
+          let acc = '';
+          const r = await Gate.stream({
+            action, settings, attempts, messages, tools, toolChoice, signal, onCostoTardivo: voce.costo,
+            onDelta: (d) => {
+              acc += d;
+              mark('firstTextMs');
+              if (textStreamer) textStreamer.push(d);
+            },
+            onReasoning: (t) => { mark('firstReasoningMs'); try { onReasoning && onReasoning(t); } catch (_) {} },
+            onToolCall: (c) => { mark('firstToolMs'); try { onToolCall && onToolCall(c); } catch (_) {} },
+            // Provider caduto a metà stream: il buffer ha testo parziale del tentativo fallito e va
+            // azzerato, e anche il testo già in chat va riscritto, non accodato: si segnala il reset.
+            onReset: () => {
+              acc = '';
+              if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
+            },
+          });
+          if (textStreamer) textStreamer.flush();
+          return { ...r, text: r.text != null ? r.text : acc };
+        })()
+      : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
+  } catch (e) {
+    timing.totalMs = Date.now() - t0;
+    voce.fallito({ action, provider: settings.provider, model: modelName, input: payload, output: `[${(e && e.message) || 'nessuna risposta'}]`, origin, timing });
+    throw e;
+  }
   timing.totalMs = Date.now() - t0;
   // Quanto il turno ha aspettato prima di chiamare il modello (stato del computer, saldo, contesto): `preparazioneMs`.
   if (tempiPrima && typeof tempiPrima === 'object') Object.assign(timing, tempiPrima);
@@ -836,21 +854,12 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
   const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
-  if (
-    action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
-    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
-    && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
-    // Passaggio interno di una ricerca, non una richiesta dell'utente: fuori dalla cronologia.
-    && action !== ACTIONS.MANAGE_SEARCH
-    // Il giudice delle carte è il passaggio interno di una ricerca nel deck builder, fino a venti chiamate a ricerca
-    // col prompt intero: in cronologia buttava fuori tutto il resto in una dozzina di ricerche (#382).
-    && action !== ACTIONS.DECKS_SEARCH_FILTER
-  ) {
+  if (inCronologia) {
     // Un giro fatto solo di chiamate non è una risposta vuota: le azioni entrano nell'output.
     const calledOut = toolCalls.length
       ? `${result.text ? `${result.text}\n\n` : ''}[Azioni: ${toolCalls.map((c) => c.name).join(', ')}]`
       : result.text;
-    await History.append({
+    await voce.scrivi({
       action, provider: usedProvider, model: concreteModel, servedBy,
       policyViolation: violation,
       input: payload, output: calledOut, origin, costEur, usage: result.usage, timing,
@@ -865,6 +874,33 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
     // La chiave propria è stata rifiutata e ha risposto la personale (#629):
     // chi mostra la risposta lo dice all'utente.
     keyFallback: ripiegoDaDire(result.keyFallback),
+  };
+}
+
+// La voce di Cronologia di un turno coi costi che il router dice dopo (tentativi rotti, risposta senza conto, #1302):
+// entrano nella voce già scritta; un turno finito senza risposta ha la sua voce solo se qualcosa si è pagato.
+function voceDelTurno(H) {
+  let base = 0;
+  let tardivi = 0;
+  let scritta = null;
+  let daScrivere = null;
+  const scrivi = (entry) => {
+    base = Number(entry.costEur) || 0;
+    scritta = Promise.resolve(H.append({ ...entry, costEur: base + tardivi })).catch(() => null);
+    return scritta;
+  };
+  return {
+    costo(eur) {
+      tardivi += Number(eur) || 0;
+      if (scritta) scritta.then((h) => (h && h.id ? H.patch(h.id, { costEur: base + tardivi }) : null)).catch(() => {});
+      else if (daScrivere) scrivi(daScrivere);
+    },
+    scrivi: (entry) => (H ? scrivi(entry) : Promise.resolve(null)),
+    fallito(entry) {
+      if (!H) return;
+      if (tardivi > 0) scrivi(entry);
+      else daScrivere = entry;
+    },
   };
 }
 
@@ -899,15 +935,22 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
 
-  const result = await Gate.stream({
-    action, settings, messages, signal,
-    onDelta: (delta) => { if (onDelta) onDelta(delta); },
-    // Provider caduto dopo i primi delta: il renderer butta il parziale prima del ripiego.
-    onReset: (info) => { if (onReset) onReset(info); },
-  });
+  const voce = voceDelTurno(History);
+  let result;
+  try {
+    result = await Gate.stream({
+      action, settings, messages, signal, onCostoTardivo: voce.costo,
+      onDelta: (delta) => { if (onDelta) onDelta(delta); },
+      // Provider caduto dopo i primi delta: il renderer butta il parziale prima del ripiego.
+      onReset: (info) => { if (onReset) onReset(info); },
+    });
+  } catch (e) {
+    voce.fallito({ action, provider: settings.provider, model, input: payload, output: `[${(e && e.message) || 'nessuna risposta'}]`, origin });
+    throw e;
+  }
   const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
-  await History.append({
+  await voce.scrivi({
     action, provider: usedProvider, model: concreteModel, servedBy,
     policyViolation: violation,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
@@ -1016,7 +1059,8 @@ async function maybeRunLessonAgent({ userMessage, filoReply, stateText, fonti = 
 
 // Compatta il buffer delle lezioni nei moduli di memoria. runCompactor() la forza subito:
 // alla fine dell'intervista le lezioni devono già essere in memoria per la prima home.
-async function maybeRunCompactor() {
+// `rilancia`: chi l'ha chiesta a mano riceve l'errore (un riordino fermato dal tetto non avviene, e lo si dice: #1302).
+async function maybeRunCompactor({ rilancia = false } = {}) {
   try {
     const settings = await getEffectiveSettings();
     if (!SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPACT)) return false;
@@ -1057,6 +1101,7 @@ async function maybeRunCompactor() {
     return applicata;
   } catch (e) {
     console.warn('[Filo] compactor failed', e);
+    if (rilancia) throw e;
     return false;
   }
 }
@@ -1248,8 +1293,8 @@ const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
 // L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
-const ARGOMENTI_TAGLIATI = 'non eseguita: la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione. '
-  + 'Se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni.';
+const ARGOMENTI_TAGLIATI = 'la tua risposta ha raggiunto la lunghezza massima mentre scrivevi gli argomenti di questa azione; '
+  + 'se l\'utente ti chiede di continuare, rifalla più corta o dividila in più azioni';
 // Letture (elenco in SN_ACTION_LEVELS.LETTURE): una che aspetta l'OK, o fermata per un segreto, ha già la sua parola
 // sotto la risposta.
 const soloLetture = (azioni) => azioni.every((a) => !a || a._auto || (globalThis.SN_ACTION_LEVELS.diSolaLettura(a.type)
@@ -6656,6 +6701,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   let giroReplicabile = true;
   // La risposta si è fermata al tetto di lunghezza (#1097.3): lo si dice, e «Continua» la riprende.
   let interrotta = false;
+  // Il tetto ha tagliato i dati di un'azione: la risposta lo dice con la sua frase, che il modello rilegge (#1302).
+  let azioneTagliata = false;
   // Il primo giro che risponde porta nella cronologia anche l'attesa prima del modello: chi aspetta la vive (#1097.1).
   let tempiPrima = { preparazioneMs: Date.now() - inizioTurno, ...(attesePrimaDelModello || {}) };
   try {
@@ -6667,7 +6714,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
-        origin: 'filo:chat',
+        origin: 'filo:chat', conSeguito: true,
         onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal, tempiPrima,
       });
       const KW = global.SN_WALLET_MAIN;
@@ -6850,7 +6897,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
           pagineLette.push({ x, i: threadMessages.length - 1, giro, coda, round, ordine: i });
         }
       });
-      if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; break; }
+      if (tagliataInAzione) { exhausted = false; interrotta = r.finishReason; azioneTagliata = true; break; }
     }
   } catch (e) {
     // Turno fallito: la prenotazione della ripresa si rilascia subito, o nessuna scheda potrà
@@ -6936,9 +6983,15 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     senzaRisposta = { passi, motivo: 'muto_dopo_letture' };
     textReply = unisciTesti([textReply, fraseSenzaRisposta(passi)]);
   }
+  // Il seguito di una risposta fermata dentro un blocco di codice lo riapre, o si leggerebbe come testo (#1302).
+  if (internal && String(userMessage || '') === globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO_HOME && textReply) {
+    const prima = (Array.isArray(threadHistory) ? threadHistory : []).filter((m) => m && m.role !== 'user').pop();
+    if (prima) textReply = globalThis.SN_CHAT_ERRORS.seguitoNelRecinto(String(prima.text || ''), textReply);
+  }
   if (interrotta && !senzaRisposta) {
     senzaRisposta = { passi, interrotta: true, motivo: 'tagliato' };
-    textReply = unisciTesti([globalThis.SN_CHAT_ERRORS.chiudiRecinto(textReply), globalThis.SN_CHAT_ERRORS.rispostaInterrotta(interrotta)]);
+    const CE = globalThis.SN_CHAT_ERRORS;
+    textReply = unisciTesti([CE.chiudiRecinto(textReply), azioneTagliata ? CE.FRASE_AZIONE_TAGLIATA : CE.rispostaInterrotta(interrotta)]);
   }
   // #1596 — le pagine lette e rimaste fuori dalla finestra: lo sa l'utente, e lo sa il modello ai turni dopo.
   textReply = unisciTesti([textReply, globalThis.SN_FILO_CONTESTO.frasePagineLasciate(pagineLasciate())]);

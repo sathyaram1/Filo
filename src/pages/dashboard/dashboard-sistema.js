@@ -54,7 +54,10 @@
     // Chi usa la home sta per mandare un turno anche senza scrivere (un suggerimento, «Riprova», «Continua»), e una
     // bozza lasciata lì parte con un Invio anche dopo una pausa lunga: finché è così il lettore resta sveglio (#1097.1).
     for (const t of ['pointermove', 'pointerdown', 'keydown', 'wheel']) document.addEventListener(t, () => scrive(), { passive: true, capture: true });
-    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive(); }, 60 * 1000);
+    // A tempo è un riscaldamento, non un gesto: con l'utente via da minuti il main non legge (#1302).
+    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive({ riscalda: true }); }, 60 * 1000);
+    // Tornati alla finestra (Alt+Tab) con una bozza, il prossimo gesto è un Invio: il lettore parte adesso (#1302).
+    window.addEventListener('focus', () => { if (deps.bozza && deps.bozza()) scrive({ entra: true }); });
   }
 
   async function chiedi({ subito = false } = {}) {
@@ -68,14 +71,15 @@
   // subito, così all'invio la lettura è pronta (#1097.1). Anche con la home che lo segue: dopo una pausa dorme.
   // `entra`: il campo ha appena preso il fuoco, cosa rara: non aspetta il passo dei tasti e non lo consuma, così il
   // primo tasto dopo un fuoco preso all'apertura della home sveglia comunque il lettore che nel frattempo dorme.
-  function scrive({ entra = false } = {}) {
+  function scrive({ entra = false, riscalda = false } = {}) {
     if (!send || document.visibilityState === 'hidden') return;
     if (!entra) {
       const adesso = Date.now();
       if (adesso - svegliatoPerChat < 20 * 1000) return;
-      svegliatoPerChat = adesso;
+      // Un riscaldamento a vuoto (utente assente) non consuma il passo dei gesti veri.
+      if (!riscalda) svegliatoPerChat = adesso;
     }
-    send({ type: MSG.SISTEMA_STATO, perChat: true }).catch(() => {});
+    send({ type: MSG.SISTEMA_STATO, perChat: true, ...(riscalda ? { riscalda: true } : {}) }).catch(() => {});
   }
 
   function programmaRichiamo() {

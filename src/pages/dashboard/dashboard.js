@@ -26,8 +26,7 @@
   const CONTINUA = '[L\'utente ti ha chiesto di continuare il lavoro che si era fermato senza una risposta. Gli esiti dei passi già fatti '
     + 'sono qui sopra: non rifarli, fai solo quelli che mancano e arriva alla risposta.]';
   // Una risposta fermata dal tetto di lunghezza (#1097.3) riprende dalla parola dove si è interrotta.
-  const CONTINUA_RISPOSTA = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
-    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
+  const CONTINUA_RISPOSTA = globalThis.SN_CHAT_ERRORS.CHIEDI_SEGUITO_HOME;
   const dashDir = $('dashDir');
 
   // Stato locale

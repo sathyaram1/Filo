@@ -178,23 +178,18 @@
     };
   }
 
-  function parseAgentReply(text) {
+  // `finishReason`: solo una risposta fermata dal tetto si recupera dall'involucro (chatErrors.testoDaInvolucro).
+  function parseAgentReply(text, finishReason = null) {
     const none = {
       reply: '', query: '', filter: '', title: '', sort: '', cards: [], hasBudget: false, budget: null, prob: null, evaluate: '',
       tagWith: [], import: [], commanderName: '', replaceCommander: false, clearChat: false,
     };
     const raw = String(text || '').trim();
     if (!raw) return none;
-    const candidates = [];
-    const fence = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw);
-    if (fence) candidates.push(fence[1].trim());
-    candidates.push(raw);
-    const brace = raw.indexOf('{');
-    if (brace >= 0) candidates.push(raw.slice(brace, raw.lastIndexOf('}') + 1));
-    for (const c of candidates) {
+    // Solo un involucro che è tutta la risposta porta azioni: un esempio fra graffe in mezzo alla prosa è prosa (#1302).
+    const o = global.SN_CHAT_ERRORS?.involucroIntero?.(raw) ?? null;
+    if (o) {
       try {
-        const o = JSON.parse(c);
-        if (!o || typeof o !== 'object' || Array.isArray(o)) continue;
         // Budget presente = intenzione esplicita: null lo rimuove, un numero valido lo imposta, il
         // resto si ignora. La virgola decimale è valida («40,50»), come nel campo Budget.
         let hasBudget = false; let budget = null;
@@ -236,10 +231,10 @@
           // Svuotare la chat chiesto a parole: la pagina chiede conferma, qui solo l'intenzione.
           clearChat: o.clearChat === true,
         };
-      } catch (_) { /* prova il prossimo candidato */ }
+      } catch (_) { /* campi illeggibili: la risposta resta testo */ }
     }
     // Nessun JSON: il testo grezzo diventa la reply (degradazione garbata); di un involucro tagliato a metà, il suo testo.
-    const salvato = raw.includes('{') ? global.SN_CHAT_ERRORS?.campoDaJsonTagliato?.(raw, ['reply']) : null;
+    const salvato = global.SN_CHAT_ERRORS?.testoDaInvolucro?.(raw, ['reply'], finishReason) ?? null;
     return { ...none, reply: salvato ?? raw };
   }
 

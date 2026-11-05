@@ -303,10 +303,15 @@ module.exports = function register(on, ctx) {
     const rigenera = msg && msg.rigenera === true && [SN_CONST.ACTIONS.EDITOR_TITLE, SN_CONST.ACTIONS.EDITOR_SUMMARY].includes(msg.action);
     const noCache = Boolean(msg && ((msg.riprova === true && DEL_CORRETTORE.has(msg.action)) || rigenera));
     const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
+    // `intera`: la pagina usa la risposta come dato (un riassunto salvato, un nome, una traduzione, una scelta) e un
+    // pezzo fermato dal tetto torna come errore che lo dice, mai come risposta (#1302).
+    const intera = msg && msg.intera === true;
+    // `conSeguito`: la pagina ha «Continua» sotto la risposta, e una tagliata senza testo le arriva con la nota (#1302).
+    const conSeguito = !intera && msg && msg.conSeguito === true;
     const chiedi = daSola
-      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera, conSeguito }))
       : valuta ? () => chiediValuta(msg.payload, origin, sender)
-        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache });
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
@@ -834,7 +839,7 @@ module.exports = function register(on, ctx) {
 
   // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché, un rifiuto del router con la stessa
   // causa che direbbe la chat (#1345). Il resto col messaggio del servizio, che a chi prova un modello serve.
-  const RIFIUTI_DEL_ROUTER = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST', 'TETTO_RISPOSTA', 'INGRESSO_NON_LETTO']);
+  const RIFIUTI_DEL_ROUTER = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST', 'PARAMETRI_HOST', 'TETTO_RISPOSTA', 'INGRESSO_NON_LETTO']);
   function provaFallita(e) {
     const W = globalThis.SN_WALLET;
     const st = W ? W.keyRefusalOf(e) : 0;

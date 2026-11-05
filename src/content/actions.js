@@ -437,6 +437,8 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
         payload: { dataUrl, automatica: true, ...(originale && originale !== dataUrl ? { originale } : {}) },
+        // Diventa il nome del file: una descrizione fermata dal tetto torna come «non descritta», mai a metà (#1302).
+        intera: true,
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
@@ -604,6 +606,7 @@
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
+      conSeguito: true,
       // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
       ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
     }).then(
@@ -618,8 +621,10 @@
           contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
         }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
+        // Fermata dal tetto (#1302): la nota la dice, e già vista non torna al tasto destro dopo.
+        if (res?.ok && global.SN_CHAT_ERRORS?.troncata?.(res.finishReason)) entry.tagliata = true;
         return (res?.ok && typeof res.text === 'string')
-          ? { text: res.text, keyFallback: res.keyFallback || null }
+          ? { text: res.text, keyFallback: res.keyFallback || null, finishReason: res.finishReason || null }
           : { errore: res || {} };
       },
       (e) => { entry.arrivata = true; return { errore: { message: e?.message } }; },
@@ -645,6 +650,8 @@
       // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
       if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      // Chiesta al tasto destro, è già aperta: interrotta, il tasto destro dopo la richiede.
+      entry.aperta = true;
       prefetchedExplain = entry;
       return entry.promise;
     };
@@ -659,8 +666,10 @@
       Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       return '';
     };
+    // Una spiegazione interrotta già mostrata si richiede: rimostrata, si leggerebbe la stessa metà (#1302).
+    const giaVistaTagliata = stessa && pre.tagliata && pre.aperta;
     if (stessa) pre.aperta = true;
-    if (stessa && !pre.fermata) {
+    if (stessa && !pre.fermata && !giaVistaTagliata) {
       const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
         if (pre.fermata) return chiedi(primaApertura ? fermata() : '');
@@ -726,21 +735,35 @@
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.errore || !res.text) {
+          // Il tetto finito nel ragionamento prima di una parola (#1302): la nota e «Continua» al posto della spiegazione.
+          const nota = res && !res.errore && !String(res.text || '').trim()
+            ? (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason) || '') : '';
+          if (!res || res.errore || (!res.text && !nota)) {
             el.classList.add('sn-menu-inline-error');
             Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
-          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
-          if (!daMostrare) {
+          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text || ''));
+          if (!daMostrare && !nota) {
             const prev = el.previousElementSibling;
             if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
             el.remove();
             return;
           }
-          body.innerHTML = Popup.renderMarkdown(daMostrare);
+          body.innerHTML = daMostrare ? Popup.renderMarkdown(daMostrare) : '';
           Popup.notaRipiego(body, res.keyFallback);
-          Popup.notaInterrotta(body, res.finishReason);
+          // «Continua» porta la spiegazione nel riquadro di Spiega, che chiede il resto (#1302); senza testo il riquadro
+          // riparte dalla nota, perché un turno del modello vuoto alcuni host lo rifiutano.
+          Popup.notaInterrotta(body, res.finishReason, () => {
+            try { global.SN_MENU?.close?.(); } catch (_) {}
+            Popup.openStreaming({
+              action: ACTIONS.EXPLAIN,
+              payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+              anchor: ancoraSelezione(deps.getLastMouseEvent()),
+              title: I18n.t('popup_explain_title'),
+              seguito: daMostrare || nota,
+            });
+          });
         });
         // Il menu chiuso prima della spiegazione (#1465); passare ad Approfondisci non è lasciarla lì.
         return () => {

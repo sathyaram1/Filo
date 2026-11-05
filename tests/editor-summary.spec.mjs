@@ -30,7 +30,7 @@ async function stubAI(page, initialSummary) {
       let r = null;
       if (msg && msg.type === MSG.AI_REQUEST) {
         window.__aiCalls.push(msg);
-        r = { ok: true, text: window.__summaryReply };
+        r = window.__summaryFail || { ok: true, text: window.__summaryReply };
       } else if (msg && msg.type === MSG.FILO_GET_MEMORY) {
         r = { ok: true, memory: { PROFILO: '', PREFERENZE: '' } };
       }
@@ -122,6 +122,40 @@ test('il riassunto si rigenera quando il file cambia in modo significativo', asy
     } catch (_) { return false; }
   }, COLLECTION_KEY, { timeout: 15000 });
   expect(await page.evaluate(() => window.__aiCalls.length)).toBeGreaterThan(firstCalls);
+});
+
+test('un riassunto automatico fermato dal tetto si dice una volta e non si richiede a ogni pausa (#1302)', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await stubAI(page, null);
+  await page.evaluate(() => {
+    window.__summaryFail = {
+      ok: false, code: 'RISPOSTA_TAGLIATA', finishReason: 'length',
+      error: 'La risposta del modello ha raggiunto la lunghezza massima prima di finire.',
+    };
+  });
+  const scrivi = (txt) => page.evaluate((t) => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>' + t + '</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  }, txt);
+  const chiamate = () => page.evaluate(() => window.__aiCalls.filter((m) => m.action === 'editor_summary').length);
+
+  await scrivi(longText(90));
+  await expect.poll(chiamate, { timeout: 15_000 }).toBe(1);
+  await expect(page.locator('.ed-toast', { hasText: 'riassunto automatico' })).toContainText('lunghezza massima');
+  expect(await activeSummary(page)).toBeNull();
+
+  // Qualche parola in più e un'altra pausa: lo stesso testo col tetto di prima si fermerebbe uguale, e si pagherebbe.
+  await scrivi(`${longText(90)} ancora due parole`);
+  await page.waitForTimeout(9_000);
+  expect(await chiamate(), 'nessuna richiesta nuova senza un cambio vero').toBe(1);
+
+  // Un cambio vero merita un riassunto nuovo.
+  await page.evaluate(() => { window.__summaryFail = null; window.__summaryReply = 'Riassunto dopo il cambio.'; });
+  await scrivi(longText(200, 'z'));
+  await expect.poll(() => activeSummary(page), { timeout: 15_000 }).toBe('Riassunto dopo il cambio.');
 });
 
 test('il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo aggiorna il riassunto', async ({ openTab }) => {

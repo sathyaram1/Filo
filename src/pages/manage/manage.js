@@ -3463,6 +3463,8 @@
         // l'altra. Non style-aware (il prompt JSON non va inquinato) e fuori dalla cronologia.
         action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.MANAGE_SEARCH) || 'manage_search',
         payload: { messages: SRCH.buildMessages(query, candidates) },
+        // Una classifica fermata dal tetto torna come errore, e il ripiego per parole dice perché (#1302).
+        intera: true,
       });
       if (r && r.ok && typeof r.text === 'string') {
         const parsed = SRCH.parseRanking(r.text, validIds);

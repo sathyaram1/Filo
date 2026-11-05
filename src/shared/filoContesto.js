@@ -613,11 +613,14 @@
   // Una rilettura (CERCA_CHAT con l'id) sta nella finestra fin dal primo tentativo (#868.7), con la richiesta già fatta
   // (`occupati`) e il tetto della risposta, che il fornitore conta dentro. Mai sotto il minimo: il resto si legge a pezzi.
   const RILETTURA_MIN = 8000;
+  // Lo spazio della finestra che si lascia alla risposta prima di mandare: al più un quarto, perché un tetto largo non
+  // tolga contesto alla chat; se testo più tetto sforano, il fornitore rifà la richiesta col tetto che ci sta (#1302).
+  const riservaRisposta = (risposta, finestra) => Math.min(Math.max(0, Number(risposta) || 0), finestra / 4);
   function capRilettura({ tetto = TETTI_DI_SERIE.token, finestra = null, occupati = 0, risposta = 0 } = {}) {
     let token = Number(tetto) > 0 ? Number(tetto) : TETTI_DI_SERIE.token;
     const f = Number(finestra);
     if (Number.isFinite(f) && f > 0) {
-      const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+      const riserva = riservaRisposta(risposta, f);
       token = Math.min(token, f * MARGINE_FINESTRA - Math.max(0, Number(occupati) || 0) - riserva);
     }
     return Math.max(RILETTURA_MIN, Math.floor(token * CARATTERI_PER_TOKEN));
@@ -642,7 +645,7 @@
   function eccessoNellaFinestra({ finestra = null, caratteri = 0, risposta = 0, margine = MARGINE_FINESTRA } = {}) {
     const f = Number(finestra);
     if (!Number.isFinite(f) || f <= 0) return 0;
-    const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+    const riserva = riservaRisposta(risposta, f);
     return Math.max(0, Math.ceil((Number(caratteri) || 0) - (f * margine - riserva) * CARATTERI_PER_TOKEN));
   }
   // Le pagine si accorciano prima di mandare con un margine stretto: sbagliare la stima costa un rifiuto, che non si

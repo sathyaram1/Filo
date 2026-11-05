@@ -768,7 +768,7 @@
   const CODICI_VISTI = Object.freeze({
     NO_API_KEY: 'senza_chiave', LIMIT_REACHED: 'limite_spesa', NO_MODEL_FOR_ACTION: 'senza_modello',
     NO_OPEN_WEIGHTS_MODEL: 'senza_pesi_aperti', NO_ALLOWED_HOST: 'nessun_host', NO_PROVIDER_ALLOWED: 'nessun_host',
-    NO_TOOL_HOST: 'nessun_host', DATA_POLICY: 'dati_fornitore', RISPOSTA_TAGLIATA: 'risposta_tagliata',
+    NO_TOOL_HOST: 'nessun_host', PARAMETRI_HOST: 'nessun_host', DATA_POLICY: 'dati_fornitore', RISPOSTA_TAGLIATA: 'risposta_tagliata',
     TETTO_RISPOSTA: 'tetto_risposta', MODEL_UNAVAILABLE: 'modello_assente',
   });
   function tipoErroreVisto(err) {
@@ -822,7 +822,7 @@
   // partita perché mancano chiave, modello o margine di spesa) e non si conta fra gli errori.
   const MAI_PARTITE = new Set(['NO_API_KEY', 'LIMIT_REACHED', 'NO_MODEL_FOR_ACTION', 'NO_OPEN_WEIGHTS_MODEL',
     'GATE_METHOD', 'PROVIDER_METHOD_MISSING', 'NO_KEY_INFO']);
-  const SENZA_HOST = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST']);
+  const SENZA_HOST = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST', 'PARAMETRI_HOST']);
   const RETE_RE = /fetch failed|failed to fetch|network error|networkerror|ENOTFOUND|EAI_AGAIN|ECONNRESET|ECONNREFUSED|ECONNABORTED|EPIPE|EHOSTUNREACH|ENETUNREACH|ENETDOWN|socket hang up|other side closed/i;
   const TEMPO_RE = /ETIMEDOUT|timed out|timeout/i;
 
@@ -1061,6 +1061,8 @@
   function fineDi(f) {
     const s = String(f == null ? '' : f).toLowerCase();
     if (s === 'content_filter') return 'filtro';
+    // Il tetto finito nel ragionamento (#1302) resta, per i contatori, un tetto raggiunto.
+    if (s === 'tetto_ragionamento') return 'length';
     return ['stop', 'length', 'tool_calls', 'error'].includes(s) ? s : ALTRO;
   }
   function tentativoDi(t) {

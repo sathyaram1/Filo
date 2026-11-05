@@ -97,10 +97,19 @@
     if (!meta.summary) return false;
     const sig = meta.summarySig;
     if (sig == null || typeof sig.words !== 'number') return true;
-    const now = Number.isFinite(currentWords) ? currentWords : fileWords(file);
-    const delta = Math.abs(now - sig.words);
+    return pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file));
+  }
+
+  function pocoCambiato(sig, now) {
     const threshold = Math.max(CHANGE_ABS, Math.round(CHANGE_RATIO * sig.words));
-    return delta < threshold;
+    return Math.abs(now - sig.words) < threshold;
+  }
+
+  // Un riassunto fermato dal tetto rifatto sullo stesso testo si ferma uguale, e si paga ogni volta (#1302):
+  // si riprova solo quando il file è cambiato quanto basta per meritarne uno nuovo.
+  function fallitoSuQuestoTesto(file, words) {
+    const sig = file && file.meta && file.meta.summaryFailSig;
+    return Boolean(sig && typeof sig.words === 'number' && pocoCambiato(sig, words));
   }
 
   function needsSummary(file, opts) {
@@ -108,7 +117,7 @@
     const minWords = Number.isFinite(o.minWords) ? o.minWords : MIN_WORDS;
     const words = fileWords(file);
     if (words < minWords) return false;
-    return !isSummaryFresh(file, words);
+    return !isSummaryFresh(file, words) && !fallitoSuQuestoTesto(file, words);
   }
 
   // Firma da salvare insieme al riassunto, per il confronto futuro.
