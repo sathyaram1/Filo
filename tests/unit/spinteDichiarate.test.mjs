@@ -560,7 +560,7 @@ function finto(risposte) {
     i += 1;
     return { status, ok: status === 200, json: async () => body };
   };
-  return { chiamate, deps: { fetchImpl, idToken: async () => 'tok', url: 'http://finto/localTicket', base: 'http://finto' } };
+  return { chiamate, deps: { fetchImpl, idToken: async () => 'tok', url: 'http://finto/localTicket', base: 'http://finto', ritardoMs: 0 } };
 }
 
 function codaFinta(voci) {
@@ -599,14 +599,50 @@ test('l’invio tiene l’ordine: dopo un guasto le voci seguenti, anche di altr
   g(dir, ['init', '-q']);
   S.accoda(dir, { tipo: 'routine', ticket: BIGLIETTO }, 'app', [{ ramo: 'claude/x', punta: A, commits: [A] }], 1000);
   S.accoda(dir, { tipo: 'routine', ticket: `${BIGLIETTO}-2` }, 'app', [{ ramo: 'claude/x', punta: B, commits: [], riscritti: [{ sha: B, di: A }], sostituiti: [A], sostituitiGrafo: [{ sha: A, parents: [] }] }], 1001);
-  const giu = finto([[503, {}], [200, { ok: true }]]);
+  const giu = finto([[503, {}], [503, {}], [503, {}], [200, { ok: true }]]);
   const r = await S.inviaSpinte({ root: dir, deps: giu.deps });
-  assert.equal(giu.chiamate.length, 1);
+  assert.equal(giu.chiamate.length, 3, 'tre tentativi, come il canale, poi la coda aspetta');
   assert.deepEqual([r.inviate, r.restano], [0, 2]);
   const su = finto([[200, { ok: true }]]);
   assert.equal((await S.inviaSpinte({ root: dir, deps: su.deps })).inviate, 2);
   assert.deepEqual(su.chiamate.map((c) => c.corpo.ticket), [BIGLIETTO, `${BIGLIETTO}-2`]);
   assert.deepEqual(su.chiamate[1].corpo.spinte[0], { repo: 'app', ramo: 'claude/x', commits: [], punta: B, sostituiti: [A], riscritti: [{ sha: B, di: A }], sostituitiGrafo: [{ sha: A, parents: [] }] });
+});
+
+test('l’invio legge le risposte come il canale: una illeggibile o un errore che passa non buttano le dichiarazioni (#1867 giro 2)', async () => {
+  const A = 'a'.repeat(40);
+  const illeggibile = { fetchImpl: async () => ({ status: 200, ok: true, json: async () => { throw new SyntaxError('<html>proxy</html>'); } }), ritardoMs: 0 };
+  const dir = codaFinta([A]);
+  const r = await S.inviaSpinte({ root: dir, deps: illeggibile });
+  assert.deepEqual([r.inviate, r.rifiutate, r.restano], [0, 0, 1], 'la pagina di un proxy non è un no del server');
+  const html403 = { fetchImpl: async () => ({ status: 403, ok: false, json: async () => { throw new SyntaxError('<html>'); } }), ritardoMs: 0 };
+  assert.equal((await S.inviaSpinte({ root: dir, deps: html403 })).restano, 1);
+  const passa = finto([[503, { ok: false, reason: 'server_error' }], [200, { ok: true }]]);
+  assert.equal((await S.inviaSpinte({ root: dir, deps: passa.deps })).inviate, 1, 'un 503 che passa si ritenta');
+  assert.equal(passa.chiamate.length, 2);
+  // La strada delle sessioni locali, uguale.
+  const loc = cartellaTemporanea('filo-spinte-locale-illeggibile-');
+  g(loc, ['init', '-q']);
+  S.accoda(loc, { tipo: 'locale', ticket: BIGLIETTO, fp: 'e'.repeat(64), file: join(loc, '.claude', 'biglietti', 's1.json') }, 'app', [{ ramo: 'claude/x', commits: [A] }]);
+  const rl = await S.inviaSpinte({ root: loc, deps: { ...illeggibile, idToken: async () => 'tok', url: 'http://finto/localTicket' } });
+  assert.deepEqual([rl.rifiutate, rl.restano], [0, 1]);
+  const locPassa = finto([[502, {}], [200, { result: { ok: true } }]]);
+  assert.equal((await S.inviaSpinte({ root: loc, deps: locPassa.deps })).inviate, 1);
+});
+
+test('esitoDichiarazione: solo un no leggibile del server toglie le spinte', () => {
+  const e = (status, corpo, locale = false) => S.esitoDichiarazione({ status, corpo, locale }).esito;
+  assert.equal(e(200, { ok: true }), 'ok');
+  assert.equal(e(200, null), 'guasto');
+  assert.equal(e(400, null), 'guasto');
+  assert.equal(e(0, null), 'guasto');
+  assert.equal(e(429, { ok: false }), 'guasto');
+  assert.equal(e(401, { ok: false, reason: 'branch_mismatch' }), 'rifiutata');
+  assert.equal(e(404, {}), 'rifiutata');
+  assert.equal(e(200, { result: { ok: true } }, true), 'ok');
+  assert.equal(e(200, {}, true), 'guasto');
+  assert.equal(e(401, {}, true), 'guasto');
+  assert.equal(e(400, { error: { message: 'x' } }, true), 'rifiutata');
 });
 
 test('l’invio di una copia è uno alla volta: chi arriva mentre un altro manda aspetta, poi trova la coda vuota', async () => {
