@@ -3,7 +3,8 @@
 ## I controlli automatici: partono subito, in sottofondo
 
 Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
-gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
+gli spec delle aree toccate dal ramo: mezzo minuto a spec, un ramo largo passa
+l'ora; la durata prevista la stampa prima di partire) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
 contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
 sia finito. Se si ferma al tetto di un comando in sottofondo, rilancialo: riparte
