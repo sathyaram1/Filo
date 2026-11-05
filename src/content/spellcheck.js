@@ -1408,8 +1408,10 @@
       else if (it.start >= fineCambio) da = it.start + delta;
       else continue;
       const a = da + (it.end - it.start);
-      if (isWordCharLocal(vecchio[it.start - 1]) !== isWordCharLocal(nuovo[da - 1])) continue;
-      if (isWordCharLocal(vecchio[it.end]) !== isWordCharLocal(nuovo[a])) continue;
+      const bordoA = !pezzi || isWordCharLocal(vecchio[it.start]);
+      const bordoB = !pezzi || isWordCharLocal(vecchio[it.end - 1]);
+      if (bordoA && isWordCharLocal(vecchio[it.start - 1]) !== isWordCharLocal(nuovo[da - 1])) continue;
+      if (bordoB && isWordCharLocal(vecchio[it.end]) !== isWordCharLocal(nuovo[a])) continue;
       out.push(da === it.start ? it : { ...it, start: da, end: a });
     }
     return { issues: out, perse: out.length !== lista.length };
