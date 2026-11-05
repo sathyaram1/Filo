@@ -167,6 +167,8 @@ export const VERIFIER_ROUND = (() => {
     formatFindings(list) { return (list || []).map((f) => this.formatFinding(f)).join('\n'); },
     primaFrase(text) { return String(text || '').split('\n')[0].trim().slice(0, 120); },
     groupLabel(g) { return g.tipo; },
+    RILIEVI_CHE_FERMANO: 'Rilievi interni che non si possono correggere da soli: decide l\'owner.',
+    dueDaParteRiga() { return ''; },
   };
 })();
 
@@ -1668,13 +1670,8 @@ export function verifierReplyText(reply, id = '<id>') {
   // La domanda con «blocca»: false (#1577) non ferma il giro: va detto, o chi verifica crede di aspettare l'owner.
   const provvRiga = typeof r.domandaProvvisoria === 'string' && r.domandaProvvisoria
     ? `La domanda ${r.domandaProvvisoria} non ferma il lavoro: vale la consigliata finché l'owner non risponde.` : null;
-  // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza dei
-  // 3 non fermano il lavoro; il server li ha già messi nel feedback dei rimasti.
-  const dueDaParte = derivati.filter((d) => d.tipo === 'rimasti')
-    .reduce((n, d) => n + d.rilievi.filter((f) => Number(f.level) === 2 && (f.sede || 'i') === 'i').length, 0);
-  const dueRiga = dueDaParte
-    ? `Bilancio delle correzioni di livello 2 finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto è entrato' : `i ${dueDaParte} rilievi interni di livello 2 rimasti sono entrati`} nel feedback dei rimasti (elencato sopra). Il lavoro non si ferma.`
-    : null;
+  // I 2 interni messi da parte non fermano il lavoro: il server li ha già messi nel feedback dei rimasti.
+  const dueRiga = VERIFIER_ROUND.dueDaParteRiga(derivati.filter((d) => d.tipo === 'rimasti').flatMap((d) => d.rilievi)) || null;
   // Un rilievo diventato un feedback suo non lascia una prova rossa nel ramo:
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
@@ -1716,7 +1713,7 @@ export function verifierReplyText(reply, id = '<id>') {
       provvRiga,
       perSegnalazione
         ? 'La domanda è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o una decisione su un 3 o su una scelta difficile da disfare): decide l\'owner.',
+        : VERIFIER_ROUND.RILIEVI_CHE_FERMANO,
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
