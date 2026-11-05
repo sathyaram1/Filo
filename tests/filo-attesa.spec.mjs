@@ -206,7 +206,7 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
     { pensa: ['Cerco di capire cosa intende. ', 'Forse vuole un elenco lunghissimo, ', 'ci vorrà parecchio. ', 'Continuo a pensare. ', 'Ancora. ', 'Ancora un po\'. '], ogni: 900, testo: 'Non dovresti leggermi.' },
   ]);
   await page.locator('#input').fill('scrivimi un poema');
-  const posto = await page.locator('#sendBtn').boundingBox();
+  const posto = await postoNelCampo(page, '#sendBtn');
   await page.locator('#sendBtn').click();
   const blocco = page.locator('.dash-activity');
   await expect(blocco).toHaveAttribute('data-phase', 'reason', { timeout: 5_000 });
