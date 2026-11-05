@@ -169,6 +169,39 @@ test('fermata prima che il campo del testo cominci: niente involucro grezzo da m
   assert.equal(CE.testoDaInvolucro('```json\n{"text":"Prima parte', ['text'], 'length'), 'Prima parte');
 });
 
+test('della prosa intera con un esempio JSON valido fra graffe è prosa: niente campo estratto né azioni', () => {
+  for (const prosa of ['Il file package.json deve contenere {"type":"module"} per usare import.', 'Nel corpo della richiesta metti {"text":"ciao"} e invia.']) {
+    assert.equal(CE.involucroIntero(prosa), null, prosa);
+  }
+  const mazzi = 'Il formato di import è {"reply":"x","import":[{"name":"Sol Ring","qty":1}]} ma basta scrivere i nomi.';
+  assert.deepEqual([Q.parseAgentReply(mazzi, 'stop').reply, Q.parseAgentReply(mazzi, 'stop').import], [mazzi, []]);
+  // Un involucro dentro un recinto o fra spazi resta un involucro.
+  assert.deepEqual(CE.involucroIntero('```json\n{"text":"ciao"}\n```'), { text: 'ciao' });
+  assert.deepEqual(CE.involucroIntero('\n  {"text":"ciao"}  \n'), { text: 'ciao' });
+  assert.equal(Q.parseAgentReply('```json\n{"reply":"x","import":[{"name":"Sol Ring"}]}\n```', 'stop').import.length, 1);
+  // L'Aiuto legge l'involucro dalla stessa porta, non dalla fetta fra la prima e l'ultima graffa.
+  const sidebar = readFileSync(new URL('../../src/content/sidebar.js', import.meta.url), 'utf8');
+  const parse = sidebar.slice(sidebar.indexOf('function parseAssistantOutput('), sidebar.indexOf('function filoActionLabel('));
+  assert.match(parse, /SN_CHAT_ERRORS\?\.involucroIntero\?\.\(text\)/);
+  assert.doesNotMatch(parse, /lastIndexOf\('\}'\)/);
+});
+
+test('tagliata dal tetto con citazioni non escapate: resta tutto il testo scritto', () => {
+  assert.equal(CE.testoDaInvolucro('{"text":"Clicca su "Salva" in alto e poi su "Chiudi", quindi', ['text'], 'length'), 'Clicca su "Salva" in alto e poi su "Chiudi", quindi');
+  assert.equal(Q.parseAgentReply('{"reply":"Ti consiglio "Sol Ring" e "Arcane Signet" per la rampa', 'length').reply, 'Ti consiglio "Sol Ring" e "Arcane Signet" per la rampa');
+  // La " che chiude davvero il campo, prima della chiave seguente, della graffa o della fine, chiude ancora.
+  assert.equal(CE.campoDaJsonTagliato('{"text":"abc","status":"do', ['text']), 'abc');
+  assert.equal(CE.campoDaJsonTagliato('{"text":"abc", "sta', ['text']), 'abc');
+  assert.equal(CE.campoDaJsonTagliato('{"text":"abc"}', ['text']), 'abc');
+});
+
+test('tagliata dal tetto con una frase prima dell\'involucro: la frase e il testo, mai la graffa', () => {
+  const s = 'Ecco la risposta: {"text":"ciao a me';
+  assert.equal(CE.testoDaInvolucro(s, ['text'], 'length'), 'Ecco la risposta: ciao a me');
+  assert.equal(Q.parseAgentReply(s, 'length').reply, 'Ecco la risposta:');
+  assert.equal(Q.parseAgentReply('Ecco: {"reply":"ciao a me', 'length').reply, 'Ecco: ciao a me');
+});
+
 test('una risposta interrotta dentro un blocco di codice lo chiude prima della frase', () => {
   assert.equal(CE.chiudiRecinto('Ecco:\n\n```js\nconst a = 1;\n'), 'Ecco:\n\n```js\nconst a = 1;\n```');
   assert.equal(CE.chiudiRecinto('a\n```\nb\n```\nc'), 'a\n```\nb\n```\nc');
