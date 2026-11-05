@@ -502,7 +502,7 @@ test('stato e scrivi da una routine si fermano sul censimento mancante; --solo e
       assert.doesNotMatch(r.stdout, /768 agenti|"daScrivere"/);
     }
     // Il mattino dopo uno «scrivi --solo 5»: quella scheda sola, ricopiata da elenca, non riapre la riscrittura di tutti.
-    writeFileSync(join(cartella, '5.json'), JSON.stringify({ ...buona(5), _fonte: { id: 'f5', stato: 'todo', aggiornato: 'A', at: 'X', modello: 'haiku' } }));
+    writeFileSync(join(cartella, '5.json'), JSON.stringify({ ...buona(5), _fonte: { id: 'f5', stato: 'todo', aggiornato: 'ieri', at: 'X', modello: 'haiku' } }));
     const dopoSolo = lancia('scrivi', '--dry-run');
     assert.equal(dopoSolo.status, 1, `${dopoSolo.stdout}${dopoSolo.stderr}`);
     assert.match(dopoSolo.stderr, /FERMO: la lettura dal server ha portato solo 1 scheda su 768 feedback aperti/);
