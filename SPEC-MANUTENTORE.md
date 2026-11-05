@@ -109,7 +109,8 @@ la memoria nel taccuino (§ 5). Si accende:
 minuti la tiene calda a costo di una rilettura. Se le sessioni cloud non
 permettono di sceglierla (oggi i worker girano a cinque minuti, e in locale la
 decide l'app), il contesto piccolo delle sveglie tiene comunque il costo basso:
-è la lettura intera che non si ripete. Da verificare per primo (§ 6).
+è la lettura intera che non si ripete. Misurato il 05/11/2026 (§ 6): nemmeno
+per lui l'ora conviene.
 
 **Domande di processo dei worker.** Un worker che si ferma su un dubbio di
 processo (quale strumento, quale ordine, cosa fare di un rilievo) lo scrive nel
