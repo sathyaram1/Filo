@@ -26,6 +26,9 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: true }, {}), 'Routine: accendi');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountBOff', valore: true }, {}), 'Routine dell’account B: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.accountAOff', valore: false }, {}), 'Routine dell’account A: accendi');
+  // Le due strade della domanda del controllo sul manutentore (SPEC-MANUTENTORE § 7).
+  assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.manutentoreAcceso', valore: true }, {}), 'Manutentore: accendi');
+  assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.manutentoreAcceso', valore: false }, {}), 'Manutentore: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'compito' }, {}), 'Affida a un agente');
   assert.equal(D.etichettaAzione({ tipo: 'ambito', nome: 'lettore_code', operazioni: ['feedback.metadati', 'x.y'], nonPuo: 'scrivere' }, {}),
     'Approva l’ambito «lettore_code»: feedback.metadati; x.y', 'senza l’elenco delle operazioni caricato restano i nomi, mai il testo di chi propone');

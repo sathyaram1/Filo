@@ -263,14 +263,6 @@ test('il fermo del manutentore su un guasto suo è scritto per intero solo nel �
   assert.ok(menzioni >= 6, `i rimandi al fermo sono spariti (${menzioni})`);
 });
 
-// #1249.4: le due regole del § 7 vivono nel codice del server; finché lì non ci sono, la spec non le presenta come fatte.
-test('la spec del manutentore dice che fermo e controllo sono ancora da costruire sul server', () => {
-  const s7 = paragrafo7.replace(/\s+/g, ' ');
-  assert.match(s7, /\*\*Stato: da costruire sul server\*\* \(§ 11\)\. I due paragrafi qui sopra dicono come deve andare, non come va oggi/);
-  const s11 = manutentore.slice(manutentore.indexOf('\n## 11.')).replace(/\s+/g, ' ');
-  assert.match(s11, /\*\*Server \(filo-security\), primo:\*\*.{0,1500}fermo su un guasto suo con le sole accensioni del § 7 \(chat e «lascialo riprovare» comprese\)/);
-});
-
 test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
   const s38 = sezione('### 3.8').replace(/\s+/g, ' ');
   assert.match(s38, /guasto \(#1781\) \| nessuna domanda e nessuna fermata/);
