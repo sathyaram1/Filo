@@ -2279,6 +2279,11 @@ function positionOnBranch(bucket) {
       ? `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${c.chiusi.join(', ')}\n`
       : `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH} rimasti su origin (${precedenti.superati.join(', ')}): ${c.errore}\n`);
   }
+  if (isNew) {
+    const o = chiudiSuperatiOvunque({ root: ROOT, mainBranch: MAIN_BRANCH });
+    if (o.chiusi.length) process.stderr.write(`[dispatch] tentativi di altri feedback superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${o.chiusi.join(', ')}\n`);
+    if (!o.ok) process.stderr.write(`[dispatch] i tentativi superati degli altri feedback restano su origin per adesso: ${o.errore}\n`);
+  }
   const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
   if (ripartito) {
     const { scelto, altri } = precedenti;
