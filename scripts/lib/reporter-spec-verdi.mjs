@@ -32,9 +32,17 @@ export default class SpecVerdi {
     const mancano = this.mancano.get(s);
     if (!mancano) return;
     if (result.status === test.expectedStatus || result.status === 'skipped') mancano.delete(test.id);
-    if (mancano.size) return;
+    if (mancano.size || this.rotto) return;
     this.mancano.delete(s);
+    this.segnati.push(s);
     segnaSpecVerdi(this.file, this.chiave, [s]);
+  }
+
+  // Un errore fuori da un test (chiusura di una fixture di worker, un globalTeardown) fa rosso il lancio senza dire di
+  // quale spec: nessuno spec di questo lancio resta verde, sennò il rilancio salterebbe il rosso.
+  onError() {
+    this.rotto = true;
+    if (this.file && this.chiave && this.segnati.length) togliSpecVerdi(this.file, this.chiave, this.segnati);
   }
 
   printsToStdio() { return false; }
