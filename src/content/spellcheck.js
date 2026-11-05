@@ -549,7 +549,7 @@
     let righe = [];
     try { righe = [...rangeDelTesto(state, start, end).getClientRects()]; } catch (_) { return; }
     const r = el.getBoundingClientRect();
-    const radice = radiceDi(el) || document.body;
+    const radice = casaDegliStrati(el);
     const tema = document.documentElement.dataset.snTheme || '';
     for (const q of righe) {
       const left = Math.max(q.left, r.left);
@@ -698,6 +698,12 @@
       if (r && r !== document && r.host && UI && r.host.hasAttribute(UI.RIQUADRO)) return r;
     } catch (_) {}
     return null;
+  }
+
+  // Dentro il campo uno strato prende il cursore e il testo dell'utente, e parte col modulo: col corpo modificabile
+  // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
+  function casaDegliStrati(el) {
+    return radiceDi(el) || (el === document.body || el === document.documentElement ? document.documentElement : document.body);
   }
 
   // ============================================================================
@@ -890,7 +896,7 @@
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    (radiceDi(state.el) || document.body).appendChild(o);
+    casaDegliStrati(state.el).appendChild(o);
     state.overlay = o;
   }
 
@@ -2067,7 +2073,7 @@
     const v = document.createElement('div');
     v.className = 'sn-spell-valori';
     global.SN_FILO_UI?.mark(v);
-    (radiceDi(state.el) || document.body).appendChild(v);
+    casaDegliStrati(state.el).appendChild(v);
     state.valori = v;
     state.badge.clear();
     return v;

@@ -484,7 +484,8 @@
       if (tag === 'TEXTAREA') return t;
       if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
       if (!t.isContentEditable) return null;
-      while (t.parentElement && t.parentElement.isContentEditable) t = t.parentElement;
+      // Col documento tutto modificabile (designMode) il testo dell'utente è il corpo: sopra stanno gli strati di Filo.
+      while (t.parentElement && t.parentElement.isContentEditable && t !== t.ownerDocument.body) t = t.parentElement;
       return t;
     }
     // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
@@ -764,9 +765,23 @@
     // Il clic su «Crea» arriva col dialogo ancora aperto: l'ultimo momento per contare il nome nella pagina.
     function onTocco(e) {
       ultimoTocco = bersaglio(e);
+      fotografaRighe();
       if (inDialogo.size) fotografaDialoghi();
     }
-    function onTasto(e) { if (e.key === 'Enter' && inDialogo.size) fotografaDialoghi(); }
+    function onTasto(e) {
+      if (e.key !== 'Enter') return;
+      fotografaRighe();
+      if (inDialogo.size) fotografaDialoghi();
+    }
+    // Un editor non rilegge le righe a ogni tasto come una casella: il clic o l'Invio che manda sono l'ultimo momento
+    // prima che la pagina lo svuoti, e senza le righe un rifiuto del sito non ritrova il testo (#1808.2).
+    function fotografaRighe() {
+      for (const area of aree.keys()) {
+        if (/^(input|textarea)$/i.test(area.tagName) || !viva(area)) continue;
+        const r = righeDi(area);
+        if (r.length) ultimeRighe.set(area, r);
+      }
+    }
     function onPrima(e) {
       if (!gesto(e)) return;
       const campo = campoDa(e);
@@ -809,8 +824,7 @@
           if (a.form !== form && !(form.contains && form.contains(a))) continue;
           const ora = pulito(testo(a));
           if (ora && ora !== pulito(base) && !sostituito(a)) conTesto = true;
-          const t = lunghe.has(a) ? ora : '';
-          if (t && t !== pulito(base)) partiti.add(impronta(t));
+          inPartenza(a, base);
         }
         // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
         let dest = '';
@@ -824,6 +838,11 @@
         aggiorna(false);
         mandaImpronte();
       }, 0);
+    }
+    // L'impronta del testo lungo che parte: la pagina che risponde può rimetterlo in un campo, ed è ancora suo.
+    function inPartenza(a, base) {
+      const t = lunghe.has(a) ? pulito(testo(a)) : '';
+      if (t && t !== pulito(base)) partiti.add(impronta(t));
     }
     // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main). Da un
     // riquadro cambia pagina il riquadro, e il main ne riconosce la risposta dall'indirizzo del modulo.
@@ -865,16 +884,21 @@
           valori.push(essenziale(t));
         }
       } catch (_) {}
+      let conTesto = false;
       for (const [a, base] of aree) {
         if (!viva(a) || sostituito(a)) continue;
         const ora = testo(a);
         if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
         const ess = essenziale(ora);
         if (ess && valori.some((v) => v.includes(ess))) {
-          segnalaInvio(form, dest);
-          return;
+          inPartenza(a, base);
+          conTesto = true;
         }
       }
+      if (!conTesto) return;
+      // Senza il bottone non c'è onSubmit: le impronte partono qui, prima che la pagina se ne vada (#1808.2).
+      mandaImpronte();
+      segnalaInvio(form, dest);
     }
 
     // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la

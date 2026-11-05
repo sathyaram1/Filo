@@ -12,6 +12,7 @@
       version: '0.2.266', date: '2026-11-05',
       fixes: [
         { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega», «Approfondisci» o «Traduci», la pagina sotto non scatta più.', segnalazione: 2119 },
+        { testo: 'Negli editor dei siti che stanno dentro un riquadro il correttore non cancella più le lettere mentre scrivi, e se il sito respinge il messaggio la pulizia delle schede lascia aperta la scheda, anche quando la pagina ha già svuotato l\'editor. Resta aperta anche nei forum che ti rimandano il testo con un errore quando pubblichi da un link invece che da un bottone.', segnalazione: 1808 },
       ],
     },
     {

@@ -103,3 +103,35 @@ test('anche nelle pagine di Filo il correttore usa il dizionario di Filo', async
   await expect.poll(() => pagina.evaluate('["andatto", "andato"].map((p) => globalThis.SN_DIZIONARIO?.sbagliata(p))'), { timeout: 8000 })
     .toEqual([true, false]);
 });
+
+// #1808.2: nell'editor classico di un riquadro il campo è il corpo stesso; lo strato dei segni dentro il corpo prendeva
+// il cursore e mangiava le lettere, e sarebbe partito col modulo.
+test('in un editor col corpo modificabile, dentro un riquadro, il correttore segna gli errori senza toccare il testo', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false },
+    });
+  });
+  await expect.poll(() => app.evaluate(() => globalThis.__filoDizionarioDiFilo.stato().fase), { timeout: 20_000 }).toBe('pronto');
+  const page = await openTab(testServer.html(`<!doctype html><meta charset="utf-8"><title>Editor</title><body style="margin:20px;background:#f3efe8">
+    <iframe id="ifr" style="width:520px;height:140px;border:1px solid #bbb;background:#fff"
+      srcdoc="<body contenteditable=true lang=it style='margin:8px;min-height:100px;font:20px serif'></body>"></iframe></body>`));
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const corpo = page.frameLocator('#ifr').locator('body');
+  await corpo.click();
+  const TESTO = 'sono andatto al mare con mia sorella';
+  await page.keyboard.type(TESTO);
+  await expect(corpo).toHaveText(TESTO);
+  const segno = page.frameLocator('#ifr').locator('.sn-spell-overlay .sn-errore');
+  await expect(segno.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
+  expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-overlay, .sn-spell-valori') === null)).toBe(true);
+  // Il segno sta sotto la parola, dentro il riquadro.
+  const ifr = await page.locator('#ifr').boundingBox();
+  const b = await riquadroDelSegno(segno.first());
+  expect(b.x).toBeGreaterThan(ifr.x);
+  expect(b.x + b.width).toBeLessThan(ifr.x + ifr.width);
+  expect(b.y).toBeGreaterThan(ifr.y);
+  expect(b.y + b.height).toBeLessThan(ifr.y + 60);
+  await page.screenshot({ path: 'tests/.shots/correttore-editor-riquadro.png', clip: { x: 0, y: 0, width: 600, height: 200 } });
+});

@@ -349,6 +349,8 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
     ['Musica', '<input id="q" type="search" placeholder="Cosa vuoi ascoltare?">'],
     ['Negozio', '<div role="search"><input id="q" type="text" aria-label="Cerca"></div>'],
     ['Motore', '<form role="search" onsubmit="event.preventDefault()"><textarea id="q" name="q"></textarea></form>'],
+    // Fuori da un modulo di ricerca e senza «rows»: la dice ricerca solo la misura delle righe che mostra.
+    ['Motore una riga', '<div><textarea id="q" name="q" style="width:480px;height:24px;line-height:24px;padding:4px;resize:none;overflow:hidden"></textarea></div>'],
   ]) {
     const page = await apriEsatta(app, shell, conRisultati(titolo, campo));
     await page.locator('#q').click();
@@ -358,12 +360,14 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
   await expect.poll(() => moduloDi(shell, 'Musica'), { timeout: 2_000 }).toBe(false);
   expect(await moduloDi(shell, 'Negozio')).toBe(false);
   expect(await moduloDi(shell, 'Motore')).toBe(false);
+  expect(await moduloDi(shell, 'Motore una riga')).toBe(false);
 
   await pulisciTutto(app, shell, testServer);
   const aperte = await titoliAperti(shell);
   expect(aperte).not.toContain('Musica');
   expect(aperte).not.toContain('Negozio');
   expect(aperte).not.toContain('Motore');
+  expect(aperte).not.toContain('Motore una riga');
 });
 
 // Il testo dell'utente si segue per contenuto: quando la pagina lo sposta in un altro campo, o
