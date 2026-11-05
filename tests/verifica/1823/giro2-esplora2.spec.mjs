@@ -23,8 +23,8 @@ const mandato = (app) => app.evaluate(() => globalThis.__mandato.slice());
 const DALLE_PREFERENZE = { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' };
 const impostaDaFilo = (app, settings) => app.evaluate(async ({}, { s, da }) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: s }, da), { s: settings, da: DALLE_PREFERENZE });
 
-for (const delicato of [true, false]) {
-  test(`file da un altro dominio in scheda nuova, banca delicata=${delicato}`, async ({ app, shell, openTab, testServer }) => {
+for (const [delicato, bersaglio] of [[true, "_blank"], [true, "_self"], [false, "_blank"]]) {
+  test(`file da un altro dominio in scheda nuova, banca delicata=${delicato} ${bersaglio}`, async ({ app, shell, openTab, testServer }) => {
     test.setTimeout(90_000);
     await modelliFinti(app);
     await impostaDaFilo(app, { nomiSensati: { scaricamenti: true }, security: { pagineDelicate: { siti: delicato ? ['sito-pubblico.test'] : [] } } });
@@ -36,7 +36,7 @@ for (const delicato of [true, false]) {
     });
     await new Promise((r) => srv.listen(0, '127.0.0.1', r));
     const url = `http://cdn-documenti.test:${srv.address().port}/documento.txt`;
-    const page = await testServer.openReady(openTab, `<!doctype html><title>Banca</title><body style="padding:40px"><a id="dl" target="_blank" href="${url}">Estratto conto</a></body>`, { pubblico: true });
+    const page = await testServer.openReady(openTab, `<!doctype html><title>Banca</title><body style="padding:40px"><a id="dl" target="${bersaglio}" href="${url}">Estratto conto</a></body>`, { pubblico: true });
     await page.locator('#dl').click();
     let rec = null;
     await expect.poll(async () => {
