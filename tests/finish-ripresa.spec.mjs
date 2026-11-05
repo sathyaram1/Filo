@@ -101,3 +101,14 @@ test('un lotto ucciso a metà dal tetto del comando tiene gli spec già passati'
     expect([...(await verdiDopo(dir, g))]).toContain('tests/a-verde');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
+
+test('un lancio rosso per un errore fuori dai test resta rosso anche al rilancio', async () => {
+  test.setTimeout(240_000);
+  const { dir, g } = alberoConDueSpec('chiusura');
+  try {
+    const lancio = () => execFileSync(process.execPath, [scriptLancio(dir)], { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 150_000 });
+    expect(lancio(), 'il primo lancio è rosso').toContain('ESITO rosso');
+    expect([...(await verdiDopo(dir, g))], 'nessuno spec di un lancio rotto resta verde').toEqual([]);
+    expect(lancio(), 'il rilancio sullo stesso contenuto resta rosso').toContain('ESITO rosso');
+  } finally { rmSync(dir, { recursive: true, force: true }); }
+});
