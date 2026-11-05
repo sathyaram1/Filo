@@ -126,8 +126,10 @@ predefinito della chiamata, esce 0 quando nessun tuo processo lavora più nella
 cartella e 5 quando lavorano ancora (rilancialo, subito). Il timeout della chiamata si
 dimensiona sulla **durata vera** del comando, mai sotto: un comando ucciso a
 metà va rifatto da capo. Lunghi di sicuro: le prove di un feedback (otto minuti
-e mezzo), `npm run finish:check` (da quindici a quarantacinque minuti),
-l'installazione di Electron.
+e mezzo), `npm run finish:check` (mezzo minuto per ogni spec delle aree
+toccate, più qualche minuto di unit: un ramo largo passa l'ora; la durata
+prevista la stampa prima di partire, e in sottofondo gli dai il tetto più
+largo), l'installazione di Electron.
 
 **Mai un'attesa scritta da te nella shell**: `sleep`, un ciclo `until` o
 `while` che dorme, `tail --pid`, `timeout N bash -c …`. In cloud l'harness
