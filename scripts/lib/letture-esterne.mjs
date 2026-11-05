@@ -98,6 +98,17 @@ export function ammessoInClaude(rel, { win = false, sessione = '', cartella = fa
   return !!s && (uguale(pezzi[2], s) ? pezzi.length > 3 : pezzi.length === 3 && uguale(pezzi[2], `${s}.jsonl`));
 }
 
+// Le modalità di Grep che restituiscono righe dei file. Il salto veloce di .claude/hooks/letture-esterne.sh le ripete:
+// la sentinella in tests/unit/lettureEsterne.test.mjs tiene insieme le due.
+export const GREP_MODI_CON_RIGHE = Object.freeze(['content']);
+
+// Skill e SlashCommand portano dentro il testo dell'abilità o del comando: quelli dell'owner stanno nel progetto o nella
+// cartella di Claude, quelli di un'estensione di terzi hanno il nome nello spazio dell'estensione («estensione:nome»).
+function richiamoDaEstensione(nome, dati) {
+  const chiesto = String((nome === 'Skill' ? dati.skill : dati.command) || '').trim().replace(/^\//, '').split(/\s+/)[0];
+  return chiesto.includes(':') ? `${nome} da un'estensione (${pulisci(chiesto, 120)})` : '';
+}
+
 // Il percorso che la chiamata legge, se ne legge uno: Read sempre, Grep solo quando restituisce righe dei file (con
 // i soli nomi resta come Glob). null = la chiamata non legge un percorso.
 function percorsoLetto(nome, dati) {
