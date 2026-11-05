@@ -45,6 +45,13 @@
         { testo: 'Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W, Cmd+R e lo zoom agiscono su di lei e non più sulla scheda che aspetta l\'accesso.', segnalazione: 2031 },
         { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
         { testo: 'Nello screenshot che alleghi a un feedback i campi password e di carta escono coperti, come nelle immagini che vanno all\'assistente. Se uno non si riesce a coprire, la pagina resta fuori e il riquadro del feedback te lo dice.', segnalazione: 2116 },
+        { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
+        { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
+        { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
+      ],
+      features: [
+        { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo. «Metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un\'altra.', segnalazione: 1397 },
+        { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
       ],
     },
     {
@@ -76,8 +83,6 @@
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
         { testo: 'Col tasto destro su una scheda chiudi tutte le altre o riapri l\'ultima che hai chiuso, con un clic. «Riapri scheda chiusa» c\'è anche col tasto destro sul pulsante +.', segnalazione: 1695 },
         { testo: 'Dal menu Impostazioni la pagina che apri più spesso compare subito, già caricata. All\'inizio è Preferenze, poi Filo impara quale scegli tu.', segnalazione: 1129 },
-        { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo. «Metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un\'altra.', segnalazione: 1397 },
-        { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
       ],
       fixes: [
         { testo: 'La pulizia delle schede non chiude più una scheda col messaggio respinto dal sito, anche nei forum, nei moduli incorporati da un altro sito e nelle caselle con nomi insoliti. Chiude invece quelle il cui testo è già arrivato, come un post pubblicato o una lista appena creata.', segnalazione: 824 },
@@ -90,9 +95,6 @@
         { testo: 'Se chiudi la finestra di Filo mentre resta aperta un\'altra sua finestra, come quella dell\'accesso a Google, riaprendo Filo torna la finestra con le tue schede, anche col clic sul Dock su Mac. Prima compariva un errore di JavaScript e Filo restava bloccato.', segnalazione: 1606 },
         { testo: 'Nella home gli avvisi in basso a destra non coprono più il tasto Invia: finché ci sono, il campo si stringe e li lascia passare.', segnalazione: 1551 },
         { testo: 'Il correttore non manda più al modello le password che scrivi in chat a chi te le chiede, né quelle scritte accanto al nome utente o dopo il nome del wifi.', segnalazione: 1446 },
-        { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
-        { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
-        { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
       ],
     },
     {
