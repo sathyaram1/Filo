@@ -71,6 +71,7 @@ import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaF
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
 import { leggiSpecVerdi, segnaSpecVerdi } from './lib/spec-verdi.mjs';
+import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
 import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
