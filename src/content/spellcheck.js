@@ -844,8 +844,10 @@
     // parola: una pagina che a ogni lettera scrive una parola sbagliata ne otterrebbe uno per tasto (#1070).
     const G = global.SN_GESTO;
     const chiude = nuovo && !!G && G.prendi('parola', G.CHIUDE, G.dentro(state.el));
+    const coerenza = prendeGesto(state, null, 'coerenza');
+    persiDalGesto(state, { rapido: gesto || chiude, ragionato: coerenza });
     programmaRapido(state, { gesto: gesto || chiude, subito: chiude });
-    programmaRagionato(state, { gesto: prendeGesto(state, null, 'coerenza'), fineFrase: chiudeFrase(state, evento) });
+    programmaRagionato(state, { gesto: coerenza, fineFrase: chiudeFrase(state, evento) });
     programmaFine(state);
   }
 
