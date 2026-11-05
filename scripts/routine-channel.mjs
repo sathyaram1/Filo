@@ -566,6 +566,8 @@ export async function release(t, fault = '', opts, report = null, spedito = null
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
  */
+// Dalla veglia al suo rilascio: il quadro del worker fermo, per le note del rapporto.
+export const ENV_QUADRO_FERMO = 'FILO_VEGLIA_QUADRO';
 // I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
 export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
 // Il server (manutentoreRegole.RILASCIO) tiene sul biglietto solo le attese sopra i 30 s, e rifiuta le altre.
@@ -1809,9 +1811,10 @@ if (isMain) {
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
       leggi: () => segniDiVita({ root: ROOT, ticket }),
       // Il rilascio è quello di sempre, dalla cartella che tiene il biglietto; della sua stampa passa solo l'esito.
-      rilascia: (guasto, mio) => {
+      // Il quadro del fermo va al rilascio per ambiente, non come opzione: finisce nelle note del rapporto (#2182).
+      rilascia: (guasto, mio, quadro) => {
         const r = spawnSync(process.execPath, [fileURLToPath(import.meta.url), 'release', ticket, '--role', 'orchestrator', '--forza',
-          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: process.env });
+          '--guasto', guasto, ...(mio ? [] : ['--senza-push'])], { encoding: 'utf8', env: { ...process.env, [ENV_QUADRO_FERMO]: String(quadro || '') } });
         const ok = r.status === 0 && /OK: biglietto rilasciato/.test(String(r.stdout || ''));
         if (!ok) stopBeat(ROOT, { ticket });
         const motivo = ok ? '' : (String(r.stdout || '').match(/rilascio non riuscito \(([^)]{1,80})\)/) || [])[1] || `uscita ${r.status}`;
@@ -1931,6 +1934,11 @@ if (isMain) {
         // dei biglietti prima.
         const { readTicketSince } = await import('./lib/routine-ticket.mjs');
         rapporto = await generaRapporto({ role: ruolo, ticket: args[0], cwd: ROOT, since: readTicketSince(ROOT, { ticket: args[0] }) });
+        if (guasto && process.env[ENV_QUADRO_FERMO]) {
+          const { notaDelFermo } = await import('./lib/veglia-worker.mjs');
+          const nota = notaDelFermo(process.env[ENV_QUADRO_FERMO]);
+          if (nota) rapporto.notes = [...(Array.isArray(rapporto.notes) ? rapporto.notes : []), nota];
+        }
       } catch (e) {
         // Stessa versione di rapportoVuoto: la sentinella in routineChannelRilascio le confronta.
         rapporto = { v: 3, role: ruolo, ticket: args[0], notes: [`rapporto non generato: ${String((e && e.message) || e)}`] };

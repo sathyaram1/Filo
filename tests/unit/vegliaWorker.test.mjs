@@ -15,7 +15,7 @@ import { senzaSessione } from '../helpers/sessione.mjs';
 const REPO = resolve(import.meta.dirname, '..', '..');
 const {
   giudica, strumentoInAttesa, programmaDi, testoGuasto, tracceSottoAgenti, segniDiVita, veglia, cartellaSottoAgenti,
-  attivitaPerBattito, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
+  attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
 } = await import('../../scripts/lib/veglia-worker.mjs');
 const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
 
@@ -246,6 +246,11 @@ describe('veglia da riga di comando', () => {
       assert.equal(rilascio.body.ticket, B);
       assert.match(rilascio.body.fault, /^guasto: permessi git: permesso in attesa: il worker non dà segni di vita da 30 minuti/);
       assert.match(rilascio.body.fault, /git push --dry-run --force-with-lease/);
+      // #2182: il quadro sta nel guasto e, uguale, nelle note del rapporto di fine sessione.
+      assert.match(rilascio.body.fault, /Ultimo strumento: Bash alle \d\d:\d\d:\d\d UTC, senza risposta\. .*Processi nella cartella: nessuno\. .*Rilasciato dalla veglia/);
+      const nota = (rilascio.body.report.notes || []).find((n) => n.startsWith('fermo dalla veglia: '));
+      assert.ok(nota, `note del rapporto: ${JSON.stringify(rilascio.body.report.notes)}`);
+      assert.ok(rilascio.body.fault.includes(nota.slice('fermo dalla veglia: '.length)), 'lo stesso quadro del guasto');
       const marcatore = JSON.parse(readFileSync(resolve(work, '.claude', 'routine-ticket.json'), 'utf8'));
       assert.ok(marcatore.morto, 'il biglietto è segnato finito nella cartella');
     } finally { srv.close(); }
@@ -335,5 +340,120 @@ describe('la misura per il battito', () => {
     const r2 = await canale.heartbeat(B, { ...base, attivitaDi: () => { throw new Error('transcript illeggibile'); } });
     assert.equal(r2.ok, true);
     assert.equal(corpi[1].attivitaMs, undefined);
+  });
+});
+
+// #2182: «worker fermo, senza uno strumento in attesa» non diceva dove si era fermato. Il guasto porta il quadro letto
+// dal transcript: ultimo strumento con ora e risposta, ultimo passo di ogni traccia, processi nella cartella, modello.
+describe('il quadro del worker fermo', () => {
+  const ORA = Date.parse('2026-11-05T09:00:00Z');
+  const conModello = (o, model) => ({ ...o, message: { ...o.message, model } });
+  const testo = (t, ora, model = 'claude-opus-5-5') => ({ type: 'assistant', timestamp: new Date(ora).toISOString(), message: { model, content: [{ type: 'text', text: t }] } });
+  /** Una cartella di sotto-agenti con le tracce date: { nome, tipo, righe, fa }. */
+  const sessione = (tracce) => {
+    const dir = cartella('filo-veglia-quadro-');
+    const sub = join(dir, 'projects', '-home-user-Filo', SID, 'subagents');
+    mkdirSync(sub, { recursive: true });
+    for (const t of tracce) {
+      const f = join(sub, `agent-${t.nome}.jsonl`);
+      writeFileSync(f, righe(...t.righe));
+      if (t.tipo) writeFileSync(join(sub, `agent-${t.nome}.meta.json`), JSON.stringify({ agentType: t.tipo, spawnDepth: 1 }));
+      const m = new Date(Date.now() - t.fa * MIN);
+      utimesSync(f, m, m);
+    }
+    return dir;
+  };
+
+  test('l\'ultimo passo: lo strumento chiamato per ultimo con la sua risposta, il tipo dell\'ultima riga, il modello', () => {
+    const l = [conModello(uso('a', 'Bash', { command: 'npm run test:unit' }, ORA), 'claude-opus-5-5'), risposta('a', ORA + 2000)];
+    assert.deepEqual(ultimoPasso(l), { strumento: { nome: 'Bash', ms: ORA, risposta: true }, passo: { cosa: 'risposta a Bash', ms: ORA + 2000 }, modello: 'claude-opus-5-5' });
+    const p = ultimoPasso([...l, testo('segreto del worker', ORA + 5000), { type: 'system', subtype: 'api_error', timestamp: new Date(ORA + 6000).toISOString() }]);
+    assert.deepEqual(p.passo, { cosa: 'sistema api_error', ms: ORA + 6000 });
+    assert.equal(ultimoPasso([testo('x', ORA)]).passo.cosa, 'testo del modello');
+    assert.deepEqual(ultimoPasso([]), { strumento: null, passo: null, modello: '' });
+  });
+
+  test('un transcript che finisce dopo una risposta di strumento: il guasto dice quale, a che ora, con risposta, e il modello', () => {
+    const { work } = clone();
+    const t0 = Date.now() - 26 * MIN;
+    const configDir = sessione([{ nome: 'w1', tipo: 'routine-nuovo-lavoro', fa: 25, righe: [
+      conModello(uso('t1', 'Bash', { command: 'npm run test:unit' }, t0), 'claude-opus-5-5'), risposta('t1', t0 + 300), testo('pensiero privato del worker', t0 + 500),
+      conModello(uso('t2', 'Read', { file_path: '/x/y.mjs' }, t0 + 1000), 'claude-opus-5-5'), risposta('t2', t0 + 2000),
+    ] }]);
+    const v = segniDiVita({ root: work, ticket: B, sessione: SID, configDir, leggiProcessi: () => [] });
+    assert.equal(giudica({ ...v, adesso: Date.now() }).stato, 'fermo');
+    assert.equal(v.tracce.attesa, null);
+    const g = testoGuasto({ fermoMs: 25 * MIN, attesa: v.tracce.attesa, tracceViste: v.tracce.viste, quadro: quadroDelFermo(v) });
+    const hh = (ms) => new Date(ms).toISOString().slice(11, 19);
+    assert.match(g, /^guasto: strumento worker: worker fermo da 25 minuti /, 'il gruppo resta quello di prima: i guasti uguali si contano ancora');
+    assert.ok(g.includes(`Ultimo strumento: Read alle ${hh(t0 + 1000)} UTC, con risposta.`), g);
+    assert.ok(g.includes(`Ultimo passo per traccia: routine-nuovo-lavoro alle ${hh(t0 + 2000)} UTC (risposta a Read); nessun sotto-agente.`), g);
+    assert.ok(g.includes('Processi nella cartella: nessuno.'), g);
+    assert.ok(g.includes('Modello: claude-opus-5-5.'), g);
+    assert.match(g, /Rilasciato dalla veglia di chi guida il giro\.$/);
+    assert.doesNotMatch(g, /pensiero privato|y\.mjs|test:unit/, 'niente testo né input del worker');
+  });
+
+  test('una traccia di sotto-agente ferma: nome e ora dell\'ultimo passo di ogni traccia, il lancio aperto come ultimo strumento', () => {
+    const { work } = clone();
+    const t0 = Date.now() - 40 * MIN;
+    const configDir = sessione([
+      { nome: 'w1', tipo: 'routine-nuovo-lavoro', fa: 38, righe: [conModello(uso('a1', 'Agent', { prompt: 'esplora' }, t0), 'claude-opus-5-5')] },
+      { nome: 'e1', tipo: 'Explore', fa: 30, righe: [conModello(uso('b1', 'Grep', { pattern: 'x' }, t0 + 60_000), 'claude-haiku-5-5'), risposta('b1', t0 + 61_000), testo('trovato', t0 + 62_000, 'claude-haiku-5-5')] },
+      { nome: 'senza-meta', fa: 35, righe: [testo('ciao', t0 + 30_000, 'claude-haiku-5-5')] },
+    ]);
+    const v = segniDiVita({ root: work, ticket: B, sessione: SID, configDir, leggiProcessi: () => [] });
+    const q = quadroDelFermo(v);
+    const hh = (ms) => new Date(ms).toISOString().slice(11, 19);
+    assert.ok(q.includes(`Ultimo strumento: Grep alle ${hh(t0 + 60_000)} UTC, con risposta.`), q);
+    assert.ok(q.includes(`Ultimo passo per traccia: Explore alle ${hh(t0 + 62_000)} UTC (testo del modello), sotto-agente alle ${hh(t0 + 30_000)} UTC (testo del modello), routine-nuovo-lavoro alle ${hh(t0)} UTC (chiamata a Agent).`), q);
+    assert.doesNotMatch(q, /nessun sotto-agente/);
+    assert.ok(q.includes('Modello: claude-haiku-5-5, claude-opus-5-5.'), q);
+    assert.doesNotMatch(q, /trovato|esplora|ciao/);
+  });
+
+  test('un processo vivo nella cartella: quanti e quale comando; non letti o transcript assente lo dicono', () => {
+    const { work } = clone();
+    const configDir = sessione([{ nome: 'w1', tipo: 'routine-nuovo-lavoro', fa: 25, righe: [testo('x', Date.now() - 25 * MIN)] }]);
+    const finti = () => [
+      { pid: 999101, ppid: 1, sid: 999101, stato: 'S', cwd: work, cmd: 'npm run finish:check' },
+      { pid: 999102, ppid: 999101, sid: 999101, stato: 'S', cwd: join(work, 'tests'), cmd: `node "$X" --token ${B}` },
+    ];
+    const v = segniDiVita({ root: work, ticket: B, sessione: SID, configDir, leggiProcessi: finti });
+    assert.equal(v.processi, 2);
+    const g = testoGuasto({ fermoMs: 21 * MIN, tracceViste: true, quadro: quadroDelFermo(v) });
+    assert.match(g, /Processi nella cartella: 2 \(npm run finish:check; node ''X' --token AbCdEf…\)\./);
+    assert.doesNotMatch(g, /["`$]/);
+    assert.ok(!g.includes(B), 'un codice lungo si accorcia');
+    const tanti = quadroDelFermo({ tracce: v.tracce, processiLetti: true, comandi: ['a', 'b', 'c', 'd', 'e'] });
+    assert.match(tanti, /Processi nella cartella: 5 \(a; b; c; e altri 2\)\./, 'oltre il tetto si contano, non si tagliano in silenzio');
+    assert.equal(quadroDelFermo({ tracce: { viste: false }, processiLetti: false }), 'Transcript del worker non visto: niente strumenti, tracce o modello. Processi nella cartella: non letti.');
+    assert.equal(notaDelFermo(''), '');
+    assert.equal(notaDelFermo('Modello: x.'), 'fermo dalla veglia: Modello: x.');
+  });
+
+  test('il worker del biglietto prima, finito pochi secondi prima di questo, non è una traccia del worker fermo', () => {
+    const vuota = cartella('filo-veglia-senza-marcatore-');
+    const configDir = sessione([
+      { nome: 'prima', tipo: 'routine-nuovo-lavoro', fa: 25.5, righe: [conModello(uso('h', 'SubagentHandback', { message: 'FATTO' }, Date.now() - 25.5 * MIN), 'claude-opus-5-5')] },
+      { nome: 'adesso', tipo: 'routine-worker', fa: 23, righe: [testo('x', Date.now() - 23 * MIN)] },
+    ]);
+    writeFileSync(join(configDir, FILE_REGISTRO), JSON.stringify({ voci: [{ impronta: impronta(B), ruolo: 'verifier', ora: new Date(Date.now() - 25 * MIN).toISOString() }] }));
+    const v = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir, leggiProcessi: () => [] });
+    const q = quadroDelFermo(v);
+    assert.equal(v.tracce.attesa, null, 'la sua ultima chiamata senza risposta non è un permesso di questo worker');
+    assert.doesNotMatch(q, /routine-nuovo-lavoro/, q);
+    assert.match(q, /routine-worker alle [0-9:]+ UTC \(testo del modello\); nessun sotto-agente\./, q);
+  });
+
+  test('un transcript che finisce su un errore dell\'API: il passo lo dice e il modello resta quello vero', () => {
+    const l = [
+      conModello(uso('a', 'Bash', { command: 'ls' }, ORA), 'claude-opus-5-5'), risposta('a', ORA + 1000),
+      { type: 'assistant', timestamp: new Date(ORA + 2000).toISOString(), message: { model: '<synthetic>', content: [{ type: 'text', text: 'API Error: 529 overloaded' }] } },
+    ];
+    const p = ultimoPasso(l);
+    assert.equal(p.modello, 'claude-opus-5-5');
+    assert.deepEqual(p.passo, { cosa: 'errore dell\'API o richiesta interrotta', ms: ORA + 2000 });
+    assert.deepEqual(p.strumento, { nome: 'Bash', ms: ORA, risposta: true });
   });
 });

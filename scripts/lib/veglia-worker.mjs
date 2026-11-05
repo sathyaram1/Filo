@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { gitIn, lavoroVivo, timbroFile, comandoLeggibile } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
+import { leggiMeta, rigaSintetica } from '../session-report.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
@@ -75,11 +76,103 @@ export function programmaDi(comando) {
 // Il guasto finisce in un argomento e nelle note del feedback: una riga, senza virgolette, apici inversi, dollari.
 const pulito = (t) => String(t || '').replace(/\\/g, '/').replace(/["`$]/g, "'");
 
-/** Il guasto da dichiarare per un worker fermo, col gruppo davanti. PURA. */
-export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true } = {}) {
+const nomeSicuro = (t) => String(t || '').replace(/[^A-Za-z0-9._:-]/g, '').slice(0, 60);
+
+/**
+ * L'ultimo passo di un transcript, senza il testo del worker: lo strumento chiamato per ultimo (ora, risposta avuta),
+ * di che tipo è l'ultima riga e il modello dell'ultimo turno. PURA.
+ */
+export function ultimoPasso(righe) {
+  const nomi = new Map();
+  const risposte = new Set();
+  let strumento = null;
+  let passo = null;
+  let modello = '';
+  for (const r of righe) {
+    let o;
+    try { o = typeof r === 'string' ? JSON.parse(r) : r; } catch (_) { continue; }
+    if (!o || typeof o !== 'object') continue;
+    const ms = Date.parse(String(o.timestamp || ''));
+    const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
+    let cosa = '';
+    if (o.type === 'assistant' && rigaSintetica(o.message)) {
+      cosa = 'errore dell\'API o richiesta interrotta';
+    } else if (o.type === 'assistant') {
+      if (o.message && o.message.model) modello = nomeSicuro(o.message.model);
+      for (const x of c) {
+        if (x && x.type === 'tool_use' && x.id) {
+          const nome = nomeSicuro(x.name) || 'strumento';
+          nomi.set(x.id, nome);
+          strumento = { id: x.id, nome, ms };
+          cosa = `chiamata a ${nome}`;
+        } else if (x && x.type === 'thinking' && !cosa) cosa = 'ragionamento';
+        else if (x && x.type === 'text' && !cosa) cosa = 'testo del modello';
+      }
+    } else if (o.type === 'user') {
+      for (const x of c) {
+        if (x && x.type === 'tool_result') {
+          risposte.add(x.tool_use_id);
+          cosa = `risposta a ${nomi.get(x.tool_use_id) || 'uno strumento'}`;
+        }
+      }
+      if (!cosa) cosa = 'messaggio in arrivo';
+    } else if (o.type === 'system') {
+      cosa = `sistema ${nomeSicuro(o.subtype)}`.trim();
+    }
+    if (cosa) passo = { cosa, ms };
+  }
+  return {
+    strumento: strumento ? { nome: strumento.nome, ms: strumento.ms, risposta: risposte.has(strumento.id) } : null,
+    passo,
+    modello,
+  };
+}
+
+// Oltre, il guasto diventa un muro: le tracce e i processi in più si contano invece di elencarli.
+export const TRACCE_MOSTRATE = 6;
+export const PROCESSI_MOSTRATI = 3;
+const ora = (ms) => (Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(11, 19)} UTC` : 'ora ignota');
+
+/**
+ * Il quadro di un worker fermo (#2182), dai segni già letti: ultimo strumento con ora e risposta, ultimo passo di ogni
+ * traccia, processi nella cartella, modello. Solo nomi, orari e conteggi: nessun testo del worker. PURA.
+ */
+export function quadroDelFermo({ tracce = null, processiLetti = false, comandi = [] } = {}) {
+  const t = tracce || {};
+  const elenco = t.viste && Array.isArray(t.elenco) ? t.elenco : [];
+  const parti = [];
+  if (!elenco.length) {
+    parti.push('Transcript del worker non visto: niente strumenti, tracce o modello.');
+  } else {
+    const ultimo = elenco.map((e) => e.strumento).filter(Boolean).reduce((a, b) => (!a || (b.ms || 0) >= (a.ms || 0) ? b : a), null);
+    parti.push(ultimo
+      ? `Ultimo strumento: ${ultimo.nome} alle ${ora(ultimo.ms)}, ${ultimo.risposta ? 'con risposta' : 'senza risposta'}.`
+      : 'Ultimo strumento: nessuno nel transcript.');
+    const righe = elenco.slice(0, TRACCE_MOSTRATE).map((e) => `${e.nome} alle ${ora(Number.isFinite(e.passo && e.passo.ms) ? e.passo.ms : e.ms)} (${e.passo ? e.passo.cosa : 'nessun passo leggibile'})`);
+    const altre = elenco.length > TRACCE_MOSTRATE ? `, e altre ${elenco.length - TRACCE_MOSTRATE}` : '';
+    parti.push(`Ultimo passo per traccia: ${righe.join(', ')}${altre}${elenco.length === 1 ? '; nessun sotto-agente' : ''}.`);
+  }
+  const cmd = Array.isArray(comandi) ? comandi : [];
+  if (!processiLetti) parti.push('Processi nella cartella: non letti.');
+  else if (!cmd.length) parti.push('Processi nella cartella: nessuno.');
+  else {
+    const altri = cmd.length > PROCESSI_MOSTRATI ? `; e altri ${cmd.length - PROCESSI_MOSTRATI}` : '';
+    parti.push(`Processi nella cartella: ${cmd.length} (${cmd.slice(0, PROCESSI_MOSTRATI).map(comandoLeggibile).join('; ')}${altri}).`);
+  }
+  const modelli = [...new Set(elenco.map((e) => e.modello).filter(Boolean))];
+  if (elenco.length) parti.push(`Modello: ${modelli.length ? modelli.join(', ') : 'non letto'}.`);
+  return pulito(parti.join(' '));
+}
+
+// Il prefisso fisso della nota nel rapporto di fine sessione: chi conta i fermi li riconosce da qui.
+export const NOTA_FERMO = 'fermo dalla veglia:';
+export const notaDelFermo = (quadro) => (String(quadro || '').trim() ? `${NOTA_FERMO} ${pulito(quadro).trim()}` : '');
+
+/** Il guasto da dichiarare per un worker fermo, col gruppo davanti e il quadro prima della coda. PURA. */
+export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '' } = {}) {
   const minuti = Math.round(fermoMs / 60000);
   const segni = tracceViste ? 'niente commit, salvataggi, processi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
-  const coda = 'Rilasciato dalla veglia di chi guida il giro.';
+  const coda = `${String(quadro || '').trim() ? `${String(quadro).trim()} ` : ''}Rilasciato dalla veglia di chi guida il giro.`;
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
     const cosa = attesa.comando ? `${attesa.nome} «${comandoLeggibile(attesa.comando)}»` : attesa.nome;
@@ -119,20 +212,29 @@ export function cartellaSottoAgenti({ sessione = '', configDir = '' } = {}) {
   return '';
 }
 
+/** Il tipo di agente di una traccia, dal meta che Claude Code le scrive accanto; senza, «sotto-agente». */
+function nomeTraccia(file) {
+  const m = leggiMeta(file);
+  return (m && nomeSicuro(m.agentType)) || 'sotto-agente';
+}
+
 /**
- * Le tracce dei sotto-agenti scritte da `dopoMs` in poi: l'ultima scrittura e lo strumento rimasto senza risposta.
- * Con un worker alla volta sono tutte del worker e dei suoi figli. `viste` falso: nessun transcript di questo biglietto.
+ * Le tracce dei sotto-agenti scritte da `dopoMs` in poi: l'ultima scrittura, lo strumento rimasto senza risposta e
+ * l'ultimo passo di ognuna (`elenco`, la più recente prima). Con un worker alla volta sono tutte del worker e dei suoi
+ * figli. `viste` falso: nessun transcript di questo biglietto.
  */
 export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   let nomi = [];
   try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.jsonl')) : []; } catch (_) { nomi = []; }
   const file = nomi.map((n) => { const p = join(dir, n); try { return { p, m: statSync(p).mtimeMs }; } catch (_) { return null; } })
     .filter((f) => f && f.m >= dopoMs);
-  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null };
+  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [] };
   const ultimoMs = Math.max(...file.map((f) => f.m));
-  const attese = file.map((f) => strumentoInAttesa(codaDi(f.p))).filter(Boolean);
+  const lette = file.map((f) => ({ f, righe: codaDi(f.p) }));
+  const attese = lette.map((l) => strumentoInAttesa(l.righe)).filter(Boolean);
   const attesa = attese.length ? attese.reduce((a, b) => ((b.ms || 0) >= (a.ms || 0) ? b : a)) : null;
-  return { viste: true, ultimoMs, attesa };
+  const elenco = lette.map(({ f, righe }) => ({ nome: nomeTraccia(f.p), ms: f.m, ...ultimoPasso(righe) })).sort((a, b) => b.ms - a.ms);
+  return { viste: true, ultimoMs, attesa, elenco };
 }
 
 /** Quando il server ha dato il biglietto, dal registro che il comando ticket scrive per il gancio. NaN se non c'è. */
@@ -165,12 +267,14 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
     const c = gitIn(root)(['log', '-1', '--format=%ct']);
     tempi.push(c.ok ? Number(c.out) * 1000 : NaN, mtime(timbroFile(root)));
   }
+  // Senza margine: il worker del biglietto prima scrive la sua ultima riga pochi secondi prima di questo (#2182).
   const partenze = [dalRegistro, dalMarcatore].filter(Number.isFinite);
-  const dopoMs = partenze.length ? Math.min(...partenze) - 60 * 1000 : -Infinity;
+  const dopoMs = partenze.length ? Math.min(...partenze) : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
-  const processi = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }).segni.length : 0;
-  return { mio, finito: mio && bigliettoFinito(m), tempi, processi, tracce };
+  const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
+  const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
+  return { mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce };
 }
 
 /**
@@ -195,8 +299,8 @@ export function attivitaPerBattito(segni, adesso = Date.now()) {
 export const TESTO_FINITO ='Worker finito: ha rilasciato il suo biglietto. Riparti dal passo 0 del tuo ruolo.';
 
 /**
- * Veglia per una fetta: torna appena il worker ha finito o risulta fermo (e allora `rilascia(guasto, mio)` dichiara il
- * guasto), altrimenti alla fine della fetta. I testi sono fissi: niente del worker arriva a chi guida il giro.
+ * Veglia per una fetta: torna appena il worker ha finito o risulta fermo (e allora `rilascia(guasto, mio, quadro)`
+ * dichiara il guasto), altrimenti alla fine della fetta. I testi sono fissi: niente del worker arriva a chi guida il giro.
  * @returns {Promise<{ uscita: number, testo: string, guasto?: string }>}
  */
 export async function veglia({
@@ -210,8 +314,9 @@ export async function veglia({
     if (g.stato === 'finito') return { uscita: USCITA_FINITO, testo: TESTO_FINITO };
     const minuti = Math.round(g.fermoMs / 60000);
     if (g.stato === 'fermo') {
-      const guasto = testoGuasto({ fermoMs: g.fermoMs, attesa: s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste) });
-      const r = rilascia(guasto, s.mio);
+      const quadro = quadroDelFermo(s);
+      const guasto = testoGuasto({ fermoMs: g.fermoMs, attesa: s.tracce && s.tracce.attesa, tracceViste: !!(s.tracce && s.tracce.viste), quadro });
+      const r = rilascia(guasto, s.mio, quadro);
       const esito = r && r.ok
         ? 'biglietto rilasciato con un guasto dichiarato'
         : `rilascio non riuscito (${(r && r.motivo) || 'motivo ignoto'}): battito spento, il biglietto scade da solo`;

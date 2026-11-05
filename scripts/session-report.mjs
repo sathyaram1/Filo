@@ -52,6 +52,9 @@ import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marcatoreWorker } from './lib/dati-worker.mjs';
 
+// Una riga dell'assistente col modello «<synthetic>» è una richiesta interrotta o un errore dell'API, non un turno.
+export const rigaSintetica = (msg) => /^<[^>]*>$/.test(String((msg && msg.model) || ''));
+
 // ─── Prezzi ($ per milione di token) ─────────────────────────────────────────
 // Fonte: skill `claude-api` (tabella modelli del 2026-06-24 e note su cache):
 // scrittura in cache a 5 minuti = 1,25× l'input, a UN'ORA = 2× l'input
@@ -571,7 +574,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     // turni e lasciavano in ogni rapporto la nota del modello sconosciuto
     // (giro del 14/09, terza verifica: 36 righe così nei transcript di una
     // macchina sola).
-    if (e.type === 'assistant' && /^<[^>]*>$/.test(String(msg.model || ''))) continue;
+    if (e.type === 'assistant' && rigaSintetica(msg)) continue;
 
     if (e.type === 'assistant') {
       const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
@@ -897,7 +900,7 @@ export function finestraOrchestratore(linee) {
     const blocchi = Array.isArray(msg.content) ? msg.content : [];
     if (e.type === 'assistant') {
       // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
-      if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
+      if (msg.usage && !rigaSintetica(msg)) turni.push(ms);
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
         if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
