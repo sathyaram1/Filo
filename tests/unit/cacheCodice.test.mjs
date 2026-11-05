@@ -77,7 +77,7 @@ test('da una cartella diversa a ogni avvio la cache non si accumula', OPZ, () =>
   assert.ok(voci(ud) <= dopoPrimo, `${voci(ud)} voci dopo tre cartelle, ${dopoPrimo} dopo una`);
 });
 
-test('con l\'AppImage o l\'app spostata da Gatekeeper la cache resta spenta e quella rimasta se ne va', () => {
+test('con l\'AppImage o l\'app spostata da Gatekeeper la cache resta spenta e quella rimasta se ne va', OPZ, () => {
   const base = nuova('filo-cache-volatile-');
   const ud = join(base, 'dati');
   fs.mkdirSync(join(ud, 'codice-compilato', 'v24.0.0-x64-aaaa-0'), { recursive: true });
