@@ -473,7 +473,15 @@ test('in una routine, nessuna scheda su tanti aperti ferma stato e scrivi invece
   assert.match(S.censimentoMancante({ via: 'cloud', indice: tanti, schede: [] }), new RegExp(`nessuna scheda su ${S.SOGLIA_CENSIMENTO} feedback aperti.*--da-zero`));
   const segnalata = { ...buona(1), [S.SEGNALATA]: true };
   assert.notEqual(S.censimentoMancante({ via: 'cloud', indice: tanti, schede: [segnalata] }), '', 'la scheda «non letto» di un segnalato non è un censimento');
-  assert.equal(S.censimentoMancante({ via: 'cloud', indice: tanti, schede: [buona(1)] }), '', 'una scheda vera: si va avanti');
+  const molti = indiceDi(768);
+  assert.match(S.censimentoMancante({ via: 'cloud', indice: molti, schede: [buona(5)] }), /solo 1 scheda su 768 feedback aperti.*767 agenti/,
+    'una scheda scritta con --solo non è un censimento: il mattino dopo non riparte la riscrittura alla cieca');
+  const meta = Array.from({ length: 384 }, (_, i) => buona(i + 1));
+  assert.equal(S.censimentoMancante({ via: 'cloud', indice: molti, schede: meta }), '', 'metà coperta: il censimento c\'è, mancano i nuovi');
+  assert.notEqual(S.censimentoMancante({ via: 'cloud', indice: molti, schede: meta.slice(1) }), '');
+  assert.equal(S.censimentoMancante({ via: 'cloud', indice: indiceDi(100), schede: Array.from({ length: 51 }, (_, i) => buona(i + 1)) }), '', 'mancano 49: un inizio vero');
+  const chiuse = Array.from({ length: 700 }, (_, i) => buona(i + 1000));
+  assert.notEqual(S.censimentoMancante({ via: 'cloud', indice: molti, schede: chiuse }), '', 'le schede di feedback non più aperti non coprono');
   assert.equal(S.censimentoMancante({ via: 'cloud', indice: indiceDi(S.SOGLIA_CENSIMENTO - 1), schede: [] }), '', 'pochi aperti: un inizio vero');
   assert.equal(S.censimentoMancante({ via: 'locale', indice: tanti, schede: [] }), '', 'in locale la cartella è il censimento');
 });
