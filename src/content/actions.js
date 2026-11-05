@@ -735,13 +735,15 @@
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.errore || !res.text) {
+          // Il tetto finito nel ragionamento prima di una parola (#1302): la nota e «Continua» al posto della spiegazione.
+          const nota = res && !res.errore ? (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason) || '') : '';
+          if (!res || res.errore || (!res.text && !nota)) {
             el.classList.add('sn-menu-inline-error');
             Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
-          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
-          if (!daMostrare) {
+          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text || ''));
+          if (!daMostrare && !nota) {
             const prev = el.previousElementSibling;
             if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
             el.remove();
