@@ -72,6 +72,8 @@ test('nessun testo per gli agenti propone un’attesa nella shell o un file scri
   // La sentinella vede le due forme che hanno fermato i worker, e lascia stare i testi passati al canale.
   const comando1685 = "timeout 235 bash -c 'until [ $(grep -c x finish.log) -eq 0 ]; do sleep 15; done'";
   assert.ok(ATTESE.some((re) => re.test(comando1685)));
+  assert.ok(ATTESE.some((re) => re.test('`timeout 240 tail --pid=<pid> -f /dev/null`')));
+  assert.ok(ATTESE.some((re) => re.test('`timeout 240 node scripts/x.mjs`')), 'il tetto in un comando');
   assert.ok(SCRITTURE.some((re) => re.test("python3 - <<'EOF'\ns=open(p).read()\nEOF")));
   assert.ok(SCRITTURE.some((re) => re.test("cat <<'EOF' > ../domanda.json")));
   assert.ok(!SCRITTURE.some((re) => re.test("node scripts/routine-channel.mjs segnala <<'FINE'")));
