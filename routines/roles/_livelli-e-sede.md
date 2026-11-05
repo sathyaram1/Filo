@@ -67,11 +67,13 @@ logica rosso sul ramo che il controllo di fine lavoro trova verde sulla fusione
 con main: il suo messaggio nomina la base del ramo e il main su cui riprovarlo.
 
 La sede non cambia il livello che scrivi: un 3 esterno resta un 3, un 3 vicino
-resta un 3. Il giro continua per i rilievi interni; un vicino può essere
-corretto insieme a loro, perché il suo file è già aperto, ma non ferma questo
-lavoro; ogni esterno esce subito in un feedback suo, con la priorità del suo
-livello (un 2 nasce a 1: la 2 la mette solo il manutentore), e non ferma questo lavoro — nemmeno col `?`: la domanda viaggia nel
-suo feedback.
+resta un 3. Il giro lo decidono i rilievi interni: un vicino entra nella
+correzione solo se il giro parte comunque per loro, perché il suo file è già
+aperto; altrimenti esce in un feedback derivato col livello che hai scritto.
+Non fa partire un giro, non lo paga e non ferma questo lavoro. Ogni esterno
+esce subito in un feedback suo, con la priorità del suo livello (un 2 nasce a
+1: la 2 la mette solo il manutentore), e non ferma questo lavoro — nemmeno col
+`?`: la domanda viaggia nel suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
 rilievo chiede una decisione dell'owner, su un trade-off che non si misura
@@ -79,7 +81,12 @@ rilievo chiede una decisione dell'owner, su un trade-off che non si misura
 CLAUDE.md § Iniziativa), e porta la sua
 domanda (più sotto). Non copre un trade-off di costo: deciso con la stima e le
 opzioni esposte non è un rilievo, altrimenti è un rilievo senza `?` (criteri
-di verifica, punto 8). Un difetto non chiede decisioni.
+di verifica, punto 8). Un difetto non chiede decisioni. Nel testo del rilievo
+scrivi **l'opzione che consigli**: un `[2i?]` non ferma il lavoro, chi corregge
+applica quella e la domanda esce in un feedback a parte. Ferma il lavoro un
+`[3i?]`, e una scelta **difficile da disfare** (dati degli utenti, sicurezza,
+formati salvati su disco), che marchi col `!` dopo il `?`: `[2i?!]`. Un 1 o uno
+0 col `?` esce in un feedback derivato senza fermare niente.
 
 | segnalazione e rilievo | livello e sede |
 |---|---|

@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { esceInOgniEsito, proveDaToglierePrimaDelVerdetto, proveScritteDa } from '../../scripts/lib/prove-tolte.mjs';
+import { esceInOgniEsito, fermaDiSicuro, proveDaToglierePrimaDelVerdetto, proveScritteDa } from '../../scripts/lib/prove-tolte.mjs';
 import { verifierReplyText } from '../../scripts/dispatch.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -19,8 +19,8 @@ const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 test('escono in ogni esito gli esterni e i `?` che contano al più 1; gli altri dipendono dai bilanci', () => {
   assert.equal(esceInOgniEsito({ level: 3, sede: 'e' }), true);
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i', decision: true }), true);
-  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true, 'un vicino conta 0');
-  assert.equal(esceInOgniEsito({ level: 2, sede: 'i', decision: true }), false, 'un 2 col ? ferma il lavoro: la prova resta per chi riprende');
+  assert.equal(esceInOgniEsito({ level: 3, sede: 'v', decision: true }), true, 'un vicino col ? esce sempre');
+  assert.equal(esceInOgniEsito({ level: 2, sede: 'i', decision: true }), false, 'un 2 col ? si corregge con la consigliata: la prova resta');
   assert.equal(esceInOgniEsito({ level: 1, sede: 'i' }), false, 'un 1 si corregge o esce secondo il bilancio');
   assert.equal(esceInOgniEsito({ level: 0, sede: 'v' }), false);
 });
@@ -45,7 +45,7 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
   const V = globalThis.SN_VERIFIER_ROUND;
   const caps = { cap3: 10, cap2: 10, cap1: 1, cap0: 0 };
   for (const critica of [
-    'Provato.\n[2i?] Il riquadro è freddo?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
+    'Provato.\n[2i?!] I dati salvati cambiano forma?\n[1i?] Il bordo è grigio?\n[1e] Fuori.',
     'Provato.\n[3i?] I dati escono?\n[2v?] Il titolo accanto è tagliato?\n[1e] Fuori.',
   ]) {
     const { findings } = V.parseFindings(critica);
@@ -55,6 +55,34 @@ test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: e
     const fuori = proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r2-sospeso.spec.mjs', 'tests/verifica/42/giro1-r3-esterno.spec.mjs'], findings);
     assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r3-esterno.spec.mjs'], critica);
   }
+});
+
+test('la pulizia prima del verdetto decide la fermata con la stessa regola del giro', () => {
+  const require = createRequire(import.meta.url);
+  require('../../src/shared/verifierRound.js');
+  const V = globalThis.SN_VERIFIER_ROUND;
+  for (const level of [0, 1, 2, 3]) for (const decision of [false, true]) for (const irreversibile of [false, true]) {
+    const f = { level, sede: 'i', decision, irreversibile };
+    assert.equal(fermaDiSicuro([f]), V.decisioneFerma(f), JSON.stringify(f));
+    assert.equal(fermaDiSicuro([{ ...f, sede: 'e' }]), false);
+    assert.equal(fermaDiSicuro([{ ...f, sede: 'v' }]), false);
+  }
+});
+
+test('un 2 col `?` non ferma (#1202): la prova di un 1 col `?` della stessa critica esce prima del verdetto, la sua resta', () => {
+  const require = createRequire(import.meta.url);
+  require('../../src/shared/verifierRound.js');
+  const V = globalThis.SN_VERIFIER_ROUND;
+  const { findings } = V.parseFindings('Provato.\n[2i?] Il riquadro è freddo? Consiglio caldo.\n[1i?] Il bordo è grigio?\n[1e] Fuori.');
+  const esito = V.decideRound({ findings, caps: { cap3: 10, cap2: 10, cap1: 1, cap0: 0 }, counts: {} });
+  assert.equal(esito.stop, false);
+  assert.deepEqual(esito.fix.map((f) => f.level), [2]);
+  const fuori = proveDaToglierePrimaDelVerdetto([
+    'tests/verifica/42/giro1-r1-riquadro.spec.mjs',
+    'tests/verifica/42/giro1-r2-bordo.spec.mjs',
+    'tests/verifica/42/giro1-r3-esterno.spec.mjs',
+  ], findings);
+  assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-bordo.spec.mjs', 'tests/verifica/42/giro1-r3-esterno.spec.mjs']);
 });
 
 /** Un ramo con un punto fermo all'avvio della verifica e, dopo, le prove della critica. */

@@ -1458,7 +1458,7 @@ async function recordVerifier(id, critiqueText, domande = []) {
   const next = applyVerifierVerdict(base, outcome, critiqueText, shaProvato);
   next.id = id;
   // I rilievi messi da parte su QUESTO commit, col loro posto nella critica: la pulizia toglie solo le loro prove.
-  const daParte = derivatiAperti(reply.phase2 ? reply.phase2.derived : reply.derived);
+  const daParte = messiDaParte(reply.phase2 ? reply.phase2.derived : reply.derived, reply.phase2 && reply.phase2.findings);
   next.messiDaParteGiro = outcome === 'fix'
     ? { sha: shaProvato, n: daParte.reduce((k, d) => k + d.rilievi.length, 0), numeri: daParte.flatMap((d) => d.rilievi.map((f) => f.n)).filter(Number.isInteger), avvio: avvio || '' }
     : null;
@@ -1488,6 +1488,13 @@ export const FERMA_NOTE = [
   '  node scripts/dispatch.mjs --record-fixed <id> "<report>" --domanda <file.json>',
   'Una domanda che blocca FERMA il lavoro: non torna in verifica, aspetta l\'owner, e riprende da lì quando ha',
   'risposto. Senza domanda torna in coda per un\'altra verifica. Un difetto non è una domanda.',
+].join('\n');
+
+// Un 2 col «?» da correggere: la regola la dice lo strumento, perché il testo della fase 2 può essere dell'owner.
+export const DECISIONE_IN_CORREZIONE_NOTE = [
+  'I rilievi col «?» nell\'elenco da correggere chiedono una decisione dell\'owner che non ferma il lavoro:',
+  'applica l\'opzione che il verificatore consiglia nel testo del rilievo. La domanda è già nel suo feedback',
+  'derivato, qui sotto: se l\'owner sceglie diversamente, sarà quel feedback a cambiare il codice già fuso.',
 ].join('\n');
 
 /**
@@ -1521,6 +1528,20 @@ export function derivatiAperti(derived) {
     if (num) perNumero.set(num, voce);
   }
   return voci;
+}
+
+/**
+ * I derivati del giro senza i rilievi che chi corregge sta anche correggendo (un 2 col «?»: la domanda esce in un
+ * feedback, il codice lo cambia questo giro). La loro prova resta e si toglie verde con quella durevole: la pulizia
+ * toglie solo quelle dei rilievi davvero messi da parte (#1202). Se il server non manda il segno, li riconosce il
+ * numero, che è lo stesso nei due elenchi. PURA.
+ */
+export function messiDaParte(derived, fix) {
+  const daCorreggere = new Set((Array.isArray(fix) ? fix : []).map((f) => f && f.n).filter(Number.isInteger));
+  const fuori = (f) => f.inCorrezione === true || (Number.isInteger(f.n) && daCorreggere.has(f.n));
+  return derivatiAperti(derived)
+    .map((d) => ({ ...d, rilievi: d.rilievi.filter((f) => !fuori(f)) }))
+    .filter((d) => d.rilievi.length);
 }
 
 function frase(f) {
@@ -1574,14 +1595,17 @@ export function verifierReplyText(reply, id = '<id>') {
   // il testo vive nel feedback, e la cartella del giro si svuota invece di
   // crescere. Le righe sono pronte da spuntare, col numero di ciascuno.
   // Quelle dei rilievi che escono in ogni esito sono già uscite prima della critica (#1555): qui restano le altre.
-  const daTogliere = derivati.flatMap((d) => d.rilievi.filter((f) => !esceInOgniEsito(f)).map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
+  const daParte = messiDaParte(r.phase2 ? r.phase2.derived : r.derived, r.phase2 && r.phase2.findings);
+  const daTogliere = daParte.flatMap((d) => d.rilievi.filter((f) => !esceInOgniEsito(f)).map((f) => `  · ${Number.isInteger(f.n) ? `le prove con r${f.n} nel nome` : 'nessuna prova (il rilievo non si ritrova nella critica)'}, per ${d.num || '(numero non comunicato)'}: ${frase(f)}`)).join('\n');
   if (r.outcome === 'fix' && r.phase2) {
+    const conDomanda = Array.isArray(r.phase2.findings) && r.phase2.findings.some((f) => f && f.decision === true);
     return [
       '══ RISPOSTA DEL SERVER: c\'è da correggere ══',
       provvRiga,
       'Rilievi interni da correggere in questo giro (con la loro famiglia: le altre porte della stessa causa):',
       fmt(r.phase2.findings),
-      'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu):',
+      conDomanda ? DECISIONE_IN_CORREZIONE_NOTE : null,
+      'Feedback derivati aperti dal server (esterni e messi da parte: non li correggi tu; una domanda su un rilievo che correggi ha qui il suo feedback):',
       derivatiRighe(derivati),
       daTogliere ? 'Prove del giro da TOGLIERE adesso, PRIMA di ogni correzione, in un commit che toglie solo queste (quelle degli esterni e delle domande sono già uscite col commit della critica). Una prova che porta anche il numero di un rilievo da correggere resta: le si toglie solo il caso di questi, e il suo caso resta rosso (la registrazione la rilancia, e anche quelle che usano un aiuto a cui hai tolto righe).' : null,
       daTogliere || null,
@@ -1608,7 +1632,7 @@ export function verifierReplyText(reply, id = '<id>') {
       provvRiga,
       perSegnalazione
         ? 'La domanda è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
-        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o un 3/2 che chiede una decisione): decide l\'owner.',
+        : 'Rilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o una decisione su un 3 o su una scelta difficile da disfare): decide l\'owner.',
       perSegnalazione ? null : fmt(r.blocking),
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
@@ -2018,7 +2042,8 @@ export function usageText() {
     '                         torna su main, perché il prossimo worker parta con i suoi agenti',
     '  --record-verifier <id> "<critica>" [--domanda <file.json>] [--ticket <b>]   una riga per rilievo,',
     '                         con livello e sede davanti ([2i] …, [1v] …, [2e] …; [1i?] = chiede una decisione,',
-    '                         e porta la sua domanda: --domanda con una, o un elenco nell\'ordine dei rilievi col «?»);',
+    '                         [2i?!] = una scelta difficile da disfare; ognuna porta la sua domanda: --domanda con',
+    '                         una, o un elenco nell\'ordine dei rilievi col «?»);',
     '                         le quadre col livello dentro sono SEMPRE un rilievo: nel',
     '                         riassunto il livello si cita a parole («il livello 2»);',
     '                         l\'esito lo calcola il server e lo stampa qui: LEGGILO',
