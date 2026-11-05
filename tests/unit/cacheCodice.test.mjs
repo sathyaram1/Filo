@@ -44,9 +44,9 @@ function avvia(userData, appPath, env = {}) {
     require(${JSON.stringify(join(appPath, 'pesante.js'))});
     C.scrivi();
     process.stdout.write(JSON.stringify({ accesa }));`;
-  const ambiente = { ...process.env, NODE_DEBUG_NATIVE: 'COMPILE_CACHE', ...env };
+  const ambiente = { ...process.env, NODE_DEBUG_NATIVE: 'COMPILE_CACHE', ...MOTORE.env, ...env };
   for (const k of ['NODE_COMPILE_CACHE', 'NODE_DISABLE_COMPILE_CACHE', 'APPIMAGE']) if (!(k in env)) delete ambiente[k];
-  const r = spawnSync(process.execPath, ['-e', codice], { env: ambiente, encoding: 'utf8' });
+  const r = spawnSync(MOTORE.bin, ['-e', codice], { env: ambiente, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   return { ...JSON.parse(r.stdout), presa: /pesante\.js was accepted/.test(r.stderr) };
 }
