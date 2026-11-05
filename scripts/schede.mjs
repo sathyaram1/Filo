@@ -290,7 +290,8 @@ export async function letturaCloud(ticket, opz = {}) {
   return {
     ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda),
     segnalati: new Map(r.voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
-    illeggibili: r.voci.filter((v) => v.schedaIllegibile).length,
+    // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita.
+    illeggibili: r.voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato)).length,
   };
 }
 
