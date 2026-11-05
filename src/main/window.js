@@ -72,6 +72,12 @@ function riaperturaDaSistema(visibili) {
   return mostraFinestraNormale();
 }
 
+// Chi agisce su una finestra appena nata aspetta le sue schede: aperta prima, la sua scheda finirebbe dietro quelle
+// riaperte. Risolve `{ ripristinata }`, o null se la finestra si chiude prima.
+function quandoPronta(win) {
+  return (win && win._filoPronta) || Promise.resolve(win && !win.isDestroyed() ? { ripristinata: false } : null);
+}
+
 // Gli init che la prima scheda deve trovare fatti (ad-blocker, impronta, permessi…) li aspetta qualunque finestra
 // normale nata durante l'avvio, prima di riaprire le schede: la finestra intanto si apre e la barra si carica (#1092).
 let avvioPronto = Promise.resolve();
@@ -102,13 +108,18 @@ function wireWindowCommon(win, tabs) {
   win.on('close', (e) => {
     // Prima del congedo: chi sceglie di non chiudere trova le schede come le aveva.
     if (scaricamentiTrattengono(win)) { e.preventDefault(); return; }
-    if (congedoChiusuraFatto) return;
-    congedoChiusuraFatto = true;
-    const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
-    if (!attesa) return;
-    e.preventDefault();
-    const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
-    attesa.then(chiudi, chiudi);
+    if (!congedoChiusuraFatto) {
+      congedoChiusuraFatto = true;
+      const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
+      if (attesa) {
+        e.preventDefault();
+        const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
+        attesa.then(chiudi, chiudi);
+        return;
+      }
+    }
+    // Da qui la chiusura va avanti: la sessione resta quella di adesso, prima che le schede si smontino (#2191).
+    tabs.chiudiSessione();
   });
 
   win.on('resize', () => tabs.layout());
@@ -230,6 +241,9 @@ function createMainWindow() {
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
+  let pronta = () => {};
+  win._filoPronta = new Promise((r) => { pronta = r; });
+  win.once('closed', () => pronta(null));
 
   wireWindowCommon(win, tabs);
   // Quando non risponde, e lo spegnimento del sistema su Windows, che non passa dall'uscita (#1466).
@@ -246,6 +260,7 @@ function createMainWindow() {
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
+    pronta({ ripristinata: restored });
     passo('sessione_ripristinata', tSessione);
     revealWindow(win);
     if (avvio) {
@@ -328,4 +343,5 @@ function createIncognitoWindow() {
 module.exports = {
   createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
   assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale, riaperturaDaSistema, attendiAvvio,
+  quandoPronta,
 };

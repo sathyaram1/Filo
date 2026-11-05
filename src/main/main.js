@@ -492,16 +492,16 @@ app.whenReady().then(async () => {
 app.on('before-quit', () => {
   try { contatori()?.inizioChiusura(); } catch (_) {}
   try {
-    // Una finestra che non ha ancora riaperto la sessione salvata non la riscrive (la regola sta in tabs.js).
-    const tm = mainWindow?._filoTabs?._sessioneDaLeggere ? null : mainWindow?._filoTabs;
+    // Chi scrive e cosa (la finestra ancora da riaprire, quella già chiusa) lo decide tabs.js.
+    const stato = mainWindow?._filoTabs?.statoPerLUscita?.() || null;
     const Storage = require('./shim/storage');
     // L'ora dei contatori viaggia con le schede: dopo questa scrittura non ne parte un'altra (#1466).
     let contati = {};
     try { contati = contatori()?.perLaChiusura() || {}; } catch (_) { contati = {}; }
     // setSync scrive già tutto il file: una seconda scrittura raddoppierebbe solo il tempo della chiusura.
-    if (tm && Storage?.setSync) {
+    if (stato && Storage?.setSync) {
       const key = globalThis.SN_CONST?.STORAGE_KEYS?.OPEN_TABS || 'sn_open_tabs';
-      Storage.setSync({ [key]: tm.sessionState(), ...contati });
+      Storage.setSync({ [key]: stato, ...contati });
     } else if (Object.keys(contati).length && Storage?.setSync) Storage.setSync(contati);
     else Storage?.flushSync?.();
   } catch (_) {}

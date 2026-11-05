@@ -484,7 +484,7 @@ class TabManager {
     VociMenuUsate.servizio().carica().catch(() => {});
     this.codaRiapertura = new CodaRiapertura({ carica: (tab) => this._caricaRinviata(tab) });
     if (window && typeof window.once === 'function') {
-      window.once('closed', () => { this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi(); });
+      window.once('closed', () => { this.chiudiSessione(); this.anteprime.chiudi(); for (const r of riserveDi(this)) r.spegni(); this.codaRiapertura.chiudi(); });
     }
     this.avvisi = new AvvisiSopraPagina(window, {
       dopoInCima: () => { if (this.propostaEmail) this.propostaEmail.inCima(); this.conferme.inCima(); if (this.strato) this.strato.inCima(); },
@@ -4641,22 +4641,47 @@ class TabManager {
   // Salvataggio con debounce: _broadcast scatta spesso (load, titolo, favicon), e titolo, icona e
   // caricamento non cambiano la sessione: se è uguale a quella scritta non si riscrive (#1089).
   _persistSession() {
-    if (this.incognito) return; // incognito: nessuna sessione salvata su disco
-    if (this._restoring || this._sessioneDaLeggere) return; // non sovrascrivere prima o durante il ripristino
+    if (!this._sessioneScrivibile()) return;
     clearTimeout(this._sessionTimer);
     this._sessionTimer = null;
     if (JSON.stringify(this.sessionState()) === sessioneScritta) return;
     this._sessionTimer = setTimeout(() => {
       this._sessionTimer = null;
-      const stato = this.sessionState();
-      const testo = JSON.stringify(stato);
-      if (testo === sessioneScritta) return;
-      sessioneScritta = testo;
-      try {
-        Promise.resolve(globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), stato))
-          .catch(() => { if (sessioneScritta === testo) sessioneScritta = null; });
-      } catch (_) { sessioneScritta = null; }
+      if (this._sessioneScrivibile()) this._scriviSessione(this.sessionState());
     }, 400);
+  }
+
+  // Non scrive la sessione l'incognito, né chi non ha ancora riaperto quella salvata, né una finestra chiusa: le sue
+  // schede si smontano una alla volta e la riscriverebbero a metà sopra quella buona (#2191).
+  _sessioneScrivibile() {
+    return !this.incognito && !this._restoring && !this._sessioneDaLeggere && !this._sessioneChiusa;
+  }
+
+  _scriviSessione(stato) {
+    const testo = JSON.stringify(stato);
+    if (testo === sessioneScritta) return;
+    sessioneScritta = testo;
+    try {
+      Promise.resolve(globalThis.SN_STORAGE?.setRaw?.(this._sessionKey(), stato))
+        .catch(() => { if (sessioneScritta === testo) sessioneScritta = null; });
+    } catch (_) { sessioneScritta = null; }
+  }
+
+  // La finestra se ne va: la sessione è quella di adesso, scritta subito (il debounce la perderebbe), e da qui non
+  // cambia più. Idempotente: la chiama la chiusura accettata e, di riserva, `closed`.
+  chiudiSessione() {
+    if (this._sessioneChiusa) return;
+    clearTimeout(this._sessionTimer);
+    this._sessionTimer = null;
+    this._statoAllaChiusura = this._sessioneScrivibile() ? this.sessionState() : null;
+    this._sessioneChiusa = true;
+    if (this._statoAllaChiusura) this._scriviSessione(this._statoAllaChiusura);
+  }
+
+  // Quello che l'uscita scrive per questa finestra, o null se non deve scrivere niente.
+  statoPerLUscita() {
+    if (this._sessioneChiusa) return this._statoAllaChiusura;
+    return this._sessioneScrivibile() ? this.sessionState() : null;
   }
 
   // Ritorna false se non c'era niente da ripristinare: allora il chiamante apre
