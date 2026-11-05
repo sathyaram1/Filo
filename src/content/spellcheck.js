@@ -1371,13 +1371,20 @@
 
   // La risposta di un controllo il cui testo è cambiato nel frattempo non si posa (metterebbe segni su parole rimaste
   // uguali, o toglierebbe quelli giusti): il suo pezzo torna da rivedere e il controllo riparte (#1302).
-  function riapri(state, fonte, zona) {
+  // Riparte da sé solo se il cambio l'ha fatto l'utente: una pagina che cambia il campo durante ogni controllo ne
+  // pagherebbe uno a risposta (#1070). La zona resta da rivedere al prossimo controllo.
+  function riapri(state, fonte, viaggio) {
+    const zona = viaggio.zonaPersa;
     if (zona && zona.end > zona.start) {
       const c = state.riaperte[fonte];
       state.riaperte[fonte] = c ? { start: Math.min(c.start, zona.start), end: Math.max(c.end, zona.end) } : { ...zona };
     }
-    if (fonte === 'rapido') programmaRapido(state, { gesto: true });
-    else programmaRagionato(state, { gesto: true });
+    const gesto = !!viaggio.dalGesto;
+    if (fonte === 'rapido') programmaRapido(state, { gesto });
+    else programmaRagionato(state, { gesto });
+  }
+  function persiDalGesto(state, { rapido = false, ragionato = false }) {
+    for (const v of state.inViaggio) if (v.perso && (v.id[0] === 'r' ? rapido : ragionato)) v.dalGesto = true;
   }
   // La zona da rivedere nelle coordinate del testo da controllare, o null.
   function riapertaIn(state, fonte, d) {
