@@ -688,3 +688,40 @@ test('col nome automatico acceso, un file scaricato da un sito delicato tiene il
     return (((r && r.items) || []).find((it) => it.id === normale.id) || {}).filename;
   }, { timeout: 15000 }).toBe('Riassunto finto della pagina.txt');
 });
+
+// #1823 — molte banche aprono il documento in una scheda nuova, servito da un altro dominio: conta la pagina che l'ha aperta.
+test.describe('un file da un altro dominio aperto in una scheda nuova', () => {
+  test.use({ hostInPiu: ['cdn-documenti.test'] });
+
+  test('dalla banca tiene il suo nome e non va al modello dei nomi', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    await modelliFinti(app);
+    await impostaDaFilo(app, { nomiSensati: { scaricamenti: true }, security: { pagineDelicate: { siti: ['sito-pubblico.test'] } } });
+    const { createServer } = await import('node:http');
+    const srv = createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': Buffer.byteLength(SEGRETO), 'Content-Disposition': 'attachment; filename="documento.txt"' });
+      res.end(SEGRETO);
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    try {
+      const url = `http://cdn-documenti.test:${srv.address().port}/documento.txt`;
+      const page = await testServer.openReady(openTab,
+        `<!doctype html><title>La mia banca</title><body style="padding:40px"><a id="dl" target="_blank" href="${url}">Scarica l'estratto conto</a></body>`,
+        { pubblico: true });
+      await page.locator('#dl').click();
+      let rec = null;
+      await expect.poll(async () => {
+        const r = await shell.evaluate(() => window.filoShell.downloads.list());
+        rec = ((r && r.items) || []).find((it) => it.url === url) || null;
+        return rec ? rec.state : null;
+      }, { timeout: 20000 }).toBe('completed');
+      await new Promise((r) => setTimeout(r, 4000));
+      expect((await mandato(app)).filter((m) => m.testo.includes('12.345,67'))).toEqual([]);
+      const r = await shell.evaluate(() => window.filoShell.downloads.list());
+      expect((((r && r.items) || []).find((it) => it.id === rec.id) || {}).filename).toBe('documento.txt');
+    } finally {
+      try { srv.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => srv.close(r));
+    }
+  });
+});

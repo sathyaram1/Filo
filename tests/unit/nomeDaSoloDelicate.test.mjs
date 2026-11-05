@@ -29,7 +29,7 @@ const improntaFinta = (b) => createHash('sha256').update(Buffer.from(b)).digest(
 let istanza = null;
 Immagini.perFilo = () => istanza;
 
-async function scarica({ nome, contenuto, url, pagina = '', primo = url, settings = {} }) {
+async function scarica({ nome, contenuto, url, pagina = '', apertaDa = '', primo = url, settings = {} }) {
   const dir = cartellaTemporanea('filo-nome-delicate-');
   try {
     impostazioni = settings;
@@ -43,7 +43,7 @@ async function scarica({ nome, contenuto, url, pagina = '', primo = url, setting
     await istanza.segna(Buffer.from(SCREENSHOT_SEGNATO));
     const savePath = join(dir, nome);
     writeFileSync(savePath, contenuto);
-    const rec = { id: `r-${Math.random()}`, filename: nome, url, _primo: primo, _pagina: pagina, savePath, state: 'completed', _scope: '' };
+    const rec = { id: `r-${Math.random()}`, filename: nome, url, _primo: primo, _pagina: pagina, _apertaDa: apertaDa, savePath, state: 'completed', _scope: '' };
     DL._records.set(rec.id, rec);
     await DL._nominaDaSolo(rec);
     DL._records.delete(rec.id);
@@ -74,6 +74,15 @@ test('anche quando è l\'indirizzo del file, o il primo della catena, a essere d
     const { chiamate } = await scarica({ nome: 'download.txt', contenuto: SALDO, ...r });
     assert.equal(chiamate.length, 0, JSON.stringify(r));
   }
+});
+
+// #1823 — il link della banca che apre il file in una scheda nuova: la scheda-ponte non ha una pagina sua.
+test('un file aperto dalla banca in una scheda nuova, servito da un altro dominio, non va al modello', async () => {
+  const { chiamate, file } = await scarica({
+    nome: 'documento.txt', contenuto: SALDO, url: 'https://cdn.esempio-file.net/x/123', pagina: '', apertaDa: 'https://www.intesasanpaolo.com/conto/estratti',
+  });
+  assert.equal(chiamate.length, 0, 'il contenuto del file è partito verso il modello dei nomi');
+  assert.deepEqual(file, ['documento.txt']);
 });
 
 test('un file scaricato dalla rete di casa non va al modello', async () => {
