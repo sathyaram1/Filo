@@ -75,9 +75,9 @@ function riaperturaDaSistema(visibili) {
 // Su Mac la barra dei menu c'è prima della finestra dell'avvio: una voce premuta lì non ne fa una seconda.
 let finestraDellAvvio = false;
 
-// Le voci della barra che aprono qualcosa, con Filo acceso senza finestre con schede (#2031): la finestra rinasce
-// come dal Dock. Prima che sia nata quella dell'avvio non si crea niente: la fa l'avvio.
-function rifaiFinestraPerUnaVoce() {
+// Chi chiede la finestra da fuori (seconda apertura, invito, voci della barra su Mac, #2031) passa da qui: prima che sia
+// nata quella dell'avvio non si crea niente, la fa l'avvio.
+function ridaiFinestraNormale() {
   return finestraDellAvvio ? mostraFinestraNormale() : null;
 }
 
@@ -353,5 +353,5 @@ function createIncognitoWindow() {
 module.exports = {
   createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
   assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale, riaperturaDaSistema, attendiAvvio,
-  rifaiFinestraPerUnaVoce, quandoPronta,
+  ridaiFinestraNormale, quandoPronta,
 };

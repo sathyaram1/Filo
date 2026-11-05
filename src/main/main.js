@@ -95,7 +95,7 @@ if (process.env.NODE_ENV === 'test') {
 try { require('./test-servizi-chiusi').chiudiServiziNeiTest(); } catch (_) {}
 
 const {
-  createMainWindow, mostraFinestraNormale, onFinestraNormale, attendiAvvio, riaperturaDaSistema,
+  createMainWindow, ridaiFinestraNormale, onFinestraNormale, attendiAvvio, riaperturaDaSistema,
 } = require('./window');
 const { registerFiloProtocol } = require('./protocol');
 const { registerIpcHandlers } = require('./ipc');
@@ -142,12 +142,10 @@ let invitoInAttesa = null;
 // codice dentro è storto. Chi ha cliccato aspetta che succeda qualcosa, e lo
 // dice la pagina Crediti — è il riscatto a rifiutarlo, con la sua frase.
 function apriInvito(code) {
-  // Senza finestra (avvio a freddo: l'apertura è ancora a metà) l'invito
-  // aspetta lì e parte appena la finestra c'è.
-  if (!mainWindow) { invitoInAttesa = { code }; return true; }
-  // Con la principale chiusa e Filo acceso (Mac, o un'altra finestra aperta) ne nasce una: Crediti si apre lì.
-  const win = mostraFinestraNormale();
-  if (!win) return true;
+  // Con la principale chiusa e Filo acceso (Mac, o un'altra finestra aperta) ne nasce una: Crediti si apre lì. Ad
+  // avvio a freddo ancora a metà l'invito aspetta e parte appena la finestra c'è.
+  const win = ridaiFinestraNormale();
+  if (!win) { invitoInAttesa = { code }; return true; }
   // Riscatto e pagina Crediti partono insieme, e la pagina si aggiorna da sé
   // all'avviso di saldo cambiato. È la stessa strada del clic dentro Filo.
   try { globalThis.SN_WALLET_MAIN?.portaDentroInvito?.(code, win); } catch (_) {}
@@ -577,8 +575,7 @@ app.on('window-all-closed', () => {
 // La seconda apertura porta davanti la finestra normale, e la rifà se Filo è rimasto acceso senza (#1606).
 app.on('second-instance', (_event, argv) => {
   try { contatori()?.secondaIstanza(); } catch (_) {}
-  // Prima che l'avvio abbia la sua finestra non si crea niente: la farà l'avvio.
-  if (mainWindow) mostraFinestraNormale();
+  ridaiFinestraNormale();
   // Su Windows e Linux un `filo://…` aperto mentre Filo è già acceso arriva
   // qui, fra gli argomenti della seconda istanza. La posizione non è fissa
   // (in sviluppo il secondo argomento è `.`, nei test `.` è l'ultimo):
