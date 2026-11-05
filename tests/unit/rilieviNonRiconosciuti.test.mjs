@@ -32,6 +32,22 @@ test('#2179: un numero di più cifre fra tonde o graffe è testo, una cifra sola
   }
 });
 
+test('#2179: in testa alla riga vale la stessa regola che a metà riga', () => {
+  for (const c of [
+    'Visto (2865) chiuso, nessun rilievo.',
+    'Provato:\n(2865) è il feedback del conteggio, regge.',
+    'Provato:\n- (2865) il conteggio regge\n- tema scuro regge',
+    'Ok: (2865) regge.',
+    'Provato:\n(10) volte la stessa azione, regge.',
+    'Provato:\n(1.000) righe incollate.',
+    'Provato:\n{2179} chiuso.',
+    'Provato:\n9) nono\n10) decimo punto, regge\n11) undicesimo',
+  ]) assert.deepEqual(R.unparsedLevelLines(c), [], c);
+  for (const riga of ['(2) bordo storto', '{2} bordo storto', '(2.5) bordo', '(2-3) bordo', '(livello 2) bordo', '(tre) bordo', '[2865] chiuso']) {
+    assert.deepEqual(R.unparsedLevelLines(`Provato tutto.\n${riga}`), [riga], riga);
+  }
+});
+
 test('#2179: il rifiuto dice, sotto ogni riga, il pezzo letto come livello', () => {
   const t = R.testoRilieviNonRiconosciuti('Provato: regge (3) volte.\nRilievo [2]: non salva.\n[1i] bordo [2i] e un secondo\n[2] senza sede');
   assert.match(t, /^rilievi non riconosciuti\./);
