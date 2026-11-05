@@ -1,5 +1,5 @@
 // Verifica #2031, giro 1: le voci della barra dei menu su Mac quando la finestra con le schede non è quella davanti
-// (chiusa, ridotta a icona, o dietro la finestrella di accesso).
+// (chiusa, o dietro la finestrella di accesso).
 import { test, expect } from '../../fixtures/electron.mjs';
 import { voceDellaBarra } from '../../helpers/barraDeiMenu.mjs';
 
