@@ -37,6 +37,27 @@ async function daSoli(file, sessione, { casa, tetto = TETTO_ATTESA_MS }) {
   return { ...r, fermo: avvisi.length ? avvisi.join('\n') : null };
 }
 
+const nomiRossi = (tap) => [...new Set([...String(tap || '').matchAll(/^\s*not ok \d+ - (.*)$/gm)].map((m) => m[1].trim()))];
+
+/**
+ * I rossi che solo la sessione accende. Un rosso che il file ha anche senza sessione lo tiene già la sua chiave
+ * `unit:<file>`: contato anche qui, l'allarme lo dava per un guasto nuovo di questo file (#2174).
+ */
+async function rossiDiSessione(file, sessione, { casa }) {
+  const con = await daSoli(file, sessione, { casa });
+  if (con.fermo || con.status === 0) return { fermo: con.fermo, soloInSessione: [], dettaglio: '' };
+  const dettaglio = String(con.stderr || con.error || '').slice(-4000);
+  const rossiCon = nomiRossi(con.stdout);
+  // Un'uscita rossa senza un caso rosso non si attribuisce: resta rossa.
+  if (!rossiCon.length) return { fermo: null, soloInSessione: [`uscita ${con.status} senza un caso rosso`], dettaglio };
+  const chiavi = chiaviDelRegistroUnit(con.stdout, ROOT);
+  const daRifare = chiavi.includes('unit') ? file : chiavi.map((k) => join(ROOT, k.slice('unit:'.length)));
+  const senza = await daSoli(daRifare, {}, { casa });
+  if (senza.fermo) return { fermo: senza.fermo, soloInSessione: [], dettaglio };
+  const rossiSenza = new Set(nomiRossi(senza.stdout));
+  return { fermo: null, soloInSessione: rossiCon.filter((n) => !rossiSenza.has(n)), dettaglio };
+}
+
 test('lanciati da soli in una sessione con tutta la sua identità accesa, i file che la leggono sono verdi (#1109.1)', async () => {
   const importano = readdirSync(QUI).filter((f) => f.endsWith('.test.mjs') && f !== QUESTO && IMPORTA.test(readFileSync(join(QUI, f), 'utf8')));
   const file = [...new Set([...NOTI, ...importano])];
