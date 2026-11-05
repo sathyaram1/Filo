@@ -149,8 +149,9 @@
   // stia. Se la riga non si legge come rilievo, viene respinta con la spiegazione.
   const QUADRA_OVUNQUE = /\[{1,2}[^\]\n]{0,200}\]{1,2}/g;
   // E, dovunque nella riga, una parentesi di QUALUNQUE forma che contenga SOLO un livello:
-  // «(3)», «{2}», «[2)», «(due)». Il contenuto è stretto apposta: «(3 volte)» resta testo.
-  const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d+(?:\\s*[.,\\-–/]\\s*\\d+)?|zero|uno|due|tre)\\s*[?!]*\\s*';
+  // «(3)», «{2}», «[2)», «(due)». Il contenuto è stretto apposta: «(3 volte)» resta testo, e
+  // la cifra è UNA: «(2865)» è un numero di feedback o un conteggio, non un livello (#2179).
+  const SOLO_UN_LIVELLO = '\\s*(?:(?:livello|level|priorit[àa]|liv|L|P)\\s*)?(?:\\d(?:\\s*[.,\\-–/]\\s*\\d)?|zero|uno|due|tre)\\s*[?!]*\\s*';
   // Le parole si ancorano ai confini, o «altre» conterrebbe «tre»; il confine si guarda alle
   // LETTERE, non con \b: per la regex l'underscore è carattere di parola.
   const LIVELLO_NUDO = '(?:\\d|(?<![A-Za-zÀ-ÿ])(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])|[?!])';
