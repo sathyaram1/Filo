@@ -136,13 +136,14 @@ async function scriviEPubblica(shell, page, titolo, campo, testo = POST) {
   return id;
 }
 
-const PAGINA_WS = (titolo, url, binario = false) => `<!doctype html><title>${titolo}</title>
+// `svuota`: la casella resta nella pagina, vuota, come nelle chat; senza, la pagina la toglie.
+const PAGINA_WS = (titolo, url, binario = false, svuota = false) => `<!doctype html><title>${titolo}</title>
   <div id="box"><textarea id="c" style="width:400px;height:100px"></textarea><button id="pub">Pubblica</button></div><p id="esito"></p>
   <script>const ws = new WebSocket(${JSON.stringify(url)}); window.pronto = new Promise((r) => { ws.onopen = () => r(true); });
-    pub.onclick = () => { const m = JSON.stringify({ type: 'post', testo: c.value }); ws.send(${binario ? 'new TextEncoder().encode(m)' : 'm'}); box.remove(); esito.textContent = 'Post pubblicato'; };</script>`;
+    pub.onclick = () => { const m = JSON.stringify({ type: 'post', testo: c.value }); ws.send(${binario ? 'new TextEncoder().encode(m)' : 'm'}); ${svuota ? "c.value = ''" : 'box.remove()'}; esito.textContent = 'Post pubblicato'; };</script>`;
 
-async function postaWs(app, shell, sito, titolo, modo, { binario = false, testo = POST } = {}) {
-  const page = await apriEsatta(app, shell, sito.pagina(PAGINA_WS(titolo, `${sito.ws}?modo=${modo}`, binario)));
+async function postaWs(app, shell, sito, titolo, modo, { binario = false, testo = POST, svuota = false } = {}) {
+  const page = await apriEsatta(app, shell, sito.pagina(PAGINA_WS(titolo, `${sito.ws}?modo=${modo}`, binario, svuota)));
   expect(await page.evaluate(() => window.pronto)).toBe(true);
   await page.locator('#c').click();
   for (const [i, riga] of testo.split('\n').entries()) { if (i) await page.keyboard.press('Enter'); await page.keyboard.type(riga); }
