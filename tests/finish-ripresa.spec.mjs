@@ -82,7 +82,10 @@ test('un lotto ucciso a metà dal tetto del comando tiene gli spec già passati'
     expect(existsSync(join(dir, 'a-fatto')), 'lo spec verde ha girato').toBe(true);
     await new Promise((r) => setTimeout(r, 5_000));
     // Il tetto di un comando in sottofondo uccide tutto il gruppo, senza dargli il tempo di salvare.
-    try { process.kill(-figlio.pid, 'SIGKILL'); } catch (_) { /* già uscito */ }
+    try {
+      if (process.platform === 'win32') execFileSync('taskkill', ['/pid', String(figlio.pid), '/T', '/F'], { stdio: 'ignore' });
+      else process.kill(-figlio.pid, 'SIGKILL');
+    } catch (_) { /* già uscito */ }
     expect([...(await verdiDopo(dir, g))]).toContain('tests/a-verde');
   } finally { rmSync(dir, { recursive: true, force: true }); }
 });
