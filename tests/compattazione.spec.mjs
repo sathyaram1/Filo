@@ -97,6 +97,8 @@ const listinoFinto = (app) => app.evaluate(async () => {
     }
     return vero(input, init);
   };
+  // Senza una chiave (propria o dei crediti) la catena dei modelli è vuota, come per chi non può usare la chat.
+  await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'sk-or-v1-prova' } });
   const opzioni = { tab: { id: 5, url: 'filo://options/options.html' }, url: 'filo://options/options.html' };
   const r = await globalThis.SN_HANDLE_MESSAGE({ type: 'stima_costo_modelli', forzaListino: true }, opzioni);
   if (!r || !r.ok || !r.contesto || !r.contesto.listino) throw new Error('listino finto non letto: ' + JSON.stringify(r).slice(0, 200));
