@@ -92,13 +92,23 @@ export function cartellaInCasa(prefisso) {
 // scrivono lì per conto loro (#717). Una sola per corsa: chi la eredita la riusa. Corta e non canonica di proposito: su
 // Mac Chromium ci mette il suo socket, che oltre 104 caratteri di percorso non nasce, e /private davanti ne costerebbe otto.
 const dentroUnaCorsa = (dir) => basename(dir).startsWith(PREFISSO_CORSA);
+const APERTE_QUI = new Set();
 export function temporaneaDellaCorsa() {
   if (dentroUnaCorsa(tmpdir())) return tmpdir();
   // Prima i resti, poi la corsa: col disco pieno di resti la corsa non nascerebbe, e nessuno li toglierebbe più (#717).
   togliCartelleOrfane({ annuncia: (n) => console.error(`[test] tolgo ${n} cartelle temporanee lasciate da prove interrotte`) });
   const temp = togliAllUscita(mkdtempSync(join(tmpdir(), PREFISSO_CORSA)));
+  APERTE_QUI.add(temp);
   Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });
   return temp;
+}
+
+// La corsa la toglie solo il processo che l'ha aperta: una corsa annidata (una prova che lancia Playwright) eredita
+// quella di fuori, e togliendola faceva cadere con ENOENT le prove di fuori ancora in corso (#2169). Vero se tolta.
+export function chiudiLaCorsa(temp) {
+  if (!APERTE_QUI.has(temp)) return false;
+  APERTE_QUI.delete(temp);
+  return togliSenzaErrori(temp);
 }
 
 // Le cartelle chieste qui se ne vanno col processo che le ha chieste, verde o rosso che finisca: lasciate a ogni

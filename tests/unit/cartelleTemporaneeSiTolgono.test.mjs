@@ -249,6 +249,32 @@ test('il globalSetup di Playwright dà alla corsa una temporanea sua, e la togli
   assert.deepEqual(readdirSync(b.tmp), [], 'rimasto nella temporanea dopo la corsa');
 });
 
+// Una prova che lancia Playwright (#2169), o un unit test che chiama il globalSetup, eredita la corsa di chi la lancia:
+// la usa, ma non la toglie, perché le prove di fuori ci stanno ancora scrivendo.
+test('il globalSetup di una corsa annidata lascia la temporanea a quella di fuori', async () => {
+  const config = readFileSync(join(RADICE, 'playwright.config.js'), 'utf8');
+  const nome = (config.match(/globalSetup:\s*['"]([^'"]+)['"]/) || [])[1];
+  const { default: primaDellaCorsa } = await import(pathToFileURL(join(RADICE, nome)).href);
+  const b = banco();
+  const fuori = join(b.tmp, `${PREFISSO_CORSA}Fu0r1X`);
+  mkdirSync(fuori);
+  writeFileSync(join(fuori, 'di-fuori.txt'), 'in uso');
+  const chiavi = ['TMPDIR', 'TEMP', 'TMP'];
+  const prima = Object.fromEntries(chiavi.map((k) => [k, process.env[k]]));
+  let temp;
+  try {
+    for (const k of chiavi) process.env[k] = fuori;
+    const dopo = await primaDellaCorsa();
+    temp = tmpdir();
+    await dopo();
+  } finally {
+    for (const k of chiavi) { if (prima[k] === undefined) delete process.env[k]; else process.env[k] = prima[k]; }
+  }
+  assert.equal(temp, fuori, 'la corsa annidata non usa quella che eredita');
+  assert.ok(existsSync(join(fuori, 'di-fuori.txt')), 'la corsa annidata ha tolto la temporanea a quella di fuori');
+  assert.doesNotThrow(() => mkdirSync(join(fuori, 'dopo')), 'le prove di fuori non riescono più a chiedere una cartella');
+});
+
 // Col disco pieno di resti la corsa nuova non nasce: se la pulizia viene dopo, non parte mai e il disco resta pieno.
 // Il disco pieno si finge: creare una cartella dice ENOSPC finché la cartella vecchia è lì.
 function discoPienoFinché(b, vecchia) {
