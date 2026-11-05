@@ -657,6 +657,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // I conti, a fine lettura, con l'ULTIMA usage di ogni messaggio (in ordine
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
+  const dollariCache = cacheVuota();
   for (const { u, model, effort } of usi.values()) {
     const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, cache, oltreSoglia, velocita } = valutaUso(u, model);
     rep.turns += 1;
