@@ -65,9 +65,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
   esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
   sempre. La prova di un `[2i?]` resta: si corregge con l'opzione che consigli.
-  Se la critica ha un `[3i?]` o un `[2i?!]` e la sua domanda blocca, il lavoro
-  si ferma e i `?` restano a chi riprende: lì esce solo la prova degli esterni;
-  con `"blocca": false` il lavoro va avanti, e gli altri `?` escono come sempre.
+  Se la critica ha un `[3i?]` o un `[2i?!]` il lavoro si ferma e i `?` restano
+  a chi riprende: lì esce solo la prova degli esterni.
   A una prova che copre anche un rilievo che resta togli solo il caso di quello
   che esce, e il suo numero dal nome (`git mv`).
   **La pulizia che non dipende dall'esito si fa prima del verdetto**, nel
