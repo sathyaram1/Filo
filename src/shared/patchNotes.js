@@ -11,7 +11,7 @@
     {
       version: '0.2.266', date: '2026-11-05',
       fixes: [
-        { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega» o «Approfondisci», la pagina sotto non scatta più.', segnalazione: 2119 },
+        { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega», «Approfondisci» o «Traduci», la pagina sotto non scatta più.', segnalazione: 2119 },
       ],
     },
     {
