@@ -195,6 +195,102 @@ test('«riaprila» detto due volte non apre una seconda copia: la scheda già to
   await ripristina(app);
 });
 
+test('r3 «riaprila» su una pagina già aperta scritta con la barra finale o il sito in maiuscolo non apre un doppione', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche', PUBBLICO));
+  await tornaAllaHome(shell);
+  const orche = (await schede(shell)).find((x) => x.title === 'Le orche del Mediterraneo');
+  const scritta = `${orche.url.replace(/^(https?:\/\/[^/]+)/i, (m) => m.toUpperCase())}/`;
+  const id = await app.evaluate(async (_e, url) => (await globalThis.SN_ARCHIVED_TABS.archive({
+    url, title: 'Le orche del Mediterraneo', closedAt: new Date().toISOString(), reason: 'manual',
+  })).id, scritta);
+  const prima = (await schede(shell)).length;
+
+  await modelloFinto(app, [
+    { text: '', toolCalls: [{ id: 'g1', name: 'RIAPRI_SCHEDA', arguments: JSON.stringify({ id }) }] },
+    { text: 'È già aperta.' },
+  ]);
+  await chiedi(chat, 'riaprimi la pagina sulle orche');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'È già aperta.' })).toBeVisible({ timeout: 20_000 });
+  expect((await schede(shell)).length, 'nessun doppione delle orche').toBe(prima);
+  await expect.poll(async () => { const x = await shell.evaluate(async () => window.filoShell.tabs.snapshot()); return x.tabs.find((t) => t.id === x.activeId).url; }).toBe(orche.url);
+  await ripristina(app);
+});
+
+test('r2 una pagina delicata chiusa arriva al modello solo col sito, nella ricerca e nella riapertura', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const chat = await home(app);
+  // 127.0.0.1 è della rete di casa: per Filo una pagina delicata, come la posta o la banca.
+  await openTab(testServer.html('<title>Posta di Mario: estratto conto</title><p>saldo 1234'));
+  await tornaAllaHome(shell);
+  const posta = (await schede(shell)).find((x) => x.title === 'Posta di Mario: estratto conto');
+  const percorso = new URL(posta.url).pathname;
+  expect(percorso.length).toBeGreaterThan(1);
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), posta.id);
+  await expect.poll(async () => (await archivio(app)).some((t) => t.url === posta.url), { timeout: 10_000 }).toBe(true);
+  await app.evaluate(async (_e, url) => {
+    const e = (await globalThis.SN_ARCHIVED_TABS.listMeta()).find((t) => t.url === url);
+    await globalThis.SN_ARCHIVED_TABS.update(e.id, { summary: 'Estratto conto con saldo 1234 euro.' });
+  }, posta.url);
+
+  await modelloCheRiapre(app, [
+    { call: { id: 'p1', name: 'SCHEDE_CHIUSE', args: {} } },
+    { call: { id: 'p2', name: 'RIAPRI_SCHEDA' }, riapri: true },
+    { text: 'Riaperta.' },
+  ]);
+  await chiedi(chat, 'che schede ho chiuso oggi? riaprimi l\'ultima');
+  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Riaperta.' })).toBeVisible({ timeout: 20_000 });
+  for (const k of ['p1', 'p2']) {
+    const esito = await esitoPerIlModello(app, k);
+    expect(esito, k).toContain(new URL(posta.url).host);
+    expect(esito, k).not.toContain('Posta di Mario');
+    expect(esito, k).not.toContain(percorso);
+    expect(esito, k).not.toContain('1234');
+  }
+  expect(await esitoPerIlModello(app, 'p1')).toContain('pagina delicata');
+  await expect.poll(async () => (await schede(shell)).filter((t) => t.url === posta.url).length, { timeout: 15_000 }).toBe(1);
+  await ripristina(app);
+});
+
+test('r1 una riapertura dalla chat che non riesce lascia la scheda riapribile: «rimettimi la musica» e Ctrl/Cmd+Shift+T la ridanno', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  await home(app);
+  const pagina = await openTab(testServer.html('<title>Musica</title><p>musica', PUBBLICO));
+  const url = pagina.url();
+  // Ha suonato: l'ora la dà il test, come la darebbe il lettore in corsa.
+  await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    tm.tabs.find((x) => x.title === 'Musica').audioAt = Date.now();
+  });
+  await tornaAllaHome(shell);
+  await shell.evaluate((id) => window.filoShell.tabs.close(id), (await schede(shell)).find((t) => t.url === url).id);
+  await expect.poll(async () => (await archivio(app)).some((t) => t.url === url), { timeout: 10_000 }).toBe(true);
+
+  // La prima riapertura non nasce (un sito bloccato nel frattempo, una finestra che si chiude).
+  const riprova = () => app.evaluate(async ({ BrowserWindow }, guasta) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    if (guasta) {
+      const vera = tm.riapri;
+      tm.riapri = async () => { tm.riapri = vera; return null; };
+    }
+    const scelta = await tm.ultimaChiusaCheSuonava();
+    return scelta ? !!(await tm.riapriCheSuonava(scelta)) : null;
+  }, guasta => guasta);
+  expect(await app.evaluate(async ({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
+    const vera = tm.riapri;
+    tm.riapri = async () => { tm.riapri = vera; return null; };
+    const scelta = await tm.ultimaChiusaCheSuonava();
+    return scelta ? !!(await tm.riapriCheSuonava(scelta)) : null;
+  }), 'la prima riapertura non è nata').toBe(false);
+  expect(await app.evaluate(async ({ BrowserWindow }) => !!(await BrowserWindow.getAllWindows()
+    .find((w) => w._filoTabs)._filoTabs.ultimaChiusaCheSuonava())), 'la musica resta da rimettere').toBe(true);
+  await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.riapriChiusa());
+  await expect.poll(async () => (await schede(shell)).filter((t) => t.url === url).length, { timeout: 10_000 }).toBe(1);
+  void riprova;
+});
+
 test('una scheda con l\'indirizzo troppo lungo per essere salvato intero non si riapre: resta il riassunto', async ({ app, shell, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
