@@ -66,7 +66,8 @@ test('aspetta <biglietto> sul processo vero: 5 mentre lavora, 0 quando ha finito
     assert.equal(presto.code, USCITA_LAVORO_VIVO, presto.se);
     assert.match(presto.so, new RegExp(`processo ${lungo.pid}`));
 
-    const breve = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 2500)'], { cwd: dir, detached: true, stdio: 'ignore' });
+    // Finisce durante l'attesa: la prima lettura lo vede ancora, una delle successive no.
+    const breve = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 900)'], { cwd: dir, detached: true, stdio: 'ignore' });
     breve.unref();
     process.kill(lungo.pid);
     const fine = await canale(dir, { FILO_ASPETTA_FETTA_MS: '30000' }, 'aspetta', T);
