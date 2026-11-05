@@ -529,13 +529,13 @@ export async function main(argv) {
     console.error('RIFIUTATO: --solo senza nessun numero (per esempio --solo 812,815). Non ho lanciato niente.');
     return 1;
   }
+  if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
   const giro = await strada();
   if (cmd !== 'stato' && !dryRun) {
     const a = await allineaAlFeedback(cartella, giro);
     if (a.codice !== undefined) return a.codice;
     indice = a.indice;
   }
-  if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
   if ((cmd === 'stato' || (cmd === 'scrivi' && !solo.length)) && !argv.includes('--da-zero')) {
     const fermo = censimentoMancante({ via: giro.via, indice, schede: leggiSchede(cartella) });
     if (fermo) { console.error(fermo); return 1; }
