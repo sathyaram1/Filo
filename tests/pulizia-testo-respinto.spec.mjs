@@ -295,6 +295,8 @@ test('un editor in un riquadro nato con srcdoc, mandato e respinto, tiene aperta
           <form id="f" method="post" action="${azione}">${campo}${EDITOR_SRCDOC}${el}</form><script>${script}</script>`));
         await page.frameLocator('#ifr').locator('body').click();
         await page.keyboard.type(LETTERA);
+        // Il correttore di Filo non deve entrare nell'editor: prendeva il cursore e mangiava le lettere.
+        await expect(page.frameLocator('#ifr').locator('body')).toHaveText(LETTERA);
         const id = await sporca(shell, titolo);
         await page.locator('#pub').click();
         await expect.poll(async () => (await schede(shell)).find((t) => t.id === id)?.title, { timeout: 10_000 }).toBe(attesa);
