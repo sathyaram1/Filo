@@ -2257,18 +2257,30 @@ function positionOnBranch(bucket) {
   // buono e riporterebbe il ramo al contenuto di un tentativo diverso.
   const checkpoint = (prev?.branch === branch) ? lastCheckpoint(prev) : null;
 
+  // Un lavoro nuovo nasce dalla punta del tentativo precedente rimasto su origin, se c'è, se no dalla linea principale:
+  // così non si rifà, e il ramo superato diventa antenato del nuovo e se ne va con lui alla fusione (#2152).
+  // Le basi feature/N del Modello B restano abolite (SPEC-RIDISEGNO-MAX.md §1).
+  const precedenti = isNew ? tentativiPrecedenti({ root: ROOT, id: bucket.id, mainBranch: MAIN_BRANCH, escludi: branch }) : { ok: true, scelto: null, altri: [] };
+  if (!precedenti.ok) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin i tentativi precedenti di ${bucket.id}, e senza si rifarebbe da main il lavoro già spinto: ${precedenti.errore}` };
   const res = prepareBranch({
     root: ROOT,
     branch,
     create: isNew && !dalBiglietto,
     createIfMissing: dalBiglietto,
-    // Un lavoro nuovo nasce SEMPRE dalla linea principale: le basi feature/N
-    // erano il Modello B dei sotto-feedback, abolito (SPEC-RIDISEGNO-MAX.md §1).
-    base: '',
+    base: precedenti.scelto ? precedenti.scelto.ramo : '',
     mainBranch: MAIN_BRANCH,
     checkpoint,
   });
   if (!res.ok) return res;
+  const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
+  if (ripartito) {
+    const { scelto, altri } = precedenti;
+    bucket.ripartenza = {
+      ramo: scelto.ramo, commit: scelto.propri,
+      ...(altri.length ? { altri: altri.map((t) => ({ ramo: t.ramo, commit: t.propri })) } : {}),
+    };
+    process.stderr.write(`[dispatch] ${branch}: nasce dalla punta ${String(res.head).slice(0, 12)} del tentativo precedente ${scelto.ramo} (${scelto.propri} commit propri), non da ${MAIN_BRANCH}${altri.length ? `; non contiene ${altri.map((t) => t.ramo).join(', ')}` : ''}\n`);
+  }
   const parcheggio = res.discarded ? `; i commit locali restano su ${res.discarded}` : '';
   if (res.rewritten) {
     process.stderr.write(`[dispatch] ${branch}: il ramo su origin è stato riscritto (un riallineamento): si riparte dalla sua punta ${String(res.head).slice(0, 12)}, non dal punto fermo locale ${String(res.rewritten).slice(0, 12)}${parcheggio}\n`);
