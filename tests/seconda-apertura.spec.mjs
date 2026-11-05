@@ -1,6 +1,7 @@
 // #1606, #1606.1, #1092 — Filo resta acceso senza la finestra principale quando la si chiude con la finestrella di
-// accesso aperta: riaprirlo (collegamento, seconda copia vera, Dock su Mac, invito) rifà la finestra con le sue schede.
-// All'avvio la finestra nasce prima degli init e la prima scheda li trova fatti. Logica: tests/unit/secondaApertura.test.mjs.
+// accesso aperta: riaprirlo (collegamento, seconda copia vera, Dock su Mac, invito, voci della barra dei menu, #2031)
+// rifà la finestra con le sue schede. All'avvio la finestra nasce prima degli init e la prima scheda li trova fatti.
+// Logica: tests/unit/secondaApertura.test.mjs, tests/unit/voceSenzaFinestra.test.mjs.
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
@@ -12,6 +13,7 @@ import { _electron as electron } from '@playwright/test';
 import { test, expect, aspettaFinestra, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { voceDellaBarra } from './helpers/barraDeiMenu.mjs';
 
 const require = createRequire(import.meta.url);
 const ELECTRON = require('electron');
@@ -32,7 +34,8 @@ const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
   return {
     normali: normali.length,
     incognito: vive.filter((w) => w._filoIncognito).length,
-    accesso: base ? vive.filter((w) => !w._filoTabs && w.webContents.getURL().startsWith(base)).length : 0,
+    // Una finestrella a metà chiusura lancia a chi le chiede l'indirizzo: conta come chiusa.
+    accesso: base ? vive.filter((w) => { try { return !w._filoTabs && w.webContents.getURL().startsWith(base); } catch (_) { return false; } }).length : 0,
     normale: normale ? {
       visibile: normale.isVisible(),
       // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
@@ -152,6 +155,139 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   await app.evaluate(({ app: a }) => { a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCD'); });
   await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: 'su Mac l\'invito non ha aperto Crediti', timeout: 15000 })
     .toContainEqual(expect.stringMatching(/^filo:\/\/credits\//));
+  expect((await stato(app, accesso)).errori).toEqual([]);
+});
+
+// #2031 — Su Mac Cmd+T, Cmd+Shift+T, Cmd+L e le pagine del menu Filo passano dalla barra dei menu: senza finestra
+// principale la ridanno.
+async function richiudi(app, accesso, negozio) {
+  // Come chi chiude dopo un po': le schede della finestra rifatta sono già scritte.
+  await expect.poll(() => sessioneSalvata(app), { message: 'le schede della finestra rifatta non sono state salvate', timeout: 10000 }).toContain(negozio);
+  const barra = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/shell.html'), 'la barra della finestra rifatta non c\'è');
+  await barra.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
+  await expect.poll(async () => (await stato(app, accesso)).normale, { timeout: 10000 }).toBeNull();
+}
+
+const attiva = (app) => app.evaluate(({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+  const t = w && w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId);
+  return (t && t.url) || '';
+});
+
+const nuove = (schede) => schede.filter((u) => u.startsWith('filo://newtab/')).length;
+
+test('su Mac, senza la finestra principale, «Nuova scheda» la ridà con le schede e una nuova davanti, senza doppioni', async ({ app, shell, openTab, testServer }) => {
+  const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+  const prima = nuove(await sessioneSalvata(app));
+  // Due Cmd+T di fila mentre la finestra rinasce: una finestra sola, due schede nuove.
+  await voceDellaBarra(app, 'Nuova scheda');
+  await voceDellaBarra(app, 'Nuova scheda');
+  await tornaLaFinestra(app, accesso, negozio, '«Nuova scheda» senza finestra non ha ridato Filo con le sue schede');
+  await expect.poll(async () => nuove((await stato(app, accesso)).normale.schede), { message: 'le schede nuove chieste non ci sono', timeout: 10000 }).toBe(prima + 2);
+  expect(await attiva(app), 'davanti va la scheda nuova, non una di quelle riaperte').toMatch(/^filo:\/\/newtab\//);
+  expect((await stato(app, accesso)).normali).toBe(1);
+
+  // Senza schede salvate la finestra nasce con la sua scheda nuova: è quella chiesta, non se ne aggiunge un'altra.
+  await richiudi(app, accesso, negozio);
+  // La finestra chiusa scrive ancora le sue schede per un attimo: la sessione si svuota dopo.
+  await new Promise((r) => setTimeout(r, 2000));
+  await app.evaluate(() => globalThis.SN_STORAGE.setRaw(globalThis.SN_CONST.STORAGE_KEYS.OPEN_TABS, { tabs: [], activeIndex: 0 }));
+  await new Promise((r) => setTimeout(r, 600));
+  expect(await sessioneSalvata(app), 'qualcuno ha riscritto le schede dopo la chiusura').toEqual([]);
+  await voceDellaBarra(app, 'Nuova scheda');
+  await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: 'la finestra non è tornata', timeout: 15000 })
+    .toEqual([expect.stringMatching(/^filo:\/\/newtab\//)]);
+  await new Promise((r) => setTimeout(r, 800));
+  expect((await stato(app, accesso)).normale.schede, 'una scheda nuova in più, vuota e doppia').toHaveLength(1);
+  expect((await stato(app, accesso)).errori).toEqual([]);
+});
+
+test('su Mac, senza la finestra principale, «Riapri scheda chiusa» la ridà com\'era, senza riaprire una scheda in più', async ({ app, shell, openTab, testServer }) => {
+  // Una scheda chiusa prima: la finestra rinata con le sue schede è già quello che si riapre, la scheda non torna doppia.
+  const chiusa = await testServer.openReady(openTab, '<title>Chiusa</title><h1>chiusa</h1>');
+  const indirizzoChiusa = chiusa.url();
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito)._filoTabs;
+    tm.closeTab(tm.tabs.find((t) => t.url === u).id);
+  }, indirizzoChiusa);
+  const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+  const salvate = await sessioneSalvata(app);
+  await voceDellaBarra(app, 'Riapri scheda chiusa');
+  await tornaLaFinestra(app, accesso, negozio, '«Riapri scheda chiusa» senza finestra non ha ridato Filo con le sue schede');
+  await new Promise((r) => setTimeout(r, 800));
+  const dopo = (await stato(app, accesso)).normale.schede;
+  expect(dopo, 'la finestra torna com\'era').toHaveLength(salvate.length);
+  expect(dopo).not.toContain(indirizzoChiusa);
+  expect((await stato(app, accesso)).normali).toBe(1);
+});
+
+// Senza finestre con schede, anche con la finestrella davanti, ogni voce che agisce su una scheda o sulla finestra la ridà.
+const voci = [['Cronologia AI', /^filo:\/\/history\//], ['Barra laterale', null], ['Assistente laterale', null], ['Ricarica', null], ['Schermo intero', null]];
+for (const [voce, davanti] of voci) {
+  test(`su Mac, senza la finestra principale, «${voce}» la ridà con le sue schede`, async ({ app, shell, openTab, testServer }) => {
+    const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+    await voceDellaBarra(app, voce);
+    await tornaLaFinestra(app, accesso, negozio, `«${voce}» senza finestra non ha ridato Filo con le sue schede`);
+    if (davanti) await expect.poll(() => attiva(app), { message: `quello che apre «${voce}» non è davanti`, timeout: 10000 }).toMatch(davanti);
+    expect((await stato(app, accesso)).normali).toBe(1);
+  });
+}
+
+const fuocoDavanti = (app) => app.evaluate(async ({ BrowserWindow }) => {
+  const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
+  const t = w && w._filoTabs.tabs.find((s) => s.id === w._filoTabs.activeId);
+  try { return await t.view.webContents.executeJavaScript('document.activeElement && document.activeElement.id', false); } catch (_) { return ''; }
+});
+
+test('su Mac, senza la finestra principale, «Vai a un indirizzo» la ridà e apre accanto la home col cursore nel campo', async ({ app, shell, openTab, testServer }) => {
+  const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+  await voceDellaBarra(app, 'Vai a un indirizzo');
+  await tornaLaFinestra(app, accesso, negozio, '«Vai a un indirizzo» senza finestra non ha ridato Filo con le sue schede');
+  await expect.poll(() => attiva(app), { message: 'davanti non c\'è la home dove si scrive l\'indirizzo', timeout: 10000 }).toMatch(/^filo:\/\/newtab\//);
+  await expect.poll(() => fuocoDavanti(app), { message: 'il cursore non è nel campo dove si scrive', timeout: 10000 }).toBe('input');
+  expect((await stato(app, accesso)).normale.schede, 'la scheda riaperta non deve sparire sotto la home').toContain(negozio);
+});
+
+// Chiusa anche la finestrella, le voci della scheda non hanno niente su cui agire: ridanno la finestra.
+for (const voce of ['Indietro', 'Ingrandisci']) {
+  test(`su Mac, senza nessuna finestra, «${voce}» ridà Filo con le sue schede`, async ({ app, shell, openTab, testServer }) => {
+    const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+    // Come su Mac, dove chiusa l'ultima finestra Filo resta acceso.
+    await app.evaluate(({ app: a, BrowserWindow }) => {
+      a.removeAllListeners('window-all-closed');
+      a.on('window-all-closed', () => {});
+      for (const w of BrowserWindow.getAllWindows()) if (!w._filoTabs) w.close();
+    });
+    // Una finestrella a metà chiusura lancia a chi le chiede l'indirizzo: qui si contano solo le vive.
+    await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+      .filter((w) => { try { return !w.isDestroyed() && !w._filoTabs; } catch (_) { return false; } }).length), { timeout: 10000 }).toBe(0);
+    await voceDellaBarra(app, voce);
+    await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [],
+      { message: `«${voce}» senza finestre non ha ridato Filo con le sue schede`, timeout: 15000 }).toContain(negozio);
+    expect((await stato(app, accesso)).errori).toEqual([]);
+  });
+}
+
+// Con la finestrella di accesso davanti le voci della scheda agiscono su di lei: il sito dietro aspetta l'accesso.
+test('su Mac, con la finestrella di accesso davanti, «Chiudi scheda» chiude lei e non il sito che aspetta', async ({ app, openTab, testServer }) => {
+  const { accesso, negozio: html } = negozioConAccesso(testServer);
+  await sentinella(app);
+  const page = await testServer.openReady(openTab, html);
+  const negozio = page.url();
+  await page.click('#b');
+  await expect.poll(async () => (await stato(app, accesso)).accesso, { timeout: 10000 }).toBe(1);
+  const davanti = (a) => app.evaluate(({ BrowserWindow }, b) => {
+    const f = BrowserWindow.getAllWindows().find((w) => !w._filoTabs && w.webContents.getURL().startsWith(b));
+    f.show(); f.focus();
+    return BrowserWindow.getFocusedWindow() === f;
+  }, a);
+  await expect.poll(() => davanti(accesso), { message: 'la finestrella non è andata davanti', timeout: 5000 }).toBe(true);
+  for (const voce of ['Ricarica', 'Indietro', 'Annulla']) await voceDellaBarra(app, voce);
+  await new Promise((r) => setTimeout(r, 800));
+  expect((await stato(app, accesso)).normale.schede, 'una voce ha toccato il sito dietro la finestrella').toContain(negozio);
+  await voceDellaBarra(app, 'Chiudi scheda');
+  await expect.poll(async () => (await stato(app, accesso)).accesso, { message: 'Cmd+W non ha chiuso la finestrella davanti', timeout: 10000 }).toBe(0);
+  expect((await stato(app, accesso)).normale.schede, 'Cmd+W ha chiuso il sito dietro la finestrella').toContain(negozio);
   expect((await stato(app, accesso)).errori).toEqual([]);
 });
 

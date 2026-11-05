@@ -166,10 +166,12 @@ const corpo = (re, cosa) => { const m = MAIN.match(re); assert.ok(m, `non trovo 
 
 test('la seconda apertura e l\'invito da fuori chiedono la finestra, mai il riferimento del main', () => {
   const seconda = corpo(/app\.on\(\s*'second-instance'[^{]*\{([\s\S]*?)\n\}\);/, 'il gestore di second-instance');
-  assert.match(seconda, /mostraFinestraNormale\(\)/, 'la seconda apertura deve passare da mostraFinestraNormale');
-  assert.doesNotMatch(seconda, /mainWindow\.\w+\(/, 'un metodo sul riferimento del main lancia se la finestra è distrutta');
+  assert.match(seconda, /ridaiFinestraNormale\(\)/, 'la seconda apertura deve passare da ridaiFinestraNormale');
+  // «Prima dell'avvio non si crea niente» vive in window.js, per lei, l'invito e le voci della barra (#2031).
+  assert.doesNotMatch(seconda, /mainWindow/, 'la regola dell\'avvio scritta una seconda volta qui');
   const invito = corpo(/function apriInvito\(code\) \{([\s\S]*?)\n\}/, 'apriInvito');
-  assert.match(invito, /mostraFinestraNormale\(\)/, 'l\'invito arrivato da fuori deve aprire Crediti in una finestra viva');
+  assert.match(invito, /ridaiFinestraNormale\(\)/, 'l\'invito arrivato da fuori deve aprire Crediti in una finestra viva');
+  assert.doesNotMatch(invito, /mainWindow/, 'la regola dell\'avvio scritta una seconda volta qui');
   assert.doesNotMatch(invito, /\(\s*mainWindow\s*\)|,\s*mainWindow\s*\)/, 'passare il riferimento del main porta Crediti in una finestra distrutta');
 });
 

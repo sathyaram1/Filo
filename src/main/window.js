@@ -72,6 +72,15 @@ function riaperturaDaSistema(visibili) {
   return mostraFinestraNormale();
 }
 
+// Su Mac la barra dei menu c'è prima della finestra dell'avvio: una voce premuta lì non ne fa una seconda.
+let finestraDellAvvio = false;
+
+// Chi chiede la finestra da fuori (seconda apertura, invito, voci della barra su Mac, #2031) passa da qui: prima che sia
+// nata quella dell'avvio non si crea niente, la fa l'avvio.
+function ridaiFinestraNormale() {
+  return finestraDellAvvio ? mostraFinestraNormale() : null;
+}
+
 // Chi agisce su una finestra appena nata aspetta le sue schede: aperta prima, la sua scheda finirebbe dietro quelle
 // riaperte. Risolve `{ ripristinata }`, o null se la finestra si chiude prima.
 function quandoPronta(win) {
@@ -241,6 +250,7 @@ function createMainWindow() {
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
+  finestraDellAvvio = true;
   let pronta = () => {};
   win._filoPronta = new Promise((r) => { pronta = r; });
   win.once('closed', () => pronta(null));
@@ -343,5 +353,5 @@ function createIncognitoWindow() {
 module.exports = {
   createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
   assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale, riaperturaDaSistema, attendiAvvio,
-  quandoPronta,
+  ridaiFinestraNormale, quandoPronta,
 };

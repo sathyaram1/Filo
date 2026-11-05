@@ -47,18 +47,18 @@
     {
       id: 'new-tab', title: 'Apri una nuova scheda', category: 'navigation',
       desc: 'Apre una nuova scheda sulla home di Filo. Ogni finestra ne tiene una già caricata, quindi compare subito.',
-      invoke: 'Pulsante "+" nella barra delle schede, l\'icona «Nuova scheda» della barra laterale, oppure la scorciatoia Ctrl+T (Cmd+T su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Pulsante "+" nella barra delle schede, l\'icona «Nuova scheda» della barra laterale, oppure la scorciatoia Ctrl+T (Cmd+T su Mac) — che funziona anche mentre stai guardando un sito. Su Mac, con Filo acceso e nessuna sua finestra aperta, Cmd+T ridà la finestra con le sue schede e una scheda nuova davanti.',
     },
     {
       id: 'close-tab', title: 'Chiudi le schede', category: 'navigation',
       desc: 'Chiude la scheda corrente, o chiedendolo a Filo le schede che dici tu: alcune, quelle di un sito, tutte tranne qualcuna. Le pagine chiuse restano nel filo della home, da cui le riapri.',
-      invoke: 'Pulsante di chiusura sulla scheda, l’icona Chiudi pagina della barra laterale, oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito. Per più schede insieme: tasto destro su una scheda → «Chiudi le altre schede», oppure chiedilo a Filo nella home: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail».',
+      invoke: 'Pulsante di chiusura sulla scheda, l’icona Chiudi pagina della barra laterale, oppure la scorciatoia Ctrl+W (Cmd+W su Mac) — che funziona anche mentre stai guardando un sito. Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W chiude lei e non la scheda dietro. Per più schede insieme: tasto destro su una scheda → «Chiudi le altre schede», oppure chiedilo a Filo nella home: «chiudi tutte le schede tranne questa», «chiudi YouTube», «chiudi tutto tranne Gmail».',
       doesNot: 'Le finestre in incognito e le pagine interne di Filo non restano nel filo. La scheda in cui gli stai scrivendo la chiude solo se glielo chiedi proprio per lei. Chiudendo tutte le schede o quelle di un sito lascia aperte quelle con del testo scritto e non ancora inviato, e a «chiudile tutte» e a «Chiudi le altre schede» anche quelle dei siti che tieni sempre aperti: te lo dice, e le chiude se glielo chiedi una per una. Con una scheda sola «Chiudi le altre schede» non c’è. Delle schede di una finestra ne distingue una per una le cento usate più di recente: le altre le prende solo col sito o con «tutte». L’Aiuto sopra un sito non chiude schede: lo fa la chat della home.',
     },
     {
       id: 'reopen-closed-tab', title: 'Riapri l’ultima scheda chiusa', category: 'navigation',
       desc: 'Riapre la scheda chiusa più di recente com’era: nello stesso posto della fila, con Indietro e Avanti, lo scorrimento, lo zoom e il paese da cui passava. Ripetendo riapre quella chiusa prima, e così via; finite quelle chiuse da quando hai aperto Filo continua con l’archivio delle schede chiuse, dalla più recente. Vale anche per le pagine di Filo e in incognito.',
-      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; tasto destro su una scheda o sul pulsante "+" → «Riapri scheda chiusa»; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa". Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
+      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; tasto destro su una scheda o sul pulsante "+" → «Riapri scheda chiusa»; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa": con Filo acceso e nessuna sua finestra aperta ridà la finestra con le sue schede. Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
       doesNot: 'Non riapre una scheda che hai cancellato dall’archivio o dalle pagine visitate. In incognito riapre solo le schede chiuse in quella finestra, finché resta aperta. Una home vuota non conta come scheda chiusa. Tenendo premuti i tasti riapre una scheda sola, non a raffica. Senza niente da riaprire te lo dice con un avviso, e la voce del tasto destro è spenta.',
     },
     {
