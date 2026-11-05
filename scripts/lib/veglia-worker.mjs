@@ -8,6 +8,7 @@ import { join } from 'node:path';
 import { gitIn, lavoroVivo, timbroFile, comandoLeggibile } from './branch-integrity.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
 import { dirImpostazioniUtente, FILE_REGISTRO, impronta } from './orchestratore-cieco.mjs';
+import { leggiMeta, rigaSintetica } from '../session-report.mjs';
 
 // Un sotto-agente vivo scrive il suo transcript almeno a ogni chiamata, e la più lunga (un comando in primo piano) ne
 // dura dieci: il doppio, senza processi nella sua cartella, è silenzio vero.
