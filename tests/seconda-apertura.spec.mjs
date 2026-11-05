@@ -13,6 +13,7 @@ import { _electron as electron } from '@playwright/test';
 import { test, expect, aspettaFinestra, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { voceDellaBarra } from './helpers/barraDeiMenu.mjs';
 
 const require = createRequire(import.meta.url);
 const ELECTRON = require('electron');
