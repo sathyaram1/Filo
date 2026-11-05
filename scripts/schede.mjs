@@ -305,26 +305,38 @@ async function strada() {
   return stradaDelGiro(ROOT);
 }
 
-/** `lettura` (le prove): la lettura già scelta, al posto di quella della strada del giro. */
-export async function elenca(cartella, dryRun, { lettura = null } = {}) {
-  const giro = await strada();
+/**
+ * Legge dal feedback cosa ha adesso e ci allinea indice e cartella (fuori da `dryRun`). Chi manda schede passa sempre di
+ * qui: l'indice dell'ultimo elenca può essere di ore prima, o di prima che portasse `nelFeedback` (#1785.2 giro 2).
+ * → { codice } se la lettura non va, altrimenti { r, indice, scritte }
+ */
+async function allineaAlFeedback(cartella, giro, { lettura = null, dryRun = false } = {}) {
   const r = lettura ? await lettura() : giro.via === 'cloud' ? await letturaCloud(giro.ticket) : await letturaLocale();
-  if (!r.ok) { console.error(`${r.codice === 4 ? 'GUASTO' : 'RIFIUTATO'}: ${r.motivo}. Indice non scritto.`); return r.codice; }
+  if (!r.ok) { console.error(`${r.codice === 4 ? 'GUASTO' : 'RIFIUTATO'}: ${r.motivo}. Indice non scritto.`); return { codice: r.codice }; }
   const { righe } = r;
   // Un indice sbagliato è peggio di uno vecchio: chi lo legge non lo distingue da uno buono.
-  if (r.complete === false) { console.error(`RIFIUTATO: la lettura non è completa (${righe.length} documenti): indice non scritto, rilancia.`); return 1; }
+  if (r.complete === false) { console.error(`RIFIUTATO: la lettura non è completa (${righe.length} documenti): indice non scritto, rilancia.`); return { codice: 1 }; }
   const illeggibili = righe.filter(statoIllegibile).length;
-  if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return 1; }
+  if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return { codice: 1 }; }
   const indice = conSchedeNelFeedback(apertiDaRighe(righe, { segnalati: r.segnalati }), r.schede);
   let scritte = 0;
-  let m = null;
   if (!dryRun) {
     mkdirSync(cartella, { recursive: true });
     writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     scritte = importaSchede(cartella, r.schede, indice);
     scriviSegnalati(cartella, indice);
-    m = await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
   }
+  return { r, indice, scritte };
+}
+
+/** `lettura` (le prove): la lettura già scelta, al posto di quella della strada del giro. */
+export async function elenca(cartella, dryRun, { lettura = null } = {}) {
+  const giro = await strada();
+  const a = await allineaAlFeedback(cartella, giro, { lettura, dryRun });
+  if (a.codice !== undefined) return a.codice;
+  const { r, indice, scritte } = a;
+  const { righe } = r;
+  const m = dryRun ? null : await mandaFuoriDalFeedback(cartella, indice, { salva: (dati) => salvaNelFeedback(dati, giro) });
   const nonSiAprono = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
   const salvate = `${r.schede.length} schede salvate nei feedback${nonSiAprono}${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
