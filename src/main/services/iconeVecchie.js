@@ -39,6 +39,7 @@ function crea({
   inLinea = () => require('electron').net.isOnline(),
   salvate = () => globalThis.SN_SAVED_PAGES,
   archivio = () => globalThis.SN_ARCHIVED_TABS,
+  regole = ProxyTab.leggiRegole,
 } = {}) {
   let corsa = null;
   let seguente = null;
