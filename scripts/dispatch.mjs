@@ -2273,6 +2273,12 @@ function positionOnBranch(bucket) {
     checkpoint,
   });
   if (!res.ok) return res;
+  if (precedenti.superati && precedenti.superati.length) {
+    const c = chiudiTentativi({ root: ROOT, rami: precedenti.superati });
+    process.stderr.write(c.ok
+      ? `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH}, tolti da origin: ${c.chiusi.join(', ')}\n`
+      : `[dispatch] tentativi superati da un lavoro già su ${MAIN_BRANCH} rimasti su origin (${precedenti.superati.join(', ')}): ${c.errore}\n`);
+  }
   const ripartito = !!precedenti.scelto && res.base === `origin/${precedenti.scelto.ramo}`;
   if (ripartito) {
     const { scelto, altri } = precedenti;
