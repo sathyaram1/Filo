@@ -267,8 +267,9 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
     const c = gitIn(root)(['log', '-1', '--format=%ct']);
     tempi.push(c.ok ? Number(c.out) * 1000 : NaN, mtime(timbroFile(root)));
   }
+  // Senza margine: il worker del biglietto prima scrive la sua ultima riga pochi secondi prima di questo (#2182).
   const partenze = [dalRegistro, dalMarcatore].filter(Number.isFinite);
-  const dopoMs = partenze.length ? Math.min(...partenze) - 60 * 1000 : -Infinity;
+  const dopoMs = partenze.length ? Math.min(...partenze) : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
   const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
