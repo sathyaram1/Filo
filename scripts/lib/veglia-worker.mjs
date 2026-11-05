@@ -95,7 +95,9 @@ export function ultimoPasso(righe) {
     const ms = Date.parse(String(o.timestamp || ''));
     const c = o.message && Array.isArray(o.message.content) ? o.message.content : [];
     let cosa = '';
-    if (o.type === 'assistant') {
+    if (o.type === 'assistant' && rigaSintetica(o.message)) {
+      cosa = 'errore dell\'API o richiesta interrotta';
+    } else if (o.type === 'assistant') {
       if (o.message && o.message.model) modello = nomeSicuro(o.message.model);
       for (const x of c) {
         if (x && x.type === 'tool_use' && x.id) {
