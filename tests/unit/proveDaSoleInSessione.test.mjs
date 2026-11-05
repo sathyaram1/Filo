@@ -52,11 +52,9 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
       FILO_TRANSCRIPT: transcript, FILO_SESSION_ID: sid,
     };
     assert.deepEqual(Object.keys(sessione).sort(), [...IDENTITA_SESSIONE].sort(), 'ogni voce dell\'identità della sessione è accesa');
-    const r = await daSoli(file.map((f) => join(QUI, f)), sessione, { casa });
+    const r = await rossiDiSessione(file.map((f) => join(QUI, f)), sessione, { casa });
     assert.equal(r.fermo, null, r.fermo);
-    const rossi = r.stdout.match(/^\s*not ok .*$/gm) || [];
-    assert.equal(r.status, 0, rossi.join('\n') || String(r.stderr || r.error || '').slice(-4000));
-    assert.match(r.stdout, /^# fail 0$/m);
+    assert.deepEqual(r.soloInSessione, [], r.soloInSessione.join('\n') || r.dettaglio);
   } finally {
     togliCartella(casa);
   }
