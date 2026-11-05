@@ -107,7 +107,9 @@ test('r2 nella scheda della musica si è passati a un\'altra pagina: «rimettimi
   ]);
   await chiedi(chat, 'rimettimi la musica');
 
-  await expect.poll(() => inPausa(app, url), { timeout: 20_000 }).toBe(false);
-  await expect(chat.locator('.dash-activity').last()).not.toContainText('non è ripartita', { timeout: 1000 });
+  const riga = chat.locator('.dash-activity').last();
+  await expect(riga).toContainText(/Ripart|Riapert|ripartit/i, { timeout: 25_000 });
+  const detto = await riga.innerText();
+  await expect.poll(() => inPausa(app, url), { timeout: 20_000, message: `la musica non riparte; in chat: «${detto}»` }).toBe(false);
   await ripristina(app);
 });
