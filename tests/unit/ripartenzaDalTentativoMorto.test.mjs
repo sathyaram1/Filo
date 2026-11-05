@@ -55,6 +55,44 @@ function tentativo(casa, nome, da, n) {
   return head;
 }
 
+describe('una regola sola sui tentativi, per dispatch e per i rami in corso', () => {
+  test('il nome di un tentativo si legge in un posto solo, anche con un id che ha un trattino', () => {
+    assert.deepEqual(leggiTentativo('worker/abc-20261101T000000Z'), { id: 'abc', stampo: '20261101T000000Z' });
+    assert.deepEqual(leggiTentativo('origin/worker/fid-2152-20261101T000000Z'), { id: 'fid-2152', stampo: '20261101T000000Z' });
+    assert.equal(leggiTentativo('worker/abc'), null);
+    assert.equal(leggiTentativo('discarded/worker/abc-20261101T000000Z-20261102T000000Z'), null);
+    assert.deepEqual(conNumeri([{ ramo: 'worker/fid-2152-20261101T000000Z', feedback: [] }], [{ id: 'fid-2152', num: '2152' }])[0].feedback, ['2152']);
+  });
+
+  test('superato è il tentativo non fuso più vecchio dell\'ultimo fuso dello stesso feedback', () => {
+    const s = tentativiSuperati([
+      { ramo: 'worker/a-20261101T000000Z', fuso: false },
+      { ramo: 'worker/a-20261102T000000Z', fuso: true },
+      { ramo: 'worker/a-20261103T000000Z', fuso: false },
+      { ramo: 'worker/b-20261101T000000Z', fuso: false },
+      { ramo: 'worker/c-20261101T000000Z', fuso: false },
+      { ramo: 'worker/c-20261102T000000Z', fuso: false },
+    ]);
+    assert.deepEqual([...s], ['worker/a-20261101T000000Z']);
+  });
+
+  test('i rami in corso del manutentore usano la stessa regola: il superato non c\'è, il vivo dopo la fusione sì', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      tentativo(casa, ramo('20261101T000000Z'), main, 1);
+      const fuso = tentativo(casa, ramo('20261102T000000Z'), main, 1);
+      git(casa, 'merge', '-q', '--no-ff', '--no-edit', fuso);
+      git(casa, 'push', '-q', 'origin', 'main');
+      git(casa, 'fetch', '-q', 'origin');
+      assert.deepEqual(ramiInCorso(casa, { giorni: 0 }).map((r) => r.ramo), []);
+      tentativo(casa, ramo('20261103T000000Z'), 'main', 1);
+      git(casa, 'fetch', '-q', 'origin');
+      assert.deepEqual(ramiInCorso(casa, { giorni: 0 }).map((r) => r.ramo), [ramo('20261103T000000Z')]);
+    } finally { togliCartella(base); }
+  });
+});
+
 describe('quale tentativo precedente si riprende', () => {
   test('lo stampo riconosce solo i tentativi di quel feedback', () => {
     assert.equal(stampoDelTentativo(ramo('20261101T000000Z'), ID), '20261101T000000Z');
