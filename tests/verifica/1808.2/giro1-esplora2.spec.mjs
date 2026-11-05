@@ -108,7 +108,7 @@ test('editor srcdoc mandato con una richiesta della pagina', async ({ app, shell
       await page.locator('#pub').click();
       await expect(page.locator('#esito')).toHaveText(api === '/api/ok' ? 'ok' : 'no');
       await page.waitForTimeout(1000);
-      ris[`${dove} ${api} svuota=${svuota}`] = id;
+      ris[`${forma} ${dove} ${api} svuota=${svuota}`] = id;
     }
     const aperte = await archiviaTutto(app, shell, sito);
     console.log('FETCH', JSON.stringify(Object.fromEntries(Object.entries(ris).map(([a, id]) => [a, aperte.includes(id) ? 'aperta' : 'archiviata'])), null, 1));
