@@ -249,6 +249,7 @@ export function rifiutoDellaCredenziale(cred, cmd) {
 /** La riga che dice con cosa si parla: con una chiave quello che si scrive nasce non fidato. PURA. */
 export function rigaCredenziale(cred) {
   if (!cred || cred.tipo === 'admin') return '';
+  if (cred.tipo !== CLASSE_NON_FIDATO) return `Parlo con la chiave ${cred.tipo} (${cred.variabile}), che delle domande legge solo il registro.`;
   return `Parlo con la chiave ${cred.tipo} (${cred.variabile}): le risposte, le archiviazioni e le riaperture da qui nascono `
     + 'non fidate, segnate in Gestione, Domande e nel recap del mattino, e l\'owner le può riaprire.';
 }
