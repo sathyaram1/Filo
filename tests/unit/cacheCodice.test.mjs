@@ -87,7 +87,7 @@ test('con l\'AppImage o l\'app spostata da Gatekeeper la cache resta spenta e qu
   assert.equal(fs.existsSync(join(ud, 'codice-compilato')), false);
 });
 
-test('la sottocartella di un motore vecchio se ne va, quella di adesso e il percorso restano', () => {
+test('la sottocartella di un motore vecchio se ne va, quella di adesso e il percorso restano', OPZ, () => {
   const base = nuova('filo-cache-motore-');
   const ud = join(base, 'dati');
   const dir = app(join(base, 'Filo'));
