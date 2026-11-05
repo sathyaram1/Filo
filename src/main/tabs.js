@@ -1749,6 +1749,16 @@ class TabManager {
     return id;
   }
 
+  // Lo stesso per una voce già uscita dalla pila (`prendi`, `riprendi`): se la scheda non nasce, la sua copia
+  // nell'archivio torna riapribile.
+  async _riapriDallaPila(v, opts = {}) {
+    let id = null;
+    try { id = await this.riapri(v, opts); } catch (_) {}
+    if (id && v.voceArchivio) this._contaTornata(v.voceArchivio);
+    else if (!id && v.archivio) this._pilaChiuse().annullaRiaperta(v.archivio);
+    return id;
+  }
+
   // Chi apre un indirizzo che è quello di una scheda chiusa (la chat, un collegamento del filo della home) la riapre.
   async tornataPerIndirizzo(url) {
     const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
