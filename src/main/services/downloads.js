@@ -228,6 +228,21 @@ function paginaDi(webContents) {
   try { return webContents && !webContents.isDestroyed?.() ? String(webContents.getURL() || '') : ''; } catch (_) { return ''; }
 }
 
+// La pagina il cui link o window.open ha aperto la scheda che scarica: un estratto conto servito da un altro dominio in
+// una scheda nuova viene dalla banca (#1823). Si legge prima che la scheda-ponte si chiuda.
+function apertaDa(webContents) {
+  try {
+    if (!webContents || webContents.isDestroyed?.()) return '';
+    for (const w of electron().BrowserWindow.getAllWindows()) {
+      const t = ((w && w._filoTabs && w._filoTabs.tabs) || []).find((x) => x && x.view && x.view.webContents === webContents);
+      if (!t) continue;
+      const o = t._sbOrigine;
+      return o && o.tipo === 'link' && typeof o.da === 'string' ? o.da : String(t._sbApertaDa || '');
+    }
+  } catch (_) {}
+  return '';
+}
+
 // Un nome lunghissimo farebbe dell'avviso un riquadro enorme: si taglia in MEZZO, così
 // restano leggibili sia l'inizio sia l'estensione.
 function shortName(name, max = 44) {
