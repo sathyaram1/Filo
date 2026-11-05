@@ -305,7 +305,9 @@ dall'owner e dal server. Campi:
   la nascita della domanda resta archiviato: la risposta si scrive nella sua
   conversazione e non lo riapre; una domanda nata su un lavoro già chiuso lo
   riapre. Finché una bloccante è aperta la fusione non parte. Una fermata
-  (§ 3.8) blocca da sé. `legata`, `provvisoria` e `nataSuChiuso` le scrive il
+  (§ 3.8) blocca da sé. La domanda di un rilievo col `?` non porta `blocca`:
+  se il lavoro si ferma lo decidono livello e segno (`decisioneFerma`), e
+  `--record-verifier` la rifiuta (#1202.2). `legata`, `provvisoria` e `nataSuChiuso` le scrive il
   server.
 - `destinatario`: l'owner. Le domande di guasto non arrivano a nessuno: le
   smista il compito «Gestisci la domanda» (§ 3.5).
