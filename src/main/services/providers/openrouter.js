@@ -748,9 +748,9 @@
   }
   // Il tetto più alto che l'host dice di reggere, quando lo scrive («max_tokens > 8192», «must be <= 4096»).
   const LIMITE_DICHIARATO = /max[_ ]?(?:new[_ ])?tokens`?[^0-9]{0,40}?(?:>|<=|≤|at most|less than or equal to|up to|maximum (?:is|of)|limit (?:is|of))\s*([\d.,]+)/i;
-  // Il tetto è la causa quando ne prende più di metà finestra, o quando il testo da solo ci starebbe: un rifiuto per
-  // un testo che da solo non ci sta resta di contesto. `stringibile`: la chat può anche accorciare la conversazione;
-  // `memoria`: testo più tetto superano la memoria del modello, anche senza le misure (#1302).
+  // Un testo che da solo non ci sta è un rifiuto di contesto, qualunque sia il tetto. `memoria`: testo più tetto superano
+  // la memoria, anche senza le misure. `stringibile`: la chat accorcia la conversazione; non quando il tetto ne prende più
+  // di metà finestra e sotto il testo resta posto per una risposta: lì la cura è il tetto (#1302).
   function causaTetto(status, errText, maxTokens) {
     if (!maxTokens || ![400, 404, 413, 422].includes(status)) return null;
     const s = String(errText || '');
