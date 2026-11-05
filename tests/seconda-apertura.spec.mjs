@@ -221,8 +221,9 @@ test('su Mac, senza la finestra principale, «Riapri scheda chiusa» la ridà co
   expect((await stato(app, accesso)).normali).toBe(1);
 });
 
-// La barra laterale e l'Aiuto sono della finestra, non della pagina: anche con la finestrella davanti la ridanno.
-for (const [voce, davanti] of [['Cronologia AI', /^filo:\/\/history\//], ['Barra laterale', null], ['Assistente laterale', null]]) {
+// Senza finestre con schede, anche con la finestrella davanti, ogni voce che agisce su una scheda o sulla finestra la ridà.
+const voci = [['Cronologia AI', /^filo:\/\/history\//], ['Barra laterale', null], ['Assistente laterale', null], ['Ricarica', null], ['Schermo intero', null]];
+for (const [voce, davanti] of voci) {
   test(`su Mac, senza la finestra principale, «${voce}» la ridà con le sue schede`, async ({ app, shell, openTab, testServer }) => {
     const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
     await voceDellaBarra(app, voce);
@@ -248,7 +249,7 @@ test('su Mac, senza la finestra principale, «Vai a un indirizzo» la ridà e ap
 });
 
 // Chiusa anche la finestrella, le voci della scheda non hanno niente su cui agire: ridanno la finestra.
-for (const voce of ['Ricarica', 'Schermo intero', 'Indietro']) {
+for (const voce of ['Indietro', 'Ingrandisci']) {
   test(`su Mac, senza nessuna finestra, «${voce}» ridà Filo con le sue schede`, async ({ app, shell, openTab, testServer }) => {
     const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
     // Come su Mac, dove chiusa l'ultima finestra Filo resta acceso.

@@ -18,12 +18,13 @@ function finestra() {
   return BrowserWindow.getAllWindows().find((w) => w._filoTabs) || null;
 }
 
-// Davanti c'è una finestra senza schede (la finestrella di accesso): le voci della scheda agiscono su di lei o non fanno
-// niente, mai sulla finestra dietro (#2031: Cmd+W chiudeva il sito che aspettava l'accesso).
+// Davanti c'è una finestra senza schede (la finestrella di accesso) e dietro una con: le voci della scheda agiscono su
+// di lei o non fanno niente, mai su quella dietro (#2031: Cmd+W chiudeva il sito che aspettava l'accesso). Senza
+// finestre con schede la voce ridà la finestra, come chiede la segnalazione.
 function finestrellaDavanti() {
   const { BrowserWindow } = require('electron');
   const messa = BrowserWindow.getFocusedWindow();
-  return messa && !messa.isDestroyed() && !messa._filoTabs ? messa : null;
+  return messa && !messa.isDestroyed() && !messa._filoTabs && finestra() ? messa : null;
 }
 
 // Su Mac Filo resta acceso senza finestre con schede (finestrella di accesso aperta, o nessuna): le voci la ridanno come
