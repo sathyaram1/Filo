@@ -88,13 +88,15 @@ function crea({ tetto = TETTO } = {}) {
     togliDove((v) => v.archivio && via.has(v.archivio));
   }
 
-  // La scheda d'archivio chiusa più di recente che non è già stata riaperta e che si può riaprire com'era.
-  function dallArchivio(voci) {
+  // La scheda d'archivio chiusa più di recente che non è già stata riaperta e che si può riaprire com'era. Con
+  // `suonata` (#1397) solo quelle che hanno suonato, dalla più recente a suonare: una regola sola per le due porte.
+  function dallArchivio(voci, { suonata = false } = {}) {
     let scelta = null;
     let quando = -Infinity;
     for (const v of Array.isArray(voci) ? voci : []) {
       if (!v || typeof v.id !== 'string' || riaperte.has(v.id) || v.urlTagliato || !web(v.url)) continue;
-      const t = Date.parse(v.closedAt);
+      if (suonata && !(Date.parse(v.audioAt) > 0)) continue;
+      const t = Date.parse(suonata ? v.audioAt : v.closedAt);
       const c = Number.isFinite(t) ? t : -Infinity;
       if (!scelta || c > quando) { scelta = v; quando = c; }
     }
