@@ -180,3 +180,12 @@ test('Gestione spiega perché un non fidato non è stato giudicato, e come farlo
   // Resta fra i «non filtrati»: è la strada con cui l'owner lo manda ai giudici lo stesso.
   assert.equal(MR.classifyBlock({ status: 'unlabeled', statusReason: 'budget_giudici', pipeline: {} }).reason, 'unfiltered');
 });
+
+test('ogni motivo con cui il server ferma un non fidato senza giudici Gestione lo spiega, non lo mostra grezzo', () => {
+  const motivi = Object.values(SG.MOTIVI);
+  assert.ok(motivi.length >= 2);
+  for (const m of motivi) {
+    assert.notEqual(MR.reasonText(m), m, m);
+    assert.match(MR.judgesNote({ status: 'unlabeled', statusReason: m, pipeline: {} }).text, /^Non giudicato/, m);
+  }
+});
