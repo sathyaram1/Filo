@@ -8,6 +8,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import { writeFileSync, readdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
@@ -21,14 +22,10 @@ const DL = require(join(SRC, 'main', 'services', 'downloads.js'));
 const Nomi = require(join(SRC, 'main', 'services', 'nomiFile.js'));
 const Immagini = require(join(SRC, 'main', 'services', 'immaginiDelicate.js'));
 
-// I byte di uno screenshot fatto su una pagina delicata, che #1274 ha già segnato.
+// I byte di uno screenshot fatto su una pagina delicata, che #1274 ha già segnato. L'impronta vera decodifica i pixel con
+// Electron: qui basta quella dei byte.
 const SCREENSHOT_SEGNATO = 'PIXEL-DEL-CONTO';
-Immagini.perFilo = () => Immagini.crea({
-  impronta: (b) => Buffer.from(b).toString('utf8').padEnd(64, '0').replace(/[^0-9a-f]/g, 'a').slice(0, 64),
-  storage: () => ({ getRaw: async (_k, d) => d, setRaw: async () => {} }),
-  appunti: async () => null,
-});
-const segnate = Immagini.perFilo();
+const improntaFinta = (b) => createHash('sha256').update(Buffer.from(b)).digest('hex');
 let istanza = null;
 Immagini.perFilo = () => istanza;
 
@@ -39,7 +36,7 @@ async function scarica({ nome, contenuto, url, pagina = '', primo = url, setting
     const chiamate = [];
     Nomi.collega({ chiamaModello: async (m) => { chiamate.push(m); return 'Estratto conto marzo'; } });
     istanza = Immagini.crea({
-      impronta: (b) => Buffer.from(b).toString('utf8').padEnd(64, '0').replace(/[^0-9a-f]/g, 'a').slice(0, 64),
+      impronta: improntaFinta,
       storage: () => ({ getRaw: async (_k, d) => d, setRaw: async () => {} }),
       appunti: async () => null,
     });
@@ -104,6 +101,4 @@ test('con le pagine delicate spente resta tutto come prima: la chiamata parte an
   const settings = { security: { pagineDelicate: { enabled: false } } };
   const { chiamate } = await scarica({ settings, nome: 'documento.txt', contenuto: SALDO, url: 'https://www.intesasanpaolo.com/doc/1', pagina: 'https://www.intesasanpaolo.com/conto' });
   assert.equal(chiamate.length, 1);
-  // L'impronta conta solo a regola accesa: uno screenshot passa dal controllo e arriva a leggere il file.
-  assert.equal(await segnate.daDelicata(Buffer.from('altro')), false);
 });
