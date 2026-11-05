@@ -106,7 +106,7 @@ test('r1 una scheda della cartella non sovrascrive quella più nuova che il feed
   try {
     writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f9', num: '9', stato: 'todo', priorita: null, aggiornato: A, attese: [], unisce: [], nelFeedback: '' }]));
     writeFileSync(join(cartella, '9.json'), JSON.stringify({ ...buona(9), _fonte: { id: 'f9', stato: 'todo', aggiornato: A, at: '2026-11-05T10:00:00.000Z', modello: 'haiku' } }));
-    const r = await lancia(['scrivi', '--solo', '9', '--cartella', cartella], env(srv.url, bin));
+    const r = await lancia(['scrivi', '--cartella', cartella], env(srv.url, bin));
     expect(fb[9].scheda._riletta, `la rilettura di Opus salvata alle 11 resta nel feedback\n${r.out}`).toEqual({ at: B, modello: 'opus' });
   } finally {
     await srv.chiudi();
