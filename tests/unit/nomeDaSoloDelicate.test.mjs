@@ -95,6 +95,9 @@ test('da una pagina normale la chiamata parte e il file prende il nome', async (
   });
   assert.equal(chiamate.length, 1);
   assert.deepEqual(file, ['Estratto conto marzo.txt']);
+  // Partito da una pagina di Filo (la home, la pagina Download): non è la rete di casa.
+  const daFilo = await scarica({ nome: 'documento.txt', contenuto: 'Verbale', url: 'https://esempio.it/f/2', pagina: 'filo://downloads/downloads.html' });
+  assert.equal(daFilo.chiamate.length, 1);
 });
 
 test('con le pagine delicate spente resta tutto come prima: la chiamata parte anche dalla banca', async () => {
