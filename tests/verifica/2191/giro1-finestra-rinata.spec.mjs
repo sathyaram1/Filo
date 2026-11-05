@@ -183,7 +183,8 @@ test('avvio a freddo da un collegamento d\'invito con schede salvate: Crediti da
     await new Promise((r) => setTimeout(r, 2500));
     const s = await stato(app);
     expect(s.normale.davanti).toMatch(/^filo:\/\/credits\//);
-    expect(s.normale.schede).toEqual(expect.arrayContaining(salvate));
+    // Il loopback chiuso dà la pagina d'errore: conta che le due schede salvate siano tornate.
+    expect(s.normale.schede.filter((u) => /127\.0\.0\.1(:|%3A)9/.test(u)).length).toBe(salvate.length);
   } finally {
     await chiudiApp(app);
     togliCartella(userData);
