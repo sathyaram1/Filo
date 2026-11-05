@@ -145,23 +145,38 @@ export function riepilogo(indice, schede) {
   };
 }
 
-// «Centinaia di aperti e nessuna scheda» (#2181): sotto questa soglia riscriverle tutte costa poco e può essere un inizio vero.
+// «Centinaia di aperti e nessuna scheda» (#2181): sotto questa soglia di mancanti riscriverle costa poco e può essere un
+// inizio vero. Il conto è sulla copertura, non su «almeno una»: una scheda scritta con --solo non è un censimento.
 export const SOGLIA_CENSIMENTO = 50;
 
 /**
- * In una routine, una cartella senza schede su tanti aperti vuol dire feedback senza schede salvate, non schede da
- * riscrivere: Haiku le rifarebbe tutte alla cieca. → '' se si può andare avanti, altrimenti il motivo. PURA.
+ * Quante schede vere ha la cartella sugli aperti dell'indice; `scarsa` = mancano tante e coprono meno di metà. È l'unica
+ * regola del censimento mancante: la usano l'avviso di elenca e il fermo di stato e scrivi. PURA.
+ */
+export function copertura({ indice, schede }) {
+  const nums = new Set((indice || []).filter((f) => f && !f.segnalato).map((f) => String(f.num)));
+  const coperti = new Set((schede || []).filter((s) => s && !s[SEGNALATA]).map((s) => String(s.numero || '').replace(/^#/, '')).filter((n) => nums.has(n)));
+  const aperti = nums.size;
+  const vere = coperti.size;
+  return { aperti, vere, mancano: aperti - vere, scarsa: aperti - vere >= SOGLIA_CENSIMENTO && vere * 2 < aperti };
+}
+
+const quanteSchede = (vere) => (vere ? `solo ${vere} ${vere === 1 ? 'scheda' : 'schede'}` : 'nessuna scheda');
+
+/**
+ * In una routine, una cartella con poche schede su tanti aperti vuol dire censimento che non sta nei feedback, non
+ * schede da riscrivere: Haiku le rifarebbe tutte alla cieca. → '' se si può andare avanti, altrimenti il motivo. PURA.
  */
 export function censimentoMancante({ via, indice, schede }) {
   if (via !== 'cloud') return '';
-  const aperti = (indice || []).filter((f) => f && !f.segnalato).length;
-  const vere = (schede || []).filter((s) => s && !s[SEGNALATA]).length;
-  if (aperti < SOGLIA_CENSIMENTO || vere > 0) return '';
+  const c = copertura({ indice, schede });
+  if (!c.scarsa) return '';
   return [
-    `FERMO: la lettura dal server non ha portato nessuna scheda su ${aperti} feedback aperti, quindi i feedback non ne hanno di salvate`,
-    '(il server le dà a questo biglietto: fuori dai riservati la lettura sarebbe stata rifiutata).',
+    `FERMO: la lettura dal server ha portato ${quanteSchede(c.vere)} su ${c.aperti} feedback aperti: il censimento non sta nei feedback`,
+    '(se elenca ne ha contate di illeggibili, è la lettura a non andare).',
     'Il censimento si porta nei feedback dalla macchina dell\'owner (elenca, poi scrivi: le schede della sua cartella si salvano senza agente);',
-    `riscriverle tutte da qui (${aperti} agenti) si fa solo deciso, con --da-zero. Intanto si decide sui titoli, e lo si dice nel recap.`,
+    `riscriverle tutte da qui (${c.mancano} agenti) si fa solo deciso, con --da-zero. Intanto si decide sui titoli, e lo si dice nel recap;`,
+    'una scheda sola si scrive con scrivi --solo N.',
   ].join(' ');
 }
 
