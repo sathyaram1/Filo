@@ -571,7 +571,12 @@ Come funziona oggi (#1152):
   l'owner e principio, la domanda si chiude). Chiarimento e chiusura si
   rifiutano se l'owner ha scritto dopo l'ultima lettura (`domanda_cambiata`).
   `azione` applica solo `riprendi`, `priorita` e `archivia`, e solo sui
-  feedback che la domanda nomina: mai un'azione di consenso. Nel feedback
+  feedback che la domanda nomina: mai un'azione di consenso. `azione` non
+  chiude la domanda, nemmeno quando riprende o archivia il lavoro che la
+  domanda ferma: quel lavoro esce dall'attesa per la risposta stessa, non per
+  un'altra strada (§ 3.4 punto 2), e la domanda resta in lavorazione e
+  affidata al compito fino a `chiarimento` o `chiudi`; il lavoro riparte con
+  `chiudi` (#2128). Un'azione che non riesce non la tiene. Nel feedback
   ripreso il turno dell'owner porta le sue parole lette dalla domanda; la nota
   del compito resta testo d'agente. Feedback e domande che il compito apre
   restano scritti nella conversazione della sua domanda.
