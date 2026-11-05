@@ -151,12 +151,16 @@ comando; raccontato nel recap del mattino. Niente esperimenti sui modelli che
 fanno il lavoro (provare un modello piccolo dal vivo no; cambiare un
 parametro di cache sì).
 
-**Primo filone: la cache.** I worker girano già a cinque minuti. Da misurare
-coi dati dei biglietti: quanti turni arrivano dopo un buco sopra i cinque
-minuti (unit ≈ 4 minuti, un controllo finale di più, le attese del server) e
-quanto costano in riletture; se conviene un'ora per alcuni ruoli; se per il
-manutentore l'ora si può scegliere. Le chiamate di Filo stesso (gli utenti)
-hanno la stessa domanda, e lì il TTL lo scegliamo noi.
+**Cache a un'ora per i sotto-agenti: chiuso il 05/11/2026 (#2121), si resta a
+cinque minuti.** Su un giorno (491 biglietti con rapporto) la cache scritta era
+304 $ su 1.104 $ di spesa, le riscritture il 9,6 % di quella (29 $): l'ora
+costerebbe 183 $ al giorno in più contro un risparmio massimo di 27 $ (saldo
+−155 $; converrebbe sopra il 62 % di riscrittura), e nessun ruolo si avvicina.
+Le riscritture vengono dalle attese in primo piano oltre i cinque minuti: la
+leva è la disciplina dei pezzi da quattro minuti (#2185), non il TTL. Il
+confronto si rifà ogni settimana con `npm run manutentore -- rapporti --giorni 7
+--cache` e va nel taccuino. Le chiamate di Filo stesso (gli utenti) hanno la
+stessa domanda, e lì il TTL lo scegliamo noi.
 
 ## 7. Guasti e account
 
