@@ -33,6 +33,10 @@
   const adminBanner = document.getElementById('adminBanner');
   const adminBannerText = document.getElementById('adminBannerText');
   const adminSignInBtn = document.getElementById('adminSignIn');
+  const adminSpin = document.getElementById('adminSpin');
+  const adminLasciaBtn = document.getElementById('adminLascia');
+  let accessoInAttesa = false;
+  let accessoN = 0; // scarta l'esito di un accesso lasciato stare
   // Interruttore master «gestione automatica» (owner-only, filo-security DESIGN §2). Default
   // OFF: finché è OFF anche i feedback sicuri richiedono verifica umana (config/automation).
   const automationRow = document.getElementById('automationRow');
@@ -1866,11 +1870,16 @@
     // Lo switch automazione è un controllo da owner: visibile solo agli admin.
     if (automationRow) automationRow.hidden = !isAdmin;
     if (isAdmin) loadAutomation();
+    // Un account entrato da qualunque strada chiude l'attesa dell'accesso chiesto da qui.
+    if (profile?.email && accessoInAttesa) mostraAttesaAccesso(false);
     if (!isAdmin && adminBannerText) {
       adminBannerText.classList.remove('fb-admin-ko');
       // Distingui "non loggato" da "loggato ma non admin": il secondo non può
       // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
-      if (profile?.email) {
+      if (accessoInAttesa) {
+        adminBannerText.textContent = 'Completa l\'accesso nella pagina di Google che si è aperta.';
+        if (adminSignInBtn) adminSignInBtn.hidden = false;
+      } else if (profile?.email) {
         // #583: senza essere admin i feedback non si leggono affatto — dirlo com'è vale più di un
         // invito che non porta da nessuna parte.
         adminBannerText.textContent = `L'account ${profile.email} non è un amministratore: i feedback li vede chi li gestisce.`;
@@ -1900,20 +1909,38 @@
     adminBannerText.classList.add('fb-admin-ko');
   }
 
+  // #678.6 — un accesso che aspetta un browser chiuso non spegne il pulsante: lo dice, si riapre o si lascia stare,
+  // come in bacheca.
+  function mostraAttesaAccesso(on) {
+    accessoInAttesa = on;
+    if (adminSpin) adminSpin.hidden = !on;
+    if (adminLasciaBtn) adminLasciaBtn.hidden = !on;
+    if (adminSignInBtn) adminSignInBtn.textContent = on ? 'Torna all\'accesso' : 'Accedi';
+  }
+
   if (adminSignInBtn) {
     adminSignInBtn.addEventListener('click', async () => {
-      adminSignInBtn.disabled = true;
-      try {
-        const r = await sendToMain({ type: 'auth_signin' });
-        setIsAdmin(r?.isAdmin);
-        renderAuthState(r?.profile);
-        applyFilter(); // ridisegna con/senza controlli admin
-        if (r?.ok === false) mostraAccessoFallito(r.error);
-      } catch (_) {
-        mostraAccessoFallito();
-      } finally {
-        adminSignInBtn.disabled = false;
-      }
+      // Il main tiene un accesso solo: chiederlo di nuovo riporta davanti la sua pagina, e l'esito arriva alla prima richiesta.
+      if (accessoInAttesa) { sendToMain({ type: 'auth_signin' }).catch(() => {}); return; }
+      const n = ++accessoN;
+      mostraAttesaAccesso(true);
+      renderAuthState(null);
+      let r = null;
+      try { r = await sendToMain({ type: 'auth_signin' }); } catch (_) { r = null; }
+      if (n !== accessoN) return;
+      mostraAttesaAccesso(false);
+      setIsAdmin(r?.isAdmin);
+      renderAuthState(r?.profile);
+      applyFilter(); // ridisegna con/senza controlli admin
+      if (!r || r.ok === false) mostraAccessoFallito(r && r.error);
+    });
+  }
+  if (adminLasciaBtn) {
+    adminLasciaBtn.addEventListener('click', () => {
+      sendToMain({ type: 'auth_signin_lascia' }).catch(() => {});
+      accessoN++;
+      mostraAttesaAccesso(false);
+      refreshAuth();
     });
   }
 

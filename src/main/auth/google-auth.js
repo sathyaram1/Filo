@@ -59,6 +59,7 @@ function erroreAccesso(code, message) {
 // l'accesso resterebbe in corso per sempre. Largo: consenso, scelta account, 2FA.
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
 let flussoInCorso = null;
+let flussoAttuale = null;
 
 // A tempo costante: un tentativo sbagliato non chiude più l'ascolto, quindi i tentativi sono illimitati.
 function stessoState(ricevuto, atteso) {
@@ -67,32 +68,72 @@ function stessoState(ricevuto, atteso) {
   return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
 }
 
-// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
-function startLoopback(expectedState) {
+// La pagina del ritorno aspetta lo scambio del codice: «completato» lo scrive solo un accesso riuscito (#678.6).
+// Oltre il tetto risponde lo stesso, e l'esito lo dice chi ha chiesto l'accesso.
+const RISPOSTA_RITORNO_MS = 2 * 60 * 1000;
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function paginaRitorno(testo) {
+  return '<!doctype html><meta charset="utf-8"><title>Filo</title><body style="font-family:system-ui;padding:2rem">'
+    + escHtml(testo) + '</body>';
+}
+const fraseErrore = (e) => { try { return require('./esitoAccesso').spiegaErroreAccesso(e).error; } catch (_) { return 'Accesso non riuscito.'; } };
+
+// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, concludi, abort }. `dove` è dove torna
+// chi ha finito nel browser ('app', o 'terminale' per lo strumento dell'owner). `concludi(errore?)` scrive la pagina.
+function startLoopback(expectedState, { dove = 'app' } = {}) {
+  const torna = dove === 'terminale' ? 'al terminale' : 'all\'app';
   return new Promise((resolve, reject) => {
     let resolveCode, rejectCode;
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
     codePromise.catch(() => {}); // un flusso interrotto prima di waitForCode non è un rifiuto orfano
+    let ricevuto = false;
+    let attesa = null; // la risposta del ritorno vero, finché lo scambio non dice com'è andata
+    let tetto = null;
+    const concludi = (errore) => {
+      clearTimeout(tetto);
+      const res = attesa;
+      attesa = null;
+      if (!res) return;
+      try {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(paginaRitorno(errore
+          ? `${fraseErrore(errore)} Puoi chiudere questa scheda.`
+          : `Accesso a Filo completato. Puoi chiudere questa scheda e tornare ${torna}.`));
+      } catch (_) {}
+    };
 
     const server = http.createServer((req, res) => {
-      const url = new URL(req.url, 'http://127.0.0.1');
+      res.on('error', () => {});
+      let url = null;
+      // Un indirizzo che non si legge («http://[») da un altro programma è una richiesta qualunque, non un crollo (#1086.2).
+      try { url = new URL(req.url, 'http://127.0.0.1'); } catch (_) { url = null; }
       // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
       // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
-      if (!stessoState(url.searchParams.get('state'), expectedState)) {
+      if (!url || ricevuto || !stessoState(url.searchParams.get('state'), expectedState)) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Richiesta non riconosciuta.');
       }
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
-        + (error || !code
-          ? 'Accesso non riuscito. Puoi chiudere questa scheda.'
-          : 'Accesso a Filo completato. Puoi chiudere questa scheda e tornare all\'app.')
-        + '</body>');
       server.close();
-      if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
-      if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
+      ricevuto = true;
+      attesa = res;
+      if (error || !code) {
+        const e = error
+          ? erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error)
+          : new Error('OAuth: nessun code nel redirect');
+        concludi(e);
+        return rejectCode(e);
+      }
+      tetto = setTimeout(() => {
+        const r = attesa;
+        attesa = null;
+        if (!r) return;
+        try {
+          r.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          r.end(paginaRitorno(`Puoi chiudere questa scheda: torna ${torna} per sapere com'è andato l'accesso.`));
+        } catch (_) {}
+      }, RISPOSTA_RITORNO_MS);
       resolveCode(code);
     });
 
@@ -100,8 +141,8 @@ function startLoopback(expectedState) {
     // porta 0 = il SO assegna una porta libera, solo su loopback.
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address();
-      const abort = (err) => { server.close(() => {}); rejectCode(err); };
-      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, abort });
+      const abort = (err) => { server.close(() => {}); concludi(err); rejectCode(err); };
+      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, concludi, abort });
     });
   });
 }
@@ -302,12 +343,10 @@ async function signIn() {
   }
   // Un accesso alla volta: chi lo chiede mentre uno aspetta riporta davanti la
   // STESSA pagina e ne condivide l'esito, così qualunque strada completi arriva a Filo.
+  // Riportarla davanti non allunga il tetto (#1132).
   if (flussoInCorso) {
     const f = await flussoInCorso;
-    if (f.aspettaBrowser) {
-      f.rinnovaAttesa();
-      await mostraAccesso(f);
-    }
+    if (f.aspettaBrowser) await mostraAccesso(f);
     return f.esito;
   }
   const prossimo = nuovoFlusso();
@@ -351,7 +390,41 @@ async function mostraAccesso(f) {
     contaAccesso('browser', 'senza_scheda');
   }
   f.nelBrowser = true;
-  await apriBrowser(f.url);
+  await apriNelBrowser(f);
+}
+
+// Chi bussa a raffica (anche dal canale delle pagine) non apre una scheda del browser a ogni richiesta (#1132).
+const RIAPERTURA_BROWSER_MS = 10 * 1000;
+async function apriNelBrowser(f) {
+  const ora = Date.now();
+  const manca = f.browserAlle ? f.browserAlle + RIAPERTURA_BROWSER_MS - ora : 0;
+  if (manca > 0) {
+    // Una richiesta frenata non si perde in silenzio: la pagina si riapre allo scadere, una volta per quante ne arrivano.
+    if (!f.riaperturaFrenata) {
+      f.riaperturaFrenata = setTimeout(() => {
+        f.riaperturaFrenata = null;
+        if (f.aspettaBrowser && f.nelBrowser) apriNelBrowser(f).catch((e) => f.loop.abort(e));
+      }, manca);
+    }
+    return;
+  }
+  f.browserAlle = ora;
+  try {
+    await apriBrowser(f.url);
+  } catch (e) {
+    f.browserAlle = 0;
+    throw e;
+  }
+}
+
+// «Lascia stare» (solo da Filo) toglie il freno: l'«Accedi» che segue è un tentativo nuovo e apre subito. L'accesso
+// resta in ascolto, così chi lo finisce comunque nel browser entra lo stesso.
+function lasciaStare() {
+  const f = flussoAttuale;
+  if (!f) return;
+  f.browserAlle = 0;
+  clearTimeout(f.riaperturaFrenata);
+  f.riaperturaFrenata = null;
 }
 
 // Lo stesso indirizzo, quindi lo stesso codice e lo stesso loopback: l'accesso a Filo riesce comunque.
@@ -364,7 +437,7 @@ function passaAlBrowser(f, motivo) {
   const nonCaricata = motivo === 'rete';
   if (!nonCaricata) { try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {} }
   // La riga «continua nel browser» solo se il browser si è aperto: altrimenti parla l'errore dell'accesso.
-  apriBrowser(f.url).then(() => {
+  apriNelBrowser(f).then(() => {
     const testo = nonCaricata ? AVVISO_NON_CARICATA : AVVISO_NEL_BROWSER;
     try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser', tipo: 'accesso_nel_browser' }); } catch (_) {}
   }, (e) => f.loop.abort(e));
@@ -400,29 +473,33 @@ async function nuovoFlusso() {
     prompt: 'select_account',
   }).toString();
 
-  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false };
-  let timer = null;
-  // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
-  f.rinnovaAttesa = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
-  };
-  f.rinnovaAttesa();
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false, browserAlle: 0, riaperturaFrenata: null };
+  flussoAttuale = f;
+  const timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
   f.esito = (async () => {
     let code;
     try {
       code = await loop.waitForCode();
     } finally {
       clearTimeout(timer);
+      clearTimeout(f.riaperturaFrenata);
+      f.riaperturaFrenata = null;
+      if (flussoAttuale === f) flussoAttuale = null;
       f.aspettaBrowser = false;
       // Arrivato il codice (o finita l'attesa) la scheda resterebbe su una pagina morta del loopback.
       if (f.scheda) { f.scheda.chiudi(); f.scheda = null; }
     }
-    const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
-    if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
-    const fb = await signInWithFirebase(googleTok.id_token);
-    setSession(fb);
-    persist();
+    try {
+      const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
+      if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
+      const fb = await signInWithFirebase(googleTok.id_token);
+      setSession(fb);
+      persist();
+    } catch (e) {
+      loop.concludi(e);
+      throw e;
+    }
+    loop.concludi();
     aggiornaFoto();
     return getProfile();
   })();
@@ -534,6 +611,7 @@ module.exports = {
   restore,
   segreti,
   signIn,
+  lasciaStare,
   signOut,
   getIdToken,
   getUid,

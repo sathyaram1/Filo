@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.265', date: '2026-11-05',
+      fixes: [
+        { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
+      ],
+    },
+    {
       version: '0.2.264', date: '2026-11-04',
       features: [
         { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },

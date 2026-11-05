@@ -361,6 +361,16 @@
        senza questa riga il banner "sola lettura" restava visibile anche agli admin, che i feedback li gestiscono. */
     .fb-admin-banner[hidden] { display: none; }
     .fb-admin-banner .fb-admin-ko { color: var(--sn-error); }
+    /* L'accesso che aspetta la pagina di Google non è muto (#678.6): rotella come la bacheca. */
+    .fb-admin-spin {
+      width: 14px; height: 14px; flex: 0 0 auto; border-radius: 50%;
+      border: 2px solid var(--sn-border); border-top-color: var(--sn-accent);
+      animation: fbAdminSpin calc(0.8s * var(--sn-motion, 1)) linear infinite;
+    }
+    .fb-admin-spin[hidden], .fb-admin-banner button[hidden] { display: none; }
+    .fb-admin-banner #adminSignIn + #adminLascia { margin-left: 0; }
+    @keyframes fbAdminSpin { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) { .fb-admin-spin { animation-duration: calc(2s * var(--sn-motion, 1)); } }
     /* Stesso contorno morbido del banner admin, così il box si legge come "zona proprietario". */
     .fb-automation {
       margin-bottom: 16px; padding: 4px 14px 12px;
@@ -376,9 +386,11 @@
     <p class="sn-muted">I feedback ricevuti dagli alpha tester.</p>
 
     <div class="fb-admin-banner" id="adminBanner" hidden>
-      <span id="adminBannerText">I feedback li vede chi li gestisce: accedi con un account amministratore.</span>
+      <span id="adminSpin" class="fb-admin-spin" aria-hidden="true" hidden></span>
+      <span id="adminBannerText" role="status">I feedback li vede chi li gestisce: accedi con un account amministratore.</span>
       <a id="adminMie" class="fb-admin-mie" href="filo://board/board.html#segnalazioni">Le tue segnalazioni</a>
       <button type="button" class="sn-btn" id="adminSignIn">Accedi</button>
+      <button type="button" class="sn-btn sn-btn-secondary" id="adminLascia" hidden>Lascia stare</button>
     </div>
 
     <!-- Interruttore master dell'auto-miglioramento, owner-only (lo smaschera feedback.js). Default OFF: ogni

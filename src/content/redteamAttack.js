@@ -196,27 +196,54 @@
       if (activeRoot === root) avvisoEl.hidden = verificato !== false;
     })();
 
+    async function leggiSaldo() {
+      if (!signedIn) return;
+      try {
+        const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
+        if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
+      } catch (_) {}
+    }
+
     (async function loadAuthAndBalance() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
         signedIn = !!(a && a.signedIn);
       } catch (_) { signedIn = false; }
-      if (signedIn) {
-        try {
-          const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-          if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
-        } catch (_) {}
-      }
+      await leggiSaldo();
       if (activeRoot === root) refreshSendState();
     })();
+
+    // L'esito dell'accesso cambia il pannello aperto (#810.15) e un fallimento dice il perché (#678.5). Sopra un sito
+    // l'accesso passa solo col clic che l'ha chiesto (#1132).
+    async function accedi() {
+      setStatus('Completa l’accesso nella pagina di Google che si è aperta.');
+      let r = null;
+      try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN_CLIC }); } catch (_) { r = null; }
+      if (activeRoot !== root) return;
+      if (r && r.ok && (r.signedIn || r.profile)) {
+        signedIn = true;
+        await leggiSaldo();
+        if (activeRoot !== root) return;
+        setStatus('');
+        refreshSendState();
+        if (!statusEl.classList.contains('sn-rt-status--err')) setStatus('Sei dentro: ora puoi inviare l’attacco.', 'ok');
+        return;
+      }
+      setStatus((r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.', 'err');
+    }
 
     // ---- invio: costa crediti, parte solo dal clic dell'utente (#1071) ----
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
+      // Un accesso fatto altrove (menu del Profilo, un'altra scheda) col pannello aperto vale qui: si chiede adesso (#1351).
       if (!signedIn) {
-        setStatus('Accedi al tuo account per inviare un attacco.', 'err');
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-        return;
+        try { const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }); signedIn = !!(a && a.signedIn); } catch (_) {}
+        if (activeRoot !== root) return;
+        if (!signedIn) { accedi(); return; }
+        await leggiSaldo();
+        if (activeRoot !== root) return;
+        refreshSendState();
+        if (sendBtn.disabled) return;
       }
       const attackText = attackEl.value.trim();
       const description = descEl.value.trim();
@@ -258,11 +285,14 @@
         return;
       }
       setStatus(msg.text, 'err');
-      if (msg.needLogin) {
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-      }
       cancelBtn.disabled = false;
       sendBtn.disabled = false;
+      if (msg.needLogin) {
+        signedIn = false;
+        refreshSendState();
+        accedi();
+        return;
+      }
       refreshSendState();
     });
 
