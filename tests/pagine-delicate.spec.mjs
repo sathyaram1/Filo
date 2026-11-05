@@ -587,3 +587,66 @@ test('spenta in Preferenze la descrizione di screenshot e immagini, lo screensho
   expect(acceso.nome).not.toMatch(/^screenshot-/);
   expect((await mandato(app)).filter((m) => m.testo.includes('image_url')).length).toBe(1);
 });
+
+// #1545, #1274.1 — due funzioni facoltative che partono da sole, la categoria delle pagine salvate e il nome dei file
+// scaricati: da una pagina delicata la prima manda solo il tipo, la seconda niente.
+const DALLE_PREFERENZE = { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' };
+const impostaDaFilo = (app, settings) => app.evaluate(async ({}, { s, da }) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: s }, da), { s: settings, da: DALLE_PREFERENZE });
+const categorizzazioni = async (app) => (await mandato(app)).filter((m) => m.testo.includes('Categorizza'));
+
+test('salvata per dopo con le categorie accese: di una pagina di posta al modello va il tipo, di una qualunque titolo e testo', async ({ app }) => {
+  await modelliFinti(app);
+  await impostaDaFilo(app, { featureFlags: { categorize: true } });
+  const salva = (page) => app.evaluate(async ({}, p) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.SAVE_PAGE, page: p }), page);
+  await salva({ url: 'https://mail.google.com/mail/u/0/#inbox', title: 'Posta in arrivo (3) - mario.rossi@gmail.com', description: '', excerpt: SEGRETO });
+  await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(1);
+  const [posta] = await categorizzazioni(app);
+  expect(posta.testo).toContain('posta');
+  for (const segreto of ['mail.google.com', 'mario.rossi', 'Posta in arrivo', '12.345,67']) expect(posta.testo).not.toContain(segreto);
+
+  await salva({ url: 'https://it.wikipedia.org/wiki/Gatto', title: 'Gatto - Wikipedia', description: '', excerpt: 'Il gatto domestico' });
+  await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(2);
+  const normale = (await categorizzazioni(app))[1];
+  expect(normale.testo).toContain('Gatto - Wikipedia');
+  expect(normale.testo).toContain('Il gatto domestico');
+});
+
+async function scaricaDa(nome, corpo, { shell, openTab, testServer }) {
+  const { createServer } = await import('node:http');
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': Buffer.byteLength(corpo), 'Content-Disposition': `attachment; filename="${nome}"` });
+    res.end(corpo);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://sito-pubblico.test:${srv.address().port}/${nome}`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><title>Estratti</title><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`, { pubblico: true });
+  await page.locator('#dl').click();
+  let rec = null;
+  await expect.poll(async () => {
+    const r = await shell.evaluate(() => window.filoShell.downloads.list());
+    rec = ((r && r.items) || []).find((it) => it.url === url) || null;
+    return rec ? rec.state : null;
+  }, { timeout: 20000 }).toBe('completed');
+  try { srv.closeAllConnections?.(); } catch (_) {}
+  await new Promise((r) => srv.close(r));
+  return rec;
+}
+
+test('col nome automatico acceso, un file scaricato da un sito delicato tiene il suo nome e non va al modello; da uno qualunque sì', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const { existsSync } = await import('node:fs');
+  await modelliFinti(app);
+  await impostaDaFilo(app, { nomiSensati: { scaricamenti: true }, security: { pagineDelicate: { siti: ['sito-pubblico.test'] } } });
+  const s = await app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
+  expect([s.nomiSensati.scaricamenti, s.security.pagineDelicate.siti]).toEqual([true, ['sito-pubblico.test']]);
+  const delicato = await scaricaDa('documento.txt', SEGRETO, { shell, openTab, testServer });
+  await new Promise((r) => setTimeout(r, 3000));
+  expect((await mandato(app)).filter((m) => m.testo.includes('12.345,67'))).toEqual([]);
+  expect(existsSync(delicato.savePath)).toBe(true);
+
+  // Lo stesso sito tolto dai delicati: il file dopo prende il nome dal modello.
+  await impostaDaFilo(app, { security: { pagineDelicate: { siti: [] } } });
+  const normale = await scaricaDa('download.txt', 'Verbale della riunione di condominio', { shell, openTab, testServer });
+  await expect.poll(async () => (await mandato(app)).filter((m) => m.testo.includes('Verbale della riunione')).length, { timeout: 15000 }).toBe(1);
+  await expect.poll(() => existsSync(normale.savePath), { timeout: 10000 }).toBe(false);
+});
