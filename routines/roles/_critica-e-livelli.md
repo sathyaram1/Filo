@@ -6,8 +6,9 @@ Appena cominci lancia `npm run finish:check` **in sottofondo** (unit test più
 gli spec delle aree toccate dal ramo: da quindici a quarantacinque minuti) e
 lavora mentre gira: aspettarlo alla fine vorrebbe dire ripagare tutto il
 contesto. L'esito lo leggi prima di registrare, e il rilascio aspetta che
-sia finito. Se si ferma al tetto di un comando in sottofondo, rilancialo: sullo
-stesso commit riparte dagli spec non ancora verdi. La suite intera (`npm test`)
+sia finito. Se si ferma al tetto di un comando in sottofondo, rilancialo: riparte
+dagli spec non ancora verdi, anche se nel frattempo hai committato le prove del
+giro (un cambio al codice invece li rifà tutti). La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
 - Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
