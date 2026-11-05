@@ -199,6 +199,75 @@ describe('quale tentativo precedente si riprende', () => {
     } finally { togliCartella(base); }
   });
 
+  test('un tentativo nato da main e mai scritto non è lavoro arrivato su main: quello più vecchio coi suoi commit si riprende', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const morto = tentativo(casa, ramo('20261101T000000Z'), main, 15);
+      commit(casa, 'altro.txt', 'fusione di un altro feedback\n');
+      git(casa, 'push', '-q', 'origin', 'main');
+      tentativo(casa, ramo('20261102T000000Z'), 'main', 0);
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.deepEqual(r.superati, [], 'il lavoro mai fuso non si toglie da origin');
+      assert.equal(r.scelto && r.scelto.head, morto, 'si riparte dai 15 commit');
+      git(casa, 'fetch', '-q', 'origin');
+      assert.deepEqual(ramiInCorso(casa, { giorni: 0 }).map((x) => x.ramo), [ramo('20261101T000000Z')], 'il manutentore lo vede in corso');
+    } finally { togliCartella(base); }
+  });
+
+  test('feedback riaperto dopo la potatura del ramo fuso: la fusione letta su main basta a dire superato il tentativo di prima', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      tentativo(casa, ramo('20261101T000000Z'), main, 3);
+      const fuso = tentativo(casa, ramo('20261102T000000Z'), main, 1);
+      git(casa, 'merge', '-q', '--no-ff', '-m', 'merge-gate: #2152 via server', fuso);
+      git(casa, 'push', '-q', 'origin', 'main');
+      git(casa, 'push', '-q', 'origin', `:refs/heads/${ramo('20261102T000000Z')}`);
+      const r = tentativiPrecedenti({ root: casa, id: ID, num: '#2152' });
+      assert.equal(r.scelto, null, 'il lavoro superato dalla fusione non torna come base');
+      assert.deepEqual(r.superati, [ramo('20261101T000000Z')]);
+      const figlio = tentativiPrecedenti({ root: casa, id: ID, num: '#21520' });
+      assert.equal(figlio.scelto && figlio.scelto.ramo, ramo('20261101T000000Z'), 'la fusione di un altro numero non conta');
+    } finally { togliCartella(base); }
+  });
+
+  test('i tentativi superati di ogni feedback si chiudono, anche di quelli che non ripartono più', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const altro = 'fid-1170';
+      tentativo(casa, ramo('20261012T000000Z', altro), main, 17);
+      tentativo(casa, ramo('20261014T000000Z', altro), main, 15);
+      const terzo = tentativo(casa, ramo('20261015T000000Z', altro), main, 21);
+      const quarto = tentativo(casa, ramo('20261018T000000Z', altro), terzo, 2);
+      git(casa, 'merge', '-q', '--no-ff', '--no-edit', quarto);
+      git(casa, 'push', '-q', 'origin', 'main');
+      const vivo = tentativo(casa, ramo('20261101T000000Z'), main, 1);
+      tentativo(casa, ramo('20261102T000000Z'), 'main', 0);
+      const c = chiudiSuperatiOvunque({ root: casa });
+      assert.equal(c.ok, true, c.errore);
+      assert.deepEqual(c.chiusi.sort(), [ramo('20261012T000000Z', altro), ramo('20261014T000000Z', altro)]);
+      const restano = git(casa, 'ls-remote', 'origin', 'refs/heads/worker/*').split('\n').map((r) => r.split('\t')[1].replace('refs/heads/', '')).sort();
+      assert.deepEqual(restano, [ramo('20261015T000000Z', altro), ramo('20261018T000000Z', altro), ramo('20261101T000000Z'), ramo('20261102T000000Z')].sort(),
+        'i fusi li toglie la potatura; il lavoro mai fuso di un feedback senza fusioni resta');
+      assert.equal(git(casa, 'rev-parse', `origin/${ramo('20261101T000000Z')}`), vivo);
+    } finally { togliCartella(base); }
+  });
+
+  test('il manutentore vede in corso lo stesso tentativo che la ripresa sceglierebbe', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const t1 = tentativo(casa, ramo('20261101T000000Z'), main, 2);
+      tentativo(casa, ramo('20261102T000000Z'), t1, 0);
+      tentativo(casa, ramo('20261101T000000Z'), t1, 1);
+      const { scelto } = tentativiPrecedenti({ root: casa, id: ID });
+      git(casa, 'fetch', '-q', 'origin');
+      assert.deepEqual(ramiInCorso(casa, { giorni: 0 }).map((x) => x.ramo), [scelto.ramo]);
+    } finally { togliCartella(base); }
+  });
+
   test('origin che non risponde è un «non so», non un «non ce ne sono»', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
