@@ -140,6 +140,7 @@ export function motivoLettura(input, ctx = {}) {
     const dove = String(dati.isolation || '');
     return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
   }
+  if (nome === 'Skill' || nome === 'SlashCommand') return richiamoDaEstensione(nome, dati);
   if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
   if (nome.startsWith('mcp__')) return mcpSenzaLettura(nome) ? '' : pulisci(nome, 160);
   if (nome !== 'Read' && nome !== 'Grep') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
