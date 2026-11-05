@@ -75,5 +75,26 @@ test('descrizione di un\'immagine, riassunto e titolo dell\'Editor, ricerca dell
 test('il canale delle pagine porta `intera` fino a chi chiama il modello', () => {
   const ai = src('src/main/services/handlers/ai.js');
   assert.match(ai, /const intera = msg && msg\.intera === true;/);
-  assert.match(ai, /handleAIRequest\(\{ action: msg\.action, payload: msg\.payload, origin, sender, noCache, intera \}\)/);
+  assert.match(ai, /handleAIRequest\(\{ action: msg\.action, payload: msg\.payload, origin, sender, noCache, intera, conSeguito \}\)/);
+});
+
+// #1302 — il tetto finito nel ragionamento prima di una parola: dove c'è «Continua» la nota e il seguito, altrove l'errore.
+test('risposta vuota fermata ragionando: nota e «Continua» dove ci sono, errore per chi legge un dato o non ha il seguito', () => {
+  const vuota = { text: '', toolCalls: [], finishReason: 'tetto_ragionamento' };
+  assert.equal(CE.erroreDelTaglio(vuota), null);
+  assert.equal(CE.erroreDelTaglio(vuota, { intera: true }).code, 'RISPOSTA_TAGLIATA');
+  assert.equal(CE.erroreDelTaglio(vuota, { senzaSeguito: true }).code, 'RISPOSTA_TAGLIATA');
+  assert.equal(CE.erroreDelTaglio({ ...vuota, finishReason: 'length' }).code, 'RISPOSTA_TAGLIATA');
+  const handlers = src('src/main/services/handlers.js');
+  assert.match(handlers, /erroreDelTaglio\(r, \{ intera, senzaSeguito: !conSeguito \}\)/);
+  assert.match(intorno(handlers, 'action: ACTIONS.FILO_CHAT,\n        payload: { ...payloadBase, threadMessages },', 200), /conSeguito: true/);
+  assert.match(intorno(src('src/main/services/handlers/scryfall.js'), 'action: ACTIONS.DECKS_CHAT,', 200), /conSeguito: true/);
+  assert.match(intorno(src('src/content/actions.js'), 'action: ACTIONS.EXPLAIN,', 200), /conSeguito: true/);
+  assert.match(intorno(src('src/content/sidebar.js'), 'action: ACTIONS.HELP,', 200), /conSeguito: true/);
+});
+
+test('la nota del tetto finito nel ragionamento non promette «Continua» né più spazio: compare anche dove non ci sono', () => {
+  const nota = CE.rispostaInterrotta('tetto_ragionamento');
+  assert.match(nota, /ragionando/);
+  assert.doesNotMatch(nota, /continu|più spazio/i);
 });
