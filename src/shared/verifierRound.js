@@ -444,30 +444,40 @@
   }
 
   /**
+   * Il livello del bilancio con cui un rilievo di livello `level` può pagare
+   * un giro: il suo, o finito quello il più alto ancora aperto sotto (X-1,
+   * poi X-2…: decisione dell'owner D88, #744); null se sono finiti tutti. PURA.
+   */
+  function livelloCheLoPaga(level, left) {
+    for (let n = Math.min(3, Math.max(0, Number(level) || 0)); n >= 0; n -= 1) {
+      if (left(capKeyOf(n)) > 0) return n;
+    }
+    return null;
+  }
+
+  /**
    * L'esito di un giro, calcolato dai livelli e dai bilanci (spec §4). PURA.
    *
    * Regole:
    *   - ferma il lavoro un rilievo che chiede una decisione se è un 3, o un 2
    *     su una scelta difficile da disfare (`[2i?!]`: decisioneFerma);
-   *   - un 3 si corregge se il bilancio dei 3 ha ancora giri; a bilancio
-   *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
-   *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
-   *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
-   *     finito NON ferma: va nel feedback derivato, a priorità 1, e il giro
-   *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
+   *   - un rilievo di livello X paga col bilancio di X; finito quello, col più
+   *     alto ancora aperto sotto X (D88, #744), anche se nient'altro fa
+   *     partire il giro (livelloCheLoPaga);
+   *   - un 3 che non può pagare nemmeno così ferma il lavoro (è l'unico
+   *     livello che ferma per bilancio); un 2, un 1 o uno 0 NON fermano: vanno
+   *     nel feedback derivato (un 2 a priorità 1), e il giro passa se non c'è
+   *     altro (decisione dell'owner del 2026-09-23);
+   *   - se almeno un interno può pagare il giro parte, e ci salgono tutti gli
+   *     altri, anche chi non può pagare (sta per forza sotto chi paga, e un
+   *     altro verificatore arriva comunque: 2026-09-16);
    *   - un 2 col `?` segue le stesse regole del 2: chi corregge applica
    *     l'opzione consigliata, e il rilievo esce ANCHE fra i `derived` (con
    *     `inCorrezione: true`), in un feedback suo con la domanda: se l'owner
    *     sceglie diversamente, quel feedback cambia il codice già fuso (#1202);
-   *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
-   *     giro lo paga già il livello più alto, e un altro verificatore arriva
-   *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
-   *     bilancio ha ancora giri; altrimenti va nel feedback derivato;
-   *   - un 1 che chiede una decisione va nel feedback derivato;
-   *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
-   *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
-   *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
-   *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
+   *   - un 1 o uno 0 che chiede una decisione va nel feedback derivato;
+   *   - un giro consuma UN giro dal bilancio più alto fra quelli con cui i
+   *     rilievi possono pagare (bilancioPagato lo racconta nella nota);
    *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
    *   - senza uno dei quattro bilanci LANCIA (`bilanci del verificatore
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
