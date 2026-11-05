@@ -7555,24 +7555,10 @@ async function maybeCategorizeAsync(savedEntry, pageInput) {
   if (!settings.featureFlags?.categorize) return;
   if (await Costs.isOverLimit(settings.monthlyLimitEur)) return;
   if (!SN_CONST.canServeAction(settings, ACTIONS.CATEGORIZE)) return;
-  const invokeAI = ({ action, payload }) => handleAIRequest({ action, payload, origin: pageInput?.url || '', intera: true });
-  const result = await Categorizer.categorize({
-    invokeAI,
-    page: {
-      url: savedEntry.url, title: savedEntry.title,
-      description: pageInput?.description || '', excerpt: pageInput?.excerpt || '',
-      thumbnail: savedEntry.thumbnail,
-    },
+  await require('./categoriaSalvata').categorizza(savedEntry, pageInput, {
+    settings,
+    chiedi: ({ action, payload, origin }) => handleAIRequest({ action, payload, origin, intera: true }),
   });
-  if (!result?.category) return;
-  const list = await SavedPages.list();
-  const idx = list.findIndex((p) => p.id === savedEntry.id);
-  if (idx >= 0) {
-    list[idx].category = result.category.name;
-    list[idx].categoryId = result.category.id;
-    list[idx].categoryConfidence = result.confidence;
-    await globalThis.chrome.storage.local.set({ [SN_CONST.STORAGE_KEYS.SAVED_PAGES]: list });
-  }
 }
 
 // Registro degli handler per dominio: ogni modulo sotto handlers/ registra i suoi tipi e
