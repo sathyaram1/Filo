@@ -736,7 +736,8 @@
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
           // Il tetto finito nel ragionamento prima di una parola (#1302): la nota e «Continua» al posto della spiegazione.
-          const nota = res && !res.errore ? (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason) || '') : '';
+          const nota = res && !res.errore && !String(res.text || '').trim()
+            ? (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason) || '') : '';
           if (!res || res.errore || (!res.text && !nota)) {
             el.classList.add('sn-menu-inline-error');
             Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });

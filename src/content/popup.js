@@ -1061,8 +1061,10 @@
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
-        // non i marker, così l'LLM non si confonde nei turni successivi.
-        try { onAssistantDone && onAssistantDone(resolved); } catch (_) {}
+        // non i marker, così l'LLM non si confonde nei turni successivi. Fermata prima del testo (#1302): la nota, perché
+        // un turno del modello vuoto alcuni host lo rifiutano al «Continua».
+        const salvata = String(resolved || '').trim() ? resolved : (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(m.finishReason) || resolved);
+        try { onAssistantDone && onAssistantDone(salvata); } catch (_) {}
         popup.activePort = null;
       } else if (m.type === 'error') {
         popup.primaRisposta = true;
