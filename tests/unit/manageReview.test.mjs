@@ -2129,6 +2129,18 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
   assert.equal(MR.inAttesaFusioneServer(rev('suite_server')), false);
 });
 
+test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi motivi, solo in coda (#2036)', () => {
+  const srv = (extra) => Object.assign({ status: 'revision_security', localOnly: { by: 'owner', at: '2026-10-01' } }, extra);
+  const segno = { motivi: ['ramo non pulito', ' '], ruolo: 'secaudit', atMs: 5 };
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], atMs: 5 });
+  assert.deepEqual(MR.restaLocale(srv({ status: 'todo', restaLocale: segno })).motivi, ['ramo non pulito']);
+  assert.equal(MR.restaLocale(srv({ restaLocale: null })), null, 'tolto dal server quando il motivo passa');
+  assert.equal(MR.restaLocale(srv({ status: 'working', restaLocale: segno })), null, 'partito: non è più fermo');
+  assert.equal(MR.restaLocale({ status: 'todo', restaLocale: segno }), null, 'solo un lavoro server');
+  assert.equal(MR.restaLocale(srv({ restaLocale: { motivi: [] } })), null);
+  assert.equal(MR.restaLocale(null), null);
+});
+
 test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hover (#857)', () => {
   assert.deepEqual(MR.tastoFrase('Ora puoi farlo.'), { piena: true, titolo: 'Frase già scritta: “Ora puoi farlo.”' });
   for (const vuota of [undefined, null, '', '   ']) {

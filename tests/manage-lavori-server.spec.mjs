@@ -129,6 +129,26 @@ test('una pratica passata che aspetta il PC lo dice sulla scheda; rimessa in cod
   await expect(page.locator('.mg-item[data-id="srv-2"] .mg-attesa-server')).toHaveCount(0);
 });
 
+test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda, col motivo; sanato torna all’iter', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await stubAutomazioni(page);
+  const fermo = fb({ _id: 'srv-6', seq: 1903, status: 'revision_security', branch: 'worker/srv-6-20261101T090000Z',
+    restaLocale: { motivi: ['ramo non pulito', '<b>ramo del server non pulito</b>'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z') } });
+  const sanato = fb({ _id: 'srv-7', seq: 1904, status: 'revision_security', branch: 'worker/srv-7-20261101T090000Z', restaLocale: null });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [fermo, sanato]);
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  const riga = page.locator('.mg-item[data-id="srv-6"] .mg-attesa-server');
+  await expect(riga).toHaveText('Fermo: resta locale');
+  await expect(riga).toHaveAttribute('title', /biglietto nascerebbe non fidato \(ramo non pulito, <b>ramo del server non pulito<\/b>\)/);
+  await expect(page.locator('.mg-item[data-id="srv-6"] b')).toHaveCount(0);
+  await expect(page.locator('.mg-item[data-id="srv-7"]')).toBeVisible();
+  await expect(page.locator('.mg-item[data-id="srv-7"] .mg-attesa-server')).toHaveCount(0);
+  await page.locator('.mg-item[data-id="srv-6"]').screenshot({ path: 'tests/.shots/manage-resta-locale-2036.png' });
+});
+
 test('#1222: la scheda dice quando il server aspetta la suite; un segno di attesa che non esiste non si mostra', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await page.waitForLoadState('domcontentloaded');

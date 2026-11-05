@@ -926,7 +926,7 @@
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
     'clientIdHash', 'createdAt', 'domandaId', 'domandeBloccanti', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly',
     'mittenteClasse', 'mittenteRuolo', 'name', 'parentId', 'pipeline',
-    'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
+    'priority', 'priorityManual', 'reopenRequests', 'resolvedAt', 'restaLocale',
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
