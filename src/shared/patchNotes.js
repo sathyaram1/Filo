@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.265', date: '2026-11-05',
+      fixes: [
+        { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
+      ],
+    },
+    {
       version: '0.2.264', date: '2026-11-04',
       features: [
         { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },
@@ -19,7 +25,6 @@
       ],
       fixes: [
         { testo: 'La pulizia delle schede non chiude più una scheda col messaggio respinto dal sito, anche nei forum, nei moduli incorporati da un altro sito e nelle caselle con nomi insoliti. Chiude invece quelle il cui testo è già arrivato, come un post pubblicato o una lista appena creata.', segnalazione: 824 },
-        { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
