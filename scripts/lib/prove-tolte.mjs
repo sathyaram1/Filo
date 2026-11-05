@@ -458,12 +458,14 @@ export function testoProvePrimaDelVerdetto(fuori, findings) {
       ? `copre anche ${r(x.restano)}, che resta: togli ${casi} e il numero dal nome (\`git mv ${x.prova} ${x.rinomina}\`)`
       : `togli ${casi}`;
   };
-  // Senza questa riga chi ha un 2 col `?` crede che il lavoro si fermi e che gli altri `?` restino con la loro prova.
-  const aperte = tutti.map((f, i) => ({ f, n: i + 1 })).filter((x) => nonBlocca(x.f)).map((x) => x.n);
   return [
     'critica non registrata: queste prove portano rilievi che escono dal giro in ogni esito, e vanno tolti PRIMA della critica,',
+<<<<<<< HEAD
     'nel suo commit: si sanno già, e ogni commit dopo il verdetto è un passo in più che i cancelli devono controllare (#1555).',
     ...(aperte.length ? [`${aperte.length === 1 ? `La domanda del rilievo ${aperte[0]} non blocca` : `Le domande dei rilievi ${aperte.join(', ')} non bloccano`}: il lavoro non si ferma, e i rilievi col \`?\` che contano al più 1 escono in un feedback loro.`] : []),
+=======
+    'nel suo commit: dopo il verdetto il ramo si muove solo col rilascio, che registra la punta per la fiducia del lavoro (#1555, #2021).',
+>>>>>>> 5c0abedb32 (auto: scripts/lib/prove-tolte.mjs)
     ...fuori.map((x) => `  · ${x.prova}: ${x.numeri.map(perche).join(', ')}; ${rimedio(x)}`),
     'Poi `git add -A && git commit` e registra la stessa critica. Il caso di un rilievo che resta non si tocca.',
   ].join('\n');
