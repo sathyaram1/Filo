@@ -469,10 +469,15 @@ export async function main(argv) {
   let indice = leggiJson(join(cartella, INDICE));
   if (cmd === 'elenca') return elenca(cartella, dryRun);
   if (!['scrivi', 'rileggi', 'stato'].includes(cmd)) {
-    console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
+    console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] [--da-zero] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
     return 1;
   }
   if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
+  const soloChiesti = Boolean(String(opzione(argv, '--solo') || '').trim());
+  if ((cmd === 'stato' || (cmd === 'scrivi' && !soloChiesti)) && !argv.includes('--da-zero')) {
+    const fermo = censimentoMancante({ via: (await strada()).via, indice, schede: leggiSchede(cartella) });
+    if (fermo) { console.error(fermo); return 1; }
+  }
   if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella)), null, 1)); return 0; }
   let restano = 0;
   if (!dryRun) {
