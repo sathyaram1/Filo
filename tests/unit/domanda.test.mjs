@@ -33,6 +33,7 @@ function finto(risposte = {}) {
     },
     consegna: async (t, domanda) => { consegne.push({ t, domanda }); return risposte.consegna || { outcome: 'ok', id: 'D-7', num: 'D-7' }; },
     biglietto: async () => risposte.biglietto || '',
+    credenziale: async () => risposte.credenziale || { tipo: 'admin' },
     bigliettoLocale: async () => risposte.bigliettoLocale || '',
     sporca: async (cosa, motivi) => { sporcate.push({ cosa, motivi }); ordine.push('sporca'); return 'Biglietto della sessione sporcato.'; },
     leggiFile: (p) => { if (!(p in (risposte.file || {}))) throw Object.assign(new Error('no'), { code: 'ENOENT' }); return risposte.file[p]; },

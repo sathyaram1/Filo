@@ -83,7 +83,7 @@ test('le letture dello strumento delle domande portano il biglietto della sessio
     if (data.op === 'elenco') return { domande: [] };
     return { voci: [] };
   };
-  const io = { chiama, biglietto: async () => '', bigliettoLocale: async () => SEGRETO, sporca: async () => '', scrivi: () => {}, errore: () => {} };
+  const io = { chiama, biglietto: async () => '', credenziale: async () => ({ tipo: 'admin' }), bigliettoLocale: async () => SEGRETO, sporca: async () => '', scrivi: () => {}, errore: () => {} };
   for (const argv of [['mostra', 'D-12'], ['elenco'], ['registro', 'crediti']]) assert.equal(await domanda(argv, io), 0, argv.join(' '));
   assert.deepEqual(mandate.map((d) => [d.op, d.biglietto]), [['mostra', SEGRETO], ['elenco', SEGRETO], ['registro', SEGRETO]]);
   // Senza biglietto la lettura parte come prima.
