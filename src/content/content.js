@@ -824,6 +824,11 @@
         mandaImpronte();
       }, 0);
     }
+    // L'impronta del testo lungo che parte: la pagina che risponde può rimetterlo in un campo, ed è ancora suo.
+    function inPartenza(a, base) {
+      const t = lunghe.has(a) ? pulito(testo(a)) : '';
+      if (t && t !== pulito(base)) partiti.add(impronta(t));
+    }
     // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main). Da un
     // riquadro cambia pagina il riquadro, e il main ne riconosce la risposta dall'indirizzo del modulo.
     function segnalaInvio(form, dest, azione = '') {
