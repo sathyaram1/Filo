@@ -79,6 +79,29 @@ test('un sito fra le voci senza copia la fa chiedere una volta al riordino delle
   assert.deepEqual(ses.chiesti, []);
 });
 
+test('un sito con la regola del paese esce solo dal proxy: dalla connessione vera nessuna richiesta, restano le copie già in casa', async () => {
+  const ses = sessione({ 'https://regola.it/favicon.ico': PNG, 'https://img.piattaforma.it/r.png': PNG });
+  const giri = [];
+  const { cercaIconaSito } = I.crea({
+    regole: async () => ({ 'regola.it': { country: 'us' } }),
+    leggiCopia: async (r) => (r === COPIA ? DATO : ''),
+    completaVoci: async () => { giri.push(1); },
+  });
+  assert.equal(await cercaIconaSito('https://www.regola.it/', { ses }), '', 'un sito che Filo non ha fra le sue voci');
+  const daCompletare = [{ url: 'https://regola.it/a', favicon: '', faviconDaChiedere: 'https://img.piattaforma.it/r.png' }];
+  assert.equal(await cercaIconaSito('https://video.regola.it/x', { ses, voci: async () => daCompletare }), '');
+  assert.deepEqual(giri, [], 'una voce di quel sito non fa partire il riordino delle icone');
+  assert.equal(await cercaIconaSito('https://regola.it/', { ses, voci: async () => [{ url: 'https://regola.it/b', favicon: COPIA }] }), DATO);
+  assert.equal(await cercaIconaSito('https://regola.it/', { ses, schede: [{ url: 'https://regola.it/c', favicon: DATO }] }), DATO);
+  assert.deepEqual(ses.chiesti, []);
+
+  // Le regole che non si leggono non danno il via libera; un sito senza regola si chiede come sempre.
+  const cieco = I.crea({ regole: async () => { throw new Error('storage'); } });
+  assert.equal(await cieco.cercaIconaSito('https://regola.it/', { ses }), '');
+  assert.deepEqual(ses.chiesti, []);
+  assert.equal(await cercaIconaSito('https://libero.it/', { ses: sessione({ 'https://libero.it/favicon.ico': PNG }) }), DATO);
+});
+
 test('/favicon.ico del sito stesso, con lo schema e la porta del suggerimento', async () => {
   const ses = sessione({ 'http://esempio.it:8080/favicon.ico': PNG });
   const { cercaIconaSito } = I.crea();
