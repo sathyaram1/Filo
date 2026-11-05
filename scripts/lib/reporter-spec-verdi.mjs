@@ -9,15 +9,15 @@ export default class SpecVerdi {
   onBegin(_config, suite) {
     this.file = process.env.FILO_SPEC_VERDI_FILE || '';
     this.chiave = process.env.FILO_SPEC_VERDI_CHIAVE || '';
-    this.segnati = [];
+    this.segnati = new Set();
     this.rotto = false;
     // config.rootDir è la cartella dei test, non quella da cui gli spec prendono il nome: si parte dal lancio.
     this.radice = process.env.FILO_SPEC_VERDI_RADICE || process.cwd();
-    this.mancano = new Map();
+    this.esiti = new Map();
     for (const t of suite.allTests()) {
       const s = this.nome(t);
-      if (!this.mancano.has(s)) this.mancano.set(s, new Set());
-      this.mancano.get(s).add(t.id);
+      if (!this.esiti.has(s)) this.esiti.set(s, new Map());
+      this.esiti.get(s).set(t.id, false);
     }
   }
 
@@ -25,24 +25,26 @@ export default class SpecVerdi {
     return relative(this.radice, t.location.file).split(sep).join('/').replace(/\.spec\.mjs$/, '');
   }
 
-  // Un tentativo rosso con un retry davanti lascia il test fra i mancanti: lo toglie solo il tentativo che riesce.
+  // Una regola sola: verde finché l'ULTIMO esito di ogni test è quello atteso. Un salto imposto da un errore prima
+  // (preparazione caduta, gruppo in fila) ha come atteso «passato» e non conta; un test già passato che torna rosso a
+  // un nuovo tentativo del gruppo toglie il segno.
   onTestEnd(test, result) {
     if (!this.file || !this.chiave) return;
     const s = this.nome(test);
-    const mancano = this.mancano.get(s);
-    if (!mancano) return;
-    if (result.status === test.expectedStatus || result.status === 'skipped') mancano.delete(test.id);
-    if (mancano.size || this.rotto) return;
-    this.mancano.delete(s);
-    this.segnati.push(s);
-    segnaSpecVerdi(this.file, this.chiave, [s]);
+    const esiti = this.esiti.get(s);
+    if (!esiti) return;
+    esiti.set(test.id, result.status === test.expectedStatus);
+    const verde = !this.rotto && [...esiti.values()].every(Boolean);
+    if (verde && !this.segnati.has(s)) { this.segnati.add(s); segnaSpecVerdi(this.file, this.chiave, [s]); }
+    if (!verde && this.segnati.has(s)) { this.segnati.delete(s); togliSpecVerdi(this.file, this.chiave, [s]); }
   }
 
   // Un errore fuori da un test (chiusura di una fixture di worker, un globalTeardown) fa rosso il lancio senza dire di
   // quale spec: nessuno spec di questo lancio resta verde, sennò il rilancio salterebbe il rosso.
   onError() {
     this.rotto = true;
-    if (this.file && this.chiave && this.segnati.length) togliSpecVerdi(this.file, this.chiave, this.segnati);
+    if (this.file && this.chiave && this.segnati.size) togliSpecVerdi(this.file, this.chiave, [...this.segnati]);
+    this.segnati.clear();
   }
 
   printsToStdio() { return false; }
