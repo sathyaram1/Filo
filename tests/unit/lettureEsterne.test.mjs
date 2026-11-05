@@ -99,6 +99,29 @@ test('classificatore: Grep con le righe di un file fuori dal repo sporca come Re
   }
 });
 
+test('classificatore: «~» nel percorso è la cartella di casa, come per Read e Grep di Claude Code, mai il repo (#1867 giro 2)', () => {
+  const casa = { ...ctxPosix, casa: '/home/o' };
+  const cerca = (tool_input, ctx = casa) => L.motivoLettura({ tool_name: 'Grep', tool_input: { pattern: 'x', ...tool_input } }, ctx);
+  assert.equal(cerca({ path: '~/Downloads/pagina.html', output_mode: 'content' }), 'Grep fuori dal repo (pagina.html)');
+  assert.equal(leggi('~/Downloads/pagina.html', casa), 'Read fuori dal repo (pagina.html)');
+  assert.equal(leggi('~/.claude/projects/x/altra.jsonl', casa), 'Read dalla cartella di Claude (altra.jsonl)');
+  assert.equal(leggi('~', casa), 'Read fuori dal repo (o)');
+  assert.equal(leggi('~/.claude/settings.json', casa), '', 'le parti ammesse restano pulite anche scritte così');
+  assert.equal(cerca({ path: '~/.claude/projects/x/memory', output_mode: 'content' }), '');
+  assert.equal(cerca({ path: '~/Downloads/pagina.html' }), '', 'coi soli nomi resta pulito');
+  // Senza la cartella di casa nota il percorso non finisce mai nel repo.
+  assert.equal(leggi('~/Downloads/pagina.html', ctxPosix), 'Read fuori dal repo (pagina.html)');
+  // Un nome che comincia con la tilde senza la barra è un file del repo, come lo legge lo strumento.
+  assert.equal(leggi('~bozza.md'), '');
+  const win = { cwd: 'C:\\casa\\Filo', win: true, casa: 'C:\\Users\\o', cartelle: ['C:\\casa\\Filo'], file: [], claude: ['C:\\Users\\o\\.claude'], sessione: 's' };
+  assert.equal(leggi('~\\Downloads\\pagina.html', win), 'Read fuori dal repo (pagina.html)');
+  assert.equal(leggi('~/Downloads/pagina.html', win), 'Read fuori dal repo (pagina.html)');
+});
+
+test('contestoLettura porta la cartella di casa vera', () => {
+  assert.equal(L.contestoLettura({ cwd: process.cwd(), env: {} }).casa, homedir());
+});
+
 test('classificatore: nella cartella di Claude solo impostazioni, abilità, comandi, CLAUDE.md, memoria e la storia della sessione stessa restano puliti (#1211.3)', () => {
   const ctx = { ...ctxPosix, cartelle: ['/casa/Filo', '/casa/filo-security'], claude: ['/home/o/.claude'], sessione: 'sess-1' };
   for (const f of ['settings.json', 'settings.local.json', 'keybindings.json', 'CLAUDE.md', 'skills/posta/SKILL.md', 'skills/posta/riferimenti/a.md',
