@@ -34,6 +34,15 @@ async function impostazioni(app, settings) {
     { url: 'filo://preferences/preferences.html' },
   ), settings);
 }
+// Il posto di un tasto DENTRO il campo, letto col campo nello stesso fotogramma: il campo si stringe quando compare
+// un avviso della barra (#1551; senza portachiavi di sistema ne arriva uno al primo invio), il tasto lo segue.
+async function postoNelCampo(page, sel) {
+  return page.evaluate((s) => {
+    const c = document.getElementById('inputForm').getBoundingClientRect();
+    const b = document.querySelector(s).getBoundingClientRect();
+    return { destra: c.right - b.right, basso: c.bottom - b.bottom, width: b.width, height: b.height };
+  }, sel);
+}
 const PENSIERO_1 = ['L\'utente vuole due timer, ', 'uno per la pasta e uno per l\'uovo. ', 'Li avvio insieme, ', 'sono indipendenti. '];
 
 test('A — il filo, la trama, un nodo per due strumenti insieme, poi il gomitolo che si srotola', async ({ app, shell }) => {
