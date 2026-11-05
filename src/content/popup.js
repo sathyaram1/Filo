@@ -1049,11 +1049,7 @@
           firstDelta = false;
         }
         buf += m.delta;
-        // Ogni delta allunga il riquadro: la posa va rifatta subito, non al prossimo disegno
-        // (#502), e la lettura resta dov'è se l'utente era tornato su a rileggere.
-        scrollaConservando(popup, () => {
-          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(conRecinto(buf), { streaming: true }));
-        });
+        ridisegno.chiedi();
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e si riparte su un ripiego: il testo parziale si
         // butta, così il messaggio finale è SOLO la risposta del provider che riesce.
