@@ -13,6 +13,8 @@ export const HOOKS_DIR = resolve(ROOT, '.claude', 'hooks');
 // Gli automatismi che girano da soli a ogni modifica: il salvataggio e il diagnostico dei limiti di sessione.
 // Rispondono entrambi alla stessa domanda, «questo ramo lo posso toccare?», e devono rispondere allo stesso modo.
 export const HOOKS = ['auto-commit-merge.sh', 'cap-observe.sh'];
+// I file che il salvataggio chiama per non spedire copie dei dati e file di sessione: viaggiano insieme.
+export const STRUMENTI_DEL_CONTROLLO = ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs', 'scripts/lib/marcatori-sessione.mjs'];
 
 export function git(cwd, args) {
   return execFileSync('git', args, { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();

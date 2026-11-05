@@ -939,7 +939,8 @@ export function commitRestante(root, { exec = execFileSync, env = process.env, p
   if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
   const add = run(['add', '-A']);
   if (!add.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(add.out) };
-  try { marcatoriFuoriDallaScena(root, { exec }); } catch (_) { /* la spedizione li ferma */ }
+  let sessione = [];
+  try { sessione = marcatoriFuoriDallaScena(root, { exec }); } catch (_) { /* la spedizione li ferma */ }
   // Un file nato da shell è il modo più comune di scaricare una copia dei dati del server: come l'hook, resta fuori (#1108).
   let fuori = [];
   try { fuori = copieInScena(root).map((c) => c.file); } catch (_) { /* la spedizione ricontrolla i commit */ }
@@ -947,6 +948,8 @@ export function commitRestante(root, { exec = execFileSync, env = process.env, p
   let restano = st.lines;
   if (fuori.length) {
     try { escludiInLocale(root, fuori); } catch (_) { /* l'avviso parte lo stesso */ }
+  }
+  if (fuori.length || sessione.length) {
     restano = run(['diff', '--cached', '--name-only']).out.split('\n').filter(Boolean);
     if (!restano.length) return { ok: true, skipped: false, committed: [], fuori, reason: '' };
   }

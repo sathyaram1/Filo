@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { appendFileSync, copyFileSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { ROOT, git, scene, togliScene, runHookRaw, stdinEdit } from '../helpers/scenaHook.mjs';
+import { ROOT, git, scene, togliScene, runHookRaw, stdinEdit, STRUMENTI_DEL_CONTROLLO } from '../helpers/scenaHook.mjs';
 
 const { isRoutineInstance } = await import('../../scripts/lib/routine-role.mjs');
 const { commitRestante, pushRamoCorrente } = await import('../../scripts/routine-channel.mjs');
@@ -74,7 +74,7 @@ test('la spedizione che toglie una copia dei dati firma da routine col solo bigl
   const { work, origin } = scene();
   git(work, ['checkout', '-q', '-b', 'worker/1966']);
   mkdirSync(join(work, 'scripts', 'lib'), { recursive: true });
-  for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(work, f));
+  for (const f of STRUMENTI_DEL_CONTROLLO) copyFileSync(join(ROOT, f), join(work, f));
   git(work, ['add', '-A']);
   git(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'strumenti']);
   git(work, ['push', '-q', 'origin', 'worker/1966']);

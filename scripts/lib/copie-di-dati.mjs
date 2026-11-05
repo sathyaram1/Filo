@@ -1,6 +1,6 @@
-// Riconosce fra i file del repo, che è pubblico, una copia di dati del server (documenti Firestore, campi di feedback) dal contenuto.
-// Non legge il server e non sposta niente: dice quali file e commit sono copie e perché. Le copie di lavoro stanno in os.tmpdir().
-// Sentinella: tests/unit/copieDiDatiFuoriDalRepo.test.mjs.
+// Riconosce fra i file del repo, che è pubblico, una copia di dati del server (documenti Firestore, campi di feedback) dal contenuto,
+// e un file di sessione dal percorso. Non legge il server e non sposta niente: dice quali file e commit sono copie e perché.
+// Sentinelle: tests/unit/copieDiDatiFuoriDalRepo.test.mjs, tests/unit/bigliettiFuoriDaGit.test.mjs.
 
 import { execFileSync } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';

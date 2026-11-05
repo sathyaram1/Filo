@@ -13,7 +13,7 @@ import { inspect } from 'node:util';
 import { Console } from 'node:console';
 import { Writable } from 'node:stream';
 import { cartellaTemporanea } from '../helpers/percorsi.mjs';
-import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena } from '../helpers/scenaHook.mjs';
+import { scene, togliScene, runHookRaw, stdinEdit, git as gitScena, STRUMENTI_DEL_CONTROLLO } from '../helpers/scenaHook.mjs';
 import {
   copieNelRepo, motivoCopia, motivoCopiaTesto, motivoContenuto, CARTELLA_FINTI, installaControlloSpedizione,
 } from '../../scripts/lib/copie-di-dati.mjs';
@@ -116,7 +116,7 @@ describe('copie di dati del server fuori dal repo', () => {
     const { origin, work } = scene();
     gitScena(work, ['checkout', '-q', '-b', 'claude/prova']);
     mkdirSync(join(work, 'scripts', 'lib'), { recursive: true });
-    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(work, f));
+    for (const f of STRUMENTI_DEL_CONTROLLO) copyFileSync(join(ROOT, f), join(work, f));
     writeFileSync(join(work, 'scripts', 'feedback.json'), JSON.stringify(RISPOSTA_FIRESTORE, null, 2));
     writeFileSync(join(work, 'export.txt'), FEEDBACK_IN_CHIARO.map((f) => JSON.stringify(f)).join('\n'));
     writeFileSync(join(work, 'README.md'), 'lavoro\n');
@@ -134,7 +134,7 @@ describe('copie di dati del server fuori dal repo', () => {
     const s = scene();
     gitScena(s.work, ['checkout', '-q', '-b', 'claude/prova']);
     mkdirSync(join(s.work, 'scripts', 'lib'), { recursive: true });
-    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(s.work, f));
+    for (const f of STRUMENTI_DEL_CONTROLLO) copyFileSync(join(ROOT, f), join(s.work, f));
     gitScena(s.work, ['add', '-A']);
     gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'strumenti']);
     gitScena(s.work, ['push', '-q', 'origin', 'claude/prova']);
@@ -431,7 +431,7 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     const { origin, work } = scene();
     gitScena(work, ['checkout', '-q', '-b', 'claude/prova']);
     mkdirSync(join(work, 'scripts', 'lib'), { recursive: true });
-    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(work, f));
+    for (const f of STRUMENTI_DEL_CONTROLLO) copyFileSync(join(ROOT, f), join(work, f));
     writeFileSync(join(work, 'scripts', 'fb-console.txt'), `${inspect(FB)}\n`);
     writeFileSync(join(work, 'scripts', 'fb-campi.json'), FORME['i campi dei documenti nel formato del server']);
     writeFileSync(join(work, 'note.md'), `# appunti\n\n${FORME['un CSV con testo, identificativo e user agent']}\n`);
@@ -448,7 +448,7 @@ describe('una copia dei feedback si ferma in qualunque forma, intera o tagliata'
     const s = scene();
     gitScena(s.work, ['checkout', '-q', '-b', 'claude/prova']);
     mkdirSync(join(s.work, 'scripts', 'lib'), { recursive: true });
-    for (const f of ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs']) copyFileSync(join(ROOT, f), join(s.work, f));
+    for (const f of STRUMENTI_DEL_CONTROLLO) copyFileSync(join(ROOT, f), join(s.work, f));
     gitScena(s.work, ['add', '-A']);
     gitScena(s.work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'strumenti']);
     assert.equal(installaControlloSpedizione(s.work), 'installato');

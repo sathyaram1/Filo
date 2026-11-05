@@ -7,13 +7,12 @@ import assert from 'node:assert/strict';
 import { copyFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { scene, togliScene, runHookRaw, stdinEdit, git } from '../helpers/scenaHook.mjs';
+import { scene, togliScene, runHookRaw, stdinEdit, git, STRUMENTI_DEL_CONTROLLO } from '../helpers/scenaHook.mjs';
 import { eMarcatore, marcatoriFuoriDallaScena, SESSION_MARKERS } from '../../scripts/lib/marcatori-sessione.mjs';
 import { installaControlloSpedizione } from '../../scripts/lib/copie-di-dati.mjs';
 import { scriviFile } from '../../scripts/lib/biglietto-locale.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const STRUMENTI = ['scripts/copie-in-scena.mjs', 'scripts/lib/copie-di-dati.mjs', 'scripts/lib/marcatori-sessione.mjs'];
 const BIGLIETTO = `${JSON.stringify({ ticket: 'x'.repeat(43), fp: 'f'.repeat(64), natoIl: 1 })}\n`;
 const commit = (cwd, msg) => git(cwd, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', msg]);
 const suOrigin = (origin, ramo) => git(origin, ['ls-tree', '-r', '--name-only', ramo]).split('\n').filter(Boolean);
@@ -29,7 +28,7 @@ after(togliScene);
 function cartellaSuBaseVecchia() {
   const s = scene();
   const base = git(s.work, ['rev-parse', 'HEAD']);
-  for (const f of STRUMENTI) { mkdirSync(dirname(join(s.work, f)), { recursive: true }); copyFileSync(join(ROOT, f), join(s.work, f)); }
+  for (const f of STRUMENTI_DEL_CONTROLLO) { mkdirSync(dirname(join(s.work, f)), { recursive: true }); copyFileSync(join(ROOT, f), join(s.work, f)); }
   const wt = join(s.base, 'vecchia');
   git(s.work, ['worktree', 'add', '-q', '-b', 'claude/vecchia', wt, base]);
   mkdirSync(join(wt, 'scripts'), { recursive: true });
