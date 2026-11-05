@@ -170,18 +170,25 @@
     + `|\\d[^\\[\\](){}\\n]{1,200}?\\)`
     + `)`, 'i');
 
+  // Ridà il PEZZO letto come livello (vuoto se non c'è): il rifiuto lo mostra a chi scrive.
   function quadraColLivello(riga) {
     // TUTTE le quadre della riga, non solo la prima: una frase fra quadre all'inizio nascondeva
     // il livello scritto più avanti. E il contenuto può essere lungo.
     const testo = String(riga || '');
     // La quadra SPAIATA col contenuto lunghissimo: una parentesi dimenticata è lo stesso errore
     // di battitura della virgoletta che manca, e non deve costare una bocciatura.
-    if (QUADRA_APERTA.test(testo) || QUADRA_CHIUSA.test(testo)) return true;
+    const spaiata = QUADRA_APERTA.exec(testo) || QUADRA_CHIUSA.exec(testo);
+    if (spaiata) return spaiata[0];
     QUADRA_OVUNQUE.lastIndex = 0;
     for (let m = QUADRA_OVUNQUE.exec(testo); m; m = QUADRA_OVUNQUE.exec(testo)) {
-      if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return true; }
+      if (DENTRO_SEMBRA_LIVELLO.test(m[0])) { QUADRA_OVUNQUE.lastIndex = 0; return m[0]; }
     }
-    return false;
+    return '';
+  }
+
+  function pezzo(re, riga) {
+    const m = re.exec(riga);
+    return m ? m[0].trim() : '';
   }
   const PARENTESI_LIVELLO = new RegExp(`(?:\\[{1,2}|\\(|\\{)${SOLO_UN_LIVELLO}(?:\\]{1,2}|\\)|\\})`);
   // Nella CONTINUAZIONE di un rilievo un livello citato in mezzo a una frase resta testo: lì
