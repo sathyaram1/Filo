@@ -50,7 +50,7 @@ function scriptLancio(dir) {
     "import { execFileSync } from 'node:child_process';",
     `const dir = ${JSON.stringify(dir)};`,
     "const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: dir, encoding: 'utf8' }).trim();",
-    `runSpecsALotti(['tests/a-verde', 'tests/b-altro'], 'prova', { dir, moduli: ${JSON.stringify(join(REPO, 'node_modules'))} }, memoriaSpecVerdi(dir, sha));`,
+    `runSpecsALotti(['tests/a-verde', 'tests/b-altro'], 'prova', { dir, moduli: ${JSON.stringify(MODULI)} }, memoriaSpecVerdi(dir, sha));`,
   ].join('\n'));
   return s;
 }
