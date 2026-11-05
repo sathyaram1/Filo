@@ -758,6 +758,19 @@ async function nominaDaSolo(rec) {
   }, '');
 }
 
+// #1274.1 — un file nato su una pagina delicata o della rete di casa non va al modello dei nomi senza una richiesta per
+// lui: conta la pagina della scheda e il primo indirizzo, non solo quello del file; un'immagine anche dalla sua impronta,
+// che uno screenshot fatto lì si porta dietro (immaginiDelicate.js). Nel dubbio resta fuori.
+async function restaFuoriDalModello(rec, percorso, tipo) {
+  const D = globalThis.SN_DELICATE;
+  if (!D) return true;
+  try {
+    if (await D.versoIlModello([rec._pagina, rec._primo, rec.url])) return true;
+    if (tipo !== 'immagine' || (await D.filtro()).attivo === false) return false;
+    return await require('./immaginiDelicate').perFilo().daDelicata(await fs.promises.readFile(percorso));
+  } catch (_) { return true; }
+}
+
 // Senza modello l'avviso arriva una volta per serie di fallimenti: ogni scaricamento ripeterebbe la stessa frase.
 function senzaNome(rec, esito) {
   if (esito.errore === 'modello') {
