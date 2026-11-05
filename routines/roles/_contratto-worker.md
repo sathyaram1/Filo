@@ -137,7 +137,7 @@ worker resta fermo in silenzio finché la veglia non lo dichiara guasto (#1685).
 Un comando in sottofondo **si aspetta prima del rilascio**: finché un tuo
 processo lavora nella cartella il rilascio rifiuta (exit 5, coi pid e i
 comandi), perché dopo il rilascio cartella e ramo passano al prossimo worker.
-Aspetta il suo avviso di fine, o fermalo se non serve più, e rilancia lo stesso
+Aspettalo con `aspetta`, o fermalo se non serve più, e rilancia lo stesso
 comando.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
