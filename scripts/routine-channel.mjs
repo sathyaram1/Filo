@@ -66,6 +66,10 @@
 //         Exit 0 = ha rilasciato il biglietto, 5 = lavora ancora (si rilancia), 3 = fermo da 20 minuti senza segni di
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
+//   node scripts/routine-channel.mjs aspetta <biglietto>
+//       → il worker che ha solo da aspettare i suoi comandi in sottofondo (#2185), al massimo una fetta
+//         (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella, 5 = lavorano ancora (si rilancia).
+//
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
 //         l'owner: il lavoro resta fermo finché lui non risponde con una nota (SPEC-MANUTENTORE § 4).
