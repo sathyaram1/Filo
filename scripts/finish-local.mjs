@@ -554,9 +554,9 @@ export function specDaRiprendere(specs, verdi) {
 
 /** La memoria dei verdi di `sha`, nella cartella git di `root`: fuori dall'albero, mai committata. */
 export function memoriaSpecVerdi(root, sha) {
-  const r = git(['rev-parse', '--path-format=absolute', '--git-path', 'filo-spec-verdi.json'], { cwd: root });
+  const r = git(['rev-parse', '--git-path', 'filo-spec-verdi.json'], { cwd: root });
   if (!r.ok || !r.out) return null;
-  const file = r.out;
+  const file = resolve(root, r.out);
   return { file, verdi: leggiSpecVerdi(file, sha), segna(specs) { this.verdi = segnaSpecVerdi(file, sha, specs); } };
 }
 
