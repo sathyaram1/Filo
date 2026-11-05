@@ -293,7 +293,7 @@ function fintoServer({ legato = '' } = {}) {
       if (req.url.includes('config')) return res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
       if (req.url.endsWith('/routineWork')) {
         return res.end(JSON.stringify({
-          ok: true, role: 'new-work', id: ID, num: '#2152', branch: '',
+          ok: true, role: 'new-work', id: ID, num: '#2152', branch: mondo.legato,
           payload: { role: 'new-work', num: '#2152', feedback: { name: 'Il ramo', text: 'Il lavoro riparte da capo.', num: '#2152' } },
         }));
       }
