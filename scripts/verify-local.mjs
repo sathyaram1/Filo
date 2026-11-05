@@ -1380,11 +1380,7 @@ if (isMain) {
     // verdetto deve legarsi al contenuto vero.
     const b = currentBranch();
     const srvStart = serverDelRamo(b);
-    // Una richiesta nuova senza l'opzione non è dell'owner; ripartire senza testo tiene quello che si sapeva.
-    const state = statoDelGiro(readState(), b, {
-      request, sha: headSha(), pratica, server: srvStart,
-      richiestaOwner: richiestaOwnerOpz ? true : (rest.join(' ').trim() ? false : undefined),
-    });
+    const state = statoDelGiro(readState(), b, { request, sha: headSha(), pratica, server: srvStart, richiestaOwner: richiestaOwnerStart });
     const partenza = state[b].chiusura && state[b].chiusura.shaPrima;
     if (partenza) {
       const adesso = shaPrimaAllineato(partenza);
