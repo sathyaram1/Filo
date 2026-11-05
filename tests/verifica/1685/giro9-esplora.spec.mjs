@@ -54,8 +54,8 @@ test('E1 OK dato durante un\'altra risposta, poi un seguito: il seguito sa dell\
     await page.waitForTimeout(3000);
     const ch = await chiamateAlModello(app);
     console.log('CHIAMATE', ch.length);
-    console.log('ULTIMA', JSON.stringify(ch[3]).slice(-2500));
-    console.log('ARCHIVIO', (await messaggi(app, 'crea la cartella tre')).join('\n'));
+    console.log('ULTIMA', JSON.stringify(ch[3].filter((m) => m.role !== 'system'), null, 1));
+    console.log('ARCHIVIOX', JSON.stringify(await messaggi(app, 'crea la cartella tre'), null, 1));
     console.log('BOLLE', await page.locator('.dash-bubble').allInnerTexts());
     expect(existsSync(join(dir, 'tre'))).toBe(true);
     expect(JSON.stringify(ch[3])).toMatch(/Comando eseguito[^"]*mkdir/);
