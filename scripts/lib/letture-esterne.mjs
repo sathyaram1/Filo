@@ -20,8 +20,6 @@ export const STRUMENTI_SENZA_LETTURA = Object.freeze([
   'Edit', 'MultiEdit', 'Write', 'NotebookEdit',
   'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TaskStop', 'CronCreate', 'CronDelete', 'CronList',
   'EnterPlanMode', 'ExitPlanMode', 'EnterWorktree', 'ExitWorktree', 'AskUserQuestion',
-  // Le abilità le installa l'owner, e stanno dove Read non sporca: il progetto e la cartella di Claude.
-  'Skill', 'SlashCommand',
   'PushNotification', 'SendUserFile', 'SubagentHandback',
 ]);
 // Artifact non porta dentro niente solo con queste azioni. Pubblicare sì: un rifiuto restituisce la pagina con le
