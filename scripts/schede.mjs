@@ -300,14 +300,22 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
   if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return 1; }
   const indice = apertiDaRighe(righe, { segnalati: r.segnalati });
   let scritte = 0;
+  let segnate = 0;
   if (!dryRun) {
     mkdirSync(cartella, { recursive: true });
     writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     scritte = importaSchede(cartella, r.schede);
+    segnate = segnaNonSalvate(cartella, indice, new Set(r.schede.map((s) => String(s.numero || '').replace(/^#/, ''))));
     scriviSegnalati(cartella, indice);
   }
-  const salvate = `${r.schede.length} schede salvate nei feedback${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
+  const illeggibili = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
+  const mandare = segnate ? `; ${segnate} schede della cartella mancano nel feedback: scrivi le salva senza agente` : '';
+  const salvate = `${r.schede.length} schede salvate nei feedback${illeggibili}${dryRun ? '' : `, ${scritte} copiate nella cartella`}${mandare}`;
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
+  const daLeggere = indice.filter((f) => !f.segnalato).length;
+  if (!r.schede.length && !r.illeggibili && daLeggere >= SOGLIA_CENSIMENTO) {
+    console.log(`Nessuno dei ${daLeggere} aperti ha una scheda salvata nel feedback: la lettura è andata, sono i feedback a non averne.`);
+  }
   return 0;
 }
 
