@@ -15,6 +15,17 @@ export function leggiSpecVerdi(file, chiave) {
 export function segnaSpecVerdi(file, chiave, specs) {
   const verdi = leggiSpecVerdi(file, chiave);
   for (const s of specs || []) verdi.add(String(s));
+  return scrivi(file, chiave, verdi);
+}
+
+/** Toglie spec già segnati che il lancio ha poi dato rossi fuori da un test. */
+export function togliSpecVerdi(file, chiave, specs) {
+  const verdi = leggiSpecVerdi(file, chiave);
+  for (const s of specs || []) verdi.delete(String(s));
+  return scrivi(file, chiave, verdi);
+}
+
+function scrivi(file, chiave, verdi) {
   try { writeFileSync(file, JSON.stringify({ sha: chiave, verdi: [...verdi].sort() })); } catch (_) { /* si riparte da capo */ }
   return verdi;
 }
