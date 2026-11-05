@@ -306,7 +306,7 @@ app.whenReady().then(async () => {
   mainWindow = createMainWindow();
   // Nelle prove, quando è nata la finestra e quando la prima scheda ha potuto partire (tests/seconda-apertura.spec.mjs).
   if (process.env.NODE_ENV === 'test') {
-    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null };
+    globalThis.__filoAvvio = { finestra: Date.now(), pronti: null, msModuli, cacheCodice: cacheCodice.accesa() };
     pronti.then(() => { globalThis.__filoAvvio.pronti = Date.now(); });
   }
 
