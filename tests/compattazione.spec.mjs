@@ -82,8 +82,9 @@ test('una chat oltre la soglia compatta prima di rispondere: la richiesta sta so
 });
 
 // Il listino di OpenRouter finto: ogni modello che l'app conosce, con un prezzo. Senza rete la stima direbbe solo che
-// il listino manca, e la prova non vedrebbe il collegamento fra modello scelto, prezzo e frase.
-const listinoFinto = (app) => app.evaluate(() => {
+// il listino manca, e la prova non vedrebbe il collegamento fra modello scelto, prezzo e frase. Il listino si rilegge
+// subito: quello letto all'avvio (o il fallimento) vale per ore e coprirebbe quello finto.
+const listinoFinto = (app) => app.evaluate(async () => {
   const ids = new Set();
   const regs = [globalThis.SN_TEST_MODELS && globalThis.SN_TEST_MODELS.registry];
   for (const r of regs) for (const v of Object.values(r || {})) if (v && v.model) ids.add(v.model);
