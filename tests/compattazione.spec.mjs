@@ -97,9 +97,9 @@ const listinoFinto = (app) => app.evaluate(async () => {
     }
     return vero(input, init);
   };
-  const req = process.mainModule.require;
-  const handlers = Object.keys(req.cache).find((p) => /[\\/]services[\\/]handlers\.js$/.test(p));
-  await req(handlers.replace(/handlers\.js$/, 'costoModelli.js')).listino({ forza: true });
+  const opzioni = { tab: { id: 5, url: 'filo://options/options.html' }, url: 'filo://options/options.html' };
+  const r = await globalThis.SN_HANDLE_MESSAGE({ type: 'stima_costo_modelli', forzaListino: true }, opzioni);
+  if (!r || !r.ok || !r.contesto || !r.contesto.listino) throw new Error('listino finto non letto: ' + JSON.stringify(r).slice(0, 200));
 });
 const STIMA = /^Circa [\d.,]+ \$ al mese con 600 messaggi .*\d+ s/;
 
