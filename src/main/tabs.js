@@ -1664,13 +1664,13 @@ class TabManager {
       return this.riapri(v, { activate: false });
     }
     if (!scelta || !scelta.archivio) return null;
-    this.tornata(scelta.archivio);
-    return this.riapri(SchedeChiuse.daArchivio(scelta.archivio), { activate: false });
+    return this.riapriDallArchivio(scelta.archivio, { activate: false });
   }
 
   // La scheda aperta sulla stessa pagina di una chiusa: una chiusa già tornata non si riapre una seconda volta (#1686).
+  // «Stessa pagina» è quella dei doppioni del riordino: una regola sola.
   apertaCon(url) {
-    const pagina = (u) => String(u || '').split('#')[0];
+    const pagina = globalThis.SN_TAB_TRIAGE.normalizeForDedup;
     const p = pagina(url);
     return p ? this.tabs.find((t) => pagina(t.url) === p) || null : null;
   }
