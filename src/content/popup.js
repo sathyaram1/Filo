@@ -873,6 +873,28 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
+  // Ogni ridisegno della risposta rifà il markdown intero: uno per pezzo costa col quadrato della lunghezza (#2119),
+  // quindi al più uno per fotogramma. Il timer copre la scheda che non disegna, dove rAF resta fermo.
+  const RIDISEGNO_MAX_MS = 100;
+  function unoPerFotogramma(fai) {
+    let pendente = false, raf = 0, timer = 0;
+    const annulla = () => {
+      pendente = false;
+      try { cancelAnimationFrame(raf); } catch (_) {}
+      clearTimeout(timer);
+    };
+    const esegui = () => { if (!pendente) return; annulla(); fai(); };
+    return {
+      chiedi() {
+        if (pendente) return;
+        pendente = true;
+        try { raf = requestAnimationFrame(esegui); } catch (_) {}
+        timer = setTimeout(esegui, RIDISEGNO_MAX_MS);
+      },
+      annulla,
+    };
+  }
+
   // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
   // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
   // Vale come detta solo se `el`, dove sta la frase, resta a schermo il tempo di leggerla: un riquadro
@@ -1006,8 +1028,14 @@
     // Il seguito di una risposta fermata dentro un blocco di codice riapre il blocco, o si leggerebbe come testo (#1302).
     const prima = opts && typeof opts.prima === 'string' ? opts.prima : null;
     const conRecinto = (t) => (prima !== null && global.SN_CHAT_ERRORS?.seguitoNelRecinto ? global.SN_CHAT_ERRORS.seguitoNelRecinto(prima, t) : t);
+    // La posa si rifà insieme al disegno, non al prossimo passo di rendering (#502); reset, fine ed errore lo annullano,
+    // o un disegno in ritardo coprirebbe quello che hanno scritto loro.
+    const ridisegno = unoPerFotogramma(() => scrollaConservando(popup, () => {
+      bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(conRecinto(buf), { streaming: true }));
+    }));
 
     port.onMessage.addListener((m) => {
+      if (m.type === 'reset' || m.type === 'done' || m.type === 'error') ridisegno.annulla();
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
         // Il prompt vero è quello composto dal main: le domande successive
@@ -1021,11 +1049,7 @@
           firstDelta = false;
         }
         buf += m.delta;
-        // Ogni delta allunga il riquadro: la posa va rifatta subito, non al prossimo disegno
-        // (#502), e la lettura resta dov'è se l'utente era tornato su a rileggere.
-        scrollaConservando(popup, () => {
-          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(conRecinto(buf), { streaming: true }));
-        });
+        ridisegno.chiedi();
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e si riparte su un ripiego: il testo parziale si
         // butta, così il messaggio finale è SOLO la risposta del provider che riesce.
