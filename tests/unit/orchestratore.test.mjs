@@ -10,7 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   apriDerivatiDi, modoDerivati, attesaLimite, caricoBasta, chiaveVerdetto, classificaFinish, creaMotore, decidiDopoVerifica, derivatiDaAprire, INCORPORATI_DAL_SERVER, nuovaPratica, oraLocale, passoDalRamo,
-  promptLavoratore, promptVerificatore, regolaFile, richiestaArg, richiestaPerLaVerifica, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
+  promptLavoratore, promptVerificatore, regolaFile, richiestaArg, richiestaPerLaVerifica, argomentiDiStart, riprendi, rigaStato, serveDeploy, siSovrappongono, toccaRegole, togliWorktree,
 } from '../../scripts/lib/orchestratore.mjs';
 import {
   IMPOSTAZIONI_NPM_VICINE, OPZIONI_DI, accessoDaStatus, aggiungiInCoda, argomentiClaude, envFiglio, frontmatter, leggiArgomenti, leggiUscitaClaude, modelloDelRuolo, opzioniDa, opzioniTenuteDaNpm, richiestaDaLettura, trovaClaude,
@@ -123,7 +123,7 @@ test('giro intero: lavoratore, due verifiche, app su main, poi server, deploy, r
   assert.equal(filo, '/r/.claude/worktrees/sette');
   const r = b.righe();
   // Prima l'app, poi il server, come dal cancello: la pubblicazione incorpora main di Filo con la parte dell'app (#1222).
-  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
+  const ordine = [/claude lavoratore/, /verify-local\.mjs start fai X --richiesta-owner --feedback 7/, /claude verificatore/, /verify-local\.mjs start$/, /claude verificatore/, /claude-feedback\.mjs .* - --non-locale --priorita 1/, /finish-local\.mjs --feedback 7/, /server-fondi-pratica\.mjs claude\/sette --feedback 7$/, /server:pubblica/, /scollega/, /worktree remove/];
   let prima = -1;
   for (const re of ordine) {
     const i = r.findIndex((x, k) => k > prima && re.test(x));
@@ -1111,7 +1111,7 @@ test('aggiungi e avvia dalla riga di comando: col refuso o col valore mancante n
   assert.deepEqual([p.richiesta, p.file], ['solo il bottone', ['src/pages/**']]);
   const v = orch('avvia', '--dry-run', '--budget-istanza', '2,5');
   assert.equal(v.status, 0, v.stderr);
-  assert.match(v.stdout, /verify-local\.mjs start "solo il bottone" --feedback 41/);
+  assert.match(v.stdout, /verify-local\.mjs start "solo il bottone" --richiesta-owner --feedback 41/);
 });
 
 test('npm run orchestra senza «--»: le opzioni che npm si è tenuto (anche storpiate) fermano il comando invece di sparire', () => {
@@ -1236,4 +1236,32 @@ test('per un feedback d’utente il compito del verificatore ha il testo in bust
   assert.equal(st.r.fiducia, 'non_fidato');
   assert.equal(withRequest(st, 'r', { request, sha: 'c', feedbackId: 'G', feedbackNum: 8, fiducia: 'fidato' }).r.fiducia, 'fidato');
   assert.equal(withRequest({}, 'r', { request: 'x', sha: 'a' }).r.fiducia, undefined);
+});
+
+test('la voce dell’owner nel compito la decide una regola sola: chi ha scritto la richiesta, poi la fiducia della pratica', async () => {
+  const { compitoDelGiro, statoDelGiro } = await import('../../scripts/verify-local.mjs');
+  const OWNER = /valgono come specifica insieme a lei/;
+  const DATO = /DI CHI È LA RICHIESTA: la pratica non è fidata/;
+  const compito = (st) => compitoDelGiro(st.r, { branch: 'claude/x', recipe: '' });
+  // La pratica com'esce dal controllo all'avvio: la sua fiducia arriva fino al compito.
+  const approvata = { id: 'F', seq: 7, fiducia: 'non_fidato' };
+  const dalFeedback = { ...nuovaPratica({ num: 7 }), richiesta: 'Il tasto non va.', richiestaDa: 'feedback' };
+  let st = statoDelGiro({}, 'r', { request: richiestaPerLaVerifica(dalFeedback), sha: 'a', pratica: approvata, richiestaOwner: false });
+  assert.match(compito(st), DATO);
+  assert.doesNotMatch(compito(st), OWNER);
+  assert.match(compito(statoDelGiro({}, 'r', { request: 'x', sha: 'a', pratica: { ...approvata, fiducia: 'fidato' } })), OWNER);
+  assert.match(compito(statoDelGiro({}, 'r', { request: 'x', sha: 'a' })), OWNER, 'senza pratica la richiesta è di chi ha lanciato start');
+
+  // Pratica d'utente approvata, richiesta scritta dall'owner: l'orchestratore lo dice a start, e il compito la tratta come sua.
+  const dallOwner = nuovaPratica({ num: 7, richiesta: 'Solo il bottone, il menu resta com’è.' });
+  const args = argomentiDiStart(dallOwner);
+  assert.deepEqual(args, ['Solo il bottone, il menu resta com’è.', '--richiesta-owner', '--feedback', '7']);
+  assert.ok(!argomentiDiStart(dalFeedback).includes('--richiesta-owner'));
+  st = statoDelGiro({}, 'r', { request: args[0], sha: 'a', pratica: approvata, richiestaOwner: true });
+  assert.match(compito(st), OWNER);
+  assert.doesNotMatch(compito(st), DATO);
+  // Il giro dopo riparte senza argomenti: resta sua; una richiesta nuova senza l'opzione no.
+  st = statoDelGiro(st, 'r', { request: args[0], sha: 'b' });
+  assert.match(compito(st), OWNER);
+  assert.match(compito(statoDelGiro(st, 'r', { request: 'altro testo', sha: 'c', richiestaOwner: false })), DATO);
 });
