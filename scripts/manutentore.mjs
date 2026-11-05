@@ -313,6 +313,75 @@ export async function tutteLePagine(chiamata, dati) {
   return Object.assign({}, r, { rapporti, cursore: null, pagine });
 }
 
+// La durata della cache dei sotto-agenti: un'attesa che la supera fa riscrivere il contesto al turno dopo (#2121).
+export const SCADENZA_CACHE_S = 300;
+
+/**
+ * Il conto di `rapporti --cache` per ruolo e in totale: costo della sessione, cache scritta, riscritture, attese oltre
+ * la scadenza e il saldo della cache a un'ora (risparmio MASSIMO sulle riscritture meno il sovrapprezzo su ogni
+ * scrittura). Il risparmio è un tetto: rewarmTurns conta ogni causa, non solo la pausa. Prezzi: PREZZI. PURA.
+ */
+export function contoCache(rapporti) {
+  const vuoto = () => ({
+    biglietti: 0, conRapporto: 0, usd: 0, turni: 0, cacheTok: 0, cacheUsd: 0, rewarmTurni: 0, rewarmTok: 0, rewarmUsd: 0,
+    attese: 0, bigliettiConAttese: 0, sovrapprezzo: 0, risparmioMax: 0, risparmioSeTutto: 0,
+  });
+  const ruoli = new Map();
+  const totale = vuoto();
+  for (const b of Array.isArray(rapporti) ? rapporti : []) {
+    const rep = b && b.report && typeof b.report === 'object' ? b.report : null;
+    const ruolo = unaRiga((b && (b.ruolo || b.role)) || (rep && rep.role)) || '?';
+    if (!ruoli.has(ruolo)) ruoli.set(ruolo, vuoto());
+    // Le attese dal biglietto: il rapporto le tiene a budget.
+    const lunghe = (Array.isArray(b && b.attese) ? b.attese : []).filter((a) => Number(a && a.secondi) >= SCADENZA_CACHE_S).length;
+    const dati = { biglietti: 1, attese: lunghe, bigliettiConAttese: lunghe ? 1 : 0 };
+    if (rep) {
+      const modelli = Array.isArray(rep.models) ? rep.models : [];
+      const p = PREZZI[famigliaPrezzo(modelli[0]).key];
+      const cw = Number(rep.tokens && rep.tokens.cacheWrite) || 0;
+      const rw = Number(rep.rewarmTokens) || 0;
+      Object.assign(dati, {
+        conRapporto: 1, usd: Number(rep.costUsd) || 0, turni: Number(rep.turns) || 0,
+        cacheTok: cw, cacheUsd: cw * p.cacheWrite / 1e6,
+        rewarmTurni: Number(rep.rewarmTurns) || 0, rewarmTok: rw, rewarmUsd: rw * p.cacheWrite / 1e6,
+        sovrapprezzo: cw * (p.cacheWrite1h - p.cacheWrite) / 1e6,
+        risparmioMax: rw * (p.cacheWrite - p.cacheRead) / 1e6,
+        risparmioSeTutto: cw * (p.cacheWrite - p.cacheRead) / 1e6,
+      });
+    }
+    for (const g of [ruoli.get(ruolo), totale]) for (const [k, v] of Object.entries(dati)) g[k] += v;
+  }
+  const chiudi = (g) => Object.assign(g, {
+    saldo: g.risparmioMax - g.sovrapprezzo,
+    // La quota della cache scritta che dovrebbe essere riscrittura da scadenza perché l'ora convenga.
+    soglia: g.risparmioSeTutto ? g.sovrapprezzo / g.risparmioSeTutto : 0,
+  });
+  return {
+    perRuolo: [...ruoli].map(([ruolo, g]) => ({ ruolo, ...chiudi(g) })).sort((x, y) => y.usd - x.usd),
+    totale: chiudi(totale),
+  };
+}
+
+/** `rapporti --cache` da leggere: una riga per ruolo, il totale, e il limite della stima. PURA. */
+export function righeCache(conto, finestra = null) {
+  const pct = (a, b) => (b ? `${(100 * a / b).toFixed(1)} %` : '0 %');
+  const mtok = (n) => `${((Number(n) || 0) / 1e6).toFixed(2)} M tok`;
+  const conSegno = (n) => `${n < 0 ? '−' : '+'}${dollari(Math.abs(n))}`;
+  const riga = (nome, g) => `  ${nome}: ${g.biglietti} biglietti (${g.conRapporto} col rapporto) · ${dollari(g.usd)}`
+    + ` · cache scritta ${mtok(g.cacheTok)} = ${dollari(g.cacheUsd)} (${pct(g.cacheUsd, g.usd)} del costo)`
+    + ` · rewarm ${g.rewarmTurni} su ${g.turni} turni, ${mtok(g.rewarmTok)} = ${dollari(g.rewarmUsd)} (${pct(g.rewarmTok, g.cacheTok)} della cache scritta)`
+    + ` · attese ≥${SCADENZA_CACHE_S} s: ${g.attese} su ${g.bigliettiConAttese} biglietti`
+    + ` · ora: sovrapprezzo ${dollari(g.sovrapprezzo)}, risparmio max ${dollari(g.risparmioMax)}, saldo ${conSegno(g.saldo)}`
+    + ` (conviene sopra il ${pct(g.soglia, 1)} di rewarm)`;
+  const quando = finestra ? ` dal ${finestra.da} al ${finestra.a}` : '';
+  return [
+    `Cache dei sotto-agenti${quando}, per ruolo (costo della sessione, senza l'orchestratore):`,
+    ...conto.perRuolo.map((g) => riga(g.ruolo, g)),
+    riga('TOTALE', conto.totale),
+    `Il risparmio è un tetto: il rewarm conta ogni causa, non solo le attese oltre ${SCADENZA_CACHE_S} s.`,
+  ];
+}
+
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
 export function richiestaSblocca(args) {
   const [n, ...resto] = senzaOpzioni(args);
