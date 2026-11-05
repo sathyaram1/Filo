@@ -1,6 +1,7 @@
 // #1606, #1606.1, #1092 — Filo resta acceso senza la finestra principale quando la si chiude con la finestrella di
-// accesso aperta: riaprirlo (collegamento, seconda copia vera, Dock su Mac, invito) rifà la finestra con le sue schede.
-// All'avvio la finestra nasce prima degli init e la prima scheda li trova fatti. Logica: tests/unit/secondaApertura.test.mjs.
+// accesso aperta: riaprirlo (collegamento, seconda copia vera, Dock su Mac, invito, voci della barra dei menu, #2031)
+// rifà la finestra con le sue schede. All'avvio la finestra nasce prima degli init e la prima scheda li trova fatti.
+// Logica: tests/unit/secondaApertura.test.mjs, tests/unit/voceSenzaFinestra.test.mjs.
 
 import { spawn } from 'node:child_process';
 import { createRequire } from 'node:module';
