@@ -15,7 +15,7 @@ import { barraPage, comandaBarra, pannelloFermo } from './helpers/barra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const SHOTS = join(APP_ROOT, 'tests', '.shots');
-const NOMI = ['negozio.test', 'blog.test', 'dal-proxy.test', 'img.piattaforma.test'];
+const NOMI = ['negozio.test', 'blog.test', 'dal-proxy.test', 'img.piattaforma.test', 'regola.test'];
 const PNG_NEGOZIO = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC', 'base64');
 const PNG_BLOG = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGPQCDgBAAHkAUEYgvCnAAAAAElFTkSuQmCC', 'base64');
 
@@ -34,6 +34,7 @@ function rispondi(req, res, porta) {
   } else if (host === 'negozio.test') html('Il negozio di dischi', 'negozio.png');
   else if (host === 'blog.test') html('Il blog di cucina', 'blog.png');
   else if (host === 'dal-proxy.test') html('Pagina dal proxy', 'proxy.png');
+  else if (host === 'regola.test') html('Sempre da un altro paese', 'regola.png');
   else { res.writeHead(404); res.end(); }
 }
 
@@ -280,6 +281,57 @@ test.describe('dal proxy', () => {
       // L'archivio tiene i byte che la scheda ha scaricato dal proxy, non l'indirizzo.
       const archiviate = await app.evaluate(async () => (await globalThis.SN_ARCHIVED_TABS.list()).filter((t) => /dal-proxy\.test/.test(t.url)).map((t) => t.favicon));
       for (const f of archiviate) expect(f).toMatch(/^filo:\/\/icone\//);
+    } finally {
+      await socks.close();
+      await siti.close();
+    }
+  });
+
+  // #1273.3: la regola del sito vale quanto la scheda col proxy, da qualunque scheda nasca la voce.
+  test('un sito che apri sempre da un altro paese: il link salvato da una scheda normale, la sua pagina di prima e il suggerimento della chat non chiedono l\'icona fuori dal proxy', async ({ app, openTab }) => {
+    test.setTimeout(120_000);
+    const siti = await sitiFinti();
+    const socks = await proxySocks(siti.portaProxy);
+    try {
+      const regola = await app.evaluate(async ({ BrowserWindow }, porta) => {
+        await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: `socks5://127.0.0.1:${porta}`, bypass: '<-loopback>' } });
+        return BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs.setDomainProxyRule('us', { domain: 'regola.test' });
+      }, socks.porta);
+      expect(regola.ok).toBe(true);
+      const { STORAGE_KEYS } = await app.evaluate(() => globalThis.SN_CONST);
+      // Una pagina salvata prima che Filo tenesse la copia: dichiarava l'icona sul server d'immagini della piattaforma.
+      await app.evaluate(async (_e, { chiave, porta }) => {
+        const r = await chrome.storage.local.get(chiave);
+        await chrome.storage.local.set({ [chiave]: [...(r[chiave] || []), {
+          id: 'di-prima', url: `http://regola.test:${porta}/vecchia`, title: 'Di prima',
+          favicon: `http://img.piattaforma.test:${porta}/regola-vecchia.png`, savedAt: '2026-01-01T00:00:00Z',
+        }] });
+      }, { chiave: STORAGE_KEYS.SAVED_PAGES, porta: siti.porta });
+
+      await openTab(`http://blog.test:${siti.porta}/`);
+      const M = await app.evaluate(() => globalThis.SN_MSG.MSG);
+      const dalBlog = (msg) => app.evaluate(async ({ BrowserWindow }, m) => {
+        const tab = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => String(t.url || '').includes('blog.test'));
+        return tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: `chrome.runtime.sendMessage(${JSON.stringify(m)})` }]);
+      }, msg);
+      expect((await dalBlog({ type: M.SAVE_LINK, url: `http://regola.test:${siti.porta}/link`, title: 'Link' })).ok).toBe(true);
+      // Il controllo: un link a un sito senza regola, salvato allo stesso modo, la sua icona la chiede.
+      expect((await dalBlog({ type: M.SAVE_LINK, url: `http://negozio.test:${siti.porta}/link`, title: 'Negozio' })).ok).toBe(true);
+      await app.evaluate(() => globalThis.__filoIconeVecchie.completa());
+      await expect.poll(() => siti.richieste.diretto.includes('negozio.test/favicon.ico'), { timeout: 15_000 }).toBe(true);
+
+      const home = await openTab('filo://newtab/');
+      await rigaDiChat(home, 'riga-regola', `http://regola.test:${siti.porta}/altra`);
+      const controllo = await rigaDiChat(home, 'riga-controllo', `http://dal-proxy.test:${siti.porta}/altra`);
+      await expect.poll(() => siti.richieste.diretto.includes('dal-proxy.test/favicon.ico'), { timeout: 15_000 }).toBe(true);
+      await expect(controllo).toBeVisible();
+      await home.waitForTimeout(1000);
+
+      const fuori = siti.richieste.diretto.filter((r) => r.startsWith('regola.test') || r.includes('regola'));
+      expect(fuori, 'niente del sito con la regola esce dalla connessione vera').toEqual([]);
+      const salvate = await app.evaluate(async () => (await globalThis.SN_SAVED_PAGES.list()).filter((p) => /regola\.test/.test(p.url)));
+      expect(salvate.map((p) => p.favicon)).toEqual(['', '']);
+      expect(salvate.find((p) => p.id === 'di-prima').iconaMancante, 'tolta la regola, la voce si completa ancora').toBeUndefined();
     } finally {
       await socks.close();
       await siti.close();

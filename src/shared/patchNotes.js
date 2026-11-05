@@ -11,6 +11,7 @@
     {
       version: '0.2.265', date: '2026-11-05',
       fixes: [
+        { testo: 'Un sito che hai chiesto di aprire sempre da un altro paese non riceve più la richiesta della sua icona dalla tua connessione, nemmeno per un suo link salvato da un\'altra scheda o per i suggerimenti della home e della chat.', segnalazione: 1273 },
         { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
         { testo: 'Un messaggio scritto mentre Filo sta ancora lavorando non si perde più se ricarichi la pagina: torna nella casella com\'era, con le immagini. Se chiudi la scheda resta nella conversazione.', segnalazione: 1296 },
         { testo: 'Se mentre Filo comincia un comando veloce, come un timer, gli scrivi un\'altra domanda, risponde anche a quella invece di fermarsi al comando.', segnalazione: 2173 },
