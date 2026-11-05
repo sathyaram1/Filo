@@ -250,6 +250,7 @@ function createMainWindow() {
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
+  finestraDellAvvio = true;
   let pronta = () => {};
   win._filoPronta = new Promise((r) => { pronta = r; });
   win.once('closed', () => pronta(null));
