@@ -52,6 +52,8 @@
     'routine.enabled': Object.freeze({ nome: 'Routine', spegne: false }),
     'routine.accountAOff': Object.freeze({ nome: 'Routine dell’account A', spegne: true }),
     'routine.accountBOff': Object.freeze({ nome: 'Routine dell’account B', spegne: true }),
+    // Accenderlo da una risposta lo fa ripartire subito anche se è fermo su un guasto suo (SPEC-MANUTENTORE § 7).
+    'routine.manutentoreAcceso': Object.freeze({ nome: 'Manutentore', spegne: false }),
   });
 
   const FEEDBACK_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
