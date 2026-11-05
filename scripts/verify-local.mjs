@@ -674,18 +674,15 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   return { ok: true, state: s, files: controllo.files, numeri };
 }
 
-/**
- * Un rilievo uscito in un feedback suo che questo giro NON corregge. Un 2 col «?» sta in tutti e due gli elenchi:
- * la domanda esce, ma il codice lo cambia questo giro, e la sua prova si toglie verde con quella durevole (#1202). PURA.
- */
-function messoDaParte(f) {
-  return !!f && f.inCorrezione !== true;
+/** I rilievi che il giro aperto ha messo da parte, esterni compresi (la regola: rilieviMessiDaParte). PURA. */
+function parteDelGiro(pending) {
+  const p = pending || {};
+  return rilieviMessiDaParte([p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : [])), p.findings);
 }
 
 /** I posti nella critica dei rilievi che il giro ha messo da parte: le loro prove escono con la pulizia. PURA. */
 export function numeriMessiDaParte(prev) {
-  const p = (prev && prev.pending) || {};
-  const parte = [p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : [])).filter(messoDaParte);
+  const parte = parteDelGiro(prev && prev.pending);
   return numeraRilievi(ROUND.parseFindings((prev && prev.critique) || '').findings, parte).map((f) => f.n);
 }
 
