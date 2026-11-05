@@ -23,6 +23,7 @@ const { writeBranchState, withCheckpoint, writeExpectation, ensureSessionExclude
 const CANALE = fileURLToPath(new URL('../../scripts/routine-channel.mjs', import.meta.url));
 const RAMO = 'worker/1867-strade';
 const ID = 'fid-1867';
+const BIGLIETTO = `B1-${'x'.repeat(40)}`;
 const g = (cwd, args) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', '-c', 'core.autocrlf=false', ...args],
   { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
 const coda = (dir) => S.vociInCoda(S.cartellaCoda(dir));
@@ -44,9 +45,10 @@ function copia(casa, nome) {
   return { origin, dir };
 }
 
-function committa(dir, file) {
+function committa(dir, file, env) {
   writeFileSync(join(dir, file), `${file}\n`);
-  g(dir, ['add', '-A']); g(dir, ['commit', '-q', '-m', file]);
+  g(dir, ['add', '-A']);
+  execFileSync('git', ['commit', '-q', '-m', file], { cwd: dir, stdio: 'ignore', ...(env ? { env: { ...process.env, ...env } } : {}) });
   return g(dir, ['rev-parse', 'HEAD']);
 }
 
@@ -81,16 +83,17 @@ test('git-server push vero: i commit del worker si leggono prima della spinta e 
   try {
     const app = copia(casa, 'Filo');
     committa(app.dir, 'regola.js');
-    writeTicket(app.dir, 'B1');
+    writeTicket(app.dir, BIGLIETTO);
     const server = copia(casa, 'filo-security');
     dichiaraSpintaServer.traccia(server.dir);
-    const w = committa(server.dir, 'funzione.js');
+    // Il commit lo fa il worker col suo biglietto: la traccia lo annota a suo nome.
+    const w = committa(server.dir, 'funzione.js', { FILO_ROUTINE_TICKET: BIGLIETTO });
     const righe = [];
     const lancia = (argv, o) => (argv.includes('get-url')
       ? { status: 0, stdout: `${URL_SERVER}\n` }
       : spawnSync('git', argv, { ...o, stdio: ['ignore', 'pipe', 'pipe'] }));
     const exit = await eseguiGitServer({
-      azione: 'push', cartella: server.dir, ramo: RAMO, biglietto: 'B1', root: app.dir, env: {},
+      azione: 'push', cartella: server.dir, ramo: RAMO, biglietto: BIGLIETTO, root: app.dir, env: {},
       lancia, token: async () => ({ outcome: 'ok', token: 'ghs_finto' }), scrivi: (r) => righe.push(r), eco: () => {},
     });
     assert.equal(exit, 0, righe.join('\n'));
@@ -98,7 +101,7 @@ test('git-server push vero: i commit del worker si leggono prima della spinta e 
     const voci = coda(server.dir);
     assert.deepEqual(voci.map((v) => [v.tipo, v.repo, v.commits]), [['routine', 'server', [w]]], 'la spinta è in coda per il server, col commit del worker');
     // Letti dopo la spinta, il ref remoto li conterrebbe già e non si dichiarerebbe niente: l'ordine è il collegamento.
-    assert.deepEqual(dichiaraSpintaServer.prima(server.dir, RAMO).commits, []);
+    assert.deepEqual((dichiaraSpintaServer.prima(server.dir, RAMO) || { commits: [] }).commits, []);
   } finally { togliCartella(casa); }
 });
 
@@ -109,8 +112,8 @@ test('ramo-server dalla riga di comando, col clone presente: prima le spinte in 
     const app = copia(casa, 'Filo');
     const server = copia(casa, 'filo-security');
     const w = committa(server.dir, 'funzione.js');
-    S.accoda(server.dir, { tipo: 'routine', ticket: 'B1' }, 'server', [{ ramo: RAMO, punta: w, commits: [w] }]);
-    const r = await canale(app.dir, port, { FILO_SERVER_CLONE: server.dir })(['ramo-server', RAMO, w, '--ticket', 'B1']);
+    S.accoda(server.dir, { tipo: 'routine', ticket: BIGLIETTO }, 'server', [{ ramo: RAMO, punta: w, commits: [w] }]);
+    const r = await canale(app.dir, port, { FILO_SERVER_CLONE: server.dir })(['ramo-server', RAMO, w, '--ticket', BIGLIETTO]);
     assert.equal(r.code, 0, r.se);
     assert.deepEqual(ricevuti.map((x) => x.url.split('/').pop()), ['routineSpinte', 'routineRamoServer']);
     assert.deepEqual(ricevuti[0].body.spinte, [{ repo: 'server', ramo: RAMO, commits: [w], punta: w }]);
@@ -129,8 +132,8 @@ test('la consegna di una correzione dalla riga di comando: prima le spinte in co
     writeBranchState(app.dir, withCheckpoint({ id: ID, branch: RAMO }, g(app.dir, ['rev-parse', 'HEAD']), 'new-work:checkout'));
     writeExpectation(app.dir, { branch: RAMO, id: ID });
     const c = committa(app.dir, 'lavoro.txt');
-    S.accoda(app.dir, { tipo: 'routine', ticket: 'B1' }, 'app', [{ ramo: RAMO, punta: c, commits: [c] }]);
-    const r = await canale(app.dir, port)(['deliver', 'B1', 'fixed', '--report', 'Corretto il salvataggio col titolo vuoto: ora salva anche senza titolo.']);
+    S.accoda(app.dir, { tipo: 'routine', ticket: BIGLIETTO }, 'app', [{ ramo: RAMO, punta: c, commits: [c] }]);
+    const r = await canale(app.dir, port)(['deliver', BIGLIETTO, 'fixed', '--report', 'Corretto il salvataggio col titolo vuoto: ora salva anche senza titolo.']);
     assert.equal(r.code, 0, r.se);
     const nomi = ricevuti.map((x) => x.url.split('/').pop());
     assert.ok(nomi.indexOf('routineSpinte') >= 0 && nomi.indexOf('routineSpinte') < nomi.indexOf('routineDeliver'), nomi.join(', '));
