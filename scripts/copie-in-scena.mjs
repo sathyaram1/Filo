@@ -5,6 +5,7 @@
 
 import { readFileSync } from 'node:fs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, copieNelPush, avvisoSpedizione, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { marcatoriFuoriDallaScena } from './lib/marcatori-sessione.mjs';
 
 const modo = ['--spedizione', '--pre-push', '--installa'].includes(process.argv[2]) ? process.argv[2] : '';
 const root = process.argv[modo ? 3 : 2] || process.cwd();
@@ -22,6 +23,8 @@ try {
   } else if (modo === '--installa') {
     installaControlloSpedizione(root);
   } else {
+    // I file di sessione escono in silenzio, come col .gitignore che il ramo vecchio non ha (#2154).
+    try { marcatoriFuoriDallaScena(root); } catch (_) { /* la spedizione li ferma */ }
     const copie = copieInScena(root);
     if (copie.length) {
       try { escludiInLocale(root, copie.map((c) => c.file)); } catch (_) { /* l'avviso parte lo stesso */ }

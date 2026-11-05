@@ -28,15 +28,15 @@ export function eMarcatore(f) {
   return SESSION_MARKERS.some((m) => (m.endsWith('/') ? p.startsWith(m) : p === m));
 }
 
-const git = (root, args) => execFileSync('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+const git = (root, args, exec = execFileSync, extra = {}) => String(exec('git', args, { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], ...extra }) || '');
 
 /**
  * Li scrive in `info/exclude` della .git comune: vale per ogni ramo e ogni worktree e non viaggia in un commit.
  * Idempotente; un errore vale false e non ferma niente.
  */
-export function ensureSessionExcludes(root) {
+export function ensureSessionExcludes(root, { exec = execFileSync } = {}) {
   try {
-    const comune = git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir']).trim();
+    const comune = git(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'], exec).trim();
     if (!comune) return false;
     const dir = resolve(comune, 'info');
     const file = resolve(dir, 'exclude');
@@ -62,13 +62,13 @@ export function ensureSessionExcludes(root) {
  * Dopo un `git add -A`: toglie dall'indice i file di sessione messi in scena (uno che il ramo tracciava già esce dal
  * ramo) e li esclude per le volte dopo. → i percorsi tolti.
  */
-export function marcatoriFuoriDallaScena(root) {
-  const tolti = git(root, ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR']).split('\0').filter(eMarcatore);
+export function marcatoriFuoriDallaScena(root, { exec = execFileSync } = {}) {
+  const tolti = git(root, ['diff', '--cached', '--name-only', '-z', '--diff-filter=ACMR'], exec).split('\0').filter(eMarcatore);
   // Da stdin: centinaia di biglietti in fila superano la riga di comando di Windows.
   if (tolti.length) {
-    execFileSync('git', ['rm', '-q', '--cached', '--ignore-unmatch', '--pathspec-from-file=-', '--pathspec-file-nul'],
-      { cwd: root, input: `${tolti.join('\0')}\0`, stdio: ['pipe', 'pipe', 'pipe'] });
+    git(root, ['rm', '-q', '--cached', '--ignore-unmatch', '--pathspec-from-file=-', '--pathspec-file-nul'], exec,
+      { input: `${tolti.join('\0')}\0`, stdio: ['pipe', 'pipe', 'pipe'] });
   }
-  ensureSessionExcludes(root);
+  ensureSessionExcludes(root, { exec });
   return tolti;
 }

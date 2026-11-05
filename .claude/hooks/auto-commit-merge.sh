@@ -267,11 +267,11 @@ fi
 # ─── UNA COPIA DEI DATI DEL SERVER NON PARTE (#1108) ─────────────────────────
 #
 # Il repo e' pubblico: un file spedito resta nella storia anche se tolto subito, quindi la forma si
-# controlla qui, sui file in scena, e non dopo. La riconosce scripts/copie-in-scena.mjs (quello della
-# cartella salvata, o in mancanza quello accanto a questo hook); il resto del lavoro si salva comunque.
+# controlla qui, sui file in scena, e non dopo. La riconosce scripts/copie-in-scena.mjs: quello accanto a questo hook,
+# perche' la regola non dipenda dalla base del ramo salvato (#2154), o in mancanza quello della cartella.
 controllo_copie() {
-  local controllo="$1/scripts/copie-in-scena.mjs"
-  [ -f "$controllo" ] || controllo="$HOOK_SCRIPTS/copie-in-scena.mjs"
+  local controllo="$HOOK_SCRIPTS/copie-in-scena.mjs"
+  [ -f "$controllo" ] || controllo="$1/scripts/copie-in-scena.mjs"
   [ -f "$controllo" ] && command -v node >/dev/null 2>&1 && printf '%s' "$controllo"
 }
 # Vero se fra i nomi letti (separati da NUL) c'e' qualcosa che non e' codice o immagine: solo allora si paga node.

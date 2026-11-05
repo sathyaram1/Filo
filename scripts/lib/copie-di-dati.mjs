@@ -6,6 +6,7 @@ import { execFileSync } from 'node:child_process';
 import { appendFileSync, chmodSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { eMarcatore } from './marcatori-sessione.mjs';
 
 // Dati finti per le prove: l'unico posto del repo dove una copia è ammessa.
 export const CARTELLA_FINTI = 'tests/fixtures/';
@@ -374,8 +375,16 @@ function testoDi(byte) {
   return byte.toString('utf8');
 }
 
+// Un file di sessione (un biglietto) non parte per nessuna strada, qualunque cosa dica il .gitignore del ramo (#2154).
+export const MOTIVO_SESSIONE = 'biglietto o stato della sessione, un segreto di questa macchina';
+const diSessione = (copie) => copie.every((c) => c.motivo === MOTIVO_SESSIONE);
+const cosaE = (copie) => (diSessione(copie)
+  ? `e' un file di sessione (${copie[0].motivo})`
+  : `ha la forma di una copia dei dati del server (${copie.find((c) => c.motivo !== MOTIVO_SESSIONE).motivo})`);
+
 /** Il motivo per cui il contenuto `byte` del file `f` è una copia, o '': fuori dai dati finti, in qualunque forma. */
 export function motivoContenuto(f, byte) {
+  if (eMarcatore(f)) return MOTIVO_SESSIONE;
   if (f.startsWith(CARTELLA_FINTI)) return '';
   const t = testoDi(byte);
   if (t === null || (CODICE.test(f) && !/^﻿?\s*[{[]/.test(t))) return '';
@@ -470,7 +479,7 @@ export function spedibileSenzaCopie(root, { nome = 'claude-local', email = 'clau
     try { g(['diff', '--cached', '--quiet']); } catch (_) { vuoto = false; }
     if (!vuoto) {
       g(['-c', `user.name=${nome}`, '-c', `user.email=${email}`, 'commit', '-q', '-m',
-        `${soggetti.join(' + ').slice(0, 200)} (senza la copia dei dati: ${file.join(', ')})`]);
+        `${soggetti.join(' + ').slice(0, 200)} (senza ${diSessione(copie) ? 'i file di sessione' : 'la copia dei dati'}: ${file.join(', ')})`]);
     }
   } catch (_) {
     try { g(['reset', '-q', '--soft', testa]); } catch (__) { /* resta il messaggio */ }
@@ -479,9 +488,10 @@ export function spedibileSenzaCopie(root, { nome = 'claude-local', email = 'clau
   if (copieDaSpedire(root).length) return fermo;
   return {
     stato: 'riparato',
-    avviso: `${file.join(', ')} ha la forma di una copia dei dati del server (${copie[0].motivo}) e il repo e' pubblico: `
+    avviso: `${file.join(', ')} ${cosaE(copie)} e il repo e' pubblico: `
       + `l'ho tolto dai commit non ancora spediti, rifatti in uno solo (il lavoro resta), e il ramo parte senza. `
-      + `La copia resta nella cartella, invisibile a git: spostala nella cartella temporanea del sistema (os.tmpdir()).`,
+      + (diSessione(copie) ? `Il file resta dov'e', invisibile a git.`
+        : `La copia resta nella cartella, invisibile a git: spostala nella cartella temporanea del sistema (os.tmpdir()).`),
   };
 }
 
@@ -491,9 +501,9 @@ const citaShell = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
 export function avvisoSpedizione(copie) {
   const file = [...new Set(copie.map((c) => c.file))];
   const primo = copie[0].commit.slice(0, 10);
-  return `NON spedisco il ramo: ${file.join(', ')} (dal commit ${primo}) ha la forma di una copia dei dati del server `
-    + `(${copie[0].motivo}), e il repo e' pubblico: una volta spedita resta nella storia anche se tolta dopo. `
-    + `Toglila dalla storia del ramo e sposta la copia nella cartella temporanea del sistema (os.tmpdir()): `
+  return `NON spedisco il ramo: ${file.join(', ')} (dal commit ${primo}) ${cosaE(copie)}, `
+    + `e il repo e' pubblico: una volta spedito resta nella storia anche se tolto dopo. `
+    + `Toglilo dalla storia del ramo${diSessione(copie) ? '' : ' e sposta la copia nella cartella temporanea del sistema (os.tmpdir())'}: `
     + `git reset --soft ${primo}~1 && git rm -q --cached --ignore-unmatch -- ${file.map(citaShell).join(' ')} && git commit -m "lavoro senza la copia dei dati" `
     + `(rifa' in un commit solo i commit da li' in poi, il lavoro resta). Poi il salvataggio spedisce.`;
 }
@@ -537,14 +547,14 @@ export function copieNelPush(root, righe) {
 
 // Il segno che riconosce il pre-push di Filo: uno con un altro contenuto è di qualcun altro e non si tocca.
 export const SEGNO_PRE_PUSH = 'filo-copie-di-dati';
-// Di riserva, se la cartella che spedisce non ha il controllo (un ramo vecchio): quello di chi ha installato.
+// Quello di chi ha installato, prima di quello del ramo che spedisce: un ramo vecchio non conosce le regole nuove (#2154).
 const RISERVA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'copie-in-scena.mjs').replace(/\\/g, '/');
 const PRE_PUSH = `#!/bin/sh
 # ${SEGNO_PRE_PUSH}: una copia dei dati del server non parte per nessuna strada, nemmeno un git push a mano (#1108).
-# Lo scrive scripts/lib/copie-di-dati.mjs; il controllo è quello della cartella che spedisce.
+# Lo scrive scripts/lib/copie-di-dati.mjs; il controllo è quello di chi l'ha installato, o della cartella che spedisce.
 radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-controllo="$radice/scripts/copie-in-scena.mjs"
-[ -f "$controllo" ] || controllo='${RISERVA.replace(/'/g, "'\\''")}'
+controllo='${RISERVA.replace(/'/g, "'\\''")}'
+[ -f "$controllo" ] || controllo="$radice/scripts/copie-in-scena.mjs"
 [ -f "$controllo" ] && command -v node >/dev/null 2>&1 || exit 0
 righe=$(cat)
 # node costa a ogni push: si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.

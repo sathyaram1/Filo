@@ -161,6 +161,7 @@ import {
   URL_SERVER, ambienteGitServer, ambienteViaProxy, chiHaRespinto, originDelServer, pianoGitServer, senzaToken, stradaGitServer, urlSenzaSegreti,
 } from './lib/git-server.mjs';
 import { copieInScena, spedibileSenzaCopie, escludiInLocale, installaControlloSpedizione } from './lib/copie-di-dati.mjs';
+import { marcatoriFuoriDallaScena } from './lib/marcatori-sessione.mjs';
 import { registraDecisione } from './lib/orchestratore-cieco.mjs';
 import { cloneDelBiglietto, rilancia } from './lib/worker-nel-clone.mjs';
 import { isRoutineInstance } from './lib/routine-role.mjs';
@@ -938,6 +939,7 @@ export function commitRestante(root, { exec = execFileSync, env = process.env, p
   if (!st.lines.length) return { ok: true, skipped: false, committed: [], reason: '' };
   const add = run(['add', '-A']);
   if (!add.ok) return { ok: false, skipped: false, committed: [], reason: pulisciGit(add.out) };
+  try { marcatoriFuoriDallaScena(root, { exec }); } catch (_) { /* la spedizione li ferma */ }
   // Un file nato da shell è il modo più comune di scaricare una copia dei dati del server: come l'hook, resta fuori (#1108).
   let fuori = [];
   try { fuori = copieInScena(root).map((c) => c.file); } catch (_) { /* la spedizione ricontrolla i commit */ }

@@ -7,6 +7,7 @@ import { execFileSync, spawn } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { ensureSessionExcludes } from './marcatori-sessione.mjs';
 
 export const CARTELLA = join('.claude', 'biglietti');
 export const ENV_FILE = 'FILO_BIGLIETTO_FILE';
@@ -76,6 +77,8 @@ export function leggiFile(path) {
 // `trascrizione`: la trascrizione della sessione che porta il nome del file, il suo segno di vita per la scadenza.
 export function scriviFile(path, { ticket, fp, natoIl, trascrizione }) {
   mkdirSync(resolve(path, '..'), { recursive: true });
+  // Prima del file: il .gitignore di un ramo vecchio non lo conosce, info/exclude vale per ogni ramo (#2154).
+  ensureSessionExcludes(resolve(path, '..'));
   const dati = Object.assign({ ticket, fp, natoIl }, trascrizione ? { trascrizione: String(trascrizione) } : {});
   writeFileSync(path, `${JSON.stringify(dati, null, 2)}\n`, { encoding: 'utf8', mode: 0o600 });
 }
