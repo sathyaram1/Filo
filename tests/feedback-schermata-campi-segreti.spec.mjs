@@ -159,7 +159,7 @@ test('se la pagina sotto non dice dove stanno i suoi campi lo screenshot non par
   await reteFinta(app);
   await page.fill('#c', '4111 1111 1111 1111');
   await nelMondoDiFilo(app, page, () => {
-    globalThis.SN_EXTRACT.campiSegretiInVista = () => { throw new Error('pagina ferma'); };
+    globalThis.SN_EXTRACT.segreti.campiInVista = () => { throw new Error('pagina ferma'); };
     return true;
   });
   const strato = await mandaConSchermata(app, page, 'Il tasto Accedi non risponde');
