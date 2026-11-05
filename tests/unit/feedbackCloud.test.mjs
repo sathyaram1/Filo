@@ -477,26 +477,23 @@ test('le schede buone della cartella che il feedback non ha si mandano senza age
     writeFileSync(join(cartella, '3.json'), JSON.stringify({ ...buona(3), _fonte: fonte(3) }));
     const blob3 = SS.perIlDocumento(buona(3), { stato: 'todo', at: '2026-10-29T11:00:00.000Z', modello: 'haiku', fiducia: 'fidato', scrittaDa: 'owner' });
     const righe = [riga(1), riga(2), riga(3, { scheda: JSON.stringify(blob3), schedaAt: AGG })];
-    const out = [];
-    const l = console.log;
-    console.log = (...a) => out.push(a.join(' '));
-    try {
-      assert.equal(await S.elenca(cartella, false, { lettura: () => S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async (v) => JSON.parse(v) }) }), 0);
-    } finally { console.log = l; }
-    assert.match(out.join('\n'), /1 schede della cartella mancano nel feedback: scrivi le salva senza agente/);
+    // I passi di elenca prima dell'invio; il comando intero contro un canale finto sta nelle prove di #1785.2 più sotto.
+    const r = await S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async (v) => JSON.parse(v) });
+    const indice = S.conSchedeNelFeedback(S.apertiDaRighe(r.righe, { segnalati: r.segnalati }), r.schede);
+    writeFileSync(join(cartella, S.INDICE), JSON.stringify(indice));
+    S.importaSchede(cartella, r.schede, indice);
     const letta = (n) => JSON.parse(readFileSync(join(cartella, `${n}.json`), 'utf8'));
-    assert.equal(letta(1)[S.NON_SALVATA], true);
-    assert.equal(letta(2)[S.NON_SALVATA], undefined, 'vecchia: non si manda, la rifà l’agente');
-    assert.equal(letta(3)[S.NON_SALVATA], undefined, 'già nel feedback');
-    const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
+    const fuori = (n, ind = indice) => S.fuoriDalFeedback(ind.find((f) => f.num === String(n)), letta(n));
+    assert.deepEqual([fuori(1), fuori(2), fuori(3)], [true, false, false], '2 vecchia: la rifà l’agente; 3 già nel feedback');
+    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).fuoriDalFeedback, 1);
     const mandati = [];
-    const r = await S.rimandaNonSalvate(cartella, indice, { salva: async (dati) => {
+    const m = await S.mandaFuoriDalFeedback(cartella, indice, { salva: async (dati) => {
       mandati.push(dati);
       return { ok: true, aggiornato: 'B', scheda: { ...buona(1), _fonte: fonte(1, 'B'), _fiducia: 'fidato' } };
     } });
     assert.deepEqual(mandati.map((d) => [d.numero, d.rilettura, d.modello]), [['1', true, 'opus']], 'la rilettura di Opus resta una rilettura');
-    assert.equal(r.mandate, 1);
-    assert.equal(letta(1)[S.NON_SALVATA], undefined, 'salvata: il segno se ne va');
+    assert.equal(m.mandate, 1);
+    assert.equal(fuori(1, JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'))), false, 'salvata: l’indice sa che il feedback l’ha');
   } finally { togliCartella(cartella); }
 });
 
