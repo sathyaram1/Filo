@@ -1356,7 +1356,7 @@ if (isMain) {
       console.error(`${rifiutoPratica(r.id, lavorabile)}\nNon ho legato il lavoro a questa pratica e non ho toccato niente.`);
       process.exit(1);
     }
-    return { ...r, avviso: lavorabile.avviso, fiducia: lavorabile.fiducia };
+    return praticaDelGiro(r, lavorabile);
   };
 
   const bilanciOStop = async () => {
