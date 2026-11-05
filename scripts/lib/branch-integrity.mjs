@@ -37,7 +37,8 @@ import { ensureCommentChar } from './carattere-commento.mjs';
 import { senzaToken } from './git-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
-import { leggiTentativo, tentativiSuperati } from './tentativi.mjs';
+import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { lineaPrincipale, numeroFeedback, ultimaFusionePropria } from './su-main.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
