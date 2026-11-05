@@ -1,6 +1,6 @@
-// domanda.mjs — le domande all'owner (#1149, SPEC-DOMANDE.md §3). Col biglietto delle routine `chiedi` passa dal canale;
-// il resto va a ownerDomande col segreto del biglietto locale (#1148, la fiducia), e chi stampa una non fidata si sporca.
-// Le azioni di consenso e quelle `bulk:false` non partono da qui: solo dalla finestra di Filo (regola, non muro).
+// domanda.mjs — le domande all'owner (#1149, SPEC-DOMANDE.md §3). Col biglietto delle routine passa dal canale; il resto
+// col token admin a ownerDomande, o con la chiave owner-non-fidato a chiaveDomande (#2015), e chi stampa una non fidata
+// si sporca. Le azioni di consenso e quelle `bulk:false` non partono da qui: solo dalla finestra di Filo.
 
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { visibile } from './routine-domanda.mjs';
 import { absolutizeOutput } from './lib/tools-pin.mjs';
+import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
@@ -25,6 +26,8 @@ const USO = [
   '                                        il testo da solo resta parole e non applica niente',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
   '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
+  'Senza biglietto delle routine parlano col token admin (FILO_ADMIN_REFRESH_TOKEN) o, da una sede non fidata, con la',
+  'chiave owner-non-fidato (FILO_OWNER_NON_FIDATO_KEY): con lei le risposte nascono non fidate, e «chiedi» non parte.',
   '',
   'Col biglietto del compito che gestisce una risposta (la domanda la dice il biglietto):',
   '  mostra                                rilegge la domanda, coi feedback che nomina e il registro',
@@ -205,13 +208,61 @@ export function soloDaFilo(azione) {
 }
 
 /** Il motivo di un errore della callable. PURA. */
-export function messaggioErrore(status, body) {
+export function messaggioErrore(status, body, funzione = 'ownerDomande') {
   const b = body || {};
   const err = b.error || {};
   const res = b.result && b.result.ok === false ? b.result : null;
   const msg = err.message || (res && (res.detail || res.reason))
-    || (status === 404 ? 'la funzione ownerDomande non esiste sul server (non ancora pubblicata?)' : `errore ${status}`);
+    || (status === 404 ? `la funzione ${funzione} non esiste sul server (non ancora pubblicata?)` : `errore ${status}`);
   return visibile(msg);
+}
+
+// ── Con quale credenziale (#2015) ───────────────────────────────────────────
+
+const VAR_ADMIN = 'FILO_ADMIN_REFRESH_TOKEN';
+const VAR_NON_FIDATO = CHIAVI.find((c) => c.classe === 'owner-non-fidato').variabile;
+export const CLASSE_NON_FIDATO = 'owner-non-fidato';
+
+/**
+ * Il token admin, poi la chiave owner-non-fidato, poi quella del manutentore (che delle domande fa solo il registro).
+ * PURA. @returns {{ tipo: 'admin' } | { tipo: 'owner-non-fidato'|'manutentore', passphrase, variabile } | null}
+ */
+export function credenzialeDomande({ env = {}, tokenAdmin = '' } = {}) {
+  if (String(tokenAdmin || '').trim()) return { tipo: 'admin' };
+  const k = chiaveDallAmbiente(env);
+  return k ? { tipo: k.classe, passphrase: k.passphrase, variabile: k.variabile } : null;
+}
+
+export const SENZA_CREDENZIALI = `servono le credenziali dell'owner: il token admin (${VAR_ADMIN}) dalla sua macchina, `
+  + `o la chiave owner-non-fidato (${VAR_NON_FIDATO}, ${comeCrearla(CLASSE_NON_FIDATO)}) da una sede non fidata`;
+
+/** Perché una credenziale non fa questo comando, o '' se lo fa. Si dice prima di chiamare il server. PURA. */
+export function rifiutoDellaCredenziale(cred, cmd) {
+  if (!cred) return SENZA_CREDENZIALI;
+  if (cred.tipo === 'admin') return '';
+  if (cmd === 'chiedi') {
+    return `«chiedi» con la chiave ${cred.tipo} non parte: una domanda per l'owner nasce da un lavoro (col suo biglietto) o dalla finestra di Filo; `
+      + 'il manutentore la apre con npm run manutentore -- domanda <file.json>';
+  }
+  if (cred.tipo === CLASSE_NON_FIDATO || cmd === 'registro') return '';
+  return `la chiave del manutentore (${cred.variabile}) delle domande legge solo il registro: per ${cmd} serve ${VAR_ADMIN} o ${VAR_NON_FIDATO}`;
+}
+
+/** La riga che dice con cosa si parla: con una chiave quello che si scrive nasce non fidato. PURA. */
+export function rigaCredenziale(cred) {
+  if (!cred || cred.tipo === 'admin') return '';
+  if (cred.tipo !== CLASSE_NON_FIDATO) return `Parlo con la chiave ${cred.tipo} (${cred.variabile}), che delle domande legge solo il registro.`;
+  return `Parlo con la chiave ${cred.tipo} (${cred.variabile}): le risposte, le archiviazioni e le riaperture da qui nascono `
+    + 'non fidate, segnate in Gestione, Domande e nel recap del mattino, e l\'owner le può riaprire.';
+}
+
+/**
+ * Il corpo per chiaveDomande: il contratto di ownerDomande con la parola d'ordine in `passphrase`. Biglietto e sessione
+ * il server li ignora con la chiave, e un segreto che non serve non viaggia. PURA.
+ */
+export function corpoChiave(data, passphrase) {
+  const { biglietto, sessione, passphrase: _p, ...resto } = data && typeof data === 'object' ? data : {};
+  return Object.assign(resto, { passphrase: String(passphrase || '') });
 }
 
 /**
@@ -450,6 +501,32 @@ export async function chiamaOwner(data, { funzione = '' } = {}) {
   return body.result || {};
 }
 
+/** chiaveDomande (#2011) con la chiave owner-non-fidato: stesse risposte e stessi errori di chiamaOwner. */
+export async function chiamaConChiave(data, passphrase, { fetchImpl = fetch } = {}) {
+  const funzione = 'chiaveDomande';
+  const res = await fetchImpl(INDIRIZZO.replace(/ownerDomande$/, funzione), {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ data: corpoChiave(data, passphrase) }),
+  });
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok || (body.result && body.result.ok === false)) throw new Error(`Non riuscito: ${messaggioErrore(res.status, body, funzione)}`);
+  return body.result || {};
+}
+
+/** Il registro con una chiave di classe: l'operazione `registro` del canale del manutentore, che le accetta tutte e due. */
+async function registroConChiave(passphrase, parole) {
+  const [{ call }, { corpoManutentore }] = await Promise.all([import('./routine-channel.mjs'), import('./manutentore.mjs')]);
+  const { status, body } = await call('routineManutentore', corpoManutentore({ passphrase }, 'registro', { parole }));
+  if (status === 200 && body && body.ok !== false) return body;
+  throw new Error(`Non riuscito: ${visibile((body && (body.detail || body.reason)) || `errore ${status}`)}`);
+}
+
+async function credenzialeDelloAmbiente() {
+  const { findAdminRefreshToken } = await import('./lib/firestore-auth.mjs');
+  return credenzialeDomande({ env: process.env, tokenAdmin: findAdminRefreshToken() || '' });
+}
+
 async function bigliettoDelGiro() {
   const { readTicket } = await import('./lib/routine-ticket.mjs');
   const { pinnedRepoRoot } = await import('./lib/tools-pin.mjs');
@@ -517,12 +594,25 @@ export async function esegui(argv, io = {}) {
     chiama = chiamaOwner, consegna = consegnaDomanda, risposta = consegnaRisposta, smistamento = consegnaSmistamento,
     registroCanale = consegnaRegistro, biglietto = bigliettoDelGiro,
     bigliettoLocale = segretoLocale, sporca = sporcaSessione,
+    credenziale = credenzialeDelloAmbiente, chiamaChiave = chiamaConChiave, registroChiave = registroConChiave,
     leggiFile = (p) => readFileSync(p, 'utf8'), stdin = leggiStdin,
     scrivi = (s) => console.log(s), errore = (s) => console.error(s),
   } = io;
   if (argv.some((x) => x === '--help' || x === '-h')) { scrivi(USO); return 0; }
   const a = leggiArgomenti(argv);
   if (a.errore) { errore(`RIFIUTATO: ${a.errore}`); return 1; }
+  // La credenziale dell'owner si sceglie solo fuori dai comandi del biglietto, e un no si dice prima di chiamare.
+  let cred = null;
+  const conCredenziale = async () => {
+    cred = await credenziale();
+    const no = rifiutoDellaCredenziale(cred, a.cmd);
+    if (no) { errore(`RIFIUTATO: ${no}. Non ho chiamato il server.`); return false; }
+    const riga = rigaCredenziale(cred);
+    if (riga) scrivi(riga);
+    return true;
+  };
+  const conChiave = () => cred && cred.tipo !== 'admin';
+  const parla = (data) => (conChiave() ? chiamaChiave(data, cred.passphrase) : chiama(data));
   try {
     if (a.cmd === 'chiedi') {
       let testo;
@@ -538,6 +628,7 @@ export async function esegui(argv, io = {}) {
         if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): la domanda non è partita.`); return 3;
       }
+      if (!(await conCredenziale())) return 1;
       const segreto = await bigliettoLocale();
       const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda }, segreto ? { biglietto: segreto } : {}));
       scrivi(`OK: domanda ${visibile(r.id || '')} aperta (${fiduciaDetta(r.fiducia)})${inSmistamento(r)}.`);
@@ -600,6 +691,7 @@ export async function esegui(argv, io = {}) {
     // Ogni lettura porta il biglietto della sessione: col token dell'owner è così che il server la riconosce, e le dà
     // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027).
     const lettura = async (data) => {
+      if (conChiave()) return parla(data);
       const s = await bigliettoLocale();
       return chiama(s ? Object.assign(data, { biglietto: s }) : data);
     };
@@ -611,12 +703,14 @@ export async function esegui(argv, io = {}) {
         if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
       }
-      const r = await lettura({ op: 'registro', parole: a.parole });
+      if (!(await conCredenziale())) return 1;
+      const r = conChiave() ? await registroChiave(cred.passphrase, a.parole) : await lettura({ op: 'registro', parole: a.parole });
       const nf = nonFidate(r.voci);
       if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)]));
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
       return 0;
     }
+    if (!(await conCredenziale())) return 1;
     // Il testo di una domanda non fidata è testo esterno: la sessione si sporca PRIMA di stamparlo (#1148).
     if (a.cmd === 'mostra') {
       const r = await lettura({ op: 'mostra', id: a.id });
@@ -638,11 +732,12 @@ export async function esegui(argv, io = {}) {
     // Col token del proprietario il server non distingue una sessione dall'owner: la sessione lo dice, col suo biglietto,
     // e le sue parole prendono la fiducia del biglietto invece di valere come dell'owner.
     const daSessione = async () => {
+      if (conChiave()) return {};
       const s = await bigliettoLocale();
       return s ? { sessione: true, biglietto: s } : { sessione: true };
     };
     if (a.cmd === 'archivia' || a.cmd === 'riapri') {
-      const r = await chiama(Object.assign({ op: a.cmd, id: a.id }, await daSessione()));
+      const r = await parla(Object.assign({ op: a.cmd, id: a.id }, await daSessione()));
       scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}.`);
       return 0;
     }
@@ -664,7 +759,7 @@ export async function esegui(argv, io = {}) {
       const data = Object.assign({ op: 'rispondi', id: a.id }, await daSessione());
       if (a.scelta !== undefined) data.scelta = a.scelta;
       if (conTesto) data.testo = a.testo;
-      const r = await chiama(data);
+      const r = await parla(data);
       const detto = esitoRisposta(r.esito, Object.assign({}, riferimenti, r.riferimenti), { conScelta: a.scelta !== undefined });
       const stato = (r.domanda && r.domanda.stato) || '?';
       scrivi(`OK: ${a.id} è ${visibile(stato)}; ${detto.riga}.`);
@@ -686,7 +781,7 @@ export async function esegui(argv, io = {}) {
         daMandare.push(id);
       }
       if (!daMandare.length) { errore('RIFIUTATO: nessun consiglio applicabile da qui.'); return 1; }
-      const r = await chiama(Object.assign({ op: 'consiglio', ids: daMandare }, await daSessione()));
+      const r = await parla(Object.assign({ op: 'consiglio', ids: daMandare }, await daSessione()));
       // Ogni esito si dice come quello della risposta singola (#1790.1): una ripresa accodata non è «fatto».
       for (const e of Array.isArray(r.esiti) ? r.esiti : []) {
         const detto = e.ok && e.esito && typeof e.esito === 'object' ? esitoRisposta(e.esito, riferimentiDi[e.id] || {}, { conScelta: true }).riga : '';

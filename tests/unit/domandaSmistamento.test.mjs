@@ -29,6 +29,7 @@ function finto(risposte = {}) {
     smistamento: async (t, data) => { canale.push({ intento: 'smistamento', t, data }); return risposte.smistamento || { outcome: 'ok', reply: {} }; },
     registroCanale: async (t, data) => { canale.push({ intento: 'registro', t, data }); return risposte.registro || { outcome: 'ok', reply: { voci: [] } }; },
     biglietto: async () => (risposte.biglietto === undefined ? 'biglietto-del-compito' : risposte.biglietto),
+    credenziale: async () => risposte.credenziale || { tipo: 'admin' },
     bigliettoLocale: async () => '',
     sporca: async (cosa, motivi) => { sporcate.push({ cosa, motivi }); return 'Biglietto della sessione sporcato.'; },
     leggiFile: (p) => { if (!(p in (risposte.file || {}))) throw Object.assign(new Error('no'), { code: 'ENOENT' }); return risposte.file[p]; },

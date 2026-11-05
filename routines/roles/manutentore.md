@@ -210,7 +210,11 @@ Ogni indicazione finisce nel taccuino con la data: `npm run manutentore -- indic
 ## Gli strumenti
 
 Parlano col tuo endpoint sul server: nella sessione accesa dal pacemaker col tuo biglietto, da soli; in locale e nella
-chat con la chiave del manutentore (`FILO_MANUTENTORE_KEY`). Un rifiuto del server dice il perché: non si aggira.
+chat con la chiave del manutentore (`FILO_MANUTENTORE_KEY`), o con quella owner-non-fidato (`FILO_OWNER_NON_FIDATO_KEY`)
+quando l'owner ti parla da una sede non fidata: se ci sono tutte e due vale la seconda. Con lei hai gli stessi poteri
+più le domande dell'owner (`node scripts/domanda.mjs elenco | mostra D-n | rispondi D-n --scelta N | archivia D-n |
+riapri D-n`): le risposte che registri nascono non fidate, e lui le rivede in Gestione → Domande. Un rifiuto del server
+dice il perché: non si aggira.
 
 ```bash
 npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo

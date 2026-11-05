@@ -262,7 +262,7 @@ test('il corpo per il server porta una credenziale sola; il biglietto vale solo 
   assert.deepEqual(M.corpoManutentore({ passphrase: 'k' }, 'stato'), { passphrase: 'k', op: 'stato', dati: {} });
   assert.throws(() => M.corpoManutentore({ ticket: 't', passphrase: 'k' }, 'stato'));
   assert.deepEqual(M.credenziale({ argv: ['stato', '--ticket', 'x'], env: { FILO_MANUTENTORE_KEY: 'k' } }), { ticket: 'x' });
-  assert.deepEqual(M.credenziale({ env: { FILO_MANUTENTORE_KEY: ' k ' }, bigliettoDelGiro: 'b', ruoloDelGiro: 'verifier' }), { passphrase: 'k' },
+  assert.deepEqual(M.credenziale({ env: { FILO_MANUTENTORE_KEY: ' k ' }, bigliettoDelGiro: 'b', ruoloDelGiro: 'verifier' }), { passphrase: 'k', classe: 'manutentore' },
     'il biglietto di un worker non parla da manutentore');
   assert.deepEqual(M.credenziale({ bigliettoDelGiro: 'b', ruoloDelGiro: 'manutentore' }), { ticket: 'b' });
   assert.equal(M.credenziale({ env: {} }), null);

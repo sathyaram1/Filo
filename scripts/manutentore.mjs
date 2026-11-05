@@ -11,6 +11,7 @@ import { espandiInclusioni } from './lib/role-text.mjs';
 import { incroci, ramiInCorso } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
 import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
+import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { famigliaPrezzo, PREZZI } from './session-report.mjs';
@@ -411,19 +412,19 @@ export function richiestaSblocca(args) {
 
 /**
  * Con cosa si parla al server: `--ticket`, il biglietto della sessione accesa per il manutentore (il ruolo scritto da
- * dispatch), o la chiave di classe «manutentore» in FILO_MANUTENTORE_KEY (la sessione locale e la chat). PURA.
+ * dispatch), o una chiave di classe nell'ordine di chiave-di-classe.mjs (la sessione locale, la chat, la sede non
+ * fidata dell'owner). PURA.
  */
 export function credenziale({ argv = [], env = {}, bigliettoDelGiro = '', ruoloDelGiro = '' } = {}) {
   const t = opzione(argv, '--ticket');
   if (t && String(t).trim()) return { ticket: String(t).trim() };
   if (ruoloDelGiro === 'manutentore' && bigliettoDelGiro) return { ticket: String(bigliettoDelGiro) };
-  const k = String(env.FILO_MANUTENTORE_KEY || '').trim();
-  if (k) return { passphrase: k };
-  return null;
+  const k = chiaveDallAmbiente(env);
+  return k ? { passphrase: k.passphrase, classe: k.classe } : null;
 }
 
-export const SENZA_CREDENZIALE = 'serve la chiave del manutentore (FILO_MANUTENTORE_KEY, la crea l\'owner con '
-  + 'node scripts/routine-keys.mjs crea <nome> manutentore) o il biglietto della sua sessione (--ticket)';
+export const SENZA_CREDENZIALE = `serve una chiave: ${CHIAVI.map((c) => `${c.variabile} (classe ${c.classe}, ${comeCrearla(c.classe)})`).join(' o ')}, `
+  + 'o il biglietto della sessione del manutentore (--ticket)';
 
 /** Il corpo per l'endpoint routineManutentore: una credenziale sola. PURA. */
 export function corpoManutentore(cred, op, dati = {}) {
@@ -851,8 +852,12 @@ async function indiceCapacita(root) {
 // ── La chat (§ 9) ───────────────────────────────────────────────────────────
 
 /** Il primo messaggio della chat: il file del contesto si legge intero, le indicazioni vanno nel taccuino. PURA. */
-export function primoMessaggioChat(file) {
-  return `Sei il manutentore di Filo, in chat con l'owner. Il tuo contesto intero (ruolo, stato, taccuino, schede, rami) è nel file ${file}: leggilo tutto prima di rispondere. Hai i poteri e i limiti del ruolo. Ogni indicazione dell'owner la scrivi nel taccuino con: npm run manutentore -- indicazione <testo>. Poi chiedigli di cosa vuole parlare.`;
+export function primoMessaggioChat(file, { classe = '' } = {}) {
+  // Con la chiave owner-non-fidato (#2015) la chat risponde anche alle domande, e le risposte nascono non fidate.
+  const domande = classe === 'owner-non-fidato'
+    ? ' Con questa chiave registri anche le risposte dell\'owner alle sue domande: node scripts/domanda.mjs elenco, mostra D-n, rispondi D-n --scelta N, archivia D-n, riapri D-n; nascono non fidate e lui le rivede in Gestione, Domande.'
+    : '';
+  return `Sei il manutentore di Filo, in chat con l'owner. Il tuo contesto intero (ruolo, stato, taccuino, schede, rami) è nel file ${file}: leggilo tutto prima di rispondere. Hai i poteri e i limiti del ruolo. Ogni indicazione dell'owner la scrivi nel taccuino con: npm run manutentore -- indicazione <testo>.${domande} Poi chiedigli di cosa vuole parlare.`;
 }
 
 // ── La riga di comando ──────────────────────────────────────────────────────
@@ -940,7 +945,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       return 0;
     } catch (e) { console.error(`RIFIUTATO: ${e.message}`); return 2; }
   }
-  // Lo sblocco dell'owner (#1961) resta: senza la chiave del manutentore passa dal canale dell'owner.
+  // Lo sblocco dell'owner (#1961) resta: senza una chiave di classe passa dal canale dell'owner.
   if (cmd === 'sblocca' && !cred) {
     const q = richiestaSblocca(argv.slice(1));
     const { chiamaOwner } = await import('./domanda.mjs');
@@ -1005,7 +1010,7 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       mkdirSync(dir, { recursive: true });
       const file = join(dir, `contesto-${giornoDi()}.md`);
       writeFileSync(file, testo, { encoding: 'utf8', mode: 0o600 });
-      const messaggio = primoMessaggioChat(file);
+      const messaggio = primoMessaggioChat(file, { classe: cred.classe || '' });
       if (argv.includes('--stampa')) { console.log(messaggio); return 0; }
       const { spawnSync } = await import('node:child_process');
       // Su Windows `claude` è uno script .cmd: senza shell non parte; fuori da Windows si lancia diretto.
