@@ -377,3 +377,41 @@ test('il finish dopo la fusione: col ramo del server ancora fuori resta aperta; 
   assert.equal(g.reply, FUSA_COL_SERVER_FUORI);
   assert.match(g.riga, /non si rilegge dopo la fusione \(rete giù\)/);
 });
+
+test('fusioni sovrapposte: il finish chiude la pratica mentre server:fondi prova il server, e server:fondi la lascia chiusa con la sua nota', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  let ramiApp = ['claude/x'];
+  await conRete(docs, async (scritture) => {
+    const r = await serverFondi(['claude/x', '--feedback', 'p'], {
+      ramiAperti: () => ramiApp,
+      // Il finish ha contato il server già su main e ha chiuso: server:fondi la ritrova chiusa dopo la sua fusione.
+      durante: () => { fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: true }); ramiApp = []; },
+    });
+    assert.equal(r.k, 0, r.testo);
+    assert.equal(stato(docs.p), 'done');
+    assert.match(r.testo, /l'ha chiusa intanto la fusione della parte dell’app: resta chiusa/);
+    assert.deepEqual(conServer(docs.p), { app: ORA, ramo: 'claude/x' });
+    assert.ok(scritture.some((s) => s.maschera.includes('notes')), 'la nota di questa parte resta scritta');
+  });
+});
+
+test('fusioni sovrapposte: se la pratica non si rilegge dopo la fusione del server resta aperta, e si dice di rilanciare', async () => {
+  const docs = { p: pratica('p', { status: 'working' }) };
+  await conRete(docs, async (scritture) => {
+    const finta = globalThis.fetch;
+    let giu = false;
+    globalThis.fetch = async (url, init = {}) => {
+      if (giu && (init.method || 'GET') === 'GET') throw new Error('rete giù');
+      return finta(url, init);
+    };
+    try {
+      const r = await serverFondi(['claude/x', '--feedback', 'p'], {
+        ramiAperti: ['claude/x'],
+        durante: () => { fondeLApp(docs.p, { ramo: 'claude/x', at: ORA, chiude: false }); giu = true; },
+      });
+      assert.equal(chiusa(scritture), false, 'senza rilettura non si chiude alla cieca');
+      assert.notEqual(stato(docs.p), 'done');
+      assert.match(r.testo, /non si rilegge dopo la fusione \(.*rete giù.*\): se intanto la parte dell’app è arrivata su main, rilancia lo stesso comando e la chiude/);
+    } finally { globalThis.fetch = finta; }
+  });
+});
