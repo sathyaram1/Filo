@@ -105,19 +105,26 @@ non puoi proseguire, dichiaralo nel rilascio.
 
 La cache del contesto dura cinque minuti: una chiamata bloccante più lunga la
 trova scaduta, e il turno dopo ripaga tutto il contesto. Quindi un comando che
-può superare i **due minuti** va in **sottofondo** (l'harness ti avvisa quando
-finisce); se devi aspettarlo, a pezzi da **quattro minuti al massimo** per
-chiamata (`timeout 240 tail --pid=<pid> -f /dev/null`, o un ciclo `until` con
-tetto 240 s), mai da dieci. Il timeout della chiamata si dimensiona sulla
-**durata vera** del comando, mai sotto: un comando ucciso a metà va rifatto da
-capo. Lunghi di sicuro: le prove di un feedback (otto minuti e mezzo),
-`npm run finish:check` (da quindici a quarantacinque minuti), l'installazione
-di Electron.
+può superare i **due minuti** va in **sottofondo**, col parametro
+`run_in_background` della chiamata Bash: mentre gira lavori ad altro, e quando
+finisce l'harness te lo avvisa da sé. Quell'avviso è l'attesa: non ne scrivi
+un'altra. Per seguire qualcosa che non hai lanciato tu, o avere un avviso a ogni
+riga di un log, c'è lo strumento Monitor. Il timeout della chiamata si
+dimensiona sulla **durata vera** del comando, mai sotto: un comando ucciso a
+metà va rifatto da capo. Lunghi di sicuro: le prove di un feedback (otto minuti
+e mezzo), `npm run finish:check` (da quindici a quarantacinque minuti),
+l'installazione di Electron.
+
+**Mai un'attesa scritta da te nella shell**: `sleep`, un ciclo `until` o
+`while` che dorme, `tail --pid`, `timeout N bash -c …`. In cloud l'harness
+blocca `sleep` in primo piano e chiede un permesso che nessuno approva: il
+worker resta fermo in silenzio finché la veglia non lo dichiara guasto (#1685).
 
 Un comando in sottofondo **si aspetta prima del rilascio**: finché un tuo
 processo lavora nella cartella il rilascio rifiuta (exit 5, coi pid e i
 comandi), perché dopo il rilascio cartella e ramo passano al prossimo worker.
-Aspettalo, o fermalo se non serve più, e rilancia lo stesso comando.
+Aspetta il suo avviso di fine, o fermalo se non serve più, e rilancia lo stesso
+comando.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 
