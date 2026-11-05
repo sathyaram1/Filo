@@ -40,7 +40,8 @@ test('nei Ricevuti un mai giudicato non si legge; un panel completo pulito e un 
     const v = mod.vietatoLeggere(status, pipeline, fiducia);
     assert.match(v, /mai passato dai giudici/, `${status} ${JSON.stringify(pipeline)}`);
     assert.match(v, motivo);
-    assert.match(v, /--anche-mai-giudicato/);
+    // Chi legge il rifiuto è la sessione, spesso un agente (schede): la strada per scavalcarlo non gliela dà.
+    assert.doesNotMatch(v, /--anche-mai-giudicato|lo stesso/);
     assert.equal(mod.vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato: true }), '', 'l’opzione esplicita lo lascia leggere');
   }
   assert.match(mod.vietatoLeggere('unlabeled', undefined), /Ri-valuta i non filtrati/);
