@@ -240,6 +240,37 @@ test('la soglia del controllo sul manutentore è scritta in un posto solo', () =
   assert.equal((man.match(/\b\d+ ore\b/g) || []).filter((x) => x !== '5 ore').length, 1, 'una sola soglia in ore nella spec del manutentore');
 });
 
+// #1249.4: le copie riassunte del fermo dicevano «solo il mattino» e lasciavano fuori la chat; chi costruiva
+// l'accensione partendo da una di loro lasciava l'owner senza modo di farlo ripartire fino al giorno dopo.
+test('il fermo del manutentore su un guasto suo è scritto per intero solo nel § 7, gli altri testi rimandano lì', () => {
+  const fuori7 = manutentore.replace(paragrafo7, '\n');
+  const testi = [['SPEC-MANUTENTORE.md fuori dal § 7', fuori7]];
+  const radice = ['SPEC-DOMANDE.md', 'FEEDBACK-STATES.md', 'SPEC-RIDISEGNO-LAVORO.md', 'CLAUDE.md'];
+  for (const f of radice) testi.push([f, readFileSync(join(ROOT, f), 'utf8')]);
+  for (const f of ['manutentore.md', 'smistamento.md', 'pacemaker.md']) {
+    try { testi.push([f, readFileSync(join(ROOT, 'routines', 'roles', f), 'utf8')]); } catch { /* ruolo assente */ }
+  }
+  const riassunto = /solo (il|al) mattino|anticipa niente|oltre al mattino|solo la sessione del giorno|riaccende solo l'owner/i;
+  let menzioni = 0;
+  for (const [nome, t] of testi) {
+    const p = t.replace(/\s+/g, ' ');
+    assert.doesNotMatch(p, riassunto, `${nome}: una versione ridotta della regola del fermo`);
+    for (const m of p.matchAll(/guasto suo/gi)) {
+      menzioni++;
+      assert.match(p.slice(m.index, m.index + 170), /§ 7/, `${nome}: «${p.slice(m.index, m.index + 90)}…» non rimanda al § 7`);
+    }
+  }
+  assert.ok(menzioni >= 6, `i rimandi al fermo sono spariti (${menzioni})`);
+});
+
+// #1249.4: le due regole del § 7 vivono nel codice del server; finché lì non ci sono, la spec non le presenta come fatte.
+test('la spec del manutentore dice che fermo e controllo sono ancora da costruire sul server', () => {
+  const s7 = paragrafo7.replace(/\s+/g, ' ');
+  assert.match(s7, /\*\*Stato: da costruire sul server\*\* \(§ 11\)\. I due paragrafi qui sopra dicono come deve andare, non come va oggi/);
+  const s11 = manutentore.slice(manutentore.indexOf('\n## 11.')).replace(/\s+/g, ' ');
+  assert.match(s11, /\*\*Server \(filo-security\), primo:\*\*.{0,1500}fermo su un guasto suo con le sole accensioni del § 7 \(chat e «lascialo riprovare» comprese\)/);
+});
+
 test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
   const s38 = sezione('### 3.8').replace(/\s+/g, ' ');
   assert.match(s38, /guasto \(#1781\) \| nessuna domanda e nessuna fermata/);
