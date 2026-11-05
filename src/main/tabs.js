@@ -1648,12 +1648,7 @@ class TabManager {
     let e = null;
     const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
     if (A) {
-      try {
-        for (const x of await A.listMeta()) {
-          if (!x || x.urlTagliato || !/^https?:\/\//i.test(x.url || '') || !(Date.parse(x.audioAt) > 0) || pila.eRiaperta(x.id)) continue;
-          if (!e || Date.parse(x.audioAt) > Date.parse(e.audioAt)) e = x;
-        }
-      } catch (_) {}
+      try { e = pila.dallArchivio(await A.listMeta(), { suonata: true }); } catch (_) {}
     }
     const ta = e ? Date.parse(e.audioAt) : -Infinity;
     if (v && v.audioAt >= ta) return { voce: v, at: v.audioAt, titolo: v.titolo || '', url: v.url };
