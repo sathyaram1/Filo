@@ -6672,7 +6672,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
       const giro = () => handleAIRequest({
         action: ACTIONS.FILO_CHAT,
         payload: { ...payloadBase, threadMessages },
-        origin: 'filo:chat',
+        origin: 'filo:chat', conSeguito: true,
         onReasoning, onText, onToolCall, tools, signal: turno.ctrl.signal, tempiPrima,
       });
       const KW = global.SN_WALLET_MAIN;
