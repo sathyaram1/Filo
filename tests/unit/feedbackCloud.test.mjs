@@ -507,6 +507,12 @@ test('stato e scrivi da una routine si fermano sul censimento mancante; --solo e
     assert.equal(dopoSolo.status, 1, `${dopoSolo.stdout}${dopoSolo.stderr}`);
     assert.match(dopoSolo.stderr, /FERMO: la lettura dal server ha portato solo 1 scheda su 768 feedback aperti/);
     assert.doesNotMatch(dopoSolo.stdout, /\d+ agenti/);
+    // Un --solo che non porta numeri non è una scheda chiesta: niente agenti, né sul fermo né su tutti gli aperti.
+    for (const vuoto of [',', '#', ' ']) {
+      const r = lancia('scrivi', '--solo', vuoto, '--dry-run');
+      assert.equal(r.status, 1, `--solo ${JSON.stringify(vuoto)}: ${r.stdout}${r.stderr}`);
+      assert.doesNotMatch(r.stdout, /\d+ agenti/);
+    }
     const solo = lancia('scrivi', '--solo', '5', '--dry-run');
     assert.equal(solo.status, 0, `${solo.stdout}${solo.stderr}`);
     assert.match(solo.stdout, /1 agenti haiku.*#5$/m);
