@@ -70,7 +70,7 @@ test('i titoli dei casi si leggono anche da describe, fail e template, non da un
 
 test('una domanda che non blocca non ferma il lavoro: il `?` di livello 1 esce prima del verdetto, con la riga che lo spiega', () => {
   const nonBlocca = { titolo: 'Colore', blocca: false };
-  const findings = [{ level: 2, sede: 'i', decision: true, domanda: nonBlocca }, { level: 1, sede: 'i', decision: true, domanda: nonBlocca }];
+  const findings = [{ level: 2, sede: 'i', decision: true, irreversibile: true, domanda: nonBlocca }, { level: 1, sede: 'i', decision: true, domanda: nonBlocca }];
   assert.equal(fermaDiSicuro(findings), false);
   const fuori = proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r1-riquadro.spec.mjs', 'tests/verifica/42/giro1-r2-bordo.spec.mjs'], findings);
   assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-bordo.spec.mjs']);
@@ -215,13 +215,13 @@ const domandaDi = (titolo, blocca) => ({
   consiglio: { opzione: 0, perche: 'Coerente col resto.' },
 });
 
-test('#1555.1 con la domanda del 2 col ? che non blocca, la prova dell\'1 col ? va tolta prima; con quella che blocca resta', async (t) => {
+test('#1555.1 con la domanda del 2 col ?! che non blocca, la prova dell\'1 col ? va tolta prima; con quella che blocca resta', async (t) => {
   const prova = 'tests/verifica/901/giro2-r2-bordo.spec.mjs';
-  const critica = 'Provato il riquadro in tema chiaro e scuro.\n[2i?] Il riquadro è freddo: caldo come il resto?\n[1i?] Il bordo è grigio: più caldo?';
+  const critica = 'Provato il riquadro in tema chiaro e scuro.\n[2i?!] Il riquadro è freddo: caldo come il resto?\n[1i?] Il bordo è grigio: più caldo?';
   const { srv, ricevuti, port } = await fintoServer({
     outcome: 'fix', domandaProvvisoria: 'D-8',
     phase2: {
-      findings: [{ level: 2, sede: 'i', decision: true, text: 'Il riquadro è freddo: caldo come il resto?' }],
+      findings: [{ level: 2, sede: 'i', decision: true, irreversibile: true, text: 'Il riquadro è freddo: caldo come il resto?' }],
       derived: [{ level: 1, sede: 'i', decision: true, text: 'Il bordo è grigio: più caldo?', num: '#901.1' }],
     },
   });
