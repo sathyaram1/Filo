@@ -110,6 +110,7 @@ test('aspetta senza il biglietto, o con altro, non aspetta niente', async () => 
     for (const args of [['aspetta'], ['aspetta', 'corto'], ['aspetta', T, 'altro']]) {
       const r = await canale(dir, {}, ...args);
       assert.equal(r.code, 1, args.join(' '));
+      assert.match(r.se, /aspetta/, `${args.join(' ')}: l’uso nomina il comando`);
     }
   } finally {
     togliCartella(dir);
