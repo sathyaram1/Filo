@@ -13,9 +13,14 @@ test('r2 finestra ridotta a icona: «Chiudi scheda» non chiude una scheda che n
   const lettera = page.url();
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    w.minimize();
+    // Lo schermo virtuale non ha chi riduce a icona: la finestra lo dice di sé come su Mac, e torna con restore().
+    let ridotta = true;
+    w.isMinimized = () => ridotta;
+    const restore = w.restore.bind(w);
+    w.restore = () => { ridotta = false; restore(); };
+    w.blur();
   });
-  await expect.poll(async () => (await schede(app)).ridotta, { message: 'in questo ambiente la finestra non si riduce', timeout: 5000 }).toBe(true);
+  expect((await schede(app)).ridotta).toBe(true);
   await voceDellaBarra(app, 'Chiudi scheda');
   await new Promise((r) => setTimeout(r, 800));
   const s = await schede(app);
