@@ -26,6 +26,8 @@ const USO = [
   '                                        il testo da solo resta parole e non applica niente',
   '  consiglio D-1 [D-2 …]                 applica l\'opzione consigliata',
   '  archivia D-n | riapri D-n             la toglie senza applicare niente, o la rimette aperta',
+  'Senza biglietto delle routine parlano col token admin (FILO_ADMIN_REFRESH_TOKEN) o, da una sede non fidata, con la',
+  'chiave owner-non-fidato (FILO_OWNER_NON_FIDATO_KEY): con lei le risposte nascono non fidate, e «chiedi» non parte.',
   '',
   'Col biglietto del compito che gestisce una risposta (la domanda la dice il biglietto):',
   '  mostra                                rilegge la domanda, coi feedback che nomina e il registro',
@@ -592,12 +594,25 @@ export async function esegui(argv, io = {}) {
     chiama = chiamaOwner, consegna = consegnaDomanda, risposta = consegnaRisposta, smistamento = consegnaSmistamento,
     registroCanale = consegnaRegistro, biglietto = bigliettoDelGiro,
     bigliettoLocale = segretoLocale, sporca = sporcaSessione,
+    credenziale = credenzialeDelloAmbiente, chiamaChiave = chiamaConChiave, registroChiave = registroConChiave,
     leggiFile = (p) => readFileSync(p, 'utf8'), stdin = leggiStdin,
     scrivi = (s) => console.log(s), errore = (s) => console.error(s),
   } = io;
   if (argv.some((x) => x === '--help' || x === '-h')) { scrivi(USO); return 0; }
   const a = leggiArgomenti(argv);
   if (a.errore) { errore(`RIFIUTATO: ${a.errore}`); return 1; }
+  // La credenziale dell'owner si sceglie solo fuori dai comandi del biglietto, e un no si dice prima di chiamare.
+  let cred = null;
+  const conCredenziale = async () => {
+    cred = await credenziale();
+    const no = rifiutoDellaCredenziale(cred, a.cmd);
+    if (no) { errore(`RIFIUTATO: ${no}. Non ho chiamato il server.`); return false; }
+    const riga = rigaCredenziale(cred);
+    if (riga) scrivi(riga);
+    return true;
+  };
+  const conChiave = () => cred && cred.tipo !== 'admin';
+  const parla = (data) => (conChiave() ? chiamaChiave(data, cred.passphrase) : chiama(data));
   try {
     if (a.cmd === 'chiedi') {
       let testo;
@@ -613,6 +628,7 @@ export async function esegui(argv, io = {}) {
         if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): la domanda non è partita.`); return 3;
       }
+      if (!(await conCredenziale())) return 1;
       const segreto = await bigliettoLocale();
       const r = await chiama(Object.assign({ op: 'chiedi', domanda: letta.domanda }, segreto ? { biglietto: segreto } : {}));
       scrivi(`OK: domanda ${visibile(r.id || '')} aperta (${fiduciaDetta(r.fiducia)})${inSmistamento(r)}.`);
@@ -675,6 +691,7 @@ export async function esegui(argv, io = {}) {
     // Ogni lettura porta il biglietto della sessione: col token dell'owner è così che il server la riconosce, e le dà
     // sporco e segno riservato prima che il testo esca (SPEC-DOMANDE §5.1, #2027).
     const lettura = async (data) => {
+      if (conChiave()) return parla(data);
       const s = await bigliettoLocale();
       return chiama(s ? Object.assign(data, { biglietto: s }) : data);
     };
@@ -686,12 +703,14 @@ export async function esegui(argv, io = {}) {
         if (r.outcome === 'refused') { errore(`RIFIUTATO dal server: ${visibile(r.reason)}${r.detail ? `: ${visibile(r.detail)}` : ''}`); return 1; }
         errore(`guasto del canale delle routine (${visibile(r.reason)}): non è arrivato niente.`); return 3;
       }
-      const r = await lettura({ op: 'registro', parole: a.parole });
+      if (!(await conCredenziale())) return 1;
+      const r = conChiave() ? await registroChiave(cred.passphrase, a.parole) : await lettura({ op: 'registro', parole: a.parole });
       const nf = nonFidate(r.voci);
       if (nf.length) errore(await sporca(`registro per «${visibile(a.parole).slice(0, 60)}»`, [motivoNonFidate(nf)]));
       scrivi(formattaRegistro(r, { titolo: `Principi per «${visibile(a.parole)}»`, vuoto: 'nessun principio copre queste parole' }));
       return 0;
     }
+    if (!(await conCredenziale())) return 1;
     // Il testo di una domanda non fidata è testo esterno: la sessione si sporca PRIMA di stamparlo (#1148).
     if (a.cmd === 'mostra') {
       const r = await lettura({ op: 'mostra', id: a.id });
@@ -713,11 +732,12 @@ export async function esegui(argv, io = {}) {
     // Col token del proprietario il server non distingue una sessione dall'owner: la sessione lo dice, col suo biglietto,
     // e le sue parole prendono la fiducia del biglietto invece di valere come dell'owner.
     const daSessione = async () => {
+      if (conChiave()) return {};
       const s = await bigliettoLocale();
       return s ? { sessione: true, biglietto: s } : { sessione: true };
     };
     if (a.cmd === 'archivia' || a.cmd === 'riapri') {
-      const r = await chiama(Object.assign({ op: a.cmd, id: a.id }, await daSessione()));
+      const r = await parla(Object.assign({ op: a.cmd, id: a.id }, await daSessione()));
       scrivi(`OK: ${a.id} è ${visibile((r.domanda && r.domanda.stato) || '?')}.`);
       return 0;
     }
@@ -739,7 +759,7 @@ export async function esegui(argv, io = {}) {
       const data = Object.assign({ op: 'rispondi', id: a.id }, await daSessione());
       if (a.scelta !== undefined) data.scelta = a.scelta;
       if (conTesto) data.testo = a.testo;
-      const r = await chiama(data);
+      const r = await parla(data);
       const detto = esitoRisposta(r.esito, Object.assign({}, riferimenti, r.riferimenti), { conScelta: a.scelta !== undefined });
       const stato = (r.domanda && r.domanda.stato) || '?';
       scrivi(`OK: ${a.id} è ${visibile(stato)}; ${detto.riga}.`);
@@ -761,7 +781,7 @@ export async function esegui(argv, io = {}) {
         daMandare.push(id);
       }
       if (!daMandare.length) { errore('RIFIUTATO: nessun consiglio applicabile da qui.'); return 1; }
-      const r = await chiama(Object.assign({ op: 'consiglio', ids: daMandare }, await daSessione()));
+      const r = await parla(Object.assign({ op: 'consiglio', ids: daMandare }, await daSessione()));
       // Ogni esito si dice come quello della risposta singola (#1790.1): una ripresa accodata non è «fatto».
       for (const e of Array.isArray(r.esiti) ? r.esiti : []) {
         const detto = e.ok && e.esito && typeof e.esito === 'object' ? esitoRisposta(e.esito, riferimentiDi[e.id] || {}, { conScelta: true }).riga : '';
