@@ -8,6 +8,8 @@ const require = createRequire(import.meta.url);
 require('../../src/shared/constants.js');
 require('../../src/shared/chatErrors.js');
 require('../../src/shared/scryfallQuery.js');
+require('../../src/shared/lunghezzaRisposte.js');
+require('../../src/shared/filoContesto.js');
 require('../../src/main/services/providers/index.js');
 require('../../src/main/services/providers/openrouter.js');
 const OR = globalThis.SN_PROVIDER_OPENROUTER;
