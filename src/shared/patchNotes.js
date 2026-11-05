@@ -45,6 +45,10 @@
         { testo: 'Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W, Cmd+R e lo zoom agiscono su di lei e non più sulla scheda che aspetta l\'accesso.', segnalazione: 2031 },
         { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
         { testo: 'Nello screenshot che alleghi a un feedback i campi password e di carta escono coperti, come nelle immagini che vanno all\'assistente. Se uno non si riesce a coprire, la pagina resta fuori e il riquadro del feedback te lo dice.', segnalazione: 2116 },
+        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
+        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
+        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
+        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {
@@ -66,10 +70,6 @@
         { testo: 'La ricerca larga nei mazzi, con il servizio AI sovraccarico, dice subito che non risponde invece di aspettare oltre un minuto.', segnalazione: 1302 },
         { testo: 'La home non legge batteria e rete ogni minuto mentre sei via, e le legge appena torni alla finestra: un Invio su una bozza non aspetta.', segnalazione: 1302 },
         { testo: 'Una risposta interrotta da un errore del servizio, mentre il modello ragionava o dopo le prime parole, ora conta nel limite di spesa mensile e in Cronologia, col costo di ogni tentativo, anche quando nessuno ha risposto.', segnalazione: 1302 },
-        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
-        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
-        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
-        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {
