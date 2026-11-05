@@ -335,3 +335,74 @@ test('un modulo mandato da uno script e rimandato indietro col testo e un errore
     for (const [nome, id] of Object.entries(ids)) expect.soft(aperte, `invio da ${nome}`).toContain(id);
   } finally { await sito.chiudi(); }
 });
+
+// Il documento tutto modificabile (designMode) dei vecchi editor: sopra il corpo stanno gli strati del correttore.
+const DESIGN_MODE = {
+  'acceso dal riquadro': ['<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body style=\'min-height:100px\'></body><script>document.designMode=\'on\'</script>"></iframe>', ''],
+  'acceso dalla pagina': ['<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body style=\'min-height:100px\'></body>"></iframe>', "ifr.addEventListener('load', () => { ifr.contentDocument.designMode = 'on'; });"],
+};
+
+test('un editor col documento tutto modificabile in un riquadro nato con srcdoc, respinto, tiene aperta la scheda; mandato bene no (#1808.2)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const respinti = {};
+    const arrivati = {};
+    let k = 0;
+    for (const [nome, [riq, prep]] of Object.entries(DESIGN_MODE)) for (const [azione, attesa, dove] of [['/err500', 'Errore', respinti], ['/ok', 'Fatto', arrivati]]) {
+      const titolo = `Dm${++k}`;
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <form id="f" method="post" action="${azione}"><textarea name="corpo" id="nasc" style="display:none"></textarea>${riq}<button id="pub">Invia</button></form>
+        <script>${prep} f.addEventListener('submit', () => { nasc.value = ifr.contentDocument.body.innerHTML; });</script>`));
+      await page.waitForTimeout(500);
+      await page.frameLocator('#ifr').locator('body').click();
+      await page.keyboard.type(LETTERA);
+      await expect(page.frameLocator('#ifr').locator('body')).toContainText(LETTERA);
+      const id = await sporca(shell, titolo);
+      await page.locator('#pub').click();
+      await expect.poll(async () => (await schede(shell)).find((t) => t.id === id)?.title, { timeout: 10_000 }).toBe(attesa);
+      await page.waitForTimeout(600);
+      dove[nome] = id;
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    for (const [nome, id] of Object.entries(respinti)) expect.soft(aperte, `respinto: ${nome}`).toContain(id);
+    for (const [nome, id] of Object.entries(arrivati)) expect.soft(aperte, `arrivato: ${nome}`).not.toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+// Un editor non rilegge le righe a ogni tasto: mandato e svuotato subito dopo l'ultimo tasto, il rifiuto deve ritrovarle.
+const EDITOR_SVUOTATO = {
+  'riquadro nato con srcdoc': ['<iframe id="ifr" style="width:420px;height:120px" srcdoc="<body contenteditable=true style=\'min-height:100px\'></body>"></iframe>', '', 'ifr.contentDocument.body'],
+  'riquadro riempito da uno script': ['<iframe id="ifr" style="width:420px;height:120px"></iframe>', "{ const d = ifr.contentDocument; d.open(); d.write(\"<body contenteditable=true style='min-height:100px'></body>\"); d.close(); }", 'ifr.contentDocument.body'],
+  'campo modificabile nella pagina': ['<div id="ce" contenteditable="true" style="width:420px;min-height:100px;border:1px solid #999"></div>', '', 'ce'],
+};
+
+test('un editor svuotato dalla pagina all’invio e respinto dal sito tiene aperta la scheda, dal bottone e dall’Invio; arrivato no (#1808.2)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const respinti = {};
+    const arrivati = {};
+    let k = 0;
+    for (const [nome, [riq, prep, campo]] of Object.entries(EDITOR_SVUOTATO)) {
+      for (const [api, modo, dove] of [['/api/rifiuta', 'bottone', respinti], ['/api/rifiuta', 'Invio', respinti], ['/api/ok', 'bottone', arrivati]]) {
+        const titolo = `Sv${++k}`;
+        const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>${riq}<button id="pub">Invia</button><p id="esito"></p>
+          <script>${prep} const manda = () => { const b = ${campo}; const t = b.innerHTML; b.innerHTML = '';
+            fetch('${api}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testo: t }) }).then((r) => { esito.textContent = r.ok ? 'Inviato' : 'Non inviato'; }); };
+            pub.onclick = manda;
+            const lega = () => (${campo}).addEventListener('keydown', (e) => { if (e.key === 'Enter') { e.preventDefault(); manda(); } });
+            if (window.ifr && ifr.hasAttribute('srcdoc')) ifr.addEventListener('load', lega); else lega();</script>`));
+        await page.waitForTimeout(400);
+        await (campo === 'ce' ? page.locator('#ce') : page.frameLocator('#ifr').locator('body')).click();
+        await page.keyboard.type(LETTERA);
+        const id = await sporca(shell, titolo);
+        if (modo === 'Invio') await page.keyboard.press('Enter'); else await page.locator('#pub').click();
+        await expect(page.locator('#esito')).toHaveText(dove === arrivati ? 'Inviato' : 'Non inviato');
+        await page.waitForTimeout(1000);
+        dove[`${nome}, ${modo}`] = id;
+      }
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    for (const [nome, id] of Object.entries(respinti)) expect.soft(aperte, `respinto: ${nome}`).toContain(id);
+    for (const [nome, id] of Object.entries(arrivati)) expect.soft(aperte, `arrivato: ${nome}`).not.toContain(id);
+  } finally { await sito.chiudi(); }
+});
