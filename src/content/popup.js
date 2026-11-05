@@ -1028,8 +1028,14 @@
     // Il seguito di una risposta fermata dentro un blocco di codice riapre il blocco, o si leggerebbe come testo (#1302).
     const prima = opts && typeof opts.prima === 'string' ? opts.prima : null;
     const conRecinto = (t) => (prima !== null && global.SN_CHAT_ERRORS?.seguitoNelRecinto ? global.SN_CHAT_ERRORS.seguitoNelRecinto(prima, t) : t);
+    // La posa si rifà insieme al disegno, non al prossimo passo di rendering (#502); reset, fine ed errore lo annullano,
+    // o un disegno in ritardo coprirebbe quello che hanno scritto loro.
+    const ridisegno = unoPerFotogramma(() => scrollaConservando(popup, () => {
+      bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(conRecinto(buf), { streaming: true }));
+    }));
 
     port.onMessage.addListener((m) => {
+      if (m.type !== 'delta') ridisegno.annulla();
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
         // Il prompt vero è quello composto dal main: le domande successive
