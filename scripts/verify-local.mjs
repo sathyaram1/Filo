@@ -800,8 +800,8 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
   // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
-  const daParte = (Array.isArray(derived) ? derived : []).filter(messoDaParte);
-  const messi = [daParte, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+  const daParte = rilieviMessiDaParte(derived, findings);
+  const messi =[daParte, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
   const conDomanda = Array.isArray(findings) && findings.some((f) => f && f.decision === true);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
