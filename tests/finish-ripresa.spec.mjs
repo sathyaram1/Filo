@@ -26,7 +26,7 @@ function repoProva(prefisso) {
 function alberoConDueSpec(secondo) {
   const { dir, g } = repoProva('finish-ripresa-');
   mkdirSync(join(dir, 'tests'), { recursive: true });
-  symlinkSync(join(REPO, 'node_modules'), join(dir, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
+  symlinkSync(MODULI, join(dir, 'node_modules'), process.platform === 'win32' ? 'junction' : 'dir');
   writeFileSync(join(dir, '.gitignore'), 'node_modules\n');
   writeFileSync(join(dir, 'playwright.config.mjs'), "export default { testDir: 'tests', workers: 1, timeout: 300_000, reporter: 'line' };\n");
   writeFileSync(join(dir, 'tests', 'a-verde.spec.mjs'), [
