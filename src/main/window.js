@@ -236,6 +236,9 @@ function createMainWindow() {
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
+  let pronta = () => {};
+  win._filoPronta = new Promise((r) => { pronta = r; });
+  win.once('closed', () => pronta(null));
 
   wireWindowCommon(win, tabs);
   // Quando non risponde, e lo spegnimento del sistema su Windows, che non passa dall'uscita (#1466).
