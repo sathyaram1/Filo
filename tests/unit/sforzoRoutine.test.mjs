@@ -34,4 +34,12 @@ test('l\'orchestratore manda ogni ruolo all\'agente giusto e dice gli stessi sfo
   assert.match(testo, /`subagent_type: routine-secaudit` se è `secaudit`/);
   assert.match(testo, /altrimenti `subagent_type: routine-worker`/);
   assert.match(testo, /il primo lavoro Opus a sforzo `xhigh`, gli altri due Opus a sforzo `high`/);
+  assert.match(testo, /il manutentore Opus a sforzo `high`/);
+});
+
+test('nessun testo del manutentore lo dà ancora su Fable', () => {
+  for (const p of [['SPEC-MANUTENTORE.md'], ['routines', 'roles', 'manutentore.md'], ['SPEC-RIDISEGNO-LAVORO.md']]) {
+    const testo = leggi(...p).replace(/\s+/g, ' ');
+    assert.doesNotMatch(testo, /Modello Fable|modello Fable|Modello: \*\*Fable|prima scelta Fable/, p.join('/'));
+  }
 });
