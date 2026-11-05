@@ -44,15 +44,15 @@ const nomiRossi = (tap) => [...new Set([...String(tap || '').matchAll(/^\s*not o
  * I rossi che solo la sessione accende. Un rosso che il file ha anche senza sessione lo tiene già la sua chiave
  * `unit:<file>`: contato anche qui, l'allarme lo dava per un guasto nuovo di questo file (#2174).
  */
-async function rossiDiSessione(file, sessione, { casa }) {
+async function rossiDiSessione(file, sessione, { casa, radice = ROOT }) {
   const con = await daSoli(file, sessione, { casa });
   if (con.fermo || con.status === 0) return { fermo: con.fermo, soloInSessione: [], dettaglio: '' };
   const dettaglio = String(con.stderr || con.error || '').slice(-4000);
   const rossiCon = nomiRossi(con.stdout);
   // Un'uscita rossa senza un caso rosso non si attribuisce: resta rossa.
   if (!rossiCon.length) return { fermo: null, soloInSessione: [`uscita ${con.status} senza un caso rosso`], dettaglio };
-  const chiavi = chiaviDelRegistroUnit(con.stdout, ROOT);
-  const daRifare = chiavi.includes('unit') ? file : chiavi.map((k) => join(ROOT, k.slice('unit:'.length)));
+  const chiavi = chiaviDelRegistroUnit(con.stdout, radice);
+  const daRifare = chiavi.includes('unit') ? file : chiavi.map((k) => join(radice, k.slice('unit:'.length)));
   const senza = await daSoli(daRifare, {}, { casa });
   if (senza.fermo) return { fermo: senza.fermo, soloInSessione: [], dettaglio };
   const rossiSenza = new Set(nomiRossi(senza.stdout));
@@ -77,6 +77,23 @@ test('lanciati da soli in una sessione con tutta la sua identità accesa, i file
     const r = await rossiDiSessione(file.map((f) => join(QUI, f)), sessione, { casa });
     assert.equal(r.fermo, null, r.fermo);
     assert.deepEqual(r.soloInSessione, [], r.soloInSessione.join('\n') || r.dettaglio);
+  } finally {
+    togliCartella(casa);
+  }
+});
+
+test('un rosso che il file ha anche senza sessione non è di questa prova; uno che solo la sessione accende sì (#2174)', async () => {
+  const casa = cartellaTemporanea('filo-prove-da-sole-propri-');
+  try {
+    const sempre = join(casa, 'sempre.test.mjs');
+    writeFileSync(sempre, "import { test } from 'node:test';\ntest('rosso di suo', () => { throw new Error('rotto'); });\ntest('verde', () => {});\n");
+    const legge = join(casa, 'legge.test.mjs');
+    writeFileSync(legge, "import { test } from 'node:test';\ntest('legge la sessione', () => { if (process.env.FILO_ROUTINE) throw new Error('sessione'); });\n");
+    const soloSuo = await rossiDiSessione([sempre], { FILO_ROUTINE: '1' }, { casa, radice: casa });
+    assert.equal(soloSuo.fermo, null, soloSuo.fermo);
+    assert.deepEqual(soloSuo.soloInSessione, []);
+    const entrambi = await rossiDiSessione([sempre, legge], { FILO_ROUTINE: '1' }, { casa, radice: casa });
+    assert.deepEqual(entrambi.soloInSessione, ['legge la sessione']);
   } finally {
     togliCartella(casa);
   }
