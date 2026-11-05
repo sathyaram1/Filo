@@ -11,7 +11,7 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
-import { newWorkBranch, tentativiPrecedenti, stampoDelTentativo } from '../../scripts/lib/branch-integrity.mjs';
+import { newWorkBranch, prepareBranch, tentativiPrecedenti, stampoDelTentativo } from '../../scripts/lib/branch-integrity.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const ID = 'fid-2152';
