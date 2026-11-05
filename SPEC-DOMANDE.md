@@ -645,7 +645,13 @@ Come funziona oggi (#1152):
     vuole fuso e collegato alla domanda; non chiude una domanda che ferma un
     altro lavoro, una risposta che si sta applicando, né una provvisoria (la
     consigliata vale finché l'owner non sceglie, anche a lavoro fuso;
-    l'elenco la segna `provvisoria`). Alla prima lettura arrivano anche i
+    l'elenco la segna `provvisoria`). Di queste due, quando la revisione la
+    dà per attuata, il server scrive nella domanda, coi soli dati, quale
+    lavoro fuso la attua e perché la scelta resta all'owner, una volta per
+    lavoro: lui risponde in un clic. Una risposta, per qualunque strada
+    (finestra, consiglio, principio, compito), che sceglie la provvisoria su
+    un lavoro già fuso non lo rimette in coda, e il suo esito dice «non
+    serviva» invece del pulsante scelto. Alla prima lettura arrivano anche i
     lavori fusi prima che le chiusure segnassero l'ora della fusione, datati
     dal loro ultimo aggiornamento. Le chiuse così vanno fra le «Risposte
     automatiche», con «attuata da #n», e l'owner le riapre: la riapertura
