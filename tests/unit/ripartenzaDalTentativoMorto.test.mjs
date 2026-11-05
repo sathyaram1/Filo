@@ -1,0 +1,253 @@
+// Un lavoro nuovo ripartito con un biglietto nuovo dopo un tentativo morto prima di consegnare nasce dalla punta di
+// quel tentativo, non da main, e il ramo superato diventa antenato del nuovo, così la fusione lo chiude (#2152).
+// Repo usa-e-getta con un origin nudo; il giro vero di dispatch parla con un server finto.
+import '../helpers/senzaSessione.mjs';
+import { test, describe } from 'node:test';
+import assert from 'node:assert/strict';
+import { createServer } from 'node:http';
+import { spawn, execFileSync } from 'node:child_process';
+import { cpSync, mkdirSync, writeFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { aspettaChe } from '../helpers/attese.mjs';
+import { newWorkBranch, tentativiPrecedenti, stampoDelTentativo } from '../../scripts/lib/branch-integrity.mjs';
+
+const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const ID = 'fid-2152';
+const BIGLIETTO = 'biglietto-di-prova';
+
+const git = (cwd, ...a) => execFileSync('git', ['-c', 'user.email=t@t', '-c', 'user.name=t', ...a],
+  { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] }).trim();
+function commit(cwd, file, body) {
+  writeFileSync(resolve(cwd, file), body, 'utf8');
+  git(cwd, 'add', '-A');
+  git(cwd, 'commit', '-qm', `add ${file}`);
+  return git(cwd, 'rev-parse', 'HEAD');
+}
+const ramo = (stampo, id = ID) => `worker/${id}-${stampo}`;
+
+function scena(base, { ruoli = false } = {}) {
+  const origin = resolve(base, 'origin.git');
+  const casa = resolve(base, 'casa');
+  mkdirSync(casa, { recursive: true });
+  git(base, 'init', '-q', '--bare', '-b', 'main', origin);
+  git(casa, 'init', '-q', '-b', 'main');
+  if (ruoli) cpSync(resolve(REPO, 'routines', 'roles'), resolve(casa, 'routines', 'roles'), { recursive: true });
+  writeFileSync(resolve(casa, '.gitignore'),
+    '.claude/routine-ticket.json\n.claude/routine-beat.json\n.claude/routine-state/\n.claude/branch-expect.json\n.claude/routine-role.json\n', 'utf8');
+  const main = commit(casa, 'segnaposto.txt', 'x\n');
+  git(casa, 'remote', 'add', 'origin', origin);
+  git(casa, 'push', '-q', '-u', 'origin', 'main');
+  return { origin, casa, main };
+}
+
+/** Un tentativo spinto su origin: nasce da `da`, con `n` commit propri. */
+function tentativo(casa, nome, da, n) {
+  git(casa, 'checkout', '-q', '-B', nome, da);
+  let head = git(casa, 'rev-parse', 'HEAD');
+  for (let i = 0; i < n; i += 1) head = commit(casa, `${nome.replace(/\W/g, '_')}-${i}.txt`, `${i}\n`);
+  git(casa, 'push', '-q', '-f', 'origin', `${nome}:refs/heads/${nome}`);
+  git(casa, 'checkout', '-q', 'main');
+  return head;
+}
+
+describe('quale tentativo precedente si riprende', () => {
+  test('lo stampo riconosce solo i tentativi di quel feedback', () => {
+    assert.equal(stampoDelTentativo(ramo('20261101T000000Z'), ID), '20261101T000000Z');
+    assert.equal(stampoDelTentativo(ramo('20261101T000000Z', `${ID}-x`), ID), '', 'un id che comincia uguale è un altro feedback');
+    assert.equal(stampoDelTentativo(`discarded/${ramo('20261101T000000Z')}-20261102T000000Z`, ID), '');
+    assert.equal(stampoDelTentativo('worker/fid-2152', ID), '');
+    assert.equal(stampoDelTentativo(ramo('20261101T000000Z'), ''), '');
+  });
+
+  test('niente da riprendere: nessun ramo, un tentativo già fuso, uno senza commit propri, un altro feedback', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      assert.deepEqual(tentativiPrecedenti({ root: casa, id: ID }), { ok: true, scelto: null, altri: [] });
+      const fuso = tentativo(casa, ramo('20261101T000000Z'), main, 2);
+      git(casa, 'merge', '-q', '--ff-only', fuso);
+      git(casa, 'push', '-q', 'origin', 'main');
+      tentativo(casa, ramo('20261102T000000Z'), 'main', 0);
+      tentativo(casa, ramo('20261103T000000Z', `${ID}-x`), 'main', 3);
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(r.ok, true, r.errore);
+      assert.equal(r.scelto, null, 'il lavoro fuso è già su main, e quello di un altro feedback non è nostro');
+    } finally { togliCartella(base); }
+  });
+
+  test('tentativi a catena: si riprende l\'ultimo, che contiene gli altri', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const t1 = tentativo(casa, ramo('20261101T000000Z'), main, 3);
+      const t2 = tentativo(casa, ramo('20261102T000000Z'), t1, 2);
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(r.scelto.ramo, ramo('20261102T000000Z'));
+      assert.equal(r.scelto.head, t2);
+      assert.equal(r.scelto.propri, 5, 'i commit propri si contano dalla linea principale');
+      assert.deepEqual(r.altri, []);
+    } finally { togliCartella(base); }
+  });
+
+  test('tentativi nati tutti da main (i rami di prima): si riprende il più recente e si nominano gli altri', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      tentativo(casa, ramo('20261101T000000Z'), main, 15);
+      tentativo(casa, ramo('20261103T000000Z'), main, 2);
+      tentativo(casa, ramo('20261102T000000Z'), main, 12);
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(r.scelto.ramo, ramo('20261103T000000Z'));
+      assert.deepEqual(r.altri.map((t) => [t.ramo, t.propri]),
+        [[ramo('20261102T000000Z'), 12], [ramo('20261101T000000Z'), 15]], 'dal più recente, coi loro commit');
+    } finally { togliCartella(base); }
+  });
+
+  test('un tentativo più nuovo fermo dentro uno più vecchio che è andato avanti: vince quello che contiene l\'altro', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const t1 = tentativo(casa, ramo('20261101T000000Z'), main, 2);
+      tentativo(casa, ramo('20261102T000000Z'), t1, 0);
+      const avanti = tentativo(casa, ramo('20261101T000000Z'), t1, 1);
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(r.scelto.ramo, ramo('20261101T000000Z'));
+      assert.equal(r.scelto.head, avanti);
+      assert.deepEqual(r.altri, []);
+    } finally { togliCartella(base); }
+  });
+
+  test('origin che non risponde è un «non so», non un «non ce ne sono»', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa } = scena(base);
+      git(casa, 'remote', 'set-url', 'origin', resolve(base, 'non-esiste.git'));
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(r.ok, false);
+      assert.ok(r.errore);
+    } finally { togliCartella(base); }
+  });
+});
+
+// ─── il giro vero di dispatch ────────────────────────────────────────────────
+
+/** Il server di oggi: un biglietto nuovo non porta ramo, e la presa in carico lega il biglietto al ramo dichiarato. */
+function fintoServer() {
+  const mondo = { legato: '', consegne: [] };
+  const srv = createServer((req, res) => {
+    let corpo = '';
+    req.on('data', (c) => { corpo += c; });
+    req.on('end', () => {
+      res.setHeader('Content-Type', 'application/json');
+      if (req.url.includes('config')) return res.end(JSON.stringify({ fields: { enabled: { booleanValue: true } } }));
+      if (req.url.endsWith('/routineWork')) {
+        return res.end(JSON.stringify({
+          ok: true, role: 'new-work', id: ID, num: '#2152', branch: '',
+          payload: { role: 'new-work', num: '#2152', feedback: { name: 'Il ramo', text: 'Il lavoro riparte da capo.', num: '#2152' } },
+        }));
+      }
+      if (req.url.endsWith('/routineDeliver')) {
+        const { intent, data = {} } = JSON.parse(corpo || '{}');
+        const r = String(data.branch || '');
+        if (r && !mondo.legato) mondo.legato = r;
+        const rifiutata = !!r && r !== mondo.legato;
+        mondo.consegne.push({ intent, status: data.status, branch: r, rifiutata });
+        if (rifiutata) {
+          res.statusCode = 409;
+          return res.end(JSON.stringify({ ok: false, reason: 'branch_mismatch', detail: `${r} ≠ ${mondo.legato}` }));
+        }
+      }
+      res.end(JSON.stringify({ ok: true }));
+    });
+  });
+  return new Promise((r) => srv.listen(0, '127.0.0.1', () => r({ srv, mondo, port: srv.address().port })));
+}
+
+function giro(casa, port) {
+  return new Promise((risolvi) => {
+    const p = spawn(process.execPath, [resolve(REPO, 'scripts', 'dispatch.mjs'), '--ticket', BIGLIETTO], {
+      cwd: casa,
+      env: {
+        ...process.env,
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`,
+        FILO_ROUTINE_CONFIG_URL: `http://127.0.0.1:${port}/config`,
+        FILO_REPO_ROOT: casa,
+        FILO_TOOLS_ROOT: casa,
+        FILO_DISPATCH_STATE_DIR: resolve(casa, '..', `stato-${casa.split(/[\\/]/).pop()}`),
+        FILO_ROUTINES_ENABLED: '1',
+        FILO_FEEDBACK_PRIVKEY: '',
+        FILO_NO_BEAT: '1',
+      },
+    });
+    let so = ''; let se = '';
+    p.stdout.on('data', (c) => { so += c; });
+    p.stderr.on('data', (c) => { se += c; });
+    p.on('close', (code) => {
+      let json = null;
+      try { json = JSON.parse(so.slice(so.indexOf('{'), so.lastIndexOf('}') + 1)); } catch (_) { /* lo dice l'assert */ }
+      risolvi({ code, json, so, se });
+    });
+  });
+}
+
+test('biglietto nuovo dopo un tentativo morto: si riparte dalla sua punta, e alla fusione il ramo vecchio è chiuso', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const { srv, mondo, port } = await fintoServer();
+  try {
+    const { origin, casa } = scena(base, { ruoli: true });
+    const primo = await giro(casa, port);
+    assert.equal(primo.json && primo.json.role, 'new-work', `il primo giro lavora (uscita ${primo.code}): ${primo.se}`);
+    assert.equal(primo.json.payload.ripartenza, undefined, 'niente prima di lui: nasce da main');
+    const morto = git(casa, 'rev-parse', '--abbrev-ref', 'HEAD');
+    // Il salvataggio automatico spinge il lavoro, poi la sessione muore prima di consegnare.
+    commit(casa, 'lavoro.js', 'metà\n');
+    const fatto = commit(casa, 'rapporto.md', 'giro 1\n');
+    git(casa, 'push', '-q', 'origin', `${morto}:refs/heads/${morto}`);
+
+    // Intanto main va avanti, e il biglietto scaduto lascia il posto a uno nuovo, senza ramo nella busta.
+    const altrove = resolve(base, 'altrove');
+    git(base, 'clone', '-q', origin, altrove);
+    commit(altrove, 'altro.txt', 'un altro lavoro fuso\n');
+    git(altrove, 'push', '-q', 'origin', 'main');
+    mondo.legato = '';
+    await aspettaChe(() => newWorkBranch(ID) !== morto, { cosa: 'un nome per tentativo diverso dal primo' });
+
+    const seconda = resolve(base, 'seconda');
+    git(base, 'clone', '-q', origin, seconda);
+    const r2 = await giro(seconda, port);
+    assert.equal(r2.json && r2.json.role, 'new-work', `il giro ripartito lavora (uscita ${r2.code}): ${r2.se}`);
+    const nuovo = git(seconda, 'rev-parse', '--abbrev-ref', 'HEAD');
+    assert.notEqual(nuovo, morto, 'il tentativo nuovo ha il suo nome');
+    assert.equal(git(seconda, 'rev-parse', 'HEAD'), fatto, 'il lavoro del tentativo morto non si rifà: si riparte da lì');
+    assert.deepEqual(r2.json.payload.ripartenza, { ramo: morto, commit: 2 }, 'chi lavora sa da dove riparte');
+    assert.match(r2.se, /nasce dalla punta .* del tentativo precedente/);
+    assert.equal(mondo.legato, nuovo, 'la presa in carico è sul ramo nuovo');
+    assert.ok(mondo.consegne.every((c) => !c.rifiutata));
+
+    // Il nuovo consegna e il cancello lo fonde: il ramo morto è antenato di main, e la potatura dei fusi lo toglie.
+    const consegnato = commit(seconda, 'lavoro.js', 'fatto\n');
+    git(seconda, 'push', '-q', 'origin', `${nuovo}:refs/heads/${nuovo}`);
+    git(altrove, 'pull', '-q', '--no-rebase', 'origin', 'main');
+    git(altrove, 'fetch', '-q', 'origin');
+    git(altrove, 'merge', '-q', '--no-edit', `origin/${nuovo}`);
+    git(altrove, 'push', '-q', 'origin', 'main');
+    git(altrove, 'fetch', '-q', 'origin');
+    const fusi = git(altrove, 'branch', '-r', '--merged', 'origin/main', '--format=%(refname:short)').split('\n');
+    assert.ok(fusi.includes(`origin/${morto}`), `il ramo superato risulta fuso: ${fusi.join(', ')}`);
+    assert.ok(fusi.includes(`origin/${nuovo}`));
+    assert.ok(consegnato);
+
+    // Riaperto dopo la fusione: niente da riprendere, si riparte da main.
+    mondo.legato = '';
+    await aspettaChe(() => newWorkBranch(ID) !== nuovo, { cosa: 'un nome per tentativo diverso dal secondo' });
+    const r3 = await giro(seconda, port);
+    assert.equal(r3.json && r3.json.role, 'new-work', `il giro dopo la fusione lavora (uscita ${r3.code}): ${r3.se}`);
+    assert.equal(r3.json.payload.ripartenza, undefined);
+    assert.equal(git(seconda, 'rev-parse', 'HEAD'), git(seconda, 'rev-parse', 'origin/main'));
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
