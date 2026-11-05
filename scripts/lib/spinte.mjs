@@ -6,11 +6,12 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs';
 import { createHash, randomBytes } from 'node:crypto';
 import { join } from 'node:path';
-import { trovaBiglietti, chiamaGrezzo, consegnaSporchi, sporchiInAttesa } from './biglietto-locale.mjs';
+import { trovaBiglietti, chiamaGrezzo, consegnaSporchi, sporchiInAttesa, TETTO_COMMIT } from './biglietto-locale.mjs';
 import { readTicket } from './routine-ticket.mjs';
 
-// Come TETTO_COMMIT in fiduciaRamo del server: oltre, la spinta si segna «oltre» e il server la legge come buco.
-export const TETTO_COMMIT = 5000;
+// Il tetto è uno, quello di biglietto-locale: oltre, la spinta si segna «oltre» e il server la legge come buco. Che
+// coincidano con quelli di fiduciaRamo del server lo controlla una prova del server.
+export { TETTO_COMMIT };
 // Come TETTO_SPINTE e TETTO_COMMIT_CHIAMATA del server: oltre, la coda parte in più chiamate.
 export const TETTO_SPINTE_CHIAMATA = 500;
 export const TETTO_COMMIT_CHIAMATA = 20000;
