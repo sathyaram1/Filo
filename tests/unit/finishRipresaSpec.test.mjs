@@ -10,7 +10,7 @@ import { resolve } from 'node:path';
 import { memoriaSpecVerdi, specDaRiprendere, leggiSpecVerdi } from '../../scripts/finish-local.mjs';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
-test('ripresa: rilanciato sullo stesso commit salta i lotti già verdi, su un altro commit li rifà tutti', () => {
+test('ripresa: rilanciato sullo stesso commit salta gli spec già verdi, su un altro contenuto li rifà tutti', () => {
   const dir = cartellaTemporanea('ripresa-spec-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   try {
