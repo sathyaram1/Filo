@@ -234,8 +234,10 @@ test('parseAgentReply: filter — criterio semantico estratto, stringa vuota/ass
   assert.equal(Q.parseAgentReply('{"query":"t:dragon","filter":42}').filter, '');
 });
 
-test('parseAgentReply: tollera fence ```json e spazi attorno; della prosa attorno fa della risposta prosa (#1302)', () => {
+test('parseAgentReply: tollera fence ```json e frasi su righe loro; un oggetto dentro una frase fa della risposta prosa (#1302)', () => {
   assert.equal(Q.parseAgentReply('\n```json\n{"query":"t:dragon"}\n```\n').query, 't:dragon');
+  assert.equal(Q.parseAgentReply('Certo!\n```json\n{"query":"t:dragon"}\n```\ngrazie').query, 't:dragon');
+  assert.equal(Q.parseAgentReply('Ecco:\n{"query":"t:elf"}').query, 't:elf');
   assert.equal(Q.parseAgentReply('  {"reply":"ok","cards":[]}  ').reply, 'ok');
   const attorno = 'premessa {"reply":"ok","cards":[]} coda';
   assert.deepEqual(Q.parseAgentReply(attorno), { ...NONE, reply: attorno });
