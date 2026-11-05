@@ -55,7 +55,7 @@
     // Le memorie che la compattazione ha proposto da una conversazione che aveva letto testo di fuori: entrano solo col
     // sì dell'utente (SPEC-CONTESTO § Il sospetto non passa nel riassunto), quindi stanno in cima.
     if (d.inAttesa && d.inAttesa.length) {
-      out.push({ id: 'proposte', titolo: 'Da confermare', righe: d.inAttesa.map((p) => ({ ...p, tipo: 'proposta', fonti: [] })) });
+      out.push({ id: 'proposte', titolo: 'Da confermare', righe: d.inAttesa.map((p) => ({ ...p, tipo: 'proposta', fonti: Array.isArray(p.fonti) ? p.fonti : [] })) });
     }
     const posto = (n) => (n === 'PROFILO' ? 0 : n === 'PREFERENZE' ? 1 : 2);
     for (const m of [...(d.moduli || [])].sort((a, b) => posto(a.nome) - posto(b.nome))) {

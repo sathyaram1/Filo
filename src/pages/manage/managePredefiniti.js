@@ -848,7 +848,8 @@
   let contestoCaricato = {};
   function renderContesto(salvato, diSerie) {
     contestoCaricato = salvato || {};
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken'], ['soglia', 'contestoSoglia']]) {
+    for (const k of window.SN_FILO_CONTESTO.NUMERI_DEI_TETTI) {
+      const id = window.SN_FILO_CONTESTO.campoDelTetto(k);
       $(id).value = contestoCaricato[k] != null ? String(contestoCaricato[k]) : '';
       $(id).placeholder = diSerie && diSerie[k] != null ? String(diSerie[k]) : '';
     }
@@ -859,24 +860,15 @@
     $('contestoCacheDiSerie').textContent = I18n.t('admin_defaults_contesto_cache_serie', I18n.t(serie));
   }
   // Accanto alla soglia di compattazione, la sua stima: costo al mese e attesa, coi prezzi di adesso (filo_design.txt).
-  let giroStimaSoglia = 0;
-  let attesaStimaSoglia = null;
-  function stimaSoglia() {
-    clearTimeout(attesaStimaSoglia);
-    attesaStimaSoglia = setTimeout(async () => {
-      const mio = ++giroStimaSoglia;
-      const v = $('contestoSoglia').value.trim() || $('contestoSoglia').placeholder;
-      let r = null;
-      try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia: v }); } catch (_) { r = null; }
-      if (mio !== giroStimaSoglia) return;
-      $('contestoSogliaStima').textContent = r && r.ok ? r.testo : '';
-    }, 250);
-  }
+  const stimaSoglia = window.SN_FILO_CONTESTO.stimatoreSoglia({
+    campo: () => $('contestoSoglia'), uscita: () => $('contestoSogliaStima'),
+    chiedi: (soglia) => chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia }),
+  });
   // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
   function collectContesto() {
     const ora = {};
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken'], ['soglia', 'contestoSoglia']]) {
-      const v = $(id).value.trim();
+    for (const k of window.SN_FILO_CONTESTO.NUMERI_DEI_TETTI) {
+      const v = $(window.SN_FILO_CONTESTO.campoDelTetto(k)).value.trim();
       if (v !== '' && Number.isFinite(Number(v))) ora[k] = Number(v);
     }
     if ($('contestoCache').value) ora.cache = $('contestoCache').value;

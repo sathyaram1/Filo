@@ -335,9 +335,9 @@ const PD = () => globalThis.SN_PAGINE_DELICATE || null;
 function tettiContesto(o) {
   const FC = globalThis.SN_FILO_CONTESTO;
   const out = {};
-  for (const k of ['giorni', 'token', 'soglia']) {
-    const v = FC ? FC.numeroIn(o && o[k], FC.LIMITI[k]) : null;
-    if (v != null) out[k] = k === 'giorni' ? v : Math.round(v);
+  for (const k of FC ? FC.NUMERI_DEI_TETTI : []) {
+    const v = FC.numeroDelTetto(k, o && o[k]);
+    if (v != null) out[k] = v;
   }
   const cache = FC ? FC.durataIn(o && o.cache) : null;
   if (cache) out.cache = cache;
