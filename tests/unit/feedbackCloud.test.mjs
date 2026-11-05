@@ -600,9 +600,9 @@ test('elenca sulla macchina dell\'owner conta le schede salvate che non si apron
     const testo = out.join('\n');
     assert.match(testo, /0 schede salvate nei feedback, 3 illeggibili \(da riscrivere\)/);
     assert.match(testo, /e 3 non si leggono: è la lettura a non andare/);
-    writeFileSync(join(cartella, '7.json'), JSON.stringify({ ...buona(7), [S.NON_SALVATA]: true }));
+    writeFileSync(join(cartella, '7.json'), JSON.stringify({ ...buona(7), _fonte: { id: 'f7', stato: 'todo', aggiornato: AGG, at: AGG, modello: 'haiku' } }));
     const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
-    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).nonSalvate, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
+    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).fuoriDalFeedback, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
   } finally { togliCartella(cartella); }
 });
 
