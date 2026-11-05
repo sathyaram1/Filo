@@ -815,7 +815,7 @@ async function main() {
     if (informative.length) {
       // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
       // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero);
+      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero, memoria);
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');
