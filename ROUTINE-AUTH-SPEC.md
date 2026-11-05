@@ -1003,4 +1003,6 @@ di decifratura, quindi li dà il server.
   (`nelFeedback`), ed `elenca`, `scrivi` e `rileggi` mandano, senza agente, le
   schede buone e fresche della cartella che non sono quella (#1785.2): anche quelle scritte
   prima che le schede stessero nei feedback, o lasciate da un comando
-  interrotto.
+  interrotto. Prima di mandare, `scrivi` e `rileggi` rileggono i feedback come
+  `elenca` e riscrivono l'indice: un indice vecchio non fa sovrascrivere una
+  scheda più nuova.
