@@ -158,7 +158,9 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
 });
 
 // #2031 — Su Mac Cmd+T, Cmd+Shift+T, Cmd+L passano dalla barra dei menu: senza finestra principale la ridanno.
-async function richiudi(app, accesso) {
+async function richiudi(app, accesso, negozio) {
+  // Come chi chiude dopo un po': le schede della finestra rifatta sono già scritte.
+  await expect.poll(() => sessioneSalvata(app), { message: 'le schede della finestra rifatta non sono state salvate', timeout: 10000 }).toContain(negozio);
   const barra = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/shell.html'), 'la barra della finestra rifatta non c\'è');
   await barra.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(async () => (await stato(app, accesso)).normale, { timeout: 10000 }).toBeNull();
@@ -184,8 +186,11 @@ test('su Mac, senza la finestra principale, «Nuova scheda» la ridà con le sch
   expect((await stato(app, accesso)).normali).toBe(1);
 
   // Senza schede salvate la finestra nasce con la sua scheda nuova: è quella chiesta, non se ne aggiunge un'altra.
-  await richiudi(app, accesso);
+  await richiudi(app, accesso, negozio);
+  await new Promise((r) => setTimeout(r, 1000));
   await app.evaluate(() => globalThis.SN_STORAGE.setRaw(globalThis.SN_CONST.STORAGE_KEYS.OPEN_TABS, { tabs: [], activeIndex: 0 }));
+  await new Promise((r) => setTimeout(r, 600));
+  expect(await sessioneSalvata(app), 'qualcuno ha riscritto le schede dopo la chiusura').toEqual([]);
   await voceDellaBarra(app, 'Nuova scheda');
   await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: 'la finestra non è tornata', timeout: 15000 })
     .toEqual([expect.stringMatching(/^filo:\/\/newtab\//)]);
@@ -211,12 +216,12 @@ test('su Mac, senza la finestra principale, «Riapri scheda chiusa», una pagina
   expect(dopo, 'la finestra torna com\'era').toHaveLength(salvate.length);
   expect(dopo).not.toContain(indirizzoChiusa);
 
-  await richiudi(app, accesso);
+  await richiudi(app, accesso, negozio);
   await voceDellaBarra(app, 'Cronologia AI');
   await tornaLaFinestra(app, accesso, negozio, '«Cronologia AI» senza finestra non ha ridato Filo');
   await expect.poll(() => attiva(app), { message: 'la Cronologia AI non è davanti', timeout: 10000 }).toMatch(/^filo:\/\/history\//);
 
-  await richiudi(app, accesso);
+  await richiudi(app, accesso, negozio);
   await voceDellaBarra(app, 'Vai a un indirizzo');
   await tornaLaFinestra(app, accesso, negozio, '«Vai a un indirizzo» senza finestra non ha ridato Filo');
   expect((await stato(app, accesso)).normali).toBe(1);
