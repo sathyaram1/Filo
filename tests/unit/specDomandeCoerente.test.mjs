@@ -200,6 +200,37 @@ test('un guasto non anticipa l\'istanza di chi ci è caduto, e un compito che no
   assert.match(sezione('## 13').replace(/\s+/g, ' '), /`destinatario`, che manda all'owner i guasti dell'ambiente dei riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto/);
 });
 
+// #1249.3: fermo su un guasto suo, ogni accensione anticipata (battito, segnali, sveglia) cade sullo stesso guasto; e
+// un controllo sulle scritture nel taccuino non vede una sessione che scrive e poi cade.
+test('fermo su un guasto suo il manutentore si accende solo al mattino, e il controllo conta le sessioni chiuse bene', () => {
+  const man = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\r\n/g, '\n');
+  const s7 = man.slice(man.indexOf('\n## 7.'), man.indexOf('\n## 8.')).replace(/\s+/g, ' ');
+  assert.match(s7, /fermo fino alla prossima \*\*sessione chiusa bene\*\*, cioè arrivata al rilascio senza guasto/);
+  assert.match(s7, /non lo accende per nessun motivo: né il battito, né un segnale .{0,160}né una sveglia chiesta prima/);
+  assert.match(s7, /Resta la decisione del mattino/);
+  assert.match(s7, /Contano le chiusure, non le scritture nel taccuino/);
+  assert.match(s7, /Una domanda alla volta, e la prima sessione chiusa bene la rende superata/);
+  const s4 = man.slice(man.indexOf('\n## 4.'), man.indexOf('\n## 5.')).replace(/\s+/g, ' ');
+  assert.match(s4, /Fermo su un guasto suo, invece, si accende solo al mattino \(§ 7\)/);
+  assert.doesNotMatch(sezione('### 4.3').replace(/\s+/g, ' '), /scrivere nel taccuino da 26 ore/);
+  assert.match(sezione('### 4.3').replace(/\s+/g, ' '), /conta le sue sessioni chiuse bene, non le scritture nel taccuino/);
+  assert.match(sezione('### 3.3').replace(/\s+/g, ' '), /`attendi`.{0,250}tranne mentre è ferma su un guasto suo/);
+  assert.match(sezione('### 3.5').replace(/\s+/g, ' '), /tranne quella del controllo sul manutentore \(SPEC-MANUTENTORE\.md § 7\)/);
+  const smista = readFileSync(join(ROOT, 'routines', 'roles', 'smistamento.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.match(smista, /domanda del server sul controllo del manutentore, .{0,140}qualunque sia la soglia: .{0,80}passa al punto 3/);
+});
+
+// La soglia del controllo sul manutentore vive solo in SPEC-MANUTENTORE § 7: una copia altrove resta indietro, e lo
+// smistamento che riconoscesse la domanda dal numero la tratterebbe da guasto al primo cambio.
+test('la soglia del controllo sul manutentore è scritta in un posto solo', () => {
+  const soglia = /\b\d+\s*ore\b[^.]{0,60}(chiu[sd]\w* bene|taccuino)|(chiu[sd]\w* bene|taccuino)[^.]{0,60}\b\d+\s*ore\b|controllo delle \d+ ore/;
+  for (const f of ['SPEC-DOMANDE.md', 'FEEDBACK-STATES.md', join('routines', 'roles', 'smistamento.md'), join('routines', 'roles', 'manutentore.md')]) {
+    assert.doesNotMatch(readFileSync(join(ROOT, f), 'utf8').replace(/\s+/g, ' '), soglia, f);
+  }
+  const man = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.equal((man.match(/\b\d+ ore\b/g) || []).filter((x) => x !== '5 ore').length, 1, 'una sola soglia in ore nella spec del manutentore');
+});
+
 test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
   const s38 = sezione('### 3.8').replace(/\s+/g, ' ');
   assert.match(s38, /guasto \(#1781\) \| nessuna domanda e nessuna fermata/);

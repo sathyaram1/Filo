@@ -65,6 +65,11 @@ risponde.
 
   `--richiesta permesso` per un permesso o una chiave.
 
+Fa eccezione la domanda del server sul controllo del manutentore, quella che
+apre quando non vede da troppo una sua sessione chiusa bene, qualunque sia la
+soglia: il guasto è suo e nessun lavoro lo cura, quindi passa al punto 3 e
+arriva all'owner (SPEC-MANUTENTORE.md § 7).
+
 ### 2. Se il registro risponde, rispondi tu
 
 Se un principio di una domanda chiusa copre questo caso, rispondi col

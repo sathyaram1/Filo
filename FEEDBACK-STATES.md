@@ -273,7 +273,9 @@ all'owner, il freno.
   restano sue e si sommano. Niente riserva del 10% su A.
 - **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 55 minuti,
   segnali del server (guasto, deploy rosso, suite rossa, nata morta, domanda di processo, owner), sveglia chiesta
-  (minimo 5 minuti), con un tetto di accensioni al giorno suo. Memoria nel **taccuino** (`manutentore/taccuino`,
+  (minimo 5 minuti), con un tetto di accensioni al giorno suo. Fermo su un guasto suo, fino alla prossima sessione
+  chiusa bene, solo il mattino; il controllo del server conta le sessioni chiuse bene (soglia in SPEC-MANUTENTORE.md § 7).
+  Memoria nel **taccuino** (`manutentore/taccuino`,
   riscritto con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
   Automazioni; le **novità** riscritte dal redattore (`manutentore-novita/<versione>`) solo senza link nuovi.
 
