@@ -18,8 +18,20 @@ function finestra() {
   return BrowserWindow.getAllWindows().find((w) => w._filoTabs) || null;
 }
 
-function schedaAttiva() {
-  const win = finestra();
+// Su Mac Filo resta acceso senza finestre con schede (finestrella di accesso aperta, o nessuna): le voci che aprono
+// qualcosa la ridanno come Dock e seconda apertura, e agiscono a schede riaperte (#2031). `nascita`: solo se l'ha
+// fatta nascere questa voce, con `ripristinata` se ha ridato le schede salvate.
+async function finestraPerAgire() {
+  const W = require('./window');
+  const c = finestra();
+  const win = c || W.rifaiFinestraPerUnaVoce();
+  if (!win) return {};
+  const esito = await W.quandoPronta(win);
+  if (!esito || win.isDestroyed()) return {};
+  return { win, nascita: c ? null : esito };
+}
+
+function schedaAttiva(win = finestra()) {
   const tabs = win && win._filoTabs;
   if (!tabs) return null;
   const tab = tabs.tabs.find((t) => t.id === tabs.activeId);
@@ -111,16 +123,20 @@ function strada(azione, ev, tastoDelBrowser = '') {
   if (tastoDelBrowser && dalTasto(ev)) Strade.misura('tastoNome', tastoDelBrowser, { incognito });
 }
 
-const nuovaScheda = contata('new-tab', (_voce, _win, ev) => {
+const nuovaScheda = contata('new-tab', async (_voce, _win, ev) => {
   strada('newTab', ev, 'ctrl_t');
-  const win = finestra();
-  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+  const { win, nascita } = await finestraPerAgire();
+  // Nata senza schede da ridare, la finestra ha già la sua scheda nuova: un'altra sarebbe un doppione.
+  if (!win || (nascita && !nascita.ripristinata)) return;
+  try { win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 });
 
-const riapriSchedaChiusa = contata('reopen-closed-tab', (_voce, _win, ev) => {
+const riapriSchedaChiusa = contata('reopen-closed-tab', async (_voce, _win, ev) => {
   strada('', ev, 'ctrl_shift_t');
-  const win = finestra();
-  try { return win && win._filoTabs.riapriChiusa({ tasto: dalTasto(ev) ? 'ctrl_shift_t' : '' }).catch(() => {}); } catch (_) { return undefined; }
+  const { win, nascita } = await finestraPerAgire();
+  // Rinata con le sue schede, è tornato quello che si era chiuso: la finestra, come in Chrome senza finestre.
+  if (!win || (nascita && nascita.ripristinata)) return undefined;
+  try { return await win._filoTabs.riapriChiusa({ tasto: dalTasto(ev) ? 'ctrl_shift_t' : '' }).catch(() => {}); } catch (_) { return undefined; }
 });
 
 // Dal tasto è Ctrl/Cmd+W, da un clic sulla voce un'altra strada (contatori della finestra, #1470).
@@ -162,12 +178,13 @@ const avanti = contata('navigate-back-forward', (_voce, _win, ev) => {
   try { c && c.tabs.navigaCronologia('avanti', c.tab.id); } catch (_) {}
 });
 
-const vaiAScrivereUnIndirizzo = contata('address-bar', (_voce, _win, ev) => {
+const vaiAScrivereUnIndirizzo = contata('address-bar', async (_voce, _win, ev) => {
   strada('', ev, 'ctrl_l');
-  const c = schedaAttiva();
+  const { win } = await finestraPerAgire();
+  if (!win) return;
+  const c = schedaAttiva(win);
   if (c) { try { c.tabs.vaiAScrivereUnIndirizzo(c.tab.id, { tasto: dalTasto(ev) ? 'ctrl_l' : '' }).catch(() => {}); } catch (_) {} return; }
-  const win = finestra();
-  try { win && win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
+  try { win._filoTabs.openTab('filo://newtab/'); } catch (_) {}
 });
 
 // Stessa porta di Ctrl+rotella (src/preload/wheel-zoom.js): lo zoom è della
@@ -206,8 +223,8 @@ function pannelloStrumenti() {
 }
 
 // `azione`: l'icona della barra che apre la stessa pagina, per le strade (#1468).
-function apriPagina(url, azione = '') {
-  const win = finestra();
+async function apriPagina(url, azione = '') {
+  const { win } = await finestraPerAgire();
   if (win && win._filoTabs) {
     const incognito = !!win._filoIncognito;
     Strade.misura('pagina', url, 'menu_app', { finestra: win._filoTabs, incognito });
@@ -220,8 +237,9 @@ const finestraIncognito = contata('incognito', () => {
   try { require('./window').createIncognitoWindow(); } catch (_) {}
 });
 
-function assistenteLaterale() {
-  try { require('./shortcuts').dispatch('open-help-sidebar', finestra(), 'menu_app'); } catch (_) {}
+async function assistenteLaterale() {
+  const { win } = await finestraPerAgire();
+  try { if (win) require('./shortcuts').dispatch('open-help-sidebar', win, 'menu_app'); } catch (_) {}
 }
 
 // Ctrl/Cmd+Z: nel campo di testo annulla, fuori torna indietro. Stessa regola di
