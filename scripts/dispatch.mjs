@@ -1616,17 +1616,10 @@ export function derivatiAperti(derived) {
   return voci;
 }
 
-/**
- * I derivati del giro senza i rilievi che chi corregge sta anche correggendo (un 2 col «?»: la domanda esce in un
- * feedback, il codice lo cambia questo giro). La loro prova resta e si toglie verde con quella durevole: la pulizia
- * toglie solo quelle dei rilievi davvero messi da parte (#1202). Se il server non manda il segno, li riconosce il
- * numero, che è lo stesso nei due elenchi. PURA.
- */
+/** I derivati del giro coi soli rilievi davvero messi da parte: la regola è rilieviMessiDaParte (lib/prove-tolte.mjs). PURA. */
 export function messiDaParte(derived, fix) {
-  const daCorreggere = new Set((Array.isArray(fix) ? fix : []).map((f) => f && f.n).filter(Number.isInteger));
-  const fuori = (f) => f.inCorrezione === true || (Number.isInteger(f.n) && daCorreggere.has(f.n));
   return derivatiAperti(derived)
-    .map((d) => ({ ...d, rilievi: d.rilievi.filter((f) => !fuori(f)) }))
+    .map((d) => ({ ...d, rilievi: rilieviMessiDaParte(d.rilievi, fix) }))
     .filter((d) => d.rilievi.length);
 }
 
