@@ -556,7 +556,7 @@ export async function main(argv) {
     if (segnalati.length) console.log(`Segnalati, senza agente: ${segnalati.map((n) => `#${n}`).join(', ')} (scheda «non letto» col motivo).`);
     const ignoti = solo.filter((n) => !perNum.has(n) && !segnalati.includes(n));
     if (ignoti.length) { console.error(`Non sono fra gli aperti dell'indice: ${ignoti.map((n) => `#${n}`).join(', ')}. Rilancia elenca se sono nuovi.`); return 1; }
-    const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
+    const mappa = new Map(schede.map((s) => [numeroDi(s), s]));
     const voci = solo.length ? solo.filter((n) => perNum.has(n)).map((n) => perNum.get(n)) : [...perNum.values()].filter((f) => daScrivere(f, mappa.get(f.num)));
     return (await lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun })) || (restano ? 3 : 0);
   }
