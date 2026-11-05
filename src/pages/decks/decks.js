@@ -1165,7 +1165,8 @@
     // Risposta fermata a metà: la riga lo dice da nota, non da risposta, e l'ultima bolla offre «Continua».
     const CE = window.SN_CHAT_ERRORS;
     const righe = String(m.reply || '').split('\n');
-    const interrotta = righe.length > 1 && !!CE?.eFraseInterrotta?.(righe[righe.length - 1]);
+    // Anche da sola: il tetto finito nel ragionamento prima di una parola lascia solo la nota, e «Continua» (#1302).
+    const interrotta = !!CE?.eFraseInterrotta?.(righe[righe.length - 1]);
     const testo = interrotta ? righe.slice(0, -1).join('\n') : m.reply;
     if (testo) parts.push(`<p class="dk-msg-text">${proseHtml(testo)}</p>`);
     if (interrotta) {
