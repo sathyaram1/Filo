@@ -265,6 +265,7 @@ module.exports = function register(on, ctx) {
         payload: { messages },
         origin: 'filo://decks',
         onReasoning,
+        conSeguito: true,
       });
       if (signal.aborted) return fermata();
       const parsed = Q.parseAgentReply(r.text, r.finishReason);
