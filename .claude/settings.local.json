@@ -62,7 +62,7 @@
         ]
       },
       {
-        "matcher": "^(?!(?:Bash|PowerShell|BashOutput|KillShell|Monitor|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|TodoWrite|TaskCreate|TaskGet|TaskList|TaskUpdate|TaskStop|CronCreate|CronDelete|CronList|EnterPlanMode|ExitPlanMode|EnterWorktree|ExitWorktree|AskUserQuestion|Skill|SlashCommand|PushNotification|SendUserFile|SubagentHandback)$).*",
+        "matcher": "^(?!(?:Bash|PowerShell|BashOutput|KillShell|Monitor|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|TodoWrite|TaskCreate|TaskGet|TaskList|TaskUpdate|TaskStop|CronCreate|CronDelete|CronList|EnterPlanMode|ExitPlanMode|EnterWorktree|ExitWorktree|AskUserQuestion|PushNotification|SendUserFile|SubagentHandback)$).*",
         "hooks": [
           {
             "type": "command",
@@ -73,7 +73,7 @@
     ],
     "PostToolUseFailure": [
       {
-        "matcher": "^(?!(?:Bash|PowerShell|BashOutput|KillShell|Monitor|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|TodoWrite|TaskCreate|TaskGet|TaskList|TaskUpdate|TaskStop|CronCreate|CronDelete|CronList|EnterPlanMode|ExitPlanMode|EnterWorktree|ExitWorktree|AskUserQuestion|Skill|SlashCommand|PushNotification|SendUserFile|SubagentHandback)$).*",
+        "matcher": "^(?!(?:Bash|PowerShell|BashOutput|KillShell|Monitor|Glob|LS|Edit|MultiEdit|Write|NotebookEdit|TodoWrite|TaskCreate|TaskGet|TaskList|TaskUpdate|TaskStop|CronCreate|CronDelete|CronList|EnterPlanMode|ExitPlanMode|EnterWorktree|ExitWorktree|AskUserQuestion|PushNotification|SendUserFile|SubagentHandback)$).*",
         "hooks": [
           {
             "type": "command",
