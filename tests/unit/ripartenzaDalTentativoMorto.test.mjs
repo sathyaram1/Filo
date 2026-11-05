@@ -106,7 +106,7 @@ describe('quale tentativo precedente si riprende', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
       const { casa, main } = scena(base);
-      assert.deepEqual(tentativiPrecedenti({ root: casa, id: ID }), { ok: true, scelto: null, altri: [] });
+      assert.deepEqual(tentativiPrecedenti({ root: casa, id: ID }), { ok: true, scelto: null, altri: [], superati: [] });
       const fuso = tentativo(casa, ramo('20261101T000000Z'), main, 2);
       git(casa, 'merge', '-q', '--ff-only', fuso);
       git(casa, 'push', '-q', 'origin', 'main');
