@@ -530,7 +530,12 @@ test('elenca dal server dice quando sono i feedback a non avere schede, e conta 
     } finally { console.log = l; togliCartella(cartella); }
     return out.join('\n');
   };
-  assert.match(await giro(voci), /Nessuno dei 60 aperti ha una scheda salvata nel feedback: la lettura è andata, sono i feedback a non averne/);
+  // Una risposta senza nessun segno della scheda non distingue i feedback senza schede da un server che non le manda.
+  const muta = await giro(voci);
+  assert.doesNotMatch(muta, /la lettura è andata/);
+  assert.match(muta, /Nessuno dei 60 aperti ha una scheda salvata nel feedback: il server non dice se i feedback ne hanno/);
+  const conOraVuota = voci.map((v) => ({ ...v, riga: { ...v.riga, schedaAt: null } }));
+  assert.match(await giro(conOraVuota), /Nessuno dei 60 aperti ha una scheda salvata nel feedback: la lettura è andata, sono i feedback a non averne/);
   const conIlleggibile = voci.map((v, i) => (i === 0 ? { ...v, schedaIllegibile: 'la scheda salvata non si decifra' } : v));
   const testo = await giro(conIlleggibile);
   assert.match(testo, /0 schede salvate nei feedback, 1 illeggibili/);
