@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
+require(join(__dirname, '..', '..', 'src', 'shared', 'chatErrors.js'));
 require(join(__dirname, '..', '..', 'src', 'shared', 'scryfallQuery.js'));
 
 const Q = globalThis.SN_SCRYFALL_Q;
@@ -233,11 +234,11 @@ test('parseAgentReply: filter — criterio semantico estratto, stringa vuota/ass
   assert.equal(Q.parseAgentReply('{"query":"t:dragon","filter":42}').filter, '');
 });
 
-test('parseAgentReply: tollera fence ```json e testo attorno', () => {
-  const fenced = 'Certo!\n```json\n{"query":"t:dragon"}\n```\ngrazie';
-  assert.equal(Q.parseAgentReply(fenced).query, 't:dragon');
+test('parseAgentReply: tollera fence ```json e spazi attorno; della prosa attorno fa della risposta prosa (#1302)', () => {
+  assert.equal(Q.parseAgentReply('\n```json\n{"query":"t:dragon"}\n```\n').query, 't:dragon');
+  assert.equal(Q.parseAgentReply('  {"reply":"ok","cards":[]}  ').reply, 'ok');
   const attorno = 'premessa {"reply":"ok","cards":[]} coda';
-  assert.equal(Q.parseAgentReply(attorno).reply, 'ok');
+  assert.deepEqual(Q.parseAgentReply(attorno), { ...NONE, reply: attorno });
 });
 
 test('parseAgentReply: non-JSON → il testo grezzo diventa reply', () => {

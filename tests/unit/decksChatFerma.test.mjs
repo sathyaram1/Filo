@@ -16,6 +16,7 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'constants.js'));
 require(join(ROOT, 'src', 'shared', 'messages.js'));
 require(join(ROOT, 'src', 'shared', 'decks.js'));
+require(join(ROOT, 'src', 'shared', 'chatErrors.js'));
 require(join(ROOT, 'src', 'shared', 'scryfallQuery.js'));
 require(join(ROOT, 'src', 'shared', 'deckChat.js'));
 require(join(ROOT, 'src', 'shared', 'deckOpinions.js'));

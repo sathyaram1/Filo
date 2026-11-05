@@ -615,10 +615,10 @@
       const t = campoDaJsonTagliato(s, campi);
       return t == null ? '' : t;
     }
-    // Una frase prima dell'involucro («Ecco la risposta: {"text":"…»): la frase e il testo, senza graffe.
+    // Una frase prima dell'involucro aperto («Ecco la risposta: {"text":"…»): la frase e il testo, mai la graffa.
     if (fineOggetto(s, graffa) >= 0) return null;
     const t = campoDaJsonTagliato(s.slice(graffa), campi);
-    return t == null ? null : [prima, t].filter(Boolean).join(' ');
+    return [prima, t].filter(Boolean).join(' ');
   }
 
   global.SN_CHAT_ERRORS = {
