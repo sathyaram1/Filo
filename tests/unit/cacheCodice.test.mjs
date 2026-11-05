@@ -56,7 +56,7 @@ const voci = (userData) => {
   return fs.existsSync(c) ? fs.readdirSync(c, { recursive: true }).length : 0;
 };
 
-test('dalla stessa cartella il secondo avvio riprende il codice compilato', () => {
+test('dalla stessa cartella il secondo avvio riprende il codice compilato', OPZ, () => {
   const base = nuova('filo-cache-stessa-');
   const ud = join(base, 'dati');
   const dir = app(join(base, 'Filo'));
