@@ -115,9 +115,60 @@ export function attemptStamp(nowMs = Date.now()) {
  * poterlo ricalcolare.
  */
 export function newWorkBranch(id, nowMs = Date.now()) {
-  const safe = String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+  const safe = idNelRamo(id);
   if (!safe) throw new Error('newWorkBranch: id non valido');
   return `worker/${safe}-${attemptStamp(nowMs)}`;
+}
+
+function idNelRamo(id) {
+  return String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+}
+
+/** Lo stampo se `ramo` è un tentativo di lavoro nuovo su `id` (`worker/<id>-<stampo>`), se no ''. PURA. */
+export function stampoDelTentativo(ramo, id) {
+  const safe = idNelRamo(id);
+  const pref = `worker/${safe}-`;
+  const r = String(ramo || '');
+  if (!safe || !r.startsWith(pref)) return '';
+  const resto = r.slice(pref.length);
+  return /^\d{8}T\d{6}Z$/.test(resto) ? resto : '';
+}
+
+/**
+ * I tentativi di lavoro nuovo su `id` rimasti su origin con commit propri fuori dalla linea principale: uno morto prima
+ * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
+ * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene. Un no di origin è un «non
+ * so», non un «non ce ne sono» (#1632).
+ */
+export function tentativiPrecedenti({ root, id, mainBranch = 'main', escludi = '' }) {
+  const safe = idNelRamo(id);
+  if (!safe) return { ok: true, scelto: null, altri: [] };
+  let elenco;
+  try {
+    elenco = execFileSync('git', ['ls-remote', 'origin', `refs/heads/worker/${safe}-*`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    return { ok: false, errore: rigaDiErrore(e.stderr, e.message) };
+  }
+  const rami = String(elenco).split('\n').map((r) => r.trim().split(/\s+/)).filter((p) => p.length === 2)
+    .map(([head, ref]) => ({ head, ramo: ref.replace(/^refs\/heads\//, '') }))
+    .filter((t) => t.ramo !== escludi && stampoDelTentativo(t.ramo, id));
+  if (!rami.length) return { ok: true, scelto: null, altri: [] };
+  const g = gitIn(root);
+  // Refspec esplicita: in un clone a ramo singolo `fetch origin <ramo>` scriverebbe solo FETCH_HEAD.
+  const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`,
+    ...rami.map((t) => `+refs/heads/${t.ramo}:refs/remotes/origin/${t.ramo}`)]);
+  if (!f.ok) return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+  const main = `origin/${mainBranch}`;
+  const vivi = rami.filter((t) => !antenato(g, t.head, main)).map((t) => {
+    const n = g(['rev-list', '--count', `${main}..${t.head}`]);
+    return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
+  });
+  const contenuto = (a, b) => a.head !== b.head && antenato(g, a.head, b.head);
+  const massimi = vivi.filter((t) => !vivi.some((o) => contenuto(t, o)))
+    .sort((a, b) => stampoDelTentativo(b.ramo, id).localeCompare(stampoDelTentativo(a.ramo, id)));
+  const scelto = massimi[0] || null;
+  const altri = scelto ? massimi.slice(1).filter((t) => t.head !== scelto.head) : [];
+  return { ok: true, scelto, altri };
 }
 
 // (Qui viveva preferredBase: col "Modello B" i pezzi #N.M di una feature
