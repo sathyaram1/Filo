@@ -431,4 +431,29 @@ describe('il quadro del worker fermo', () => {
     assert.equal(notaDelFermo(''), '');
     assert.equal(notaDelFermo('Modello: x.'), 'fermo dalla veglia: Modello: x.');
   });
+
+  test('il worker del biglietto prima, finito pochi secondi prima di questo, non è una traccia del worker fermo', () => {
+    const vuota = cartella('filo-veglia-senza-marcatore-');
+    const configDir = sessione([
+      { nome: 'prima', tipo: 'routine-nuovo-lavoro', fa: 25.5, righe: [conModello(uso('h', 'SubagentHandback', { message: 'FATTO' }, Date.now() - 25.5 * MIN), 'claude-opus-5-5')] },
+      { nome: 'adesso', tipo: 'routine-worker', fa: 23, righe: [testo('x', Date.now() - 23 * MIN)] },
+    ]);
+    writeFileSync(join(configDir, FILE_REGISTRO), JSON.stringify({ voci: [{ impronta: impronta(B), ruolo: 'verifier', ora: new Date(Date.now() - 25 * MIN).toISOString() }] }));
+    const v = segniDiVita({ root: vuota, ticket: B, sessione: SID, configDir, leggiProcessi: () => [] });
+    const q = quadroDelFermo(v);
+    assert.equal(v.tracce.attesa, null, 'la sua ultima chiamata senza risposta non è un permesso di questo worker');
+    assert.doesNotMatch(q, /routine-nuovo-lavoro/, q);
+    assert.match(q, /routine-worker alle [0-9:]+ UTC \(testo del modello\); nessun sotto-agente\./, q);
+  });
+
+  test('un transcript che finisce su un errore dell\'API: il passo lo dice e il modello resta quello vero', () => {
+    const l = [
+      conModello(uso('a', 'Bash', { command: 'ls' }, ORA), 'claude-opus-5-5'), risposta('a', ORA + 1000),
+      { type: 'assistant', timestamp: new Date(ORA + 2000).toISOString(), message: { model: '<synthetic>', content: [{ type: 'text', text: 'API Error: 529 overloaded' }] } },
+    ];
+    const p = ultimoPasso(l);
+    assert.equal(p.modello, 'claude-opus-5-5');
+    assert.deepEqual(p.passo, { cosa: 'errore dell\'API o richiesta interrotta', ms: ORA + 2000 });
+    assert.deepEqual(p.strumento, { nome: 'Bash', ms: ORA, risposta: true });
+  });
 });
