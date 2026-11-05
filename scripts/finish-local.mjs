@@ -804,6 +804,7 @@ async function main() {
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
     const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
+    console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
