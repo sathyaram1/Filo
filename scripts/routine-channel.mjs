@@ -564,6 +564,7 @@ export async function release(t, fault = '', opts, report = null, spedito = null
  */
 // I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
 export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
+export const CAMPI_NUOVI_DEL_RAPPORTO = Object.freeze(['listino', 'cache']);
 // Il server (manutentoreRegole.RILASCIO) tiene sul biglietto solo le attese sopra i 30 s, e rifiuta le altre.
 const ATTESA_SOPRA_S = 30;
 // Il tetto della domanda di processo sul server: oltre, il rilascio si rifiuta prima di partire.
