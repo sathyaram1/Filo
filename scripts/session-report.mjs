@@ -178,7 +178,13 @@ export function valutaUso(u, model) {
   const p = oltreSoglia ? listino.oltre : listino;
   const velocita = velocitaPrezzo(u, fam);
   const costo = velocita.molt * (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
-  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam, oltreSoglia, velocita };
+  // Le scritture già a un'ora non hanno né sovrapprezzo né risparmio: l'ora c'è già.
+  const cache = {
+    scritta: velocita.molt * (cw5m * p.cacheWrite + cw1h * p.cacheWrite1h) / 1e6,
+    sovrapprezzoOra: velocita.molt * cw5m * (p.cacheWrite1h - p.cacheWrite) / 1e6,
+    risparmioOra: velocita.molt * cw5m * (p.cacheWrite - p.cacheRead) / 1e6,
+  };
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, cache, fam, oltreSoglia, velocita };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
