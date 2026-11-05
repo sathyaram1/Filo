@@ -1,6 +1,6 @@
 // #1273 — le icone delle pagine salvate e delle schede archiviate sono una copia tenuta da Filo: riaperto Filo, la home,
-// «Aperti per dopo» e la chat le mostrano senza chiedere niente a chi ospita l'icona; e di una scheda passata da un proxy
-// l'icona non si chiede mai fuori dal proxy. I siti sono un server locale che annota ogni richiesta, col nome chiesto.
+// «Aperti per dopo» e la chat le mostrano senza chiedere niente a chi ospita l'icona; e di una scheda passata da un proxy,
+// o di un sito con la regola del paese, l'icona non si chiede mai fuori dal proxy. I siti sono un server locale che annota ogni richiesta, col nome chiesto.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
