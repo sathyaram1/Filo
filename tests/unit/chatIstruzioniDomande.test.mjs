@@ -1,5 +1,5 @@
 // #1921: le istruzioni della chat su domande, segnalazioni, trasparenza e nomi interni. Il comportamento lo decide il
-// modello: qui si fissa che la regola resti scritta nella parte del prompt che ogni modello riceve.
+// modello: qui si fissa che la regola resti scritta dove ogni modello la riceve (parte fissa, intervista, strumenti).
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -12,7 +12,7 @@ const statico = PROMPTS.filoChatStatic();
 const riga = (inizio) => statico.split('\n').find((l) => l.startsWith(inizio)) || '';
 
 test('«cosa sai fare con X?» è una domanda a cui si risponde, senza segnalazione', () => {
-  const r = riga('COSA SA FARE FILO (');
+  const r = riga('CHE COSA SAI FARE (');
   assert.match(r, /cosa posso farti fare con le schede/);
   assert.match(r, /DOMANDA/);
   assert.match(r, /niente INVIA_FEEDBACK/);
