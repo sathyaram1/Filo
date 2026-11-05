@@ -18,6 +18,9 @@ const {
   attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
 } = await import('../../scripts/lib/veglia-worker.mjs');
 const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+const { processiDiSistema } = await import('../../scripts/lib/branch-integrity.mjs');
+// La riga di comando legge i processi del sistema vero: fuori da Linux (/proc assente) il quadro dice «non letti».
+const PROCESSI_DEL_SISTEMA = processiDiSistema() === null ? 'non letti' : 'nessuno';
 
 const B = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
 const SID = 'sessione-del-giro-1797';
