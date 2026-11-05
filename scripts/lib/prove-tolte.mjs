@@ -343,6 +343,18 @@ export function numeriDelNome(percorso) {
 }
 
 /**
+ * I rilievi di `rilievi` davvero messi da parte: fuori quelli che il giro sta anche correggendo (un 2 col `?` esce in un
+ * feedback con la domanda, ma il codice lo cambia questo giro, e la sua prova si toglie verde con quella durevole, #1202).
+ * Li riconosce il segno `inCorrezione` o, se manca, il posto `n` fra quelli di `daCorreggere`. Unica regola, per le
+ * routine e per la verifica locale. PURA.
+ */
+export function rilieviMessiDaParte(rilievi, daCorreggere) {
+  const numeri = new Set((Array.isArray(daCorreggere) ? daCorreggere : []).map((f) => f && f.n).filter(Number.isInteger));
+  return (Array.isArray(rilievi) ? rilievi : [])
+    .filter((f) => f && typeof f === 'object' && f.inCorrezione !== true && !(Number.isInteger(f.n) && numeri.has(f.n)));
+}
+
+/**
  * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, un vicino col `?`, o un interno col `?`
  * di livello 0 o 1 (un 2 col `?` si corregge con la consigliata, #1202).
  * La sua prova esce PRIMA del verdetto, col commit della critica (#1555; il perché: routines/roles/_critica-e-livelli.md). PURA.
