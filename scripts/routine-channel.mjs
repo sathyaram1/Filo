@@ -562,9 +562,9 @@ export async function release(t, fault = '', opts, report = null, spedito = null
  * arrivato al server: 'allegato', 'ridotto', 'scartato' o 'assente';
  * `esito.avviso` è la riga da stampare quando qualcosa è andato perso.
  */
-// I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
 // Dalla veglia al suo rilascio: il quadro del worker fermo, per le note del rapporto.
 export const ENV_QUADRO_FERMO = 'FILO_VEGLIA_QUADRO';
+// I dati del § 6 di SPEC-MANUTENTORE: un server che non li conosce ancora riceve il resto del rapporto, e lo si dice.
 export const CAMPI_FALLITI_E_ATTESE = Object.freeze(['falliti', 'attese', 'atteseOltre30']);
 // Il server (manutentoreRegole.RILASCIO) tiene sul biglietto solo le attese sopra i 30 s, e rifiuta le altre.
 const ATTESA_SOPRA_S = 30;
