@@ -195,7 +195,7 @@ test('«riaprila» detto due volte non apre una seconda copia: la scheda già to
   await ripristina(app);
 });
 
-test('r3 «riaprila» su una pagina già aperta scritta con la barra finale o il sito in maiuscolo non apre un doppione', async ({ app, shell, openTab, testServer }) => {
+test('«riaprila» su una pagina già aperta scritta con la barra finale o il sito in maiuscolo non apre un doppione', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const chat = await home(app);
   await openTab(testServer.html('<title>Le orche del Mediterraneo</title><p>orche', PUBBLICO));
