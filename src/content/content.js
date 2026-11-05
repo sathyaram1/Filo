@@ -765,9 +765,23 @@
     // Il clic su «Crea» arriva col dialogo ancora aperto: l'ultimo momento per contare il nome nella pagina.
     function onTocco(e) {
       ultimoTocco = bersaglio(e);
+      fotografaRighe();
       if (inDialogo.size) fotografaDialoghi();
     }
-    function onTasto(e) { if (e.key === 'Enter' && inDialogo.size) fotografaDialoghi(); }
+    function onTasto(e) {
+      if (e.key !== 'Enter') return;
+      fotografaRighe();
+      if (inDialogo.size) fotografaDialoghi();
+    }
+    // Un editor non rilegge le righe a ogni tasto come una casella: il clic o l'Invio che manda sono l'ultimo momento
+    // prima che la pagina lo svuoti, e senza le righe un rifiuto del sito non ritrova il testo (#1808.2).
+    function fotografaRighe() {
+      for (const area of aree.keys()) {
+        if (/^(input|textarea)$/i.test(area.tagName) || !viva(area)) continue;
+        const r = righeDi(area);
+        if (r.length) ultimeRighe.set(area, r);
+      }
+    }
     function onPrima(e) {
       if (!gesto(e)) return;
       const campo = campoDa(e);
