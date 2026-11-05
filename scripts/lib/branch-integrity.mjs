@@ -167,7 +167,18 @@ export function tentativiPrecedenti({ root, id, mainBranch = 'main', escludi = '
     .sort((a, b) => stampoDelTentativo(b.ramo, id).localeCompare(stampoDelTentativo(a.ramo, id)));
   const scelto = massimi[0] || null;
   const altri = scelto ? massimi.slice(1).filter((t) => t.head !== scelto.head) : [];
-  return { ok: true, scelto, altri };
+  return { ok: true, scelto, altri, superati: [...superati] };
+}
+
+/**
+ * Toglie da origin i tentativi superati: lasciati lì nessuno li fonde, e la potatura dei fusi non li vede mai (#2152).
+ * Best-effort: un no di origin lascia i rami come sono, e lo dice.
+ */
+export function chiudiTentativi({ root, rami }) {
+  const elenco = (Array.isArray(rami) ? rami : []).filter((r) => leggiTentativo(r));
+  if (!elenco.length) return { ok: true, chiusi: [] };
+  const p = gitIn(root)(['push', 'origin', ...elenco.map((r) => `:refs/heads/${r}`)]);
+  return p.ok ? { ok: true, chiusi: elenco } : { ok: false, chiusi: [], errore: rigaDiErrore(p.out, 'push fallito') };
 }
 
 // (Qui viveva preferredBase: col "Modello B" i pezzi #N.M di una feature
