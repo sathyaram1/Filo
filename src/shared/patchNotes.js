@@ -46,6 +46,9 @@
         { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
         { testo: 'Nello screenshot che alleghi a un feedback i campi password e di carta escono coperti, come nelle immagini che vanno all\'assistente. Se uno non si riesce a coprire, la pagina resta fuori e il riquadro del feedback te lo dice.', segnalazione: 2116 },
       ],
+      features: [
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
+      ],
     },
     {
       version: '0.2.265', date: '2026-11-05',
@@ -71,7 +74,6 @@
     {
       version: '0.2.264', date: '2026-11-04',
       features: [
-        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
         { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },
         { testo: 'Puoi aprire e chiudere la barra laterale chiedendolo a Filo da qualunque chat, anche dall\'Aiuto su una pagina.', segnalazione: 1292 },
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
