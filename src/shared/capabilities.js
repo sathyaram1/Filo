@@ -47,7 +47,7 @@
     {
       id: 'new-tab', title: 'Apri una nuova scheda', category: 'navigation',
       desc: 'Apre una nuova scheda sulla home di Filo. Ogni finestra ne tiene una già caricata, quindi compare subito.',
-      invoke: 'Pulsante "+" nella barra delle schede, l\'icona «Nuova scheda» della barra laterale, oppure la scorciatoia Ctrl+T (Cmd+T su Mac) — che funziona anche mentre stai guardando un sito.',
+      invoke: 'Pulsante "+" nella barra delle schede, l\'icona «Nuova scheda» della barra laterale, oppure la scorciatoia Ctrl+T (Cmd+T su Mac) — che funziona anche mentre stai guardando un sito. Su Mac, con Filo acceso e nessuna sua finestra aperta, Cmd+T ridà la finestra con le sue schede e una scheda nuova davanti.',
     },
     {
       id: 'close-tab', title: 'Chiudi le schede', category: 'navigation',
@@ -58,7 +58,7 @@
     {
       id: 'reopen-closed-tab', title: 'Riapri l’ultima scheda chiusa', category: 'navigation',
       desc: 'Riapre la scheda chiusa più di recente com’era: nello stesso posto della fila, con Indietro e Avanti, lo scorrimento, lo zoom e il paese da cui passava. Ripetendo riapre quella chiusa prima, e così via; finite quelle chiuse da quando hai aperto Filo continua con l’archivio delle schede chiuse, dalla più recente. Vale anche per le pagine di Filo e in incognito.',
-      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; tasto destro su una scheda o sul pulsante "+" → «Riapri scheda chiusa»; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa". Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
+      invoke: 'Ctrl+Shift+T (Cmd+Shift+T su Mac), anche mentre stai guardando un sito; tasto destro su una scheda o sul pulsante "+" → «Riapri scheda chiusa»; su Mac anche dalla barra dei menu, Schede → "Riapri scheda chiusa": con Filo acceso e nessuna sua finestra aperta ridà la finestra con le sue schede. Una scheda precisa fra quelle chiuse la ritrovi cercandola nel filo della home.',
       doesNot: 'Non riapre una scheda che hai cancellato dall’archivio o dalle pagine visitate. In incognito riapre solo le schede chiuse in quella finestra, finché resta aperta. Una home vuota non conta come scheda chiusa. Tenendo premuti i tasti riapre una scheda sola, non a raffica. Senza niente da riaprire te lo dice con un avviso, e la voce del tasto destro è spenta.',
     },
     {

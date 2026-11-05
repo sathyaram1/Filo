@@ -157,7 +157,8 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   expect((await stato(app, accesso)).errori).toEqual([]);
 });
 
-// #2031 — Su Mac Cmd+T, Cmd+Shift+T, Cmd+L passano dalla barra dei menu: senza finestra principale la ridanno.
+// #2031 — Su Mac Cmd+T, Cmd+Shift+T, Cmd+L e le pagine del menu Filo passano dalla barra dei menu: senza finestra
+// principale la ridanno.
 async function richiudi(app, accesso, negozio) {
   // Come chi chiude dopo un po': le schede della finestra rifatta sono già scritte.
   await expect.poll(() => sessioneSalvata(app), { message: 'le schede della finestra rifatta non sono state salvate', timeout: 10000 }).toContain(negozio);
@@ -187,7 +188,8 @@ test('su Mac, senza la finestra principale, «Nuova scheda» la ridà con le sch
 
   // Senza schede salvate la finestra nasce con la sua scheda nuova: è quella chiesta, non se ne aggiunge un'altra.
   await richiudi(app, accesso, negozio);
-  await new Promise((r) => setTimeout(r, 1000));
+  // La finestra chiusa scrive ancora le sue schede per un attimo: la sessione si svuota dopo.
+  await new Promise((r) => setTimeout(r, 2000));
   await app.evaluate(() => globalThis.SN_STORAGE.setRaw(globalThis.SN_CONST.STORAGE_KEYS.OPEN_TABS, { tabs: [], activeIndex: 0 }));
   await new Promise((r) => setTimeout(r, 600));
   expect(await sessioneSalvata(app), 'qualcuno ha riscritto le schede dopo la chiusura').toEqual([]);
@@ -199,7 +201,7 @@ test('su Mac, senza la finestra principale, «Nuova scheda» la ridà con le sch
   expect((await stato(app, accesso)).errori).toEqual([]);
 });
 
-test('su Mac, senza la finestra principale, «Riapri scheda chiusa», una pagina di Filo e «Vai a un indirizzo» la ridanno', async ({ app, shell, openTab, testServer }) => {
+test('su Mac, senza la finestra principale, «Riapri scheda chiusa» la ridà com\'era, senza riaprire una scheda in più', async ({ app, shell, openTab, testServer }) => {
   // Una scheda chiusa prima: la finestra rinata con le sue schede è già quello che si riapre, la scheda non torna doppia.
   const chiusa = await testServer.openReady(openTab, '<title>Chiusa</title><h1>chiusa</h1>');
   const indirizzoChiusa = chiusa.url();
@@ -215,17 +217,18 @@ test('su Mac, senza la finestra principale, «Riapri scheda chiusa», una pagina
   const dopo = (await stato(app, accesso)).normale.schede;
   expect(dopo, 'la finestra torna com\'era').toHaveLength(salvate.length);
   expect(dopo).not.toContain(indirizzoChiusa);
-
-  await richiudi(app, accesso, negozio);
-  await voceDellaBarra(app, 'Cronologia AI');
-  await tornaLaFinestra(app, accesso, negozio, '«Cronologia AI» senza finestra non ha ridato Filo');
-  await expect.poll(() => attiva(app), { message: 'la Cronologia AI non è davanti', timeout: 10000 }).toMatch(/^filo:\/\/history\//);
-
-  await richiudi(app, accesso, negozio);
-  await voceDellaBarra(app, 'Vai a un indirizzo');
-  await tornaLaFinestra(app, accesso, negozio, '«Vai a un indirizzo» senza finestra non ha ridato Filo');
   expect((await stato(app, accesso)).normali).toBe(1);
 });
+
+for (const [voce, davanti] of [['Cronologia AI', /^filo:\/\/history\//], ['Vai a un indirizzo', null]]) {
+  test(`su Mac, senza la finestra principale, «${voce}» la ridà con le sue schede`, async ({ app, shell, openTab, testServer }) => {
+    const { negozio, accesso } = await chiudiLaPrincipaleConLAccessoAperto(app, shell, openTab, testServer);
+    await voceDellaBarra(app, voce);
+    await tornaLaFinestra(app, accesso, negozio, `«${voce}» senza finestra non ha ridato Filo con le sue schede`);
+    if (davanti) await expect.poll(() => attiva(app), { message: `quello che apre «${voce}» non è davanti`, timeout: 10000 }).toMatch(davanti);
+    expect((await stato(app, accesso)).normali).toBe(1);
+  });
+}
 
 // La finestra ora c'è mentre gli init lavorano: chi la chiude subito non deve trovare la sessione svuotata.
 test('chiuso appena compare la finestra, prima che le schede tornino, Filo non perde le schede salvate', async () => {
