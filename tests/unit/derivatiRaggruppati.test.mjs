@@ -41,7 +41,7 @@ test('verifierReplyText: il feedback dei rimasti si stampa una volta, coi suoi r
   assert.equal(pass.match(/→ feedback #7\.3/g).length, 1, 'un feedback, una riga');
   // Ogni rilievo accorpato ha le sue prove, riconosciute dal suo numero nella critica.
   assert.match(pass, /· le prove con r1 nel nome, per #7\.3: Non salva\.\n {2}· le prove con r3 nel nome, per #7\.3: Vicino rotto\./);
-  assert.match(pass, /il rilievo interno di livello 2 rimasto è entrato nel feedback dei rimasti/);
+  assert.match(pass, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti/);
 });
 
 test('verify-local: i rilievi non corretti si stampano raggruppati come li aprirà il server', () => {

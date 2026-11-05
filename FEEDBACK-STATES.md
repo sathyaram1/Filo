@@ -30,12 +30,12 @@ consumer ricalcola lo stato dai campi grezzi.
 | `suspicious_file` | **nero** | Ricevuti | gate deterministico file ha flaggato PRIMA dei giudici |
 | `attack` | rosso | Ricevuti | un livello di sicurezza ha flaggato come attacco |
 | `spam` | giallo | Ricevuti | flaggato come spam |
-| `design` | verde | Ricevuti | serve decisione owner (3 origini distinte via chat: verdetto design; domande routine ex-`clarify`; fix fallito 3× ex-`blocked/loop`) |
-| `aligned` | blu | Ricevuti | sicuro e sensato ma automatica OFF: aspetta approvazione manuale |
+| `design` | verde | Ricevuti, o In coda con `domandaId` (§5) | serve decisione owner (3 origini distinte via chat: verdetto design; domande routine ex-`clarify`; fix fallito 3× ex-`blocked/loop`) |
+| `aligned` | blu | Ricevuti, o In coda con `domandaId` (§5) | sicuro e sensato ma automatica OFF: aspetta approvazione manuale |
 | `todo` | — | In coda | approvato (a mano o auto): aspetta di essere lavorato |
 | `working` | — | In coda | un'istanza lo sta lavorando ORA (lock, §6) |
 | `revision_capability` | — | In coda | fix su branch, aspetta verifica comportamentale (verifier avversariale) |
-| `revision_security` | — | In coda | verifica passata, aspetta audit L4 (secaudit) + merge-gate |
+| `revision_security` | — | In coda | verifica passata, aspetta audit L4 (secaudit), poi gli unit sulla fusione da GitHub e il cancello del server |
 | `done` | — | In coda*/Risolti | fuso su main e deployato; aspetta verifica umana owner |
 | `archived` | — | Archiviati | verificato dall'owner; log |
 | `attack_confirmed` | rosso | Archiviati (filtro "Bloccati confermati") | attacco confermato: terminale |
@@ -46,8 +46,10 @@ DB3 esistente), poi "Risolti".
 
 **Campi ortogonali (NON stati):** `starred` (bool), `priority` (0–3), `statusReason`
 (string breve opzionale per il sottotesto in dashboard, MAI per la logica: `clarify`,
-`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `locale` (§5, §4b), `attesa_origine`,
-`origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c), `legacy-ignored` (§8);
+`loop`, `decisione`, `secaudit`, `l5`, `arenato`, `attesa_chiusa`, `guasto`, `locale`,
+`fidato` (§5, §4b), `worker` (attacco o spam giudicato da chi lavorava, §3),
+`attesa_origine`, `origine_bloccata`, `origine_chiusa`, `origine_mancante` (§4c),
+`legacy-ignored` (§8);
 il giudizio dei giudici non ne scrive: `judges` lo ricava solo la normalizzazione dello
 storico, e la frase «Panel incompleto…» la dashboard dai verdetti, `judgesNote`), `workingSince`
 (ISO, solo con `working`), `branch` (da `revision_*` in poi), `beatAt` (ISO:
@@ -57,11 +59,14 @@ vero su "qualcuno ci sta lavorando ORA"), `livelli` (dal 2026-09-13: mappa con a
 più `l3` e `l4`, ognuna `{ esito, at, ruolo?, by?, testo }`; la scrive SOLO il
 server; `l3` è la segnalazione di chi ha risolto o verificato (`esito:
 segnalato`, `ruolo`), un trade-off vero che decide l'owner, arrivata con
-`--segnala`; `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato`,
+`--segnala` fino al #1790 (da lì la scelta per l'owner è solo una domanda); `l4` è l'esito del controllo di sicurezza, `pass|fail|saltato`,
 scritto sempre, anche su pass, col testo di cosa è stato controllato; `saltato`
 lo mette l'owner (`by: owner`) quando, letto il fail, decide di andare avanti,
 e conserva il testo del fail; `testo` è cifrato come `notes`; in dashboard sono
-il rombo e il pentagono della fila delle forme).
+il rombo e il pentagono della fila delle forme; un attacco o spam segnato dal worker
+scrive `l3` con `esito: attacco|spam`), `domandaId` (dal #1358: `D-<n>`, la domanda
+dell'owner che sblocca un'attesa, SPEC-DOMANDE §3.8; la scrive SOLO il server, nella
+stessa transazione dello stato, e nessuna regola la lascia scrivere a un client).
 
 **Stati legacy da RITIRARE:** `new`, `review`, `blocked`, `clarify`, `verified`,
 `ignored` (mappatura in §8).
@@ -76,10 +81,22 @@ functions. Qui sotto il perché dei passaggi, per attore.
 **Pipeline** (filo-security):
 - ingresso → gate file (prima dei giudici): flag → `suspicious_file`; pulito → `unlabeled`.
 - `unlabeled` —panel completo→ `attack` | `spam` | `design` | (sicuro: automatica ON **e
-  mittente ammesso** → `todo`, altrimenti → `aligned`).
-- `attack`/`spam` → `unlabeled`: un mittente fidato segnalato per errore torna al ri-giudizio
-  (sotto, «Mittenti fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
+  la sua fiducia ammessa** → `todo`, altrimenti → `aligned`; un ritrovamento del server senza
+  origine → `todo` comunque, §4c).
+- `attack`/`spam` → `unlabeled`: un feedback fidato segnalato per errore torna al ri-giudizio
+  (sotto, «Feedback fidati»). `design` → `unlabeled` | `todo` | `aligned` e `aligned` →
   `unlabeled` | `todo`: solo i derivati che seguono la loro origine (§4c).
+- **Un feedback che aspetta una scelta dell'owner non gira** (regola dell'owner del 22/09,
+  #775). Il derivato nato da un rilievo col `?` porta il segno `chiedeDecisione` (in chiaro,
+  lo scrive solo il server alla nascita) e la domanda come turno di Filo nella conversazione.
+  Ogni esito che lo metterebbe in coda o ad aspettare l'origine (sicuro dei giudici, salto dei
+  fidati, origine fusa, chiusa, sparita o non ancora fusa), e anche il verdetto `design` dei
+  giudici, diventa `design` (`statusReason: decisione`) con la sua domanda (`domandaId`): In coda col segno «aspetta D-n», e si risponde nella sezione Domande (§5). Attacco, spam, origine bloccata e
+  giudizio incompleto vincono come per gli altri; con l'origine si blocca e si sblocca, ma la
+  sua fusione non lo mette in coda. Dopo la risposta va in coda come un feedback normale (non
+  ha un ramo da riprendere) e chi lo prende trova domanda e risposta (`decisioni`). Un
+  `design` che aspetta la risposta (`decisione`, `clarify`) la pipeline non lo sovrascrive:
+  una ri-valutazione non lo rimette in coda.
 
 **Owner**: le sue righe sono le azioni di §4a, una per azione e nessuna in più (sentinella
 `tests/unit/ownerActionsTransizioni.test.mjs`). La tabella ammette all'owner gli stessi
@@ -103,41 +120,51 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   legittimo»).
 
 **Routine** (canale autenticato: il server valida ogni mossa con la tabella incorporata):
-- `todo` —claim (§6)→ `working`.
+- `todo` —claim (§6)→ `working`; —riordino o unione→ `archived` (#1153: solo un biglietto con
+  l'ambito `coda` o `unisci`, su un lavoro non ancora iniziato; l'unione scrive sul genitore il
+  rimando `unitoIn` al figlio).
 - `working` —routine→ `revision_capability`; —arenato (ramo fermo da un'ora)→ `todo`;
   —arenato per la 3ª volta consecutiva→ `design` (`statusReason: arenato`, nota
   in chat: istanza che muore sempre, es. crediti esauriti — vedi §6a).
 - `revision_capability` —routine, critica del verificatore senza rilievi INTERNI da
   correggere→ `revision_security` (dal 2026-09-23 ogni rilievo porta livello e sede,
   `[2i]`/`[2e]`: contano gli interni; dal 2026-09-27 anche `[1v]`, il vicino, un
-  difetto di un altro lavoro in un file che il ramo modifica già, che conta come
-  livello 0. Ciò che il lavoro non corregge diventa SUBITO un feedback derivato,
+  difetto di un altro lavoro in un file che il ramo modifica già: dal 2026-10-12
+  (#1202) entra nella correzione solo se il giro parte comunque per gli interni,
+  altrimenti va da parte col livello scritto, e non paga nessun bilancio. Ciò che
+  il lavoro non corregge diventa SUBITO un feedback derivato,
   figlio `#N.k`, con `priorityManual` perché il giudice non la riabbassi, aperto dal
   server in ogni esito: un feedback per ogni esterno e per ogni rilievo col `?`, a
-  priorità uguale al livello; UNO solo per tutti gli altri (interni messi da parte
+  priorità del livello, salvo un 2 che nasce a 1 perché la 2 è solo del manutentore (quello col `?` aspetta la risposta alla sua domanda: sopra,
+  Pipeline); UNO solo per tutti gli altri (interni messi da parte
   dal bilancio, vicini non corretti), a priorità = il livello scritto più alto
-  fra loro); —critica con rilievi
+  fra loro, con la stessa regola sul 2); —critica con rilievi
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
-  (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
-  dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
-  ferma: sale sulla correzione se un altro rilievo la fa partire col suo bilancio (#744),
-  altrimenti entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
-  (dal 2026-09-23, bilanci separati per livello); —rilievo di livello 3/2 che chiede una
-  decisione→ `design` (`statusReason: decisione`); —QUALUNQUE consegna con una
-  segnalazione per l'owner (`--segnala`: di chi risolve, di chi corregge, e la critica
-  di chi verifica in ogni esito)→ `design` (`statusReason: decisione`), senza bisogno
-  di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
+  (feedback #561, dal 2026-09-05); finito il bilancio del suo livello, un rilievo paga
+  col più alto ancora aperto sotto (D88, #744); —rilievo di livello 3 non correggibile
+  (esauriti il bilancio dei 3 e quelli sotto)→ `design` (`statusReason: loop`); un 2
+  nello stesso caso NON ferma: entra nel feedback derivato dei rimasti e il lavoro passa
+  se non c'è altro (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
+  decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
+  utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
+  NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
+  feedback derivato con la domanda (dal 2026-10-12, #1202); —QUALUNQUE consegna con una
+  domanda che blocca (`--domanda`: di chi risolve, di chi corregge, e la domanda di un
+  rilievo interno di livello 3 o col `!` di chi verifica, in ogni esito)→ `design`
+  (`statusReason: decisione`), senza bisogno di `--ferma`: un feedback che aspetta una scelta dell'owner non gira altri giri. Le
   consegne che non possono fermare (nota, controllo di sicurezza, apertura di un
   feedback) la RESPINGONO, mai ignorata in silenzio. Il segnalibro di ripresa porta,
   con quello che ha fermato, anche gli altri rilievi interni della stessa critica
   (`sospesi`): chi riprende li chiude, il giro dopo non li riscopre.
 - `revision_security` —routine PASS secaudit+merge→ `done`; —FAIL fixer-loop→ `design`
-  (`statusReason: loop`); —conflitto di fusione→ `revision_capability`
-  (riallineamento: main è avanzato e il merge non passa più da solo — non è una
-  bocciatura di qualità, il contatore M non si muove; il ramo viene ribasato e
-  ripassa verifica e sicurezza sul contenuto nuovo).
+  (`statusReason: loop`); —conflitto di fusione, o unit rossi sul risultato
+  della fusione→ `revision_capability` (riallineamento: main è avanzato e il
+  merge non passa più da solo — non è una bocciatura di qualità, il contatore M
+  non si muove; il ramo viene ribasato e ripassa verifica e sicurezza sul
+  contenuto nuovo). Chi ribasa non corregge gli unit rossi: li elenca, e chi
+  verifica ne fa rilievi interni (#1204).
 - `design` —fusione bloccata da L5, approvata dall'owner e finita in conflitto→
   `revision_capability` in DUE passi: la riapertura `design → todo` a nome
   dell'owner (il click di approvazione è la sua decisione) e il rientro
@@ -145,30 +172,58 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   rientro veniva rifiutato e la pratica restava ferma nei Ricevuti).
 - da todo/working/revision_* la routine con domande → `design` (+ domande nella chat,
   `statusReason: clarify`).
+- da todo/working/revision_* il worker che giudica il feedback un attacco o uno spam →
+  `attack` | `spam` (`statusReason: worker`, il perché cifrato in `livelli.l3` con `esito:
+  attacco|spam` e `ruolo`): Ricevuti, L3 (#1358, SPEC-DOMANDE §2.2). Lo consegnano chi
+  risolve, chi corregge e chi verifica, mai il controllo di sicurezza; da lì decide l'owner
+  come per i giudici (conferma, falso positivo → `todo`, archivia).
+- ogni fermata per l'owner (`clarify`, `decisione`, `loop`, `arenato`, `attesa_chiusa`, e
+  `locale` con la domanda di chi si ferma) apre una domanda nella stessa transazione dello
+  stato, e il feedback prende `domandaId` (§5, #1358). `design` + `locale` senza domanda
+  non torna più al PC: un feedback fidato prende il segno dei lavori server (`localOnly`)
+  e torna `todo` col segnalibro sul ramo; uno non fidato resta `design` col motivo
+  `fidato`, nei Ricevuti L3 come richiesta di renderlo fidato, e «Segna fidato» lo
+  rimette `todo` come lavoro server nello stesso gesto.
 
 **Regole dure:** da `unlabeled` il verdetto lo scrive solo la pipeline; l'owner lo mette in
 coda o lo archivia. Da `suspicious_file`, `done`, `archived` e `*_confirmed` esce solo
 l'owner; da `attack`, `spam`, `design`, `aligned` l'owner, e la pipeline nei soli casi dei
 mittenti fidati e dei derivati. L'iter `todo→working→revision_*→done` e `revision_*→design`
-lo muovono solo le routine; l'owner dall'iter può solo archiviare. Nessuna riga owner →
-`done`. Transizioni non elencate = illegali: il writer le rifiuta.
+lo muovono solo le routine, che dall'iter possono anche segnare `attack`/`spam`; l'owner
+dall'iter può solo archiviare. Nessuna riga owner → `done`. Transizioni non elencate =
+illegali: il writer le rifiuta.
 
 **La fiducia** (#1148, SPEC-DOMANDE.md §1): `fiducia` (`fidato`|`non_fidato`, in chiaro) la
 scrive solo il server, le regole la vietano a ogni client. Alla nascita: fidato l'owner
 dall'app (`owner:` con la prova dell'admin), una sessione col biglietto pulito
 (`bigliettoLocale`), un biglietto pulito delle routine, il server (allarmi); tutto il resto
 non fidato. Dopo, solo «🤝 Segna fidato» in Gestione (callable `ownerFiducia`; da riga di
-comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
+comando no); lo stesso tasto, premuto, la toglie: biglietti e derivati nuovi nascono non fidati, e L5 torna a valere. La
+toglie da sé anche una nota nuova scritta dagli strumenti delle sessioni (`npm run feedback`, le note dei giri) senza un
+biglietto pulito (#1428): prima la fiducia, poi la nota; se la prima non va, la nota non parte. Da chiusa la
+fiducia non si toglie: chi riapre con la nota riapre prima, e una nota che lascia la pratica chiusa non parte. Decide i giudici alla nascita (solo i non fidati), lo spareggio della coda
 (fidati prima) e L5 (§4b, e ROUTINE-AUTH-SPEC.md).
 
-**La prova del mittente** (#595, #912): un nome riservato vale solo con `senderProof`, che
-scrivono l'admin (owner, sessioni, esploratore) e il server (routine). Senza, è un utente
+**La prova del mittente** (#595, #912, #1037): un nome riservato vale solo con `senderProof`, che
+scrivono alla nascita l'admin (owner, sessioni, esploratore) e il server (routine). Dopo, nessun
+client la aggiunge né la cambia, nemmeno l'admin: le regole non la ammettono in un update. Senza, è un utente
 ovunque, e alla nascita il server lo rifiuta: sul documento resta `non-provato:<nome>`.
-Dal #1148 serve solo alle statistiche, alle raffiche e al segno di pericolo: non dà permessi.
+Dalla copia dell'owner (#953) firmano tutte le strade: riquadro, chat, riapertura dalla bacheca
+(`owner:uid:<uid>`). La segnalazione che Filo scrive in chat e l'owner conferma è sua (`owner:filo:chat`, fidata) solo
+se il compito non ha letto testo di altri (lo stato dei livelli di autonomia, mai oltre la classe 2); altrimenti, e
+sempre dall'Aiuto di un sito, resta `filo:chat` con la sua prova: «Filo per conto dell'owner», non fidata, giudicata.
+La segnalazione automatica resta `auto:` (non l'ha letta né confermata) con la sua prova, come quella. Chi decide il mittente: `src/main/services/feedbackMittente.js`.
+Dal §10 (#1162) il mittente è solo statistica: il server stampa `mittenteClasse` (`owner`,
+`utente`, `filo_per_utente`, `sessione_locale`, `routine` con `mittenteRuolo`, `server`, `test`) alla
+nascita e con `npm run mittenti:migra` sui documenti di prima; la mappatura delle etichette sta in
+un posto solo, `src/shared/mittenti.js` (il server la incorpora). Il mittente decide solo la chiave
+di raffiche e segno: un processo dell'owner con la prova non è una persona e conta nel solo tetto
+globale. Ogni permesso segue `fiducia`; l'unico mittente che diventa fiducia è l'owner dall'app,
+alla nascita.
 
-**Mittenti provati** (`owner:`/`routine:`/`agent:`/`local:` con la prova; per mittente fino al §10, non per fiducia): mai `attack`/`spam`; se un
-livello identità li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
-PANEL COMPLETO segnala un provato (L2 dice attack/spam a verdetti pieni), lo status resta
+**Feedback fidati** (`fiducia: fidato`, mai il mittente): mai `attack`/`spam`, mai contati come
+raffica né segnati; se un livello li flagga è un errore → `unlabeled` per ri-giudizio. Caso limite: se il
+PANEL COMPLETO segnala un fidato (L2 dice attack/spam a verdetti pieni), lo status resta
 `unlabeled` ma non c'è niente da ri-giudicare — la dashboard lo mostra con la categoria
 segnalata (rosso/arancio, frase "decidi tu") invece del bianco "non filtrato", e il
 bottone «Ri-valuta» lo salta (scelta owner 2026-08-29: la segnalazione resta visibile,
@@ -186,7 +241,232 @@ pianificatore non esiste più. Le chiusure manuali senza
 branch (`npm run feedback -- <id> done "…" --come-routine`) restano legali come
 CATENA di passi (`canReach` attraversa l'iter todo→working→revision_*→done). I
 sub-feedback storici (#N.x) restano visibili e lavorabili; è sparita solo la
-possibilità di crearne di nuovi.
+possibilità di crearne di nuovi. Dal ridisegno del lavoro (§3a) ci sono due porte
+dirette verso `done`, strette: `todo → done` della pipeline per una segnalazione unita a
+un pacchetto fuso, e `working → done` della routine per un feedback già risolto su main.
+Questa la tabella la permette a ogni routine, ma il server la accetta solo dal primo
+lavoro, con `--reason gia_risolto` e la fusione che controlla da sé (§3a); qualunque
+altra consegna `done` da `working` la respinge. Per una routine `todo → done` resta
+illegale.
+
+### 3b. Il manutentore (SPEC-MANUTENTORE.md, #1958, #1959)
+
+Rivede il § 3a dove dice altro. Il manutentore è una sessione **non fidata** con la sua chiave (classe
+`manutentore`, endpoint `routineManutentore`) o col biglietto che il pacemaker lega alla sessione accesa per lui
+(ruolo `manutentore`, contesto piccolo nel payload): legge schede, testi e rapporti (testi e rapporti solo
+nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
+all'owner, il freno.
+
+- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = la rosa del giorno,
+  scelta ogni mattina dal manutentore; 1 = da fare, non oggi; 0 = rimandato a lungo. I giudici assegnano 3 o
+  lasciano 1: la 2 è del manutentore. Una 3 la può creare, non abbassare. Le 2 di prima scendono a 1 con
+  l'operazione una tantum `transizione` di `ownerManutentore`.
+- **Quante insieme.** Niente tetti per priorità: le 3 partono sempre, il resto fino al parallelismo **N** del
+  manutentore, sotto il **freno d'emergenza** dell'owner (`config/routines.maxSessions`, 1–20, predefinito 20,
+  Gestione → Automazioni). Senza N vale il freno.
+- **Guasti.** Niente fermo globale: il lavoro che dichiara un guasto resta fermo (`fermoManutentore`) finché una
+  nota del manutentore o dell'owner (`sblocca`) o un'attesa sulla correzione non lo sbloccano; gli altri lavori
+  vanno avanti. Una **domanda di processo** nel rilascio (`--processo`) ferma il lavoro allo stesso modo e sveglia
+  il manutentore, non l'owner; col manutentore spento resta nelle note e il lavoro non si ferma.
+- **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
+  errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
+- **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner
+  restano sue e si sommano. Niente riserva del 10% su A.
+- **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 55 minuti,
+  segnali del server (guasto, deploy rosso, suite rossa, nata morta, domanda di processo, owner), sveglia chiesta
+  (minimo 5 minuti), con un tetto di accensioni al giorno suo. Memoria nel **taccuino** (`manutentore/taccuino`,
+  riscritto con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
+  Automazioni; le **novità** riscritte dal redattore (`manutentore-novita/<versione>`) solo senza link nuovi.
+
+### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
+
+I numeri che motivano ogni regola stanno nella spec, § 1. Qui le regole come le
+applicano strumenti e server.
+
+**Una sessione per feedback.** Il manutentore scrive sul server l'ordine dei feedback da
+accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, con la
+chiave del manutentore o il biglietto della sua sessione; `accendi --niente` lo svuota). Con un ordine un primo lavoro parte solo per i
+feedback dell'ordine e per le priorità 3; verifica, correzione, controllo di sicurezza,
+riallineamento e risposte dell'owner li assegna il server come sempre, anche per i feedback
+fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
+server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
+semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
+dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
+accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione al suo
+numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
+per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
+anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
+con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine, né un
+feedback legato a un'altra sessione accesa che non ha ancora preso il suo biglietto (entro
+la finestra d'avvio del pacemaker; dopo è nata morta e il feedback torna libero). Quando
+una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
+lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
+dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
+nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
+un pacchetto nato prima del 30/10 si chiudono solo sulle strade della fusione: un «fatto»
+consegnato da un ruolo non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
+parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
+biglietto ogni altra richiesta della stessa sessione è «niente»
+(`sessione_finita: …`), e un numero diverso dal suo è un rifiuto. Un feedback, una
+sessione: verifica, controllo di sicurezza e correzione li accende il pacemaker in
+sessioni nuove. Una sessione si può ancora accendere a mano per un feedback: il preflight
+con `--feedback <N>` consegna `routines/roles/sessione.md`, cieca come l'orchestratore
+(chi tiene la parola d'ordine non legge mai il testo di un feedback), che chiede il
+biglietto di QUEL feedback (`ticket <parola> --feedback <N>`) e lancia un worker. Un
+biglietto di un altro feedback lo strumento lo restituisce subito ed esce come guasto. Il
+server fa passare la scelta di sempre ristretta a quel numero e dà il ruolo che serve
+adesso; se non c'è risponde «niente» col motivo: `non_in_coda: #N <perché>`, i posti
+pieni con il codice di sempre, `feedback_inesistente`. Un numero malformato è un rifiuto
+(`bad_feedback`). Un feedback già risolto su main il biglietto lo prende: lo chiude il
+primo lavoro.
+
+**Già risolto su main.** Prima dell'accensione (pacemaker) o al primo ritiro del primo lavoro il server cerca, con l'API di
+GitHub, le fusioni sulla linea principale di main che portano un commit che cita `#N`
+(la fusione stessa o un commit del ramo fuso) dopo la nascita del feedback e la sua
+ultima riapertura (`riapertoAt`, che il server segna quando un feedback chiuso torna
+aperto), e le passa in `payload.suMain`, anche vuoto; il biglietto se le tiene. Se
+GitHub non risponde o la finestra supera i tetti, `suMain` manca e dispatch fa la
+stessa ricerca da sé (`scripts/lib/su-main.mjs`). Dispatch segna `propria` la fusione
+del lavoro stesso del feedback (vuol dire riaperto dall'owner, non risolto). La sessione
+la ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `deliver
+status --status done --reason gia_risolto --fusione <sha>` con report e frase: `working
+→ done` (routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non
+sta sulla linea principale di `origin/main`; il server lo riprova da sé e lo accetta
+solo dal primo lavoro, da `working`, se la fusione sta sulla linea principale (una
+fusione più vecchia di quanto il server rilegge di main, ~12.000 commit, basta che sia
+arrivata su main), porta una citazione del feedback, è più recente della nascita e dell'ultima riapertura e non è
+la propria. Chiude come il cancello (stato del giro azzerato) con la frase, il report
+preceduto dalla riga della fusione e la versione di `package.json` sulla fusione. Un
+rifiuto dice il motivo, e la sessione lavora il feedback come sempre.
+
+**Pacchetti.** Un pacchetto P è un feedback il cui testo è la spec che unisce più
+segnalazioni della stessa area: per ognuna cosa cambia e come si verifica. Nasce da
+`npm run feedback:apri -- … --pacchetto N,M` col campo `unisce: [{ id, num }]` (in
+chiaro, da 1 a 20, solo alla nascita e solo admin: `unisceValido` nelle regole). Lo
+strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi insieme:
+fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
+dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto o ne porta
+il rimando `unitoIn` (rimasta in coda perché l'archiviazione non è riuscita), chi è a
+priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
+urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
+priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
+o non passa intero.
+
+*La spec sta nel testo* (#2033): chi lavora P, chi lo verifica e i lavori server ricevono
+testo e allegati, mai le note. Prima della rete, anche a vuoto, lo strumento legge il testo
+insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una frase che
+manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
+un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
+«prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
+dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
+o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
+segnalazione qualunque racconta un problema, e può citare note e attese di altri.
+I pacchetti nati prima, con la spec nei turni delle note che cominciano con «SPEC DEL
+PACCHETTO» (#2038), la consegnano lo stesso: il server la mette fra i documenti di chi lavora
+e di chi verifica, le parti nell'ordine, solo se P è fidato e nato dall'owner o da una
+sessione. Quei turni li apre solo l'owner o una sessione: nel testo di una routine la stessa
+riga resta citata.
+
+*Gli allegati viaggiano con P*: chi lavora un biglietto apre solo quelli del suo feedback.
+Prima di aprire lo strumento legge e decifra immagini, documenti e allegati della
+conversazione di ogni unita e li carica in P: i documenti col nome «#N — nome», le
+immagini (che un nome non l'hanno) nel campo delle immagini, con da dove viene ognuna in
+un blocco in coda alla spec. Il tetto è quello di un feedback, 5 immagini e 5 documenti
+compresi quelli di `--allega`: oltre, o con un allegato che non si apre o che un feedback
+non ammette, non apre niente e lo dice; un caricamento che non riesce ferma la nascita
+(`submit` con `interi`): niente pacchetto monco. Con allegati di una unita non fidata, o
+della conversazione di una scritta anche da routine o sessioni, P nasce non fidato anche
+da una sessione pulita (lo strumento non manda il biglietto), come un figlio di genitori
+non fidati (SPEC-DOMANDE.md § 1.3).
+
+*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). Chi aspettava una
+unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre
+restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel pacchetto
+#P: il lavoro continua lì», senza frase per chi l'ha segnalata. Prima le attese: un
+aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
+una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
+per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
+P si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
+archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
+nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
+dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
+Le unite archiviate restano leggibili a chi gestisce il lavoro: `feedback:leggi` non filtra
+per stato, e dal cloud `routineFeedback` (#1785) coi numeri espliciti non esclude gli
+archiviati e ne dà gli allegati testuali; delle immagini dà il conteggio, e le porta P.
+
+Alla fusione di P (`done`) il server non ha più unite da chiudere. Resta, per i pacchetti
+nati prima (le unite `todo` che aspettano P), la chiusura di prima: `todo → done`
+(pipeline, `statusReason: pacchetto`) con la frase di P come `userNote` (senza, una frase
+di ripiego, e le note di P lo dicono) e la versione di P se ne ha una, PRIMA di scrivere P
+in `done`, così l'attesa sciolta non le rimette in coda, con un gancio solo per ogni
+strada che porta P a `done` dopo una fusione; un'unita che è a sua volta un pacchetto
+chiude prima le sue. Una unita archiviata col rimando a P non è un'eccezione da scrivere
+nelle note di P; una in un altro stato, o che non aspetta più P, resta dove sta e le note
+lo dicono. Il messaggio della fusione di P cita le unite (`merge-gate: #P via server
+(unisce #N, #M)`), così la ricerca «già risolto su main» le trova. P archiviato senza
+fusione: le unite restano archiviate; se il lavoro serve ancora le rimette in coda l'owner,
+da Gestione (`archived → todo`).
+
+**Il piano.** Un lavoro grosso (una spec in più fasi, un pacchetto) consegna il piano
+prima di toccare codice e a ogni parte chiusa (`deliver piano --piano <file.md>`, al più
+64 KB, oltre è un rifiuto col numero): il server lo scrive nelle note per l'owner, lo
+tiene cifrato nel feedback (l'ultimo sostituisce il precedente) e lo rimanda a chi
+riprende, nel primo lavoro e nella ripresa (`payload.piano`). Lo consegnano solo il
+primo lavoro e il correttore di una ripresa. Alla chiusura il piano si toglie: un
+feedback riaperto riparte senza il piano di un lavoro già fuso. Figli (#N.M) per spezzare un lavoro non se ne
+aprono più: il contenitore è il pacchetto.
+
+**Il motivo del correttore.** Chi corregge (fixer, nel riallineamento e nella ripresa)
+consegna `dispatch.mjs --record-fixed … --motivo "<tipo>: <dettaglio>"`: conflitto coi
+file (o «nessuno»), prove rosse con le prove, ripresa, altro col testo. Forme e parser in
+`SN_VERIFIER_ROUND.leggiMotivoCorrettore`. Senza motivo lo strumento non consegna, e il
+server rifiuta la consegna `fixed` di un correttore senza un motivo che il parser rilegga
+identico; quello valido lo scrive nel biglietto (`motivo`, più `riallineamento` del
+client) e nelle note per l'owner. Una fermata nella stessa consegna (segnalazione o
+domanda, che va in `design`) vale come motivo. Il rilascio non si blocca: terrebbe il
+semaforo a un worker morto.
+
+**La verifica dopo un riallineamento.** Dispatch scrive nel marcatore del ruolo la base
+del confronto (`dal`: lo sha verificato se il server lo manda come `shaVerificato`, sennò
+la punta che il correttore riceve). A chi verifica il riallineamento il perimetro arriva
+con lo sha verificato del server: se in copia manca dispatch lo scarica da origin (un rebase
+lo toglie dai rami), e se è la punta stessa del ramo non va nel marcatore e il compito dice
+che il confronto manca, invece di dare un diff vuoto (#1968). Se il report di chi ha rifatto
+la base nomina un commit di `main` che la punta non contiene, il rebase non è arrivato su
+origin (#2101); lo stesso se la punta verificata è nata quando sulla catena delle fusioni di
+`main` era già arrivato, da oltre mezza giornata, qualcosa che non contiene (il report può non
+nominare lo sha). Sulla punta verificata il compito dice di registrare senza rilievi, così il
+lavoro torna alla fusione, che rifà il riallineamento se serve ancora; con altri commit
+sopra, chi verifica li prova e ne fa un rilievo interno. Quello sha il server lo tiene
+sul commit che un verificatore ha approvato: un salto dopo un riallineamento pulito marca
+passata la punta nuova per il cancello, ma il riallineamento dopo riparte dall'approvato,
+anche nel confronto che decide il giro: per questo anche a chi riallinea dispatch scarica lo
+sha verificato che manca in copia. Alla consegna lo strumento guarda due cose: i file in
+cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
+in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
+più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,
+fileInConflitto, giro }`. Se tutti stanno fra i file di servizio (`FILE_DI_SERVIZIO`:
+`src/shared/patchNotes.js`, `src/shared/capabilities.js`, `tests/rossi-noti.json`,
+`PATTERNS.md`), o non ce n'è nessuno, niente giro nuovo di verifica: bastano le prove del
+server sulla fusione, e il controllo di sicurezza resta. Un file di codice in conflitto o
+riscritto chiede la verifica intera, perché è logica che nessuno ha guardato (anche un
+conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). La
+regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
+sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
+`merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
+nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare, e se la
+punta non contiene `origin/main`, non parte o su origin non risulta uguale, non consegna
+(#1964: altrimenti chi verifica dopo legge il commit già verificato). Vale anche per
+`deliver fixed`; una consegna che si ferma con una domanda non riallinea e passa. Ogni
+guasto (GitHub giù, sha sconosciuto, main cambiato in troppi file) vale `pieno`. Un
+lavoro che tocca anche il server confronta allo stesso modo la sua parte del server,
+dalla punta verificata a quella registrata dell'ultima spinta (`realign.shaVerificatoServer`):
+lì nessun file è di servizio, quindi la parte del server deve restare identica o portare
+la stessa modifica; senza una delle due punte vale `pieno`. Con `nessuno` il server
+scrive «verifica passata» sulle punte nuove (app e server) e il lavoro va al controllo
+di sicurezza; la decisione, coi file, va nel biglietto
+(`giroDopoRiallineamento`) e nelle note.
 
 ## 4. Tab dashboard (deriva SOLO da `status`)
 
@@ -201,7 +481,21 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 `tabFor(status)` = lookup pura, senza `pipeline`, senza `isApproved`, senza `autoMode`:
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
-- Lavori locali (#908): quello che starebbe «In coda» ma porta il segno `localOnly`.
+- Il segno `localOnly` (#908) non sposta di scheda (#1575): la pratica sta nella scheda del suo stato con l'etichetta «server».
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta-anche 676,663.2` (aggiunge), `--aspetta 676,663.2` (l'elenco intero) / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito; `--aspetta` che toglierebbe un'attesa non fusa si rifiuta senza scrivere, a meno di `--sostituisci` (#1756), e la risposta dice quelle che sostituisce; `feedback:leggi` le stampa, una per riga col loro stato): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
+  - **La priorità risale le attese** (#1630, decisione dell'owner del 23/10): se B aspetta A, `priority` di A
+    vale almeno quella di B, lungo tutta la catena (C aspetta B che aspetta A → A ≥ B ≥ C), e **solo verso
+    l'alto**: un'attesa tolta o B riabbassato non riabbassano niente. Scatta quando la priorità di un feedback
+    sale o gli si aggiunge o cambia un'attesa (anche alla nascita); salgono al suo valore gli aspettati aperti
+    (non fusi, non chiusi, non archiviati, non cancellati), e da loro i loro aspettati. Uno con stato o priorità
+    illeggibili si salta, mai riscritto più basso. La scrive il server, in un punto solo (trigger sul documento
+    feedback, qualunque scrittore), cifrata e col segno `priorityInherited: true` (in chiaro): il giudice di
+    priorità può alzarla ma non abbassarla; su un `priorityManual` il segno manuale resta e il giudice continua a
+    non toccarla. Con la nota «priorità 3: la eredita da #B, che lo aspetta»; l'alzato entra in coda con la
+    priorità nuova. L'owner resta libero di abbassare a mano un aspettato sotto chi lo aspetta; un aspettato fuso
+    e poi riaperto eredita alla prossima salita di priorità o cambio d'attesa di chi lo aspetta.
+    Logica pura: `ereditaPriorita`, `scattaEredita`, `notaEredita` in `src/shared/feedbackAttese.js`,
+    sentinella in `tests/unit/feedbackAttese.test.mjs`.
 - Risolti: `done(rilasciato)` — Archiviati: `archived` (+ filtro ⭐; + filtro "Bloccati
   confermati" per `*_confirmed`, decisione presa: restano ispezionabili come log lì).
 
@@ -209,34 +503,37 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 
 `localOnly: { by, at }` (in chiaro, `at` in millisecondi, scrive solo l'admin) dice
 che la pratica la lavora solo una sessione locale: la coda delle routine, il recupero
-degli arenati e il pacemaker la saltano, e le superfici la mostrano nei Lavori locali
-invece che «In coda». Negli stati dei Ricevuti resta nei Ricevuti (aspetta comunque
-l'owner), con l'approvazione che dice `→ Lavori locali`.
+degli arenati e il pacemaker la saltano. In Gestione resta nella scheda del suo stato (In
+coda, Aspettano, Ricevuti…) con l'etichetta «server» (#1575): la scheda «Lavori server» non
+c'è più.
 
 - Il segno si mette solo su un feedback **fidato** (#1148; lo fa l'owner con «🤝 Segna fidato»
   in Gestione, da riga di comando no), a pratica aperta, non segnalata come
   attacco/spam e non in mano a una routine (`localSignCheck`). Su un utente o una routine
-  solo col sì dell'owner: un feedback che richiederebbe lavoro locale torna nei Ricevuti
-  (`design`, motivo `locale`, nota «Richiede lavoro locale») con `owner-feedback.mjs
-  --serve-locale`, e lì l'owner lo approva come lavoro locale (#913, sotto).
+  solo col sì dell'owner: da una sessione dell'owner un feedback torna nei Ricevuti (`design`,
+  motivo `locale` senza `domandaId`, nota «Richiede lavoro locale») con `owner-feedback.mjs
+  --serve-locale`, e lì l'owner lo approva (#913, sotto). Dalle routine `design`+`locale` senza
+  domanda non nasce più: il lavoro server va ai lavori server o chiede la fiducia (§3), e il
+  motivo `locale` con `domandaId` è un passo che solo l'owner può fare, chiesto con la domanda.
 - **L'approvazione dell'owner (#913)**: `localApproval: { by, at }` (stessa forma di
   `localOnly`, scrive solo l'admin, `localApprovalValido` nelle regole). La scrive
-  «💻 Lavoro locale» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
-  feedback), insieme a `todo`, `reviewDecision: accepted` e `localOnly`: il feedback va
-  nei Lavori locali. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
+  «💻 Lavoro server» nei Ricevuti (dettaglio, tasto destro sulla scheda, pagina dei
+  feedback), insieme a `todo`, `reviewDecision: accepted` e `localOnly`: il feedback torna
+  In coda col segno. Dal #1575 il tasto c'è solo sui rombi azzurri nati prima del #1358
+  (`design`+`locale` senza `domandaId`), dove è l'unica uscita; su un fidato scrive il solo
+  segno. Solo da lì (#957): nessuno strumento delle sessioni lo scrive, perché
   hanno le credenziali dell'owner e un testo d'utente potrebbe convincerle a darselo. Le regole non distinguono la
   pagina da uno script con lo stesso token: il limite sta negli strumenti (sentinella in
   `tests/unit/lavoroLocaleApprovato.test.mjs`). Lo stesso clic segna anche fidato il
   feedback (#1148, callable `ownerFiducia`): è la fiducia, non il segno, a far registrare L5
   senza fermare (§4b); la sessione lo lega a `start`/`finish --feedback`. Non cambia chi l'ha scritto: il lettore lo dice ancora utente, e il testo resta
-  un dato. Si offre solo nei Ricevuti, su chi non è owner o sessione con la prova; su un
+  un dato. Il sì si scrive solo su chi non è fidato né già approvato; su un
   segnalato l'hover lo dice e serve guardarlo prima.
-  Togliere il segno locale lascia l'approvazione, così il segno si rimette con un clic
-  (il sì si dà solo dai Ricevuti, dove la pratica non torna). Risolto, il feedback di un
+  Togliere il segno locale lascia l'approvazione. Risolto, il feedback di un
   utente approvato tiene la scheda pubblica (`isPrivateLocalWork`): è da lì che chi l'ha
   mandato vede la risoluzione; senza scheda resta solo il lavoro dell'owner e delle sessioni.
-- Si mette e si toglie in Gestione (tasto «Locale» nel dettaglio, tasto destro sulla
-  scheda), con `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
+- In Gestione non si mette né si toglie più a mano (#1575): lo mette il server quando chi
+  lavora lo chiede (#1358). Da riga di comando `owner-feedback.mjs --solo-locale | --non-locale`, e nasce già messo sui
   feedback aperti da `claude-feedback.mjs --locale` (`--non-locale` per le routine: la
   scelta è obbligatoria, perché una segnalazione per le routine nata locale non la prende nessuno).
 - Le sessioni locali hanno le credenziali dell'owner. Per REGOLA (non per un blocco
@@ -253,7 +550,10 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
   blocchi (`skippedL5: true`, motivo `fiducia`), fonde senza chiedere e chiude la pratica.
   `verify-local start` e `finish` scrivono la voce col biglietto della sessione
   (`scripts/biglietto.mjs`). Manca una condizione → la richiesta aspetta il sì dell'owner in
-  Gestione, col motivo. I rami nati prima del registro, di pratiche migrate, seguono la
+  Gestione, col motivo, e porta con sé la pratica e le parti mancanti: al sì il server fonde e
+  chiude la pratica come qui sopra, con la nota «approvazione dell'owner», o la annota se
+  un'altra parte del lavoro manca ancora (#2004). Solo una pratica col segno locale, in
+  lavorazione; alla sua chiusura la richiesta locale non si scarta (alla riapertura sì). I rami nati prima del registro, di pratiche migrate, seguono la
   regola di prima (prova del mittente o `localApproval`) finché non si chiudono.
 
 ### 4c. Chi nasce senza giudici (#914)
@@ -261,12 +561,12 @@ l'owner), con l'approvazione che dice `→ Lavori locali`.
 Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il feedback è
 **fidato** (#1148, `functions/src/nascita.js`); il mittente decide solo dove va:
 
-- lavoro locale fidato (§4b): `todo` nei Lavori locali, senza nemmeno L0;
-- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): L0, poi `todo` In
+- lavoro locale fidato (§4b): `todo` col segno, senza nemmeno il cancello degli allegati;
+- owner, sessione col biglietto pulito (`claude-feedback.mjs --non-locale`): il cancello degli allegati, poi `todo` In
   coda (`pipeline.skipped: 'fidato'`); la priorità scelta con `--priorita` nasce col documento
   (`priorityManual`), senza scelta la decide il giudice;
 - ritrovamento fidato del server (`routine:`/`agent:` + `senderProof: 'server'`: ritrovamenti,
-  derivati, allarmi della costruzione): L0, poi dove dice l'**origine** (`pipeline.skipped:
+  derivati, allarmi della costruzione): il cancello degli allegati, poi dove dice l'**origine** (`pipeline.skipped:
   'routine_proven'`, decisione dell'owner del 04/10). Un ritrovamento NON fidato passa dai
   giudici; se lo manderebbero in coda, aspetta comunque l'origine come sotto. L'origine è il lavoro del biglietto (`origineId`, lo scrive il server,
   mai la routine; `parentId` resta un collegamento) e conta il genitore diretto:
@@ -279,12 +579,19 @@ Alla nascita (solo il trigger di creazione) L1 e L2 non girano se e solo se il f
     `onFeedbackOrigineCambiata` (functions/src/origine.js), e alla nascita si rilegge l'origine
     dopo la scrittura perché un passo appena avvenuto non vada perso;
   - origine sparita → `aligned` (`statusReason: origine_mancante`);
-  - senza origine (allarmi della costruzione, esplorazioni) → come un allineato dei giudici: `todo`
-    se l'automatica e l'interruttore del gruppo lo ammettono, altrimenti `aligned`.
+  - senza origine (gli allarmi della costruzione) → `todo`, a interruttori spenti o accesi
+    (decisione dell'owner del 05/10, #1035): le routine lo prendono quando l'automatica è accesa,
+    come ogni altro lavoro in coda. Vale anche per il NON fidato: passa
+    dai giudici, e se lo dicono allineato entra in coda senza guardare gli interruttori; se lo
+    fermano resta nei Ricevuti. La prova è `senderProof: 'server'` col prefisso, mai il solo nome:
+    un anonimo che si firma `agent:costruzione` è un utente. L'allarme porta la sua priorità
+    (`priorityManual`, 3): il giudice di priorità non la riscrive.
+  - un derivato col `?` fa eccezione: dove gli altri andrebbero in coda o ad aspettare, lui va nei
+    fermo sulla sua domanda (`design`, `decisione`, `domandaId`: §3, Pipeline; In coda col segno).
 
   Chi è fermo con l'origine (`design`, `origine_bloccata`) la segue anche quando l'owner la libera:
   torna ad aspettarla (`design → unlabeled`) se il lavoro riparte, entra in coda (`design → todo`) se
-  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi è tornato nei Ricevuti
+  si fonde, va in `aligned` se si chiude senza fusione. Allo stesso modo chi aspetta la sua domanda
   con l'origine chiusa (`aligned`, `origine_chiusa`) la aspetta di nuovo (`aligned → unlabeled`)
   se l'owner la ripristina, ed entra in coda (`aligned → todo`) quando si fonde. Sono le sole uscite
   della pipeline da `design` e da `aligned`, e solo per quei motivi; un derivato che l'owner ha già
@@ -296,11 +603,14 @@ da agente è un segnale sospetto. Non a un mittente provato (l'owner dall'app, l
 di una routine o di una sessione): lì il tono tecnico è normale. Una ri-valutazione passa
 sempre dai giudici.
 
-Le routine non aprono lavoro locale: il canale non scrive il segno, e dentro una routine
-`claude-feedback.mjs` e `owner-feedback.mjs --solo-locale` si rifiutano. Un
-lavoro che si fa solo in locale torna nei Ricevuti dal canale (`deliver status --status design
---reason locale`, nota «Richiede lavoro locale»): lo stesso motivo di `--serve-locale`, e lì
-l'owner lo approva come lavoro locale (§4b, #913).
+Le routine non aprono lavoro locale: dentro una routine `claude-feedback.mjs` e
+`owner-feedback.mjs --solo-locale` si rifiutano. Dal #1358 nessun lavoro torna al PC
+dell'owner: `deliver status --status design --reason locale` vuol dire «serve il codice del
+server», e il server dà a un feedback fidato il segno dei lavori server (`localOnly`, `by:
+routine`) rimettendolo `todo`, mentre uno non fidato resta `design` col motivo `fidato`
+(Ricevuti L3, richiesta di renderlo fidato). Un passo che solo l'owner può fare (un segreto,
+un'automazione GitHub) arriva con la sua domanda (`--domanda`), e il feedback resta
+`design`/`locale` col `domandaId`, In coda (§5).
 
 ### 4a. Le AZIONI dell'owner per sezione (`ownerActions`)
 
@@ -327,34 +637,33 @@ La modalità automatica agisce UNA volta, al giudizio (sicuro + ON → `todo`; s
 → `aligned`). Attivarla dopo NON ri-tocca i vecchi `aligned`: l'owner li approva in blocco
 dai Ricevuti con «Approva tutti gli allineati» (`aligned→todo`).
 
-**Per mittente (#446).** "ON" non è più un sì/no per tutti: l'interruttore master
+**Per fiducia (#446, §10).** "ON" non è un sì/no per tutti: l'interruttore master
 (`config/automation.enabled`) abilita l'auto-approvazione, e la mappa
-`config/automation.autoApprove` dice QUALI categorie di mittente ne beneficiano
-(una per categoria d'autore, dal prefisso e dal ruolo nel `clientId`). Master spento ⇒
-nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti, come prima che esistesse.
-La logica è pura e vive in due copie da tenere allineate: `src/shared/feedbackThread.js`
-(dashboard) e `filo-security/functions/src/autoApprove.js` (chi decide davvero).
+`config/automation.autoApprove` dice QUALE fiducia ne beneficia: `fidato` e `non_fidato`, mai
+un mittente. Master spento ⇒ nessuno, qualunque cosa dica la mappa. Mappa assente ⇒ tutti.
+La logica è pura e vive in due copie da tenere allineate, con la stessa tabella di casi nei due
+test: `src/shared/feedbackThread.js` (dashboard) e `filo-security/functions/src/autoApprove.js`
+(chi decide davvero). All'automatica i fidati arrivano di rado: owner e sessioni pulite entrano
+in coda senza giudici (§4c); restano i ritrovamenti delle routine senza origine e gli allarmi.
 
-C'È UN GRUPPO PER OGNI CATEGORIA D'AUTORE, quelle che la coda mostra con un'icona:
-`owner`, `user`, `local` (la sessione locale), `worker`, `verifier`, `residuo`, `prober`,
-`claude` (automazioni che non dichiarano il ruolo) e `filo`. Fino al 2026-08-22 le cinque
-istanze di Claude stavano dietro un interruttore solo: la coda le distingueva ma la
-fiducia era una sola, quindi per fermare l'esploratore si fermava anche la sessione
-locale. Adesso i due assi coincidono — chi si vede separato si regola separato.
-
-**Compatibilità:** un documento salvato prima, che ha il solo `claude`, fa ereditare quel
-valore a tutte le sue istanze (`resolveAutoApprove`, in entrambe le copie). Senza,
-sdoppiare l'interruttore riaprirebbe da solo cinque porte che l'owner aveva chiuso.
+**Compatibilità:** una mappa salvata prima del §10 ha un interruttore per categoria d'autore
+(`owner`, `user`, `local`, `worker`, `verifier`, `residuo`, `prober`, `claude`, `filo`). Finché
+l'owner non sceglie i due nuovi, uno spento chiude: `fidato` si chiude se è spenta una delle
+istanze delle routine (`worker`, `verifier`, `residuo`, `prober`, `claude`), `non_fidato` se è
+spento uno qualunque (`resolveAutoApprove`, in entrambe le copie).
 
 ## 5. La dashboard distingue i sotto-casi di `design`
 
 Un solo stato `design`, più origini, distinte da `statusReason`: (1) verdetto
 giudici (nessun reason o `judges`); (2) domande della routine (appende le domande
-alla chat + `statusReason: clarify`); (3) la verifica ha trovato un difetto di livello
-3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
-(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3/2 che chiede una
-decisione dell'owner (`statusReason: decisione`), oppure chi risolve o chi corregge ha
-consegnato con una segnalazione per l'owner (stesso `statusReason: decisione`); in
+alla chat + `statusReason: clarify`); (2b) un derivato nato da un rilievo col `?`
+(`statusReason: decisione`, domanda in chat dalla nascita, #775): alla risposta torna
+`todo` e lo prende un risolutore da capo, con domanda e risposta nelle `decisioni`; (3) la verifica ha trovato un difetto di livello
+3 che non si può più correggere da soli — esauriti il bilancio delle correzioni dei 3 e quelli sotto
+(`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3, o un 2 su una
+scelta difficile da disfare, che chiede una decisione dell'owner (`statusReason:
+decisione`), oppure chi risolve o chi corregge ha consegnato con una segnalazione per
+l'owner (stesso `statusReason: decisione`); in
 tutti questi casi bilanci e verdetti del giro si azzerano — la storia delle critiche
 resta — e il server lascia un **segnalibro di ripresa** nello stato del giro (chi si
 è fermato, perché, i rilievi rimasti aperti). Nei casi `clarify` e `decisione` la
@@ -370,14 +679,73 @@ scritto approvando conta come risposta solo se è arrivato dopo lo stop; (4) fix
 dal **controllo di sicurezza** (`statusReason: secaudit`, con `livelli.l4.esito:
 fail`); (4b, dal 2026-09-13) fix fermato dal **cancello di fusione** L5 sul
 server (`statusReason: l5`): il controllo di sicurezza è passato, a fermare è
-stato il cancello, e c'è una richiesta di fusione in attesa; (5) lavorazione
-arenata ripetutamente (`statusReason: arenato`). La risposta dell'owner appende
+stato il cancello, e c'è una richiesta di fusione in attesa (#1040: un blocco la
+cui richiesta non si registra è un guasto, non un `l5`, e una consegna di `l5`
+senza richiesta viva è respinta; se la richiesta poi scade o viene scartata, il
+quadrato offre «Chiedi di nuovo il via libera», che la riapre solo se la punta
+del ramo è ancora la versione esaminata dal cancello, altrimenti propone la
+coda; fa eccezione il lavoro server fermato dal cancello del server, che una
+richiesta non ce l'ha e si rimanda in lavorazione o si archivia); (5) lavorazione
+arenata ripetutamente (`statusReason: arenato`); (6, #1241) chi risolve o
+corregge è caduto su un guasto dell'ambiente (`statusReason: guasto`). Dal #1790
+un guasto non porta più in `design` e non apre una domanda: si dichiara nel rilascio
+(`--guasto "<gruppo>: <messaggio>"`), il feedback torna `todo` sul suo ramo con
+la nota del guasto, fermo per il manutentore finché non lo sblocca (§ Guasti più
+sopra; a manutentore spento il fermo non c'è), e una consegna `design` + `guasto` si rifiuta; al terzo guasto
+uguale di seguito il server apre una domanda col conteggio, che smista il compito
+«Gestisci la domanda» (SPEC-DOMANDE §3.5, §3.8). Non è lavoro per regola: quello è
+`locale`, e la sua nota dice quale regola lo tiene fuori dalla cloud. La risposta dell'owner appende
 alla chat e (se decide) muove a `todo`. Sul caso `secaudit` l'owner ha anche
 «Salta il controllo»: il server scrive `livelli.l4 = { esito: saltato, by:
 owner }`, tratta il verdetto come un pass e lancia subito il cancello L5 sul
 ramo; l'esito è quello di un'approvazione (fuso → `done`; bloccato → richiesta
-di fusione in attesa; conflitto → riallineamento). Non serve una transizione
-nuova: è `design` → `todo` con attore owner, e da lì il cancello.
+di fusione in attesa, o la nota che quella versione era già decisa; conflitto →
+riallineamento). Lo stesso gesto c'è sulla pagina da browser. Non serve una transizione
+nuova: è `design` → `todo` con attore owner, e da lì il cancello. Il salto vale
+solo per la versione letta da verifica e audit (#1040.1): se la punta del ramo
+non è più quella, o il giro non dice quale fosse, il server non salta, non fonde
+e non apre richieste (esiti `mosso`, `senza_controllo`), la pratica resta dov'è
+e il pentagono propone di rimandarla in lavorazione.
+
+**Le attese con la loro domanda (#1358, SPEC-DOMANDE §3.8).** Ogni fermata dei casi (2),
+(2b), (3), (5), (6), `attesa_chiusa`, `locale` con la domanda, e `aligned` con `origine_chiusa`
+o `origine_mancante` apre una domanda per l'owner e il feedback prende `domandaId`,
+restando nello stato e col motivo di prima: la macchina a stati non cambia. Dal canale la
+domanda nasce nella stessa transazione dello stato, ed è sempre quella scritta da chi si
+ferma con `--domanda`: il server non ne compone più, e una fermata senza domanda si
+rifiuta (tranne `locale`, #1790). Un derivato nato da un rilievo col `?` prende la domanda
+del rilievo, e il suo titolo. Le fermate del server (`loop`, `arenato`, `attesa_chiusa`,
+`origine_chiusa`, `origine_mancante`) ricevono la domanda di servizio, coi fatti e le due
+strade, che il compito riscrive: rimesse in coda girerebbero senza fine. Una fermata di chi
+lavora che entra in `design` senza una domanda viva (la pipeline, una migrazione) torna
+invece in coda con una nota che dice perché. Ogni domanda nasce `in_smistamento` e
+arriva all'owner dopo il compito «Gestisci la domanda» (SPEC-DOMANDE §3.5). Una domanda aperta di un'attesa lasciata per un'altra strada diventa
+`superata`. In dashboard un `design`/`aligned` con `domandaId` e uno di quei motivi sta
+**In coda**, col segno «aspetta D-n» che apre la domanda nella sezione Domande; nel
+dettaglio la casella di risposta lascia il posto al tasto «Rispondi alla domanda»: si
+risponde in un posto solo. La risposta con l'opzione `riprendi` lo riporta `todo` con la
+decisione in `payload.decisioni`, `notePerAgenti` comprese, e scrive la ripresa sul ramo
+del lavoro; il solo testo resta parole da ogni strada e va al compito «Gestisci la
+risposta» (SPEC-DOMANDE §3.4, #1598). Un `riprendi` su un feedback che non è fermo non ne
+cambia lo stato: la decisione si accoda; una
+domanda archiviata o superata non sblocca niente. Restano nei Ricevuti, anche con un
+`domandaId`: `secaudit`, `l5`, `fidato`, attacchi, spam e file sospetti. Le
+attese aperte prima si migrano con `ownerDomande { op: 'migra' }`, a lotti
+(`npm run domande:migra`, a secco; `-- --dal-vero` per creare); un guasto di prima, che
+nominava la domanda solo nella nota, la adotta.
+
+**Le domande che fermano un lavoro in coda (#1577, SPEC-DOMANDE §3.1 `blocca`).** Fuori
+dalle fermate lo stato non cambia: un `todo` o un ramo in revisione con una domanda
+bloccante aperta tiene il suo id in `domandeBloccanti` (lo scrive solo il server, nella
+transazione che cambia la domanda), nessuna routine lo prende, e in dashboard sta in
+**Aspettano** col segno «aspetta D-n». Alla risposta l'id esce dall'elenco e il lavoro
+riparte con la decisione. La ripresa non sposta un `todo`, un `working` né un
+`revision_capability` (la decisione si accoda per il giro dopo); un `revision_security`
+torna `revision_capability` coi verdetti azzerati, perché sicurezza e fusione non leggono
+le decisioni; un `done` torna `todo`. Fanno eccezione gli ultimi due quando la scelta è la
+provvisoria di una domanda non bloccante, senza parole in più: il `revision_security` resta
+dov'è con la decisione accodata, e sul `done` la risposta dice «non serviva». Finché una bloccante è aperta né il recupero delle fusioni né la richiesta del
+server fondono il ramo.
 
 Presentazione (scelta owner 2026-08-29): i casi `secaudit` e `l5` sono **ROSSI** in
 dashboard (un blocco di sicurezza, non una questione di gusto); gli altri restano verdi. Nel
@@ -437,7 +805,7 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   (che `applyStatus` azzera da sé alla prima consegna vera).
   Alla **3ª volta** il feedback esce dal giro automatico → `design`
   (`statusReason: arenato`) con nota per l'owner, o un guasto che si ripete ogni
-  ora si mangia il tetto giornaliero di accensioni entro sera.
+  ora si mangia le accensioni e i crediti dell'account entro sera.
 
 ### 6b. Storia: la riconciliazione dell'Action (smontata)
 
@@ -509,6 +877,10 @@ dashboard scriveva "in attesa di ripresa". Adesso:
   bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
+  *(Dal 2026-10-15, #795: alla chiusura di un lavoro, per qualunque strada, i suoi giri
+  — data, livelli trovati, esterni, corretti, bilancio pagato, esito; mai il testo dei
+  rilievi — passano nella collezione `routine-giri`, chiusa alle app; lo stato del giro
+  si azzera come prima. Li stampa `node scripts/storico-giri.mjs --da … --a …`.)*
 - **`firestore.rules`**: enum `status` esteso ai nuovi valori (in create anonimo resta
   bloccato: solo `new`→ ora `unlabeled`), `hasOnly` esteso con `statusReason`,
   `workingSince`. Deploy manuale (`npm run regole:pubblica`).
@@ -594,11 +966,11 @@ oggi il codice dice altro vale il codice (le sezioni sopra).
 - [x] **F6 — filo-security** (fatto 2026-07-03, commit bd93b47, DEPLOYATO):
       `src/statusMap.js` (decisione→status canonico; fidati mai attack/spam →
       unlabeled; canWriteStatus = la pipeline non regredisce feedback oltre il
-      giudizio — vale anche per le ri-valutazioni); `src/l0/fileGate.js` (gate
+      giudizio — vale anche per le ri-valutazioni); `src/cancelloAllegati.js` (cancello
       deterministico allowlist su `files[]`, PRIMA dei giudici → suspicious_file,
       niente panel); `feedbackState.recordDecision` scrive `status` CIFRATO (come
       il pipeline: anti hill-climbing, la dashboard lo decifra già — status è nei
-      TEXT_FIELDS) + `statusPublic` in chiaro; runner: gate L0, owner-accepted →
+      TEXT_FIELDS) + `statusPublic` in chiaro; runner: cancello degli allegati, owner-accepted →
       todo, trusted, reeval aggiorna lo status. Test 279 verdi. `storage.rules`
       (repo Filo): via i wildcard `text/.*`/`image/.*` (passava text/html!),
       allowlist esplicita — DEPLOYATE.

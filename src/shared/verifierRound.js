@@ -319,7 +319,7 @@
     return s === 'e' || s === 'v' ? s : 'i';
   }
 
-  /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono): è quello che paga il giro. PURA. */
+  /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono). PURA. */
   function livelloDegliInterni(list) {
     return maxLevel((Array.isArray(list) ? list : []).filter((f) => f && sedeDi(f.sede) === 'i'));
   }

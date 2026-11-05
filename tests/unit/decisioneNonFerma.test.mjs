@@ -81,14 +81,14 @@ test('[2i?!] e [3i?] fermano; [1i?!] e [0i?] vanno da parte senza fermare', () =
   assert.ok(lieve.derived.every((f) => f.inCorrezione !== true), 'niente si applica: la domanda e basta');
 });
 
-test('[2i?] a bilancio dei 2 finito va da parte come un 2: domanda nel suo feedback, niente applicato, niente fermo', () => {
-  const d = decide('Provato.\n[2i?] A o B? Consiglio A.', { count2: 5 });
+test('[2i?] a bilanci finiti dal 2 in giù va da parte come un 2: domanda nel suo feedback, niente applicato, niente fermo', () => {
+  const d = decide('Provato.\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5, count0: 5 });
   assert.equal(d.stop, false);
   assert.deepEqual(d.fix, []);
   assert.equal(d.derived.length, 1);
   assert.notEqual(d.derived[0].inCorrezione, true);
   // Con un 3 da correggere nello stesso giro, invece, entra: il giro lo paga il 3.
-  const conTre = decide('Provato.\n[3i] perde i dati\n[2i?] A o B? Consiglio A.', { count2: 5 });
+  const conTre = decide('Provato.\n[3i] perde i dati\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5, count0: 5 });
   assert.deepEqual(tag(conTre.fix), ['[3i]', '[2i?]']);
   assert.equal(conTre.consume, 'cap3');
   assert.equal(conTre.derived[0].inCorrezione, true);

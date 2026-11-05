@@ -132,7 +132,7 @@ test('groupLabel dice cosa contiene il feedback, con livello e sede di ciascun r
 
 test('roundNote parla per gruppi: il feedback dei rimasti coi suoi rilievi, i vicini corretti insieme', () => {
   const list = [f(2, 'i', 'Non salva. Passi: …'), f(1, 'v', 'Etichetta tagliata.'), f(0, 'i', 'Bordo storto.'), f(1, 'e', 'Altrove.')];
-  const r = decide(list, { count2: 5 });
+  const r = decide(list, { count2: 5, count1: 2 });
   const nota = R.roundNote({ summary: 'provato', findings: list, decision: r });
   assert.match(nota, /I 3 rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità 1 \(la più alta fra loro\): \[2i\] Non salva\.; \[1v\] Etichetta tagliata\.; \[0i\] Bordo storto\./);
   assert.match(nota, /il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra nel feedback dei rimasti/);
