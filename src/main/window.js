@@ -108,13 +108,18 @@ function wireWindowCommon(win, tabs) {
   win.on('close', (e) => {
     // Prima del congedo: chi sceglie di non chiudere trova le schede come le aveva.
     if (scaricamentiTrattengono(win)) { e.preventDefault(); return; }
-    if (congedoChiusuraFatto) return;
-    congedoChiusuraFatto = true;
-    const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
-    if (!attesa) return;
-    e.preventDefault();
-    const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
-    attesa.then(chiudi, chiudi);
+    if (!congedoChiusuraFatto) {
+      congedoChiusuraFatto = true;
+      const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
+      if (attesa) {
+        e.preventDefault();
+        const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
+        attesa.then(chiudi, chiudi);
+        return;
+      }
+    }
+    // Da qui la chiusura va avanti: la sessione resta quella di adesso, prima che le schede si smontino (#2191).
+    tabs.chiudiSessione();
   });
 
   win.on('resize', () => tabs.layout());
