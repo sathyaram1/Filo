@@ -211,13 +211,14 @@ function opzione(argv, nome) {
  * feedback aperti e leggibili, come le dà il server. `apri(v)` → l'oggetto in chiaro o null; `vietato(stato, giudizio)`
  * è la regola del lettore. → [scheda nella forma dei file]
  */
-export async function schedeDaRighe(righe, { apri, vietato }) {
+export async function schedeDaRighe(righe, { apri, vietato, illeggibili = [] }) {
   const out = [];
   for (const r of Array.isArray(righe) ? righe : []) {
     const stato = String(r.status || '').trim();
     if (!r.scheda || !r._id || STATI_CHIUSI.includes(stato) || vietato(stato, r.pipeline)) continue;
     const s = SS.dalDocumento(await apri(r.scheda), { id: String(r._id), aggiornato: String(r.schedaAt || '') });
     if (s) out.push(s);
+    else illeggibili.push(String(r._id));
   }
   return out;
 }
