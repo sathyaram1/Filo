@@ -749,9 +749,10 @@
             el.remove();
             return;
           }
-          body.innerHTML = Popup.renderMarkdown(daMostrare);
+          body.innerHTML = daMostrare ? Popup.renderMarkdown(daMostrare) : '';
           Popup.notaRipiego(body, res.keyFallback);
-          // «Continua» porta la spiegazione nel riquadro di Spiega, che chiede il resto (#1302).
+          // «Continua» porta la spiegazione nel riquadro di Spiega, che chiede il resto (#1302); senza testo il riquadro
+          // riparte dalla nota, perché un turno del modello vuoto alcuni host lo rifiutano.
           Popup.notaInterrotta(body, res.finishReason, () => {
             try { global.SN_MENU?.close?.(); } catch (_) {}
             Popup.openStreaming({
