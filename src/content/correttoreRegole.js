@@ -289,7 +289,8 @@
   }
 
   // Una zona da rivedere (una risposta arrivata su un testo cambiato nel frattempo, #1302) si unisce al nuovo, a parole
-  // intere: la base la dava già per giudicata, e senza questo nessun controllo la riprenderebbe.
+  // intere: la base la dava già per giudicata, e senza questo nessun controllo la riprenderebbe. A frasi intere: il pezzo
+  // perso è spesso un moncone («Marco e Luca è»), e una frase lasciata a metà il modello non la giudica.
   function conRiaperta(r, riapri, adesso) {
     adesso = String(adesso ?? '');
     if (!riapri || !(riapri.end > riapri.start)) return r;
@@ -298,6 +299,9 @@
     while (a > 0 && diParola(adesso[a - 1])) a--;
     while (b < adesso.length && diParola(adesso[b])) b++;
     if (!conContenuto(adesso.slice(a, b))) return r;
+    const f = aFrasiIntere(adesso, a, b);
+    a = Math.min(a, f.start);
+    b = Math.max(b, f.end);
     return r ? { start: Math.min(r.start, a), end: Math.max(r.end, b) } : { start: a, end: b };
   }
 
