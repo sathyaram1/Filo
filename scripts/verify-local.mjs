@@ -1272,7 +1272,10 @@ if (isMain) {
   // STA PRIMA DI TUTTI E TRE I COMANDI, e non è un dettaglio: quando stava
   // dopo, `start` aveva già aperto il giro e per lui non scattava mai.
   let feedbackRif = null;
+  let richiestaOwnerOpz = false;
   if (cmd === 'start') {
+    richiestaOwnerOpz = rest.includes(RICHIESTA_OWNER);
+    rest.splice(0, rest.length, ...rest.filter((a) => a !== RICHIESTA_OWNER));
     const { estraiOpzioneFeedback, parseRiferimento } = await import('./lib/pratica-locale.mjs');
     const o = estraiOpzioneFeedback(rest);
     if (o.errore) { console.error(`${o.errore} — non ho toccato niente.`); process.exit(1); }
