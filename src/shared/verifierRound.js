@@ -266,7 +266,7 @@
       // rilievo; le altre parentesi valgono a inizio riga, dove uno le userebbe per aprirlo.
       const apertura = APERTURA_PARENTESI.exec(raw) || LIVELLO_VICINO.exec(raw.trim());
       const letto = pezzo(LEVEL_START, raw)
-        || (apertura && DENTRO_SEMBRA_LIVELLO.test(apertura[1]) ? apertura[1].trim() : '')
+        || (apertura && aperturaSembraLivello(apertura[1].trim()) ? apertura[1].trim() : '')
         || quadraColLivello(raw)
         || pezzo(APRE_LIVELLO_SENZA_APERTURA, raw)
         || pezzo(PARENTESI_LIVELLO, raw)
