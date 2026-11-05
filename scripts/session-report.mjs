@@ -52,6 +52,9 @@ import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { marcatoreWorker } from './lib/dati-worker.mjs';
 
+// Una riga dell'assistente col modello «<synthetic>» è una richiesta interrotta o un errore dell'API, non un turno.
+export const rigaSintetica = (msg) => /^<[^>]*>$/.test(String((msg && msg.model) || ''));
+
 // ─── Prezzi ($ per milione di token) ─────────────────────────────────────────
 // Fonte: skill `claude-api` (tabella modelli del 2026-06-24 e note su cache):
 // scrittura in cache a 5 minuti = 1,25× l'input, a UN'ORA = 2× l'input
