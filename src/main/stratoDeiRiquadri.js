@@ -12,9 +12,8 @@ const INDIRIZZO = 'filo://riquadri/riquadri.html';
 const PRELOAD = 'src/preload/riquadri-preload.js';
 const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto']);
 // L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
-// può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi. `campi` la chiede il
-// main per una foto chiesta dallo strato: i campi segreti della pagina sotto, da coprire.
-const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000, campi: 5000 });
+// può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
+const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000 });
 const COMANDI_AIUTO = new Set(['passo', 'chiudi', 'posa', 'azione']);
 const AIUTO_CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false });
 // Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina. Oltre, la

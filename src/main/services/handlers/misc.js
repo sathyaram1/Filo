@@ -287,12 +287,14 @@ module.exports = function register(on, ctx) {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
     // Per un modello la foto è già coperta, e leggera (#1721): una che non si può coprire non parte, e `motivo` lo dice.
-    if (msg && msg.perModello) {
+    // Lo screenshot del feedback (`coperta`) esce dal computer anche lui: stessa copertura, a piena risoluzione (#2116).
+    if (msg && (msg.perModello || msg.coperta)) {
       const r = await Foto.fotoPerModello(wc);
       if (!r.ok) {
         return r.code === 'vuota' ? { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' }
           : { ok: false, code: 'coperture', motivo: r.code, error: Foto.perche(r.code) };
       }
+      if (!msg.perModello) return { ok: true, dataUrl: r.img.toDataURL() };
       const dataUrl = Foto.fotoLeggera(r.img, Foto.fattoreDiScala(sender, require('electron').screen));
       return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
     }

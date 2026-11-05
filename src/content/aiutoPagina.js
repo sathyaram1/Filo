@@ -445,7 +445,6 @@
       } else if (m.op === 'accetta') esito = accetta(args);
       else if (m.op === 'auto') esito = auto(args);
       else if (m.op === 'pulisci') esito = pulisci(args);
-      else if (m.op === 'campi') esito = { campi: Extract.campiSegretiInVista(), w: innerWidth, h: innerHeight };
     } catch (e) {
       console.error('[Filo] Aiuto sulla pagina', m.op, e);
       esito = null;
