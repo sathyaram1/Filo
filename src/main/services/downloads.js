@@ -902,6 +902,7 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     siteUncertain: incerto,
     servedBy: servito,
     _pagina: paginaDi(webContents) || (ripresa ? ripresa._pagina || '' : ''),
+    _apertaDa: apertaDa(webContents) || (ripresa ? ripresa._apertaDa || '' : ''),
     _partitoDavanti: utenteDavanti(),
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
