@@ -40,7 +40,8 @@ export function giudizioDelTesto(status, pipeline, fiducia) {
 
 /**
  * '' se il testo si può leggere, altrimenti il motivo. Nei Ricevuti un mai giudicato si legge solo con
- * `ancheMaiGiudicato`: da fuori, chi lo manda ci arriva riempiendo le raffiche (#1514). PURA.
+ * `ancheMaiGiudicato`: da fuori, chi lo manda ci arriva riempiendo le raffiche (#1514). Il motivo non nomina l'opzione:
+ * lo legge la sessione, spesso un agente, e scavalcarlo è una scelta dell'owner. PURA.
  */
 export function vietatoLeggere(status, pipeline, fiducia, { ancheMaiGiudicato = false } = {}) {
   const s = String(status || '').trim();
