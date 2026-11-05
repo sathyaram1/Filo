@@ -11,7 +11,7 @@ import { fileURLToPath } from 'node:url';
 const ROOT = resolve(fileURLToPath(new URL('.', import.meta.url)), '..', '..');
 const leggi = (...p) => readFileSync(resolve(ROOT, ...p), 'utf8');
 
-const SFORZI = { 'routine-nuovo-lavoro': 'xhigh', 'routine-worker': 'high', 'routine-secaudit': 'high', 'routine-lettura': 'high' };
+const SFORZI = { 'routine-nuovo-lavoro': 'xhigh', 'routine-worker': 'high', 'routine-secaudit': 'high', 'routine-lettura': 'high', 'routine-manutentore': 'high' };
 
 for (const [nome, sforzo] of Object.entries(SFORZI)) {
   test(`${nome}: effort ${sforzo} nell'intestazione, e la descrizione non dice altro`, () => {
