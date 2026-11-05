@@ -81,6 +81,11 @@ function crea({ tetto = TETTO } = {}) {
     togliDove((v) => v.archivio === id);
   }
 
+  // La riapertura segnata non è riuscita: la voce torna fra quelle che l'archivio può ridare.
+  function annullaRiaperta(id) {
+    if (id) riaperte.delete(id);
+  }
+
   // Schede cancellate dall'archivio: non tornano nemmeno da qui. `null` = l'archivio svuotato tutto.
   function dimentica(ids) {
     if (ids == null) { pila.length = 0; return; }
