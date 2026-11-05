@@ -271,12 +271,17 @@
       return chain.map((a) => (a && a.maxTokens ? { ...a, maxTokens: LR.perSeguito(a.maxTokens) } : a));
     }
 
-    async function settleChain(s, action, chain, r, m = MUTO) {
+    async function settleChain(s, action, chain, r, m = MUTO, onCostoTardivo) {
       const res = r || {};
       const provider = res.provider || (chain[0] && chain[0].provider);
       const model = res.model || (chain[0] && chain[0].model);
       const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
+      // Una risposta tornata senza conto (interrotta dopo aver scritto, #1302) si è pagata: il costo lo dice il router dopo.
+      if (res.generationId && !carriesCost(res.usage)) {
+        const keySource = (res.usage && res.usage.keySource) || '';
+        auditLater({ s, action, provider, model, apiKey: res.keyUsed || (chain[0] && chain[0].apiKey), generationId: res.generationId, withCost: true, keySource, m, onCosto: onCostoTardivo });
+      }
       m.chiamata(chiamataDi(res, model, { tentativo: res.tentativo, spesa: spesaDi(s, model, res.usage) }));
       // Testo e streaming dicono chi ha servito nella risposta, o non lo dicono più.
       contaServizio('servita', action, { modello: model, provider, keySource: res.usage && res.usage.keySource, ignota: !servedBy });
@@ -307,10 +312,10 @@
     }
 
     // Un tentativo rotto a metà si è già pagato: il suo costo il router lo dice solo dopo, e lo si chiede come per la voce.
-    function auditBroken(s, action, list, m) {
+    function auditBroken(s, action, list, m, onCosto) {
       if (Array.isArray(list) && list.length) contaServizio('ripiego', action, 'spezzato', list.length);
       for (const b of list || []) {
-        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource, m });
+        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource, m, onCosto });
       }
     }
 
@@ -323,7 +328,8 @@
       } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
-    async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}, m) {
+    // `onCostoTardivo(eur)`: il costo che il router dice dopo (tentativi rotti, risposta senza conto), per chi scrive la Cronologia.
+    async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onCostoTardivo } = {}, m) {
       const { s, chain } = await chainFor({ action, settings, attempts, messages });
       let r;
       try {
@@ -334,12 +340,12 @@
           onFallback, onReset, onTentativoFallito: m.errore,
         });
       } catch (e) {
-        auditBroken(s, action, e && e.brokenAttempts, m);
+        auditBroken(s, action, e && e.brokenAttempts, m, onCostoTardivo);
         throw conLaFunzione(e, s, action);
       }
       const { brokenAttempts, ...rest } = r || {};
-      auditBroken(s, action, brokenAttempts, m);
-      return settleChain(s, action, chain, rest, m);
+      auditBroken(s, action, brokenAttempts, m, onCostoTardivo);
+      return settleChain(s, action, chain, rest, m, onCostoTardivo);
     }
 
     // Chi chiede solo il testo lo legge come dati (un'etichetta, un giudizio, un JSON): un pezzo tagliato è un errore.
@@ -352,7 +358,7 @@
 
     // Chi ha servito e quanto è costato, chiesti a posteriori: best-effort e fuori dal cammino della risposta.
     // `ignota`: una risposta servita, che a tentativi finiti senza chi l'ha servita conta fra le ignote (#1472).
-    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, m = MUTO, ignota = false }) {
+    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, onCosto, m = MUTO, ignota = false }) {
       const P = providerOf(provider);
       if (!P || typeof P.lookupServedBy !== 'function') {
         if (ignota) contaServizio('servitaIgnota', action, model);
@@ -373,8 +379,9 @@
         try { r = await P.lookupServedBy({ apiKey, generationId }); } catch (_) { r = null; }
         if (r && !costDone && Number.isFinite(r.costUsd) && r.costUsd > 0) {
           costDone = true;
-          await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
+          const eur = await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
           m.tardiva(model, r.costUsd);
+          if (typeof onCosto === 'function' && eur > 0) { try { onCosto(eur); } catch (_) {} }
         }
         if (!r || !r.servedBy) { schedule(); return; }
         const seen = noteServed(s, action, { servedBy: r.servedBy, model, keySource: keySource || '' });

@@ -801,35 +801,52 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
 
   const attempts = buildAttemptChain(settings, model, configurata);
 
+  const inCronologia = action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
+    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
+    && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
+    // Passaggio interno di una ricerca, non una richiesta dell'utente: fuori dalla cronologia.
+    && action !== ACTIONS.MANAGE_SEARCH
+    // Il giudice delle carte è il passaggio interno di una ricerca nel deck builder, fino a venti chiamate a ricerca
+    // col prompt intero: in cronologia buttava fuori tutto il resto in una dozzina di ricerche (#382).
+    && action !== ACTIONS.DECKS_SEARCH_FILTER;
+  const voce = voceDelTurno(inCronologia ? History : null);
+
   // Col ragionamento o la risposta in diretta si usa lo streaming: la risposta finale è
   // identica, accumulata dai delta. I tempi del turno si contano dalla partenza.
   const t0 = Date.now();
   const timing = { firstReasoningMs: null, firstTextMs: null, firstToolMs: null, totalMs: 0 };
   const mark = (k) => { if (timing[k] == null) timing[k] = Date.now() - t0; };
   const textStreamer = onText ? createAnswerStreamer(onText) : null;
-  const result = (onReasoning || onText || onToolCall)
-    ? await (async () => {
-        let acc = '';
-        const r = await Gate.stream({
-          action, settings, attempts, messages, tools, toolChoice, signal,
-          onDelta: (d) => {
-            acc += d;
-            mark('firstTextMs');
-            if (textStreamer) textStreamer.push(d);
-          },
-          onReasoning: (t) => { mark('firstReasoningMs'); try { onReasoning && onReasoning(t); } catch (_) {} },
-          onToolCall: (c) => { mark('firstToolMs'); try { onToolCall && onToolCall(c); } catch (_) {} },
-          // Provider caduto a metà stream: il buffer ha testo parziale del tentativo fallito e va
-          // azzerato, e anche il testo già in chat va riscritto, non accodato: si segnala il reset.
-          onReset: () => {
-            acc = '';
-            if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
-          },
-        });
-        if (textStreamer) textStreamer.flush();
-        return { ...r, text: r.text != null ? r.text : acc };
-      })()
-    : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
+  let result;
+  try {
+    result = (onReasoning || onText || onToolCall)
+      ? await (async () => {
+          let acc = '';
+          const r = await Gate.stream({
+            action, settings, attempts, messages, tools, toolChoice, signal, onCostoTardivo: voce.costo,
+            onDelta: (d) => {
+              acc += d;
+              mark('firstTextMs');
+              if (textStreamer) textStreamer.push(d);
+            },
+            onReasoning: (t) => { mark('firstReasoningMs'); try { onReasoning && onReasoning(t); } catch (_) {} },
+            onToolCall: (c) => { mark('firstToolMs'); try { onToolCall && onToolCall(c); } catch (_) {} },
+            // Provider caduto a metà stream: il buffer ha testo parziale del tentativo fallito e va
+            // azzerato, e anche il testo già in chat va riscritto, non accodato: si segnala il reset.
+            onReset: () => {
+              acc = '';
+              if (textStreamer) { textStreamer.reset(); try { onText({ reset: true }); } catch (_) {} }
+            },
+          });
+          if (textStreamer) textStreamer.flush();
+          return { ...r, text: r.text != null ? r.text : acc };
+        })()
+      : await Gate.complete({ action, settings, attempts, messages, tools, toolChoice, signal });
+  } catch (e) {
+    timing.totalMs = Date.now() - t0;
+    voce.fallito({ action, provider: settings.provider, model: modelName, input: payload, output: `[${(e && e.message) || 'nessuna risposta'}]`, origin, timing });
+    throw e;
+  }
   timing.totalMs = Date.now() - t0;
   // Quanto il turno ha aspettato prima di chiamare il modello (stato del computer, saldo, contesto): `preparazioneMs`.
   if (tempiPrima && typeof tempiPrima === 'object') Object.assign(timing, tempiPrima);
@@ -837,21 +854,12 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
   const reasoningDetails = Array.isArray(result.reasoningDetails) ? result.reasoningDetails : [];
   const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
-  if (
-    action !== ACTIONS.TRANSLATE_PAGE && action !== ACTIONS.CATEGORIZE
-    && action !== ACTIONS.SPELLCHECK_SEMANTIC && action !== ACTIONS.SPELLCHECK_CONTEXT
-    && action !== ACTIONS.HELP_INTENT_GUESS && action !== ACTIONS.HELP_INTENT_JUDGE
-    // Passaggio interno di una ricerca, non una richiesta dell'utente: fuori dalla cronologia.
-    && action !== ACTIONS.MANAGE_SEARCH
-    // Il giudice delle carte è il passaggio interno di una ricerca nel deck builder, fino a venti chiamate a ricerca
-    // col prompt intero: in cronologia buttava fuori tutto il resto in una dozzina di ricerche (#382).
-    && action !== ACTIONS.DECKS_SEARCH_FILTER
-  ) {
+  if (inCronologia) {
     // Un giro fatto solo di chiamate non è una risposta vuota: le azioni entrano nell'output.
     const calledOut = toolCalls.length
       ? `${result.text ? `${result.text}\n\n` : ''}[Azioni: ${toolCalls.map((c) => c.name).join(', ')}]`
       : result.text;
-    await History.append({
+    await voce.scrivi({
       action, provider: usedProvider, model: concreteModel, servedBy,
       policyViolation: violation,
       input: payload, output: calledOut, origin, costEur, usage: result.usage, timing,
@@ -866,6 +874,33 @@ async function chiamaIlModello({ action, payload, origin, sender = null, onReaso
     // La chiave propria è stata rifiutata e ha risposto la personale (#629):
     // chi mostra la risposta lo dice all'utente.
     keyFallback: ripiegoDaDire(result.keyFallback),
+  };
+}
+
+// La voce di Cronologia di un turno coi costi che il router dice dopo (tentativi rotti, risposta senza conto, #1302):
+// entrano nella voce già scritta; un turno finito senza risposta ha la sua voce solo se qualcosa si è pagato.
+function voceDelTurno(H) {
+  let base = 0;
+  let tardivi = 0;
+  let scritta = null;
+  let daScrivere = null;
+  const scrivi = (entry) => {
+    base = Number(entry.costEur) || 0;
+    scritta = Promise.resolve(H.append({ ...entry, costEur: base + tardivi })).catch(() => null);
+    return scritta;
+  };
+  return {
+    costo(eur) {
+      tardivi += Number(eur) || 0;
+      if (scritta) scritta.then((h) => (h && h.id ? H.patch(h.id, { costEur: base + tardivi }) : null)).catch(() => {});
+      else if (daScrivere) scrivi(daScrivere);
+    },
+    scrivi: (entry) => (H ? scrivi(entry) : Promise.resolve(null)),
+    fallito(entry) {
+      if (!H) return;
+      if (tardivi > 0) scrivi(entry);
+      else daScrivere = entry;
+    },
   };
 }
 
@@ -900,15 +935,22 @@ async function handleStream({ action, payload, origin, onDelta, onMeta, onReset,
     return { costEur: 0, usage: cached.usage || {}, cached: true, provider: settings.provider, model };
   }
 
-  const result = await Gate.stream({
-    action, settings, messages, signal,
-    onDelta: (delta) => { if (onDelta) onDelta(delta); },
-    // Provider caduto dopo i primi delta: il renderer butta il parziale prima del ripiego.
-    onReset: (info) => { if (onReset) onReset(info); },
-  });
+  const voce = voceDelTurno(History);
+  let result;
+  try {
+    result = await Gate.stream({
+      action, settings, messages, signal, onCostoTardivo: voce.costo,
+      onDelta: (delta) => { if (onDelta) onDelta(delta); },
+      // Provider caduto dopo i primi delta: il renderer butta il parziale prima del ripiego.
+      onReset: (info) => { if (onReset) onReset(info); },
+    });
+  } catch (e) {
+    voce.fallito({ action, provider: settings.provider, model, input: payload, output: `[${(e && e.message) || 'nessuna risposta'}]`, origin });
+    throw e;
+  }
   const { provider: usedProvider, model: concreteModel, servedBy, violation, costEur } = result;
 
-  await History.append({
+  await voce.scrivi({
     action, provider: usedProvider, model: concreteModel, servedBy,
     policyViolation: violation,
     input: payload, output: result.text, origin, costEur, usage: result.usage,
