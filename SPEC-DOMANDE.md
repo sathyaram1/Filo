@@ -847,7 +847,7 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
     rispetta con un tetto suo, separato da quello del lavoro.
 - **Chi controlla lei:** il server conta le sue sessioni chiuse bene, non le
   scritture nel taccuino, e quando da troppo non ne vede una apre una domanda
-  per l'owner (la soglia sta in SPEC-MANUTENTORE.md § 7).
+  per l'owner (regola, soglia e stato in SPEC-MANUTENTORE.md § 7).
 
 ### 4.4 Cosa minimizzare
 
