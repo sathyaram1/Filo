@@ -91,7 +91,8 @@ Una sessione locale che scrive la nota da sé la fa segnare con l'op
 `notaFidata` del biglietto locale: il server la segna solo da un biglietto
 aperto e pulito, e solo per l'ultimo turno non dell'owner.
 Le routine, a cui la conversazione la consegna il server, restano per ora sul
-segno `scrittoSporco` (chi ha scritto da sporco tramite il server): con le
+segno `scrittoSporco`, anche quando leggono i testi dal cloud (compito di
+gestione del lavoro, manutentore) (chi ha scritto da sporco tramite il server): con le
 note senza impronta non fidate, ogni lavoro già avviato nascerebbe sporco.
 Passano alla regola delle note col timbro delle note di prima (#1918).
 
