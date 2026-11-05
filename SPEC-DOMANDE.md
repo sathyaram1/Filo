@@ -634,8 +634,10 @@ Come funziona oggi (#1152):
     lettura di un'istanza che ha consegnato il rapporto (la prima volta,
     l'ultima settimana), ognuna col riassunto del manutentore (titolo,
     stato, ultimo aggiornamento) e le domande aperte o in lavorazione
-    collegate, per origine, collegamenti, azioni, fermo o perché gli
-    aggiornamenti le nominano. Il feedback intero (`feedback.leggi`) di un
+    collegate, per origine, collegamenti, azioni, fermo, perché gli
+    aggiornamenti le nominano, o perché titolo, testo o aggiornamenti del
+    lavoro nominano il feedback che la domanda ferma o da cui è nata (#2149:
+    D-266 ferma #2101, e #2105 che la attua nomina solo #2101). Il feedback intero (`feedback.leggi`) di un
     lavoro fuso porta anche gli aggiornamenti, cioè cosa ha fatto: la
     revisione decide su quello, non sulla sola richiesta, e chi li ha
     scritti da sporco sporca anche lei. La chiusura è `domande.chiudi`, col
