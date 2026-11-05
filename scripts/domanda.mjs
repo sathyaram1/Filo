@@ -206,13 +206,60 @@ export function soloDaFilo(azione) {
 }
 
 /** Il motivo di un errore della callable. PURA. */
-export function messaggioErrore(status, body) {
+export function messaggioErrore(status, body, funzione = 'ownerDomande') {
   const b = body || {};
   const err = b.error || {};
   const res = b.result && b.result.ok === false ? b.result : null;
   const msg = err.message || (res && (res.detail || res.reason))
-    || (status === 404 ? 'la funzione ownerDomande non esiste sul server (non ancora pubblicata?)' : `errore ${status}`);
+    || (status === 404 ? `la funzione ${funzione} non esiste sul server (non ancora pubblicata?)` : `errore ${status}`);
   return visibile(msg);
+}
+
+// ── Con quale credenziale (#2015) ───────────────────────────────────────────
+
+const VAR_ADMIN = 'FILO_ADMIN_REFRESH_TOKEN';
+const VAR_NON_FIDATO = CHIAVI.find((c) => c.classe === 'owner-non-fidato').variabile;
+export const CLASSE_NON_FIDATO = 'owner-non-fidato';
+
+/**
+ * Il token admin, poi la chiave owner-non-fidato, poi quella del manutentore (che delle domande fa solo il registro).
+ * PURA. @returns {{ tipo: 'admin' } | { tipo: 'owner-non-fidato'|'manutentore', passphrase, variabile } | null}
+ */
+export function credenzialeDomande({ env = {}, tokenAdmin = '' } = {}) {
+  if (String(tokenAdmin || '').trim()) return { tipo: 'admin' };
+  const k = chiaveDallAmbiente(env);
+  return k ? { tipo: k.classe, passphrase: k.passphrase, variabile: k.variabile } : null;
+}
+
+export const SENZA_CREDENZIALI = `servono le credenziali dell'owner: il token admin (${VAR_ADMIN}) dalla sua macchina, `
+  + `o la chiave owner-non-fidato (${VAR_NON_FIDATO}, ${comeCrearla(CLASSE_NON_FIDATO)}) da una sede non fidata`;
+
+/** Perché una credenziale non fa questo comando, o '' se lo fa. Si dice prima di chiamare il server. PURA. */
+export function rifiutoDellaCredenziale(cred, cmd) {
+  if (!cred) return SENZA_CREDENZIALI;
+  if (cred.tipo === 'admin') return '';
+  if (cmd === 'chiedi') {
+    return `«chiedi» con la chiave ${cred.tipo} non parte: una domanda per l'owner nasce da un lavoro (col suo biglietto) o dalla finestra di Filo; `
+      + 'il manutentore la apre con npm run manutentore -- domanda <file.json>';
+  }
+  if (cred.tipo === CLASSE_NON_FIDATO || cmd === 'registro') return '';
+  return `la chiave del manutentore (${cred.variabile}) delle domande legge solo il registro: per ${cmd} serve ${VAR_ADMIN} o ${VAR_NON_FIDATO}`;
+}
+
+/** La riga che dice con cosa si parla: con una chiave quello che si scrive nasce non fidato. PURA. */
+export function rigaCredenziale(cred) {
+  if (!cred || cred.tipo === 'admin') return '';
+  return `Parlo con la chiave ${cred.tipo} (${cred.variabile}): le risposte, le archiviazioni e le riaperture da qui nascono `
+    + 'non fidate, segnate in Gestione, Domande e nel recap del mattino, e l\'owner le può riaprire.';
+}
+
+/**
+ * Il corpo per chiaveDomande: il contratto di ownerDomande con la parola d'ordine in `passphrase`. Biglietto e sessione
+ * il server li ignora con la chiave, e un segreto che non serve non viaggia. PURA.
+ */
+export function corpoChiave(data, passphrase) {
+  const { biglietto, sessione, passphrase: _p, ...resto } = data && typeof data === 'object' ? data : {};
+  return Object.assign(resto, { passphrase: String(passphrase || '') });
 }
 
 /**
