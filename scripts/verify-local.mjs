@@ -1265,7 +1265,7 @@ if (isMain) {
     process.exit(0);
   }
 
-  // Qui nessun comando accetta opzioni (salvo --feedback di start, che si toglie subito sotto): una parola con due trattini in coda
+  // Qui nessun comando accetta opzioni (salvo --feedback e --richiesta-owner di start, che si tolgono subito sotto): una parola con due trattini in coda
   // finiva DENTRO al testo della critica (o del report) e l'esito veniva
   // registrato lo stesso — un testo che non si modifica più, e che l'owner
   // legge nella chat del feedback (feedback #565).
