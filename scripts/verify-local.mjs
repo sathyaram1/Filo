@@ -726,7 +726,7 @@ export function cartellaProveGiro(branch) {
  */
 export function testoProveDaCancellare(branch, derived) {
   const cartella = cartellaProveGiro(branch);
-  const elenco = (Array.isArray(derived) ? derived : []).filter((f) => messoDaParte(f) && f.text);
+  const elenco = rilieviMessiDaParte(derived).filter((f) => f.text);
   return [
     `Adesso togli da ${cartella} le prove che riproducono questi rilievi: il rilievo vive nel feedback`,
     'che ne nasce, e la cartella del giro non deve crescere di giro in giro. Una per rilievo:',
