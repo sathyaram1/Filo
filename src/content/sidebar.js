@@ -2337,7 +2337,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // Con delle correzioni il modello deve ritrovare nei turni dopo quali ha proposto: gli torna la sua risposta intera.
       const conCorrezioni = !!(valutazione && parsed.correzioni && parsed.correzioni.length);
       if (valuta) contaValuta(conCorrezioni ? 'con_correzioni' : 'senza_correzioni');
-      history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text) });
+      // Fermata prima del testo: al «Continua» il modello ritrova la nota, non un turno vuoto che un host rifiuta.
+      history.push({ role: 'assistant', content: conCorrezioni ? res.text : (parsed.display || res.text || interrotta) });
 
       if (parsed.choices && parsed.choices.length) {
         renderChoices(assistantEl, parsed.choices);
