@@ -32,4 +32,8 @@ quello: un confronto che non dipende da come è finito il giro prima. I segni
 restano solo per le decisioni della fonte che rimandare non cambia (un no
 definitivo), e chi riscrive la copia non se li porta dietro.
 
+Il confronto vale quanto la lettura su cui poggia: chi manda (anche `scrivi` e
+`rileggi`) rilegge la fonte subito prima. Un indice di ore prima, o scritto
+prima che portasse l'ora, fa sovrascrivere una scheda più nuova (#1785.2 giro 2).
+
 Prove: `tests/unit/feedbackCloud.test.mjs`.
