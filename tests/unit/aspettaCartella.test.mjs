@@ -59,7 +59,7 @@ const canale = (cwd, env, ...args) => new Promise((ok) => {
 test('aspetta <biglietto> sul processo vero: 5 mentre lavora, 0 quando ha finito', { skip: !LINUX && 'i processi si leggono da /proc' }, async () => {
   const dir = cartellaTemporanea('aspetta-');
   // Un comando in sottofondo del worker: un'altra sessione, la cartella di lavoro è la sua.
-  const lungo = spawn(process.execPath, ['-e', 'setTimeout(() => {}, 60000)'], { cwd: dir, detached: true, stdio: 'ignore' });
+  const lungo = spawn(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { cwd: dir, detached: true, stdio: 'ignore' });
   lungo.unref();
   try {
     const presto = await canale(dir, { FILO_ASPETTA_FETTA_MS: '1500' }, 'aspetta', T);
