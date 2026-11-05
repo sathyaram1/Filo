@@ -276,8 +276,8 @@ Il minimo di feedback; chi li prende usa sotto-agenti per area.
   dell'owner; via i tetti per priorità e la riserva su A;
 - sveglie (§ 4): segnali che accendono il manutentore, sveglia richiesta,
   tetto suo nel pacemaker; compito ricorrente quotidiano per la decisione;
-  fermo su un guasto suo, solo il mattino; il controllo sulle sessioni chiuse
-  bene (§ 7);
+  fermo su un guasto suo con le sole accensioni del § 7 (chat e «lascialo
+  riprovare» comprese) e il controllo sulle sessioni chiuse bene (§ 7, #1249.4);
 - guasti (§ 7): via il rispetto globale; lavoro guasto fermo finché una nota del
   manutentore o una correzione non lo sblocca; domanda di processo nel rilascio
   che sveglia il manutentore;
