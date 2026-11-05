@@ -155,7 +155,7 @@ export function motivoLettura(input, ctx = {}) {
   for (const c of ctx.claude || []) {
     const rel = relativo(file, c, P, win);
     if (rel === null) continue;
-    return ammessoInClaude(rel, { win, sessione: ctx.sessione }) ? '' : `${nome} dalla cartella di Claude (${nomeFile})`;
+    return ammessoInClaude(rel, { win, sessione: ctx.sessione, cartella: nome === 'Grep' }) ? '' : `${nome} dalla cartella di Claude (${nomeFile})`;
   }
   if ((ctx.cartelle || []).some((c) => dentro(file, c, P, win))) return '';
   const uguale = (a) => (win ? a.toLowerCase() === file.toLowerCase() : a === file);
