@@ -5,6 +5,8 @@
 //   - manager dei tab basato su WebContentsView
 //   - servizi (storage, providers AI, saved pages, ecc.)
 
+// Il passo «moduli_caricati» dei contatori d'avvio: da qui alla fine del codice in cima al file, prima di whenReady.
+const inizioModuli = Date.now();
 const { app, BrowserWindow, nativeTheme, session } = require('electron');
 const path = require('node:path');
 
