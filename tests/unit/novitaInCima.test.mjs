@@ -220,6 +220,20 @@ test('prima del rebase lo strumento riconosce la riga che finirà sotto la versi
   assert.equal(readFileSync(join(s.work, FILE_NOVITA), 'utf8'), ATTESO);
 });
 
+test('senza --commit lo strumento dice cosa sposterebbe e non tocca il ramo, anche con una riga da spostare davvero', () => {
+  // Chi verifica lo lancia così per riconoscere il caso: la correzione nel suo ramo finirebbe col commit della verifica.
+  const s = scena();
+  const sulRamo = readFileSync(join(s.work, FILE_NOVITA), 'utf8');
+  const punta = git(s.work, ['rev-parse', 'HEAD']);
+  const cli = execFileSync(process.execPath, [join(REPO, 'scripts', 'novita-in-cima.mjs')],
+    { encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: s.work, FILO_ROUTINE: '' } });
+  assert.match(cli, /una riga del ramo sta sotto versioni già uscite alla partenza del ramo e va nel blocco 0\.2\.258\. Non ho toccato niente/);
+  assert.match(cli, /in 0\.2\.257: Una novità del ramo/);
+  assert.equal(readFileSync(join(s.work, FILE_NOVITA), 'utf8'), sulRamo);
+  assert.equal(git(s.work, ['status', '--porcelain']), '');
+  assert.equal(git(s.work, ['rev-parse', 'HEAD']), punta);
+});
+
 test('l\'avviso vale solo per una versione di main più alta di quella del ramo', () => {
   const prima = [{ version: '0.2.257', features: ['in arrivo'] }, { version: '0.2.256', features: ['uscita'] }];
   const dopo = [{ version: '0.2.257', features: ['in arrivo', 'del ramo'] }, { version: '0.2.256', features: ['uscita'] }];
