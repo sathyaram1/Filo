@@ -92,10 +92,14 @@ test('editor srcdoc mandato con una richiesta della pagina', async ({ app, shell
   try {
     const ris = {};
     let k = 0;
-    for (const [api, svuota, dove] of [['/api/rifiuta', true, 'R'], ['/api/rifiuta', false, 'R'], ['/api/ok', true, 'A'], ['/api/ok', false, 'A']]) {
+    const FORME = {
+      srcdoc: [RIQ, ''],
+      scritto: ['<iframe id="ifr" style="width:420px;height:120px"></iframe>', "{ const d = ifr.contentDocument; d.open(); d.write(\"<body contenteditable=true style='min-height:100px'></body>\"); d.close(); }"],
+    };
+    for (const [forma, [riq, prep]] of Object.entries(FORME)) for (const [api, svuota, dove] of [['/api/rifiuta', true, 'R'], ['/api/rifiuta', false, 'R'], ['/api/ok', true, 'A'], ['/api/ok', false, 'A']]) {
       const titolo = `Fe${++k}`;
-      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title><ul id="msg"></ul>${RIQ}<button id="pub">Invia</button><p id="esito"></p>
-        <script>pub.onclick = () => { const b = ifr.contentDocument.body; const t = b.innerHTML; ${svuota ? "b.innerHTML = '';" : ''}
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title><ul id="msg"></ul>${riq}<button id="pub">Invia</button><p id="esito"></p>
+        <script>${prep} pub.onclick = () => { const b = ifr.contentDocument.body; const t = b.innerHTML; ${svuota ? "b.innerHTML = '';" : ''}
           fetch('${api}', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ testo: t }) }).then((r) => { esito.textContent = r.ok ? 'ok' : 'no'; }); };</script>`));
       await page.frameLocator('#ifr').locator('body').click();
       await page.keyboard.type(LETTERA);
