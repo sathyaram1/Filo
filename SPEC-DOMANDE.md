@@ -838,7 +838,7 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 - **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
   per sempre. Un segnale le anticipa l'istanza (SPEC-MANUTENTORE.md § 4):
   una sessione al giorno non basta a un feedback fermo. Ferma su un guasto
-  suo, invece, resta solo la sessione del giorno. Le indagini lunghe le fanno
+  suo, invece, la regola è in SPEC-MANUTENTORE.md § 7. Le indagini lunghe le fanno
   sotto-agenti, e il suo contesto resta piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
