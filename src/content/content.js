@@ -484,7 +484,8 @@
       if (tag === 'TEXTAREA') return t;
       if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
       if (!t.isContentEditable) return null;
-      while (t.parentElement && t.parentElement.isContentEditable) t = t.parentElement;
+      // Col documento tutto modificabile (designMode) il testo dell'utente è il corpo: sopra stanno gli strati di Filo.
+      while (t.parentElement && t.parentElement.isContentEditable && t !== t.ownerDocument.body) t = t.parentElement;
       return t;
     }
     // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
