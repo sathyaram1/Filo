@@ -136,6 +136,31 @@ describe('quale tentativo precedente si riprende', () => {
     } finally { togliCartella(base); }
   });
 
+  test('feedback riaperto: un tentativo morto prima di quello fuso è superato, uno morto dopo si riprende', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      tentativo(casa, ramo('20261101T000000Z'), main, 3);
+      const fuso = tentativo(casa, ramo('20261102T000000Z'), main, 1);
+      git(casa, 'merge', '-q', '--no-ff', '--no-edit', fuso);
+      git(casa, 'push', '-q', 'origin', 'main');
+      const r = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(r.scelto, null, 'il lavoro del primo è stato superato da quello fuso');
+      assert.deepEqual(r.superati, [ramo('20261101T000000Z')]);
+
+      tentativo(casa, ramo('20261103T000000Z'), 'main', 2);
+      const dopo = tentativiPrecedenti({ root: casa, id: ID });
+      assert.equal(dopo.scelto.ramo, ramo('20261103T000000Z'), 'morto dopo la riapertura: è il lavoro da riprendere');
+      assert.deepEqual(dopo.altri, []);
+      assert.deepEqual(dopo.superati, [ramo('20261101T000000Z')]);
+
+      const c = chiudiTentativi({ root: casa, rami: dopo.superati });
+      assert.equal(c.ok, true, c.errore);
+      assert.equal(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261101T000000Z')}`), '', 'il ramo superato non resta su origin');
+      assert.notEqual(git(casa, 'ls-remote', 'origin', `refs/heads/${ramo('20261103T000000Z')}`), '');
+    } finally { togliCartella(base); }
+  });
+
   test('origin che non risponde è un «non so», non un «non ce ne sono»', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
