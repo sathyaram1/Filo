@@ -192,7 +192,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
     });
 
     test('gira su main a ogni rosso, anche con npm ci rosso prima della suite; salta una corsa verde, un ramo, una corsa annullata', () => {
-      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
+      assert.match(avvisoJob, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows,\s*unit-windows-punta\s*\]\s*$/m, '`avviso` legge gli esiti di tutti i lavori provati');
       const apre = {
         'rossi nuovi della suite': { verdetto: 'failure' },
         'npm ci rosso in una parte, prima della suite': { suite: 'failure', verdetto: 'failure' },
@@ -312,7 +312,7 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
           leggi: ['allarme.json'],
         });
         const argv = r.letti['allarme.json'] ? JSON.parse(r.letti['allarme.json']) : null;
-        return { stato: r.stato, registro: r.registro, titolo: argv?.[0], testo: argv?.[1] || '', chiavi: argv?.slice(2) };
+        return { stato: r.stato, registro: r.registro, riepilogo: r.riepilogo, titolo: argv?.[0], testo: argv?.[1] || '', chiavi: argv?.slice(2) };
       };
 
       test('suite senza allegato (npm ci rosso in una parte): feedback con la chiave «non partita»', () => {
@@ -364,6 +364,36 @@ describe('suite.yml: la suite completa a ogni fusione su main', () => {
         // Il registro è nato su Windows e lo legge Linux: le chiavi devono restare quelle del cancello.
         assert.deepEqual(chiaviDelRegistroUnit(registro, '/home/runner/work/Filo/Filo'), chiaviDelRegistroUnit(registro, 'D:\\a\\Filo\\Filo'));
         assert.deepEqual(chiaviDelRegistroUnit(registro, '/home/runner/work/Filo/Filo'), ['unit:tests/unit/x.test.mjs']);
+      });
+
+      // #2148: i rossi di #2145 li aveva già corretti una fusione arrivata mentre la suite girava.
+      const REGISTRO_DUE = [
+        "not ok 1 - a\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\a.test.mjs:3:1'",
+        "not ok 2 - b\n  location: 'D:\\\\a\\\\Filo\\\\Filo\\\\tests\\\\unit\\\\b.test.mjs:3:1'",
+      ].join('\n');
+      const PUNTA = 'fe'.padEnd(40, '1');
+
+      test('unit rossi tutti già verdi su Windows sulla punta: nessun feedback, e il riepilogo dice quali', () => {
+        const r = gira(allarmeUnit, {
+          file: { 'esiti-unit/unit.log': REGISTRO_DUE },
+          env: { PUNTA, GIA_VERDI: 'tests/unit/a.test.mjs tests/unit/b.test.mjs', TUTTI_GIA_VERDI: 'true' },
+        });
+        assert.equal(r.stato, 0, r.registro);
+        assert.equal(r.titolo, undefined, 'il feedback chiederebbe un lavoro già fuso');
+        assert.match(r.registro, /gia' verdi sulla punta di main \(fe11111111\)/);
+        assert.match(r.riepilogo, /- tests\/unit\/a\.test\.mjs\n- tests\/unit\/b\.test\.mjs/);
+      });
+
+      test('unit rossi verdi sulla punta solo in parte: feedback, che dice quali non correggere', () => {
+        const r = gira(allarmeUnit, {
+          file: { 'esiti-unit/unit.log': REGISTRO_DUE },
+          env: { PUNTA, GIA_VERDI: 'tests/unit/a.test.mjs', TUTTI_GIA_VERDI: 'false' },
+        });
+        assert.equal(r.stato, 0, r.registro);
+        assert.equal(r.titolo, 'Unit test rossi su Windows: commit non pubblicabile');
+        assert.deepEqual(r.chiavi, ['--chiavi-unit', 'esiti-unit/unit.log', '--commit', SHA_PROVATO]);
+        assert.match(r.testo, /Gia verdi su Windows sulla punta di main \(fe11111111\), da non correggere: tests\/unit\/a\.test\.mjs/);
+        assert.match(r.testo, /location: 'D:.*b\.test\.mjs/);
       });
     });
   });
@@ -486,6 +516,82 @@ describe('suite.yml: gli unit test su Windows, gli stessi del cancello di pubbli
   test('la scelta del verde chiede alle corse se questo lavoro è passato', () => {
     assert.ok(SCEGLI_JS.includes('/actions/runs/${r.id}/jobs'), 'senza chiedere i lavori, un verde di prima del lavoro passerebbe');
     assert.match(SCEGLI_JS, /scegliUltimoVerde\(runs, primoGenitore, valida\)/);
+  });
+
+  // #2148: la suite dura ore, e una fusione arrivata intanto può aver già corretto i rossi del commit provato.
+  describe('a fine suite i rossi si rifanno su Windows sulla punta di main', () => {
+    const punta = senzaCommenti(job('unit-windows-punta', SUITE_YML));
+    const passiPunta = passi(punta);
+    const rifai = passiPunta.find((p) => p.id === 'rifai');
+    const se = (punta.match(/^ {4}if:\s*(.+)$/m) || [])[1] || '';
+    const corsa = ({ ref = 'refs/heads/main', unit: u = 'failure', cancellata = false } = {}) => ({
+      github: { ref }, cancellata,
+      needs: { suite: { result: 'success' }, verdetto: { result: 'success' }, [LAVORO_UNIT_WINDOWS]: { result: u } },
+    });
+
+    test('gira su Windows dopo la suite, solo su main e a unit rossi, col codice della punta e senza segreti', () => {
+      assert.match(punta, /runs-on:\s*windows-latest/, 'i rossi sono di Windows: su Linux passerebbero senza essere corretti');
+      assert.match(punta, /^ {4}needs:\s*\[\s*suite,\s*verdetto,\s*unit-windows\s*\]\s*$/m, 'a fine suite, quando l\'avviso apre il feedback');
+      assert.equal(valutaCondizione(se, corsa()), true);
+      assert.equal(valutaCondizione(se, corsa({ unit: 'success' })), false);
+      assert.equal(valutaCondizione(se, corsa({ ref: 'refs/heads/prova' })), false);
+      assert.equal(valutaCondizione(se, corsa({ cancellata: true })), false);
+      assert.match(passiPunta[0].corpo, /actions\/checkout[\s\S]*ref:\s*main\s*$/m);
+      assert.match(passiPunta[0].corpo, /fetch-depth:\s*0\s*$/m, 'storia intera come la prima corsa: in una copia corta un unit che la legge si salta e passa');
+      assert.doesNotMatch(punta, /secrets\.|environment:|build-alarm/, 'qui gira il codice della punta');
+      assert.match(punta, /node scripts\/npm-ci-ritenta\.mjs/);
+    });
+
+    test('legge il registro che carica il lavoro degli unit, e passa all\'avviso cosa ha trovato', () => {
+      const scarica = passiPunta.find((p) => /download-artifact/.test(p.corpo));
+      const carica = passi(senzaCommenti(job(LAVORO_UNIT_WINDOWS, SUITE_YML))).find((p) => /upload-artifact/.test(p.corpo));
+      const nome = (p) => (p.corpo.match(/^ {10}name:\s*(\S+)\s*$/m) || [])[1];
+      assert.equal(nome(scarica), nome(carica));
+      assert.match(scarica.corpo, /path:\s*esiti-unit\s*$/m);
+      assert.match(rifai.corpo, /node scripts\/rossi-sulla-punta\.mjs esiti-unit\/unit\.log/);
+      assert.deepEqual(usciteDelLavoro(punta), {
+        punta: { passo: 'rifai', chiave: 'punta' }, gia_verdi: { passo: 'rifai', chiave: 'gia_verdi' }, tutti: { passo: 'rifai', chiave: 'tutti' },
+      });
+      const allarmeUnit = passi(senzaCommenti(job('avviso', SUITE_YML))).find((p) => /Unit test rossi su Windows/.test(p.corpo) && /build-alarm/.test(p.corpo));
+      for (const [env, uscita] of [['PUNTA', 'punta'], ['GIA_VERDI', 'gia_verdi'], ['TUTTI_GIA_VERDI', 'tutti']]) {
+        assert.match(allarmeUnit.corpo, new RegExp(`^ {10}${env}: \\$\\{\\{ needs\\.unit-windows-punta\\.outputs\\.${uscita} \\}\\}$`, 'm'));
+      }
+    });
+
+    test('con main fermo sul commit provato non rifà niente', () => {
+      for (const p of passiPunta.slice(2)) {
+        const c = (p.corpo.match(/^ {8}if:\s*(.+)$/m) || [])[1] || '';
+        const sha = 'ab'.padEnd(40, '0');
+        assert.equal(valutaCondizione(c, { github: { sha }, steps: { punta: { outputs: { sha } } } }), false, p.nome);
+        assert.equal(valutaCondizione(c, { github: { sha }, steps: { punta: { outputs: { sha: 'cd'.padEnd(40, '0') } } } }), true, p.nome);
+      }
+    });
+
+    describe('il passo, fatto girare', { skip: !haBash && 'serve bash' }, () => {
+      const PUNTA = 'cd'.padEnd(40, '2');
+      const FINTO = "process.stdout.write(process.env.FINTO_VERDI || ''); process.exit(Number(process.env.FINTO_ESITO || 0));";
+      const gira = ({ registro = 'not ok 1\n', verdi = '', esito = 0 } = {}) => eseguiPasso(`cd "$CARTELLA_PASSO"\n${scriptDelPasso(rifai.corpo)}`, {
+        env: { CARTELLA_PASSO: '{{dir}}', PUNTA, FINTO_VERDI: verdi, FINTO_ESITO: esito },
+        file: { 'scripts/rossi-sulla-punta.mjs': FINTO, ...(registro ? { 'esiti-unit/unit.log': registro } : {}) },
+      });
+
+      test('tutti verdi sulla punta: lo dice all\'avviso, con la punta e i file', () => {
+        const r = gira({ verdi: 'tests/unit/a.test.mjs\ntests/unit/b.test.mjs\n', esito: 0 });
+        assert.equal(r.stato, 0, r.registro);
+        assert.deepEqual(r.uscite, { punta: PUNTA, gia_verdi: 'tests/unit/a.test.mjs tests/unit/b.test.mjs', tutti: 'true' });
+      });
+
+      test('verdi solo in parte, o lo strumento che cade: non tutti', () => {
+        assert.deepEqual(gira({ verdi: 'tests/unit/a.test.mjs\n', esito: 1 }).uscite, { punta: PUNTA, gia_verdi: 'tests/unit/a.test.mjs', tutti: 'false' });
+        assert.equal(gira({ esito: 2 }).uscite.tutti, 'false');
+      });
+
+      test('senza registro non dice niente: l\'avviso apre come prima', () => {
+        const r = gira({ registro: '' });
+        assert.equal(r.stato, 0, r.registro);
+        assert.deepEqual(r.uscite, {});
+      });
+    });
   });
 });
 
