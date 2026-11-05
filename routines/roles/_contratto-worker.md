@@ -121,9 +121,9 @@ finisce l'harness te lo avvisa da sé. Per un avviso a ogni riga di un log c'è
 lo strumento Monitor. Non chiudere il turno per aspettare: con la tua risposta
 finale i comandi in sottofondo muoiono, e l'avviso non arriva più. Quando resta
 solo da aspettare, l'attesa in primo piano è
-`node scripts/routine-channel.mjs aspetta <biglietto>`: dura al massimo cento
-secondi, esce 0 quando nessun tuo processo lavora più nella cartella e 5 quando
-lavorano ancora (rilancialo, subito). Il timeout della chiamata si
+`node scripts/routine-channel.mjs aspetta <biglietto>`: sta sotto il timeout
+predefinito della chiamata, esce 0 quando nessun tuo processo lavora più nella
+cartella e 5 quando lavorano ancora (rilancialo, subito). Il timeout della chiamata si
 dimensiona sulla **durata vera** del comando, mai sotto: un comando ucciso a
 metà va rifatto da capo. Lunghi di sicuro: le prove di un feedback (otto minuti
 e mezzo), `npm run finish:check` (da quindici a quarantacinque minuti),
