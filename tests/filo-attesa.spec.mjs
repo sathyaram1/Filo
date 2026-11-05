@@ -214,8 +214,8 @@ test('C — il quadrato ferma subito: filo tagliato, ragionamento a metà aperto
   const ferma = page.locator('#stopBtn');
   await expect(ferma).toBeVisible();
   await expect(page.locator('#sendBtn')).toBeHidden();
-  const quadrato = await ferma.boundingBox();
-  for (const k of ['x', 'y', 'width', 'height']) expect(Math.abs(quadrato[k] - posto[k])).toBeLessThan(3);
+  const quadrato = await postoNelCampo(page, '#stopBtn');
+  for (const k of ['destra', 'basso', 'width', 'height']) expect(Math.abs(quadrato[k] - posto[k])).toBeLessThan(3);
   await page.screenshot({ path: 'tests/.shots/filo-attesa-quadrato.png' });
   await expect(blocco.locator('.dash-activity-seg[data-stato="pensa"] .dash-activity-trama')).toContainText('elenco', { timeout: 4_000 });
 
