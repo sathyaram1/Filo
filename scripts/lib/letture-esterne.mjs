@@ -81,16 +81,20 @@ export const CLAUDE_CARTELLE_AMMESSE = Object.freeze(['skills', 'commands', 'age
 
 /**
  * `rel` (relativo alla cartella di Claude) è fra le parti ammesse? Dei progetti valgono la memoria e la storia della
- * sessione stessa (`sessione`), che ha già in contesto: quella di un'altra sessione no. PURA.
+ * sessione stessa (`sessione`), che ha già in contesto: quella di un'altra sessione no. Con `cartella` (una ricerca)
+ * vale anche la cartella ammessa in sé, perché quello che ci sta dentro è tutto ammesso. PURA.
  */
-export function ammessoInClaude(rel, { win = false, sessione = '' } = {}) {
+export function ammessoInClaude(rel, { win = false, sessione = '', cartella = false } = {}) {
   const pezzi = String(rel || '').split(win ? /[\\/]+/ : /\/+/).filter(Boolean);
   const uguale = (a, b) => (win ? String(a).toLowerCase() === String(b).toLowerCase() : a === b);
-  if (pezzi.length === 1) return CLAUDE_FILE_AMMESSI.some((f) => uguale(f, pezzi[0]));
+  const s = String(sessione || '').trim();
+  if (pezzi.length === 1) {
+    return CLAUDE_FILE_AMMESSI.some((f) => uguale(f, pezzi[0])) || (cartella && CLAUDE_CARTELLE_AMMESSE.some((c) => uguale(c, pezzi[0])));
+  }
   if (pezzi.length > 1 && CLAUDE_CARTELLE_AMMESSE.some((c) => uguale(c, pezzi[0]))) return true;
   if (pezzi.length < 3 || !uguale(pezzi[0], 'projects')) return false;
   if (pezzi.length > 3 && uguale(pezzi[2], 'memory')) return true;
-  const s = String(sessione || '').trim();
+  if (cartella && pezzi.length === 3 && (uguale(pezzi[2], 'memory') || (!!s && uguale(pezzi[2], s)))) return true;
   return !!s && (uguale(pezzi[2], s) ? pezzi.length > 3 : pezzi.length === 3 && uguale(pezzi[2], `${s}.jsonl`));
 }
 
