@@ -79,10 +79,9 @@
   }
   // Un lavoro server che nessuna routine prende perché il suo biglietto nascerebbe non fidato (#2036): i motivi li
   // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda.
-  const STATI_IN_CODA = Object.freeze(['todo', 'revision_capability', 'revision_security']);
   function restaLocale(fb) {
     const r = fb && fb.restaLocale;
-    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_IN_CODA.includes(normalizeStatus(fb).status)) return null;
+    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
     const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
     return motivi.length ? { motivi, atMs: Number(r.atMs) || 0 } : null;
   }
