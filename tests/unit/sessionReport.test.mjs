@@ -1087,3 +1087,35 @@ test('la riga d\'errore è quella del fallimento: mai una prova passata che si c
   assert.equal(rigaErrore('Exit code 1\nTo https://github.com/o/r.git\n ! [rejected]        claude/x -> claude/x (non-fast-forward)\nerror: failed to push some refs'), 'exit 1: ! [rejected] claude/x -> claude/x (non-fast-forward)');
   assert.equal(rigaErrore('Exit code 1\n  ✓  1 tests/a.spec.mjs:3:1 › apre (1s)\n  ✘  2 tests/b.spec.mjs:22:3 › salva (5s)'), 'exit 1: ✘ 2 tests/b.spec.mjs:22:3 › salva (5s)');
 });
+
+// #2121: i dollari della cache li scrive il rapporto, ogni richiesta col suo listino; il conto della cache a un'ora li
+// legge e non riprezza i token al primo modello.
+test('la cache in dollari: ogni richiesta col suo modello, la soglia di Haiku, le scritture già a un ora, i sotto-agenti', async () => {
+  const vicino = (a, b) => assert.ok(Math.abs(a - b) < 1e-6, `${a} contro ${b}`);
+  const opus = await analizzaRighe([
+    assistant('a', 'claude-opus-5-5', { input_tokens: 0, cache_creation_input_tokens: 1000000, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:00')),
+    // Il secondo turno riscrive: rewarm, a 5 minuti.
+    assistant('b', 'claude-opus-5-5', { input_tokens: 0, cache_creation_input_tokens: 500000, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:10')),
+    // Una scrittura già a un'ora: niente sovrapprezzo né risparmio dall'ora.
+    assistant('c', 'claude-opus-5-5', { input_tokens: 0, cache_creation_input_tokens: 100000, cache_creation: { ephemeral_1h_input_tokens: 100000, ephemeral_5m_input_tokens: 0 }, cache_read_input_tokens: 1500000, output_tokens: 0 }, [], T('00:20')),
+  ]);
+  // Opus 5.5: 5 $/M a cinque minuti, 8 $/M a un'ora, lettura 0,2 $/M.
+  vicino(opus.cache.scrittaUsd, 1.5 * 5 + 0.1 * 8);
+  vicino(opus.cache.rewarmUsd, 0.5 * 5);
+  vicino(opus.cache.sovrapprezzoOraUsd, 1.5 * 3);
+  vicino(opus.cache.risparmioOraUsd, 0.5 * 4.8);
+  vicino(opus.cache.risparmioSeTuttoUsd, 1.5 * 4.8);
+
+  // Un sotto-agente Haiku 5.5 oltre la soglia del prompt: la sua tariffa alta, non quella di Opus.
+  const haiku = await analizzaRighe([
+    assistant('h', 'claude-haiku-5-5', { input_tokens: 0, cache_creation_input_tokens: 200000, cache_read_input_tokens: 0, output_tokens: 0 }, [], T('00:00')),
+  ]);
+  vicino(haiku.cache.scrittaUsd, 0.2 * 0.625);
+  sommaSottoAgente(opus, haiku);
+  vicino(opus.cache.scrittaUsd, 1.5 * 5 + 0.1 * 8 + 0.2 * 0.625);
+  vicino(opus.cache.sovrapprezzoOraUsd, 1.5 * 3 + 0.2 * 0.375);
+  // Un sotto-agente da un rapporto vecchio, senza il campo: non rompe la somma.
+  sommaSottoAgente(opus, { costUsd: 0, tokens: {}, tools: {} });
+  vicino(opus.cache.rewarmUsd, 2.5);
+  assert.deepEqual(rapportoVuoto().cache, { scrittaUsd: 0, rewarmUsd: 0, sovrapprezzoOraUsd: 0, risparmioOraUsd: 0, risparmioSeTuttoUsd: 0 });
+});

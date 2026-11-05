@@ -856,3 +856,23 @@ test('«[remote rejected]» (pre-receive, regola del repo, push protection): non
   assert.match(r.reason, /GH013/, 'col motivo del remoto');
   assert.notEqual(remoteSha(origin, 'worker/10'), g(work, ['rev-parse', 'HEAD']));
 });
+
+// #2121: un server che non conosce ancora i dollari della cache toglie quelli, non strumenti falliti e attese.
+test('400 report_malformed sui dollari della cache: escono solo quelli, falliti e attese arrivano', async () => {
+  const corpi = [];
+  const conCache = {
+    ...RAPPORTO, cache: { scrittaUsd: 1, rewarmUsd: 0, sovrapprezzoOraUsd: 0, risparmioOraUsd: 0, risparmioSeTuttoUsd: 0 },
+    attese: [{ strumento: 'Bash', cosa: 'unit', s: 400 }],
+  };
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && 'cache' in b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo cache' }) : reply(200, { ok: true });
+  };
+  const r = await mod.releaseConRapporto('t', '', conCache, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.equal('cache' in corpi[1].report, false);
+  assert.deepEqual(corpi[1].attese, [{ cosa: 'Bash: unit', secondi: 400 }]);
+  assert.match(r.avviso, /campo cache \(report_malformed: campo cache\): allegato senza\./);
+});

@@ -318,15 +318,35 @@ export async function tutteLePagine(chiamata, dati) {
 // La durata della cache dei sotto-agenti: un'attesa che la supera fa riscrivere il contesto al turno dopo (#2121).
 export const SCADENZA_CACHE_S = 300;
 
+// I dollari della cache di un rapporto: quelli scritti dal rapporto, o la stima dei rapporti nati prima del campo.
+function dollariCache(rep, cw, rw) {
+  const c = rep.cache && typeof rep.cache === 'object' ? rep.cache : null;
+  if (c && Number.isFinite(c.scrittaUsd)) {
+    const n = (k) => Number(c[k]) || 0;
+    return {
+      cacheUsd: n('scrittaUsd'), rewarmUsd: n('rewarmUsd'), sovrapprezzo: n('sovrapprezzoOraUsd'),
+      risparmioMax: n('risparmioOraUsd'), risparmioSeTutto: n('risparmioSeTuttoUsd'),
+    };
+  }
+  const p = PREZZI[famigliaPrezzo((Array.isArray(rep.models) ? rep.models : [])[0]).key];
+  return {
+    stimati: 1, cacheUsd: cw * p.cacheWrite / 1e6, rewarmUsd: rw * p.cacheWrite / 1e6,
+    sovrapprezzo: cw * (p.cacheWrite1h - p.cacheWrite) / 1e6,
+    risparmioMax: rw * (p.cacheWrite - p.cacheRead) / 1e6,
+    risparmioSeTutto: cw * (p.cacheWrite - p.cacheRead) / 1e6,
+  };
+}
+
 /**
  * Il conto di `rapporti --cache` per ruolo e in totale: costo della sessione, cache scritta, riscritture, attese oltre
  * la scadenza e il saldo della cache a un'ora (risparmio MASSIMO sulle riscritture meno il sovrapprezzo su ogni
- * scrittura). Il risparmio è un tetto: rewarmTurns conta ogni causa, non solo la pausa. Prezzi: PREZZI. PURA.
+ * scrittura). Il risparmio è un tetto: rewarmTurns conta ogni causa, non solo la pausa. I dollari sono quelli del
+ * rapporto (`report.cache`, ogni richiesta col suo listino); un rapporto che non li ha si stima al primo modello. PURA.
  */
 export function contoCache(rapporti) {
   const vuoto = () => ({
     biglietti: 0, conRapporto: 0, usd: 0, turni: 0, cacheTok: 0, cacheUsd: 0, rewarmTurni: 0, rewarmTok: 0, rewarmUsd: 0,
-    attese: 0, bigliettiConAttese: 0, sovrapprezzo: 0, risparmioMax: 0, risparmioSeTutto: 0,
+    attese: 0, bigliettiConAttese: 0, sovrapprezzo: 0, risparmioMax: 0, risparmioSeTutto: 0, stimati: 0,
   });
   const ruoli = new Map();
   const totale = vuoto();
@@ -338,18 +358,12 @@ export function contoCache(rapporti) {
     const lunghe = (Array.isArray(b && b.attese) ? b.attese : []).filter((a) => Number(a && a.secondi) >= SCADENZA_CACHE_S).length;
     const dati = { biglietti: 1, attese: lunghe, bigliettiConAttese: lunghe ? 1 : 0 };
     if (rep) {
-      const modelli = Array.isArray(rep.models) ? rep.models : [];
-      const p = PREZZI[famigliaPrezzo(modelli[0]).key];
       const cw = Number(rep.tokens && rep.tokens.cacheWrite) || 0;
       const rw = Number(rep.rewarmTokens) || 0;
       Object.assign(dati, {
         conRapporto: 1, usd: Number(rep.costUsd) || 0, turni: Number(rep.turns) || 0,
-        cacheTok: cw, cacheUsd: cw * p.cacheWrite / 1e6,
-        rewarmTurni: Number(rep.rewarmTurns) || 0, rewarmTok: rw, rewarmUsd: rw * p.cacheWrite / 1e6,
-        sovrapprezzo: cw * (p.cacheWrite1h - p.cacheWrite) / 1e6,
-        risparmioMax: rw * (p.cacheWrite - p.cacheRead) / 1e6,
-        risparmioSeTutto: cw * (p.cacheWrite - p.cacheRead) / 1e6,
-      });
+        cacheTok: cw, rewarmTurni: Number(rep.rewarmTurns) || 0, rewarmTok: rw,
+      }, dollariCache(rep, cw, rw));
     }
     for (const g of [ruoli.get(ruolo), totale]) for (const [k, v] of Object.entries(dati)) g[k] += v;
   }
@@ -381,6 +395,7 @@ export function righeCache(conto, finestra = null) {
     ...conto.perRuolo.map((g) => riga(g.ruolo, g)),
     riga('TOTALE', conto.totale),
     `Il risparmio è un tetto: il rewarm conta ogni causa, non solo le attese oltre ${SCADENZA_CACHE_S} s.`,
+    ...(conto.totale.stimati ? [`${conto.totale.stimati} rapporti senza i dollari della cache (nati prima del campo, o il server non lo tiene): stimati tutti al listino del primo modello, sotto-agenti compresi.`] : []),
   ];
 }
 

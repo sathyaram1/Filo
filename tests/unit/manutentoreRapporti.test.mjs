@@ -178,3 +178,19 @@ test('rapporti --cache legge tutte le pagine della finestra e stampa una riga pe
   assert.equal(o.totale.biglietti, 3);
   assert.equal(o.perRuolo[0].ruolo, 'verifier');
 });
+
+test('rapporti --cache: i dollari scritti dal rapporto vincono sulla stima al primo modello, e i rapporti stimati si contano', () => {
+  const cache = { scrittaUsd: 2, rewarmUsd: 0.4, sovrapprezzoOraUsd: 1.1, risparmioOraUsd: 0.3, risparmioSeTuttoUsd: 1.9 };
+  const c = M.contoCache([
+    // Opus col sotto-agente Haiku: la stima al primo modello direbbe 5 $ di cache scritta.
+    { ruolo: 'verifier', report: { role: 'verifier', models: ['claude-opus-5-5', 'claude-haiku-5-5'], costUsd: 10, turns: 9, rewarmTokens: 100000, tokens: { cacheWrite: 1000000 }, cache } },
+    ...BIGLIETTI_CACHE,
+  ]);
+  const v = c.perRuolo.find((g) => g.ruolo === 'verifier');
+  const vicino = (a, b) => assert.ok(Math.abs(a - b) < 1e-9, `${a} contro ${b}`);
+  vicino(v.cacheUsd, 2 + 5); vicino(v.rewarmUsd, 0.4 + 0.5); vicino(v.sovrapprezzo, 1.1 + 3); vicino(v.risparmioMax, 0.3 + 0.48);
+  assert.equal(v.stimati, 1);
+  assert.equal(c.totale.stimati, 2);
+  assert.match(M.righeCache(c).join('\n'), /\n2 rapporti senza i dollari della cache/);
+  assert.doesNotMatch(M.righeCache(M.contoCache([{ report: { cache, tokens: {} } }])).join('\n'), /senza i dollari/);
+});

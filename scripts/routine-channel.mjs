@@ -605,28 +605,32 @@ export async function releaseConRapporto(t, fault, report, opts, spedito = null)
     for (const k of CAMPI_FALLITI_E_ATTESE) delete out[k];
     return out;
   };
-  // Un server che non conosce ancora un campo nuovo (`listino` #882, `cache` #2121) non deve costare il rapporto intero
-  // a ogni rilascio: escono insieme, la versione del listino resta nelle note.
+  // Un server che non conosce ancora `listino` (#882) non deve costare il rapporto intero a ogni rilascio.
   const conListino = async (rep, r) => {
-    const nuovi = CAMPI_NUOVI_DEL_RAPPORTO.filter((k) => Object.prototype.hasOwnProperty.call(rep, k));
-    if (!malformato(r) || !nuovi.length) return r;
-    const senza = { ...rep };
-    for (const k of nuovi) delete senza[k];
-    if (nuovi.includes('listino') && Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${rep.listino}`];
+    if (!malformato(r) || !Object.prototype.hasOwnProperty.call(rep, 'listino')) return r;
+    const { listino, ...senza } = rep;
+    if (Array.isArray(rep.notes)) senza.notes = [...rep.notes, `listino ${listino}`];
     const r2 = await tenta(senza);
     if (malformato(r2)) return r;
-    const resto = !nuovi.includes('listino') ? 'allegato senza' : senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino';
-    if (r2.ok) avvisi.push(`il server non accetta il campo ${nuovi.join(' e ')} (report_malformed${dettaglioDi(r)}): ${resto}.`);
+    if (r2.ok) avvisi.push(`il server non accetta il campo listino (report_malformed${dettaglioDi(r)}): ${senza.notes ? 'la versione è nelle note' : 'allegato senza la versione del listino'}.`);
     return r2;
   };
-  // Prima escono i campi nuovi: un server che rifiuta solo quelli non deve costare strumenti falliti e attese.
-  const tentaRapporto = async (rep) => {
-    const r = await tenta(rep);
-    const r1 = await conListino(rep, r);
-    if (!malformato(r1) || !haDati(rep)) return r1;
+  // I dollari della cache (#2121) escono per primi: un server che non li conosce ancora non deve costare strumenti
+  // falliti e attese, che ormai conosce.
+  const tentaRapporto = async (completo) => {
+    const r = await tenta(completo);
+    if (!malformato(r) || !Object.prototype.hasOwnProperty.call(completo, 'cache')) return restoDellaCatena(completo, r, r);
+    const { cache, ...rep } = completo;
+    const r1 = await tenta(rep);
+    if (r1.ok) avvisi.push(`il server non accetta il campo cache (report_malformed${dettaglioDi(r)}): allegato senza.`);
+    return restoDellaCatena(rep, r1, r);
+  };
+  // `primo` è il rifiuto da citare: quello del rapporto completo.
+  const restoDellaCatena = async (rep, r, primo) => {
+    if (!malformato(r) || !haDati(rep)) return conListino(rep, r);
     const senza = senzaDati(rep);
     const r2 = await conListino(senza, await tenta(senza));
-    if (malformato(r2)) return r;
+    if (malformato(r2)) return primo;
     if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(r)}): allegato senza.`);
     return r2;
   };
