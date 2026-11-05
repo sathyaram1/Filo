@@ -547,8 +547,7 @@
       return { stop: true, blocking, sospesi, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
     }
 
-    // Ordine stabile: come nella critica. Il bilancio si paga dal livello più
-    // alto fra gli interni corretti. Un 2 col `?` corretto esce anche da parte:
+    // Ordine stabile: come nella critica. Un 2 col `?` corretto esce anche da parte:
     // la domanda all'owner viaggia nel suo feedback mentre il lavoro va avanti.
     const fix = findings.filter((f) => fixable.includes(f));
     const rest = findings
@@ -556,7 +555,7 @@
       .map((f) => (fixable.includes(f) ? Object.assign(conPriorita(f), { inCorrezione: true }) : conPriorita(f)));
     let consume = null;
     if (fix.length) {
-      consume = capKeyOf(livelloDegliInterni(fix));
+      consume = capKeyOf(paga);
       counts[consume.replace('cap', 'count')] += 1;
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
