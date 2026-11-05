@@ -1816,6 +1816,23 @@ if (isMain) {
     });
     console.log(esito.testo);
     process.exit(esito.uscita);
+  } else if (cmd === 'aspetta') {
+    if (args.length !== 1 || !looksLikeTicket(args[0]) || Object.keys(data).length) {
+      console.error('Uso: aspetta <biglietto> — il tuo biglietto, nient’altro. Non ho aspettato niente.');
+      process.exit(1);
+    }
+    const nelClone = cloneDelBiglietto(ROOT, args[0]);
+    if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
+    const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
+    const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
+    // Gli stessi processi che fanno rifiutare il rilascio di un worker: finita l'attesa, il rilascio passa.
+    const esito = await aspettaCartella({
+      controlla: () => lavoroVivo(ROOT, { cosa: ['processi'] }),
+      sleep: defaultSleep,
+      fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
+    });
+    console.log(esito.testo);
+    process.exit(esito.uscita);
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
