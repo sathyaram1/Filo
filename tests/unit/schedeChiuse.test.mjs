@@ -145,6 +145,33 @@ test('una voce d\'archivio diventa una voce da riaprire con scroll, paese e colo
   assert.deepEqual(SchedeChiuse.daArchivio({ url: 'https://b.example/' }), { url: 'https://b.example/', scroll: null, proxy: null, colore: null });
 });
 
+test('#1686: la musica chiusa si sceglie con la regola di Ctrl+Shift+T, dalla più recente a suonare', () => {
+  const p = SchedeChiuse.crea();
+  const voci = [
+    arch('muta', 'https://muta.example/', '2026-10-22T12:00:00Z'),
+    arch('prima', 'https://radio.example/', '2026-10-22T11:00:00Z', { audioAt: '2026-10-22T10:59:00Z' }),
+    arch('dopo', 'https://musica.example/', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:30:00Z' }),
+    arch('tagliata', 'https://lunga.example/', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:40:00Z', urlTagliato: true }),
+    arch('file', 'file:///musica.mp3', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T11:50:00Z' }),
+  ];
+  assert.equal(p.dallArchivio(voci).id, 'muta');
+  assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'dopo');
+  p.segnaRiaperta('dopo');
+  assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'prima');
+});
+
+test('#1686: una riapertura segnata e non riuscita rende la voce di nuovo riapribile, da ogni porta', () => {
+  const p = SchedeChiuse.crea();
+  const voci = [arch('a', 'https://a.example/', '2026-10-22T10:00:00Z', { audioAt: '2026-10-22T09:59:00Z' })];
+  p.segnaRiaperta('a');
+  assert.equal(p.dallArchivio(voci), null);
+  assert.equal(p.dallArchivio(voci, { suonata: true }), null);
+  p.annullaRiaperta('a');
+  assert.equal(p.dallArchivio(voci).id, 'a');
+  assert.equal(p.dallArchivio(voci, { suonata: true }).id, 'a');
+  assert.equal(p.eRiaperta('a'), false);
+});
+
 test('Ctrl+Shift+T è descritto come «riapre l\'ultima scheda chiusa» su ogni sistema', () => {
   for (const [scritta, s] of [['Ctrl+Shift+T', 'win32'], ['Ctrl+Shift+T', 'linux'], ['Cmd+Shift+T', 'darwin']]) {
     assert.match(T.chiLaPrende(scritta, s), /riapre l'ultima scheda chiusa/, `${scritta} su ${s}`);
