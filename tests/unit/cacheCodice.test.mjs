@@ -8,9 +8,22 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const MODULO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'main', 'cacheCodice.js');
+
+// La cache la accende il Node di Electron: quello che corre gli unit (il 20 di GitHub) non ha enableCompileCache (#2204).
+function motore() {
+  const require = createRequire(import.meta.url);
+  try {
+    const bin = require('electron');
+    if (typeof bin === 'string' && fs.existsSync(bin)) return { bin, env: { ELECTRON_RUN_AS_NODE: '1' } };
+  } catch (_) {}
+  return typeof require('node:module').enableCompileCache === 'function' ? { bin: process.execPath, env: {} } : null;
+}
+const MOTORE = motore();
+const OPZ = { skip: !MOTORE && 'manca Electron, e questo Node non ha la cache del codice compilato' };
 const cartelle = [];
 afterEach(() => { while (cartelle.length) togliCartella(cartelle.pop()); });
 const nuova = (p) => { const d = cartellaTemporanea(p); cartelle.push(d); return d; };
@@ -31,9 +44,9 @@ function avvia(userData, appPath, env = {}) {
     require(${JSON.stringify(join(appPath, 'pesante.js'))});
     C.scrivi();
     process.stdout.write(JSON.stringify({ accesa }));`;
-  const ambiente = { ...process.env, NODE_DEBUG_NATIVE: 'COMPILE_CACHE', ...env };
+  const ambiente = { ...process.env, NODE_DEBUG_NATIVE: 'COMPILE_CACHE', ...MOTORE.env, ...env };
   for (const k of ['NODE_COMPILE_CACHE', 'NODE_DISABLE_COMPILE_CACHE', 'APPIMAGE']) if (!(k in env)) delete ambiente[k];
-  const r = spawnSync(process.execPath, ['-e', codice], { env: ambiente, encoding: 'utf8' });
+  const r = spawnSync(MOTORE.bin, ['-e', codice], { env: ambiente, encoding: 'utf8' });
   assert.equal(r.status, 0, r.stderr);
   return { ...JSON.parse(r.stdout), presa: /pesante\.js was accepted/.test(r.stderr) };
 }
@@ -43,7 +56,7 @@ const voci = (userData) => {
   return fs.existsSync(c) ? fs.readdirSync(c, { recursive: true }).length : 0;
 };
 
-test('dalla stessa cartella il secondo avvio riprende il codice compilato', () => {
+test('dalla stessa cartella il secondo avvio riprende il codice compilato', OPZ, () => {
   const base = nuova('filo-cache-stessa-');
   const ud = join(base, 'dati');
   const dir = app(join(base, 'Filo'));
@@ -54,7 +67,7 @@ test('dalla stessa cartella il secondo avvio riprende il codice compilato', () =
   assert.equal(voci(ud), dopoPrimo);
 });
 
-test('da una cartella diversa a ogni avvio la cache non si accumula', () => {
+test('da una cartella diversa a ogni avvio la cache non si accumula', OPZ, () => {
   const base = nuova('filo-cache-sposta-');
   const ud = join(base, 'dati');
   avvia(ud, app(join(base, 'uno')));
@@ -64,7 +77,7 @@ test('da una cartella diversa a ogni avvio la cache non si accumula', () => {
   assert.ok(voci(ud) <= dopoPrimo, `${voci(ud)} voci dopo tre cartelle, ${dopoPrimo} dopo una`);
 });
 
-test('con l\'AppImage o l\'app spostata da Gatekeeper la cache resta spenta e quella rimasta se ne va', () => {
+test('con l\'AppImage o l\'app spostata da Gatekeeper la cache resta spenta e quella rimasta se ne va', OPZ, () => {
   const base = nuova('filo-cache-volatile-');
   const ud = join(base, 'dati');
   fs.mkdirSync(join(ud, 'codice-compilato', 'v24.0.0-x64-aaaa-0'), { recursive: true });
@@ -74,7 +87,7 @@ test('con l\'AppImage o l\'app spostata da Gatekeeper la cache resta spenta e qu
   assert.equal(fs.existsSync(join(ud, 'codice-compilato')), false);
 });
 
-test('la sottocartella di un motore vecchio se ne va, quella di adesso e il percorso restano', () => {
+test('la sottocartella di un motore vecchio se ne va, quella di adesso e il percorso restano', OPZ, () => {
   const base = nuova('filo-cache-motore-');
   const ud = join(base, 'dati');
   const dir = app(join(base, 'Filo'));
@@ -87,7 +100,7 @@ test('la sottocartella di un motore vecchio se ne va, quella di adesso e il perc
   assert.equal(avvia(ud, dir).presa, true);
 });
 
-test('con una cartella di cache scelta nell\'ambiente Filo non cancella niente di suo', () => {
+test('con una cartella di cache scelta nell\'ambiente Filo non cancella niente di suo', OPZ, () => {
   const base = nuova('filo-cache-altrui-');
   const altrui = join(base, 'cache-mia');
   const sua = join(altrui, 'v0.0.0-x64-sua-0');
