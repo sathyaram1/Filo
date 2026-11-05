@@ -1916,6 +1916,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       esterno: esterno || undefined,
       history: aiHistory,
       screenshot: letta.screenshot || undefined,
+      fotoMancante: (!letta.screenshot && letta.fotoMancante) || undefined,
       outline: letta.outline || '',
       viewport: letta.viewport || null,
       origineImmagini: letta.origineImmagini || undefined,

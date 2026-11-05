@@ -189,8 +189,107 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista };
+    // I valori dei campi segreti compilati, anche fuori vista: un'anteprima della carta li ripete altrove (#810.16).
+    function valoriSegreti(radice = doc) {
+      const out = [];
+      for (const el of tuttiICampi(radice)) if (el.value && campoSegreto(el)) out.push(String(el.value));
+      return out;
+    }
+
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti };
   }
 
-  global.SN_CAMPI_SEGRETI = { crea };
+  // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
+  // mentre si scrive: sei cifre consecutive del valore lo identificano, un valore più corto solo se una sequenza di
+  // cifre del testo è lui intero («•••• 1234» resta). Autosufficiente come `crea`. Rettangoli nella finestra di `win`.
+  function rettangoliRipetuti(win, valori, radice) {
+    const doc = win.document;
+    const NORMA = /[\s   \-‐-―]/g;
+    const aghi = new Set();
+    const interi = new Set();
+    for (const v of valori || []) {
+      const t = String(v || '').replace(NORMA, '');
+      for (const seq of t.match(/\d+/g) || []) {
+        if (seq.length >= 6) for (let i = 0; i + 6 <= seq.length; i++) aghi.add(seq.slice(i, i + 6));
+        else if (seq.length >= 3 && seq === t) interi.add(seq);
+      }
+    }
+    if (!aghi.size && !interi.size) return [];
+
+    const SALTA = /^(SCRIPT|STYLE|TEMPLATE|NOSCRIPT|TEXTAREA|SELECT|OPTION|INPUT)$/;
+    const nodi = [];
+    let flusso = '';
+    const pila = [radice || doc];
+    while (pila.length) {
+      const n = pila.pop();
+      if (n.nodeType === 3) {
+        const t = String(n.nodeValue || '').replace(NORMA, '');
+        if (t) { nodi.push({ n, da: flusso.length, a: flusso.length + t.length }); flusso += t; }
+        continue;
+      }
+      if (n.nodeType === 1 && SALTA.test(n.tagName)) continue;
+      const figli = Array.from(n.childNodes || []);
+      if (n.shadowRoot) figli.push(n.shadowRoot);
+      for (let i = figli.length - 1; i >= 0; i--) pila.push(figli[i]);
+    }
+
+    const corrisponde = (cifre) => {
+      for (const seq of cifre.match(/\d+/g) || []) {
+        if (interi.has(seq)) return true;
+        if (seq.length >= 6) for (const a of aghi) if (seq.includes(a)) return true;
+      }
+      return false;
+    };
+    const rettangolo = (n) => {
+      try {
+        const rg = (n.ownerDocument || doc).createRange();
+        rg.selectNodeContents(n);
+        const q = rg.getBoundingClientRect();
+        return q && q.width && q.height ? q : null;
+      } catch (_) { return null; }
+    };
+    // Pezzi consecutivi sulla stessa riga sono un numero solo anche sparsi sulla carta disegnata (un gruppo per
+    // <span>, distribuiti da un capo all'altro): nel documento fra loro ci sono solo spazi. Su righe diverse no.
+    const affiancati = (p, q) => {
+      const alto = Math.min(p.height, q.height);
+      const insieme = Math.min(p.top + p.height, q.top + q.height) - Math.max(p.top, q.top);
+      return insieme >= alto / 2 && q.left - (p.left + p.width) >= -alto;
+    };
+    const area = (r) => r.width * r.height;
+    const out = [];
+    const re = /\d+/g;
+    for (let m = re.exec(flusso); m; m = re.exec(flusso)) {
+      if (!corrisponde(m[0])) continue;
+      const da = m.index, a = da + m[0].length;
+      let pezzo = [];
+      const pezzi = [pezzo];
+      for (const x of nodi) {
+        if (x.a <= da || x.da >= a) continue;
+        if (x.r === undefined) x.r = rettangolo(x.n);
+        const prec = pezzo[pezzo.length - 1];
+        if (!x.r || (prec && !affiancati(prec.r, x.r))) { pezzo = []; pezzi.push(pezzo); }
+        if (x.r) pezzo.push(x);
+      }
+      for (const p of pezzi) {
+        if (!p.length || !corrisponde(p.map((x) => flusso.slice(Math.max(x.da, da), Math.min(x.a, a))).join(''))) continue;
+        let l = Infinity, t = Infinity, r = -Infinity, b = -Infinity;
+        for (const { r: q } of p) {
+          l = Math.min(l, q.left); t = Math.min(t, q.top); r = Math.max(r, q.left + q.width); b = Math.max(b, q.top + q.height);
+        }
+        let box = { left: l, top: t, width: r - l, height: b - t };
+        // L'elemento che tiene il numero, se non è molto più grande del testo: anche il suo sfondo è l'anteprima.
+        let su = p[0].n.parentElement;
+        while (su && !p.every((x) => su.contains(x.n))) su = su.parentElement;
+        const e = su && su.getBoundingClientRect ? su.getBoundingClientRect() : null;
+        if (e && e.left <= l && e.top <= t && e.left + e.width >= r && e.top + e.height >= b && area(e) <= 3 * area(box)) {
+          box = { left: e.left, top: e.top, width: e.width, height: e.height };
+        }
+        if (box.left + box.width <= 0 || box.top + box.height <= 0 || box.left >= win.innerWidth || box.top >= win.innerHeight) continue;
+        out.push(box);
+      }
+    }
+    return out;
+  }
+
+  global.SN_CAMPI_SEGRETI = { crea, rettangoliRipetuti };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

@@ -6,7 +6,6 @@ require('../../../shared/linkSospetto.js'); // SN_LINK_SOSPETTO su globalThis: l
 const { perContoDellaScheda } = require('../perContoDellaScheda');
 const { avvisoNellaFinestra, avvisoQuandoPronta } = require('../avvisoFinestra');
 const { luogoDownload } = require('../contatoriFinestra');
-const { campiSegretiFuoriPagina } = require('../campiNeiRiquadri');
 const Foto = require('../fotoDellaPagina');
 const Mittente = require('../feedbackMittente');
 // L'identità da allegare a un invio che il server limita per identità: la
@@ -287,22 +286,24 @@ module.exports = function register(on, ctx) {
   on(MSG.CAPTURE_VISIBLE_TAB, async (msg, sender) => {
     const wc = Foto.paginaDaFotografare(sender);
     if (!wc) return { ok: false, code: 'fuori_vista', error: 'la pagina non è in vista' };
-    // Per un modello (#810.7): i campi segreti che il content script non vede (riquadri di altri siti, componenti
-    // chiusi), e con campi da coprire la foto piena, che diventa leggera dopo la copertura.
-    if (msg && msg.campiSegreti) {
-      const [img, fuori] = await Promise.all([wc.capturePage(), campiSegretiFuoriPagina(wc)]);
-      if (fuori.nonCoperti) return { ok: false, code: 'segreti', error: 'campi segreti che non si riescono a coprire' };
-      if (img.isEmpty()) return { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
-      if (fuori.campi.length || Number(msg.campiNellaPagina) > 0) {
-        const leggera = msg.leggera === true
-          ? { fattore: Foto.fattoreDiScala(sender, require('electron').screen), qualita: Foto.QUALITA_LEGGERA } : {};
-        return { ok: true, dataUrl: img.toDataURL(), campi: fuori.campi, ...leggera };
+    // Per un modello la foto è già coperta, e leggera (#1721): una che non si può coprire non parte, e `motivo` lo dice.
+    if (msg && msg.perModello) {
+      const r = await Foto.fotoPerModello(wc);
+      if (!r.ok) {
+        return r.code === 'vuota' ? { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' }
+          : { ok: false, code: 'coperture', motivo: r.code, error: Foto.perche(r.code) };
       }
-      if (msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL(), campi: [] };
-      const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
-      return dataUrl ? { ok: true, dataUrl, campi: [] } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
+      const dataUrl = Foto.fotoLeggera(r.img, Foto.fattoreDiScala(sender, require('electron').screen));
+      return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
     }
-    const img = await wc.capturePage();
+    // Lo Screenshot: l'utente tiene la foto intera, il modello che sceglie il nome del file la copia coperta dello
+    // stesso scatto, o niente.
+    if (msg && msg.copiaPerModello) {
+      const r = await Foto.fotoPerModello(wc);
+      if (!r.piena) return { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
+      return { ok: true, dataUrl: r.piena.toDataURL(), perModello: r.ok ? r.img.toDataURL() : null };
+    }
+    const img = await Foto.fotoPiena(wc);
     if (!msg || msg.leggera !== true) return { ok: true, dataUrl: img.toDataURL() };
     const dataUrl = Foto.fotoLeggera(img, Foto.fattoreDiScala(sender, require('electron').screen));
     return dataUrl ? { ok: true, dataUrl } : { ok: false, code: 'vuota', error: 'la foto della pagina è vuota' };
@@ -600,8 +601,7 @@ module.exports = function register(on, ctx) {
     try {
       const barH = win._filoTabs.topChromeHeight();
       if (barH <= 0) return { ok: false, error: 'no topbar' };
-      const [w] = win.getContentSize();
-      const img = await win.webContents.capturePage({ x: 0, y: 0, width: w, height: barH });
+      const img = await Foto.fotoDellaBarra(win, barH);
       return { ok: true, dataUrl: img.toDataURL(), barHeight: barH };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };

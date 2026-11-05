@@ -292,7 +292,9 @@
     //   `shown` è `reconcile.offPolicy` come la scheda lo mostrava: un uso arrivato dopo resta segnato.
     WALLET_OWNER_OFF_POLICY_SEEN: 'wallet_owner_off_policy_seen',
     // Le due foto (pagina e barra) vanno solo alla pagina in vista, che inquadra sé stessa: services/fotoDellaPagina.js.
-    CAPTURE_VISIBLE_TAB: 'capture_visible_tab', // { leggera? } → { ok, dataUrl? }; leggera: JPEG ai pixel che si vedono
+    // { leggera? } → { ok, dataUrl? } (leggera: JPEG ai pixel che si vedono); { perModello } → JPEG leggero coperto, o
+    // { code: 'coperture', motivo }; { copiaPerModello } → { dataUrl, perModello: PNG coperta o null }.
+    CAPTURE_VISIBLE_TAB: 'capture_visible_tab',
     // "Salva immagine come…" dal menu contestuale. Instradato dal main
     // (session download + will-download) perché l'attributo `download` di un
     // <a> lato pagina è onorato da Chromium SOLO per URL same-origin/blob:/

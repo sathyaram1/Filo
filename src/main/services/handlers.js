@@ -22,6 +22,7 @@ const RicordiFilo = require('./ricordiFilo');
 const ConversazioniApp = require('./conversazioniApp');
 const FiloParla = require('./filoParla');
 const Schermo = require('./schermo').crea();
+const Foto = require('./fotoDellaPagina');
 const SempreAperte = require('./sempreAperte');
 const ChiudiSchede = require('./chiudiSchede');
 
@@ -252,6 +253,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
     if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
+    else if (Foto.perche(payload.fotoMancante)) parts.push({ type: 'text', text: PROMPTS.fotoMancanteAiuto(Foto.perche(payload.fotoMancante)) });
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
       : { role: 'user', content: parts };

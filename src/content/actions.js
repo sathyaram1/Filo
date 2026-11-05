@@ -1031,23 +1031,36 @@
     });
   }
 
-  // La foto resta com'è per l'utente; `campi` sono i campi segreti da coprire nella copia che va a un modello (#810.7),
-  // null se non si sono potuti trovare tutti: quella copia allora non parte.
+  // La foto resta com'è per l'utente; `perModello` è la copia dello stesso scatto coperta dal main (#1721), null se non
+  // si è potuta coprire: allora al modello non parte niente.
   async function captureVisibleTab() {
     await attendiCompositor();
-    const prima = Extract.campiSegretiInVista();
-    const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true, campiNellaPagina: prima.length });
-    if (r?.ok) return { ...r, campi: prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista()) };
-    if (r?.code !== 'segreti') return r;
-    const pura = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-    return pura?.ok ? { ...pura, campi: null } : pura;
+    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, copiaPerModello: true });
   }
 
-  // Il nome del file lo sceglie un modello guardando la foto: gli arriva coi campi segreti coperti, o non gli arriva.
-  async function descrizioneCoperta(dataUrl, campi, ritaglio = null) {
-    if (!Array.isArray(campi)) return null;
-    const perModello = campi.length ? await Extract.fotoCoperta(dataUrl, campi, { ritaglio }) : dataUrl;
-    return requestImageDescription(perModello, dataUrl);
+  // Il pezzo `ritaglio` (pixel CSS di una finestra larga `vista.w`) di una foto in pixel del dispositivo, su un canvas.
+  // Uno solo per la foto dell'utente e per la copia coperta: i due pezzi devono coincidere.
+  function tagliaInCanvas(img, larga, alta, ritaglio, vista) {
+    const sx = larga / vista.w, sy = alta / vista.h;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(ritaglio.w * sx));
+    canvas.height = Math.max(1, Math.round(ritaglio.h * sy));
+    canvas.getContext('2d').drawImage(img, Math.round(ritaglio.x * sx), Math.round(ritaglio.y * sy), canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  async function ritagliaCopia(dataUrl, ritaglio, vista) {
+    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
+    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([byte]));
+    return tagliaInCanvas(img, img.width, img.height, ritaglio, vista).toDataURL('image/png');
+  }
+
+  // Il nome del file lo sceglie un modello guardando la foto: gli arriva la copia coperta, o non gli arriva.
+  async function descrizioneCoperta(dataUrl, perModello, ritaglio = null, vista = null) {
+    if (typeof perModello !== 'string' || !perModello) return null;
+    const pezzo = ritaglio ? await ritagliaCopia(perModello, ritaglio, vista || { w: window.innerWidth, h: window.innerHeight }) : perModello;
+    return requestImageDescription(pezzo, dataUrl);
   }
 
   function buildSavePayload() {
@@ -1655,7 +1668,7 @@
       const copied = await immagineNegliAppunti(cap.dataUrl, () => dataUrlToPngBlob(cap.dataUrl));
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
+      const desc = await descrizioneCoperta(cap.dataUrl, cap.perModello).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1768,17 +1781,12 @@
         const w = maxX - minX, h = maxY - minY;
         cleanup();
         if (w < 4 || h < 4) { resolve(null); return; }
-        const sx = img.naturalWidth / vw;
-        const sy = img.naturalHeight / vh;
-        const cx = Math.round(minX * sx), cy = Math.round(minY * sy);
-        const cw = Math.round(w * sx), ch = Math.round(h * sy);
-        const canvas = document.createElement('canvas');
-        canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+        const rect = { x: minX, y: minY, w, h }, vista = { w: vw, h: vh };
+        const canvas = tagliaInCanvas(img, img.naturalWidth, img.naturalHeight, rect, vista);
         canvas.toBlob((blob) => {
           if (!blob) { resolve(null); return; }
           const r = new FileReader();
-          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, campi: cap.campi });
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect, vista, perModello: cap.perModello });
           r.onerror = () => resolve(null);
           r.readAsDataURL(blob);
         }, 'image/png');
@@ -1823,7 +1831,7 @@
       const { dataUrl, blob } = region;
       const copied = await immagineNegliAppunti(dataUrl, async () => blob);
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
+      const desc = await descrizioneCoperta(dataUrl, region.perModello, region.rect, region.vista).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
