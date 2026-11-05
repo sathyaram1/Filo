@@ -224,9 +224,25 @@ test('strada locale: dalle righe solo le schede di feedback aperti e leggibili, 
     { _id: 'd', seq: 4, status: 'todo' },
     { _id: 'e', seq: 5, status: 'todo', scheda: 'FENC1:illeggibile' },
   ];
-  const out = await S.schedeDaRighe(righe, { apri: async (v) => { try { return JSON.parse(v); } catch (_) { return null; } }, vietato: L.vietatoLeggere });
+  const out = await S.schedeDaRighe(righe, { apri: async (v) => { try { return JSON.parse(v); } catch (_) { return null; } }, vietato: L.vietatoNellIndice });
   assert.deepEqual(out.map((s) => s.numero), ['1']);
   assert.equal(out[0]._fonte.aggiornato, '2026-10-29T10:00:00.123456Z');
+});
+
+test('l’indice locale dei Ricevuti segna solo i segnalati, come quello del server senza testi: il mai giudicato vale per il testo (#1514)', async () => {
+  const blob = (num, stato) => JSON.stringify(SS.perIlDocumento(buona(num, { stato }), { stato, at: 't' }));
+  const righe = [
+    { _id: 'a', seq: 41, status: 'design', fiducia: 'fidato', pipeline: { skipped: 'fidato' }, scheda: blob(41, 'design') },
+    { _id: 'b', seq: 42, status: 'aligned', fiducia: 'fidato', pipeline: { skipped: 'routine_proven' }, scheda: blob(42, 'aligned') },
+    { _id: 'c', seq: 43, status: 'unlabeled', pipeline: { l1Category: 'spam', action: 'human_review' }, scheda: blob(43, 'unlabeled') },
+    { _id: 'd', seq: 44, status: 'unlabeled', pipeline: { verdicts: [{ class: 'attack' }] }, scheda: blob(44, 'unlabeled') },
+  ];
+  const r = await S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async (v) => JSON.parse(v) });
+  assert.deepEqual([...r.segnalati.keys()], ['d']);
+  assert.deepEqual(r.schede.map((s) => s.numero).sort(), ['41', '42', '43']);
+  // Il testo invece no: il mai giudicato dei Ricevuti si rifiuta, il fidato coi giudici saltati si legge.
+  assert.ok(L.vietatoLeggere('unlabeled', righe[2].pipeline, ''));
+  assert.equal(L.vietatoLeggere('design', righe[0].pipeline, 'fidato'), '');
 });
 
 test('nella cartella la scheda salvata vince, tranne su una scritta qui dopo; l’indice prende l’ora nuova del feedback', () => {
@@ -340,7 +356,7 @@ test('il motivo del no arriva da tutte e due le strade; il freno del server esau
 
 test('un segnalato non va all’agente: la sua scheda «non letto» si scrive qui, col motivo, una volta per stato', async () => {
   const righe = [{ _id: 'a', seq: 7, status: 'attack' }, { _id: 'b', seq: 8, status: 'todo' }];
-  const segnalati = new Map(righe.map((r) => [r._id, L.vietatoLeggere(r.status, r.pipeline)]).filter(([, m]) => m));
+  const segnalati = new Map(righe.map((r) => [r._id, L.vietatoNellIndice(r.status, r.pipeline)]).filter(([, m]) => m));
   const indice = S.apertiDaRighe(righe, { segnalati });
   assert.match(indice[0].segnalato, /segnalato come attacco/);
   assert.equal(indice[1].segnalato, undefined);
