@@ -1118,6 +1118,7 @@ export function buildPayload(bucket, ctx = {}) {
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
+      if (bucket.ripartenza) out.ripartenza = bucket.ripartenza;
       return { ...out, ...conPiano(ctx), ...(Array.isArray(ctx.suMain) && ctx.suMain.length ? { suMain: ctx.suMain } : {}) };
     }
     case 'risposta': {
