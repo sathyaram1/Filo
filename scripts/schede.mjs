@@ -275,6 +275,7 @@ export async function letturaCloud(ticket, opz = {}) {
   return {
     ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda),
     segnalati: new Map(r.voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
+    illeggibili: r.voci.filter((v) => v.schedaIllegibile).length,
   };
 }
 
