@@ -297,7 +297,7 @@ const DELL_OWNER = { fiducia: { stringValue: 'fidato' }, pipeline: { mapValue: {
 test('feedback:leggi stampa le attese una per riga, fuse o no, e la forma che aggiunge senza togliere', async () => {
   const principale = {
     status: { stringValue: 'todo' }, seq: { integerValue: '1294' }, name: { stringValue: 'Titolo' }, text: { stringValue: 'testo' },
-    clientId: { stringValue: 'owner:me' }, senderProof: { stringValue: 'admin' },
+    clientId: { stringValue: 'owner:me' }, senderProof: { stringValue: 'admin' }, ...DELL_OWNER,
     waitsFor: { arrayValue: { values: [attesa('a1741', '1741'), attesa('a567', '567'), attesa('a600', '600'), attesa('sparito', '1700'), attesa('cifrato', '1735')] } },
   };
   const { fetchImpl } = reteConAttese(principale, {
