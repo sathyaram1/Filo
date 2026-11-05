@@ -627,11 +627,14 @@ export async function releaseConRapporto(t, fault, report, opts, spedito = null)
   };
   // `primo` è il rifiuto da citare: quello del rapporto completo.
   const restoDellaCatena = async (rep, r, primo) => {
-    if (!malformato(r) || !haDati(rep)) return conListino(rep, r);
+    if (!malformato(r) || !haDati(rep)) {
+      const r1 = await conListino(rep, r);
+      return malformato(r1) ? primo : r1;
+    }
     const senza = senzaDati(rep);
     const r2 = await conListino(senza, await tenta(senza));
     if (malformato(r2)) return primo;
-    if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(r)}): allegato senza.`);
+    if (r2.ok) avvisi.push(`il server non accetta ancora strumenti falliti e attese (report_malformed${dettaglioDi(primo)}): allegato senza.`);
     return r2;
   };
   const conAvvisi = (r, rapporto, avviso) => {
