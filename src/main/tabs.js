@@ -1616,10 +1616,7 @@ class TabManager {
     };
     const pila = this._pilaChiuse();
     const voce = pila.prendi();
-    if (voce) {
-      if (voce.voceArchivio) this._contaTornata(voce.voceArchivio);
-      return attendi(this.riapri(voce));
-    }
+    if (voce) return attendi(this._riapriDallaPila(voce));
     const e = await this._chiusaDallArchivio();
     if (e) return attendi(this.riapriDallArchivio(e));
     try {
