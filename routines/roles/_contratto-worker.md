@@ -83,6 +83,16 @@ Un comando che il controllo dei permessi nega non si riprova in un'altra
 forma: o prendi una strada che non ne ha bisogno, come il test qui sopra, o è
 un guasto (`guasto: permessi <programma>`, col messaggio del rifiuto).
 
+## I file si scrivono con Edit e Write
+
+Un file, nel repo o fuori (un sorgente, una prova, il JSON di una domanda, la
+nota del controllo), si crea con Write e si modifica con Edit: non chiedono
+permessi. Mai dalla shell: né con un interprete (`python3`, `node -e`, `perl`,
+`sed -i`) né con un heredoc che scrive (`cat > f <<'EOF'`, `python3 - <<'EOF'`).
+In cloud chiedono un permesso che nessuno approva, e il worker resta fermo in
+silenzio (#1563). Un heredoc che passa un testo a uno script del canale, come
+`segnala` o `risposta`, è un'altra cosa: non scrive file e resta com'è.
+
 ## Sotto-agenti
 
 Puoi lanciarne e sceglierne il modello col parametro `model` dello strumento
@@ -105,19 +115,30 @@ non puoi proseguire, dichiaralo nel rilascio.
 
 La cache del contesto dura cinque minuti: una chiamata bloccante più lunga la
 trova scaduta, e il turno dopo ripaga tutto il contesto. Quindi un comando che
-può superare i **due minuti** va in **sottofondo** (l'harness ti avvisa quando
-finisce); se devi aspettarlo, a pezzi da **quattro minuti al massimo** per
-chiamata (`timeout 240 tail --pid=<pid> -f /dev/null`, o un ciclo `until` con
-tetto 240 s), mai da dieci. Il timeout della chiamata si dimensiona sulla
-**durata vera** del comando, mai sotto: un comando ucciso a metà va rifatto da
-capo. Lunghi di sicuro: le prove di un feedback (otto minuti e mezzo),
-`npm run finish:check` (da quindici a quarantacinque minuti), l'installazione
-di Electron.
+può superare i **due minuti** va in **sottofondo**, col parametro
+`run_in_background` della chiamata Bash: mentre gira lavori ad altro, e quando
+finisce l'harness te lo avvisa da sé. Per un avviso a ogni riga di un log c'è
+lo strumento Monitor. Non chiudere il turno per aspettare: con la tua risposta
+finale i comandi in sottofondo muoiono, e l'avviso non arriva più. Quando resta
+solo da aspettare, l'attesa in primo piano è
+`node scripts/routine-channel.mjs aspetta <biglietto>`: sta sotto il timeout
+predefinito della chiamata, esce 0 quando nessun tuo processo lavora più nella
+cartella e 5 quando lavorano ancora (rilancialo, subito). Il timeout della chiamata si
+dimensiona sulla **durata vera** del comando, mai sotto: un comando ucciso a
+metà va rifatto da capo. Lunghi di sicuro: le prove di un feedback (otto minuti
+e mezzo), `npm run finish:check` (da quindici a quarantacinque minuti),
+l'installazione di Electron.
+
+**Mai un'attesa scritta da te nella shell**: `sleep`, un ciclo `until` o
+`while` che dorme, `tail --pid`, `timeout N bash -c …`. In cloud l'harness
+blocca `sleep` in primo piano e chiede un permesso che nessuno approva: il
+worker resta fermo in silenzio finché la veglia non lo dichiara guasto (#1685).
 
 Un comando in sottofondo **si aspetta prima del rilascio**: finché un tuo
 processo lavora nella cartella il rilascio rifiuta (exit 5, coi pid e i
 comandi), perché dopo il rilascio cartella e ramo passano al prossimo worker.
-Aspettalo, o fermalo se non serve più, e rilancia lo stesso comando.
+Aspettalo con `aspetta`, o fermalo se non serve più, e rilancia lo stesso
+comando.
 
 ## Se il server RIFIUTA una consegna (exit 4) o NON RISPONDE (exit 3)
 

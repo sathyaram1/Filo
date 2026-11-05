@@ -43,9 +43,10 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
   Più sotto-agenti insieme solo se leggono soltanto: due che scrivono si
   pestano sui lock del salvataggio automatico.
 - **Si legge la parte, non il file**: intervalli di righe, uscite filtrate.
-- **Attese.** Un comando che può superare i due minuti si lancia in sottofondo;
-  se serve aspettarlo, a pezzi da quattro minuti al massimo. Il timeout si
-  dimensiona sulla durata vera del comando, mai sotto.
+- **Attese.** Un comando che può superare i due minuti si lancia in sottofondo,
+  e la sua fine la annuncia l'harness: niente attese scritte nella shell
+  (`sleep`, cicli `until`, `tail --pid`), che in cloud chiedono un permesso.
+  Il timeout si dimensiona sulla durata vera del comando, mai sotto.
 - **A un cambio di argomento si riparte** con una sessione nuova.
 
 ## Regole del repo

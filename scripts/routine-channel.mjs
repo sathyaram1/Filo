@@ -66,6 +66,10 @@
 //         Exit 0 = ha rilasciato il biglietto, 5 = lavora ancora (si rilancia), 3 = fermo da 20 minuti senza segni di
 //         vita: biglietto già rilasciato con un guasto dichiarato, il giro si chiude.
 //
+//   node scripts/routine-channel.mjs aspetta <biglietto>
+//       → il worker che ha solo da aspettare i suoi comandi in sottofondo (#2185), al massimo una fetta
+//         (lib/aspetta-cartella.mjs). Exit 0 = nessun suo processo nella cartella, 5 = lavorano ancora (si rilancia).
+//
 //   node scripts/routine-channel.mjs release <biglietto> --role <ruolo> [--guasto "motivo"] [--processo "domanda"] [--forza]
 //       → `--processo`: un dubbio di processo (strumento, ordine, cosa fare di un rilievo) per il manutentore, non per
 //         l'owner: il lavoro resta fermo finché lui non risponde con una nota (SPEC-MANUTENTORE § 4).
@@ -148,7 +152,7 @@ import { pinnedRepoRoot, absolutizeOutput, segnaLavoroPreso } from './lib/tools-
 import { sessioneDaChiudere } from './lib/strumenti-vecchi.mjs';
 import {
   isProtectedBranch, headSha, guardiaConsegna, azzeraRifiuti, escalationNote, IDENTITY_REJECT_LIMIT, lavoroVivo, testoLavoroVivo,
-  USCITA_LAVORO_VIVO,
+  USCITA_LAVORO_VIVO, SEGNI_RILASCIO_WORKER,
 } from './lib/branch-integrity.mjs';
 import { dirtyTreeText, statoDirectory, statoIllegibileText } from './lib/dirty-tree.mjs';
 import { bigliettoFinito, haFormaDiBigliettoVero, leggiBigliettoAMano, leggiMarcatoreBiglietto, looksLikeTicket, segnaBigliettoFinito } from './lib/routine-ticket.mjs';
@@ -1636,7 +1640,7 @@ if (isMain) {
     // la copia fissata, `scripts/…` porterebbe a quello del ramo di lavoro —
     // cioè proprio la cosa che il contratto dei worker vieta di scrivere a mano.
     const io = resolve(fileURLToPath(import.meta.url)).split('\\').join('/');
-    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|veglia|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
+    console.error(`Uso: node "${io}" <probe|ticket|work|immagine|heartbeat|veglia|aspetta|release|deliver|operazione|segnala|rapporto|sporca|git-server|ramo-server|compare|domanda|risposta> <segreto> [...]`);
     process.exit(1);
   };
 
@@ -1816,6 +1820,22 @@ if (isMain) {
     });
     console.log(esito.testo);
     process.exit(esito.uscita);
+  } else if (cmd === 'aspetta') {
+    if (args.length !== 1 || !looksLikeTicket(args[0]) || Object.keys(data).length) {
+      console.error('Uso: aspetta <biglietto> — il tuo biglietto, nient’altro. Non ho aspettato niente.');
+      process.exit(1);
+    }
+    const nelClone = cloneDelBiglietto(ROOT, args[0]);
+    if (nelClone) process.exit(rilancia(nelClone.strumenti, 'routine-channel.mjs', process.argv.slice(2)));
+    const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
+    const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
+    const esito = await aspettaCartella({
+      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER }),
+      sleep: defaultSleep,
+      fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
+    });
+    console.log(esito.testo);
+    process.exit(esito.uscita);
   } else if (cmd === 'release') {
     // `--guasto "motivo"`: il guasto si dichiara AL CANALE nel rilascio, non a
     // parole nel testo di ritorno (che nessuna macchina legge).
@@ -1851,12 +1871,12 @@ if (isMain) {
     const cartellaSua = !marcatore || !marcatore.ticket || String(marcatore.ticket) === String(args[0]);
     const chiRilascia = typeof data.role === 'string' ? data.role : '';
     if (chiRilascia === 'orchestrator' ? data.forza !== true : cartellaSua && !!marcatore) {
-      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: ['processi'] });
+      const vivo = lavoroVivo(ROOT, chiRilascia === 'orchestrator' ? {} : { cosa: SEGNI_RILASCIO_WORKER });
       if (vivo.vivo) {
         console.error(`LAVORO VIVO: ${testoLavoroVivo(vivo, 'rilasciato il biglietto')}`);
         console.error(chiRilascia === 'orchestrator'
           ? 'Chiudi il giro senza rilasciare: chi lavora qui consegna e rilascia da sé, e un biglietto abbandonato scade da solo. --forza solo per un worker morto davvero (il gancio ti ha detto «Worker finito», o il canale dice che il suo battito è scaduto).'
-          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona), o fermali se non servono più, poi rilancia lo stesso comando.');
+          : 'Aspetta che finiscano (un comando in sottofondo si aspetta, non si abbandona: «aspetta <biglietto>» di questo stesso script), o fermali se non servono più, poi rilancia lo stesso comando.');
         process.exit(USCITA_LAVORO_VIVO);
       }
     }
