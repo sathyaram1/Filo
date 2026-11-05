@@ -12,7 +12,7 @@ import { readTicket } from './routine-ticket.mjs';
 // Il tetto è uno, quello di biglietto-locale: oltre, la spinta si segna «oltre» e il server la legge come buco. Che
 // coincidano con quelli di fiduciaRamo del server lo controlla una prova del server.
 export { TETTO_COMMIT };
-// Come TETTO_SPINTE e TETTO_COMMIT_CHIAMATA del server: oltre, la coda parte in più chiamate.
+// Come TETTO_SPINTE e TETTO_COMMIT_CHIAMATA del server (la stessa prova): oltre, la coda parte in più chiamate.
 export const TETTO_SPINTE_CHIAMATA = 500;
 export const TETTO_COMMIT_CHIAMATA = 20000;
 export const CODA = 'filo-spinte';
