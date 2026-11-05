@@ -365,6 +365,8 @@ export function withRequest(state, branch, { request, sha, at, feedbackId, feedb
   return s;
 }
 
+export const RICHIESTA_OWNER = '--richiesta-owner';
+
 /**
  * La richiesta del giro è la voce dell'owner (#1514)? PURA. Sì se l'ha scritta lui (l'orchestratore lo dice con
  * --richiesta-owner), se non c'è pratica (l'ha scritta chi ha lanciato start), o se la pratica è fidata.
