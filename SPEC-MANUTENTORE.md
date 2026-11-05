@@ -82,7 +82,14 @@ d'emergenza.
 feedback, ~800 oggi), le indicazioni dell'owner nel taccuino, i rami vivi coi
 loro file, la spesa della settimana per account. Scrive: la rosa (priorità 2),
 l'ordine, N, i pacchetti, le attese. È l'unica lettura intera: ~240k token,
-una volta al giorno.
+una volta al giorno. Prima della lettura il censimento delle schede parte da
+lui: Haiku scrive quelle mancanti o vecchie, Opus rilegge quelle che tolgono
+lavoro e un campione.
+
+**A secco.** Un'indicazione dell'owner nel taccuino chiede la prova a secco:
+finché c'è, nessuna accensione (mattino, battito, sveglia) cambia il lavoro;
+quello che avrebbe fatto lo scrive come proposta nel taccuino, e al mattino
+nel recap. La toglie la decisione del mattino del giorno dopo, o l'owner.
 
 **Fra una decisione e l'altra non resta sveglio: si fa svegliare.** Ogni
 accensione è una sessione nuova con un contesto piccolo (ruolo, taccuino,

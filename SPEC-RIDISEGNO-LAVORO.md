@@ -212,3 +212,7 @@ Fatto in #1785 (server da rideployare): `routineFeedback`, che dà schede e test
 biglietto con l'ambito `gestione_lavoro`, o al manutentore, nell'ambiente dei riservati e salva le schede nel
 feedback (ROUTINE-AUTH-SPEC.md § 15); `feedback:leggi` e `feedback:schede` lo usano in
 una routine, il token dell'owner in locale.
+
+Fase 2 (#1786): il manutentore in cloud è quello di SPEC-MANUTENTORE.md (decisione del mattino e battito accesi dal
+pacemaker, #1959; il recap al posto delle note settimanali). Il censimento delle schede e la prova a secco stanno
+in SPEC-MANUTENTORE.md § 4.

@@ -438,3 +438,29 @@ test('la spesa per account porta quanto resta, le ultime 24 ore e le accensioni;
   assert.doesNotMatch(senzaFreni[0], /ultime 24 ore|accensioni|resta/);
   assert.match(senzaFreni[1], /non frenano: dosa tu sulla settimana/);
 });
+
+test('la decisione del mattino parte dal censimento delle schede e sa fare la prova a secco (#1786)', () => {
+  const mattino = RUOLO.slice(RUOLO.indexOf('- **`mattino`**'), RUOLO.indexOf('- **gli altri motivi**'));
+  const posti = ['npm run feedback:schede -- elenca', '`scrivi` (Haiku', '`rileggi` (Opus', 'npm run manutentore -- contesto']
+    .map((p) => mattino.indexOf(p));
+  assert.ok(posti.every((p) => p >= 0), `passi mancanti: ${posti}`);
+  assert.deepEqual([...posti].sort((a, b) => a - b), posti, 'elenca, scrivi, rileggi, poi il contesto');
+  assert.match(mattino, /tolgono lavoro/);
+  assert.match(mattino.replace(/\s+/g, ' '), /a secco .*nel recap come proposta, senza applicarne nessuno/);
+});
+
+// La prova a secco è dell'intera giornata: un battito che riscrivesse ordine e N la renderebbe bagnata un'ora dopo.
+test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non la toglie (#1786)', () => {
+  const inizio = RUOLO.indexOf('- **`mattino`**');
+  const fine = RUOLO.indexOf('- **gli altri motivi**');
+  const fuori = (RUOLO.slice(0, inizio) + RUOLO.slice(fine)).replace(/\s+/g, ' ');
+  const regola = fuori.slice(fuori.indexOf('**A secco.**'));
+  assert.ok(fuori.includes('**A secco.**'), 'la regola a secco fuori dalla voce del mattino');
+  assert.match(regola, /ogni accensione finché sta nel taccuino, battiti e sveglie compresi/);
+  for (const v of ['ordine', 'N', 'priorità', 'pacchetti', 'attese', 'accensioni', 'sblocchi']) assert.ok(regola.includes(v), v);
+  assert.match(regola, /lascia l'indicazione al suo posto/);
+  assert.doesNotMatch(RUOLO.replace(/\s+/g, ' '), /togli l'indicazione dal taccuino/);
+  const spec = readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\s+/g, ' ');
+  assert.match(spec, /censimento delle schede parte da lui/);
+  assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
+});
