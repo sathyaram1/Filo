@@ -389,6 +389,14 @@ export function testoRiportaInCima(r) {
     ...attesa.map((s) => `  in ${s.version}: ${s.riga.slice(0, 100)}`),
   ] : [];
   if (!r.spostate.length) return dopo.length ? dopo : [`Novità: nessuna riga del ramo sotto una versione già uscita.`];
+  if (r.soloLettura) {
+    return [
+      `Novità: ${r.spostate.length === 1 ? 'una riga del ramo sta' : `${r.spostate.length} righe del ramo stanno`} sotto versioni già uscite alla partenza del ramo e ${r.spostate.length === 1 ? 'va' : 'vanno'} nel blocco ${r.verso}. `
+        + 'Non ho toccato niente: le sposta e le committa `node scripts/novita-in-cima.mjs --commit`.',
+      ...r.spostate.map((s) => `  in ${s.version}: ${s.riga.slice(0, 100)}`),
+      ...dopo,
+    ];
+  }
   return [
     `Novità: ${r.spostate.length === 1 ? 'una riga del ramo era' : `${r.spostate.length} righe del ramo erano`} sotto versioni già uscite, ora ${r.spostate.length === 1 ? 'sta' : 'stanno'} nel blocco ${r.verso}${r.commit ? ` (commit ${r.commit.slice(0, 9)})` : ''}:`,
     ...r.spostate.map((s) => `  da ${s.version}: ${s.riga.slice(0, 100)}`),
