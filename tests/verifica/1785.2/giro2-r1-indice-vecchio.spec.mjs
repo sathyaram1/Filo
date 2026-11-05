@@ -84,7 +84,7 @@ test('r1 un indice scritto prima di questo lavoro non rimanda al feedback le sch
   try {
     writeFileSync(join(cartella, 'indice.json'), JSON.stringify([{ id: 'f7', num: '7', stato: 'todo', priorita: null, aggiornato: S1, attese: [], unisce: [] }]));
     writeFileSync(join(cartella, '7.json'), JSON.stringify(nelFeedback));
-    const r = await lancia(['scrivi', '--solo', '7', '--cartella', cartella], env(srv.url, bin));
+    const r = await lancia(['scrivi', '--cartella', cartella], env(srv.url, bin));
     expect(srv.scritte, `il feedback ha già questa scheda: non va riscritta a nome di chi lancia il comando\n${r.out}`).toEqual([]);
     expect(fb[7].scheda._fiducia).toBe('non_fidato');
   } finally {
