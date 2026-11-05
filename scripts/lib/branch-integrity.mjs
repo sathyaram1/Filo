@@ -127,22 +127,19 @@ function idNelRamo(id) {
 /** Lo stampo se `ramo` è un tentativo di lavoro nuovo su `id` (`worker/<id>-<stampo>`), se no ''. PURA. */
 export function stampoDelTentativo(ramo, id) {
   const safe = idNelRamo(id);
-  const pref = `worker/${safe}-`;
-  const r = String(ramo || '');
-  if (!safe || !r.startsWith(pref)) return '';
-  const resto = r.slice(pref.length);
-  return /^\d{8}T\d{6}Z$/.test(resto) ? resto : '';
+  const t = leggiTentativo(ramo);
+  return safe && t && t.id === safe ? t.stampo : '';
 }
 
 /**
  * I tentativi di lavoro nuovo su `id` rimasti su origin con commit propri fuori dalla linea principale: uno morto prima
  * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
- * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene. Un no di origin è un «non
- * so», non un «non ce ne sono» (#1632).
+ * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene; `superati` quelli che la
+ * regola dei tentativi dà per morti, da chiudere. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
  */
 export function tentativiPrecedenti({ root, id, mainBranch = 'main', escludi = '' }) {
   const safe = idNelRamo(id);
-  if (!safe) return { ok: true, scelto: null, altri: [] };
+  if (!safe) return { ok: true, scelto: null, altri: [], superati: [] };
   let elenco;
   try {
     elenco = execFileSync('git', ['ls-remote', 'origin', `refs/heads/worker/${safe}-*`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
