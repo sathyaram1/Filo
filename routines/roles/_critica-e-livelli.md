@@ -130,14 +130,15 @@ parte. Le opzioni agiscono su `payload.id`; per un rilievo che esce in un
 feedback derivato il server le sposta sul derivato, che nasce col titolo della
 domanda. Un difetto non va lì: è un rilievo col suo livello.
 
-Sulla critica fermano il lavoro i rilievi interni col `?` di livello 3 o col
-`!` (`[2i?!]`): con la loro domanda che blocca il lavoro aspetta l'owner in
-ogni esito, e i rilievi da correggere restano davanti a chi riprende dopo la
-sua risposta; con `"blocca": false` la critica va avanti col suo esito e la
-domanda resta aperta. Un `[2i?]` va avanti: chi corregge applica l'opzione che
-consigli, e la sua domanda esce in un feedback derivato. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato con la sua
-domanda, che l'owner decide a parte.
+Se il lavoro si ferma lo decidono il livello e il segno, mai la domanda: su un
+rilievo `blocca` non si scrive, e la critica che lo porta non parte. Fermano
+i rilievi interni col `?` di livello 3 o col `!` (`[2i?!]`): il lavoro aspetta
+l'owner in ogni esito, e i rilievi da correggere restano davanti a chi
+riprende dopo la sua risposta. Un `[2i?]` va avanti: chi corregge applica
+l'opzione che consigli, e la sua domanda esce in un feedback derivato. Un 1 col
+`?`, un vicino col `?` o un esterno di qualunque livello va avanti in un
+feedback derivato con la sua domanda, che l'owner decide a parte. Una scelta
+che non deve fermare il lavoro si scrive col segno che non lo ferma.
 
 La critica registrata non si modifica più.
 
