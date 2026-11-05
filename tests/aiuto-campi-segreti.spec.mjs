@@ -2,6 +2,7 @@
 // di pagina (#810.7): il campo arriva col suo nome e, nell'immagine, coperto dai puntini. Senza il fix è rossa: con
 // l'etichetta legata al campo e nessun segnaposto, la descrizione degli elementi portava il valore in chiaro.
 
+import http from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
 import { vistaAvviso, copertura } from './helpers/avvisoSito.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
@@ -477,38 +478,109 @@ test('il codice monouso in un campo solo arriva al modello col testo che lo prec
 });
 
 // La ricerca dei campi nei componenti chiusi legge l'albero intero solo dove ce n'è uno con dei campi: su una pagina
-// grande prima costava secondi a ogni foto, con Filo fermo per più di un secondo alla volta.
-test('su una pagina grande senza componenti chiusi la foto per l’assistente non aspetta e Filo non si ferma', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(120_000);
-  const riquadri = Array.from({ length: 20 }, (_, i) => testServer.html(`<!doctype html><html><body>
-    ${'<div><span>x</span><a href="#">y</a></div>'.repeat(2000)}<p>r${i}</p></body></html>`, { pubblico: true }));
-  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Lunga</title></head><body>
-    <form><input name="q" value="scarpe da corsa"> <textarea>una nota</textarea></form>
-    <script>document.write('<div><p>testo <b>uno</b> <i>due</i></p><ul><li>a</li><li>b</li></ul></div>'.repeat(13000));</script>
-    ${riquadri.map((u) => `<iframe src="${u}" width="200" height="100"></iframe>`).join('')}</body></html>`);
-  await expect.poll(() => page.frames().length, { timeout: 30_000 }).toBeGreaterThan(15);
-  const aiuto = await apriAiuto(app, shell, page);
-  const percorso = new URL(page.url()).pathname;
+// grande prima costava secondi a ogni foto, con Filo fermo per più di un secondo alla volta. Un riquadro dello stesso
+// sito su un altro indirizzo, o la scritta «<input>» in un commento, non sono componenti chiusi (#810.18).
+async function secondoServer(body) {
+  const s = http.createServer((_q, res) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' }); res.end(body); });
+  await new Promise((r) => s.listen(0, '127.0.0.1', r));
+  return { s, url: `http://127.0.0.1:${s.address().port}/` };
+}
 
-  const esito = await app.evaluate(async ({ webContents }, percorso) => {
+const PAGINA_GRANDE = [
+  ['senza altro', () => ''],
+  ['con un riquadro dello stesso sito su un altro indirizzo con un campo', (altro) => `<iframe src="${altro}" width="300" height="80"></iframe>`],
+  ['con la scritta «<input>» in un commento', () => '<!-- vecchio modulo: <input> --><p hidden>&lt;textarea&gt;</p>'],
+  ['con la scritta «<input>» nel valore di un attributo', () => '<div hidden data-modello="<input> <textarea> <select>"></div>'],
+];
+for (const [nome, extra] of PAGINA_GRANDE) {
+  test(`su una pagina grande senza componenti chiusi, ${nome}, la foto per l’assistente non aspetta e Filo non si ferma`, async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    const altro = await secondoServer('<!doctype html><html><body><form>Iscriviti alla newsletter <input name="email"></form></body></html>');
+    try {
+      const riquadri = Array.from({ length: 20 }, (_, i) => testServer.html(`<!doctype html><html><body>
+        ${'<div><span>x</span><a href="#">y</a></div>'.repeat(2000)}<p>r${i}</p></body></html>`, { pubblico: true }));
+      const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Lunga</title></head><body>
+        <form><input name="q" value="scarpe da corsa"> <textarea>una nota</textarea></form>${extra(altro.url)}
+        <script>document.write('<div><p>testo <b>uno</b> <i>due</i></p><ul><li>a</li><li>b</li></ul></div>'.repeat(13000));</script>
+        ${riquadri.map((u) => `<iframe src="${u}" width="200" height="100"></iframe>`).join('')}</body></html>`);
+      await expect.poll(() => page.frames().length, { timeout: 30_000 }).toBeGreaterThan(15);
+      await apriAiuto(app, shell, page);
+      const esito = await misuraLaRicerca(app, new URL(page.url()).pathname);
+      expect(esito.durate.every((d) => d.campi === 0)).toBe(true);
+      expect(Math.max(...esito.durate.map((d) => d.ms)), 'ogni foto dell’assistente aspetta la ricerca dei campi').toBeLessThan(1000);
+      expect(esito.fermo, 'Filo resta fermo mentre cerca i campi').toBeLessThan(300);
+    } finally { altro.s.close(); }
+  });
+}
+
+async function misuraLaRicerca(app, percorso, volte = 3) {
+  return app.evaluate(async ({ webContents }, [percorso, volte]) => {
     const rq = process.mainModule.require;
     const M = rq(rq('node:path').join(process.cwd(), 'src/main/services/campiNeiRiquadri.js'));
     const wc = webContents.getAllWebContents().find((w) => w.getURL().includes(percorso));
     const durate = [];
     let fermo = 0, prec = Date.now();
     const iv = setInterval(() => { const n = Date.now(); fermo = Math.max(fermo, n - prec); prec = n; }, 10);
-    for (let i = 0; i < 3; i++) {
+    for (let i = 0; i < volte; i++) {
       const t = Date.now();
       const r = await M.campiSegretiFuoriPagina(wc);
-      durate.push({ ms: Date.now() - t, campi: r.campi.length });
+      durate.push({ ms: Date.now() - t, campi: r.campi.length, nonCoperti: r.nonCoperti });
     }
     clearInterval(iv);
     return { durate, fermo };
-  }, percorso);
+  }, [percorso, volte]);
+}
 
-  expect(esito.durate.every((d) => d.campi === 0)).toBe(true);
-  expect(Math.max(...esito.durate.map((d) => d.ms)), 'ogni foto dell’assistente aspetta la ricerca dei campi').toBeLessThan(1000);
-  expect(esito.fermo, 'Filo resta fermo mentre cerca i campi').toBeLessThan(300);
+// Il conto costa uguale con tre o tremila campi; un componente chiuso senza niente di segreto non fa leggere l'albero,
+// e quando i conti non tornano non si guardano tutti i campi della pagina uno per uno.
+const CASELLE = `<table>${'<tr><td><input type="checkbox"></td><td>ordine</td></tr>'.repeat(3000)}</table>`;
+const CERCA_CHIUSO = `<cerca-chiuso></cerca-chiuso><script>customElements.define('cerca-chiuso', class extends HTMLElement {
+    constructor() { super(); this.attachShadow({ mode: 'closed' }).innerHTML = '<input type="search" value="scarpe">'; } });</script>`;
+const PAGINA_SENZA_RIQUADRI = [
+  ['tremila caselle da spuntare', CASELLE, 400, 150],
+  ['un componente chiuso con il solo campo di ricerca', CERCA_CHIUSO, 1000, 300],
+  ['tremila caselle e un componente chiuso con il solo campo di ricerca', CERCA_CHIUSO + CASELLE, 1000, 600],
+  ['tremila caselle e un riquadro con gli script spenti con un campo per l’email',
+    `<iframe sandbox srcdoc="<form>Iscriviti <input name='email'></form>" width="300" height="60"></iframe>${CASELLE}`, 1000, 600],
+];
+for (const [nome, extra, attesa, fermo] of PAGINA_SENZA_RIQUADRI) {
+  test(`su una pagina grande con ${nome}, la foto per l’assistente non aspetta e Filo non si ferma`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120_000);
+    const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Lunga</title></head><body>${extra}
+      <script>document.write('<div><p>testo <b>uno</b> <i>due</i></p><ul><li>a</li><li>b</li></ul></div>'.repeat(9000));</script></body></html>`);
+    const esito = await misuraLaRicerca(app, new URL(page.url()).pathname);
+    expect(esito.durate.every((d) => d.campi === 0)).toBe(true);
+    expect(Math.max(...esito.durate.map((d) => d.ms)), 'ogni foto dell’assistente aspetta la ricerca dei campi').toBeLessThan(attesa);
+    expect(esito.fermo, 'Filo resta fermo mentre cerca i campi').toBeLessThan(fermo);
+  });
+}
+
+// La scritta «<input>» o un riquadro dello stesso sito accanto a un componente chiuso non ne nascondono i campi.
+test('il campo di un componente chiuso si trova anche con la scritta «<input>» e in un riquadro dello stesso sito su un altro indirizzo', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const altro = await secondoServer(`<!doctype html><html><body style="margin:0">${componenteChiuso}</body></html>`);
+  try {
+    const page = await testServer.openReady(openTab, modulo(`<!-- vecchio modulo: <input> -->${componenteChiuso}`
+      + `<iframe name="porta" src="${altro.url}" style="width:420px;height:60px"></iframe>`));
+    await expect.poll(() => page.frame({ name: 'porta' })?.evaluate(() => Boolean(window.__radice)).catch(() => false),
+      { timeout: 10_000 }).toBe(true);
+    await Promise.all([page, page.frame({ name: 'porta' })].map((f) => scriviNelComponente(f, '4111111111111111')));
+    const esito = await misuraLaRicerca(app, new URL(page.url()).pathname, 1);
+    expect(esito.durate[0].campi, 'i campi dei due componenti chiusi').toBe(2);
+  } finally { altro.s.close(); }
+});
+
+// I due conti dei campi non si prendono nello stesso istante: una pagina che toglie un campo fra l'uno e l'altro non
+// deve far saltare la ricerca nei componenti chiusi (#810.18).
+test('il numero della carta nel componente chiuso è coperto in ogni foto, anche con la pagina che ridisegna i suoi campi', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const page = await testServer.openReady(openTab, modulo(`${componenteChiuso}<div id="z"></div>
+    <script>let on = false; setInterval(() => { on = !on; z.innerHTML = on ? '<input>'.repeat(50) : ''; }, 2);</script>`));
+  await expect.poll(() => page.evaluate(() => Boolean(window.__radice)), { timeout: 10_000 }).toBe(true);
+  await scriviNelComponente(page, '4111111111111111');
+  const esito = await misuraLaRicerca(app, new URL(page.url()).pathname, 30);
+  const scoperte = esito.durate.filter((d) => !d.nonCoperti && d.campi === 0).length;
+  expect(scoperte, 'foto con la carta scoperta, su trenta').toBe(0);
 });
 
 // Lo screenshot del menu: il nome del file lo sceglie un modello guardando la foto. La foto dell'utente resta intera.

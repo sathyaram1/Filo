@@ -9,7 +9,9 @@
   // resta nella pagina (il content script), non la misura usa e getta del main.
   function crea(win, cartaValida, { ricorda = false } = {}) {
     const doc = win.document;
-    const CAMPO_CON_VALORE = /^(INPUT|TEXTAREA|SELECT)$/;
+    // Da qui prende i nomi anche la ricerca del main nei componenti chiusi: un campo nuovo va aggiunto solo qui.
+    const NOMI_DEI_CAMPI = ['input', 'textarea', 'select'];
+    const CAMPO_CON_VALORE = new RegExp(`^(${NOMI_DEI_CAMPI.join('|')})$`, 'i');
     const INPUT_BOTTONE = /^(button|submit|reset|image|checkbox|radio|hidden|file|range|color)$/i;
     const AUTOCOMPLETE_SEGRETO = /(^|\s)(current-password|new-password|one-time-code|cc-[a-z-]+)(\s|$)/i;
     const PAROLE_SEGRETE = new RegExp(['pass ?word', 'passwd', 'pwd', 'passcode', 'pass_code', 'passwort', 'kennwort',
@@ -158,7 +160,7 @@
 
     // Anche i campi dentro i componenti della pagina (ombra aperta): a schermo si vedono come gli altri.
     function tuttiICampi(radice, profondita = 0) {
-      const out = Array.from(radice.querySelectorAll('input, textarea, select'));
+      const out = Array.from(radice.querySelectorAll(NOMI_DEI_CAMPI.join(', ')));
       if (profondita > 8) return out;
       for (const n of radice.querySelectorAll('*')) {
         if (n.shadowRoot) out.push(...tuttiICampi(n.shadowRoot, profondita + 1));
@@ -196,7 +198,7 @@
       return out;
     }
 
-    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti };
+    return { campoSegreto, copertoAschermo, etichettaCollegata, etichettaVicina, campiInVista, valoriSegreti, NOMI_DEI_CAMPI };
   }
 
   // Il testo a schermo che ripete il valore di un campo segreto (#810.16), come l'anteprima della carta che si compone
