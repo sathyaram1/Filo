@@ -312,6 +312,8 @@ app.whenReady().then(async () => {
 
   // Dopo la prima scheda: niente di questo cambia come si apre.
   pronti.then(() => {
+    // Qualche secondo dopo, per prendere anche i moduli che l'avvio carica in ritardo.
+    setTimeout(() => cacheCodice.scrivi(), 5000).unref?.();
     // I cookie dei tracker rimasti da una chiusura brusca (quella normale li toglie uscendo).
     try { require('./services/cookies').wipeTrackerCookies(s).catch(() => {}); } catch (_) {}
     // #711 — l'elenco ufficiale dei firmatari C2PA: rilegge la copia su disco e la rinfresca quando è vecchia.
