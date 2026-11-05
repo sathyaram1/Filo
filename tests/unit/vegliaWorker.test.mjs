@@ -18,6 +18,9 @@ const {
   attivitaPerBattito, ultimoPasso, quadroDelFermo, notaDelFermo, SOGLIA_FERMO_MS, USCITA_FINITO, USCITA_FERMO, USCITA_LAVORA, TESTO_FINITO,
 } = await import('../../scripts/lib/veglia-worker.mjs');
 const { impronta, FILE_REGISTRO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+const { processiDiSistema } = await import('../../scripts/lib/branch-integrity.mjs');
+// La riga di comando legge i processi del sistema vero: fuori da Linux (/proc assente) il quadro dice «non letti».
+const PROCESSI_DEL_SISTEMA = processiDiSistema() === null ? 'non letti' : 'nessuno';
 
 const B = 'AbCdEfGhIjKlMnOpQrStUvWxYz0123456789_-abcde';
 const SID = 'sessione-del-giro-1797';
@@ -247,7 +250,7 @@ describe('veglia da riga di comando', () => {
       assert.match(rilascio.body.fault, /^guasto: permessi git: permesso in attesa: il worker non dà segni di vita da 30 minuti/);
       assert.match(rilascio.body.fault, /git push --dry-run --force-with-lease/);
       // #2182: il quadro sta nel guasto e, uguale, nelle note del rapporto di fine sessione.
-      assert.match(rilascio.body.fault, /Ultimo strumento: Bash alle \d\d:\d\d:\d\d UTC, senza risposta\. .*Processi nella cartella: nessuno\. .*Rilasciato dalla veglia/);
+      assert.match(rilascio.body.fault, new RegExp(`Ultimo strumento: Bash alle \\d\\d:\\d\\d:\\d\\d UTC, senza risposta\\. .*Processi nella cartella: ${PROCESSI_DEL_SISTEMA}\\. .*Rilasciato dalla veglia`));
       const nota = (rilascio.body.report.notes || []).find((n) => n.startsWith('fermo dalla veglia: '));
       assert.ok(nota, `note del rapporto: ${JSON.stringify(rilascio.body.report.notes)}`);
       assert.ok(rilascio.body.fault.includes(nota.slice('fermo dalla veglia: '.length)), 'lo stesso quadro del guasto');
