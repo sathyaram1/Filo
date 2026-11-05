@@ -45,6 +45,27 @@ test('ripresa: rilanciato sullo stesso commit salta gli spec già verdi, su un a
   }
 });
 
+test('ripresa: le prove del giro committate mentre il controllo gira non buttano i verdi, il codice sì', () => {
+  const dir = cartellaTemporanea('ripresa-prove-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  try {
+    g('init', '-q', '-b', 'main');
+    g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+    writeFileSync(resolve(dir, 'a.txt'), '1\n'); g('add', '-A'); g('commit', '-qm', 'lavoro');
+    memoriaSpecVerdi(dir, g('rev-parse', 'HEAD')).segna(['tests/editor']);
+
+    mkdirSync(resolve(dir, 'tests', 'verifica', '2113'), { recursive: true });
+    writeFileSync(resolve(dir, 'tests', 'verifica', '2113', 'giro1-r1-x.spec.mjs'), '// prova\n');
+    g('add', '-A'); g('commit', '-qm', 'auto: prova del giro');
+    assert.deepEqual([...memoriaSpecVerdi(dir, g('rev-parse', 'HEAD')).verdi], ['tests/editor']);
+
+    writeFileSync(resolve(dir, 'a.txt'), '2\n'); g('commit', '-qam', 'auto: codice');
+    assert.deepEqual([...memoriaSpecVerdi(dir, g('rev-parse', 'HEAD')).verdi], []);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 test('ripresa: una memoria illeggibile o di forma sbagliata non salta niente', () => {
   const dir = cartellaTemporanea('ripresa-guasta-');
   try {
