@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.266', date: '2026-11-05',
+      fixes: [
+        { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega» o «Approfondisci», la pagina sotto non scatta più.', segnalazione: 2119 },
+      ],
+    },
+    {
       version: '0.2.265', date: '2026-11-05',
       fixes: [
         { testo: 'Un sito che hai chiesto di aprire sempre da un altro paese non riceve più la richiesta della sua icona dalla tua connessione, nemmeno per un suo link salvato da un\'altra scheda o per i suggerimenti della home e della chat.', segnalazione: 1273 },
