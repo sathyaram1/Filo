@@ -110,6 +110,10 @@ test('con la chiave owner-non-fidato elenco, mostra, rispondi, archivia e riapri
   assert.ok(f.out.some((s) => /^OK: D-3 è in_lavorazione; applicata/.test(s)));
   assert.ok(f.out.some((s) => s === 'OK: D-3 è chiusa.'));
   assert.ok(f.out.some((s) => s === 'OK: D-3 è aperta.'), 'la riapre');
+  const c = finto(NON_FIDATO, { mostra: { domanda: DOMANDA(), riferimenti: {} }, consiglio: { esiti: [{ id: 'D-3', ok: true }] } });
+  assert.equal(await Q.esegui(['consiglio', 'D-3'], c.io), 0, c.err.join(' | '));
+  assert.deepEqual(c.chiave.map((x) => x.data), [{ op: 'mostra', id: 'D-3' }, { op: 'consiglio', ids: ['D-3'] }]);
+  assert.equal(c.owner.length, 0);
 });
 
 test('con la chiave restano i controlli di prima: l’opzione «solo dalla finestra» non parte, la non fidata sporca prima di stampare', async () => {
