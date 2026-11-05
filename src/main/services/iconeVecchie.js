@@ -51,6 +51,9 @@ function crea({
     const gruppi = [[S, S ? await S.list() : [], new Map()], [A, A ? await A.list() : [], new Map()]];
     const perIndirizzo = new Map();
     const online = inLinea();
+    // Senza le regole dei siti non si sa chi esce solo dal proxy: si convertono i dati, e la rete aspetta il giro dopo.
+    let leRegole = null;
+    try { leRegole = await regole(); } catch (_) {}
     for (const [, voci, esiti] of gruppi) {
       for (const v of voci) {
         const prima = statoIcona(v);
@@ -58,6 +61,9 @@ function crea({
           esiti.set(v.id, { prima, a: await Copie.conserva(v.favicon) });
           continue;
         }
+        // Un sito con la regola del paese esce solo dal proxy, da qualunque scheda sia nata la voce; la voce resta com'è,
+        // da chiedere se la regola cade.
+        if (!v.proxy && (!leRegole || ProxyTab.regolaPer(v.url, leRegole))) continue;
         const u = daChiedere(v);
         // Un indirizzo di prima di una scheda passata dal proxy non si segue: si toglie, e resta l'icona generica.
         if (!u) { if (v.faviconDaChiedere) esiti.set(v.id, { prima, a: '' }); continue; }
