@@ -75,7 +75,9 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
 - **`mattino`**: la decisione del giorno. Prima il censimento delle schede, che parte da te:
   `npm run feedback:schede -- elenca`, poi `scrivi` (Haiku: i feedback nati senza scheda e quelle vecchie), poi
   `rileggi` (Opus: tutte quelle che tolgono lavoro, più il campione); in sottofondo, e lo aspetti prima del contesto.
-  Un feedback rimasto senza scheda si decide sul titolo, e lo dici nel recap. Poi `npm run manutentore -- contesto`
+  Un feedback rimasto senza scheda si decide sul titolo, e lo dici nel recap. Un FERMO di `stato` o `scrivi` vuol
+  dire che il censimento non sta nei feedback (nessuna scheda, o le poche scritte con `--solo`): si decide sui titoli,
+  e riscriverle tutte (`--da-zero`) è una scelta dell'owner, non tua. Poi `npm run manutentore -- contesto`
   per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
   (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi

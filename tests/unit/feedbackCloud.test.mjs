@@ -428,3 +428,149 @@ test('elenca: dal server col biglietto e dalle righe dell’owner, lo stesso ind
     assert.equal(existsSync(join(locale, '700.json')), false, 'un chiuso resta fuori');
   } finally { togliCartella(cloud); togliCartella(locale); }
 });
+
+// #2181: il censimento della fase 0 stava solo nella cartella dell'owner; dal cloud la lettura dava 0 schede su 769 aperti.
+test('elenca segna le schede buone della cartella che il feedback non ha, e scrivi le salva senza agente', async () => {
+  const AGG = '2026-10-29T12:00:00.000Z';
+  const cartella = cartellaTemporanea('schede-fase0-');
+  try {
+    mkdirSync(cartella, { recursive: true });
+    const fonte = (num, aggiornato = AGG) => ({ id: `f${num}`, stato: 'todo', aggiornato, at: '2026-10-28T10:00:00.000Z', modello: 'haiku' });
+    const riga = (num, extra = {}) => ({ _id: `f${num}`, seq: num, subSeq: 0, status: 'todo', updatedAt: AGG, waitsFor: [], unisce: [], ...extra });
+    // 1: fresca, il feedback non l'ha → da mandare. 2: il feedback è cambiato → la riscrive l'agente. 3: il feedback l'ha già.
+    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1), _riletta: { at: 'R', modello: 'opus' } }));
+    writeFileSync(join(cartella, '2.json'), JSON.stringify({ ...buona(2), _fonte: fonte(2, 'prima') }));
+    writeFileSync(join(cartella, '3.json'), JSON.stringify({ ...buona(3), _fonte: fonte(3) }));
+    const blob3 = SS.perIlDocumento(buona(3), { stato: 'todo', at: '2026-10-29T11:00:00.000Z', modello: 'haiku', fiducia: 'fidato', scrittaDa: 'owner' });
+    const righe = [riga(1), riga(2), riga(3, { scheda: JSON.stringify(blob3), schedaAt: AGG })];
+    const out = [];
+    const l = console.log;
+    console.log = (...a) => out.push(a.join(' '));
+    try {
+      assert.equal(await S.elenca(cartella, false, { lettura: () => S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async (v) => JSON.parse(v) }) }), 0);
+    } finally { console.log = l; }
+    assert.match(out.join('\n'), /1 schede della cartella mancano nel feedback: scrivi le salva senza agente/);
+    const letta = (n) => JSON.parse(readFileSync(join(cartella, `${n}.json`), 'utf8'));
+    assert.equal(letta(1)[S.NON_SALVATA], true);
+    assert.equal(letta(2)[S.NON_SALVATA], undefined, 'vecchia: non si manda, la rifà l’agente');
+    assert.equal(letta(3)[S.NON_SALVATA], undefined, 'già nel feedback');
+    const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
+    const mandati = [];
+    const r = await S.rimandaNonSalvate(cartella, indice, { salva: async (dati) => {
+      mandati.push(dati);
+      return { ok: true, aggiornato: 'B', scheda: { ...buona(1), _fonte: fonte(1, 'B'), _fiducia: 'fidato' } };
+    } });
+    assert.deepEqual(mandati.map((d) => [d.numero, d.rilettura, d.modello]), [['1', true, 'opus']], 'la rilettura di Opus resta una rilettura');
+    assert.equal(r.mandate, 1);
+    assert.equal(letta(1)[S.NON_SALVATA], undefined, 'salvata: il segno se ne va');
+  } finally { togliCartella(cartella); }
+});
+
+const indiceDi = (quanti) => Array.from({ length: quanti }, (_, i) => ({ id: `f${i + 1}`, num: String(i + 1), stato: 'todo', aggiornato: 'A', attese: [], unisce: [] }));
+
+test('in una routine, nessuna scheda su tanti aperti ferma stato e scrivi invece di riscriverle tutte', () => {
+  const tanti = indiceDi(S.SOGLIA_CENSIMENTO);
+  assert.match(S.censimentoMancante({ via: 'cloud', indice: tanti, schede: [] }), new RegExp(`nessuna scheda su ${S.SOGLIA_CENSIMENTO} feedback aperti.*--da-zero`));
+  const segnalata = { ...buona(1), [S.SEGNALATA]: true };
+  assert.notEqual(S.censimentoMancante({ via: 'cloud', indice: tanti, schede: [segnalata] }), '', 'la scheda «non letto» di un segnalato non è un censimento');
+  const molti = indiceDi(768);
+  assert.match(S.censimentoMancante({ via: 'cloud', indice: molti, schede: [buona(5)] }), /solo 1 scheda su 768 feedback aperti.*767 agenti/,
+    'una scheda scritta con --solo non è un censimento: il mattino dopo non riparte la riscrittura alla cieca');
+  const meta = Array.from({ length: 384 }, (_, i) => buona(i + 1));
+  assert.equal(S.censimentoMancante({ via: 'cloud', indice: molti, schede: meta }), '', 'metà coperta: il censimento c\'è, mancano i nuovi');
+  assert.notEqual(S.censimentoMancante({ via: 'cloud', indice: molti, schede: meta.slice(1) }), '');
+  assert.equal(S.censimentoMancante({ via: 'cloud', indice: indiceDi(100), schede: Array.from({ length: 51 }, (_, i) => buona(i + 1)) }), '', 'mancano 49: un inizio vero');
+  const chiuse = Array.from({ length: 700 }, (_, i) => buona(i + 1000));
+  assert.notEqual(S.censimentoMancante({ via: 'cloud', indice: molti, schede: chiuse }), '', 'le schede di feedback non più aperti non coprono');
+  assert.equal(S.censimentoMancante({ via: 'cloud', indice: indiceDi(S.SOGLIA_CENSIMENTO - 1), schede: [] }), '', 'pochi aperti: un inizio vero');
+  assert.equal(S.censimentoMancante({ via: 'locale', indice: tanti, schede: [] }), '', 'in locale la cartella è il censimento');
+});
+
+test('stato e scrivi da una routine si fermano sul censimento mancante; --solo e --da-zero passano', async () => {
+  const { spawnSync } = await import('node:child_process');
+  const dir = cartellaTemporanea('schede-censimento-');
+  try {
+    const cartella = join(dir, 'schede');
+    mkdirSync(cartella, { recursive: true });
+    writeFileSync(join(cartella, 'indice.json'), JSON.stringify(indiceDi(768)));
+    const env = { ...process.env, FILO_ROUTINE: '1', FILO_ROUTINE_TICKET: 'biglietto-finto', FILO_ROUTINE_API: 'http://127.0.0.1:9' };
+    const lancia = (...a) => spawnSync(process.execPath, [join(ROOT, 'scripts', 'schede.mjs'), ...a, '--cartella', cartella], { cwd: ROOT, env, encoding: 'utf8' });
+    for (const cmd of ['stato', 'scrivi']) {
+      const r = lancia(cmd, '--dry-run');
+      assert.equal(r.status, 1, `${cmd}: ${r.stdout}${r.stderr}`);
+      assert.match(r.stderr, /FERMO: la lettura dal server ha portato nessuna scheda su 768 feedback aperti/);
+      assert.doesNotMatch(r.stdout, /768 agenti|"daScrivere"/);
+    }
+    // Il mattino dopo uno «scrivi --solo 5»: quella scheda sola, ricopiata da elenca, non riapre la riscrittura di tutti.
+    writeFileSync(join(cartella, '5.json'), JSON.stringify({ ...buona(5), _fonte: { id: 'f5', stato: 'todo', aggiornato: 'ieri', at: 'X', modello: 'haiku' } }));
+    const dopoSolo = lancia('scrivi', '--dry-run');
+    assert.equal(dopoSolo.status, 1, `${dopoSolo.stdout}${dopoSolo.stderr}`);
+    assert.match(dopoSolo.stderr, /FERMO: la lettura dal server ha portato solo 1 scheda su 768 feedback aperti/);
+    assert.doesNotMatch(dopoSolo.stdout, /\d+ agenti/);
+    // Un --solo che non porta numeri non è una scheda chiesta: niente agenti, né sul fermo né su tutti gli aperti.
+    for (const vuoto of [',', '#', ' ']) {
+      const r = lancia('scrivi', '--solo', vuoto, '--dry-run');
+      assert.equal(r.status, 1, `--solo ${JSON.stringify(vuoto)}: ${r.stdout}${r.stderr}`);
+      assert.doesNotMatch(r.stdout, /\d+ agenti/);
+    }
+    const solo = lancia('scrivi', '--solo', '5', '--dry-run');
+    assert.equal(solo.status, 0, `${solo.stdout}${solo.stderr}`);
+    assert.match(solo.stdout, /1 agenti haiku.*#5$/m);
+    const tutte = lancia('scrivi', '--da-zero', '--dry-run');
+    assert.equal(tutte.status, 0, `${tutte.stdout}${tutte.stderr}`);
+    assert.match(tutte.stdout, /768 agenti haiku/);
+  } finally { togliCartella(dir); }
+});
+
+test('elenca dal server dice quando sono i feedback a non avere schede, e conta quelle illeggibili', async () => {
+  const AGG = '2026-10-29T12:00:00.000Z';
+  const voci = indiceDi(60).map((f) => ({ num: f.num, id: f.id, riga: { _id: f.id, seq: Number(f.num), subSeq: 0, status: 'todo', priority: null, updatedAt: AGG, waitsFor: [], unisce: [] } }));
+  const giro = async (vv) => {
+    const cartella = cartellaTemporanea('schede-vuote-');
+    const out = [];
+    const l = console.log;
+    console.log = (...a) => out.push(a.join(' '));
+    try {
+      const server = serverFinto([{ status: 200, body: { ok: true, resto: [], voci: vv } }]);
+      assert.equal(await S.elenca(cartella, false, { lettura: () => S.letturaCloud('tk', { chiama: server.chiama }) }), 0);
+    } finally { console.log = l; togliCartella(cartella); }
+    return out.join('\n');
+  };
+  // Una risposta senza nessun segno della scheda non distingue i feedback senza schede da un server che non le manda.
+  const muta = await giro(voci);
+  assert.doesNotMatch(muta, /la lettura è andata/);
+  assert.match(muta, /Nessuno dei 60 aperti ha una scheda salvata nel feedback: il server non dice se i feedback ne hanno/);
+  const conOraVuota = voci.map((v) => ({ ...v, riga: { ...v.riga, schedaAt: null } }));
+  assert.match(await giro(conOraVuota), /Nessuno dei 60 aperti ha una scheda salvata nel feedback: la lettura è andata, sono i feedback a non averne/);
+  const conIlleggibile = voci.map((v, i) => (i === 0 ? { ...v, schedaIllegibile: 'la scheda salvata non si decifra' } : v));
+  const testo = await giro(conIlleggibile);
+  assert.match(testo, /0 schede salvate nei feedback, 1 illeggibili/);
+  assert.doesNotMatch(testo, /sono i feedback a non averne/);
+  assert.match(testo, /Nessuno dei 60 aperti ha una scheda salvata nel feedback, e 1 non si leggono: è la lettura a non andare/);
+  // Senza il segno del server: l'ora di scrittura in chiaro senza la scheda conta lo stesso.
+  const soloOra = voci.map((v, i) => (i < 2 ? { ...v, riga: { ...v.riga, schedaAt: AGG } } : v));
+  assert.match(await giro(soloOra), /0 schede salvate nei feedback, 2 illeggibili/);
+  const unaSola = voci.map((v, i) => (i === 0 ? { ...v, scheda: { ...buona(1), _fonte: { id: 'f1', stato: 'todo', aggiornato: AGG, at: AGG } } } : v));
+  assert.match(await giro(unaSola), /Solo 1 dei 60 aperti ha una scheda salvata nel feedback: la lettura è andata/);
+});
+
+test('elenca sulla macchina dell\'owner conta le schede salvate che non si aprono, e stato conta quelle da mandare', async () => {
+  const AGG = '2026-10-29T12:00:00.000Z';
+  const cartella = cartellaTemporanea('schede-illeggibili-locale-');
+  const out = [];
+  const l = console.log;
+  console.log = (...a) => out.push(a.join(' '));
+  try {
+    const righe = indiceDi(60).map((f, i) => ({ _id: f.id, seq: Number(f.num), subSeq: 0, status: 'todo', updatedAt: AGG, waitsFor: [], unisce: [], ...(i < 3 ? { scheda: 'cifrata-male', schedaAt: AGG } : {}) }));
+    const lettura = () => S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async () => null });
+    assert.equal(await S.elenca(cartella, false, { lettura }), 0);
+  } finally { console.log = l; }
+  try {
+    const testo = out.join('\n');
+    assert.match(testo, /0 schede salvate nei feedback, 3 illeggibili \(da riscrivere\)/);
+    assert.match(testo, /e 3 non si leggono: è la lettura a non andare/);
+    writeFileSync(join(cartella, '7.json'), JSON.stringify({ ...buona(7), [S.NON_SALVATA]: true }));
+    const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
+    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).nonSalvate, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
+  } finally { togliCartella(cartella); }
+});

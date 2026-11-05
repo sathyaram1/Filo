@@ -139,7 +139,63 @@ export function riepilogo(indice, schede) {
   const per = (k) => schede.reduce((m, s) => ({ ...m, [s[k] ?? '?']: (m[s[k] ?? '?'] || 0) + 1 }), {});
   const mappa = new Map(schede.map((s) => [String(s.numero || '').replace(/^#/, ''), s]));
   const daFare = (indice || []).filter((f) => daScrivere(f, mappa.get(f.num)));
-  return { aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length, valido: per('valido'), area: per('area') };
+  return {
+    aperti: (indice || []).length, schede: schede.length, daScrivere: daFare.length, daRileggere: daRileggere(schede).length,
+    nonSalvate: schede.filter((s) => s && s[NON_SALVATA] === true).length, valido: per('valido'), area: per('area'),
+  };
+}
+
+// «Centinaia di aperti e nessuna scheda» (#2181): sotto questa soglia di mancanti riscriverle costa poco e può essere un
+// inizio vero. Il conto è sulla copertura, non su «almeno una»: una scheda scritta con --solo non è un censimento.
+export const SOGLIA_CENSIMENTO = 50;
+
+/**
+ * Quante schede vere ha la cartella sugli aperti dell'indice; `scarsa` = mancano tante e coprono meno di metà. È l'unica
+ * regola del censimento mancante: la usano l'avviso di elenca e il fermo di stato e scrivi. PURA.
+ */
+export function copertura({ indice, schede }) {
+  const nums = new Set((indice || []).filter((f) => f && !f.segnalato).map((f) => String(f.num)));
+  const coperti = new Set((schede || []).filter((s) => s && !s[SEGNALATA]).map((s) => String(s.numero || '').replace(/^#/, '')).filter((n) => nums.has(n)));
+  const aperti = nums.size;
+  const vere = coperti.size;
+  return { aperti, vere, mancano: aperti - vere, scarsa: aperti - vere >= SOGLIA_CENSIMENTO && vere * 2 < aperti };
+}
+
+const quanteSchede = (vere) => (vere ? `solo ${vere} ${vere === 1 ? 'scheda' : 'schede'}` : 'nessuna scheda');
+
+/**
+ * In una routine, una cartella con poche schede su tanti aperti vuol dire censimento che non sta nei feedback, non
+ * schede da riscrivere: Haiku le rifarebbe tutte alla cieca. → '' se si può andare avanti, altrimenti il motivo. PURA.
+ */
+export function censimentoMancante({ via, indice, schede }) {
+  if (via !== 'cloud') return '';
+  const c = copertura({ indice, schede });
+  if (!c.scarsa) return '';
+  return [
+    `FERMO: la lettura dal server ha portato ${quanteSchede(c.vere)} su ${c.aperti} feedback aperti: il censimento non arriva dai feedback`,
+    '(elenca dice se sono i feedback a non averne o la lettura a non andare).',
+    'Il censimento si porta nei feedback dalla macchina dell\'owner (elenca, poi scrivi: le schede della sua cartella si salvano senza agente);',
+    `riscriverle tutte da qui (${c.mancano} agenti) si fa solo deciso, con --da-zero. Intanto si decide sui titoli, e lo si dice nel recap;`,
+    'una scheda sola si scrive con scrivi --solo N.',
+  ].join(' ');
+}
+
+/**
+ * Le schede della cartella buone e fresche che il feedback non ha (il censimento della fase 0, o un salvataggio perso):
+ * si segnano da mandare, e il prossimo `scrivi` le salva senza agente. `salvate`: i numeri che la lettura ha portato con
+ * la scheda. → quante segnate.
+ */
+export function segnaNonSalvate(cartella, indice, salvate) {
+  const perNum = new Map((indice || []).filter((f) => f && !f.segnalato).map((f) => [f.num, f]));
+  let segnate = 0;
+  for (const s of leggiSchede(cartella)) {
+    const num = String(s.numero || '').replace(/^#/, '');
+    const f = perNum.get(num);
+    if (!f || salvate.has(num) || s[NON_SALVATA] || s[RIFIUTATA] || s[SEGNALATA] || daScrivere(f, s)) continue;
+    writeFileSync(fileScheda(cartella, num), `${JSON.stringify({ ...s, [NON_SALVATA]: true }, null, 1)}\n`);
+    segnate += 1;
+  }
+  return segnate;
 }
 
 /** Lancia gli agenti al più `paralleli` alla volta; `lavora(voce)` → esito. */
@@ -170,13 +226,14 @@ function opzione(argv, nome) {
  * feedback aperti e leggibili, come le dà il server. `apri(v)` → l'oggetto in chiaro o null; `vietato(stato, giudizio)`
  * è la regola del lettore. → [scheda nella forma dei file]
  */
-export async function schedeDaRighe(righe, { apri, vietato }) {
+export async function schedeDaRighe(righe, { apri, vietato, illeggibili = [] }) {
   const out = [];
   for (const r of Array.isArray(righe) ? righe : []) {
     const stato = String(r.status || '').trim();
     if (!r.scheda || !r._id || STATI_CHIUSI.includes(stato) || vietato(stato, r.pipeline)) continue;
     const s = SS.dalDocumento(await apri(r.scheda), { id: String(r._id), aggiornato: String(r.schedaAt || '') });
     if (s) out.push(s);
+    else illeggibili.push(String(r._id));
   }
   return out;
 }
@@ -219,9 +276,10 @@ export async function letturaLocale(dip = {}) {
   }
   const r = await leggiRighe();
   const righe = r.rows;
-  const schede = await schedeDaRighe(righe, { apri, vietato: vietatoLeggere });
+  const illeggibili = [];
+  const schede = await schedeDaRighe(righe, { apri, vietato: vietatoLeggere, illeggibili });
   const segnalati = new Map(righe.map((x) => [String(x._id || ''), vietatoLeggere(String(x.status || '').trim(), x.pipeline)]).filter(([id, m]) => id && m));
-  return { ok: true, righe, schede, segnalati, complete: r.complete !== false };
+  return { ok: true, righe, schede, segnalati, complete: r.complete !== false, illeggibili: illeggibili.length };
 }
 
 /** Righe e schede dal server, col biglietto della routine. `opz` passa a leggiDalServer (le prove ci mettono la rete finta). */
@@ -232,6 +290,11 @@ export async function letturaCloud(ticket, opz = {}) {
   return {
     ok: true, righe: r.voci.filter((v) => v.riga).map((v) => v.riga), schede: r.voci.filter((v) => v.scheda).map((v) => v.scheda),
     segnalati: new Map(r.voci.filter((v) => v.riga && v.rifiutato).map((v) => [String(v.riga._id || v.id || ''), String(v.rifiutato)])), complete: true,
+    // Oltre al segno del server: un'ora di scrittura in chiaro senza la scheda è una scheda salvata che non è uscita.
+    illeggibili: r.voci.filter((v) => v.schedaIllegibile || (v.riga && v.riga.schedaAt && !v.scheda && !v.rifiutato)).length,
+    // Zero illeggibili vale «i feedback non ne hanno» solo se la risposta porta un segno della scheda (una scheda, il segno
+    // di illeggibile, l'ora di scrittura anche vuota): senza, da qui non si distingue un server che non le manda (#2181).
+    distingue: r.voci.some((v) => v.scheda || 'schedaIllegibile' in v || (v.riga && 'schedaAt' in v.riga)),
   };
 }
 
@@ -256,14 +319,26 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
   if (illeggibili) { console.error(`RIFIUTATO: lo stato di ${illeggibili} feedback su ${righe.length} non si decifra (manca la chiave privata, o è un'altra): senza non so chi è aperto, indice non scritto.`); return 1; }
   const indice = apertiDaRighe(righe, { segnalati: r.segnalati });
   let scritte = 0;
+  let segnate = 0;
   if (!dryRun) {
     mkdirSync(cartella, { recursive: true });
     writeFileSync(join(cartella, INDICE), `${JSON.stringify(indice, null, 1)}\n`);
     scritte = importaSchede(cartella, r.schede);
+    segnate = segnaNonSalvate(cartella, indice, new Set(r.schede.map((s) => String(s.numero || '').replace(/^#/, ''))));
     scriviSegnalati(cartella, indice);
   }
-  const salvate = `${r.schede.length} schede salvate nei feedback${dryRun ? '' : `, ${scritte} copiate nella cartella`}`;
+  const nonSiAprono = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
+  const mandare = segnate ? `; ${segnate} schede della cartella mancano nel feedback: scrivi le salva senza agente` : '';
+  const salvate = `${r.schede.length} schede salvate nei feedback${nonSiAprono}${dryRun ? '' : `, ${scritte} copiate nella cartella`}${mandare}`;
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
+  const c = copertura({ indice, schede: r.schede });
+  if (c.scarsa) {
+    const chi = c.vere ? `Solo ${c.vere} dei ${c.aperti} aperti ${c.vere === 1 ? 'ha' : 'hanno'}` : `Nessuno dei ${c.aperti} aperti ha`;
+    const perche = r.illeggibili ? `, e ${r.illeggibili} non si leggono: è la lettura a non andare`
+      : r.distingue === false ? ': il server non dice se i feedback ne hanno, quindi da qui non si distingue se sono i feedback a non averne o la lettura a non portarle (elenca sulla macchina dell\'owner lo dice)'
+        : ': la lettura è andata, sono i feedback a non averne';
+    console.log(`${chi} una scheda salvata nel feedback${perche}. In una routine stato e scrivi si fermano.`);
+  }
   return 0;
 }
 
@@ -417,10 +492,20 @@ export async function main(argv) {
   let indice = leggiJson(join(cartella, INDICE));
   if (cmd === 'elenca') return elenca(cartella, dryRun);
   if (!['scrivi', 'rileggi', 'stato'].includes(cmd)) {
-    console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
+    console.error('Uso: npm run feedback:schede -- elenca | scrivi [--solo 812,815] [--paralleli 6] [--da-zero] | rileggi [--quota 0.1] | stato [--cartella <dir>] [--dry-run]');
     return 1;
   }
   if (!Array.isArray(indice)) { console.error(`Manca l'indice in ${join(cartella, INDICE)}: prima npm run feedback:schede -- elenca.`); return 1; }
+  // Una lettura sola di --solo per il fermo e per la scelta (#2181): un --solo senza numeri non è una scheda chiesta.
+  const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
+  if (cmd === 'scrivi' && !solo.length && argv.some((a) => a === '--solo' || a.startsWith('--solo='))) {
+    console.error('RIFIUTATO: --solo senza nessun numero (per esempio --solo 812,815). Non ho lanciato niente.');
+    return 1;
+  }
+  if ((cmd === 'stato' || (cmd === 'scrivi' && !solo.length)) && !argv.includes('--da-zero')) {
+    const fermo = censimentoMancante({ via: (await strada()).via, indice, schede: leggiSchede(cartella) });
+    if (fermo) { console.error(fermo); return 1; }
+  }
   if (cmd === 'stato') { console.log(JSON.stringify(riepilogo(indice, leggiSchede(cartella)), null, 1)); return 0; }
   let restano = 0;
   if (!dryRun) {
@@ -440,7 +525,6 @@ export async function main(argv) {
   // Un segnalato non va all'agente: non lo può leggere, e la sua scheda il server non la salva.
   const perNum = new Map(indice.filter((f) => !f.segnalato).map((f) => [f.num, f]));
   if (cmd === 'scrivi') {
-    const solo = String(opzione(argv, '--solo') || '').split(/[\s,]+/).map((n) => n.replace(/^#/, '')).filter(Boolean);
     const segnalati = solo.filter((n) => indice.some((f) => f.num === n && f.segnalato));
     if (segnalati.length) console.log(`Segnalati, senza agente: ${segnalati.map((n) => `#${n}`).join(', ')} (scheda «non letto» col motivo).`);
     const ignoti = solo.filter((n) => !perNum.has(n) && !segnalati.includes(n));
