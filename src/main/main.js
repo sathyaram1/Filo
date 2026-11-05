@@ -212,9 +212,12 @@ function configureSpellchecker() {
   } catch (_) { /* best-effort: il correttore resta sul default di sistema */ }
 }
 
+const msModuli = Date.now() - inizioModuli;
+
 app.whenReady().then(async () => {
   // I passi dell'avvio per i contatori anonimi (#1466): quanto pesa ognuno, non solo il tutto.
   const passo = (nome, t0) => { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} };
+  try { contatori()?.passoAvvio('moduli_caricati', msModuli); } catch (_) {}
   let t = Date.now();
   // #1039 — un aggiornamento scaricato si installa qui, con la barra visibile, prima che si apra qualsiasi finestra.
   // Prima di ogni lettura delle impostazioni: le pagine leggono il file com'è, e un vecchio «Aiuto spento» di serie non si vede.
