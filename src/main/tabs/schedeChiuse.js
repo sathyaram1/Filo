@@ -116,7 +116,7 @@ function crea({ tetto = TETTO } = {}) {
   }
 
   return {
-    ricorda, archiviata, prendi, riprendi, segnaRiaperta, dimentica, dallArchivio, ultimaCheSuonava,
+    ricorda, archiviata, prendi, riprendi, segnaRiaperta, annullaRiaperta, dimentica, dallArchivio, ultimaCheSuonava,
     eRiaperta: (id) => riaperte.has(id),
     get quante() { return pila.length; },
   };
