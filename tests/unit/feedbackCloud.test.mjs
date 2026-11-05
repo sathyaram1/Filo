@@ -535,4 +535,31 @@ test('elenca dal server dice quando sono i feedback a non avere schede, e conta 
   const testo = await giro(conIlleggibile);
   assert.match(testo, /0 schede salvate nei feedback, 1 illeggibili/);
   assert.doesNotMatch(testo, /sono i feedback a non averne/);
+  assert.match(testo, /Nessuno dei 60 aperti ha una scheda salvata nel feedback, e 1 non si leggono: è la lettura a non andare/);
+  // Senza il segno del server: l'ora di scrittura in chiaro senza la scheda conta lo stesso.
+  const soloOra = voci.map((v, i) => (i < 2 ? { ...v, riga: { ...v.riga, schedaAt: AGG } } : v));
+  assert.match(await giro(soloOra), /0 schede salvate nei feedback, 2 illeggibili/);
+  const unaSola = voci.map((v, i) => (i === 0 ? { ...v, scheda: { ...buona(1), _fonte: { id: 'f1', stato: 'todo', aggiornato: AGG, at: AGG } } } : v));
+  assert.match(await giro(unaSola), /Solo 1 dei 60 aperti ha una scheda salvata nel feedback: la lettura è andata/);
+});
+
+test('elenca sulla macchina dell\'owner conta le schede salvate che non si aprono, e stato conta quelle da mandare', async () => {
+  const AGG = '2026-10-29T12:00:00.000Z';
+  const cartella = cartellaTemporanea('schede-illeggibili-locale-');
+  const out = [];
+  const l = console.log;
+  console.log = (...a) => out.push(a.join(' '));
+  try {
+    const righe = indiceDi(60).map((f, i) => ({ _id: f.id, seq: Number(f.num), subSeq: 0, status: 'todo', updatedAt: AGG, waitsFor: [], unisce: [], ...(i < 3 ? { scheda: 'cifrata-male', schedaAt: AGG } : {}) }));
+    const lettura = () => S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async () => null });
+    assert.equal(await S.elenca(cartella, false, { lettura }), 0);
+  } finally { console.log = l; }
+  try {
+    const testo = out.join('\n');
+    assert.match(testo, /0 schede salvate nei feedback, 3 illeggibili \(da riscrivere\)/);
+    assert.match(testo, /e 3 non si leggono: è la lettura a non andare/);
+    writeFileSync(join(cartella, '7.json'), JSON.stringify({ ...buona(7), [S.NON_SALVATA]: true }));
+    const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
+    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).nonSalvate, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
+  } finally { togliCartella(cartella); }
 });
