@@ -110,7 +110,7 @@ export function daRileggere(schede, { quota = 0.1 } = {}) {
   return (Array.isArray(schede) ? schede : []).filter((s) => {
     if (!s || s._riletta || s[SEGNALATA]) return false;
     const toglie = s.valido === 'no' || (Array.isArray(s.doppione_di) && s.doppione_di.length > 0);
-    return toglie || nelCampione(String(s.numero || '').replace(/^#/, ''), quota);
+    return toglie || nelCampione(numeroDi(s), quota);
   });
 }
 
