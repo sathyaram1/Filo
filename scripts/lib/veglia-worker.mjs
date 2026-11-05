@@ -214,11 +214,8 @@ export function cartellaSottoAgenti({ sessione = '', configDir = '' } = {}) {
 
 /** Il tipo di agente di una traccia, dal meta che Claude Code le scrive accanto; senza, «sotto-agente». */
 function nomeTraccia(file) {
-  try {
-    return nomeSicuro(JSON.parse(readFileSync(file.replace(/\.jsonl$/, '.meta.json'), 'utf8')).agentType) || 'sotto-agente';
-  } catch (_) {
-    return 'sotto-agente';
-  }
+  const m = leggiMeta(file);
+  return (m && nomeSicuro(m.agentType)) || 'sotto-agente';
 }
 
 /**
