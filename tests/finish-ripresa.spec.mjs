@@ -10,6 +10,9 @@ import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const FINISH = join(REPO, 'scripts', 'finish-local.mjs');
+// Il controllo di fine lavoro lancia questo spec in una cartella staccata col node_modules un livello sopra: si chiede
+// a Node dove sta, invece di presumerlo dentro il repo.
+const MODULI = dirname(dirname(dirname(createRequire(import.meta.url).resolve('@playwright/test/package.json'))));
 
 function repoProva(prefisso) {
   const dir = cartellaTemporanea(prefisso);
