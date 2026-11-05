@@ -1,5 +1,6 @@
 // #1790 (#1640): ogni rilievo col «?» porta la sua domanda in JSON, con almeno due opzioni, dentro la critica: il server
-// la adotta com'è e non compone più «Da decidere: …». Qui le regole condivise (verifierRound) e lo strumento (dispatch).
+// la adotta com'è e non compone più «Da decidere: …», e senza «blocca» (#1202.2). Qui le regole condivise (verifierRound)
+// e lo strumento (dispatch).
 
 import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
