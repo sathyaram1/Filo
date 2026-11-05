@@ -86,4 +86,17 @@ test.describe('file della banca su un altro dominio', () => {
       } finally { await s.chiudi(); }
     });
   }
+
+  test('controllo: la stessa finestrella da un sito qualunque manda il file al modello', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    await modelliFinti(app);
+    await impostaDaFilo(app, { nomiSensati: { scaricamenti: true }, security: { pagineDelicate: { siti: [] } } });
+    const s = await servitoreFile();
+    try {
+      const page = await testServer.openReady(openTab, `<!doctype html><title>Un sito</title><body style="padding:40px"><button id="dl" onclick="window.open('${s.url}', 'doc', 'width=600,height=500')">Doc</button></body>`, { pubblico: true });
+      await page.locator('#dl').click();
+      await finito(shell, s.url);
+      await expect.poll(async () => (await mandato(app)).filter((m) => m.testo.includes('12.345,67')).length, { timeout: 15000 }).toBe(1);
+    } finally { await s.chiudi(); }
+  });
 });
