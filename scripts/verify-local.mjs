@@ -334,7 +334,7 @@ const senzaNumero = (l) => l.map(({ n: _n, ...f }) => f);
  * I bilanci consumati e i rilievi messi da parte nei giri precedenti dello
  * stesso lavoro sopravvivono: sono del lavoro, non della singola verifica.
  */
-export function withRequest(state, branch, { request, sha, at, feedbackId, feedbackNum, fiducia, server = null }) {
+export function withRequest(state, branch, { request, sha, at, feedbackId, feedbackNum, fiducia, richiestaOwner, server = null }) {
   const s = (state && typeof state === 'object') ? { ...state } : {};
   const prev = s[branch] || {};
   s[branch] = {
