@@ -67,7 +67,7 @@ test('dalla stessa cartella il secondo avvio riprende il codice compilato', OPZ,
   assert.equal(voci(ud), dopoPrimo);
 });
 
-test('da una cartella diversa a ogni avvio la cache non si accumula', () => {
+test('da una cartella diversa a ogni avvio la cache non si accumula', OPZ, () => {
   const base = nuova('filo-cache-sposta-');
   const ud = join(base, 'dati');
   avvia(ud, app(join(base, 'uno')));
