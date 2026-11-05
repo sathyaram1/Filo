@@ -66,7 +66,8 @@ test('r2 feedback riaperto dopo la potatura del tentativo fuso: il tentativo mor
     git(casa, 'push', '-q', 'origin', 'main');
     // La potatura del lunedì toglie il ramo fuso, che nessun feedback aperto nomina.
     git(casa, 'push', '-q', 'origin', `:refs/heads/${ramo('20261014T100000Z')}`);
-    const r = tentativiPrecedenti({ root: casa, id: ID, mainBranch: 'main', escludi: '' });
+    // Come la chiama dispatch: col numero del feedback, che legge la fusione su main.
+    const r = tentativiPrecedenti({ root: casa, id: ID, num: '#9', mainBranch: 'main', escludi: '' });
     expect(r.ok).toBe(true);
     expect(r.scelto && r.scelto.ramo, 'il lavoro superato dalla fusione non torna come base').not.toBe(ramo('20261012T100000Z'));
   } finally { togliCartella(base); }
