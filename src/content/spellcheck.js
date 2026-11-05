@@ -549,7 +549,7 @@
     let righe = [];
     try { righe = [...rangeDelTesto(state, start, end).getClientRects()]; } catch (_) { return; }
     const r = el.getBoundingClientRect();
-    const radice = radiceDi(el) || document.body;
+    const radice = casaDegliStrati(el);
     const tema = document.documentElement.dataset.snTheme || '';
     for (const q of righe) {
       const left = Math.max(q.left, r.left);
