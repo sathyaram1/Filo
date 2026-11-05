@@ -738,14 +738,11 @@ test('elenca manda al feedback una scheda buona e fresca scritta prima che le sc
 test('una scheda dell’agente che il server non ha preso va al feedback al giro dopo, senza rifarla, anche con un segno vecchio addosso', async (t) => {
   if (process.platform === 'win32') { t.skip('il finto claude è uno script con la riga #!'); return; }
   const dir = cartellaTemporanea('schede-dopo-un-no-');
-  const salvate = [];
   let primo = true;
-  const canale = await canaleFinto((b) => {
-    if (b.op !== 'scheda') return { status: 400, body: { ok: false, reason: 'bad_request' } };
-    salvate.push(b.numero);
-    if (primo) { primo = false; return { status: 403, body: { ok: false, reason: 'fuori_ambito' } }; }
-    return { body: salvataDalServer(b, '2026-10-29T12:00:00.000Z') };
+  const canale = await canaleConStato({ 813: { updatedAt: '2026-10-29T10:00:00.000Z' } }, {
+    rifiuta: () => { if (!primo) return null; primo = false; return { status: 403, body: { ok: false, reason: 'fuori_ambito' } }; },
   });
+  const salvate = canale.scritte;
   try {
     const cartella = join(dir, 'schede');
     mkdirSync(cartella, { recursive: true });
