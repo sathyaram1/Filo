@@ -133,12 +133,14 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   const esclusi = fuori || {};
   esclusi.vecchi = 0;
   esclusi.altri = [];
-  // Di più tentativi dello stesso feedback (`worker/<id>-<ora>`) vale il più recente, fuso o no: se è arrivato su main,
-  // i tentativi prima di lui sono morti anche se non sono fusi.
+  // I tentativi superati sono morti (la regola sta in tentativi.mjs); dei vivi di un feedback si mostra il più recente.
+  const tutti = git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()).filter(Boolean);
+  const fusi = new Set(git(root, ['for-each-ref', `--merged=${base}`, '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n').map((r) => r.trim()));
+  const superati = tentativiSuperati(tutti.map((ramo) => ({ ramo, fuso: fusi.has(ramo) })));
   const ultimo = new Map();
-  for (const ref of git(root, ['for-each-ref', '--format=%(refname:short)', 'refs/remotes/origin/worker']).split('\n')) {
-    const m = /^origin\/worker\/([A-Za-z0-9]+)-(\d{8}T\d{6}Z)$/.exec(ref.trim());
-    if (m && (!ultimo.has(m[1]) || ultimo.get(m[1]) < m[2])) ultimo.set(m[1], m[2]);
+  for (const ref of tutti) {
+    const t = leggiTentativo(ref);
+    if (t && !superati.has(ref) && !fusi.has(ref) && !(ultimo.get(t.id) >= t.stampo)) ultimo.set(t.id, t.stampo);
   }
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
   const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
