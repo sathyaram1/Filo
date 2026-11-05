@@ -396,8 +396,24 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
           COMMIT_PROVATO: ${{ github.sha }}
+          PUNTA: ${{ needs.unit-windows-punta.outputs.punta }}
+          GIA_VERDI: ${{ needs.unit-windows-punta.outputs.gia_verdi }}
+          TUTTI_GIA_VERDI: ${{ needs.unit-windows-punta.outputs.tutti }}
         shell: bash
         run: |
+          # Il commit resta non pubblicabile (la corsa e' rossa); il rosso che una fusione dopo non avesse corretto lo
+          # riapre la corsa sulla punta.
+          if [ "$TUTTI_GIA_VERDI" = "true" ]; then
+            echo "::warning::Gli unit rossi su Windows di ${COMMIT_PROVATO:0:10} sono gia' verdi sulla punta di main (${PUNTA:0:10}): nessun feedback."
+            { echo "## Unit rossi gia' corretti su main"; echo; echo "Rossi su ${COMMIT_PROVATO:0:10}, verdi su Windows sulla punta ${PUNTA:0:10}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          SULLA_PUNTA=""
+          if [ -n "$GIA_VERDI" ]; then
+            SULLA_PUNTA="
+
+          Gia verdi su Windows sulla punta di main (${PUNTA:0:10}), da non correggere: ${GIA_VERDI}"
+          fi
           PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Registro: ${ESECUZIONE}"
           ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' esiti-unit/unit.log 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
