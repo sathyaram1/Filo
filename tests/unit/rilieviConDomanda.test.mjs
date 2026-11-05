@@ -111,6 +111,8 @@ test('«blocca» su una domanda di rilievo si rifiuta col numero: se il lavoro s
     assert.equal(r.ok, false, 'un [3i?] che non blocca andava a correggere sul server, e la pulizia credeva che si fermasse');
     assert.match(r.errore, /la domanda dei rilievi 1, 3 porta «blocca»/);
     assert.match(r.errore, /Non ho registrato niente/);
+    // Il testo della regola è uno, quello che dice anche il server: niente copie a mano che divergono.
+    assert.ok(r.errore.startsWith(V.bloccaSuUnRilievo('la domanda dei rilievi 1, 3')), r.errore);
     const vera = rilieviConDomanda(f, [{ ...domanda('A o B?'), blocca: true }, domanda('Bordo caldo?'), domanda('Formato?')]);
     assert.match(vera.errore, /la domanda del rilievo 1 porta «blocca»/, 'anche true: il segno basta');
     const senza = rilieviConDomanda(f, [domanda('A o B?'), domanda('Bordo caldo?'), domanda('Formato?')]);
