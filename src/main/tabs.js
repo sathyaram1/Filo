@@ -1656,9 +1656,7 @@ class TabManager {
   async riapriCheSuonava(scelta) {
     if (scelta && scelta.voce) {
       const v = this._pilaChiuse().riprendi(scelta.voce);
-      if (!v) return null;
-      if (v.voceArchivio) this._contaTornata(v.voceArchivio);
-      return this.riapri(v, { activate: false });
+      return v ? this._riapriDallaPila(v, { activate: false }) : null;
     }
     if (!scelta || !scelta.archivio) return null;
     return this.riapriDallArchivio(scelta.archivio, { activate: false });
