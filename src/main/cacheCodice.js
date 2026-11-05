@@ -2,6 +2,7 @@
 // avvio finito, perché un'uscita con app.exit o process.exit non la scrive. Leggera: si carica prima di accenderla.
 // NODE_DISABLE_COMPILE_CACHE=1 la spegne. Prova: tests/cache-codice.spec.mjs.
 
+const fs = require('node:fs');
 const Module = require('node:module');
 const path = require('node:path');
 
