@@ -214,7 +214,9 @@ test('fermo su un guasto suo il manutentore lo accendono il mattino e l\'owner, 
   assert.match(s7, /Lo accendono solo: - la \*\*decisione del mattino\*\*/);
   assert.match(s7, /- l'\*\*owner dalla chat\*\*, quando chiede di farlo ripartire .{0,80}: subito, senza aspettare il mattino/);
   assert.match(s7, /- la risposta \*\*«lascialo riprovare»\*\* dell'owner alla domanda del controllo .{0,30}: subito anche lei/);
+  assert.match(s7, /- l'\*\*interruttore\*\* del manutentore .{0,200}vale come «lascialo riprovare»/);
   assert.match(s7, /lasciarlo riprovare \(azione `automazione`, che lo accende subito anche se è fermo\)/);
+  assert.match(s7, /Va diretta all'owner, senza passare dal compito che smista le domande/);
   assert.match(s7, /Contano le chiusure, non le scritture nel taccuino/);
   assert.match(s7, /Una domanda alla volta, e la prima sessione chiusa bene la rende superata/);
   const s4 = man.slice(man.indexOf('\n## 4.'), man.indexOf('\n## 5.')).replace(/\s+/g, ' ');
