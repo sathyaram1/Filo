@@ -119,6 +119,20 @@ describe('quale tentativo precedente si riprende', () => {
     } finally { togliCartella(base); }
   });
 
+  test('ramo del biglietto mai spinto: nasce col suo nome dalla punta del tentativo precedente', () => {
+    const base = cartellaTemporanea('filo-ripartenza-');
+    try {
+      const { casa, main } = scena(base);
+      const t1 = tentativo(casa, ramo('20261101T000000Z'), main, 2);
+      const legato = ramo('20261102T000000Z');
+      const { scelto } = tentativiPrecedenti({ root: casa, id: ID, escludi: legato });
+      const r = prepareBranch({ root: casa, branch: legato, createIfMissing: true, base: scelto.ramo });
+      assert.equal(r.ok, true, r.message);
+      assert.equal(r.head, t1);
+      assert.equal(r.base, `origin/${scelto.ramo}`);
+    } finally { togliCartella(base); }
+  });
+
   test('origin che non risponde è un «non so», non un «non ce ne sono»', () => {
     const base = cartellaTemporanea('filo-ripartenza-');
     try {
