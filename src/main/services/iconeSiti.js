@@ -77,6 +77,10 @@ function crea({
     const chiave = `${incognito ? 'i' : 'n'}|${sito.host}`;
     const nota = ricordate.get(chiave);
     if (nota && nota.dato) return nota.dato;
+    // Un sito con la regola del paese esce solo dal proxy: dalla connessione vera niente, restano le copie già in casa.
+    let conRegola = true;
+    try { conRegola = !!ProxyTab.regolaPer(url, await regole()); } catch (_) {}
+    if (conRegola) soloCopie = true;
     const proprieDi = async () => {
       try { return (await voci()).filter((v) => v && stessoSito(v.url, sito)); } catch (_) { return []; }
     };
