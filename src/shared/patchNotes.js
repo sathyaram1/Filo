@@ -12,6 +12,8 @@
       version: '0.2.265', date: '2026-11-05',
       fixes: [
         { testo: 'Se chiudi il browser senza finire l\'accesso con Google, il menu del profilo e Crediti non restano più bloccati per dieci minuti: «Torna all\'accesso» riapre la pagina e «Lascia stare» chiude l\'attesa. La pagina nel browser scrive «completato» solo se l\'accesso è riuscito, altrimenti dice cosa è andato storto.', segnalazione: 1351 },
+        { testo: 'Un messaggio scritto mentre Filo sta ancora lavorando non si perde più se ricarichi la pagina: torna nella casella com\'era, con le immagini. Se chiudi la scheda resta nella conversazione.', segnalazione: 1296 },
+        { testo: '«Chat nuova», sotto l\'errore di una conversazione troppo lunga, rimette nella casella anche immagini e documenti del messaggio, e non cancella quello che avevi già scritto.', segnalazione: 1596 },
       ],
     },
     {
@@ -25,8 +27,6 @@
       ],
       fixes: [
         { testo: 'La pulizia delle schede non chiude più una scheda col messaggio respinto dal sito, anche nei forum, nei moduli incorporati da un altro sito e nelle caselle con nomi insoliti. Chiude invece quelle il cui testo è già arrivato, come un post pubblicato o una lista appena creata.', segnalazione: 824 },
-        { testo: 'Un messaggio scritto mentre Filo sta ancora lavorando non si perde più se ricarichi la pagina: torna nella casella com\'era, con le immagini. Se chiudi la scheda resta nella conversazione.', segnalazione: 1296 },
-        { testo: '«Chat nuova», sotto l\'errore di una conversazione troppo lunga, rimette nella casella anche immagini e documenti del messaggio, e non cancella quello che avevi già scritto.', segnalazione: 1596 },
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
