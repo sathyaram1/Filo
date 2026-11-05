@@ -7711,13 +7711,7 @@ async function handleMessage(msg, sender = {}) {
 
 // Una pagina della rete di casa (router, NAS, localhost) non va ai lavori automatici col modello (#591).
 const isHomeNetworkUrl = (url) => Boolean(url && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.isHomeNetworkUrl(url));
-async function isHomeNetworkUrlSettled(url) {
-  let host = '';
-  try { host = new URL(String(url)).hostname; } catch (_) {}
-  const pending = host && globalThis.SN_URL_NAV && globalThis.SN_URL_NAV.homeNetworkPending(host);
-  if (pending) await pending;
-  return isHomeNetworkUrl(url);
-}
+const isHomeNetworkUrlSettled = (url) => globalThis.SN_DELICATE.diCasa(url);
 
 // Le pagine delicate (posta, banca, sanità, con password) non mandano testo ai lavori automatici col modello (#1004).
 // `fuori(url)` dà il motivo o null; `fuori.voce(it)` vale anche per una scheda archiviata, che il motivo se lo porta dietro.
