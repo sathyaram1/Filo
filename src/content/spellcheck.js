@@ -890,7 +890,10 @@
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    (radiceDi(state.el) || document.body).appendChild(o);
+    // Dentro il campo lo specchio prende il cursore e il testo dell'utente, e parte col modulo: con il corpo modificabile
+    // (l'editor di un riquadro) sta fuori dal corpo (#1808.2).
+    const casa = radiceDi(state.el) || (state.el.contains(document.body) ? document.documentElement : document.body);
+    casa.appendChild(o);
     state.overlay = o;
   }
 
