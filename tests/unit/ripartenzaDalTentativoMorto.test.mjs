@@ -439,6 +439,26 @@ test('giro vero, feedback riaperto: il tentativo superato dalla fusione non è l
   }
 });
 
+test('giro vero, biglietto legato a un ramo mai spinto: nasce con quel nome dalla punta del tentativo precedente', async () => {
+  const base = cartellaTemporanea('filo-ripartenza-');
+  const legato = ramo('20261102T000000Z');
+  const { srv, mondo, port } = await fintoServer({ legato });
+  try {
+    const { casa, main } = scena(base, { ruoli: true });
+    const t1 = tentativo(casa, ramo('20261101T000000Z'), main, 2);
+    const r = await giro(casa, port);
+    assert.equal(r.json && r.json.role, 'new-work', `il giro lavora (uscita ${r.code}): ${r.se}`);
+    assert.equal(git(casa, 'rev-parse', '--abbrev-ref', 'HEAD'), legato, 'il nome è quello a cui il biglietto è legato');
+    assert.equal(git(casa, 'rev-parse', 'HEAD'), t1, 'il lavoro del tentativo morto non si rifà');
+    assert.deepEqual(r.json.payload.ripartenza, { ramo: ramo('20261101T000000Z'), commit: 2 });
+    assert.match(r.se, /nasce adesso con quel nome, dal tentativo precedente/);
+    assert.ok(mondo.consegne.every((c) => !c.rifiutata));
+  } finally {
+    srv.close();
+    togliCartella(base);
+  }
+});
+
 test('giro vero, origin che non risponde: il lavoro non parte da main, si ferma', async () => {
   const base = cartellaTemporanea('filo-ripartenza-');
   const { srv, mondo, port } = await fintoServer();
