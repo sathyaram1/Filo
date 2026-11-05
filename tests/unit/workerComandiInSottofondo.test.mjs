@@ -1,6 +1,7 @@
 // Il «primo piano» è del lancio del worker, non dei suoi comandi (#1914): il ruolo gli chiede finish:check in sottofondo,
 // e un prompt che glielo vietasse metterebbe due regole che non si rispettano insieme.
 
+import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, readdirSync } from 'node:fs';
