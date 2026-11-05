@@ -3,6 +3,7 @@
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from './helpers/chatFinta.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const ORA_MS = 60 * 60 * 1000;
 const RIGA = '09:12 incollati quattro capitoli della tesi sulle api, discussi con Filo';
@@ -141,15 +142,20 @@ test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tien
   const gruppo = q.locator('[data-gruppo="proposte"]');
   await expect(gruppo).toBeVisible({ timeout: 10000 });
   await expect(gruppo.locator('.qd-riga')).toHaveCount(2);
+  // Chi decide vede da dove viene la proposta: la risposta che aveva letto la pagina.
+  await expect(gruppo.locator('.qd-riga').first().locator('.qd-salto')).toBeVisible();
   await q.screenshot({ path: 'tests/.shots/compattazione-quaderno.png' });
   const tieni = gruppo.locator('.qd-riga').filter({ hasText: 'Le piace cucinare.' });
   await tieni.hover();
   await tieni.getByRole('button', { name: 'Tienila in memoria' }).click();
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_FILO_MEMORY.getLessonsBuffer()).map((l) => l.text)), { timeout: 10000 })
     .toContain('Le piace cucinare.');
+  // Dal tasto destro le stesse scelte, più il salto al punto del filo.
   const via = gruppo.locator('.qd-riga').filter({ hasText: 'x@y.z' });
-  await via.hover();
-  await via.getByRole('button', { name: 'Non tenerla' }).click();
+  await via.locator('.qd-testo').click({ button: 'right' });
+  const menu = menuDi(q);
+  await expect(menu.voce('Vai al punto del filo')).toBeVisible();
+  await menu.voce('Non tenerla').click();
   await expect(gruppo).toHaveCount(0, { timeout: 10000 });
   expect(await app.evaluate(async () => JSON.stringify(await globalThis.SN_FILO_MEMORY.getLessonsBuffer()))).not.toContain('x@y.z');
   expect(await app.evaluate(async () => (await globalThis.SN_COMPATTAZIONE.inAttesa()).length)).toBe(0);

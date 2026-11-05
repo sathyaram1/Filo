@@ -1135,7 +1135,7 @@ async function stimaSogliaCompattazione(valore) {
     try { return (buildAttemptChain(settings, modelForAction(settings, action), action)[0] || {}).model || ''; } catch (_) { return ''; }
   };
   const chat = primo(ACTIONS.FILO_CHAT);
-  const comp = SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPATTAZIONE) ? primo(ACTIONS.FILO_COMPATTAZIONE) : chat;
+  const comp = primo(modelloCheCompatta(settings));
   const Tools = globalThis.SN_ACTION_TOOLS;
   const base = FC.stimaToken(JSON.stringify(Tools ? Tools.definitions() : []) + PROMPTS.filoChatStatic()) + globalThis.SN_FILO_COMPATTAZIONE.USO.parteUtente;
   const r = globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({
@@ -1145,14 +1145,17 @@ async function stimaSogliaCompattazione(valore) {
 }
 
 // La compattazione del filo (SPEC-CONTESTO fase 4) chiama il modello scelto per lei, o quello della chat se nessuno l'ha
-// scelto: lo stesso modello che legge il tratto lo riassume.
+// scelto: lo stesso modello che legge il tratto lo riassume. La stima accanto alla soglia prende il prezzo dallo stesso.
+function modelloCheCompatta(settings) {
+  return SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPATTAZIONE) ? ACTIONS.FILO_COMPATTAZIONE : ACTIONS.FILO_CHAT;
+}
 Compattazione.imposta({
   chiama: async ({ messages, motivo }) => {
     const settings = await getEffectiveSettings();
-    const propria = SN_CONST.canServeAction(settings, ACTIONS.FILO_COMPATTAZIONE);
+    const di = modelloCheCompatta(settings);
     const r = await handleAIRequest({
       action: ACTIONS.FILO_COMPATTAZIONE, payload: { daCompattare: messages, motivo }, origin: 'filo:compattazione', intera: true,
-      modelloDi: propria ? null : ACTIONS.FILO_CHAT,
+      modelloDi: di === ACTIONS.FILO_COMPATTAZIONE ? null : di,
     });
     return r && r.text;
   },

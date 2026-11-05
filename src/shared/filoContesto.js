@@ -44,20 +44,44 @@
     return Math.min(max, Math.max(min, n));
   }
 
+  // I numeri dei tetti, uno per campo in Preferenze e nei Modelli predefiniti (`contestoGiorni`…): chi ne aggiunge uno
+  // lo aggiunge qui, e calcolo, salvataggio e pagine lo seguono.
   const NUMERI_DEI_TETTI = Object.freeze(['giorni', 'token', 'soglia']);
+  const campoDelTetto = (k) => `contesto${k[0].toUpperCase()}${k.slice(1)}`;
+  // Dentro i limiti, intero tranne i giorni (mezza giornata ha senso, mezzo token no). null se non è un numero.
+  function numeroDelTetto(k, v) {
+    const n = numeroIn(v, LIMITI[k]);
+    return n != null && k !== 'giorni' ? Math.round(n) : n;
+  }
+  // La stima accanto alla soglia, uguale nelle due pagine: il campo (vuoto, il segnaposto), un'attesa breve mentre si
+  // scrive, e una risposta arrivata tardi non copre quella dopo.
+  function stimatoreSoglia({ campo, uscita, chiedi, attesaMs = 250 }) {
+    let giro = 0;
+    let attesa = null;
+    return () => {
+      clearTimeout(attesa);
+      attesa = setTimeout(async () => {
+        const mio = ++giro;
+        const c = campo();
+        const v = c.value.trim() || c.placeholder;
+        let r = null;
+        try { r = await chiedi(v); } catch (_) { r = null; }
+        if (mio !== giro) return;
+        uscita().textContent = r && r.ok ? r.testo : '';
+      }, attesaMs);
+    };
+  }
   // L'utente vince sull'owner, l'owner sul codice. Un valore vuoto vuol dire «come i predefiniti».
   function tetti(utente, owner) {
     const u = utente && typeof utente === 'object' ? utente : {};
     const o = owner && typeof owner === 'object' ? owner : {};
     const out = { da: {} };
     for (const k of NUMERI_DEI_TETTI) {
-      const vu = numeroIn(u[k], LIMITI[k]);
-      const vo = numeroIn(o[k], LIMITI[k]);
+      const vu = numeroDelTetto(k, u[k]);
+      const vo = numeroDelTetto(k, o[k]);
       out[k] = vu ?? vo ?? TETTI_DI_SERIE[k];
       out.da[k] = vu != null ? 'utente' : (vo != null ? 'predefiniti' : 'codice');
     }
-    if (out.token % 1) out.token = Math.round(out.token);
-    if (out.soglia % 1) out.soglia = Math.round(out.soglia);
     const cu = durataIn(u.cache);
     const co = durataIn(o.cache);
     out.cache = cu ?? co ?? TETTI_DI_SERIE.cache;
@@ -883,7 +907,7 @@
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
     TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
-    tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
+    tetti, numeroIn, NUMERI_DEI_TETTI, campoDelTetto, numeroDelTetto, stimatoreSoglia, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
     ESTERNO_COMANDO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
     provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
     troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, rendiMessaggio: rendi, conGiro,

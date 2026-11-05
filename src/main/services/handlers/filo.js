@@ -368,7 +368,7 @@ module.exports = function register(on, ctx) {
     return {
       ok: true, moduli, lezioni: await Promise.all(q.lezioni.map(conFonti)),
       sempreAperte: q.sempreAperte, nascoste: await Promise.all(q.nascoste.map(conFonti)),
-      inAttesa: inAttesa.map((p) => ({ id: p.id, testo: p.testo, nata: p.ts })),
+      inAttesa: await Promise.all(inAttesa.map(async (p) => ({ id: p.id, testo: p.testo, nata: p.ts, fonti: (await fontiNelFilo(p.fonti)) }))),
     };
   });
 

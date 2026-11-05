@@ -1020,13 +1020,11 @@
   }
 
   // Quanto ricorda la chat (#868): vuoto = come i predefiniti; fuori scala si riporta dentro come fa il main.
-  function tettoContesto(k, v) {
-    const FC = window.SN_FILO_CONTESTO;
-    const c = FC.numeroIn(v, FC.LIMITI[k]);
-    return c != null && k !== 'giorni' ? Math.round(c) : c;
-  }
+  const tettoContesto = (k, v) => window.SN_FILO_CONTESTO.numeroDelTetto(k, v);
   function canonContesto() {
-    for (const [k, id] of [['giorni', 'contestoGiorni'], ['token', 'contestoToken'], ['soglia', 'contestoSoglia']]) {
+    const FC = window.SN_FILO_CONTESTO;
+    for (const k of FC.NUMERI_DEI_TETTI) {
+      const id = FC.campoDelTetto(k);
       const v = tettoContesto(k, $(id).value);
       $(id).value = v == null ? '' : String(v);
     }
@@ -1042,28 +1040,18 @@
   }
 
   // Accanto alla soglia di compattazione, la sua stima: costo al mese e attesa, coi prezzi di adesso (filo_design.txt).
-  let giroStimaSoglia = 0;
-  let attesaStimaSoglia = null;
-  function stimaSoglia() {
-    clearTimeout(attesaStimaSoglia);
-    attesaStimaSoglia = setTimeout(async () => {
-      const mio = ++giroStimaSoglia;
-      const v = $('contestoSoglia').value.trim() || $('contestoSoglia').placeholder;
-      let r = null;
-      try { r = await chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia: v }); } catch (_) { r = null; }
-      if (mio !== giroStimaSoglia) return;
-      $('contestoSogliaStima').textContent = r && r.ok ? r.testo : '';
-    }, 250);
-  }
+  const stimaSoglia = window.SN_FILO_CONTESTO.stimatoreSoglia({
+    campo: () => $('contestoSoglia'), uscita: () => $('contestoSogliaStima'),
+    chiedi: (soglia) => chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia }),
+  });
 
   // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
   async function segnapostiContesto() {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.DEFAULT_MODELS_PUBLIC });
       const d = { ...((r && r.contestoFiloDiSerie) || {}), ...((r && r.contestoFilo) || {}) };
-      if (d.giorni != null) $('contestoGiorni').placeholder = String(d.giorni);
-      if (d.token != null) $('contestoToken').placeholder = String(d.token);
-      if (d.soglia != null) $('contestoSoglia').placeholder = String(d.soglia);
+      const FC = window.SN_FILO_CONTESTO;
+      for (const k of FC.NUMERI_DEI_TETTI) if (d[k] != null) $(FC.campoDelTetto(k)).placeholder = String(d[k]);
       stimaSoglia();
       if (d.cache) $('contestoCachePredefinita').textContent = `Come i predefiniti (${d.cache === '1h' ? 'un\'ora' : '5 minuti'})`;
       const l = { ...((r && r.lunghezzaRisposteDiSerie) || {}), ...((r && r.lunghezzaRisposte) || {}) };
@@ -1904,7 +1892,7 @@
     });
     $('propostaEmailIncognito').addEventListener('change', persist);
     $('contestoSoglia').addEventListener('input', stimaSoglia);
-    for (const id of ['contestoGiorni', 'contestoToken', 'contestoSoglia']) {
+    for (const id of window.SN_FILO_CONTESTO.NUMERI_DEI_TETTI.map(window.SN_FILO_CONTESTO.campoDelTetto)) {
       $(id).addEventListener('change', persist);
       $(id).addEventListener('input', (e) => caselle.cambiato('pref', e));
       $(id).addEventListener('blur', canonContesto);
