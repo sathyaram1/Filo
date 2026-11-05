@@ -1,5 +1,5 @@
 // Le attese fra feedback (#903): «aspetta #676, #663.2». Lettura dei numeri, rifiuti alla scrittura, stato di ciascuno, priorità ereditata (#1630).
-// Non tocca la rete: chi scrive passa `risolvi`, `leggiAttese` e `leggi`. Gemello lato coda: functions/src/waits.js (filo-security).
+// Non tocca la rete: chi scrive passa `risolvi`, `leggiAttese` e `leggi`. Il server la incorpora al deploy (bake-shared): un cambio qui va su main solo con un lavoro server.
 // Test: tests/unit/feedbackAttese.test.mjs. Il campo: FEEDBACK-STATES.md.
 
 (function (global) {
