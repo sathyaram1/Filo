@@ -148,8 +148,7 @@ const LINUX_CON_XVFB = process.platform === 'linux' && xvfbDisponibile();
 const senzaLinuxXvfb = LINUX_CON_XVFB ? false : 'serve Linux con xvfb-run';
 const numero = (display) => display.slice(1);
 const spento = (display) => aspettaChe(() => !existsSync(`/tmp/.X${numero(display)}-lock`), { cosa: `Xvfb ${display} spento` });
-// Al figlio una temporanea sua: con quella della corsa degli unit test ereditata, il suo teardown la toglierebbe
-// sotto ai file di prova che girano insieme (centotrenta rossi finti).
+// Al figlio una temporanea sua: è lì che si guarda se la corsa che apre se ne va con lui.
 const ambienteSenzaSchermo = (temp) => {
   const env = { ...process.env, TMPDIR: temp, TEMP: temp, TMP: temp };
   for (const k of ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'ELECTRON_DISABLE_SANDBOX']) delete env[k];
