@@ -79,7 +79,7 @@ test('nessun testo per gli agenti propone un’attesa nella shell o un file scri
   assert.ok(!SCRITTURE.some((re) => re.test("node scripts/routine-channel.mjs segnala <<'FINE'")));
 });
 
-test('ogni worker riceve le due regole: l’attesa è l’avviso di fine o Monitor, i file si toccano con Edit e Write', () => {
+test('ogni worker riceve le due regole: l’attesa è l’avviso di fine, Monitor o aspetta; i file si toccano con Edit e Write', () => {
   for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento', 'compito', 'manutentore']) {
     const t = readRoleInstructions(ruolo);
     const lunghi = una(t.slice(t.indexOf('## Comandi lunghi'), t.indexOf('\n## ', t.indexOf('## Comandi lunghi') + 3)));
