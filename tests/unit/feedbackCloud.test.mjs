@@ -761,7 +761,7 @@ test('una scheda dell’agente che il server non ha preso va al feedback al giro
     assert.equal(dopo.code, 0, dopo.out);
     assert.deepEqual(salvate, ['813', '813']);
     assert.equal(claude.lanci(), 1, 'la scheda c’era già: niente agente la seconda volta');
-    assert.equal(JSON.parse(readFileSync(join(cartella, 'indice.json'), 'utf8'))[0].nelFeedback, '2026-10-29T12:00:00.000Z');
+    assert.equal(JSON.parse(readFileSync(join(cartella, 'indice.json'), 'utf8'))[0].nelFeedback, '2026-11-05T15:00:01.000Z');
   } finally {
     await canale.chiudi();
     togliCartella(dir);
