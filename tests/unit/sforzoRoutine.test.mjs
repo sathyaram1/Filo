@@ -42,4 +42,7 @@ test('nessun testo del manutentore lo dà ancora su Fable', () => {
     const testo = leggi(...p).replace(/\s+/g, ' ');
     assert.doesNotMatch(testo, /Modello Fable|modello Fable|Modello: \*\*Fable|prima scelta Fable/, p.join('/'));
   }
+  const decisioni = leggi('routines', 'roles', '_decisioni-owner.md').replace(/\s+/g, ' ');
+  assert.match(decisioni, /il manutentore gira su Opus a sforzo high, non su Fable/);
+  assert.match(decisioni, /niente revisore di un'altra famiglia di modelli/);
 });
