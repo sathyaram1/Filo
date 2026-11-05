@@ -68,19 +68,17 @@ test('i titoli dei casi si leggono anche da describe, fail e template, non da un
     ['r1 gruppo', 'r2 atteso', 'r4 sì']);
 });
 
-test('una domanda che non blocca non ferma il lavoro: il `?` di livello 1 esce prima del verdetto, con la riga che lo spiega', () => {
-  const nonBlocca = { titolo: 'Colore', blocca: false };
-  const findings = [{ level: 2, sede: 'i', decision: true, irreversibile: true, domanda: nonBlocca }, { level: 1, sede: 'i', decision: true, domanda: nonBlocca }];
-  assert.equal(fermaDiSicuro(findings), false);
+test('#1202.2 la fermata la decidono livello e segno, mai la domanda: un 2 col ?! ferma e il `?` di livello 1 resta con la sua prova', () => {
+  for (const domanda of [{ titolo: 'Colore' }, { titolo: 'Colore', blocca: true }, { titolo: 'Colore', blocca: false }]) {
+    const findings = [{ level: 2, sede: 'i', decision: true, irreversibile: true, domanda }, { level: 1, sede: 'i', decision: true, domanda }];
+    assert.equal(fermaDiSicuro(findings), true, JSON.stringify(domanda));
+    assert.deepEqual(proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r2-bordo.spec.mjs'], findings), []);
+  }
+  // Un 2 col ? senza «!» non ferma: la prova dell'1 col ? esce, e il rifiuto non parla di domande che non bloccano.
+  const findings = [{ level: 2, sede: 'i', decision: true }, { level: 1, sede: 'i', decision: true }];
   const fuori = proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r1-riquadro.spec.mjs', 'tests/verifica/42/giro1-r2-bordo.spec.mjs'], findings);
   assert.deepEqual(fuori.map((f) => f.prova), ['tests/verifica/42/giro1-r2-bordo.spec.mjs']);
-  assert.match(testoProvePrimaDelVerdetto(fuori, findings), /La domanda del rilievo 1 non blocca: il lavoro non si ferma/);
-  // Senza «blocca», o con true, la domanda blocca e il `?` di livello 1 resta a chi riprende.
-  for (const domanda of [{ titolo: 'Colore' }, { titolo: 'Colore', blocca: true }]) {
-    const fermi = [{ ...findings[0], domanda }, findings[1]];
-    assert.equal(fermaDiSicuro(fermi), true);
-    assert.deepEqual(proveDaToglierePrimaDelVerdetto(['tests/verifica/42/giro1-r2-bordo.spec.mjs'], fermi), []);
-  }
+  assert.doesNotMatch(testoProvePrimaDelVerdetto(fuori, findings), /non blocca/);
 });
 
 test('a lavoro fermo di sicuro i `?` restano a chi riprende con la loro prova: escono prima solo gli esterni', () => {
