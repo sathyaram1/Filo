@@ -213,11 +213,11 @@ const domandaDi = (titolo, blocca) => ({
   consiglio: { opzione: 0, perche: 'Coerente col resto.' },
 });
 
-test('#1555.1 con la domanda del 2 col ?! che non blocca, la prova dell\'1 col ? va tolta prima; con quella che blocca resta', async (t) => {
+test('#1555.1 #1202.2 una domanda di rilievo con «blocca» non parte; senza, il 2 col ?! ferma e la prova dell\'1 col ? resta', async (t) => {
   const prova = 'tests/verifica/901/giro2-r2-bordo.spec.mjs';
   const critica = 'Provato il riquadro in tema chiaro e scuro.\n[2i?!] Il riquadro è freddo: caldo come il resto?\n[1i?] Il bordo è grigio: più caldo?';
   const { srv, ricevuti, port } = await fintoServer({
-    outcome: 'fix', domandaProvvisoria: 'D-8',
+    outcome: 'fix',
     phase2: {
       findings: [{ level: 2, sede: 'i', decision: true, irreversibile: true, text: 'Il riquadro è freddo: caldo come il resto?' }],
       derived: [{ level: 1, sede: 'i', decision: true, text: 'Il bordo è grigio: più caldo?', num: '#901.1' }],
@@ -228,27 +228,20 @@ test('#1555.1 con la domanda del 2 col ?! che non blocca, la prova dell\'1 col ?
   const { casa, g } = ramoConProve([prova]);
   t.after(() => togliCartella(casa));
   const file = resolve(casa, 'stato', 'fuori', 'domande.json');
-  writeFileSync(file, JSON.stringify([domandaDi('Colore del riquadro', false), domandaDi('Colore del bordo', false)]), 'utf8');
-  const fermo = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
-  assert.notEqual(fermo.code, 0, fermo.out);
-  assert.match(fermo.out, /giro2-r2-bordo\.spec\.mjs: il rilievo 2 chiede una decisione e conta al più 1; toglila/);
-  assert.match(fermo.out, /La domanda del rilievo 1 non blocca/);
-  assert.ok(!ricevuti.some((x) => x.url.includes('routineDeliver')));
+  for (const blocca of [false, true]) {
+    writeFileSync(file, JSON.stringify([domandaDi('Colore del riquadro', blocca), domandaDi('Colore del bordo')]), 'utf8');
+    const respinta = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
+    assert.notEqual(respinta.code, 0, respinta.out);
+    assert.match(respinta.out, /la domanda del rilievo 1 porta «blocca»: su un rilievo non si scrive/);
+    assert.doesNotMatch(respinta.out, /toglila|non blocca/, 'la pulizia non chiede di togliere la prova di chi resta');
+    assert.ok(!ricevuti.some((x) => x.url.includes('routineDeliver')));
+  }
 
-  g('rm', '-q', prova); g('commit', '-qm', 'verifica #901 giro 2: via la prova del bordo');
-  const ok = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
-  assert.equal(ok.code, 0, ok.out);
-  assert.doesNotMatch(ok.out, /le prove con r2 nel nome/, 'la sua prova è già uscita');
-
-  // La stessa critica con la domanda del 2 che blocca ferma il lavoro: l'1 col ? resta a chi riprende, con la prova.
-  const altro = ramoConProve([prova]);
-  t.after(() => togliCartella(altro.casa));
-  const bloccante = resolve(altro.casa, 'stato', 'fuori', 'domande.json');
-  writeFileSync(bloccante, JSON.stringify([domandaDi('Colore del riquadro'), domandaDi('Colore del bordo', false)]), 'utf8');
-  const prima = ricevuti.length;
-  const resta = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', bloccante], altro.casa, port);
+  writeFileSync(file, JSON.stringify([domandaDi('Colore del riquadro'), domandaDi('Colore del bordo')]), 'utf8');
+  const resta = await esegui(['--record-verifier', 'fid-901', critica, '--domanda', file], casa, port);
   assert.doesNotMatch(resta.out, /critica non registrata/, resta.out);
-  assert.ok(ricevuti.slice(prima).some((x) => x.url.includes('routineDeliver')), 'la critica arriva al server');
+  assert.ok(ricevuti.some((x) => x.url.includes('routineDeliver')), 'la critica arriva al server');
+  assert.match(g('ls-files', prova), /giro2-r2-bordo/, 'l\'1 col ? resta a chi riprende, con la sua prova');
 });
 
 test('#1555.1 una prova che copre un interno e un esterno perde prima del verdetto il caso dell\'esterno e il suo numero', async (t) => {
