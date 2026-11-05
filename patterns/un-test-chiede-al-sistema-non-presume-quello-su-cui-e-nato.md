@@ -148,6 +148,9 @@ il rosso ferma le versioni per tutti:
   `fuoriDa(cartella, percorso)` (`tests/helpers/percorsi.mjs`). E un nome relativo
   rimesso insieme con `join(radice, nome)` incolla i due dischi
   (`D:\a\Filo\Filo\C:\Users\…`): si usa `resolve`.
+- **Le barre.** `relative(ROOT, f)` su Windows dà `src\shared\x.js`: confrontato con
+  un `'src/shared/x.js'` scritto a mano non si trova mai (#2186). Un percorso che fa da
+  chiave si normalizza prima, `.split(sep).join('/')`; in un messaggio può restare com'è.
 - **Il node che gira.** Il processo che esegue la prova tiene aperto il proprio
   eseguibile, e su Windows nessun nome di quel file si cancella finché gira: un
   collegamento fisso a `process.execPath` (per fingere un comando) fa fallire la pulizia
