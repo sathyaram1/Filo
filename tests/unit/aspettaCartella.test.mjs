@@ -11,8 +11,10 @@ import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaCartella, testoAttesa, FETTA_MS, USCITA_LIBERA } from '../../scripts/lib/aspetta-cartella.mjs';
 import { USCITA_LAVORO_VIVO } from '../../scripts/lib/branch-integrity.mjs';
+import { FETTA_MS as FETTA_VEGLIA_MS } from '../../scripts/lib/veglia-worker.mjs';
 
-const CANALE = join(resolve(dirname(fileURLToPath(import.meta.url)), '..', '..'), 'scripts', 'routine-channel.mjs');
+const RADICE = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const CANALE = join(RADICE, 'scripts', 'routine-channel.mjs');
 const T = 'C'.repeat(43);
 const LINUX = process.platform === 'linux';
 const vivo = (pid = 7) => ({ vivo: true, processiVisti: true, segni: [{ tipo: 'processo', pid, cmd: 'npm run finish:check', cwd: '/w' }], commit: null });
