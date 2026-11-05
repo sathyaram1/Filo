@@ -157,7 +157,7 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     if (l && !superati.has(t.ramo) && !fusi.has(t.ramo)) perId.set(l.id, [...(perId.get(l.id) || []), t]);
   }
   const contiene = (a, b) => { try { git(root, ['merge-base', '--is-ancestor', a.head, b.head]); return true; } catch (_) { return false; } };
-  const inCima = new Set([...perId.values()].flatMap((vivi) => (vivi.length > 1 ? viviInCima(vivi, contiene) : vivi)).map((t) => t.ramo));
+  const inCima = new Set([...perId.values()].map((vivi) => (vivi.length > 1 ? viviInCima(vivi, contiene)[0] : vivi[0]).ramo));
   // `--no-merged` toglie in una chiamata sola i rami già arrivati: sono la gran parte, e uno per uno costavano minuti.
   const righe = git(root, ['for-each-ref', `--no-merged=${base}`, '--format=%(refname:short)%09%(committerdate:iso-strict)', 'refs/remotes/origin']).split('\n');
   const rami = [];
