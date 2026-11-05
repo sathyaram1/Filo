@@ -8,7 +8,8 @@ import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
 const RADICE = join(import.meta.dirname, '..');
-const CLI_PW = join(RADICE, 'node_modules', '@playwright', 'test', 'cli.js');
+// Risolto come un import: nella cartella di prova di finish:check node_modules sta un livello sopra il repo.
+const CLI_PW = createRequire(import.meta.url).resolve('@playwright/test/cli');
 const DENTRO = 'FILO_CORSA_ANNIDATA';
 // Le variabili del lavoratore di fuori farebbero credere alla corsa di dentro di essere un suo lavoratore.
 const ambienteDiDentro = () => ({
