@@ -173,7 +173,8 @@
     // La tonda invece È un modo di elencare: «1) primo punto» è testo normale. Vale solo col
     // livello scritto a parole, o con qualcosa in mezzo.
     + `|(?:zero|uno|due|tre)(?![A-Za-zÀ-ÿ])[^\\[\\](){}\\n]{0,200}?\\)`
-    + `|\\d[^\\[\\](){}\\n]{1,200}?\\)`
+    // La cifra è UNA: «10) decimo punto» è un elenco lungo, non un livello (#2179).
+    + `|\\d(?!\\d)[^\\[\\](){}\\n]{1,200}?\\)`
     + `)`, 'i');
 
   // Ridà il PEZZO letto come livello (vuoto se non c'è): il rifiuto lo mostra a chi scrive.
