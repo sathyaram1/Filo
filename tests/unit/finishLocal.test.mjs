@@ -745,3 +745,37 @@ test('senza pratica la chiusura si ferma e dice come aprirla; --check e una prat
   assert.equal(senzaPraticaStop({ checkOnly: true, pratica: null }), '');
   assert.equal(senzaPraticaStop({ checkOnly: false, pratica: { id: 'abc', seq: 908 } }), '');
 });
+
+// La durata dei controlli cresce con gli spec scelti (#2178): chi li aspetta la legge prima che partano, non da un
+// intervallo fisso nei ruoli che un ramo largo supera.
+import { stimaDurataControlli } from '../../scripts/finish-local.mjs';
+
+test('la durata prevista cresce con gli spec, e un ramo largo passa l’ora', () => {
+  const largo = stimaDurataControlli(192);
+  assert.ok(largo.da >= 60, `192 spec: da ${largo.da} minuti`);
+  assert.ok(largo.a > largo.da);
+  assert.match(largo.testo, /da \d+ a \d+ minuti/);
+  assert.match(largo.testo, /192 spec/);
+  const pochi = stimaDurataControlli(4);
+  assert.ok(pochi.a < largo.da, 'quattro spec durano meno di duecento');
+  const niente = stimaDurataControlli(0);
+  assert.ok(niente.da > 0, 'gli unit girano anche senza spec');
+  assert.deepEqual(stimaDurataControlli(undefined), niente);
+});
+
+test('la durata prevista si stampa dopo la scelta degli spec e prima degli unit', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
+  const main = src.slice(src.indexOf('async function main('));
+  const scelta = main.indexOf('specsForChangedFiles(changed');
+  const stima = main.indexOf('stimaDurataControlli(specs.length)');
+  const unit = main.indexOf("'run-unit-tests.mjs'");
+  assert.ok(scelta > 0 && stima > scelta && unit > stima, `scelta ${scelta}, stima ${stima}, unit ${unit}`);
+});
+
+test('i ruoli non promettono più una durata fissa ai controlli', () => {
+  const ruoli = resolve(ROOT, 'routines', 'roles');
+  for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
+    const testo = readFileSync(resolve(ruoli, f), 'utf8');
+    assert.doesNotMatch(testo, /finish:check[^.]{0,120}\d+\s*(?:-|a)\s*\d+\s*minuti|quarantacinque minuti/, f);
+  }
+});
