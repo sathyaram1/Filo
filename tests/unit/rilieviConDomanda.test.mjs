@@ -120,3 +120,16 @@ test('«blocca» su una domanda di rilievo si rifiuta col numero: se il lavoro s
     togliCartella(dir);
   }
 });
+
+test('il ruolo di chi verifica non spiega «blocca» come una scelta sua senza dire che sul rilievo non si scrive', async () => {
+  const { readFileSync } = await import('node:fs');
+  const { espandiInclusioni } = await import('../../scripts/lib/role-text.mjs');
+  const dir = join(ROOT, 'routines', 'roles');
+  for (const nome of ['verifier.md', 'verifier-chiusura.md', 'verifier-riallineamento.md']) {
+    const ruolo = espandiInclusioni(readFileSync(join(dir, nome), 'utf8'), dir);
+    // Ogni paragrafo che insegna a scegliere «blocca» porta con sé l'eccezione del rilievo.
+    const paragrafi = ruolo.split(/\n\s*\n/).filter((p) => /senza `blocca` blocca|lo decidi tu quando un'opzione lo riprende/.test(p));
+    assert.ok(paragrafi.length >= 2, `${nome}: le due regole generali su «blocca» ci sono`);
+    for (const p of paragrafi) assert.match(p.replace(/\s+/g, ' '), /rilievo[^.]*`blocca` non|`blocca` non si scrive/, `${nome}: «${p.slice(0, 80)}…»`);
+  }
+});
