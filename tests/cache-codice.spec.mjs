@@ -61,7 +61,8 @@ test('al secondo avvio il codice del main arriva già compilato dalla cartella d
 
     filo = avvia(userData);
     await expect.poll(() => delLoader('preso').test(filo.log()), { timeout: 90_000, message: 'il secondo avvio ha ricompilato il loader' }).toBe(true);
-    expect(accettati(filo.log()), 'i moduli caricati all’avvio vengono dalla cache').toBeGreaterThan(50);
+    // Il loader arriva dalla cache prima dei moduli che carica lui: contati in quel momento sono ancora una cinquantina.
+    await expect.poll(() => accettati(filo.log()), { timeout: 30_000, message: 'i moduli caricati all’avvio vengono dalla cache' }).toBeGreaterThan(150);
   } finally {
     if (filo) await filo.chiudi();
     togliCartella(userData);
