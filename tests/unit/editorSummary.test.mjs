@@ -145,6 +145,15 @@ test('needsSummary: rigenera solo su cambiamento significativo', () => {
   assert.equal(SUM.needsSummary(stale), true);
 });
 
+test('needsSummary: un riassunto fermato dal tetto non si richiede sullo stesso testo, sì dopo un cambio vero (#1302)', () => {
+  const f = fileWith({ id: 'e', lines: [longBody('X')] });
+  const words = SUM.fileWords(f);
+  f.meta = { ...(f.meta || {}), summaryFailSig: { words, at: 1 } };
+  assert.equal(SUM.needsSummary(f), false, 'qualche parola in più non basta a riprovare');
+  f.meta.summaryFailSig = { words: 1, at: 1 };
+  assert.equal(SUM.needsSummary(f), true, 'il testo è cambiato quanto basta per un riassunto nuovo');
+});
+
 // ── Ponte main: services/editorFiles.js (lettura on-demand + elenco riassunti) ──
 // Simuliamo l'archivio (chrome.storage.local) con la collezione dell'editor e
 // verifichiamo che readFile ritorni il CONTENUTO del file richiesto e

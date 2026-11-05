@@ -14,17 +14,19 @@ async function routerFinto(app) {
     const vero = globalThis.fetch;
     const enc = new TextEncoder();
     const riga = (o) => enc.encode(`data: ${JSON.stringify(o)}\n\n`);
-    globalThis.__ritentata = 0;
+    globalThis.__chiamate = {};
     globalThis.fetch = async (url, init) => {
       const u = String(url);
       if (u.includes('openrouter.ai/api/v1/generation')) {
-        const id = new URL(u).searchParams.get('id');
+        const id = new URL(u).searchParams.get('id').replace(/-\d+$/, '');
         return new Response(JSON.stringify({ data: { provider_name: 'DeepInfra', total_cost: costi[id] || 0 } }), { status: 200 });
       }
       if (!u.includes('openrouter.ai/api/v1/chat/completions')) return vero(url, init);
       const testo = String(init.body);
       const caso = ['rotta', 'tronca', 'ritentata'].find((c) => testo.includes(`caso-${c}`));
-      const id = `g-${caso}`;
+      const n = (globalThis.__chiamate[caso] = (globalThis.__chiamate[caso] || 0) + 1);
+      // Un id per tentativo: con il ripiego della catena il turno rotto ne paga più d'uno.
+      const id = `g-${caso}-${n}`;
       const flusso = new ReadableStream({
         start(c) {
           c.enqueue(riga({ id, choices: [{ delta: { reasoning: 'ci penso a lungo' } }] }));
@@ -33,9 +35,10 @@ async function routerFinto(app) {
           } else if (caso === 'tronca') {
             c.enqueue(riga({ id, choices: [{ delta: { content: 'Ecco la mia ' } }] }));
             c.enqueue(riga({ id, error: { code: 502, message: 'Provider disconnected' }, choices: [{ delta: {}, finish_reason: 'error' }] }));
-          } else if (globalThis.__ritentata++ === 0) {
+          } else if (n === 1) {
             // Il primo giro cade a metà per la rete: si ritenta da solo, e il tentativo rotto si è pagato lo stesso.
-            c.error(new TypeError('fetch failed'));
+            // Dopo il primo pezzo: un errore subito butterebbe anche quello che era in coda.
+            setTimeout(() => c.error(new TypeError('fetch failed')), 50);
             return;
           } else {
             c.enqueue(riga({ id: 'g-buona', choices: [{ delta: { content: 'Ecco.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 2, cost: 0.001 } }));
@@ -65,13 +68,14 @@ test('i costi detti dopo entrano nella voce del turno, anche quando nessun tenta
   test.setTimeout(90_000);
   await routerFinto(app);
   const eur = await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).usdToEur || 1);
+  const chiamate = (caso) => app.evaluate((_e, c) => globalThis.__chiamate[c] || 0, caso);
 
   expect(await chiedi(app, 'rotta', 'richiesta'), 'il fornitore si ferma durante il ragionamento').not.toBe('ok');
   await chiedi(app, 'tronca', 'stream');
   expect(await chiedi(app, 'ritentata', 'richiesta')).toBe('ok');
+  expect(await chiamate('ritentata'), 'il primo giro rotto, il secondo risponde').toBe(2);
 
-  const vicino = (atteso) => (v) => typeof v === 'number' && Math.abs(v - atteso) < 1e-9;
-  await expect.poll(() => costoInCronologia(app, 'rotta'), { timeout: 30_000 }).toSatisfy(vicino(0.002 * eur));
-  await expect.poll(() => costoInCronologia(app, 'tronca'), { timeout: 30_000 }).toSatisfy(vicino(0.003 * eur));
-  await expect.poll(() => costoInCronologia(app, 'ritentata'), { timeout: 30_000 }).toSatisfy(vicino((0.004 + 0.001) * eur));
+  await expect.poll(() => costoInCronologia(app, 'rotta'), { timeout: 30_000 }).toBeCloseTo(0.002 * (await chiamate('rotta')) * eur, 9);
+  await expect.poll(() => costoInCronologia(app, 'tronca'), { timeout: 30_000 }).toBeCloseTo(0.003 * eur, 9);
+  await expect.poll(() => costoInCronologia(app, 'ritentata'), { timeout: 30_000 }).toBeCloseTo((0.004 + 0.001) * eur, 9);
 });
