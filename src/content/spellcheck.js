@@ -700,6 +700,12 @@
     return null;
   }
 
+  // Dentro il campo uno strato prende il cursore e il testo dell'utente, e parte col modulo: col corpo modificabile
+  // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
+  function casaDegliStrati(el) {
+    return radiceDi(el) || (el.contains(document.body) ? document.documentElement : document.body);
+  }
+
   // ============================================================================
   // Fuoco
   // ============================================================================
@@ -890,10 +896,7 @@
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
     o.setAttribute('aria-hidden', 'true');
-    // Dentro il campo lo specchio prende il cursore e il testo dell'utente, e parte col modulo: con il corpo modificabile
-    // (l'editor di un riquadro) sta fuori dal corpo (#1808.2).
-    const casa = radiceDi(state.el) || (state.el.contains(document.body) ? document.documentElement : document.body);
-    casa.appendChild(o);
+    casaDegliStrati(state.el).appendChild(o);
     state.overlay = o;
   }
 
@@ -2070,7 +2073,7 @@
     const v = document.createElement('div');
     v.className = 'sn-spell-valori';
     global.SN_FILO_UI?.mark(v);
-    (radiceDi(state.el) || document.body).appendChild(v);
+    casaDegliStrati(state.el).appendChild(v);
     state.valori = v;
     state.badge.clear();
     return v;

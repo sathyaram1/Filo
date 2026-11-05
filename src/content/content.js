@@ -809,8 +809,7 @@
           if (a.form !== form && !(form.contains && form.contains(a))) continue;
           const ora = pulito(testo(a));
           if (ora && ora !== pulito(base) && !sostituito(a)) conTesto = true;
-          const t = lunghe.has(a) ? ora : '';
-          if (t && t !== pulito(base)) partiti.add(impronta(t));
+          inPartenza(a, base);
         }
         // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
         let dest = '';
