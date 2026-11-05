@@ -246,10 +246,12 @@ jobs:
       gia_verdi: ${{ steps.rifai.outputs.gia_verdi }}
       tutti: ${{ steps.rifai.outputs.tutti }}
     steps:
+      # Con la storia intera, come la prima corsa: in una copia corta un unit che legge la storia si salta e passa.
       - name: Checkout della punta di main
         uses: actions/checkout@v4
         with:
           ref: main
+          fetch-depth: 0
 
       - name: Punta di main
         id: punta
