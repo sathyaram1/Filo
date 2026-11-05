@@ -70,6 +70,28 @@ test('esplora: riquadro di un altro sito senza segreti', async ({ app, openTab, 
   expect(s.colori, 'il contenuto del riquadro senza segreti si vede').toBeGreaterThan(3);
 });
 
+test('esplora: feedback con screenshot da una pagina di Filo', async ({ app, shell }) => {
+  test.setTimeout(60_000);
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+  let win = null;
+  const fine = Date.now() + 10_000;
+  while (!win && Date.now() < fine) {
+    win = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    if (!win) await new Promise((r) => setTimeout(r, 100));
+  }
+  await win.waitForFunction(() => document.documentElement.dataset.filoContentScripts === '1', null, { timeout: 8_000 });
+  await reteFinta(app);
+  await win.evaluate(() => window.SN_FEEDBACK_UI.open());
+  await expect(win.locator('.sn-fb-modal')).toBeVisible();
+  await win.locator('.sn-fb-text').fill('La home non carica le scorciatoie');
+  await win.locator('.sn-fb-clear').click();
+  await win.locator('.sn-fb-send').click();
+  await expect.poll(() => app.evaluate(() => globalThis.__rete.payload.length), { timeout: 15_000 }).toBe(1);
+  const n = await app.evaluate(() => globalThis.__rete.payload[0].images.length);
+  console.log('ESPLORA filo immagini', n);
+  expect(n).toBe(1);
+});
+
 test('esplora: pagina pesante', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   const righe = Array.from({ length: 3000 }, (_, i) => `<div class="r"><span>riga ${i}</span>${'<b>x</b>'.repeat(30)}</div>`).join('');
