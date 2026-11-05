@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { quadratoPronto } from './helpers/copione.mjs';
 
 const RISPOSTA = 'Hai pagato 305,40 € di TARI per il 2026, in due rate.';
 const DOPO = 'Ti ho messo anche il bottone per aprirlo.';
