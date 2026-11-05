@@ -308,9 +308,9 @@ export async function elenca(cartella, dryRun, { lettura = null } = {}) {
     segnate = segnaNonSalvate(cartella, indice, new Set(r.schede.map((s) => String(s.numero || '').replace(/^#/, ''))));
     scriviSegnalati(cartella, indice);
   }
-  const illeggibili = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
+  const nonSiAprono = r.illeggibili ? `, ${r.illeggibili} illeggibili (da riscrivere)` : '';
   const mandare = segnate ? `; ${segnate} schede della cartella mancano nel feedback: scrivi le salva senza agente` : '';
-  const salvate = `${r.schede.length} schede salvate nei feedback${illeggibili}${dryRun ? '' : `, ${scritte} copiate nella cartella`}${mandare}`;
+  const salvate = `${r.schede.length} schede salvate nei feedback${nonSiAprono}${dryRun ? '' : `, ${scritte} copiate nella cartella`}${mandare}`;
   console.log(`${indice.length} feedback aperti su ${righe.length} letti${dryRun ? ' (prova a vuoto: indice non scritto)' : `: indice in ${join(cartella, INDICE)}`}; ${salvate}.`);
   const daLeggere = indice.filter((f) => !f.segnalato).length;
   if (!r.schede.length && !r.illeggibili && daLeggere >= SOGLIA_CENSIMENTO) {
