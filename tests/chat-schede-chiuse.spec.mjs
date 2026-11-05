@@ -253,7 +253,7 @@ test('una pagina delicata chiusa arriva al modello solo col sito, nella ricerca 
   await ripristina(app);
 });
 
-test('r1 una riapertura dalla chat che non riesce lascia la scheda riapribile: «rimettimi la musica» e Ctrl/Cmd+Shift+T la ridanno', async ({ app, shell, openTab, testServer }) => {
+test('la musica chiusa che non riesce a riaprirsi resta da rimettere, e Ctrl/Cmd+Shift+T la ridà', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
   await home(app);
   const pagina = await openTab(testServer.html('<title>Musica</title><p>musica', PUBBLICO));
