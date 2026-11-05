@@ -122,11 +122,12 @@
     }
   }
 
-  // invokeAI lo passa il chiamante: evita la dipendenza circolare col routing dei messaggi.
+  // invokeAI lo passa il chiamante: evita la dipendenza circolare col routing dei messaggi. `page.tipo` (#1545): di una
+  // pagina delicata parte solo il tipo scritto da Filo, mai indirizzo, titolo o testo.
   async function categorize({ invokeAI, page }) {
     const cats = await listCategories();
     const existing = cats.map((c) => c.name);
-    const payload = {
+    const payload = page.tipo ? { tipo: String(page.tipo), existing } : {
       url: page.url,
       title: page.title || '',
       description: page.description || '',
