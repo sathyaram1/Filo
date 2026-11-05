@@ -3,12 +3,14 @@
 // File, chiave e radice dei nomi arrivano da FILO_SPEC_VERDI_FILE, _CHIAVE e _RADICE; senza file e chiave, niente.
 
 import { relative, sep } from 'node:path';
-import { segnaSpecVerdi } from './spec-verdi.mjs';
+import { segnaSpecVerdi, togliSpecVerdi } from './spec-verdi.mjs';
 
 export default class SpecVerdi {
   onBegin(_config, suite) {
     this.file = process.env.FILO_SPEC_VERDI_FILE || '';
     this.chiave = process.env.FILO_SPEC_VERDI_CHIAVE || '';
+    this.segnati = [];
+    this.rotto = false;
     // config.rootDir è la cartella dei test, non quella da cui gli spec prendono il nome: si parte dal lancio.
     this.radice = process.env.FILO_SPEC_VERDI_RADICE || process.cwd();
     this.mancano = new Map();
