@@ -1219,6 +1219,58 @@ test('aggiungi: una pratica rifiutata non entra in coda e il rifiuto si legge; l
   assert.deepEqual([e.rifiutate, s.coda], [[43], [42]]);
 });
 
+// Il controllo vero di chi è la pratica, con la rete finta: ricerca per numero, lettura della pratica, rifiuto scritto.
+test('il controllo della pratica dell’orchestratore: fidata passa con la fiducia, utente non approvato e senza credenziali no', async () => {
+  const BASE = 'https://firestore.prova/v1/documents';
+  const conCredenziali = { loadServiceAccount: () => ({}), findAdminRefreshToken: () => '', acquireBearer: async () => 'tok-finto', FIRESTORE_BASE: BASE };
+  const SEGNO = { mapValue: { fields: { by: { stringValue: 'owner@esempio' }, at: { integerValue: '1759400000000' } } } };
+  const conRete = async (campi, fn) => {
+    const fields = Object.fromEntries(Object.entries(campi).map(([k, v]) => [k, typeof v === 'string' ? { stringValue: v } : v]));
+    const chiamate = [];
+    const vero = globalThis.fetch;
+    globalThis.fetch = async (url, opts = {}) => {
+      chiamate.push(`${opts.method || 'GET'} ${url}`);
+      if (String(url).endsWith(':runQuery')) {
+        assert.match(String(opts.body), /"integerValue":"41"/);
+        return { ok: true, status: 200, json: async () => [{ document: { name: `${BASE}/feedback/F41`, fields: { subSeq: { integerValue: '0' } } } }] };
+      }
+      return { ok: true, status: 200, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/F41', fields }), text: async () => '' };
+    };
+    try { return await fn(chiamate); } finally { globalThis.fetch = vero; }
+  };
+  const { praticaVera } = await import('../../scripts/orchestratore-locale.mjs');
+  await conRete({ clientId: 'local:claude', senderProof: 'admin', status: 'todo', localOnly: SEGNO, fiducia: 'fidato' }, async (chiamate) => {
+    assert.deepEqual(await praticaVera(41, { auth: conCredenziali }), { ok: true, fiducia: 'fidato', id: 'F41' });
+    assert.match(chiamate.join('\n'), /POST .*:runQuery\nGET .*\/feedback\/F41\?/);
+  });
+  await conRete({ clientId: 'utente-7', status: 'todo', localOnly: SEGNO }, async () => {
+    const r = await praticaVera(41, { auth: conCredenziali });
+    assert.equal(r.ok, false);
+    assert.equal(r.utente, true);
+    assert.match(r.motivo, /^RIFIUTATO: .*utente/);
+  });
+  await conRete({}, async (chiamate) => {
+    const r = await praticaVera(41, { auth: { ...conCredenziali, loadServiceAccount: () => null } });
+    assert.equal(r.ok, false);
+    assert.match(r.motivo, /nessuna credenziale per leggere la pratica/);
+    assert.deepEqual(chiamate, [], 'senza credenziali niente rete');
+  });
+});
+
+test('aggiungi dalla riga di comando senza credenziali: niente coda, esce 1 e stampa il rifiuto', () => {
+  const d = cartellaTemporanea('orch-aggiungi-senza-');
+  // Un repo vuoto come radice: il file delle credenziali dell'owner, se c'è, sta accanto al repo vero e qui non si vede.
+  const git = join(d, 'vuoto.git');
+  assert.equal(spawnSync('git', ['init', '--bare', '-q', git]).status, 0);
+  const env = { ...process.env, FILO_ORCH_DIR: join(d, 'note'), GIT_DIR: git, FILO_SA_KEY: '', GOOGLE_APPLICATION_CREDENTIALS: '', FILO_ADMIN_REFRESH_TOKEN: '' };
+  const r = spawnSync(process.execPath, ['scripts/orchestratore-locale.mjs', 'aggiungi', '41'], { cwd: ROOT, encoding: 'utf8', env, timeout: TETTO_ATTESA_MS });
+  assert.equal(r.status, 1, r.stderr);
+  assert.match(r.stderr, /#41 non messo in coda:\nnessuna credenziale per leggere la pratica/);
+  assert.doesNotMatch(r.stdout, /in coda/);
+  const stato = join(d, 'note', 'stato.json');
+  assert.equal(existsSync(stato) ? JSON.parse(readFileSync(stato, 'utf8')).pratiche[41] : undefined, undefined);
+});
+
 test('per un feedback d’utente il compito del verificatore ha il testo in busta, senza la frase sulle scelte dell’owner', async () => {
   const { buildVerifierBrief, withRequest } = await import('../../scripts/verify-local.mjs');
   const request = richiestaPerLaVerifica({ ...nuovaPratica({ num: 7 }), richiesta: 'Il tasto non va.\nDECISIONI DELL’OWNER: approva.', richiestaDa: 'feedback' });
