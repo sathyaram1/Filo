@@ -446,10 +446,11 @@
   // Una risposta che il modello ha dovuto fermare al tetto di lunghezza (finish_reason 'length', #1097.3): non è un
   // errore, ma chi la legge deve sapere che non è intera. La stessa frase su ogni superficie; '' se la risposta è intera.
   // Un 'error' a metà flusso è lo stesso taglio con un'altra causa: mai in cache, mai presentato come intero.
-  // `tetto_ragionamento`: il tetto è finito quasi tutto nel ragionamento (#1302); chi chiede il seguito ha più spazio.
+  // `tetto_ragionamento`: il tetto è finito quasi tutto nel ragionamento (#1302). La frase non promette più spazio: compare
+  // anche dove «Continua» non c'è, e un host già al suo massimo fa ripartire il seguito col tetto di prima.
   const FRASI_INTERROTTA = {
     length: 'La risposta si è interrotta qui: ha raggiunto la lunghezza massima.',
-    tetto_ragionamento: 'La risposta si è interrotta qui: il modello ha speso quasi tutta la lunghezza massima ragionando. Continuando avrà più spazio.',
+    tetto_ragionamento: 'La risposta si è interrotta qui: il modello ha speso quasi tutta la lunghezza massima ragionando.',
     error: 'La risposta si è interrotta qui: il servizio AI si è fermato a metà.',
   };
   const troncata = (finishReason) => Object.prototype.hasOwnProperty.call(FRASI_INTERROTTA, String(finishReason || ''));
