@@ -165,7 +165,7 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
     const [ramo, data] = riga.split('\t');
     if (!ramo || ramo === 'origin/HEAD' || ramo === 'origin' || ramo === `origin/${nomeBase}`) continue;
     const tentativo = leggiTentativo(ramo);
-    if (tentativo && ultimo.get(tentativo.id) !== tentativo.stampo) continue;
+    if (tentativo && !inCima.has(ramo)) continue;
     // Riferimenti, prove, parcheggi, `discarded/`: non ci lavora una sessione, ma si contano.
     if (!/^origin\/(worker|claude)\//.test(ramo)) { esclusi.altri.push(ramo.replace(/^origin\//, '')); continue; }
     if (giorni && adesso - Date.parse(data) > giorni * 86400000) { esclusi.vecchi += 1; continue; }
