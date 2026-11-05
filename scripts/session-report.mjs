@@ -900,7 +900,7 @@ export function finestraOrchestratore(linee) {
     const blocchi = Array.isArray(msg.content) ? msg.content : [];
     if (e.type === 'assistant') {
       // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
-      if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
+      if (msg.usage && !rigaSintetica(msg)) turni.push(ms);
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
         if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
