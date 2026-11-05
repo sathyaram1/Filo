@@ -25,8 +25,30 @@ function orologio() {
   return { adesso: () => t, sleep: async (ms) => { t += ms; } };
 }
 
-test('la fetta resta sotto il timeout predefinito di una chiamata Bash', () => {
-  assert.ok(FETTA_MS < 120 * 1000);
+// Le due attese in primo piano, del worker e di chi guida il giro, stanno sotto lo stesso tetto; il ruolo non scrive la
+// durata a mano, così cambiarla non lascia indietro il testo che il worker legge.
+test('le fette delle due attese restano sotto il timeout predefinito di una chiamata Bash, e il ruolo non le ricopia', () => {
+  const TIMEOUT_BASH_MS = 120 * 1000;
+  assert.ok(FETTA_MS < TIMEOUT_BASH_MS, 'aspetta');
+  assert.ok(FETTA_VEGLIA_MS < TIMEOUT_BASH_MS, 'veglia');
+  const contratto = readFileSync(join(RADICE, 'routines', 'roles', '_contratto-worker.md'), 'utf8').replace(/\s+/g, ' ');
+  const da = contratto.indexOf('aspetta <biglietto>');
+  assert.ok(da >= 0);
+  assert.doesNotMatch(contratto.slice(da, da + 200), /\bsecondi\b|\d+\s*s\b/);
+});
+
+test('l’attesa e il rilascio del worker leggono lo stesso criterio di lavoro vivo', () => {
+  const sorgente = readFileSync(CANALE, 'utf8');
+  assert.doesNotMatch(sorgente, /cosa:\s*\[\s*'processi'\s*\]/, 'un criterio scritto a mano');
+  assert.equal(sorgente.match(/cosa: SEGNI_RILASCIO_WORKER\b/g)?.length, 2);
+});
+
+test('l’elenco d’uso del canale nomina ogni suo comando', () => {
+  const sorgente = readFileSync(CANALE, 'utf8');
+  const elenco = (sorgente.match(/Uso: node "\$\{io\}" <([a-z|-]+)>/) || [])[1];
+  assert.ok(elenco, 'la riga d’uso c’è');
+  const comandi = [...new Set([...sorgente.matchAll(/cmd === '([a-z-]+)'/g)].map((m) => m[1]))];
+  assert.deepEqual(comandi.filter((c) => !elenco.split('|').includes(c)), []);
 });
 
 test('esce 0 appena il processo finisce, senza aspettare il resto della fetta', async () => {
