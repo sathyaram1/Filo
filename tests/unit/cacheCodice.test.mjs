@@ -8,9 +8,22 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
 import fs from 'node:fs';
+import { createRequire } from 'node:module';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const MODULO = join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'main', 'cacheCodice.js');
+
+// La cache la accende il Node di Electron: quello che corre gli unit (il 20 di GitHub) non ha enableCompileCache (#2204).
+function motore() {
+  const require = createRequire(import.meta.url);
+  try {
+    const bin = require('electron');
+    if (typeof bin === 'string' && fs.existsSync(bin)) return { bin, env: { ELECTRON_RUN_AS_NODE: '1' } };
+  } catch (_) {}
+  return typeof require('node:module').enableCompileCache === 'function' ? { bin: process.execPath, env: {} } : null;
+}
+const MOTORE = motore();
+const OPZ = { skip: !MOTORE && 'manca Electron, e questo Node non ha la cache del codice compilato' };
 const cartelle = [];
 afterEach(() => { while (cartelle.length) togliCartella(cartelle.pop()); });
 const nuova = (p) => { const d = cartellaTemporanea(p); cartelle.push(d); return d; };
