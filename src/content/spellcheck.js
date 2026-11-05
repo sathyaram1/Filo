@@ -1387,8 +1387,9 @@
   }
 
   // Prima del cambio resta, dopo scorre; chi tocca il cambio, o la cui parola il cambio allunga o fonde con un'altra
-  // (un bordo che passa da separatore a lettera), si perde.
-  function riallineaIssues(issues, vecchio, nuovo) {
+  // (un bordo che passa da separatore a lettera), si perde. `pezzi`: un pezzo di testo in viaggio che finisce (o comincia)
+  // con un separatore non ha parole da allungare su quel bordo, e chi scrive subito dopo non lo invalida (#1302).
+  function riallineaIssues(issues, vecchio, nuovo, { pezzi = false } = {}) {
     const lista = Array.isArray(issues) ? issues : [];
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
