@@ -255,6 +255,7 @@ function createMainWindow() {
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
+    pronta({ ripristinata: restored });
     passo('sessione_ripristinata', tSessione);
     revealWindow(win);
     if (avvio) {
