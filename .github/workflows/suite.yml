@@ -446,7 +446,7 @@ jobs:
           TESTO="${PREMESSA}
 
           Test rossi (${N_TUTTE:-0} righe):
-          ${ROSSI:-(nessuna riga not ok: guarda la coda)}
+          ${ROSSI:-(nessuna riga not ok: guarda la coda)}${SULLA_PUNTA}
 
 
           ${DOPO_VERDE}
