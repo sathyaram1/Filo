@@ -510,11 +510,14 @@
     return e;
   }
   // Una risposta tagliata che non si può mostrare: chi la legge come dati (`intera`) non ne usa un pezzo, e un taglio
-  // senza testo né azioni non ha niente da mostrare a nessuno. null se la risposta si può usare.
-  function erroreDelTaglio(r, { intera = false } = {}) {
+  // senza testo né azioni non ha niente da mostrare. Salvo il tetto finito nel ragionamento dove c'è «Continua»: la nota
+  // e il seguito, che riparte con un tetto più largo, sono la strada (#1302); `senzaSeguito` dice che lì non c'è.
+  function erroreDelTaglio(r, { intera = false, senzaSeguito = false } = {}) {
     if (!r || !troncata(r.finishReason)) return null;
     const vuota = !String(r.text || '').trim() && !(Array.isArray(r.toolCalls) && r.toolCalls.length);
-    return intera || vuota ? erroreTagliata(r.finishReason, { vuota }) : null;
+    if (intera) return erroreTagliata(r.finishReason, { vuota });
+    if (!vuota || (r.finishReason === 'tetto_ragionamento' && !senzaSeguito)) return null;
+    return erroreTagliata(r.finishReason, { vuota });
   }
 
   // Il testo di un campo di una risposta JSON tagliata a metà (l'involucro dell'Aiuto o dei mazzi): quello che il
