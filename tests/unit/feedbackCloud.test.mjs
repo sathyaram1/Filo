@@ -464,7 +464,7 @@ test('elenca: dal server col biglietto e dalle righe dell’owner, lo stesso ind
 });
 
 // #2181: il censimento della fase 0 stava solo nella cartella dell'owner; dal cloud la lettura dava 0 schede su 769 aperti.
-test('elenca segna le schede buone della cartella che il feedback non ha, e scrivi le salva senza agente', async () => {
+test('le schede buone della cartella che il feedback non ha si mandano senza agente, confrontate con quello che il feedback ha', async () => {
   const AGG = '2026-10-29T12:00:00.000Z';
   const cartella = cartellaTemporanea('schede-fase0-');
   try {
