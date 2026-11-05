@@ -51,7 +51,7 @@ const Vecchie = () => require('./iconeVecchie');
 
 function crea({
   adesso = () => Date.now(), iconaPer = IconaScheda.iconaPer, leggiCopia = Copie.comeDato,
-  completaVoci = () => Vecchie().completa(), daChiedere = (v) => Vecchie().daChiedere(v),
+  completaVoci = () => Vecchie().completa(), daChiedere = (v) => Vecchie().daChiedere(v), regole = ProxyTab.leggiRegole,
 } = {}) {
   const ricordate = new Map();
   const inCorso = new Map();
