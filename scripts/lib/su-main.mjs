@@ -3,6 +3,7 @@
 // Test: tests/unit/suMain.test.mjs.
 
 import { execFileSync } from 'node:child_process';
+import { leggiTentativo, tentativiSuperati } from './tentativi.mjs';
 
 const git = (root, args) => execFileSync('git', ['-C', root, '-c', 'core.quotepath=off', ...args], {
   encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
