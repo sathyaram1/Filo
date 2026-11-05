@@ -183,3 +183,41 @@ test('un seguito letto dal turno in corso non torna nella casella al ricaricamen
     await ripristina(app);
   }
 });
+
+// #2173 — Un turno lento a partire (i cambi chiesti alla rete prima del modello) legge il seguito già alla prima
+// chiamata: il comando secco di quella chiamata non chiude il turno, o il seguito resta senza risposta.
+test('un seguito letto prima della prima chiamata riceve la sua risposta anche dopo un comando secco', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  try {
+    await app.evaluate(() => {
+      globalThis.__fetchPrimaDeiCambi = globalThis.fetch;
+      globalThis.fetch = async (url, init) => {
+        if (/frankfurter/.test(String(url))) {
+          await new Promise((ok) => setTimeout(ok, 1_500));
+          return new Response(JSON.stringify({ base: 'EUR', date: '2026-11-04', rates: { USD: 1.08 } }), { status: 200, headers: { 'content-type': 'application/json' } });
+        }
+        return globalThis.__fetchPrimaDeiCambi(url, init);
+      };
+    });
+    await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
+    await configureModel(app);
+    await copione(app, [
+      { strumenti: [{ id: 'b1', name: 'TIMER', arguments: '{"secondi":120,"etichetta":"Pasta"}' }] },
+      { testo: 'Timer messo, e sono le cinque.' },
+    ]);
+    const page = await openTab('filo://newtab/');
+    await page.locator('#input').fill('metti un timer di due minuti');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('#stopBtn')).toBeVisible({ timeout: 5_000 });
+    await page.locator('#input').fill('e poi dimmi che ore sono');
+    await page.locator('#input').press('Enter');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'sono le cinque' })).toBeVisible({ timeout: 15_000 });
+    const chiamate = await app.evaluate(() => globalThis.__messaggi.map((m) => JSON.stringify(m)));
+    expect(chiamate).toHaveLength(2);
+    expect(chiamate[0]).toContain('e poi dimmi che ore sono');
+    await expect(page.locator('#input')).toHaveValue('');
+  } finally {
+    await app.evaluate(() => { if (globalThis.__fetchPrimaDeiCambi) globalThis.fetch = globalThis.__fetchPrimaDeiCambi; });
+    await ripristina(app);
+  }
+});
