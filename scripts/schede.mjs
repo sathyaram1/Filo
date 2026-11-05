@@ -246,7 +246,7 @@ export function importaSchede(cartella, schede, indice = []) {
   const perNum = new Map((indice || []).map((f) => [f.num, f]));
   let scritte = 0;
   for (const s of schede) {
-    const num = String(s.numero || '').replace(/^#/, '');
+    const num = numeroDi(s);
     if (!/^\d+(\.\d+)?$/.test(num)) continue;
     const qui = leggiJson(fileScheda(cartella, num));
     const piuNuova = qui && !validaScheda(qui, num).length && String((qui._fonte || {}).at || '') > String((s._fonte || {}).at || '');
