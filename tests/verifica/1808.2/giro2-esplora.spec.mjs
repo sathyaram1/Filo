@@ -128,10 +128,9 @@ test('forum rimandato indietro: varianti di invio e di testo', async ({ app, she
       await page.locator('#q').click();
       await page.keyboard.type('ricetta lasagne vegetariane');
       await page.locator('#pub').click();
-      await expect.poll(() => titoloDi(shell, (async () => 0)()) || true).toBeTruthy();
+      await expect.poll(async () => (await schede(shell)).some((s) => s.title === `Risultati${kk}`), { timeout: 10_000 }).toBe(true);
       await page.waitForTimeout(1500);
-      const t = (await schede(shell)).find((s) => s.title === `Risultati${kk}`);
-      if (t) arrivati['ricerca da script'] = t.id;
+      arrivati['ricerca da script'] = (await schede(shell)).find((s) => s.title === `Risultati${kk}`).id;
     }
     const aperte = await archiviaTutto(app, shell, sito);
     for (const [nome, id] of Object.entries(respinti)) expect.soft(aperte, `respinto: ${nome}`).toContain(id);
