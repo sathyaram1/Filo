@@ -86,7 +86,7 @@ import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from '.
 import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
-  proveScritteDa, puliziaDelPass, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
+  proveScritteDa, puliziaDelPass, rigaNumerata, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
@@ -1408,8 +1408,9 @@ async function recordVerifier(id, critiqueText, domande = []) {
   const conDomande = rilieviConDomanda(parsed.findings, domande);
   if (!conDomande.ok) return { rejected: true, formatRejected: true, message: `critica non registrata: ${conDomande.errore}` };
   // La pulizia che non dipende dall'esito esce col commit della critica (#1555): dopo, conta solo se la spinge il rilascio (#2021).
-  const primaDelVerdetto = avvio ? proveDaToglierePrimaDelVerdetto(proveScritteDa(avvio, ROOT), parsed.findings) : [];
-  if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, parsed.findings) };
+  const scritte = avvio ? proveScritteDa(avvio, ROOT) : [];
+  const primaDelVerdetto = scritte.length ? proveDaToglierePrimaDelVerdetto(scritte, conDomande.findings, testiDelleProve(scritte, ROOT)) : [];
+  if (primaDelVerdetto.length) return { rejected: true, formatRejected: true, message: testoProvePrimaDelVerdetto(primaDelVerdetto, conDomande.findings) };
   const base = { ...defaultState(id, ''), ...(guard.state || {}), id };
 
   // PRIMA il server, POI lo stato locale. L'ordine non è un dettaglio: lo stato

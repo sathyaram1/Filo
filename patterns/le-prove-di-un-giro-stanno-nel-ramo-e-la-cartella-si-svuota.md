@@ -30,9 +30,12 @@ la cartella.
   registro della fiducia non vede: la pratica fidata perde la fiducia e la fusione aspetta
   l'owner. Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
   mette da parte, che la risposta del server elenca per numero: quelle non si possono
-  sapere prima. Una critica con un `[3i?]` o un `[2i?!]` ferma di sicuro il lavoro, e lì i
-  `?` restano a chi riprende con la loro prova: esce solo quella degli esterni. Un `[2i?]`
-  non ferma e si corregge con la consigliata: la sua prova resta (#1202).
+  sapere prima. Una critica con un `[3i?]` o un `[2i?!]` la cui domanda blocca ferma di
+  sicuro il lavoro, e lì i `?` restano a chi riprende con la loro prova: esce solo quella
+  degli esterni. Un `[2i?]` non ferma e si corregge con la consigliata: la sua prova resta
+  (#1202). Con `"blocca": false` il lavoro va avanti, e lo sa già chi registra (#1555.1).
+  Una prova che copre anche un rilievo che resta perde il caso di quello che esce e il suo
+  numero dal nome: guardare solo le prove intere lasciava il caso rosso nel ramo.
 - Si cancella anche quella di un rilievo corretto, nello stesso commit in cui si scrive la
   prova durevole che lo tiene chiuso. Se una prova durevole non c'è, la prova del giro
   resta.
