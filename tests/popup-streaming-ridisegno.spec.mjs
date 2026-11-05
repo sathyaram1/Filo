@@ -1,7 +1,6 @@
-// #2119 — la risposta in streaming del riquadro si ridisegna al più una volta per fotogramma, non a ogni pezzo.
-// Ogni ridisegno rifà il markdown dell'intera risposta: a ogni pezzo il costo cresce col quadrato della lunghezza.
-// Si asserisce: la bolla cresce mentre arriva (anche dove rAF è fermo), con molti meno disegni che pezzi, e il testo
-// finale è quello completo; un errore arrivato col disegno in attesa resta scritto.
+// #2119: la risposta in streaming del riquadro si ridisegna al più una volta per fotogramma, non a ogni pezzo.
+// Si asserisce: la bolla cresce mentre arriva (anche dove rAF è fermo), con molti meno disegni che pezzi, il testo
+// finale è quello completo, e un errore arrivato col disegno in attesa resta scritto.
 
 import { test, expect } from './fixtures/electron.mjs';
 
