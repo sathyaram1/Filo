@@ -15,6 +15,7 @@
         { testo: 'Un messaggio scritto mentre Filo sta ancora lavorando non si perde più se ricarichi la pagina: torna nella casella com\'era, con le immagini. Se chiudi la scheda resta nella conversazione.', segnalazione: 1296 },
         { testo: '«Chat nuova», sotto l\'errore di una conversazione troppo lunga, rimette nella casella anche immagini e documenti del messaggio, e non cancella quello che avevi già scritto.', segnalazione: 1596 },
         { testo: 'Sulle pagine molto lunghe l\'assistente di pagina risponde senza farti aspettare e Filo non si blocca più, anche quando la pagina incorpora un modulo dello stesso sito o mostra del codice HTML d\'esempio.', segnalazione: 810 },
+        { testo: 'La chiave di Safe Browsing e la password del proxy si salvano cifrate col portachiavi del sistema, come le chiavi API. Un proxy scritto come «utente:password@indirizzo:porta» esce dall\'archivio esportato senza password, se non spunti «Includi le chiavi».', segnalazione: 905 },
       ],
     },
     {

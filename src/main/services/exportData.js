@@ -183,10 +183,12 @@ function togliSegreti(dati, filo) {
     if (!m) { delete o[k]; continue; }
     // Gli stessi valori che i segreti custoditi tengono lontani da uscite e modelli.
     for (const x of costanti().segretiDelProxy(v)) segna(x);
+    // Anche come la usa chi si collega: decodificata e senza i ritorni a capo che l'indirizzo scarta.
+    try { if (m.password) segna({ valore: decodeURIComponent(m.password.replace(/[\t\n\r]/g, '')), password: true }); } catch (_) {}
     o[k] = m.senza;
     proxy.push(k);
   }
-  if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; }
+  if (isPlainObject(s)) { delete s.apiKeys; delete s.apiKeysEnc; delete s[costanti().CAMPO_SEGRETI_CIFRATI]; }
   // Il più lungo prima: l'indirizzo intero del proxy contiene la sua password.
   const G = guardiano();
   const daTogliere = [...segreti.values()].map((x) => G.segretoDi(x)).filter((x) => x.v.length >= x.min)

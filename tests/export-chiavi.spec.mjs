@@ -1,6 +1,6 @@
 // #905 — l'archivio esportato dalla pagina Sicurezza non porta le chiavi API, a meno che l'utente spunti «Includi le
-// chiavi»; un archivio senza chiavi importato lascia quelle che ci sono; senza portachiavi Filo dice, una volta sola,
-// che le chiavi API vanno sul disco in chiaro.
+// chiavi»; un archivio senza chiavi importato lascia quelle che ci sono; col portachiavi tutti i segreti vanno sul disco
+// cifrati, senza Filo dice, una volta sola, che restano in chiaro.
 
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
@@ -20,6 +20,9 @@ const { buildExportZip, readExportZip } = require('../src/main/services/exportDa
 
 const CHIAVE = 'sk-or-v1-chiave-di-prova-0123456789abcdef';
 const CHIAVE_QUI = 'sk-or-v1-chiave-di-questo-computer-98765';
+const PASSWORD_PROXY = 'passwordsegreta-del-proxy';
+const PROXY_SENZA_SCHEMA = `mario:${PASSWORD_PROXY}@gate.esempio.com:8080`;
+const CHIAVE_SAFE = 'AIzaSyD-chiave-safe-browsing-di-prova';
 
 async function avvia(userData) {
   return electron.launch({
@@ -99,6 +102,36 @@ test('Esporta: senza la spunta le chiavi restano fuori dall\'archivio, con la sp
   }
 });
 
+test('Esporta: il proxy scritto senza http:// davanti esce col solo indirizzo, e la casella lo offre (#905.1)', async () => {
+  const userData = cartellaTemporanea('filo-chiavi-proxy-exp-');
+  writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light', proxy: { datacenter: PROXY_SENZA_SCHEMA } } }), 'utf8');
+  const senza = join(userData, 'senza.zip');
+  const con = join(userData, 'con.zip');
+  const app = await avvia(userData);
+  try {
+    await app.evaluate(({ dialog }, percorsi) => {
+      dialog.showSaveDialog = async () => ({ canceled: false, filePath: percorsi.shift() });
+    }, [senza, con]);
+    const page = await apriSicurezza(app);
+    await expect(page.locator('#sec-export-keys-row')).toBeVisible();
+    await expect(page.locator('#sec-export-keys')).not.toBeChecked();
+
+    await page.locator('#sec-export-btn').click();
+    await expect.poll(() => existsSync(senza), { timeout: 8000 }).toBe(true);
+    const zipSenza = readFileSync(senza);
+    expect(zipSenza.includes(Buffer.from(PASSWORD_PROXY)), 'la password del proxy non deve stare nell\'archivio').toBe(false);
+    expect(readExportZip(zipSenza).data.settings.proxy.datacenter).toBe('gate.esempio.com:8080');
+
+    await page.locator('#sec-export-keys').check();
+    await page.locator('#sec-export-btn').click();
+    await expect.poll(() => existsSync(con), { timeout: 8000 }).toBe(true);
+    expect(readExportZip(readFileSync(con)).data.settings.proxy.datacenter).toBe(PROXY_SENZA_SCHEMA);
+  } finally {
+    try { await app.close(); } catch (_) {}
+    rmSync(userData, { recursive: true, force: true });
+  }
+});
+
 test('Importa: un archivio senza chiavi lascia quelle di questo computer, e la conferma lo dice prima', async () => {
   const userData = cartellaTemporanea('filo-chiavi-imp-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({
@@ -172,7 +205,7 @@ test('senza portachiavi: alla prima chiave salvata Filo dice che resta in chiaro
     await campo.press('Tab');
 
     const vista = await aspettaFinestra(app, (w) => w.url().startsWith('filo://shell/avvisi.html'), 'nessun avviso nella finestra');
-    const avviso = vista.locator('.shell-notif-msg', { hasText: 'chiavi API in chiaro' });
+    const avviso = vista.locator('.shell-notif-msg', { hasText: 'salva in chiaro' });
     await expect(avviso).toBeVisible({ timeout: 10000 });
     if (process.platform === 'linux') await expect(avviso).toContainText('GNOME Keyring');
     mkdirSync(SHOTS, { recursive: true });
@@ -208,7 +241,7 @@ test('senza portachiavi: alla prima chiave salvata Filo dice che resta in chiaro
   }
 });
 
-test('col portachiavi la chiave salvata non fa partire nessun avviso', async () => {
+test('col portachiavi nessun segreto salvato resta leggibile nel file, e nessun avviso parte (#905.1)', async () => {
   const userData = cartellaTemporanea('filo-chiavi-cifrate-');
   writeFileSync(join(userData, 'storage.json'), JSON.stringify({ settings: { theme: 'light' } }), 'utf8');
   const app = await avvia(userData);
@@ -219,12 +252,19 @@ test('col portachiavi la chiave salvata non fa partire nessun avviso', async () 
       safeStorage.decryptString = (b) => Buffer.from(b).toString('utf8');
     });
     await primaFinestra(app);
-    await app.evaluate(async (k) => {
-      await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: k } });
+    await app.evaluate(async (_e, segreti) => {
+      await globalThis.SN_STORAGE.updateSettings({
+        apiKeys: { openrouter: segreti.chiave },
+        proxy: { datacenter: segreti.proxy },
+        security: { safeBrowse: { enabled: true, safeBrowsingKey: segreti.safe } },
+      });
       await globalThis.__filoStorage.whenSettled();
-    }, CHIAVE);
+    }, { chiave: CHIAVE, proxy: PROXY_SENZA_SCHEMA, safe: CHIAVE_SAFE });
     const suDisco = readFileSync(join(userData, 'storage.json'), 'utf8');
-    expect(suDisco.includes(CHIAVE)).toBe(false);
+    for (const segreto of [CHIAVE, CHIAVE_SAFE, PASSWORD_PROXY]) expect(suDisco.includes(segreto), segreto).toBe(false);
+    const inMemoria = await app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
+    expect(inMemoria.proxy.datacenter, 'in memoria il proxy resta usabile').toBe(PROXY_SENZA_SCHEMA);
+    expect(inMemoria.security.safeBrowse.safeBrowsingKey).toBe(CHIAVE_SAFE);
     expect(await avvisiInChiaro(app)).toBe(0);
   } finally {
     try { await app.close(); } catch (_) {}
