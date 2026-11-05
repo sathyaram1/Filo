@@ -561,7 +561,7 @@ export async function main(argv) {
     return (await lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'haiku', paralleli, rilettura: false, dryRun })) || (restano ? 3 : 0);
   }
   const quota = Math.max(0, Math.min(1, Number(opzione(argv, '--quota') ?? 0.1)));
-  const voci = daRileggere(schede, { quota }).map((s) => perNum.get(String(s.numero).replace(/^#/, ''))).filter(Boolean);
+  const voci = daRileggere(schede, { quota }).map((s) => perNum.get(numeroDi(s))).filter(Boolean);
   return (await lanciaAgenti(voci, { cartella, modello: opzione(argv, '--modello') || 'opus', paralleli, rilettura: true, dryRun })) || (restano ? 3 : 0);
 }
 
