@@ -1189,6 +1189,7 @@ export async function ramoServer(t, ramo, sha, opts, commits) {
 export async function eseguiGitServer({
   azione, cartella, ramo, biglietto, root = ROOT, env = process.env, strada = stradaGitServer(env),
   lancia = (argv, o) => spawnSync('git', argv, o), token = gitToken, scrivi = (r) => console.error(r),
+  app = (dove, b) => spedisciAppPrimaDelServer(dove, b, { env }),
   eco = (dove, testo) => (dove === 'out' ? process.stdout : process.stderr).write(testo), spinte = dichiaraSpintaServer,
 } = {}) {
   const clonato = Boolean(String(cartella || '').trim()) && existsSync(join(resolve(String(cartella)), '.git'));
@@ -1214,12 +1215,33 @@ export async function eseguiGitServer({
     scrivi(t.outcome === 'refused' ? `RIFIUTATO dal server: niente token per filo-security (${motivo}).` : `guasto ${motivo}`);
     return t.outcome === 'refused' ? 4 : 3;
   }
+  // Dopo il sì del server, che dice il biglietto vivo: il ramo dell'app non si spedisce per un biglietto chiuso.
+  if (azione === 'push') {
+    const a = app(root, biglietto);
+    for (const riga of a.righe || []) scrivi(`git-server: ${riga}`);
+    if (!a.ok) {
+      scrivi(`git-server: il ramo dell'app${a.branch ? ` '${a.branch}'` : ''} NON è arrivato su origin (${a.reason}), quindi quello del server non parte: la sua suite proverebbe l'app com'era prima. Non spingere a mano: se la causa sta nel ramo dell'app sistemala e rilancia lo stesso comando, che rispedisce da sé; altrimenti è un guasto (guasto: github, col messaggio qui sopra).`);
+      return 1;
+    }
+    scrivi(a.skipped
+      ? `git-server: ramo dell'app non spedito (${a.reason}).`
+      : `git-server: ramo dell'app '${a.branch}' su origin${a.forced ? ' (storia riscritta: --force-with-lease)' : ''}, prima di quello del server.`);
+  }
+  // In cloud il sì serve lo stesso: biglietto pulito, ambito e registro del ramo li decide il server a ogni chiamata,
+  // anche se il token che porta resta qui e non arriva a git.
+  const viaProxy = strada === 'proxy';
+  const segreto = viaProxy ? '' : t.token;
+  const { env: figlio, tolte } = viaProxy ? { env: ambienteViaProxy(env), tolte: [] } : ambienteGitServer(env, t.token);
+  const verbo = piano.argv[0] === 'clone' ? 'clone' : piano.argv[2];
+  if (viaProxy) {
+    scrivi(`git-server: il server dà il via al biglietto. In cloud git ${verbo} su filo-security passa dal proxy della sessione, con le sue credenziali: il token non si usa.`);
+  } else {
+    const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
+    scrivi(`git-server: token del biglietto ottenuto${scade}, git ${verbo} su filo-security.`);
+    if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
+  }
   // I commit che il worker ha creato si leggono prima della spinta: dopo, il ref remoto li contiene già (#1362).
   const propri = azione === 'push' ? spinte.prima(piano.dir, String(ramo || '').trim()) : null;
-  const { env: figlio, tolte } = ambienteGitServer(env, t.token);
-  const scade = t.scadeIl ? ` (scade alle ${new Date(t.scadeIl).toISOString().slice(11, 16)} UTC)` : '';
-  scrivi(`git-server: token del biglietto ottenuto${scade}, git ${piano.argv[0] === 'clone' ? 'clone' : piano.argv[2]} su filo-security.`);
-  if (tolte.length) scrivi(`git-server: tolti per questa chiamata: ${[...new Set(tolte)].join(', ')}.`);
   // L'URL con dentro il token può finire in un messaggio di git: l'uscita passa da qui, ripulita, mai diretta.
   const r = lancia(piano.argv, { env: figlio, stdio: ['inherit', 'pipe', 'pipe'], encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
   if (r && r.stdout) eco('out', senzaToken(r.stdout, segreto));
@@ -1276,59 +1298,6 @@ export const dichiaraSpintaServer = {
     try { installaTraccia(dir, 'server'); } catch (_) { /* senza, i commit del clone restano di nessuno: non fidati */ }
   },
 };
-
-/**
- * Chiede al SERVER di fondere il ramo su main (SPEC-RIDISEGNO-MAX.md §10).
- *
- * Qui non si decide niente: il server verifica dallo stato VERO (verdetti di
- * verifica e sicurezza REGISTRATI), fa girare L5 sul diff che scarica lui da
- * GitHub, e fonde con la SUA identità. Il ramo passato può solo CONFERMARE
- * quello legato al biglietto: nominarne un altro è un rifiuto registrato, non
- * una correzione silenziosa. Nessun verdetto viaggia nel corpo — il vecchio
- * FILO_L4_VERDICT per il server non esiste.
- *
- * Stessi ritentativi di call(): i guasti transienti (rete, 5xx) si ritentano,
- * un rifiuto no.
- *
- * `approval` c'è solo sui blocchi: è la richiesta che il server ha aperto per
- * l'owner. Va portata fin qui, o chi legge il registro crede che il ramo sia
- * perduto proprio nel caso in cui invece basta un via libera.
- *
- * `opts.sha` è il CONTENUTO su cui i due esiti ragionati erano stati dati:
- * viaggia con la richiesta come già fa il cammino locale (`ownerMerge`), dove
- * il server pretende che combaci con la punta vera e altrimenti risponde
- * `stale`. Senza, l'ultimo passo del giro continua a parlare del nome del ramo
- * mentre tutti i passi prima parlano di un commit, e il via libera resta buono
- * anche dopo che il foglio è stato sostituito (feedback #485). La sicurezza
- * non dipende dal fatto che il chiamante lo dichiari: la punta vera il server
- * se la chiede comunque. Questo è il controllo in più, e il posto dove
- * l'informazione arriva.
- *
- * `opts.provaUnit` è l'esito degli unit sul risultato della fusione (#929, scripts/lib/unit-sulla-fusione.mjs):
- * il server fonde solo se main è ancora lo sha provato, e altrimenti risponde `main_moved`.
- *
- * @returns {{ ok:true, result:'merged'|'blocked'|'conflict'|'main_moved'|'unit_rossi', reason?, sha?, approval?, mainSha? }
- *           | { ok:false, reason }}
- */
-export async function merge(t, branch, opts) {
-  const { sha = '', provaUnit = null, ...rest } = opts && typeof opts === 'object' ? opts : {};
-  const payload = { ticket: t, branch: String(branch || '') };
-  if (String(sha || '')) payload.sha = String(sha);
-  if (provaUnit && typeof provaUnit === 'object') payload.provaUnit = provaUnit;
-  const { status, body } = await call('routineMerge', payload, rest);
-  if (status === 200 && body && body.ok && body.result) {
-    return {
-      ok: true,
-      result: String(body.result),
-      reason: String(body.reason || ''),
-      sha: String(body.sha || ''),
-      approval: String(body.approval || ''),
-      ...(body.mainSha ? { mainSha: String(body.mainSha) } : {}),
-      ...(body.esito ? { esito: String(body.esito) } : {}),
-    };
-  }
-  return { ok: false, reason: String((body && body.reason) || `http_${status}`) };
-}
 
 // ─── L'impronta dichiarata a mano ────────────────────────────────────────────
 //

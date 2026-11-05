@@ -108,6 +108,7 @@ import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { dentroLaBusta } from './lib/busta.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
+import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 // DUE radici, e tenerle separate è il punto (lib/tools-pin.mjs):

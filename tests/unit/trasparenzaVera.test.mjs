@@ -124,6 +124,14 @@ test('il lavoro fidato fonde senza il clic, la pre-approvazione non c\'è più, 
   legame(!preapprovaTolta, sicurezza, 'fondi senza chiedermelo', 'la pre-approvazione');
 });
 
+test('la memoria e gli appunti di Claude non sporcano chi li legge, e il documento sulla sicurezza lo dice fra i punti deboli', () => {
+  const ctx = Letture.contestoLettura({ cwd: ROOT, env: { CLAUDE_PROJECT_DIR: ROOT } });
+  const pulita = (f) => Letture.motivoLettura({ tool_name: 'Read', tool_input: { file_path: f } }, ctx) === '';
+  const memoria = pulita(join(homedir(), '.claude', 'projects', 'x', 'memory', 'MEMORY.md'));
+  const appunti = pulita(join(tmpdir(), 'claude', ROOT.replace(/[^A-Za-z0-9]/g, '-'), 's', 'scratchpad', 'nota.md'));
+  legame(memoria && appunti, sicurezza, 'Il testo che una sessione sporca lascia fuori dal ramo può arrivare a una sessione pulita', 'testo delle sessioni sporche che arriva a quelle pulite (#1209)');
+});
+
 test('ogni invio al ramo lo dichiara chi l’ha fatto col suo biglietto, l’ora del commit non conta più, e il documento sulla sicurezza lo dice', () => {
   const prePush = /node "\$spinte" --pre-push \$\{repo\} "\$radice" "\$2"/.test(leggi('scripts', 'lib', 'copie-di-dati.mjs'));
   const salvataggio = /export CLAUDE_CODE_SESSION_ID="\$HOOK_SESSION"/.test(leggi('.claude', 'hooks', 'auto-commit-merge.sh'));
@@ -131,6 +139,13 @@ test('ogni invio al ramo lo dichiara chi l’ha fatto col suo biglietto, l’ora
   legame(dichiara, sicurezza, 'Ogni invio al ramo lo dichiara al server chi l\'ha fatto, col suo biglietto.', 'il lavoro fidato e le spinte dichiarate');
   legame(dichiara, sicurezza, 'ognuno lo dichiara la sessione che l\'ha fatto, col suo biglietto', 'le spinte dichiarate fra i punti deboli');
   legame(!dichiara, sicurezza, 'Lo attribuisce in base all\'ora', 'il buco dell\'ora (#1181)');
+});
+
+test('il salvataggio automatico lancia gli script del ramo, e il documento sulla sicurezza dice che una routine pulita esegue il codice della sporca già lì (#1362)', () => {
+  const gancio = leggi('.claude', 'hooks', 'auto-commit-merge.sh');
+  const delRamo = /controllo="\$1\/scripts\/copie-in-scena\.mjs"/.test(gancio) && /regola="\$dove\/scripts\/lib\/lease-atteso\.mjs"/.test(gancio);
+  legame(delRamo, sicurezza, 'esegue il codice della sporca già al primo salvataggio, perché il salvataggio automatico e i suoi controlli sono file del ramo', 'il codice del ramo eseguito al salvataggio');
+  legame(false, sicurezza, 'quando lancia le prove, esegue il codice della sporca', 'la frase di prima, che spostava il momento alle prove');
 });
 
 test('il tasto destro su un link chiede da solo titolo e descrizione al sito e spiega il link con un modello, e il documento sulla privacy lo dice', () => {
