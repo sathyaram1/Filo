@@ -177,12 +177,6 @@ describe('i motivi del blocco', () => {
     assert.match(UI.blockLabel({}), /Controllo di sicurezza/);
   });
 
-  test('i file toccati si vedono, e il troncamento si dichiara', () => {
-    assert.deepEqual(UI.blockItems({ items: ['a.js', 'b.js'] }), ['a.js', 'b.js']);
-    assert.deepEqual(UI.blockItems({ items: ['a.js'], more: 4 }), ['a.js', '… e altri 4']);
-    assert.deepEqual(UI.blockItems({}), []);
-  });
-
   // #1404: ogni riga dice dove sta, e i blocchi si leggono divisi per tipo.
   test('dove sta una voce: file e riga, o il solo file', () => {
     assert.equal(UI.doveVoce({ file: 'src/a.js', riga: 12 }), 'src/a.js:12');
@@ -588,5 +582,26 @@ describe('esito di «Salta il controllo»', () => {
     assert.match(UI.skipReasonNote({ motivo: 'x', motivoTagliato: true }), /continua/);
     assert.match(UI.skipReasonNote({ motivo: '', motivoIlleggibile: true }), /non si apre/);
     assert.match(UI.skipReasonNote({ motivo: '   ' }), /non ha lasciato una spiegazione/);
+  });
+});
+
+describe('voci che si vedono davvero (#1502)', () => {
+  test('i caratteri di controllo e di formato si scrivono per esteso, tabulazione e a capo restano', () => {
+    assert.equal(UI.caratteriVisibili('if (ok)‮ { evil() }⁦'), 'if (ok)⟨U+202E⟩ { evil() }⟨U+2066⟩');
+    assert.equal(UI.caratteriVisibili('a\u0000b​c­d'), 'a⟨U+0000⟩b⟨U+200B⟩c⟨U+00AD⟩d');
+    assert.equal(UI.caratteriVisibili('tag\u{E0041}'), 'tag⟨U+E0041⟩');
+    assert.equal(UI.caratteriVisibili('\triga\nseconda\r'), '\triga\nseconda\r');
+    assert.equal(UI.caratteriVisibili('שלום ok'), 'שלום ok', 'le lettere da destra a sinistra sono testo, non invisibili');
+    assert.equal(UI.caratteriVisibili(null), '');
+    assert.equal(UI.doveVoce({ file: 'src/‮sj.txt', riga: 3 }), 'src/⟨U+202E⟩sj.txt:3');
+  });
+
+  test('si contano le voci oltre le prime dodici e quelle che il server non ha mandato', () => {
+    const voci = (n) => Array.from({ length: n }, (_, i) => ({ file: `f${i}.js`, testo: 'x' }));
+    assert.equal(UI.vociNascoste({ voci: voci(12) }), 0);
+    assert.equal(UI.vociNascoste({ voci: voci(14) }), 2);
+    assert.equal(UI.vociNascoste({ voci: voci(12), more: 5 }), 5);
+    assert.equal(UI.vociNascoste({ items: Array.from({ length: 13 }, String) }), 1, 'anche le righe di un server di prima');
+    assert.equal(UI.vociNascoste(null), 0);
   });
 });

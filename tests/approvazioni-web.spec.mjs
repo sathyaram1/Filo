@@ -86,7 +86,7 @@ function bocciatura(feedbackId, extra = {}) {
   return {
     feedbackId, num: `#${feedbackId.replace(/\D/g, '') || '7'}`, branch: `worker/${feedbackId}`, titolo: 'Il menu si apre due volte',
     motivo: 'Il diff scrive nelle regole del database:\n- firestore.rules, riga 12: allow write a tutti.',
-    motivoTagliato: false, motivoIlleggibile: false, atMs: Date.now() - 20 * 60 * 1000, ...extra,
+    motivoTagliato: false, motivoIlleggibile: false, atMs: Date.now() - 20 * 60 * 1000, sha: 'c'.repeat(40), ...extra,
   };
 }
 
@@ -393,7 +393,8 @@ test('senza Filo: una bocciatura del controllo si salta col secondo clic, e la f
     await page.mouse.click(punto.x, punto.y);
 
     await expect(page.locator('.ap-stato')).toHaveText('feedback #7: Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera qui, fra le fusioni da approvare.');
-    expect(finto.salti.filter((c) => c.feedbackId)).toEqual([{ feedbackId: 'fid-7', token: 'Bearer token-owner@example.com' }]);
+    expect(finto.salti.filter((c) => c.feedbackId), 'il salto porta il commit esaminato che la card ha mostrato (#1502)')
+      .toEqual([{ feedbackId: 'fid-7', sha: 'c'.repeat(40), token: 'Bearer token-owner@example.com' }]);
     await expect(card).toHaveCount(0);
     const nata = page.locator('.sn-mac-card[data-request-id="r-fid-7"]');
     await expect(nata).toBeVisible();

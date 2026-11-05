@@ -102,7 +102,7 @@ const FB_BOCCIATO = {
     verdicts: ['fixed_1', 'fixed_2', 'fixed_3', 'dynamic'].map((j) => ({ judge: j, class: 'aligned', reasoning: 'Ok.' })),
   },
   livelli: {
-    l4: { esito: 'fail', at: '2026-09-12T12:00:00Z', testo: 'Il fix scrive nelle regole del database.' },
+    l4: { esito: 'fail', at: '2026-09-12T12:00:00Z', sha: 'f00d'.repeat(10), testo: 'Il fix scrive nelle regole del database.' },
   },
 };
 
@@ -789,6 +789,9 @@ test('pentagono rosso: il problema trovato e il tasto «Salta il controllo»', a
   const chiamata = await page.evaluate(() => window.__chiamate[0]);
   expect(chiamata.type).toBe('livello4_salta');
   expect(chiamata.feedbackId).toBe(FB_BOCCIATO._id);
+  // Si salta il commit che il pannello mostra, non quello su cui il ramo sarà arrivato (#1502).
+  await expect(page.locator('#mgSideBody')).toContainText('f00df00d');
+  expect(chiamata.sha).toBe('f00d'.repeat(10));
 
   // L'esito vero del server, detto in italiano.
   await expect(page.locator('#mgSideBody .mg-liv-esito')).toContainText(/entrato in main/i);
@@ -828,6 +831,28 @@ test('un lavoro anche sul server: ogni seguito del cancello del server detto in 
     await expect(esito).not.toContainText('Il server ha risposto');
     await expect(page.locator('#mgSaltaL4Btn')).toBeEnabled();
     // La pagina rilegge tutto 800 ms dopo l'esito: il caso dopo parte a rilettura finita.
+    await page.waitForTimeout(1_000);
+  }
+});
+
+test('il salto che passa dalla prova degli unit, o che torna alle routine, detto in italiano (#1502)', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await apri(page, [FB_BOCCIATO]);
+  await page.evaluate((id) => window.__mgTest.openDetail(id), FB_BOCCIATO._id);
+  await page.locator('#mgLivelliRow .mg-forma[data-livello="l4"]').click();
+  const esito = page.locator('#mgSideBody .mg-liv-esito');
+  const casi = [
+    ['attesa_unit', /GitHub prova gli unit sulla fusione/, 'ok'],
+    ['riverifica', /torna alle routine per la verifica/, 'err'],
+    ['ricontrollo', /torna al controllo di sicurezza sulla punta di adesso/, 'err'],
+  ];
+  for (const [nome, testo, kind] of casi) {
+    await stub(page, { saltaReply: { ok: true, esito: nome } });
+    await page.locator('#mgSaltaL4Btn').click();
+    await page.locator('#mgSaltaL4Btn').click();
+    await expect(esito).toContainText(testo, { timeout: 8_000 });
+    await expect(esito).toHaveAttribute('data-kind', kind);
+    await expect(esito).not.toContainText('Il server ha risposto');
     await page.waitForTimeout(1_000);
   }
 });

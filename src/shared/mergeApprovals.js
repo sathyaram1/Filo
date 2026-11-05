@@ -210,24 +210,28 @@
     return gate ? 'Controllo di sicurezza scattato (' + gate + ')' : 'Controllo di sicurezza scattato';
   }
 
-  function blockItems(block) {
-    var b = block || {};
-    var items = Array.isArray(b.items) ? b.items.map(String) : [];
-    var more = Math.max(0, Math.floor(Number(b.more) || 0));
-    if (more > 0) items = items.concat(['… e altri ' + more]);
-    return items;
-  }
-
   /** Un collegamento che si apre: solo pagine https di GitHub, gli altri indirizzi no. PURA. */
   function linkGitHub(url) {
     var s = String(url || '');
     return /^https:\/\/github\.com\/[^\s"'<>\\]+$/.test(s) ? s : '';
   }
 
+  // I caratteri di controllo e di formato (marche di direzione, larghezza zero, «tag») si mostrano come ⟨U+XXXX⟩:
+  // invisibili rigirerebbero o nasconderebbero ciò che l'owner approva (#1502). Li usano anche le domande non fidate.
+  var INVISIBILI_RE = /[\p{Cc}\p{Cf}]/gu;
+  /** Il testo coi caratteri invisibili scritti per esteso; tabulazione e a capo restano. PURA. */
+  function caratteriVisibili(testo) {
+    return String(testo == null ? '' : testo).replace(INVISIBILI_RE, function (c) {
+      if (c === '\t' || c === '\n' || c === '\r') return c;
+      var hex = c.codePointAt(0).toString(16).toUpperCase();
+      return '⟨U+' + ('0000' + hex).slice(-Math.max(4, hex.length)) + '⟩';
+    });
+  }
+
   /** Dove sta una voce: «file:riga», «file» o ''. PURA. */
   function doveVoce(voce) {
     var v = voce || {};
-    var file = String(v.file || '');
+    var file = caratteriVisibili(v.file || '');
     var riga = Math.floor(Number(v.riga) || 0);
     if (!file) return '';
     return riga > 0 ? file + ':' + riga : file;
@@ -237,6 +241,16 @@
   function blockVoci(block) {
     var b = block || {};
     return Array.isArray(b.voci) ? b.voci.filter(function (v) { return v && (v.file || v.testo); }) : [];
+  }
+
+  // Le voci a vista di un blocco: le altre si aprono, e finché restano chiuse «Approva e fondi» è spento (#1502).
+  var VOCI_A_VISTA = 12;
+
+  /** Quante voci di un blocco non si vedono a card appena disegnata: oltre le prime, più quelle mai mandate. PURA. */
+  function vociNascoste(block) {
+    var b = block || {};
+    var n = blockVoci(b).length || (Array.isArray(b.items) ? b.items.length : 0);
+    return Math.max(0, n - VOCI_A_VISTA) + Math.max(0, Math.floor(Number(b.more) || 0));
   }
 
   // Le guardie toccate, le capacità nuove e ciò che il controllo non ha potuto leggere si guardano con occhi diversi:
@@ -275,7 +289,7 @@
 
   /** Il ramo come lo legge l'owner: quello del server (filo-security) lo dice, perché ha lo stesso nome di quello dell'app. PURA. */
   function branchLabel(req) {
-    var b = String((req && req.branch) || '') || '(ramo sconosciuto)';
+    var b = req && req.branch ? caratteriVisibili(req.branch) : '(ramo sconosciuto)';
     return req && req.repo === 'server' ? 'server · ' + b : b;
   }
 
@@ -435,6 +449,10 @@
 
   // «Salta il controllo»: ogni esito del server in italiano, uguale nella scheda di Filo e nella pagina da browser.
   var SALTA_ESITI = {
+    // Il salto segue la strada di un controllo passato: unit sulla fusione da GitHub, poi il cancello (#1502).
+    attesa_unit: { kind: 'ok', text: 'Saltato. GitHub prova gli unit sulla fusione con main, poi il cancello fonde il ramo o lo ferma per il tuo via libera.' },
+    riverifica: { kind: 'err', text: 'Non c’era più un controllo da saltare, perché i verdetti erano stati azzerati. Il lavoro torna alle routine per la verifica e un controllo nuovo.' },
+    ricontrollo: { kind: 'err', text: 'Questo controllo non dice su quale commit è stato fatto, quindi non si può saltare. Il lavoro torna al controllo di sicurezza sulla punta di adesso: se boccia ancora, potrai saltare quello.' },
     fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
     conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
     ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
@@ -485,6 +503,22 @@
     return n;
   }
 
+  // Un carattere invisibile scritto per esteso si stacca dal codice intorno: è il segno da notare, non una parentesi.
+  var MARCA_RE = /(⟨U\+[0-9A-F]{4,6}⟩)/;
+  function segnaInvisibili(nodo) {
+    var t = nodo && nodo.textContent;
+    if (!t || !MARCA_RE.test(t)) return nodo;
+    nodo.textContent = '';
+    t.split(MARCA_RE).forEach(function (pezzo, i) {
+      if (!pezzo) return;
+      if (i % 2 === 0) { nodo.appendChild(document.createTextNode(pezzo)); return; }
+      var m = el('span', 'sn-mac-invisibile', pezzo);
+      m.title = 'Un carattere che non si vede: nel file c’è, qui è scritto per esteso.';
+      nodo.appendChild(m);
+    });
+    return nodo;
+  }
+
   /** Un collegamento a GitHub che si apre in una scheda; un indirizzo che non lo è resta testo. */
   function linkEsterno(cls, testo, url, titolo) {
     var u = linkGitHub(url);
@@ -506,10 +540,11 @@
     var li = el('li', 'sn-mac-voce');
     var testa = el('span', 'sn-mac-voce-testa');
     var dove = doveVoce(v);
-    if (dove) testa.appendChild(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub'));
-    if (v.testo) testa.appendChild(el('code', 'sn-mac-voce-testo', v.testo));
-    var prima = Array.isArray(v.prima) ? v.prima.map(String) : [];
-    var dopo = Array.isArray(v.dopo) ? v.dopo.map(String) : [];
+    if (dove) testa.appendChild(segnaInvisibili(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub')));
+    var testo = v.testo ? caratteriVisibili(v.testo) : '';
+    if (testo) testa.appendChild(segnaInvisibili(el('code', 'sn-mac-voce-testo', testo)));
+    var prima = Array.isArray(v.prima) ? v.prima.map(caratteriVisibili) : [];
+    var dopo = Array.isArray(v.dopo) ? v.dopo.map(caratteriVisibili) : [];
     if (!v.testo || (!prima.length && !dopo.length)) {
       li.appendChild(testa);
       return li;
@@ -521,23 +556,39 @@
     det.appendChild(sum);
     var pre = el('pre', 'sn-mac-intorno');
     var riga = function (testo, scattata) {
-      var r = el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo);
+      var r = segnaInvisibili(el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo));
       r.dataset.segno = testo.charAt(0) === '+' ? 'piu' : testo.charAt(0) === '-' ? 'meno' : 'uguale';
       return r;
     };
     prima.forEach(function (t) { pre.appendChild(riga(t, false)); });
-    pre.appendChild(riga('+' + v.testo, true));
+    pre.appendChild(riga('+' + testo, true));
     dopo.forEach(function (t) { pre.appendChild(riga(t, false)); });
     det.appendChild(pre);
     li.appendChild(det);
     return li;
   }
 
+  /** Il tasto che apre le voci nascoste di un blocco: aperte, il tasto se ne va e lo dice a `onApri`. */
+  function tastoTutte(nascoste, quante, onApri) {
+    nascoste.forEach(function (r) { r.hidden = true; });
+    var b = el('button', 'sn-mac-tutte', quante === 1 ? 'Mostra l’altra voce' : 'Mostra le altre ' + quante + ' voci');
+    b.type = 'button';
+    b.title = 'Approvare vale anche per queste: si apre l’elenco intero.';
+    b.addEventListener('click', function () {
+      nascoste.forEach(function (r) { r.hidden = false; });
+      if (b.parentNode) b.parentNode.removeChild(b);
+      if (typeof onApri === 'function') onApri();
+    });
+    return b;
+  }
+
   /**
    * I blocchi di una richiesta: divisi in guardie toccate, capacità nuove e diff da guardare, ognuno con l'elenco
    * intero delle sue voci (#1404). Un blocco di un server di prima, senza voci, mostra le sue righe come allora.
+   * Oltre le prime voci un blocco si apre col suo tasto (`sn-mac-tutte`); `aperti` li disegna già aperti.
    */
-  function buildBlocchi(blocks) {
+  function buildBlocchi(blocks, opts) {
+    var o = opts || {};
     var box = el('div', 'sn-mac-gruppi');
     var gruppi = gruppiDiBlocchi(blocks);
     for (var g = 0; g < gruppi.length; g++) {
@@ -552,14 +603,20 @@
         li.appendChild(el('span', 'sn-mac-block-label', blockLabel(b)));
         var voci = blockVoci(b);
         var lista = el('ul', 'sn-mac-block-list');
-        if (voci.length) {
-          voci.forEach(function (v) { lista.appendChild(buildVoce(v)); });
-          var more = Math.max(0, Math.floor(Number(b.more) || 0));
-          if (more > 0) lista.appendChild(el('li', 'sn-mac-block-items', '… e altre ' + more + ' che non entrano nell’elenco: sono nel diff su GitHub'));
-        } else {
-          blockItems(b).forEach(function (t) { lista.appendChild(el('li', 'sn-mac-block-items', t)); });
+        var righe = voci.length ? voci.map(buildVoce)
+          : (Array.isArray(b.items) ? b.items : []).map(function (t) { return segnaInvisibili(el('li', 'sn-mac-block-items', caratteriVisibili(t))); });
+        righe.forEach(function (r) { lista.appendChild(r); });
+        var nascoste = righe.slice(VOCI_A_VISTA);
+        var more = Math.max(0, Math.floor(Number(b.more) || 0));
+        if (more > 0) {
+          // Un server di prima ne manda una parte: quelle che mancano si dicono, con la strada per vederle.
+          var mancanti = el('li', 'sn-mac-block-items sn-mac-mancanti', '… e altre ' + more + ' che il server non ha mandato: ');
+          mancanti.appendChild(linkEsterno('sn-mac-mancanti-link', linkGitHub(o.diffUrl) ? 'sono nel diff su GitHub' : 'sono nel diff del ramo', o.diffUrl));
+          lista.appendChild(mancanti);
+          nascoste.push(mancanti);
         }
         if (lista.childNodes.length) li.appendChild(lista);
+        if (nascoste.length && !o.aperti) li.appendChild(tastoTutte(nascoste, vociNascoste(b), o.onApri));
         ul.appendChild(li);
       }
       sez.appendChild(ul);
@@ -571,6 +628,8 @@
   // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
   // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
   var LIBERA = 'sn-mac-libera';
+  // Le richieste di cui l'owner ha già aperto tutte le voci, per «id@sha».
+  var APERTE = {};
   var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere…' };
   function occupata(root) {
     return !!(root && root.querySelector
@@ -701,10 +760,22 @@
     }
 
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
+    // Aperte una volta, le voci restano aperte anche quando la card si ridisegna: la chiave è richiesta e commit.
+    var chiave = String(req.id || '') + '@' + String(req.sha || '');
+    var blocchi = null;
     if (blocks.length) {
       card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
-      card.appendChild(buildBlocchi(blocks));
+      blocchi = buildBlocchi(blocks, {
+        aperti: APERTE[chiave] === true,
+        diffUrl: req.diffUrl,
+        onApri: function () {
+          if (!daAprire()) APERTE[chiave] = true;
+          aggiornaApprova();
+        },
+      });
+      card.appendChild(blocchi);
     }
+    function daAprire() { return !!(blocchi && blocchi.querySelector('.sn-mac-tutte')); }
 
     var status = el('p', 'sn-mac-status');
     status.setAttribute('role', 'status');
@@ -716,7 +787,16 @@
     discardBtn.title = 'Toglila dall’elenco senza fondere niente. ' + howToRetry(req);
     var approveBtn = el('button', 'sn-mac-btn sn-mac-btn-go', 'Approva e fondi');
     approveBtn.type = 'button';
-    approveBtn.title = 'Fonde su main esattamente il commit esaminato.';
+    var serveAprire = el('span', 'sn-mac-serve-aprire', 'Apri tutte le voci per approvare');
+    var occupato = false;
+    // Il sì vale per tutto il commit: finché una voce resta chiusa non si dà (#1502).
+    function aggiornaApprova() {
+      var chiuse = daAprire();
+      approveBtn.disabled = occupato || chiuse;
+      serveAprire.hidden = !chiuse;
+      approveBtn.title = chiuse ? 'Prima apri tutte le voci: approvare vale anche per quelle che non hai visto.'
+        : 'Fonde su main esattamente il commit esaminato.';
+    }
 
     var armed = false;
     var armTimer = null;
@@ -730,7 +810,8 @@
       liberata(card);
     }
     function setBusy(on) {
-      approveBtn.disabled = !!on;
+      occupato = !!on;
+      aggiornaApprova();
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
       if (!on) {
@@ -818,8 +899,10 @@
         });
     });
 
+    actions.appendChild(serveAprire);
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
+    aggiornaApprova();
     // L'esito sotto i tasti: comparendo sopra li spingeva giù, e il clic per riprovare cadeva fuori.
     card.appendChild(actions);
     card.appendChild(status);
@@ -1369,7 +1452,7 @@
         head.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       }
       aggiungiInfoFeedback(head, r, o);
-      head.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
+      head.appendChild(el('span', 'sn-mac-recent-branch', r.branch ? caratteriVisibili(r.branch) : '—'));
       var sha = linkEsterno('sn-mac-sha', shortSha(r.mergeSha || r.sha), r.diffUrl);
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '')
         + (linkGitHub(r.diffUrl) ? '\nApri il diff su GitHub' : '');
@@ -1385,7 +1468,7 @@
       li.appendChild(head);
       var blocks = Array.isArray(r.blocks) ? r.blocks : [];
       if (blocks.length) {
-        li.appendChild(buildBlocchi(blocks));
+        li.appendChild(buildBlocchi(blocks, { diffUrl: r.diffUrl }));
       } else {
         li.appendChild(el('p', 'sn-mac-status', 'Nessun dettaglio registrato su cosa era stato segnalato.'));
       }
@@ -1418,8 +1501,9 @@
     isFiducia: isFiducia,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
-    blockItems: blockItems,
     blockVoci: blockVoci,
+    vociNascoste: vociNascoste,
+    caratteriVisibili: caratteriVisibili,
     doveVoce: doveVoce,
     linkGitHub: linkGitHub,
     gruppiDiBlocchi: gruppiDiBlocchi,

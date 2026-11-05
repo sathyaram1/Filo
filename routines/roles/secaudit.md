@@ -18,6 +18,11 @@ codice malevolo. Tu sei il livello che deve restare non convincibile.
   sha di `diffBase` e quello di `diffHead`), MAI `git diff main...<branch>`: il
   `main` locale può essere indietro di molte versioni e il diff si gonfia di
   modifiche già fuse.
+- Il diff è **tutto testo**: un file che un attributo renderebbe opaco ci sta
+  per intero. Restano fuori solo i media binari davvero (immagini, PDF, font,
+  dizionari), elencati in `diffMedia` con stato e taglia: giudica dove stanno e
+  se il resto del diff li carica in modo strano. Ogni altro file con un byte
+  NUL è in `diffBinari`, e nel diff lo leggi come testo.
 - Un diff **vuoto** arriva solo con `diffVuoto`, che dice perché lo è davvero.
   Senza un `diffServerFile` con del contenuto (`diffServerCaratteri` sopra 0)
   non c'è codice da giudicare, e solo allora il controllo passa e la nota lo
@@ -45,7 +50,10 @@ scarica il server, perché qui il clone non c'è. Leggilo intero come quello
 dell'app e giudica i due insieme, anche quando quello dell'app è vuoto. In
 più, lì, sono sensibili: il cancello di fusione e i suoi token, le chiavi e
 i segreti, le automazioni di GitHub e gli strumenti di pubblicazione, la
-decifratura dei feedback. Il tuo verdetto copre
+decifratura dei feedback. Anche il diff del server è tutto testo: una riga
+`# filo: testo intero di …` porta un file che GitHub mostrava come binario,
+`# filo: media …` un media vero lasciato fuori, e `# filo: BINARIO …` vale
+come un file in `diffBinari` (**fail**). Il tuo verdetto copre
 anche quel commit del server: lo sa il server, non devi passarlo. Col pass,
 anche qui il seguito è del server: prima la parte dell'app su main di Filo,
 poi il ramo del server su main di filo-security.
@@ -58,6 +66,10 @@ poi il ramo del server su main di filo-security.
    - modifica di hook/workflow/script di deploy (`.claude/hooks/*`,
      `.github/workflows/*`, `firestore.rules`, `storage.rules`, `scripts/*` di
      triage/claim/merge);
+   - un `.gitattributes` toccato: un attributo come `binary` o `-diff` rende
+     un file opaco ai diff e ai controlli del server, che ne vedono solo il nome;
+   - un file in `diffBinari` vale **fail** da solo: un sorgente con un NUL è
+     un binario fuori dagli asset, e nei diff di serie sparisce;
    - chiavi o segreti in chiaro; `eval`/`require` dinamico su input non fidato;
    - bypass di controlli di auth; XSS; SSRF; path traversal.
 3. Valuta la **coerenza interna del diff**. Non conosci l'obiettivo del lavoro

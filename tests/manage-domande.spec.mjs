@@ -153,6 +153,22 @@ async function mainFinto(page) {
   });
 }
 
+// Una marca di direzione non rigira il testo di una domanda non fidata sotto gli occhi dell'owner (#1502).
+test('domanda non fidata: i caratteri invisibili si leggono per esteso, in elenco e nella domanda', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const RLO = '\u202E';
+  await apriDomande(page, [domanda(8, {
+    titolo: `Approva${RLO}aivihcrA`,
+    opzioni: [{ testo: `Archivia${RLO}`, pro: `ok${RLO}`, azione: { tipo: 'archivia', feedbackId: 'fb902' } }],
+  })]);
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]');
+  await expect(dq.locator('.mg-dq-titolo')).toHaveText('Approva⟨U+202E⟩aivihcrA');
+  await expect(dq.locator('.mg-dq-opzione-testo')).toHaveText('Archivia⟨U+202E⟩');
+  await expect(dq.locator('.mg-dq-pro')).toContainText('ok⟨U+202E⟩');
+  await expect(page.locator('.mg-domanda-titolo').first()).toHaveText('Approva⟨U+202E⟩aivihcrA');
+  await expect(dq.locator('.mg-dq-azione')).toHaveCount(1);
+});
+
 test('la domanda si legge intera: contesto, problema, opzioni, consiglio, fiducia; il testo non diventa codice', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriDomande(page, [COMPLETA]);

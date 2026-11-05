@@ -61,6 +61,12 @@ chiede, ma **far decidere l'owner su ciò che non viene da lui**:
   guardie toccate separate dalle capacità nuove. Un tetto di righe o di
   caratteri sull'elenco che si approva fa dire sì a quello che non si è letto;
   dove il documento non basta, quante mancano si dice.
+- **Il sì copre solo quello che si è visto** (#1502): oltre le prime voci un
+  blocco si apre col suo tasto, e finché resta chiuso «Approva e fondi» è
+  spento e dice perché. I caratteri di controllo e di formato si scrivono per
+  esteso (⟨U+202E⟩) e ogni voce è un paragrafo di direzione a sé: un testo
+  invisibile o rigirato non cambia quello che si approva. Stessa resa nelle
+  domande non fidate.
 - **Dove:** decisione pura + I/O in `filo-security/functions/src/routine/
   mergeApprovals.js`; lavoro locale in `functions/src/routine/ownerMerge.js` e
   `functions/src/localWork.js`, lato sessione `scripts/lib/owner-merge.mjs`;
