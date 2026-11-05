@@ -168,8 +168,8 @@ test('se la pagina sotto non dice dove stanno i suoi campi lo screenshot non par
   await expect(strato.locator('.sn-toast').filter({ hasText: 'La schermata non è partita' })).toHaveCount(1, { timeout: 8_000 });
 });
 
-// Una cassa online tiene la carta nel riquadro di un servizio di pagamento, su un altro sito: dallo strato quei campi
-// li misura il main e la foto si copre con la vista della pagina sotto.
+// Una cassa online tiene la carta nel riquadro di un servizio di pagamento, su un altro sito: il main copre il riquadro
+// come nella foto per un modello.
 test('nello screenshot del feedback è coperto il numero scritto nel riquadro di pagamento di un altro sito', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   const riquadro = testServer.html(`<!doctype html><html><body style="margin:0;background:#fff">
