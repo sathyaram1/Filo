@@ -1752,7 +1752,7 @@
     }
     const nota = document.createElement('div');
     nota.className = 'dash-bubble-note dash-bubble-fermato';
-    nota.textContent = parziale ? 'Fermato a metà della risposta.' : 'Fermato prima della risposta.';
+    nota.textContent = parziale ? 'Fermato a metà della risposta.' : globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
     bubblesEl.appendChild(nota);
     return { entry, host, nota, parziale };
   }
