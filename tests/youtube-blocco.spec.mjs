@@ -149,9 +149,6 @@ fixture('il video di YouTube incorporato in un altro sito parte senza pubblicitÃ
     return webContents.getAllWebContents().map((wc) => wc.mainFrame.framesInSubtree.map((x) => x.url).join(' ')).join(' | ');
   });
   expect(ospite.url()).toContain('sito-pubblico.test');
-  await new Promise((r) => setTimeout(r, 3000));
-  const diag = `DIAG ${JSON.stringify(youtube.servite)} ${await app.evaluate(() => JSON.stringify(globalThis.__diag || []))}`;
-  expect(diag).toBe('');
   await expect.poll(nelRiquadro, { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
 });
 
