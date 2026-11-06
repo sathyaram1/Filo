@@ -18,7 +18,6 @@
   })();
 
   let deps = {
-    isContentFullscreen: () => false,
     aiutoPasso: () => {},
     aiutoAcceso: () => true,
     aiutoStato: () => null,
