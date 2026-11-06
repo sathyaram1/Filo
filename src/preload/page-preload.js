@@ -962,6 +962,7 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'geoProposal.js')); } catch (e) { console.error('[Filo CS] geoProposal', e); }
+  if (PAGE_ONLY) try { require(path.join(SHARED_DIR, 'precarico.js')); require(path.join(CONTENT_DIR, 'precarico.js')); } catch (e) { console.error('[Filo CS] precarico', e); } // #1985 — PRIMA di content.js, che lo avvia
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieRules.js')); } catch (e) { console.error('[Filo CS] cookieRules', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookieBanners.js')); } catch (e) { console.error('[Filo CS] cookieBanners', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'cookies.js')); } catch (e) { console.error('[Filo CS] cookies', e); }
