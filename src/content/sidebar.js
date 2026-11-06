@@ -2029,7 +2029,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   // Dopo un'attesa il turno prosegue solo se è ancora suo; il pannello che la pagina ha tolto chiude la sessione.
   function finito(mia) {
     if (mia !== epoca) return true;
-    if (root) return false;
+    if (apertoQui()) return false;
     staccato();
     return true;
   }
