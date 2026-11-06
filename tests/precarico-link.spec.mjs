@@ -226,7 +226,7 @@ test('aprire la pagina e passare sui link d\'uscita non fa uscire dal sito, in n
     const page = await openTab(`http://127.0.0.1:${server.address().port}/area`);
     await expect(page.locator('#stato')).toHaveText('Ciao, sei dentro');
     await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
-    for (const id of ['#u0', '#u1', '#u2', '#u3']) { await page.hover(id); await page.waitForTimeout(300); }
+    for (const id of ['#u0', '#u1', '#u2', '#u3', '#u4', '#u5']) { await page.hover(id); await page.waitForTimeout(300); }
     // Il profilo, a schermo e dello stesso sito, parte: i link d'uscita restano fermi lo stesso.
     await expect.poll(() => richieste.includes('/area/profilo'), { timeout: 15_000 }).toBe(true);
     await page.waitForTimeout(2000);
