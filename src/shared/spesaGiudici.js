@@ -1,6 +1,6 @@
 // Il tetto di spesa dei giudici per i mittenti non fidati (#1515): tetto e lunghezza giudicabile in config/automation,
-// la spesa del giorno nel contatore che tiene il server. Logica pura, dopo campoNumero.js: Gestione e main rifiutano gli
-// stessi valori, il server applica gli stessi intervalli. Prove: tests/unit/spesaGiudici.test.mjs.
+// la spesa del giorno nel contatore del server. Logica pura, dopo campoNumero.js: Gestione e main rifiutano gli stessi valori.
+// Il server la incorpora al deploy (bake-shared): un cambio qui va su main solo con un lavoro server. Prove: tests/unit/spesaGiudici.test.mjs.
 
 (function (global) {
   'use strict';
