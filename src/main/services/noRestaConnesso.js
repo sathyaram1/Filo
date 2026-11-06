@@ -1,6 +1,6 @@
 // I «no» alla proposta «Resta connesso» dopo un accesso (#759.1, decisione D-8): sul disco solo impronte salate e
 // lente, mai il nome del sito, e il sale in un file suo. Filo sa se su un sito ha già chiesto; l'elenco non si legge.
-// Prove: tests/unit/noRestaConnesso.test.mjs, tests/cookies-resta-connesso-ricarica.spec.mjs.
+// Prove: tests/unit/noRestaConnesso.test.mjs, tests/cookies-resta-connesso.spec.mjs.
 'use strict';
 
 const crypto = require('node:crypto');
