@@ -86,7 +86,7 @@ test('spento all\'avvio non scarica; riacceso, con la copia vecchia, scarica', a
 test('dopo un ripiego le regole si richiedono subito e poi ogni ora, finché non cambiano', async (t) => {
   mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: ORA });
   t.after(() => mock.timers.reset());
-  rete = { 'filters.txt': DISCO, 'quick-fixes.txt': '' };
+  rete = { 'filters.txt': DISCO, 'quick-fixes.txt': NIENTE };
   const B = avvio({ copiaDi: H });
   await B.init({});
   await svuota();
