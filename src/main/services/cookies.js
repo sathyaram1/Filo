@@ -712,7 +712,7 @@ function configureFromSettings(settings) {
   }
   _configured = true;
   if (prevMode !== _cached.mode || prevTrusted !== trustedOra) {
-    try { if (configChange) configChange(); } catch (_) {}
+    for (const fn of configChange) { try { fn(); } catch (_) {} }
   }
   return changed;
 }
