@@ -322,7 +322,7 @@
     // deve saperlo per scendere lo stesso, invece di lasciare in inglese del testo che si vede (#505).
     if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return 'visibility';
     if (isFlattened(el)) return true;
-    if (isTransparentOnScreen(el, cs)) return true;
+    if (ovunque ? isFullyTransparent(cs) : isTransparentOnScreen(el, cs)) return true;
     if (isPushedOutOfPage(el, cs)) return true;
     if (isClippedAwayByPath(el, cs)) return true;
     return isClippedToNothing(el, cs);
