@@ -51,7 +51,9 @@ async function sitoConAccesso() {
         ${dentro ? '<h1 id="dentro">Ciao Sara</h1>' : ''}
         <button id="google" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y', 'accesso', 'width=420,height=420')">Continua con Google</button>
         <button id="google-entra" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y&entra=1', 'accesso', 'width=420,height=420')">Entra con Google</button>
+        <button id="google-token" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y&token=1', 'accesso', 'width=420,height=420')">Accedi</button>
         <input id="campo" placeholder="Un commento">
+        ${u.searchParams.get('vivo') ? '<script>setInterval(() => fetch(\'/ping\'), 300)</script>' : ''}
         </body></html>`);
       return;
     }
