@@ -157,15 +157,32 @@
     return tiene(AZIONI, id) && contestoDiZona(zona) === AZIONI[id].contesto;
   }
 
-  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra e il suo «Altro…», la fila del tasto destro e il
-  // suo «Altro…», queste due con il contesto (zonaDaDove).
-  const DOVE = Object.freeze({ barra: 'bar', altro: 'secondary', fila: 'fila', altro_fila: 'altro' });
+  // Le zone come le dice chi parla con Filo (SPOSTA_ICONA): la barra e il suo «Altro…», la fila del tasto destro
+  // («menu» vale «fila») e il suo «Altro…», queste due con il contesto (zonaDaDove).
+  const DOVE = Object.freeze({ barra: 'bar', altro: 'secondary', fila: 'fila', menu: 'fila', altro_fila: 'altro' });
   function zonaDaDove(dove, contesto = '') {
     const d = String(dove || '').trim().toLowerCase();
     if (!tiene(DOVE, d)) return '';
     if (d === 'barra' || d === 'altro') return DOVE[d];
     const ctx = String(contesto || '').trim().toLowerCase();
     return tiene(CONTESTI, ctx) ? `${DOVE[d]}:${ctx}` : '';
+  }
+
+  // La zona di un'azione SPOSTA_ICONA: senza contesto vale quello dell'azione stessa. Una porta sola per chi la esegue,
+  // per la frase di conferma e per la riga nelle attività (#1434.2).
+  function zonaDellAzione(a) {
+    const id = String((a && (a.icona ?? a.id)) || '').trim();
+    const ctx = String((a && a.contesto) || '').trim().toLowerCase() || (tiene(AZIONI, id) ? AZIONI[id].contesto : '');
+    return zonaDaDove(a && a.dove, ctx);
+  }
+
+  // Il verso opposto: la zona come la scrive il filo, `{ dove, contesto? }`.
+  function doveDaZona(z) {
+    if (z === 'bar') return { dove: 'barra' };
+    if (z === 'secondary') return { dove: 'altro' };
+    const ctx = contestoDiZona(z);
+    if (!ctx) return { dove: '' };
+    return { dove: String(z).startsWith('fila:') ? 'fila' : 'altro_fila', contesto: ctx };
   }
 
   // Il nome che l'utente legge nel menu, per la chat.
