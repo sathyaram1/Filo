@@ -4073,11 +4073,11 @@ async function eseguiAzioneFilo(action, {
         // parole: stessa porta del trascinamento, così menu e barre di tutte le finestre la ricevono uguale.
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = String(action.icona ?? action.id ?? '').trim();
-        const dove = String(action.dove ?? '').trim().toLowerCase();
+        const dove = D ? D.parolaDove(action.dove) : String(action.dove ?? '');
         const prima = String(action.prima_di ?? '').trim();
         const target = D ? D.zonaDellAzione(action) : '';
         if (!D || !D.esiste(id) || !target) {
-          const serveContesto = !!(D && D.DOVE[dove]) && !['barra', 'altro'].includes(dove);
+          const serveContesto = dove === 'fila' || dove === 'altro_fila';
           return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(serveContesto ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
         }
         if (!D.ammessa(id, target)) {
