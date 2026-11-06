@@ -1,4 +1,4 @@
-// #1985 giro 3, r2: i link che fanno un'azione diversa dall'uscita non si precaricano, né a pagina ferma né al passaggio.
+// #1985 giro 3, r3: i link che fanno un'azione diversa dall'uscita non si precaricano, né a pagina ferma né al passaggio.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
