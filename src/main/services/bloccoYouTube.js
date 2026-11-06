@@ -193,5 +193,5 @@ function spentaPerTest(id) { return spente.get(id) === versione; }
 
 module.exports = {
   CARTELLA_LISTE, SORGENTI, OGNI_MS, FORZATO_MS, TESTO_RIPIEGO,
-  attivo, init, configureFromSettings, aggiorna, regolePer, rotto, documentoNuovo, status, impostaListePerTest, spentaPerTest,
+  attivo, init, configureFromSettings, aggiorna, regolePer, rotto, status, impostaListePerTest, spentaPerTest,
 };
