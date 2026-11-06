@@ -216,29 +216,23 @@ function buildRiquadriVuotiSource(corpi) {
     try { su = campo(D(w.EventTarget.prototype, 'addEventListener'), 'value'); } catch (e) {}
     ascolta(d, su);
     try { new w.MutationObserver(spazza).observe(d, { __proto__: null, childList: true, subtree: true }); } catch (e) {}
-    var N = proto(w, 'Node');
-    ['appendChild', 'insertBefore', 'replaceChild'].forEach(function (m) { dopo(N, m, SE.nodi); });
-    var conTesto = { insertAdjacentHTML: SE.testo(1), setHTMLUnsafe: SE.testo(0), setHTML: SE.testo(0) };
-    ['Element', 'Document', 'DocumentFragment', 'CharacterData', 'DocumentType', 'ShadowRoot'].forEach(function (c) {
-      var P = proto(w, c);
-      if (!P) return;
-      ['append', 'prepend', 'replaceChildren', 'before', 'after', 'replaceWith', 'moveBefore', 'insertAdjacentElement',
-        'insertAdjacentHTML', 'setHTMLUnsafe', 'setHTML'].forEach(function (m) { if (R(proprio, P, [m])) dopo(P, m, conTesto[m] || (m === 'moveBefore' ? SE.sposta : SE.nodi)); });
-      if (c !== 'Document') ['innerHTML', 'outerHTML'].forEach(function (p) { if (R(proprio, P, [p])) dopoLaScrittura(P, p); });
-    });
-    var Doc = proto(w, 'Document');
-    dopo(Doc, 'write', SE.sempre);
-    dopo(Doc, 'writeln', SE.sempre);
-    dopo(Doc, 'execCommand', SE.testo(2));
-    // La riscrittura da capo toglie gli ascolti del documento; con tre argomenti apre una finestra.
-    dopo(Doc, 'open', SE.sempre, function (doc, r) { ascolta(doc, su); if (finestra(r)) applica(r); });
-    var Rg = proto(w, 'Range');
-    ['insertNode', 'surroundContents'].forEach(function (m) { dopo(Rg, m, SE.gamma); });
+    var i, v, P;
+    for (i = 0; i < VIE_NODI.length; i++) {
+      v = VIE_NODI[i]; P = proto(w, v[0]);
+      if (P && R(proprio, P, [v[1]])) dopo(P, v[1], v[2] === 'sposta' ? SE.sposta : v[2] === 'gamma' ? SE.gamma : SE.nodi);
+    }
+    // La riscrittura da capo (anche write a documento chiuso) toglie gli ascolti del documento; open con tre argomenti
+    // apre una finestra.
+    var riapre = function (doc, r) { ascolta(doc, su); if (finestra(r)) applica(r); };
+    for (i = 0; i < VIE_TESTO.length; i++) {
+      v = VIE_TESTO[i]; P = proto(w, v[0]);
+      if (!P || !R(proprio, P, [v[1]])) continue;
+      if (typeof campo(D(P, v[1]), 'set') === 'function') { dopoLaScrittura(P, v[1]); continue; }
+      dopo(P, v[1], v[2] < 0 ? SE.sempre : SE.testo(v[2]), RISCRIVONO.indexOf(v[1]) >= 0 ? riapre : null);
+    }
     dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice, su); });
-    ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'].forEach(function (c) {
-      ['contentWindow', 'contentDocument'].forEach(function (p) { prima(proto(w, c), p); });
-    });
-    ['HTMLIFrameElement', 'HTMLObjectElement', 'HTMLEmbedElement'].forEach(function (c) { prima(proto(w, c), 'getSVGDocument'); });
+    for (i = 0; i < CORNICI.length; i++) for (var j = 0; j < GETTER_FINESTRA.length; j++) prima(proto(w, CORNICI[i]), GETTER_FINESTRA[j]);
+    for (i = 0; i < CON_SVG.length; i++) prima(proto(w, CON_SVG[i]), 'getSVGDocument');
     dopo(D(w, 'open') ? w : proto(w, 'Window'), 'open', SE.sempre, function (_, r) { if (finestra(r)) applica(r); });
   }
   visti.add(document);
