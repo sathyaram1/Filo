@@ -815,15 +815,23 @@
     } catch (_) { return false; }
   }
 
-  // La domanda passa per un evento dal nome segreto sull'elemento: la sonda (preload/ombre-chiuse.js) lo annulla solo
-  // se conosce il suo albero chiuso e lì dentro non c'è niente da leggere.
-  function ombraSenzaTesto(el) {
+  // Cosa c'è nell'albero chiuso di `el`, per la sonda (preload/ombre-chiuse.js): 'testo', 'incorporati' (riquadri di cui
+  // da lì non si legge niente), 'vuoto', o null se non lo conosce. La sonda annulla la domanda il cui sì è vero; la
+  // domanda esce dai componenti aperti, se no da lì non arriverebbe.
+  function ombraChiusa(el) {
     const nome = global.SN_OMBRE_CHIUSE;
-    if (!nome) return false;
-    try { return !el.dispatchEvent(new CustomEvent(nome, { cancelable: true })); } catch (_) { return false; }
+    if (!nome) return null;
+    const si = (suffisso) => !el.dispatchEvent(new CustomEvent(nome + suffisso, { cancelable: true, composed: true }));
+    try {
+      if (si('')) return 'vuoto';
+      if (si('t')) return 'testo';
+      if (si('r')) return 'incorporati';
+    } catch (_) {}
+    return null;
   }
 
-  function isClosedComponent(el) {
+  // `soloTestoNoto`: chi traduce fuori conto (un riquadro nascosto) conta solo il testo chiuso che sa esserci (#1290).
+  function isClosedComponent(el, soloTestoNoto) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
     // La prova del cursore si fa sul documento della pagina: dentro un riquadro misurerebbe
