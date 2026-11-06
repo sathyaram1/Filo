@@ -274,10 +274,13 @@ module.exports = function register(on, ctx) {
     if (fermatiPrima.delete(chiave)) controller.abort();
     turniAiuto.set(chiave, controller);
     const dest = sender.strato || sender.frame || sender.wc;
-    return {
+    const diretta = {
+      // Intero anche nella risposta: gli eventi in diretta possono arrivare dopo di lei e la coda andrebbe persa (#1321).
+      ragionamento: '',
       signal: controller.signal,
       onReasoning: (testo) => {
         if (!testo || controller.signal.aborted) return;
+        diretta.ragionamento += String(testo);
         try { dest.send('filo:broadcast', { type: MSG.AIUTO_RAGIONAMENTO, turno: msg.turno, testo: String(testo) }); } catch (_) {}
       },
       fine: () => { if (turniAiuto.get(chiave) === controller) turniAiuto.delete(chiave); },
