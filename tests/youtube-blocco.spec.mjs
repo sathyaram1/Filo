@@ -144,9 +144,9 @@ fixture('il video di YouTube incorporato in un altro sito parte senza pubblicitÃ
   const nelRiquadro = () => app.evaluate(async ({ webContents }) => {
     for (const wc of webContents.getAllWebContents()) {
       const f = wc.mainFrame.framesInSubtree.find((x) => x.url.includes('/embed/inc'));
-      if (f) return f.executeJavaScript('window.__esiti ? window.__esiti.slice().sort() : null').catch(() => null);
+      if (f) return f.executeJavaScript('window.__esiti ? window.__esiti.slice().sort() : null').catch((e) => `errore: ${e.message}`);
     }
-    return null;
+    return webContents.getAllWebContents().map((wc) => wc.mainFrame.framesInSubtree.map((x) => x.url).join(' ')).join(' | ');
   });
   expect(ospite.url()).toContain('sito-pubblico.test');
   await expect.poll(nelRiquadro, { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
