@@ -169,3 +169,20 @@ test('#1279.5: a caccia chiusa, sulla pagina viva, i pulsanti vuoti ricevono la 
   expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([1, undefined]);
   expect(await nodiNuovi(page)).toBeGreaterThan(300);
 });
+
+test('a caccia chiusa, pulsanti-campo vuoti che ricevono dopo «Rifiuta» come valore: rifiutato', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, `<title>VIVA_VALORE</title>${LINK(300)}${VIVO}`);
+  await expect.poll(async () => (await stato(app, page)).hunting, { timeout: 35_000, intervals: [1_000] }).toBe(false);
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend', `<div id="campi" class="cookie-consent" style="position:fixed;top:0;left:0;right:0;height:90px;background:#fff;z-index:10">
+      <p>Usiamo i cookie.</p><input type="button" id="acc" style="width:120px;height:30px" onclick="window.__accettati=1;this.parentNode.remove()">
+      <input type="button" id="rif" style="width:120px;height:30px" onclick="window.__rifiuti=(window.__rifiuti||0)+1;this.parentNode.remove()"></div>`);
+    setTimeout(() => {
+      document.getElementById('acc').setAttribute('value', 'Accetta');
+      document.getElementById('rif').setAttribute('value', 'Rifiuta');
+    }, 300);
+  });
+  await page.waitForFunction(() => !document.getElementById('campi'), null, { timeout: 8_000 });
+  expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([1, undefined]);
+});
