@@ -91,7 +91,7 @@ for (const [nome, prima, dopo, scorri] of [
   ['in cima, tradotto dopo averlo superato scorrendo', '', '<div style="height:2500px"></div>', 1400],
   ['dentro una sezione chiusa, che di serie si traduce', '<details id="d"><summary>Open the box</summary>', '</details>', 0],
 ]) {
-  test(`componente chiuso con testo ${nome}: l'avviso dice «solo in parte»`, async ({ app, openTab, testServer }) => {
+  test(`r1 componente chiuso con testo ${nome}: l'avviso dice «solo in parte»`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
     await stubTranslationProvider(app);
     const page = await testServer.openReady(openTab, SIGILLATO(prima, dopo));
