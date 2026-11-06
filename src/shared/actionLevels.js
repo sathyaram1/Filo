@@ -18,10 +18,7 @@
   // Dove va un'icona chiesta a parole: la barra, il suo «Altro…», la fila del tasto destro di un contesto (#1434).
   function doveDellIcona(a) {
     const D = global.SN_DISPOSIZIONE_ICONE;
-    const dove = String((a && a.dove) || '').trim().toLowerCase();
-    const id = String((a && (a.icona ?? a.id)) || '').trim();
-    const ctx = String((a && a.contesto) || '').trim().toLowerCase() || (D && D.AZIONI && D.AZIONI[id] ? D.AZIONI[id].contesto : '');
-    const z = D && D.zonaDaDove ? D.zonaDaDove(dove, ctx) : '';
+    const z = D && D.zonaDellAzione ? D.zonaDellAzione(a) : '';
     if (!z) return '';
     const n = D.nomeZona(z);
     return `${n.in} ${n.nome}`;
