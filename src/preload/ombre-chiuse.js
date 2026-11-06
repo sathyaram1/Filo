@@ -65,11 +65,15 @@ function sorgenteSonda(nome) {
       return r;
     }, oAttach, 'attachShadow');
     mascheraToString();
-    oAdd.call(window, NOME, function (e) {
-      var r = radici.get(e.target);
-      oStop.call(e);
-      if (r && !haTesto(r, 0)) oPrevent.call(e);
-    }, true);
+    // Una domanda per risposta: annullato vuol dire sì. NOME «è vuoto?», NOME+'r' «solo incorporati?», NOME+'t' «testo?».
+    var RISPOSTE = [['', 0], ['r', 1], ['t', 2]];
+    RISPOSTE.forEach(function (q) {
+      oAdd.call(window, NOME + q[0], function (e) {
+        var r = radici.get(chiesto(e));
+        oStop.call(e);
+        if (r && leggibile(r, 0) === q[1]) oPrevent.call(e);
+      }, true);
+    });
   } catch (e) {}
 })();`;
 }
