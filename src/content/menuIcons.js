@@ -276,11 +276,16 @@
 
   function init(d) { deps = { ...deps, ...d }; }
 
+  // Lo stato delle icone della finestra è cambiato col menu aperto (lo schermo intero spento da un'altra strada, #514).
+  function ridisegnaFinestra() {
+    chiediFinestra().then(ridisegna, ridisegna);
+  }
+
   loadIconLayout();
-  refreshOwner();
 
   global.SN_MENU_ICONS = {
     init, fila, runIconAction, statoPerBarra, layoutCambiato, dallaBarra,
-    redrawIconRows: ridisegna,
+    prepara: chiediFinestra,
+    redrawIconRows: ridisegnaFinestra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
