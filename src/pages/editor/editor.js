@@ -911,13 +911,15 @@
   const titoliInVolo = new Set();
   const riassuntiInVolo = new Set();
 
-  const TITLE_SYSTEM_PROMPT =
-    'Sei l\'assistente di Filo. Genera un TITOLO molto breve (2-6 parole) per il '
-    + 'documento qui sotto, nella STESSA lingua del testo. Il titolo deve '
-    + 'descrivere il contenuto del documento. Usa l\'eventuale conversazione e la '
-    + 'memoria SOLO come contesto per capire meglio l\'argomento, non come oggetto '
-    + 'del titolo. Rispondi SOLO col titolo: niente virgolette, niente punto '
-    + 'finale, niente spiegazioni.';
+  // Le regole di titolo e riassunto stanno qui una volta: le chiamate da sole e quella unica le compongono.
+  const REGOLA_TITOLO = 'un TITOLO molto breve (2-6 parole), nella STESSA lingua del testo, che descriva il contenuto del documento';
+  const REGOLA_RIASSUNTO = 'un RIASSUNTO di 1-2 frasi (massimo due righe), nella STESSA lingua del testo, che spieghi COSA '
+    + 'CONTIENE il documento. Serve a orientarsi tra più file senza aprirli: descrivi l\'argomento e il tipo di contenuto, '
+    + 'non i dettagli';
+  const SOLO_CONTESTO = 'Usa l\'eventuale conversazione e la memoria SOLO come contesto per capire meglio l\'argomento, '
+    + 'non come oggetto del testo che scrivi.';
+  const TITLE_SYSTEM_PROMPT = `Sei l'assistente di Filo. Per il documento qui sotto scrivi ${REGOLA_TITOLO}. ${SOLO_CONTESTO} `
+    + 'Rispondi SOLO col titolo: niente virgolette, niente punto finale, niente spiegazioni.';
 
   function cleanTitle(raw) {
     let t = String(raw == null ? '' : raw).trim();
