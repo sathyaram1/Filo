@@ -1,4 +1,4 @@
-// Verifica #1985, giro 1, rilievo 3: un clic su un link che scarica un file lascia la pagina dov'è; a scaricamento
+// Verifica #1985, giro 1, rilievo 2: un clic su un link che scarica un file lascia la pagina dov'è; a scaricamento
 // finito i link a schermo devono riprendere a precaricarsi.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
