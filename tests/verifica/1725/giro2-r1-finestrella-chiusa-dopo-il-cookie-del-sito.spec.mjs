@@ -7,9 +7,27 @@ import { createServer } from 'node:http';
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 async function sito() {
+  const dentro = new Set();
   const server = createServer((req, res) => {
     const u = new URL(req.url, 'http://x');
     const html = (corpo, extra = {}) => { res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...extra }); res.end(corpo); };
+    const sessione = ((req.headers.cookie || '').match(/(?:^|;\s*)app_session=([^;]+)/) || [])[1];
+    // Accesso riuscito nella finestrella: la sessione che il sito aveva già aperto cambia valore (come fa chi la
+    // rinnova all'accesso) e la finestrella si chiude da sola, senza dirlo alla pagina.
+    if (u.pathname === '/auth/google/ritorno') {
+      const nuova = Math.random().toString(36).slice(2);
+      dentro.add(nuova);
+      html('<!doctype html><title>Fatto</title><p>Accesso fatto</p><script>setTimeout(() => window.close(), 400)</script>',
+        { 'Set-Cookie': `app_session=${nuova}; Path=/; HttpOnly` });
+      return;
+    }
+    if (u.pathname === '/negozio') {
+      const extra = sessione ? {} : { 'Set-Cookie': `app_session=anonima${Math.random().toString(36).slice(2)}; Path=/; HttpOnly` };
+      html(`<!doctype html><title>Negozio</title><body style="padding:30px">
+        ${sessione && dentro.has(sessione) ? '<h1 id="dentro">Ciao Sara</h1>' : ''}
+        <button id="entra" onclick="window.open('/auth/google/ritorno', 'accesso', 'width=420,height=420')">Continua con Google</button></body>`, extra);
+      return;
+    }
     if (u.pathname === '/auth/google') {
       const nome = u.searchParams.get('nome') || 'next-auth.state';
       res.writeHead(302, {
