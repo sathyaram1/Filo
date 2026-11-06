@@ -2297,7 +2297,7 @@
     // Un carattere invisibile piantato davanti alla selezione: Chrome non incolla in un blocco vuoto, dove paga al
     // quadrato, e la selezione può finire in un elenco o in una citazione (#1697). Il modello non lo salva.
     const conAncora = () => {
-      const z = document.createTextNode('​');
+      const z = document.createTextNode(ANCORA);
       const davanti = r.cloneRange();
       davanti.collapse(true);
       davanti.insertNode(z);
