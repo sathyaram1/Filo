@@ -193,3 +193,163 @@ test('su una pagina che stringe gli script (CSP) il precarico al passaggio funzi
     await expect.poll(() => sito.precarichi(), { timeout: 5000 }).toEqual(['/p/5']);
   } finally { await sito.chiudi(); }
 });
+
+// #1985 giro 1, r1: un sito con l'accesso che chiude la sessione a un GET sul link d'uscita, come tanti siti veri.
+test('aprire la pagina e passare sui link d\'uscita non fa uscire dal sito, in nessuna lingua', async ({ openTab }) => {
+  const uscite = ['/konto/abmelden', '/compte/d%C3%A9connexion', '/user/doLogout', '/a/x9'];
+  const sessioni = new Set();
+  const richieste = [];
+  let prossima = 1;
+  const server = createServer((req, res) => {
+    const cookie = /sess=(\d+)/.exec(req.headers.cookie || '');
+    richieste.push(req.url);
+    if (req.url === '/favicon.ico') { res.writeHead(404); res.end(); return; }
+    if (uscite.includes(req.url)) {
+      if (cookie) sessioni.delete(cookie[1]);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+      res.end('<!doctype html><p>Sei uscito.</p>');
+      return;
+    }
+    const extra = {};
+    let id = cookie && sessioni.has(cookie[1]) ? cookie[1] : '';
+    if (!cookie) { id = String(prossima++); sessioni.add(id); extra['Set-Cookie'] = `sess=${id}; Path=/; HttpOnly`; }
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', ...extra });
+    res.end(`<!doctype html><meta charset="utf-8"><body><nav>
+      <a href="/area/profilo">Profilo</a> <a id="u0" href="/konto/abmelden">Abmelden</a>
+      <a id="u1" href="/compte/déconnexion">Se déconnecter</a> <a id="u2" href="/user/doLogout">Esci</a>
+      <a id="u3" class="btn btn-logout" href="/a/x9"><svg width="16" height="16"></svg></a></nav>
+      <h1 id="stato">${id ? 'Ciao, sei dentro' : 'Accedi'}</h1></body>`);
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  try {
+    const page = await openTab(`http://127.0.0.1:${server.address().port}/area`);
+    await expect(page.locator('#stato')).toHaveText('Ciao, sei dentro');
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    for (const id of ['#u0', '#u1', '#u2', '#u3']) { await page.hover(id); await page.waitForTimeout(300); }
+    // Il profilo, a schermo e dello stesso sito, parte: i link d'uscita restano fermi lo stesso.
+    await expect.poll(() => richieste.includes('/area/profilo'), { timeout: 15_000 }).toBe(true);
+    await page.waitForTimeout(2000);
+    expect(richieste.filter((u) => uscite.includes(u))).toEqual([]);
+    await page.reload();
+    await expect(page.locator('#stato')).toHaveText('Ciao, sei dentro');
+  } finally { await new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }); }
+});
+
+// #1985 giro 1, r2: un clic che non porta via la pagina non spegne i link a schermo per sempre.
+test('dopo il clic su un link che scarica un file, i link a schermo riprendono', async ({ openTab }) => {
+  const richieste = [];
+  const server = createServer((req, res) => {
+    richieste.push({ url: req.url, prefetch: /prefetch/.test(req.headers['sec-purpose'] || '') });
+    if (req.url === '/favicon.ico') { res.writeHead(404); res.end(); return; }
+    if (req.url === '/report') {
+      res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Disposition': 'attachment; filename="report.txt"' });
+      res.end('ciao');
+      return;
+    }
+    const sotto = Array.from({ length: 10 }, (_, i) => `<a style="display:block;height:18px" href="/giu/${i}">giu ${i}</a>`).join('');
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(`<!doctype html><meta charset="utf-8"><body style="margin:0"><a id="scarica" href="/report">Scarica il resoconto</a>
+      <div style="height:3000px"></div><div id="sotto">${sotto}</div></body>`);
+  });
+  await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
+  const origin = `http://127.0.0.1:${server.address().port}`;
+  try {
+    const page = await openTab(`${origin}/pagina`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    await page.waitForTimeout(2000);
+    await page.click('#scarica');
+    await page.waitForTimeout(3000);
+    expect(page.url()).toBe(`${origin}/pagina`);
+    await page.locator('#sotto').scrollIntoViewIfNeeded();
+    await expect.poll(() => richieste.filter((r) => r.prefetch && r.url.startsWith('/giu/')).length, { timeout: 25_000, intervals: [500] })
+      .toBeGreaterThan(0);
+  } finally { await new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }); }
+});
+
+// #1985 giro 1, r3: niente precarico in incognito né sui siti dove l'utente ha spento Filo, nemmeno al passaggio.
+async function trovaPagina(app, url, tetto = 15_000) {
+  const fine = Date.now() + tetto;
+  while (Date.now() < fine) {
+    const p = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } });
+    if (p) return p;
+    await new Promise((r) => setTimeout(r, 120));
+  }
+  throw new Error(`pagina non trovata: ${url}`);
+}
+
+test('in incognito non parte nessun precarico, né al passaggio del mouse né a pagina ferma', async ({ app, shell }) => {
+  const sito = await sitoCheConta();
+  try {
+    const idIncognito = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((w) => w._filoIncognito).map((w) => w.id));
+    const prima = await idIncognito();
+    await shell.evaluate(() => window.filoShell.openIncognito());
+    let id = null;
+    await expect.poll(async () => (id = (await idIncognito()).find((x) => !prima.includes(x)) ?? null), { timeout: 15_000 }).not.toBeNull();
+    const url = `${sito.origin}/indice`;
+    await app.evaluate(({ BrowserWindow }, a) => { BrowserWindow.fromId(a.id)._filoTabs.openTab(a.url); }, { id, url });
+    const page = await trovaPagina(app, url);
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
+    await page.hover('#l3');
+    await page.dispatchEvent('#l4', 'pointerdown', { button: 0, pointerType: 'mouse' });
+    await page.waitForTimeout(4000);
+    expect(sito.precarichi()).toEqual([]);
+  } finally { await sito.chiudi(); }
+});
+
+test('su un sito dove Filo è spento non parte nessun precarico', async ({ app, openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['127.0.0.1'] }); });
+    const page = await openTab(`${sito.origin}/indice`);
+    await page.waitForLoadState('load');
+    await page.waitForTimeout(1500);
+    await page.hover('#l3');
+    await page.dispatchEvent('#l4', 'pointerdown', { button: 0, pointerType: 'mouse' });
+    await page.waitForTimeout(4000);
+    expect(sito.precarichi()).toEqual([]);
+  } finally { await sito.chiudi(); }
+});
+
+// #1985 giro 1, r4: le parti che si vedono solo sul cammino vero.
+test('col portatile senza la spina i link a schermo aspettano, e partono quando torna', async ({ app, openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    await app.evaluate(({ powerMonitor }) => { globalThis.__veroBatteria = powerMonitor.isOnBatteryPower; powerMonitor.isOnBatteryPower = () => true; });
+    const page = await openTab(`${sito.origin}/indice`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    await page.waitForTimeout(4000);
+    expect(sito.precarichi()).toEqual([]);
+    await app.evaluate(({ powerMonitor }) => { powerMonitor.isOnBatteryPower = () => false; });
+    await expect.poll(() => sito.precarichi().length, { timeout: 20_000, intervals: [500] }).toBeGreaterThan(0);
+  } finally {
+    await app.evaluate(({ powerMonitor }) => { if (globalThis.__veroBatteria) powerMonitor.isOnBatteryPower = globalThis.__veroBatteria; });
+    await sito.chiudi();
+  }
+});
+
+test('un altro sottodominio dello stesso sito si precarica, e verso un altro sito parte solo la connessione', async ({ app, openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    await precaricoVisibili(app, false);
+    const porta = new URL(sito.origin).port;
+    const page = await openTab(`http://${WWW}:${porta}/indice`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    await page.evaluate((u) => {
+      const a = document.createElement('a');
+      a.id = 'blog';
+      a.href = u;
+      a.textContent = 'il blog';
+      document.body.prepend(a);
+    }, `http://${BLOG}:${porta}/articolo`);
+    const regole = () => page.evaluate(() => Array.from(document.querySelectorAll('script[type="speculationrules"]'))
+      .flatMap((s) => JSON.parse(s.textContent).prefetch.flatMap((r) => r.urls)));
+    await page.hover('#blog');
+    await expect.poll(regole, { timeout: 5000 }).toContain(`http://${BLOG}:${porta}/articolo`);
+
+    await page.hover('#altro');
+    await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('link[rel="preconnect"]')).map((l) => l.href)), { timeout: 5000 })
+      .toContain(`http://${ALTRO}:${porta}/`);
+    expect((await regole()).some((u) => u.includes(ALTRO))).toBe(false);
+  } finally { await sito.chiudi(); }
+});
