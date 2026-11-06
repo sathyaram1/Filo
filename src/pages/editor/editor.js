@@ -907,7 +907,9 @@
   // Titolo automatico (#379.4): a ~100 parole un documento senza nome ne riceve uno; poi lo segue il riassunto (#1570).
   // Scritto a mano non cambia più da solo; «Rigenera titolo» dal tasto destro resta.
   const AUTO_TITLE_WORDS = 100;
-  let autoTitleBusy = false;
+  // Per documento: un titolo o un riassunto in volo per un altro non salta il tiro di questo (#1697).
+  const titoliInVolo = new Set();
+  const riassuntiInVolo = new Set();
 
   const TITLE_SYSTEM_PROMPT =
     'Sei l\'assistente di Filo. Genera un TITOLO molto breve (2-6 parole) per il '
