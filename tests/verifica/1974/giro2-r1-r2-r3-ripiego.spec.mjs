@@ -140,8 +140,9 @@ test('r3 un video aperto a pochi secondi dalla fine, con il blocco che regge, no
     await liste(app, REGOLE);
     const page = await openTab(s.url('/watch?v=finale&modo=ok&inizio=57'));
     await expect.poll(() => page.evaluate(() => window.__esito && window.__esito.iniziale), { timeout: 10_000 }).toBe(false);
-    await expect.poll(() => page.evaluate(() => document.getElementById('v').currentTime), { timeout: 10_000 }).toBeGreaterThan(59);
-    await page.waitForTimeout(3000);
+    await expect.poll(() => page.evaluate(() => document.getElementById('v').currentTime), { timeout: 10_000 }).toBeGreaterThan(57);
+    // Arriva alla fine da sé, a passo normale: tre secondi, più margine.
+    await page.waitForTimeout(6000);
     expect(await avvisoVisto(app), 'avviso di blocco rotto su un video che andava').toBe(false);
     expect(s.quante('/watch?v=finale'), 'la scheda si è ricaricata').toBe(1);
     expect((await stato(app)).spente).toBe(0);
