@@ -74,6 +74,7 @@
         avvisoCreditiGiorni: 'avvisoCrediti.giorni',
         avvisoCreditiPercento: 'avvisoCrediti.percento',
         spiegaAnticipata: 'spiegaAnticipata.enabled',
+        precaricoVisibili: 'precarico.visibili',
         descriviImmagini: 'descriviImmagini.enabled',
         contatoriAttivi: 'contatori.attivi',
         aiutoAcceso: 'featureFlags.help',
