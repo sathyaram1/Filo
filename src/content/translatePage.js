@@ -180,6 +180,7 @@
       // In un riquadro fuori conto si traduce tutto: chi lo ospita l'ha svegliato proprio per questo.
       const modo = fuoriConto ? Extract.NASCOSTE.TRADUCI : await leggiModo();
       if (aborted()) return;
+      modoUltimo = modo;
       // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
       // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
       framesRunId = quiet ? null : await beginFrames(myRun, modo);
