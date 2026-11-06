@@ -57,8 +57,7 @@
     if (!stessoSito(u, p)) return 'altro-sito';
     if (/(?:^|\s)nofollow(?:\s|$)/i.test(String(l.rel || ''))) return 'nofollow';
     if (l.download) return 'download';
-    const target = String(l.target || '').trim().toLowerCase();
-    if (target && target !== '_self' && target !== '_top' && target !== '_parent') return 'altra-scheda';
+    if (!apreQui(l.target)) return 'altra-scheda';
     let percorso = u.pathname;
     try { percorso = decodeURIComponent(percorso); } catch (_) {}
     if (AZIONI.test(percorso)) return 'azione';
