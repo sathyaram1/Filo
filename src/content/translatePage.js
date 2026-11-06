@@ -191,7 +191,7 @@
       framesRunId = quiet ? null : await beginFrames(myRun, modo);
       for (let pass = 0; pass < MAX_PASSES; pass++) {
         newContentSeen = false;
-        result = await runPass(progress, myRun, modo);
+        result = await runPass(progress, myRun, modo, fuoriConto);
         if (aborted()) return;
         // Il sito ha allungato la pagina mentre lavoravamo: si finisce adesso, senza ricliccare
         // né ripagare ciò che è fatto. Vale anche se il primo giro non aveva trovato testo.
