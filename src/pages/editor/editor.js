@@ -904,8 +904,8 @@
     rinominaNelFilo(id, f && f.meta && f.meta.title);
   }
 
-  // Titolo automatico (#379.4): a ~100 parole un documento senza nome ne riceve UNO SOLO, da
-  // testo + chat + memoria. Resta modificabile a mano e rigenerabile dal tasto destro.
+  // Titolo automatico (#379.4): a ~100 parole un documento senza nome ne riceve uno; poi lo segue il riassunto (#1570).
+  // Scritto a mano non cambia più da solo; «Rigenera titolo» dal tasto destro resta.
   const AUTO_TITLE_WORDS = 100;
   let autoTitleBusy = false;
 
