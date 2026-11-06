@@ -82,8 +82,8 @@ async function siti(t) {
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     if (u.pathname === '/blog') {
       return res.end(`<title>Blog</title><p>articolo</p>
-<iframe id="yt" width="400" height="240" src="http://${YT}:${porta}/embed/abc123?modo=ok"></iframe>
-<iframe id="nc" width="400" height="240" src="http://${NOCOOKIE}:${porta}/embed/abc123?modo=ok"></iframe>`);
+<iframe id="yt" width="400" height="240" src="https://${YT}:${porta}/embed/abc123?modo=ok"></iframe>
+<iframe id="nc" width="400" height="240" src="https://${NOCOOKIE}:${porta}/embed/abc123?modo=ok"></iframe>`);
     }
     res.end(lettore(u.searchParams.get('modo') || 'ok'));
   });
