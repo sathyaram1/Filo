@@ -871,7 +871,7 @@ class BarraLaterale {
       this._consegnaInAttesa();
       return;
     }
-    const daTastiera = this.motivo === 'tasto';
+    const daTastiera = !dallaFila && this.motivo === 'tasto';
     const fai = () => {
       switch (id) {
         case 'back': tabs.navigaCronologia('indietro'); break;
