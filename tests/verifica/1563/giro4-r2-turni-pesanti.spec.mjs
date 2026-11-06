@@ -1,5 +1,5 @@
 // Verifica #1563 giro 4: con turni pesanti (circa 5.000 token l'uno, un capitolo incollato a ogni messaggio) una
-// compattazione lascia spazio sotto la soglia: i due messaggi dopo non ne chiedono un'altra, e nessuna risposta aspetta.
+// compattazione lascia spazio sotto la soglia: i due messaggi dopo non ne chiedono un'altra, e al più una risposta aspetta.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from '../../helpers/chatFinta.mjs';
 
