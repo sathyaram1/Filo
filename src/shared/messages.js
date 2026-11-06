@@ -465,6 +465,8 @@
     ICON_LAYOUT_CHANGED: 'icon_layout_changed',     // spinta alle schede → { layout }
     BARRA_TRASCINA: 'barra_trascina',               // dal menu della scheda davanti { fase: inizio|sopra|posa|fine, id, menuSinistra, y } → { ok, larghezza }
     BARRA_FUORI: 'barra_fuori',                     // spinta alla scheda davanti → { fase: muovi|rilascia|annulla, id, x, y }
+    FILA_FINESTRA: 'fila_finestra',                 // dalla scheda davanti → { ok, icone: { id: { icona, etichetta, tasto, spenta, accesa } } }
+    FILA_FINESTRA_ESEGUI: 'fila_finestra_esegui',   // dalla scheda davanti { id }: un'icona della finestra premuta nella fila → { ok }
     // Aperti ai siti (#1432): ci scrive il content script dell'Aiuto, e toccano solo la scheda che li manda.
     AIUTO_STATO: 'aiuto_stato',                     // { pannello: chiuso|ridotto|aperto, voce, spento: ''|aiuto|sito|pagina } → { ok }
     RISPOSTA_IN_ATTESA: 'risposta_in_attesa',       // { fonte: aiuto|app, attesa } → { ok }: la striscia della barra si accende
