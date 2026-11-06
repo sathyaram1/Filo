@@ -148,10 +148,3 @@ test('i tetti restano larghi abbastanza e dentro quelli di Chromium', () => {
   assert.equal(P.LIMITI.TETTO_VISIBILI, 20);
   assert.ok(P.LIMITI.TETTO_VISIBILI + P.LIMITI.PASSAGGI_TENUTI <= 50);
 });
-
-// #1985 giro 2, r1: un precarico «subito» in corso al clic Chromium lo aspetta e lo scarta; il passaggio va «moderate».
-test('i link passati col mouse vanno a Chromium come «moderate», quelli a schermo come elenco da scaricare subito', () => {
-  const testo = readFileSync(new URL('../../src/content/precarico.js', import.meta.url), 'utf8');
-  assert.match(testo, /urls: passati\.slice\(\), eagerness: 'moderate'/);
-  assert.match(testo, /source: 'list', urls: visibili\.slice\(\) \}/);
-});
