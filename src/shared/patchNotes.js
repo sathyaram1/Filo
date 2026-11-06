@@ -15,6 +15,7 @@
         { testo: 'In Privacy massima Filo non ricorda più dopo la chiusura i siti non fidati dove ha visto un campo password o carta: valgono come pagine delicate finché Filo resta aperto, e intanto li vedi in Sicurezza.', segnalazione: 2219 },
         { testo: 'Taglia del tasto destro, dalla fila di icone o dalla voce, si annulla con Ctrl+Z e funziona anche nelle caselle per l\'email o per i numeri. In un campo password il menu non offre più Taglia e Copia, così la password scritta non si perde.', segnalazione: 1434 },
         { testo: 'Indietro e Avanti portati nella fila del tasto destro sono spenti quando non c\'è dove andare, come nella barra laterale.', segnalazione: 1434 },
+        { testo: 'Taglia e Copia del tasto destro tengono grassetto, corsivo e collegamenti: incollato, il testo resta com\'era.', segnalazione: 1434 },
       ],
     },
     {
