@@ -2224,7 +2224,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         if (finito(mia)) return;
       }
       vivo.turno = '';
-      if (typeof res?.ragionamento === 'string') attesa?.ragiona(res.ragionamento, { intero: true });
+      if (false && typeof res?.ragionamento === 'string') attesa?.ragiona(res.ragionamento, { intero: true });
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
       if (!res?.ok) {
