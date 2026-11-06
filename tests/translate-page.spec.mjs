@@ -515,6 +515,30 @@ test('pagina più lunga del tetto: lo dice e la ripresa la finisce', async ({ ap
   expect(doubled).toBe(0);
 });
 
+// D61 (#1290) — a tetto pieno il posto va prima a quel che si vede: le sezioni chiuse in cima alla pagina non si
+// mangiano il testo in vista, restano loro per la ripresa.
+const HUGE_CHIUSE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <details id="menu"><summary>Menu</summary>
+  ${Array.from({ length: 300 }, (_, i) => `<div id="h${i}">Hidden menu entry ${i} of the site.</div>`).join('\n  ')}
+  </details>
+  ${Array.from({ length: 1900 }, (_, i) => `<div id="v${i}">Visible block number ${i} of this page.</div>`).join('\n  ')}
+</body></html>`;
+
+test('pagina più lunga del tetto con sezioni chiuse in cima: il primo giro traduce tutto quel che si vede', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240000);
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, HUGE_CHIUSE);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect
+    .poll(async () => (await toasts(page)).join(' | ').includes('Riprendi dall\'icona Traduci della barra laterale'), { timeout: 120000 })
+    .toBe(true);
+  await expect(page.locator('#v1899')).toHaveText(/^IT /);
+  await expect(page.locator('#v0')).toHaveText(/^IT /);
+  // Quello che resta per la ripresa sta nella sezione chiusa.
+  await expect(page.locator('#h299')).toHaveText('Hidden menu entry 299 of the site.');
+});
+
 test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
   const page = await testServer.openReady(openTab, ARTICLE);
