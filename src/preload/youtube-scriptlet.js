@@ -3,7 +3,6 @@
 // da `motore`, che si spedisce come testo. Regole: tests/unit/youtubeScriptlet.test.mjs.
 'use strict';
 
-/* eslint-disable no-new-func */
 function motore(regole, W, esponi) {
   const N = {
     parse: W.JSON.parse, stringify: W.JSON.stringify, apply: Reflect.apply, def: Object.defineProperty,
