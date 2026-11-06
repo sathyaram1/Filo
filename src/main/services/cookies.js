@@ -622,9 +622,10 @@ function wipeChanged(prev, next, sessions, scope) {
 let listChange = null;
 function setListChangeHandler(fn) { listChange = typeof fn === 'function' ? fn : null; }
 
-// Modalità o elenchi cambiati: chi tiene dati per sito li riguarda (tabs/tabCookies.js, cosa resta sul disco).
-let configChange = null;
-function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? fn : null; }
+// Modalità o fidati cambiati: chi tiene dati per sito riguarda cosa resta sul disco (tabs/tabCookies.js,
+// services/pagineDelicate.js). Sono più d'uno: ognuno si aggiunge.
+const configChange = new Set();
+function onConfigChange(fn) { if (typeof fn === 'function') configChange.add(fn); }
 
 // Un sito entra o esce dai fidati, da qualunque strada (proposta, menu della scheda, chat, Sicurezza, import,
 // annulla): chi tiene le schede (tabs/tabRestaConnesso.js) sposta l'accesso nel jar giusto. Il sito è quello del
