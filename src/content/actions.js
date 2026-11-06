@@ -2186,6 +2186,7 @@
   global.SN_ACTIONS = {
     init,
     copyToClipboard,
+    copySelection,
     copyUrlToClipboard,
     isAddress,
     cutSelection,
