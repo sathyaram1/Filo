@@ -3319,6 +3319,7 @@
     memoriaImbustata,
     rigaNomeModello,
     VALUTA_MAX_CARATTERI,
+    PAUSA_QUADRATO_MS,
     AGENT_STYLE_PRESETS,
     STYLE_AWARE_ACTIONS,
     INIZI_VARIABILI_CHAT,
