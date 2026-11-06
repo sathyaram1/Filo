@@ -2410,7 +2410,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         return;
       }
 
-      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      attesa?.fine();
       // Nell'Editor il modello cambia la formattazione del documento: la fa la pagina, col suo punto di ripristino e
       // l'«Annulla», anche a pannello chiuso a metà turno: è la modifica chiesta, non un segno sulla pagina.
       // Era chiesta per il documento letto alla partenza: se nel frattempo ne è aperto un altro, quello non si tocca.
