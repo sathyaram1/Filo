@@ -1107,7 +1107,12 @@
     });
   } catch (_) {}
 
-  if (IS_TOP) { try { document.addEventListener('click', onUserClick, true); } catch (_) {} }
+  if (IS_TOP) {
+    try {
+      document.addEventListener('click', onUserClick, true);
+      for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, (e) => { if (e.isTrusted) lastGestureAt = Date.now(); }, true);
+    } catch (_) {}
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', load, { once: true });
