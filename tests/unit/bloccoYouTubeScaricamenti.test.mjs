@@ -97,7 +97,7 @@ test('dopo un ripiego le regole si richiedono subito e poi ogni ora, finché non
   assert.ok(B.spentaPerTest(scheda.id), 'le stesse regole non riaccendono la scheda');
   await scorri(H);
   assert.ok(await finché(() => chieste.length === 4), `dopo un'ora: ${JSON.stringify(chieste)}`);
-  rete = { 'filters.txt': `${DISCO}\nwww.youtube.com##+js(set, nuove, undefined)`, 'quick-fixes.txt': '' };
+  rete = { 'filters.txt': `${DISCO}\nwww.youtube.com##+js(set, nuove, undefined)`, 'quick-fixes.txt': NIENTE };
   await scorri(H);
   assert.ok(await finché(() => !B.spentaPerTest(scheda.id)), 'le regole nuove riaccendono la scheda');
   const fatte = chieste.length;
