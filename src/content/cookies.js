@@ -148,11 +148,27 @@
     }
   }
 
-  // I gestori del sito girano dentro click(); promesse e rinvii a zero finiscono prima del giro dopo.
+  const ANSWER_LOOKS_MS = [0, 300, 1000, 2000, 4000];
+
   function answerAfter(base, now) {
     if (!base) return;
     if (now) reportCreated(base);
-    setTimeout(() => reportCreated(base), 0);
+    for (const ms of ANSWER_LOOKS_MS) setTimeout(() => reportCreated(base), ms);
+  }
+
+  // Il riquadro di un banner sta per premere: la pagina fotografa adesso i suoi nomi (main → frameBase).
+  // Un riquadro qualsiasi può chiederlo, quindi poche volte per pagina.
+  const FRAME_BASES_MAX = 6;
+  let frameBases = 0;
+  function frameBase() {
+    if (!IS_TOP || !active || frameBases >= FRAME_BASES_MAX) return false;
+    frameBases++;
+    answerAfter(answerBase(), false);
+    return true;
+  }
+
+  function pageBase() {
+    return Promise.race([ask({ type: T_ANSWER_BASE }), new Promise((r) => setTimeout(r, 800))]);
   }
 
   // Coi banner mostrati la risposta la dà l'utente: stessa regola, dal suo clic dentro al banner.
