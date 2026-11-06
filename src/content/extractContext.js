@@ -965,16 +965,17 @@
         pushKids(el, stack, shadowRoots);
         continue;
       }
-      if (skip) {
+      else if (skip) {
         // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue etichette si leggono
         // sullo schermo e si traducono, salvo una barriera dura.
         if (skip === 'tag') {
-          takeAttrs(el, true);
+          takeAttrs(el, true, nascosto);
           // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo a cui passare
           // parola, e il testo si legge da qui (#407).
           if (!hardSkipForTranslation(el)) {
             const inner = inlineFrameBody(el);
             if (inner) {
+              if (nascosto) dentroNascosto.add(inner);
               stack.push(inner);
               // Anche qui il sito può aggiungere testo dopo: chi sorveglia la
               // pagina deve tenere d'occhio pure questo documento.
