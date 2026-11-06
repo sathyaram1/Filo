@@ -2128,6 +2128,19 @@
         return { partial: { spiegaAnticipata: { enabled: b } }, label: `Spiegazione preparata alla selezione → ${b ? 'attiva' : 'spenta'}` };
       },
     },
+    // ── #1985: il precarico dei link a schermo (quello al passaggio del mouse non si spegne) ──
+    {
+      scrive: ['precarico.visibili'],
+      aiuto: 'true | false (a rete ferma Filo precarica i link a schermo della pagina, così al clic la pagina è già arrivata; spento, si precarica solo il link su cui si ferma il mouse e si consuma meno rete)',
+      costo: 1,
+      keys: ['precarico_link_visibili', 'precarico dei link', 'precarica i link', 'precaricamento dei link', 'precarico delle pagine',
+        'precarica le pagine', 'link precaricati', 'prefetch', 'precarico.visibili'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { precarico: { visibili: b } }, label: `Precarico dei link a schermo → ${b ? 'attivo' : 'spento'}` };
+      },
+    },
     {
       scrive: ['descriviImmagini.enabled'],
       aiuto: 'true | false (ogni screenshot, intero o di una parte, e ogni immagine copiata da una pagina va intera al modello delle immagini, che ne scrive il nome del file e la riga della cronologia appunti; spenta, l\'immagine non parte e il file si chiama con data e ora. Da una pagina delicata non parte mai)',
