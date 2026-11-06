@@ -26,11 +26,11 @@ const REAZIONE_MS = 1500;
 // dove la finestrella mette l'accesso.
 async function cookieDAccesso(ses, url, sito) {
   const out = new Map();
-  const indirizzi = [url];
-  if (Google.diGoogle(sito)) indirizzi.push(`https://accounts.${Google.SITO_GOOGLE}/`);
-  for (const u of indirizzi) {
+  const filtri = [{ url }];
+  if (Google.diGoogle(sito)) filtri.push({ domain: Google.SITO_GOOGLE });
+  for (const f of filtri) {
     let lista = [];
-    try { lista = await ses.cookies.get({ url: u }); } catch (_) {}
+    try { lista = await ses.cookies.get(f); } catch (_) {}
     for (const c of lista) if (looksLikeLoginCookie(c)) out.set(`${c.domain}|${c.path}|${c.name}`, c.value);
   }
   return out;
