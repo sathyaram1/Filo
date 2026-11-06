@@ -1,6 +1,6 @@
 // Sonda nel mondo della pagina che tiene gli alberi chiusi dei componenti del sito (#472): risponde al mondo di Filo
 // se uno di loro non ha niente da leggere, così una decorazione non fa dire «tradotta solo in parte». Non legge altro
-// e non dice cosa c'è dentro. La chiede extractContext.js; regole in tests/unit/ombreChiuse.test.mjs.
+// e non dice cosa c'è dentro. La chiede extractContext.js; regole in tests/translate-page.spec.mjs (#472).
 'use strict';
 
 const { SORGENTE: SEMBRA_NATIVA } = require('./sembraNativa.js');
