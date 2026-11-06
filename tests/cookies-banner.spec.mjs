@@ -1077,6 +1077,9 @@ test('rifiuto in Automatico, poi Privacy e riavvio, poi Automatico: il rifiuto e
     }
     run = await avviaFilo(userData);
     try {
+      // Il rifiuto fatto in Automatico è ancora sul disco, anche ripartiti in Privacy.
+      const salvato = await run.app.evaluate(async () => globalThis.SN_STORAGE.getRaw('cookieSites', null));
+      expect(salvato && salvato['127.0.0.1'] && salvato['127.0.0.1'].rejected).toBe(true);
       await modo(run, 'default');
       const b = await run.open(url);
       await sleep(1500);
