@@ -137,9 +137,12 @@
     manda({ type: MSG.ICON_LAYOUT_GET }).then((r) => { if (r && r.ok && setLayout(r.layout)) ridisegna(); });
   }
 
-  // Cambiata altrove (un'altra scheda, la barra, la chat, un annullo): il menu aperto si ridisegna.
+  // Cambiata altrove (un'altra scheda, la barra, la chat, un annullo): il menu aperto si ridisegna. Un'icona della
+  // finestra appena arrivata nella fila ha l'aspetto solo dal main: si richiede, o la fila la perde (#1434.2).
   function layoutCambiato(v) {
-    if (setLayout(v)) ridisegna();
+    if (!setLayout(v)) return;
+    ridisegna();
+    if (aperta) ridisegnaFinestra();
   }
 
   // Il gesto si vede subito qui, poi vale quello che il main ha scritto. `source` 'bar': arriva dalla barra laterale.
