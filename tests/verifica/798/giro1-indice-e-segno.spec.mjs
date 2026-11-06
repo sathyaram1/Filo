@@ -39,7 +39,7 @@ async function apri(openTab) {
   return { srv, url: `http://127.0.0.1:${srv.address().port}/` };
 }
 
-test('r1 un riquadro della pagina raggiunto per indice prima che sia preparato ha lo stesso rumore della pagina', async ({ openTab }) => {
+test('un riquadro della pagina raggiunto per indice prima che sia preparato ha lo stesso rumore della pagina', async ({ openTab }) => {
   test.setTimeout(90_000);
   const { srv, url } = await apri(openTab);
   try {
