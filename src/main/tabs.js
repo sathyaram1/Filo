@@ -2944,6 +2944,11 @@ class TabManager {
     }
     if (this._maybeBlockNavigation(tab, target || current)) return;
     AzioniContate.scheda(tab.view.webContents);
+    // Chi ricarica accetta di perdere il testo: il passaggio di «Resta connesso» rinviato si fa adesso.
+    if (!target && tab._passaggioRinviato) {
+      this._passaggioDopoCambio(tab, { chiesta: true });
+      return;
+    }
     if (target) {
       this._segnaRiprova(tab, current);
       try { tab.view.webContents.loadURL(target); } catch (_) {}
