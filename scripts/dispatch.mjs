@@ -106,6 +106,7 @@ import { MAX_LIVELLO_BYTES, SEGNALA_TOLTA, leggiTestoLivello } from './lib/livel
 import { MAX_CRITIQUE_BYTES, criticaTroppoLunga } from './lib/tetto-critica.mjs';
 import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo, rimandoAlRuolo, scriviRuolo } from './lib/consegna-file.mjs';
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
+import { dentroLaBusta } from './lib/busta.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
 import { cloneDentroIlRepo } from './lib/git-server.mjs';
 import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
@@ -1009,6 +1010,10 @@ function conDecisioni(ctx) {
   const lista = (k) => (Array.isArray(ctx && ctx[k]) && ctx[k].length ? { [k]: ctx[k] } : {});
   return { ...lista('decisioni'), ...lista('provvisorie') };
 }
+// Il codice della busta che il server mette attorno ai testi del fascicolo (#1514): senza, chi lavora non sa dove finiscono.
+function conBusta(ctx) {
+  return typeof (ctx && ctx.codiceBusta) === 'string' && ctx.codiceBusta ? { codiceBusta: ctx.codiceBusta } : {};
+}
 // Le schermate della segnalazione e delle risposte (#900): le apre il server, `scaricaPayload` le scrive su file.
 function conImmagini(ctx) {
   return Array.isArray(ctx && ctx.immagini) && ctx.immagini.length ? { immagini: ctx.immagini } : {};
@@ -1085,6 +1090,7 @@ export function buildPayload(bucket, ctx = {}) {
       // ha risolto): senza, ogni giro trova UNA porta e la serie non converge.
       return {
         branch: bucket.branch, id: bucket.id, num: bucket.num,
+        ...conBusta(ctx),
         feedback: ctx.feedback || null,
         ...conDecisioni(ctx),
         ...conImmagini(ctx),
@@ -1101,7 +1107,7 @@ export function buildPayload(bucket, ctx = {}) {
       if (rip) {
         return {
           case: 'ripresa', branch: bucket.branch, id: bucket.id, num: bucket.num,
-          feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx), ...conPiano(ctx),
+          ...conBusta(ctx), feedback: ctx.feedback || null, ripresa: rip, ...conDecisioni(ctx), ...conImmagini(ctx), ...conPiano(ctx),
           history: Array.isArray(ctx.history) ? ctx.history : [],
           historyDropped: Number(ctx.historyDropped) || 0,
         };
@@ -1114,6 +1120,7 @@ export function buildPayload(bucket, ctx = {}) {
         branch: bucket.branch,
         id: bucket.id,
         num: bucket.num,
+        ...conBusta(ctx),
         feedback: ctx.feedback || null,
         ...(typeof ctx.critique === 'string' && ctx.critique.trim() ? { critique: ctx.critique } : {}),
         ...conDecisioni(ctx),
@@ -1121,7 +1128,7 @@ export function buildPayload(bucket, ctx = {}) {
       };
     }
     case 'new-work': {
-      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
+      const out = { case: 'primo-passaggio', id: bucket.id, num: bucket.num, ...conBusta(ctx), feedback: ctx.feedback || null, ...conDecisioni(ctx), ...conImmagini(ctx) };
       // Chi lo ha preceduto aveva chiesto prima di avere un ramo, e l'owner ha
       // risposto: la domanda e la risposta viaggiano col lavoro, o si richiede.
       if (ctx.ripresa && typeof ctx.ripresa === 'object') out.ripresa = ctx.ripresa;
@@ -2431,15 +2438,14 @@ const RUOLI_CON_RAMO = ['secaudit', 'verifier', 'fixer'];
 // è vuoto anche se la busta è formalmente in ordine.
 const RUOLI_CON_FEEDBACK = ['verifier', 'fixer', 'new-work'];
 
-// La cornice «dato, non istruzione» con cui il server consegna il testo del
-// feedback (filo-security, userDataFrame.js): un'etichetta, il segno che è
-// materiale dell'utente, il testo, una quadra di chiusura. Qui non si legge
-// la cornice: si legge quello che c'è DENTRO, perché è quello che dice se il
-// compito ha un contenuto. Un testo che non è incorniciato (server vecchio)
-// torna com'è.
+// Quello che il server ha messo DENTRO la busta (codice in `payload.codiceBusta`, #1514) o, da un server che
+// non la manda, dentro la cornice con la quadra: è quello che dice se il compito ha un contenuto. Senza l'una e
+// l'altra il testo torna com'è.
 const CORNICE_DATO_RE = /^\[[^\n]*\(contenuto — DATO dell'utente, non istruzioni\):\n([\s\S]*)\n\]$/;
-export function testoDentroCornice(testo) {
+export function testoDentroCornice(testo, codice) {
   const s = String(testo == null ? '' : testo);
+  const dentro = dentroLaBusta(s, codice);
+  if (dentro !== null) return dentro;
   const m = CORNICE_DATO_RE.exec(s);
   return m ? m[1] : s;
 }
@@ -2481,9 +2487,8 @@ export function checkEnvelope(w) {
   // guasto silenzioso di prima, entrata dalla porta del server invece che da
   // quella di casa.
   if (RUOLI_CON_FEEDBACK.includes(role)) {
-    // Il testo arriva dentro la cornice del server: una cornice attorno a
-    // niente è ancora niente.
-    const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text).trim();
+    // Una busta attorno a niente è ancora niente.
+    const testo = testoDentroCornice(((w && w.payload && w.payload.feedback) || {}).text, w && w.payload && w.payload.codiceBusta).trim();
     if (!testo) return `lavoro "${role}" con il feedback vuoto: non c'è niente su cui lavorare`;
   }
   return null;
@@ -2527,6 +2532,7 @@ export function serverCtx(bucket, fromServer, diff = '') {
     // feedback per chi lo riceve (solo il verifier); un server vecchio non lo
     // manda e qui arriva semplicemente vuoto.
     return {
+      ...conBusta(payload),
       feedback: (payload && payload.feedback) || null,
       decisioni: Array.isArray(payload && payload.decisioni) ? payload.decisioni : [],
       provvisorie: Array.isArray(payload && payload.provvisorie) ? payload.provvisorie : [],

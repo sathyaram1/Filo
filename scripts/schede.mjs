@@ -263,7 +263,8 @@ export function importaSchede(cartella, schede, indice = []) {
  * complete }, `apri(v)` → la scheda in chiaro. → { ok, righe, schede, segnalati, complete }
  */
 export async function letturaLocale(dip = {}) {
-  const { vietatoLeggere } = await import('./leggi-feedback.mjs');
+  // La regola dell'indice, non quella del testo: dal server l'indice si prende senza testi, e le due strade danno lo stesso.
+  const { vietatoNellIndice: vietatoLeggere } = await import('./leggi-feedback.mjs');
   let { leggiRighe, apri } = dip;
   if (!leggiRighe || !apri) {
     const { acquireBearer } = await import('./lib/firestore-auth.mjs');
