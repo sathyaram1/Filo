@@ -361,8 +361,8 @@ module.exports = function register(on, ctx) {
     const conSeguito = !intera && msg && msg.conSeguito === true;
     const chiedi = daSola
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera, conSeguito }))
-      : valuta ? () => chiediValuta(msg.payload, origin, sender)
-        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito });
+      : valuta ? () => chiediValuta(msg.payload, origin, sender, diretta)
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito, ...diretta });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
