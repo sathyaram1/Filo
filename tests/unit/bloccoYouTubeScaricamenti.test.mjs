@@ -56,7 +56,7 @@ const regole = (B) => B.regolePer('https://www.youtube.com/watch?v=x', scheda).m
 test('all\'avvio la copia di oggi si usa dal disco senza rete; ogni giorno le regole si riscaricano', async (t) => {
   mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: ORA });
   t.after(() => mock.timers.reset());
-  const B = avvio({ copiaDi: 3 * H });
+  const B = await avvio({ copiaDi: 3 * H });
   await B.init({});
   await svuota();
   assert.deepEqual(chieste, [], 'copia di tre ore fa: niente rete');
