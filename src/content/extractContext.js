@@ -842,14 +842,19 @@
     if ((el.textContent || '').trim()) return false;
     try {
       if (el.matches && !el.matches(':defined')) return false;
+      // Quel che la sonda sa vince su ogni misura (#472, #1290): una decorazione non conta mai; del testo chiuso conta
+      // dovunque stia, sotto lo schermo o in una sezione chiusa, così l'avviso non cambia con lo scorrimento.
+      const dentro = ombraChiusa(el);
+      if (dentro === 'vuoto') return false;
+      if (dentro === 'testo') return true;
+      if (soloTestoNoto) return false;
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
       if (isInvisibleToUser(el)) return false;
       if (!isReachableByUser(el, r)) return false;
-      // Un componente chiuso che non mostra testo è una decorazione: la sonda nel mondo della pagina lo sa (#472).
-      // Dove non lo sa, l'avviso resta.
-      if (ombraSenzaTesto(el)) return false;
-      // Serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
+      // Un riquadro chiuso là dentro conta come un riquadro: se si vede.
+      if (dentro === 'incorporati') return true;
+      // Dove la sonda non sa, serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
       // no. Il prezzo è un componente chiuso che resta fuori dal conto quando
       // sta sotto il bordo dello schermo — l'avviso dirà "Pagina tradotta"
       // invece di "solo in parte". Tacere su un pezzo che forse non esiste
