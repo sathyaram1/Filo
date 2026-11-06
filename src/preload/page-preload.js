@@ -419,7 +419,8 @@ if (IS_SUBFRAME) try {
     if (!runId) return;
     const visto = d.visible === true;
     verdettiRiquadro.delete(runId);
-    verdettiRiquadro.set(runId, visto);
+    // Nascosto ma da tradurre in sottofondo (D61): si sveglia, e lo dice nel conto come fuori conto.
+    verdettiRiquadro.set(runId, { visto, fuoriConto: visto && d.fuoriConto === true });
     if (verdettiRiquadro.size > 20) verdettiRiquadro.delete(verdettiRiquadro.keys().next().value);
     // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
     if (!visto) {
