@@ -160,8 +160,29 @@ test('il clic su un altro link ferma i precarichi ancora in corso', async ({ app
   } finally { await sito.chiudi(); }
 });
 
+test('l\'interruttore delle Preferenze spegne i link a schermo, e il passaggio del mouse resta', async ({ app, openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    const pref = await openTab('filo://preferences/preferences.html');
+    const casella = pref.locator('#precaricoVisibili');
+    await expect(casella).toBeChecked({ timeout: 15_000 });
+    await pref.locator('#sec-funzioni').scrollIntoViewIfNeeded();
+    await pref.screenshot({ path: 'tests/.shots/1985/preferenze.png' });
+    await casella.uncheck();
+    await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).precarico), { timeout: 10_000 })
+      .toEqual({ visibili: false });
+
+    const page = await openTab(`${sito.origin}/indice`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    await page.waitForTimeout(3000);
+    expect(sito.precarichi()).toEqual([]);
+    await page.hover('#l1');
+    await expect.poll(() => sito.precarichi(), { timeout: 5000 }).toEqual(['/p/1']);
+  } finally { await sito.chiudi(); }
+});
+
 test('su una pagina che stringe gli script (CSP) il precarico al passaggio funziona lo stesso', async ({ app, openTab }) => {
-  const sito = await sitoCheConta({ csp: "script-src 'none'" });
+  const sito = await sitoCheConta({ csp: "script-src 'none'; require-trusted-types-for 'script'" });
   try {
     await precaricoVisibili(app, false);
     const page = await openTab(`${sito.origin}/indice`);
