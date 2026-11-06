@@ -139,12 +139,22 @@
   }
 
   // Perché il main ferma i link a schermo adesso, '' se possono partire.
-  function motivoFermoVisibili({ impostazioni, incognito = false, scaricando = false, aBatteria = false } = {}) {
+  // `dietro`: la scheda non è quella davanti, o la finestra è ridotta. Per la pagina resta «visibile» lo stesso.
+  function motivoFermoVisibili({ impostazioni, incognito = false, scaricando = false, aBatteria = false, dietro = false } = {}) {
     if (!visibiliAcceso(impostazioni)) return 'spento';
     if (incognito) return 'incognito';
+    if (dietro) return 'dietro';
     if (scaricando) return 'scaricamento';
     if (aBatteria) return 'batteria';
     return '';
+  }
+
+  // Il passo fra due link a schermo: un precarico dura circa quanto è durata la pagina stessa, e ogni durata/2 ne
+  // tiene in corso al più due. `durataPagina`: ms dalla richiesta della pagina all'ultimo byte.
+  function passoVisibili(durataPagina) {
+    const d = Number(durataPagina);
+    const stima = Number.isFinite(d) && d > 0 ? Math.ceil(d / LIMITI.IN_CORSO_MAX) : 0;
+    return Math.min(LIMITI.PASSO_MAX_MS, Math.max(LIMITI.PASSO_MS, stima));
   }
 
   // Il prossimo link a schermo da precaricare: il più in alto, poi il più a sinistra. `candidati`: [{ url, top, left }].
