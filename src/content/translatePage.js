@@ -177,6 +177,7 @@
     // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è normale, e quel
     // testo resterebbe in lingua originale. Le nostre sostituzioni nascono già marcate.
     newContentSeen = false;
+    riquadroNelGiro = false;
     startWatchingNewContent();
     let result = null;
     let framesRunId = null;
