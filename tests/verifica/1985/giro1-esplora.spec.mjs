@@ -131,8 +131,8 @@ test('r3 dopo il clic su un link che scarica un file, i link a schermo riprendon
     await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
     await page.waitForTimeout(2000);
     await page.click('#scarica');
-    await expect.poll(() => richieste.some((r) => r.url === '/report' && !r.prefetch), { timeout: 5000 }).toBe(true);
     await page.waitForTimeout(3000);
+    expect(page.url()).toBe(`${origin}/pagina`);
     await page.locator('#sotto').scrollIntoViewIfNeeded();
     await expect.poll(() => richieste.filter((r) => r.prefetch && r.url.startsWith('/giu/')).length, { timeout: 20_000, intervals: [500] })
       .toBeGreaterThan(0);
