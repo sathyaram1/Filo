@@ -416,7 +416,7 @@ const PROPAGAZIONE = `
     }
     return false;
   }
-  function conTesto(P, nome, dove) {
+  function conTesto(P, nome, dove, riapre) {
     var d = P && gOPD(P, nome);
     if (!d) return;
     var dopo = function (c, args) { if (c && conCornici(args)) { try { cornici(c, toccaDaScript); } catch (e) {} } };
@@ -424,7 +424,8 @@ const PROPAGAZIONE = `
       var orig = d.value;
       if (typeof orig !== 'function') return;
       P[nome] = mask(function () {
-        var c = dove(this), r = R(orig, this, arguments);
+        var c = dove(this), r;
+        try { r = R(orig, this, arguments); } finally { if (riapre) riascoltaIn(this); }
         dopo(c, arguments);
         return r;
       }, orig, nome);
