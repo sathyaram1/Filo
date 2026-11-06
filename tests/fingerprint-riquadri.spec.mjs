@@ -557,6 +557,77 @@ test('un riquadro della stessa origine preso per indice o per nome prima del car
   }
 });
 
+// Un riquadro della stessa origine che uno script inserisce e prende subito, prima che carichi: i suoi script che
+// girano mentre carica leggono col rumore della pagina in Privacy massima, dove si copre appena entra (D-221). In
+// Automatico resta come la pagina lo lascia: un riquadro che la pagina non tocca ha Filo dentro.
+async function presiMentreCarica(urls) {
+  /* global fnv, scena */
+  const attendi = (k) => new Promise((res) => {
+    const t0 = Date.now();
+    const t = () => (window.__l[k] || Date.now() - t0 > 8000 ? res(window.__l[k] || 'nessuna risposta') : setTimeout(t, 25));
+    t();
+  });
+  const { c } = scena(document);
+  const out = { pagina: fnv(c.toDataURL()) };
+  const prese = { indice: () => window[window.length - 1], frames: () => frames[frames.length - 1], nome: (f) => window[f.name] };
+  for (const [k, prendi] of Object.entries(prese)) {
+    const f = document.createElement('iframe');
+    f.name = 'mc_' + k;
+    f.src = urls[k];
+    document.body.appendChild(f);
+    const w = prendi(f);
+    out[k + 'Dentro'] = await attendi(k);
+    out[k + 'DaQui'] = fnv(w.HTMLCanvasElement.prototype.toDataURL.call(c));
+  }
+  const box = document.createElement('div');
+  document.body.appendChild(box);
+  box.innerHTML = `<iframe src="${urls.testo}"></iframe>`;
+  void window[window.length - 1];
+  out.testoDentro = await attendi('testo');
+  const lib = document.createElement('iframe');
+  lib.src = urls.libero;
+  await new Promise((r) => { lib.addEventListener('load', r, { once: true }); document.body.appendChild(lib); });
+  await new Promise((r) => setTimeout(r, 500));
+  out.liberoConFilo = lib.contentDocument?.documentElement?.dataset.filoReady === '1';
+  return out;
+}
+
+async function apriMentreCarica(openTab, testServer, modo) {
+  const urls = { libero: testServer.html('<!doctype html><p>libero</p>') };
+  for (const k of ['indice', 'frames', 'nome', 'testo']) urls[k] = testServer.html(documento(k));
+  const pagina = testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}
+    window.__l = {};
+    addEventListener('message', function (e) { if (e.data && e.data.lettura) window.__l[e.data.lettura] = e.data.valore; });
+  </script></head><body></body></html>`);
+  const leggi = async (u) => {
+    const page = await openTab(u);
+    await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+    return page.evaluate(presiMentreCarica, urls);
+  };
+  if (modo) await setFpMode(openTab, modo);
+  const on = await leggi(pagina);
+  await setFpMode(openTab, 'off');
+  const off = await leggi(pagina + '?off');
+  expect(on.pagina).not.toBe(off.pagina);
+  return { on, off };
+}
+
+test('in Privacy massima un riquadro della stessa origine inserito da uno script ha il rumore anche mentre carica', async ({ openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const { on, off } = await apriMentreCarica(openTab, testServer, 'privacy');
+  for (const k of ['indiceDentro', 'indiceDaQui', 'framesDentro', 'framesDaQui', 'nomeDentro', 'nomeDaQui', 'testoDentro']) {
+    expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+    expect.soft(off[k], `${k}: in Off come la pagina`).toBe(off.pagina);
+  }
+});
+
+test('in Automatico un riquadro della stessa origine inserito da uno script tiene Filo e ha il rumore dopo il carico', async ({ openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const { on } = await apriMentreCarica(openTab, testServer, null);
+  expect(on.liberoConFilo, 'Filo nel riquadro che la pagina non tocca').toBe(true);
+  for (const k of ['indiceDaQui', 'framesDaQui', 'nomeDaQui']) expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
+});
+
 test.describe('una pagina di accesso del sito', () => {
   // Un sito noto che risponde in http: quelli nell'elenco HSTS del browser passerebbero a https.
   test.use({ hostInPiu: ['www.linkedin.com'] });
