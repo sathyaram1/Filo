@@ -170,7 +170,9 @@
     if (r && Number(r.n) >= CAMPIONI_MINIMI && (Number(r.prompt) + Number(r.completion)) > 0) {
       return { prompt: Number(r.prompt) || 0, completion: Number(r.completion) || 0, cached: Number(r.cached) || 0, fonte: 'registro' };
     }
-    const t = TIPI[funzione(action).tipo];
+    const tipo = funzione(action).tipo;
+    const LC = global.SN_FILO_COMPATTAZIONE;
+    const t = tipo === 'compattazione' ? (LC && global.SN_FILO_CONTESTO ? LC.usoTipico() : null) : TIPI[tipo];
     return t ? { prompt: t.prompt, completion: t.completion, cached: 0, fonte: 'prudente' } : null;
   }
 
