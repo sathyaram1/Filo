@@ -99,10 +99,23 @@ test('un passaggio di traverso non precarica, la pressione sì anche senza ferma
     await page.waitForTimeout(800);
     expect(sito.precarichi()).toEqual([]);
 
-    // Il link escluso non parte nemmeno premuto.
-    await page.dispatchEvent('#logout', 'pointerdown', { button: 0, pointerType: 'mouse' });
-    await page.dispatchEvent('#l7', 'pointerdown', { button: 0, pointerType: 'mouse' });
+    // Il link escluso non parte nemmeno premuto; premuto e trascinato via, non è un clic.
+    const premiEtrascinaVia = async (sel) => {
+      const b = await page.locator(sel).boundingBox();
+      await page.mouse.move(b.x + 3, b.y + 3);
+      await page.mouse.down();
+      await page.waitForTimeout(400);
+      await page.mouse.move(box.x + 5, box.y + 18 * 33);
+      await page.mouse.up();
+    };
+    await premiEtrascinaVia('#logout');
+    // Premuto appena arrivato, senza fermarsi prima.
+    const b7 = await page.locator('#l7').boundingBox();
+    await page.mouse.move(b7.x + 3, b7.y + 3);
+    await page.mouse.down();
     await expect.poll(() => sito.precarichi(), { timeout: 5000 }).toEqual(['/p/7']);
+    await page.mouse.move(box.x + 5, box.y + 18 * 33);
+    await page.mouse.up();
   } finally { await sito.chiudi(); }
 });
 
