@@ -150,6 +150,7 @@ test('il clic su un altro link ferma i precarichi ancora in corso', async ({ app
     const page = await openTab(`${sito.origin}/indice`);
     await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
     await page.hover('#l2');
+    await expect.poll(() => sito.precarichi(), { timeout: 5000 }).toEqual(['/p/2']);
     await page.hover('#l4');
     await expect.poll(() => sito.precarichi(), { timeout: 5000 }).toEqual(['/p/2', '/p/4']);
     await page.click('#l9');
