@@ -354,3 +354,74 @@ test('un altro sottodominio dello stesso sito si precarica, e verso un altro sit
     expect((await regole()).some((u) => u.includes(ALTRO))).toBe(false);
   } finally { await sito.chiudi(); }
 });
+
+// #1985 giro 2, r1: un precarico ancora in corso al clic va usato, non aspettato e poi buttato.
+test('con un sito lento il clic dopo il passaggio usa il precarico in corso, e la pagina arriva prima', async ({ app, openTab }) => {
+  const RITARDO = 2000;
+  const sito = await sitoCheConta({ lente: ['/p/3'], ritardoLente: RITARDO });
+  try {
+    await precaricoVisibili(app, false);
+    const page = await openTab(`${sito.origin}/indice`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    await page.hover('#l3');
+    await page.waitForTimeout(300);
+    const t0 = Date.now();
+    await page.click('#l3', { noWaitAfter: true });
+    await expect(page.locator('#arrivato')).toHaveText('/p/3', { timeout: 15_000 });
+    const attesa = Date.now() - t0;
+    expect(sito.richieste.filter((r) => r.url === '/p/3').map((r) => r.prefetch)).toEqual([true]);
+    expect(attesa).toBeLessThan(RITARDO + 600);
+  } finally { await sito.chiudi(); }
+});
+
+// #1985 giro 2, r2: per la pagina una scheda dietro resta «visibile»; i suoi link a schermo aspettano che torni davanti.
+test('una scheda rimasta dietro non precarica i suoi link a schermo, e li precarica quando torna davanti', async ({ app, shell, openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    const url = `${sito.origin}/indice?dietro`;
+    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => (page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } })) != null,
+      { timeout: 15_000 }).toBe(true);
+    await page.waitForLoadState('load');
+    await openTab(`${sito.origin}/p/davanti`);
+    const prima = sito.precarichi().length;
+    await new Promise((r) => setTimeout(r, 8000));
+    expect(sito.precarichi().length).toBe(prima);
+    await shell.evaluate((id) => window.filoShell.tabs.activate(id), aperta.id);
+    await expect.poll(() => sito.precarichi().length, { timeout: 30_000, intervals: [500] }).toBeGreaterThan(prima);
+  } finally { await sito.chiudi(); }
+});
+
+// #1985 giro 2, r4: una pagina che cambia indirizzo da sé non riempie la lista oltre il tetto di Chromium.
+test('in una pagina che cambia indirizzo da sola i link a schermo restano dentro il tetto, e il passaggio del mouse funziona ancora', async ({ openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    const page = await openTab(`${sito.origin}/indice`);
+    const subito = () => page.evaluate(() => Array.from(document.querySelectorAll('script[type="speculationrules"]'))
+      .flatMap((s) => JSON.parse(s.textContent).prefetch.filter((r) => !r.eagerness).flatMap((r) => r.urls)).length);
+    await expect.poll(() => sito.precarichi().length, { timeout: 30_000, intervals: [500] }).toBe(20);
+    for (let giro = 1; giro <= 3; giro++) {
+      await page.evaluate((g) => {
+        history.pushState({}, '', `/indice/${g}`);
+        const box = document.createElement('div');
+        box.innerHTML = Array.from({ length: 20 }, (_, i) => `<a style="display:block;height:18px" href="/v${g}/${i}">v${g} ${i}</a>`).join('');
+        document.body.prepend(box);
+        window.scrollTo(0, 0);
+        window.dispatchEvent(new Event('scroll'));
+      }, giro);
+      await expect.poll(() => sito.precarichi().filter((u) => u.startsWith(`/v${giro}/`)).length, { timeout: 30_000, intervals: [500] }).toBe(20);
+      expect(await subito()).toBeLessThanOrEqual(20);
+    }
+    await page.evaluate(() => {
+      const a = document.createElement('a');
+      a.id = 'nuovo';
+      a.href = '/p/nuovo';
+      a.textContent = 'nuovo';
+      a.style.cssText = 'display:block;height:30px';
+      document.body.prepend(a);
+    });
+    await page.hover('#nuovo');
+    await expect.poll(() => sito.precarichi(), { timeout: 5000 }).toContain('/p/nuovo');
+  } finally { await sito.chiudi(); }
+});
