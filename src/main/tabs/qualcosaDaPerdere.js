@@ -79,7 +79,6 @@ async function qualcosaDaPerdere(wc) {
   if (await entro(p) === true) return true;
   let riquadri = [];
   try {
-    const { riquadroArrivato } = require('../services/riquadroArrivato');
     riquadri = wc.mainFrame.framesInSubtree.filter((f) => f !== wc.mainFrame && riquadroArrivato(f));
   } catch (_) { riquadri = []; }
   for (const f of riquadri) {
