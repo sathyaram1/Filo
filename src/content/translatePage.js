@@ -635,12 +635,16 @@
   function onFrameReport(msg) {
     const st = frameRuns.get(String((msg && msg.runId) || ''));
     if (!st) return;
+    // Un riquadro fuori conto non copre il silenzio di uno contato: i suoi passi vanno nella colonna a parte.
+    const fuori = !!msg.fuoriConto;
     if (msg.phase === 'ack') {
+      if (fuori) { st.extraAcked++; return; }
       st.acked++;
       st.expected += Number(msg.frames) || 0;
       return;
     }
-    st.ended++;
+    if (fuori) st.extraEnded++;
+    else st.ended++;
     st.applied += Number(msg.applied) || 0;
     st.left += Number(msg.left) || 0;
   }
