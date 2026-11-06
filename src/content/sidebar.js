@@ -348,16 +348,24 @@
       allega(e.dataTransfer.files);
     });
     form.addEventListener('submit', (e) => e.preventDefault());
-    form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
+    // Mentre l'Aiuto lavora il tasto è il quadrato che lo ferma (#578.1), e Invio a casella vuota fa lo stesso; con
+    // qualcosa scritto Invio manda. Fermare, come chiudere, non chiede un gesto vero: toglie lavoro, non ne aggiunge.
+    const tasto = form.querySelector('button[type="submit"]');
+    tasto.addEventListener('click', (e) => {
       e.preventDefault();
+      if (tasto.dataset.modo === 'ferma') { if (!quadratoAppena(tasto)) fermaDallUtente(); ta.focus(); return; }
       if (gestoVero(e)) invia();
     });
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (gestoVero(e)) invia();
+        if (!gestoVero(e)) return;
+        const vuota = !ta.value.trim() && !allegati.immagini.length && !allegati.riferimenti.length;
+        if (vuota && lavora()) { if (!e.repeat && !quadratoAppena(tasto)) fermaDallUtente(); return; }
+        invia();
       }
     });
+    aggiornaTasto();
     // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere). Diretta, non dal
     // modulo: il suo invio non manda più niente (#592.6), e il microfono si accende già solo con un gesto vero.
     voce = global.SN_VOCE_CHAT?.collega({
