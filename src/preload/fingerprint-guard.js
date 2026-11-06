@@ -410,7 +410,7 @@ const PROPAGAZIONE = `
     P[nome] = mask(function () {
       var c = raccogli(arguments);
       var r = R(orig, this, arguments);
-      for (var i = 0; i < c.n; i++) { try { tocca(c[i]); } catch (e) {} }
+      for (var i = 0; i < c.n; i++) { try { tocca(c[i], true); } catch (e) {} }
       return r;
     }, orig, nome);
   }
