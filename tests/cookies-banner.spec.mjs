@@ -1099,11 +1099,12 @@ async function dallaChat(home, valore) {
   // A Normale il costo 2 può partire da solo: la conferma si dà solo se compare.
   const fine = await Promise.race([corsa.then(() => 'fatto'), home.locator(CONFIRM_HOST).waitFor({ timeout: 10_000 }).then(() => 'conferma', () => 'fatto')]);
   if (fine === 'conferma') {
-    // Abbassare una difesa si conferma col pulsante rosso; OK si accende dopo aver letto il testo fino in fondo (#592).
+    // Abbassare una difesa si conferma scrivendo «conferma»; OK si accende dopo aver letto il testo fino in fondo (#592).
     await expect.poll(() => home.evaluate(() => {
       const T = window.SN_CONFIRM_UI._test;
       T.scrollToEnd();
-      return T.click('ok') || T.click('danger') ? true : JSON.stringify(T.state() && { ...T.state(), riquadro: null });
+      if (T.state() && T.state().hasInput) T.fill('conferma');
+      return T.click('ok') || T.click('danger');
     }), { timeout: 8_000 }).toBe(true);
   }
   await corsa;
