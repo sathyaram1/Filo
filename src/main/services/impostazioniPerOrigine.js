@@ -27,6 +27,8 @@ const CAMPI_WEB = Object.freeze({
   }),
   // La spiegazione che parte da sola alla selezione (#818): spenta, la pagina aspetta il tasto destro.
   spiegaAnticipata: true,
+  // Le sezioni nascoste della pagina: tradotte subito o quando si aprono (#1290).
+  traduzionePagina: Object.freeze({ nascoste: true }),
   // I tasti di Spiega e Aiuto scelti dall'utente (#842): il menu del tasto destro li scrive accanto alle voci.
   scorciatoie: true,
   tts: Object.freeze({ voice: true, rate: true, pitch: true }),
