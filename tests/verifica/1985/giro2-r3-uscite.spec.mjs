@@ -4,7 +4,7 @@ import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
 const USCITE = [
-  ['/user/loginOut', 'Sign out'.replace('Sign out', '退出登录')],
+  ['/user/loginOut', '退出登录'],
   ['/session/exit', '⏻'],
   ['/konto/vyhod', 'Выйти'],
   ['/mypage/rogu', 'ログアウト'],
