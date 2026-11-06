@@ -471,8 +471,11 @@
     const s = String(t || '');
     return (s.match(/^\s*```/gm) || []).length % 2 ? `${s.replace(/\s+$/, '')}\n\`\`\`` : s;
   }
+  // Le righe di un lavoro fermato col quadrato, uguali nella chat della home e nell'Aiuto (#578.1).
+  const FERMATO_QUI = 'Fermato qui';
+  const FERMATO_PRIMA = 'Fermato prima della risposta.';
   // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
-  const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  const CHIEDI_SEGUITO ='Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   // La home lo chiede con un messaggio interno, che l'utente non vede.
   const CHIEDI_SEGUITO_HOME = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
     + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
