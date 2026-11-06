@@ -42,7 +42,7 @@ test('la soglia di serie dell\'owner si salva, si rilegge e vale per la chat di 
     assert.equal(Defaults.get().contestoFilo.soglia, 50000, 'riletta dal documento');
     const tetti = FC.tetti({}, Defaults.get().contestoFilo);
     assert.equal(tetti.soglia, 50000);
-    assert.equal(tetti.da.soglia, 'owner');
+    assert.equal(tetti.da.soglia, 'predefiniti');
     assert.equal(FC.tetti({ soglia: 40000 }, Defaults.get().contestoFilo).soglia, 40000, 'chi l\'ha cambiata tiene la sua');
   } finally {
     auth.getIdToken = origToken;

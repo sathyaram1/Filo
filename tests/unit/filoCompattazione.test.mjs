@@ -451,4 +451,101 @@ test('la soglia si cambia anche chiedendolo in chat, e il cambio si annulla con 
   assert.equal(P.buildPreferencePartial('soglia_compattazione', '10').partial.contestoFilo.soglia, FC.LIMITI.soglia[0]);
   assert.equal(K.fraseCambio({ chiave: 'contestoFilo.soglia', prima: null, dopo: 50000 }),
     'soglia oltre la quale la chat compatta la conversazione: come i predefiniti → 50.000 token');
+  // A parole come nei campi: stessi limiti e stesso arrotondamento.
+  for (const [k, chiave] of [['soglia', 'soglia_compattazione'], ['token', 'token_ricordati']]) {
+    for (const scritto of ['3 milioni', '12345,6', '1']) {
+      const n = P.buildPreferencePartial(chiave, scritto).partial.contestoFilo[k];
+      const atteso = FC.numeroDelTetto(k, scritto === '3 milioni' ? 3000000 : Number(scritto.replace(',', '.')));
+      assert.equal(n, atteso, `${chiave} «${scritto}»`);
+    }
+  }
+});
+
+// ── Rilievi del giro 4 (#1563) ───────────────────────────────────────────────
+
+test('il diario segue la chat: nascosta esce dal CONTESTO e torna, cancellata se ne va subito anche dal disco', async () => {
+  const { cartella } = azzera();
+  const ora = Date.now();
+  const disco = () => readFileSync(join(cartella, 'filo', 'livelli.json'), 'utf8');
+  await scrivi('nn01', 'user', 'ho la febbre, che medico chiamo?', new Date(ora - 5 * ORA_MS).toISOString());
+  await scrivi('nn01', 'filo', 'Il medico di base.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.match(await Comp.sezione(false), /parlato di gatti/);
+  await Chats.nascondi('nn01', true);
+  assert.equal(await Comp.sezione(false), '', 'nascosta, non sta davanti a Filo');
+  assert.match(disco(), /parlato di gatti/, 'ma resta nel diario: nascondere si disfa');
+  await Chats.nascondi('nn01', false);
+  assert.match(await Comp.sezione(false), /parlato di gatti/, 'rimessa, la riga torna');
+  await Chats.remove('nn01');
+  assert.doesNotMatch(disco(), /parlato di gatti/, 'cancellata, la riga esce dal disco subito, senza aspettare un messaggio');
+
+  await scrivi('nn02', 'user', 'parliamo di gatti', new Date(ora - 4 * ORA_MS).toISOString());
+  await scrivi('nn02', 'filo', 'Volentieri.', new Date(ora - 4 * ORA_MS + 1000).toISOString());
+  await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+  assert.match(disco(), /parlato di gatti/);
+  await Chats.clear();
+  assert.doesNotMatch(disco(), /parlato di gatti/, 'cancellate tutte, il diario delle chat se ne va');
+});
+
+test('il grezzo che resta ha un tetto in token: turni pesanti lasciano spazio sotto la soglia, l\'ultimo resta sempre', () => {
+  const ora = Date.parse('2026-11-04T18:00:00Z');
+  const lista = [];
+  for (let i = 0; i < 6; i++) lista.push(msg('ab', 'user', 60 - i * 5, `d${i}`, ora, { peso: 5000 }), msg('ab', 'filo', 59 - i * 5, `r${i}`, ora, { peso: 100 }));
+  const peso = (m) => m.peso;
+  const turni = (k) => lista.slice(k).filter((m) => m.role === 'user').length;
+  assert.equal(turni(L.puntoDiTaglio(lista, { ora })), 4, 'senza tetto, quattro turni');
+  assert.equal(turni(L.puntoDiTaglio(lista, { ora, maxToken: 14500, peso })), 2);
+  assert.equal(turni(L.puntoDiTaglio(lista, { ora, maxToken: 10, peso })), 1, 'la domanda di adesso resta grezza');
+  assert.equal(L.grezzoMassimo({ soglia: 70000, base: 41000 }), 14500);
+  assert.equal(L.grezzoMassimo({ soglia: 70000, base: null }), Infinity);
+  assert.equal(L.sogliaAnticipo({ soglia: 70000, base: 40000 }), 40000 + L.QUOTA_ANTICIPO * 30000);
+  assert.equal(L.sogliaAnticipo({ soglia: 70000 }), 70000 * L.QUOTA_ANTICIPO);
+});
+
+test('la compattazione usa la parte fissa dell\'ultimo turno: con turni pesanti lascia meno grezzo', async () => {
+  const { chiamate } = azzera();
+  const ora = Date.now();
+  const capitolo = (i) => `capitolo ${i} ${'le api danzano. '.repeat(1100)}`;
+  for (let i = 0; i < 6; i++) {
+    await scrivi('ab12', 'user', capitolo(i), new Date(ora - (60 - i * 5) * 60000).toISOString());
+    await scrivi('ab12', 'filo', `letto ${i}`, new Date(ora - (59 - i * 5) * 60000).toISOString());
+  }
+  Comp.segnaBase(false, 41000);
+  const r = await Comp.compatta({ incognito: false, motivo: 'anticipo', ora, tetti: tettiDi() });
+  assert.equal(r.fatto, true);
+  assert.match(chiamate[0][1].content, /capitolo 3 /);
+  assert.deepEqual((await componi(ora)).visti.filter((m) => m.role === 'user').map((m) => m.text.slice(0, 10)), ['capitolo 4', 'capitolo 5']);
+});
+
+test('una lettura che non ha portato dentro niente da fuori non rende sospetto il pezzo, come per la chat', async () => {
+  const CERCA_PULITA = { type: 'CERCA_CHAT', _executed: true, params: { query: 'lunedì' }, _output: { ok: true, risultati: [{ titolo: 'Tesi', snippet: 'il capitolo sulle api' }] } };
+  const CERCA_PAGINE = { type: 'CERCA_CHAT', _executed: true, params: { query: 'lunedì' }, _output: { ok: true, pagine: [{ titolo: 'Un sito' }] } };
+  const ora = Date.now();
+  const prova = async (azione) => {
+    const esito = azzera({ memorie: ['Scrive una tesi sulle api.'] });
+    await scrivi('ab12', 'user', 'riprendi il discorso di lunedì', new Date(ora - 5 * ORA_MS).toISOString());
+    const c = await scrivi('ab12', 'filo', 'Ripreso.', new Date(ora - 5 * ORA_MS + 1000).toISOString());
+    Contesto.ricordaEsiti('ab12', c.messages.at(-1).ts, { azioni: [azione] });
+    const r = await Comp.compatta({ incognito: false, ora, tetti: tettiDi() });
+    return { r, scritte: esito.scritte, attesa: await Comp.inAttesa() };
+  };
+  const pulita = await prova(CERCA_PULITA);
+  assert.equal(pulita.r.sospetto, false);
+  assert.deepEqual(pulita.scritte, ['Scrive una tesi sulle api.'], 'la memoria entra da sola');
+  assert.deepEqual(pulita.attesa, []);
+  const sporca = await prova(CERCA_PAGINE);
+  assert.equal(sporca.r.sospetto, true, 'i titoli dei siti visitati sporcano, come per la chat');
+  assert.deepEqual(sporca.scritte, []);
+  assert.equal(sporca.attesa.length, 1);
+});
+
+test('i limiti dei campi e la stima tipica nelle Opzioni vengono dalla regola della soglia', () => {
+  const campi = {};
+  FC.limitiAiCampi((id) => (campi[id] = {}));
+  for (const k of FC.NUMERI_DEI_TETTI) assert.deepEqual(campi[FC.campoDelTetto(k)], { min: String(FC.LIMITI[k][0]), max: String(FC.LIMITI[k][1]) });
+  require('../../src/shared/stimaCosto.js');
+  const S = globalThis.SN_STIMA_COSTO;
+  const t = S.tokenTipici(globalThis.SN_CONST.ACTIONS.FILO_COMPATTAZIONE, null);
+  assert.deepEqual({ prompt: t.prompt, completion: t.completion }, L.usoTipico());
+  assert.ok(t.prompt > 0 && t.prompt < FC.TETTI_DI_SERIE.soglia);
 });
