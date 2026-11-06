@@ -268,13 +268,19 @@ all'owner, il freno.
   nota del manutentore o dell'owner (`sblocca`) o un'attesa sulla correzione non lo sbloccano; gli altri lavori
   vanno avanti. Una **domanda di processo** nel rilascio (`--processo`) ferma il lavoro allo stesso modo e sveglia
   il manutentore, non l'owner; col manutentore spento resta nelle note e il lavoro non si ferma.
+- **Lavori server che restano locali (#2036).** Un lavoro server il cui biglietto nascerebbe non fidato (ramo non
+  pulito, contenuto sporco…) non è lavoro pronto per nessuna voce: niente accensioni, niente posto nel sondaggio. Il
+  server scrive sul feedback `restaLocale { motivi, ruolo, atMs }`, che Gestione mostra come «Fermo: resta locale»
+  col motivo, e lo toglie (null) quando il giudizio torna pulito o il biglietto nasce.
 - **Rilascio.** Ogni worker registra da sé, dal transcript, gli strumenti falliti (`strumentiFalliti`: nome,
   errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
 - **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner
   restano sue e si sommano. Niente riserva del 10% su A.
 - **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 55 minuti,
   segnali del server (guasto, deploy rosso, suite rossa, nata morta, domanda di processo, owner), sveglia chiesta
-  (minimo 5 minuti), con un tetto di accensioni al giorno suo. Memoria nel **taccuino** (`manutentore/taccuino`,
+  (minimo 5 minuti), con un tetto di accensioni al giorno suo. Fermo su un guasto suo, fino alla prossima sessione
+  chiusa bene, solo il mattino; il controllo del server conta le sessioni chiuse bene (soglia in SPEC-MANUTENTORE.md § 7).
+  Memoria nel **taccuino** (`manutentore/taccuino`,
   riscritto con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
   Automazioni; le **novità** riscritte dal redattore (`manutentore-novita/<versione>`) solo senza link nuovi.
 
@@ -348,7 +354,7 @@ strumento controlla tutte le segnalazioni prima di aprire e dice tutti i motivi 
 fuori chi non è `todo` (già in lavorazione o ferma), chi ha già un ramo (tornata in coda
 dopo una risposta o una riapertura), chi aspetta già un altro pacchetto aperto o ne porta
 il rimando `unitoIn` (rimasta in coda perché l'archiviazione non è riuscita), chi è a
-priorità 3, un lavoro locale, chi ha già 20 attese, chi P stesso aspetta. Area, tetto e
+priorità 3, un lavoro locale, chi P stesso aspetta. Area, tetto e
 urgenti li controlla il manutentore. Senza `--priorita` P nasce con la
 priorità più alta fra le unite. Un pezzo che si blocca in verifica non si stacca: P passa
 o non passa intero.
@@ -359,7 +365,8 @@ insieme agli allegati di testo di `--allega` e rifiuta, con tutti i motivi: una 
 manda la spec nelle note («spec nelle note del feedback», «vedere le note», «come da note»),
 un'unita che la spec non nomina, un feedback che il testo mette prima («#1202 si fonde prima»,
 «prerequisito: #N», «solo dopo #N», «quando #N è fuso») senza che P lo aspetti, perché senza attesa il server
-dà P da lavorare con quello fuori da main. Il rimedio sta nel messaggio: la spec nel testo
+dà P da lavorare con quello fuori da main. Un'attesa che P prende da un'unita vale quanto `--aspetta`: aprendo,
+quel controllo si fa dopo aver letto le unite; a vuoto no, e il rifiuto lo dice. Il rimedio sta nel messaggio: la spec nel testo
 o allegata, `--aspetta` coi numeri, o la frase riscritta. Vale solo per i pacchetti: una
 segnalazione qualunque racconta un problema, e può citare note e attese di altri.
 I pacchetti nati prima, con la spec nei turni delle note che cominciano con «SPEC DEL
@@ -380,14 +387,19 @@ della conversazione di una scritta anche da routine o sessioni, P nasce non fida
 da una sessione pulita (lo strumento non manda il biglietto), come un figlio di genitori
 non fidati (SPEC-DOMANDE.md § 1.3).
 
-*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). Chi aspettava una
+*Le unite si archiviano alla nascita* (decisione dell'owner del 30/10). P nasce con le
+attese delle unite insieme a quelle di `--aspetta` (#1903.1): archiviate, le loro non
+conterebbero più da nessuna parte, e P partirebbe prima di ciò che una di loro aspettava.
+Quelle su un'altra unita cadono; il tetto delle 20 si conta su P, e oltre non apre e dice i
+conti per unita. Chi aspettava una
 unita passa ad aspettare P (le sue attese sulle unite diventano una su P, le altre
 restano); poi ogni unita va `todo → archived` (owner) con la nota «Unito nel pacchetto
 #P: il lavoro continua lì», senza frase per chi l'ha segnalata. Prima le attese: un
 aspettato archiviato senza fusione manda chi lo aspetta all'owner (`attesa_chiusa`), così
 una unita con un'attesa che non si è spostata resta aperta, e lo strumento stampa le righe
 per rimediare, come per ogni passo che non riesce. Chi aspetta una unita ed è aspettato da
-P si rifiuta prima di aprire (si aspetterebbero a vicenda); P nato senza numero non
+P, anche per un'attesa presa da un'altra unita o a catena (P aspetta A, A aspetta lui), si rifiuta prima di
+aprire con la catena (si aspetterebbero a vicenda); P nato senza numero non
 archivia niente, perché nota e attese lo nominano. Il rimando `unitoIn` (l'id di P, come
 nell'unione) su ogni unita il cui numero corrisponde lo scrive il server alla nascita di P,
 dal trigger di creazione e prima dei giudici: ai client le regole lo vietano, come la fiducia.
@@ -482,7 +494,7 @@ new/draft/todo/review/blocked/clarify/done/verified) e faceva cadere in
 - Ricevuti: `unlabeled | suspicious_file | attack | spam | design | aligned`
 - In coda: `todo | working | revision_capability | revision_security | done(non rilasciato)`
 - Il segno `localOnly` (#908) non sposta di scheda (#1575): la pratica sta nella scheda del suo stato con l'etichetta «server».
-- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta-anche 676,663.2` (aggiunge), `--aspetta 676,663.2` (l'elenco intero) / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito; `--aspetta` che toglierebbe un'attesa non fusa si rifiuta senza scrivere, a meno di `--sostituisci` (#1756), e la risposta dice quelle che sostituisce; `feedback:leggi` le stampa, una per riga col loro stato): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
+- Aspettano (#903): `waitsFor: [{ id, num }]` (in chiaro, da 1 a 20, scrive l'admin da Gestione, `npm run feedback -- <n> --aspetta-anche 676,663.2` (aggiunge), `--aspetta 676,663.2` (l'elenco intero) / `--aspetta-niente` e `feedback:apri --aspetta`; inesistenti, sé stesso e giri si rifiutano; un'attesa già scritta non si rifiuta perché il suo aspettato è sparito; `--aspetta` che toglierebbe un'attesa non fusa si rifiuta senza scrivere, a meno di `--sostituisci` (#1756), e la risposta dice quelle che sostituisce; ogni scrittura (riga di comando, pacchetti, Gestione) ricalcola dall'elenco letto e scrive solo se nel frattempo il documento non è cambiato, altrimenti rilegge (#1756.1, `SN_FB_ATTESE.scriviSullaLettura`); `feedback:leggi` le stampa, una per riga col loro stato): finché un aspettato non è fuso (`done`, o `archived` con `resolvedInVersion`) né biglietti né accensioni per un `todo` o un ramo in revisione, poi entra in coda da solo; se uno si chiude senza fusione o sparisce, il pacemaker lo porta in `design` (`statusReason: attesa_chiusa`) con la domanda e toglie quell'attesa.
   - **La priorità risale le attese** (#1630, decisione dell'owner del 23/10): se B aspetta A, `priority` di A
     vale almeno quella di B, lungo tutta la catena (C aspetta B che aspetta A → A ≥ B ≥ C), e **solo verso
     l'alto**: un'attesa tolta o B riabbassato non riabbassano niente. Scatta quando la priorità di un feedback

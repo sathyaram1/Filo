@@ -2496,7 +2496,7 @@
       if (ATT.atteseDi(fb).length) {
         voci.push({
           testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
-          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, () => []); },
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, togliTutte); },
         });
       }
     }
@@ -2969,6 +2969,12 @@
     const attesa = fb ? ATTESE_SERVER[MR.attesaServer(fb)] : null;
     if (attesa) {
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(attesa[1])}">${esc(attesa[0])}</span></div>`;
+    }
+    const fermo = fb ? MR.restaLocale(fb) : null;
+    if (fermo) {
+      const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Riparte da solo quando il motivo passa.${dal}`;
+      return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
     }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
     if (fb && MR.isLocalOnly(fb) && !(mgLavoriServer && mgLavoriServer.checked && MR.isFidato(fb))) {
@@ -3458,6 +3464,8 @@
         // l'altra. Non style-aware (il prompt JSON non va inquinato) e fuori dalla cronologia.
         action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.MANAGE_SEARCH) || 'manage_search',
         payload: { messages: SRCH.buildMessages(query, candidates) },
+        // Una classifica fermata dal tetto torna come errore, e il ripiego per parole dice perché (#1302).
+        intera: true,
       });
       if (r && r.ok && typeof r.text === 'string') {
         const parsed = SRCH.parseRanking(r.text, validIds);
@@ -3896,34 +3904,28 @@
     }).join('');
   }
 
-  // Le attese da riscrivere, tranne `salvo`: per numero quelle di un aspettato che la pagina vede, per id le altre
-  // (cancellato, non letto, senza numero), che il main tiene come sono invece di rifiutarle cercandone il numero.
-  function atteseDaTenere(fb, salvo = '') {
-    return ATT.atteseDi(fb).filter((w) => w.id !== salvo).map((w) => {
-      const doc = trovaAtteso(w.id);
-      const n = doc && !doc.missing ? (w.num || numeroDi(doc)) : '';
-      return n || { id: w.id };
-    });
-  }
+  // Il gesto «togli tutte» toglie quelle che la pagina mostra: un'attesa scritta intanto da altri resta (#1756.1).
+  const togliTutte = (fb) => ({ togli: ATT.atteseDi(fb).map((w) => w.id) });
 
-  async function scriviAttese(id, voci) {
+  // Si manda il gesto, non l'elenco: il main lo applica alle attese di adesso, che la pagina può vedere in ritardo.
+  async function scriviAttese(id, gesto) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb || !ATT) return false;
     const num = numeroDi(fb);
     const chi = num ? `#${num}` : 'Il feedback';
-    const tieni = voci.filter((v) => v && typeof v === 'object').map((v) => v.id);
-    const lette = ATT.leggiNumeri(voci.filter((v) => typeof v === 'string'));
-    if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
-    const vuoto = !lette.numeri.length && !tieni.length;
+    const aggiungi = (gesto && gesto.aggiungi) || [];
+    const togli = (gesto && gesto.togli) || [];
+    const vuoto = !aggiungi.length && ATT.atteseDi(fb).every((w) => togli.includes(w.id));
     for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
     setManageMsg(vuoto ? 'Tolgo le attese…' : 'Scrivo le attese…', '');
     try {
-      const r = await sendToMain(Object.assign({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') }, tieni.length ? { waitsTieni: tieni } : {}));
+      const r = await sendToMain(Object.assign({ type: 'feedback_update', id },
+        aggiungi.length ? { waitsAggiungi: aggiungi.join(', ') } : { waitsTogli: togli }));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
-      // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
-      if (vuoto && atteseApertePer === id) atteseApertePer = '';
-      else if (!vuoto) atteseApertePer = id;
+      // Si chiude solo se non ne resta nessuna: una scritta intanto da altri, e mai vista qui, resta da guardare.
+      if (!fb.waitsFor && atteseApertePer === id) atteseApertePer = '';
+      else if (fb.waitsFor) atteseApertePer = id;
       renderList();
       if (selectedId === id) reflectAttese(fb);
       const dove = MR.manageTabFor(fb, opzSezioni());
@@ -3939,8 +3941,8 @@
     }
   }
 
-  // Una scrittura alla volta, e ciascuna calcola l'elenco solo quando tocca a lei: calcolato prima, un gesto fatto
-  // mentre la precedente è in volo riscriverebbe l'elenco vecchio e la cancellerebbe.
+  // Una scrittura alla volta, e ciascuna calcola il gesto solo quando tocca a lei: «togli tutte» toglie anche quelle
+  // aggiunte dal gesto in volo prima di lei.
   let codaAttese = Promise.resolve();
   function accodaAttese(id, calcola) {
     const giro = codaAttese.then(() => {
@@ -3967,7 +3969,7 @@
     // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
     const testo = mgAtteseInput.value;
     mgAtteseInput.value = '';
-    const ok = await accodaAttese(fb._id, (f) => [...atteseDaTenere(f), ...nuovi.numeri]);
+    const ok = await accodaAttese(fb._id, () => ({ aggiungi: nuovi.numeri }));
     if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
   }
   if (mgAtteseToggle) {
@@ -3992,7 +3994,7 @@
     });
   }
   if (mgAtteseTogliTutte) {
-    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, () => []); });
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, togliTutte); });
   }
   if (mgAtteseLista) {
     mgAtteseLista.addEventListener('click', (e) => {
@@ -4002,7 +4004,7 @@
       if (!fb) return;
       if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
       const via = li.dataset.id;
-      accodaAttese(fb._id, (f) => atteseDaTenere(f, via));
+      accodaAttese(fb._id, () => ({ togli: [via] }));
     });
   }
   // Dall'attesa alla pratica aspettata, nella sua sezione.
@@ -5385,7 +5387,7 @@
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
     if (strade) body.appendChild(strade);
-    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb, liv));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
     // Un ridisegno a metà risposta non porta via il cursore a chi sta scrivendo.
@@ -5576,11 +5578,13 @@
     return JSON.stringify([n.status, n.statusReason || '', l4.esito || '', l4.at || '']);
   }
 
-  function pannelloSaltaAudit(fb) {
+  function pannelloSaltaAudit(fb, liv) {
     const fermo = esitiSalta.get(fb._id);
     const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', opzSezioni());
     if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
     if (fermo) esitiSalta.delete(fb._id);
+    // Lo sha mostrato nel pannello parte col salto: un ramo andato avanti dopo l'audit non si salta alla cieca (#1502).
+    const sha = (liv && liv.pannello && liv.pannello.sha) || '';
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const btn = document.createElement('button');
@@ -5615,7 +5619,7 @@
       esito.dataset.kind = 'wait';
       esito.textContent = 'Chiedo al server…';
       try {
-        const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
+        const r = await sendToMain(Object.assign({ type: LIVELLO4_SALTA, feedbackId: fb._id }, sha ? { sha } : {}));
         if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
         // Bloccata senza richiesta: la pratica resta sul controllo di sicurezza, e il via libera sul quadrato non c'è (#1040).
         // Il resto: le stesse frasi della pagina da browser; sul blocco del cancello conta lo stato della richiesta (#486).
