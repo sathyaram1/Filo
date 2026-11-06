@@ -140,12 +140,16 @@ fixture('il video di YouTube incorporato in un altro sito parte senza pubblicit�
   const dentro = youtube.url('/embed/inc?interna=1');
   const ospite = await openTab(testServer.html(`<!doctype html><title>Articolo</title><p>articolo</p><iframe src="${dentro}" width="700" height="420"></iframe>`, { pubblico: true }));
   await expect.poll(() => youtube.servite.includes('/embed/inc?interna=1'), { timeout: 15_000 }).toBe(true);
-  let frame = null;
-  await expect.poll(async () => {
-    frame = ospite.frames().find((f) => f.url().includes('/embed/inc'));
-    return frame ? frame.evaluate(() => window.__esiti && window.__esiti.length).catch(() => 0) : 0;
-  }, { timeout: 25_000, message: `riquadri visti: ${ospite.frames().map((f) => f.url()).join(' ')}` }).toBe(3);
-  expect(await esiti(frame)).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
+  // Il riquadro di un altro sito vive in un suo processo: lo si legge dal main, che i frame li vede tutti.
+  const nelRiquadro = () => app.evaluate(async ({ webContents }) => {
+    for (const wc of webContents.getAllWebContents()) {
+      const f = wc.mainFrame.framesInSubtree.find((x) => x.url.includes('/embed/inc'));
+      if (f) return f.executeJavaScript('window.__esiti ? window.__esiti.slice().sort() : null').catch(() => null);
+    }
+    return null;
+  });
+  expect(ospite.url()).toContain('sito-pubblico.test');
+  await expect.poll(nelRiquadro, { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
 });
 
 fixture('l\'avviso di YouTube sui blocchi: la scheda torna al solo «Salta», si ricarica una volta e lo dice; con le regole nuove riprova', async ({ app, openTab, youtube, avvisi }) => {
