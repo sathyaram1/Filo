@@ -46,15 +46,24 @@ function guarda({ window: w, segnala, partenzaMs = PARTENZA_MS, ora = () => Date
     return ora() - ultimaPub < PUBBLICITA_MS || ora() - ultimoGesto < GESTO_MS;
   };
 
-  doc.addEventListener('play', (e) => {
-    const v = video(e);
-    if (!v || inPubblicita(v)) { if (v) ultimaPub = ora(); return; }
+  // Una scheda dietro può non caricare il video finché non la guardi: lì si ricomincia a contare quando torna davanti.
+  const attendi = (v) => {
     const t0 = v.currentTime;
     w.setTimeout(() => {
-      if (detto || v.paused || v.ended || !v.isConnected || doc.visibilityState === 'hidden') return;
+      if (detto || v.paused || v.ended || !v.isConnected) return;
+      if (doc.visibilityState === 'hidden') {
+        const torna = () => { if (doc.visibilityState === 'hidden') return; doc.removeEventListener('visibilitychange', torna); attendi(v); };
+        doc.addEventListener('visibilitychange', torna);
+        return;
+      }
       if (spiegato(v) || Math.abs(v.currentTime - t0) > 0.1) return;
       di('fermo');
     }, partenzaMs);
+  };
+  doc.addEventListener('play', (e) => {
+    const v = video(e);
+    if (!v || inPubblicita(v)) { if (v) ultimaPub = ora(); return; }
+    attendi(v);
   }, true);
 
   doc.addEventListener('playing', (e) => { const v = video(e); if (v && !inizio.has(v)) inizio.set(v, ora()); }, true);
