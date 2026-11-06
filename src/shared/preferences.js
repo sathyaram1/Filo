@@ -2107,12 +2107,8 @@
       risk: 'Una soglia più bassa riassume più spesso (più chiamate, e ogni tanto una risposta aspetta qualche secondo); una più alta manda richieste più grosse, e sopra i 100.000 token Haiku costa cinque volte tanto.',
       build(v) {
         if (predefinito(v)) return { partial: { contestoFilo: { soglia: null } }, label: 'Soglia di compattazione della chat → come i predefiniti' };
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        let n = parseItalianNumber(s);
-        if (!Number.isFinite(n)) return null;
-        if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
-        else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
-        const soglia = Math.round(contestoFilo().numeroIn(n, contestoFilo().LIMITI.soglia));
+        const soglia = tettoAParole('soglia', v);
+        if (soglia == null) return null;
         return { partial: { contestoFilo: { soglia } }, label: `Soglia di compattazione della chat → ${soglia.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
