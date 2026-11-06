@@ -307,7 +307,7 @@ test('in una riga vuota sopra un paragrafo, e su tutto il testo selezionato, l\'
   expect(ms, `incolla su tutto durato ${ms} ms`).toBeLessThan(2_000);
   expect(await blocchi(page)).toEqual(righe);
   await page.keyboard.press('Control+Z');
-  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(tutto);
+  await expect.poll(() => foglioVisto(page)).toBe(tutto);
 });
 
 test('in una riga vuota sotto un paragrafo, 600 righe che cominciano con un carattere solo entrano in fretta', async ({ app, openTab }) => {
