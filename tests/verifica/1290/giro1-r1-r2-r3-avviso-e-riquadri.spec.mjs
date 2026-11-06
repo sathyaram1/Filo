@@ -105,7 +105,7 @@ for (const [nome, prima, dopo, scorri] of [
   });
 }
 
-test('riquadro incorporato dentro un componente chiuso: tradotto, o l’avviso lo dice', async ({ app, openTab, testServer }) => {
+test('r2 riquadro incorporato dentro un componente chiuso: tradotto, o l’avviso lo dice', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   const src = testServer.html(frameInner('ZZSHUT')).replace('127.0.0.1', 'blocked.test');
