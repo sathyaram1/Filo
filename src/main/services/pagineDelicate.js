@@ -1,6 +1,6 @@
 // Le pagine delicate lato main (#1004): ricorda i siti che hanno mostrato un campo password o carta, e dà ai lavori
 // automatici una domanda sola, «questa pagina è delicata?», con impostazioni ed elenco remoto di adesso.
-// La regola sta in src/shared/pagineDelicate.js; dall'incognito non si scrive niente su disco.
+// La regola sta in src/shared/pagineDelicate.js; dall'incognito, e in Privacy dai siti non fidati, niente va su disco.
 
 const { getDomainInfo } = require('./safebrowse/psl');
 const { ElencoSiti } = require('../../shared/stessoSito');
