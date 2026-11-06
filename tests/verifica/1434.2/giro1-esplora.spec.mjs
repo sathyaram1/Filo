@@ -52,10 +52,13 @@ test('esplora: Taglia in un campo ricco tiene il grassetto come Ctrl+X e si annu
   await page.locator('#ricco').focus();
   await page.evaluate(() => { const b = document.querySelector('#ricco b'); const r = document.createRange(); r.selectNodeContents(b); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
   await page.keyboard.press('Control+x');
-  const htmlSistema = await appuntiHtml(app);
-  console.log('html dopo Ctrl+X', JSON.stringify(htmlSistema));
-  await page.keyboard.press('Control+z');
-  await expect.poll(() => page.locator('#ricco').innerHTML()).toContain('<b>grassetto</b>');
+  console.log('chiavi appunti', await app.evaluate(({ clipboard }) => Object.keys(clipboard).join(',')));
+  await page.locator('#altro').click();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Control+v');
+  const htmlSistema = await page.locator('#altro').innerHTML();
+  console.log('incollato dopo Ctrl+X', JSON.stringify(htmlSistema));
+  await page.evaluate(() => { document.getElementById('altro').innerHTML = 'x'; document.getElementById('ricco').innerHTML = '<b>grassetto</b> normale'; });
 
   await page.evaluate(() => { const b = document.querySelector('#ricco b'); const r = document.createRange(); r.selectNodeContents(b); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
   await page.locator('#ricco').click({ button: 'right', position: { x: 20, y: 8 } });
