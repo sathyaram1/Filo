@@ -2179,11 +2179,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     };
     conDocumento();
 
+    // Il turno ha un nome che il main riconosce: gli manda il ragionamento in diretta e lo interrompe al quadrato.
+    vivo.turno = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
     try {
       const chiedi = () => chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        turno: vivo.turno,
         diceRipiego: true,
         conSeguito: true,
         // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
