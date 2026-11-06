@@ -984,7 +984,7 @@ test('un «no» alla proposta resta dopo il riavvio, senza scrivere il sito sul 
     // Sul disco dell'app non c'è l'indirizzo del sito, né nello storage né nel file dei «no».
     for (const nome of readdirSync(userData)) {
       const f = join(userData, nome);
-      if (!statSync(f).isFile() || !/^(storage\.json|resta-connesso-no\.)/.test(nome)) continue;
+      if (!/^(storage\.json|resta-connesso-no\.)/.test(nome) || !lstatSync(f).isFile()) continue;
       expect(readFileSync(f, 'utf8'), nome).not.toContain('127.0.0.1');
     }
 
