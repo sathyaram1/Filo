@@ -155,8 +155,11 @@ il rosso ferma le versioni per tutti:
   eseguibile, e su Windows nessun nome di quel file si cancella finché gira: un
   collegamento fisso a `process.execPath` (per fingere un comando) fa fallire la pulizia
   con EPERM. Si copia.
+- **L'import di un percorso.** `import(join(ROOT, 'x.js'))` su Windows legge `D:` come
+  schema di un URL e lancia `ERR_UNSUPPORTED_ESM_URL_SCHEME` (#2223): si importa
+  `pathToFileURL(percorso).href`.
 
-Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+Sentinella di queste forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
 **Il codice che fa una cosa diversa per sistema** (#1135). Su Windows la versione
 nuova si installa all'apertura dopo, altrove alla chiusura (#1039): la prova scritta
