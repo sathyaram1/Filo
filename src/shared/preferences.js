@@ -1362,6 +1362,20 @@
         return { partial: { security: { adSkip: { enabled: b } } }, label: `Salta le pubblicità dei video → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
+    // #1974 — accanto a «Salta», indipendente da lui: vale dal prossimo video aperto.
+    {
+      scrive: ['security.youtubeAds.enabled'],
+      aiuto: 'true | false (toglie le pubblicità di YouTube prima che partano, coi video incorporati in altri siti)',
+      costo: 1,
+      keys: ['blocca_pubblicita_youtube', 'blocca le pubblicità di youtube', 'blocca le pubblicita di youtube',
+        'pubblicità di youtube', 'pubblicita di youtube', 'pubblicità youtube', 'pubblicita youtube', 'annunci di youtube',
+        'youtube ads', 'blocco youtube', 'adblock youtube'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { youtubeAds: { enabled: b } } }, label: `Blocca le pubblicità di YouTube → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
 
     // ── Sicurezza / privacy — costo 2; spegnere una protezione abbassa una difesa ──
     {
