@@ -873,7 +873,7 @@ test('«Resta connesso» dalla proposta dopo l\'accesso: la scheda dove stai scr
     await segna(await pagina(app, `${sito.b}/home`));
     await accetta(await proposta(await avvisi(), 'localhost'));
     await expect.poll(() => fidati(app)).toEqual(['localhost']);
-    await laScrittaAspettaIlCambioDiPagina(app, sito.b, 'localhost', 'persist:filo-priv-localhost');
+    await laScrittaAspettaIlCambioDiPagina(app, sito.b, 'localhost', 'persist:filo-priv-localhost', { shell });
   } finally {
     await sito.chiudi();
   }
