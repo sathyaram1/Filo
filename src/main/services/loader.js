@@ -54,6 +54,7 @@ require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordin
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
 require(path.join(SHARED, 'stessoSito.js')); // #876 — «stesso sito» e Public Suffix List: prima di eseguibili e preferences
 require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google sono un accesso solo (dopo stessoSito)
+require(path.join(SHARED, 'precarico.js')); // #1985 — quali link si precaricano e quando (dopo stessoSito)
 require(path.join(SHARED, 'accessoFisso.js')); // #1808 — la password dell'accesso fisso, per la pulizia delle schede
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
 require(path.join(SHARED, 'restanoAperte.js')); // #1695 — perché una scheda resta aperta dopo una chiusura in blocco
