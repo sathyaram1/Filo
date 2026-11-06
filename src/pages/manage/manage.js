@@ -5607,9 +5607,7 @@
     let timer = null;
     const disarma = () => {
       armato = false;
-      btn.textContent = 'Salta il controllo';
-      btn.style.minWidth = '';
-      btn.style.minHeight = '';
+      window.SN_CONFERMA_SUL_POSTO.disarma(btn, 'Salta il controllo');
       if (timer) { clearTimeout(timer); timer = null; }
     };
     btn.addEventListener('click', async (e) => {
