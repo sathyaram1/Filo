@@ -106,6 +106,30 @@ test('link con frammento a schermo: il clic usa il precarico', async ({ openTab 
   } finally { await s.chiudi(); }
 });
 
+test('controllo: link a schermo senza frammento, clic vero dopo il precarico finito', async ({ openTab }) => {
+  const s = await sito();
+  try {
+    const page = await openTab(`${s.origin}/indice`);
+    await expect.poll(() => s.precarichi(), { timeout: 30_000 }).toContain('/p/2');
+    await page.waitForTimeout(1000);
+    await page.click('#l2');
+    await expect(page.locator('#arrivato')).toHaveText('/p/2');
+    expect(s.richieste.filter((r) => r.url === '/p/2').map((r) => r.prefetch)).toEqual([true]);
+  } finally { await s.chiudi(); }
+});
+
+test('controllo: link a schermo senza frammento, navigazione da script', async ({ openTab }) => {
+  const s = await sito();
+  try {
+    const page = await openTab(`${s.origin}/indice`);
+    await expect.poll(() => s.precarichi(), { timeout: 30_000 }).toContain('/p/2');
+    await page.waitForTimeout(1000);
+    await page.evaluate(() => { location.href = '/p/2'; });
+    await expect(page.locator('#arrivato')).toHaveText('/p/2');
+    expect(s.richieste.filter((r) => r.url === '/p/2').map((r) => r.prefetch)).toEqual([true]);
+  } finally { await s.chiudi(); }
+});
+
 test('clic su un altro link ferma i link a schermo in corso', async ({ openTab }) => {
   const s = await sito({ lente: ['/p/0', '/p/1', '/p/2'], ritardo: 15_000 });
   try {
