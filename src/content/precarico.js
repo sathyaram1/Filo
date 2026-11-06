@@ -91,23 +91,21 @@
   }
 
   // ── livello 1: passaggio del mouse e pressione ─────────────────────────────
+  // Il link entra fra i «moderate» appena il mouse ci arriva: il fermo sul link e la pressione li conta Chromium, che
+  // parte solo se la regola c'è già quando il mouse si ferma o preme.
   let sopra = null;
-  let timerSopra = null;
 
   function suPassaggio(e) {
     const a = linkDi(e.composedPath ? e.composedPath()[0] : e.target);
     if (a === sopra) return;
-    clearTimeout(timerSopra);
     sopra = a;
-    if (!a) return;
-    timerSopra = setTimeout(() => { timerSopra = null; if (sopra === a) precarica(a); }, LIMITI.ATTESA_PASSAGGIO_MS);
+    if (a) precarica(a);
   }
 
   function suUscita(e) {
     if (!sopra) return;
     const verso = e.relatedTarget;
     if (verso && sopra.contains(verso)) return;
-    clearTimeout(timerSopra);
     sopra = null;
   }
 
