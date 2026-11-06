@@ -41,8 +41,10 @@ test('esplora: Taglia di una parte dell\'email dalla fila, poi Ctrl+Z', async ({
   await page.locator('#numero').click({ button: 'right', position: { x: 12, y: 8 } });
   await expect(fila).toBeVisible();
   await fila.locator('[data-sn-icon-id="campo:cut"]').click();
-  await expect.poll(() => appunti(app)).toBe('45');
-  await expect.poll(() => page.locator('#numero').inputValue()).toBe('123');
+  await expect.poll(() => appunti(app)).toBe('12');
+  await expect.poll(() => page.locator('#numero').inputValue()).toBe('345');
+  await page.keyboard.press('Control+z');
+  await expect.poll(() => page.locator('#numero').inputValue()).toBe('12345');
 });
 
 test('esplora: Taglia in un campo ricco tiene il grassetto come Ctrl+X e si annulla', async ({ app, openTab, testServer }) => {
