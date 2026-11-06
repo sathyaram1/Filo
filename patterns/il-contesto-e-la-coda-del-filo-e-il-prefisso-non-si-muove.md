@@ -53,7 +53,9 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   dieci minuti. Il sospetto (SPEC-CONTESTO § Il sospetto non passa nel riassunto): le letture sopra la soglia di pulito
   arrivano a chi compatta come riga del codice (ora, indirizzo, titolo, parole), le fonti delle chat scadono col punto
   compattato (`ts` su ogni fonte, rinnovato a ogni rilettura), e da un pezzo sospetto le memorie aspettano nel
-  quaderno, con un avviso nella cornice. Una conversazione cancellata porta via le righe del diario nate da lei.
+  quaderno, con un avviso nella cornice; una lettura è sospetta con la regola della sicurezza della chat (senza fonte,
+  pulita). Una conversazione cancellata porta via subito le righe del diario nate da lei, anche dal disco; una nascosta
+  le tiene, fuori dal CONTESTO finché non torna.
 - **I punti di cache stanno sui confini dei blocchi**: fine della parte fissa e fine del CONTESTO (tutte e due della
   durata scelta, un'ora di serie), fine del tratto prima della domanda, ultimo messaggio: quattro, il massimo di
   Anthropic. Il piano lo fa il cancello dei modelli sui messaggi già oscurati; lo scrive nel corpo solo il fornitore, e
