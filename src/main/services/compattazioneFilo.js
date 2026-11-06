@@ -163,7 +163,10 @@ async function compattaOra({ incognito, motivo = 'soglia', ora = Date.now(), tet
   if (typeof _dip.chiama !== 'function') return { fatto: false, motivo: 'senza_modello' };
   const t = tetti || FC().tetti(null, null);
   const lista = await daCompattare(incognito, { ora, tetti: t });
-  const taglio = L().puntoDiTaglio(lista, { ora, ore: grezzo && grezzo.ore != null ? grezzo.ore : L().ORE_GREZZE, turni: grezzo && grezzo.turni != null ? grezzo.turni : L().TURNI_GREZZI });
+  const taglio = L().puntoDiTaglio(lista, {
+    ora, ore: grezzo && grezzo.ore != null ? grezzo.ore : L().ORE_GREZZE, turni: grezzo && grezzo.turni != null ? grezzo.turni : L().TURNI_GREZZI,
+    maxToken: L().grezzoMassimo({ soglia: t.soglia, base: basi[lato(incognito)] }), peso: pesoDi,
+  });
   // Un pezzo enorme (il primo giro su giorni di filo mai compattati) va a pezzi: il resto lo prende la prossima. Con la
   // parte dell'utente davanti, chi compatta resta sotto il listino.
   const foto = CF().ultimaFotografia(incognito);
