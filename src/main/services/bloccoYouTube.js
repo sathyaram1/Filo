@@ -179,11 +179,6 @@ function ricaricaFrame(wc, frame) {
   if (principale) wc.reload(); else frame.reload();
 }
 
-// Un documento nuovo nella scheda chiede di nuovo le regole: quello di prima non può più dirle rotte.
-function documentoNuovo(wc) {
-  if (wc && typeof wc.id === 'number') conRegole.delete(wc.id);
-}
-
 function status() {
   return { enabled: acceso, regole: insieme.regole.length, ignote: insieme.ignote.slice(), versione, aggiornateIl, spente: spente.size };
 }
