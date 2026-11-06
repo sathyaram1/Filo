@@ -157,6 +157,22 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   mazzi rimanda il ragionamento intero). Prova: «A2» in
   `tests/dashboard-chat-strumenti.spec.mjs`, che trattiene gli eventi nel main
   finché la risposta è arrivata; senza la correzione la nota manca.
+- **L'Aiuto sui siti segue le stesse regole, in piccolo (#578.1).** Niente
+  frasi inventate: una rotella finché non c'è niente di vero, l'azione in
+  corso («Leggo la pagina», «Cerco sul web»), la trama del ragionamento che un
+  clic apre; a risposta arrivata resta una riga «Ragionamento · N s» da
+  aprire, senza ragionamento non resta niente. Il quadrato prende il posto
+  dell'invio (anche Invio a casella vuota e «Ferma» dal tasto destro), con la
+  stessa pausa (`SN_CONST.PAUSA_QUADRATO_MS`) e le stesse righe
+  (`SN_CHAT_ERRORS.FERMATO_QUI`, `FERMATO_PRIMA`). Fermare, chiudere davvero
+  e il pannello tolto dalla pagina passano da una strada sola
+  (`fermaLavoro`, src/content/sidebar.js): i passi in coda non partono, la
+  chiamata in volo si interrompe nel main (`MSG.AIUTO_FERMA`, valida solo
+  per chi l'ha chiesta, anche se arriva prima della richiesta) e una risposta
+  arrivata dopo non si usa. Il ragionamento arriva in diretta
+  (`MSG.AIUTO_RAGIONAMENTO`) e intero con la risposta, per la regola qui
+  sopra. Prove: `tests/aiuto-attesa.spec.mjs` e il pannello tolto in
+  `tests/aiuto-passi-da-solo.spec.mjs`.
 - Test: `tests/filo-attesa.spec.mjs` (filo, nodi, gomitolo, fermare e
   riprendere, con screenshot), `tests/secondo-gesto.spec.mjs` (secondi gesti,
   seguiti, stop dell'accoglienza), `tests/dashboard-chat-attivita.spec.mjs`.
