@@ -96,7 +96,7 @@ async function scaricaLista(nome, prendi) {
  * Riscarica le liste. Senza `forza` salta se la copia ha meno di un giorno. Una lista che non arriva lascia le regole
  * di prima: meglio regole di ieri che nessuna.
  */
-function aggiorna({ forza = false, prendi = require('./adblock').fetchList } = {}) {
+function aggiorna({ forza = false, prendi = prendiListe } = {}) {
   if (giro) return giro;
   giro = (async () => {
     if (!forza && aggiornateIl && Date.now() - aggiornateIl < OGNI_MS) return { ok: true, saltato: true, versione };
