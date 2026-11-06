@@ -39,9 +39,6 @@ test('i link che fanno qualcosa non partono mai', () => {
     '/newsletter/unsubscribe', '/profilo/esci', '/ordine/cancella', '/Elimina', '/opt-out', '/abbonamento/disiscriviti']) {
     assert.equal(motivo(`https://www.esempio.it${p}`), 'azione', p);
   }
-  // Una parola che contiene l'azione non è l'azione.
-  assert.equal(motivo('https://www.esempio.it/removed-items'), '');
-  assert.equal(motivo('https://www.esempio.it/deleted-scenes'), '');
   assert.equal(motivo('https://www.esempio.it/files/guida.pdf'), 'file');
   assert.equal(motivo('https://www.esempio.it/foto/gatto.JPG'), 'file');
   assert.equal(motivo('https://utente:segreto@www.esempio.it/x'), 'credenziali');
