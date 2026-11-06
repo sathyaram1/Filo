@@ -18,10 +18,9 @@
     let u;
     try { u = new URL(rawUrl); } catch (_) { return ['url_invalido']; }
     const query = (u.search || '').toLowerCase();
-    const AZIONI = /(^|[/?&=])(unsubscribe|optout|opt-out|logout|signout|sign-out|delete|remove|confirm|verify|reset|cancel)([/?&=]|$)/;
     // #725 — il percorso NON si abbassa a minuscole: un indirizzo che esegue
     // un'azione è minuscolo, «/wiki/Delete» è il titolo di una voce.
-    if (AZIONI.test(u.pathname) || AZIONI.test(query)) flags.push('side_effect');
+    if (pezzoAzione(u.pathname) || pezzoAzione(query)) flags.push('side_effect');
     if (haCredenziale(query)) flags.push('token_in_url');
 
     // #725.2 — si guarda il nome come lo vede chi legge (unicode), non come
