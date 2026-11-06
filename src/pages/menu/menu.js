@@ -278,38 +278,9 @@
     cerca = c;
   }).observe(document.documentElement, { childList: true });
 
-  // Le icone trascinate dalla fila verso la barra laterale: i px dello strato sono quelli della scheda (#871, #1434).
-  let barra = null;
-  let mira = null;
-  let inVolo = false;
-  const trascina = (d) => Promise.resolve(api.barra(d)).catch(() => null);
-  Menu.setPonteBarra({
-    inizio(id, menuSinistra) {
-      barra = null;
-      mira = null;
-      // Un'azione dell'elemento (grassetto, salva immagine) nella barra non avrebbe su cosa agire.
-      inVolo = !/:/.test(String(id || ''));
-      if (!inVolo) return;
-      trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barra = { larghezza: Number(r.larghezza) || 0 }; });
-    },
-    sopra(x, y) {
-      const dentro = !!barra && x <= barra.larghezza;
-      const nuova = dentro ? Math.round(y) : null;
-      if (nuova !== mira) { mira = nuova; trascina({ fase: 'sopra', y: nuova }); }
-      return dentro;
-    },
-    posa(id, x, y) {
-      if (!barra || x > barra.larghezza) return false;
-      trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
-      return true;
-    },
-    fine() {
-      barra = null;
-      mira = null;
-      if (inVolo) trascina({ fase: 'fine' });
-      inVolo = false;
-    },
-  });
+  // Le icone trascinate dalla fila verso la barra laterale: i px dello strato sono quelli della scheda (#871, #1434). Il
+  // gesto e quale icona può andare nella barra li decide menu.js, lo stesso della pagina.
+  Menu.setPonteBarra((d) => api.barra(d));
 
   // Fuori dal menu c'è solo lo strato vuoto: chiude, e un tasto destro lì apre il menu nuovo sulla scheda (il Ctrl+clic
   // del Mac arriva già come tasto destro).

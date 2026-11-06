@@ -214,7 +214,9 @@ test('la home manda reazioni e copie dell’elenco chiuso, e ogni chiusura di un
   }
   assert.match(home, /document\.addEventListener\('copy',/);
   assert.match(home, /document\.addEventListener\('filo-copia',/);
-  assert.match(leggi('src', 'content', 'content.js'), /onClick: copia \}/, 'il Copia del tasto destro lo dice alla pagina');
+  // Voci e fila prendono il Copia dallo stesso posto (#1434.2).
+  assert.match(leggi('src', 'content', 'content.js'), /out\.copy = \(\) => \{ Actions\.copySelection\(selInfo\.selection\); copiatoNellaPagina\(target\); \};/,
+    'il Copia del tasto destro lo dice alla pagina');
 
   const chiamate = [...`${handlers}\n${filo}`.matchAll(/closeAndTriageChat\(([^()]*(?:\([^()]*\)[^()]*)*)\)/g)].map((m) => m[1])
     .filter((a) => !/^chatId, opz = \{\}$/.test(a));

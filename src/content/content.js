@@ -31,7 +31,6 @@
     spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
-    isContentFullscreen: () => contentFullscreen,
     aiutoPasso: () => aiutoPasso(),
     aiutoStato: () => Sidebar?.stato?.(),
     aiutoAcceso: () => aiutoAcceso(),
@@ -1375,7 +1374,7 @@
     contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await Actions.getClipboardHistory();
+    const clipboardHistory = await primaDelMenu();
     const items = buildMenuItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
     });
@@ -1460,6 +1459,13 @@
           && document.execCommand('insertText', false, suggestion)) return;
     } catch (_) {}
     chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion });
+  }
+
+  // Quello che il menu chiede al main prima di aprirsi, insieme: la cronologia degli appunti e lo stato delle icone della
+  // finestra portate nella fila (Indietro spento senza dove tornare).
+  async function primaDelMenu() {
+    const [cronologia] = await Promise.all([Actions.getClipboardHistory(), Promise.resolve(MenuIcons?.prepara?.()).catch(() => {})]);
+    return cronologia;
   }
 
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
@@ -1839,7 +1845,8 @@
     const value = el.value || '';
     const selection = value.slice(start, end).trim();
     if (!selection) return null;
-    if (Extract.campoSegreto?.(el)) return { selection, sentence: selection, segreto: true };
+    const s = Extract.segretezza?.(null, el);
+    if (s && s.segreto) return { selection, sentence: selection, ...s };
     return { selection, sentence: value.trim() || selection };
   }
 
@@ -1875,7 +1882,7 @@
     // usava un contesto stantio e incollava all'inizio del campo.
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await Actions.getClipboardHistory();
+    const clipboardHistory = await primaDelMenu();
     return buildMenuItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
     });
@@ -2557,13 +2564,12 @@
     const items = [];
     const di = (nome, campi = {}) => Object.assign(contesto, { nome, ...campi });
     const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
-    const copia = () => { Actions.copyToClipboard(selInfo.selection); copiatoNellaPagina(target); };
+    const sel = azioniDellaSelezione(selInfo, target);
 
     if (selInfo && editable) {
-      const ricco = campoRicco(target);
-      di(ricco && !selInfo.segreto ? 'scrivibile' : 'campo', { segreto: !!selInfo.segreto });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
+      di(contestoDelCampo(selInfo, target), { segreto: !!selInfo.segreto });
+      if (sel.cut) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: sel.cut });
+      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
@@ -2581,14 +2587,9 @@
 
     if (selInfo) {
       di('testo', { segreto: !!selInfo.segreto });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
+      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
       if (selInfo.segreto) return items;
-      items.push({
-        type: 'item',
-        azione: 'search-web',
-        label: I18n.t('menu_search_text'),
-        onClick: () => Actions.searchTextOnWeb(selInfo.selection),
-      });
+      items.push({ type: 'item', azione: 'search-web', label: I18n.t('menu_search_text'), onClick: sel.search });
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -2731,6 +2732,25 @@
     return items;
   }
 
+  // Taglia, Copia e Cerca sul testo selezionato, una volta sola: le voci e la fila (#1434) fanno la stessa cosa. Su un
+  // campo coperto (una password) Taglia e Copia mancano, come nel menu del sistema; su uno segreto manca Cerca.
+  function azioniDellaSelezione(selInfo, target) {
+    const out = {};
+    if (!selInfo) return out;
+    if (!selInfo.coperto) {
+      out.cut = () => Actions.cutSelection();
+      out.copy = () => { Actions.copySelection(selInfo.selection); copiatoNellaPagina(target); };
+    }
+    if (!selInfo.segreto) out.search = () => Actions.searchTextOnWeb(selInfo.selection);
+    return out;
+  }
+
+  // Il testo selezionato dove si scrive: con la formattazione la fila mette grassetto e corsivo, in una casella (una
+  // barra di ricerca, un'area di testo, un campo «solo testo») taglia, copia e incolla.
+  function contestoDelCampo(selInfo, target) {
+    return campoRicco(target) && !selInfo.segreto ? 'scrivibile' : 'campo';
+  }
+
   // Il campo dove si scrive con la formattazione (il foglio dell'Editor, un campo ricco di un sito): lì la fila mette
   // grassetto e corsivo. Un campo «solo testo» non ne ha, e resta una casella.
   function campoRicco(target) {
@@ -2808,8 +2828,8 @@
     const nome = contesto && contesto.nome;
     if (!nome || !MenuIcons?.fila) return null;
     const testo = selInfo ? selInfo.selection : '';
-    const copia = () => { Actions.copyToClipboard(testo); copiatoNellaPagina(target); };
-    const cerca = contesto.segreto ? null : { onClick: () => Actions.searchTextOnWeb(testo) };
+    const sel = azioniDellaSelezione(selInfo, target);
+    const daSel = (k) => (sel[k] ? { onClick: sel[k] } : null);
     const azioni = {};
     if (nome === 'scrivibile') {
       Object.assign(azioni, {
@@ -2823,23 +2843,23 @@
           tieneAperto: true,
           onClick: (ancora) => Menu.openLinkSubmenu(ancora, { valore: collegamentoProposto(selInfo, clipboardHistory), onApplica: (v) => collega(v) }),
         },
-        cut: { onClick: () => Actions.cutSelection() },
-        copy: { onClick: copia },
-        search: cerca,
+        cut: daSel('cut'),
+        copy: daSel('copy'),
+        search: daSel('search'),
       });
       const stato = statoFormattazione();
       for (const k of Object.keys(stato)) azioni[k].acceso = stato[k];
     } else if (nome === 'campo') {
       Object.assign(azioni, {
-        cut: { onClick: () => Actions.cutSelection() },
-        copy: { onClick: copia },
+        cut: daSel('cut'),
+        copy: daSel('copy'),
         paste: { onClick: () => Actions.pasteFromClipboard() },
-        search: cerca,
+        search: daSel('search'),
       });
     } else if (nome === 'testo') {
-      Object.assign(azioni, { copy: { onClick: copia } });
+      Object.assign(azioni, { copy: daSel('copy') });
       if (!contesto.segreto) {
-        azioni.search = cerca;
+        azioni.search = daSel('search');
         azioni.translate = { onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) };
         const leggi = TTS.buildReadAloudItem(testo);
         if (leggi) azioni.readAloud = { onClick: leggi.onClick };
@@ -2853,19 +2873,7 @@
       const a = azioniDelLink(contesto.link);
       for (const k of ['openTab', 'copy', 'saveForLater', 'share']) azioni[k] = { onClick: a[k] };
     } else if (nome === 'media' && contesto.media) {
-      const el = contesto.media;
-      const audio = Actions.isAudioEl(el);
-      Object.assign(azioni, {
-        playPause: { onClick: () => Actions.toggleMediaPlay(el), icona: el.paused ? 'play' : 'pause', label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause') },
-        mute: { onClick: () => Actions.toggleMediaMute(el), icona: el.muted ? 'volume' : 'volumeMute', label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute') },
-        save: { onClick: () => Actions.downloadMedia(el, contesto.link || null), label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as') },
-        loop: { onClick: () => Actions.toggleMediaLoop(el), label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop') },
-        pip: Actions.mediaPipAvailable(el)
-          ? { onClick: () => Actions.toggleMediaPip(el), label: I18n.t(Actions.isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip') }
-          : null,
-        copyLink: { onClick: () => Actions.copyMediaUrl(el), label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link') },
-        ...azioniDellAnteprima(contesto.link),
-      });
+      Object.assign(azioni, Actions.azioniDelMedia(contesto.media, contesto.link || null), azioniDellAnteprima(contesto.link));
     } else if (nome === 'cursore') {
       azioni.paste = { onClick: () => Actions.pasteFromClipboard() };
       const detta = TTS.buildDictateItem(target);

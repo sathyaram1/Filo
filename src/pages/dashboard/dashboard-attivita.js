@@ -998,7 +998,7 @@
       const D = window.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
       const nome = D && D.esiste && D.esiste(id) ? D.nome(id) : id;
-      const zona = D && D.zonaDaDove ? D.zonaDaDove(a.dove, a.contesto || (D.AZIONI && D.AZIONI[id] ? D.AZIONI[id].contesto : '')) : '';
+      const zona = D && D.zonaDellAzione ? D.zonaDellAzione(a) : '';
       const dove = zona ? `${D.nomeZona(zona).in} ${D.nomeZona(zona).nome}` : '';
       return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
     },

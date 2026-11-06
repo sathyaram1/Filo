@@ -18,7 +18,6 @@
   })();
 
   let deps = {
-    isContentFullscreen: () => false,
     aiutoPasso: () => {},
     aiutoAcceso: () => true,
     aiutoStato: () => null,
@@ -60,41 +59,34 @@
     return reg;
   }
 
-  // Le icone della finestra portate dalla barra nella fila (#1434): le esegue il main, come per la barra.
+  // Le icone della finestra portate dalla barra nella fila (#1434): disegno, nome, se è spenta e chi la vede li dice il
+  // main con la stessa regola della barra, e le esegue lui per la stessa strada (src/main/barraLaterale.js). Qui resta
+  // l'Aiuto, che vive nella pagina e il cui aspetto viene da aspettoAiuto, come nella barra.
+  let finestra = {};
+  const finestraInFila = () => Disp.ZONE_FILA.some((z) => (disposizione()[z] || []).some((id) => Disp.noto(id) && Disp.ICONE[id].tipo === 'finestra'));
+  function chiediFinestra() {
+    if (IS_SUBFRAME || !finestraInFila()) return Promise.resolve();
+    return manda({ type: MSG.FILA_FINESTRA }).then((r) => { finestra = r && r.ok && r.icone && typeof r.icone === 'object' ? r.icone : {}; });
+  }
+
   function registroFinestra() {
-    const Icons = global.SN_ICONS;
-    const Actions = global.SN_ACTIONS;
-    const I = (name) => Icons[name](18);
-    const isFs = !!(document.fullscreenElement || deps.isContentFullscreen());
+    const I = (name) => global.SN_ICONS[name](18);
     const stato = (typeof deps.aiutoStato === 'function' && deps.aiutoStato()) || {};
     const aiuto = Disp.aspettoAiuto({ ...stato, risposta: !!stato.nonLetta });
     const spento = !deps.aiutoAcceso();
     const reg = {
-      help:        { id: 'help',        icon: I(spento ? 'help' : aiuto.icona), label: I18n.t(spento ? 'aiuto_spento_barra' : aiuto.etichetta), disabled: spento, onClick: () => deps.aiutoPasso() },
-      fullscreen:  { id: 'fullscreen',  icon: isFs ? I('shrink') : I('zoom'), label: I18n.t(isFs ? 'menu_exit_fullscreen' : 'menu_fullscreen'), tasto: global.SN_TASTI?.etichettaSchermoIntero(), onClick: () => Actions.toggleFullscreen() },
-      back:        { id: 'back',        icon: I('back'),        label: I18n.t('menu_back'),         onClick: () => manda({ type: MSG.NAV_BACK }) },
-      forward:     { id: 'forward',     icon: I('forward'),     label: I18n.t('menu_forward'),      onClick: () => manda({ type: MSG.NAV_FORWARD }) },
-      reload:      { id: 'reload',      icon: I('reload'),      label: I18n.t('menu_reload'),       onClick: () => manda({ type: MSG.NAV_RELOAD }) },
-      closeTab:    { id: 'closeTab',    icon: I('close'),       label: I18n.t('menu_close_tab'),    onClick: () => manda({ type: MSG.CLOSE_TAB, via: 'tasto_destro_riga' }) },
-      newTab:      { id: 'newTab',      icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),      onClick: () => manda({ type: MSG.OPEN_NEW_TAB }) },
-      incognito:   { id: 'incognito',   icon: I('incognito'),   label: I18n.t('menu_incognito'),    onClick: () => manda({ type: MSG.OPEN_INCOGNITO }) },
-      openOptions: { id: 'openOptions', icon: I('models'),      label: I18n.t('menu_open_options'), onClick: () => manda({ type: MSG.OPEN_OPTIONS }) },
-      home:        { id: 'home',        icon: I('home'),        label: I18n.t('menu_open_home'),    onClick: () => manda({ type: MSG.GO_HOME }) },
-      editorApp:   { id: 'editorApp',   icon: I('editor'),      label: I18n.t('menu_open_editor'),  onClick: () => manda({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
+      help: { id: 'help', icon: I(spento ? 'help' : aiuto.icona), label: I18n.t(spento ? 'aiuto_spento_barra' : aiuto.etichetta), disabled: spento, onClick: () => deps.aiutoPasso() },
     };
-    // «Feedback» porta alla posta delle segnalazioni, che a un utente comune è un vicolo cieco (#583).
-    if (isOwner) reg.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => manda({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
+    // Un'icona che il main non ha descritto (del solo owner, o lui non ha risposto) non si disegna.
+    for (const [id, f] of Object.entries(finestra)) {
+      if (!Disp.noto(id) || Disp.ICONE[id].tipo !== 'finestra' || !f || typeof global.SN_ICONS[f.icona] !== 'function') continue;
+      reg[id] = {
+        id, icon: I(f.icona), label: String(f.etichetta || ''), tasto: f.tasto || undefined, disabled: !!f.spenta,
+        ...(f.accesa ? { acceso: true } : {}),
+        onClick: () => manda({ type: MSG.FILA_FINESTRA_ESEGUI, id }),
+      };
+    }
     return reg;
-  }
-
-  let isOwner = false;
-  function refreshOwner() {
-    manda({ type: MSG.AUTH_STATUS }).then((r) => {
-      const ora = !!(r && r.ok && r.signedIn && r.isAdmin);
-      if (ora === isOwner) return;
-      isOwner = ora;
-      ridisegna();
-    });
   }
 
   // Le icone si misurano dal clic alla fine della loro azione (#1461). Quelle della finestra le esegue e le misura il
@@ -145,9 +137,12 @@
     manda({ type: MSG.ICON_LAYOUT_GET }).then((r) => { if (r && r.ok && setLayout(r.layout)) ridisegna(); });
   }
 
-  // Cambiata altrove (un'altra scheda, la barra, la chat, un annullo): il menu aperto si ridisegna.
+  // Cambiata altrove (un'altra scheda, la barra, la chat, un annullo): il menu aperto si ridisegna. Un'icona della
+  // finestra appena arrivata nella fila ha l'aspetto solo dal main: si richiede, o la fila la perde (#1434.2).
   function layoutCambiato(v) {
-    if (setLayout(v)) ridisegna();
+    if (!setLayout(v)) return;
+    ridisegna();
+    if (aperta) ridisegnaFinestra();
   }
 
   // Il gesto si vede subito qui, poi vale quello che il main ha scritto. `source` 'bar': arriva dalla barra laterale.
@@ -156,6 +151,7 @@
     const locale = Disp.applicaPosa(disposizione(), { id, target, beforeId: beforeId || null });
     if (locale) layout = locale;
     ridisegna();
+    if (Disp.ICONE[id]?.tipo === 'finestra') ridisegnaFinestra();
     manda({ type: MSG.ICON_LAYOUT_DROP, id, source: source === 'bar' ? 'bar' : 'menu', target, beforeId: beforeId || null })
       .then((r) => { if (r && r.ok) layoutCambiato(r.layout); });
   }
@@ -210,7 +206,6 @@
   // `acceso` uno stile che la selezione ha già (Grassetto).
   function fila(contesto, azioni = {}) {
     if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
-    refreshOwner();
     aperta = { contesto, azioni: azioni || {} };
     const c = costruisci();
     return {
@@ -234,40 +229,8 @@
   }
 
   // ── la barra laterale, terza zona (#871) ─────────────────────────────────
-  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra.
-  let barraAperta = null;
-  let miraInviata = null;
-  let inVolo = false;
-  const trascina = (dati) => manda({ type: MSG.BARRA_TRASCINA, ...dati });
-  if (!IS_SUBFRAME) {
-    Menu.setPonteBarra?.({
-      inizio(id, menuSinistra) {
-        barraAperta = null;
-        miraInviata = null;
-        // Un'azione dell'elemento non va nella barra: lì non c'è un elemento su cui farla.
-        inVolo = Disp.noto(id);
-        if (!inVolo) return;
-        trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
-      },
-      sopra(x, y) {
-        const dentro = !!barraAperta && x <= barraAperta.larghezza;
-        const mira = dentro ? Math.round(y) : null;
-        if (mira !== miraInviata) { miraInviata = mira; trascina({ fase: 'sopra', y: mira }); }
-        return dentro;
-      },
-      posa(id, x, y) {
-        if (!barraAperta || x > barraAperta.larghezza) return false;
-        trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
-        return true;
-      },
-      fine() {
-        barraAperta = null;
-        miraInviata = null;
-        if (inVolo) trascina({ fase: 'fine' });
-        inVolo = false;
-      },
-    });
-  }
+  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra. Il gesto sta in menu.js.
+  if (!IS_SUBFRAME) Menu.setPonteBarra?.((dati) => manda({ type: MSG.BARRA_TRASCINA, ...dati }));
 
   // Un'icona portata fuori dalla barra sopra questa pagina: se il menu è aperto ci cade dentro.
   function dallaBarra(msg) {
@@ -285,11 +248,16 @@
 
   function init(d) { deps = { ...deps, ...d }; }
 
+  // Lo stato delle icone della finestra è cambiato col menu aperto (lo schermo intero spento da un'altra strada, #514).
+  function ridisegnaFinestra() {
+    chiediFinestra().then(ridisegna, ridisegna);
+  }
+
   loadIconLayout();
-  refreshOwner();
 
   global.SN_MENU_ICONS = {
     init, fila, runIconAction, statoPerBarra, layoutCambiato, dallaBarra,
-    redrawIconRows: ridisegna,
+    prepara: chiediFinestra,
+    redrawIconRows: ridisegnaFinestra,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

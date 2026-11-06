@@ -606,6 +606,8 @@ class BarraLaterale {
     if (!D || !D.valida(layout)) return;
     const l = D.migra(layout).layout;
     this.layout = { bar: l.bar, secondary: l.secondary };
+    // Le icone della barra portate in una fila del tasto destro: lì le esegue questa stessa barra (#1434.2).
+    this.inFila = new Set(D.ZONE_FILA.flatMap((z) => l[z]).filter((id) => D.noto(id)));
     this._invia();
   }
 
@@ -697,7 +699,6 @@ class BarraLaterale {
 
   _icone() {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const I18n = globalThis.SN_I18N;
     if (!D || !this.layout) return [];
     const nav = this._nav();
     const owner = this._owner();
@@ -705,21 +706,45 @@ class BarraLaterale {
     const out = [];
     const zone = [...this.layout.bar.map((id) => [id, false]), ...this.layout.secondary.map((id) => [id, true])];
     for (const [id, riserva] of zone) {
-      const d = D.ICONE[id];
-      if (!d || (d.soloOwner && !owner)) continue;
-      if (d.tipo === 'aiuto') { out.push({ ...this._iconaAiuto(id, nav.aiuto), riserva }); continue; }
-      let icona = d.icona;
-      let chiave = d.etichetta;
-      if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
-      let etichetta = I18n ? I18n.t(chiave) : id;
-      const sp = dallaPagina && dallaPagina[id];
-      if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
-      const ferma = d.tipo === 'pagina' && nav.pagina ? this._motivoAzione(id, nav) : '';
-      const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
-        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || !!ferma));
-      const motivo = ferma && I18n ? I18n.t(MOTIVI_AZIONI_SPENTE[ferma]) : '';
-      const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      out.push({ id, icona, etichetta, tasto, spenta, motivo, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', riserva });
+      const it = this._descrivi(id, { nav, owner, dallaPagina });
+      if (it) out.push({ ...it, riserva });
+    }
+    return out;
+  }
+
+  // Un'icona come la vede chi la usa adesso, nella barra e nella fila del tasto destro: disegno, nome, spenta e perché.
+  // null per chi non la vede.
+  _descrivi(id, { nav, owner, dallaPagina = null }) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const I18n = globalThis.SN_I18N;
+    const d = D.ICONE[id];
+    if (!d || (d.soloOwner && !owner)) return null;
+    if (d.tipo === 'aiuto') return this._iconaAiuto(id, nav.aiuto);
+    let icona = d.icona;
+    let chiave = d.etichetta;
+    if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
+    let etichetta = I18n ? I18n.t(chiave) : id;
+    const sp = dallaPagina && dallaPagina[id];
+    if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
+    const ferma = d.tipo === 'pagina' && nav.pagina ? this._motivoAzione(id, nav) : '';
+    const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
+      || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || !!ferma));
+    const motivo = ferma && I18n ? I18n.t(MOTIVI_AZIONI_SPENTE[ferma]) : '';
+    const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
+    return { id, icona, etichetta, tasto, spenta, motivo, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' };
+  }
+
+  // Le icone della finestra per la fila del tasto destro della scheda davanti, per id: quelle che questa persona vede.
+  iconeFila() {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    if (!D) return {};
+    const nav = this._nav();
+    const owner = this._owner();
+    const out = {};
+    for (const id of Object.keys(D.ICONE)) {
+      if (D.ICONE[id].tipo !== 'finestra') continue;
+      const it = this._descrivi(id, { nav, owner });
+      if (it) out[id] = { icona: it.icona, etichetta: it.etichetta, tasto: it.tasto, spenta: !!it.spenta, accesa: !!it.accesa };
     }
     return out;
   }
@@ -813,15 +838,24 @@ class BarraLaterale {
 
   // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
   // `daAltro`: scelta dentro «Altro…», per i contatori (#1471).
-  esegui(id, { colore = '', daAltro = false } = {}) {
+  // `via` 'fila': premuta nella fila del tasto destro della scheda davanti, dove sta un'icona della finestra (#1434.2);
+  // lì è spenta come nella barra, e non conta come una scelta fatta nella barra.
+  esegui(id, { colore = '', daAltro = false, via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
-    if (!d || !this.layout || !this._inBarra().includes(id)) return;
+    const dallaFila = via === 'fila';
+    if (!d || !this.layout || !(dallaFila ? this.inFila && this.inFila.has(id) && d.tipo === 'finestra' : this._inBarra().includes(id))) return;
     if (d.soloOwner && !this._owner()) return;
-    if (daAltro && Array.isArray(this.layout.secondary) && this.layout.secondary.includes(id)) this._contaGesto('altro_del_menu', { icona: id });
-    this._lettura().clic(id);
-    this._esito('azione');
-    this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
+    if (dallaFila) {
+      const it = this._descrivi(id, { nav: this._nav(), owner: this._owner() });
+      if (!it || it.spenta) return;
+    } else {
+      if (daAltro && Array.isArray(this.layout.secondary) && this.layout.secondary.includes(id)) this._contaGesto('altro_del_menu', { icona: id });
+      this._lettura().clic(id);
+      this._esito('azione');
+      this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
+    }
+    const strada = dallaFila ? 'tasto_destro_riga' : 'barra';
     const tabs = this.tabs;
     const attiva = this._attiva();
     const incognito = this._incognito();
@@ -837,7 +871,7 @@ class BarraLaterale {
       this._consegnaInAttesa();
       return;
     }
-    const daTastiera = this.motivo === 'tasto';
+    const daTastiera = !dallaFila && this.motivo === 'tasto';
     const fai = () => {
       switch (id) {
         case 'back': tabs.navigaCronologia('indietro'); break;
@@ -848,7 +882,7 @@ class BarraLaterale {
           else tabs.openTab('filo://newtab/');
           break;
         case 'newTab': tabs.openTab('filo://newtab/'); break;
-        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: 'barra' }); break;
+        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: strada }); break;
         case 'fullscreen': tabs.toggleContentFullscreen(); break;
         case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
         case 'openOptions': tabs.openTab('filo://options/options.html'); break;
@@ -861,9 +895,9 @@ class BarraLaterale {
     const azione = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.AZIONE_DI_ICONA[id];
     // Le strade (#1468): indietro e avanti contano anche nella cronologia, un'icona che apre una pagina anche fra le pagine;
     // la chiusura la conta la scheda che si chiude, dalla sua via.
-    if (id === 'back' || id === 'forward') Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', 'barra', { incognito });
-    else if (id !== 'closeTab') Strade.misura('azione', id, 'barra', { incognito });
-    if (PAGINA_DELL_ICONA[id]) Strade.misura('pagina', PAGINA_DELL_ICONA[id], 'barra', { finestra: tabs, incognito });
+    if (id === 'back' || id === 'forward') Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', strada, { incognito });
+    else if (id !== 'closeTab') Strade.misura('azione', id, strada, { incognito });
+    if (PAGINA_DELL_ICONA[id] && !dallaFila) Strade.misura('pagina', PAGINA_DELL_ICONA[id], 'barra', { finestra: tabs, incognito });
     const fatto = azione ? AzioniContate.azione(azione, fai, { incognito: !!this.win._filoIncognito }) : fai();
     if (!fatto) return;
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.

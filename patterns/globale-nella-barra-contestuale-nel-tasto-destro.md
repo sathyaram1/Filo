@@ -148,6 +148,18 @@ per le azioni sulla pagina intera, che stavano in una fila in cima al menu (#124
   la sua fila ha Apri in nuova tab, e il «+» Copia URL, azioni del suo contesto
   che compaiono solo dove il collegamento c'è (giro 2).
 - **Tante icone vanno a capo**, mai fuori dal bordo del menu.
+- **Un'azione vive in un posto solo, e voci e fila la prendono da lì** (#1434.2): `azioniDellImmagine`,
+  `azioniDelLink`, `azioniDellaSelezione` (`content.js`), `azioniDelMedia` (`actions.js`), coi nomi che dicono lo
+  stato. Due copie avevano già diviso la stessa azione sullo stesso elemento. Taglia fa come il sistema: appunti, poi
+  una cancellazione vera che Ctrl+Z annulla, anche nelle caselle per l'email o i numeri (che non espongono la
+  selezione); in un campo coperto (password) né Taglia né Copia, come nel menu del sistema.
+- **Le icone della finestra portate nella fila le descrive e le esegue la barra** (`_descrivi`, `iconeFila`,
+  `esegui` con `via: 'fila'` in `src/main/barraLaterale.js`): spente quando lo sono nella barra (Indietro senza dove
+  tornare), «Feedback» solo all'owner. La pagina chiede lo stato prima di aprire il menu, insieme agli appunti.
+- **Il trascinamento verso la barra è uno solo** (`ponteVersoLaBarra` in `src/content/menu.js`): la pagina e lo
+  strato del menu passano solo la strada verso il main, e quale icona può andare nella barra lo dice il catalogo.
+- **La parola detta a Filo e il posto** si traducono in `zonaDellAzione` e `doveDaZona`: chi sposta, la conferma, la
+  riga nelle attività e il filo passano da lì.
 - Catalogo: `src/shared/disposizioneIcone.js`; chi esegue:
   `src/content/content.js` (`filaContestuale`); chi disegna:
   `src/content/menuIcons.js`.

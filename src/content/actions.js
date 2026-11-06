@@ -32,18 +32,62 @@
 
   // Gli appunti li scrive prima il main (anche in cronologia): la pagina può non avere il fuoco, come col visore PDF
   // o dopo un clic nella barra laterale (#1343). Se il main dice no, ci prova la pagina.
-  async function copyToClipboard(text) {
+  // `html`: la stessa selezione con la sua formattazione, come la mette il Copia del sistema.
+  async function scriviNegliAppunti(text, html = '') {
+    const conHtml = typeof html === 'string' && html ? { html } : {};
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text });
-      if (r && r.ok) { Popup.showToast(I18n.t('toast_copied')); return; }
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text, ...conHtml });
+      if (r && r.ok) return true;
     } catch (_) {}
-    navigator.clipboard.writeText(text).then(
-      () => {
-        Popup.showToast(I18n.t('toast_copied'));
-        pushClipboardEntry({ type: 'text', text });
-      },
-      () => {/* niente toast su errore — UX silenziosa */}
-    );
+    try {
+      if (conHtml.html && typeof ClipboardItem === 'function') {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+          'text/html': new Blob([conHtml.html], { type: 'text/html' }),
+        })]);
+      } else await navigator.clipboard.writeText(text);
+    } catch (_) { return false; }
+    pushClipboardEntry({ type: 'text', text });
+    return true;
+  }
+
+  async function copyToClipboard(text, html = '') {
+    // Niente toast su errore: UX silenziosa.
+    if (await scriviNegliAppunti(text, html)) Popup.showToast(I18n.t('toast_copied'));
+  }
+
+  // La selezione della pagina (testo o campo con la formattazione) in HTML, coi contenitori che le danno lo stile
+  // (un grassetto selezionato da dentro è ancora grassetto), come il Copia del sistema (#1434.2). '' in una casella.
+  const IN_LINEA = /^(B|STRONG|I|EM|U|S|STRIKE|DEL|INS|MARK|CODE|SUB|SUP|SMALL|BIG|FONT|SPAN|A|Q|CITE|KBD|ABBR)$/;
+  function htmlDellaSelezione() {
+    try {
+      const el = document.activeElement;
+      if (el?.matches?.('input, textarea')) return '';
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) return '';
+      const range = sel.getRangeAt(0);
+      let frammento = range.cloneContents();
+      let nodo = range.commonAncestorContainer;
+      if (nodo && nodo.nodeType !== 1) nodo = nodo.parentElement;
+      for (let i = 0; nodo && nodo !== document.body && i < 32 && IN_LINEA.test(nodo.tagName); nodo = nodo.parentElement, i++) {
+        const guscio = nodo.cloneNode(false);
+        guscio.appendChild(frammento);
+        frammento = guscio;
+      }
+      const box = document.createElement('div');
+      box.appendChild(frammento);
+      // Gli indirizzi relativi incollati altrove non porterebbero da nessuna parte.
+      for (const a of box.querySelectorAll('[href]')) { try { a.setAttribute('href', new URL(a.getAttribute('href'), document.baseURI).href); } catch (_) {} }
+      for (const a of box.querySelectorAll('[src]')) { try { a.setAttribute('src', new URL(a.getAttribute('src'), document.baseURI).href); } catch (_) {} }
+      return box.innerHTML;
+    } catch (_) { return ''; }
+  }
+
+  // Copia del tasto destro sulla selezione: con la formattazione, se la selezione è ancora quella del menu.
+  function copySelection(text) {
+    const qui = (window.getSelection()?.toString() || '').replace(/\s+/g, ' ').trim();
+    const html = qui && qui === String(text || '').replace(/\s+/g, ' ').trim() ? htmlDellaSelezione() : '';
+    return copyToClipboard(text, html);
   }
 
   // Negli appunti deve finire un indirizzo apribile: un javascript:, un data: o un
@@ -75,30 +119,33 @@
     return true;
   }
 
-  function cutSelection() {
-    // La selezione dentro <input>/<textarea> si recupera dal nodo attivo: regola in src/content/content.js.
-    const sel = window.getSelection();
-    let text = sel?.toString() || '';
-    const activeEl = document.activeElement;
-    const inInput = activeEl?.matches?.('input, textarea');
-    if (!text && inInput) {
-      const start = activeEl.selectionStart ?? 0;
-      const end = activeEl.selectionEnd ?? 0;
-      if (start !== end) text = (activeEl.value || '').slice(start, end);
+  // Il testo esatto selezionato nel campo dove si scrive. Una casella per l'email o per un numero non espone
+  // selectionStart: lì la selezione la dice il documento.
+  function testoSelezionatoQui() {
+    const el = document.activeElement;
+    if (el?.matches?.('input, textarea') && el.selectionStart != null && el.selectionEnd != null) {
+      return (el.value || '').slice(el.selectionStart, el.selectionEnd);
     }
+    return window.getSelection()?.toString() || '';
+  }
+
+  // Come il Taglia del sistema (#1434.2): il testo va negli appunti e lascia il campo con una cancellazione vera, che
+  // Ctrl+Z annulla, in ogni tipo di casella. La selezione è quella catturata all'apertura del menu.
+  async function cutSelection() {
+    deps.restorePasteContext();
+    const text = testoSelezionatoQui();
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      pushClipboardEntry({ type: 'text', text });
-      if (inInput) {
-        const start = activeEl.selectionStart ?? 0;
-        const end = activeEl.selectionEnd ?? 0;
-        activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
-        activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
-      } else {
-        document.execCommand('delete');
-      }
-    });
+    if (!(await scriviNegliAppunti(text, htmlDellaSelezione()))) { Popup.showToast(I18n.t('toast_cut_failed')); return; }
+    deps.restorePasteContext();
+    let tolto = false;
+    try { tolto = document.execCommand('delete'); } catch (_) { tolto = false; }
+    const el = document.activeElement;
+    if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
+    // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
+    const start = el.selectionStart;
+    el.value = el.value.slice(0, start) + el.value.slice(el.selectionEnd);
+    el.setSelectionRange(start, start);
+    el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'deleteByCut' })));
   }
 
   function blobToDataUrl(blob) {
@@ -1601,56 +1648,40 @@
     };
   }
 
+  // Le azioni di un filmato o di un audio, una volta sola: le voci del menu e le icone della fila (#1434) le prendono da
+  // qui, coi nomi che dicono lo stato. `icona`: il disegno per la fila, quando lo stato lo cambia. Manca chi qui non c'è
+  // (la finestra mobile dove il filmato non la permette).
+  function azioniDelMedia(el, link = null) {
+    const audio = isAudioEl(el);
+    return {
+      playPause: { label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'), icona: el.paused ? 'play' : 'pause', onClick: () => toggleMediaPlay(el) },
+      mute: { label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'), icona: el.muted ? 'volume' : 'volumeMute', onClick: () => toggleMediaMute(el) },
+      loop: { label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'), onClick: () => toggleMediaLoop(el) },
+      ...(mediaPipAvailable(el)
+        ? { pip: { label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'), onClick: () => toggleMediaPip(el) } }
+        : {}),
+      controls: { label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'), onClick: () => toggleMediaControls(el) },
+      copyLink: { label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'), onClick: () => copyMediaUrl(el) },
+      save: { label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'), onClick: () => downloadMedia(el, link) },
+    };
+  }
+
   // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
   function buildMediaItems(el, link = null) {
-    const audio = isAudioEl(el);
-    const items = [];
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'),
-      onClick: () => toggleMediaPlay(el),
-    });
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'),
-      onClick: () => toggleMediaMute(el),
-    });
-    items.push(buildMediaSpeedItem(el));
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'),
-      onClick: () => toggleMediaLoop(el),
-    });
-    if (mediaPipAvailable(el)) {
-      items.push({
-        type: 'item',
-        azione: 'video-pip',
-        label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'),
-        onClick: () => toggleMediaPip(el),
-      });
-    }
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'),
-      onClick: () => toggleMediaControls(el),
-    });
-    items.push({ type: 'separator' });
-    items.push({
-      type: 'item',
-      azione: 'copy-download-video',
-      label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'),
-      onClick: () => copyMediaUrl(el),
-    });
-    items.push({
-      type: 'item',
-      azione: 'copy-download-video',
-      label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
-      onClick: () => downloadMedia(el, link),
-    });
+    const a = azioniDelMedia(el, link);
+    const items = [
+      { type: 'item', azione: 'video-audio-controls', label: a.playPause.label, onClick: a.playPause.onClick },
+      { type: 'item', azione: 'video-audio-controls', label: a.mute.label, onClick: a.mute.onClick },
+      buildMediaSpeedItem(el),
+      { type: 'item', azione: 'video-audio-controls', label: a.loop.label, onClick: a.loop.onClick },
+    ];
+    if (a.pip) items.push({ type: 'item', azione: 'video-pip', label: a.pip.label, onClick: a.pip.onClick });
+    items.push(
+      { type: 'item', azione: 'video-audio-controls', label: a.controls.label, onClick: a.controls.onClick },
+      { type: 'separator' },
+      { type: 'item', azione: 'copy-download-video', label: a.copyLink.label, onClick: a.copyLink.onClick },
+      { type: 'item', azione: 'copy-download-video', label: a.save.label, onClick: a.save.onClick },
+    );
     return items;
   }
 
@@ -2155,6 +2186,7 @@
   global.SN_ACTIONS = {
     init,
     copyToClipboard,
+    copySelection,
     copyUrlToClipboard,
     isAddress,
     cutSelection,
@@ -2198,6 +2230,7 @@
     imageSearchUrlFor,
     // video / audio
     buildMediaItems,
+    azioniDelMedia,
     buildMediaSpeedItem,
     downloadMedia,
     copyMediaUrl,

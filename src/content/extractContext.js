@@ -117,15 +117,20 @@
       }
     } catch (_) {}
 
-    return selezioneSegreta(target) ? { selection: text, sentence: text, segreto: true } : { selection: text, sentence };
+    const s = segretezza(target);
+    return s.segreto ? { selection: text, sentence: text, ...s } : { selection: text, sentence };
   }
 
   // Una selezione dentro un campo segreto resta all'utente: si copia e si taglia, ma non va a nessun modello (#810.7).
-  function selezioneSegreta(target) {
-    let el = target?.closest?.('input, textarea') || document.activeElement;
-    for (let i = 0; el?.shadowRoot?.activeElement && i < 8; i++) el = el.shadowRoot.activeElement;
-    return !!el && /^(INPUT|TEXTAREA)$/.test(el.tagName) && campoSegreto(el);
+  // Se il campo la mostra coperta (una password) a schermo ci sono pallini: lì, come nel menu del sistema, non si taglia
+  // e non si copia (#1434.2). `campo`: l'elemento, quando chi chiede lo ha già.
+  function segretezza(target, campo = null) {
+    let el = campo || target?.closest?.('input, textarea') || document.activeElement;
+    for (let i = 0; !campo && el?.shadowRoot?.activeElement && i < 8; i++) el = el.shadowRoot.activeElement;
+    if (!el || !/^(INPUT|TEXTAREA)$/.test(el.tagName) || !campoSegreto(el)) return { segreto: false, coperto: false };
+    return { segreto: true, coperto: Segreti.copertoAschermo(el) };
   }
+  const selezioneSegreta = (target) => segretezza(target).segreto;
 
   // Euristiche semplici invece di Readability, per non gonfiare il bundle: <article>, <main>,
   // oppure il body filtrando nav, footer e aside.
@@ -1274,6 +1279,7 @@
     nomeElemento,
     campoSegreto,
     selezioneSegreta,
+    segretezza,
     // La foto per un modello la copre il main (services/fotoDellaPagina.js), che legge da qui i campi che ricordano.
     segreti: Segreti,
     viewportInfo,
