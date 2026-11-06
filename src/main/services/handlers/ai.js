@@ -255,7 +255,59 @@ module.exports = function register(on, ctx) {
     return { ...(ultima || {}), text: SENZA_VALORE };
   }
 
+  // L'Aiuto (#578.1): il suo turno riceve il ragionamento in diretta e il quadrato lo interrompe. La chiave è del
+  // mittente vero (lo strato, se l'Aiuto sta lì): un'altra pagina non ferma né ascolta un turno che non è suo.
+  const turniAiuto = new Map();
+  // Uno stop arrivato prima della sua richiesta (i messaggi non si aspettano fra loro) vale quando lei arriva.
+  const fermatiPrima = new Map();
+  const FERMATI_PRIMA_MS = 60 * 1000;
+  const FERMATI_PRIMA_MAX = 500;
+  function chiaveTurno(sender, turno) {
+    const wc = sender && (sender.strato || sender.wc);
+    const t = typeof turno === 'string' && /^[\w-]{1,64}$/.test(turno) ? turno : '';
+    return wc && typeof wc.id === 'number' && t ? `${wc.id}:${t}` : '';
+  }
+  function direttaAiuto(msg, sender) {
+    const chiave = msg && msg.action === SN_CONST.ACTIONS.HELP ? chiaveTurno(sender, msg.turno) : '';
+    if (!chiave) return null;
+    const controller = new AbortController();
+    if (fermatiPrima.delete(chiave)) controller.abort();
+    turniAiuto.set(chiave, controller);
+    const dest = sender.strato || sender.frame || sender.wc;
+    return {
+      signal: controller.signal,
+      onReasoning: (testo) => {
+        if (!testo || controller.signal.aborted) return;
+        try { dest.send('filo:broadcast', { type: MSG.AIUTO_RAGIONAMENTO, turno: msg.turno, testo: String(testo) }); } catch (_) {}
+      },
+      fine: () => { if (turniAiuto.get(chiave) === controller) turniAiuto.delete(chiave); },
+    };
+  }
+  on(MSG.AIUTO_FERMA, async (msg, sender) => {
+    const chiave = chiaveTurno(sender, msg && msg.turno);
+    if (!chiave) return { ok: false, code: 'BAD_TURNO' };
+    const c = turniAiuto.get(chiave);
+    if (c) {
+      turniAiuto.delete(chiave);
+      try { c.abort(); } catch (_) {}
+      return { ok: true };
+    }
+    const ora = Date.now();
+    for (const [k, t] of fermatiPrima) if (ora - t > FERMATI_PRIMA_MS || fermatiPrima.size >= FERMATI_PRIMA_MAX) fermatiPrima.delete(k);
+    fermatiPrima.set(chiave, ora);
+    return { ok: true };
+  });
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    const diretta = direttaAiuto(msg, sender);
+    try {
+      if (diretta && diretta.signal.aborted) return { ok: false, code: 'FERMATO', error: 'fermato' };
+      return await richiestaAI(msg, sender, origin, diretta ? { signal: diretta.signal, onReasoning: diretta.onReasoning } : {});
+    } finally {
+      if (diretta) diretta.fine();
+    }
+  });
+  async function richiestaAI(msg, sender, origin, diretta) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     if (await descrizioneSpenta(msg)) return { ok: false, code: 'DESCRIZIONE_SPENTA' };
     const fermata = fermataDalTetto(msg, sender);
