@@ -2329,6 +2329,23 @@
         return;
       }
     }
+    // O prima di un paragrafo semplice con testo: il suo primo carattere chiude il frammento, in un paragrafo suo.
+    const sotto = bloccoFine.nextElementSibling;
+    const testa = sotto && sotto.parentNode === bloccoFine.parentNode && sotto.tagName === 'P' && bloccoFine.tagName === 'P'
+      ? document.createTreeWalker(sotto, NodeFilter.SHOW_TEXT).nextNode() : null;
+    if (testa) {
+      const car = document.createRange();
+      car.setStart(sotto, 0);
+      car.setEnd(testa, 1);
+      if (testa.nodeValue.length && carattereSemplice(car)) {
+        const tutta = r.cloneRange();
+        tutta.setEnd(testa, 1);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, `${paragrafi(tag)}<p>${carattereVestito(car, sotto, testa)}</p>`);
+        cursoreIndietro(1);
+        return;
+      }
+    }
     document.execCommand('insertHTML', false, paragrafi(tag));
   }
   // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
