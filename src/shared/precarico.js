@@ -20,7 +20,8 @@
     RIPROVA_PERMESSO_MS: 5000,
     // Dopo un clic che non ha portato via la pagina (un file scaricato, una risposta vuota) i link a schermo ripartono.
     RIPRESA_DOPO_CLIC_MS: 8000,
-    // Del testo di un link basta l'inizio: una scheda intera dentro un link non dice di più.
+    // Di ogni pezzo del testo di un link (testo, etichetta, titolo, classe) basta l'inizio: una scheda intera dentro un
+    // link non dice di più.
     TESTO_LINK: 200,
   });
 
