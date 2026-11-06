@@ -386,13 +386,15 @@ const restaConnessoMethods = {
 
   // I cookie del sito vanno con la scheda, e la memoria della pagina arriva alla pagina nuova prima dei suoi script
   // (takeSemina). La pagina si ricarica.
-  async _passaScheda(tab, sito, dest) {
+  async _passaScheda(tab, sito, dest, { rinviato = false } = {}) {
     const url = tab.url;
     const wc = tab.view && tab.view.webContents;
     if (!wc || wc.isDestroyed()) return 0;
     const propri = new Set([Cookies.partitionForSite(sito, true), Cookies.partitionForSite(sito, false)]);
-    // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito.
+    // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito. Rinviato, il jar
+    // di prima ha i cookie arrivati dopo la copia (un invio, una sessione rinnovata): ripassano tutti.
     if (!propri.has(tab.partition)) await Cookies.copiaBarattolo(wc.session, dest, sito);
+    else if (rinviato) await Cookies.copiaBarattolo(wc.session, dest);
     let mem = null;
     try { mem = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
     if (!this.tabs.includes(tab) || !tab.view || tab.view.webContents !== wc) return 0;
