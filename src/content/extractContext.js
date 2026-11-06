@@ -846,6 +846,12 @@
       // Una decorazione non conta mai: la sonda nel mondo della pagina lo sa (#472).
       const dentro = ombraChiusa(el);
       if (dentro === 'vuoto') return false;
+      // Testo chiuso in una fisarmonica del browser: è la sezione che la pagina dichiara da aprire, e aprendola il
+      // testo sarebbe in inglese. Gli altri modi di nascondere li usano anche gli spazi pubblicitari (#503): lì no.
+      if (dentro === 'testo') {
+        const sezione = fisarmonicaChiusaAttorno(el);
+        if (sezione) return !isInvisibleToUser(sezione) && isReachableByUser(sezione, sezione.getBoundingClientRect());
+      }
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
       if (isInvisibleToUser(el)) return false;
