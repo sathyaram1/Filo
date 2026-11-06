@@ -2402,7 +2402,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
         if (parsed.status === 'continue' && ok && !(azioniDiPagina()[parsed.page.op] || {}).chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: urlPrimaDelPasso() }), 200);
+          passo({ userAction: note, preActionUrl: urlPrimaDelPasso() }, 200);
         } else {
           expand({ ai: true });
         }
