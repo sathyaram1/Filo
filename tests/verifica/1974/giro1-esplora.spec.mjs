@@ -67,7 +67,9 @@ const lettore = (modo) => `<!doctype html><title>Prova - YouTube</title>
 
 async function siti(t) {
   const visite = [];
-  const server = createServer((req, res) => {
+  const { der, privateKey } = certificato({ organizzazione: 'Filo test', nomeComune: YT, usi: [] });
+  const cert = `-----BEGIN CERTIFICATE-----\n${der.toString('base64').match(/.{1,64}/g).join('\n')}\n-----END CERTIFICATE-----\n`;
+  const server = createServer({ key: privateKey.export({ type: 'pkcs8', format: 'pem' }), cert }, (req, res) => {
     const host = String(req.headers.host || '').split(':')[0];
     const u = new URL(req.url, 'http://x');
     visite.push(host + u.pathname + u.search);
