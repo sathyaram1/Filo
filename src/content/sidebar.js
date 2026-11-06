@@ -2110,6 +2110,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
     // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
     const testoCampo = valuta || (userMessage ? await testoCambiato() : null);
+    if (finito(mia)) return;
     // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
     // Aperto un altro documento a metà conversazione, il modello lo sa prima della domanda nuova.
     const appPagina = appDellaPagina();
