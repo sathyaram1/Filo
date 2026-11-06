@@ -6,6 +6,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const SHOTS = join(resolve(dirname(fileURLToPath(import.meta.url))), '.shots');
 const PAGINA = '<!doctype html><title>Guida</title><h1>Guida</h1>'
