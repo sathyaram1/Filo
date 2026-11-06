@@ -2371,7 +2371,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // prosegue solo su status «continue» e solo se la pagina non è cambiata.
         if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
           const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: urlPrimaDelPasso() }), 200);
+          passo({ userAction: note, preActionUrl: urlPrimaDelPasso() }, 200);
         } else {
           expand({ ai: true });
         }
