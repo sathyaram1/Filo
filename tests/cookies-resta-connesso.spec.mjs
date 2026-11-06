@@ -981,12 +981,16 @@ test('un «no» alla proposta resta dopo il riavvio, senza scrivere il sito sul 
     expect(await vista.locator('.shell-notif', { hasText: 'accesso a 127.0.0.1' }).count()).toBe(0);
     await expect.poll(impronte, { timeout: 10_000 }).toBe(2);
 
-    // Sul disco dell'app non c'è l'indirizzo del sito, né nello storage né nel file dei «no».
-    for (const nome of readdirSync(userData)) {
-      const f = join(userData, nome);
-      if (!/^(storage\.json|resta-connesso-no\.)/.test(nome) || !lstatSync(f).isFile()) continue;
-      expect(readFileSync(f, 'utf8'), nome).not.toContain('127.0.0.1');
-    }
+    // Il «no» non lascia l'indirizzo del sito sul disco: né nei suoi file né nello storage. Le schede aperte, che si
+    // riaprono al riavvio, l'indirizzo lo tengono per forza; l'elenco dei siti coi campi è un'altra cosa.
+    const fileNo = readdirSync(userData).filter((n) => /^resta-connesso-no\./.test(n));
+    expect(fileNo.sort()).toEqual(['resta-connesso-no.json', 'resta-connesso-no.sale']);
+    for (const nome of fileNo) expect(readFileSync(join(userData, nome), 'utf8'), nome).not.toContain('127.0.0.1');
+    expect(lstatSync(join(userData, 'storage.json')).isFile()).toBe(true);
+    const storage = JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8'));
+    delete storage.sn_open_tabs;
+    delete storage.filo_siti_con_campi;
+    expect(JSON.stringify(storage)).not.toContain('127.0.0.1');
 
     // Il «no» non chiude la strada: dal menu della scheda si resta connessi, e il «no» se ne va.
     const id = (await schedaSu(shell, `${sito.a}/home`)).id;
