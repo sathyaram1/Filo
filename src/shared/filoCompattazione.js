@@ -342,8 +342,8 @@
 
   // ── La stima accanto alla soglia (filo_design.txt § GESTIONE DEI MODELLI) ───────────────────
   // Un uso attivo: 600 messaggi al mese, ognuno porta nel tratto ~3.000 token (domanda, risposta, esiti). `base`: strumenti,
-  // parte fissa e CONTESTO. Fra una compattazione e l'altra il tratto cresce dal grezzo fino alla soglia.
-  // `base` di chi non la misura (le pagine, la stima tipica nelle Opzioni): strumenti, parte fissa e CONTESTO di oggi.
+  // parte fissa e CONTESTO; `USO.base` vale per chi non la misura (la stima tipica nelle Opzioni). Fra una compattazione
+  // e l'altra il tratto cresce dal grezzo fino alla soglia dell'anticipo.
   const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000, base: 38000 });
   // Fra una compattazione e l'altra: il grezzo che resta, quanto cresce il tratto prima della prossima, cosa riceve chi compatta.
   function ciclo({ soglia, base, uso = USO } = {}) {
