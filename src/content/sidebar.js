@@ -2306,14 +2306,15 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         history.push({ role: 'assistant', content: `(ho chiesto di cercare fra i documenti dell'utente: "${Esterno.perCanaleSistema(parsed.cosa)}")` });
         if (session && session.documentiCount >= MAX_DOCUMENTI_PER_SESSIONE) {
           appendActionLog('ricerca fra i documenti: limite raggiunto, ignorata');
-          setTimeout(() => submit({
+          passo({
             userAction: 'limite di ricerche fra i documenti raggiunto per questa conversazione. Rispondi ora con il JSON normale usando solo ciò che già sai',
             preActionUrl: urlPrimaDelPasso(),
-          }), 50);
+          }, 50);
           return;
         }
         if (session) session.documentiCount += 1;
         const r = await cercaDocumenti(parsed);
+        if (finito(mia)) return;
         if (!r || !r.ok) {
           // Rifiutata dalla persona: l'ha fermato lei prima che finisse; non riuscita: un errore.
           if (session) session.esito = r && r.annullata ? 'chiusa_prima' : 'errore';
