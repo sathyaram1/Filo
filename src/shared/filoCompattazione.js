@@ -343,14 +343,24 @@
   // ── La stima accanto alla soglia (filo_design.txt § GESTIONE DEI MODELLI) ───────────────────
   // Un uso attivo: 600 messaggi al mese, ognuno porta nel tratto ~3.000 token (domanda, risposta, esiti). `base`: strumenti,
   // parte fissa e CONTESTO. Fra una compattazione e l'altra il tratto cresce dal grezzo fino alla soglia.
-  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000 });
+  // `base` di chi non la misura (le pagine, la stima tipica nelle Opzioni): strumenti, parte fissa e CONTESTO di oggi.
+  const USO = Object.freeze({ messaggiAlMese: 600, perMessaggio: 3000, uscitaChat: 900, uscitaCompattazione: 600, parteUtente: 4000, base: 38000 });
+  // Fra una compattazione e l'altra: il grezzo che resta, quanto cresce il tratto prima della prossima, cosa riceve chi compatta.
+  function ciclo({ soglia, base, uso = USO } = {}) {
+    const u = { ...USO, ...(uso || {}) };
+    const grezzo = Math.min(TURNI_GREZZI * u.perMessaggio, Math.max(u.perMessaggio, grezzoMassimo({ soglia, base })));
+    const spazio = Math.max(u.perMessaggio, sogliaAnticipo({ soglia, base }) - base - grezzo);
+    return { u, grezzo, spazio, ingresso: spazio + u.parteUtente };
+  }
+  // I token di una compattazione tipica, per la stima di costo delle Opzioni.
+  function usoTipico() {
+    const { u, ingresso } = ciclo({ soglia: FC().TETTI_DI_SERIE.soglia, base: USO.base });
+    return { prompt: Math.round(ingresso), completion: u.uscitaCompattazione };
+  }
   function stimaSoglia({ soglia, base, prezzoChat, prezzoCompattazione, prezzoPer = (p) => p, uso = USO } = {}) {
     if (!prezzoChat || !prezzoCompattazione || !(soglia > 0)) return null;
-    const u = { ...USO, ...(uso || {}) };
-    const grezzo = TURNI_GREZZI * u.perMessaggio;
-    const spazio = Math.max(u.perMessaggio, soglia - base - grezzo);
+    const { u, grezzo, spazio, ingresso } = ciclo({ soglia, base, uso });
     const ogni = Math.max(1, Math.round(spazio / u.perMessaggio));
-    const ingresso = spazio + u.parteUtente;
     const pc = prezzoPer(prezzoCompattazione, ingresso);
     const unaCompattazione = ingresso * pc.prompt + u.uscitaCompattazione * pc.completion;
     const medio = Math.max(base, Math.min(soglia, base + grezzo + spazio / 2));
