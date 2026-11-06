@@ -164,6 +164,8 @@
       if (!nascosto) nascondi();
       return;
     }
+    // Chiuso davvero: niente parte più, e una chiamata ancora in volo non si paga fino in fondo.
+    fermaLavoro();
     Pagina.pulisci({ hover: true }).catch(() => {});
     evidenziato = null;
     togliNotaPasso();
