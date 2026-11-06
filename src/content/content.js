@@ -2581,14 +2581,9 @@
 
     if (selInfo) {
       di('testo', { segreto: !!selInfo.segreto });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
+      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
       if (selInfo.segreto) return items;
-      items.push({
-        type: 'item',
-        azione: 'search-web',
-        label: I18n.t('menu_search_text'),
-        onClick: () => Actions.searchTextOnWeb(selInfo.selection),
-      });
+      items.push({ type: 'item', azione: 'search-web', label: I18n.t('menu_search_text'), onClick: sel.search });
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
