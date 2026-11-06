@@ -93,10 +93,10 @@ test.describe('strato', () => {
 });
 
 test('pagina di Filo: taglia in un campo e Ctrl+Z', async ({ app, openTab }) => {
-  const pg = await openTab('filo://editor/editor.html');
-  await pg.waitForSelector('#doc');
+  const pg = await openTab('filo://history/history.html');
+  await pausa(1500);
   const campo = await pg.evaluate(() => {
-    const el = [...document.querySelectorAll('input[type=text],input[type=search],input:not([type]),textarea')].find((e) => e.offsetParent);
+    const el = [...document.querySelectorAll('input[type=text],input[type=search],input:not([type]),textarea')].find((e) => e.getBoundingClientRect().width > 20);
     if (!el) return null;
     el.id = el.id || 'cercato';
     el.value = 'una parola qui';
