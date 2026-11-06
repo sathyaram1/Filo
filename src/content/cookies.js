@@ -903,8 +903,11 @@
     for (const r of records) {
       if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
       if (r.type === 'characterData') { const c = labelled(r.target); if (c) push(c); continue; }
+      // Testo nudo o elemento che lo avvolge, quello che entra in un pulsante è una novità del pulsante (#1279.5).
+      let label = null;
       for (const n of r.addedNodes) {
-        if (n.nodeType !== 1) { const c = n.nodeType === 3 && labelled(r.target); if (c) push(c); continue; }
+        if ((n.nodeType === 1 || n.nodeType === 3) && label === null) { label = labelled(r.target) || false; if (label) push(label); }
+        if (n.nodeType !== 1) continue;
         push(n);
         if (surveying) B.survey(n, true);
       }
