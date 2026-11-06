@@ -31,6 +31,8 @@ const DIFFERENZE = {
     'src/shared/menuDescritto.js': 'il menu come dati per lo strato sopra la scheda: sulle pagine di Filo resta nella pagina',
     'src/content/menuNelloStrato.js': 'il menu nello strato sopra la scheda: sulle pagine di Filo resta nella pagina',
     'src/content/riquadriSopraLaScheda.js': 'i riquadri nello strato sopra la scheda: sulle pagine di Filo restano nella pagina',
+    'src/shared/precarico.js': 'il precarico dei link (#1985): solo le pagine dei siti, quelle di Filo sono già sul computer',
+    'src/content/precarico.js': 'il precarico dei link (#1985): solo le pagine dei siti, quelle di Filo sono già sul computer',
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
