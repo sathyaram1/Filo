@@ -314,5 +314,21 @@
     return f.length ? '⚠️ ' + f.join(' ') : '';
   }
 
-  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, POPULAR };
+  // Le parole di un indirizzo che fa un'azione invece di mostrare una pagina, senza trattini: un elenco solo per
+  // l'avviso sui link e per il precarico (#1985), che le cerca anche dentro le parole composte e nel testo del link.
+  const PAROLE_AZIONE = Object.freeze([
+    'logout', 'logoff', 'signout', 'signoff', 'optout', 'unsubscribe', 'unsub', 'delete', 'remove', 'confirm', 'verify',
+    'reset', 'cancel', 'deactivate', 'disconnect', 'destroy',
+    'esci', 'disconnetti', 'elimina', 'cancella', 'rimuovi', 'disiscriviti', 'disiscrizione',
+    'abmelden', 'abmeldung', 'ausloggen', 'deconnexion', 'deconnecter', 'cerrarsesion', 'desconectar', 'salir', 'sair',
+    'uitloggen', 'afmelden', 'wyloguj',
+  ]);
+  const AZIONE = new Set(PAROLE_AZIONE);
+
+  // Un pezzo fra / ? & = che è per intero una parola d'azione, scritto minuscolo («sign-out» vale «signout»).
+  function pezzoAzione(s) {
+    return String(s || '').split(/[/?&=]/).some((p) => p === p.toLowerCase() && AZIONE.has(p.replace(/[-_]/g, '')));
+  }
+
+  global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, POPULAR, PAROLE_AZIONE };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
