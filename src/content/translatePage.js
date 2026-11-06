@@ -419,29 +419,53 @@
   // I riquadri di questo documento, divisi da chi li guarda come guarda il resto della pagina (#503): quelli da
   // contare e quelli che non si contano. Fra questi ultimi, a parte, quelli nascosti adesso che l'utente può aprire.
   // Chi non si conta non deve nemmeno rispondere: un "ci sono" in più coprirebbe nel conto un riquadro muto.
-  function embeddedFrames() {
+  // Con le sezioni nascoste da tradurre subito (D61), i nascosti vanno in `background`: tradotti, ma fuori dal conto
+  // dell'avviso. `folded` resta per chi le rimanda.
+  function embeddedFrames(modo) {
     const shown = [];
     const skipped = [];
     const folded = [];
+    const background = [];
     try {
       for (const f of framesOf(document)) {
-        // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
-        // che possa rispondere, ma il testo lo prende l'estrazione da qui.
-        if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
-        const nascosto = frameHidden(f);
-        if (isInsideFiloUi(f)) { skipped.push(f); continue; }
-        // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
-        // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
-        if (frameTooSmall(f)) { skipped.push(f); if (nascosto) folded.push(f); continue; }
-        if (nascosto) {
+        const g = frameVerdict(f, modo);
+        if (g === 'inline') continue;
+        if (g === 'shown') shown.push(f);
+        else if (g === 'background') background.push(f);
+        else {
           skipped.push(f);
-          folded.push(f);
-          continue;
+          if (g === 'folded') folded.push(f);
         }
-        shown.push(f);
       }
     } catch (_) {}
-    return { shown, skipped, folded };
+    return { shown, skipped, folded, background };
+  }
+
+  // Il giudizio su un riquadro, uno per tutte le strade (il giro, e il riquadro che arriva dopo): 'inline' riempito
+  // dalla pagina, 'shown' si vede e si conta, 'background' nascosto da tradurre fuori conto, 'folded' nascosto da
+  // offrire quando si apre, 'skip' niente da leggere.
+  function frameVerdict(f, modo) {
+    // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
+    // che possa rispondere, ma il testo lo prende l'estrazione da qui.
+    if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) return 'inline';
+    if (isInsideFiloUi(f)) return 'skip';
+    const nascosto = frameHidden(f);
+    if (nascosto) {
+      // Un pixel di tracciamento nascosto resta un pixel; uno senza misura (scheda spenta) non si sa, e si traduce.
+      if (modo === Extract.NASCOSTE.TRADUCI) return pixel(f) ? 'skip' : 'background';
+      return 'folded';
+    }
+    // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
+    // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
+    if (frameTooSmall(f)) return 'skip';
+    return 'shown';
+  }
+
+  function pixel(f) {
+    try {
+      const r = f.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H);
+    } catch (_) { return false; }
   }
 
   // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma. E quelli
