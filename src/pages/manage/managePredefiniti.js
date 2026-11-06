@@ -864,6 +864,7 @@
     campo: () => $('contestoSoglia'), uscita: () => $('contestoSogliaStima'),
     chiedi: (soglia) => chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia }),
   });
+  window.SN_FILO_CONTESTO.limitiAiCampi($);
   // Un campo vuoto non si salva: segue il codice. null = niente di cambiato.
   function collectContesto() {
     const ora = {};
