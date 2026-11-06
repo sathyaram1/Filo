@@ -1,7 +1,11 @@
 // Handler del precarico dei link (#1985): se i link a schermo possono partire adesso. Aperto ai siti di proposito: lo
 // chiede il content script della pagina, e risponde solo sì o no col motivo. Le regole: src/shared/precarico.js.
 
-const { powerMonitor } = require('electron');
+// La spina la sa il lettore dello stato del sistema, che su Linux la legge dai file.
+function sullaBatteria() {
+  if (!globalThis.SN_SISTEMA_MAIN) require('../statoSistema');
+  return !!globalThis.SN_SISTEMA_MAIN.sullaBatteria();
+}
 
 module.exports = function register(on, ctx) {
   const { MSG, winOf } = ctx;
