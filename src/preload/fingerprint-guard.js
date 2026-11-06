@@ -257,13 +257,12 @@ const PROPAGAZIONE = `
   var RISCRIVONO = ${JSON.stringify(Object.fromEntries(V.RISCRIVONO.map((n) => [n, 1])))};
   var inArrivo = ${V.sorgenteInArrivo()};
   var TAG = { __proto__: null, IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1 };
-  var NP = Node.prototype, EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute;
+  var NP = Node.prototype, EP = Element.prototype;
   var qsaE = EP.querySelectorAll, qsaF = DocumentFragment.prototype.querySelectorAll, qsaD = Document.prototype.querySelectorAll;
   var localName = gOPD(EP, 'localName').get, nodeType = gOPD(NP, 'nodeType').get, genitore = gOPD(NP, 'parentNode').get;
-  var docDi = gOPD(NP, 'ownerDocument').get, baseDi = gOPD(NP, 'baseURI').get, quanti = gOPD(NodeList.prototype, 'length').get;
+  var docDi = gOPD(NP, 'ownerDocument').get, quanti = gOPD(NodeList.prototype, 'length').get;
   var primoFiglio = gOPD(EP, 'firstElementChild').get;
-  var SP = String.prototype, trim = SP.trim, lower = SP.toLowerCase, upper = SP.toUpperCase, taglia = SP.slice, cerca = SP.indexOf;
-  var URLc = URL, origineUrl = gOPD(URL.prototype, 'origin').get, costruisci = Reflect.construct;
+  var SP = String.prototype, lower = SP.toLowerCase, upper = SP.toUpperCase, taglia = SP.slice, cerca = SP.indexOf;
   var MO = MutationObserver, moObserve = MO.prototype.observe;
   var addEL = EventTarget.prototype.addEventListener, bersaglio = gOPD(Event.prototype, 'target').get;
   var annulla = Event.prototype.preventDefault, proprio = Object.prototype.hasOwnProperty;
