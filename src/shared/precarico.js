@@ -6,8 +6,6 @@
   'use strict';
 
   const LIMITI = Object.freeze({
-    // Il fermo del mouse sul link prima di partire, come instant.page: sotto, un passaggio di traverso non conta.
-    ATTESA_PASSAGGIO_MS: 65,
     // Link a schermo precaricati per pagina; oltre, i link restanti partono al passaggio del mouse.
     TETTO_VISIBILI: 20,
     // Link passati col mouse tenuti in lista: Chromium ne accetta 50 per pagina, e coi 20 a schermo ne restano 30.
