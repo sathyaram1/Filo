@@ -43,20 +43,24 @@
   }
 
   // Le due liste che Chromium riceve. Un indirizzo che resta da una scrittura all'altra non riparte; uno che esce si
-  // ferma se è ancora in corso.
+  // ferma se è ancora in corso. I passati vanno come «moderate»: un precarico «subito» ancora in corso al clic
+  // Chromium lo aspetta e poi lo scarta, e il clic paga la pagina due volte; «moderate» lo usa (#1985 giro 2).
+  // Lo stesso indirizzo può stare in tutte e due: un link a schermo passato col mouse diventa servibile al clic.
   let passati = [];
   let visibili = [];
   let regola = null;
 
   function scrivi() {
-    const urls = Array.from(new Set(visibili.concat(passati)));
     const radice = document.head || document.documentElement;
     if (!radice) return;
+    const regole = [];
+    if (visibili.length) regole.push({ source: 'list', urls: visibili.slice() });
+    if (passati.length) regole.push({ source: 'list', urls: passati.slice(), eagerness: 'moderate' });
     let nuova = null;
-    if (urls.length) {
+    if (regole.length) {
       nuova = document.createElement('script');
       nuova.type = 'speculationrules';
-      nuova.textContent = JSON.stringify({ prefetch: [{ source: 'list', urls }] });
+      nuova.textContent = JSON.stringify({ prefetch: regole });
       radice.appendChild(nuova);
     }
     if (regola) { try { regola.remove(); } catch (_) {} }
