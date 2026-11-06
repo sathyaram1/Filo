@@ -525,11 +525,14 @@
   // Il giudizio arriva al riquadro prima della parola di tradurre: lo legge il suo preload, che senza un sì non lo
   // sveglia. La chiave è scritta uguale in page-preload.js.
   // Uno ancora in arrivo non si tocca (#1560): non ha sentito la parola di tradurre, quindi non aspetta un giudizio.
-  function tellFrames(runId, list, visible) {
+  // `fuoriConto`: si traduce ma non entra nel conto dell'avviso, lui e chi sta dentro di lui.
+  function tellFrames(runId, list, visible, fuoriConto) {
     for (const f of list) {
       try {
         const w = global.SN_RIQUADRI_IN_ARRIVO?.finestra(f);
-        if (w) w.postMessage({ filoFrameVerdict: 1, runId: String(runId), visible: !!visible }, '*');
+        const v = { filoFrameVerdict: 1, runId: String(runId), visible: !!visible };
+        if (visible && fuoriConto) v.fuoriConto = true;
+        if (w) w.postMessage(v, '*');
       } catch (_) {}
     }
   }
