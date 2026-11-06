@@ -74,6 +74,17 @@ async function prova(app, page, url, testo) {
 
 const TESTI = ['ok ci vediamo qwzxv', 'si va bene qwzxv', 'domani mattina andiamo al mercato qwzxv'];
 
+test('sonda: con solo inglese la parola italiana si segna', async ({ app, shell, testServer }) => {
+  test.setTimeout(120_000);
+  const base = testServer.html(PAGINA);
+  const id = await apriIncognito(app, shell);
+  await app.evaluate(({ BrowserWindow, session }, id) => session.fromPartition(BrowserWindow.fromId(id)._filoTabs.partition).setSpellCheckerLanguages(['en-US']), id);
+  const inc = `${base}?w=incognito`;
+  const esiti = await prova(app, await apriInIncognito(app, id, inc), inc, 'ok ci vediamo qwzxv');
+  console.log(JSON.stringify(esiti));
+  expect(esiti.vediamo).toBe('vediamo');
+});
+
 for (const testo of TESTI) {
   test(`in incognito non segna le parole italiane: «${testo}»`, async ({ app, shell, testServer, openTab }) => {
     test.setTimeout(120_000);
