@@ -48,7 +48,7 @@ try {
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
 // In OGNI sessione, anche incognito e proxy: senza client hints Google respinge l'accesso (#1616). Il GPC resta spento finché la modalità non lo accende.
 app.on('session-created', (ses) => { try { require('./services/cookies').ensureHeaderHook(ses); } catch (_) {} });
-app.on('session-created', (ses) => configureSpellchecker(ses));
+app.on('session-created', (ses) => ses === require('electron').session.defaultSession && configureSpellchecker(ses));
 
 // Il portachiavi si sceglie solo prima di `ready`: senza, su sway/i3 l'accesso
 // non sopravvive alla chiusura nemmeno col portachiavi acceso (#708.1).
