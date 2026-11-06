@@ -3336,6 +3336,7 @@ async function eseguiAzioneFilo(action, {
           if (r.invariato && dimenticate) return { executed: true, kept: true, output: { etichetta: `${built.label} (Filo ne dimentica i documenti già letti)` } };
           if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
           partial = r.partial;
+          if (await bannerDellaScheda(built.elenco, sender)) return { executed: true, kept: true, output: { etichetta: built.label } };
         }
         await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).
