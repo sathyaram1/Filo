@@ -42,10 +42,8 @@
     return !regole().motivoEscluso(daGiudicare(a), location.href);
   }
 
-  // Le due liste che Chromium riceve. Un indirizzo che resta da una scrittura all'altra non riparte; uno che esce si
-  // ferma se è ancora in corso. I passati vanno come «moderate»: un precarico «subito» ancora in corso al clic
-  // Chromium lo aspetta e poi lo scarta, e il clic paga la pagina due volte; «moderate» lo usa (#1985 giro 2).
-  // Lo stesso indirizzo può stare in tutte e due: un link a schermo passato col mouse diventa servibile al clic.
+  // Le due liste che Chromium riceve; un indirizzo che esce si ferma se è in corso. I passati vanno «moderate»: un
+  // precarico «subito» in corso al clic Chromium lo aspetta e lo scarta, e la pagina si paga due volte (#1985).
   let passati = [];
   let visibili = [];
   let regola = null;
