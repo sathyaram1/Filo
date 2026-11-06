@@ -1008,10 +1008,11 @@
     const esito = (e) => contaRiquadro('editor_titolo', { via, esito: e });
     try {
       // Rifatto a mano chiede una risposta nuova: la stessa domanda tornerebbe uguale dalla cache.
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? { intera: true } : { rigenera: true, intera: true });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? { intera: true } : { rigenera: true, intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
-      const ok = applyGeneratedTitle(id, rawText, via);
+      if (auto && titoloScrittoAMano(id)) { esito('vuoto'); return false; }
+      const ok = applyGeneratedTitle(id, rawText, via, firma);
       esito(ok ? 'applicato' : 'vuoto');
       if (!ok && !auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); showEditorToast('Non sono riuscito a generare il titolo.'); }
       if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
