@@ -23,7 +23,11 @@ test('esplora', async ({ openTab }) => {
   test.setTimeout(300_000);
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
+  await page.evaluate(() => { const x = document.createElement('div'); x.id = 'pulito'; x.contentEditable = 'true'; document.body.appendChild(x); });
   const casi = [
+    ['G pulito p vuoto', `d = document.getElementById('pulito'); d.focus(); d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['H pulito pieno', `d = document.getElementById('pulito'); d.focus(); d.innerHTML='<p>abc</p>'; ${cursore("({node: d.firstChild.firstChild, off: 3})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['I br nel p', `d.innerHTML='<p>abc<br><br></p>'; ${cursore("({node: d.firstChild, off: 2})")}`, `document.execCommand('insertHTML', false, h)`],
     ['D radice prima del p vuoto', `d.innerHTML='<p><br></p>'; ${cursore("({node: d, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
     ['E radice prima del p vuoto in mezzo', `d.innerHTML='<p>uno</p><p><br></p><p>tre</p>'; ${cursore("({node: d, off: 1})")}`, `document.execCommand('insertHTML', false, h)`],
     ['A div', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<div>' + h + '</div>')`],
