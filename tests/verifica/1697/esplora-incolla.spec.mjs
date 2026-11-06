@@ -42,23 +42,16 @@ const stato = (page) => page.evaluate(() => {
 });
 
 const casi = [
-  ['A secondo paragrafo inizio, 60 righe prima vuota', '<p>primo paragrafo</p><p>secondo paragrafo</p>', ['p', 1, 0], righe(60, '')],
-  ['B fine paragrafo 100 righe', '<p>alpha beta</p>', ['p', 0, 'fine'], righe(100)],
-  ['C vuoto 600 prima vuota', '<p><br></p>', ['p', 0, 0], righe(600, '')],
-  ['C2 vuoto 1500 prima vuota', '<p><br></p>', ['p', 0, 0], righe(1500, '')],
-  ['D elenco voce 2 fine 600', '<ul><li>uno</li><li>due</li><li>tre</li></ul>', ['li', 1, 'fine'], righe(600)],
-  ['D2 elenco voce 2 fine 600 prima vuota', '<ul><li>uno</li><li>due</li><li>tre</li></ul>', ['li', 1, 'fine'], righe(600, '')],
-  ['D3 elenco voce vuota 600', '<ul><li>uno</li><li><br></li></ul>', ['li', 1, 0], righe(600)],
-  ['E paragrafo vuoto dopo elenco 600', '<ul><li>uno</li><li>due</li></ul><p><br></p>', ['p', 0, 0], righe(600)],
-  ['E2 paragrafo vuoto dopo elenco 600 prima vuota', '<ul><li>uno</li><li>due</li></ul><p><br></p>', ['p', 0, 0], righe(600, '')],
-  ['E3 paragrafo vuoto fra due titoli 600', '<h2>Uno</h2><p><br></p><h2>Due</h2>', ['p', 0, 0], righe(600)],
-  ['E4 paragrafo vuoto dopo citazione 600', '<blockquote>citato</blockquote><p><br></p>', ['p', 0, 0], righe(600)],
-  ['F seleziona tutto 600', '<p>uno</p><p>due</p><p>tre</p>', ['p', 0, 0, 'tutto'], righe(600)],
-  ['G dopo spazio 60', '<p>alpha beta</p>', ['p', 0, 6], righe(60)],
-  ['H prima riga un carattere 600', '<p>testo</p><p><br></p>', ['p', 1, 0], righe(600, 'x')],
-  ['J titolo fine 600', '<h1>Titolo</h1>', ['h1', 0, 'fine'], righe(600)],
-  ['K citazione fine 600', '<blockquote>citato</blockquote>', ['blockquote', 0, 'fine'], righe(600)],
-  ['L emoji intorno 600', '<p>ciao 😀😀</p><ul><li>x</li></ul>', ['p', 0, 6], righe(600)],
+  ['E5 paragrafo vuoto dopo elenco 1500', '<ul><li>uno</li><li>due</li></ul><p><br></p>', ['p', 0, 0], righe(1500)],
+  ['F2 seleziona tutto 200', '<p>uno</p><p>due</p><p>tre</p>', ['p', 0, 0, 'tutto'], righe(200)],
+  ['F3 seleziona tutto 1500', '<p>uno</p><p>due</p><p>tre</p>', ['p', 0, 0, 'tutto'], righe(1500)],
+  ['F4 Ctrl+A da tastiera 600', '<p>uno</p><p>due</p><p>tre</p>', ['p', 0, 0, 'ctrlA'], righe(600)],
+  ['F5 seleziona una parola 600', '<p>alpha beta gamma</p>', ['p', 0, 6, 10], righe(600)],
+  ['F6 selezione su due paragrafi 600', '<p>alpha beta</p><p>gamma delta</p>', ['p', 0, 6, ['p', 1, 5]], righe(600)],
+  ['F7 Ctrl+A con titolo ed elenco 600', '<h1>Titolo</h1><p>testo</p><ul><li>a</li><li>b</li></ul>', ['p', 0, 0, 'ctrlA'], righe(600)],
+  ['L2 fra due emoji 600', '<p>ciao 😀😀</p><ul><li>x</li></ul>', ['p', 0, 7], righe(600)],
+  ['L3 dopo emoji in fondo 600', '<p>ciao 😀</p><ul><li>x</li></ul>', ['p', 0, 'fine'], righe(600)],
+  ['M a capo morbido prima 600', '<p>riga<br>seconda</p>', ['p', 0, 0], righe(600)],
 ];
 
 for (const [nome, html, posa, testo] of casi) {
