@@ -365,7 +365,8 @@ test('la casella e le scelte dell’Aiuto: il codice della pagina non manda nien
 
   await strato.locator('.sn-sidebar-choice').first().click();
   await expect.poll(() => chiamate(app, page)).toBe(2);
-  // Il bottone di invio, premuto davvero, manda quello che c'è scritto.
+  // Il bottone di invio, premuto davvero, manda quello che c'è scritto. Mentre l'Aiuto lavora è il quadrato che lo ferma.
+  await expect(strato.locator('.sn-sidebar-input button[type="submit"]')).toHaveAttribute('data-modo', 'invia');
   await strato.click('.sn-sidebar-input textarea');
   await strato.keyboard.type('ancora');
   await strato.click('.sn-sidebar-input button[type="submit"]');
