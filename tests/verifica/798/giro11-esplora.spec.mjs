@@ -49,6 +49,17 @@ async function porte() {
     return leggi(W); });
   await prova('ombraAppendSrc', async () => { const sr = ombra(); const f = document.createElement('iframe'); f.src = '/figlio?k=ombra3'; sr.appendChild(f);
     out.ombraDentro3 = await attendi('ombra3'); await pausa(); return leggi(f.contentWindow); });
+  await prova('ombraCambio', async () => { const sr = ombra(); const f = document.createElement('iframe'); sr.appendChild(f); leggi(f.contentWindow);
+    f.src = '/figlio?k=ombra4'; out.ombraDentro4 = await attendi('ombra4'); await pausa(); return leggi(f.contentWindow); });
+  await prova('ombraSrcdoc', async () => { const sr = ombra(); const f = document.createElement('iframe'); sr.appendChild(f); leggi(f.contentWindow);
+    f.srcdoc = '<p>x</p>'; await new Promise((r) => { f.addEventListener('load', r, { once: true }); setTimeout(r, 3000); }); await pausa(); return leggi(f.contentWindow); });
+  await prova('ombraBlob', async () => { const sr = ombra(); sr.innerHTML = '<iframe src="/figlio?k=ombra5"></iframe>'; await attendi('ombra5'); await pausa();
+    const b = await new Promise((r) => el(sr).HTMLCanvasElement.prototype.toBlob.call(c, r));
+    const u = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
+    out.paginaBlob = await new Promise((r) => c.toBlob((bb) => { const fr = new FileReader(); fr.onload = () => r(fnv(fr.result)); fr.readAsDataURL(bb); }));
+    return fnv(u); });
+  await prova('luceSrcElemento', async () => { const f = document.createElement('iframe'); f.src = '/figlio?k=luce'; document.body.appendChild(f);
+    await attendi('luce'); await pausa(); return leggi(f.contentWindow); });
   await prova('openDaQui', async () => { const f = document.createElement('iframe'); f.name = 'perOpen'; f.src = '/figlio?k=open'; document.body.appendChild(f);
     const w = open('', 'perOpen'); out.openDentro = await attendi('open'); await pausa(); return leggi(w); });
   await prova('openVuoto', () => { const f = document.createElement('iframe'); f.name = 'perOpenVuoto'; document.body.appendChild(f); return leggi(open('', 'perOpenVuoto')); });
