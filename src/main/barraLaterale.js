@@ -895,9 +895,9 @@ class BarraLaterale {
     const azione = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.AZIONE_DI_ICONA[id];
     // Le strade (#1468): indietro e avanti contano anche nella cronologia, un'icona che apre una pagina anche fra le pagine;
     // la chiusura la conta la scheda che si chiude, dalla sua via.
-    if (id === 'back' || id === 'forward') Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', 'barra', { incognito });
-    else if (id !== 'closeTab') Strade.misura('azione', id, 'barra', { incognito });
-    if (PAGINA_DELL_ICONA[id]) Strade.misura('pagina', PAGINA_DELL_ICONA[id], 'barra', { finestra: tabs, incognito });
+    if (id === 'back' || id === 'forward') Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', strada, { incognito });
+    else if (id !== 'closeTab') Strade.misura('azione', id, strada, { incognito });
+    if (PAGINA_DELL_ICONA[id] && !dallaFila) Strade.misura('pagina', PAGINA_DELL_ICONA[id], 'barra', { finestra: tabs, incognito });
     const fatto = azione ? AzioniContate.azione(azione, fai, { incognito: !!this.win._filoIncognito }) : fai();
     if (!fatto) return;
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.
