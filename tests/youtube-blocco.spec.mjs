@@ -131,7 +131,7 @@ fixture('con le regole vere scaricate da uAssets il video parte senza pubblicitÃ
   const s = await liste(app, testi);
   expect(s.regole).toBeGreaterThan(5);
   const page = await apri(openTab, youtube.url('/watch?v=vere&interna=1'));
-  await expect.poll(() => esiti(page), { timeout: 15_000 }).toEqual(['pagina:video', 'fetch:video', 'xhr:video']);
+  await expect.poll(() => esiti(page), { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
   await expect(page.locator('#movie_player')).not.toHaveClass(/ad-showing/);
 });
 
