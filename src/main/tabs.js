@@ -3950,7 +3950,8 @@ class TabManager {
     }
     let mostrata = false;
     pwc.on('did-navigate', () => { mostrata = true; });
-    if (origine) win.once('closed', () => this._accessoDopoFinestrella(origine));
+    const seguita = origine ? this._finestrellaAperta(origine) : null;
+    if (origine) win.once('closed', () => this._accessoDopoFinestrella(origine, seguita));
     // Una finestrella fermata prima di mostrare qualcosa resterebbe vuota a schermo.
     const ferma = (event) => {
       event.preventDefault();
