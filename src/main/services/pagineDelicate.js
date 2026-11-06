@@ -80,9 +80,8 @@ async function dimentica({ da = null, a = null, sito = '' } = {}) {
   // Come per le pagine: senza punto vale ogni dominio con quel nome, col punto il dominio e i suoi sottodomini.
   const delSito = (k) => !n || (n.includes('.') ? k === n || k.endsWith(`.${n}`) || n.endsWith(`.${k}`) : k.split('.').includes(n));
   await carica();
-  for (const k of [...conCampi]) if (delSito(k)) { conCampi.delete(k); salvati.delete(k); }
-  if (!letti) return;
-  try { await globalThis.SN_STORAGE.setRaw(chiaveDisco(), [...salvati]); } catch (_) {}
+  for (const k of [...conCampi]) if (delSito(k)) { conCampi.delete(k); noti.delete(k); }
+  await scrivi();
 }
 
 function haCampi(host) {
