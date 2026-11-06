@@ -305,9 +305,10 @@
   // di lasciare come unica strada tornare all'originale e ripagare la pagina.
   // Il sito sceglie COME ripiegare una sezione, e da quella scelta non possono
   // dipendere né il comportamento né il conto dell'utente (#505).
-  function isVisibilityHidden(el) {
+  // Il segno per i lettori di schermo (aria-hidden) non entra: non dice niente su cosa vede chi guarda (#503.3).
+  // `ovunque`: trasparente vale nascosto dovunque stia, così il giudizio non dipende dallo scorrimento (#503.3).
+  function isVisibilityHidden(el, ovunque) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
-    if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     // Prima dello stile: su una pagina di domande frequenti la risposta è quasi sempre questa, e chiedere lo stile
     // di migliaia di elementi per scoprirlo si sente all'apertura del menu.
     if (isInsideClosedDisclosure(el)) return true;
