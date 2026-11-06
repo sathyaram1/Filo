@@ -25,6 +25,11 @@ test('esplora', async ({ openTab }) => {
   await page.waitForSelector('#doc');
   await page.evaluate(() => { const x = document.createElement('div'); x.id = 'pulito'; x.contentEditable = 'true'; document.body.appendChild(x); });
   const casi = [
+    ['J inizio pieno collassato', `d.innerHTML='<p>uno</p><p>due</p>'; ${cursore("({node: d.lastChild.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['K fine pieno seguito', `d.innerHTML='<p>uno</p><p>due</p>'; ${cursore("({node: d.firstChild.firstChild, off: 3})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['L vuoto fra pieni, sel da fine prec', `d.innerHTML='<p>uno</p><p><br></p>'; const r=document.createRange(); r.setStart(d.firstChild.firstChild,2); r.setEnd(d.lastChild,0); getSelection().removeAllRanges(); getSelection().addRange(r);`, `document.execCommand('insertHTML', false, '<p>o</p>' + h)`],
+    ['M vuoto unico, sel br, frammento con p vuoto finale', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h + '<p><br></p>')`],
+    ['N vuoto: div senza p', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<div>' + h.replace(/<p>/g,'').replace(/<\\/p>/g,'<br>') + '</div>')`],
     ['G pulito p vuoto', `d = document.getElementById('pulito'); d.focus(); d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
     ['H pulito pieno', `d = document.getElementById('pulito'); d.focus(); d.innerHTML='<p>abc</p>'; ${cursore("({node: d.firstChild.firstChild, off: 3})")}`, `document.execCommand('insertHTML', false, h)`],
     ['I br nel p', `d.innerHTML='<p>abc<br><br></p>'; ${cursore("({node: d.firstChild, off: 2})")}`, `document.execCommand('insertHTML', false, h)`],
