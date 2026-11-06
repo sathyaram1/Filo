@@ -1309,6 +1309,7 @@
     getRenderedSelectionText,
     extractMainTextNodes,
     extractTranslatableBlocks,
+    NASCOSTE,
     findTranslatedElements,
     hasRevealedText,
     inlineFrameBody,
