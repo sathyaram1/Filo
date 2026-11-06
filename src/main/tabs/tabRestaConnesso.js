@@ -376,7 +376,7 @@ const restaConnessoMethods = {
       tab._passaggioRinviato = null;
       if (!this._needsRepartition(tab, tab.url)) continue;
       if (this._qualcosaDaPerdere(tab)) {
-        tab._passaggioRinviato = { sito, dest, partition: this._partitionForTab(tab, tab.url) || null };
+        tab._passaggioRinviato = { sito, partition: this._partitionForTab(tab, tab.url) || null };
         continue;
       }
       persi += await this._passaScheda(tab, sito, dest);
