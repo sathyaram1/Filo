@@ -1658,6 +1658,7 @@
     $('sec-block-popups').addEventListener('change', save);
     $('sec-adblock').addEventListener('change', save);
     $('sec-adskip').addEventListener('change', save);
+    $('sec-ytads').addEventListener('change', save);
     $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
     $('sec-siteblock-lists').addEventListener('change', save);
     // L'avviso sulle righe scartate si toglie mentre si corregge e torna quando si esce dal campo.
