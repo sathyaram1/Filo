@@ -861,6 +861,11 @@
     // Solo pagine filo:// (Sicurezza): «Apri da un altro paese» ha un fornitore? E con quale host.
     PROXY_STATUS: 'proxy_status',                   // {} → { ok, configured, providerHost }
 
+    // === Precarico dei link (#1985, src/content/precarico.js) ===
+    // Aperto alle pagine web di proposito: il content script chiede se i link a schermo possono partire adesso
+    // (interruttore, scaricamenti in corso, spina staccata). Non porta dati dell'utente.
+    PRECARICO_STATO: 'precarico_stato',             // {} → { ok, visibili, motivo }
+
     // === Pubblicità dei video da saltare (#737, src/content/adSkip.js) ===
     // Aperti alle pagine web di proposito: li chiede il content script di ogni frame, e non portano dati dell'utente.
     // `clicVero` dice se questo frame può chiedere il clic vero: il frame principale di una scheda su YouTube, o il
