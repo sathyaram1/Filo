@@ -359,6 +359,7 @@
     toast_file_save_failed: 'Non sono riuscito a scaricare il file',
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
+    toast_cut_failed: 'Non riesco a scrivere negli appunti: il testo resta dov\'era',
     clipboard_image_pending: 'Descrizione…',
     // Una selezione di soli spazi (o a capo, o tabulazioni) si copia per
     // sbaglio: senza un'etichetta diventa una riga vuota che non si capisce.
