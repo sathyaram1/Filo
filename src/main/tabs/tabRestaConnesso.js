@@ -46,7 +46,7 @@ async function cookieDAccesso(ses, url, sito) {
 const proposti = new Set();
 const ricordaNo = () => require('../services/noRestaConnesso').perFilo();
 // Google e YouTube hanno un jar solo, e un «no» solo.
-const chiaveNo = (sito) => (Google.diGoogle(sito) ? Google.SITO_GOOGLE : sito);
+const chiaveNo = Google.sitoDelContenitore;
 
 // L'accesso non è finito finché resta in vista un campo password (password sbagliata) o il campo del codice di un
 // secondo fattore: sulla pagina del codice il sito ha già messo i suoi cookie, ma l'utente non è ancora dentro.
