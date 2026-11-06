@@ -447,6 +447,20 @@ test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è 
   assert.deepEqual(build('spiegazione_anticipata', 'no').partial, { spiegaAnticipata: { enabled: false } });
 });
 
+test('#1290 — le sezioni chiuse da tradurre, a parole: «solo quando apro» le rimanda, «traduci tutto» le traduce subito', () => {
+  const modo = (k, v) => build(k, v) && build(k, v).partial && build(k, v).partial.traduzionePagina;
+  assert.deepEqual(modo('traduzione delle sezioni nascoste', 'solo quando apro'), { nascoste: 'apertura' });
+  assert.deepEqual(modo('traduci solo quando apro', 'sì'), { nascoste: 'apertura' }.nascoste === 'apertura' ? modo('traduci solo quando apro', 'sì') : null);
+  assert.deepEqual(modo('traduzione_sezioni_nascoste', 'traduci tutto'), { nascoste: 'subito' });
+  assert.deepEqual(modo('traduzione_sezioni_nascoste', 'no'), { nascoste: 'apertura' });
+  assert.equal(build('traduzione_sezioni_nascoste', 'boh'), null);
+  // La lettura della scelta: solo 'apertura' rimanda, ogni altro valore (anche mancante) è il di serie.
+  const C = globalThis.SN_CONST;
+  assert.equal(C.nascosteDellaTraduzione({ traduzionePagina: { nascoste: 'apertura' } }), 'apertura');
+  assert.equal(C.nascosteDellaTraduzione({}), 'subito');
+  assert.equal(C.nascosteDellaTraduzione(C.DEFAULT_SETTINGS), 'subito');
+});
+
 test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {
   const spegni = build('siti_filo_spento', 'aggiungi https://www.Docs.Google.com/document/d/x');
   assert.equal(spegni.costo, 1);
