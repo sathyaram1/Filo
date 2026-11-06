@@ -2467,6 +2467,10 @@ for (const [nome, html, arriva] of [
     await arriva(page);
     await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^ZZLATE /, { timeout: 30000 });
     // Dal tasto destro sulla pagina c'è da continuare: «Mostra originale» diventa una voce a parte.
+    // Il menu si chiude se la pagina scorre: si torna in cima e si aspetta che sia ferma prima del tasto destro.
+    await page.evaluate(() => window.scrollTo(0, 0));
+    await expect.poll(() => page.evaluate(() => window.scrollY)).toBe(0);
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
     await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
     const menu = menuDi(page).locator('.sn-menu');
     await expect(menu.getByText('Mostra originale', { exact: true }).first()).toBeVisible();
