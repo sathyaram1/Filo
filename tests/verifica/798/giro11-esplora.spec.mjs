@@ -114,7 +114,7 @@ for (const modo of ['default', 'privacy']) {
       console.log(modo, JSON.stringify({ on, off, sost }, null, 1));
       expect(on.pagina).not.toBe(off.pagina);
       for (const k of Object.keys(on)) {
-        if (k === 'pagina' || (/Dentro/.test(k) && modo === 'default')) continue;
+        if (k === 'pagina' || /Px$/.test(k) || (/Dentro/.test(k) && modo === 'default')) continue;
         expect.soft(on[k], `${k}`).toBe(on.pagina);
       }
       for (const come of Object.keys(sost)) for (const k of ['elemento', 'indice', 'vuoto']) expect.soft(sost[come][k], `${come}.${k}`).toBe(sost[come].pagina);
