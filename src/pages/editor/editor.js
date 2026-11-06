@@ -1224,10 +1224,11 @@
     };
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
     add('Rigenera riassunto', () => {
-      if (autoSummaryBusy) return;
-      autoSummaryBusy = true;
+      const id = doc && doc.id;
+      if (!id || riassuntiInVolo.has(id)) return;
+      riassuntiInVolo.add(id);
       Promise.resolve(generateSummaryForActive({ manuale: true }))
-        .finally(() => { autoSummaryBusy = false; });
+        .finally(() => { riassuntiInVolo.delete(id); });
     });
     add('Storico versioni', () => openVersionHistory());
     // Parità di cammini col menu documenti: il cestino si raggiunge anche col tasto destro sul
