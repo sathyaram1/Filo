@@ -2380,7 +2380,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
 
       if (parsed.kind === 'filo_action') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
