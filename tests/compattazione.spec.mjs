@@ -127,7 +127,8 @@ test('la soglia si cambia nelle Preferenze, con la stima accanto, e la chat la u
   expect(tetti.da.soglia).toBe('utente');
 });
 
-test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tiene o si scarta', async ({ app, openTab }) => {
+test('una memoria proposta da un tratto sospetto aspetta nel quaderno, e si tiene o si scarta', async ({ app, shell, openTab }) => {
+  await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8000 });
   await app.evaluate(async () => {
     const C = globalThis.SN_COMPATTAZIONE;
     const s = await C.inAttesa();
