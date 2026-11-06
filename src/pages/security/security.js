@@ -39,6 +39,8 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-adblock-label').textContent = I18n.t('options_security_adblock');
     $('sec-adblock-desc').textContent = I18n.t('options_security_adblock_desc');
+    $('sec-ytads-label').textContent = I18n.t('options_security_ytads');
+    $('sec-ytads-desc').textContent = I18n.t('options_security_ytads_desc');
     $('sec-adskip-label').textContent = I18n.t('options_security_adskip');
     $('sec-adskip-desc').textContent = I18n.t('options_security_adskip_desc');
     $('sec-siteblock-label').textContent = I18n.t('options_security_siteblock');
@@ -892,6 +894,7 @@
     $('sec-block-popups').checked = sec.blockPopups !== false;
     $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
     $('sec-adskip').checked = (sec.adSkip || {}).enabled !== false;
+    $('sec-ytads').checked = (sec.youtubeAds || {}).enabled !== false;
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
@@ -1462,6 +1465,7 @@
       blockPopups: !!$('sec-block-popups').checked,
       adblock: { enabled: !!$('sec-adblock').checked },
       adSkip: { enabled: !!$('sec-adskip').checked },
+      youtubeAds: { enabled: !!$('sec-ytads').checked },
       siteBlock: {
         enabled: !!$('sec-siteblock').checked,
         useAdblockLists: !!$('sec-siteblock-lists').checked,
@@ -1654,6 +1658,7 @@
     $('sec-block-popups').addEventListener('change', save);
     $('sec-adblock').addEventListener('change', save);
     $('sec-adskip').addEventListener('change', save);
+    $('sec-ytads').addEventListener('change', save);
     $('sec-siteblock').addEventListener('change', () => { syncSiteBlockEnabled(); save(); });
     $('sec-siteblock-lists').addEventListener('change', save);
     // L'avviso sulle righe scartate si toglie mentre si corregge e torna quando si esce dal campo.

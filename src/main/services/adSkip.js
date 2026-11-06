@@ -22,23 +22,17 @@ function configureFromSettings(settings) {
   return cambiato;
 }
 
+// I siti di YouTube stanno in un elenco solo, quello del blocco delle pubblicità (#1974): services/regoleYouTube.js.
+const { hostDi, hostYouTube, hostYouTubeInScheda } = require('./regoleYouTube');
+
 /** I siti a cui Filo dà il clic vero sul «Salta». PURA. */
 function hostConClicVero(url) {
-  let u;
-  try { u = new URL(String(url || '')); } catch (_) { return false; }
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
-  const h = u.hostname.toLowerCase();
-  return h === 'youtube.com' || h.endsWith('.youtube.com');
+  return hostYouTubeInScheda(hostDi(url));
 }
 
-// I lettori incorporati: il dominio senza cookie è quello che molti siti usano per i video di YouTube.
+// I lettori incorporati: anche il dominio senza cookie, che molti siti usano per i video di YouTube.
 function hostIncorporato(url) {
-  if (hostConClicVero(url)) return true;
-  let u;
-  try { u = new URL(String(url || '')); } catch (_) { return false; }
-  if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
-  const h = u.hostname.toLowerCase();
-  return h === 'youtube-nocookie.com' || h.endsWith('.youtube-nocookie.com');
+  return hostYouTube(hostDi(url));
 }
 
 function framePrincipale(sender) {

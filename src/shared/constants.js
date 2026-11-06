@@ -2837,6 +2837,10 @@
       adSkip: {
         enabled: true,
       },
+      // #1974 — le pubblicità di YouTube tolte prima che partano, con le regole di uAssets. Vedi src/main/services/bloccoYouTube.js.
+      youtubeAds: {
+        enabled: true,
+      },
       // Blocco apertura siti in blacklist (#170.3). A differenza dell'ad-block
       // (che annulla le singole richieste), qui si BLOCCA l'apertura della
       // pagina top-level di un sito in blacklist, da qualunque provenienza (#590):

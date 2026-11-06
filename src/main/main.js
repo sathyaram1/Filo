@@ -81,6 +81,7 @@ if (process.env.NODE_ENV === 'test') {
     globalThis.__filoDefaults = require('./services/defaultsStore');
     globalThis.__filoCookies = require('./services/cookies');
     globalThis.__filoAdblock = require('./services/adblock');
+    globalThis.__filoBloccoYouTube = require('./services/bloccoYouTube');
     globalThis.__filoCookieBanners = require('./services/cookieBanners');
     globalThis.__filoCookieIncorporati = require('./services/cookieIncorporati');
     globalThis.__filoRiquadriRotti = require('./services/riquadriRotti');
@@ -291,6 +292,8 @@ app.whenReady().then(async () => {
     // Anti-fingerprinting: il master secret persistente e la modalità (off/default/privacy).
     init('fingerprint', () => require('./services/fingerprint').init(s)),
     init('adblock', () => require('./services/adblock').init(s)),
+    // #1974 — le regole di YouTube dalla copia su disco: la prima scheda di YouTube le chiede prima dei suoi script.
+    init(null, () => require('./services/bloccoYouTube').init(s)),
     // Le risposte date ai siti: il controllo dei permessi è sincrono e una pagina riaperta chiede subito.
     init('permessi', () => require('./services/permessiPagine').carica()),
     // Cosa Filo ha fatto coi banner dei singoli siti: il menu della scheda lo mostra anche alla visita dopo.

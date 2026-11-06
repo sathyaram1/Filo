@@ -121,6 +121,7 @@
         'sec-block-popups': 'security.blockPopups',
         'sec-adblock': 'security.adblock.enabled',
         'sec-adskip': 'security.adSkip.enabled',
+        'sec-ytads': 'security.youtubeAds.enabled',
         'sec-siteblock': 'security.siteBlock.enabled',
         'sec-siteblock-lists': 'security.siteBlock.useAdblockLists',
         'sec-siteblock-blacklist': 'security.siteBlock.blacklist',

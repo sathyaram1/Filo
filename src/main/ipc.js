@@ -174,6 +174,19 @@ function registerIpcHandlers() {
     }
   }));
 
+  // #1974 — le regole che tolgono le pubblicità di YouTube: SINCRONO, devono girare prima degli script del sito.
+  ipcMain.on('filo:youtube-regole', (event, href) => {
+    try {
+      event.returnValue = require('./services/bloccoYouTube').regolePer(String(href || ''), event.sender);
+    } catch (_) {
+      event.returnValue = [];
+    }
+  });
+  // Il frame che ha ricevuto le regole vede il video rotto: la scheda torna al solo «Salta».
+  ipcMain.on('filo:youtube-rotto', (event, motivo) => {
+    try { require('./services/bloccoYouTube').rotto(event.sender, event.senderFrame, String(motivo || '').slice(0, 20)); } catch (_) {}
+  });
+
   // Il sito vale quello del frame che chiede, non quello che il messaggio dichiara.
   ipcMain.handle('filo:adblock-tokens', (event, msg) => {
     try {

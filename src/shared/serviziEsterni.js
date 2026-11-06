@@ -311,6 +311,16 @@
       dove: ['src/main/services/adblock.js'],
     },
     {
+      id: 'liste-youtube', nome: 'Le liste di uBlock Origin, per togliere le pubblicità di YouTube',
+      base: ['https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/'],
+      quando: 'avvio',
+      occasione: 'col blocco delle pubblicità di YouTube acceso: all’avvio se la copia ha più di un giorno, poi una volta al giorno, e quando le regole smettono di funzionare, subito e poi ogni ora finché non ne arrivano di nuove',
+      riceve: 'niente di tuo',
+      frase: ['le regole per togliere le pubblicità di YouTube', 'uBlock Origin le pubblica su GitHub'],
+      // Lo scaricamento passa dalla funzione delle liste della pubblicità, che il servizio riceve come dipendenza.
+      dove: ['src/main/services/bloccoYouTube.js'], prova: "require('./adblock').fetchList",
+    },
+    {
       id: 'liste-cookie', nome: 'Fanboy ed EasyList, per i banner dei cookie',
       base: [
         'https://secure.fanboy.co.nz/fanboy-cookiemonster.txt',

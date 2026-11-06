@@ -186,6 +186,7 @@
     'security.fingerprint.mode': { nome: 'protezione dal fingerprinting', valori: { off: 'spenta', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.adblock.enabled': { nome: 'blocco di pubblicità e tracker', valore: ATTIVO, livello: 2 },
     'security.adSkip.enabled': { nome: 'salta le pubblicità dei video', valore: ATTIVO, livello: 1 },
+    'security.youtubeAds.enabled': { nome: 'blocca le pubblicità di YouTube', valore: ATTIVO, livello: 1 },
     'security.siteBlock.enabled': { nome: 'blocco dei siti in blacklist', valore: ATTIVO, livello: 2 },
     'security.siteBlock.useAdblockLists': { nome: 'liste pubbliche come blacklist', valore: sino('in uso', 'spente'), livello: 2 },
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },

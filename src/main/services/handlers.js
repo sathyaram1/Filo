@@ -1222,6 +1222,7 @@ async function applySettingsUpdate(partial, { mentreScrive = false } = {}) {
   try {
     if (require('./adSkip').configureFromSettings(merged)) broadcastToTabs({ type: MSG.AD_SKIP_CONFIG_UPDATE });
   } catch (_) {}
+  try { require('./bloccoYouTube').configureFromSettings(merged); } catch (_) {}
   try { require('./siteBlock').configureFromSettings(merged); } catch (_) {}
   try { require('../propostaEmail').impostazioni(merged); } catch (_) {}
   // Una scheda già aperta su un sito appena messo in lista si porta via subito (#590).
