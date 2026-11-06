@@ -48,7 +48,12 @@ function usa(nuovo, quando) {
   }
 }
 
-function inTest() { return process.env.NODE_ENV === 'test' || !!process.env.FILO_SMOKE; }
+// Nei test gli scaricamenti a tempo restano spenti, tranne quando la prova dà le liste da un server suo: così quelli
+// all'avvio, di ogni giorno e dopo un ripiego si provano veri (tests/unit/bloccoYouTubeScaricamenti.test.mjs).
+const listeDiProva = () => (process.env.NODE_ENV === 'test' ? String(process.env.FILO_TEST_LISTE_YOUTUBE || '') : '');
+const cartellaListe = () => listeDiProva() || CARTELLA_LISTE;
+function inTest() { return !listeDiProva() && (process.env.NODE_ENV === 'test' || !!process.env.FILO_SMOKE); }
+let prendiListe = (url) => require('./adblock').fetchList(url);
 
 // ─── cache su disco ─────────────────────────────────────────────────────────
 
