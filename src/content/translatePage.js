@@ -622,7 +622,8 @@
       await sleep(80);
     }
     const silent = Math.max(0, st.expected - st.acked);
-    while (st.ended < st.acked && Date.now() - t0 < FRAME_WORK_CAP) {
+    // Quelli in sottofondo che hanno risposto si aspettano come gli altri: il loro testo è parte della pagina tradotta.
+    while ((st.ended < st.acked || st.extraEnded < st.extraAcked) && Date.now() - t0 < FRAME_WORK_CAP) {
       if (aborted && aborted()) break;
       await sleep(120);
     }
