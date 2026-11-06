@@ -1676,6 +1676,7 @@ module.exports = {
   safeName,
   marcaOrigine,
   list,
+  scaricaInCorso,
   clearCompleted,
   remove,
   confirmDownload,
