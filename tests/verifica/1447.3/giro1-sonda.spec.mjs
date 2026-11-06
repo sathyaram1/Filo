@@ -85,6 +85,22 @@ test('sonda: con solo inglese la parola italiana si segna', async ({ app, shell,
   expect(esiti.vediamo).toBe('vediamo');
 });
 
+test('sonda: refuso italiano e altre sessioni', async ({ app, shell, testServer }) => {
+  test.setTimeout(120_000);
+  const base = testServer.html(PAGINA);
+  const id = await apriIncognito(app, shell);
+  const inc = `${base}?w=incognito`;
+  const page = await apriInIncognito(app, id, inc);
+  await prova(app, page, inc, 'andaimo qwzxv');
+  const r = await segnata(app, page, inc, 'andaimo qwzxv', 'andaimo');
+  const altre = await app.evaluate(({ session }) => ({
+    persist: session.fromPartition('persist:sito-prova').getSpellCheckerLanguages(),
+    memoria: session.fromPartition('sito-prova-mem').getSpellCheckerLanguages(),
+    predefinita: session.defaultSession.getSpellCheckerLanguages(),
+  }));
+  console.log(JSON.stringify({ r, altre }));
+});
+
 for (const testo of TESTI) {
   test(`in incognito non segna le parole italiane: «${testo}»`, async ({ app, shell, testServer, openTab }) => {
     test.setTimeout(120_000);
