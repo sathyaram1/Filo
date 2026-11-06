@@ -79,7 +79,7 @@ test('all\'avvio con la copia di ieri, o senza copia, le regole si scaricano sub
 test('spento all\'avvio non scarica; riacceso, con la copia vecchia, scarica', async (t) => {
   mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: ORA });
   t.after(() => mock.timers.reset());
-  const B = avvio({ copiaDi: 2 * 24 * H });
+  const B = await avvio({ copiaDi: 2 * 24 * H });
   await B.init({ security: { youtubeAds: { enabled: false } } });
   await scorri(H);
   assert.deepEqual(chieste, []);
