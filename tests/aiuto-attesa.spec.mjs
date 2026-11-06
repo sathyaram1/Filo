@@ -178,6 +178,29 @@ test('il tasto destro sull\'attesa e sul quadrato offre «Ferma», che vale subi
   await expect(menuDi(aiuto).voce('Ferma')).toHaveCount(0);
 });
 
+// Lo stop e la richiesta viaggiano su messaggi che il main non mette in fila: uno stop arrivato prima vale quando la
+// richiesta arriva, e vale solo per chi l'ha mandato.
+test('nel main uno stop arrivato prima della richiesta la ferma, ma solo per la pagina che l\'ha mandato', async ({ app }) => {
+  await prepara(app, [{ risposta: { text: 'Fatto.', status: 'done' } }]);
+  const esiti = await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    const M = globalThis.SN_MSG.MSG;
+    const da = (id) => ({ wc: { id, isDestroyed: () => false, send() {} }, tab: null, url: 'https://esempio.it/' });
+    const richiesta = (id) => globalThis.SN_HANDLE_MESSAGE({ type: M.AI_REQUEST, action: C.ACTIONS.HELP, turno: 'tprova1', payload: { userMessage: 'ciao' } }, da(id))
+      .then((r) => (r && r.code) || 'altro', () => 'altro');
+    const fermo = await globalThis.SN_HANDLE_MESSAGE({ type: M.AIUTO_FERMA, turno: 'tprova1' }, da(901));
+    const altra = await richiesta(902);
+    const stessa = await richiesta(901);
+    const dopo = await richiesta(901);
+    return { fermo: !!(fermo && fermo.ok), altra, stessa, dopo };
+  });
+  expect(esiti.fermo).toBe(true);
+  expect(esiti.altra).not.toBe('FERMATO');
+  expect(esiti.stessa).toBe('FERMATO');
+  // Lo stop vale una volta: la richiesta dopo non è più fermata.
+  expect(esiti.dopo).not.toBe('FERMATO');
+});
+
 test('Invio a casella vuota ferma come il quadrato; il secondo clic di un doppio clic sull\'invio no', async ({ app, shell, openTab, testServer }) => {
   await prepara(app, [{ pensa: ['ci penso'], aspetta: true, risposta: { text: 'Fatto.', status: 'done' } }]);
   const { aiuto } = await apriAiuto(app, shell, openTab, testServer);
