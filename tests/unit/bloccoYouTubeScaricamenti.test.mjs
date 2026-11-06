@@ -91,7 +91,7 @@ test('dopo un ripiego le regole si richiedono subito e poi ogni ora, finché non
   mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: ORA });
   t.after(() => mock.timers.reset());
   rete = { 'filters.txt': DISCO, 'quick-fixes.txt': NIENTE };
-  const B = avvio({ copiaDi: H });
+  const B = await avvio({ copiaDi: H });
   await B.init({});
   await svuota();
   assert.equal(regole(B).length, 1);
