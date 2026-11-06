@@ -102,8 +102,9 @@
   // ─── la risposta che il sito si scrive dopo un clic sul banner ──────────────
   //
   // «Mostra il banner» e «Rifiuta in automatico» devono togliere la risposta, qualunque nome le dia il sito.
-  // La risposta è quello che il clic CREA mentre il sito lo gestisce: cookie e chiavi della pagina che prima
-  // non c'erano. Quello che c'era già (stato dell'applicazione, accesso) o nasce più tardi resta del sito (#754).
+  // La risposta è quello che il clic CREA: cookie e chiavi della pagina che prima non c'erano, anche scritti poco dopo
+  // (al ritorno da una richiesta, o dalla pagina avvisata dal riquadro del banner, #1279.2). Quello che c'era già
+  // (stato dell'applicazione, accesso) o nasce più tardi resta del sito (#754).
 
   function cookieNames() {
     const out = new Set();
