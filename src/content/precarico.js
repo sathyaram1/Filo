@@ -70,7 +70,6 @@
     const l = document.createElement('link');
     l.rel = 'preconnect';
     l.href = origine;
-    l.setAttribute('data-filo-precarico', '');
     try { (document.head || document.documentElement).appendChild(l); } catch (_) {}
   }
 
