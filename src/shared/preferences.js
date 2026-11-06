@@ -1449,7 +1449,7 @@
     },
     {
       scrive: ['security.cookies.mode'],
-      aiuto: '"manuale" | "automatico" | "privacy"',
+      aiuto: '"manuale" | "automatico" | "privacy" (per tutti i siti; il banner di un sito solo sta in siti_con_banner)',
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       costo: 2,
       allenta: (r, at) => scende(RIGORE_COOKIE, r.partial.security.cookies.mode, at && at.security && at.security.cookies && at.security.cookies.mode),
