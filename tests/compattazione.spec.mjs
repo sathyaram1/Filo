@@ -434,3 +434,32 @@ test('riaperto Filo dopo ore di pausa, col tratto grande il primo messaggio comp
     await ripristina(app);
   }
 });
+
+// Turni pesanti (un capitolo incollato a ogni messaggio, circa 5.000 token): dopo una compattazione resta spazio sotto
+// la soglia, così la chat non compatta a ogni messaggio e la risposta non la aspetta (giro 4 di #1563).
+test('turni da circa 5.000 token: la chat compatta ogni qualche messaggio, in sottofondo, non prima di ogni risposta', async ({ app }) => {
+  test.setTimeout(300000);
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Letto, ecco il punto.' }]);
+  await compattatoreFinto(app, '10:00 letto un capitolo della tesi');
+  const perMessaggio = [];
+  try {
+    for (let i = 0; i < 12; i++) {
+      await chiedi(page, `Capitolo ${i}: ${'Le api tornano all\'alveare e danzano per le compagne. '.repeat(330)}`);
+      await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 30000 }).toBe(i + 1);
+      // La compattazione in anticipo parte dopo la risposta: le si dà il tempo di finire.
+      await page.waitForTimeout(1500);
+      perMessaggio.push((await app.evaluate(() => globalThis.__compattazioni)).map((c) => c.motivo));
+    }
+  } finally {
+    await rimettiCompattatore(app);
+    await ripristina(app);
+  }
+  const nuove = perMessaggio.map((c, i) => c.slice(i ? perMessaggio[i - 1].length : 0));
+  const con = nuove.map((c, i) => (c.length ? i : -1)).filter((i) => i >= 0);
+  expect(con.length, 'la chat compatta').toBeGreaterThan(1);
+  for (const i of con) expect(con.includes(i + 1) || con.includes(i + 2), `compattazioni per messaggio: ${JSON.stringify(nuove)}`).toBe(false);
+  expect(nuove.flat().filter((m) => m === 'soglia'), 'nessuna risposta aspetta la compattazione').toEqual([]);
+  const ultima = (await chiamateAlModello(app)).at(-1);
+  expect(await tokenDi(app, ultima)).toBeLessThan(70000);
+});
