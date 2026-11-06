@@ -326,7 +326,7 @@ test('in Sicurezza si vedono i siti segnati per il campo password: uno tolto tor
 // #2219 — in Privacy massima Filo non tiene sul disco cosa sa dei siti non fidati: nemmeno dove ha visto un campo password.
 test('in Privacy massima un sito non fidato col campo password è delicato e in Sicurezza, ma il suo nome non resta sul disco', async ({ app, openTab, testServer }) => {
   const sulDisco = () => app.evaluate(() => globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.SITI_CON_CAMPI, []));
-  const imposta = (cookies) => app.evaluate((c) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: c } }), cookies);
+  const imposta = (cookies) => app.evaluate((_electron, c) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: c } }), cookies);
   await imposta({ mode: 'privacy', trustedSites: [] });
   await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
