@@ -1480,7 +1480,9 @@
     const out = [];
     parent.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
-        if (node.nodeValue) out.push({ type: 'text', text: node.nodeValue, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
+        // Lo spazio di larghezza zero è l'ancora dell'incolla lungo (incollaLungo), non testo dell'utente.
+        const testo = node.nodeValue.replace(/​/g, '');
+        if (testo) out.push({ type: 'text', text: testo, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
