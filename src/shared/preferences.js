@@ -1953,11 +1953,14 @@
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),
     elenco({
-      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie'],
+      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie',
+        'rivedi il banner dei cookie', 'mostra il banner dei cookie', 'rifiuta i cookie in automatico qui'],
       percorso: 'security.cookies.bannerSites',
       allentaSe: 'aggiungi',
       nome: 'Siti dove vedi i banner dei cookie',
-      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere',
+      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere. Per il sito aperto: «questo sito» (la scheda '
+        + 'web davanti): «fammi rivedere il banner qui» è aggiungi questo sito, «torna a rifiutarli qui» è togli questo sito; '
+        + 'la pagina si ricarica da sola. Per un sito solo si usa questo elenco, mai la modalità dei cookie',
       risk: 'Cambia i siti dove Filo lascia i banner dei cookie a te invece di rifiutarli da solo: lì una scelta '
         + 'sbagliata sul banner fa accettare i cookie di tracciamento.',
     }),
