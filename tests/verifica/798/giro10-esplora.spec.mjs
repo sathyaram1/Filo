@@ -45,7 +45,7 @@ async function riscritta() {
   return out;
 }
 
-for (const modo of ['default', 'max']) {
+for (const modo of ['default', 'privacy']) {
   test(`esplora ${modo}`, async ({ openTab }) => {
     test.setTimeout(120_000);
     const srv = createServer((req, res) => {
