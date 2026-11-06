@@ -421,7 +421,7 @@ const restaConnessoMethods = {
       if (entrati.length !== ck.loggedSites.length) cambio.loggedSites = entrati;
     }
     const { applySettingsUpdate } = require('../services/handlers');
-    const jar = Google.diGoogle(s) ? Google.SITO_GOOGLE : s;
+    const jar = Google.sitoDelContenitore(s);
     let persi = [];
     conAvviso.set(jar, this);
     esiti.delete(jar);
