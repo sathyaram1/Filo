@@ -78,30 +78,33 @@
     return true;
   }
 
-  function cutSelection() {
-    // La selezione dentro <input>/<textarea> si recupera dal nodo attivo: regola in src/content/content.js.
-    const sel = window.getSelection();
-    let text = sel?.toString() || '';
-    const activeEl = document.activeElement;
-    const inInput = activeEl?.matches?.('input, textarea');
-    if (!text && inInput) {
-      const start = activeEl.selectionStart ?? 0;
-      const end = activeEl.selectionEnd ?? 0;
-      if (start !== end) text = (activeEl.value || '').slice(start, end);
+  // Il testo esatto selezionato nel campo dove si scrive. Una casella per l'email o per un numero non espone
+  // selectionStart: lì la selezione la dice il documento.
+  function testoSelezionatoQui() {
+    const el = document.activeElement;
+    if (el?.matches?.('input, textarea') && el.selectionStart != null && el.selectionEnd != null) {
+      return (el.value || '').slice(el.selectionStart, el.selectionEnd);
     }
+    return window.getSelection()?.toString() || '';
+  }
+
+  // Come il Taglia del sistema (#1434.2): il testo va negli appunti e lascia il campo con una cancellazione vera, che
+  // Ctrl+Z annulla, in ogni tipo di casella. La selezione è quella catturata all'apertura del menu.
+  async function cutSelection() {
+    deps.restorePasteContext();
+    const text = testoSelezionatoQui();
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      pushClipboardEntry({ type: 'text', text });
-      if (inInput) {
-        const start = activeEl.selectionStart ?? 0;
-        const end = activeEl.selectionEnd ?? 0;
-        activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
-        activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
-      } else {
-        document.execCommand('delete');
-      }
-    });
+    if (!(await scriviNegliAppunti(text))) { Popup.toastErrore('toast_cut_failed'); return; }
+    deps.restorePasteContext();
+    let tolto = false;
+    try { tolto = document.execCommand('delete'); } catch (_) { tolto = false; }
+    const el = document.activeElement;
+    if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
+    // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
+    const start = el.selectionStart;
+    el.value = el.value.slice(0, start) + el.value.slice(el.selectionEnd);
+    el.setSelectionRange(start, start);
+    el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'deleteByCut' })));
   }
 
   function blobToDataUrl(blob) {
