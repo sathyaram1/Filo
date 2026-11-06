@@ -2291,8 +2291,21 @@
       cursoreIndietro(dopo.toString().length);
       return;
     }
+    // Un carattere invisibile piantato davanti alla selezione: Chrome non incolla in un blocco vuoto, dove paga al
+    // quadrato, e la selezione può finire in un elenco o in una citazione (#1697). Il modello non lo salva.
+    const conAncora = () => {
+      const z = document.createTextNode('​');
+      const davanti = r.cloneRange();
+      davanti.collapse(true);
+      davanti.insertNode(z);
+      r.setStart(z, 1);
+      scegli(r);
+      const t0 = blocco.tagName;
+      document.execCommand('insertHTML', false, paragrafi(PARAGRAFO.test(t0) || t0 === 'BLOCKQUOTE' ? t0.toLowerCase() : 'p'));
+    };
     if (!PARAGRAFO.test(blocco.tagName) || !PARAGRAFO.test(bloccoFine.tagName)) {
-      document.execCommand('insertText', false, righe.join('\n'));
+      if (blocco.tagName === 'LI') document.execCommand('insertText', false, righe.join('\n'));
+      else conAncora();
       return;
     }
     const tag = blocco.tagName.toLowerCase();
