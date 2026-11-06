@@ -1096,26 +1096,35 @@
   // Con `manuale` chi ha chiesto il riassunto sa com'è andata.
   async function generateSummaryForActive({ manuale = false } = {}) {
     if (!doc || !doc.meta) return false;
+    // Il testo si legge adesso: dopo l'attesa della memoria il foglio può mostrare già un altro documento (#1570).
+    const testo = docPlainText();
     syncActiveIntoCollection();
     const id = doc.id;
-    if (!docPerIlModello().testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
+    if (!window.SN_EDITOR_SUMMARY.testoAlModello(testo).testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
     const prima = STORE.findFile(collection, id);
     const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
+    // Il titolo non scritto a mano viaggia con il riassunto: nessuna chiamata in più (#1570).
+    const conTitolo = !!(SUMMARY && prima && firma && !autoTitleBusy && SUMMARY.titoloDaRifare(prima, firma.words));
     const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
-      { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+      { role: 'system', content: conTitolo ? TITOLO_E_RIASSUNTO_PROMPT : SUMMARY_SYSTEM_PROMPT },
       { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
       // `intera`: un riassunto fermato dal tetto non si salva e non va alla chat come se fosse completo (#1302).
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true, intera: true } : { intera: true });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true, intera: true } : { intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) {
         // L'automatico lo dice una volta sola: il prossimo tentativo arriva solo dopo un cambio vero del testo.
         if (segnaRiassuntoFallito(id, firma, r) || manuale) avvisoNonGenerato(manuale ? 'il riassunto' : 'il riassunto automatico', r);
         return false;
       }
-      const ok = applyGeneratedSummary(id, rawText);
+      const parti = conTitolo ? SUMMARY.titoloERiassunto(rawText) : { titolo: '', riassunto: rawText };
+      if (parti.titolo && !titoloScrittoAMano(id)) {
+        const nuovo = applyGeneratedTitle(id, parti.titolo, 'automatico', firma);
+        contaRiquadro('editor_titolo', { via: 'automatico', esito: nuovo ? 'applicato' : 'vuoto' });
+      }
+      const ok = applyGeneratedSummary(id, parti.riassunto);
       if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
       if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
       return ok;
