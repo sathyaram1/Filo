@@ -1,6 +1,6 @@
-// Verifica #798 giro 1. r1: la pagina raggiunge per indice (window[n]) un suo riquadro senza documento proprio prima
-// che la guardia lo prepari, e ne legge il canvas senza rumore. r2: con la protezione accesa la finestra porta una
-// proprietà in più che un sito vede, e con Off no.
+// Verifica #798 giro 1 (porte chiuse, riprovate): la pagina raggiunge per indice (window[n]) un suo riquadro senza
+// documento proprio prima che la guardia lo prepari, e ne legge il canvas senza rumore; con la protezione accesa la
+// finestra porta una proprietà in più che un sito vede, e con Off no.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
