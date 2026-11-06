@@ -1839,7 +1839,8 @@
     const value = el.value || '';
     const selection = value.slice(start, end).trim();
     if (!selection) return null;
-    if (Extract.campoSegreto?.(el)) return { selection, sentence: selection, segreto: true };
+    const s = Extract.segretezza?.(null, el);
+    if (s && s.segreto) return { selection, sentence: selection, ...s };
     return { selection, sentence: value.trim() || selection };
   }
 
