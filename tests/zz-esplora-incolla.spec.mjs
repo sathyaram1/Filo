@@ -25,6 +25,12 @@ test('esplora', async ({ openTab }) => {
   await page.waitForSelector('#doc');
   await page.evaluate(() => { const x = document.createElement('div'); x.id = 'pulito'; x.contentEditable = 'true'; document.body.appendChild(x); });
   const casi = [
+    ['T1 interchange inizio', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<br class="Apple-interchange-newline">' + h)`],
+    ['T2 interchange fine', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h + '<br class="Apple-interchange-newline">')`],
+    ['T3 p vuoto in testa', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<p><br></p>' + h)`],
+    ['T4 vuoto: ul', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, hl)`],
+    ['T5 vuoto: due sole p', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<p>a</p><p>b</p>')`],
+    ['T6 vuoto 300', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h.slice(0, h.length/2))`],
     ['S span vuoto unico', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<span>' + h + '</span>')`],
     ['S span vuoto 1500', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<span>' + h + h + h.slice(0, h.length/2) + '</span>')`],
     ['S span fine pieno', `d.innerHTML='<p>abc</p><p>def</p>'; ${cursore("({node: d.firstChild.firstChild, off: 3})")}`, `document.execCommand('insertHTML', false, '<span>' + h + '</span>')`],
