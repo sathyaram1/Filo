@@ -237,7 +237,7 @@ const restaConnessoMethods = {
   // Il sito del jar della scheda in Privacy, come lo nomina services/cookies.js quando cambia la fiducia.
   _jarDi(tab) {
     const sito = this._propostaSito(tab);
-    return sito && Google.diGoogle(sito) ? Google.SITO_GOOGLE : sito;
+    return sito && Google.sitoDelContenitore(sito);
   },
 
   _fidato(sito) {
