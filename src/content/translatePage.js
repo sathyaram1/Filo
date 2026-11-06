@@ -557,11 +557,11 @@
     } catch (_) { return true; }
   }
 
-  function reportToHost(runId, data) {
+  function reportToHost(runId, data, fuoriConto) {
     if (!runId) return;
     try {
       chrome.runtime.sendMessage(Object.assign(
-        { type: MSG.FRAME_TRANSLATE_DONE, runId: String(runId) }, data,
+        { type: MSG.FRAME_TRANSLATE_DONE, runId: String(runId) }, data, fuoriConto ? { fuoriConto: 1 } : {},
       ));
     } catch (_) {}
   }
