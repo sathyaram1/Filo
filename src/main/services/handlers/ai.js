@@ -306,7 +306,8 @@ module.exports = function register(on, ctx) {
     const diretta = direttaAiuto(msg, sender);
     try {
       if (diretta && diretta.signal.aborted) return { ok: false, code: 'FERMATO', error: 'fermato' };
-      return await richiestaAI(msg, sender, origin, diretta ? { signal: diretta.signal, onReasoning: diretta.onReasoning } : {});
+      const r = await richiestaAI(msg, sender, origin, diretta ? { signal: diretta.signal, onReasoning: diretta.onReasoning } : {});
+      return diretta && diretta.ragionamento && r && r.ok ? { ...r, ragionamento: diretta.ragionamento } : r;
     } finally {
       if (diretta) diretta.fine();
     }
