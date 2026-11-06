@@ -36,8 +36,8 @@ test('esplora: Taglia di una parte dell\'email dalla fila, poi Ctrl+Z', async ({
   await expect.poll(() => page.locator('#mail').inputValue()).toBe('mario@posta.it');
 
   await page.locator('#numero').focus();
-  await page.keyboard.press('End');
-  for (let i = 0; i < 2; i++) await page.keyboard.press('Shift+ArrowLeft');
+  await page.keyboard.press('Home');
+  for (let i = 0; i < 2; i++) await page.keyboard.press('Shift+ArrowRight');
   await page.locator('#numero').click({ button: 'right', position: { x: 12, y: 8 } });
   await expect(fila).toBeVisible();
   await fila.locator('[data-sn-icon-id="campo:cut"]').click();
