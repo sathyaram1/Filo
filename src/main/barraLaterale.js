@@ -699,7 +699,6 @@ class BarraLaterale {
 
   _icone() {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const I18n = globalThis.SN_I18N;
     if (!D || !this.layout) return [];
     const nav = this._nav();
     const owner = this._owner();
