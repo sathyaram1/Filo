@@ -117,9 +117,7 @@
   function suClic(e) {
     if (e.defaultPrevented || e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
     const a = linkDi(e.composedPath ? e.composedPath()[0] : e.target);
-    if (!a || !/^https?:/i.test(a.href)) return;
-    const t = String(a.getAttribute('target') || '').trim().toLowerCase();
-    if (t && t !== '_self' && t !== '_top' && t !== '_parent') return;
+    if (!a || !/^https?:/i.test(a.href) || !R.apreQui(a.getAttribute('target'))) return;
     const url = R.indirizzoDaPrecaricare(a.href);
     const qui = R.indirizzoDaPrecaricare(location.href);
     if (!url || url === qui) return;
