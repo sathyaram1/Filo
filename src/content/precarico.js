@@ -82,10 +82,10 @@
     if (spento() || !/^https?:/i.test(a.href)) return;
     preconnetti(a.href);
     if (!adatto(a)) return;
-    const url = R.indirizzoDaPrecaricare(a.href);
-    if (!url) return;
-    if (passati.includes(url)) return;
-    passati.push(url);
+    // A Chromium il link com'è, frammento compreso: senza, né il passaggio né la navigazione verso «#sezione» lo trovano.
+    const href = a.href;
+    if (!R.indirizzoDaPrecaricare(href) || passati.includes(href)) return;
+    passati.push(href);
     if (passati.length > LIMITI.PASSAGGI_TENUTI) passati = passati.slice(-LIMITI.PASSAGGI_TENUTI);
     scrivi();
   }
