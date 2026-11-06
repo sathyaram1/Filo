@@ -118,7 +118,8 @@
     return '';
   }
 
-  // L'indirizzo da dare a Chromium: senza il frammento, che al server non arriva.
+  // La pagina di un link, per contarla una volta sola: senza il frammento, che al server non arriva. A Chromium invece va
+  // il link com'è, frammento compreso.
   function indirizzoDaPrecaricare(href) {
     const u = leggi(href);
     return u ? senzaFrammento(u) : '';
