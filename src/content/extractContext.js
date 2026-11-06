@@ -989,7 +989,7 @@
                  && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
         continue;
       }
-      takeAttrs(el, false);
+      takeAttrs(el, false, nascosto);
       // Già tradotto: si salta l'elemento ma si scende lo stesso nei figli (#408), o i blocchi
       // annidati lasciati da una traduzione interrotta resterebbero irraggiungibili.
       if (!(el.dataset && el.dataset.snTranslated)) {
@@ -998,15 +998,26 @@
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
           // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
           // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
-          if (isOwnTextHidden(el)) {
+          const proprioNascosto = isOwnTextHidden(el);
+          if (proprioNascosto && !tutto) {
             if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
-          } else if (room()) out.push({ el, text: txt });
-          else truncated++;
+          } else if (nascosto || proprioNascosto) nascostiTesto.push({ el, text: txt, nascosto: true });
+          else visti.push({ el, text: txt });
         }
       }
       if (isClosedComponent(el) && !el.shadowRoot) unreachable++;
-      pushKids(el, stack, shadowRoots);
+      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null);
     }
+    let posto = maxBlocks;
+    const prendi = (da, a) => {
+      for (const x of da) {
+        if (posto > 0) { a.push(x); posto--; } else truncated++;
+      }
+    };
+    prendi(visti, out);
+    prendi(vistiAttr, attrs);
+    prendi(nascostiTesto, out);
+    prendi(nascostiAttr, attrs);
     return Object.assign(out, { unreachable, truncated, attrs, mirrors, shadowRoots, frameDocs, hidden });
   }
 
