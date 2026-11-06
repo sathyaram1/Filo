@@ -2343,6 +2343,7 @@
         scegli(tutta);
         document.execCommand('insertHTML', false, `${paragrafi(tag)}<p>${carattereVestito(car, sotto, testa)}</p>`);
         cursoreIndietro(1);
+        sel.modify('move', 'backward', 'character');
         return;
       }
     }
