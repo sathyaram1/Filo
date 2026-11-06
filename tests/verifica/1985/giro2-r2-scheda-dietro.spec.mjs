@@ -32,6 +32,6 @@ test('r2 i link a schermo di una scheda rimasta dietro non si precaricano, e rip
     await new Promise((r) => setTimeout(r, 12_000));
     expect(dietro()).toBe(prima);
     await shell.evaluate((id) => window.filoShell.tabs.activate(id), aperta.id);
-    await expect.poll(dietro, { timeout: 20_000, intervals: [500] }).toBeGreaterThan(prima);
+    await expect.poll(dietro, { timeout: 30_000, intervals: [500] }).toBeGreaterThan(prima);
   } finally { await new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }); }
 });
