@@ -2229,8 +2229,9 @@
     const sel = window.getSelection();
     const r = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
     const ultima = righe.length - 1;
+    // In una citazione ogni riga resta citazione, come con l'incolla corto.
     const paragrafi = (tag, prefisso = '', suffisso = '') => righe.map((x, i) => {
-      const t = i === 0 ? tag : 'p';
+      const t = i === 0 || tag === 'blockquote' ? tag : 'p';
       return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
     }).join('');
     const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
