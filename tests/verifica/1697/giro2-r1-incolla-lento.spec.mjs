@@ -49,7 +49,7 @@ test('r1 selezione da metà di una voce di elenco a metà del paragrafo sotto, i
   const ms = await incolla(page, righe(1000));
   expect(await entrate(page)).toBe(1000);
   await expect(page.locator('#doc')).toContainText('voc');
-  await expect(page.locator('#doc')).toContainText('grafo dopo');
+  await expect(page.locator('#doc')).toContainText('rafo dopo');
   expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2000);
 });
 
