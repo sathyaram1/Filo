@@ -328,7 +328,8 @@ const restaConnessoMethods = {
     if (seguita) this._ricaricaDopoFinestrella(tab, seguita).catch(() => {});
   },
 
-  // Accesso riuscito nella finestrella (cookie d'accesso nuovi o cambiati per il sito della scheda): la scheda che
+  // Accesso riuscito nella finestrella (un cookie d'accesso che prima non c'era: un valore rinnovato lo dà anche il
+  // sito che rinnova la sessione da sé, #1725 r1): la scheda che
   // l'ha aperta si ricarica e il sito la vede dentro. Non se la pagina ha già reagito da sé, se è passata ad altro,
   // o se ha qualcosa da perdere.
   async _ricaricaDopoFinestrella(tab, seguita) {
