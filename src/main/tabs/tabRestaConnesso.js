@@ -129,6 +129,11 @@ function managersNormali() {
 // Un cambio alla volta: «resta» e «non restare» di fila non devono incrociare le copie dei jar.
 let coda = Promise.resolve();
 const inCorso = new Map();
+function inFila(lavoro) {
+  const p = coda.then(lavoro);
+  coda = p.catch(() => {});
+  return p;
+}
 // Sito cambiato dal menu o dalla proposta → la finestra che l'ha chiesto: lì l'avviso di conferma dice già se c'è
 // da rientrare, e l'esito le resta in `esiti` anche se lo spostamento finisce prima che lo chieda.
 const conAvviso = new Map();
