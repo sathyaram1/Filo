@@ -2479,6 +2479,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       togliNotaPasso();
       passoQui = 0;
       await Pagina.pulisci({}).catch(() => null);
+      if (finito(mia)) return;
       // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
       if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
