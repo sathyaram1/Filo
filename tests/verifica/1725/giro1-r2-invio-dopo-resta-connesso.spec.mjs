@@ -90,10 +90,13 @@ test('r2 scrivi un commento, dici «Resta connesso» e poi lo pubblichi: la pagi
     expect(await commenta.locator('#campo').inputValue()).toBe('bellissimo articolo');
 
     await commenta.locator('#manda').click();
-    await expect((await pagina(app, `${s.base}/commenta`)).locator('#pubblicato')).toBeVisible({ timeout: 10_000 });
+    await expect.poll(() => s.visite.includes('POST /commenta'), { timeout: 10_000 }).toBe(true);
     await sleep(5000);
-    const ora = await pagina(app, `${s.base}/commenta`);
-    expect(await ora.locator('#pubblicato').count(), 'la pagina dell\'esito è sparita, ricaricata come pagina vuota').toBe(1);
+    // Dopo un eventuale passaggio la vista è nuova: si ricerca.
+    const pubblicato = async () => {
+      try { return await (await pagina(app, `${s.base}/commenta`, 3000)).locator('#pubblicato').count(); } catch (_) { return -1; }
+    };
+    await expect.poll(pubblicato, { timeout: 10_000, message: 'la pagina dell\'esito è sparita, ricaricata come pagina vuota' }).toBe(1);
     expect(s.visite.filter((v) => v === 'GET /commenta').length, 'Filo ha richiesto di nuovo la pagina dopo l\'invio').toBe(1);
   } finally {
     await s.chiudi();
