@@ -5615,11 +5615,7 @@
       if (armato && e && e.detail > 1) return;
       if (!armato) {
         armato = true;
-        // «Confermi?» è più corto: senza la scatola ferma il secondo clic sul lato destro cadeva fuori dal tasto.
-        const scatola = btn.getBoundingClientRect();
-        btn.style.minWidth = scatola.width + 'px';
-        btn.style.minHeight = scatola.height + 'px';
-        btn.textContent = 'Confermi?';
+        window.SN_CONFERMA_SUL_POSTO.arma(btn, 'Confermi?');
         timer = setTimeout(disarma, 5000);
         return;
       }
