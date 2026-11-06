@@ -125,7 +125,7 @@ test('r2 riquadro incorporato dentro un componente chiuso: tradotto, o l’avvis
   expect(tradotto || avvisa, `il riquadro è rimasto in inglese e l'avviso dice: ${await toasts(page)}`).toBe(true);
 });
 
-test('riquadro arrivato MENTRE la traduzione lavora: a lavoro finito è tradotto, o l’icona offre di tradurlo', async ({ app, openTab, testServer }) => {
+test('r3 riquadro arrivato MENTRE la traduzione lavora: a lavoro finito è tradotto, o l’icona offre di tradurlo', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app, 6000);
   const src = testServer.html(frameInner('ZZMID')).replace('127.0.0.1', 'blocked.test');
