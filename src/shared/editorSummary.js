@@ -210,6 +210,8 @@
     isSummaryFresh,
     needsSummary,
     makeSig,
+    titoloDaRifare,
+    titoloERiassunto,
     summaryFor,
     buildContextFiles,
     renderForPrompt,
