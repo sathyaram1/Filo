@@ -312,7 +312,7 @@ async function sezione(incognito) {
       s.tolte = tolte;
     } catch (_) { eventi = null; }
   }
-  const vivo = (f) => (String(f).includes('|') ? chats.has(String(f).split('|')[0]) : (!eventi || eventi.has(f)));
+  const vivo = (f) => (chatDellaFonte(f) != null ? chats.has(chatDellaFonte(f)) : (!eventi || eventi.has(f)));
   const ore = L().senzaCancellate(s.ore, vivo);
   const giorni = L().senzaCancellate(s.giorni, vivo);
   if (ore.length !== s.ore.length || giorni.length !== s.giorni.length) {
@@ -320,7 +320,25 @@ async function sezione(incognito) {
     s.giorni = giorni;
     try { await salva(incognito); } catch (_) {}
   }
-  return L().rendiFiloCompattato({ ore, giorni });
+  const visibile = (f) => !nascoste.has(chatDellaFonte(f));
+  return L().rendiFiloCompattato({ ore: L().senzaCancellate(ore, visibile), giorni: L().senzaCancellate(giorni, visibile) });
+}
+
+// Una conversazione cancellata (null: tutte) porta via subito le righe del diario nate da lei, anche dal disco, come le
+// sue altre copie (filoChats.js, dimenticaCopie). `sezione` resta la rete per una compattazione che era in corso.
+async function dimenticaChat(chatId) {
+  const incognito = inIncognito(null);
+  const s = await stato(incognito);
+  const tocca = (f) => chatDellaFonte(f) != null && (chatId == null || chatDellaFonte(f) === String(chatId));
+  const tieni = (r) => !(r && Array.isArray(r.fonti) && r.fonti.some(tocca));
+  const ore = s.ore.filter(tieni);
+  const giorni = s.giorni.filter(tieni);
+  const tolte = s.ore.length - ore.length + s.giorni.length - giorni.length;
+  if (!tolte) return 0;
+  s.ore = ore;
+  s.giorni = giorni;
+  await salva(incognito);
+  return tolte;
 }
 
 // Quanto pesa un messaggio del tratto, in token: testo ed esiti.
