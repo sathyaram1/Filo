@@ -838,15 +838,24 @@ class BarraLaterale {
 
   // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
   // `daAltro`: scelta dentro «Altro…», per i contatori (#1471).
-  esegui(id, { colore = '', daAltro = false } = {}) {
+  // `via` 'fila': premuta nella fila del tasto destro della scheda davanti, dove sta un'icona della finestra (#1434.2);
+  // lì è spenta come nella barra, e non conta come una scelta fatta nella barra.
+  esegui(id, { colore = '', daAltro = false, via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
-    if (!d || !this.layout || !this._inBarra().includes(id)) return;
+    const dallaFila = via === 'fila';
+    if (!d || !this.layout || !(dallaFila ? this.inFila && this.inFila.has(id) && d.tipo === 'finestra' : this._inBarra().includes(id))) return;
     if (d.soloOwner && !this._owner()) return;
-    if (daAltro && Array.isArray(this.layout.secondary) && this.layout.secondary.includes(id)) this._contaGesto('altro_del_menu', { icona: id });
-    this._lettura().clic(id);
-    this._esito('azione');
-    this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
+    if (dallaFila) {
+      const it = this._descrivi(id, { nav: this._nav(), owner: this._owner() });
+      if (!it || it.spenta) return;
+    } else {
+      if (daAltro && Array.isArray(this.layout.secondary) && this.layout.secondary.includes(id)) this._contaGesto('altro_del_menu', { icona: id });
+      this._lettura().clic(id);
+      this._esito('azione');
+      this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
+    }
+    const strada = dallaFila ? 'tasto_destro_riga' : 'barra';
     const tabs = this.tabs;
     const attiva = this._attiva();
     const incognito = this._incognito();
