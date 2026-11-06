@@ -243,7 +243,8 @@ try {
 } catch (_) { /* mai bloccare il caricamento */ }
 
 // Gli alberi chiusi dei componenti del sito, per l'avviso della traduzione (#472): regole in preload/ombre-chiuse.js.
-if (!IS_SUBFRAME) try {
+// In ogni frame http(s): un riquadro incorporato ha i suoi componenti, e lì si giudicano come nella pagina.
+try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) require('./ombre-chiuse.js').installa({ webFrame });
 } catch (_) { /* mai bloccare il caricamento */ }
