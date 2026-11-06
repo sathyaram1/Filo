@@ -11,9 +11,10 @@ const { motore, sorgente } = require('../../src/preload/youtube-scriptlet.js');
 
 const risposta = () => ({ videoDetails: { videoId: 'v1' }, adPlacements: [{ a: 1 }], adSlots: [{ s: 1 }], playerAds: [{ p: 1 }] });
 
+// Ogni finestra ha la sua Response: json-prune ne avvolge il prototipo, e quello di Node resta pulito per le altre prove.
 function finestra(extra = {}) {
   const W = {
-    JSON: { parse: JSON.parse, stringify: JSON.stringify }, Response, Request, ReferenceError,
+    JSON: { parse: JSON.parse, stringify: JSON.stringify }, Response: class extends Response {}, Request, ReferenceError,
     setTimeout: (fn, ms) => ({ fn, ms }),
     fetch: async (u) => new Response(JSON.stringify(risposta()), { status: 203, statusText: 'Fatto', headers: { 'x-prova': 'si' } }),
     ...extra,
