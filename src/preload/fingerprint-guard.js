@@ -250,8 +250,12 @@ function parteFingerprint(seed) {
 // Un riquadro che carica un documento della stessa origine non si tocca prima: il documento erediterebbe la finestra
 // senza il preload. Nessun segno sulla finestra: un sito vedrebbe chi usa Filo (regole e porte rimaste:
 // patterns/riquadri-incorporati-iframe-filo-gira-anche-li.md).
+const V = require('./vie-dei-riquadri.js');
 const PROPAGAZIONE = `
-  var CORNICI = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'];
+  var CORNICI = ${JSON.stringify(V.CORNICI)}, GETTER_FINESTRA = ${JSON.stringify(V.GETTER_FINESTRA)};
+  var VIE_NODI = ${JSON.stringify(V.VIE_NODI)}, VIE_TESTO = ${JSON.stringify(V.VIE_TESTO)};
+  var RISCRIVONO = ${JSON.stringify(Object.fromEntries(V.RISCRIVONO.map((n) => [n, 1])))};
+  var inArrivo = ${V.sorgenteInArrivo()};
   var TAG = { __proto__: null, IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1 };
   var NP = Node.prototype, EP = Element.prototype, leggiAttr = EP.getAttribute, haAttr = EP.hasAttribute;
   var qsaE = EP.querySelectorAll, qsaF = DocumentFragment.prototype.querySelectorAll, qsaD = Document.prototype.querySelectorAll;
