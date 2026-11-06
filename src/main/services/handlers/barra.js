@@ -44,6 +44,19 @@ module.exports = function register(on, ctx) {
     return barra ? barra.dallaScheda(msg || {}, sender.tab.id) : { ok: false };
   });
 
+  // Le icone della finestra portate nella fila del tasto destro: le descrive e le esegue la barra, con le sue regole.
+  on(MSG.FILA_FINESTRA, async (msg, sender) => {
+    const barra = barraDellaSchedaDavanti(sender);
+    return barra ? { ok: true, icone: barra.iconeFila() } : { ok: false };
+  });
+
+  on(MSG.FILA_FINESTRA_ESEGUI, async (msg, sender) => {
+    const barra = barraDellaSchedaDavanti(sender);
+    if (!barra) return { ok: false };
+    barra.esegui(String(msg?.id || ''), { via: 'fila' });
+    return { ok: true };
+  });
+
   // Come si chiamano adesso le azioni della pagina che stanno nella barra («Traduci» o «Mostra originale»).
   on(MSG.BARRA_ETICHETTE, async (msg, sender) => {
     const barra = barraDellaSchedaDavanti(sender);
