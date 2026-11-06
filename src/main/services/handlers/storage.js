@@ -403,7 +403,12 @@ module.exports = function register(on, ctx) {
     if (!text) return { ok: false, error: 'empty' };
     const entry = { type: 'text', text };
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, entry)) return vietato;
-    try { require('electron').clipboard.writeText(text); } catch (_) { return { ok: false, error: 'clipboard' }; }
+    // Con `html` la formattazione della selezione, come la scrive il Copia del sistema (#1434.2).
+    const html = typeof msg.html === 'string' ? msg.html : '';
+    try {
+      const { clipboard } = require('electron');
+      if (html) clipboard.write({ text, html }); else clipboard.writeText(text);
+    } catch (_) { return { ok: false, error: 'clipboard' }; }
     await inCronologia(entry);
     return { ok: true };
   });
