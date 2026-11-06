@@ -330,8 +330,6 @@ test('in Privacy massima un sito non fidato col campo password è delicato e in 
   await imposta({ mode: 'privacy', trustedSites: [] });
   await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
   await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
-  console.log('DEBUG', await app.evaluate(() => ({ nuovo: globalThis.SN_DELICATE.segnaCampi.toString().includes('noti'), m: process.mainModule && process.mainModule.filename })));
-  console.log('DEBUG2', JSON.stringify(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies)));
   expect(await sulDisco()).not.toContain('sito-pubblico.test');
 
   const sicurezza = await openTab('filo://security/security.html');
