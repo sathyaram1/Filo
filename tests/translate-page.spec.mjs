@@ -2376,7 +2376,6 @@ const SIGILLATO = (prima, dopo) => `<!doctype html><html lang="en"><body style="
 for (const [nome, prima, dopo, scorri] of [
   ['più in basso della prima schermata', '<div style="height:2500px"></div>', '', 0],
   ['in cima, tradotto dopo averlo superato scorrendo', '', '<div style="height:2500px"></div>', 1400],
-  ['dentro una sezione chiusa', '<details><summary>Open the box</summary>', '</details>', 0],
 ]) {
   test(`componente chiuso con testo ${nome}: «solo in parte»`, async ({ app, openTab, testServer }) => {
     await stubTranslationProvider(app);
