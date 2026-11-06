@@ -66,7 +66,7 @@ test('il sì toglie il «no»; senza il suo sale un\'impronta non vale più', as
 
 test('la descrizione per la chat non nega più che il database del sito passi con «Resta connesso»', () => {
   require('../../src/shared/capabilities.js');
-  const voce = globalThis.SN_CAPABILITIES.ALL.find((c) => c.id === 'stay-signed-in');
+  const voce = globalThis.SN_CAPABILITIES.get('stay-signed-in');
   const testo = `${voce.desc} ${voce.doesNot}`;
   assert.ok(!/non i database del sito/i.test(testo), testo);
   assert.match(voce.desc, /database compreso/);
