@@ -1462,6 +1462,13 @@
     chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion });
   }
 
+  // Quello che il menu chiede al main prima di aprirsi, insieme: la cronologia degli appunti e lo stato delle icone della
+  // finestra portate nella fila (Indietro spento senza dove tornare).
+  async function primaDelMenu() {
+    const [cronologia] = await Promise.all([Actions.getClipboardHistory(), Promise.resolve(MenuIcons?.prepara?.()).catch(() => {})]);
+    return cronologia;
+  }
+
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
   // del menu, perché il click sul bottone del menu sposta il focus altrove.
   let pasteContext = null;
