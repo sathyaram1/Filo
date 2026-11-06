@@ -2275,6 +2275,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
             esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {
+          if (finito(mia)) return;
+          attesa?.fine();
           esitoVuoto = 'la ricerca web che avevi chiesto è fallita per un errore di rete';
         }
         const note = ricercaWeb
