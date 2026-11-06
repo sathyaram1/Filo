@@ -150,7 +150,6 @@
     const locale = Disp.applicaPosa(disposizione(), { id, target, beforeId: beforeId || null });
     if (locale) layout = locale;
     ridisegna();
-    if (Disp.ICONE[id]?.tipo === 'finestra') ridisegnaFinestra();
     manda({ type: MSG.ICON_LAYOUT_DROP, id, source: source === 'bar' ? 'bar' : 'menu', target, beforeId: beforeId || null })
       .then((r) => { if (r && r.ok) layoutCambiato(r.layout); });
   }
