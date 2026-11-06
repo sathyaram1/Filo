@@ -928,8 +928,7 @@
     const sottoInvisibile = new WeakSet();
     let unreachable = 0;
     let truncated = 0;
-    const room = () => out.length + attrs.length < maxBlocks;
-    const takeAttrs = (el, checkHard) => {
+    const takeAttrs = (el, checkHard, nascosto) => {
       // Qui arrivano gli elementi in cui NON si scende: il loro testo non verrà tradotto, e da
       // lì non c'è nessuna etichetta gemella da copiare.
       const targets = attrTargetsOf(el, !checkHard);
