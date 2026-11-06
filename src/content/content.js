@@ -145,6 +145,9 @@
       // Segnali di attività (§2.1): ultima interazione, % di scroll.
       // Servono all'LLM per decidere cosa archiviare.
       try { startTabActivityReporter(); } catch (_) {}
+
+      // #1985 — il precarico dei link: come la spiegazione anticipata, mai in incognito né dove Filo è spento.
+      try { self.SN_PRECARICO_PAGINA?.avvia({ spento: () => inIncognito || isBlocked() }); } catch (_) {}
     }
     // Il testo da inviare invece si guarda in ogni frame: editor, commenti e
     // moduli di contatto stanno spesso in un riquadro (#824).
