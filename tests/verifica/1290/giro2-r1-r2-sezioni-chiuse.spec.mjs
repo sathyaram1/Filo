@@ -1,4 +1,5 @@
-// Verifica di #1290, giro 2: esplorazione.
+// Verifica di #1290, giro 2: r1 componente chiuso col testo nelle sezioni chiuse che non sono fisarmoniche;
+// r2 «solo quando le apro» che non traduce all'apertura. Fornitore finto come in translate-page.spec.mjs.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { barraPage, comandaBarra, pannelloFermo, premiNellaBarra } from '../../helpers/barra.mjs';
