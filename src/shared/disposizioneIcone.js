@@ -343,7 +343,7 @@
 
   global.SN_DISPOSIZIONE_ICONE = {
     ZONE, ZONE_FILA, TUTTE, GLOBALI, ICONE, AZIONI, CONTESTI, DEFAULT, RITIRATE, AGGIUNTE, IN_CIMA, DOVE,
-    noto, esiste, descrizione, ammessa, nome, nomeZona, zonaDaDove, contestoDiZona, zonaFila, zonaAltro, filaDi,
+    noto, esiste, descrizione, ammessa, nome, nomeZona, zonaDaDove, zonaDellAzione, doveDaZona, contestoDiZona, zonaFila, zonaAltro, filaDi,
     valida, migra, applicaPosa, aspettoAiuto, posizione, spostate, posaPer,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
