@@ -24,6 +24,11 @@ test('esplora', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
   const casi = [
+    ['D radice prima del p vuoto', `d.innerHTML='<p><br></p>'; ${cursore("({node: d, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['E radice prima del p vuoto in mezzo', `d.innerHTML='<p>uno</p><p><br></p><p>tre</p>'; ${cursore("({node: d, off: 1})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['A div', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<div>' + h + '</div>')`],
+    ['B div per riga', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h.replace(/<(\\/?)p>/g, '<$1div>'))`],
+    ['F p vuoto con span', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<span></span>' + h)`],
     ['vuoto testa nuda', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h.replace('<p>A0</p>', 'A0'))`],
     ['doc senza figli', `d.innerHTML=''; ${cursore("({node: d, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
     ['vuoto testa nuda 1500', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h.replace('<p>A0</p>', 'A0') + h + h.slice(0, h.length/2))`],
