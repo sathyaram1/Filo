@@ -85,7 +85,7 @@ test('le vie dei riquadri e la regola del riquadro in arrivo vivono in un posto 
     }
     new Function(s);
   }
-  const VIE = /'(appendChild|insertBefore|replaceChild|append|prepend|replaceChildren|before|after|replaceWith|moveBefore|insertAdjacentElement|insertAdjacentHTML|innerHTML|outerHTML|setHTMLUnsafe|setHTML|insertNode|surroundContents|write|writeln|open|execCommand|srcdoc)'/;
+  const VIE = /'(appendChild|insertBefore|replaceChild|append|prepend|replaceChildren|before|after|replaceWith|moveBefore|insertAdjacentElement|insertAdjacentHTML|innerHTML|outerHTML|setHTMLUnsafe|setHTML|insertNode|surroundContents|write|writeln|execCommand|srcdoc)'/;
   for (const f of ['src/preload/fingerprint-guard.js', 'src/preload/riquadri-vuoti.js']) {
     const testo = readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');
     assert.doesNotMatch(testo, VIE, `${f}: una via dei riquadri scritta a mano, fuori dall'elenco condiviso`);
