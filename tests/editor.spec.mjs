@@ -352,6 +352,7 @@ test('su tutto un documento con titolo ed elenco, l\'incolla lungo entra in fret
   test.setTimeout(60_000);
   const page = await apriEditor(openTab);
   await foglio(page, '<h1>Titolo</h1><p>testo di prima</p><ul><li>voce a</li><li>voce b</li></ul>', { nodo: "d.querySelector('p').firstChild", off: 0 });
+  await expect(page.locator('#doc h1 .ed-collapse-toggle')).toHaveCount(1);
   const prima = await foglioVisto(page);
   await page.keyboard.press('Control+A');
   const righe = Array.from({ length: 1000 }, (_, i) => `Riga ${i}`);
