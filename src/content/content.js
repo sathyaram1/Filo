@@ -2837,23 +2837,23 @@
           tieneAperto: true,
           onClick: (ancora) => Menu.openLinkSubmenu(ancora, { valore: collegamentoProposto(selInfo, clipboardHistory), onApplica: (v) => collega(v) }),
         },
-        cut: { onClick: () => Actions.cutSelection() },
-        copy: { onClick: copia },
-        search: cerca,
+        cut: daSel('cut'),
+        copy: daSel('copy'),
+        search: daSel('search'),
       });
       const stato = statoFormattazione();
       for (const k of Object.keys(stato)) azioni[k].acceso = stato[k];
     } else if (nome === 'campo') {
       Object.assign(azioni, {
-        cut: { onClick: () => Actions.cutSelection() },
-        copy: { onClick: copia },
+        cut: daSel('cut'),
+        copy: daSel('copy'),
         paste: { onClick: () => Actions.pasteFromClipboard() },
-        search: cerca,
+        search: daSel('search'),
       });
     } else if (nome === 'testo') {
-      Object.assign(azioni, { copy: { onClick: copia } });
+      Object.assign(azioni, { copy: daSel('copy') });
       if (!contesto.segreto) {
-        azioni.search = cerca;
+        azioni.search = daSel('search');
         azioni.translate = { onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) };
         const leggi = TTS.buildReadAloudItem(testo);
         if (leggi) azioni.readAloud = { onClick: leggi.onClick };
