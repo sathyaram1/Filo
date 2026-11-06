@@ -289,13 +289,18 @@ async function riassumiGiorni({ incognito = false, ora = Date.now() } = {}) {
   return fatti;
 }
 
+const chatDellaFonte = (f) => (String(f).includes('|') ? String(f).split('|')[0] : null);
+
 // La sezione del CONTESTO: giorni e ore che il filo ha ancora. Una riga nata da una conversazione o una pagina
-// cancellata esce, anche dal disco: quello che è cancellato non torna dal riassunto (#868.1).
+// cancellata esce, anche dal disco: quello che è cancellato non torna dal riassunto (#868.1). Una nata da una
+// conversazione nascosta resta sul disco e sta fuori finché la conversazione non torna (#1295: nascondere si disfa).
 async function sezione(incognito) {
   incognito = inIncognito(incognito);
   const s = await stato(incognito);
   if (!s.ore.length && !s.giorni.length) return '';
-  const chats = new Set((await F().chats({ incognito })).map((c) => c && c.id));
+  const tutte = await F().chats({ incognito, nascoste: true });
+  const chats = new Set(tutte.map((c) => c && c.id));
+  const nascoste = new Set(tutte.filter((c) => c && c.nascosta).map((c) => c.id));
   // Le pagine e gli accaduti si rileggono solo dopo una cancellazione nuova; se non si leggono, non si toglie niente.
   let eventi = null;
   let tolte = null;
