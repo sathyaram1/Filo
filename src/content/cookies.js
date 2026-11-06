@@ -48,16 +48,21 @@
     } catch (_) { return false; }
   }
 
+  function press(el) {
+    lastActionAt = Date.now();
+    try { el.click(); return true; } catch (_) {}
+    try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; } catch (_) {}
+    return false;
+  }
+
+  // In un riquadro il clic aspetta che la pagina abbia fotografato i suoi nomi: la risposta la scrive spesso lei.
   function clickEl(el) {
     if (!el || el.__filoCookieClicked || !isVisible(el)) return false;
     el.__filoCookieClicked = true;
     lastActionAt = Date.now();
+    if (!IS_TOP) { pageBase().then(() => { if (el.isConnected) press(el); }); return true; }
     const base = answerBase();
-    let ok = false;
-    try { el.click(); ok = true; } catch (_) {}
-    if (!ok) {
-      try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); ok = true; } catch (_) {}
-    }
+    const ok = press(el);
     answerAfter(base, true);
     return ok;
   }
