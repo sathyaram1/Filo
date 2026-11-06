@@ -164,11 +164,11 @@ async function versoIlModello(urls, settings) {
   return null;
 }
 
-// I siti segnati per un campo password o carta che restano anche dopo un riavvio: quelli che l'utente vede in Sicurezza.
-// Quelli visti solo in incognito non ci sono, e non escono.
+// I siti segnati per un campo password o carta che l'utente vede in Sicurezza, anche quelli che in Privacy durano la
+// sessione. Quelli visti solo in incognito non ci sono, e non escono.
 async function elencoCampi() {
   await carica();
-  return [...salvati].sort();
+  return [...noti].sort();
 }
 
 // Dopo un'importazione (#1256): i siti del backup si aggiungono a quelli in memoria, così la prossima scrittura li tiene.
