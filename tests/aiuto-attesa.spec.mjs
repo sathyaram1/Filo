@@ -157,6 +157,26 @@ test('il quadrato ferma la chiamata in volo e i passi dopo; quello già fatto re
   expect(dopo.ultimo).toContain('ha fermato il lavoro prima della risposta');
 });
 
+test('il tasto destro sull\'attesa e sul quadrato offre «Ferma», che vale subito', async ({ app, shell, openTab, testServer }) => {
+  await prepara(app, [{ pensa: ['ci penso su'], aspetta: true, risposta: { text: 'Fatto.', status: 'done' } }]);
+  const { aiuto } = await apriAiuto(app, shell, openTab, testServer);
+  await chiedi(aiuto, 'riassumi');
+  const attesa = aiuto.locator('.sn-sidebar-attesa');
+  await expect(attesa).toHaveAttribute('data-fase', 'pensa', { timeout: 15_000 });
+  await tasto(aiuto).click({ button: 'right' });
+  await expect(menuDi(aiuto).voce('Ferma')).toBeVisible();
+  await aiuto.keyboard.press('Escape');
+  await attesa.click({ button: 'right' });
+  await menuDi(aiuto).voce('Ferma').click();
+  await expect(attesa).toHaveAttribute('data-fase', 'fermato');
+  await expect.poll(() => stato(app).then((s) => s.interrotte)).toBe(1);
+  await expect(tasto(aiuto)).toHaveAttribute('data-modo', 'invia');
+  // Finito il lavoro, il tasto destro sull'invio non offre più di fermare.
+  await tasto(aiuto).click({ button: 'right' });
+  await expect(menuDi(aiuto).pannelli.first()).toBeVisible();
+  await expect(menuDi(aiuto).voce('Ferma')).toHaveCount(0);
+});
+
 test('Invio a casella vuota ferma come il quadrato; il secondo clic di un doppio clic sull\'invio no', async ({ app, shell, openTab, testServer }) => {
   await prepara(app, [{ pensa: ['ci penso'], aspetta: true, risposta: { text: 'Fatto.', status: 'done' } }]);
   const { aiuto } = await apriAiuto(app, shell, openTab, testServer);
