@@ -2101,7 +2101,7 @@
     },
     {
       scrive: ['contestoFilo.soglia'],
-      aiuto: 'token 5.000-2.000.000, o "predefinito" (oltre questa misura la chat riassume la parte più vecchia della conversazione prima di rispondere)',
+      aiuto: () => `token ${limitiDelTetto('soglia')}, o "predefinito" (oltre questa misura la chat riassume la parte più vecchia della conversazione prima di rispondere)`,
       keys: ['soglia_compattazione', 'soglia di compattazione', 'soglia della compattazione', 'compattazione della chat', 'contestofilo.soglia'],
       costo: 2,
       risk: 'Una soglia più bassa riassume più spesso (più chiamate, e ogni tanto una risposta aspetta qualche secondo); una più alta manda richieste più grosse, e sopra i 100.000 token Haiku costa cinque volte tanto.',
