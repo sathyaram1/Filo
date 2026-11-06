@@ -61,6 +61,22 @@ test('link a schermo lento cliccato mentre il precarico è in corso', async ({ o
   } finally { await s.chiudi(); }
 });
 
+test('variante: navigazione senza clic sul link a schermo lento', async ({ openTab }) => {
+  const RITARDO = 2000;
+  const s = await sito({ lente: ['/p/0'], ritardo: RITARDO });
+  try {
+    const page = await openTab(`${s.origin}/indice`);
+    await expect.poll(() => s.precarichi().includes('/p/0'), { timeout: 30_000, intervals: [100] }).toBe(true);
+    await page.waitForTimeout(200);
+    const t0 = Date.now();
+    await page.evaluate(() => { setTimeout(() => { location.href = '/p/0'; }, 0); });
+    await expect(page.locator('#arrivato')).toHaveText('/p/0', { timeout: 15_000 });
+    const attesa = Date.now() - t0;
+    const r0 = s.richieste.filter((r) => r.url === '/p/0').map((r) => r.prefetch);
+    expect({ r0, attesa }).toEqual({ r0: [true], attesa: -1 });
+  } finally { await s.chiudi(); }
+});
+
 test('link con frammento: il clic usa il precarico', async ({ app, openTab }) => {
   const s = await sito();
   try {
