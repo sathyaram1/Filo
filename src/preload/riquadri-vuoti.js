@@ -4,6 +4,8 @@
 
 // `corpi`: espressioni che valgono ciascuna una funzione (finestra). Per indice (window[i]) un riquadro si prende senza
 // passare da niente di intercettabile: va sistemato appena nasce, dopo ogni via che lo crea e al suo load.
+const V = require('./vie-dei-riquadri.js');
+
 function buildRiquadriVuotiSource(corpi) {
   return `(function(){
   'use strict';
