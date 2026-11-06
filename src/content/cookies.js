@@ -977,7 +977,7 @@
     try { return el ? el.closest(CLICKABLE) : null; } catch (_) { return null; }
   }
 
-  // Gli attributi servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
+  // Classi e id servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
   let observedAttrs = false;
   function startObserver() {
     const B = global.SN_COOKIE_BANNERS;
