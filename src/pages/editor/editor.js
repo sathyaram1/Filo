@@ -2254,6 +2254,12 @@
         r.collapse(!prima);
       }
     }
+    // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
+    if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) r.setStart(docEl.childNodes[r.startOffset], 0);
+    if (r && !r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
+      const ultimo = docEl.childNodes[r.endOffset - 1];
+      r.setEnd(ultimo, ultimo.nodeType === 3 ? ultimo.length : ultimo.childNodes.length);
+    }
     const blocco = r && bloccoDi(r.startContainer);
     const bloccoFine = r && bloccoDi(r.endContainer);
     if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
