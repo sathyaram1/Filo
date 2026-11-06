@@ -4073,22 +4073,21 @@ async function eseguiAzioneFilo(action, {
         // parole: stessa porta del trascinamento, così menu e barre di tutte le finestre la ricevono uguale.
         const D = globalThis.SN_DISPOSIZIONE_ICONE;
         const id = String(action.icona ?? action.id ?? '').trim();
-        let dove = String(action.dove ?? '').trim().toLowerCase();
-        if (dove === 'menu') dove = 'fila';
+        const dove = String(action.dove ?? '').trim().toLowerCase();
         const prima = String(action.prima_di ?? '').trim();
-        const contesto = String(action.contesto ?? '').trim().toLowerCase() || (D && D.AZIONI[id] ? D.AZIONI[id].contesto : '');
-        const target = D ? D.zonaDaDove(dove, contesto) : '';
+        const target = D ? D.zonaDellAzione(action) : '';
         if (!D || !D.esiste(id) || !target) {
-          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(dove === 'fila' || dove === 'altro_fila' ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
+          const serveContesto = !!(D && D.DOVE[dove]) && !['barra', 'altro'].includes(dove);
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, ...(serveContesto ? { motivo: 'per la fila del tasto destro serve il contesto' } : {}) } };
         }
         if (!D.ammessa(id, target)) {
-          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, contesto, motivo: `«${D.nome(id)}» è un'azione ${D.CONTESTI[D.AZIONI[id].contesto].su}: resta nella sua fila o nel suo «Altro…»` } };
+          return { executed: false, kept: false, output: { icona: 'invalid', id, dove, contesto: D.contestoDiZona(target), motivo: `«${D.nome(id)}» è un'azione ${D.CONTESTI[D.AZIONI[id].contesto].su}: resta nella sua fila o nel suo «Altro…»` } };
         }
         const incognito = !!winOf(sender)?._filoIncognito;
         const layout = await require('./layoutIcone').posa(
           { id, target, beforeId: D.esiste(prima) && prima !== id ? prima : null }, { incognito, via: 'chat' });
         if (!layout) return { executed: false, kept: false, output: { icona: 'invalid', id, dove } };
-        return { executed: true, kept: false, output: { icona: id, dove, ...(D.contestoDiZona(target) ? { contesto: D.contestoDiZona(target) } : {}), layout } };
+        return { executed: true, kept: false, output: { icona: id, ...D.doveDaZona(target), layout } };
       }
       case 'PANNELLO_APP': {
         // #1433 — il pannello di destra delle app a parole: le stesse porte del mouse (la pagina per aprire e chiudere,
