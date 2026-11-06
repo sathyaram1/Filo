@@ -60,6 +60,13 @@ try {
   });
   if (scelto) app.commandLine.appendSwitch('password-store', scelto);
 } catch (_) {}
+// Un link a schermo precaricato e cliccato a metà: Chromium aspetta il precarico «immediate» solo 1 s, poi lo butta e
+// riscarica, e su un sito lento la pagina si paga due volte. Si aspetta come per il passaggio del mouse (#1985).
+try {
+  const prima = app.commandLine.getSwitchValue('enable-features');
+  const nostra = 'PrefetchUseContentRefactor:block_until_head_timeout_immediate_prefetch/0';
+  app.commandLine.appendSwitch('enable-features', prima ? `${prima},${nostra}` : nostra);
+} catch (_) {}
 require('./test-window-mode').disegnaAncheFuoriSchermo(app);
 require('./test-window-mode').webglAncheSenzaScheda(app);
 
