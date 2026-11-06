@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
