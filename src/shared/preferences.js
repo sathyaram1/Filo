@@ -2094,12 +2094,8 @@
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
       build(v) {
         if (predefinito(v)) return { partial: { contestoFilo: { token: null } }, label: 'Tetto in token della chat → come i predefiniti' };
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        let n = parseItalianNumber(s);
-        if (!Number.isFinite(n)) return null;
-        if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
-        else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
-        const token = Math.round(contestoFilo().numeroIn(n, contestoFilo().LIMITI.token));
+        const token = tettoAParole('token', v);
+        if (token == null) return null;
         return { partial: { contestoFilo: { token } }, label: `Tetto in token della chat → ${token.toLocaleString('it-IT', { useGrouping: true })}` };
       },
     },
