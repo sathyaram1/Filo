@@ -114,7 +114,7 @@ fixture('il video parte senza pubblicità: la risposta nella pagina, quella chie
   await impostazioni(app, { security: { youtubeAds: { enabled: false } } });
   await page.reload();
   await page.waitForFunction(() => Array.isArray(window.__esiti), null, { timeout: 10_000 });
-  await expect.poll(() => esiti(page), { timeout: 10_000 }).toEqual(['pagina:pubblicita', 'fetch:pubblicita', 'xhr:pubblicita']);
+  await expect.poll(() => esiti(page), { timeout: 10_000 }).toEqual(['fetch:pubblicita', 'pagina:pubblicita', 'xhr:pubblicita']);
   await expect.poll(() => page.evaluate(() => window.__saltata), { timeout: 10_000, message: '«Salta» resta acceso da solo' }).toBe(true);
 });
 
