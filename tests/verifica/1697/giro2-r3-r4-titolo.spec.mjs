@@ -9,6 +9,10 @@ const KEY = 'filo.editor.collection';
 async function stubAI(page, unica = 'giusta') {
   await page.evaluate((unica) => {
     window.__chiamate = [];
+    window.__avvisi = 0;
+    new MutationObserver((ms) => {
+      for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains('ed-toast')) window.__avvisi++;
+    }).observe(document.body, { childList: true, subtree: true });
     const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
     const orig = window.chrome.runtime.sendMessage.bind(window.chrome.runtime);
     window.chrome.runtime.sendMessage = (msg, cb) => {
