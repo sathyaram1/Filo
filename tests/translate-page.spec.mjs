@@ -2341,7 +2341,7 @@ for (const [nome, html, arriva] of [
 
 test('«traduci solo quando apro» si sceglie anche nelle Preferenze, e vale dal giro dopo', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
-  const pref = await openTab('filo://preferences/');
+  const pref = await openTab('filo://preferences/preferences.html');
   const scelta = pref.locator('#traduzioneNascoste');
   await expect(scelta).toHaveValue('subito');
   await scelta.selectOption('apertura');
