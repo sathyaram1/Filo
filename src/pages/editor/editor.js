@@ -2289,7 +2289,7 @@
         const tutta = r.cloneRange();
         tutta.setEnd(car.endContainer, car.endOffset);
         scegli(tutta);
-        document.execCommand('insertHTML', false, paragrafi(tag, '', carattereVestito(car, bloccoFine)));
+        document.execCommand('insertHTML', false, paragrafi(tag, '', carattereVestito(car, bloccoFine, car.endContainer)));
         cursoreIndietro(1);
         return;
       }
