@@ -70,7 +70,7 @@ test('all\'avvio con la copia di ieri, o senza copia, le regole si scaricano sub
   mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: ORA });
   t.after(() => mock.timers.reset());
   for (const copiaDi of [25 * H, null]) {
-    const B = avvio({ copiaDi });
+    const B = await avvio({ copiaDi });
     await B.init({});
     assert.ok(await finché(() => regole(B)[0] === 'dalla.rete'), `copia di ${copiaDi}: ${JSON.stringify(chieste)}`);
   }
