@@ -585,27 +585,30 @@ async function presiMentreCarica(urls) {
   void window[window.length - 1];
   out.testoDentro = await attendi('testo');
   const lib = document.createElement('iframe');
+  lib.id = 'libero';
+  lib.width = 500;
+  lib.height = 200;
   lib.src = urls.libero;
-  await new Promise((r) => { lib.addEventListener('load', r, { once: true }); document.body.appendChild(lib); });
-  await new Promise((r) => setTimeout(r, 500));
-  out.liberoConFilo = lib.contentDocument?.documentElement?.dataset.filoReady === '1';
+  await new Promise((r) => { lib.addEventListener('load', r, { once: true }); document.body.prepend(lib); });
   return out;
 }
 
-async function apriMentreCarica(openTab, testServer, modo) {
-  const urls = { libero: testServer.html('<!doctype html><p>libero</p>') };
+async function apriMentreCarica(openTab, testServer, modo, dopoOn) {
+  const urls = { libero: testServer.html('<!doctype html><body style="margin:0;padding:16px;font:16px sans-serif"><p id="t">Un testo dentro il riquadro, da cliccare.</p></body>') };
   for (const k of ['indice', 'frames', 'nome', 'testo']) urls[k] = testServer.html(documento(k));
   const pagina = testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}
     window.__l = {};
     addEventListener('message', function (e) { if (e.data && e.data.lettura) window.__l[e.data.lettura] = e.data.valore; });
   </script></head><body></body></html>`);
-  const leggi = async (u) => {
+  const leggi = async (u, poi) => {
     const page = await openTab(u);
     await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
-    return page.evaluate(presiMentreCarica, urls);
+    const out = await page.evaluate(presiMentreCarica, urls);
+    if (poi) await poi(page);
+    return out;
   };
   if (modo) await setFpMode(openTab, modo);
-  const on = await leggi(pagina);
+  const on = await leggi(pagina, dopoOn);
   await setFpMode(openTab, 'off');
   const off = await leggi(pagina + '?off');
   expect(on.pagina).not.toBe(off.pagina);
