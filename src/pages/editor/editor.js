@@ -1161,12 +1161,13 @@
     if (summaryTimer) { clearTimeout(summaryTimer); summaryTimer = null; }
     summaryTimer = setTimeout(() => {
       summaryTimer = null;
-      if (autoSummaryBusy || !doc) return;
+      if (!doc || riassuntiInVolo.has(doc.id)) return;
       syncActiveIntoCollection();
-      const f = STORE.findFile(collection, doc.id);
-      if (!f || !SUMMARY.needsSummary(f)) return;
-      autoSummaryBusy = true;
-      Promise.resolve(generateSummaryForActive()).finally(() => { autoSummaryBusy = false; });
+      const id = doc.id;
+      const f = STORE.findFile(collection, id);
+      if (!f || !(SUMMARY.needsSummary(f) || SUMMARY.titoloDaRifare(f))) return;
+      riassuntiInVolo.add(id);
+      Promise.resolve(generateSummaryForActive()).finally(() => { riassuntiInVolo.delete(id); });
     }, SUMMARY_DEBOUNCE_MS);
   }
 
