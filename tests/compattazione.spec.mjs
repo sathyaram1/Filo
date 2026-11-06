@@ -288,12 +288,18 @@ test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti v
     });
   });
   await modelloFinto(app, [{ text: 'Va bene.' }]);
-  await compattatoreFinto(app, RIGA);
+  // Chi compatta non risponde (rete giù): il tratto resta com'è, e la richiesta deve comunque stare sotto il listino.
+  await app.evaluate(() => {
+    const C = globalThis.SN_COMPATTAZIONE;
+    globalThis.__compattazioni = [];
+    globalThis.__compattatoreVero = C._dip.chiama;
+    C._dip.chiama = async ({ motivo }) => { globalThis.__compattazioni.push({ motivo }); throw new Error('rete giù'); };
+  });
   try {
     const lunga = `adesso riassumila tenendo conto di questo: ${Array(200).fill('nota mia.').join(' ')}`;
     await chiedi(page, lunga);
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Va bene.' })).toBeVisible({ timeout: 20000 });
-    expect(await app.evaluate(() => globalThis.__compattazioni.length), 'niente di compattabile: nessuna chiamata').toBe(0);
+    expect(await app.evaluate(() => globalThis.__compattazioni.length), 'una compattazione tentata, non riuscita').toBe(1);
     const [richiesta] = await chiamateAlModello(app);
     const testo = JSON.stringify(richiesta);
     // Le pagine c'erano davvero: messe a parte, la richiesta passerebbe il listino.
