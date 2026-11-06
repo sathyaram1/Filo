@@ -165,6 +165,74 @@ test('un\'icona della finestra nella fila è spenta come nella barra, premuta fa
   await expect.poll(() => page.url()).toBe(prima);
 });
 
+test('Taglia e Copia del tasto destro su una parola in grassetto: incollata resta in grassetto, come col sistema', async ({ app, openTab, testServer }) => {
+  const BORDO = `${CAMPO};border:1px solid #888;min-height:30px`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Ricco</title></head>
+    <body style="margin:0;padding:40px"><div id="ricco" contenteditable="true" style="${BORDO}"><b>grassetto</b> normale</div>
+    <div id="altro" contenteditable="true" style="${BORDO}">x</div></body></html>`);
+  const menu = menuDi(page);
+  const seleziona = async () => {
+    await page.locator('#ricco').focus();
+    await page.evaluate(() => {
+      const r = document.createRange();
+      r.selectNodeContents(document.querySelector('#ricco b'));
+      const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    });
+  };
+  const incolla = async () => {
+    await page.locator('#altro').click();
+    await page.keyboard.press('End');
+    await page.keyboard.press('Control+v');
+    return page.locator('#altro').innerHTML();
+  };
+
+  await seleziona();
+  await page.locator('#ricco').click({ button: 'right', position: { x: 20, y: 8 } });
+  await menu.voce('Copia').click();
+  await expect.poll(() => appunti(app)).toBe('grassetto');
+  expect(await incolla()).toContain('<b>grassetto</b>');
+
+  await page.evaluate(() => { document.getElementById('altro').innerHTML = 'x'; });
+  await seleziona();
+  await page.locator('#ricco').click({ button: 'right', position: { x: 20, y: 8 } });
+  await menu.voce('Taglia').click();
+  await expect.poll(() => page.locator('#ricco').textContent()).not.toContain('grassetto');
+  expect(await incolla()).toContain('<b>grassetto</b>');
+});
+
+test('un\'icona della finestra portata nella fila a menu aperto ci compare subito, a parole e trascinata dalla barra', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await testServer.openReady(openTab, `<!doctype html><html><head><title>Fila</title></head>
+    <body style="margin:0;padding:40px;height:1200px"><div id="vuoto" style="height:400px"></div></body></html>`);
+  const menu = menuDi(page);
+
+  // A parole, col menu aperto sulla fila vuota della pagina.
+  await page.locator('#vuoto').click({ button: 'right' });
+  await expect(menu.principale).toBeVisible();
+  expect((await esegui(app, { type: 'SPOSTA_ICONA', icona: 'reload', dove: 'fila', contesto: 'pagina' })).executed).toBe(true);
+  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="reload"]')).toBeVisible();
+  await page.keyboard.press('Escape');
+
+  // Dalla barra, col mouse: Home lascia la barra e arriva nella fila.
+  const barra = await barraPage(app);
+  await page.locator('#vuoto').click({ button: 'right' });
+  await expect(menu.locator('.sn-menu-row')).toBeVisible();
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  const src = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
+  const s = await statoBarra(app);
+  const alto = s.bounds.y - s.alto;
+  const fila = await fermo(menu.locator('.sn-menu-row'));
+  await barra.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
+  await barra.mouse.move(fila.x + 40, fila.y + fila.height / 2 - alto, { steps: 10 });
+  await barra.mouse.move(fila.x + 20, fila.y + fila.height / 2 - alto, { steps: 4 });
+  await barra.mouse.up();
+  await expect.poll(async () => (await salvata(app))['fila:pagina']).toContain('home');
+  await expect(menu.locator('.sn-menu-row [data-sn-icon-id="home"]')).toBeVisible();
+});
+
 test.describe('col menu nello strato sopra la scheda', () => {
   test.use({ stratoDelMenu: true });
 
