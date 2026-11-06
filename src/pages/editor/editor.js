@@ -1165,7 +1165,9 @@
       syncActiveIntoCollection();
       const id = doc.id;
       const f = STORE.findFile(collection, id);
-      if (!f || !(SUMMARY.needsSummary(f) || SUMMARY.titoloDaRifare(f))) return;
+      // Un titolo da rifare chiama anche a parità di parole, ma non su un testo ormai troppo corto per un riassunto.
+      const perTitolo = SUMMARY.fileWords(f) >= SUMMARY.MIN_WORDS && SUMMARY.titoloDaRifare(f);
+      if (!f || !(SUMMARY.needsSummary(f) || perTitolo)) return;
       riassuntiInVolo.add(id);
       Promise.resolve(generateSummaryForActive()).finally(() => { riassuntiInVolo.delete(id); });
     }, SUMMARY_DEBOUNCE_MS);
