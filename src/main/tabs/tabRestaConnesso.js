@@ -22,16 +22,21 @@ const SEMINA_MS = 60 * 1000;
 // entro questo: la ricarica di Filo arriva dopo, e solo se la pagina è rimasta ferma.
 const REAZIONE_MS = 1500;
 
-// Nome → valore dei cookie d'accesso che la scheda manda al suo sito; per un sito di Google anche quelli di Google,
-// dove la finestrella mette l'accesso.
+// I token anti-falsificazione li mette ogni pagina d'accesso, anche a chi non entra.
+const ANTI_FALSIFICAZIONE = /csrf|xsrf/i;
+
+// I cookie d'accesso che la scheda manda al suo sito; per un sito di Google solo quelli dell'account Google, perché la
+// pagina d'accesso di Google ne mette altri anche a chi non entra.
 async function cookieDAccesso(ses, url, sito) {
-  const out = new Map();
+  const out = new Set();
   const filtri = [{ url }];
-  if (Google.diGoogle(sito)) filtri.push({ domain: Google.SITO_GOOGLE });
+  const google = Google.diGoogle(sito);
+  if (google) filtri.push({ domain: Google.SITO_GOOGLE });
+  const vale = google ? Google.cookieDiAccesso : (c) => looksLikeLoginCookie(c) && !ANTI_FALSIFICAZIONE.test(c.name);
   for (const f of filtri) {
     let lista = [];
     try { lista = await ses.cookies.get(f); } catch (_) {}
-    for (const c of lista) if (looksLikeLoginCookie(c)) out.set(`${c.domain}|${c.path}|${c.name}`, c.value);
+    for (const c of lista) if (vale(c)) out.add(`${c.domain}|${c.path}|${c.name}`);
   }
   return out;
 }
