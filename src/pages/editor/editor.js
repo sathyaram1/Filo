@@ -973,11 +973,22 @@
     return true;
   }
 
-  // auto:true → tiro automatico a 100 parole, silenzioso, UNA VOLTA SOLA.
+  // Un titolo automatico che arriva dopo che l'utente ne ha scritto uno a mano non lo sostituisce.
+  function titoloScrittoAMano(id) {
+    const f = STORE.findFile(collection, id);
+    return !!(f && f.meta && f.meta.titleManual);
+  }
+
+  // auto:true → primo titolo a 100 parole, silenzioso; dopo lo rifà il riassunto, nella sua chiamata.
   // auto:false → rigenerazione esplicita dal menu, con feedback a video.
   async function generateTitleForActive({ auto } = {}) {
     if (!doc || !doc.meta) return false;
     const id = doc.id;
+    // Il testo si legge adesso: dopo l'attesa della memoria il foglio può mostrare già un altro documento (#1570).
+    const testo = docPlainText();
+    syncActiveIntoCollection();
+    const prima = STORE.findFile(collection, id);
+    const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
     if (auto) {
       // Segna SUBITO come «già tentato»: la generazione automatica è una sola. In caso di errore
       // resta «Rigenera titolo» nel menu.
