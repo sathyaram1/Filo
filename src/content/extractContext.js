@@ -830,6 +830,9 @@
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
       if (isInvisibleToUser(el)) return false;
       if (!isReachableByUser(el, r)) return false;
+      // Un componente chiuso che non mostra testo è una decorazione: la sonda nel mondo della pagina lo sa (#472).
+      // Dove non lo sa, l'avviso resta.
+      if (ombraSenzaTesto(el)) return false;
       // Serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
       // no. Il prezzo è un componente chiuso che resta fuori dal conto quando
       // sta sotto il bordo dello schermo — l'avviso dirà "Pagina tradotta"
