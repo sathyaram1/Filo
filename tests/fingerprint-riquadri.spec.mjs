@@ -626,8 +626,11 @@ test('in Privacy massima un riquadro della stessa origine inserito da uno script
 
 test('in Automatico un riquadro della stessa origine inserito da uno script tiene Filo e ha il rumore dopo il carico', async ({ openTab, testServer }) => {
   test.setTimeout(120_000);
-  const { on } = await apriMentreCarica(openTab, testServer, null);
-  expect(on.liberoConFilo, 'Filo nel riquadro che la pagina non tocca').toBe(true);
+  const { on } = await apriMentreCarica(openTab, testServer, null, async (page) => {
+    const frame = page.frameLocator('#libero');
+    await frame.locator('#t').click({ button: 'right' });
+    await expect(menuDi(frame).locator('.sn-menu'), 'il menu di Filo nel riquadro che la pagina non tocca').toBeVisible();
+  });
   for (const k of ['indiceDaQui', 'framesDaQui', 'nomeDaQui']) expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
 });
 
