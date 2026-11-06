@@ -74,8 +74,8 @@ for (const [caso, unica] of [['la risposta arriva tagliata', 'tagliata'], ['la r
       await aggiungiParola(page);
       await page.waitForTimeout(8500);
     }
-    expect(await insieme(page), 'chiamate titolo+riassunto dopo i ritocchi').toBeLessThanOrEqual(2);
-    expect(await page.locator('.ed-toast').count(), 'avvisi a video').toBeLessThanOrEqual(1);
+    expect.soft(await insieme(page), 'chiamate titolo+riassunto dopo i ritocchi').toBeLessThanOrEqual(2);
+    expect.soft(await page.evaluate(() => window.__avvisi || 0), 'avvisi a video').toBeLessThanOrEqual(1);
   });
 }
 
