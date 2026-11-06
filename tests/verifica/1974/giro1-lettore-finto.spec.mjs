@@ -1,6 +1,6 @@
 // #1974 giro 1: un lettore finto servito sotto l'indirizzo di YouTube, con la forma della risposta del lettore, e le
 // regole vere scaricate dalle liste di uAssets. Le pubblicità non partono; quando le regole non reggono, la scheda torna
-// al solo «Salta», si ricarica una volta e lo dice; con le regole nuove riprova.
+// al solo «Salta», si ricarica una volta e lo dice; con le regole nuove riprova. Prova senza rilievo; vuole la rete.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:https';
