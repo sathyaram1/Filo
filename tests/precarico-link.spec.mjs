@@ -217,7 +217,8 @@ test('aprire la pagina e passare sui link d\'uscita non fa uscire dal sito, in n
     res.end(`<!doctype html><meta charset="utf-8"><body><nav>
       <a href="/area/profilo">Profilo</a> <a id="u0" href="/konto/abmelden">Abmelden</a>
       <a id="u1" href="/compte/déconnexion">Se déconnecter</a> <a id="u2" href="/user/doLogout">Esci</a>
-      <a id="u3" class="btn btn-logout" href="/a/x9"><svg width="16" height="16"></svg></a></nav>
+      <a id="u3" class="btn btn-logout" href="/a/x9"><svg width="16" height="16"></svg></a>
+      <a id="u4" href="/a/v1">Выйти</a> <a id="u5" href="/user/loginOut">退出登录</a></nav>
       <h1 id="stato">${id ? 'Ciao, sei dentro' : 'Accedi'}</h1></body>`);
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
