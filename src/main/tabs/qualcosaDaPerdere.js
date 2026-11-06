@@ -2,6 +2,8 @@
 // Il passaggio di «Resta connesso» e la ricarica dopo la finestrella d'accesso (#759.2, #1629) non ricaricano in
 // silenzio una pagina così. Prove: tests/unit/qualcosaDaPerdere.test.mjs, tests/cookies-resta-connesso-ricarica.spec.mjs.
 
+const { riquadroArrivato } = require('../services/riquadroArrivato');
+
 const MONDO = 1001;
 // Una pagina che non risponde non ferma chi chiede: senza risposta vale «niente da perdere».
 const ATTESA_MS = 2000;
