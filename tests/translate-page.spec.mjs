@@ -1576,8 +1576,9 @@ test('solo quando apro: aperta una sezione ripiegata, l\'icona Traduci offre di 
   expect(muti, `ripiegature che, aperte, non fanno offrire niente: ${muti.join(', ')}`).toEqual([]);
 });
 
-test('il testo scoperto si traduce senza rispedire al modello la pagina già tradotta', async ({ app, openTab, testServer }) => {
+test('solo quando apro: il testo scoperto si traduce senza rispedire al modello la pagina già tradotta', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const page = await testServer.openReady(openTab, RIPIEGATE);
   await watchToasts(page);
   await clickTranslateIcon(app);
