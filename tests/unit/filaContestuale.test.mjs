@@ -98,6 +98,45 @@ test('a parole: le zone della fila si dicono col contesto', () => {
   assert.equal(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'translate', dove: 'fila', contesto: 'pagina' }), `«${D.nome('translate')}» ora sta nella fila del tasto destro sulla pagina`);
 });
 
+test('a parole, una porta sola fra la parola e il posto: chi esegue, la conferma e l\'attività dicono lo stesso posto', async () => {
+  // «menu» vale «fila» per tutti, e senza contesto vale quello dell'azione (#1434.2).
+  assert.equal(D.zonaDellAzione({ icona: 'testo:copy', dove: 'menu' }), 'fila:testo');
+  assert.equal(D.zonaDellAzione({ icona: 'qrCode', dove: 'menu', contesto: 'immagine' }), 'fila:immagine');
+  assert.equal(D.zonaDellAzione({ icona: 'qrCode', dove: 'menu' }), '');
+  assert.match(L.describeDone({ type: 'SPOSTA_ICONA', icona: 'testo:readAloud', dove: 'menu' }), /ora sta nella fila del tasto destro sul testo selezionato$/);
+  // Il verso opposto rimette le stesse parole, e tornando indietro si arriva allo stesso posto.
+  for (const z of D.TUTTE) {
+    const p = D.doveDaZona(z);
+    assert.equal(D.zonaDaDove(p.dove, p.contesto), z, z);
+  }
+  // Chi esegue, la conferma, la riga nelle attività e il filo passano da qui, senza una regola loro.
+  const { readFileSync } = await import('node:fs');
+  const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
+  const handlers = leggi('src', 'main', 'services', 'handlers.js');
+  const caso = handlers.slice(handlers.indexOf("case 'SPOSTA_ICONA':"), handlers.indexOf("case 'PANNELLO_APP':"));
+  assert.match(caso, /D\.zonaDellAzione\(action\)/);
+  assert.doesNotMatch(caso, /=== 'menu'|zonaDaDove/);
+  assert.match(leggi('src', 'shared', 'actionLevels.js'), /function doveDellIcona\(a\) \{[\s\S]{0,160}D\.zonaDellAzione\(a\)/);
+  const attivita = leggi('src', 'pages', 'dashboard', 'dashboard-attivita.js');
+  assert.match(attivita.slice(attivita.indexOf('SPOSTA_ICONA: (a) =>')), /^SPOSTA_ICONA: \(a\) => \{[\s\S]{0,300}D\.zonaDellAzione\(a\)/);
+  const layout = leggi('src', 'main', 'services', 'layoutIcone.js');
+  assert.match(layout, /D\(\)\.doveDaZona\(d\.target\)/);
+  assert.doesNotMatch(layout, /'altro_fila'/);
+});
+
+test('il trascinamento fra la fila e la barra è uno solo, nella pagina e nello strato del menu', async () => {
+  const { readFileSync } = await import('node:fs');
+  const leggi = (...p) => readFileSync(join(ROOT, ...p), 'utf8');
+  // Chi installa il ponte dà solo la strada verso il main: quale icona può andare nella barra lo decide menu.js col catalogo.
+  assert.match(leggi('src', 'content', 'menu.js'), /function ponteVersoLaBarra\(trascina\) \{[\s\S]{0,700}SN_DISPOSIZIONE_ICONE\?\.noto\(id\)/);
+  for (const f of [['src', 'content', 'menuIcons.js'], ['src', 'pages', 'menu', 'menu.js']]) {
+    const t = leggi(...f);
+    assert.match(t, /setPonteBarra\??\.?\(\(d(ati)?\) =>/, `${f.join('/')}: passa solo la strada`);
+    assert.doesNotMatch(t, /inizio\(id, menuSinistra\)/, `${f.join('/')}: una seconda copia del gesto`);
+  }
+  assert.match(leggi('src', 'pages', 'menu', 'menu.html'), /filo:\/\/shared\/disposizioneIcone\.js/);
+});
+
 test('il collegamento scritto nella fila: solo indirizzi del web e della posta', () => {
   assert.equal(U.collegamentoScritto('esempio.it'), 'https://esempio.it');
   assert.equal(U.collegamentoScritto(' https://filo.app/x?y=1 '), 'https://filo.app/x?y=1');
