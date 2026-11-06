@@ -2330,6 +2330,119 @@ test('componente chiuso decorativo, senza testo dentro: «Pagina tradotta», non
   expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
 });
 
+// #1290 — la decorazione si riconosce anche dentro un componente aperto del sito e dentro un riquadro incorporato.
+const DECOR_DEFINE = `customElements.define('deco-band', class extends HTMLElement {
+      connectedCallback() { this.attachShadow({ mode: 'closed' }).innerHTML = '<div style="width:100%;height:100%;background:#a33"></div>'; }
+    });`;
+const DECOR_NEL_RIQUADRO = `<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+  <p id="fbody">ZZDECO an embedded box written in english and long enough to count as text.</p>
+  <deco-band style="display:block;width:400px;height:60px"></deco-band>
+  <script>${DECOR_DEFINE}</script>
+</body></html>`;
+
+test('componente chiuso decorativo dentro un componente aperto o dentro un riquadro incorporato: «Pagina tradotta»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(DECOR_NEL_RIQUADRO).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`<open-card></open-card>
+    <iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe>
+    <script>${DECOR_DEFINE}
+    customElements.define('open-card', class extends HTMLElement { connectedCallback() {
+      this.attachShadow({ mode: 'open' }).innerHTML = '<p>Text of an open component around a band.</p><deco-band style="display:block;width:600px;height:60px"></deco-band>';
+    } });</script>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).join(' | ')).not.toMatch(/solo in parte|riquadro incorporato/);
+});
+
+// #1290 — il testo chiuso in un componente si conta dovunque stia: l'avviso non cambia con lo scorrimento né con
+// una sezione chiusa (che di serie si traduce).
+const SIGILLATO = (prima, dopo) => `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="plain">A plain heading outside any component</h1>
+  <p id="p1">First paragraph of the article, long enough to be picked up by the translation.</p>
+  ${prima}<closed-card></closed-card>${dopo}
+  <script>
+    customElements.define('closed-card', class extends HTMLElement {
+      connectedCallback() {
+        this.attachShadow({ mode: 'closed' }).innerHTML = '<h2>Headline locked inside a closed component</h2><p>Body text nobody outside can read.</p>';
+      }
+    });
+  </script>
+</body></html>`;
+
+for (const [nome, prima, dopo, scorri] of [
+  ['più in basso della prima schermata', '<div style="height:2500px"></div>', '', 0],
+  ['in cima, tradotto dopo averlo superato scorrendo', '', '<div style="height:2500px"></div>', 1400],
+  ['dentro una sezione chiusa', '<details><summary>Open the box</summary>', '</details>', 0],
+]) {
+  test(`componente chiuso con testo ${nome}: «solo in parte»`, async ({ app, openTab, testServer }) => {
+    await stubTranslationProvider(app);
+    const page = await testServer.openReady(openTab, SIGILLATO(prima, dopo));
+    await watchToasts(page);
+    if (scorri) await page.evaluate((y) => window.scrollTo(0, y), scorri);
+    await clickTranslateIcon(app);
+    await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+    await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('solo in parte');
+  });
+}
+
+// #1290 — un riquadro chiuso in un componente: da fuori non si legge, quindi conta come un riquadro, se si vede. Uno
+// spazio nascosto che si traduce in sottofondo non fa uscire l'avviso per quel che contiene e che non si sa.
+const CHIUDE_RIQUADRO = (src) => `<embed-card></embed-card>
+  <script>customElements.define('embed-card', class extends HTMLElement { connectedCallback() {
+    this.attachShadow({ mode: 'closed' }).innerHTML = '<iframe src="${src}" style="width:520px;height:220px"></iframe>'; } });</script>`;
+
+test('riquadro incorporato chiuso dentro un componente: l’avviso dice che è rimasto fuori', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const src = testServer.html(frameInner('ZZSHUT')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`${CHIUDE_RIQUADRO(src)}
+    <style>embed-card { display:block; width:560px; height:240px; }</style>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('solo in parte');
+});
+
+test('spazio nascosto con dentro un riquadro chiuso in un componente: si traduce in sottofondo e l’avviso dice «Pagina tradotta»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const interno = testServer.html(frameInner('ZZINNER')).replace('127.0.0.1', 'blocked.test');
+  const spazio = testServer.html(`<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+    <p id="fbody">ZZAD a hidden advertising slot with some english text inside.</p>
+    ${CHIUDE_RIQUADRO(interno)}<style>embed-card { display:block; width:560px; height:240px; }</style></body></html>`)
+    .replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(
+    `<iframe id="ad" src="${spazio}" style="opacity:0;width:600px;height:300px"></iframe>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect(page.frameLocator('#ad').locator('#fbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).join(' | ')).not.toMatch(/solo in parte|riquadro incorporato/);
+});
+
+test('riquadro incorporato che arriva mentre la traduzione lavora: l’icona offre «Traduci il testo nuovo» e lo traduce', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app, 6000);
+  const src = testServer.html(frameInner('ZZMID')).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`<div id="slot"></div><script>window.__arriva = () => {
+      document.getElementById('slot').innerHTML = '<iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe>'; };</script>`));
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 10000 }).toContain('in corso');
+  await page.evaluate(() => window.__arriva());
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^ZZMID /, { timeout: 30000 });
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('Pagina tradotta');
+  await traduciIlTestoNuovo(app);
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT ZZMID /, { timeout: 60000 });
+});
+
 // #503.1 — un riquadro che arriva dopo la traduzione fa offrire «Traduci il testo nuovo», come il testo normale.
 for (const [nome, html, arriva] of [
   ['caricato quando ci si arriva scorrendo', (src) => `<div style="height:2500px"></div><div id="slot"></div>
