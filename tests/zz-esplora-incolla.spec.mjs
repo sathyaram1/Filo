@@ -25,6 +25,11 @@ test('esplora', async ({ openTab }) => {
   await page.waitForSelector('#doc');
   await page.evaluate(() => { const x = document.createElement('div'); x.id = 'pulito'; x.contentEditable = 'true'; document.body.appendChild(x); });
   const casi = [
+    ['S span vuoto unico', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<span>' + h + '</span>')`],
+    ['S span vuoto 1500', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<span>' + h + h + h.slice(0, h.length/2) + '</span>')`],
+    ['S span fine pieno', `d.innerHTML='<p>abc</p><p>def</p>'; ${cursore("({node: d.firstChild.firstChild, off: 3})")}`, `document.execCommand('insertHTML', false, '<span>' + h + '</span>')`],
+    ['S span inizio secondo', `d.innerHTML='<p>abc</p><p>def</p>'; ${cursore("({node: d.lastChild.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, '<span>' + h + '</span>')`],
+    ['S span vuoto in mezzo', `d.innerHTML='<p>abc</p><p><br></p><p>def</p>'; ${cursore("({node: d.children[1], off: 0})")}`, `document.execCommand('insertHTML', false, '<span>' + h + '</span>')`],
     ['J inizio pieno collassato', `d.innerHTML='<p>uno</p><p>due</p>'; ${cursore("({node: d.lastChild.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
     ['K fine pieno seguito', `d.innerHTML='<p>uno</p><p>due</p>'; ${cursore("({node: d.firstChild.firstChild, off: 3})")}`, `document.execCommand('insertHTML', false, h)`],
     ['L vuoto fra pieni, sel da fine prec', `d.innerHTML='<p>uno</p><p><br></p>'; const r=document.createRange(); r.setStart(d.firstChild.firstChild,2); r.setEnd(d.lastChild,0); getSelection().removeAllRanges(); getSelection().addRange(r);`, `document.execCommand('insertHTML', false, '<p>o</p>' + h)`],
