@@ -2349,7 +2349,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // I bottoni della barra vivono nella shell, non nella pagina: l'utente non potrebbe
       // cliccarli, quindi li eseguiamo noi.
       if (parsed.kind === 'shell') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         const human = {
           home: 'home', settings: 'impostazioni', apps: 'app',
           account: 'account', fullscreen: 'schermo intero', minimize: 'riduci a icona',
