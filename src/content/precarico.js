@@ -123,7 +123,7 @@
     const url = R.indirizzoDaPrecaricare(a.href);
     const qui = R.indirizzoDaPrecaricare(location.href);
     if (!url || url === qui) return;
-    const tieni = (u) => u === url;
+    const tieni = (u) => R.indirizzoDaPrecaricare(u) === url;
     passati = passati.filter(tieni);
     visibili = visibili.filter(tieni);
     fermo = true;
