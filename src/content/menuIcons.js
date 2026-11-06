@@ -142,7 +142,6 @@
   function layoutCambiato(v) {
     if (!setLayout(v)) return;
     ridisegna();
-    if (aperta) ridisegnaFinestra();
   }
 
   // Il gesto si vede subito qui, poi vale quello che il main ha scritto. `source` 'bar': arriva dalla barra laterale.
