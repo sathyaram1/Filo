@@ -377,12 +377,17 @@ const PROPAGAZIONE = `
     }, true]);
   }
 
-  // Il parser segna un riquadro scritto nell'HTML prima di eseguire lo script che lo segue.
+  function toccaDaScript(el) { tocca(el, true); }
+
+  // Il parser segna un riquadro scritto nell'HTML prima di eseguire lo script che lo segue. A documento caricato quello
+  // che arriva qui l'ha inserito uno script, per una via che le funzioni avvolte non vedono.
   function osserva(w) {
     var mo = new MO(function (rec) {
+      var fa = tocca;
+      try { if (R(statoDoc, w.document, []) !== 'loading') fa = toccaDaScript; } catch (e) {}
       for (var i = 0; i < rec.length; i++) {
         var nodi = rec[i].addedNodes;
-        for (var j = 0; j < nodi.length; j++) { try { cornici(nodi[j], tocca); } catch (e) {} }
+        for (var j = 0; j < nodi.length; j++) { try { cornici(nodi[j], fa); } catch (e) {} }
       }
     });
     R(moObserve, mo, [w.document, { __proto__: null, childList: true, subtree: true }]);
