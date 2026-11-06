@@ -817,7 +817,7 @@ async function dueSchedeUnaScritta(app, shell, base) {
   return modulo;
 }
 
-async function laScrittaAspettaIlCambioDiPagina(app, base, sito, partizione) {
+async function laScrittaAspettaIlCambioDiPagina(app, base, sito, partizione, { shell = null } = {}) {
   // La scheda senza niente da perdere è già passata, ricaricata e dentro.
   await expect.poll(() => partizioneDi(app, `${base}/home`)).toBe(partizione);
   await dentro(app, `${base}/home`);
