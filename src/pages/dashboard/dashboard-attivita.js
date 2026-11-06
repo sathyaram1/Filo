@@ -475,7 +475,7 @@
         if (!fineLavoro) fineLavoro = Date.now();
         if (viva && (viva.stato === 'pensa' || viva.stato === 'coda') && wrap.dataset.filo !== 'gomitolo') {
           statoSeg(viva, 'fermato');
-          scrivi(viva, 'Fermato qui');
+          scrivi(viva, global.SN_CHAT_ERRORS.FERMATO_QUI);
           apri(viva, true);
         }
         filo.taglia();
