@@ -2234,14 +2234,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // L'AI ha chiesto una ricerca: si esegue e si rilancia un turno coi risultati come nota
       // di sistema, così l'AI può produrre il JSON normale.
       if (parsed.kind === 'web_search') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
+          attesa?.fine();
           appendActionLog('ricerca web: limite raggiunto, ignorata');
           try { Popup?.conta?.({ misura: 'ricerca-web-tetto' }); } catch (_) {}
-          setTimeout(() => submit({
+          passo({
             userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
             preActionUrl: urlPrimaDelPasso(),
-          }), 50);
+          }, 50);
           return;
         }
         if (session) session.webSearchCount += 1;
