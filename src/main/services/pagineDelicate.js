@@ -66,12 +66,10 @@ async function segnaCampi(url, { incognito = false } = {}) {
   const k = chiave(PD.host(url));
   if (!k) return;
   conCampi.add(k);
-  if (incognito || salvati.has(k)) return;
+  if (incognito || noti.has(k)) return;
+  noti.add(k);
   await carica();
-  // Senza aver letto quelli già salvati, scrivere li cancellerebbe.
-  if (!letti || salvati.has(k)) return;
-  salvati.add(k);
-  try { await globalThis.SN_STORAGE.setRaw(chiaveDisco(), [...salvati]); } catch (_) {}
+  await scrivi();
 }
 
 // Cancellate le pagine visitate di un sito, o tutte, se ne va anche il ricordo del suo campo password: è una traccia
