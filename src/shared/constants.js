@@ -3240,6 +3240,7 @@
     actionLabel,
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,
+    nascosteDellaTraduzione,
     resolveModel,
     parseModelRefs,
     isRawModelId,
