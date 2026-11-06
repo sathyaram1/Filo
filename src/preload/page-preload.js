@@ -239,7 +239,7 @@ try {
 // degli script del sito; la guardia rimanda al solo «Salta» quando le regole non reggono. Regole in preload/youtube-guardia.js.
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (/^https:\/\/([a-z0-9-]+\.)*youtube(-nocookie|kids)?\.com(:\d+)?\//i.test(loc)) require('./youtube-guardia.js').avvia({ ipcRenderer, webFrame, window, href: loc });
+  if (/^https?:/i.test(loc)) require('./youtube-guardia.js').avvia({ ipcRenderer, webFrame, window, href: loc });
 } catch (_) { /* mai bloccare il caricamento */ }
 
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
