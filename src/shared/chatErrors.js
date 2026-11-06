@@ -633,7 +633,7 @@
   }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, FERMATO_QUI, FERMATO_PRIMA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };
