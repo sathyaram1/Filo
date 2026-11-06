@@ -418,7 +418,7 @@ const restaConnessoMethods = {
     tab._passaggioRinviato = null;
     const ricarica = () => { if (chiesta) { try { tab.view.webContents.reload(); } catch (_) {} } };
     if (!this.tabs.includes(tab) || this._jarDi(tab) !== r.sito || !this._needsRepartition(tab, tab.url)) { ricarica(); return; }
-    inFila(() => this._passaScheda(tab, r.sito, r.dest)).then((persi) => {
+    inFila(() => this._passaScheda(tab, r.sito, r.dest, { rinviato: true })).then((persi) => {
       if (persi > 0) avvisaRientro(this, r.sito, this._fidato(r.sito));
     }, ricarica);
   },
