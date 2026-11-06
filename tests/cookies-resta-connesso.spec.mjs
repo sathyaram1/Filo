@@ -826,6 +826,13 @@ async function laScrittaAspettaIlCambioDiPagina(app, base, sito, partizione, { s
   expect(await segnata(app, `${base}/modulo`)).toBe(true);
   expect(await (await pagina(app, `${base}/modulo`)).locator('#campo').inputValue()).toBe('una bozza a metà');
   expect(await partizioneDi(app, `${base}/modulo`)).toMatch(new RegExp(`^filo-priv-${sito.replace(/\./g, '\\.')}(~\\d+)?$`));
+  // Ricaricata da chi la usa, passa subito: chi ricarica accetta di perdere il testo.
+  if (shell) {
+    const { id } = await schedaSu(shell, `${base}/modulo`);
+    await shell.evaluate((i) => window.filoShell.tabs.reload(i), id);
+    await expect.poll(() => partizioneDi(app, `${base}/modulo`), { timeout: 15_000 }).toBe(partizione);
+    expect(await segnata(app, `${base}/modulo`)).toBe(false);
+  }
   // Cambiata pagina, passa anche lei: dentro, nel posto che resta.
   await (await pagina(app, `${base}/modulo`)).locator('#vai').click();
   await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
