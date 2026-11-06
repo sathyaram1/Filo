@@ -1463,6 +1463,14 @@
           privacy: 'privacy', riservatezza: 'privacy', massima: 'privacy', isolato: 'privacy', isolata: 'privacy',
         };
         const mode = map[s];
+        // #1279.1 — un sito nominato qui non deve cambiare la modalità di tutti: la strada è l'elenco dei siti coi banner.
+        if (!mode && /\b(sito|siti|qui|pagina|scheda)\b|\.[a-z]{2,}\b/.test(s)) {
+          return {
+            rifiuto: 'la modalità dei cookie vale per tutti i siti',
+            perModello: 'Per un sito solo usa la chiave siti_con_banner: «aggiungi questo sito» fa rivedere il banner, '
+              + '«togli questo sito» torna a rifiutarlo.',
+          };
+        }
         if (!mode) return null;
         const labelMode = { manual: 'Manuale', default: 'Automatico', privacy: 'Privacy' }[mode];
         return { partial: { security: { cookies: { mode } } }, label: `Gestione cookie → ${labelMode}` };
