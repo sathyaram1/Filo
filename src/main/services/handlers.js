@@ -1256,6 +1256,17 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// #1279.1 — «fammi rivedere il banner qui» / «torna a rifiutarli qui» in chat: per il sito della scheda davanti si fa
+// quello che fa la voce del menu della scheda (via la risposta salvata, pagina ricaricata). Altri siti: solo l'elenco.
+async function bannerDellaScheda(elenco, sender) {
+  if (!elenco || elenco.percorso !== 'security.cookies.bannerSites' || elenco.voci.length !== 1) return false;
+  if (elenco.op !== 'aggiungi' && elenco.op !== 'togli') return false;
+  const { tm, tab } = targetWebTab(sender);
+  if (!tm || !tab || !require('../../shared/stessoSito').voceSalvata(tab.url, elenco.voci)) return false;
+  const r = await tm.setCookieBanners(tab.id, elenco.op === 'aggiungi');
+  return !!(r && r.ok);
+}
+
 // Il nome di una scheda come lo vede il modello in TAB APERTE: il titolo, e di una pagina delicata solo il sito (#1004).
 async function nomeDellaScheda() {
   let delicata = () => null;
