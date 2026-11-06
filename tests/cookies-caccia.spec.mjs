@@ -150,3 +150,22 @@ test('a caccia chiusa si rifiuta il banner con la scritta arrivata dopo e quello
   await page.waitForFunction(() => !document.getElementById('chiave'), null, { timeout: 8_000 });
   expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([3, undefined]);
 });
+
+test('#1279.5: a caccia chiusa, sulla pagina viva, i pulsanti vuoti ricevono la scritta dentro un elemento: rifiutato', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await testServer.openReady(openTab, `<title>VIVA_ELEMENTO</title>${LINK(300)}${VIVO}`);
+  await expect.poll(async () => (await stato(app, page)).hunting, { timeout: 35_000, intervals: [1_000] }).toBe(false);
+
+  await page.evaluate(() => {
+    document.body.insertAdjacentHTML('beforeend', `<div id="avvolta" class="cookie-consent" style="position:fixed;top:0;left:0;right:0;height:90px;background:#fff;z-index:10">
+      <p>Usiamo i cookie.</p><button id="acc" onclick="window.__accettati=1;this.parentNode.remove()"></button>
+      <button id="rif" onclick="window.__rifiuti=(window.__rifiuti||0)+1;this.parentNode.remove()"></button></div>`);
+    setTimeout(() => {
+      document.getElementById('acc').innerHTML = '<span class="etichetta">Accetta</span>';
+      document.getElementById('rif').innerHTML = '<span class="etichetta">Rifiuta</span>';
+    }, 300);
+  });
+  await page.waitForFunction(() => !document.getElementById('avvolta'), null, { timeout: 8_000 });
+  expect(await page.evaluate(() => [window.__rifiuti, window.__accettati])).toEqual([1, undefined]);
+  expect(await nodiNuovi(page)).toBeGreaterThan(300);
+});
