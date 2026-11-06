@@ -290,7 +290,7 @@
       threadHistory.push({ role: 'filo', text: '', actions: [], interrotto: true, fermato: true });
       const nota = document.createElement('div');
       nota.className = 'dash-bubble-note dash-bubble-fermato';
-      nota.textContent = 'Fermato prima della risposta.';
+      nota.textContent = globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
       bubblesEl.appendChild(nota);
       ripresa = { nota, blocco: null };
       aggiornaTasto();
