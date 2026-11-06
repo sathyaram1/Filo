@@ -76,6 +76,13 @@ test('il prossimo link a schermo è il più in alto non ancora fatto', () => {
   assert.equal(P.prossimo(c, new Set(['a', 'a2', 'b'])), null);
 });
 
+test('la chat spegne e riaccende i link a schermo con la stessa voce delle Preferenze', () => {
+  require('../../src/shared/preferences.js');
+  const Pref = globalThis.SN_PREF;
+  assert.deepEqual(Pref.buildPreferencePartial('precarico_link_visibili', 'no').partial, { precarico: { visibili: false } });
+  assert.deepEqual(Pref.buildPreferencePartial('precarica i link', 'sì').partial, { precarico: { visibili: true } });
+});
+
 test('i tetti restano larghi abbastanza e dentro quelli di Chromium', () => {
   assert.equal(P.LIMITI.TETTO_VISIBILI, 20);
   assert.ok(P.LIMITI.TETTO_VISIBILI + P.LIMITI.PASSAGGI_TENUTI <= 50);
