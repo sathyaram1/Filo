@@ -292,7 +292,7 @@ test('in una riga vuota sotto un paragrafo, 600 righe che cominciano con un cara
   const ms = await incolla(app, page, righe.join('\n'));
   expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
   expect(await blocchi(page)).toEqual(['titolo forte', ...righe]);
-  expect(await page.evaluate(() => document.querySelector('#doc > p b').textContent)).toBe('forte');
+  expect(await page.evaluate(() => [...document.querySelectorAll('#doc > p:first-child b')].map((b) => b.textContent).join(''))).toBe('forte');
   await page.keyboard.press('Control+Z');
   await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(prima);
 });
