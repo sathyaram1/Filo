@@ -531,7 +531,8 @@ async function presiPrimaDelCarico(urls) {
   return out;
 }
 
-async function apriEPresi(openTab, pagina, urls) {
+async function apriEPresi(openTab, pagina, urls, modo) {
+  if (modo) await setFpMode(openTab, modo);
   const leggi = async (u) => {
     const page = await openTab(u);
     await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
