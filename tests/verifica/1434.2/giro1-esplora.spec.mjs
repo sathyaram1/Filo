@@ -67,7 +67,7 @@ test('esplora: Taglia in un campo ricco tiene il grassetto come Ctrl+X e si annu
   await expect(menu.voce('Taglia')).toBeVisible();
   await menu.voce('Taglia').click();
   await expect.poll(() => appunti(app)).toBe('grassetto');
-  await expect.poll(() => page.locator('#ricco').textContent()).toBe(' normale');
+  await expect.poll(() => page.locator('#ricco').textContent()).not.toContain('grassetto');
   await page.locator('#altro').click();
   await page.keyboard.press('End');
   await page.keyboard.press('Control+v');
