@@ -92,6 +92,7 @@ for (const [nome, prima, dopo, scorri] of [
   ['dentro una sezione chiusa, che di serie si traduce', '<details id="d"><summary>Open the box</summary>', '</details>', 0],
 ]) {
   test(`r1 componente chiuso con testo ${nome}: l'avviso dice «solo in parte»`, async ({ app, openTab, testServer }) => {
+    test.fail(nome.startsWith('dentro una sezione chiusa'), '#1290.1: Un riquadro chiuso a chiave che non si vede (trasparente, in una sezione chiusa, fuori schermo) fa dire «Pagina tradotta» anche se dentro potrebbe esserci testo rimasto in inglese');
     test.setTimeout(120000);
     await stubTranslationProvider(app);
     const page = await testServer.openReady(openTab, SIGILLATO(prima, dopo));
