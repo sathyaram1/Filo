@@ -2340,7 +2340,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           cartellaMancante: r.cartellaMancante || '',
           cartellaDiRete: r.cartellaDiRete || '',
         };
-        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: urlPrimaDelPasso(), dopoDocumenti: true }), 50);
+        passo({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: urlPrimaDelPasso(), dopoDocumenti: true }, 50);
         return;
       }
 
