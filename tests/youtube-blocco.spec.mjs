@@ -137,12 +137,12 @@ fixture('con le regole vere scaricate da uAssets il video parte senza pubblicitÃ
 
 fixture('il video di YouTube incorporato in un altro sito parte senza pubblicitÃ ', async ({ app, openTab, testServer, youtube }) => {
   await liste(app, [MANO]);
-  await app.evaluate(({ webContents }) => {
+  await app.evaluate(({ webContents, app: a }) => {
     globalThis.__diag = [];
     for (const wc of webContents.getAllWebContents()) {
       wc.on('did-fail-load', (_e, code, desc, url, main) => globalThis.__diag.push({ code, desc, url, main }));
     }
-    require('electron').app.on('web-contents-created', (_e, wc) => wc.on('did-fail-load', (_e2, code, desc, url, main) => globalThis.__diag.push({ code, desc, url, main })));
+    a.on('web-contents-created', (_e, wc) => wc.on('did-fail-load', (_e2, code, desc, url, main) => globalThis.__diag.push({ code, desc, url, main })));
   });
   const dentro = youtube.url('/embed/inc?interna=1');
   const ospite = await openTab(testServer.html(`<!doctype html><title>Articolo</title><p>articolo</p><iframe src="${dentro}" width="700" height="420"></iframe>`, { pubblico: true }));
