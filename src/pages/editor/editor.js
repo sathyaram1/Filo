@@ -954,13 +954,14 @@
       && Number.isFinite(m.titleAutoAt) && ['automatico', 'rigenerato'].includes(m.titleAutoVia));
   }
 
-  // Titolo automatico: conta come «già generato» e toglie il flag manuale.
-  function applyGeneratedTitle(id, raw, via = 'automatico') {
+  // Titolo automatico: conta come «già generato» e toglie il flag manuale. `firma` è il testo da cui è nato: il
+  // titolo si rifà quando il testo se ne allontana (SN_EDITOR_SUMMARY.titoloDaRifare).
+  function applyGeneratedTitle(id, raw, via = 'automatico', firma = null) {
     const clean = cleanTitle(raw);
     if (!clean) return false;
     STORE.renameFile(collection, id, clean);
     const f = STORE.findFile(collection, id);
-    const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via };
+    const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via, titleSig: firma };
     if (f && f.meta) Object.assign(f.meta, segno);
     if (doc && doc.id === id && doc.meta) {
       doc.meta.title = f.meta.title;
