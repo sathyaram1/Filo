@@ -1,24 +1,23 @@
-// Esplorazione (si cancella): quali inserimenti restano veloci nei casi lenti dell'incolla lungo.
+// Esplorazione (si cancella): un'ancora invisibile dopo la selezione rende veloce l'inserimento?
 import { test } from '../../fixtures/electron.mjs';
 
 test.setTimeout(600_000);
 
 const N = 1500;
 const setups = {
-  dopoElenco: { html: '<ul><li>uno</li><li>due</li></ul><p><br></p>', sel: (doc) => { const p = doc.querySelector('p'); return [p, 0, p, 0]; } },
-  tuttoTitoloElenco: { html: '<h1>Titolo</h1><p>testo di prima</p><ul><li>voce a</li><li>voce b</li></ul>', sel: (doc) => { const h = doc.querySelector('h1').lastChild; const l = doc.querySelectorAll('li')[1].firstChild; return [h, 0, l, l.length]; } },
-  tuttoParagrafi: { html: '<p>uno</p><p>due</p><p>tre</p>', sel: (doc) => { const a = doc.querySelector('p').firstChild; const b = doc.querySelectorAll('p')[2].firstChild; return [a, 0, b, b.length]; } },
-  citazioneFine: { html: '<blockquote>citato</blockquote>', sel: (doc) => { const t = doc.querySelector('blockquote').firstChild; return [t, t.length, t, t.length]; } },
+  dopoElenco: { html: '<ul><li>uno</li><li>due</li></ul><p><br></p>', primo: 'p', sel: (doc) => { const p = doc.querySelector('p'); return [p, 0, p, 0]; } },
+  tuttoTitoloElenco: { html: '<h1>Titolo</h1><p>testo di prima</p><ul><li>voce a</li><li>voce b</li></ul>', primo: 'h1', sel: (doc) => { const h = doc.querySelector('h1').lastChild; const l = doc.querySelectorAll('li')[1].firstChild; return [h, 0, l, l.length]; } },
+  tuttoParagrafi: { html: '<p>uno</p><p>due</p><p>tre</p>', primo: 'p', sel: (doc) => { const a = doc.querySelector('p').firstChild; const b = doc.querySelectorAll('p')[2].firstChild; return [a, 0, b, b.length]; } },
+  citazioneFine: { html: '<blockquote>citato</blockquote>', primo: 'blockquote', sel: (doc) => { const t = doc.querySelector('blockquote').firstChild; return [t, t.length, t, t.length]; } },
+  elencoAParagrafo: { html: '<ul><li>voce a</li><li>voce b</li></ul><p>dopo</p>', primo: 'li', sel: (doc) => { const a = doc.querySelectorAll('li')[1].firstChild; const b = doc.querySelector('p').firstChild; return [a, 2, b, 2]; } },
 };
 
-const strategie = ['ps', 'testaNuda', 'nodoEsterno', 'dopoNodo', 'divUnico'];
-
 for (const [nome, s] of Object.entries(setups)) {
-  for (const strat of strategie) {
+  for (const strat of ['ancora', 'ancoraTagPrimo', 'tagPrimo']) {
     test(`${nome} ${strat}`, async ({ openTab }) => {
       const page = await openTab('filo://editor/editor.html');
       await page.waitForSelector('#doc');
-      const out = await page.evaluate(({ html, selSrc, strat, N }) => {
+      const out = await page.evaluate(({ html, selSrc, strat, N, primo }) => {
         const doc = document.getElementById('doc');
         doc.focus();
         doc.innerHTML = html;
@@ -27,20 +26,14 @@ for (const [nome, s] of Object.entries(setups)) {
         const [a, ao, b, bo] = (new Function('doc', `return (${selSrc})(doc)`))(doc);
         r.setStart(a, ao); r.setEnd(b, bo);
         const righe = Array.from({ length: N }, (_, i) => `riga ${i}`);
-        const ps = righe.map((x) => `<p>${x}</p>`).join('');
-        let htmlIns = ps;
-        if (strat === 'testaNuda') htmlIns = righe[0] + righe.slice(1).map((x) => `<p>${x}</p>`).join('');
-        if (strat === 'nodoEsterno') {
-          const bA = (r.startContainer.nodeType === 3 ? r.startContainer.parentNode : r.startContainer);
-          let top = bA; while (top.parentNode !== doc) top = top.parentNode;
-          let topB = (r.endContainer.nodeType === 3 ? r.endContainer.parentNode : r.endContainer); while (topB.parentNode !== doc) topB = topB.parentNode;
-          r.setStartBefore(top); r.setEndAfter(topB);
+        const tag0 = strat === 'ancora' ? 'p' : (primo === 'li' ? '' : primo);
+        const htmlIns = righe.map((x, i) => (i === 0 && tag0 === '' ? x : `<${i === 0 ? tag0 : 'p'}>${x}</${i === 0 ? tag0 : 'p'}>`)).join('');
+        if (strat !== 'tagPrimo') {
+          const fine = r.cloneRange(); fine.collapse(false);
+          const anc = document.createTextNode('​');
+          fine.insertNode(anc);
+          r.setEnd(anc, 0);
         }
-        if (strat === 'dopoNodo') {
-          let top = (r.startContainer.nodeType === 3 ? r.startContainer.parentNode : r.startContainer); while (top.parentNode !== doc) top = top.parentNode;
-          r.setStartAfter(top); r.collapse(true);
-        }
-        if (strat === 'divUnico') htmlIns = `<div>${ps}</div>`;
         sel.removeAllRanges(); sel.addRange(r);
         const t0 = performance.now();
         document.execCommand('insertHTML', false, htmlIns);
@@ -48,10 +41,11 @@ for (const [nome, s] of Object.entries(setups)) {
         const tags = [...doc.children].map((c) => c.tagName);
         const riassunto = [];
         for (const t of tags) { if (riassunto.length && riassunto[riassunto.length - 1][0] === t) riassunto[riassunto.length - 1][1]++; else riassunto.push([t, 1]); }
-        const primo = doc.children[0] ? doc.children[0].outerHTML.slice(0, 80) : '';
+        const pezzi = [...doc.children].slice(0, 2).map((c) => c.outerHTML.replace(/<button.*?<\/button>/, '').slice(0, 90));
+        const ultimo = doc.lastElementChild ? doc.lastElementChild.outerHTML.slice(-90) : '';
         document.execCommand('undo');
-        return { ms, struttura: riassunto.slice(0, 8).map(([t, n]) => `${t}x${n}`).join(' '), primo, annullato: doc.innerHTML === html, dopoUndo: doc.innerHTML.slice(0, 120) };
-      }, { html: s.html, selSrc: s.sel.toString(), strat, N });
+        return { ms, struttura: riassunto.slice(0, 8).map(([t, n]) => `${t}x${n}`).join(' '), pezzi, ultimo, dopoUndo: doc.innerHTML.replace(/<button.*?<\/button>/g, '').replace(/​/g, '[Z]').slice(0, 160) };
+      }, { html: s.html, selSrc: s.sel.toString(), strat, N, primo: s.primo });
       console.log('RIS', nome, strat, JSON.stringify(out));
     });
   }
