@@ -91,7 +91,8 @@
     if (!apreQui(l.target)) return 'altra-scheda';
     let percorso = u.pathname;
     try { percorso = decodeURIComponent(percorso); } catch (_) {}
-    if (AZIONI.test(percorso)) return 'azione';
+    const azioni = paroleAzione();
+    if (!azioni || faAzione(percorso, azioni) || faAzione(String(l.testo || '').slice(0, LIMITI.TESTO_LINK), azioni)) return 'azione';
     if (FILE.test(percorso)) return 'file';
     return '';
   }
