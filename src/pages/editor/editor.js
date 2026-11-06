@@ -2231,7 +2231,7 @@
     }).join('');
     const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
     // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito.
-    if (r && !docEl.textContent.trim() && !docEl.querySelector('img')) {
+    if (r && !/[^\r\n]/.test(docEl.textContent) && !docEl.querySelector('img')) {
       const primo = bloccoDi(r.startContainer);
       const tag = primo && PARAGRAFO.test(primo.tagName) ? primo.tagName.toLowerCase() : 'p';
       docEl.textContent = '';
