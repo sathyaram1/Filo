@@ -36,19 +36,37 @@
     return L && Array.isArray(L.PAROLE_AZIONE) ? L.PAROLE_AZIONE : null;
   }
 
+  // In ogni alfabeto: un testo in cirillico o in giapponese non deve sparire prima del confronto.
+  function normalizza(s) {
+    return String(s || '').normalize('NFD').replace(/\p{M}/gu, '').replace(/ı/g, 'i');
+  }
   function parole(s) {
-    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
-      .replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+    return normalizza(s).replace(/([\p{Ll}\p{N}])(\p{Lu})/gu, '$1 $2').toLowerCase().split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+  }
+
+  let elencoVisto = null;
+  let elencoNormale = [];
+  function normali(elenco) {
+    if (elenco !== elencoVisto) {
+      elencoVisto = elenco;
+      elencoNormale = elenco.map((w) => {
+        const n = normalizza(w).toLowerCase();
+        // Le scritture senza spazi fra le parole (giapponese, cinese) e quelle non latine si cercano anche dentro.
+        return { w: n, dentro: n.length >= 5 || /[^\x00-\x7f]/.test(n) };
+      });
+    }
+    return elencoNormale;
   }
 
   // Precaricare un link d'uscita fa uscire dal sito: meglio perdere il precarico di una pagina che l'accesso. Una
   // parola d'azione vale anche dentro una composta («doLogout», «deleteAccount») e scritta in due («log out»).
   function faAzione(testo, elenco) {
     const p = parole(testo);
+    const voci = normali(elenco);
     for (let i = 0; i < p.length; i++) {
       const due = i + 1 < p.length ? p[i] + p[i + 1] : '';
-      for (const w of elenco) {
-        if (p[i] === w || due === w || (w.length >= 5 && p[i].includes(w))) return true;
+      for (const { w, dentro } of voci) {
+        if (p[i] === w || due === w || (dentro && p[i].includes(w))) return true;
       }
     }
     return false;
