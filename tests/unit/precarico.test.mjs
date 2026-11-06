@@ -55,6 +55,14 @@ test('un link d\'uscita si riconosce anche composto, in altre lingue o dal solo 
   for (const testo of ['Esci', 'Log out', 'Abmelden', 'Se déconnecter', 'Cerrar sesión', 'Disconnettiti', 'btn-logout']) {
     assert.equal(motivo('https://www.esempio.it/account/x7', { testo }), 'azione', testo);
   }
+  // #1985 giro 2, r3: altre lingue e altri alfabeti, che prima sparivano prima del confronto.
+  for (const p of ['/user/loginOut', '/session/exit', '/account/quit', '/konto/выйти']) {
+    assert.equal(motivo(`https://www.esempio.it${p}`), 'azione', p);
+  }
+  for (const testo of ['Выйти', 'Выход', 'ログアウト', '退出登录', '注销', '로그아웃', 'Logga ut', 'Logg ut', 'Log ud', 'Kirjaudu ulos',
+    'Odhlásit', 'Çıkış yap', 'Termina sessione', 'Terminar sessão', 'Αποσύνδεση', 'Kijelentkezés', 'Deconectare', 'Exit', 'Quit']) {
+    assert.equal(motivo('https://www.esempio.it/a/x9', { testo }), 'azione', testo);
+  }
   // Le pagine di tutti i giorni restano: due parole vicine non si fondono in un'azione che non c'è.
   for (const [href, testo] of [['/catalogo/utile', 'Il catalogo utile'], ['/blog/output', 'Output del blog'], ['/notizie/ieri', 'Le notizie di ieri']]) {
     assert.equal(motivo(`https://www.esempio.it${href}`, { testo }), '', href);
