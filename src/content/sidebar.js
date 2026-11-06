@@ -2522,7 +2522,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
             appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
             if (session && result.reason === 'selector-not-found') session.nonTrovati += 1;
             if (parsed.status === 'continue') {
-              setTimeout(() => submit({ userAction: aiNote, preActionUrl: urlPrimaDelPasso() }), 50);
+              passo({ userAction: aiNote, preActionUrl: urlPrimaDelPasso() }, 50);
             }
           }
         } else {
