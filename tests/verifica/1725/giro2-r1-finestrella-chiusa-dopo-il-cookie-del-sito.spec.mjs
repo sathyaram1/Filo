@@ -84,3 +84,21 @@ for (const [bottone, cosa] of [['#stato', 'il ricordo della risposta attesa'], [
     }
   });
 }
+
+test('r1 accesso riuscito nella finestrella su un sito che aveva già aperto la sua sessione: la scheda si aggiorna', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const s = await sito();
+  try {
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), `${s.base}/negozio`);
+    const page = await pagina(app, `${s.base}/negozio`);
+    await expect(page.locator('#dentro')).toHaveCount(0);
+    await page.locator('#entra').click();
+    await expect.poll(() => app.windows().some((x) => { try { return x.url().includes('/auth/google/ritorno'); } catch (_) { return false; } }), { timeout: 10_000 }).toBe(true);
+    await expect.poll(() => app.windows().some((x) => { try { return x.url().includes('/auth/google/ritorno'); } catch (_) { return false; } }), { timeout: 10_000 }).toBe(false);
+    await expect.poll(async () => {
+      try { return await (await pagina(app, `${s.base}/negozio`)).locator('#dentro').count(); } catch (_) { return -1; }
+    }, { timeout: 10_000 }).toBe(1);
+  } finally {
+    await s.chiudi();
+  }
+});
