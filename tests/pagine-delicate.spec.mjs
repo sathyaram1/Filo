@@ -323,6 +323,25 @@ test('in Sicurezza si vedono i siti segnati per il campo password: uno tolto tor
     .toEqual({ delicata: 'campi', summary: '', snippet: '', embedding: false });
 });
 
+// #2219 — in Privacy massima Filo non tiene sul disco cosa sa dei siti non fidati: nemmeno dove ha visto un campo password.
+test('in Privacy massima un sito non fidato col campo password è delicato e in Sicurezza, ma il suo nome non resta sul disco', async ({ app, openTab, testServer }) => {
+  const sulDisco = () => app.evaluate(() => globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.SITI_CON_CAMPI, []));
+  const imposta = (cookies) => app.evaluate((c) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: c } }), cookies);
+  await imposta({ mode: 'privacy', trustedSites: [] });
+  await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  expect(await sulDisco()).not.toContain('sito-pubblico.test');
+
+  const sicurezza = await openTab('filo://security/security.html');
+  await expect(sicurezza.locator('#sec-delicate-campi-list li', { hasText: 'sito-pubblico.test' })).toBeVisible({ timeout: 8000 });
+
+  await imposta({ trustedSites: ['sito-pubblico.test'] });
+  await expect.poll(sulDisco, { timeout: 4000, message: 'un sito fidato si ricorda anche dopo un riavvio' }).toContain('sito-pubblico.test');
+  await imposta({ trustedSites: [] });
+  await expect.poll(sulDisco, { timeout: 4000, message: 'tolto dai fidati, il nome lascia il disco' }).not.toContain('sito-pubblico.test');
+  expect(await app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), 'per la sessione resta delicato').toBe(true);
+});
+
 test('un campo carta nel riquadro di un servizio di pagamento rende delicata la pagina che lo contiene', async ({ app, openTab, testServer }) => {
   const riquadro = testServer.html('<!doctype html><html><body><input autocomplete="cc-number" name="cardnumber"></body></html>')
     .replace('127.0.0.1', 'blocked.test');
