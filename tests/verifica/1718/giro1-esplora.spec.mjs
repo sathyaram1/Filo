@@ -88,7 +88,7 @@ test('stop durante la ricerca web: niente chiamata dopo, pannello pronto', async
 });
 
 test('stop fra un passo e l\'altro: nessuna chiamata parte dopo il clic', async ({ app, shell, openTab, testServer }) => {
-  await prepara(app, [{ risposta: () => 0 }]);
+  await prepara(app, [{ serie: true }]);
   const { sito, aiuto } = await apriAiuto(app, shell, openTab, testServer);
   await chiedi(aiuto, 'apri tutto');
   await expect(aiuto.locator('.sn-sidebar-log', { hasText: 'sezione aperta' })).toHaveCount(2, { timeout: 20_000 });
