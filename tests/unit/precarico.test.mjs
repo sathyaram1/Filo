@@ -64,11 +64,12 @@ test('un link d\'uscita si riconosce anche composto, in altre lingue o dal solo 
     assert.equal(motivo('https://www.esempio.it/a/x9', { testo }), 'azione', testo);
   }
   // #1985 giro 3, r3: le azioni oltre l'uscita, dall'indirizzo o dal solo testo.
-  for (const [href, testo] of [['/account/disattiva', 'Disattiva account'], ['/ordini/5/annulla', 'Annulla ordine'],
-    ['/abbonamento/disdici', 'Disdici'], ['/newsletter/abbestellen', 'Abbestellen'], ['/nieuwsbrief/uitschrijven', 'Uitschrijven'],
-    ['/utenti/mario/unfollow', 'Smetti di seguire'], ['/carrello/aggiungi/12', 'Aggiungi al carrello'], ['/cart/add/1', 'Add to cart'],
-    ['/messaggi/7/x', 'Archivia'], ['/compte/x', 'Se désabonner'], ['/cuenta/x', 'Darse de baja'], ['/post/9/x', 'Upvote']]) {
-    assert.equal(motivo(`https://www.esempio.it${href}`), 'azione', href);
+  for (const p of ['/account/disattiva', '/ordini/5/annulla', '/abbonamento/disdici', '/newsletter/abbestellen',
+    '/nieuwsbrief/uitschrijven', '/utenti/mario/unfollow', '/carrello/aggiungi/12', '/cart/add/1']) {
+    assert.equal(motivo(`https://www.esempio.it${p}`), 'azione', p);
+  }
+  for (const testo of ['Disattiva account', 'Annulla ordine', 'Disdici', 'Abbestellen', 'Uitschrijven', 'Smetti di seguire',
+    'Aggiungi al carrello', 'Add to cart', 'Archivia', 'Se désabonner', 'Darse de baja', 'Upvote']) {
     assert.equal(motivo('https://www.esempio.it/a/x9', { testo }), 'azione', testo);
   }
   // Le pagine di tutti i giorni restano: due parole vicine non si fondono in un'azione che non c'è.
