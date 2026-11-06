@@ -830,6 +830,15 @@
     return null;
   }
 
+  // Il <details> chiuso più esterno che contiene `el`, attraverso i componenti aperti; null se nessuno.
+  function fisarmonicaChiusaAttorno(el) {
+    let trovata = null;
+    for (let cur = parentOrHost(el), hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; cur = parentOrHost(cur), hops++) {
+      if (cur.tagName === 'DETAILS' && !cur.open) trovata = cur;
+    }
+    return trovata;
+  }
+
   // `fuoriConto`: un riquadro che chi lo ospita non vede non conta i suoi componenti chiusi, come lui non conta (#1290).
   function isClosedComponent(el, fuoriConto) {
     if (fuoriConto) return false;
