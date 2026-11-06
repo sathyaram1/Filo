@@ -110,7 +110,7 @@ function segnoDi(msg) {
 }
 
 // Codice per il mondo dei content script della pagina (quello di riquadroRotto.js), dove vive la mappa dei segni.
-const MONDO_SCRIPT = 999;
+const MONDO_SCRIPT = require('../../preload/mondo-esente').MONDO;
 function chiamaPagina(wc, metodo, ...args) {
   const code = `(() => { const R = globalThis.SN_RIQUADRO_COOKIE; return R && typeof R.${metodo} === 'function' ? R.${metodo}(...${JSON.stringify(args)}) : null; })()`;
   try { return wc.executeJavaScriptInIsolatedWorld(MONDO_SCRIPT, [{ code }]).catch(() => null); } catch (_) { return Promise.resolve(null); }

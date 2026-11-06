@@ -29,7 +29,7 @@ const LINK_IN_CODA = 4;
 const LINK_SEGNALATI_MAX = 10000;
 let avvisiDiLink = 0;
 // Il mondo dei content script della pagina (src/content/safebrowseLinks.js).
-const MONDO_SCRIPT = 999;
+const MONDO_SCRIPT = require('../../preload/mondo-esente').MONDO;
 
 // In un riquadro di un altro sito la pagina sopra non si legge: se è lei a nasconderlo (trasparente, ritagliato,
 // coperto) lo dice il motore, che vede tutta la catena dei riquadri. Senza risposta in tempo vale mostrato.

@@ -14,6 +14,7 @@
   const T_FRAME = MSG.COOKIES_FRAME_BANNER || 'cookies_frame_banner';
   const T_HIDE_FRAME = MSG.COOKIES_HIDE_FRAME || 'cookies_hide_frame';
   const T_ACCESSO = MSG.COOKIES_ACCESSO || 'cookies_accesso';
+  const T_ANSWER_BASE = MSG.COOKIES_ANSWER_BASE || 'cookies_answer_base';
 
   const IS_TOP = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
 
@@ -48,16 +49,21 @@
     } catch (_) { return false; }
   }
 
+  function press(el) {
+    lastActionAt = Date.now();
+    try { el.click(); return true; } catch (_) {}
+    try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); return true; } catch (_) {}
+    return false;
+  }
+
+  // In un riquadro il clic aspetta che la pagina abbia fotografato i suoi nomi: la risposta la scrive spesso lei.
   function clickEl(el) {
     if (!el || el.__filoCookieClicked || !isVisible(el)) return false;
     el.__filoCookieClicked = true;
     lastActionAt = Date.now();
+    if (!IS_TOP) { pageBase().then(() => { if (el.isConnected) press(el); }); return true; }
     const base = answerBase();
-    let ok = false;
-    try { el.click(); ok = true; } catch (_) {}
-    if (!ok) {
-      try { el.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, view: window })); ok = true; } catch (_) {}
-    }
+    const ok = press(el);
     answerAfter(base, true);
     return ok;
   }
@@ -97,8 +103,9 @@
   // ─── la risposta che il sito si scrive dopo un clic sul banner ──────────────
   //
   // «Mostra il banner» e «Rifiuta in automatico» devono togliere la risposta, qualunque nome le dia il sito.
-  // La risposta è quello che il clic CREA mentre il sito lo gestisce: cookie e chiavi della pagina che prima
-  // non c'erano. Quello che c'era già (stato dell'applicazione, accesso) o nasce più tardi resta del sito (#754).
+  // La risposta è quello che il clic CREA: cookie e chiavi della pagina che prima non c'erano, anche scritti poco dopo
+  // (al ritorno da una richiesta, o dalla pagina avvisata dal riquadro del banner, #1279.2). Quello che c'era già
+  // (stato dell'applicazione, accesso) o nasce più tardi resta del sito (#754).
 
   function cookieNames() {
     const out = new Set();
@@ -121,32 +128,54 @@
   const answerSent = new Set();
 
   function answerBase() {
-    return IS_TOP ? { c: cookieNames(), s: memoryNames() } : null;
+    return IS_TOP ? { c: cookieNames(), s: memoryNames(), at: Date.now() } : null;
   }
 
-  function created(base, now, tag) {
+  function created(base, now, tag, late) {
     const out = [];
     for (const k of now) {
       if (base.has(k) || k.length > 200 || answerSent.has(tag + k)) continue;
+      if (late && !LATE_ANSWER.test(k)) continue;
       answerSent.add(tag + k);
       out.push(k);
     }
     return out;
   }
 
-  function reportCreated(base) {
-    const cookies = created(base.c, cookieNames(), 'c:');
-    const storage = created(base.s, memoryNames(), 's:');
+  function reportCreated(base, late) {
+    const cookies = created(base.c, cookieNames(), 'c:', late);
+    const storage = created(base.s, memoryNames(), 's:', late);
     if (cookies.length || storage.length) {
       send({ type: T_OUTCOME, outcome: 'answer', cookies: cookies.slice(0, 20), storage: storage.slice(0, 20) });
     }
   }
 
-  // I gestori del sito girano dentro click(); promesse e rinvii a zero finiscono prima del giro dopo.
+  // Durante il clic e nel giro dopo conta ogni nome nuovo. Più tardi, fino a quattro secondi e finché l'utente non fa
+  // altro, solo un nome che parla di scelta o di consenso: la valuta che il sito si scrive mentre carica resta sua.
+  const LATE_ANSWER = /(consen|cookie|privacy|gdpr|rgpd|dsgvo|scelt|choice|choix|wahl|elecci|accept|reject|refus|rifiut|opt.?(in|out)|notice|banner|tracking)/i;
+  const ANSWER_LATE_MS = [300, 1000, 2000, 4000];
+  let lastGestureAt = 0;
+
   function answerAfter(base, now) {
     if (!base) return;
-    if (now) reportCreated(base);
-    setTimeout(() => reportCreated(base), 0);
+    if (now) reportCreated(base, false);
+    setTimeout(() => reportCreated(base, false), 0);
+    for (const ms of ANSWER_LATE_MS) setTimeout(() => { if (lastGestureAt <= base.at) reportCreated(base, true); }, ms);
+  }
+
+  // Il riquadro di un banner sta per premere: la pagina fotografa adesso i suoi nomi. Glielo chiede il main
+  // (COOKIES_ANSWER_BASE), per conto di un riquadro qualsiasi: quindi poche volte per pagina.
+  const FRAME_BASES_MAX = 6;
+  let frameBases = 0;
+  function frameBase() {
+    if (!IS_TOP || !active || frameBases >= FRAME_BASES_MAX) return false;
+    frameBases++;
+    answerAfter(answerBase(), false);
+    return true;
+  }
+
+  function pageBase() {
+    return Promise.race([ask({ type: T_ANSWER_BASE }), new Promise((r) => setTimeout(r, 800))]);
   }
 
   // Coi banner mostrati la risposta la dà l'utente: stessa regola, dal suo clic dentro al banner.
@@ -464,7 +493,7 @@
         continue;
       }
       com.busy = true;
-      cmp.reject().then((res) => {
+      (IS_TOP ? Promise.resolve() : pageBase()).then(() => cmp.reject()).then((res) => {
         com.busy = false;
         com.tried.add(name);
         // Una regola che non ha premuto niente non ha cambiato la pagina: non c'è niente da lasciar assestare.
@@ -577,6 +606,28 @@
     return false;
   }
 
+  // Il collegamento per riaprire le preferenze resta in pagina dopo la risposta, e la lista lo nomina: non è un banner,
+  // né da nascondere né da contare (#1279.4). Per forma: un comando solo, senza una scritta fuori da lui.
+  const REOPEN = [
+    '.ot-sdk-show-settings', '#ot-sdk-btn', '.optanon-show-settings', '#cookie-law-info-again', '#cookie_hdr_showagain',
+    '.cky-btn-revisit-wrapper', '.cmplz-manage-consent', '#CookiebotWidget', '.iubenda-tp-btn',
+  ].join(',');
+
+  function flat(t) { return String(t || '').replace(/\s+/g, ' ').trim(); }
+
+  function reopenLink(el) {
+    try { if (el.matches(REOPEN)) return true; } catch (_) {}
+    let text = '';
+    try { text = flat(el.innerText); } catch (_) {}
+    if (text.length > 60) return false;
+    let btns = [];
+    try { btns = el.matches(CLICKABLE) ? [el] : [...el.querySelectorAll(CLICKABLE)].slice(0, 2); } catch (_) {}
+    if (btns.length !== 1) return false;
+    let own = '';
+    try { own = flat(btns[0].innerText); } catch (_) {}
+    return own === text;
+  }
+
   function bannerTick(knownCmp) {
     const B = global.SN_COOKIE_BANNERS;
     if (!IS_TOP || !B || !B.isRunning() || reported.has('rejected')) return;
@@ -584,6 +635,7 @@
     let recheck = 0;
     for (const { el, at } of B.pending()) {
       if (!shows(el)) { if (now - at < 10000) recheck = 500; continue; }
+      if (reopenLink(el)) continue;
       const btn = findRejectText(el, true);
       if (btn && clickEl(btn)) { B.forget(el); noteRejected('lista'); return; }
       const age = now - at;
@@ -703,7 +755,7 @@
     com.shownCmp = null;
     let any = false;
     for (const el of cmp.hideTargets()) {
-      if (el !== document.body && el !== document.documentElement && isVisible(el) && aboutConsent(el) && B.hide(el)) any = true;
+      if (el !== document.body && el !== document.documentElement && isVisible(el) && aboutConsent(el) && !reopenLink(el) && B.hide(el)) any = true;
     }
     if (any) noteHidden();
   }
@@ -901,10 +953,17 @@
     let added = false;
     const push = (n) => { added = true; if (addedRoots.length < ADDED_MAX) addedRoots.push(n); else addedLost = true; };
     for (const r of records) {
-      if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
+      if (r.type === 'attributes') {
+        // La scritta di un pulsante-campo è il suo valore: anche lui entra dopo il pulsante.
+        if (r.attributeName === 'value') { const c = labelled(r.target); if (c) push(c); } else if (surveying) B.survey(r.target, false);
+        continue;
+      }
       if (r.type === 'characterData') { const c = labelled(r.target); if (c) push(c); continue; }
+      // Testo nudo o elemento che lo avvolge, quello che entra in un pulsante è una novità del pulsante (#1279.5).
+      let label = null;
       for (const n of r.addedNodes) {
-        if (n.nodeType !== 1) { const c = n.nodeType === 3 && labelled(r.target); if (c) push(c); continue; }
+        if ((n.nodeType === 1 || n.nodeType === 3) && label === null) { label = labelled(r.target) || false; if (label) push(label); }
+        if (n.nodeType !== 1) continue;
         push(n);
         if (surveying) B.survey(n, true);
       }
@@ -918,7 +977,7 @@
     try { return el ? el.closest(CLICKABLE) : null; } catch (_) { return null; }
   }
 
-  // Gli attributi servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
+  // Classi e id servono solo alla lista dei banner: senza, ogni classe che cambia sarebbe un record da buttare.
   let observedAttrs = false;
   function startObserver() {
     const B = global.SN_COOKIE_BANNERS;
@@ -933,9 +992,9 @@
         observer = new MutationObserver(onMutations);
       }
       observedAttrs = attrs;
-      observer.observe(document.documentElement || document, attrs
-        ? { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'id'] }
-        : { childList: true, subtree: true, characterData: true });
+      observer.observe(document.documentElement || document, {
+        childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: attrs ? ['class', 'id', 'value'] : ['value'],
+      });
     } catch (_) {}
   }
 
@@ -1056,7 +1115,12 @@
     });
   } catch (_) {}
 
-  if (IS_TOP) { try { document.addEventListener('click', onUserClick, true); } catch (_) {} }
+  if (IS_TOP) {
+    try {
+      document.addEventListener('click', onUserClick, true);
+      for (const ev of ['pointerdown', 'keydown']) document.addEventListener(ev, (e) => { if (e.isTrusted) lastGestureAt = Date.now(); }, true);
+    } catch (_) {}
+  }
 
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', load, { once: true });
@@ -1064,5 +1128,5 @@
     load();
   }
 
-  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, _state: () => ({ mode, active, banners, fullScans, hunting: banners && hunting(Date.now()) }) };
+  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, frameBase, _state: () => ({ mode, active, banners, fullScans, hunting: banners && hunting(Date.now()) }) };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

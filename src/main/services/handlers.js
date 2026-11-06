@@ -1256,6 +1256,17 @@ function targetWebTab(sender) {
   return { win, tm, tab: recent[0] || null };
 }
 
+// #1279.1 — «fammi rivedere il banner qui» / «torna a rifiutarli qui» in chat: per il sito della scheda davanti si fa
+// quello che fa la voce del menu della scheda (via la risposta salvata, pagina ricaricata). Altri siti: solo l'elenco.
+async function bannerDellaScheda(elenco, sender) {
+  if (!elenco || elenco.percorso !== 'security.cookies.bannerSites' || elenco.voci.length !== 1) return false;
+  if (elenco.op !== 'aggiungi' && elenco.op !== 'togli') return false;
+  const { tm, tab } = targetWebTab(sender);
+  if (!tm || !tab || !require('../../shared/stessoSito').voceSalvata(tab.url, elenco.voci)) return false;
+  const r = await tm.setCookieBanners(tab.id, elenco.op === 'aggiungi');
+  return !!(r && r.ok);
+}
+
 // Il nome di una scheda come lo vede il modello in TAB APERTE: il titolo, e di una pagina delicata solo il sito (#1004).
 async function nomeDellaScheda() {
   let delicata = () => null;
@@ -2597,7 +2608,8 @@ async function eseguiAzioneFilo(action, {
       const chiave = action.chiave ?? action.key ?? action.nome ?? action.name ?? action.preferenza;
       const setter = global.SN_PREF.setterDellaChiave(chiave);
       if (setter && (setter.scrive.includes('security.pagineDelicate.siti') || setter.scrive.includes('menuDelSito.siti')
-        || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites'))) {
+        || setter.scrive.includes('blocklist') || setter.scrive.includes('security.safeBrowse.trustedSites')
+        || setter.scrive.includes('security.cookies.bannerSites'))) {
         // Dall'Aiuto di un sito «questo sito» è lui, e le altre schede non si nominano (#843).
         const daSito = /^https?:/i.test(sender?.tab?.url || sender?.url || '');
         const { tm, tab } = daSito ? { tm: null, tab: { url: sender?.tab?.url || sender?.url } } : targetWebTab(sender);
@@ -3335,6 +3347,7 @@ async function eseguiAzioneFilo(action, {
           if (r.invariato && dimenticate) return { executed: true, kept: true, output: { etichetta: `${built.label} (Filo ne dimentica i documenti già letti)` } };
           if (r.invariato) return { executed: false, kept: false, output: { error: r.invariato, invariato: true } };
           partial = r.partial;
+          if (await bannerDellaScheda(built.elenco, sender)) return { executed: true, kept: true, output: { etichetta: built.label } };
         }
         await applySettingsUpdate(partial);
         // Il nome leggibile serve alla riga della chat quando il valore era già quello (niente evento).

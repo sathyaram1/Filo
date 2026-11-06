@@ -322,6 +322,11 @@
   // #876 — i siti fidati si salvano come li usa Filo, uguali alla pagina Sicurezza: mail.google.com vale google.com, e fra
   // i programmi fidati una piattaforma che ospita i siti di chiunque (github.io) non entra, col perché.
   const RIDUZIONI = {
+    // Come la voce del menu della scheda: il sito intero dei cookie (services/cookies.js, registrableOf).
+    'security.cookies.bannerSites': (d) => {
+      const S = stessoSito();
+      return { sito: (S && S.sitoDellaVoce(d)) || d };
+    },
     'security.cookies.trustedSites': (d) => {
       const S = stessoSito();
       const E = eseguibili();
@@ -1444,7 +1449,7 @@
     },
     {
       scrive: ['security.cookies.mode'],
-      aiuto: '"manuale" | "automatico" | "privacy"',
+      aiuto: '"manuale" | "automatico" | "privacy" (per tutti i siti; il banner di un sito solo sta in siti_con_banner)',
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       costo: 2,
       allenta: (r, at) => scende(RIGORE_COOKIE, r.partial.security.cookies.mode, at && at.security && at.security.cookies && at.security.cookies.mode),
@@ -1458,6 +1463,14 @@
           privacy: 'privacy', riservatezza: 'privacy', massima: 'privacy', isolato: 'privacy', isolata: 'privacy',
         };
         const mode = map[s];
+        // #1279.1 — un sito nominato qui non deve cambiare la modalità di tutti: la strada è l'elenco dei siti coi banner.
+        if (!mode && /\b(sito|siti|qui|pagina|scheda)\b|\.[a-z]{2,}\b/.test(s)) {
+          return {
+            rifiuto: 'la modalità dei cookie vale per tutti i siti',
+            perModello: 'Per un sito solo usa la chiave siti_con_banner: «aggiungi questo sito» fa rivedere il banner, '
+              + '«togli questo sito» torna a rifiutarlo.',
+          };
+        }
         if (!mode) return null;
         const labelMode = { manual: 'Manuale', default: 'Automatico', privacy: 'Privacy' }[mode];
         return { partial: { security: { cookies: { mode } } }, label: `Gestione cookie → ${labelMode}` };
@@ -1948,11 +1961,14 @@
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),
     elenco({
-      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie'],
+      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie',
+        'rivedi il banner dei cookie', 'mostra il banner dei cookie', 'rifiuta i cookie in automatico qui'],
       percorso: 'security.cookies.bannerSites',
       allentaSe: 'aggiungi',
       nome: 'Siti dove vedi i banner dei cookie',
-      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere',
+      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere. Per il sito aperto: «questo sito» (la scheda '
+        + 'web davanti): «fammi rivedere il banner qui» è aggiungi questo sito, «torna a rifiutarli qui» è togli questo sito; '
+        + 'la pagina si ricarica da sola. Per un sito solo si usa questo elenco, mai la modalità dei cookie',
       risk: 'Cambia i siti dove Filo lascia i banner dei cookie a te invece di rifiutarli da solo: lì una scelta '
         + 'sbagliata sul banner fa accettare i cookie di tracciamento.',
     }),

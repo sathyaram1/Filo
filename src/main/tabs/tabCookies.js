@@ -56,20 +56,50 @@ function trim(map) {
   while (map.size > MAX_REMEMBERED) map.delete(map.keys().next().value);
 }
 
-// Sul disco va solo quello che il sito stesso tiene oltre la sessione: in Privacy i siti non fidati no (#754).
+// Sul disco va solo quello che il sito stesso tiene oltre la sessione, secondo la modalità della VISITA, non quella
+// di quando si salva (#1279.3): una visita in Privacy di un sito non fidato resta in memoria (`privata`), e sul disco
+// resta quello che c'era prima di lei (`salvato`), che il jar normale del sito ricorda ancora.
+function nudo(v) {
+  const { privata, salvato, ...resto } = v;
+  return resto;
+}
+
+function suDisco(v) {
+  const d = v && v.privata ? v.salvato : v;
+  return d ? nudo(d) : null;
+}
+
+// La voce che una visita scrive per un sito, nella memoria di `map`: in quella del profilo normale porta la modalità.
+function scriviVisita(map, site, prev, next) {
+  let v = nudo(next);
+  if (map === remembered && !Cookies.keepsSiteData(site)) {
+    const salvato = suDisco(prev);
+    v = { ...v, privata: true, ...(salvato ? { salvato } : {}) };
+  }
+  map.delete(site);
+  map.set(site, v);
+  trim(map);
+  if (map === remembered) saveSoon();
+}
+
 function saveSoon() {
   if (saveTimer) return;
   saveTimer = setTimeout(() => {
     saveTimer = null;
     const Storage = globalThis.SN_STORAGE;
-    const kept = [...remembered].filter(([site]) => Cookies.keepsSiteData(site));
+    const kept = [...remembered].map(([site, v]) => [site, suDisco(v)]).filter(([, v]) => v);
     if (Storage) Storage.setRaw(storageKey(), Object.fromEntries(kept)).catch(() => {});
   }, 800);
   if (saveTimer.unref) saveTimer.unref();
 }
 Cookies.onConfigChange(saveSoon);
-// Il jar Privacy del sito è stato buttato: il sito non si ricorda più niente, e nemmeno Filo di lui.
-Cookies.setJarWipeHandler((site) => { if (!Cookies.keepsSiteData(site)) remembered.delete(site); });
+// Il jar Privacy del sito è stato buttato: il sito dimentica la visita, e Filo con lui; resta quello del jar normale.
+Cookies.setJarWipeHandler((site) => {
+  const v = remembered.get(site);
+  if (!v || !v.privata) return;
+  if (v.salvato) remembered.set(site, v.salvato);
+  else remembered.delete(site);
+});
 
 function siteMemory(tm) {
   if (!tm.incognito) return remembered;
@@ -102,10 +132,7 @@ function wipeField(w) {
 function rememberOutcome(tm, site, outcome) {
   const map = siteMemory(tm);
   const prev = map.get(site) || { rejected: false, hidden: false };
-  map.delete(site);
-  map.set(site, { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer), ...wipeField(prev.wipe) });
-  trim(map);
-  if (map === remembered) saveSoon();
+  scriviVisita(map, site, map.get(site), { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer), ...wipeField(prev.wipe) });
 }
 
 function rememberAnswer(tm, site, cookies, storage) {
@@ -116,9 +143,7 @@ function rememberAnswer(tm, site, cookies, storage) {
     cookies: [...new Set([...old.cookies, ...cleanNames(cookies)])],
     storage: [...new Set([...old.storage, ...cleanNames(storage)])],
   });
-  map.set(site, { ...prev, ...merged });
-  trim(map);
-  if (map === remembered) saveSoon();
+  scriviVisita(map, site, map.get(site), { ...prev, ...merged });
 }
 
 // Tutte le risposte note per il sito, nel profilo normale e negli incognito aperti: i nomi sono del sito.

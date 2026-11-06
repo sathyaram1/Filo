@@ -61,7 +61,7 @@ function fotoLeggera(img, fattore, qualita = QUALITA_LEGGERA) {
 
 // Il mondo dei content script: lì il riconoscimento ricorda le password che il sito ha reso visibili. Dove non c'è
 // (pagine filo:// senza isolamento) la misura si crea da sé.
-const MONDO_SCRIPT = 999;
+const MONDO_SCRIPT = require('../../preload/mondo-esente').MONDO;
 const ATTESA_MISURA_MS = 3000;
 const GRIGIO = [128, 128, 128];
 // Oltre questa profondità un riquadro della stessa origine si copre intero invece di entrarci: misura e frame tree

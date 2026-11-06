@@ -853,6 +853,8 @@
     // suo figlio da nascondere: fra frame si passa dal main, una postMessage la saprebbe scrivere anche il sito.
     COOKIES_FRAME_BANNER: 'cookies_frame_banner',   // (riquadro) {} → { ok }
     COOKIES_HIDE_FRAME: 'cookies_hide_frame',       // main → pagina { url, origin }
+    // Il riquadro di un banner sta per premere: la pagina fotografa i suoi cookie, la risposta la scrive spesso lei (#1279.2).
+    COOKIES_ANSWER_BASE: 'cookies_answer_base',     // (riquadro) {} → { ok } dopo la foto
     // #760 — riquadro di terzi rotto dai cookie che Filo rifiuta. Il riquadro dice cosa mostra; il servizio e la
     // pagina li ricava il main dal mittente, mai dal messaggio. La proposta la disegna la pagina, la risposta la
     // valida il main sul gettone che ha dato lui.

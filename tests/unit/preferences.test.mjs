@@ -540,3 +540,12 @@ test('#876 — i siti fidati dalla chat: il sito che la voce copre, e nessuna pi
   assert.ok(P.applicaElenco(build('non restare connesso', 'togli esempio.it').elenco, entrato('privacy')).invariato);
   assert.ok(P.applicaElenco(build('non restare connesso', 'togli altro.it').elenco, entrato('default')).invariato);
 });
+
+test('#1279.1: il banner di un sito solo si chiede all\'elenco, ridotto al sito intero; la modalità dei cookie lo rifiuta', () => {
+  assert.deepEqual(build('siti_con_banner', 'aggiungi www.Shop.Esempio.co.uk').elenco.voci, ['esempio.co.uk']);
+  assert.deepEqual(build('siti_con_banner', 'togli https://news.esempio.it/articolo').elenco.voci, ['esempio.it']);
+  const rif = build('gestione_cookie', 'aggiungi esempio.it');
+  assert.match(rif.rifiuto, /tutti i siti/);
+  assert.match(rif.perModello, /siti_con_banner/);
+  assert.deepEqual(build('banner dei cookie', 'automatico').partial, { security: { cookies: { mode: 'default' } } });
+});
