@@ -83,7 +83,7 @@ for (const testo of TESTI) {
     const id = await apriIncognito(app, shell);
     const inc = `${base}?w=incognito`;
     const esitiInc = await prova(app, await apriInIncognito(app, id, inc), inc, testo);
-    const lingue = await app.evaluate(({ BrowserWindow }, id) => BrowserWindow.fromId(id)._filoTabs && require('electron').session.fromPartition(BrowserWindow.fromId(id)._filoTabs.partition).getSpellCheckerLanguages(), id).catch((e) => String(e));
+    const lingue = await app.evaluate(({ BrowserWindow, session }, id) => session.fromPartition(BrowserWindow.fromId(id)._filoTabs.partition).getSpellCheckerLanguages(), id).catch((e) => String(e));
     console.log(JSON.stringify({ testo, esitiNormale, esitiInc, lingue }));
     const pulite = Object.fromEntries(Object.keys(esitiInc).map((k) => [k, '']));
     expect(esitiNormale).toEqual(pulite);
