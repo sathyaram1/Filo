@@ -72,7 +72,7 @@ for (const [nome, sezione, apri] of [
   ['una sezione chiusa da un bottone', '<button id="tg" onclick="document.getElementById(\'more\').hidden=false">Show more</button><div id="more" hidden><p id="m1">Folded paragraph written in English for the reader.</p><closed-card></closed-card></div>', '#tg'],
   ['un pannello di schede spento', '<button id="tg" onclick="document.getElementById(\'more\').style.display=\'block\'">Second tab</button><div id="more" style="display:none"><p id="m1">Tab paragraph written in English for the reader.</p><closed-card></closed-card></div>', '#tg'],
 ]) {
-  test(`componente chiuso con testo dentro ${nome}: l'avviso dice «solo in parte», come nella fisarmonica`, async ({ app, openTab, testServer }) => {
+  test(`r1 componente chiuso con testo dentro ${nome}: l'avviso dice «solo in parte», come nella fisarmonica`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
     await stubTranslationProvider(app);
     const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
