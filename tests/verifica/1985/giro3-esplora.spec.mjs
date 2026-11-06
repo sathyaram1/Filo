@@ -57,9 +57,7 @@ test('link a schermo lento cliccato mentre il precarico è in corso', async ({ o
     await expect(page.locator('#arrivato')).toHaveText('/p/0', { timeout: 15_000 });
     const attesa = Date.now() - t0;
     const r0 = s.richieste.filter((r) => r.url === '/p/0').map((r) => r.prefetch);
-    console.log('LENTO attesa', attesa, 'richieste /p/0', JSON.stringify(r0));
-    expect(r0).toEqual([true]);
-    expect(attesa).toBeLessThan(RITARDO);
+    expect({ r0, attesa }).toEqual({ r0: [true], attesa: -1 });
   } finally { await s.chiudi(); }
 });
 
