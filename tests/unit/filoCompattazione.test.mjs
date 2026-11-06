@@ -513,8 +513,18 @@ test('la compattazione usa la parte fissa dell\'ultimo turno: con turni pesanti 
   Comp.segnaBase(false, 41000);
   const r = await Comp.compatta({ incognito: false, motivo: 'anticipo', ora, tetti: tettiDi() });
   assert.equal(r.fatto, true);
-  assert.match(chiamate[0][1].content, /capitolo 3 /);
-  assert.deepEqual((await componi(ora)).visti.filter((m) => m.role === 'user').map((m) => m.text.slice(0, 10)), ['capitolo 4', 'capitolo 5']);
+  assert.match(chiamate[0][1].content, /capitolo 4 /);
+  assert.deepEqual((await componi(ora)).visti.filter((m) => m.role === 'user').map((m) => m.text.slice(0, 10)), ['capitolo 5']);
+  // Con turni leggeri il tetto non tocca niente: restano i quattro turni.
+  const leggeri = azzera();
+  for (let i = 0; i < 6; i++) {
+    await scrivi('ab12', 'user', `domanda ${i}`, new Date(ora - (60 - i * 5) * 60000).toISOString());
+    await scrivi('ab12', 'filo', `risposta ${i}`, new Date(ora - (59 - i * 5) * 60000).toISOString());
+  }
+  Comp.segnaBase(false, 41000);
+  await Comp.compatta({ incognito: false, motivo: 'anticipo', ora, tetti: tettiDi() });
+  assert.equal(leggeri.chiamate.length, 1);
+  assert.equal((await componi(ora)).visti.filter((m) => m.role === 'user').length, 4);
 });
 
 test('una lettura che non ha portato dentro niente da fuori non rende sospetto il pezzo, come per la chat', async () => {
