@@ -1191,71 +1191,82 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     return btn;
   }
 
-  // Non sono il reasoning vero, che non è disponibile: sono varie e specifiche quanto basta
-  // a non sembrare uno spinner.
-  const THINKING_PHRASES = [
-    'Leggo la pagina…',
-    'Analizzo lo screenshot…',
-    'Identifico gli elementi interattivi…',
-    'Confronto con la tua richiesta…',
-    'Cerco il menu giusto…',
-    'Valuto il prossimo passo…',
-    'Controllo la struttura del DOM…',
-    'Capisco il contesto…',
-    'Scelgo il target migliore…',
-    'Verifico che la pagina sia cambiata…',
-    'Compongo la risposta…',
-    'Riconosco i pattern noti…',
-    'Stimo cosa serve all\'utente…',
-  ];
-
-  function appendThinking() {
+  // L'attesa di un passo (#578.1), con le regole della chat della home (patterns/il-filo-dell-attesa.md): niente frasi
+  // inventate. Una rotella finché non c'è niente di vero; l'azione in corso la dice lei; il ragionamento vero scorre su
+  // una riga sola e un clic lo apre per intero. Sempre testo, mai HTML: il ragionamento può ricopiare la pagina.
+  function creaAttesa() {
     const conv = convEl();
     if (!conv) return null;
     const wrap = document.createElement('div');
-    wrap.className = 'sn-sidebar-thinking';
-    const lines = [];
-    for (let i = 0; i < 3; i++) {
-      const ln = document.createElement('div');
-      ln.className = 'sn-sidebar-thinking-line';
-      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
-      wrap.appendChild(ln);
-      lines.push(ln);
-    }
+    wrap.className = 'sn-sidebar-attesa';
+    wrap.dataset.fase = 'attesa';
+    const testa = document.createElement('button');
+    testa.type = 'button';
+    testa.className = 'sn-sidebar-attesa-testa';
+    testa.setAttribute('aria-expanded', 'false');
+    testa.setAttribute('aria-label', 'Il ragionamento');
+    const rotella = document.createElement('span');
+    rotella.className = 'sn-sidebar-rotella';
+    rotella.setAttribute('aria-hidden', 'true');
+    const riga = document.createElement('span');
+    riga.className = 'sn-sidebar-attesa-riga';
+    const rigaTesto = document.createElement('span');
+    riga.append(rigaTesto);
+    testa.append(rotella, riga);
+    const corpo = document.createElement('div');
+    corpo.className = 'sn-sidebar-attesa-corpo';
+    corpo.hidden = true;
+    wrap.append(testa, corpo);
     conv.appendChild(wrap);
     conv.scrollTop = conv.scrollHeight;
 
-    const pool = THINKING_PHRASES.slice();
-    let recent = [];
-    function nextPhrase() {
-      const candidates = pool.filter((p) => !recent.includes(p));
-      const src = candidates.length ? candidates : pool;
-      const phrase = src[Math.floor(Math.random() * src.length)];
-      recent.push(phrase);
-      if (recent.length > 4) recent.shift();
-      return phrase;
-    }
-
-    lines[0].textContent = nextPhrase();
-    lines[1].textContent = nextPhrase();
-    lines[2].textContent = nextPhrase();
-
-    let stopped = false;
-    const tick = () => {
-      if (stopped || !wrap.isConnected) return;
-      lines[0].textContent = lines[1].textContent;
-      lines[1].textContent = lines[2].textContent;
-      lines[2].textContent = nextPhrase();
-      lines[2].classList.remove('sn-sidebar-thinking-enter');
-      void lines[2].offsetWidth;
-      lines[2].classList.add('sn-sidebar-thinking-enter');
+    const t0 = Date.now();
+    let ragionamento = '';
+    let azione = '';
+    let finita = false;
+    const apri = (v) => {
+      corpo.hidden = !v;
+      testa.setAttribute('aria-expanded', v ? 'true' : 'false');
+      wrap.classList.toggle('sn-sidebar-attesa-aperta', v);
+      if (v) corpo.scrollTop = finita ? 0 : corpo.scrollHeight;
     };
-    const interval = setInterval(tick, 900);
-    lines[2].classList.add('sn-sidebar-thinking-enter');
-
+    testa.addEventListener('click', () => { if (ragionamento) apri(corpo.hidden); });
+    const disegna = () => {
+      if (finita) return;
+      wrap.dataset.fase = azione ? 'azione' : ragionamento ? 'pensa' : 'attesa';
+      rigaTesto.textContent = azione || ragionamento.replace(/\s+/g, ' ').trim().slice(-90);
+    };
+    const chiudi = (fase, testo) => {
+      finita = true;
+      wrap.dataset.fase = fase;
+      rigaTesto.textContent = testo;
+      testa.title = ragionamento ? 'Il ragionamento' : '';
+    };
     return {
       el: wrap,
-      stop() { stopped = true; clearInterval(interval); },
+      // L'azione vera che sta accadendo adesso («Leggo la pagina»), '' quando è finita.
+      azione(t) { azione = String(t || ''); disegna(); },
+      ragiona(pezzo) {
+        if (finita || !pezzo) return;
+        ragionamento += pezzo;
+        corpo.textContent = ragionamento;
+        if (!corpo.hidden) corpo.scrollTop = corpo.scrollHeight;
+        disegna();
+      },
+      // Risposta arrivata: senza ragionamento non resta niente; con, una riga chiusa che lo riapre.
+      fine() {
+        if (finita) return;
+        if (!ragionamento) { finita = true; wrap.remove(); return; }
+        apri(false);
+        const s = Math.max(1, Math.round((Date.now() - t0) / 1000));
+        chiudi('fatto', `Ragionamento · ${s} s`);
+      },
+      // Fermato dall'utente: la riga lo dice e il ragionamento a metà resta aperto, come nella home.
+      ferma() {
+        if (finita) return;
+        chiudi('fermato', globalThis.SN_CHAT_ERRORS?.FERMATO_QUI || 'Fermato qui');
+        if (ragionamento) apri(true);
+      },
     };
   }
 
