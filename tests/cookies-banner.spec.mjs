@@ -334,9 +334,10 @@ async function avviaFilo(userData) {
   const shell = await primaFinestra(app);
   await shell.waitForLoadState('domcontentloaded');
   const open = async (url) => {
+    const prima = new Set(app.windows());
     await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
     let page = null;
-    await expect.poll(() => { page = app.windows().find((w) => w.url() === url); return !!page; }, { timeout: 10_000 }).toBe(true);
+    await expect.poll(() => { page = app.windows().find((w) => w.url() === url && !prima.has(w)); return !!page; }, { timeout: 10_000 }).toBe(true);
     await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
     return page;
   };
