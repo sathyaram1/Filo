@@ -324,6 +324,15 @@
     'uitloggen', 'afmelden', 'wyloguj',
     'exit', 'quit', 'loginout', 'terminasessione', 'terminarsessao', 'loggaut', 'loggut', 'logud', 'kirjauduulos',
     'odhlasit', 'odhlaseni', 'odhlasenie', 'odjava', 'cikis', 'kijelentkezes', 'deconectare',
+    // Le azioni oltre l'uscita: disattivare, annullare, disdire, iscriversi, seguire, votare, aggiungere, archiviare, bloccare.
+    'subscribe', 'follow', 'like', 'upvote', 'downvote', 'vote', 'add', 'addtocart', 'trash', 'block', 'mute', 'leave',
+    'approve', 'reject', 'accept', 'decline', 'revoke', 'disable', 'unlink',
+    'disattiva', 'annulla', 'disdici', 'disdetta', 'iscriviti', 'segui', 'vota', 'aggiungi', 'archivia', 'cestina',
+    'blocca', 'abbandona', 'approva', 'rifiuta', 'accetta', 'revoca',
+    'abbestellen', 'kundigen', 'loschen', 'entfernen', 'deaktivieren', 'stornieren',
+    'uitschrijven', 'opzeggen', 'verwijderen', 'annuleren',
+    'desabonner', 'desinscrire', 'desactiver', 'supprimer', 'annuler', 'resilier',
+    'debaja', 'eliminar', 'borrar', 'cancelar', 'desactivar', 'desuscribir', 'excluir', 'descadastrar',
     // Le altre scritture il precarico le confronta senza accenti, e anche dentro una parola più lunga.
     'выйти', 'выход', 'вийти', 'вихід', 'αποσύνδεση', 'ログアウト', '로그아웃', '退出', '注销', '登出', 'الخروج', 'התנתק',
   ]);
