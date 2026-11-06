@@ -338,8 +338,8 @@ const PROPAGAZIONE = `
     } catch (e) { return false; }
   }
   // In Automatico un riquadro della stessa origine resta scoperto per indice finché carica: coprirlo spegne Filo lì
-  // dentro. In Privacy massima (decisioni owner D-221 e precedente) uno inserito da uno script si copre appena entra,
-  // uno scritto nell'HTML dopo qualche secondo ancora vuoto; mai in un sito con accessi esenti, che resterebbero coperti.
+  // dentro. In Privacy massima (decisioni owner, D-221) uno inserito da uno script si copre appena entra, tranne nei siti
+  // con accessi esenti (uno di quelli si coprirebbe); uno scritto nell'HTML, o lento, dopo qualche secondo ancora vuoto.
   var ATTESA_VUOTO = 3000, attesi = new WeakSet();
   var statoDoc = gOPD(Document.prototype, 'readyState').get;
   function tocca(el, daScript) {
