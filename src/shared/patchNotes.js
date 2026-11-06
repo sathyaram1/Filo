@@ -13,6 +13,9 @@
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
       ],
+      features: [
+        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
+      ],
     },
     {
       version: '0.2.268', date: '2026-11-06',
@@ -67,9 +70,7 @@
         { testo: 'La home non legge batteria e rete ogni minuto mentre sei via, e le legge appena torni alla finestra: un Invio su una bozza non aspetta.', segnalazione: 1302 },
         { testo: 'Una risposta interrotta da un errore del servizio, mentre il modello ragionava o dopo le prime parole, ora conta nel limite di spesa mensile e in Cronologia, col costo di ogni tentativo, anche quando nessuno ha risposto.', segnalazione: 1302 },
       ],
-      features: [
-        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
-      ],
+      features: [],
     },
     {
       version: '0.2.264', date: '2026-11-04',
