@@ -388,6 +388,75 @@ test('con un sito lento il clic dopo il passaggio usa il precarico in corso, e l
   } finally { await sito.chiudi(); }
 });
 
+// #1985 giro 3, r1: lo stesso per un link a schermo, che Chromium scarica «subito» e aspettava solo un secondo.
+test('con un sito lento il clic su un link a schermo ancora in precarico usa quel precarico, e la pagina arriva prima', async ({ openTab }) => {
+  const RITARDO = 2000;
+  const sito = await sitoCheConta({ lente: ['/p/0'], ritardoLente: RITARDO });
+  try {
+    const page = await openTab(`${sito.origin}/indice`);
+    await expect.poll(() => sito.precarichi().includes('/p/0'), { timeout: 30_000, intervals: [100] }).toBe(true);
+    await page.waitForTimeout(200);
+    const t0 = Date.now();
+    await page.click('#l0', { noWaitAfter: true });
+    await expect(page.locator('#arrivato')).toHaveText('/p/0', { timeout: 15_000 });
+    const attesa = Date.now() - t0;
+    expect(sito.richieste.filter((r) => r.url === '/p/0').map((r) => r.prefetch)).toEqual([true]);
+    expect(attesa).toBeLessThan(RITARDO + 600);
+  } finally { await sito.chiudi(); }
+});
+
+// #1985 giro 3, r5: con le impostazioni di serie, al clic si fermano anche i link a schermo ancora in corso.
+test('il clic su un altro link ferma anche i link a schermo ancora in precarico', async ({ openTab }) => {
+  const lente = ['/p/0', '/p/1', '/p/2'];
+  const sito = await sitoCheConta({ lente });
+  try {
+    const page = await openTab(`${sito.origin}/indice`);
+    await expect.poll(() => sito.precarichi().filter((u) => lente.includes(u)).length, { timeout: 30_000, intervals: [100] }).toBeGreaterThanOrEqual(2);
+    await page.click('#l29');
+    await expect(page.locator('#arrivato')).toHaveText('/p/29');
+    const partiti = sito.richieste.filter((r) => r.prefetch && lente.includes(r.url));
+    await expect.poll(() => partiti.filter((r) => r.chiusaPrima).length, { timeout: 5000 }).toBe(partiti.length);
+  } finally { await sito.chiudi(); }
+});
+
+// #1985 giro 3, r2: un link a una sezione di un'altra pagina (con #) si precarica, e il clic usa il precarico.
+test('un link verso una sezione di un\'altra pagina si precarica al passaggio e a schermo, e il clic non lo riscarica', async ({ app, openTab }) => {
+  const sito = await sitoCheConta();
+  try {
+    const conSezione = async (page) => {
+      await page.evaluate(() => {
+        const a = document.createElement('a');
+        a.id = 'sezione';
+        a.href = '/p/articolo#commenti';
+        a.textContent = '12 commenti';
+        a.style.cssText = 'display:block;height:30px';
+        document.body.prepend(a);
+      });
+    };
+    const richiesteArticolo = () => sito.richieste.filter((r) => r.url === '/p/articolo').map((r) => r.prefetch);
+
+    await precaricoVisibili(app, false);
+    let page = await openTab(`${sito.origin}/indice?passaggio`);
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+    await conSezione(page);
+    await page.hover('#sezione');
+    await expect.poll(richiesteArticolo, { timeout: 5000 }).toEqual([true]);
+    await page.click('#sezione');
+    await expect(page.locator('#arrivato')).toHaveText('/p/articolo');
+    expect(richiesteArticolo()).toEqual([true]);
+
+    sito.richieste.length = 0;
+    await precaricoVisibili(app, true);
+    page = await openTab(`${sito.origin}/indice?schermo`);
+    await conSezione(page);
+    await expect.poll(richiesteArticolo, { timeout: 30_000, intervals: [250] }).toEqual([true]);
+    await page.waitForTimeout(500);
+    await page.click('#sezione');
+    await expect(page.locator('#arrivato')).toHaveText('/p/articolo');
+    expect(richiesteArticolo()).toEqual([true]);
+  } finally { await sito.chiudi(); }
+});
+
 // #1985 giro 2, r2: per la pagina una scheda dietro resta «visibile»; i suoi link a schermo aspettano che torni davanti.
 test('una scheda rimasta dietro non precarica i suoi link a schermo, e li precarica quando torna davanti', async ({ app, shell, openTab }) => {
   const sito = await sitoCheConta();
