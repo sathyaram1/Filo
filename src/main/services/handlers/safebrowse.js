@@ -174,6 +174,19 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // La risposta arriva prima del clic: la foto la fa il mondo dei content script della pagina, e qui la si aspetta.
+  on(MSG.COOKIES_ANSWER_BASE, async (msg, sender) => {
+    const wc = sender && sender.wc;
+    const top = wc && !wc.isDestroyed() && wc.mainFrame;
+    if (!top || !sender.frame || sender.frame.frameTreeNodeId === top.frameTreeNodeId) return { ok: false };
+    const MONDO_CONTENT_SCRIPT = 999;
+    try {
+      const fatta = await wc.executeJavaScriptInIsolatedWorld(MONDO_CONTENT_SCRIPT,
+        [{ code: '!!(globalThis.SN_COOKIES_CS && globalThis.SN_COOKIES_CS.frameBase())' }]);
+      return { ok: !!fatta };
+    } catch (_) { return { ok: false }; }
+  });
+
   on(MSG.COOKIES_ACCESSO, async (msg, sender) => {
     const win = winOf(sender);
     const tabId = sender && sender.tab && sender.tab.id;
