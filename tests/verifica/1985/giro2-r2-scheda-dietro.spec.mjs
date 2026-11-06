@@ -21,19 +21,17 @@ test('r2 i link a schermo di una scheda rimasta dietro non si precaricano, e rip
   const origin = `http://127.0.0.1:${server.address().port}`;
   const dietro = () => richieste.filter((r) => r.prefetch && r.url.startsWith('/dietro/')).length;
   try {
-    const page = await openTab(`${origin}/dietro`);
+    const url = `${origin}/dietro`;
+    const aperta = await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => (page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } })) != null,
+      { timeout: 15_000 }).toBe(true);
     await page.waitForLoadState('load');
-    const idDietro = await shell.evaluate(async () => {
-      const t = await window.filoShell.tabs.list?.();
-      return Array.isArray(t) ? (t.find((x) => x.active) || {}).id : null;
-    }).catch(() => null);
     await openTab(`${origin}/davanti`);
     const prima = dietro();
-    await page.waitForTimeout(12_000);
+    await new Promise((r) => setTimeout(r, 12_000));
     expect(dietro()).toBe(prima);
-    if (idDietro != null) {
-      await shell.evaluate((id) => window.filoShell.tabs.activate(id), idDietro);
-      await expect.poll(dietro, { timeout: 20_000, intervals: [500] }).toBeGreaterThan(prima);
-    }
+    await shell.evaluate((id) => window.filoShell.tabs.activate(id), aperta.id);
+    await expect.poll(dietro, { timeout: 20_000, intervals: [500] }).toBeGreaterThan(prima);
   } finally { await new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }); }
 });
