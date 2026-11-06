@@ -6,8 +6,9 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer as createHttpsServer } from 'node:https';
 import { certificato } from './helpers/immagineFirmata.mjs';
 
+// I video incorporati Filo li porta su youtube-nocookie.com (src/content/cookies.js): anche lui sta sul server finto.
 test.use({
-  hostInPiu: ['www.youtube.com'],
+  hostInPiu: ['www.youtube.com', 'www.youtube-nocookie.com'],
   // In https Chromium passerebbe dal proxy dell'ambiente, che il server locale non lo raggiunge.
   argomentiInPiu: ['--ignore-certificate-errors', '--no-proxy-server'],
 });
