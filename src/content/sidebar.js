@@ -2256,8 +2256,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // di Filo — e i risultati viaggiano a parte, per essere imbustati.
         let ricercaWeb = null;
         let esitoVuoto = '';
+        attesa?.azione('Cerco sul web');
         try {
           const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, parole: paroleUtente() });
+          if (finito(mia)) return;
+          attesa?.fine();
           // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
           // riga né la nota ripetono la domanda.
           if (r && r.blocked === 'segreto') {
