@@ -137,12 +137,14 @@
 
   // La risposta della chiamata unica: «TITOLO: …» e «RIASSUNTO: …». Senza etichette è tutta riassunto, e il titolo resta.
   function titoloERiassunto(raw) {
-    const parti = { titolo: [], riassunto: [] };
-    let dove = 'riassunto';
-    for (const riga of String(raw == null ? '' : raw).split(/\r?\n/)) {
+    const testo = String(raw == null ? '' : raw);
+    const parti = { prima: [], titolo: [], riassunto: [] };
+    let dove = 'prima';
+    for (const riga of testo.split(/\r?\n/)) {
       const m = riga.match(/^\s*[*_#]*\s*(titolo|riassunto)\s*[*_]*\s*[:\-–—]\s*[*_]*\s*(.*)$/i);
       if (m) { dove = m[1].toLowerCase(); parti[dove].push(m[2]); } else parti[dove].push(riga);
     }
+    if (dove === 'prima') return { titolo: '', riassunto: testo.trim() };
     const unisci = (righe) => righe.join('\n').replace(/[*_]+$/, '').trim();
     return { titolo: unisci(parti.titolo).split('\n')[0].trim(), riassunto: unisci(parti.riassunto) };
   }
