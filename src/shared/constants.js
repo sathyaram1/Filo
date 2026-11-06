@@ -3059,6 +3059,12 @@
     };
   }
 
+  // Le sezioni chiuse di una pagina da tradurre (#1290): solo 'apertura' le rimanda, ogni altro valore è il di serie.
+  function nascosteDellaTraduzione(settings) {
+    const v = settings && settings.traduzionePagina && settings.traduzionePagina.nascoste;
+    return v === 'apertura' ? 'apertura' : 'subito';
+  }
+
   // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
   const AVVISO_SCHERMO_PIENO_LIMITI = Object.freeze({ durataMs: Object.freeze([1000, 10000]) });
   function opzioniAvvisoSchermoPieno(v) {
