@@ -2013,6 +2013,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       if (v.turno) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_FERMA, turno: v.turno }).catch(() => {}); } catch (_) {} }
       try { v.attesa?.ferma(); } catch (_) {}
     }
+    // Una lettura dei documenti nuovi si ferma come col suo «Ferma»: la ricerca risponde e il turno la lascia cadere.
+    if (letturaDocumenti) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_DOCUMENTI_FERMA }).catch(() => {}); } catch (_) {} }
     aggiornaTasto();
   }
   // Un passo che l'Aiuto fa da solo parte poco dopo il turno che l'ha chiesto, e solo se nel frattempo nessuno l'ha fermato.
