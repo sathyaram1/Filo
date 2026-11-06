@@ -584,6 +584,7 @@
     let recheck = 0;
     for (const { el, at } of B.pending()) {
       if (!shows(el)) { if (now - at < 10000) recheck = 500; continue; }
+      if (reopenLink(el)) continue;
       const btn = findRejectText(el, true);
       if (btn && clickEl(btn)) { B.forget(el); noteRejected('lista'); return; }
       const age = now - at;
