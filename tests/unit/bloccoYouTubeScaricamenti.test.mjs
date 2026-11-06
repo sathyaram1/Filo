@@ -93,10 +93,12 @@ test('dopo un ripiego le regole si richiedono subito e poi ogni ora, finché non
   assert.equal(regole(B).length, 1);
   assert.equal(B.rotto(scheda, { url: 'https://www.youtube.com/watch?v=x', frameTreeNodeId: 1 }, 'fermo', { avvisa() {}, ricarica() {} }).fatto, true);
   assert.ok(await finché(() => chieste.length === 2), `subito: ${JSON.stringify(chieste)}`);
-  await finché(() => false);
+  // Lo scaricamento in corso finisce (la copia su disco è vera): aggiorna() restituisce quello, senza riscaricare.
+  await B.aggiorna();
   assert.ok(B.spentaPerTest(scheda.id), 'le stesse regole non riaccendono la scheda');
   await scorri(H);
   assert.ok(await finché(() => chieste.length === 4), `dopo un'ora: ${JSON.stringify(chieste)}`);
+  await B.aggiorna();
   rete = { 'filters.txt': `${DISCO}\nwww.youtube.com##+js(set, nuove, undefined)`, 'quick-fixes.txt': NIENTE };
   await scorri(H);
   assert.ok(await finché(() => !B.spentaPerTest(scheda.id)), 'le regole nuove riaccendono la scheda');
