@@ -2255,10 +2255,15 @@
       }
     }
     // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
-    if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) r.setStart(docEl.childNodes[r.startOffset], 0);
+    if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
+      const primoNodo = docEl.childNodes[r.startOffset];
+      const testo = primoNodo.nodeType === 3 ? primoNodo : document.createTreeWalker(primoNodo, NodeFilter.SHOW_TEXT).nextNode();
+      if (testo && !testo.parentNode.closest('[contenteditable="false"]')) r.setStart(testo, 0); else r.setStart(primoNodo, 0);
+    }
     if (r && !r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
       const ultimo = docEl.childNodes[r.endOffset - 1];
-      r.setEnd(ultimo, ultimo.nodeType === 3 ? ultimo.length : ultimo.childNodes.length);
+      const testo = ultimo.nodeType === 3 ? ultimo : ultimoTesto(ultimo);
+      if (testo) r.setEnd(testo, testo.length); else r.setEnd(ultimo, ultimo.childNodes.length);
     }
     const blocco = r && bloccoDi(r.startContainer);
     const bloccoFine = r && bloccoDi(r.endContainer);
