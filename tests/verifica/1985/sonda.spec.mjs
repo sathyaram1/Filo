@@ -22,13 +22,28 @@ async function sito(ritardo) {
   return { origin: `http://127.0.0.1:${server.address().port}`, richieste, chiudi: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }) };
 }
 
-for (const premuto of [0, 150, 400]) {
-  test(`pressione veloce, tenuto ${premuto} ms`, async ({ app, openTab }) => {
-    await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ precarico: { visibili: false } }); });
+const VARIANTI = {
+  immediate: (u) => ({ prefetch: [{ source: 'list', urls: [u] }] }),
+  entrambe: (u) => ({ prefetch: [{ source: 'list', urls: [u] }, { source: 'list', urls: [u], eagerness: 'moderate' }] }),
+  conservative: (u) => ({ prefetch: [{ source: 'list', urls: [u], eagerness: 'conservative' }] }),
+};
+for (const [nome, regola] of Object.entries(VARIANTI)) for (const premuto of [100]) {
+  test(`pressione veloce ${nome}, tenuto ${premuto} ms`, async ({ app, openTab }) => {
+    await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['127.0.0.1'] }); });
     const s = await sito(1500);
     try {
       const page = await openTab(`${s.origin}/pag`);
-      await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
+      await page.waitForLoadState('load');
+      await page.evaluate((r) => {
+        document.addEventListener('pointerdown', (e) => {
+          const a = e.target.closest('a');
+          if (!a) return;
+          const x = document.createElement('script');
+          x.type = 'speculationrules';
+          x.textContent = JSON.stringify(r).replaceAll('URL', a.href);
+          document.head.append(x);
+        }, true);
+      }, regola('URL'));
       const box = await page.locator('#l3').boundingBox();
       await page.mouse.move(box.x + 5, box.y + 5);
       const t0 = Date.now();
