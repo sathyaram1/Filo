@@ -992,9 +992,9 @@
         observer = new MutationObserver(onMutations);
       }
       observedAttrs = attrs;
-      observer.observe(document.documentElement || document, attrs
-        ? { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['class', 'id'] }
-        : { childList: true, subtree: true, characterData: true });
+      observer.observe(document.documentElement || document, {
+        childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: attrs ? ['class', 'id', 'value'] : ['value'],
+      });
     } catch (_) {}
   }
 
