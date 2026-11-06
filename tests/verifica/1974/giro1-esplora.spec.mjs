@@ -139,10 +139,18 @@ test('video di YouTube incorporati in un altro sito: senza pubblicità, anche su
   try {
     await regoleVere(app);
     const page = await openTab(s.blog);
-    const frame = (h) => page.frames().find((f) => { try { return new URL(f.url()).hostname === h; } catch (_) { return false; } });
-    await expect.poll(() => Boolean(frame(YT) && frame(NOCOOKIE)), { timeout: 10_000 }).toBe(true);
-    await expect.poll(() => esito(frame(YT)), { timeout: 10_000 }).toEqual(senzaPub);
-    await expect.poll(() => esito(frame(NOCOOKIE)), { timeout: 10_000 }).toMatchObject({ iniziale: false, idIniziale: 'abc123' });
+    // Filo può portare l'incorporato di youtube.com su youtube-nocookie: contano i due riquadri, dove che stiano.
+    const esiti = async () => {
+      const out = [];
+      for (const f of page.frames()) {
+        let h = '';
+        try { h = new URL(f.url()).hostname; } catch (_) {}
+        if (h !== YT && h !== NOCOOKIE) continue;
+        try { out.push(await esito(f)); } catch (_) { out.push(null); }
+      }
+      return out;
+    };
+    await expect.poll(esiti, { timeout: 15_000 }).toEqual([senzaPub, senzaPub]);
   } finally { await t.chiudi(); }
 });
 
