@@ -2088,7 +2088,7 @@
     },
     {
       scrive: ['contestoFilo.token'],
-      aiuto: 'token 2.000-2.000.000, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)',
+      aiuto: () => `token ${limitiDelTetto('token')}, o "predefinito" (il tetto in token di quello che la chat ha davanti; vince il minore fra questo e i giorni)`,
       keys: ['token_ricordati', 'token ricordati', 'tetto del contesto', 'tetto di token', 'token del contesto', 'contestofilo.token'],
       costo: 2,
       risk: 'Un tetto più alto fa ricordare più conversazioni a ogni messaggio, e ogni messaggio costa di più; uno più basso costa meno e ricorda meno senza cercare.',
