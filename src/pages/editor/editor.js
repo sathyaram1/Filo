@@ -2241,10 +2241,11 @@
     }
     // Il cursore posato sul foglio fra due blocchi (un clic nel vuoto) va dentro il blocco accanto.
     if (r && r.collapsed && r.startContainer === docEl) {
-      const accanto = docEl.childNodes[r.startOffset - 1] || docEl.childNodes[r.startOffset];
+      const prima = docEl.childNodes[r.startOffset - 1];
+      const accanto = prima || docEl.childNodes[r.startOffset];
       if (accanto) {
         r.selectNodeContents(accanto);
-        r.collapse(accanto === docEl.childNodes[r.startOffset - 1] ? false : true);
+        r.collapse(!prima);
       }
     }
     const blocco = r && bloccoDi(r.startContainer);
