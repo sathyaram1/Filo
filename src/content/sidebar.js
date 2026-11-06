@@ -1995,21 +1995,96 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
+  // Fermare (#578.1) e il pannello tolto dalla pagina (#1049.1) passano da qui: l'epoca cresce, i passi in coda non
+  // partono, la chiamata in volo si interrompe nel main e la sua risposta, se arriva lo stesso, non si usa.
+  let epoca = 0;
+  const turniVivi = new Map();
+  const passiInCoda = new Set();
+  function lavora() { return turniVivi.size > 0 || passiInCoda.size > 0; }
+  function fermaLavoro() {
+    epoca += 1;
+    for (const t of passiInCoda) clearTimeout(t);
+    passiInCoda.clear();
+    const vivi = [...turniVivi.values()];
+    turniVivi.clear();
+    for (const v of vivi) {
+      if (v.turno) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_FERMA, turno: v.turno }).catch(() => {}); } catch (_) {} }
+      try { v.attesa?.ferma(); } catch (_) {}
+    }
+    aggiornaTasto();
+  }
+  // Un passo che l'Aiuto fa da solo parte poco dopo il turno che l'ha chiesto, e solo se nel frattempo nessuno l'ha fermato.
+  function prossimoPasso(op, ms, mia) {
+    if (mia !== epoca) return;
+    const t = setTimeout(() => { passiInCoda.delete(t); submit(op); }, ms);
+    passiInCoda.add(t);
+    aggiornaTasto();
+  }
+  // Dopo un'attesa il turno prosegue solo se è ancora suo; il pannello che la pagina ha tolto chiude la sessione.
+  function finito(mia) {
+    if (mia !== epoca) return true;
+    if (apertoQui()) return false;
+    staccato();
+    return true;
+  }
+  function staccato() {
+    if (session && lavora()) session.chiusaPrima = true;
+    close({ davvero: true });
+  }
+  function fermaDallUtente() {
+    if (!lavora()) return;
+    if (session) { session.esito = 'chiusa_prima'; segnaSessione(); }
+    fermaLavoro();
+    appendActionLog(global.SN_CHAT_ERRORS.FERMATO_PRIMA)?.classList.add('sn-sidebar-log-fermato');
+    // Il modello lo ritrova alla domanda dopo: quello che si era fermato non lo riprende da solo.
+    history.push({ role: 'user', kind: 'action', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_FERMATO, perCronologia: true }) });
+    try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+  }
+  const NOTA_FERMATO = 'l\'utente ha fermato il lavoro prima della risposta: i passi rimasti non sono partiti. Non riprenderli se non te lo chiede lui';
+  // Il quadrato compare sotto il dito che ha appena mandato: il secondo colpo di un doppio clic non lo preme.
+  const quadratoAppena = (b) => Date.now() - Number((b && b.dataset.comparso) || 0) < global.SN_CONST.PAUSA_QUADRATO_MS;
+  function aggiornaTasto() {
+    const b = root && root.querySelector('.sn-sidebar-input button[type="submit"]');
+    if (!b) return;
+    const modo = lavora() ? 'ferma' : 'invia';
+    if (b.dataset.modo === modo) return;
+    b.dataset.modo = modo;
+    if (modo === 'ferma') b.dataset.comparso = String(Date.now());
+    b.textContent = modo === 'ferma' ? '' : '↵';
+    b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
+    b.title = modo === 'ferma' ? 'Ferma' : '';
+  }
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.AIUTO_RAGIONAMENTO || !msg.turno) return;
+      for (const v of turniVivi.values()) if (v.turno === msg.turno) v.attesa?.ragiona(String(msg.testo || ''));
+    });
+  } catch (_) {}
+
   // Chiudere a metà di un turno nasconde il pannello invece di buttare la risposta; i passi che l'Aiuto farebbe da
-  // solo, chiuso, non partono.
+  // solo, chiuso, non partono. Un pannello che la pagina ha tolto è chiuso anche per loro (#1049.1).
   async function submit(op = {}) {
-    if (!root || (nascosto && !op.userMessage)) return;
+    if (root && !apertoQui()) { staccato(); return; }
+    if (!root || (nascosto && !op.userMessage)) { aggiornaTasto(); return; }
+    const mia = epoca;
+    const chiave = {};
+    const vivo = { turno: '', attesa: null };
+    turniVivi.set(chiave, vivo);
     inVolo += 1;
-    try { await turno(op); } finally {
+    aggiornaTasto();
+    try { await turno(op, mia, vivo); } finally {
       inVolo -= 1;
+      turniVivi.delete(chiave);
+      aggiornaTasto();
       segnaSessione();
       // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
       if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
     }
   }
 
-  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
     if (!root) return;
+    const passo = (op, ms) => prossimoPasso(op, ms, mia);
     // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro. Un riferimento trascinato arriva
     // al modello col suo contenuto; nella bolla resta il titolo.
     const userMessage = [scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : ''), testoRiferimenti(riferimenti)].filter(Boolean).join('\n\n');
