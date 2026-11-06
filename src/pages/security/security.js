@@ -1465,6 +1465,7 @@
       blockPopups: !!$('sec-block-popups').checked,
       adblock: { enabled: !!$('sec-adblock').checked },
       adSkip: { enabled: !!$('sec-adskip').checked },
+      youtubeAds: { enabled: !!$('sec-ytads').checked },
       siteBlock: {
         enabled: !!$('sec-siteblock').checked,
         useAdblockLists: !!$('sec-siteblock-lists').checked,
