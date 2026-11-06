@@ -704,7 +704,7 @@
     com.shownCmp = null;
     let any = false;
     for (const el of cmp.hideTargets()) {
-      if (el !== document.body && el !== document.documentElement && isVisible(el) && aboutConsent(el) && B.hide(el)) any = true;
+      if (el !== document.body && el !== document.documentElement && isVisible(el) && aboutConsent(el) && !reopenLink(el) && B.hide(el)) any = true;
     }
     if (any) noteHidden();
   }
