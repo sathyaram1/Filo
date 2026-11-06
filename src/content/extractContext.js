@@ -815,6 +815,14 @@
     } catch (_) { return false; }
   }
 
+  // La domanda passa per un evento dal nome segreto sull'elemento: la sonda (preload/ombre-chiuse.js) lo annulla solo
+  // se conosce il suo albero chiuso e lì dentro non c'è niente da leggere.
+  function ombraSenzaTesto(el) {
+    const nome = global.SN_OMBRE_CHIUSE;
+    if (!nome) return false;
+    try { return !el.dispatchEvent(new CustomEvent(nome, { cancelable: true })); } catch (_) { return false; }
+  }
+
   function isClosedComponent(el) {
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
