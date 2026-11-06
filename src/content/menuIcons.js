@@ -202,7 +202,6 @@
   // `acceso` uno stile che la selezione ha già (Grassetto).
   function fila(contesto, azioni = {}) {
     if (!Object.prototype.hasOwnProperty.call(Disp.CONTESTI, contesto)) { aperta = null; return null; }
-    refreshOwner();
     aperta = { contesto, azioni: azioni || {} };
     const c = costruisci();
     return {
