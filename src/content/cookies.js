@@ -14,6 +14,7 @@
   const T_FRAME = MSG.COOKIES_FRAME_BANNER || 'cookies_frame_banner';
   const T_HIDE_FRAME = MSG.COOKIES_HIDE_FRAME || 'cookies_hide_frame';
   const T_ACCESSO = MSG.COOKIES_ACCESSO || 'cookies_accesso';
+  const T_ANSWER_BASE = MSG.COOKIES_ANSWER_BASE || 'cookies_answer_base';
 
   const IS_TOP = (() => { try { return window.top === window.self; } catch (_) { return false; } })();
 
