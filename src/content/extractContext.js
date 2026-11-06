@@ -878,7 +878,8 @@
   const MAX_HIDDEN = 5000;
 
   // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
-  function pushKids(el, stack, shadowRoots) {
+  // `nascosti` segna i figli come parte di una sezione nascosta.
+  function pushKids(el, stack, shadowRoots, nascosti) {
     const kids = [];
     const shadow = el.shadowRoot;
     if (shadow) {
@@ -886,12 +887,26 @@
       for (const c of shadow.children) kids.push(c);
     }
     for (const c of el.children) kids.push(c);
-    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    for (let i = kids.length - 1; i >= 0; i--) {
+      if (nascosti) nascosti.add(kids[i]);
+      stack.push(kids[i]);
+    }
   }
 
-  function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
+  // Le due scelte per le sezioni nascoste (D61): 'traduci' le prende tutte, segnate `nascosto` perché partano dopo
+  // quel che si vede; 'rimanda' le lascia in `hidden`, e il menu offre di tradurle quando si aprono.
+  const NASCOSTE = Object.freeze({ TRADUCI: 'traduci', RIMANDA: 'rimanda' });
+
+  function extractTranslatableBlocks({ maxBlocks = 2000, nascoste = NASCOSTE.RIMANDA } = {}) {
     const root = document.body || document.documentElement;
     if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
+    const tutto = nascoste === NASCOSTE.TRADUCI;
+    const dentroNascosto = new WeakSet();
+    // Il tetto si applica a fine camminata, in ordine di priorità: quel che si vede prima delle sezioni nascoste.
+    const visti = [];
+    const vistiAttr = [];
+    const nascostiTesto = [];
+    const nascostiAttr = [];
     const out = [];
     // Gli alberi dei componenti aperti servono a chi sorveglia il testo che arriva DOPO: una
     // MutationObserver sul documento non vede lì dentro.
