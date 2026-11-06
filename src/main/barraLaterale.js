@@ -707,21 +707,45 @@ class BarraLaterale {
     const out = [];
     const zone = [...this.layout.bar.map((id) => [id, false]), ...this.layout.secondary.map((id) => [id, true])];
     for (const [id, riserva] of zone) {
-      const d = D.ICONE[id];
-      if (!d || (d.soloOwner && !owner)) continue;
-      if (d.tipo === 'aiuto') { out.push({ ...this._iconaAiuto(id, nav.aiuto), riserva }); continue; }
-      let icona = d.icona;
-      let chiave = d.etichetta;
-      if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
-      let etichetta = I18n ? I18n.t(chiave) : id;
-      const sp = dallaPagina && dallaPagina[id];
-      if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
-      const ferma = d.tipo === 'pagina' && nav.pagina ? this._motivoAzione(id, nav) : '';
-      const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
-        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || !!ferma));
-      const motivo = ferma && I18n ? I18n.t(MOTIVI_AZIONI_SPENTE[ferma]) : '';
-      const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      out.push({ id, icona, etichetta, tasto, spenta, motivo, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina', riserva });
+      const it = this._descrivi(id, { nav, owner, dallaPagina });
+      if (it) out.push({ ...it, riserva });
+    }
+    return out;
+  }
+
+  // Un'icona come la vede chi la usa adesso, nella barra e nella fila del tasto destro: disegno, nome, spenta e perché.
+  // null per chi non la vede.
+  _descrivi(id, { nav, owner, dallaPagina = null }) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const I18n = globalThis.SN_I18N;
+    const d = D.ICONE[id];
+    if (!d || (d.soloOwner && !owner)) return null;
+    if (d.tipo === 'aiuto') return this._iconaAiuto(id, nav.aiuto);
+    let icona = d.icona;
+    let chiave = d.etichetta;
+    if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
+    let etichetta = I18n ? I18n.t(chiave) : id;
+    const sp = dallaPagina && dallaPagina[id];
+    if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
+    const ferma = d.tipo === 'pagina' && nav.pagina ? this._motivoAzione(id, nav) : '';
+    const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
+      || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || !!ferma));
+    const motivo = ferma && I18n ? I18n.t(MOTIVI_AZIONI_SPENTE[ferma]) : '';
+    const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
+    return { id, icona, etichetta, tasto, spenta, motivo, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' };
+  }
+
+  // Le icone della finestra per la fila del tasto destro della scheda davanti, per id: quelle che questa persona vede.
+  iconeFila() {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    if (!D) return {};
+    const nav = this._nav();
+    const owner = this._owner();
+    const out = {};
+    for (const id of Object.keys(D.ICONE)) {
+      if (D.ICONE[id].tipo !== 'finestra') continue;
+      const it = this._descrivi(id, { nav, owner });
+      if (it) out[id] = { icona: it.icona, etichetta: it.etichetta, tasto: it.tasto, spenta: !!it.spenta, accesa: !!it.accesa };
     }
     return out;
   }
