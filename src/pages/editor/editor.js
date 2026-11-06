@@ -2224,15 +2224,32 @@
   function incollaLungo(righe) {
     const sel = window.getSelection();
     const r = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
-    const blocco = r && bloccoDi(r.startContainer);
-    const bloccoFine = r && bloccoDi(r.endContainer);
-    if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
     const ultima = righe.length - 1;
     const paragrafi = (tag, prefisso = '', suffisso = '') => righe.map((x, i) => {
       const t = i === 0 ? tag : 'p';
       return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
     }).join('');
     const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
+    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito.
+    if (r && !docEl.textContent.trim() && !docEl.querySelector('img')) {
+      const primo = bloccoDi(r.startContainer);
+      const tag = primo && PARAGRAFO.test(primo.tagName) ? primo.tagName.toLowerCase() : 'p';
+      docEl.textContent = '';
+      sel.collapse(docEl, 0);
+      document.execCommand('insertHTML', false, paragrafi(tag));
+      return;
+    }
+    // Il cursore posato sul foglio fra due blocchi (un clic nel vuoto) va dentro il blocco accanto.
+    if (r && r.collapsed && r.startContainer === docEl) {
+      const accanto = docEl.childNodes[r.startOffset - 1] || docEl.childNodes[r.startOffset];
+      if (accanto) {
+        r.selectNodeContents(accanto);
+        r.collapse(accanto === docEl.childNodes[r.startOffset - 1] ? false : true);
+      }
+    }
+    const blocco = r && bloccoDi(r.startContainer);
+    const bloccoFine = r && bloccoDi(r.endContainer);
+    if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
 
     // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto.
     if (blocco.tagName === 'LI' && bloccoFine === blocco) {
