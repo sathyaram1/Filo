@@ -32,18 +32,21 @@
 
   // Gli appunti li scrive prima il main (anche in cronologia): la pagina può non avere il fuoco, come col visore PDF
   // o dopo un clic nella barra laterale (#1343). Se il main dice no, ci prova la pagina.
-  async function copyToClipboard(text) {
+  async function scriviNegliAppunti(text) {
     try {
       const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text });
-      if (r && r.ok) { Popup.showToast(I18n.t('toast_copied')); return; }
+      if (r && r.ok) return true;
     } catch (_) {}
-    navigator.clipboard.writeText(text).then(
-      () => {
-        Popup.showToast(I18n.t('toast_copied'));
-        pushClipboardEntry({ type: 'text', text });
-      },
-      () => {/* niente toast su errore — UX silenziosa */}
-    );
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (_) { return false; }
+    pushClipboardEntry({ type: 'text', text });
+    return true;
+  }
+
+  async function copyToClipboard(text) {
+    // Niente toast su errore: UX silenziosa.
+    if (await scriviNegliAppunti(text)) Popup.showToast(I18n.t('toast_copied'));
   }
 
   // Negli appunti deve finire un indirizzo apribile: un javascript:, un data: o un
