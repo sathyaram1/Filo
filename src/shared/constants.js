@@ -3245,6 +3245,8 @@
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,
     nascosteDellaTraduzione,
+    NASCOSTE_TRADUZIONE,
+    modoNascoste,
     resolveModel,
     parseModelRefs,
     isRawModelId,
