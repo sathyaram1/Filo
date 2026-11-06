@@ -360,6 +360,10 @@ const restaConnessoMethods = {
     if (!pagina.chiave && !cookies.some(looksLikeLoginCookie)) return;
     if (tab._accesso !== a || proposti.has(a.sito) || this._propostaSito(tab) !== a.sito) return;
     tab._accesso = null;
+    proposti.add(a.sito);
+    let detto = false;
+    try { detto = await ricordaNo().detto(chiaveNo(a.sito)); } catch (_) {}
+    if (detto || this._fidato(a.sito)) return;
     this._proponiConnesso(a.sito);
   },
 
