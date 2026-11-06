@@ -2298,7 +2298,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // Caso speciale: un documento dell'utente (#947.3). La ricerca la fa il main; il turno dopo il modello ha i
       // candidati e ne indica uno col numero.
       if (parsed.kind === 'documenti') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
