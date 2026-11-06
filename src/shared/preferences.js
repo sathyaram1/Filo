@@ -126,6 +126,18 @@
     return global.SN_FILO_CONTESTO;
   }
 
+  // Un tetto del contesto chiesto a parole («50 mila», «2 milioni»): i limiti e l'arrotondamento sono quelli dei campi
+  // di Preferenze e Modelli predefiniti (numeroDelTetto). null se non è un numero.
+  function tettoAParole(k, v) {
+    const s = String(v == null ? '' : v).trim().toLowerCase();
+    let n = parseItalianNumber(s);
+    if (!Number.isFinite(n)) return null;
+    if (/\d\s*(k|mila)\b/.test(s)) n *= 1000;
+    else if (/\d\s*(m|milion[ei])\b/.test(s)) n *= 1000000;
+    return contestoFilo().numeroDelTetto(k, n);
+  }
+  const limitiDelTetto = (k) => contestoFilo().LIMITI[k].map((n) => n.toLocaleString('it-IT', { useGrouping: true })).join('-');
+
   function lunghezzaRisposte() {
     if (!global.SN_LUNGHEZZA_RISPOSTE && typeof require === 'function') require('./lunghezzaRisposte.js');
     return global.SN_LUNGHEZZA_RISPOSTE;
