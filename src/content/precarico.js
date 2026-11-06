@@ -12,7 +12,7 @@
   const MSG = (global.SN_MSG && global.SN_MSG.MSG) || {};
 
   let deps = null;
-  const spento = () => !deps || deps.spento();
+  const spento = () => !deps || (typeof deps.spento === 'function' && deps.spento());
 
   // «Stesso sito» vuole la Public Suffix List: si carica al primo link da giudicare, non a ogni pagina.
   let pslPronta = false;
