@@ -361,34 +361,59 @@ const restaConnessoMethods = {
     return { ok: true, sito: s, nome: nomeLeggibile(s), fidato: !!on, modo, rientra: persi.includes(this) };
   },
 
-  // Le schede del sito passano nel jar giusto: i cookie del sito vanno con loro, e la memoria della pagina
-  // arriva alla pagina nuova prima dei suoi script (takeSemina). La pagina si ricarica. Torna quanti database
-  // sono rimasti indietro.
+  // Le schede del sito passano nel jar giusto. Una scheda con qualcosa da perdere (testo scritto, audio) non si
+  // ricarica in silenzio: resta nel jar di prima, coi cookie già copiati, e passa al cambio di pagina o quando la
+  // ricarichi (#759.2). Torna quanti database sono rimasti indietro.
   async _spostaSchede(sito, dest) {
-    const propri = new Set([Cookies.partitionForSite(sito, true), Cookies.partitionForSite(sito, false)]);
     let persi = 0;
     for (const tab of this.tabs.slice()) {
       if (this._jarDi(tab) !== sito) continue;
-      const url = tab.url;
-      if (!this._needsRepartition(tab, url)) continue;
-      const wc = tab.view && tab.view.webContents;
-      if (!wc || wc.isDestroyed()) continue;
-      // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito.
-      if (!propri.has(tab.partition)) await Cookies.copiaBarattolo(wc.session, dest, sito);
-      let mem = null;
-      try { mem = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
-      if (!this.tabs.includes(tab) || !tab.view || tab.view.webContents !== wc) continue;
-      let origin = '';
-      try { origin = new URL(wc.getURL()).origin; } catch (_) {}
-      const locale = mem && Array.isArray(mem.locale) ? mem.locale : [];
-      const sessione = mem && Array.isArray(mem.sessione) ? mem.sessione : [];
-      const database = mem && Array.isArray(mem.database) ? mem.database : [];
-      if (mem && Array.isArray(mem.persi)) persi += mem.persi.length;
-      tab._semina = (locale.length || sessione.length || database.length) && origin
-        ? { origin, locale, sessione, database, at: Date.now() } : null;
-      this._recreateView(tab, url);
+      tab._passaggioRinviato = null;
+      if (!this._needsRepartition(tab, tab.url)) continue;
+      if (this._qualcosaDaPerdere(tab)) {
+        tab._passaggioRinviato = { sito, dest, partition: this._partitionForTab(tab, tab.url) || null };
+        continue;
+      }
+      persi += await this._passaScheda(tab, sito, dest);
     }
     return persi;
+  },
+
+  // I cookie del sito vanno con la scheda, e la memoria della pagina arriva alla pagina nuova prima dei suoi script
+  // (takeSemina). La pagina si ricarica.
+  async _passaScheda(tab, sito, dest) {
+    const url = tab.url;
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return 0;
+    const propri = new Set([Cookies.partitionForSite(sito, true), Cookies.partitionForSite(sito, false)]);
+    // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito.
+    if (!propri.has(tab.partition)) await Cookies.copiaBarattolo(wc.session, dest, sito);
+    let mem = null;
+    try { mem = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
+    if (!this.tabs.includes(tab) || !tab.view || tab.view.webContents !== wc) return 0;
+    let origin = '';
+    try { origin = new URL(wc.getURL()).origin; } catch (_) {}
+    const locale = mem && Array.isArray(mem.locale) ? mem.locale : [];
+    const sessione = mem && Array.isArray(mem.sessione) ? mem.sessione : [];
+    const database = mem && Array.isArray(mem.database) ? mem.database : [];
+    tab._semina = (locale.length || sessione.length || database.length) && origin
+      ? { origin, locale, sessione, database, at: Date.now() } : null;
+    this._recreateView(tab, url);
+    return mem && Array.isArray(mem.persi) ? mem.persi.length : 0;
+  },
+
+  // Pagina cambiata (o ricarica chiesta) su una scheda col passaggio rinviato. Un invio che il sito ha respinto
+  // lascia il testo da perdere anche sulla pagina nuova: lì si aspetta ancora.
+  _passaggioDopoCambio(tab, { chiesta = false } = {}) {
+    const r = tab && tab._passaggioRinviato;
+    if (!r) return;
+    if (!chiesta && this._qualcosaDaPerdere(tab)) return;
+    tab._passaggioRinviato = null;
+    const ricarica = () => { if (chiesta) { try { tab.view.webContents.reload(); } catch (_) {} } };
+    if (!this.tabs.includes(tab) || this._jarDi(tab) !== r.sito || !this._needsRepartition(tab, tab.url)) { ricarica(); return; }
+    inFila(() => this._passaScheda(tab, r.sito, r.dest)).then((persi) => {
+      if (persi > 0) avvisaRientro(this, r.sito, this._fidato(r.sito));
+    }, ricarica);
   },
 
   // Il preload della pagina che sta per caricarsi chiede se c'è memoria da rimettere (src/main/ipc.js).
