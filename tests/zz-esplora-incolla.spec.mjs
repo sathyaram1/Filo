@@ -24,6 +24,11 @@ test('esplora', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#doc');
   const casi = [
+    ['vuoto testa nuda', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h.replace('<p>A0</p>', 'A0'))`],
+    ['doc senza figli', `d.innerHTML=''; ${cursore("({node: d, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
+    ['vuoto testa nuda 1500', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h.replace('<p>A0</p>', 'A0') + h + h.slice(0, h.length/2))`],
+    ['vuoto collassato 1500', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h + h + h.slice(0, h.length/2))`],
+    ['vuoto br sostituito da testo', `d.innerHTML='<p><br></p>'; const r=document.createRange(); r.selectNode(d.firstChild.firstChild); getSelection().removeAllRanges(); getSelection().addRange(r);`, `document.execCommand('insertHTML', false, h.replace('<p>A0</p>', 'A0'))`],
     ['vuoto collassato', `d.innerHTML='<p><br></p>'; ${cursore("({node: d.firstChild, off: 0})")}`, `document.execCommand('insertHTML', false, h)`],
     ['vuoto br selezionato', `d.innerHTML='<p><br></p>'; const r=document.createRange(); r.selectNodeContents(d.firstChild); getSelection().removeAllRanges(); getSelection().addRange(r);`, `document.execCommand('insertHTML', false, h)`],
     ['vuoto p selezionato', `d.innerHTML='<p><br></p>'; const r=document.createRange(); r.selectNode(d.firstChild); getSelection().removeAllRanges(); getSelection().addRange(r);`, `document.execCommand('insertHTML', false, h)`],
