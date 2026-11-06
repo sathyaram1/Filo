@@ -2382,7 +2382,7 @@
         return;
       }
     }
-    document.execCommand('insertHTML', false, paragrafi(tag));
+    conAncora();
   }
   // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
   function spaziVisibili(s) {
