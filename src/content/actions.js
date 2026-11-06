@@ -2181,6 +2181,7 @@
     imageSearchUrlFor,
     // video / audio
     buildMediaItems,
+    azioniDelMedia,
     buildMediaSpeedItem,
     downloadMedia,
     copyMediaUrl,
