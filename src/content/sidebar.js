@@ -1673,10 +1673,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       return;
     }
     fermataDetta = true;
-    setTimeout(() => submit({
+    prossimoPasso({
       userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
       preActionUrl: urlPrimaDelPasso(),
-    }), 50);
+    }, 50, epoca);
   }
 
   // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
