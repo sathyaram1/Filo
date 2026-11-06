@@ -638,7 +638,7 @@ function fiduciaCambiata(prev, next) {
     const out = new Set();
     for (const d of l) {
       const s = String(d || '').toLowerCase();
-      if (s) out.add(Google.diGoogle(s) ? Google.SITO_GOOGLE : s);
+      if (s) out.add(Google.sitoDelContenitore(s));
     }
     return out;
   };
