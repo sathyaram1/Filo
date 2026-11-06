@@ -193,6 +193,49 @@ fixture('regole che fermano il video: dopo pochi secondi la scheda torna al solo
   await expect.poll(() => page.evaluate(() => window.__saltata), { timeout: 10_000 }).toBe(true);
 });
 
+fixture('regole che non reggono in un video incorporato: si ricarica una volta il solo riquadro, non l\'articolo', async ({ app, openTab, testServer, youtube, avvisi }) => {
+  await liste(app, [MANO]);
+  // L'articolo conta le sue aperture: una ricarica della scheda intera le porterebbe a due.
+  await openTab(testServer.html(`<!doctype html><title>Articolo</title><p>articolo</p>
+    <script>sessionStorage.aperture = String(Number(sessionStorage.aperture || 0) + 1);</script>
+    <iframe src="${youtube.url('/embed/rotto?controllo=1')}" width="700" height="420"></iframe>`, { pubblico: true }));
+  const vista = await avvisi();
+  await expect(vista.locator('.shell-notif-msg', { hasText: 'Oggi il blocco delle pubblicità su YouTube non funziona' })).toBeVisible({ timeout: 10_000 });
+  const servite = () => youtube.servite.filter((p) => p.startsWith('/embed/rotto')).length;
+  await expect.poll(servite, { timeout: 10_000 }).toBe(2);
+  await expect.poll(() => nelRiquadro(app, '/embed/rotto'), { timeout: 10_000 }).toEqual(['pagina:pubblicita']);
+  await new Promise((r) => setTimeout(r, 1500));
+  expect(servite(), 'una ricarica sola').toBe(2);
+  const ospite = app.windows().find((w) => w.url().includes('sito-pubblico.test'));
+  expect(await ospite.evaluate(() => sessionStorage.aperture), 'l\'articolo non si ricarica').toBe('1');
+});
+
+// All'avvio Filo va a prendere da solo le regole del giorno: qui da un server di liste suo, al posto di uAssets.
+const conListe = fixture.extend({
+  servitoreListe: async ({}, use) => {
+    const chieste = [];
+    const testi = { '/filters.txt': MANO, '/quick-fixes.txt': '! niente per YouTube' };
+    const srv = createHttpServer((req, res) => {
+      chieste.push(req.url);
+      if (!testi[req.url]) { res.writeHead(404); res.end(); return; }
+      res.writeHead(200, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end(testi[req.url]);
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    await use({ url: `http://127.0.0.1:${srv.address().port}/`, chieste });
+    try { srv.closeAllConnections?.(); } catch (_) {}
+    await new Promise((r) => srv.close(r));
+  },
+  envInPiu: async ({ servitoreListe }, use) => use({ FILO_TEST_LISTE_YOUTUBE: servitoreListe.url }),
+});
+
+conListe('appena acceso, senza regole su disco, Filo le scarica da solo e il primo video parte senza pubblicità', async ({ app, openTab, youtube, servitoreListe }) => {
+  await expect.poll(() => servitoreListe.chieste.slice().sort(), { timeout: 15_000 }).toEqual(['/filters.txt', '/quick-fixes.txt']);
+  await expect.poll(() => stato(app).then((s) => s.regole), { timeout: 10_000 }).toBeGreaterThan(0);
+  const page = await apri(openTab, youtube.url('/watch?v=avvio&interna=1'));
+  await expect.poll(() => esiti(page), { timeout: 10_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
+});
+
 fixture('l\'interruttore in Sicurezza è acceso di serie, accanto a «Salta», e spegne il blocco', async ({ app, openTab }) => {
   const page = await openTab('filo://security/security.html');
   const casella = page.locator('#sec-ytads');
