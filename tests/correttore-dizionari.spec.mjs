@@ -52,6 +52,65 @@ test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli a
   await expect(menuDi(page).locator('.sn-menu-correction:visible').first()).not.toBeEmpty({ timeout: 4000 });
 });
 
+// #1447.3 — ogni sessione nuova (incognito, scheda col proxy) partiva con la sola lingua dell'app: su un sistema non
+// italiano il correttore del browser segnava quasi ogni parola italiana. Le lingue sono le stesse della finestra normale.
+test('in una finestra in incognito il correttore del browser conosce l\'italiano come nella finestra normale', async ({ app, shell, testServer }) => {
+  const piattaforma = await app.evaluate(() => process.platform);
+  test.skip(piattaforma === 'darwin', 'su Mac il correttore è quello del sistema, con le sue lingue');
+  const normali = await app.evaluate(({ session }) => session.defaultSession.getSpellCheckerLanguages());
+  expect(normali).toContain('it-IT');
+
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return w ? w._filoTabs.tabs.length : 0;
+  }), { timeout: 15000 }).toBe(1);
+  const lingue = await app.evaluate(({ BrowserWindow, session }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    return {
+      incognito: session.fromPartition(w._filoTabs.partition).getSpellCheckerLanguages(),
+      // La stessa regola per ogni sessione che nasce dopo, come quella di una scheda col proxy.
+      proxy: session.fromPartition('proxy:prova-correttore').getSpellCheckerLanguages(),
+    };
+  });
+  expect(lingue).toEqual({ incognito: normali, proxy: normali });
+
+  const url = testServer.html(`<!doctype html><meta charset="utf-8"><body style="margin:0">
+    <div id="giusta" contenteditable="true" spellcheck="true" style="font:16px monospace;padding:8px;width:400px;height:40px"></div>
+    <div id="sbagliata" contenteditable="true" spellcheck="true" style="font:16px monospace;padding:8px;width:400px;height:40px"></div>
+  </body>`);
+  await app.evaluate(({ BrowserWindow }, u) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoIncognito);
+    w._filoTabs.openTab(u); w.show(); w.focus();
+  }, url);
+  let page = null;
+  await expect.poll(async () => {
+    page = app.windows().find((w) => { try { return w.url() === url; } catch (_) { return false; } }) || null;
+    return page ? page.evaluate(() => document.documentElement.dataset.filoContentReady === '1').catch(() => false) : false;
+  }, { timeout: 10000 }).toBe(true);
+
+  await page.locator('#giusta').click();
+  await page.keyboard.type('vediamo bene ');
+  await page.locator('#sbagliata').click();
+  await page.keyboard.type('funzion ciao ');
+  const parolaSotto = async (sel) => {
+    await app.evaluate(({ webContents }, u) => {
+      globalThis.__suggerimentiNativi = null;
+      const wc = webContents.getAllWebContents().find((x) => x.getURL() === u);
+      wc.once('context-menu', (_e, p) => { globalThis.__suggerimentiNativi = { parola: p.misspelledWord, voci: p.dictionarySuggestions }; });
+    }, url);
+    const b = await page.locator(sel).boundingBox();
+    await page.keyboard.press('Escape');
+    await page.mouse.click(b.x + 20, b.y + 16, { button: 'right' });
+    await page.waitForTimeout(300);
+    return app.evaluate(() => globalThis.__suggerimentiNativi);
+  };
+  // Prima l'errore vero, che dice quando il dizionario italiano della sessione è carico; poi la parola giusta.
+  await expect.poll(() => parolaSotto('#sbagliata'), { timeout: 15_000, intervals: [1000] })
+    .toEqual({ parola: 'funzion', voci: expect.arrayContaining(['funzione']) });
+  expect(await parolaSotto('#giusta')).toEqual({ parola: '', voci: [] });
+});
+
 // #1585 — su Windows il browser lascia l'italiano al dizionario del sistema, e la pagina non lo vede: ogni
 // parola le risulta giusta. Qui il browser resta senza lingue, come lì: il correttore deve vedere lo stesso l'errore.
 test('col browser senza italiano, come su Windows: «andatto» ha il segno anche col modello spento, «andato» no', async ({ app, openTab, testServer }) => {
