@@ -105,11 +105,10 @@ async function giudice() {
   const livello = A.livelloAttivo(aut.livello);
   const sopra = (fonti) => A.stato({ fonti, livello, spostamenti: aut.fonti, manopole: aut.manopole }).stato === 'contaminato';
   return {
+    // La stessa regola che decide la sicurezza della chat: una lettura senza fonte non ha portato dentro niente di fuori.
     sospetta: (a) => {
       const f = Lv && Lv.fonteDi(a);
-      // Una lettura senza classe dichiarata vale come una pagina: nel dubbio, il testo non passa.
-      if (!f) return !!(Lv && Lv.diSolaLettura(a && a.type)) && a.type !== 'LEGGI_IMPOSTAZIONI' && a.type !== 'CAPACITA_DETTAGLIO' && a.type !== 'LEGGI_TRASPARENZA';
-      return sopra([f]);
+      return !!f && sopra([f]);
     },
     classeSospetta: (c) => sopra([{ classe: c, campo: 'web', chiave: 'filo:tratto', motivo: '' }]),
   };
