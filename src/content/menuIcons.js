@@ -224,40 +224,8 @@
   }
 
   // ── la barra laterale, terza zona (#871) ─────────────────────────────────
-  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra.
-  let barraAperta = null;
-  let miraInviata = null;
-  let inVolo = false;
-  const trascina = (dati) => manda({ type: MSG.BARRA_TRASCINA, ...dati });
-  if (!IS_SUBFRAME) {
-    Menu.setPonteBarra?.({
-      inizio(id, menuSinistra) {
-        barraAperta = null;
-        miraInviata = null;
-        // Un'azione dell'elemento non va nella barra: lì non c'è un elemento su cui farla.
-        inVolo = Disp.noto(id);
-        if (!inVolo) return;
-        trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barraAperta = { larghezza: Number(r.larghezza) || 0 }; });
-      },
-      sopra(x, y) {
-        const dentro = !!barraAperta && x <= barraAperta.larghezza;
-        const mira = dentro ? Math.round(y) : null;
-        if (mira !== miraInviata) { miraInviata = mira; trascina({ fase: 'sopra', y: mira }); }
-        return dentro;
-      },
-      posa(id, x, y) {
-        if (!barraAperta || x > barraAperta.larghezza) return false;
-        trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
-        return true;
-      },
-      fine() {
-        barraAperta = null;
-        miraInviata = null;
-        if (inVolo) trascina({ fase: 'fine' });
-        inVolo = false;
-      },
-    });
-  }
+  // Solo nel frame principale: le coordinate di un riquadro non sono quelle della barra. Il gesto sta in menu.js.
+  if (!IS_SUBFRAME) Menu.setPonteBarra?.((dati) => manda({ type: MSG.BARRA_TRASCINA, ...dati }));
 
   // Un'icona portata fuori dalla barra sopra questa pagina: se il menu è aperto ci cade dentro.
   function dallaBarra(msg) {
