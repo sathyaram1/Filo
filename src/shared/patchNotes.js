@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.268', date: '2026-11-06',
+      fixes: [
+        { testo: 'Nelle finestre in incognito il correttore riconosce l\'italiano come nella finestra normale, invece di segnare quasi ogni parola. Vale anche per le schede aperte da un altro paese e per i siti che la gestione dei cookie tiene separati.', segnalazione: 1447 },
+      ],
+    },
+    {
       version: '0.2.266', date: '2026-11-05',
       fixes: [
         { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega», «Approfondisci» o «Traduci», la pagina sotto non scatta più.', segnalazione: 2119 },

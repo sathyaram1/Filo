@@ -48,6 +48,7 @@ try {
 } catch (_) { /* best-effort: in peggio resta la UA di default */ }
 // In OGNI sessione, anche incognito e proxy: senza client hints Google respinge l'accesso (#1616). Il GPC resta spento finché la modalità non lo accende.
 app.on('session-created', (ses) => { try { require('./services/cookies').ensureHeaderHook(ses); } catch (_) {} });
+app.on('session-created', (ses) => configureSpellchecker(ses));
 
 // Il portachiavi si sceglie solo prima di `ready`: senza, su sway/i3 l'accesso
 // non sopravvive alla chiusura nemmeno col portachiavi acceso (#708.1).
@@ -197,11 +198,11 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Le lingue del correttore nativo: senza, Electron usa solo quella di sistema e la correzione in cima al menu
-// (`_spell:native`, tabs.js) manca sulle parole italiane. La scelta e il perché niente inglese forzato: spellLanguages.js.
-function configureSpellchecker() {
+// Le lingue del correttore nativo, in ogni sessione (incognito e proxy compresi, #1447.3): senza, Electron usa solo
+// quella dell'app, segna ogni parola italiana e la correzione in cima al menu (`_spell:native`, tabs.js) manca. La
+// scelta e il perché niente inglese forzato: spellLanguages.js.
+function configureSpellchecker(ses) {
   try {
-    const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
@@ -233,7 +234,6 @@ app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
   passo('protocollo_ipc', t);
-  configureSpellchecker();
   try { require('./services/dizionarioDiFilo').prepara({ locale: app.getLocale(), dopoMs: 1500 }); } catch (_) {}
   // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
