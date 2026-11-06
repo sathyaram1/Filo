@@ -1,5 +1,5 @@
-// Il giro di verifica — la parte PURA (feedback #561, deciso con l'owner il
-// 2026-09-04/05).
+// Il giro di verifica, la parte PURA (#561). Il server la incorpora al deploy (bake-shared di filo-security): un
+// cambio qui arriva su main solo insieme a un lavoro server che ne porta il generato.
 //
 // COSA C'È QUI
 //   Le regole con cui un giro di verifica decide cosa succede ai rilievi:
