@@ -135,7 +135,7 @@ fixture('il video parte senza pubblicità: la risposta nella pagina, quella chie
   await expect.poll(() => page.evaluate(() => window.__saltata), { timeout: 10_000, message: '«Salta» resta acceso da solo' }).toBe(true);
 });
 
-fixture('con le regole vere scaricate da uAssets il video parte senza pubblicità', async ({ app, openTab, youtube }) => {
+fixture('con le regole vere scaricate da uAssets il video parte senza pubblicità, anche incorporato', async ({ app, openTab, testServer, youtube }) => {
   test.setTimeout(90_000);
   const base = 'https://raw.githubusercontent.com/uBlockOrigin/uAssets/master/filters/';
   let testi = null;
