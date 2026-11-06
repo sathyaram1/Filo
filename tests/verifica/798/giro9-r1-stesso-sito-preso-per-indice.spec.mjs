@@ -53,7 +53,9 @@ test('r1 un riquadro della stessa origine preso per indice prima del carico ha i
   await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
   const off = await page.evaluate(letture, urls);
   expect(on.pagina).not.toBe(off.pagina);
-  for (const k of ['indiceDentro', 'indiceDaQui', 'framesDentro', 'framesDaQui', 'nomeDentro', 'nomeDaQui', 'htmlDentro', 'htmlDaQui']) {
+  // In Automatico gli script del documento che carica restano scoperti finché carica (decisione dell'owner, D-221):
+  // qui conta la finestra dopo il carico.
+  for (const k of ['indiceDaQui', 'framesDaQui', 'nomeDaQui', 'htmlDaQui']) {
     expect.soft(on[k], `${k}: col rumore della pagina`).toBe(on.pagina);
   }
 });
