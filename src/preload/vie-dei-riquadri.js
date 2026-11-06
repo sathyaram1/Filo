@@ -38,15 +38,20 @@ function sorgenteInArrivo() {
     var nomeDi = gd(Element.prototype, 'localName').get, haAttr = Element.prototype.hasAttribute;
     var attr = Element.prototype.getAttribute, baseDi = gd(Node.prototype, 'baseURI').get;
     var docDi = gd(Node.prototype, 'ownerDocument').get, Indirizzo = URL, origineUrl = gd(URL.prototype, 'origin').get;
-    var trim = String.prototype.trim, VUOTO = /^about:blank([?#]|$)/i;
+    // Niente espressioni regolari né String(): exec e il costruttore li può riscrivere la pagina.
+    var SP = String.prototype, trim = SP.trim, minuscolo = SP.toLowerCase, taglia = SP.slice;
+    function vuoto(v) {
+      var s = R(minuscolo, v, []), dopo = R(taglia, s, [11, 12]);
+      return R(taglia, s, [0, 11]) === 'about:blank' && (dopo === '' || dopo === '?' || dopo === '#');
+    }
     return function inArrivo(el) {
       try {
         var n = R(nomeDi, el, []);
         if (n === 'iframe' && R(haAttr, el, ['srcdoc'])) return true;
         var a = n === 'object' ? 'data' : 'src';
         if (!R(haAttr, el, [a])) return false;
-        var v = R(trim, String(R(attr, el, [a])), []);
-        if (!v || VUOTO.test(v)) return false;
+        var v = R(trim, '' + R(attr, el, [a]), []);
+        if (!v || vuoto(v)) return false;
         var d = R(docDi, el, []);
         return R(origineUrl, nuovo(Indirizzo, [v, R(baseDi, el, [])]), []) === d.location.origin;
       } catch (e) { return false; }
