@@ -92,6 +92,20 @@ test('link con frammento: il clic usa il precarico', async ({ app, openTab }) =>
   } finally { await s.chiudi(); }
 });
 
+test('link con frammento a schermo: il clic usa il precarico', async ({ openTab }) => {
+  const s = await sito();
+  try {
+    const page = await openTab(`${s.origin}/indice`);
+    await page.evaluate(() => { const a = document.createElement('a'); a.id = 'fr'; a.href = '/p/77#parte'; a.textContent = 'sezione'; a.style.cssText = 'display:block;height:30px'; document.body.prepend(a); });
+    await expect.poll(() => s.precarichi(), { timeout: 30_000 }).toContain('/p/77');
+    await page.waitForTimeout(1000);
+    await page.mouse.move(600, 500);
+    await page.evaluate(() => { location.href = '/p/77#parte'; });
+    await expect(page.locator('#arrivato')).toHaveText('/p/77');
+    expect(s.richieste.filter((r) => r.url === '/p/77').map((r) => r.prefetch)).toEqual([true]);
+  } finally { await s.chiudi(); }
+});
+
 test('clic su un altro link ferma i link a schermo in corso', async ({ openTab }) => {
   const s = await sito({ lente: ['/p/0', '/p/1', '/p/2'], ritardo: 15_000 });
   try {
