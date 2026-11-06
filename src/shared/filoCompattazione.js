@@ -129,6 +129,19 @@
     let k = Math.max(perOre, perTurni);
     // Una risposta resta con la sua domanda: il taglio scende al messaggio dell'utente che l'ha chiesta.
     while (k > 0 && k < n && lista[k].role !== 'user' && lista[k - 1].chat === lista[k].chat) k--;
+    if (typeof peso === 'function' && Number.isFinite(Number(maxToken))) {
+      const inizioTurno = (m) => m.role === 'user' && !m.riga && !m.seguito;
+      let ultimo = -1;
+      for (let i = n - 1; i >= 0; i--) if (inizioTurno(lista[i])) { ultimo = i; break; }
+      let resto = 0;
+      for (let i = k; i < n; i++) resto += Number(peso(lista[i])) || 0;
+      while (resto > Number(maxToken) && k < ultimo) {
+        let j = k + 1;
+        while (j < ultimo && !inizioTurno(lista[j])) j++;
+        for (let i = k; i < j; i++) resto -= Number(peso(lista[i])) || 0;
+        k = j;
+      }
+    }
     return k;
   }
 
