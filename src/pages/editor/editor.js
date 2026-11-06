@@ -844,13 +844,13 @@
     overlayBox.querySelectorAll('.ed-tr-purge').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.confirm !== '1') {
         b.dataset.confirm = '1';
-        b.textContent = 'Confermi?';
+        CONFERMA.arma(b, 'Confermi?');
         b.classList.add('danger');
         staleClick.arm();
         setTimeout(() => {
           if (!b.isConnected || b.dataset.confirm !== '1') return;
           b.dataset.confirm = '';
-          b.textContent = 'Elimina definitivamente';
+          CONFERMA.disarma(b, 'Elimina definitivamente');
           b.classList.remove('danger');
         }, 4000);
         return;
