@@ -135,7 +135,7 @@
     deps.restorePasteContext();
     const text = testoSelezionatoQui();
     if (!text) return;
-    if (!(await scriviNegliAppunti(text))) { Popup.showToast(I18n.t('toast_cut_failed')); return; }
+    if (!(await scriviNegliAppunti(text, htmlDellaSelezione()))) { Popup.showToast(I18n.t('toast_cut_failed')); return; }
     deps.restorePasteContext();
     let tolto = false;
     try { tolto = document.execCommand('delete'); } catch (_) { tolto = false; }
