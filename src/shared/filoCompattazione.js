@@ -90,9 +90,26 @@
     return [...out].sort();
   }
 
+  // Quanto grezzo può restare dopo una compattazione: metà dello spazio fra la parte fissa (`base`, tutto quello che non è
+  // tratto) e la soglia. Quattro turni pesanti lasciavano la richiesta appena sotto la soglia, e la chat compattava a
+  // ogni messaggio. Senza `base` nota, nessun tetto: restano ore e turni.
+  function grezzoMassimo({ soglia, base } = {}) {
+    const b = Number(base);
+    return Number.isFinite(b) && b > 0 ? Math.max(0, (Number(soglia) - b) / 2) : Infinity;
+  }
+
+  // Oltre questa stima, dopo una risposta, si compatta in sottofondo: la quota vale sullo spazio sopra la parte fissa,
+  // che da sola occupa più di metà della soglia di serie.
+  function sogliaAnticipo({ soglia, base } = {}) {
+    const s = Number(soglia);
+    const b = Number(base);
+    return Number.isFinite(b) && b > 0 && b < s ? b + QUOTA_ANTICIPO * (s - b) : s * QUOTA_ANTICIPO;
+  }
+
   // Dove finisce il pezzo da compattare: i messaggi da `k` in poi restano grezzi. Le ultime `ore` o gli ultimi `turni`
-  // messaggi dell'utente, il più corto dei due; il taglio non separa una risposta dalla sua domanda.
-  function puntoDiTaglio(messaggi, { ora = Date.now(), ore = ORE_GREZZE, turni = TURNI_GREZZI } = {}) {
+  // messaggi dell'utente, il più corto dei due, e oltre `maxToken` (pesati con `peso(m)`) meno turni, tenendo sempre
+  // l'ultimo; il taglio non separa una risposta dalla sua domanda.
+  function puntoDiTaglio(messaggi, { ora = Date.now(), ore = ORE_GREZZE, turni = TURNI_GREZZI, maxToken = Infinity, peso = null } = {}) {
     const lista = Array.isArray(messaggi) ? messaggi : [];
     const n = lista.length;
     let perOre = n;
