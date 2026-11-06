@@ -53,6 +53,13 @@
     const n = numeroIn(v, LIMITI[k]);
     return n != null && k !== 'giorni' ? Math.round(n) : n;
   }
+  // I limiti dei campi nelle due pagine vengono da LIMITI, non dall'HTML. `trova(id)`: il campo.
+  function limitiAiCampi(trova) {
+    for (const k of NUMERI_DEI_TETTI) {
+      const c = trova(campoDelTetto(k));
+      if (c) { c.min = String(LIMITI[k][0]); c.max = String(LIMITI[k][1]); }
+    }
+  }
   // La stima accanto alla soglia, uguale nelle due pagine: il campo (vuoto, il segnaposto), un'attesa breve mentre si
   // scrive, e una risposta arrivata tardi non copre quella dopo.
   function stimatoreSoglia({ campo, uscita, chiedi, attesaMs = 250 }) {
