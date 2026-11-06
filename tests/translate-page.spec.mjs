@@ -2039,9 +2039,10 @@ test('riquadro con script nella diapositiva nascosta di una giostra: si traduce,
 const filledWith = (src) => `<!doctype html><html><body style="margin:0"><iframe id="in" src="${src}" style="width:300px;height:200px;border:0"></iframe></body></html>`
   .replace(/&/g, '&amp;').replace(/"/g, '&quot;');
 
-test('riquadro con script dentro uno spazio della pagina nascosto: non si paga e non copre quello chiuso a chiave', async ({ app, openTab, testServer }) => {
+test('solo quando apro: riquadro con script dentro uno spazio della pagina nascosto, non si paga e non copre quello chiuso a chiave', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
   const muto = await senzaFilo(app, cross('ZZLOCK'));
   const page = await testServer.openReady(openTab, framePage(`
