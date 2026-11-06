@@ -154,13 +154,18 @@
     }, ms == null ? LIMITI.PASSO_MS : ms);
   }
 
-  function reteFerma() {
-    if (document.readyState !== 'complete') return false;
-    let ultima = 0;
+  // Un osservatore e non l'elenco delle risorse: quello si riempie a 250 voci e da lì sembrerebbe tutto fermo.
+  let ultimaRisorsa = 0;
+  function seguiRisorse() {
     try {
-      for (const r of performance.getEntriesByType('resource')) if (r.responseEnd > ultima) ultima = r.responseEnd;
+      new PerformanceObserver((lista) => {
+        for (const r of lista.getEntries()) if (r.responseEnd > ultimaRisorsa) ultimaRisorsa = r.responseEnd;
+      }).observe({ type: 'resource', buffered: true });
     } catch (_) {}
-    return performance.now() - ultima >= LIMITI.RETE_FERMA_MS;
+  }
+
+  function reteFerma() {
+    return document.readyState === 'complete' && performance.now() - ultimaRisorsa >= LIMITI.RETE_FERMA_MS;
   }
 
   function candidatiAschermo() {
