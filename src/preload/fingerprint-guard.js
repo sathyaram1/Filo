@@ -337,13 +337,15 @@ const PROPAGAZIONE = `
       return R(origineUrl, costruisci(URLc, [s, R(baseDi, el, [])]), []) !== R(docDi, el, []).location.origin;
     } catch (e) { return false; }
   }
-  // In Automatico un riquadro della stessa origine lento o muto resta scoperto per indice: coprirlo spegne Filo lì
-  // dentro se il documento arriva dopo. In Privacy massima, dopo qualche secondo ancora vuoto, si copre (decisione owner).
+  // In Automatico un riquadro della stessa origine resta scoperto per indice finché carica: coprirlo spegne Filo lì
+  // dentro. In Privacy massima (decisioni owner D-221 e precedente) uno inserito da uno script si copre appena entra,
+  // uno scritto nell'HTML dopo qualche secondo ancora vuoto; mai in un sito con accessi esenti, che resterebbero coperti.
   var ATTESA_VUOTO = 3000, attesi = new WeakSet();
-  function tocca(el) {
+  var statoDoc = gOPD(Document.prototype, 'readyState').get;
+  function tocca(el, daScript) {
     var tag = tagName(el);
     if (!TAG[tag]) return;
-    if (anticipabile(el, tag)) { prepara(finestraDi(el, tag)); return; }
+    if (anticipabile(el, tag) || (daScript && LIVELLO >= 2 && !ESENTI)) { prepara(finestraDi(el, tag)); return; }
     if (LIVELLO < 2 || R(wsHas, attesi, [el])) return;
     R(wsAdd, attesi, [el]);
     R(aspetta, window, [function () { try { prepara(finestraDi(el, tag)); } catch (e) {} }, ATTESA_VUOTO]);
