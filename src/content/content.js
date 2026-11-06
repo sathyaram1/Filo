@@ -1375,7 +1375,7 @@
     contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await Actions.getClipboardHistory();
+    const clipboardHistory = await primaDelMenu();
     const items = buildMenuItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
     });
@@ -1876,7 +1876,7 @@
     // usava un contesto stantio e incollava all'inizio del campo.
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const clipboardHistory = await Actions.getClipboardHistory();
+    const clipboardHistory = await primaDelMenu();
     return buildMenuItems({
       selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
     });
