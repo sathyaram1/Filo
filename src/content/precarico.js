@@ -84,8 +84,7 @@
     if (!adatto(a)) return;
     const url = R.indirizzoDaPrecaricare(a.href);
     if (!url) return;
-    if (passati[passati.length - 1] === url) return;
-    passati = passati.filter((u) => u !== url);
+    if (passati.includes(url)) return;
     passati.push(url);
     if (passati.length > LIMITI.PASSAGGI_TENUTI) passati = passati.slice(-LIMITI.PASSAGGI_TENUTI);
     scrivi();
