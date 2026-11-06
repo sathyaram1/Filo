@@ -18,6 +18,7 @@
         { testo: 'Taglia e Copia del tasto destro tengono grassetto, corsivo e collegamenti: incollato, il testo resta com\'era.', segnalazione: 1434 },
         { testo: 'L\'Aiuto sui siti mostra cosa sta facendo davvero, il ragionamento compreso, e il quadrato al posto dell\'invio lo ferma con un clic.', segnalazione: 578 },
         { testo: 'I video di YouTube partono senza pubblicità, anche quelli incorporati in altri siti. Il giorno in cui YouTube cambia e il blocco non regge, Filo torna da solo a premere «Salta» finché le regole non si aggiornano. Si spegne in Sicurezza → «Blocca le pubblicità di YouTube».', segnalazione: 1974 },
+        { testo: 'Dopo un accesso fatto nella finestrella di «Continua con Google» e simili, la scheda si aggiorna da sola. «Resta connesso» non ricarica più una scheda dove stai scrivendo o guardando un video, e se gli dici di no non te lo richiede a ogni avvio.', segnalazione: 1725 },
       ],
     },
     {
