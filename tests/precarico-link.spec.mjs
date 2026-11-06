@@ -196,7 +196,7 @@ test('su una pagina che stringe gli script (CSP) il precarico al passaggio funzi
 
 // #1985 giro 1, r1: un sito con l'accesso che chiude la sessione a un GET sul link d'uscita, come tanti siti veri.
 test('aprire la pagina e passare sui link d\'uscita non fa uscire dal sito, in nessuna lingua', async ({ openTab }) => {
-  const uscite = ['/konto/abmelden', '/compte/d%C3%A9connexion', '/user/doLogout', '/a/x9'];
+  const uscite = ['/konto/abmelden', '/compte/d%C3%A9connexion', '/user/doLogout', '/a/x9', '/a/v1', '/user/loginOut'];
   const sessioni = new Set();
   const richieste = [];
   let prossima = 1;
