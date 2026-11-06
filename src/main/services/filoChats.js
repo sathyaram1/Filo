@@ -235,6 +235,7 @@
     }
     try { global.SN_CONTESTO_FILO?.dimentica(null); } catch (_) {}
     await global.SN_RICORDI_FILO?.dimentica(null).catch(() => {});
+    await global.SN_COMPATTAZIONE?.dimenticaChat(null).catch(() => {});
     return [];
   }
 
