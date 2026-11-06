@@ -2152,12 +2152,16 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
     }
 
-    const thinking = appendThinking();
+    const attesa = creaAttesa();
+    vivo.attesa = attesa;
     let assistantEl = null;
 
     // Sui proseguimenti automatici si aspetta la pagina aggiornata prima dello screenshot:
     // senza, l'AI vede quella vecchia e chiede di ripetere il click.
+    attesa?.azione('Leggo la pagina');
     const letta = (await Pagina.leggi({ attendi: !!userAction, daUrl: preActionUrl || '', origine: !!userMessage }).catch(() => null)) || {};
+    if (finito(mia)) return;
+    attesa?.azione('');
     ricordaPagina(letta);
     const payload = buildPayload(userMessage, userAction, esterno, letta);
     if (valutazione) payload.valuta = true;
