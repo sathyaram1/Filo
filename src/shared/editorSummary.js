@@ -122,17 +122,35 @@
 
   // Firma da salvare insieme al riassunto, per il confronto futuro.
   function makeSig(file) {
-    return { words: fileWords(file), at: Date.now() };
+    return { words: fileWords(file), at: Date.now(), parole: impronta(fileText(file)) };
   }
 
-  // Un titolo che l'utente non ha scritto segue il contenuto (#1570): con la stessa soglia del riassunto, e nella sua
-  // stessa chiamata. Quello scritto a mano non cambia mai da solo; il primo titolo lo dà il tiro a 100 parole.
+  // Le parole che dicono di cosa parla il testo: le più frequenti fra quelle di almeno quattro lettere.
+  const IMPRONTA_MAX = 40;
+  function impronta(testo) {
+    const conta = new Map();
+    for (const p of String(testo || '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []) conta.set(p, (conta.get(p) || 0) + 1);
+    return [...conta].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, IMPRONTA_MAX).map(([p]) => p);
+  }
+
+  // Riscritto su un altro argomento con lo stesso numero di parole (#1697): meno di metà delle parole di prima resta.
+  function argomentoCambiato(sig, testo) {
+    const prima = sig && Array.isArray(sig.parole) ? sig.parole : [];
+    if (prima.length < 3) return false;
+    const ora = new Set(impronta(testo));
+    return prima.filter((p) => ora.has(p)).length / prima.length < 0.5;
+  }
+
+  // Un titolo che l'utente non ha scritto segue il contenuto (#1570): con la stessa soglia del riassunto, o quando
+  // l'argomento cambia, e nella sua stessa chiamata. Quello scritto a mano non cambia mai da solo; il primo lo dà il
+  // tiro a 100 parole.
   function titoloDaRifare(file, currentWords) {
     const meta = (file && file.meta) || {};
     if (meta.titleManual || !meta.titleAuto) return false;
     const sig = meta.titleSig;
     if (sig == null || typeof sig.words !== 'number') return true;
-    return !pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file));
+    return !pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file))
+      || argomentoCambiato(sig, fileText(file));
   }
 
   // La risposta della chiamata unica: «TITOLO: …» e «RIASSUNTO: …». Senza etichette è tutta riassunto, e il titolo resta.
