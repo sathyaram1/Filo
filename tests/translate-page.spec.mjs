@@ -848,9 +848,10 @@ const COLLAPSED = `<!doctype html><html lang="en"><body style="font:16px sans-se
   </div>
 </body></html>`;
 
-test('la sezione ripiegata che si apre DOPO si traduce dalla barra laterale, senza rifare il resto', async ({ app, openTab, testServer }) => {
+test('solo quando apro: la sezione ripiegata che si apre DOPO si traduce dalla barra laterale, senza rifare il resto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const page = await testServer.openReady(openTab, COLLAPSED);
   await watchToasts(page);
   await clickTranslateIcon(app);
