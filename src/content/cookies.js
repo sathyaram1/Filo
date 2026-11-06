@@ -128,7 +128,7 @@
   const answerSent = new Set();
 
   function answerBase() {
-    return IS_TOP ? { c: cookieNames(), s: memoryNames() } : null;
+    return IS_TOP ? { c: cookieNames(), s: memoryNames(), at: Date.now() } : null;
   }
 
   function created(base, now, tag) {
