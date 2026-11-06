@@ -75,7 +75,7 @@ test('descrizione di un\'immagine, riassunto e titolo dell\'Editor, ricerca dell
 test('il canale delle pagine porta `intera` fino a chi chiama il modello', () => {
   const ai = src('src/main/services/handlers/ai.js');
   assert.match(ai, /const intera = msg && msg\.intera === true;/);
-  assert.match(ai, /handleAIRequest\(\{ action: msg\.action, payload: msg\.payload, origin, sender, noCache, intera, conSeguito \}\)/);
+  assert.match(ai, /handleAIRequest\(\{ action: msg\.action, payload: msg\.payload, origin, sender, noCache, intera, conSeguito(?:, \.\.\.diretta)? \}\)/);
 });
 
 // #1302 — il tetto finito nel ragionamento prima di una parola: dove c'è «Continua» la nota e il seguito, altrove l'errore.
