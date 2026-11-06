@@ -111,7 +111,23 @@ test('il main ferma i link a schermo per interruttore, incognito, scaricamento e
   assert.equal(P.motivoFermoVisibili({ impostazioni: {}, incognito: true }), 'incognito');
   assert.equal(P.motivoFermoVisibili({ impostazioni: {}, scaricando: true }), 'scaricamento');
   assert.equal(P.motivoFermoVisibili({ impostazioni: {}, aBatteria: true }), 'batteria');
+  // #1985 giro 2, r2: una scheda dietro non ha link sullo schermo, anche se per la pagina è «visibile».
+  assert.equal(P.motivoFermoVisibili({ impostazioni: {}, dietro: true }), 'dietro');
   assert.equal(P.visibiliAcceso(null), true);
+});
+
+// #1985 giro 2, r5: i precarichi di Chromium la pagina non li vede; il passo li tiene a uno o due in corso.
+test('su un sito lento i link a schermo partono più distanti, e restano in corso al più due alla volta', () => {
+  assert.equal(P.passoVisibili(0), P.LIMITI.PASSO_MS);
+  assert.equal(P.passoVisibili(undefined), P.LIMITI.PASSO_MS);
+  assert.equal(P.passoVisibili(300), P.LIMITI.PASSO_MS);
+  for (const durata of [1500, 3000, 6000]) {
+    const passo = P.passoVisibili(durata);
+    // Un precarico dura quanto la pagina: in `durata` ms ne partono durata/passo, più quello in corso.
+    assert.ok(Math.ceil(durata / passo) <= P.LIMITI.IN_CORSO_MAX, `${durata} ms: passo ${passo}`);
+  }
+  assert.equal(P.passoVisibili(10 * 60_000), P.LIMITI.PASSO_MAX_MS);
+  assert.ok(P.LIMITI.IN_CORSO_MAX >= 1 && P.LIMITI.IN_CORSO_MAX <= 2);
 });
 
 test('il prossimo link a schermo è il più in alto non ancora fatto', () => {
