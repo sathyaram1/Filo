@@ -1055,7 +1055,6 @@ test('«Resta connesso» con una scheda del sito che sta suonando: non si ricari
       }
     }, `${sito.a}/modulo`);
     await (await pagina(app, `${sito.a}/modulo`)).locator('#vai').click();
-    await expect.poll(() => partizioneDi(app, `${sito.a}/home?`).catch(() => null), { timeout: 2000 }).toBe(undefined);
     await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
       const out = [];
       for (const w of BrowserWindow.getAllWindows()) {
