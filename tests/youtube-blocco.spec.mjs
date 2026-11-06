@@ -144,7 +144,7 @@ fixture('il video di YouTube incorporato in un altro sito parte senza pubblicitÃ
   const nelRiquadro = () => app.evaluate(async ({ webContents }) => {
     for (const wc of webContents.getAllWebContents()) {
       const f = wc.mainFrame.framesInSubtree.find((x) => x.url.includes('/embed/inc'));
-      if (f) return f.executeJavaScript('window.__esiti ? window.__esiti.slice().sort() : null').catch((e) => `errore: ${e.message}`);
+      if (f) return f.executeJavaScript('window.__esiti ? window.__esiti.slice().sort() : location.href + " " + document.documentElement.outerHTML.slice(0, 1500)').catch((e) => `errore: ${e.message}`);
     }
     return webContents.getAllWebContents().map((wc) => wc.mainFrame.framesInSubtree.map((x) => x.url).join(' ')).join(' | ');
   });
