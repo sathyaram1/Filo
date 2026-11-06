@@ -440,19 +440,18 @@ const PROPAGAZIONE = `
   function se(t) { return t; }
   function suo(t) { try { return R(genitore, t, []); } catch (e) { return null; } }
   function suoOSe(t) { return suo(t) || t; }
+  var DOVE = { __proto__: null, se: se, genitore: suo, genitoreOSe: suoOSe };
+  // moveBefore sposta tenendo il documento del riquadro: nessuna finestra nuova da preparare.
   function inserimenti(w) {
-    var p = function (n) { var C = w[n]; return C && C.prototype; };
-    var N = p('Node'), E = p('Element'), F = p('DocumentFragment'), D = p('Document'), C = p('CharacterData');
-    var T = p('DocumentType'), G = p('Range'), S = p('ShadowRoot');
-    var nodi = [[N, 'appendChild'], [N, 'insertBefore'], [N, 'replaceChild'], [E, 'append'], [E, 'prepend'],
-      [E, 'replaceChildren'], [E, 'before'], [E, 'after'], [E, 'replaceWith'], [E, 'insertAdjacentElement'],
-      [F, 'append'], [F, 'prepend'], [F, 'replaceChildren'], [D, 'append'], [D, 'prepend'], [D, 'replaceChildren'],
-      [C, 'before'], [C, 'after'], [C, 'replaceWith'], [T, 'before'], [T, 'after'], [T, 'replaceWith'],
-      [G, 'insertNode'], [G, 'surroundContents']];
-    for (var i = 0; i < nodi.length; i++) { try { conNodi(nodi[i][0], nodi[i][1]); } catch (e) {} }
-    var testi = [[E, 'innerHTML', se], [S, 'innerHTML', se], [E, 'outerHTML', suo], [E, 'insertAdjacentHTML', suoOSe],
-      [E, 'setHTMLUnsafe', se], [S, 'setHTMLUnsafe', se], [D, 'write', se], [D, 'writeln', se], [D, 'execCommand', se]];
-    for (var j = 0; j < testi.length; j++) { try { conTesto(testi[j][0], testi[j][1], testi[j][2]); } catch (e) {} }
+    var p = function (n) { var C = w[n]; return C && C.prototype; }, v;
+    for (var i = 0; i < VIE_NODI.length; i++) {
+      v = VIE_NODI[i];
+      if (v[2] !== 'sposta') { try { conNodi(p(v[0]), v[1]); } catch (e) {} }
+    }
+    for (var j = 0; j < VIE_TESTO.length; j++) {
+      v = VIE_TESTO[j];
+      try { conTesto(p(v[0]), v[1], DOVE[v[3]], R(proprio, RISCRIVONO, [v[1]])); } catch (e) {}
+    }
   }
 
   // L'aggiunta della finestra stessa: quella di questa può essere già avvolta da chi gira prima della pagina.
@@ -463,31 +462,38 @@ const PROPAGAZIONE = `
 
   // Un riquadro della stessa origine col suo preload chiede, prima dei suoi script, questo stesso preambolo: un canvas
   // annotato da uno si legge con le funzioni dell'altro. Il tipo dell'evento è un segreto della sessione.
-  function ascolta(w) {
-    if (!CANALE) return;
-    R(ascoltoDi(w), w, [CANALE, function (e) {
-      try {
-        var el = R(bersaglio, e, []), tag = tagName(el);
-        if (!TAG[tag]) return;
-        var cw = finestraDi(el, tag);
-        segna(cw);
-        prepara(cw, true);
-        if (preparata(cw)) R(annulla, e, []);
-      } catch (x) {}
-    }, true]);
+  function alCanale(e) {
+    try {
+      var el = R(bersaglio, e, []), tag = tagName(el);
+      if (!TAG[tag]) return;
+      var cw = finestraDi(el, tag);
+      segna(cw);
+      prepara(cw, true);
+      if (preparata(cw)) R(annulla, e, []);
+    } catch (x) {}
   }
+
+  // La riscrittura da capo di un documento (open, o write a documento chiuso) toglie i suoi ascolti e, se è quello della
+  // finestra, quelli della finestra: si rimettono subito. Stessa funzione, stessa aggiunta di allora: un doppione non
+  // si aggiunge. L'aggiunta è quella presa quando la finestra si è preparata, non una riscritta dopo dalla pagina.
+  var aggiunte = new WeakMap();
+  function riascolta(w) {
+    var r = regno(w), su = r && R(wmGet, aggiunte, [r]);
+    if (!su) return;
+    R(su, w.document, ['load', alCarico, true]);
+    if (CANALE) R(su, w, [CANALE, alCanale, true]);
+  }
+  function riascoltaIn(doc) { try { var w = R(vista, doc, []); if (w) riascolta(w); } catch (e) {} }
 
   function riquadri(w) {
     for (var i = 0; i < CORNICI.length; i++) {
       var C = w[CORNICI[i]], CP = C && C.prototype, d = CP && gOPD(CP, 'contentWindow');
       if (!d || !d.get) continue;
-      avvolgi(CP, 'contentDocument', d.get);
-      avvolgi(CP, 'contentWindow', d.get);
+      for (var j = 0; j < GETTER_FINESTRA.length; j++) avvolgi(CP, GETTER_FINESTRA[j], d.get);
     }
     try { inserimenti(w); } catch (e) {}
     try { osserva(w); } catch (e) {}
-    try { alCarico(w); } catch (e) {}
-    try { ascolta(w); } catch (e) {}
+    try { var r = regno(w); if (r) R(wmSet, aggiunte, [r, ascoltoDi(w)]); riascolta(w); } catch (e) {}
   }
 
   prepara(window, true);`;
