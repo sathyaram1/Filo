@@ -471,8 +471,11 @@
     const s = String(t || '');
     return (s.match(/^\s*```/gm) || []).length % 2 ? `${s.replace(/\s+$/, '')}\n\`\`\`` : s;
   }
+  // Le righe di un lavoro fermato col quadrato, uguali nella chat della home e nell'Aiuto (#578.1).
+  const FERMATO_QUI = 'Fermato qui';
+  const FERMATO_PRIMA = 'Fermato prima della risposta.';
   // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
-  const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  const CHIEDI_SEGUITO ='Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
   // La home lo chiede con un messaggio interno, che l'utente non vede.
   const CHIEDI_SEGUITO_HOME = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
     + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
@@ -630,7 +633,7 @@
   }
 
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, FERMATO_QUI, FERMATO_PRIMA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
     MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };

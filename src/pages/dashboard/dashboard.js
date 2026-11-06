@@ -69,10 +69,9 @@
   const PAUSA_RIPRESA = 700;
   let fermatoAlle = 0;
   const appenaFermato = () => Date.now() - fermatoAlle < PAUSA_RIPRESA;
-  // Lo stesso al contrario (#1296): il quadrato compare sotto il dito che ha appena mandato o ripreso, e il secondo
-  // clic di un doppio clic, o il secondo Invio, non ferma quello che è appena partito. Il «Ferma» del menu vale subito.
+  // Lo stesso al contrario (SN_CONST.PAUSA_QUADRATO_MS). Il «Ferma» del menu vale subito.
   // L'istante della comparsa sta sul tasto (`data-comparso`): lì lo leggono le prove, e il CSS lo accende in quel tempo.
-  const PAUSA_QUADRATO = 500;
+  const PAUSA_QUADRATO = globalThis.SN_CONST.PAUSA_QUADRATO_MS;
   const quadratoAppena = () => Date.now() - Number(stopBtn.dataset.comparso || 0) < PAUSA_QUADRATO;
   stopBtn.style.setProperty('--dash-pausa-quadrato', `${PAUSA_QUADRATO}ms`);
   let liveTickHandle = null;
@@ -291,7 +290,7 @@
       threadHistory.push({ role: 'filo', text: '', actions: [], interrotto: true, fermato: true });
       const nota = document.createElement('div');
       nota.className = 'dash-bubble-note dash-bubble-fermato';
-      nota.textContent = 'Fermato prima della risposta.';
+      nota.textContent = globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
       bubblesEl.appendChild(nota);
       ripresa = { nota, blocco: null };
       aggiornaTasto();
@@ -1753,7 +1752,7 @@
     }
     const nota = document.createElement('div');
     nota.className = 'dash-bubble-note dash-bubble-fermato';
-    nota.textContent = parziale ? 'Fermato a metà della risposta.' : 'Fermato prima della risposta.';
+    nota.textContent = parziale ? 'Fermato a metà della risposta.' : globalThis.SN_CHAT_ERRORS.FERMATO_PRIMA;
     bubblesEl.appendChild(nota);
     return { entry, host, nota, parziale };
   }

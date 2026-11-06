@@ -262,14 +262,17 @@ test('trascrizione fallita: un avviso lo dice e niente parte', async ({ app, she
   expect(await app.evaluate(() => globalThis.__richieste.length)).toBe(0);
 });
 
-// Le altre chat di Filo rispondono col modello senza flusso: qui risponde quello finto.
+// L'Aiuto chiede in diretta, per mostrare il ragionamento (#578.1): qui risponde quello finto.
 async function rispostaFinta(app, testo) {
   await app.evaluate((_e, t) => {
-    globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages }) => {
+    const finto = async ({ attempts, messages, onDelta }) => {
       const ultimo = [...messages].reverse().find((m) => m.role === 'user');
       globalThis.__richieste.push(typeof ultimo?.content === 'string' ? ultimo.content : JSON.stringify(ultimo?.content));
+      try { onDelta && onDelta(t); } catch (_) {}
       return { text: t, model: attempts[0].model, provider: attempts[0].provider, usage: {} };
     };
+    globalThis.SN_PROVIDERS.completeWithFallback = finto;
+    globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
   }, testo);
 }
 

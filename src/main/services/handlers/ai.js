@@ -142,8 +142,8 @@ module.exports = function register(on, ctx) {
 
   // «Valuta» dell'Aiuto (#1449) risponde col modello della chat. Se quello non vede le immagini la pagina gli arriva
   // senza la foto: outline, indirizzo e testo del campo bastano a giudicare.
-  async function chiediValuta(payload, origin, sender) {
-    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, sender, modelloDi: SN_CONST.ACTIONS.FILO_CHAT });
+  async function chiediValuta(payload, origin, sender, diretta = {}) {
+    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, sender, modelloDi: SN_CONST.ACTIONS.FILO_CHAT, ...diretta });
     try {
       return await chiedi(payload);
     } catch (e) {
@@ -255,7 +255,64 @@ module.exports = function register(on, ctx) {
     return { ...(ultima || {}), text: SENZA_VALORE };
   }
 
+  // L'Aiuto (#578.1): il suo turno riceve il ragionamento in diretta e il quadrato lo interrompe. La chiave è del
+  // mittente vero (lo strato, se l'Aiuto sta lì): un'altra pagina non ferma né ascolta un turno che non è suo.
+  const turniAiuto = new Map();
+  // Uno stop arrivato prima della sua richiesta (i messaggi non si aspettano fra loro) vale quando lei arriva.
+  const fermatiPrima = new Map();
+  const FERMATI_PRIMA_MS = 60 * 1000;
+  const FERMATI_PRIMA_MAX = 500;
+  function chiaveTurno(sender, turno) {
+    const wc = sender && (sender.strato || sender.wc);
+    const t = typeof turno === 'string' && /^[\w-]{1,64}$/.test(turno) ? turno : '';
+    return wc && typeof wc.id === 'number' && t ? `${wc.id}:${t}` : '';
+  }
+  function direttaAiuto(msg, sender) {
+    const chiave = msg && msg.action === SN_CONST.ACTIONS.HELP ? chiaveTurno(sender, msg.turno) : '';
+    if (!chiave) return null;
+    const controller = new AbortController();
+    if (fermatiPrima.delete(chiave)) controller.abort();
+    turniAiuto.set(chiave, controller);
+    const dest = sender.strato || sender.frame || sender.wc;
+    const diretta = {
+      // Intero anche nella risposta: gli eventi in diretta possono arrivare dopo di lei e la coda andrebbe persa (#1321).
+      ragionamento: '',
+      signal: controller.signal,
+      onReasoning: (testo) => {
+        if (!testo || controller.signal.aborted) return;
+        diretta.ragionamento += String(testo);
+        try { dest.send('filo:broadcast', { type: MSG.AIUTO_RAGIONAMENTO, turno: msg.turno, testo: String(testo) }); } catch (_) {}
+      },
+      fine: () => { if (turniAiuto.get(chiave) === controller) turniAiuto.delete(chiave); },
+    };
+    return diretta;
+  }
+  on(MSG.AIUTO_FERMA, async (msg, sender) => {
+    const chiave = chiaveTurno(sender, msg && msg.turno);
+    if (!chiave) return { ok: false, code: 'BAD_TURNO' };
+    const c = turniAiuto.get(chiave);
+    if (c) {
+      turniAiuto.delete(chiave);
+      try { c.abort(); } catch (_) {}
+      return { ok: true };
+    }
+    const ora = Date.now();
+    for (const [k, t] of fermatiPrima) if (ora - t > FERMATI_PRIMA_MS || fermatiPrima.size >= FERMATI_PRIMA_MAX) fermatiPrima.delete(k);
+    fermatiPrima.set(chiave, ora);
+    return { ok: true };
+  });
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    const diretta = direttaAiuto(msg, sender);
+    try {
+      if (diretta && diretta.signal.aborted) return { ok: false, code: 'FERMATO', error: 'fermato' };
+      const r = await richiestaAI(msg, sender, origin, diretta ? { signal: diretta.signal, onReasoning: diretta.onReasoning } : {});
+      return diretta && diretta.ragionamento && r && r.ok ? { ...r, ragionamento: diretta.ragionamento } : r;
+    } finally {
+      if (diretta) diretta.fine();
+    }
+  });
+  async function richiestaAI(msg, sender, origin, diretta) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     if (await descrizioneSpenta(msg)) return { ok: false, code: 'DESCRIZIONE_SPENTA' };
     const fermata = fermataDalTetto(msg, sender);
@@ -309,8 +366,8 @@ module.exports = function register(on, ctx) {
     const conSeguito = !intera && msg && msg.conSeguito === true;
     const chiedi = daSola
       ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera, conSeguito }))
-      : valuta ? () => chiediValuta(msg.payload, origin, sender)
-        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito });
+      : valuta ? () => chiediValuta(msg.payload, origin, sender, diretta)
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito, ...diretta });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
@@ -320,7 +377,7 @@ module.exports = function register(on, ctx) {
     if (msg && msg.anticipo === true && r && typeof r.text === 'string' && Cont && Cont.anticipoPronto) Cont.anticipoPronto(msg.action);
     if (lettura) await lettura;
     return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
-  });
+  }
 
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la

@@ -475,7 +475,7 @@
         if (!fineLavoro) fineLavoro = Date.now();
         if (viva && (viva.stato === 'pensa' || viva.stato === 'coda') && wrap.dataset.filo !== 'gomitolo') {
           statoSeg(viva, 'fermato');
-          scrivi(viva, 'Fermato qui');
+          scrivi(viva, global.SN_CHAT_ERRORS.FERMATO_QUI);
           apri(viva, true);
         }
         filo.taglia();
@@ -504,7 +504,7 @@
           // diventata la risposta. Vuota se ne va, con una nota resta com'è.
           if (!s.attese.size) { if (!s.testo && !s.corpo.querySelector('.dash-activity-note') && !s.esiti.childElementCount) togliSeg(s); continue; }
           // Nominata ma mai partita (fermata prima, o persa per strada): il nodo non tiene e la riga lo dice.
-          scrivi(s, fermato ? 'Fermato qui' : 'Non partita');
+          scrivi(s, fermato ? global.SN_CHAT_ERRORS.FERMATO_QUI : 'Non partita');
           if (s.nodo && !s.esito) { s.esito = 'cede'; s.nodo.cede(); }
         }
         if (viva && viva.stato === 'pensa') statoSeg(viva, fermato ? 'fermato' : 'coda');

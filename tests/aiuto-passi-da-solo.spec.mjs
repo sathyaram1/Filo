@@ -148,6 +148,31 @@ for (const [porta, nome] of [['rifiutato', 'reveal rifiutati'], ['ricerca', 'ric
   });
 }
 
+// #1049.1 — il pannello tolto da codice mentre l'Aiuto apre le sezioni vale chiuso: nessun passo in coda parte più.
+test('un pannello tolto a metà giro non fa partire altre chiamate', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await prepara(app, 'reveal');
+  const { sito, aiuto } = await apriAiuto(app, shell, openTab, testServer);
+  await chiedi(aiuto, 'apri tutte le sezioni');
+  await expect.poll(() => turni(app), { timeout: 30_000 }).toBeGreaterThanOrEqual(3);
+
+  await aiuto.evaluate(() => document.querySelector('.sn-sidebar').remove());
+  const allaRimozione = await turni(app);
+  await sito.waitForTimeout(5000);
+  expect(await turni(app)).toBe(allaRimozione);
+  expect(allaRimozione).toBeLessThan(1 + TETTO);
+
+  // Chiuso davvero: riaperto, l'Aiuto parte da una conversazione nuova e risponde.
+  await app.evaluate(() => { globalThis.__fineDopo = 0; });
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const riaperto = await paginaDellAiuto(app, sito);
+  await riaperto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8_000 });
+  await expect(riaperto.locator('.sn-sidebar-msg')).toHaveCount(0);
+  await chiedi(riaperto, 'e adesso?');
+  await expect(riaperto.locator('.sn-sidebar-msg-assistant', { hasText: 'Fatto.' })).toBeVisible({ timeout: 15_000 });
+});
+
 test('pochi passi da solo arrivano in fondo senza fermate', async ({ app, shell, openTab, testServer }) => {
   await prepara(app, 'reveal');
   await app.evaluate(() => { globalThis.__fineDopo = 5; });

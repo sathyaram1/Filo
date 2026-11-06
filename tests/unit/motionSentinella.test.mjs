@@ -15,6 +15,7 @@ const SRC = join(ROOT, 'src');
 const ECCEZIONI = [
   { file: 'src/styles/voce.css', contiene: 'var(--sn-voce-attesa', perche: "l'anello si svuota nel tempo vero per annullare la richiesta a voce" },
   { file: 'src/pages/dashboard/dashboard.css', contiene: 'var(--dash-pausa-quadrato', perche: 'il quadrato si accende nel tempo vero in cui ignora i clic (#1296)' },
+  { file: 'src/styles/sidebar.css', contiene: 'var(--sn-pausa-quadrato', perche: 'lo stesso quadrato nell\'Aiuto (#578.1)' },
 ];
 
 const DECL = /(?:^|[\s;{])((?:-webkit-)?(?:transition|animation)(?:-duration|-delay)?)\s*:\s*([^;{}]*)/g;

@@ -406,6 +406,11 @@
     AIUTO_DOCUMENTI_FERMA: 'aiuto_documenti_ferma',
     // main → la pagina che cerca: { fatti, totali } mentre l'indice legge i documenti nuovi (niente nomi).
     AIUTO_DOCUMENTI_AVANZAMENTO: 'aiuto_documenti_avanzamento',
+    // #578.1 — un AI_REQUEST dell'Aiuto con `turno` riceve il ragionamento in diretta e si può interrompere.
+    // main → l'Aiuto che ha chiesto: { turno, testo } pezzo di ragionamento del modello.
+    AIUTO_RAGIONAMENTO: 'aiuto_ragionamento',
+    // { turno } → { ok }: interrompe la chiamata di quel turno; vale solo per chi l'ha chiesta, anche se arriva prima.
+    AIUTO_FERMA: 'aiuto_ferma',
     // { chiave } → { ok } | { ok:false, frase }: apre il documento, lo mostra nella cartella, o ne avvia il trascinamento
     // vero (un file che la pagina riceve al rilascio, come da una cartella).
     AIUTO_APRI_FILE: 'aiuto_apri_file',

@@ -16,6 +16,7 @@
         { testo: 'Taglia del tasto destro, dalla fila di icone o dalla voce, si annulla con Ctrl+Z e funziona anche nelle caselle per l\'email o per i numeri. In un campo password il menu non offre più Taglia e Copia, così la password scritta non si perde.', segnalazione: 1434 },
         { testo: 'Indietro e Avanti portati nella fila del tasto destro sono spenti quando non c\'è dove andare, come nella barra laterale.', segnalazione: 1434 },
         { testo: 'Taglia e Copia del tasto destro tengono grassetto, corsivo e collegamenti: incollato, il testo resta com\'era.', segnalazione: 1434 },
+        { testo: 'L\'Aiuto sui siti mostra cosa sta facendo davvero, il ragionamento compreso, e il quadrato al posto dell\'invio lo ferma con un clic.', segnalazione: 578 },
       ],
     },
     {

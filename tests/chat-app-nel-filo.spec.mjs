@@ -320,11 +320,20 @@ test('le risposte di Filo nello scambio aperto restano formattate, e il loro lin
   await app.evaluate(() => {
     const P = globalThis.SN_PROVIDERS;
     const prima = P.completeWithFallback;
-    P.completeWithFallback = async (o) => {
+    const primaInDiretta = P.streamCompleteWithFallback;
+    const risposta = (o) => {
       const sistema = String((o.messages.find((m) => m.role === 'system') || {}).content || '');
-      if (!sistema.includes('# Protocollo di risposta')) return prima(o);
+      if (!sistema.includes('# Protocollo di risposta')) return null;
       const text = '**Iscriviti** è in alto a destra: vedi [la guida](https://example.com/guida). <b>niente markup</b>';
       return { text: JSON.stringify({ text, status: 'done' }), model: o.attempts[0].model, provider: o.attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async (o) => risposta(o) || prima(o);
+    // L'Aiuto chiede in diretta, per mostrare il ragionamento (#578.1).
+    P.streamCompleteWithFallback = async (o) => {
+      const r = risposta(o);
+      if (!r) return primaInDiretta(o);
+      try { o.onDelta && o.onDelta(r.text); } catch (_) {}
+      return r;
     };
   });
   const casa = await home(app);

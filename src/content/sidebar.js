@@ -164,6 +164,8 @@
       if (!nascosto) nascondi();
       return;
     }
+    // Chiuso davvero: niente parte più, e una chiamata ancora in volo non si paga fino in fondo.
+    fermaLavoro();
     Pagina.pulisci({ hover: true }).catch(() => {});
     evidenziato = null;
     togliNotaPasso();
@@ -348,16 +350,24 @@
       allega(e.dataTransfer.files);
     });
     form.addEventListener('submit', (e) => e.preventDefault());
-    form.querySelector('button[type="submit"]').addEventListener('click', (e) => {
+    // Mentre l'Aiuto lavora il tasto è il quadrato che lo ferma (#578.1), e Invio a casella vuota fa lo stesso; con
+    // qualcosa scritto Invio manda. Fermare, come chiudere, non chiede un gesto vero: toglie lavoro, non ne aggiunge.
+    const tasto = form.querySelector('button[type="submit"]');
+    tasto.addEventListener('click', (e) => {
       e.preventDefault();
+      if (tasto.dataset.modo === 'ferma') { if (!quadratoAppena(tasto)) fermaDallUtente(); ta.focus(); return; }
       if (gestoVero(e)) invia();
     });
     ta.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
-        if (gestoVero(e)) invia();
+        if (!gestoVero(e)) return;
+        const vuota = !ta.value.trim() && !allegati.immagini.length && !allegati.riferimenti.length;
+        if (vuota && lavora()) { if (!e.repeat && !quadratoAppena(tasto)) fermaDallUtente(); return; }
+        invia();
       }
     });
+    aggiornaTasto();
     // Il tasto microfono: si parla, e la richiesta parte come con l'invio (o resta da correggere). Diretta, non dal
     // modulo: il suo invio non manda più niente (#592.6), e il microfono si accende già solo con un gesto vero.
     voce = global.SN_VOCE_CHAT?.collega({
@@ -1191,71 +1201,84 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     return btn;
   }
 
-  // Non sono il reasoning vero, che non è disponibile: sono varie e specifiche quanto basta
-  // a non sembrare uno spinner.
-  const THINKING_PHRASES = [
-    'Leggo la pagina…',
-    'Analizzo lo screenshot…',
-    'Identifico gli elementi interattivi…',
-    'Confronto con la tua richiesta…',
-    'Cerco il menu giusto…',
-    'Valuto il prossimo passo…',
-    'Controllo la struttura del DOM…',
-    'Capisco il contesto…',
-    'Scelgo il target migliore…',
-    'Verifico che la pagina sia cambiata…',
-    'Compongo la risposta…',
-    'Riconosco i pattern noti…',
-    'Stimo cosa serve all\'utente…',
-  ];
-
-  function appendThinking() {
+  // L'attesa di un passo (#578.1), con le regole della chat della home (patterns/il-filo-dell-attesa.md): niente frasi
+  // inventate. Una rotella finché non c'è niente di vero; l'azione in corso la dice lei; il ragionamento vero scorre su
+  // una riga sola e un clic lo apre per intero. Sempre testo, mai HTML: il ragionamento può ricopiare la pagina.
+  function creaAttesa() {
     const conv = convEl();
     if (!conv) return null;
     const wrap = document.createElement('div');
-    wrap.className = 'sn-sidebar-thinking';
-    const lines = [];
-    for (let i = 0; i < 3; i++) {
-      const ln = document.createElement('div');
-      ln.className = 'sn-sidebar-thinking-line';
-      ln.dataset.slot = String(i); // 0=top fading out, 1=mid, 2=bottom fresh
-      wrap.appendChild(ln);
-      lines.push(ln);
-    }
+    wrap.className = 'sn-sidebar-attesa';
+    wrap.dataset.fase = 'attesa';
+    const testa = document.createElement('button');
+    testa.type = 'button';
+    testa.className = 'sn-sidebar-attesa-testa';
+    testa.setAttribute('aria-expanded', 'false');
+    testa.setAttribute('aria-label', 'Il ragionamento');
+    const rotella = document.createElement('span');
+    rotella.className = 'sn-sidebar-rotella';
+    rotella.setAttribute('aria-hidden', 'true');
+    const riga = document.createElement('span');
+    riga.className = 'sn-sidebar-attesa-riga';
+    const rigaTesto = document.createElement('span');
+    riga.append(rigaTesto);
+    testa.append(rotella, riga);
+    const corpo = document.createElement('div');
+    corpo.className = 'sn-sidebar-attesa-corpo';
+    corpo.hidden = true;
+    wrap.append(testa, corpo);
     conv.appendChild(wrap);
     conv.scrollTop = conv.scrollHeight;
 
-    const pool = THINKING_PHRASES.slice();
-    let recent = [];
-    function nextPhrase() {
-      const candidates = pool.filter((p) => !recent.includes(p));
-      const src = candidates.length ? candidates : pool;
-      const phrase = src[Math.floor(Math.random() * src.length)];
-      recent.push(phrase);
-      if (recent.length > 4) recent.shift();
-      return phrase;
-    }
-
-    lines[0].textContent = nextPhrase();
-    lines[1].textContent = nextPhrase();
-    lines[2].textContent = nextPhrase();
-
-    let stopped = false;
-    const tick = () => {
-      if (stopped || !wrap.isConnected) return;
-      lines[0].textContent = lines[1].textContent;
-      lines[1].textContent = lines[2].textContent;
-      lines[2].textContent = nextPhrase();
-      lines[2].classList.remove('sn-sidebar-thinking-enter');
-      void lines[2].offsetWidth;
-      lines[2].classList.add('sn-sidebar-thinking-enter');
+    const t0 = Date.now();
+    let ragionamento = '';
+    let azione = '';
+    let finita = false;
+    const apri = (v) => {
+      corpo.hidden = !v;
+      testa.setAttribute('aria-expanded', v ? 'true' : 'false');
+      wrap.classList.toggle('sn-sidebar-attesa-aperta', v);
+      if (v) corpo.scrollTop = finita ? 0 : corpo.scrollHeight;
     };
-    const interval = setInterval(tick, 900);
-    lines[2].classList.add('sn-sidebar-thinking-enter');
-
+    testa.addEventListener('click', () => { if (ragionamento) apri(corpo.hidden); });
+    const disegna = () => {
+      if (finita) return;
+      wrap.dataset.fase = azione ? 'azione' : ragionamento ? 'pensa' : 'attesa';
+      rigaTesto.textContent = azione || ragionamento.replace(/\s+/g, ' ').trim().slice(-90);
+    };
+    const chiudi = (fase, testo) => {
+      finita = true;
+      wrap.dataset.fase = fase;
+      rigaTesto.textContent = testo;
+      testa.title = ragionamento ? 'Il ragionamento' : '';
+    };
     return {
       el: wrap,
-      stop() { stopped = true; clearInterval(interval); },
+      // L'azione vera che sta accadendo adesso («Leggo la pagina»), '' quando è finita.
+      azione(t) { azione = String(t || ''); disegna(); },
+      ragiona(pezzo, { intero = false } = {}) {
+        if (finita || !pezzo) return;
+        // Il ragionamento intero arriva con la risposta: i pezzi in diretta possono restare indietro.
+        if (intero) { if (pezzo.length < ragionamento.length) return; ragionamento = pezzo; } else ragionamento += pezzo;
+        wrap.classList.add('sn-sidebar-attesa-pensata');
+        corpo.textContent = ragionamento;
+        if (!corpo.hidden) corpo.scrollTop = corpo.scrollHeight;
+        disegna();
+      },
+      // Risposta arrivata: senza ragionamento non resta niente; con, una riga chiusa che lo riapre.
+      fine() {
+        if (finita) return;
+        if (!ragionamento) { finita = true; wrap.remove(); return; }
+        apri(false);
+        const s = Math.max(1, Math.round((Date.now() - t0) / 1000));
+        chiudi('fatto', `Ragionamento · ${s} s`);
+      },
+      // Fermato dall'utente: la riga lo dice e il ragionamento a metà resta aperto, come nella home.
+      ferma() {
+        if (finita) return;
+        chiudi('fermato', global.SN_CHAT_ERRORS.FERMATO_QUI);
+        if (ragionamento) apri(true);
+      },
     };
   }
 
@@ -1652,10 +1675,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       return;
     }
     fermataDetta = true;
-    setTimeout(() => submit({
+    prossimoPasso({
       userAction: `${NOTA_FERMATA}. Procedi ora con il JSON normale (highlight / choices / text / status) usando solo ciò che già sai`,
       preActionUrl: urlPrimaDelPasso(),
-    }), 50);
+    }, 50, epoca);
   }
 
   // Quello che l'utente ha scritto qui: il main lascia uscire un codice scritto da lui (#810).
@@ -1976,21 +1999,112 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   //   qualcosa che viene da fuori: i risultati di una ricerca web, l'etichetta
   //   di un elemento della pagina. Quella roba NON entra nella nota (#593):
   //   viaggia qui e finisce imbustata, dichiarata dati e recintata.
+  // Fermare (#578.1) e il pannello tolto dalla pagina (#1049.1) passano da qui: l'epoca cresce, i passi in coda non
+  // partono, la chiamata in volo si interrompe nel main e la sua risposta, se arriva lo stesso, non si usa.
+  let epoca = 0;
+  const turniVivi = new Map();
+  const passiInCoda = new Set();
+  function lavora() { return turniVivi.size > 0 || passiInCoda.size > 0; }
+  function fermaLavoro() {
+    epoca += 1;
+    for (const t of passiInCoda) clearTimeout(t);
+    passiInCoda.clear();
+    const vivi = [...turniVivi.values()];
+    turniVivi.clear();
+    for (const v of vivi) {
+      if (v.turno) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_FERMA, turno: v.turno }).catch(() => {}); } catch (_) {} }
+      try { v.attesa?.ferma(); } catch (_) {}
+    }
+    // Una lettura dei documenti nuovi si ferma come col suo «Ferma»: la ricerca risponde e il turno la lascia cadere.
+    if (letturaDocumenti) { try { chrome.runtime.sendMessage({ type: MSG.AIUTO_DOCUMENTI_FERMA }).catch(() => {}); } catch (_) {} }
+    aggiornaTasto();
+  }
+  // Un passo che l'Aiuto fa da solo parte poco dopo il turno che l'ha chiesto, e solo se nel frattempo nessuno l'ha fermato.
+  function prossimoPasso(op, ms, mia) {
+    if (mia !== epoca) return;
+    const t = setTimeout(() => { passiInCoda.delete(t); submit(op); }, ms);
+    passiInCoda.add(t);
+    aggiornaTasto();
+  }
+  // Dopo un'attesa il turno prosegue solo se è ancora suo; il pannello che la pagina ha tolto chiude la sessione.
+  function finito(mia) {
+    if (mia !== epoca) return true;
+    if (apertoQui()) return false;
+    staccato();
+    return true;
+  }
+  function staccato() {
+    if (session && lavora()) session.chiusaPrima = true;
+    close({ davvero: true });
+  }
+  function fermaDallUtente() {
+    if (!lavora()) return;
+    if (session) { session.esito = 'chiusa_prima'; segnaSessione(); }
+    fermaLavoro();
+    appendActionLog(global.SN_CHAT_ERRORS.FERMATO_PRIMA)?.classList.add('sn-sidebar-log-fermato');
+    // Il modello lo ritrova alla domanda dopo: quello che si era fermato non lo riprende da solo.
+    history.push({ role: 'user', kind: 'action', content: PROMPTS.turnoAutomaticoAiuto({ nota: NOTA_FERMATO, perCronologia: true }) });
+    try { root.querySelector('.sn-sidebar-input textarea')?.focus(); } catch (_) {}
+  }
+  const NOTA_FERMATO = 'l\'utente ha fermato il lavoro prima della risposta: i passi rimasti non sono partiti. Non riprenderli se non te lo chiede lui';
+  // Il quadrato compare sotto il dito che ha appena mandato: il secondo colpo di un doppio clic non lo preme.
+  const quadratoAppena = (b) => Date.now() - Number((b && b.dataset.comparso) || 0) < global.SN_CONST.PAUSA_QUADRATO_MS;
+  function aggiornaTasto() {
+    const b = root && root.querySelector('.sn-sidebar-input button[type="submit"]');
+    if (!b) return;
+    const modo = lavora() ? 'ferma' : 'invia';
+    if (b.dataset.modo === modo) return;
+    b.dataset.modo = modo;
+    if (modo === 'ferma') {
+      b.dataset.comparso = String(Date.now());
+      b.style.setProperty('--sn-pausa-quadrato', `${global.SN_CONST.PAUSA_QUADRATO_MS}ms`);
+    }
+    b.textContent = modo === 'ferma' ? '' : '↵';
+    b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
+    b.title = modo === 'ferma' ? 'Ferma' : '';
+  }
+  // Il tasto destro sul quadrato e sull'attesa che lavora: «Ferma», subito, come nella home (letto da content.js).
+  function vociAttesa(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (!el || !root || !root.contains(el) || !lavora()) return [];
+    const attesa = el.closest('.sn-sidebar-attesa');
+    const quadrato = el.closest('.sn-sidebar-input button[type="submit"]');
+    if (!quadrato && !(attesa && !['fatto', 'fermato'].includes(attesa.dataset.fase))) return [];
+    return [{ type: 'item', label: 'Ferma', onClick: () => fermaDallUtente() }];
+  }
+  global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+  if (!global.SN_VOCI_PAGINA.includes(vociAttesa)) global.SN_VOCI_PAGINA.push(vociAttesa);
+  try {
+    chrome.runtime.onMessage.addListener((msg) => {
+      if (!msg || msg.type !== MSG.AIUTO_RAGIONAMENTO || !msg.turno) return;
+      for (const v of turniVivi.values()) if (v.turno === msg.turno) v.attesa?.ragiona(String(msg.testo || ''));
+    });
+  } catch (_) {}
+
   // Chiudere a metà di un turno nasconde il pannello invece di buttare la risposta; i passi che l'Aiuto farebbe da
-  // solo, chiuso, non partono.
+  // solo, chiuso, non partono. Un pannello che la pagina ha tolto è chiuso anche per loro (#1049.1).
   async function submit(op = {}) {
-    if (!root || (nascosto && !op.userMessage)) return;
+    if (root && !apertoQui()) { staccato(); return; }
+    if (!root || (nascosto && !op.userMessage)) { aggiornaTasto(); return; }
+    const mia = epoca;
+    const chiave = {};
+    const vivo = { turno: '', attesa: null };
+    turniVivi.set(chiave, vivo);
     inVolo += 1;
-    try { await turno(op); } finally {
+    aggiornaTasto();
+    try { await turno(op, mia, vivo); } finally {
       inVolo -= 1;
+      turniVivi.delete(chiave);
+      aggiornaTasto();
       segnaSessione();
       // Chiuso mentre pensava e niente da leggere: allora era chiuso davvero.
       if (nascosto && !inVolo && !nonLetta) close({ davvero: true });
     }
   }
 
-  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
     if (!root) return;
+    const passo = (op, ms) => prossimoPasso(op, ms, mia);
     // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro. Un riferimento trascinato arriva
     // al modello col suo contenuto; nella bolla resta il titolo.
     const userMessage = [scritto || (immagini.length ? PROMPTS.soloAllegatiAiuto() : ''), testoRiferimenti(riferimenti)].filter(Boolean).join('\n\n');
@@ -2014,6 +2128,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
     // «Valuta» (#1449): il testo del campo, o quello cambiato da allora che una domanda dopo porta con sé.
     const testoCampo = valuta || (userMessage ? await testoCambiato() : null);
+    if (finito(mia)) return;
     // Nell'Editor il documento viaggia intero fino al tetto (#1475), e il main lo accetta solo da una pagina di Filo.
     // Aperto un altro documento a metà conversazione, il modello lo sa prima della domanda nuova.
     const appPagina = appDellaPagina();
@@ -2055,12 +2170,16 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
     }
 
-    const thinking = appendThinking();
+    const attesa = creaAttesa();
+    vivo.attesa = attesa;
     let assistantEl = null;
 
     // Sui proseguimenti automatici si aspetta la pagina aggiornata prima dello screenshot:
     // senza, l'AI vede quella vecchia e chiede di ripetere il click.
+    attesa?.azione('Leggo la pagina');
     const letta = (await Pagina.leggi({ attendi: !!userAction, daUrl: preActionUrl || '', origine: !!userMessage }).catch(() => null)) || {};
+    if (finito(mia)) return;
+    attesa?.azione('');
     ricordaPagina(letta);
     const payload = buildPayload(userMessage, userAction, esterno, letta);
     if (valutazione) payload.valuta = true;
@@ -2078,11 +2197,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     };
     conDocumento();
 
+    // Il turno ha un nome che il main riconosce: gli manda il ragionamento in diretta e lo interrompe al quadrato.
+    vivo.turno = `t${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
     try {
       const chiedi = () => chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
         action: ACTIONS.HELP,
         payload,
+        turno: vivo.turno,
         diceRipiego: true,
         conSeguito: true,
         // Un passo che l'Aiuto fa da solo è un giro della stessa richiesta, come i giri di strumenti della chat (#969).
@@ -2090,6 +2212,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         ...(userMessage || valuta ? {} : { parteDiUnUso: true }),
       });
       let res = await chiedi();
+      if (finito(mia)) return;
       // Un modello dalla finestra più stretta rifiuta il documento intero: si rimanda più corto, e lo si dice sotto.
       for (let giro = 0; giro < 3 && letto && !res?.ok; giro++) {
         let corto = null;
@@ -2098,7 +2221,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         letto = corto;
         conDocumento();
         res = await chiedi();
+        if (finito(mia)) return;
       }
+      vivo.turno = '';
+      if (typeof res?.ragionamento === 'string') attesa?.ragiona(res.ragionamento, { intero: true });
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
       if (!res?.ok) {
@@ -2127,14 +2253,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // L'AI ha chiesto una ricerca: si esegue e si rilancia un turno coi risultati come nota
       // di sistema, così l'AI può produrre il JSON normale.
       if (parsed.kind === 'web_search') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
         if (session && session.webSearchCount >= MAX_WEB_SEARCHES_PER_SESSION) {
+          attesa?.fine();
           appendActionLog('ricerca web: limite raggiunto, ignorata');
           try { Popup?.conta?.({ misura: 'ricerca-web-tetto' }); } catch (_) {}
-          setTimeout(() => submit({
+          passo({
             userAction: 'limite di ricerche web raggiunto per questa sessione. Rispondi ora con il JSON normale usando solo ciò che già sai (pagina, llms.txt, percorsi noti).',
             preActionUrl: urlPrimaDelPasso(),
-          }), 50);
+          }, 50);
           return;
         }
         if (session) session.webSearchCount += 1;
@@ -2149,8 +2275,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // di Filo — e i risultati viaggiano a parte, per essere imbustati.
         let ricercaWeb = null;
         let esitoVuoto = '';
+        attesa?.azione('Cerco sul web');
         try {
           const r = await chrome.runtime.sendMessage({ type: MSG.WEB_SEARCH, query: parsed.query, parole: paroleUtente() });
+          if (finito(mia)) return;
+          attesa?.fine();
           // #810 — la domanda avrebbe portato fuori un segreto: la ricerca non parte, e né la
           // riga né la nota ripetono la domanda.
           if (r && r.blocked === 'segreto') {
@@ -2165,6 +2294,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
             esitoVuoto = 'la ricerca web che avevi chiesto non ha dato nessun risultato';
           }
         } catch (_) {
+          if (finito(mia)) return;
+          attesa?.fine();
           esitoVuoto = 'la ricerca web che avevi chiesto è fallita per un errore di rete';
         }
         const note = ricercaWeb
@@ -2175,18 +2306,18 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // La query la scrive il modello, spesso ricopiando la pagina: anche qui
         // niente a capo e niente marcature.
         history.push({ role: 'assistant', content: `(ho richiesto una ricerca web: "${Esterno.perCanaleSistema(parsed.query)}")` });
-        setTimeout(() => submit({
+        passo({
           userAction: note,
           esterno: ricercaWeb ? { ricercaWeb } : null,
           preActionUrl: urlPrimaDelPasso(),
-        }), 50);
+        }, 50);
         return;
       }
 
       // Caso speciale: un documento dell'utente (#947.3). La ricerca la fa il main; il turno dopo il modello ha i
       // candidati e ne indica uno col numero.
       if (parsed.kind === 'documenti') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
@@ -2194,14 +2325,15 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         history.push({ role: 'assistant', content: `(ho chiesto di cercare fra i documenti dell'utente: "${Esterno.perCanaleSistema(parsed.cosa)}")` });
         if (session && session.documentiCount >= MAX_DOCUMENTI_PER_SESSIONE) {
           appendActionLog('ricerca fra i documenti: limite raggiunto, ignorata');
-          setTimeout(() => submit({
+          passo({
             userAction: 'limite di ricerche fra i documenti raggiunto per questa conversazione. Rispondi ora con il JSON normale usando solo ciò che già sai',
             preActionUrl: urlPrimaDelPasso(),
-          }), 50);
+          }, 50);
           return;
         }
         if (session) session.documentiCount += 1;
         const r = await cercaDocumenti(parsed);
+        if (finito(mia)) return;
         if (!r || !r.ok) {
           // Rifiutata dalla persona: l'ha fermato lei prima che finisse; non riuscita: un errore.
           if (session) session.esito = r && r.annullata ? 'chiusa_prima' : 'errore';
@@ -2227,14 +2359,14 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           cartellaMancante: r.cartellaMancante || '',
           cartellaDiRete: r.cartellaDiRete || '',
         };
-        setTimeout(() => submit({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: urlPrimaDelPasso(), dopoDocumenti: true }), 50);
+        passo({ userAction: NOTA_DOCUMENTI, esterno: { documenti: perCronologia }, preActionUrl: urlPrimaDelPasso(), dopoDocumenti: true }, 50);
         return;
       }
 
       // I bottoni della barra vivono nella shell, non nella pagina: l'utente non potrebbe
       // cliccarli, quindi li eseguiamo noi.
       if (parsed.kind === 'shell') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         const human = {
           home: 'home', settings: 'impostazioni', apps: 'app',
           account: 'account', fullscreen: 'schermo intero', minimize: 'riduci a icona',
@@ -2256,7 +2388,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // prosegue solo su status «continue» e solo se la pagina non è cambiata.
         if (parsed.status === 'continue' && okShell && parsed.command !== 'home') {
           const note = `ho eseguito il comando Filo "${parsed.command}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: urlPrimaDelPasso() }), 200);
+          passo({ userAction: note, preActionUrl: urlPrimaDelPasso() }, 200);
         } else {
           expand({ ai: true });
         }
@@ -2265,7 +2397,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
 
       if (parsed.kind === 'filo_action') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
@@ -2277,7 +2409,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       }
 
       if (parsed.kind === 'page_action') {
-        if (thinking) { thinking.stop(); thinking.el.remove(); }
+        attesa?.fine();
         if (parsed.display) {
           appendChatMessage('assistant', parsed.display);
           history.push({ role: 'assistant', content: parsed.display });
@@ -2287,7 +2419,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // andata a buon fine, prosegue con una nota di sistema; altrimenti chiude.
         if (parsed.status === 'continue' && ok && !(azioniDiPagina()[parsed.page.op] || {}).chiude) {
           const note = `ho eseguito l'azione di pagina "${parsed.page.op}". Valuta lo stato e prosegui, oppure chiudi con status:"done".`;
-          setTimeout(() => submit({ userAction: note, preActionUrl: urlPrimaDelPasso() }), 200);
+          passo({ userAction: note, preActionUrl: urlPrimaDelPasso() }, 200);
         } else {
           expand({ ai: true });
         }
@@ -2295,7 +2427,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         return;
       }
 
-      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      attesa?.fine();
       // Nell'Editor il modello cambia la formattazione del documento: la fa la pagina, col suo punto di ripristino e
       // l'«Annulla», anche a pannello chiuso a metà turno: è la modifica chiesta, non un segno sulla pagina.
       // Era chiesta per il documento letto alla partenza: se nel frattempo ne è aperto un altro, quello non si tocca.
@@ -2364,6 +2496,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       togliNotaPasso();
       passoQui = 0;
       await Pagina.pulisci({}).catch(() => null);
+      if (finito(mia)) return;
       // Chiuso dall'utente, la pagina non si tocca: della risposta resta il testo da aprire.
       if (parsed.highlight && !nascosto) {
         const act = parsed.highlight.action;
@@ -2391,11 +2524,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
               const aiNote = act === 'reveal'
                 ? 'ho eseguito reveal sull\'elemento qui sotto: la sezione è ora aperta. Outline e screenshot sono aggiornati'
                 : 'ho eseguito hover sull\'elemento qui sotto: il menu è ora aperto. Outline e screenshot sono aggiornati';
-              setTimeout(() => submit({
+              passo({
                 userAction: aiNote,
                 esterno: { elementoPagina: { etichetta: targetLabel, selettore: parsed.highlight.selector } },
                 preActionUrl: urlPrimaDelPasso(),
-              }), 150);
+              }, 150);
             }
           } else {
             // Reveal rifiutato dalla whitelist o bersaglio mancante:
@@ -2406,12 +2539,13 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
             appendActionLog(act === 'reveal' ? 'reveal rifiutato' : 'hover fallito');
             if (session && result.reason === 'selector-not-found') session.nonTrovati += 1;
             if (parsed.status === 'continue') {
-              setTimeout(() => submit({ userAction: aiNote, preActionUrl: urlPrimaDelPasso() }), 50);
+              passo({ userAction: aiNote, preActionUrl: urlPrimaDelPasso() }, 50);
             }
           }
         } else {
           // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
           const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
+          if (finito(mia)) return;
           if (fermo) {
             fermata(fermo);
             parsed.highlight = null;
@@ -2468,8 +2602,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         }
       }
     } catch (err) {
+      // Fermato o staccato nel frattempo: l'errore è quasi sempre l'interruzione stessa, e non è di nessuno.
+      if (finito(mia)) return;
       if (session) { session.esito = 'errore'; session.dopoPasso = false; }
-      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      attesa?.fine();
       const raw = err?.message || String(err);
       // #360 — la chat non è un log: «fetch failed» non dice niente all'utente. Stessa
       // traduzione della chat della home e di quella dei mazzi.
