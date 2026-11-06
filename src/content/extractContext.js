@@ -893,9 +893,10 @@
     }
   }
 
-  // Le due scelte per le sezioni nascoste (D61): 'traduci' le prende tutte, segnate `nascosto` perché partano dopo
-  // quel che si vede; 'rimanda' le lascia in `hidden`, e il menu offre di tradurle quando si aprono.
-  const NASCOSTE = Object.freeze({ TRADUCI: 'traduci', RIMANDA: 'rimanda' });
+  // Le due scelte per le sezioni nascoste (D61), coi valori dell'impostazione `traduzionePagina.nascoste`: TRADUCI le
+  // prende tutte, segnate `nascosto` perché partano dopo quel che si vede; RIMANDA le lascia in `hidden`, e il menu
+  // offre di tradurle quando si aprono.
+  const NASCOSTE = Object.freeze({ TRADUCI: 'subito', RIMANDA: 'apertura' });
 
   function extractTranslatableBlocks({ maxBlocks = 2000, nascoste = NASCOSTE.RIMANDA } = {}) {
     const root = document.body || document.documentElement;
