@@ -402,7 +402,7 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts,
 .sn-sidebar-input button[type="submit"][data-modo="ferma"] {
   background: var(--sn-accent);
   color: #fff;
-  animation: sn-sidebar-arma var(--sn-pausa-quadrato, 500ms) ease-in;
+  animation: sn-sidebar-arma var(--sn-pausa-quadrato) ease-in;
 }
 .sn-sidebar-input button[type="submit"][data-modo="ferma"]::before {
   content: '';
