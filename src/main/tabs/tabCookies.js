@@ -59,18 +59,27 @@ function trim(map) {
 // Sul disco va solo quello che il sito stesso tiene oltre la sessione, secondo la modalità della VISITA, non quella
 // di quando si salva (#1279.3): una visita in Privacy di un sito non fidato resta in memoria (`privata`), e sul disco
 // resta quello che c'era prima di lei (`salvato`), che il jar normale del sito ricorda ancora.
-function suDisco(v) {
-  const d = v && v.privata ? v.salvato : v;
-  if (!d) return null;
-  const { privata, salvato, ...resto } = d;
+function nudo(v) {
+  const { privata, salvato, ...resto } = v;
   return resto;
 }
 
-// La voce nuova di un sito del profilo normale, con la modalità della visita che la scrive.
-function conVisita(site, prev, next) {
-  if (Cookies.keepsSiteData(site)) return next;
-  const salvato = suDisco(prev);
-  return { ...next, privata: true, ...(salvato ? { salvato } : {}) };
+function suDisco(v) {
+  const d = v && v.privata ? v.salvato : v;
+  return d ? nudo(d) : null;
+}
+
+// La voce che una visita scrive per un sito, nella memoria di `map`: in quella del profilo normale porta la modalità.
+function scriviVisita(map, site, prev, next) {
+  let v = nudo(next);
+  if (map === remembered && !Cookies.keepsSiteData(site)) {
+    const salvato = suDisco(prev);
+    v = { ...v, privata: true, ...(salvato ? { salvato } : {}) };
+  }
+  map.delete(site);
+  map.set(site, v);
+  trim(map);
+  if (map === remembered) saveSoon();
 }
 
 function saveSoon() {
