@@ -157,7 +157,8 @@ fixture('il video di YouTube incorporato in un altro sito parte senza pubblicitÃ
   });
   expect(ospite.url()).toContain('sito-pubblico.test');
   await new Promise((r) => setTimeout(r, 3000));
-  console.log('DIAG', JSON.stringify(youtube.servite), await app.evaluate(() => JSON.stringify(globalThis.__diag || [])));
+  const diag = `DIAG ${JSON.stringify(youtube.servite)} ${await app.evaluate(() => JSON.stringify(globalThis.__diag || []))}`;
+  expect(diag).toBe('');
   await expect.poll(nelRiquadro, { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
 });
 
