@@ -69,9 +69,7 @@ function buildRiquadriVuotiSource(corpi) {
   function aperta(w) { try { return !R(chiusa, w, []); } catch (e) { return false; } }
   var OSPITI = 'iframe,frame,object,embed', OSPITE = /^(iframe|frame|object|embed)$/;
   var nomeDi = (D(Element.prototype, 'localName') || {}).get;
-  var perNome = Document.prototype.getElementsByTagName, haAttr = Element.prototype.hasAttribute, attr = Element.prototype.getAttribute;
-  var baseDi = (D(Node.prototype, 'baseURI') || {}).get, Indirizzo = URL, origineDi = (D(URL.prototype, 'origin') || {}).get;
-  var ORIGINE = String(self.origin);
+  var perNome = Document.prototype.getElementsByTagName;
   var arrivati = new WeakSet();
   // Le raccolte vive costano poco a ogni giro: il giro parte a ogni cambio del documento.
   var raccolte = new WeakMap();
