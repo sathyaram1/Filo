@@ -235,6 +235,13 @@ try {
   if (/^https?:/i.test(loc)) require('./collegamento-aperto.js').installa({ webFrame });
 } catch (_) { /* mai bloccare il caricamento */ }
 
+// #1974 — le pubblicità di YouTube tolte prima che partano, in ogni frame di YouTube (anche i video incorporati), prima
+// degli script del sito; la guardia rimanda al solo «Salta» quando le regole non reggono. Regole in preload/youtube-guardia.js.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https:\/\/([a-z0-9-]+\.)*youtube(-nocookie|kids)?\.com(:\d+)?\//i.test(loc)) require('./youtube-guardia.js').avvia({ ipcRenderer, webFrame, window, href: loc });
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
 try {
