@@ -48,7 +48,7 @@ async function sitoCheConta({ lente = [], csp = '', ritardoLente = 15_000 } = {}
     }
     const lenta = lente.includes(req.url);
     res.on('close', () => { if (!res.writableEnded) r.chiusaPrima = true; });
-    setTimeout(() => { if (!res.destroyed) html(`<h1 id="arrivato">${req.url}</h1>`); }, lenta ? 15_000 : 0);
+    setTimeout(() => { if (!res.destroyed) html(`<h1 id="arrivato">${req.url}</h1>`); }, lenta ? ritardoLente : 0);
   });
   await new Promise((ok) => server.listen(0, '127.0.0.1', ok));
   const origin = `http://127.0.0.1:${server.address().port}`;
