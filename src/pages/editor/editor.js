@@ -1011,7 +1011,7 @@
       const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? { intera: true } : { rigenera: true, intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
-      if (auto && titoloScrittoAMano(id)) { esito('vuoto'); return false; }
+      if (auto && titoloScrittoAMano(id)) return false;
       const ok = applyGeneratedTitle(id, rawText, via, firma);
       esito(ok ? 'applicato' : 'vuoto');
       if (!ok && !auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); showEditorToast('Non sono riuscito a generare il titolo.'); }
