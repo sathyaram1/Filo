@@ -971,6 +971,103 @@ test('Privacy massima: dopo l\'accesso nella finestrella la scheda si aggiorna e
   }
 });
 
+test('finestrella chiusa senza entrare: la scheda resta ferma anche se la pagina d\'accesso mette il suo token o il sito rinnova la sessione da sé', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const sito = await sitoConAccesso();
+  try {
+    let page = await apri(app, shell, `${sito.a}/pubblica`);
+    await segna(page);
+    await finestrellaDa(app, page, '#google-token', { chiudi: true });
+    await sleep(4000);
+    expect(await segnata(app, `${sito.a}/pubblica`)).toBe(true);
+
+    page = await apri(app, shell, `${sito.b}/pubblica?vivo=1`);
+    await sleep(1000);
+    await segna(page);
+    await finestrellaDa(app, page, '#google', { chiudi: true });
+    await sleep(4000);
+    expect(await segnata(app, `${sito.b}/pubblica`)).toBe(true);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Resta connesso» e poi l\'invio del modulo scritto: la pagina dell\'esito resta, e la scheda passa alla pagina dopo', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    await apri(app, shell, `${sito.a}/commenta`);
+    await scriviNelCampo(app, shell, `${sito.a}/commenta`, 'bellissimo articolo');
+    await app.evaluate(async () => {
+      await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { trustedSites: ['127.0.0.1'] } } });
+    });
+    await expect.poll(() => partizioneDi(app, `${sito.a}/home`)).toBe('persist:filo-priv-127.0.0.1');
+
+    await (await pagina(app, `${sito.a}/commenta`)).locator('#manda').click();
+    await expect((await pagina(app, `${sito.a}/commenta`)).locator('#pubblicato')).toBeVisible({ timeout: 10_000 });
+    await segna(await pagina(app, `${sito.a}/commenta`));
+    await sleep(4000);
+    expect(await segnata(app, `${sito.a}/commenta`)).toBe(true);
+    expect(await partizioneDi(app, `${sito.a}/commenta`)).toMatch(/^filo-priv-127\.0\.0\.1(~\d+)?$/);
+
+    await (await pagina(app, `${sito.a}/commenta`)).locator('#vai').click();
+    await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
+      const out = [];
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) out.push(t.partition);
+      }
+      return out;
+    }, `${sito.a}/home`), { timeout: 15_000 }).toEqual(['persist:filo-priv-127.0.0.1', 'persist:filo-priv-127.0.0.1']);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Resta connesso» con una scheda del sito che sta suonando: non si ricarica, e passa al cambio di pagina', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    const modulo = await apri(app, shell, `${sito.a}/modulo`);
+    await segna(modulo);
+    // Lo schermo virtuale non suona: la scheda si dice in riproduzione come la segnerebbe l'evento dell'audio.
+    await app.evaluate(({ BrowserWindow }, pre) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) t.audible = true;
+      }
+    }, `${sito.a}/modulo`);
+    await app.evaluate(async () => {
+      await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { trustedSites: ['127.0.0.1'] } } });
+    });
+    await expect.poll(() => partizioneDi(app, `${sito.a}/home`)).toBe('persist:filo-priv-127.0.0.1');
+    await sleep(2500);
+    expect(await segnata(app, `${sito.a}/modulo`)).toBe(true);
+    expect(await partizioneDi(app, `${sito.a}/modulo`)).toMatch(/^filo-priv-127\.0\.0\.1(~\d+)?$/);
+
+    await app.evaluate(({ BrowserWindow }, pre) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) t.audible = false;
+      }
+    }, `${sito.a}/modulo`);
+    await (await pagina(app, `${sito.a}/modulo`)).locator('#vai').click();
+    await expect.poll(() => partizioneDi(app, `${sito.a}/home?`).catch(() => null), { timeout: 2000 }).toBe(undefined);
+    await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
+      const out = [];
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) out.push(t.partition);
+      }
+      return out;
+    }, `${sito.a}/home`), { timeout: 15_000 }).toEqual(['persist:filo-priv-127.0.0.1', 'persist:filo-priv-127.0.0.1']);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
 // ── il «no» ricordato (#759.1) ─────────────────────────────────────────────
 
 test('un «no» alla proposta resta dopo il riavvio, senza scrivere il sito sul disco; «Resta connesso qui» dal menu lo toglie', async () => {
