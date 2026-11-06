@@ -84,7 +84,7 @@
 
   global.SN_SCHEDE = {
     VERSIONE, STATI_CHIUSI, VALIDI, TIPI, AREE, MAX_BYTE,
-    validaScheda, campiDellAgente, perIlDocumento, dalDocumento,
+    validaScheda, campiDellAgente, perIlDocumento, dalDocumento, numeroPulito,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -995,6 +995,14 @@ di decifratura, quindi li dà il server.
   `routine-letture` (biglietto, ruolo e tutti i numeri usciti con testo o scheda,
   senza i rifiutati), che `routineLog` rimanda in `letture`.
 - **Due strade, stessa uscita**: `npm run feedback:leggi` e `npm run
-  feedback:schede` passano dal server con `FILO_ROUTINE` e il biglietto, dal
-  token dell'owner altrimenti (`scripts/lib/feedback-cloud.mjs`). Il server
-  rimanda campi in chiaro e la cornice la mette l'app su tutte e due.
+  feedback:schede` passano dal server in una routine (`isRoutineInstance`) col
+  biglietto, dal token dell'owner altrimenti (`scripts/lib/feedback-cloud.mjs`).
+  Il server rimanda campi in chiaro e la cornice la mette l'app su tutte e due.
+- **La cartella delle schede è una copia**: quello che conta è la scheda nel
+  feedback. `elenca` scrive nell'indice l'ora della scheda che ogni feedback ha
+  (`nelFeedback`), ed `elenca`, `scrivi` e `rileggi` mandano, senza agente, le
+  schede buone e fresche della cartella che non sono quella (#1785.2): anche quelle scritte
+  prima che le schede stessero nei feedback, o lasciate da un comando
+  interrotto. Prima di mandare, `scrivi` e `rileggi` rileggono i feedback come
+  `elenca` e riscrivono l'indice: un indice vecchio non fa sovrascrivere una
+  scheda più nuova.
