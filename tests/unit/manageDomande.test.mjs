@@ -12,6 +12,7 @@ const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const RADICE = join(__dirname, '..', '..');
 require(join(RADICE, 'src', 'shared', 'domande.js'));
+require(join(RADICE, 'src', 'shared', 'feedbackAttese.js'));
 const D = globalThis.SN_DOMANDE;
 
 // Un valore valido per ogni forma di parametro: una forma nuova senza esempio fa cadere la prova, non la salta.
@@ -23,6 +24,7 @@ const ESEMPI = {
   nomeAmbito: 'lettore_code',
   operazioniAmbito: ['feedback.metadati'],
   testoAmbito: 'scrivere',
+  numeroFeedback: '1959',
 };
 const RIFERIMENTI = { fb902: { num: '#902', priorita: 1, stato: 'todo', motivo: '' } };
 

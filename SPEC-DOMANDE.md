@@ -277,7 +277,7 @@ dall'owner e dal server. Campi:
 - `notePerAgenti`: testo privato per chi riprenderà la domanda (§ 3.2).
 - `gruppo`: il tema, per il raggruppamento.
 - `blocca` (#1577): una domanda legata a un feedback (un'opzione `riprendi`
-  lo riprende) dice se lo ferma; lo decide chi la apre, e col biglietto senza
+  o `attendi` lo riprende, #1965) dice se lo ferma; lo decide chi la apre, e col biglietto senza
   si rifiuta. Blocca se andare avanti con la consigliata, e poi l'owner sceglie
   altro, lascia un danno che un altro giro non rimedia (soldi, dati
   dell'utente, sicurezza e segreti, politica sui modelli, terzi, account e
@@ -573,8 +573,11 @@ Come funziona oggi (#1152):
   il compito è fatto), `note`, `principio`, `azione`, `chiudi` (resoconto per
   l'owner e principio, la domanda si chiude). Chiarimento e chiusura si
   rifiutano se l'owner ha scritto dopo l'ultima lettura (`domanda_cambiata`).
-  `azione` applica solo `riprendi`, `priorita` e `archivia`, e solo sui
-  feedback che la domanda nomina: mai un'azione di consenso. `azione` non
+  `azione` applica solo `riprendi`, `priorita`, `archivia` e `attendi`
+  (#1965: una risposta che chiede un'attesa non finisce in un chiarimento), e
+  solo sui feedback che la domanda nomina; il feedback atteso da `attendi` è
+  uno qualunque, per numero, e il server lo valida come le attese di
+  Gestione. Mai un'azione di consenso. `azione` non
   chiude la domanda, nemmeno quando riprende o archivia il lavoro che la
   domanda ferma: quel lavoro esce dall'attesa per la risposta stessa, non per
   un'altra strada (§ 3.4 punto 2), e la domanda resta in lavorazione e

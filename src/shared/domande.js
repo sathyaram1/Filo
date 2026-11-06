@@ -64,6 +64,8 @@
     nomeAmbito: (v) => typeof v === 'string' && /^[a-z][a-z_]{2,30}$/.test(v),
     operazioniAmbito: (v) => Array.isArray(v) && v.length >= 1 && v.length <= 30 && v.every((o) => typeof o === 'string' && /^[a-z_]{1,30}(\.[a-z_]{1,30})?$/.test(o)),
     testoAmbito: (v) => typeof v === 'string' && v.trim().length >= 1 && v.length <= 1000,
+    // Il numero nella forma che scrivono le attese («1959», «663.2»): senza SN_FB_ATTESE caricato non passa niente.
+    numeroFeedback: (v) => typeof v === 'string' && v !== '' && !!global.SN_FB_ATTESE && global.SN_FB_ATTESE.normalizzaNumero(v) === v,
   });
 
   // `bulk`: ammessa in «applica il consiglio» su più domande. `consenso`: vale solo da un gesto dell'owner nella finestra.
@@ -74,6 +76,8 @@
     riprendi: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
     priorita: tipo({ feedbackId: 'feedbackId', valore: 'valorePriorita' }, { bulk: true, consenso: false, attivo: true }),
     archivia: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
+    // `aspetta` per numero: chi applica conosce il feedback atteso dalle parole dell'owner; esistenza e giri li controlla il server.
+    attendi: tipo({ feedbackId: 'feedbackId', aspetta: 'numeroFeedback' }, { bulk: true, consenso: false, attivo: true }),
     automazione: tipo({ chiave: 'chiave', valore: 'valoreBooleano' }, { bulk: false, consenso: false, attivo: true }),
     ambito: tipo({ nome: 'nomeAmbito', operazioni: 'operazioniAmbito', nonPuo: 'testoAmbito' }, { bulk: false, consenso: true, attivo: true }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
@@ -343,10 +347,15 @@
     return null;
   }
 
+  // Le azioni che scrivono la decisione nella conversazione del loro feedback e lo fanno ripartire se è fermo (#1965):
+  // legame, blocco, peso e fermate le contano da qui, nell'app e nel server.
+  const AZIONI_CHE_RIPRENDONO = Object.freeze(['riprendi', 'attendi']);
+  const riprendeIlLavoro = (azione) => isOggetto(azione) && AZIONI_CHE_RIPRENDONO.includes(azione.tipo);
+
   /** Un'opzione riprende il lavoro su `feedbackId` ('' = su qualunque feedback). PURA. */
   function riprende(domanda, feedbackId = '') {
     return (isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : [])
-      .some((o) => isOggetto(o) && isOggetto(o.azione) && o.azione.tipo === 'riprendi' && (!feedbackId || o.azione.feedbackId === feedbackId));
+      .some((o) => isOggetto(o) && riprendeIlLavoro(o.azione) && (!feedbackId || o.azione.feedbackId === feedbackId));
   }
 
   const BLOCCA_REGOLA = 'Blocca (true) se andare avanti con la consigliata, e poi l’owner sceglie altro, lascia un danno che un altro giro '
@@ -364,14 +373,14 @@
       return no('blocca_mancante', `manca «blocca»: la domanda riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}, dì se lo ferma finché l’owner non risponde. ${BLOCCA_REGOLA}`);
     }
     if (!lega && d.blocca === true) {
-      return no('blocca_senza_ripresa', `«blocca» vale per una domanda che riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}: aggiungi l’opzione «riprendi», o togli «blocca»`);
+      return no('blocca_senza_ripresa', `«blocca» vale per una domanda che riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}: aggiungi un’opzione ${AZIONI_CHE_RIPRENDONO.map((t) => `«${t}»`).join(' o ')}, o togli «blocca»`);
     }
     return null;
   }
 
   // Le azioni che il compito «Gestisci la risposta» (§3.5) applica da sé: quelle che l'owner applica anche in blocco.
   // Una di consenso resta a un gesto dell'owner nella finestra (§1.4), e un compito non ne fa nascere un altro.
-  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia']);
+  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia', 'attendi']);
 
   /** Il rifiuto per un'azione che il compito non applica, o null se la può applicare. PURA. */
   function vietataAlCompito(azione) {
@@ -421,6 +430,7 @@
     if (!r) return null;
     if (a.tipo === 'riprendi') return `Riprendi ${r.num} con questa scelta`;
     if (a.tipo === 'archivia') return `Archivia ${r.num}`;
+    if (a.tipo === 'attendi') return `${r.num} aspetta #${a.aspetta}`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
   }
@@ -527,7 +537,7 @@
   global.SN_DOMANDE = {
     PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
     validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
-    DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
+    AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

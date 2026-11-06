@@ -10,6 +10,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 require(join(ROOT, 'src', 'shared', 'domande.js'));
+require(join(ROOT, 'src', 'shared', 'feedbackAttese.js'));
 const D = globalThis.SN_DOMANDE;
 
 const RIF = { f1: { num: '#813', priorita: 1, stato: 'design', motivo: 'decisione' }, f2: { num: '#902.3', priorita: 0 } };
@@ -18,6 +19,8 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
   assert.equal(D.etichettaAzione({ tipo: 'riprendi', feedbackId: 'f1' }, RIF), 'Riprendi #813 con questa scelta');
   assert.equal(D.etichettaAzione({ tipo: 'priorita', feedbackId: 'f1', valore: 3 }, RIF), 'Priorità di #813: 1 → 3');
   assert.equal(D.etichettaAzione({ tipo: 'archivia', feedbackId: 'f2' }, RIF), 'Archivia #902.3');
+  assert.equal(D.etichettaAzione({ tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' }, RIF), '#813 aspetta #1959');
+  assert.equal(D.etichettaAzione({ tipo: 'attendi', feedbackId: 'f2', aspetta: '663.2' }, RIF), '#902.3 aspetta #663.2');
   assert.equal(D.etichettaAzione({ tipo: 'approva_locale', feedbackId: 'f1' }, RIF), null, 'il lavoro server non si affida più da una domanda (#1576)');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: false }, {}), 'Routine: spegni');
   assert.equal(D.etichettaAzione({ tipo: 'automazione', chiave: 'routine.enabled', valore: true }, {}), 'Routine: accendi');
@@ -28,7 +31,7 @@ test('ogni tipo attivo ha la sua etichetta, fatta di numero e parametri', () => 
     'Approva l’ambito «lettore_code»: feedback.metadati; x.y', 'senza l’elenco delle operazioni caricato restano i nomi, mai il testo di chi propone');
   for (const [nome, spec] of Object.entries(D.TIPI)) {
     if (!spec.attivo) continue;
-    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {}, ambito: { nome: 'lettore_code', operazioni: ['feedback.metadati'], nonPuo: 'scrivere' } }[nome];
+    const esempio = { riprendi: { feedbackId: 'f1' }, priorita: { feedbackId: 'f1', valore: 2 }, archivia: { feedbackId: 'f1' }, attendi: { feedbackId: 'f1', aspetta: '1959' }, automazione: { chiave: 'routine.enabled', valore: true }, compito: {}, ambito: { nome: 'lettore_code', operazioni: ['feedback.metadati'], nonPuo: 'scrivere' } }[nome];
     assert.ok(esempio, `il tipo attivo «${nome}» non ha un esempio in questo test`);
     assert.equal(typeof D.etichettaAzione({ tipo: nome, ...esempio }, RIF), 'string', nome);
   }
@@ -55,6 +58,18 @@ test('validaAzione: tipo e soli parametri; i non attivi rifiutati col loro codic
   assert.equal(D.validaAzione({ tipo: 'ambito' }).errore, 'parametri_non_validi');
   assert.equal(D.validaAzione({ tipo: 'riprendi', feedbackId: '../x' }).errore, 'parametri_non_validi');
   assert.equal(D.validaAzione({ tipo: 'compito', feedbackId: 'f1' }).errore, 'parametri_non_validi');
+});
+
+test('attendi (#1965): il compito della risposta la applica; il feedback atteso è un numero nella forma delle attese', () => {
+  assert.ok(D.DEL_COMPITO.includes('attendi'));
+  assert.equal(D.vietataAlCompito({ tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' }), null, 'una risposta che chiede un’attesa non finisce in un chiarimento');
+  assert.deepEqual(D.validaAzione({ tipo: 'attendi', feedbackId: 'f1', aspetta: '663.2' }), { ok: true, azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '663.2' } });
+  for (const aspetta of ['#1959', '1959.0', '0', '01959', 'abc', '', ' 1959', 1959, null, '1959; archivia']) {
+    assert.equal(D.validaAzione({ tipo: 'attendi', feedbackId: 'f1', aspetta }).errore, 'parametri_non_validi', JSON.stringify(aspetta));
+  }
+  assert.equal(D.validaAzione({ tipo: 'attendi', feedbackId: 'f1' }).errore, 'parametri_non_validi', 'senza il feedback atteso');
+  assert.equal(D.validaAzione({ tipo: 'attendi', aspetta: '1959' }).errore, 'parametri_non_validi', 'senza chi aspetta');
+  assert.equal(D.etichettaAzione({ tipo: 'attendi', feedbackId: 'sconosciuto', aspetta: '1959' }, RIF), null, 'chi aspetta viene dai riferimenti del server');
 });
 
 const DUE = [
@@ -158,6 +173,13 @@ test('blocca: true o false, e serve quando un’opzione riprende il lavoro; senz
   assert.equal(D.riprende(base, 'f1'), true);
   assert.equal(D.riprende(base, 'f2'), false);
   assert.equal(D.riprende(base), true);
+  // #1965: «attendi» riprende il lavoro come «riprendi», per legame e blocco; la regola sta in un posto solo.
+  const conAttesa = D.validaDomanda({ ...base, opzioni: [conPro({ testo: 'Aspetta', azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' } }), conPro({ testo: 'Archivia', azione: { tipo: 'archivia', feedbackId: 'f1' } })], blocca: true }).domanda;
+  assert.equal(D.riprende(conAttesa, 'f1'), true);
+  assert.equal(D.controllaBlocca(conAttesa, 'f1'), null);
+  assert.deepEqual(D.AZIONI_CHE_RIPRENDONO.filter((t) => D.riprendeIlLavoro({ tipo: t })), ['riprendi', 'attendi']);
+  assert.equal(D.riprendeIlLavoro({ tipo: 'archivia', feedbackId: 'f1' }), false);
+  assert.match(D.controllaBlocca(aParte, 'f1').dettaglio, /«riprendi» o «attendi»/);
 });
 
 // #1790: il titolo dice di cosa si parla, un'opzione sola non è una domanda, ogni opzione ha pro e contro.

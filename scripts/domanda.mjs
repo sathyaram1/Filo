@@ -13,6 +13,8 @@ import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.
 const require = createRequire(import.meta.url);
 const HERE = dirname(fileURLToPath(import.meta.url));
 require(join(HERE, '..', 'src', 'shared', 'domande.js'));
+// Il numero del feedback atteso da `attendi` si legge con la regola delle attese.
+require(join(HERE, '..', 'src', 'shared', 'feedbackAttese.js'));
 const D = globalThis.SN_DOMANDE;
 
 const INDIRIZZO = 'https://europe-west1-filo-8b9cb.cloudfunctions.net/ownerDomande';
@@ -34,7 +36,7 @@ const USO = [
   '  chiarimento --testo "…" | --testo -   chiede all\'owner un chiarimento: la domanda torna aperta',
   '  note --testo "…" | --testo -          riscrive le note per gli agenti (vuote: le toglie)',
   '  principio --testo "…" | --testo -     la regola generale che la risposta stabilisce',
-  '  azione \'{"tipo":…}\' [--testo …]     applica riprendi, priorita o archivia su un feedback della domanda',
+  '  azione \'{"tipo":…}\' [--testo …]     applica riprendi, priorita, archivia o attendi su un feedback della domanda',
   '  chiudi --testo "…" | --testo - [--principio "…"]   il resoconto per l\'owner: la domanda si chiude',
   '',
   'Col biglietto del compito che gestisce una domanda appena nata (la domanda la dice il biglietto):',
@@ -436,7 +438,8 @@ export function testoDelCompito(cmd, reply = {}) {
   if (cmd === 'chiudi') return 'OK: risposta gestita, la domanda è chiusa. Hai finito: rilascia il biglietto.';
   if (cmd === 'note') return 'OK: note per gli agenti scritte.';
   if (cmd === 'principio') return 'OK: principio scritto.';
-  const dove = reply.accodata ? ' (il lavoro era già in coda o in mano a qualcuno: la prende il prossimo giro)' : reply.rimandata ? ' (il lavoro torna in verifica)' : '';
+  const dove = reply.gia ? ' (c\'era già: niente di nuovo)'
+    : reply.accodata ? ' (il lavoro era già in coda o in mano a qualcuno: la prende il prossimo giro)' : reply.rimandata ? ' (il lavoro torna in verifica)' : '';
   return `OK: ${visibile(reply.azione || 'azione')} applicata${dove}. Quando hai finito, chiudi o chiedi un chiarimento.`;
 }
 

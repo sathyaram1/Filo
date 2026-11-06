@@ -49,6 +49,7 @@ test('il ruolo riceve un testo intero, col contratto dei worker e i suoi comandi
   assert.match(t, /domanda\.mjs" chiudi --testo -|domanda\.mjs chiudi --testo -/);
   assert.match(t, /release <biglietto> --role risposta/);
   assert.match(t, /un gesto dell'owner/);
+  assert.match(t, /"tipo":"attendi","feedbackId":"<id>","aspetta":"1959"/, 'il ruolo sa applicare un’attesa chiesta a parole (#1965)');
   assert.doesNotMatch(t, /approvare un lavoro server/, 'il lavoro server non si affida più da una domanda (#1576)');
 });
 
@@ -74,6 +75,9 @@ test('argomenti dei comandi del compito: forme ammesse, consenso rifiutato prima
   assert.deepEqual(leggiArgomenti(['azione', '{"tipo":"riprendi","feedbackId":"f1"}', '--testo', 'nota']), { cmd: 'azione', azione: { tipo: 'riprendi', feedbackId: 'f1' }, testo: 'nota' });
   assert.match(leggiArgomenti(['azione', '{"tipo":"approva_locale","feedbackId":"f1"}']).errore, /tipo_sconosciuto/, 'il lavoro server non si affida più da una domanda (#1576)');
   assert.match(leggiArgomenti(['azione', '{"tipo":"automazione","chiave":"routine.enabled","valore":false}']).errore, /azione_non_del_compito/);
+  assert.deepEqual(leggiArgomenti(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"1959"}']), { cmd: 'azione', azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' } },
+    'una risposta che chiede un’attesa la applica il compito (#1965)');
+  assert.match(leggiArgomenti(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"#1959"}']).errore, /parametri_non_validi.*aspetta/);
   assert.match(leggiArgomenti(['azione', '{tipo:']).errore, /non è JSON valido/);
   assert.ok(leggiArgomenti(['chiarimento']).errore, 'senza testo');
   assert.ok(leggiArgomenti(['note', '--principio', 'x']).errore, '--principio vale solo con chiudi');
@@ -101,6 +105,14 @@ test('col canale finto: azione e chiusura col principio, rifiuti e guasti con le
   assert.equal(await esegui(['azione', '{"tipo":"riprendi","feedbackId":"f1"}', '--testo', 'per chi riprende'], az.io), 0);
   assert.deepEqual(az.consegne[0].data, { op: 'azione', azione: { tipo: 'riprendi', feedbackId: 'f1' }, testo: 'per chi riprende' });
   assert.match(az.out.join('\n'), /riprendi applicata .*prossimo giro/);
+
+  const attesa = finto({ canale: { outcome: 'ok', reply: { outcome: 'applicata', azione: 'attendi' } } });
+  assert.equal(await esegui(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"1959"}', '--testo', 'aspetta la correzione della barra'], attesa.io), 0);
+  assert.deepEqual(attesa.consegne[0].data, { op: 'azione', azione: { tipo: 'attendi', feedbackId: 'f1', aspetta: '1959' }, testo: 'aspetta la correzione della barra' });
+  assert.match(attesa.out.join('\n'), /attendi applicata\. Quando hai finito/);
+  const gia = finto({ canale: { outcome: 'ok', reply: { outcome: 'applicata', azione: 'attendi', gia: true } } });
+  assert.equal(await esegui(['azione', '{"tipo":"attendi","feedbackId":"f1","aspetta":"1959"}'], gia.io), 0);
+  assert.match(gia.out.join('\n'), /attendi applicata \(c'era già/);
 
   const chiudi = finto({ stdin: 'Ripreso #813.' });
   assert.equal(await esegui(['chiudi', '--testo', '-', '--principio', 'Un lavoro ripreso porta la risposta intera.'], chiudi.io), 0);

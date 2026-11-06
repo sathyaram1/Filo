@@ -34,7 +34,7 @@ comunque per l'owner, con quello che hai capito.
 
 `blocca` (`true` o `false`) dice se la domanda ferma il lavoro su `payload.id`
 finché l'owner non risponde, e lo decidi tu quando un'opzione lo riprende
-(`riprendi` su `payload.id`): con `domanda.mjs chiedi`, senza, la domanda è
+(`riprendi` o `attendi` su `payload.id`): con `domanda.mjs chiedi`, senza, la domanda è
 rifiutata. Blocca se andare avanti con la consigliata, e poi l'owner sceglie
 altro, lascia un danno che un altro giro non rimedia (soldi, dati dell'utente,
 sicurezza e segreti, politica sui modelli, terzi, account e credenziali), o se
