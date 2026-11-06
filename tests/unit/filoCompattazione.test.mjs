@@ -496,7 +496,7 @@ test('il grezzo che resta ha un tetto in token: turni pesanti lasciano spazio so
   assert.equal(turni(L.puntoDiTaglio(lista, { ora })), 4, 'senza tetto, quattro turni');
   assert.equal(turni(L.puntoDiTaglio(lista, { ora, maxToken: 14500, peso })), 2);
   assert.equal(turni(L.puntoDiTaglio(lista, { ora, maxToken: 10, peso })), 1, 'la domanda di adesso resta grezza');
-  assert.equal(L.grezzoMassimo({ soglia: 70000, base: 41000 }), 14500);
+  assert.equal(Math.round(L.grezzoMassimo({ soglia: 70000, base: 40000 })), 10000);
   assert.equal(L.grezzoMassimo({ soglia: 70000, base: null }), Infinity);
   assert.equal(L.sogliaAnticipo({ soglia: 70000, base: 40000 }), 40000 + L.QUOTA_ANTICIPO * 30000);
   assert.equal(L.sogliaAnticipo({ soglia: 70000 }), 70000 * L.QUOTA_ANTICIPO);
