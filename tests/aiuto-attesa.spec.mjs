@@ -108,8 +108,10 @@ test('mentre lavora mostra il ragionamento vero, non frasi fisse; dopo la rispos
   await expect(corpo).toBeHidden();
 });
 
-test('senza ragionamento da mostrare resta una rotella, che sparisce con la risposta', async ({ app, shell, openTab, testServer }) => {
+test('senza ragionamento da mostrare resta una rotella, che sparisce con la risposta (tema scuro)', async ({ app, shell, openTab, testServer }) => {
   await prepara(app, [{ aspetta: true, risposta: { text: 'Eccolo.', status: 'done' } }]);
+  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { theme: 'dark' } },
+    { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' }));
   const { aiuto } = await apriAiuto(app, shell, openTab, testServer);
   await chiedi(aiuto, 'cosa dice la pagina?');
   const attesa = aiuto.locator('.sn-sidebar-attesa');
@@ -117,6 +119,8 @@ test('senza ragionamento da mostrare resta una rotella, che sparisce con la risp
   await expect(attesa).toHaveAttribute('data-fase', 'attesa');
   await expect(attesa.locator('.sn-sidebar-rotella')).toBeVisible();
   await expect(attesa.locator('.sn-sidebar-attesa-riga')).toHaveText('');
+  await aiuto.waitForTimeout(600);
+  await aiuto.locator('.sn-sidebar').screenshot({ path: join(SHOTS, 'aiuto-attesa-rotella-scuro.png') });
   await app.evaluate(() => globalThis.__aiuto.rilascia());
   await expect(aiuto.locator('.sn-sidebar-msg-assistant', { hasText: 'Eccolo.' })).toBeVisible();
   await expect(attesa).toHaveCount(0);
