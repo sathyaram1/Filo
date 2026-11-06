@@ -32,6 +32,21 @@ function albero(file, sistema) {
   return radice;
 }
 
+test('#1985 la spina per chi risparmia: su Linux si legge dai file, perché lì Electron non la sa', () => {
+  const r = albero({
+    'sys/class/power_supply/BAT0/type': 'Battery\n', 'sys/class/power_supply/BAT0/capacity': '70\n',
+    'sys/class/power_supply/BAT0/status': 'Discharging\n',
+    'sys/class/power_supply/AC/type': 'Mains\n', 'sys/class/power_supply/AC/online': '0\n',
+  });
+  try {
+    assert.equal(L.sullaBatteria({ piattaforma: 'linux', radice: r }), true);
+    writeFileSync(join(r, 'sys/class/power_supply/AC/online'), '1\n');
+    assert.equal(L.sullaBatteria({ piattaforma: 'linux', radice: r }), false);
+    // Un fisso senza batteria non è mai «senza la spina».
+    assert.equal(L.sullaBatteria({ piattaforma: 'linux', radice: join(r, 'non-esiste') }), false);
+  } finally { togliCartella(r); }
+});
+
 const ROUTE = 'Iface\tDestination\tGateway \tFlags\tRefCnt\tUse\tMetric\tMask\t\tMTU\tWindow\tIRTT\n';
 
 test('Linux, portatile: due batterie pesate sulla capacità, il mouse non conta, il caricatore dice «collegata»', () => {
