@@ -2287,11 +2287,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         // La query la scrive il modello, spesso ricopiando la pagina: anche qui
         // niente a capo e niente marcature.
         history.push({ role: 'assistant', content: `(ho richiesto una ricerca web: "${Esterno.perCanaleSistema(parsed.query)}")` });
-        setTimeout(() => submit({
+        passo({
           userAction: note,
           esterno: ricercaWeb ? { ricercaWeb } : null,
           preActionUrl: urlPrimaDelPasso(),
-        }), 50);
+        }, 50);
         return;
       }
 
