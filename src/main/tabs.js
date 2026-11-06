@@ -2651,6 +2651,7 @@ class TabManager {
   // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
   _recreateView(tab, url, opts = {}) {
     this._rinviataPresa(tab);
+    tab._passaggioRinviato = null;
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
     // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
