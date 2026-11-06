@@ -1,6 +1,6 @@
-// Verifica #798 giro 9. r1: un riquadro della stessa origine che la pagina prende per indice (o per nome) prima che
-// carichi resta senza rumore per sempre: il suo documento legge il proprio canvas come con Off, e lo stesso la pagina
-// con le funzioni di quel riquadro dopo il carico.
+// Verifica #798 giro 9 (porta chiusa, riprovata): un riquadro della stessa origine che la pagina prende per indice (o
+// per nome) prima che carichi resta senza rumore per sempre: la pagina lo legge con le funzioni di quel riquadro dopo
+// il carico come con Off.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 async function setFpMode(openTab, mode) {
