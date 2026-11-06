@@ -125,6 +125,28 @@
     return { words: fileWords(file), at: Date.now() };
   }
 
+  // Un titolo che l'utente non ha scritto segue il contenuto (#1570): con la stessa soglia del riassunto, e nella sua
+  // stessa chiamata. Quello scritto a mano non cambia mai da solo; il primo titolo lo dà il tiro a 100 parole.
+  function titoloDaRifare(file, currentWords) {
+    const meta = (file && file.meta) || {};
+    if (meta.titleManual || !meta.titleAuto) return false;
+    const sig = meta.titleSig;
+    if (sig == null || typeof sig.words !== 'number') return true;
+    return !pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file));
+  }
+
+  // La risposta della chiamata unica: «TITOLO: …» e «RIASSUNTO: …». Senza etichette è tutta riassunto, e il titolo resta.
+  function titoloERiassunto(raw) {
+    const parti = { titolo: [], riassunto: [] };
+    let dove = 'riassunto';
+    for (const riga of String(raw == null ? '' : raw).split(/\r?\n/)) {
+      const m = riga.match(/^\s*[*_#]*\s*(titolo|riassunto)\s*[*_]*\s*[:\-–—]\s*[*_]*\s*(.*)$/i);
+      if (m) { dove = m[1].toLowerCase(); parti[dove].push(m[2]); } else parti[dove].push(riga);
+    }
+    const unisci = (righe) => righe.join('\n').replace(/[*_]+$/, '').trim();
+    return { titolo: unisci(parti.titolo).split('\n')[0].trim(), riassunto: unisci(parti.riassunto) };
+  }
+
   function clip(s, n) {
     const t = String(s == null ? '' : s).replace(/\s+/g, ' ').trim();
     return t.length > n ? t.slice(0, n).trim() + '…' : t;
