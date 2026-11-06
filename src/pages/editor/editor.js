@@ -1476,6 +1476,7 @@
 
   // Le marche sono { type, attrs? }: i tag B/I/U/S danno marche semplici; il font-size, che è
   // stile inline, diventa una marca con attrs.size così sopravvive al round-trip.
+  const ANCORA = String.fromCharCode(0x200b);
   function inlineToPM(parent, marks) {
     const out = [];
     parent.childNodes.forEach((node) => {
