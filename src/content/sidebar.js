@@ -2194,6 +2194,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         ...(userMessage || valuta ? {} : { parteDiUnUso: true }),
       });
       let res = await chiedi();
+      if (finito(mia)) return;
       // Un modello dalla finestra più stretta rifiuta il documento intero: si rimanda più corto, e lo si dice sotto.
       for (let giro = 0; giro < 3 && letto && !res?.ok; giro++) {
         let corto = null;
@@ -2202,7 +2203,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         letto = corto;
         conDocumento();
         res = await chiedi();
+        if (finito(mia)) return;
       }
+      vivo.turno = '';
       // Col suo codice: senza, la frase già scritta per l'utente («serve un
       // invito») diventava «qualcosa è andato storto» (#663).
       if (!res?.ok) {
