@@ -218,7 +218,10 @@ test('nella pagina: un ospite inserito di nuovo, anche solo spostato, torna in v
   const s = readFileSync(join(ROOT, 'src/preload/riquadri-vuoti.js'), 'utf8');
   assert.match(s, /nodi: function[\s\S]*?ripartono\(a\[i\]\)/, 'senza, un riquadro spostato si tocca prima del suo load');
   assert.match(s, /gamma: function[\s\S]*?ripartono\(a\[0\]\)/);
-  assert.match(s, /m === 'moveBefore' \? SE\.sposta : SE\.nodi/, 'moveBefore tiene il documento: in volo non arriverebbe più');
+  const { VIE_NODI } = require('../../src/preload/vie-dei-riquadri.js');
+  const sposta = VIE_NODI.filter((v) => v[2] === 'sposta').map((v) => v[1]);
+  assert.ok(sposta.length && sposta.every((m) => m === 'moveBefore'), 'moveBefore tiene il documento: in volo non arriverebbe più');
+  assert.match(s, /v\[2\] === 'sposta' \? SE\.sposta/);
   assert.doesNotMatch(s.match(/sposta: function[^\n]*/)[0], /ripartono/);
 });
 
