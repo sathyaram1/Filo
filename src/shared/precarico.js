@@ -18,11 +18,36 @@
     RETE_FERMA_MS: 500,
     // Con uno scaricamento in corso o senza la spina, ogni quanto si richiede al main se si può ripartire.
     RIPROVA_PERMESSO_MS: 5000,
+    // Dopo un clic che non ha portato via la pagina (un file scaricato, una risposta vuota) i link a schermo ripartono.
+    RIPRESA_DOPO_CLIC_MS: 8000,
+    // Del testo di un link basta l'inizio: una scheda intera dentro un link non dice di più.
+    TESTO_LINK: 200,
   });
 
-  // Percorsi che fanno qualcosa invece di mostrare una pagina: uscire, cancellare, disiscriversi. Una parola intera
-  // del percorso, così «removed-items» resta una pagina e «user/delete-account» no.
-  const AZIONI = /(?:^|[^a-z0-9])(?:(?:log|sign|opt)[-_]?(?:out|off)|delete|remove|unsubscribe|unsub|deactivate|disconnect|destroy|cancel|esci|disconnetti|elimina|cancella|rimuovi|disiscriviti|disiscrizione)(?:[^a-z0-9]|$)/i;
+  // Le parole d'azione stanno con l'avviso sui link sospetti (src/shared/linkSospetto.js), in un elenco solo.
+  function paroleAzione() {
+    if (!global.SN_LINK_SOSPETTO && typeof require === 'function') { try { require('./linkSospetto.js'); } catch (_) {} }
+    const L = global.SN_LINK_SOSPETTO;
+    return L && Array.isArray(L.PAROLE_AZIONE) ? L.PAROLE_AZIONE : null;
+  }
+
+  function parole(s) {
+    return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '')
+      .replace(/([a-z0-9])([A-Z])/g, '$1 $2').toLowerCase().split(/[^a-z0-9]+/).filter(Boolean);
+  }
+
+  // Precaricare un link d'uscita fa uscire dal sito: meglio perdere il precarico di una pagina che l'accesso. Una
+  // parola d'azione vale anche dentro una composta («doLogout», «deleteAccount») e scritta in due («log out»).
+  function faAzione(testo, elenco) {
+    const p = parole(testo);
+    for (let i = 0; i < p.length; i++) {
+      const due = i + 1 < p.length ? p[i] + p[i + 1] : '';
+      for (const w of elenco) {
+        if (p[i] === w || due === w || (w.length >= 5 && p[i].includes(w))) return true;
+      }
+    }
+    return false;
+  }
   // Un file non è una pagina: precaricarlo scaricherebbe megabyte che nessuno ha chiesto.
   const FILE = /\.(?:pdf|zip|rar|7z|gz|tgz|bz2|xz|tar|exe|msi|dmg|pkg|deb|rpm|apk|appimage|iso|img|bin|jar|torrent|mp3|m4a|wav|flac|ogg|mp4|m4v|mkv|mov|avi|webm|docx?|xlsx?|pptx?|odt|ods|odp|csv|jpe?g|png|gif|webp|avif|svg)$/i;
 
