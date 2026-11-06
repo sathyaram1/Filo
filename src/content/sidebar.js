@@ -2585,8 +2585,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         }
       }
     } catch (err) {
+      // Fermato o staccato nel frattempo: l'errore è quasi sempre l'interruzione stessa, e non è di nessuno.
+      if (finito(mia)) return;
       if (session) { session.esito = 'errore'; session.dopoPasso = false; }
-      if (thinking) { thinking.stop(); thinking.el.remove(); }
+      attesa?.fine();
       const raw = err?.message || String(err);
       // #360 — la chat non è un log: «fetch failed» non dice niente all'utente. Stessa
       // traduzione della chat della home e di quella dei mazzi.
