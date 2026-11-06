@@ -825,6 +825,15 @@ function correnteSenzaProcessi() {
   return null;
 }
 
+// Il portatile senza la spina adesso, per chi deve risparmiare (il precarico dei link, #1985): su Linux Electron non lo sa.
+function sullaBatteria({ piattaforma = process.platform, radice = '/' } = {}) {
+  if (piattaforma === 'linux') {
+    const b = batteriaLinux(radice);
+    return !!(b && !b.collegata);
+  }
+  return aBatteria();
+}
+
 function statoInattivita() {
   try { return inattivita(ASSENTE_DOPO_S); } catch (_) { return 'unknown'; }
 }
