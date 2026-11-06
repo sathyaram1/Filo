@@ -360,15 +360,13 @@ const PROPAGAZIONE = `
   // o per nome (il documento la eredita e il preload non parte). Uno col suo preload no: avrebbe due guardie. In un sito
   // con pagine esenti (gli accessi) un documento senza preload potrebbe essere una di quelle: lì solo i vuoti.
   function segna(cw) { var r = regno(cw); if (r) R(wsAdd, conPreload, [r]); }
-  function alCarico(w) {
-    R(ascoltoDi(w), w.document, ['load', function (e) {
-      try {
-        var el = R(bersaglio, e, []), tag = tagName(el);
-        if (!TAG[tag]) return;
-        var cw = finestraDi(el, tag), r = regno(cw);
-        if (r && !R(wsHas, conPreload, [r])) prepara(cw, !ESENTI);
-      } catch (x) {}
-    }, true]);
+  function alCarico(e) {
+    try {
+      var el = R(bersaglio, e, []), tag = tagName(el);
+      if (!TAG[tag]) return;
+      var cw = finestraDi(el, tag), r = regno(cw);
+      if (r && !R(wsHas, conPreload, [r])) prepara(cw, !ESENTI);
+    } catch (x) {}
   }
 
   function toccaDaScript(el) { tocca(el, true); }
