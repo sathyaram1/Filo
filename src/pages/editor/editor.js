@@ -2235,10 +2235,11 @@
       return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
     }).join('');
     const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
-    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito.
-    if (r && !/[^\r\n]/.test(docEl.textContent) && !docEl.querySelector('img')) {
-      const primo = bloccoDi(r.startContainer);
-      const tag = primo && PARAGRAFO.test(primo.tagName) ? primo.tagName.toLowerCase() : 'p';
+    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito. Un elenco o
+    // una citazione appena aperti invece sono dell'utente: lì si incolla dentro (#1697).
+    const primo = r && bloccoDi(r.startContainer);
+    if (r && !/[^\r\n​]/.test(docEl.textContent) && !docEl.querySelector('img') && (!primo || PARAGRAFO.test(primo.tagName))) {
+      const tag = primo ? primo.tagName.toLowerCase() : 'p';
       docEl.textContent = '';
       sel.collapse(docEl, 0);
       document.execCommand('insertHTML', false, paragrafi(tag));
