@@ -136,13 +136,23 @@
     progressToast = null;
   }
 
+  // La scelta dell'utente sulle sezioni nascoste (D61), letta a ogni giro: cambiata a parole vale dal giro dopo.
+  async function leggiModo() {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
+      return global.SN_CONST.nascosteDellaTraduzione(res && res.settings);
+    } catch (_) { return global.SN_CONST.nascosteDellaTraduzione(null); }
+  }
+
   async function translatePage(opts) {
     const quiet = !!(opts && opts.quiet);
     const frameRunId = (opts && opts.runId) || '';
+    const fuoriConto = !!(opts && opts.fuoriConto);
+    const riferisci = (data) => reportToHost(frameRunId, data, fuoriConto);
     if (pageTranslating) {
       // Un riquadro già al lavoro non deve restare «mai finito» nel conto di chi lo ospita, o
       // l'avviso direbbe rimasto fuori del testo che sta invece arrivando.
-      if (quiet) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
+      if (quiet) riferisci({ phase: 'end', applied: 0, left: 0 });
       return;
     }
     pageTranslating = true;
