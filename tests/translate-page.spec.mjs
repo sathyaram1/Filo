@@ -2201,7 +2201,6 @@ test('di serie i riquadri con script nascosti si traducono in sottofondo e l’a
   await clickTranslateIcon(app);
 
   await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 60000 }).toContain('Pagina tradotta');
-  await expect.poll(async () => ['ZZFOLD', 'ZZFADE', 'ZZTAB', 'ZZSHADOW'].filter((t) => !(sentText(app).then ? false : true)).length).toBe(0);
   await expect.poll(async () => {
     const s = await sentText(app);
     return ['ZZFOLD', 'ZZFADE', 'ZZTAB', 'ZZSHADOW'].filter((t) => !s.includes(t));
