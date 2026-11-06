@@ -1962,9 +1962,10 @@ for (const [nome, apre, chiusa] of [
   ['con l’attributo hidden', (el) => { el.hidden = false; }, 'hidden'],
   ['con display:none', (el) => { el.style.display = 'block'; }, 'style="display:none"'],
 ]) {
-  test(`scheda spenta ${nome} con dentro solo un riquadro con script: aperta, l'icona Traduci offre di tradurlo`, async ({ app, openTab, testServer }) => {
+  test(`solo quando apro: scheda spenta ${nome} con dentro solo un riquadro con script, aperta, l'icona Traduci offre di tradurlo`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
     await stubTranslationProvider(app);
+    await soloQuandoApro(app);
     const src = testServer.html(frameInner('ZZTAB')).replace('127.0.0.1', 'blocked.test');
     const page = await testServer.openReady(openTab, framePage(
       `<div id="tab" ${chiusa}><iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe></div>`));
