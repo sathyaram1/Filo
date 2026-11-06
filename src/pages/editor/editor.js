@@ -2255,15 +2255,20 @@
       }
     }
     // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
+    const dentro = (n, giu) => {
+      while (n && n.nodeType === 1 && !BLOCCO.test(n.tagName) && (giu ? n.firstElementChild : n.lastElementChild)) n = giu ? n.firstElementChild : n.lastElementChild;
+      return n;
+    };
     if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
-      const primoNodo = docEl.childNodes[r.startOffset];
-      const testo = primoNodo.nodeType === 3 ? primoNodo : document.createTreeWalker(primoNodo, NodeFilter.SHOW_TEXT).nextNode();
-      if (testo && !testo.parentNode.closest('[contenteditable="false"]')) r.setStart(testo, 0); else r.setStart(primoNodo, 0);
+      const b = dentro(docEl.childNodes[r.startOffset], true);
+      const w = b.nodeType === 1 ? document.createTreeWalker(b, NodeFilter.SHOW_TEXT) : null;
+      let t = w ? w.nextNode() : b;
+      while (t && w && t.parentNode.closest('[contenteditable="false"]')) t = w.nextNode();
+      r.setStart(t || b, 0);
     }
     if (r && !r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
-      const ultimo = docEl.childNodes[r.endOffset - 1];
-      const testo = ultimo.nodeType === 3 ? ultimo : ultimoTesto(ultimo);
-      if (testo) r.setEnd(testo, testo.length); else r.setEnd(ultimo, ultimo.childNodes.length);
+      const b = dentro(docEl.childNodes[r.endOffset - 1], false);
+      r.setEnd(b, b.nodeType === 3 ? b.length : b.childNodes.length);
     }
     const blocco = r && bloccoDi(r.startContainer);
     const bloccoFine = r && bloccoDi(r.endContainer);
