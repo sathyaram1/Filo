@@ -2528,6 +2528,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         } else {
           // Il testo proposto per un campo esce verso il sito: prima passa dalla porta delle uscite (#810).
           const fermo = act === 'fill' ? await campoFermato(parsed.highlight.value) : '';
+          if (finito(mia)) return;
           if (fermo) {
             fermata(fermo);
             parsed.highlight = null;
