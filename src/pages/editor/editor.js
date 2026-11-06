@@ -2237,7 +2237,7 @@
     // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito. Un elenco o
     // una citazione appena aperti invece sono dell'utente: lì si incolla dentro (#1697).
     const primo = r && bloccoDi(r.startContainer);
-    if (r && !/[^\r\n]/.test(docEl.textContent.split(ANCORA).join('')) &&!docEl.querySelector('img') && (!primo || PARAGRAFO.test(primo.tagName))) {
+    if (r && !/[^\r\n]/.test(docEl.textContent.split(ANCORA).join('')) && !docEl.querySelector('img') && (!primo || PARAGRAFO.test(primo.tagName))) {
       const tag = primo ? primo.tagName.toLowerCase() : 'p';
       docEl.textContent = '';
       sel.collapse(docEl, 0);
