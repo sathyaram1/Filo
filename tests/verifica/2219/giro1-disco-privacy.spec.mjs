@@ -35,8 +35,8 @@ async function cookies(app, shell, mode, trustedSites = []) {
 // Il file vero sul disco, dopo che lo storage ha finito di scrivere: non la copia in memoria.
 const sulDisco = (app) => app.evaluate(async () => {
   await globalThis.__filoStorage.whenSettled();
-  const fs = require('node:fs');
-  const path = require('node:path');
+  const fs = process.getBuiltinModule('fs');
+  const path = process.getBuiltinModule('path');
   const leggi = (f) => { try { return fs.readFileSync(path.join(process.env.FILO_USER_DATA, f), 'utf8'); } catch (_) { return ''; } };
   return { file: leggi('storage.json'), copia: leggi('storage.json.bak') };
 });
