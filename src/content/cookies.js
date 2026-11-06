@@ -142,9 +142,9 @@
     return out;
   }
 
-  function reportCreated(base) {
-    const cookies = created(base.c, cookieNames(), 'c:');
-    const storage = created(base.s, memoryNames(), 's:');
+  function reportCreated(base, late) {
+    const cookies = created(base.c, cookieNames(), 'c:', late);
+    const storage = created(base.s, memoryNames(), 's:', late);
     if (cookies.length || storage.length) {
       send({ type: T_OUTCOME, outcome: 'answer', cookies: cookies.slice(0, 20), storage: storage.slice(0, 20) });
     }
