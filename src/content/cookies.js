@@ -1113,5 +1113,5 @@
     load();
   }
 
-  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, _state: () => ({ mode, active, banners, fullScans, hunting: banners && hunting(Date.now()) }) };
+  global.SN_COOKIES_CS = { applyMode, tryReject, rewriteYouTube, nocookieUrl, frameBase, _state: () => ({ mode, active, banners, fullScans, hunting: banners && hunting(Date.now()) }) };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
