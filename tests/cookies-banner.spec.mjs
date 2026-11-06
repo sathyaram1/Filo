@@ -1098,7 +1098,11 @@ async function dallaChat(home, valore) {
     { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_con_banner', valore: v }), valore);
   // A Normale il costo 2 può partire da solo: la conferma si dà solo se compare.
   const fine = await Promise.race([corsa.then(() => 'fatto'), home.locator(CONFIRM_HOST).waitFor({ timeout: 10_000 }).then(() => 'conferma', () => 'fatto')]);
-  if (fine === 'conferma') await clickConfirm(home, 'ok');
+  if (fine === 'conferma') {
+    // OK si accende dopo aver letto il testo fino in fondo (#592).
+    await expect.poll(() => home.evaluate(() => { window.SN_CONFIRM_UI._test.scrollToEnd(); return window.SN_CONFIRM_UI._test.click('ok'); }),
+      { timeout: 8_000 }).toBe(true);
+  }
   await corsa;
 }
 
