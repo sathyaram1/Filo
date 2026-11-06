@@ -329,15 +329,16 @@ test('su un sito dove Filo è spento non parte nessun precarico', async ({ app, 
 test('col portatile senza la spina i link a schermo aspettano, e partono quando torna', async ({ app, openTab }) => {
   const sito = await sitoCheConta();
   try {
-    await app.evaluate(({ powerMonitor }) => { globalThis.__veroBatteria = powerMonitor.isOnBatteryPower; powerMonitor.isOnBatteryPower = () => true; });
+    // Si finge il lettore dello stato del sistema, quello che su Linux legge la spina dai file (giro 3, r4).
+    await app.evaluate(() => { const S = globalThis.SN_SISTEMA_MAIN; globalThis.__veroBatteria = S.sullaBatteria; S.sullaBatteria = () => true; });
     const page = await openTab(`${sito.origin}/indice`);
     await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
     await page.waitForTimeout(4000);
     expect(sito.precarichi()).toEqual([]);
-    await app.evaluate(({ powerMonitor }) => { powerMonitor.isOnBatteryPower = () => false; });
+    await app.evaluate(() => { globalThis.SN_SISTEMA_MAIN.sullaBatteria = () => false; });
     await expect.poll(() => sito.precarichi().length, { timeout: 20_000, intervals: [500] }).toBeGreaterThan(0);
   } finally {
-    await app.evaluate(({ powerMonitor }) => { if (globalThis.__veroBatteria) powerMonitor.isOnBatteryPower = globalThis.__veroBatteria; });
+    await app.evaluate(() => { if (globalThis.__veroBatteria) globalThis.SN_SISTEMA_MAIN.sullaBatteria = globalThis.__veroBatteria; });
     await sito.chiudi();
   }
 });
