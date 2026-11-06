@@ -965,6 +965,8 @@ test('un «no» alla proposta resta dopo il riavvio, senza scrivere il sito sul 
     const carta = await proposta(vista, '127.0.0.1');
     await carta.locator('.shell-notif-close').click();
     await expect.poll(impronte, { timeout: 10_000 }).toBe(1);
+    // Una scheda riaperta al riavvio su /home, ormai fuori, confonderebbe la ricerca della scheda dopo l'accesso.
+    await chiudiScheda(app, shell, sito.a);
 
     await chiudiApp(app);
     app = await lancia();
