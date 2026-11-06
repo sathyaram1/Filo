@@ -87,10 +87,7 @@
     if (armato && e && e.detail > 1) return;
     if (!armato) {
       armato = true;
-      const scatola = togliBtn.getBoundingClientRect();
-      togliBtn.style.minWidth = scatola.width + 'px';
-      togliBtn.style.minHeight = scatola.height + 'px';
-      togliBtn.textContent = 'Confermi?';
+      window.SN_CONFERMA_SUL_POSTO.arma(togliBtn, 'Confermi?');
       togliBtn.title = 'Dal server non si rilegge: se non l’hai anche altrove, ne servirà una nuova';
       timer = setTimeout(disarma, 5000);
       return;
