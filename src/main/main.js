@@ -197,11 +197,11 @@ function syncNativeTheme(theme) {
   nativeTheme.themeSource = theme === 'dark' ? 'dark' : theme === 'light' ? 'light' : 'system';
 }
 
-// Le lingue del correttore nativo: senza, Electron usa solo quella di sistema e la correzione in cima al menu
-// (`_spell:native`, tabs.js) manca sulle parole italiane. La scelta e il perché niente inglese forzato: spellLanguages.js.
-function configureSpellchecker() {
+// Le lingue del correttore nativo, in ogni sessione (incognito e proxy compresi, #1447.3): senza, Electron usa solo
+// quella dell'app, segna ogni parola italiana e la correzione in cima al menu (`_spell:native`, tabs.js) manca. La
+// scelta e il perché niente inglese forzato: spellLanguages.js.
+function configureSpellchecker(ses) {
   try {
-    const ses = session.defaultSession;
     if (!ses || typeof ses.setSpellCheckerLanguages !== 'function') return;
     const available = ses.availableSpellCheckerLanguages || [];
     if (!available.length) return; // macOS / nativo: nessuna lista Hunspell
