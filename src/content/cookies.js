@@ -487,7 +487,7 @@
         continue;
       }
       com.busy = true;
-      cmp.reject().then((res) => {
+      (IS_TOP ? Promise.resolve() : pageBase()).then(() => cmp.reject()).then((res) => {
         com.busy = false;
         com.tried.add(name);
         // Una regola che non ha premuto niente non ha cambiato la pagina: non c'è niente da lasciar assestare.
