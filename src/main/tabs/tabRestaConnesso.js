@@ -18,6 +18,23 @@ const FINESTRELLA_MS = 30 * 1000;
 const RIGUARDA_MS = [1500, 4000, 10000, 25000, 60000];
 // La memoria della pagina portata nel jar nuovo vale per il primo caricamento, non per sempre.
 const SEMINA_MS = 60 * 1000;
+// Chiusa la finestrella d'accesso, una pagina che riceve l'esito da sé (OAuth col messaggio all'opener) si muove
+// entro questo: la ricarica di Filo arriva dopo, e solo se la pagina è rimasta ferma.
+const REAZIONE_MS = 1500;
+
+// Nome → valore dei cookie d'accesso che la scheda manda al suo sito; per un sito di Google anche quelli di Google,
+// dove la finestrella mette l'accesso.
+async function cookieDAccesso(ses, url, sito) {
+  const out = new Map();
+  const indirizzi = [url];
+  if (Google.diGoogle(sito)) indirizzi.push(`https://accounts.${Google.SITO_GOOGLE}/`);
+  for (const u of indirizzi) {
+    let lista = [];
+    try { lista = await ses.cookies.get({ url: u }); } catch (_) {}
+    for (const c of lista) if (looksLikeLoginCookie(c)) out.set(`${c.domain}|${c.path}|${c.name}`, c.value);
+  }
+  return out;
+}
 
 // Siti già proposti o tolti dall'utente: non si ripropongono. Solo in memoria, perché in Privacy Filo non tiene
 // sul disco cosa sa dei siti non fidati (services/cookies.js, keepsSiteData), nemmeno dove accedi.
