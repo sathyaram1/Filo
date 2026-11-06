@@ -745,6 +745,7 @@
     if (!contentObserver) return;
     for (const r of (roots || [])) {
       try { contentObserver.observe(r, { childList: true, subtree: true }); } catch (_) {}
+      ascoltaRiquadri(r);
     }
   }
 
