@@ -150,14 +150,17 @@
     }
   }
 
-  // Poco dopo vuol dire due secondi, e finché l'utente non fa altro: la valuta scelta subito dopo resta del sito.
-  const ANSWER_LOOKS_MS = [0, 300, 1000, 2000];
+  // Durante il clic e nel giro dopo conta ogni nome nuovo. Più tardi, fino a quattro secondi e finché l'utente non fa
+  // altro, solo un nome che parla di scelta o di consenso: la valuta che il sito si scrive mentre carica resta sua.
+  const LATE_ANSWER = /(consen|cookie|privacy|gdpr|rgpd|dsgvo|scelt|choice|choix|wahl|elecci|accept|reject|refus|rifiut|opt.?(in|out)|notice|banner|tracking)/i;
+  const ANSWER_LATE_MS = [300, 1000, 2000, 4000];
   let lastGestureAt = 0;
 
   function answerAfter(base, now) {
     if (!base) return;
-    if (now) reportCreated(base);
-    for (const ms of ANSWER_LOOKS_MS) setTimeout(() => { if (lastGestureAt <= base.at) reportCreated(base); }, ms);
+    if (now) reportCreated(base, false);
+    setTimeout(() => reportCreated(base, false), 0);
+    for (const ms of ANSWER_LATE_MS) setTimeout(() => { if (lastGestureAt <= base.at) reportCreated(base, true); }, ms);
   }
 
   // Il riquadro di un banner sta per premere: la pagina fotografa adesso i suoi nomi. Glielo chiede il main
