@@ -284,6 +284,29 @@ test('600 righe con la prima vuota in un documento vuoto, e 600 in una voce di e
   await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(elenco);
 });
 
+test('in una riga vuota sopra un paragrafo, e su tutto il testo selezionato, l\'incolla lungo entra in fretta e si annulla in un passo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const righe = Array.from({ length: 600 }, (_, i) => `Riga ${i}`);
+  const prima = await foglio(page, '<p><br></p><p>dopo</p>', { nodo: 'd.firstChild', off: 0 });
+  let ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual([...righe, 'dopo']);
+  await page.keyboard.type('X');
+  expect((await blocchi(page)).slice(-2)).toEqual(['Riga 599X', 'dopo']);
+  await page.keyboard.press('Control+Z');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(prima);
+
+  const tutto = await foglio(page, '<p>uno <b>due</b></p><p>tre</p>', { nodo: 'd.firstChild.firstChild', off: 0 });
+  await page.keyboard.press('Control+A');
+  ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla su tutto durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual(righe);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(tutto);
+});
+
 test('in una riga vuota sotto un paragrafo, 600 righe che cominciano con un carattere solo entrano in fretta', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await apriEditor(openTab);
