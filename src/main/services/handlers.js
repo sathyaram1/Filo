@@ -6556,12 +6556,14 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     let token = await stimaRichiesta();
     // Dopo un riavvio non c'è una richiesta precedente in memoria: la pausa si misura dall'ultimo messaggio del filo.
     const ultimoUso = round !== 1 ? null : (fotoPrima ? fotoPrima.usata : LC.ultimaAttivita(filo.tutti, { chat: chatId }));
-    // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero. Al primo
-    // giro la differenza è la parte fissa, che dice quanto grezzo può restare e quando compattare in anticipo.
+    // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
     let tokenTratto = 0;
+    if (ultimoUso != null) { try { tokenTratto = await Compattazione.tokenDelTratto(incognitoTurno, { tetti: tettiChat }); } catch (_) {} }
+    // Al primo giro, la richiesta meno il tratto composto è la parte fissa: dice quanto grezzo può restare e quando
+    // compattare in anticipo.
     if (round === 1) {
-      try { tokenTratto = await Compattazione.tokenDelTratto(incognitoTurno, { tetti: tettiChat }); } catch (_) {}
-      if (tokenTratto > 0) Compattazione.segnaBase(incognitoTurno, token - tokenTratto);
+      const FC = globalThis.SN_FILO_CONTESTO;
+      Compattazione.segnaBase(incognitoTurno, token - Math.ceil(FC.caratteriDi(filo.messaggi || []) / FC.CARATTERI_PER_TOKEN));
     }
     const motivo = LC.motivo({
       token, soglia: tettiChat.soglia, tokenTratto, ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
