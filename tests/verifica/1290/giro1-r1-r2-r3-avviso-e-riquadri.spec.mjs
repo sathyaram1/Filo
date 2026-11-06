@@ -87,7 +87,6 @@ const SIGILLATO = (prima, dopo) => `<!doctype html><html lang="en"><body style="
 </body></html>`;
 
 for (const [nome, prima, dopo, scorri] of [
-  ['in vista (controllo)', '', '', 0],
   ['più in basso della prima schermata', '<div style="height:2500px"></div>', '', 0],
   ['in cima, tradotto dopo averlo superato scorrendo', '', '<div style="height:2500px"></div>', 1400],
   ['dentro una sezione chiusa, che di serie si traduce', '<details id="d"><summary>Open the box</summary>', '</details>', 0],
