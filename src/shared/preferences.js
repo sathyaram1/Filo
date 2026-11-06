@@ -1369,7 +1369,7 @@
       costo: 1,
       keys: ['blocca_pubblicita_youtube', 'blocca le pubblicità di youtube', 'blocca le pubblicita di youtube',
         'pubblicità di youtube', 'pubblicita di youtube', 'pubblicità youtube', 'pubblicita youtube', 'annunci di youtube',
-        'youtube ads', 'blocco youtube', 'adblock youtube'],
+        'youtube ads', 'blocco youtube'],
       build(v) {
         const b = parsePrefBool(v);
         if (b === null) return null;
