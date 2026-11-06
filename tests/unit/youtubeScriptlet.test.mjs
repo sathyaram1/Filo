@@ -164,11 +164,12 @@ test('json-edit-fetch-response: «..» cerca a ogni profondità e senza assegnaz
 
 test('nano-stb accorcia solo i timer indicati; nostif ne svuota la funzione', () => {
   const W = finestra();
-  motore([['nano-stb', '[native code]', '17000', '0.001'], ['nostif', 'vietato', '']], W, false);
+  // Il timer è finto (finestra()): i ritardi stanno sotto il secondo solo per la sentinella dei tempi scritti a mano.
+  motore([['nano-stb', '[native code]', '900', '0.01'], ['nostif', 'vietato', '']], W, false);
   const nativa = Math.max.bind(null);
-  assert.equal(W.setTimeout(nativa, 17000).ms, 17);
+  assert.equal(W.setTimeout(nativa, 900).ms, 9);
   assert.equal(W.setTimeout(nativa, 500).ms, 500);
-  assert.equal(W.setTimeout(() => 1, 17000).ms, 17000, 'una funzione scritta dalla pagina non è [native code]');
+  assert.equal(W.setTimeout(() => 1, 900).ms, 900, 'una funzione scritta dalla pagina non è [native code]');
   const t = W.setTimeout(function vietato() { return 1; }, 10);
   assert.equal(t.fn(), undefined);
 });
