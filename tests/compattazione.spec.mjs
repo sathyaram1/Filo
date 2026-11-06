@@ -268,7 +268,7 @@ test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; 
   }
 });
 
-test('oltre i 100.000 token senza niente da compattare escono gli esiti vecchi, il testo dell\'utente resta', async ({ app }) => {
+test('oltre i 100.000 token con la compattazione non riuscita escono gli esiti vecchi, il testo dell\'utente resta', async ({ app }) => {
   const page = await home(app);
   // Sette pagine lette dieci minuti fa, ancora nel grezzo: ognuna entra fino al tetto della sua busta (32 KB), e insieme
   // portano la richiesta oltre il listino.
