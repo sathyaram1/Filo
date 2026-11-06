@@ -282,11 +282,45 @@ const restaConnessoMethods = {
     if (sito && sito === partito) this._accessoSegna(tab, sito);
   },
 
+  // Aperta una finestrella d'accesso dalla scheda: i cookie d'accesso che la scheda ha adesso, per riconoscere alla
+  // chiusura un accesso riuscito (#1629).
+  _finestrellaAperta(tab) {
+    const wc = tab && tab.view && tab.view.webContents;
+    const url = String((tab && tab.url) || '');
+    if (!wc || wc.isDestroyed() || !/^https?:/i.test(url)) return null;
+    const sito = Cookies.registrableOf(url);
+    if (!sito) return null;
+    return { wc, sito, prima: cookieDAccesso(wc.session, url, sito) };
+  },
+
   // Chiusa la finestrella d'accesso aperta dalla scheda: il sito della scheda potrebbe averla appena usata.
-  _accessoDopoFinestrella(tab) {
+  _accessoDopoFinestrella(tab, seguita = null) {
     if (!tab || !this.tabs.includes(tab)) return;
     const sito = this._propostaSito(tab);
     if (sito) this._accessoSegna(tab, sito, { dopoCarico: true });
+    if (seguita) this._ricaricaDopoFinestrella(tab, seguita).catch(() => {});
+  },
+
+  // Accesso riuscito nella finestrella (cookie d'accesso nuovi o cambiati per il sito della scheda): la scheda che
+  // l'ha aperta si ricarica e il sito la vede dentro. Non se la pagina ha già reagito da sé, se è passata ad altro,
+  // o se ha qualcosa da perdere.
+  async _ricaricaDopoFinestrella(tab, seguita) {
+    const { wc, sito } = seguita;
+    const valida = () => this.tabs.includes(tab) && tab.view && tab.view.webContents === wc && !wc.isDestroyed();
+    if (!valida()) return;
+    const allaChiusura = wc.getURL();
+    const prima = await seguita.prima;
+    await new Promise((r) => { const t = setTimeout(r, REAZIONE_MS); if (t.unref) t.unref(); });
+    if (!valida() || wc.isLoading() || wc.getURL() !== allaChiusura) return;
+    const url = wc.getURL();
+    const ora = /^https?:/i.test(url) ? Cookies.registrableOf(url) : null;
+    const AP = globalThis.SN_AUTH_POPUP;
+    const stesso = ora === sito || (Google.diGoogle(ora) && Google.diGoogle(sito)) || !!(AP && AP.isIdentityAuthSurface(url));
+    if (!stesso || this._qualcosaDaPerdere(tab)) return;
+    const dopo = await cookieDAccesso(wc.session, tab.url, sito);
+    if (![...dopo].some(([k, v]) => prima.get(k) !== v)) return;
+    if (!valida() || wc.isLoading() || wc.getURL() !== allaChiusura || this._qualcosaDaPerdere(tab)) return;
+    try { wc.reload(); } catch (_) {}
   },
 
   // Riuscito vuol dire: nessun campo password in vista sul sito, e il sito si è segnato un accesso.
