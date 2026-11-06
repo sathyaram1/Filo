@@ -3580,6 +3580,7 @@ class TabManager {
       this._sbOnNavigate(tab, url);
       this._cookieOnNavigate(tab, url);
       this._accessoDaNavigazione(tab, urlPrima, url);
+      this._passaggioDopoCambio(tab);
       // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
       // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
       // redirect "di blocco" memorizzato durante questa navigazione.
