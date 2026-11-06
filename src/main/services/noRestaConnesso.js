@@ -68,13 +68,21 @@ function crea({ file, fileSale }) {
     return k.toString('hex');
   }
 
+  // Un sì subito dopo la proposta non deve arrivare prima del suo «no».
+  let fila = Promise.resolve();
+  const inFila = (lavoro) => {
+    const p = fila.then(lavoro, lavoro);
+    fila = p.catch(() => {});
+    return p;
+  };
+
   return {
     /** Su `sito` l'utente ha già lasciato cadere la proposta. */
-    async detto(sito) {
+    detto: (sito) => inFila(async () => {
       if (!sito || !carica().impronte.length) return false;
       return carica().impronte.includes(await impronta(sito));
-    },
-    async segna(sito) {
+    }),
+    segna: (sito) => inFila(async () => {
       if (!sito) return;
       const imp = await impronta(sito);
       const s = carica();
@@ -82,15 +90,15 @@ function crea({ file, fileSale }) {
       s.impronte.push(imp);
       if (s.impronte.length > TETTO) s.impronte.splice(0, s.impronte.length - TETTO);
       await salva();
-    },
-    async togli(sito) {
+    }),
+    togli: (sito) => inFila(async () => {
       if (!sito || !carica().impronte.length) return;
       const imp = await impronta(sito);
       const s = carica();
       const prima = s.impronte.length;
       s.impronte = s.impronte.filter((x) => x !== imp);
       if (s.impronte.length !== prima) await salva();
-    },
+    }),
   };
 }
 
