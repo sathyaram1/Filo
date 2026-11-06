@@ -2314,7 +2314,7 @@
         tutta.setStart(car.startContainer, car.startOffset);
         scegli(tutta);
         const suo = sopra.tagName.toLowerCase();
-        document.execCommand('insertHTML', false, `<${suo}>${carattereVestito(car, sopra)}</${suo}>${paragrafi(tag)}`);
+        document.execCommand('insertHTML', false, `<${suo}>${carattereVestito(car, sopra, coda)}</${suo}>${paragrafi(tag)}`);
         return;
       }
     }
