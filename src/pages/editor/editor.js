@@ -1481,7 +1481,7 @@
     parent.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
         // Lo spazio di larghezza zero è l'ancora dell'incolla lungo (incollaLungo), non testo dell'utente.
-        const testo = node.nodeValue.replace(/\\u200b/g, '');
+        const testo = node.nodeValue.split(ANCORA).join('');
         if (testo) out.push({ type: 'text', text: testo, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
         return;
       }
