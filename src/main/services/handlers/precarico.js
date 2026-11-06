@@ -18,7 +18,7 @@ module.exports = function register(on, ctx) {
     let scaricando = false;
     try { scaricando = require('../downloads').scaricaInCorso(); } catch (_) {}
     let aBatteria = false;
-    try { aBatteria = powerMonitor.isOnBatteryPower(); } catch (_) {}
+    try { aBatteria = sullaBatteria(); } catch (_) {}
     const tm = win && win._filoTabs;
     let dietro = false;
     try {
