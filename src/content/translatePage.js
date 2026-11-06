@@ -717,19 +717,22 @@
     try { radice.addEventListener('load', riquadroCaricato, true); } catch (_) {}
   }
 
-  // Mentre si traduce no: quel giro gli ha già passato parola, o lo riprende il giro dopo.
+  // Anche mentre si traduce: il giro ha passato parola ai riquadri che c'erano quando è partito, non a questo (#1290).
   function riquadroCaricato(e) {
     const f = e && e.target;
     if (!f || (f.tagName !== 'IFRAME' && f.tagName !== 'FRAME')) return;
-    if (!contentObserver || !pageHasTranslation || pageTranslating || !isTopFrame()) return;
-    const modo = modoUltimo;
-    const g = frameVerdict(f, modo);
-    if (g === 'shown' || g === 'background') newContentSeen = true;
+    if (!contentObserver || !(pageHasTranslation || pageTranslating) || !isTopFrame()) return;
+    const g = frameVerdict(f, modoUltimo);
+    let nuovo = false;
+    if (g === 'shown' || g === 'background') nuovo = true;
     else if (g === 'folded') { if (hiddenFrames.indexOf(f) < 0) hiddenFrames.push(f); revealedDirty = true; }
     else if (g === 'inline') {
       const body = Extract.inlineFrameBody(f);
-      if (body && HAS_LETTER.test(body.textContent || '')) newContentSeen = true;
+      nuovo = !!(body && HAS_LETTER.test(body.textContent || ''));
     }
+    if (!nuovo) return;
+    if (pageTranslating) riquadroNelGiro = true;
+    else newContentSeen = true;
   }
 
   // Le fisarmoniche fatte di solo CSS (la casella nascosta, il bersaglio nell'indirizzo) si aprono senza toccare
