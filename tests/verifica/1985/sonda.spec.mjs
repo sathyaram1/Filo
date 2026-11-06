@@ -22,37 +22,31 @@ async function sito(ritardo) {
   return { origin: `http://127.0.0.1:${server.address().port}`, richieste, chiudi: () => new Promise((ok) => { server.closeAllConnections?.(); server.close(ok); }) };
 }
 
-const VARIANTI = {
-  immediate: (u) => ({ prefetch: [{ source: 'list', urls: [u] }] }),
-  entrambe: (u) => ({ prefetch: [{ source: 'list', urls: [u] }, { source: 'list', urls: [u], eagerness: 'moderate' }] }),
-  conservative: (u) => ({ prefetch: [{ source: 'list', urls: [u], eagerness: 'conservative' }] }),
-};
-for (const [nome, regola] of Object.entries(VARIANTI)) for (const premuto of [100]) {
-  test(`pressione veloce ${nome}, tenuto ${premuto} ms`, async ({ app, openTab }) => {
+for (const ritardo of [600, 1500]) for (const fermo of [0, 100, 300]) {
+  test(`server ${ritardo}, fermo ${fermo}`, async ({ app, openTab }) => {
     await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ blocklist: ['127.0.0.1'] }); });
-    const s = await sito(1500);
+    const s = await sito(ritardo);
     try {
       const page = await openTab(`${s.origin}/pag`);
       await page.waitForLoadState('load');
-      await page.evaluate((r) => {
-        document.addEventListener('pointerdown', (e) => {
+      await page.evaluate(() => {
+        const metti = (r) => { const x = document.createElement('script'); x.type = 'speculationrules'; x.textContent = JSON.stringify(r); document.head.append(x); };
+        document.addEventListener('mouseover', (e) => {
           const a = e.target.closest('a');
           if (!a) return;
-          const x = document.createElement('script');
-          x.type = 'speculationrules';
-          x.textContent = JSON.stringify(r).replaceAll('URL', a.href);
-          document.head.append(x);
+          metti({ prefetch: [{ source: 'list', urls: [a.href], eagerness: 'moderate' }] });
+          setTimeout(() => metti({ prefetch: [{ source: 'list', urls: [a.href] }] }), 65);
         }, true);
-      }, regola('URL'));
+      });
       const box = await page.locator('#l3').boundingBox();
       await page.mouse.move(box.x + 5, box.y + 5);
+      await page.waitForTimeout(fermo);
       const t0 = Date.now();
       await page.mouse.down();
-      await page.waitForTimeout(premuto);
-      const primaDelClic = s.richieste.filter((x) => x.url === '/pag/3').length;
+      await page.waitForTimeout(90);
       await page.mouse.up();
       await expect(page.locator('#arrivato')).toHaveText('/pag/3', { timeout: 15_000 });
-      console.log('PRESSIONE', premuto, Date.now() - t0, 'prima', primaDelClic, s.richieste.filter((x) => x.url === '/pag/3').map((x) => (x.prefetch ? 'P' : 'N')).join(''));
+      console.log('SONDA', ritardo, fermo, Date.now() - t0, s.richieste.filter((x) => x.url === '/pag/3').map((x) => (x.prefetch ? 'P' : 'N')).join(''));
     } finally { await s.chiudi(); }
   });
 }
