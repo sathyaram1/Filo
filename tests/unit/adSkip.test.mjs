@@ -34,6 +34,17 @@ test('il clic vero solo su YouTube, in http(s)', () => {
   }
 });
 
+// #1974: dove il blocco delle pubblicità di YouTube può tornare al solo «Salta», il «Salta» deve avere il suo clic vero.
+test('il clic vero vale su ogni sito di YouTube che il blocco tocca: un elenco solo', () => {
+  const R = require(join(ROOT, 'src', 'main', 'services', 'regoleYouTube.js'));
+  for (const b of R.BASI) {
+    assert.equal(A.hostIncorporato(`https://www.${b}/embed/x`), true, b);
+    assert.equal(A.hostConClicVero(`https://www.${b}/watch?v=x`), !R.SOLO_INCORPORATI.includes(b), b);
+  }
+  assert.equal(A.hostConClicVero('https://www.youtubekids.com/watch?v=x'), true);
+  assert.equal(A.hostIncorporato('https://youtubekids.com.evil.example/'), false);
+});
+
 test('il clic vero solo dal frame principale di una scheda', () => {
   const main = { frameTreeNodeId: 1, url: 'https://www.youtube.com/watch?v=x' };
   const wc = { mainFrame: main };
