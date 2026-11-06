@@ -4,8 +4,11 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 process.env.NODE_ENV = 'test';
+// La copia delle regole su disco va in una cartella di prova, non nel repo.
+process.env.FILO_USER_DATA = cartellaTemporanea('filo-blocco-youtube-');
 const require = createRequire(import.meta.url);
 const B = require('../../src/main/services/bloccoYouTube.js');
 
