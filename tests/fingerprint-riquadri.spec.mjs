@@ -5,6 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { guardiaAccesa } from './helpers/guardia.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 import { createServer } from 'node:http';
 
 async function setFpMode(openTab, mode) {
