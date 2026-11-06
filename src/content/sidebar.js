@@ -2084,7 +2084,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   // Chiudere a metà di un turno nasconde il pannello invece di buttare la risposta; i passi che l'Aiuto farebbe da
   // solo, chiuso, non partono. Un pannello che la pagina ha tolto è chiuso anche per loro (#1049.1).
   async function submit(op = {}) {
-    if (root && !apertoQui()) { staccato(); return; }
+    if (root && !root) { staccato(); return; }
     if (!root || (nascosto && !op.userMessage)) { aggiornaTasto(); return; }
     const mia = epoca;
     const chiave = {};
