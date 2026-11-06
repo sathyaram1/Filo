@@ -940,8 +940,8 @@
         // Le gemelle non consumano il tetto del giro e non contano come
         // "rimasto fuori": non sono lavoro da spedire, sono una copia.
         if (t.mirror) { if (mirrors.length < maxBlocks) mirrors.push(t); continue; }
-        if (room()) attrs.push(t);
-        else truncated++;
+        if (nascosto) t.nascosto = true;
+        (nascosto ? nascostiAttr : vistiAttr).push(t);
       }
     };
     // Pila esplicita invece del TreeWalker: deve poter saltare da un albero
@@ -949,12 +949,15 @@
     const stack = [root];
     while (stack.length) {
       const el = stack.pop();
+      let nascosto = dentroNascosto.has(el);
       // La radice non passa dal filtro: un <body> translate=no o nascosto spegnerebbe tutta la
       // pagina. Il filtro vale da lì in giù.
       const skip = el !== root && skipSubtreeForTranslation(el);
+      // Si traduce tutto: la sezione nascosta si legge come il resto, solo dopo.
+      if (tutto && (skip === 'hidden' || skip === 'visibility')) nascosto = true;
       // Invisibile per `visibility`, che un figlio può riprendersi: si segna come ogni altra ripiegatura, ma la
       // camminata continua là sotto, se no il testo che si vede resta in inglese e il menu non lo offre (#505).
-      if (skip === 'visibility') {
+      else if (skip === 'visibility') {
         const p = el.parentElement;
         if (!(p && sottoInvisibile.has(p)) && hidden.length < MAX_HIDDEN
             && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
