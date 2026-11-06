@@ -46,8 +46,8 @@ la lettura del filo e la fotografia del CONTESTO in `src/main/services/contestoF
   spazio fra la parte fissa e la soglia (turni pesanti: meno turni, l'ultimo sempre). Il tratto riparte dal punto
   compattato (`finestra({ dopo })`), il diario entra nel CONTESTO come sezione `FILO` (che rifà la fotografia), e i
   turni rimasti tornano byte per byte: verso Claude il loro ragionamento lo toglie l'impronta del prefisso. Le altre
-  porte: fermo oltre la durata della cache col tratto grande (timer dopo il turno), una risposta già oltre l'80% della
-  soglia (in sottofondo, così il messaggio dopo non aspetta), una volta al giorno le ore di ieri in una riga dei giorni.
+  porte: fermo oltre la durata della cache col tratto grande (timer dopo il turno), una risposta già oltre l'80% dello
+  spazio fra la parte fissa e la soglia (in sottofondo, così il messaggio dopo non aspetta), una volta al giorno le ore di ieri in una riga dei giorni.
   Oltre i 100.000 token anche dopo, escono gli esiti dei turni passati (la risposta dice come rifarli); se non basta la
   richiesta parte con `oltreListino` nella Cronologia AI. Una compattazione non riuscita non sposta niente e aspetta
   dieci minuti. Il sospetto (SPEC-CONTESTO § Il sospetto non passa nel riassunto): le letture sopra la soglia di pulito
