@@ -259,14 +259,16 @@
       if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
       const { templated, refs } = templateizeBlock(b.el);
       if (!hasTranslatableText(templated)) continue;
-      units.push({ el: b.el, templated, refs, run: myRun });
+      units.push({ el: b.el, templated, refs, run: myRun, nascosto: !!b.nascosto });
     }
     // Etichette (suggerimenti, descrizioni, scritte sui bottoni): stessa coda di lavoro, ma si
     // applicano scrivendo l'attributo invece di sostituire i figli.
     for (const a of (blocks.attrs || [])) {
       if (!a.el || !hasTranslatableText(a.text)) continue;
-      units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [], run: myRun });
+      units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [], run: myRun, nascosto: !!a.nascosto });
     }
+    // Prima quello che si vede, poi in sottofondo le sezioni nascoste (D61): la coda è una, e l'ordine è questo.
+    units.sort((x, y) => (x.nascosto ? 1 : 0) - (y.nascosto ? 1 : 0));
 
     if (!units.length) {
       if (truncated) {
