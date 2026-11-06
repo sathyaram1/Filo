@@ -149,12 +149,14 @@
     }
   }
 
-  const ANSWER_LOOKS_MS = [0, 300, 1000, 2000, 4000];
+  // Poco dopo vuol dire due secondi, e finché l'utente non fa altro: la valuta scelta subito dopo resta del sito.
+  const ANSWER_LOOKS_MS = [0, 300, 1000, 2000];
+  let lastGestureAt = 0;
 
   function answerAfter(base, now) {
     if (!base) return;
     if (now) reportCreated(base);
-    for (const ms of ANSWER_LOOKS_MS) setTimeout(() => reportCreated(base), ms);
+    for (const ms of ANSWER_LOOKS_MS) setTimeout(() => { if (lastGestureAt <= base.at) reportCreated(base); }, ms);
   }
 
   // Il riquadro di un banner sta per premere: la pagina fotografa adesso i suoi nomi. Glielo chiede il main
