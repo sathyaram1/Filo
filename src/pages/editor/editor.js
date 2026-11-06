@@ -864,7 +864,9 @@
     if (emptyBtn) emptyBtn.addEventListener('click', () => {
       if (emptyBtn.dataset.confirm !== '1') {
         emptyBtn.dataset.confirm = '1';
-        emptyBtn.textContent = `Confermi? Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
+        // La scatola resta quella di «Svuota cestino»: il conto va nel suggerimento, non nella scritta.
+        CONFERMA.arma(emptyBtn, 'Confermi?');
+        emptyBtn.title = `Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
         emptyBtn.classList.add('danger');
         staleClick.arm();
         return;
