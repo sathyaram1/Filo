@@ -3,7 +3,7 @@
 import { test, expect } from '../../fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
-test('r2 i link a schermo di una scheda rimasta dietro non si precaricano, e ripartono quando la si riporta davanti', async ({ shell, openTab }) => {
+test('r2 i link a schermo di una scheda rimasta dietro non si precaricano, e ripartono quando la si riporta davanti', async ({ app, shell, openTab }) => {
   const richieste = [];
   const server = createServer((req, res) => {
     richieste.push({ url: req.url, prefetch: /prefetch/.test(req.headers['sec-purpose'] || '') });
