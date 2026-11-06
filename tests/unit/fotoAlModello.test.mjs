@@ -63,9 +63,9 @@ test('la foto intera e quella della barra si chiedono solo dal gestore delle ric
   assert.deepEqual(chi, { 'src/main/services/handlers/misc.js': 2 });
 });
 
-// Chi chiede alla pagina la foto senza la copia coperta la riceve intera: lo fa solo chi non la manda a un modello.
+// Chi chiede alla pagina la foto senza la copia coperta la riceve intera: lo fa solo chi non la manda a un modello né
+// fuori dal computer. Lo screenshot del feedback va all'owner e chiede `coperta` (#2116).
 const RICHIESTE_INTERE = {
-  'src/content/feedback.js': 'lo screenshot allegato al feedback, che l’utente vede e manda all’owner',
   'src/preload/internal-preload.js': 'chrome.tabs.captureVisibleTab delle pagine di Filo: nessuna la manda a un modello',
 };
 test('una richiesta di foto della pagina senza la copia coperta sta solo dove la foto non va a un modello', () => {
@@ -75,7 +75,7 @@ test('una richiesta di foto della pagina senza la copia coperta sta solo dove la
       const rel = relative(RADICE, p).split('\\').join('/');
       const t = readFileSync(p, 'utf8');
       for (const m of t.matchAll(/\{\s*type:\s*(?:MSG\.CAPTURE_VISIBLE_TAB|'capture_visible_tab')([^}]*)\}/g)) {
-        if (!/\b(?:perModello|copiaPerModello):\s*true/.test(m[1]) && !RICHIESTE_INTERE[rel]) fuori.push(rel);
+        if (!/\b(?:perModello|copiaPerModello|coperta):\s*true/.test(m[1]) && !RICHIESTE_INTERE[rel]) fuori.push(rel);
       }
     }
   }

@@ -86,10 +86,13 @@
     });
   }
 
+  // La schermata esce dal computer: la copre il main come la foto per un modello. `{ segreti: true, motivo }` se
+  // coprirla non riesce, e allora la pagina non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, coperta: true });
+      if (r?.ok && r.dataUrl) return { dataUrl: r.dataUrl };
+      if (r?.code === 'coperture') return { segreti: true, motivo: String(r.motivo || '') };
     } catch (_) {}
     return null;
   }
@@ -756,7 +759,8 @@
           // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
-          const shot = await captureScreenshot();
+          const foto = await captureScreenshot();
+          const shot = foto?.dataUrl || null;
           // Lo scatto annotato della barra in alto si chiede solo se ci si ha disegnato sopra.
           let topbarShot = null;
           if (topbarHasDrawing) {
@@ -767,8 +771,16 @@
           }
           root.style.visibility = '';
           const full = (shot || topbarShot) ? await schermataAnnotata(shot, topbarShot) : null;
+          const perche = foto?.motivo === 'misura'
+            ? 'la pagina non ha risposto in tempo, e senza sapere dove sono i campi password o carta non la mando.'
+            : foto?.motivo === 'riquadri'
+              ? 'nella pagina c’è un riquadro di un altro sito che non sono riuscito a coprire.'
+              : 'nella pagina c’è un campo riservato (password o carta) che non sono riuscito a coprire.';
           if (full) {
             outImages.push({ dataUrl: full, name: 'schermata annotata' });
+            if (foto?.segreti) senzaSchermata = `Della schermata è partita solo la barra in alto: ${perche}`;
+          } else if (foto?.segreti) {
+            senzaSchermata = `La schermata non è partita: ${perche}`;
           } else {
             senzaSchermata = (shot || topbarShot)
               ? 'Non sono riuscito a preparare la schermata annotata.'

@@ -26,6 +26,7 @@
         { testo: 'Su Mac, con Filo acceso e nessuna sua finestra aperta, le voci della barra dei menu e le loro scorciatoie, come Cmd+T e Cmd+Shift+T, riaprono la finestra con le tue schede invece di non fare niente.', segnalazione: 2031 },
         { testo: 'Su Mac, con davanti la finestrella di accesso di un sito, Cmd+W, Cmd+R e lo zoom agiscono su di lei e non più sulla scheda che aspetta l\'accesso.', segnalazione: 2031 },
         { testo: 'Filo si apre un po\' più in fretta: il codice dell\'app compilato alla prima apertura resta pronto per le successive.', segnalazione: 2118 },
+        { testo: 'Nello screenshot che alleghi a un feedback i campi password e di carta escono coperti, come nelle immagini che vanno all\'assistente. Se uno non si riesce a coprire, la pagina resta fuori e il riquadro del feedback te lo dice.', segnalazione: 2116 },
       ],
     },
     {
