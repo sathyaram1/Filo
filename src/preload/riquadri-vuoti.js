@@ -27,10 +27,10 @@ function buildRiquadriVuotiSource(corpi) {
   var urlDi = (D(Document.prototype, 'URL') || {}).get;
   var vistaDi = (D(Document.prototype, 'defaultView') || {}).get;
   var chiusa = (D(window, 'closed') || D(Window.prototype, 'closed') || {}).get;
-  // Un riquadro dentro una radice ombra non sta fra quelli per indice: si raggiunge dal suo elemento.
   var CORNICI = ${JSON.stringify(V.CORNICI)}, GETTER_FINESTRA = ${JSON.stringify(V.GETTER_FINESTRA)};
   var CON_SVG = ${JSON.stringify(V.CON_SVG)}, VIE_NODI = ${JSON.stringify(V.VIE_NODI)};
   var VIE_TESTO = ${JSON.stringify(V.VIE_TESTO)}, RISCRIVONO = ${JSON.stringify(Object.fromEntries(V.RISCRIVONO.map((n) => [n, 1])))};
+  // Un riquadro dentro una radice ombra non sta fra quelli per indice: si raggiunge dal suo elemento.
   var finestreDi = CORNICI.map(function (c) {
     return ((window[c] && D(window[c].prototype, 'contentWindow')) || {}).get;
   }).filter(Boolean);
