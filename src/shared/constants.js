@@ -3059,10 +3059,14 @@
     };
   }
 
-  // Le sezioni chiuse di una pagina da tradurre (#1290): solo 'apertura' le rimanda, ogni altro valore è il di serie.
+  // Le sezioni chiuse di una pagina da tradurre (#1290): i due valori di `traduzionePagina.nascoste`, scritti solo qui.
+  // Solo RIMANDA le rimanda, ogni altro valore è il di serie.
+  const NASCOSTE_TRADUZIONE = Object.freeze({ TRADUCI: 'subito', RIMANDA: 'apertura' });
+  function modoNascoste(v) {
+    return v === NASCOSTE_TRADUZIONE.RIMANDA ? NASCOSTE_TRADUZIONE.RIMANDA : NASCOSTE_TRADUZIONE.TRADUCI;
+  }
   function nascosteDellaTraduzione(settings) {
-    const v = settings && settings.traduzionePagina && settings.traduzionePagina.nascoste;
-    return v === 'apertura' ? 'apertura' : 'subito';
+    return modoNascoste(settings && settings.traduzionePagina && settings.traduzionePagina.nascoste);
   }
 
   // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
