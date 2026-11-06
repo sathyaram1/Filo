@@ -233,8 +233,6 @@ app.whenReady().then(async () => {
   await registerFiloProtocol();
   registerIpcHandlers();
   passo('protocollo_ipc', t);
-  configureSpellchecker(session.defaultSession);
-  app.on('session-created', configureSpellchecker);
   try { require('./services/dizionarioDiFilo').prepara({ locale: app.getLocale(), dopoMs: 1500 }); } catch (_) {}
   // PRIMA di qualsiasi finestra: su Mac la barra vince sui tasti delle pagine.
   installaMenuApplicazione();
