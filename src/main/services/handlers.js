@@ -6559,11 +6559,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // Il tratto «grande» si misura come lo misura il timer da fermo: le due strade decidono sullo stesso numero.
     let tokenTratto = 0;
     if (ultimoUso != null) { try { tokenTratto = await Compattazione.tokenDelTratto(incognitoTurno, { tetti: tettiChat }); } catch (_) {} }
-    // Al primo giro, la richiesta meno il tratto composto è la parte fissa: dice quanto grezzo può restare e quando
-    // compattare in anticipo.
+    // La parte della richiesta che non è tratto né domanda (strumenti, parte fissa, CONTESTO): dice quanto grezzo può
+    // restare e quando compattare in anticipo. Gli stessi pezzi della stima accanto alla soglia.
     if (round === 1) {
       const FC = globalThis.SN_FILO_CONTESTO;
-      Compattazione.segnaBase(incognitoTurno, token - Math.ceil(FC.caratteriDi(filo.messaggi || []) / FC.CARATTERI_PER_TOKEN));
+      try {
+        Compattazione.segnaBase(incognitoTurno, Math.ceil((PROMPTS.filoChatStatic().length + String(payloadBase.parteUtente || '').length + caratteriStrumenti()) / FC.CARATTERI_PER_TOKEN));
+      } catch (_) {}
     }
     const motivo = LC.motivo({
       token, soglia: tettiChat.soglia, tokenTratto, ultimoUso, cacheMs: ContestoFilo.durataMs(tettiChat.cache),
