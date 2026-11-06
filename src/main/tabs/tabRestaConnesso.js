@@ -367,9 +367,11 @@ const restaConnessoMethods = {
     this._proponiConnesso(a.sito);
   },
 
-  // Una volta per sito: chiusa, scaduta o accettata, non torna.
+  // Una volta per sito: chiusa, scaduta o accettata, non torna. Il «no» si ricorda già adesso; il sì lo toglie
+  // (onTrustChange), quindi resta quello di chi la chiude o la lascia scadere, anche chiudendo Filo.
   _proponiConnesso(sito) {
     proposti.add(sito);
+    ricordaNo().segna(chiaveNo(sito)).catch(() => {});
     try {
       this.win.webContents.send('shell:toast', {
         text: `Hai fatto l'accesso a ${nomeLeggibile(sito)}. Vuoi restare connesso anche quando chiudi la scheda o riapri Filo?`,
