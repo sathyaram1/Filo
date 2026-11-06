@@ -174,22 +174,25 @@
     // testo resterebbe in lingua originale. Le nostre sostituzioni nascono già marcate.
     newContentSeen = false;
     startWatchingNewContent();
-    // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
-    // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
-    const framesRunId = quiet ? null : await beginFrames(myRun);
-
     let result = null;
     try {
+      // In un riquadro fuori conto si traduce tutto: chi lo ospita l'ha svegliato proprio per questo.
+      const modo = fuoriConto ? Extract.NASCOSTE.TRADUCI : await leggiModo();
+      if (aborted()) return;
+      // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
+      // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
+      const framesRunId = quiet ? null : await beginFrames(myRun, modo);
+      if (framesRunId) runFrames = framesRunId;
       for (let pass = 0; pass < MAX_PASSES; pass++) {
         newContentSeen = false;
-        result = await runPass(progress, myRun);
+        result = await runPass(progress, myRun, modo);
         if (aborted()) return;
         // Il sito ha allungato la pagina mentre lavoravamo: si finisce adesso, senza ricliccare
         // né ripagare ciò che è fatto. Vale anche se il primo giro non aveva trovato testo.
         if (!newContentSeen || (result.kind !== 'done' && result.kind !== 'none')) break;
       }
       if (aborted()) return;
-      if (quiet) { reportToHost(frameRunId, { phase: 'end', applied: appliedOf(result), left: leftOf(result) }); return; }
+      if (quiet) { riferisci({ phase: 'end', applied: appliedOf(result), left: leftOf(result) }); return; }
       // I riquadri lavorano in parallelo e l'avviso finale li aspetta, perché è lui a dover dire
       // la verità su tutta la pagina. Fino ad allora resta in vista «sto traducendo».
       const frames = await waitForFrames(framesRunId, aborted);
