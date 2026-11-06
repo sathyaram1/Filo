@@ -1512,8 +1512,9 @@ const RIPIEGATE = `<!doctype html><html lang="en"><body style="font:16px sans-se
 const TOKEN = ['ZZWRAP', 'ZZBARE', 'ZZMAX', 'ZZNONE', 'ZZSCALE', 'ZZOFF', 'ZZFADE', 'ZZRIGHT', 'ZZSLIDE', 'ZZCLIP',
   'ZZPROP', 'ZZFILT'];
 
-test('le sezioni ripiegate non si pagano in anticipo, comunque il sito le abbia chiuse', async ({ app, openTab, testServer }) => {
+test('solo quando apro: le sezioni ripiegate non si pagano in anticipo, comunque il sito le abbia chiuse', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const page = await testServer.openReady(openTab, RIPIEGATE);
   await watchToasts(page);
   await clickTranslateIcon(app);
