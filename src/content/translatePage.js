@@ -203,6 +203,9 @@
       // la verità su tutta la pagina. Fino ad allora resta in vista «sto traducendo».
       const frames = await waitForFrames(framesRunId, aborted);
       if (aborted()) return;
+      // Arrivato a giro avviato, il riquadro è testo nuovo come quello che il sito aggiunge dopo: l'avviso lo dice e
+      // l'icona offre di tradurlo.
+      if (riquadroNelGiro) newContentSeen = true;
       // Il testo cambiato sta tutto dentro i riquadri: senza questo il menu offrirebbe di nuovo
       // «Traduci la pagina» e non ci sarebbe modo di tornare indietro.
       if (frames.applied > 0 && !pageHasTranslation) {
