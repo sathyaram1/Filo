@@ -3,12 +3,19 @@
 // al solo «Salta», si ricarica una volta e lo dice; con le regole nuove riprova.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { createServer } from 'node:http';
+import { createServer } from 'node:https';
 import { home, modelloFinto, chiedi } from '../../helpers/chatFinta.mjs';
+import { certificato } from '../../helpers/immagineFirmata.mjs';
 
 const YT = 'www.youtube.com';
 const NOCOOKIE = 'www.youtube-nocookie.com';
-test.use({ hostInPiu: [YT, NOCOOKIE] });
+// Chromium apre YouTube solo in https (lista HSTS); le liste vere arrivano dalla rete, col proxy dell'ambiente se c'è.
+const proxy = process.env.HTTPS_PROXY || process.env.https_proxy || '';
+test.use({
+  hostInPiu: [YT, NOCOOKIE],
+  argomentiInPiu: ['--ignore-certificate-errors',
+    ...(proxy ? [`--proxy-server=${proxy}`, `--proxy-bypass-list=${YT};${NOCOOKIE};sito-pubblico.test;127.0.0.1`] : [])],
+});
 test.setTimeout(150_000);
 
 const RISPOSTA = {
