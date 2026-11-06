@@ -1026,8 +1026,7 @@
     }
   }
 
-  // Tiro automatico: parte dall'input del testo, una sola volta, e solo se il
-  // file non ha già un titolo scelto a mano.
+  // Primo titolo: parte dall'input del testo, una volta, e solo se il file non ha già un titolo scelto a mano.
   function maybeAutoTitle() {
     if (!doc || !doc.meta) return;
     if (doc.meta.titleAuto || doc.meta.titleManual) return;
