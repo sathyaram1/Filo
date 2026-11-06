@@ -2623,8 +2623,11 @@ class TabManager {
   }
 
   _needsRepartition(tab, url) {
-    const next = this._partitionForTab(tab, url);
-    return (next || null) !== (tab.partition || null);
+    const next = this._partitionForTab(tab, url) || null;
+    if (next === (tab.partition || null)) return false;
+    // Un passaggio di «Resta connesso» rinviato: lo stesso sito resta nel jar di prima fino al cambio di pagina, così
+    // un modulo inviato arriva intero (tabs/tabRestaConnesso.js, _passaggioDopoCambio).
+    return !(tab._passaggioRinviato && tab._passaggioRinviato.partition === next);
   }
 
   // Confine di FIDUCIA: una pagina filo:// nasce col preload privilegiato e il preload non
