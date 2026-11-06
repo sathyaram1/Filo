@@ -346,7 +346,7 @@ const restaConnessoMethods = {
     const stesso = ora === sito || (Google.diGoogle(ora) && Google.diGoogle(sito)) || !!(AP && AP.isIdentityAuthSurface(url));
     if (!stesso || this._qualcosaDaPerdere(tab)) return;
     const dopo = await cookieDAccesso(wc.session, tab.url, sito);
-    if (![...dopo].some(([k, v]) => prima.get(k) !== v)) return;
+    if (![...dopo].some((k) => !prima.has(k))) return;
     if (!valida() || wc.isLoading() || wc.getURL() !== allaChiusura || this._qualcosaDaPerdere(tab)) return;
     try { wc.reload(); } catch (_) {}
   },
