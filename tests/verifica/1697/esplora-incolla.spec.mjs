@@ -16,6 +16,8 @@ async function prepara(page, html, posa) {
     const [selettore, idx, off, fine] = posa;
     const el = doc.querySelectorAll(selettore)[idx];
     if (fine === 'tutto') { r.selectNodeContents(doc); }
+    else if (typeof fine === 'number') { r.setStart(el.firstChild, off); r.setEnd(el.firstChild, fine); }
+    else if (Array.isArray(fine)) { const el2 = doc.querySelectorAll(fine[0])[fine[1]]; r.setStart(el.firstChild, off); r.setEnd(el2.firstChild, fine[2]); }
     else {
       const t = el.firstChild && el.firstChild.nodeType === 3 ? el.firstChild : el;
       r.setStart(t, off === 'fine' ? (t.nodeType === 3 ? t.length : t.childNodes.length) : off);
