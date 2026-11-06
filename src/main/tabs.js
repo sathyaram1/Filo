@@ -1861,11 +1861,17 @@ class TabManager {
   // Mai chiuse dalla pulizia, qualunque cosa decida il modello: l'attiva, quella con audio,
   // quella di un sito tenuto sempre aperto, quella con testo scritto e non inviato (#824, spec §2.1).
   _intoccabileDalTriage(tab) {
-    return tab.id === this.activeId || !!tab.audible || this._sempreAperta(tab) || this._testoNonInviato(tab);
+    return tab.id === this.activeId || this._sempreAperta(tab) || this._qualcosaDaPerdere(tab);
   }
 
   _testoNonInviato(tab) {
     return !!tab.formDirty || this._invioNonTenuto(tab);
+  }
+
+  // Una ricarica decisa da Filo, non chiesta, non tocca una scheda così: il passaggio di «Resta connesso» e la
+  // ricarica dopo la finestrella d'accesso la saltano (#759.2, #1629).
+  _qualcosaDaPerdere(tab) {
+    return !!tab && (!!tab.audible || this._testoNonInviato(tab));
   }
 
   // Un modulo col testo dell'utente mandato cambiando pagina: se il sito risponde con un errore, non
@@ -2617,8 +2623,11 @@ class TabManager {
   }
 
   _needsRepartition(tab, url) {
-    const next = this._partitionForTab(tab, url);
-    return (next || null) !== (tab.partition || null);
+    const next = this._partitionForTab(tab, url) || null;
+    if (next === (tab.partition || null)) return false;
+    // Un passaggio di «Resta connesso» rinviato: lo stesso sito resta nel jar di prima fino al cambio di pagina, così
+    // un modulo inviato arriva intero (tabs/tabRestaConnesso.js, _passaggioDopoCambio).
+    return !(tab._passaggioRinviato && tab._passaggioRinviato.partition === next);
   }
 
   // Confine di FIDUCIA: una pagina filo:// nasce col preload privilegiato e il preload non
@@ -2642,6 +2651,7 @@ class TabManager {
   // crash per mostrare la pagina d'errore in una view pronta a ritentare il sito.
   _recreateView(tab, url, opts = {}) {
     this._rinviataPresa(tab);
+    tab._passaggioRinviato = null;
     const wasActive = tab.id === this.activeId;
     const partition = this._partitionForTab(tab, url);
     // La pagina che la vista vecchia mostrava: se il primo salto della nuova si ferma sulla lista, si torna lì.
@@ -2934,6 +2944,11 @@ class TabManager {
     }
     if (this._maybeBlockNavigation(tab, target || current)) return;
     AzioniContate.scheda(tab.view.webContents);
+    // Chi ricarica accetta di perdere il testo: il passaggio di «Resta connesso» rinviato si fa adesso.
+    if (!target && tab._passaggioRinviato) {
+      this._passaggioDopoCambio(tab, { chiesta: true });
+      return;
+    }
     if (target) {
       this._segnaRiprova(tab, current);
       try { tab.view.webContents.loadURL(target); } catch (_) {}
@@ -3570,6 +3585,7 @@ class TabManager {
       this._sbOnNavigate(tab, url);
       this._cookieOnNavigate(tab, url);
       this._accessoDaNavigazione(tab, urlPrima, url);
+      this._passaggioDopoCambio(tab);
       // Geo-block livello 1 (deterministico): nuova navigazione → il segnale
       // precedente decade; HTTP 451 è conclusivo, altrimenti vale l'eventuale
       // redirect "di blocco" memorizzato durante questa navigazione.
@@ -3934,7 +3950,8 @@ class TabManager {
     }
     let mostrata = false;
     pwc.on('did-navigate', () => { mostrata = true; });
-    if (origine) win.once('closed', () => this._accessoDopoFinestrella(origine));
+    const seguita = origine ? this._finestrellaAperta(origine) : null;
+    if (origine) win.once('closed', () => this._accessoDopoFinestrella(origine, seguita));
     // Una finestrella fermata prima di mostrare qualcosa resterebbe vuota a schermo.
     const ferma = (event) => {
       event.preventDefault();
