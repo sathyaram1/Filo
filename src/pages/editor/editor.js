@@ -1112,7 +1112,7 @@
     const prima = STORE.findFile(collection, id);
     const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
     // Il titolo non scritto a mano viaggia con il riassunto: nessuna chiamata in più (#1570).
-    const conTitolo = !!(SUMMARY && prima && firma && !autoTitleBusy && SUMMARY.titoloDaRifare(prima, firma.words));
+    const conTitolo = !!(SUMMARY && prima && firma && !titoliInVolo.has(id) && SUMMARY.titoloDaRifare(prima, firma.words));
     const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
       { role: 'system', content: conTitolo ? TITOLO_E_RIASSUNTO_PROMPT : SUMMARY_SYSTEM_PROMPT },
