@@ -2822,8 +2822,8 @@
     const nome = contesto && contesto.nome;
     if (!nome || !MenuIcons?.fila) return null;
     const testo = selInfo ? selInfo.selection : '';
-    const copia = () => { Actions.copyToClipboard(testo); copiatoNellaPagina(target); };
-    const cerca = contesto.segreto ? null : { onClick: () => Actions.searchTextOnWeb(testo) };
+    const sel = azioniDellaSelezione(selInfo, target);
+    const daSel = (k) => (sel[k] ? { onClick: sel[k] } : null);
     const azioni = {};
     if (nome === 'scrivibile') {
       Object.assign(azioni, {
