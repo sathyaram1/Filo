@@ -96,9 +96,9 @@ function sceltaDaIntestazione(testServer, httpOnly) {
     </script>`;
 }
 
-test('scelta scritta dal server nella risposta (Set-Cookie leggibile): «Mostra il banner dei cookie» lo riporta', async ({ app, openTab, testServer, shell }) => {
+for (const httpOnly of [false, true]) test(`scelta scritta dal server nella risposta (Set-Cookie${httpOnly ? ' HttpOnly' : ''}): «Mostra il banner dei cookie» lo riporta`, async ({ app, openTab, testServer, shell }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, sceltaDaIntestazione(testServer, false));
+  const page = await testServer.openReady(openTab, sceltaDaIntestazione(testServer, httpOnly));
   await page.waitForFunction(() => document.cookie.includes('segno_banner='), null, { timeout: 15_000 });
   await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
   await sleep(4500);
