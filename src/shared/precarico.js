@@ -12,8 +12,12 @@
     TETTO_VISIBILI: 20,
     // Link passati col mouse tenuti in lista: Chromium ne accetta 50 per pagina, e coi 20 a schermo ne restano 30.
     PASSAGGI_TENUTI: 30,
-    // Fra un link a schermo e il successivo: con le pagine che rispondono sotto il secondo ne restano in corso uno o due.
+    // Fra un link a schermo e il successivo, al minimo; su un sito lento il passo si allunga (passoVisibili).
     PASSO_MS: 700,
+    // Precarichi dei link a schermo in corso insieme: la pagina non vede quelli di Chromium, il passo li stima.
+    IN_CORSO_MAX: 2,
+    // Il passo più lungo: un sito lentissimo non ferma del tutto i link a schermo.
+    PASSO_MAX_MS: 10000,
     // La rete è ferma quando nessuna risorsa della pagina è finita da almeno questo tempo.
     RETE_FERMA_MS: 500,
     // Con uno scaricamento in corso o senza la spina, ogni quanto si richiede al main se si può ripartire.
