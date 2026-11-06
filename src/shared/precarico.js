@@ -109,7 +109,7 @@
   }
 
   const api = Object.freeze({
-    LIMITI, motivoEscluso, indirizzoDaPrecaricare, reteARisparmio, visibiliAcceso, motivoFermoVisibili, prossimo,
+    LIMITI, motivoEscluso, apreQui, indirizzoDaPrecaricare, reteARisparmio, visibiliAcceso, motivoFermoVisibili, prossimo,
   });
   global.SN_PRECARICO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
