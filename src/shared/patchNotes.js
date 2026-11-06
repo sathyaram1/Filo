@@ -12,6 +12,7 @@
       version: '0.2.268', date: '2026-11-06',
       fixes: [
         { testo: 'Nelle finestre in incognito il correttore riconosce l\'italiano come nella finestra normale, invece di segnare quasi ogni parola. Vale anche per le schede aperte da un altro paese e per i siti che la gestione dei cookie tiene separati.', segnalazione: 1447 },
+        { testo: 'In Privacy massima Filo non ricorda più dopo la chiusura i siti non fidati dove ha visto un campo password o carta: valgono come pagine delicate finché Filo resta aperto, e intanto li vedi in Sicurezza.', segnalazione: 2219 },
       ],
     },
     {
