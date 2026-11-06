@@ -79,10 +79,8 @@
     armato = false;
     if (timer) { clearTimeout(timer); timer = null; }
     if (!togliBtn) return;
-    togliBtn.textContent = 'Togli';
+    window.SN_CONFERMA_SUL_POSTO.disarma(togliBtn, 'Togli');
     togliBtn.title = TITOLO_TOGLI;
-    togliBtn.style.minWidth = '';
-    togliBtn.style.minHeight = '';
   }
   async function togli(e) {
     if (inVolo) return;
