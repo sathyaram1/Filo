@@ -1279,6 +1279,7 @@
     nomeElemento,
     campoSegreto,
     selezioneSegreta,
+    segretezza,
     // La foto per un modello la copre il main (services/fotoDellaPagina.js), che legge da qui i campi che ricordano.
     segreti: Segreti,
     viewportInfo,
