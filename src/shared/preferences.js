@@ -2142,14 +2142,14 @@
         return { partial: { spiegaAnticipata: { enabled: b } }, label: `Spiegazione preparata alla selezione → ${b ? 'attiva' : 'spenta'}` };
       },
     },
-    // D61 (#1290): «traduci tutto» o «traduci solo quando apro». Un sì vale «subito», un no «quando le apro».
+    // D61 (#1290): «traduci tutto» o «traduci solo quando apro». Un sì (tradurle) vale «subito», un no «quando le apro»:
+    // per questo nessuna chiave nomina una delle due scelte, che rovescerebbe il senso del sì.
     {
       scrive: ['traduzionePagina.nascoste'],
       aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, dal menu, e spende meno)',
       costo: 1,
       keys: ['traduzione_sezioni_nascoste', 'traduzione delle sezioni nascoste', 'traduzione delle sezioni chiuse',
-        'traduci solo quando apro', 'traduci tutto', 'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre',
-        'traduzionepagina.nascoste'],
+        'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre', 'traduzionepagina.nascoste'],
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
         const map = {
