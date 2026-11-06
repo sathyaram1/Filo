@@ -31,8 +31,8 @@ function guarda({ window: w, segnala, partenzaMs = PARTENZA_MS, ora = () => Date
     try { if (oss) oss.disconnect(); } catch (_) {}
     try { segnala(motivo); } catch (_) {}
   };
-  let ultimoGesto = 0;
-  let ultimaPub = 0;
+  let ultimoGesto = -Infinity;
+  let ultimaPub = -Infinity;
   for (const t of ['pointerdown', 'keydown']) w.addEventListener(t, (e) => { if (e.isTrusted) ultimoGesto = ora(); }, true);
 
   const avvisi = doc.getElementsByTagName(AVVISO);

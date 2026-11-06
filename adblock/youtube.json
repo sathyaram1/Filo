@@ -1,0 +1,1 @@
+{"formato":1,"aggiornateIl":1793947634951,"versione":"31f8d1cc628c08e9","insieme":{"regole":[{"domini":{"pos":["www.youtube.com"],"neg":[]},"nome":"set","args":["a.b","false"]},{"domini":{"pos":["youtube.com"],"neg":[]},"nome":"set","args":["c.d","false"]},{"domini":{"pos":["www.youtube.com"],"neg":[]},"nome":"json-prune","args":["adSlots"]}],"eccezioni":[],"ignote":[]}}
