@@ -40,7 +40,7 @@ async function letture(urls) {
   return out;
 }
 
-test('r1 un riquadro della stessa origine preso per indice prima del carico ha il rumore della pagina', async ({ openTab, testServer }) => {
+test('un riquadro della stessa origine preso per indice prima del carico ha il rumore della pagina dopo il carico', async ({ openTab, testServer }) => {
   test.setTimeout(120_000);
   const urls = { indice: testServer.html(interno('indice')), frames: testServer.html(interno('frames')), nome: testServer.html(interno('nome')) };
   const pagina = testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body>
