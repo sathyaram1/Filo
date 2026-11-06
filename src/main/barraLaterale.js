@@ -606,6 +606,8 @@ class BarraLaterale {
     if (!D || !D.valida(layout)) return;
     const l = D.migra(layout).layout;
     this.layout = { bar: l.bar, secondary: l.secondary };
+    // Le icone della barra portate in una fila del tasto destro: lì le esegue questa stessa barra (#1434.2).
+    this.inFila = new Set(D.ZONE_FILA.flatMap((z) => l[z]).filter((id) => D.noto(id)));
     this._invia();
   }
 
