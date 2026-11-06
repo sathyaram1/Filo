@@ -693,9 +693,34 @@
         }
       });
       contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+      ascoltaRiquadri(document);
       addWatchRoots(extraRoots);
     } catch (_) { contentObserver = null; }
     startWatchingReveal();
+  }
+
+  // Un riquadro incorporato che si carica dopo la traduzione (scorrendo, o aggiunto dal sito) è testo nuovo come
+  // gli altri (#503.1): la sentinella dei nodi non lo vede, perché il suo testo arriva col caricamento.
+  const radiciAscoltate = new WeakSet();
+  function ascoltaRiquadri(radice) {
+    if (!radice || radiciAscoltate.has(radice)) return;
+    radiciAscoltate.add(radice);
+    try { radice.addEventListener('load', riquadroCaricato, true); } catch (_) {}
+  }
+
+  // Mentre si traduce no: quel giro gli ha già passato parola, o lo riprende il giro dopo.
+  function riquadroCaricato(e) {
+    const f = e && e.target;
+    if (!f || (f.tagName !== 'IFRAME' && f.tagName !== 'FRAME')) return;
+    if (!contentObserver || !pageHasTranslation || pageTranslating || !isTopFrame()) return;
+    const modo = modoUltimo;
+    const g = frameVerdict(f, modo);
+    if (g === 'shown' || g === 'background') newContentSeen = true;
+    else if (g === 'folded') { if (hiddenFrames.indexOf(f) < 0) hiddenFrames.push(f); revealedDirty = true; }
+    else if (g === 'inline') {
+      const body = Extract.inlineFrameBody(f);
+      if (body && HAS_LETTER.test(body.textContent || '')) newContentSeen = true;
+    }
   }
 
   // Le fisarmoniche fatte di solo CSS (la casella nascosta, il bersaglio nell'indirizzo) si aprono senza toccare
