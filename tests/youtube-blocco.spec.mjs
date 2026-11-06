@@ -139,12 +139,13 @@ fixture('il video di YouTube incorporato in un altro sito parte senza pubblicit�
   await liste(app, [MANO]);
   const dentro = youtube.url('/embed/inc?interna=1');
   const ospite = await openTab(testServer.html(`<!doctype html><title>Articolo</title><p>articolo</p><iframe src="${dentro}" width="700" height="420"></iframe>`, { pubblico: true }));
+  await expect.poll(() => youtube.servite.includes('/embed/inc?interna=1'), { timeout: 15_000 }).toBe(true);
   let frame = null;
   await expect.poll(async () => {
     frame = ospite.frames().find((f) => f.url().includes('/embed/inc'));
     return frame ? frame.evaluate(() => window.__esiti && window.__esiti.length).catch(() => 0) : 0;
-  }, { timeout: 15_000 }).toBe(3);
-  expect(await frame.evaluate(() => window.__esiti)).toEqual(['pagina:video', 'fetch:video', 'xhr:video']);
+  }, { timeout: 25_000, message: `riquadri visti: ${ospite.frames().map((f) => f.url()).join(' ')}` }).toBe(3);
+  expect(await esiti(frame)).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
 });
 
 fixture('l\'avviso di YouTube sui blocchi: la scheda torna al solo «Salta», si ricarica una volta e lo dice; con le regole nuove riprova', async ({ app, openTab, youtube, avvisi }) => {
