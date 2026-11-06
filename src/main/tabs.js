@@ -1868,6 +1868,12 @@ class TabManager {
     return !!tab.formDirty || this._invioNonTenuto(tab);
   }
 
+  // Una ricarica decisa da Filo, non chiesta, non tocca una scheda così: il passaggio di «Resta connesso» e la
+  // ricarica dopo la finestrella d'accesso la saltano (#759.2, #1629).
+  _qualcosaDaPerdere(tab) {
+    return !!tab && (!!tab.audible || this._testoNonInviato(tab));
+  }
+
   // Un modulo col testo dell'utente mandato cambiando pagina: se il sito risponde con un errore, non
   // risponde o chiede di accedere, il testo vive solo nella pagina di prima (Indietro lo rimette).
   _dopoInvio(tab, url, httpResponseCode) {
