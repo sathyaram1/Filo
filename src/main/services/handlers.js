@@ -7680,6 +7680,7 @@ require('./handlers/scryfall')(on, handlerCtx);
 require('./handlers/safebrowse')(on, handlerCtx);
 require('./handlers/adSkip')(on, handlerCtx);     // #737 — pubblicità dei video da saltare
 require('./handlers/propostaEmail')(on, handlerCtx); // #1124 — l'email dell'account nei campi di accesso dei siti
+require('./handlers/precarico')(on, handlerCtx); // #1985 — se i link a schermo si possono precaricare adesso
 require('./handlers/menuDelSito')(on, handlerCtx); // #975 — il menu che un sito si disegna da sé
 require('./handlers/filoSpento')(on, handlerCtx); // #843 — Filo spento o riacceso su un sito dal tasto destro
 require('./handlers/redteam')(on, handlerCtx);
