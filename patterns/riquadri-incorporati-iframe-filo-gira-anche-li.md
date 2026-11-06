@@ -131,12 +131,16 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   girano prima del load. In un sito con accessi esenti (`esentiNelSito`) un
   documento senza preload può essere uno di quelli: lì al load si preparano solo
   i vuoti. Uno che va su un'altra origine sì: avrà una
-  finestra nuova. Restano scoperti, per indice, solo `srcdoc` prima che carichi
-  e un indirizzo della stessa origine che non arriva mai (un 204) o è lento:
-  coprirli spegne Filo in quei riquadri. In Automatico restano aperti per scelta
-  dell'owner (Automatico promette nessun impatto); in Privacy massima un riquadro
-  ancora vuoto dopo qualche secondo si copre, e il contenuto che arriva dopo ha il
-  rumore ma non Filo. Scoperti per scelta dell'owner anche gli script di un
+  finestra nuova. Restano scoperti, per indice, gli script di un documento della
+  stessa origine (`srcdoc` compreso) che girano prima del suo `load`, e un
+  indirizzo che non arriva mai (un 204) o è lento: coprirli spegne Filo in quei
+  riquadri. In Automatico restano aperti per scelta dell'owner (Automatico
+  promette nessun impatto). In Privacy massima (D-221) un riquadro inserito da uno
+  script si copre appena entra, fuori dai siti con accessi esenti: lì dentro non
+  c'è Filo. Uno scritto nell'HTML resta scoperto finché carica (coprirlo
+  spegnerebbe Filo in ogni riquadro del sito, costo che l'owner non ha scelto), e
+  uno ancora vuoto dopo qualche secondo si copre: il contenuto che arriva dopo ha
+  il rumore ma non Filo. Scoperti per scelta dell'owner anche gli script di un
   documento che un riquadro già nella pagina riceve da un indirizzo `javascript:`
   (`src`, attributo, `location`): Chromium non avvisa quando nasce, la guardia lo
   raggiunge al suo `load` e da fuori dopo si legge col rumore. Chiuderlo vorrebbe
