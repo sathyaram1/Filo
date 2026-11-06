@@ -3,12 +3,21 @@
 // Regole: tests/unit/regoleYouTube.test.mjs.
 'use strict';
 
-// I siti che il blocco tocca: le regole scritte per altri siti, o per tutti, restano fuori.
+// I siti di YouTube, per il blocco e per il clic vero sul «Salta» (services/adSkip.js): un elenco solo. Le regole
+// scritte per altri siti, o per tutti, restano fuori.
 const BASI = ['youtube.com', 'youtube-nocookie.com', 'youtubekids.com'];
+// Quelli che servono solo il lettore incorporato in un altro sito: lì il «Salta» vale dentro il riquadro, mai in scheda.
+const SOLO_INCORPORATI = ['youtube-nocookie.com'];
+
+const sotto = (h, basi) => basi.some((b) => h === b || h.endsWith('.' + b));
 
 function hostYouTube(host) {
+  return sotto(String(host || '').toLowerCase(), BASI);
+}
+
+function hostYouTubeInScheda(host) {
   const h = String(host || '').toLowerCase();
-  return BASI.some((b) => h === b || h.endsWith('.' + b));
+  return sotto(h, BASI) && !sotto(h, SOLO_INCORPORATI);
 }
 
 function hostDi(url) {
