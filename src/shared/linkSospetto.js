@@ -322,6 +322,10 @@
     'esci', 'disconnetti', 'elimina', 'cancella', 'rimuovi', 'disiscriviti', 'disiscrizione',
     'abmelden', 'abmeldung', 'ausloggen', 'deconnexion', 'deconnecter', 'cerrarsesion', 'desconectar', 'salir', 'sair',
     'uitloggen', 'afmelden', 'wyloguj',
+    'exit', 'quit', 'loginout', 'terminasessione', 'terminarsessao', 'loggaut', 'loggut', 'logud', 'kirjauduulos',
+    'odhlasit', 'odhlaseni', 'odhlasenie', 'odjava', 'cikis', 'kijelentkezes', 'deconectare',
+    // Le altre scritture il precarico le confronta senza accenti, e anche dentro una parola più lunga.
+    'выйти', 'выход', 'вийти', 'вихід', 'αποσύνδεση', 'ログアウト', '로그아웃', '退出', '注销', '登出', 'الخروج', 'התנתק',
   ]);
   const AZIONE = new Set(PAROLE_AZIONE);
 
