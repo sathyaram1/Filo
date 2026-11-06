@@ -21,7 +21,9 @@ const CACHE = join(process.env.FILO_USER_DATA, 'adblock', 'youtube.json');
 const ORA = Date.UTC(2026, 10, 6, 10);
 const H = 60 * 60 * 1000;
 const DISCO = 'www.youtube.com##+js(set, dal.disco, undefined)';
-let rete = { 'filters.txt': '!#include filters-2026.txt\nwww.youtube.com##+js(set, dalla.rete, undefined)', 'filters-2026.txt': '', 'quick-fixes.txt': '' };
+// Una lista vuota è una lista che non è arrivata: le altre portano almeno un commento.
+const NIENTE = '! niente per YouTube';
+let rete = { 'filters.txt': '!#include filters-2026.txt\nwww.youtube.com##+js(set, dalla.rete, undefined)', 'filters-2026.txt': NIENTE, 'quick-fixes.txt': NIENTE };
 let chieste = [];
 
 // Un main appena acceso: il modulo da capo, con la sua copia su disco (o senza).
