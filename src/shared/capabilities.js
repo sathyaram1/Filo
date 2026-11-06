@@ -315,6 +315,12 @@
       doesNot: 'Per un link pulito Filo legge titolo e descrizione della pagina, quindi il sito vede una visita. Non lo fa per un link sospetto né per un sito della tua lista dei siti bloccati. Di un sito bloccato il menu ti dice solo che è in lista. L’analisi di sicurezza è basata su indizi nell’indirizzo, non su un database in tempo reale.',
     },
     {
+      id: 'precarico-link', title: 'Pagine pronte prima del clic', category: 'links',
+      desc: 'Quando fermi il mouse su un link, o lo premi, Filo comincia a scaricare la pagina: al clic è già arrivata o quasi. A pagina ferma scarica in anticipo anche i link dello stesso sito che hai sullo schermo, dal primo in alto, fino a venti per pagina; gli altri partono quando ci passi sopra col mouse. Se clicchi un altro link, gli scaricamenti anticipati ancora in corso si fermano.',
+      invoke: 'Da solo. Il precarico dei link sullo schermo si spegne in Preferenze (filo://preferences/preferences.html), Impostazioni avanzate, «Funzioni», oppure chiedendolo a Filo («non precaricare i link»); quello al passaggio del mouse resta sempre acceso.',
+      doesNot: 'Non anticipa i link verso altri siti, quelli con un punto di domanda nell’indirizzo, quelli per uscire dall’account, cancellare o disiscriversi, i file da scaricare e i link che aprono un’altra scheda. Non lo fa in incognito né sui siti dove hai spento Filo. I link sullo schermo aspettano mentre stai scaricando un file, con una connessione a consumo o lenta e col portatile senza la spina. Il sito può rifiutare lo scaricamento anticipato. Una pagina che il sito vieta di conservare si riscarica al clic.',
+    },
+    {
       id: 'save-link', title: 'Salva un link per dopo', category: 'links',
       desc: 'Mette da parte un link nella lista "Aperti per dopo".',
       invoke: 'Clic destro su un link → "Salva link per dopo".',
