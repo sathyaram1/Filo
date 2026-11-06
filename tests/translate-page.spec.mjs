@@ -915,9 +915,10 @@ async function traduciIlTestoNuovo(app) {
   await icon.click();
 }
 
-test('ripiegata, schiacciata a zero o lasciata al browser: una sezione chiusa vale come le altre', async ({ app, openTab, testServer }) => {
+test('solo quando apro: ripiegata, schiacciata a zero o lasciata al browser, una sezione chiusa vale come le altre', async ({ app, openTab, testServer }) => {
   test.setTimeout(180000);
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const page = await testServer.openReady(openTab, FOLDS);
   await watchToasts(page);
   await clickTranslateIcon(app);
