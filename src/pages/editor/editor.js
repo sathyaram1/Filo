@@ -15,6 +15,7 @@
   const VERSIONS_KEY = 'filo.editor.versions';
   const STORE = window.SN_EDITOR_STORE;
   const VERS = window.SN_EDITOR_VERSIONS;
+  const CONFERMA = window.SN_CONFERMA_SUL_POSTO;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
