@@ -209,7 +209,7 @@
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
-      if (quiet && (result === null || myRun !== runSeq)) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
+      if (quiet && (result === null || myRun !== runSeq)) riferisci({ phase: 'end', applied: 0, left: 0 });
       if (progressToast === progress) progressToast = null;
       // L'utente ha annullato (o ha già fatto ripartire un altro giro): lo stato non è più
       // nostro, e toccarlo vorrebbe dire spegnere il lavoro di qualcun altro.
