@@ -2932,6 +2932,8 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // #1985 — a rete ferma Filo precarica i link a schermo della pagina. Il precarico al passaggio del mouse non si spegne.
+    precarico: { visibili: true },
     // #1274 — la descrizione che un modello scrive da sé per ogni screenshot e immagine copiata: dà il nome del file e la
     // riga della cronologia appunti. Spenta, l'immagine resta qui e il file prende data e ora.
     descriviImmagini: { enabled: true },
