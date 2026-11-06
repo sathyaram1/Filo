@@ -21,7 +21,6 @@ for (const tema of ['light', 'dark']) {
     await setDocText(page, 'contenuto BETA');
     await page.click('#docSwitch');
     await page.locator('.ed-doc-item').nth(0).locator('.ed-doc-del').click();
-    await page.click('#docSwitch');
     await page.click('#docTrash');
     const purge = page.locator('.ed-tr-purge');
     const b0 = await purge.boundingBox();
