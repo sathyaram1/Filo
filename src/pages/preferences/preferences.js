@@ -1052,6 +1052,7 @@
     campo: () => $('contestoSoglia'), uscita: () => $('contestoSogliaStima'),
     chiedi: (soglia) => chrome.runtime.sendMessage({ type: MSG.FILO_STIMA_SOGLIA, soglia }),
   });
+  window.SN_FILO_CONTESTO.limitiAiCampi($);
 
   // I segnaposto dicono il valore che vale quando il campo è vuoto: quello dei Modelli predefiniti, o del codice.
   async function segnapostiContesto() {
