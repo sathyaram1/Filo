@@ -1533,13 +1533,15 @@
     let barra = null;
     let mira = null;
     let gesto = 0;
+    let serie = 0;
     return {
       inizio(id, menuSinistra) {
         barra = null;
         mira = null;
         // Solo le icone della barra: un'azione dell'elemento (grassetto, salva immagine) lì non avrebbe su cosa agire.
         if (!global.SN_DISPOSIZIONE_ICONE?.noto(id)) { gesto = 0; return; }
-        const questo = ++gesto;
+        const questo = ++serie;
+        gesto = questo;
         manda({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok && gesto === questo) barra = { larghezza: Number(r.larghezza) || 0 }; });
       },
       sopra(x, y) {
