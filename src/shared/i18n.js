@@ -624,6 +624,11 @@
       'che restano nella pagina spariscono. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
+    options_security_ytads: 'Blocca le pubblicità di YouTube',
+    options_security_ytads_desc:
+      'I video di YouTube partono senza pubblicità, anche quelli incorporati in altri siti, con le regole ' +
+      'che uBlock Origin pubblica e aggiorna ogni giorno. Se un giorno YouTube cambia e le regole non reggono, ' +
+      'Filo torna da solo a saltare le pubblicità finché non arrivano quelle nuove.',
     options_security_adskip: 'Salta le pubblicità dei video',
     options_security_adskip_desc:
       'Quando un video, per esempio su YouTube, mostra una pubblicità col pulsante «Salta», ' +
