@@ -38,6 +38,7 @@ async function avvio({ copiaDi = null } = {}) {
     writeFileSync(CACHE, JSON.stringify({ formato: 1, aggiornateIl: ORA - copiaDi, insieme: R.leggi(DISCO) }));
   }
   const B = require(PERCORSO);
+  ultimo = B;
   chieste = [];
   B.impostaPrendiPerTest(async (url) => { chieste.push(url); const t = rete[url.slice('https://liste.prova/'.length)]; return t === undefined ? null : t; });
   return B;
