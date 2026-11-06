@@ -953,7 +953,11 @@
     let added = false;
     const push = (n) => { added = true; if (addedRoots.length < ADDED_MAX) addedRoots.push(n); else addedLost = true; };
     for (const r of records) {
-      if (r.type === 'attributes') { if (surveying) B.survey(r.target, false); continue; }
+      if (r.type === 'attributes') {
+        // La scritta di un pulsante-campo è il suo valore: anche lui entra dopo il pulsante.
+        if (r.attributeName === 'value') { const c = labelled(r.target); if (c) push(c); } else if (surveying) B.survey(r.target, false);
+        continue;
+      }
       if (r.type === 'characterData') { const c = labelled(r.target); if (c) push(c); continue; }
       // Testo nudo o elemento che lo avvolge, quello che entra in un pulsante è una novità del pulsante (#1279.5).
       let label = null;
