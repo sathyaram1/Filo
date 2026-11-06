@@ -85,10 +85,10 @@ async function salvaCache() {
 
 /** I testi della lista e dei suoi «!#include»: null se la lista principale non arriva. */
 async function scaricaLista(nome, prendi) {
-  const testo = await prendi(CARTELLA_LISTE + nome);
+  const testo = await prendi(cartellaListe() + nome);
   if (!testo) return null;
   const altri = R.inclusi(testo).slice(0, MAX_INCLUSI);
-  const inclusi = await Promise.all(altri.map((n) => prendi(CARTELLA_LISTE + n)));
+  const inclusi = await Promise.all(altri.map((n) => prendi(cartellaListe() + n)));
   return [testo, ...inclusi.filter(Boolean)];
 }
 
