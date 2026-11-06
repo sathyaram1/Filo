@@ -2726,6 +2726,25 @@
     return items;
   }
 
+  // Taglia, Copia e Cerca sul testo selezionato, una volta sola: le voci e la fila (#1434) fanno la stessa cosa. Su un
+  // campo coperto (una password) Taglia e Copia mancano, come nel menu del sistema; su uno segreto manca Cerca.
+  function azioniDellaSelezione(selInfo, target) {
+    const out = {};
+    if (!selInfo) return out;
+    if (!selInfo.coperto) {
+      out.cut = () => Actions.cutSelection();
+      out.copy = () => { Actions.copyToClipboard(selInfo.selection); copiatoNellaPagina(target); };
+    }
+    if (!selInfo.segreto) out.search = () => Actions.searchTextOnWeb(selInfo.selection);
+    return out;
+  }
+
+  // Il testo selezionato dove si scrive: con la formattazione la fila mette grassetto e corsivo, in una casella (una
+  // barra di ricerca, un'area di testo, un campo «solo testo») taglia, copia e incolla.
+  function contestoDelCampo(selInfo, target) {
+    return campoRicco(target) && !selInfo.segreto ? 'scrivibile' : 'campo';
+  }
+
   // Il campo dove si scrive con la formattazione (il foglio dell'Editor, un campo ricco di un sito): lì la fila mette
   // grassetto e corsivo. Un campo «solo testo» non ne ha, e resta una casella.
   function campoRicco(target) {
