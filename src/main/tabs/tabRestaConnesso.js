@@ -160,6 +160,8 @@ const conAvviso = new Map();
 const esiti = new Map();
 
 function onTrustChange(sito, fidato) {
+  // Un sì da qualunque strada (proposta, menu, chat, Sicurezza) toglie il «no» ricordato.
+  if (fidato) { try { ricordaNo().togli(chiaveNo(sito)).catch(() => {}); } catch (_) {} }
   const lavoro = coda.then(() => spostaAccesso(sito, fidato)).catch(() => []);
   coda = lavoro;
   inCorso.set(sito, lavoro);
