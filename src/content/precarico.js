@@ -53,7 +53,6 @@
     if (urls.length) {
       nuova = document.createElement('script');
       nuova.type = 'speculationrules';
-      nuova.setAttribute('data-filo-precarico', '');
       nuova.textContent = JSON.stringify({ prefetch: [{ source: 'list', urls }] });
       radice.appendChild(nuova);
     }
