@@ -175,14 +175,14 @@
     newContentSeen = false;
     startWatchingNewContent();
     let result = null;
+    let framesRunId = null;
     try {
       // In un riquadro fuori conto si traduce tutto: chi lo ospita l'ha svegliato proprio per questo.
       const modo = fuoriConto ? Extract.NASCOSTE.TRADUCI : await leggiModo();
       if (aborted()) return;
       // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
       // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
-      const framesRunId = quiet ? null : await beginFrames(myRun, modo);
-      if (framesRunId) runFrames = framesRunId;
+      framesRunId = quiet ? null : await beginFrames(myRun, modo);
       for (let pass = 0; pass < MAX_PASSES; pass++) {
         newContentSeen = false;
         result = await runPass(progress, myRun, modo);
