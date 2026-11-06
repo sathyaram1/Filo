@@ -92,7 +92,7 @@ test('il tetto dei link a schermo scritto a parole nelle Preferenze e nel manife
   assert.ok(cap && cap.desc.includes(`fino a ${aParole} per pagina`), 'manifesto delle capacità');
 });
 
-test('a Chromium va l\'indirizzo senza frammento', () => {
+test('la pagina di un link si conta senza frammento (a Chromium va il link com\'è)', () => {
   assert.equal(P.indirizzoDaPrecaricare('https://www.esempio.it/a#b'), 'https://www.esempio.it/a');
   assert.equal(P.indirizzoDaPrecaricare('non è un indirizzo'), '');
 });
