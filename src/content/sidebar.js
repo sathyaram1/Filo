@@ -1259,6 +1259,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       ragiona(pezzo) {
         if (finita || !pezzo) return;
         ragionamento += pezzo;
+        wrap.classList.add('sn-sidebar-attesa-pensata');
         corpo.textContent = ragionamento;
         if (!corpo.hidden) corpo.scrollTop = corpo.scrollHeight;
         disegna();
