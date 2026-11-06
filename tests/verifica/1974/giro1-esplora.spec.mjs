@@ -91,8 +91,8 @@ async function siti(t) {
   const porta = server.address().port;
   t.chiudi = () => new Promise((r) => { try { server.closeAllConnections?.(); } catch (_) {} server.close(r); });
   return {
-    watch: (modo, v = 'abc123') => `http://${YT}:${porta}/watch?v=${v}&modo=${modo}`,
-    blog: `http://sito-pubblico.test:${porta}/blog`,
+    watch: (modo, v = 'abc123') => `https://${YT}:${porta}/watch?v=${v}&modo=${modo}`,
+    blog: `https://sito-pubblico.test:${porta}/blog`,
     quante: (modo, v = 'abc123') => visite.filter((x) => x === `${YT}/watch?v=${v}&modo=${modo}`).length,
   };
 }
