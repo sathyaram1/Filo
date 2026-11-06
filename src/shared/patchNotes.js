@@ -20,8 +20,12 @@
         { testo: 'I video di YouTube partono senza pubblicità, anche quelli incorporati in altri siti. Il giorno in cui YouTube cambia e il blocco non regge, Filo torna da solo a premere «Salta» finché le regole non si aggiornano. Si spegne in Sicurezza → «Blocca le pubblicità di YouTube».', segnalazione: 1974 },
         { testo: 'Dopo un accesso fatto nella finestrella di «Continua con Google» e simili, la scheda si aggiorna da sola. «Resta connesso» non ricarica più una scheda dove stai scrivendo o guardando un video, e se gli dici di no non te lo richiede a ogni avvio.', segnalazione: 1725 },
         { testo: 'Traduci la pagina traduce tutto: prima quello che vedi, poi in sottofondo menu, fisarmoniche e sezioni chiuse, così quando le apri sono già in italiano. Se preferisci tradurle solo quando le apri, lo scegli nelle Preferenze avanzate o lo chiedi a Filo. «Tradotta solo in parte» compare solo se resta davvero del testo in lingua originale, e un riquadro incorporato che si carica dopo si traduce con «Traduci il testo nuovo».', segnalazione: 1290 },
+<<<<<<< HEAD
         { testo: 'Filo rifiuta da solo più banner dei cookie, e «Mostra il banner dei cookie» lo riporta anche sui siti che salvano la tua scelta con un nome loro. Puoi chiederlo anche in chat: «fammi rivedere il banner dei cookie su questo sito» o «torna a rifiutarli qui».', segnalazione: 1279 },
         { testo: 'Nell\'Editor un testo lungo incollato entra subito anche se comincia con una riga vuota, in un elenco o all\'inizio di un paragrafo, e un solo Ctrl+Z lo toglie tutto.', segnalazione: 1475 },
+=======
+        { testo: 'Nell\'Editor un testo lungo incollato entra subito anche se comincia con una riga vuota, in un elenco o all\'inizio di un paragrafo, e lo togli tutto con un solo annulla.', segnalazione: 1475 },
+>>>>>>> 9dde96e6d9 (auto: src/shared/patchNotes.js)
         { testo: 'Il titolo che l\'Editor dà da solo a un documento cambia quando cambi l\'argomento del testo. Un titolo che hai scritto tu resta com\'è, e un documento non prende più il titolo di quello aperto prima.', segnalazione: 1570 },
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
       ],
