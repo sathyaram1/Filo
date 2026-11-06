@@ -242,6 +242,12 @@ try {
   if (/^https?:/i.test(loc)) require('./youtube-guardia.js').avvia({ ipcRenderer, webFrame, window, href: loc });
 } catch (_) { /* mai bloccare il caricamento */ }
 
+// Gli alberi chiusi dei componenti del sito, per l'avviso della traduzione (#472): regole in preload/ombre-chiuse.js.
+if (!IS_SUBFRAME) try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./ombre-chiuse.js').installa({ webFrame });
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
 try {
