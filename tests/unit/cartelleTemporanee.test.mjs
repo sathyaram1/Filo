@@ -84,6 +84,33 @@ test('nessun test o script ricava un percorso dal pathname di un URL di file', (
     + '`fileURLToPath(new URL(..., import.meta.url))` da node:url');
 });
 
+// `import()` di un percorso su Windows legge la lettera di disco come schema (`d:`) e lancia
+// ERR_UNSUPPORTED_ESM_URL_SCHEME: verde su Linux, rosso solo al cancello (#2223). Si passa `pathToFileURL(p).href`.
+// Le prove dei giri (tests/verifica) girano solo nel contenitore Linux e si cancellano.
+const IMPORT_DI_PERCORSO = /\bimport\(\s*(?:path\.)?(?:join|resolve)\s*\(/;
+
+test('la trappola dell\'import di un percorso si riconosce', () => {
+  assert.ok(IMPORT_DI_PERCORSO.test("await import(join(ROOT, 'src/shared/x.js'));"));
+  assert.ok(IMPORT_DI_PERCORSO.test("const m = await import( path.resolve(ROOT, 'scripts', 'a.mjs'));"));
+  assert.ok(!IMPORT_DI_PERCORSO.test("await import(pathToFileURL(join(ROOT, 'src/shared/x.js')).href);"));
+  assert.ok(!IMPORT_DI_PERCORSO.test("await import('node:fs');"));
+});
+
+test('nessun test o script importa un percorso invece di un URL di file', () => {
+  const RADICE = join(TESTS, '..');
+  const VERIFICA = join(TESTS, 'verifica');
+  const colpevoli = [];
+  for (const cartella of ['tests', 'scripts']) {
+    for (const p of fileDiTest(join(RADICE, cartella), [], /\.(mjs|cjs|js)$/)) {
+      if (p === fileURLToPath(import.meta.url) || !fuoriDa(VERIFICA, p)) continue;
+      if (IMPORT_DI_PERCORSO.test(readFileSync(p, 'utf8'))) colpevoli.push(relative(RADICE, p));
+    }
+  }
+  assert.deepEqual(colpevoli, [],
+    'questi file passano a import() un percorso: su Windows la lettera di disco diventa uno schema e l\'import fallisce; '
+    + 'usa `import(pathToFileURL(percorso).href)` da node:url');
+});
+
 // Un symlink su Windows vuole l'amministratore o la modalità sviluppatore: senza, EPERM, e la prova (o lo
 // script di chiusura) è rossa solo dall'owner e ferma ogni chiusura locale (#742).
 // Si guarda ogni volta che il nome compare, non la forma della chiamata: alias, promisify e accessi per stringa
