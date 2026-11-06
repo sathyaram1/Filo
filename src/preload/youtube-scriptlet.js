@@ -36,9 +36,9 @@ function motore(regole, W, esponi) {
     if (!p) return true;
     for (const pezzo of p.split(/\s+/)) {
       const m = /^([a-zA-Z]+):(.*)$/.exec(pezzo);
-      const chiave = m && !/^https?$/i.test(m[1]) ? m[1] : 'url';
-      const valore = m && chiave !== 'url' ? m[2] : (m && m[1] === 'url' ? m[2] : pezzo);
-      if (!prova(schema(valore), String(det[chiave] == null ? '' : det[chiave]))) return false;
+      const nominato = m && !/^https?$/i.test(m[1]);
+      const chiave = nominato ? m[1] : 'url';
+      if (!prova(schema(nominato ? m[2] : pezzo), String(det[chiave] == null ? '' : det[chiave]))) return false;
     }
     return true;
   }
