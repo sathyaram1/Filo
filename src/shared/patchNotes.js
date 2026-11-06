@@ -9,6 +9,12 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.268', date: '2026-11-06',
+      fixes: [
+        { testo: 'I link si aprono prima: Filo comincia a scaricare la pagina quando fermi il mouse su un link, e a pagina ferma prepara i link dello stesso sito che hai sullo schermo. Questo secondo lo spegni in Preferenze, Impostazioni avanzate.', segnalazione: 1985 },
+      ],
+    },
+    {
       version: '0.2.266', date: '2026-11-05',
       fixes: [
         { testo: 'Mentre arriva una risposta lunga nel riquadro di «Spiega», «Approfondisci» o «Traduci», la pagina sotto non scatta più.', segnalazione: 2119 },
