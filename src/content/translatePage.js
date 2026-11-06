@@ -231,8 +231,8 @@
 
   // Un giro: rilegge, manda al modello solo ciò che non è già tradotto, applica. L'avviso lo
   // scrive chi chiama, l'unico a sapere se nel frattempo è arrivato dell'altro.
-  async function runPass(progress, myRun) {
-    const blocks = Extract.extractTranslatableBlocks();
+  async function runPass(progress, myRun, modo) {
+    const blocks = Extract.extractTranslatableBlocks({ nascoste: modo });
     // I componenti aperti del sito sono alberi a parte: una sentinella sul solo
     // documento non vede il contenuto che cambia lì dentro.
     addWatchRoots(blocks.shadowRoots);
