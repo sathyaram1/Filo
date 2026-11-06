@@ -26,7 +26,7 @@ async function sito() {
   };
 }
 
-test('r3 dopo il clic su un link che scarica un file, i link a schermo riprendono', async ({ openTab }) => {
+test('r2 dopo il clic su un link che scarica un file, i link a schermo riprendono', async ({ openTab }) => {
   const s = await sito();
   try {
     const page = await openTab(`${s.origin}/pagina`);
