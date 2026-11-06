@@ -170,8 +170,8 @@ filo, i nodi, il gomitolo e i titoli); cosa succede lo decide il blocco
   chiamata in volo si interrompe nel main (`MSG.AIUTO_FERMA`, valida solo
   per chi l'ha chiesta, anche se arriva prima della richiesta) e una risposta
   arrivata dopo non si usa. Il ragionamento arriva in diretta
-  (`MSG.AIUTO_RAGIONAMENTO`) e intero con la risposta, per la regola qui
-  sopra. Prove: `tests/aiuto-attesa.spec.mjs` e il pannello tolto in
+  (`MSG.AIUTO_RAGIONAMENTO`) e intero con la risposta: i pezzi in diretta
+  possono arrivare dopo di lei (#1321). Prove: `tests/aiuto-attesa.spec.mjs` e il pannello tolto in
   `tests/aiuto-passi-da-solo.spec.mjs`.
 - Test: `tests/filo-attesa.spec.mjs` (filo, nodi, gomitolo, fermare e
   riprendere, con screenshot), `tests/secondo-gesto.spec.mjs` (secondi gesti,
