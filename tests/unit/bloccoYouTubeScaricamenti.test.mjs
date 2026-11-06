@@ -26,8 +26,11 @@ const NIENTE = '! niente per YouTube';
 let rete = { 'filters.txt': '!#include filters-2026.txt\nwww.youtube.com##+js(set, dalla.rete, undefined)', 'filters-2026.txt': NIENTE, 'quick-fixes.txt': NIENTE };
 let chieste = [];
 
-// Un main appena acceso: il modulo da capo, con la sua copia su disco (o senza).
-function avvio({ copiaDi = null } = {}) {
+// Un main appena acceso: il modulo da capo, con la sua copia su disco (o senza). Lo scaricamento del main di prima
+// finisce prima: la sua copia scritta dopo prenderebbe il posto di questa.
+let ultimo = null;
+async function avvio({ copiaDi = null } = {}) {
+  if (ultimo) await ultimo.aggiorna();
   delete require.cache[PERCORSO];
   rmSync(CACHE, { force: true });
   if (copiaDi !== null) {
