@@ -23,6 +23,17 @@ test('acceso di serie, spento solo da un false esplicito', () => {
   assert.equal(B.attivo({ security: { youtubeAds: { enabled: false } } }), false);
 });
 
+test('dalla chat si spegne e si riaccende, senza confondersi con «Salta» e col blocco di pubblicità e tracker', () => {
+  require('../../src/shared/constants.js');
+  require('../../src/shared/preferences.js');
+  const P = Object.keys(globalThis).map((k) => globalThis[k]).find((o) => o && typeof o.buildPreferencePartial === 'function');
+  for (const chiave of ['blocca_pubblicita_youtube', 'pubblicità di youtube', 'blocca le pubblicità di YouTube']) {
+    assert.deepEqual(P.buildPreferencePartial(chiave, false).partial, { security: { youtubeAds: { enabled: false } } }, chiave);
+  }
+  assert.deepEqual(P.buildPreferencePartial('blocca_pubblicita_youtube', 'sì').partial, { security: { youtubeAds: { enabled: true } } });
+  assert.deepEqual(P.buildPreferencePartial('salta_pubblicita', false).partial, { security: { adSkip: { enabled: false } } });
+});
+
 test('le regole vanno solo ai frame di YouTube, e niente con l\'interruttore spento', async () => {
   B.impostaListePerTest([LISTA]);
   await B.init({});
