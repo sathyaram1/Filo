@@ -90,27 +90,22 @@ for (const [nome, sezione, apri] of [
   });
 }
 
-// «Mostra originale» mentre le sezioni chiuse si traducono ancora in sottofondo.
-const MOLTE_CHIUSE = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
-  <h1 id="head">An article with many folded sections</h1>
-  <p id="p1">The visible paragraph of the article, long enough to be picked up.</p>
-  ${Array.from({ length: 40 }, (_, i) => `<details id="d${i}"><summary>Section ${i}</summary><p id="s${i}">${'Hidden sentence number ' + i + ' written in English for whoever opens it. '.repeat(30)}</p></details>`).join('\n')}
-</body></html>`;
-
-test('«Mostra originale» mentre le sezioni chiuse si traducono in sottofondo: aperte, restano in inglese', async ({ app, openTab, testServer }) => {
-  test.setTimeout(180000);
-  await stubTranslationProvider(app, 4000);
-  const page = await testServer.openReady(openTab, MOLTE_CHIUSE);
+// «Solo quando le apro»: la scelta promette la sezione tradotta un paio di secondi dopo averla aperta.
+test('r2 solo quando le apro: aperta la sezione su una pagina tradotta, si traduce da sola', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const r = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'traduzione delle sezioni nascoste', valore: 'solo quando apro' }, { sender: null }));
+  expect(r.executed).toBe(true);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+    <h1>An article with a folded section</h1>
+    <p id="p1">First paragraph of the article, long enough to be picked up by the translation.</p>
+    <details id="d"><summary id="sum">Read more</summary><p id="m1">Folded paragraph written in English for the reader.</p></details>
+  </body></html>`);
   await watchToasts(page);
   await clickTranslateIcon(app);
-  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
-  const chiamate = await app.evaluate(() => globalThis.__filoTranslatePrompts.length);
-  await clickTranslateIcon(app);
-  await expect(page.locator('#p1')).toHaveText(/^The visible/, { timeout: 30000 });
-  await page.waitForTimeout(15000);
-  const dopo = await app.evaluate(() => globalThis.__filoTranslatePrompts.length);
-  await page.evaluate(() => { for (const d of document.querySelectorAll('details')) d.open = true; });
-  const ancoraIt = await page.evaluate(() => Array.from(document.querySelectorAll('details p')).filter((p) => /^IT /.test(p.textContent)).map((p) => p.id));
-  expect(ancoraIt, `sezioni rimaste in italiano dopo «Mostra originale»; chiamate ${chiamate} → ${dopo}`).toEqual([]);
-  await expect(page.locator('#p1')).toHaveText(/^The visible/);
+  await expect.poll(() => toasts(page), { timeout: 30000 }).toContain('Pagina tradotta');
+  expect(await sentText(app)).not.toContain('Folded paragraph');
+  await page.locator('#sum').click();
+  await expect(page.locator('#m1')).toHaveText(/^IT /, { timeout: 10000 });
 });
