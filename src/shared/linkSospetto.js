@@ -331,7 +331,11 @@
 
   // Un pezzo fra / ? & = che è per intero una parola d'azione, scritto minuscolo («sign-out» vale «signout»).
   function pezzoAzione(s) {
-    return String(s || '').split(/[/?&=]/).some((p) => p === p.toLowerCase() && AZIONE.has(p.replace(/[-_]/g, '')));
+    return String(s || '').split(/[/?&=]/).some((p) => {
+      let d = p;
+      try { d = decodeURIComponent(p); } catch (_) {}
+      return d === d.toLowerCase() && AZIONE.has(d.replace(/[-_]/g, ''));
+    });
   }
 
   global.SN_LINK_SOSPETTO = { analizza, frasi, avviso, POPULAR, PAROLE_AZIONE };
