@@ -58,7 +58,7 @@ test('un riquadro della pagina raggiunto per indice prima che sia preparato ha l
   } finally { srv.closeAllConnections?.(); await new Promise((r) => srv.close(r)); }
 });
 
-test('r2 la finestra della pagina ha le stesse proprietà con la protezione accesa e con Off', async ({ openTab }) => {
+test('la finestra della pagina ha le stesse proprietà con la protezione accesa e con Off', async ({ openTab }) => {
   test.setTimeout(90_000);
   const { srv, url } = await apri(openTab);
   try {
