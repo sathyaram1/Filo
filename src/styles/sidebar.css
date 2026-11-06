@@ -398,37 +398,94 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts,
 .sn-sidebar-input button[type="submit"]:hover { transform: translateY(-1px); }
 .sn-sidebar-input button[type="submit"]:active { transform: translateY(0); opacity: 0.85; }
 
-/* Tre righe di ragionamento che scorrono: la prima quasi trasparente sta uscendo, l'ultima è piena.
-   Le frasi cambiano ogni ~900ms con uno shift verso l'alto. */
-.sn-sidebar-thinking {
-  align-self: flex-start;
+/* Il quadrato che ferma (#578.1): stesso posto dell'invio, colore d'accento, come nella home. */
+.sn-sidebar-input button[type="submit"][data-modo="ferma"] {
+  background: var(--sn-accent);
+  color: #fff;
+  animation: sn-sidebar-arma var(--sn-pausa-quadrato, 500ms) ease-in;
+}
+.sn-sidebar-input button[type="submit"][data-modo="ferma"]::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.sn-sidebar-input button[type="submit"][data-modo="ferma"]:hover { transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato ignora i clic: si accende in quel tempo vero (SN_CONST.PAUSA_QUADRATO_MS). */
+@keyframes sn-sidebar-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .sn-sidebar-input button[type="submit"][data-modo="ferma"] { animation-timing-function: step-end; }
+}
+
+/* L'attesa di un passo (#578.1): una rotella finché non c'è niente di vero, poi l'azione in corso o la trama del
+   ragionamento, piccola e sfumata come nella home (patterns/il-filo-dell-attesa.md). Un clic la apre per intero. */
+.sn-sidebar-attesa {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 6px;
+  min-width: 0;
   font-size: 11px;
-  font-style: italic;
   color: var(--sn-muted);
-  line-height: 1.35;
-  max-width: 92%;
-  overflow: hidden;
 }
-.sn-sidebar-thinking-line {
+.sn-sidebar-attesa-testa {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 18px;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-attesa-pensata .sn-sidebar-attesa-testa { cursor: pointer; }
+.sn-sidebar-attesa-pensata .sn-sidebar-attesa-testa:hover,
+.sn-sidebar-attesa-aperta .sn-sidebar-attesa-testa { background: var(--sn-hover); color: var(--sn-fg); }
+.sn-sidebar-rotella {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  border-radius: 50%;
+  animation: sn-sidebar-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
+}
+.sn-sidebar-attesa[data-fase="fatto"] .sn-sidebar-rotella,
+.sn-sidebar-attesa[data-fase="fermato"] .sn-sidebar-rotella { display: none; }
+@keyframes sn-sidebar-gira { to { transform: rotate(360deg); } }
+.sn-sidebar-attesa-riga {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-  transition: opacity calc(350ms * var(--sn-motion, 1)) ease;
 }
-.sn-sidebar-thinking-line[data-slot="0"] { opacity: 0.25; }
-.sn-sidebar-thinking-line[data-slot="1"] { opacity: 0.55; }
-.sn-sidebar-thinking-line[data-slot="2"] { opacity: 0.95; }
-.sn-sidebar-thinking-line.sn-sidebar-thinking-enter {
-  animation: sn-thinking-enter calc(350ms * var(--sn-motion, 1)) ease-out;
+/* La trama non si legge, si intravede: la coda del ragionamento, sfumata ai bordi. */
+.sn-sidebar-attesa[data-fase="pensa"] .sn-sidebar-attesa-riga {
+  direction: rtl;
+  text-align: left;
+  text-overflow: clip;
+  font-size: 10.5px;
+  opacity: var(--sn-filo-trama-opacity, 0.5);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
 }
-@keyframes sn-thinking-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 0.95; transform: translateY(0); }
+.sn-sidebar-attesa-riga > span { direction: ltr; unicode-bidi: isolate; }
+.sn-sidebar-attesa[data-fase="fermato"] .sn-sidebar-attesa-testa { color: var(--sn-fg); }
+.sn-sidebar-attesa-corpo {
+  margin: 2px 0 4px 10px;
+  padding: 2px 8px;
+  border-left: 2px solid var(--sn-border);
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
+.sn-sidebar-attesa-corpo[hidden] { display: none; }
+.sn-sidebar-log.sn-sidebar-log-fermato { opacity: 0.9; }
 
 /* Popup di fine lavoro: appare in chat quando Filo dichiara di aver finito. */
 .sn-sidebar-feedback {
