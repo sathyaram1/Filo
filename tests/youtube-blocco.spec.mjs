@@ -150,6 +150,7 @@ fixture('con le regole vere scaricate da uAssets il video parte senza pubblicitÃ
   const page = await apri(openTab, youtube.url('/watch?v=vere&interna=1'));
   await expect.poll(() => esiti(page), { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
   await expect(page.locator('#movie_player')).not.toHaveClass(/ad-showing/);
+  await incorporato({ app, openTab, testServer, youtube }, 'veri');
 });
 
 fixture('il video di YouTube incorporato in un altro sito parte senza pubblicitÃ ', async ({ app, openTab, testServer, youtube }) => {
