@@ -63,7 +63,29 @@ async function sitoConAccesso() {
       res.end('<!doctype html><title>Fatto</title><p>Accesso fatto</p><script>setTimeout(() => window.close(), 400)</script>');
       return;
     }
+    // Come quasi ogni pagina d'accesso, mette il token del modulo anche a chi non entra (#1725).
+    if (u.pathname === '/oauth/authorize' && u.searchParams.get('token') === '1') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': `csrftoken=${Math.random().toString(36).slice(2)}; Path=/; HttpOnly` });
+      res.end('<!doctype html><title>Scegli un account</title><p>Account</p>');
+      return;
+    }
     if (u.pathname === '/oauth/authorize') { html('<!doctype html><title>Scegli un account</title><p>Account</p>'); return; }
+    // Il sito che rinnova da sé la sessione a ogni richiesta, come molti framework.
+    if (u.pathname === '/ping') {
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Set-Cookie': `XSRF-TOKEN=${Math.random().toString(36).slice(2)}; Path=/` });
+      res.end('ok');
+      return;
+    }
+    // Un commento pubblicato con la pagina dell'esito, senza rimandare a un'altra pagina.
+    if (u.pathname === '/commenta' && req.method === 'POST') {
+      html('<!doctype html><title>Pubblicato</title><p id="pubblicato">Commento pubblicato</p><a id="vai" href="/home">Casa</a>');
+      return;
+    }
+    if (u.pathname === '/commenta') {
+      html(`<!doctype html><title>Commenta</title><body style="padding:30px"><form method="post" action="/commenta">
+        <input id="campo" name="testo" placeholder="Il tuo commento"> <button id="manda">Pubblica</button></form></body>`);
+      return;
+    }
     // Una pagina del sito con un campo da scrivere (#759.2).
     if (u.pathname === '/modulo') {
       html(`<!doctype html><html><head><title>Modulo</title></head><body style="padding:30px">
