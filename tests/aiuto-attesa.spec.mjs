@@ -133,7 +133,8 @@ test('il quadrato ferma la chiamata in volo e i passi dopo; quello già fatto re
   const viva = aiuto.locator('.sn-sidebar-attesa').last();
   await expect(viva).toContainText('adesso la seconda');
   await expect.poll(() => stato(app).then((s) => s.chiamate)).toBe(2);
-
+  // Il quadrato è comparso alla domanda: passata la sua pausa, il clic vale.
+  await aiuto.waitForTimeout(600);
   await tasto(aiuto).click();
   await expect(aiuto.locator('.sn-sidebar-log-fermato')).toHaveText('Fermato prima della risposta.');
   await expect(viva).toHaveAttribute('data-fase', 'fermato');
