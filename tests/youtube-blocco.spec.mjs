@@ -198,7 +198,7 @@ fixture('regole che non reggono in un video incorporato: si ricarica una volta i
   // L'articolo conta le sue aperture: una ricarica della scheda intera le porterebbe a due.
   await openTab(testServer.html(`<!doctype html><title>Articolo</title><p>articolo</p>
     <script>sessionStorage.aperture = String(Number(sessionStorage.aperture || 0) + 1);</script>
-    <iframe src="${youtube.url('/embed/rotto?controllo=1')}" width="700" height="420"></iframe>`, { pubblico: true }));
+    <iframe src="${youtube.url('/embed/rotto?controllo=1').replace('www.youtube.com', 'www.youtube-nocookie.com')}" width="700" height="420"></iframe>`, { pubblico: true }));
   const vista = await avvisi();
   await expect(vista.locator('.shell-notif-msg', { hasText: 'Oggi il blocco delle pubblicità su YouTube non funziona' })).toBeVisible({ timeout: 10_000 });
   const servite = () => youtube.servite.filter((p) => p.startsWith('/embed/rotto')).length;
