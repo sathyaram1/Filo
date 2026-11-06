@@ -830,8 +830,9 @@
     return null;
   }
 
-  // `soloTestoNoto`: chi traduce fuori conto (un riquadro nascosto) conta solo il testo chiuso che sa esserci (#1290).
-  function isClosedComponent(el, soloTestoNoto) {
+  // `fuoriConto`: un riquadro che chi lo ospita non vede non conta i suoi componenti chiusi, come lui non conta (#1290).
+  function isClosedComponent(el, fuoriConto) {
+    if (fuoriConto) return false;
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
     // La prova del cursore si fa sul documento della pagina: dentro un riquadro misurerebbe
