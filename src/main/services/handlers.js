@@ -7255,7 +7255,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     }
     if (!internal && filo) {
       compattaDaFermo(incognitoTurno, tettiChat);
-      if (tettiChat && ultimaStima > tettiChat.soglia * LC.QUOTA_ANTICIPO) {
+      if (tettiChat && ultimaStima > LC.sogliaAnticipo({ soglia: tettiChat.soglia, base: Compattazione.base(incognitoTurno) })) {
         Compattazione.compatta({ incognito: incognitoTurno, motivo: 'anticipo', tetti: tettiChat }).catch((e) => console.warn('[Filo] compattazione in anticipo:', e?.message || e));
       }
     }
