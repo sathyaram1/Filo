@@ -2507,11 +2507,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
               const aiNote = act === 'reveal'
                 ? 'ho eseguito reveal sull\'elemento qui sotto: la sezione è ora aperta. Outline e screenshot sono aggiornati'
                 : 'ho eseguito hover sull\'elemento qui sotto: il menu è ora aperto. Outline e screenshot sono aggiornati';
-              setTimeout(() => submit({
+              passo({
                 userAction: aiNote,
                 esterno: { elementoPagina: { etichetta: targetLabel, selettore: parsed.highlight.selector } },
                 preActionUrl: urlPrimaDelPasso(),
-              }), 150);
+              }, 150);
             }
           } else {
             // Reveal rifiutato dalla whitelist o bersaglio mancante:
