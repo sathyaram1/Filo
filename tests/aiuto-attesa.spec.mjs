@@ -108,6 +108,28 @@ test('mentre lavora mostra il ragionamento vero, non frasi fisse; dopo la rispos
   await expect(corpo).toBeHidden();
 });
 
+// I pezzi in diretta e la risposta viaggiano su code diverse: con la pagina occupata i pezzi arrivano dopo (#1321).
+test('il ragionamento rimasto indietro arriva intero con la risposta', async ({ app, shell, openTab, testServer }) => {
+  await prepara(app, [{ pensa: ['Prima guardo il menu, ', 'poi la pagina del profilo.'], risposta: { text: 'Trovato.', status: 'done' } }]);
+  const { aiuto } = await apriAiuto(app, shell, openTab, testServer);
+  // Nessun pezzo in diretta arriva allo strato.
+  await app.evaluate(({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      for (const s of w._filoTabs?.riquadri?.strati?.values() || []) {
+        const wc = s.vista.webContents;
+        const send = wc.send.bind(wc);
+        wc.send = (canale, dati, ...resto) => (canale === 'filo:broadcast' && dati && dati.type === 'aiuto_ragionamento' ? undefined : send(canale, dati, ...resto));
+      }
+    }
+  });
+  await chiedi(aiuto, 'dove sta il profilo?');
+  await expect(aiuto.locator('.sn-sidebar-msg-assistant', { hasText: 'Trovato.' })).toBeVisible({ timeout: 15_000 });
+  const attesa = aiuto.locator('.sn-sidebar-attesa');
+  await expect(attesa).toHaveAttribute('data-fase', 'fatto');
+  await attesa.locator('.sn-sidebar-attesa-testa').click();
+  await expect(attesa.locator('.sn-sidebar-attesa-corpo')).toHaveText('Prima guardo il menu, poi la pagina del profilo.');
+});
+
 test('senza ragionamento da mostrare resta una rotella, che sparisce con la risposta (tema scuro)', async ({ app, shell, openTab, testServer }) => {
   await prepara(app, [{ aspetta: true, risposta: { text: 'Eccolo.', status: 'done' } }]);
   await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: { theme: 'dark' } },
