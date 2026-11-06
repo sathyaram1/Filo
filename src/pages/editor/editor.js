@@ -2313,13 +2313,6 @@
       }
       scegli(r);
     }
-    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito.
-    if (!docEl.textContent.trim() && !docEl.querySelector('img')) {
-      docEl.textContent = '';
-      sel.collapse(docEl, 0);
-      document.execCommand('insertHTML', false, paragrafi(tag));
-      return;
-    }
     // Blocco vuoto dopo un paragrafo con testo: si prende in prestito l'ultimo carattere di quello.
     const sopra = blocco.previousElementSibling;
     const coda = sopra && sopra.parentNode === blocco.parentNode && PARAGRAFO.test(sopra.tagName) ? ultimoTesto(sopra) : null;
