@@ -85,7 +85,7 @@ test('in un campo password la fila e le voci non offrono Taglia e Copia, come il
   await destroSulCampo(page, '#segreta');
   await expect(menu.locator('.sn-menu-row')).toBeVisible();
   expect(await iconeDellaFila(menu)).toEqual(['campo:paste']);
-  await expect(menu.voce('Incolla')).toBeVisible();
+  await expect(menu.locator('.sn-menu-paste-main', { hasText: 'Incolla' })).toBeVisible();
   await expect(menu.voce('Taglia')).toHaveCount(0);
   await expect(menu.voce('Copia')).toHaveCount(0);
   await page.keyboard.press('Escape');
