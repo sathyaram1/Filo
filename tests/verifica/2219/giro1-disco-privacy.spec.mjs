@@ -44,7 +44,8 @@ const inSicurezza = (app) => app.evaluate(() => globalThis.SN_DELICATE.elencoCam
 
 async function accedi(app, shell, host) {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), su(host));
-  await expect.poll(() => inSicurezza(app), { timeout: 10_000 }).toContain(host.split('.').slice(-2).join('.'));
+  const sito = /^[\d.]+$/.test(host) ? host : host.split('.').slice(-2).join('.');
+  await expect.poll(() => inSicurezza(app), { timeout: 10_000 }).toContain(sito);
 }
 
 test('lo scenario della segnalazione: accesso su 127.0.0.1 e localhost in Privacy, nessuno dei due nomi sul disco', async ({ app, shell }) => {
