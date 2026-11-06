@@ -450,7 +450,6 @@ test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è 
 test('#1290 — le sezioni chiuse da tradurre, a parole: «solo quando apro» le rimanda, «traduci tutto» le traduce subito', () => {
   const modo = (k, v) => build(k, v) && build(k, v).partial && build(k, v).partial.traduzionePagina;
   assert.deepEqual(modo('traduzione delle sezioni nascoste', 'solo quando apro'), { nascoste: 'apertura' });
-  assert.deepEqual(modo('traduci solo quando apro', 'sì'), { nascoste: 'apertura' }.nascoste === 'apertura' ? modo('traduci solo quando apro', 'sì') : null);
   assert.deepEqual(modo('traduzione_sezioni_nascoste', 'traduci tutto'), { nascoste: 'subito' });
   assert.deepEqual(modo('traduzione_sezioni_nascoste', 'no'), { nascoste: 'apertura' });
   assert.equal(build('traduzione_sezioni_nascoste', 'boh'), null);
