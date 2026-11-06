@@ -160,11 +160,25 @@ function rotto(wc, frame, motivo, { avvisa = avvisoDiRipiego, ricarica = ricaric
   conRegole.delete(id);
   try { avvisa(motivo); } catch (_) {}
   try { ricarica(wc, frame); } catch (_) {}
-  if (!inTest() && Date.now() - ultimoForzato >= FORZATO_MS) {
-    ultimoForzato = Date.now();
-    aggiorna({ forza: true }).catch(() => {});
-  }
+  if (!inTest()) { cercaRegoleNuove(); ricontrolla(); }
   return { fatto: true };
+}
+
+function cercaRegoleNuove() {
+  if (Date.now() - ultimoForzato < FORZATO_MS) return;
+  ultimoForzato = Date.now();
+  aggiorna({ forza: true }).catch(() => {});
+}
+
+// Finché una scheda aspetta le regole nuove si guarda ogni ora, non solo al giro del giorno dopo.
+let ricontrolli = null;
+function ricontrolla() {
+  if (ricontrolli) return;
+  ricontrolli = setInterval(() => {
+    if (!spente.size || !acceso) { clearInterval(ricontrolli); ricontrolli = null; return; }
+    cercaRegoleNuove();
+  }, FORZATO_MS);
+  if (ricontrolli.unref) ricontrolli.unref();
 }
 
 const TESTO_RIPIEGO = 'Oggi il blocco delle pubblicità su YouTube non funziona: aggiorno le regole e riprovo';
