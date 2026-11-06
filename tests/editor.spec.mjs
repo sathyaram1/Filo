@@ -345,3 +345,55 @@ test('incollato a metà di un paragrafo, il testo lungo si unisce come una riga 
   expect(ps[1]).toBe('R1');
   expect(ps[59]).toBe('R59ASdopo');
 });
+
+// #1697: le strade che restavano lente. Tutto il documento con un titolo e un elenco, la fine di una citazione, il
+// paragrafo vuoto dopo un elenco; e in un documento appena aperto con un elenco l'incolla resta nell'elenco.
+test('su tutto un documento con titolo ed elenco, l\'incolla lungo entra in fretta, si annulla in un passo e non salva l\'ancora', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  await foglio(page, '<h1>Titolo</h1><p>testo di prima</p><ul><li>voce a</li><li>voce b</li></ul>', { nodo: "d.querySelector('p').firstChild", off: 0 });
+  const prima = await foglioVisto(page);
+  await page.keyboard.press('Control+A');
+  const righe = Array.from({ length: 1000 }, (_, i) => `Riga ${i}`);
+  const ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page, '#doc > h1, #doc > p')).toEqual(righe);
+  expect(await page.locator('#doc li').count()).toBe(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('filo.editor.collection') || ''), { timeout: 15_000 }).toContain('Riga 999');
+  expect(await page.evaluate(() => localStorage.getItem('filo.editor.collection').includes(String.fromCharCode(0x200b)))).toBe(false);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(prima);
+});
+
+test('in fondo a una citazione e nel paragrafo vuoto dopo un elenco, l\'incolla lungo entra in fretta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  await foglio(page, '<blockquote>citato</blockquote><p>dopo</p>', { nodo: "d.querySelector('blockquote').firstChild", off: 6 });
+  const righe = Array.from({ length: 600 }, (_, i) => `Riga ${i}`);
+  let ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla nella citazione durato ${ms} ms`).toBeLessThan(2_000);
+  const citate = (await blocchi(page, '#doc > blockquote')).join('|');
+  expect(citate).toContain('Riga 0');
+  expect(citate).toContain('Riga 599');
+  expect((await blocchi(page)).at(-1)).toBe('dopo');
+
+  const prima = await foglio(page, '<ul><li>uno</li><li>due</li></ul><p><br></p><p>sotto</p>', { nodo: "d.querySelector('p')", off: 0 });
+  const tante = Array.from({ length: 1500 }, (_, i) => `Riga ${i}`);
+  ms = await incolla(app, page, tante.join('\n'));
+  expect(ms, `incolla dopo l'elenco durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual([...tante, 'sotto']);
+  expect(await blocchi(page, '#doc li')).toEqual(['uno', 'due']);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(prima);
+});
+
+test('in un documento vuoto che comincia con un elenco, l\'incolla lungo entra come voci e si annulla in un passo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const prima = await foglio(page, '<ul><li><br></li></ul>', { nodo: "d.querySelector('li')", off: 0 });
+  const righe = Array.from({ length: 60 }, (_, i) => `V${i}`);
+  await incolla(app, page, righe.join('\n'));
+  expect(await blocchi(page, '#doc li')).toEqual(righe);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(prima);
+});
