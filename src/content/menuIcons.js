@@ -81,7 +81,8 @@
     for (const [id, f] of Object.entries(finestra)) {
       if (!Disp.noto(id) || Disp.ICONE[id].tipo !== 'finestra' || !f || typeof global.SN_ICONS[f.icona] !== 'function') continue;
       reg[id] = {
-        id, icon: I(f.icona), label: String(f.etichetta || ''), tasto: f.tasto || undefined, disabled: !!f.spenta, acceso: !!f.accesa,
+        id, icon: I(f.icona), label: String(f.etichetta || ''), tasto: f.tasto || undefined, disabled: !!f.spenta,
+        ...(f.accesa ? { acceso: true } : {}),
         onClick: () => manda({ type: MSG.FILA_FINESTRA_ESEGUI, id }),
       };
     }
