@@ -2062,6 +2062,17 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
     b.title = modo === 'ferma' ? 'Ferma' : '';
   }
+  // Il tasto destro sul quadrato e sull'attesa che lavora: «Ferma», subito, come nella home (letto da content.js).
+  function vociAttesa(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (!el || !root || !root.contains(el) || !lavora()) return [];
+    const attesa = el.closest('.sn-sidebar-attesa');
+    const quadrato = el.closest('.sn-sidebar-input button[type="submit"]');
+    if (!quadrato && !(attesa && !['fatto', 'fermato'].includes(attesa.dataset.fase))) return [];
+    return [{ type: 'item', label: 'Ferma', onClick: () => fermaDallUtente() }];
+  }
+  global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+  if (!global.SN_VOCI_PAGINA.includes(vociAttesa)) global.SN_VOCI_PAGINA.push(vociAttesa);
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.AIUTO_RAGIONAMENTO || !msg.turno) return;
