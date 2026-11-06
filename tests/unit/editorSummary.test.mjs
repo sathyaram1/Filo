@@ -279,6 +279,25 @@ test('titoloDaRifare: segue il testo cambiato, mai un titolo scritto a mano', ()
   assert.equal(SUM.titoloDaRifare(nuovo), false, 'il primo titolo lo dà il tiro a 100 parole');
 });
 
+// #1697: riscritto su un altro argomento con le stesse parole di numero, il titolo si rifà; ritoccato, no.
+test('titoloDaRifare: un altro argomento a parità di parole si accorge, un ritocco no', () => {
+  const testo = (v, n) => Array.from({ length: n }, (_, i) => v[i % v.length]).join(' ');
+  const mare = ['il', 'mare', 'onde', 'spiaggia', 'sabbia', 'barca', 'scogli', 'gabbiani', 'conchiglie', 'marea'];
+  const monti = ['la', 'montagna', 'neve', 'vetta', 'sentiero', 'rifugio', 'bosco', 'ghiacciaio', 'valle', 'cresta'];
+  const f = fileWith({ id: 'a', title: 'Il mare', lines: [testo(mare, 150)] });
+  f.meta.titleAuto = true;
+  f.meta.titleSig = SUM.makeSig(f);
+  assert.equal(SUM.titoloDaRifare(f), false, 'stesso testo: resta');
+  const ritoccato = fileWith({ id: 'a', lines: [testo(mare, 140) + ' ' + testo(monti, 10)] });
+  ritoccato.meta = { ...ritoccato.meta, titleAuto: true, titleSig: f.meta.titleSig };
+  assert.equal(SUM.titoloDaRifare(ritoccato), false, 'qualche parola nuova: resta');
+  const riscritto = fileWith({ id: 'a', lines: [testo(monti, 150)] });
+  riscritto.meta = { ...riscritto.meta, titleAuto: true, titleSig: f.meta.titleSig };
+  assert.equal(SUM.titoloDaRifare(riscritto), true, 'altro argomento, stesse parole: si rifà');
+  riscritto.meta.titleManual = true;
+  assert.equal(SUM.titoloDaRifare(riscritto), false, 'scritto a mano: mai');
+});
+
 test('titoloERiassunto legge le due righe, e senza etichette tiene tutto come riassunto', () => {
   assert.deepEqual(SUM.titoloERiassunto('TITOLO: Ricetta della torta\nRIASSUNTO: Come si fa la torta di mele.'),
     { titolo: 'Ricetta della torta', riassunto: 'Come si fa la torta di mele.' });
