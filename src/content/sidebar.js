@@ -2054,7 +2054,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     const modo = lavora() ? 'ferma' : 'invia';
     if (b.dataset.modo === modo) return;
     b.dataset.modo = modo;
-    if (modo === 'ferma') b.dataset.comparso = String(Date.now());
+    if (modo === 'ferma') {
+      b.dataset.comparso = String(Date.now());
+      b.style.setProperty('--sn-pausa-quadrato', `${global.SN_CONST.PAUSA_QUADRATO_MS}ms`);
+    }
     b.textContent = modo === 'ferma' ? '' : '↵';
     b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
     b.title = modo === 'ferma' ? 'Ferma' : '';
