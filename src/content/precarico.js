@@ -32,7 +32,10 @@
   }
 
   function daGiudicare(a) {
-    return { href: a.href, rel: a.getAttribute('rel'), download: a.hasAttribute('download'), target: a.getAttribute('target') };
+    // Un link d'uscita fatto di sola icona si riconosce spesso solo dalla classe o dall'id.
+    const testo = [a.getAttribute('aria-label'), a.getAttribute('title'), a.id, a.getAttribute('class'),
+      (a.textContent || '').slice(0, LIMITI.TESTO_LINK)].filter(Boolean).join(' ');
+    return { href: a.href, rel: a.getAttribute('rel'), download: a.hasAttribute('download'), target: a.getAttribute('target'), testo };
   }
 
   function adatto(a) {
