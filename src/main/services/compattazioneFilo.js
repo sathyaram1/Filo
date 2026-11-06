@@ -404,9 +404,9 @@ function avvia() {
   if (primo.unref) primo.unref();
 }
 
-function dimenticaIncognito() { stati.incognito = vuoto(); }
+function dimenticaIncognito() { stati.incognito = vuoto(); basi.incognito = null; }
 // Le prove ripartono da un filo nuovo.
-function azzera() { stati.normale = null; stati.incognito = vuoto(); caricando = null; }
+function azzera() { stati.normale = null; stati.incognito = vuoto(); caricando = null; basi.normale = null; basi.incognito = null; }
 function imposta(dip) { Object.assign(_dip, dip || {}); }
 
 module.exports = {
