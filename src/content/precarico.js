@@ -129,7 +129,11 @@
     visibili = visibili.filter(tieni);
     fermo = true;
     scrivi();
+    // Se la pagina è ancora qui dopo un po', il clic non l'ha portata via: i link a schermo riprendono.
+    clearTimeout(timerRipresa);
+    timerRipresa = setTimeout(() => { fermo = false; riprendi(); }, LIMITI.RIPRESA_DOPO_CLIC_MS);
   }
+  let timerRipresa = null;
 
   // ── livello 2: i link a schermo, a rete ferma ──────────────────────────────
   let fermo = false;
