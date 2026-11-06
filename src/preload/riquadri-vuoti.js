@@ -80,18 +80,8 @@ function buildRiquadriVuotiSource(corpi) {
   }
   // Toccato prima del suo load, un riquadro che arriva a un indirizzo dello stesso sito tiene la finestra e perde il
   // preload: niente accesso, menu, cookie lì dentro. Non si tocca finché non arriva; resta fuori finché è in volo.
-  function inVolo(t, d) {
-    if (arrivati.has(t)) return false;
-    try {
-      var n = R(nomeDi, t, []);
-      if (n === 'iframe' && R(haAttr, t, ['srcdoc'])) return true;
-      var a = n === 'object' ? 'data' : 'src';
-      if (!R(haAttr, t, [a])) return false;
-      var v = String(R(attr, t, [a])).trim();
-      if (!v || VUOTO.test(v)) return false;
-      return R(origineDi, new Indirizzo(v, R(baseDi, d, [])), []) === ORIGINE;
-    } catch (e) { return false; }
-  }
+  var inArrivo = ${V.sorgenteInArrivo()};
+  function inVolo(t) { return !arrivati.has(t) && inArrivo(t); }
   var inGiro = false;
   function spazza() {
     if (inGiro) return;
