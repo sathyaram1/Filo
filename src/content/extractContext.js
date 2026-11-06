@@ -1005,7 +1005,7 @@
           else visti.push({ el, text: txt });
         }
       }
-      if (isClosedComponent(el) && !el.shadowRoot) unreachable++;
+      if (isClosedComponent(el, soloTestoNoto) && !el.shadowRoot) unreachable++;
       pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null);
     }
     let posto = maxBlocks;
