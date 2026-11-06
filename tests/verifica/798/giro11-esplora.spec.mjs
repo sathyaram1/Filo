@@ -58,6 +58,10 @@ async function porte() {
     const u = await new Promise((r) => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(b); });
     out.paginaBlob = await new Promise((r) => c.toBlob((bb) => { const fr = new FileReader(); fr.onload = () => r(fnv(fr.result)); fr.readAsDataURL(bb); }));
     return fnv(u); });
+  const dentroSrcdoc = (k) => `<script>${'fnv'}=${fnv.toString()};${'scena'}=${scena.toString()};top.postMessage({ lettura: '${k}', valore: fnv(scena(document).toDataURL()) }, '*')<\/script>`;
+  await prova('srcdocOmbraDentro', async () => { const sr = ombra(); const f = document.createElement('iframe'); f.srcdoc = dentroSrcdoc('sd1'); sr.appendChild(f); return attendi('sd1'); });
+  await prova('srcdocOmbraDopoDentro', async () => { const sr = ombra(); const f = document.createElement('iframe'); sr.appendChild(f); f.srcdoc = dentroSrcdoc('sd2'); return attendi('sd2'); });
+  await prova('srcdocLuceDopoDentro', async () => { const f = document.createElement('iframe'); document.body.appendChild(f); f.srcdoc = dentroSrcdoc('sd3'); return attendi('sd3'); });
   await prova('luceSrcElemento', async () => { const f = document.createElement('iframe'); f.src = '/figlio?k=luce'; document.body.appendChild(f);
     await attendi('luce'); await pausa(); return leggi(f.contentWindow); });
   await prova('openDaQui', async () => { const f = document.createElement('iframe'); f.name = 'perOpen'; f.src = '/figlio?k=open'; document.body.appendChild(f);
