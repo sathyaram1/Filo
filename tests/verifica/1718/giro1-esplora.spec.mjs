@@ -37,8 +37,7 @@ async function prepara(app, passi) {
           if (signal.aborted) via(); else signal.addEventListener('abort', via, { once: true });
         });
       }
-      const r = typeof p.risposta === 'function' ? p.risposta : null;
-      const text = JSON.stringify(r ? { highlight: { selector: `#sez${n}`, action: 'reveal' }, status: 'continue' } : p.risposta);
+      const text = JSON.stringify(p.serie ?{ highlight: { selector: `#sez${n}`, action: 'reveal' }, status: 'continue' } : p.risposta);
       try { onDelta && onDelta(text); } catch (_) {}
       return { ...base, text };
     };
