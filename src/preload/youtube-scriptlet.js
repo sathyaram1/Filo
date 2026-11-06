@@ -612,7 +612,8 @@ function motore(regole, W, esponi) {
             ? (n.nodeName === 'IFRAME' ? [n] : Array.from(n.querySelectorAll ? n.querySelectorAll('iframe') : []))
             : [];
           for (const fr of riquadri) {
-            const w = fr.contentWindow;
+            // Mondo della pagina, come riquadri-vuoti.js: un tocco da qui il preload del riquadro non lo toglie.
+            const w = fr['contentWindow'];
             if (w) N.def(w, prop, { value: W[prop], configurable: true, writable: true });
           }
         } catch (_) {}
