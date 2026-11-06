@@ -427,7 +427,7 @@ const PROPAGAZIONE = `
   function conTesto(P, nome, dove) {
     var d = P && gOPD(P, nome);
     if (!d) return;
-    var dopo = function (c, args) { if (c && conCornici(args)) { try { cornici(c, tocca); } catch (e) {} } };
+    var dopo = function (c, args) { if (c && conCornici(args)) { try { cornici(c, toccaDaScript); } catch (e) {} } };
     if (R(proprio, d, ['value'])) {
       var orig = d.value;
       if (typeof orig !== 'function') return;
