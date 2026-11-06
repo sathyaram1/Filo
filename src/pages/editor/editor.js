@@ -1048,9 +1048,9 @@
   const SUMMARY_DEBOUNCE_MS = 7000;
   let summaryTimer = null;
 
-  const SUMMARY_SYSTEM_PROMPT = `Sei l'assistente di Filo. Per il documento qui sotto scrivi ${REGOLA_RIASSUNTO}. `
+  const SUMMARY_SYSTEM_PROMPT = `Sei l'assistente di Filo. Scrivi ${REGOLA_RIASSUNTO}. `
     + `${SOLO_CONTESTO} Rispondi SOLO col riassunto: niente virgolette, niente preamboli, niente elenco.`;
-  const TITOLO_E_RIASSUNTO_PROMPT = `Sei l'assistente di Filo. Per il documento qui sotto scrivi ${REGOLA_TITOLO}; poi `
+  const TITOLO_E_RIASSUNTO_PROMPT = `Sei l'assistente di Filo. Prima scrivi ${REGOLA_TITOLO}; poi `
     + `${REGOLA_RIASSUNTO}. ${SOLO_CONTESTO} Rispondi con due righe esatte, senza virgolette né altro:\n`
     + 'TITOLO: <il titolo, senza punto finale>\nRIASSUNTO: <il riassunto, senza preamboli né elenco>';
 
