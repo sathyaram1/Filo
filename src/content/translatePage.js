@@ -651,18 +651,22 @@
 
   // Parola arrivata dalla pagina che ci ospita: traduci te stesso, o torna
   // all'originale insieme a lei.
-  function onFrameCommand(msg) {
+  async function onFrameCommand(msg) {
     if (isTopFrame()) return;
     const runId = String((msg && msg.runId) || '');
     if (String(msg && msg.mode) === 'restore') { restoreOriginal({ quiet: true }); return; }
-    // Qui arriva solo un riquadro che chi lo ospita vede (il preload ha fermato gli altri): ai suoi passa lo stesso
-    // giudizio, e nel "ci sono" dice quanti ne contare.
-    const { shown, skipped } = embeddedFrames();
+    // Qui arriva solo un riquadro che chi lo ospita vede o traduce in sottofondo (il preload ha fermato gli altri): ai
+    // suoi passa lo stesso giudizio, e nel "ci sono" dice quanti ne contare. Dentro uno fuori conto, tutti fuori conto.
+    const fuori = !!msg.fuoriConto;
+    const modo = fuori ? Extract.NASCOSTE.TRADUCI : await leggiModo();
+    const { shown, skipped, background } = embeddedFrames(modo);
     tellFrames(runId, skipped, false);
-    tellFrames(runId, shown, true);
-    reportToHost(runId, { phase: 'ack', frames: shown.length });
-    if (!worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
-    translatePage({ quiet: true, runId });
+    tellFrames(runId, shown, true, fuori);
+    tellFrames(runId, background, true, true);
+    reportToHost(runId, { phase: 'ack', frames: fuori ? 0 : shown.length }, fuori);
+    // Nascosto, un riquadro non ha misura: il francobollo si riconosce solo da uno che si vede.
+    if (!fuori && !worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
+    translatePage({ quiet: true, runId, fuoriConto: fuori });
   }
 
   try {
