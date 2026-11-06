@@ -95,7 +95,8 @@ const liste = (app, testi) => app.evaluate((_e, t) => globalThis.__filoBloccoYou
 const stato = (app) => app.evaluate(() => globalThis.__filoBloccoYouTube.status());
 const impostazioni = (app, settings) => app.evaluate(async (_e, s) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: s },
   { tab: { id: 1, url: 'filo://security/security.html' }, url: 'filo://security/security.html' }), settings);
-const esiti = (page) => page.evaluate(() => window.__esiti);
+// fetch e xhr rispondono nell'ordine che vogliono: conta cosa ha mostrato ognuno.
+const esiti = (page) => page.evaluate(() => window.__esiti && window.__esiti.slice().sort());
 
 async function apri(openTab, url) {
   const page = await openTab(url);
