@@ -577,6 +577,28 @@
     return false;
   }
 
+  // Il collegamento per riaprire le preferenze resta in pagina dopo la risposta, e la lista lo nomina: non è un banner,
+  // né da nascondere né da contare (#1279.4). Per forma: un comando solo, senza una scritta fuori da lui.
+  const REOPEN = [
+    '.ot-sdk-show-settings', '#ot-sdk-btn', '.optanon-show-settings', '#cookie-law-info-again', '#cookie_hdr_showagain',
+    '.cky-btn-revisit-wrapper', '.cmplz-manage-consent', '#CookiebotWidget', '.iubenda-tp-btn',
+  ].join(',');
+
+  function flat(t) { return String(t || '').replace(/\s+/g, ' ').trim(); }
+
+  function reopenLink(el) {
+    try { if (el.matches(REOPEN)) return true; } catch (_) {}
+    let text = '';
+    try { text = flat(el.innerText); } catch (_) {}
+    if (text.length > 60) return false;
+    let btns = [];
+    try { btns = el.matches(CLICKABLE) ? [el] : [...el.querySelectorAll(CLICKABLE)].slice(0, 2); } catch (_) {}
+    if (btns.length !== 1) return false;
+    let own = '';
+    try { own = flat(btns[0].innerText); } catch (_) {}
+    return own === text;
+  }
+
   function bannerTick(knownCmp) {
     const B = global.SN_COOKIE_BANNERS;
     if (!IS_TOP || !B || !B.isRunning() || reported.has('rejected')) return;
