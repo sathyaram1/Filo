@@ -65,13 +65,12 @@ test('esplora: Taglia in un campo ricco tiene il grassetto come Ctrl+X e si annu
   await expect(menu.voce('Taglia')).toBeVisible();
   await menu.voce('Taglia').click();
   await expect.poll(() => appunti(app)).toBe('grassetto');
-  const htmlFilo = await appuntiHtml(app);
-  console.log('html dopo Taglia di Filo', JSON.stringify(htmlFilo));
   await expect.poll(() => page.locator('#ricco').textContent()).toBe(' normale');
   await page.locator('#altro').click();
   await page.keyboard.press('End');
   await page.keyboard.press('Control+v');
-  console.log('incollato', await page.locator('#altro').innerHTML());
+  const htmlFilo = await page.locator('#altro').innerHTML();
+  console.log('incollato dopo Taglia di Filo', JSON.stringify(htmlFilo));
   expect(htmlSistema).toContain('<b');
   expect(htmlFilo).toContain('<b');
 });
