@@ -1861,7 +1861,7 @@ class TabManager {
   // Mai chiuse dalla pulizia, qualunque cosa decida il modello: l'attiva, quella con audio,
   // quella di un sito tenuto sempre aperto, quella con testo scritto e non inviato (#824, spec §2.1).
   _intoccabileDalTriage(tab) {
-    return tab.id === this.activeId || !!tab.audible || this._sempreAperta(tab) || this._testoNonInviato(tab);
+    return tab.id === this.activeId || this._sempreAperta(tab) || this._qualcosaDaPerdere(tab);
   }
 
   _testoNonInviato(tab) {
