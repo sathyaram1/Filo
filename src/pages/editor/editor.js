@@ -2167,30 +2167,158 @@
     if (righe.length < INCOLLA_A_RIGHE) document.execCommand('insertText', false, text);
     else incollaLungo(righe);
   });
-  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475); insertHTML è lento uguale in un
-  // blocco vuoto, per questo la prima riga entra da insertText e il suo ultimo carattere torna col resto, nel suo tag.
+  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475). L'incolla lungo è UN insertHTML,
+  // così si annulla in un passo (#1475.2). Chrome lo paga al quadrato quando arriva in un blocco vuoto: la selezione
+  // allora prende un carattere vicino, che torna nel frammento al suo posto, e un foglio senza testo si svuota prima.
   const INCOLLA_A_RIGHE = 50;
   const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
-  function incollaLungo(righe) {
-    const [prima, ...resto] = righe;
-    document.execCommand('insertText', false, prima);
-    const sel = window.getSelection();
-    let blocco = sel && sel.anchorNode;
-    while (blocco && blocco !== docEl && !(blocco.nodeType === 1 && BLOCCO.test(blocco.tagName))) blocco = blocco.parentNode;
-    if (!blocco || blocco === docEl || !/^(P|DIV|H[1-6])$/.test(blocco.tagName) || (blocco.textContent || '').length < 2) {
-      document.execCommand('insertText', false, `\n${resto.join('\n')}`);
-      return;
-    }
-    sel.modify('extend', 'backward', 'character');
-    let pezzo = spaziVisibili(sel.toString());
-    for (let n = sel.getRangeAt(0).startContainer.parentNode; n && n !== blocco; n = n.parentNode) {
+  const PARAGRAFO = /^(P|DIV|H[1-6])$/;
+  function bloccoDi(nodo) {
+    let b = nodo;
+    while (b && b !== docEl && !(b.nodeType === 1 && BLOCCO.test(b.tagName))) b = b.parentNode;
+    return b && b !== docEl ? b : null;
+  }
+  function htmlDi(range) {
+    const box = document.createElement('div');
+    box.appendChild(range.cloneContents());
+    return box.innerHTML;
+  }
+  // Il carattere preso in prestito torna dentro gli stessi tag in linea (grassetto, link…) che aveva nel blocco.
+  function carattereVestito(range, blocco) {
+    let pezzo = spaziVisibili(range.toString());
+    for (let n = range.startContainer.parentNode; n && n !== blocco; n = n.parentNode) {
       const vuoto = n.cloneNode(false).outerHTML;
       const chiude = vuoto.lastIndexOf('</');
       pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
     }
+    return pezzo;
+  }
+  // Un carattere solo, senza immagini o a capo in mezzo: il frammento lo può riscrivere com'era.
+  function carattereSemplice(range) {
+    if (range.toString().length !== 1) return false;
+    return !range.cloneContents().querySelector('img, br');
+  }
+  function ultimoTesto(el) {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let ultimo = null;
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (t.nodeValue.length) ultimo = t;
+    return ultimo;
+  }
+  // Dopo l'incolla il cursore sta in fondo a quello che è entrato: si riporta prima di ciò che c'era dopo.
+  function cursoreIndietro(caratteri) {
+    const sel = window.getSelection();
+    if (!caratteri || !sel || !sel.rangeCount) return;
+    const blocco = bloccoDi(sel.anchorNode);
+    if (!blocco) return;
+    const prima = document.createRange();
+    prima.setStart(blocco, 0);
+    prima.setEnd(sel.anchorNode, sel.anchorOffset);
+    let resta = Math.max(0, prima.toString().length - caratteri);
+    const w = document.createTreeWalker(blocco, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (resta <= t.nodeValue.length) { sel.collapse(t, resta); return; }
+      resta -= t.nodeValue.length;
+    }
+  }
+  function riga(r) { return r ? spaziVisibili(r) : '<br>'; }
+  function incollaLungo(righe) {
+    const sel = window.getSelection();
+    const r = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    const blocco = r && bloccoDi(r.startContainer);
+    const bloccoFine = r && bloccoDi(r.endContainer);
+    if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
+    const ultima = righe.length - 1;
+    const paragrafi = (tag, prefisso = '', suffisso = '') => righe.map((x, i) => {
+      const t = i === 0 ? tag : 'p';
+      return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
+    }).join('');
+    const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
+
+    // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto.
+    if (blocco.tagName === 'LI' && bloccoFine === blocco) {
+      const prima = document.createRange();
+      prima.setStart(blocco, 0);
+      prima.setEnd(r.startContainer, r.startOffset);
+      const dopo = document.createRange();
+      dopo.setStart(r.endContainer, r.endOffset);
+      dopo.setEnd(blocco, blocco.childNodes.length);
+      const lista = blocco.parentNode.tagName === 'OL' ? 'ol' : 'ul';
+      const voci = righe.map((x, i) => `<li>${i === 0 ? htmlDi(prima) : ''}${(i === 0 && prima.toString()) || (i === ultima && dopo.toString()) ? spaziVisibili(x) : riga(x)}${i === ultima ? htmlDi(dopo) : ''}</li>`).join('');
+      const tutta = document.createRange();
+      tutta.selectNodeContents(blocco);
+      scegli(tutta);
+      document.execCommand('insertHTML', false, `<${lista}>${voci}</${lista}>`);
+      cursoreIndietro(dopo.toString().length);
+      return;
+    }
+    if (!PARAGRAFO.test(blocco.tagName) || !PARAGRAFO.test(bloccoFine.tagName)) {
+      document.execCommand('insertText', false, righe.join('\n'));
+      return;
+    }
     const tag = blocco.tagName.toLowerCase();
-    document.execCommand('insertHTML', false, `<${tag}>${pezzo}</${tag}>`
-      + resto.map((r) => `<p>${r ? spaziVisibili(r) : '<br>'}</p>`).join(''));
+    // Testo prima del cursore nel suo blocco: l'ultimo carattere entra in testa alla prima riga.
+    const indietro = r.cloneRange();
+    indietro.setStart(blocco, 0);
+    indietro.setEnd(r.startContainer, r.startOffset);
+    if (indietro.toString().length) {
+      sel.collapse(r.startContainer, r.startOffset);
+      sel.modify('move', 'backward', 'character');
+      const car = document.createRange();
+      car.setStart(sel.anchorNode, sel.anchorOffset);
+      car.setEnd(r.startContainer, r.startOffset);
+      if (carattereSemplice(car) && bloccoDi(car.startContainer) === blocco) {
+        const tutta = r.cloneRange();
+        tutta.setStart(car.startContainer, car.startOffset);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, paragrafi(tag, carattereVestito(car, blocco)));
+        return;
+      }
+      scegli(r);
+    }
+    // Testo dopo il cursore: il primo carattere chiude l'ultima riga, e il cursore torna prima di lui.
+    const avanti = r.cloneRange();
+    avanti.setStart(r.endContainer, r.endOffset);
+    avanti.setEnd(bloccoFine, bloccoFine.childNodes.length);
+    if (avanti.toString().length) {
+      sel.collapse(r.endContainer, r.endOffset);
+      sel.modify('move', 'forward', 'character');
+      const car = document.createRange();
+      car.setStart(r.endContainer, r.endOffset);
+      car.setEnd(sel.anchorNode, sel.anchorOffset);
+      if (carattereSemplice(car) && bloccoDi(car.endContainer) === bloccoFine) {
+        const tutta = r.cloneRange();
+        tutta.setEnd(car.endContainer, car.endOffset);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, paragrafi(tag, '', carattereVestito(car, bloccoFine)));
+        cursoreIndietro(1);
+        return;
+      }
+      scegli(r);
+    }
+    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito.
+    if (!docEl.textContent.trim() && !docEl.querySelector('img')) {
+      docEl.textContent = '';
+      sel.collapse(docEl, 0);
+      document.execCommand('insertHTML', false, paragrafi(tag));
+      return;
+    }
+    // Blocco vuoto dopo un paragrafo con testo: si prende in prestito l'ultimo carattere di quello.
+    const sopra = blocco.previousElementSibling;
+    const coda = sopra && sopra.parentNode === blocco.parentNode && PARAGRAFO.test(sopra.tagName) ? ultimoTesto(sopra) : null;
+    if (coda) {
+      const car = document.createRange();
+      car.setStart(coda, coda.nodeValue.length - 1);
+      car.setEnd(sopra, sopra.childNodes.length);
+      if (carattereSemplice(car)) {
+        const tutta = r.cloneRange();
+        tutta.setStart(car.startContainer, car.startOffset);
+        scegli(tutta);
+        const suo = sopra.tagName.toLowerCase();
+        document.execCommand('insertHTML', false, `<${suo}>${carattereVestito(car, sopra)}</${suo}>${paragrafi(tag)}`);
+        return;
+      }
+    }
+    document.execCommand('insertHTML', false, paragrafi(tag));
   }
   // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
   function spaziVisibili(s) {
