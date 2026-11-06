@@ -458,6 +458,15 @@ test('#1290 — le sezioni chiuse da tradurre, a parole: «solo quando apro» le
   assert.equal(C.nascosteDellaTraduzione({ traduzionePagina: { nascoste: 'apertura' } }), 'apertura');
   assert.equal(C.nascosteDellaTraduzione({}), 'subito');
   assert.equal(C.nascosteDellaTraduzione(C.DEFAULT_SETTINGS), 'subito');
+  assert.equal(C.modoNascoste('qualcos\'altro'), C.NASCOSTE_TRADUZIONE.TRADUCI);
+  assert.equal(C.modoNascoste(C.NASCOSTE_TRADUZIONE.RIMANDA), C.NASCOSTE_TRADUZIONE.RIMANDA);
+});
+
+test('#1290 — i due valori delle sezioni chiuse stanno in un posto solo: chi legge la scelta lo chiede a lui', () => {
+  const leggi = (p) => readFileSync(join(__dirname, '..', '..', p), 'utf8');
+  for (const p of ['src/content/extractContext.js', 'src/content/translatePage.js', 'src/pages/preferences/preferences.js']) {
+    assert.doesNotMatch(leggi(p), /['"](subito|apertura)['"]/, `${p} riscrive a mano un valore delle sezioni chiuse`);
+  }
 });
 
 test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {
