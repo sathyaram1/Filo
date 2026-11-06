@@ -193,7 +193,7 @@
       const r = a.getBoundingClientRect();
       if (!r.width || !r.height || r.bottom <= 0 || r.right <= 0 || r.top >= alto || r.left >= largo) continue;
       if (!adatto(a)) continue;
-      out.push({ url, top: r.top, left: r.left });
+      out.push({ url, href: a.href, top: r.top, left: r.left });
     }
     return out;
   }
