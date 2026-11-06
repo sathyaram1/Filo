@@ -1628,12 +1628,19 @@
   // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
   function buildMediaItems(el, link = null) {
     const a = azioniDelMedia(el, link);
-    const voce = (azione, x) => ({ type: 'item', azione, label: x.label, onClick: x.onClick });
-    const items = [voce('video-audio-controls', a.playPause), voce('video-audio-controls', a.mute), buildMediaSpeedItem(el),
-      voce('video-audio-controls', a.loop)];
-    if (a.pip) items.push(voce('video-pip', a.pip));
-    items.push(voce('video-audio-controls', a.controls), { type: 'separator' },
-      voce('copy-download-video', a.copyLink), voce('copy-download-video', a.save));
+    const items = [
+      { type: 'item', azione: 'video-audio-controls', label: a.playPause.label, onClick: a.playPause.onClick },
+      { type: 'item', azione: 'video-audio-controls', label: a.mute.label, onClick: a.mute.onClick },
+      buildMediaSpeedItem(el),
+      { type: 'item', azione: 'video-audio-controls', label: a.loop.label, onClick: a.loop.onClick },
+    ];
+    if (a.pip) items.push({ type: 'item', azione: 'video-pip', label: a.pip.label, onClick: a.pip.onClick });
+    items.push(
+      { type: 'item', azione: 'video-audio-controls', label: a.controls.label, onClick: a.controls.onClick },
+      { type: 'separator' },
+      { type: 'item', azione: 'copy-download-video', label: a.copyLink.label, onClick: a.copyLink.onClick },
+      { type: 'item', azione: 'copy-download-video', label: a.save.label, onClick: a.save.onClick },
+    );
     return items;
   }
 
