@@ -794,10 +794,11 @@
 
   // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
   // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
-  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo.
+  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo. Trasparente sì,
+  // dovunque stia: il conto dell'avviso non può cambiare con lo scorrimento (#503.2, #503.3).
   function isHiddenFromUser(el) {
     try {
-      if (isVisibilityHidden(el)) return true;
+      if (isVisibilityHidden(el, true)) return true;
       if (el.ownerDocument === document) {
         const r = el.getBoundingClientRect();
         if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
