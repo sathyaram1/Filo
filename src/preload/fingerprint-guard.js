@@ -331,16 +331,7 @@ const PROPAGAZIONE = `
 
   // Si tocca in anticipo un riquadro che resterà la finestra vuota della pagina, o che andrà su un'altra origine e
   // avrà una finestra nuova; mai uno che carica un documento della stessa origine.
-  function anticipabile(el, tag) {
-    if (R(haAttr, el, ['srcdoc'])) return false;
-    var s = R(leggiAttr, el, [tag === 'OBJECT' ? 'data' : 'src']);
-    if (s === null) return true;
-    s = R(lower, R(trim, '' + s, []), []);
-    if (s === '' || R(taglia, s, [0, 11]) === 'about:blank' || R(taglia, s, [0, 11]) === 'javascript:') return true;
-    try {
-      return R(origineUrl, costruisci(URLc, [s, R(baseDi, el, [])]), []) !== R(docDi, el, []).location.origin;
-    } catch (e) { return false; }
-  }
+  function anticipabile(el) { return !inArrivo(el); }
   // In Automatico un riquadro della stessa origine resta scoperto per indice finché carica: coprirlo spegne Filo lì
   // dentro. In Privacy massima (decisioni owner, D-221) uno inserito da uno script si copre appena entra, tranne nei siti
   // con accessi esenti (uno di quelli si coprirebbe); uno scritto nell'HTML, o lento, dopo qualche secondo ancora vuoto.
