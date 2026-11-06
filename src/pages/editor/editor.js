@@ -1032,10 +1032,11 @@
   function maybeAutoTitle() {
     if (!doc || !doc.meta) return;
     if (doc.meta.titleAuto || doc.meta.titleManual) return;
-    if (autoTitleBusy) return;
+    const id = doc.id;
+    if (titoliInVolo.has(id)) return;
     if (textStats().words < AUTO_TITLE_WORDS) return;
-    autoTitleBusy = true;
-    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { autoTitleBusy = false; });
+    titoliInVolo.add(id);
+    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { titoliInVolo.delete(id); });
   }
 
   // Riassunto per file (#379.5): stesso canale AI del titolo, ma si RIGENERA quando il file
