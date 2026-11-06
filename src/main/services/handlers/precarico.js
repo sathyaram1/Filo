@@ -15,8 +15,14 @@ module.exports = function register(on, ctx) {
     try { scaricando = require('../downloads').scaricaInCorso(); } catch (_) {}
     let aBatteria = false;
     try { aBatteria = powerMonitor.isOnBatteryPower(); } catch (_) {}
+    const tm = win && win._filoTabs;
+    let dietro = false;
+    try {
+      const davanti = tm && Array.isArray(tm.tabs) ? tm.tabs.find((t) => t && t.id === tm.activeId) : null;
+      dietro = !!(sender && sender.wc) && (!davanti || !davanti.view || davanti.view.webContents !== sender.wc || win.isMinimized());
+    } catch (_) {}
     const motivo = globalThis.SN_PRECARICO.motivoFermoVisibili({
-      impostazioni, incognito: !!(win && win._filoTabs && win._filoTabs.incognito), scaricando, aBatteria,
+      impostazioni, incognito: !!(tm && tm.incognito), scaricando, aBatteria, dietro,
     });
     return { ok: true, visibili: !motivo, motivo };
   });
