@@ -477,12 +477,12 @@ const restaConnessoMethods = {
     return mem && Array.isArray(mem.persi) ? mem.persi.length : 0;
   },
 
-  // Pagina cambiata (o ricarica chiesta) su una scheda col passaggio rinviato. Un invio che il sito ha respinto
-  // lascia il testo da perdere anche sulla pagina nuova: lì si aspetta ancora.
+  // Pagina cambiata (o ricarica chiesta) su una scheda col passaggio rinviato. La pagina arrivata da un invio non si
+  // richiede: mostra l'esito (o il testo respinto) che una seconda richiesta perderebbe; si passa alla pagina dopo.
   _passaggioDopoCambio(tab, { chiesta = false } = {}) {
     const r = tab && tab._passaggioRinviato;
     if (!r) return;
-    if (!chiesta && this._qualcosaDaPerdere(tab)) return;
+    if (!chiesta && (this._qualcosaDaPerdere(tab) || tab._invioRespinto)) return;
     tab._passaggioRinviato = null;
     const ricarica = () => { if (chiesta) { try { tab.view.webContents.reload(); } catch (_) {} } };
     if (!this.tabs.includes(tab) || this._jarDi(tab) !== r.sito || !this._needsRepartition(tab, tab.url)) { ricarica(); return; }
