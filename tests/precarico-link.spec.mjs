@@ -11,7 +11,7 @@ test.use({ hostInPiu: [ALTRO, WWW, BLOG] });
 
 // `lente`: indirizzi che rispondono dopo tanto, per vedere un precarico ancora in corso. `scarico`: un file che scende
 // piano finché la prova non lo finisce.
-async function sitoCheConta({ lente = [], csp = '' } = {}) {
+async function sitoCheConta({ lente = [], csp = '', ritardoLente = 15_000 } = {}) {
   const richieste = [];
   let finisciScarico = null;
   const server = createServer((req, res) => {
