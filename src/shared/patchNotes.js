@@ -38,6 +38,9 @@
         { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo. «Metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un\'altra.', segnalazione: 1397 },
         { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
       ],
+      features: [
+        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
+      ],
     },
     {
       version: '0.2.268', date: '2026-11-06',
@@ -93,9 +96,7 @@
         { testo: 'La home non legge batteria e rete ogni minuto mentre sei via, e le legge appena torni alla finestra: un Invio su una bozza non aspetta.', segnalazione: 1302 },
         { testo: 'Una risposta interrotta da un errore del servizio, mentre il modello ragionava o dopo le prime parole, ora conta nel limite di spesa mensile e in Cronologia, col costo di ogni tentativo, anche quando nessuno ha risposto.', segnalazione: 1302 },
       ],
-      features: [
-        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
-      ],
+      features: [],
     },
     {
       version: '0.2.264', date: '2026-11-04',
