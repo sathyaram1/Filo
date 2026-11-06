@@ -17,6 +17,7 @@
         { testo: 'Indietro e Avanti portati nella fila del tasto destro sono spenti quando non c\'è dove andare, come nella barra laterale.', segnalazione: 1434 },
         { testo: 'Taglia e Copia del tasto destro tengono grassetto, corsivo e collegamenti: incollato, il testo resta com\'era.', segnalazione: 1434 },
         { testo: 'L\'Aiuto sui siti mostra cosa sta facendo davvero, il ragionamento compreso, e il quadrato al posto dell\'invio lo ferma con un clic.', segnalazione: 578 },
+        { testo: 'I video di YouTube partono senza pubblicità, anche quelli incorporati in altri siti. Il giorno in cui YouTube cambia e il blocco non regge, Filo torna da solo a premere «Salta» finché le regole non si aggiornano. Si spegne in Sicurezza → «Blocca le pubblicità di YouTube».', segnalazione: 1974 },
       ],
     },
     {
