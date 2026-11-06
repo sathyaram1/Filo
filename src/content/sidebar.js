@@ -1264,7 +1264,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // Fermato dall'utente: la riga lo dice e il ragionamento a metà resta aperto, come nella home.
       ferma() {
         if (finita) return;
-        chiudi('fermato', globalThis.SN_CHAT_ERRORS?.FERMATO_QUI || 'Fermato qui');
+        chiudi('fermato', global.SN_CHAT_ERRORS.FERMATO_QUI);
         if (ragionamento) apri(true);
       },
     };
