@@ -222,6 +222,7 @@
   function avvia(d) {
     if (deps) return;
     deps = d || {};
+    seguiRisorse();
     const opz = { capture: true, passive: true };
     document.addEventListener('mouseover', suPassaggio, opz);
     document.addEventListener('mouseout', suUscita, opz);
