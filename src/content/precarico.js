@@ -227,8 +227,8 @@
     if (!c) return;
     fatti.add(c.url);
     contati++;
-    if (!visibili.includes(c.url) && !passati.includes(c.url)) {
-      visibili.push(c.url);
+    if (!visibili.includes(c.href) && !passati.includes(c.href)) {
+      visibili.push(c.href);
       scrivi();
     }
     pianifica();
