@@ -1523,10 +1523,44 @@
   // <button>, e l'immagine trascinata spesso non si vede.
   const dropZones = [];
 
-  // La barra laterale come zona in più (#871): la installa menuIcons.js. Il puntatore resta della pagina per tutto il
-  // gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
+  // La barra laterale come zona in più (#871): chi installa il ponte (menuIcons.js nella pagina, lo strato del menu) dà
+  // solo `trascina(dati)`, la strada verso il main; il gesto è uno solo per tutti e due (#1434.2). Il puntatore resta
+  // del menu per tutto il gesto, anche sopra la barra, quindi è da qui che si dice dove cade.
   let ponteBarra = null;
-  function setPonteBarra(p) { ponteBarra = p || null; }
+  function setPonteBarra(trascina) { ponteBarra = typeof trascina === 'function' ? ponteVersoLaBarra(trascina) : null; }
+  function ponteVersoLaBarra(trascina) {
+    const manda = (d) => { try { return Promise.resolve(trascina(d)).catch(() => null); } catch (_) { return Promise.resolve(null); } };
+    let barra = null;
+    let mira = null;
+    let gesto = 0;
+    return {
+      inizio(id, menuSinistra) {
+        barra = null;
+        mira = null;
+        // Solo le icone della barra: un'azione dell'elemento (grassetto, salva immagine) lì non avrebbe su cosa agire.
+        if (!global.SN_DISPOSIZIONE_ICONE?.noto(id)) { gesto = 0; return; }
+        const questo = ++gesto;
+        manda({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok && gesto === questo) barra = { larghezza: Number(r.larghezza) || 0 }; });
+      },
+      sopra(x, y) {
+        const dentro = !!barra && x <= barra.larghezza;
+        const ora = dentro ? Math.round(y) : null;
+        if (gesto && ora !== mira) { mira = ora; manda({ fase: 'sopra', y: ora }); }
+        return dentro;
+      },
+      posa(id, x, y) {
+        if (!barra || x > barra.larghezza) return false;
+        manda({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
+        return true;
+      },
+      fine() {
+        barra = null;
+        mira = null;
+        if (gesto) manda({ fase: 'fine' });
+        gesto = 0;
+      },
+    };
+  }
   // Dove comincia il menu aperto: se sta dove si apre la barra, lei aspetta che il puntatore vada al bordo.
   function sinistraDelMenu() {
     const els = [activeMenu?.root, activeMenu?.subRoot].filter((e) => e && e.isConnected);
