@@ -2867,19 +2867,7 @@
       const a = azioniDelLink(contesto.link);
       for (const k of ['openTab', 'copy', 'saveForLater', 'share']) azioni[k] = { onClick: a[k] };
     } else if (nome === 'media' && contesto.media) {
-      const el = contesto.media;
-      const audio = Actions.isAudioEl(el);
-      Object.assign(azioni, {
-        playPause: { onClick: () => Actions.toggleMediaPlay(el), icona: el.paused ? 'play' : 'pause', label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause') },
-        mute: { onClick: () => Actions.toggleMediaMute(el), icona: el.muted ? 'volume' : 'volumeMute', label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute') },
-        save: { onClick: () => Actions.downloadMedia(el, contesto.link || null), label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as') },
-        loop: { onClick: () => Actions.toggleMediaLoop(el), label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop') },
-        pip: Actions.mediaPipAvailable(el)
-          ? { onClick: () => Actions.toggleMediaPip(el), label: I18n.t(Actions.isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip') }
-          : null,
-        copyLink: { onClick: () => Actions.copyMediaUrl(el), label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link') },
-        ...azioniDellAnteprima(contesto.link),
-      });
+      Object.assign(azioni, Actions.azioniDelMedia(contesto.media, contesto.link || null), azioniDellAnteprima(contesto.link));
     } else if (nome === 'cursore') {
       azioni.paste = { onClick: () => Actions.pasteFromClipboard() };
       const detta = TTS.buildDictateItem(target);
