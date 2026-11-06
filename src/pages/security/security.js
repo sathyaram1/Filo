@@ -39,6 +39,8 @@
     $('sec-block-popups-desc').textContent = I18n.t('options_security_block_popups_desc');
     $('sec-adblock-label').textContent = I18n.t('options_security_adblock');
     $('sec-adblock-desc').textContent = I18n.t('options_security_adblock_desc');
+    $('sec-ytads-label').textContent = I18n.t('options_security_ytads');
+    $('sec-ytads-desc').textContent = I18n.t('options_security_ytads_desc');
     $('sec-adskip-label').textContent = I18n.t('options_security_adskip');
     $('sec-adskip-desc').textContent = I18n.t('options_security_adskip_desc');
     $('sec-siteblock-label').textContent = I18n.t('options_security_siteblock');
