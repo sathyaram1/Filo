@@ -894,6 +894,7 @@
     $('sec-block-popups').checked = sec.blockPopups !== false;
     $('sec-adblock').checked = (sec.adblock || {}).enabled !== false;
     $('sec-adskip').checked = (sec.adSkip || {}).enabled !== false;
+    $('sec-ytads').checked = (sec.youtubeAds || {}).enabled !== false;
     const sblk = sec.siteBlock || {};
     $('sec-siteblock').checked = sblk.enabled !== false;
     $('sec-siteblock-lists').checked = sblk.useAdblockLists !== false;
