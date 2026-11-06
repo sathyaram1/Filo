@@ -1920,9 +1920,10 @@ for (const [dove, html] of [
   });
 }
 
-test('un riquadro con script nascosto non si paga; aperta la sua sezione, si traduce dalla barra laterale', async ({ app, openTab, testServer }) => {
+test('solo quando apro: un riquadro con script nascosto non si paga; aperta la sua sezione, si traduce dalla barra laterale', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
   const page = await testServer.openReady(openTab, framePage(`
     <details id="d"><summary>Show the comments</summary>
