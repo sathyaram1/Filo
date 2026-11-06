@@ -92,7 +92,7 @@
     let percorso = u.pathname;
     try { percorso = decodeURIComponent(percorso); } catch (_) {}
     const azioni = paroleAzione();
-    if (!azioni || faAzione(percorso, azioni) || faAzione(String(l.testo || '').slice(0, LIMITI.TESTO_LINK), azioni)) return 'azione';
+    if (!azioni || faAzione(percorso, azioni) || faAzione(String(l.testo || '').slice(0, LIMITI.TESTO_LINK * 5), azioni)) return 'azione';
     if (FILE.test(percorso)) return 'file';
     return '';
   }
