@@ -62,6 +62,7 @@ for (const [nome, html, posa, testo] of casi) {
     page.on('pageerror', (e) => errori.push(String(e)));
     page.on('console', (m) => { if (m.type() === 'error') errori.push(m.text()); });
     await prepara(page, html, posa);
+    if (posa[3] === 'ctrlA') await page.keyboard.press('Control+a');
     const prima = await stato(page);
     const ms = await incolla(page, testo);
     const dopo = await stato(page);
