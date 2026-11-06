@@ -38,6 +38,12 @@
     return a.hostname === b.hostname;
   }
 
+  // Il link si apre nella scheda della pagina: un precarico serve solo lì, Chromium non lo passa a un'altra scheda.
+  function apreQui(target) {
+    const t = String(target || '').trim().toLowerCase();
+    return !t || t === '_self' || t === '_top' || t === '_parent';
+  }
+
   function senzaFrammento(u) {
     return u.href.slice(0, u.href.length - u.hash.length);
   }
