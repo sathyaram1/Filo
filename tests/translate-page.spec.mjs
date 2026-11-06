@@ -1528,8 +1528,9 @@ test('solo quando apro: le sezioni ripiegate non si pagano in anticipo, comunque
   expect(pagate, `ripiegature spedite al modello: ${pagate.join(', ')}`).toEqual([]);
 });
 
-test('aperta una sezione ripiegata, l\'icona Traduci offre di tradurre il testo scoperto', async ({ app, openTab, testServer }) => {
+test('solo quando apro: aperta una sezione ripiegata, l\'icona Traduci offre di tradurre il testo scoperto', async ({ app, openTab, testServer }) => {
   await stubTranslationProvider(app);
+  await soloQuandoApro(app);
   const page = await testServer.openReady(openTab, RIPIEGATE);
   await watchToasts(page);
   await clickTranslateIcon(app);
