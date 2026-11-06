@@ -48,11 +48,28 @@ async function sitoConAccesso() {
     if (u.pathname === '/pubblica') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': 'visita=1; Path=/; HttpOnly' });
       res.end(`<!doctype html><html><head><title>Benvenuto</title></head><body style="padding:30px">
+        ${dentro ? '<h1 id="dentro">Ciao Sara</h1>' : ''}
         <button id="google" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y', 'accesso', 'width=420,height=420')">Continua con Google</button>
+        <button id="google-entra" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y&entra=1', 'accesso', 'width=420,height=420')">Entra con Google</button>
+        <input id="campo" placeholder="Un commento">
         </body></html>`);
       return;
     }
+    // La finestrella che fa l'accesso da sé (#1629): mette il cookie della sessione e si chiude, senza dirlo alla pagina.
+    if (u.pathname === '/oauth/authorize' && u.searchParams.get('entra') === '1') {
+      const nuovo = Math.random().toString(36).slice(2);
+      sessioni.add(nuovo);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': `sid=${nuovo}; Max-Age=86400; Path=/; HttpOnly` });
+      res.end('<!doctype html><title>Fatto</title><p>Accesso fatto</p><script>setTimeout(() => window.close(), 400)</script>');
+      return;
+    }
     if (u.pathname === '/oauth/authorize') { html('<!doctype html><title>Scegli un account</title><p>Account</p>'); return; }
+    // Una pagina del sito con un campo da scrivere (#759.2).
+    if (u.pathname === '/modulo') {
+      html(`<!doctype html><html><head><title>Modulo</title></head><body style="padding:30px">
+        <input id="campo" placeholder="Scrivi qui"> <a id="vai" href="/home">Casa</a></body></html>`);
+      return;
+    }
     if (u.pathname === '/oauth-ritorno') {
       const nuovo = Math.random().toString(36).slice(2);
       sessioni.add(nuovo);
