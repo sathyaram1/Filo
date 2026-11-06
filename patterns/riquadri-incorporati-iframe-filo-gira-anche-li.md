@@ -122,10 +122,14 @@ Cinque regole quando si tocca qualcosa che vive nel content script:
   e non alla finestra; un `embed` di HTML non dà la finestra dall'elemento:
   nasce al calcolo della disposizione, e la si cerca fra quelle della pagina
   con `frameElement`. **Un riquadro che carica un documento della stessa origine
-  non si tocca prima**: la sua finestra vuota, toccata, la riusa il documento
-  vero e il preload non gira più (niente Filo lì dentro, provato anche con la
-  protezione spenta); la pagina che la tocca da sé l'ha già creata, quindi lì
-  prepararla non costa niente. Se la tocca per indice o per nome non lo si vede:
+  non si tocca prima**: è la regola dei corpi nei riquadri vuoti (racconto in
+  `un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md`), e la regola con le
+  vie che fanno nascere un riquadro sta in `src/preload/vie-dei-riquadri.js`, una
+  per la guardia e per quei corpi. La pagina che la tocca da sé l'ha già creata,
+  quindi lì prepararla non costa niente. **La riscrittura da capo** di un
+  documento (`open`, o `write` a documento chiuso) gli toglie gli ascolti, e a
+  quello della finestra anche i suoi: la guardia li rimette subito, con
+  l'aggiunta presa quando la finestra si è preparata. Se la tocca per indice o per nome non lo si vede:
   il documento che eredita la finestra si prepara al suo `load` se il suo preload
   non si è fatto sentire col canale, e restano scoperti solo i suoi script che
   girano prima del load. In un sito con accessi esenti (`esentiNelSito`) un
