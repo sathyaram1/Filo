@@ -157,8 +157,8 @@
     for (const ms of ANSWER_LOOKS_MS) setTimeout(() => reportCreated(base), ms);
   }
 
-  // Il riquadro di un banner sta per premere: la pagina fotografa adesso i suoi nomi (main → frameBase).
-  // Un riquadro qualsiasi può chiederlo, quindi poche volte per pagina.
+  // Il riquadro di un banner sta per premere: la pagina fotografa adesso i suoi nomi. Glielo chiede il main
+  // (COOKIES_ANSWER_BASE), per conto di un riquadro qualsiasi: quindi poche volte per pagina.
   const FRAME_BASES_MAX = 6;
   let frameBases = 0;
   function frameBase() {
