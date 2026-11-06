@@ -36,9 +36,12 @@ async function cookieDAccesso(ses, url, sito) {
   return out;
 }
 
-// Siti già proposti o tolti dall'utente: non si ripropongono. Solo in memoria, perché in Privacy Filo non tiene
-// sul disco cosa sa dei siti non fidati (services/cookies.js, keepsSiteData), nemmeno dove accedi.
+// Siti già proposti o tolti dall'utente in questa sessione: non si ripropongono. Dopo un riavvio vale il «no»
+// ricordato, che sul disco è un'impronta da cui il sito non si legge (services/noRestaConnesso.js).
 const proposti = new Set();
+const ricordaNo = () => require('../services/noRestaConnesso').perFilo();
+// Google e YouTube hanno un jar solo, e un «no» solo.
+const chiaveNo = (sito) => (Google.diGoogle(sito) ? Google.SITO_GOOGLE : sito);
 
 // L'accesso non è finito finché resta in vista un campo password (password sbagliata) o il campo del codice di un
 // secondo fattore: sulla pagina del codice il sito ha già messo i suoi cookie, ma l'utente non è ancora dentro.
