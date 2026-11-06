@@ -213,7 +213,12 @@
     if (fermo || spento() || document.visibilityState !== 'visible') return;
     // Una pagina che cambia indirizzo da sé (le app di una pagina sola) è una pagina nuova anche per il tetto.
     const qui = R.indirizzoDaPrecaricare(location.href);
-    if (qui !== paginaContata) { paginaContata = qui; contati = 0; }
+    // I link a schermo della pagina di prima escono dalla lista: Chromium ne accetta 50 in tutto.
+    if (qui !== paginaContata) {
+      if (paginaContata && visibili.length) { visibili = []; scrivi(); }
+      paginaContata = qui;
+      contati = 0;
+    }
     if (contati >= LIMITI.TETTO_VISIBILI) return;
     if (R.reteARisparmio(navigator.connection)) return;
     if (!reteFerma()) { pianifica(); return; }
