@@ -93,7 +93,7 @@ test('un passaggio di traverso non precarica, la pressione sì anche senza ferma
     const box = await page.locator('#l0').boundingBox();
     await page.mouse.move(box.x + 5, box.y + 5);
     await page.mouse.move(box.x + 5, box.y + 18 * 10, { steps: 10 });
-    await page.mouse.move(box.x + 800, box.y + 18 * 10);
+    await page.mouse.move(box.x + 5, box.y + 18 * 33);
     await page.waitForTimeout(800);
     expect(sito.precarichi()).toEqual([]);
 
