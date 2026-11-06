@@ -2152,19 +2152,18 @@
         'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre', 'traduzionepagina.nascoste'],
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
-        const map = {
-          subito: 'subito', tutto: 'subito', 'traduci tutto': 'subito', sempre: 'subito', 'in sottofondo': 'subito',
-          'di serie': 'subito', predefinito: 'subito',
-          apertura: 'apertura', aperte: 'apertura', 'quando apro': 'apertura', 'quando le apro': 'apertura',
-          'solo quando apro': 'apertura', 'traduci solo quando apro': 'apertura', 'all\'apertura': 'apertura',
-          dopo: 'apertura', 'su richiesta': 'apertura',
+        const { TRADUCI, RIMANDA } = global.SN_CONST.NASCOSTE_TRADUZIONE;
+        const parole = {
+          [TRADUCI]: ['subito', 'tutto', 'traduci tutto', 'sempre', 'in sottofondo', 'di serie', 'predefinito'],
+          [RIMANDA]: ['apertura', 'aperte', 'quando apro', 'quando le apro', 'solo quando apro', 'traduci solo quando apro',
+            'all\'apertura', 'dopo', 'su richiesta'],
         };
         const b = parsePrefBool(v);
-        const modo = map[s] || (b === null ? null : (b ? 'subito' : 'apertura'));
+        const modo = Object.keys(parole).find((k) => parole[k].includes(s)) || (b === null ? null : (b ? TRADUCI : RIMANDA));
         if (!modo) return null;
         return {
           partial: { traduzionePagina: { nascoste: modo } },
-          label: `Sezioni chiuse di una pagina → ${modo === 'subito' ? 'tradotte subito, insieme al resto' : 'tradotte solo quando le apri'}`,
+          label: `Sezioni chiuse di una pagina → ${modo === TRADUCI ? 'tradotte subito, insieme al resto' : 'tradotte solo quando le apri'}`,
         };
       },
     },
