@@ -143,9 +143,7 @@ function rememberAnswer(tm, site, cookies, storage) {
     cookies: [...new Set([...old.cookies, ...cleanNames(cookies)])],
     storage: [...new Set([...old.storage, ...cleanNames(storage)])],
   });
-  map.set(site, { ...prev, ...merged });
-  trim(map);
-  if (map === remembered) saveSoon();
+  scriviVisita(map, site, map.get(site), { ...prev, ...merged });
 }
 
 // Tutte le risposte note per il sito, nel profilo normale e negli incognito aperti: i nomi sono del sito.
