@@ -951,7 +951,7 @@ test('un «no» alla proposta resta dopo il riavvio, senza scrivere il sito sul 
     cwd: ROOT,
     env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
   });
-  const { readFileSync, readdirSync, statSync } = await import('node:fs');
+  const { readFileSync, readdirSync, lstatSync } = await import('node:fs');
   const impronte = () => {
     try { return JSON.parse(readFileSync(join(userData, 'resta-connesso-no.json'), 'utf8')).impronte.length; } catch (_) { return 0; }
   };
