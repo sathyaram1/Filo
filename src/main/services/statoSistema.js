@@ -995,6 +995,7 @@ const api = {
   leggiUnaVolta,
   offline,
   ferma,
+  sullaBatteria,
   _perProve,
 };
 globalThis.SN_SISTEMA_MAIN = api;
