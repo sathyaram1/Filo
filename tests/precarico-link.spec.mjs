@@ -5,7 +5,9 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 
 const ALTRO = 'altro-sito.test';
-test.use({ hostInPiu: [ALTRO] });
+const WWW = 'www.sito-precarico.test';
+const BLOG = 'blog.sito-precarico.test';
+test.use({ hostInPiu: [ALTRO, WWW, BLOG] });
 
 // `lente`: indirizzi che rispondono dopo tanto, per vedere un precarico ancora in corso. `scarico`: un file che scende
 // piano finché la prova non lo finisce.
