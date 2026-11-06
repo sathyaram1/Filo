@@ -31,7 +31,6 @@
     spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
-    isContentFullscreen: () => contentFullscreen,
     aiutoPasso: () => aiutoPasso(),
     aiutoStato: () => Sidebar?.stato?.(),
     aiutoAcceso: () => aiutoAcceso(),
