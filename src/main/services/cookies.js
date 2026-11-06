@@ -789,7 +789,7 @@ module.exports = {
   isConsentName,
   wipeConsentCookies,
   setListChangeHandler,
-  setConfigChangeHandler,
+  onConfigChange,
   setTrustChangeHandler,
   sitoFidato,
   partitionForSite,
