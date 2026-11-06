@@ -78,7 +78,8 @@ function sorgenteSonda(nome) {
 })();`;
 }
 
-// Nel frame principale, prima degli script del sito. Il nome segreto resta nel mondo di Filo.
+// In ogni frame, prima degli script del sito: anche un riquadro incorporato ha i suoi componenti. Il nome segreto resta
+// nel mondo di Filo.
 function installa({ webFrame } = {}) {
   const nome = `x${Array.from(globalThis.crypto.getRandomValues(new Uint8Array(12)), (b) => b.toString(16).padStart(2, '0')).join('')}`;
   try { webFrame.executeJavaScript(sorgenteSonda(nome), false).catch(() => {}); } catch (_) { return null; }
