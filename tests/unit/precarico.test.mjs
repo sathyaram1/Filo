@@ -44,6 +44,45 @@ test('i link che fanno qualcosa non partono mai', () => {
   assert.equal(motivo('https://utente:segreto@www.esempio.it/x'), 'credenziali');
 });
 
+// #1985 giro 1, r1: un precarico del link d'uscita fa uscire dal sito, quindi nel dubbio il link resta fuori.
+test('un link d\'uscita si riconosce anche composto, in altre lingue o dal solo testo', () => {
+  for (const p of ['/user/doLogout', '/logoutUser', '/logoutuser.php', '/api/deleteAccount', '/user/removeItem/5', '/konto/abmelden',
+    '/compte/d%C3%A9connexion', '/cuenta/cerrar-sesion', '/password/reset', '/conferma/confirm/abc', '/account/verify-email',
+    '/removed-items', '/deleted-scenes']) {
+    assert.equal(motivo(`https://www.esempio.it${p}`), 'azione', p);
+  }
+  for (const testo of ['Esci', 'Log out', 'Abmelden', 'Se déconnecter', 'Cerrar sesión', 'Disconnettiti', 'btn-logout']) {
+    assert.equal(motivo('https://www.esempio.it/account/x7', { testo }), 'azione', testo);
+  }
+  // Le pagine di tutti i giorni restano: due parole vicine non si fondono in un'azione che non c'è.
+  for (const [href, testo] of [['/catalogo/utile', 'Il catalogo utile'], ['/blog/output', 'Output del blog'], ['/notizie/ieri', 'Le notizie di ieri']]) {
+    assert.equal(motivo(`https://www.esempio.it${href}`, { testo }), '', href);
+  }
+});
+
+test('le parole d\'azione sono un elenco solo, quello dell\'avviso sui link sospetti', () => {
+  require('../../src/shared/linkSospetto.js');
+  const LS = globalThis.SN_LINK_SOSPETTO;
+  for (const w of LS.PAROLE_AZIONE) {
+    assert.equal(motivo(`https://www.esempio.it/a/${w}`), 'azione', w);
+    assert.ok(LS.analizza(`https://www.esempio.it/a/${w}`).includes('side_effect'), w);
+  }
+  const testo = readFileSync(new URL('../../src/shared/precarico.js', import.meta.url), 'utf8');
+  assert.ok(!/logout|unsubscribe/i.test(testo.replace(/\/\/.*$/gm, '')), 'una parola d\'azione scritta nel precarico: va nell\'elenco condiviso');
+});
+
+test('il tetto dei link a schermo scritto a parole nelle Preferenze e nel manifesto è quello vero', () => {
+  // Se il tetto cambia, cambiano insieme il numero qui, il suggerimento della voce e il manifesto.
+  const aParole = { 20: 'venti' }[P.LIMITI.TETTO_VISIBILI];
+  assert.ok(aParole, `il tetto ${P.LIMITI.TETTO_VISIBILI} non ha la sua parola: aggiornala qui e nei due testi`);
+  const html = readFileSync(new URL('../../src/pages/preferences/preferences.html', import.meta.url), 'utf8');
+  const voce = /<label title="([^"]*)">\s*<input type="checkbox" id="precaricoVisibili"/.exec(html);
+  assert.ok(voce && voce[1].includes(`fino a ${aParole} link`), 'suggerimento della voce in Preferenze');
+  require('../../src/shared/capabilities.js');
+  const cap = (globalThis.SN_CAPABILITIES.list || globalThis.SN_CAPABILITIES.CAPABILITIES || []).find((c) => c.id === 'precarico-link');
+  assert.ok(cap && cap.desc.includes(`fino a ${aParole} per pagina`), 'manifesto delle capacità');
+});
+
 test('a Chromium va l\'indirizzo senza frammento', () => {
   assert.equal(P.indirizzoDaPrecaricare('https://www.esempio.it/a#b'), 'https://www.esempio.it/a');
   assert.equal(P.indirizzoDaPrecaricare('non è un indirizzo'), '');
