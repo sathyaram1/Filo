@@ -2,7 +2,6 @@
 // Fornitore finto nel main come in translate-page.spec.mjs: "IT " davanti a ogni blocco.
 
 import { test, expect } from '../../fixtures/electron.mjs';
-import { menuDi } from '../../helpers/menuContestuale.mjs';
 import { barraPage, comandaBarra, pannelloFermo, premiNellaBarra } from '../../helpers/barra.mjs';
 
 async function stubTranslationProvider(app, delayMs = 0) {
