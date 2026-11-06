@@ -997,7 +997,7 @@
       if (f0 && f0.meta) f0.meta.titleAuto = true;
       writeCollection();
     }
-    if (!docPerIlModello().testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    if (!SN_EDITOR_SUMMARY.testoAlModello(testo).testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
     const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
