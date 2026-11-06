@@ -1095,6 +1095,83 @@ test('rifiuto in Automatico, poi Privacy e riavvio, poi Automatico: il rifiuto e
   }
 });
 
+test('rifiuto in Automatico, visita dello stesso sito in Privacy, ritorno ad Automatico e riavvio: il rifiuto e la voce del menu restano', async ({ testServer }) => {
+  test.setTimeout(150_000);
+  const userData = cartellaTemporanea('filo-test-');
+  const modo = (run, mode) => run.app.evaluate((_e, m) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { mode: m } } }), mode);
+  const url = testServer.html(RICORDA);
+  try {
+    let run = await avviaFilo(userData);
+    try {
+      const a = await run.open(url);
+      await a.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+      await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      await modo(run, 'privacy');
+      await sleep(1000);
+      // In Privacy il sito riparte da un barattolo suo: il banner torna e Filo lo rifiuta lì.
+      const b = await run.open(url);
+      await b.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 10_000 });
+      await sleep(1500);
+      await modo(run, 'default');
+      await sleep(2000);
+      await run.app.evaluate(async ({ session }) => { await session.defaultSession.cookies.flushStore(); });
+    } finally {
+      await chiudiApp(run.app);
+    }
+    run = await avviaFilo(userData);
+    try {
+      const salvato = await run.app.evaluate(async () => globalThis.SN_STORAGE.getRaw('cookieSites', null));
+      expect(salvato && salvato['127.0.0.1'] && salvato['127.0.0.1'].rejected).toBe(true);
+      const c = await run.open(url);
+      await sleep(1500);
+      expect(await c.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+      const menu = await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      expect(menu).toContain('Mostra il banner dei cookie');
+    } finally {
+      await chiudiApp(run.app);
+    }
+  } finally {
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+// ── #1279.4, la regola per forma: un comando solo, senza scritta fuori da lui, è un collegamento ────────
+
+const PER_FORMA = {
+  icona: `<title>ICONA</title><style>body{margin:0} .page{height:2000px}</style><div class="page">contenuto</div>
+    <button class="riapri-consenso" aria-label="Preferenze cookie"
+      style="position:fixed;bottom:12px;left:12px;width:44px;height:44px;border-radius:50%;background:#eee;z-index:99">
+      <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg></button>`,
+  scritta: `<title>SCRITTA</title><style>body{margin:0} .page{height:2000px}</style><div class="page">contenuto</div>
+    <div class="riapri-consenso" style="position:fixed;bottom:0;right:80px;padding:6px 12px;background:#eee;z-index:99">
+      <a href="#" role="button" onclick="return false">Preferenze privacy</a></div>`,
+  banner: `<title>UN_PULSANTE</title><style>body{margin:0} .page{height:2000px}</style><div class="page">contenuto</div>
+    <div class="riapri-consenso" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:#fff;z-index:99">
+      <p>Usiamo i cookie per la pubblicità.</p><button onclick="window.__acc=1">OK</button></div>`,
+};
+
+for (const [nome, html, resta] of [
+  ['icona fissa senza scritta, che la lista nomina', PER_FORMA.icona, true],
+  ['linguetta con la sola scritta del suo collegamento, che la lista nomina', PER_FORMA.scritta, true],
+  ['banner vero con la scritta fuori dal suo unico pulsante «OK»', PER_FORMA.banner, false],
+]) {
+  test(`per forma, ${nome}: ${resta ? 'resta, e il menu non dice «Banner nascosto»' : 'nascosto, senza accettare'}`, async ({ app, openTab, testServer, shell }) => {
+    test.setTimeout(60_000);
+    await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('##.riapri-consenso'));
+    const page = await testServer.openReady(openTab, html);
+    const visibile = () => page.evaluate(() => getComputedStyle(document.querySelector('.riapri-consenso')).display !== 'none');
+    if (resta) {
+      await sleep(5000);
+      expect(await visibile()).toBe(true);
+      expect((await tabCookies(shell))?.hidden).toBeFalsy();
+    } else {
+      await expect.poll(visibile, { timeout: 12_000 }).toBe(false);
+      await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 6_000 }).toBe(true);
+      expect(await page.evaluate(() => window.__acc || null)).toBeNull();
+    }
+  });
+}
+
 // ── #1279.1: dalla chat, per il sito della scheda ─────────────────────────────────────────────────────
 
 async function dallaChat(home, valore) {
