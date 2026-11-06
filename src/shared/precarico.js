@@ -73,8 +73,8 @@
     return u.href.slice(0, u.href.length - u.hash.length);
   }
 
-  // Il motivo per cui un link non si precarica, '' se si può. `link`: { href, rel, download, target }; `pagina`:
-  // l'indirizzo della pagina che lo contiene.
+  // Il motivo per cui un link non si precarica, '' se si può. `link`: { href, rel, download, target, testo }, con
+  // `testo` quello che il link dice a chi lo guarda (testo, etichetta, titolo); `pagina`: l'indirizzo che lo contiene.
   function motivoEscluso(link, pagina) {
     const l = link || {};
     const raw = String(l.href || '');
