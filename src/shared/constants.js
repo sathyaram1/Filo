@@ -3072,6 +3072,9 @@
   const MEMORIA_MAX = 200 * 1024;
   // Il testo di un campo che «Valuta» manda (#1449): un saggio intero ci sta; oltre, l'Aiuto dice all'utente dove si ferma.
   const VALUTA_MAX_CARATTERI = 100000;
+  // Il quadrato per fermare compare sotto il dito che ha appena mandato: per questo tempo ignora clic e Invio a vuoto,
+  // così il secondo colpo di un doppio clic non ferma quello che è appena partito (#1296). Home e Aiuto.
+  const PAUSA_QUADRATO_MS = 500;
   function memoriaImbustata({ profilo, preferenze, espansioni, lezioni } = {}, etichettaProfilo = 'PROFILO UTENTE') {
     const corpo = `${etichettaProfilo}:\n${profilo || '(vuoto)'}\n\n`
       + `PREFERENZE:\n${preferenze || '(vuoto)'}`
