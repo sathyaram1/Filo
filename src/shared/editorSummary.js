@@ -126,18 +126,20 @@
   }
 
   // Le parole che dicono di cosa parla il testo: le più frequenti fra quelle di almeno quattro lettere.
-  const IMPRONTA_MAX = 40;
+  const IMPRONTA_MAX = 60;
+  const paroleDi = (testo) => String(testo || '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || [];
   function impronta(testo) {
     const conta = new Map();
-    for (const p of String(testo || '').toLowerCase().match(/[\p{L}\p{N}]{4,}/gu) || []) conta.set(p, (conta.get(p) || 0) + 1);
+    for (const p of paroleDi(testo)) conta.set(p, (conta.get(p) || 0) + 1);
     return [...conta].sort((a, b) => b[1] - a[1] || (a[0] < b[0] ? -1 : 1)).slice(0, IMPRONTA_MAX).map(([p]) => p);
   }
 
-  // Riscritto su un altro argomento con lo stesso numero di parole (#1697): meno di metà delle parole di prima resta.
+  // Riscritto su un altro argomento con lo stesso numero di parole (#1697): di quelle di prima ne resta meno di metà.
+  // Si cercano nel testo intero, così aggiungere non conta mai come cambiare.
   function argomentoCambiato(sig, testo) {
     const prima = sig && Array.isArray(sig.parole) ? sig.parole : [];
     if (prima.length < 3) return false;
-    const ora = new Set(impronta(testo));
+    const ora = new Set(paroleDi(testo));
     return prima.filter((p) => ora.has(p)).length / prima.length < 0.5;
   }
 
