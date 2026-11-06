@@ -13,7 +13,7 @@ const AZIONI = [
   ['/messaggi/7/archive', 'Archivia'],
 ];
 
-test('r2 aprire la pagina e passare sui link che fanno un\'azione non la fa', async ({ openTab }) => {
+test('r3 aprire la pagina e passare sui link che fanno un\'azione non la fa', async ({ openTab }) => {
   const richieste = [];
   const server = createServer((req, res) => {
     richieste.push(decodeURIComponent(req.url));
