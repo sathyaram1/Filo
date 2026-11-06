@@ -2300,8 +2300,7 @@
   }
   // `costruisci(letto)` dà i messaggi; se il modello rifiuta il documento perché non gli sta nella finestra, si
   // rimanda più corto e `letto` dice il taglio a chi lo mostra.
-  async function chiediSulDocumento(action, costruisci, extra = {}) {
-    const testo = docPlainText();
+  async function chiediSulDocumento(action, costruisci, extra = {}, testo = docPlainText()) {
     let letto = window.SN_EDITOR_SUMMARY.testoAlModello(testo);
     let r = null;
     for (let giro = 0; giro < 4; giro++) {
