@@ -158,7 +158,17 @@
       timerPasso = null;
       attesaIdle = true;
       quandoLibera(() => { attesaIdle = false; passo(); });
-    }, ms == null ? LIMITI.PASSO_MS : ms);
+    }, ms == null ? passo_ms() : ms);
+  }
+
+  // I precarichi di Chromium la pagina non li vede finire: il passo si misura sulla durata della pagina stessa.
+  function passo_ms() {
+    let durata = 0;
+    try {
+      const n = performance.getEntriesByType('navigation')[0];
+      if (n && n.responseEnd > n.requestStart) durata = n.responseEnd - n.requestStart;
+    } catch (_) {}
+    return R.passoVisibili(durata);
   }
 
   // Un osservatore e non l'elenco delle risorse: quello si riempie a 250 voci e da lì sembrerebbe tutto fermo.
