@@ -322,6 +322,11 @@
   // #876 — i siti fidati si salvano come li usa Filo, uguali alla pagina Sicurezza: mail.google.com vale google.com, e fra
   // i programmi fidati una piattaforma che ospita i siti di chiunque (github.io) non entra, col perché.
   const RIDUZIONI = {
+    // Come la voce del menu della scheda: il sito intero dei cookie (services/cookies.js, registrableOf).
+    'security.cookies.bannerSites': (d) => {
+      const S = stessoSito();
+      return { sito: (S && S.sitoDellaVoce(d)) || d };
+    },
     'security.cookies.trustedSites': (d) => {
       const S = stessoSito();
       const E = eseguibili();
