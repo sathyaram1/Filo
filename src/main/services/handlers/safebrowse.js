@@ -179,9 +179,8 @@ module.exports = function register(on, ctx) {
     const wc = sender && sender.wc;
     const top = wc && !wc.isDestroyed() && wc.mainFrame;
     if (!top || !sender.frame || sender.frame.frameTreeNodeId === top.frameTreeNodeId) return { ok: false };
-    const MONDO_CONTENT_SCRIPT = 999;
     try {
-      const fatta = await wc.executeJavaScriptInIsolatedWorld(MONDO_CONTENT_SCRIPT,
+      const fatta = await wc.executeJavaScriptInIsolatedWorld(require('../../../preload/mondo-esente').MONDO,
         [{ code: '!!(globalThis.SN_COOKIES_CS && globalThis.SN_COOKIES_CS.frameBase())' }]);
       return { ok: !!fatta };
     } catch (_) { return { ok: false }; }
