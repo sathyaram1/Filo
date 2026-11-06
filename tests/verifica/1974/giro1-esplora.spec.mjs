@@ -17,6 +17,7 @@ test.use({
     ...(proxy ? [`--proxy-server=${proxy}`, `--proxy-bypass-list=${YT};${NOCOOKIE};sito-pubblico.test;127.0.0.1`] : [])],
 });
 test.setTimeout(150_000);
+test.describe.configure({ retries: 0 });
 
 const RISPOSTA = {
   responseContext: { serviceTrackingParams: [] },
