@@ -107,7 +107,7 @@ async function apri(openTab, url) {
 fixture('il video parte senza pubblicità: la risposta nella pagina, quella chiesta con fetch e con xhr; spento, torna «Salta»', async ({ app, openTab, youtube }) => {
   await liste(app, [MANO]);
   const page = await apri(openTab, youtube.url('/watch?v=abc&interna=1'));
-  await expect.poll(() => esiti(page), { timeout: 10_000 }).toEqual(['pagina:video', 'fetch:video', 'xhr:video']);
+  await expect.poll(() => esiti(page), { timeout: 10_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
   await expect(page.locator('#movie_player')).not.toHaveClass(/ad-showing/);
   expect(await page.evaluate(() => window.__pubblicitaAccesa), 'rpnt riscrive lo script prima che giri').toBe(false);
 
