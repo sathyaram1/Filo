@@ -2558,13 +2558,12 @@
     const items = [];
     const di = (nome, campi = {}) => Object.assign(contesto, { nome, ...campi });
     const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
-    const copia = () => { Actions.copyToClipboard(selInfo.selection); copiatoNellaPagina(target); };
+    const sel = azioniDellaSelezione(selInfo, target);
 
     if (selInfo && editable) {
-      const ricco = campoRicco(target);
-      di(ricco && !selInfo.segreto ? 'scrivibile' : 'campo', { segreto: !!selInfo.segreto });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
-      items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: copia });
+      di(contestoDelCampo(selInfo, target), { segreto: !!selInfo.segreto });
+      if (sel.cut) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: sel.cut });
+      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
