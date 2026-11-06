@@ -126,7 +126,7 @@ fixture('con le regole vere scaricate da uAssets il video parte senza pubblicitÃ
     const [filtri, rapide] = await Promise.all([prendi('filters.txt'), prendi('quick-fixes.txt')]);
     const inclusi = [...filtri.matchAll(/^!#include\s+([\w.-]+\.txt)$/gm)].map((m) => m[1]);
     testi = [filtri, rapide, ...(await Promise.all(inclusi.map(prendi)))];
-  } catch (e) { test.skip(true, `liste di uAssets non raggiungibili: ${e.message}`); }
+  } catch (e) { fixture.skip(true, `liste di uAssets non raggiungibili: ${e.message}`); }
   const s = await liste(app, testi);
   expect(s.regole).toBeGreaterThan(5);
   const page = await apri(openTab, youtube.url('/watch?v=vere&interna=1'));
