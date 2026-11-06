@@ -9,7 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
-import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -1099,9 +1099,12 @@ async function dallaChat(home, valore) {
   // A Normale il costo 2 può partire da solo: la conferma si dà solo se compare.
   const fine = await Promise.race([corsa.then(() => 'fatto'), home.locator(CONFIRM_HOST).waitFor({ timeout: 10_000 }).then(() => 'conferma', () => 'fatto')]);
   if (fine === 'conferma') {
-    // OK si accende dopo aver letto il testo fino in fondo (#592).
-    await expect.poll(() => home.evaluate(() => { window.SN_CONFIRM_UI._test.scrollToEnd(); return window.SN_CONFIRM_UI._test.click('ok'); }),
-      { timeout: 8_000 }).toBe(true);
+    // Abbassare una difesa si conferma col pulsante rosso; OK si accende dopo aver letto il testo fino in fondo (#592).
+    await expect.poll(() => home.evaluate(() => {
+      const T = window.SN_CONFIRM_UI._test;
+      T.scrollToEnd();
+      return T.click('ok') || T.click('danger') ? true : JSON.stringify(T.state() && { ...T.state(), riquadro: null });
+    }), { timeout: 8_000 }).toBe(true);
   }
   await corsa;
 }
