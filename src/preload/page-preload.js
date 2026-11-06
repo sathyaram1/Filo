@@ -450,7 +450,9 @@ function conVerdetto(runId, fn) {
 
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
   if (IS_SUBFRAME && msg && msg.type === 'frame_translate' && msg.mode !== 'restore') {
-    conVerdetto(String(msg.runId || ''), (visto) => { if (visto) consegnaBroadcast(msg); });
+    conVerdetto(String(msg.runId || ''), (v) => {
+      if (v.visto) consegnaBroadcast(v.fuoriConto ? Object.assign({}, msg, { fuoriConto: true }) : msg);
+    });
     return;
   }
   consegnaBroadcast(msg);
