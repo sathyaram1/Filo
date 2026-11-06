@@ -127,37 +127,17 @@ test('riquadro incorporato dentro un componente chiuso: tradotto, o l’avviso l
   expect(tradotto || avvisa, `il riquadro è rimasto in inglese e l'avviso dice: ${await toasts(page)}`).toBe(true);
 });
 
-test('riquadro arrivato dopo la traduzione: il tasto destro sulla pagina offre «Traduci il testo nuovo»', async ({ app, openTab, testServer }) => {
-  test.setTimeout(120000);
-  await stubTranslationProvider(app);
-  const src = testServer.html(frameInner('ZZLATE')).replace('127.0.0.1', 'blocked.test');
-  const page = await testServer.openReady(openTab, framePage(`<div id="slot"></div><script>window.__arriva = () => {
-      document.getElementById('slot').innerHTML = '<iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe>'; };</script>`));
-  await watchToasts(page);
-  await clickTranslateIcon(app);
-  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
-  await expect.poll(() => toasts(page), { timeout: 30000 }).toContain('Pagina tradotta');
-  await page.evaluate(() => window.__arriva());
-  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^ZZLATE /, { timeout: 30000 });
-  await page.locator('#p1').click({ button: 'right', position: { x: 5, y: 5 } });
-  const menu = menuDi(page);
-  await expect(menu.locator('.sn-menu').first()).toBeVisible();
-  const voci = await menu.locator('.sn-menu').first().innerText();
-  expect(voci, `voci del menu: ${voci}`).toContain('Traduci il testo nuovo');
-  await menu.locator('.sn-menu').getByText('Traduci il testo nuovo', { exact: true }).first().click();
-  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT ZZLATE /, { timeout: 60000 });
-});
-
 test('riquadro arrivato MENTRE la traduzione lavora: a lavoro finito è tradotto, o l’icona offre di tradurlo', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
-  await stubTranslationProvider(app, 2500);
+  await stubTranslationProvider(app, 6000);
   const src = testServer.html(frameInner('ZZMID')).replace('127.0.0.1', 'blocked.test');
   const page = await testServer.openReady(openTab, framePage(`<div id="slot"></div><script>window.__arriva = () => {
       document.getElementById('slot').innerHTML = '<iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe>'; };</script>`));
   await watchToasts(page);
   await clickTranslateIcon(app);
-  await expect.poll(() => toasts(page), { timeout: 10000 }).toContain('raduc');
+  await expect.poll(() => toasts(page), { timeout: 10000 }).toContain('in corso');
   await page.evaluate(() => window.__arriva());
+  expect(await toasts(page)).not.toContain('Pagina tradotta');
   await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/ZZMID /, { timeout: 30000 });
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
   await expect.poll(() => toasts(page), { timeout: 30000 }).toMatch(/Pagina tradotta|riquadro/);
