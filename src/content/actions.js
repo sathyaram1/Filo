@@ -1607,56 +1607,33 @@
     };
   }
 
+  // Le azioni di un filmato o di un audio, una volta sola: le voci del menu e le icone della fila (#1434) le prendono da
+  // qui, coi nomi che dicono lo stato. `icona`: il disegno per la fila, quando lo stato lo cambia. Manca chi qui non c'è
+  // (la finestra mobile dove il filmato non la permette).
+  function azioniDelMedia(el, link = null) {
+    const audio = isAudioEl(el);
+    return {
+      playPause: { label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'), icona: el.paused ? 'play' : 'pause', onClick: () => toggleMediaPlay(el) },
+      mute: { label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'), icona: el.muted ? 'volume' : 'volumeMute', onClick: () => toggleMediaMute(el) },
+      loop: { label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'), onClick: () => toggleMediaLoop(el) },
+      ...(mediaPipAvailable(el)
+        ? { pip: { label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'), onClick: () => toggleMediaPip(el) } }
+        : {}),
+      controls: { label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'), onClick: () => toggleMediaControls(el) },
+      copyLink: { label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'), onClick: () => copyMediaUrl(el) },
+      save: { label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'), onClick: () => downloadMedia(el, link) },
+    };
+  }
+
   // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
   function buildMediaItems(el, link = null) {
-    const audio = isAudioEl(el);
-    const items = [];
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'),
-      onClick: () => toggleMediaPlay(el),
-    });
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'),
-      onClick: () => toggleMediaMute(el),
-    });
-    items.push(buildMediaSpeedItem(el));
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'),
-      onClick: () => toggleMediaLoop(el),
-    });
-    if (mediaPipAvailable(el)) {
-      items.push({
-        type: 'item',
-        azione: 'video-pip',
-        label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'),
-        onClick: () => toggleMediaPip(el),
-      });
-    }
-    items.push({
-      type: 'item',
-      azione: 'video-audio-controls',
-      label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'),
-      onClick: () => toggleMediaControls(el),
-    });
-    items.push({ type: 'separator' });
-    items.push({
-      type: 'item',
-      azione: 'copy-download-video',
-      label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'),
-      onClick: () => copyMediaUrl(el),
-    });
-    items.push({
-      type: 'item',
-      azione: 'copy-download-video',
-      label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
-      onClick: () => downloadMedia(el, link),
-    });
+    const a = azioniDelMedia(el, link);
+    const voce = (azione, x) => ({ type: 'item', azione, label: x.label, onClick: x.onClick });
+    const items = [voce('video-audio-controls', a.playPause), voce('video-audio-controls', a.mute), buildMediaSpeedItem(el),
+      voce('video-audio-controls', a.loop)];
+    if (a.pip) items.push(voce('video-pip', a.pip));
+    items.push(voce('video-audio-controls', a.controls), { type: 'separator' },
+      voce('copy-download-video', a.copyLink), voce('copy-download-video', a.save));
     return items;
   }
 
