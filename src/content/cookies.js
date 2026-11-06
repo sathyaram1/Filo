@@ -131,10 +131,11 @@
     return IS_TOP ? { c: cookieNames(), s: memoryNames(), at: Date.now() } : null;
   }
 
-  function created(base, now, tag) {
+  function created(base, now, tag, late) {
     const out = [];
     for (const k of now) {
       if (base.has(k) || k.length > 200 || answerSent.has(tag + k)) continue;
+      if (late && !LATE_ANSWER.test(k)) continue;
       answerSent.add(tag + k);
       out.push(k);
     }
