@@ -1047,19 +1047,11 @@
   const SUMMARY_DEBOUNCE_MS = 7000;
   let summaryTimer = null;
 
-  const SUMMARY_SYSTEM_PROMPT =
-    'Sei l\'assistente di Filo. Scrivi un RIASSUNTO di 1-2 frasi (massimo due '
-    + 'righe) che spieghi COSA CONTIENE il documento qui sotto, nella STESSA '
-    + 'lingua del testo. Serve a orientarsi tra più file senza aprirli: descrivi '
-    + 'l\'argomento e il tipo di contenuto, non i dettagli. Usa l\'eventuale '
-    + 'conversazione e la memoria SOLO come contesto. Rispondi SOLO col riassunto: '
-    + 'niente virgolette, niente preamboli, niente elenco.';
-  const TITOLO_E_RIASSUNTO_PROMPT =
-    'Sei l\'assistente di Filo. Per il documento qui sotto scrivi, nella STESSA lingua del testo, un TITOLO molto '
-    + 'breve (2-6 parole) che ne descriva il contenuto e un RIASSUNTO di 1-2 frasi (massimo due righe) che spieghi '
-    + 'COSA CONTIENE, per orientarsi tra più file senza aprirli: l\'argomento e il tipo di contenuto, non i dettagli. '
-    + 'Usa l\'eventuale conversazione e la memoria SOLO come contesto. Rispondi con due righe esatte, senza '
-    + 'virgolette né altro:\nTITOLO: <il titolo, senza punto finale>\nRIASSUNTO: <il riassunto>';
+  const SUMMARY_SYSTEM_PROMPT = `Sei l'assistente di Filo. Per il documento qui sotto scrivi ${REGOLA_RIASSUNTO}. `
+    + `${SOLO_CONTESTO} Rispondi SOLO col riassunto: niente virgolette, niente preamboli, niente elenco.`;
+  const TITOLO_E_RIASSUNTO_PROMPT = `Sei l'assistente di Filo. Per il documento qui sotto scrivi ${REGOLA_TITOLO}; poi `
+    + `${REGOLA_RIASSUNTO}. ${SOLO_CONTESTO} Rispondi con due righe esatte, senza virgolette né altro:\n`
+    + 'TITOLO: <il titolo, senza punto finale>\nRIASSUNTO: <il riassunto, senza preamboli né elenco>';
 
   function cleanSummary(raw) {
     let t = String(raw == null ? '' : raw).trim();
