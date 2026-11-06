@@ -20,6 +20,9 @@ let caricando = null;
 const inCorso = { normale: null, incognito: null };
 const ascoltatori = new Set();
 const timerFermo = { normale: null, incognito: null };
+// Quanto pesa la richiesta della chat fuori dal tratto (strumenti, parte fissa, CONTESTO), misurata all'ultimo turno: dice
+// quanto grezzo può restare dopo una compattazione.
+const basi = { normale: null, incognito: null };
 let timerGiorni = null;
 
 // `chiama({ messages, motivo, incognito })` → il testo del modello; `applicaMemoria(testo)` → scrive una memoria. Li dà
