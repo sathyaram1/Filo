@@ -808,7 +808,7 @@
       let cur = parentOrHost(el);
       for (let hops = 0; cur && cur.nodeType === 1 && cur !== stop && hops < REACH_MAX_HOPS; hops++) {
         // `visibility` l'ha già detta il riquadro, che la eredita: un antenato invisibile così non decide per lui.
-        if (isVisibilityHidden(cur) === true) return true;
+        if (isVisibilityHidden(cur, true) === true) return true;
         cur = parentOrHost(cur);
       }
       return false;
