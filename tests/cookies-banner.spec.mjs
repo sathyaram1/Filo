@@ -1104,14 +1104,15 @@ async function dallaChat(home, valore) {
 
 test('in chat «fammi rivedere il banner su questo sito» lo riporta, «torna a rifiutarli qui» lo rifiuta di nuovo', async ({ app, openTab, testServer, shell }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, RICORDA);
+  // Un nome di dominio come quelli veri: l'elenco a parole non prende gli indirizzi numerici.
+  const page = await testServer.openReady(openTab, RICORDA, { pubblico: true });
   await page.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
   const home = await openTab('filo://newtab/');
   await home.evaluate(() => window.SN_SIDEBAR.open());
 
   await dallaChat(home, 'aggiungi questo sito');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.bannerSites), { timeout: 6_000 })
-    .toEqual(['127.0.0.1']);
+    .toEqual(['sito-pubblico.test']);
   await expect.poll(() => page.evaluate(() => !!document.getElementById('onetrust-banner-sdk')).catch(() => false), { timeout: 10_000 }).toBe(true);
   await sleep(1500);
   expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(true);
