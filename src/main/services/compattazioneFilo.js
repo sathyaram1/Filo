@@ -410,7 +410,7 @@ function azzera() { stati.normale = null; stati.incognito = vuoto(); caricando =
 function imposta(dip) { Object.assign(_dip, dip || {}); }
 
 module.exports = {
-  _dip, imposta, carica, compattato, fonteScaduta, compatta, riassumiGiorni, sezione, righe, tokenDelTratto, inAttesa, decidi, suCompattazione,
-  programmaFermo, avvia, dimenticaIncognito, azzera,
+  _dip, imposta, carica, compattato, fonteScaduta, compatta, riassumiGiorni, sezione, dimenticaChat, righe, tokenDelTratto, segnaBase, base,
+  inAttesa, decidi, suCompattazione, programmaFermo, avvia, dimenticaIncognito, azzera,
 };
 globalThis.SN_COMPATTAZIONE = module.exports;
