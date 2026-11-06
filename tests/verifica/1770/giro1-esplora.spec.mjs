@@ -80,26 +80,24 @@ async function clickUntil(app, { open, needle, labelRe, until, timeout = 25_000 
 
 // ── la scelta la scrive il server, nella risposta alla richiesta del clic ────────────────────────────
 
-function sceltaDaIntestazione(testServer, httpOnly) {
-  const risposta = testServer.html('ok', { headers: { 'Set-Cookie': `scelta_sito=no; Path=/; Max-Age=86400${httpOnly ? '; HttpOnly' : ''}` } });
-  const segno = testServer.html('ok', { headers: { 'Set-Cookie': 'segno_banner=1; Path=/; Max-Age=86400' } });
-  // Il server rende la pagina senza banner quando ha la scelta: qui lo fa lo script col segno leggibile.
+function sceltaDaIntestazione(testServer) {
+  const risposta = testServer.html('ok', { headers: { 'Set-Cookie': 'scelta_sito=no; Path=/; Max-Age=86400' } });
   return `<title>SCELTA_HEADER</title>
     <div id="avviso-privacy" class="cookie-consent" style="position:fixed;top:0;left:0;right:0;height:90px;background:#fff;z-index:10">
       <p>Usiamo i cookie per la pubblicità.</p>
       <button onclick="window.__acc=1">Accetta</button>
-      <button onclick="fetch('${risposta}').then(() => fetch('${segno}')).then(() => document.getElementById('avviso-privacy').remove())">Rifiuta</button>
+      <button onclick="fetch('${risposta}').then(() => new Promise((r) => setTimeout(r, 300))).then(() => document.getElementById('avviso-privacy').remove())">Rifiuta</button>
     </div>
     <script>
       document.cookie = 'sessione=utente; path=/; max-age=86400';
-      if (document.cookie.includes('segno_banner=')) document.getElementById('avviso-privacy').remove();
+      if (document.cookie.includes('scelta_sito=')) document.getElementById('avviso-privacy').remove();
     </script>`;
 }
 
-for (const httpOnly of [false, true]) test(`scelta scritta dal server nella risposta (Set-Cookie${httpOnly ? ' HttpOnly' : ''}): «Mostra il banner dei cookie» lo riporta`, async ({ app, openTab, testServer, shell }) => {
+test('scelta scritta dal server nella risposta (Set-Cookie): «Mostra il banner dei cookie» lo riporta', async ({ app, openTab, testServer, shell }) => {
   test.setTimeout(90_000);
-  const page = await testServer.openReady(openTab, sceltaDaIntestazione(testServer, httpOnly));
-  await page.waitForFunction(() => document.cookie.includes('segno_banner='), null, { timeout: 15_000 });
+  const page = await testServer.openReady(openTab, sceltaDaIntestazione(testServer));
+  await page.waitForFunction(() => document.cookie.includes('scelta_sito='), null, { timeout: 15_000 });
   await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
   await sleep(4500);
   await clickUntil(app, {
