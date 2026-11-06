@@ -22,8 +22,8 @@ test('l\'Aiuto non ha più l\'elenco di frasi fisse che scorrevano mentre lavora
 
 test('le righe del lavoro fermato e la pausa del quadrato vivono in un posto solo', async () => {
   globalThis.self = globalThis;
-  await import(join(ROOT, 'src/shared/chatErrors.js'));
-  await import(join(ROOT, 'src/shared/constants.js'));
+  await import(pathToFileURL(join(ROOT, 'src/shared/chatErrors.js')).href);
+  await import(pathToFileURL(join(ROOT, 'src/shared/constants.js')).href);
   const CE = globalThis.SN_CHAT_ERRORS;
   assert.equal(typeof CE.FERMATO_QUI, 'string');
   assert.equal(typeof CE.FERMATO_PRIMA, 'string');
