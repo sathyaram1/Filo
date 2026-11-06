@@ -132,10 +132,7 @@ function wipeField(w) {
 function rememberOutcome(tm, site, outcome) {
   const map = siteMemory(tm);
   const prev = map.get(site) || { rejected: false, hidden: false };
-  map.delete(site);
-  map.set(site, { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer), ...wipeField(prev.wipe) });
-  trim(map);
-  if (map === remembered) saveSoon();
+  scriviVisita(map, site, map.get(site), { rejected: !!prev.rejected, hidden: !!prev.hidden, [outcome]: true, at: Date.now(), ...answerField(prev.answer), ...wipeField(prev.wipe) });
 }
 
 function rememberAnswer(tm, site, cookies, storage) {
