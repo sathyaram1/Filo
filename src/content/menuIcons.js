@@ -60,41 +60,33 @@
     return reg;
   }
 
-  // Le icone della finestra portate dalla barra nella fila (#1434): le esegue il main, come per la barra.
+  // Le icone della finestra portate dalla barra nella fila (#1434): disegno, nome, se è spenta e chi la vede li dice il
+  // main con la stessa regola della barra, e le esegue lui per la stessa strada (src/main/barraLaterale.js). Qui resta
+  // l'Aiuto, che vive nella pagina e il cui aspetto viene da aspettoAiuto, come nella barra.
+  let finestra = {};
+  const finestraInFila = () => Disp.ZONE_FILA.some((z) => (disposizione()[z] || []).some((id) => Disp.noto(id) && Disp.ICONE[id].tipo === 'finestra'));
+  function chiediFinestra() {
+    if (IS_SUBFRAME || !finestraInFila()) return Promise.resolve();
+    return manda({ type: MSG.FILA_FINESTRA }).then((r) => { finestra = r && r.ok && r.icone && typeof r.icone === 'object' ? r.icone : {}; });
+  }
+
   function registroFinestra() {
-    const Icons = global.SN_ICONS;
-    const Actions = global.SN_ACTIONS;
-    const I = (name) => Icons[name](18);
-    const isFs = !!(document.fullscreenElement || deps.isContentFullscreen());
+    const I = (name) => global.SN_ICONS[name](18);
     const stato = (typeof deps.aiutoStato === 'function' && deps.aiutoStato()) || {};
     const aiuto = Disp.aspettoAiuto({ ...stato, risposta: !!stato.nonLetta });
     const spento = !deps.aiutoAcceso();
     const reg = {
-      help:        { id: 'help',        icon: I(spento ? 'help' : aiuto.icona), label: I18n.t(spento ? 'aiuto_spento_barra' : aiuto.etichetta), disabled: spento, onClick: () => deps.aiutoPasso() },
-      fullscreen:  { id: 'fullscreen',  icon: isFs ? I('shrink') : I('zoom'), label: I18n.t(isFs ? 'menu_exit_fullscreen' : 'menu_fullscreen'), tasto: global.SN_TASTI?.etichettaSchermoIntero(), onClick: () => Actions.toggleFullscreen() },
-      back:        { id: 'back',        icon: I('back'),        label: I18n.t('menu_back'),         onClick: () => manda({ type: MSG.NAV_BACK }) },
-      forward:     { id: 'forward',     icon: I('forward'),     label: I18n.t('menu_forward'),      onClick: () => manda({ type: MSG.NAV_FORWARD }) },
-      reload:      { id: 'reload',      icon: I('reload'),      label: I18n.t('menu_reload'),       onClick: () => manda({ type: MSG.NAV_RELOAD }) },
-      closeTab:    { id: 'closeTab',    icon: I('close'),       label: I18n.t('menu_close_tab'),    onClick: () => manda({ type: MSG.CLOSE_TAB, via: 'tasto_destro_riga' }) },
-      newTab:      { id: 'newTab',      icon: I('filoLogo'),    label: I18n.t('menu_new_tab'),      onClick: () => manda({ type: MSG.OPEN_NEW_TAB }) },
-      incognito:   { id: 'incognito',   icon: I('incognito'),   label: I18n.t('menu_incognito'),    onClick: () => manda({ type: MSG.OPEN_INCOGNITO }) },
-      openOptions: { id: 'openOptions', icon: I('models'),      label: I18n.t('menu_open_options'), onClick: () => manda({ type: MSG.OPEN_OPTIONS }) },
-      home:        { id: 'home',        icon: I('home'),        label: I18n.t('menu_open_home'),    onClick: () => manda({ type: MSG.GO_HOME }) },
-      editorApp:   { id: 'editorApp',   icon: I('editor'),      label: I18n.t('menu_open_editor'),  onClick: () => manda({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }) },
+      help: { id: 'help', icon: I(spento ? 'help' : aiuto.icona), label: I18n.t(spento ? 'aiuto_spento_barra' : aiuto.etichetta), disabled: spento, onClick: () => deps.aiutoPasso() },
     };
-    // «Feedback» porta alla posta delle segnalazioni, che a un utente comune è un vicolo cieco (#583).
-    if (isOwner) reg.feedbackApp = { id: 'feedbackApp', icon: I('feedback'), label: I18n.t('menu_open_feedback'), onClick: () => manda({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' }) };
+    // Un'icona che il main non ha descritto (del solo owner, o lui non ha risposto) non si disegna.
+    for (const [id, f] of Object.entries(finestra)) {
+      if (!Disp.noto(id) || Disp.ICONE[id].tipo !== 'finestra' || !f || typeof global.SN_ICONS[f.icona] !== 'function') continue;
+      reg[id] = {
+        id, icon: I(f.icona), label: String(f.etichetta || ''), tasto: f.tasto || undefined, disabled: !!f.spenta, acceso: !!f.accesa,
+        onClick: () => manda({ type: MSG.FILA_FINESTRA_ESEGUI, id }),
+      };
+    }
     return reg;
-  }
-
-  let isOwner = false;
-  function refreshOwner() {
-    manda({ type: MSG.AUTH_STATUS }).then((r) => {
-      const ora = !!(r && r.ok && r.signedIn && r.isAdmin);
-      if (ora === isOwner) return;
-      isOwner = ora;
-      ridisegna();
-    });
   }
 
   // Le icone si misurano dal clic alla fine della loro azione (#1461). Quelle della finestra le esegue e le misura il
