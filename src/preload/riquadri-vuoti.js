@@ -228,7 +228,7 @@ function buildRiquadriVuotiSource(corpi) {
       v = VIE_TESTO[i]; P = proto(w, v[0]);
       if (!P || !R(proprio, P, [v[1]])) continue;
       if (typeof campo(D(P, v[1]), 'set') === 'function') { dopoLaScrittura(P, v[1]); continue; }
-      dopo(P, v[1], v[2] < 0 ? SE.sempre : SE.testo(v[2]), RISCRIVONO.indexOf(v[1]) >= 0 ? riapre : null);
+      dopo(P, v[1], v[2] < 0 ? SE.sempre : SE.testo(v[2]), R(proprio, RISCRIVONO, [v[1]]) ? riapre : null);
     }
     dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice, su); });
     for (i = 0; i < CORNICI.length; i++) for (var j = 0; j < GETTER_FINESTRA.length; j++) prima(proto(w, CORNICI[i]), GETTER_FINESTRA[j]);
