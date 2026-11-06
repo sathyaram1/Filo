@@ -2936,6 +2936,9 @@
     // #818 — la spiegazione che parte appena selezioni un testo, così al tasto destro è già pronta. Spenta, parte
     // solo dal tasto destro: si aspetta un po' e si spende meno.
     spiegaAnticipata: { enabled: true },
+    // D61 (#1290) — le sezioni chiuse e nascoste di una pagina: 'subito' le traduce in sottofondo dopo quel che si
+    // vede, così aprendole sono già tradotte; 'apertura' le lascia com'erano e le offre quando si aprono.
+    traduzionePagina: { nascoste: 'subito' },
     // #1274 — la descrizione che un modello scrive da sé per ogni screenshot e immagine copiata: dà il nome del file e la
     // riga della cronologia appunti. Spenta, l'immagine resta qui e il file prende data e ora.
     descriviImmagini: { enabled: true },
@@ -3054,6 +3057,16 @@
       striscia: o.striscia !== false,
       bloccato: o.bloccato === true,
     };
+  }
+
+  // Le sezioni chiuse di una pagina da tradurre (#1290): i due valori di `traduzionePagina.nascoste`, scritti solo qui.
+  // Solo RIMANDA le rimanda, ogni altro valore è il di serie.
+  const NASCOSTE_TRADUZIONE = Object.freeze({ TRADUCI: 'subito', RIMANDA: 'apertura' });
+  function modoNascoste(v) {
+    return v === NASCOSTE_TRADUZIONE.RIMANDA ? NASCOSTE_TRADUZIONE.RIMANDA : NASCOSTE_TRADUZIONE.TRADUCI;
+  }
+  function nascosteDellaTraduzione(settings) {
+    return modoNascoste(settings && settings.traduzionePagina && settings.traduzionePagina.nascoste);
   }
 
   // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
@@ -3231,6 +3244,9 @@
     actionLabel,
     DEFAULT_MODELS,
     DEFAULT_MODEL_REGISTRY,
+    nascosteDellaTraduzione,
+    NASCOSTE_TRADUZIONE,
+    modoNascoste,
     resolveModel,
     parseModelRefs,
     isRawModelId,

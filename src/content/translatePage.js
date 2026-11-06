@@ -63,6 +63,10 @@
   let hiddenSkipped = [];
   // Lo stesso per i riquadri incorporati nascosti al momento della traduzione (#503): non si sono svegliati.
   let hiddenFrames = [];
+  // La scelta sulle sezioni nascoste dell'ultimo giro: giudica i riquadri che arrivano dopo come li avrebbe giudicati lui.
+  let modoUltimo = global.SN_CONST.nascosteDellaTraduzione(null);
+  // Un riquadro che si carica mentre il giro lavora: il giro gli aveva già passato parola prima che ci fosse (#1290).
+  let riquadroNelGiro = false;
   // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
   // cose succede, la risposta di prima vale ancora.
   let revealedDirty = true;
@@ -136,13 +140,23 @@
     progressToast = null;
   }
 
+  // La scelta dell'utente sulle sezioni nascoste (D61), letta a ogni giro: cambiata a parole vale dal giro dopo.
+  async function leggiModo() {
+    try {
+      const res = await chrome.runtime.sendMessage({ type: MSG.GET_SETTINGS });
+      return global.SN_CONST.nascosteDellaTraduzione(res && res.settings);
+    } catch (_) { return global.SN_CONST.nascosteDellaTraduzione(null); }
+  }
+
   async function translatePage(opts) {
     const quiet = !!(opts && opts.quiet);
     const frameRunId = (opts && opts.runId) || '';
+    const fuoriConto = !!(opts && opts.fuoriConto);
+    const riferisci = (data) => reportToHost(frameRunId, data, fuoriConto);
     if (pageTranslating) {
       // Un riquadro già al lavoro non deve restare «mai finito» nel conto di chi lo ospita, o
       // l'avviso direbbe rimasto fuori del testo che sta invece arrivando.
-      if (quiet) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
+      if (quiet) riferisci({ phase: 'end', applied: 0, left: 0 });
       return;
     }
     pageTranslating = true;
@@ -163,27 +177,35 @@
     // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è normale, e quel
     // testo resterebbe in lingua originale. Le nostre sostituzioni nascono già marcate.
     newContentSeen = false;
+    riquadroNelGiro = false;
     startWatchingNewContent();
-    // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
-    // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
-    const framesRunId = quiet ? null : await beginFrames(myRun);
-
     let result = null;
+    let framesRunId = null;
     try {
+      // In un riquadro fuori conto si traduce tutto: chi lo ospita l'ha svegliato proprio per questo.
+      const modo = fuoriConto ? Extract.NASCOSTE.TRADUCI : await leggiModo();
+      if (aborted()) return;
+      modoUltimo = modo;
+      // Parola ai riquadri incorporati PRIMA di cominciare: traducono in
+      // parallelo alla pagina, non dopo di lei (l'attesa è attrito).
+      framesRunId = quiet ? null : await beginFrames(myRun, modo);
       for (let pass = 0; pass < MAX_PASSES; pass++) {
         newContentSeen = false;
-        result = await runPass(progress, myRun);
+        result = await runPass(progress, myRun, modo, fuoriConto);
         if (aborted()) return;
         // Il sito ha allungato la pagina mentre lavoravamo: si finisce adesso, senza ricliccare
         // né ripagare ciò che è fatto. Vale anche se il primo giro non aveva trovato testo.
         if (!newContentSeen || (result.kind !== 'done' && result.kind !== 'none')) break;
       }
       if (aborted()) return;
-      if (quiet) { reportToHost(frameRunId, { phase: 'end', applied: appliedOf(result), left: leftOf(result) }); return; }
+      if (quiet) { riferisci({ phase: 'end', applied: appliedOf(result), left: leftOf(result) }); return; }
       // I riquadri lavorano in parallelo e l'avviso finale li aspetta, perché è lui a dover dire
       // la verità su tutta la pagina. Fino ad allora resta in vista «sto traducendo».
       const frames = await waitForFrames(framesRunId, aborted);
       if (aborted()) return;
+      // Arrivato a giro avviato, il riquadro è testo nuovo come quello che il sito aggiunge dopo: l'avviso lo dice e
+      // l'icona offre di tradurlo.
+      if (riquadroNelGiro) newContentSeen = true;
       // Il testo cambiato sta tutto dentro i riquadri: senza questo il menu offrirebbe di nuovo
       // «Traduci la pagina» e non ci sarebbe modo di tornare indietro.
       if (frames.applied > 0 && !pageHasTranslation) {
@@ -196,7 +218,7 @@
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
-      if (quiet && (result === null || myRun !== runSeq)) reportToHost(frameRunId, { phase: 'end', applied: 0, left: 0 });
+      if (quiet && (result === null || myRun !== runSeq)) riferisci({ phase: 'end', applied: 0, left: 0 });
       if (progressToast === progress) progressToast = null;
       // L'utente ha annullato (o ha già fatto ripartire un altro giro): lo stato non è più
       // nostro, e toccarlo vorrebbe dire spegnere il lavoro di qualcun altro.
@@ -218,8 +240,8 @@
 
   // Un giro: rilegge, manda al modello solo ciò che non è già tradotto, applica. L'avviso lo
   // scrive chi chiama, l'unico a sapere se nel frattempo è arrivato dell'altro.
-  async function runPass(progress, myRun) {
-    const blocks = Extract.extractTranslatableBlocks();
+  async function runPass(progress, myRun, modo, fuoriConto) {
+    const blocks = Extract.extractTranslatableBlocks({ nascoste: modo, fuoriConto: !!fuoriConto });
     // I componenti aperti del sito sono alberi a parte: una sentinella sul solo
     // documento non vede il contenuto che cambia lì dentro.
     addWatchRoots(blocks.shadowRoots);
@@ -246,14 +268,16 @@
       if (b.el && b.el.dataset && b.el.dataset.snTranslated) continue;
       const { templated, refs } = templateizeBlock(b.el);
       if (!hasTranslatableText(templated)) continue;
-      units.push({ el: b.el, templated, refs, run: myRun });
+      units.push({ el: b.el, templated, refs, run: myRun, nascosto: !!b.nascosto });
     }
     // Etichette (suggerimenti, descrizioni, scritte sui bottoni): stessa coda di lavoro, ma si
     // applicano scrivendo l'attributo invece di sostituire i figli.
     for (const a of (blocks.attrs || [])) {
       if (!a.el || !hasTranslatableText(a.text)) continue;
-      units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [], run: myRun });
+      units.push({ el: a.el, attr: a.attr, templated: a.text, refs: [], run: myRun, nascosto: !!a.nascosto });
     }
+    // Prima quello che si vede, poi in sottofondo le sezioni nascoste (D61): la coda è una, e l'ordine è questo.
+    units.sort((x, y) => (x.nascosto ? 1 : 0) - (y.nascosto ? 1 : 0));
 
     if (!units.length) {
       if (truncated) {
@@ -404,29 +428,53 @@
   // I riquadri di questo documento, divisi da chi li guarda come guarda il resto della pagina (#503): quelli da
   // contare e quelli che non si contano. Fra questi ultimi, a parte, quelli nascosti adesso che l'utente può aprire.
   // Chi non si conta non deve nemmeno rispondere: un "ci sono" in più coprirebbe nel conto un riquadro muto.
-  function embeddedFrames() {
+  // Con le sezioni nascoste da tradurre subito (D61), i nascosti vanno in `background`: tradotti, ma fuori dal conto
+  // dell'avviso. `folded` resta per chi le rimanda.
+  function embeddedFrames(modo) {
     const shown = [];
     const skipped = [];
     const folded = [];
+    const background = [];
     try {
       for (const f of framesOf(document)) {
-        // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
-        // che possa rispondere, ma il testo lo prende l'estrazione da qui.
-        if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) continue;
-        const nascosto = frameHidden(f);
-        if (isInsideFiloUi(f)) { skipped.push(f); continue; }
-        // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
-        // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
-        if (frameTooSmall(f)) { skipped.push(f); if (nascosto) folded.push(f); continue; }
-        if (nascosto) {
+        const g = frameVerdict(f, modo);
+        if (g === 'inline') continue;
+        if (g === 'shown') shown.push(f);
+        else if (g === 'background') background.push(f);
+        else {
           skipped.push(f);
-          folded.push(f);
-          continue;
+          if (g === 'folded') folded.push(f);
         }
-        shown.push(f);
       }
     } catch (_) {}
-    return { shown, skipped, folded };
+    return { shown, skipped, folded, background };
+  }
+
+  // Il giudizio su un riquadro, uno per tutte le strade (il giro, e il riquadro che arriva dopo): 'inline' riempito
+  // dalla pagina, 'shown' si vede e si conta, 'background' nascosto da tradurre fuori conto, 'folded' nascosto da
+  // offrire quando si apre, 'skip' niente da leggere.
+  function frameVerdict(f, modo) {
+    // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo
+    // che possa rispondere, ma il testo lo prende l'estrazione da qui.
+    if (Extract && typeof Extract.inlineFrameBody === 'function' && Extract.inlineFrameBody(f)) return 'inline';
+    if (isInsideFiloUi(f)) return 'skip';
+    const nascosto = frameHidden(f);
+    if (nascosto) {
+      // Un pixel di tracciamento nascosto resta un pixel; uno senza misura (scheda spenta) non si sa, e si traduce.
+      if (modo === Extract.NASCOSTE.TRADUCI) return pixel(f) ? 'skip' : 'background';
+      return 'folded';
+    }
+    // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
+    // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
+    if (frameTooSmall(f)) return 'skip';
+    return 'shown';
+  }
+
+  function pixel(f) {
+    try {
+      const r = f.getBoundingClientRect();
+      return r.width > 0 && r.height > 0 && (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H);
+    } catch (_) { return false; }
   }
 
   // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma. E quelli
@@ -486,11 +534,14 @@
   // Il giudizio arriva al riquadro prima della parola di tradurre: lo legge il suo preload, che senza un sì non lo
   // sveglia. La chiave è scritta uguale in page-preload.js.
   // Uno ancora in arrivo non si tocca (#1560): non ha sentito la parola di tradurre, quindi non aspetta un giudizio.
-  function tellFrames(runId, list, visible) {
+  // `fuoriConto`: si traduce ma non entra nel conto dell'avviso, lui e chi sta dentro di lui.
+  function tellFrames(runId, list, visible, fuoriConto) {
     for (const f of list) {
       try {
         const w = global.SN_RIQUADRI_IN_ARRIVO?.finestra(f);
-        if (w) w.postMessage({ filoFrameVerdict: 1, runId: String(runId), visible: !!visible }, '*');
+        const v = { filoFrameVerdict: 1, runId: String(runId), visible: !!visible };
+        if (visible && fuoriConto) v.fuoriConto = true;
+        if (w) w.postMessage(v, '*');
       } catch (_) {}
     }
   }
@@ -515,11 +566,11 @@
     } catch (_) { return true; }
   }
 
-  function reportToHost(runId, data) {
+  function reportToHost(runId, data, fuoriConto) {
     if (!runId) return;
     try {
       chrome.runtime.sendMessage(Object.assign(
-        { type: MSG.FRAME_TRANSLATE_DONE, runId: String(runId) }, data,
+        { type: MSG.FRAME_TRANSLATE_DONE, runId: String(runId) }, data, fuoriConto ? { fuoriConto: 1 } : {},
       ));
     } catch (_) {}
   }
@@ -546,19 +597,20 @@
 
   // Indice il giro: conta i riquadri da guardare e passa parola. Se non ce n'è
   // nessuno di visibile, non si spende nemmeno un messaggio.
-  async function beginFrames(myRun) {
+  async function beginFrames(myRun, modo) {
     if (!isTopFrame()) return null;
-    const { shown, skipped, folded } = embeddedFrames();
+    const { shown, skipped, folded, background } = embeddedFrames(modo);
     hiddenFrames = folded;
     const expected = shown.length;
-    if (!expected) return null;
+    if (!expected && !background.length) return null;
     const runId = 'r' + myRun;
     tellFrames(runId, skipped, false);
     tellFrames(runId, shown, true);
+    tellFrames(runId, background, true, true);
     // Chi non si farà vivo resta nel conto: `expected` sono i riquadri che si
     // VEDONO, e un rettangolo visibile che nessuno script raggiunge è
-    // esattamente ciò che l'avviso finale deve confessare.
-    frameRuns.set(runId, { expected, acked: 0, ended: 0, applied: 0, left: 0 });
+    // esattamente ciò che l'avviso finale deve confessare. Quelli tradotti in sottofondo hanno un conto a parte.
+    frameRuns.set(runId, { expected, acked: 0, ended: 0, applied: 0, left: 0, extraAcked: 0, extraEnded: 0 });
     try {
       await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
     } catch (_) {}
@@ -579,7 +631,8 @@
       await sleep(80);
     }
     const silent = Math.max(0, st.expected - st.acked);
-    while (st.ended < st.acked && Date.now() - t0 < FRAME_WORK_CAP) {
+    // Quelli in sottofondo che hanno risposto si aspettano come gli altri: il loro testo è parte della pagina tradotta.
+    while ((st.ended < st.acked || st.extraEnded < st.extraAcked) && Date.now() - t0 < FRAME_WORK_CAP) {
       if (aborted && aborted()) break;
       await sleep(120);
     }
@@ -591,30 +644,38 @@
   function onFrameReport(msg) {
     const st = frameRuns.get(String((msg && msg.runId) || ''));
     if (!st) return;
+    // Un riquadro fuori conto non copre il silenzio di uno contato: i suoi passi vanno nella colonna a parte.
+    const fuori = !!msg.fuoriConto;
     if (msg.phase === 'ack') {
+      if (fuori) { st.extraAcked++; return; }
       st.acked++;
       st.expected += Number(msg.frames) || 0;
       return;
     }
-    st.ended++;
+    if (fuori) st.extraEnded++;
+    else st.ended++;
     st.applied += Number(msg.applied) || 0;
     st.left += Number(msg.left) || 0;
   }
 
   // Parola arrivata dalla pagina che ci ospita: traduci te stesso, o torna
   // all'originale insieme a lei.
-  function onFrameCommand(msg) {
+  async function onFrameCommand(msg) {
     if (isTopFrame()) return;
     const runId = String((msg && msg.runId) || '');
     if (String(msg && msg.mode) === 'restore') { restoreOriginal({ quiet: true }); return; }
-    // Qui arriva solo un riquadro che chi lo ospita vede (il preload ha fermato gli altri): ai suoi passa lo stesso
-    // giudizio, e nel "ci sono" dice quanti ne contare.
-    const { shown, skipped } = embeddedFrames();
+    // Qui arriva solo un riquadro che chi lo ospita vede o traduce in sottofondo (il preload ha fermato gli altri): ai
+    // suoi passa lo stesso giudizio, e nel "ci sono" dice quanti ne contare. Dentro uno fuori conto, tutti fuori conto.
+    const fuori = !!msg.fuoriConto;
+    const modo = fuori ? Extract.NASCOSTE.TRADUCI : await leggiModo();
+    const { shown, skipped, background } = embeddedFrames(modo);
     tellFrames(runId, skipped, false);
-    tellFrames(runId, shown, true);
-    reportToHost(runId, { phase: 'ack', frames: shown.length });
-    if (!worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
-    translatePage({ quiet: true, runId });
+    tellFrames(runId, shown, true, fuori);
+    tellFrames(runId, background, true, true);
+    reportToHost(runId, { phase: 'ack', frames: fuori ? 0 : shown.length }, fuori);
+    // Nascosto, un riquadro non ha misura: il francobollo si riconosce solo da uno che si vede.
+    if (!fuori && !worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
+    translatePage({ quiet: true, runId, fuoriConto: fuori });
   }
 
   try {
@@ -641,9 +702,37 @@
         }
       });
       contentObserver.observe(document.documentElement || document, { childList: true, subtree: true });
+      ascoltaRiquadri(document);
       addWatchRoots(extraRoots);
     } catch (_) { contentObserver = null; }
     startWatchingReveal();
+  }
+
+  // Un riquadro incorporato che si carica dopo la traduzione (scorrendo, o aggiunto dal sito) è testo nuovo come
+  // gli altri (#503.1): la sentinella dei nodi non lo vede, perché il suo testo arriva col caricamento.
+  const radiciAscoltate = new WeakSet();
+  function ascoltaRiquadri(radice) {
+    if (!radice || radiciAscoltate.has(radice)) return;
+    radiciAscoltate.add(radice);
+    try { radice.addEventListener('load', riquadroCaricato, true); } catch (_) {}
+  }
+
+  // Anche mentre si traduce: il giro ha passato parola ai riquadri che c'erano quando è partito, non a questo (#1290).
+  function riquadroCaricato(e) {
+    const f = e && e.target;
+    if (!f || (f.tagName !== 'IFRAME' && f.tagName !== 'FRAME')) return;
+    if (!contentObserver || !(pageHasTranslation || pageTranslating) || !isTopFrame()) return;
+    const g = frameVerdict(f, modoUltimo);
+    let nuovo = false;
+    if (g === 'shown' || g === 'background') nuovo = true;
+    else if (g === 'folded') { if (hiddenFrames.indexOf(f) < 0) hiddenFrames.push(f); revealedDirty = true; }
+    else if (g === 'inline') {
+      const body = Extract.inlineFrameBody(f);
+      nuovo = !!(body && HAS_LETTER.test(body.textContent || ''));
+    }
+    if (!nuovo) return;
+    if (pageTranslating) riquadroNelGiro = true;
+    else newContentSeen = true;
   }
 
   // Le fisarmoniche fatte di solo CSS (la casella nascosta, il bersaglio nell'indirizzo) si aprono senza toccare
@@ -668,6 +757,7 @@
     if (!contentObserver) return;
     for (const r of (roots || [])) {
       try { contentObserver.observe(r, { childList: true, subtree: true }); } catch (_) {}
+      ascoltaRiquadri(r);
     }
   }
 

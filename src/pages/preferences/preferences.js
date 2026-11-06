@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore, nascosteDellaTraduzione, modoNascoste } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -885,6 +885,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'traduzionePagina.nascoste': return modoNascoste($('traduzioneNascoste').value);
       case 'descriviImmagini.enabled': return $('descriviImmagini').checked;
       case 'contatori.attivi': return $('contatoriAttivi').checked;
       case 'featureFlags.help': return $('aiutoAcceso').checked;
@@ -984,6 +985,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'traduzionePagina.nascoste': return nascosteDellaTraduzione(s);
       case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
@@ -1204,6 +1206,7 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    if (vuole('traduzionePagina.nascoste')) $('traduzioneNascoste').value = nascosteDellaTraduzione(settings);
     if (vuole('descriviImmagini.enabled')) $('descriviImmagini').checked = !(settings.descriviImmagini && settings.descriviImmagini.enabled === false);
     if (vuole('contatori.attivi')) $('contatoriAttivi').checked = !(settings.contatori && settings.contatori.attivi === false);
     for (const [nome, id, diSerie] of INTERRUTTORI) {
@@ -1893,6 +1896,7 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    $('traduzioneNascoste').addEventListener('change', persist);
     $('descriviImmagini').addEventListener('change', persist);
     $('contatoriAttivi').addEventListener('change', persist);
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);

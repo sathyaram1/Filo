@@ -2142,6 +2142,31 @@
         return { partial: { spiegaAnticipata: { enabled: b } }, label: `Spiegazione preparata alla selezione → ${b ? 'attiva' : 'spenta'}` };
       },
     },
+    // D61 (#1290): «traduci tutto» o «traduci solo quando apro». Un sì (tradurle) vale «subito», un no «quando le apro»:
+    // per questo nessuna chiave nomina una delle due scelte, che rovescerebbe il senso del sì.
+    {
+      scrive: ['traduzionePagina.nascoste'],
+      aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, dal menu, e spende meno)',
+      costo: 1,
+      keys: ['traduzione_sezioni_nascoste', 'traduzione delle sezioni nascoste', 'traduzione delle sezioni chiuse',
+        'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre', 'traduzionepagina.nascoste'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+        const { TRADUCI, RIMANDA } = global.SN_CONST.NASCOSTE_TRADUZIONE;
+        const parole = {
+          [TRADUCI]: ['subito', 'tutto', 'traduci tutto', 'sempre', 'in sottofondo', 'di serie', 'predefinito'],
+          [RIMANDA]: ['apertura', 'aperte', 'quando apro', 'quando le apro', 'solo quando apro', 'traduci solo quando apro',
+            'all\'apertura', 'dopo', 'su richiesta'],
+        };
+        const b = parsePrefBool(v);
+        const modo = Object.keys(parole).find((k) => parole[k].includes(s)) || (b === null ? null : (b ? TRADUCI : RIMANDA));
+        if (!modo) return null;
+        return {
+          partial: { traduzionePagina: { nascoste: modo } },
+          label: `Sezioni chiuse di una pagina → ${modo === TRADUCI ? 'tradotte subito, insieme al resto' : 'tradotte solo quando le apri'}`,
+        };
+      },
+    },
     {
       scrive: ['descriviImmagini.enabled'],
       aiuto: 'true | false (ogni screenshot, intero o di una parte, e ogni immagine copiata da una pagina va intera al modello delle immagini, che ne scrive il nome del file e la riga della cronologia appunti; spenta, l\'immagine non parte e il file si chiama con data e ora. Da una pagina delicata non parte mai)',

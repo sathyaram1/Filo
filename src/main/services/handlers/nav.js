@@ -366,6 +366,7 @@ module.exports = function register(on, ctx) {
     frames: Number(msg?.frames) || 0,
     applied: Number(msg?.applied) || 0,
     left: Number(msg?.left) || 0,
+    fuoriConto: msg?.fuoriConto ? 1 : 0,
   }));
 
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {

@@ -122,6 +122,11 @@
     'avvisoSchermoPieno.durataMs': { nome: 'durata dell\'avviso del sito a schermo intero', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'traduzionePagina.nascoste': {
+      nome: 'traduzione delle sezioni chiuse di una pagina',
+      valori: { subito: 'subito, insieme al resto', apertura: 'solo quando le apri' },
+      livello: 1,
+    },
     'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },
     'contatori.attivi': { nome: 'contatori anonimi d\'uso', valore: ATTIVI, livello: 2 },
     'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },

@@ -638,6 +638,19 @@
         </div>
       </section>
 
+      <!-- D61 (#1290) — sezioni chiuse: subito in sottofondo, o quando si aprono. Stime a 3 pagine al giorno, modello da
+           0,26 $ e 0,38 $ per milione di token (OpenRouter), un terzo di testo in più nelle sezioni chiuse. -->
+      <section id="sec-traduzione">
+        <h2>Traduzione della pagina</h2>
+        <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Menu, fisarmoniche, schede e pannelli che ancora non si vedono. Subito: quando li apri sono già tradotti, e paghi anche quelli che non apri. Solo quando li apri: li traduci dal menu, aspettando un paio di secondi.">
+          <span>Sezioni chiuse</span>
+          <select id="traduzioneNascoste" style="width:460px;max-width:100%;">
+            <option value="subito">Subito, insieme al resto (circa 0,40 $ al mese, già pronte all'apertura)</option>
+            <option value="apertura">Solo quando le apro (circa 0,30 $ al mese, 2 s dopo l'apertura)</option>
+          </select>
+        </label>
+      </section>
+
       <!-- #818 — quando Filo avvisa che i crediti stanno per finire, e il pre-calcolo che li consuma senza che si veda. -->
       <section id="sec-crediti">
         <h2>Crediti</h2>

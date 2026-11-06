@@ -305,9 +305,10 @@
   // di lasciare come unica strada tornare all'originale e ripagare la pagina.
   // Il sito sceglie COME ripiegare una sezione, e da quella scelta non possono
   // dipendere né il comportamento né il conto dell'utente (#505).
-  function isVisibilityHidden(el) {
+  // Il segno per i lettori di schermo (aria-hidden) non entra: non dice niente su cosa vede chi guarda (#503.3).
+  // `ovunque`: trasparente vale nascosto dovunque stia, così il giudizio non dipende dallo scorrimento (#503.3).
+  function isVisibilityHidden(el, ovunque) {
     if (el.hasAttribute && el.hasAttribute('hidden')) return true;
-    if (el.getAttribute && el.getAttribute('aria-hidden') === 'true') return true;
     // Prima dello stile: su una pagina di domande frequenti la risposta è quasi sempre questa, e chiedere lo stile
     // di migliaia di elementi per scoprirlo si sente all'apertura del menu.
     if (isInsideClosedDisclosure(el)) return true;
@@ -321,7 +322,7 @@
     // deve saperlo per scendere lo stesso, invece di lasciare in inglese del testo che si vede (#505).
     if (cs.visibility === 'hidden' || cs.visibility === 'collapse') return 'visibility';
     if (isFlattened(el)) return true;
-    if (isTransparentOnScreen(el, cs)) return true;
+    if (ovunque ? isFullyTransparent(cs) : isTransparentOnScreen(el, cs)) return true;
     if (isPushedOutOfPage(el, cs)) return true;
     if (isClippedAwayByPath(el, cs)) return true;
     return isClippedToNothing(el, cs);
@@ -793,10 +794,11 @@
 
   // Un riquadro incorporato che l'utente non vede (#503): il metro delle sezioni ripiegate, su di lui e su ogni
   // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
-  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo.
+  // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo. Trasparente sì,
+  // dovunque stia: il conto dell'avviso non può cambiare con lo scorrimento (#503.2, #503.3).
   function isHiddenFromUser(el) {
     try {
-      if (isVisibilityHidden(el)) return true;
+      if (isVisibilityHidden(el, true)) return true;
       if (el.ownerDocument === document) {
         const r = el.getBoundingClientRect();
         if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
@@ -806,14 +808,40 @@
       let cur = parentOrHost(el);
       for (let hops = 0; cur && cur.nodeType === 1 && cur !== stop && hops < REACH_MAX_HOPS; hops++) {
         // `visibility` l'ha già detta il riquadro, che la eredita: un antenato invisibile così non decide per lui.
-        if (isVisibilityHidden(cur) === true) return true;
+        if (isVisibilityHidden(cur, true) === true) return true;
         cur = parentOrHost(cur);
       }
       return false;
     } catch (_) { return false; }
   }
 
-  function isClosedComponent(el) {
+  // Cosa c'è nell'albero chiuso di `el`, per la sonda (preload/ombre-chiuse.js): 'testo', 'incorporati' (riquadri di cui
+  // da lì non si legge niente), 'vuoto', o null se non lo conosce. La sonda annulla la domanda il cui sì è vero; la
+  // domanda esce dai componenti aperti, se no da lì non arriverebbe.
+  function ombraChiusa(el) {
+    const nome = global.SN_OMBRE_CHIUSE;
+    if (!nome) return null;
+    const si = (suffisso) => !el.dispatchEvent(new CustomEvent(nome + suffisso, { cancelable: true, composed: true }));
+    try {
+      if (si('')) return 'vuoto';
+      if (si('t')) return 'testo';
+      if (si('r')) return 'incorporati';
+    } catch (_) {}
+    return null;
+  }
+
+  // Il <details> chiuso più esterno che contiene `el`, attraverso i componenti aperti; null se nessuno.
+  function fisarmonicaChiusaAttorno(el) {
+    let trovata = null;
+    for (let cur = parentOrHost(el), hops = 0; cur && cur.nodeType === 1 && hops < REACH_MAX_HOPS; cur = parentOrHost(cur), hops++) {
+      if (cur.tagName === 'DETAILS' && !cur.open) trovata = cur;
+    }
+    return trovata;
+  }
+
+  // `fuoriConto`: un riquadro che chi lo ospita non vede non conta i suoi componenti chiusi, come lui non conta (#1290).
+  function isClosedComponent(el, fuoriConto) {
+    if (fuoriConto) return false;
     const tag = (el.tagName || '').toLowerCase();
     if (tag.indexOf('-') < 0) return false;
     // La prova del cursore si fa sul documento della pagina: dentro un riquadro misurerebbe
@@ -824,11 +852,23 @@
     if ((el.textContent || '').trim()) return false;
     try {
       if (el.matches && !el.matches(':defined')) return false;
+      // Una decorazione non conta mai: la sonda nel mondo della pagina lo sa (#472).
+      const dentro = ombraChiusa(el);
+      if (dentro === 'vuoto') return false;
+      // Testo chiuso in una fisarmonica del browser: è la sezione che la pagina dichiara da aprire, e aprendola il
+      // testo sarebbe in inglese. Gli altri modi di nascondere li usano anche gli spazi pubblicitari (#503): lì no.
+      if (dentro === 'testo') {
+        const sezione = fisarmonicaChiusaAttorno(el);
+        if (sezione) return !isInvisibleToUser(sezione) && isReachableByUser(sezione, sezione.getBoundingClientRect());
+      }
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
       if (isInvisibleToUser(el)) return false;
       if (!isReachableByUser(el, r)) return false;
-      // Serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
+      // Testo, o un riquadro di cui da fuori non si legge niente: quel che la sonda sa vince sulla prova del punto, che
+      // vede solo lo schermo di adesso, così l'avviso non cambia con lo scorrimento (#1290).
+      if (dentro) return true;
+      // Dove la sonda non sa, serve la PROVA che lì dentro ci sia qualcosa: 'unknown' vale quanto un
       // no. Il prezzo è un componente chiuso che resta fuori dal conto quando
       // sta sotto il bordo dello schermo — l'avviso dirà "Pagina tradotta"
       // invece di "solo in parte". Tacere su un pezzo che forse non esiste
@@ -865,7 +905,8 @@
   const MAX_HIDDEN = 5000;
 
   // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
-  function pushKids(el, stack, shadowRoots) {
+  // `nascosti` segna i figli come parte di una sezione nascosta.
+  function pushKids(el, stack, shadowRoots, nascosti) {
     const kids = [];
     const shadow = el.shadowRoot;
     if (shadow) {
@@ -873,12 +914,26 @@
       for (const c of shadow.children) kids.push(c);
     }
     for (const c of el.children) kids.push(c);
-    for (let i = kids.length - 1; i >= 0; i--) stack.push(kids[i]);
+    for (let i = kids.length - 1; i >= 0; i--) {
+      if (nascosti) nascosti.add(kids[i]);
+      stack.push(kids[i]);
+    }
   }
 
-  function extractTranslatableBlocks({ maxBlocks = 2000 } = {}) {
+  // Le due scelte per le sezioni nascoste (D61), i valori di constants.js: TRADUCI le prende tutte, segnate `nascosto`
+  // perché partano dopo quel che si vede; RIMANDA le lascia in `hidden`, e il menu offre di tradurle quando si aprono.
+  const NASCOSTE = global.SN_CONST.NASCOSTE_TRADUZIONE;
+
+  function extractTranslatableBlocks({ maxBlocks = 2000, nascoste = NASCOSTE.RIMANDA, fuoriConto = false } = {}) {
     const root = document.body || document.documentElement;
     if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
+    const tutto = nascoste === NASCOSTE.TRADUCI;
+    const dentroNascosto = new WeakSet();
+    // Il tetto si applica a fine camminata, in ordine di priorità: quel che si vede prima delle sezioni nascoste.
+    const visti = [];
+    const vistiAttr = [];
+    const nascostiTesto = [];
+    const nascostiAttr = [];
     const out = [];
     // Gli alberi dei componenti aperti servono a chi sorveglia il testo che arriva DOPO: una
     // MutationObserver sul documento non vede lì dentro.
@@ -900,8 +955,7 @@
     const sottoInvisibile = new WeakSet();
     let unreachable = 0;
     let truncated = 0;
-    const room = () => out.length + attrs.length < maxBlocks;
-    const takeAttrs = (el, checkHard) => {
+    const takeAttrs = (el, checkHard, nascosto) => {
       // Qui arrivano gli elementi in cui NON si scende: il loro testo non verrà tradotto, e da
       // lì non c'è nessuna etichetta gemella da copiare.
       const targets = attrTargetsOf(el, !checkHard);
@@ -913,8 +967,8 @@
         // Le gemelle non consumano il tetto del giro e non contano come
         // "rimasto fuori": non sono lavoro da spedire, sono una copia.
         if (t.mirror) { if (mirrors.length < maxBlocks) mirrors.push(t); continue; }
-        if (room()) attrs.push(t);
-        else truncated++;
+        if (nascosto) t.nascosto = true;
+        (nascosto ? nascostiAttr : vistiAttr).push(t);
       }
     };
     // Pila esplicita invece del TreeWalker: deve poter saltare da un albero
@@ -922,12 +976,15 @@
     const stack = [root];
     while (stack.length) {
       const el = stack.pop();
+      let nascosto = dentroNascosto.has(el);
       // La radice non passa dal filtro: un <body> translate=no o nascosto spegnerebbe tutta la
       // pagina. Il filtro vale da lì in giù.
       const skip = el !== root && skipSubtreeForTranslation(el);
+      // Si traduce tutto: la sezione nascosta si legge come il resto, solo dopo.
+      if (tutto && (skip === 'hidden' || skip === 'visibility')) nascosto = true;
       // Invisibile per `visibility`, che un figlio può riprendersi: si segna come ogni altra ripiegatura, ma la
       // camminata continua là sotto, se no il testo che si vede resta in inglese e il menu non lo offre (#505).
-      if (skip === 'visibility') {
+      else if (skip === 'visibility') {
         const p = el.parentElement;
         if (!(p && sottoInvisibile.has(p)) && hidden.length < MAX_HIDDEN
             && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
@@ -935,16 +992,17 @@
         pushKids(el, stack, shadowRoots);
         continue;
       }
-      if (skip) {
+      else if (skip) {
         // Sottoalbero senza prosa: il contenuto resta intoccato, ma le sue etichette si leggono
         // sullo schermo e si traducono, salvo una barriera dura.
         if (skip === 'tag') {
-          takeAttrs(el, true);
+          takeAttrs(el, true, nascosto);
           // Riquadro riempito dalla pagina stessa: lì dentro non c'è nessun Filo a cui passare
           // parola, e il testo si legge da qui (#407).
           if (!hardSkipForTranslation(el)) {
             const inner = inlineFrameBody(el);
             if (inner) {
+              if (nascosto) dentroNascosto.add(inner);
               stack.push(inner);
               // Anche qui il sito può aggiungere testo dopo: chi sorveglia la
               // pagina deve tenere d'occhio pure questo documento.
@@ -958,7 +1016,7 @@
                  && HAS_LETTER.test(el.textContent || '')) hidden.push(el);
         continue;
       }
-      takeAttrs(el, false);
+      takeAttrs(el, false, nascosto);
       // Già tradotto: si salta l'elemento ma si scende lo stesso nei figli (#408), o i blocchi
       // annidati lasciati da una traduzione interrotta resterebbero irraggiungibili.
       if (!(el.dataset && el.dataset.snTranslated)) {
@@ -967,15 +1025,26 @@
         if (txt.length >= 2 && HAS_LETTER.test(txt)) {
           // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
           // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
-          if (isOwnTextHidden(el)) {
+          const proprioNascosto = isOwnTextHidden(el);
+          if (proprioNascosto && !tutto) {
             if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
-          } else if (room()) out.push({ el, text: txt });
-          else truncated++;
+          } else if (nascosto || proprioNascosto) nascostiTesto.push({ el, text: txt, nascosto: true });
+          else visti.push({ el, text: txt });
         }
       }
-      if (isClosedComponent(el) && !el.shadowRoot) unreachable++;
-      pushKids(el, stack, shadowRoots);
+      if (isClosedComponent(el, fuoriConto) && !el.shadowRoot) unreachable++;
+      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null);
     }
+    let posto = maxBlocks;
+    const prendi = (da, a) => {
+      for (const x of da) {
+        if (posto > 0) { a.push(x); posto--; } else truncated++;
+      }
+    };
+    prendi(visti, out);
+    prendi(vistiAttr, attrs);
+    prendi(nascostiTesto, out);
+    prendi(nascostiAttr, attrs);
     return Object.assign(out, { unreachable, truncated, attrs, mirrors, shadowRoots, frameDocs, hidden });
   }
 
@@ -1267,6 +1336,7 @@
     getRenderedSelectionText,
     extractMainTextNodes,
     extractTranslatableBlocks,
+    NASCOSTE,
     findTranslatedElements,
     hasRevealedText,
     inlineFrameBody,

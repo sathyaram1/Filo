@@ -242,6 +242,13 @@ try {
   if (/^https?:/i.test(loc)) require('./youtube-guardia.js').avvia({ ipcRenderer, webFrame, window, href: loc });
 } catch (_) { /* mai bloccare il caricamento */ }
 
+// Gli alberi chiusi dei componenti del sito, per l'avviso della traduzione (#472): regole in preload/ombre-chiuse.js.
+// In ogni frame http(s): un riquadro incorporato ha i suoi componenti, e lì si giudicano come nella pagina.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./ombre-chiuse.js').installa({ webFrame });
+} catch (_) { /* mai bloccare il caricamento */ }
+
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
 try {
@@ -413,7 +420,8 @@ if (IS_SUBFRAME) try {
     if (!runId) return;
     const visto = d.visible === true;
     verdettiRiquadro.delete(runId);
-    verdettiRiquadro.set(runId, visto);
+    // Nascosto ma da tradurre in sottofondo (D61): si sveglia, e lo dice nel conto come fuori conto.
+    verdettiRiquadro.set(runId, { visto, fuoriConto: visto && d.fuoriConto === true });
     if (verdettiRiquadro.size > 20) verdettiRiquadro.delete(verdettiRiquadro.keys().next().value);
     // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
     if (!visto) {
@@ -437,13 +445,15 @@ function conVerdetto(runId, fn) {
     fn(visto);
   };
   const guarda = () => { if (verdettiRiquadro.has(runId)) chiudi(verdettiRiquadro.get(runId)); };
-  const timer = setTimeout(() => chiudi(true), VERDETTO_ATTESA_MS);
+  const timer = setTimeout(() => chiudi({ visto: true, fuoriConto: false }), VERDETTO_ATTESA_MS);
   inAttesaDiVerdetto.add(guarda);
 }
 
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
   if (IS_SUBFRAME && msg && msg.type === 'frame_translate' && msg.mode !== 'restore') {
-    conVerdetto(String(msg.runId || ''), (visto) => { if (visto) consegnaBroadcast(msg); });
+    conVerdetto(String(msg.runId || ''), (v) => {
+      if (v.visto) consegnaBroadcast(v.fuoriConto ? Object.assign({}, msg, { fuoriConto: true }) : msg);
+    });
     return;
   }
   consegnaBroadcast(msg);
