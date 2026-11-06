@@ -2739,7 +2739,7 @@
     if (!selInfo) return out;
     if (!selInfo.coperto) {
       out.cut = () => Actions.cutSelection();
-      out.copy = () => { Actions.copyToClipboard(selInfo.selection); copiatoNellaPagina(target); };
+      out.copy = () => { Actions.copySelection(selInfo.selection); copiatoNellaPagina(target); };
     }
     if (!selInfo.segreto) out.search = () => Actions.searchTextOnWeb(selInfo.selection);
     return out;
