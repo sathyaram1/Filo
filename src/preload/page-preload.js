@@ -444,7 +444,7 @@ function conVerdetto(runId, fn) {
     fn(visto);
   };
   const guarda = () => { if (verdettiRiquadro.has(runId)) chiudi(verdettiRiquadro.get(runId)); };
-  const timer = setTimeout(() => chiudi(true), VERDETTO_ATTESA_MS);
+  const timer = setTimeout(() => chiudi({ visto: true, fuoriConto: false }), VERDETTO_ATTESA_MS);
   inAttesaDiVerdetto.add(guarda);
 }
 
