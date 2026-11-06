@@ -1463,6 +1463,12 @@ async function init() {
 // ─── API per gli handler IPC (comandi dalla shell) ─────────────────────────
 function list(scope = '') { return listRecords(scope); }
 
+// Un file che sta scendendo adesso, in qualunque finestra: il precarico dei link a schermo gli lascia la rete (#1985).
+function scaricaInCorso() {
+  for (const r of records.values()) if (r && r.state === 'progressing') return true;
+  return false;
+}
+
 function clearCompleted(scope = '') {
   for (const [id, rec] of records) {
     if (scopeOf(rec) === scope && !NON_TERMINAL.has(rec.state)) records.delete(id);
