@@ -90,12 +90,14 @@
     return [...out].sort();
   }
 
-  // Quanto grezzo può restare dopo una compattazione: metà dello spazio fra la parte fissa (`base`, tutto quello che non è
-  // tratto) e la soglia. Quattro turni pesanti lasciavano la richiesta appena sotto la soglia, e la chat compattava a
-  // ogni messaggio. Senza `base` nota, nessun tetto: restano ore e turni.
+  // Quanto grezzo può restare dopo una compattazione: un terzo dello spazio fra la parte fissa (`base`, quello che non è
+  // tratto né domanda) e la soglia, così due turni come quelli di adesso stanno prima della prossima. Quattro turni
+  // pesanti lasciavano la richiesta appena sotto la soglia, e la chat compattava a ogni messaggio. Senza `base` nota,
+  // nessun tetto: restano ore e turni.
+  const QUOTA_GREZZO = 1 / 3;
   function grezzoMassimo({ soglia, base } = {}) {
     const b = Number(base);
-    return Number.isFinite(b) && b > 0 ? Math.max(0, (Number(soglia) - b) / 2) : Infinity;
+    return Number.isFinite(b) && b > 0 ? Math.max(0, (Number(soglia) - b) * QUOTA_GREZZO) : Infinity;
   }
 
   // Oltre questa stima, dopo una risposta, si compatta in sottofondo: la quota vale sullo spazio sopra la parte fissa,
