@@ -1043,7 +1043,6 @@
   // cambia molto. Entra nel contesto di Filo al posto del testo integrale.
   const SUMMARY = window.SN_EDITOR_SUMMARY || null;
   const SUMMARY_DEBOUNCE_MS = 7000;
-  let autoSummaryBusy = false;
   let summaryTimer = null;
 
   const SUMMARY_SYSTEM_PROMPT =
