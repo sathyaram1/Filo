@@ -372,7 +372,7 @@ module.exports = function register(on, ctx) {
     if (msg && msg.anticipo === true && r && typeof r.text === 'string' && Cont && Cont.anticipoPronto) Cont.anticipoPronto(msg.action);
     if (lettura) await lettura;
     return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
-  });
+  }
 
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
