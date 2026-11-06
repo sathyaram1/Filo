@@ -12,8 +12,8 @@
   const TIPI = Object.freeze({
     conversazione: { prompt: 16000, completion: 900 },
     documento: { prompt: 8000, completion: 800 },
-    // La soglia di serie piena, meno il grezzo che resta: righe delle ore e qualche memoria in uscita.
-    compattazione: { prompt: 60000, completion: 1500 },
+    // I token li calcola la compattazione stessa (SN_FILO_COMPATTAZIONE.usoTipico), dalla soglia di serie.
+    compattazione: null,
     traduzione: { prompt: 5000, completion: 5000 },
     testo: { prompt: 3000, completion: 500 },
     breve: { prompt: 1500, completion: 150 },
