@@ -1256,9 +1256,10 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       el: wrap,
       // L'azione vera che sta accadendo adesso («Leggo la pagina»), '' quando è finita.
       azione(t) { azione = String(t || ''); disegna(); },
-      ragiona(pezzo) {
+      ragiona(pezzo, { intero = false } = {}) {
         if (finita || !pezzo) return;
-        ragionamento += pezzo;
+        // Il ragionamento intero arriva con la risposta: i pezzi in diretta possono restare indietro.
+        if (intero) { if (pezzo.length < ragionamento.length) return; ragionamento = pezzo; } else ragionamento += pezzo;
         wrap.classList.add('sn-sidebar-attesa-pensata');
         corpo.textContent = ragionamento;
         if (!corpo.hidden) corpo.scrollTop = corpo.scrollHeight;
