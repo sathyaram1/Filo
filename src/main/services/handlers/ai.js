@@ -285,6 +285,7 @@ module.exports = function register(on, ctx) {
       },
       fine: () => { if (turniAiuto.get(chiave) === controller) turniAiuto.delete(chiave); },
     };
+    return diretta;
   }
   on(MSG.AIUTO_FERMA, async (msg, sender) => {
     const chiave = chiaveTurno(sender, msg && msg.turno);
