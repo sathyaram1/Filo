@@ -15,6 +15,7 @@
   const VERSIONS_KEY = 'filo.editor.versions';
   const STORE = window.SN_EDITOR_STORE;
   const VERS = window.SN_EDITOR_VERSIONS;
+  const CONFERMA = window.SN_CONFERMA_SUL_POSTO;
   const MSG = (window.SN_MSG && window.SN_MSG.MSG) || {};
   const ACTIONS = (window.SN_CONST && window.SN_CONST.ACTIONS) || {};
   const ICONS = window.SN_ICONS || {};
@@ -844,13 +845,13 @@
     overlayBox.querySelectorAll('.ed-tr-purge').forEach((b) => b.addEventListener('click', () => {
       if (b.dataset.confirm !== '1') {
         b.dataset.confirm = '1';
-        b.textContent = 'Confermi?';
+        CONFERMA.arma(b, 'Confermi?');
         b.classList.add('danger');
         staleClick.arm();
         setTimeout(() => {
           if (!b.isConnected || b.dataset.confirm !== '1') return;
           b.dataset.confirm = '';
-          b.textContent = 'Elimina definitivamente';
+          CONFERMA.disarma(b, 'Elimina definitivamente');
           b.classList.remove('danger');
         }, 4000);
         return;
@@ -864,7 +865,9 @@
     if (emptyBtn) emptyBtn.addEventListener('click', () => {
       if (emptyBtn.dataset.confirm !== '1') {
         emptyBtn.dataset.confirm = '1';
-        emptyBtn.textContent = `Confermi? Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
+        // La scatola resta quella di «Svuota cestino»: il conto va nel suggerimento, non nella scritta.
+        CONFERMA.arma(emptyBtn, 'Confermi?');
+        emptyBtn.title = `Elimini ${trash.length} document${trash.length === 1 ? 'o' : 'i'} per sempre`;
         emptyBtn.classList.add('danger');
         staleClick.arm();
         return;
@@ -901,18 +904,23 @@
     rinominaNelFilo(id, f && f.meta && f.meta.title);
   }
 
-  // Titolo automatico (#379.4): a ~100 parole un documento senza nome ne riceve UNO SOLO, da
-  // testo + chat + memoria. Resta modificabile a mano e rigenerabile dal tasto destro.
+  // Titolo automatico (#379.4): a ~100 parole un documento senza nome ne riceve uno; poi lo segue il riassunto (#1570).
+  // Scritto a mano non cambia più da solo; «Rigenera titolo» dal tasto destro resta.
   const AUTO_TITLE_WORDS = 100;
-  let autoTitleBusy = false;
+  // Per documento: un titolo o un riassunto in volo per un altro non salta il tiro di questo (#1697).
+  const titoliInVolo = new Set();
+  const riassuntiInVolo = new Set();
 
-  const TITLE_SYSTEM_PROMPT =
-    'Sei l\'assistente di Filo. Genera un TITOLO molto breve (2-6 parole) per il '
-    + 'documento qui sotto, nella STESSA lingua del testo. Il titolo deve '
-    + 'descrivere il contenuto del documento. Usa l\'eventuale conversazione e la '
-    + 'memoria SOLO come contesto per capire meglio l\'argomento, non come oggetto '
-    + 'del titolo. Rispondi SOLO col titolo: niente virgolette, niente punto '
-    + 'finale, niente spiegazioni.';
+  // Le regole di titolo e riassunto stanno qui una volta: le chiamate da sole e quella unica le compongono.
+  const REGOLA_TITOLO = 'un TITOLO molto breve (2-6 parole), nella STESSA lingua del testo, che descriva il contenuto del '
+    + 'documento qui sotto';
+  const REGOLA_RIASSUNTO = 'un RIASSUNTO di 1-2 frasi (massimo due righe), nella STESSA lingua del testo, che spieghi COSA '
+    + 'CONTIENE il documento qui sotto. Serve a orientarsi tra più file senza aprirli: descrivi l\'argomento e il tipo di '
+    + 'contenuto, non i dettagli';
+  const SOLO_CONTESTO = 'Usa l\'eventuale conversazione e la memoria SOLO come contesto per capire meglio l\'argomento, '
+    + 'non come oggetto del testo che scrivi.';
+  const TITLE_SYSTEM_PROMPT = `Sei l'assistente di Filo. Genera ${REGOLA_TITOLO}. ${SOLO_CONTESTO} `
+    + 'Rispondi SOLO col titolo: niente virgolette, niente punto finale, niente spiegazioni.';
 
   function cleanTitle(raw) {
     let t = String(raw == null ? '' : raw).trim();
@@ -951,13 +959,14 @@
       && Number.isFinite(m.titleAutoAt) && ['automatico', 'rigenerato'].includes(m.titleAutoVia));
   }
 
-  // Titolo automatico: conta come «già generato» e toglie il flag manuale.
-  function applyGeneratedTitle(id, raw, via = 'automatico') {
+  // Titolo automatico: conta come «già generato» e toglie il flag manuale. `firma` è il testo da cui è nato: il
+  // titolo si rifà quando il testo se ne allontana (SN_EDITOR_SUMMARY.titoloDaRifare).
+  function applyGeneratedTitle(id, raw, via = 'automatico', firma = null) {
     const clean = cleanTitle(raw);
     if (!clean) return false;
     STORE.renameFile(collection, id, clean);
     const f = STORE.findFile(collection, id);
-    const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via };
+    const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via, titleSig: firma };
     if (f && f.meta) Object.assign(f.meta, segno);
     if (doc && doc.id === id && doc.meta) {
       doc.meta.title = f.meta.title;
@@ -969,11 +978,22 @@
     return true;
   }
 
-  // auto:true → tiro automatico a 100 parole, silenzioso, UNA VOLTA SOLA.
+  // Un titolo automatico che arriva dopo che l'utente ne ha scritto uno a mano non lo sostituisce.
+  function titoloScrittoAMano(id) {
+    const f = STORE.findFile(collection, id);
+    return !!(f && f.meta && f.meta.titleManual);
+  }
+
+  // auto:true → primo titolo a 100 parole, silenzioso; dopo lo rifà il riassunto, nella sua chiamata.
   // auto:false → rigenerazione esplicita dal menu, con feedback a video.
   async function generateTitleForActive({ auto } = {}) {
     if (!doc || !doc.meta) return false;
     const id = doc.id;
+    // Il testo si legge adesso: dopo l'attesa della memoria il foglio può mostrare già un altro documento (#1570).
+    const testo = docPlainText();
+    syncActiveIntoCollection();
+    const prima = STORE.findFile(collection, id);
+    const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
     if (auto) {
       // Segna SUBITO come «già tentato»: la generazione automatica è una sola. In caso di errore
       // resta «Rigenera titolo» nel menu.
@@ -982,7 +1002,7 @@
       if (f0 && f0.meta) f0.meta.titleAuto = true;
       writeCollection();
     }
-    if (!docPerIlModello().testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
+    if (!window.SN_EDITOR_SUMMARY.testoAlModello(testo).testo) { if (!auto) showEditorToast('Scrivi qualcosa prima di generare un titolo.'); return false; }
     const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
       { role: 'system', content: TITLE_SYSTEM_PROMPT },
@@ -993,10 +1013,11 @@
     const esito = (e) => contaRiquadro('editor_titolo', { via, esito: e });
     try {
       // Rifatto a mano chiede una risposta nuova: la stessa domanda tornerebbe uguale dalla cache.
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? { intera: true } : { rigenera: true, intera: true });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_TITLE || 'editor_title', conDocumento, auto ? { intera: true } : { rigenera: true, intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) { esito('fallito'); if (!auto) { contaModello(r); avvisoNonGenerato('il titolo', r); } return false; }
-      const ok = applyGeneratedTitle(id, rawText, via);
+      if (auto && titoloScrittoAMano(id)) return false;
+      const ok = applyGeneratedTitle(id, rawText, via, firma);
       esito(ok ? 'applicato' : 'vuoto');
       if (!ok && !auto) { contaErroreVisto({ misura: 'avviso', chiave: 'titolo_non_generato' }); showEditorToast('Non sono riuscito a generare il titolo.'); }
       if (ok && !auto && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il titolo'));
@@ -1010,31 +1031,28 @@
     }
   }
 
-  // Tiro automatico: parte dall'input del testo, una sola volta, e solo se il
-  // file non ha già un titolo scelto a mano.
+  // Primo titolo: parte dall'input del testo, una volta, e solo se il file non ha già un titolo scelto a mano.
   function maybeAutoTitle() {
     if (!doc || !doc.meta) return;
     if (doc.meta.titleAuto || doc.meta.titleManual) return;
-    if (autoTitleBusy) return;
+    const id = doc.id;
+    if (titoliInVolo.has(id)) return;
     if (textStats().words < AUTO_TITLE_WORDS) return;
-    autoTitleBusy = true;
-    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { autoTitleBusy = false; });
+    titoliInVolo.add(id);
+    Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { titoliInVolo.delete(id); });
   }
 
   // Riassunto per file (#379.5): stesso canale AI del titolo, ma si RIGENERA quando il file
   // cambia molto. Entra nel contesto di Filo al posto del testo integrale.
   const SUMMARY = window.SN_EDITOR_SUMMARY || null;
   const SUMMARY_DEBOUNCE_MS = 7000;
-  let autoSummaryBusy = false;
   let summaryTimer = null;
 
-  const SUMMARY_SYSTEM_PROMPT =
-    'Sei l\'assistente di Filo. Scrivi un RIASSUNTO di 1-2 frasi (massimo due '
-    + 'righe) che spieghi COSA CONTIENE il documento qui sotto, nella STESSA '
-    + 'lingua del testo. Serve a orientarsi tra più file senza aprirli: descrivi '
-    + 'l\'argomento e il tipo di contenuto, non i dettagli. Usa l\'eventuale '
-    + 'conversazione e la memoria SOLO come contesto. Rispondi SOLO col riassunto: '
-    + 'niente virgolette, niente preamboli, niente elenco.';
+  const SUMMARY_SYSTEM_PROMPT = `Sei l'assistente di Filo. Scrivi ${REGOLA_RIASSUNTO}. `
+    + `${SOLO_CONTESTO} Rispondi SOLO col riassunto: niente virgolette, niente preamboli, niente elenco.`;
+  const TITOLO_E_RIASSUNTO_PROMPT = `Sei l'assistente di Filo. Prima scrivi ${REGOLA_TITOLO}; poi `
+    + `${REGOLA_RIASSUNTO}. ${SOLO_CONTESTO} Rispondi con due righe esatte, senza virgolette né altro:\n`
+    + 'TITOLO: <il titolo, senza punto finale>\nRIASSUNTO: <il riassunto, senza preamboli né elenco>';
 
   function cleanSummary(raw) {
     let t = String(raw == null ? '' : raw).trim();
@@ -1081,26 +1099,35 @@
   // Con `manuale` chi ha chiesto il riassunto sa com'è andata.
   async function generateSummaryForActive({ manuale = false } = {}) {
     if (!doc || !doc.meta) return false;
+    // Il testo si legge adesso: dopo l'attesa della memoria il foglio può mostrare già un altro documento (#1570).
+    const testo = docPlainText();
     syncActiveIntoCollection();
     const id = doc.id;
-    if (!docPerIlModello().testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
+    if (!window.SN_EDITOR_SUMMARY.testoAlModello(testo).testo) { if (manuale) showEditorToast('Scrivi qualcosa prima di generare un riassunto.'); return false; }
     const prima = STORE.findFile(collection, id);
     const firma = SUMMARY && prima ? SUMMARY.makeSig(prima) : null;
+    // Il titolo non scritto a mano viaggia con il riassunto: nessuna chiamata in più (#1570).
+    const conTitolo = !!(SUMMARY && prima && firma && !titoliInVolo.has(id) && SUMMARY.titoloDaRifare(prima, firma.words));
     const contesto = contestoDelDocumento(await filoMemoryText());
     const conDocumento = (letto) => [
-      { role: 'system', content: SUMMARY_SYSTEM_PROMPT },
+      { role: 'system', content: conTitolo ? TITOLO_E_RIASSUNTO_PROMPT : SUMMARY_SYSTEM_PROMPT },
       { role: 'user', content: [bloccoDocumento(letto), ...contesto].join('\n\n') },
     ];
     try {
       // `intera`: un riassunto fermato dal tetto non si salva e non va alla chat come se fosse completo (#1302).
-      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true, intera: true } : { intera: true });
+      const { r, letto } = await chiediSulDocumento(ACTIONS.EDITOR_SUMMARY || 'editor_summary', conDocumento, manuale ? { rigenera: true, intera: true } : { intera: true }, testo);
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) {
         // L'automatico lo dice una volta sola: il prossimo tentativo arriva solo dopo un cambio vero del testo.
         if (segnaRiassuntoFallito(id, firma, r) || manuale) avvisoNonGenerato(manuale ? 'il riassunto' : 'il riassunto automatico', r);
         return false;
       }
-      const ok = applyGeneratedSummary(id, rawText);
+      const parti = conTitolo ? SUMMARY.titoloERiassunto(rawText) : { titolo: '', riassunto: rawText };
+      if (parti.titolo && !titoloScrittoAMano(id)) {
+        const nuovo = applyGeneratedTitle(id, parti.titolo, 'automatico', firma);
+        contaRiquadro('editor_titolo', { via: 'automatico', esito: nuovo ? 'applicato' : 'vuoto' });
+      }
+      const ok = applyGeneratedSummary(id, parti.riassunto);
       if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
       if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
       return ok;
@@ -1129,12 +1156,15 @@
     if (summaryTimer) { clearTimeout(summaryTimer); summaryTimer = null; }
     summaryTimer = setTimeout(() => {
       summaryTimer = null;
-      if (autoSummaryBusy || !doc) return;
+      if (!doc || riassuntiInVolo.has(doc.id)) return;
       syncActiveIntoCollection();
-      const f = STORE.findFile(collection, doc.id);
-      if (!f || !SUMMARY.needsSummary(f)) return;
-      autoSummaryBusy = true;
-      Promise.resolve(generateSummaryForActive()).finally(() => { autoSummaryBusy = false; });
+      const id = doc.id;
+      const f = STORE.findFile(collection, id);
+      // Un titolo da rifare chiama anche a parità di parole, ma non su un testo ormai troppo corto per un riassunto.
+      const perTitolo = SUMMARY.fileWords(f) >= SUMMARY.MIN_WORDS && SUMMARY.titoloDaRifare(f);
+      if (!f || !(SUMMARY.needsSummary(f) || perTitolo)) return;
+      riassuntiInVolo.add(id);
+      Promise.resolve(generateSummaryForActive()).finally(() => { riassuntiInVolo.delete(id); });
     }, SUMMARY_DEBOUNCE_MS);
   }
 
@@ -1191,10 +1221,11 @@
     };
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
     add('Rigenera riassunto', () => {
-      if (autoSummaryBusy) return;
-      autoSummaryBusy = true;
+      const id = doc && doc.id;
+      if (!id || riassuntiInVolo.has(id)) return;
+      riassuntiInVolo.add(id);
       Promise.resolve(generateSummaryForActive({ manuale: true }))
-        .finally(() => { autoSummaryBusy = false; });
+        .finally(() => { riassuntiInVolo.delete(id); });
     });
     add('Storico versioni', () => openVersionHistory());
     // Parità di cammini col menu documenti: il cestino si raggiunge anche col tasto destro sul
@@ -1442,11 +1473,14 @@
 
   // Le marche sono { type, attrs? }: i tag B/I/U/S danno marche semplici; il font-size, che è
   // stile inline, diventa una marca con attrs.size così sopravvive al round-trip.
+  const ANCORA = String.fromCharCode(0x200b);
   function inlineToPM(parent, marks) {
     const out = [];
     parent.childNodes.forEach((node) => {
       if (node.nodeType === Node.TEXT_NODE) {
-        if (node.nodeValue) out.push({ type: 'text', text: node.nodeValue, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
+        // Lo spazio di larghezza zero è l'ancora dell'incolla lungo (incollaLungo), non testo dell'utente.
+        const testo = node.nodeValue.split(ANCORA).join('');
+        if (testo) out.push({ type: 'text', text: testo, ...(marks.length ? { marks: marks.map((m) => ({ type: m.type, ...(m.attrs ? { attrs: m.attrs } : {}) })) } : {}) });
         return;
       }
       if (node.nodeType !== Node.ELEMENT_NODE) return;
@@ -2137,30 +2171,218 @@
     if (righe.length < INCOLLA_A_RIGHE) document.execCommand('insertText', false, text);
     else incollaLungo(righe);
   });
-  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475); insertHTML è lento uguale in un
-  // blocco vuoto, per questo la prima riga entra da insertText e il suo ultimo carattere torna col resto, nel suo tag.
+  // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475). L'incolla lungo è UN insertHTML,
+  // così si annulla in un passo (#1475.2). Chrome lo paga al quadrato quando arriva in un blocco vuoto: la selezione
+  // allora prende un carattere vicino, che torna nel frammento al suo posto, e un foglio senza testo si svuota prima.
   const INCOLLA_A_RIGHE = 50;
   const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
-  function incollaLungo(righe) {
-    const [prima, ...resto] = righe;
-    document.execCommand('insertText', false, prima);
-    const sel = window.getSelection();
-    let blocco = sel && sel.anchorNode;
-    while (blocco && blocco !== docEl && !(blocco.nodeType === 1 && BLOCCO.test(blocco.tagName))) blocco = blocco.parentNode;
-    if (!blocco || blocco === docEl || !/^(P|DIV|H[1-6])$/.test(blocco.tagName) || (blocco.textContent || '').length < 2) {
-      document.execCommand('insertText', false, `\n${resto.join('\n')}`);
-      return;
-    }
-    sel.modify('extend', 'backward', 'character');
-    let pezzo = spaziVisibili(sel.toString());
-    for (let n = sel.getRangeAt(0).startContainer.parentNode; n && n !== blocco; n = n.parentNode) {
+  const PARAGRAFO = /^(P|DIV|H[1-6])$/;
+  function bloccoDi(nodo) {
+    let b = nodo;
+    while (b && b !== docEl && !(b.nodeType === 1 && BLOCCO.test(b.tagName))) b = b.parentNode;
+    return b && b !== docEl ? b : null;
+  }
+  function htmlDi(range) {
+    const box = document.createElement('div');
+    box.appendChild(range.cloneContents());
+    return box.innerHTML;
+  }
+  // Il carattere preso in prestito torna dentro gli stessi tag in linea (grassetto, link…) che aveva nel blocco.
+  function carattereVestito(range, blocco, suo = range.startContainer) {
+    let pezzo = spaziVisibili(range.toString());
+    for (let n = suo.parentNode; n && n !== blocco; n = n.parentNode) {
       const vuoto = n.cloneNode(false).outerHTML;
       const chiude = vuoto.lastIndexOf('</');
       pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
     }
+    return pezzo;
+  }
+  // Un carattere solo, senza immagini o a capo in mezzo: il frammento lo può riscrivere com'era.
+  function carattereSemplice(range) {
+    if (range.toString().length !== 1) return false;
+    return !range.cloneContents().querySelector('img, br');
+  }
+  function ultimoTesto(el) {
+    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    let ultimo = null;
+    for (let t = w.nextNode(); t; t = w.nextNode()) if (t.nodeValue.length) ultimo = t;
+    return ultimo;
+  }
+  // Dopo l'incolla il cursore sta in fondo a quello che è entrato: si riporta prima di ciò che c'era dopo.
+  function cursoreIndietro(caratteri) {
+    const sel = window.getSelection();
+    if (!caratteri || !sel || !sel.rangeCount) return;
+    const blocco = bloccoDi(sel.anchorNode);
+    if (!blocco) return;
+    const prima = document.createRange();
+    prima.setStart(blocco, 0);
+    prima.setEnd(sel.anchorNode, sel.anchorOffset);
+    let resta = Math.max(0, prima.toString().length - caratteri);
+    const w = document.createTreeWalker(blocco, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      if (resta <= t.nodeValue.length) { sel.collapse(t, resta); return; }
+      resta -= t.nodeValue.length;
+    }
+  }
+  function riga(r) { return r ? spaziVisibili(r) : '<br>'; }
+  function incollaLungo(righe) {
+    const sel = window.getSelection();
+    const r = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
+    const ultima = righe.length - 1;
+    // In una citazione ogni riga resta citazione, come con l'incolla corto.
+    const paragrafi = (tag, prefisso = '', suffisso = '') => righe.map((x, i) => {
+      const t = i === 0 || tag === 'blockquote' ? tag : 'p';
+      return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
+    }).join('');
+    const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
+    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito. Un elenco o
+    // una citazione appena aperti invece sono dell'utente: lì si incolla dentro (#1697).
+    const primo = r && bloccoDi(r.startContainer);
+    if (r && !/[^\r\n]/.test(docEl.textContent.split(ANCORA).join('')) && !docEl.querySelector('img') && (!primo || PARAGRAFO.test(primo.tagName))) {
+      const tag = primo ? primo.tagName.toLowerCase() : 'p';
+      docEl.textContent = '';
+      sel.collapse(docEl, 0);
+      document.execCommand('insertHTML', false, paragrafi(tag));
+      return;
+    }
+    // Il cursore posato sul foglio fra due blocchi (un clic nel vuoto) va dentro il blocco accanto.
+    if (r && r.collapsed && r.startContainer === docEl) {
+      const prima = docEl.childNodes[r.startOffset - 1];
+      const accanto = prima || docEl.childNodes[r.startOffset];
+      if (accanto) {
+        r.selectNodeContents(accanto);
+        r.collapse(!prima);
+      }
+    }
+    // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
+    const dentro = (n, giu) => {
+      while (n && n.nodeType === 1 && !BLOCCO.test(n.tagName) && (giu ? n.firstElementChild : n.lastElementChild)) n = giu ? n.firstElementChild : n.lastElementChild;
+      return n;
+    };
+    if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
+      const b = dentro(docEl.childNodes[r.startOffset], true);
+      const w = b.nodeType === 1 ? document.createTreeWalker(b, NodeFilter.SHOW_TEXT) : null;
+      let t = w ? w.nextNode() : b;
+      while (t && w && t.parentNode.closest('[contenteditable="false"]')) t = w.nextNode();
+      r.setStart(t || b, 0);
+    }
+    if (r && !r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
+      const b = dentro(docEl.childNodes[r.endOffset - 1], false);
+      r.setEnd(b, b.nodeType === 3 ? b.length : b.childNodes.length);
+    }
+    const blocco = r && bloccoDi(r.startContainer);
+    const bloccoFine = r && bloccoDi(r.endContainer);
+    if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
+
+    // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto.
+    if (blocco.tagName === 'LI' && bloccoFine === blocco) {
+      const prima = document.createRange();
+      prima.setStart(blocco, 0);
+      prima.setEnd(r.startContainer, r.startOffset);
+      const dopo = document.createRange();
+      dopo.setStart(r.endContainer, r.endOffset);
+      dopo.setEnd(blocco, blocco.childNodes.length);
+      const lista = blocco.parentNode.tagName === 'OL' ? 'ol' : 'ul';
+      const voci = righe.map((x, i) => `<li>${i === 0 ? htmlDi(prima) : ''}${(i === 0 && prima.toString()) || (i === ultima && dopo.toString()) ? spaziVisibili(x) : riga(x)}${i === ultima ? htmlDi(dopo) : ''}</li>`).join('');
+      const tutta = document.createRange();
+      tutta.selectNodeContents(blocco);
+      scegli(tutta);
+      document.execCommand('insertHTML', false, `<${lista}>${voci}</${lista}>`);
+      cursoreIndietro(dopo.toString().length);
+      return;
+    }
+    // Un carattere invisibile piantato davanti alla selezione: Chrome non incolla in un blocco vuoto, dove paga al
+    // quadrato, e la selezione può finire in un elenco o in una citazione (#1697). Il modello non lo salva.
+    const conAncora = () => {
+      const z = document.createTextNode(ANCORA);
+      const davanti = r.cloneRange();
+      davanti.collapse(true);
+      davanti.insertNode(z);
+      r.setStart(z, 1);
+      scegli(r);
+      const t0 = blocco.tagName;
+      document.execCommand('insertHTML', false, paragrafi(PARAGRAFO.test(t0) || t0 === 'BLOCKQUOTE' ? t0.toLowerCase() : 'p'));
+    };
+    if (!PARAGRAFO.test(blocco.tagName) || !PARAGRAFO.test(bloccoFine.tagName)) {
+      if (blocco.tagName === 'LI') document.execCommand('insertText', false, righe.join('\n'));
+      else conAncora();
+      return;
+    }
     const tag = blocco.tagName.toLowerCase();
-    document.execCommand('insertHTML', false, `<${tag}>${pezzo}</${tag}>`
-      + resto.map((r) => `<p>${r ? spaziVisibili(r) : '<br>'}</p>`).join(''));
+    // Testo prima del cursore nel suo blocco: l'ultimo carattere entra in testa alla prima riga.
+    const indietro = r.cloneRange();
+    indietro.setStart(blocco, 0);
+    indietro.setEnd(r.startContainer, r.startOffset);
+    if (indietro.toString().length) {
+      sel.collapse(r.startContainer, r.startOffset);
+      sel.modify('move', 'backward', 'character');
+      const car = document.createRange();
+      car.setStart(sel.anchorNode, sel.anchorOffset);
+      car.setEnd(r.startContainer, r.startOffset);
+      if (carattereSemplice(car) && bloccoDi(car.startContainer) === blocco) {
+        const tutta = r.cloneRange();
+        tutta.setStart(car.startContainer, car.startOffset);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, paragrafi(tag, carattereVestito(car, blocco)));
+        return;
+      }
+      scegli(r);
+    }
+    // Testo dopo il cursore: il primo carattere chiude l'ultima riga, e il cursore torna prima di lui.
+    const avanti = r.cloneRange();
+    avanti.setStart(r.endContainer, r.endOffset);
+    avanti.setEnd(bloccoFine, bloccoFine.childNodes.length);
+    if (avanti.toString().length) {
+      sel.collapse(r.endContainer, r.endOffset);
+      sel.modify('move', 'forward', 'character');
+      const car = document.createRange();
+      car.setStart(r.endContainer, r.endOffset);
+      car.setEnd(sel.anchorNode, sel.anchorOffset);
+      if (carattereSemplice(car) && bloccoDi(car.endContainer) === bloccoFine) {
+        const tutta = r.cloneRange();
+        tutta.setEnd(car.endContainer, car.endOffset);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, paragrafi(tag, '', carattereVestito(car, bloccoFine, car.endContainer)));
+        cursoreIndietro(1);
+        return;
+      }
+      scegli(r);
+    }
+    // Blocco vuoto dopo un paragrafo con testo: si prende in prestito l'ultimo carattere di quello.
+    const sopra = blocco.previousElementSibling;
+    const coda = sopra && sopra.parentNode === blocco.parentNode && PARAGRAFO.test(sopra.tagName) ? ultimoTesto(sopra) : null;
+    if (coda) {
+      const car = document.createRange();
+      car.setStart(coda, coda.nodeValue.length - 1);
+      car.setEnd(sopra, sopra.childNodes.length);
+      if (carattereSemplice(car)) {
+        const tutta = r.cloneRange();
+        tutta.setStart(car.startContainer, car.startOffset);
+        scegli(tutta);
+        const suo = sopra.tagName.toLowerCase();
+        document.execCommand('insertHTML', false, `<${suo}>${carattereVestito(car, sopra, coda)}</${suo}>${paragrafi(tag)}`);
+        return;
+      }
+    }
+    // O prima di un paragrafo semplice con testo: il suo primo carattere chiude il frammento, in un paragrafo suo.
+    const sotto = bloccoFine.nextElementSibling;
+    const testa = sotto && sotto.parentNode === bloccoFine.parentNode && sotto.tagName === 'P' && bloccoFine.tagName === 'P'
+      ? document.createTreeWalker(sotto, NodeFilter.SHOW_TEXT).nextNode() : null;
+    if (testa) {
+      const car = document.createRange();
+      car.setStart(sotto, 0);
+      car.setEnd(testa, 1);
+      if (testa.nodeValue.length && carattereSemplice(car)) {
+        const tutta = r.cloneRange();
+        tutta.setEnd(testa, 1);
+        scegli(tutta);
+        document.execCommand('insertHTML', false, `${paragrafi(tag)}<p>${carattereVestito(car, sotto, testa)}</p>`);
+        cursoreIndietro(1);
+        sel.modify('move', 'backward', 'character');
+        return;
+      }
+    }
+    conAncora();
   }
   // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
   function spaziVisibili(s) {
@@ -2297,8 +2519,7 @@
   }
   // `costruisci(letto)` dà i messaggi; se il modello rifiuta il documento perché non gli sta nella finestra, si
   // rimanda più corto e `letto` dice il taglio a chi lo mostra.
-  async function chiediSulDocumento(action, costruisci, extra = {}) {
-    const testo = docPlainText();
+  async function chiediSulDocumento(action, costruisci, extra = {}, testo = docPlainText()) {
     let letto = window.SN_EDITOR_SUMMARY.testoAlModello(testo);
     let r = null;
     for (let giro = 0; giro < 4; giro++) {

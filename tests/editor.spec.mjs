@@ -202,9 +202,130 @@ test('un testo di 1.500 righe incollato entra intero, a paragrafi, in pochi seco
   expect(dentro.vuoto).toBe('');
   expect(dentro.ultimo.replace(/ /g, ' ')).toBe('Riga 1499: <b>non grassetto</b> &  due  spazi.');
   expect(dentro.grassetti).toBe(0);
-  await page.keyboard.press('Control+Z');
+  // Un solo annulla toglie tutto l'incolla (#1475.2).
   await page.keyboard.press('Control+Z');
   await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerText.trim())).toBe('');
+});
+
+// #1475.2: l'incolla lungo entra anche con la prima riga vuota o all'inizio di un paragrafo non primo, si annulla in un
+// passo, e non ferma la pagina in un documento vuoto o in una voce di elenco.
+function foglio(page, html, dove) {
+  return page.evaluate(({ html, dove }) => {
+    const d = document.getElementById('doc');
+    d.innerHTML = html;
+    d.focus();
+    const nodo = new Function('d', `return ${dove.nodo}`)(d);
+    const r = document.createRange();
+    r.setStart(nodo, dove.off);
+    r.collapse(true);
+    getSelection().removeAllRanges();
+    getSelection().addRange(r);
+    return d.innerHTML;
+  }, { html, dove });
+}
+function erroriDi(page) {
+  const errori = [];
+  page.on('pageerror', (e) => errori.push(String(e)));
+  page.on('console', (m) => { if (m.type() === 'error') errori.push(m.text()); });
+  return errori;
+}
+// Lo spazio di larghezza zero è l'ancora dell'incolla lungo: non si vede e il documento salvato non lo porta.
+const senzaAncora = (t) => t.split(String.fromCharCode(0x200b)).join('');
+const blocchi = (page, sel = '#doc > p') => page.evaluate((s) => [...document.querySelectorAll(s)].map((p) => p.textContent), sel).then((b) => b.map(senzaAncora));
+// Il tasto per chiudere una sezione lo rimette l'editor a ogni modifica: non è contenuto.
+const foglioVisto = (page) => page.evaluate(() => {
+  const c = document.getElementById('doc').cloneNode(true);
+  c.querySelectorAll('.ed-collapse-toggle').forEach((b) => b.remove());
+  return c.innerHTML;
+}).then(senzaAncora);
+
+test('all\'inizio di un paragrafo non primo, 60 righe con la prima vuota entrano, senza errori, e il cursore resta prima del resto', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const errori = erroriDi(page);
+  await foglio(page, '<p>uno</p><p>due</p>', { nodo: 'd.lastChild.firstChild', off: 0 });
+  await incolla(app, page, ['', ...Array.from({ length: 59 }, (_, i) => `R${i + 1}`)].join('\n'));
+  const ps = await blocchi(page);
+  expect(ps).toEqual(['uno', '', ...Array.from({ length: 58 }, (_, i) => `R${i + 1}`), 'R59due']);
+  await page.keyboard.type('X');
+  expect((await blocchi(page)).at(-1)).toBe('R59Xdue');
+  expect(errori).toEqual([]);
+});
+
+test('100 righe incollate in fondo a un paragrafo: un Ctrl+Z riporta il documento identico', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const prima = await foglio(page, '<p>alfa beta</p><p>gamma</p>', { nodo: 'd.firstChild.firstChild', off: 9 });
+  await incolla(app, page, Array.from({ length: 100 }, (_, i) => `R${i}`).join('\n'));
+  const ps = await blocchi(page);
+  expect(ps.length).toBe(101);
+  expect(ps[0]).toBe('alfa betaR0');
+  expect(ps[100]).toBe('gamma');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(prima);
+});
+
+test('600 righe con la prima vuota in un documento vuoto, e 600 in una voce di elenco: entrano in fretta e si annullano in un passo', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  const page = await apriEditor(openTab);
+  const righe = ['', ...Array.from({ length: 599 }, (_, i) => `Riga ${i + 1} del testo incollato`)];
+  await page.locator('#doc').click();
+  let ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
+  const ps = await blocchi(page);
+  expect(ps.length).toBe(600);
+  expect(ps[0]).toBe('');
+  expect(ps[599]).toBe('Riga 599 del testo incollato');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerText.trim())).toBe('');
+
+  const elenco = await foglio(page, '<ul><li>voce</li><li>dopo</li></ul>', { nodo: "d.querySelector('li').firstChild", off: 4 });
+  const voci = Array.from({ length: 600 }, (_, i) => `V${i}`);
+  ms = await incolla(app, page, voci.join('\n'));
+  expect(ms, `incolla nell'elenco durato ${ms} ms`).toBeLessThan(2_000);
+  const li = await blocchi(page, '#doc li');
+  expect(li).toEqual(['voceV0', ...voci.slice(1), 'dopo']);
+  await page.keyboard.type('!');
+  expect((await blocchi(page, '#doc li')).at(-2)).toBe('V599!');
+  await page.keyboard.press('Control+Z');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(elenco);
+});
+
+test('in una riga vuota sopra un paragrafo, e su tutto il testo selezionato, l\'incolla lungo entra in fretta e si annulla in un passo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const righe = Array.from({ length: 600 }, (_, i) => `Riga ${i}`);
+  const prima = await foglio(page, '<p><br></p><p>dopo</p>', { nodo: 'd.firstChild', off: 0 });
+  let ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual([...righe, 'dopo']);
+  await page.keyboard.type('X');
+  expect((await blocchi(page)).slice(-2)).toEqual(['Riga 599X', 'dopo']);
+  await page.keyboard.press('Control+Z');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(prima);
+
+  const tutto = await foglio(page, '<p>uno <b>due</b></p><p>tre</p>', { nodo: 'd.firstChild.firstChild', off: 0 });
+  await page.keyboard.press('Control+A');
+  ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla su tutto durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual(righe);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(tutto);
+});
+
+test('in una riga vuota sotto un paragrafo, 600 righe che cominciano con un carattere solo entrano in fretta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const prima = await foglio(page, '<p>titolo <b>forte</b></p><p><br></p>', { nodo: 'd.lastChild', off: 0 });
+  const righe = ['x', ...Array.from({ length: 599 }, (_, i) => `Riga ${i + 1}`)];
+  const ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual(['titolo forte', ...righe]);
+  expect(await page.evaluate(() => [...document.querySelectorAll('#doc > p:first-child b')].map((b) => b.textContent).join(''))).toBe('forte');
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => page.evaluate(() => document.getElementById('doc').innerHTML)).toBe(prima);
 });
 
 test('incollato a metà di un paragrafo, il testo lungo si unisce come una riga sola', async ({ app, openTab }) => {
@@ -228,4 +349,56 @@ test('incollato a metà di un paragrafo, il testo lungo si unisce come una riga 
   expect(ps[0]).toBe('primaGRR0');
   expect(ps[1]).toBe('R1');
   expect(ps[59]).toBe('R59ASdopo');
+});
+
+// #1697: le strade che restavano lente. Tutto il documento con un titolo e un elenco, la fine di una citazione, il
+// paragrafo vuoto dopo un elenco; e in un documento appena aperto con un elenco l'incolla resta nell'elenco.
+test('su tutto un documento con titolo ed elenco, l\'incolla lungo entra in fretta, si annulla in un passo e non salva l\'ancora', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  await foglio(page, '<h1>Titolo</h1><p>testo di prima</p><ul><li>voce a</li><li>voce b</li></ul>', { nodo: "d.querySelector('p').firstChild", off: 0 });
+  const prima = await foglioVisto(page);
+  await page.keyboard.press('Control+A');
+  const righe = Array.from({ length: 1000 }, (_, i) => `Riga ${i}`);
+  const ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page, '#doc > h1, #doc > p')).toEqual(righe);
+  expect(await page.locator('#doc li').count()).toBe(0);
+  await expect.poll(() => page.evaluate(() => localStorage.getItem('filo.editor.collection') || ''), { timeout: 15_000 }).toContain('Riga 999');
+  expect(await page.evaluate(() => localStorage.getItem('filo.editor.collection').includes(String.fromCharCode(0x200b)))).toBe(false);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(prima);
+});
+
+test('in fondo a una citazione e nel paragrafo vuoto dopo un elenco, l\'incolla lungo entra in fretta', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  await foglio(page, '<blockquote>citato</blockquote><p>dopo</p>', { nodo: "d.querySelector('blockquote').firstChild", off: 6 });
+  const righe = Array.from({ length: 600 }, (_, i) => `Riga ${i}`);
+  let ms = await incolla(app, page, righe.join('\n'));
+  expect(ms, `incolla nella citazione durato ${ms} ms`).toBeLessThan(2_000);
+  const citate = (await blocchi(page, '#doc > blockquote')).join('|');
+  expect(citate).toContain('Riga 0');
+  expect(citate).toContain('Riga 599');
+  expect((await blocchi(page)).at(-1)).toBe('dopo');
+
+  const prima = await foglio(page, '<ul><li>uno</li><li>due</li></ul><p><br></p><p>sotto</p>', { nodo: "d.querySelector('p')", off: 0 });
+  const tante = Array.from({ length: 1500 }, (_, i) => `Riga ${i}`);
+  ms = await incolla(app, page, tante.join('\n'));
+  expect(ms, `incolla dopo l'elenco durato ${ms} ms`).toBeLessThan(2_000);
+  expect(await blocchi(page)).toEqual([...tante, 'sotto']);
+  expect(await blocchi(page, '#doc li')).toEqual(['uno', 'due']);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(prima);
+});
+
+test('in un documento vuoto che comincia con un elenco, l\'incolla lungo entra come voci e si annulla in un passo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const prima = await foglio(page, '<ul><li><br></li></ul>', { nodo: "d.querySelector('li')", off: 0 });
+  const righe = Array.from({ length: 60 }, (_, i) => `V${i}`);
+  await incolla(app, page, righe.join('\n'));
+  expect(await blocchi(page, '#doc li')).toEqual(righe);
+  await page.keyboard.press('Control+Z');
+  await expect.poll(() => foglioVisto(page)).toBe(prima);
 });
