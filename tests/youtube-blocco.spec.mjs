@@ -85,12 +85,28 @@ const fixture = test.extend({
 });
 
 const MANO = [
-  'www.youtube.com##+js(set, ytInitialPlayerResponse.adPlacements, undefined)',
-  'www.youtube.com##+js(set, ytInitialPlayerResponse.adSlots, undefined)',
-  'www.youtube.com##+js(json-prune-fetch-response, adPlacements adSlots, , propsToMatch, /\\/player(\\?|$)/)',
-  'www.youtube.com##+js(json-prune-xhr-response, adPlacements adSlots, , propsToMatch, /\\/player$/)',
+  'www.youtube.com,youtube-nocookie.com##+js(set, ytInitialPlayerResponse.adPlacements, undefined)',
+  'www.youtube.com,youtube-nocookie.com##+js(set, ytInitialPlayerResponse.adSlots, undefined)',
+  'www.youtube.com,youtube-nocookie.com##+js(json-prune-fetch-response, adPlacements adSlots, , propsToMatch, /\\/player(\\?|$)/)',
+  'www.youtube.com,youtube-nocookie.com##+js(json-prune-xhr-response, adPlacements adSlots, , propsToMatch, /\\/player$/)',
   'www.youtube.com##+js(rpnt, script, window.__pubblicitaAccesa = true, window.__pubblicitaAccesa = false)',
 ].join('\n');
+
+// Il riquadro di un altro sito vive in un suo processo: lo si legge dal main, che i frame li vede tutti.
+const nelRiquadro = (app, pezzo) => app.evaluate(async ({ webContents }, p) => {
+  for (const wc of webContents.getAllWebContents()) {
+    const f = wc.mainFrame.framesInSubtree.find((x) => x.url.includes(p));
+    if (f) return f.executeJavaScript('window.__esiti ? window.__esiti.slice().sort() : location.href').catch((e) => `errore: ${e.message}`);
+  }
+  return null;
+}, pezzo);
+
+// Un articolo di un altro sito col video incorporato; ritorna cosa ha mostrato il lettore.
+async function incorporato({ app, openTab, testServer, youtube }, id) {
+  const ospite = await openTab(testServer.html(`<!doctype html><title>Articolo</title><p>articolo</p><iframe src="${youtube.url(`/embed/${id}?interna=1`)}" width="700" height="420"></iframe>`, { pubblico: true }));
+  expect(ospite.url()).toContain('sito-pubblico.test');
+  await expect.poll(() => nelRiquadro(app, `/embed/${id}`), { timeout: 15_000 }).toEqual(['fetch:video', 'pagina:video', 'xhr:video']);
+}
 
 const liste = (app, testi) => app.evaluate((_e, t) => globalThis.__filoBloccoYouTube.impostaListePerTest(t), testi);
 const stato = (app) => app.evaluate(() => globalThis.__filoBloccoYouTube.status());
