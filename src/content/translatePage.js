@@ -64,7 +64,9 @@
   // Lo stesso per i riquadri incorporati nascosti al momento della traduzione (#503): non si sono svegliati.
   let hiddenFrames = [];
   // La scelta sulle sezioni nascoste dell'ultimo giro: giudica i riquadri che arrivano dopo come li avrebbe giudicati lui.
-  let modoUltimo = 'subito';
+  let modoUltimo = global.SN_CONST.nascosteDellaTraduzione(null);
+  // Un riquadro che si carica mentre il giro lavora: il giro gli aveva già passato parola prima che ci fosse (#1290).
+  let riquadroNelGiro = false;
   // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
   // cose succede, la risposta di prima vale ancora.
   let revealedDirty = true;
