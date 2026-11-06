@@ -647,4 +647,93 @@ test.describe('una pagina di accesso del sito', () => {
     const { on, off } = await apriEPresi(openTab, pagina, { indice: sito(testServer.origin) + '/login' });
     expect(on.indice, 'letta con le funzioni della pagina di accesso: come Off').toBe(off.pagina);
   });
+
+  // In Privacy massima un riquadro inserito da uno script si copre appena entra (D-221), ma non in un sito con pagine
+  // di accesso esenti: sarebbe uno di quelli.
+  test('in Privacy massima inserita da uno script e presa per indice resta esente', async ({ openTab, testServer }) => {
+    test.setTimeout(90_000);
+    const sito = (u) => u.replace('127.0.0.1', 'www.linkedin.com');
+    const pagina = sito(testServer.html(`<!doctype html><html><head><meta charset="utf-8"><script>${IMPRONTA}</script></head><body></body></html>`));
+    const { on, off } = await apriEPresi(openTab, pagina, { indice: sito(testServer.origin) + '/login' }, 'privacy');
+    expect(on.indice, 'letta con le funzioni della pagina di accesso: come Off').toBe(off.pagina);
+    expect(on.indiceSuo, 'il canvas della pagina di accesso: come Off').toBe(off.pagina);
+  });
+});
+
+// In Privacy massima la copertura appena entra vale per i riquadri che uno script aggiunge (D-221): uno dello stesso
+// sito scritto nell'HTML tiene Filo, col menu del tasto destro.
+test('in Privacy massima un riquadro dello stesso sito scritto nell\'HTML tiene Filo', async ({ openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await setFpMode(openTab, 'privacy');
+  const libero = testServer.html('<!doctype html><body style="margin:0;padding:16px;font:16px sans-serif"><p id="t">Un testo dentro il riquadro, da cliccare.</p></body>');
+  const page = await openTab(testServer.html(`<!doctype html><meta charset="utf-8"><body>
+    <iframe id="nellHtml" width="500" height="200" src="${libero}"></iframe></body>`));
+  await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 8_000 });
+  const frame = page.frameLocator('#nellHtml');
+  await frame.locator('#t').click({ button: 'right' });
+  await expect(menuDi(frame).locator('.sn-menu'), 'il menu di Filo nel riquadro scritto nell\'HTML').toBeVisible();
+});
+
+// La riscrittura da capo (document.open, o write a documento chiuso) toglie gli ascolti del documento e della sua
+// finestra: la guardia li rimette, e i riquadri della stessa origine nati dopo leggono col rumore della pagina.
+async function riscritti(daCapo) {
+  /* global fnv, scena */
+  const carico = (f) => new Promise((r) => { f.addEventListener('load', r, { once: true }); setTimeout(r, 5000); });
+  const pausa = () => new Promise((r) => setTimeout(r, 300));
+  let doc = document;
+  if (daCapo === 'pagina') {
+    document.open(); document.write('<!doctype html><meta charset="utf-8"><body><p>riscritta</p></body>'); document.close();
+  } else if (daCapo === 'scrittura') {
+    document.write('<!doctype html><meta charset="utf-8"><body><p>riscritta</p></body>'); document.close();
+  } else if (daCapo === 'riquadro') {
+    const a = document.createElement('iframe'); document.body.appendChild(a);
+    doc = a.contentDocument; doc.open(); doc.write('<!doctype html><body></body>'); doc.close();
+  }
+  const { c } = scena(document);
+  const leggi = (W) => { try { return fnv(W.HTMLCanvasElement.prototype.toDataURL.call(c)); } catch (e) { return 'errore ' + e.message; } };
+  const out = { pagina: fnv(c.toDataURL()) };
+  const vista = doc.defaultView;
+  { const f = doc.createElement('iframe'); f.src = location.origin + '/figlio?1'; doc.body.appendChild(f); await carico(f); await pausa(); out.stessaOrigine = leggi(f.contentWindow); }
+  { const f = doc.createElement('iframe'); f.src = location.origin + '/figlio?2'; doc.body.appendChild(f); const w = vista[vista.length - 1]; await carico(f); await pausa(); out.presoPerIndice = leggi(w); }
+  { const f = doc.createElement('iframe'); f.src = location.origin + '/figlio?3'; doc.body.appendChild(f); await carico(f); await pausa();
+    const altro = document.createElement('canvas'); altro.width = 80; altro.height = 40;
+    const x = f.contentWindow.HTMLCanvasElement.prototype.getContext.call(altro, '2d');
+    x.fillStyle = '#1e90ff'; x.fillRect(0, 0, 80, 40); x.fillStyle = '#000'; x.font = '16px sans-serif'; x.fillText('filo', 4, 24);
+    out.contestoDelRiquadro = fnv(altro.toDataURL()); }
+  return out;
+}
+
+test('una pagina, o un suo riquadro vuoto, riscritti da capo: i riquadri della stessa origine leggono col suo rumore', async ({ openTab }) => {
+  test.setTimeout(180_000);
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+    res.end(req.url.startsWith('/figlio') ? '<!doctype html><meta charset="utf-8"><p>figlio</p>'
+      : `<!doctype html><meta charset="utf-8"><title>riscritta</title><script>${IMPRONTA}</script><body><p>ok</p></body>`);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://127.0.0.1:${srv.address().port}/`;
+  const casi = ['pagina', 'scrittura', 'riquadro'];
+  try {
+    const page = await openTab(url);
+    const leggi = async (u, daCapo) => {
+      await page.goto(u);
+      await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 10_000 });
+      return page.evaluate(riscritti, daCapo);
+    };
+    const on = {};
+    for (const k of casi) on[k] = await leggi(`${url}?${k}`, k);
+    await setFpMode(openTab, 'off');
+    const off = await leggi(`${url}?off`, 'pagina');
+    for (const k of casi) {
+      expect(on[k].pagina, `${k}: la pagina ha il rumore`).not.toBe(off.pagina);
+      for (const p of ['stessaOrigine', 'presoPerIndice', 'contestoDelRiquadro']) {
+        expect.soft(on[k][p], `${k}, ${p}: col rumore della pagina`).toBe(on[k].pagina);
+        expect.soft(off[p], `${p}: in Off come la pagina`).toBe(off.pagina);
+      }
+    }
+  } finally {
+    srv.closeAllConnections?.();
+    await new Promise((r) => srv.close(r));
+  }
 });
