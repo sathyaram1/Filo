@@ -318,18 +318,26 @@ async function sezione(incognito) {
   return L().rendiFiloCompattato({ ore, giorni });
 }
 
-// Quanto pesa il tratto vivo, senza comporlo: testi ed esiti dei messaggi dopo il punto compattato.
+// Quanto pesa un messaggio del tratto, in token: testo ed esiti.
+function pesoDi(m) {
+  let caratteri = String((m && m.text) || '').length;
+  if (m && m.role !== 'user') {
+    for (const a of CF().esitiPerCompattare(m).azioni) { try { caratteri += JSON.stringify(a._output || '').length; } catch (_) {} }
+  }
+  return caratteri / FC().CARATTERI_PER_TOKEN;
+}
+
+// Quanto pesa il tratto vivo, senza comporlo: i messaggi dopo il punto compattato.
 async function tokenDelTratto(incognito, { ora = Date.now(), tetti = null } = {}) {
   const lista = await daCompattare(!!incognito, { ora, tetti: tetti || FC().tetti(null, null) });
-  let caratteri = 0;
-  for (const m of lista) {
-    caratteri += String(m.text || '').length;
-    if (m.role !== 'user') {
-      for (const a of CF().esitiPerCompattare(m).azioni) { try { caratteri += JSON.stringify(a._output || '').length; } catch (_) {} }
-    }
-  }
-  return Math.ceil(caratteri / FC().CARATTERI_PER_TOKEN);
+  return Math.ceil(lista.reduce((n, m) => n + pesoDi(m), 0));
 }
+
+function segnaBase(incognito, base) {
+  const b = Number(base);
+  basi[lato(inIncognito(incognito))] = Number.isFinite(b) && b > 0 ? b : null;
+}
+function base(incognito) { return basi[lato(inIncognito(incognito))]; }
 
 async function righe(incognito) {
   const s = await stato(inIncognito(incognito));
