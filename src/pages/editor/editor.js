@@ -2184,9 +2184,9 @@
     return box.innerHTML;
   }
   // Il carattere preso in prestito torna dentro gli stessi tag in linea (grassetto, link…) che aveva nel blocco.
-  function carattereVestito(range, blocco) {
+  function carattereVestito(range, blocco, suo = range.startContainer) {
     let pezzo = spaziVisibili(range.toString());
-    for (let n = range.startContainer.parentNode; n && n !== blocco; n = n.parentNode) {
+    for (let n = suo.parentNode; n && n !== blocco; n = n.parentNode) {
       const vuoto = n.cloneNode(false).outerHTML;
       const chiude = vuoto.lastIndexOf('</');
       pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
