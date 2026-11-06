@@ -223,11 +223,16 @@ test('a metà di un giro di strumenti: l\'esito che porta la richiesta oltre la 
 
 test('una risposta già vicina alla soglia compatta subito dopo, in sottofondo; e da fermo, passata la cache', async ({ app }) => {
   const page = await home(app);
-  const b = await base(app);
-  await conSoglia(app, b + 20000);
-  await vecchiaDa(app, 12000);
+  await vecchiaDa(app, 18000);
   await modelloFinto(app, [{ text: 'Eccomi.' }]);
   await compattatoreFinto(app, RIGA);
+  // Un primo turno con la soglia lontana misura la parte fissa come la misura la chat (strumenti, istruzioni, CONTESTO):
+  // l'anticipo scatta all'80% dello spazio fra lei e la soglia.
+  await conSoglia(app, 2000000);
+  await chiedi(page, 'ciao');
+  await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 20000 }).toBe(1);
+  const parteFissa = await app.evaluate(() => globalThis.SN_COMPATTAZIONE.base(false));
+  await conSoglia(app, Math.round(parteFissa + 21000));
   // Il timer della pausa: si prende la funzione che il turno lascia, per farla partire senza aspettare un'ora.
   await app.evaluate(() => {
     const C = globalThis.SN_COMPATTAZIONE;
