@@ -89,6 +89,15 @@ async function stubTranslationProvider(app, delayMs = 0) {
   }, delayMs);
 }
 
+// D61 (#1290) — di serie si traduce tutto, sezioni nascoste comprese; «traduci solo quando apro» si chiede a parole,
+// come lo chiederebbe l'utente, e riporta le sezioni chiuse al menu.
+async function soloQuandoApro(app) {
+  const r = await app.evaluate(() => globalThis.SN_EXECUTE_FILO_ACTION(
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'traduzione delle sezioni nascoste', valore: 'solo quando apro' }, { sender: null }));
+  expect(r.executed).toBe(true);
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).traduzionePagina)).toEqual({ nascoste: 'apertura' });
+}
+
 // Raccoglie i toast man mano che compaiono (durano pochi secondi: un assert
 // a campione sarebbe race-prone).
 async function watchToasts(page) {
