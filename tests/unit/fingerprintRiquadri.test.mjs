@@ -71,6 +71,28 @@ test('fuori dalle prove la guardia non lascia nessun segno che un sito possa leg
   assert.match(G.buildGuardSource(123, 1, 'xabc', true), /__filoFpGuard/);
 });
 
+// La guardia e i corpi che Filo mette nei riquadri vuoti prendono le vie dei riquadri e la regola del riquadro in arrivo
+// da un elenco solo: una via nuova, o una correzione alla regola, vale per tutti e due.
+test('le vie dei riquadri e la regola del riquadro in arrivo vivono in un posto solo', () => {
+  const { readFileSync } = require('node:fs');
+  const V = require('../../src/preload/vie-dei-riquadri.js');
+  const G = require('../../src/preload/fingerprint-guard.js');
+  const { buildRiquadriVuotiSource } = require('../../src/preload/riquadri-vuoti.js');
+  const sorgenti = { guardia: G.buildGuardSource(123, 1, 'xabc'), vuoti: buildRiquadriVuotiSource(['function (w) {}']) };
+  for (const [chi, s] of Object.entries(sorgenti)) {
+    for (const parte of [JSON.stringify(V.VIE_NODI), JSON.stringify(V.VIE_TESTO), JSON.stringify(V.CORNICI), V.sorgenteInArrivo()]) {
+      assert.ok(s.includes(parte), `${chi}: senza l'elenco condiviso`);
+    }
+    new Function(s);
+  }
+  const VIE = /'(appendChild|insertBefore|replaceChild|append|prepend|replaceChildren|before|after|replaceWith|moveBefore|insertAdjacentElement|insertAdjacentHTML|innerHTML|outerHTML|setHTMLUnsafe|setHTML|insertNode|surroundContents|write|writeln|open|execCommand|srcdoc)'/;
+  for (const f of ['src/preload/fingerprint-guard.js', 'src/preload/riquadri-vuoti.js']) {
+    const testo = readFileSync(new URL(`../../${f}`, import.meta.url), 'utf8');
+    assert.doesNotMatch(testo, VIE, `${f}: una via dei riquadri scritta a mano, fuori dall'elenco condiviso`);
+  }
+  assert.ok(V.RISCRIVONO.every((n) => V.VIE_TESTO.some((v) => v[0] === 'Document' && v[1] === n)), 'la riscrittura da capo passa dalle vie del testo');
+});
+
 test('un sito con pagine di accesso esenti lo dice alla guardia, uno qualunque no', () => {
   assert.equal(FP.esentiNelSito('https://github.com/filo/filo'), true);
   assert.equal(FP.esentiNelSito('http://www.linkedin.com:8080/feed'), true);
