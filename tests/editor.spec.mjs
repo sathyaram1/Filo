@@ -229,7 +229,10 @@ function erroriDi(page) {
   page.on('console', (m) => { if (m.type() === 'error') errori.push(m.text()); });
   return errori;
 }
-const blocchi = (page, sel = '#doc > p') => page.evaluate((s) => [...document.querySelectorAll(s)].map((p) => p.textContent), sel);
+// Lo spazio di larghezza zero è l'ancora dell'incolla lungo: non si vede e il documento salvato non lo porta.
+const senzaAncora = (t) => t.split(String.fromCharCode(0x200b)).join('');
+const blocchi = (page, sel = '#doc > p') => page.evaluate((s) => [...document.querySelectorAll(s)].map((p) => p.textContent), sel).then((b) => b.map(senzaAncora));
+const foglioVisto = (page) => page.evaluate(() => document.getElementById('doc').innerHTML).then(senzaAncora);
 
 test('all\'inizio di un paragrafo non primo, 60 righe con la prima vuota entrano, senza errori, e il cursore resta prima del resto', async ({ app, openTab }) => {
   test.setTimeout(60_000);
