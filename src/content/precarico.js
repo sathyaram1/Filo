@@ -158,11 +158,11 @@
       timerPasso = null;
       attesaIdle = true;
       quandoLibera(() => { attesaIdle = false; passo(); });
-    }, ms == null ? passo_ms() : ms);
+    }, ms == null ? passoMs() : ms);
   }
 
   // I precarichi di Chromium la pagina non li vede finire: il passo si misura sulla durata della pagina stessa.
-  function passo_ms() {
+  function passoMs() {
     let durata = 0;
     try {
       const n = performance.getEntriesByType('navigation')[0];
