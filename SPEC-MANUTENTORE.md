@@ -91,8 +91,8 @@ d'emergenza.
 
 **La decisione del mattino, ogni giorno.** Legge tutte le schede (una riga per
 feedback, ~800 oggi), le indicazioni dell'owner nel taccuino, i rami vivi coi
-loro file, la spesa della settimana per account. Scrive: la rosa (priorità 2),
-l'ordine, N, i pacchetti, le attese. È l'unica lettura intera: ~240k token,
+loro file, la spesa della settimana per account. Scrive: le classi dove il
+criterio le cambia, l'ordine, N, i pacchetti, le attese. È l'unica lettura intera: ~240k token,
 una volta al giorno. Prima della lettura il censimento delle schede parte da
 lui: Haiku scrive quelle mancanti o vecchie, Opus rilegge quelle che tolgono
 lavoro e un campione.
