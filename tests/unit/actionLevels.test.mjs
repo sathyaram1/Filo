@@ -430,3 +430,10 @@ test('quello che Filo impara su chi è l’utente nel benvenuto segue la regola 
   assert.equal(AL.costoFor({ ...lezione, _accoglienza: 'true' }), 2);
   assert.equal(AL.lezioneDellAccoglienza({ type: 'SALVA_LEZIONE', testo: '   ', _accoglienza: true }), '');
 });
+
+// #2096: l'articolo davanti alla percentuale lo decide una regola sola, anche nelle frasi da confermare.
+test('zoom e volume da confermare dicono «all\'80%» e «allo 0%», non «al 80%»', () => {
+  assert.equal(AL.describe({ type: 'ZOOM_PAGINA', percentuale: 80 }), 'Portare lo zoom della pagina all\'80%');
+  assert.equal(AL.describe({ type: 'ZOOM_PAGINA', percentuale: 150 }), 'Portare lo zoom della pagina al 150%');
+  assert.equal(AL.describe({ type: 'VOLUME', _richiestaSistema: { livello: 0 } }), 'Portare il volume del computer allo 0%');
+});
