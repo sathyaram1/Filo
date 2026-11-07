@@ -128,7 +128,37 @@
     let inArrivo = [];
     // Le schede già passate dal campo: un gettone che esce e torna (Annulla, Taglia e Incolla) ritrova la sua.
     let viste = [];
-    function riallinea() { schede = allinea(ta.value, vive().concat(inArrivo, viste)); }
+    let testoPrima = ta.value;
+    // Un gettone che la modifica non ha toccato tiene la sua scheda per posizione, non per nome: due titoli accorciati
+    // allo stesso nome non si scambiano. Per nome si cercano solo quelli entrati adesso (rilascio, Annulla, Incolla).
+    function riallinea() {
+      const nuovo = ta.value;
+      const vecchio = testoPrima;
+      const vecchi = pezzi(vecchio).filter((x) => x.gettone);
+      const nuovi = pezzi(nuovo).filter((x) => x.gettone);
+      const delta = nuovo.length - vecchio.length;
+      const max = Math.min(nuovo.length, vecchio.length);
+      let p = 0;
+      while (p < max && nuovo[p] === vecchio[p]) p++;
+      let s = 0;
+      while (s < max - p && nuovo[nuovo.length - 1 - s] === vecchio[vecchio.length - 1 - s]) s++;
+      const tenuti = new Set();
+      const out = nuovi.map((t) => {
+        let j = -1;
+        if (t.a <= p) j = vecchi.findIndex((v) => v.da === t.da && v.a === t.a);
+        else if (t.da >= nuovo.length - s) j = vecchi.findIndex((v) => v.da === t.da - delta && v.a === t.a - delta);
+        if (j < 0 || tenuti.has(j)) return undefined;
+        tenuti.add(j);
+        return schede[j] || null;
+      });
+      const resto = inArrivo.concat(schede.filter((x, j) => x && !tenuti.has(j)), viste).map(normalizza).filter(Boolean);
+      schede = out.map((x, i) => {
+        if (x !== undefined) return x;
+        const k = resto.findIndex((r) => etichetta(r) === nuovi[i].etichetta);
+        return k >= 0 ? resto.splice(k, 1)[0] : null;
+      });
+      testoPrima = nuovo;
+    }
 
     let colori = null;
     function ricalca() {
