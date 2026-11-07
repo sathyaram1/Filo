@@ -338,6 +338,7 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   safe(path.join(SHARED, 'avvisiTempo.js'), 'SN_AVVISI'); // tempi della pila degli avvisi: PRIMA di popup.js
+  safe(path.join(SHARED, 'azioniMessaggio.js'), 'SN_AZIONI_MESSAGGIO'); // #2096 — Copia e Rispondi sui messaggi: PRIMA di popup.js e sidebar.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
