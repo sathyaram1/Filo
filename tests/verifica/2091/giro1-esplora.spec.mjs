@@ -148,18 +148,7 @@ test('gettone: anteprima, invio, filo, Backspace, scheda chiusa, ricarica', asyn
   await modelloFinto(app, [{ text: 'Risposta finta.' }]);
   const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
   const casa = await home(app, { scheda: nuova?.id });
-  // Il rilascio come lo farebbe il main sotto il puntatore.
-  const lascia = () => app.evaluate(({ BrowserWindow }, { id }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const tm = w._filoTabs;
-    const t = tm.tabs.find((x) => x.id === tm.activeId);
-    return t.view.webContents.executeJavaScript(`(() => { const r = document.getElementById('inputForm').getBoundingClientRect(); return [r.left + r.width / 2, r.top + r.height / 2]; })()`)
-      .then(([x, y]) => {
-        const S = require(require('path').join(process.cwd(), 'src/main/schedaTrascinata.js'));
-        const b = t.view.getBounds();
-        S.riceve(w, { fase: 'lascia', id, x: b.x + x, y: b.y + y }, 1);
-      });
-  }, { id: idArticolo });
+  const lascia = () => lasciaNellaHome(app, shell, casa, idArticolo);
   await casa.locator('#input').fill('come ha fatto a volare?');
   await lascia();
   await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
