@@ -213,7 +213,13 @@
     window.removeEventListener('scroll', scorre, true);
     window.removeEventListener('resize', chiudiBox);
   }
-  function fuori(e) { if (box && !box.el.contains(e.target)) chiudiBox(); }
+  // Il menu del tasto destro aperto su una riga del riquadro, e la conferma che chiede, non lo chiudono: la loro azione
+  // ha bisogno della riga per dire com'è andata.
+  function fuori(e) {
+    if (!box || box.el.contains(e.target)) return;
+    if (e.target && e.target.closest && e.target.closest('.sn-menu, .sn-confirm-host')) return;
+    chiudiBox();
+  }
   // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo).
   function scorre(e) { if (box && !(e.target instanceof Node && box.el.contains(e.target))) chiudiBox(); }
   function tasto(e) {
