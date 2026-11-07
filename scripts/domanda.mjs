@@ -319,7 +319,7 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   if (opzioni.length) {
     righe.push('', 'Opzioni');
     opzioni.forEach((o, i) => {
-      const etichetta = D.etichettaAzione(o.azione, riferimenti);
+      const etichetta = D.etichettaOpzione(x, i, riferimenti);
       const segni = [etichetta ? `pulsante: ${etichetta}` : 'nessun pulsante: azione non applicabile'];
       if (soloDaFilo(o.azione)) segni.push('solo dalla finestra di Filo');
       if (x.consiglio && x.consiglio.opzione === i) segni.push('consigliata');
