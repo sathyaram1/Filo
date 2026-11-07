@@ -377,10 +377,16 @@ test.describe('utente già accolto', () => {
     await queueChat(app, { toolCalls: [{ id: 'c1', name: 'CANCELLA_MEMORIA', arguments: '{}' }] },
       { text: 'Non posso farlo io: le righe le togli dal quaderno, le interviste da Preferenze.', actions: [] });
     await scrivi(page, 'dimentica tutto di me');
-    await expect.poll(() => app.evaluate(() => globalThis.__chatPrompts.length), { timeout: 30_000 }).toBeGreaterThan(1);
-    const esito = await app.evaluate(() => globalThis.__chatPrompts[globalThis.__chatPrompts.length - 1]);
-    expect(esito).toContain('interviste di benvenuto');
-    expect(esito).toContain('filo://preferences/preferences.html');
+    // In una conversazione che non ha letto niente cancellare per sempre vuole la parola (#1840, strada B): il riquadro
+    // dice che se ne vanno anche le interviste, e annullato non tocca niente.
+    const bottone = page.locator('button.dash-action-btn', { hasText: 'Eliminare DEFINITIVAMENTE' });
+    await expect(page.locator(CONFIRM_HOST).or(bottone)).toBeVisible({ timeout: 30_000 });
+    if (await bottone.isVisible()) await bottone.click();
+    await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
+    expect((await confirmState(page)).hasInput).toBe(true);
+    await expect(page.locator(CONFIRM_HOST)).toContainText('interviste di benvenuto');
+    await clickConfirm(page, 'cancel');
+    await expect(prefs.locator('.onb-conv')).toHaveCount(3);
 
     // Un'intervista tolta da un'altra parte di Filo sparisce anche dalla pagina già aperta.
     await app.evaluate(async () => {
