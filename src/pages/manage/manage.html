@@ -173,6 +173,8 @@
       transition: background calc(0.15s * var(--sn-motion, 1)), color calc(0.15s * var(--sn-motion, 1)), border-color calc(0.15s * var(--sn-motion, 1));
     }
     .mg-auto-choice-item:hover .mg-auto-choice-text { background: var(--sn-hover); color: var(--sn-fg); }
+    /* La stima accanto alla scelta (filo_design § GESTIONE DEI MODELLI): più leggera del nome, nella stessa pillola. */
+    .mg-auto-choice-stima { margin-left: 8px; font-weight: 400; font-size: 12px; opacity: 0.8; }
     .mg-auto-choice-item input:checked + .mg-auto-choice-text {
       border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover);
     }
