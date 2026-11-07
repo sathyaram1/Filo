@@ -251,6 +251,12 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       ? PROMPTS.richiestaValuta({ testo: campo.testo, domanda: payload.userMessage || '' })
       : (payload.userMessage || testoDelTurnoAutomatico(payload));
     if (userText) parts.push({ type: 'text', text: userText });
+    // #2085 — le schede lasciate nel messaggio, lette come LEGGI_PAGINA.
+    const G = globalThis.SN_SCHEDE_IN_CHAT;
+    if (G && payload.userMessage && Array.isArray(payload.schede) && payload.schede.length) {
+      const nota = notaDeiGettoni(await lettureDeiGettoni(G.allinea(String(payload.userMessage), payload.schede).filter(Boolean), sender));
+      if (nota) parts.push({ type: 'text', text: nota });
+    }
     const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
     if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
