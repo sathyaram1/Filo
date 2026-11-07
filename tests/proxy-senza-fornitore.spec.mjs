@@ -371,6 +371,9 @@ test('chat nel formato vecchio: l\'esito «non disponibile» torna al modello e 
   const giri = await app.evaluate(() => globalThis.__legacy);
   expect(giri.length).toBe(2);
   expect(giri[1]).toContain('aprire da un altro paese non è ancora disponibile');
+  // Anche nel formato vecchio l'avviso del testo finito fra le note chiede di non raccontarlo (#1921.1).
+  expect(giri[1]).toContain('riscrivila per intero');
+  expect(giri[1]).toContain('non dire all\'utente che stai riscrivendo');
   const regole = await app.evaluate(async () => globalThis.SN_FILO_MEMORY.listProxyRules());
   expect(Object.keys(regole || {})).toEqual([]);
 });
