@@ -82,6 +82,18 @@ test('il nome di un tasto si mostra solo se il tasto non ha già parole scritte'
   for (const s of ['Copia', 'OK', '2', 'Invia ↵']) assert.equal(S.senzaParole(s), false, s);
 });
 
+test('il fumetto della barra prende gli stessi token, per tema, e ignora un valore non valido', () => {
+  const movimento = require(join(ROOT, 'src', 'main', 'movimento.js'));
+  movimento.segui({ themeTokens: {} });
+  assert.equal(movimento.fumetto(false)['--bg'], '#fdf6ec');
+  assert.equal(movimento.fumetto(true)['--fg'], '#f1e7d6');
+  movimento.segui({ themeTokens: { 'fumetto.sfondo': '#203040', 'fumetto.bordo': 'url(x)' } });
+  assert.equal(movimento.fumetto(false)['--bg'], '#203040');
+  assert.equal(movimento.fumetto(true)['--bg'], '#203040');
+  assert.equal(movimento.fumetto(false)['--border'], '#e2d3b5');
+  movimento.segui({ themeTokens: {} });
+});
+
 test('i token del fumetto: colori per tema, attesa in millisecondi letta da JS', () => {
   assert.equal(T.defaultValue('fumetto.sfondo', 'light'), '#fdf6ec');
   assert.equal(T.defaultValue('fumetto.sfondo', 'dark'), '#1d1a16');
