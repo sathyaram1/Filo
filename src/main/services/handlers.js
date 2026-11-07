@@ -6404,6 +6404,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const gettoni = internal || !globalThis.SN_SCHEDE_IN_CHAT ? []
     : globalThis.SN_SCHEDE_IN_CHAT.allinea(String(userMessage || ''), schede).filter(Boolean);
   const lettiDaiGettoni = gettoni.length ? lettureDeiGettoni(gettoni, sender) : Promise.resolve([]);
+  globalThis.__dbgGettoni = { schede, userMessage, gettoni, internal };
   // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
   if (!internal) Schermo.nuovoTurno(chiaveSchermo(sender));
   await FiloMem.touchSession();
