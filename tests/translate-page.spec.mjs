@@ -982,12 +982,11 @@ test('solo quando apro: ripiegata, schiacciata a zero o lasciata al browser, una
   expect(before.squashed).not.toMatch(/^IT /);
   expect(before.details).not.toMatch(/^IT /);
 
-  // …e aprendole si traducono, allo stesso prezzo: un blocco per sezione.
+  // …e aprendole si traducono da sole (#1290.2), allo stesso prezzo: un blocco per sezione.
   let paid = await blocksSent(app);
   for (const [open, body] of [['#t1', '#gbody'], ['#t2', '#sbody'], ['#dsum', '#detbody']]) {
     await page.locator(open).click();
-    await traduciIlTestoNuovo(app);
-    await expect(page.locator(body)).toHaveText(/^IT /, { timeout: 60000 });
+    await expect(page.locator(body)).toHaveText(/^IT /, { timeout: 4000 });
     const now = await blocksSent(app);
     expect(now - paid).toBe(1);
     paid = now;
