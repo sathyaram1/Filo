@@ -2672,7 +2672,11 @@
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
       // Oltre il tetto dell'elenco le chiuse sono solo le più recenti: il numero è un minimo.
-      badge.textContent = `(${nt[tab]}${d.altre && (tab === 'domande-archivio' || tab === 'domande-automatiche') ? '+' : ''})`;
+      if (tab === 'domande') {
+        const rt = daRispondere(soloNonFidate ? MR.filtraFiducia(d.domande, true) : d.domande);
+        badge.textContent = `(${rt.testo})`;
+        btn.title = rt.titolo;
+      } else badge.textContent = `(${nt[tab]}${d.altre && (tab === 'domande-archivio' || tab === 'domande-automatiche') ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
