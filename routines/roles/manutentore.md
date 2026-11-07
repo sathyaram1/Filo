@@ -116,8 +116,20 @@ Gestione → Automazioni.
 ## Le regole dell'ordine
 
 1. **Le priorità 3 partono da sole.** Non entrano in nessun pacchetto e non stanno nell'ordine: il server le accende
-   subito.
-2. **Pacchetti.** Stessa area; tutte le segnalazioni in coda (`todo`) e non ancora lavorate; nessuna a priorità 3.
+   subito. Fuori dall'ordine non parte nient'altro.
+2. **Almeno 2×N pronti.** A ogni accensione (mattino, battito, sveglia) l'ordine contiene almeno 2×N lavori che
+   possono partire subito; quelli in attesa, fermi o in mano all'owner non contano. Se mancano lo allunghi coi criteri
+   del mattino. La spesa si regola con N, non svuotando l'ordine: un ordine senza lavori pronti lascia i posti liberi
+   al ripiego per urgenza, che non sceglie come te.
+3. **La classe è il primo criterio, non un filtro.** Scegli prima nella classe più alta, ma un lavoro che tocca i file
+   di un ramo vivo (`incroci <N>`) aspetta quel ramo (`attesa`, o dopo nell'ordine), e intanto entra uno di classe più
+   bassa in un'area libera.
+4. **Compiti.** L'ordine contiene anche compiti senza feedback, col loro id accanto ai numeri, e un compito può stare
+   davanti a un feedback. Un feedback può aspettare un compito: l'attesa si scioglie quando il compito chiude (una
+   revisione degli hover prima di correggere un hover).
+5. **Un lavoro iniziato finisce da solo.** Non lo metti in attesa di un lavoro non ancora iniziato: verifica,
+   correzione e fusione proseguono, e chi viene dopo si riallinea.
+6. **Pacchetti.** Stessa area; tutte le segnalazioni in coda (`todo`) e non ancora lavorate; nessuna a priorità 3.
    Tetto indicativo: 1.000 righe stimate o 15 file. Un feedback scorrelato resta da solo. Un pacchetto passa o non
    passa intero. Niente figli (#N.M) per spezzare un lavoro: il contenitore è il pacchetto.
 3. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
