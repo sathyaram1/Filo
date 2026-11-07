@@ -1284,8 +1284,13 @@ async function nomeDellaScheda() {
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
 const esitoNonDisponibile = (a) => !!(a && a._output && a._output.proxy === 'non_disponibile');
 const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo non si può ancora.';
+// Ogni avviso che chiede di riscrivere la risposta lo dice: GLM raccontava all'utente il perché («riscrivo, che il testo
+// è finito nelle note di lavoro», #1921.1), e per l'utente quella è la prima risposta.
+const RISCRIVI_SENZA_DIRLO = 'Scrivila come la prima volta: questo avviso e le note di lavoro sono solo per te, quindi non dire all\'utente che '
+  + 'stai riscrivendo, ripetendo o correggendo, né perché.';
 const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
-  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
+  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra. '
+  + `${RISCRIVI_SENZA_DIRLO}]`;
 
 // Azioni che mettono un bottone in chat e basta: il loro esito si sa già quando le si chiama. Il bottone dell'evento
 // lo aziona l'utente, quindi non risulta «eseguito»: conta che sia in chat.
