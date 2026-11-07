@@ -73,7 +73,9 @@ async function provaChat(app, pagina, { contenitore, messaggi, risposta, campo, 
   await expect.poll(() => appunti(app)).toBe(testoCopiato);
   await r.hover();
   await r.getByRole('button', { name: 'Rispondi' }).click();
-  await expect(pagina.locator(campo)).toHaveValue(`> ${citato}\n`);
+  // In un campo di una riga la citazione sta fra virgolette basse, in una casella su una riga sua.
+  const unaRiga = await pagina.locator(campo).evaluate((el) => el.tagName !== 'TEXTAREA');
+  await expect(pagina.locator(campo)).toHaveValue(unaRiga ? `«${citato}» ` : `> ${citato}\n`);
   await expect(pagina.locator(campo)).toBeFocused();
 }
 
