@@ -893,12 +893,15 @@
       rititola(card.closest ? card.closest('.sn-mac') : null);
       liberata(card);
     }
+    // Dopo un clic qui l'esito compare sotto i tasti: in fondo a un elenco lungo cadeva fuori vista, tempo dal sì compreso.
+    var mostraEsito = false;
     function say(msg) {
       if (!msg) { status.hidden = true; status.textContent = ''; return; }
       status.hidden = false;
       status.textContent = msg.text;
       status.dataset.kind = msg.kind;
       if (voloDa && msg.kind === 'wait') { status.appendChild(trascorso); tic(); }
+      if (mostraEsito && card.isConnected && typeof status.scrollIntoView === 'function') status.scrollIntoView({ block: 'nearest' });
     }
 
     var appenaAperte = false;
@@ -922,6 +925,7 @@
         return;
       }
       disarm();
+      mostraEsito = true;
       segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null, Date.now());
     });
 
@@ -960,6 +964,7 @@
 
     discardBtn.addEventListener('click', function () {
       disarm();
+      mostraEsito = true;
       setBusy(true);
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
