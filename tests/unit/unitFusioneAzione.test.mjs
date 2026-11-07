@@ -91,10 +91,55 @@ test('nessun workflow usa le cache di Actions', () => {
 });
 
 test('argomenti: due sha interi e la cartella', () => {
-  assert.deepEqual(leggiArgomenti(['--root', 'p', '--ramo', A.toUpperCase(), '--main', B]), { root: 'p', ramo: A, main: B, errori: [] });
+  assert.deepEqual(leggiArgomenti(['--root', 'p', '--ramo', A.toUpperCase(), '--main', B]), { root: 'p', ramo: A, main: B, parte: '', unit: 'tutti', unisci: [], errori: [] });
   assert.ok(leggiArgomenti(['--root', 'p', '--ramo', 'main', '--main', B]).errori.length);
   assert.ok(leggiArgomenti(['--ramo', A, '--main', B]).errori.length);
   assert.ok(leggiArgomenti(['--root', 'p', '--ramo', A, '--main', B, '--altro', 'x']).errori.length);
+  const w = leggiArgomenti(['--root', 'p', '--ramo', A, '--main', B, '--parte', 'windows', '--unit', '']);
+  assert.deepEqual({ parte: w.parte, unit: w.unit, errori: w.errori }, { parte: 'windows', unit: 'toccati', errori: [] }, 'senza scelta del server, i toccati');
+  assert.equal(leggiArgomenti(['--root', 'p', '--ramo', A, '--main', B, '--unit', 'tutti']).unit, 'tutti');
+  assert.equal(leggiArgomenti(['--root', 'p', '--ramo', A, '--main', B, '--unit', '$(rm -rf)']).unit, 'toccati');
+  assert.ok(leggiArgomenti(['--root', 'p', '--ramo', A, '--main', B, '--parte', 'Win dows']).errori.length);
+  const u = leggiArgomenti(['--unisci', 'linux,windows', '--ramo', A, '--main', B]);
+  assert.deepEqual({ unisci: u.unisci, errori: u.errori }, { unisci: ['linux', 'windows'], errori: [] });
+  assert.ok(leggiArgomenti(['--unisci', 'linux', '--root', 'p', '--ramo', A, '--main', B]).errori.length);
+});
+
+test('l\'esito unico dalle parti: un rosso di Windows ferma la fusione e si legge come tale', () => {
+  const parte = (nome, campo, risultato = 'success') => ({ nome, risultato, campo: campo === null ? '' : JSON.stringify({ ramo: A, main: B, mainSha: B, ...campo }) });
+  const unisci = (...parti) => unisciParti({ ramo: A, main: B, parti });
+  const verde = unisci(parte('linux', { esito: 'verde', storia: { superficiale: false } }), parte('windows', { esito: 'verde' }));
+  assert.deepEqual(verde, { ramo: A, main: B, esito: 'verde', mainSha: B, storia: { superficiale: false } });
+  assert.equal(codiceUscita(verde), 0);
+
+  const rossoWin = unisci(parte('linux', { esito: 'verde' }), parte('windows', { esito: 'rosso_sulla_fusione', rossi: ['tests/unit/aiutoAttesa.test.mjs › import'] }));
+  assert.equal(rossoWin.esito, 'rosso_sulla_fusione');
+  assert.deepEqual(rossoWin.rossi, ['tests/unit/aiutoAttesa.test.mjs › import [Windows]']);
+  assert.equal(codiceUscita(rossoWin), 1);
+
+  const due = unisci(parte('linux', { esito: 'rosso_sulla_fusione', rossi: Array.from({ length: 30 }, (_, i) => `l${i}`), altriRossi: 5 }),
+    parte('windows', { esito: 'rosso_sulla_fusione', rossi: Array.from({ length: 20 }, (_, i) => `w${i}`) }));
+  assert.equal(due.rossi.length, 40);
+  assert.equal(due.rossi[30], 'w0 [Windows]');
+  assert.equal(due.altriRossi, 15, 'nessun rosso sparisce in silenzio: il conto dice quanti restano fuori');
+
+  assert.equal(unisci(parte('linux', { esito: 'verde' }), parte('windows', { esito: 'conflitto', file: ['a.js'] })).esito, 'conflitto');
+  assert.equal(unisci(parte('linux', { esito: 'verde' }), parte('windows', { esito: 'rosso_anche_su_main' })).esito, 'rosso_anche_su_main');
+  assert.equal(unisci(parte('linux', { esito: 'main_contenuto' }), parte('windows', { esito: 'main_contenuto' })).esito, 'main_contenuto');
+  assert.equal(unisci(parte('linux', { esito: 'verde' }), { nome: 'windows', risultato: 'skipped', campo: '' }).esito, 'verde', 'la parte spenta non conta');
+
+  const caduta = unisci(parte('linux', { esito: 'verde' }), { nome: 'windows', risultato: 'failure', campo: '' });
+  assert.equal(caduta.esito, 'non_provata');
+  assert.match(caduta.motivo, /windows: corsa failure/);
+  assert.equal(codiceUscita(caduta), 2);
+  assert.match(unisci(parte('linux', { esito: 'verde' }), parte('windows', { esito: 'non_provata', motivo: 'npm giù' })).motivo, /windows: npm giù/);
+  const altraCoppia = { nome: 'windows', risultato: 'success', campo: JSON.stringify({ ramo: B, main: A, esito: 'verde' }) };
+  assert.equal(unisci(parte('linux', { esito: 'verde' }), altraCoppia).esito, 'non_provata', 'un esito di un\'altra coppia non vale');
+  assert.equal(unisci(parte('linux', { esito: 'verde' }), { nome: 'windows', risultato: 'success', campo: '{rotto' }).esito, 'non_provata');
+  assert.equal(unisci().esito, 'non_provata');
+  assert.equal(unisci(parte('linux', { esito: 'rosso_sulla_fusione', rossi: ['x'] }), { nome: 'windows', risultato: 'cancelled', campo: '' }).esito,
+    'rosso_sulla_fusione', 'un rosso trovato decide anche se l\'altra parte è caduta');
+  assert.deepEqual(partiDaAmbiente(['linux'], { CAMPO_LINUX: '{}', RISULTATO_LINUX: 'success' }), [{ nome: 'linux', campo: '{}', risultato: 'success' }]);
 });
 
 test('la riga dell\'esito: una riga, la coppia, il campo della richiesta di fusione', () => {
