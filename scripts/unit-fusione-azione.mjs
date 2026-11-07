@@ -69,7 +69,8 @@ export function codiceUscita(campo) {
   return 2;
 }
 
-const etichetta = (nome) => (nome === 'linux' ? '' : ` [${nome.charAt(0).toUpperCase()}${nome.slice(1)}]`);
+/** La firma in coda ai rossi di un sistema che non è Linux: il server la cerca, e il ruolo del riallineamento la nomina. PURA. */
+export const firmaSistema = (nome) => (nome === 'linux' ? '' : ` [${nome.charAt(0).toUpperCase()}${nome.slice(1)}]`);
 const intero = (n) => Math.max(0, Math.floor(Number(n) || 0));
 
 /**
