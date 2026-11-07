@@ -34,20 +34,47 @@
     return String(copia.textContent || '').trim();
   }
 
-  // Una risposta di Filo nel filo, finita e con qualcosa da leggere: le bolle dentro il blocco di attività sono passi.
+  const diUtente = (b) => b.classList.contains('dash-bubble-user');
+  const modificabile = (b) => diUtente(b) && !!d.modificabile && d.modificabile(b);
+  // Un messaggio nel filo, finito e con qualcosa da leggere (o, dell'utente, da rimettere nel campo): le bolle dentro il
+  // blocco di attività sono passi, il seguito in attesa ha il suo menu.
   function rispondibile(b) {
-    return !!b && !!d && b.parentElement === d.bubblesEl && !b.hidden && b.classList.contains('dash-bubble-filo')
+    if (!b || !d || b.parentElement !== d.bubblesEl || b.hidden) return false;
+    if (diUtente(b)) return !b.classList.contains('dash-bubble-attesa') && (!!testoDi(b) || modificabile(b));
+    return b.classList.contains('dash-bubble-filo')
       && !b.classList.contains('dash-bubble-streaming') && !b.classList.contains('dash-bubble-pending')
       && !!testoDi(b);
   }
   function bollaDi(target) {
     const el = elDi(target);
-    const b = el && el.closest ? el.closest('.dash-bubble-filo') : null;
+    const b = el && el.closest ? el.closest('.dash-bubble-filo, .dash-bubble-user') : null;
     return rispondibile(b) ? b : null;
   }
+  // Le azioni di una bolla, le stesse per i tasti e per il tasto destro: Copia e Rispondi sotto una risposta, Copia,
+  // Modifica e Cita sotto un messaggio dell'utente.
+  function azioniDi(b) {
+    const a = [];
+    if (testoDi(b)) a.push('copia');
+    if (diUtente(b)) {
+      if (modificabile(b)) a.push('modifica');
+      if (testoDi(b)) a.push('cita');
+    } else a.push('rispondi');
+    return a;
+  }
+  const AZIONI = {
+    copia: { icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' },
+    rispondi: { icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi' },
+    modifica: { icona: 'edit', etichetta: 'Modifica', voce: 'Modifica' },
+    cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita' },
+  };
+  function fai(azione, b, t = null) {
+    if (azione === 'copia') copia(b, t).catch(() => {});
+    else if (azione === 'modifica') { if (d.modifica) d.modifica(b); }
+    else rispondi(b);
+  }
 
-  // ── I tasti sotto la risposta ─────────────────────────────────────────────
-  // Uno solo, che va sulla bolla sotto il mouse: lo spazio sotto ogni risposta lo tiene il CSS, così comparendo non
+  // ── I tasti sotto il messaggio ────────────────────────────────────────────
+  // Uno solo, che va sulla bolla sotto il mouse: lo spazio sotto ogni messaggio lo tiene il CSS, così comparendo non
   // sposta niente. Le etichette sono attributi: nella bolla non entra testo, e chi la confronta col filo la ritrova.
   function tasto(azione, nome, etichetta) {
     const b = document.createElement('button');
