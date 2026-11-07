@@ -559,9 +559,10 @@ test('Dimentica su Windows: lo stato di UnpairAsync dice com\'è andata, e il no
   assert.deepEqual(C.interpretaBtDimentica(u('Failed'), 'win32'), { ok: false, errore: 'bt-non-dimenticato' });
   const s = C.spiega('bt-negato', { cosa: 'bluetooth', nome: 'Cuffie', piattaforma: 'win32' });
   assert.equal(s.apri, 'win-bluetooth');
-  assert.deepEqual(C.interpretaWifiDimentica(C.leggiUscita('FILO:uscita=0\n'), 'win32'), { ok: true });
-  assert.deepEqual(C.interpretaWifiDimentica(C.leggiUscita('FILO:uscita=1\n'), 'win32'), { ok: false, errore: 'non-dimenticata' });
-  assert.deepEqual(C.interpretaWifiDimentica(C.leggiUscita('FILO:errore=parametro\n'), 'win32'), { ok: false, errore: 'parametro' });
+  const w = (codice, conf) => C.leggiUscita(`FILO:codice=${codice}\nFILO:interfacce=1\nFILO:confermato=${conf}\n`);
+  assert.deepEqual(C.interpretaWifiDimentica(w(0, 1), 'win32'), { ok: true });
+  assert.deepEqual(C.interpretaWifiDimentica(w(1168, 0), 'win32'), { ok: false, errore: 'nessuna-rete' });
+  assert.deepEqual(C.interpretaWifiDimentica(w(5, 0), 'win32'), { ok: false, errore: 'posizione' });
 });
 
 test('Dimentica su Linux: bluetoothctl remove e nmcli connection delete ricevono solo l\'indirizzo e l\'identificativo', { skip: SENZA_SH }, () => {
