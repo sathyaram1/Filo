@@ -722,6 +722,23 @@ networksetup -setairportnetwork "$D" "$FILO_SIS_RETE" 2>&1 | grezzo
 dice blocco attuale
 networksetup -getairportnetwork "$D" 2>&1 | grezzo
 `,
+    'bt-dimentica': SH_INIZIO + String.raw`I="$FILO_SIS_INDIRIZZO"
+case "$I" in [0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]) ;; *) dice errore indirizzo; exit 0 ;; esac
+B=
+for c in "$(command -v blueutil 2>/dev/null)" /opt/homebrew/bin/blueutil /usr/local/bin/blueutil; do
+  if [ -n "$c" ] && [ -x "$c" ]; then B=$c; break; fi
+done
+[ -n "$B" ] || { dice errore manca-blueutil; exit 0; }
+OUT=$("$B" --unpair "$I" 2>&1); RC=$?
+printf '%s\n' "$OUT" | grezzo
+dice uscita "$RC"
+if "$B" --paired --format json 2>/dev/null | grep -qi "$I"; then dice dimenticato 0; else dice dimenticato 1; fi
+`,
+    'wifi-dimentica': SH_INIZIO + String.raw`D=$(networksetup -listallhardwareports 2>/dev/null | awk '/^Hardware Port: (Wi-Fi|AirPort)$/ { getline; print $2; exit }')
+[ -n "$D" ] || { dice errore nessuna-radio; exit 0; }
+networksetup -removepreferredwirelessnetwork "$D" "$FILO_SIS_RETE" 2>&1 | grezzo
+if networksetup -listpreferredwirelessnetworks "$D" 2>/dev/null | sed 's/^[[:space:]]*//' | grep -qxF -- "$FILO_SIS_RETE"; then dice uscita 1; else dice uscita 0; fi
+`,
   },
 };
 
