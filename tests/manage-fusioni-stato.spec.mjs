@@ -1,6 +1,7 @@
 // Gestione: rosso e in cima solo una fusione che aspetta davvero l'owner (#1425, #1040.2); la riga dei tasti non
 // chiude una pratica mentre la sua fusione aspetta (#928); quadrato, registro dei rifiuti e Log dicono il vero (#1327);
 // la scheda della richiesta tiene il tempo, mostra la rotella e dice il ruolo in italiano (#1328). Pacchetto #1839.
+// Dopo il sì, un conflitto con main non chiede niente all'owner se il lavoro è in main o aspetta una domanda (#2193).
 
 import { test, expect } from './fixtures/electron.mjs';
 import { apriScheda } from './helpers/gestione.mjs';

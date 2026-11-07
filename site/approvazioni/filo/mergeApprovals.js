@@ -930,8 +930,8 @@
   // all'owner solo questi: gli altri fermi passano da soli quando la pratica torna lavorabile.
   var FERMI_DELL_OWNER = {
     tetto: 'si era già riallineato da solo il numero di volte previsto, e main è andato di nuovo avanti',
-    locale: 'è un lavoro locale, che la routine non riallinea',
-    archiviata: 'hai archiviato la sua pratica',
+    locale: 'è un lavoro fuori dalle routine, che non si riallinea da solo',
+    archiviata: 'la sua pratica è archiviata',
   };
   var DOMANDA_RE = /^D-[1-9]\d{0,8}$/;
   function motivoFermo(req) {
@@ -942,14 +942,15 @@
   function fermoDellOwner(req) {
     return Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, motivoFermo(req));
   }
-  function nonAndato(req, motivo) {
-    var m = motivo || motivoFermo(req);
+  function nonAndato(req) {
+    var m = motivoFermo(req);
     var detto = Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, m) ? FERMI_DELL_OWNER[m] : m;
-    return 'Il riallineamento automatico si è fermato' + (detto ? ': ' + detto : '') + '. ' + RIALLINEAMENTO_NON_ANDATO;
+    return (detto ? 'Il riallineamento automatico si è fermato: ' + detto + '. '
+      : 'La sua pratica non è in lavorazione, e il riallineamento automatico aspetta con lei. ') + RIALLINEAMENTO_NON_ANDATO;
   }
   /**
    * La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea.
-   * `dettagli` = { domanda: 'D-12' che la pratica aspetta, motivo: fermo che la pagina conosce }. PURA.
+   * `dettagli.domanda` = la domanda ('D-12') che la pratica aspetta, se la pagina la conosce. PURA.
    */
   function esitoRiallineamento(req, inCorso, dettagli) {
     var fermo = inCorso === false ? 'fallito' : 'da_guardare';
@@ -961,7 +962,7 @@
       return { chiave: 'dopo_domanda', testo: 'Si riallinea da sola dopo la tua risposta a ' + domanda
         + ': la routine riprende il ramo che avevi approvato e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.' };
     }
-    return { chiave: fermo, testo: inCorso === false ? nonAndato(req, d.motivo) : RIALLINEAMENTO_DA_GUARDARE };
+    return { chiave: fermo, testo: inCorso === false ? nonAndato(req) : RIALLINEAMENTO_DA_GUARDARE };
   }
   function testoRiallineamento(req, inCorso, dettagli) {
     return esitoRiallineamento(req, inCorso, dettagli).testo;
@@ -1011,7 +1012,7 @@
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
       + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
-      + ' Quando il lavoro rifatto verrà fuso, questa scheda si toglie da sola.'));
+      + ' Quando il lavoro verrà fuso, questa scheda si toglie da sola.'));
 
     var status = el('p', 'sn-mac-status');
     status.setAttribute('role', 'status');
@@ -1087,8 +1088,11 @@
 
     // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
-      // Se le riallinea tutte la routine, il titolo non suona l'allarme: non c'è niente da fare (#1425).
-      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso === true; });
+      // Se le riallinea tutte la routine, adesso o dopo una risposta, il titolo non suona l'allarme (#1425, #2193).
+      var tutteInCorso = failed.every(function (r) {
+        var c = riallineamentoDi(r, o).chiave;
+        return c === 'in_corso' || c === 'dopo_domanda';
+      });
       var fbox = el('section', 'sn-mac sn-mac-failed' + (tutteInCorso ? ' sn-mac-failed--in-corso' : ''));
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
       var ftitle = el('div', 'sn-mac-title');
