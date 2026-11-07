@@ -199,7 +199,7 @@
 /* #2096 — Copia e Rispondi al passaggio del mouse sotto i messaggi delle chat (Aiuto, riquadro, Mazzi, scambi delle
    app nella home), come nel filo della home. La barra è assoluta: lo spazio sotto il messaggio lo tiene chi la ospita
    (`.sn-con-azioni-msg`), così comparendo non sposta niente. Logica: src/shared/azioniMessaggio.js. */
-.sn-con-azioni-msg { position: relative; margin-bottom: 26px; }
+.sn-con-azioni-msg, .sn-msg.sn-con-azioni-msg { position: relative; margin-bottom: 26px; }
 .sn-azioni-msg {
   position: absolute; left: 0; top: 100%;
   display: flex; align-items: center; gap: 2px;
