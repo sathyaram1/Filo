@@ -63,8 +63,7 @@ test('Windows/Linux: con la sola incognito aperta, invito da fuori: Crediti dava
 
 test('Mac: icona del Dock e subito dopo il collegamento d\'invito, a finestra in riapertura: Crediti davanti', async ({ app, shell, openTab, testServer }) => {
   const salvate = await preparaSchede(app, openTab, testServer);
-  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).close(); });
-  await expect.poll(async () => (await stato(app)).normale, { timeout: 10000 }).toBeNull();
+  await chiudiPrincipale(app);
   await app.evaluate(({ app: a }) => {
     a.emit('activate', {}, false);
     setTimeout(() => a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCD'), 20);
