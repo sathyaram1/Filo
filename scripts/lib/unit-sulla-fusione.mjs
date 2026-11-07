@@ -486,6 +486,25 @@ export function testoStoria(s) {
   return '▸ Clone poco profondo, ma la base comune con main c\'era già.';
 }
 
+/**
+ * Le righe di novità del ramo sotto versioni uscite su main, spostate in cima e committate nell'albero di prova con la
+ * regola del riallineamento (#2214): così gli unit dicono se il resto regge. null se non c'era niente da spostare.
+ */
+function novitaInCimaNellaProva({ dir, mainSha, nessunHook, scrivi }) {
+  const exec = (cmd, args, opts) => execFileSync(cmd, [...IDENTITA, '-c', `core.hooksPath=${nessunHook}`, ...args], { ...opts, timeout: 120000 });
+  let r;
+  try { r = riportaInCima(dir, { commit: true, basi: [mainSha], exec }); } catch (e) { r = { ok: false, spostate: [], motivo: String((e && e.message) || e) }; }
+  if (!r.ok) {
+    // Spostate ma non committate: si torna al registro della fusione, perché l'esito parli di quella.
+    if (r.spostate && r.spostate.length) gitIn(dir)(['checkout', '--', FILE_NOVITA]);
+    scrivi(`▸ Novità: le righe del ramo sotto versioni già uscite non si spostano da sole (${primaRiga(r.motivo)}): provo la fusione così com'è.`);
+    return null;
+  }
+  if (!r.spostate.length) return null;
+  scrivi(`▸ Novità: ${r.spostate.length === 1 ? 'una riga del ramo sta' : `${r.spostate.length} righe del ramo stanno`} sotto versioni già uscite. Le sposto nel blocco ${r.verso} prima degli unit, come farebbe il riallineamento`);
+  return { verso: r.verso, righe: r.spostate };
+}
+
 /** I file di unit toccati dal ramo, nell'albero `dir` già fuso. { file } | { errore }. */
 function sceltiDalRamo({ git, dir, mainSha, punta }) {
   const d = git(['-c', 'core.quotepath=false', 'diff', '--name-only', `${mainSha}...${punta}`]);
@@ -538,7 +557,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       const s = sceltiDalRamo({ git, dir: a.dir, mainSha, punta });
       if (s.errore) return { errore: s.errore, mainSha };
       scelti = s.file;
-      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0 };
+      if (!scelti.length) return conNovita({ ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0 }, novita);
       scrivi(`▸ Solo gli unit toccati dal ramo (${scelti.length} file): ${scelti.join(', ')}`);
     }
     const quali = scelti ? { file: scelti } : {};
