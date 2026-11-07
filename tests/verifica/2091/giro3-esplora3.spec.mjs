@@ -1,9 +1,8 @@
-// Esplorazione 3 del giro 3: la chat di un mazzo e il documento dell'Editor come destinazioni. Si cancella.
+// Esplorazione 3 del giro 3: Annulla dopo un rilascio in un campo di una pagina. Si cancella.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { disponibili, finestraASchermo, trascina } from '../../helpers/gestiVeri.mjs';
 
-const OUT = 'tests/.shots/2091-g3';
 const schede = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs);
 const idPerUrl = async (shell, url) => (await schede(shell)).find((t) => t.url === url)?.id;
 
@@ -31,36 +30,21 @@ async function sulloSchermo(app, doc, sel) {
 test.describe.configure({ retries: 0 });
 test.beforeEach(() => { test.skip(!disponibili(), 'niente XTest'); });
 
-test('M la chat di un mazzo', async ({ app, shell, openTab, testServer }) => {
+test('O Annulla dopo il rilascio in una textarea e in un contenteditable', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
-  const url = testServer.html('<title>Guida al commander Niv-Mizzet</title><p>Carte consigliate: Ophidian Eye.');
+  const url = testServer.html('<title>Ricetta del pane</title><p>x');
   await openTab(url);
   const id = await idPerUrl(shell, url);
-  const mazzi = await openTab('filo://decks/decks.html');
-  await mazzi.waitForLoadState('domcontentloaded');
-  await mazzi.click('#newDeck');
-  await expect(mazzi.locator('#screenBuilder')).toBeVisible();
+  const pagina = await openTab(testServer.html('<title>Moduli</title><textarea id="t" style="width:300px;height:60px">Ciao</textarea><div id="c" contenteditable="true" style="width:300px;height:60px;border:1px solid">scritto</div>'));
   await finestraASchermo(app);
-  await mazzi.waitForTimeout(800);
-  await mazzi.fill('#chatInput', 'che ne pensi di ');
-  trascina(await linguetta(app, shell, id), await sulloSchermo(app, mazzi, '#chatInput'));
-  await mazzi.waitForTimeout(1200);
-  console.log('M-VALORE', JSON.stringify(await mazzi.locator('#chatInput').inputValue()), 'gettoni', await mazzi.locator('.sn-gettone').count());
-  await mazzi.screenshot({ path: `${OUT}/M-mazzo.png` });
-});
-
-test('N il documento dell\'Editor', async ({ app, shell, openTab, testServer }) => {
-  test.setTimeout(120_000);
-  const url = testServer.html('<title>Fonte per la tesi</title><p>x');
-  await openTab(url);
-  const id = await idPerUrl(shell, url);
-  const editor = await openTab('filo://editor/editor.html');
-  await editor.waitForSelector('#doc');
-  await editor.click('#doc');
-  await editor.keyboard.type('Fonte: ');
-  await finestraASchermo(app);
-  await editor.waitForTimeout(800);
-  trascina(await linguetta(app, shell, id), await sulloSchermo(app, editor, '#doc'));
-  await editor.waitForTimeout(1200);
-  console.log('N-DOC', JSON.stringify(await editor.locator('#doc').innerText()));
+  await pagina.waitForTimeout(800);
+  for (const sel of ['#t', '#c']) {
+    trascina(await linguetta(app, shell, id), await sulloSchermo(app, pagina, sel));
+    await pagina.waitForTimeout(800);
+    const prima = await pagina.evaluate((s) => { const e = document.querySelector(s); return { v: e.value ?? e.innerText, f: document.activeElement === e }; }, sel);
+    await pagina.keyboard.press('Control+z');
+    await pagina.waitForTimeout(300);
+    const dopo = await pagina.evaluate((s) => { const e = document.querySelector(s); return e.value ?? e.innerText; }, sel);
+    console.log('O', sel, JSON.stringify(prima), '-> annulla ->', JSON.stringify(dopo));
+  }
 });
