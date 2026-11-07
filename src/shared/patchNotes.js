@@ -69,6 +69,7 @@
       features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
+        { testo: 'Il giorno in cui il blocco delle pubblicità di YouTube non regge, in un articolo con più video ripartono tutti col solo «Salta», non solo il primo. Quando arrivano le regole nuove il blocco riparte dal video dopo anche senza ricaricare la pagina, un video aperto a pochi secondi dalla fine non conta più come blocco rotto, e Filo smette di riscaricare le regole ogni ora quando hai chiuso YouTube.', segnalazione: 1974 },
       ],
     },
     {
