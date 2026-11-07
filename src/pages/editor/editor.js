@@ -967,15 +967,26 @@
     STORE.renameFile(collection, id, clean);
     const f = STORE.findFile(collection, id);
     const segno = { titleAuto: true, titleManual: false, titleAutoAt: Date.now(), titleAutoVia: via, titleSig: firma };
-    if (f && f.meta) Object.assign(f.meta, segno);
+    if (f && f.meta) { Object.assign(f.meta, segno); delete f.meta.titleFailSig; }
     if (doc && doc.id === id && doc.meta) {
       doc.meta.title = f.meta.title;
       Object.assign(doc.meta, segno);
+      delete doc.meta.titleFailSig;
     }
     writeCollection();
     renderDocSwitcher();
     rinominaNelFilo(id, f && f.meta && f.meta.title);
     return true;
+  }
+
+  // La chiamata unica non ha portato il titolo: su questo testo non si richiede (SN_EDITOR_SUMMARY.titoloDaRifare).
+  function segnaTitoloMancato(id, firma) {
+    const f = firma ? STORE.findFile(collection, id) : null;
+    if (!f) return;
+    if (!f.meta) f.meta = {};
+    f.meta.titleFailSig = firma;
+    if (doc && doc.id === id && doc.meta) doc.meta.titleFailSig = firma;
+    writeCollection();
   }
 
   // Un titolo automatico che arriva dopo che l'utente ne ha scritto uno a mano non lo sostituisce.
