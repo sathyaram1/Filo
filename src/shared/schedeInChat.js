@@ -27,7 +27,7 @@
     const titolo = testo(s.titolo, 300) || sitoDi(url);
     if (!url || !titolo) return null;
     const icona = typeof s.icona === 'string' && s.icona.length <= 200000
-      && (/^https:\/\//i.test(s.icona) || /^data:image\/(png|x-icon|vnd\.microsoft\.icon|gif|jpeg|webp);base64,/i.test(s.icona)) ? s.icona : '';
+      && /^data:image\/(png|x-icon|vnd\.microsoft\.icon|gif|jpeg|webp);base64,/i.test(s.icona) ? s.icona : '';
     const id = typeof s.id === 'string' && /^[\w-]{1,80}$/.test(s.id) ? s.id : '';
     return { id, titolo, url, icona };
   }
