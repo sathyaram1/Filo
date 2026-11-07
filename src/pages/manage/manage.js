@@ -1747,14 +1747,16 @@
     const risposta = Promise.resolve()
       .then(() => sendToMain({ type: MERGE_APPROVAL_APPROVE, id: req.id }))
       .catch((e) => ({ ok: false, error: e?.message || String(e) }));
-    approvazioniInVolo.set(req.id, { risposta, attesa });
+    // L'istante del sì: una card ridisegnata a metà volo conta il tempo da qui (#2250).
+    const volo = { risposta, attesa, daMs: Date.now() };
+    approvazioniInVolo.set(req.id, volo);
     // Registrata per prima: chi aspetta la stessa risposta trova già l'esito al suo posto.
     risposta.then((reply) => {
       approvazioniInVolo.delete(req.id);
       if (UI) esitiTentati.set(req.id, UI.outcomeMessage(reply, req));
       statoFusioniCambiato();
     });
-    if (UI) UI.seguiSulPosto(document, req.id, { risposta, attesa });
+    if (UI) UI.seguiSulPosto(document, req.id, volo);
     statoFusioniCambiato();
     return risposta;
   }
