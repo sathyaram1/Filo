@@ -444,11 +444,10 @@
     if (rispostaA) out.rispostaA = rispostaA;
     // Scritto nell'Aiuto sopra un sito: riletto è testo da fuori (#1508, src/shared/filoContesto.js → daFuoriDi).
     if (role === 'user' && turn.daPagina === true) out.daPagina = true;
-    // Le schede lasciate nel messaggio (#2085): il filo ridisegna i gettoni anche a scheda chiusa. Un'icona grossa non si tiene.
+    // Le schede lasciate nel messaggio (#2085): il filo ridisegna i gettoni anche a scheda chiusa.
     const G = global.SN_SCHEDE_IN_CHAT;
     if (role === 'user' && G && Array.isArray(turn.schede) && turn.schede.length) {
-      const schede = turn.schede.slice(0, G.MASSIMO).map(G.normalizza).filter(Boolean)
-        .map((s) => (s.icona.length > 16384 ? { ...s, icona: '' } : s));
+      const schede = G.perIlDisco(turn.schede);
       if (schede.length) out.schede = schede;
     }
     // La classe peggiore che la conversazione aveva letto quando Filo ha risposto: riletta da un'altra chat, la porta (#1508).
