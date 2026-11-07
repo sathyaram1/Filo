@@ -330,7 +330,8 @@ try {
     // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
     if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
       const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
-      corpi.push(buildStatoPermessiCorpo(ipcRenderer.sendSync('filo:permessi-stato', loc)));
+      // Un documento blob non ha fatto la chiamata d'avvio: chiede da solo.
+      corpi.push(buildStatoPermessiCorpo(AVVIO ? AVVIO.permessi : ipcRenderer.sendSync('filo:permessi-stato', loc)));
       // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
       ascolti.push([SCRITTURA, () => {
         ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
