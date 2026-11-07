@@ -73,8 +73,9 @@ export function codiceUscita(campo) {
 export const firmaSistema = (nome) => (nome === 'linux' ? '' : ` [${nome.charAt(0).toUpperCase()}${nome.slice(1)}]`);
 const intero = (n) => Math.max(0, Math.floor(Number(n) || 0));
 
-// Dal migliore al peggiore: l'esito dopo lo spostamento delle novità, unito, è il peggiore delle parti (#2214).
-const PESO_DOPO = ['verde', 'rosso_anche_su_main', 'rosso_sulla_fusione'];
+// Dal migliore al peggiore, nell'ordine di PESO_SI_FONDE: l'esito dopo lo spostamento, unito, è il peggiore delle parti
+// (#2214). Che ogni esito della regola si fonda lo tiene la sentinella.
+export const PESO_DOPO = Object.freeze([...PESO_SI_FONDE.filter((e) => BASTA_SPOSTARE.includes(e)), 'rosso_sulla_fusione']);
 
 /**
  * Le novità spostate per il server, dalle parti rosse (#2214): solo se le portano tutte, perché un rosso senza dice che
