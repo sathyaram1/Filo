@@ -594,6 +594,10 @@ export function rigaSchedaServer(s, locale = null) {
     Number.isInteger(s.priorita) ? `p${s.priorita}${s.prioritaOwner ? ' (owner)' : ''}` : 'p?',
     unaRiga(s.stato) || '?',
     s.fermo ? `FERMO (${unaRiga(s.fermo.tipo)}${s.fermo.gruppo ? `: ${unaRiga(s.fermo.gruppo)}` : ''})` : '',
+    // Perché un lavoro con stato da partire non parte (#2258): il recap lo dice invece di ipotizzarlo.
+    s.restaLocale ? `RESTA LOCALE (${(s.restaLocale.motivi || []).map(unaRiga).join('; ')}${s.restaLocale.atMs ? `; visto ${new Date(Number(s.restaLocale.atMs)).toISOString().slice(0, 16).replace('T', ' ')}` : ''})` : '',
+    s.attesa ? `aspetta il server (${unaRiga(s.attesa)})` : '',
+    Array.isArray(s.domandeBloccanti) && s.domandeBloccanti.length ? `fermo sulle domande ${s.domandeBloccanti.map(unaRiga).join(', ')}` : '',
     s.inLavorazione ? 'in lavorazione' : '',
     s.lavoroServer ? 'lavoro server' : '',
     s.fiducia && s.fiducia !== 'fidato' ? unaRiga(s.fiducia).replace(/_/g, ' ') : '',
