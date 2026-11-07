@@ -274,6 +274,15 @@ test('regola del freno: togliere un freno è costo 4, l\'avviso del riquadro lo 
   assert.equal(A.richiestaCambioLivello('conservativo', 'default'), 'conferma');
   assert.equal(A.richiestaCambioLivello('automatico', 'conservativo'), 'si');
   assert.equal(A.richiestaCambioLivello('default', 'yolo'), 'no');
+  // #1840: la chat chiede alla stessa regola, ai margini compresi (nessun livello salvato, uno che non si sceglie).
+  const P = globalThis.SN_PREF;
+  const allentaInChat = (salvato, nuovo) => P.buildPreferencePartial('autonomia', nuovo, { attuali: salvato === undefined ? {} : { autonomia: { livello: salvato } } }).allenta;
+  for (const salvato of [undefined, 'yolo', 'conservativo', 'default', 'automatico', 'sconosciuto']) {
+    for (const nuovo of ['conservativo', 'default', 'automatico']) {
+      assert.equal(allentaInChat(salvato, nuovo), A.richiestaCambioLivello(salvato, nuovo) === 'conferma', `da ${salvato} a ${nuovo}`);
+    }
+  }
+  assert.equal(P.buildPreferencePartial('autonomia', 'default').allenta, true, 'senza le impostazioni attuali vale alzarlo');
   assert.equal(A.selezionabile('yolo'), false, 'yolo esiste come valore ma aspetta il guardiano dei registri');
   assert.ok(A.livelloValido('yolo'));
   assert.deepEqual(A.livelliSelezionabili().map((l) => l.id), ['conservativo', 'default', 'automatico']);
