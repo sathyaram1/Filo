@@ -15,7 +15,13 @@ const normale = (app) => app.evaluate(({ BrowserWindow }) => {
   const w = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x._filoTabs && !x._filoIncognito);
   if (!w) return null;
   const tm = w._filoTabs;
-  const url = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const caricata = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  // Le schede salvate dell'avvio a freddo puntano a una porta chiusa: caricate, diventano la pagina d'errore col loro indirizzo.
+  const url = (t) => {
+    const u = caricata(t);
+    if (!u.startsWith('filo://error/')) return u;
+    try { return new URL(u).searchParams.get('url') || u; } catch (_) { return u; }
+  };
   const davanti = tm.tabs.find((t) => t.id === tm.activeId);
   return { schede: tm.tabs.map(url), davanti: davanti ? url(davanti) : null };
 });
