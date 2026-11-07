@@ -490,6 +490,14 @@ test('#530.6: il popup mostra la frase della ricerca solo se l\'indirizzo cerca 
   assert.match(AL.describe({ type: 'NAVIGA', url: `https://www.google.com/search?q=${encodeURIComponent(lunga.slice(0, 500))}`, cerca: lunga }), /Cercare sul web/);
   const img = 'https://a.example/foto.png';
   assert.match(AL.describe({ type: 'NAVIGA', url: `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(img)}`, cerca: img }), /Cercare sul web/);
+  // #1840: il menu le costruisce con lo stesso modulo che le riconosce, non con una sua copia.
+  const N = globalThis.SN_URL_NAV;
+  assert.match(AL.describe({ type: 'NAVIGA', url: N.indirizzoRicerca(lunga), cerca: lunga }), /Cercare sul web/);
+  assert.match(AL.describe({ type: 'NAVIGA', url: N.indirizzoRicercaImmagine(img), cerca: img }), /Cercare sul web/);
+  const azioni = readFileSync(join(ROOT, 'src', 'content', 'actions.js'), 'utf8');
+  assert.doesNotMatch(azioni, /google\.com\/search\?q=|lens\.google\.com\/uploadbyurl/, 'il menu non si scrive la ricerca da sé');
+  assert.match(azioni, /SN_URL_NAV\.indirizzoRicerca\(/);
+  assert.match(azioni, /SN_URL_NAV\.indirizzoRicercaImmagine\(/);
 });
 
 // Il cammino del dispatch, senza Electron: ingressi dal registro, stato dalle fonti, risposta dal modulo.
