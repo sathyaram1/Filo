@@ -44,6 +44,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
     globalThis.fetch = async (input, init) => {
       const url = String((input && input.url) || input);
       if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
+        console.log('DEBUG2276 listino', url, globalThis.__accettate.length, new Error().stack.split('\n').slice(1, 9).join(' | '));
         if (!listino) return new Response('giù', { status: 503 });
         const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: finestra, pricing: { prompt: '0.0000001', completion: '0.0000002' } }];
         return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
