@@ -2698,6 +2698,9 @@
     // Ora, batteria, rete, Bluetooth e volume nella colonna destra della home (#873, #874): ognuna si toglie da sé
     // (Preferenze, chat, tasto destro). Una voce di cui il computer non dice niente non compare comunque.
     homeSistema: { ora: true, batteria: true, rete: true, bluetooth: true, volume: true },
+    // I dispositivi Bluetooth preferiti, in cima all'elenco della home (#2096): [{ indirizzo, nome }], il nome com'era
+    // quando li si è messi, per riconoscerli anche spenti.
+    bluetoothPreferiti: [],
     // Carta con l'anteprima della scheda al passaggio del puntatore sulla barra (#430). size: 'piccola' |
     // 'media' | 'grande' (le larghezze stanno in src/main/popup-anteprima.js).
     tabPreview: { enabled: true, size: 'media' },
