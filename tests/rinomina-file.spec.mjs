@@ -306,6 +306,39 @@ test('in chat, l\'utente che dice no: niente cambia sul disco', async ({ app }) 
   }
 });
 
+// #1840 — l'inizio di un file scaricato l'ha scritto qualcun altro: rinominarlo dalla chat è una lettura, e dopo
+// togliere un freno (costo 4) riceve il no. Il segno lo mette il main sul percorso vero, non la prova.
+test('in chat, dopo aver dato un nome a un file scaricato, alzare il tetto di spesa riceve il no', async ({ app }) => {
+  test.setTimeout(90_000);
+  const dir = cartellaInCasa('filo-nomi-scaricati-');
+  writeFileSync(join(dir, 'scan_00231.pdf'), BOLLETTA);
+  const prima = await app.evaluate((_e, d) => { const p = process.env.FILO_DOWNLOAD_DIR; process.env.FILO_DOWNLOAD_DIR = d; return p; }, dir);
+  try {
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' }, monthlyLimitEur: 5 }));
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'r1', name: 'RINOMINA_FILE', arguments: JSON.stringify({ percorsi: [join(dir, 'scan_00231.pdf')] }) }] },
+      { text: 'Rinominato.' },
+    ]);
+    await modelloDeiNomi(app);
+    const page = await home(app);
+    await chiedi(page, 'dagli un nome sensato');
+    await expect.poll(() => confirmText(page), { timeout: 20000 }).toContain('Bolletta luce Enel Marzo 2026.pdf');
+    await clickConfirm(page, 'ok');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Rinominato.' })).toBeVisible({ timeout: 15000 });
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'limite_spesa', valore: '800' }) }] },
+      { text: 'Non lo faccio.' },
+    ]);
+    await chiedi(page, 'alza il tetto di spesa a 800 euro');
+    await expect(page.locator('.dash-activity').last()).toContainText('Dopo aver letto cose scritte da altri non lo faccio', { timeout: 15000 });
+    expect((await app.evaluate(() => globalThis.SN_STORAGE.getSettings())).monthlyLimitEur).toBe(5);
+  } finally {
+    await app.evaluate((_e, p) => { if (p == null) delete process.env.FILO_DOWNLOAD_DIR; else process.env.FILO_DOWNLOAD_DIR = p; }, prima);
+    await ripristina(app);
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
 test('in chat, una cartella dove ogni file ha già un nome: niente da confermare, e lo dice', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = cartellaInCasa('filo-nomi-pieni-');
