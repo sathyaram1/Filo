@@ -80,8 +80,9 @@ resta un 3. Il giro lo decidono i rilievi interni: un vicino entra nella
 correzione solo se il giro parte comunque per loro, perché il suo file è già
 aperto; altrimenti esce in un feedback derivato col livello che hai scritto.
 Non fa partire un giro, non lo paga e non ferma questo lavoro. Ogni esterno
-esce subito in un feedback suo, con la priorità del suo livello (un 2 nasce a
-1: la 2 la mette solo il manutentore), e non ferma questo lavoro — nemmeno col
+esce subito in un feedback suo, a priorità 1 (un esterno di livello 3 a
+priorità 3: parte subito; gli altri li mette in lavoro il manutentore
+nell'ordine), e non ferma questo lavoro — nemmeno col
 `?`: la domanda viaggia nel suo feedback.
 
 **Il segno `?`** dopo la lettera (`[2i?]`, `[1v?]`, `[1e?]`) dice che il
