@@ -1008,7 +1008,7 @@
     const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'sn-msg-copia';
+    btn.className = 'sn-msg-tasto sn-msg-rispondi';
     btn.dataset.etichetta = 'Rispondi';
     btn.setAttribute('aria-label', 'Rispondi');
     btn.innerHTML = iconaCopia('reply');
