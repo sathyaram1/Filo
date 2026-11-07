@@ -520,11 +520,11 @@
    * va da parte col livello scritto. Non paga e non ferma niente, e un `v?` va
    * sempre da parte (decisione dell'owner del 2026-10-12, #1202). Gli esterni
    * non entrano in nessuna delle regole sopra: tornano a parte in `external`, ciascuno con
-   * `priority` del livello (un 2 nasce a 1), in ogni esito (anche a lavoro fermo: sono
+   * `priority` di nascita (prioritaDiNascita), in ogni esito (anche a lavoro fermo: sono
    * di un altro lavoro, ed escono in un feedback loro). Un esterno col `?`
    * non ferma niente: la domanda viaggia nel suo feedback. Anche i rilievi
-   * messi da parte (`derived`) portano la `priority` del livello SCRITTO; come
-   * diventano feedback lo dice derivedGroups.
+   * messi da parte (`derived`) portano la `priority` di nascita, col livello
+   * SCRITTO accanto; come diventano feedback lo dice derivedGroups.
    *
    * @param {object} p { findings, caps:{cap3,cap2,cap1,cap0}, counts:{count3,count2,count1,count0} }
    * @returns {{
