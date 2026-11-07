@@ -203,3 +203,75 @@ test('gettone: anteprima, invio, filo, Backspace, scheda chiusa, ricarica', asyn
     return s.tabs.find((t) => t.id === s.activeId)?.url;
   }).toBe(urlArticolo);
 });
+
+test('gettone nel campo: hover mostra la carta', async ({ app, shell, openTab, testServer }) => {
+  const { idArticolo } = await preparaDue(app, shell, openTab, testServer);
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const casa = await home(app, { scheda: nuova?.id });
+  await lasciaNellaHome(app, shell, casa, idArticolo);
+  await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
+  const g = await casa.locator('.sn-gettoni-fondo .sn-gettone').boundingBox();
+  await casa.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await casa.mouse.move(g.x + g.width / 2 + 2, g.y + g.height / 2);
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .some((w) => !w.isDestroyed() && w.webContents.getURL().includes('anteprima.html') && w.isVisible()))).toBe(true);
+});
+
+test('Annulla dopo Backspace: il gettone torna gettone, non testo con le parentesi', async ({ app, shell, openTab, testServer }) => {
+  const { idArticolo } = await preparaDue(app, shell, openTab, testServer);
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const casa = await home(app, { scheda: nuova?.id });
+  await casa.locator('#input').fill('guarda');
+  await lasciaNellaHome(app, shell, casa, idArticolo);
+  await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
+  await casa.locator('#input').focus();
+  await casa.keyboard.press('End');
+  await casa.keyboard.press('Backspace');
+  await casa.keyboard.press('Backspace');
+  await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni.schede().length)).toBe(0);
+  await casa.keyboard.press('Control+z');
+  await casa.waitForTimeout(300);
+  const stato = await casa.evaluate(() => ({ v: document.getElementById('input').value, n: document.getElementById('input')._snGettoni.schede().length }));
+  // O il gettone torna (testo e scheda), o non torna niente: mai il segno senza la scheda.
+  expect(stato.v.includes('⟦') ? stato.n : 1).toBe(1);
+});
+
+test('dopo l\'invio, la home ricaricata mostra ancora il gettone nel filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const { idArticolo } = await preparaDue(app, shell, openTab, testServer);
+  await modelloFinto(app, [{ text: 'Risposta finta.' }]);
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const casa = await home(app, { scheda: nuova?.id });
+  await casa.locator('#input').fill('di cosa parla');
+  await lasciaNellaHome(app, shell, casa, idArticolo);
+  await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
+  await casa.locator('#sendBtn').click();
+  await expect(casa.locator('.sn-bolla-gettone')).toHaveCount(1);
+  await expect(casa.getByText('Risposta finta.')).toBeVisible();
+  await casa.reload();
+  await casa.waitForLoadState('domcontentloaded');
+  await expect(casa.locator('.sn-bolla-gettone')).toHaveCount(1, { timeout: 10_000 });
+  await expect(casa.locator('body')).not.toContainText('⟦');
+});
+
+test('due schede nello stesso messaggio: Filo le riceve tutte e due', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const { idArticolo, articolo } = await preparaDue(app, shell, openTab, testServer);
+  const altra = await testServer.openReady(openTab, ARTICOLO.replace('Tesla volante', 'Fiat sommergibile').replace('Testo-segreto-2091', 'Altro-testo-2091'));
+  const idAltra = await attiva(shell);
+  await modelloFinto(app, [{ text: 'Risposta finta.' }]);
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const casa = await home(app, { scheda: nuova?.id });
+  await casa.locator('#input').fill('confronta');
+  await lasciaNellaHome(app, shell, casa, idArticolo);
+  await lasciaNellaHome(app, shell, casa, idAltra);
+  await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(2);
+  await casa.locator('#sendBtn').click();
+  await expect.poll(async () => (await chiamateAlModello(app)).length).toBeGreaterThan(0);
+  const tutto = JSON.stringify((await chiamateAlModello(app))[0]);
+  expect(tutto).toContain(articolo.url());
+  expect(tutto).toContain(altra.url());
+  expect(tutto).toContain('Testo-segreto-2091');
+  expect(tutto).toContain('Altro-testo-2091');
+  await expect(casa.locator('.sn-bolla-gettone')).toHaveCount(2);
+});
