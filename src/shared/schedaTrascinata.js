@@ -90,6 +90,34 @@
     return doc.execCommand('insertText', false, parole);
   }
 
+  // Un riquadro incorporato (i commenti di un blog, un editor in un frame): il suo campo lo trova il frame di dentro.
+  // Qui si dice al main in quale riquadro e in quale punto del suo contenuto; la scheda gliela porta il main, mai noi.
+  let riquadroOra = null;
+  function riquadroSotto(doc, x, y) {
+    if (!campiDelSito) return null;
+    const el = elementoSotto(doc, x, y);
+    return el && /^(IFRAME|FRAME)$/.test(el.tagName) ? el : null;
+  }
+  function inoltra(doc, fr, fase, x, y) {
+    let dx = 0;
+    let dy = 0;
+    try {
+      const r = fr.getBoundingClientRect();
+      const cs = getComputedStyle(fr);
+      dx = r.left + fr.clientLeft + (parseFloat(cs.paddingLeft) || 0);
+      dy = r.top + fr.clientTop + (parseFloat(cs.paddingTop) || 0);
+    } catch (_) {}
+    try {
+      const rt = global.chrome && global.chrome.runtime;
+      const tipo = (global.SN_MSG && global.SN_MSG.MSG && global.SN_MSG.MSG.SCHEDA_NEL_RIQUADRO) || 'scheda_nel_riquadro';
+      const p = rt && rt.sendMessage({
+        type: tipo, fase, x: Math.round(x - dx), y: Math.round(y - dy),
+        indice: [...doc.querySelectorAll('iframe, frame')].indexOf(fr), src: String(fr.src || ''),
+      });
+      if (p && typeof p.catch === 'function') p.catch(() => {});
+    } catch (_) {}
+  }
+
   // msg: { fase: 'sopra' | 'lascia' | 'esci', x, y, scheda: { id, titolo, url, icona } }
   function ricevi(msg, doc = global.document) {
     if (!msg || !doc) return false;
@@ -98,6 +126,15 @@
     const S = global.SN_SCHEDE_IN_CHAT;
     const scheda = S ? S.normalizza(msg.scheda) : null;
     const b = msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : bersaglio(doc, x, y);
+    const fr = b || msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : riquadroSotto(doc, x, y);
+    if (riquadroOra && riquadroOra !== fr) { inoltra(doc, riquadroOra, 'esci', 0, 0); riquadroOra = null; }
+    if (fr && (msg.fase === 'sopra' || msg.fase === 'lascia')) {
+      illumina(doc, null);
+      ora = null;
+      inoltra(doc, fr, msg.fase, x, y);
+      riquadroOra = msg.fase === 'sopra' ? fr : null;
+      return true;
+    }
     if (msg.fase === 'sopra') {
       if (!b || !ora || b.el !== ora.el) illumina(doc, b && b.el);
       else illumina(doc, b.el);
