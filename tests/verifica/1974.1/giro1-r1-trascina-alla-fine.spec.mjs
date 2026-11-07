@@ -38,7 +38,7 @@ test('r1 trascinare la barra fino alla fine appena partito il video non spegne i
   const { der, privateKey } = certificato({ organizzazione: 'Filo test', nomeComune: YT, usi: [] });
   const cert = `-----BEGIN CERTIFICATE-----\n${der.toString('base64').match(/.{1,64}/g).join('\n')}\n-----END CERTIFICATE-----\n`;
   const server = createServer({ key: privateKey.export({ type: 'pkcs8', format: 'pem' }), cert }, (req, res) => {
-    visite++;
+    if (req.url.startsWith('/watch')) visite++;
     res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
     res.end(lettore);
   });
