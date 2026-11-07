@@ -161,7 +161,7 @@ test('l\'Aiuto su una pagina di Filo: le parole restano dell\'utente', async () 
 
 // Il «no» consiglia una conversazione nuova solo se nascerebbe pulita: le risposte del tratto e gli esiti recenti del
 // filo li avrebbe davanti anche lei.
-test('a Conservativo il no per una risposta di un\'altra chat non consiglia una conversazione nuova, che nascerebbe uguale', async () => {
+test('il no del costo 4 per una risposta di un\'altra chat non consiglia una conversazione nuova, che nascerebbe uguale', async () => {
   azzera();
   await Chats.append('pagina', [
     { role: 'user', text: 'cosa dice quella pagina?' },
