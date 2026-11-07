@@ -691,6 +691,50 @@ test('la consegna che spinge porta i commit del ramo e svuota la coda prima; le 
   assert.deepEqual(viste, ['/r', '/r', '/r']);
 });
 
+// #2263: la critica del verificatore porta la punta della pulizia (git rm + commit, che il salvataggio non spinge), e il
+// server la confronta leggendola da GitHub: rimasta in locale, la critica tornava «stale» a ogni giro.
+test('la consegna porta su origin la punta che dichiara prima di chiamare il server, e la dichiara', async () => {
+  const d = deposito();
+  const env = ambiente(d.origin, { FILO_ROUTINE_TICKET: BIGLIETTO });
+  const prova = 'tests/verifica/1/giro3-esplora.spec.mjs';
+  mkdirSync(join(d.pulita, 'tests', 'verifica', '1'), { recursive: true });
+  const scritta = commit(d.pulita, prova, env);
+  assert.equal(spingi(d.pulita, env).status, 0, 'la prova scritta parte col salvataggio');
+  g(d.pulita, ['rm', '-q', prova]);
+  g(d.pulita, ['commit', '-qm', 'via la prova di sola esplorazione'], env);
+  const punta = g(d.pulita, ['rev-parse', 'HEAD']);
+  const suOrigin = () => g(d.origin, ['rev-parse', 'refs/heads/claude/x']);
+  assert.equal(suOrigin(), scritta, 'premessa: la cancellazione è solo locale');
+  const viste = [];
+  const fetchImpl = async () => { viste.push(suOrigin()); return { status: 200, text: async () => JSON.stringify({ ok: true, reply: { outcome: 'pass' } }) }; };
+  const { deliver } = await import('../../scripts/routine-channel.mjs');
+  const inviate = [];
+  const opts = { root: d.pulita, fetchImpl, env, inviaSpinte: async () => { inviate.push(coda(d.pulita).flatMap((v) => v.commits)); return { inviate: 0, rifiutate: 0, restano: 0, errori: [] }; } };
+  const r = await deliver(BIGLIETTO, 'verdict', { sha: punta, findings: [], summary: 'ok', critique: 'ok', branch: 'claude/x' }, opts);
+  assert.equal(r.outcome, 'ok');
+  assert.deepEqual(viste, [punta], 'quando il server la cerca, la punta è già su origin');
+  assert.ok(inviate[0].includes(punta), 'e il commit spedito è in coda per la dichiarazione, che parte prima della consegna');
+});
+
+test('la spedizione prima della consegna: solo la punta di questa cartella, e un guasto lo dice senza fermarla', async () => {
+  const { spedisciPuntaConsegnata } = await import('../../scripts/routine-channel.mjs');
+  const d = deposito();
+  const env = ambiente(d.origin);
+  const punta = commit(d.pulita, 'a.txt');
+  const chiamate = [];
+  const spedisci = (root) => { chiamate.push(root); return { ok: true, skipped: false, branch: 'claude/x', punta }; };
+  assert.equal(spedisciPuntaConsegnata({ sha: 'b'.repeat(40) }, { root: d.pulita, spedisci, env }), '', 'uno sha che non è la punta non si spedisce');
+  assert.equal(spedisciPuntaConsegnata({ sha: 'corto' }, { root: d.pulita, spedisci, env }), '');
+  assert.equal(spedisciPuntaConsegnata({}, { root: d.pulita, spedisci, env }), '');
+  assert.deepEqual(chiamate, []);
+  assert.equal(spedisciPuntaConsegnata({ sha: punta.toUpperCase() }, { root: d.pulita, spedisci, env }), '');
+  assert.deepEqual(chiamate, [d.pulita]);
+  const giu = spedisciPuntaConsegnata({ sha: punta }, { root: d.pulita, env, spedisci: () => ({ ok: false, skipped: false, branch: 'claude/x', reason: 'rete giù' }) });
+  assert.match(giu, /non è arrivato su origin prima della consegna: rete giù/);
+  const rifatta = spedisciPuntaConsegnata({ sha: punta }, { root: d.pulita, env, spedisci: () => ({ ok: true, skipped: false, branch: 'claude/x', punta: 'c'.repeat(40) }) });
+  assert.match(rifatta, /ha rifatto i commit/);
+});
+
 test('git-server push: i commit del worker si leggono prima della spinta e si accodano per filo-security', async () => {
   const d = deposito();
   const a = commit(d.pulita, 'a.txt');
