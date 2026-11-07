@@ -1567,6 +1567,7 @@
     siRiallineaDaSola: siRiallineaDaSola,
     dopoIlConflitto: dopoIlConflitto,
     testoRiallineamento: testoRiallineamento,
+    fermoDellOwner: fermoDellOwner,
     RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
