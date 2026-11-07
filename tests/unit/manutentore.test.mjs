@@ -146,6 +146,20 @@ test('la riga di una scheda dice se il feedback aspetta un pacchetto, o se è lu
   assert.match(M.rigaScheda(scheda(950), { stato: 'todo', priorita: 1, unisce: ['812', '815'] }), / · pacchetto di #812, #815/);
 });
 
+test('la riga della scheda del server tiene a parte le attese che bloccano, col loro stato, e quelle già fuse (#2262)', () => {
+  const s = { num: '1564', stato: 'todo', priorita: 2, titolo: 'T',
+    aspetta: [{ num: '1563', stato: 'aperto' }, { num: '1600', stato: 'chiuso' }, { num: '1601', stato: 'ignoto' }, { num: '', stato: 'cancellato' }],
+    aspettava: ['1562'], unisce: [] };
+  const riga = M.rigaSchedaServer(s);
+  assert.match(riga, / · aspetta #1563 \(non ancora fuso\), #1600 \(chiuso senza fusione\), #1601 \(stato non letto\), un feedback senza numero \(cancellato\) · aspettava #1562/);
+  const libera = M.rigaSchedaServer({ ...s, aspetta: [], aspettava: ['1302'] });
+  assert.doesNotMatch(libera, / · aspetta #/, 'tutte fuse: non sembra bloccata');
+  assert.match(libera, / · aspettava #1302/);
+  assert.match(M.rigaSchedaServer({ ...s, aspetta: ['950'], aspettava: undefined }), / · aspetta #950( |$)/, 'il server di prima manda numeri nudi');
+  const [f] = M.indiceDalServer([s]);
+  assert.match(M.rigaScheda(scheda(1564), f), / · aspetta #1563 \(non ancora fuso\), .* · aspettava #1562/, 'la scheda locale dice lo stesso');
+});
+
 test('un ramo i cui feedback sono tutti chiusi secondo l\'indice non è in corso, e si dice fra i lasciati fuori', () => {
   const rami = [
     { ramo: 'claude/morto', feedback: ['1728'] }, { ramo: 'claude/vivo', feedback: ['1728', '900'] },
