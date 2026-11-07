@@ -1710,14 +1710,13 @@
   }
 
   // Approvata e finita in conflitto (#1425, #2193): il server riallinea da sé il lavoro di una routine (siRiallineaDaSola)
-  // appena la pratica è lavorabile, anche dopo la risposta a una domanda. Restano dell'owner solo il lavoro locale, la
-  // pratica archiviata, il fermo che il server ha scritto sulla richiesta (tetto) e i fermi senza domanda (arenato, loop).
+  // appena la pratica è lavorabile, anche dopo la risposta a una domanda. Restano dell'owner il fermo che il server ha
+  // scritto sulla richiesta (tetto, lavoro locale, archiviata) e le pratiche ferme senza domanda (arenata, chiusa).
   function riallineamentoDi(fb, failed) {
     const MA = schedaFusioni();
     const { status } = normalizeStatus(fb);
-    const motivo = isLocalOnly(fb) ? 'locale' : (status === 'archived' ? 'archiviata' : '');
-    const fallito = { stato: 'riallineamento_fallito', motivo };
-    if (motivo || !failed.every((r) => MA.siRiallineaDaSola(r)) || failed.some((r) => MA.fermoDellOwner(r))) return fallito;
+    const fallito = { stato: 'riallineamento_fallito' };
+    if (!failed.every((r) => MA.siRiallineaDaSola(r)) || failed.some((r) => MA.fermoDellOwner(r))) return fallito;
     const domanda = aspettaDomanda(fb);
     if (domanda) return { stato: 'attende_domanda', domanda };
     return status === 'todo' || WORK_STAGES.includes(status) ? { stato: 'da_riallineare' } : fallito;
