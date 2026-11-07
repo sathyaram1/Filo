@@ -932,6 +932,8 @@
     locale: 'è un lavoro fuori dalle routine, che non si riallinea da solo',
     archiviata: 'la sua pratica è archiviata',
   };
+  // I fermi passeggeri che il server scrive oggi (pratica non lavorabile): la frase è quella della pratica ferma.
+  var FERMI_PASSEGGERI = { domanda: true, stato: true };
   var DOMANDA_RE = /^D-[1-9]\d{0,8}$/;
   function motivoFermo(req) {
     var b = req && req.realignBlocked;
