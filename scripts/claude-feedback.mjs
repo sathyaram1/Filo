@@ -637,12 +637,16 @@ export async function main(argvIn) {
   }
   // Chi lo lavora si dice sempre: senza scelta, una segnalazione per le routine nasceva lavoro locale e non la
   // prendeva nessuno (verifica di #908, giro 6). Un errore d'uso costa una riga; un feedback perso no.
-  const locale = argv.includes('--locale');
-  if (locale === argv.includes('--non-locale')) {
-    console.error(locale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
+  const soloLocale = argv.includes('--locale');
+  // `--server` è il segno «lavoro server» (`localOnly`, lo stesso di --locale) anche accanto a --non-locale (#2217).
+  const server = argv.includes('--server') || argv.includes('--lavoro-server');
+  const nonLocale = argv.includes('--non-locale');
+  if ((soloLocale && nonLocale) || (!soloLocale && !nonLocale && !server)) {
+    console.error(soloLocale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
     uso();
     return EXIT.USO;
   }
+  const locale = soloLocale || server;
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
