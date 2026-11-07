@@ -2112,7 +2112,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     }
   }
 
-  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], schede = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
     if (!root) return;
     const passo = (op, ms) => prossimoPasso(op, ms, mia);
     // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro. Un riferimento trascinato arriva
