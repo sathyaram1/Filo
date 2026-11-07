@@ -55,7 +55,7 @@ test('foto a metà: in fila, sopra la textarea, sopra la chat della home', async
 
   let p = tieni(await linguetta(app, shell, idArticolo), { ...(await linguetta(app, shell, idArticolo)), x: (await linguetta(app, shell, idArticolo)).x + 90 });
   await shell.waitForTimeout(1800);
-  await shell.screenshot({ path: 'tests/.shots/2091-metà-fila.png' });
+  await fotoFinestra(app, '2091-metà-fila');
   const tr = await shell.locator(`.tab[data-id="${idArticolo}"]`).evaluate((el) => getComputedStyle(el).transform);
   await new Promise((r) => p.on('exit', r));
 
