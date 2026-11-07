@@ -174,6 +174,8 @@ test('#2085 una scheda lasciata nella chat della home: gettone, anteprima, lettu
   try {
     await page.locator('#sendBtn').click();
     await expect(page.locator('.dash-bubble-user .sn-bolla-gettone')).toContainText('Articolo sulla Tesla', { timeout: 15_000 });
+    await page.waitForTimeout(3000);
+    console.log('DBG', JSON.stringify(await app.evaluate(() => globalThis.__dbgGettoni)));
     await expect.poll(async () => JSON.stringify(await chiamateAlModello(app)), { timeout: 15_000 }).toContain('Falcon Heavy');
     const inviato = JSON.stringify(await chiamateAlModello(app));
     expect(inviato).toContain('Articolo sulla Tesla');
