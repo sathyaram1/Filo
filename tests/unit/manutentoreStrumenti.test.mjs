@@ -101,10 +101,11 @@ test('gli elenchi del rilascio tengono quanto il server accetta', () => {
   assert.equal(dentroBudget(voci).length, 200);
 });
 
-test('una promessa scritta con parole comuni senza il suo lavoro nella rosa si rifiuta', () => {
+// Una 2 fuori dall'ordine non parte (#2269): una promessa su di lei non si regge.
+test('una promessa scritta con parole comuni senza il suo lavoro nell\'ordine si rifiuta', () => {
   const blocco = { version: '0.2.255', features: [{ testo: 'Le schede si trascinano.' }], fixes: [] };
-  const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
-  const prova = (riga, promesse) => M.controllaNovita({ versione: '0.2.255', features: [riga], fixes: [], ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  const schede = [{ num: '812', priorita: 1 }, { num: '900', priorita: 2 }];
+  const prova = (riga, promesse) => M.controllaNovita({ versione: '0.2.255', features: [riga], fixes: [], ...(promesse ? { promesse } : {}) }, { blocco, schede, ordine: ['812'] });
   for (const riga of ['I formati audio arriveranno con il prossimo aggiornamento.', 'Nella prossima versione: i formati audio.',
     'Stiamo preparando i formati audio.', 'In futuro anche i formati audio.', 'Coming soon: audio.', 'Sarà disponibile anche l\'audio.']) {
     assert.equal(prova(riga).ok, false, riga);
