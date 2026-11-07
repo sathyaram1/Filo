@@ -31,6 +31,7 @@ require(path.join(SHARED, 'pannelliApp.js')); // #1433 — il pannello di destra
 // annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
 // (src/main/menu.js), i content script la chiamano direttamente.
 require(path.join(SHARED, 'campoTesto.js'));
+require(path.join(SHARED, 'schedeInChat.js')); // #2085 — la forma delle schede lasciate in una chat
 require(path.join(SHARED, 'timeFormat.js'));
 require(path.join(SHARED, 'modelCaps.js'));
 // Va PRIMA dell'editor delle catene, che da qui prende l'elenco delle funzioni impostabili.
