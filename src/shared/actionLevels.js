@@ -975,7 +975,6 @@
         return !!(built && !built.rifiuto && built.allenta);
       },
       dove: (a) => { const built = prefBuilt(a); return (built && built.dove) || ''; },
-      chiesta: chiestaPreferenza,
       // Un setter che vuole sempre l'OK (`chiede` in preferences.js) sta fuori dal perimetro: un clic, a ogni livello.
       perimetro: (a) => {
         if (a && a._invariato) return true;
