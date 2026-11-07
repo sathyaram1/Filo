@@ -549,14 +549,12 @@
     };
     const px = (v) => { const m = /^(\d+(?:\.\d+)?)px$/.exec(String(v || '')); return m ? Number(m[1]) : NaN; };
     for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
-      let m = misura(el);
+      const m = misura(el);
       if (nascosto && !(m.w > 0 && m.h > 0)) {
         let cs = null;
         try { cs = (el.ownerDocument.defaultView || window).getComputedStyle(el); } catch (_) {}
-        const w = px(cs && cs.width);
-        const h = px(cs && cs.height);
-        if (!(w < FRAME_MIN_W || h < FRAME_MIN_H)) continue;
-        m = { w: Number.isNaN(w) ? Infinity : w, h: Number.isNaN(h) ? Infinity : h };
+        if (px(cs && cs.width) < FRAME_MIN_W || px(cs && cs.height) < FRAME_MIN_H) return true;
+        continue;
       }
       if (m.w < FRAME_MIN_W || m.h < FRAME_MIN_H) return true;
     }
