@@ -152,7 +152,7 @@
     if (!pro.ok) return Object.assign(pro, { dettaglio: `opzione ${n}: ${pro.dettaglio}` });
     const contro = testoFacoltativo(o, 'contro', TETTI.contro);
     if (!contro.ok) return Object.assign(contro, { dettaglio: `opzione ${n}: ${contro.dettaglio}` });
-    if (perOwner) {
+    if (perOwner && !daFare) {
       for (const [campo, r] of [['pro', pro], ['contro', contro]]) {
         if (r.valore.trim()) continue;
         return no(`${campo}_mancante`, `l'opzione ${n} non ha il ${campo}: ogni opzione dice cosa guadagna e cosa costa, in una riga ciascuno`,
