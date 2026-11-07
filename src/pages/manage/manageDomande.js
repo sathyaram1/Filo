@@ -1249,13 +1249,14 @@
   // La domanda come la vede l'owner, in testo: è quello che Filo legge di una riga trascinata in chat.
   function riferimentoDi(d) {
     const id = idDi(d);
-    const righe = [`Domanda ${id} (${[PRIORITA[d.priorita], NOMI_SCHEDA[MR.schedaDomanda(d)]].filter(Boolean).join(', ').toLowerCase()})`];
+    const nomi = nomiSezioni(d);
+    const righe = [`Domanda ${id} (${[TIPO[tipoDi(d)].nome, PRIORITA[d.priorita], NOMI_SCHEDA[MR.schedaDomanda(d)]].filter(Boolean).join(', ').toLowerCase()})`];
     if (d.illeggibile) righe.push('Il server non riesce ad aprire il testo di questa domanda.');
-    if (d.contesto) righe.push('', 'Contesto:', String(d.contesto));
-    if (d.problema) righe.push('', 'Problema:', String(d.problema));
+    if (d.contesto) righe.push('', `${nomi.contesto}:`, String(d.contesto));
+    if (d.problema) righe.push('', `${nomi.problema}:`, String(d.problema));
     const ops = Array.isArray(d.opzioni) ? d.opzioni : [];
     if (ops.length) {
-      righe.push('', 'Opzioni:');
+      righe.push('', `${nomi.opzioni}:`);
       ops.forEach((o, i) => {
         const segni = [d.consiglio && d.consiglio.opzione === i ? 'consigliata' : '', sceltaFatta(d) === i && d.stato !== 'aperta' ? 'scelta' : ''].filter(Boolean);
         righe.push(`${i + 1}. ${o.testo}${segni.length ? ` (${segni.join(', ')})` : ''}`);
