@@ -19,7 +19,7 @@ async function newtabPage(app) {
   throw new Error('newtab non trovata');
 }
 
-test('quali dati escono:la risposta scritta insieme alla spunta arriva all’utente anche se il giro dopo non la riscrive', async ({ app, shell }) => {
+test('quali dati escono: la risposta scritta insieme alla spunta arriva all’utente anche se il giro dopo non la riscrive', async ({ app, shell }) => {
   test.setTimeout(120_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const page = await newtabPage(app);
