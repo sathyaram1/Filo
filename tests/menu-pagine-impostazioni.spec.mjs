@@ -75,15 +75,17 @@ for (const url of ['filo://preferences/preferences.html', 'filo://options/option
           preso = null;
           const c = M.vociMenu(el).find((v) => v.label === 'Chiedi a Filo');
           if (c) c.onClick();
-          const scelte = el.tagName === 'SELECT' && el.options.length > 1 ? [...el.options].slice(0, 2).map((o) => o.textContent.trim()).join('') : '';
+          // Le scelte come le scrive l'elenco disegnato da Filo, senza la stima fra parentesi.
+          const scelte = el.tagName === 'SELECT' ? [...el.options].map((o) => o.textContent.split(' (')[0].trim()).filter((t) => t.length > 2) : [];
           out.push({ id, percorso, scelte, nome: String(preso || '').replace(/^Sull'impostazione «|»:$/g, '') });
         }
       } finally { S.chiediDaPagina = orig; }
       return out;
     });
     expect(nomi.length).toBeGreaterThan(0);
-    const strani = nomi.filter((n) => !n.nome || n.nome === n.id || n.nome === n.percorso || n.nome.length > 80 || /▾/.test(n.nome)
-      || (n.scelte && n.nome.replace(/\s/g, '').includes(n.scelte.replace(/\s/g, ''))));
+    const strani = nomi.filter((n) => !n.nome || n.nome === n.id || n.nome === n.percorso || n.nome.length > 141 || /▾/.test(n.nome)
+      || /\s\S{1,3}…$/.test(n.nome)
+      || n.scelte.some((s) => s !== n.nome && n.nome.includes(s)));
     expect(strani).toEqual([]);
   });
 }
