@@ -4224,7 +4224,7 @@ class TabManager {
       Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
     }
     const apri = (segna) => {
-      const id = this.openTab(url, { activate: !sfondo, openedByLink: true, origine });
+      const id = this.openTab(url, { activate: !sfondo, openedByLink: true, origine, azioneMisurata });
       if (segna) segna(this.tabs.find((t) => t.id === id));
     };
     if (daScheda && this._sbPrimaDelClic(daScheda, url, apri, { daFilo: true })) return true;
