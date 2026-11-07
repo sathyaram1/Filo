@@ -54,6 +54,22 @@ test('Preferenze: «Rimetti di serie» su una tendina la rimette senza chiedere'
   expect(await confirmText(page)).toBe('');
 });
 
+// Una tendina dentro la sua etichetta: il nome è l'etichetta, non l'etichetta più le scelte dell'elenco disegnato accanto.
+for (const { id, nome } of [{ id: 'contestoCache', nome: 'Durata della cache' }, { id: 'traduzioneNascoste', nome: 'Sezioni chiuse' }]) {
+  test(`Preferenze: «Chiedi a Filo» sulla tendina ${id} la chiama «${nome}»`, async ({ openTab }) => {
+    test.setTimeout(90_000);
+    const page = await openTab('filo://preferences/preferences.html');
+    await expect(page.locator(`#${id}`)).toBeAttached({ timeout: 10_000 });
+    const tendina = page.locator(`#${id}`).locator('xpath=..').locator('.sn-select-button').first();
+    await tendina.scrollIntoViewIfNeeded();
+    await tendina.click({ button: 'right' });
+    await menuDi(page).voce('Chiedi a Filo').first().click();
+    const campo = page.locator('.sn-sidebar-input textarea');
+    await expect(campo).toBeVisible({ timeout: 8_000 });
+    await expect(campo).toHaveValue(`Sull'impostazione «${nome}»: `);
+  });
+}
+
 // Ogni voce delle quattro pagine prende un nome dalla pagina: mai il nome interno, mai l'elenco delle scelte.
 for (const url of ['filo://preferences/preferences.html', 'filo://options/options.html', 'filo://options/altro.html', 'filo://security/security.html']) {
   test(`i nomi delle voci in ${url.split('/').pop()}`, async ({ openTab }) => {
