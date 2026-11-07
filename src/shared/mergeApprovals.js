@@ -649,7 +649,7 @@
   var LIBERA = 'sn-mac-libera';
   // Le richieste di cui l'owner ha già aperto tutte le voci, per «id@sha».
   var APERTE = {};
-  var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere…' };
+  var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere: di solito ci vuole qualche minuto.' };
   function occupata(root) {
     return !!(root && root.querySelector
       && root.querySelector('.sn-mac-btn-go.is-armed, .sn-mac-card.is-busy:not(.is-done)'));
