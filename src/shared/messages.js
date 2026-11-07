@@ -479,6 +479,11 @@
     // { dove: casa|aiuto, immagini: [{ dataUrl, nome, percorso }], file: [percorso], grandi }: la home prende le sue,
     // l'Aiuto le altre; `grandi` sono quelle oltre il tetto che non entrano.
     CHAT_ALLEGA: 'chat_allega',
+    // main → la vista sotto il puntatore (#2084): una scheda portata fuori dalla fila.
+    // { fase: sopra|lascia|esci, x, y (px della pagina), scheda: { id, titolo, url, icona } } (src/shared/schedaTrascinata.js).
+    SCHEDA_TRASCINATA: 'scheda_trascinata',
+    // Da una chat, sul gettone di una scheda (#2085): { op: anteprima|nascondi|apri, scheda, rect } → { ok }.
+    GETTONE_SCHEDA: 'gettone_scheda',
     // Il pannello di destra delle app di Filo (#1433): solo dalle pagine di Filo (`soloFilo`), un sito non ha un pannello.
     PANNELLO_APP_LEGGI: 'pannello_app_leggi',       // { app } → { ok, stato: { elementi, config } }
     PANNELLO_APP_MODIFICA: 'pannello_app_modifica', // { app, op: posa|togli|configura|migra, id, primaDi?, config? } → { ok, stato }
