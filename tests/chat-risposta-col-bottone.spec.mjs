@@ -170,6 +170,8 @@ test('risposta scritta insieme al solo promemoria dopo una lettura: il modello s
     await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
     const esito = (await chiamateAlModello(app))[2].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
     expect(esito.content).toContain('riscrivila per intero');
+    // #1921.1: GLM spiegava all'utente perché riscriveva; l'avviso gli dice che è solo per lui.
+    expect(esito.content).toContain('non dire all\'utente che stai riscrivendo');
     await expect(bolla).toHaveCount(1);
     expect((await bolla.evaluate((el) => el.textContent)).split('305,40').length - 1).toBe(1);
   } finally {
