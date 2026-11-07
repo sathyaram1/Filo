@@ -1,8 +1,9 @@
-// Esplorazione 3 del giro 3: quello che il mondo della pagina vede di una scheda che le passa sopra. Si cancella.
+// Esplorazione 3 del giro 3: la chat di un mazzo e il documento dell'Editor come destinazioni. Si cancella.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { disponibili, finestraASchermo, trascina } from '../../helpers/gestiVeri.mjs';
 
+const OUT = 'tests/.shots/2091-g3';
 const schede = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs);
 const idPerUrl = async (shell, url) => (await schede(shell)).find((t) => t.url === url)?.id;
 
@@ -24,44 +25,42 @@ async function sulloSchermo(app, doc, sel) {
     const vb = tm.tabs.find((x) => x.id === tm.activeId).view.getBounds();
     return { x: cb.x + vb.x, y: cb.y + vb.y };
   });
-  return { x: Math.round(o.x + r.x + r.width / 2), y: Math.round(o.y + r.y + r.height / 2) };
+  return { x: Math.round(o.x + r.x + Math.min(30, r.width / 2)), y: Math.round(o.y + r.y + r.height / 2) };
 }
 
 test.describe.configure({ retries: 0 });
 test.beforeEach(() => { test.skip(!disponibili(), 'niente XTest'); });
 
-const SPIA = `<script>
-  window.__visto = [];
-  const cerca = (s) => { try { s = typeof s === 'string' ? s : JSON.stringify(s); } catch (_) { s = String(s); } if (new RegExp(['SEG', 'RETO'].join('') + '|' + ['Conto', ' corr'].join('')).test(s)) window.__visto.push(s.slice(0, 200)); };
-  for (const t of ['message','dragenter','dragover','drop','paste','beforeinput','input','focus','mousemove','pointermove','filo','custom']) addEventListener(t, (e) => { cerca(e.data); cerca(e.detail); try { cerca(e.dataTransfer && e.dataTransfer.getData('text')); } catch (_) {} }, true);
-  new MutationObserver((ms) => { for (const m of ms) { if (m.type === 'attributes') cerca(m.target.getAttribute(m.attributeName)); for (const n of m.addedNodes || []) cerca(n.outerHTML || n.textContent); if (m.type === 'characterData') cerca(m.target.data); } }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
-  setInterval(() => { cerca(document.documentElement.outerHTML); }, 100);
-</script>`;
-
-test('L una scheda che passa sopra una pagina senza esserci lasciata: la pagina non ne vede titolo né indirizzo', async ({ app, shell, openTab, testServer }) => {
+test('M la chat di un mazzo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(120_000);
-  const segreta = testServer.html('<title>Conto corrente di Mario</title><p>saldo') + '?SEGRETO=1';
-  await openTab(segreta);
-  const id = await idPerUrl(shell, segreta);
-  const altra = testServer.html('<title>Altra</title><p>x');
-  await openTab(altra);
-  const pagina = await openTab(testServer.html(`<title>Spia</title>${SPIA}<p style="margin-top:300px">testo</p>
-    <textarea id="t" style="width:300px;height:60px"></textarea><iframe src="${testServer.html('<title>f</title>' + SPIA + '<textarea id=u></textarea>', { pubblico: true })}" style="width:300px;height:100px"></iframe>`));
+  const url = testServer.html('<title>Guida al commander Niv-Mizzet</title><p>Carte consigliate: Ophidian Eye.');
+  await openTab(url);
+  const id = await idPerUrl(shell, url);
+  const mazzi = await openTab('filo://decks/decks.html');
+  await mazzi.waitForLoadState('domcontentloaded');
+  await mazzi.click('#newDeck');
+  await expect(mazzi.locator('#screenBuilder')).toBeVisible();
   await finestraASchermo(app);
-  await pagina.waitForTimeout(800);
-  const t = await sulloSchermo(app, pagina, '#t');
-  const p = await sulloSchermo(app, pagina, 'p');
-  const fr = await sulloSchermo(app, pagina, 'iframe');
-  const da = await linguetta(app, shell, id);
-  // Sopra la pagina, sopra il campo, sopra il riquadro, e ritorno alla fila.
-  trascina(da, p, t, fr, { x: da.x + 5, y: da.y });
-  await pagina.waitForTimeout(800);
-  const visto = await pagina.evaluate(() => window.__visto);
-  const vistoF = await pagina.frames()[1]?.evaluate(() => window.__visto).catch(() => 'n/d');
-  console.log('L-PAGINA', JSON.stringify(visto), 'L-RIQUADRO', JSON.stringify(vistoF));
-  // Rilascio sopra il testo della pagina (non un campo).
-  trascina(await linguetta(app, shell, id), p);
-  await pagina.waitForTimeout(800);
-  console.log('L-RILASCIO-NON-CAMPO', JSON.stringify(await pagina.evaluate(() => window.__visto)));
-  console.log('L-ORDINE', JSON.stringify((await schede(shell)).map((x) => x.title)));
+  await mazzi.waitForTimeout(800);
+  await mazzi.fill('#chatInput', 'che ne pensi di ');
+  trascina(await linguetta(app, shell, id), await sulloSchermo(app, mazzi, '#chatInput'));
+  await mazzi.waitForTimeout(1200);
+  console.log('M-VALORE', JSON.stringify(await mazzi.locator('#chatInput').inputValue()), 'gettoni', await mazzi.locator('.sn-gettone').count());
+  await mazzi.screenshot({ path: `${OUT}/M-mazzo.png` });
+});
+
+test('N il documento dell\'Editor', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const url = testServer.html('<title>Fonte per la tesi</title><p>x');
+  await openTab(url);
+  const id = await idPerUrl(shell, url);
+  const editor = await openTab('filo://editor/editor.html');
+  await editor.waitForSelector('#doc');
+  await editor.click('#doc');
+  await editor.keyboard.type('Fonte: ');
+  await finestraASchermo(app);
+  await editor.waitForTimeout(800);
+  trascina(await linguetta(app, shell, id), await sulloSchermo(app, editor, '#doc'));
+  await editor.waitForTimeout(1200);
+  console.log('N-DOC', JSON.stringify(await editor.locator('#doc').innerText()));
 });
