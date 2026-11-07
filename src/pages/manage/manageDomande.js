@@ -652,7 +652,7 @@
       }
       lista.appendChild(li);
     });
-    return sezione('mg-dq-opz', 'Opzioni', lista);
+    return sezione('mg-dq-opz', nomiSezioni(d).opzioni, lista);
   }
 
   function consiglio(d) {
