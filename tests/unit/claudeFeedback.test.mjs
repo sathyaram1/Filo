@@ -356,6 +356,23 @@ test('#908 senza --locale né --non-locale non apre niente e dice le due strade;
   });
 });
 
+test('#2217 --server, anche accanto a --non-locale, apre col segno lavoro server e lo dice', async () => {
+  for (const argv of [['T', 'X', '--non-locale', '--server'], ['T', 'X', '--server'], ['T', 'X', '--non-locale', '--lavoro-server']]) {
+    const righe = [];
+    const orig = console.log;
+    console.log = (...a) => righe.push(a.join(' '));
+    try {
+      await conSubmit(async (_p, o) => ({ id: 'd11', seq: 911, senderProof: 'admin', localOnly: !!o.localOnly }), async (visti) => {
+        assert.equal(await SCRIPT.main(argv), SCRIPT.EXIT.FATTO, argv.join(' '));
+        assert.ok(visti.opts[0].localOnly, argv.join(' '));
+        assert.equal(visti[0].text, 'X', 'l’opzione non finisce nel testo');
+      });
+    } finally { console.log = orig; }
+    assert.ok(righe.some((r) => /lavoro server/.test(r)), righe.join('\n'));
+    assert.ok(!righe.some((r) => /verify-local/.test(r)), righe.join('\n'));
+  }
+});
+
 test('#908 --non-locale: stessa prova del mittente, ma è per le routine', async () => {
   const righe = [];
   const orig = console.log;
