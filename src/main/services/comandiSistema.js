@@ -614,6 +614,18 @@ command -v nmcli >/dev/null 2>&1 || { dice errore manca-nmcli; exit 0; }
 nmcli --wait 25 connection up uuid "$U" 2>&1 | grezzo
 dice uscita "$(nmcli -t -f UUID connection show --active 2>/dev/null | grep -qix "$U" && echo 0 || echo 1)"
 `,
+    'bt-dimentica': SH_INIZIO + String.raw`I="$FILO_SIS_INDIRIZZO"
+case "$I" in [0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]) ;; *) dice errore indirizzo; exit 0 ;; esac
+command -v bluetoothctl >/dev/null 2>&1 || { dice errore manca-bluetoothctl; exit 0; }
+timeout 15 bluetoothctl remove "$I" 2>&1 | grezzo
+if timeout 5 bluetoothctl info "$I" 2>/dev/null | grep -q 'Paired: yes'; then dice dimenticato 0; else dice dimenticato 1; fi
+`,
+    'wifi-dimentica': SH_INIZIO + String.raw`U="$FILO_SIS_UUID"
+case "$U" in *[!0-9a-fA-F-]*|'') dice errore parametro; exit 0 ;; esac
+command -v nmcli >/dev/null 2>&1 || { dice errore manca-nmcli; exit 0; }
+nmcli connection delete uuid "$U" 2>&1 | grezzo
+dice uscita "$(nmcli -t -f UUID connection show 2>/dev/null | grep -qix "$U" && echo 1 || echo 0)"
+`,
   },
 
   darwin: {
