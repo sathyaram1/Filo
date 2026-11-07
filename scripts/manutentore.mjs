@@ -549,12 +549,9 @@ const perNumero = (a, b) => Number(String(a.num).split('.')[0]) - Number(String(
  * fuori. La priorità 2 non c'entra: decide l'ordine. PURA.
  */
 export function schedeDelPiccolo(schede, ordine = []) {
-  const perNum = new Map((schede || []).filter((s) => s && s.num).map((s) => [String(s.num), s]));
-  const tre = [...perNum.values()].filter((s) => s.priorita === 3).sort(perNumero);
-  const nellOrdine = [...new Set((ordine || []).map((n) => String(n).replace(/^#/, '')))]
-    .map((n) => perNum.get(n)).filter((s) => s && s.priorita !== 3);
-  const prese = new Set([...tre, ...nellOrdine]);
-  return [...tre, ...nellOrdine, ...[...perNum.values()].filter((s) => s.fermo && !prese.has(s)).sort(perNumero)];
+  const { ordine: nellOrdine, tre, ammessi } = lavoriPromettibili(schede, ordine);
+  const ferme = (schede || []).filter((s) => s && s.num && s.fermo && !ammessi.has(String(s.num))).sort(perNumero);
+  return [...[...tre].sort(perNumero), ...nellOrdine, ...ferme];
 }
 
 /**
