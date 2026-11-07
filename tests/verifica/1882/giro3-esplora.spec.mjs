@@ -70,6 +70,42 @@ test('Cerca dalla home misura fino alla pagina dei risultati', async ({ app, ope
   expect(Object.keys(fine)).toEqual(['s5']);
 });
 
+test('Cerca dalla risposta di Filo sopra un sito (strato dei riquadri) apre i risultati e misura fino a pagina caricata', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.TRANSLATE_SELECTION]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const orig = globalThis.SN_PROVIDER_OPENROUTER;
+    globalThis.SN_PROVIDER_OPENROUTER = { ...orig, streamComplete: async ({ onDelta }) => { onDelta('The cat sleeps.'); return { text: 'The cat sleeps.', usage: {} }; } };
+  });
+  const p = await testServer.openReady(openTab, '<!doctype html><body style="padding:40px"><p style="font-size:22px">Il <span id="parola">gatto</span> dorme.</p></body>');
+  await motoreLento(app, p);
+  await p.locator('#parola').dblclick();
+  await app.evaluate(({ BrowserWindow }) => {
+    const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
+    globalThis.__filoShortcuts.dispatch('translate-selection', win);
+  });
+  await expect.poll(async () => (await statoDi(app, p, '.sn-popup-body'))?.testo || '', { timeout: 15_000 }).toContain('The cat');
+  const strato = await paginaDelloStrato(app, p);
+  const corpo = strato.locator('.sn-popup-body');
+  await corpo.click({ clickCount: 3 });
+  await corpo.click({ button: 'right' });
+  let superficie = null;
+  await expect.poll(async () => {
+    for (const w of app.windows()) {
+      try { if (await w.locator('.sn-menu:not(.sn-menu-sub)').isVisible()) { superficie = w; return w.url(); } } catch (_) {}
+    }
+    return null;
+  }, { timeout: 8_000 }).not.toBeNull();
+  await superficie.locator('.sn-menu-item', { hasText: /^\s*Cerca\s*$/ }).first().click();
+  await expect.poll(() => caricata(app, 'google\\.com/search'), { timeout: 15_000, message: 'Cerca dallo strato non apre i risultati' }).toBe(true);
+  await expect.poll(async () => (await oggi(app))['search-web']?.n || 0, { timeout: 8_000 }).toBe(1);
+  expect(Object.keys((await oggi(app))['search-web'].fine)).toEqual(['s5']);
+});
+
 test('il QR della pagina, su richiesta, si apre al primo uso su un sito appena aperto', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<!doctype html><body><p>qr</p></body>');
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
