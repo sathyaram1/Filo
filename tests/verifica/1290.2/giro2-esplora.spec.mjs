@@ -89,8 +89,9 @@ const framePage = (frames) => `<!doctype html><html lang="en"><body style="font:
 for (const [nome, html] of [
   ['scritto nel srcdoc', (img) => `<iframe id="emb" style="width:520px;height:220px" srcdoc="${frameInner('ZZSRCDOC', `<img src='${img}' width='40' height='40' alt=''>`).replace(/"/g, '&quot;')}"></iframe>`],
   ['scritto dalla pagina', (img) => `<iframe id="emb" style="width:520px;height:220px"></iframe><script>
-    const d = document.getElementById('emb').contentDocument; d.open();
-    d.write(${JSON.stringify(frameInner('ZZSRCDOC', `<img src="${img}" width="40" height="40" alt="">`))}); d.close();</script>`],
+    window.__scrivi = () => { const d = document.getElementById('emb').contentDocument; d.open();
+    d.write(${JSON.stringify(frameInner('ZZSRCDOC', `<img src="${img}" width="40" height="40" alt="">`))}); d.close(); };
+    setTimeout(window.__scrivi, 300);</script>`],
 ]) {
   test(`A riquadro ${nome} che finisce di caricarsi dopo Traduci: tradotto, e niente «testo nuovo»`, async ({ app, openTab, testServer }) => {
     test.setTimeout(120000);
