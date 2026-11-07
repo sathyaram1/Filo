@@ -81,7 +81,6 @@ function nelRiquadro(win, wc, frame, dati) {
   if (!win || !vivo(wc) || !frame || !dati) return false;
   const fase = ['sopra', 'lascia', 'esci'].includes(dati.fase) ? dati.fase : '';
   const st = inCorso.get(win);
-  console.log('[dbg] nelRiquadro', fase, JSON.stringify(dati), !!st, st && st.wc === wc, (frame.frames || []).map((f) => f.url));
   if (!fase || (fase !== 'esci' && (!st || st.wc !== wc || Date.now() > st.fino))) return false;
   const x = Number(dati.x);
   const y = Number(dati.y);
