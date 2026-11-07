@@ -921,36 +921,40 @@
         return;
       }
       disarm();
-      segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null);
+      segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null, Date.now());
     });
 
     // Un'approvazione in volo, partita da qui o da un'altra strada (il segno «fondi senza
     // chiedermelo»): finché il server non risponde la card lo dice e non se ne manda un'altra (#702).
+    // `daMs` è l'istante del sì: una card ridisegnata a metà volo conta da lì, non da quando è nata.
     var seguita = null;
-    function segui(attesa, risposta) {
+    function segui(attesa, risposta, daMs) {
       // La stessa risposta arriva anche da seguiSulPosto: seguita due volte, l'esito si direbbe due volte.
       if (risposta && seguita === risposta) return;
       seguita = risposta;
-      setBusy(true);
       card.classList.add('is-merging');
+      setBusy(true);
       rititola(card.closest ? card.closest('.sn-mac') : null);
+      avviaTic(daMs);
       say(attesa);
       Promise.resolve(risposta)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
+          fermaTic();
           say(msg);
           if ((msg.kind === 'ok' || msg.reload) && o.onDone) { finita(); o.onDone(); }
           else setBusy(false);
         })
         .catch(function (e) {
+          fermaTic();
           say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
     }
-    card.__snMacSegui = function (attesa, risposta) {
+    card.__snMacSegui = function (attesa, risposta, daMs) {
       if (card.classList.contains('is-done')) return;
       if (armed) disarm();
-      segui(attesa, risposta);
+      segui(attesa, risposta, daMs);
     };
 
     discardBtn.addEventListener('click', function () {
