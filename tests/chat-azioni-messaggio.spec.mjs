@@ -28,7 +28,8 @@ async function prepara(app) {
       if (sistema.includes('# Protocollo di risposta')) return fatto(JSON.stringify({ text: 'Il capitolo sui licheni va accorciato.\n\nIl resto regge.', status: 'done' }));
       if (sistema.includes('deck builder per Magic')) return fatto(JSON.stringify({ reply: 'Per questo mazzo servono più pescate.' }));
       if (sistema.startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic())) {
-        globalThis.__domande.push(typeof ultimo.content === 'string' ? ultimo.content : JSON.stringify(ultimo.content));
+        globalThis.__domande.push(messages.filter((m) => m.role === 'user').slice(-2)
+          .map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n'));
         return fatto('Va bene.');
       }
       return fatto('{}');
