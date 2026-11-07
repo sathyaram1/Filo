@@ -72,4 +72,23 @@ test('main: le schede del messaggio arrivano al modello come letture di pagina, 
   assert.match(turno, /notaDeiGettoni\(lettureGettoni\)/);
   const aiuto = src.slice(src.indexOf('if (action === ACTIONS.HELP)'), src.indexOf('if (action === ACTIONS.CATEGORIZE)'));
   assert.match(aiuto, /notaDeiGettoni\(await lettureDeiGettoni\(/);
+  // Nell'Aiuto le stesse letture si segnano fra le fonti della sua conversazione: alzano la guardia sulle azioni come
+  // una lettura chiesta da lui, anche su una pagina di Filo dove l'Aiuto non conta già un sito.
+  assert.match(aiuto, /lettureDeiGettoni\([^;]*\{ assistente: true \}\)/);
+  assert.match(lettura, /if \(assistente\) for \(const l of letture\) segnaLetturaAiuto\(sender, l\)/);
+});
+
+// Il filo riletto dal disco porta le schede del messaggio, e la ricerca le legge col titolo, senza i segni.
+test('filo: un messaggio con le schede le porta nella coda, e la ricerca lo trova senza i segni', async () => {
+  await import('../../src/shared/filoCoda.js');
+  const C = globalThis.SN_FILO_CODA;
+  const S = globalThis.SN_SCHEDE_IN_CHAT;
+  const testo = `di cosa parla ${S.gettone(SCHEDA)} `;
+  const chats = [{ id: 'c1', createdAt: '2026-11-07T10:00:00Z', messages: [{ role: 'user', text: testo, ts: '2026-11-07T10:00:00Z', schede: [SCHEDA] }] }];
+  const righe = C.righe ? C.righe({ chats }) : null;
+  const msg = (righe && (righe.voci || righe)).find?.((v) => v.k === 'msg');
+  if (msg) assert.deepEqual(msg.schede, [SCHEDA]);
+  const r = C.cerca({ chats }, 'parla');
+  assert.equal(r.messaggi.length, 1);
+  assert.ok(!r.messaggi[0].testo.includes('⟦'), r.messaggi[0].testo);
 });
