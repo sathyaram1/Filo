@@ -34,7 +34,14 @@
     // La forma (§3.1): il titolo dice di cosa si parla, e un'opzione sola non è una domanda.
     paroleTitolo: 10,
     opzioniMinime: 2,
+    // Un «da fare» (#2229): «Fatto», e facoltativo «Non lo faccio».
+    opzioniDaFare: 2,
   });
+
+  // `da_fare`: un passo che solo l'owner può fare, nella stessa lista delle domande (#2229). Assente = da decidere.
+  const TIPI_DOMANDA = Object.freeze(['da_decidere', 'da_fare']);
+  // Il nome del pulsante di un «da fare» lo dà la posizione dell'opzione, mai il testo di chi chiede (§3.3).
+  const PULSANTI_DA_FARE = Object.freeze(['Fatto', 'Non lo faccio']);
 
   // La forma che il compito «Gestisci la domanda» dà a ciò che pubblica per l'owner (§3.5). Una riga sono
   // `caratteriRiga` caratteri, un a capo ne apre un'altra.
