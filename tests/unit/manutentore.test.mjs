@@ -364,26 +364,30 @@ test('indicazione con la chiave: se il taccuino cambia in mezzo lo rilegge e ris
   assert.match(scritture[1].dati.testo, /^voce 4\n\nIndicazione dell'owner \(\d{4}-\d{2}-\d{2}\): meno riallineamenti\n$/);
 });
 
-test('il redattore: una promessa su un lavoro che non è nella rosa né a 3 si rifiuta, come un link nuovo', () => {
+test('il redattore: una promessa su un lavoro che non è nell\'ordine né a 3 si rifiuta, come un link nuovo (#2269)', () => {
   const blocco = { version: '0.2.255', features: ['Le schede si trascinano. Guida su https://filo.app/guida'], fixes: ['Il menu si apre.'] };
-  const schede = [schedaServer(812, 2), schedaServer(900, 1), schedaServer(950, 3)];
+  // #900 è a 2 ma fuori dall'ordine: non parte, e su di lei non si promette.
+  const schede = [schedaServer(812, 1), schedaServer(813, 0), schedaServer(900, 2), schedaServer(950, 3)];
+  const ordine = ['813', '812'];
   const base = { versione: '0.2.255', features: [{ testo: 'Le schede si trascinano (guida su https://filo.app/guida).', da: [1] }], fixes: ['Il menu si apre.'] };
-  assert.equal(M.controllaNovita(base, { blocco, schede }).ok, true);
-  const fuoriRosa = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede });
-  assert.equal(fuoriRosa.ok, false);
-  assert.match(fuoriRosa.errori.join('\n'), /promessa su #900, che non è nella rosa né a priorità 3/);
-  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede });
+  assert.equal(M.controllaNovita(base, { blocco, schede, ordine }).ok, true);
+  const fuoriOrdine = M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: '900', riga: 'Altri formati in arrivo.' }] }, { blocco, schede, ordine });
+  assert.equal(fuoriOrdine.ok, false);
+  assert.match(fuoriOrdine.errori.join('\n'), /promessa su #900, che non è nell'ordine né a priorità 3/);
+  const taciuta = M.controllaNovita({ ...base, features: [...base.features, 'Il supporto per i PDF è in arrivo.'] }, { blocco, schede, ordine });
   assert.match(taciuta.errori.join('\n'), /non dice da quali righe dei worker nasce/);
-  for (const n of ['812', '950']) {
-    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede }).ok, true, `#${n}`);
+  for (const n of ['812', '813', '950']) {
+    assert.equal(M.controllaNovita({ ...base, features: [...base.features, 'Altri formati in arrivo.'], promesse: [{ numero: n, riga: 'Altri formati in arrivo.' }] }, { blocco, schede, ordine }).ok, true, `#${n}`);
   }
-  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede });
+  const link = M.controllaNovita({ ...base, fixes: ['Il menu si apre: vedi www.altro.example/x'] }, { blocco, schede, ordine });
   assert.match(link.errori.join('\n'), /link che le righe dei worker non avevano: www\.altro\.example\/x/);
-  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede }).errori[0], /il blocco in cima è 0\.2\.255/);
-  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede });
-  assert.match(ctx, /## La rosa \(priorità 2\)\n\n#812 /);
+  assert.match(M.controllaNovita({ ...base, versione: '0.2.254' }, { blocco, schede, ordine }).errori[0], /il blocco in cima è 0\.2\.255/);
+  const ctx = M.contestoRedattore({ blocco, capacita: '• Trascinare', schede, ordine });
+  assert.match(ctx, /## I lavori nell'ordine\n\n#813 .*\n#812 /, 'nella sequenza dell\'ordine');
   assert.match(ctx, /## Priorità 3 in corso\n\n#950 /);
   assert.doesNotMatch(ctx, /#900/);
+  assert.doesNotMatch(ctx, /rosa/i);
+  assert.match(M.contestoRedattore({ blocco, schede }), /## I lavori nell'ordine\n\n\(nessuno\)/);
 });
 
 test('il redattore: una riga tiene la segnalazione delle righe lette, e la consegna porta le impronte di quelle righe', async () => {
