@@ -35,6 +35,7 @@
       manutentoreAcceso: d.manutentoreAcceso === true,
       riservatiOff: d.riservatiOff === true,
       riservatiTetto: tettoDi(d.riservatiTetto, max),
+      unitWindows: UNIT_WINDOWS.includes(d.unitWindows) ? d.unitWindows : UNIT_WINDOWS[0],
     };
   }
 
