@@ -231,3 +231,51 @@ test('prova vera: prova il main nominato, non quello di origin, e il rosso esce 
     togliCartella(r.casa);
   }
 });
+
+// La strada del workflow: due parti scrivono il loro esito nelle uscite del lavoro, `--unisci` lo legge dall'ambiente.
+test('prova vera a parti: la parte veloce trova il test rotto del ramo, la riga unica lo porta al server', () => {
+  const r = repoFinto();
+  try {
+    writeFileSync(join(r.lavoro, 'altro.txt'), 'x\n', 'utf8');
+    const m1 = r.commit('main: altro');
+    r.git(['push', '-q', 'origin', 'main']);
+    r.git(['checkout', '-q', '-b', 'claude/import', 'HEAD~1']);
+    // Il caso di #2223 come lo vede Linux non c'è: qui il test nuovo è rosso ovunque, e basta che la parte lo scelga.
+    writeFileSync(join(r.lavoro, 'tests', 'unit', 'nuovo.test.mjs'), TEST_VALORE.replace("'uno'", "'due'"), 'utf8');
+    const ramo = r.commit('ramo: test nuovo');
+
+    const campi = {};
+    for (const [nome, unit] of [['linux', 'tutti'], ['windows', '']]) {
+      const uscita = join(r.casa, `uscita-${nome}.txt`);
+      writeFileSync(uscita, '', 'utf8');
+      const p = azione(r, ramo, m1, { args: ['--root', r.lavoro, '--parte', nome, '--unit', unit], extra: { GITHUB_OUTPUT: uscita } });
+      assert.equal(p.codice, 0, `una parte non decide la corsa:\n${p.uscita}`);
+      assert.equal(p.campo, null, 'una parte non scrive la riga del server');
+      assert.match(p.uscita, new RegExp(`^${MARCA_PARTE} ${nome} \\{`, 'm'));
+      const righe = readFileSync(uscita, 'utf8').split('\n').filter(Boolean);
+      assert.equal(righe.length, 1, righe.join('\n'));
+      assert.ok(righe[0].startsWith('campo={'));
+      campi[nome] = righe[0].slice('campo='.length);
+      assert.equal(JSON.parse(campi[nome]).esito, 'rosso_sulla_fusione', p.uscita);
+    }
+    assert.match(azione(r, ramo, m1, { args: ['--root', r.lavoro, '--parte', 'windows', '--unit', ''] }).uscita, /toccati dal ramo \(1 file\)/);
+
+    const finale = azione(r, ramo, m1, {
+      args: ['--unisci', 'linux,windows'],
+      extra: { CAMPO_LINUX: campi.linux, RISULTATO_LINUX: 'success', CAMPO_WINDOWS: campi.windows, RISULTATO_WINDOWS: 'success' },
+    });
+    assert.equal(finale.codice, 1, finale.uscita);
+    assert.equal(finale.campo.esito, 'rosso_sulla_fusione');
+    assert.deepEqual(finale.campo.rossi, ['tests/unit/nuovo.test.mjs › il valore è uno', 'tests/unit/nuovo.test.mjs › il valore è uno [Windows]']);
+    assert.deepEqual({ ramo: finale.campo.ramo, main: finale.campo.main }, { ramo, main: m1 });
+
+    const senzaWindows = azione(r, ramo, m1, {
+      args: ['--unisci', 'linux,windows'],
+      extra: { CAMPO_LINUX: JSON.stringify({ ramo, main: m1, esito: 'verde', mainSha: m1 }), RISULTATO_LINUX: 'success', RISULTATO_WINDOWS: 'failure' },
+    });
+    assert.equal(senzaWindows.codice, 2, senzaWindows.uscita);
+    assert.equal(senzaWindows.campo.esito, 'non_provata');
+  } finally {
+    togliCartella(r.casa);
+  }
+});
