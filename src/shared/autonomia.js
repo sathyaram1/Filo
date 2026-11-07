@@ -302,7 +302,7 @@
 
   // Il segreto che `testo` porterebbe fuori: { tipo, scritto }, tipo '' se nessuno. `richiesta` = cosa ha scritto
   // l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui e non contano; `scritto` dice
-  // se ogni altro segreto l'ha scritto lui, cioè se ha chiesto con parole sue di mandarlo (costo 4).
+  // se ogni altro segreto l'ha scritto lui: solo allora può uscire, con la parola (costo 4).
   function segretoDettaglio(testo, { richiesta = '' } = {}) {
     const chiesto = soloAlnum(richiesta);
     let tipo = '';
