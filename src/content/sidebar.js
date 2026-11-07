@@ -2721,7 +2721,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     accoglieRilascio: () => chiuso() !== 'sito',
     contiene: (n) => !!(root && n && root.contains(n)),
     suChiusura: (fn) => { if (typeof fn === 'function') chiusoPerche = fn; },
-    dalloStrato, dallaPagina,
+    dalloStrato, dallaPagina, chiediDaPagina,
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.
