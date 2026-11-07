@@ -125,21 +125,46 @@ test('sopra la tabella (b): da un\'automazione CHIEDE diventa PROPONE, CONFERMA 
   assert.deepEqual([cons.risposta, cons.digita], ['propone', true], 'la tabella non dice più no');
 });
 
-test('costo 4: «conferma» a ogni livello, yolo compreso, e solo se l\'utente l\'ha chiesto con parole sue', () => {
+test('costo 4 (strada B): a compito pulito «conferma» a ogni livello, yolo compreso; dopo una lettura no; mai da un\'automazione', () => {
   for (const livello of Object.keys(A.TABELLA)) {
-    for (const stato of ['pulito', 'contaminato']) {
-      for (const guardiano of [false, true]) {
-        const d = A.decideDettaglio({ livello, stato, costo: 4, guardiano });
-        assert.deepEqual([d.risposta, d.digita], ['conferma', true], `${livello}/${stato}`);
-        assert.equal(A.decide({ livello, stato, costo: 4, guardiano, chiesta: false }), 'no', `${livello}/${stato}: non chiesto`);
-        assert.equal(A.decide({ livello, stato, costo: 4, guardiano, origine: 'automazione' }), 'no', `${livello}/${stato}: da un'automazione`);
-        assert.equal(A.decide({ livello, stato, costo: 4, guardiano, dentroPerimetro: false }), 'conferma', `${livello}/${stato}: fuori perimetro resta la parola`);
+    for (const guardiano of [false, true]) {
+      for (const difesa of [false, true]) {
+        const ing = { livello, costo: difesa ? 1 : 4, difesa, guardiano };
+        const d = A.decideDettaglio({ ...ing, stato: 'pulito' });
+        assert.deepEqual([d.risposta, d.digita], ['conferma', true], `${livello}: pulito`);
+        assert.equal(A.decide({ ...ing, stato: 'pulito', dentroPerimetro: false }), 'conferma', `${livello}: fuori perimetro resta la parola`);
+        const letto = A.decideDettaglio({ ...ing, stato: 'contaminato' });
+        assert.deepEqual([letto.risposta, letto.regola], ['no', 'lettura'], `${livello}: dopo una lettura`);
+        for (const stato of ['pulito', 'contaminato']) {
+          assert.equal(A.decide({ ...ing, stato, chiesta: false }), 'no', `${livello}/${stato}: segreto non scritto o proposta di Filo`);
+          assert.equal(A.decide({ ...ing, stato, origine: 'automazione' }), 'no', `${livello}/${stato}: da un'automazione`);
+        }
       }
     }
   }
   assert.equal(A.decideDettaglio({ livello: 'yolo', stato: 'pulito', costo: 4, chiesta: false }).regola, 'chiesta');
   // Sotto il 4, `chiesta` non cambia niente: il resto lo dice la tabella.
   assert.equal(A.decide({ livello: 'default', stato: 'pulito', costo: 1, chiesta: false }), 'si');
+});
+
+// #1312.2 — le lezioni che Filo si scrive da solo non hanno nessuno a cui chiedere.
+test('lezioni automatiche: con (a) partono a compito pulito anche senza guardiano, con (b) no; contaminato mai', () => {
+  const lezione = AL.ingressi({ type: 'SALVA_LEZIONE', testo: 'lezione' }, {});
+  for (const livello of ['default', 'automatico']) {
+    const pulito = A.decideDettaglio({ livello, stato: 'pulito', costo: lezione.costo });
+    const sporco = A.decideDettaglio({ livello, stato: 'contaminato', costo: lezione.costo });
+    assert.equal(A.parteSenzaChiedere(pulito, 'pulito', 'pulito'), true, `${livello}: (a), pulito`);
+    assert.equal(A.parteSenzaChiedere(pulito, 'pulito', 'mai'), false, `${livello}: (b), pulito`);
+    assert.equal(A.parteSenzaChiedere(sporco, 'contaminato', 'pulito'), false, `${livello}: (a), contaminato`);
+    assert.equal(A.parteSenzaChiedere(sporco, 'contaminato', 'mai'), false, `${livello}: (b), contaminato`);
+  }
+  // Un «sì» vero della tabella parte con ogni scelta; senza scelta vale quella dell'owner, oggi (a).
+  assert.equal(A.parteSenzaChiedere(A.decideDettaglio({ livello: 'default', stato: 'pulito', costo: 1 }), 'pulito', 'mai'), true);
+  assert.equal(A.SENZA_GUARDIANO, 'pulito');
+  assert.equal(A.parteSenzaChiedere(A.decideDettaglio({ livello: 'default', stato: 'pulito', costo: 2 }), 'pulito'), true);
+  // Il main passa da qui.
+  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  assert.match(h, /async function lezioniAutomaticheConsentite[\s\S]*?SN_AUTONOMIA\.parteSenzaChiedere\(/);
 });
 
 test('lo stesso testo a più di 5 destinatari nello stesso giorno chiede a ogni livello', () => {
