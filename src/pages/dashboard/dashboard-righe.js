@@ -193,7 +193,10 @@
   function vociMenu(target) {
     const r = rigaDi(target);
     if (!r) return [];
+    const delMessaggio = azioni.flatMap((a) => a.voci(target))
+      .map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
     const voci = [
+      ...delMessaggio,
       { type: 'item', icon: icona('caretDown', 16), label: r.aperta ? 'Chiudi lo scambio' : 'Mostra lo scambio', onClick: () => alterna(r).catch(() => {}) },
     ];
     if (r.vista.dove && vai(r.vista.app)) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: vai(r.vista.app), onClick: () => apri(r) });
