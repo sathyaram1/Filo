@@ -523,5 +523,96 @@ test('prima della conferma si sa se rete o dispositivo sono già come li si chie
     assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'ufficio' }), { nome: 'Ufficio', gia: false });
     assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'le cuffie', collega: false }), { nome: 'Cuffie', gia: true });
     assert.deepEqual(await C.risolviNome({ cosa: 'bluetooth', dispositivo: 'tastiera', collega: false }), { nome: 'Tastiera', gia: false });
+    // Dimenticare non è mai già fatto, nemmeno la rete a cui si è collegati: la conferma la chiede sempre.
+    assert.deepEqual(await C.risolviNome({ cosa: 'wifi', rete: 'casa', dimentica: true }), { nome: 'Casa', gia: false });
   } finally { C._perProve.usaComputer(null); }
+});
+
+// ── #2096: dimenticare un dispositivo o una rete, su ogni piattaforma, senza toccare il sistema vero ──
+
+test('Dimentica: lo script è fisso e l\'indirizzo o la rete stanno solo nell\'ambiente, controllati per piattaforma', () => {
+  const indirizzi = { win32: '001122aabbcc', linux: '00:11:22:AA:BB:CC', darwin: '00-11-22-aa-bb-cc' };
+  for (const piattaforma of C.PIATTAFORME) {
+    const b = C.costruisci('bt-dimentica', { indirizzo: indirizzi[piattaforma] }, piattaforma);
+    assert.equal(b.script, C.SCRIPT[piattaforma]['bt-dimentica']);
+    assert.deepEqual(b.env, { FILO_SIS_INDIRIZZO: indirizzi[piattaforma] });
+    for (const altro of Object.values(indirizzi).filter((x) => x !== indirizzi[piattaforma])) {
+      assert.throws(() => C.costruisci('bt-dimentica', { indirizzo: altro }, piattaforma), /indirizzo/);
+    }
+    assert.throws(() => C.costruisci('bt-dimentica', { indirizzo: '00:11; rm -rf /' }, piattaforma), /indirizzo/);
+  }
+  assert.deepEqual(C.costruisci('wifi-dimentica', { uuid: '2f1e-ab' + '0'.repeat(10) }, 'linux').env, { FILO_SIS_UUID: `2f1e-ab${'0'.repeat(10)}` });
+  assert.deepEqual(C.costruisci('wifi-dimentica', { rete: 'Albergo "Sole"' }, 'darwin').env, { FILO_SIS_RETE: 'Albergo "Sole"' });
+  assert.deepEqual(C.costruisci('wifi-dimentica', { rete: 'Albergo' }, 'win32').env, { FILO_SIS_RETE: 'Albergo' });
+  // Windows: Pairing.UnpairAsync di WinRT, sull'indirizzo letto dall'ambiente; la rete passa a netsh come argomento a sé.
+  assert.match(C.SCRIPT.win32['bt-dimentica'], /\$env:FILO_SIS_INDIRIZZO/);
+  assert.match(C.SCRIPT.win32['bt-dimentica'], /Pairing\.UnpairAsync\(\)/);
+  assert.match(C.SCRIPT.win32['wifi-dimentica'], /& netsh\.exe wlan delete profile \('name=' \+ \$r\)/);
+  assert.match(C.SCRIPT.win32['wifi-dimentica'], /\$r\.Contains\('"'\)/);
+});
+
+test('Dimentica su Windows: lo stato di UnpairAsync dice com\'è andata, e il no di Windows porta alle impostazioni', () => {
+  const u = (stato) => C.leggiUscita(`FILO:stato=${stato}\n`);
+  assert.deepEqual(C.interpretaBtDimentica(u('Unpaired'), 'win32'), { ok: true });
+  assert.deepEqual(C.interpretaBtDimentica(u('AlreadyUnpaired'), 'win32'), { ok: true });
+  assert.deepEqual(C.interpretaBtDimentica(u('AccessDenied'), 'win32'), { ok: false, errore: 'bt-negato' });
+  assert.deepEqual(C.interpretaBtDimentica(u('Failed'), 'win32'), { ok: false, errore: 'bt-non-dimenticato' });
+  const s = C.spiega('bt-negato', { cosa: 'bluetooth', nome: 'Cuffie', piattaforma: 'win32' });
+  assert.equal(s.apri, 'win-bluetooth');
+  assert.deepEqual(C.interpretaWifiDimentica(C.leggiUscita('FILO:uscita=0\n'), 'win32'), { ok: true });
+  assert.deepEqual(C.interpretaWifiDimentica(C.leggiUscita('FILO:uscita=1\n'), 'win32'), { ok: false, errore: 'non-dimenticata' });
+  assert.deepEqual(C.interpretaWifiDimentica(C.leggiUscita('FILO:errore=parametro\n'), 'win32'), { ok: false, errore: 'parametro' });
+});
+
+test('Dimentica su Linux: bluetoothctl remove e nmcli connection delete ricevono solo l\'indirizzo e l\'identificativo', { skip: SENZA_SH }, () => {
+  const pc = computerFinto({
+    timeout: 'shift; exec "$@"',
+    bluetoothctl: `S="$(dirname "$0")/../tolto"
+case "$1" in
+  remove) touch "$S"; echo "Device has been removed" ;;
+  info) if [ -f "$S" ]; then echo "Device $2 not available"; else printf '	Paired: yes\\n'; fi ;;
+esac`,
+    nmcli: `S="$(dirname "$0")/../rete"
+case "$*" in
+  "connection delete uuid"*) touch "$S" ;;
+  "-t -f UUID connection show") [ -f "$S" ] || echo 1234abcd-0000 ;;
+esac`,
+  });
+  const r = C.interpretaBtDimentica(C.leggiUscita(pc.esegui('bt-dimentica', { indirizzo: '00:11:22:33:44:55' }, 'linux')), 'linux');
+  assert.deepEqual(r, { ok: true });
+  assert.deepEqual(pc.chiamate('bluetoothctl').filter((a) => a[0] === 'remove'), [['remove', '00:11:22:33:44:55']]);
+  const w = C.interpretaWifiDimentica(C.leggiUscita(pc.esegui('wifi-dimentica', { uuid: '1234abcd-0000' }, 'linux')), 'linux');
+  assert.deepEqual(w, { ok: true });
+  assert.deepEqual(pc.chiamate('nmcli').filter((a) => a[1] === 'delete'), [['connection', 'delete', 'uuid', '1234abcd-0000']]);
+  assert.deepEqual(readdirSync(pc.lavoro), []);
+});
+
+test('Dimentica su Mac: blueutil --unpair e networksetup ricevono l\'indirizzo e il nome interi, e niente altro parte', { skip: SENZA_SH }, () => {
+  const nome = NOMI_CATTIVI[0];
+  const pc = computerFinto({
+    blueutil: `case "$1" in
+  --unpair) touch "$(dirname "$0")/../tolto" ;;
+  --paired) if [ -f "$(dirname "$0")/../tolto" ]; then echo '[]'; else echo '[{"address":"00-11-22-33-44-55"}]'; fi ;;
+esac`,
+    networksetup: `case "$1" in
+  -listallhardwareports) printf 'Hardware Port: Wi-Fi\\nDevice: en0\\n' ;;
+  -listpreferredwirelessnetworks) printf 'Preferred networks on en0:\\n\\tCasa\\n' ;;
+esac`,
+  });
+  const r = C.interpretaBtDimentica(C.leggiUscita(pc.esegui('bt-dimentica', { indirizzo: '00-11-22-33-44-55' }, 'darwin')), 'darwin');
+  assert.deepEqual(r, { ok: true });
+  assert.deepEqual(pc.chiamate('blueutil').filter((a) => a[0] === '--unpair'), [['--unpair', '00-11-22-33-44-55']]);
+  const w = C.interpretaWifiDimentica(C.leggiUscita(pc.esegui('wifi-dimentica', { rete: nome }, 'darwin')), 'darwin');
+  assert.deepEqual(w, { ok: true });
+  assert.deepEqual(pc.chiamate('networksetup').filter((a) => a[0] === '-removepreferredwirelessnetwork'), [['-removepreferredwirelessnetwork', 'en0', nome]]);
+  assert.deepEqual(readdirSync(pc.lavoro), [], 'un nome ha eseguito qualcosa');
+});
+
+test('i pannelli delle impostazioni del sistema: Bluetooth, Wi-Fi e audio su Windows e Mac, nessuno su Linux', () => {
+  for (const p of ['win32', 'darwin']) {
+    const pannelli = C.pannelliImpostazioni(p);
+    assert.deepEqual(Object.keys(pannelli).sort(), ['audio', 'bluetooth', 'wifi']);
+    for (const chiave of Object.values(pannelli)) assert.ok(C.uriImpostazioni(chiave), `${p}: ${chiave} senza indirizzo`);
+  }
+  assert.deepEqual(C.pannelliImpostazioni('linux'), {});
 });
