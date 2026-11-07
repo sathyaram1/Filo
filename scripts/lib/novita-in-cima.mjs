@@ -10,8 +10,18 @@ import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
-require(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'patchNotes.js'));
-const { cmpVersion, testo } = globalThis.SN_PATCH_NOTES;
+// Il registro si carica al primo uso: chi importa questo modulo solo di passaggio (dispatch, via la prova sulla
+// fusione) gira anche da una copia degli strumenti senza src/shared.
+let registroVero = null;
+const pn = () => {
+  if (!registroVero) {
+    require(join(dirname(fileURLToPath(import.meta.url)), '..', '..', 'src', 'shared', 'patchNotes.js'));
+    registroVero = globalThis.SN_PATCH_NOTES;
+  }
+  return registroVero;
+};
+const cmpVersion = (a, b) => pn().cmpVersion(a, b);
+const testo = (r) => pn().testo(r);
 
 export const FILE_NOVITA = 'src/shared/patchNotes.js';
 export const CAMPO = 'prossimaVersione';
