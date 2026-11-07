@@ -783,6 +783,15 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   margin-bottom: 14px;
 }
 .dash-bubbles > .dash-bubble-filo:not(.dash-bubble-streaming):not(.dash-bubble-pending):not(.dash-bubble-actions-only) + .dash-altrove-filo { margin-top: -2px; }
+/* #2096 — anche il messaggio dell'utente ha i suoi tasti, sotto e allineati a destra, nello spazio tenuto come sopra. */
+.dash-bubbles > .dash-bubble-user:not(.dash-bubble-attesa) {
+  position: relative;
+  margin-bottom: 14px;
+}
+.dash-bubble-user > .dash-msg-azioni { left: auto; right: 4px; }
+/* Il segno dei cambi sta sul bordo in basso a destra: i tasti gli lasciano il posto. */
+.dash-bubble-cambi:not(.dash-cambi-vuoto) > .dash-msg-azioni { right: 34px; }
+.dash-bubble-user > .dash-msg-azioni .dash-msg-azione::after { left: auto; right: calc(100% + 4px); }
 .dash-msg-azioni {
   position: absolute; left: 4px; top: 100%;
   display: flex; align-items: center; gap: 2px;
