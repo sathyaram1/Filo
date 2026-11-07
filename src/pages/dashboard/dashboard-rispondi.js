@@ -48,7 +48,8 @@
     return rispondibile(b) ? b : null;
   }
   // Le azioni di una bolla, le stesse per i tasti e per il tasto destro: Copia e Rispondi sotto una risposta, Copia,
-  // Modifica e Cita sotto un messaggio dell'utente.
+  // Modifica e Cita sotto un messaggio dell'utente. La barra è quella di tutte le chat (src/shared/azioniMessaggio.js);
+  // le sue etichette sono attributi: nella bolla non entra testo, e chi la confronta col filo la ritrova.
   function azioniDi(b) {
     const a = [];
     if (testoDi(b)) a.push('copia');
@@ -58,86 +59,14 @@
     } else a.push('rispondi');
     return a;
   }
-  const AZIONI = {
-    copia: { icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' },
-    rispondi: { icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi' },
-    modifica: { icona: 'pencil', etichetta: 'Modifica', voce: 'Modifica' },
-    cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita' },
-  };
-  function fai(azione, b, t = null) {
-    if (azione === 'copia') copia(b, t).catch(() => {});
-    else if (azione === 'modifica') { if (d.modifica) d.modifica(b); }
-    else rispondi(b);
-  }
+  let tasti = null;
 
-  // ── I tasti sotto il messaggio ────────────────────────────────────────────
-  // Uno solo, che va sulla bolla sotto il mouse: lo spazio sotto ogni messaggio lo tiene il CSS, così comparendo non
-  // sposta niente. Le etichette sono attributi: nella bolla non entra testo, e chi la confronta col filo la ritrova.
-  function tasto(azione, nome, etichetta) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'dash-msg-azione';
-    b.dataset.azione = azione;
-    b.dataset.etichetta = etichetta;
-    b.setAttribute('aria-label', etichetta);
-    b.innerHTML = icona(nome, 15);
-    return b;
-  }
-  function creaBarra() {
-    const el = document.createElement('div');
-    el.className = 'dash-msg-azioni';
-    el.setAttribute('role', 'toolbar');
-    el.setAttribute('aria-label', 'Azioni sul messaggio');
-    // Il fuoco resta nel campo: chi copia o cita sta per scrivere.
-    el.addEventListener('mousedown', (e) => { if (e.target.closest('.dash-msg-azione')) e.preventDefault(); });
-    el.addEventListener('click', (e) => {
-      const t = e.target.closest('.dash-msg-azione');
-      const b = el.parentElement;
-      if (!t || !rispondibile(b)) return;
-      e.stopPropagation();
-      fai(t.dataset.azione, b, t);
-    });
-    return el;
-  }
-  function mettiBarra(b) {
-    if (!barra) barra = creaBarra();
-    if (barra.parentElement === b) return;
-    const voluti = azioniDi(b);
-    if (voluti.join() !== [...barra.children].map((t) => t.dataset.azione).join()) {
-      barra.replaceChildren(...voluti.map((a) => tasto(a, AZIONI[a].icona, AZIONI[a].etichetta)));
-    }
-    for (const t of barra.querySelectorAll('.dash-msg-azione')) esito(t, null);
-    b.appendChild(barra);
-  }
-
-  function esito(t, ok) {
-    clearTimeout(t._timer);
-    const copiaTasto = t.dataset.azione === 'copia';
-    t.classList.toggle('dash-copiato', ok === true);
-    t.classList.toggle('dash-non-copiato', ok === false);
-    if (!copiaTasto) return;
-    const etichetta = ok === true ? 'Copiato' : ok === false ? 'Non copiato' : 'Copia';
-    t.dataset.etichetta = etichetta;
-    t.setAttribute('aria-label', etichetta);
-    t.innerHTML = icona(ok === true ? 'check' : 'copy', 15);
-    if (ok != null) t._timer = setTimeout(() => esito(t, null), COPIATO_MS);
-  }
-
-  // Gli appunti li scrive il main, che mette il testo anche nella cronologia degli appunti come il Copia del tasto
-  // destro; se dice no, ci prova la pagina.
-  async function copia(b, t = null) {
+  // Copia il testo come si legge; la copia conta come le altre della home.
+  async function copia(b) {
     const testo = testoDi(b);
     if (!testo) return false;
-    let ok = false;
-    try {
-      const r = await d.send({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text: testo });
-      ok = !!(r && r.ok);
-    } catch (_) { ok = false; }
-    if (!ok) {
-      try { await navigator.clipboard.writeText(testo); ok = true; } catch (_) { ok = false; }
-    }
+    const ok = await global.SN_AZIONI_MESSAGGIO.copiaTesto(testo);
     if (ok) d.contaCopia(b);
-    if (t) esito(t, ok);
     return ok;
   }
 
