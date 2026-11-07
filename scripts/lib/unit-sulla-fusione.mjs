@@ -100,7 +100,9 @@ export function campoPerIlServer(prova) {
   return out;
 }
 
-const PROVATI = ['verde', 'rosso_anche_su_main', 'rosso_sulla_fusione'];
+// Gli esiti di una prova che ha girato gli unit: quelli dopo cui basta spostare le novità, più il rosso vero.
+export const ESITI_DOPO_NOVITA = Object.freeze([...BASTA_SPOSTARE, 'rosso_sulla_fusione']);
+const PROVATI = ESITI_DOPO_NOVITA;
 export { BASTA_SPOSTARE };
 
 /** Il rosso che la fusione così com'è avrebbe in più: le righe di novità del ramo sotto versioni già uscite. PURA. */
