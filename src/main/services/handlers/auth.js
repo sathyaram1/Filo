@@ -1730,7 +1730,11 @@ module.exports = function register(on, ctx) {
     const rami = (Array.isArray(r.rami) ? r.rami : []).filter((x) => x && (x.repo === 'app' || x.repo === 'server') && SHA_RE.test(String(x.punta)))
       .map((x) => ({ repo: x.repo, punta: String(x.punta), motivo: String(x.motivo || '').slice(0, 400) }));
     const out = { ok: true, rami, stato: Number.isInteger(r.stato) ? r.stato : 0 };
-    if (prova) out.visto = vistoDi(r.visto);
+    if (prova) {
+      out.visto = vistoDi(r.visto);
+      out.scritti = (Array.isArray(r.scritti) ? r.scritti : []).filter((x) => x && Number(x.at) > 0)
+        .map((x) => ({ at: Number(x.at), ruolo: String(x.ruolo || '').slice(0, 40) }));
+    }
     return out;
   }));
 
