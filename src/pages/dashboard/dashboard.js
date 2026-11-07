@@ -1406,6 +1406,7 @@
       ...(c.immagini.length ? { images: c.immagini.length } : {}),
       ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
       ...(nelloStorico ? { rispostaA: nelloStorico } : {}),
+      ...(c.schede && c.schede.length ? { schede: c.schede } : {}),
     });
     if (!bolla) bubblesEl.appendChild(bollaUtente(c));
     Coda.segnaGiorni();
