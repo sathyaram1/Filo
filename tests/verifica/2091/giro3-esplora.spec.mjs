@@ -20,6 +20,17 @@ async function linguetta(app, shell, id) {
   return { x: Math.round(o.x + (r.x + r.width / 2) * o.z), y: Math.round(o.y + (r.y + r.height / 2) * o.z), win: o };
 }
 
+async function sopra(p, sel) {
+  const b = await p.locator(sel).first().boundingBox();
+  await p.mouse.move(b.x + 2, b.y + 2);
+  await p.mouse.move(b.x + b.width / 2, b.y + b.height / 2, { steps: 4 });
+}
+async function clicSopra(p, sel) {
+  const b = await p.locator(sel).first().boundingBox();
+  await p.mouse.click(b.x + b.width / 2, b.y + b.height / 2);
+}
+
+test.describe.configure({ retries: 0 });
 test.beforeEach(() => { test.skip(!disponibili(), 'niente XTest'); });
 
 test('A home: gettone, carta, invio, clic, scheda chiusa', async ({ app, shell, openTab, testServer }) => {
