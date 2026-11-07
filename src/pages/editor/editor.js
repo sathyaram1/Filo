@@ -1208,9 +1208,10 @@
   function onTitleMenuKeydown(e) {
     if (e.key === 'Escape') closeTitleMenu();
   }
-  function openTitleMenu(x, y) {
+  // `file`: una voce dell'elenco documenti (#2096): il menu è di quel documento, e l'elenco resta aperto.
+  function openTitleMenu(x, y, { file = null } = {}) {
     closeTitleMenu();
-    closeDocPop();
+    if (!file) closeDocPop();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop ed-title-ctxmenu';
     menu.setAttribute('role', 'menu');
