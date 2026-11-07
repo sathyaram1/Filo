@@ -1073,7 +1073,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   function vociMessaggio(target) {
     const conv = convEl();
     const a = conv && azioniConv.get(conv);
-    return a ? a.voci(target).map((v) => ({ type: 'item', icon: global.SN_ICONS?.[v.icona]?.(16) || '', label: v.label, onClick: () => { v.fai(); } })) : [];
+    return a ? a.vociMenu(target) : [];
   }
 
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
