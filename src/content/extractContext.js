@@ -993,7 +993,7 @@
           if (!hardSkipForTranslation(el)) {
             const inner = inlineFrameBody(el);
             if (inner) {
-              if (nascosto) dentroNascosto.add(inner);
+              if (nascosto) dentroNascosto.set(inner, sezione);
               stack.push(inner);
               // Anche qui il sito può aggiungere testo dopo: chi sorveglia la
               // pagina deve tenere d'occhio pure questo documento.
