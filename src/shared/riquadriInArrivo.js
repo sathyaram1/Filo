@@ -37,8 +37,10 @@
 
   function osserva(win) {
     if (stato || !win || !win.document) return;
-    stato = { doc: win.document, arrivatoA: new WeakMap() };
+    stato = { doc: win.document, arrivatoA: new WeakMap(), caricati: new WeakSet() };
     win.addEventListener('load', (e) => arrivato(e.target), true);
+    // Il load di un elemento non sale alla finestra: chi vuole sapere se un riquadro ha finito lo ascolta sul documento.
+    try { win.document.addEventListener('load', (e) => { if (eRiquadro(e.target)) stato.caricati.add(e.target); }, true); } catch (_) {}
     // Rimesso nella pagina, un riquadro ricarica da capo: l'arrivo di prima non vale più.
     try {
       new win.MutationObserver((giri) => {
