@@ -62,7 +62,8 @@ const suYouTube = (f) => { try { return !!f && R.hostYouTube(R.hostDi(String(f.u
 
 // I frame di YouTube più in alto della scheda: ricaricarli ricarica anche quelli di YouTube che contengono.
 function cimeYouTube(wc) {
-  return frameDi(wc).filter((f) => suYouTube(f) && !suYouTube(f.parent));
+  const padre = (f) => { try { return f.parent; } catch (_) { return null; } };
+  return frameDi(wc).filter((f) => suYouTube(f) && !suYouTube(padre(f)));
 }
 
 // Ai frame di YouTube rimasti senza regole: ce ne sono di nuove. Chi le ha già le ignora.
