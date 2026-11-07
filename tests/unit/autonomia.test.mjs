@@ -637,11 +637,11 @@ test('regola del freno sulle preferenze: spegnere una difesa o alzare il tetto v
   assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '20' }, { impostazioni: att('default'), richiesta: 'alza il tetto a 20' }), 'conferma');
   assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '2' }, { impostazioni: att('default') }), 'si');
   assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '0' }, { impostazioni: att('default'), richiesta: 'togli il limite di spesa' }), 'conferma', 'zero vuol dire senza tetto');
-  // Alzare il tetto di spesa dalla chat vuole «conferma» a ogni livello, anche dopo aver letto altro.
+  // Alzare il tetto di spesa dalla chat vuole «conferma» a ogni livello; dopo aver letto altro è no (strada B).
   for (const livello of ['conservativo', 'default', 'automatico']) {
-    for (const azioni of [[], [ricercaFatta]]) {
-      assert.equal(risposta({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '50' }, { impostazioni: att('default'), livello, azioni, guardiano: true, richiesta: 'alza il tetto di spesa a 50 euro' }), 'conferma', livello);
-    }
+    const alza = { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '50' };
+    assert.equal(risposta(alza, { impostazioni: att('default'), livello, guardiano: true, richiesta: 'alza il tetto di spesa a 50 euro' }), 'conferma', livello);
+    assert.equal(risposta(alza, { impostazioni: att('default'), livello, azioni: [ricercaFatta], guardiano: true, richiesta: 'alza il tetto di spesa a 50 euro' }), 'no', `${livello}, dopo una lettura`);
   }
   // Stringere un freno è costo 1: abbassare il tetto, riaccendere i pesi aperti, togliere un sito fidato.
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '2' }, { impostazioni: att('default') }), 1);
