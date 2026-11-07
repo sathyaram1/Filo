@@ -122,13 +122,14 @@ test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono
   await pref.locator('[id="tok-fumetto.ritardo"]').fill('1500ms');
   await expect.poll(() => home.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sn-fumetto-ritardo').trim()))
     .toBe('1500ms');
-  await home.bringToFront();
-  await home.locator('#sendBtn').hover();
+  const nuova = await openTab('filo://newtab/');
+  await pronta(nuova);
+  await nuova.locator('#sendBtn').hover();
   // L'attesa è quella scelta: a 700 ms non c'è ancora, poi compare.
-  await home.waitForTimeout(700);
-  await expect(fumetto(home)).toBeHidden();
-  await expect(fumetto(home)).toHaveText('Invia', { timeout: 3000 });
-  expect(await fumetto(home).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(32, 48, 64)');
+  await nuova.waitForTimeout(700);
+  await expect(fumetto(nuova)).toBeHidden();
+  await expect(fumetto(nuova)).toHaveText('Invia', { timeout: 3000 });
+  expect(await fumetto(nuova).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(32, 48, 64)');
   await pref.locator('.sn-token-row[data-token="fumetto.sfondo"] .sn-token-reset').click();
   await pref.locator('.sn-token-row[data-token="fumetto.ritardo"] .sn-token-reset').click();
 });
