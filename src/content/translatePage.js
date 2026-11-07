@@ -501,18 +501,23 @@
     } catch (_) { return null; }
   }
 
-  // Un riquadro è nascosto se lo è lui o uno dei riquadri della pagina che lo contengono.
+  // Un riquadro è nascosto se lo è lui o uno dei riquadri della pagina che lo contengono: true, 'trasparente' (solo da
+  // una trasparenza fuori dallo schermo, vedi Extract.isHiddenFromUser) o false.
   function frameHidden(f) {
     if (!(Extract && typeof Extract.isHiddenFromUser === 'function')) return false;
+    let esito = false;
     for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
-      if (Extract.isHiddenFromUser(el)) return true;
+      const h = Extract.isHiddenFromUser(el);
+      if (h === true) return true;
+      if (h) esito = h;
     }
-    return false;
+    return esito;
   }
 
   // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere. Conta la finestra
   // da cui si vede, non il rettangolo: un riquadro grande dietro una finestrella da un pixel è un francobollo.
-  function frameTooSmall(f) {
+  // `nascosto`: una misura a zero è la sezione chiusa, non un francobollo (la scheda spenta): non si sa, e si traduce.
+  function frameTooSmall(f, nascosto) {
     const misura = (el) => {
       if (Extract && typeof Extract.clippedExtent === 'function') return Extract.clippedExtent(el);
       const r = el.getBoundingClientRect();
@@ -520,6 +525,7 @@
     };
     for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
       const m = misura(el);
+      if (nascosto && !(m.w > 0 && m.h > 0)) continue;
       if (m.w < FRAME_MIN_W || m.h < FRAME_MIN_H) return true;
     }
     return false;
