@@ -279,7 +279,25 @@ dall'owner e dal server. Campi:
   nota. Un resoconto senza niente da decidere (§ 4.8) non è una domanda: va nel
   rapporto settimanale o nelle note del feedback. Fa eccezione la domanda che
   il server apre al terzo guasto uguale (§ 3.8): un'opzione sola, perché non
-  arriva all'owner e la smista il compito della § 3.5 (#1790).
+  arriva all'owner e la smista il compito della § 3.5 (#1790), e il «da fare».
+- `tipo` (#2229): `da_fare` per un passo che solo l'owner può fare (un
+  segreto, un'impostazione di GitHub o di Firebase, una prova o una modifica
+  dal suo PC); assente, o `da_decidere`, per una domanda. Un «da fare» sta
+  nella stessa lista delle domande, col segno «da fare» accanto a «da
+  decidere», e il contatore di Gestione lo conta a parte. `problema` sono i
+  passi e dove si fanno, `contesto` perché serve, i collegamenti il lavoro che
+  aspetta. Ha una o due opzioni senza pro, contro né consiglio: la prima è il
+  pulsante «Fatto», la seconda, facoltativa, «Non lo faccio»; il nome lo dà la
+  posizione, l'azione lo segue (`riprendi` o `attendi` sul lavoro che aspetta,
+  `archivia`, o `nessuna` quando non aspetta niente, ammessa solo qui). Senza
+  consiglio «applica il consiglio» non lo segna mai fatto, e un principio del
+  registro non lo chiude (§ 3.5). Chiunque scopra un passo così lo apre come
+  «da fare», non lo scrive nel testo o nelle note di un feedback.
+- Nelle azioni `feedbackId` può essere il numero col cancelletto (`#1736`,
+  `#831.2`): il server lo traduce nell'id all'ingresso
+  (`SN_DOMANDE.traduciNumeri`), per i biglietti come per la chiave del
+  manutentore e quella owner-non-fidato, e rifiuta col numero quello che non
+  esiste. Una domanda salvata porta sempre l'id.
 - `consiglio`: l'opzione che sceglierebbe chi chiede, e perché.
 - `priorita`: `bloccante`, `importante`, `quando_puoi`.
 - `origine` e `collegamenti`: feedback, rami, compiti, altre domande.
