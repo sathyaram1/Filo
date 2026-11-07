@@ -697,5 +697,5 @@
     el.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
   }
 
-  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive };
+  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive, apri };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
