@@ -1336,6 +1336,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
     const bottoni = row.attachShadow({ mode: 'closed' });
+    global.SN_SUGGERIMENTO?.ombra?.(row, bottoni);
     const stile = document.createElement('style');
     stile.textContent = CSS_RISPOSTA;
     bottoni.appendChild(stile);
