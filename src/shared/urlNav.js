@@ -270,5 +270,6 @@
     isLocalHost, isHomeNetworkUrl, isHomeNetworkHost, isLanAddress, noteHostAddress, forgetHostAddress,
     noteHostPending, homeNetworkPending, isLocalNetworkName, isIpv4,
     normalizeUrl, looksLikeAddress, canonicalizeFiloUrl, isShareableAddress, collegamentoScritto, ricercaDi, eRicercaDi,
+    indirizzoRicerca, indirizzoRicercaImmagine,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
