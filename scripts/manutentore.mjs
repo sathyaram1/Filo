@@ -984,6 +984,10 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     if (r.avviso) console.error(`AVVISO: ${r.avviso}`);
     return 0;
   };
+  const segnoServer = (chiesto, r) => {
+    const riga = rigaSegnoServer(chiesto, r);
+    if (riga) (r.lavoroServer === true ? console.log : console.error)(riga);
+  };
   switch (cmd) {
     case 'stato': { const r = await chiama(cred, 'stato'); return esito(r, (x) => righeStato(x).join('\n')); }
     case 'schede': { const r = await tutteLeSchede(cred); return esito(r, (x) => x.schede.map((s) => rigaSchedaServer(s)).join('\n') || 'Nessuna scheda aperta.'); }
