@@ -1697,6 +1697,43 @@ module.exports = function register(on, ctx) {
     return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
   }));
 
+  // Ramo e note di un lavoro dichiarati fidati com'erano (#2258): il main passa solo la forma; cosa e se lo decide il server.
+  const SHA_RE = /^[0-9a-f]{40}$/;
+  function vistoDi(v) {
+    if (!v || typeof v !== 'object' || !Number.isInteger(v.stato) || v.stato < 0) return null;
+    const out = { stato: v.stato };
+    for (const repo of ['app', 'server']) {
+      if (v[repo] === undefined) continue;
+      if (!SHA_RE.test(String(v[repo]))) return null;
+      out[repo] = String(v[repo]);
+    }
+    return out;
+  }
+  on(MSG.FIDUCIA_DICHIARA, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca il feedback da dichiarare fidato.' };
+    const prova = msg?.prova === true;
+    const visto = prova ? null : vistoDi(msg?.visto);
+    if (!prova && !visto) return { ok: false, error: 'Manca quello che hai guardato: riapri il controllo e riprova.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerFiducia', prova ? { op: 'dichiara', feedbackId, prova: true } : { op: 'dichiara', feedbackId, visto });
+    } catch (e) {
+      if (e?.httpStatus === 404) return { ok: false, error: 'La funzione della fiducia non è ancora pubblicata sul server.' };
+      if (String(e?.code || '').toUpperCase() === 'PERMISSION_DENIED') return { ok: false, error: 'Il server dice che questo account non può farlo: serve quello del proprietario.' };
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Non riuscito.' };
+    }
+    if (r && r.ok === false && r.reason === 'op_sconosciuta') return { ok: false, error: 'Il server non sa ancora farlo: arriva col prossimo aggiornamento del server.' };
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non l’ha dichiarato fidato.' };
+    if (r.niente === true) return { ok: true, niente: true };
+    const rami = (Array.isArray(r.rami) ? r.rami : []).filter((x) => x && (x.repo === 'app' || x.repo === 'server') && SHA_RE.test(String(x.punta)))
+      .map((x) => ({ repo: x.repo, punta: String(x.punta), motivo: String(x.motivo || '').slice(0, 400) }));
+    const out = { ok: true, rami, stato: Number.isInteger(r.stato) ? r.stato : 0 };
+    if (prova) out.visto = vistoDi(r.visto);
+    return out;
+  }));
+
   // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
   // pagina (SN_COMPITI); fiducia e numeri li decide il server. Dalla finestra scrive l'owner, mai una sessione.
   async function chiamaCompiti(data, nonAncora) {
