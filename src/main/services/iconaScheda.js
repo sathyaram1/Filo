@@ -93,4 +93,4 @@ async function iconaPer(ses, candidati, { interna = false, vivo = () => true, co
   return { url: '', dato: '' };
 }
 
-module.exports = { iconaPer, tipoImmagine, bytesDaDataUrl, TETTO_BYTE };
+module.exports = { iconaPer, tipoImmagine, bytesDaDataUrl, TETTO_BYTE, TIPI };
