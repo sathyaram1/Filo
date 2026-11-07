@@ -5545,7 +5545,9 @@ function schedeChiuseForPrompt(actions) {
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
 // resta solo ciò che scrive Filo (capacità, trasparenza); il resto, file
 // dell'editor compresi, arriva imbustato (#593, #592.4).
-function observationsForPrompt(actions) {
+function observationsForPrompt(tutte) {
+  // Le pagine delle schede lasciate in un messaggio stanno già con la domanda (notaDeiGettoni): non si ripetono qui.
+  const actions = Array.isArray(tutte) ? tutte.filter((a) => !(a && a._gettone)) : tutte;
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
