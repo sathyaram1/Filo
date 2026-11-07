@@ -2074,7 +2074,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     }
     b.textContent = modo === 'ferma' ? '' : '↵';
     b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
-    b.title = modo === 'ferma' ? 'Ferma' : '';
+    b.title = modo === 'ferma' ? 'Ferma' : I18n.t('popup_send');
   }
   // Il tasto destro sul quadrato e sull'attesa che lavora: «Ferma», subito, come nella home (letto da content.js).
   function vociAttesa(target) {
