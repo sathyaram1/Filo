@@ -839,9 +839,10 @@ export async function main(argvIn) {
   console.log(r.seq
     ? `OK: feedback #${r.seq} aperto (${r.id}), mittente ${r.clientId}.`
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
-  console.log(locale
+  console.log(soloLocale
     ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
-    : 'Aperto per le routine.');
+    : server ? 'Aperto come lavoro server: lo prendono le routine dei lavori server, se in Automazioni sono accese.'
+      : 'Aperto per le routine.');
   // La fiducia la decide il server dal biglietto (#1148): pulito salta i giudici, sporco o assente ci passa.
   console.log(r.nonFidato ? `Nasce non fidato perché ${r.nonFidato}: passa dai giudici e la fusione aspetta il tuo sì.`
     : r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'
