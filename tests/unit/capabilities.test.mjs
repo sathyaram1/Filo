@@ -590,9 +590,9 @@ test('il manifesto nomina ogni strumento dell\'Editor che prende una scorciatoia
   }
 });
 
-// #1295 — il manifesto non dice insieme «la cancella per sempre» e «non cancella mai per sempre»: dove promette di
-// non cancellare dati in modo definitivo, nella stessa voce dice che una cosa sola la cancella se la chiedi tu.
-test('dove il manifesto promette di non cancellare mai per sempre, nomina la cancellazione che chiedi tu', () => {
+// #1295 — il manifesto non dice insieme «la cancella per sempre» e «non cancella mai per sempre». Col costo 4 (#1312)
+// cancellare per sempre vuole «conferma», e nessuna voce promette che non si fa mai.
+test('il manifesto non promette di non cancellare mai per sempre: dice che vuole la parola «conferma»', () => {
   const tutto = JSON.stringify(CAP);
   assert.ok(tutto.includes('cancellala per sempre'), 'la voce delle chat dice che si cancellano per sempre');
   const testi = [];
