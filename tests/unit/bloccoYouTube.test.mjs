@@ -79,6 +79,64 @@ test('alle regole nuove la scheda spenta riprova; le stesse regole riscaricate n
   assert.equal(B.regolePer('https://www.youtube.com/', wc).length, 3);
 });
 
+// Una scheda finta coi suoi frame: il primo è il principale, gli altri dicono di chi sono figli.
+function conFrame(...frame) {
+  for (const f of frame) f.parent = f.parent || null;
+  frame[0].framesInSubtree = frame;
+  return { ...scheda(), mainFrame: frame[0] };
+}
+
+test('regole che non reggono in un articolo con due video: si ricaricano tutti e due i riquadri, l\'articolo no', () => {
+  B.impostaListePerTest([LISTA]);
+  const articolo = { url: 'https://giornale.it/pezzo' };
+  const uno = { url: 'https://www.youtube-nocookie.com/embed/uno', parent: articolo };
+  const due = { url: 'https://www.youtube-nocookie.com/embed/due', parent: articolo };
+  const dentroDue = { url: 'https://www.youtube.com/iframe_api', parent: due };
+  const annuncio = { url: 'https://annunci.it/x', parent: articolo };
+  const wc = conFrame(articolo, uno, due, dentroDue, annuncio);
+  B.regolePer(uno.url, wc);
+  B.regolePer(due.url, wc);
+  const ricariche = [];
+  assert.equal(B.rotto(wc, uno, 'avviso', { avvisa() {}, ricarica: (w, f) => ricariche.push(f) }).fatto, true);
+  assert.deepEqual(ricariche, [uno, due], 'il secondo video aveva le stesse regole: riparte anche lui');
+  assert.deepEqual(B.regolePer(due.url, wc), [], 'ricaricato, ha il solo «Salta»');
+  assert.equal(B.rotto(wc, due, 'avviso', { avvisa() {}, ricarica: (w, f) => ricariche.push(f) }).fatto, false);
+  assert.equal(ricariche.length, 2, 'una ricarica sola per riquadro');
+
+  const yt = { url: 'https://www.youtube.com/watch?v=x' };
+  const intera = conFrame(yt, { url: 'https://www.youtube.com/embed/y', parent: yt });
+  B.regolePer(yt.url, intera);
+  const sola = [];
+  B.rotto(intera, yt, 'fermo', { avvisa() {}, ricarica: (w, f) => sola.push(f) });
+  assert.deepEqual(sola, [yt], 'la scheda di YouTube si ricarica intera, una volta');
+});
+
+test('regole nuove, o interruttore riacceso: i frame di YouTube aperti lo sanno, e solo loro', (t) => {
+  const R = require('../../src/main/services/regoleYouTube.js');
+  const inviati = [];
+  const frame = (url, parent) => ({ url, parent, send: (c) => inviati.push(`${url} ${c}`) });
+  const watch = frame('https://www.youtube.com/watch?v=x');
+  const articolo = frame('https://giornale.it/');
+  const incorporato = frame('https://www.youtube-nocookie.com/embed/a', articolo);
+  const altrove = frame('https://esempio.it/');
+  const chiusa = { ...conFrame(frame('https://www.youtube.com/watch?v=chiusa')), isDestroyed: () => true };
+  const tutte = [conFrame(watch), conFrame(articolo, incorporato), conFrame(altrove), chiusa];
+  B.impostaSchedePerTest({ daId: () => null, tutte: () => tutte });
+  t.after(() => B.impostaSchedePerTest({ daId: () => null, tutte: () => [] }));
+  const attese = [watch.url, incorporato.url].map((u) => `${u} ${R.CANALE_PRONTE}`).sort();
+
+  B.impostaListePerTest([`${LISTA}\nwww.youtube.com##+js(set, offerte.prima, undefined)`]);
+  assert.deepEqual(inviati.splice(0).sort(), attese);
+  B.impostaListePerTest([`${LISTA}\nwww.youtube.com##+js(set, offerte.prima, undefined)`]);
+  assert.deepEqual(inviati, [], 'le stesse regole non svegliano nessuno');
+
+  B.configureFromSettings({ security: { youtubeAds: { enabled: false } } });
+  B.impostaListePerTest([`${LISTA}\nwww.youtube.com##+js(set, offerte.seconda, undefined)`]);
+  assert.deepEqual(inviati, [], 'spento, niente');
+  B.configureFromSettings({});
+  assert.deepEqual(inviati.splice(0).sort(), attese, 'riacceso, le pagine aperte lo sanno');
+});
+
 test('lo scaricamento prende filters.txt coi suoi «!#include» accanto e quick-fixes.txt; se una manca tiene le regole di prima', async () => {
   B.impostaListePerTest([LISTA]);
   const chieste = [];
