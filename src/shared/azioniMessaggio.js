@@ -150,8 +150,10 @@
       return [...a.filter((x) => x !== 'copia'), ...a.filter((x) => x === 'copia')]
         .map((x) => ({ azione: x, label: DEF[x].voce, icona: DEF[x].icona, fai: () => fai(x, m) }));
     }
-    return { voci, messaggioDi };
+    // Le stesse voci già nella forma del menu del tasto destro: ogni chat le passa così com'è.
+    const vociMenu = (target) => voci(target).map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
+    return { voci, vociMenu, messaggioDi };
   }
 
-  global.SN_AZIONI_MESSAGGIO = { attacca, citazione, citaNelCampo, copiaTesto, CITA_MAX };
+  global.SN_AZIONI_MESSAGGIO = { attacca, tasto, AZIONI, citazione, citaNelCampo, copiaTesto, CITA_MAX };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
