@@ -1277,6 +1277,8 @@ const COMPUTER = {
   async btCollega(p) { return interpretaBtCollega(await eseguiScript('bt-collega', p), process.platform, p.collega); },
   async wifiElenco() { return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform); },
   async wifiCollega(p) { return interpretaWifiCollega(await eseguiScript('wifi-collega', p), process.platform, p.rete); },
+  async btDimentica(p) { return interpretaBtDimentica(await eseguiScript('bt-dimentica', p), process.platform); },
+  async wifiDimentica(p) { return interpretaWifiDimentica(await eseguiScript('wifi-dimentica', p), process.platform); },
 };
 const computer = () => computerFinto || COMPUTER;
 
