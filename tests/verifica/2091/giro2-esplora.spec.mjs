@@ -157,7 +157,7 @@ test('E4 Aiuto sopra l\'Editor', async ({ app, shell, openTab, testServer }) => 
   const n = await dove.locator('.sn-sidebar-input textarea').count();
   console.log('E4 campi', n, aiuto ? 'strato' : 'pagina');
   if (!n) return;
-  const verso = aiuto ? await puntoNelloStrato(app, aiuto, '.sn-sidebar-input textarea') : await puntoInPagina(app, ed, '.sn-sidebar-input textarea');
+  const verso = aiuto && aiuto !== ed ? await puntoNelloStrato(app, aiuto, '.sn-sidebar-input textarea') : await puntoInPagina(app, ed, '.sn-sidebar-input textarea');
   await trascina(shell, await linguetta(shell, sorgente), verso);
   await dove.waitForTimeout(1500);
   console.log('E4 gettoni', await dove.locator('.sn-gettoni-fondo .sn-gettone').count(), JSON.stringify(await dove.locator('.sn-sidebar-input textarea').inputValue()));
