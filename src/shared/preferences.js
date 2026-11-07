@@ -1559,7 +1559,6 @@
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
         'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
         'disattiva modelli proprietari', 'open weights'],
-      contrarie: ['modelli proprietari', 'modelli chiusi', 'modelli a pesi chiusi', 'modelli non aperti'],
       costo: 2,
       allenta: (r) => r.partial.openWeightsOnly === false,
       risk: 'Spegne tutti i modelli proprietari (Anthropic compresa) e lascia lavorare solo modelli '
