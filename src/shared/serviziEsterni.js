@@ -436,6 +436,13 @@
       dove: ['src/pages/manage/manageUtenti.js'],
     },
     {
+      id: 'modifiche-rami-github', nome: 'Le modifiche di un lavoro su GitHub',
+      base: ['https://github.com/sathyaram1/Filo/compare/', 'https://github.com/sathyaram1/filo-security/compare/'],
+      occasione: 'solo per il proprietario di Filo, quando prima di dichiarare fidato un lavoro in Gestione ne apre le modifiche',
+      riceve: 'la visita, come ogni sito',
+      dove: ['src/pages/manage/manage.js'],
+    },
+    {
       id: 'sito-filo', nome: 'Il sito di Filo',
       base: ['https://filo.red'],
       occasione: 'quando apri la pagina per scaricare Filo, o qualcuno apre un tuo link d’invito',
