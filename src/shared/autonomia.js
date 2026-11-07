@@ -179,10 +179,11 @@
     return regola === 'pulito' && dettaglio.cella === 'si+G' && statoCompito === 'pulito';
   }
 
-  // Regola (d) per i cambi che fa l'utente: alzare il livello o la fiducia in una fonte vuole «conferma».
+  // Regola (d) per i cambi che fa l'utente: alzare il livello o la fiducia in una fonte vuole «conferma». Si confronta
+  // col livello che vale davvero; è la sola regola, per Preferenze, benvenuto e chat (#1840).
   function richiestaCambioLivello(da, a) {
     if (!selezionabile(a)) return 'no';
-    return indice(a) > indice(livelloDa(da)) ? 'conferma' : 'si';
+    return indice(a) > indice(livelloAttivo(da)) ? 'conferma' : 'si';
   }
   // Il riquadro che chiede «conferma» quando l'utente alza il livello: lo stesso in Preferenze e nell'intervista di benvenuto.
   function confermaAlzata(id) {
