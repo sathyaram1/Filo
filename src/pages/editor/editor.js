@@ -2304,7 +2304,7 @@
       const tutta = finoInFondo();
       tutta.setStart(blocco, 0);
       scegli(tutta);
-      inserisci(`<${lista}>${voci}</${lista}>`);
+      inserisci(voci);
       cursoreIndietro(restoDopo);
       return;
     }
