@@ -108,9 +108,9 @@ function avvia({ ipcRenderer, webFrame, window: w, href }) {
     return true;
   };
   if (prova()) return true;
-  const pronte = () => { if (prova()) ipcRenderer.removeListener(CANALE_PRONTE, pronte); };
-  try { ipcRenderer.on(CANALE_PRONTE, pronte); } catch (_) {}
+  const pronte = () => { if (prova()) ipcRenderer.removeListener(R.CANALE_PRONTE, pronte); };
+  try { ipcRenderer.on(R.CANALE_PRONTE, pronte); } catch (_) {}
   return false;
 }
 
-module.exports = { avvia, guarda, AVVISO, PARTENZA_MS, FINE_ENTRO_MS, CANALE_PRONTE };
+module.exports = { avvia, guarda, AVVISO, PARTENZA_MS, FINE_ENTRO_MS };
