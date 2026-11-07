@@ -13,6 +13,9 @@
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
       ],
+      features: [
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
+      ],
     },
     {
       version: '0.2.268', date: '2026-11-06',
@@ -32,9 +35,7 @@
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
         'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
       ],
-      features: [
-        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
-      ],
+      features: [],
     },
     {
       version: '0.2.266', date: '2026-11-05',
