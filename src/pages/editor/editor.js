@@ -2297,9 +2297,9 @@
     const finoInFondo = () => { const f = r.cloneRange(); f.setEnd(bloccoFine, bloccoFine.childNodes.length); return f; };
 
     // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto, anche
-    // quando la selezione finisce in un'altra voce o fuori dall'elenco.
+    // quando la selezione finisce in un'altra voce o fuori dall'elenco. Le voci entrano senza l'elenco intorno: un elenco
+    // intero Chrome lo travasa voce per voce e lo paga al quadrato (4.000 righe, 5 s contro 0,1).
     if (blocco.tagName === 'LI') {
-      const lista = blocco.parentNode.tagName === 'OL' ? 'ol' : 'ul';
       const voci = righe.map((x, i) => `<li>${i === 0 ? htmlDi(prima) : ''}${(i === 0 && prima.toString()) || (i === ultima && dopo.toString()) ? spaziVisibili(x) : riga(x)}${i === ultima ? htmlDi(dopo) : ''}</li>`).join('');
       const tutta = finoInFondo();
       tutta.setStart(blocco, 0);
