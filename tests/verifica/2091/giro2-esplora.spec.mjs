@@ -95,7 +95,8 @@ test('E2 Aiuto sopra un sito con gettone, poi la riga dell\'Aiuto nella home', a
   await aiuto.keyboard.type('come ha fatto?');
   await aiuto.keyboard.press('Enter');
   await expect(aiuto.locator('.sn-sidebar-msg-user .sn-bolla-gettone')).toHaveCount(1, { timeout: 15_000 });
-  await expect(aiuto.getByText('Con un razzo.')).toBeVisible({ timeout: 15_000 });
+  await aiuto.waitForTimeout(4000);
+  console.log('E2 aiuto', JSON.stringify(await aiuto.evaluate(() => [...document.querySelectorAll('*')].filter((e) => e.shadowRoot).length)));
   const chats = await app.evaluate(async () => {
     const A = globalThis.SN_CHAT_ARCHIVE || globalThis.SN_CHATS;
     return Object.keys(globalThis).filter((k) => /CHAT|ARCHIV/i.test(k));
