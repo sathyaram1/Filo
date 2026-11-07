@@ -474,7 +474,7 @@ export function rigaSchedaServer(s, locale = null) {
     s.lavoroServer ? 'lavoro server' : '',
     s.fiducia && s.fiducia !== 'fidato' ? unaRiga(s.fiducia).replace(/_/g, ' ') : '',
     Array.isArray(s.unisce) && s.unisce.length ? `pacchetto di ${numeri(s.unisce)}` : '',
-    ...pezziAttese(s.aspetta, s.aspettava),
+    ...pezziAttese(s.aspetta, s.aspettava, s.nonFermano),
     s.ramo ? `ramo ${unaRiga(s.ramo)}` : '',
   ].filter(Boolean).join(' · ');
   const titolo = s.titolo ? unaRiga(s.titolo) : (s.riservato ? '(riservato)' : '');
