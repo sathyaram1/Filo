@@ -3884,11 +3884,11 @@
     mgWorkState.appendChild(posto);
   }
   // Si dichiara fidato dopo averlo letto: ogni ramo apre le sue modifiche rispetto a main.
-  const REPO_DICHIARA = { app: 'sathyaram1/Filo', server: 'sathyaram1/filo-security' };
+  const CONFRONTO_DICHIARA = { app: 'https://github.com/sathyaram1/Filo/compare/', server: 'https://github.com/sathyaram1/filo-security/compare/' };
   function modificheDelRamo(repo, ramo) {
     const r = String(ramo || '');
-    if (!REPO_DICHIARA[repo] || !/^[A-Za-z0-9._/-]{1,200}$/.test(r) || r.includes('..')) return '';
-    return `https://github.com/${REPO_DICHIARA[repo]}/compare/main...${r.split('/').map(encodeURIComponent).join('/')}`;
+    if (!CONFRONTO_DICHIARA[repo] || !/^[A-Za-z0-9._/-]{1,200}$/.test(r) || r.includes('..')) return '';
+    return `${CONFRONTO_DICHIARA[repo]}main...${r.split('/').map(encodeURIComponent).join('/')}`;
   }
   function righeDichiara(r, ramo) {
     const dove = { app: 'Ramo dell’app', server: 'Ramo del server' };
