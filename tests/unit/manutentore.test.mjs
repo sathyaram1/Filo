@@ -486,7 +486,9 @@ test('battiti e sveglie riempiono la rosa quando l\'ordine non ha lavori pronti 
   assert.ok(ritmo.includes('**La rosa si riempie anche di giorno.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
   assert.match(regola, /A ogni battito e sveglia/);
   assert.match(regola, /nell'ordine non resta un lavoro che possa partire adesso \(vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner\)/);
-  assert.match(regola, /spesa delle ultime 24 ore di ogni account .*sotto il ritmo sostenibile fino al suo rinnovo/);
+  // Il conto è unico come al mattino: con «prima B, poi A» la condizione su ogni account lascerebbe la rosa vuota.
+  assert.match(regola, /spesa delle ultime 24 ore, sommata sugli account .*sotto il ritmo sostenibile fino ai rinnovi/);
+  assert.doesNotMatch(regola, /(ultime 24 ore|ultimo giorno) di ogni account/);
   assert.match(regola, /riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole/);
   for (const r of ['decisione incrementale', 'scala delle classi', 'classe ereditata da chi blocca', 'incroci coi rami vivi', 'riscrivi l\'ordine', 'taccuino', 'recap del giorno dopo']) {
     assert.ok(regola.includes(r), r);
