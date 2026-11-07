@@ -134,6 +134,30 @@ test('lasciata nella chat dell\'Aiuto su un sito con gesto vero: gettone', async
   await Gesti.finestraASchermo(app);
   Gesti.trascina(await linguetta(app, shell, idArticolo), await Gesti.sulloSchermo(app, modulo, strato, '.sn-sidebar-input textarea'));
   await expect(casella).toHaveValue(/⟦/);
+  if (!process.env.AIUTO_INVIO) return;
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash' }, modelRegistry: globalThis.SN_TEST_MODELS.registry });
+    globalThis.__aiuto = [];
+    const risposta = ({ attempts, messages }) => {
+      const fatto = (text) => ({ text, finishReason: 'stop', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [] });
+      const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
+      if (!sistema.includes('# Protocollo di risposta')) return fatto('{}');
+      globalThis.__aiuto.push(JSON.stringify(messages));
+      return fatto(JSON.stringify({ text: 'Fine.', status: 'done' }));
+    };
+    const P = globalThis.SN_PROVIDERS;
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => { const r = risposta(o); try { o.onDelta && o.onDelta(r.text); } catch (_) {} return r; };
+  });
+  await casella.focus();
+  await strato.keyboard.type(' di cosa parla?');
+  await strato.keyboard.press('Enter');
+  await expect.poll(() => app.evaluate(() => globalThis.__aiuto.length), { timeout: 15_000 }).toBeGreaterThan(0);
+  const tutto = await app.evaluate(() => globalThis.__aiuto.join('\n'));
+  expect(tutto).toContain('Testo-segreto-2091');
+  await expect(strato.locator('.sn-bolla-gettone')).toHaveCount(1);
 });
 
 test('a metà trascinamento la linguetta sta sotto il puntatore (mouse sintetico)', async ({ app, shell, openTab, testServer }) => {
