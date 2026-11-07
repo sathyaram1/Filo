@@ -357,6 +357,8 @@
     for (const tipo of ['mouseup', 'touchend']) {
       document.addEventListener(tipo, (e) => { if (e.isTrusted) Actions.schedulePrefetchExplain(); }, true);
     }
+    // #2084 — una scheda lasciata su un campo di testo del sito ci scrive titolo e indirizzo.
+    if (!IS_SUBFRAME && /^https?:$/.test(location.protocol)) { try { self.SN_SCHEDA_TRASCINATA?.ascolta({ campi: true }); } catch (_) {} }
     chrome.runtime.onMessage.addListener((msg, sender, sendResponse) => {
       // Spento sul sito tacciono le azioni sulla pagina; lo stato (impostazioni, schermo intero) si segue lo stesso.
       if (isBlocked() && AZIONI_DA_FUORI.has(msg?.type)) return;
