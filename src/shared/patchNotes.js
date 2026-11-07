@@ -21,6 +21,10 @@
         { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
         { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
         { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
+        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
+        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
+        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
+        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
       features: [
         { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo. «Metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un\'altra.', segnalazione: 1397 },
@@ -44,10 +48,6 @@
         { testo: 'Il titolo che l\'Editor dà da solo a un documento cambia quando cambi l\'argomento del testo. Un titolo che hai scritto tu resta com\'è, e un documento non prende più il titolo di quello aperto prima.', segnalazione: 1570 },
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
         'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
-        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
-        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
-        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
-        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {
