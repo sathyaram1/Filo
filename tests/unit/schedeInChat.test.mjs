@@ -81,8 +81,11 @@ test('main: le schede del messaggio arrivano al modello come letture di pagina, 
 // Le icone che la linguetta mostra le mostra anche il gettone: svg, bmp e avif compresi.
 test('forma: il gettone tiene le icone in tutti i formati che il main riconosce in una scheda', () => {
   const S = globalThis.SN_SCHEDE_IN_CHAT;
-  for (const tipo of ['png', 'x-icon', 'gif', 'jpeg', 'webp', 'bmp', 'avif', 'svg+xml']) {
-    const icona = `data:image/${tipo};base64,AAAA`;
+  // L'elenco è quello del main, non una copia: un formato che la barra impara entra qui da sé.
+  const { TIPI } = require('../../src/main/services/iconaScheda.js');
+  assert.ok(TIPI.length >= 8);
+  for (const tipo of TIPI) {
+    const icona = `data:${tipo};base64,AAAA`;
     assert.equal(S.normalizza({ ...SCHEDA, icona }).icona, icona, tipo);
   }
   assert.equal(S.normalizza({ ...SCHEDA, icona: 'data:text/html;base64,AAAA' }).icona, '');
