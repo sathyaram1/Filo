@@ -144,6 +144,17 @@ test('l\'esito unico dalle parti: un rosso di Windows ferma la fusione e si legg
   assert.deepEqual(partiDaAmbiente(['linux'], { CAMPO_LINUX: '{}', RISULTATO_LINUX: 'success' }), [{ nome: 'linux', campo: '{}', risultato: 'success' }]);
 });
 
+// Chi riallinea corregge i rossi firmati perché su Linux sono verdi: uno rosso anche lì non va firmato (verifica #2225 giro 2).
+test('un rosso di tutti e due i sistemi esce una volta, senza firma; la firma è quella che il ruolo del riallineamento nomina', () => {
+  const parte = (nome, rossi) => ({ nome, risultato: 'success', campo: JSON.stringify({ ramo: A, main: B, mainSha: B, esito: 'rosso_sulla_fusione', rossi }) });
+  const out = unisciParti({ ramo: A, main: B, parti: [parte('linux', ['x › y']), parte('windows', ['x › y', 'z › import'])] });
+  assert.deepEqual(out.rossi, ['x › y', `z › import${firmaSistema('windows')}`]);
+  assert.equal(out.altriRossi, undefined, 'il doppione non si conta');
+  assert.equal(firmaSistema('linux'), '');
+  const ruolo = readFileSync(join(ROOT, 'routines', 'roles', 'resolver-rebase.md'), 'utf8');
+  assert.ok(ruolo.includes(`\`${firmaSistema('windows').trim()}\``), 'il ruolo del riallineamento nomina la firma che esce dall\'unione');
+});
+
 test('la riga dell\'esito: una riga, la coppia, il campo della richiesta di fusione', () => {
   const rosso = campoEsito({ ramo: A, main: B, prova: { esito: 'rosso_sulla_fusione', mainSha: B, rossi: ['t › uno\nfinto'] } });
   assert.equal(rosso.ramo, A);
