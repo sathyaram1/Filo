@@ -553,7 +553,11 @@ test('ogni passo dell’avvio, ogni canale sincrono e ogni passo degli aggiornam
   assert.match(main, /tettoChiusura\(\)/);
   assert.match(main, /perLaChiusura\(\)/);
   const ipc = leggi('src', 'main', 'ipc.js');
-  for (const c of C.CANALI_SINCRONI) assert.ok(ipc.includes(`ipcMain.on('filo:${c}', cronometrata('${c}',`), `il canale ${c} non è cronometrato`);
+  // Ogni risposta d'avvio passa dal cronometro, sola o nella chiamata unica del frame principale (#1093).
+  for (const c of C.CANALI_SINCRONI) {
+    assert.ok(ipc.includes(`  '${c}': (event`), `il canale ${c} non sta fra le risposte di avvio cronometrate`);
+    assert.ok(ipc.includes(`rispostaDiAvvio('${c}', event`), `la chiamata unica d'avvio non porta ${c}`);
+  }
   const updater = leggi('src', 'main', 'updater.js');
   for (const e of C.EVENTI_AGGIORNAMENTO) {
     const diretto = updater.includes(`contaAggiornamento('${e}'`);
