@@ -51,14 +51,15 @@ test('le 40 celle: un «sì» da costo 2 in su chiede senza guardiano e parte co
   assert.equal(A.GUARDIANO_REGISTRI, false, 'finché il guardiano non c\'è, yolo non si sceglie');
 });
 
-test('sentinella: nessuna cella vuota, nessun «no» nella tabella, e un compito contaminato non è mai più permissivo', () => {
+test('sentinella: nessuna cella vuota, l\'unico «no» è il costo 4 dopo una lettura, e un compito contaminato non è mai più permissivo', () => {
   assert.deepEqual(Object.keys(A.TABELLA).sort(), A.LIVELLI.map((l) => l.id).sort());
   for (const [livello, righe] of Object.entries(A.TABELLA)) {
     for (const stato of ['pulito', 'contaminato']) {
       assert.equal(righe[stato].length, 5, `${livello}/${stato}: servono 5 costi`);
-      for (const c of righe[stato]) assert.ok(['si', 'chiede', 'conferma'].includes(c), `${livello}/${stato}: cella «${c}»`);
-      assert.equal(righe[stato][4], 'conferma', `${livello}/${stato}: il costo 4 vuole «conferma» a ogni livello`);
+      for (const c of righe[stato].slice(0, 4)) assert.ok(['si', 'chiede', 'conferma'].includes(c), `${livello}/${stato}: cella «${c}»`);
     }
+    assert.equal(righe.pulito[4], 'conferma', `${livello}: a compito pulito il costo 4 vuole «conferma», comunque sia detto`);
+    assert.equal(righe.contaminato[4], 'no', `${livello}: dopo una lettura il costo 4 è no a ogni livello`);
     for (let costo = 0; costo <= 4; costo++) {
       assert.ok(PESO[righe.contaminato[costo]] >= PESO[righe.pulito[costo]], `${livello}, costo ${costo}: contaminato più permissivo`);
     }
