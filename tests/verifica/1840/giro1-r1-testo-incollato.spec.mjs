@@ -21,7 +21,7 @@ test('r1 un testo incollato in chat è una lettura: il costo 4 dopo un incolla r
     await expect(input).toHaveValue(articolo);
     await page.keyboard.type(' riassumi');
     await page.locator('#sendBtn').click();
-    // Oggi la conversazione resta «pulita»: compare il bottone dell'azione che porta al riquadro con la parola.
+    // Senza la cura la conversazione resta «pulita»: compare il bottone dell'azione che porta al riquadro con la parola.
     await expect(page.locator('.dash-activity').last(), 'dopo un testo incollato il costo 4 riceve il no')
       .toContainText('Dopo aver letto cose scritte da altri non lo faccio', { timeout: 15000 });
     await expect(page.locator('button.dash-action-btn', { hasText: 'Limite di spesa' })).toHaveCount(0);
