@@ -1182,7 +1182,8 @@ export function controlliLocali(cmd, argv) {
   const num = (v, cosa) => (numeroDi(v) ? '' : `${cosa}: «${String(v ?? '').slice(0, 20)}» non è un numero di feedback`);
   const ignote = (c) => {
     const x = opzioniIgnote(c, argv);
-    return x.length ? `${c} non conosce ${x.map((o) => o.slice(0, 30)).join(', ')} (conosce ${OPZIONI_DI[c].join(', ')})` : '';
+    const senzaValore = x.some((o) => OPZIONI_SERVER.includes(o.split('=')[0])) ? '; --server non prende valori, si scrive da solo' : '';
+    return x.length ? `${c} non conosce ${x.map((o) => o.slice(0, 30)).join(', ')} (conosce ${OPZIONI_DI[c].join(', ')})${senzaValore}` : '';
   };
   switch (cmd) {
     case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
