@@ -49,6 +49,19 @@
   const TITOLO_SEGNA_FIDATA = 'L’hai letta, note per gli agenti comprese: chi riprende un lavoro con la sua decisione non si sporca più';
   const TITOLO_TOGLI_FIDUCIA = 'Torna non fidata: chi ne riceve le note si sporca di nuovo';
   const segnataDaTe = (d) => `Segnata fidata da te ${quando(d.fidataDallOwner.il, true)}.`;
+  // Il segno che separa le cose da fare da quelle da decidere (#2229), uguale in elenco e nella domanda aperta.
+  const TIPO = {
+    da_fare: { nome: 'da fare', titolo: 'Un passo che solo tu puoi fare: quando l’hai fatto, premi «Fatto».' },
+    da_decidere: { nome: 'da decidere', titolo: 'Una scelta che spetta a te: le opzioni dicono cosa fa ognuna.' },
+  };
+  const tipoDi = (d) => (D.daFare(d) ? 'da_fare' : 'da_decidere');
+  function segnoTipo(d, cls) {
+    const t = tipoDi(d);
+    const s = el('span', `${cls} ${cls}--${t === 'da_fare' ? 'fare' : 'decidere'}`, TIPO[t].nome);
+    s.dataset.tipo = t;
+    s.title = TIPO[t].titolo;
+    return s;
+  }
 
   // `lette` falso finché nessuna lettura è riuscita: un numero senza dati direbbe più di quanto si sa. Dopo, una
   // rilettura che salta tiene le domande a schermo e lo dice in `aggiornamento`: l'owner può star rispondendo.
