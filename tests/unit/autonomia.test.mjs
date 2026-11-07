@@ -372,12 +372,13 @@ test('CERCA_CHAT con pagine: solo titoli classe 3, con un riassunto classe 5; a 
   assert.equal(AL.fonteDi(riassunto).campo, 'web');
   assert.match(A.frasePerche(AL.fonteDi(riassunto)), /riassunto di una pagina/);
   const lezione = { type: 'SALVA_LEZIONE', testo: 'L’utente vuole inoltrare le mail.' };
-  assert.equal(risposta(lezione), 'si', 'senza letture parte da sola');
-  assert.equal(risposta(lezione, { azioni: [titoli] }), 'chiede');
-  assert.equal(risposta(lezione, { azioni: [riassunto] }), 'chiede');
+  // Col guardiano la cella pulita parte da sola: così si vede che è la lettura a farla chiedere.
+  assert.equal(risposta(lezione, { guardiano: true }), 'si', 'senza letture parte da sola');
+  assert.equal(risposta(lezione, { azioni: [titoli], guardiano: true }), 'chiede');
+  assert.equal(risposta(lezione, { azioni: [riassunto], guardiano: true }), 'chiede');
   // Una ricerca che trova solo conversazioni pulite resta pulita; una risposta nata da testo di altri porta la sua classe.
   assert.equal(AL.fonteDi({ type: 'CERCA_CHAT', query: 'x', _output: { results: [{ title: 't' }], pagine: [] } }), null);
-  assert.equal(risposta(lezione, { azioni: [{ type: 'CERCA_CHAT', query: 'x', _output: { results: [{ title: 't' }], classeLetta: 5 } }] }), 'chiede');
+  assert.equal(risposta(lezione, { azioni: [{ type: 'CERCA_CHAT', query: 'x', _output: { results: [{ title: 't' }], classeLetta: 5 } }], guardiano: true }), 'chiede');
   assert.equal(AL.fonteDi({ type: 'CERCA_CHAT', query: 'x', _output: { results: [], classeLetta: 4, pagine: titoli._output.pagine } }).classe, 4, 'vince la peggiore');
 });
 
