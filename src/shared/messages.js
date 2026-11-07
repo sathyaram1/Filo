@@ -1147,6 +1147,8 @@
     FILO_DECIDI_PAGINA: 'filo_decidi_pagina',
     // #530 — l'Aiuto si è aperto: comincia una conversazione nuova, che non ha ancora letto niente. {}
     FILO_AIUTO_NUOVO: 'filo_aiuto_nuovo',
+    // #1840 — nell'Aiuto è entrato un testo incollato o trascinato, o un'immagine: la conversazione ha letto. { immagini? }
+    FILO_AIUTO_TESTO_DI_ALTRI: 'filo_aiuto_testo_di_altri',
 
     // #810 — un indirizzo web proposto da un modello in una pagina di Filo si apre solo dopo la porta delle
     // uscite. { url, parole } → { aperto, frase }
