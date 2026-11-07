@@ -85,7 +85,7 @@ import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from '.
 import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
-  proveScritteDa, puliziaDelPass, rigaNumerata, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
+  proveScritteDa, puliziaDelPass, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
 } from './lib/prove-tolte.mjs';
 import { espandiInclusioni } from './lib/role-text.mjs';
 import { installa as installaCecita } from './lib/orchestratore-cieco.mjs';
@@ -586,6 +586,13 @@ export function rilieviConDomanda(findings, domande) {
   if (d.length > conSegno.length) {
     return { ok: false, errore: `${d.length} ${d.length === 1 ? 'domanda' : 'domande'} per ${conSegno.length} ${conSegno.length === 1 ? 'rilievo' : 'rilievi'} col «?»: `
       + 'una domanda accompagna un rilievo che chiede una decisione. Segna col «?» il rilievo che la domanda decide, o togli la domanda. Non ho registrato niente.' };
+  }
+  // Se il lavoro si ferma lo decidono livello e segno (decisioneFerma), mai «blocca»: sul server cambierebbe la sorte
+  // del rilievo, e la pulizia prima del verdetto, che legge solo il segno, toglierebbe le prove sbagliate (#1202.2).
+  const conBlocca = conSegno.filter((x, k) => d[k] && Object.prototype.hasOwnProperty.call(d[k], 'blocca'));
+  if (conBlocca.length) {
+    const chi = `la domanda ${conBlocca.length === 1 ? `del rilievo ${conBlocca[0].n}` : `dei rilievi ${conBlocca.map((x) => x.n).join(', ')}`}`;
+    return { ok: false, errore: `${VERIFIER_ROUND.bloccaSuUnRilievo(chi)} Non ho registrato niente.` };
   }
   conSegno.forEach((x, k) => { lista[x.n - 1].domanda = d[k]; });
   return { ok: true, findings: lista };
@@ -1610,17 +1617,10 @@ export function derivatiAperti(derived) {
   return voci;
 }
 
-/**
- * I derivati del giro senza i rilievi che chi corregge sta anche correggendo (un 2 col «?»: la domanda esce in un
- * feedback, il codice lo cambia questo giro). La loro prova resta e si toglie verde con quella durevole: la pulizia
- * toglie solo quelle dei rilievi davvero messi da parte (#1202). Se il server non manda il segno, li riconosce il
- * numero, che è lo stesso nei due elenchi. PURA.
- */
+/** I derivati del giro coi soli rilievi davvero messi da parte: la regola è rilieviMessiDaParte (lib/prove-tolte.mjs). PURA. */
 export function messiDaParte(derived, fix) {
-  const daCorreggere = new Set((Array.isArray(fix) ? fix : []).map((f) => f && f.n).filter(Number.isInteger));
-  const fuori = (f) => f.inCorrezione === true || (Number.isInteger(f.n) && daCorreggere.has(f.n));
   return derivatiAperti(derived)
-    .map((d) => ({ ...d, rilievi: d.rilievi.filter((f) => !fuori(f)) }))
+    .map((d) => ({ ...d, rilievi: rilieviMessiDaParte(d.rilievi, fix) }))
     .filter((d) => d.rilievi.length);
 }
 

@@ -343,6 +343,18 @@ export function numeriDelNome(percorso) {
 }
 
 /**
+ * I rilievi di `rilievi` davvero messi da parte: fuori quelli che il giro sta anche correggendo (un 2 col `?` esce in un
+ * feedback con la domanda, ma il codice lo cambia questo giro, e la sua prova si toglie verde con quella durevole, #1202).
+ * Li riconosce il segno `inCorrezione` o, se manca, il posto `n` fra quelli di `daCorreggere`. Unica regola, per le
+ * routine e per la verifica locale. PURA.
+ */
+export function rilieviMessiDaParte(rilievi, daCorreggere) {
+  const numeri = new Set((Array.isArray(daCorreggere) ? daCorreggere : []).map((f) => f && f.n).filter(Number.isInteger));
+  return (Array.isArray(rilievi) ? rilievi : [])
+    .filter((f) => f && typeof f === 'object' && f.inCorrezione !== true && !(Number.isInteger(f.n) && numeri.has(f.n)));
+}
+
+/**
  * Vero se il rilievo esce dal giro in un pass o in una correzione: un esterno, un vicino col `?`, o un interno col `?`
  * di livello 0 o 1 (un 2 col `?` si corregge con la consigliata, #1202).
  * La sua prova esce PRIMA del verdetto, col commit della critica (#1555; il perché: routines/roles/_critica-e-livelli.md). PURA.
@@ -353,19 +365,15 @@ export function esceInOgniEsito(f) {
   return !!(f && f.decision) && (sede === 'v' || Number(f.level) <= 1);
 }
 
-// Senza «blocca» la domanda blocca (SPEC-DOMANDE § 3.1): solo un false esplicito lascia andare avanti il lavoro.
-const domandaCheBlocca = (f) => !(f && f.domanda && typeof f.domanda === 'object' && f.domanda.blocca === false);
-const nonBlocca = (f) => f && f.decision && String(f.sede || 'i').toLowerCase() === 'i' && Number(f.level) >= 2 && !domandaCheBlocca(f);
-
 /**
- * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202), la cui
- * domanda blocca: con `"blocca": false` il lavoro va avanti con la consigliata, e gli altri `?` escono come sempre (#1555.1).
+ * Vero se la critica ferma di sicuro il lavoro: un interno col `?` di livello 3, o di livello 2 col `!` (#1202). La
+ * domanda non conta: su un rilievo «blocca» non si scrive, la registrazione lo respinge (#1202.2).
  * Copia di decisioneFerma (le ricette fissate non portano src/shared): una sentinella le tiene uguali. PURA.
  */
 export function fermaDiSicuro(findings) {
   return (Array.isArray(findings) ? findings : []).some((f) => f && f.decision === true
     && String(f.sede || 'i').toLowerCase() === 'i'
-    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)) && domandaCheBlocca(f));
+    && (Number(f.level) >= 3 || (Number(f.level) === 2 && f.irreversibile === true)));
 }
 
 // I titoli dei casi (anche dei describe) scritti come testo: un titolo composto a runtime non si legge, e non ferma.
@@ -450,12 +458,9 @@ export function testoProvePrimaDelVerdetto(fuori, findings) {
       ? `copre anche ${r(x.restano)}, che resta: togli ${casi} e il numero dal nome (\`git mv ${x.prova} ${x.rinomina}\`)`
       : `togli ${casi}`;
   };
-  // Senza questa riga chi ha un 2 col `?` crede che il lavoro si fermi e che gli altri `?` restino con la loro prova.
-  const aperte = tutti.map((f, i) => ({ f, n: i + 1 })).filter((x) => nonBlocca(x.f)).map((x) => x.n);
   return [
     'critica non registrata: queste prove portano rilievi che escono dal giro in ogni esito, e vanno tolti PRIMA della critica,',
     'nel suo commit: si sanno già, e ogni commit dopo il verdetto è un passo in più che i cancelli devono controllare (#1555).',
-    ...(aperte.length ? [`${aperte.length === 1 ? `La domanda del rilievo ${aperte[0]} non blocca` : `Le domande dei rilievi ${aperte.join(', ')} non bloccano`}: il lavoro non si ferma, e i rilievi col \`?\` che contano al più 1 escono in un feedback loro.`] : []),
     ...fuori.map((x) => `  · ${x.prova}: ${x.numeri.map(perche).join(', ')}; ${rimedio(x)}`),
     'Poi `git add -A && git commit` e registra la stessa critica. Il caso di un rilievo che resta non si tocca.',
   ].join('\n');

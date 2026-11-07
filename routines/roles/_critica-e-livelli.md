@@ -65,9 +65,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   nello stesso commit: quel rilievo esce di qui dentro un feedback suo in ogni
   esito, e la prova lasciata indietro sarebbe solo un rosso da rispiegare per
   sempre. La prova di un `[2i?]` resta: si corregge con l'opzione che consigli.
-  Se la critica ha un `[3i?]` o un `[2i?!]` e la sua domanda blocca, il lavoro
-  si ferma e i `?` restano a chi riprende: lì esce solo la prova degli esterni;
-  con `"blocca": false` il lavoro va avanti, e gli altri `?` escono come sempre.
+  Se la critica ha un `[3i?]` o un `[2i?!]` il lavoro si ferma e i `?` restano
+  a chi riprende: lì esce solo la prova degli esterni.
   A una prova che copre anche un rilievo che resta togli solo il caso di quello
   che esce, e il suo numero dal nome (`git mv`).
   **La pulizia che non dipende dall'esito si fa prima del verdetto**, nel
@@ -131,14 +130,15 @@ parte. Le opzioni agiscono su `payload.id`; per un rilievo che esce in un
 feedback derivato il server le sposta sul derivato, che nasce col titolo della
 domanda. Un difetto non va lì: è un rilievo col suo livello.
 
-Sulla critica fermano il lavoro i rilievi interni col `?` di livello 3 o col
-`!` (`[2i?!]`): con la loro domanda che blocca il lavoro aspetta l'owner in
-ogni esito, e i rilievi da correggere restano davanti a chi riprende dopo la
-sua risposta; con `"blocca": false` la critica va avanti col suo esito e la
-domanda resta aperta. Un `[2i?]` va avanti: chi corregge applica l'opzione che
-consigli, e la sua domanda esce in un feedback derivato. Un 1 col `?`, o un
-esterno di qualunque livello, va avanti in un feedback derivato con la sua
-domanda, che l'owner decide a parte.
+Se il lavoro si ferma lo decidono il livello e il segno, mai la domanda: su un
+rilievo `blocca` non si scrive, e la critica che lo porta non parte. Fermano
+i rilievi interni col `?` di livello 3 o col `!` (`[2i?!]`): il lavoro aspetta
+l'owner in ogni esito, e i rilievi da correggere restano davanti a chi
+riprende dopo la sua risposta. Un `[2i?]` va avanti: chi corregge applica
+l'opzione che consigli, e la sua domanda esce in un feedback derivato. Un 1 col
+`?`, un vicino col `?` o un esterno di qualunque livello va avanti in un
+feedback derivato con la sua domanda, che l'owner decide a parte. Una scelta
+che non deve fermare il lavoro si scrive col segno che non lo ferma.
 
 La critica registrata non si modifica più.
 

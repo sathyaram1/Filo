@@ -28,7 +28,8 @@ per sceglierlo sta in «Una domanda per l'owner si scrive per lui»). Il feedbac
 aspetta la sua risposta e non riparte prima; poi riprende da dove era, con la
 risposta davanti. Con `"blocca": false` la consegna va avanti col suo esito:
 il lavoro fatto è quello della consigliata, e chi viene dopo trova la domanda
-in `payload.provvisorie`. In ogni caso ci va solo una scelta che spetta a lui:
+in `payload.provvisorie`. Sulla domanda di un rilievo `blocca` non si scrive:
+decidono il livello e il segno del rilievo. In ogni caso ci va solo una scelta che spetta a lui:
 un difetto lo correggi (o, se stai verificando, lo scrivi come rilievo col suo
 livello), non lo chiedi. Consegna comunque tutto quello che hai fatto: è da lì
 che si riprende.

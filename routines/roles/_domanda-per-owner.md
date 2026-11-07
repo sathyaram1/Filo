@@ -42,7 +42,9 @@ sicurezza e segreti, politica sui modelli, terzi, account e credenziali), o se
 serve un fatto che sa solo l'owner; nel dubbio blocca. Con `false` il lavoro va
 avanti con la consigliata, che resta scritta come decisione provvisoria: se
 l'owner sceglie altro riparte con la sua scelta, anche se è già fuso. Una
-fermata (`--status design`) blocca da sé, e lì `false` è rifiutato.
+fermata (`--status design`) blocca da sé, e lì `false` è rifiutato. La domanda
+di un rilievo, quella di chi verifica, `blocca` non lo porta: il lavoro lo
+fermano il livello e il segno del rilievo, e la critica col campo non parte.
 
 L'owner non legge il codice. Prima di mandare una domanda applica
 `.claude/skills/unslop/SKILL.md` a titolo, contesto, problema, opzioni (testo,

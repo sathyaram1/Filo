@@ -369,6 +369,18 @@
   }
 
   /**
+   * Il rifiuto di «blocca» sulla domanda di un rilievo (#1202.2), uno per lo
+   * strumento delle routine e per il server: `chi` è il rilievo come lo nomina
+   * chi rifiuta. PURA.
+   */
+  function bloccaSuUnRilievo(chi) {
+    return `${chi} porta «blocca»: su un rilievo non si scrive, decidono il livello e il segno. Fermano il lavoro `
+      + 'un interno [3i?] e una scelta difficile da disfare [2i?!]; un [2i?] si corregge con l\'opzione che consigli e '
+      + 'la domanda esce in un feedback suo; gli altri col «?» vanno da parte con la loro domanda. '
+      + 'Togli «blocca» dal JSON (e, se serve, cambia il segno).';
+  }
+
+  /**
    * Un elenco di rilievi arrivato da fuori (dal client, da un file) portato
    * alla forma canonica. Scarta quello che non è un rilievo: livello fuori
    * scala, testo vuoto. Un rilievo STRUTTURATO senza sede vale interno: è
@@ -830,7 +842,7 @@
   global.SN_VERIFIER_ROUND = {
     LEVELS, SEDI, SPIEGAZIONE_SEDE, SPIEGAZIONE_SEGNO, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, testoRilieviNonRiconosciuti, normalizeFindings, maxLevel, primaFrase,
-    sedeDi, livelloDegliInterni, decisioneFerma, missingCaps, normalizeCaps, normalizeCounts,
+    sedeDi, livelloDegliInterni, decisioneFerma, bloccaSuUnRilievo, missingCaps, normalizeCaps, normalizeCounts,
     livelloCheLoPaga, decideRound, RILIEVI_CHE_FERMANO, dueDaParteRiga, bilancioPagato, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
     FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,

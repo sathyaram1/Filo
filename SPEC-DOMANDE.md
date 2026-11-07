@@ -308,13 +308,20 @@ dall'owner e dal server. Campi:
   la stessa, senza parole in più, su un fuso risponde «non serviva». Una
   risposta che arriva mentre il lavoro è in coda, in mano a qualcuno o in
   verifica non sposta lo stato: la decisione si accoda e la prende il giro
-  dopo. Un lavoro già passato, al controllo di sicurezza, torna in verifica
+  dopo. Il derivato di un `[2i?]`, che il lavoro corregge intanto con la
+  consigliata, nasce con la sua domanda che non blocca e aspetta il lavoro in
+  coda: la fusione del lavoro lo chiude. La consigliata data prima della
+  fusione lo lascia chiudere («si chiude quando quel lavoro si fonde»);
+  un'altra scelta, o parole in più, lo fa partire dopo la fusione
+  (FEEDBACK-STATES.md § 4c, #1202.2). Un lavoro già passato, al controllo di sicurezza, torna in verifica
   con la risposta (sicurezza e fusione non leggono le decisioni), salvo la
   stessa scelta della provvisoria. Un lavoro che l'owner ha archiviato dopo
   la nascita della domanda resta archiviato: la risposta si scrive nella sua
   conversazione e non lo riapre; una domanda nata su un lavoro già chiuso lo
   riapre. Finché una bloccante è aperta la fusione non parte. Una fermata
-  (§ 3.8) blocca da sé. `legata`, `provvisoria` e `nataSuChiuso` le scrive il
+  (§ 3.8) blocca da sé. La domanda di un rilievo col `?` non porta `blocca`:
+  se il lavoro si ferma lo decidono livello e segno (`decisioneFerma`), e
+  `--record-verifier` la rifiuta (#1202.2). `legata`, `provvisoria` e `nataSuChiuso` le scrive il
   server.
 - `destinatario`: l'owner. Le domande di guasto non arrivano a nessuno: le
   smista il compito «Gestisci la domanda» (§ 3.5).

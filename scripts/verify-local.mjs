@@ -83,7 +83,7 @@ import { VERIFIER_SCOPE_FILE, verifierScope, perimetroNote } from './lib/verifie
 import {
   PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus, diffDopoLaVerifica as diffTraCommit,
 } from './lib/solo-tolte.mjs';
-import { numeraRilievi, rigaNumerata, ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
+import { numeraRilievi, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testoPuliziaFuoriNumero } from './lib/prove-tolte.mjs';
 import { installaControlloSpedizione } from './lib/copie-di-dati.mjs';
 import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
@@ -657,7 +657,7 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   if (prev.verdict !== 'fix-pending' || !prev.pending) {
     return { ok: false, reason: 'nessun giro di correzione aperto su questo ramo: la pulizia si fa subito dopo una critica che manda a correggere, prima della correzione.' };
   }
-  const parte = [prev.pending.derived, prev.pending.external].flatMap((l) => (Array.isArray(l) ? l : [])).filter(messoDaParte);
+  const parte = parteDelGiro(prev.pending);
   if (!parte.length) {
     return { ok: false, reason: 'questo giro non ha messo da parte nessun rilievo: non c\'è niente da pulire. Una prova del giro si toglie solo verde, insieme alla prova durevole che la sostituisce.' };
   }
@@ -674,18 +674,15 @@ export function withPulizia(state, branch, { controllo, dirtyFiles = [] } = {}) 
   return { ok: true, state: s, files: controllo.files, numeri };
 }
 
-/**
- * Un rilievo uscito in un feedback suo che questo giro NON corregge. Un 2 col «?» sta in tutti e due gli elenchi:
- * la domanda esce, ma il codice lo cambia questo giro, e la sua prova si toglie verde con quella durevole (#1202). PURA.
- */
-function messoDaParte(f) {
-  return !!f && f.inCorrezione !== true;
+/** I rilievi che il giro aperto ha messo da parte, esterni compresi (la regola: rilieviMessiDaParte). PURA. */
+function parteDelGiro(pending) {
+  const p = pending || {};
+  return rilieviMessiDaParte([p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : [])), p.findings);
 }
 
 /** I posti nella critica dei rilievi che il giro ha messo da parte: le loro prove escono con la pulizia. PURA. */
 export function numeriMessiDaParte(prev) {
-  const p = (prev && prev.pending) || {};
-  const parte = [p.derived, p.external].flatMap((l) => (Array.isArray(l) ? l : [])).filter(messoDaParte);
+  const parte = parteDelGiro(prev && prev.pending);
   return numeraRilievi(ROUND.parseFindings((prev && prev.critique) || '').findings, parte).map((f) => f.n);
 }
 
@@ -726,7 +723,7 @@ export function cartellaProveGiro(branch) {
  */
 export function testoProveDaCancellare(branch, derived) {
   const cartella = cartellaProveGiro(branch);
-  const elenco = (Array.isArray(derived) ? derived : []).filter((f) => messoDaParte(f) && f.text);
+  const elenco = rilieviMessiDaParte(derived).filter((f) => f.text);
   return [
     `Adesso togli da ${cartella} le prove che riproducono questi rilievi: il rilievo vive nel feedback`,
     'che ne nasce, e la cartella del giro non deve crescere di giro in giro. Una per rilievo:',
@@ -800,8 +797,8 @@ export function codaText({ findings, derived, external, budgets, branch, instruc
   // in cloud sta nelle istruzioni del ruolo, ma qui la coda arriva da un file
   // fuori dal repo, che non le nomina — e la parte che vive nel repo è questa.
   const cartella = cartellaProveGiro(branch);
-  const daParte = (Array.isArray(derived) ? derived : []).filter(messoDaParte);
-  const messi = [daParte, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
+  const daParte = rilieviMessiDaParte(derived, findings);
+  const messi =[daParte, external].reduce((n, l) => n + (Array.isArray(l) ? l.length : 0), 0);
   const conDomanda = Array.isArray(findings) && findings.some((f) => f && f.decision === true);
   const righe = [
     '══ ESITO: c\'è da correggere ══',
