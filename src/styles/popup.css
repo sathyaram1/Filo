@@ -155,10 +155,11 @@
 }
 .sn-msg-copia:hover { background: var(--sn-hover); color: var(--sn-fg); }
 .sn-msg-copia:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
-.sn-msg-copia:active { transform: scale(0.92); }
+.sn-msg-copia:active svg { transform: scale(0.92); }
 .sn-msg-copia.sn-copiato { color: var(--sn-success); }
 .sn-msg-copia.sn-non-copiato { color: var(--sn-error); }
 .sn-msg-copia svg { display: block; }
+.sn-msg-azioni:has(.sn-copiato, .sn-non-copiato) .sn-msg-copia:not(.sn-copiato):not(.sn-non-copiato)::after { opacity: 0; visibility: hidden; }
 /* L'etichetta sta a destra, fuori dal flusso: comparendo non sposta niente, e il corpo che scorre non la taglia. */
 .sn-msg-copia::after {
   content: attr(data-etichetta);
