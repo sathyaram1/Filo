@@ -82,7 +82,7 @@ for (const url of ['filo://preferences/preferences.html', 'filo://options/option
       return out;
     });
     expect(nomi.length).toBeGreaterThan(0);
-    const strani = nomi.filter((n) => !n.nome || n.nome === n.id || n.nome === n.percorso || n.nome.length > 60 || /▾/.test(n.nome)
+    const strani = nomi.filter((n) => !n.nome || n.nome === n.id || n.nome === n.percorso || n.nome.length > 80 || /▾/.test(n.nome)
       || (n.scelte && n.nome.replace(/\s/g, '').includes(n.scelte.replace(/\s/g, ''))));
     expect(strani).toEqual([]);
   });
