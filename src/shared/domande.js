@@ -449,6 +449,7 @@
     if (!v.ok) return null;
     const a = v.azione;
     if (a.tipo === 'compito') return 'Affida a un agente';
+    if (a.tipo === 'nessuna') return 'Chiudi senza altre azioni';
     if (a.tipo === 'ambito') {
       // Le operazioni dette con le parole dell'elenco chiuso (ambiti.js), mai con quelle di chi propone.
       const A = global.SN_AMBITI;
