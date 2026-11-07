@@ -12,6 +12,7 @@
       version: '0.2.270', date: '2026-11-07',
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
+        { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
       ],
     },
     {
