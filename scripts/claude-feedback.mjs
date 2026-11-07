@@ -593,6 +593,7 @@ function uso() {
   console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia allegati e attese e le archivia, e chi le aspettava aspetta lui.');
   console.error('     La spec sta nel testo o in un --allega (le note non arrivano a chi lavora); un feedback che deve fondersi prima va in --aspetta.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
+  console.error('     --server (anche con --non-locale): il lavoro tocca il codice del server, e lo prendono i lavori server.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
