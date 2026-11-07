@@ -89,6 +89,21 @@ test('--server=valore non parte: il segno non prende valori', () => {
   }
 });
 
+// #2217 giro 2: `npm run manutentore feedback … --server` senza il doppio trattino: npm si prende l'opzione.
+test('le opzioni che npm si è preso si riprendono dall\'ambiente e si dice; un valore scivolato non parte', () => {
+  const f = lancia(['feedback', 'Titolo', '-'], { feedback: { ok: true, numero: '2230', lavoroServer: true } }, 'Testo.', { npm_config_server: 'true', npm_config_priorita: '2' });
+  assert.equal(f.status, 0, f.out);
+  assert.deepEqual(f.inviati[0].dati, { titolo: 'Titolo', testo: 'Testo.', priorita: 2, lavoroServer: true });
+  assert.match(f.out, /finite a npm invece che a me/);
+  const p = lancia(['pacchetto', '2220', '2215'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215'], lavoroServer: true } }, '', { npm_config_lavoro_server: 'true' });
+  assert.equal(p.inviati[0].dati.lavoroServer, true, p.out);
+  // `--priorita 2` spezzato da npm: il 2 finirebbe nel titolo.
+  const s = lancia(['feedback', 'Titolo', '2', '-'], {}, 'Testo.', { npm_config_priorita: 'true' });
+  assert.notEqual(s.status, 0);
+  assert.deepEqual(s.inviati, []);
+  assert.match(s.out, /--priorita=<valore>/);
+});
+
 test('la riga sul segno dice se aspetta il timbro dell\'owner', () => {
   assert.match(M.rigaSegnoServer(true, { lavoroServer: true, fiducia: 'fidato' }), /è fidato, lo prendono i lavori server/);
   assert.match(M.rigaSegnoServer(true, { lavoroServer: true, fiducia: 'non_fidato' }), /non fidato: va nei Ricevuti/);
