@@ -96,8 +96,8 @@ la trova fra quelle da rispondere.
 Un «da fare» (`"tipo": "da_fare"`, un passo che solo l'owner può fare) resta un
 «da fare»: niente opzioni inventate, niente consiglio, niente pro e contro.
 Riscrivi i passi (problema) e il perché (contesto) nella stessa forma corta, e
-tieni il «Fatto» e, se c'era, il «Non lo faccio» con le loro azioni. Se invece è
-una scelta travestita, con due strade vere, riscrivila come domanda, senza tipo.
+tieni il «Fatto» e, se c'era, il «Non lo faccio» con le loro azioni. Il tipo,
+come la priorità, resta quello di chi ha chiesto.
 
 Una riga sono 140 caratteri: lo strumento conta, e rifiuta col campo e il
 numero. Se chi ha chiesto ha scritto un'opzione sola, aggiungi quelle che il
