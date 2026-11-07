@@ -891,8 +891,7 @@
     const dx = e && Number.isFinite(e.clientX) ? e.clientX - d.startX : 0;
     assesta(d, dx);
     // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
-    ridisegnoRimandato = false;
-    if (d.a !== d.da) api.tabs.move(d.id, d.a);
+    if (d.a !== d.da) { ridisegnoRimandato = false; api.tabs.move(d.id, d.a); }
     // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
     try {
       Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
