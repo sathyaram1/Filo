@@ -108,13 +108,13 @@ la memoria nel taccuino (§ 5). Si accende:
 
 **La rosa si riempie anche di giorno.** A ogni battito e sveglia, se
 nell'ordine non resta un lavoro che possa partire adesso (vuoto, o solo lavori
-fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa delle
-ultime 24 ore di ogni account sta sotto il ritmo sostenibile fino al suo
+fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa
+dell'ultimo giorno di ogni account sta sotto il ritmo sostenibile fino al suo
 rinnovo, riporta le priorità 2 all'obiettivo con le regole della decisione del
 mattino e riscrive l'ordine; lo annota nel taccuino, e il recap del giorno
-dopo lo racconta. Non in una giornata a secco. Il 06/11 una rosa scritta solo
-al mattino si è svuotata a metà giornata e le quote sono rimaste ferme circa
-quattordici ore.
+dopo lo racconta. Non in una giornata a secco. Il 06/11 la rosa del mattino si
+è svuotata a metà giornata, nessun battito l'ha riempita e le quote sono
+rimaste ferme per quattordici ore circa.
 
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
