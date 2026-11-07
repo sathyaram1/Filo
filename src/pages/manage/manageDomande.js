@@ -636,7 +636,7 @@
         li.appendChild(pc);
       }
       if (rispondibile) {
-        const etichetta = etichettaDi(o);
+        const etichetta = D.etichettaOpzione(d, i, stato.riferimenti);
         if (etichetta) {
           const b = el('button', 'sn-btn mg-dq-azione', etichetta);
           b.type = 'button';
