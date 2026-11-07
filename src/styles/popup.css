@@ -134,13 +134,15 @@
 .sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
 /* Comandi di una risposta finita: piccoli e quieti, l'icona allineata al bordo del testo. */
+/* L'etichetta di un tasto sta dopo tutta la riga (Copia, Rispondi): non copre il tasto vicino (#2096). */
 .sn-msg-azioni {
+  position: relative;
   display: flex;
+  gap: 2px;
   margin: 2px 0 0 -4px;
 }
 .sn-msg-copia {
   all: unset;
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
