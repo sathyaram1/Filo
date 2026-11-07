@@ -1418,6 +1418,11 @@ async function wifi(q) {
     return { ...f, candidati: s.candidati || nomi };
   }
   const rete = elenco.reti.find((x) => x.nome === s.scelto);
+  if (q.dimentica) {
+    const r = await computer().wifiDimentica({ rete: rete.nome, uuid: rete.id });
+    if (!r.ok) return { ...fallito(r.errore, { ...q, nome: rete.nome }), rete: rete.nome };
+    return { ok: true, cosa: 'wifi', rete: rete.nome, dimenticata: true };
+  }
   if (rete.attiva) return { ok: true, cosa: 'wifi', rete: rete.nome, confermato: true, gia: true };
   let acceso = false;
   // Windows non dice la radio nell'elenco delle reti: la sa il lettore della home.
