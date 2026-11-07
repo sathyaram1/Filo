@@ -117,7 +117,7 @@ test('a parole, una porta sola fra la parola e il posto: chi esegue, la conferma
   assert.match(caso, /D\.zonaDellAzione\(action\)/);
   assert.doesNotMatch(caso, /=== 'menu'|zonaDaDove/);
   assert.match(leggi('src', 'shared', 'actionLevels.js'), /function doveDellIcona\(a\) \{[\s\S]{0,160}D\.zonaDellAzione\(a\)/);
-  const attivita = leggi('src', 'pages', 'dashboard', 'dashboard-attivita.js');
+  const attivita = leggi('src', 'shared', 'righeAttivita.js');
   assert.match(attivita.slice(attivita.indexOf('SPOSTA_ICONA: (a) =>')), /^SPOSTA_ICONA: \(a\) => \{[\s\S]{0,300}D\.zonaDellAzione\(a\)/);
   const layout = leggi('src', 'main', 'services', 'layoutIcone.js');
   assert.match(layout, /D\(\)\.doveDaZona\(d\.target\)/);
