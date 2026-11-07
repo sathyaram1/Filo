@@ -575,11 +575,11 @@ export function dopoIlSalvataggio(salvata, tenuta) {
 
 /**
  * Riscrive l'indice della cartella coi nuovi aggiornamenti: col timbro e la data di elenca se era fidato, senza timbro se
- * non lo era (lo script non firma quello che non ha scritto lui). `scrivi(nome, testo)`: la guardia, mentre lavorano gli
- * agenti. → gli aperti scritti, o null se l'indice manca.
+ * non lo era (lo script non firma quello che non ha scritto lui). `scrivi(nome, testo)` e `leggi(nome)`: la guardia,
+ * mentre lavorano gli agenti. → gli aperti scritti, o null se l'indice manca.
  */
-export function riscriviIndice(cartella, aggiornati, { scrivi = (nome, testo) => writeFileSync(join(cartella, nome), testo) } = {}) {
-  const letto = leggiIndice(cartella);
+export function riscriviIndice(cartella, aggiornati, { scrivi = (nome, testo) => writeFileSync(join(cartella, nome), testo), leggi = null } = {}) {
+  const letto = leggiIndice(cartella, { leggi });
   if (!Array.isArray(letto.aperti)) return null;
   const aperti = indiceAggiornato(letto.aperti, aggiornati);
   const o = letto.fidato ? conTimbro({ creato: letto.creato, aperti }, chiaveTimbri(cartella)) : { creato: '', aperti };
