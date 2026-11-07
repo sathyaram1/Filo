@@ -6561,6 +6561,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Le azioni il cui esito il modello ha davanti, da qualunque scheda e giorno: decidono se un NAVIGA di questo
   // turno può portare fuori dati (#587).
   const azioniViste = filo ? [...filo.azioni] : [];
+  const lettureGettoni = await lettiDaiGettoni;
+  azioniViste.push(...lettureGettoni);
   const FCx = globalThis.SN_FILO_CONTESTO;
   for (const m of codaScheda) {
     if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
