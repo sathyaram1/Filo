@@ -303,6 +303,10 @@ test('#2096: sotto il proprio messaggio Copia, Modifica e Cita, anche dal tasto 
   await barra.getByRole('button', { name: 'Modifica' }).click();
   await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
   await expect(home.locator('#input')).toBeFocused();
+  // Un secondo clic (o un doppio clic) non lo rimette una seconda volta.
+  await mia.hover();
+  await barra.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
   await home.locator('#input').fill('');
 
   await mia.hover();
