@@ -181,7 +181,7 @@
     },
     {
       id: 'translate-selection', title: 'Traduci il testo selezionato', category: 'selection',
-      desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro, dove puoi fare altre domande. Sotto ogni risposta «Copia» mette il testo negli appunti senza segni di formattazione, coi numeri già calcolati. Su un sito il riquadro sta sopra la pagina: le domande che ci scrivi il sito non le legge.',
+      desc: 'Traduce il testo selezionato e mostra il risultato in un riquadro, dove puoi fare altre domande. Sotto ogni risposta «Copia» mette il testo negli appunti senza segni di formattazione, coi numeri già calcolati, e «Rispondi» la cita in testa alla domanda dopo; passando il mouse su una tua domanda compaiono gli stessi due tasti. Su un sito il riquadro sta sopra la pagina: le domande che ci scrivi il sito non le legge.',
       invoke: 'Seleziona il testo e usa {tasto:translate-selection}, oppure apri il tasto destro e premi Traduci nella fila di icone in cima: la traduzione compare in un riquadro sopra la selezione. Tutta la pagina la traduce l\'icona Traduci della barra laterale.',
       doesNot: 'Non traduce il testo selezionato in altri programmi: la scorciatoia vale solo con Filo in primo piano, e fuori da Filo il tasto resta al programma che stai usando.',
     },
