@@ -156,11 +156,11 @@ function valeSu(dom, host) {
 }
 
 // Per «youtube.*» vale lo stesso elenco dei siti, senza il dominio di primo livello.
-const RADICI = BASI.map((b) => b.replace(/\.[^.]+$/, ''));
+const radici = () => BASI.map((b) => b.replace(/\.[^.]+$/, ''));
 
 // Una regola entra solo se nomina per sé un sito di YouTube: «*» o «~youtube.com» non bastano.
 function perYouTube(dom) {
-  return dom.pos.some((d) => (d.endsWith('.*') ? sotto(d.slice(0, -2), RADICI) : hostYouTube(d)));
+  return dom.pos.some((d) => (d.endsWith('.*') ? sotto(d.slice(0, -2), radici()) : hostYouTube(d)));
 }
 
 // ─── lettura ───────────────────────────────────────────────────────────────
