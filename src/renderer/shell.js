@@ -791,7 +791,7 @@
     drag.el.classList.add('dragging');
     tabsEl.classList.add('riordino');
     document.documentElement.classList.add('trascina-scheda');
-    anteprimaScheda.nascondi();
+    try { ANTEPRIMA.nascondi(); } catch (_) {}
     // Il puntatore resta alla barra anche sopra la pagina o fuori dalla finestra.
     if (drag.pointerId != null) { try { tabsEl.setPointerCapture(drag.pointerId); } catch (_) {} }
   }
