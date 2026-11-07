@@ -29,7 +29,10 @@ const improntaFinta = (b) => createHash('sha256').update(Buffer.from(b)).digest(
 let istanza = null;
 Immagini.perFilo = () => istanza;
 
-async function scarica({ nome, contenuto, url, pagina = '', apertaDa = '', primo = url, settings = {} }) {
+// I livelli di privacy (#1589): qui di norma «Chiedi sulle delicate»; di serie la banca parte in anticipo.
+const CHIEDI_DELICATE = { security: { privacy: { livello: 'delicate' } } };
+
+async function scarica({ nome, contenuto, url, pagina = '', apertaDa = '', primo = url, settings = CHIEDI_DELICATE }) {
   const dir = cartellaTemporanea('filo-nome-delicate-');
   try {
     impostazioni = settings;
