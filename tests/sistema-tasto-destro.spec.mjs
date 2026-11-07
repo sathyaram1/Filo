@@ -161,7 +161,7 @@ test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui prefer
   ]);
   await chiedi(page, 'collega le cuffie');
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1].collega), { timeout: 20_000 }).toEqual([true]);
-  (await rigaDi('Cuffie')).click({ button: 'right' });
+  await (await rigaDi('Cuffie')).click({ button: 'right' });
   await expect(menuDi(page).voce('Annulla · Scollega').first()).toBeVisible();
   await menuDi(page).voce('Annulla · Scollega').first().click();
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1].collega)).toEqual([true, false]);
