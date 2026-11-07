@@ -67,7 +67,7 @@ dall'ultima volta) e la memoria nel taccuino. Ti accendi:
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
-ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
+ordine e N se qualcosa è cambiato, riporta l'ordine ad almeno 2×N lavori pronti, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
 ipotesi, prossimo controllo e quando.
 
 ## La sessione accesa dal pacemaker
