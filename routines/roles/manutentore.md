@@ -65,6 +65,14 @@ A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi a
 ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
 ipotesi, prossimo controllo e quando.
 
+**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire
+adesso (vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa delle ultime 24
+ore di ogni account (`spesa`) sta sotto il ritmo sostenibile fino al suo rinnovo (il conto «sostenibile fino ai
+rinnovi ≈ … $/giorno» del mattino), riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole
+(decisione incrementale, scala delle classi, classe ereditata da chi blocca, incroci coi rami vivi) e riscrivi
+l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo lo racconta. Una rosa vuota a metà giornata con la quota
+che avanza sono ore di lavoro perse fino al rinnovo (06/11: quattordici). In una giornata a secco no.
+
 ## La sessione accesa dal pacemaker
 
 Il pacemaker accende una sessione per te al mattino, al battito, a un segnale o alla sveglia che hai chiesto; il
