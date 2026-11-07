@@ -141,7 +141,7 @@
   gap: 2px;
   margin: 2px 0 0 -4px;
 }
-.sn-msg-copia {
+.sn-msg-tasto {
   all: unset;
   display: inline-flex;
   align-items: center;
@@ -153,15 +153,15 @@
   cursor: pointer;
   transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
 }
-.sn-msg-copia:hover { background: var(--sn-hover); color: var(--sn-fg); }
-.sn-msg-copia:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
-.sn-msg-copia:active svg { transform: scale(0.92); }
-.sn-msg-copia.sn-copiato { color: var(--sn-success); }
-.sn-msg-copia.sn-non-copiato { color: var(--sn-error); }
-.sn-msg-copia svg { display: block; }
-.sn-msg-azioni:has(.sn-copiato, .sn-non-copiato) .sn-msg-copia:not(.sn-copiato):not(.sn-non-copiato)::after { opacity: 0; visibility: hidden; }
+.sn-msg-tasto:hover { background: var(--sn-hover); color: var(--sn-fg); }
+.sn-msg-tasto:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-msg-tasto:active svg { transform: scale(0.92); }
+.sn-msg-tasto.sn-copiato { color: var(--sn-success); }
+.sn-msg-tasto.sn-non-copiato { color: var(--sn-error); }
+.sn-msg-tasto svg { display: block; }
+.sn-msg-azioni:has(.sn-copiato, .sn-non-copiato) .sn-msg-tasto:not(.sn-copiato):not(.sn-non-copiato)::after { opacity: 0; visibility: hidden; }
 /* L'etichetta sta a destra, fuori dal flusso: comparendo non sposta niente, e il corpo che scorre non la taglia. */
-.sn-msg-copia::after {
+.sn-msg-tasto::after {
   content: attr(data-etichetta);
   position: absolute;
   left: calc(100% + 4px);
@@ -180,21 +180,21 @@
   visibility: hidden;
   transition: opacity calc(100ms * var(--sn-motion, 1)) ease, visibility 0s linear calc(100ms * var(--sn-motion, 1));
 }
-.sn-msg-copia:hover::after,
-.sn-msg-copia:focus-visible::after {
+.sn-msg-tasto:hover::after,
+.sn-msg-tasto:focus-visible::after {
   opacity: 1;
   visibility: visible;
   transition-delay: calc(250ms * var(--sn-motion, 1));
 }
 /* L'esito si legge subito, senza aspettare il passaggio del mouse. */
-.sn-msg-copia.sn-copiato::after,
-.sn-msg-copia.sn-non-copiato::after {
+.sn-msg-tasto.sn-copiato::after,
+.sn-msg-tasto.sn-non-copiato::after {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;
 }
-.sn-msg-copia.sn-copiato::after { color: var(--sn-success); }
-.sn-msg-copia.sn-non-copiato::after { color: var(--sn-error); }
+.sn-msg-tasto.sn-copiato::after { color: var(--sn-success); }
+.sn-msg-tasto.sn-non-copiato::after { color: var(--sn-error); }
 
 /* #2096 — Copia e Rispondi al passaggio del mouse sotto i messaggi delle chat (Aiuto, riquadro, Mazzi, scambi delle
    app nella home), come nel filo della home. La barra è assoluta: lo spazio sotto il messaggio lo tiene chi la ospita
