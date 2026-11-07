@@ -923,11 +923,10 @@ test('alzare il tetto di spesa dalla chat vuole «conferma» a ogni livello; dop
 test('chat: «mettiti ad Automatico» apre il riquadro con la parola, e scritta il livello sale; «torna a Normale» scende subito', async ({ app }) => {
   const page = await home(app);
   try {
+    // Un giro di modello per domanda: un'azione che chiede, o che parla da sé, chiude il turno senza richiamarlo (#1130).
     await modelloFinto(app, [
       { toolCalls: [{ id: 'a1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'autonomia', valore: 'automatico' }) }] },
       { text: 'Serve la tua conferma.' },
-      { toolCalls: [{ id: 'a2', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'autonomia', valore: 'normale' }) }] },
-      { text: 'Fatto.' },
     ]);
     await chiedi(page, 'mettiti ad automatico');
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
