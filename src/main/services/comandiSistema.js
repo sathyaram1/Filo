@@ -1420,7 +1420,12 @@ async function bluetooth(q) {
     const f = fallito(s.candidati ? 'ambiguo' : 'nessun-dispositivo', { ...q, nome: q.nome });
     return { ...f, candidati: s.candidati || nomi };
   }
-  const d = elenco.dispositivi.find((x) => x.nome === s.scelto);
+  const d = (q.indirizzo && elenco.dispositivi.find((x) => x.indirizzo === q.indirizzo && x.nome === s.scelto))
+    || elenco.dispositivi.find((x) => x.nome === s.scelto);
+  if (q.preferito != null) {
+    await segnaPreferito(d, q.preferito);
+    return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, preferito: q.preferito };
+  }
   if (q.dimentica) {
     const r = await computer().btDimentica({ indirizzo: d.indirizzo });
     if (!r.ok) return { ...fallito(r.errore, { ...q, nome: d.nome }), dispositivo: d.nome };
