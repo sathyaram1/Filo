@@ -1125,13 +1125,16 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       }
       // Le righe del commit che la pubblicazione costruirà: con quelle di un main più avanti la riscrittura verrebbe scartata.
       const sha = consegna && typeof consegna.commit === 'string' && /^[0-9a-f]{7,40}$/.test(consegna.commit) ? consegna.commit : '';
-      const [bl, sc] = [await bloccoDaRiscrivere(root, sha), await tutteLeSchede(cred)];
+      const [bl, sc, st] = [await bloccoDaRiscrivere(root, sha), await tutteLeSchede(cred), await chiama(cred, 'stato')];
       if (sc.ok === false) return esito(sc);
+      // Senza l'ordine ogni promessa su un suo lavoro sembrerebbe fuori posto: meglio fermarsi col motivo.
+      if (st.ok === false) return esito(st);
+      const ordine = Array.isArray(st.ordine) ? st.ordine : [];
       if (bl.errore) { console.error(`RIFIUTATO: ${bl.errore}.`); return 1; }
       const blocco = bl.blocco;
       if (!blocco) { console.error('RIFIUTATO: non trovo il blocco in cima alle novità.'); return 1; }
-      if (arg !== 'consegna') { console.log(contestoRedattore({ blocco, capacita: await indiceCapacita(root), schede: sc.schede, commit: bl.commit, motivo: bl.motivo })); return 0; }
-      const c = controllaNovita(consegna, { blocco, schede: sc.schede });
+      if (arg !== 'consegna') { console.log(contestoRedattore({ blocco, capacita: await indiceCapacita(root), schede: sc.schede, ordine, commit: bl.commit, motivo: bl.motivo })); return 0; }
+      const c = controllaNovita(consegna, { blocco, schede: sc.schede, ordine });
       if (!c.ok) { console.error(`RIFIUTATO, non consegnato:\n- ${c.errori.join('\n- ')}`); return 1; }
       const r = await chiama(cred, 'novita', c.novita);
       return esito(r, (x) => `Novità della ${x.versione} accettate dal server (${x.righe} righe): escono con la prossima pubblicazione, al posto delle righe che hai letto.`);
