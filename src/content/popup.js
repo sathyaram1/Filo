@@ -1093,7 +1093,8 @@
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
-            tastoCopia(bubble.wrap, daMostrare, () => conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'copia' }));
+            const copiaBtn = tastoCopia(bubble.wrap, daMostrare, () => conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'copia' }));
+            tastoRispondi(copiaBtn, daMostrare, popup.inputEl);
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
