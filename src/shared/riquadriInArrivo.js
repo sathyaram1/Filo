@@ -82,6 +82,14 @@
     return !!(altro && altro !== API && typeof altro.inArrivo === 'function' && altro.inArrivo(f));
   }
 
+  // Il riquadro ha finito di caricarsi (immagini e script compresi) dall'ultima volta che è entrato nella pagina. null se
+  // da qui non si sa: in una radice ombra il load non arriva al documento, e un documento più sotto ha il suo Filo.
+  function caricato(f) {
+    if (!stato || !eRiquadro(f) || f.ownerDocument !== stato.doc) return null;
+    try { if (f.getRootNode() !== stato.doc) return null; } catch (_) { return null; }
+    return stato.caricati.has(f);
+  }
+
   // Anche più sotto: chi tocca alla cieca (uno script in ogni frame figlio) raggiunge pure i riquadri dei riquadri.
   function qualcunoInArrivo() {
     if (!stato) return false;
