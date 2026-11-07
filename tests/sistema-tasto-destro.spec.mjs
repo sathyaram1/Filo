@@ -203,7 +203,7 @@ test('a parole: «metti le cuffie fra i preferiti» e «dimentica le cuffie» pa
     return { pref, dopo, via, fine: (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti };
   });
   expect(r.pref).toMatchObject({ ok: true, dispositivo: 'Cuffie Sony', preferito: true });
-  expect(r.dopo).toEqual([{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony' }]);
+  expect(r.dopo).toEqual(['00:11:22:33:44:55']);
   expect(r.via).toMatchObject({ ok: true, dispositivo: 'Cuffie Sony', dimenticato: true });
   expect(r.fine).toEqual([]);
   // Dimenticare chiede sempre conferma, a qualunque livello di autonomia: costo 3.
