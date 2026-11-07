@@ -212,5 +212,5 @@ test('F solo quando apro: dopo «Mostra originale» la sezione aperta resta com\
   await page.locator('#apri').click();
   await page.waitForTimeout(3000);
   await expect(page.locator('#psez')).not.toHaveText(/^IT /);
-  expect(await sentText(app)).not.toContain('folded section');
+  expect(await sentText(app)).not.toContain('inside the folded section');
 });
