@@ -1,6 +1,6 @@
 // Verifica #1840 giro 2, rilievo 1: la frase sotto i livelli promette che dopo una lettura togliere un freno si fa
 // «in una conversazione nuova». Nella home la conversazione nuova ha davanti gli ultimi giorni del filo, ricerca
-// compresa, e riceve lo stesso no: o la strada promessa funziona, o la frase non la promette.
+// compresa, e riceve lo stesso no. O la strada promessa funziona, o la frase non la promette.
 import { test, expect } from '../../fixtures/electron.mjs';
 import { CONFIRM_HOST, clickConfirm } from '../../helpers/confirm.mjs';
 import { home, modelloFinto, ripristina, chiedi } from '../../helpers/chatFinta.mjs';
