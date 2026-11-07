@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { home, modelloFinto, chiamateAlModello, ripristina } from './helpers/chatFinta.mjs';
+import { paginaDellAiuto } from './helpers/riquadri.mjs';
 
 const SHOTS = path.join(path.dirname(fileURLToPath(import.meta.url)), '.shots');
 const scatta = async (page, nome) => {
