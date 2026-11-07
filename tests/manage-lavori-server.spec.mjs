@@ -272,7 +272,8 @@ test('#2258: l’owner dichiara fidato com’è un lavoro fermo «resta locale»
   await expect(cosa).toHaveText([
     'Ramo dell’app, all’ultimo commit aaaaaaa: una voce di biglietti non fidati',
     'Ramo del server, all’ultimo commit bbbbbbb: <b>la punta</b> non è l’ultima registrata',
-    '2 scritti di biglietti non fidati fra note e critiche',
+    // Quando e da chi: l'owner trova le note da leggere senza rileggerle tutte.
+    /^2 scritti di biglietti non fidati fra note e critiche: Correzione 0\d\/11\/2026 \d\d:32; Manutenzione 0\d\/11\/2026 \d\d:10$/,
   ]);
   await expect(stato.locator('.mg-dichiara b')).toHaveCount(0);
   // Si dichiara dopo aver letto: ogni ramo apre le sue modifiche rispetto a main, nel suo repo.
