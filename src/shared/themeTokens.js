@@ -354,6 +354,7 @@
   }
 
   // Una durata del registro in millisecondi, per chi la usa da JS (un'attesa, non un'animazione): NaN se non è valida.
+  // È anche la regola di validate per i token di tempo: tetto e formato stanno solo qui.
   function durataMs(value) {
     const m = typeof value === 'string' ? value.trim().match(RE_TIME) : null;
     if (!m) return NaN;
