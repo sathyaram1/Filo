@@ -32,5 +32,6 @@ test('debug riquadro', async ({ app, shell, openTab, testServer }) => {
   await pagina.waitForTimeout(1000);
   console.log('log', JSON.stringify(await app.evaluate(() => globalThis.__log)));
   console.log('valore', await frame.locator('#t').inputValue());
+  expect(1).toBe(2);
   console.log('top', await pagina.evaluate(([x, y]) => { const e = document.elementFromPoint(x, y); return e && e.tagName; }, [r.x + off.x, r.y + off.y]));
 });
