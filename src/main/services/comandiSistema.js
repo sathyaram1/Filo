@@ -1514,7 +1514,9 @@ async function risolviNome(richiesta) {
   const s = scegliNome(q.nome, nomi);
   if (s.scelto) {
     const x = r.elenco.find((v) => v.nome === s.scelto) || {};
-    const gia = q.cosa === 'wifi' ? x.attiva === true : typeof x.collegato === 'boolean' && x.collegato === q.collega;
+    // Dimenticare non è mai «già fatto»: quello che si legge nell'elenco è ancora abbinato o conosciuto.
+    const gia = q.dimentica ? false
+      : q.cosa === 'wifi' ? x.attiva === true : typeof x.collegato === 'boolean' && x.collegato === q.collega;
     return { nome: s.scelto, gia };
   }
   const errore = s.candidati ? 'ambiguo' : q.cosa === 'wifi' ? 'nessuna-rete' : 'nessun-dispositivo';
