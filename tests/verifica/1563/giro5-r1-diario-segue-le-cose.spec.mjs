@@ -51,6 +51,14 @@ test('r1 una conversazione nascosta mentre la chat compatta, rimessa, torna dava
     await chiedi(page, 'a che ora parte il mio volo?');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Parte alle 7:40.' })).toBeVisible({ timeout: 20000 });
     const [richiesta] = await chiamateAlModello(app);
+    if (process.env.DEBUG_R1) {
+      const s = JSON.stringify(richiesta);
+      const out = [];
+      let i = s.indexOf('Lisbona');
+      while (i >= 0 && out.length < 6) { out.push(s.slice(Math.max(0, i - 300), i + 80)); i = s.indexOf('Lisbona', i + 1); }
+      console.log('DOVE:\n' + out.join('\n----\n'));
+      console.log('DIARIO:', JSON.stringify(await app.evaluate(() => globalThis.SN_COMPATTAZIONE.righe(false))));
+    }
     expect(JSON.stringify(richiesta), 'rimessa, la conversazione del volo è di nuovo davanti a Filo (diario o tratto)').toContain('Lisbona');
   } finally {
     await rimettiCompattatore(app);
