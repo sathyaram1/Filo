@@ -701,16 +701,35 @@ test('#1312, strada B: il costo 4 lo decide lo stato, non le parole: a compito p
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_popup', valore: 'no' }, ['non spegnere il blocco dei popup']],
   ];
   for (const [azione, frasi] of diPassaggio) {
-    for (const richiesta of frasi) assert.equal(risposta(azione, { impostazioni: att, azioni: [ricercaFatta], richiesta }), 'no', `${JSON.stringify(azione)} con «${richiesta}»`);
+    for (const richiesta of frasi) {
+      assert.equal(risposta(azione, { impostazioni: att, azioni: [ricercaFatta], richiesta }), 'no', `${JSON.stringify(azione)} con «${richiesta}»`);
+      const pulito = risposta(azione, { impostazioni: att, richiesta });
+      assert.ok(pulito === 'conferma' || PESO[pulito] < PESO.conferma, `${JSON.stringify(azione)} con «${richiesta}»: ${pulito}`);
+    }
   }
-  // Ogni azione che può arrivare al costo 4 senza un segreto dice come si riconosce chiesta: senza, non parte mai.
-  for (const [tipo, voce] of Object.entries(AL.REGISTRY)) {
-    const pu4 = voce.costo === 4 || typeof voce.difesa !== 'undefined' || ['DIMENTICA', 'IMPOSTA_PREFERENZA'].includes(tipo);
-    if (pu4) assert.equal(typeof voce.chiesta, 'function', `${tipo}: manca la regola che riconosce il costo 4 chiesto`);
-  }
-  // Il no dice al modello di riportarlo all'utente, una volta: l'utente può chiederlo lui.
+  // Nessuna voce del registro riconosce più le parole dell'utente: l'elenco è tolto.
+  for (const [tipo, voce] of Object.entries(AL.REGISTRY)) assert.equal(voce.chiesta, undefined, `${tipo}: niente regola di parole`);
+  assert.equal(P.paroleDellaVoce, undefined);
+  // Il no di un'automazione o di una proposta di Filo lo dice al modello, una volta.
   const d = A.decideDettaglio({ livello: 'default', stato: 'pulito', costo: 4, chiesta: false });
-  assert.match(A.fraseNo({ regola: d.regola }).perModello, /solo se è l'utente a chiederle con parole sue/);
+  assert.match(A.fraseNo({ regola: d.regola }).perModello, /non le propone da sé e non le fa per un'automazione/);
+});
+
+test('#835.1: sbloccare un sito, svuotare i bloccati, fidarsi di un sito per i programmi, spegnere un interruttore di Sicurezza sono costo 4 e il no rimanda alla pagina Sicurezza', () => {
+  const att = { security: { siteBlock: { blacklist: ['example.org'], enabled: true }, safeBrowse: { llmJudge: true } } };
+  const azioni = [
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_bloccati', valore: 'togli example.org' },
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_bloccati', valore: 'svuota' },
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_fidati_programmi', valore: 'aggiungi programmi.example' },
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'giudizio_ai', valore: 'off' },
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'blocco_siti', valore: 'off' },
+  ];
+  for (const a of azioni) {
+    assert.equal(AL.costoFor(a, { impostazioni: att }), 4, JSON.stringify(a));
+    assert.equal(risposta(a, { impostazioni: att }), 'conferma', `${JSON.stringify(a)}: pulito`);
+    assert.equal(risposta(a, { impostazioni: att, azioni: [ricercaFatta] }), 'no', `${JSON.stringify(a)}: dopo una lettura`);
+    assert.match(AL.ingressi(a, { impostazioni: att }).dove, /pagina Sicurezza/, JSON.stringify(a));
+  }
 });
 
 test('#1312: un client di database o un login a un registro verso un server portano fuori la password come un link', () => {
