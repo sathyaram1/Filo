@@ -34,8 +34,12 @@ const TITOLO = 'Posta in arrivo (3) - mario.rossi@gmail.com';
 const ESTRATTO = 'Saldo disponibile 12.345,67 euro. IBAN IT60X0542811101000000123456';
 const DESCRIZIONE = 'Le tue email di Gmail';
 
+// I livelli di privacy (#1589): qui di norma «Chiedi sulle delicate»; di serie la posta parte in anticipo.
+const CHIEDI_DELICATE = { security: { privacy: { livello: 'delicate' } } };
+const TUTTO = { security: { privacy: { livello: 'anticipo', chiedi: [] } } };
+
 // Salva una pagina come fa il tasto destro (SAVE_PAGE) o un link (SAVE_LINK), e aspetta la categoria.
-async function salva({ settings = {}, incognito = false, tipo = MSG.SAVE_PAGE, page, sender = null }) {
+async function salva({ settings = CHIEDI_DELICATE, incognito = false, tipo = MSG.SAVE_PAGE, page, sender = null }) {
   for (const k of Object.keys(disco)) delete disco[k];
   const chiamate = [];
   const pagine = [];
