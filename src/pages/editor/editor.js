@@ -2202,8 +2202,9 @@
     else incollaLungo(righe);
   });
   // insertText paga ogni a capo e mille righe fermavano la pagina per minuti (#1475). L'incolla lungo è UN insertHTML,
-  // così si annulla in un passo (#1475.2). Chrome lo paga al quadrato quando arriva in un blocco vuoto: la selezione
-  // allora prende un carattere vicino, che torna nel frammento al suo posto, e un foglio senza testo si svuota prima.
+  // così si annulla in un passo (#1475.2). Chrome lo paga al quadrato quando l'HTML finisce DENTRO un paragrafo (un
+  // blocco vuoto, o una selezione a metà testo): ogni strada qui sotto lo fa entrare al bordo di un blocco con del testo.
+  // Racconto e misure: patterns/incolla-lungo-un-insertHTML-al-bordo-di-un-blocco.md
   const INCOLLA_A_RIGHE = 50;
   const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
   const PARAGRAFO = /^(P|DIV|H[1-6])$/;
