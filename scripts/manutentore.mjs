@@ -1132,8 +1132,11 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       const testo = (await leggiStdin()).trim();
       if (!testo) { console.error('RIFIUTATO: il feedback vuole il testo da stdin (feedback "<titolo>" - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
       const p = opzione(argv, '--priorita');
-      const r = await chiama(cred, 'feedback', { titolo: senzaOpzioni(argv.slice(1)).filter((a) => a !== '-').join(' '), testo, ...(p !== undefined ? { priorita: Number(p) } : {}) });
-      return esito(r, (x) => `Aperto #${x.numero}${x.fiducia ? ` (${x.fiducia})` : ''}.`);
+      const server = vuoleServer(argv);
+      const r = await chiama(cred, 'feedback', { titolo: senzaOpzioni(argv.slice(1)).filter((a) => a !== '-').join(' '), testo, ...(p !== undefined ? { priorita: Number(p) } : {}), ...(server ? { lavoroServer: true } : {}) });
+      const fatto = esito(r, (x) => `Aperto #${x.numero}${x.fiducia ? ` (${x.fiducia})` : ''}.`);
+      if (!fatto) segnoServer(server, r);
+      return fatto;
     }
     case 'domanda': {
       let domanda;
