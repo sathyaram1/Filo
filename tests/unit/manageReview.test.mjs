@@ -2291,3 +2291,16 @@ test('testoRifiuto: frase per ogni motivo del server, dettaglio, e mai il solo c
   assert.match(ignoto.frase, /motivo_nuovo/);
   assert.equal(ignoto.dettaglio, '');
 });
+
+// #2217: un lavoro server non fidato in coda non lo prende nessuna routine. Dai Ricevuti ogni tasto che lo rimette In
+// coda lo segna anche fidato (`locale`, che in Gestione manda il timbro), o resterebbe fermo in silenzio.
+test('Ricevuti: chi aspetta il timbro col segno lavoro server torna In coda solo fidato', () => {
+  const fermo = { status: 'design', statusReason: 'fidato', fiducia: 'non_fidato', localOnly: { by: 'routine', at: 1 } };
+  assert.equal(MR.manageTabFor(fermo, {}), 'inbox');
+  const inCoda = MR.ownerActions(fermo, {}).filter((a) => a.to === 'todo');
+  assert.ok(inCoda.length, 'l\'owner lo può rimettere in coda');
+  for (const a of inCoda) assert.equal(a.locale, true, `«${a.label}» lo lascerebbe non fidato`);
+  // Fidato basta il tasto di sempre: le routine lo prendono già.
+  const fidato = Object.assign({}, fermo, { fiducia: 'fidato' });
+  assert.equal(MR.ownerActions(fidato, {})[0].key, 'accept');
+});
