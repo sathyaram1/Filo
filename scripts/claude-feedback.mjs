@@ -589,6 +589,16 @@ export const ambiente = {
   routine() { return isRoutineInstance(resolve(fileURLToPath(import.meta.url), '..', '..')); },
 };
 
+/** Chi lo prende, detto dopo l'apertura. Un lavoro server non fidato non lo prende nessuna routine (#2217). PURA. */
+export function rigaAperto({ soloLocale = false, server = false, r = {} } = {}) {
+  const ref = r.seq || r.id;
+  if (soloLocale) return `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${ref} (o npm run finish -- --feedback ${ref}).`;
+  if (!server) return 'Aperto per le routine.';
+  return !r.nonFidato && r.biglietto === 'pulito'
+    ? 'Aperto come lavoro server: lo prendono le routine dei lavori server, se in Automazioni sono accese.'
+    : 'Aperto come lavoro server, non fidato: dopo i giudici va nei Ricevuti a chiedere la fiducia, e col tuo timbro lo prendono i lavori server.';
+}
+
 function uso() {
   console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--server] [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
   console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia allegati e attese e le archivia, e chi le aspettava aspetta lui.');
