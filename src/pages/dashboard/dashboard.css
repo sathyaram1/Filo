@@ -636,8 +636,11 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex;
   flex-direction: column;
   gap: var(--dash-filo-gap);
-  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. */
-  padding: 40px 8px calc(8px + var(--dash-vuoto, 0px));
+  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. Il margine
+     dell'ultima bolla più questo fondo tengono i suoi tasti (27px): nemmeno lì compare la barra di scorrimento. */
+  padding: 40px 8px calc(14px + var(--dash-vuoto, 0px));
+  /* Il posto della barra di scorrimento è tenuto: comparendo non stringe la chat (#2096). */
+  scrollbar-gutter: stable;
 }
 
 .dash-bubble {
