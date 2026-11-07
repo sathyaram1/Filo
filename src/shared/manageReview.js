@@ -1678,6 +1678,12 @@
       titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e ti arriva una richiesta nuova solo se serve',
       testo: '',
     },
+    // Etichetta e titolo nominano la domanda: li completa fusioneDi.
+    attende_domanda: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'riallinea dopo la risposta',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: si riallinea da solo dopo la tua risposta',
+      testo: '',
+    },
     riallineamento_fallito: {
       attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione non avvenuta',
       titolo: 'Avevi detto sì, ma il ramo era in conflitto con main e nessuno lo sta riallineando',
