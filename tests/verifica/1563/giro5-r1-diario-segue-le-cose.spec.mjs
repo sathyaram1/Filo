@@ -6,19 +6,19 @@ import { home, modelloFinto, ripristina, chiedi, chiamateAlModello } from '../..
 
 const ORA_MS = 60 * 60 * 1000;
 
-// Chi compatta riscrive quello che riceve: una riga che nomina Lisbona o la clinica solo se le ha viste.
-const compattatoreFinto = (app) => app.evaluate(() => {
+// Chi compatta riscrive quello che riceve: una riga che nomina Lisbona solo se l'ha vista; `fissa`, quella data.
+const compattatoreFinto = (app, fissa = null) => app.evaluate((_e, fissa) => {
   const C = globalThis.SN_COMPATTAZIONE;
   globalThis.__compattatoreVero = C._dip.chiama;
   C._dip.chiama = async ({ messages }) => {
     const testo = messages.map((m) => m.content).join('\n');
     const righe = [];
-    if (/Lisbona/.test(testo)) righe.push({ testo: '08:00 prenotato il volo TAP per Lisbona del 12' });
-    if (/clinica\.example/.test(testo)) righe.push({ testo: '09:00 cercata la clinica.example per un esame' });
+    if (fissa) righe.push({ testo: fissa });
+    else if (/Lisbona/.test(testo)) righe.push({ testo: '08:00 prenotato il volo TAP per Lisbona del 12' });
     if (!righe.length) righe.push({ testo: '09:30 salutato Filo' });
     return JSON.stringify({ ore: righe, memorie: [] });
   };
-});
+}, fissa);
 const rimettiCompattatore = (app) => app.evaluate(() => {
   if (globalThis.__compattatoreVero) globalThis.SN_COMPATTAZIONE._dip.chiama = globalThis.__compattatoreVero;
 });
