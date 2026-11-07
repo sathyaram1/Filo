@@ -341,3 +341,39 @@ test('#2096: sotto il proprio messaggio Copia, Modifica e Cita, anche dal tasto 
   await riletta.getByRole('button', { name: 'Modifica' }).click();
   await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
 });
+
+// L'invio scrive i documenti in coda al messaggio come righe «File: …», e Modifica li rilegge da lì dopo la riapertura:
+// le due metà dello stesso formato si provano insieme.
+test('#2096: Modifica rimette nel campo anche il documento allegato, subito e riaprendo la home', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const dir = cartellaTemporanea('filo-2096-');
+  const percorso = join(dir, 'preventivo cucina.txt');
+  writeFileSync(percorso, 'Preventivo: 1200 euro.');
+  await preparaModello(app, [{ text: 'Letto.' }]);
+  const home = await apriHome(openTab);
+  await app.evaluate(({ webContents }, p) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://newtab'));
+    wc.mainFrame.send('filo:broadcast', { type: globalThis.SN_MSG.MSG.CHAT_ALLEGA, dove: 'casa', immagini: [], file: [p] });
+  }, percorso);
+  const chip = home.locator('.dash-file-chip', { hasText: 'preventivo cucina.txt' });
+  await expect(chip).toBeVisible({ timeout: 10_000 });
+  await scrivi(home, 'quanto costa?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Letto.' })).toBeVisible({ timeout: 20_000 });
+  await expect(chip).toHaveCount(0);
+
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'quanto costa?' });
+  await mia.hover();
+  await mia.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('quanto costa?');
+  await expect(chip).toHaveCount(1);
+
+  await home.reload();
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await expect(chip).toHaveCount(0);
+  const riletta = home.locator('#bubbles > .dash-bubble-user', { hasText: 'quanto costa?' });
+  await expect(riletta).toBeVisible({ timeout: 15_000 });
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('quanto costa?');
+  await expect(chip).toHaveCount(1);
+});
