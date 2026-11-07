@@ -279,3 +279,32 @@ test('prova vera a parti: la parte veloce trova il test rotto del ramo, la riga 
     togliCartella(r.casa);
   }
 });
+
+// Il caso di #1718, da cui è nato il rosso di #2223: verifica e sicurezza hanno provato il ramo solo su Linux (#2225).
+test('ramo che contiene già main: Linux risponde «main contenuto», Windows prova lo stesso il test del ramo', () => {
+  const r = repoFinto();
+  try {
+    const main = r.git(['rev-parse', 'HEAD']);
+    r.git(['checkout', '-q', '-b', 'claude/import']);
+    writeFileSync(join(r.lavoro, 'tests', 'unit', 'nuovo.test.mjs'), TEST_VALORE.replace("'uno'", "'due'"), 'utf8');
+    const ramo = r.commit('ramo: test nuovo');
+    const campi = {};
+    for (const nome of ['linux', 'windows']) {
+      const uscita = join(r.casa, `uscita-${nome}.txt`);
+      writeFileSync(uscita, '', 'utf8');
+      const p = azione(r, ramo, main, { args: ['--root', r.lavoro, '--parte', nome, '--unit', nome === 'linux' ? 'tutti' : 'toccati'], extra: { GITHUB_OUTPUT: uscita } });
+      assert.equal(p.codice, 0, p.uscita);
+      campi[nome] = readFileSync(uscita, 'utf8').trim().slice('campo='.length);
+    }
+    assert.equal(JSON.parse(campi.linux).esito, 'main_contenuto');
+    assert.equal(JSON.parse(campi.windows).esito, 'rosso_sulla_fusione', campi.windows);
+    const finale = azione(r, ramo, main, {
+      args: ['--unisci', 'linux,windows'],
+      extra: { CAMPO_LINUX: campi.linux, RISULTATO_LINUX: 'success', CAMPO_WINDOWS: campi.windows, RISULTATO_WINDOWS: 'success' },
+    });
+    assert.equal(finale.codice, 1, finale.uscita);
+    assert.deepEqual(finale.campo.rossi, ['tests/unit/nuovo.test.mjs › il valore è uno [Windows]']);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
