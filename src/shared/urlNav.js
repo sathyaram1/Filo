@@ -40,10 +40,8 @@
   // per loro lo schema di default è http. Accetta anche la forma IPv6 fra parentesi ([::1]).
   function isLocalHost(host) {
     const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
-    if (h === 'localhost' || h.endsWith('.localhost')) return true;
+    if (questoComputer(h)) return true;
     if (isLocalNetworkName(h)) return true;
-    if (h === '::1' || h.startsWith('::ffff:127.')) return true;
-    if (/^127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;       // loopback
     if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h)) return true;         // privato /8
     if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(h)) return true;           // privato /16
     if (/^172\.(1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3}$/.test(h)) return true; // privato /12
