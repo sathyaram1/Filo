@@ -139,7 +139,9 @@ function main() {
     console.log(riga);
     process.exit(codiceUscita(campo));
   }
-  const prova = provaUnitSullaFusione({ root: resolve(a.root), punta: a.ramo, mainSha: a.main, unit: a.unit, scrivi: (s) => console.log(s) });
+  // Verifica e sicurezza girano su Linux: su un altro sistema il ramo con main già dentro non l'ha provato nessuno (#2225).
+  const ancheContenuto = Boolean(a.parte) && a.parte !== 'linux';
+  const prova = provaUnitSullaFusione({ root: resolve(a.root), punta: a.ramo, mainSha: a.main, unit: a.unit, ancheContenuto, scrivi: (s) => console.log(s) });
   const testo = testoProva(prova);
   console.log(testo);
   const campo = campoEsito({ ramo: a.ramo, main: a.main, prova });
