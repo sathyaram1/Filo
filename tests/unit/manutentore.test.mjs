@@ -218,32 +218,37 @@ const ottocento = () => Array.from({ length: 800 }, (_, i) => {
 const RUOLO = readFileSync(risolvi(RADICE, 'routines', 'roles', 'manutentore.md'), 'utf8');
 const STATO = { ordine: ['4'], parallelismo: 3, parallelismoEffettivo: 3, freno: 20, segnali: [{ id: 's1', tipo: 'guasto', atMs: 0, dettaglio: { numero: '29' } }], account: { primo: 'B', spenti: {}, esclusiDallOwner: {} } };
 
-test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segnali e il taccuino, sotto il tetto', () => {
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
-    rami: [{ ramo: 'worker/x', feedback: ['5'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['700'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
+// #2269: decide l'ordine, non la priorità 2. Le 25 a 2 qui sotto stanno fuori dall'ordine e non entrano.
+test('contesto piccolo: con 800 schede porta le 3, i lavori dell\'ordine nella sua sequenza e le ferme, sotto il tetto', () => {
+  const stato = { ...STATO, ordine: ['700', '41', '4', '29'] };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato, taccuino: { testo: 'criterio: grafica prima', versione: 4 }, schede: ottocento(),
+    rami: [{ ramo: 'worker/x', feedback: ['700'], avanti: 2, data: '2026-10-31', file: ['a.js'] }, { ramo: 'worker/y', feedback: ['5'], avanti: 1, data: '2026-10-31', file: ['b.js'] }] });
   assert.equal(p.ok, true);
   assert.ok(p.token < M.PICCOLO_TETTO_TOKEN, `${p.token} token`);
-  assert.match(p.testo, /Schede a priorità 3 e 2, e le ferme \(30 di 800\)/);
-  assert.match(p.testo, /^#1 · p3 · todo/m);
+  assert.match(p.testo, /Schede: le priorità 3, l'ordine nella sua sequenza, le ferme \(8 di 800\)/);
+  assert.match(p.testo, /Ordine da accendere \(4\): #700 \(todo\), #41 \(todo\), #4 \(todo\), #29 \(todo\)/);
+  const righe = p.testo.split('\n').filter((r) => /^#\d+ · p/.test(r)).map((r) => r.split(' ')[0]);
+  assert.deepEqual(righe, ['#1', '#2', '#3', '#700', '#41', '#4', '#29', '#30'], 'le 3, poi l\'ordine com\'è scritto, poi le ferme rimaste');
+  assert.match(p.testo, /^#700 · p0 · todo/m, 'una 0 nell\'ordine entra');
   assert.match(p.testo, /^#29 · p1 · todo · FERMO \(guasto: guasto: npm\)/m);
-  assert.doesNotMatch(p.testo, /^#(3[1-9]|[4-9]\d|\d{3}) · /m, 'niente schede a 0 e a 1');
   assert.match(p.testo, /criterio: grafica prima/);
   assert.match(p.testo, /Versione 4/);
   assert.match(p.testo, /s1 guasto/);
   assert.match(p.testo, /^worker\/x/m);
-  assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori della rosa e delle 3');
+  assert.doesNotMatch(p.testo, /worker\/y/, 'una 2 fuori dall\'ordine non porta il suo ramo');
 });
 
 test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () => {
-  const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
-  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
+  const lunghe = ottocento().map((s) => ({ ...s, titolo: s.titolo.repeat(3) }));
+  const stato = { ...STATO, ordine: lunghe.map((s) => s.num) };
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato, taccuino: { testo: '', versione: 0 }, schede: lunghe });
   assert.equal(p.ok, false);
-  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede a priorità 3 e 2 \\(\\d+ token\\)\\. Riporta a 1`));
-  // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non abbassare lavori che non c'entrano.
-  const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [tutte2[0]] });
+  assert.match(p.motivo, new RegExp(`stima ${p.token} token, il tetto è ${M.PICCOLO_TETTO_TOKEN}: pesa di più le 800 schede delle 3, dell'ordine e delle ferme \\(\\d+ token\\)\\. Togli dall'ordine i lavori che non partiranno presto \\(bastano 2×N pronti\\)`));
+  // Un taccuino lungo con una scheda sola: il rimedio è il taccuino, non accorciare l'ordine.
+  const lungo = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: 'appunto '.repeat(16000), versione: 3 }, schede: [lunghe[0]] });
   assert.equal(lungo.ok, false);
   assert.match(lungo.motivo, /pesa di più il taccuino \(\d+ token\)\. Riscrivi il taccuino più corto/);
-  assert.doesNotMatch(lungo.motivo, /Riporta a 1/);
+  assert.doesNotMatch(lungo.motivo, /Togli dall'ordine/);
 });
 
 test('contesto intero: tutte le schede coi conti per priorità, la parte delle schede locali, taccuino, rami, registro', () => {
