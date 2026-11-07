@@ -599,13 +599,16 @@ test('dopo una lettura, un freno tolto o una cancellazione per sempre è un no a
     expect(r.executed, nome).toBe(false);
     expect(r.needsConfirm, `${nome}: niente riquadro con la parola`).toBeFalsy();
     expect(r.no, nome).toBe(true);
-    expect(r.output.error, nome).toMatch(/lo fa solo se glielo chiedi tu/);
+    expect(r.output.error, nome).toMatch(/Dopo aver letto cose scritte da altri non lo faccio/);
   }
   const s = await impostazioni(app);
   expect([s.autonomia.livello, s.monthlyLimitEur, s.openWeightsOnly]).toEqual(['default', 5, true]);
   expect(await lezioni(app)).toContain('Vive a Bologna.');
-  // Chiesto con parole sue, anche dopo la lettura, lo stesso cambio arriva alla parola.
-  expect((await execAction(app, azioni.tetto, { contesto: [pagina], richiesta: 'alza il tetto di spesa a 500 euro' })).needsConfirm).toBe(3);
+  // Chiesto con parole chiare, dopo la lettura resta no; nella conversazione pulita arriva alla parola.
+  const chiaro = await execAction(app, azioni.tetto, { contesto: [pagina], richiesta: 'alza il tetto di spesa a 500 euro' });
+  expect(chiaro.no).toBe(true);
+  expect(chiaro.error, 'il modello sa dove mandare l\'utente').toMatch(/Si cambia a mano/);
+  expect((await execAction(app, azioni.tetto, { richiesta: 'alza il tetto di spesa a 500 euro' })).needsConfirm).toBe(3);
 });
 
 test('chat a Normale, conversazione nuova: «riordina le schede» dà il bottone, e il popup non parla di letture', async ({ app }) => {
