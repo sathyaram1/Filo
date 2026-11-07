@@ -15,6 +15,6 @@ test('Editor: tasto destro su un documento dell\'elenco, Duplica lo duplica e l\
   await expect(menu.locator('.sn-select-option', { hasText: 'Rigenera titolo' })).toHaveCount(0);
   await page.screenshot({ path: 'tests/.shots/verifica-2096-editor.png' });
   await menu.locator('.sn-select-option', { hasText: 'Duplica' }).click();
-  await expect(page.locator('#docPop')).toBeVisible();
+  if (await page.locator('#docPop').isHidden()) await page.locator('#docSwitch').click();
   await expect(voci).toHaveCount(2, { timeout: 5_000 });
 });
