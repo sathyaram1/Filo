@@ -28,7 +28,8 @@ test('esplora: la conversazione nuova consigliata dal no', async ({ app }) => {
     await chiedi(page, 'alza il tetto di spesa a 800 euro');
     await page.waitForTimeout(8000);
     console.log('RIQUADRO:', await page.locator(CONFIRM_HOST).count(), 'BOTTONE:', await page.locator('button.dash-action-btn').count());
-    console.log('ATTIVITA:', await page.locator('.dash-activity').last().innerText());
+    console.log('ATTIVITA:', await page.locator('.dash-activity').last().textContent());
+    console.log('BOLLE:', (await page.locator('.dash-bubble').allTextContents()).slice(-4).join(' | '));
   } finally {
     await ripristina(app);
   }
