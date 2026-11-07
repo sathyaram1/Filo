@@ -224,7 +224,7 @@
       const raw = attrSourceValue(el, attr, tag);
       if (raw === null) continue;
       const text = raw.replace(/\s+/g, ' ').trim();
-      if (text.length < 2 || !HAS_LETTER.test(text)) continue;
+      if (!global.SN_CONST.testoDaTradurre(text)) continue;
       // `textContent` si paga solo quando un'etichetta c'è davvero: sulla
       // stragrande maggioranza degli elementi non si arriva fin qui.
       if (canMirror && visible === undefined) visible = visibleTextOf(el);
