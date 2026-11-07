@@ -47,6 +47,8 @@ test('un indirizzo scritto in un\'altra forma si salva in quella dell\'elenco de
     assert.deepEqual(P.applicaElenco(aggiungi.elenco, correnti).partial.bluetoothPreferiti, ['0011223344aa', '66778899aabb']);
     const togli = s.build('togli 00:11:22:33:44:AA');
     assert.deepEqual(P.applicaElenco(togli.elenco, correnti).partial, { bluetoothPreferiti: [] });
+    // Ogni forma che la regola dell'indirizzo accetta passa anche a parole: punti e spazi fra le coppie compresi.
+    assert.deepEqual(s.build('aggiungi 66.77.88.99.AA.BB').elenco.voci, ['66778899aabb']);
   } finally {
     globalThis.SN_COMANDI_SISTEMA = prima;
   }
