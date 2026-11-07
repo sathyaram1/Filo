@@ -335,6 +335,9 @@
       anteprima: (s, r) => manda({ op: 'anteprima', scheda: s, rect: rect(r) }),
       nascondi: () => manda({ op: 'nascondi' }),
       apri: (s) => manda({ op: 'apri', scheda: s }),
+      troppe: (n) => {
+        try { global.SN_POPUP && global.SN_POPUP.showToast && global.SN_POPUP.showToast(`In un messaggio entrano al massimo ${n} schede: questa è rimasta fuori.`); } catch (_) {}
+      },
       ...extra,
     };
   }
