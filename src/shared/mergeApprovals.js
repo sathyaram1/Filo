@@ -961,7 +961,7 @@
       return { chiave: 'dopo_domanda', testo: 'Si riallinea da sola dopo la tua risposta a ' + domanda
         + ': la routine riprende il ramo che avevi approvato e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.' };
     }
-    return { chiave: fermo, testo: inCorso === false ? nonAndato(req, d.motivo) : RIALLINEAMENTO_DA_GUARDARE };
+    return { chiave: fermo, testo: inCorso === false ? nonAndato(req) : RIALLINEAMENTO_DA_GUARDARE };
   }
   function testoRiallineamento(req, inCorso, dettagli) {
     return esitoRiallineamento(req, inCorso, dettagli).testo;
