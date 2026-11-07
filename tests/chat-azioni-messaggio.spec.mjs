@@ -139,6 +139,15 @@ test('i Mazzi: Copia e Rispondi sotto domanda e risposta, senza spostare la chat
     testoCopiato: 'Per questo mazzo servono più pescate.', citato: 'Per questo mazzo servono più pescate.',
   });
   await mazzi.screenshot({ path: 'tests/.shots/2096-mazzi.png' });
+  // Il tasto destro sul messaggio ha le stesse azioni dei tasti.
+  await mazzi.fill('#chatInput', '');
+  await mazzi.locator('.dk-msg-user').last().click({ button: 'right' });
+  await expect(menuDi(mazzi).voce('Rispondi').first()).toBeVisible();
+  await menuDi(mazzi).voce('Copia il messaggio').first().click();
+  await expect.poll(() => appunti(app)).toBe('che ne pensi del mazzo?');
+  await mazzi.locator('.dk-msg-bot.sn-con-azioni-msg').last().click({ button: 'right' });
+  await menuDi(mazzi).voce('Rispondi').first().click();
+  await expect(mazzi.locator('#chatInput')).toHaveValue(/servono più pescate/);
 });
 
 test('uno scambio di un’app nella home: Copia e Rispondi, e la risposta parte citata col suo posto', async ({ app, shell, openTab }) => {
