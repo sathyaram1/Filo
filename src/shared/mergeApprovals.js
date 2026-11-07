@@ -683,7 +683,7 @@
     var cards = root.querySelectorAll('.sn-mac-card');
     for (var i = 0; i < cards.length; i++) {
       if (cards[i].dataset.requestId === String(id) && typeof cards[i].__snMacSegui === 'function') {
-        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta);
+        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta, volo.daMs);
       }
     }
   }
