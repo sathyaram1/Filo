@@ -2281,8 +2281,17 @@ function nuovaConversazioneAiuto(sender) {
 }
 function segnaLetturaAiuto(sender, action) {
   const wc = sender && sender.wc;
-  const f = wc && globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action);
-  if (!f) return;
+  segnaFonteAiuto(sender, wc && globalThis.SN_ACTION_LEVELS && globalThis.SN_ACTION_LEVELS.fonteDi(action));
+}
+// Un testo incollato o trascinato, o un'immagine, mandati nell'Aiuto: lettura come nella chat della home (#1840).
+function segnaTestoNellAiuto(sender, { immagini = false } = {}) {
+  segnaFonteAiuto(sender, immagini
+    ? { classe: 5, campo: null, chiave: 'aiuto:immagine', motivo: 'ho guardato un\'immagine che hai incollato' }
+    : { classe: 5, campo: null, chiave: 'aiuto:testo-di-altri', motivo: 'è entrato un testo che non hai scritto tu' });
+}
+function segnaFonteAiuto(sender, f) {
+  const wc = sender && sender.wc;
+  if (!wc || !f) return;
   if (!aiutoAscoltato.has(wc)) {
     aiutoAscoltato.add(wc);
     try { wc.on('did-navigate', () => fontiPerAiuto.delete(wc)); } catch (_) {}
