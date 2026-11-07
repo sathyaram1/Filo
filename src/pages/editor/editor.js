@@ -2334,7 +2334,7 @@
       r.setStart(z, 1);
       scegli(r);
       inserisci(frammento(tag, { resto }));
-      if (suo.isConnected && suo.textContent === ANCORA && !suo.querySelector('img')) suo.remove();
+      if (suo.isConnected && !suo.textContent.split(ANCORA).join('') && !suo.querySelector('img')) suo.remove();
     } else {
       const fine = r.cloneRange();
       fine.collapse(false);
