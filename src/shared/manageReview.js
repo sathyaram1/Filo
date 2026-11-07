@@ -1735,7 +1735,6 @@
     const at = Number(atMs);
     if (!isFinite(at) || at <= 0) return false;
     const valore = (v) => {
-      if (v && typeof v === 'object' && typeof v.toMillis === 'function') return v.toMillis();
       const ms = typeof v === 'number' ? v : Date.parse(String(v || ''));
       return isFinite(ms) && ms > 0 ? ms : 0;
     };
