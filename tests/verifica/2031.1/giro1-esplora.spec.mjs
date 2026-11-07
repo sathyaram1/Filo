@@ -31,6 +31,15 @@ async function preparaSchede(app, openTab, testServer, quante = 3) {
   return salvate;
 }
 
+// Fuori da Mac Filo resta acceso a principale chiusa solo con un'altra finestra viva: qui una vuota fa da Mac.
+async function chiudiPrincipale(app) {
+  await app.evaluate(({ BrowserWindow }) => {
+    globalThis.__tieniVivo = new BrowserWindow({ show: false });
+    BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).close();
+  });
+  await expect.poll(async () => (await stato(app)).normale, { timeout: 10000 }).toBeNull();
+}
+
 async function attendiCreditiDavanti(app, salvate, msg) {
   await expect.poll(async () => (await stato(app)).normale?.davanti || '', { message: `${msg}: Crediti non è davanti`, timeout: 15000 })
     .toMatch(/^filo:\/\/credits\//);
