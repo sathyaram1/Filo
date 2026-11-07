@@ -199,6 +199,19 @@ if (!IS_SUBFRAME) {
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] cmd-freccia', e); }
 try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] trascina-bordo', e); }
 
+// Quello che il frame principale deve sapere prima degli script della pagina (fingerprint, pubblicità, cookie, permessi)
+// arriva in una chiamata sincrona sola: la pagina resta ferma finché non risponde (#1093). Lato main: ipc.js.
+let GATE_PUBBLICITA = '';
+const AVVIO = (() => {
+  if (IS_SUBFRAME) return null;
+  try {
+    const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+    if (!/^https?:/i.test(loc)) return null;
+    GATE_PUBBLICITA = require('./nascondi-pubblicita.js').attributoDelBlocco();
+    return ipcRenderer.sendSync('filo:avvio-pagina', loc, GATE_PUBBLICITA) || {};
+  } catch (_) { return {}; }
+})();
+
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
 // Inietta nel MAIN WORLD (prima degli script di pagina) gli override di
@@ -212,7 +225,9 @@ try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (IS_SUBFRAME ? /^(https?|data|blob):|^about:srcdoc$/i.test(loc) : /^https?:/i.test(loc)) {
-    const cfg = ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: IS_SUBFRAME }) || { level: 0, seed: 0 };
+    // Il frame principale l'ha già nella risposta di avvio; un riquadro la chiede da sé.
+    const cfg = (IS_SUBFRAME ? ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: true }) : (AVVIO && AVVIO.fp))
+      || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
       // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
       // le due finestre condividono ciò che sanno dei canvas (fingerprint-guard.js, ascolta).
@@ -265,7 +280,7 @@ try {
   const nascondi = require('./nascondi-pubblicita.js');
   nascondi.chiudiBloccati({ ipcRenderer, webFrame });
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (!IS_SUBFRAME && /^https?:/i.test(loc)) nascondi({ ipcRenderer, webFrame, href: loc });
+  if (!IS_SUBFRAME && /^https?:/i.test(loc)) nascondi({ ipcRenderer, webFrame, href: loc, gate: GATE_PUBBLICITA, risposta: AVVIO && AVVIO.adblock });
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
 // Il sito è entrato o uscito dall'elenco coi banner dei cookie: la sua risposta va via prima che i suoi script
@@ -273,7 +288,7 @@ try {
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
-    const w = ipcRenderer.sendSync('filo:cookie-wipe', loc);
+    const w = AVVIO && AVVIO.cookie;
     if (w && typeof w.pattern === 'string') {
       const re = new RegExp(w.pattern, 'i');
       const extra = new Set(Array.isArray(w.keys) ? w.keys : []);
@@ -315,7 +330,8 @@ try {
     // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
     if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
       const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
-      corpi.push(buildStatoPermessiCorpo(ipcRenderer.sendSync('filo:permessi-stato', loc)));
+      // Un documento blob non ha fatto la chiamata d'avvio: chiede da solo.
+      corpi.push(buildStatoPermessiCorpo(AVVIO ? AVVIO.permessi : ipcRenderer.sendSync('filo:permessi-stato', loc)));
       // La pagina chiede di scrivere su un file che ha già; a risposta data rilegge il permesso da Chromium (#1069).
       ascolti.push([SCRITTURA, () => {
         ipcRenderer.invoke('filo:permessi-scrittura').catch(() => null)
@@ -836,12 +852,7 @@ try {
     if (stratoMenu === null) { try { stratoMenu = ipcRenderer.sendSync('filo:strato-menu') === true; } catch (_) { stratoMenu = false; } }
     return stratoMenu;
   };
-  // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
-  // `azione`: l'azione del menu che apre (#1461), misurata dal main fino alla pagina caricata.
-  globalThis.SN_APERTURA_SCELTA = (url, azione) => {
-    const a = azione && typeof azione === 'object' ? { id: String(azione.id || ''), t0: Number(azione.t0) } : null;
-    try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || ''), a); } catch (_) {}
-  };
+  globalThis.SN_APERTURA_SCELTA = require('./apertura-scelta.js')(ipcRenderer);
 } catch (_) {}
 
 // Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede
@@ -934,6 +945,40 @@ if (riscrittura) {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
+// I moduli che servono solo a richiesta (#1093): il primo che legge uno dei loro nomi su globalThis li carica, nell'ordine
+// dell'elenco; fino ad allora la pagina non li paga. Su un sito dove Filo è spento non si caricano: chi li cerca trova il
+// vuoto, come prima che arrivassero. Quali sono e quanto pesa il resto: tests/unit/moduliSubito.test.mjs.
+const inAttesaDiRichiesta = new Set();
+function segnaInAttesa() {
+  try { document.documentElement.dataset.filoSuRichiesta = [...inAttesaDiRichiesta].join(','); } catch (_) {}
+}
+function suRichiesta(nomi, carica) {
+  let partito = false;
+  const avvia = () => {
+    if (partito || globalThis.__snFiloSpento === true) return;
+    partito = true;
+    try { carica(); } finally {
+      for (const n of nomi) inAttesaDiRichiesta.delete(n);
+      segnaInAttesa();
+    }
+  };
+  for (const nome of nomi) {
+    if (Object.prototype.hasOwnProperty.call(globalThis, nome)) continue;
+    inAttesaDiRichiesta.add(nome);
+    Object.defineProperty(globalThis, nome, {
+      configurable: true,
+      get() {
+        avvia();
+        const d = Object.getOwnPropertyDescriptor(globalThis, nome);
+        return d && 'value' in d ? d.value : undefined;
+      },
+      // Il modulo che si registra rimette il nome come un valore qualunque.
+      set(v) { Object.defineProperty(globalThis, nome, { value: v, writable: true, configurable: true, enumerable: true }); },
+    });
+  }
+  segnaInAttesa();
+}
+
 // Stesso elenco di loadContentScripts() in internal-preload.js: le differenze
 // ammesse stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadScripts() {
@@ -958,14 +1003,14 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo CS] accessoFisso', e); } // #1808 — la password dell'accesso fisso: PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
-  try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
+  suRichiesta(['SN_WALLET'], () => { try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } }); // #664 — «è un link d'invito?» per il tasto destro
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo CS] filoMarkdown', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo CS] linkSospetto', e); } // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo CS] themeTokens', e); }
   try { require(path.join(SHARED_DIR, 'confirmUi.js')); } catch (e) { console.error('[Filo CS] confirmUi', e); }
   try { require(path.join(SHARED_DIR, 'chatErrors.js')); } catch (e) { console.error('[Filo CS] chatErrors', e); } // #360 — errori tecnici → frasi per l'utente
   try { require(path.join(SHARED_DIR, 'icons.js')); } catch (e) { console.error('[Filo CS] icons', e); }
-  try { require(path.join(SHARED_DIR, 'qr.js')); } catch (e) { console.error('[Filo CS] qr', e); }
+  suRichiesta(['SN_QR'], () => { try { require(path.join(SHARED_DIR, 'qr.js')); } catch (e) { console.error('[Filo CS] qr', e); } });
   try { require(path.join(SHARED_DIR, 'calcMarkers.js')); } catch (e) { console.error('[Filo CS] calcMarkers', e); } // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
   try { require(path.join(SHARED_DIR, 'overlayPlacement.js')); } catch (e) { console.error('[Filo CS] overlayPlacement', e); } // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
   try { require(path.join(SHARED_DIR, 'guardianoStatico.js')); } catch (e) { console.error('[Filo CS] guardianoStatico', e); } // #810.7 — la forma di un numero di carta: PRIMA di extractContext
@@ -996,20 +1041,25 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'adSkip.js')); } catch (e) { console.error('[Filo CS] adSkip', e); } // #737 — nei riquadri è già partito da solo
   try { require(path.join(SHARED_DIR, 'campoAccesso.js')); } catch (e) { console.error('[Filo CS] campoAccesso', e); } // #1124 — quali campi chiedono l'email
   try { require(path.join(CONTENT_DIR, 'propostaEmail.js')); } catch (e) { console.error('[Filo CS] propostaEmail', e); } // #1124 — anche nei riquadri: il campo può stare lì
-  try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
-  try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); }
-  try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
-  try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
-  try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); }
+  suRichiesta(['SN_FEEDBACK', 'SN_FEEDBACK_CLIENT_ID_HASH', 'SN_FEEDBACK_ATTACH', 'SN_FEEDBACK_UI'], () => {
+    try { require(path.join(SHARED_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback shared', e); }
+    try { require(path.join(SHARED_DIR, 'feedbackClientIdHash.js')); } catch (e) { console.error('[Filo CS] feedbackClientIdHash', e); }
+    try { require(path.join(SHARED_DIR, 'feedbackAttachTypes.js')); } catch (e) { console.error('[Filo CS] feedbackAttachTypes', e); }
+    try { require(path.join(CONTENT_DIR, 'feedback.js')); } catch (e) { console.error('[Filo CS] feedback content', e); }
+  });
+  suRichiesta(['SN_REDTEAM_ATTACK_UI'], () => { try { require(path.join(CONTENT_DIR, 'redteamAttack.js')); } catch (e) { console.error('[Filo CS] redteamAttack content', e); } });
   try { require(path.join(SHARED_DIR, 'tabColor.js')); } catch (e) { console.error('[Filo CS] tabColor', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
   try { require(path.join(CONTENT_DIR, 'translatePage.js')); } catch (e) { console.error('[Filo CS] translatePage', e); }
   try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo CS] ttsChunk', e); }
-  try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo CS] modelCaps', e); }
-  try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo CS] ttsVoices', e); }
-  try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
-  try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo CS] ascolto', e); } // microfono e trascrizione: Detta e le chat
-  try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo CS] voceChat', e); } // tasto microfono delle chat, a cui «Detta» passa la mano
+  suRichiesta(['SN_MODEL_CAPS'], () => { try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo CS] modelCaps', e); } });
+  suRichiesta(['SN_TTS_VOICES'], () => { try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo CS] ttsVoices', e); } });
+  // Microfono e trascrizione: Detta e le chat; voceChat è il tasto microfono delle chat, a cui «Detta» passa la mano.
+  suRichiesta(['SN_DICTATION_SEGMENTER', 'SN_ASCOLTO', 'SN_VOCE_CHAT'], () => {
+    try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
+    try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo CS] ascolto', e); }
+    try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo CS] voceChat', e); }
+  });
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo CS] editBox', e); }
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo CS] actions', e); }
@@ -1025,7 +1075,7 @@ function start() {
   try {
     const loaded = ['SN_CONST', 'SN_MSG', 'SN_I18N', 'SN_ICONS', 'SN_EXTRACT',
       'SN_POPUP', 'SN_MENU', 'SN_HIGHLIGHT', 'SN_SIDEBAR', 'SN_SPELLCHECK',
-      'SN_FEEDBACK', 'SN_COOKIES_CS'].filter((k) => typeof globalThis[k] !== 'undefined');
+      'SN_FEEDBACK', 'SN_COOKIES_CS'].filter((k) => 'value' in (Object.getOwnPropertyDescriptor(globalThis, k) || {}));
     document.documentElement.dataset.filoModules = loaded.join(',');
     document.documentElement.dataset.filoReady = '1';
   } catch (_) {}

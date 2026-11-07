@@ -111,55 +111,36 @@ function provenienzaDi(info) {
   return { via: 'pagina' };
 }
 
-// Le quattro chiamate sincrone che una pagina fa prima dei suoi script: finché non c'è la risposta la pagina è ferma.
-// Quanto ci mettono, per canale, lo contano i contatori anonimi (#1466); da una finestra incognito no.
-function cronometrata(canale, gestore) {
-  return (event, ...args) => {
-    const t0 = performance.now();
-    try { gestore(event, ...args); } finally {
-      try {
-        const C = globalThis.SN_CONTATORI_MAIN;
-        if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
-      } catch (_) {}
-    }
-  };
-}
+// Le quattro risposte che una pagina aspetta prima dei suoi script: finché non arrivano la pagina è ferma. Il frame
+// principale le chiede tutte in una chiamata sola (`filo:avvio-pagina`, #1093); i canali singoli restano per chi ne
+// chiede una dopo. Quanto ci mette ognuna lo contano i contatori anonimi (#1466); da una finestra incognito no.
+// `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
+// `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
+const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
+const SONDA_FP = !!process.env.FILO_USER_DATA;
+// `esenti`: nel sito del documento alcune pagine sono esenti, e la guardia non prepara da fuori chi non ha il preload.
+const conCanale = (cfg, href) => (cfg && cfg.level > 0
+  ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP, esenti: require('./services/fingerprint').esentiNelSito(href) } : cfg);
 
-function registerIpcHandlers() {
-  // Niente shell orfane dopo l'uscita: alla riapertura si riparte puliti.
-  app.on('before-quit', () => {
-    for (const s of shellSessions.values()) { try { s.kill(); } catch (_) {} }
-    shellSessions.clear();
-  });
-
-  // SINCRONO perché il preload deve installare gli override PRIMA degli script
-  // di pagina. Passa { level, seed }: il master secret NON attraversa mai qui.
+const RISPOSTE_DI_AVVIO = {
+  // { level, seed }: il master secret NON attraversa mai qui.
   // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
-  // `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
-  // `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
-  const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
-  const SONDA_FP = !!process.env.FILO_USER_DATA;
-  // `esenti`: nel sito del documento alcune pagine sono esenti, e la guardia non prepara da fuori chi non ha il preload.
-  const conCanale = (cfg, href) => (cfg && cfg.level > 0
-    ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP, esenti: require('./services/fingerprint').esentiNelSito(href) } : cfg);
-  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href, opts) => {
+  'fp-config': (event, href, opts) => {
     try {
       const F = require('./services/fingerprint');
       const ambito = ambitoIncognitoDi(senderInfo(event));
       const fr = event.senderFrame;
-      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito), href); return; }
+      if (fr ? !fr.parent : !(opts && opts.riquadro)) return conCanale(F.configForHref(href, ambito), href);
       const catena = [];
       for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
       const web = catena.find((u) => /^https?:/i.test(u)) || '';
-      event.returnValue = catena.length > 1 ? conCanale(F.configForFrames(catena, ambito), web) : { level: 0, seed: 0 };
+      return catena.length > 1 ? conCanale(F.configForFrames(catena, ambito), web) : { level: 0, seed: 0 };
     } catch (_) {
-      event.returnValue = { level: 0, seed: 0 };
+      return { level: 0, seed: 0 };
     }
-  }));
-
-  // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
-  // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
-  ipcMain.on('filo:cookie-wipe', cronometrata('cookie-wipe', (event, href) => {
+  },
+  // #754 — la risposta al banner dei cookie da togliere dalla memoria della pagina, se il sito ha cambiato elenco.
+  'cookie-wipe': (event, href) => {
     let out = null;
     try {
       const wc = event.sender;
@@ -177,17 +158,56 @@ function registerIpcHandlers() {
         }
       }
     } catch (_) { out = null; }
-    event.returnValue = out;
-  }));
-
-  // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
-  ipcMain.on('filo:adblock-css', cronometrata('adblock-css', (event, href, gate) => {
+    return out;
+  },
+  // #576 — i riquadri pubblicitari da nascondere, o compaiono prima.
+  'adblock-css': (event, href, gate) => {
     try {
-      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
+      return require('./services/adblock').cosmeticForPage(String(href || ''), gate);
     } catch (_) {
-      event.returnValue = { css: '', tokens: false };
+      return { css: '', tokens: false };
     }
-  }));
+  },
+  // Cosa la pagina legge delle notifiche (#591).
+  'permessi-stato': (event, href) => {
+    try {
+      const Permessi = require('./services/permessiPagine');
+      return { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
+    } catch (_) {
+      return { notifiche: 'default' };
+    }
+  },
+};
+
+function rispostaDiAvvio(canale, event, ...args) {
+  const t0 = performance.now();
+  try { return RISPOSTE_DI_AVVIO[canale](event, ...args); } finally {
+    try {
+      const C = globalThis.SN_CONTATORI_MAIN;
+      if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
+    } catch (_) {}
+  }
+}
+
+function registerIpcHandlers() {
+  // Niente shell orfane dopo l'uscita: alla riapertura si riparte puliti.
+  app.on('before-quit', () => {
+    for (const s of shellSessions.values()) { try { s.kill(); } catch (_) {} }
+    shellSessions.clear();
+  });
+
+  // SINCRONI perché il preload deve installare tutto PRIMA degli script di pagina.
+  ipcMain.on('filo:avvio-pagina', (event, href, gate) => {
+    event.returnValue = {
+      fp: rispostaDiAvvio('fp-config', event, href),
+      adblock: rispostaDiAvvio('adblock-css', event, href, gate),
+      cookie: rispostaDiAvvio('cookie-wipe', event, href),
+      permessi: rispostaDiAvvio('permessi-stato', event, href),
+    };
+  });
+  for (const canale of Object.keys(RISPOSTE_DI_AVVIO)) {
+    ipcMain.on(`filo:${canale}`, (event, ...args) => { event.returnValue = rispostaDiAvvio(canale, event, ...args); });
+  }
 
   // #1974 — le regole che tolgono le pubblicità di YouTube: SINCRONO, devono girare prima degli script del sito.
   ipcMain.on('filo:youtube-regole', (event, href) => {
@@ -211,16 +231,6 @@ function registerIpcHandlers() {
       return '';
     }
   });
-
-  // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
-  ipcMain.on('filo:permessi-stato', cronometrata('permessi-stato', (event, href) => {
-    try {
-      const Permessi = require('./services/permessiPagine');
-      event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
-    } catch (_) {
-      event.returnValue = { notifiche: 'default' };
-    }
-  }));
 
   // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
   ipcMain.on('filo:permessi-si', (event, parte) => {

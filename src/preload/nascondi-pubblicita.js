@@ -134,10 +134,14 @@ function chiudiBloccati({ ipcRenderer, webFrame }) {
   });
 }
 
-function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
-  // Electron non toglie un foglio dell'utente: le regole valgono finché la radice non porta questo attributo (blocco spento).
-  // Il nome cambia a ogni pagina, così un sito non lo mette da sé per tenersi la pubblicità.
-  const GATE = 'data-filo-' + Math.random().toString(36).slice(2, 10);
+// Electron non toglie un foglio dell'utente: le regole valgono finché la radice non porta questo attributo (blocco spento).
+// Il nome cambia a ogni pagina, così un sito non lo mette da sé per tenersi la pubblicità.
+function attributoDelBlocco() { return 'data-filo-' + Math.random().toString(36).slice(2, 10); }
+
+// `gate` e `risposta`: l'attributo e la prima risposta del main, se il preload li ha già chiesti con le altre (#1093).
+function nascondiPubblicita({ ipcRenderer, webFrame, href, gate = '', risposta = null }) {
+  const GATE = gate || attributoDelBlocco();
+  let primaRisposta = gate && risposta && typeof risposta === 'object' ? risposta : null;
   let inserite = false;
   let attivo = false;
   let generiche = false;
@@ -205,7 +209,9 @@ function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
 
   const accendi = () => {
     let cfg = null;
-    try { cfg = ipcRenderer.sendSync('filo:adblock-css', (window.location && window.location.href) || href, GATE); } catch (_) {}
+    if (primaRisposta) { cfg = primaRisposta; primaRisposta = null; } else {
+      try { cfg = ipcRenderer.sendSync('filo:adblock-css', (window.location && window.location.href) || href, GATE); } catch (_) {}
+    }
     if (!cfg || typeof cfg !== 'object' || !cfg.on) return;
     attivo = true;
     generiche = !!cfg.tokens;
@@ -231,3 +237,4 @@ function nascondiPubblicita({ ipcRenderer, webFrame, href }) {
 
 module.exports = nascondiPubblicita;
 module.exports.chiudiBloccati = chiudiBloccati;
+module.exports.attributoDelBlocco = attributoDelBlocco;

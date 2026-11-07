@@ -940,3 +940,48 @@ test('Cerca e Cerca immagine dal tasto destro contano l’attesa fino alla pagin
   expect(Object.keys((await oggi(app)).azioni['search-image'].fine)).toEqual(['s5']);
   expect((await oggi(app)).azioni['search-web'].n, 'nessuna misura doppia').toBe(1);
 });
+
+// Le stesse voci da una pagina di Filo (#1461.1): prima la misura si chiudeva al clic, nella fascia del mezzo secondo.
+test('Cerca e Cerca immagine da una pagina di Filo contano l’attesa fino alla pagina dei risultati', async ({ app, openTab, testServer }) => {
+  test.setTimeout(60_000);
+  const sito = await testServer.openReady(openTab, '<!doctype html><body><p>sessione dei siti</p></body>');
+  await app.evaluate(async ({ webContents }, url) => {
+    const ses = webContents.getAllWebContents().find((w) => w.getURL() === url).session;
+    ses.protocol.handle('https', async (req) => {
+      if (!/(^|\.)google\.com$/.test(new URL(req.url).hostname)) return new Response('', { status: 404 });
+      await new Promise((r) => setTimeout(r, 3000));
+      return new Response('<!doctype html><title>risultati</title><p>risultati</p>', { headers: { 'content-type': 'text/html' } });
+    });
+  }, sito.url());
+  const caricata = (re) => app.evaluate(({ webContents }, src) => webContents.getAllWebContents()
+    .some((w) => new RegExp(src).test(w.getURL()) && !w.isLoading()), re);
+
+  const page = await openTab('filo://transparency/transparency.html');
+  await expect(page.locator('#doc-body p').first()).toBeVisible({ timeout: 10_000 });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  const menu = menuDi(page);
+  const testo = page.locator('#doc-body p').first();
+  await testo.evaluate((p) => { const r = document.createRange(); r.selectNodeContents(p); const s = getSelection(); s.removeAllRanges(); s.addRange(r); });
+  await testo.click({ button: 'right' });
+  await expect(menu.principale).toBeVisible({ timeout: 8_000 });
+  await menu.voce('Cerca').first().click();
+  await expect.poll(() => caricata('google\\.com/search'), { timeout: 15_000 }).toBe(true);
+  await expect.poll(async () => (await oggi(app))?.azioni?.['search-web']?.n || 0, { timeout: 8_000 }).toBe(1);
+  expect(Object.keys((await oggi(app)).azioni['search-web'].fine)).toEqual(['s5']);
+
+  await page.bringToFront();
+  const svg = encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><rect width="120" height="80" fill="#c84"/></svg>');
+  await page.evaluate((src) => {
+    const img = Object.assign(document.createElement('img'), { id: 'img-prova', src, width: 120, height: 80 });
+    document.getElementById('doc-body').prepend(img);
+  }, `data:image/svg+xml,${svg}`);
+  await page.evaluate(() => getSelection().removeAllRanges());
+  await page.locator('#img-prova').scrollIntoViewIfNeeded();
+  await page.locator('#img-prova').click({ button: 'right' });
+  await expect(menu.principale).toBeVisible({ timeout: 8_000 });
+  await menu.voce('Cerca immagine').first().click();
+  await expect.poll(() => caricata('lens\\.google\\.com'), { timeout: 15_000 }).toBe(true);
+  await expect.poll(async () => (await oggi(app))?.azioni?.['search-image']?.n || 0, { timeout: 8_000 }).toBe(1);
+  expect(Object.keys((await oggi(app)).azioni['search-image'].fine)).toEqual(['s5']);
+  expect((await oggi(app)).azioni['search-web'].n, 'nessuna misura doppia').toBe(1);
+});

@@ -3857,11 +3857,13 @@ class TabManager {
     // un gesto vero dell'utente, uno per gesto e di chi l'ha ricevuto (#737.1), qualunque forma chieda la pagina.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition, referrer } = details;
+      // La voce del menu di Filo che apre questa scheda, da una pagina web o da una di Filo (#1461.1).
+      const azioneMisurata = Permessi.azioneDellApertura(wc, url);
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const gesto = Permessi.gestoRecente(wc);
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
+          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto, azioneMisurata });
         }).catch(() => {});
         return { action: 'deny' };
       }
@@ -3894,7 +3896,6 @@ class TabManager {
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Si legge prima che la finestra la spenda (perUnaFinestra).
       const scelta = tab.isInternal === false && Permessi.sceltaDallUtente(wc, url);
-      const azioneMisurata = Permessi.azioneDellApertura(wc, url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
       const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
       // Una finestra senza barra dell'indirizzo la apre solo il clic, anche a blocco spento: da sola la pagina
@@ -4349,7 +4350,7 @@ class TabManager {
   // `fromUrl`: la pagina web che ha messo il collegamento davanti; per il giudizio sui siti arriva da lei, non da Filo.
   // `daScheda`: la pagina dove l'utente ha scelto il link (menu di riserva, una pagina di Filo, l'assistente sopra una
   // pagina), dove compare l'avviso che lo precede (#965).
-  apriDaCollegamento(url, { sfondo = false, daScheda = null, gesto = false, fromUrl = '' } = {}) {
+  apriDaCollegamento(url, { sfondo = false, daScheda = null, gesto = false, fromUrl = '', azioneMisurata = null } = {}) {
     if (isWebUnsafeNav(url)) return fermaNavigazione(url, { win: this.win });
     if (this._maybeBlockNavigation(null, url)) return false;
     const origine = /^https?:/i.test(String(fromUrl || '')) ? { tipo: 'link', da: String(fromUrl), gesto: !!gesto } : { tipo: 'filo', gesto: !!gesto };
@@ -4358,7 +4359,7 @@ class TabManager {
       Strade.misura('pagina', url, 'collegamento_interno', { finestra: this, incognito: this.incognito });
     }
     const apri = (segna) => {
-      const id = this.openTab(url, { activate: !sfondo, openedByLink: true, origine });
+      const id = this.openTab(url, { activate: !sfondo, openedByLink: true, origine, azioneMisurata });
       if (segna) segna(this.tabs.find((t) => t.id === id));
     };
     if (daScheda && this._sbPrimaDelClic(daScheda, url, apri, { daFilo: true })) return true;

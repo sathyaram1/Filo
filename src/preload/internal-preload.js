@@ -145,6 +145,10 @@ const filoApi = {
 };
 
 if (IS_FILO_ORIGIN) window.filo = filoApi;
+// Come dalle pagine web: senza, Cerca dal tasto destro chiudeva la misura al clic (#1461.1).
+if (IS_FILO_ORIGIN) {
+  try { globalThis.SN_APERTURA_SCELTA = require('./apertura-scelta.js')(ipcRenderer); } catch (e) { console.error('[Filo internal] apertura scelta', e); }
+}
 
 // Shim chrome.*: i moduli portati lo usano senza sapere che siamo in Electron.
 const chromeShim = {
@@ -291,42 +295,46 @@ function injectContentScriptStyles() {
 function loadContentScripts() {
   const SHARED = path.join(__dirname, '..', 'shared');
   const CONTENT = path.join(__dirname, '..', 'content');
-  // Alcuni moduli sono già caricati via <script> nelle pagine interne: il
-  // require li riesegue, ma è idempotente (riassegna gli stessi oggetti).
-  const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
+  // Un modulo che la pagina ha già caricato coi suoi <script> non si riesegue (#1093): si pagherebbe due volte, e uno
+  // con stato o ascoltatori (i18n, voceChat) ripartirebbe da capo. `globale`: l'ultimo nome che il modulo registra.
+  // Sentinella: tests/unit/contentScriptPreload.test.mjs.
+  const safe = (p, globale) => {
+    if (globale && typeof globalThis[globale] !== 'undefined') return;
+    try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); }
+  };
   // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
-  safe(path.join(SHARED, 'constants.js'));
-  safe(path.join(SHARED, 'immaginiChat.js')); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
-  safe(path.join(SHARED, 'contenutoEsterno.js')); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
+  safe(path.join(SHARED, 'constants.js'), 'SN_CONST');
+  safe(path.join(SHARED, 'immaginiChat.js'), 'SN_IMMAGINI_CHAT'); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
+  safe(path.join(SHARED, 'contenutoEsterno.js'), 'SN_ESTERNO'); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.
-  safe(path.join(SHARED, 'filoUi.js'));
-  safe(path.join(SHARED, 'i18n.js'));
-  safe(path.join(SHARED, 'clipboardHistory.js')); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
-  safe(path.join(SHARED, 'messages.js'));
-  safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
-  safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
-  safe(path.join(SHARED, 'gestiContati.js')); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
-  safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
-  safe(path.join(SHARED, 'ricercaCampo.js')); // #824 — "è una ricerca?": PRIMA di content.js
-  safe(path.join(SHARED, 'accessoFisso.js')); // #1808 — la password dell'accesso fisso: PRIMA di content.js
-  safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
-  safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
-  safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
-  safe(path.join(SHARED, 'filoMarkdown.js')); // #853 — senza, le risposte del modello entrano come HTML
-  safe(path.join(SHARED, 'linkSospetto.js')); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
-  safe(path.join(SHARED, 'themeTokens.js'));
-  safe(path.join(SHARED, 'confirmUi.js'));
-  safe(path.join(SHARED, 'chatErrors.js')); // #360 — errori tecnici → frasi per l'utente
-  safe(path.join(SHARED, 'icons.js'));
-  safe(path.join(SHARED, 'qr.js'));
-  safe(path.join(SHARED, 'calcMarkers.js')); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
-  safe(path.join(SHARED, 'overlayPlacement.js')); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
-  safe(path.join(SHARED, 'guardianoStatico.js')); // #810.7 — la forma di un numero di carta: PRIMA di extractContext
-  safe(path.join(SHARED, 'campiSegreti.js')); // #810.7 — campi che non vanno al modello: PRIMA di extractContext
+  safe(path.join(SHARED, 'filoUi.js'), 'SN_FILO_UI');
+  safe(path.join(SHARED, 'i18n.js'), 'SN_I18N');
+  safe(path.join(SHARED, 'clipboardHistory.js'), 'SN_CLIPBOARD'); // #256 — cronologia appunti: chiave e testi uguali da ogni parte
+  safe(path.join(SHARED, 'messages.js'), 'SN_MSG');
+  safe(path.join(SHARED, 'tasti.js'), 'SN_TASTI'); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
+  safe(path.join(SHARED, 'disposizioneIcone.js'), 'SN_DISPOSIZIONE_ICONE'); // dove sta ogni icona globale: PRIMA di menuIcons
+  safe(path.join(SHARED, 'gestiContati.js'), 'SN_GESTI'); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
+  safe(path.join(SHARED, 'campoTesto.js'), 'SN_CAMPO_TESTO'); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
+  safe(path.join(SHARED, 'ricercaCampo.js'), 'SN_RICERCA_CAMPO'); // #824 — "è una ricerca?": PRIMA di content.js
+  safe(path.join(SHARED, 'accessoFisso.js'), 'SN_ACCESSO_FISSO'); // #1808 — la password dell'accesso fisso: PRIMA di content.js
+  safe(path.join(SHARED, 'urlNav.js'), 'SN_URL_NAV'); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
+  safe(path.join(SHARED, 'nomiSito.js'), 'SN_NOMI_SITO'); // #843 — il sito di «Spegni Filo su questo sito»
+  safe(path.join(SHARED, 'wallet.js'), 'SN_WALLET'); // #664 — «è un link d'invito?» per il tasto destro
+  safe(path.join(SHARED, 'filoMarkdown.js'), 'SN_MARKDOWN'); // #853 — senza, le risposte del modello entrano come HTML
+  safe(path.join(SHARED, 'linkSospetto.js'), 'SN_LINK_SOSPETTO'); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
+  safe(path.join(SHARED, 'themeTokens.js'), 'SN_THEME_TOKENS');
+  safe(path.join(SHARED, 'confirmUi.js'), 'SN_CONFIRM_UI');
+  safe(path.join(SHARED, 'chatErrors.js'), 'SN_CHAT_ERRORS'); // #360 — errori tecnici → frasi per l'utente
+  safe(path.join(SHARED, 'icons.js'), 'SN_ICONS_UTIL');
+  safe(path.join(SHARED, 'qr.js'), 'SN_QR');
+  safe(path.join(SHARED, 'calcMarkers.js'), 'SN_CALC'); // #724 — calcolatrice e marker [[calc:]]: PRIMA di popup.js
+  safe(path.join(SHARED, 'overlayPlacement.js'), 'SN_PLACE'); // #500 — geometria di menu e riquadro risposta: PRIMA di popup.js e menu.js
+  safe(path.join(SHARED, 'guardianoStatico.js'), 'SN_GUARDIANO_STATICO'); // #810.7 — la forma di un numero di carta: PRIMA di extractContext
+  safe(path.join(SHARED, 'campiSegreti.js'), 'SN_CAMPI_SEGRETI'); // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
-  safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
+  safe(path.join(SHARED, 'avvisiTempo.js'), 'SN_AVVISI'); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
@@ -338,20 +346,20 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'correttoreAutomatica.js')); // #1447 — correzione a fine parola: PRIMA di spellcheck.js
   try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
-  safe(path.join(SHARED, 'feedback.js'));
-  safe(path.join(SHARED, 'feedbackClientIdHash.js'));
-  safe(path.join(SHARED, 'feedbackAttachTypes.js')); // allowlist tipi allegato
+  safe(path.join(SHARED, 'feedback.js'), 'SN_FEEDBACK');
+  safe(path.join(SHARED, 'feedbackClientIdHash.js'), 'SN_FEEDBACK_CLIENT_ID_HASH');
+  safe(path.join(SHARED, 'feedbackAttachTypes.js'), 'SN_FEEDBACK_ATTACH'); // allowlist tipi allegato
   safe(path.join(CONTENT, 'feedback.js'));
   safe(path.join(CONTENT, 'redteamAttack.js'));
-  safe(path.join(SHARED, 'tabColor.js'));
+  safe(path.join(SHARED, 'tabColor.js'), 'SN_TAB_COLOR');
   safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'translatePage.js'));
-  safe(path.join(SHARED, 'ttsChunk.js'));
-  safe(path.join(SHARED, 'modelCaps.js'));
-  safe(path.join(SHARED, 'ttsVoices.js'));
-  safe(path.join(SHARED, 'dictationSegmenter.js'));
-  safe(path.join(SHARED, 'ascolto.js')); // microfono e trascrizione: Detta e le chat
-  safe(path.join(SHARED, 'voceChat.js')); // tasto microfono delle chat, a cui «Detta» passa la mano
+  safe(path.join(SHARED, 'ttsChunk.js'), 'SN_TTS_CHUNK');
+  safe(path.join(SHARED, 'modelCaps.js'), 'SN_MODEL_CAPS');
+  safe(path.join(SHARED, 'ttsVoices.js'), 'SN_TTS_VOICES');
+  safe(path.join(SHARED, 'dictationSegmenter.js'), 'SN_DICTATION_SEGMENTER');
+  safe(path.join(SHARED, 'ascolto.js'), 'SN_ASCOLTO'); // microfono e trascrizione: Detta e le chat
+  safe(path.join(SHARED, 'voceChat.js'), 'SN_VOCE_CHAT'); // tasto microfono delle chat, a cui «Detta» passa la mano
   // Solo nei test: modelli di prova (vedi loader.js).
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
