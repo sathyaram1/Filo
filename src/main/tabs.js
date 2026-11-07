@@ -3722,11 +3722,13 @@ class TabManager {
     // un gesto vero dell'utente, uno per gesto e di chi l'ha ricevuto (#737.1), qualunque forma chieda la pagina.
     wc.setWindowOpenHandler((details) => {
       const { url, disposition, referrer } = details;
+      // La voce del menu di Filo che apre questa scheda, da una pagina web o da una di Filo (#1461.1).
+      const azioneMisurata = Permessi.azioneDellApertura(wc, url);
       // Da una pagina di Filo l'indirizzo l'ha scelto quasi sempre un modello: passa dalla porta delle uscite (#810).
       if (tab.isInternal && typeof globalThis.SN_USCITA_DA_FILO === 'function') {
         const gesto = Permessi.gestoRecente(wc);
         globalThis.SN_USCITA_DA_FILO(url, wc, () => {
-          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto });
+          this.apriDaCollegamento(url, { sfondo: disposition === 'background-tab', daScheda: this.tabs.includes(tab) ? tab : null, gesto, azioneMisurata });
         }).catch(() => {});
         return { action: 'deny' };
       }
