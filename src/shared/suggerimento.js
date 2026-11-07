@@ -386,6 +386,11 @@
   }
 
   api.installa = installa;
+  // Quello che il fumetto direbbe su un pezzo ('' = niente): la spazzata degli hover mancanti lo chiede qui.
+  api.testoPer = (el) => {
+    const lab = el ? etichettaDi(catena(el)) : null;
+    return lab ? lab.testo : '';
+  };
   api.aperto = () => (visibile && corrente ? { testo: tipEl ? tipEl.textContent : '', el: corrente.el } : null);
 
   // Le pagine di Filo sono tutte sue; in un sito sono di Filo solo i pezzi che lui ha marcato.
