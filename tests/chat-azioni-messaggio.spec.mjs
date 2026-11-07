@@ -179,6 +179,8 @@ test('uno scambio di un’app nella home: Copia e Rispondi, e la risposta parte 
   await casa.locator('#input').fill('quali carte?');
   await casa.locator('#input').press('Enter');
   // La domanda arriva al modello con la citazione in testa, e il testo citato è quello dei Mazzi.
+  await expect.poll(() => app.evaluate(() => globalThis.__domande.length), { timeout: 20_000 }).toBeGreaterThan(0);
+  console.log('DEBUG', JSON.stringify(await app.evaluate(() => globalThis.__domande.map((t) => t.slice(-600)))));
   const conCitazione = () => app.evaluate(() => globalThis.__domande.flatMap((t) => t.split('\n')).find((r) => r.includes("l'utente risponde al tuo messaggio")) || '');
   await expect.poll(conCitazione, { timeout: 20_000 }).toContain('servono più pescate');
 });
