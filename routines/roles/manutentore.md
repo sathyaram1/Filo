@@ -53,12 +53,13 @@ sta sotto di lui.
 
 **La decisione del mattino**, una volta al giorno, è l'unica lettura intera: tutte le schede, il taccuino con le
 indicazioni dell'owner, il registro delle decisioni, i rami vivi coi loro file, la spesa della settimana per account.
-Scrivi la rosa (priorità 2: promuovi le nuove, riporta a 1 quelle che oggi non contano più), l'ordine, N, i pacchetti,
-le attese. Poi il recap del giorno prima.
+Scrivi le classi dove il criterio del giorno le cambia, l'ordine (almeno 2×N lavori pronti, § Le regole dell'ordine),
+N, i pacchetti, le attese. Poi il recap del giorno prima. Il taccuino non tiene una scelta quotidiana di priorità 2
+accanto all'ordine: se ne trovi una scritta, la togli, perché la stessa scelta scritta due volte prima o poi diverge.
 
 **Fra una decisione e l'altra non resti sveglio: ti fai svegliare.** Ogni accensione è una sessione nuova col contesto
-piccolo (questo ruolo, il taccuino, le schede a priorità 3 e 2, i rami vivi, i segnali dall'ultima volta) e la memoria
-nel taccuino. Ti accendi:
+piccolo (questo ruolo, il taccuino, le schede dei lavori nell'ordine e quelle a priorità 3, i rami vivi, i segnali
+dall'ultima volta) e la memoria nel taccuino. Ti accendi:
 
 - al **battito**, ogni 55 minuti al più: biglietti, guasti, deploy, suite, domande di processo;
 - a una **sveglia del server**, al segnale: guasto dichiarato, deploy del server rosso, suite rossa su main,
