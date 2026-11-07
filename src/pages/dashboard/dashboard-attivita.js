@@ -967,12 +967,12 @@
     },
     ZOOM_PAGINA: (a) => {
       const p = Number(a._output && a._output.percentuale);
-      return { icon: '🔍', text: Number.isFinite(p) && p > 0 ? `Zoom al ${p}%` : 'Zoom cambiato' };
+      return { icon: '🔍', text: Number.isFinite(p) && p > 0 ? `Zoom ${globalThis.SN_SISTEMA.alPercento(p)}` : 'Zoom cambiato' };
     },
     // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
     VOLUME: (a) => {
       const o = a._output || {};
-      const al = globalThis.SN_SISTEMA ? globalThis.SN_SISTEMA.alPercento(o.volume) : `al ${o.volume}%`;
+      const al = globalThis.SN_SISTEMA.alPercento(o.volume);
       return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume ${al}${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
