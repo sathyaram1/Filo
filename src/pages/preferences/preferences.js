@@ -1864,6 +1864,7 @@
     }
     const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
     if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(settings.bluetoothPreferiti || []) !== JSON.stringify(preferitiBtSalvati || [])) disegnaPreferitiBt(settings.bluetoothPreferiti);
     if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
 
