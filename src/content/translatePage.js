@@ -681,7 +681,8 @@
     tellFrames(runId, skipped, false);
     tellFrames(runId, shown, true, fuori);
     tellFrames(runId, background, true, true);
-    reportToHost(runId, { phase: 'ack', frames: fuori ? 0 : shown.length }, fuori);
+    // `fuori`: quanti dei suoi risponderanno fuori conto, perché chi aspetta sappia se hanno risposto tutti.
+    reportToHost(runId, { phase: 'ack', frames: fuori ? 0 : shown.length, fuori: (fuori ? shown.length : 0) + background.length }, fuori);
     // Nascosto, un riquadro non ha misura: il francobollo si riconosce solo da uno che si vede.
     if (!fuori && !worthTranslatingHere()) { reportToHost(runId, { phase: 'end', applied: 0, left: 0 }); return; }
     translatePage({ quiet: true, runId, fuoriConto: fuori });
