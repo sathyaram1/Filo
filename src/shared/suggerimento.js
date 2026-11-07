@@ -72,15 +72,19 @@
     return r && r.host ? r.host : null;
   }
 
+  // Dal pezzo in su; dentro l'ambito da quando un antenato lo è, anche oltre il confine di uno shadow chiuso (dove
+  // `closest` di SN_FILO_UI.inside si ferma all'host).
   function catena(t) {
-    const out = [];
+    const tutti = [];
     let el = t && t.nodeType === 1 ? t : t && t.parentElement;
     for (let giri = 0; el && giri < 80; giri++, el = sopra(el)) {
       if (el === document.documentElement) break;
       if (INTOCCABILI.has(el.tagName)) return [];
-      if (dentroAmbito(el)) out.push(el);
+      tutti.push(el);
     }
-    return out;
+    let i = tutti.length - 1;
+    while (i >= 0 && !dentroAmbito(tutti[i])) i--;
+    return tutti.slice(0, i + 1);
   }
 
   // null: niente da dire qui, si sale; '': questo pezzo ha scelto il silenzio, e anche chi lo contiene tace.
