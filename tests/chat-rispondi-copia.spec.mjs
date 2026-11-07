@@ -317,14 +317,12 @@ test('#2096: sotto il proprio messaggio Copia, Modifica e Cita, anche dal tasto 
   expect(await ultimaDomanda(app)).toContain("(l'utente risponde a un suo messaggio");
 
   // Il tasto destro ha le stesse voci, e fanno la stessa cosa.
+  await app.evaluate(({ clipboard }) => clipboard.writeText(''));
   await mia.click({ button: 'right' });
   const menu = menuDi(home);
   await expect(menu.voce('Cita').first()).toBeVisible();
   await expect(menu.voce('Modifica').first()).toBeVisible();
   await menu.voce('Copia il messaggio').first().click();
-  await app.evaluate(({ clipboard }) => clipboard.writeText(''));
-  await mia.click({ button: 'right' });
-  await menuDi(home).voce('Copia il messaggio').first().click();
   await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('che tempo fa domani a Torino?');
   await mia.click({ button: 'right' });
   await menuDi(home).voce('Modifica').first().click();
