@@ -2265,11 +2265,7 @@
       },
       keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo', 'autonomia di filo'],
       costo: 2,
-      allenta: (r, at) => {
-        const A = global.SN_AUTONOMIA;
-        const prima = at && at.autonomia ? A.livelloAttivo(at.autonomia.livello) : 'conservativo';
-        return A.indice(r.partial.autonomia.livello) > A.indice(prima);
-      },
+      allenta: (r, at) => !at || global.SN_AUTONOMIA.richiestaCambioLivello((at.autonomia || {}).livello, r.partial.autonomia.livello) !== 'si',
       dove: 'Il livello di autonomia si cambia anche in Preferenze, sotto «Autonomia di Filo».',
       risk: 'Cambia quante cose Filo fa da solo senza chiederti prima.',
       build(v) {
