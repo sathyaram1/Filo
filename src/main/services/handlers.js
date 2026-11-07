@@ -1306,7 +1306,7 @@ const giroDiSoliBottoni = (results) => results.length > 0 && results.every(({ ac
 const NON_RIPETERE_LA_RISPOSTA = 'Il testo che hai scritto insieme a questa chiamata l\'utente lo sta leggendo come risposta: non ripeterlo e non '
   + 'annunciare il bottone. Se non hai altro da fare, chiudi senza scrivere altro.';
 const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate l\'utente lo vede fra le note di lavoro, non come risposta: '
-  + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
+  + `se conteneva la risposta, riscrivila per intero nel prossimo messaggio. ${RISCRIVI_SENZA_DIRLO}`;
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
 // L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
