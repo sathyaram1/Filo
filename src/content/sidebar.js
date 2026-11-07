@@ -2112,6 +2112,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   }
   global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
   if (!global.SN_VOCI_PAGINA.includes(vociAttesa)) global.SN_VOCI_PAGINA.push(vociAttesa);
+  if (!global.SN_VOCI_PAGINA.includes(vociMessaggio)) global.SN_VOCI_PAGINA.push(vociMessaggio);
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.AIUTO_RAGIONAMENTO || !msg.turno) return;
