@@ -1970,6 +1970,7 @@ function esitoSistemaPerModello(o) {
   const nome = o.dispositivo || o.rete;
   const acceso = o.accesoPrima ? ` ${radio} era spento: acceso prima.` : '';
   if (o.dimenticato) return `Dimenticato: per riusarlo va riabbinato dalle impostazioni del sistema.\n${busta([nome])}`;
+  if (typeof o.preferito === 'boolean') return `${o.preferito ? 'Messo fra i preferiti (in cima all\'elenco nella home)' : 'Tolto dai preferiti'}:\n${busta([nome])}`;
   if (o.dimenticata) return `Rete dimenticata: per ricollegarsi servirà di nuovo la password.\n${busta([nome])}`;
   if (o.gia) return `Era già così, niente da cambiare:\n${busta([nome])}`;
   if (o.cosa === 'bluetooth') {
