@@ -47,7 +47,7 @@ test('la coppia del server non entra mai in una shell come testo', () => {
 });
 
 // I lavori del workflow, ognuno col suo testo: `nome` → blocco.
-const LAVORI = Object.fromEntries(W.split(/\n(?= {2}[a-z][\w-]*:\n)/).slice(1).map((b) => [/^ {2}([\w-]+):/.exec(b)[1], b]));
+const LAVORI = Object.fromEntries(W.slice(W.indexOf('\njobs:\n')).split(/\n(?= {2}[a-z][\w-]*:\n)/).slice(1).map((b) => [/^ {2}([\w-]+):/.exec(b)[1], b]));
 
 test('strumenti di main, ramo dal suo sha, titolo che il server cerca', () => {
   for (const nome of ['linux', 'windows']) {
