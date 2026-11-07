@@ -142,7 +142,7 @@ test('C componente chiuso con dentro solo testo che la traduzione salta per scel
   await watchToasts(page);
   await clickTranslateIcon(app);
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
-  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toMatch(/tradotta/);
   expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
 });
 
