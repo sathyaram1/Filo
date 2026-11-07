@@ -352,6 +352,7 @@
   }
 
   function suTasto(e) {
+    if (e.isTrusted) ultimoTasto = Date.now();
     if (e.key !== 'Escape' || !corrente) return;
     zittito = corrente.el;
     nascondi();
