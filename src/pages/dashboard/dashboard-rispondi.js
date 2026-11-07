@@ -4,14 +4,11 @@
 (function (global) {
   'use strict';
 
-  const { MSG } = global.SN_MSG;
   let d = null;
   // Il testo come l'ha scritto Filo, bolla per bolla: a schermo è già formattato, e il posto nel filo si ritrova da lui.
   const scritti = new WeakMap();
-  let barra = null;
   let anteprima = null;
   let citata = null;
-  const COPIATO_MS = 1600;
 
   const icona = (nome, size = 16) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](size) : '');
   const elDi = (t) => (t && t.nodeType === 1 ? t : (t && t.parentElement) || null);
