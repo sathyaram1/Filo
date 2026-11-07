@@ -1802,14 +1802,14 @@
       }, { richiesta: pending[0], richieste: ferme, conflitto: false, fusione, statoFusione: stato });
     }
     if (failed.length) {
-      const stato = riallineamentoDi(fb, failed);
-      const fallito = stato === 'riallineamento_fallito';
+      const ria = riallineamentoDi(fb, failed);
+      const fallito = ria.stato === 'riallineamento_fallito';
       return forma('l5', 'quadrato', titolo, fallito ? 'attack' : 'spam', fallito ? 'conflitto' : 'riallinea', {
         titolo,
         righe: [],
-        testo: testoRiallineamento(failed, !fallito),
+        testo: testoRiallineamento(failed, ria),
         azioni: [],
-      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: stato });
+      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: ria.stato, riallineamento: ria });
     }
 
     const versione = String((fb && fb.resolvedInVersion) || '').trim();
