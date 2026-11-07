@@ -38,15 +38,48 @@ test('token in sola lettura, nessun segreto, nessuna credenziale nei checkout', 
 test('la coppia del server non entra mai in una shell come testo', () => {
   const righe = W.split('\n').filter((r) => r.includes('client_payload'));
   assert.ok(righe.length >= 3);
-  for (const r of righe) assert.match(r, /^(run-name: |\s{6}(RAMO|MAIN): )/, `client_payload fuori da run-name ed env: ${r.trim()}`);
+  for (const r of righe) {
+    assert.match(r, /^(run-name: |\s{6}(RAMO|MAIN|MODO): |\s{4}if: github\.event\.client_payload\.windows != 'spento'$)/, `client_payload fuori da run-name, env e la parte spenta: ${r.trim()}`);
+  }
   assert.doesNotMatch(W, /run:[^\n]*\$\{\{/, 'un\'espressione dentro `run:` diventa codice della shell');
 });
 
+// I lavori del workflow, ognuno col suo testo: `nome` → blocco.
+const LAVORI = Object.fromEntries(W.split(/\n(?= {2}[a-z][\w-]*:\n)/).slice(1).map((b) => [/^ {2}([\w-]+):/.exec(b)[1], b]));
+
 test('strumenti di main, ramo dal suo sha, titolo che il server cerca', () => {
-  assert.match(W, /ref: \$\{\{ github\.sha \}\}\n {10}path: strumenti/);
-  assert.match(W, /ref: \$\{\{ env\.RAMO \}\}\n {10}path: prova\n {10}fetch-depth: 0/);
-  assert.match(W, /node strumenti\/scripts\/unit-fusione-azione\.mjs --root prova --ramo "\$RAMO" --main "\$MAIN"/);
+  for (const nome of ['linux', 'windows']) {
+    const b = LAVORI[nome];
+    assert.match(b, /ref: \$\{\{ github\.sha \}\}\n {10}path: strumenti/, nome);
+    assert.match(b, /ref: \$\{\{ env\.RAMO \}\}\n {10}path: prova\n {10}fetch-depth: 0/, nome);
+    assert.match(b, /if \[\[ ! "\$RAMO" =~ \^\[0-9a-f\]\{40\}\$ \|\| ! "\$MAIN" =~ \^\[0-9a-f\]\{40\}\$ \]\]/, `${nome}: la coppia si controlla prima di tutto`);
+  }
+  assert.match(LAVORI.unit, /ref: \$\{\{ github\.sha \}\}\n {10}path: strumenti/);
+  assert.doesNotMatch(LAVORI.unit, /path: prova/, 'chi scrive la riga non tocca il codice del ramo');
   assert.match(W, /^run-name: unit-fusione \$\{\{ github\.event\.client_payload\.corsa \}\}$/m);
+});
+
+// #2225: tre rossi di Windows nati su main da fusioni verdi su Linux.
+test('Linux e Windows provano in parallelo, e la riga per il server la scrive solo `unit`, con entrambi gli esiti', () => {
+  assert.deepEqual(Object.keys(LAVORI).sort(), ['linux', 'unit', 'windows']);
+  assert.match(LAVORI.linux, /runs-on: ubuntu-latest/);
+  assert.match(LAVORI.windows, /runs-on: windows-latest/);
+  assert.match(LAVORI.windows, /defaults:\n {6}run:\n {8}shell: bash/);
+  for (const nome of ['linux', 'windows']) {
+    assert.doesNotMatch(LAVORI[nome], /needs:/, `${nome} non aspetta nessuno: la latenza è quella del più lento`);
+    assert.match(LAVORI[nome], /outputs:\n {6}campo: \$\{\{ steps\.prova\.outputs\.campo \}\}/);
+    assert.match(LAVORI[nome], new RegExp(`id: prova\\n {8}run: node strumenti/scripts/unit-fusione-azione\\.mjs --root prova --ramo "\\$RAMO" --main "\\$MAIN" --parte ${nome} --unit `));
+  }
+  assert.match(LAVORI.linux, /--parte linux --unit tutti$/m, 'su Linux la corsa intera, come prima');
+  assert.match(LAVORI.windows, /--parte windows --unit "\$MODO"$/m);
+  assert.match(LAVORI.unit, /needs: \[linux, windows\]\n {4}if: \$\{\{ !cancelled\(\) \}\}/, 'anche con una parte caduta la riga si scrive');
+  for (const n of ['LINUX', 'WINDOWS']) {
+    const p = n.toLowerCase();
+    assert.match(LAVORI.unit, new RegExp(`CAMPO_${n}: \\$\\{\\{ needs\\.${p}\\.outputs\\.campo \\}\\}`));
+    assert.match(LAVORI.unit, new RegExp(`RISULTATO_${n}: \\$\\{\\{ needs\\.${p}\\.result \\}\\}`));
+  }
+  assert.match(LAVORI.unit, /run: node strumenti\/scripts\/unit-fusione-azione\.mjs --unisci linux,windows --ramo "\$RAMO" --main "\$MAIN"$/m);
+  assert.equal((W.match(/--unisci/g) || []).length, 1);
 });
 
 // Gira codice non fidato nell'ambito delle cache di main: una cache letta da un'altra corsa sarebbe sua da avvelenare.
