@@ -38,6 +38,40 @@ async function prova(app, page, sel, nome) {
   await page.waitForTimeout(300);
 }
 
+test('salto unico e title aggiunto sotto il puntatore', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.waitForFunction(() => !!window.SN_SUGGERIMENTO);
+  await pref.evaluate(() => {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:200px;top:200px;z-index:2147480000;display:flex;gap:30px';
+    box.innerHTML = '<button id="pSalto" title="SALTO UNICO" style="font-size:30px">S</button>'
+      + '<button id="pDopo" style="font-size:30px">N</button>';
+    document.body.appendChild(box);
+  });
+  const p = await schermo(app, pref, '#pSalto');
+  x(p.display, 'move', 5, 5);
+  await pref.waitForTimeout(500);
+  x(p.display, 'move', p.x, p.y);
+  await pref.waitForTimeout(2500);
+  foto(p.display, 'f-salto');
+  console.log('f', JSON.stringify(await pref.evaluate(() => ({ t: document.querySelector('#pSalto').getAttribute('title'), f: window.SN_SUGGERIMENTO.aperto()?.testo || null }))));
+  // Title aggiunto dal codice mentre il puntatore riposa su un tasto che non ne aveva.
+  const q = await schermo(app, pref, '#pDopo');
+  x(p.display, 'move', 5, 5);
+  await pref.waitForTimeout(500);
+  x(p.display, 'move', q.x - 2, q.y);
+  await pref.waitForTimeout(100);
+  x(p.display, 'move', q.x, q.y);
+  await pref.waitForTimeout(800);
+  await pref.evaluate(() => document.querySelector('#pDopo').setAttribute('title', 'AGGIUNTO DOPO'));
+  await pref.waitForTimeout(200);
+  x(p.display, 'move', q.x + 1, q.y);
+  await pref.waitForTimeout(2500);
+  foto(p.display, 'g-dopo');
+  console.log('g', JSON.stringify(await pref.evaluate(() => ({ t: document.querySelector('#pDopo').getAttribute('title'), f: window.SN_SUGGERIMENTO.aperto()?.testo || null }))));
+});
+
 test('nativo: sito di controllo e pagine di Filo', async ({ app, openTab, testServer }) => {
   test.setTimeout(120_000);
   const sito = await testServer.openReady(openTab, '<!doctype html><html><body style="padding:60px">'
