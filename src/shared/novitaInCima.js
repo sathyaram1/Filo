@@ -445,6 +445,6 @@
   }
 
   global.SN_NOVITA_IN_CIMA = {
-    FILE_NOVITA, CAMPO, cmpVersion, testo, prossimaVersione, leggiRegistro, aggiunteSottoUscite, sottoUsciteSuMain, spostaInCima,
+    FILE_NOVITA, CAMPO, BASTA_SPOSTARE, cmpVersion, testo, prossimaVersione, leggiRegistro, aggiunteSottoUscite, sottoUsciteSuMain, spostaInCima,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
