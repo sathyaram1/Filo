@@ -40,7 +40,6 @@ non può sapere quali siano i più importanti fra tutti.
   0 diventano 1 e molti 1 diventano 2: lo decide il manutentore e lo scrive nel
   taccuino.
 - **La transizione.** Le 2 di prima scendono a 1 in un colpo (operazione
-  `transizione` di `ownerManutentore`, a secco se non si dice `applica`); la
-  prima mattina il manutentore promuove la rosa.
+  `transizione` di `ownerManutentore`, a secco se non si dice `applica`).
 
 Dove si applica: `FEEDBACK-STATES.md` § 3b, `routines/roles/manutentore.md`.
