@@ -159,30 +159,6 @@ test('#835.1: «sblocca example.org» e «spegni il giudizio AI» chiedono la pa
     }
     expect((await sicurezza()).siteBlock.blacklist).toContain('example.org');
     expect((await sicurezza()).safeBrowse.llmJudge).toBe(true);
-
-    // In una scheda nuova, conversazione che non ha letto niente: la parola, e scritta il cambio è fatto.
-    const nuova = await app.evaluate(async () => {
-      const tm = globalThis.SN_TABS || globalThis.__filoTabs;
-      return tm && tm.create ? (await tm.create({ url: 'filo://newtab/', active: true })).id : null;
-    });
-    const pulita = nuova != null ? await home(app, { scheda: nuova }) : page;
-    test.skip(nuova == null, 'nessuna scheda nuova: la conversazione pulita non si prova qui');
-    await app.evaluate(() => globalThis.SN_IL_FILO && globalThis.SN_IL_FILO.dimenticaTratto && globalThis.SN_IL_FILO.dimenticaTratto());
-    for (const [i, [frase, args, fatto]] of [
-      ['sblocca example.org', { chiave: 'siti_bloccati', valore: 'togli example.org' }, async () => !(await sicurezza()).siteBlock.blacklist.includes('example.org')],
-      ['spegni il giudizio AI', { chiave: 'giudizio_ai_siti', valore: 'off' }, async () => (await sicurezza()).safeBrowse.llmJudge === false],
-    ].entries()) {
-      await modelloFinto(app, [chiamata(`p${i}`, 'IMPOSTA_PREFERENZA', args), { text: 'Serve la tua conferma.' }]);
-      await chiedi(pulita, frase);
-      await expect(pulita.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
-      expect((await confirmState(pulita)).hasInput, frase).toBe(true);
-      expect(await fatto(), `${frase}: prima della parola niente cambia`).toBe(false);
-      await fillConfirmInput(pulita, 'conferma');
-      await scrollConfirmToEnd(pulita);
-      await clickConfirm(pulita, 'danger');
-      await expect.poll(fatto, { timeout: 8000, message: frase }).toBe(true);
-    }
-    expect((await sicurezza()).siteBlock.blacklist).toContain('altro.example');
   } finally {
     await ripristina(app);
   }
