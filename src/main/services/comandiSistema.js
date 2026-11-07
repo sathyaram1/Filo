@@ -1538,6 +1538,7 @@ module.exports = {
   PIATTAFORME, PASSO_VOLUME, NOME_MAX, SCRIPT, AMBIENTE, IMPOSTAZIONI, INDIRIZZO,
   costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
   interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
+  interpretaBtDimentica, interpretaWifiDimentica, PANNELLI,
   campiNmcli, erroreWlan,
   _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, psCompila },
 };
