@@ -2545,3 +2545,121 @@ test('«traduci solo quando apro» si sceglie anche nelle Preferenze, e vale dal
   const sent = await sentText(app);
   expect(TOKEN.filter((t) => sent.includes(t))).toEqual([]);
 });
+
+// ───────────────────────────────────────────────────────────────────────────
+// #1290.2 — i rilievi messi da parte nel giro 2 di #1290.
+// ───────────────────────────────────────────────────────────────────────────
+
+// Un'immagine che arriva dopo `ms`: tiene il riquadro «in caricamento» quando il suo testo c'è già, come un video o un
+// post incorporato.
+async function immagineLenta(ms) {
+  const server = createServer((_req, res) => {
+    setTimeout(() => { res.writeHead(200, { 'Content-Type': 'image/gif' }); res.end(Buffer.from(PIXEL.split(',')[1], 'base64')); }, ms);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return {
+    url: `http://127.0.0.1:${server.address().port}/foto.gif`,
+    chiudi: () => { try { server.closeAllConnections?.(); server.close(); } catch (_) {} },
+  };
+}
+
+for (const [nome, ritardoFoto, ritardoModello] of [
+  ['mentre la traduzione lavora', 3000, 6000],
+  ['a traduzione finita', 7000, 0],
+]) {
+  test(`riquadro già nella pagina che finisce di caricarsi ${nome}: tradotto, e niente «testo nuovo»`, async ({ app, openTab, testServer }) => {
+    test.setTimeout(120000);
+    await stubTranslationProvider(app, ritardoModello);
+    const foto = await immagineLenta(ritardoFoto);
+    try {
+      const src = testServer.html(`<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+        <p id="fbody">ZZSLOW an embedded post written in english and long enough to count as text.</p>
+        <img src="${foto.url}" width="40" height="40" alt=""></body></html>`).replace('127.0.0.1', 'blocked.test');
+      const page = await testServer.openReady(openTab, framePage(`<iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe>`));
+      await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^ZZSLOW /, { timeout: 30000 });
+      const riquadro = page.frames().find((f) => f.url().includes('blocked.test'));
+      // Il presupposto: si preme Traduci con il riquadro ancora in caricamento.
+      expect(await riquadro.evaluate(() => document.readyState)).not.toBe('complete');
+      await watchToasts(page);
+      await clickTranslateIcon(app);
+
+      await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT ZZSLOW /, { timeout: 60000 });
+      await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+      await expect.poll(() => riquadro.evaluate(() => document.readyState), { timeout: 30000 }).toBe('complete');
+      await page.waitForTimeout(500);
+      expect((await toasts(page)).join(' | ')).not.toContain('aggiunta');
+      await expect(await iconaTraduci(app)).toHaveAttribute('aria-label', 'Mostra originale');
+    } finally { foto.chiudi(); }
+  });
+}
+
+test('solo quando apro: testo e riquadri in un blocco che compare in dissolvenza più in basso si traducono insieme', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  await soloQuandoApro(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const muto = await senzaFilo(app, cross('ZZLOCK'));
+  const page = await testServer.openReady(openTab, framePage(`<div style="height:2500px"></div>
+    <div style="opacity:0">
+      <p id="ptr">A paragraph in a block that fades in when the reader scrolls down to it.</p>
+      <iframe id="emb" src="${cross('ZZFADEIN')}" style="width:520px;height:220px"></iframe>
+      <iframe src="${muto}" style="width:520px;height:220px"></iframe>
+    </div>`));
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+
+  // Lo stesso metro per il testo e per il riquadro accanto: tutti e due tradotti.
+  await expect(page.locator('#ptr')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.frameLocator('#emb').locator('#fbody')).toHaveText(/^IT ZZFADEIN /, { timeout: 60000 });
+  // E l'avviso non cambia con lo scorrimento: il riquadro chiuso a chiave trasparente non lo fa uscire.
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+  await page.waitForTimeout(2500);
+  expect((await toasts(page)).join(' | ')).not.toContain('riquadro incorporato');
+});
+
+// Un grafico disegnato e un blocco di codice: la traduzione non li tocca mai, quindi non sono testo rimasto fuori.
+const SENZA_PROSA_CHIUSO = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A page with a chart and a code sample sealed by the site</h1>
+  <p id="p1">First paragraph of the page, long enough to be picked up by the translation.</p>
+  <sealed-chart style="display:block;width:600px;height:200px"></sealed-chart>
+  <sealed-code style="display:block;width:600px;height:80px"></sealed-code>
+  <script>
+    customElements.define('sealed-chart', class extends HTMLElement { connectedCallback() {
+      this.attachShadow({ mode: 'closed' }).innerHTML = '<svg width="600" height="200"><rect width="80" height="120" y="60"/>'
+        + '<text x="10" y="40">Revenue by quarter</text><text x="10" y="190">Q1 Q2 Q3 Q4</text></svg>';
+    } });
+    customElements.define('sealed-code', class extends HTMLElement { connectedCallback() {
+      this.attachShadow({ mode: 'closed' }).innerHTML = '<pre><code>const message = "hello world";</code></pre>';
+    } });
+  </script>
+</body></html>`;
+
+test('componente chiuso con dentro solo un grafico disegnato o del codice: «Pagina tradotta», non «solo in parte»', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, SENZA_PROSA_CHIUSO);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
+});
+
+test('di serie un riquadro nascosto grande come un pixel, o dietro una finestrella da un pixel, non va al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe src="${cross('ZZPIX')}" style="opacity:0;width:1px;height:1px;border:0"></iframe>
+    <div style="opacity:0"><div style="width:1px;height:1px;overflow:hidden">
+      <iframe src="${cross('ZZWIN')}" style="width:300px;height:200px;border:0"></iframe></div></div>
+    <iframe id="big" src="${cross('ZZBIG')}" style="opacity:0;width:520px;height:220px"></iframe>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  // Il riquadro nascosto vero si traduce in sottofondo: è il metro che dice che il giro è arrivato fin lì.
+  await expect.poll(async () => (await sentText(app)).includes('ZZBIG'), { timeout: 60000 }).toBe(true);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+  await page.waitForTimeout(1500);
+  const sent = await sentText(app);
+  expect(['ZZPIX', 'ZZWIN'].filter((t) => sent.includes(t))).toEqual([]);
+});
