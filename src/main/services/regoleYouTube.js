@@ -228,4 +228,4 @@ function perHost(insieme, host) {
   return out;
 }
 
-module.exports = { BASI, SOLO_INCORPORATI, hostYouTube, hostYouTubeInScheda, hostDi, nomeNoto, valuta, righeAttive, inclusi, argomenti, domini, valeSu, leggi, perHost };
+module.exports = { BASI, SOLO_INCORPORATI, CANALE_PRONTE, hostYouTube, hostYouTubeInScheda, hostDi, nomeNoto, valuta, righeAttive, inclusi, argomenti, domini, valeSu, leggi, perHost };
