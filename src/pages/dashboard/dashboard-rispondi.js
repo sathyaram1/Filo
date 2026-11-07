@@ -1,4 +1,4 @@
-// Copia e Rispondi sotto una risposta di Filo (#1620): i tasti al passaggio del mouse, la citazione sopra il campo e in
+// Le azioni sui messaggi della home (#1620, #2096): quali tasti ha ogni bolla, la citazione sopra il campo e in
 // testa alla bolla che parte, il salto alla risposta citata. Non tocca il DOM al caricamento. Cosa si salva della
 // citazione e come la legge il modello: src/shared/rispostaA.js.
 (function (global) {
