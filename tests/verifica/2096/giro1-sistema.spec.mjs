@@ -88,7 +88,7 @@ test('riga Bluetooth: preferito in cima e ancora lì riaprendo la home, Copia il
   // Dimentica, con conferma.
   await opzione(page, 'Cuffie Sony').click({ button: 'right' });
   await menuDi(page).voce('Dimentica').click();
-  await clickConfirm(page, 'Dimentica');
+  await clickConfirm(page, 'ok');
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btDimentica').map((c) => c[1].indirizzo)).toEqual(['00:11:22:33:44:55']);
   await expect(opzione(page, 'Cuffie Sony')).toHaveCount(0, { timeout: 5_000 });
 });
