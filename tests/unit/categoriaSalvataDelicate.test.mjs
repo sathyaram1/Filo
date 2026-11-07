@@ -105,11 +105,13 @@ test('una pagina normale manda titolo ed estratto come prima', async () => {
   assert.equal(voce.category, 'Comunicazioni');
 });
 
-test('con le pagine delicate spente la posta va al modello come oggi', async () => {
-  const { chiamate } = await salva({ settings: { security: { pagineDelicate: { enabled: false } } }, page: posta });
-  assert.equal(chiamate.length, 1);
-  assert.match(chiamate[0].prompt, /Posta in arrivo/);
-  assert.match(chiamate[0].prompt, /IBAN/);
+test('col livello di serie, e a «Tutto in anticipo», la posta va al modello come una pagina qualunque', async () => {
+  for (const settings of [{}, TUTTO]) {
+    const { chiamate } = await salva({ settings, page: posta });
+    assert.equal(chiamate.length, 1);
+    assert.match(chiamate[0].prompt, /Posta in arrivo/);
+    assert.match(chiamate[0].prompt, /IBAN/);
+  }
 });
 
 test('un sito aggiunto dall\'utente fra i delicati vale come la posta', async () => {
