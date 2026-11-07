@@ -1576,6 +1576,8 @@
     blockLabel: blockLabel,
     blockVoci: blockVoci,
     vociNascoste: vociNascoste,
+    apriVociText: apriVociText,
+    trascorsoText: trascorsoText,
     caratteriVisibili: caratteriVisibili,
     doveVoce: doveVoce,
     linkGitHub: linkGitHub,
