@@ -383,6 +383,7 @@
     lista.appendChild(attesa);
     const r = await comanda({ cosa, elenca: true });
     if (box !== questo || questo.letture !== giro) return;
+    if (r.ok && cosa === 'bluetooth' && Array.isArray(r.elenco)) r.elenco = inCimaIPreferiti(r.elenco);
     lista.replaceChildren();
     if (!r.ok) {
       const err = document.createElement('div');
