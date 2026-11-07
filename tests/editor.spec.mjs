@@ -453,6 +453,21 @@ test('una selezione che parte da una voce di elenco e finisce in un\'altra voce 
   await expect.poll(() => foglioVisto(page)).toBe(prima);
 });
 
+test('a metà e in fondo a una voce con altre voci dopo, 4000 righe entrano in fretta come voci e si annullano in un passo', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  const page = await apriEditor(openTab);
+  const righe = Array.from({ length: 4000 }, (_, i) => `R${i}`);
+  for (const [off, davanti, dietro] of [[4, 'voce', ' uno'], [8, 'voce uno', '']]) {
+    const prima = await foglio(page, '<ol><li>voce uno</li><li>voce due</li></ol><p>dopo</p>', { nodo: 'd.querySelector("li").firstChild', off });
+    const ms = await incolla(app, page, righe.join('\n'));
+    expect(ms, `incolla a ${off} durato ${ms} ms`).toBeLessThan(2_000);
+    expect(await page.locator('#doc ol').count()).toBe(1);
+    expect(await blocchi(page, '#doc li')).toEqual([`${davanti}R0`, ...righe.slice(1, -1), `R3999${dietro}`, 'voce due']);
+    await page.keyboard.press('Control+Z');
+    await expect.poll(() => foglioVisto(page)).toBe(prima);
+  }
+});
+
 test('a metà di un paragrafo 3000 righe entrano in fretta, e quello che seguiva chiude l\'ultima riga', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const page = await apriEditor(openTab);
