@@ -1488,7 +1488,7 @@
       sendBtn.dataset.modo = modo;
       sendBtn.innerHTML = modo === 'riprendi' ? GLIFO_RIPRENDI : GLIFO_INVIO;
       sendBtn.setAttribute('aria-label', modo === 'riprendi' ? 'Riprendi' : 'Invia');
-      sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : '';
+      sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : 'Invia';
     }
     sendBtn.disabled = quadrato;
     sendBtn.hidden = quadrato;
