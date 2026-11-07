@@ -765,9 +765,11 @@ e la prova la dichiarava lui al server. Adesso:
   in cima prima degli unit, con la regola del riallineamento (#2214): l'esito
   resta `rosso_sulla_fusione`, perché la fusione del ramo com'è le lascerebbe
   lì, e il campo `novita` (righe, blocco, `dopo` = esito dopo lo spostamento)
-  dice se basta spostarle (`dopo` verde o rosso anche su main). Se basta, le
-  sposta il server invece di un giro di correzione: fonde main nella punta
-  provata, rifà il registro con la regola (`src/shared/novitaInCima.js`, che
+  dice se basta spostarle (`dopo` verde o rosso anche su main; con le parti
+  Linux e Windows il campo passa solo se lo portano tutte le parti rosse, col
+  `dopo` peggiore). Se basta, le sposta il server invece di un giro di
+  correzione: fonde nella punta provata il main su cui gli unit sono girati
+  (non quello arrivato dopo), rifà il registro con la regola (`src/shared/novitaInCima.js`, che
   legge il registro come dati e non lo esegue), committa il solo registro con
   la sua identità, avanza il ramo e lo registra come riallineamento fidato.
   Verifica e controllo di sicurezza della punta di partenza valgono per quella
