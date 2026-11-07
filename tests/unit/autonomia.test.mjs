@@ -20,12 +20,13 @@ const AL = globalThis.SN_ACTION_LEVELS;
 const P = globalThis.SN_PREF;
 
 // La tabella com'è scritta nel feedback (#1312, decisa dall'owner il 30/09), copiata a mano: il modulo deve dire
-// la stessa cosa. Un «sì» da costo 2 in su passa dal guardiano: senza, chiede.
+// la stessa cosa. Un «sì» da costo 2 in su passa dal guardiano: senza, chiede. Il costo 4 segue la strada B (#1840):
+// a compito pulito la parola, dopo una lettura no.
 const ATTESA = {
-  conservativo: { pulito: 'sì, sì, chiede, conferma, conferma', contaminato: 'sì, chiede, conferma, conferma, conferma' },
-  default: { pulito: 'sì, sì, sì, chiede, conferma', contaminato: 'sì, sì, chiede, conferma, conferma' },
-  automatico: { pulito: 'sì, sì, sì, sì, conferma', contaminato: 'sì, sì, sì, chiede, conferma' },
-  yolo: { pulito: 'sì, sì, sì, sì, conferma', contaminato: 'sì, sì, sì, sì, conferma' },
+  conservativo: { pulito: 'sì, sì, chiede, conferma, conferma', contaminato: 'sì, chiede, conferma, conferma, no' },
+  default: { pulito: 'sì, sì, sì, chiede, conferma', contaminato: 'sì, sì, chiede, conferma, no' },
+  automatico: { pulito: 'sì, sì, sì, sì, conferma', contaminato: 'sì, sì, sì, chiede, no' },
+  yolo: { pulito: 'sì, sì, sì, sì, conferma', contaminato: 'sì, sì, sì, sì, no' },
 };
 const PESO = { si: 0, 'si+G': 1, chiede: 2, conferma: 3, no: 4 };
 const cella = (t) => t.trim().replace('sì', 'si');
