@@ -207,10 +207,10 @@ test('ESEGUI_COMANDO (#146.6): il costo dipende dal comando, classificato dal re
   // Modifica recuperabile → 2 (popup).
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), 2);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'npm install' }), 2);
-  // Cancellazione / non riconosciuto / concatenato → 3 (digita "conferma").
-  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), 3);
+  // Cancellare senza cestino → 4, come ELIMINA_FILE per sempre (#1840); non riconosciuto → 3.
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'rm -rf build' }), 4);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'comandoinventato' }), 3);
-  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'ls && rm x' }), 3);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'ls && rm x' }), 4);
   // Comando assente → 3 per cautela (mai eseguire alla cieca).
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO' }), 3);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: '' }), 3);
