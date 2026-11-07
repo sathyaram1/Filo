@@ -150,7 +150,7 @@ test('D Aiuto su un sito: rilascio, carta, clic sul gettone', async ({ app, shel
   const a = { x: Math.round(v.cb.x + v.b.x + r.x * v.z), y: Math.round(v.cb.y + v.b.y + r.y * v.z) };
   trascina(await linguetta(app, shell, sorgente), a);
   await expect(aiuto.locator('.sn-gettoni-fondo .sn-gettone')).toHaveCount(1, { timeout: 5000 });
-  await aiuto.locator('.sn-gettoni-fondo .sn-gettone').first().hover();
+  await sopra(aiuto, '.sn-gettoni-fondo .sn-gettone');
   await aiuto.waitForTimeout(1200);
   const carta = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed() && x.webContents.getURL().includes('anteprima.html') && x.isVisible()).map((x) => x.getBounds()));
   console.log('CARTA-AIUTO', JSON.stringify(carta));
