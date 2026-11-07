@@ -608,6 +608,8 @@
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
     rispondi = deps.rispondi || null;
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
   }
 
   global.SN_DASH_ONBOARDING = {
