@@ -153,6 +153,7 @@
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
     'menuDelSito.siti': { nome: 'siti dove il tasto destro apre il menu del sito', elenco: true, livello: 1 },
+    bluetoothPreferiti: { nome: 'dispositivi Bluetooth preferiti', elenco: true, livello: 1 },
     'documenti.cartelle': { nome: 'cartelle dove Filo cerca i documenti', elenco: true, livello: 2 },
     provider: { nome: 'fornitore dei modelli', valori: { openrouter: 'OpenRouter' }, livello: 2 },
     useDefaultModels: { nome: 'modelli predefiniti', valore: sino('in uso', 'spenti'), livello: 2 },
