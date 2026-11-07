@@ -34,7 +34,8 @@ async function preparaDue(app, shell, openTab, testServer) {
   return { articolo, idArticolo };
 }
 
-test.describe.configure({ mode: 'parallel' });
+// I gesti veri passano dallo stesso schermo: una prova per volta.
+test.describe.configure({ mode: 'serial' });
 
 test('riordino con gesto vero: la scheda lasciata sulla prima posizione ci resta', async ({ app, shell, openTab, testServer }) => {
   test.skip(!Gesti.disponibili(), 'servono XTest e un display X');
