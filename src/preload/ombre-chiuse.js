@@ -26,22 +26,40 @@ function sorgenteSonda(nome) {
   var oAdd = EventTarget.prototype.addEventListener;
   var oStop = Event.prototype.stopImmediatePropagation, oPrevent = Event.prototype.preventDefault;
   var oPath = Event.prototype.composedPath, oClosest = EP.closest;
-  var LETTERA = /\\p{L}/u, HTML = 'http://www.w3.org/1999/xhtml';
+  var HTML = 'http://www.w3.org/1999/xhtml';
   var MUTI = ${JSON.stringify(Object.fromEntries(senzaProsa.map((t) => [t, 1])))};
-  var SEL_MUTI = ${JSON.stringify(senzaProsa.map((t) => t.toLowerCase()).join(','))};
+  var ETICHETTE = ${JSON.stringify(C.ETICHETTE_TRADOTTE)};
   // Di un riquadro o di un oggetto incorporato da qui non si legge il contenuto: non è testo, ma nemmeno vuoto.
   var INCORPORATI = { IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1, PORTAL: 1 };
-  var ETICHETTE = ['alt', 'title', 'aria-label', 'placeholder', 'value'];
   ${SEMBRA_NATIVA}
-  // Come la traduzione: almeno due caratteri, con una lettera.
-  function testo(s) { s = String(s || '').replace(/\\s+/g, ' ').trim(); return s.length >= 2 && LETTERA.test(s); }
+  ${String(C.testoDaTradurre)}
+  ${String(C.valoreEtichetta)}
+  ${String(C.nonDaTradurre)}
   function testoProprio(nodo) {
     var c = nodo.childNodes || [], s = '';
     for (var k = 0; k < c.length; k++) if (c[k].nodeType === 3) s += c[k].nodeValue || '';
-    return testo(s);
+    return testoDaTradurre(s);
+  }
+  // Un antenato dentro l'albero in cui la traduzione non scende: niente prosa, non HTML, o da non tradurre.
+  function sottoMuto(el) {
+    for (var su = el.parentElement; su; su = su.parentElement) {
+      if (MUTI[String(su.tagName || '').toUpperCase()] || su.namespaceURI !== HTML || nonDaTradurre(su)) return true;
+    }
+    return false;
+  }
+  function etichetta(el, tag) {
+    var nomi = ETICHETTE.ovunque.concat(ETICHETTE.perTag[tag] || []);
+    if (tag === 'INPUT' && valoreEtichetta(el)) nomi.push('value');
+    for (var a = 0; a < nomi.length; a++) {
+      var v = el.getAttribute(nomi[a]);
+      if (v === null && nomi[a] === 'label' && tag === 'OPTION') v = el.textContent;
+      if (testoDaTradurre(v)) return true;
+    }
+    return false;
   }
   // 2 testo che si legge, anche negli alberi annidati; 1 solo incorporati (o troppo fondo per saperlo); 0 niente.
-  // Lì dove la traduzione non entra (stile, script, grafici, codice) non c'è testo; le etichette dell'elemento sì.
+  // Lì dove la traduzione non entra (stile, script, grafici, codice, testo da non tradurre) non c'è testo; le etichette
+  // che lei traduce sì.
   function leggibile(radice, prof) {
     if (!radice || prof > 8) return 1;
     var tutti;
@@ -50,14 +68,11 @@ function sorgenteSonda(nome) {
     var esito = 0;
     for (var j = 0; j < tutti.length; j++) {
       var el = tutti[j];
-      var su = el.parentElement;
-      if (su && oClosest.call(su, SEL_MUTI)) continue;
+      if (sottoMuto(el)) continue;
       var tag = String(el.tagName || '').toUpperCase();
       if (INCORPORATI[tag]) esito = 1;
-      for (var a = 0; a < ETICHETTE.length; a++) {
-        if (ETICHETTE[a] === 'value' && tag !== 'INPUT') continue;
-        if (testo(el.getAttribute(ETICHETTE[a]))) return 2;
-      }
+      if (nonDaTradurre(el)) continue;
+      if (etichetta(el, tag)) return 2;
       if (MUTI[tag] || el.namespaceURI !== HTML) continue;
       if (testoProprio(el)) return 2;
       var dentro = el.shadowRoot || radici.get(el);
