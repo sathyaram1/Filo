@@ -25,7 +25,12 @@ const ESTERNO = Object.freeze({
 function pulisci(messaggi) {
   return (Array.isArray(messaggi) ? messaggi : [messaggi])
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'filo', text: m.text }));
+    .map((m) => {
+      // Le schede lasciate nel messaggio (#2085): la riga ripiegata ridisegna i gettoni come il filo della home.
+      const G = globalThis.SN_SCHEDE_IN_CHAT;
+      const schede = m.role === 'user' && G ? G.perIlDisco(m.schede) : [];
+      return { role: m.role === 'user' ? 'user' : 'filo', text: m.text, ...(schede.length ? { schede } : {}) };
+    });
 }
 
 // «Riprova» rimanda la stessa domanda subito dopo sé stessa: è lo stesso turno, non si scrive due volte.
