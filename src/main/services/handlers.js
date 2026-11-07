@@ -5918,7 +5918,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       const tagliato = o.limitato
         ? ` Il ${o.richiesto}% chiesto non era raggiungibile${limiti}: si è fermato qui. Dillo all'utente.`
         : '';
-      return `Zoom della pagina ora al ${o.percentuale}%.${tagliato}`;
+      return `Zoom della pagina ora ${global.SN_SISTEMA.alPercento(o.percentuale)}.${tagliato}`;
     }
   }
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'no-tab') {
