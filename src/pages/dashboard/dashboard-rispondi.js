@@ -64,7 +64,7 @@
   const AZIONI = {
     copia: { icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' },
     rispondi: { icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi' },
-    modifica: { icona: 'edit', etichetta: 'Modifica', voce: 'Modifica' },
+    modifica: { icona: 'pencil', etichetta: 'Modifica', voce: 'Modifica' },
     cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita' },
   };
   function fai(azione, b, t = null) {
