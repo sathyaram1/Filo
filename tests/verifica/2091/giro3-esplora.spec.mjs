@@ -166,7 +166,7 @@ test('D Aiuto su un sito: rilascio, carta, clic sul gettone', async ({ app, shel
   const carta = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed() && x.webContents.getURL().includes('anteprima.html') && x.isVisible()).map((x) => x.getBounds()));
   console.log('CARTA-AIUTO', JSON.stringify(carta));
   await sito.screenshot({ path: `${OUT}/D-aiuto.png` });
-  await aiuto.locator('.sn-gettoni-fondo .sn-gettone').first().click();
+  await clicSopra(aiuto, '.sn-gettoni-fondo .sn-gettone');
   await aiuto.waitForTimeout(800);
   console.log('CLIC-AIUTO attiva sorgente', (await attiva(shell)) === sorgente);
 });
