@@ -107,6 +107,14 @@ una risposta che lo usava, e finché non risponde vale come assente. La
 risposta finisce fra le risposte automatiche, e l'owner può riaprirla. Le
 opzioni che vogliono un suo gesto il server le rifiuta.
 
+Due famiglie il registro le copre sempre, anche quando le parole non
+combaciano, e lì il dubbio non va all'owner: quale lavoro fare prima e quale
+dopo, adesso o in un giro a parte (D-149), e «conviene fare questo lavoro?»,
+cioè crediti e giri degli agenti contro un lavoro in più (D-224). Si sceglie
+l'opzione che fa il lavoro, o che lo stacca in un feedback suo se è grosso.
+Restano all'owner le spese sue fuori dal lavoro (un abbonamento, un servizio a
+pagamento) e i passi che chiedono lui.
+
 ### 4. Decide l'owner: riscrivi la domanda per lui
 
 Riscrivi la domanda nella forma per l'owner e pubblicala: da lì è aperta, e lui

@@ -20,7 +20,10 @@ La forma, che la validazione comune controlla e rifiuta dicendo il campo:
 
 Un dubbio di processo (quale strumento, quale ordine, cosa fare di un rilievo)
 non è una domanda per l'owner: va al manutentore, nel rilascio con
-`--processo` (contratto del worker). All'owner arrivano solo le scelte vere.
+`--processo` (contratto del worker). Nemmeno «conviene fare questo lavoro?» è
+una domanda (D-224): la risposta è sì, perché fermarsi a chiedere costa di
+più, e un lavoro grosso diventa un feedback suo per più avanti. All'owner
+arrivano solo le scelte vere.
 
 Prima di chiedere cerca nel registro delle decisioni già prese:
 `node scripts/domanda.mjs registro <poche parole>`. Se un principio risponde,
