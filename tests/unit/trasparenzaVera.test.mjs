@@ -90,9 +90,11 @@ test('l\'accesso Google si apre in una scheda di Filo, col browser come ripiego,
 });
 
 test('le ricerche su Google dal tasto destro sono fra gli altri servizi', () => {
+  // Il tasto destro le costruisce col modulo degli indirizzi (#1840).
   const azioni = leggi('src', 'content', 'actions.js');
-  legame(/lens\.google\.com/.test(azioni), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');
-  legame(/google\.com\/search/.test(azioni), privacy, 'apre la ricerca di Google', 'ricerca del testo selezionato');
+  const nav = leggi('src', 'shared', 'urlNav.js');
+  legame(/indirizzoRicercaImmagine\(/.test(azioni) && /lens\.google\.com/.test(nav), privacy, 'apre Google Lens', 'ricerca per immagine con Google Lens');
+  legame(/indirizzoRicerca\(/.test(azioni) && /google\.com\/search/.test(nav), privacy, 'apre la ricerca di Google', 'ricerca del testo selezionato');
 });
 
 test('l\'Aiuto chiede al server i percorsi del sito, e il documento sulla privacy lo dice', () => {
