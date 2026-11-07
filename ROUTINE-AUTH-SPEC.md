@@ -765,7 +765,14 @@ e la prova la dichiarava lui al server. Adesso:
   in cima prima degli unit, con la regola del riallineamento (#2214): l'esito
   resta `rosso_sulla_fusione`, perché la fusione del ramo com'è le lascerebbe
   lì, e il campo `novita` (righe, blocco, `dopo` = esito dopo lo spostamento)
-  dice se basta spostarle (`dopo` verde o rosso anche su main); main o punta
+  dice se basta spostarle (`dopo` verde o rosso anche su main). Se basta, le
+  sposta il server invece di un giro di correzione: fonde main nella punta
+  provata, rifà il registro con la regola (`src/shared/novitaInCima.js`, che
+  legge il registro come dati e non lo esegue), committa il solo registro con
+  la sua identità, avanza il ramo e lo registra come riallineamento fidato.
+  Verifica e controllo di sicurezza della punta di partenza valgono per quella
+  nuova (`appNovita`), L5 rigira sul diff, la prova si rifà; al terzo
+  spostamento di fila, o se uno non riesce, resta il riallineamento. Main o punta
   mossi prima della fusione → la prova si rifà, al più tre volte, poi la
   riprende il recupero fra un'ora. Un blocco L5 va all'owner con la spiegazione
   composta dal server dai blocchi. Un'azione che non parte, non finisce o non
