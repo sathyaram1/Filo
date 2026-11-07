@@ -6651,7 +6651,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // La risposta citata, come la pagina l'ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620).
     const citataQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPagina(m.rispostaA) : null;
     if (citataQui && citataQui.testo.trim()) {
-      content = `${FCx.notaRisposta({ role: 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
+      content = `${FCx.notaRisposta({ role: citataQui.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
     }
     const msg = { role, content };
     if (role === 'assistant') {
