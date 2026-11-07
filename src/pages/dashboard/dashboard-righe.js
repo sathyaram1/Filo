@@ -268,8 +268,31 @@
     if (r && !r.aperta) alterna(r, true).catch(() => {});
   }
 
+  // Copia e Rispondi sotto ogni messaggio dello scambio aperto (#2096): Rispondi lo cita nel campo della home, col suo
+  // posto nel filo, come una risposta della home.
+  const azioni = [];
+  function attaccaAzioni(el) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (!A || !el) return;
+    const Md = global.SN_MARKDOWN;
+    azioni.push(A.attacca(el, {
+      messaggio: '.dash-riga-app-msg',
+      testo: (m) => {
+        const c = m._citabile;
+        if (!c) return m.textContent;
+        return c.role === 'filo' && Md && Md.testo ? Md.testo(c.scritto) : c.scritto;
+      },
+      ruolo: (m) => (m.classList.contains('dash-riga-app-msg-user') ? 'user' : 'filo'),
+      rispondi: global.SN_DASH_RISPONDI && global.SN_DASH_RISPONDI.cita
+        ? (m, testo) => global.SN_DASH_RISPONDI.cita({ ...m._citabile, testo })
+        : null,
+    }));
+  }
+
   function init(deps) {
     d = deps;
+    attaccaAzioni(d.bubblesEl);
+    if (d.homeEl && d.homeEl !== d.bubblesEl) attaccaAzioni(d.homeEl);
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     try {
