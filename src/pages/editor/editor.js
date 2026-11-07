@@ -2243,36 +2243,29 @@
     const sel = window.getSelection();
     const r = sel && sel.rangeCount ? sel.getRangeAt(0).cloneRange() : null;
     const ultima = righe.length - 1;
-    // In una citazione ogni riga resta citazione, come con l'incolla corto.
-    const paragrafi = (tag, prefisso = '', suffisso = '') => righe.map((x, i) => {
-      const t = i === 0 || tag === 'blockquote' ? tag : 'p';
-      return `<${t}>${i === 0 ? prefisso : ''}${(i === 0 && prefisso) || (i === ultima && suffisso) ? spaziVisibili(x) : riga(x)}${i === ultima ? suffisso : ''}</${t}>`;
+    // `primo`, `resto` e `ultimo` sono i tag delle righe: in una citazione ogni riga resta citazione, come con
+    // l'incolla corto. `dopo` è quello che seguiva la selezione nel suo blocco, e chiude l'ultima riga.
+    const frammento = (primo, { resto = primo === 'blockquote' ? 'blockquote' : 'p', ultimo = resto, dopo = '' } = {}) => righe.map((x, i) => {
+      const t = i === 0 ? primo : i === ultima ? ultimo : resto;
+      return `<${t}>${i === ultima && dopo ? spaziVisibili(x) + dopo : riga(x)}</${t}>`;
     }).join('');
     const scegli = (range) => { sel.removeAllRanges(); sel.addRange(range); };
-    // Nessun testo nel foglio: il segnaposto vuoto non è dell'utente, e senza di lui l'HTML entra subito. Un elenco o
-    // una citazione appena aperti invece sono dell'utente: lì si incolla dentro (#1697).
-    const primo = r && bloccoDi(r.startContainer);
-    if (r && !/[^\r\n]/.test(docEl.textContent.split(ANCORA).join('')) && !docEl.querySelector('img') && (!primo || PARAGRAFO.test(primo.tagName))) {
-      const tag = primo ? primo.tagName.toLowerCase() : 'p';
-      docEl.textContent = '';
-      sel.collapse(docEl, 0);
-      document.execCommand('insertHTML', false, paragrafi(tag));
-      return;
-    }
+    const inserisci = (html) => document.execCommand('insertHTML', false, html);
+    if (!r) { document.execCommand('insertText', false, righe.join('\n')); return; }
+    const dentro = (n, giu) => {
+      while (n && n.nodeType === 1 && !BLOCCO.test(n.tagName) && (giu ? n.firstElementChild : n.lastElementChild)) n = giu ? n.firstElementChild : n.lastElementChild;
+      return n;
+    };
     // Il cursore posato sul foglio fra due blocchi (un clic nel vuoto) va dentro il blocco accanto.
-    if (r && r.collapsed && r.startContainer === docEl) {
+    if (r.collapsed && r.startContainer === docEl) {
       const prima = docEl.childNodes[r.startOffset - 1];
-      const accanto = prima || docEl.childNodes[r.startOffset];
-      if (accanto) {
+      const accanto = dentro(prima || docEl.childNodes[r.startOffset], !prima);
+      if (accanto && accanto.nodeType === 1 && BLOCCO.test(accanto.tagName)) {
         r.selectNodeContents(accanto);
         r.collapse(!prima);
       }
     }
     // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
-    const dentro = (n, giu) => {
-      while (n && n.nodeType === 1 && !BLOCCO.test(n.tagName) && (giu ? n.firstElementChild : n.lastElementChild)) n = giu ? n.firstElementChild : n.lastElementChild;
-      return n;
-    };
     if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
       const b = dentro(docEl.childNodes[r.startOffset], true);
       const w = b.nodeType === 1 ? document.createTreeWalker(b, NodeFilter.SHOW_TEXT) : null;
