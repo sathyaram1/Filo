@@ -1659,6 +1659,67 @@ test('fusione approvata e in conflitto, in riallineamento: non è una decisione 
   assert.equal(MR.segnoFermata(ferma, opts).classe, 'attack');
 });
 
+// #2193: una pratica chiusa col lavoro in main non chiede niente per una vecchia fusione in conflitto, anche di un altro ramo.
+test('fusione approvata e in conflitto su una pratica chiusa col lavoro in main: la scheda sparisce (#2193)', () => {
+  const vecchia = { ...FALLITA_ROUTINE, branch: 'worker/vecchio' };
+  const registrate = [
+    [{ ...FB_412, status: 'done', resolvedInVersion: '0.2.100' }, {}],
+    [{ ...FB_412, status: 'done', statusReason: 'gia_risolto' }, {}],
+    [{ ...FB_412, status: 'done', branch: 'worker/nuovo' }, { recent: [{ id: 'm', feedbackId: 'fb-412', branch: 'worker/nuovo', used: true, outcome: 'merged' }] }],
+    [{ ...FB_412, status: 'archived', resolvedInVersion: '0.2.100' }, {}],
+  ];
+  for (const [fb, altre] of registrate) {
+    const opts = { fusioni: { failed: [vecchia], ...altre }, fusioniLette: true };
+    assert.notEqual(MR.statoFusione(fb, opts), 'riallineamento_fallito', JSON.stringify(fb));
+    assert.equal(MR.fusioneInAttesa(fb, opts), false);
+    assert.notEqual(MR.manageTabFor(fb, opts), 'inbox');
+    const l5 = MR.livelloL5(fb, opts);
+    assert.deepEqual(l5.richieste.filter((r) => r.id === vecchia.id), [], 'la scheda della fusione non avvenuta non resta nel pannello');
+    assert.notEqual(l5.colore, MR.REASONS.attack.color);
+  }
+  // Chiusa senza fusione registrata: il sì dell'owner non è ancora in main, e resta da decidere.
+  const senza = { ...FB_412, status: 'done' };
+  assert.equal(MR.statoFusione(senza, { fusioni: { failed: [vecchia] }, fusioniLette: true }), 'riallineamento_fallito');
+});
+
+test('fusione approvata e in conflitto, pratica ferma su una domanda: si riallinea dopo la risposta, senza rosso (#2193)', () => {
+  const opts = { fusioni: { failed: [FALLITA_ROUTINE] }, fusioniLette: true };
+  const inDesign = { ...FB_412, status: 'design', statusReason: 'clarify', domandaId: 'D-42' };
+  const inCoda = { ...FB_412, status: 'todo', domandeBloccanti: ['D-43'] };
+  for (const [fb, d] of [[inDesign, 'D-42'], [inCoda, 'D-43']]) {
+    assert.equal(MR.statoFusione(fb, opts), 'attende_domanda');
+    assert.equal(MR.fusioneInAttesa(fb, opts), false);
+    const f = MR.fusioneDi(fb, opts);
+    assert.ok(f.etichetta.includes(d), f.etichetta);
+    assert.ok(f.titolo.includes(d), f.titolo);
+    const l5 = MR.livelloL5(fb, opts);
+    assert.notEqual(l5.colore, MR.REASONS.attack.color);
+    assert.match(l5.pannello.testo, new RegExp(`dopo la tua risposta a ${d}`));
+    assert.doesNotMatch(l5.pannello.testo, /In coda/);
+    assert.equal(l5.richieste.length, 1, 'la scheda resta nel pannello');
+    assert.notEqual((MR.segnoFermata(fb, opts) || {}).classe, 'attack');
+  }
+  // Una domanda che non ferma il riallineamento (fermo dell'owner scritto dal server) lascia la decisione a lui.
+  const conTetto = { fusioni: { failed: [{ ...FALLITA_ROUTINE, realignBlocked: { motivo: 'tetto' } }] }, fusioniLette: true };
+  assert.equal(MR.statoFusione(inDesign, conTetto), 'riallineamento_fallito');
+});
+
+test('fusione approvata e in conflitto col fermo scritto dal server: torna all’owner col motivo (#2193)', () => {
+  const fb = { ...FB_412, status: 'revision_capability' };
+  const motivi = { tetto: /riallineato da solo il numero di volte previsto/, locale: /fuori dalle routine/, archiviata: /archiviata/ };
+  for (const [motivo, frase] of Object.entries(motivi)) {
+    const opts = { fusioni: { failed: [{ ...FALLITA_ROUTINE, realignBlocked: { motivo, status: 'design', at: 1 } }] }, fusioniLette: true };
+    assert.equal(MR.statoFusione(fb, opts), 'riallineamento_fallito', motivo);
+    assert.equal(MR.fusioneInAttesa(fb, opts), true);
+    const testo = MR.livelloL5(fb, opts).pannello.testo;
+    assert.match(testo, frase);
+    assert.match(testo, /pratica In coda la routine riallinea il ramo che avevi approvato/);
+  }
+  // Un fermo passeggero (la pratica non era lavorabile) passa da solo quando torna in lavorazione.
+  const passeggero = { fusioni: { failed: [{ ...FALLITA_ROUTINE, realignBlocked: { motivo: 'stato', status: 'design' } }] }, fusioniLette: true };
+  assert.equal(MR.statoFusione(fb, passeggero), 'da_riallineare');
+});
+
 test('richiesta in attesa: rossa, in cima e nei Ricevuti (#1425)', () => {
   const opts = { fusioni: { pending: [RICHIESTA] }, fusioniLette: true };
   assert.equal(MR.statoFusione(FB_412, opts), 'da_decidere');
