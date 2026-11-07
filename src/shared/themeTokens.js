@@ -343,12 +343,7 @@
       case 'size': return RE_SIZE.test(v);
       case 'font': return RE_FONT.test(v);
       case 'linea': return STILI_LINEA.includes(v);
-      case 'time': {
-        const m = v.match(RE_TIME);
-        if (!m) return false;
-        const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
-        return ms >= 0 && ms <= 10000;
-      }
+      case 'time': return durataMs(v) >= 0;
       case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
       case 'pixel': {
         const m = v.match(/^(\d{1,4})px$/);
