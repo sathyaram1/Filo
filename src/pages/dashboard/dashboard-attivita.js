@@ -1498,7 +1498,9 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi, row.title || ''));
+          const riga = makeActivityRow(row.icon, row.text, row.cambi, row.title || '');
+          segnaSistema(riga, a);
+          wrap.appendChild(riga);
           if (!anche) continue;
         }
       }
