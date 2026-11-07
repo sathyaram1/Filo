@@ -45,4 +45,16 @@ function chiudeIlTurno(esiti, { daLeggere = () => false, testo = '' } = {}) {
   });
 }
 
-module.exports = { eseguiGiro, chiudeIlTurno };
+// La risposta scritta insieme alle azioni, finita fra le note e non riscritta dall'ultimo giro (#1921.1): GLM a volte
+// chiude con la sola battuta che segue («Torniamo a noi: chi sei?»). Misurato con GLM: le riscritte e i riassunti
+// stavano sopra la metà della nota, le battute sole sotto un sesto.
+const NOTA_DA_RISPOSTA = 300;
+const FINALE_CHE_NON_LA_RIPORTA = 1 / 3;
+function rispostaFraLeNote(note, finale) {
+  const lunga = (Array.isArray(note) ? note : []).map((n) => String(n || '').trim())
+    .reduce((a, n) => (n.length > a.length ? n : a), '');
+  if (lunga.length < NOTA_DA_RISPOSTA) return '';
+  return String(finale || '').trim().length < lunga.length * FINALE_CHE_NON_LA_RIPORTA ? lunga : '';
+}
+
+module.exports = { eseguiGiro, chiudeIlTurno, rispostaFraLeNote };
