@@ -222,5 +222,6 @@ test('il riquadro: Rispondi accanto a Copia sotto la risposta, e Copia e Rispond
   expect([dopo.x, dopo.y, dopo.width, dopo.height]).toEqual([prima.x, prima.y, prima.width, prima.height]);
   await app.evaluate(({ clipboard }) => clipboard.writeText(''));
   await clicca(app, page, '.sn-msg-user .sn-azioni-msg-tasto[data-azione="copia"]');
-  await expect.poll(() => appunti(app)).toBe('and the plural?');
+  // La domanda è partita con la citazione in testa: si copia com'è stata scritta.
+  await expect.poll(() => appunti(app)).toBe('> The cat sleeps.\nand the plural?');
 });
