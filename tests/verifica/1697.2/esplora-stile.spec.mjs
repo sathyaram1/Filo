@@ -41,7 +41,7 @@ test('righe vuote: incolla corto contro lungo in un paragrafo vuoto', async ({ o
 for (const tema of ['light', 'dark']) {
   test(`prima riga incollata in titolo e citazione, tema ${tema}`, async ({ openTab }) => {
     const page = await openTab('filo://editor/editor.html');
-    await page.evaluate((t) => { document.documentElement.dataset.theme = t; }, tema);
+    await page.evaluate((t) => { document.documentElement.dataset.snTheme = t; }, tema);
     for (const [nome, h, sel] of [
       ['titolo corto', '<h2>Un titolo</h2><p>sotto</p>', 'h2'],
       ['citazione corto', '<blockquote>Una citazione</blockquote><p>sotto</p>', 'blockquote'],
