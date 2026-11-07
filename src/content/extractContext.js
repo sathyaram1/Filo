@@ -1006,7 +1006,7 @@
       if (!(el.dataset && el.dataset.snTranslated)) {
         // Serve almeno una lettera: numeri, bullet e simboli non si traducono.
         const txt = ownTextOf(el);
-        if (txt.length >= 2 && HAS_LETTER.test(txt)) {
+        if (global.SN_CONST.testoDaTradurre(txt)) {
           // L'elemento si vede, il suo testo no: la fisarmonica chiusa con la risposta scritta senza riquadro
           // attorno. Si rimanda come ogni altra sezione ripiegata, segnandola perché il menu se ne accorga (#505).
           const proprioNascosto = isOwnTextHidden(el);
