@@ -14,6 +14,8 @@ const MARCA_PARTE = 'ESITO-PARTE-UNIT';
 function repoFinto() {
   const casa = cartellaTemporanea('filo-2225-dentro-');
   const lavoro = join(casa, 'prova');
+  const origin = join(casa, 'origin.git');
+  execFileSync('git', ['init', '-q', '--bare', '--initial-branch=main', origin]);
   mkdirSync(join(lavoro, 'scripts', 'lib'), { recursive: true });
   mkdirSync(join(lavoro, 'tests', 'unit'), { recursive: true });
   for (const f of ['scripts/run-unit-tests.mjs', 'scripts/lib/riga-di-comando.mjs', 'scripts/lib/riepilogo-unit.mjs', 'scripts/lib/avanzamento-unit.mjs']) {
