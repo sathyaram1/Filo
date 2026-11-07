@@ -422,6 +422,12 @@
       doesNot: 'Non invia i moduli al posto tuo: ogni azione che modifica la pagina richiede una tua conferma. Non va avanti da solo all’infinito: dopo 20 passi di fila fatti senza che tu tocchi niente (aprire sezioni o menu, comandi di Filo, ricerche) si ferma e riparte solo se premi «Continua» o gli scrivi. Per ora non ti chiede se ha funzionato e non condivide con nessuno i passi delle tue sessioni.',
     },
     {
+      id: 'chat-schede-trascinate', title: 'Parla di una scheda in chat', category: 'assistant',
+      desc: 'Una scheda trascinata dalla barra nella casella della nuova scheda o dell’Aiuto diventa un gettone in linea col testo, con l’icona del sito e il titolo accorciato («come ha fatto a volare? [articolo sulla Tesla]»); più schede, più gettoni, e Backspace ne toglie uno come un carattere. Passandoci sopra compare la carta dell’anteprima; un clic porta davanti la scheda. All’invio Filo legge il testo di ogni pagina come quando gli chiedi di leggerne una, e nella conversazione il messaggio tiene il gettone, anche dopo aver chiuso la scheda: allora la carta mostra l’ultima immagine che Filo ne aveva, o titolo e sito, e il clic la riapre.',
+      invoke: 'Trascina una scheda dalla barra nella casella della chat. Senza gettoni Filo parla della scheda che hai davanti.',
+      doesNot: 'Al massimo 12 schede per messaggio. Una pagina di Filo non si lascia come gettone, e l’immagine di una scheda chiusa resta solo finché Filo è aperto.',
+    },
+    {
       id: 'chat-immagini-trascinate', title: 'Dai un’immagine a Filo trascinandola', category: 'assistant',
       desc: 'Un’immagine che trascini dentro Filo entra nella chat come se l’avessi incollata, dovunque la lasci. Nella nuova scheda va nella casella da qualunque punto della pagina, e la casella si accende mentre la trascini; gli altri file entrano col loro nome e percorso. Su un sito o su un’altra pagina di Filo va all’Aiuto, che si apre con l’immagine già allegata e il cursore nella casella. Lasciata sulla fila delle schede o sulla barra laterale va alla chat della scheda che hai davanti. Più immagini insieme entrano tutte, e ognuna si toglie con la sua ×.',
       invoke: 'Trascina un’immagine dal computer o da un’altra finestra e lasciala su Filo, oppure incollala nella casella della chat.',
