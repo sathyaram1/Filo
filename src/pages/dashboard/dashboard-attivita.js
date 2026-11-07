@@ -2181,7 +2181,7 @@
         const btn = renderActionButton({
           ...v.azione, type: v.type, _confirm: { level: v.conferma.livello, text: v.conferma.testo }, _executed: false,
           ...(v.conferma.domanda ? { _domanda: v.conferma.domanda } : {}),
-        }, { chat });
+        }, { chat, gruppo });
         if (btn) { wrap.appendChild(btn); continue; }
       }
       const riga = E.rigaDellaVoce(v);
