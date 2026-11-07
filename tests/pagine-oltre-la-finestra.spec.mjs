@@ -65,7 +65,6 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       if (!finestra) finestra = ingresso + uscita + Math.ceil(posto / 3.5);
       if (ingresso + uscita > finestra) {
         globalThis.__rifiutate++;
-        console.log('DEBUG2276 rifiuto', JSON.stringify({ ingresso, uscita, finestra, lens: testi.map((t) => t.length), tools: tools ? JSON.stringify(tools).length : 0 }));
         if (anthropic) {
           const message = ingresso > finestra ? `prompt is too long: ${ingresso} tokens > ${finestra} maximum`
             : `input length and \`max_tokens\` exceed context limit: ${ingresso} + ${uscita} > ${finestra}, decrease input length or \`max_tokens\` and try again`;
