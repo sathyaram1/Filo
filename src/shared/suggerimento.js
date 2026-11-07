@@ -282,6 +282,8 @@
     const testo = testoProprio(corrente.el);
     if (!testo) { nascondi(); return; }
     disegna(testo);
+    // Chi conta le etichette lette (le icone del menu) lo sa dal pezzo stesso, anche dentro uno shadow chiuso.
+    try { corrente.el.dispatchEvent(new CustomEvent('sn-fumetto-mostrato')); } catch (_) {}
   }
 
   function nascondi({ caldo = false } = {}) {
