@@ -42,11 +42,6 @@
       && !b.classList.contains('dash-bubble-streaming') && !b.classList.contains('dash-bubble-pending')
       && !!testoDi(b);
   }
-  function bollaDi(target) {
-    const el = elDi(target);
-    const b = el && el.closest ? el.closest('.dash-bubble-filo, .dash-bubble-user') : null;
-    return rispondibile(b) ? b : null;
-  }
   // Le azioni di una bolla, le stesse per i tasti e per il tasto destro: Copia e Rispondi sotto una risposta, Copia,
   // Modifica e Cita sotto un messaggio dell'utente. La barra è quella di tutte le chat (src/shared/azioniMessaggio.js);
   // le sue etichette sono attributi: nella bolla non entra testo, e chi la confronta col filo la ritrova.
