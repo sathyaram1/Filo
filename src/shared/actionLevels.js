@@ -1332,6 +1332,8 @@
       costo: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
+        // Dimenticato, torna solo riabbinandolo col dispositivo in mano (#2096).
+        if (r.dimentica) return 3;
         if (r.gia === true) return 1;
         return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
       },
@@ -1340,6 +1342,9 @@
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
+        if (r.nome && r.dimentica) {
+          return ['Dimenticare il dispositivo Bluetooth ', cit(nome), '\n\nPer usarlo di nuovo andrà riabbinato dalle impostazioni del sistema, col dispositivo pronto ad abbinarsi.'];
+        }
         if (r.nome && r.collega === false) {
           return ['Scollegare dal Bluetooth ', cit(nome), '\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.'];
         }
