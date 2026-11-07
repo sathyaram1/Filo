@@ -467,6 +467,33 @@ try {
   Dice 'confermato' ([int]$e.Confermato)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
+    // #2096 — dimenticare un dispositivo abbinato: Pairing.UnpairAsync di WinRT; lo stato che torna dice com'è andata.
+    'bt-dimentica': PS_INIZIO + String.raw`$indirizzo = [string]$env:FILO_SIS_INDIRIZZO
+if ($indirizzo -notmatch '^[0-9a-f]{12}$') { Dice 'errore' 'indirizzo'; exit 0 }
+try {
+` + PS_ATTESA + String.raw`  $null = [Windows.Devices.Bluetooth.BluetoothDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Enumeration.DeviceUnpairingResult,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
+} catch { Dice 'errore' 'winrt'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
+try {
+  $numero = [Convert]::ToUInt64($indirizzo, 16)
+  $dev = $null
+  try { $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothDevice]::FromBluetoothAddressAsync($numero)) ([Windows.Devices.Bluetooth.BluetoothDevice]) } catch {}
+  if ($null -eq $dev) { try { $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromBluetoothAddressAsync($numero)) ([Windows.Devices.Bluetooth.BluetoothLEDevice]) } catch {} }
+  if ($null -eq $dev) { Dice 'errore' 'nessun-dispositivo'; exit 0 }
+  $esito = Attendi ($dev.DeviceInformation.Pairing.UnpairAsync()) ([Windows.Devices.Enumeration.DeviceUnpairingResult])
+  Dice 'stato' ([string]$esito.Status)
+} catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
+`,
+    // Il profilo della rete lo toglie netsh: il nome passa come argomento a sé, e uno con le virgolette non ci arriva.
+    'wifi-dimentica': PS_INIZIO + String.raw`$r = [string]$env:FILO_SIS_RETE
+if ($r -eq '' -or $r.Contains('"')) { Dice 'errore' 'parametro'; exit 0 }
+try {
+  $out = & netsh.exe wlan delete profile ('name=' + $r) 2>&1
+  Dice 'uscita' $LASTEXITCODE
+  foreach ($l in @($out)) { Dice 'riga' ([string]$l) }
+} catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
+`,
   },
 
   linux: {
