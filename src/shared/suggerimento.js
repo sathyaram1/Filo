@@ -119,7 +119,10 @@
       spogliati.set(el, v);
       el.removeAttribute('title');
     }
-    if (spogliati.size) osserva();
+    if (spogliati.size) {
+      osserva();
+      for (const el of cat) osservaRadice(el);
+    }
   }
 
   function restituisci(tranne) {
