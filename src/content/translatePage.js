@@ -1109,6 +1109,7 @@
     hiddenFrames = [];
     caricoAtteso = { riquadri: new WeakSet(), risposto: null, arrivati: 0 };
     clearTimeout(aperturaTimer);
+    aperturaInSospeso = false;
     revealedDirty = true;
     revealedAnswer = false;
     // Il lavoro ancora in volo smette di essere quello buono: quando le
