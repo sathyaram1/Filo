@@ -1760,7 +1760,7 @@
     const f = (opts && opts.fusioni && typeof opts.fusioni === 'object') ? opts.fusioni : {};
     const lista = (k) => (Array.isArray(f[k]) ? f[k] : []).filter((r) => richiestaDiQuesto(r, fb));
     const pending = lista('pending');
-    const failed = lista('failed');
+    const failed = lavoroInMain(fb, lista('recent')) ? [] : lista('failed');
     const preapproved = lista('preapproved');
     const { status, statusReason } = normalizeStatus(fb);
 
