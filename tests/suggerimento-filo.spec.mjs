@@ -296,3 +296,133 @@ test('home: la X delle Novità ha il suo fumetto', async ({ app }) => {
   await expect(fumetto(page)).toHaveText('Chiudi');
   await page.screenshot({ path: 'tests/.shots/2095-novita-x.png' });
 });
+
+// La conferma vive in uno shadow chiuso: il fumetto ci scende col punto del puntatore (giro 1, r1).
+const LUNGO = Array.from({ length: 120 }, (_, i) => `Riga ${i + 1} del testo da leggere prima di confermare.`).join('\n');
+async function tastoInAttesa(page) {
+  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI?._test.state()?.okDisabled)).toBe(true);
+  const p = await page.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
+  await page.mouse.move(p.x - 3, p.y);
+  await page.mouse.move(p.x, p.y);
+  await expect(fumetto(page)).toHaveText('Scorri fino in fondo per confermare', { timeout: 3000 });
+}
+
+test('conferma in una pagina di Filo: il tasto che aspetta lo scorrimento dice perché nel fumetto', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await pronta(page);
+  await page.evaluate((t) => { window.SN_CONFIRM_UI.confirm({ title: 'Prova', text: t, okLabel: 'Esegui' }); }, LUNGO);
+  await tastoInAttesa(page);
+});
+
+test('conferma sopra un sito: il tasto che aspetta lo scorrimento dice perché nel fumetto', async ({ app, openTab, testServer }) => {
+  await app.evaluate(() => { globalThis.SN_FEEDBACK.submit = async () => ({ id: 'test-fb' }); });
+  const page = await testServer.openReady(openTab, '<!doctype html><html><body style="padding:40px"><h1>Pagina</h1></body></html>');
+  const host = new URL(page.url()).hostname;
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await nelMondoDiFilo(app, host, `
+    window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: LUNGO, titolo: 'Prova' })});
+    true;`);
+  await tastoInAttesa(await confermaSopraPagina(app));
+});
+
+// Un title che il codice mette o cambia col puntatore già sopra: esce nel fumetto, e il nativo non lo trova (r2).
+test('un title scritto dal codice durante il passaggio esce nel fumetto, quello cambiato si aggiorna e all\'uscita torna', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await pronta(page);
+  await page.evaluate(() => {
+    const box = document.createElement('div');
+    box.style.cssText = 'position:fixed;left:200px;top:200px;z-index:2147480000;display:flex;gap:30px';
+    box.innerHTML = '<button id="pDopo" style="font-size:30px">Tasto</button><button id="pCambia" title="Invia" style="font-size:30px">Altro</button>';
+    document.body.appendChild(box);
+  });
+  const box = await page.locator('#pDopo').boundingBox();
+  const cx = box.x + box.width / 2;
+  const cy = box.y + box.height / 2;
+  await page.mouse.move(cx - 4, cy);
+  await page.mouse.move(cx, cy);
+  await page.waitForTimeout(500);
+  await page.evaluate(() => document.querySelector('#pDopo').setAttribute('title', 'Arrivato dopo'));
+  await page.mouse.move(cx + 1, cy);
+  await expect(fumetto(page)).toHaveText('Arrivato dopo');
+  expect(await haTitolo(page.locator('#pDopo'))).toBe(false);
+
+  // Come l'invio della home che passa a «Riprendi»: il fumetto cambia testo, e all'uscita torna il title nuovo.
+  const cambia = page.locator('#pCambia');
+  await cambia.hover();
+  await expect(fumetto(page)).toHaveText('Invia');
+  await cambia.evaluate((el) => { el.title = 'Riprendi da dove si era fermato'; });
+  await expect(fumetto(page)).toHaveText('Riprendi da dove si era fermato');
+  expect(await haTitolo(cambia)).toBe(false);
+  await page.mouse.move(1, 1);
+  await expect.poll(() => cambia.evaluate((el) => el.getAttribute('title'))).toBe('Riprendi da dove si era fermato');
+});
+
+test('lo scorrimento e la finestra che perde il fuoco chiudono il fumetto', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await pronta(page);
+  const { el, titolo } = await unTitoloVisibile(page);
+  await el.hover();
+  await expect(fumetto(page)).toHaveText(titolo);
+  await page.mouse.wheel(0, 200);
+  await expect(fumetto(page)).toBeHidden();
+  await page.mouse.move(1, 1);
+  await el.scrollIntoViewIfNeeded();
+  await el.hover();
+  await expect(fumetto(page)).toHaveText(titolo);
+  await page.evaluate(() => window.dispatchEvent(new Event('blur')));
+  await expect(fumetto(page)).toBeHidden();
+  expect(await haTitolo(el), 'perso il fuoco, il title torna al suo posto').toBe(true);
+});
+
+// Le icone del menu del tasto destro: una sola etichetta, quella del fumetto, col nome della scorciatoia (r3).
+async function provaIconeDelMenu(page) {
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#bersaglio'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
+  await page.locator('#bersaglio').click({ button: 'right' });
+  const m = menuDi(page);
+  await expect(m.locator('.sn-menu').first()).toBeVisible();
+  const icona = m.locator('.sn-menu-row-btn[aria-label="Traduci"]');
+  const atteso = await icona.getAttribute('data-tip');
+  expect(atteso).toMatch(/^Traduci/);
+  await icona.hover({ force: true });
+  await expect(fumetto(m.superficie)).toHaveText(atteso);
+  expect(await m.valuta(() => document.querySelectorAll('.sn-tooltip').length), 'il menu non disegna più un\'etichetta sua').toBe(0);
+  await m.superficie.keyboard.press('Escape');
+}
+
+test('menu del tasto destro in una pagina di Filo: le icone hanno un fumetto solo', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await pronta(page);
+  await page.evaluate(() => {
+    const p = document.createElement('p'); p.id = 'bersaglio'; p.textContent = 'Una frase da cliccare col destro.';
+    p.style.cssText = 'position:fixed;left:200px;top:200px;z-index:2147480000;background:#fff;padding:8px';
+    document.body.appendChild(p);
+  });
+  await provaIconeDelMenu(page);
+});
+
+test.describe('strato del menu', () => {
+  test.use({ stratoDelMenu: true });
+  test('sopra un sito le icone del menu hanno il fumetto di Filo', async ({ openTab, testServer }) => {
+    const page = await testServer.openReady(openTab, '<!doctype html><body style="padding:40px"><p id="bersaglio">Una frase da cliccare col destro.</p></body>');
+    await provaIconeDelMenu(page);
+  });
+});
+
+test('barra in alto: un tasto disabilitato col data-tip ha il suo fumetto a finestra', async ({ app, shell }) => {
+  await shell.evaluate(() => {
+    const b = document.createElement('button');
+    b.id = 'provaSpento';
+    b.disabled = true;
+    b.dataset.tip = 'Spento per una ragione';
+    b.textContent = 'Sì';
+    b.style.cssText = 'position:fixed;left:300px;top:200px;z-index:2147483000;font-size:20px';
+    document.body.appendChild(b);
+  });
+  await shell.locator('#provaSpento').hover({ force: true });
+  await expect.poll(() => fumettoDellaBarra(app), { timeout: 3000 }).toEqual({ testo: 'Spento per una ragione', sfondo: expect.any(String) });
+  await shell.mouse.move(400, 300);
+});
