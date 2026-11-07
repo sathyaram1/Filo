@@ -2620,7 +2620,7 @@
         b.className = 'dl-row-btn';
         b.textContent = etichetta;
         b.dataset.scelta = scelta;
-        b.title = nota;
+        b.dataset.tip = nota;
         b.disabled = spento;
         b.addEventListener('click', () => {
           api.downloads.chiusura(scelta).then((res) => {
