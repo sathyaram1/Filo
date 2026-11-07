@@ -323,7 +323,8 @@ test('riscritto su un altro argomento a parità di parole, il titolo automatico 
 });
 
 // #1697.2 — una risposta che non porta il titolo (tagliata dal tetto, o senza la sua riga) non fa richiamare il modello
-// a ogni pausa: sullo stesso testo il titolo da rifare aspetta un cambio vero.
+// a ogni pausa: sullo stesso testo il titolo da rifare aspetta un cambio vero. Quella senza la riga del titolo lo fa
+// chiedere da solo, una volta: il titolo segue il nuovo argomento.
 const giardino = (n) => Array.from({ length: n }, (_, i) => ['giardino', 'fiori', 'rose', 'prato', 'siepe', 'erba'][i % 6]).join(' ');
 const montagna = (n) => Array.from({ length: n }, (_, i) => ['montagna', 'neve', 'vetta', 'sentiero', 'rifugio', 'valle'][i % 6]).join(' ');
 for (const [caso, guasto] of [['arriva tagliata', 'tagliata'], ['non ha la riga del titolo', 'senzaTitolo']]) {
