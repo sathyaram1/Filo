@@ -361,14 +361,17 @@ test('la risposta di un\'altra chat nata da una pagina fa chiedere la lezione ne
   }
 });
 
-test('la risposta di un\'altra chat nata dalle sole parole dell\'utente non sporca: la lezione si salva da sola', async ({ app }) => {
+test('la risposta di un\'altra chat nata dalle sole parole dell\'utente non sporca: la lezione chiede senza dire di letture', async ({ app }) => {
   try {
     const page = await home(app);
     await rispostaDiUnAltraChat(app, 1);
     await modelloFinto(app, [SALVA, { text: 'Fatto.' }]);
     await chiedi(page, 'ricordatelo');
-    await expect.poll(async () => (await lezioni(app)).includes('maiuscolo'), { timeout: 15000 }).toBe(true);
-    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    // Senza guardiano anche a compito pulito un salvataggio che dura chiede un OK (tabella del 30/09): il riquadro però
+    // non nomina nessuna lettura, perché la risposta dell'altra chat è dell'utente.
+    expect(await chiedeLaLezione(page, app)).toEqual({ popup: true, salvata: false });
+    expect(await confirmText(page)).not.toContain('Te lo chiedo perché in questo compito');
+    await clickConfirm(page, 'cancel');
     await expect.poll(() => ultimaRisposta(app, 'ricordatelo'), { timeout: 15000 }).toBe(1);
   } finally {
     await ripristina(app);
