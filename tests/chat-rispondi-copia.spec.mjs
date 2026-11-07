@@ -380,3 +380,43 @@ test('#2096: Modifica rimette nel campo anche il documento allegato, subito e ri
   await expect(home.locator('#input')).toHaveValue('quanto costa?');
   await expect(chip).toHaveCount(1);
 });
+
+// Una foto mandata da sola: Modifica la rimette una volta, come foto e non anche come documento, e il campo resta vuoto
+// invece di mostrare la domanda che l'invio scrive al suo posto. Subito e riaprendo la home.
+test('#2096: Modifica su un messaggio con la sola foto la rimette una volta, col campo vuoto', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const dir = cartellaTemporanea('filo-2096-foto-');
+  const percorso = join(dir, 'scontrino.png');
+  writeFileSync(percorso, Buffer.from(PNG.split(',')[1], 'base64'));
+  await preparaModello(app, [{ text: 'Vedo uno scontrino.' }]);
+  const home = await apriHome(openTab);
+  await app.evaluate(({ webContents }, a) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://newtab'));
+    wc.mainFrame.send('filo:broadcast', { type: globalThis.SN_MSG.MSG.CHAT_ALLEGA, dove: 'casa', immagini: [{ dataUrl: a.PNG, percorso: a.percorso }], file: [] });
+  }, { PNG, percorso });
+  const foto = home.locator('.dash-img-preview');
+  const chip = home.locator('.dash-file-chip');
+  await expect(foto).toHaveCount(1, { timeout: 10_000 });
+  await home.locator('#input').press('Enter');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Vedo uno scontrino.' })).toBeVisible({ timeout: 20_000 });
+  await expect(foto).toHaveCount(0);
+
+  const mia = home.locator('#bubbles > .dash-bubble-user').last();
+  await mia.hover();
+  await mia.getByRole('button', { name: 'Modifica' }).click();
+  await expect(foto).toHaveCount(1);
+  await expect(chip).toHaveCount(0);
+  await expect(home.locator('#input')).toHaveValue('');
+
+  await home.reload();
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await expect(foto).toHaveCount(0);
+  const riletta = home.locator('#bubbles > .dash-bubble-user').last();
+  await expect(riletta.locator('.dash-bubble-img')).toHaveCount(1, { timeout: 15_000 });
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(foto).toHaveCount(1);
+  await expect(chip).toHaveCount(0);
+  await expect(home.locator('#input')).toHaveValue('');
+});
