@@ -2416,20 +2416,6 @@
       : 'Si cambia a mano nelle impostazioni di Filo, dove sta la voce.';
   }
 
-  // Come l'utente nomina una voce, per sapere se un freno tolto l'ha chiesto lui (#1312): chiavi, nome in pagina e `detto`
-  // (nomi che solo l'utente usa), interi; `contrarie` la nominano al rovescio, `allentaDetto` sono già la richiesta di
-  // allentarla; `alzaAllenta`: alzarla è allentarla. Le regole che li usano stanno in actionLevels.js.
-  function paroleDellaVoce(rawKey, rawVal) {
-    const r = risolviChiave(rawKey);
-    if (!r || !r.setter) return { frasi: [], valori: [], contrarie: [], allenta: [], alza: false };
-    const s = r.setter;
-    const piane = (l) => [...new Set((l || []).map((t) => pianoChiave(t)).filter(Boolean))];
-    const contrarie = piane(s.contrarie);
-    const frasi = piane([...s.keys, nomeVoce(s), ...(s.detto || [])]).filter((f) => !contrarie.some((c) => f.includes(c)));
-    const valori = typeof rawVal === 'string' || typeof rawVal === 'number' ? pianoChiave(String(rawVal)).split(' ').filter(Boolean) : [];
-    return { frasi, valori, contrarie, allenta: piane(s.allentaDetto), alza: s.alzaAllenta === true };
-  }
-
   // Perché una chiave o un valore non si applicano (buildPreferencePartial ha reso null): { rifiuto, perModello }.
   function spiegaNonValida(rawKey, rawVal) {
     const r = risolviChiave(rawKey);
