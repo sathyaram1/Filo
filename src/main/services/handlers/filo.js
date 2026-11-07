@@ -216,6 +216,11 @@ module.exports = function register(on, ctx) {
     nuovaConversazioneAiuto(sender);
     return { ok: true };
   });
+  // Anche da una pagina web: può solo restringere quello che l'Aiuto di quella scheda fa da sé.
+  on(MSG.FILO_AIUTO_TESTO_DI_ALTRI, async (msg, sender) => {
+    segnaTestoNellAiuto(sender, { immagini: !!(msg && msg.immagini === true) });
+    return { ok: true };
+  });
 
   // Lo stato porta schede aperte, notifiche e il messaggio della home con le pagine salvate: a un sito non si dà (#589.12).
   on(MSG.FILO_GET_STATE, async (msg, sender, origin) => {
