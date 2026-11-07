@@ -13,25 +13,36 @@ function descrivi(tab) {
   return { id: String(tab.id), titolo: String(tab.title || ''), url: String(tab.url || ''), icona };
 }
 
+// Dove sta nella finestra la pagina di una scheda (`strato`: lo strato dei riquadri sopra di lei) e il suo zoom: l'unico
+// conto fra px della pagina e px della finestra, per il rilascio e per la carta sopra un gettone.
+function cornice(tm, tab, strato = false) {
+  const wc = tab && tab.view && tab.view.webContents;
+  if (!vivo(wc)) return null;
+  try {
+    if (strato) {
+      const s = tm.riquadri && tm.riquadri.strati && tm.riquadri.strati.get(wc);
+      if (!s || !vivo(s.vista.webContents)) return null;
+      return { wc: s.vista.webContents, b: s.perIlVuoto.getBounds(), zoom: s.vista.webContents.getZoomFactor() || 1 };
+    }
+    return { wc, b: tab.view.getBounds(), zoom: wc.getZoomFactor() || 1 };
+  } catch (_) { return null; }
+}
+
 // x, y nella finestra (px della barra per il suo zoom) → la vista sotto e i punti nella sua pagina.
 function vistaSotto(win, x, y) {
   const tm = win._filoTabs;
   const tab = tm && tm.tabs.find((t) => t.id === tm.activeId);
   const wc = tab && tab.view && tab.view.webContents;
   if (!vivo(wc)) return null;
-  const nellaPagina = (destWc, b) => {
-    const z = destWc.getZoomFactor() || 1;
-    return { wc: destWc, x: (x - b.x) / z, y: (y - b.y) / z };
-  };
+  const nellaPagina = (c) => (c ? { wc: c.wc, x: (x - c.b.x) / c.zoom, y: (y - c.b.y) / c.zoom } : null);
   const s = tm.riquadri && tm.riquadri.strati && tm.riquadri.strati.get(wc);
   if (s && s.visibile && s.aiuto && vivo(s.vista.webContents)) {
-    let cornice = null;
-    try { cornice = s.cornice.getBounds(); } catch (_) {}
-    if (dentro(cornice, x, y)) return nellaPagina(s.vista.webContents, s.perIlVuoto.getBounds());
+    let bordo = null;
+    try { bordo = s.cornice.getBounds(); } catch (_) {}
+    if (dentro(bordo, x, y)) return nellaPagina(cornice(tm, tab, true));
   }
-  let b = null;
-  try { b = tab.view.getBounds(); } catch (_) {}
-  return dentro(b, x, y) ? nellaPagina(wc, b) : null;
+  const c = cornice(tm, tab);
+  return c && dentro(c.b, x, y) ? nellaPagina(c) : null;
 }
 
 function manda(wc, dati) {
