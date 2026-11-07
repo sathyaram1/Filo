@@ -2233,8 +2233,9 @@ test('«💻 Lavoro server» c’è solo sul rombo azzurro, ed è il tasto princ
   const fidato = MR.ownerActionFor({ ...rombo, fiducia: 'fidato' }, 'accept_local');
   assert.ok(fidato);
   assert.equal(fidato.approva, false);
-  // Già col segno: basta «→ In coda», che lo porta In coda con l'etichetta.
-  assert.equal(MR.ownerActionFor({ ...rombo, localOnly: { by: 'owner', at: 1 } }, 'accept_local'), null);
+  // Già col segno e fidato: basta «→ In coda», che lo porta In coda con l'etichetta. Non fidato il tasto resta (#2217).
+  assert.equal(MR.ownerActionFor({ ...rombo, localOnly: { by: 'owner', at: 1 }, fiducia: 'fidato' }, 'accept_local'), null);
+  assert.ok(MR.ownerActionFor({ ...rombo, localOnly: { by: 'owner', at: 1 } }, 'accept_local'));
   // Con la sua domanda è In coda, e si risponde lì.
   assert.equal(MR.ownerActionFor({ ...rombo, domandaId: 'D-4' }, 'accept_local'), null);
   // Su ogni altra pratica il tasto non c'è.
