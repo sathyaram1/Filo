@@ -113,7 +113,11 @@
   }
 
   function applicaImpostazioni(settings) {
+    const prima = JSON.stringify(preferiti);
+    preferiti = Array.isArray(settings && settings.bluetoothPreferiti) ? settings.bluetoothPreferiti.filter((p) => p && typeof p.indirizzo === 'string') : [];
     cambiaVisibili(Sis().vociVisibili(settings));
+    // Un preferito messo o tolto mentre l'elenco è aperto: l'ordine si rilegge.
+    if (box && box.voce === 'bluetooth' && box.elenco && prima !== JSON.stringify(preferiti)) caricaElenco(box);
   }
 
   // I gesti sul riquadro (#1471): per voce, come la si apre o la si trascina, e i comandi dati da qui.
