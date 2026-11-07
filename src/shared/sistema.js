@@ -120,8 +120,8 @@
       icona: b.inCarica ? 'batteryCharging' : b.collegata ? 'batteryPlugged' : 'battery',
       livello: b.livello,
       bassa: !b.collegata && b.livello <= 15,
-      dettaglio: [`Batteria al ${b.livello}%`, `${frase.charAt(0).toUpperCase()}${frase.slice(1)}`],
-      copia: `Batteria al ${b.livello}%, ${frase}`,
+      dettaglio: [`Batteria ${alPercento(b.livello)}`, `${frase.charAt(0).toUpperCase()}${frase.slice(1)}`],
+      copia: `Batteria ${alPercento(b.livello)}, ${frase}`,
     };
   }
 
