@@ -36,16 +36,12 @@ time.sleep(${fermo}); b(False); time.sleep(0.3)
 `], { env: process.env, stdio: 'ignore' });
 }
 
+// Lo schermo X intero: la shell e le viste sopra, come le vede l'utente.
 async function fotoFinestra(app, nome) {
-  const png = await app.evaluate(async ({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
-    const { desktopCapturer } = require('electron');
-    const img = await w.webContents.capturePage();
-    return img.toPNG().toString('base64');
-  });
-  const { writeFileSync, mkdirSync } = await import('node:fs');
+  const { execFileSync } = await import('node:child_process');
+  const { mkdirSync } = await import('node:fs');
   mkdirSync('tests/.shots', { recursive: true });
-  writeFileSync(`tests/.shots/${nome}.png`, Buffer.from(png, 'base64'));
+  execFileSync('import', ['-window', 'root', `tests/.shots/${nome}.png`], { env: process.env });
 }
 
 test('foto a metà: in fila, sopra la textarea, sopra la chat della home', async ({ app, shell, openTab, testServer }) => {
