@@ -49,6 +49,22 @@ async function idPerUrl(shell, url) {
   return (await schede(shell)).find((t) => t.url === url)?.id;
 }
 
+// Il punto di un elemento dell'Aiuto nello strato sopra la scheda davanti, nei px della barra.
+async function puntoNelloStrato(app, aiuto, selettore) {
+  const r = await aiuto.locator(selettore).first().evaluate((el) => {
+    const b = el.getBoundingClientRect();
+    return { x: b.left + Math.min(24, b.width / 2), y: b.top + b.height / 2 };
+  });
+  const v = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
+    const tm = w._filoTabs;
+    const t = tm.tabs.find((x) => x.id === tm.activeId);
+    const s = tm.riquadri.strati.get(t.view.webContents);
+    return { b: s.perIlVuoto.getBounds(), z: s.vista.webContents.getZoomFactor() || 1, zs: w.webContents.getZoomFactor() || 1 };
+  });
+  return { x: (v.b.x + r.x * v.z) / v.zs, y: (v.b.y + r.y * v.z) / v.zs };
+}
+
 const cartaVisibile = (app) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
   .some((w) => !w.isDestroyed() && w.webContents.getURL().includes('anteprima.html') && w.isVisible()));
 
