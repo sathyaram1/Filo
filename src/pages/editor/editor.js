@@ -2262,7 +2262,8 @@
       const accanto = dentro(prima || docEl.childNodes[r.startOffset], !prima);
       if (accanto && accanto.nodeType === 1 && BLOCCO.test(accanto.tagName)) {
         r.selectNodeContents(accanto);
-        r.collapse(!prima);
+        // In un blocco vuoto si sta prima del suo segnaposto <br>, non dopo: dopo, il <br> diventerebbe una riga in più.
+        r.collapse(!prima || !pieno(r));
       }
     }
     // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
