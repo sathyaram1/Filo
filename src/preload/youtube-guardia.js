@@ -7,8 +7,6 @@ const R = require('../main/services/regoleYouTube.js');
 const { sorgente } = require('./youtube-scriptlet.js');
 
 const AVVISO = 'ytd-enforcement-message-view-model';
-const CANALE_REGOLE = 'filo:youtube-regole';
-const CANALE_PRONTE = 'filo:youtube-regole-pronte';
 // Dal «play» al primo passo avanti del video: oltre, il lettore è fermo.
 const PARTENZA_MS = 8000;
 // Il video che arriva alla fine entro così poco dal suo inizio, e più avanti di quanto il tempo gli permetteva, ci è
