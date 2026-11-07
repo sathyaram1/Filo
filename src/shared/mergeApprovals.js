@@ -1011,7 +1011,7 @@
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
       + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
-      + ' Quando il lavoro rifatto verrà fuso, questa scheda si toglie da sola.'));
+      + ' Quando il lavoro verrà fuso, questa scheda si toglie da sola.'));
 
     var status = el('p', 'sn-mac-status');
     status.setAttribute('role', 'status');
