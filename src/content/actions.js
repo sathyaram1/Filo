@@ -1412,8 +1412,9 @@
     copyToClipboard(href);
   }
 
+  // Il costruttore sta in urlNav, dove la conferma riconosce la stessa ricerca (#1840).
   function searchUrlFor(text) {
-    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+    return global.SN_URL_NAV.indirizzoRicerca(text || '');
   }
 
   // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
