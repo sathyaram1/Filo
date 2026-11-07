@@ -513,13 +513,11 @@ try {
   Dice 'stato' ([string]$esito.Status)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
-    // Il profilo della rete lo toglie netsh: il nome passa come argomento a sé, e uno con le virgolette non ci arriva.
-    'wifi-dimentica': PS_INIZIO + String.raw`$r = [string]$env:FILO_SIS_RETE
-if ($r -eq '' -or $r.Contains('"')) { Dice 'errore' 'parametro'; exit 0 }
-try {
-  $out = & netsh.exe wlan delete profile ('name=' + $r) 2>&1
-  Dice 'uscita' $LASTEXITCODE
-  foreach ($l in @($out)) { Dice 'riga' ([string]$l) }
+    'wifi-dimentica': PS_INIZIO + psCompila(CS_WLAN) + String.raw`try {
+  $e = [FiloWlan.Wlan]::Dimentica([string]$env:FILO_SIS_RETE)
+  Dice 'codice' $e.Codice
+  Dice 'interfacce' $e.Interfacce
+  Dice 'confermato' ([int]$e.Confermato)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
   },
