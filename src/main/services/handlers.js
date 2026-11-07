@@ -5261,12 +5261,15 @@ async function leggiPaginaDa(url, da, sender) {
 }
 
 // Le schede lasciate in una chat (#2085) entrano come letture già fatte: davanti al modello la cornice di LEGGI_PAGINA,
-// e per uscite, fonti e segreti letti contano come la lettura che sono. Sentinella: tests/unit/schedeInChat.test.mjs.
-async function lettureDeiGettoni(schede, sender) {
+// e per uscite, fonti e segreti letti contano come la lettura che sono. La chat le mette fra le azioni viste del turno;
+// l'Aiuto (`assistente`) le segna qui fra le fonti della sua conversazione. Sentinella: tests/unit/schedeInChat.test.mjs.
+async function lettureDeiGettoni(schede, sender, { assistente = false } = {}) {
   const lista = Array.isArray(schede) ? schede : [];
-  return Promise.all(lista.map(async (s) => ({
+  const letture = await Promise.all(lista.map(async (s) => ({
     type: 'LEGGI_PAGINA', url: s.url, _gettone: true, _executed: true, _output: await leggiPaginaDa(s.url, 0, sender),
   })));
+  if (assistente) for (const l of letture) segnaLetturaAiuto(sender, l);
+  return letture;
 }
 function notaDeiGettoni(letture) {
   const pagine = pageReadsForPrompt(letture);
