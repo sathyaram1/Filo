@@ -468,6 +468,61 @@
     return null;
   }
 
+  function daFare(domanda) { return isOggetto(domanda) && domanda.tipo === 'da_fare'; }
+
+  /**
+   * Il pulsante dell'opzione `i`: in un «da fare» il nome viene dalla posizione («Fatto», «Non lo faccio») e l'azione
+   * lo segue; altrove è quello di `etichettaAzione`. null = nessun pulsante. PURA.
+   */
+  function etichettaOpzione(domanda, i, riferimenti) {
+    const o = isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni[i] : null;
+    if (!isOggetto(o)) return null;
+    if (!daFare(domanda)) return etichettaAzione(o.azione, riferimenti);
+    const nome = PULSANTI_DA_FARE[i];
+    if (!nome) return null;
+    const v = validaAzione(o.azione);
+    if (!v.ok) return null;
+    if (v.azione.tipo === 'nessuna') return nome;
+    const base = etichettaAzione(v.azione, riferimenti);
+    if (!base) return null;
+    const detta = base.replace(/ con questa scelta$/, '');
+    return `${nome}: ${detta.charAt(0).toLocaleLowerCase('it')}${detta.slice(1)}`;
+  }
+
+  /** I numeri («1736», «831.2») scritti col cancelletto al posto dell'id nelle azioni, senza doppioni. PURA. */
+  function numeriDaTradurre(domanda) {
+    const out = [];
+    for (const o of isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : []) {
+      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
+      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
+      const n = m ? (m[2] ? `${m[1]}.${m[2]}` : m[1]) : '';
+      if (n && !out.includes(n)) out.push(n);
+    }
+    return out;
+  }
+
+  /**
+   * La domanda coi numeri delle azioni tradotti negli id: `ids` è { '1736': '<id>' } (lo legge il server). Un numero
+   * che non c'è si rifiuta col numero. PURA: non tocca la domanda in ingresso.
+   */
+  function traduciNumeri(domanda, ids) {
+    const mappa = isOggetto(ids) ? ids : {};
+    const mancanti = numeriDaTradurre(domanda).filter((n) => !(ha(mappa, n) && FEEDBACK_ID_RE.test(String(mappa[n]))));
+    if (mancanti.length) {
+      return no('feedback_inesistente', `nessun feedback col numero ${mancanti.map((n) => `#${n}`).join(', ')}: controlla il numero nelle azioni`,
+        { campo: 'opzioni', numeri: mancanti });
+    }
+    if (!isOggetto(domanda) || !Array.isArray(domanda.opzioni)) return { ok: true, domanda };
+    const opzioni = domanda.opzioni.map((o) => {
+      const f = isOggetto(o) && isOggetto(o.azione) ? o.azione.feedbackId : null;
+      const m = typeof f === 'string' ? NUMERO_IN_AZIONE_RE.exec(f) : null;
+      if (!m) return o;
+      const n = m[2] ? `${m[1]}.${m[2]}` : m[1];
+      return Object.assign({}, o, { azione: Object.assign({}, o.azione, { feedbackId: String(mappa[n]) }) });
+    });
+    return { ok: true, domanda: Object.assign({}, domanda, { opzioni }) };
+  }
+
   function rangoPriorita(p) {
     const i = PRIORITA.indexOf(p);
     return i < 0 ? PRIORITA.length : i;
