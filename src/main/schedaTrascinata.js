@@ -62,11 +62,38 @@ function riceve(win, dati, zoom = 1) {
   // Chi aveva la luce e non sta più sotto la spegne.
   if (prima && (!sotto || sotto.wc !== prima) && vivo(prima)) manda(prima, { fase: 'esci' });
   ultima.delete(win);
-  if (!sotto || !tab) return;
+  if (!sotto || !tab) { inCorso.delete(win); return; }
   const scheda = descrivi(tab);
-  // Ai passaggi, uno per fotogramma, l'icona non serve: viaggia solo col rilascio.
-  manda(sotto.wc, { fase, x: Math.round(sotto.x), y: Math.round(sotto.y), scheda: fase === 'lascia' ? scheda : { ...scheda, icona: '' } });
+  // Il rilascio può dover scendere in un riquadro del sito: la scheda resta pronta ancora un momento.
+  inCorso.set(win, { scheda, wc: sotto.wc, fino: Date.now() + (fase === 'lascia' ? 3000 : 60000) });
+  manda(sotto.wc, { fase, x: Math.round(sotto.x), y: Math.round(sotto.y), scheda: perFase(scheda, fase) });
   if (fase === 'sopra') ultima.set(win, sotto.wc);
 }
 
-module.exports = { riceve, vistaSotto, descrivi, cornice };
+// Ai passaggi, uno per fotogramma, l'icona non serve: viaggia solo col rilascio.
+const perFase = (scheda, fase) => (fase === 'lascia' ? scheda : { ...scheda, icona: '' });
+const inCorso = new WeakMap(); // finestra → { scheda, wc, fino }: il trascinamento in corso, per i riquadri dei siti
+
+// Un frame della pagina sotto il puntatore dice che il punto cade in un suo riquadro incorporato (`dati.indice`,
+// `dati.src`): il main gira la scheda a quel frame figlio, coi punti del suo contenuto. La scheda è quella del
+// trascinamento in corso verso quella pagina: un frame non la sceglie e non la inventa.
+function nelRiquadro(win, wc, frame, dati) {
+  if (!win || !vivo(wc) || !frame || !dati) return false;
+  const fase = ['sopra', 'lascia', 'esci'].includes(dati.fase) ? dati.fase : '';
+  const st = inCorso.get(win);
+  if (!fase || (fase !== 'esci' && (!st || st.wc !== wc || Date.now() > st.fino))) return false;
+  const x = Number(dati.x);
+  const y = Number(dati.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return false;
+  let figli = [];
+  try { figli = frame.frames || []; } catch (_) { figli = []; }
+  const perSrc = dati.src ? figli.filter((f) => { try { return f.url === dati.src; } catch (_) { return false; } }) : [];
+  const figlio = perSrc.length === 1 ? perSrc[0] : figli[Number(dati.indice)];
+  if (!figlio) return false;
+  const tipo = globalThis.SN_MSG?.MSG?.SCHEDA_TRASCINATA || 'scheda_trascinata';
+  const msg = fase === 'esci' ? { type: tipo, fase } : { type: tipo, fase, x: Math.round(x), y: Math.round(y), scheda: perFase(st.scheda, fase) };
+  try { figlio.send('filo:broadcast', msg); } catch (_) { return false; }
+  return true;
+}
+
+module.exports = { riceve, nelRiquadro, vistaSotto, descrivi, cornice };
