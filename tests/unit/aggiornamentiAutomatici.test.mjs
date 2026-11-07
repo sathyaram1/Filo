@@ -396,10 +396,11 @@ test('dalla chat: la preferenza cambia solo dopo una conferma che spiega il risc
   for (const chiave of ['aggiornamenti_automatici', 'installa gli aggiornamenti da solo', 'aggiornamenti automatici']) {
     const r = P.buildPreferencePartial(chiave, 'no');
     assert.deepEqual(r.partial, { aggiornamenti: { automatici: false } }, chiave);
-    assert.equal(r.costo, 2);
-    assert.equal(r.allenta, true, 'spegnerli dalla chat abbassa una difesa: vuole «conferma» a ogni livello (#530)');
+    assert.equal(r.costo, 4, 'spegnerli dalla chat toglie un freno: costo 4, «conferma» a ogni livello (#1312)');
+    assert.equal(r.allenta, true);
     assert.match(r.risk, /sicurezza/);
   }
   assert.deepEqual(P.buildPreferencePartial('aggiornamenti_automatici', 'sì').partial, { aggiornamenti: { automatici: true } });
+  assert.equal(P.buildPreferencePartial('aggiornamenti_automatici', 'sì').costo, 1, 'riaccenderli stringe il freno');
   assert.equal(globalThis.SN_CONST.DEFAULT_SETTINGS.aggiornamenti.automatici, true, 'di serie deve restare acceso');
 });

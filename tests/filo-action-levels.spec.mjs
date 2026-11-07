@@ -42,7 +42,7 @@ test('accendere il terminale abbassa una difesa: non esegue senza «conferma»; 
 
   // Senza conferma: l'azione NON viene eseguita, torna al client con la parola
   // da digitare e la spiegazione per il box.
-  const r = await execAction(app, action);
+  const r = await execAction(app, action, { richiesta: 'accendi il terminale' });
   expect(r.executed).toBe(false);
   expect(r.kept).toBe(true);
   expect(r.needsConfirm).toBe(3);
@@ -54,7 +54,7 @@ test('accendere il terminale abbassa una difesa: non esegue senza «conferma»; 
 
   // Con la conferma dell'utente (MSG.FILO_CONFIRM_ACTION): esegue.
   const c = await page.evaluate(async (a) =>
-    chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a }), action);
+    chrome.runtime.sendMessage({ type: 'filo_confirm_action', action: a, parole: ['accendi il terminale'] }), action);
   expect(c.executed).toBe(true);
   expect((await getSettings(page)).terminal?.enabled).toBe(true);
 });
@@ -88,6 +88,7 @@ test('il bottone in chat apre il popup di conferma: Annulla non applica, OK appl
     const host = document.createElement('div');
     host.id = 'test-actions';
     document.body.appendChild(host);
+    window.__filoDashActions.scriveUtente('accendi il terminale');
     window.__filoDashActions.renderActions(host, [a]);
   }, action);
 
@@ -139,6 +140,7 @@ test('#183: più impostazioni di livello 2 in una risposta → i popup si aprono
     const host = document.createElement('div');
     host.id = 'test-actions-multi';
     document.body.appendChild(host);
+    window.__filoDashActions.scriveUtente('accendi il terminale e metti i cookie in privacy');
     window.__filoDashActions.renderActions(host, acts, { autoConfirm: true });
   }, actions);
 

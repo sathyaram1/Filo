@@ -442,7 +442,7 @@
       required: [],
     },
     CANCELLA_MEMORIA: {
-      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Filo non lo fa da solo a nessun livello di autonomia: il sistema risponde di no e ti dice dove l\'utente può farlo lui. NON dichiarare mai di averlo fatto.',
+      description: 'Cancella DEFINITIVAMENTE tutta la memoria di Filo (profilo, preferenze apprese, lezioni). Solo se l\'utente lo chiede con parole sue: il sistema gli fa scrivere «conferma» a ogni livello di autonomia, e se non l\'ha chiesto risponde di no. Non dichiarare di averlo fatto finché l\'esito non lo dice.',
       properties: {},
       required: [],
     },
@@ -485,8 +485,8 @@
           ? P.righeDescrizione({ shellPref: SHELL_AMMESSE }) : [];
         return 'Modifica un\'impostazione dell\'app: ogni voce delle pagine Preferenze, Sicurezza, Modelli e Altro ha la sua chiave qui sotto. '
           + 'Una sola chiave per chiamata (chiama più volte per più impostazioni); le chiavi servono alla chiamata, all\'utente dici la voce a parole. Per le impostazioni segnate [conferma] il sistema può '
-          + 'chiedere l\'OK all\'utente da sé: tu non chiederlo a parole. Il livello di autonomia di Filo non è fra queste: lo sceglie solo '
-          + 'l\'utente, in Preferenze. Per un cambio relativo («un po\' più veloce») '
+          + 'chiedere l\'OK all\'utente da sé: tu non chiederlo a parole. Il livello di autonomia (chiave autonomia) lo cambi solo se '
+          + 'l\'utente te lo chiede: abbassarlo vale subito, alzarlo vuole che scriva «conferma». Per un cambio relativo («un po\' più veloce») '
           + 'o per dire com\'era prima, leggi il valore attuale con LEGGI_IMPOSTAZIONI. Chiavi valide e valori ammessi:\n'
           + righe.join('\n');
       },

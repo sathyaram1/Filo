@@ -1729,6 +1729,8 @@
       label.append(input, testo);
       box.appendChild(label);
     }
+    const sempre = $('autonomiaSempre');
+    if (sempre) sempre.textContent = Autonomia.FRASE_COSTO_4 || '';
   }
 
   function mostraAutonomia(livello) {

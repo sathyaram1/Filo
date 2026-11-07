@@ -5,17 +5,20 @@
 (function (global) {
   'use strict';
 
+  // Le frasi descrivono la tabella com'è oggi, senza guardiano: un «sì» da costo 2 in su chiede.
   const LIVELLI = Object.freeze([
-    Object.freeze({ id: 'conservativo', nome: 'Conservativo', frase: 'Senza chiederti fa solo quello che resta in chat o si disfa con un gesto. Dopo aver letto cose scritte da altri chiede anche per quello, e ciò che non si disfa non lo fa.' }),
-    Object.freeze({ id: 'default', nome: 'Normale', frase: 'Fa da solo quello che si rimedia e ti chiede prima di ciò che non si disfa. Dopo aver letto cose scritte da altri chiede anche prima di ciò che dura, e per ciò che non si disfa vuole la parola «conferma».' }),
+    Object.freeze({ id: 'conservativo', nome: 'Conservativo', frase: 'Senza chiederti fa solo quello che resta in chat o si disfa con un gesto, e per ciò che non si disfa vuole la parola «conferma». Dopo aver letto cose scritte da altri chiede anche per quello che si disfa, e vuole «conferma» per ciò che dura.' }),
+    Object.freeze({ id: 'default', nome: 'Normale', frase: 'Fa da solo quello che si disfa e ti chiede prima di ciò che dura o non si disfa. Dopo aver letto cose scritte da altri, per ciò che non si disfa vuole la parola «conferma».' }),
     Object.freeze({ id: 'automatico', nome: 'Automatico', frase: 'Come Normale, ma dopo aver letto cose scritte da altri, per ciò che non si disfa basta un OK invece della parola «conferma».' }),
-    Object.freeze({ id: 'yolo', nome: 'Yolo', frase: 'Fa tutto da solo, con un guardiano che rilegge ogni uscita.' }),
+    Object.freeze({ id: 'yolo', nome: 'Yolo', frase: 'Fa da solo tutto quello che il guardiano lascia passare.' }),
   ]);
   const LIVELLO_PREDEFINITO = 'default';
+  // Comune a ogni livello: la riga che le superfici mostrano sotto la scelta, scritta qui una volta sola.
+  const FRASE_COSTO_4 = 'A ogni livello, per togliere un freno che hai messo, cambiare una chiave di un servizio o cancellare per sempre vuole la parola «conferma». Dopo aver letto cose scritte da altri non lo fa: si fa a mano, o in una conversazione nuova.';
 
-  // Il guardiano dei registri e quello di uscita non esistono ancora: finché mancano, yolo non si sceglie
-  // e una cella «+G» chiede invece di partire. Quando arrivano diventano veri qui, e solo qui: allora
-  // va riscritta anche la frase di Automatico, che oggi descrive la tabella senza guardiano.
+  // Il guardiano dei registri e quello di uscita non esistono ancora (#536): finché mancano, yolo non si sceglie
+  // e ogni «sì» da costo 2 in su chiede invece di partire. Quando arrivano diventano veri qui, e solo qui: allora
+  // vanno riscritte anche le frasi dei livelli, che oggi descrivono la tabella senza guardiano.
   const GUARDIANO_REGISTRI = false;
 
   const CLASSI = Object.freeze({
@@ -23,46 +26,42 @@
     2: 'I file su cui lavori: l\'editor, quelli toccati di recente',
     3: 'Autori fidati: mittenti a cui hai risposto o che hai segnato, siti di un autore solo segnati da te',
     4: 'Gli altri file del computer',
-    5: 'Autore ignoto: sconosciuti, contatti nuovi, web, ricerche, file scaricati',
+    5: 'Autore ignoto: sconosciuti, contatti nuovi, web, ricerche, file scaricati, immagini incollate',
   });
   // La classe più alta (meno fidata) che lascia il compito pulito, per livello.
   const SOGLIA_PULITO = Object.freeze({ conservativo: 1, default: 2, automatico: 3, yolo: 3 });
 
   const COSTI = Object.freeze({
     0: 'Resta in chat',
-    1: 'Si disfa: una sveglia, il tema, una scheda archiviata, una bozza non inviata',
+    1: 'Si disfa: una sveglia, il tema, una scheda archiviata, una bozza non inviata, un freno stretto',
     2: 'Dura o si vede fuori, ma si rimedia: una lezione in memoria, una regola di automazione, una mail a un destinatario scelto',
     3: 'Irreversibile o costoso: una mail a uno sconosciuto, un modulo inviato, un acquisto, un file eliminato, un comando che modifica',
+    4: 'Toglie un freno messo da te o non torna più: alzare il livello o il tetto di spesa, una chiave di un servizio, cancellare per sempre, un segreto che esce',
   });
+  const COSTO_MAX = 4;
 
-  // Costo 0, 1, 2, 3. «si+G» parte da solo dopo il guardiano di uscita: finché non c'è, vale «chiede».
+  // Costo 0, 1, 2, 3, 4 (decisione dell'owner del 30/09). Un «sì» da costo 2 in su passa dal guardiano.
+  // Il costo 4 lo decide lo stato del compito, non come l'utente l'ha detto (#1312, strada B).
   const TABELLA = Object.freeze({
     conservativo: Object.freeze({
-      pulito: Object.freeze(['si', 'si', 'chiede', 'chiede']),
-      contaminato: Object.freeze(['si', 'chiede', 'chiede', 'no']),
+      pulito: Object.freeze(['si', 'si', 'chiede', 'conferma', 'conferma']),
+      contaminato: Object.freeze(['si', 'chiede', 'conferma', 'conferma', 'no']),
     }),
     default: Object.freeze({
-      pulito: Object.freeze(['si', 'si', 'si', 'chiede']),
-      contaminato: Object.freeze(['si', 'si', 'chiede', 'conferma']),
+      pulito: Object.freeze(['si', 'si', 'si', 'chiede', 'conferma']),
+      contaminato: Object.freeze(['si', 'si', 'chiede', 'conferma', 'no']),
     }),
     automatico: Object.freeze({
-      pulito: Object.freeze(['si', 'si', 'si', 'si+G']),
-      contaminato: Object.freeze(['si', 'si', 'si+G', 'chiede']),
+      pulito: Object.freeze(['si', 'si', 'si', 'si', 'conferma']),
+      contaminato: Object.freeze(['si', 'si', 'si', 'chiede', 'no']),
     }),
     yolo: Object.freeze({
-      pulito: Object.freeze(['si', 'si', 'si', 'si+G']),
-      contaminato: Object.freeze(['si', 'si+G', 'si+G', 'si+G']),
+      pulito: Object.freeze(['si', 'si', 'si', 'si', 'conferma']),
+      contaminato: Object.freeze(['si', 'si', 'si', 'si', 'no']),
     }),
   });
-
-  // Sopra la tabella, a ogni livello e da qualunque origine.
-  const ELENCO_FISSO = Object.freeze([
-    Object.freeze({ id: 'segreto', cosa: 'far uscire un segreto (password, codici usa e getta o di recupero, chiavi, coordinate bancarie che non hai chiesto di mandare)' }),
-    Object.freeze({ id: 'molti-destinatari', cosa: 'spedire a molti destinatari insieme' }),
-    Object.freeze({ id: 'credenziali', cosa: 'cambiare le credenziali o il recupero di un servizio' }),
-    Object.freeze({ id: 'regole', cosa: 'cambiare i livelli di autonomia, le classi delle fonti, i costi o questo elenco' }),
-    Object.freeze({ id: 'cancella-definitivo', cosa: 'cancellare dati in modo definitivo' }),
-  ]);
+  // Da questo costo in su un «sì» parte solo dopo il guardiano di uscita.
+  const COSTO_GUARDIANO = 2;
 
   // I campi non hanno un livello proprio: due manopole che possono solo restringere.
   const CAMPI = Object.freeze({
@@ -87,7 +86,7 @@
   function livelliSelezionabili() { return LIVELLI.filter((l) => selezionabile(l.id)); }
   function indice(id) { return LIVELLI.findIndex((l) => l.id === id); }
 
-  function costoValido(c) { return Number.isInteger(c) && c >= 0 && c <= 3; }
+  function costoValido(c) { return Number.isInteger(c) && c >= 0 && c <= COSTO_MAX; }
   function campoValido(c) { return Object.prototype.hasOwnProperty.call(CAMPI, c); }
   function classeValida(c) { return Number.isInteger(c) && c >= 1 && c <= 5; }
 
@@ -97,8 +96,10 @@
     return !!(m && typeof m === 'object' && m[nome] === true);
   }
 
+  // La manopola «grave» alza di un costo fino al 3: il costo 4 è una categoria di azioni, non un grado.
   function costoEffettivo(costo, campo, manopole) {
-    return Math.min(3, costo + (manopola(manopole, campo, 'grave') ? 1 : 0));
+    if (costo >= COSTO_MAX) return COSTO_MAX;
+    return Math.min(COSTO_MAX - 1, costo + (manopola(manopole, campo, 'grave') ? 1 : 0));
   }
 
   // Una fonte: { classe, campo?, chiave?, motivo }. Lo spostamento scelto dall'utente vale prima della
@@ -128,33 +129,38 @@
 
   function piuStretta(a, b) { return PESO[a] >= PESO[b] ? a : b; }
 
-  // Ingressi: livello, stato ('pulito'|'contaminato'), costo 0-3, dentroPerimetro, origine ('chat'|'automazione'),
-  // campo, manopole; più elenco (id dell'elenco fisso colpito), difesa (l'azione abbassa una difesa) e parola
-  // (l'azione vuole «conferma» a ogni livello), che dichiara chi conosce l'azione. `guardiano` dice se il guardiano di uscita c'è.
+  // Ingressi: livello, stato ('pulito'|'contaminato'), costo 0-4, dentroPerimetro, origine ('chat'|'automazione'),
+  // campo, manopole; più difesa (l'azione toglie un freno: costo 4), chiesta (falso per un segreto che l'utente non ha
+  // scritto), parola (l'azione vuole «conferma» a ogni livello) e molti (lo stesso testo a più di 5 destinatari nello
+  // stesso giorno), che dichiara chi conosce l'azione. `guardiano` dice se il guardiano di uscita c'è.
   // Esce { risposta, digita, regola, cella }: risposta fra RISPOSTE, digita = va scritta la parola «conferma».
   function decideDettaglio({
     livello, stato: st, costo, dentroPerimetro = true, origine = 'chat', campo = null,
-    manopole = null, elenco = '', difesa = false, parola = false, guardiano = false,
+    manopole = null, difesa = false, chiesta = true, parola = false, molti = false, guardiano = false,
   } = {}) {
     const lv = livelloDa(livello);
     if (!costoValido(costo)) return { risposta: 'no', digita: false, regola: 'costo', cella: 'no' };
-    if (elenco) return { risposta: 'no', digita: false, regola: 'elenco', cella: 'no', elenco: String(elenco) };
-    const c = costoEffettivo(costo, campo, manopole);
-    const contaminato = st !== 'pulito';
     const automazione = origine === 'automazione';
+    const c = difesa ? COSTO_MAX : costoEffettivo(costo, campo, manopole);
+    // Il costo 4 non parte mai da un'automazione, né per un segreto che l'utente non ha scritto lui.
+    if (c === COSTO_MAX && (!chiesta || automazione)) return { risposta: 'no', digita: false, regola: 'chiesta', cella: 'no' };
+    const contaminato = st !== 'pulito';
     let cella = TABELLA[lv][contaminato ? 'contaminato' : 'pulito'][c];
-    let regola = 'tabella';
-    if (!dentroPerimetro) {
+    // Conta lo stato, non le parole (#1312, strada B): dopo una lettura il costo 4 è no a ogni livello.
+    if (cella === 'no') return { risposta: 'no', digita: false, regola: 'lettura', cella };
+    let regola = difesa ? 'difesa' : 'tabella';
+    if (!dentroPerimetro && c < COSTO_MAX) {
       regola = 'perimetro';
       if (automazione) cella = piuStretta(TABELLA[lv].contaminato[c], 'chiede');
       else if (lv === 'conservativo' || lv === 'default') cella = piuStretta(cella, 'chiede');
       else cella = TABELLA[lv].contaminato[c] === 'si' ? 'si+G' : TABELLA[lv].contaminato[c];
     }
-    if (difesa && PESO[cella] < PESO.conferma) { cella = 'conferma'; regola = 'difesa'; }
+    if (cella === 'si' && c >= COSTO_GUARDIANO) cella = 'si+G';
     if (parola && PESO[cella] < PESO.conferma) { cella = 'conferma'; regola = 'parola'; }
+    if (molti && PESO[cella] < PESO.chiede) { cella = 'chiede'; regola = 'molti'; }
     let risposta = cella;
     if (risposta === 'si+G') risposta = guardiano ? 'si' : 'chiede';
-    let digita = risposta === 'conferma';
+    const digita = risposta === 'conferma';
     if (automazione && (risposta === 'chiede' || risposta === 'conferma')) {
       risposta = 'propone';
       regola = regola === 'tabella' ? 'origine' : regola;
@@ -163,6 +169,15 @@
   }
 
   function decide(ingressi) { return decideDettaglio(ingressi).risposta; }
+
+  // Un lavoro che non ha nessuno a cui chiedere (le lezioni che Filo si scrive dopo un turno, #1312.2): finché manca
+  // il guardiano, il «sì» che lo aspetta vale solo a compito pulito ('pulito') o mai ('mai'). Scelta dell'owner.
+  const SENZA_GUARDIANO = 'pulito';
+  function parteSenzaChiedere(dettaglio, statoCompito, regola = SENZA_GUARDIANO) {
+    if (!dettaglio) return false;
+    if (dettaglio.risposta === 'si') return true;
+    return regola === 'pulito' && dettaglio.cella === 'si+G' && statoCompito === 'pulito';
+  }
 
   // Regola (d) per i cambi che fa l'utente: alzare il livello o la fiducia in una fonte vuole «conferma».
   function richiestaCambioLivello(da, a) {
@@ -223,6 +238,11 @@
     /\btvly-[A-Za-z0-9_-]{16,}/,
     /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}/,
   ];
+  // Un token nell'intestazione di autorizzazione, di qualunque forma, e la password dentro un indirizzo (utente:password@).
+  const INTESTAZIONE = /\bAuthorization[ \t]*:[ \t]*(?:Bearer|Basic|Token|Digest)[ \t]+([A-Za-z0-9._~+\/=-]{8,})/gi;
+  const NELL_INDIRIZZO = /\b[a-z][a-z0-9+.-]*:\/\/[^\s\/:@"'`]+:([^\s\/@"'`]{4,})@/gi;
+  // utente:password dato a un programma di rete (`curl -u`, `--user`): diventa la stessa intestazione di autorizzazione.
+  const OPZIONE_UTENTE = /(?:^|\s)(?:-u|--user|--proxy-user)(?:=|\s+)["']?[^\s:"'\/@]+:([^\s"']{4,})/g;
   const PAROLA_PASSWORD = /(?:password|passwd|pwd|passphrase|parola\s+d['’]ordine|chiave\s+segreta|secret)\s*(?:[:=]|\bè\b|\bis\b|\bera\b)\s*["'«“]?([^\s"'»”,;&]{4,})/gi;
   const PAROLA_CODICE = /(?:\botp\b|\b2fa\b|\bone[-\s]?time\b|\bpin\b|\bcodic[ei]\s+(?:di\s+)?(?:verifica|accesso|sicurezza|conferma|recupero|backup|autenticazione|usa\s+e\s+getta|monouso|temporane[oi]|sms)\b|\b(?:recovery|backup|verification|security)\s+codes?\b)[\s:=]*(?:(?:è|e'|is|era|was)\s+)?["'«“]?(\d[A-Za-z0-9]{3,}|[A-Za-z0-9]{4,}(?:[-\s][A-Za-z0-9]{4,}){1,9})/gi;
 
@@ -253,29 +273,49 @@
   const CARTA = /^(?:4\d{12}(?:\d{3}){0,2}|5[1-5]\d{14}|2(?:2[2-9]|[3-6]\d|7[01])\d{13}|3[47]\d{13}|6(?:011|5\d{2})\d{12})$/;
   function soloAlnum(s) { return String(s || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase(); }
 
-  // Il segreto che `testo` porterebbe fuori: '' se nessuno. `richiesta` = cosa ha scritto l'utente nel
-  // compito: le coordinate bancarie che ci stanno dentro le ha chieste lui, il resto no.
-  function segreto(testo, { richiesta = '' } = {}) {
+  // I segreti che `testo` contiene, uno per uno: { tipo, valore }.
+  function* trovati(testo) {
     let t = String(testo || '');
-    if (!t.trim()) return '';
+    if (!t.trim()) return;
     try { t = `${t}\n${decodeURIComponent(t.replace(/\+/g, ' '))}`; } catch (_) {}
-    for (const re of CHIAVI_API) if (re.test(t)) return 'chiave';
-    for (const m of t.matchAll(PAROLA_PASSWORD)) if (sembraPassword(m[1])) return 'password';
-    for (const m of t.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) return 'codice';
-    const chiesto = soloAlnum(richiesta);
+    for (const re of CHIAVI_API) {
+      const m = t.match(re);
+      if (m) yield { tipo: 'chiave', valore: m[0] };
+    }
+    for (const m of t.matchAll(INTESTAZIONE)) yield { tipo: 'chiave', valore: m[1] };
+    for (const m of t.matchAll(PAROLA_PASSWORD)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
+    for (const m of t.matchAll(NELL_INDIRIZZO)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
+    for (const m of t.matchAll(OPZIONE_UTENTE)) if (sembraPassword(m[1])) yield { tipo: 'password', valore: m[1] };
+    for (const m of t.matchAll(PAROLA_CODICE)) if (/\d/.test(m[1])) yield { tipo: 'codice', valore: m[1] };
     for (const m of t.matchAll(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]){11,30}/g)) {
       const s = soloAlnum(m[0]);
       for (let n = s.length; n >= 15; n--) {
-        if (ibanValido(s.slice(0, n)) && !chiesto.includes(s.slice(0, n))) return 'banca';
+        if (ibanValido(s.slice(0, n))) { yield { tipo: 'banca', valore: s.slice(0, n) }; break; }
       }
     }
     // Solo i prefissi dei circuiti: un numero di 13 cifre che comincia per 1 è un orario in millisecondi.
     for (const m of t.matchAll(/(?<![\d])[2-6](?:[ -]?\d){12,18}(?![\d])/g)) {
       const cifre = m[0].replace(/\D/g, '');
-      if (CARTA.test(cifre) && luhn(cifre) && !chiesto.includes(cifre)) return 'banca';
+      if (CARTA.test(cifre) && luhn(cifre)) yield { tipo: 'banca', valore: cifre };
     }
-    return '';
   }
+
+  // Il segreto che `testo` porterebbe fuori: { tipo, scritto }, tipo '' se nessuno. `richiesta` = cosa ha scritto
+  // l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui e non contano; `scritto` dice
+  // se ogni altro segreto l'ha scritto lui, cioè se ha chiesto con parole sue di mandarlo (costo 4).
+  function segretoDettaglio(testo, { richiesta = '' } = {}) {
+    const chiesto = soloAlnum(richiesta);
+    let tipo = '';
+    for (const s of trovati(testo)) {
+      const v = soloAlnum(s.valore);
+      const suo = v.length >= 4 && chiesto.includes(v);
+      if (s.tipo === 'banca' && suo) continue;
+      if (!suo) return { tipo: s.tipo, scritto: false };
+      if (!tipo) tipo = s.tipo;
+    }
+    return { tipo, scritto: !!tipo };
+  }
+  function segreto(testo, opzioni) { return segretoDettaglio(testo, opzioni).tipo; }
 
   const SEGRETI = Object.freeze({
     chiave: 'una chiave o un token di accesso',
@@ -290,41 +330,51 @@
     const cosa = fonte && fonte.motivo ? String(fonte.motivo) : 'ho letto cose scritte da altri';
     return `Te lo chiedo perché in questo compito ${cosa}.`;
   }
+  // La frase del popup quando a farlo chiedere è un segreto che l'utente ha scritto e che uscirebbe.
+  function fraseSegreto(seg) {
+    return `Te lo chiedo perché porterebbe fuori ${SEGRETI[seg] || 'un segreto'}.`;
+  }
 
-  // Il testo di un «no», da una regola sola: solo il no dell'elenco fisso dice «a nessun livello»; quello della
-  // tabella dice cosa ha letto il compito e le strade che restano (#530). La conversazione nuova si consiglia solo se
-  // nasce pulita: non sopra una pagina (`daPagina`), né quando il filo che avrebbe davanti la sporca già
-  // (`nuovaUguale`, o una fonte `ereditata` dalle altre conversazioni, #1508).
-  function fraseNo({ regola = '', elenco = '', segreto: seg = '', dove = '', fonte = null, livello = '', daPagina = false, nuovaUguale = false } = {}) {
-    if (regola === 'elenco' || regola === 'costo') {
-      const voce = ELENCO_FISSO.find((e) => e.id === elenco);
-      const cosa = seg ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'}` : (voce ? voce.cosa : 'è fra le cose che Filo non fa');
+  // Il testo di un «no», da una regola sola (#530): il costo 4 dopo una lettura, quello che Filo non fa da sé (un
+  // segreto che l'utente non ha scritto, un'automazione, una sua proposta) e il costo che il registro non sa dare.
+  // `dove` = la strada che resta all'utente. La conversazione nuova si consiglia solo se nasce pulita: non sopra una
+  // pagina (`daPagina`), né quando il filo che avrebbe davanti la sporca già (`nuovaUguale`, o una fonte `ereditata`, #1508).
+  function fraseNo({ regola = '', segreto: seg = '', dove = '', fonte = null, daPagina = false, nuovaUguale = false } = {}) {
+    const strada = String(dove || '').trim().replace(/[\s.;:,]+$/, '');
+    const coda = `Dillo all'utente in una riga${strada ? `: ${strada}` : ''}. Non riprovare e non cercare un'altra strada per farlo`;
+    if (regola === 'lettura') {
+      const letto = fonte && fonte.motivo ? String(fonte.motivo) : 'ho letto cose scritte da altri';
+      const nuova = !(daPagina || nuovaUguale || (fonte && fonte.ereditata));
       return {
-        breve: `Filo non lo fa da solo: ${cosa}`,
-        perModello: `${cosa}: è nell'elenco fisso, e Filo non lo fa a nessun livello di autonomia, nemmeno se l'utente conferma. `
-          + `Dillo all'utente in una riga${dove ? `: ${dove}` : ''}. Non riprovare e non cercare un'altra strada per farlo`,
+        breve: `Dopo aver letto cose scritte da altri non lo faccio, a nessun livello: in questo compito ${letto}. `
+          + (nuova ? 'Puoi farlo tu, o chiedermelo in una conversazione nuova' : 'Puoi farlo tu'),
+        perModello: `toglie un freno o cancella per sempre, e in questo compito ${letto}: dopo una lettura Filo non lo fa a nessun `
+          + `livello di autonomia, nemmeno con la parola «conferma». Dillo all'utente in una riga, con le strade che ha (${strada || 'farlo da sé'}`
+          + `${nuova ? '; oppure chiederlo in una conversazione nuova, che non ha ancora letto niente' : ''}). Non riprovare in questa conversazione`,
       };
     }
-    const nome = infoLivello(livello).nome;
-    const letto = fonte && fonte.motivo ? String(fonte.motivo) : 'ho letto cose scritte da altri';
-    const soloLivello = daPagina || nuovaUguale || !!(fonte && fonte.ereditata);
-    const strade = soloLivello
-      ? 'alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»'
-      : 'chiederlo in una conversazione nuova, che non ha ancora letto niente, oppure alzare il livello di autonomia in Preferenze, sotto «Autonomia di Filo»';
+    if (regola === 'chiesta') {
+      const cosa = seg ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'} che non hai scritto tu` : 'non lo fa per un\'automazione né su una sua proposta';
+      return {
+        breve: `Filo non lo fa da solo: ${cosa}`,
+        perModello: (seg
+          ? `porterebbe fuori ${SEGRETI[seg] || 'un segreto'} che l'utente non ha scritto: Filo lo manda solo se è l'utente a scriverlo e a chiederlo, con la parola «conferma». `
+          : 'è fra le cose che Filo fa solo dentro una conversazione con l\'utente, e con la parola «conferma»: non le propone da sé e non le fa per un\'automazione. ')
+          + coda,
+      };
+    }
     return {
-      breve: `a livello ${nome} non lo faccio da solo, perché in questo compito ${letto}. `
-        + (soloLivello ? 'Si può alzando il livello in Preferenze' : 'Si può in una conversazione nuova, o alzando il livello in Preferenze'),
-      perModello: `a livello di autonomia ${nome}, dopo che in questo compito ${letto}, Filo non fa da solo ciò che non si disfa. `
-        + `Non è vietato a ogni livello: dillo all'utente in una riga, con le strade che ha (${strade}). Non riprovare in questa conversazione`,
+      breve: 'Filo non lo fa: non sa quanto costerebbe sbagliarlo',
+      perModello: `questa azione non ha un costo nel registro di Filo, e un'azione senza costo non parte. ${coda}`,
     };
   }
 
   global.SN_AUTONOMIA = Object.freeze({
-    LIVELLI, LIVELLO_PREDEFINITO, GUARDIANO_REGISTRI, CLASSI, SOGLIA_PULITO, COSTI, TABELLA,
-    ELENCO_FISSO, CAMPI, MANOPOLE, RISPOSTE, SEGRETI,
-    livelloValido, livelloDa, livelloAttivo, selezionabile, infoLivello, livelliSelezionabili, unisciPiuStretta,
+    LIVELLI, LIVELLO_PREDEFINITO, FRASE_COSTO_4, GUARDIANO_REGISTRI, CLASSI, SOGLIA_PULITO, COSTI, COSTO_MAX, COSTO_GUARDIANO,
+    TABELLA, CAMPI, MANOPOLE, RISPOSTE, SEGRETI, SENZA_GUARDIANO,
+    livelloValido, livelloDa, livelloAttivo, selezionabile, infoLivello, livelliSelezionabili, unisciPiuStretta, indice,
     costoValido, campoValido, classeValida, costoEffettivo, classeFonte, stato,
-    decide, decideDettaglio, richiestaCambioLivello, confermaAlzata, richiestaSpostamentoFonte,
-    segreto, frasePerche, fraseNo,
+    decide, decideDettaglio, parteSenzaChiedere, richiestaCambioLivello, confermaAlzata, richiestaSpostamentoFonte,
+    segreto, segretoDettaglio, frasePerche, fraseSegreto, fraseNo,
   });
 })(typeof globalThis !== 'undefined' ? globalThis : self);

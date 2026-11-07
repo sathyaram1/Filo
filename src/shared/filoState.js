@@ -376,12 +376,9 @@
         muto: !!c.nonRisponde || c.lastKnown === 'server' || c.lastKnown === 'models',
       }));
     }
-    // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non
-    // l'utente: è contenuto esterno come i risultati di una ricerca, e va
-    // dichiarato tale e recintato prima di entrare in un prompt (#593). Filo
-    // scrive la riga intorno (numero, fuoco, ultima attività); dentro la busta
-    // ci va il titolo, ripulito come un campo, così non può aprire una riga
-    // per conto suo.
+    // TAB APERTE — il titolo di una scheda lo scrive il SITO, non Filo e non l'utente: è contenuto esterno come i
+    // risultati di una ricerca, dichiarato tale e recintato prima di entrare in un prompt (#593). Filo scrive la riga
+    // intorno (numero, fuoco, ultima attività); dentro la busta ci va il titolo, ripulito come un campo.
     const E = esterno();
     {
       const righe = ['TAB APERTE'];
@@ -433,7 +430,7 @@
       aggiungi('AUTONOMIA DI FILO', [
         'AUTONOMIA DI FILO',
         `Livello scelto dall'utente: ${state.autonomia.nome}. ${state.autonomia.frase}`,
-        'Lo cambia solo l\'utente, in Preferenze sotto «Autonomia di Filo».',
+        'Si cambia solo se l\'utente lo chiede: in Preferenze sotto «Autonomia di Filo», o dalla chat con IMPOSTA_PREFERENZA (chiave autonomia; alzarlo vuole che l\'utente scriva «conferma»).',
       ]);
     }
     // Da qui in giù i testi salvati: nomi, notifiche, frasi della chat e della

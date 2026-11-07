@@ -109,7 +109,8 @@
       scrive: [percorso],
       aiuto: aiuto || 'true | false',
       costo: 2,
-      allenta: (r) => spentoAllenta && dentro(r.partial, percorso) === false,
+      // Senza un verso che abbassa una difesa non è un freno: spegnerlo manda fuori meno, quindi stringe (costo 1).
+      ...(spentoAllenta ? { allenta: (r) => dentro(r.partial, percorso) === false } : { stringe: (r) => dentro(r.partial, percorso) === false }),
       avviso: (r, at) => (dentro(r.partial, percorso) === true ? principaleSpento(sotto, at) : ''),
       risk,
       build(v) {
@@ -384,21 +385,24 @@
   }
   // `allentaSe` (#530): il verso che abbassa una difesa. 'togli' per un elenco che protegge (un sito tolto
   // torna libero), 'aggiungi' per un elenco di eccezioni; senza l'elenco di adesso «solo …» vale come abbassare.
-  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null, sotto = '' }) {
+  function elenco({ keys, percorso, nome, risk, aiuto, allentaSe = null, sotto = '', detto = [] }) {
     return {
       keys,
+      detto,
       scrive: [percorso],
       aiuto: `"aggiungi <siti>" | "togli <siti>" | "solo <siti>" | "svuota" (${aiuto}; più siti separati da virgole)`,
       costo: 2,
       avviso: (r, at) => (r.elenco && r.elenco.op !== 'togli' && r.elenco.voci.length ? principaleSpento(sotto, at) : ''),
-      allenta: (r, at) => {
-        const e = r.elenco;
-        if (!allentaSe || !e) return false;
-        if (e.op !== 'sostituisci') return e.op === allentaSe;
-        const prima = at ? dentro(at, percorso) : null;
-        if (!Array.isArray(prima)) return true;
-        return allentaSe === 'togli' ? prima.some((x) => !e.voci.includes(x)) : e.voci.some((x) => !prima.includes(x));
-      },
+      ...(allentaSe ? {
+        allenta: (r, at) => {
+          const e = r.elenco;
+          if (!e) return false;
+          if (e.op !== 'sostituisci') return e.op === allentaSe;
+          const prima = at ? dentro(at, percorso) : null;
+          if (!Array.isArray(prima)) return true;
+          return allentaSe === 'togli' ? prima.some((x) => !e.voci.includes(x)) : e.voci.some((x) => !prima.includes(x));
+        },
+      } : {}),
       risk,
       build(v) {
         const o = opElenco(v, RIDUZIONI[percorso]);
@@ -736,8 +740,9 @@
   }
 
   // Ogni voce: sinonimi di chiave + build(valore) → { partial, label }; `partial` si fonde nelle impostazioni.
-  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat; `allenta(r, attuali)` dice se il
-  // valore abbassa una difesa (vuole «conferma» a ogni livello); `elencoFisso` la mette nell'elenco fisso.
+  // `costo` (0-3) è il costo di sbagliare quando la cambia FILO dalla chat. Una voce con `allenta(r, attuali)` è un
+  // freno (regola del freno, #1312): toglierlo è costo 4, stringerlo costo 1; il suo `costo` resta quello del cambio
+  // per il registro dei cambi; `stringe(r)` dà costo 1 al verso che toglie portata a Filo in una voce che non è un freno.
   // `risk` è obbligatorio dal costo 2 o con `allenta`: è il rischio che il popup mostra.
   const PREF_SETTERS = [
     {
@@ -1010,6 +1015,7 @@
       // Accenderla vuole sempre un OK, a ogni livello di autonomia: un clic, non la parola (#778). Non abbassa una
       // difesa: anche accesa, la prima occhiata a ogni finestra di un'altra app chiede.
       chiede: (r) => r.partial.schermo.guarda === true,
+      stringe: (r) => r.partial.schermo.guarda === false,
       risk: 'Da accesa, quando glielo chiedi in chat Filo cattura l\'immagine di una finestra o dello schermo e la fa leggere '
         + 'a un modello che vede le immagini, insieme alla tua domanda. Quello che si vede in quella finestra arriva quindi al modello. '
         + 'La prima volta che guarda una finestra di un\'altra app, a ogni tua richiesta, ti chiede l\'OK dicendoti quale. '
@@ -1401,6 +1407,8 @@
       scrive: ['security.blockPopups'],
       aiuto: 'true | false',
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
+      allentaDetto: ['lascia aprire i popup', 'lascia aprire le finestre popup', 'lascia passare i popup', 'permetti i popup',
+        'consenti i popup', 'sblocca i popup', 'apri i popup'],
       costo: 2,
       allenta: (r) => r.partial.security.blockPopups === false,
       risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
@@ -1554,6 +1562,7 @@
       keys: ['solo_pesi_aperti', 'solo pesi aperti', 'modelli a pesi aperti', 'solo modelli a pesi aperti',
         'solo modelli aperti', 'modelli aperti', 'modelli proprietari', 'niente modelli proprietari',
         'disattiva modelli proprietari', 'open weights'],
+      contrarie: ['modelli proprietari', 'modelli chiusi', 'modelli a pesi chiusi', 'modelli non aperti'],
       costo: 2,
       allenta: (r) => r.partial.openWeightsOnly === false,
       risk: 'Spegne tutti i modelli proprietari (Anthropic compresa) e lascia lavorare solo modelli '
@@ -1655,7 +1664,9 @@
     {
       scrive: ['monthlyLimitEur'],
       aiuto: 'numero in euro (limite di spesa mensile)',
-      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget'],
+      keys: ['limite_spesa', 'limite di spesa', 'limite spesa', 'limite di spesa mensile', 'limite mensile', 'budget mensile', 'spesa massima', 'limite costi', 'budget', 'tetto di spesa', 'tetto spesa'],
+      detto: ['limite', 'tetto', 'spendere', 'spendo', 'spesa mensile', 'spesa al mese', 'spese mensili', 'euro al mese', 'crediti al mese'],
+      alzaAllenta: true,
       costo: 2,
       allenta: (r, at) => {
         const tetto = (v) => (Number(v) > 0 ? Number(v) : Infinity);
@@ -1952,6 +1963,8 @@
     elenco({
       keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso',
         'siti connessi', 'resta connesso su', 'resta connesso qui', 'non restare connesso'],
+      detto: ['tienimi connesso', 'restare connesso', 'rimanere connesso', 'rimani connesso', 'resto connesso', 'resta collegato',
+        'tienimi collegato', 'restare collegato'],
       percorso: 'security.cookies.trustedSites',
       allentaSe: 'aggiungi',
       nome: 'Siti fidati dove resti connesso',
@@ -2000,8 +2013,7 @@
         percorso: 'menuDelSito.siti',
         nome: 'Siti dove il tasto destro apre il menu del sito',
         aiuto: 'siti col loro menu del tasto destro (Google Docs, Figma…) dove il tasto destro apre il menu del sito e quello di Filo '
-          + 'resta a Shift + tasto destro; per un sito aperto di cui non vedi l\'indirizzo: «questo sito» (la scheda web davanti) '
-          + 'o «scheda: <titolo come in TAB APERTE>»',
+          + 'resta a Shift + tasto destro; per un sito aperto: il suo nome come in TAB APERTE, o «questo sito» (la scheda web davanti)',
         risk: 'Cambia su quali siti il tasto destro apre il menu del sito invece di quello di Filo; '
           + 'il menu di Filo resta a Shift + tasto destro.',
       }),
@@ -2250,21 +2262,36 @@
         + 'tornano a mandare ai modelli.',
     }),
 
-    // Il livello di autonomia lo cambia solo l'utente, in Preferenze: dalla chat è nell'elenco fisso.
+    // Il livello di autonomia è il primo freno: alzarlo è costo 4, abbassarlo 1 (#1312). Il livello attuale ignoto
+    // vale il più stretto, e yolo non si sceglie finché manca il guardiano.
     // Sta in fondo perché i sinonimi corti («auto») trovino prima le voci di sopra.
     {
-      scrive: [],
-      aiuto: '"conservativo" | "default" | "automatico" (lo sceglie solo l\'utente in Preferenze: dalla chat non si cambia)',
-      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo'],
-      costo: 3,
-      elencoFisso: 'regole',
-      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo»: aprigli la pagina lì '
-        + 'con NAVIGA filo://preferences/preferences.html#autonomia',
+      scrive: ['autonomia.livello'],
+      aiuto: () => {
+        const A = global.SN_AUTONOMIA;
+        const nomi = A ? A.livelliSelezionabili().map((l) => `"${l.nome.toLowerCase()}"`).join(' | ') : '"conservativo" | "normale" | "automatico"';
+        return `${nomi} (quanto Filo fa da solo; abbassarlo vale subito, alzarlo vuole che l'utente scriva «conferma»)`;
+      },
+      keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo', 'autonomia di filo'],
+      alzaAllenta: true,
+      costo: 2,
+      allenta: (r, at) => {
+        const A = global.SN_AUTONOMIA;
+        const prima = at && at.autonomia ? A.livelloAttivo(at.autonomia.livello) : 'conservativo';
+        return A.indice(r.partial.autonomia.livello) > A.indice(prima);
+      },
+      dove: 'Il livello di autonomia si cambia anche in Preferenze, sotto «Autonomia di Filo».',
+      risk: 'Cambia quante cose Filo fa da solo senza chiederti prima.',
       build(v) {
         const A = global.SN_AUTONOMIA;
+        if (!A) return null;
         const s = String(v == null ? '' : v).trim().toLowerCase();
-        const lv = A && A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
-        return { partial: {}, label: `Autonomia di Filo → ${lv ? lv.nome : (s || '?')}` };
+        const lv = A.LIVELLI.find((l) => l.id === s || l.nome.toLowerCase() === s);
+        if (!lv) return null;
+        if (!A.selezionabile(lv.id)) {
+          return { rifiuto: `${lv.nome} non si può ancora scegliere`, perModello: `I livelli che l'utente può scegliere sono ${A.livelliSelezionabili().map((l) => l.nome).join(', ')}.` };
+        }
+        return { partial: { autonomia: { livello: lv.id } }, label: `Autonomia di Filo → ${lv.nome}` };
       },
     },
   ];
@@ -2350,7 +2377,7 @@
     return scelte.length === 1 ? { setter: scelte[0] } : { ambigui: scelte };
   }
 
-  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, elencoFisso, dove,
+  // Trova il setter giusto per una chiave e costruisce il partial. Ritorna { partial, label, costo, allenta, dove,
   // risk, testo?, avviso? }; `attuali` = le impostazioni correnti, se note: senza, un cambio di rigore vale come abbassare.
   // Oppure { rifiuto, perModello? } se va rifiutato spiegando perché (`rifiuto` lo legge l'utente, `perModello` dice al
   // modello come rimediare), o null se chiave/valore non validi (il perché lo dà spiegaNonValida).
@@ -2373,19 +2400,35 @@
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
-    // `costoDi`: un elenco che costa diverso nei due versi (#967); senza, il costo dichiarato.
+    // Un freno costa 4 tolto e 1 stretto; senza freno, `costoDi` dà il costo nei due versi di un elenco (#967).
+    const freno = typeof setter.allenta === 'function';
+    let stringe = false;
+    try { stringe = !freno && typeof setter.stringe === 'function' && !!setter.stringe(b, attuali); } catch (_) { stringe = false; }
     let costo = setter.costo;
     try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
     return {
       ...b,
-      costo,
+      costo: freno ? (allenta ? 4 : 1) : (stringe ? 1 : costo),
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
-      elencoFisso: setter.elencoFisso || '',
       dove: setter.dove || '',
       risk: setter.risk || '',
     };
+  }
+
+  // Come l'utente nomina una voce, per sapere se un freno tolto l'ha chiesto lui (#1312): chiavi, nome in pagina e `detto`
+  // (nomi che solo l'utente usa), interi; `contrarie` la nominano al rovescio, `allentaDetto` sono già la richiesta di
+  // allentarla; `alzaAllenta`: alzarla è allentarla. Le regole che li usano stanno in actionLevels.js.
+  function paroleDellaVoce(rawKey, rawVal) {
+    const r = risolviChiave(rawKey);
+    if (!r || !r.setter) return { frasi: [], valori: [], contrarie: [], allenta: [], alza: false };
+    const s = r.setter;
+    const piane = (l) => [...new Set((l || []).map((t) => pianoChiave(t)).filter(Boolean))];
+    const contrarie = piane(s.contrarie);
+    const frasi = piane([...s.keys, nomeVoce(s), ...(s.detto || [])]).filter((f) => !contrarie.some((c) => f.includes(c)));
+    const valori = typeof rawVal === 'string' || typeof rawVal === 'number' ? pianoChiave(String(rawVal)).split(' ').filter(Boolean) : [];
+    return { frasi, valori, contrarie, allenta: piane(s.allentaDetto), alza: s.alzaAllenta === true };
   }
 
   // Perché una chiave o un valore non si applicano (buildPreferencePartial ha reso null): { rifiuto, perModello }.
@@ -2438,7 +2481,7 @@
 
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
-    applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
+    applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, paroleDellaVoce, PARAMETRI_COLORE_TAB,
     SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

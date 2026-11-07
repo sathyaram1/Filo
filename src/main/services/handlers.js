@@ -1004,7 +1004,9 @@ async function lezioniAutomaticheConsentite({ sender = null, contesto = null, fo
     const ing = globalThis.SN_ACTION_LEVELS.ingressi({ type: 'SALVA_LEZIONE', testo: 'lezione' }, {});
     let impostazioni = {};
     try { impostazioni = await Storage.getSettings(); } catch (_) {}
-    return !!ing && decisioneAutonomia(ing, { sender, contesto, fontiLette, impostazioni }).risposta === 'si';
+    if (!ing) return false;
+    const d = decisioneAutonomia(ing, { sender, contesto, fontiLette, impostazioni });
+    return globalThis.SN_AUTONOMIA.parteSenzaChiedere(d, d.stato.stato);
   } catch (_) { return false; }
 }
 
@@ -2314,15 +2316,16 @@ function fileScaricato(p) {
 }
 
 // L'unico punto del main che chiede a SN_AUTONOMIA se un'azione parte (#530). Il guardiano di uscita non
-// esiste ancora: le celle «+G» chiedono. `perche` è la frase del popup quando non è ovvio cosa fa chiedere.
-function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = null, assistente = false, origine = 'chat', dentroPerimetro = true, impostazioni = null } = {}) {
+// esiste ancora: i «sì» da costo 2 in su chiedono. `perche` è la frase del popup quando non è ovvio cosa fa chiedere.
+// `chiesta` = l'azione viene dalla conversazione, non da una proposta che Filo fa da sé: senza, il costo 4 non parte.
+function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = null, assistente = false, origine = 'chat', dentroPerimetro = true, chiesta = true, impostazioni = null } = {}) {
   const A = globalThis.SN_AUTONOMIA;
   const aut = (impostazioni && impostazioni.autonomia) || {};
   const livello = A.livelloAttivo(aut.livello);
   const st = A.stato({ fonti: fontiDelCompito(sender, contesto, fontiLette, assistente), livello, spostamenti: aut.fonti, manopole: aut.manopole });
   const ingressi = {
     livello, stato: st.stato, costo: ing.costo, campo: ing.campo, manopole: aut.manopole,
-    elenco: ing.elenco, difesa: ing.difesa, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
+    difesa: ing.difesa, chiesta: chiesta && ing.chiesta !== false, parola: !!ing.parola, origine, dentroPerimetro, guardiano: false,
   };
   const d = A.decideDettaglio(ingressi);
   let nuovaUguale = false;
@@ -2333,8 +2336,10 @@ function decisioneAutonomia(ing, { sender = null, contesto = null, fontiLette = 
   }
   let perche = '';
   if (d.risposta !== 'si' && d.risposta !== 'no') {
-    const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito' }) : d.risposta;
-    if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
+    // La lettura è il perché quando, a compito pulito e col guardiano, la risposta sarebbe più larga.
+    const daPulito = st.stato === 'contaminato' ? A.decide({ ...ingressi, stato: 'pulito', guardiano: true }) : d.risposta;
+    if (ing.segreto) perche = A.fraseSegreto(ing.segreto);
+    else if (daPulito !== d.risposta) perche = A.frasePerche(st.fonte);
     // Una difesa abbassata vuole sempre la parola: il motivo lo dice già l'`avviso` del box, una volta sola.
     else if (d.regola === 'perimetro') perche = ing.perchePerimetro || 'Te lo chiedo perché non me l\'hai chiesto tu: è una mia proposta.';
   }
@@ -2350,7 +2355,7 @@ async function decisioneAzionePagina({ costo, campo = 'web', sender = null } = {
   if (!A.costoValido(costo)) return { risposta: 'no', digita: false, perche: '' };
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const ing = { costo, campo: A.campoValido(campo) ? campo : null, elenco: '', difesa: false };
+  const ing = { costo, campo: A.campoValido(campo) ? campo : null, difesa: false };
   const d = decisioneAutonomia(ing, { sender, assistente: true, impostazioni });
   // I contatori (#1461): la risposta calcolata e, quando chiede, quello che sceglie la persona nel box della pagina.
   const contati = ingressiContati(ing, d, { origine: 'chat', dentroPerimetro: true });
@@ -2406,8 +2411,8 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', daFuori = 
 // Il testo di un «no» lo dà SN_AUTONOMIA.fraseNo: breve per il diario, intero per il modello, con la strada che resta.
 function fraseNo(ing, decisione, sender) {
   return globalThis.SN_AUTONOMIA.fraseNo({
-    regola: decisione.regola, elenco: ing.elenco, segreto: ing.segreto, dove: ing.dove,
-    fonte: decisione.stato && decisione.stato.fonte, livello: decisione.livello,
+    regola: decisione.regola, segreto: ing.segreto, dove: ing.dove,
+    fonte: decisione.stato && decisione.stato.fonte,
     daPagina: /^https?:/i.test(String(sender?.tab?.url || sender?.url || '')),
     nuovaUguale: !!decisione.nuovaUguale,
   });
@@ -2569,7 +2574,7 @@ function ingressiContati(ing, decisione, { origine, dentroPerimetro }) {
 // compresi: dicono cosa il compito ha letto (#530) e servono all'anti-esfiltrazione di NAVIGA.
 async function eseguiAzioneFilo(action, {
   confirmed = false, sender = null, contesto = null, provenienza = null, fontiLette = null, assistente = false, parole = '', avanzamento = null,
-  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
+  chatId = null, richiesta = '', origine = 'chat', dentroPerimetro = true, chiesta = true, accoglienza = false, segnale = null, nascostiDellaChat = null,
   domanda = '', soloConferma = false, capRilettura = null, schedeViste = null, intervista = false,
 } = {}) {
   if (!action || typeof action !== 'object') return { executed: false, kept: false };
@@ -2905,6 +2910,7 @@ async function eseguiAzioneFilo(action, {
     action._proposte = prep.proposte;
     action._saltati = prep.saltati;
     action._oltre = prep.oltre;
+    action._daScaricati = prep.proposte.some((p) => fileScaricato(p && p.da));
     if (!prep.proposte.length) {
       const errore = prep.errore || (prep.saltati.length ? 'nessuno dei file si può rinominare' : 'nessun file da rinominare');
       return { executed: false, kept: false, output: { error: errore, saltati: prep.saltati } };
@@ -2938,6 +2944,7 @@ async function eseguiAzioneFilo(action, {
   // scritta qui sempre, sopra qualunque valore arrivato col modello.
   if (type === 'VOLUME' || type === 'BLUETOOTH' || type === 'WIFI') {
     const C = require('./comandiSistema');
+    if (!confirmed) delete action._nomeTrovato;
     const q = C.normalizzaRichiesta(richiestaDiSistema(type, action));
     let nome = q.nome || '';
     // Già com'è chiesto (la rete è quella, le cuffie sono staccate, la radio è spenta): niente da confermare.
@@ -2951,6 +2958,8 @@ async function eseguiAzioneFilo(action, {
       } else {
         const trovato = await C.risolviNome(q);
         if (trovato.esito) return { executed: false, kept: false, output: trovato.esito };
+        // Il nome vero l'ha scelto chi gestisce la rete o il dispositivo: entra nel compito come una lettura.
+        if (trovato.nome && trovato.nome !== q.nome) action._nomeTrovato = true;
         if (trovato.nome) nome = trovato.nome;
         gia = trovato.gia === true;
       }
@@ -2983,18 +2992,19 @@ async function eseguiAzioneFilo(action, {
   }
 
   // ── chi decide se parte (#530) ─────────────────────────────────────────────
-  // Il registro dà costo, campo, elenco fisso e difesa (src/shared/actionLevels.js), mai l'LLM; la risposta
+  // Il registro dà costo, campo, freno tolto e segreti (src/shared/actionLevels.js), mai l'LLM; la risposta
   // la dà SN_AUTONOMIA col livello scelto dall'utente e lo stato del compito. Fuori registro o senza costo:
   // non parte. `confirmed` salta solo la sospensione, il registro si rilegge anche alla conferma.
   const Levels = globalThis.SN_ACTION_LEVELS;
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
-  const ing = Levels ? Levels.ingressi(action, { richiesta, impostazioni }) : null;
+  // Alla conferma la richiesta non viaggia: valgono le parole dell'utente che la pagina rimanda, come per la porta delle uscite.
+  const ing = Levels ? Levels.ingressi(action, { richiesta: richiesta || parole, impostazioni }) : null;
   if (!ing) {
     console.warn('[Filo] azione non registrata o senza costo, rifiutata:', type);
     return { executed: false, kept: false, rejected: true };
   }
-  let decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
+  let decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, chiesta, impostazioni });
   // L'indirizzo scritto dal modello si conferma con un OK (decisione su D-20): aprire o leggere una pagina si disfa,
   // e il riquadro da digitare direbbe il contrario.
   if (action._nonCompare && decisione.digita) decisione = { ...decisione, digita: false };
@@ -3899,7 +3909,10 @@ async function eseguiAzioneFilo(action, {
         return {
           executed: rinominati.length > 0,
           kept: true,
-          output: { rinominati, falliti, saltati: Array.isArray(action._saltati) ? action._saltati : [] },
+          output: {
+            rinominati, falliti, saltati: Array.isArray(action._saltati) ? action._saltati : [],
+            ...(rinominati.some((r) => fileScaricato(r.da)) ? { scaricati: true } : {}),
+          },
         };
       }
       case 'ESEGUI_COMANDO': {
@@ -6316,6 +6329,10 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   if (onbActive && !accoglienza) {
     await segnaFonte(chatId, fontiLette, { classe: 5, campo: null, chiave: 'benvenuto:testo-di-altri', motivo: 'è entrato un testo che non hai scritto tu' });
   }
+  // Un'immagine incollata o trascinata in chat l'ha fatta qualcun altro: guardarla è una lettura (#1312).
+  if (imageList.length && !internal) {
+    await segnaFonte(chatId, fontiLette, { classe: 5, campo: null, chiave: 'chat:immagine', motivo: 'ho guardato un\'immagine che hai incollato' });
+  }
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
   // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
   const conversazioneScheda = filo && chatId ? [...vistiDalFilo.filter((m) => m && m.chat === chatId), ...codaScheda] : codaScheda;
@@ -7032,7 +7049,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // La proposta è un'uscita come le altre: passa dalla porta con quello che la chat ha letto (#810).
     // Se la risposta citata porta un segreto letto da fuori, la proposta parte senza citarla.
     // La segnalazione la propone Filo, non l'ha chiesta l'utente: è fuori dal perimetro del compito (#530).
-    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false };
+    const conContesto = { sender, contesto: azioniViste, parole: paroleUtente, fontiLette, richiesta, dentroPerimetro: false, chiesta: false };
     let res = await executeFiloAction(proposal, conContesto);
     if (res.output && res.output.blocked === 'segreto') {
       proposal = maybeProposeFeedbackAction({ textReply, rawActions, userMessage, threadHistory: cleanHistory, citaRisposta: false });

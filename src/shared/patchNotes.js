@@ -10,7 +10,16 @@
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
       version: '0.2.270', date: '2026-11-07',
+      features: [
+        { testo: 'Il livello di autonomia lo cambi anche chiedendolo a Filo, per esempio «mettiti a Conservativo». Abbassarlo vale subito. Alzarlo vuole che tu scriva «conferma», come alzare il limite di spesa, sbloccare un sito o spegnere una protezione.', segnalazione: 1312 },
+        { testo: 'Puoi chiedere a Filo di cancellare tutta la sua memoria in un colpo: ti fa scrivere «conferma» e la svuota.', segnalazione: 1312 },
+      ],
       fixes: [
+        { testo: 'Togliere una protezione di Filo dalla chat, come alzare il tetto di spesa o il livello o sbloccare un sito, chiede sempre di scrivere «conferma». Una pagina letta non può chiederlo al posto tuo: dopo che Filo ha letto cose scritte da altri, lo fai a mano o in una conversazione nuova.', segnalazione: 1312 },
+        { testo: 'A Normale Filo ti chiede un OK prima di ricordare una cosa per sempre, installare un pacchetto dal terminale, leggere un file di configurazione fuori dalla tua cartella o aprire un link che porta tuoi dati. Prima, in una conversazione nuova, partiva da solo.', segnalazione: 1312 },
+        { testo: 'Un comando con dentro una password o una chiave, come un curl o un git clone con un token, si ferma come un link con la stessa chiave.', segnalazione: 1312 },
+        { testo: 'Quando Filo vuole aprire una pagina presentandola come una ricerca, il riquadro mostra le parole cercate solo se la pagina è davvero quella ricerca. Altrimenti mostra l\'indirizzo che si aprirà.', segnalazione: 1312 },
+        { testo: 'Un\'immagine incollata in chat, i nomi di reti Wi-Fi e dispositivi Bluetooth e i nomi nuovi proposti per i tuoi file contano come testo scritto da altri: dopo averli letti Filo fa meno da solo.', segnalazione: 1312 },
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
       ],
     },
