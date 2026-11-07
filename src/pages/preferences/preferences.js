@@ -1826,6 +1826,7 @@
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
     disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaPreferitiBt(settings.bluetoothPreferiti);
     disegnaScorciatoie(settings.scorciatoie);
 
     Bootstrap.applyTheme(settings.theme);
