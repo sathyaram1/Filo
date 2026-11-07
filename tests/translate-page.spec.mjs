@@ -897,7 +897,8 @@ const COLLAPSED = `<!doctype html><html lang="en"><body style="font:16px sans-se
   </div>
 </body></html>`;
 
-test('solo quando apro: la sezione ripiegata che si apre DOPO si traduce dalla barra laterale, senza rifare il resto', async ({ app, openTab, testServer }) => {
+// #1290.2 — con «solo quando le apro» la sezione che l'utente apre si traduce da sola, senza un clic su Traduci.
+test('solo quando apro: la sezione ripiegata che si apre DOPO si traduce da sola, senza rifare il resto', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
   await soloQuandoApro(app);
@@ -908,23 +909,21 @@ test('solo quando apro: la sezione ripiegata che si apre DOPO si traduce dalla b
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
   await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
   const paidFirst = await blocksSent(app);
+  expect(await page.locator('#mtitle').textContent()).toBe('The headline hidden inside the folded section');
+  const avvisiPrima = (await toasts(page)).length;
 
-  // L'utente apre la fisarmonica: dentro è tutto in lingua originale.
+  // L'utente apre la fisarmonica: entro i 2 s promessi dalle Preferenze è in italiano, senza toccare altro.
   await page.locator('#toggle').click();
-  await expect(page.locator('#mtitle')).toHaveText('The headline hidden inside the folded section');
-
-  // L'icona se ne accorge e offre di tradurre quello, non di buttare via tutto.
-  const icon = await iconaTraduci(app);
-  await expect(icon).toHaveAttribute('aria-label', 'Traduci il testo nuovo');
-  await icon.click();
-
-  await expect(page.locator('#mtitle')).toHaveText(/^IT /, { timeout: 60000 });
-  await expect(page.locator('#mbody')).toHaveText(/^IT /, { timeout: 60000 });
+  await expect(page.locator('#mtitle')).toHaveText(/^IT /, { timeout: 4000 });
+  await expect(page.locator('#mbody')).toHaveText(/^IT /, { timeout: 4000 });
   // Al modello sono andati SOLO i due blocchi scoperti adesso.
   expect(await blocksSent(app) - paidFirst).toBe(2);
   const doubled = await page.evaluate(() => Array.from(document.querySelectorAll('[data-sn-translated="1"]'))
     .filter((el) => /^IT\s+IT\s/.test(el.textContent || '')).length);
   expect(doubled).toBe(0);
+  // Fatto da sola, senza un avviso a ogni sezione aperta: l'icona torna all'originale.
+  expect((await toasts(page)).slice(avvisiPrima)).toEqual([]);
+  await expect(await iconaTraduci(app)).toHaveAttribute('aria-label', 'Mostra originale');
 });
 
 // #505 — il sito sceglie COME ripiegare una sezione, e quella scelta non deve
