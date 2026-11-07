@@ -33,6 +33,13 @@
     return { id, titolo, url, icona };
   }
 
+  // Le schede di un messaggio come si salvano col filo (home e righe delle app): ripulite, al più MASSIMO, senza le
+  // icone grosse. Un solo posto per tutte le strade che scrivono un messaggio su disco.
+  function perIlDisco(lista) {
+    return (Array.isArray(lista) ? lista : []).slice(0, MASSIMO).map(normalizza).filter(Boolean)
+      .map((s) => (s.icona.length > 16384 ? { ...s, icona: '' } : s));
+  }
+
   function etichetta(s) {
     const t = testo(s && s.titolo, 300) || sitoDi(s && s.url) || '';
     return t.length > LUNGO ? `${t.slice(0, LUNGO - 1).trimEnd()}…` : t;
