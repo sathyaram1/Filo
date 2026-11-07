@@ -35,6 +35,8 @@ function tipoImmagine(buf) {
   if (RADICE_SVG.test(buf.toString('utf8', 0, Math.min(buf.length, 8192)))) return 'image/svg+xml';
   return '';
 }
+// Tutti i tipi che tipoImmagine può dare: chi accetta le icone delle schede (il gettone, #2085) si confronta con questi.
+const TIPI = [...new Set([...FIRME.map(([, t]) => t), 'image/webp', 'image/avif', 'image/svg+xml'])];
 
 function bytesDaDataUrl(url) {
   const m = /^data:([^,]*),([\s\S]*)$/i.exec(String(url || ''));
