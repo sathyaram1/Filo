@@ -277,6 +277,11 @@ export function guardiaCartella(cartella) {
       writeFileSync(f, Buffer.from(testo));
       attesa.set(nome, { b: Buffer.from(testo), t: statSync(f).mtime });
     },
+    // Il testo che la voce deve avere, non quello sul disco: chi riscrive mentre gli agenti lavorano parte da qui.
+    leggi(nome) {
+      const a = attesa.get(nome);
+      return a && a.b !== NON_FILE ? a.b.toString('utf8') : null;
+    },
     // Anche la sola data conta: chi legge la cartella può fidarsi di quando un file è cambiato.
     controlla() {
       const ora = fotografia(cartella);
