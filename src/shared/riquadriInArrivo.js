@@ -117,11 +117,10 @@
     return !!(altro && altro !== API && typeof altro.inArrivo === 'function' && altro.inArrivo(f));
   }
 
-  // Il riquadro ha finito di caricarsi (immagini e script compresi) dall'ultima volta che è entrato nella pagina. null se
-  // da qui non si sa: in una radice ombra il load non arriva al documento, e un documento più sotto ha il suo Filo.
+  // Il riquadro ha finito di caricarsi (immagini e script compresi) dall'ultima volta che è entrato nella pagina; dentro
+  // un componente lo sa da quando l'ha detto lui. null se da qui non si sa: un documento più sotto ha il suo Filo.
   function caricato(f) {
     if (!stato || !eRiquadro(f) || f.ownerDocument !== stato.doc) return null;
-    try { if (f.getRootNode() !== stato.doc) return null; } catch (_) { return null; }
     return stato.caricati.has(f);
   }
 
