@@ -23,6 +23,7 @@ const N = () => {
 // Uguali a quelle della regola (la sentinella le confronta): servono anche senza caricarla.
 export const FILE_NOVITA = 'src/shared/patchNotes.js';
 export const CAMPO = 'prossimaVersione';
+export const BASTA_SPOSTARE = Object.freeze(['verde', 'rosso_anche_su_main']);
 
 export const prossimaVersione = (manifesto) => N().prossimaVersione(manifesto);
 /** I blocchi del registro scritto in `src`, letti come dati senza eseguirlo. Lancia se il testo non è un registro. */
