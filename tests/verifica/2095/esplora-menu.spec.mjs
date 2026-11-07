@@ -3,6 +3,11 @@ import { test, expect } from '../../fixtures/electron.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
 
 async function prova(page, nome) {
+  await page.evaluate(() => {
+    const r = document.createRange();
+    r.selectNodeContents(document.querySelector('#bersaglio'));
+    const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
+  });
   await page.locator('#bersaglio').click({ button: 'right' });
   const m = menuDi(page);
   await expect(m.locator('.sn-menu').first()).toBeVisible();
