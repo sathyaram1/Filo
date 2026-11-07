@@ -1040,6 +1040,22 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
+  // #2096 — una domanda scritta dal tasto destro di una pagina di Filo (una voce delle impostazioni): «Spiega cosa fa»
+  // la manda, «Chiedi a Filo» la lascia nella casella da finire. Sui siti l'Aiuto sta nello strato: lì non serve.
+  function chiediDaPagina(testo, { invia = false } = {}) {
+    const t = String(testo || '').trim();
+    if (!t || nelloStrato) return false;
+    apri({ source: 'menu' });
+    const ta = root && root.querySelector('.sn-sidebar-input textarea');
+    if (!ta) return false;
+    if (invia) { submit({ userMessage: t }); return true; }
+    ta.value = `${t} `;
+    try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    ta.focus();
+    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
+    return true;
+  }
+
   // I tasti dei messaggi, una volta per conversazione a schermo: Rispondi cita nella casella dell'Aiuto.
   const azioniConv = new WeakMap();
   function azioniSu(conv) {
