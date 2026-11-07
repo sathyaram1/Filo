@@ -38,7 +38,7 @@ quelli che servono li metti tu nell'ordine.
 
 ## Cosa puoi, e cosa no
 
-Puoi, da solo: scrivere l'**ordine** e il **parallelismo N** (il server accende una sessione per feedback
+Puoi, da solo: scrivere l'**ordine** e il **parallelismo N** (il server accende una sessione per lavoro
 nell'ordine, fino a N); cambiare le **priorità** (0, 1, 2; creare una 3, mai abbassarla); comporre **pacchetti** e
 mettere **attese** fra feedback; aprire feedback e domande, archiviare doppioni, mettere note; **sbloccare** un lavoro
 fermo per guasto; **spegnere e riaccendere** un account o le routine e scegliere quale account usare prima; fare
