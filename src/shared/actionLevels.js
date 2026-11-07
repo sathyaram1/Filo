@@ -87,7 +87,6 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-PLACEHOLDER_DA_TOGLIERE('\\$&')}(?![\\w-])`, 'i').test(testo)) return true;
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati. Contano in ogni uscita: l'elenco chiesto, i candidati di un
   // nome non trovato o ambiguo, il nome vero trovato da quello detto (`_nomeTrovato`, lo scrive il main).
