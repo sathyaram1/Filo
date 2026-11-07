@@ -477,3 +477,42 @@ test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non
   assert.match(spec, /censimento delle schede parte da lui/);
   assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
 });
+
+// Il 06/11 la rosa scritta solo al mattino si è svuotata a metà giornata: quattordici ore di quota ferma (#2261).
+test('battiti e sveglie riempiono la rosa quando l\'ordine non ha lavori pronti e la spesa lo consente, non a secco (#2261)', () => {
+  const piatto = (t) => t.replace(/\s+/g, ' ');
+  const ritmo = piatto(RUOLO.slice(RUOLO.indexOf('## Il ritmo'), RUOLO.indexOf('## La sessione accesa dal pacemaker')));
+  const regola = ritmo.slice(ritmo.indexOf('**La rosa si riempie anche di giorno.**'));
+  assert.ok(ritmo.includes('**La rosa si riempie anche di giorno.**'), 'la regola sta nel ritmo, fuori dalla voce del mattino');
+  assert.match(regola, /A ogni battito e sveglia/);
+  assert.match(regola, /nell'ordine non resta un lavoro che possa partire adesso \(vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner\)/);
+  // Il conto è unico come al mattino: con «prima B, poi A» la condizione su ogni account lascerebbe la rosa vuota.
+  assert.match(regola, /spesa delle ultime 24 ore, sommata sugli account .*sotto il ritmo sostenibile fino ai rinnovi/);
+  assert.doesNotMatch(regola, /(ultime 24 ore|ultimo giorno) di ogni account/);
+  assert.match(regola, /riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole/);
+  for (const r of ['decisione incrementale', 'scala delle classi', 'classe ereditata da chi blocca', 'incroci coi rami vivi', 'riscrivi l\'ordine', 'taccuino', 'recap del giorno dopo']) {
+    assert.ok(regola.includes(r), r);
+  }
+  assert.match(regola, /In una giornata a secco no\./);
+  const spec = piatto(readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'));
+  const quattro = spec.slice(spec.indexOf('## 4. Ritmo'), spec.indexOf('## 5.'));
+  assert.match(quattro, /\*\*La rosa si riempie anche di giorno\.\*\* A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire adesso/);
+  assert.match(quattro, /dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del mattino e riscrive l'ordine/);
+  assert.doesNotMatch(quattro, /ultimo giorno di ogni account/);
+  assert.match(quattro, /Non in una giornata a secco\./);
+});
+
+// Il segno lo mette il server alla consegna design + locale: aspettarlo dall'owner tiene fuori un fidato per giorni (#2261).
+test('un fidato che tocca il server entra nell\'ordine senza il segno, e il segno non è una cosa dell\'owner (#2261)', () => {
+  const ordine = RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')).replace(/\s+/g, ' ');
+  const regola = ordine.slice(ordine.indexOf('**Il segno «lavoro server» non serve per entrare.**'));
+  assert.ok(ordine.includes('**Il segno «lavoro server» non serve per entrare.**'), 'la regola sta fra quelle dell\'ordine');
+  assert.match(regola, /Un feedback fidato che secondo te tocca il server entra nell'ordine anche senza il segno/);
+  assert.match(regola, /consegna `design --reason locale`, e il server gli mette il segno da sé e lo passa ai lavori server/);
+  assert.match(regola, /non va fra le sue cose da fare, né nel recap né nelle domande/);
+  assert.match(regola, /«Segna fidato» per i non fidati/);
+  assert.match(regola, /sbagliato lo scrivi nel recap come informazione/);
+  const piatto = RUOLO.replace(/\s+/g, ' ');
+  assert.doesNotMatch(piatto, /(chiedi|chiedere|domanda)[^.]*all'owner[^.]*segno «lavoro server»/);
+  assert.doesNotMatch(piatto, /segno «lavoro server»[^.]*(lo mette|lo chiedi a|aspetta) l'owner/);
+});

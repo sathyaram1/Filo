@@ -65,6 +65,14 @@ A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi a
 ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
 ipotesi, prossimo controllo e quando.
 
+**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire
+adesso (vuoto, o solo lavori fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa delle ultime 24
+ore, sommata sugli account (`spesa`), sta sotto il ritmo sostenibile fino ai rinnovi (il conto unico «sostenibile fino
+ai rinnovi ≈ … $/giorno» del mattino: con «prima B, poi A» un account sopra il suo ritmo non ferma l'altro), riporta le priorità 2 all'obiettivo del mattino con le sue stesse regole
+(decisione incrementale, scala delle classi, classe ereditata da chi blocca, incroci coi rami vivi) e riscrivi
+l'ordine. Lo annoti nel taccuino, e il recap del giorno dopo lo racconta. Una rosa vuota a metà giornata con la quota
+che avanza sono ore di lavoro perse fino al rinnovo (06/11: quattordici). In una giornata a secco no.
+
 ## La sessione accesa dal pacemaker
 
 Il pacemaker accende una sessione per te al mattino, al battito, a un segnale o alla sveglia che hai chiesto; il
@@ -121,7 +129,12 @@ Gestione → Automazioni.
    (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
 5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
-6. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
+6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
+   nell'ordine anche senza il segno: il primo giro, quando lo scopre, consegna `design --reason locale`, e il server gli
+   mette il segno da sé e lo passa ai lavori server dal suo ramo. Costa quel giro, non un giorno fuori dall'ordine. Il
+   segno quindi non aspetta l'owner: non va fra le sue cose da fare, né nel recap né nelle domande (a lui resta solo
+   «Segna fidato» per i non fidati). Un segno che ti sembra sbagliato lo scrivi nel recap come informazione.
+7. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
    non c'è più. Usa prima B, poi A: non c'è riserva su A, perché anche a quote finite Filo resta usabile coi crediti
    API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%). La spesa
    della settimana nel contesto (o `spesa`) dà per account dollari e percentuale, quanto resta, le ultime 24 ore, le

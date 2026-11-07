@@ -106,6 +106,16 @@ la memoria nel taccuino (§ 5). Si accende:
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
 
+**La rosa si riempie anche di giorno.** A ogni battito e sveglia, se
+nell'ordine non resta un lavoro che possa partire adesso (vuoto, o solo lavori
+fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa
+dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino
+ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del
+mattino e riscrive l'ordine; lo annota nel taccuino, e il recap del giorno
+dopo lo racconta. Non in una giornata a secco. Il 06/11 la rosa del mattino si
+è svuotata a metà giornata, nessun battito l'ha riempita e le quote sono
+rimaste ferme per quattordici ore circa.
+
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
 **Cache.** Il manutentore vuole la cache a **un'ora**: il battito ogni 55
