@@ -1042,6 +1042,7 @@
       else if (chiuso && !el.shadowRoot) unreachable++;
       pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null, sezione);
     }
+    for (const s of chiusiInSezione) if (sezioniConTesto.has(s)) unreachable++;
     let posto = maxBlocks;
     const prendi = (da, a) => {
       for (const x of da) {
