@@ -2550,6 +2550,20 @@
       const span = e.target.closest('.dk-prose-card');
       if (span) resolveProseCard(span);
     });
+    // #2096 — Copia e Rispondi al passaggio del mouse sotto domande e risposte, come nella home; anche dal tasto destro.
+    const A = window.SN_AZIONI_MESSAGGIO;
+    if (A) {
+      const azioniChat = A.attacca(log, {
+        messaggio: '.dk-msg-user, .dk-msg-bot',
+        testo: (el) => (el.classList.contains('dk-msg-user') ? el.textContent : (el.querySelector('.dk-msg-text:not(.dk-msg-pending)')?.textContent || '')),
+        ruolo: (el) => (el.classList.contains('dk-msg-user') ? 'user' : 'filo'),
+        rispondi: (_el, testo) => A.citaNelCampo($('chatInput'), testo),
+      });
+      const vociMessaggio = (target) => azioniChat.voci(target)
+        .map((v) => ({ type: 'item', icon: window.SN_ICONS?.[v.icona]?.(16) || '', label: v.label, onClick: () => { v.fai(); } }));
+      window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
+      if (!window.SN_VOCI_PAGINA.includes(vociMessaggio)) window.SN_VOCI_PAGINA.push(vociMessaggio);
+    }
     // Tasto destro su un risultato o su un nome citato (§8.3): le stesse azioni della carta, compreso il commander.
     log.addEventListener('contextmenu', async (e) => {
       const sum = e.target.closest('[data-toggle-list]');
