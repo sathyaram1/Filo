@@ -280,6 +280,18 @@ test('contesto piccolo: con 800 schede porta solo le 3, le 2 e le ferme, i segna
   assert.doesNotMatch(p.testo, /worker\/y/, 'solo i rami dei lavori della rosa e delle 3');
 });
 
+test('la scheda del server dice perché un lavoro non parte: resta locale coi motivi e l’ora, attesa del server, domande (#2258)', () => {
+  const ferma = schedaServer(1160, 1, { lavoroServer: true, restaLocale: { motivi: ['ramo non pulito', 'contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-07T10:26:00Z') } });
+  assert.match(M.rigaSchedaServer(ferma), /^#1160 · p1 · todo · RESTA LOCALE \(ramo non pulito; contenuto scritto da un biglietto sporco; visto 2026-11-07 10:26\) · lavoro server/);
+  assert.match(M.rigaSchedaServer(schedaServer(1140, 1, { stato: 'revision_security', attesa: 'suite_server' })), / · aspetta il server \(suite_server\)/);
+  assert.match(M.rigaSchedaServer(schedaServer(1384, 1, { domandeBloccanti: ['D-12'] })), / · fermo sulle domande D-12/);
+  assert.doesNotMatch(M.rigaSchedaServer(schedaServer(1405, 1)), /RESTA LOCALE|aspetta il server|fermo sulle/);
+  // Nel contesto piccolo come le ferme per guasto: a priorità 1 o 0 la sveglia non la vedrebbe.
+  const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: [ferma, schedaServer(1405, 1)] });
+  assert.match(p.testo, /^#1160 · p1 · todo · RESTA LOCALE/m);
+  assert.doesNotMatch(p.testo, /^#1405 /m);
+});
+
 test('contesto piccolo oltre il tetto: rifiutato col numero, non tagliato', () => {
   const tutte2 = ottocento().map((s) => ({ ...s, priorita: 2, titolo: s.titolo.repeat(3) }));
   const p = M.testoPiccolo({ ruolo: RUOLO, stato: STATO, taccuino: { testo: '', versione: 0 }, schede: tutte2 });
