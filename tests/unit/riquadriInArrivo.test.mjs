@@ -142,8 +142,40 @@ test('#1290.2 — un riquadro è caricato solo dopo il suo load sul documento; r
   win.document.finito(f);
   win.rimesso({ nodeType: 1, firstElementChild: {}, getElementsByTagName: () => [f] });
   assert.equal(R.caricato(f), false, 'rimesso dentro un contenitore');
-  assert.equal(R.caricato(riquadro(win, { src: '/x', ombra: true })), null, 'in una radice ombra il load non arriva: non si sa');
   assert.equal(carica().caricato(f), null, 'senza il conto dei load non si sa');
+});
+
+test('#1290.2 — un riquadro dentro un componente aperto è caricato quando lo dice lui; un messaggio d\'altri non conta', () => {
+  const R = carica();
+  const win = finestraFinta();
+  R.osserva(win);
+  const finestraPost = { nome: 'post' };
+  const f = riquadro(win, { src: 'https://altro.example/post', ombra: true, figlio: finestraPost });
+  // Il componente aperto che lo contiene, come lo vede chi cammina nella pagina.
+  const radice = { querySelectorAll: () => [f] };
+  win.document.querySelectorAll = (sel) => (sel === '*' ? [{ shadowRoot: radice }] : []);
+  const messaggi = win.__ascolti = [];
+  assert.equal(R.caricato(f), false, 'il load nel componente non arriva al documento: finché non parla, non è caricato');
+  const parla = (data, source) => { for (const fn of messaggi) fn({ data, source }); };
+  for (const a of win.ascoltiFinestra()) if (a.tipo === 'message') messaggi.push(a.fn);
+  parla({ filoRiquadroCaricato: 1 }, { nome: 'un altro' });
+  assert.equal(R.caricato(f), false, 'una finestra che non è la sua non lo dichiara caricato');
+  parla({ filoRiquadroCaricato: 1 }, finestraPost);
+  assert.equal(R.caricato(f), true);
+});
+
+test('#1290.2 — un riquadro, finito di caricarsi, lo dice a chi lo ospita', () => {
+  const R = carica();
+  const inviati = [];
+  const ascolti = [];
+  const doc = { URL: 'https://altro.example/post', baseURI: 'https://altro.example/post', addEventListener() {} };
+  R.osserva({
+    document: doc, parent: { postMessage: (m) => inviati.push(m) },
+    addEventListener(tipo, fn, cattura) { ascolti.push({ tipo, fn, cattura }); },
+    MutationObserver: class { observe() {} },
+  });
+  for (const a of ascolti) if (a.tipo === 'load' && !a.cattura) a.fn({ target: doc });
+  assert.deepEqual(inviati, [{ filoRiquadroCaricato: 1 }]);
 });
 
 test('in una radice ombra il load non si vede: si fa come prima, e lo dice', () => {
