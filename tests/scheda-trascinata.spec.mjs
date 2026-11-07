@@ -487,7 +487,8 @@ test('#2085 nell\'Aiuto la pagina di una scheda lasciata resta nella conversazio
   await aiutoFinto(app);
   await chiediAllAiuto(aiuto, 'come ha fatto a volare?');
   await expect.poll(() => app.evaluate(() => (globalThis.__visti || []).length), { timeout: 15_000 }).toBeGreaterThan(0);
-  await expect(aiuto.getByText('Con un razzo.').first()).toBeVisible({ timeout: 15_000 });
+  await expect(aiuto.locator('.sn-sidebar-msg-user .sn-bolla-gettone')).toHaveCount(1, { timeout: 15_000 });
+  await aiuto.waitForTimeout(2000);
   const prima = await app.evaluate(() => globalThis.__visti.length);
   await chiediAllAiuto(aiuto, 'e chi la ha lanciata?');
   await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 15_000 }).toBeGreaterThan(prima);
