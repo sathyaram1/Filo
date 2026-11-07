@@ -131,11 +131,11 @@ export function testoProva(prova) {
     }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
     case 'rosso_anche_su_main':
-      return `▸ Unit ${dove}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo${p.contenuto ? '.' : ': si fonde.'}`;
+      return `▸ Unit ${quali}${dove}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo${p.contenuto ? '.' : ': si fonde.'}`;
     case 'rosso_sulla_fusione': {
       const rossi = Array.isArray(p.rossi) ? p.rossi : [];
       return [
-        `✗ Unit ${dove}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
+        `✗ Unit ${quali}${dove}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
         ...(rossi.length ? rossi.map((r) => `    ✖ ${r}`) : ['    (nessun test rosso registrato: la causa è nell\'uscita qui sotto)']),
         ...(p.coda ? [`  Ultime righe dell'uscita ${p.contenuto ? 'sul ramo' : 'sulla fusione'}:`, ...String(p.coda).split('\n').map((r) => `    ${r}`)] : []),
       ].join('\n');
