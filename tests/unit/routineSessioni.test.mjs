@@ -150,6 +150,27 @@ test('pause lunghe: domani, o la data; scadute o sporche non diventano una riga'
   assert.match(RS.pausaInParole('La routine server (account B)', { finoMs: ORA + ORE, perche: 'http_429', account: 'B', oggi: 4 }, ORA).dettaglio, /oggi su quell'account: 4/);
 });
 
+test('gli unit su Windows al cancello (#2225): tre scelte, i toccati senza il campo, e il workflow le capisce tutte', async () => {
+  assert.ok(RS.CHIAVI.includes('unitWindows'), 'il main la inoltra e la rilegge');
+  assert.deepEqual([...RS.UNIT_WINDOWS], ['toccati', 'tutti', 'spento']);
+  for (const m of RS.UNIT_WINDOWS) {
+    assert.equal(RS.leggiDoc({ unitWindows: m }).unitWindows, m);
+    assert.deepEqual(RS.valida({ unitWindows: m }), { ok: true, valori: { unitWindows: m } });
+  }
+  for (const storto of ['', 'TUTTI', 'tutti ', 1, true, '<b>spento</b>']) {
+    assert.equal(RS.leggiDoc({ unitWindows: storto }).unitWindows, 'toccati', String(storto));
+    const r = RS.valida({ unitWindows: storto });
+    assert.equal(r.ok, false, String(storto));
+    assert.match(r.testo, /^Unit su Windows: vale «toccati», «tutti», «spento»\. Non salvato\.$/);
+  }
+  const { readFileSync } = await import('node:fs');
+  const wf = readFileSync(new URL('../../.github/workflows/unit-fusione.yml', import.meta.url), 'utf8');
+  assert.match(wf, /if: github\.event\.client_payload\.windows != 'spento'/, '«spento» toglie la parte Windows');
+  const { modoUnit } = await import('../../scripts/unit-fusione-azione.mjs');
+  assert.equal(modoUnit('tutti'), 'tutti');
+  assert.equal(modoUnit('toccati'), 'toccati');
+});
+
 test('la routine riservati (#2069): spenta solo con un vero booleano, e un tetto intero da 1 al massimo', () => {
   assert.ok(RS.CHIAVI.includes('riservatiOff') && RS.CHIAVI.includes('riservatiTetto'), 'il main li inoltra e li rilegge');
   assert.ok(!RS.CHIAVI.some((k) => /reteAperta/.test(k)), 'la rete aperta non ha più posto in Gestione');
