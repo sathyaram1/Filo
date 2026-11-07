@@ -384,7 +384,7 @@ test.describe('utente già accolto', () => {
     if (await bottone.isVisible()) await bottone.click();
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
     expect((await confirmState(page)).hasInput).toBe(true);
-    await expect(page.locator(CONFIRM_HOST)).toContainText('interviste di benvenuto');
+    expect(await confirmText(page)).toContain('interviste di benvenuto');
     await clickConfirm(page, 'cancel');
     await expect(prefs.locator('.onb-conv')).toHaveCount(3);
 
