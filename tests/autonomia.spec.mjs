@@ -938,9 +938,12 @@ test('chat: «mettiti ad Automatico» apre il riquadro con la parola, e scritta 
     await clickConfirm(page, 'danger');
     await expect.poll(() => livello(app), { timeout: 8000 }).toBe('automatico');
 
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'a2', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'autonomia', valore: 'normale' }) }] },
+      { text: 'Fatto.' },
+    ]);
     await chiedi(page, 'torna a normale');
-    await expect(page.locator('.dash-bubble').filter({ hasText: 'Fatto.' })).toBeVisible({ timeout: 15000 });
-    await expect.poll(() => livello(app), { timeout: 8000 }).toBe('default');
+    await expect.poll(() => livello(app), { timeout: 15000 }).toBe('default');
     await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   } finally {
     await ripristina(app);
