@@ -82,7 +82,7 @@ test('un 3 vicino a cap3 finito non ferma; un v col ? non ferma e va da parte', 
   assert.equal(domanda.stop, false);
   assert.deepEqual(tag(domanda.fix), ['2i']);
   assert.deepEqual(tag(domanda.derived), ['3v?']);
-  assert.equal(domanda.derived[0].priority, 3);
+  assert.equal(domanda.derived[0].priority, 1, 'un vicino non è un\'emergenza: entra quando lo mette l\'ordine');
 });
 
 test('allo stop i vicini restano fra i sospesi, come gli interni', () => {
