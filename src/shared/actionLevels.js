@@ -1448,7 +1448,7 @@
       describe: (a) => {
         const Z = global.SN_ZOOM;
         const perc = Z ? Z.leggiPercentuale(a && (a.percentuale ?? a.percent ?? a.valore)) : null;
-        if (perc != null) return `Portare lo zoom della pagina al ${Math.round(perc)}%`;
+        if (perc != null) return `Portare lo zoom della pagina ${alPercento(Math.round(perc))}`;
         const verso = String((a && (a.verso ?? a.direzione ?? a.direction)) || '').trim().toLowerCase();
         if (verso === 'in') return 'Ingrandire la pagina di un passo';
         if (verso === 'out') return 'Rimpicciolire la pagina di un passo';
