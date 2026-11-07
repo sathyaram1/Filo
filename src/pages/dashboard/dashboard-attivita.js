@@ -404,6 +404,7 @@
         const gia = contaAzione(type, a, failed);
         const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
         const riga = makeActivityRow(rowIcon, text, cambi, title);
+        segnaSistema(riga, a);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
         if (gia && gia.prima === global.SN_ESITO.PROPOSTO && gia.voce.riga && gia.voce.riga.isConnected) gia.voce.riga.replaceWith(riga);
         else aggiungiEsito(seg, riga);
