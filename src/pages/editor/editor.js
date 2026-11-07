@@ -1245,6 +1245,7 @@
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
+    }
     document.body.appendChild(menu);
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = menu.offsetWidth, h = menu.offsetHeight;
