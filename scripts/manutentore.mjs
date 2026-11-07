@@ -898,7 +898,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   account <A|B> spento|acceso | account primo <A|B|alterna> | routine spente|accese
   recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
   novita | novita consegna <file.json> | chat [--stampa]
-  feedback "<titolo>" - [--priorita P]     (testo da stdin) | domanda <file.json> | domanda-fine <ruolo> - | --togli
+  feedback "<titolo>" - [--priorita P] [--server]   (testo da stdin; --server: il codice sta nel server) | domanda <file.json> | domanda-fine <ruolo> - | --togli
   registro [parole] | spesa
   transizione [--applica]                  (solo l'owner: le priorità 2 scendono a 1; senza --applica conta e basta)`;
 
