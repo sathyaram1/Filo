@@ -86,17 +86,28 @@
     return accorcia(testo || testoSenzaControlli(v.riga)) || v.percorso;
   }
 
-  // Una chiave non entra nel registro dei cambi: tolta, non si riavrà da nessun Annulla.
-  const segreto = (v) => /^apiKeys\./.test(v.percorso) || ((global.document.getElementById(v.id) || {}).type === 'password');
+  // Una voce segreta non entra nel registro dei cambi: tolta, non si riavrà da nessun Annulla. Quali lo sono lo dice il
+  // registro (src/shared/cambi.js).
+  const segreto = (v) => {
+    const c = global.SN_CAMBI && global.SN_CAMBI.voce(v.percorso);
+    return !!(c && c.segreto);
+  };
+  // Un campo dove l'utente scrive: una tendina o un pallino sono scelte, e tornano con Annulla.
+  const TIPI_NON_SCRITTI = new Set(['checkbox', 'radio', 'number', 'range', 'color', 'hidden']);
+  function scritto(v) {
+    const el = global.document.getElementById(v.id);
+    if (!el) return false;
+    return el.tagName === 'TEXTAREA' || (el.tagName === 'INPUT' && !TIPI_NON_SCRITTI.has(el.type));
+  }
 
   // Quello che l'utente ha scritto e che il valore di serie cancellerebbe: le voci di un elenco che spariscono, un
-  // testo (una chiave) che diventa un altro. Numeri e interruttori si rimettono senza chiedere: tornano con Annulla.
-  function cosaSiPerde(attuale, diSerie) {
+  // testo (una chiave) che diventa un altro. Scelte, numeri e interruttori si rimettono senza chiedere: tornano con Annulla.
+  function cosaSiPerde(attuale, diSerie, testoScritto) {
     if (Array.isArray(attuale)) {
       const resta = Array.isArray(diSerie) ? diSerie.map((x) => JSON.stringify(x)) : [];
       return attuale.filter((x) => !resta.includes(JSON.stringify(x)));
     }
-    if (typeof attuale === 'string' && attuale.trim() && attuale !== diSerie) return [attuale];
+    if (testoScritto && typeof attuale === 'string' && attuale.trim() && attuale !== diSerie) return [attuale];
     return [];
   }
 
