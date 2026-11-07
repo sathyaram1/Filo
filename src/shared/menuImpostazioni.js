@@ -42,12 +42,48 @@
     return null;
   }
 
-  // Il nome come lo legge l'utente: l'etichetta del controllo, o il titolo della sua riga.
+  // Il testo di un'etichetta senza i controlli che contiene: una tendina dentro la sua etichetta non vi aggiunge le scelte.
+  function testoSenzaControlli(el) {
+    if (!el) return '';
+    const copia = el.cloneNode(true);
+    copia.querySelectorAll('select, option, textarea, input, button, .sn-select').forEach((x) => x.remove());
+    return String(copia.textContent || '').replace(/\s+/g, ' ').trim();
+  }
+  // Un'etichetta che continua con la spiegazione («Siti fidati per i programmi, uno per riga. Da questi…») tiene il nome.
+  function accorcia(t) {
+    let s = String(t || '').split(/[.:;](?:\s|$)|\s\(/)[0].trim();
+    if (s.length > 60) s = s.split(/,\s/)[0].trim();
+    return s.length > 80 ? `${s.slice(0, 79)}…` : s;
+  }
+  const TITOLI = 'h1, h2, h3, h4, legend, .sn-info-box-title';
+  // Il titolo più vicino che sta prima del controllo: quello della sezione, o l'etichetta del campo accanto.
+  function titoloVicino(el) {
+    for (let n = el; n && n !== global.document.body; n = n.parentElement) {
+      for (let s = n.previousElementSibling; s; s = s.previousElementSibling) {
+        const t = s.matches(`${TITOLI}, label`) && !s.querySelector('input, select, textarea') ? testoSenzaControlli(s) : '';
+        if (t) return t;
+      }
+      if (n.tagName === 'SECTION') return '';
+    }
+    return '';
+  }
+  // Il nome come lo legge l'utente, nell'ordine in cui la pagina lo dà: chi lo nomina per id, l'etichetta del campo, il
+  // titolo sopra. Una scelta di un gruppo (un pallino) prende il nome del gruppo, non il suo.
   function nomeDi(v) {
     const doc = global.document;
-    const lab = doc.querySelector(`label[for="${CSS.escape(v.id)}"]`) || (doc.getElementById(v.id) || {}).closest?.('label');
-    const testo = String(((lab || v.riga) && (lab || v.riga).textContent) || '').replace(/\s+/g, ' ').trim();
-    return testo.length > 80 ? `${testo.slice(0, 79)}…` : testo || v.percorso;
+    const el = doc.getElementById(v.id);
+    const perId = (ids) => String(ids || '').split(/\s+/).map((id) => testoSenzaControlli(doc.getElementById(id))).filter(Boolean).join(' ');
+    let testo = '';
+    if (el) {
+      const gruppo = el.type === 'radio' ? el.closest('[role="radiogroup"], fieldset') : null;
+      if (gruppo) testo = perId(gruppo.getAttribute('aria-labelledby')) || titoloVicino(gruppo);
+      else {
+        const lab = doc.querySelector(`label[for="${CSS.escape(v.id)}"]`) || el.closest('label');
+        testo = perId(el.getAttribute('aria-labelledby')) || testoSenzaControlli(doc.getElementById(`${v.id}-label`))
+          || testoSenzaControlli(lab) || titoloVicino(el);
+      }
+    }
+    return accorcia(testo || testoSenzaControlli(v.riga)) || v.percorso;
   }
 
   // Una chiave non entra nel registro dei cambi: tolta, non si riavrà da nessun Annulla.
