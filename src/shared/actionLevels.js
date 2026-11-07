@@ -89,21 +89,6 @@
 
   function chiestaPreferenza(a, ctx) {
     const P = global.SN_PREF;
-    if (!P || !P.paroleDellaVoce || !P.buildPreferencePartial) return false;
-    const chiave = a.chiave ?? a.key ?? a.nome ?? a.name ?? a.preferenza;
-    const valore = a.valore ?? a.value ?? a.valoreNuovo ?? a.val;
-    const attuali = (ctx && ctx.impostazioni) || null;
-    // Un elenco porta il verso in `elenco.op`: «togli X» e «aggiungi X» hanno lo stesso `partial`.
-    const letto = (c) => {
-      const b = P.buildPreferencePartial(chiave, c, { attuali });
-      return b && !b.rifiuto && b.partial ? JSON.stringify([b.partial, b.elenco ? b.elenco.op : '']) : '';
-    };
-    const voluto = letto(valore);
-    if (!voluto) return false;
-    const stesso = (c) => letto(c) === voluto;
-    const altro = (c) => { const l = letto(c); return !!l && l !== voluto; };
-    const testo = richiestaDi(ctx);
-    // Un valore unico (una chiave di un servizio) scritto intero dall'utente basta da solo.
     const unico = typeof valore === 'string' ? valore.trim() : '';
     if (unico.length >= 8 && /\d/.test(unico) && /[a-z]/i.test(unico)
       && new RegExp(`(?<![\\w-])${unico.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i').test(testo)) return true;
