@@ -429,6 +429,7 @@
   }
 
   api.installa = installa;
+  api.ombra = (host, radice) => { if (host && radice) ombreProprie.set(host, radice); };
   // Quello che il fumetto direbbe su un pezzo ('' = niente): la spazzata degli hover mancanti lo chiede qui.
   api.testoPer = (el) => {
     const lab = el ? etichettaDi(catena(el)) : null;
