@@ -1,6 +1,6 @@
 # Mouse e tastiera veri sul display X (XTest): i trascinamenti fra viste li decide il sistema, e solo un gesto suo li
 # prova. Lo usa tests/helpers/gestiVeri.mjs; fuori da Linux con X non serve.
-#   gestiVeri.py trascina x1 y1 x2 y2     premi, scorri a piccoli passi, rilascia
+#   gestiVeri.py trascina x1 y1 x2 y2 [x3 y3 …]   premi, scorri a piccoli passi per ogni tappa, rilascia
 #   gestiVeri.py scrivi parola            lettere minuscole, una per tasto
 import ctypes, sys, time
 
