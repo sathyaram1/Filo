@@ -584,7 +584,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
-    return { ...d, mainSha, ...segno, ...toccati, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
+    return conNovita({ ...d, mainSha, ...segno, ...toccati, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) }, novita);
   } finally {
     const collegamento = togliCollegamento(join(base, 'node_modules'));
     const rimasti = [...alberi.map((dir) => chiudiAlbero(git, dir)), collegamento].filter((r) => !r.ok);
