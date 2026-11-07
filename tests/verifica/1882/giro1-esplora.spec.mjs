@@ -26,10 +26,19 @@ test('sito appena aperto: cosa resta su richiesta dopo il primo tasto destro, e 
   const dopoCampo = await inAttesa(page);
   await page.keyboard.press('Escape');
   console.log('PRONTA', pronta.join(','), '\nDOPO MENU', dopoMenu.join(','), '\nDOPO CAMPO', dopoCampo.join(','));
-  await page.locator('#p').click({ button: 'right' });
-  await expect(menu.principale).toBeVisible({ timeout: 8_000 });
-  await menu.voce('QR code della pagina').first().click();
-  await expect(page.locator('.sn-qr-card')).toBeVisible({ timeout: 8_000 });
+  test.info().annotations.push({ type: 'pronta', description: pronta.join(',') }, { type: 'dopoMenu', description: dopoMenu.join(',') }, { type: 'dopoCampo', description: dopoCampo.join(',') });
+  expect(pronta.join(',') + ' | ' + dopoMenu.join(',') + ' | ' + dopoCampo.join(',')).toBe('LOG');
+});
+
+test('sito appena aperto: il QR dalla barra alla prima richiesta', async ({ app, openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, '<!doctype html><body style="padding:40px"><p id="p">Una pagina.</p></body>');
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  expect(await inAttesa(page)).toContain('SN_QR');
+  const barra = await barraPage(app);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  await barra.locator('#nav .ico[data-id="qrCode"]:not(.riserva)').click();
+  await expect(page.locator('.sn-qr-overlay img')).toBeVisible({ timeout: 8_000 });
   expect(await inAttesa(page)).not.toContain('SN_QR');
 });
 
