@@ -975,13 +975,6 @@ function interpretaBtElenco(u, piattaforma) {
   return { ok: true, acceso: bit(u.primo('acceso')), dispositivi: valide };
 }
 
-function normalizzaIndirizzo(ind, piattaforma) {
-  const s = String(ind || '').trim();
-  if (piattaforma === 'linux') return s.toUpperCase();
-  if (piattaforma === 'darwin') return s.toLowerCase().replace(/:/g, '-');
-  return s.toLowerCase();
-}
-
 function interpretaBtCollega(u, piattaforma, collega) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
