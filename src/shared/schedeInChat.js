@@ -320,6 +320,25 @@
     }
   }
 
-  global.SN_SCHEDE_IN_CHAT = { normalizza, etichetta, gettone, pezzi, allinea, campo, nellaBolla, MASSIMO, RE };
+  // Le azioni di un gettone, chieste al main (GETTONE_SCHEDA): la carta va messa nella finestra, e la scheda la conosce lui.
+  function azioni(extra = {}) {
+    const manda = (m) => {
+      try {
+        const rt = global.chrome && global.chrome.runtime;
+        const tipo = (global.SN_MSG && global.SN_MSG.MSG && global.SN_MSG.MSG.GETTONE_SCHEDA) || 'gettone_scheda';
+        const p = rt && rt.sendMessage({ type: tipo, ...m });
+        if (p && typeof p.catch === 'function') p.catch(() => {});
+      } catch (_) {}
+    };
+    const rect = (r) => (r ? { x: Math.round(r.left), y: Math.round(r.top), w: Math.round(r.width), h: Math.round(r.height) } : null);
+    return {
+      anteprima: (s, r) => manda({ op: 'anteprima', scheda: s, rect: rect(r) }),
+      nascondi: () => manda({ op: 'nascondi' }),
+      apri: (s) => manda({ op: 'apri', scheda: s }),
+      ...extra,
+    };
+  }
+
+  global.SN_SCHEDE_IN_CHAT = { normalizza, etichetta, gettone, pezzi, allinea, campo, nellaBolla, azioni, MASSIMO, RE };
   if (typeof module !== 'undefined' && module.exports) module.exports = global.SN_SCHEDE_IN_CHAT;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
