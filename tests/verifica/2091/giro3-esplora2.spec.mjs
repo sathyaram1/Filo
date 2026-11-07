@@ -3,7 +3,20 @@
 import { execFileSync } from 'node:child_process';
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home, modelloFinto, chiamateAlModello } from '../../helpers/chatFinta.mjs';
-import { disponibili, finestraASchermo, sulloSchermo, trascina } from '../../helpers/gestiVeri.mjs';
+import { disponibili, finestraASchermo, trascina } from '../../helpers/gestiVeri.mjs';
+
+// Come quello del repo, ma con la scheda ATTIVA: con due home quello prende la prima, nascosta, a 0,0.
+async function sulloSchermo(app, _scheda, doc, sel) {
+  const r = await doc.locator(sel).first().boundingBox();
+  const o = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const cb = w.getContentBounds();
+    const tm = w._filoTabs;
+    const vb = tm.tabs.find((x) => x.id === tm.activeId).view.getBounds();
+    return { x: cb.x + vb.x, y: cb.y + vb.y };
+  });
+  return { x: Math.round(o.x + r.x + r.width / 2), y: Math.round(o.y + r.y + r.height / 2) };
+}
 
 const OUT = 'tests/.shots/2091-g3';
 const PY = '/tmp/claude-0/-home-user-Filo/8a9d76c9-1b32-50cd-8685-9b03c0a70f7b/scratchpad/gesti.py';
