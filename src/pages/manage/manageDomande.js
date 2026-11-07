@@ -377,7 +377,7 @@
     const bl = blocchi(scheda);
     const firma = JSON.stringify([scheda, aperta && aperta.ids, [...scelte],
       bl.map((b) => [b.priorita, b.gruppo, b.domande.map((d) => [d.id, d.titolo, d.stato, d.modificataIl, d.illeggibile, d.fiducia,
-        d.priorita, d.blocca, d.legata, lavoroFermo(d), principioUsato(d), sceltaFatta(d)])])]);
+        d.priorita, d.blocca, d.legata, lavoroFermo(d), principioUsato(d), sceltaFatta(d), tipoDi(d)])])]);
     if (firma === firmaLista && !lista.hidden) return;
     firmaLista = firma;
     const nuove = [];
