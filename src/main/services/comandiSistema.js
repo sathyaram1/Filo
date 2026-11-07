@@ -981,6 +981,7 @@ const IMPOSTAZIONI = {
   'mac-bluetooth': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Bluetooth',
   'mac-wifi': 'x-apple.systempreferences:com.apple.wifi-settings-extension',
   'mac-registrazione-schermo': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
+  'mac-automazione': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation',
 };
 
 function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
@@ -1348,9 +1349,15 @@ async function wifi(q) {
 }
 
 // La porta unica dei due cammini (chat e tasti): stessa richiesta, stesso risultato.
+// Ogni comando (non le letture degli elenchi) entra nel filo da qui, da qualunque strada arrivi (#1561).
+function nelFilo(richiesta, r) {
+  try { require('./accaduti').comandoSistema(richiesta, r); } catch (_) {}
+  return r;
+}
+
 function comanda(richiesta) {
   const q = normalizzaRichiesta(richiesta);
-  if (q.errore) return Promise.resolve({ ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore });
+  if (q.errore) return Promise.resolve(nelFilo(richiesta, { ok: false, cosa: String((richiesta && richiesta.cosa) || ''), errore: 'richiesta', frase: q.errore }));
   const esegui = async () => {
     try {
       // Una prova che si è dimenticata il computer finto non cambia il volume o la rete di chi la lancia.
@@ -1364,7 +1371,7 @@ function comanda(richiesta) {
       return fallito('sconosciuto', q);
     }
   };
-  return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui);
+  return q.elenca ? inLettura(q.cosa, esegui) : inFila(esegui).then((r) => nelFilo(q, r));
 }
 
 // Il nome vero di una rete o di un dispositivo detto a parole, letto prima di chiedere conferma: { nome, gia } se ce
@@ -1404,5 +1411,5 @@ module.exports = {
   costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
   interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
   campiNmcli, erroreWlan,
-  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO },
+  _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, psCompila },
 };

@@ -1,19 +1,8 @@
-// #252 — Dopo "Salva per dopo" la conferma deve essere CLICCABILE e portare alla
-// lista "Aperti per dopo", con la scheda appena salvata evidenziata.
-//
-// Prima: "Salva per dopo" mostrava un toast muto e chiudeva la scheda quasi
-// subito; chi salvava la prima volta non scopriva mai dove fosse finita la
-// pagina. Ora la conferma è un riquadro cliccabile che apre la lista con la
-// scheda evidenziata.
-//
-// Assert di SUCCESSO (rosso senza il fix):
-//   1. dopo il salvataggio compare un riquadro di conferma CLICCABILE con la
-//      call-to-action per aprire la lista (senza il fix è un toast non cliccabile);
-//   2. cliccandolo si apre davvero "Aperti per dopo" con ?highlight=<id> nell'URL;
-//   3. nella lista la scheda salvata è quella evidenziata (data-highlighted).
+// #252 — la conferma di «Salva per dopo» (premuto nella barra laterale) è CLICCABILE e apre la lista «Aperti per
+// dopo» con la scheda appena salvata evidenziata: prima era un toast muto, e chi salvava non sapeva dove cercarla.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 test('la conferma di "Salva per dopo" è cliccabile e apre la lista con la scheda evidenziata', async ({ app, openTab, testServer }) => {
   const pageUrl = testServer.html(
@@ -28,11 +17,7 @@ test('la conferma di "Salva per dopo" è cliccabile e apre la lista con la sched
     { timeout: 8000 },
   );
 
-  // Apri il menu tasto destro e clicca "Salva per dopo".
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(btn).toBeVisible();
-  await btn.click();
+  await premiNellaBarra(app, 'saveForLater');
 
   // 1) Compare la conferma CLICCABILE con la call-to-action.
   const pill = page.locator('.sn-save-confirm');

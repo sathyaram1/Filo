@@ -106,51 +106,88 @@ function readNote(base) {
 
 // Guarda la CARTELLA, non il file: il file può ancora non esistere, e una cartella dedicata
 // evita di svegliarsi a ogni file temporaneo del sistema.
-function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS } = {}) {
+// Una cartella tolta (pulizia del sistema) lascia il watcher sordo, e su Windows senza errore (#488): ogni
+// `controlloMs` si guarda che sia ancora quella ascoltata, e se non lo è ci si rimette in ascolto, su ogni piattaforma.
+const CONTROLLO_MS = 2000;
+function identita(dir) {
+  try {
+    const st = fs.statSync(dir);
+    return st.isDirectory() ? `${st.dev}:${st.ino}:${st.birthtimeMs}` : '';
+  } catch (_) {
+    return '';
+  }
+}
+function watchSignal(onRing, { base, debounceMs = DEBOUNCE_MS, controlloMs = CONTROLLO_MS } = {}) {
   let watcher = null;
   let timer = null;
   let stopped = false;
   let rearm = null;
+  let ascoltata = '';
+  let controllo = null;
 
   const ring = () => {
     timer = null;
     try { onRing(); } catch (_) {}
+  };
+  const chiudi = () => {
+    try { if (watcher) watcher.close(); } catch (_) {}
+    watcher = null;
+  };
+  const riprova = () => {
+    if (stopped) return;
+    rearm = setTimeout(arm, 5000);
+    if (rearm.unref) rearm.unref();
   };
 
   const arm = () => {
     if (stopped) return;
     try {
       fs.mkdirSync(signalDir(base), { recursive: true });
+      chiudi();
       watcher = fs.watch(signalDir(base), (_event, filename) => {
         if (filename && String(filename) !== FILE_NAME) return;
         if (timer) clearTimeout(timer);
         timer = setTimeout(ring, debounceMs);
       });
+      ascoltata = identita(signalDir(base));
       // Un orecchio teso non deve tenere in vita il processo per conto suo.
       if (typeof watcher.unref === 'function') watcher.unref();
-      // La cartella temporanea può sparire (pulizia del sistema) e il watcher muore in silenzio:
-      // si riarma, con calma.
       watcher.on('error', () => {
-        try { watcher.close(); } catch (_) {}
-        watcher = null;
-        if (stopped) return;
-        rearm = setTimeout(arm, 5000);
-        if (rearm.unref) rearm.unref();
+        chiudi();
+        ascoltata = '';
+        riprova();
       });
     } catch (_) {
-      if (stopped) return;
-      rearm = setTimeout(arm, 5000);
-      if (rearm.unref) rearm.unref();
+      ascoltata = '';
+      riprova();
+    }
+  };
+
+  // Cartella sparita, o rifatta da `note()` mentre il watcher guardava la vecchia: ci si rimette in ascolto, e se
+  // il campanello c'è già si suona, perché può essere stato scritto nella cartella nuova prima del riarmo.
+  const controlla = () => {
+    if (stopped || !watcher) return;
+    const ora = identita(signalDir(base));
+    if (ora && ora === ascoltata) return;
+    const suonato = !!ora && fs.existsSync(signalFile(base));
+    arm();
+    if (suonato) {
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(ring, debounceMs);
     }
   };
 
   arm();
+  if (controlloMs > 0) {
+    controllo = setInterval(controlla, controlloMs);
+    if (controllo.unref) controllo.unref();
+  }
   return () => {
     stopped = true;
     if (timer) clearTimeout(timer);
     if (rearm) clearTimeout(rearm);
-    try { if (watcher) watcher.close(); } catch (_) {}
-    watcher = null;
+    if (controllo) clearInterval(controllo);
+    chiudi();
   };
 }
 
@@ -239,6 +276,7 @@ module.exports = {
   FILE_NAME,
   DEBOUNCE_MS,
   FOCUS_MIN_MS,
+  CONTROLLO_MS,
   signalDir,
   signalFile,
   note,

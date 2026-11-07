@@ -231,6 +231,19 @@
   color: var(--sn-muted);
   min-height: 16px;
 }
+/* L'invio aspetta la consegna (#1667): la rotella dice che sta succedendo qualcosa. */
+.sn-fb-status--attesa { display: flex; align-items: center; gap: 6px; }
+.sn-fb-status--attesa::before {
+  content: '';
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  border-radius: 50%;
+  animation: sn-fb-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
+}
+@keyframes sn-fb-gira { to { transform: rotate(360deg); } }
 
 .sn-fb-btn,
 .sn-fb-btn-secondary {

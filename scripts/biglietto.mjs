@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import * as B from './lib/biglietto-locale.mjs';
 import { gancio } from './lib/letture-esterne.mjs';
 
-export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"] | sporca "<motivo>" | stato | chiudi';
+export const USO = 'Uso: node scripts/biglietto.mjs prendi [--sporco "<motivo>"] | sporca "<motivo>" | riservato "<cosa hai letto>" | stato | chiudi';
 
 /** Le parole della riga di comando. PURA. @returns {{ cmd, motivo?, sporco? } | { errore }} */
 export function leggiArgomenti(argv) {
@@ -20,6 +20,10 @@ export function leggiArgomenti(argv) {
   if (cmd === 'sporca') {
     const motivo = a.slice(1).join(' ').trim();
     return motivo ? { cmd, motivo } : { errore: `sporca vuole il motivo: cosa hai letto che il server non vede. ${USO}` };
+  }
+  if (cmd === 'riservato') {
+    const motivo = a.slice(1).join(' ').trim();
+    return motivo ? { cmd, motivo } : { errore: `riservato vuole il motivo: quali dati privati hai letto. ${USO}` };
   }
   if (cmd === 'prendi') {
     if (a.length === 1) return { cmd, sporco: false };
@@ -93,6 +97,13 @@ async function main() {
     if (r.inAttesa) console.log(`Server non raggiunto (${r.errori.join('; ')}): lo sporco è annotato in locale e parte alla prossima occasione; intanto ciò che scrivi nasce non fidato.`);
     else if (r.errori.length) console.error(`Non sporcati: ${r.errori.join('; ')}`);
     return r.sporcati || r.inAttesa ? 0 : 1;
+  }
+  if (args.cmd === 'riservato') {
+    const r = await B.segnaRiservato(args.motivo);
+    if (r.senzaBiglietto) { console.error('Nessun biglietto trovato da qui: niente da segnare.'); return 1; }
+    if (r.segnati) console.log('Biglietto riservato: compiti, feedback e domande che scrivi da qui portano il segno.');
+    if (r.errori.length) console.error(`Non segnati: ${r.errori.join('; ')}`);
+    return r.segnati ? 0 : 1;
   }
   if (args.cmd === 'stato') {
     const trovati = B.trovaBiglietti();

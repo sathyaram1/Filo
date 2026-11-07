@@ -43,9 +43,10 @@ Le riletture della cache sono la voce più grossa del costo di una sessione.
   Più sotto-agenti insieme solo se leggono soltanto: due che scrivono si
   pestano sui lock del salvataggio automatico.
 - **Si legge la parte, non il file**: intervalli di righe, uscite filtrate.
-- **Attese.** Un comando che può superare i due minuti si lancia in sottofondo;
-  se serve aspettarlo, a pezzi da quattro minuti al massimo. Il timeout si
-  dimensiona sulla durata vera del comando, mai sotto.
+- **Attese.** Un comando che può superare i due minuti si lancia in sottofondo,
+  e la sua fine la annuncia l'harness: niente attese scritte nella shell
+  (`sleep`, cicli `until`, `tail --pid`), che in cloud chiedono un permesso.
+  Il timeout si dimensiona sulla durata vera del comando, mai sotto.
 - **A un cambio di argomento si riparte** con una sessione nuova.
 
 ## Regole del repo
@@ -147,8 +148,16 @@ I feedback arrivano spesso poco specificati. Il tuo lavoro è ricostruire
   cammini equivalenti (scorciatoia e menu) fanno la stessa cosa.
 - **Miglioramenti SENZA trade-off** (non costano servizi a pagamento, non
   complicano l'uso, non chiudono strade future): nel dubbio si fanno.
-- **Trade-off VERO** (velocità vs costo, semplicità vs potenza, dati
-  dell'utente, scelte di gusto): NON decidere tu, segnala all'owner.
+- **Trade-off di costo** (costo contro velocità, costo contro qualità): lo
+  decidi tu, coi numeri, senza chiedere. Il metodo sta in `filo_design.txt`
+  § GESTIONE DEI MODELLI: prezzi letti da OpenRouter al momento del lavoro, le
+  alternative confrontate diventano un'impostazione con la loro stima accanto,
+  tu scegli quella di partenza. Nel report all'owner una riga: la scelta di
+  partenza e dove stanno le alternative.
+- **Trade-off VERO**, quello che non si misura (dati dell'utente, gusto,
+  direzione di prodotto come semplicità contro potenza, un costo che non si
+  stima perché manca il dato: uso previsto ignoto, prezzo non disponibile):
+  NON decidere tu, segnala all'owner.
 
 Nel report: **elenca cosa hai aggiunto oltre il chiesto**, e **se hai fatto una
 cosa DIVERSA da quella chiesta dillo per primo, col perché** (anche per le
@@ -209,7 +218,9 @@ riscrive. Sono TRE testi distinti:
 3. **Riga di changelog** in `src/shared/patchNotes.js`: solo se un utente
    qualunque può usare la cosa (superfici owner e parti interne no); una
    riga, orientata al beneficio, nel blocco in cima (vedi § Fonti di verità
-   singole).
+   singole). Nata da una segnalazione, si scrive `{ testo, segnalazione: <num> }`
+   (il numero intero, senza la parte dopo il punto): la pagina Novità la apre
+   dal tasto destro.
 
 Prima di mandare un testo destinato a un umano, compresa ogni risposta in chat
 anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
@@ -217,9 +228,12 @@ anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
 ## Fonti di verità singole (aggiornale nello stesso commit)
 
 - **`src/shared/patchNotes.js`**: changelog per l'utente comune. Il blocco in
-  cima porta il numero della prossima versione (`package.json` + 1 patch); se
+  cima porta il numero della prossima versione (`package.json` + 1 patch, o il
+  suo `prossimaVersione` se lo dichiara); se
   quel numero è già uscito se ne apre uno nuovo, perché una riga sotto una
-  versione uscita non la vede chi aggiorna. Sentinella:
+  versione uscita non la vede chi aggiorna. Se esce su main mentre il ramo
+  aspetta, le righe le sposta il riallineamento prima della fusione
+  (`scripts/novita-in-cima.mjs`, dopo il rebase): non si rincorre. Sentinella:
   `tests/unit/patchNotes.test.mjs`.
 - **`src/shared/capabilities.js`**: manifesto di cosa sa fare Filo. Capacità
   nuova, cambiata o rimossa = voce aggiornata; una sentinella la confronta col
@@ -227,8 +241,10 @@ anche di tre righe, applica **`.claude/skills/unslop/SKILL.md`**.
 - **`src/shared/feedbackTransitions.js`**: le tabelle della macchina a stati
   come DATI (i numeri dei bilanci no: li scrive l'owner in Gestione →
   Automazioni, e chi ne ha bisogno li legge dal server o si ferma). Il server
-  di filo-security le incorpora al deploy insieme a **`filo_filosofia.txt`**: se tocchi transizioni o filosofia, **rideploya le
-  functions**.
+  di filo-security le incorpora al deploy insieme a **`filo_filosofia.txt`** e
+  ad altri moduli di `src/shared/` (lo dicono nell'intestazione): un cambio a
+  uno di questi arriva su main solo con un **lavoro server** che ne porta i
+  generati, altrimenti la fusione lo rimanda indietro.
 
 ## Run / test
 
@@ -237,7 +253,7 @@ npm install                # se manca il binario Electron: node node_modules/ele
 npm start
 npm run test:unit          # logica pura, ms, senza Electron
 npm run test:smoke         # smoke headless con screenshot
-npm test                   # SUITE COMPLETA (~590 spec, ~1.450 casi): NON si lancia a mano (vedi § Verifica)
+npm test                   # SUITE COMPLETA (~660 spec, ~4.650 casi): NON si lancia a mano (vedi § Verifica)
 npm run finish:check       # in locale: unit + spec delle aree toccate dal ramo
 npm run test:shoot         # cattura visiva della finestra reale
 ```
@@ -281,4 +297,5 @@ src/content/    content scripts
 
 Macchina a stati dei feedback: **`FEEDBACK-STATES.md`**; canale autenticato
 delle routine: **`ROUTINE-AUTH-SPEC.md`**; decisioni del ridisegno per il piano
-Max, chiuso: **`SPEC-RIDISEGNO-MAX.md`**.
+Max, chiuso: **`SPEC-RIDISEGNO-MAX.md`**; pacchetti, una sessione per feedback e
+manutentore: **`SPEC-RIDISEGNO-LAVORO.md`**.

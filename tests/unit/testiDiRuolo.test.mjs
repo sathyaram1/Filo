@@ -13,10 +13,11 @@
 //   guida i giri locali, deve rimandare lì invece di tenerne una copia più
 //   corta.
 
+import '../helpers/senzaSessione.mjs';
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
-import { join, resolve, dirname } from 'node:path';
+import { existsSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
@@ -33,7 +34,7 @@ function cartellaConPezzi() {
 }
 
 test('ogni ruolo riceve un testo intero, senza richiami rimasti dentro', () => {
-  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'halt']) {
+  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento', 'halt']) {
     const testo = readRoleInstructions(ruolo);
     assert.ok(testo.length > 400, `il ruolo ${ruolo} riceve un testo vuoto`);
     assert.ok(!/<!--\s*includi:/i.test(testo), `richiamo non espanso nel testo del ruolo ${ruolo}`);
@@ -63,13 +64,62 @@ test('i tre ambiti della verifica condividono livelli, critica e registrazione',
 
 // Chi verifica dà i livelli con misura solo se non sa cosa ne seguirà: che poi
 // correggerà lui, o quanti giri restano, non deve leggerlo da nessuna parte.
+// La pulizia messa prima o dopo le correzioni dice che chi l'ha registrata c'è ancora quando si corregge.
+const PULIZIA_E_CORREZIONI = /(?:prima d(?:i ogni|ella|elle)|anche dopo (?:la|le)) correzion/i;
+
 test('nessun testo di verifica anticipa il seguito del giro', () => {
   for (const scope of ['pieno', 'chiusura', 'riallineamento']) {
     const t = readRoleInstructions('verifier', { scope });
-    for (const spia of [/correggerai/i, /sarai tu a corregg/i, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/]) {
-      assert.ok(!spia.test(t), `ambito ${scope}: il testo anticipa il seguito (${spia})`);
+    for (const spia of [/correggerai/i, /sarai tu a corregg/i, PULIZIA_E_CORREZIONI, /giri (che )?resta/i, /bilanci/i, /cap[012]\b/]) {
+      assert.ok(!spia.test(t.replace(/\s+/g, ' ')), `ambito ${scope}: il testo anticipa il seguito (${spia})`);
     }
   }
+});
+
+// Vale anche per ciò che si incontra senza cercarlo fuori dal ruolo (documenti nominati da CLAUDE.md, compito
+// locale, aiuto, intestazioni degli strumenti), letto unito perché una frase va a capo dove capita.
+test('le formule vietate prendono le frasi che lo dicono e lasciano stare quelle legittime', async () => {
+  const { OVUNQUE, ESEMPI } = await import('../helpers/formule-vietate.mjs');
+  for (const f of ESEMPI.vietati) assert.ok(OVUNQUE.some((r) => r.test(f)), `non presa: «${f}»`);
+  for (const f of ESEMPI.legittimi) assert.ok(!OVUNQUE.some((r) => r.test(f)), `presa per sbaglio: «${f}»`);
+});
+
+test('i documenti e le intestazioni che si leggono senza cercarli non anticipano il seguito del giro', async () => {
+  const { OVUNQUE } = await import('../helpers/formule-vietate.mjs');
+  const { testoLavoroServer, usageText } = await import('../../scripts/dispatch.mjs');
+  const { buildVerifierBrief } = await import('../../scripts/verify-local.mjs');
+  const comune = readFileSync(join(ROOT, 'CLAUDE.md'), 'utf8');
+  const nominati = [...new Set(['CLAUDE.md', ...(comune.match(/[\w./-]+\.(?:md|txt)\b/g) || [])])]
+    .filter((n) => resolve(ROOT, n).startsWith(ROOT + sep) && existsSync(resolve(ROOT, n)));
+  for (const n of ['FEEDBACK-STATES.md', 'ROUTINE-AUTH-SPEC.md', 'SPEC-RIDISEGNO-MAX.md', 'routines/roles/_criteri-verifica.md']) {
+    assert.ok(nominati.includes(n), `${n} non risulta più fra i documenti nominati da CLAUDE.md: la lettura dei nomi si è rotta`);
+  }
+  const intestazione = (f) => {
+    const righe = [];
+    for (const r of readFileSync(join(ROOT, f), 'utf8').split('\n')) {
+      if (!/^\s*(\/\/|$)/.test(r)) break;
+      righe.push(r.replace(/^\s*\/\/\s?/, ''));
+    }
+    assert.ok(righe.join('\n').trim().length > 500, `intestazione di ${f} vuota: la lettura si è rotta`);
+    return righe.join('\n');
+  };
+  const superfici = [
+    ...['pieno', 'chiusura', 'riallineamento'].map((scope) => [`ruolo verifier, ambito ${scope}`, readRoleInstructions('verifier', { scope })]),
+    ['lavoro server', testoLavoroServer({ clone: '/clone' })],
+    ['compito del giro locale', buildVerifierBrief({ request: 'fai X', branch: 'claude/x', recipe: readRoleInstructions('verifier'), history: [] })],
+    ['aiuto di dispatch', usageText()],
+    ...nominati.map((n) => [n, readFileSync(resolve(ROOT, n), 'utf8')]),
+    ...['scripts/dispatch.mjs', 'scripts/verify-local.mjs', 'scripts/routine-channel.mjs'].map((f) => [`intestazione di ${f}`, intestazione(f)]),
+  ];
+  const colpevoli = [];
+  for (const [nome, testo] of superfici) {
+    const unito = testo.replace(/\s+/g, ' ');
+    for (const formula of [...OVUNQUE, PULIZIA_E_CORREZIONI]) {
+      const m = unito.match(formula);
+      if (m) colpevoli.push(`${nome}: «${unito.slice(Math.max(0, m.index - 30), m.index + m[0].length + 10)}»`);
+    }
+  }
+  assert.deepEqual(colpevoli, [], 'frasi da riscrivere (il seguito del giro non si anticipa)');
 });
 
 test('un pezzo condiviso dentro un altro viene espanso', () => {
@@ -116,7 +166,7 @@ test('nessuna regola scritta due volte in due testi di ruolo', () => {
 // dentro il testo che ogni ruolo riceve davvero, quante volte viene spiegata
 // la stessa cosa: due spiegazioni sono due regole che divergeranno.
 test('dentro un testo di ruolo la stessa regola non viene spiegata due volte', () => {
-  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit'];
+  const RUOLI_LAVORANTI = ['verifier', 'new-work', 'fixer', 'secaudit', 'risposta', 'smistamento'];
   // Ogni voce: il segno che riconosce la spiegazione, e cosa spiega.
   const UNA_VOLTA = [
     [/rombo/g, 'dove l\'owner apre un trade-off segnalato'],
@@ -188,5 +238,59 @@ test('come si nomina una prova del giro lo spiega un testo solo, e le risposte d
   for (const t of [risposta, coda]) {
     assert.match(t, /- r1 \[2i\] rotto/);
     assert.match(t, /- r2 \[1i\] il bordo è freddo/);
+  }
+});
+
+// Un `git push` lanciato a mano in cloud resta fermo sul controllo dei permessi, che nessuno approva: la sessione di
+// #1776 è rimasta così per ore, quattro volte (#1797). Nessun testo che un ruolo o un agente riceve lo chiede; la sola
+// riga che lo nomina è la regola che lo vieta, nel contratto dei worker.
+test('nessun ruolo chiede un git push a mano: lo nomina solo la regola che lo vieta', () => {
+  const AGENTI = join(ROOT, '.claude', 'agents');
+  const superfici = [
+    ...readdirSync(RUOLI).filter((n) => n.endsWith('.md')).map((n) => [n, join(RUOLI, n)]),
+    ...readdirSync(AGENTI).filter((n) => n.endsWith('.md')).map((n) => [`agente ${n}`, join(AGENTI, n)]),
+  ];
+  const PUSH = /\bgit\s+(?:-C\s+(?:"[^"]*"|\S+)\s+|-c\s+\S+\s+)*push\b/g;
+  const regola = (t) => t.slice(t.indexOf('## Niente push a mano'), t.indexOf('\n## ', t.indexOf('## Niente push a mano') + 1));
+  const fuori = [];
+  for (const [nome, file] of superfici) {
+    const t = readFileSync(file, 'utf8').replace(/\r/g, '');
+    const ammessa = nome === '_contratto-worker.md' ? regola(t) : '';
+    const resto = ammessa ? t.replace(ammessa, '') : t;
+    for (const m of resto.matchAll(PUSH)) fuori.push(`${nome}: …${resto.slice(Math.max(0, m.index - 40), m.index + 40).replace(/\s+/g, ' ')}…`);
+  }
+  assert.deepEqual(fuori, [], 'un push lo fanno il salvataggio e il rilascio; la riproduzione di git va in un unit test');
+  for (const ruolo of ['new-work', 'fixer', 'verifier', 'secaudit', 'risposta', 'smistamento']) {
+    const t = readRoleInstructions(ruolo).replace(/\s+/g, ' ');
+    assert.match(t, /## Niente push a mano/, `${ruolo}: manca la regola`);
+    assert.match(t, /git init --bare/, `${ruolo}: la strada al posto del push`);
+    assert.match(t, /guasto: permessi <programma>/, `${ruolo}: un comando negato è un guasto`);
+  }
+  // La sentinella vede anche le forme che un ruolo potrebbe scrivere.
+  for (const s of ['git push origin x', 'git -C "/tmp/a b" push', 'git -c x=y push --dry-run']) assert.ok(new RegExp(PUSH.source).test(s), s);
+  assert.ok(!new RegExp(PUSH.source).test('git-server push "<CLONE>" <ramo>'), 'il push del server passa dal canale');
+});
+
+// Anche la risposta del server che dispatch stampa è un'istruzione del ruolo: la pulizia dopo un «pass» la spedisce il
+// rilascio, e un «spingi» manderebbe chi verifica sullo stesso permesso che nessuno approva (#1797).
+test('la risposta a una verifica superata con derivati non chiede un push a mano', async () => {
+  const { verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  // Un interno messo da parte: le prove degli esterni escono prima del verdetto e qui non lasciano righe (#1555).
+  const t = verifierReplyText({ outcome: 'pass', derived: [{ level: 1, sede: 'i', text: 'bordo freddo', priority: 1, num: '#7.1', n: 1 }] });
+  assert.match(t, /Prove del giro da TOGLIERE/);
+  assert.doesNotMatch(t, /\bspingi\b|\bgit\s+push\b/i);
+  assert.match(t, /lo spedisce il rilascio/);
+});
+
+// Il worker spostato in sottofondo si veglia: senza, chi guida chiude il turno e aspetta una notifica che da un worker
+// fermo su un permesso non arriva mai (#1797). La regola è una, in un pezzo condiviso, per le due sessioni che guidano.
+test('chi guida il giro veglia il worker in sottofondo, e la notifica di fine non decide niente', async () => {
+  const { espandiInclusioni: espandi } = await import('../../scripts/lib/role-text.mjs');
+  for (const f of ['orchestrator.md', 'sessione.md']) {
+    const t = espandi(readFileSync(join(RUOLI, f), 'utf8'), RUOLI).replace(/\s+/g, ' ');
+    assert.match(t, /node scripts\/routine-channel\.mjs veglia <biglietto>/, `${f}: il comando della veglia`);
+    assert.match(t, /\*\*exit 3\*\*: era fermo da venti minuti/, f);
+    assert.match(t, /La notifica di fine del worker non fa ripartire niente/, f);
+    assert.doesNotMatch(t, /aspetta la notifica di fine|la notifica di fine del worker ti risveglia/i, `${f}: la regola vecchia è rimasta`);
   }
 });

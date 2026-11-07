@@ -3,8 +3,9 @@
 // Regole: patterns/la-shell-non-disegna-sopra-la-pagina.md
 
 import { test, expect } from './fixtures/electron.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNelMenu, puntatoreCheSegue } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, mettiNellaBarra, puntatoreCheSegue } from './helpers/barra.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { nelloStrato } from './helpers/riquadri.mjs';
 
 const SITO = `<!doctype html><html><body style="margin:0;height:4000px;font:16px sans-serif">
   <div id="z" style="position:fixed;left:0;top:0;width:240px;height:100%;background:#f3eee6">colonna del sito</div>
@@ -149,10 +150,10 @@ test('sopra l\'avviso del sito pericoloso il vuoto della barra e degli avvisi è
   expect(await page.evaluate(() => window.__g)).toEqual({ giu: 0, clic: 0, rotella: 0 });
 });
 
-// Le icone della pagina portate nella barra agirebbero sulla pagina nascosta, e quello che mostrano resterebbe
+// Le icone della pagina nella barra agirebbero sulla pagina nascosta, e quello che mostrano resterebbe
 // dietro l'avviso: spente finché l'avviso copre la scheda, riaccese quando l'utente conferma.
 test('sopra l\'avviso del sito pericoloso le icone della pagina nella barra sono spente; dopo la conferma tornano', async ({ app, shell }) => {
-  await mettiNelMenu(app, ['qrCode', 'saveForLater'], 'bar');
+  await mettiNellaBarra(app, ['qrCode', 'saveForLater']);
   const { page, avviso } = await apriSegnalata(app, shell);
   const barra = await barraPage(app);
   const qr = barra.locator('#nav .ico[data-id="qrCode"]');
@@ -202,6 +203,7 @@ test('sopra l\'avviso del sito pericoloso l\'icona Aiuto fa la domanda a Filo su
   await expect.poll(async () => (await schede()).n, { timeout: 8000 }).toBe(prima + 1);
   expect((await schede()).url).toMatch(/^filo:\/\/newtab\//);
   expect(await page.locator('.sn-sidebar').count()).toBe(0);
+  expect(await nelloStrato(app, page, () => document.querySelectorAll('.sn-sidebar').length) || 0, 'Aiuto aperto sotto l\'avviso').toBe(0);
 });
 
 // Il puntatore sull'avviso conta come quello sulla pagina: un clic chiude la barra, uscendoci sopra si chiude.

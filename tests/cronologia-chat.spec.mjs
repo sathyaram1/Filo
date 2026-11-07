@@ -14,6 +14,7 @@
 // nessun posto in cui una chat finita potesse esistere.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 const HOME = 'filo://newtab/';
 const risultati = (page) => page.locator('#cercaRisultati .dash-cerca-msg');
@@ -853,6 +854,8 @@ test('l’esito di un comando lento resta nella chat in cui il comando è stato 
   // La parola spezzata vale in sh e in PowerShell ("ESIT""O" in PowerShell stampa ESIT"O).
   await dash.locator('#input').fill("/sleep 4; echo ESIT''O-TARDIVO");
   await dash.locator('#input').press('Enter');
+  // Un comando che il terminale non riconosce chiede un OK anche scritto a mano (#892.1).
+  await clickConfirm(dash, 'ok');
   await dash.waitForTimeout(700);
   await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');

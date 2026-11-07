@@ -26,11 +26,15 @@
       || Number(m.images) > 0 || (Array.isArray(m.guardate) && m.guardate.length));
   }
 
-  function voceMessaggio(c, m, i, qui) {
+  // `trovaChat(id)`: la chat del filo con quell'id, per la risposta citata da un messaggio (#1620).
+  function voceMessaggio(c, m, i, qui, trovaChat = null) {
     const v = {
       k: 'msg', key: `m:${c.id}:${i}`, chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo',
       text: String(m.text == null ? '' : m.text),
     };
+    const R = global.SN_RISPOSTA_A;
+    const citata = m.rispostaA && R ? R.risolvi(m.rispostaA, trovaChat) : null;
+    if (citata) v.rispostaA = citata;
     if (Array.isArray(m.actions) && m.actions.length) v.actions = m.actions.slice();
     if (Array.isArray(m.cambi) && m.cambi.length) v.cambi = m.cambi.slice();
     if (Number(m.images) > 0) v.images = Number(m.images);
@@ -52,6 +56,8 @@
   function elementi({ chats = [], pagine = [], cambi = [], qui = '' } = {}) {
     const altri = [];
     let n = 0;
+    const perId = new Map((Array.isArray(chats) ? chats : []).filter((c) => c && c.id).map((c) => [c.id, c]));
+    const trovaChat = (id) => perId.get(id) || null;
     for (const c of Array.isArray(chats) ? chats : []) {
       if (!c || !Array.isArray(c.messages) || !c.messages.length) continue;
       if (eApp(c)) {
@@ -68,7 +74,7 @@
         const posto = m.tardiva && Number.isFinite(prima) && prima < t ? prima + 1 : t;
         prima = posto;
         if (!haContenuto(m)) return;
-        const v = voceMessaggio(c, m, i, qui);
+        const v = voceMessaggio(c, m, i, qui, trovaChat);
         if (posto !== t) { v.ts = new Date(posto).toISOString(); v.fine = m.ts; }
         altri.push({ ...v, _n: n++ });
       });

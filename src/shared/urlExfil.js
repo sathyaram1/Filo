@@ -742,15 +742,15 @@
     const G = global.SN_GUARDIANO_STATICO;
     const uscente = testoUscente(action);
     const u = formeDi(uscente);
-    const min = (G && G.SEGRETO_MIN) || 12;
     for (const s of Array.isArray(segreti) ? segreti : []) {
       const v = String((s && s.valore) || '').trim();
+      const min = G && typeof G.segretoDi === 'function' ? G.segretoDi(s).min : 12;
       if (v.length < min) continue;
       const norm = v.toLowerCase().replace(/[^a-z0-9]+/g, '');
       // Lo stesso riconoscimento che lo toglie dai messaggi verso i modelli: travestito, al contrario o codificato, esce uguale.
-      const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [v]) !== uscente;
+      const travestito = !!G && typeof G.oscuraSegreti === 'function' && G.oscuraSegreti(uscente, [s]) !== uscente;
       if (travestito || u.forme.some((f) => f.includes(v)) || (norm.length >= min && u.alnum.includes(norm)) || pezzoDiChiave(v, u)) {
-        return { ...niente, blocca: true, regola: 'custodito', frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
+        return { ...niente, blocca: true, regola: 'custodito', tipo: String(s.tipo || ''), frase: `${verbo}: conteneva ${CUSTODITI[s.tipo] || CUSTODITI.chiave}` };
       }
     }
     const avvisi = { memoria, azioni, daPagina, parole, domanda };

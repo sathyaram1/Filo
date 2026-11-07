@@ -1,12 +1,22 @@
-// Git verso filo-security col token del biglietto (#1233): un comando fisso del canale, nessun aiutante di credenziali.
-// Il token vive solo nell'ambiente del git figlio, come credenziale nell'URL riscritto (scelta owner su #1233): mai in
-// argv, nel clone o a video. Sentinella: tests/unit/gitServer.test.mjs.
+// Git verso filo-security da un comando fisso del canale, su due strade (ROUTINE-AUTH-SPEC.md § 14): in locale col token
+// del biglietto nell'URL riscritto, mai in argv, nel clone o a video (#1233); in cloud col proxy della sessione, che
+// autentica da sé i repository agganciati (#1761). Sentinella: tests/unit/gitServer.test.mjs.
 
 import { isAbsolute, relative, resolve } from 'node:path';
 
 export const URL_SERVER = 'https://github.com/sathyaram1/filo-security.git';
 const URL_NUDO = URL_SERVER.replace(/\.git$/, '');
 export const AZIONI_GIT_SERVER = ['clone', 'ls-remote', 'fetch', 'push'];
+
+/** 'proxy' nelle sessioni cloud, dove una credenziale nostra non è detto che passi il proxy (#1519); 'token' altrove. PURA. */
+export function stradaGitServer(env = {}) {
+  return env.CLAUDE_CODE_REMOTE === 'true' || env.GH_TOKEN === 'proxy-injected' ? 'proxy' : 'token';
+}
+
+/** L'ambiente del git figlio sulla strada del proxy: quello della sessione, aiutanti compresi, senza prompt. PURA. */
+export function ambienteViaProxy(base) {
+  return { ...(base || {}), GIT_TERMINAL_PROMPT: '0' };
+}
 
 /** Il clone cade dentro il checkout di Filo? L'hook di salvataggio lo pubblicherebbe intero. PURA. */
 export function cloneDentroIlRepo(clone, root) {

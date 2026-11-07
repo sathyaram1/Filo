@@ -167,7 +167,7 @@ test('la zona di una mappa d\'immagine verso un sosia: voci del link e dell\'imm
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible();
   await expect(menu.voce('Apri in nuova tab')).toBeVisible();
-  await expect(menu.superficie.getByRole('button', { name: 'Copia URL', exact: true })).toBeVisible();
+  await expect(menu.voci.filter({ hasText: /^Copia URL$/ })).toBeVisible();
   await expect(menu.voce('Copia immagine')).toBeVisible();
   const avviso = menu.locator('.sn-menu .sn-menu-inline[data-subject="link"] .sn-menu-link-warn');
   await expect(avviso).toBeVisible({ timeout: 3000 });

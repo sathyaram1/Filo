@@ -103,10 +103,41 @@
     // Un sito che ospita la chat non accende il microfono di Filo con un clic fabbricato.
     try { global.SN_FILO_UI && global.SN_FILO_UI.soloGestiVeri(b); } catch (_) {}
 
+    // Per i contatori (#1467), che contano una dettatura quando si sa che fine ha fatto il testo, cioè quando parte:
+    // `perche` 'cambiata' se la persona l'ha toccato mentre si parlava; `inviata` se l'ha mandato mentre si parlava;
+    // `inAttesa` la sessione che aspetta l'attimo per annullare; `dettate` quelle rimaste nella casella da mandare.
     const c = {
       campo, bottone: b, stato: 'pronto', giro: 0, sessione: null, toccato: false, preso: false, lasciato: '',
-      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0,
+      daSolo: true, timer: 0, atteso: '', dal: 0, attesaMs: 0, perche: '', inviata: false, inAttesa: null, dettate: [],
     };
+    const contaFine = (esito, invio) => { try { global.SN_ASCOLTO.contaSessione(esito, invio); } catch (_) {} };
+    // Se la chat se ne va adesso: il testo lasciato nella casella è «tenuta», quello che si stava dicendo o che aspettava
+    // l'invio da solo è «annullata», come in `scollega`.
+    const segnaLasciata = (esito, invio = 'tenuta') => { try { global.SN_ASCOLTO.segnaSessione(esito, invio); } catch (_) {} };
+    function esitoDellAttesa(invio) {
+      const e = c.inAttesa;
+      c.inAttesa = null;
+      if (e) contaFine(e, invio);
+    }
+    // Il testo dettato resta nella casella: si conta quando parte (corretto o no), si cancella, o la chat se ne va.
+    function lasciaInCasella(esito, cambiata) {
+      c.dettate.push({ esito, cambiata });
+      segnaLasciata(esito);
+    }
+    function chiudiDettate(invio) {
+      const l = c.dettate;
+      c.dettate = [];
+      for (const d of l) contaFine(d.esito, typeof invio === 'function' ? invio(d) : invio);
+    }
+    // La casella svuotata senza che la persona l'abbia cancellata (quello passa da `suInput`): l'ha mandata la chat.
+    function verificaInvio() {
+      if (c.dettate.length && campo.isConnected && !campo.value.trim()) chiudiDettate((d) => (d.cambiata ? 'cambiata' : 'a_mano'));
+    }
+    function verificaPresto() {
+      if (!c.dettate.length) return;
+      setTimeout(verificaInvio, 0);
+      setTimeout(verificaInvio, 300);
+    }
 
     function imposta(stato) {
       c.stato = stato;
@@ -147,7 +178,8 @@
     function presaInMano() {
       if (!c.sessione || c.preso || campo.value === c.lasciato) return false;
       c.preso = true;
-      tieni();
+      tieni(true);
+      verificaInvio();
       return true;
     }
 
@@ -158,12 +190,15 @@
       imposta('avvio');
       c.toccato = false;
       c.preso = false;
+      c.perche = '';
+      c.inviata = false;
       if (document.activeElement !== campo) caretInFondo(campo);
       c.lasciato = campo.value;
       c.daSolo = await impostazioneFresca();
       if (giro !== c.giro) return;
       const sessione = await Ascolto.avvia({
         fineDaSola: { silenceMs: tempi.silenceSec * 1000, waitMs: MUTO_MS },
+        invioSeLasciata: 'annullata',
         suLivello: (v) => {
           if (giro !== c.giro) return;
           // La chat è sparita (l'Aiuto chiuso, il modulo tolto): il microfono non resta acceso per nessuno.
@@ -182,13 +217,23 @@
     }
 
     function finito(giro, esito) {
-      if (giro !== c.giro) return;
-      if (c.sessione && campo.isConnected && campo.value !== c.lasciato) c.toccato = true;
+      // Una sessione lasciata da un giro dopo (chat sparita, tasto ripremuto): quello che aveva detto non parte.
+      if (giro !== c.giro) { contaFine(esito, esito.frasi > 0 ? 'annullata' : 'nessuno'); return; }
+      // Cambiata né dal microfono né dalla tastiera: vuota, l'ha mandata la chat; altrimenti è stata corretta.
+      if (c.sessione && campo.isConnected && campo.value !== c.lasciato) {
+        c.toccato = true;
+        if (!campo.value.trim()) c.inviata = true;
+        else if (!c.perche) c.perche = 'cambiata';
+      }
       c.sessione = null;
       const parte = esito.frasi > 0 && !esito.errore && ['utente', 'finito', 'tempo'].includes(esito.motivo)
         && c.daSolo && !c.toccato && campo.isConnected && campo.value.trim();
-      if (parte) { attendi(); return; }
+      if (parte) { c.inAttesa = esito; segnaLasciata(esito, 'annullata'); attendi(); return; }
       imposta('pronto');
+      if (!(esito.frasi > 0)) contaFine(esito, 'nessuno');
+      else if (c.inviata) contaFine(esito, c.perche === 'cambiata' ? 'cambiata' : 'a_mano');
+      else if (campo.isConnected && campo.value.trim()) lasciaInCasella(esito, c.perche === 'cambiata');
+      else contaFine(esito, 'annullata');
       if (esito.frasi > 0 && campo.isConnected) caretInFondo(campo);
     }
 
@@ -204,20 +249,36 @@
     // Ogni decimo di secondo: se la casella è cambiata (inviata a mano, corretta) l'attesa finisce senza inviare.
     function controlla() {
       if (c.stato !== 'attesa') { smetti(); return; }
-      if (!campo.isConnected || campo.value !== c.atteso || !campo.value.trim()) { smetti(); imposta('pronto'); return; }
+      if (!campo.isConnected || campo.value !== c.atteso || !campo.value.trim()) {
+        smetti();
+        imposta('pronto');
+        // Sparita la chat, il testo è perso; vuota senza che la persona l'abbia cancellata, l'ha inviata lei (il tasto
+        // d'invio col mouse); cambiata, aspetta l'invio.
+        if (!campo.isConnected) esitoDellAttesa('annullata');
+        else if (!campo.value.trim()) esitoDellAttesa('a_mano');
+        else if (c.inAttesa) { lasciaInCasella(c.inAttesa, true); c.inAttesa = null; }
+        return;
+      }
       if (Date.now() - c.dal < c.attesaMs) return;
       if (typeof occupato === 'function' && occupato()) { b.dataset.occupato = '1'; return; }
       smetti();
       imposta('pronto');
+      esitoDellAttesa('da_sola');
+      // Quello che era rimasto nella casella da prima parte insieme.
+      chiudiDettate((d) => (d.cambiata ? 'cambiata' : 'da_sola'));
       try { invia(); } catch (e) { console.error('[Filo voce]', e); }
     }
     function smetti() {
       if (c.timer) clearInterval(c.timer);
       c.timer = 0;
     }
-    function annullaInvio() {
+    // L'invio da solo fermato (Esc, il microfono, una correzione): il testo resta nella casella e si conta quando parte.
+    function annullaInvio(cambiata = false) {
       smetti();
       imposta('pronto');
+      const e = c.inAttesa;
+      c.inAttesa = null;
+      if (e) lasciaInCasella(e, cambiata);
       caretInFondo(campo);
     }
 
@@ -230,9 +291,11 @@
     }
     // Un Esc o un Invio finché la sessione non ha consegnato tutto (anche mentre trascrive l'ultima frase):
     // quello che arriva ancora resta nella casella e non parte da solo.
-    function tieni() {
+    // `inviata`: l'ha mandata la chat (Invio, o la casella svuotata da lei).
+    function tieni(inviata = false) {
       if (!c.sessione) return false;
       c.toccato = true;
+      if (inviata) c.inviata = true;
       c.sessione.ferma('utente');
       return true;
     }
@@ -254,17 +317,29 @@
     const suInput = (e) => {
       if (!e.isTrusted) return;
       c.toccato = true;
+      if (c.sessione && !c.perche) c.perche = 'cambiata';
       c.lasciato = campo.value;
-      if (c.stato === 'attesa') annullaInvio();
+      // La persona che svuota la casella butta il dettato; che la cambia, lo corregge.
+      if (c.dettate.length) {
+        if (!campo.value.trim()) chiudiDettate('annullata');
+        else for (const d of c.dettate) d.cambiata = true;
+      }
+      if (c.stato === 'attesa') {
+        if (campo.value.trim()) annullaInvio(true);
+        else { smetti(); imposta('pronto'); esitoDellAttesa('annullata'); }
+      }
     };
     campo.addEventListener('input', suInput);
+    const suClic = () => verificaPresto();
+    document.addEventListener('click', suClic, true);
     const suTasto = (e) => {
       if (!e.isTrusted) return;
       // Invio a mano (la chat l'ha già preso): manda da sé quello che c'è, l'attesa finisce, e quello che si
       // stava ancora dicendo resta nella casella invece di partire dopo come un secondo messaggio.
       if (e.key === 'Enter' && !e.shiftKey && !e.isComposing && e.target === campo) {
-        if (c.stato === 'attesa') { smetti(); imposta('pronto'); }
-        tieni();
+        if (c.stato === 'attesa') { smetti(); imposta('pronto'); esitoDellAttesa('a_mano'); }
+        tieni(true);
+        verificaPresto();
         return;
       }
       if (e.defaultPrevented) return;
@@ -288,6 +363,10 @@
     function ferma() {
       c.giro++;
       smetti();
+      // Il testo resta nella casella della chat nascosta: si conta quando parte, o quando la chat se ne va.
+      const e = c.inAttesa;
+      c.inAttesa = null;
+      if (e) lasciaInCasella(e, false);
       if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
       if (c.stato !== 'pronto') imposta('pronto');
     }
@@ -295,8 +374,11 @@
     function scollega() {
       c.giro++;
       smetti();
-      if (c.sessione) { c.sessione.ferma('altro'); c.sessione = null; }
+      esitoDellAttesa('annullata');
+      chiudiDettate('tenuta');
+      if (c.sessione) { c.sessione.ferma('annulla'); c.sessione = null; }
       campo.removeEventListener('input', suInput);
+      document.removeEventListener('click', suClic, true);
       doveTasti.removeEventListener('keydown', suTasto);
       b.remove();
       controlli.delete(c);

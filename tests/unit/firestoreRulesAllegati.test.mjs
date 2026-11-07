@@ -87,5 +87,35 @@ test('ogni posto della lista è controllato, fino al tetto del client', () => {
       assert.ok(m[1].includes(`(l.size() < ${i + 1} || ${voce}(l[${i}]))`), `${fn}: il posto ${i} non è controllato`);
     }
   }
-  assert.match(RULES, /function documentoAllegato\(f\) \{\s*return f is map && indirizzoAllegato\(f\.get\('url', ''\)\);/);
+});
+
+// #1515: una voce di files[] con un campo in più portava alle routine testo che i giudici non avevano visto.
+function corpoDocumentoAllegato() {
+  const m = /function documentoAllegato\(f\) \{([\s\S]*?)\n    \}/.exec(RULES);
+  assert.ok(m, 'documentoAllegato non trovata');
+  return m[1].replace(/\s+/g, ' ');
+}
+
+test('una voce di files[] ha solo url, nome e tipo, coi tetti del client', () => {
+  const corpo = corpoDocumentoAllegato();
+  assert.match(corpo, /f is map && f\.keys\(\)\.hasOnly\(\['url', 'name', 'type'\]\)/);
+  assert.match(corpo, /indirizzoAllegato\(f\.get\('url', ''\)\)/);
+  assert.match(corpo, new RegExp(`f\\.get\\('name', ''\\) is string && f\\.get\\('name', ''\\)\\.size\\(\\) <= ${FB.VOCE_DOCUMENTO.NOME_MAX}`));
+  assert.match(corpo, new RegExp(`f\\.get\\('type', ''\\) is string && f\\.get\\('type', ''\\)\\.size\\(\\) <= ${FB.VOCE_DOCUMENTO.TIPO_MAX}`));
+});
+
+test('la voce che scrive l\'app sta nella forma delle regole, anche con nome e tipo fuori misura', async () => {
+  const url = await indirizzoDellApp('text/markdown');
+  const normale = FB.voceDocumento(url, 'spec.md', 'text/markdown');
+  assert.deepEqual(normale, { url, name: 'spec.md', type: 'text/markdown' });
+
+  const lungo = FB.voceDocumento(url, `${'😀'.repeat(400)}${'a'.repeat(300)}.pdf`, `application/${'x'.repeat(300)}`);
+  assert.deepEqual(Object.keys(lungo).sort(), ['name', 'type', 'url']);
+  assert.equal(Array.from(lungo.name).length, FB.VOCE_DOCUMENTO.NOME_MAX);
+  assert.ok(lungo.name.endsWith('….pdf'), `l'estensione si perde: ${lungo.name.slice(-12)}`);
+  assert.ok(!/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/.test(lungo.name), 'un\'emoji tagliata a metà');
+  assert.equal(lungo.type, '');
+
+  const vuoto = FB.voceDocumento(url, '', undefined);
+  assert.deepEqual(vuoto, { url, name: 'allegato', type: '' });
 });

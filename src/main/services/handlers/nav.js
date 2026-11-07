@@ -1,7 +1,22 @@
 // Handler di dominio: navigazione, apertura/chiusura tab, fullscreen e comandi shell.
 
 const { app } = require('electron');
-const { soloFilo } = require('./origine');
+const { soloFilo, filoNegatoAllaPagina } = require('./origine');
+const { azione: contata } = require('../azioniContate');
+const Strade = require('../contatoriStrade');
+
+// Una pagina di Filo aperta da un'altra pagina di Filo (#1468): la strada la dice chi manda (un comando, una carta della
+// home, la chat), sennò è un collegamento; aperta da una strada che è anche un'icona, è anche la sua azione.
+const VIE_DICHIARATE = ['comando_slash', 'carta_home', 'chat'];
+function contaPagina(url, via, win) {
+  const T = globalThis.SN_CONTATORI_STRADE;
+  if (!T || !win) return;
+  const v = VIE_DICHIARATE.includes(via) ? via : 'collegamento_interno';
+  const incognito = !!win._filoIncognito;
+  Strade.misura('pagina', url, v, { finestra: win._filoTabs, incognito });
+  const azione = T.AZIONE_DELLA_PAGINA[T.paginaDi(url)];
+  if (azione && v !== 'collegamento_interno') Strade.misura('azione', azione, v, { incognito });
+}
 
 // Un'icona della home dice dove sta in px della sua pagina; il menu della shell lo vuole in px della finestra.
 // Il punto resta dentro la vista: una pagina non apre il menu fuori da sé.
@@ -29,7 +44,7 @@ module.exports = function register(on, ctx) {
     // subito dove è finita.
     let url = 'filo://home/home.html';
     if (msg && msg.highlight) url += `?highlight=${encodeURIComponent(String(msg.highlight))}`;
-    if (win?._filoTabs) win._filoTabs.openTab(url);
+    if (win?._filoTabs) contata('open-for-later', () => win._filoTabs.openTab(url));
     return { ok: true };
   });
 
@@ -38,20 +53,23 @@ module.exports = function register(on, ctx) {
   on(MSG.GO_HOME, async (msg, sender) => {
     const win = winOf(sender);
     if (!win?._filoTabs) return { ok: true };
-    if (sender?.tab?.id) win._filoTabs.navigate(sender.tab.id, 'filo://newtab/');
-    else win._filoTabs.openTab('filo://newtab/');
+    contata('home', () => {
+      if (sender?.tab?.id) win._filoTabs.navigate(sender.tab.id, 'filo://newtab/');
+      else win._filoTabs.openTab('filo://newtab/');
+    });
     return { ok: true };
   });
 
   on(MSG.OPEN_HISTORY, async (msg, sender) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab('filo://history/history.html');
+    if (win?._filoTabs) contata('history', () => win._filoTabs.openTab('filo://history/history.html'));
     return { ok: true };
   });
 
-  on(MSG.OPEN_OPTIONS, async (msg, sender) => {
+  on(MSG.OPEN_OPTIONS, async (msg, sender, origin) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab('filo://options/options.html');
+    if (win?._filoTabs && isFilo(origin)) contaPagina('filo://options/options.html', msg && msg.via, win);
+    if (win?._filoTabs) contata('options-models', () => win._filoTabs.openTab('filo://options/options.html'));
     return { ok: true };
   });
 
@@ -61,10 +79,12 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // La pagina chiude solo sé stessa; `via` dice da quale gesto, per i contatori della finestra (#1470).
   on(MSG.CLOSE_TAB, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.closeTab(sender.tab.id);
+      const via = ['tasto_destro_riga', 'salva_per_dopo'].includes(msg && msg.via) ? msg.via : 'altro';
+      if (win?._filoTabs) contata('close-tab', () => win._filoTabs.closeTab(sender.tab.id, { via }));
     }
     return { ok: true };
   });
@@ -90,8 +110,10 @@ module.exports = function register(on, ctx) {
       const r = await apriDaFilo(url, { wc: sender?.wc, parole, apri: () => win._filoTabs.openTab(url, { origine }) });
       return { ok: true, ...r };
     }
+    if (filoNegatoAllaPagina(url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
     const daPagina = /^https?:/i.test(String(sender?.url || ''));
     const gesto = require('../permessiPagine').gestoDellUtente(sender?.wc);
+    if (/^filo:/i.test(url) && isFilo(origin)) contaPagina(url, msg.via, win);
     win._filoTabs.openTab(url, daPagina ? { origine: { tipo: 'link', da: sender.url, gesto } } : {});
     return { ok: true };
   });
@@ -129,9 +151,11 @@ module.exports = function register(on, ctx) {
   }));
 
   on(MSG.NAV_BACK, async (msg, sender) => {
+    // Ctrl/Cmd+Z fuori da un campo subito dopo un'azione di Filo la annulla (#1461).
+    if (msg && msg.daAnnulla === true) { try { globalThis.SN_CONTATORI_MAIN?.tastoAnnulla(); } catch (_) {} }
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.goBack(sender.tab.id);
+      if (win?._filoTabs) contata('navigate-back-forward', () => win._filoTabs.goBack(sender.tab.id));
     }
     return { ok: true };
   });
@@ -139,7 +163,7 @@ module.exports = function register(on, ctx) {
   on(MSG.NAV_FORWARD, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.goForward(sender.tab.id);
+      if (win?._filoTabs) contata('navigate-back-forward', () => win._filoTabs.goForward(sender.tab.id));
     }
     return { ok: true };
   });
@@ -147,18 +171,9 @@ module.exports = function register(on, ctx) {
   on(MSG.NAV_RELOAD, async (msg, sender) => {
     if (sender?.tab?.id) {
       const win = winOf(sender);
-      win?._filoTabs?.reload(sender.tab.id);
+      if (win?._filoTabs) contata('reload', () => win._filoTabs.reload(sender.tab.id));
     }
     return { ok: true };
-  });
-
-  on(MSG.NAV_STATE, async (msg, sender) => {
-    if (!sender?.tab?.id) return { ok: false, canBack: false, canFwd: false };
-    const win = winOf(sender);
-    const tab = win?._filoTabs?.tabs?.find((t) => t.id === sender.tab.id);
-    if (!tab?.view?.webContents) return { ok: false, canBack: false, canFwd: false };
-    const tabs = win._filoTabs;
-    return { ok: true, canBack: tabs.puoTornare(tab, 'indietro'), canFwd: tabs.puoTornare(tab, 'avanti') };
   });
 
   on(MSG.TOGGLE_FULLSCREEN, async (msg, sender) => {
@@ -208,9 +223,13 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
-  on(MSG.OPEN_NEW_TAB, async (msg, sender) => {
+  on(MSG.OPEN_NEW_TAB, async (msg, sender, origin) => {
     const win = winOf(sender);
-    if (win?._filoTabs) win._filoTabs.openTab(msg.url || 'filo://newtab/');
+    if (filoNegatoAllaPagina(msg.url, sender, origin)) return { ok: false, code: 'forbidden', error: 'forbidden' };
+    if (win?._filoTabs) {
+      const apri = () => win._filoTabs.openTab(msg.url || 'filo://newtab/');
+      if (msg.url) apri(); else contata('new-tab', apri);
+    }
     return { ok: true };
   });
 
@@ -219,17 +238,32 @@ module.exports = function register(on, ctx) {
     // in alto). "close" è ESCLUSO di proposito: l'AI non chiude finestra né
     // schede. Inoltriamo alla shell, che clicca il bottone reale, così si
     // riusa tutto il comportamento esistente (menu ancorati, toggle finestra…).
-    const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize'];
+    const { COMANDI_CHAT } = require('../../barraLaterale');
+    const allowed = ['home', 'settings', 'apps', 'account', 'fullscreen', 'minimize', ...Object.keys(COMANDI_CHAT)];
     const command = String(msg.command || '').trim().toLowerCase();
     if (!allowed.includes(command)) {
       return { ok: false, error: `comando shell non consentito: "${command}"` };
     }
     const win = winOf(sender);
-    if (!win) return { ok: false, error: 'nessuna finestra' };
+    // Il comando che l'Aiuto aziona da sé entra nel filo come le azioni della chat (#1561). Le icone della home passano
+    // di qui per un clic dell'utente: è l'Aiuto a dire che il comando è suo.
+    const dellAiuto = msg.assistente === true;
+    const nelFilo = (r) => {
+      if (dellAiuto) { try { ctx.azioneDellAiuto({ type: 'COMANDO_BARRA', comando: command }, { executed: !!r.ok, error: r.error }, sender); } catch (_) {} }
+      return r;
+    };
+    if (!win) return nelFilo({ ok: false, error: 'nessuna finestra' });
+    // La barra laterale non è un bottone della shell: la comanda il main, e il lucchetto entra nel filo dell'Aiuto (#1292).
+    if (COMANDI_CHAT[command]) {
+      const barra = win._filoTabs && win._filoTabs.barra;
+      if (!barra) return nelFilo({ ok: false, error: 'nessuna barra laterale' });
+      await require('../registroCambi').con({ via: dellAiuto ? 'assistente' : 'interfaccia' }, () => barra.comandoChat(command));
+      return nelFilo({ ok: true });
+    }
     const anchor = isFilo(origin) ? ancoraNellaFinestra(win, sender && sender.wc, msg.anchor) : null;
     try { win.webContents.send('shell:trigger-button', anchor ? { command, anchor } : { command }); }
-    catch (_) { return { ok: false, error: 'invio alla shell fallito' }; }
-    return { ok: true };
+    catch (_) { return nelFilo({ ok: false, error: 'invio alla shell fallito' }); }
+    return nelFilo({ ok: true });
   });
 
   on(MSG.OPEN_INCOGNITO, async () => {
@@ -237,7 +271,7 @@ module.exports = function register(on, ctx) {
     // non creare cicli al boot.
     try {
       const { createIncognitoWindow } = require('../../window');
-      createIncognitoWindow();
+      contata('incognito', () => createIncognitoWindow());
       return { ok: true };
     } catch (e) {
       console.error('[Filo] open-incognito', e);
@@ -246,7 +280,7 @@ module.exports = function register(on, ctx) {
   });
 
   // Un iframe non può parlare col frame che lo ospita (origini diverse): passa da qui. Non
-  // porta dati arbitrari, solo l'id di un'icona che il frame principale risolve da sé.
+  // porta dati arbitrari, solo il nome di un pannello che il frame principale apre da sé.
   const frameBridge = (msg, sender, payload) => {
     const wc = sender && sender.wc;
     if (!wc) return { ok: false, error: 'no-sender' };
@@ -269,7 +303,6 @@ module.exports = function register(on, ctx) {
 
   on(MSG.RUN_IN_TOP_FRAME, async (msg, sender) => frameBridge(msg, sender, {
     type: MSG.TOP_FRAME_COMMAND,
-    iconId: String(msg?.iconId || ''),
     surface: String(msg?.surface || ''),
   }));
 
@@ -333,6 +366,7 @@ module.exports = function register(on, ctx) {
     frames: Number(msg?.frames) || 0,
     applied: Number(msg?.applied) || 0,
     left: Number(msg?.left) || 0,
+    fuoriConto: msg?.fuoriConto ? 1 : 0,
   }));
 
   on(MSG.REPLACE_MISSPELLING, async (msg, sender) => {

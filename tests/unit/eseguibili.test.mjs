@@ -335,6 +335,15 @@ test('i file che al doppio clic connettono, installano dalla rete o eseguono cod
   }
 });
 
+test('gli installatori di Linux sono programmi, anche Snap e Flatpak che il centro software installa dalla rete (#1399.4)', () => {
+  for (const nome of ['Filo-1.2.3.AppImage', 'filo_1.2.3_amd64.deb', 'filo-1.2.3.x86_64.rpm', 'filo_1.2.3.snap',
+    'filo.flatpak', 'org.filo.App.flatpakref', 'flathub.flatpakrepo', 'installa.run']) {
+    assert.equal(E.eEseguibile(nome), true, `manca ${nome}`);
+    assert.equal(E.eImmagineDisco(nome), false, `${nome} non è un disco`);
+  }
+  for (const nome of ['snapshot.png', 'flatpak.txt', 'note.snapx']) assert.equal(E.eEseguibile(nome), false, `falso allarme su ${nome}`);
+});
+
 test('un’immagine disco si dice immagine disco, non «programma»', () => {
   for (const nome of ['setup.iso', 'disco.IMG', 'win.vhdx', 'app.dmg']) {
     assert.equal(E.eImmagineDisco(nome), true, nome);

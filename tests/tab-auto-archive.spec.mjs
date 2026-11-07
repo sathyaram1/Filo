@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
+import { createHash } from 'node:crypto';
 import { statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 
@@ -348,6 +349,8 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
     ['Musica', '<input id="q" type="search" placeholder="Cosa vuoi ascoltare?">'],
     ['Negozio', '<div role="search"><input id="q" type="text" aria-label="Cerca"></div>'],
     ['Motore', '<form role="search" onsubmit="event.preventDefault()"><textarea id="q" name="q"></textarea></form>'],
+    // Fuori da un modulo di ricerca e senza «rows»: la dice ricerca solo la misura delle righe che mostra.
+    ['Motore una riga', '<div><textarea id="q" name="q" style="width:480px;height:24px;line-height:24px;padding:4px;resize:none;overflow:hidden"></textarea></div>'],
   ]) {
     const page = await apriEsatta(app, shell, conRisultati(titolo, campo));
     await page.locator('#q').click();
@@ -357,12 +360,14 @@ test('una casella di ricerca non protegge la scheda, anche coi risultati dal viv
   await expect.poll(() => moduloDi(shell, 'Musica'), { timeout: 2_000 }).toBe(false);
   expect(await moduloDi(shell, 'Negozio')).toBe(false);
   expect(await moduloDi(shell, 'Motore')).toBe(false);
+  expect(await moduloDi(shell, 'Motore una riga')).toBe(false);
 
   await pulisciTutto(app, shell, testServer);
   const aperte = await titoliAperti(shell);
   expect(aperte).not.toContain('Musica');
   expect(aperte).not.toContain('Negozio');
   expect(aperte).not.toContain('Motore');
+  expect(aperte).not.toContain('Motore una riga');
 });
 
 // Il testo dell'utente si segue per contenuto: quando la pagina lo sposta in un altro campo, o
@@ -694,6 +699,7 @@ async function apriSito() {
       if (percorso === '/invia-ok') { res.writeHead(302, { Location: '/discussione' }); res.end(); return; }
       if (percorso === '/discussione') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Discussione</title><p>Il tuo post è pubblicato'); return; }
       if (percorso === '/contatto') { res.writeHead(302, { Location: '/grazie' }); res.end(); return; }
+      if (percorso === '/traccia') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<!doctype html><title>Stato spedizione</title><p>In consegna domani'); return; }
       if (percorso === '/grazie') { res.writeHead(200, { 'Content-Type': 'text/html' }); res.end(`<!doctype html><title>Grazie</title>${TESTATA_ACCESSO}<p>Grazie, ti risponderemo presto`); return; }
       if (percorso === '/sw.js') {
         res.writeHead(200, { 'Content-Type': 'text/javascript' });
@@ -721,11 +727,32 @@ async function apriSito() {
       res.end(html);
     });
   });
+  // Collegamento sempre aperto: /ws-ok risponde a ogni messaggio, /ws-muto tace, /ws-errore chiude con un errore.
+  const prese = new Set();
+  server.on('upgrade', (req, socket) => {
+    prese.add(socket);
+    socket.on('error', () => {});
+    socket.on('close', () => prese.delete(socket));
+    const accetta = createHash('sha1').update(`${req.headers['sec-websocket-key']}258EAFA5-E914-47DA-95CA-C5AB0DC85B11`).digest('base64');
+    socket.write(`HTTP/1.1 101 Switching Protocols\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nSec-WebSocket-Accept: ${accetta}\r\n\r\n`);
+    const modo = req.url.split('?')[0];
+    socket.on('data', (b) => {
+      if ((b[0] & 0x0f) !== 1) return;
+      if (modo === '/ws-ok') { const r = Buffer.from('{"ok":true}'); socket.write(Buffer.concat([Buffer.from([0x81, r.length]), r])); }
+      if (modo === '/ws-errore') socket.end(Buffer.from([0x88, 2, 1011 >> 8, 1011 & 0xff]));
+    });
+  });
   await new Promise((r) => server.listen(0, '127.0.0.1', r));
   const origine = `http://127.0.0.1:${server.address().port}`;
   return {
     pagina(html) { const id = `p${++n}`; pagine.set(id, html); return `${origine}/${id}`; },
-    async chiudi() { try { server.closeAllConnections(); } catch (_) {} await new Promise((r) => server.close(r)); },
+    // Lo stesso server sotto un altro sito: per i riquadri di un servizio esterno.
+    altroSito(html) { return this.pagina(html).replace('127.0.0.1', 'sito-pubblico.test'); },
+    async chiudi() {
+      for (const p of prese) p.destroy();
+      try { server.closeAllConnections(); } catch (_) {}
+      await new Promise((r) => server.close(r));
+    },
   };
 }
 
@@ -1036,5 +1063,173 @@ test('un modulo mandato in un\'altra scheda, in un riquadro o senza cambiare pag
     }
     const aperte = await archiviaTutto(app, shell, sito);
     for (const [nome, id] of Object.entries(ids)) expect.soft(aperte, nome).toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+// #1808 (pacchetto #824.3, #824.4, #824.6): una scheda resta protetta finché il suo testo può ancora andare perso, e
+// smette di esserlo appena il testo è arrivato.
+
+const LETTERA = 'Dear team, I am writing about the order I placed last week, which never arrived';
+
+// Scrive dove dice `campo` e aspetta che la scheda lo sappia; torna l'id della scheda.
+async function scriviIn(shell, page, titolo, campo, testo = LETTERA) {
+  await campo.click();
+  await page.keyboard.type(testo);
+  await expect.poll(async () => (await schedeConId(shell)).find((t) => t.title === titolo)?.formDirty, { timeout: 8_000 }).toBe(true);
+  return (await schedeConId(shell)).find((t) => t.title === titolo).id;
+}
+
+test('la sessione scaduta che rimanda all’accesso dopo un invio fatto dalla pagina tiene aperta la scheda (#824.3)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const scuola = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Compito</title>
+      <form id="f" method="post" action="/invia-scaduta"><textarea name="corpo" id="c" style="width:400px;height:100px"></textarea></form>
+      <a href="#" id="pub" onclick="setTimeout(() => f.submit(), 200);return false">Consegna</a>`));
+    const id = await scriviEPubblica(shell, scuola, 'Compito', scuola.locator('#c'));
+    expect((await schedeConId(shell)).find((t) => t.id === id)?.title).toBe('Accedi');
+    expect(await archiviaTutto(app, shell, sito)).toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo mandato bene da una pagina senza accesso, che risponde con l’accesso in testata, non protegge la scheda (#824.3)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const contatti = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>Scrivici</title>
+      <form method="post" action="/contatto"><textarea name="msg" id="c" style="width:400px;height:100px"></textarea><button id="pub">Invia</button></form>`));
+    const id = await scriviEPubblica(shell, contatti, 'Scrivici', contatti.locator('#c'));
+    await expect(contatti.getByText('Grazie, ti risponderemo presto')).toBeVisible();
+    expect(await archiviaTutto(app, shell, sito)).not.toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+test('una casella del messaggio col nome di una ricerca tiene aperta la scheda (#824.4)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    for (const [titolo, campo, testo] of [
+      ['Contact us', '<textarea name="query" id="c" placeholder="Your query" style="width:400px;height:120px"></textarea>', LETTERA],
+      ['Commento', '<textarea name="s" id="c" style="width:400px;height:120px"></textarea>', 'Bella ricetta, la provo domenica'],
+      ['Annuncio', '<input name="annuncio" id="c" placeholder="Cercasi: descrivi chi cerchi" style="width:400px">', 'Cameriere per il fine settimana'],
+      ['Ricerca', '<input id="c" placeholder="Research topic" style="width:400px">', 'Biologia marina del Mediterraneo'],
+      ['Lungo', '<input name="query" id="c" style="width:400px">', LETTERA + ' and I would like a refund'],
+    ]) {
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <form method="post" action="/api/contatto"><input name="nome" placeholder="Your name">${campo}<button>Send</button></form>`));
+      ids[titolo] = await scriviIn(shell, page, titolo, page.locator('#c'), testo);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    for (const [titolo, id] of Object.entries(ids)) expect.soft(aperte, titolo).toContain(id);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo in un riquadro di un altro sito, mandato e respinto, tiene aperta la scheda; pubblicato no (#824.4)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    for (const [titolo, azione, invio, attesa] of [
+      ['Respinto', '/invia-500', '<button id="pub">Invia</button>', 'Errore del server'],
+      ['Da script', '/invia-500', '<a href="#" id="pub" onclick="f.submit();return false">Invia</a>', 'Errore del server'],
+      ['Rete caduta', '/invia-cade', '<button id="pub">Invia</button>', null],
+      ['Pubblicato', '/invia-ok', '<button id="pub">Invia</button>', 'pubblicato'],
+    ]) {
+      const dentro = sito.altroSito(`<!doctype html><title>Modulo</title>
+        <form id="f" method="post" action="${azione}"><textarea name="msg" id="c" style="width:400px;height:100px"></textarea>${invio}</form>`);
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <p>Negozio</p><iframe id="ifr" src="${dentro}" style="width:500px;height:250px"></iframe>`));
+      const riquadro = page.frameLocator('#ifr');
+      await expect(riquadro.locator('#c')).toBeVisible();
+      ids[titolo] = await scriviIn(shell, page, titolo, riquadro.locator('#c'));
+      await riquadro.locator('#pub').click();
+      if (attesa) await expect(riquadro.getByText(attesa)).toBeVisible();
+      else await page.waitForTimeout(1500);
+      await page.waitForTimeout(500);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'respinto').toContain(ids.Respinto);
+    expect.soft(aperte, 'mandato da uno script e respinto').toContain(ids['Da script']);
+    expect.soft(aperte, 'rete caduta').toContain(ids['Rete caduta']);
+    expect.soft(aperte, 'pubblicato').not.toContain(ids.Pubblicato);
+  } finally { await sito.chiudi(); }
+});
+
+test('un post mandato su un collegamento sempre aperto conta come inviato quando il server risponde (#824.4)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    for (const modo of ['/ws-ok', '/ws-muto', '/ws-errore']) {
+      const titolo = `Social ${modo.slice(4)}`;
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <div id="box"><textarea id="c" style="width:400px;height:100px"></textarea><button id="pub">Pubblica</button></div><p id="esito"></p>
+        <script>const ws = new WebSocket('ws://' + location.host + '${modo}');
+          window.pronto = new Promise((r) => { ws.onopen = () => r(true); });
+          pub.onclick = () => { ws.send(JSON.stringify({ tipo: 'post', testo: c.value })); box.remove(); esito.textContent = 'Invio…'; };
+          ws.onmessage = () => { esito.textContent = 'Post pubblicato'; };</script>`));
+      expect(await page.evaluate(() => window.pronto)).toBe(true);
+      ids[modo] = await scriviIn(shell, page, titolo, page.locator('#c'));
+      await page.locator('#pub').click();
+      if (modo === '/ws-ok') await expect(page.locator('#esito')).toHaveText('Post pubblicato');
+      else await page.waitForTimeout(1000);
+    }
+    await expect.poll(async () => (await schedeConId(shell)).find((t) => t.id === ids['/ws-ok'])?.formDirty, { timeout: 8_000 }).toBe(false);
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'il server ha risposto').not.toContain(ids['/ws-ok']);
+    expect.soft(aperte, 'il server non risponde').toContain(ids['/ws-muto']);
+    expect.soft(aperte, 'il server chiude con un errore').toContain(ids['/ws-errore']);
+  } finally { await sito.chiudi(); }
+});
+
+test('un modulo di una riga che apre il risultato in una scheda nuova non protegge la scheda di partenza; respinto sì (#824.6)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  try {
+    const ids = {};
+    for (const [titolo, azione, attesa] of [['Spedizioni', '/traccia', 'Stato spedizione'], ['Biglietti', '/invia-500', 'Errore']]) {
+      const page = await apriEsatta(app, shell, sito.pagina(`<!doctype html><title>${titolo}</title>
+        <form action="${azione}" target="_blank"><input name="codice" id="c" style="width:300px"><button id="vai">Traccia</button></form>`));
+      ids[titolo] = await scriviIn(shell, page, titolo, page.locator('#c'), 'AB123456789IT');
+      await page.locator('#vai').click();
+      await expect.poll(async () => (await schedeConId(shell)).some((t) => t.title === attesa), { timeout: 10_000 }).toBe(true);
+      await page.waitForTimeout(800);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'risultato in una scheda nuova').not.toContain(ids.Spedizioni);
+    expect.soft(aperte, 'risposta d’errore nella scheda nuova').toContain(ids.Biglietti);
+  } finally { await sito.chiudi(); }
+});
+
+test('un dialogo chiuso dopo «Crea» col nome nella pagina non protegge la scheda, chiuso con Annulla sì (#824.6)', async ({ app, shell }) => {
+  const sito = await apriSito();
+  const NOME = 'Regali di Natale per i nonni';
+  try {
+    const conDiv = (titolo) => sito.pagina(`<!doctype html><title>${titolo}</title>
+      <button id="nuova">Nuova lista</button><ul id="liste"><li>Spesa</li></ul><div id="slot"></div>
+      <script>nuova.onclick = () => { slot.innerHTML = '<div role="dialog" aria-modal="true"><label>Nome <input id="nome"></label>'
+        + '<button id="crea">Crea</button><button id="annulla">Annulla</button></div>'; };
+        slot.onclick = (e) => {
+          if (e.target.id === 'crea') { const li = document.createElement('li'); li.textContent = nome.value; liste.append(li); slot.innerHTML = ''; }
+          if (e.target.id === 'annulla') slot.innerHTML = '';
+        };</script>`);
+    const conDialog = (titolo) => sito.pagina(`<!doctype html><title>${titolo}</title>
+      <button id="nuova">Nuova lista</button><ul id="liste"><li>Spesa</li></ul>
+      <dialog id="d"><form method="dialog"><label>Nome <input id="nome"></label><button id="crea" value="crea">Crea</button>
+        <button id="annulla" value="annulla">Annulla</button></form></dialog>
+      <script>nuova.onclick = () => d.showModal();
+        d.onclose = () => { if (d.returnValue === 'crea') { const li = document.createElement('li'); li.textContent = nome.value; liste.append(li); } };</script>`);
+    const ids = {};
+    for (const [titolo, url, bottone] of [
+      ['Liste crea', conDiv, '#crea'], ['Liste dialogo crea', conDialog, '#crea'],
+      ['Liste annulla', conDiv, '#annulla'], ['Liste dialogo annulla', conDialog, '#annulla'],
+    ]) {
+      const page = await apriEsatta(app, shell, url(titolo));
+      await page.locator('#nuova').click();
+      ids[titolo] = await scriviIn(shell, page, titolo, page.locator('#nome'), NOME);
+      await page.locator(bottone).click();
+      await expect(page.locator('#nome')).toBeHidden();
+      if (bottone === '#crea') await expect(page.locator('#liste li').last()).toHaveText(NOME);
+    }
+    const aperte = await archiviaTutto(app, shell, sito);
+    expect.soft(aperte, 'dialogo tolto dopo Crea').not.toContain(ids['Liste crea']);
+    expect.soft(aperte, 'dialogo chiuso dopo Crea').not.toContain(ids['Liste dialogo crea']);
+    expect.soft(aperte, 'dialogo tolto con Annulla').toContain(ids['Liste annulla']);
+    expect.soft(aperte, 'dialogo chiuso con Annulla').toContain(ids['Liste dialogo annulla']);
   } finally { await sito.chiudi(); }
 });

@@ -679,7 +679,8 @@
       soggetto: campoCert(certs[0].subject, 'O') || campoCert(certs[0].subject, 'CN') || '',
       catenaIntegra,
       scaduto: scaduto(certs[0]),
-      marca: scaduto(certs[0]) ? leggiMarca(nonProtetto, protetto, claimBytes, firma) : null,
+      // Serve anche a certificato valido: l'elenco provvisorio vale solo per le firme anteriori al congelamento.
+      marca: leggiMarca(nonProtetto, protetto, claimBytes, firma),
       certificati: certs,
     };
   }
@@ -723,6 +724,34 @@
     }
     return 'sconosciuto';
   }
+
+  // L'elenco provvisorio del C2PA (anchors.pem + allowed.pem del verificatore di riferimento) è congelato da questa data:
+  // vale solo per chi l'elenco ufficiale non riconosce, e solo per le firme fatte prima, con la sua frase (#946.1).
+  const CONGELAMENTO_PROVVISORIO = Date.UTC(2026, 0, 1);
+  // L'ora della firma la dice una marca che regge; senza, il certificato deve almeno essere nato prima del congelamento.
+  function primaDelCongelamento(firma, ancoreTsa) {
+    const foglia = firma && firma.certificati && firma.certificati[0];
+    if (!foglia) return false;
+    if (firma.marca && marcaValida(firma.marca, foglia, ancoreTsa)) return firma.marca.ora < CONGELAMENTO_PROVVISORIO;
+    const da = Date.parse(foglia.validFrom);
+    return Number.isFinite(da) && da < CONGELAMENTO_PROVVISORIO;
+  }
+  // Nell'elenco provvisorio ci sono anche certificati di singoli firmatari, ammessi senza catena: vale l'impronta esatta.
+  function ammessoProvvisorio(certs, ammessi) {
+    const foglia = certs && certs[0];
+    if (!foglia || foglia.ca || !Array.isArray(ammessi)) return false;
+    return ammessi.some((c) => c && c.fingerprint256 === foglia.fingerprint256);
+  }
+  // Torna lo stato del firmatario e le autorità di marcatura che valgono per lui.
+  function fiducia(firma, ancore, ancoreTsa, provvisorio) {
+    const stato = statoFirmatario(firma.certificati, ancore);
+    if (stato !== 'sconosciuto' || !provvisorio) return { stato, ancoreTsa };
+    const tsa = (ancoreTsa || []).concat(provvisorio.ancore || []);
+    const dentro = statoFirmatario(firma.certificati, provvisorio.ancore || []) === 'riconosciuto'
+      || ammessoProvvisorio(firma.certificati, provvisorio.ammessi);
+    if (!dentro || !primaDelCongelamento(firma, tsa)) return { stato, ancoreTsa };
+    return { stato: 'provvisorio', ancoreTsa: tsa };
+  }
   // Il motore crittografico di Electron non decodifica le chiavi RSA dichiarate «solo per PSS» (id-RSASSA-PSS),
   // che Node legge: i byte della chiave sono quelli di una RSA qualunque, quindi si rileggono con l'identificativo generico.
   const OID_RSA_PSS = '1.2.840.113549.1.1.10';
@@ -752,20 +781,19 @@
 
   // L'elenco scaricato è un PEM con righe di commento in mezzo: vale ogni
   // certificato che si legge, gli altri blocchi si saltano.
-  function ancoreDaPem(testo) {
+  function certificatiDaPem(testo) {
     const crypto = nodeMod('node:crypto');
     if (!crypto || !crypto.X509Certificate) return [];
     const out = [];
     const re = /-----BEGIN CERTIFICATE-----[\s\S]*?-----END CERTIFICATE-----/g;
     let m;
     while ((m = re.exec(String(testo || '')))) {
-      try {
-        const c = new crypto.X509Certificate(m[0]);
-        if (c.ca) out.push(c);
-      } catch (_) {}
+      try { out.push(new crypto.X509Certificate(m[0])); } catch (_) {}
     }
     return out;
   }
+  function ancoreDaPem(testo) { return certificatiDaPem(testo).filter((c) => c.ca); }
+  function ammessiDaPem(testo) { return certificatiDaPem(testo).filter((c) => !c.ca); }
 
   // ───────────────────────── marca temporale (RFC 3161) ─────────────────────────
   // Un certificato scaduto oggi non dice niente su una firma fatta quando valeva: lo
@@ -959,7 +987,7 @@
       }
     }
     const store = perEtichetta(manifesto.figli, 'c2pa.assertions');
-    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, hashBmff: null, ingredienti: [] };
+    const out = { origine: null, generatore: '', coperte: 0, scoperte: 0, hashDati: null, hashBmff: null, ingredienti: [], tuttiIngredienti: 0, azioni: [] };
     if (!store) return out;
     for (const box of store.figli) {
       if (box.tipo !== 'jumb' || !box.etichetta) continue;
@@ -979,6 +1007,7 @@
       }
       else if (/^c2pa\.ingredient(\.v\d+)?$/.test(etichetta)) {
         const ing = cborTesta(dati);
+        out.tuttiIngredienti++;
         const rif = ing && (ing.activeManifest || ing.c2pa_manifest);
         if (rif && typeof rif.url === 'string' && RELAZIONI.has(String(ing.relationship))) {
           out.ingredienti.push({ relazione: String(ing.relationship), url: rif.url, hash: u8(rif.hash), alg: rif.alg || claim.alg || 'sha256' });
@@ -988,6 +1017,7 @@
         const elenco = az && Array.isArray(az.actions) ? az.actions : [];
         for (const a of elenco) {
           if (!a || typeof a !== 'object') continue;
+          out.azioni.push(String(a.action || ''));
           const c = codiceSorgente(a.digitalSourceType);
           if (c === 'ai') out.origine = 'ai';
           else if (c && out.origine !== 'ai') out.origine = c;
@@ -1036,9 +1066,13 @@
 
   // `opzioni.ancore`: i certificati dell'elenco ufficiale dei firmatari
   // (`ancoreDaPem`); assente se Filo non l'ha mai scaricato.
+  // `opzioni.provvisorio`: { ancore, ammessi } dell'elenco provvisorio, o assente.
   function analizza(byte, opzioni) {
     const ancore = opzioni && Array.isArray(opzioni.ancore) ? opzioni.ancore : null;
     const ancoreTsa = opzioni && Array.isArray(opzioni.ancoreTsa) ? opzioni.ancoreTsa : null;
+    const p = opzioni && opzioni.provvisorio;
+    const provvisorio = p && (Array.isArray(p.ancore) || Array.isArray(p.ammessi))
+      ? { ancore: Array.isArray(p.ancore) ? p.ancore : [], ammessi: Array.isArray(p.ammessi) ? p.ammessi : [] } : null;
     const b = u8(byte);
     const vuoto = { trovato: false, origine: null, prova: '', dichiarante: '', firmatario: '', avvisi: [], fonte: '' };
     if (b.length < 12) return vuoto;
@@ -1048,7 +1082,7 @@
 
     // 1. Credenziali firmate: l'unica cosa che può valere come attribuzione.
     if (cont.c2pa && cont.c2pa.length) {
-      const esito = daC2pa(cont.c2pa, b, ancore, ancoreTsa);
+      const esito = daC2pa(cont.c2pa, b, ancore, ancoreTsa, provvisorio);
       if (esito) return esito;
     }
 
@@ -1089,7 +1123,8 @@
   // Un'immagine generata e poi solo ritagliata porta l'origine nel manifesto del
   // passo prima: vale se la sua impronta è quella che il passo dopo ha firmato e
   // se la sua firma regge. Torna { origine, firma } o null.
-  function daIngredienti(store, ingredienti, profondita, visti) {
+  // `genitore`: { firma, letto } del manifesto che elenca questi ingredienti.
+  function daIngredienti(store, ingredienti, profondita, visti, genitore) {
     if (profondita > 16) return null;
     let meglio = null;
     for (const ing of ingredienti) {
@@ -1104,11 +1139,12 @@
       visti.add(etichetta);
       const dentro = leggiManifesto(box, letto.claim);
       let esito = dentro.origine ? { origine: dentro.origine, firma: letto.firma, generatore: dentro.generatore } : null;
-      const sotto = daIngredienti(store, dentro.ingredienti, profondita + 1, visti);
+      const sotto = daIngredienti(store, dentro.ingredienti, profondita + 1, visti, { firma: letto.firma, letto: dentro });
       if (sotto && (!esito || PESO_ORIGINE[sotto.origine] > PESO_ORIGINE[esito.origine])) esito = sotto;
       if (!esito) continue;
       // Un pezzo incollato dentro l'immagine non la rende scattata né generata: la rende modificata.
-      if (ing.relazione === 'componentOf') {
+      // Non quando il pezzo è l'immagine intera (ChatGPT firma così ogni sua immagine, #946.1).
+      if (ing.relazione === 'componentOf' && !pezzoUnico(genitore, letto.firma)) {
         if (esito.origine === 'fotocamera') continue;
         esito = { ...esito, origine: 'ai-modificata' };
       }
@@ -1117,7 +1153,19 @@
     return meglio;
   }
 
-  function daC2pa(boxes, byteFile, ancore, ancoreTsa) {
+  // Azioni che passano l'immagine com'è, senza aggiungerle niente.
+  const SOLO_TRASPORTO = new Set(['c2pa.converted', 'c2pa.transcoded', 'c2pa.repackaged', 'c2pa.published']);
+  // Il componente è tutta l'immagine se è il suo solo ingrediente, lo firma lo stesso certificato, e il passo che lo
+  // incorpora non dichiara nessun'altra lavorazione: un firmatario diverso o un secondo ingrediente è un montaggio.
+  function pezzoUnico(genitore, firmaPezzo) {
+    if (!genitore || !genitore.letto || genitore.letto.tuttiIngredienti !== 1) return false;
+    if (!genitore.letto.azioni.every((a) => SOLO_TRASPORTO.has(a))) return false;
+    const a = genitore.firma && genitore.firma.certificati && genitore.firma.certificati[0];
+    const b = firmaPezzo && firmaPezzo.certificati && firmaPezzo.certificati[0];
+    return !!(a && b && a.fingerprint256 && a.fingerprint256 === b.fingerprint256);
+  }
+
+  function daC2pa(boxes, byteFile, ancore, ancoreTsa, provvisorio) {
     const store = boxes.find((x) => x.tipo === 'jumb') || boxes[0];
     if (!store || !store.figli) return null;
     // L'ultimo manifesto è quello attivo: i precedenti sono la storia del file.
@@ -1150,18 +1198,22 @@
     // un'immagine generata e poi ritagliata, il generatore e non il programma del ritaglio.
     let origine = letto.origine;
     let chi = { firma, generatore: letto.generatore };
-    const storia = daIngredienti(store, letto.ingredienti, 0, new Set([manifesto.etichetta]));
+    const storia = daIngredienti(store, letto.ingredienti, 0, new Set([manifesto.etichetta]), { firma, letto });
     if (storia && (!origine || PESO_ORIGINE[storia.origine] > PESO_ORIGINE[origine])) {
       origine = storia.origine;
       chi = { firma: storia.firma, generatore: storia.generatore };
     }
-    const firmataInTempo = chi.firma.marca && marcaValida(chi.firma.marca, chi.firma.certificati[0], ancoreTsa);
+    let fid = fiducia(chi.firma, ancore, ancoreTsa, provvisorio);
+    const firmataInTempo = chi.firma.marca && marcaValida(chi.firma.marca, chi.firma.certificati[0], fid.ancoreTsa);
     if (chi.firma.scaduto && !firmataInTempo) avvisi.push('certificato_scaduto');
     if (chi.firma.catenaIntegra === false) avvisi.push('catena_rotta');
 
     // Un file cambiato dopo la firma chiama in causa chi ha firmato QUEI byte, cioè l'ultimo passo.
-    if (avvisi.includes('file_cambiato')) chi = { firma, generatore: letto.generatore };
-    const firmatario = statoFirmatario(chi.firma.certificati, ancore);
+    if (avvisi.includes('file_cambiato')) {
+      chi = { firma, generatore: letto.generatore };
+      fid = fiducia(chi.firma, ancore, ancoreTsa, provvisorio);
+    }
+    const firmatario = fid.stato;
     const dichiarante = nomeLeggibile(chi.firma.soggetto) || chi.generatore || '';
     // Un manifesto valido che non dice niente sull'origine non è una notizia:
     // si tace e si lascia parlare le altre etichette del file.
@@ -1255,17 +1307,19 @@
           ? `${cosa} secondo credenziali firmate da ${chi}. Firma valida, firmatario non verificato.`
           : `${cosa} secondo credenziali firmate. Firma valida, firmatario non verificato.`;
       }
-      if (res.firmatario !== 'riconosciuto') {
+      if (res.firmatario !== 'riconosciuto' && res.firmatario !== 'provvisorio') {
         return chi
           ? `${cosa} secondo credenziali firmate da ${chi}, che non è nell’elenco ufficiale dei firmatari riconosciuti.`
           : `${cosa} secondo credenziali firmate da qualcuno che non è nell’elenco ufficiale dei firmatari riconosciuti.`;
       }
+      // Il riconoscimento dell'elenco provvisorio pesa meno di quello ufficiale, e lo si dice.
+      const dove = res.firmatario === 'provvisorio' ? ' Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.' : '';
       const debole = (res.avvisi || []).some((a) => a === 'legame_assente' || a === 'asserzioni_scoperte' || a === 'catena_rotta' || a === 'certificato_scaduto');
-      if (!chi) return `${cosa} secondo credenziali firmate da un firmatario riconosciuto${debole ? ', ma incomplete' : ''}.`;
-      if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.`;
-      if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.`;
-      if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.`;
-      return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.`;
+      if (!chi) return `${cosa} secondo credenziali firmate da un firmatario riconosciuto${debole ? ', ma incomplete' : ''}.${dove}`;
+      if (debole) return `${cosa} secondo ${chi}, ma le sue credenziali sono incomplete.${dove}`;
+      if (res.origine === 'fotocamera') return `Scattata con una fotocamera, firmata da ${chi}.${dove}`;
+      if (res.origine === 'ai-modificata') return `Modificata con l’AI, credenziali di ${chi}.${dove}`;
+      return `Generata con l’AI, lo dichiara ${chi} nelle credenziali firmate.${dove}`;
     }
     if (res.prova === 'marchio') return chi ? `${cosa}: porta il marchio invisibile che ${chi} mette nelle sue immagini.` : '';
     return chi
@@ -1318,7 +1372,7 @@
   }
 
   global.SN_PROVENIENZA = {
-    analizza, frase, notaPerModello, ancoreDaPem, esitoDaMarchio,
-    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario },
+    analizza, frase, notaPerModello, ancoreDaPem, ammessiDaPem, esitoDaMarchio, CONGELAMENTO_PROVVISORIO,
+    _interni: { chiavePubblica, leggiMarca, marcaValida, pulisci, nomeLeggibile, cborDecode: cborTesta, jumbfBoxes, leggiContenitore, leggiXmp, codiceSorgente, verificaCose, fileIntatto, fileIntattoBmff, statoFirmatario, fiducia, pezzoUnico },
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

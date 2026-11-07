@@ -12,7 +12,10 @@ documento.
 
 - **Nasce prima del clic.** Il menu nasce nascosto quando la barra della
   finestra ha finito di caricarsi (`preparaMenu` in `src/main/window.js`), col
-  documento e il preload già caricati. Chi lo distrugge (uno spec, la chiusura
+  documento e il preload già caricati. Il fumetto, uno per l'app, nasce lì con
+  lui (`preparaSuggerimento`): il primo suggerimento dopo l'avvio aspettava un
+  processo nuovo e arrivava tardi (#871.4). Tutti e due senza
+  `backgroundThrottling`: nascosti rispondono come visibili. Chi lo distrugge (uno spec, la chiusura
   della madre) non rompe niente: la prossima apertura lo ricrea.
 - **Col processo morto si butta e rinasce.** Riusata, una finestra il cui
   renderer è morto lascerebbe la madre senza menu (o fumetto, o carta) fino al
@@ -45,3 +48,8 @@ documento.
 - **Negli spec il menu aperto è quello con `.menu` dentro** (vuoto quando è
   chiuso) o quello visibile: che esista una finestra `data:` non vuol dire niente.
   Prova: `tests/menu-a-comparsa-riusato.spec.mjs`.
+- **Una finestra nata presto ha un indirizzo suo.** Il fumetto, da `data:`, era
+  preso per il menu; da `filo://shell/`, per la finestra principale (#1722): ora
+  sta in `filo://src/renderer/fumetto.html`. Negli spec una finestra si riconosce
+  dall'indirizzo esatto o da `_filoTabs`, mai da un inizio condiviso. Sentinella:
+  `tests/unit/proveRiconosconoFinestre.test.mjs`.

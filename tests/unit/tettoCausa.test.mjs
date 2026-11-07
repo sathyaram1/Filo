@@ -3,11 +3,15 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { join, relative, sep } from 'node:path';
 
 const require = createRequire(import.meta.url);
 require('../../src/shared/constants.js');
 require('../../src/shared/chatErrors.js');
 require('../../src/shared/scryfallQuery.js');
+require('../../src/shared/lunghezzaRisposte.js');
+require('../../src/shared/filoContesto.js');
 require('../../src/main/services/providers/index.js');
 require('../../src/main/services/providers/openrouter.js');
 const OR = globalThis.SN_PROVIDER_OPENROUTER;
@@ -35,7 +39,8 @@ test('nessun host ammesso regge gli strumenti: la frase parla degli strumenti, n
   assert.equal(e.code, 'NO_TOOL_HOST');
   assert.equal(e.maxTokens, undefined);
   assert.match(CE.sentence(e), /^Per il modello scelto nessun fornitore ammesso sa usare gli strumenti/);
-  assert.equal(CE.rimedio(e), '');
+  // La cura è un altro modello: il tasto porta alle Opzioni.
+  assert.equal(CE.rimedio(e), 'opzioni');
 });
 
 test('gli host con gli strumenti non arrivano al tetto: la frase nomina il tetto e porta alle Preferenze', async () => {
@@ -65,10 +70,51 @@ test('modello da 32 mila, testo lungo e tetto di partenza: la frase nomina il te
   assert.doesNotMatch(frase, /Riprova/);
 });
 
+// Anthropic dietro OpenRouter: l'errore dell'host arriva dentro `metadata.raw`.
+const rifiutoAnthropic = (message) => ({
+  status: 400, ok: false, headers: { get: () => null },
+  text: async () => JSON.stringify({ error: { message: 'Provider returned error', code: 400, metadata: { raw: JSON.stringify({ type: 'error', error: { type: 'invalid_request_error', message } }), provider_name: 'Anthropic' } } }),
+});
+
+test('Anthropic, ingresso più tetto oltre la finestra: la chat può ancora accorciare; un tetto da più di metà finestra resta la causa', async () => {
+  const e = await OR.httpError(rifiutoAnthropic('input length and `max_tokens` exceed context limit: 188240 + 16384 > 200000, decrease input length or `max_tokens` and try again'), { tools: true, maxTokens: 16384 });
+  assert.equal(e.finestra, 200000);
+  assert.ok(e.stringibile, 'il testo da solo ci sta: la chat accorcia pagine e conversazione');
+  const t = await OR.httpError(rifiutoAnthropic('input length and `max_tokens` exceed context limit: 50000 + 128000 > 160000, decrease input length or `max_tokens` and try again'), { tools: false, maxTokens: 128000 });
+  assert.equal(t.code, 'TETTO_RISPOSTA');
+  assert.ok(!t.stringibile);
+});
+
 test('un testo che da solo non sta nella memoria resta un rifiuto di contesto, non del tetto', async () => {
   const msg = "This endpoint's maximum context length is 32768 tokens. However, you requested about 56384 tokens (40000 of text input, 16384 in the output).";
   const e = await OR.httpError(risposta(400, msg), { tools: false, maxTokens: 16384 });
   assert.notEqual(e.code, 'TETTO_RISPOSTA');
+});
+
+// #1302 — col tetto di serie oltre metà della memoria, i rifiuti per conversazione lunga restano curabili dalla home: la
+// regola è quella di stringiDopoRifiuto (handlers.js), che accorcia se non è il tetto o se è `stringibile`.
+const laHomeAccorcia = (e) => !!(e && (e.code !== 'TETTO_RISPOSTA' || e.stringibile) && globalThis.SN_FILO_CONTESTO.troppoLungo(e));
+const rifiutoOR = (finestra, testo, out) => `This endpoint's maximum context length is ${finestra} tokens. However, you requested about ${testo + out} tokens (${testo} of text input, ${out} in the output).`;
+
+test('conversazione più lunga della memoria col tetto di serie: rifiuto di contesto, la home accorcia e la frase non dice di abbassare il tetto', async () => {
+  const e = await OR.httpError(risposta(400, rifiutoOR(65536, 100000, 65536)), { tools: false, maxTokens: 65536 });
+  assert.notEqual(e.code, 'TETTO_RISPOSTA');
+  assert.equal(e.tettoRetto, undefined);
+  assert.ok(laHomeAccorcia(e));
+  assert.doesNotMatch(fraseDi(e), /abbassa/i);
+});
+
+test('il testo ci sta da solo ma sotto non resta posto per una risposta: niente tetto da riprovare, la home accorcia', async () => {
+  const { esito, corpi } = await conRouter({ rifiuta: (b) => (b.max_tokens && 127500 + b.max_tokens > 128000 ? [400, rifiutoOR(128000, 127500, b.max_tokens)] : null) },
+    () => chiedi().catch((e) => e));
+  assert.equal(corpi.length, 1, 'un tetto sotto il minimo non si prova');
+  assert.equal(esito.code, 'TETTO_RISPOSTA');
+  assert.ok(laHomeAccorcia(esito));
+  // Con posto per una risposta il tetto resta la cura: si rifà più basso e la home non accorcia.
+  const t = await OR.httpError(risposta(400, rifiutoOR(128000, 100000, 65536)), { tools: false, maxTokens: 65536 });
+  assert.equal(t.code, 'TETTO_RISPOSTA');
+  assert.ok(t.tettoRetto > 0);
+  assert.ok(!laHomeAccorcia(t));
 });
 
 test('le altre forme del rifiuto per il tetto si riconoscono; un parametro non supportato no', async () => {
@@ -105,11 +151,246 @@ test('un taglio senza niente da mostrare è un errore che nomina il tetto; uno c
 test('un involucro JSON tagliato a metà mostra il testo che il modello aveva scritto', () => {
   assert.equal(CE.campoDaJsonTagliato('{"status":"done","text":"Prima riga\\nseconda \\"citata\\" \\u00e8 tagl', ['text']), 'Prima riga\nseconda "citata" è tagl');
   assert.equal(CE.campoDaJsonTagliato('niente involucro', ['text']), null);
-  const r = Q.parseAgentReply('{"reply":"Per questo mazzo servono più pescate:\\n1. Rhystic');
+  const r = Q.parseAgentReply('{"reply":"Per questo mazzo servono più pescate:\\n1. Rhystic', 'length');
   assert.equal(r.reply, 'Per questo mazzo servono più pescate:\n1. Rhystic');
+});
+
+// #1302: il recupero vale solo per una risposta che il tetto ha fermato e che comincia dall'involucro.
+test('una risposta intera scritta male, o della prosa con un esempio fra graffe, si mostra intera', () => {
+  const citazioni = '{"reply":"Ti consiglio "Sol Ring" e "Arcane Signet" per la rampa"}';
+  assert.equal(Q.parseAgentReply(citazioni, 'stop').reply, citazioni);
+  assert.equal(CE.testoDaInvolucro('{"text":"Clicca su "Salva" in alto"}', ['text'], 'stop'), null);
+  const prosa = 'Per cercare scrivi così: {"text": "esempio", "x": …} e poi premi Invio.';
+  assert.equal(CE.testoDaInvolucro(prosa, ['text'], 'length'), null);
+  assert.equal(Q.parseAgentReply('Puoi scrivere {"reply": "una prova" ... come esempio.', 'stop').reply, 'Puoi scrivere {"reply": "una prova" ... come esempio.');
+});
+
+test('fermata prima che il campo del testo cominci: niente involucro grezzo da mostrare', () => {
+  assert.equal(CE.testoDaInvolucro('{"action":"shell","command":"ls -', ['text'], 'length'), '');
+  assert.equal(Q.parseAgentReply('{"query":"o:haste t:creature', 'length').reply, '');
+  assert.equal(CE.testoDaInvolucro('```json\n{"text":"Prima parte', ['text'], 'length'), 'Prima parte');
+});
+
+test('della prosa intera con un esempio JSON valido fra graffe è prosa: niente campo estratto né azioni', () => {
+  for (const prosa of ['Il file package.json deve contenere {"type":"module"} per usare import.', 'Nel corpo della richiesta metti {"text":"ciao"} e invia.']) {
+    assert.equal(CE.involucroIntero(prosa), null, prosa);
+  }
+  const mazzi = 'Il formato di import è {"reply":"x","import":[{"name":"Sol Ring","qty":1}]} ma basta scrivere i nomi.';
+  assert.deepEqual([Q.parseAgentReply(mazzi, 'stop').reply, Q.parseAgentReply(mazzi, 'stop').import], [mazzi, []]);
+  // Un involucro dentro un recinto o fra spazi resta un involucro.
+  assert.deepEqual(CE.involucroIntero('```json\n{"text":"ciao"}\n```'), { text: 'ciao' });
+  assert.deepEqual(CE.involucroIntero('\n  {"text":"ciao"}  \n'), { text: 'ciao' });
+  assert.equal(Q.parseAgentReply('```json\n{"reply":"x","import":[{"name":"Sol Ring"}]}\n```', 'stop').import.length, 1);
+  // L'Aiuto legge l'involucro dalla stessa porta, non dalla fetta fra la prima e l'ultima graffa.
+  const sidebar = readFileSync(new URL('../../src/content/sidebar.js', import.meta.url), 'utf8');
+  const parse = sidebar.slice(sidebar.indexOf('function parseAssistantOutput('), sidebar.indexOf('function filoActionLabel('));
+  assert.match(parse, /SN_CHAT_ERRORS\?\.involucroIntero\?\.\(text\)/);
+  assert.doesNotMatch(parse, /lastIndexOf\('\}'\)/);
+});
+
+test('tagliata dal tetto con citazioni non escapate: resta tutto il testo scritto', () => {
+  assert.equal(CE.testoDaInvolucro('{"text":"Clicca su "Salva" in alto e poi su "Chiudi", quindi', ['text'], 'length'), 'Clicca su "Salva" in alto e poi su "Chiudi", quindi');
+  assert.equal(Q.parseAgentReply('{"reply":"Ti consiglio "Sol Ring" e "Arcane Signet" per la rampa', 'length').reply, 'Ti consiglio "Sol Ring" e "Arcane Signet" per la rampa');
+  // La " che chiude davvero il campo, prima della chiave seguente, della graffa o della fine, chiude ancora.
+  assert.equal(CE.campoDaJsonTagliato('{"text":"abc","status":"do', ['text']), 'abc');
+  assert.equal(CE.campoDaJsonTagliato('{"text":"abc", "sta', ['text']), 'abc');
+  assert.equal(CE.campoDaJsonTagliato('{"text":"abc"}', ['text']), 'abc');
+});
+
+test('tagliata dal tetto con una frase prima dell\'involucro: la frase e il testo, mai la graffa', () => {
+  const s = 'Ecco la risposta: {"text":"ciao a me';
+  assert.equal(CE.testoDaInvolucro(s, ['text'], 'length'), 'Ecco la risposta: ciao a me');
+  assert.equal(Q.parseAgentReply(s, 'length').reply, 'Ecco la risposta:');
+  assert.equal(Q.parseAgentReply('Ecco: {"reply":"ciao a me', 'length').reply, 'Ecco: ciao a me');
 });
 
 test('una risposta interrotta dentro un blocco di codice lo chiude prima della frase', () => {
   assert.equal(CE.chiudiRecinto('Ecco:\n\n```js\nconst a = 1;\n'), 'Ecco:\n\n```js\nconst a = 1;\n```');
   assert.equal(CE.chiudiRecinto('a\n```\nb\n```\nc'), 'a\n```\nb\n```\nc');
+});
+
+// #1302 — un rifiuto legato al tetto si racconta per la sua causa, e quando un tetto più basso si regge la richiesta si
+// rifà con quello invece di fallire.
+const fraseDi = (e) => CE.sentence(CE.fromResponse({ error: e.message, code: e.code || 'UNKNOWN', ...CE.dettagliDelTetto(e) }));
+
+// Router finto: `rifiuti` decide, dal corpo mandato, se rifiutare (status, messaggio) o rispondere.
+async function conRouter({ endpoints = null, rifiuta }, fn) {
+  const orig = globalThis.fetch;
+  const corpi = [];
+  globalThis.fetch = async (url, init) => {
+    if (String(url).endsWith('/endpoints')) {
+      return endpoints ? new Response(JSON.stringify({ data: { endpoints } }), { status: 200 }) : new Response('{}', { status: 500 });
+    }
+    if (/chat\/completions/.test(String(url))) {
+      const body = JSON.parse(init.body);
+      corpi.push(body);
+      const no = rifiuta(body);
+      if (no) return new Response(JSON.stringify({ error: { message: no[1] } }), { status: no[0] });
+      return new Response(JSON.stringify({ choices: [{ message: { content: 'Risposta intera.' }, finish_reason: 'stop' }], usage: { prompt_tokens: 10, completion_tokens: 3 } }), { status: 200 });
+    }
+    throw new Error(`rete finta: ${url}`);
+  };
+  try { return { esito: await fn(), corpi }; } finally { globalThis.fetch = orig; }
+}
+const chiedi = (extra = {}) => OR.complete({ apiKey: 'k', model: MODELLO, messages: [{ role: 'user', content: 'ciao' }], maxTokens: 65536, ...extra });
+
+test('un fornitore regge strumenti e un tetto più lungo: la frase non dà la colpa al tetto né agli strumenti', async () => {
+  const e = await conRouter({ endpoints: [host('A', ['tools', 'max_tokens'], 131072)], rifiuta: () => [404, NO_PARAMS] },
+    () => OR.httpError(risposta(404, NO_PARAMS), { tools: true, maxTokens: 16384, apiKey: 'k', model: MODELLO }));
+  assert.equal(e.esito.code, 'PARAMETRI_HOST');
+  const s = fraseDi(e.esito);
+  assert.doesNotMatch(s, /abbassa/);
+  assert.match(s, /il tetto di lunghezza non c'entra/);
+  assert.equal(CE.rimedio(e.esito), 'opzioni');
+});
+
+test('gli host reggono gli strumenti ma non il tetto: si rifà col massimo che reggono, e la risposta arriva', async () => {
+  const endpoints = [host('A', ['tools', 'max_tokens'], 32768), host('B', ['tools', 'max_tokens'], 16384)];
+  const { esito, corpi } = await conRouter({ endpoints, rifiuta: (b) => (b.max_tokens > 32768 ? [404, NO_PARAMS] : null) },
+    () => chiedi({ tools: [{ type: 'function', function: { name: 'x', parameters: { type: 'object' } } }] }));
+  assert.equal(esito.text, 'Risposta intera.');
+  assert.deepEqual(corpi.map((b) => b.max_tokens), [65536, 32768]);
+  assert.deepEqual(esito.tettoSceso, { chiesto: 65536, usato: 32768 });
+});
+
+test('elenco dei fornitori illeggibile: si rifà senza tetto; se il router rifiuta ancora, il tetto non è la causa', async () => {
+  const riuscita = await conRouter({ rifiuta: (b) => (b.max_tokens ? [404, NO_PARAMS] : null) }, () => chiedi({ tools: [{ type: 'function', function: { name: 'x', parameters: { type: 'object' } } }] }));
+  assert.equal(riuscita.esito.text, 'Risposta intera.');
+  assert.equal(riuscita.corpi[1].max_tokens, undefined);
+  const { esito } = await conRouter({ rifiuta: () => [404, NO_PARAMS] }, () => chiedi({ tools: [{ type: 'function', function: { name: 'x', parameters: { type: 'object' } } }] }).catch((e) => e));
+  assert.equal(esito.code, 'NO_TOOL_HOST');
+  assert.equal(esito.maxTokens, undefined);
+  assert.doesNotMatch(fraseDi(esito), /tetto/);
+});
+
+test('un fornitore che non dichiara la sua lunghezza massima non fa dare la colpa al tetto senza prova', async () => {
+  const endpoints = [host('A', ['tools', 'max_tokens'], 8192), { provider_name: 'B', tag: 'b', supported_parameters: ['tools', 'max_tokens'] }];
+  const { corpi, esito } = await conRouter({ endpoints, rifiuta: (b) => (b.max_tokens ? [404, NO_PARAMS] : null) }, () => chiedi({ tools: [{ type: 'function', function: { name: 'x', parameters: { type: 'object' } } }] }));
+  assert.equal(esito.text, 'Risposta intera.');
+  assert.equal(corpi.length, 2);
+  assert.equal(corpi[1].max_tokens, undefined);
+});
+
+test('«context_length_exceeded» senza numeri: nomina tetto e memoria, non «Riprova», e la chat può accorciare', async () => {
+  const e = await OR.httpError(risposta(400, 'context_length_exceeded'), { tools: false, maxTokens: 16384 });
+  assert.equal(e.code, 'TETTO_RISPOSTA');
+  assert.ok(e.stringibile);
+  const s = fraseDi(e);
+  assert.match(s, /tetto di 16\.384 token/);
+  assert.match(s, /memoria/);
+  assert.doesNotMatch(s, /Riprova|nessun fornitore/);
+});
+
+test('«190000 + 32000 > 200000»: si rifà col tetto che ci sta e la risposta arriva', async () => {
+  const msg = 'input length and max_tokens exceed context limit: 190000 + 32000 > 200000, decrease input length or max_tokens and try again';
+  const { esito, corpi } = await conRouter({ rifiuta: (b) => (b.max_tokens > 10000 ? [400, msg] : null) }, () => chiedi({ maxTokens: 32000 }));
+  assert.equal(esito.text, 'Risposta intera.');
+  assert.equal(corpi[1].max_tokens, 200000 - 190000 - 256);
+});
+
+test('testo quasi pari alla memoria: non c\'è un tetto utile, la frase dice testo più tetto e la chat accorcia', async () => {
+  const msg = 'input length and max_tokens exceed context limit: 199500 + 32000 > 200000';
+  const { esito, corpi } = await conRouter({ rifiuta: () => [400, msg] }, () => chiedi({ maxTokens: 32000 }).catch((e) => e));
+  assert.equal(corpi.length, 1, 'un tetto sotto il minimo non si prova');
+  assert.equal(esito.code, 'TETTO_RISPOSTA');
+  assert.ok(esito.stringibile);
+  assert.match(fraseDi(esito), /supera la memoria del modello scelto \(200\.000 token\)/);
+  assert.doesNotMatch(fraseDi(esito), /nessun fornitore/);
+});
+
+test('«tools are not supported with max_tokens > 8192»: si rifà a 8192; se non basta la frase nomina strumenti e tetto', async () => {
+  const msg = 'tools are not supported with max_tokens > 8192';
+  const tools = [{ type: 'function', function: { name: 'x', parameters: { type: 'object' } } }];
+  const ok = await conRouter({ rifiuta: (b) => (b.max_tokens > 8192 ? [400, msg] : null) }, () => chiedi({ tools }));
+  assert.equal(ok.esito.text, 'Risposta intera.');
+  assert.equal(ok.corpi[1].max_tokens, 8192);
+  const { esito } = await conRouter({ rifiuta: () => [400, msg] }, () => chiedi({ tools }).catch((e) => e));
+  assert.equal(esito.code, 'NO_TOOL_HOST');
+  const s = fraseDi(esito);
+  assert.match(s, /strumenti/);
+  assert.match(s, /tetto di 65\.536 token/);
+});
+
+// #1302: il rifiuto del router per un altro parametro (PARAMETRI_HOST) sta in ogni elenco dei rifiuti del router accanto a
+// NO_TOOL_HOST e TETTO_RISPOSTA: contatori anonimi, prova dei modelli, filtro della ricerca dei mazzi.
+const ROOT = join(import.meta.dirname, '..', '..');
+
+function sorgenti(dir, out = []) {
+  for (const n of readdirSync(dir)) {
+    const p = join(dir, n);
+    if (statSync(p).isDirectory()) sorgenti(p, out);
+    else if (n.endsWith('.js')) out.push(p);
+  }
+  return out;
+}
+
+// Il letterale ([…] o {…} senza istruzioni dentro) che contiene la posizione `i`, o null.
+function elencoAttorno(s, i) {
+  const apre = { ']': '[', '}': '{', ')': '(' };
+  let prof = 0;
+  for (let k = i; k >= 0; k--) {
+    const c = s[k];
+    if (c === ']' || c === '}' || c === ')') prof += 1;
+    else if (c === '[' || c === '{' || c === '(') {
+      if (prof) { prof -= 1; continue; }
+      if (c === '(') return null;
+      let d = 0;
+      for (let j = k; j < s.length; j++) {
+        if (s[j] === c) d += 1;
+        else if (s[j] === Object.keys(apre).find((x) => apre[x] === c) && --d === 0) {
+          const corpo = s.slice(k + 1, j);
+          return /[;()=]/.test(corpo) ? null : corpo;
+        }
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+test('ogni elenco che nomina NO_TOOL_HOST o TETTO_RISPOSTA nomina anche PARAMETRI_HOST', () => {
+  const trovati = [];
+  for (const f of sorgenti(join(ROOT, 'src'))) {
+    const s = readFileSync(f, 'utf8').replace(/\/\/[^\n]*/g, '');
+    const visti = new Set();
+    for (const m of s.matchAll(/'(?:NO_TOOL_HOST|TETTO_RISPOSTA)'|\b(?:NO_TOOL_HOST|TETTO_RISPOSTA)\s*:/g)) {
+      const corpo = elencoAttorno(s, m.index);
+      if (corpo == null || visti.has(corpo)) continue;
+      visti.add(corpo);
+      // Con le barre normali: su Windows `relative` dà `src\shared\…` e l'elenco atteso sotto non si trova più.
+      const rel = relative(ROOT, f).split(sep).join('/');
+      trovati.push(rel);
+      assert.match(corpo, /\bPARAMETRI_HOST\b/, `${rel}: ${corpo.trim().slice(0, 160)}`);
+    }
+  }
+  for (const atteso of ['src/shared/contatoriGiornalieri.js', 'src/main/services/handlers/ai.js', 'src/main/services/deckOpinions.js', 'src/shared/chatErrors.js']) {
+    assert.ok(trovati.includes(atteso), `la sentinella non vede più gli elenchi di ${atteso}`);
+  }
+});
+
+test('i contatori anonimi contano PARAMETRI_HOST come «nessun host», non come guasto generico', () => {
+  require('../../src/shared/contatoriGiornalieri.js');
+  require('../../src/shared/contatoriServizio.js');
+  const C = globalThis.SN_CONTATORI;
+  const e = Object.assign(new Error('No endpoints found that can handle the requested parameters.'), { code: 'PARAMETRI_HOST', status: 404 });
+  assert.equal(C.tipoErroreVisto(e), 'nessun_host');
+  assert.equal(C.tipoErrore(e), 'nessun_host');
+  // Il contatore del servizio lo conta col suo motivo (firestore.rules lo ammette: tests/unit/firestoreRulesContatoriServizio).
+  assert.equal(globalThis.SN_CONTATORI_SERVIZIO.motivoNessunHost(e), 'parametri_host');
+});
+
+test('il filtro della ricerca dei mazzi non riprova un lotto che il router rifiuta per un parametro', async () => {
+  require('../../src/shared/constants.js');
+  require('../../src/shared/chatErrors.js');
+  require('../../src/shared/scryfallQuery.js');
+  require('../../src/shared/deckOpinions.js');
+  globalThis.chrome = { storage: { local: { get: async () => ({}), set: async () => {} } } };
+  require('../../src/main/services/deckOpinions.js');
+  let chiamate = 0;
+  const r = await globalThis.SN_DECK_OPINIONS_SVC.filterSearch({
+    criterion: 'artefatti', cardIds: ['a'], cards: { a: { id: 'a', name: 'Sol Ring', type_line: 'Artifact', oracle_text: '{T}: Add {C}{C}.' } },
+    handleAIRequest: async () => { chiamate += 1; throw Object.assign(new Error('rifiutata'), { code: 'PARAMETRI_HOST', status: 404 }); },
+  });
+  assert.equal(chiamate, 1);
+  assert.equal(r.error.code, 'PARAMETRI_HOST');
 });

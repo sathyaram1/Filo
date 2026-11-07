@@ -25,7 +25,9 @@ function installFetch(createStatuses = [200]) {
   const prev = globalThis.fetch;
   globalThis.fetch = async (url, opts = {}) => {
     const u = String(url);
-    const r = { url: u, method: opts.method || 'GET', headers: { ...(opts.headers || {}) }, body: opts.body ? JSON.parse(opts.body) : null };
+    const corpo = opts.body ? JSON.parse(opts.body) : null;
+    // La create passa da `:commit` (#1517): il documento è la scrittura.
+    const r = { url: u, method: opts.method || 'GET', headers: { ...(opts.headers || {}) }, body: corpo && corpo.writes ? corpo.writes[0].update : corpo };
     richieste.push(r);
     if (u.includes('/counters/')) {
       if (r.method === 'PATCH') return { ok: true, status: 200, json: async () => ({}) };
@@ -75,7 +77,8 @@ test('token rifiutato su un nome qualunque: si riparte anonimi, senza prova, e i
       assert.ok(!('senderProof' in f.create[1].body.fields), 'la seconda create è quella anonima');
       assert.equal(r.senderProof, '');
       assert.equal(r.authRefused, rifiuto);
-      assert.equal(r.id, 'DOC');
+      assert.equal(r.id, f.create[1].body.name.split('/').pop(), 'l\'id è quello con cui il documento è scritto');
+      assert.equal(f.create[1].body.name, f.create[0].body.name, 'lo stesso documento: il primo tentativo non è nato');
     } finally { f.restore(); }
   }
 });

@@ -48,6 +48,38 @@ const SCRITTURE_ANONIME_DICHIARATE = {
     'i contatori giornalieri (#969): solo numeri e chiavi da elenchi chiusi, a sola creazione, letti solo ' +
     'dall’admin e mai rimessi nel prompt di nessuno. Anonimi per scelta: legarli a un account toglierebbe lo ' +
     'pseudonimo mensile, che è il punto. Il caso peggiore è un numero falso (firestoreRulesContatori.test.mjs).',
+  'contatori-chiamate':
+    'le chiamate ai modelli di un’ora dei contatori (#1464), accanto all’ora e con lo stesso id: stesse ragioni e ' +
+    'stessa forma chiusa (numeri, fasce e nomi di modello), a sola creazione e letti solo dall’admin.',
+  'contatori-finestra':
+    'la finestra di un’ora dei contatori (#1470), con lo stesso id: stesse ragioni, solo conti con chiavi da elenchi ' +
+    'chiusi (mai titoli, indirizzi o nomi di file), a sola creazione e letti solo dall’admin.',
+  'contatori-gesti':
+    'i gesti della personalizzazione di un’ora dei contatori (#1471), accanto all’ora e con lo stesso id: stesse ' +
+    'ragioni e stessa forma chiusa (numeri, fasce e nomi dei cataloghi del codice), a sola creazione e letti solo dall’admin.',
+  'contatori-navigazione':
+    'la navigazione di un’ora dei contatori (#1469), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
+    'numeri sotto chiavi di elenchi chiusi (codici di rete, fonti, paesi, servizi), mai un sito o un nome di file.',
+  'contatori-attivita':
+    'le attività di un’ora dei contatori (#1467: Aiuto, ricerche web, voce, lezioni, memoria, pulizia delle schede, ' +
+    'home), accanto all’ora e con lo stesso id: stesse ragioni, chiavi fatte solo di nomi da elenchi chiusi e valori ' +
+    'che sono conti, a sola creazione e letti solo dall’admin.',
+  'contatori-servizio':
+    'il servizio di un’ora dei contatori (#1472), accanto all’ora e con lo stesso id: stesse ragioni, e solo numeri sotto ' +
+    'chiavi di elenchi chiusi (funzioni, modelli e host nella forma dei contatori, motivi, esiti, fasce), mai una chiave, ' +
+    'un codice d’invito o un’email.',
+  'contatori-sicurezza':
+    'la sicurezza di un’ora dei contatori (#1474), accanto all’ora e con lo stesso id: stesse ragioni, e solo numeri ' +
+    'sotto chiavi di elenchi chiusi (livelli, motivi, controlli, scelte, categorie, tipi, tetti), mai un dominio o un segreto.',
+  'contatori-riquadri':
+    'i riquadri AI e l’Editor di un’ora dei contatori (#1465), accanto all’ora e con lo stesso id: stesse ragioni, e solo ' +
+    'numeri sotto chiavi di elenchi chiusi (funzioni, scorciatoie, esiti), mai un testo, un titolo o un sito.',
+  'contatori-home-pagina':
+    'la home e gli automatismi sulla pagina di un’ora dei contatori (#1473), accanto all’ora e con lo stesso id: stesse ' +
+    'ragioni, e solo numeri sotto chiavi di elenchi chiusi (comandi, fasce, tipi, passi, esiti), mai un testo, un sito o un paese.',
+  'contatori-strade':
+    'le strade di un’ora dei contatori (#1468), accanto all’ora e con lo stesso id: stesse ragioni, e solo numeri sotto ' +
+    'chiavi di elenchi chiusi (azioni, strade, tasti per nome, pagine di Filo, fasce), mai un testo, un indirizzo o un sito.',
 };
 
 const VERBI_SCRITTURA = ['write', 'create', 'update', 'delete'];

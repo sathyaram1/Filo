@@ -145,6 +145,15 @@ test('needsSummary: rigenera solo su cambiamento significativo', () => {
   assert.equal(SUM.needsSummary(stale), true);
 });
 
+test('needsSummary: un riassunto fermato dal tetto non si richiede sullo stesso testo, sì dopo un cambio vero (#1302)', () => {
+  const f = fileWith({ id: 'e', lines: [longBody('X')] });
+  const words = SUM.fileWords(f);
+  f.meta = { ...(f.meta || {}), summaryFailSig: { words, at: 1 } };
+  assert.equal(SUM.needsSummary(f), false, 'qualche parola in più non basta a riprovare');
+  f.meta.summaryFailSig = { words: 1, at: 1 };
+  assert.equal(SUM.needsSummary(f), true, 'il testo è cambiato quanto basta per un riassunto nuovo');
+});
+
 // ── Ponte main: services/editorFiles.js (lettura on-demand + elenco riassunti) ──
 // Simuliamo l'archivio (chrome.storage.local) con la collezione dell'editor e
 // verifichiamo che readFile ritorni il CONTENUTO del file richiesto e
@@ -251,4 +260,51 @@ test('un altro errore, o un documento già minimo, non si rilegge', () => {
   const corto = SUM.testoAlModello('ciao '.repeat(300));
   const rifiuto = { ok: false, error: 'maximum context length is 1000 tokens. However, you requested about 5000 tokens' };
   assert.equal(SUM.rilettoDopoRifiuto('ciao '.repeat(300), corto, rifiuto, corto.letti + 20000), null);
+});
+
+// #1570: il titolo non scritto a mano segue il contenuto, con la soglia del riassunto.
+test('titoloDaRifare: segue il testo cambiato, mai un titolo scritto a mano', () => {
+  const f = fileWith({ id: 't', title: 'Il giardino', lines: [longBody('w')] });
+  const parole = SUM.fileWords(f);
+  f.meta.titleAuto = true;
+  f.meta.titleSig = { words: parole, at: 1 };
+  assert.equal(SUM.titoloDaRifare(f), false, 'testo uguale: il titolo resta');
+  f.meta.titleSig = { words: parole + 60, at: 1 };
+  assert.equal(SUM.titoloDaRifare(f), true, 'testo cambiato quanto il riassunto: si rifà');
+  delete f.meta.titleSig;
+  assert.equal(SUM.titoloDaRifare(f), true, 'un titolo automatico di prima della firma si rifà');
+  f.meta.titleManual = true;
+  assert.equal(SUM.titoloDaRifare(f), false, 'scritto a mano: mai');
+  const nuovo = fileWith({ id: 'n', lines: [longBody('w')] });
+  assert.equal(SUM.titoloDaRifare(nuovo), false, 'il primo titolo lo dà il tiro a 100 parole');
+});
+
+// #1697: riscritto su un altro argomento con le stesse parole di numero, il titolo si rifà; ritoccato, no.
+test('titoloDaRifare: un altro argomento a parità di parole si accorge, un ritocco no', () => {
+  const testo = (v, n) => Array.from({ length: n }, (_, i) => v[i % v.length]).join(' ');
+  const mare = ['il', 'mare', 'onde', 'spiaggia', 'sabbia', 'barca', 'scogli', 'gabbiani', 'conchiglie', 'marea'];
+  const monti = ['la', 'montagna', 'neve', 'vetta', 'sentiero', 'rifugio', 'bosco', 'ghiacciaio', 'valle', 'cresta'];
+  const f = fileWith({ id: 'a', title: 'Il mare', lines: [testo(mare, 150)] });
+  f.meta.titleAuto = true;
+  f.meta.titleSig = SUM.makeSig(f);
+  assert.equal(SUM.titoloDaRifare(f), false, 'stesso testo: resta');
+  const ritoccato = fileWith({ id: 'a', lines: [testo(mare, 140) + ' ' + testo(monti, 10)] });
+  ritoccato.meta = { ...ritoccato.meta, titleAuto: true, titleSig: f.meta.titleSig };
+  assert.equal(SUM.titoloDaRifare(ritoccato), false, 'qualche parola nuova: resta');
+  const riscritto = fileWith({ id: 'a', lines: [testo(monti, 150)] });
+  riscritto.meta = { ...riscritto.meta, titleAuto: true, titleSig: f.meta.titleSig };
+  assert.equal(SUM.titoloDaRifare(riscritto), true, 'altro argomento, stesse parole: si rifà');
+  riscritto.meta.titleManual = true;
+  assert.equal(SUM.titoloDaRifare(riscritto), false, 'scritto a mano: mai');
+});
+
+test('titoloERiassunto legge le due righe, e senza etichette tiene tutto come riassunto', () => {
+  assert.deepEqual(SUM.titoloERiassunto('TITOLO: Ricetta della torta\nRIASSUNTO: Come si fa la torta di mele.'),
+    { titolo: 'Ricetta della torta', riassunto: 'Come si fa la torta di mele.' });
+  assert.deepEqual(SUM.titoloERiassunto('**Titolo:** Viaggio a Lisbona\n\n**Riassunto:** Appunti di viaggio\nsu due righe.'),
+    { titolo: 'Viaggio a Lisbona', riassunto: 'Appunti di viaggio\nsu due righe.' });
+  assert.deepEqual(SUM.titoloERiassunto('Ecco:\nRiassunto - Note sparse.\nTitolo — Note'),
+    { titolo: 'Note', riassunto: 'Note sparse.' });
+  assert.deepEqual(SUM.titoloERiassunto('Solo un riassunto senza etichette.'),
+    { titolo: '', riassunto: 'Solo un riassunto senza etichette.' });
 });

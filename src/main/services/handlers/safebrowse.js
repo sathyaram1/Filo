@@ -75,6 +75,21 @@ module.exports = function register(on, ctx) {
     return { ok: true, richiesta: win._filoTabs.richiestaCasa(tabId) };
   }));
 
+  // #967 — un sito entra fra quelli fidati solo col nome che ne ricava il main (`indirizzo`); ne escono le voci dette.
+  // In incognito non entra niente: la scelta resta nella scheda.
+  on(MSG.SITI_FIDATI_IMPOSTA, soloFilo(async (msg, sender) => {
+    const Fidati = require('../sitiFidati');
+    const win = winOf(sender);
+    if (msg && msg.fidato === true) {
+      const SB = globalThis.SN_SAFEBROWSE;
+      const voce = SB && typeof msg.indirizzo === 'string' ? SB.voceFidata(msg.indirizzo.slice(0, 2048)) : null;
+      if (!voce) return { ok: false, code: 'sito', error: 'Non è l\'indirizzo di un sito' };
+      return Fidati.fidati(voce, { win: msg.avvisa === true ? win : null, incognito: !!(sender && sender.isIncognito) });
+    }
+    const voci = Array.isArray(msg && msg.voci) ? msg.voci.filter((v) => typeof v === 'string').slice(0, 500) : [];
+    return { ok: true, ...(await Fidati.cambia({ togli: voci })) };
+  }));
+
   // Geo-block accettato: instrada la tab dal paese indicato; il tabId arriva dal sender.
   on(MSG.GEO_PROPOSE_ACCEPT, async (msg, sender) => {
     const win = winOf(sender);
@@ -157,6 +172,18 @@ module.exports = function register(on, ctx) {
       top.send('filo:broadcast', { type: MSG.COOKIES_HIDE_FRAME, url: String(f.url || ''), origin: String(f.origin || '') });
     } catch (_) { return { ok: false }; }
     return { ok: true };
+  });
+
+  // La risposta arriva prima del clic: la foto la fa il mondo dei content script della pagina, e qui la si aspetta.
+  on(MSG.COOKIES_ANSWER_BASE, async (msg, sender) => {
+    const wc = sender && sender.wc;
+    const top = wc && !wc.isDestroyed() && wc.mainFrame;
+    if (!top || !sender.frame || sender.frame.frameTreeNodeId === top.frameTreeNodeId) return { ok: false };
+    try {
+      const fatta = await wc.executeJavaScriptInIsolatedWorld(require('../../../preload/mondo-esente').MONDO,
+        [{ code: '!!(globalThis.SN_COOKIES_CS && globalThis.SN_COOKIES_CS.frameBase())' }]);
+      return { ok: !!fatta };
+    } catch (_) { return { ok: false }; }
   });
 
   on(MSG.COOKIES_ACCESSO, async (msg, sender) => {

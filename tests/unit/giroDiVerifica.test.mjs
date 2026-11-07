@@ -136,7 +136,7 @@ test('la critica parte strutturata, la risposta del server viene stampata intera
     // Poi la correzione (un commit nuovo) e la sua consegna.
     writeFileSync(resolve(casa, 'segnaposto.txt'), 'corretto', 'utf8');
     execFileSync('git', ['commit', '-qam', 'correzione'], { cwd: casa });
-    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto. Il caso raro non l\'ho toccato: non era in elenco.'], ENV(casa, port));
+    const c = await esegui(['--record-fixed', 'fid-901', 'Corretto: il pulsante ora salva anche col titolo vuoto. Il caso raro non l\'ho toccato: non era in elenco.', '--motivo', 'ripresa'], ENV(casa, port));
     assert.equal(c.code, 0, `la consegna doveva riuscire (stderr: ${c.se})`);
     const fixed = ricevuti.filter((x) => x.url.includes('routineDeliver')).at(-1);
     assert.equal(fixed.body.intent, 'fixed');
@@ -262,14 +262,14 @@ test('#880: il riallineamento dopo un pass con pulizia si consegna; una prova ro
   const consegne = () => ricevuti.filter((x) => x.url.includes('routineDeliver') && x.body.intent === 'fixed').length;
   try {
     g('rm', '-q', 'tests/verifica/591/giro1-chiusa.spec.mjs'); g('commit', '-qm', 'riallineamento: tolta una prova rossa');
-    const fermo = await esegui(['--record-fixed', 'fid-591', REPORT_RIALLINEO], env);
+    const fermo = await esegui(['--record-fixed', 'fid-591', REPORT_RIALLINEO, '--motivo', 'conflitto: nessuno'], env);
     assert.notEqual(fermo.code, 0, 'la prova tolta da chi riallinea è rossa: la consegna si ferma (#679)');
     assert.match(fermo.se + fermo.so, /giro1-chiusa\.spec\.mjs/);
     assert.doesNotMatch(fermo.se + fermo.so, /Consegna respinta[^]*giro2-r1-diventato-feedback/, 'la prova uscita dopo il pass non è fra le respinte');
     assert.equal(consegne(), 0);
 
     g('reset', '-q', '--hard', 'HEAD~1');
-    const r = await esegui(['--record-fixed', 'fid-591', REPORT_RIALLINEO], env);
+    const r = await esegui(['--record-fixed', 'fid-591', REPORT_RIALLINEO, '--motivo', 'conflitto: nessuno'], env);
     assert.equal(r.code, 0, `il riallineamento doveva consegnarsi (stderr: ${r.se})`);
     assert.match(r.se, new RegExp(`tolte in ${pulizia.slice(0, 8)} sono la pulizia`));
     assert.doesNotMatch(r.se, /Rilancio/, 'niente da rilanciare: la prova del rilievo diventato feedback è uscita nella pulizia');

@@ -24,6 +24,25 @@ salto si alzano lì `MAJOR` e `USCITA_STABILE`.
   `test:smoke`, `test:shoot` e `test:explore` si fermano se il motore installato non è quello del lockfile
   (`tests/helpers/motoreDelleProve.mjs`); un binario scelto con `ELECTRON_OVERRIDE_DIST_PATH` lo dicono e proseguono.
 
+## Le patch della stessa major
+
+Le correzioni di Chromium arrivano nelle patch di Electron (dalla 44.7.0 alla 44.9.3, in due settimane, più di cento
+correzioni di Chromium, V8 e PDFium), e quasi mai diventano un avviso sul pacchetto npm: gli avvisi di Dependabot non le
+vedono. Il lockfile le ferma, perché la pubblicazione installa con `npm ci`. Ogni sei ore, nel lavoro `scegli` della
+pubblicazione, `scripts/motore-ultima-patch.mjs` confronta il lockfile con l'ultima stabile della stessa major
+(`npm view electron@<major> version --json`) e, se è indietro, apre un feedback con una chiave per major
+(`motore:electron-44`): finché è aperto, le patch uscite dopo non ne aprono un altro. Avvisa e non ferma: una
+pubblicazione ferma non toglie il motore vecchio a nessuno, lascia i tester sull'ultima uscita col motore vecchio e senza
+le correzioni di Filo. Rete giù o risposta illeggibile: un avviso nel registro e la corsa prosegue.
+
+- **Il salto**: `npm install --save-dev electron@<ultima>`, in cloud il binario con `node scripts/ensure-electron.mjs`.
+- **I cambi fra le due versioni**: da qui le note delle release di Electron su GitHub non si leggono, la storia del ramo
+  sì: `git clone --bare --filter=blob:none --single-branch --branch 44-x-y --shallow-since=<data della vecchia>
+  https://github.com/electron/electron` e `git log`. Le righe `fix:` e `feat:` sono quelle da leggere.
+- **Anche una minor cambia comportamenti**: dalla 44.9.0 un collegamento aperto con Ctrl, Maiuscolo o il tasto centrale
+  passa dal gestore delle finestre come un `window.open()`, e `createWindow` riceve sempre `options.webContents`
+  (prima per i collegamenti arrivava senza). Si lanciano gli spec delle aree che una riga `fix:` tocca.
+
 ## Cosa si è rotto da 33 a 44
 
 - **Gli appunti nel main sono asincroni** (44): `readText`/`writeText` rendono una Promise, `readImage` e gli altri

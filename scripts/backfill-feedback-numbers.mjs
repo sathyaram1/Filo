@@ -19,7 +19,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, resolve } from 'node:path';
 import { acquireBearer, FIRESTORE_BASE, FIREBASE_API_KEY } from './lib/firestore-auth.mjs';
-import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { cambiataNelFrattempo, firmaOra, patchFirmato } from './lib/firma-ora.mjs';
 import { contaDocumenti } from './lib/firestore-conta.mjs';
 import { contatoreLetture } from './lib/letture.mjs';
 import { scansione, dopoApplicazione, copiaChiesta } from './lib/scansione-secco.mjs';
@@ -172,8 +172,11 @@ async function listAll(bearer) {
   return ordinaPerArrivo(docs);
 }
 
-async function patchSeq(id, seq, bearer) {
-  const qs = 'updateMask.fieldPaths=seq&updateMask.fieldPaths=subSeq&updateMask.fieldPaths=updatedAt';
+// `updateTime`: com'era il documento quando lo si è letto. La scrittura parte solo se è ancora così: una segnalazione
+// che nel frattempo ha preso un numero (o è cambiata) non si riscrive (#680.2).
+async function patchSeq(id, seq, bearer, updateTime = '') {
+  const qs = 'updateMask.fieldPaths=seq&updateMask.fieldPaths=subSeq&updateMask.fieldPaths=updatedAt'
+    + (updateTime ? `&currentDocument.updateTime=${encodeURIComponent(updateTime)}` : '');
   const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${qs}`, {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
@@ -185,8 +188,40 @@ async function patchSeq(id, seq, bearer) {
       },
     }),
   });
-  return { ok: res.ok, status: res.status, body: res.ok ? '' : (await res.text()).slice(0, 200) };
+  const body = res.ok ? '' : (await res.text()).slice(0, 200);
+  return { ok: res.ok, status: res.status, body, cambiata: !res.ok && cambiataNelFrattempo(res.status, body) };
 }
+
+/**
+ * Il primo numero fra `da` e `a` che una segnalazione ha già, 0 se sono tutti liberi, null se il server non risponde.
+ * Una lettura sola, qualunque sia l'intervallo.
+ */
+async function numeroPresoFra(da, a, bearer) {
+  const headers = { 'Content-Type': 'application/json' };
+  if (bearer) headers.Authorization = `Bearer ${bearer}`;
+  const filtro = (op, n) => ({ fieldFilter: { field: { fieldPath: 'seq' }, op, value: { integerValue: String(n) } } });
+  const structuredQuery = {
+    from: [{ collectionId: 'feedback' }],
+    where: { compositeFilter: { op: 'AND', filters: [filtro('GREATER_THAN_OR_EQUAL', da), filtro('LESS_THAN_OR_EQUAL', a)] } },
+    orderBy: [{ field: { fieldPath: 'seq' }, direction: 'ASCENDING' }],
+    select: { fields: [{ fieldPath: 'seq' }] },
+    limit: 1,
+  };
+  try {
+    const res = await fetch(`${FIRESTORE_BASE}:runQuery?key=${FIREBASE_API_KEY}`, { method: 'POST', headers, body: JSON.stringify({ structuredQuery }) });
+    if (!res.ok) return null;
+    const riga = (await res.json()).find((r) => r && r.document);
+    return riga ? (intField(riga.document, 'seq') || da) : 0;
+  } catch (_) {
+    return null;
+  }
+}
+
+const idDi = (d) => String(d?.name || '').split('/').pop();
+const dividi = (docs) => ({
+  withSeq: docs.filter((d) => intField(d, 'seq') > 0),
+  missing: docs.filter((d) => intField(d, 'seq') === 0),
+});
 
 // Esegue il backfill. `dry` = solo lettura, nessuna scrittura. Le credenziali
 // servono in entrambi i casi: dal 2026-09 (#583) la collezione dei feedback non
@@ -216,7 +251,7 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     }
     console.log(`${conto.totale} feedback totali: ${conto.numerati} già numerati, 0 da numerare (si parte da #${(Number.isInteger(ultimo) ? ultimo : 0) + 1}).`);
     console.log(letture.riga());
-    return { total: conto.totale, numbered: 0, failures: 0, dry, letture: letture.totale };
+    return { total: conto.totale, numbered: 0, failures: 0, saltate: [], dry, letture: letture.totale };
   }
   if (!contati) {
     console.warn('AVVISO: il server non ha saputo contare i feedback: scansiono la collezione (una lettura per segnalazione).');
@@ -227,34 +262,53 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
     letture.aggiungi(letti.length, 'segnalazioni');
     return letti;
   };
-  const { dati: primi, dallaCopia } = await scansione({
-    nome: COPIA, dry, now, dir: copiaDir, usaCopia, scansiona: leggi,
+  // Il contatore letto per il confronto vale anche per assegnare: i numeri controllati sono quelli che si danno.
+  let contatore;
+  let contatoreLetto = false;
+  const leggiContatore = async () => {
+    contatore = await FB.submissionCount({ idToken: bearer || '' });
+    letture.aggiungi(1, 'contatore');
+    contatoreLetto = true;
+  };
+  // I numeri si assegnano contando quelli che ci sono: la copia della prova a secco si riusa solo se il presente le
+  // somiglia ancora, o una segnalazione arrivata nel frattempo, che il primo numero libero se lo prende da sé, finirebbe
+  // col numero di un'altra. Un conteggio che non risponde non dice «uguale»: dice «non so», e si rilegge (#680.2).
+  const confronta = async (copia) => {
+    if (!contati) return 'il server non ha saputo contare le segnalazioni, e senza il conto non so se sono cambiate';
+    const { withSeq, missing } = dividi(copia);
+    if (conto.totale !== copia.length || conto.numerati !== withSeq.length) {
+      return `dalla prova a secco le segnalazioni sono cambiate (${copia.length} → ${conto.totale}, numerate ${withSeq.length} → ${conto.numerati})`;
+    }
+    if (!missing.length) return '';
+    await leggiContatore();
+    const primo = ultimoNumeroBuono(contatore, withSeq) + 1;
+    const preso = await numeroPresoFra(primo, primo + missing.length - 1, bearer || '');
+    letture.aggiungi(1, 'numeri liberi');
+    if (preso === null) return 'il server non ha detto se i numeri da dare sono ancora liberi';
+    if (preso) return `il numero #${preso}, che la prova a secco dava, ora è di un'altra segnalazione`;
+    return '';
+  };
+  const { dati: docs, scartata } = await scansione({
+    nome: COPIA, dry, now, dir: copiaDir, usaCopia, scansiona: leggi, confronta,
   });
-  let docs = primi;
-  // La copia descrive il server di qualche minuto fa, e i numeri si assegnano
-  // contando quelli che ci sono: se nel frattempo è arrivata una segnalazione,
-  // il numero che si prende da sé è il primo che questo giro sta per dare, e
-  // due segnalazioni finirebbero con lo stesso numero. Il conto vero ce
-  // l'abbiamo già in mano (l'abbiamo appena chiesto): se non combacia con la
-  // copia, si rilegge — costa una scansione, un numero doppio non si aggiusta
-  // da sé (#680, secondo giro).
-  if (dallaCopia && contati
-      && (conto.totale !== docs.length || conto.numerati !== docs.filter((d) => intField(d, 'seq') > 0).length)) {
-    console.warn(`AVVISO: dalla prova a secco le segnalazioni sono cambiate (${docs.length} → ${conto.totale}): `
-      + 'rileggo, o assegnerei numeri già presi.');
-    docs = await leggi();
+  const { withSeq, missing } = dividi(docs);
+  // Chi la prova a secco numerava e adesso non è più da numerare: cambiata nel frattempo, si salta e si dice.
+  const saltate = [];
+  if (scartata && Array.isArray(scartata.dati)) {
+    const ancora = new Set(missing.map(idDi));
+    for (const d of dividi(scartata.dati).missing) {
+      if (!ancora.has(idDi(d))) saltate.push({ id: idDi(d), motivo: 'cambiata dalla prova a secco: ha già un numero, o non c\'è più' });
+    }
   }
-  const withSeq = docs.filter((d) => intField(d, 'seq') > 0);
-  const missing = docs.filter((d) => intField(d, 'seq') === 0);
   // Il contatore si legge DOPO la scansione: più tardi, meno numeri presi nel frattempo da chi invia.
-  const contatore = await FB.submissionCount({ idToken: bearer || '' });
-  letture.aggiungi(1, 'contatore');
+  if (!contatoreLetto || scartata) await leggiContatore();
   let next = ultimoNumeroBuono(contatore, withSeq) + 1;
 
   console.log(`${docs.length} feedback totali: ${withSeq.length} già numerati, ${missing.length} da numerare (si parte da #${next}).`);
   let failures = 0;
+  let cambiate = 0;
   for (const d of missing) {
-    const id = d.name.split('/').pop();
+    const id = idDi(d);
     // Il titolo, se c'è: il testo della segnalazione non si scarica più (#680),
     // quindi il ripiego è l'id, che la riga stampa comunque.
     const label = strField(d, 'name') || '(senza titolo)';
@@ -262,16 +316,21 @@ export async function backfillNumbers(bearer, { dry = false, now = Date.now(), c
       console.log(`  • #${next++} → ${id}  «${label}»`);
       continue;
     }
-    const r = await patchSeq(id, next, bearer);
+    const r = await patchSeq(id, next, bearer, d.updateTime || '');
     if (r.ok) console.log(`  ✓ #${next++} → ${id}  «${label}»`);
+    else if (r.cambiata) { saltate.push({ id, motivo: 'cambiata da quando l\'ho letta: non l\'ho riscritta' }); cambiate += 1; }
     else { console.error(`  ✗ ${id}: HTTP ${r.status} ${r.body}`); failures++; }
+  }
+  if (saltate.length) {
+    console.warn(`Saltate perché cambiate nel frattempo (${saltate.length}): rilancia per numerarle se serve.`);
+    for (const s of saltate) console.warn(`  ↷ ${s.id}: ${s.motivo}`);
   }
   // Fin qui sono numeri dati da questo giro o provati: gli unici che possono alzare il contatore.
   await allineaContatore(next - 1, bearer, dry, letture, { mancante: !Number.isInteger(contatore) });
   // Applicato: i numeri sul server non sono più quelli che la copia descrive.
   dopoApplicazione(COPIA, { dry, usaCopia, dir: copiaDir });
   console.log(letture.riga());
-  return { total: docs.length, numbered: missing.length - failures, failures, dry, letture: letture.totale };
+  return { total: docs.length, numbered: missing.length - failures - cambiate, failures, saltate, dry, letture: letture.totale };
 }
 
 // Il contatore da cui i feedback nuovi prendono il numero: se un giro ha

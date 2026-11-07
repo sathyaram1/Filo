@@ -15,14 +15,14 @@ const A = globalThis.SN_CONST.AUTOMATION;
 test('l\'intervallo delle sessioni è suo, non quello dei bilanci', () => {
   assert.equal(A.MAX_SESSIONS_MIN, 1, 'zero sarebbe un interruttore master di nascosto');
   assert.equal(A.MAX_SESSIONS_MAX, 20);
-  assert.equal(A.MAX_SESSIONS_DEFAULT, 1);
+  assert.equal(A.MAX_SESSIONS_DEFAULT, 20, 'lo stesso del server (policy.MAX_SESSIONS_DEFAULT): il freno, non il lavoro');
   assert.notEqual(A.MAX_SESSIONS_MIN, A.CAP_MIN, 'i bilanci partono da 0, le sessioni no');
   assert.notEqual(A.MAX_SESSIONS_MAX, A.CAP_MAX);
 });
 
 test('un documento senza i campi vale come il comportamento di oggi', () => {
   assert.deepEqual(RS.leggiDoc({}), {
-    maxSessions: 1, priorityAccount: '', accountAOff: false, accountBOff: false,
+    maxSessions: 20, priorityAccount: '', accountAOff: false, accountBOff: false, manutentoreAcceso: false, riservatiOff: false, riservatiTetto: 20,
   });
   assert.deepEqual(RS.leggiDoc(null), RS.leggiDoc({}));
   assert.deepEqual(RS.leggiDoc(undefined), RS.leggiDoc({}));
@@ -30,13 +30,17 @@ test('un documento senza i campi vale come il comportamento di oggi', () => {
 
 test('il documento si legge com\'è, e un valore storto non fa esplodere la pagina', () => {
   assert.deepEqual(RS.leggiDoc({
-    maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false,
-  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false });
+    maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, riservatiOff: true, riservatiTetto: 3,
+  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false, riservatiOff: true, riservatiTetto: 3 });
+  assert.equal(RS.leggiDoc({ manutentoreAcceso: true }).manutentoreAcceso, true);
+  assert.equal(RS.leggiDoc({ manutentoreAcceso: 'sì' }).manutentoreAcceso, false, 'solo un vero booleano lo accende');
+  assert.deepEqual(RS.valida({ manutentoreAcceso: true }), { ok: true, valori: { manutentoreAcceso: true } });
+  assert.equal(RS.valida({ manutentoreAcceso: 'sì' }).ok, false);
   // Firestore rende gli interi come stringhe: «5» è cinque, non un guasto.
   assert.equal(RS.leggiDoc({ maxSessions: '5' }).maxSessions, 5);
   assert.equal(RS.leggiDoc({ maxSessions: 99 }).maxSessions, 20, 'in lettura si riporta nell\'intervallo');
   assert.equal(RS.leggiDoc({ maxSessions: 0 }).maxSessions, 1);
-  assert.equal(RS.leggiDoc({ maxSessions: 'tante' }).maxSessions, 1);
+  assert.equal(RS.leggiDoc({ maxSessions: 'tante' }).maxSessions, 20, 'come il server: un valore storto vale il predefinito');
   assert.equal(RS.leggiDoc({ priorityAccount: 'C' }).priorityAccount, '');
   assert.equal(RS.leggiDoc({ accountAOff: 'sì' }).accountAOff, false, 'solo un vero booleano esclude');
 });
@@ -143,4 +147,36 @@ test('pause lunghe: domani, o la data; scadute o sporche non diventano una riga'
   // La routine server senza account noto non inventa un conto del giorno.
   assert.doesNotMatch(RS.pausaInParole('La routine server', { finoMs: ORA + ORE, perche: 'http_429', account: '', oggi: 0 }, ORA).dettaglio, /Accensioni di oggi/);
   assert.match(RS.pausaInParole('La routine server (account B)', { finoMs: ORA + ORE, perche: 'http_429', account: 'B', oggi: 4 }, ORA).dettaglio, /oggi su quell'account: 4/);
+});
+
+test('la routine riservati (#2069): spenta solo con un vero booleano, e un tetto intero da 1 al massimo', () => {
+  assert.ok(RS.CHIAVI.includes('riservatiOff') && RS.CHIAVI.includes('riservatiTetto'), 'il main li inoltra e li rilegge');
+  assert.ok(!RS.CHIAVI.some((k) => /reteAperta/.test(k)), 'la rete aperta non ha più posto in Gestione');
+  assert.equal(RS.leggiDoc({ riservatiOff: 'sì' }).riservatiOff, false);
+  assert.equal(RS.leggiDoc({ riservatiTetto: '4' }).riservatiTetto, 4);
+  assert.equal(RS.leggiDoc({ riservatiTetto: 0 }).riservatiTetto, 20, 'senza un tetto scritto vale quello comune');
+  assert.equal(RS.leggiDoc({ riservatiTetto: 99 }).riservatiTetto, 20);
+  assert.deepEqual(RS.valida({ riservatiOff: true, riservatiTetto: '2' }), { ok: true, valori: { riservatiOff: true, riservatiTetto: 2 } });
+  for (const storto of [0, 21, 1.5, '', '   ', 'due', '<b>3</b>']) {
+    const r = RS.valida({ riservatiTetto: storto });
+    assert.equal(r.ok, false, String(storto));
+    assert.match(r.testo, /riservati: ci vuole un numero intero da 1 a 20\. Non salvato\./);
+  }
+  assert.equal(RS.valida({ riservatiOff: 'true' }).ok, false);
+});
+
+test('lo stato della routine riservati in una riga: cosa ha deciso il pacemaker e quante volte l’ha accesa oggi', () => {
+  assert.equal(RS.statoRiservati(undefined), '', 'il pacemaker non ne ha ancora scritto niente');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_work', oggi: 1 }), 'Accesa una volta oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_work', oggi: 3 }), 'Accesa 3 volte oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_no_routine_id', oggi: 0 }), 'Ferma: manca l’id della routine su claude.ai; mai accesa oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'riservati_off', oggi: 0 }), 'Spenta: si usa la routine normale; mai accesa oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'no_riservati_work', oggi: 2 }), 'Nessun compito per lei; accesa 2 volte oggi.');
+  assert.equal(RS.statoRiservati({ perche: 'motivo_nuovo' }), 'Ferma: stato non leggibile; mai accesa oggi.');
+  // La sua pausa conta le accensioni sue, non quelle dell'account.
+  const ora = Date.parse('2026-11-01T10:00:00Z');
+  const p = RS.pausaInParole('La routine riservati dell’account A', { finoMs: ora + 3600000, perche: 'http_402', strikes: 1, account: 'A', oggi: 2 }, ora, { contoDi: 'routine' });
+  assert.match(p.testo, /^La routine riservati dell’account A in pausa fino alle .*crediti finiti/);
+  assert.match(p.dettaglio, /Accensioni di oggi di questa routine: 2\./);
+  assert.doesNotMatch(p.dettaglio, /quell'account/);
 });

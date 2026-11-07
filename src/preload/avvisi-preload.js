@@ -1,6 +1,6 @@
 // Preload della vista degli avvisi sopra la pagina (src/renderer/avvisi.html): riceve lo stato, dice
-// quanto è grande, riporta clic, tasto destro e puntatore sopra le carte, chiede il suggerimento della X e
-// rigira alla scheda i gesti caduti nel vuoto. Nient'altro deve poter chiedere al main.
+// quanto è grande, riporta clic, tasto destro, trascinamento e puntatore sopra le carte, chiede il suggerimento
+// della X e rigira alla scheda i gesti caduti nel vuoto. Nient'altro deve poter chiedere al main.
 
 const { contextBridge, ipcRenderer } = require('electron');
 
@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld('avvisi', {
   menuPila: (x, y) => ipcRenderer.send('avvisi:menu', { pila: true, x, y }),
   sopra: (on) => ipcRenderer.send('avvisi:sopra', { sopra: !!on }),
   inoltra: (gesto) => ipcRenderer.send('avvisi:inoltra', gesto),
+  // #588.8 — trascinare la carta di un file arrivato: il file lo sceglie il main dalla carta, non da qui.
+  trascina: (id) => ipcRenderer.send('avvisi:trascina', { id }),
   onCursore: (fn) => {
     ipcRenderer.on('avvisi:cursore', (_event, forma) => { try { fn(forma); } catch (_) {} });
   },

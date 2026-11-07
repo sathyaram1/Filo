@@ -303,8 +303,9 @@ async function apriInSecondoPiano(app, url, arrivo = url) {
   await app.evaluate((_e, url) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'NAVIGA', url, background: true }), url);
   await expect.poll(() => app.evaluate(({ BrowserWindow }, arrivo) => BrowserWindow.getAllWindows()
     .some((w) => w._filoTabs && w._filoTabs.tabs.some((t) => t.view.webContents.getURL() === arrivo && !t.view.webContents.isLoading())), arrivo),
-  // Una pagina da 160 mila elementi qui ci mette tredici secondi a caricarsi, e su una macchina con due processori un minuto.
-  { timeout: 90_000 }).toBe(true);
+  // Una pagina da 160 mila elementi qui ci mette tredici secondi a caricarsi, e su una macchina con due processori o
+  // carica da altri lavori oltre un minuto e mezzo (#1907).
+  { timeout: 150_000 }).toBe(true);
 }
 const leggi = (app, azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
 
@@ -353,9 +354,11 @@ test('quello che Filo ha letto dalla scheda dell\'utente non esce in un indirizz
 });
 
 test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece di consegnarne metà', async ({ app, openTab, testServer }) => {
-  test.setTimeout(180_000);
+  test.setTimeout(240_000);
   const page = await openTab(NEWTAB);
-  const url = testServer.html(`<!doctype html><html><head><title>Registro</title></head><body><main><h1>Registro</h1><p>${'<b>x</b> '.repeat(160000)}</p>
+  // Oltre il tetto di elementi, ma nascosti: contano lo stesso, e senza impaginarli la pagina si carica anche su una
+  // macchina carica, dove 160 mila elementi visibili sforavano l'attesa e la prova diventava rossa a caso (#1907).
+  const url = testServer.html(`<!doctype html><html><head><title>Registro</title></head><body><main><h1>Registro</h1><p>Spedizioni del mese.</p><p>${'<b hidden>x</b>'.repeat(160000)}</p>
 <p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
   await apriInSecondoPiano(app, url);
   await reteDiProva(app, { vietata: true });
@@ -368,7 +371,7 @@ test('una scheda troppo grande per leggerla tutta lo dichiara al modello invece 
   const giri = await chiamate(app);
   const letto = esitiDi(giri[1]).join('\n');
   expect(letto).toContain('letta dalla scheda aperta');
-  expect(letto).toContain('solo la sua prima parte');
+  expect(letto).toContain('Filo ha solo la prima parte');
 });
 
 // #1574: su una macchina lenta la lettura di una scheda enorme scadeva e al modello non arrivava niente. Qui la scadenza
@@ -397,6 +400,96 @@ test('una scheda che non si finisce di leggere in tempo consegna il suo primo pe
   expect(pezzo.lettaInParte).toBe(true);
   expect(pezzo.testo.length, 'il primo pezzo arriva pieno, non tagliato dalla scadenza').toBeGreaterThan(25_000);
   expect(await app.evaluate(() => globalThis.__scaricati.length), 'la rete non sostituisce la scheda in ritardo').toBe(0);
+});
+
+// #1307.3: chiesto il seguito oltre l'ultimo pezzo di una scheda letta in parte, il modello sentiva «la pagina finisce qui»
+// e rispondeva che il dato non c'era.
+test('oltre l\'ultimo pezzo di una scheda letta in parte, al modello non arriva «la pagina finisce»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  const righe = Array.from({ length: 4000 }, (_, i) => `<p>Spedizione ${i + 1} partita da Bologna e consegnata a Verona.</p>`).join('');
+  const url = testServer.html(`<!doctype html><html><head><title>Spedizioni</title></head><body><main><h1>Spedizioni</h1>${righe}
+<p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scheda = -1; });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url, da: 10_000_000 } }] },
+    { finale: { cerca: '(prima parte)', testo: 'RISPOSTA: letta la $1.' } },
+  ]);
+  await chiedi(page, 'quando è stata consegnata l\'ultima spedizione della pagina che ho aperto?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: letta la prima parte.' })).toBeVisible({ timeout: 30_000 });
+  const letto = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(letto).toContain('Filo ha solo la prima parte');
+  expect(letto).toContain('ma la pagina continua');
+  expect(letto).not.toMatch(/finisce al carattere \d+: non c'è altro da leggere/);
+});
+
+// #1307.3: la prima parte letta di una scheda troppo grande può non avere testo (una griglia enorme di celle vuote prima del
+// contenuto): al modello non arriva «la scheda non mostra testo», che gli fa rispondere che nella pagina non c'è niente.
+test('una scheda letta in parte con la prima parte senza testo lo dichiara al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(240_000);
+  const page = await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Tabellone</title></head><body><main>${'<i hidden></i>'.repeat(160000)}
+<p>ULTIMA_RIGA consegnata il 27 settembre</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await reteDiProva(app, { vietata: true });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(prima parte)', testo: 'RISPOSTA: letta la $1.' } },
+  ]);
+  await chiedi(page, 'quando è stata consegnata l\'ultima spedizione nella pagina che ho aperto?');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: letta la prima parte.' })).toBeVisible({ timeout: 60_000 });
+  const letto = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(letto).toContain('Filo ha solo la prima parte');
+  expect(letto).toContain('non contiene testo, ma la pagina continua');
+  expect(letto).not.toContain('non mostra testo da leggere');
+});
+
+// #1307.3: la scheda che non risponde in tempo non lascia al modello una copia scaricata a parte spacciata per la pagina
+// che l'utente ha davanti, né il consiglio di aprirla in una scheda quando la copia non arriva.
+test('una scheda aperta che non risponde in tempo lo dice al modello, con la copia scaricata o senza', async ({ app, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const page = await openTab(NEWTAB);
+  const url = testServer.html(`<!doctype html><html><head><title>Ordini</title></head><body><main><h1>Ordini</h1>
+<p>Il tuo ordine 4471 è partito martedì da Bologna e arriva a Verona giovedì 29 ottobre entro le 13.</p></main></body></html>`);
+  await apriInSecondoPiano(app, url);
+  await app.evaluate(() => { globalThis.SN_LETTURA_PAGINE._tempi.scadenzaScheda = 1500; });
+  // La pagina resta occupata a fare altro più a lungo della scadenza, come un sito pesante su una macchina lenta.
+  const occupa = () => app.evaluate(({ BrowserWindow }, url) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      for (const t of (w._filoTabs ? w._filoTabs.tabs : [])) {
+        if (t.view.webContents.getURL() !== url) continue;
+        t.view.webContents.executeJavaScript('setTimeout(() => { const f = Date.now() + 6000; while (Date.now() < f); }, 0); 1').catch(() => {});
+      }
+    }
+  }, url);
+
+  await reteDiProva(app);
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(non ha risposto in tempo)', testo: 'RISPOSTA: la scheda $1.' } },
+  ]);
+  await occupa();
+  await chiedi(page, 'quando arriva il mio ordine? è nella pagina che ho aperto');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA: la scheda non ha risposto in tempo.' })).toBeVisible({ timeout: 30_000 });
+  const copia = esitiDi((await chiamate(app))[1]).join('\n');
+  expect(copia).toContain('scaricata');
+  expect(copia).toContain('giovedì 29 ottobre');
+  expect(copia).toContain('può non essere quello che vede l\'utente');
+  expect(await app.evaluate(() => globalThis.__scaricati.length), 'senza risposta dalla scheda la copia arriva dalla rete').toBe(1);
+
+  await reteDiProva(app, { vietata: true });
+  await stubModello(app, [
+    { strumenti: [{ nome: 'LEGGI_PAGINA', args: { url } }] },
+    { finale: { cerca: '(scaricarla a parte non è riuscito)', testo: 'RISPOSTA BIS: $1.' } },
+  ]);
+  await occupa();
+  await chiedi(page, 'riprova a leggerla');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'RISPOSTA BIS: scaricarla a parte non è riuscito.' })).toBeVisible({ timeout: 30_000 });
+  const niente = esitiDi((await chiamate(app))[1]).at(-1);
+  expect(niente).toContain('la scheda aperta non ha risposto in tempo');
+  expect(niente, 'la pagina è quella aperta dall\'utente: un\'altra fonte non è il consiglio giusto').not.toContain('un\'altra fonte');
 });
 
 test('aperta in una scheda come consiglia Filo, la pagina che rimanda si rilegge dalla scheda con l\'indirizzo di partenza', async ({ app, openTab, testServer }) => {

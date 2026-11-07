@@ -82,10 +82,13 @@ export function avvisoDaCampi(fields, ora = Date.now()) {
   return `Attenzione: a questa pratica manca ${mancano.join(', ')}. Alla fusione L5 non si salta e, se i controlli fermano, si aspetta il tuo sì.`;
 }
 
+// Quanti documenti si leggono per un numero: pieno vuol dire che oltre ce ne possono essere altri.
+const NUMERO_RIGHE_MAX = 200;
+
 /**
- * Il riferimento risolto all'id Firestore, in rete. Un numero con più documenti
- * (i vecchi #N.k) prende quello col subSeq chiesto, 0 se non detto.
- * @returns {Promise<{ ok: true, id: string, seq: number|null } | { ok: false, motivo: string }>}
+ * Il riferimento risolto all'id Firestore, in rete: di #N.k prende il subSeq chiesto, 0 se non detto.
+ * Due documenti con lo stesso #N.k (#1517) non si scelgono: si rifiuta con gli id.
+ * @returns {Promise<{ ok: true, id: string, seq: number|null } | { ok: false, motivo: string, doppi?: string[] }>}
  */
 export async function risolviFeedback(raw, { bearer, base, fetchImpl = fetch } = {}) {
   const r = parseRiferimento(raw);
@@ -104,13 +107,21 @@ export async function risolviFeedback(raw, { bearer, base, fetchImpl = fetch } =
       from: [{ collectionId: 'feedback' }],
       where: { fieldFilter: { field: { fieldPath: 'seq' }, op: 'EQUAL', value: { integerValue: String(r.seq) } } },
       select: { fields: [{ fieldPath: 'subSeq' }] },
-      limit: 50,
+      limit: NUMERO_RIGHE_MAX,
     },
   };
   const res = await fetchImpl(`${base}:runQuery`, { method: 'POST', headers, body: JSON.stringify(q) });
   if (!res.ok) return { ok: false, motivo: `ricerca di #${r.seq} fallita (${res.status})` };
   const righe = (await res.json()).filter((x) => x && x.document);
-  const giusto = righe.find((x) => (Number(x.document.fields?.subSeq?.integerValue) || 0) === r.subSeq);
-  if (!giusto) return { ok: false, motivo: `nessun feedback #${r.seq}${r.subSeq ? `.${r.subSeq}` : ''}` };
-  return { ok: true, id: giusto.document.name.split('/').pop(), seq: r.seq };
+  const num = `#${r.seq}${r.subSeq ? `.${r.subSeq}` : ''}`;
+  const giusti = righe.filter((x) => (Number(x.document.fields?.subSeq?.integerValue) || 0) === r.subSeq)
+    .map((x) => x.document.name.split('/').pop());
+  if (giusti.length > 1) {
+    return { ok: false, motivo: `${num} è il numero di ${giusti.length} feedback (${giusti.join(', ')}): indica quello giusto con l'id`, doppi: giusti };
+  }
+  if (righe.length >= NUMERO_RIGHE_MAX) {
+    return { ok: false, motivo: `${num}: più di ${NUMERO_RIGHE_MAX - 1} feedback col numero ${r.seq}, non so dire se è uno solo: indicalo con l'id`, doppi: giusti };
+  }
+  if (!giusti.length) return { ok: false, motivo: `nessun feedback ${num}` };
+  return { ok: true, id: giusti[0], seq: r.seq };
 }

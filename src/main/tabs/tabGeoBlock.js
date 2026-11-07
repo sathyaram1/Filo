@@ -5,6 +5,7 @@
 const ProxyTab = require('../services/proxyTab');
 const GeoBlock = require('../services/geoBlock');
 const GeoBlockRules = require('../services/geoBlockRules');
+const ContatoriHomePagina = require('../services/contatoriHomePagina');
 
 const geoBlockMethods = {
   // Qui solo rilevamento, segnale interno e azione (#151). Un segnale solo per navigazione:
@@ -15,6 +16,7 @@ const geoBlockMethods = {
     let host = '';
     try { host = new URL(url).hostname; } catch (_) {}
     tab.geoBlock = { url, host, source, detail, at: Date.now() };
+    this._contaNavigazione((N) => N.geoRilevato(source));
     GeoBlock.emitDetected({ tabId: tab.id, url, host, source, detail, at: tab.geoBlock.at });
     // Il livello decisionale vive nello stesso TabManager che possiede il tab, quindi si chiama
     // diretto; il registro onDetected resta per i consumatori esterni. Mai bloccante.
@@ -56,6 +58,7 @@ const geoBlockMethods = {
     } catch (_) {}
 
     const decision = GeoBlockRules.decideGeoAction({ flaggedDangerous, hasLoginCookies, proxyConfigured, stage });
+    this._contaNavigazione((N) => N.geoDecisione(decision.reason));
 
     // Paese di destinazione: ultima location usata, altrimenti default, altrimenti USA.
     const p = (settings && settings.proxy) || {};
@@ -77,7 +80,7 @@ const geoBlockMethods = {
     // proxy fallisce del tutto (es. tier non configurato), non c'è retry: si propone.
     const tier = decision.tier;
     let res = { ok: false };
-    try { res = await this.setTabProxy(tab.id, country, { tier }); } catch (_) { res = { ok: false }; }
+    try { res = await this.setTabProxy(tab.id, country, { tier, daSola: 'automazione' }); } catch (_) { res = { ok: false }; }
     if (res && res.ok) {
       // Informare, non chiedere (spec §5): toast discreto. La ri-rilevazione del
       // blocco dopo il reload proxato (se l'IP è bloccato) farà scattare l'escalation.
@@ -100,7 +103,7 @@ const geoBlockMethods = {
 
   // Toast discreto nella shell ("Aperto da {paese}"): informa senza chiedere.
   _geoToast(text) {
-    try { this.win.webContents.send('shell:toast', { text }); } catch (_) {}
+    try { this.win.webContents.send('shell:toast', { text, opts: { tipo: 'aperta_da_paese' } }); } catch (_) {}
   },
 
   // Proposta inline al content script (login attivo, o retry esaurito): l'avviso dice che in
@@ -110,6 +113,11 @@ const geoBlockMethods = {
     try {
       tab.view.webContents.send('filo:broadcast', { type: T, url, country, countryLabel: label });
     } catch (_) {}
+    // I contatori (#1473): la risposta, o la pagina che se ne va senza (tabs.js); mai il sito né il paese.
+    if (!tab._proposte) tab._proposte = {};
+    ContatoriHomePagina.misura('propostaMostrata', tab._proposte, 'apri_da_altro_paese', {
+      chiave: url, incognito: !!(this.incognito || (this.win && this.win._filoIncognito)),
+    });
   },
 
   _geoState(tab) {
@@ -128,6 +136,7 @@ const geoBlockMethods = {
     this._geoState(tab);
     if (host) tab.geoDismissed.delete(host);
     tab.geoRetry = { host, stage: 'settled' }; // scelta presa: niente auto-escalation
+    ContatoriHomePagina.misura('propostaRisposta', tab._proposte, 'apri_da_altro_paese', 'accettata');
     return this.setTabProxy(tabId, country);
   },
 
@@ -141,6 +150,7 @@ const geoBlockMethods = {
     try { host = url ? new URL(url).hostname : (tab.geoBlock ? tab.geoBlock.host : ''); } catch (_) {}
     if (host) tab.geoDismissed.add(host);
     tab.geoRetry = { host, stage: 'settled' };
+    ContatoriHomePagina.misura('propostaRisposta', tab._proposte, 'apri_da_altro_paese', 'rifiutata');
     return { ok: true };
   },
 
@@ -192,6 +202,7 @@ const geoBlockMethods = {
     this.proxyAvailable()
       .then((ok) => (ok ? classify(input) : null))
       .then((res) => {
+        this._contaNavigazione((N) => N.geoClasse(res));
         if (!res || res.skipped) return;
         if (!res.route || !res.route.proxy) return; // solo geo_block agisce
         const wc = tab.view && tab.view.webContents;

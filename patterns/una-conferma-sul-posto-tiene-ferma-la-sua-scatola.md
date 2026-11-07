@@ -33,7 +33,15 @@ conferma: una fusione voluta è finita scartata (#550).
   prima.
 - Vicino: [Un clic, una scheda: nessuna azione ricompone la lista sotto il cursore](un-clic-una-scheda-nessuna-azione-ricompone-la-lista.md),
   la stessa trappola quando a muoversi è la lista intera.
-- **Dove:** `buildCard` in `src/shared/mergeApprovals.js` (copiato nella pagina
-  delle approvazioni da browser) e «Salta il controllo» del pentagono in
-  `src/pages/manage/manage.js`. Prove: `tests/livelli-forme.spec.mjs`,
-  `tests/merge-approvals.spec.mjs`.
+- **Una conferma nuova usa l'aiuto** `SN_CONFERMA_SUL_POSTO.arma/disarma`
+  (`src/shared/confermaSulPosto.js`), che la pagina carica prima del suo script.
+  Un'etichetta armata più lunga in una fila allineata a destra sposta il bordo
+  sinistro: si sceglie corta, e il dettaglio va nel suggerimento (cestino
+  dell'editor, #256.6).
+- **Dove:** l'aiuto lo usano il Cestino dell'editor, «Salta il controllo» del
+  pentagono (`src/pages/manage/manage.js`) e «Togli» della parola d'ordine.
+  `buildCard` e `buildSkipCard` in `src/shared/mergeApprovals.js` hanno ancora
+  la loro copia, perché il modulo si copia anche nella pagina delle approvazioni
+  da browser. Prove: `tests/editor-trash.spec.mjs`, `tests/livelli-forme.spec.mjs`,
+  `tests/merge-approvals.spec.mjs`, `tests/approvazioni-web.spec.mjs`,
+  `tests/unit/confermaSulPosto.test.mjs`.

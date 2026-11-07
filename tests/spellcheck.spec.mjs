@@ -178,7 +178,8 @@ test.describe('spellcheck-autocorrect-multiword', () => {
       return document.getElementById('dictList')?.querySelectorAll('.sn-spell-word').length === 2;
     }, null, { timeout: 4_000 });
 
-    const words = await page.locator('#dictList .sn-spell-word').allTextContents();
+    // Le parole imparate si cambiano scrivendoci (#1447): ogni riga è una casella.
+    const words = await page.locator('#dictList .sn-spell-word').evaluateAll((els) => els.map((el) => el.value));
     const set = new Set(words);
     expect(set.has('New')).toBe(true);
     expect(set.has('York')).toBe(true);
@@ -523,15 +524,7 @@ test.describe('spellcheck-input-menu-top', () => {
     await expect(correction).toBeVisible({ timeout: 5_000 });
 
     // È davvero il primo item del menu (in cima).
-    const firstItemIsCorrection = await menuDi(page).valuta(() => {
-      const menu = document.querySelector('.sn-menu');
-      if (!menu) return false;
-      const first = Array.from(menu.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstItemIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
 
     // Mostra il suggerimento di correzione.
     await expect(correction.locator('.sn-menu-label').first()).toHaveText('ciao');
@@ -818,15 +811,7 @@ test.describe('spellcheck-native', () => {
     await expect(corr.first()).toContainText('world');
 
     // Ed è davvero la prima voce cliccabile del menu.
-    const firstIsCorrection = await menuDi(page).valuta(() => {
-      const menu = document.querySelector('.sn-menu');
-      if (!menu) return false;
-      const first = Array.from(menu.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
   });
 });
 
@@ -874,7 +859,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     // ASSERISCE IL SUCCESSO: la parola in lista deve essere "iPhone" (casing preservato)
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
-    await expect(wordSpans.first()).toHaveText('iPhone');
+    await expect(wordSpans.first()).toHaveValue('iPhone');
   });
 
   test('dizionario personale dedup case-insensitive: aggiungere "iphone" dopo "iPhone" non crea duplicati', async ({ openTab }) => {
@@ -896,7 +881,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
     // Il casing originale ("iPhone") deve essere preservato
-    await expect(wordSpans.first()).toHaveText('iPhone');
+    await expect(wordSpans.first()).toHaveValue('iPhone');
   });
 
   // ---------------------------------------------------------------------------
@@ -986,7 +971,7 @@ test.describe('spellcheck-page-dict-autocorrect', () => {
     // ASSERISCE IL SUCCESSO 2: nessun duplicato aggiunto (resta una sola parola)
     const wordSpans = page.locator('#dictList .sn-spell-word');
     await expect(wordSpans).toHaveCount(1);
-    await expect(wordSpans.first()).toHaveText('casa');
+    await expect(wordSpans.first()).toHaveValue('casa');
 
     // ASSERISCE IL SUCCESSO 3: l'input NON viene ingoiato in silenzio — il testo
     // digitato resta visibile così l'utente capisce cosa è successo.
@@ -1441,15 +1426,7 @@ test.describe('spellcheck-shadow-editable', () => {
     await expect(corr.first()).toContainText('ciao');
 
     // Ed è davvero la prima voce cliccabile del menu, come in light DOM.
-    const firstIsCorrection = await menuDi(page).valuta(() => {
-      const m = document.querySelector('.sn-menu');
-      if (!m) return false;
-      const first = Array.from(m.children).find(
-        (c) => !c.classList.contains('sn-menu-sep') && c.style.display !== 'none',
-      );
-      return !!first && first.classList.contains('sn-menu-correction');
-    });
-    expect(firstIsCorrection).toBe(true);
+    await expect(menuDi(page).primaVoce).toHaveClass(/sn-menu-correction/);
     await expect(menu).toBeVisible();
   });
 

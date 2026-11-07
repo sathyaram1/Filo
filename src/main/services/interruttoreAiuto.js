@@ -47,6 +47,10 @@ async function migra({ storage = require('../shim/storage'), registro = require(
   const K = chiavi();
   const dati = await storage.get([K.SETTINGS, K.FILO_CAMBI, SEGNO]);
   if (dati[SEGNO]) return false;
+  // Il registro dei cambi già entrato nel filo (#1561) si legge da lì.
+  if (!Array.isArray(dati[K.FILO_CAMBI]) && typeof registro.lista === 'function') {
+    try { dati[K.FILO_CAMBI] = await registro.lista(); } catch (_) {}
+  }
   const riaccendi = spentoDiSerie(dati);
   const scrittura = { [SEGNO]: true };
   if (riaccendi) {
@@ -70,7 +74,7 @@ function seAcceso(win, fn) {
     if (si) { fn(); return; }
     try {
       const testo = globalThis.SN_I18N && globalThis.SN_I18N.t('help_disabled');
-      if (testo && win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { unica: 'aiuto-spento' } });
+      if (testo && win && !win.isDestroyed()) win.webContents.send('shell:toast', { text: testo, opts: { unica: 'aiuto-spento', tipo: 'aiuto_spento' } });
     } catch (_) {}
   }, () => {});
 }

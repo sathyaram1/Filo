@@ -10,3 +10,16 @@ export async function apriRedteamATutti(app) {
     await req('./services/redteamGate').rileggiOra();
   });
 }
+
+// La voce «Invia attacco» del tasto destro c'è solo per chi ha riscattato un codice (#991): qui il main lo crede,
+// senza account né server. Chi lo legge dal server vero lo prova tests/redteam-verificati.spec.mjs.
+export async function fingiRedteamerVerificato(app) {
+  await app.evaluate(() => {
+    const Module = process.getBuiltinModule('module');
+    const path = process.getBuiltinModule('path');
+    const req = Module.createRequire(path.join(process.cwd(), 'src', 'main', 'main.js'));
+    const V = req('./services/redteamVerificato');
+    V.noto = () => true;
+    V.assicura = async () => true;
+  });
+}

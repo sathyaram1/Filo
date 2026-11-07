@@ -38,6 +38,16 @@ function decodeJwtPayload(jwt) {
   }
 }
 
+// L'accesso con Google per i contatori del servizio (#1472): l'esito, il passaggio al browser, il rinnovo. Mai un'email.
+function contaAccesso(cosa, voce) {
+  try { require('../services/contatoriServizio').misura('accesso', cosa, voce); } catch (_) {}
+}
+function contaEsito(e) {
+  let code = 'servizio';
+  try { code = require('./esitoAccesso').spiegaErroreAccesso(e).code; } catch (_) {}
+  contaAccesso('esito', code);
+}
+
 // `code` è la causa per chi ha chiesto l'accesso (esitoAccesso.js ne fa la frase).
 function erroreAccesso(code, message) {
   const e = new Error(message);
@@ -49,6 +59,7 @@ function erroreAccesso(code, message) {
 // l'accesso resterebbe in corso per sempre. Largo: consenso, scelta account, 2FA.
 const ATTESA_ACCESSO_MS = 10 * 60 * 1000;
 let flussoInCorso = null;
+let flussoAttuale = null;
 
 // A tempo costante: un tentativo sbagliato non chiude più l'ascolto, quindi i tentativi sono illimitati.
 function stessoState(ricevuto, atteso) {
@@ -57,32 +68,72 @@ function stessoState(ricevuto, atteso) {
   return a.length === b.length && require('node:crypto').timingSafeEqual(a, b);
 }
 
-// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, abort }.
-function startLoopback(expectedState) {
+// La pagina del ritorno aspetta lo scambio del codice: «completato» lo scrive solo un accesso riuscito (#678.6).
+// Oltre il tetto risponde lo stesso, e l'esito lo dice chi ha chiesto l'accesso.
+const RISPOSTA_RITORNO_MS = 2 * 60 * 1000;
+const escHtml = (s) => String(s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+function paginaRitorno(testo) {
+  return '<!doctype html><meta charset="utf-8"><title>Filo</title><body style="font-family:system-ui;padding:2rem">'
+    + escHtml(testo) + '</body>';
+}
+const fraseErrore = (e) => { try { return require('./esitoAccesso').spiegaErroreAccesso(e).error; } catch (_) { return 'Accesso non riuscito.'; } };
+
+// Avvia un server loopback effimero e ritorna { redirectUri, waitForCode, concludi, abort }. `dove` è dove torna
+// chi ha finito nel browser ('app', o 'terminale' per lo strumento dell'owner). `concludi(errore?)` scrive la pagina.
+function startLoopback(expectedState, { dove = 'app' } = {}) {
+  const torna = dove === 'terminale' ? 'al terminale' : 'all\'app';
   return new Promise((resolve, reject) => {
     let resolveCode, rejectCode;
     const codePromise = new Promise((res, rej) => { resolveCode = res; rejectCode = rej; });
     codePromise.catch(() => {}); // un flusso interrotto prima di waitForCode non è un rifiuto orfano
+    let ricevuto = false;
+    let attesa = null; // la risposta del ritorno vero, finché lo scambio non dice com'è andata
+    let tetto = null;
+    const concludi = (errore) => {
+      clearTimeout(tetto);
+      const res = attesa;
+      attesa = null;
+      if (!res) return;
+      try {
+        res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+        res.end(paginaRitorno(errore
+          ? `${fraseErrore(errore)} Puoi chiudere questa scheda.`
+          : `Accesso a Filo completato. Puoi chiudere questa scheda e tornare ${torna}.`));
+      } catch (_) {}
+    };
 
     const server = http.createServer((req, res) => {
-      const url = new URL(req.url, 'http://127.0.0.1');
+      res.on('error', () => {});
+      let url = null;
+      // Un indirizzo che non si legge («http://[») da un altro programma è una richiesta qualunque, non un crollo (#1086.2).
+      try { url = new URL(req.url, 'http://127.0.0.1'); } catch (_) { url = null; }
       // Lo state prima di tutto: una richiesta che non lo porta (un altro programma locale, il favicon) non chiude
       // né fa fallire l'accesso, che resta in ascolto del ritorno vero.
-      if (!stessoState(url.searchParams.get('state'), expectedState)) {
+      if (!url || ricevuto || !stessoState(url.searchParams.get('state'), expectedState)) {
         res.writeHead(400, { 'Content-Type': 'text/plain; charset=utf-8' });
         return res.end('Richiesta non riconosciuta.');
       }
       const code = url.searchParams.get('code');
       const error = url.searchParams.get('error');
-      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
-      res.end('<!doctype html><meta charset="utf-8"><body style="font-family:system-ui;padding:2rem">'
-        + (error || !code
-          ? 'Accesso non riuscito. Puoi chiudere questa scheda.'
-          : 'Accesso a Filo completato. Puoi chiudere questa scheda e tornare all\'app.')
-        + '</body>');
       server.close();
-      if (error) return rejectCode(erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error));
-      if (!code) return rejectCode(new Error('OAuth: nessun code nel redirect'));
+      ricevuto = true;
+      attesa = res;
+      if (error || !code) {
+        const e = error
+          ? erroreAccesso(error === 'access_denied' ? 'annullato' : 'servizio', 'OAuth: ' + error)
+          : new Error('OAuth: nessun code nel redirect');
+        concludi(e);
+        return rejectCode(e);
+      }
+      tetto = setTimeout(() => {
+        const r = attesa;
+        attesa = null;
+        if (!r) return;
+        try {
+          r.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+          r.end(paginaRitorno(`Puoi chiudere questa scheda: torna ${torna} per sapere com'è andato l'accesso.`));
+        } catch (_) {}
+      }, RISPOSTA_RITORNO_MS);
       resolveCode(code);
     });
 
@@ -90,8 +141,8 @@ function startLoopback(expectedState) {
     // porta 0 = il SO assegna una porta libera, solo su loopback.
     server.listen(0, '127.0.0.1', () => {
       const { port } = server.address();
-      const abort = (err) => { server.close(() => {}); rejectCode(err); };
-      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, abort });
+      const abort = (err) => { server.close(() => {}); concludi(err); rejectCode(err); };
+      resolve({ redirectUri: `http://127.0.0.1:${port}`, waitForCode: () => codePromise, concludi, abort });
     });
   });
 }
@@ -168,8 +219,50 @@ function persist() {
     email: session.email,
     name: session.name,
     picture: session.picture,
+    foto: session.foto || '',
+    fotoDi: session.fotoDi || '',
   });
 }
+
+// La foto del profilo è una copia nella cartella dati (#1273): si scarica una volta per account (o quando Google ne indica
+// un'altra, o all'avvio dopo se non era arrivata), senza cookie, e barra, shell e home la mostrano da lì. `suFoto` avvisa chi deve ridisegnarla.
+const copie = () => require('../services/copieIcone');
+const ascoltaFoto = new Set();
+function suFoto(fn) { ascoltaFoto.add(fn); return () => ascoltaFoto.delete(fn); }
+let fotoInCorso = null;
+let fotoPer = null;
+// L'account vale per tutte le finestre: la copia va su disco anche se l'accesso è partito da una finestra in incognito.
+const fuoriIncognito = (fn) => { try { return require('../shim/storage').runNormale(fn); } catch (_) { return fn(); } };
+
+function aggiornaFoto() {
+  const s = session;
+  // Un accesso nuovo mentre arriva la foto di quello prima aspetta il suo turno, non la perde.
+  if (fotoInCorso) return fotoPer === s ? fotoInCorso : fotoInCorso.then(() => aggiornaFoto());
+  if (!s || (!s.picture && !s.foto)) return Promise.resolve();
+  const nome = copie().nomeDa(s.foto);
+  const presente = !!nome && require('node:fs').existsSync(require('node:path').join(copie().cartella(), nome));
+  if (s.fotoDi === s.picture && (presente || !s.foto)) return Promise.resolve();
+  fotoPer = s;
+  fotoInCorso = fuoriIncognito(async () => {
+    let rif = '';
+    if (s.picture) {
+      const { session: sessioni } = require('electron');
+      const { dato } = await require('../services/iconaScheda').iconaPer(sessioni.defaultSession, [s.picture], { cookie: false });
+      rif = dato ? await copie().conserva(dato) : '';
+    }
+    if (session !== s) { copie().togliSeOrfane(rif); return; }
+    // Non arrivata (rete assente, server che non risponde): non si segna come presa, così l'avvio dopo la richiede.
+    if (s.picture && !rif) return;
+    const vecchia = s.foto;
+    s.foto = rif;
+    s.fotoDi = s.picture;
+    persist();
+    if (vecchia && vecchia !== rif) copie().togliSeOrfane(vecchia);
+    for (const fn of ascoltaFoto) { try { fn(getProfile()); } catch (_) {} }
+  }).catch(() => {}).finally(() => { fotoInCorso = null; fotoPer = null; });
+  return fotoInCorso;
+}
+copie().usaCopie('foto-profilo', () => [session && session.foto]);
 
 // Una risposta 200 può non essere un accesso (FEDERATED_USER_ID_ALREADY_LINKED, needConfirmation): senza i due
 // token non c'è sessione, e salvarla farebbe credere a un accesso riuscito.
@@ -180,13 +273,20 @@ function rispostaConSessione(fb) {
 function setSession(fb) {
   // Prima di toccare la sessione o il segno dell'owner caduto (#912): un accesso non avvenuto non li cambia.
   if (!rispostaConSessione(fb)) throw new Error('accesso senza sessione: risposta di Firebase senza token');
+  const prima = session;
+  const picture = fb.photoUrl || '';
+  // Lo stesso account con la stessa foto tiene la sua copia; un altro account la sua la scarica di nuovo.
+  const stessaFoto = !!(prima && prima.foto && prima.fotoDi === picture && prima.email === (fb.email || ''));
+  if (prima && prima.foto && !stessaFoto) copie().togliSeOrfane(prima.foto);
   session = {
     refreshToken: fb.refreshToken,
     idToken: fb.idToken,
     idTokenExp: Date.now() + (Number(fb.expiresIn || 3600) - 60) * 1000,
     email: fb.email || '',
     name: fb.displayName || '',
-    picture: fb.photoUrl || '',
+    picture,
+    foto: stessaFoto ? prima.foto : '',
+    fotoDi: stessaFoto ? prima.fotoDi : '',
   };
   segnaOwnerCaduto(false);
 }
@@ -223,26 +323,30 @@ function restore() {
   if (saved?.refreshToken) {
     session = { ...saved, idToken: null, idTokenExp: 0 };
     ricordata = store.canEncrypt();
+    // Una sessione di prima del #1273 ha solo l'indirizzo della foto: la copia si fa una volta, adesso.
+    try { aggiornaFoto(); } catch (_) {}
   }
   return getProfile();
 }
 
 async function signIn() {
   if (!cfg.isConfigured()) {
-    throw erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
+    const e = erroreAccesso('non-configurato', 'Login non configurato: manca il Google OAuth Client ID (vedi src/main/auth/config.js).');
+    contaEsito(e);
+    throw e;
   }
   const { net } = require('electron');
   if (net && typeof net.isOnline === 'function' && !net.isOnline()) {
-    throw erroreAccesso('rete', 'nessuna connessione');
+    const e = erroreAccesso('rete', 'nessuna connessione');
+    contaEsito(e);
+    throw e;
   }
   // Un accesso alla volta: chi lo chiede mentre uno aspetta riporta davanti la
   // STESSA pagina e ne condivide l'esito, così qualunque strada completi arriva a Filo.
+  // Riportarla davanti non allunga il tetto (#1132).
   if (flussoInCorso) {
     const f = await flussoInCorso;
-    if (f.aspettaBrowser) {
-      f.rinnovaAttesa();
-      await mostraAccesso(f);
-    }
+    if (f.aspettaBrowser) await mostraAccesso(f);
     return f.esito;
   }
   const prossimo = nuovoFlusso();
@@ -253,6 +357,7 @@ async function signIn() {
     f = await prossimo;
   } catch (e) {
     libera();
+    contaEsito(e);
     throw e;
   }
   f.esito.then(libera, libera);
@@ -282,9 +387,44 @@ async function mostraAccesso(f) {
       });
     } catch (_) {}
     if (scheda) { f.scheda = scheda; return; }
+    contaAccesso('browser', 'senza_scheda');
   }
   f.nelBrowser = true;
-  await apriBrowser(f.url);
+  await apriNelBrowser(f);
+}
+
+// Chi bussa a raffica (anche dal canale delle pagine) non apre una scheda del browser a ogni richiesta (#1132).
+const RIAPERTURA_BROWSER_MS = 10 * 1000;
+async function apriNelBrowser(f) {
+  const ora = Date.now();
+  const manca = f.browserAlle ? f.browserAlle + RIAPERTURA_BROWSER_MS - ora : 0;
+  if (manca > 0) {
+    // Una richiesta frenata non si perde in silenzio: la pagina si riapre allo scadere, una volta per quante ne arrivano.
+    if (!f.riaperturaFrenata) {
+      f.riaperturaFrenata = setTimeout(() => {
+        f.riaperturaFrenata = null;
+        if (f.aspettaBrowser && f.nelBrowser) apriNelBrowser(f).catch((e) => f.loop.abort(e));
+      }, manca);
+    }
+    return;
+  }
+  f.browserAlle = ora;
+  try {
+    await apriBrowser(f.url);
+  } catch (e) {
+    f.browserAlle = 0;
+    throw e;
+  }
+}
+
+// «Lascia stare» (solo da Filo) toglie il freno: l'«Accedi» che segue è un tentativo nuovo e apre subito. L'accesso
+// resta in ascolto, così chi lo finisce comunque nel browser entra lo stesso.
+function lasciaStare() {
+  const f = flussoAttuale;
+  if (!f) return;
+  f.browserAlle = 0;
+  clearTimeout(f.riaperturaFrenata);
+  f.riaperturaFrenata = null;
 }
 
 // Lo stesso indirizzo, quindi lo stesso codice e lo stesso loopback: l'accesso a Filo riesce comunque.
@@ -292,13 +432,14 @@ function passaAlBrowser(f, motivo) {
   f.scheda = null;
   f.nelBrowser = true;
   console.warn('[auth] scheda d\'accesso abbandonata (' + motivo + '): accesso nel browser di sistema');
+  contaAccesso('browser', motivo);
   // Una pagina che non si carica non è un no di Google: la riga dice il motivo vero, e l'invito a collegare resta.
   const nonCaricata = motivo === 'rete';
   if (!nonCaricata) { try { require('./prodottiGoogle').googleRifiutaLeSchede(); } catch (_) {} }
   // La riga «continua nel browser» solo se il browser si è aperto: altrimenti parla l'errore dell'accesso.
-  apriBrowser(f.url).then(() => {
+  apriNelBrowser(f).then(() => {
     const testo = nonCaricata ? AVVISO_NON_CARICATA : AVVISO_NEL_BROWSER;
-    try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser' }); } catch (_) {}
+    try { require('../services/avvisoFinestra').avvisoNellaFinestra(testo, { chiave: 'accesso-nel-browser', tipo: 'accesso_nel_browser' }); } catch (_) {}
   }, (e) => f.loop.abort(e));
 }
 
@@ -332,31 +473,38 @@ async function nuovoFlusso() {
     prompt: 'select_account',
   }).toString();
 
-  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false };
-  let timer = null;
-  // Il tetto riparte a ogni riapertura: chi riapre il browser ricomincia da capo.
-  f.rinnovaAttesa = () => {
-    clearTimeout(timer);
-    timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
-  };
-  f.rinnovaAttesa();
+  const f = { url: authUrl.toString(), loop, aspettaBrowser: true, scheda: null, nelBrowser: false, browserAlle: 0, riaperturaFrenata: null };
+  flussoAttuale = f;
+  const timer = setTimeout(() => loop.abort(erroreAccesso('scaduto', 'accesso non completato in tempo')), ATTESA_ACCESSO_MS);
   f.esito = (async () => {
     let code;
     try {
       code = await loop.waitForCode();
     } finally {
       clearTimeout(timer);
+      clearTimeout(f.riaperturaFrenata);
+      f.riaperturaFrenata = null;
+      if (flussoAttuale === f) flussoAttuale = null;
       f.aspettaBrowser = false;
       // Arrivato il codice (o finita l'attesa) la scheda resterebbe su una pagina morta del loopback.
       if (f.scheda) { f.scheda.chiudi(); f.scheda = null; }
     }
-    const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
-    if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
-    const fb = await signInWithFirebase(googleTok.id_token);
-    setSession(fb);
-    persist();
+    try {
+      const googleTok = await exchangeCodeForGoogleToken(code, verifier, redirectUri);
+      if (!googleTok.id_token) throw new Error('OAuth: nessun id_token da Google');
+      const fb = await signInWithFirebase(googleTok.id_token);
+      setSession(fb);
+      persist();
+    } catch (e) {
+      loop.concludi(e);
+      throw e;
+    }
+    loop.concludi();
+    aggiornaFoto();
     return getProfile();
   })();
+  // Un esito per accesso: chi si accoda allo stesso flusso ne condivide la promessa, e non conta di nuovo.
+  f.esito.then(() => contaAccesso('esito', 'ok'), contaEsito);
   return f;
 }
 
@@ -366,9 +514,11 @@ function segreti() {
 }
 
 function chiudiSessione() {
+  const foto = session && session.foto;
   session = null;
   ricordata = false;
   store.clear();
+  if (foto) copie().togliSeOrfane(foto);
 }
 
 function signOut() {
@@ -392,7 +542,11 @@ async function refreshIfNeeded() {
     // Si esce solo se il servizio dice che il refresh token non vale più: un 503 o un proxy
     // che risponde 403 lasciano sessione e auth.bin come sono, e il prossimo tentativo riesce.
     const testo = await res.text().catch(() => '');
-    if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
+    if (!guasti.rinnovoRifiutato(testo)) {
+      contaAccesso('rinnovo', 'irraggiungibile');
+      throw guasti.nonRaggiungibile(res.status);
+    }
+    contaAccesso('rinnovo', 'rifiutato');
     const eraOwner = isAdmin();
     chiudiSessione();
     if (eraOwner) segnaOwnerCaduto(true);
@@ -422,9 +576,10 @@ async function getUid() {
   } catch (_) { return null; }
 }
 
+// `picture` è la copia della foto (filo://icone/…), mai l'indirizzo di Google: le pagine non la chiedono a nessuno.
 function getProfile() {
   if (!session) return null;
-  return { email: session.email, name: session.name, picture: session.picture };
+  return { email: session.email, name: session.name, picture: copie().eCopia(session.foto) ? session.foto : '' };
 }
 
 // Claim email/email_verified come le vedono le regole: servono a spiegare un 403
@@ -456,6 +611,7 @@ module.exports = {
   restore,
   segreti,
   signIn,
+  lasciaStare,
   signOut,
   getIdToken,
   getUid,
@@ -465,6 +621,8 @@ module.exports = {
   isRemembered,
   isAdmin,
   accessoOwnerCaduto,
+  suFoto,
+  aggiornaFoto,
   // esportati per i test
   _internals: { decodeJwtPayload, startLoopback, nuovoFlusso },
 };

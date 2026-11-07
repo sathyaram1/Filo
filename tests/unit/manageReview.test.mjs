@@ -1373,7 +1373,7 @@ test('livelli: cinque forme, sempre, sempre nello stesso ordine', () => {
 
 test('livelli L1: categoria, motivi in italiano, chi ha deciso e cosa ha fatto', () => {
   const l1 = MR.livelloL1({
-    pipeline: { l1Category: 'dangerous', l1Reasons: ['linked_prior_attack', 'obfuscation'], action: 'block_attack' },
+    pipeline: { l1Category: 'dangerous', l1Reasons: ['linked_prior_attack'], action: 'block_attack' },
   });
   assert.equal(l1.esito, 'pericoloso');
   assert.equal(l1.classe, 'attack');
@@ -1381,12 +1381,79 @@ test('livelli L1: categoria, motivi in italiano, chi ha deciso e cosa ha fatto',
   const testo = l1.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`).join(' | ');
   assert.match(testo, /Categoria: Pericoloso/);
   assert.match(testo, /collegato a un attacco precedente/);
-  assert.match(testo, /offuscamento/);
   assert.match(testo, /filtro automatico/);
   assert.match(testo, /ha fermato la segnalazione come attacco/);
   // Un codice che la tabella non conosce si scrive lo stesso: meglio grezzo
   // che muto.
   assert.equal(MR.l1MotivoText('qualcosa_di_nuovo'), 'qualcosa di nuovo');
+});
+
+// La scheda che compone il server (pipeline.ingresso): qui i contenuti sono finti apposta, la pagina non li capisce.
+const SCHEDA = {
+  classe: 'design', esito: 'esito del server', breve: 'frase breve del server', rigiudica: false,
+  righe: [{ etichetta: 'Esito', valore: 'riga del server' }, { etichetta: 'Altro', valore: 3 }, null, 'storta'],
+  parti: [
+    { titolo: 'Testo del feedback', segmenti: [{ t: 'prima ' }, { t: 'segnato', nota: 'perché' }, { t: '' }, null, { t: ' dopo', nota: '  ' }] },
+    { titolo: 'vuota', segmenti: [] },
+    'storta',
+  ],
+};
+
+test('livelli L1: con la scheda del server il triangolo mostra le sue righe, il suo colore e il suo testo', () => {
+  const fb = { status: 'aligned', pipeline: { l1Category: 'clean', verdicts: [{ judge: 'a', class: 'aligned' }], ingresso: SCHEDA } };
+  const l1 = MR.livelloL1(fb);
+  assert.equal(l1.classe, 'design');
+  assert.equal(l1.colore, MR.LIVELLO_COLORI.design);
+  assert.equal(l1.esito, 'esito del server');
+  const righe = l1.pannello.righe.map((r) => `${r.etichetta}: ${r.valore}`);
+  assert.deepEqual(righe.slice(0, 2), ['Esito: riga del server', 'Altro: 3']);
+  assert.ok(!righe.some((r) => /Categoria|filtro automatico/.test(r)), 'le righe di prima non si mescolano a quelle del server');
+  assert.deepEqual(l1.pannello.parti, [
+    { titolo: 'Testo del feedback', segmenti: [{ t: 'prima ' }, { t: 'segnato', nota: 'perché' }, { t: ' dopo' }] },
+  ]);
+  assert.deepEqual(l1.pannello.azioni, []);
+});
+
+test('livelli L1: una scheda storta o con un colore sconosciuto non rompe il triangolo', () => {
+  assert.equal(MR.schedaIngresso({ pipeline: { ingresso: { righe: 'no' } } }), null);
+  assert.equal(MR.schedaIngresso({ pipeline: 'FENC1:abc' }), null);
+  const l1 = MR.livelloL1({ status: 'unlabeled', pipeline: { ingresso: { classe: 'viola', righe: [] } } });
+  assert.equal(l1.classe, null);
+  assert.equal(l1.vuoto, true);
+  assert.equal(l1.esito, 'assente');
+});
+
+test('livelli L1: Ri-giudica si offre dove il server lo dice, e sulle vecchie fermate al filtro senza il segno', () => {
+  const conScheda = (status, rigiudica) => ({ status, pipeline: { stage: 'altro', verdicts: [], ingresso: { ...SCHEDA, rigiudica } } });
+  assert.deepEqual(MR.livelloL1(conScheda('unlabeled', true)).pannello.azioni, ['rigiudica']);
+  assert.deepEqual(MR.livelloL1(conScheda('unlabeled', false)).pannello.azioni, []);
+  // Già uscita dalle mani della pipeline: niente da ri-giudicare.
+  assert.deepEqual(MR.livelloL1(conScheda('todo', true)).pannello.azioni, []);
+  const vecchia = (l1Reasons) => ({ status: 'attack', pipeline: { stage: 'L1', l1Category: 'dangerous', l1Reasons, verdicts: [] } });
+  assert.deepEqual(MR.livelloL1(vecchia(['codice_di_prima'])).pannello.azioni, ['rigiudica']);
+  assert.deepEqual(MR.livelloL1(vecchia(['linked_prior_attack'])).pannello.azioni, [], 'il segno ha il suo gesto');
+  assert.equal(MR.rigiudicabile({ status: 'attack', pipeline: { stage: 'L2', verdicts: [{ class: 'attack' }] } }), false);
+});
+
+test('fermata prima dei giudici: la frase breve del server va in lista e nel pannello, non «in attesa del giudizio»', () => {
+  const fb = { status: 'unlabeled', pipeline: { stage: 'altro', verdicts: [], ingresso: { ...SCHEDA, classe: 'spam', rigiudica: true } } };
+  assert.deepEqual(MR.judgesNote(fb), { text: 'frase breve del server.', color: MR.LIVELLO_COLORI.spam });
+  const segno = MR.segnoFermata(fb, {});
+  assert.equal(segno.forma, 'triangolo');
+  assert.equal(segno.livello, 'l1');
+  assert.equal(segno.classe, 'spam');
+  assert.equal(segno.testo, 'frase breve del server');
+  // Senza la frase resta quello di prima.
+  const senza = { status: 'unlabeled', pipeline: { verdicts: [], ingresso: { ...SCHEDA, breve: '' } } };
+  assert.equal(MR.judgesNote(senza).text, 'In attesa del giudizio.');
+});
+
+test('ri-valutazione: il server che non riesce ancora a leggere non conta come fatto, e si dice perché', () => {
+  const r = { ok: true, remaining: 0, results: [{ ok: true, changed: false, reason: 'non_decifrabile', errorKind: 'non_decifrabile' }] };
+  const esito = MR.classifyReevalResult(r);
+  assert.equal(esito.outcome, 'noop');
+  assert.equal(esito.errorKind, 'non_decifrabile');
+  assert.match(MR.reevalErrorHint('non_decifrabile'), /non riesce ancora a decifrare/);
 });
 
 test('livelli L1: spam giallo, pulito blu, e "pulito" dedotto se i giudici hanno votato', () => {
@@ -1482,6 +1549,13 @@ test('livelli L4: verde passa, rosso boccia (col tasto), ambra saltato, grigio n
   assert.deepEqual(fail.pannello.azioni, ['salta_l4']);
   assert.match(fail.pannello.testo, /Scrive su una chiave/);
 
+  // Il commit che l'audit ha letto si vede, e il salto lo porta con sé (#1502); uno sha storto no.
+  const conSha = MR.livelloL4({ livelli: { l4: { esito: 'fail', sha: 'ab12'.repeat(10), testo: 'x' } } });
+  assert.equal(conSha.pannello.sha, 'ab12'.repeat(10));
+  assert.deepEqual(conSha.pannello.righe.find((r) => r.etichetta === 'Commit esaminato'), { etichetta: 'Commit esaminato', valore: 'ab12ab12' });
+  assert.equal(MR.livelloL4({ livelli: { l4: { esito: 'fail', sha: 'main; rm -rf' } } }).pannello.sha, '');
+  assert.equal(fail.pannello.sha, '');
+
   const saltato = MR.livelloL4({ livelli: { l4: { esito: 'saltato', by: 'owner', at: '2026-09-13T09:00:00Z' } } });
   assert.equal(saltato.colore, MR.REASONS.spam.color);
   assert.match(saltato.pannello.righe.map((r) => r.valore).join(' '), /Saltato dall/);
@@ -1522,8 +1596,9 @@ test('livelli L5: una richiesta già mandata a fondere, o già decisa, non dice 
   assert.match(ferma.pannello.testo, /via libera/);
   assert.equal(ferma.fusione, null);
   const volo = MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'volo' });
-  assert.equal(volo.esito, 'bloccato');
+  assert.equal(volo.esito, 'attesa', 'in volo non è più una decisione: niente rosso');
   assert.equal(volo.fusione, 'volo');
+  assert.equal(MR.fusioneInAttesa(FB_412, { fusioni, statoRichiesta: () => 'volo' }), false);
   assert.doesNotMatch(volo.pannello.testo, /via libera/);
   assert.equal(volo.richieste.length, 1);
   assert.equal(MR.livelloL5(FB_412, { fusioni, statoRichiesta: () => 'decisa' }).fusione, 'decisa');
@@ -1548,11 +1623,83 @@ test('livelli L5: giallo in lavorazione, verde fuso con la versione, grigio se n
   assert.equal(mai.vuoto, true);
 });
 
-test('livelli L5: un sì già dato che non ha prodotto niente resta rosso, e lo dice', () => {
+test('livelli L5: un sì del lavoro locale finito in conflitto resta rosso, e dice cosa fare (#1425)', () => {
   const l5 = MR.livelloL5(FB_412, { fusioni: { failed: [{ ...RICHIESTA, used: true, outcome: 'conflict' }] } });
   assert.equal(l5.esito, 'conflitto');
   assert.equal(l5.colore, MR.REASONS.attack.color);
-  assert.match(l5.pannello.testo, /non è avvenuta/);
+  assert.equal(l5.statoFusione, 'riallineamento_fallito');
+  assert.match(l5.pannello.testo, /npm run finish/);
+});
+
+// #1425: approvata, in conflitto, e la routine la sta riallineando: niente rosso, niente cima, un'etichetta sua.
+const FALLITA_ROUTINE = { ...RICHIESTA, id: 'f1', feedbackId: 'fb-412', origin: 'routine', used: true, outcome: 'conflict' };
+test('fusione approvata e in conflitto, in riallineamento: non è una decisione dell’owner (#1425)', () => {
+  const opts = { fusioni: { failed: [FALLITA_ROUTINE] }, fusioniLette: true };
+  const fb = { ...FB_412, status: 'revision_capability' };
+  assert.equal(MR.statoFusione(fb, opts), 'da_riallineare');
+  assert.equal(MR.fusioneInAttesa(fb, opts), false);
+  const f = MR.fusioneDi(fb, opts);
+  assert.equal(f.etichetta, 'da riallineare');
+  assert.match(f.titolo, /la routine lo riallinea/);
+  const l5 = MR.livelloL5(fb, opts);
+  assert.notEqual(l5.colore, MR.REASONS.attack.color);
+  assert.match(l5.pannello.testo, /torna da solo alla routine/);
+  assert.equal(l5.richieste.length, 1, 'la scheda resta nel pannello');
+  // Fuori dai Ricevuti (In coda) nessun segno, e la scheda non sale fra le decisioni.
+  assert.equal(MR.manageTabFor(fb, opts), 'queue');
+  assert.equal(MR.segnoFermata(fb, opts), null);
+  const pending = { ...FB_412, _id: 'p', seq: 7 };
+  const lista = MR.fusioniFermeInCima([fb, pending], { ...opts, fusioni: { ...opts.fusioni, pending: [{ id: 'q', feedbackId: 'p' }] } });
+  assert.deepEqual(lista.map((x) => x._id), ['p', 'fb-412']);
+  // Riallineamento non andato: la pratica è uscita dalla lavorazione (ferma, arenata) → torna all'owner, col da farsi.
+  const ferma = { ...FB_412, status: 'design', statusReason: 'arenato' };
+  assert.equal(MR.statoFusione(ferma, opts), 'riallineamento_fallito');
+  assert.equal(MR.fusioneInAttesa(ferma, opts), true);
+  assert.match(MR.livelloL5(ferma, opts).pannello.testo, /rimetti la sua pratica In coda/);
+  assert.equal(MR.segnoFermata(ferma, opts).classe, 'attack');
+});
+
+test('richiesta in attesa: rossa, in cima e nei Ricevuti (#1425)', () => {
+  const opts = { fusioni: { pending: [RICHIESTA] }, fusioniLette: true };
+  assert.equal(MR.statoFusione(FB_412, opts), 'da_decidere');
+  assert.equal(MR.fusioneInAttesa(FB_412, opts), true);
+  assert.equal(MR.fusioneDi(FB_412, opts).etichetta, 'fusione ferma');
+  assert.equal(MR.manageTabFor(FB_412, opts), 'inbox');
+  const s = MR.segnoFermata(FB_412, opts);
+  assert.equal(s.classe, 'attack');
+  assert.match(s.testo, /via libera/);
+});
+
+// #1040.2: approvata e fusa, con lo stato nuovo non ancora arrivato.
+test('approvata e fusa, stato non ancora aggiornato: non aspetta l’owner (#1040.2)', () => {
+  const fb = { _id: 'f1040', seq: 1040, status: 'design', statusReason: 'l5' };
+  const opts = { fusioniLette: true, fusioni: { recent: [{ id: 'r2', feedbackId: 'f1040', used: true, outcome: 'merged' }] } };
+  assert.equal(MR.statoFusione(fb, opts), 'fusa');
+  assert.equal(MR.fusioneInAttesa(fb, opts), false);
+  const f = MR.fusioneDi(fb, opts);
+  assert.notEqual(f.etichetta, 'fusione ferma');
+  assert.match(f.titolo, /Approvata e fusa/);
+  const s = MR.segnoFermata(fb, opts);
+  assert.notEqual(s.classe, 'attack');
+  assert.doesNotMatch(s.testo, /via libera/);
+  assert.notEqual(MR.livelloL5(fb, opts).colore, MR.REASONS.attack.color);
+  // Chiuderla a mano non scavalca niente: il lavoro è in main.
+  assert.ok(MR.ownerActions(fb, opts).some((a) => a.to === 'archived'));
+});
+
+// #1327 punto 4 (#928): finché c'è una fusione da decidere, o il ramo approvato non è in main, la riga non chiude.
+test('ownerActions: niente Risolto né chiusure mentre una fusione aspetta (#928)', () => {
+  const chiusure = (acts) => acts.filter((a) => ['done', 'archived', 'attack_confirmed', 'spam_confirmed'].includes(a.to));
+  const pend = { fusioni: { pending: [RICHIESTA] }, fusioniLette: true };
+  assert.deepEqual(chiusure(MR.ownerActions(FB_412, pend)), []);
+  const fb = { ...FB_412, status: 'revision_capability' };
+  const rial = { fusioni: { failed: [FALLITA_ROUTINE] }, fusioniLette: true };
+  assert.deepEqual(chiusure(MR.ownerActions(fb, rial)), []);
+  const loc = { fusioni: { failed: [{ ...RICHIESTA, used: true, outcome: 'conflict' }] }, fusioniLette: true };
+  assert.deepEqual(chiusure(MR.ownerActions(fb, loc)), []);
+  assert.equal(MR.ownerActionAllowsStatus(fb, 'done', rial), false);
+  // Senza fusioni la riga è quella dello stato.
+  assert.ok(MR.ownerActions(fb, { fusioni: {} }).some((a) => a.to === 'done'));
 });
 
 test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenchi', () => {
@@ -1561,6 +1708,9 @@ test('livelli L5: lo stato del server basta da solo (design/l5), senza gli elenc
   const l5 = MR.livelloL5({ status: 'design', statusReason: 'l5' }, {});
   assert.equal(l5.esito, 'bloccato');
   assert.equal(l5.colore, MR.REASONS.attack.color);
+  // Senza richiesta in vista non promette un via libera: può non arrivare mai, perché quella versione era già
+  // decisa (#486).
+  assert.doesNotMatch(l5.pannello.testo, /col tuo via libera/);
 });
 
 test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le strade sono rifare o archiviare', () => {
@@ -1581,9 +1731,9 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   const vecchia = { ...fb, notes: "--- Aggiornamento dell'agente del 20/10/26, 09:00 ---\nReport: tasto spostato a destra." };
   assert.match(MR.livelloL5(vecchia, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
   assert.deepEqual(MR.livelloL5(vecchia, lette).pannello.righe, []);
-  // Senza l'ora dell'audit nessuna nota si può dire del cancello.
-  assert.match(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
-  assert.deepEqual(l5.pannello.azioni, ['rimanda', 'archivia']);
+  // La nota del cancello si riconosce dalla forma: l'ora dell'audit non serve (#1556.2).
+  assert.equal(MR.livelloL5({ ...fb, livelli: {} }, lette).pannello.testo, nota);
+  assert.deepEqual(l5.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
   assert.equal(l5.fusione, 'senza');
   assert.ok(l5.pannello.righe.some((r) => r.etichetta === 'Quando'));
   assert.doesNotMatch(MR.segnoFermata(fb, lette).testo, /via libera/);
@@ -1592,7 +1742,7 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   const muta = MR.livelloL5({ status: 'design', statusReason: 'l5' }, lette);
   assert.match(muta.pannello.testo, /Nessuna richiesta di fusione è aperta/);
   assert.doesNotMatch(muta.pannello.testo, /ancora/);
-  assert.deepEqual(muta.pannello.azioni, ['rimanda', 'archivia']);
+  assert.deepEqual(muta.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
   // Elenchi non letti: «nessuna richiesta» sarebbe un'ipotesi, e la lista non lo afferma.
   const presto = MR.livelloL5({ status: 'design', statusReason: 'l5' }, { fusioni: {} });
   assert.match(presto.pannello.testo, /non sono ancora arrivate/);
@@ -1607,27 +1757,71 @@ test('livelli L5 senza richiesta (#1556): il motivo è la nota del server, le st
   assert.equal(conRichiesta.richiesta.id, 'r');
 });
 
-test('livelli L5 senza richiesta (#1556): la nota del server, con l’ora in UTC, letta in Italia resta il motivo', () => {
-  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
-  const tzPrima = process.env.TZ;
-  process.env.TZ = 'Europe/Rome';
-  try {
-    const nota = 'Il cancello non fonde il ramo del server. Decidi tu: archiviarlo, o farlo rifare.';
-    const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
-    const fb = (marcatore) => ({
-      status: 'design', statusReason: 'l5',
-      notes: `Report.\n\n--- Aggiornamento dell'agente del ${marcatore} ---\n${nota}`,
-      livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } },
-    });
-    // Il server scrive «15:55» per le 15:55 UTC: un quarto d'ora dopo l'audit, anche se in Italia sono le 17:55.
-    assert.equal(MR.livelloL5(fb('21/10/26, 15:55'), lette).pannello.testo, nota);
-    // Uno strumento dell'owner scrive nella sua ora: le 17:55 italiane sono sempre dopo l'audit.
-    assert.equal(MR.livelloL5(fb('21/10/26, 17:55'), lette).pannello.testo, nota);
-    // Scritta dal server un'ora prima dell'audit: non è il motivo della fermata.
-    assert.match(MR.livelloL5(fb('21/10/26, 14:40'), lette).pannello.testo, /Nessuna richiesta di fusione è aperta/);
-  } finally {
-    if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
-  }
+// #1556.2: il motivo è la nota del cancello riconosciuta dalla forma, mai un report, in qualunque fuso.
+for (const tz of ['America/New_York', 'Europe/Rome', 'UTC']) {
+  test(`livelli L5 senza richiesta (#1556.2): un report non diventa il motivo della fermata (TZ=${tz})`, () => {
+    require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackThread.js'));
+    const tzPrima = process.env.TZ;
+    process.env.TZ = tz;
+    try {
+      const lette = { fusioni: { pending: [], failed: [] }, fusioniLette: true };
+      const fb = (marcatore, testo) => ({
+        status: 'design', statusReason: 'l5',
+        notes: `Report.\n\n--- Aggiornamento dell'agente del ${marcatore} ---\n${testo}`,
+        livelli: { l4: { esito: 'pass', at: '2026-10-21T15:40:00.000Z' } },
+      });
+      // Report del server delle 14:00 UTC, controllo alle 15:40 UTC: a New York sembrava nato dopo.
+      const report = MR.livelloL5(fb('21/10/26, 14:00', 'Report: tasto spostato a destra, prove verdi.'), lette);
+      assert.match(report.pannello.testo, /Nessuna richiesta di fusione è aperta/);
+      assert.deepEqual(report.pannello.righe, []);
+      // Nota degli strumenti dell'owner in ora italiana, prima del controllo.
+      assert.match(MR.livelloL5(fb('21/10/26, 15:30', 'Report: fatto il rebase.'), lette).pannello.testo, /Nessuna richiesta/);
+      // Una vera nota del cancello si riconosce, anche col marcatore più vecchio dell'audit.
+      for (const nota of [
+        'Il cancello non fonde il ramo del server: suite rossa. Decidi tu: archiviarlo, o farlo rifare.',
+        'Il cancello di fusione (L5) ha fermato la modifica (commit abc1234):\n- guardie toccate',
+        'Verifica e controllo di sicurezza erano passati ma la fusione non era mai partita: l’ha chiesta il server, e il cancello l’ha fermata.',
+        'Verifica e controllo di sicurezza sono passati, e gli unit non hanno fermato niente. I controlli deterministici del cancello (L5) hanno fermato la fusione:\n- x',
+      ]) {
+        assert.equal(MR.livelloL5(fb('21/10/26, 14:00', nota), lette).pannello.testo, nota);
+      }
+    } finally {
+      if (tzPrima === undefined) delete process.env.TZ; else process.env.TZ = tzPrima;
+    }
+  });
+}
+
+test('livelli L5: ferma al cancello senza richiesta viva, a elenchi letti, offre di riaprirla (#1040)', () => {
+  const fb = { _id: 'f1040', seq: 1040, status: 'design', statusReason: 'l5' };
+  const senza = MR.livelloL5(fb, { fusioniLette: true, fusioni: { pending: [], failed: [], recent: [] } });
+  assert.equal(senza.esito, 'bloccato');
+  assert.deepEqual(senza.pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  assert.match(senza.pannello.testo, /Nessuna richiesta di fusione è aperta/);
+  // Elenchi non ancora arrivati (o computer non dell'owner): la riapertura non si offre.
+  assert.deepEqual(MR.livelloL5(fb, { fusioni: {} }).pannello.azioni, ['rimanda', 'archivia']);
+  // Scaduta o scartata è come mancante; approvata e fusa aspetta solo lo stato nuovo.
+  const scaduta = { id: 'r1', feedbackId: 'f1040', expired: true, used: false };
+  assert.deepEqual(MR.livelloL5(fb, { fusioniLette: true, fusioni: { recent: [scaduta] } }).pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  const fusa = { id: 'r2', feedbackId: 'f1040', used: true, outcome: 'merged' };
+  const dopo = MR.livelloL5(fb, { fusioniLette: true, fusioni: { recent: [fusa] } });
+  assert.deepEqual(dopo.pannello.azioni, []);
+  assert.match(dopo.pannello.testo, /Approvata e fusa/);
+  // Una fusa che non è l'ultima richiesta, o di un altro ramo, o di un lavoro server, non vuol dire «sta per uscire».
+  const vecchia = { id: 'r0', feedbackId: 'f1040', used: true, outcome: 'merged', branch: 'worker/vecchio', createdAtMs: 1 };
+  const nuova = { id: 'r4', feedbackId: 'f1040', expired: true, used: false, branch: 'worker/nuovo', createdAtMs: 2 };
+  const conRamo = { ...fb, branch: 'worker/nuovo' };
+  assert.deepEqual(MR.livelloL5(conRamo, { fusioniLette: true, fusioni: { recent: [vecchia, nuova] } }).pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  assert.deepEqual(MR.livelloL5(conRamo, { fusioniLette: true, fusioni: { recent: [vecchia] } }).pannello.azioni, ['riapri_fusione', 'rimanda', 'archivia']);
+  const serverFusa = MR.livelloL5({ ...fb, localOnly: { by: 'routine', at: 1 } }, { fusioniLette: true, fusioni: { recent: [fusa] } });
+  assert.deepEqual(serverFusa.pannello.azioni, ['rimanda', 'archivia']);
+  assert.doesNotMatch(serverFusa.pannello.testo, /Approvata e fusa/);
+  // Un lavoro anche sul server non si riapre da qui: lo ferma anche il cancello del server, che non apre richieste.
+  const server = MR.livelloL5({ ...fb, localOnly: { by: 'routine', at: 1 } }, { fusioniLette: true, fusioni: {} });
+  assert.deepEqual(server.pannello.azioni, ['rimanda', 'archivia']);
+  assert.match(server.pannello.testo, /un lavoro anche sul server/);
+  // Con la richiesta in attesa il pannello è quello di sempre.
+  const viva = { id: 'r3', feedbackId: 'f1040' };
+  assert.deepEqual(MR.livelloL5(fb, { fusioniLette: true, fusioni: { pending: [viva] } }).pannello.azioni, []);
 });
 
 test('statusReason l5: blocco ROSSO in lista, non "questione di design"', () => {
@@ -1660,6 +1854,26 @@ test('fusioniSenzaFeedback: restano solo quelle che non hanno una scheda dove vi
   // Senza la lista dei feedback non si può dire di nessuna che ha una scheda:
   // si mostrano tutte, invece di perderne una.
   assert.equal(MR.fusioniSenzaFeedback([RICHIESTA, locale], []).length, 2);
+});
+
+// #1517: un documento estraneo col numero della pratica non riceve la richiesta (e il suo via libera) nel dettaglio.
+test('richiestaDiQuesto: con l’id della pratica il numero non basta', () => {
+  const vero = { _id: 'vero', seq: 5, subSeq: 0 };
+  const estraneo = { _id: 'estraneo', seq: 5, subSeq: 0 };
+  const req = { id: 'r', num: '#5', feedbackId: 'vero' };
+  assert.equal(MR.richiestaDiQuesto(req, vero), true);
+  assert.equal(MR.richiestaDiQuesto(req, estraneo), false);
+  assert.equal(MR.richiestaDiQuesto({ id: 'r', num: '#5' }, estraneo), true, 'senza id vale ancora il numero');
+});
+
+test('descriviRiferimento: stato e mittente del documento, la riserva del server, il numero doppio', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'mittenti.js'));
+  const fb = { _id: 'a', seq: 5, status: 'todo', mittenteClasse: 'utente' };
+  assert.deepEqual(MR.descriviRiferimento(fb, null, 1), { testo: 'In coda · utente', doppi: 1 });
+  assert.deepEqual(MR.descriviRiferimento(fb, null, 2), { testo: 'In coda · utente', doppi: 2 });
+  assert.deepEqual(MR.descriviRiferimento(null, { stato: 'design', mittenteClasse: 'routine' }, 0), { testo: 'Design · routine', doppi: 0 });
+  assert.deepEqual(MR.descriviRiferimento(null, null, 3), { testo: '', doppi: 3 });
+  assert.equal(MR.descriviRiferimento(null, { stato: 'inventato' }, 1), null);
 });
 
 test('livelli L1: il pannello del triangolo porta anche la decisione già presa', () => {
@@ -1733,7 +1947,7 @@ test('praticaChiusa e localSignCheck: su un lavoro locale chiuso togliere il seg
 
 test('segno: fermato dal segno solo col motivo linked_prior_attack del filtro d’ingresso', () => {
   assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['linked_prior_attack'] } }), true);
-  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['obfuscation', ' linked_prior_attack '] } }), true);
+  assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: ['prefisso_riservato_senza_prova', ' linked_prior_attack '] } }), true);
   // Le raffiche non le ha fermate nessun segno: si sbloccano col rigiudizio.
   for (const r of ['raffica_mittente', 'raffica_globale', 'raffica_non_contata', 'prior_attack']) {
     assert.equal(MR.fermatoDalSegno({ pipeline: { l1Reasons: [r] } }), false, r);
@@ -1821,11 +2035,11 @@ test('conteggi per livello: lunghezza della lista filtrata, e la scheda Ricevuti
 
 test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta fuori', () => {
   const attese = {
-    domande: 'domande', 'domande-lavoro': 'domande', 'domande-archivio': 'domande',
+    domande: 'domande', 'domande-smistamento': 'domande', 'domande-lavoro': 'domande', 'domande-automatiche': 'domande', 'domande-archivio': 'domande',
     inbox: 'feedback', queue: 'feedback', waiting: 'feedback', resolved: 'feedback', archived: 'feedback',
     fbstats: 'feedback', stats: 'feedback',
-    automation: 'routine', crediti: 'routine', log: 'routine',
-    utenti: 'utenti', predefiniti: 'predefinite',
+    automation: 'routine', compiti: 'routine', ricorrenti: 'routine', crediti: 'routine', log: 'routine',
+    utenti: 'utenti', contatori: 'utenti', predefiniti: 'predefinite',
   };
   for (const [tab, sez] of Object.entries(attese)) assert.equal(MR.sezioneDiScheda(tab), sez, tab);
   const tutte = MR.SEZIONI.flatMap((s) => s.schede);
@@ -1839,6 +2053,7 @@ test('sezioni: ogni scheda di Gestione sta in una sezione sola, e nessuna resta 
 // #1414: i vecchi indirizzi delle pagine dell'owner arrivano col nome della sezione.
 test('indirizzo: nomina una scheda o una sezione, il resto non apre niente', () => {
   assert.equal(MR.schedaDaIndirizzo('#utenti'), 'utenti');
+  assert.equal(MR.schedaDaIndirizzo('#contatori'), 'contatori');
   assert.equal(MR.schedaDaIndirizzo('#predefiniti'), 'predefiniti');
   assert.equal(MR.schedaDaIndirizzo('#predefinite'), 'predefiniti');
   assert.equal(MR.schedaDaIndirizzo('#routine'), 'automation');
@@ -1881,24 +2096,27 @@ test('apertura: bloccante aperta > Ricevuti non vuoto > ultima sezione > Feedbac
 
 test('domande: la scheda di ogni stato viene da SN_DOMANDE.schedaDi, e ogni sua scheda ha un posto in Gestione', () => {
   assert.equal(MR.schedaDomanda({ stato: 'aperta' }), 'domande');
+  assert.equal(MR.schedaDomanda({ stato: 'in_smistamento' }), 'domande-smistamento');
   assert.equal(MR.schedaDomanda({ stato: 'in_lavorazione' }), 'domande-lavoro');
   assert.equal(MR.schedaDomanda({ stato: 'chiusa' }), 'domande-archivio');
   assert.equal(MR.schedaDomanda({ stato: 'superata' }), 'domande-archivio');
-  // Uno stato ignoto resta davanti all'owner, come dice il modulo delle domande.
-  assert.equal(MR.schedaDomanda({ stato: 'boh' }), 'domande');
-  assert.equal(MR.schedaDomanda({ stato: 'chiusa', esito: { automatica: true } }), 'domande-archivio');
+  // #1791: «Da rispondere» tiene solo le aperte; uno stato ignoto si vede, fra quelle in lavorazione.
+  assert.equal(MR.schedaDomanda({ stato: 'boh' }), 'domande-lavoro');
+  assert.equal(MR.schedaDomanda({ stato: 'chiusa', esito: { automatica: true } }), 'domande-automatiche');
   assert.equal(MR.schedaDomanda(null), null);
   const schedeDomande = MR.SEZIONI.find((s) => s.id === 'domande').schede;
   for (const s of globalThis.SN_DOMANDE.SCHEDE) {
-    const d = { da_rispondere: { stato: 'aperta' }, in_lavorazione: { stato: 'in_lavorazione' },
+    const d = { da_rispondere: { stato: 'aperta' }, in_smistamento: { stato: 'in_smistamento' }, in_lavorazione: { stato: 'in_lavorazione' },
       risposte_automatiche: { stato: 'chiusa', esito: { automatica: true } }, archivio: { stato: 'superata' } }[s];
     assert.ok(d, `la prova non conosce la scheda «${s}» di SN_DOMANDE`);
     assert.ok(schedeDomande.includes(MR.schedaDomanda(d)), `«${s}» non ha una scheda in Gestione`);
   }
+  const zero = { domande: 0, 'domande-smistamento': 0, 'domande-lavoro': 0, 'domande-automatiche': 0, 'domande-archivio': 0 };
   assert.deepEqual(MR.contaDomande([
     { stato: 'aperta' }, { stato: 'aperta' }, { stato: 'in_lavorazione' }, { stato: 'superata' }, { stato: 'boh' },
-  ]), { domande: 3, 'domande-lavoro': 1, 'domande-archivio': 1 });
-  assert.deepEqual(MR.contaDomande(null), { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 });
+    { stato: 'in_smistamento' }, { stato: 'chiusa', esito: { automatica: true } },
+  ]), Object.assign({}, zero, { domande: 2, 'domande-smistamento': 1, 'domande-lavoro': 2, 'domande-automatiche': 1, 'domande-archivio': 1 }));
+  assert.deepEqual(MR.contaDomande(null), zero);
 });
 
 test('attesaServer: le due attese di un lavoro server passato, solo in revisione (#1222)', () => {
@@ -1916,6 +2134,18 @@ test('attesaServer: le due attese di un lavoro server passato, solo in revisione
   assert.equal(MR.attesaServer(null), '');
   assert.equal(MR.inAttesaFusioneServer(rev('fusione_server')), true);
   assert.equal(MR.inAttesaFusioneServer(rev('suite_server')), false);
+});
+
+test('restaLocale: il fermo di un lavoro server che nascerebbe non fidato, coi motivi, solo in coda (#2036)', () => {
+  const srv = (extra) => Object.assign({ status: 'revision_security', localOnly: { by: 'owner', at: '2026-10-01' } }, extra);
+  const segno = { motivi: ['ramo non pulito', ' '], ruolo: 'secaudit', atMs: 5 };
+  assert.deepEqual(MR.restaLocale(srv({ restaLocale: segno })), { motivi: ['ramo non pulito'], atMs: 5 });
+  assert.deepEqual(MR.restaLocale(srv({ status: 'todo', restaLocale: segno })).motivi, ['ramo non pulito']);
+  assert.equal(MR.restaLocale(srv({ restaLocale: null })), null, 'tolto dal server quando il motivo passa');
+  assert.equal(MR.restaLocale(srv({ status: 'working', restaLocale: segno })), null, 'partito: non è più fermo');
+  assert.equal(MR.restaLocale({ status: 'todo', restaLocale: segno }), null, 'solo un lavoro server');
+  assert.equal(MR.restaLocale(srv({ restaLocale: { motivi: [] } })), null);
+  assert.equal(MR.restaLocale(null), null);
 });
 
 test('tastoFrase: acceso solo con una frase vera, che si legge intera nell\'hover (#857)', () => {
@@ -2012,4 +2242,52 @@ test('«💻 Lavoro server» c’è solo sul rombo azzurro, ed è il tasto princ
     { status: 'attack' }, { status: 'unlabeled' }, { status: 'todo' }, { status: 'archived' }]) {
     assert.equal(MR.ownerActionFor(fb, 'accept_local'), null, JSON.stringify(fb));
   }
+});
+
+// #1425: un design che non viene dai giudici ha il segno del suo motivo, non il cerchio dei giudici.
+test('segnoFermata: attesa_chiusa e origine_bloccata hanno un segno proprio (#1425)', () => {
+  const giudici = /giudici/i;
+  const chiusa = MR.segnoFermata({ status: 'design', statusReason: 'attesa_chiusa' }, {});
+  assert.notEqual(chiusa.forma, 'cerchio');
+  assert.doesNotMatch(chiusa.testo, giudici);
+  assert.match(chiusa.testo, /chiuso senza fusione/);
+  const bloccata = MR.segnoFermata({ status: 'design', statusReason: 'origine_bloccata', origine: { num: '#77' } }, {});
+  assert.notEqual(bloccata.forma, 'cerchio');
+  assert.equal(bloccata.classe, 'attack');
+  assert.doesNotMatch(bloccata.testo, giudici);
+  assert.match(bloccata.testo, /bloccato/);
+});
+
+// #1327 punto 1 (#743.1): la fusione partita dal segno di un clic su Approva viene dal sì a una richiesta di prima.
+test('livelli L5: fusa col segno lasciato da un clic, non «avevi messo il segno» (#743.1)', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'mergeApprovals.js'));
+  const fb = { _id: 'p1', seq: 9, status: 'revision_security' };
+  const daClic = { id: 'r', feedbackId: 'p1', preapprovedBy: 'owner@esempio.it · approvazione ' + 'a'.repeat(24), preapprovedAt: '2026-10-01T10:00:00Z' };
+  const t = MR.livelloL5(fb, { fusioni: { preapproved: [daClic] } }).pannello.testo;
+  assert.match(t, /sì a una richiesta precedente/);
+  assert.doesNotMatch(t, /avevi messo il segno/);
+  const aMano = { id: 'r', feedbackId: 'p1', preapprovedBy: 'owner@esempio.it' };
+  assert.match(MR.livelloL5(fb, { fusioni: { preapproved: [aMano] } }).pannello.testo, /avevi messo il segno/);
+  const fidato = { id: 'r', feedbackId: 'p1', skippedL5: true, motivo: 'fiducia' };
+  assert.match(MR.livelloL5(fb, { fusioni: { preapproved: [fidato] } }).pannello.testo, /Lavoro fidato/);
+});
+
+// #1327 punto 2 (#773.2): ogni motivo che il server scrive ha la sua frase, col dettaglio accanto.
+test('testoRifiuto: frase per ogni motivo del server, dettaglio, e mai il solo codice', () => {
+  const delServer = ['dead_ticket', 'bad_passphrase', 'rate_limited', 'role_forbids', 'branch_mismatch', 'malformed',
+    'illegal_transition', 'no_critique', 'self_review', 'config_incomplete', 'fermata_senza_domanda', 'domanda_non_valida',
+    'domanda_troppo_grande', 'troppe_domande', 'domanda_doppia', 'risposta_non_valida', 'risposta_chiusa', 'domanda_cambiata',
+    'azione_vietata', 'smistamento_non_valido', 'smistamento_chiuso', 'fuori_ambito', 'fuori_ambiente', 'compito_inesistente',
+    'repo_non_ammesso', 'biglietto_non_vivo', 'biglietto_sporco', 'feedback_non_fidato', 'troppi_token', 'not_approved',
+    'server_error', 'l5_blocked', 'stale', 'secaudit_stale'];
+  for (const reason of delServer) {
+    const t = MR.testoRifiuto({ reason, detail: 'verifica: fail' });
+    assert.ok(!t.frase.includes(reason), `${reason}: la frase non deve essere il codice`);
+    assert.ok(t.frase.length > 8, `${reason} senza frase`);
+    assert.equal(t.dettaglio, 'verifica: fail');
+  }
+  const ignoto = MR.testoRifiuto({ reason: 'motivo_nuovo' });
+  assert.match(ignoto.frase, /non conosce/);
+  assert.match(ignoto.frase, /motivo_nuovo/);
+  assert.equal(ignoto.dettaglio, '');
 });

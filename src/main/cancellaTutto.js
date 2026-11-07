@@ -17,6 +17,7 @@ const RESTA = Object.freeze({
   SingletonSocket: 'il segno di Chromium che tiene aperta una copia sola di Filo, non un dato',
   lockfile: 'il segno di Chromium che tiene aperta una copia sola di Filo (Windows), non un dato',
   'preload-pacchetto': 'il codice di Filo per le pagine web, ricomposto a ogni avvio: niente di chi usa l\'app',
+  'codice-compilato': 'il codice di Filo già compilato, che fa partire l\'app prima: niente di chi usa l\'app',
   Dictionaries: 'i dizionari delle lingue del correttore, uguali per tutti (le parole tue stanno altrove e se ne vanno)',
   adblock: 'le liste pubbliche contro la pubblicità, uguali per tutti',
   'firmatari-c2pa': 'l\'elenco pubblico dei firmatari delle credenziali sulle immagini, uguale per tutti',
@@ -27,8 +28,9 @@ const RESTA = Object.freeze({
 // L'identità dei crediti e ciò che la regge: l'account anonimo, la chiave e l'ultimo stato letto, con le copie messe da
 // parte (identity.bin.<etichetta>…). Senza, i crediti sul server non si raggiungono più.
 const IDENTITA = Object.freeze(['identity.bin', 'wallet.bin', 'wallet-stato.bin']);
-// Le righe del registro d'uso non ancora scritte sul server appartengono ai crediti: se l'identità resta, restano.
-const CHIAVI_IDENTITA = Object.freeze(['walletUsageQueue']);
+// Le righe del registro d'uso non ancora scritte sul server, e il conto di quelle perse, appartengono ai crediti: se
+// l'identità resta, restano.
+const CHIAVI_IDENTITA = Object.freeze(['walletUsageQueue', 'walletUsageLog']);
 const TENTATIVI_MASSIMI = 3;
 
 const dellIdentita = (nome) => IDENTITA.some((f) => nome === f || nome.startsWith(`${f}.`));
@@ -125,7 +127,7 @@ function fraseEsito(e) {
 function annuncia() {
   const frase = fraseEsito(esito);
   if (!frase) return;
-  try { require('./services/avvisoFinestra').avvisoQuandoPronta(frase, { chiave: 'cancella-tutto' }); } catch (_) {}
+  try { require('./services/avvisoFinestra').avvisoQuandoPronta(frase, { chiave: 'cancella-tutto', tipo: 'cancella_tutto' }); } catch (_) {}
 }
 
 // Le dipendenze che le prove sostituiscono: in test il riavvio aprirebbe un Filo che nessuno chiude.

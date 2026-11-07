@@ -233,7 +233,9 @@ test('un numero di attivi apre le persone che ha contato: clic, tastiera e tasto
   await voce.click();
   await expect(righeVisibili(page)).toHaveCount(2);
 
-  // Una rilettura della vista (un regalo, una manopola) tiene il filtro.
+  // Una rilettura della vista (un regalo, una manopola) tiene il filtro. Senza il minuto fra due riletture (#2059): un
+  // movimento nato dall'accesso dell'owner può averlo già preso.
+  await page.evaluate(() => window.__mgTest.tempiRiletturaUtenti(0));
   const prima = stato.overview;
   await app.evaluate(() => globalThis.SN_BROADCAST_FILO({ type: globalThis.SN_MSG.MSG.CREDITS_CHANGED }));
   await expect.poll(() => stato.overview).toBeGreaterThan(prima);

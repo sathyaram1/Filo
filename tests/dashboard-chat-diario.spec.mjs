@@ -965,7 +965,8 @@ test('I — quello che l\'utente finisce col bottone si raggiunge e finisce nel 
   await page.locator('#input').fill('crea la cartella');
   await page.locator('#sendBtn').click();
   await expect(page.locator('.dash-bubble-filo', { hasText: 'Creo la cartella.' })).toBeVisible({ timeout: 10_000 });
-  const cmdBtn = page.locator('.dash-bubble-actions .dash-action-btn').last();
+  // Il bottone del comando, dal suo testo: l'ultimo bottone della chat, sotto carico, era ancora quello del riordino.
+  const cmdBtn = page.locator('.dash-bubble-actions .dash-action-btn', { hasText: 'mkdir' });
   await cmdBtn.click();
   await clickConfirm(page, 'ok', { timeout: 10_000 });
   await expect(cmdBtn).toContainText('✓', { timeout: 15_000 });

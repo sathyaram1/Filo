@@ -353,7 +353,7 @@
           if (id) { daRegistro.set(String(id), now()); ids.push(String(id)); }
         } catch (err) {
           // Senza id non lo si può seguire: lo trova il riallineamento.
-          avvisa(`#${num} del registro non trovato: ${motivo(err)}`);
+          avvisa(`#${num} del registro non seguito: ${motivo(err)}`);
           lastReconcileAt = 0;
         }
       }

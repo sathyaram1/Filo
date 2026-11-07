@@ -3,6 +3,7 @@
 // tolto prima della cartella). Unit test: tests/unit/cloneWorker.test.mjs. Comando: scripts/clone-worker.mjs.
 
 import { spawnSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, readdirSync, readlinkSync, realpathSync, rmSync, rmdirSync, statSync, symlinkSync, unlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
@@ -10,7 +11,11 @@ import { ensureSessionExcludes } from './branch-integrity.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { MARCATORE_WORKER } from './dati-worker.mjs';
+import {
+  MARCA_COLLEGATI, collegatoVoceAVoce, descrivi, fileBlocco, pacchettiDaInstallare, primoLivello, TETTO_INSTALLAZIONE_MS,
+} from './pacchetti.mjs';
 import { pinWorkerTools, pinnedDirWorker, TOOLS_ROOT } from './tools-pin.mjs';
+import { applicaVersioneAlLock } from '../release-apply-version.mjs';
 
 export { MARCATORE_WORKER, datiWorker, concorrenzaUnit } from './dati-worker.mjs';
 export const REGISTRO = 'filo-cloni';
@@ -82,8 +87,7 @@ function collega(verso, link) {
 // node_modules del clone è una cartella vera con un collegamento per ogni pacchetto del principale, non un collegamento
 // solo: npm, svuotando o riordinando la cartella, toglie così i collegamenti invece dei pacchetti di tutti. Per lo
 // stesso motivo gli ambiti (@x) sono cartelle con un collegamento per pacchetto, e .bin è una copia.
-export const MARCA_COLLEGATI = '.filo-collegati';
-const collegatiVoceAVoce = (nm) => existsSync(resolve(nm, MARCA_COLLEGATI));
+export { MARCA_COLLEGATI };
 
 function copiaBin(da, a) {
   mkdirSync(a, { recursive: true });
@@ -135,47 +139,144 @@ export function scollegaPacchetti(nm) {
 
 const restaUnCollegamento = (nm) => eLink(nm) || vociCollegate(nm).length > 0;
 
+/** Il motivo di un'installazione fallita: le prime righe d'errore di npm, o l'ultima riga. PURA. */
+export function motivoNpm(uscita) {
+  const righe = String(uscita || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  const errori = righe.filter((l) => /^npm (error|ERR!)\s+\S/.test(l) && !/complete log of this run/i.test(l));
+  return (errori.length ? errori.slice(0, 3) : righe.slice(-1)).join(' / ').slice(0, 400);
+}
+
+function esegui(comando, args, cartella, env) {
+  const r = spawnSync(comando, args, {
+    cwd: cartella, env, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], maxBuffer: 256 * 1024 * 1024,
+    timeout: TETTO_INSTALLAZIONE_MS, shell: process.platform === 'win32' && comando === 'npm',
+  });
+  // Su stderr: stdout di chi lancia (dispatch, il comando dei clone) porta il suo JSON.
+  process.stderr.write(`${r.stdout || ''}${r.stderr || ''}`);
+  if (r.status === 0) return { ok: true, why: '' };
+  if (r.error && r.error.code === 'ETIMEDOUT') return { ok: false, why: `fermato dopo ${TETTO_INSTALLAZIONE_MS / 60_000} minuti` };
+  const motivo = motivoNpm(`${r.stderr || ''}\n${r.stdout || ''}`) || (r.error ? String(r.error.message || r.error) : '');
+  return { ok: false, why: `uscito con ${r.status === null ? r.signal || 'errore' : r.status}${motivo ? `: ${motivo}` : ''}` };
+}
+
 function npmCiDavvero(cartella) {
-  const env = { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: '1' };
-  const ci = spawnSync('npm', ['ci', '--no-audit', '--no-fund'], { cwd: cartella, env, stdio: 'inherit', shell: process.platform === 'win32' });
-  if (ci.status !== 0) return { ok: false, why: `npm ci uscito con ${ci.status}` };
+  const ci = esegui('npm', ['ci', '--no-audit', '--no-fund'], cartella, { ...process.env, ELECTRON_SKIP_BINARY_DOWNLOAD: '1' });
+  if (!ci.ok) return { ok: false, why: `npm ci ${ci.why}` };
   const el = resolve(cartella, 'scripts', 'ensure-electron.mjs');
-  if (existsSync(el)) {
-    const r = spawnSync(process.execPath, [el], { cwd: cartella, stdio: 'inherit' });
-    if (r.status !== 0) return { ok: false, why: `ensure-electron uscito con ${r.status}` };
-  }
-  return { ok: true, why: '' };
+  if (!existsSync(el)) return { ok: true, why: '' };
+  // Senza il binario di Electron i pacchetti servono lo stesso (smistamento, unit): lo dice, non ferma il worker.
+  const r = esegui(process.execPath, [el], cartella, process.env);
+  return r.ok ? { ok: true, why: '' } : { ok: true, why: '', electron: `ensure-electron ${r.why}` };
 }
 
 const leggi = (f) => { try { return readFileSync(f, 'utf8'); } catch (_) { return null; } };
-// I fine riga non cambiano i pacchetti: un checkout con autocrlf non deve costare un'installazione.
-const lock = (dir) => { const t = leggi(resolve(dir, 'package-lock.json')); return t === null ? null : t.replace(/\r\n/g, '\n'); };
+// I fine riga e il numero del progetto non cambiano i pacchetti: né un checkout con autocrlf né un rilascio, che alza
+// il numero anche nel lockfile (#2040), devono costare un'installazione.
+const lock = (dir) => {
+  const t = leggi(resolve(dir, 'package-lock.json'));
+  if (t === null) return null;
+  const lf = t.replace(/\r\n/g, '\n');
+  const senzaNumero = applicaVersioneAlLock(lf, '0.0.0');
+  return senzaNumero.ok ? senzaNumero.testo : lf;
+};
+
+// Un'installazione privata finita porta l'impronta del lock da cui è nata: rifarla costa minuti, e npm ci la cancella.
+export const MARCA_PRIVATI = '.filo-privati';
+const impronta = (testo) => createHash('sha1').update(String(testo ?? '')).digest('hex');
+const privatiDi = (nm) => (eLink(nm) ? null : String(leggi(resolve(nm, MARCA_PRIVATI)) || '').trim() || null);
+// npm scrive node_modules/.package-lock.json a installazione finita: senza, quelli del principale sono a metà.
+const pacchettiPronti = (dir) => existsSync(resolve(dir, 'node_modules', '.package-lock.json'));
+
+const dormi = (ms) => Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, ms);
+
+// Lo stesso file di chi avvia le prove (lib/pacchetti.mjs), che lo lascia vuoto: lì vale l'età. Qui c'è il pid, perché
+// un dispatch fermato dal tempo del comando non lo toglie, e chi rilancia aspetterebbe un quarto d'ora per niente.
+function bloccoVivo(f, ora) {
+  let eta;
+  try { eta = ora() - statSync(f).mtimeMs; } catch (_) { return false; }
+  if (eta > TETTO_INSTALLAZIONE_MS) return false;
+  const pid = Number.parseInt(String(leggi(f) || ''), 10);
+  if (!(pid > 0)) return true;
+  try { process.kill(pid, 0); return true; } catch (e) { return !!e && e.code === 'EPERM'; }
+}
+
+function prendiBlocco(f, ora) {
+  for (let i = 0; i < 2; i += 1) {
+    // Una cartella dei blocchi che non si scrive non ferma l'installazione: resta solo senza blocco.
+    try { writeFileSync(f, `${process.pid}\n`, { flag: 'wx' }); return true; } catch (e) { if (!e || e.code !== 'EEXIST') return true; }
+    if (bloccoVivo(f, ora)) return false;
+    rmSync(f, { force: true });
+  }
+  return false;
+}
+
+function installaPrivati(clone, nm, firma, { npmCi, avvisa, perche, blocchi, ora, attendi }) {
+  const f = fileBlocco(clone, blocchi);
+  if (!prendiBlocco(f, ora)) {
+    avvisa('Un\'altra installazione dei pacchetti è in corso in questo clone: aspetto che finisca, non ne apro un\'altra.', { attesa: true });
+    for (const fine = ora() + TETTO_INSTALLAZIONE_MS; bloccoVivo(f, ora) && ora() < fine;) attendi(1000);
+    if (privatiDi(nm) === firma) return { ok: true, pacchetti: 'privati', why: '' };
+    if (!prendiBlocco(f, ora)) return { ok: false, pacchetti: '', gruppo: 'npm', why: `l'altra installazione nel clone non ha finito in ${TETTO_INSTALLAZIONE_MS / 60_000} minuti` };
+  }
+  try {
+    avvisa(`${perche}: installo i pacchetti nel clone con npm ci, ci vogliono alcuni minuti.`, { attesa: true });
+    const daCollegati = eLink(nm) || collegatoVoceAVoce(nm);
+    scollegaPacchetti(nm);
+    if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
+    if (daCollegati) rmSync(nm, { recursive: true, force: true });
+    const r = npmCi(clone) || {};
+    if (!r.ok) return { ok: false, pacchetti: '', gruppo: 'npm', why: r.why || 'npm ci non riuscito' };
+    mkdirSync(nm, { recursive: true });
+    writeFileSync(resolve(nm, MARCA_PRIVATI), `${firma}\n`, 'utf8');
+    if (r.electron) avvisa(`Pacchetti installati, ma il binario di Electron non è arrivato (${r.electron}): le prove che aprono Filo non partono.`);
+    return { ok: true, pacchetti: 'privati', why: '', ...(r.electron ? { electron: r.electron } : {}) };
+  } finally {
+    rmSync(f, { force: true });
+  }
+}
+
+const suStderr = (m) => process.stderr.write(`[clone-worker] ${m}\n`);
 
 /**
  * `node_modules` del clone: collegato pacchetto per pacchetto a quello del principale se `package-lock.json` è lo
- * stesso da cui il principale ha installato; altrimenti un'installazione privata (la cache di npm resta condivisa).
- * Da richiamare dopo che il clone è sul ramo del lavoro.
+ * stesso e il principale ha installato le versioni che fissa; altrimenti un'installazione privata (la cache di npm resta
+ * condivisa), anche quando il principale i pacchetti non li ha, o non ha finito di installarli. Dopo che il clone è sul ramo.
  */
-export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {}) {
+export function allineaPacchetti(clone, principale, {
+  npmCi = npmCiDavvero, soloCollegati = false, avvisa = suStderr, blocchi = tmpdir(), ora = Date.now, attendi = dormi,
+} = {}) {
   const nm = resolve(clone, 'node_modules');
   const lockClone = lock(clone);
-  const lockPrincipale = lock(principale);
-  if (lockClone !== null && lockClone === lockPrincipale) {
-    if (!existsSync(resolve(principale, 'node_modules'))) return { ok: false, pacchetti: '', why: 'il principale non ha node_modules' };
+  const stesso = lockClone !== null && lockClone === lock(principale);
+  const firma = impronta(lockClone);
+  const privati = privatiDi(nm);
+  if (lockClone !== null && privati === firma) return { ok: true, pacchetti: 'privati', why: '' };
+  const pronti = pacchettiPronti(principale);
+  // Lo stesso lock non basta: il principale può averlo ricevuto senza reinstallare, e il clone erediterebbe le sue
+  // versioni, Electron compreso (#1141.8). Una libreria di primo livello che manca e basta no: la aggiungono in pochi
+  // secondi le prove del clone, e un npm ci qui costerebbe minuti a ogni giro.
+  const daCambiare = stesso && pronti ? pacchettiDaInstallare(clone, { base: principale }) : [];
+  const assenti = new Set(daCambiare.filter((v) => !v.trovata && primoLivello(v.percorso) === v.percorso).map((v) => v.percorso));
+  const diversi = daCambiare.filter((v) => !assenti.has(primoLivello(v.percorso)));
+  const uguali = stesso && !diversi.length;
+  // soloCollegati: chi non può aspettare un npm ci (dispatch) collega anche con un altro lock, e dice. Installa solo
+  // quando non c'è niente da collegare: un worker senza pacchetti è peggio di qualche minuto d'attesa (#1906). Né
+  // collega col lock uguale e le versioni diverse: il worker partirebbe col motore vecchio, e nessun avviso lo direbbe.
+  const collegabile = uguali || (soloCollegati && !diversi.length);
+  if (collegabile && pronti) {
     // Ogni volta da capo: il principale può aver aggiunto o tolto pacchetti da allora.
     scollegaPacchetti(nm);
     if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
     rmSync(nm, { recursive: true, force: true }); // un'installazione privata rimasta da un ramo prima
     // Al bersaglio vero: il node_modules di un worktree è già un collegamento a quello del principale.
     collegaVoci(realpathSync(resolve(principale, 'node_modules')), nm);
-    return { ok: true, pacchetti: 'collegati', why: '' };
+    return { ok: true, pacchetti: 'collegati', why: '', ...(uguali ? {} : { lockDiverso: true }) };
   }
-  const daCollegati = eLink(nm) || collegatiVoceAVoce(nm);
-  scollegaPacchetti(nm);
-  if (restaUnCollegamento(nm)) return { ok: false, pacchetti: '', why: 'un collegamento a node_modules non si toglie: mi fermo' };
-  if (daCollegati) rmSync(nm, { recursive: true, force: true });
-  const r = npmCi(clone);
-  return r.ok ? { ok: true, pacchetti: 'privati', why: '' } : { ok: false, pacchetti: '', why: r.why };
+  if (soloCollegati && privati && !diversi.length) return { ok: true, pacchetti: 'privati', why: '', lockDiverso: true };
+  let perche = 'Il principale non ha i pacchetti installati, o non ha finito di installarli';
+  if (diversi.length) perche = `Il principale non ha installato le versioni che il package-lock fissa (${descrivi(diversi)})`;
+  else if (pronti) perche = 'Il package-lock del clone non è quello del principale';
+  return installaPrivati(clone, nm, firma, { npmCi, avvisa, perche, blocchi, ora, attendi });
 }
 
 /**
@@ -185,7 +286,7 @@ export function allineaPacchetti(clone, principale, { npmCi = npmCiDavvero } = {
  * repo nudo locale e lasciano il registro ai worker veri.
  */
 export function preparaClone(principale, n, {
-  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true,
+  base = baseCloni(), dest = '', paralleli = 0, pushUrl = '', strumentiDa = TOOLS_ROOT, basePin, npmCi, registra = true, soloCollegati = false, avvisa,
 } = {}) {
   let i;
   try { i = indiceWorker(n); } catch (e) { return { ok: false, why: e.message }; }
@@ -228,14 +329,15 @@ export function preparaClone(principale, n, {
   }
   if (pushUrl) gitIn(dir, ['remote', 'set-url', '--push', 'origin', pushUrl]);
 
-  const pacchetti = allineaPacchetti(dir, radice, npmCi ? { npmCi } : {});
-  if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why };
-
+  // Il marcatore prima dei pacchetti: un'installazione fallita lascia un clone che il giro dopo riprende.
   mkdirSync(resolve(dir, '.claude'), { recursive: true });
   writeFileSync(resolve(dir, MARCATORE_WORKER), `${JSON.stringify({ indice: i, paralleli: Number(paralleli) || 0, principale: radice })}\n`, 'utf8');
   ensureSessionExcludes(dir);
   try { installaControlloSpedizione(dir); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(dir);
+
+  const pacchetti = allineaPacchetti(dir, radice, { ...(npmCi ? { npmCi } : {}), ...(avvisa ? { avvisa } : {}), soloCollegati });
+  if (!pacchetti.ok) return { ok: false, dir, why: pacchetti.why, ...(pacchetti.gruppo ? { gruppo: pacchetti.gruppo } : {}) };
 
   const registro = registra ? cartellaRegistro(radice) : '';
   if (registro) {

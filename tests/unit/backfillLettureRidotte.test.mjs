@@ -35,6 +35,12 @@ function firestoreFinto({ totale, numerati, documenti = [], contaRotta = false, 
     }
     if (String(url).includes(':runQuery')) {
       const q = corpo.structuredQuery;
+      // «Questi numeri sono ancora liberi?» (#680.2): un intervallo su seq, un documento al massimo.
+      if (q.where && q.where.compositeFilter) {
+        const [da, a] = q.where.compositeFilter.filters.map((f) => Number(f.fieldFilter.value.integerValue));
+        const presi = documenti.filter((d) => { const n = Number(d.fields.seq?.integerValue || 0); return n >= da && n <= a; });
+        return { ok: true, status: 200, json: async () => presi.slice(0, 1).map((d) => ({ document: d })) };
+      }
       // La domanda «il numero più alto» ordina per seq e ne chiede uno solo.
       if (q.limit === 1 && q.orderBy && q.orderBy[0].field.fieldPath === 'seq') {
         chiamate.maxSeq += 1;

@@ -5,6 +5,7 @@
 import { test, expect, lista, schede, contaAvvisi } from './helpers/reteFinta.mjs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
 import { aspettaFinestra } from './fixtures/electron.mjs';
+import { nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 const naviga = (url, id = 'n1', extra = {}) => ({ id, name: 'NAVIGA', arguments: JSON.stringify({ url, etichetta: 'pagina', ...extra }) });
 const risposteAlModello = async (app, giro) => JSON.stringify(((await chiamateAlModello(app))[giro] || []).filter((m) => m && m.role !== 'system'));
@@ -184,7 +185,9 @@ test('due NAVIGA fermate nello stesso giro: ogni «Apri comunque» dice il suo s
   }
 });
 
-// L'assistente sulla pagina vive nel mondo isolato dei content script di una pagina web.
+// L'assistente sulla pagina si apre dai content script della pagina web, e su un sito sta nello strato sopra la scheda
+// (#1509.3): `tab` è la Page dello strato, dove stanno il diario e i bottoni, `sito` quella della pagina. `naviga`
+// chiede l'apertura dall'Aiuto, nello strato; `esegui` gira nel mondo dei content script della pagina.
 async function assistenteSu(app, shell, pagina, host) {
   await shell.evaluate((u) => window.filoShell.tabs.open(u), pagina);
   await expect.poll(async () => (await schede(app)).includes(pagina), { timeout: 8000 }).toBe(true);
@@ -195,9 +198,11 @@ async function assistenteSu(app, shell, pagina, host) {
     return t.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code: c }]);
   }, [code, host]);
   await esegui('window.SN_SIDEBAR.open(), 1');
-  const tab = app.windows().find((w) => w.url().includes(host));
-  const naviga = (url) => esegui(`window.__filoSidebarTest.runFiloAction({ type: 'NAVIGA', url: ${JSON.stringify(url)} })`);
-  return { tab, naviga, esegui };
+  const sito = app.windows().find((w) => w.url().includes(host));
+  const tab = await paginaDelloStrato(app, sito);
+  await tab.waitForSelector('.sn-sidebar-input textarea');
+  const naviga = (url) => nelloStrato(app, sito, (u) => globalThis.__filoSidebarTest.runFiloAction({ type: 'NAVIGA', url: u }), url);
+  return { tab, sito, naviga, esegui };
 }
 
 test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col sito, che riporta la notifica di Filo: il sì si dà lì', async ({ app, shell, rete, avvisi }) => {
@@ -224,48 +229,32 @@ test('assistente sulla pagina: NAVIGA fermata, sotto c\'è «Apri comunque» col
   await expect.poll(() => suBloccato(app), { timeout: 8000 }).toEqual([bersaglio]);
 });
 
-// Il bottone sta nel DOM della pagina: quello che la pagina gli fa (mondo principale) non deve aprire il sito.
-const bottoneDellaPagina = () => [...document.querySelectorAll('.sn-sidebar button')].find((x) => /Apri comunque|Chiudi questo avviso/.test(x.textContent));
+// Il bottone sta nello strato sopra la scheda: il codice della pagina non lo trova. Lì, un clic fabbricato non vale.
+const bottoneDelloStrato = () => [...document.querySelectorAll('.sn-sidebar button')].find((x) => /Apri comunque/.test(x.textContent));
 
-test('assistente sulla pagina: la pagina che dà il fuoco a «Apri comunque», lo traveste o lo stende su tutto lo schermo non apre il sito della lista', async ({ app, shell, rete, avvisi }) => {
+test('assistente sulla pagina: la pagina non trova «Apri comunque», e un suo velo sullo schermo non lo fa premere', async ({ app, shell, rete, avvisi }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
-  const { tab, naviga: apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1><p style="height:3000px">testo lungo</p>'), 'sito.test');
+  const { tab, sito, naviga: apri } = await assistenteSu(app, shell, rete.pagina('sito.test', '/', '<h1>PAGINA</h1><p style="height:3000px">testo lungo</p>'), 'sito.test');
   expect(await apri(bersaglio)).toBe(false);
   await expect(tab.locator('.sn-sidebar button', { hasText: 'Apri comunque blocked.test' })).toBeVisible();
+  expect(await sito.evaluate(() => document.querySelectorAll('.sn-sidebar, .sn-sidebar button').length)).toBe(0);
   const notifica = shell.locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
   const aSchermo = (await avvisi()).locator('.shell-notif', { hasText: 'Sito bloccato: blocked.test' });
-  const pagina = (codice) => tab.evaluate(([trova, c]) => { const b = new Function(`return (${trova})()`)(); new Function('b', c)(b); }, [bottoneDellaPagina.toString(), codice]);
-  // Ogni gesto arriva al bottone (ricompare la notifica), e il sito resta chiuso.
-  const gesto = async (fai) => {
-    await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
-    await aSchermo.first().locator('.shell-notif-close').click();
-    await expect(notifica).toHaveCount(0, { timeout: 3000 });
-    await fai();
-    await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
-    await tab.waitForTimeout(800);
-    expect(await suBloccato(app)).toEqual([]);
-  };
-  // Invisibile e col fuoco: lo spazio per scorrere la pagina.
-  await gesto(async () => {
-    await pagina("b.style.opacity = '0'; b.focus();");
-    await tab.keyboard.press('Space');
-  });
-  // Travestito da «Chiudi questo avviso».
-  await gesto(async () => {
-    await pagina("b.style.opacity = ''; b.textContent = 'Chiudi questo avviso';");
-    await tab.locator('.sn-sidebar button', { hasText: 'Chiudi questo avviso' }).click();
-  });
-  // Trasparente e grande quanto lo schermo: un clic sul testo della pagina.
-  await gesto(async () => {
-    await pagina("document.body.append(b); b.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;opacity:0;z-index:2147483647;margin:0;padding:0;border:0';");
-    await tab.mouse.click(200, 300);
-  });
+  await expect(aSchermo.first()).toBeVisible({ timeout: 6000 });
+  await aSchermo.first().locator('.shell-notif-close').click();
+  await expect(notifica).toHaveCount(0, { timeout: 3000 });
+  // Un velo trasparente del sito grande quanto lo schermo, e un clic dell'utente sul testo della pagina.
+  await sito.evaluate(() => { const v = document.createElement('div'); v.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;opacity:0;z-index:2147483647'; document.body.append(v); });
+  await sito.mouse.click(200, 300);
+  await sito.waitForTimeout(1500);
+  await expect(aSchermo).toHaveCount(0);
+  expect(await suBloccato(app)).toEqual([]);
 });
 
 // #592.16: un sito uscito dalla lista nel frattempo «Apri comunque» lo apre subito; lo preme solo l'utente.
-test('assistente sulla pagina: «Apri comunque» premuto dal codice della pagina non fa niente, dall\'utente riporta la notifica', async ({ app, shell, rete, avvisi }) => {
+test('assistente sulla pagina: «Apri comunque» premuto da codice non fa niente, dall\'utente riporta la notifica', async ({ app, shell, rete, avvisi }) => {
   test.setTimeout(60_000);
   await lista(shell, ['blocked.test']);
   const bersaglio = rete.pagina('blocked.test', '/', '<h1>SITO</h1>');
@@ -284,7 +273,7 @@ test('assistente sulla pagina: «Apri comunque» premuto dal codice della pagina
     b.focus();
     b.click();
     b.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true, detail: 1 }));
-  }, [bottoneDellaPagina.toString()]);
+  }, [bottoneDelloStrato.toString()]);
   await tab.waitForTimeout(1500);
   await expect(aSchermo).toHaveCount(0);
   expect(await suBloccato(app)).toEqual([]);

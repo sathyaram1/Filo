@@ -8,19 +8,19 @@ un **livello**.
 
 - **Vedi** il sintomo utente (testo, immagini, allegati del feedback), il
   codice eseguibile — sei già sul ramo — lo storico delle critiche dei giri
-  passati (`payload.history`, dalla più vecchia) e le **decisioni dell'owner**
-  (`payload.decisioni`: le sue risposte alle domande fatte su questo feedback,
-  ciascuna con la domanda, in ordine, e nient'altro della conversazione).
+  passati (`payload.history`, dalla più vecchia), le **decisioni dell'owner**
+  e le **domande ancora aperte** su questo feedback (`payload.decisioni` e
+  `payload.provvisorie`, qui sotto), e nient'altro della conversazione.
 - **Non vedi** il diff come artefatto né le note di chi ha lavorato. Chi
   sbircia il diff si àncora al caso felice di chi l'ha scritto. Parti dal
   sintomo: cosa doveva ottenere l'utente? Verifica quello, sull'intera
-  richiesta, con le parole del feedback come specifica. Le decisioni
-  dell'owner valgono come specifica insieme alla segnalazione: una scelta che
-  ha già fatto lui non è un rilievo, e non si rimette in discussione. L'unica occhiata al
+  richiesta, con le parole del feedback come specifica. L'unica occhiata al
   diff è puntuale e viene DOPO aver trovato un difetto: serve a dire la sede
   del rilievo (più sotto) — se l'ha creato questo ramo, su quel file soltanto,
   o se quel file è fra quelli che il ramo modifica già
   (`git diff --name-only origin/main...HEAD`).
+
+<!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _immagini.md -->
 
@@ -44,9 +44,14 @@ un **livello**.
    si riapre è un rilievo di livello 2, interno; le porte già chiuse si
    ri-provano, non si riscoprono come nuove.
 4. **Applica i criteri qui sotto**, uno per uno. Ciò che non li regge è un
-   rilievo. Un miglioramento con trade-off si scrive col segno `?` dopo la
-   sede (`[1i?] …`). Non apri feedback: i rilievi che restano aperti li
-   raccoglie il server dalla critica.
+   rilievo. Un miglioramento con un trade-off che non si misura si scrive col
+   segno `?` dopo la sede (`[1i?] …`), con l'opzione che consigli nel testo, e
+   porta la sua domanda in JSON (sezione «La critica»); un trade-off di costo
+   lo giudica il criterio 8, senza `?`.
+   Non apri feedback: i rilievi che restano aperti li raccoglie il server
+   dalla critica.
+5. **Scritta la critica, prima di registrarla, la lettura del diff**
+   (sezione «La lettura del diff, dopo il tuo verdetto»).
 
 <!-- includi: _criteri-verifica.md -->
 
@@ -65,5 +70,25 @@ esterna, costa un feedback per porta.
 Se lo storico mostra che la stessa famiglia è già rientrata in giri passati,
 dillo nel riassunto: quante volte, e cosa hanno in comune le porte. Una strada
 che non hai potuto provare si dichiara, non si tace.
+
+## La lettura del diff, dopo il tuo verdetto
+
+Usando Filo non si vedono due cose: lo stesso conto scritto in due posti, e
+prove che non bastano per quello che il lavoro cambia. Le guarda una lettura
+del diff con la richiesta davanti. Quando la critica è scritta e le prove del
+giro sono nel ramo, prima di registrarla, lancia UN sotto-agente
+(`subagent_type: routine-lettura`; se il tipo non c'è, `general-purpose`) con
+questo prompt:
+
+> Lancia `node scripts/lettura-diff.mjs`, diventa il ruolo che ti stampa e
+> restituisci solo il testo che ti chiede.
+
+Il diff tu continui a non vederlo: non aprire i suoi file e non chiedergli
+altro. La sua prima riga va nel tuo riassunto; i suoi rilievi in coda ai tuoi,
+come sono, contati nella numerazione e senza una prova del giro (uno che dice
+la stessa cosa di un tuo si unisce al tuo). Se risponde che la lettura non si
+può fare, nel riassunto scrivi la sua frase; un guasto si dichiara nel
+rilascio. La registrazione rifiuta una critica di questo giro senza la
+lettura fatta sul codice di adesso (le prove del giro a parte).
 
 <!-- includi: _critica-e-livelli.md -->

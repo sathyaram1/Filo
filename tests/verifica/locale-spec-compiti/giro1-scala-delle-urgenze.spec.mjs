@@ -43,7 +43,6 @@ function senzaFeedback() {
   };
   return {
     risposta: n('Gestisci la risposta'),
-    invio: n('Invio'),
     monitoraggio: n('Monitoraggio'),
     domande: n('Revisione delle domande'),
     unione: n('Unione'),
@@ -52,10 +51,9 @@ function senzaFeedback() {
   };
 }
 
-test('i compiti senza feedback hanno le urgenze decise (47, 46, 45, 30, 20, 5, esplorazione sotto tutto)', () => {
+test('i compiti senza feedback hanno le urgenze decise (47, 45, 30, 20, 5, esplorazione sotto tutto)', () => {
   const u = senzaFeedback();
   expect(u.risposta).toBe(47);
-  expect(u.invio).toBe(46);
   expect(u.monitoraggio).toBe(45);
   expect(riga(sezione('### 6.3'), 'Monitoraggio')).toMatch(/audit/i);
   expect(riga(sezione('### 6.3'), 'Monitoraggio')).toMatch(/riordino/i);
@@ -71,7 +69,7 @@ test('la priorità 3 sta sopra ogni altra casella e ogni compito senza feedback'
   const minP3 = Math.min(...FASI.map((f) => c[f][3][0]));
   const altri = FASI.flatMap((f) => c[f].slice(0, 3).map((x) => x[1]));
   const u = senzaFeedback();
-  const fissi = [u.risposta, u.invio, u.monitoraggio, u.domande, u.unione, u.potatura];
+  const fissi = [u.risposta, u.monitoraggio, u.domande, u.unione, u.potatura];
   expect(minP3).toBeGreaterThan(Math.max(...altri, ...fissi));
 });
 

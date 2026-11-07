@@ -27,6 +27,7 @@ const withCritique = (s, b, o) => withCritiqueRaw(s, b, { caps: CAPS_TEST, ...o 
 // Il server finto che serve config/routines ai comandi del CLI (processo
 // separato: i comandi si lanciano in modo sincrono). Vale per tutto il file.
 import { avviaConfigRoutinesFinto as fintoConfigRoutines } from '../helpers/server-finto.mjs';
+import { faiLaLettura } from '../helpers/letturaDiff.mjs';
 const FINTO = await fintoConfigRoutines({ FINTO_CAPS: JSON.stringify(CAPS_TEST) });
 process.env.FILO_ROUTINE_CONFIG_URL = FINTO.url;
 process.env.FILO_ADMIN_ID_TOKEN = 'finto-id-token';
@@ -132,21 +133,31 @@ test('withFixed senza un giro aperto: rifiutata', () => {
   assert.equal(withFixed(s, 'r', { report: 'x', sha: SHA }).ok, false);
 });
 
-test('un 3 a bilancio esaurito, o un 2 col segno ?: esito stop; un 2 a bilancio esaurito passa e mette da parte', () => {
+test('un 3 a bilanci esauriti, o un 2 col segno ?!: esito stop; un 2 a bilanci esauriti passa e mette da parte', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  s.r.counts = { count3: 5 };
+  s.r.counts = { count3: 5, count2: 5, count1: 2 };
   const r = withCritique(s, 'r', { critique: '[3i] ancora rotto', sha: SHA });
   assert.equal(r.outcome, 'stop');
   assert.equal(r.state.r.verdict, 'fail');
   assert.match(checkVerdict(r.state.r, SHA).reason, /bocciato/);
-  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada?', sha: SHA });
+  const d = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?!] quale formato su disco?', sha: SHA });
   assert.equal(d.outcome, 'stop');
-  // Il 2 a bilancio dei 2 finito non ferma (2026-09-23): esce a parte, a priorità 2.
+  // Senza il segno «!» un 2 col ? non ferma più (#1202): si corregge con l'opzione consigliata.
+  const q = withCritique(withRequest({}, 'r', { request: 'fai X', sha: SHA }), 'r', { critique: '[2i?] quale strada? Consiglio A.', sha: SHA });
+  assert.equal(q.outcome, 'fix');
+  // Il 2 a bilanci finiti non ferma (2026-09-23): esce a parte, a priorità 1 (la 2 è del manutentore).
   let due = withRequest({}, 'r', { request: 'fai X', sha: SHA });
-  due.r.counts = { count2: 5 };
+  due.r.counts = { count2: 5, count1: 2 };
   const p = withCritique(due, 'r', { critique: 'P.\n[2i] ancora rotto', sha: SHA });
   assert.equal(p.outcome, 'pass');
-  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 2]]);
+  assert.deepEqual(p.state.r.derived.map((x) => [x.level, x.priority]), [[2, 1]]);
+  // D88 (#744): finito solo cap2, il 2 si corregge col bilancio dell'1, anche da solo.
+  let sotto = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  sotto.r.counts = { count2: 5 };
+  const q2 = withCritique(sotto, 'r', { critique: 'P.\n[2i] ancora rotto', sha: SHA });
+  assert.equal(q2.outcome, 'fix');
+  assert.equal(q2.state.r.rounds.at(-1).consumed, 'cap1');
+  assert.deepEqual([q2.state.r.counts.count2, q2.state.r.counts.count1], [5, 1]);
 });
 
 test('i rilievi fuori dal giro restano in `derived` per il report', () => {
@@ -470,7 +481,7 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
   assert.match(ripensa.reason, /start/);
   assert.equal(ripensa.state.r.verdict, 'pass', 'il pass registrato resta quello');
   assert.equal(ripensa.state.r.counts.count2 || 0, 0, 'nessun giro pagato');
-  const fermo = withCritique(s, 'r', { critique: 'P.\n[2i?] scelta', sha: SHA });
+  const fermo = withCritique(s, 'r', { critique: 'P.\n[3i?] scelta', sha: SHA });
   assert.equal(fermo.outcome, 'stop');
   assert.equal(withCritique(fermo.state, 'r', { critique: 'Regge.', sha: SHA }).ok, false);
   // Dopo start la critica di un'altra istanza passa.
@@ -481,6 +492,7 @@ test('#561 giro 3: dopo un pass (o uno stop) una seconda critica senza un nuovo 
 
 test('#561 giro 3: quando il lavoro si ferma i bilanci si azzerano (come sul server), la storia resta', () => {
   let s = withRequest({}, 'r', { request: 'fai X', sha: SHA });
+  s.r.counts = { count2: 5, count1: 2 }; // finiti i bilanci sotto, il sesto 3 non ha con cosa pagare (D88)
   for (let i = 0; i < 5; i++) {
     const r = withCritique(s, 'r', { critique: `P.\n[3i] rotto ${i}`, sha: SHA });
     assert.equal(r.outcome, 'fix', `giro ${i}`);
@@ -550,6 +562,7 @@ function depositoUsaEGetta() {
 // ragione (una verifica di due parole non è una verifica).
 const LUNGA_FIX = 'Provato inserimento, tasto destro, tema scuro e finestra stretta: il resto regge bene.\n[2i] rotto';
 function vl(casa, ...args) {
+  if (args[0] === 'critica') faiLaLettura(casa);
   try {
     return { code: 0, out: _exec(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env: { ...process.env, FILO_REPO_ROOT: casa }, stdio: ['ignore', 'pipe', 'pipe'] }) };
   } catch (e) { return { code: e.status, out: `${e.stdout || ''}${e.stderr || ''}` }; }
@@ -700,6 +713,7 @@ test('#256 locale (CLI): una spec cancellata dalla shell ma non committata ferma
   // Committata la pulizia, la stessa critica passa, e vale per il commit nuovo.
   g(work, ['add', '-A']);
   g(work, ['commit', '-q', '-m', 'verifica: pulizia']);
+  faiLaLettura(work);
   const pulita = spawnSync(process.execPath, [VERIFY, 'critica', critica], { env: { ...process.env, FILO_REPO_ROOT: work }, encoding: 'utf8' });
   assert.equal(pulita.status, 0, pulita.stderr);
   assert.match(String(pulita.stdout), /Si può pubblicare/);
@@ -976,7 +990,10 @@ test('CLI giro stretto: dopo «corretto», start consegna la chiusura solo con l
   try {
     const casa = depositoUsaEGetta();
     const env = { ...process.env, FILO_REPO_ROOT: casa, FILO_ROUTINE_CONFIG_URL: acceso.url };
-    const lancia = (...args) => spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    const lancia = (...args) => {
+      if (args[0] === 'critica') faiLaLettura(casa);
+      return spawnSync(process.execPath, [resolve(_ROOT, 'scripts', 'verify-local.mjs'), ...args], { cwd: casa, encoding: 'utf8', env });
+    };
     const primo = lancia('start', 'richiesta di prova');
     assert.equal(primo.status, 0, primo.stderr);
     assert.doesNotMatch(primo.stdout, /Perimetro di questo giro/, 'il primo giro è pieno anche a interruttore acceso');

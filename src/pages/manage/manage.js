@@ -31,6 +31,13 @@
   const mgLavoriServer       = document.getElementById('mgLavoriServer');
   const mgLavoriServerSwitch = document.getElementById('mgLavoriServerSwitch');
   const mgLavoriServerMsg    = document.getElementById('mgLavoriServerMsg');
+  // La routine riservati (#2069): accesa o spenta, quante sessioni sue, e lo stato che scrive il pacemaker.
+  const mgRiservati          = document.getElementById('mgRiservati');
+  const mgRiservatiSwitch    = document.getElementById('mgRiservatiSwitch');
+  const mgRiservatiMsg       = document.getElementById('mgRiservatiMsg');
+  const mgRiservatiTetto     = document.getElementById('mgRiservatiTetto');
+  const mgRiservatiTettoSave = document.getElementById('mgRiservatiTettoSave');
+  const mgRiservatiTettoMsg  = document.getElementById('mgRiservatiTettoMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
   // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
   // per i soli 0; più il testo in coda alla risposta (fixInstructions).
@@ -62,6 +69,8 @@
   const mgAccountA        = document.getElementById('mgAccountA');
   const mgAccountB        = document.getElementById('mgAccountB');
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
+  const mgManutentoreAcceso = document.getElementById('mgManutentoreAcceso');
+  const mgManutentoreMsg  = document.getElementById('mgManutentoreMsg');
   const mgAccountsWarn    = document.getElementById('mgAccountsWarn');
   const mgPriorityWarn    = document.getElementById('mgPriorityWarn');
   // Modello e sforzo per fase: le tendine le crea buildRoleModels, una per `${ruolo}.${campo}`.
@@ -71,6 +80,12 @@
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515): un campo per chiave della risposta del main.
+  const mgJudgeCampi = {
+    tettoUsd: ['mgJudgeBudget', 'mgJudgeBudgetSave', 'mgJudgeBudgetRimetti', 'mgJudgeBudgetMsg'],
+    maxCaratteri: ['mgJudgeChars', 'mgJudgeCharsSave', 'mgJudgeCharsRimetti', 'mgJudgeCharsMsg'],
+  };
+  for (const k of Object.keys(mgJudgeCampi)) mgJudgeCampi[k] = mgJudgeCampi[k].map((id) => document.getElementById(id));
 
   const mgLogLoading = document.getElementById('mgLogLoading');
   const mgLogDenied  = document.getElementById('mgLogDenied');
@@ -130,6 +145,19 @@
   const bozzeRisposta = new Map();
   const rispostaInVolo = new Set();
   let esitoRisposta = { text: '', kind: '' };
+  // Immagini e file incollati, trascinati o scelti nelle caselle che scrivono nella conversazione (#1331): la risposta
+  // del rombo e la riapertura, per pratica, coi tipi e i tetti dell'invio dei feedback.
+  const allegatiRisposta = window.SN_MG_ALLEGATI.crea({
+    alCambio: (id) => {
+      const vecchia = document.querySelector('.mg-liv-risposta .mg-dq-allegati');
+      if (vecchia && id === selectedId) vecchia.replaceWith(allegatiRisposta.riga(id, { disabilitata: rispostaInVolo.has(id) }));
+    },
+    alMessaggio: (id, testo) => { if (id === selectedId) setClarifyMsg(testo, testo ? 'err' : ''); },
+  });
+  const allegatiRiapertura = window.SN_MG_ALLEGATI.crea({
+    alCambio: () => disegnaAllegatiRiapertura(),
+    alMessaggio: (id, testo) => { if (id === selectedId) setActionMsg(testo, testo ? 'err' : ''); },
+  });
   // La pratica che aveva già le domande al disegno prima: il pannello si apre
   // da sé quando arrivano, non a ogni ridisegno dopo che l'owner l'ha chiuso.
   let attesaDisegnata = null;
@@ -233,6 +261,7 @@
   }
   // Il filtro per livello non si ricorda: un L4 lasciato acceso nasconderebbe un L1 arrivato dopo.
   let livelliScelti = [];
+  let rivalutaChiesto = false; // #906: aperta da `#rivaluta`, il tasto dei non filtrati va messo in vista appena c'è
   // «Solo non fidate» (#1575) vale per le schede dei feedback e per le Domande; non si ricorda, per lo stesso motivo.
   let soloNonFidate = false;
   const mgFiduciaFiltro = document.getElementById('mgFiduciaFiltro');
@@ -254,7 +283,7 @@
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
     // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // esterni al lavoro, o interni messi da parte dal bilancio), aperti dal
-    // server uno per rilievo, figli #N.k, priorità = livello: categoria
+    // server uno per rilievo, figli #N.k, priorità dal livello (un 2 nasce a 1): categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
@@ -380,7 +409,7 @@
   function caricaImpostazioni() {
     // Le pause non trattengono gli altri controlli «in lettura»: sono una riga in più, non un valore da scegliere.
     loadPause();
-    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadMergeApprovals()])
+    return Promise.allSettled([loadAutoMode(), loadCaps(), loadSessions(), loadRoleModels(), loadJudgeTimeout(), loadJudgeBudget(), loadMergeApprovals()])
       .finally(fineLetturaAutomazioni);
   }
 
@@ -644,22 +673,20 @@
     // accesa, perché si preparano prima di riaccendere (richiesta owner).
     if (mgGiroStrettoSwitch) mgGiroStrettoSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     if (mgLavoriServerSwitch) mgLavoriServerSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
+    if (mgRiservatiSwitch) mgRiservatiSwitch.classList.toggle('mg-switch--disabled', !isAdmin);
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
-      mgAccountA, mgAccountB, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove)]) {
+      mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
+      mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
+      ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
     }
   }
 
   // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
   // Cinque campi sul doc Firestore config/routines (feedback #561, §4):
-  //   cap3  giri di correzione per i rilievi di livello 3 (a bilancio finito
-  //         un 3 ferma la pratica e chiama l'owner);
-  //   cap2  giri per i rilievi di livello 2 (a bilancio finito escono come
-  //         feedback a priorità 2, il lavoro non si ferma);
-  //   cap1  giri per i rilievi di livello 1 (a bilancio finito vanno nel
-  //         feedback derivato);
-  //   cap0  giri per i soli rilievi di livello 0 (0 = mai da soli);
+  //   cap3/cap2/cap1/cap0  giri per i rilievi di livello 3/2/1/0 (come si
+  //         spendono: decideRound in verifierRound.js);
   //   fixInstructions  il testo che il server aggiunge in coda alla risposta
   //         a una critica (vuoto = il testo del server).
   // Li applica il SERVER quando registra la critica; chrome.storage.local è
@@ -862,11 +889,13 @@
   const sessionsInAttesa = [];
   // Numero scritto e non ancora salvato: una risposta su un altro campo non lo cancella.
   let maxInScrittura = false;
+  let tettoInScrittura = false;
 
   // Righe che dicono di non aver riletto il resto, col testo che resta quando
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
   const avvisiLettura = new Map();
-  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']]];
+  const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']],
+    [mgRiservatiMsg, ['riservatiOff']], [mgRiservatiTettoMsg, ['riservatiTetto']]];
   // Ultimo esito di ogni riga; l'avviso «non letto» non è un esito: lo decide mostraSessionsMsg.
   const esitiSessions = new Map();
   const sceltePendenti = () => Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
@@ -926,6 +955,9 @@
     for (const r of mgPriorityRadios) r.checked = noto('priorityAccount') && r.value === vista.priorityAccount;
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
     if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
+    if (mgManutentoreAcceso) mgManutentoreAcceso.checked = noto('manutentoreAcceso') && vista.manutentoreAcceso;
+    if (mgRiservati) mgRiservati.checked = !vista.riservatiOff;
+    if (mgRiservatiTetto && !tettoInScrittura) mgRiservatiTetto.value = noto('riservatiTetto') ? String(vista.riservatiTetto) : '';
     // Esclusi tutti e due non parte niente; escluso il solo prioritario si
     // lavora sull'altro. Due stati che a guardare gli interruttori non si
     // capiscono, quindi si scrivono.
@@ -971,6 +1003,7 @@
       return Promise.resolve(false);
     }
     if ('maxSessions' in esito.valori) maxInScrittura = false;
+    if ('riservatiTetto' in esito.valori) tettoInScrittura = false;
     const scelta = { valori: esito.valori, msgEl };
     sessionsInAttesa.push(scelta);
     // In coda dietro un'altra richiesta può aspettare: si vede che è partita.
@@ -980,6 +1013,7 @@
     const confermaSessions = (testo, dopoLettura) => {
       if (sessionsInAttesa.some((s) => s.msgEl === msgEl)) return;
       if ('maxSessions' in esito.valori && mgMaxSessions && mgMaxSessions.value !== String(esito.valori.maxSessions)) return;
+      if ('riservatiTetto' in esito.valori && mgRiservatiTetto && mgRiservatiTetto.value !== String(esito.valori.riservatiTetto)) return;
       setSessionsMsg(msgEl, testo, 'ok', dopoLettura);
     };
     const scritti = Object.keys(esito.valori);
@@ -1039,21 +1073,42 @@
     });
   }
 
-  for (const [el, campo] of [[mgAccountA, 'accountAOff'], [mgAccountB, 'accountBOff']]) {
+  if (mgManutentoreAcceso) {
+    mgManutentoreAcceso.addEventListener('change', () => saveSessions({ manutentoreAcceso: mgManutentoreAcceso.checked }, mgManutentoreMsg));
+  }
+
+  for (const [el, campo, msg] of [[mgAccountA, 'accountAOff', mgAccountsMsg], [mgAccountB, 'accountBOff', mgAccountsMsg], [mgRiservati, 'riservatiOff', mgRiservatiMsg]]) {
     if (!el) continue;
     el.addEventListener('change', () => {
       // Acceso = in uso, quindi l'interruttore e il campo dicono l'opposto.
-      saveSessions({ [campo]: !el.checked }, mgAccountsMsg);
+      saveSessions({ [campo]: !el.checked }, msg);
+    });
+  }
+
+  if (mgRiservatiTetto) {
+    const letto = () => (mgRiservatiTetto.validity && mgRiservatiTetto.validity.badInput ? 'NaN' : mgRiservatiTetto.value);
+    const salva = () => saveSessions({ riservatiTetto: letto() }, mgRiservatiTettoMsg);
+    if (mgRiservatiTettoSave) mgRiservatiTettoSave.addEventListener('click', salva);
+    mgRiservatiTetto.addEventListener('input', () => {
+      tettoInScrittura = true;
+      setSessionsMsg(mgRiservatiTettoMsg, '', null);
+    });
+    mgRiservatiTetto.addEventListener('keydown', (e) => {
+      if (e.key !== 'Enter' || mgRiservatiTetto.disabled) return;
+      e.preventDefault();
+      salva();
     });
   }
 
   // ── Le pause in corso (#996) ───────────────────────────────────────────────
-  // Sola lettura dal server: A, B o la routine server fermi dopo un'accensione rifiutata, col motivo. Nessun tetto
-  // giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
+  // Sola lettura dal server: A, B, le routine server o quelle riservati fermi dopo un'accensione rifiutata, col
+  // motivo. Nessun tetto giornaliero: è la pausa a fermare un account, quindi si vede qui, accanto a chi la subisce.
   const PAUSE_GET = (window.SN_MSG?.MSG?.AUTOMATION_PAUSE_GET) || 'automation_pause_get';
   const mgAccountsPausa = document.getElementById('mgAccountsPausa');
   const mgServerPausa = document.getElementById('mgServerPausa');
-  // null = non chiesto o non per te; { errore } = non letto; { pause, scartoMs } = letto (scarto: orologio locale − server).
+  const mgRiservatiPausa = document.getElementById('mgRiservatiPausa');
+  const mgRiservatiStato = document.getElementById('mgRiservatiStato');
+  // null = non chiesto o non per te; { errore } = non letto; { pause, voci, scartoMs } = letto (scarto: orologio locale − server).
   let pauseLette = null;
   let pauseTick = 0;
   let pauseTimer = null;
@@ -1072,11 +1127,12 @@
     const ora = Date.now();
     const righe = [];
     const righeServer = [];
+    const righeRiservati = [];
     let prossima = Infinity;
-    const leggi = (chi, voce) => {
+    const leggi = (chi, voce, opzioni) => {
       if (!voce || typeof voce !== 'object') return null;
       const v = Object.assign({}, voce, { finoMs: Number(voce.finoMs) + pauseLette.scartoMs });
-      const p = RS.pausaInParole(chi, v, ora);
+      const p = RS.pausaInParole(chi, v, ora, opzioni);
       if (p) prossima = Math.min(prossima, v.finoMs);
       return p;
     };
@@ -1092,6 +1148,17 @@
         const p = leggi(`La routine server dell'account ${k}`, pauseLette.pause[`server${k}`]);
         if (p) righeServer.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
       }
+      // Una routine riservati per account (#2069): conta le accensioni sue, manutentore compreso.
+      for (const k of ['A', 'B']) {
+        const p = leggi(`La routine riservati dell'account ${k}`, pauseLette.pause[`riservati${k}`], { contoDi: 'routine' });
+        if (p) righeRiservati.push(rigaPausa('mg-auto-warn', p.testo, p.dettaglio));
+      }
+    }
+    // Cosa ha deciso il pacemaker su di lei all'ultimo giro: senza, «accesa» sull'interruttore non dice se parte.
+    if (mgRiservatiStato) {
+      const stato = pauseLette && !pauseLette.errore ? RS.statoRiservati(pauseLette.voci.riservati) : '';
+      mgRiservatiStato.textContent = stato;
+      mgRiservatiStato.hidden = !stato;
     }
     if (mgAccountsPausa) {
       mgAccountsPausa.replaceChildren(...righe);
@@ -1100,6 +1167,10 @@
     if (mgServerPausa) {
       mgServerPausa.replaceChildren(...righeServer);
       mgServerPausa.hidden = righeServer.length === 0;
+    }
+    if (mgRiservatiPausa) {
+      mgRiservatiPausa.replaceChildren(...righeRiservati);
+      mgRiservatiPausa.hidden = righeRiservati.length === 0;
     }
     // Una pausa che scade sparisce da sola, senza ricaricare la pagina.
     if (prossima < Infinity) pauseTimer = setTimeout(reflectPause, Math.min(Math.max(0, prossima - ora) + 1000, 2 ** 31 - 1));
@@ -1119,6 +1190,7 @@
         const oraServer = Number(r.oraMs);
         pauseLette = {
           pause: r.pause && typeof r.pause === 'object' ? r.pause : {},
+          voci: r.voci && typeof r.voci === 'object' ? r.voci : {},
           scartoMs: Number.isFinite(oraServer) && oraServer > 0 ? Date.now() - oraServer : 0,
         };
       }
@@ -1346,22 +1418,69 @@
   if (mgJudgeTimeoutSave) mgJudgeTimeoutSave.addEventListener('click', saveJudgeTimeout);
   if (mgJudgeTimeout) mgJudgeTimeout.addEventListener('input', () => setJudgeTimeoutMsg('', null));
 
+  // Tetto di spesa e lunghezza dei giudici per i non fidati (#1515). Regole in SN_SPESA_GIUDICI, comportamento del
+  // campo (Invio, uscita dal campo, «Rimetti com'era») in SN_CAMPO_NUMERO; la spesa di oggi la scrive solo il server.
+  const JUDGE_BUDGET_GET = (window.SN_MSG?.MSG?.AUTOMATION_JUDGE_BUDGET_GET) || 'automation_judge_budget_get';
+  const JUDGE_BUDGET_SET = (window.SN_MSG?.MSG?.AUTOMATION_JUDGE_BUDGET_SET) || 'automation_judge_budget_set';
+  const SG = window.SN_SPESA_GIUDICI;
+  const giudiciCampi = new Map();
+  let giudiciLetto = null; // l'ultima risposta del main: { tettoUsd, maxCaratteri, spesa, oraMs }
+
+  function mostraSpesaGiudici() {
+    const box = document.getElementById('mgJudgeSpesa');
+    if (!box || !SG) return;
+    const r = giudiciLetto;
+    const riga = SG.rigaSpesa(r ? r.spesa : null, r ? r.tettoUsd : null, (r && r.oraMs) || Date.now());
+    const nota = document.getElementById('mgJudgeSpesaNota');
+    const barra = document.getElementById('mgJudgeSpesaBarra');
+    document.getElementById('mgJudgeSpesaTesto').textContent = riga.testo;
+    box.title = riga.dettaglio;
+    box.classList.toggle('is-pieno', riga.pieno);
+    // Il motivo si legge senza hover quando cambia qualcosa per l'owner: tetto pieno o spesa ignota.
+    nota.textContent = riga.pieno || riga.quota === null ? riga.dettaglio : '';
+    nota.hidden = !nota.textContent;
+    barra.hidden = riga.quota === null;
+    document.getElementById('mgJudgeSpesaQuota').style.width = `${Math.round((riga.quota || 0) * 100)}%`;
+  }
+
+  async function salvaGiudici(chiave, valore) {
+    const r = await sendToMain({ type: JUDGE_BUDGET_SET, [chiave]: valore });
+    if (!r || r.ok === false) return { ok: false, errore: String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '') };
+    giudiciLetto = r.letto === false ? Object.assign({}, giudiciLetto, r) : r;
+    mostraSpesaGiudici();
+    return { ok: true, valore: r[chiave] };
+  }
+
+  if (SG && window.SN_CAMPO_NUMERO) {
+    for (const [chiave, [input, salvaBtn, rimetti, msg]] of Object.entries(mgJudgeCampi)) {
+      if (!input) continue;
+      const regole = chiave === 'tettoUsd' ? SG.REGOLE_CAMPO.tetto : SG.REGOLE_CAMPO.caratteri;
+      giudiciCampi.set(chiave, window.SN_CAMPO_NUMERO.collega({
+        input, salvaBtn, rimetti, msg, regole, salva: (valore) => salvaGiudici(chiave, valore),
+      }));
+    }
+  }
+
+  async function loadJudgeBudget() {
+    let r = null;
+    try { r = await sendToMain({ type: JUDGE_BUDGET_GET }); } catch (_) { r = null; }
+    giudiciLetto = r && r.ok !== false ? r : null;
+    mostraSpesaGiudici();
+    for (const [chiave, campo] of giudiciCampi) {
+      // Un numero scritto e non ancora partito resta sotto le dita di chi lo scrive.
+      if (!campo.stato().pulito) continue;
+      if (giudiciLetto) campo.mostra(giudiciLetto[chiave], { daCapo: true });
+      else campo.dillo(`Non letto: ${String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '')}.`, 'is-error');
+    }
+  }
+
   // Tab «Log»: gli ultimi worker spawnati. Fonte config/automation.workerLog, scritto dal
   // server al rilascio di ogni biglietto; sola lettura via main (owner-gated).
   const WORKER_LOG_GET = (window.SN_MSG?.MSG?.WORKER_LOG_GET) || 'worker_log_get';
-  // Etichette amichevoli per i ruoli del dispatcher (mai l'id grezzo).
-  const ROLE_LABELS = {
-    'new-work': 'Nuovo lavoro',
-    verifier:   'Verifica',
-    fixer:      'Correzione',
-    secaudit:   'Audit sicurezza',
-    prober:     'Esplorazione',
-    idle:       'Fermo',
-    off:        'Routine spente',
-  };
+  // Il ruolo detto all'owner, mai l'id grezzo: la traduzione sta in mergeApprovals.etichettaRuolo, che serve anche la pagina da browser (#555).
   function roleLabel(role) {
-    const r = String(role || '').trim();
-    return ROLE_LABELS[r] || (r || 'Sconosciuto');
+    const UI = window.SN_MERGE_APPROVALS;
+    return (UI && UI.etichettaRuolo(role)) || String(role || '').trim() || 'Sconosciuto';
   }
   let logLoaded  = false;   // true dopo il primo caricamento riuscito
   let logLoading = false;
@@ -1402,7 +1521,9 @@
     if (!list.length) { setLogView('empty'); mgLogList.innerHTML = ''; return; }
     mgLogList.innerHTML = list.map((e) => {
       const role = roleLabel(e && e.role);
-      const num  = e && e.num ? ` · #${esc(String(e.num))}` : '';
+      // Il server scrive già «#500», le righe vecchie il numero nudo: un cancelletto solo in ogni caso (#512).
+      const n = String((e && e.num) || '').trim().replace(/^#+/, '');
+      const num  = n ? ` · #${esc(n)}` : '';
       const rel  = timeAgo(e && e.startedAt);
       const abs  = formatDateTime(e && e.startedAt);
       return `<li class="mg-log-row" title="${esc(abs)}">`
@@ -1444,22 +1565,24 @@
   const FIDUCIA_SEGNA = (window.SN_MSG?.MSG?.FIDUCIA_SEGNA) || 'fiducia_segna';
   const MERGE_APPROVAL_APPROVE = (window.SN_MSG?.MSG?.MERGE_APPROVAL_APPROVE) || 'merge_approval_approve';
   const MERGE_APPROVAL_DISCARD = (window.SN_MSG?.MSG?.MERGE_APPROVAL_DISCARD) || 'merge_approval_discard';
+  const MERGE_APPROVAL_RIAPRI = (window.SN_MSG?.MSG?.MERGE_APPROVAL_RIAPRI) || 'merge_approval_riapri';
   const MERGE_APPROVALS_CHANGED = (window.SN_MSG?.MSG?.MERGE_APPROVALS_CHANGED) || 'merge_approvals_changed';
   const LIVELLO4_SALTA = (window.SN_MSG?.MSG?.LIVELLO4_SALTA) || 'livello4_salta';
   const FEEDBACK_SENDER_FLAG = (window.SN_MSG?.MSG?.FEEDBACK_SENDER_FLAG) || 'feedback_sender_flag';
 
-  // Perché una richiesta è stata respinta, detto all'owner e non al codice.
-  const DENY_LABELS = {
-    bad_passphrase: 'parola d’ordine non valida o revocata',
-    bad_ticket: 'biglietto inesistente',
-    dead_ticket: 'biglietto scaduto o già rilasciato',
-    role_forbids: 'azione fuori dal ruolo',
-    branch_mismatch: 'ramo diverso da quello assegnato',
-    illegal_transition: 'passaggio di stato non permesso',
-    rate_limited: 'troppe richieste',
-    malformed: 'richiesta non interpretabile',
-    routines_off: 'routine spente',
-  };
+  // Perché una richiesta è stata respinta: la frase, col dettaglio del server accanto, sta in MR.testoRifiuto (#773.2).
+  // Il numero del feedback viene subito dopo il motivo: da qui si deve leggere chi è fermo (#1653).
+  const numDiRifiuto = (r) => { const n = String((r && r.num) || '').trim().replace(/^#+/, ''); return n ? ` · #${n}` : ''; };
+  // Un blocco L5 su un lavoro che si fonde lo stesso (fidato o pre-approvato) si registra soltanto: non è un fermo.
+  const bloccoCheSiFonde = (r) => String(r && r.reason) === 'l5_blocked'
+    && (r.siFonde === true || /si fonde e si registra/.test(String(r.detail || '')));
+  const rigaBloccoRegistrato = (r) => ({
+    at: r && r.at,
+    kind: 'l5reg',
+    label: 'Registrato',
+    text: `controlli di sicurezza scattati, ${/^pre-approvata/.test(String(r.detail || '')) ? 'pre-approvata dall’owner' : 'lavoro fidato'}: la fusione prosegue`
+      + `${numDiRifiuto(r)}${r.slug ? ` · ${r.slug}` : ''}`,
+  });
 
   // Le richieste di fusione senza gli unit sul risultato (#958): una per una, e in cima un avviso quando il server
   // le giudica frequenti. Una prova che manca sempre non protegge niente, e nessuno se ne accorgerebbe.
@@ -1487,16 +1610,53 @@
       + `</li>`;
   }
 
-  function renderChannelLog(rejections, comparisons, prove = null) {
+  // Una sessione uscita per lasciare il posto all'altra voce (#1652): chi, quale lavoro ha lasciato, per quale.
+  function righePostiLasciati(posti) {
+    const lavoro = (w) => `${(w && w.num) || '—'} (${roleLabel(w && w.role)}, p${Number(w && w.priority) || 0})`;
+    return (Array.isArray(posti) ? posti : []).map((p) => {
+      const per = Array.isArray(p && p.perIl) ? p.perIl : [];
+      const altri = Number(p && p.altriInAttesa) || per.length;
+      return {
+        at: p && p.at,
+        kind: 'cmp',
+        label: 'Posto lasciato',
+        text: `${lavoro(p && p.lasciato)} lasciato alla routine ${p && p.altraVoce === 'server' ? 'server' : 'normale'} per ${per.map(lavoro).join(', ') || '—'}`
+          + `${altri > per.length ? ` e altri ${altri - per.length}` : ''}${p && p.slug ? ` · ${p.slug}` : ''}`,
+      };
+    });
+  }
+
+  // Chi ha letto schede e testi dei feedback dal cloud, o ne ha scritto una scheda (#1785). Solo le più recenti: tante
+  // letture non devono spingere fuori dall'elenco i rifiuti, che sono il segnale da vedere.
+  const LETTURE_IN_ELENCO = 10;
+  function righeLetture(letture) {
+    return (Array.isArray(letture) ? letture : []).slice(0, LETTURE_IN_ELENCO).map((l) => {
+      const numeri = (Array.isArray(l && l.numeri) ? l.numeri : []).map((n) => `#${String(n).replace(/^#+/, '')}`);
+      const quanti = Math.max(Number(l && l.quanti) || 0, numeri.length);
+      const cosa = l && l.op === 'scheda' ? 'scheda scritta' : l && l.testi ? 'testi letti' : l && l.schede ? 'schede lette' : 'indice letto';
+      const quali = l && l.aperti ? `tutti gli aperti (${quanti})` : `${numeri.slice(0, 8).join(', ')}${quanti > 8 ? ` e altri ${quanti - 8}` : ''}`;
+      return {
+        at: l && l.at,
+        kind: 'cmp',
+        label: 'Lettura',
+        text: `${cosa}: ${quali || '—'}${l && l.slug ? ` · ${l.slug}` : ''}${l && l.role && l.role !== l.slug ? ` · ${roleLabel(l.role)}` : ''}`,
+      };
+    });
+  }
+
+  function renderChannelLog(rejections, comparisons, prove = null, posti = null, letture = null) {
     if (!mgChannelSection || !mgChannelList) return;
-    const rows = righeSenzaProva(prove);
+    const rows = righeSenzaProva(prove).concat(righePostiLasciati(posti), righeLetture(letture));
     for (const r of (Array.isArray(rejections) ? rejections : [])) {
+      if (bloccoCheSiFonde(r)) { rows.push(rigaBloccoRegistrato(r)); continue; }
+      const t = MR.testoRifiuto(r);
       rows.push({
         at: r && r.at,
         kind: 'deny',
         label: 'Respinto',
-        text: `${DENY_LABELS[String(r && r.reason)] || String((r && r.reason) || '—')}`
+        text: `${t.frase}${numDiRifiuto(r)}`
           + `${r && r.slug ? ` · ${r.slug}` : ''}${r && r.action ? ` · ${r.action}` : ''}`,
+        dettaglio: t.dettaglio,
       });
     }
     for (const c of (Array.isArray(comparisons) ? comparisons : [])) {
@@ -1526,7 +1686,7 @@
       const cls = row.kind === 'deny' ? ' mg-log-role--deny' : '';
       return `<li class="mg-log-row" title="${esc(abs)}">`
         + `<span class="mg-log-role${cls}">${esc(row.label)}</span>`
-        + `<span class="mg-log-when">${esc(row.text)}</span>`
+        + `<span class="mg-log-when">${esc(row.text)}${row.dettaglio ? `<span class="mg-log-dettaglio">${esc(row.dettaglio)}</span>` : ''}</span>`
         + (abs ? `<span class="mg-log-abs">${esc(timeAgo(row.at))}</span>` : '')
         + `</li>`;
     }).join('');
@@ -1610,19 +1770,50 @@
   function opzioniLivelli(fb) {
     return { fusioni, fusioniLette: fusioniOk, dettaglioLetto: !FB.soloLista(fb), statoRichiesta };
   }
-  // Una richiesta che parte, arriva o viene decisa cambia le frasi della lista e del quadrato.
+  // Una richiesta che parte, arriva o viene decisa cambia lista, quadrato in cima e testo del pannello insieme: un
+  // segno rimasto indietro direbbe «bloccato» su una fusione in volo.
   function statoFusioniCambiato() {
     if (dataLoaded) ridisegnaListaAlSuoPosto();
+    const fb = selectedId && allFeedbacks.find((f) => f._id === selectedId);
+    if (fb) renderLivelliRow(fb);
     aggiornaTestoQuadrato();
   }
 
-  // Dal numero sull'etichetta al feedback vero: la scheda è già in questa dashboard, quindi
-  // «guarda cosa era stato chiesto» è un click, non una ricerca. Se non è in lista, nulla.
-  function openFeedbackByNum(num) {
-    const cerca = String(num || '').trim();
-    if (!cerca || !FB || typeof FB.formatNum !== 'function') return;
-    const fb = allFeedbacks.find((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
-    if (!fb) return;
+  // Dall'etichetta al feedback vero, già in questa dashboard. Per id quando c'è: un numero può essere di più documenti
+  // (#1517), e il sì dell'owner vale per l'id. Senza id vale il numero, solo se è di uno. Se non è in lista, nulla.
+  function feedbacksColNumero(num) {
+    const cerca = String(num || '').trim().replace(/^#+/, '');
+    if (!cerca || !FB || typeof FB.formatNum !== 'function') return [];
+    return allFeedbacks.filter((f) => FB.formatNum(f.seq, f.subSeq) === cerca);
+  }
+  function feedbackDelRiferimento(id, num) {
+    if (id) return allFeedbacks.find((f) => f._id === String(id)) || null;
+    const conNumero = feedbacksColNumero(num);
+    return conNumero.length === 1 ? conNumero[0] : null;
+  }
+  function descriviFeedbackDi(id, num, riserva) {
+    if (!MR || typeof MR.descriviRiferimento !== 'function') return null;
+    const fb = feedbackDelRiferimento(id, num);
+    const numero = String(num || '').trim() || (fb && FB ? FB.formatNum(fb.seq, fb.subSeq) : '');
+    return MR.descriviRiferimento(fb, riserva, feedbacksColNumero(numero).length);
+  }
+  // Stato e mittente accanto ai feedback nominati dalle domande vengono da questa lista: cambiata lei, si ridisegnano.
+  function domandeRileggonoLista() {
+    if (DOMANDE && typeof DOMANDE.ridisegna === 'function') DOMANDE.ridisegna();
+  }
+  function apriFeedbackDi(id, num) {
+    const fb = feedbackDelRiferimento(id, num);
+    if (!fb) {
+      const quanti = id ? 0 : feedbacksColNumero(num).length;
+      if (quanti > 1) toast(`#${String(num).replace(/^#+/, '')} è il numero di ${quanti} segnalazioni: non so quale aprire.`, 'err');
+      return false;
+    }
+    return apriFeedback(fb);
+  }
+
+  // Un feedback nominato da un'altra scheda (Domande, Compiti) si apre nella sua.
+  function apriFeedback(fb) {
+    if (!fb) return false;
     // Aprire una pratica precisa spegne il filtro dei livelli se la nasconderebbe.
     mostraNelFiltro(fb);
     // Senza sezioni non c'è una sezione in cui saltare: la lista è una sola e
@@ -1631,6 +1822,7 @@
     // Dal Log o da Automazioni il dettaglio sta in un pannello che non è a schermo.
     else if (!LIST_TABS.includes(schedaAttiva())) selectTab(currentTab);
     openDetail(fb._id);
+    return true;
   }
 
   // `already` è l'elenco già pronto quando ad avvisare è il main: una pagina aperta deve
@@ -1644,7 +1836,8 @@
       // L'esito resta scritto anche se la card si ridisegna appena la conferma è finita.
       onApprove: (req) => approvaUnaVolta(req, null),
       onDiscard: (req) => decidiFusione(MERGE_APPROVAL_DISCARD, req),
-      onFeedback: (req) => openFeedbackByNum(UI ? UI.feedbackNum(req) : ''),
+      onFeedback: (req) => apriFeedbackDi(req.feedbackId, UI ? UI.feedbackNum(req) : ''),
+      descriviFeedback: (req) => descriviFeedbackDi(req.feedbackId, UI ? UI.feedbackNum(req) : ''),
     }, extra || {});
   }
 
@@ -1744,7 +1937,8 @@
       UI.renderPreapproved(mgMergeApprovalsPreapproved, {
         preapproved: r.preapproved || [],
         preapprovedTotal: r.preapprovedTotal,
-        onFeedback: (req) => openFeedbackByNum(UI.feedbackNum(req)),
+        onFeedback: (req) => apriFeedbackDi(req.feedbackId, UI.feedbackNum(req)),
+        descriviFeedback: (req) => descriviFeedbackDi(req.feedbackId, UI.feedbackNum(req)),
       });
     }
     aggiornaSezioneFusioni(true);
@@ -1777,7 +1971,7 @@
     try {
       const r = await sendToMain({ type: ROUTINE_LOG_GET });
       if (!r || r.ok === false) { mgChannelSection.hidden = true; return; }
-      renderChannelLog(r.rejections, r.comparisons, r.proveFusione);
+      renderChannelLog(r.rejections, r.comparisons, r.proveFusione, r.postiLasciati, r.letture);
     } catch (err) {
       console.error('[manage] caricamento registri canale fallito:', err);
       mgChannelSection.hidden = true;
@@ -1838,7 +2032,8 @@
     DOMANDE.alCambio(() => updateSezioniCounts());
     // Un feedback nominato da una domanda si apre nella sua scheda, come dall'avviso di una fusione.
     DOMANDE.collega({
-      apriFeedback: (num) => openFeedbackByNum(String(num || '').replace(/^#/, '')),
+      apriFeedback: (id, num) => apriFeedbackDi(id, num),
+      descriviFeedback: (id, num, riserva) => descriviFeedbackDi(id, num, riserva),
       apriScheda: (tab) => selectTab(tab),
       soloNonFidate: () => soloNonFidate,
       impostaSoloNonFidate: (v) => impostaSoloNonFidate(v),
@@ -1900,7 +2095,7 @@
     aperturaFatta = true;
     const d = DOMANDE ? DOMANDE.stato() : null;
     const ricevuti = dataLoaded && sezioniAttendibili()
-      ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length
+      ? MR.listForManageTab(allFeedbacks, 'inbox', opzSezioni()).length
       : null;
     const scelta = MR.sezioneDiApertura({ domande: d && d.lette ? d.domande : null, ricevuti, ultima: leggiSezione() });
     // Si apre sui Ricevuti per quello che c'è dentro: a filtri spenti, o un blocco nuovo resterebbe nascosto.
@@ -1930,7 +2125,7 @@
   function mostraNelFiltro(fb) {
     if (!fb) return;
     if (soloNonFidate && MR.isFidato(fb)) impostaSoloNonFidate(false);
-    if (!livelliScelti.length || MR.manageTabFor(fb, { releasedVersion, fusioni }) !== 'inbox') return;
+    if (!livelliScelti.length || MR.manageTabFor(fb, opzSezioni()) !== 'inbox') return;
     if (!MR.filtraLivelli([fb], livelliScelti, { releasedVersion, fusioni }).length) livelliScelti = [];
   }
 
@@ -2275,6 +2470,7 @@
   }
   // Lo stesso menu per le schede che vivono in un file loro (manageRedteam.js).
   window.SN_MANAGE_MENU = { apri: apriMenu };
+  window.SN_MANAGE_FEEDBACK = { apri: (id) => apriFeedback(allFeedbacks.find((f) => f._id === String(id || ''))) };
   // Lo stesso cammino del tasto nel dettaglio (applyAction), che scrive solo la pratica aperta: l'esito si legge lì.
   function approvaDalMenu(fb, azione) {
     if (selectedId !== fb._id) openDetail(fb._id);
@@ -2300,12 +2496,12 @@
       if (ATT.atteseDi(fb).length) {
         voci.push({
           testo: '⏳ Non aspettare più', titolo: testoStatiAttese(ATT.statiDelleAttese(fb, trovaAtteso)),
-          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, () => []); },
+          azione: () => { if (selectedId !== fb._id) openDetail(fb._id); accodaAttese(fb._id, togliTutte); },
         });
       }
     }
     // Solo sul rombo azzurro, come nel dettaglio: lì è l'unica uscita (#1575).
-    const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', { releasedVersion }) : null;
+    const lavoroLocale = isAdmin ? MR.ownerActionFor(fb, 'accept_local', opzSezioni()) : null;
     if (lavoroLocale) {
       voci.push({ testo: lavoroLocale.label, titolo: titoloLavoroLocale(fb), azione: () => approvaDalMenu(fb, lavoroLocale) });
     }
@@ -2438,8 +2634,11 @@
     }
   }
 
-  // Domande e le tre schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
-  const DOMANDE_LABELS = { domande: 'Da rispondere', 'domande-lavoro': 'In lavorazione', 'domande-archivio': 'Archivio' };
+  // Domande e le sue schede: un numero solo con le domande lette davvero (patterns/una-barra-di-sezioni-dice-quante-cose-contiene-ogni-sezione.md).
+  const DOMANDE_LABELS = {
+    domande: 'Da rispondere', 'domande-smistamento': 'In smistamento', 'domande-lavoro': 'In lavorazione',
+    'domande-automatiche': 'Risposte automatiche', 'domande-archivio': 'Archivio',
+  };
   function updateSezioniCounts() {
     if (!mgSezioni) return;
     const scrivi = (sez, testo, titolo) => {
@@ -2464,14 +2663,14 @@
       if (!nd) continue;
       const badge = document.createElement('span');
       badge.className = 'mg-tab-count';
-      // Oltre il tetto dell'elenco l'archivio ha solo le più recenti: il numero è un minimo.
-      badge.textContent = `(${nt[tab]}${d.altre && tab === 'domande-archivio' ? '+' : ''})`;
+      // Oltre il tetto dell'elenco le chiuse sono solo le più recenti: il numero è un minimo.
+      badge.textContent = `(${nt[tab]}${d.altre && (tab === 'domande-archivio' || tab === 'domande-automatiche') ? '+' : ''})`;
       btn.appendChild(badge);
     }
 
     // Feedback = i Ricevuti a filtro spento: il filtro è una vista della scheda, non della sezione.
     const leggibili = dataLoaded && sezioniAttendibili();
-    const ricevuti = leggibili ? MR.listForManageTab(allFeedbacks, 'inbox', { releasedVersion, fusioni }).length : null;
+    const ricevuti = leggibili ? MR.listForManageTab(allFeedbacks, 'inbox', opzSezioni()).length : null;
     const bf = scrivi('feedback', ricevuti === null ? '' : countText(ricevuti),
       ricevuti === null ? '' : `${ricevuti} nei Ricevuti${loadHitCap() ? ` · ${FB.COUNT_INCOMPLETE_HINT}` : ''}`);
     if (bf) bf.classList.toggle('mg-sezione--arrivi', sezioneAttiva !== 'feedback'
@@ -2556,22 +2755,15 @@
     caricaAttesiFuori();
   }
 
-  // Questa segnalazione ha una fusione ferma che aspetta l'owner?
-  // Etichetta e suggerimento della pratica in lista: «aspetta il tuo via libera» solo se aspetta davvero (#702).
-  const TESTI_FUSIONE_LISTA = {
-    ferma: { etichetta: 'fusione ferma', titolo: 'Una fusione aspetta il tuo via libera', tooltip: 'una fusione aspetta il tuo via libera' },
-    volo: { etichetta: 'in fusione', titolo: 'Approvata: il server sta fondendo il ramo', tooltip: 'il server sta fondendo il ramo' },
-    decisa: { etichetta: 'fusione decisa', titolo: 'Hai già deciso: esce da qui alla prossima rilettura', tooltip: 'fusione già decisa' },
-    senza: { etichetta: 'fusione ferma', titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla', tooltip: 'ferma al cancello, nessuna richiesta aperta' },
-  };
-  function fusioneFerma(fb) {
-    return MR.fusioneInAttesa(fb, { fusioni });
+  // Lo stato della fusione di una pratica e le sue parole, dalla stessa funzione del quadrato (#1425).
+  function fusioneDi(fb) {
+    return MR.fusioneDi(fb, opzSezioni());
   }
 
-  // Le segnalazioni con una fusione ferma davanti a tutte, conservando fra loro l'ordine
+  // Le segnalazioni con una fusione che aspetta l'owner davanti a tutte, conservando fra loro l'ordine
   // (`sort` è stabile).
   function pinFusioniFerme(lista) {
-    return MR.fusioniFermeInCima(lista, { fusioni });
+    return MR.fusioniFermeInCima(lista, opzSezioni());
   }
 
   // La parte che NON dipende da quale sezione si guarda: la condivide anche l'elenco unico di
@@ -2615,7 +2807,11 @@
       // La domanda è di QUESTA scheda, non della lista: in una coda mista basta un documento
       // cifrato fra mille leggibili perché le sezioni restino, ed è lì che tornava il difetto.
       const leggibile = sezioni && statoLeggibile(fb);
-      const cl = leggibile ? MR.classifyBlock(fb) : null;
+      // Ferma al cancello ma non per una decisione dell'owner (approvata e fusa): il bordo non dice «bloccato» (#1040.2).
+      const fusione = fusioneDi(fb);
+      const ferma = !!(fusione && fusione.attende);
+      const bloccoL5 = leggibile ? MR.classifyBlock(fb) : null;
+      const cl = bloccoL5 && bloccoL5.reason === 'l5' && fusione && !ferma ? null : bloccoL5;
       const num = FB.formatNum(fb.seq, fb.subSeq);
       const title = fb.name || FB.fallbackName(fb.text) || '(senza titolo)';
 
@@ -2636,11 +2832,9 @@
         + (progress && progress.active ? ' mg-item--active-work' : '')
         + ` mg-fiducia--${MR.segnoFiducia(fb).classe}`;
       item.dataset.id = fb._id;
-      // Una fusione ferma aspetta l'owner quanto un blocco: stessa tinta rossa, così si riconosce
-      // scorrendo la lista.
-      const ferma = fusioneFerma(fb);
+      // Una fusione che aspetta l'owner pesa quanto un blocco: stessa tinta rossa, così si riconosce
+      // scorrendo la lista. Le altre (fusa, in volo, da riallineare) hanno l'etichetta e basta (#1425).
       if (ferma) item.classList.add('mg-item--fusione');
-      const fusioneTesti = TESTI_FUSIONE_LISTA[(ferma && MR.livelloL5(fb, opzioniLivelli(fb)).fusione) || 'ferma'];
       const arrivata = arrivate.has(String(fb._id));
       if (arrivata) item.classList.add('mg-item--arrivata');
       item.style.borderLeftColor = ferma
@@ -2655,7 +2849,7 @@
       ));
       item.title = (num ? `#${num} · ` : '') + title
         + (norm.statusReason ? ` — ${MR.reasonText(norm.statusReason)}` : '')
-        + (ferma ? ` — ${fusioneTesti.tooltip}` : '')
+        + (fusione ? ` — ${fusione.titolo.charAt(0).toLowerCase()}${fusione.titolo.slice(1)}` : '')
         + (arrivata ? ' — arrivata qui mentre la pagina era aperta' : '')
         + (ripartenze ? ` · rientrato in coda ${ripartenze} volt${ripartenze === 1 ? 'a' : 'e'}` : '');
       const rowHtml = `
@@ -2663,7 +2857,7 @@
         ${num ? `<span class="mg-item-num">#${esc(num)}</span>` : ''}
         ${leggibile ? segnoFermataHtml(fb) : ''}
         <span class="mg-item-title">${esc(title)}</span>
-        ${ferma ? `<span class="mg-fusione-badge" title="${esc(fusioneTesti.titolo)}">${esc(fusioneTesti.etichetta)}</span>` : ''}
+        ${fusione ? `<span class="mg-fusione-badge${ferma ? '' : ' mg-fusione-badge--quieta'}" data-stato="${esc(fusione.stato)}" title="${esc(fusione.titolo)}">${esc(fusione.etichetta)}</span>` : ''}
         ${leggibile ? '' : statePublicHtml(fb)}
         ${localBadgeHtml(fb)}
         ${attesaBadgeHtml(fb)}
@@ -2689,8 +2883,12 @@
   function domandaBadgeHtml(fb) {
     const id = MR.aspettaDomanda(fb);
     if (!id) return '';
-    const motivo = MR.reasonText(MR.normalizeStatus(fb).statusReason);
-    const titolo = `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
+    // Fermo in coda su una domanda (#1577): il motivo è lei, non lo stato.
+    const ferme = MR.domandeBloccantiDi(fb);
+    const motivo = ferme.includes(id) ? '' : MR.reasonText(MR.normalizeStatus(fb).statusReason);
+    const titolo = ferme.includes(id)
+      ? `Nessuna routine lo prende finché non rispondi ${ferme.length > 1 ? `alle domande ${ferme.join(', ')}` : `alla domanda ${id}`}: apri ${id}`
+      : `Aspetta la tua risposta alla domanda ${id}${motivo ? ` (${motivo})` : ''}: aprila`;
     return `<button type="button" class="mg-domanda-badge" data-domanda="${esc(id)}" title="${esc(titolo)}" aria-label="${esc(titolo)}">aspetta ${esc(id)}</button>`;
   }
 
@@ -2704,7 +2902,7 @@
 
   // Il segno dei Ricevuti (D93): la forma del livello che ha fermato la pratica, il motivo sotto il puntatore.
   function segnoFermataHtml(fb) {
-    const s = MR.segnoFermata(fb, { fusioni, fusioniLette: fusioniOk });
+    const s = MR.segnoFermata(fb, opzSezioni());
     if (!s || !FORME_SVG[s.forma]) return '';
     const cls = 'mg-segno-fermata' + (s.classe ? ` mg-forma--${s.classe}` : ' mg-segno-fermata--vuoto');
     return `<span class="${cls}" data-forma="${esc(s.forma)}" data-livello="${esc(s.livello)}" title="${esc(s.testo)}" aria-label="${esc(s.testo)}" role="img">`
@@ -2772,6 +2970,12 @@
     if (attesa) {
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(attesa[1])}">${esc(attesa[0])}</span></div>`;
     }
+    const fermo = fb ? MR.restaLocale(fb) : null;
+    if (fermo) {
+      const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Riparte da solo quando il motivo passa.${dal}`;
+      return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
+    }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
     if (fb && MR.isLocalOnly(fb) && !(mgLavoriServer && mgLavoriServer.checked && MR.isFidato(fb))) {
       const dove = progress.status === 'working' ? 'In lavorazione' : 'In verifica';
@@ -2796,10 +3000,14 @@
     // vera.
     // Chi aspetta altri feedback non lo prende nessuno finché non sono fusi: né un verificatore né il rientro in coda.
     const aspetta = !!(ATT && fb && ATT.aspettaAncora(fb, trovaAtteso));
+    // Così chi è fermo su una domanda bloccante (#1577): riparte alla risposta.
+    const ferme = fb && MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) ? MR.domandeBloccantiDi(fb) : [];
     const who = progress.active
       ? `<span class="mg-work-live"><i></i>Un'istanza ci sta lavorando ora</span>`
       : `<span class="mg-work-idle">${
-          aspetta
+          ferme.length
+            ? esc(`Nessuna istanza al lavoro: riparte quando rispondi a ${ferme.join(', ')}`)
+            : aspetta
             ? 'Nessuna istanza al lavoro: riparte quando quelli che aspetta sono fusi'
             : progress.current.key === 'impl'
             ? 'Nessuna istanza al lavoro: rientra in coda da solo'
@@ -2840,6 +3048,10 @@
     const show = isAdmin && currentTab === 'inbox' && l2Visibili() && whites.length > 0;
     mgReevalBar.hidden = !show;
     if (show && mgReevalBtn) mgReevalBtn.textContent = `Ri-valuta i non filtrati (${whites.length})`;
+    if (rivalutaChiesto && dataLoaded) {
+      rivalutaChiesto = false;
+      if (show && mgReevalBtn) { mgReevalBtn.scrollIntoView({ block: 'nearest' }); mgReevalBtn.focus(); }
+    }
   }
 
   // ── Approvazione in blocco degli allineati (macchina a stati) ─────────────
@@ -3252,6 +3464,8 @@
         // l'altra. Non style-aware (il prompt JSON non va inquinato) e fuori dalla cronologia.
         action: (window.SN_CONST && window.SN_CONST.ACTIONS && window.SN_CONST.ACTIONS.MANAGE_SEARCH) || 'manage_search',
         payload: { messages: SRCH.buildMessages(query, candidates) },
+        // Una classifica fermata dal tetto torna come errore, e il ripiego per parole dice perché (#1302).
+        intera: true,
       });
       if (r && r.ok && typeof r.text === 'string') {
         const parsed = SRCH.parseRanking(r.text, validIds);
@@ -3613,7 +3827,7 @@
     return allFeedbacks.find((f) => f._id === id) || attesiFuori.get(id);
   }
   function opzSezioni(extra) {
-    return Object.assign({ releasedVersion, fusioni, trovaAtteso }, extra);
+    return Object.assign({ releasedVersion, fusioni, fusioniLette: fusioniOk, statoRichiesta, trovaAtteso }, extra);
   }
   // Gli aspettati più vecchi della finestra caricata: una lettura, poi la lista si ridisegna con il loro stato.
   function caricaAttesiFuori() {
@@ -3690,34 +3904,28 @@
     }).join('');
   }
 
-  // Le attese da riscrivere, tranne `salvo`: per numero quelle di un aspettato che la pagina vede, per id le altre
-  // (cancellato, non letto, senza numero), che il main tiene come sono invece di rifiutarle cercandone il numero.
-  function atteseDaTenere(fb, salvo = '') {
-    return ATT.atteseDi(fb).filter((w) => w.id !== salvo).map((w) => {
-      const doc = trovaAtteso(w.id);
-      const n = doc && !doc.missing ? (w.num || numeroDi(doc)) : '';
-      return n || { id: w.id };
-    });
-  }
+  // Il gesto «togli tutte» toglie quelle che la pagina mostra: un'attesa scritta intanto da altri resta (#1756.1).
+  const togliTutte = (fb) => ({ togli: ATT.atteseDi(fb).map((w) => w.id) });
 
-  async function scriviAttese(id, voci) {
+  // Si manda il gesto, non l'elenco: il main lo applica alle attese di adesso, che la pagina può vedere in ritardo.
+  async function scriviAttese(id, gesto) {
     const fb = allFeedbacks.find((f) => f._id === id);
     if (!fb || !ATT) return false;
     const num = numeroDi(fb);
     const chi = num ? `#${num}` : 'Il feedback';
-    const tieni = voci.filter((v) => v && typeof v === 'object').map((v) => v.id);
-    const lette = ATT.leggiNumeri(voci.filter((v) => typeof v === 'string'));
-    if (!lette.ok) { setManageMsg(`Attese non scritte: ${lette.motivo}.`, 'err'); return false; }
-    const vuoto = !lette.numeri.length && !tieni.length;
+    const aggiungi = (gesto && gesto.aggiungi) || [];
+    const togli = (gesto && gesto.togli) || [];
+    const vuoto = !aggiungi.length && ATT.atteseDi(fb).every((w) => togli.includes(w.id));
     for (const b of [mgAtteseToggle, mgAtteseAggiungi, mgAtteseTogliTutte]) if (b) b.disabled = true;
     setManageMsg(vuoto ? 'Tolgo le attese…' : 'Scrivo le attese…', '');
     try {
-      const r = await sendToMain(Object.assign({ type: 'feedback_update', id, waitsFor: lette.numeri.join(', ') }, tieni.length ? { waitsTieni: tieni } : {}));
+      const r = await sendToMain(Object.assign({ type: 'feedback_update', id },
+        aggiungi.length ? { waitsAggiungi: aggiungi.join(', ') } : { waitsTogli: togli }));
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       fb.waitsFor = Array.isArray(r.waitsFor) && r.waitsFor.length ? r.waitsFor : undefined;
-      // Si chiude col gesto che toglie l'ultima, non con la risposta: un'attesa tenuta per id resta da guardare.
-      if (vuoto && atteseApertePer === id) atteseApertePer = '';
-      else if (!vuoto) atteseApertePer = id;
+      // Si chiude solo se non ne resta nessuna: una scritta intanto da altri, e mai vista qui, resta da guardare.
+      if (!fb.waitsFor && atteseApertePer === id) atteseApertePer = '';
+      else if (fb.waitsFor) atteseApertePer = id;
       renderList();
       if (selectedId === id) reflectAttese(fb);
       const dove = MR.manageTabFor(fb, opzSezioni());
@@ -3733,8 +3941,8 @@
     }
   }
 
-  // Una scrittura alla volta, e ciascuna calcola l'elenco solo quando tocca a lei: calcolato prima, un gesto fatto
-  // mentre la precedente è in volo riscriverebbe l'elenco vecchio e la cancellerebbe.
+  // Una scrittura alla volta, e ciascuna calcola il gesto solo quando tocca a lei: «togli tutte» toglie anche quelle
+  // aggiunte dal gesto in volo prima di lei.
   let codaAttese = Promise.resolve();
   function accodaAttese(id, calcola) {
     const giro = codaAttese.then(() => {
@@ -3761,7 +3969,7 @@
     // Il campo si libera subito per il numero dopo; a un rifiuto torna il testo, se nel frattempo non se n'è scritto altro.
     const testo = mgAtteseInput.value;
     mgAtteseInput.value = '';
-    const ok = await accodaAttese(fb._id, (f) => [...atteseDaTenere(f), ...nuovi.numeri]);
+    const ok = await accodaAttese(fb._id, () => ({ aggiungi: nuovi.numeri }));
     if (!ok && !mgAtteseInput.value) mgAtteseInput.value = testo;
   }
   if (mgAtteseToggle) {
@@ -3786,7 +3994,7 @@
     });
   }
   if (mgAtteseTogliTutte) {
-    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, () => []); });
+    mgAtteseTogliTutte.addEventListener('click', () => { if (selectedId) accodaAttese(selectedId, togliTutte); });
   }
   if (mgAtteseLista) {
     mgAtteseLista.addEventListener('click', (e) => {
@@ -3796,7 +4004,7 @@
       if (!fb) return;
       if (btn.dataset.azione === 'apri') { openFromAttesa(li.dataset.id); return; }
       const via = li.dataset.id;
-      accodaAttese(fb._id, (f) => atteseDaTenere(f, via));
+      accodaAttese(fb._id, () => ({ togli: [via] }));
     });
   }
   // Dall'attesa alla pratica aspettata, nella sua sezione.
@@ -3860,7 +4068,7 @@
     chiudiConfermaSegno();
     setActionMsg('', '');
     mgActionsRow.querySelectorAll('button').forEach((b) => b.remove());
-    const azioni = (isAdmin && fb) ? MR.ownerActions(fb, { releasedVersion }) : [];
+    const azioni = (isAdmin && fb) ? MR.ownerActions(fb, opzSezioni()) : [];
     // Chi aspetta una domanda si sblocca rispondendo lì: è la prima azione, e la sola strada per farlo ripartire.
     const domandaId = (isAdmin && fb) ? MR.aspettaDomanda(fb) : '';
     mgActions.hidden = !azioni.length && !domandaId;
@@ -3927,7 +4135,7 @@
     if (!fb) return;
     // Il guardiano sta SOTTO ai pulsanti: si scrive solo uno stato che la segnalazione offre
     // adesso, o un pannello rimasto aperto riscrive un attacco confermato ad «archiviato».
-    if (!MR.ownerActionAllowsStatus(fb, action.to, { releasedVersion })) {
+    if (!MR.ownerActionAllowsStatus(fb, action.to, opzSezioni())) {
       renderActions(fb);
       setActionMsg('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile.', 'err');
       return;
@@ -4023,6 +4231,9 @@
     if (!mgReopen) return;
     mgReopen.hidden = true;
     if (mgReopenText) mgReopenText.value = '';
+    if (mgReopen.dataset.per) allegatiRiapertura.svuota(mgReopen.dataset.per);
+    delete mgReopen.dataset.per;
+    disegnaAllegatiRiapertura();
     // I due bottoni del modulo vivono nell'HTML: senza riaccenderli qui, una riapertura riuscita li
     // lascerebbe spenti per sempre.
     if (mgReopenConfirm) mgReopenConfirm.disabled = false;
@@ -4052,19 +4263,32 @@
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     setActionMsg('', '');
     mgReopen.hidden = false;
+    mgReopen.dataset.per = fb._id;
+    disegnaAllegatiRiapertura();
     if (mgReopenText) mgReopenText.focus();
   }
+
+  function disegnaAllegatiRiapertura() {
+    const posto = document.getElementById('mgReopenAllegati');
+    if (!posto) return;
+    const id = mgReopen && mgReopen.dataset.per;
+    posto.replaceChildren(...(id ? [allegatiRiapertura.riga(id)] : []));
+  }
+  if (mgReopenText) allegatiRiapertura.collega(mgReopenText, () => (mgReopen && mgReopen.dataset.per) || '');
 
   async function confermaRiapertura() {
     // Quello che l'owner ha scritto si legge PRIMA di ogni attesa, come nella
     // gemella che risponde a un chiarimento: durante l'attesa la casella può
     // svuotarsi, e allora si riaprirebbe la segnalazione senza il motivo.
     const reason = mgReopenText ? (mgReopenText.value || '').trim() : '';
+    const per = (mgReopen && mgReopen.dataset.per) || '';
+    if (per && allegatiRiapertura.caricando(per)) { setActionMsg('Aspetta che gli allegati finiscano di caricarsi.', 'err'); return; }
+    const atts = per === selectedId ? allegatiRiapertura.di(per) : [];
     // La conversazione su cui si appende va letta PRIMA: dall'elenco arriva
     // senza note, e appenderci sopra il motivo le cancellerebbe.
     const fb = await feedbackCompleto(selectedId);
     if (!fb) { setActionMsg(CONVERSAZIONE_NON_ARRIVATA, 'err'); return; }
-    const azione = MR.ownerActionFor(fb, 'reopen', { releasedVersion });
+    const azione = MR.ownerActionFor(fb, 'reopen', opzSezioni());
     if (!azione) {
       chiudiRiapertura();
       renderActions(fb);
@@ -4074,11 +4298,11 @@
     const oldNotes = String(fb.notes || '');
     if (conversazioneIlleggibile(fb)) { setActionMsg(RIAPERTURA_ILLEGGIBILE, 'err'); return; }
     let extra = null;
-    if (reason) {
-      const T = window.SN_FEEDBACK_THREAD;
+    const T = window.SN_FEEDBACK_THREAD;
+    if (reason || (atts.length && T)) {
       const ts = new Date().toLocaleString('it-IT', { dateStyle: 'short', timeStyle: 'short' });
       const newNotes = T
-        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il' })
+        ? T.appendUserTurn(oldNotes, reason, { ts, label: 'Riaperto il', attachments: atts })
         : (oldNotes ? `${oldNotes}\n\n--- Riaperto il ${ts} ---\n${reason}` : `--- Riaperto il ${ts} ---\n${reason}`);
       extra = { notes: newNotes };
     }
@@ -4418,7 +4642,9 @@
     const id = selectedId;
     if (rispostaInVolo.has(id)) return;
     const reply = (bozzeRisposta.get(id) || '').trim();
-    if (!reply) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
+    if (allegatiRisposta.caricando(id)) { setClarifyMsg('Aspetta che gli allegati finiscano di caricarsi.', 'err'); return; }
+    const atts = allegatiRisposta.di(id);
+    if (!reply && !atts.length) { const c = document.getElementById('mgSideRispostaText') || origine; if (c) c.focus(); return; }
     // Come la riapertura: la conversazione si legge intera prima di
     // appenderci la risposta, o al suo posto resterebbe la sola risposta.
     const fb = await feedbackCompleto(id);
@@ -4436,12 +4662,13 @@
     }
     // Lo stesso guardiano delle azioni di stato: in coda ci si rimette solo da dove la tabella
     // condivisa lo prevede.
-    if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', { releasedVersion })) {
+    if (fb && !MR.ownerActionAllowsStatus(fb, 'todo', opzSezioni())) {
       setClarifyMsg('Lo stato di questa segnalazione è cambiato: aggiorna e riprova.', 'err');
       return;
     }
+    if (!T && !reply) { setClarifyMsg('Gli allegati da soli non si possono mandare qui: scrivi anche due parole.', 'err'); return; }
     const newNotes = T
-      ? T.appendUserTurn(oldNotes, reply, {})
+      ? T.appendUserTurn(oldNotes, reply, { attachments: atts })
       : (oldNotes ? `${oldNotes}\n\n${reply}` : reply);
 
     rispostaInVolo.add(id);
@@ -4452,6 +4679,7 @@
       if (!r || r.ok === false) throw new Error((r && r.error) || 'aggiornamento rifiutato');
       if (fb) { fb.status = 'todo'; fb.notes = newNotes; }
       bozzeRisposta.delete(id);
+      allegatiRisposta.svuota(id);
       // Nell'attesa l'owner può aver aperto un ALTRO feedback. Il dato è
       // salvato lo stesso e la lista si ridisegna, ma il pannello NON si tocca:
       // chiuderlo adesso chiuderebbe il dettaglio dell'altro feedback, che
@@ -4492,6 +4720,7 @@
     t.value = bozzeRisposta.get(fb._id) || '';
     t.addEventListener('input', () => scriviBozzaRisposta(t));
     t.addEventListener('keydown', tastiRisposta);
+    allegatiRisposta.collega(t, fb._id);
     const riga = document.createElement('div');
     riga.className = 'mg-actions-row';
     const btn = document.createElement('button');
@@ -4507,7 +4736,9 @@
     msg.setAttribute('role', 'status');
     riflettiEsitoRisposta(msg);
     riga.appendChild(btn); riga.appendChild(msg);
-    box.appendChild(t); box.appendChild(riga);
+    box.appendChild(t);
+    box.appendChild(allegatiRisposta.riga(fb._id, { disabilitata: rispostaInVolo.has(fb._id) }));
+    box.appendChild(riga);
     return box;
   }
 
@@ -4938,7 +5169,7 @@
       // una cifrata è la macchina a inventarsi che aspetta, perché la sezione
       // qui non si legge. Senza il criterio si dice solo il fatto: nessun
       // verdetto è mai arrivato, punto. La gemella quella frase non la scrive.
-      else if (statoLeggibile(fb) && MR.manageTabFor(fb, { releasedVersion }) === 'inbox') {
+      else if (statoLeggibile(fb) && MR.manageTabFor(fb, opzSezioni()) === 'inbox') {
         opinionHtml = '<em>Filo non ha ancora un parere su questo feedback (giudici non attivi).</em>';
       } else {
         opinionHtml = '<em>I giudici non hanno mai valutato questo feedback.</em>';
@@ -5151,10 +5382,12 @@
       body.appendChild(t);
     }
 
+    if (Array.isArray(p.parti) && p.parti.length) body.appendChild(partiLeggibili(p.parti));
+    if (liv.key === 'l1' && isAdmin && p.azioni.includes('rigiudica')) body.appendChild(pannelloRigiudica(fb));
     if (liv.key === 'l5') body.appendChild(pannelloFusione(fb, liv));
     const strade = liv.key === 'l5' ? pannelloStradeFusione(fb, liv) : null;
     if (strade) body.appendChild(strade);
-    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb));
+    if (mostraSaltaAudit(fb, liv)) body.appendChild(pannelloSaltaAudit(fb, liv));
     if (liv.key === 'l3' && rispostaOfferta(fb)) body.appendChild(pannelloRisposta(fb));
 
     // Un ridisegno a metà risposta non porta via il cursore a chi sta scrivendo.
@@ -5197,12 +5430,19 @@
   // Stesso disegno e stessi tasti dell'elenco in Automazioni, perché è la stessa cosa.
   function pannelloFusione(fb, liv) {
     const UI = window.SN_MERGE_APPROVALS;
+    if (isAdmin && liv.pannello.azioni.includes('riapri_fusione')) return pannelloRiapriFusione(fb);
     const host = document.createElement('div');
     const ferme = Array.isArray(liv.richieste) ? liv.richieste : [];
     if (!UI || !ferme.length || !isAdmin) return host;
+    // Chi riallinea una fusione approvata e non avvenuta lo dice lo stato della pratica, come il quadrato (#1425).
+    const stato = liv.statoFusione;
+    const riallineamento = stato === 'da_riallineare' || stato === 'riallineamento_fallito'
+      ? () => ({ inCorso: stato === 'da_riallineare' })
+      : null;
     UI.render(host, opzioniFusioni({
       requests: ferme.filter((r) => !r.used),
       failed: ferme.filter((r) => r.used),
+      ...(riallineamento ? { riallineamento } : {}),
     }));
     host.hidden = false;
     return host;
@@ -5221,30 +5461,99 @@
   function pannelloStradeFusione(fb, liv) {
     if (!isAdmin) return null;
     const strade = (liv.pannello.azioni || []).map((k) => STRADE_FUSIONE[k]).filter(Boolean)
-      .map((s) => ({ ...s, azione: MR.ownerActionFor(fb, s.key, { releasedVersion }) }))
+      .map((s) => ({ ...s, azione: MR.ownerActionFor(fb, s.key, opzSezioni()) }))
       .filter((s) => s.azione);
     if (!strade.length) return null;
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const fila = document.createElement('div');
     fila.className = 'mg-liv-strade';
-    for (const s of strade) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
-      b.id = s.id;
-      b.dataset.strada = s.key;
-      b.textContent = s.label;
-      b.title = titoloStrada(fb, s.key);
-      b.disabled = azioniInVolo;
-      b.addEventListener('click', () => applyAction(s.azione, null));
-      fila.appendChild(b);
-    }
+    for (const s of strade) fila.appendChild(tastoStrada(fb, s));
     const esito = document.createElement('span');
     esito.className = 'mg-liv-esito';
     esito.id = 'mgL5StradeEsito';
     esito.setAttribute('role', 'status');
     box.append(fila, esito);
+    return box;
+  }
+  function tastoStrada(fb, s) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-btn' + (s.primary ? '' : ' sn-btn-secondary');
+    b.id = s.id;
+    b.dataset.strada = s.key;
+    b.textContent = s.label;
+    b.title = titoloStrada(fb, s.key);
+    b.disabled = azioniInVolo;
+    b.addEventListener('click', () => applyAction(s.azione, null));
+    return b;
+  }
+
+  // L'esito resta per pratica: la rilettura delle fusioni ridisegna il pannello, e la frase non deve sparire.
+  const RIAPRI_ESITI = {
+    aperta: { kind: 'ok', text: 'Richiesta riaperta. La approvi da qui.' },
+    conflitto: { kind: 'err', text: 'Il ramo non si fonde più con main. Rimettila in coda e le routine lo riallineano.', inCoda: true },
+    senza_ramo: { kind: 'err', text: 'Il ramo di questa pratica non c’è più. Rimettila in coda per rifare il lavoro.', inCoda: true },
+    non_ferma: { kind: 'ok', text: 'La pratica non è più ferma al cancello. Aggiorno la pagina.' },
+    usata: { kind: 'err', text: 'Per questa versione del ramo il sì l’hai già dato. Rimettila in coda per un giro nuovo.', inCoda: true },
+    lavoro_server: { kind: 'err', text: 'È un lavoro anche sul server, e da qui non si riapre. Rimandala in lavorazione o archiviala.', inCoda: true },
+    // Il sì vale solo per la versione che i controlli hanno letto: un ramo cambiato dopo rifà il giro.
+    mosso: { kind: 'err', text: 'Il ramo ha commit nuovi, arrivati dopo i controlli. Rimettila in coda così li rileggono.', inCoda: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo la versione che i controlli hanno letto. Rimettila in coda per un giro nuovo.', inCoda: true },
+  };
+  const esitiRiapertura = new Map();
+  const riaperturaInVolo = new Set();
+
+  function pannelloRiapriFusione(fb) {
+    const id = fb._id;
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn';
+    btn.id = 'mgRiapriFusioneBtn';
+    btn.textContent = 'Chiedi di nuovo il via libera';
+    btn.title = 'Il server rifà i controlli sul ramo di questa pratica e riapre la richiesta, che poi approvi da qui.';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    box.appendChild(btn);
+    box.appendChild(esito);
+
+    const mostra = () => {
+      const m = riaperturaInVolo.has(id) ? { kind: 'wait', text: 'Chiedo al server…' } : esitiRiapertura.get(id);
+      btn.disabled = riaperturaInVolo.has(id);
+      esito.dataset.kind = m ? m.kind : '';
+      esito.textContent = m ? m.text : '';
+      // Dopo un esito che chiede un giro nuovo, rifare la stessa domanda non serve: la strada è «Rimanda in
+      // lavorazione», fra le strade della fusione ferma qui sotto.
+      btn.className = m && m.inCoda ? 'sn-btn sn-btn-secondary' : 'sn-btn';
+    };
+    mostra();
+
+    btn.addEventListener('click', async () => {
+      if (riaperturaInVolo.has(id)) return;
+      riaperturaInVolo.add(id);
+      esitiRiapertura.delete(id);
+      mostra();
+      let m;
+      try {
+        const r = await sendToMain({ type: MERGE_APPROVAL_RIAPRI, feedbackId: id });
+        if (!r || r.ok === false) throw new Error((r && r.error) || 'Il server non ha riaperto la richiesta.');
+        m = RIAPRI_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+      } catch (e) {
+        m = { kind: 'err', text: e.message || 'Non riuscito.' };
+      } finally {
+        riaperturaInVolo.delete(id);
+      }
+      esitiRiapertura.set(id, m);
+      mostra();
+      toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+      // La richiesta nuova sta negli elenchi, una pratica che ha cambiato stato nel documento: si rilegge tutto.
+      // Riaperta, la frase serve finché la richiesta non è nel pannello: una scadenza futura non deve ritrovarla lì.
+      Promise.resolve(loadMergeApprovals()).finally(() => { if (m === RIAPRI_ESITI.aperta) esitiRiapertura.delete(id); });
+      if (m === RIAPRI_ESITI.non_ferma) refreshFromRemote({ force: true }).catch(() => {});
+    });
     return box;
   }
 
@@ -5260,25 +5569,22 @@
     return n.status === 'design' && n.statusReason === 'secaudit';
   }
 
-  // Ogni esito del server detto in italiano. Uno che questo client non conosce si scrive
-  // grezzo: meglio grezzo che muto, e mai un «fatto» al posto di un guasto.
-  const SALTA_ESITI = {
-    fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
-    bloccato: { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' },
-    conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
-    ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
-    feedback_assente: { kind: 'err', text: 'Il server non trova questa segnalazione.' },
-    non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
-    non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
-    guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
-    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
-    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
-    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
-    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
-    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
-  };
+  // Un esito che chiede un giro nuovo resta per pratica: la rilettura dopo l'esito ridisegna il pannello e
+  // riproporrebbe il salto. Vale finché stato e audit sono quelli su cui il server ha risposto.
+  const esitiSalta = new Map();
+  function firmaSalta(fb) {
+    const n = MR.normalizeStatus(fb);
+    const l4 = (fb && fb.livelli && fb.livelli.l4) || {};
+    return JSON.stringify([n.status, n.statusReason || '', l4.esito || '', l4.at || '']);
+  }
 
-  function pannelloSaltaAudit(fb) {
+  function pannelloSaltaAudit(fb, liv) {
+    const fermo = esitiSalta.get(fb._id);
+    const azione = fermo && fermo.firma === firmaSalta(fb) && MR.ownerActionFor(fb, 'accept', opzSezioni());
+    if (azione) return pannelloSaltoFermo(fb, fermo.m, azione);
+    if (fermo) esitiSalta.delete(fb._id);
+    // Lo sha mostrato nel pannello parte col salto: un ramo andato avanti dopo l'audit non si salta alla cieca (#1502).
+    const sha = (liv && liv.pannello && liv.pannello.sha) || '';
     const box = document.createElement('div');
     box.className = 'mg-liv-azioni';
     const btn = document.createElement('button');
@@ -5296,9 +5602,7 @@
     let timer = null;
     const disarma = () => {
       armato = false;
-      btn.textContent = 'Salta il controllo';
-      btn.style.minWidth = '';
-      btn.style.minHeight = '';
+      window.SN_CONFERMA_SUL_POSTO.disarma(btn, 'Salta il controllo');
       if (timer) { clearTimeout(timer); timer = null; }
     };
     btn.addEventListener('click', async (e) => {
@@ -5306,11 +5610,7 @@
       if (armato && e && e.detail > 1) return;
       if (!armato) {
         armato = true;
-        // «Confermi?» è più corto: senza la scatola ferma il secondo clic sul lato destro cadeva fuori dal tasto.
-        const scatola = btn.getBoundingClientRect();
-        btn.style.minWidth = scatola.width + 'px';
-        btn.style.minHeight = scatola.height + 'px';
-        btn.textContent = 'Confermi?';
+        window.SN_CONFERMA_SUL_POSTO.arma(btn, 'Confermi?');
         timer = setTimeout(disarma, 5000);
         return;
       }
@@ -5319,12 +5619,20 @@
       esito.dataset.kind = 'wait';
       esito.textContent = 'Chiedo al server…';
       try {
-        const r = await sendToMain({ type: LIVELLO4_SALTA, feedbackId: fb._id });
+        const r = await sendToMain(Object.assign({ type: LIVELLO4_SALTA, feedbackId: fb._id }, sha ? { sha } : {}));
         if (!r || r.ok === false) throw new Error((r && r.error) || 'Non riuscito.');
-        const m = SALTA_ESITI[r.esito] || { kind: 'err', text: `Il server ha risposto: ${r.esito || 'niente'}.` };
+        // Bloccata senza richiesta: la pratica resta sul controllo di sicurezza, e il via libera sul quadrato non c'è (#1040).
+        // Il resto: le stesse frasi della pagina da browser; sul blocco del cancello conta lo stato della richiesta (#486).
+        const m = (r.esito === 'bloccato' && !r.requestId)
+          ? { kind: 'err', text: 'Saltato, ma la richiesta di fusione non si è registrata: nessuna fusione è avvenuta. Il motivo è nella conversazione. Rilancia «Salta il controllo».' }
+          : window.SN_MERGE_APPROVALS.skipOutcomeMessage(r);
         esito.dataset.kind = m.kind;
         esito.textContent = m.text;
-        toast(m.text, m.kind === 'ok' ? 'ok' : 'err');
+        toast(m.text, m.kind === 'ok' ? 'ok' : (m.kind === 'warn' ? '' : 'err'));
+        if (m.giroNuovo) {
+          esitiSalta.set(fb._id, { m, firma: firmaSalta(fb) });
+          ridisegnaPannelloAperto();
+        }
         // L'esito cambia il pentagono e (se si è aperta una richiesta) il
         // quadrato: si rilegge tutto invece di indovinare.
         setTimeout(() => { loadMergeApprovals(); refreshFromRemote({ force: true }).catch(() => {}); }, 800);
@@ -5338,6 +5646,87 @@
     });
     box.appendChild(btn);
     box.appendChild(esito);
+    return box;
+  }
+
+  // Il testo che il server ha reso leggibile, coi punti che ha segnato evidenziati: il perché di ognuno sta sotto
+  // il puntatore. Testo e note arrivano da fuori: solo nodi di testo, mai markup.
+  function partiLeggibili(parti) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-leggibile';
+    for (const parte of parti) {
+      const sez = document.createElement('section');
+      const h = document.createElement('h4');
+      h.textContent = parte.titolo;
+      const testo = document.createElement('div');
+      testo.className = 'mg-liv-leggibile-testo';
+      for (const s of parte.segmenti) {
+        if (!s.nota) { testo.appendChild(document.createTextNode(s.t)); continue; }
+        const m = document.createElement('mark');
+        m.textContent = s.t;
+        m.title = s.nota;
+        testo.appendChild(m);
+      }
+      sez.append(h, testo);
+      box.appendChild(sez);
+    }
+    return box;
+  }
+
+  // Ri-giudica dal triangolo: la pratica che il filtro d'ingresso ha fermato torna dai giudici, come i non
+  // filtrati della barra in cima ma una sola.
+  function pannelloRigiudica(fb) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-btn sn-btn-secondary';
+    btn.id = 'mgRigiudicaBtn';
+    btn.textContent = 'Ri-giudica';
+    btn.title = 'Rimanda la segnalazione ai giudici';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.setAttribute('role', 'status');
+    btn.addEventListener('click', async () => {
+      btn.disabled = true;
+      esito.dataset.kind = 'wait';
+      esito.textContent = 'I giudici stanno leggendo…';
+      const card = startCardEvaluating(fb._id);
+      let r;
+      try {
+        r = await sendToMain({ type: 'feedback_reevaluate', feedbackIds: [fb._id] });
+      } catch (e) {
+        r = { ok: false, error: (e && e.message) || String(e) };
+      }
+      stopCardEvaluating(card);
+      const { outcome, errorKind } = MR.classifyReevalResult(r);
+      const hint = MR.reevalErrorHint(errorKind);
+      const fatto = outcome === 'recovered';
+      const testo = fatto ? 'Giudicata: il verdetto è nei cerchi.'
+        : outcome === 'budget' ? 'Il server ha finito il tempo: riprova tra poco.'
+          : hint || (outcome === 'error' ? `Non riuscito: ${(r && r.error) || 'riprova'}.` : 'Niente da rifare: il server l’ha lasciata com’era.');
+      esito.dataset.kind = fatto ? 'ok' : 'err';
+      esito.textContent = testo;
+      toast(testo, fatto ? 'ok' : 'err');
+      btn.disabled = false;
+      if (fatto) refreshFromRemote({ force: true }).catch(() => {});
+    });
+    box.append(btn, esito);
+    return box;
+  }
+
+  // Il salto non c'è più da proporre: prima cosa è successo, poi la strada, sotto e non dove stava il salto, così
+  // un clic in più sul punto di prima non rimanda la pratica.
+  function pannelloSaltoFermo(fb, m, azione) {
+    const box = document.createElement('div');
+    box.className = 'mg-liv-azioni';
+    const esito = document.createElement('span');
+    esito.className = 'mg-liv-esito';
+    esito.id = 'mgL4StradeEsito';
+    esito.setAttribute('role', 'status');
+    esito.dataset.kind = m.kind;
+    esito.textContent = m.text;
+    box.append(esito, tastoStrada(fb, { ...STRADE_FUSIONE.rimanda, id: 'mgL4RimandaBtn', azione }));
     return box;
   }
 
@@ -5544,6 +5933,7 @@
     if (testDataInjected) return;
 
     reindexByClient();
+    domandeRileggonoLista();
     renderList();
     aggiornaSeguiti();
     live.segnaRiuscito();
@@ -5594,7 +5984,7 @@
     pronta: () => dataLoaded,
     carica: () => loadData(),
     righe: () => allFeedbacks,
-    sostituisci: (lista) => { allFeedbacks = lista; reindexByClient(); },
+    sostituisci: (lista) => { allFeedbacks = lista; reindexByClient(); domandeRileggonoLista(); },
     decifra: () => isAdmin,
     sezioneDi: (fb) => sezioneDi(fb),
     ridisegna: ({ ids, righe, removed }) => {
@@ -5810,6 +6200,7 @@
       dataLoaded = true;
       loadFailed = false;
       reindexByClient();
+      domandeRileggonoLista();
       renderList();
       if (opts && opts.dalVivo) {
         live.segnaRiuscito();
@@ -7997,8 +8388,20 @@
     await domandePronte;
     sceltaApertura();
     apriDomandaDallIndirizzo();
+    apriFeedbackDallIndirizzo();
     startLive();
   }
+
+  // `#feedback=1956`: arriva dalla riga delle Novità nata da quella segnalazione.
+  function apriFeedbackDallIndirizzo() {
+    const m = /^#feedback=([1-9]\d{0,8}(?:\.\d{1,4})?)$/.exec(String(location.hash || ''));
+    if (!m || !allFeedbacks.length) return;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (_) {}
+    if (!apriFeedbackDi(null, m[1]) && feedbacksColNumero(m[1]).length === 0) {
+      setManageMsg(`La segnalazione #${m[1]} non è fra quelle caricate: cercala nella casella in alto.`, 'err');
+    }
+  }
+  window.addEventListener('hashchange', apriFeedbackDallIndirizzo);
 
   // `#domanda=D-12`: arriva dal segno «aspetta D-12» della pagina dei feedback, che porta dove si risponde.
   function apriDomandaDallIndirizzo() {
@@ -8012,6 +8415,15 @@
   // Un indirizzo che nomina una scheda o una sezione la apre, come un clic (#1414: è così che arrivano i vecchi indirizzi
   // delle pagine dell'owner). Poi torna pulito: riaprendo la scheda scavalcherebbe ogni volta la scelta d'apertura.
   function apriDaIndirizzo() {
+    // #906 — `#rivaluta` arriva dall'avviso dei giudici fermi: Ricevuti senza filtri, e il tasto dei non filtrati in vista.
+    if (/^#rivaluta$/i.test(String(location.hash || ''))) {
+      rivalutaChiesto = true;
+      if (livelliScelti.length) { livelliScelti = []; renderList(); }
+      selectTab('inbox');
+      try { history.replaceState(history.state, '', location.pathname + location.search); } catch (_) {}
+      updateReevalBar();
+      return;
+    }
     const tab = MR.schedaDaIndirizzo(location.hash);
     if (!tab) return;
     selectTab(tab);

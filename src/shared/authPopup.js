@@ -91,7 +91,7 @@
     let u;
     try { u = new URL(url); } catch (_) { return false; }
     if (!/^https?:$/.test(u.protocol)) return false;
-    if (hostMatches(u.host)) return true;
+    if (hostMatches(u.hostname)) return true;
     // Path OAuth/SSO su qualunque host (es. provider self-hosted).
     return looksLikeAuthPath(u);
   }
@@ -103,7 +103,7 @@
     let u;
     try { u = new URL(url); } catch (_) { return false; }
     if (!/^https?:$/.test(u.protocol)) return false;
-    return hostMatches(u.host);
+    return hostMatches(u.hostname);
   }
 
   // Superficie di accesso esente dal rumore anti-fingerprint (#209): host dedicato → esente
@@ -113,7 +113,7 @@
     let u;
     try { u = new URL(url); } catch (_) { return false; }
     if (!/^https?:$/.test(u.protocol)) return false;
-    const host = (u.host || '').toLowerCase();
+    const host = (u.hostname || '').toLowerCase();
     if (!host) return false;
     for (const suf of AUTH_HOST_SUFFIXES) {
       if (host.endsWith(suf)) return true;

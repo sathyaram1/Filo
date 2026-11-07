@@ -100,10 +100,21 @@ test('il titolo porta i guasti fra parentesi, entro il tetto del server, e un ta
 
 test('gli argomenti: titolo e testo, --chiave ripetibile, --chiavi-da, --chiavi-unit', () => {
   assert.deepEqual(leggiArgomenti(['T', 'x', '--chiave', 'a', '--chiave', 'b', '--chiavi-da', 'k.txt', '--chiavi-unit', 'u.log']),
-    { posizionali: ['T', 'x'], chiavi: ['a', 'b'], chiaviDa: ['k.txt'], chiaviUnit: ['u.log'] });
+    { posizionali: ['T', 'x'], chiavi: ['a', 'b'], chiaviDa: ['k.txt'], chiaviUnit: ['u.log'], commit: '', avvisi: [] });
   assert.deepEqual(leggiArgomenti(['T', 'x']).chiavi, [], 'senza chiavi resta l\'uso di prima');
   assert.throws(() => leggiArgomenti(['T', 'x', '--chiave']), /vuole un valore/);
   assert.throws(() => leggiArgomenti(['T', 'x', '--chiavi']), /non capita/);
+});
+
+test('--commit tiene solo lo sha intero; uno storto o mancante si dice e non ferma l\'allarme', () => {
+  const sha = 'A'.repeat(40);
+  assert.equal(leggiArgomenti(['T', 'x', '--commit', sha]).commit, 'a'.repeat(40));
+  for (const storto of [['--commit', '1090323ab'], ['--commit', ''], ['--commit']]) {
+    const arg = leggiArgomenti(['T', 'x', ...storto]);
+    assert.equal(arg.commit, '');
+    assert.equal(arg.avvisi.length, 1, storto.join(' '));
+    assert.deepEqual(arg.posizionali, ['T', 'x']);
+  }
 });
 
 const { parolaDellaCostruzione } = await import('../../scripts/build-alarm.mjs');
@@ -130,7 +141,7 @@ describe('le chiavi arrivano al server', () => {
   const CLI = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', 'scripts', 'build-alarm.mjs');
 
   // Il server vero risponde 401 bad_passphrase a una parola d'ordine che non è la sua, spazi compresi.
-  async function spedisci(argomenti, { parola = 'prova', giusta = 'prova' } = {}) {
+  async function spedisci(argomenti, { parola = 'prova', giusta = 'prova', risposta = { ok: true, num: '#9', duplicate: false } } = {}) {
     const ricevute = [];
     const srv = createServer((req, res) => {
       let corpo = '';
@@ -140,7 +151,7 @@ describe('le chiavi arrivano al server', () => {
         ricevute.push(json);
         const buona = json.passphrase === giusta;
         res.writeHead(buona ? 200 : 401, { 'Content-Type': 'application/json' });
-        res.end(JSON.stringify(buona ? { ok: true, num: '#9', duplicate: false } : { ok: false, reason: 'bad_passphrase' }));
+        res.end(JSON.stringify(buona ? risposta : { ok: false, reason: 'bad_passphrase' }));
       });
     });
     await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
@@ -180,6 +191,16 @@ describe('le chiavi arrivano al server', () => {
     assert.match(b, /board-offline-error/);
     const u = (await spedisci(['Controlli automatici rossi', 'testo', '--chiavi-unit', 'unit.log'])).ricevute[0].name;
     assert.equal(u, 'Controlli automatici rossi (y)');
+  });
+
+  test('il commit provato arriva al server insieme alle chiavi, e un rosso già corretto si dice nel registro', async () => {
+    const sha = '1090323ab'.padEnd(40, '0');
+    const { ricevute, stdout } = await spedisci(['Titolo', 'testo', '--chiave', 'suite:tests/a.spec.mjs', '--commit', sha],
+      { risposta: { ok: true, duplicate: true, num: '#1782', correttoDa: '4104e262c' } });
+    assert.equal(ricevute[0].commit, sha);
+    assert.match(stdout, /rosso vecchio, corretto da 4104e262c \(#1782\): nessun feedback nuovo/);
+    const senza = await spedisci(['Titolo', 'testo', '--commit', sha]);
+    assert.ok(!('commit' in senza.ricevute[0]), 'senza chiavi il server non dedup: il commit non gli serve');
   });
 
   test('senza chiavi il campo non parte: un server vecchio e uno nuovo fanno quel che facevano', async () => {

@@ -30,14 +30,64 @@
     getLastMouseEvent: () => ({ clientX: window.innerWidth / 2, clientY: window.innerHeight / 2 }),
   };
 
-  function copyToClipboard(text) {
-    navigator.clipboard.writeText(text).then(
-      () => {
-        Popup.showToast(I18n.t('toast_copied'));
-        pushClipboardEntry({ type: 'text', text });
-      },
-      () => {/* niente toast su errore — UX silenziosa */}
-    );
+  // Gli appunti li scrive prima il main (anche in cronologia): la pagina può non avere il fuoco, come col visore PDF
+  // o dopo un clic nella barra laterale (#1343). Se il main dice no, ci prova la pagina.
+  // `html`: la stessa selezione con la sua formattazione, come la mette il Copia del sistema.
+  async function scriviNegliAppunti(text, html = '') {
+    const conHtml = typeof html === 'string' && html ? { html } : {};
+    try {
+      const r = await chrome.runtime.sendMessage({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text, ...conHtml });
+      if (r && r.ok) return true;
+    } catch (_) {}
+    try {
+      if (conHtml.html && typeof ClipboardItem === 'function') {
+        await navigator.clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+          'text/html': new Blob([conHtml.html], { type: 'text/html' }),
+        })]);
+      } else await navigator.clipboard.writeText(text);
+    } catch (_) { return false; }
+    pushClipboardEntry({ type: 'text', text });
+    return true;
+  }
+
+  async function copyToClipboard(text, html = '') {
+    // Niente toast su errore: UX silenziosa.
+    if (await scriviNegliAppunti(text, html)) Popup.showToast(I18n.t('toast_copied'));
+  }
+
+  // La selezione della pagina (testo o campo con la formattazione) in HTML, coi contenitori che le danno lo stile
+  // (un grassetto selezionato da dentro è ancora grassetto), come il Copia del sistema (#1434.2). '' in una casella.
+  const IN_LINEA = /^(B|STRONG|I|EM|U|S|STRIKE|DEL|INS|MARK|CODE|SUB|SUP|SMALL|BIG|FONT|SPAN|A|Q|CITE|KBD|ABBR)$/;
+  function htmlDellaSelezione() {
+    try {
+      const el = document.activeElement;
+      if (el?.matches?.('input, textarea')) return '';
+      const sel = window.getSelection();
+      if (!sel || !sel.rangeCount || sel.isCollapsed) return '';
+      const range = sel.getRangeAt(0);
+      let frammento = range.cloneContents();
+      let nodo = range.commonAncestorContainer;
+      if (nodo && nodo.nodeType !== 1) nodo = nodo.parentElement;
+      for (let i = 0; nodo && nodo !== document.body && i < 32 && IN_LINEA.test(nodo.tagName); nodo = nodo.parentElement, i++) {
+        const guscio = nodo.cloneNode(false);
+        guscio.appendChild(frammento);
+        frammento = guscio;
+      }
+      const box = document.createElement('div');
+      box.appendChild(frammento);
+      // Gli indirizzi relativi incollati altrove non porterebbero da nessuna parte.
+      for (const a of box.querySelectorAll('[href]')) { try { a.setAttribute('href', new URL(a.getAttribute('href'), document.baseURI).href); } catch (_) {} }
+      for (const a of box.querySelectorAll('[src]')) { try { a.setAttribute('src', new URL(a.getAttribute('src'), document.baseURI).href); } catch (_) {} }
+      return box.innerHTML;
+    } catch (_) { return ''; }
+  }
+
+  // Copia del tasto destro sulla selezione: con la formattazione, se la selezione è ancora quella del menu.
+  function copySelection(text) {
+    const qui = (window.getSelection()?.toString() || '').replace(/\s+/g, ' ').trim();
+    const html = qui && qui === String(text || '').replace(/\s+/g, ' ').trim() ? htmlDellaSelezione() : '';
+    return copyToClipboard(text, html);
   }
 
   // Negli appunti deve finire un indirizzo apribile: un javascript:, un data: o un
@@ -49,39 +99,53 @@
     return global.SN_URL_NAV.isShareableAddress(raw);
   }
 
+  // L'indirizzo della pagina per chi lo condivide o lo salva: sulla pagina «sito non raggiungibile» è il sito che si
+  // voleva aprire, non l'indirizzo interno dell'errore (#1343).
+  function indirizzoDellaPagina() {
+    const qui = String(location.href || '');
+    if (!qui.startsWith('filo://error/')) return qui;
+    let voluto = '';
+    try { voluto = new URL(qui).searchParams.get('url') || ''; } catch (_) { voluto = ''; }
+    return /^https?:\/\//i.test(voluto) && isAddress(voluto) ? voluto : qui;
+  }
+  const paginaDErrore = () => indirizzoDellaPagina() !== String(location.href || '');
+
   function copyUrlToClipboard(url) {
     if (!isAddress(url)) {
-      Popup.showToast(I18n.t('toast_not_an_address'));
+      Popup.toastErrore('toast_not_an_address');
       return false;
     }
     copyToClipboard(String(url).trim());
     return true;
   }
 
-  function cutSelection() {
-    // La selezione dentro <input>/<textarea> si recupera dal nodo attivo: regola in src/content/content.js.
-    const sel = window.getSelection();
-    let text = sel?.toString() || '';
-    const activeEl = document.activeElement;
-    const inInput = activeEl?.matches?.('input, textarea');
-    if (!text && inInput) {
-      const start = activeEl.selectionStart ?? 0;
-      const end = activeEl.selectionEnd ?? 0;
-      if (start !== end) text = (activeEl.value || '').slice(start, end);
+  // Il testo esatto selezionato nel campo dove si scrive. Una casella per l'email o per un numero non espone
+  // selectionStart: lì la selezione la dice il documento.
+  function testoSelezionatoQui() {
+    const el = document.activeElement;
+    if (el?.matches?.('input, textarea') && el.selectionStart != null && el.selectionEnd != null) {
+      return (el.value || '').slice(el.selectionStart, el.selectionEnd);
     }
+    return window.getSelection()?.toString() || '';
+  }
+
+  // Come il Taglia del sistema (#1434.2): il testo va negli appunti e lascia il campo con una cancellazione vera, che
+  // Ctrl+Z annulla, in ogni tipo di casella. La selezione è quella catturata all'apertura del menu.
+  async function cutSelection() {
+    deps.restorePasteContext();
+    const text = testoSelezionatoQui();
     if (!text) return;
-    navigator.clipboard.writeText(text).then(() => {
-      pushClipboardEntry({ type: 'text', text });
-      if (inInput) {
-        const start = activeEl.selectionStart ?? 0;
-        const end = activeEl.selectionEnd ?? 0;
-        activeEl.value = activeEl.value.slice(0, start) + activeEl.value.slice(end);
-        activeEl.setSelectionRange(start, start);
-        activeEl.dispatchEvent(nostro(new Event('input', { bubbles: true })));
-      } else {
-        document.execCommand('delete');
-      }
-    });
+    if (!(await scriviNegliAppunti(text, htmlDellaSelezione()))) { Popup.showToast(I18n.t('toast_cut_failed')); return; }
+    deps.restorePasteContext();
+    let tolto = false;
+    try { tolto = document.execCommand('delete'); } catch (_) { tolto = false; }
+    const el = document.activeElement;
+    if (tolto || !el?.matches?.('input, textarea') || el.selectionStart == null) return;
+    // Un campo che execCommand non tocca: si toglie a mano, senza annullo, piuttosto che lasciare il testo due volte.
+    const start = el.selectionStart;
+    el.value = el.value.slice(0, start) + el.value.slice(el.selectionEnd);
+    el.setSelectionRange(start, start);
+    el.dispatchEvent(nostro(new InputEvent('input', { bubbles: true, inputType: 'deleteByCut' })));
   }
 
   function blobToDataUrl(blob) {
@@ -125,7 +189,7 @@
     let appunti = null;
     if (letti && typeof letti === 'object') appunti = { ok: true, testo: letti.testo, immagine: letti.immagine };
     else try { appunti = await chrome.runtime.sendMessage({ type: MSG.APPUNTI_DI_FILO }); } catch (_) { appunti = null; }
-    if (!appunti || !appunti.ok) { Popup.showToast(I18n.t('toast_paste_failed')); return; }
+    if (!appunti || !appunti.ok) { Popup.toastErrore('toast_paste_failed'); return; }
     const text = typeof appunti.testo === 'string' ? appunti.testo : '';
     let blob = null;
     if (appunti.immagine) blob = blobDaDataUrl(appunti.immagine);
@@ -145,17 +209,17 @@
           insertTextAtSelection(text);
           pushClipboardEntry({ type: 'text', text }, 'paste');
         } else {
-          Popup.showToast(I18n.t('toast_cannot_paste_image'));
+          Popup.toastErrore('toast_cannot_paste_image');
         }
         return;
       }
       if (targetKind !== 'ce') {
         // Nessun target editabile valido per un'immagine.
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       if (!insertImageInEditable(blob, dataUrl)) {
-        Popup.showToast(I18n.t('toast_paste_failed'));
+        Popup.toastErrore('toast_paste_failed');
         return;
       }
       const description = await describeImage(blob);
@@ -193,16 +257,16 @@
           Popup.showToast(I18n.t('toast_pasted_image'));
           return;
         }
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       if (ctx?.kind !== 'ce') {
-        Popup.showToast(I18n.t('toast_cannot_paste_image'));
+        Popup.toastErrore('toast_cannot_paste_image');
         return;
       }
       const ok = insertImageInEditable(blob, entry.dataUrl, descriptionToFilename(entry.description));
       if (ok) Popup.showToast(I18n.t('toast_pasted_image'));
-      else Popup.showToast(I18n.t('toast_paste_failed'));
+      else Popup.toastErrore('toast_paste_failed');
       return;
     }
     insertTextAtSelection(entry.text || '');
@@ -347,6 +411,7 @@
   function buildPasteItem(clipboardHistory) {
     return {
       type: 'paste',
+      azione: 'paste-clipboard',
       label: I18n.t('menu_paste'),
       shortcut: Tasti.etichetta('Ctrl+V'),
       history: clipboardHistory,
@@ -374,15 +439,6 @@
     } catch (_) { return []; }
   }
 
-  // Serve a mostrare in grigio avanti e indietro nel menu quando la cronologia non lo
-  // consente, come i tasti nella barra in alto.
-  async function getNavState() {
-    try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.NAV_STATE });
-      return { canBack: !!r?.canBack, canFwd: !!r?.canFwd };
-    } catch (_) { return { canBack: true, canFwd: true }; }
-  }
-
   // `via: 'paste'` dice a chi tiene la cronologia che la voce viene da un
   // incolla, non da una copia scelta: una voce appena tolta non rientra così.
   function pushClipboardEntry(entry, via) {
@@ -395,11 +451,12 @@
 
   // L'avviso «manca il modello» si dà una volta per pagina: la descrizione parte a ogni
   // immagine e ripetere il toast sarebbe rumore.
+  // La frase dice dove si sceglie il modello: l'avviso porta il tasto per andarci (#663, #1344.1).
   const modelConfigWarned = new Set();
-  function warnModelConfigOnce(message) {
+  function warnModelConfigOnce(message, res) {
     if (!message || modelConfigWarned.has(message)) return;
     modelConfigWarned.add(message);
-    try { Popup.showToast(message, { duration: 7000 }); } catch (_) {}
+    try { Popup.showToast(message, { duration: 7000, rimedio: res || null }); } catch (_) {}
   }
 
   // «Descrizione…» solo finché può davvero arrivare: un'attesa che non finirà mai è una
@@ -427,6 +484,8 @@
         type: MSG.AI_REQUEST,
         action: ACTIONS.DESCRIBE_IMAGE,
         payload: { dataUrl, automatica: true, ...(originale && originale !== dataUrl ? { originale } : {}) },
+        // Diventa il nome del file: una descrizione fermata dal tetto torna come «non descritta», mai a metà (#1302).
+        intera: true,
       });
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
@@ -442,25 +501,32 @@
       }).catch(() => {});
       return null;
     }
+    // La descrizione si chiede una volta sola: una richiesta andata male lascerebbe la voce in cronologia su
+    // «Descrizione…» per sempre (crediti finiti, rete, risposta vuota: #1344.1). Le si dice la verità.
+    const nonArrivera = (chiave) => {
+      chrome.runtime.sendMessage({
+        type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
+        dataUrl,
+        description: I18n.t(chiave),
+      }).catch(() => {});
+    };
     if (!res?.ok) {
       // Un modello che nessun host ammesso serve (#828) è un modello che manca: la descrizione non arriverà.
       if ((res?.code === 'NO_MODEL_FOR_ACTION' || res?.code === 'NO_ALLOWED_HOST') && res.error) {
         imageDescNoModel = true;
-        warnModelConfigOnce(res.error);
-        // La voce in cronologia incolla resterebbe su «Descrizione…» per
-        // sempre: dille la verità invece di far finta che stia arrivando.
-        chrome.runtime.sendMessage({
-          type: MSG.UPDATE_CLIPBOARD_DESCRIPTION,
-          dataUrl,
-          description: I18n.t('clipboard_image_no_model'),
-        }).catch(() => {});
+        if (!modelConfigWarned.has(res.error)) Popup.conta({ misura: 'errore-modello', code: String(res.code || ''), status: 0 });
+        warnModelConfigOnce(res.error, res);
+        nonArrivera('clipboard_image_no_model');
+      } else {
+        nonArrivera('clipboard_image_non_descritta');
       }
       console.warn('[SN] descrizione immagine non eseguita:', res?.error || 'errore sconosciuto');
       return null;
     }
     imageDescNoModel = false;
-    if (!res.text) {
+    if (!res.text || !res.text.replace(/\s+/g, ' ').trim()) {
       console.warn('[SN] descrizione immagine: risposta vuota');
+      nonArrivera('clipboard_image_non_descritta');
       return null;
     }
     const description = res.text.replace(/\s+/g, ' ').trim().slice(0, 80);
@@ -502,7 +568,7 @@
 
   function triggerExplainOrTranslate(action, selInfo, anchorEvent) {
     if (!selInfo) {
-      Popup.showToast(I18n.t('err_no_selection'));
+      Popup.toastErrore('err_no_selection');
       return;
     }
     if (selInfo.segreto) {
@@ -587,49 +653,85 @@
       action: ACTIONS.EXPLAIN,
       payload: { selection: selInfo.selection, sentence: selInfo.sentence },
       diceRipiego: true,
+      conSeguito: true,
       // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
-      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
+      ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
     }).then(
       (res) => {
+        // Per i contatori (#1465): l'anticipo era già qui quando la persona ha aperto Spiega, o ancora in volo.
+        entry.arrivata = true;
         // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
         if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
+        // Il livello di privacy nella famiglia degli anticipi (#1586): la spiegazione che la pagina delicata non lascia preparare.
+        if (res && res.code === 'PAGINA_DELICATA') {
+          entry.perPrivacy = true;
+          contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
+        }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
+        // Fermata dal tetto (#1302): la nota la dice, e già vista non torna al tasto destro dopo.
+        if (res?.ok && global.SN_CHAT_ERRORS?.troncata?.(res.finishReason)) entry.tagliata = true;
         return (res?.ok && typeof res.text === 'string')
-          ? { text: res.text, keyFallback: res.keyFallback || null }
+          ? { text: res.text, keyFallback: res.keyFallback || null, finishReason: res.finishReason || null }
           : { errore: res || {} };
       },
-      (e) => ({ errore: { message: e?.message } }),
+      (e) => { entry.arrivata = true; return { errore: { message: e?.message } }; },
     );
     return entry;
   }
 
-  function contaUso(action, attesaMs) {
-    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs })).catch(() => {}); } catch (_) {}
+  function contaUso(action, attesaMs, anticipata = false) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs, anticipata })).catch(() => {}); } catch (_) {}
   }
+  // I riquadri del tasto destro e del popup (#1465): nomi degli elenchi chiusi e numeri, mai il testo.
+  const contaRiquadro = (cosa, campi) => Popup.conta({ misura: 'riquadro', cosa, ...campi });
 
   // Restituisce la Promise per la spiegazione di questa selezione.
   // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
   // Un anticipo fermato dal tetto delle automatiche non è la risposta: al tasto destro si chiede davvero.
   function getExplainPromise(selInfo) {
     const key = explainKey(selInfo.selection);
-    const chiedi = () => {
+    // Com'era l'anticipo al gesto (#1465): contato alla prima apertura della selezione, una riapertura no.
+    const anticipo = (stato) => contaRiquadro('anticipo_al_gesto', { funzione: 'spiega', stato });
+    const chiedi = (stato = '') => {
+      if (stato) anticipo(stato);
+      // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
+      if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
       const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      // Chiesta al tasto destro, è già aperta: interrotta, il tasto destro dopo la richiede.
+      entry.aperta = true;
       prefetchedExplain = entry;
       return entry.promise;
     };
     const pre = prefetchedExplain;
-    if (pre && pre.key === key && !pre.fermata) {
+    const stessa = !!pre && pre.key === key;
+    const primaApertura = stessa && !!pre.anticipata && !pre.aperta;
+    // Fermato da una pagina delicata, l'anticipo non è del tetto: è il gesto che il livello di privacy costa, e
+    // «Chiedi» lo conta come quello dell'anticipo spento (#1586).
+    const fermata = () => {
+      if (!pre.perPrivacy) return 'fermato_tetto';
+      contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'chiesto' });
+      Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
+      return '';
+    };
+    // Una spiegazione interrotta già mostrata si richiede: rimostrata, si leggerebbe la stessa metà (#1302).
+    const giaVistaTagliata = stessa && pre.tagliata && pre.aperta;
+    if (stessa) pre.aperta = true;
+    if (stessa && !pre.fermata && !giaVistaTagliata) {
+      const stato = !primaApertura ? '' : pre.sentence !== selInfo.sentence ? 'contesto_cambiato' : pre.arrivata ? 'pronto' : 'in_volo';
       return pre.promise.then((res) => {
-        if (pre.fermata) return chiedi();
+        if (pre.fermata) return chiedi(primaApertura ? fermata() : '');
+        if (stato) anticipo(stato);
         // Preparata e aperta: per i crediti non è una chiamata sprecata (#818). Una fermata non è partita.
-        if (pre.anticipata && !pre.usata) {
+        const primaVolta = !!pre.anticipata && !pre.usata;
+        if (primaVolta) {
           pre.usata = true;
           Promise.resolve(chrome.runtime.sendMessage({ type: MSG.SPIEGAZIONE_ANTICIPATA_USATA })).catch(() => {});
         }
-        return { ...res, giaChiesta: true };
+        // Per i contatori un anticipo è aperto una volta sola, e solo se era pronto: riaperto o fallito non conta (#1461).
+        return { ...res, giaChiesta: true, anticipata: primaVolta && !!res && !res.errore && !!res.text };
       });
     }
-    return chiedi();
+    return chiedi(primaApertura ? fermata() : stessa ? '' : 'assente');
   }
 
   // Il tasto del rimedio sotto una spiegazione del menu apre un'altra scheda: il menu non resta aperto sopra il sito.
@@ -659,6 +761,10 @@
           arrow.textContent = '▸';
           arrow.addEventListener('click', (e) => {
             e.stopPropagation();
+            approfondita = true;
+            contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN, uso: 'approfondisci' });
+            // Approfondisci è Spiega della scorciatoia, dal box del tasto destro (#1468).
+            Popup.conta({ misura: 'strada', id: 'explain-selection', via: 'tasto_destro_altro' });
             try { global.SN_MENU?.close?.(); } catch (_) {}
             triggerExplainDeep(selInfo, deps.getLastMouseEvent());
           });
@@ -666,30 +772,51 @@
         }
 
         let cancelled = false;
+        let arrivata = false;
+        let approfondita = false;
         const apertaIl = Date.now();
         getExplainPromise(selInfo).then((res) => {
+          arrivata = true;
           // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
           // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
-          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null);
+          if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
           if (cancelled) return;
           el.classList.remove('sn-menu-inline-loading');
-          if (!res || res.errore || !res.text) {
+          // Il tetto finito nel ragionamento prima di una parola (#1302): la nota e «Continua» al posto della spiegazione.
+          const nota = res && !res.errore && !String(res.text || '').trim()
+            ? (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason) || '') : '';
+          if (!res || res.errore || (!res.text && !nota)) {
             el.classList.add('sn-menu-inline-error');
             Popup.scriviErrore(body, (res && res.errore) || {}, { dopo: chiudiMenu });
             return;
           }
-          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text));
-          if (!daMostrare) {
+          const daMostrare = spiegazioneDaMostrare(Popup.resolveCalcMarkers(res.text || ''));
+          if (!daMostrare && !nota) {
             const prev = el.previousElementSibling;
             if (prev && prev.classList.contains('sn-menu-sep')) prev.remove();
             el.remove();
             return;
           }
-          body.innerHTML = Popup.renderMarkdown(daMostrare);
+          body.innerHTML = daMostrare ? Popup.renderMarkdown(daMostrare) : '';
           Popup.notaRipiego(body, res.keyFallback);
-          Popup.notaInterrotta(body, res.finishReason);
+          // «Continua» porta la spiegazione nel riquadro di Spiega, che chiede il resto (#1302); senza testo il riquadro
+          // riparte dalla nota, perché un turno del modello vuoto alcuni host lo rifiutano.
+          Popup.notaInterrotta(body, res.finishReason, () => {
+            try { global.SN_MENU?.close?.(); } catch (_) {}
+            Popup.openStreaming({
+              action: ACTIONS.EXPLAIN,
+              payload: { selection: selInfo.selection, sentence: selInfo.sentence },
+              anchor: ancoraSelezione(deps.getLastMouseEvent()),
+              title: I18n.t('popup_explain_title'),
+              seguito: daMostrare || nota,
+            });
+          });
         });
-        return () => { cancelled = true; };
+        // Il menu chiuso prima della spiegazione (#1465); passare ad Approfondisci non è lasciarla lì.
+        return () => {
+          cancelled = true;
+          if (!arrivata && !approfondita) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.EXPLAIN, attesaMs: Date.now() - apertaIl });
+        };
       },
     };
   }
@@ -790,6 +917,8 @@
           return () => {};
         }
         let cancelled = false;
+        let arrivata = false;
+        const apertaIl = Date.now();
         // Il sito in lista lo dice anche l'immagine che fa da link, come il link di testo; la domanda non contatta il sito.
         if (indirizzo) {
           chrome.runtime.sendMessage({ type: MSG.LINK_FERMATO, url: indirizzo }).then((r) => {
@@ -806,6 +935,7 @@
             dataUrl = await scaricaImmagine(src, imgEl);
           } catch (_) {
             if (cancelled) return;
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
             body.textContent = I18n.t('menu_image_unreadable');
@@ -818,7 +948,8 @@
             if (cancelled || !p || !p.ok || !p.frase) return;
             testoChiuso(origine, p.frase);
             origine.title = I18n.t(p.firmatario === 'non_verificato' ? 'menu_origin_hint_unverified'
-              : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
+              : p.firmatario === 'provvisorio' ? 'menu_origin_hint_interim'
+                : p.prova === 'marchio' ? 'menu_origin_hint_mark' : 'menu_origin_hint');
             origine.classList.toggle('sn-menu-origine-debole', !p.forte);
             origine.hidden = false;
           }).catch(() => {});
@@ -831,6 +962,7 @@
               diceRipiego: true,
             });
             if (cancelled) return;
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             if (!res?.ok || !res.text) {
               el.classList.add('sn-menu-inline-error');
@@ -842,12 +974,16 @@
             Popup.notaInterrotta(el, res.finishReason);
           } catch (e) {
             if (cancelled) return;
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
             body.textContent = I18n.t('err_provider_failed');
           }
         })();
-        return () => { cancelled = true; };
+        return () => {
+          cancelled = true;
+          if (!arrivata) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.DESCRIBE_IMAGE, attesaMs: Date.now() - apertaIl });
+        };
       },
     };
   }
@@ -861,6 +997,8 @@
       onMount: (el) => {
         el.classList.add('sn-menu-inline-loading');
         let cancelled = false;
+        let arrivata = false;
+        const apertaIl = Date.now();
         (async () => {
           const url = indirizzoDelLink(linkEl);
           const anchorText = nomeDelLink(linkEl).slice(0, 200);
@@ -883,6 +1021,7 @@
           if (cancelled) return;
           if (r?.ok) { ogTitle = r.ogTitle || ''; ogDescription = r.ogDescription || ''; }
           else if (r?.bloccato) {
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             body.textContent = I18n.t(r.bloccato === 'lists' ? 'menu_link_blocked_lists' : 'menu_link_blocked', r.host || '');
             return;
@@ -892,6 +1031,7 @@
           try {
             port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
           } catch (_) {
+            arrivata = true;
             el.classList.remove('sn-menu-inline-loading');
             el.classList.add('sn-menu-inline-error');
             body.textContent = I18n.t('err_provider_failed');
@@ -901,6 +1041,7 @@
           let firstDelta = true;
           port.onMessage.addListener((m) => {
             if (m.type === 'delta') {
+              arrivata = true;
               if (firstDelta) {
                 el.classList.remove('sn-menu-inline-loading');
                 firstDelta = false;
@@ -913,10 +1054,13 @@
               // butta il testo parziale (l'avviso sicurezza resta).
               buf = '';
               body.textContent = '';
+              if (!cancelled) contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN_LINK, uso: 'ricominciata' });
             } else if (m.type === 'done') {
+              arrivata = true;
               Popup.notaRipiego(el, m.keyFallback);
               Popup.notaInterrotta(el, m.finishReason);
             } else if (m.type === 'error') {
+              arrivata = true;
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
               Popup.scriviErrore(body, m, { dopo: chiudiMenu });
@@ -929,7 +1073,10 @@
             origin: location.href,
           });
         })();
-        return () => { cancelled = true; };
+        return () => {
+          cancelled = true;
+          if (!arrivata) contaRiquadro('riquadro_chiuso_prima', { action: ACTIONS.EXPLAIN_LINK, attesaMs: Date.now() - apertaIl });
+        };
       },
     };
   }
@@ -954,26 +1101,41 @@
     });
   }
 
-  // La foto resta com'è per l'utente; `campi` sono i campi segreti da coprire nella copia che va a un modello (#810.7),
-  // null se non si sono potuti trovare tutti: quella copia allora non parte.
+  // La foto resta com'è per l'utente; `perModello` è la copia dello stesso scatto coperta dal main (#1721), null se non
+  // si è potuta coprire: allora al modello non parte niente.
   async function captureVisibleTab() {
     await attendiCompositor();
-    const prima = Extract.campiSegretiInVista();
-    const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, campiSegreti: true, campiNellaPagina: prima.length });
-    if (r?.ok) return { ...r, campi: prima.concat(Array.isArray(r.campi) ? r.campi : [], Extract.campiSegretiInVista()) };
-    if (r?.code !== 'segreti') return r;
-    const pura = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-    return pura?.ok ? { ...pura, campi: null } : pura;
+    return chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, copiaPerModello: true });
   }
 
-  // Il nome del file lo sceglie un modello guardando la foto: gli arriva coi campi segreti coperti, o non gli arriva.
-  async function descrizioneCoperta(dataUrl, campi, ritaglio = null) {
-    if (!Array.isArray(campi)) return null;
-    const perModello = campi.length ? await Extract.fotoCoperta(dataUrl, campi, { ritaglio }) : dataUrl;
-    return requestImageDescription(perModello, dataUrl);
+  // Il pezzo `ritaglio` (pixel CSS di una finestra larga `vista.w`) di una foto in pixel del dispositivo, su un canvas.
+  // Uno solo per la foto dell'utente e per la copia coperta: i due pezzi devono coincidere.
+  function tagliaInCanvas(img, larga, alta, ritaglio, vista) {
+    const sx = larga / vista.w, sy = alta / vista.h;
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(ritaglio.w * sx));
+    canvas.height = Math.max(1, Math.round(ritaglio.h * sy));
+    canvas.getContext('2d').drawImage(img, Math.round(ritaglio.x * sx), Math.round(ritaglio.y * sy), canvas.width, canvas.height, 0, 0, canvas.width, canvas.height);
+    return canvas;
+  }
+
+  async function ritagliaCopia(dataUrl, ritaglio, vista) {
+    // Decodificata qui e non caricata come <img>: la politica dei contenuti del sito può vietare le immagini data:.
+    const byte = Uint8Array.from(atob(dataUrl.slice(dataUrl.indexOf(',') + 1)), (c) => c.charCodeAt(0));
+    const img = await createImageBitmap(new Blob([byte]));
+    return tagliaInCanvas(img, img.width, img.height, ritaglio, vista).toDataURL('image/png');
+  }
+
+  // Il nome del file lo sceglie un modello guardando la foto: gli arriva la copia coperta, o non gli arriva.
+  async function descrizioneCoperta(dataUrl, perModello, ritaglio = null, vista = null) {
+    if (typeof perModello !== 'string' || !perModello) return null;
+    const pezzo = ritaglio ? await ritagliaCopia(perModello, ritaglio, vista || { w: window.innerWidth, h: window.innerHeight }) : perModello;
+    return requestImageDescription(pezzo, dataUrl);
   }
 
   function buildSavePayload() {
+    // Del sito non raggiungibile si salva solo dove sta: il testo qui è quello dell'errore.
+    if (paginaDErrore()) return { url: indirizzoDellaPagina(), title: document.title, favicon: '', description: '', excerpt: '' };
     const meta = Extract.pageMeta();
     return {
       url: location.href,
@@ -1023,7 +1185,7 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.SAVE_PAGE, page: base });
       if (!res?.ok) {
-        Popup.showToast(I18n.t('toast_save_failed'));
+        Popup.toastErrore('toast_save_failed');
         return null;
       }
       entry = res.entry;
@@ -1031,7 +1193,7 @@
       // Contesto distrutto da un redirect immediato o errore IPC: avvisa
       // invece di fallire in silenzio.
       console.error('[SN] savePage', e);
-      Popup.showToast(I18n.t('toast_save_failed'));
+      Popup.toastErrore('toast_save_failed');
       return null;
     }
 
@@ -1101,7 +1263,7 @@
       if (openList && entry && entry.id) {
         chrome.runtime.sendMessage({ type: MSG.OPEN_HOME, highlight: entry.id }).catch(() => {});
       }
-      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB }).catch(() => {});
+      if (chiudiScheda) chrome.runtime.sendMessage({ type: MSG.CLOSE_TAB, via: 'salva_per_dopo' }).catch(() => {});
     };
 
     pill.addEventListener('click', (e) => { if (gestoVero(e)) finish(true); });
@@ -1174,9 +1336,9 @@
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_IMAGE, url: src, politiche: politicheReferrer(imgEl) });
       if (res?.ok) Popup.showToast(I18n.t('toast_image_saved'));
-      else if (!res?.cancelled) Popup.showToast(I18n.t('toast_image_save_failed'));
+      else if (!res?.cancelled) Popup.toastErrore('toast_image_save_failed');
     } catch (_) {
-      Popup.showToast(I18n.t('toast_image_save_failed'));
+      Popup.toastErrore('toast_image_save_failed');
     }
   }
 
@@ -1214,9 +1376,9 @@
     }
     try {
       const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url: href });
-      if (res && res.ok === false) Popup.showToast(I18n.t('toast_file_save_failed'));
+      if (res && res.ok === false) Popup.toastErrore('toast_file_save_failed');
     } catch (_) {
-      Popup.showToast(I18n.t('toast_file_save_failed'));
+      Popup.toastErrore('toast_file_save_failed');
     }
   }
 
@@ -1227,11 +1389,12 @@
   }
 
   async function shareCurrentPage() {
-    const data = { title: document.title, url: location.href };
+    const url = indirizzoDellaPagina();
+    const data = { title: document.title, url };
     if (navigator.share) {
       try { await navigator.share(data); return; } catch (_) {}
     }
-    copyToClipboard(location.href);
+    copyToClipboard(url);
   }
 
   // Senza condivisione nativa si copia negli appunti: vale il discorso di «Copia URL»
@@ -1239,7 +1402,7 @@
   async function shareLink(linkEl) {
     const href = indirizzoDelLink(linkEl);
     if (!isAddress(href)) {
-      Popup.showToast(I18n.t('toast_not_an_address'));
+      Popup.toastErrore('toast_not_an_address');
       return;
     }
     const data = { title: nomeDelLink(linkEl) || href, url: href };
@@ -1261,7 +1424,13 @@
       chrome.runtime.sendMessage({ type: MSG.OPEN_NEW_TAB, url: String(url) }).catch(() => {});
       return;
     }
-    try { if (typeof global.SN_APERTURA_SCELTA === 'function') global.SN_APERTURA_SCELTA(url); } catch (_) {}
+    try {
+      if (typeof global.SN_APERTURA_SCELTA === 'function') {
+        const voce = global.SN_MENU && typeof global.SN_MENU.azioneInCorso === 'function' ? global.SN_MENU.azioneInCorso() : null;
+        if (voce) voce.apre = true;
+        global.SN_APERTURA_SCELTA(url, voce ? { id: voce.id, t0: voce.t0 } : null);
+      }
+    } catch (_) {}
     window.open(url, '_blank', 'noopener');
   }
 
@@ -1356,7 +1525,7 @@
       if (isMediaInPip(el)) { await document.exitPictureInPicture(); return; }
       await el.requestPictureInPicture();
     } catch (_) {
-      Popup.showToast(I18n.t('toast_pip_failed'));
+      Popup.toastErrore('toast_pip_failed');
     }
   }
 
@@ -1365,20 +1534,20 @@
   function copyMediaUrl(el) {
     const src = mediaSrc(el);
     if (!src || /^blob:/i.test(src)) {
-      Popup.showToast(I18n.t('toast_media_stream_only'));
+      Popup.toastErrore('toast_media_stream_only');
       return;
     }
     copyUrlToClipboard(src);
   }
 
-  async function downloadMedia(el) {
+  async function downloadMedia(el, link = null) {
     const audio = isAudioEl(el);
     const failToast = audio ? 'toast_audio_save_failed' : 'toast_video_save_failed';
     const src = mediaSrc(el);
-    if (!src) { Popup.showToast(I18n.t(failToast)); return; }
+    if (!src) { Popup.toastErrore(failToast); return; }
 
     // Come in downloadImage, blob: e data: restano sul cammino anchor. Un blob: di
-    // MediaSource non è leggibile: lì non esiste nessun file da salvare.
+    // MediaSource non è leggibile: il file non esiste, e lo ricompone yt-dlp dalla pagina (#1488).
     if (/^(blob:|data:)/i.test(src)) {
       try {
         const r = await fetch(src);
@@ -1393,7 +1562,8 @@
         document.body.appendChild(a); a.click(); a.remove();
         setTimeout(() => { try { URL.revokeObjectURL(objUrl); } catch (_) {} }, 20000);
       } catch (_) {
-        Popup.showToast(I18n.t('toast_media_stream_only'));
+        if (/^blob:/i.test(src)) await salvaInStreaming(audio, indirizzoDelVideo(el, link));
+        else Popup.toastErrore('toast_media_stream_only');
       }
       return;
     }
@@ -1408,10 +1578,56 @@
         politiche: politicheReferrer(el),
       });
       if (res?.ok) Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved'));
-      else if (!res?.cancelled) Popup.showToast(I18n.t(failToast));
+      else if (!res?.cancelled) Popup.toastErrore(failToast);
     } catch (_) {
-      Popup.showToast(I18n.t(failToast));
+      Popup.toastErrore(failToast);
     }
+  }
+
+  // L'indirizzo del filmato cliccato quando la pagina non è lui (#1488): il collegamento a cui il menu lo lega, quello
+  // che il lettore di YouTube dà al suo video, o il permalink col <time> del post che lo contiene. '' = la pagina.
+  function indirizzoDelVideo(el, link) {
+    const di = (a) => {
+      const h = a && (typeof a.href === 'string' ? a.href : a.href?.baseVal);
+      if (!h) return '';
+      try { const u = new URL(String(h), location.href); return /^https?:$/.test(u.protocol) ? u.href : ''; } catch (_) { return ''; }
+    };
+    const delLink = di(link);
+    if (delLink) return delLink;
+    const lettore = el.closest?.('.html5-video-player, #movie_player');
+    const titolo = di(lettore && lettore.querySelector('a.ytp-title-link[href]'));
+    if (titolo) return titolo;
+    // Il post più piccolo che contiene il filmato e un solo permalink. Un contenitore con un altro filmato, o molto
+    // più grande del filmato, è la pagina e non il post: il suo <time> può essere una data qualunque.
+    const area = (x) => { const r = x.getBoundingClientRect(); return r.width * r.height; };
+    const delFilmato = area(el);
+    for (let n = el.parentElement, i = 0; n && n !== document.body && i < 25; n = n.parentElement, i++) {
+      if (n.querySelectorAll('video, audio').length > 1 || !(delFilmato > 0) || area(n) > 8 * delFilmato) break;
+      const permalink = new Set(Array.from(n.querySelectorAll('a[href] time'), (t) => di(t.closest('a'))).filter(Boolean));
+      if (permalink.size === 1) return [...permalink][0];
+      if (permalink.size > 1) break;
+    }
+    return '';
+  }
+
+  // La risposta arriva a video salvato, anche dopo minuti: se tarda, un avviso dice subito che è partito.
+  async function salvaInStreaming(audio, indirizzo = '') {
+    let partito = null;
+    const avviso = setTimeout(() => { partito = Popup.showToast(I18n.t(audio ? 'toast_audio_streaming_started' : 'toast_video_streaming_started')); }, 700);
+    let res = null;
+    try {
+      res = await chrome.runtime.sendMessage({ type: MSG.SAVE_STREAMING_VIDEO, kind: audio ? 'audio' : 'video', titolo: document.title || '', indirizzo });
+    } catch (_) { res = null; }
+    clearTimeout(avviso);
+    try { if (partito && partito.close) partito.close(); } catch (_) {}
+    // La fine di un salvataggio lungo la dice la finestra, dovunque sia l'utente: qui non si ripete.
+    if (res?.cancelled || res?.annunciato) return;
+    if (res?.ok) { Popup.showToast(I18n.t(audio ? 'toast_audio_saved' : 'toast_video_saved')); return; }
+    // Una build senza la funzione (quelle da negozio) dice com'era prima: lo streaming non ha un file.
+    if (res?.spento) { Popup.toastErrore('toast_media_stream_only'); return; }
+    const chiave = `streaming_${res?.motivo || 'generico'}`;
+    const frase = I18n.t(chiave) !== chiave ? I18n.t(chiave) : I18n.t('streaming_generico');
+    Popup.toastErrore('streaming_non_riuscito', { duration: 9000 }, frase);
   }
 
   // Il corpo accelera di uno scatto, la freccetta apre l'elenco completo. L'etichetta
@@ -1420,58 +1636,52 @@
     const rate = Number(el.playbackRate) || 1;
     return {
       type: 'split',
+      azione: 'video-audio-controls',
       label: `${I18n.t('menu_media_speed')} ${formatSpeed(rate)}`,
       arrowTitle: I18n.t('menu_media_speed_pick'),
       onClick: () => setMediaSpeed(el, nextMediaSpeed(rate)),
       subItems: MEDIA_SPEEDS.map((s) => ({
+        azione: 'video-audio-controls',
         label: `${Math.abs(s - rate) < 0.001 ? '✓ ' : ''}${formatSpeed(s)}${s === 1 ? ` (${I18n.t('menu_media_speed_normal')})` : ''}`,
         onClick: () => setMediaSpeed(el, s),
       })),
     };
   }
 
-  function buildMediaItems(el) {
+  // Le azioni di un filmato o di un audio, una volta sola: le voci del menu e le icone della fila (#1434) le prendono da
+  // qui, coi nomi che dicono lo stato. `icona`: il disegno per la fila, quando lo stato lo cambia. Manca chi qui non c'è
+  // (la finestra mobile dove il filmato non la permette).
+  function azioniDelMedia(el, link = null) {
     const audio = isAudioEl(el);
-    const items = [];
-    items.push({
-      type: 'item',
-      label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'),
-      onClick: () => toggleMediaPlay(el),
-    });
-    items.push({
-      type: 'item',
-      label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'),
-      onClick: () => toggleMediaMute(el),
-    });
-    items.push(buildMediaSpeedItem(el));
-    items.push({
-      type: 'item',
-      label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'),
-      onClick: () => toggleMediaLoop(el),
-    });
-    if (mediaPipAvailable(el)) {
-      items.push({
-        type: 'item',
-        label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'),
-        onClick: () => toggleMediaPip(el),
-      });
-    }
-    items.push({
-      type: 'item',
-      label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'),
-      onClick: () => toggleMediaControls(el),
-    });
-    items.push({ type: 'separator' });
-    items.push({
-      type: 'item',
-      label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'),
-      onClick: () => copyMediaUrl(el),
-    });
-    items.push({
-      type: 'item',
-      label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'),
-      onClick: () => downloadMedia(el),
-    });
+    return {
+      playPause: { label: I18n.t(el.paused ? 'menu_media_play' : 'menu_media_pause'), icona: el.paused ? 'play' : 'pause', onClick: () => toggleMediaPlay(el) },
+      mute: { label: I18n.t(el.muted ? 'menu_media_unmute' : 'menu_media_mute'), icona: el.muted ? 'volume' : 'volumeMute', onClick: () => toggleMediaMute(el) },
+      loop: { label: I18n.t(el.loop ? 'menu_media_loop_off' : 'menu_media_loop'), onClick: () => toggleMediaLoop(el) },
+      ...(mediaPipAvailable(el)
+        ? { pip: { label: I18n.t(isMediaInPip(el) ? 'menu_media_pip_exit' : 'menu_media_pip'), onClick: () => toggleMediaPip(el) } }
+        : {}),
+      controls: { label: I18n.t(el.controls ? 'menu_media_hide_controls' : 'menu_media_show_controls'), onClick: () => toggleMediaControls(el) },
+      copyLink: { label: I18n.t(audio ? 'menu_copy_audio_link' : 'menu_copy_video_link'), onClick: () => copyMediaUrl(el) },
+      save: { label: I18n.t(audio ? 'menu_save_audio_as' : 'menu_save_video_as'), onClick: () => downloadMedia(el, link) },
+    };
+  }
+
+  // `link`: il collegamento a cui il menu lega il filmato (l'anteprima stesa sopra la scheda di una home).
+  function buildMediaItems(el, link = null) {
+    const a = azioniDelMedia(el, link);
+    const items = [
+      { type: 'item', azione: 'video-audio-controls', label: a.playPause.label, onClick: a.playPause.onClick },
+      { type: 'item', azione: 'video-audio-controls', label: a.mute.label, onClick: a.mute.onClick },
+      buildMediaSpeedItem(el),
+      { type: 'item', azione: 'video-audio-controls', label: a.loop.label, onClick: a.loop.onClick },
+    ];
+    if (a.pip) items.push({ type: 'item', azione: 'video-pip', label: a.pip.label, onClick: a.pip.onClick });
+    items.push(
+      { type: 'item', azione: 'video-audio-controls', label: a.controls.label, onClick: a.controls.onClick },
+      { type: 'separator' },
+      { type: 'item', azione: 'copy-download-video', label: a.copyLink.label, onClick: a.copyLink.onClick },
+      { type: 'item', azione: 'copy-download-video', label: a.save.label, onClick: a.save.onClick },
+    );
     return items;
   }
 
@@ -1486,24 +1696,33 @@
     apriInSchedaNuova(url);
   }
 
+  // Come copyToClipboard: prima il main, che non chiede il fuoco alla pagina; se dice no, la pagina. `blobPng()` → Blob.
+  async function immagineNegliAppunti(dataUrl, blobPng) {
+    if (/^data:image\/png;base64,/.test(String(dataUrl || ''))) {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.COPY_IMAGE_TO_CLIPBOARD, dataUrl });
+        if (r && r.ok) return true;
+      } catch (_) {}
+    }
+    try {
+      const pngBlob = await blobPng();
+      if (!pngBlob || !navigator.clipboard?.write) return false;
+      await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
+      return true;
+    } catch (_) { return false; }
+  }
+
   async function takeScreenshot() {
     try {
       const cap = await captureVisibleTab();
       if (!cap?.dataUrl) {
-        Popup.showToast(I18n.t('err_provider_failed'));
+        Popup.toastErrore('err_provider_failed');
         return;
       }
-      let copied = false;
-      try {
-        const pngBlob = await dataUrlToPngBlob(cap.dataUrl);
-        if (pngBlob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': pngBlob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      const copied = await immagineNegliAppunti(cap.dataUrl, () => dataUrlToPngBlob(cap.dataUrl));
       // Toast immediato: feedback istantaneo prima che il LLM generi il nome file
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(cap.dataUrl, cap.campi).catch(() => null);
+      const desc = await descrizioneCoperta(cap.dataUrl, cap.perModello).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1616,17 +1835,12 @@
         const w = maxX - minX, h = maxY - minY;
         cleanup();
         if (w < 4 || h < 4) { resolve(null); return; }
-        const sx = img.naturalWidth / vw;
-        const sy = img.naturalHeight / vh;
-        const cx = Math.round(minX * sx), cy = Math.round(minY * sy);
-        const cw = Math.round(w * sx), ch = Math.round(h * sy);
-        const canvas = document.createElement('canvas');
-        canvas.width = cw; canvas.height = ch;
-        canvas.getContext('2d').drawImage(img, cx, cy, cw, ch, 0, 0, cw, ch);
+        const rect = { x: minX, y: minY, w, h }, vista = { w: vw, h: vh };
+        const canvas = tagliaInCanvas(img, img.naturalWidth, img.naturalHeight, rect, vista);
         canvas.toBlob((blob) => {
           if (!blob) { resolve(null); return; }
           const r = new FileReader();
-          r.onload = () => resolve({ dataUrl: r.result, blob, rect: { x: minX, y: minY, w, h }, campi: cap.campi });
+          r.onload = () => resolve({ dataUrl: r.result, blob, rect, vista, perModello: cap.perModello });
           r.onerror = () => resolve(null);
           r.readAsDataURL(blob);
         }, 'image/png');
@@ -1669,15 +1883,9 @@
       const region = await selectScreenRegion();
       if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       const { dataUrl, blob } = region;
-      let copied = false;
-      try {
-        if (blob && navigator.clipboard?.write) {
-          await navigator.clipboard.write([new ClipboardItem({ 'image/png': blob })]);
-          copied = true;
-        }
-      } catch (_) {}
+      const copied = await immagineNegliAppunti(dataUrl, async () => blob);
       if (copied) Popup.showToast(I18n.t('toast_copied_saving'), { duration: 3000 });
-      const desc = await descrizioneCoperta(dataUrl, region.campi, region.rect).catch(() => null);
+      const desc = await descrizioneCoperta(dataUrl, region.perModello, region.rect, region.vista).catch(() => null);
       try {
         chrome.runtime.sendMessage({
           type: MSG.PUSH_CLIPBOARD_ENTRY,
@@ -1690,14 +1898,16 @@
       a.download = descriptionToFilename(desc) || `screenshot-${stamp}.png`;
       document.body.appendChild(a); a.click(); a.remove();
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
     }
   }
 
   async function transcribeRegion() {
     try {
       const region = await selectScreenRegion();
-      if (!region) { Popup.showToast(I18n.t('toast_region_cancelled')); return; }
+      // Com'è finita la trascrizione (#1465); un guasto del modello lo contano già gli errori.
+      const ocr = (esito) => contaRiquadro('ocr', { esito });
+      if (!region) { ocr('annullato'); Popup.showToast(I18n.t('toast_region_cancelled')); return; }
       Popup.showToast(I18n.t('toast_transcribing'), { duration: 2500 });
       const res = await chrome.runtime.sendMessage({
         type: MSG.AI_REQUEST,
@@ -1706,7 +1916,7 @@
       });
       if (!res?.ok) { Popup.avvisoErrore(res); return; }
       const text = (res.text || '').trim();
-      if (!text) { Popup.showToast(I18n.t('toast_transcribe_empty')); return; }
+      if (!text) { ocr('vuoto'); Popup.toastErrore('toast_transcribe_empty'); return; }
       try { await navigator.clipboard.writeText(text); } catch (_) {
         const ta = document.createElement('textarea');
         ta.value = text;
@@ -1718,9 +1928,10 @@
       try { pushClipboardEntry({ type: 'text', text }); } catch (_) {}
       // Copiato, ma non intero: fermato al tetto di lunghezza (#1097.3).
       const interrotta = globalThis.SN_CHAT_ERRORS?.rispostaInterrotta?.(res.finishReason);
+      ocr(interrotta ? 'tagliato' : 'copiato');
       Popup.showToast(interrotta ? `${I18n.t('toast_transcribed')} ${interrotta}` : I18n.t('toast_transcribed'), interrotta ? { duration: 9000 } : undefined);
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
     }
   }
 
@@ -1751,11 +1962,11 @@
   // click sull'icona il cursore cambia (gestito dal browser/SO) e la prossima
   // pressione del tasto sinistro su un pixel qualsiasi della pagina copia il
   // colore in formato hex nella clipboard. Esc annulla.
-  // `scelto`: il colore l'ha già preso lo strato del menu sopra la scheda, che ha il gesto dell'utente (#1054).
+  // `scelto`: il colore l'ha già preso la barra laterale, che ha il gesto dell'utente e la pagina no (#1246).
   async function pickColor(scelto) {
     const giaScelto = typeof scelto === 'string' && /^#[0-9a-f]{6}$/i.test(scelto);
     if (!giaScelto && typeof window.EyeDropper !== 'function') {
-      Popup.showToast(I18n.t('err_color_picker_unsupported'), { duration: 3000 });
+      Popup.toastErrore('err_color_picker_unsupported', { duration: 3000 });
       return;
     }
     try {
@@ -1781,16 +1992,16 @@
   // Resta nero su bianco a prescindere dal tema: il contrasto che gli scanner pretendono.
   function showPageQrCode() {
     const QR = global.SN_QR;
-    const url = String(location.href || '');
+    const url = indirizzoDellaPagina();
     if (!QR || typeof QR.toMatrix !== 'function') {
-      Popup.showToast(I18n.t('qr_error'), { duration: 3000 });
+      Popup.toastErrore('qr_error', { duration: 3000 });
       return;
     }
     let matrix;
     try {
       matrix = QR.toMatrix(url, { ecc: 'M' });
     } catch (e) {
-      Popup.showToast(I18n.t('qr_error'), { duration: 3500 });
+      Popup.toastErrore('qr_error', { duration: 3500 });
       return;
     }
 
@@ -1966,7 +2177,7 @@
         finish(canvas.toDataURL('image/png'));
       }
     } catch (e) {
-      Popup.showToast(I18n.t('qr_error'), { duration: 2500 });
+      Popup.toastErrore('qr_error', { duration: 2500 });
     }
   }
 
@@ -1975,17 +2186,18 @@
   global.SN_ACTIONS = {
     init,
     copyToClipboard,
+    copySelection,
     copyUrlToClipboard,
     isAddress,
     cutSelection,
     blobToDataUrl,
+    blobDaDataUrl,
     pasteFromClipboard,
     pasteHistoryEntry,
     insertTextAtSelection,
     insertDictatedText,
     buildPasteItem,
     getClipboardHistory,
-    getNavState,
     pushClipboardEntry,
     requestImageDescription,
     descriptionToFilename,
@@ -2018,6 +2230,7 @@
     imageSearchUrlFor,
     // video / audio
     buildMediaItems,
+    azioniDelMedia,
     buildMediaSpeedItem,
     downloadMedia,
     copyMediaUrl,
@@ -2027,6 +2240,9 @@
     toggleMediaLoop,
     toggleMediaControls,
     toggleMediaPip,
+    mediaPipAvailable,
+    isMediaInPip,
+    isAudioEl,
     setMediaSpeed,
     takeScreenshot,
     takePartialScreenshot,

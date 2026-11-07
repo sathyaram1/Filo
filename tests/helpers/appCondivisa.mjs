@@ -12,12 +12,12 @@ import { primaFinestra } from './primaFinestra.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-export const OPZIONI_FIXTURE = Object.freeze({ accoglienzaFatta: true, riservaNuovaScheda: false, stratoDelMenu: false, argomentiInPiu: [], hostInPiu: [], inPausaAperte: true });
+export const OPZIONI_FIXTURE = Object.freeze({ accoglienzaFatta: true, riservaNuovaScheda: false, stratoDelMenu: false, argomentiInPiu: [], hostInPiu: [], inPausaAperte: true, envInPiu: {} });
 // Le stesse della fixture, nello stesso ordine: la sentinella le confronta col suo sorgente.
 export const REGOLE_HOST = Object.freeze(['MAP blocked.test 127.0.0.1', 'MAP 192.168.1.1 127.0.0.1:9', 'MAP sito-pubblico.test 127.0.0.1']);
 
 /** Argomenti e ambiente del lancio, gli stessi della fixture `app`. PURA. */
-export function lancio(userData, { accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte } = OPZIONI_FIXTURE, env = process.env) {
+export function lancio(userData, { accoglienzaFatta, riservaNuovaScheda, stratoDelMenu, argomentiInPiu, hostInPiu, inPausaAperte, envInPiu = {} } = OPZIONI_FIXTURE, env = process.env) {
   const regole = [...REGOLE_HOST, ...hostInPiu.map((h) => `MAP ${h} 127.0.0.1`)].join(', ');
   return {
     args: [...argomentiScala, ...argomentiInPiu, `--host-resolver-rules=${regole}`, '.'],
@@ -31,6 +31,7 @@ export function lancio(userData, { accoglienzaFatta, riservaNuovaScheda, stratoD
       FILO_TEST_IN_PAUSA_APERTE: inPausaAperte ? '1' : '0',
       FILO_DOWNLOAD_DIR: join(userData, 'downloads'),
       NODE_ENV: 'test',
+      ...envInPiu,
     },
   };
 }
@@ -79,7 +80,10 @@ async function fotografaNelMain() {
   }
   await globalThis.__filoStorage.whenSettled();
   const storage = JSON.stringify(await globalThis.chrome.storage.local.get(null));
-  globalThis.__filoAppCondivisa = { globali, oggetti, storage };
+  // Il filo ha un file suo (chat, cambi, schede…): torna anche lui com'era.
+  await globalThis.SN_REGISTRO_CAMBI?.attesa?.();
+  const filo = (await globalThis.SN_IL_FILO.esporta()).toString('utf8');
+  globalThis.__filoAppCondivisa = { globali, oggetti, storage, filo };
 }
 
 // Nel main: rimette le funzioni rattoppate e toglie i globali `__x` delle prove (l'app ne crea solo coi nomi __filo*).
@@ -116,12 +120,14 @@ async function chiudiSchedeNelMain({ BrowserWindow }, tetto) {
   return vecchie.filter((wc) => !wc.isDestroyed()).map((wc) => wc.getURL());
 }
 
-// Nel main: lo storage com'era a lancio fermo (archivi, cronologia e segnalazioni compresi), e le impostazioni rimesse
-// ai servizi che le tengono in memoria. Fuori dal registro dei cambi, come una migrazione.
+// Nel main: lo storage e il filo com'erano a lancio fermo (archivi, cronologia e segnalazioni compresi), e le impostazioni
+// rimesse ai servizi che le tengono in memoria. Fuori dal registro dei cambi, come una migrazione.
 async function azzeraStorageNelMain() {
   const s = globalThis.__filoAppCondivisa;
   await globalThis.__filoStorage.whenSettled();
+  await globalThis.SN_REGISTRO_CAMBI.attesa();
   await globalThis.SN_IL_FILO?.quandoFermo?.();
+  await globalThis.SN_IL_FILO.ricomincia(s.filo);
   await globalThis.SN_REGISTRO_CAMBI.con({ via: 'migrazione' }, async () => {
     await globalThis.chrome.storage.local.clear();
     await globalThis.chrome.storage.local.set(JSON.parse(s.storage));

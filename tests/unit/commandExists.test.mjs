@@ -123,3 +123,49 @@ test('#1176: un probe che conferma basta anche dopo uno incerto, e solo tutti «
   assert.equal(await esitoDeiProbe([esce(1), esce(1)], undefined, TETTO_ATTESA_MS), false);
   assert.equal(await esitoDeiProbe([esce(2)], undefined, TETTO_ATTESA_MS), false);
 });
+
+// #892.1 — su Windows una / seguita dal percorso di un documento che esiste è un messaggio per Filo, non un programma:
+// conta solo un'estensione che Windows esegue, scritta o sottintesa. Il ramo di Windows si prova fingendo la piattaforma.
+test('#892.1: su Windows un documento al percorso non è un programma, un eseguibile sì', async () => {
+  const { writeFileSync } = await import('node:fs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const dir = cartellaTemporanea('filo-892-1-');
+  for (const f of ['lettera.docx', 'foto.jpg', 'setup.exe', 'avvia.cmd', 'build.ps1']) writeFileSync(join(dir, f), 'x');
+  const vera = Object.getOwnPropertyDescriptor(process, 'platform');
+  Object.defineProperty(process, 'platform', { value: 'win32' });
+  try {
+    const c = (command, shell = 'powershell') => commandExists({ shell, cwd: dir, command, attesaMs: 2000 });
+    assert.equal(await c(join(dir, 'lettera.docx')), false);
+    assert.equal(await c(join(dir, 'foto.jpg')), false);
+    assert.equal(await c(dir), false, 'una cartella non è un programma');
+    assert.equal(await c(join(dir, 'setup.exe')), true);
+    assert.equal(await c(join(dir, 'avvia')), true, 'l\'estensione sottintesa vale come in Windows');
+    assert.equal(await c('./build.ps1'), true);
+    // In WSL il bit d'esecuzione non si vede da qui (e sotto /mnt ce l'hanno tutti): decide il contenuto.
+    writeFileSync(join(dir, 'avvia.sh'), '#!/bin/sh\necho ciao\n');
+    writeFileSync(join(dir, 'prog.exe'), 'MZ\x90\x00');
+    assert.equal(await c(join(dir, 'foto.jpg'), 'bash'), false, 'in WSL un documento non è un programma');
+    assert.equal(await c(join(dir, 'avvia.sh'), 'bash'), true, 'in WSL uno script sì');
+    assert.equal(await c(join(dir, 'prog.exe'), 'bash'), true, 'in WSL un eseguibile di Windows sì');
+  } finally {
+    Object.defineProperty(process, 'platform', vera);
+  }
+});
+
+// Verifica #1683 — su un disco NTFS o exFAT ogni documento ha il permesso d'esecuzione: la frase che comincia col suo
+// percorso resta un messaggio per Filo. Un programma si riconosce dai primi byte: `#!` o il segno di un eseguibile.
+test('#892.5: fuori da Windows un documento col permesso d\'esecuzione non è un programma, uno script e un eseguibile sì', { skip: process.platform === 'win32' && 'il permesso d\'esecuzione è dei dischi di Linux e Mac' }, async () => {
+  const { writeFileSync, chmodSync, copyFileSync } = await import('node:fs');
+  const { cartellaTemporanea } = await import('../helpers/percorsi.mjs');
+  const dir = cartellaTemporanea('filo-892-5-');
+  writeFileSync(join(dir, 'lettera.pdf'), '%PDF-1.4\n');
+  writeFileSync(join(dir, 'note.txt'), 'appunti\n');
+  writeFileSync(join(dir, 'saluta.sh'), '#!/bin/sh\necho ciao\n');
+  copyFileSync(process.execPath, join(dir, 'binario'));
+  for (const f of ['lettera.pdf', 'note.txt', 'saluta.sh', 'binario']) chmodSync(join(dir, f), 0o777);
+  const c = (command) => commandExists({ cwd: dir, command, attesaMs: 2000 });
+  assert.equal(await c('./lettera.pdf'), false, 'un pdf da un disco di Windows');
+  assert.equal(await c(join(dir, 'note.txt')), false, 'un testo da un disco di Windows');
+  assert.equal(await c('./saluta.sh'), true);
+  assert.equal(await c('./binario'), true);
+});

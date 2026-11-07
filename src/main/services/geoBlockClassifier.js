@@ -242,7 +242,8 @@ function spendFor(cache, host, url, budgetUrl) {
   const SB = sb();
   let budget = budgetByCache.get(cache);
   if (!budget) { budget = SB.createOwnerBudget(); budgetByCache.set(cache, budget); }
-  return budget.spend(SB.ownerOf(url || `https://${host}/`, budgetUrl) || String(host || '').toLowerCase());
+  const toccato = () => require('./contatoriSicurezza').misura('tetto', 'geo_budget');
+  return budget.spend(SB.ownerOf(url || `https://${host}/`, budgetUrl) || String(host || '').toLowerCase(), toccato);
 }
 
 async function classify(input = {}, { complete, cache, now = Date.now, signal } = {}) {

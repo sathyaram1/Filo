@@ -4,6 +4,7 @@
 
 const { BrowserWindow } = require('electron');
 require('../shared/tasti');
+const Strade = require('./services/contatoriStrade');
 
 // I tasti di serie, combinazione → comando: la scelta dell'utente la tiene SN_TASTI.
 const COMMANDS = Object.freeze(Object.fromEntries(globalThis.SN_TASTI.AZIONI_FILO.map((a) => [a.serie, a.id])));
@@ -13,20 +14,21 @@ function configura(settings) {
   globalThis.SN_TASTI.usaScorciatoieFilo(settings && settings.scorciatoie);
 }
 
-// Le combinazioni dei moduli dell'Editor stanno nei suoi documenti: la chat e il salvataggio le confrontano con le
-// quattro, quindi il main le segue da quando parte a ogni salvataggio dell'Editor.
-const COLLEZIONE_EDITOR = 'filo.editor.collection';
-let moduliSeguiti = false;
-async function seguiModuliEditor() {
-  if (moduliSeguiti) return;
-  moduliSeguiti = true;
+// Le combinazioni degli elementi dei pannelli delle app (#1433): la chat e il salvataggio le confrontano con le quattro,
+// quindi il main le segue da quando parte e a ogni cambio dei pannelli.
+const PANNELLI = 'sn_pannelli_app';
+let pannelliSeguiti = false;
+async function seguiPannelli() {
   const Storage = require('./shim/storage');
-  Storage.onChanged((cambi) => {
-    if (cambi && cambi[COLLEZIONE_EDITOR]) globalThis.SN_TASTI.usaScorciatoieModuli(cambi[COLLEZIONE_EDITOR].newValue);
-  });
+  if (!pannelliSeguiti) {
+    pannelliSeguiti = true;
+    Storage.onChanged((cambi) => {
+      if (cambi && cambi[PANNELLI]) globalThis.SN_TASTI.usaScorciatoiePannelli(cambi[PANNELLI].newValue);
+    });
+  }
   try {
-    const r = await Storage.get(COLLEZIONE_EDITOR);
-    globalThis.SN_TASTI.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+    const r = await Storage.get(PANNELLI);
+    globalThis.SN_TASTI.usaScorciatoiePannelli(r && r[PANNELLI]);
   } catch (_) {}
 }
 
@@ -71,8 +73,11 @@ function tastoSchermoIntero(wc, event, input, finestra) {
   const tabs = finestraDiFilo(typeof finestra === 'function' ? finestra() : finestra)?._filoTabs;
   if (!tabs || tabs.schermoPienoDi(wc)) return false;
   event.preventDefault();
-  // Tenuto premuto non lampeggia: entra una volta sola.
-  if (!input.isAutoRepeat) tabs.toggleContentFullscreen();
+  // Tenuto premuto non lampeggia: entra una volta sola. È la stessa azione contata della voce di menu (#1461).
+  if (!input.isAutoRepeat) {
+    Strade.misura('azione', 'fullscreen', 'scorciatoia', { incognito: !!(tabs.win && tabs.win._filoIncognito) });
+    require('./services/azioniContate').azione('fullscreen', () => tabs.toggleContentFullscreen(), { incognito: !!(tabs.win && tabs.win._filoIncognito) });
+  }
   return true;
 }
 
@@ -93,7 +98,38 @@ function finestraDiFilo(ripiego) {
   try { return (BrowserWindow.getAllWindows?.() || []).find(viva) || null; } catch (_) { return null; }
 }
 
-function dispatch(command, window) {
+// L'Aiuto laterale e Salva per dopo si contano qui, dove arrivano il tasto, la barra dei menu e chi altro li chiede
+// (#1461): la stessa azione dell'icona del tasto destro.
+// `via`: la strada del gesto (#1468), il tasto, la barra dei menu o la chat.
+const AZIONE_DEL_COMANDO = { 'open-help-sidebar': 'help-sidebar', 'save-for-later': 'save-for-later' };
+function dispatch(command, window, via = 'scorciatoia') {
+  const win = finestraDiFilo(window);
+  contaStrada(command, via, win);
+  const azione = AZIONE_DEL_COMANDO[command];
+  if (!azione) return dispatchOra(command, window);
+  return require('./services/azioniContate').azione(azione, () => dispatchOra(command, window), { incognito: !!(win && win._filoIncognito) });
+}
+
+// Sotto l'avviso del sito l'Aiuto è la domanda dell'avviso, da qualunque strada lo si chieda.
+// L'ultima consegnata e da dove: la pagina che la trova muta lo dice (#1468), e conta solo se era il tasto.
+let ultima = null;
+function daTastoDaPoco(command, entroMs = 5000) {
+  return !!ultima && ultima.command === command && ultima.via === 'scorciatoia' && Date.now() - ultima.t <= entroMs;
+}
+
+function contaStrada(command, via, win) {
+  if (!globalThis.SN_TASTI.AZIONI_FILO.some((a) => a.id === command)) return;
+  ultima = { command, via, t: Date.now() };
+  const incognito = !!(win && win._filoIncognito);
+  Strade.misura('azione', command, via, { incognito });
+  if (command !== 'open-help-sidebar') return;
+  const tm = win && win._filoTabs;
+  const active = tm && tm.tabs.find((t) => t.id === tm.activeId);
+  const coperta = !!(active && tm.avvisoSito && tm.avvisoSito.coperta() === active);
+  Strade.misura('aiuto', coperta ? 'avviso_sito' : via, { incognito });
+}
+
+function dispatchOra(command, window) {
   // Manda al webContents della tab attiva. Se è una pagina interna senza
   // content script, nessuno raccoglie: ok, è il comportamento atteso.
   const win = finestraDiFilo(window);
@@ -104,14 +140,17 @@ function dispatch(command, window) {
   if (command === 'save-for-later') {
     // Una pagina filo:// non va salvata né chiusa: l'uscita è esplicita perché questo comando,
     // a differenza degli altri, agisce comunque.
-    if (isInternalTab(active)) return;
-    saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
-    return;
+    if (isInternalTab(active)) {
+      Strade.misura('aVuoto', command, 'pagina_interna', { incognito: !!win._filoIncognito });
+      return;
+    }
+    return saveForLater(win, active).catch((e) => console.warn('[Filo] save-for-later failed', e));
   }
   // Sotto l'avviso del sito pericoloso un pannello della pagina non si vedrebbe: l'Aiuto lì è la domanda a Filo (#813.5).
   const tm = win._filoTabs;
   if (tm.avvisoSito && tm.avvisoSito.coperta() === active) {
     if (command === 'open-help-sidebar') require('./services/interruttoreAiuto').seAcceso(win, () => tm._sbScelta(active, 'chiedi'));
+    else Strade.misura('aVuoto', command, 'avviso_sito', { incognito: !!win._filoIncognito });
     return;
   }
   const wc = active.view.webContents;
@@ -123,6 +162,9 @@ function dispatch(command, window) {
     try {
       const frame = wc._filoActiveFrame;
       if (frame && !frame.detached) target = frame;
+      // Con la tastiera nei riquadri sopra la pagina (#1509.1) la selezione è la loro.
+      const strato = tm.riquadri && tm.riquadri.conTastiera(wc);
+      if (strato) target = strato;
     } catch (_) { target = wc; }
   }
   try { target.send('shortcut:triggered', { command }); } catch (_) {
@@ -182,16 +224,17 @@ async function salvaPerDopo(win, tab) {
   // I dati della scheda si fotografano prima di ogni attesa: un redirect intanto farebbe salvare la pagina sbagliata (#334).
   const url = tab.url;
   const title = tab.title;
-  const favicon = tab.faviconUrl || '';
+  // L'icona già scaricata con la sessione della scheda (proxy compreso): la voce ne tiene la copia (#1273).
+  const favicon = tab.favicon || '';
   if (await consegnaConRicevuta(tab, 'save-for-later')) return null;
   // Pagina che non l'ha presa (ancora in caricamento, bloccata): si salva comunque, prima della miniatura.
   const entry = await comeLaFinestra(win, async () => {
-    const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon } });
+    const res = await handleMessage({ type: MSG.SAVE_PAGE, page: { url, title, favicon }, proxy: tab.proxy || null });
     const thumbnail = await dallaScheda(tab.view.webContents);
     if (thumbnail && res?.entry?.id) await globalThis.SN_SAVED_PAGES.setThumbnail(res.entry.id, thumbnail);
     return res?.entry;
   });
-  try { win._filoTabs.closeTab(tab.id); } catch (_) {}
+  try { win._filoTabs.closeTab(tab.id, { via: 'salva_per_dopo' }); } catch (_) {}
   return entry;
 }
 
@@ -213,6 +256,6 @@ async function confermaSullaSchedaDavanti(win, entry, { tentativoMs = 800, total
 }
 
 module.exports = {
-  collegaScorciatoie, comandoDaTasto, configura, seguiModuliEditor, registraTasti, staRegistrandoTasti, dispatch, saveForLater,
+  collegaScorciatoie, comandoDaTasto, configura, seguiPannelli, registraTasti, staRegistrandoTasti, dispatch, saveForLater, daTastoDaPoco,
   consegnaConRicevuta, riceviRicevuta, confermaSullaSchedaDavanti, isInternalTab, COMMANDS,
 };

@@ -19,7 +19,7 @@ const ghExeFinto = (bin) => copyFileSync(process.execPath, join(bin, 'gh.exe'));
 const {
   scegliUltimoVerde, corseVerdi, rilascioFermo, testoRilascioFermo, rigaCorsa, verdePiuNuovoDelTag, SOGLIA_ORE, CHIAVE_FERMO,
   oreDalPrimoVerde, testoFermoDopoIlVerde, SOGLIA_VERDE_ORE, CHIAVE_FERMO_DOPO_VERDE, chiaveDelFermo,
-  passaIlCancello, LAVORO_UNIT_WINDOWS,
+  passaIlCancello, LAVORO_UNIT_WINDOWS, CAMPI_CORSA, CAMPI_LAVORO,
 } = await import('../../scripts/ultima-suite-verde.mjs');
 
 // main dal più nuovo: c5 è la punta, c1 il più vecchio.
@@ -130,6 +130,35 @@ describe('verde vuol dire anche unit test passati su Windows, come il cancello d
   });
 });
 
+// #1989: a gh api si chiedono solo questi campi; uno letto e non chiesto arriverebbe sempre vuoto.
+describe('di corse e lavori si leggono solo i campi chiesti a GitHub', () => {
+  const spia = (letti) => (o) => new Proxy(o, {
+    get(t, k, r) { if (typeof k === 'string') letti.add(k); return Reflect.get(t, k, r); },
+  });
+  const intera = (sha, conclusion, id) => ({ ...corsa(sha, conclusion), id, updated_at: '2026-09-28T11:00:00Z',
+    run_number: id, display_title: 'merge-gate', repository: { full_name: 'o/r' }, head_commit: { message: 'm' } });
+
+  test('scelta, età del verde e testi dei due fermi leggono di una corsa solo CAMPI_CORSA', () => {
+    const letti = new Set();
+    const runs = [intera('c5', 'failure', 5), intera('c4', 'success', 4), intera('c3', 'success', 3)].map(spia(letti));
+    const valida = (r) => r.id !== 4;
+    const verde = scegliUltimoVerde(runs, MAIN, valida);
+    assert.equal(verde, 'c3');
+    assert.ok(Number.isFinite(oreDalPrimoVerde(runs, MAIN, 'c1', () => true, Date.now(), valida)));
+    const v = corseVerdi(runs);
+    testoRilascioFermo({ tag: 'v1', oreDallUltima: 100, commitDopoTag: 3, verde, corsaVerde: v.get('c3'), scartata: v.get('c4'), corse: runs });
+    testoFermoDopoIlVerde({ tag: 'v1', oreDallUltima: 100, commitDopoTag: 3, verde, corsaVerde: v.get('c3'), oreDalVerde: 20, pubblicazioni: runs });
+    assert.deepEqual([...letti].filter((k) => !CAMPI_CORSA.includes(k)), [], 'un campo nuovo va aggiunto a CAMPI_CORSA');
+  });
+
+  test('il cancello su Windows legge di un lavoro solo CAMPI_LAVORO', () => {
+    const letti = new Set();
+    const lavori = [{ id: 1, name: 'suite (1)', conclusion: 'success', steps: [] }, { id: 2, name: LAVORO_UNIT_WINDOWS, conclusion: 'success', steps: [] }];
+    assert.equal(passaIlCancello(lavori.map(spia(letti))), true);
+    assert.deepEqual([...letti].filter((k) => !CAMPI_LAVORO.includes(k)), []);
+  });
+});
+
 describe('la pubblicazione ferma', () => {
   test(`ferma: più di ${SOGLIA_ORE} ore, codice nuovo dopo l'ultima versione, niente di verde dopo di lei`, () => {
     assert.equal(rilascioFermo({ oreDallUltima: 49, commitDopoTag: 3, verdeDopoTag: false }), 'senza-verde');
@@ -237,8 +266,10 @@ describe('la scelta vera, contro un main finto', () => {
 const fs = require('fs');
 const p = process.argv.find((a) => a.startsWith('repos/')) || '';
 const s = JSON.parse(fs.readFileSync(process.env.FAKE_GH_STATO, 'utf8'));
+fs.appendFileSync(process.env.FAKE_GH_ARGV, JSON.stringify(process.argv) + '\\n');
 if (p.includes('/actions/workflows/suite.yml/runs')) {
-  const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success');
+  const runs = s.runs.filter((r) => !p.includes('status=success') || r.conclusion === 'success')
+    .map((r) => (s.zavorra ? { ...r, head_commit: { message: 'z'.repeat(s.zavorra) } } : r));
   process.stdout.write(JSON.stringify({ workflow_runs: runs }));
 } else if (/actions[/]runs[/][^/]+[/]jobs/.test(p)) {
   const id = p.match(/actions[/]runs[/]([^/]+)[/]jobs/)[1];
@@ -248,7 +279,7 @@ if (p.includes('/actions/workflows/suite.yml/runs')) {
 else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
 `;
 
-  async function scegli({ oreVersione, oreVerde, senzaWindows = false }) {
+  async function scegli({ oreVersione, oreVerde, senzaWindows = false, zavorra = 0 }) {
     const tmp = cartellaTemporanea('filo-scelta-vera-');
     const repo = join(tmp, 'main');
     const ricevute = [];
@@ -288,10 +319,11 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
         head_branch: 'main', created_at: oreFa(ore + 1), updated_at: oreFa(ore), html_url: `https://github.com/o/r/actions/runs/${ore}` });
       writeFileSync(join(tmp, 'stato.json'), JSON.stringify({
         pubblicata: oreFa(oreVersione), runs: [corsaDi(sha[2], 'failure', 0.5), corsaDi(sha[1], 'success', oreVerde)],
-        senzaWindows: senzaWindows ? [oreVerde * 10] : [],
+        senzaWindows: senzaWindows ? [oreVerde * 10] : [], zavorra,
       }));
       const env = {
         ...process.env, PATH: `${bin}${delimiter}${process.env.PATH}`, FAKE_GH_STATO: join(tmp, 'stato.json'),
+        FAKE_GH_ARGV: join(tmp, 'argv.log'),
         GITHUB_REPOSITORY: 'o/r', GITHUB_OUTPUT: join(tmp, 'output.txt'), GITHUB_STEP_SUMMARY: join(tmp, 'riassunto.md'),
         FILO_BUILD_PASSPHRASE: 'prova', FILO_ROUTINE_API: `http://127.0.0.1:${srv.address().port}`,
         NO_PROXY: '127.0.0.1,localhost', no_proxy: '127.0.0.1,localhost',
@@ -300,12 +332,27 @@ else { process.stderr.write('percorso non previsto ' + p); process.exit(1); }
         execFile(process.execPath, [SCRIPT], { cwd: repo, env }, (err) => ok(err ? (err.code ?? 1) : 0));
       });
       return { codice, ricevute, output: readFileSync(join(tmp, 'output.txt'), 'utf8'), verde: sha[1],
-        riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8') };
+        riassunto: readFileSync(join(tmp, 'riassunto.md'), 'utf8'),
+        chiamate: readFileSync(join(tmp, 'argv.log'), 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)) };
     } finally {
       await new Promise((ok) => srv.close(ok));
       togliCartella(tmp, { tentativi: 10 });
     }
   }
+
+  test('#1989: le corse della suite pesano più del tetto di Node (1 MB): si leggono lo stesso e il verde si pubblica', async () => {
+    const r = await scegli({ oreVersione: 30, oreVerde: 3, zavorra: 1.5 * 1024 * 1024 });
+    assert.doesNotMatch(r.riassunto, /non si sono lette/, 'una risposta grossa di gh api non deve far sparire tutte le corse');
+    assert.equal(r.output.trim(), `sha=${r.verde}`);
+    assert.equal(r.codice, 0);
+    const filtro = (frammento) => r.chiamate.filter((a) => a.some((x) => x.includes(frammento)))
+      .map((a) => (a.includes('--jq') ? a[a.indexOf('--jq') + 1] : ''));
+    const corse = filtro('/actions/workflows/suite.yml/runs');
+    const lavori = filtro('/jobs');
+    assert.ok(corse.length && lavori.length, `chiamate a gh: ${JSON.stringify(r.chiamate)}`);
+    for (const jq of corse) for (const c of CAMPI_CORSA) assert.ok(jq.includes(c), `alle corse si chiede solo il necessario, ${c} compreso: «${jq}»`);
+    for (const jq of lavori) for (const c of CAMPI_LAVORO) assert.ok(jq.includes(c), `«${jq}»`);
+  });
 
   test('ultima versione di 100 ore fa, un verde di 68 ore fa mai uscito: allarme, e il verde si prova lo stesso', async () => {
     const r = await scegli({ oreVersione: 100, oreVerde: 68 });

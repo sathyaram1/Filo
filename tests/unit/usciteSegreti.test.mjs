@@ -996,7 +996,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const sidebar = readFileSync(join(ROOT, 'src', 'content', 'sidebar.js'), 'utf8');
     const prima = sidebar.indexOf('await campoFermato(parsed.highlight.value)');
     assert.ok(prima > 0, 'il testo per un campo non passa dalla porta');
-    assert.ok(prima < sidebar.indexOf('Highlight.show(parsed.highlight.selector'), 'la porta deve venire prima del riquadro «Accetta»');
+    assert.ok(prima < sidebar.indexOf('await Pagina.evidenzia('), 'la porta deve venire prima del riquadro «Accetta»');
     const filo = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'filo.js'), 'utf8');
     assert.match(corpo(filo, 'on(MSG.CONTROLLA_CAMPO'), /controllaUscita\(\{ type: 'CAMPO_PAGINA'/);
   });
@@ -1049,7 +1049,9 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.match(corpo(popup, 'async function apriCollegamento('), /proposta: conVerdetto\(a\)/);
     assert.match(corpo(popup, 'async function apriCollegamento('), /type: MSG\.APRI_COLLEGAMENTO_FILO, url, parole:/);
     assert.match(corpo(popup, 'async function scaricaCollegamento('), /type: MSG\.DOWNLOAD_LINK, url, diFilo: true, parole:/);
-    const menu = corpo(src('content', 'content.js'), 'function buildLinkActionItems(');
+    // Le voci del menu e le icone della fila del tasto destro (#1434) prendono le azioni dallo stesso posto.
+    assert.match(corpo(src('content', 'content.js'), 'function buildLinkActionItems('), /const a = azioniDelLink\(linkEl\);/);
+    const menu = corpo(src('content', 'content.js'), 'function azioniDelLink(');
     assert.match(menu, /diFilo \? Popup\.apriCollegamento\(linkEl\)/);
     assert.match(menu, /diFilo \? Popup\.scaricaCollegamento\(linkEl\)/);
     const filo = corpo(src('main', 'services', 'handlers', 'filo.js'), 'on(MSG.APRI_COLLEGAMENTO_FILO');
@@ -1074,7 +1076,8 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     assert.equal((clic.match(/submitMessage\(.*\{ daModello: true \}\)/g) || []).length, 2);
     assert.match(corpo(dash, 'function paroleUtente('), /!m\.daModello/);
     const handlers = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
-    assert.match(handlers, /(?:const|let) paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello\)/);
+    assert.match(handlers, /(?:const|let) paroleUtente = \[\.\.\.vistiDalFilo, \.\.\.codaScheda\]\.filter\(\(m\) => m && m\.role !== 'filo' && !m\.daModello && !m\.riga && !m\.daPagina\)/,
+      'né la riga di un\'altra app né quello scritto nell\'Aiuto sopra un sito sono parole dell\'utente (#1508)');
     assert.match(handlers, /concat\(internal \|\| daModello \? \[\] :/);
   });
 
@@ -1141,7 +1144,7 @@ describe('sentinella: ogni uscita passa dalla porta unica', () => {
     const gate = readFileSync(join(ROOT, 'src', 'main', 'services', 'modelGate.js'), 'utf8');
     // I messaggi oscurati stanno in una costante prima della chiamata: il piano della cache si fa su quelli (#1412).
     for (const f of ['completeWithFallback', 'streamCompleteWithFallback']) {
-      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
+      const re = new RegExp(`const (\\w+) = await senzaSegreti\\(messages(?:, action)?\\);\\s*r = await providers\\(\\)\\.${f}\\(\\{[^}]*?messages: \\1,`);
       assert.match(gate, re, `${f} senza oscuramento`);
     }
     assert.ok(/segreti:\s*async/.test(handlers), 'il cancello di Filo non riceve i segreti custoditi');
@@ -1274,7 +1277,7 @@ describe('sentinella: nessun chiamante della porta prende un guasto per via libe
   const handlers = src('main', 'services', 'handlers.js');
 
   test('la porta è costruita chiusa a guasto, e chi la chiama non la avvolge in un try', () => {
-    assert.match(handlers, /const controllaUscita = VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
+    assert.match(handlers, /const controllaUscita = ContatoriSicurezza\.contaUscite\(VerdettiUscite\.chiudiAGuasto\(giudicaUscita,/);
     const esegui = corpo(handlers, 'async function eseguiAzioneFilo(');
     const i = esegui.indexOf('await controllaUscita(action');
     assert.ok(i > 0);

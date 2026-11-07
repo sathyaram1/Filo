@@ -3,6 +3,8 @@
 // (VEDI_SCHERMO); prove in tests/unit/vediSchermo.test.mjs e tests/vedi-schermo.spec.mjs.
 'use strict';
 
+const Foto = require('./fotoDellaPagina');
+
 // Il lato lungo chiesto al sistema e quello che va al modello: un 4K resta leggibile, una PNG da decine di MB no.
 const LATO_CATTURA = 2560;
 const LATO_MODELLO = 2000;
@@ -161,7 +163,7 @@ function sistemaVero() {
     },
     delicata: async (url) => {
       if (!/^https?:/i.test(String(url || ''))) return '';
-      try { return String((await globalThis.SN_DELICATE.filtro())(url) || ''); } catch (_) { return 'delicata'; }
+      try { return String((await globalThis.SN_DELICATE.filtro())(url) || ''); } catch (_) { return 'filtro_guasto'; }
     },
   };
 }
@@ -276,6 +278,7 @@ function crea({ sistema = null } = {}) {
     const v = scelta.voce;
     const web = !!(v.filo && /^https?:/i.test(String(v.url || '')));
     const delicata = v.filo && web ? await S().delicata(v.url) : '';
+    if (delicata) require('./contatoriSicurezza').misura('paginaDelicata', delicata, 'schermo');
     action._finestra = { id: v.id, nome: v.nome, tipo: v.tipo, filo: !!v.filo, web, ...(delicata ? { delicata } : {}) };
     action._approvata = approvata(chiave, v.id);
     return { voce: v };
@@ -286,7 +289,10 @@ function crea({ sistema = null } = {}) {
     if (f.filo) {
       const w = s.finestreFilo().find((x) => x.id === f.id);
       if (!w || !w.wc) return { errore: 'la finestra di Filo non è più aperta' };
-      return immagineDa(await w.wc.capturePage());
+      // La scheda passa dalla stessa copertura dell'Aiuto (#810.17); se non si può coprire, al modello non parte.
+      const r = await Foto.fotoPerModello(w.wc);
+      if (!r.ok && r.code !== 'vuota') return { errore: `la foto non è partita: ${Foto.perche(r.code)}` };
+      return immagineDa(r.ok ? r.img : null);
     }
     if (f.tipo === SELETTORE) {
       const scelte = await s.fonti({ tipi: ['window', 'screen'], lato: latoCattura() });

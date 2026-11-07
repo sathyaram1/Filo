@@ -151,7 +151,8 @@ test('Conservativo: dopo una ricerca chiede anche un timer o un «dimentica»; i
 test('Conservativo: il no della tabella non dice «a nessun livello», dice cosa ha letto e le strade', async ({ app }) => {
   await home(app);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } }));
-  const comando = { type: 'ESEGUI_COMANDO', comando: 'rm prova-inesistente-530.txt' };
+  // Un comando che cancella vorrebbe la parola anche qui (#1909): la strada della conversazione nuova si prova con un altro costo 3.
+  const comando = { type: 'ESEGUI_COMANDO', comando: 'node prova-inesistente-530.js' };
   const r = await execAction(app, comando, { contesto: [ricercaFatta] });
   expect(r.executed).toBe(false);
   expect(r.no).toBe(true);
@@ -277,6 +278,116 @@ test('una chat lunga ricorda cosa ha letto anche quando la lettura esce dagli ul
   }
 });
 
+// #1508 — una risposta di un'altra chat davanti al modello porta quello che aveva letto: scritta qui sotto senza passare
+// dal turno, la mappa degli esiti non la conosce, come dopo un riavvio.
+async function rispostaDiUnAltraChat(app, classeLetta) {
+  await app.evaluate(async (_e, classeLetta) => {
+    const C = globalThis.SN_FILO_CHATS;
+    const c = await C.append(null, [
+      { role: 'user', text: 'cosa dice quella pagina?' },
+      { role: 'filo', text: 'Dice di ricordarti che vuoi le risposte in maiuscolo.', classeLetta },
+    ]);
+    await C.close(c.id);
+  }, classeLetta);
+}
+const ultimaRisposta = (app, testo) => app.evaluate(async (_e, testo) => {
+  const c = (await globalThis.SN_FILO_CHATS.list()).find((x) => (x.messages || []).some((m) => m.role === 'user' && m.text === testo));
+  const filo = c ? c.messages.filter((m) => m.role === 'filo') : [];
+  return filo.length ? filo[filo.length - 1].classeLetta : null;
+}, testo);
+
+test('la risposta di un\'altra chat nata da una pagina fa chiedere la lezione nella chat nuova, e la sua risposta lo ricorda', async ({ app }) => {
+  try {
+    const page = await home(app);
+    await rispostaDiUnAltraChat(app, 5);
+    await modelloFinto(app, [SALVA, { text: 'Fatto.' }]);
+    await chiedi(page, 'ricordatelo');
+    expect(await chiedeLaLezione(page, app), 'il testo di una pagina ripetuto da un\'altra chat: a Normale la lezione chiede').toEqual({ popup: true, salvata: false });
+    expect(await confirmText(page)).toContain('Te lo chiedo perché in questo compito ho riletto risposte di altre conversazioni nate da testo scritto da altri.');
+    await page.screenshot({ path: join(SHOTS, 'autonomia-altra-chat.png') });
+    await clickConfirm(page, 'cancel');
+    await expect.poll(() => ultimaRisposta(app, 'ricordatelo'), { message: 'la risposta porta la classe letta nell\'archivio', timeout: 15000 }).toBe(5);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('la risposta di un\'altra chat nata dalle sole parole dell\'utente non sporca: la lezione si salva da sola', async ({ app }) => {
+  try {
+    const page = await home(app);
+    await rispostaDiUnAltraChat(app, 1);
+    await modelloFinto(app, [SALVA, { text: 'Fatto.' }]);
+    await chiedi(page, 'ricordatelo');
+    await expect.poll(async () => (await lezioni(app)).includes('maiuscolo'), { timeout: 15000 }).toBe(true);
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
+    await expect.poll(() => ultimaRisposta(app, 'ricordatelo'), { timeout: 15000 }).toBe(1);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+// Una conversazione nuova avrebbe davanti le stesse risposte: il «no» non la consiglia, dice solo il livello.
+test('Conservativo, per una risposta di un\'altra chat nata da una pagina: il no non consiglia una conversazione nuova, che nascerebbe uguale', async ({ app }) => {
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'conservativo' }, terminal: { enabled: true } }));
+    await rispostaDiUnAltraChat(app, 5);
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'c1', name: 'ESEGUI_COMANDO', arguments: JSON.stringify({ comando: 'rm prova-1508.txt' }) }] },
+      { text: 'Fine.' },
+    ]);
+    await chiedi(page, 'cancella prova-1508.txt');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Fine.' })).toBeVisible({ timeout: 15000 });
+    const blocco = page.locator('.dash-activity').last();
+    await expect(blocco.locator('.dash-activity-body')).toBeVisible();
+    const testo = await blocco.innerText();
+    expect(testo).toContain('Comando non eseguito · a livello Conservativo');
+    expect(testo).toContain('risposte di altre conversazioni');
+    expect(testo).toContain('alzando il livello in Preferenze');
+    expect(testo).not.toMatch(/conversazione nuova/);
+    // Ed è vero: la stessa richiesta da una conversazione nuova trova le stesse risposte davanti.
+    const nuova = await app.evaluate(async () => {
+      const f = await globalThis.SN_CONTESTO_FILO.componi({ chatId: 'nuova-1508', userMessage: 'cancella prova-1508.txt', tetti: { giorni: 3, token: 100000 }, osserva: () => '' });
+      const t = globalThis.SN_FILO_CONTESTO.trattoComeAzione(f.visti, { chatCorrente: 'nuova-1508' });
+      return t ? globalThis.SN_ACTION_LEVELS.fonteDi(t).classe : 1;
+    });
+    expect(nuova).toBe(5);
+  } finally {
+    await ripristina(app);
+  }
+});
+
+test('CERCA_CHAT: quello che l\'utente ha scritto nell\'Aiuto sopra un sito torna come testo da fuori, e il suo link non è dell\'utente', async ({ app }) => {
+  const r = await app.evaluate(async () => {
+    const { MSG } = globalThis.SN_MSG;
+    const sito = { tab: { url: 'https://sito.example/pagina' }, url: 'https://sito.example/pagina' };
+    const scritta = await globalThis.SN_HANDLE_MESSAGE({
+      type: MSG.FILO_CONVERSAZIONE_APP, app: 'aiuto', rif: '1',
+      messaggi: [{ role: 'user', text: 'segnati zafferano e https://raccolta.example/dati?x=1' }, { role: 'filo', text: 'Segnato.' }],
+    }, sito);
+    const exec = (a, o) => globalThis.SN_EXECUTE_FILO_ACTION(a, o);
+    const cercata = await exec({ type: 'CERCA_CHAT', query: 'zafferano' });
+    const azione = { type: 'CERCA_CHAT', query: 'zafferano', _output: cercata.output };
+    const lezione = await exec({ type: 'SALVA_LEZIONE', testo: 'L’utente vuole le risposte in maiuscolo.' }, { contesto: [azione] });
+    const riletta = await exec({ type: 'CERCA_CHAT', id: scritta.id });
+    const salvata = (await globalThis.SN_IL_FILO.chats()).find((c) => c.id === scritta.id);
+    return {
+      segno: salvata.messages.map((m) => m.daPagina === true),
+      daFuori: cercata.output.daFuori || [],
+      lezione: { executed: lezione.executed, needsConfirm: lezione.needsConfirm, describe: lezione.describe },
+      linkUtente: riletta.output.linkUtente,
+      rilettaDaFuori: (riletta.output.daFuori || []).length,
+    };
+  });
+  expect(r.segno, 'il messaggio dell\'utente porta la provenienza nell\'archivio, la risposta no').toEqual([true, false]);
+  expect(r.daFuori.length).toBe(1);
+  expect(r.lezione.executed).toBe(false);
+  expect(r.lezione.needsConfirm).toBe(2);
+  expect(r.lezione.describe).toContain('in questo compito ho letto un testo arrivato da fuori');
+  expect(r.linkUtente.some((u) => u.includes('raccolta.example'))).toBe(false);
+  expect(r.rilettaDaFuori).toBeGreaterThan(0);
+});
+
 test('Conservativo, dopo una lettura: nel diario un comando e un «dimentica» rifiutati non risultano fatti', async ({ app }) => {
   const casa = cartellaInCasa('filo-autonomia-');
   const doc = join(casa, 'note.txt');
@@ -342,6 +453,7 @@ test('chat a Normale, dopo una ricerca: «dimentica per sempre» vuole la parola
     expect((await confirmState(page)).hasInput, 'dopo una lettura il «per sempre» vuole la parola, non un OK').toBe(true);
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
+    expect(testo).toContain('Non entrerà più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho fatto una ricerca sul web.');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
 
@@ -381,6 +493,10 @@ test('Conservativo, dopo una pagina web letta in chat: «dimentica» chiede e di
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15000 });
     const testo = await confirmText(page);
     expect(testo).toContain('Vive a Bologna.');
+    // Una riga sola, al singolare fino in fondo (#592.23).
+    mkdirSync(SHOTS, { recursive: true });
+    await page.screenshot({ path: join(SHOTS, 'autonomia-dimentica-una-riga.png') });
+    expect(testo).toContain('Non entrerà più nelle conversazioni. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.');
     expect(testo).toContain('Te lo chiedo perché in questo compito ho letto una pagina web.');
     await clickConfirm(page, 'cancel');
     expect(await lezioni(app)).toContain('Vive a Bologna.');
@@ -526,7 +642,8 @@ test('l\'Aiuto chiuso e riaperto è una conversazione nuova: non porta con sé l
   });
   const page = await openTab(PREFS);
   await page.waitForFunction(() => typeof window.__filoSidebarTest?.runPageAction === 'function', null, { timeout: 10000 });
-  const comando = { type: 'ESEGUI_COMANDO', comando: 'rm prova-inesistente-530-aiuto.txt' };
+  // Un comando che cancella vorrebbe la parola (#1909): qui serve un costo 3 che chiede soltanto un OK.
+  const comando = { type: 'ESEGUI_COMANDO', comando: 'node prova-inesistente-530-aiuto.js' };
   const lancia = () => page.evaluate((a) => chrome.runtime.sendMessage({ type: window.SN_MSG.MSG.FILO_RUN_ACTION, action: a }), comando);
 
   await page.evaluate(() => window.SN_SIDEBAR.open());
@@ -650,10 +767,9 @@ test('in chat Filo sa a che livello di autonomia sta: il contesto di ogni turno 
   try {
     await chiedi(page, 'a che livello di autonomia sei adesso?');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 15000 }).toBeGreaterThan(0);
-    // Lo stato cambia a ogni turno: sta nel contesto di adesso, in coda, non nel prefisso in cache (#868).
-    const contesto = (await chiamateAlModello(app))[0]
-      .map((m) => String(m.content || '')).find((t) => t.startsWith('═══ CONTESTO DI ADESSO')) || '';
-    expect(contesto).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
+    // Lo stato sta nel CONTESTO dell'utente, nel system dopo la parte fissa; se cambia dopo, arriva nella domanda (#1562).
+    const contesto = String((await chiamateAlModello(app))[0][0].content || '');
+    expect(contesto.slice(contesto.indexOf('═══ CONTESTO (lo scrive Filo'))).toMatch(/AUTONOMIA DI FILO\nLivello scelto dall'utente: Conservativo\./);
   } finally {
     await ripristina(app);
   }

@@ -80,11 +80,17 @@
   // Metacaratteri che rendono il comando composto o non riconoscibile → 3.
   const CHAIN_RE = /[|;&`<>]|\$\(|\$\{|\r|\n/;
 
+  // I programmi che cancellano senza cestino: un elenco solo, per il costo (sempre 3) e per la parola (#1909).
+  const CANCELLANO = new Set([
+    'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred', 'srm', 'wipe', 'rimraf',
+    'remove-item', 'ri', 'clear-recyclebin', 'format', 'diskpart',
+  ]);
+
   // Codice arbitrario o distruzione di stato: SEMPRE 3, controllati per primi, backstop
   // anche se finissero in una whitelist.
   const ALWAYS_3 = new Set([
-    'rm', 'rmdir', 'rd', 'del', 'erase', 'unlink', 'deltree', 'shred',
-    'format', 'mkfs', 'fdisk', 'diskpart', 'dd', 'shutdown', 'reboot',
+    ...CANCELLANO,
+    'mkfs', 'fdisk', 'diskpart', 'dd', 'shutdown', 'reboot',
     'restart', 'halt', 'poweroff', 'kill', 'killall', 'taskkill', 'pkill',
     'reg', 'regedit', 'sc', 'net', 'netsh', 'fsutil', 'bcdedit', 'mklink',
     'chmod', 'chown', 'chgrp', 'attrib', 'icacls', 'takeown',
@@ -855,7 +861,10 @@
     const x = ctx && typeof ctx === 'object' ? ctx : SENZA_CONTESTO;
     const reti = Array.isArray(x.reti) ? x.reti.map((u) => String(u).slice(0, 1).toLowerCase() + ':') : [];
     const shell = String(x.shell || '').toLowerCase();
-    const c = { win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO };
+    const c = {
+      win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO,
+      esiste: typeof x.esiste === 'function' ? x.esiste : null,
+    };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
     const cw = String(x.cwd || '');
@@ -1186,8 +1195,208 @@
     return UNO;
   }
 
+  // ── Sovrascritture (#892.2) ───────────────────────────────────────────────
+  // Una copia, uno spostamento o un archivio scritti su un file che c'è già lo sostituiscono o lo svuotano, e quello
+  // di prima non torna: costo 3, per l'utente come per Filo. Se ci sia lo dice il disco, `c.esiste` del main, che qui
+  // si chiede solo per percorsi locali; senza sonda il livello resta quello del programma.
+  const SOVRASCRIVE = "sovrascrive un file che c'è già, e quello di prima si perde";
+  const PUO_SOVRASCRIVERE = "può sovrascrivere dei file che ci sono già, e quello di prima si perde";
+
+  function statoDi(p, c) {
+    const r = dove(String(p || ''), c);
+    if (!r || typeof r !== 'object') return 'ignoto';
+    const assoluto = c.win ? `${r.radice}\\${r.segs.join('\\')}` : `/${r.segs.join('/')}`;
+    let s = null;
+    try { s = c.esiste(assoluto); } catch (_) { s = 'ignoto'; }
+    return s === 'file' || s === 'cartella' || s === null ? s : 'ignoto';
+  }
+  const nomeDi = (p) => pezzi(p).pop() || '';
+  const unisci = (cartella, nome) => `${String(cartella).replace(/[\\/]+$/, '')}/${nome}`;
+
+  // `sorgenti` vanno in `dest`: dentro, se è una cartella (o `inCartella`), altrimenti al suo posto.
+  function copiaSovrascrive(sorgenti, dest, c, { inCartella = false, maiDentro = false } = {}) {
+    const sd = statoDi(dest, c);
+    if (sd === 'ignoto') return PUO_SOVRASCRIVERE;
+    if (!inCartella && (sd !== 'cartella' || maiDentro)) return sd ? SOVRASCRIVE : '';
+    if (sd !== 'cartella') return '';
+    for (const s of sorgenti) {
+      const nome = nomeDi(s);
+      if (!nome || JOLLY.test(s) || nome === '.' || nome === '..') return PUO_SOVRASCRIVERE;
+      const st = statoDi(unisci(dest, nome), c);
+      if (st === 'file') return SOVRASCRIVE;
+      // Una cartella che c'è già si fonde: i file con lo stesso nome dentro si sostituiscono.
+      if (st) return PUO_SOVRASCRIVERE;
+    }
+    return '';
+  }
+
+  // Lo stile della riga: PowerShell (cp e mv sono Copy-Item e Move-Item), cmd (opzioni con la barra) o POSIX.
+  function stileDi(c) {
+    if (!c.win || shellPosix(c)) return 'posix';
+    return c.shell === 'cmd' ? 'cmd' : 'powershell';
+  }
+
+  function copiaPosix(testi, c, { forza = null } = {}) {
+    let target = null;
+    let noClobber = false;
+    let maiDentro = false;
+    let forzato = false;
+    const ops = [];
+    let fine = false;
+    for (let i = 0; i < testi.length; i++) {
+      const t = testi[i];
+      if (fine || !t.startsWith('-') || t === '-') { ops.push(t); continue; }
+      if (t === '--') { fine = true; continue; }
+      if (t.startsWith('--')) {
+        const [nome, ...v] = t.split('=');
+        if (nome === '--target-directory') target = v.length ? v.join('=') : testi[++i];
+        else if (nome === '--no-clobber' || (nome === '--update' && /^none/.test(v.join('=')))) noClobber = true;
+        else if (nome === '--no-target-directory') maiDentro = true;
+        else if (nome === '--force') forzato = true;
+        else if (nome === '--suffix' && !v.length) i += 1;
+        continue;
+      }
+      for (let k = 1; k < t.length; k++) {
+        const ch = t[k];
+        if (ch === 'n') noClobber = true;
+        else if (ch === 'T') maiDentro = true;
+        else if (ch === 'f') forzato = true;
+        else if (ch === 't' || ch === 'S') {
+          const valore = t.slice(k + 1) || testi[++i];
+          if (ch === 't') target = valore;
+          break;
+        }
+      }
+    }
+    if (forza && !forzato) return '';
+    if (noClobber && !forza) return '';
+    if (target != null) return ops.length ? copiaSovrascrive(ops, target, c, { inCartella: true }) : '';
+    if (ops.length < 2) return '';
+    return copiaSovrascrive(ops.slice(0, -1), ops[ops.length - 1], c, { maiDentro });
+  }
+
+  function copiaCmd(prog, testi, c) {
+    const ops = testi.filter((t) => !/^\/[-A-Za-z0-9:]+$/.test(t));
+    if (!ops.length) return '';
+    // Con un operando solo la copia arriva nella cartella di lavoro, col suo nome.
+    if (ops.length === 1) return prog === 'move' ? '' : copiaSovrascrive(ops, '.', c, { inCartella: true });
+    const sorgenti = ops.slice(0, -1).flatMap((s) => s.split('+')).filter(Boolean);
+    const dest = ops[ops.length - 1];
+    // cmd copia il CONTENUTO di una cartella dentro l'altra: quali nomi, non si sa.
+    if (sorgenti.some((s) => statoDi(s, c) === 'cartella') && statoDi(dest, c) === 'cartella') return PUO_SOVRASCRIVERE;
+    return copiaSovrascrive(sorgenti, dest, c);
+  }
+
+  // `-Path` e `-LiteralPath` le sorgenti, `-Destination` la meta; il resto con un valore cambia quali file: non si sa.
+  const PS_INTERRUTTORI = ['force', 'recurse', 'container', 'passthru', 'confirm', 'verbose', 'debug'];
+  function copiaPowerShell(testi, c) {
+    const sorgenti = [];
+    let dest = null;
+    const posizionali = [];
+    for (let i = 0; i < testi.length; i++) {
+      const t = testi[i];
+      if (!/^-[A-Za-z]/.test(t)) { posizionali.push(t); continue; }
+      const legato = valoreDuePunti(t);
+      const valore = () => (legato != null ? legato : testi[++i]);
+      if (parametro(t, 'destination', 1)) dest = valore();
+      else if (parametro(t, 'literalpath', 1) || parametro(t, 'path', 1)) sorgenti.push(...String(valore() || '').split(','));
+      else if (parametro(t, 'whatif', 1)) return '';
+      else if (!PS_INTERRUTTORI.some((n) => parametro(t, n, 2))) return PUO_SOVRASCRIVERE;
+    }
+    for (const p of posizionali) {
+      if (!sorgenti.length) sorgenti.push(...p.split(','));
+      else if (dest == null) dest = p;
+      else return PUO_SOVRASCRIVERE;
+    }
+    if (!sorgenti.length) return '';
+    return copiaSovrascrive(sorgenti, dest == null ? '.' : dest, c, { inCartella: dest == null });
+  }
+
+  // tar: crea l'archivio dato con f (sovrascrivendolo), estrae sopra i file che trova se non gli si dice di tenerli.
+  function tarSovrascrive(testi, c) {
+    let modo = '';
+    let archivio = null;
+    let tiene = false;
+    const daLeggere = [];
+    const lettere = (s, attaccato) => {
+      for (let k = 0; k < s.length; k++) {
+        const ch = s[k];
+        if ('cxtruAd'.includes(ch) && !modo) modo = ch;
+        else if (ch === 'k' || ch === 'O') tiene = true;
+        else if (ch === 'f' || ch === 'C' || ch === 'T' || ch === 'X' || ch === 'b' || ch === 'L' || ch === 'H') {
+          const resto = attaccato ? s.slice(k + 1) : '';
+          if (resto) { if (ch === 'f') archivio = resto; return; }
+          daLeggere.push(ch);
+          if (attaccato) return;
+        }
+      }
+    };
+    for (let i = 0; i < testi.length; i++) {
+      const t = testi[i];
+      if (daLeggere.length) { if (daLeggere.shift() === 'f') archivio = t; continue; }
+      if (t.startsWith('--')) {
+        const [nome, ...v] = t.split('=');
+        const valore = () => (v.length ? v.join('=') : testi[++i]);
+        if (nome === '--create') modo = modo || 'c';
+        else if (nome === '--extract' || nome === '--get') modo = modo || 'x';
+        else if (nome === '--file') archivio = valore();
+        else if (/^--(keep-old-files|skip-old-files|to-stdout|keep-newer-files)$/.test(nome)) tiene = true;
+        else if (/^--(directory|files-from|exclude-from|blocking-factor|tape-length|use-compress-program)$/.test(nome) && !v.length) i += 1;
+        continue;
+      }
+      if (t.startsWith('-') && t.length > 1) { lettere(t.slice(1), true); continue; }
+      if (i === 0 && /^[A-Za-z]+$/.test(t)) { lettere(t, false); continue; }
+    }
+    if (modo === 'c') return archivio && archivio !== '-' ? copiaSovrascrive([], archivio, c, { maiDentro: true }) : '';
+    if (modo === 'x') return tiene ? '' : PUO_SOVRASCRIVERE;
+    return '';
+  }
+
+  function sovrascrive(raw, c) {
+    if (!c.esiste) return '';
+    const prog = programOf(dequote(raw));
+    const testi = argomenti(raw, c).slice(1).map((a) => (a.variabile || a.ignoto ? '$ignoto' : a.testo));
+    const opzione = (re) => testi.some((t) => re.test(t));
+    const stile = stileDi(c);
+    switch (prog) {
+      case 'cp': case 'mv': case 'copy': case 'move': case 'xcopy':
+        if (stile === 'powershell') return copiaPowerShell(testi, c);
+        if (stile === 'cmd') return copiaCmd(prog, testi, c);
+        return copiaPosix(testi, c);
+      case 'ln':
+        return copiaPosix(testi, c, { forza: true });
+      case 'robocopy': {
+        const ops = testi.filter((t) => !t.startsWith('/'));
+        return ops.length >= 2 && statoDi(ops[1], c) !== null ? PUO_SOVRASCRIVERE : '';
+      }
+      case 'tar':
+        return tarSovrascrive(testi, c);
+      case 'zip': {
+        const ops = [];
+        for (let i = 0; i < testi.length; i++) {
+          if (/^-(b|n|t|tt|P|O|x|i)$/.test(testi[i])) i += 1;
+          else if (!testi[i].startsWith('-')) ops.push(testi[i]);
+        }
+        return ops.length ? copiaSovrascrive([], /\.[^\\/]+$/.test(ops[0]) ? ops[0] : `${ops[0]}.zip`, c, { maiDentro: true }) : '';
+      }
+      case 'unzip':
+        return opzione(/^-[A-Za-z]*o/) ? PUO_SOVRASCRIVERE : '';
+      case 'gzip': case 'gunzip':
+        return opzione(/^-[A-Za-z]*f|^--force$/) ? PUO_SOVRASCRIVERE : '';
+      case 'rename':
+        // Il `rename` di Linux sostituisce un file che c'è già; `ren` di Windows no, e lì `rename` è lui.
+        return stile === 'posix' && !opzione(/^-[A-Za-z]*[no]|^--(no-act|no-overwrite)$/) ? PUO_SOVRASCRIVERE : '';
+      default:
+        return '';
+    }
+  }
+
   function classifyOneDet(raw, c) {
     const base = classifyOne(raw);
+    if (base === 2) {
+      const motivo = sovrascrive(raw, c);
+      if (motivo) return { level: 3, motivo };
+    }
     return base === 1 ? perimetroDi(raw, c) : { level: base, motivo: '' };
   }
 
@@ -1591,7 +1800,53 @@
     return (PROFILO_APERTE[nomeNorm(r.segs[r.segs.length - 1])] || []).slice();
   }
 
+  // Cancellare senza cestino (#1909): un comando che lo fa vuole la parola «conferma» a ogni livello, come ogni «per
+  // sempre». Si guarda il programma di ogni pezzo (anche dopo sudo, xargs, `cmd /c`, `find -exec` e negli scriptblock):
+  // sbagliare per eccesso costa una parola da scrivere, per difetto il comando resta comunque al costo più alto.
+  // Chi lancia un altro comando, e le parole di shell che lo precedono (`for …; do rm`, `if …; then rm`): dopo di loro si
+  // guarda il comando che segue.
+  const DAVANTI = new Set(['sudo', 'doas', 'nohup', 'time', 'env', 'nice', 'ionice', 'xargs', 'command', 'builtin', 'exec',
+    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call',
+    'do', 'then', 'else']);
+  // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
+  const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
+  const nomeProgramma = (tok) => String(tok || '').split(/[\\/]/).pop().replace(/\.(exe|cmd|bat|ps1|com)$/, '');
+  function cancellaPerSempre(cmd) {
+    if (typeof cmd !== 'string' || !cmd.trim()) return false;
+    const t = cmd.replace(/[‘-‟'"`^]/g, '').toLowerCase();
+    if (CANCELLA_IN_UNO_SCRIPT.test(t)) return true;
+    for (const pezzo of t.split(/[;&|(){}\r\n]|\s-(?:exec|execdir|ok|okdir)\s/)) {
+      // `$x = Remove-Item …`: l'assegnazione davanti non cambia il comando.
+      const tok = pezzo.replace(/^\s*(?:\[[\w.]+\]\s*)?\$[\w:]+\s*=\s*/, '').trim().split(/\s+/).filter(Boolean);
+      let i = 0;
+      while (i < tok.length) {
+        const prog = nomeProgramma(tok[i]);
+        const resto = tok.slice(i + 1);
+        if (CANCELLANO.has(prog) || /^mkfs(\.|$)/.test(prog)) return true;
+        if (prog === 'find' && resto.includes('-delete')) return true;
+        if (prog === 'git' && resto.find((x) => !x.startsWith('-')) === 'clean') return true;
+        if (prog === 'robocopy' && resto.some((x) => x === '/mir' || x === '/purge')) return true;
+        // `gci | ForEach-Object Delete`, `% Delete`: il metodo che cancella chiamato per nome.
+        if (/^(foreach-object|foreach|%)$/.test(prog) && resto.filter((x) => !x.startsWith('-'))[0] === 'delete') return true;
+        // forfiles lancia quello che sta dopo `/c`.
+        if (prog === 'forfiles') { const c = resto.indexOf('/c'); if (c < 0) break; i += c + 2; continue; }
+        if (!DAVANTI.has(prog)) break;
+        i += 1;
+        let opzione = false;
+        while (i < tok.length && (/^-|^\/[a-z?]{1,2}$/.test(tok[i]) || /^\w+=/.test(tok[i]))) { opzione = true; i += 1; }
+        // `sudo -u root rm`: un'opzione può portarsi dietro un valore, e il comando viene dopo.
+        const dopo = nomeProgramma(tok[i]);
+        if (opzione && i + 1 < tok.length && !CANCELLANO.has(dopo) && !DAVANTI.has(dopo)) {
+          const poi = nomeProgramma(tok[i + 1]);
+          if (CANCELLANO.has(poi)) return true;
+        }
+      }
+    }
+    return false;
+  }
+
   global.SN_CMD_CLASSIFY = {
+    cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

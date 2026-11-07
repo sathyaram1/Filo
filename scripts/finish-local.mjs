@@ -63,13 +63,17 @@
 
 import { execFileSync, spawnSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
+import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { verdictForCurrentBranch, readState, registraNelRegistro } from './verify-local.mjs';
 import { askServerMerge, messageForOwnerMerge, exitCodeForOwnerMerge, richiestaForseInAttesa } from './lib/owner-merge.mjs';
 import { preparaLancioElectron } from './lib/schermo-virtuale.mjs';
 import { lottiPerRigaDiComando } from './lib/riga-di-comando.mjs';
+import { leggiSpecVerdi, segnaSpecVerdi } from './lib/spec-verdi.mjs';
+import { dentroProveGiro } from './lib/solo-tolte.mjs';
 import { readMarker } from './lib/routine-role.mjs';
+import { fileRiscritti } from './lib/su-main.mjs';
 import { NOME_PARTE, partiServerInSospeso, riaperturaConAltraInArrivo } from './lib/parti-lavoro.mjs';
 import { apriProvaSulCommit, chiediConProva, pulisciResti, gitIn, provaUnitSullaFusione, provaDaRiusare, testoProva } from './lib/unit-sulla-fusione.mjs';
 import { cartellaDelServer } from './server-fondi-pratica.mjs';
@@ -170,7 +174,7 @@ function run(cmd, args, label, env = undefined, cwd = ROOT) {
 /**
  * Il commit da cui prendere ANCHE i file cambiati, in un giro di riallineamento: quello che
  * aveva passato la verifica, scritto da dispatch nel marcatore del ruolo. '' altrimenti. PURA.
- * Il ramo contro main non vede il lato arrivato da main né il file in conflitto.
+ * Il ramo contro main non vede un file in conflitto risolto col lato di main.
  */
 export function shaDelRiallineamento(marker) {
   const m = marker && typeof marker === 'object' ? marker : {};
@@ -179,23 +183,28 @@ export function shaDelRiallineamento(marker) {
 }
 
 /**
- * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche
- * quelli cambiati dal commit verificato alla punta. `{ changed, nota }`; la nota va stampata.
+ * I file da cui scegliere gli spec: il ramo contro `base` e, in un giro di riallineamento, anche quelli che il
+ * riallineamento ha dovuto risolvere, con la stessa definizione della consegna (fileRiscritti). Il resto del lato
+ * arrivato da main l'ha già provato la suite di main: preso intero erano ore, oltre il tetto di un comando (#1907).
  */
 export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
   const g = (args) => git(args, { cwd: root });
-  const changed = g(['diff', '--name-only', `${base}...HEAD`]).out.split('\n').filter(Boolean);
+  const righe = (r) => r.out.split('\n').filter(Boolean);
+  const changed = righe(g(['diff', '--name-only', `${base}...HEAD`]));
   const dal = shaDelRiallineamento(marker);
   if (!dal) return { changed, nota: '' };
   const c = g(['cat-file', '-e', `${dal}^{commit}`]).ok || g(['fetch', 'origin', dal]).ok;
-  const r = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
-  if (!r.ok) {
-    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} qui non c'è: scelgo gli spec solo dal ramo contro main, e il lato arrivato da main resta scoperto.` };
+  const arrivati = c ? g(['diff', '--name-only', dal, 'HEAD']) : { ok: false };
+  const risolti = arrivati.ok ? fileRiscritti(root, { prima: dal, base }) : { ok: false };
+  if (!arrivati.ok || !risolti.ok) {
+    const perche = arrivati.ok ? `non riesco a confrontarlo con questa punta (${risolti.errore})` : 'qui non c\'è';
+    return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} ${perche}: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const lato = r.out.split('\n').filter(Boolean);
+  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
+  const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
   return {
-    changed: [...new Set([...changed, ...lato])],
-    nota: `Giro di riallineamento: scelgo gli spec anche dai ${lato.length} file cambiati da ${dal.slice(0, 8)} (il commit verificato) alla punta, cioè il lato arrivato da main e i file in conflitto.`,
+    changed: [...new Set([...changed, ...daRiprovare])],
+    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}. Il resto del lato arrivato da main (${resto} file) l'ha già provato la suite di main.`,
   };
 }
 
@@ -302,6 +311,15 @@ export function provaFusione(base, root = ROOT) {
   return leggiMergeTree(r.status, r.stdout);
 }
 
+// Le prove nell'app di una decisione presa in un file col nome di un altro: per nome restavano fuori, e una modifica a
+// cosa chiede un livello arrivava rossa su main (#600.1 il registro, #600.2 il punto del main che lo applica).
+const PROVE_AUTONOMIA = ['autonomia', 'filo-action-levels'];
+export const PROVE_DI_CHI_DECIDE = new Map([
+  ['src/shared/actionLevels.js', PROVE_AUTONOMIA],
+  ['src/shared/autonomia.js', PROVE_AUTONOMIA],
+  ['src/main/services/handlers.js', PROVE_AUTONOMIA],
+]);
+
 /**
  * Gli spec Playwright che toccano le aree modificate dal branch. Puro.
  *
@@ -360,6 +378,8 @@ export function specsForChangedFiles(changed, tracked) {
     // (giro 4 di suite-locale). Il nome di un file è l'area che prova.
     const n = f.match(/^src\/(?:[^/]+\/)*([^/.]+)\.[^/]+$/);
     if (n) aggiungi(n[1]);
+    // Per nome esatto: come area, `filo-action-levels` si porterebbe dietro tutti gli spec `filo-*`.
+    for (const prova of PROVE_DI_CHI_DECIDE.get(f) || []) esatte.add(prova);
     // Uno spec toccato si lancia; una prova di un giro no, si lancia per numero
     // (un ramo che ne sposta o ne ritocca qualcuna ne trascinerebbe centinaia).
     if (f.startsWith('tests/') && !f.startsWith('tests/verifica/') && f.endsWith('.spec.mjs')) {
@@ -441,7 +461,11 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
     if (p.esito === 'rosso_anche_su_main') perche = 'sono rossi uguali anche su main da solo, senza test rotti in più';
     else if (p.contenuto) perche = `rifatti sul ramo (che contiene già main ${m}) in una cartella pulita sono verdi`;
     else perche = `sul risultato della fusione con main ${m}, che è ciò che arriva su main, sono verdi`;
-    const righe = [...(ins ? [testoProva(p)] : []), `▸ Controlli di logica rossi sul ramo da solo, ma ${perche}: non sono del ramo, proseguo.`];
+    const b = p.esito === 'verde' && !p.contenuto ? String(p.baseRamo || '').slice(0, 8) : '';
+    const base = b
+      ?` Il ramo parte da main ${b}, più vecchio: i commit arrivati dopo su main li rendono verdi. Per riprovarli su main da solo si usa ${m}, non la base del ramo.`
+      : '';
+    const righe = [...(ins ? [testoProva(p)] : []), `▸ Controlli di logica rossi sul ramo da solo, ma ${perche}: non sono del ramo, proseguo.${base}`];
     return { ferma: false, rosso: false, messaggio: righe.join('\n') };
   }
   let motivo;
@@ -459,7 +483,7 @@ export function esitoUnitDelRamo({ checkOnly, prova }) {
  * Gli spec delle aree toccate si rilanciano, o li ha già corsi chi ha
  * verificato sullo stesso contenuto? PURA.
  *
- * Sono la parte lunga della chiusura (da quindici a quarantacinque minuti), e
+ * Sono la parte lunga della chiusura (vedi stimaDurataControlli), e
  * chi verifica li lancia in partenza per obbligo del suo ruolo: rifarli qui,
  * sullo stesso commit, è la stessa ora pagata due volte. Si saltano solo con un
  * verdetto valido in mano, che è già legato a quel contenuto — senza verifica
@@ -479,23 +503,78 @@ export function specDaRilanciare({ checkOnly, ok, sha, tollerato }) {
   };
 }
 
+// Un worker solo: le parti della suite su GitHub vanno a 20-28 s per spec, e un ramo largo ne sceglie quasi duecento
+// (#2178): una durata fissa promessa nei ruoli faceva uccidere i controlli a metà da chi li aspettava.
+export const SECONDI_PER_SPEC = [20, 30];
+export const MINUTI_UNIT = [4, 8];
+
+/** La durata prevista dei controlli, da quanti spec lanceranno: la si stampa prima di partire. PURA. */
+export function stimaDurataControlli(nSpec) {
+  const n = Math.max(0, Math.floor(Number(nSpec) || 0));
+  const da = MINUTI_UNIT[0] + Math.floor((n * SECONDI_PER_SPEC[0]) / 60);
+  const a = MINUTI_UNIT[1] + Math.ceil((n * SECONDI_PER_SPEC[1]) / 60);
+  return { da, a, testo: `▸ Durata prevista: da ${da} a ${a} minuti (unit più ${n} spec, circa mezzo minuto l'uno con un worker).` };
+}
+
 // Con tutto `src` toccato gli spec mirati sono stati 245: in una riga sola `npx` (cmd.exe) moriva prima di partire.
 export { lottiPerRigaDiComando };
 
+const REPORTER_VERDI = join(ROOT, 'scripts', 'lib', 'reporter-spec-verdi.mjs');
+
 /**
  * Lancia gli spec a lotti (vedi lottiPerRigaDiComando); tutti i lotti girano, l'esito è l'AND. Nella cartella della
- * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe.
+ * prova Playwright si chiama dal node_modules collegato: `npx` lì non lo trova e lo scaricherebbe. Con la memoria, ogni
+ * spec si segna verde appena passa (reporter-spec-verdi): un lotto rosso o ucciso a metà tiene i suoi verdi.
  */
-function runSpecsALotti(specs, label, albero) {
+export function runSpecsALotti(specs, label, albero, memoria = null) {
   if (!albero.moduli) { console.error(`\n✗ ${label}: node_modules manca, lancia npm install.`); return false; }
-  const lotti = lottiPerRigaDiComando(specs.map((s) => `${s}.spec.mjs`));
+  const { restano, saltati } = memoria ? specDaRiprendere(specs, memoria.verdi) : { restano: specs, saltati: [] };
+  if (saltati.length) {
+    console.log(`\n▸ ${label}: ${saltati.length} già verdi su questo contenuto in un lancio precedente, non li rifaccio; ne restano ${restano.length}.`);
+  }
+  const lotti = lottiPerRigaDiComando(restano.map((s) => `${s}.spec.mjs`));
+  // Percorso relativo: Playwright lo risolve dalla cartella della prova, senza i guai di un assoluto Windows in import.
+  const daAlbero = relative(albero.dir, REPORTER_VERDI).split(sep).join('/');
+  const reporter = memoria ? [`--reporter=list,${daAlbero.startsWith('.') || isAbsolute(daAlbero) ? daAlbero : `./${daAlbero}`}`] : [];
+  const env = (base) => (memoria ? { ...(base || process.env), FILO_SPEC_VERDI_FILE: memoria.file, FILO_SPEC_VERDI_CHIAVE: memoria.chiave, FILO_SPEC_VERDI_RADICE: albero.dir } : base);
   let ok = true;
   lotti.forEach((lotto, i) => {
     const suffisso = lotti.length > 1 ? ` — lotto ${i + 1}/${lotti.length}, ${lotto.length} spec` : '';
-    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...lotto]);
-    if (!l.ok || !run(l.cmd, l.args, label + suffisso, l.env, albero.dir)) ok = false;
+    const l = preparaLancioElectron(process.execPath, [join(albero.moduli, '@playwright', 'test', 'cli.js'), 'test', ...reporter, ...lotto]);
+    if (!l.ok || !run(l.cmd, l.args, label + suffisso, env(l.env), albero.dir)) ok = false;
   });
   return ok;
+}
+
+export { leggiSpecVerdi, segnaSpecVerdi };
+
+/**
+ * Il contenuto di `sha` al netto delle prove del giro: chi verifica le committa mentre il controllo gira, e un
+ * rilancio dopo il tetto deve ripartire dai verdi lo stesso (#2113). Senza git vale il commit.
+ */
+export function chiaveDelContenuto(root, sha) {
+  const r = git(['ls-tree', '-r', '--full-tree', sha], { cwd: root, maxBuffer: 256 * 1024 * 1024 });
+  if (!r.ok) return sha;
+  const righe = r.out.split('\n').filter((l) => !dentroProveGiro(l.split('\t')[1]));
+  return createHash('sha1').update(righe.join('\n')).digest('hex');
+}
+
+/** PURA. */
+export function specDaRiprendere(specs, verdi) {
+  const gia = verdi instanceof Set ? verdi : new Set(verdi || []);
+  const restano = [];
+  const saltati = [];
+  for (const s of specs || []) (gia.has(s) ? saltati : restano).push(s);
+  return { restano, saltati };
+}
+
+/** La memoria dei verdi sul contenuto di `sha`, nella cartella git di `root`: fuori dall'albero, mai committata. */
+export function memoriaSpecVerdi(root, sha) {
+  const r = git(['rev-parse', '--git-path', 'filo-spec-verdi.json'], { cwd: root });
+  if (!r.ok || !r.out) return null;
+  const file = resolve(root, r.out);
+  const chiave = chiaveDelContenuto(root, sha);
+  return { file, chiave, verdi: leggiSpecVerdi(file, chiave), segna(specs) { this.verdi = segnaSpecVerdi(file, chiave, specs); } };
 }
 
 function readKnownRed(root) {
@@ -724,6 +803,7 @@ async function main() {
     const tracked = new Set(git(['ls-files', 'tests/*.spec.mjs'], { cwd: albero.dir }).out.split('\n').filter(Boolean));
     const specs = specsForChangedFiles(changed, [...tracked]).filter((s) => tracked.has(`${s}.spec.mjs`));
     const { blocking, informative } = splitKnownRed(specs, readKnownRed(albero.dir));
+    console.log(`\n${stimaDurataControlli(specs.length).testo}`);
     if (specs.length) {
       const schermo = preparaLancioElectron('npx', []);
       if (!schermo.ok) { console.error(`\n✗ ${schermo.motivo}`); process.exit(1); }
@@ -742,8 +822,9 @@ async function main() {
     }
     // 2. Spec mirati alle aree toccate. La suite completa gira SOLO in GitHub
     //    Actions, a ogni fusione su main: qui serve il segnale rapido.
+    const memoria = memoriaSpecVerdi(ROOT, shaProvato);
     if (blocking.length) {
-      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero)) {
+      if (!runSpecsALotti(blocking, `Spec delle aree toccate (${blocking.length})`, albero, memoria)) {
         console.error('\n✗ Spec rossi: non pubblico. Sistema e rilancia.');
         if (unitRossi) console.error('  Rossi anche i controlli di logica, più sopra.');
         process.exit(1);
@@ -752,7 +833,7 @@ async function main() {
     if (informative.length) {
       // Rossi noti su questa macchina (tests/rossi-noti.json): si vedono, non
       // fermano. Se uno diventa verde, è ora di toglierlo dall'elenco.
-      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero);
+      const ok = runSpecsALotti(informative, `Spec fra i rossi noti (${informative.length}, non bloccano; feedback #563)`, albero, memoria);
       console.log(ok
         ? '\n(i rossi noti toccati sono verdi qui: valuta se toglierli da tests/rossi-noti.json)'
         : '\n(rossi noti anche su main su questa macchina: non fermano la pubblicazione)');

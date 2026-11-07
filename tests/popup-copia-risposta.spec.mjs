@@ -2,7 +2,7 @@
 // il testo come si legge, senza marcature e coi numeri già calcolati; mentre la risposta arriva il comando non c'è.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo, statoDi, conta, clicca, scrivi } from './helpers/riquadri.mjs';
+import { neiRiquadri, statoDi, conta, clicca, scrivi, tastieraDi, tastoSullaScheda } from './helpers/riquadri.mjs';
 
 const PRIMA = '**The cat** is on the *roof*.\nIt costs [[calc: 1200*1.5]] euros, see [the page](https://example.com).';
 const PRIMA_PULITA = 'The cat is on the roof.\nIt costs 1800 euros, see the page.';
@@ -67,15 +67,17 @@ test('Alt+T: Copia mette negli appunti la traduzione pulita, coi numeri risolti;
 
   // Il passaggio del mouse dice cosa fa, in una parola.
   const tasto = await statoDi(app, page, '.sn-msg-copia');
-  await page.mouse.move(tasto.x + tasto.width / 2, tasto.y + tasto.height / 2);
+  // Sui siti il riquadro sta nello strato sopra la scheda: mouse e foto sono i suoi.
+  const riquadri = await tastieraDi(app, page);
+  await riquadri.mouse.move(tasto.x + tasto.width / 2, tasto.y + tasto.height / 2);
   await page.waitForTimeout(500);
-  try { await page.screenshot({ path: 'tests/.shots/popup-copia-hover.png' }); } catch (_) {}
+  try { await riquadri.screenshot({ path: 'tests/.shots/popup-copia-hover.png' }); } catch (_) {}
 
   await clicca(app, page, '.sn-msg-copia');
   await expect.poll(() => appunti(app)).toBe(PRIMA_PULITA);
   // La conferma breve, poi il tasto torna com'era.
   await expect.poll(async () => (await statoDi(app, page, '.sn-msg-copia'))?.classi || '').toContain('sn-copiato');
-  try { await page.screenshot({ path: 'tests/.shots/popup-copia-copiato.png' }); } catch (_) {}
+  try { await riquadri.screenshot({ path: 'tests/.shots/popup-copia-copiato.png' }); } catch (_) {}
   await expect.poll(async () => (await statoDi(app, page, '.sn-msg-copia'))?.classi || '', { timeout: 5000 }).not.toContain('sn-copiato');
 
   // Incollato in un campo della pagina arriva lo stesso testo.
@@ -91,8 +93,8 @@ test('Alt+T: Copia mette negli appunti la traduzione pulita, coi numeri risolti;
   expect(storia[0]).toBe(PRIMA_PULITA);
 
   // La domanda dopo ha la sua risposta e il suo comando, che copia solo quella.
-  await scrivi(app, page, '.sn-popup-input', 'and the plural?');
-  await page.keyboard.press('Enter');
+  const dove = await scrivi(app, page, '.sn-popup-input', 'and the plural?');
+  await dove.keyboard.press('Enter');
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(2);
   await cliccaUltimo(app, page, '.sn-msg-copia');
   await expect.poll(() => appunti(app)).toBe(SECONDA_PULITA);
@@ -100,13 +102,13 @@ test('Alt+T: Copia mette negli appunti la traduzione pulita, coi numeri risolti;
 
 // Clic vero sull'ultimo nodo che risponde a `sel` (l'helper `clicca` prende il primo).
 async function cliccaUltimo(app, page, sel) {
-  const r = await nelMondoDiFilo(app, page, (s) => {
+  const r = await neiRiquadri(app, page, (s) => {
     const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
     const tutti = T ? T.trovaTutti(s) : document.querySelectorAll(s);
     const b = tutti[tutti.length - 1].getBoundingClientRect();
     return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
   }, sel);
-  await page.mouse.click(r.x, r.y);
+  await (await tastieraDi(app, page)).mouse.click(r.x, r.y);
 }
 
 test('Alt+E: anche l\'approfondimento si copia senza titoli né asterischi; uno script del sito non copia niente', async ({ app, openTab, testServer }) => {
@@ -119,9 +121,10 @@ test('Alt+E: anche l\'approfondimento si copia senza titoli né asterischi; uno 
   await comando(app, 'explain-selection');
   await expect.poll(() => conta(app, page, '.sn-msg-copia'), { timeout: 15_000 }).toBe(1);
 
-  // Il riquadro sta in un'ombra chiusa: un clic fabbricato dalla pagina sull'host non arriva al tasto.
+  // Il riquadro sta sopra la scheda: nel documento del sito non c'è niente da cliccare, nemmeno un host.
+  expect(await page.evaluate(() => document.querySelectorAll('[data-sn-riquadro], .sn-popup').length)).toBe(0);
   await page.evaluate(() => {
-    for (const el of document.querySelectorAll('[data-sn-riquadro]')) el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
+    for (const el of document.querySelectorAll('*')) el.dispatchEvent(new MouseEvent('click', { bubbles: true, composed: true }));
   });
   await page.waitForTimeout(400);
   expect(await appunti(app)).toBe('vecchio contenuto');
@@ -132,7 +135,7 @@ test('Alt+E: anche l\'approfondimento si copia senza titoli né asterischi; uno 
   // In tema scuro il tasto e la sua etichetta restano leggibili.
   await app.evaluate((_e) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { theme: 'dark' } }, { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.waitForTimeout(600);
-  await page.keyboard.press('Escape');
+  await tastoSullaScheda(app, page, 'Escape');
   await expect.poll(() => conta(app, page, '.sn-popup')).toBe(0);
   await app.evaluate(() => { globalThis.__n846 = 1; });
   await page.locator('#parola').dblclick();
@@ -141,7 +144,7 @@ test('Alt+E: anche l\'approfondimento si copia senza titoli né asterischi; uno 
   await clicca(app, page, '.sn-msg-copia');
   await expect.poll(async () => (await statoDi(app, page, '.sn-msg-copia'))?.classi || '').toContain('sn-copiato');
   await page.waitForTimeout(300);
-  try { await page.screenshot({ path: 'tests/.shots/popup-copia-scuro.png' }); } catch (_) {}
+  try { await (await tastieraDi(app, page)).screenshot({ path: 'tests/.shots/popup-copia-scuro.png' }); } catch (_) {}
 });
 
 test('dentro il riquadro incorporato di un altro sito Copia funziona lo stesso', async ({ app, openTab, testServer }) => {

@@ -45,7 +45,8 @@ async function main() {
   if (!cfg.isConfigured()) throw new Error('Manca il Google OAuth Client ID in src/main/auth/config.js');
 
   const { verifier, challenge, method, state } = pkce.createPkce();
-  const { redirectUri, waitForCode } = await startLoopback(state);
+  const loop = await startLoopback(state, { dove: 'terminale' });
+  const { redirectUri } = loop;
 
   const authUrl = new URL(cfg.authEndpoint);
   authUrl.search = new URLSearchParams({
@@ -63,8 +64,18 @@ async function main() {
   console.log('Se non si apre, vai a:\n' + authUrl.toString() + '\n');
   openBrowser(authUrl.toString());
 
-  const code = await waitForCode();
+  const code = await loop.waitForCode();
+  // La pagina nel browser dice com'è andata solo a scambio finito, come nell'app.
+  try {
+    await accedi(code, verifier, redirectUri);
+  } catch (e) {
+    loop.concludi(e);
+    throw e;
+  }
+  loop.concludi();
+}
 
+async function accedi(code, verifier, redirectUri) {
   // Fase 1: code → id_token Google.
   const tokBody = new URLSearchParams({
     client_id: cfg.googleClientId,

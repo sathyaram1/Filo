@@ -213,11 +213,11 @@ test('nel menu della linguetta le frecce accendono una voce e Invio la esegue', 
   await setup(openTab, shell);
   const before = await shell.locator('.tab').count();
   const popup = await apriMenuLinguetta(app, shell);
-  // Freccia su da nessuna voce: l'ultima, «Chiudi». Poi Home torna in cima.
-  await tastoAlMenu(app, 'Up');
-  await expect.poll(() => voceAccesa(popup)).toBe('Chiudi');
-  await tastoAlMenu(app, 'Home');
+  // Freccia su da nessuna voce: l'ultima che si può scegliere. Poi Home torna in cima.
   const voci = await popup.evaluate(() => [...document.querySelectorAll('button.item')].map((b) => b.textContent.trim()));
+  await tastoAlMenu(app, 'Up');
+  await expect.poll(() => voceAccesa(popup)).toBe(voci[voci.length - 1]);
+  await tastoAlMenu(app, 'Home');
   await expect.poll(() => voceAccesa(popup)).toBe(voci[0]);
   const idx = voci.indexOf('Duplica');
   expect(idx).toBeGreaterThanOrEqual(0);

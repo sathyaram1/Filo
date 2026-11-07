@@ -256,3 +256,25 @@ test('a sinistra i Crediti e ciò che suona sono fissi in cima; il resto no', ()
   }, null, ora);
   assert.deepEqual(sx.map((v) => [v.chiave, !!v.fissa]), [['crediti', true], ['timer:t2', true], ['timer:t1', false], ['avviso:n1', false]]);
 });
+
+// #1661 — al primo incontro la home tiene solo la colonna di sinistra.
+test('il primo incontro dura finché l’accoglienza non si chiude, e solo se la strada per cominciare è una', () => {
+  assert.equal(C.primoIncontro({ done: false }, 'chiave'), true);
+  assert.equal(C.primoIncontro({ done: false }, ''), true);
+  assert.equal(C.primoIncontro(null, 'chiave'), true);
+  assert.equal(C.primoIncontro({ done: true }, 'chiave'), false);
+  // Rifatta o ripresa dalle Preferenze: l'utente è già stato accolto.
+  assert.equal(C.primoIncontro({ done: false, rifatta: true }, ''), false);
+  // Un modello da scegliere: la strada sta fra i suggerimenti, a destra.
+  assert.equal(C.primoIncontro({ done: false }, 'modelli'), false);
+  assert.equal(C.primoIncontro({ done: false }, 'pesi-aperti'), false);
+});
+
+test('tolta la carta dei Crediti la home torna intera; con l’intervista no', () => {
+  assert.equal(C.homeRidotta(true, null, true), true);
+  assert.equal(C.homeRidotta(false, null, true), false);
+  const tolta = { nascoste: ['crediti'] };
+  assert.equal(C.homeRidotta(true, tolta, true), false);
+  // Coi crediti la carta non c'è: averla tolta prima non riapre la home durante l'intervista.
+  assert.equal(C.homeRidotta(true, tolta, false), true);
+});

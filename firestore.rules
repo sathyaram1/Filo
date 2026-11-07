@@ -76,7 +76,7 @@ service cloud.firestore {
     // (non caratteri: in cirillico sarebbero il doppio), cifrati, stanno in 20.000.
     function livelloValido(l) {
       return l is map
-        && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo'])
+        && l.keys().hasOnly(['esito', 'at', 'ruolo', 'by', 'testo', 'sha'])
         && l.get('esito', '') is string
         && l.get('esito', '').size() > 0
         && l.get('esito', '').size() <= 40
@@ -87,7 +87,10 @@ service cloud.firestore {
         && l.get('by', '') is string
         && l.get('by', '').size() <= 120
         && l.get('testo', '') is string
-        && l.get('testo', '').size() <= 20000;
+        && l.get('testo', '').size() <= 20000
+        // Il commit su cui vale il verdetto di sicurezza (#1502): il salto dell'owner lo rimanda al server.
+        && l.get('sha', '') is string
+        && (l.get('sha', '') == '' || l.get('sha', '').matches('^[0-9a-f]{40}$'));
     }
     function livelliValidi(d) {
       return !('livelli' in d)
@@ -117,6 +120,13 @@ service cloud.firestore {
     function waitsForValido(d) {
       return !('waitsFor' in d)
         || (d.waitsFor is list && d.waitsFor.size() >= 1 && d.waitsFor.size() <= 20);
+    }
+
+    // `unisce` [{ id, num }]: le segnalazioni che un pacchetto unisce (SPEC-RIDISEGNO-LAVORO.md § 2), scritte alla
+    // nascita del pacchetto; alla sua fusione il server le chiude. Stessa forma e stesso tetto di `waitsFor`.
+    function unisceValido(d) {
+      return !('unisce' in d)
+        || (d.unisce is list && d.unisce.size() >= 1 && d.unisce.size() <= 20);
     }
 
     // `localMerges` { app?, server?, solo?, ramo? } (#915): quando ogni parte di un
@@ -167,8 +177,13 @@ service cloud.firestore {
       return u is string && u.size() <= 2000
         && u.matches('^https://firebasestorage[.]googleapis[.]com/v0/b/filo-8b9cb[.]firebasestorage[.]app/o/feedback%2F(agent_)?[0-9]{10,17}_[0-9a-f]{8}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{4}-?[0-9a-f]{12}[.][a-z0-9]{1,12}[?]alt=media&token=[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
     }
+    // Una voce di `files[]` porta solo ciò che scrive il caricatore (url, nome, tipo): le routine la ricevono,
+    // e un campo in più sarebbe testo che i giudici non hanno visto (#1515). Tetti: SN_FEEDBACK.VOCE_DOCUMENTO.
     function documentoAllegato(f) {
-      return f is map && indirizzoAllegato(f.get('url', ''));
+      return f is map && f.keys().hasOnly(['url', 'name', 'type'])
+        && indirizzoAllegato(f.get('url', ''))
+        && f.get('name', '') is string && f.get('name', '').size() <= 500
+        && f.get('type', '') is string && f.get('type', '').size() <= 255;
     }
     // Le regole non hanno cicli: una riga per posto, fino al tetto di 5.
     function immaginiValide(l) {
@@ -199,6 +214,20 @@ service cloud.firestore {
     match /domande/{id} {
       allow read: if isAdmin();
       allow write: if false;
+    }
+
+    // I compiti delle routine (#1196, SPEC-DOMANDE.md §6) e il loro indice (contatore, compito aperto per feedback):
+    // li scrive solo il server, che tiene «un compito aperto per feedback»; l'owner li legge da ownerCompiti.
+    match /compiti/{id} {
+      allow read, write: if false;
+    }
+    match /compiti-indice/{id} {
+      allow read, write: if false;
+    }
+    // I compiti ricorrenti (#1153, SPEC-DOMANDE.md §4.1): modelli dell'owner coi testi cifrati, li legge e li scrive solo
+    // il server (ownerCompiti), che ne fa le istanze.
+    match /compiti-ricorrenti/{id} {
+      allow read, write: if false;
     }
 
     // Allowlist routine. Gestita SOLO da console Firebase.
@@ -236,6 +265,13 @@ service cloud.firestore {
     match /config/models {
       allow read: if true;
       allow write: if isAdmin();
+    }
+    // L'àncora delle release (#1501): l'impronta di ogni file, scritta una volta dal server dopo averlo riscaricato.
+    // Ogni Filo la legge prima di scaricare un aggiornamento (anche l'elenco: una raccolta vuota vuol dire controllo
+    // non ancora acceso). Nessun client la scrive, nemmeno l'owner: riscrivibile da una sessione, non ancorerebbe niente.
+    match /ancoreRilascio/{tag} {
+      allow read: if true;
+      allow write: if false;
     }
     match /config/secrets {
       allow read: if isAdmin();
@@ -284,8 +320,10 @@ service cloud.firestore {
     //   - `failCap` (int): quanti fallimenti di fila prima di fermarsi.
     //   - `routineId` / `routineIdB` (string): le routine dei due account.
     //   - `accountBlockMs` (int): la pausa che si prende un account che fallisce.
-    //   - `maxSessions` (int 1-20; assente = 1): quante sessioni lavorano
-    //     insieme.
+    //   - `maxSessions` (int 1-20; assente = 20): il freno d'emergenza, sopra la
+    //     N del manutentore.
+    //   - `manutentoreAcceso` (bool; assente = false): il pacemaker accende il
+    //     manutentore (SPEC-MANUTENTORE § 4).
     //   - `priorityAccount` ('A'|'B'|''; assente = ''): da quale account si
     //     parte sempre finché regge; vuoto = si alternano.
     //   - `accountAOff` / `accountBOff` (bool; assente = false): account
@@ -306,6 +344,12 @@ service cloud.firestore {
     match /config/routines {
       allow read: if true;
       allow write: if isAdmin();
+    }
+
+    // config/manutentore (#1680): l'ordine dei feedback da accendere, scritto dal manutentore con le credenziali
+    // dell'owner (npm run manutentore -- accendi); il pacemaker lo legge con l'Admin SDK.
+    match /config/manutentore {
+      allow read, write: if isAdmin();
     }
 
     // config/redteam (#896) → `openToAll`: il Red Team è aperto a chi non è
@@ -367,20 +411,27 @@ service cloud.firestore {
       // tests/unit/firestoreRulesFiducia.test.mjs.
       allow create: if isAdmin() && localOnlyValido(request.resource.data) && localApprovalValido(request.resource.data)
         && waitsForValido(request.resource.data)
-        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo'])
+        && unisceValido(request.resource.data)
+        // `inCoda` (#1515): il segno che la coda delle routine legge. Lo scrive solo il server, a ogni cambio di stato.
+        // `riservato`, `tipo` e `unitoIn` (#1153): il segno che segue il testo riservato, la segnalazione, il rimando
+        // dell'unione. Come la fiducia, li scrive solo il server.
+        && !request.resource.data.keys().hasAny(['fiducia', 'fiduciaDa', 'genitori', 'mergePreapproved', 'mittenteClasse', 'mittenteRuolo', 'inCoda', 'riservato', 'tipo', 'unitoIn'])
         && bigliettoLocaleValido(request.resource.data)
         && immaginiValide(request.resource.data.get('images', []))
         && documentiValidi(request.resource.data.get('files', []))
         // #676: una data, mai testo (anche qui il giro della Gestione la confronta).
         && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
 
-      // `name` = titolo breve generato da un LLM all'invio; `seq`/`subSeq` =
-      // numero progressivo leggibile (#22, #22.1) calcolato dal client.
+      // `name` = titolo breve generato da un LLM all'invio; `seq` = numero
+      // progressivo leggibile (#22) calcolato dal client. Un sotto-numero
+      // (#22.1) lo scrive solo il server, e l'id del documento non lo sceglie
+      // un anonimo a piacere (#1517). Sentinella: firestoreRulesFeedbackAnonimo.test.mjs.
       // `parentId` (DC4): presente solo quando questo feedback è la riapertura
       // di un fix "Risolti" — collega al doc originale (ID Firestore, stessa
       // forma usata altrove nel repo: alfanumerico/`-`/`_`).
       allow create: if
-        request.resource.data.keys().hasOnly(
+        doc.matches('^[A-Za-z0-9_-]{20,128}$')
+        && request.resource.data.keys().hasOnly(
           ['text', 'url', 'title', 'name', 'userAgent', 'clientId', 'clientIdHash', 'images',
            'files', 'createdAt', 'seq', 'subSeq', 'parentId',
            'statusPublic',   // S1.F2.1: aggiunto statusPublic (sempre in chiaro, nuovo nei submit)
@@ -389,15 +440,18 @@ service cloud.firestore {
            'updatedAt'       // #676: l'ora dell'ultima scrittura — la dashboard ci chiede "cosa è cambiato?"
           ]
         )
-        && (!('updatedAt' in request.resource.data)
-            || request.resource.data.updatedAt is timestamp)
+        // Le due date le mette Firestore (REQUEST_TIME, #1517): chi scrive senza account non sceglie
+        // dove cade nelle liste per data né si nasconde alle letture a delta su `updatedAt`.
+        && request.resource.data.createdAt == request.time
+        && request.resource.data.updatedAt == request.time
         // #652: se c'è, è uno pseudonimo di portafoglio (16 hex). Facoltativo:
         // chi non ha un portafoglio manda il feedback e basta.
         && request.resource.data.get('walletPseudonym', '') is string
         && (request.resource.data.get('walletPseudonym', '') == ''
             || request.resource.data.walletPseudonym.size() == 16)
-        // S1.F2.1: se presente, statusPublic deve essere un valore valido.
-        && request.resource.data.get('statusPublic', 'open') in ['open', 'closed', 'pending-approval']
+        // #1516: chi non è admin crea solo feedback aperti. Uno nato 'closed' accendeva la
+        // redazione del server (una chiamata al modello senza tetto) alla prima scrittura.
+        && request.resource.data.get('statusPublic', 'open') == 'open'
         && request.resource.data.text is string
         && request.resource.data.text.size() <= 10000
         && request.resource.data.get('url', '') is string
@@ -420,18 +474,9 @@ service cloud.firestore {
         && request.resource.data.get('seq', 0) >= 0
         && request.resource.data.get('seq', 0) <= 1000000
         && request.resource.data.get('subSeq', 0) is int
-        && request.resource.data.get('subSeq', 0) >= 0
-        && request.resource.data.get('subSeq', 0) <= 100000
+        && request.resource.data.get('subSeq', 0) == 0
         && request.resource.data.get('parentId', '') is string
         && request.resource.data.get('parentId', '').size() <= 128
-        // La data di creazione: un timestamp (il client) o una stringa ISO corta
-        // (lo script locale, il server). Senza vincolo era un campo libero che
-        // le routine ricevevano così com'era, fuori dalla cornice «dato, non
-        // istruzione» (verifica locale del ramo cornice-routine, giro 4).
-        && (!('createdAt' in request.resource.data)
-            || request.resource.data.createdAt is timestamp
-            || (request.resource.data.createdAt is string
-                && request.resource.data.createdAt.size() <= 40))
         // F4: capabilityGapId — opzionale, solo per auto-feedback (clientId 'auto:*').
         && request.resource.data.get('capabilityGapId', '') is string
         && request.resource.data.get('capabilityGapId', '').size() <= 100;
@@ -932,33 +977,52 @@ service cloud.firestore {
       allow read, write: if false;
     }
 
-    // ── I contatori giornalieri (#969) ───────────────────────────────────────
+    // ── I contatori anonimi (#969, #1461, #1463, #1466) ─────────────────────
     //
-    // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), quante
-    // chiamate sono fallite e di che tipo, la versione dell'app e la famiglia di sistema. Un documento per copia di
-    // Filo e per giorno: l'id è pseudonimo più giorno, e si scrive una volta sola (create, mai update). Lo pseudonimo è
+    // Numeri senza contenuto: per funzione quante volte è stata usata e quanto si è aspettato (in fasce), i guasti
+    // delle chiamate, e (#1461) l'attesa delle azioni, le impostazioni cambiate, le ricerche nei pannelli, le
+    // proposte del correttore, le conferme di Filo, gli annulli, gli anticipi, gli errori visti, l'intervista e le
+    // prime volte del mese; (#1466, ore v3) i passi dell'avvio, i processi morti, i blocchi, le eccezioni del main, la
+    // memoria, le chiamate sincrone, la chiusura, il disco, la sessione e gli aggiornamenti, tutti in elenchi chiusi.
+    // Un documento per copia di Filo e per ora (v3; le ore v2 e i giorni v1 partono ancora dalle copie vecchie), più
+    // quello della chat della stessa ora (v4, #1463): l'id è pseudonimo, giorno e ora (e «_chat»), e si scrive una
+    // volta sola (create, mai update). Lo pseudonimo è
     // casuale, cambia ogni mese, e non è il codice dei feedback né lo pseudonimo dei crediti.
     //
-    // SOLA CREAZIONE E SENZA LOGIN, come i feedback: chi ha la chiave web può scrivere numeri falsi, e i contatori
-    // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, le chiavi delle
-    // mappe dall'elenco chiuso delle funzioni, e i valori annidati: ognuno è una stringa di forma fissa (le regole non
-    // passano in rassegna una mappa, ma ne uniscono i valori in una stringa sola, che si misura e si confronta).
-    // L'elenco contiene quello dell'app (tests/unit/firestoreRulesContatori.test.mjs): una funzione nuova va aggiunta
-    // e ripubblicata, o i giorni che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
+    // SOLA CREAZIONE, CON L'IDENTITÀ ANONIMA DELL'INSTALLAZIONE (#1547): senza, chiunque abbia la chiave web riempirebbe
+    // le collezioni a piacere. Il documento non porta l'uid. Chi ha un'identità può scrivere numeri falsi, e i contatori
+    // servono a leggere tendenze, non a dare niente a nessuno. Qui si tiene la forma: i campi, i tipi, e i valori
+    // annidati, ognuno una stringa di forma fissa (le regole non passano in rassegna una mappa, ma ne uniscono chiavi
+    // e valori in una stringa sola, che si misura e si confronta). Le chiavi degli elenchi piccoli e fermi (funzioni,
+    // pannelli, tipi del correttore) sono l'elenco; quelle degli elenchi che crescono a ogni funzione nuova (azioni,
+    // impostazioni, tipi d'azione, errori) ne hanno la forma, senza spazi né testo: l'elenco chiuso lo tiene l'app.
+    // tests/unit/firestoreRulesContatori.test.mjs confronta tutto con l'app: una funzione nuova va aggiunta e
+    // ripubblicata, o le ore che la portano restano in attesa; una tolta dall'app RESTA, le copie vecchie la mandano.
+    // Ogni tetto sta sopra il caso peggiore dell'app, con un margine che la stessa sentinella tiene stretto (#1547).
     // Legge solo l'admin.
+    // Le funzioni contate e il controllo delle mappe, a chiavi chiuse o a forma, servono alle ore, alle loro chiamate
+    // e ai loro gesti.
+    function funzioniContate() {
+      return [
+        'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
+        'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
+        'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
+        'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
+        'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
+        'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
+        'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
+      ];
+    }
+    function chiuse(m, chiavi, tetto, valori) {
+      return m is map && m.keys().hasOnly(chiavi)
+        && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
+    }
+    function aForma(m, chiavi, tettoChiavi, tetto, valori) {
+      return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+        && m.values().join('#').size() <= tetto && m.values().join('#').matches(valori);
+    }
     match /contatori-giornalieri/{docId} {
-      function funzioniContate() {
-        return [
-          'explain', 'explain-deep', 'explain-link', 'translate-selection', 'translate-page', 'edit-text',
-          'categorize', 'describe-image', 'transcribe-image', 'spellcheck-word', 'spellcheck-semantic', 'spellcheck-context',
-          'transcribe-audio', 'tts', 'help', 'help-intent-guess', 'help-intent-judge', 'filo-chat', 'filo-dashboard',
-          'filo-lesson', 'filo-compact', 'filo-chat-triage', 'tab-triage', 'tab-summary', 'archive-embed',
-          'tab-search', 'editor-title', 'editor-summary', 'editor-chat', 'file-name', 'decks-chat', 'decks-opinion',
-          'decks-autotag', 'decks-search-filter', 'safebrowse-judge', 'geoblock-classify', 'embed-cookie-check',
-          'feedback-title', 'manage-search', 'manage-search-classify', 'provider-test'
-        ];
-      }
-      function contatoriValidi(d) {
+      function contatoriGiorno(d) {
         return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
           && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'app', 'os', 'uso', 'errori'])
           && d.v == 1
@@ -973,11 +1037,501 @@ service cloud.firestore {
           && d.uso.values().join('#').size() <= 8000
           && d.uso.values().join('#').matches('^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
           && d.errori is map && d.errori.keys().hasOnly(funzioniContate())
-          && d.errori.values().join('#').size() <= 600000
+          && d.errori.values().join('#').size() <= 48000
           && d.errori.values().join('#').matches('^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$');
       }
+      // Pseudonimo, giorno, ora, versione, sistema e segno del primo documento: uguali per le ore v2 e v3.
+      function testaOra(d) {
+        return d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && d.primo in ['', 'giorno', 'mese'];
+      }
+      // Le misure dell'ora di #1461, uguali per le ore v2 e v3.
+      function misureOra(d) {
+        let funzioni = funzioniContate();
+        return chiuse(d.uso, funzioni, 7000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9})*)?$')
+          && chiuse(d.errori, funzioni, 48000, '^([a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][A-Za-z0-9 ._-]{0,48}[|](rete|tempo|crediti|chiave|nessun_host|fornitore)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.azioni, '^([a-z0-9][a-z0-9-]{0,59}(#[a-z0-9][a-z0-9-]{0,59})*)?$', 5000, 16000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9})*)?$')
+          && aForma(d.impostazioni, '^([A-Za-z0-9_.*-]{1,80}(#[A-Za-z0-9_.*-]{1,80})*)?$', 6000, 50000, '^([A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9}(;[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9})*(#[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9}(;[A-Za-z0-9_.-]{1,40}[|](mano|chat|auto|import)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ricerche, ['cerca-filo', 'incolla', 'font', 'modello', 'barra-laterale', 'tasto-destro', 'menu'], 4000, '^([0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9}(,[0-9]{1,9}){6};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9})*)?$')
+          && chiuse(d.correttore, ['ortografia', 'frase', 'coerenza', 'suggerimento'], 40000, '^([a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|][0-9]{1,9},[0-9]{1,9},[0-9]{1,9},[0-9]{1,9})*)*)?$')
+          && aForma(d.conferme, '^([A-Za-z][A-Za-z0-9_-]{0,39}(#[A-Za-z][A-Za-z0-9_-]{0,39})*)?$', 4000, 100000, '^((conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9}(;(conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9})*(#(conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9}(;(conservativo|default|automatico|yolo|altro)[|](pulito|contaminato|altro)[|](0|1|2|3|altro)[|](dentro|fuori|altro)[|](chat|automazione|altro)[|](si|chiede|conferma|no|propone|altro)[|](automatica|approvata|rifiutata|senza-risposta|negata|pannello)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.annullati, '^([A-Za-z][A-Za-z0-9_-]{0,39}(#[A-Za-z][A-Za-z0-9_-]{0,39})*)?$', 4000, 2000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.anticipi, funzioni, 2000, '^([0-9]{1,9};[0-9]{1,9}(#[0-9]{1,9};[0-9]{1,9})*)?$')
+          && chiuse(d.chiedi, funzioni, 1000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && aForma(d.erroriVisti, '^([a-z0-9_:.-]{1,80}(#[a-z0-9_:.-]{1,80})*)?$', 10000, 8000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && aForma(d.intervista, '^([a-z0-9_-]{1,30}(#[a-z0-9_-]{1,30})*)?$', 1000, 6000, '^([a-z0-9_-]{1,30}[|][0-9]{1,9}(;[a-z0-9_-]{1,30}[|][0-9]{1,9})*(#[a-z0-9_-]{1,30}[|][0-9]{1,9}(;[a-z0-9_-]{1,30}[|][0-9]{1,9})*)*)?$')
+          && d.primeVolte is list && d.primeVolte.size() <= 400
+          && d.primeVolte.join('#').size() <= 6000 && d.primeVolte.join('#').matches('^([a-z0-9][a-z0-9-]{0,59}(#[a-z0-9][a-z0-9-]{0,59})*)?$');
+      }
+      // Le ore delle copie che non hanno ancora le misure del sistema (fino alla 0.2.248).
+      function contatoriOra(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', 'uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', 'uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte'])
+          && d.v == 2
+          && testaOra(d) && misureOra(d);
+      }
+      // Le ore v3 (#1466): quelle di prima più il sistema in un campo solo, una stringa di voci da elenchi chiusi
+      // (avvio, processi morti, blocchi, eccezioni del main, memoria, chiamate sincrone, chiusura, disco, sessione,
+      // aggiornamenti). Controllato qui e non in una funzione: ogni uso di un argomento si rivaluta, e costa.
+      function contatoriOra3(d) {
+        let campi = ['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'primo', 'uso', 'errori', 'azioni', 'impostazioni', 'ricerche', 'correttore', 'conferme', 'annullati', 'anticipi', 'chiedi', 'erroriVisti', 'intervista', 'primeVolte', 'sistema'];
+        return d.keys().hasOnly(campi)
+          && d.keys().hasAll(campi)
+          && d.v == 3
+          && testaOra(d) && misureOra(d)
+          && d.sistema is string && d.sistema.size() <= 16000
+          && d.sistema.matches('^((^|;)(avvioPasso[.](moduli_caricati|impostazioni_lette|protocollo_ipc|adblock|fingerprint|permessi|finestra_creata|prima_scheda_visibile|sessione_ripristinata)[.](ms500|s1|s2|s5|s10|s30|oltre)|avvioTipo[.](freddo|dopo_aggiornamento|seconda_istanza)|processoMorto[.](gpu|utility|zygote|sandbox_helper|pepper_plugin|scheda_in_recupero|altro)[.](abnormal-exit|killed|crashed|oom|launch-failed|integrity-failure|memory-eviction|altro)|finestraBloccata[.]((volte)|(tornata)[.](ms500|s1|s2|s5|s10|s30|oltre)|(chiusa_da_utente)[.](ms500|s1|s2|s5|s10|s30|oltre))|mainFermo[.]((max)[.](ms500|s1|s2|s5|s10|s30|oltre)|(blocchi)[.](ms200|ms1000|ms5000))|eccezioneMain[.](uncaught|rejection)[.](TypeError|RangeError|ReferenceError|SyntaxError|Error|altro)|memoria[.]((totale)[.](mb256|mb512|mb1024|mb2048|mb4096|oltre)|(vive)[.](n0|n1|n5|n20|n50|oltre)|(attesa)[.](n0|n1|n5|n20|n50|oltre))|ipcSincrono[.](fp-config|cookie-wipe|adblock-css|permessi-stato)[.](ms500|s1|s2|s5|s10|s30|oltre)|chiusura[.]((durata)[.](ms500|s1|s2|s5|s10|s30|oltre)|(tetto))|uscitaPrecedente[.](pulita|non_pulita)|storageEsito[.](lettura_ok|lettura_vuoto|lettura_illeggibile|lettura_rovinato_con_copia|lettura_rovinato_senza_copia|lettura_non_spostato_sola_memoria|salvataggio_fallito_enospc|salvataggio_fallito_eacces|salvataggio_fallito_eperm|salvataggio_fallito_erofs|salvataggio_fallito_ebusy|salvataggio_fallito_altro|salvataggio_tornato|rinomina_ritentata_ebusy|rinomina_ritentata_eperm|rinomina_ritentata_eacces|chiave_non_serializzabile|cambiato_senza_set|cifratura_assente|dimensione_mb1|dimensione_mb5|dimensione_mb20|dimensione_mb50|dimensione_mb100|dimensione_oltre|flush_ms500|flush_s1|flush_s2|flush_s5|flush_s10|flush_s30|flush_oltre)|sessione[.]((schede)[.](n0|n1|n5|n20|n50|oltre)|(esiti)[.](ripristinata|niente|lettura_fallita)|(vista)[.](ms500|s1|s2|s5|s10|s30|oltre)|(coda)[.](ms500|s1|s2|s5|s10|s30|oltre))|aggiornamento[.](trovato|scaricato|scaricamento_fallito|installatore_non_valido|installazione_lanciata_all_avvio|installazione_fallita|installazione_fallita_secondo_avviso|versione_rifiutata|bloccato_mac|bloccato_linux|installatore_non_avviato))[|][0-9]{1,9})*$');
+      }
+      // La chat e l'agente della stessa ora (#1463, v4), in un documento suo: nell'ora le regole non hanno più posto (il
+      // motore valuta al più mille espressioni per scrittura). I turni coi loro giri, le strade di riserva, gli strumenti
+      // per nome ed esito, le azioni per giro, le reazioni, le copie da una bolla e le chat finite. Il nome di uno
+      // strumento ha la sua forma, maiuscole e cifre senza spazi: l'elenco lo tiene l'app.
+      function contatoriChat(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'chatTurni', 'chatRecuperi', 'strumenti', 'azioniPerGiro', 'chatReazioni', 'chatCopie', 'chatChiuse'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'chatTurni', 'chatRecuperi', 'strumenti', 'azioniPerGiro', 'chatReazioni', 'chatCopie', 'chatChiuse'])
+          && d.v == 4
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora + '_chat'
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.chatTurni, ['filo-chat'], 2000, '^((risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9}(;(risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9})*(#(risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9}(;(risposta|tetto_giri|fermato|tagliato|muto_dopo_letture|non_disponibile|vuoto|errore)[|](g1|g2|g3|g4_6|g7_11|tetto)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.chatRecuperi, ['senza_foto', 'contesto_stretto', 'sollecito', 'formato_vecchio', 'file_aggiunto', 'proposta_segnalazione'], 200, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.strumenti, ['filo-chat'], 9000, '^((altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9}(;(altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9})*(#(altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9}(;(altro|[A-Z][A-Z0-9_]{0,39})[|](eseguito|non_riuscito|rifiutato|argomenti_errati|argomenti_tagliati|in_conferma|fermato_segreto|non_disponibile)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.azioniPerGiro, ['filo-chat'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){3}(#[0-9]{1,9}(,[0-9]{1,9}){3})*)?$')
+          && chiuse(d.chatReazioni, ['ferma_prima_del_testo', 'ferma_durante_azioni', 'ferma_durante_testo', 'riprendi', 'continua_tetto_giri', 'continua_tagliato', 'continua_muto_dopo_letture', 'riprova', 'seguito_scritto'], 200, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.chatCopie, ['risposta', 'attivita', 'utente'], 100, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.chatChiuse, ['home', 'chat_nuova', 'uscita', 'nascosta', 'appesa_all_avvio', 'risposta_tardiva'], 17000, '^((m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9}(;(m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9})*(#(m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9}(;(m1|m2|m3_5|m6_10|oltre)[|](min1|min5|min30|ora|oltre)[|](conversazione|comando|nessuno)[|][0-9]{1,9})*)*)?$');
+      }
+      // La forma si sceglie dalla versione prima di provarla: il server valuta al più mille espressioni a richiesta (ogni
+      // uso di un argomento si rivaluta, ogni elemento di un elenco conta), e un'ora v3 provata dopo le altre ci passerebbe
+      // sopra. Il margine lo misura solo il motore vero: tests/unit/contatoriRegole.motore-vero.mjs.
+      function contatori(d) {
+        return (d.v == 3 && contatoriOra3(d)) || (d.v == 2 && contatoriOra(d)) || (d.v == 4 && contatoriChat(d)) || (d.v == 1 && contatoriGiorno(d));
+      }
       allow get, list: if isAdmin();
-      allow create: if contatoriValidi(request.resource.data);
+      allow create: if request.auth != null && contatori(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── Le chiamate ai modelli dei contatori (#1464) ─────────────────────────
+    //
+    // Per ogni ora di contatori che ne ha, i numeri delle chiamate ai modelli: per funzione e modello il contesto, la
+    // cache, il ragionamento, l'uscita, i ripieghi, la spesa e gli adattamenti, in fasce; le chiamate per uso. Stesso
+    // pseudonimo, stessa ora e stesso id dell'ora; sta in un documento a parte perché le regole dell'ora sono già
+    // vicine al tetto di mille espressioni che Firestore valuta per scrittura. Le stesse regole dell'ora: sola
+    // creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-chiamate/{docId} {
+      function contatoriChiamate(d) {
+        let f = funzioniContate();
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa', 'adattamenti', 'chiamate'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'contesto', 'cache', 'ragionamento', 'uscita', 'ripieghi', 'spesa', 'adattamenti', 'chiamate'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.contesto, f, 24000, '^([a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t2k|t8k|t16k|t32k|t64k|t128k|oltre)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.cache, f, 22000, '^([a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](zero|q25|q50|q75|q100|nd)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ragionamento, f, 22000, '^([a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](r0|r1k|r4k|r16k|oltre|nd)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.uscita, f, 64000, '^([a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|error|altro)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|error|altro)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|error|altro)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](o256|o1k|o4k|o16k|oltre)[|](stop|length|tool_calls|filtro|error|altro)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.ripieghi, f, 28000, '^([a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](t1|t2|t3|t4_oltre)[|](si|no)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.spesa, f, 18000, '^([a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](router|stima|tardiva)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.adattamenti, f, 20000, '^([a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9})*(#[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9}(;[a-z0-9._:/-]{1,120}[|](contesto_stretto|finestra_piccola|ragionamento_tolto)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.chiamate, f, 5000, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriChiamate(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── La finestra dei contatori (#1470) ────────────────────────────────────
+    //
+    // Per ogni ora che ne ha, i numeri della finestra: quante schede e finestre al massimo, come e a che età si
+    // chiudono le schede, i giri del riordino e quello che l'utente ne disfa, gli spostamenti a mano, le voci del menu
+    // della scheda, la carta d'anteprima, l'esito delle notifiche per tipo, le azioni sugli scaricamenti, larghezza,
+    // scala, stato e tema della finestra, le schede ripristinate all'avvio e quante se ne chiudono subito. Ogni mappa
+    // ha per chiave un nome dei suoi elenchi chiusi (i tipi di notifica, che crescono, per forma) e per valore un conto.
+    // Stesso id dell'ora, sola creazione con l'identità anonima, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriFinestra.test.mjs.
+    match /contatori-finestra/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriFinestra(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'schedeAperte', 'chiusuraScheda', 'riordinoAutomatico', 'schedaTrascinata', 'voceMenuScheda', 'anteprimaScheda', 'notifica', 'downloadAzione', 'ambienteFinestra', 'sessioneRipristinata'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'schedeAperte', 'chiusuraScheda', 'riordinoAutomatico', 'schedaTrascinata', 'voceMenuScheda', 'anteprimaScheda', 'notifica', 'downloadAzione', 'ambienteFinestra', 'sessioneRipristinata'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && d.schedeAperte is string && d.schedeAperte.matches('^((n1|n2_5|n6_10|n11_20|n21_50|oltre)[:](n1|n2|n3_oltre))?$')
+          && conti(d.chiusuraScheda, '^((pulsante_x|clic_centrale|ctrl_w|barra|tasto_destro_riga|tasto_destro_scheda|chiudi_tutto|riordino_automatico|chat|salva_per_dopo|altro)[:](m1|m10|h1|h8|g1|oltre)(#(pulsante_x|clic_centrale|ctrl_w|barra|tasto_destro_riga|tasto_destro_scheda|chiudi_tutto|riordino_automatico|chat|salva_per_dopo|altro)[:](m1|m10|h1|h8|g1|oltre))*)?$', 2500, 1500)
+          && conti(d.riordinoAutomatico, '^(((idle|reopen|manual)[:]((duplicato|modello)[:](n0|n1|n2_5|oltre)|giudizio_mancato|gia_in_corso)|riaperta[:](m1|m10|h1|g1|oltre)|spostata_a_mano)(#((idle|reopen|manual)[:]((duplicato|modello)[:](n0|n1|n2_5|oltre)|giudizio_mancato|gia_in_corso)|riaperta[:](m1|m10|h1|g1|oltre)|spostata_a_mano))*)?$', 1500, 800)
+          && conti(d.schedaTrascinata, '^((d1|d2_3|d4_10|oltre)(#(d1|d2_3|d4_10|oltre))*)?$', 100, 100)
+          && conti(d.voceMenuScheda, '^((tab-duplicate|tab-mute|tab-help|tab-proxy-pick|tab-proxy-clear|tab-proxy-default|tab-cookies-auto|tab-cookies-show|tab-connesso-si|tab-connesso-no|tab-permessi-azzera)(#(tab-duplicate|tab-mute|tab-help|tab-proxy-pick|tab-proxy-clear|tab-proxy-default|tab-cookies-auto|tab-cookies-show|tab-connesso-si|tab-connesso-no|tab-permessi-azzera))*)?$', 600, 300)
+          && conti(d.anteprimaScheda, '^((pronta|vecchia|assente)[:](clic_sulla_scheda|via)[:](ms500|s1|s2|s5|oltre)(#(pronta|vecchia|assente)[:](clic_sulla_scheda|via)[:](ms500|s1|s2|s5|oltre))*)?$', 1500, 700)
+          && conti(d.notifica, '^([a-z][a-z0-9_]{0,39}[:](azione_0|azione_1|azione_2|chiusa_x|scaduta|sostituita|chiuse_tutte|ritirata|letta|in_attesa)(#[a-z][a-z0-9_]{0,39}[:](azione_0|azione_1|azione_2|chiusa_x|scaduta|sostituita|chiuse_tutte|ritirata|letta|in_attesa))*)?$', 40500, 13500)
+          && conti(d.downloadAzione, '^(((pannello|pagina|notifica)[:](apri_file|apri_cartella|pausa|riprendi|annulla|rimuovi|svuota|rimetti_nome)|rinominato_da_filo)(#((pannello|pagina|notifica)[:](apri_file|apri_cartella|pausa|riprendi|annulla|rimuovi|svuota|rimetti_nome)|rinominato_da_filo))*)?$', 1000, 600)
+          && d.ambienteFinestra is string && d.ambienteFinestra.matches('^((w1024|w1366|w1600|w1920|oltre)[:](1|1_25|1_5|2|altro)[:](normale|massimizzata|schermo_intero)[:](chiaro|scuro))?$')
+          && conti(d.sessioneRipristinata, '^((n1|n2_5|n6_10|n11_20|n21_50|oltre)[:](zero|q25|q50|q75|q100)(#(n1|n2_5|n6_10|n11_20|n21_50|oltre)[:](zero|q25|q50|q75|q100))*)?$', 700, 400);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriFinestra(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── I gesti della personalizzazione dei contatori (#1471) ────────────────
+    //
+    // Per ogni ora di contatori che ne ha, cosa si sposta, si trascina e si rimette: le pose delle icone fra barra e
+    // tasto destro, se le zone sono come di serie, il riquadro «Altro…», le aperture della barra laterale, il nome
+    // letto su un'icona, le carte e il riquadro di sistema della home, i moduli dell'Editor, i ripristini, gli
+    // «annulla» sui cambi e i trascinamenti (origine e destinazione, mai il contenuto). Stesso pseudonimo, stessa ora e
+    // stesso id dell'ora, in un documento a parte per il tetto di espressioni. Le stesse regole: sola creazione con
+    // l'identità anonima, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-gesti/{docId} {
+      function contatoriGesti(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'icona_spostata', 'disposizione_di_serie', 'altro_del_menu', 'barra_aperta', 'suggerimento_letto', 'carta_home', 'riquadro_sistema', 'modulo_editor', 'ripristino', 'annulla_cambio', 'trascinamento'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'icona_spostata', 'disposizione_di_serie', 'altro_del_menu', 'barra_aperta', 'suggerimento_letto', 'carta_home', 'riquadro_sistema', 'modulo_editor', 'ripristino', 'annulla_cambio', 'trascinamento'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && aForma(d.icona_spostata, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 36000, '^((primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9}(;(primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9})*(#(primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9}(;(primary|secondary|bar)[|](primary|secondary|bar)[|](trascina|rimessa_nel_menu|chat)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.disposizione_di_serie, ['primary', 'secondary', 'bar'], 20, '^((si|no)(#(si|no))*)?$')
+          && aForma(d.altro_del_menu, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 2000, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.barra_aperta, ['spinta', 'clic', 'tasto', 'chat', 'trascina'], 4000, '^((azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6}(;(azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6})*(#(azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6}(;(azione|sistema|tasto_destro|a_vuoto)[|][0-9]{1,9}[|][0-9]{1,9}(,[0-9]{1,9}){6})*)*)?$')
+          && aForma(d.suggerimento_letto, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 6000, '^((barra|menu)[|](clic|via)[|][0-9]{1,9}(;(barra|menu)[|](clic|via)[|][0-9]{1,9})*(#(barra|menu)[|](clic|via)[|][0-9]{1,9}(;(barra|menu)[|](clic|via)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.carta_home, '^([A-Za-z][A-Za-z0-9]{0,39}(#[A-Za-z][A-Za-z0-9]{0,39})*)?$', 2000, 9000, '^(((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9}(;((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9})*(#((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9}(;((mostra|aggiungi|togli|ripristina|ordina)|(sinistra|destra|altro)[|](clic|invio|tasto_destro))[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.riquadro_sistema, ['ora', 'batteria', 'rete', 'bluetooth', 'volume'], 2000, '^((clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9}(;(clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9})*(#(clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9}(;(clic|tasto_destro|tastiera|trascina_in_chat|comando_dato)[|][0-9]{1,9})*)*)?$')
+          && aForma(d.modulo_editor, '^([a-z][a-z0-9-]{0,39}(#[a-z][a-z0-9-]{0,39})*)?$', 1000, 9000, '^(([0-9]{1,9}|((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9}(;((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9})*)(#([0-9]{1,9}|((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9}(;((aggiunto|tolto|spostato|ridimensionato|configurato|usato|scorciatoia_si|scorciatoia_no)|(3|4|5|6|7|8|9|10|11|12)[|](4|5|6|7|8|9|10|11|12|13|14|15|16))[|][0-9]{1,9})*))*)?$')
+          && chiuse(d.ripristino, ['token', 'tutti_token', 'tutte_impostazioni', 'colore_schede', 'tutto_colore_schede', 'carte_home', 'avanzate_viste'], 4000, '^(([0-9]{1,9}|[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9}(;[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9})*)(#([0-9]{1,9}|[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9}(;[a-z][A-Za-z0-9._]{0,59}[|][0-9]{1,9})*))*)?$')
+          && aForma(d.annulla_cambio, '^([A-Za-z0-9_.*-]{1,80}(#[A-Za-z0-9_.*-]{1,80})*)?$', 6000, 175000, '^((chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9}(;(chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9})*(#(chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9}(;(chat|assistente|interfaccia|pagina|importazione|filo|altro)[|](s10|m1|m10|h1|oltre)[|][0-9]{1,9})*)*)?$')
+          && chiuse(d.trascinamento, ['carta_home', 'voce_sistema', 'file_da_chat', 'pagina_salvata', 'icona_barra', 'icona_menu', 'scheda', 'modulo_editor', 'palette_editor', 'testo_pagina', 'file_disco', 'immagine'], 17000, '^((chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9}(;(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9})*(#(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9}(;(chat_home|chat_aiuto|chat_modulo_editor|colonna_home|altro_home|barra|riga_menu|altro_menu|striscia_schede|griglia_editor|campo_feedback|nessuna)[|](posato|annullato)[|][0-9]{1,9})*)*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriGesti(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── La navigazione dei contatori (#1469) ─────────────────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi, copie di quelli del codice: le pagine d'errore
+    // di rete per codice di Chromium, con la scheda diretta o da un altro paese, e il loro «Riprova»; il blocco per
+    // paese (fonte, classe del modello, decisione, instradamenti per paese e tier); le liste della pubblicità e dei
+    // banner (esito, età e domini in fasce); i siti bloccati per lista e i loro «Apri comunque»; i banner dei cookie;
+    // la pulizia dei cookie all'uscita; i riquadri rotti per servizio; gli scaricamenti in fasce e le domande dei
+    // programmi per classe. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle
+    // espressioni; le stesse regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-navigazione/{docId} {
+      function contatoriNavigazione(d) {
+        let codici = ['-105', '-137', '-106', '-102', '-104', '-100', '-101', '-109', '-118', '-7', '-21', '-130', '-111', '-20', '-501', '-324', 'altro'];
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'navFallite', 'navRiprove', 'geoRilevati', 'geoClassi', 'geoDecisioni', 'geoProxy', 'liste', 'sitiBloccati', 'bannerCookie', 'puliziaCookie', 'riquadri', 'scaricamenti', 'programmi'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'navFallite', 'navRiprove', 'geoRilevati', 'geoClassi', 'geoDecisioni', 'geoProxy', 'liste', 'sitiBloccati', 'bannerCookie', 'puliziaCookie', 'riquadri', 'scaricamenti', 'programmi'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.navFallite, codici, 340, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.navRiprove, codici, 340, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.geoRilevati, ['http_451', 'redirect_pattern', 'text_pattern', 'llm_classifier'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.geoClassi, ['geo_block', 'bot_block', 'paywall', 'login_wall', 'errore_generico', 'saltato_budget', 'no_model'], 70, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.geoDecisioni, ['flagged_dangerous', 'not_configured', 'login_session', 'safe_no_login', 'datacenter_ipblock', 'retry_failed'], 60, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.geoProxy, ['us|datacenter', 'us|residential', 'gb|datacenter', 'gb|residential', 'fr|datacenter', 'fr|residential', 'de|datacenter', 'de|residential', 'es|datacenter', 'es|residential', 'nl|datacenter', 'nl|residential', 'jp|datacenter', 'jp|residential', 'altro|datacenter', 'altro|residential'], 320, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.liste, ['adblock', 'cookie_banner'], 340, '^([0-9]{1,9}(,[0-9]{1,9}){3};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){3};[0-9]{1,9}(,[0-9]{1,9}){5};[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.sitiBloccati, ['liste', 'lista_utente'], 40, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$')
+          && chiuse(d.bannerCookie, ['rejected', 'hidden', 'unconfirmed', 'mostra_banner'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.puliziaCookie, ['finita', 'tetto_2500ms'], 20, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.riquadri, ['instagram', 'x', 'tiktok', 'facebook', 'spotify', 'soundcloud', 'vimeo', 'youtube', 'google-maps', 'disqus', 'pinterest', 'linkedin', 'twitch', 'altro'], 1540, '^([0-9]{1,9}(,[0-9]{1,9}){10}(#[0-9]{1,9}(,[0-9]{1,9}){10})*)?$')
+          && chiuse(d.scaricamenti, ['completed', 'interrupted', 'cancelled'], 330, '^([0-9]{1,9}(,[0-9]{1,9}){4};[0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){4};[0-9]{1,9}(,[0-9]{1,9}){5})*)?$')
+          && chiuse(d.programmi, ['programma', 'immagine_disco'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$');
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriNavigazione(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── Le attività dei contatori (#1467) ────────────────────────────────────
+    //
+    // Per ogni ora di contatori che ne ha, quello che Filo fa da solo o a metà con la persona: le sessioni dell'Aiuto,
+    // le ricerche web, le dettature, le letture ad alta voce, le lezioni e la compattazione, le righe di memoria
+    // corrette, i giri di pulizia e le schede riaperte, la home e i suggerimenti usati. Per misura una mappa
+    // «combinazione → n»: la combinazione è fatta di nomi da elenchi chiusi uniti da «|», e qui ne sta l'elenco (per il
+    // tipo d'azione di un suggerimento, che cresce col registro delle azioni, la forma). Stesso pseudonimo, stessa ora e
+    // stesso id dell'ora; sola creazione con l'identità anonima, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatori.test.mjs.
+    match /contatori-attivita/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriAttivita(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'aiuto', 'ricercaWeb', 'dettatura', 'lettura', 'lezioni', 'compattazioni', 'memoria', 'pulizia', 'riaperte', 'home', 'suggerimenti'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'aiuto', 'ricercaWeb', 'dettatura', 'lettura', 'lezioni', 'compattazioni', 'memoria', 'pulizia', 'riaperte', 'home', 'suggerimenti'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.aiuto, '^(((fatto|chiusa_prima|tetto_passi|errore|pagina_cambiata)[|](p0|p1|p2_5|p6_20|oltre)[|](p0|p1|p2_5|p6_20|oltre)[|](n0|n1|n2_oltre)[|](n0|n1|n2_oltre)|altro)(#((fatto|chiusa_prima|tetto_passi|errore|pagina_cambiata)[|](p0|p1|p2_5|p6_20|oltre)[|](p0|p1|p2_5|p6_20|oltre)[|](n0|n1|n2_oltre)[|](n0|n1|n2_oltre)|altro))*)?$', 4646, 1010)
+          && conti(d.ricercaWeb, '^(((chat|aiuto|correttore)[|](tavily|duckduckgo|nessuno)[|](si|no)[|](r0|r1_2|r3_5|oltre)|(aiuto)[|](al_tetto)|altro)(#((chat|aiuto|correttore)[|](tavily|duckduckgo|nessuno)[|](si|no)[|](r0|r1_2|r3_5|oltre)|(aiuto)[|](al_tetto)|altro))*)?$', 3131, 1010)
+          && conti(d.dettatura, '^(((utente|finito|muto|tempo|errore|altro|annulla)[|](f0|f1|f2_5|oltre)[|](da_sola|cambiata|tenuta|annullata|a_mano|nessuno)[|](si|no)|altro)(#((utente|finito|muto|tempo|errore|altro|annulla)[|](f0|f1|f2_5|oltre)[|](da_sola|cambiata|tenuta|annullata|a_mano|nessuno)[|](si|no)|altro))*)?$', 2727, 1010)
+          && conti(d.lettura, '^(((modello|browser|mista)[|](nessuno|no_api_key|limit_reached|no_model_for_action|no_open_weights_model|no_allowed_host|tts_voice_required|tts_voice_unknown|chiave_rifiutata|no_tts_model|altro)[|](q25|q50|q75|q100|fine)|altro)(#((modello|browser|mista)[|](nessuno|no_api_key|limit_reached|no_model_for_action|no_open_weights_model|no_allowed_host|tts_voice_required|tts_voice_unknown|chiave_rifiutata|no_tts_model|altro)[|](q25|q50|q75|q100|fine)|altro))*)?$', 3535, 1010)
+          && conti(d.lezioni, '^(((nulla)|(l0|l1|l2_3|oltre)[|](l0|l1|l2_3|oltre)|altro)(#((nulla)|(l0|l1|l2_3|oltre)[|](l0|l1|l2_3|oltre)|altro))*)?$', 1212, 1010)
+          && conti(d.compattazioni, '^(((nessuna|applicata|rimandata)[|](r0|r1|r2_5|oltre)|altro)(#((nessuna|applicata|rimandata)[|](r0|r1|r2_5|oltre)|altro))*)?$', 1616, 1010)
+          && conti(d.memoria, '^(((quaderno|chat)[|](togli|correggi|ripristina|svuota)[|](profilo|preferenze|espansioni|lezione|tutte)[|](giorno|settimana|mese|oltre|nd)|altro)(#((quaderno|chat)[|](togli|correggi|ripristina|svuota)[|](profilo|preferenze|espansioni|lezione|tutte)[|](giorno|settimana|mese|oltre|nd)|altro))*)?$', 4141, 1010)
+          && conti(d.pulizia, '^(((idle|reopen|manual)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](si|no)|altro)(#((idle|reopen|manual)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](s0|s1|s2_5|s6_20|oltre)[|](si|no)|altro))*)?$', 2828, 1010)
+          && conti(d.riaperte, '^(((pulizia|duplicato|persona)[|](min10|ora|giorno|oltre)|altro)(#((pulizia|duplicato|persona)[|](min10|ora|giorno|oltre)|altro))*)?$', 1717, 1010)
+          && conti(d.home, '^(((generata|senza_ai_chiave|senza_ai_pesi_aperti|senza_ai_modelli)|altro)(#((generata|senza_ai_chiave|senza_ai_pesi_aperti|senza_ai_modelli)|altro))*)?$', 2121, 1010)
+          && conti(d.suggerimenti, '^(([A-Za-z][A-Za-z0-9_-]{0,39}[|](1|2|3|4_oltre)[|](ora|giorno|oltre|nd)|altro)(#([A-Za-z][A-Za-z0-9_-]{0,39}[|](1|2|3|4_oltre)[|](ora|giorno|oltre|nd)|altro))*)?$', 5656, 1010);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriAttivita(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── La sicurezza dei contatori (#1474) ───────────────────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi, copie di quelli del codice: il verdetto di ogni
+    // pagina aperta (livello e motivi del motore), l'esito e la durata in fasce dei controlli di rete del verdetto e se
+    // l'hanno cambiato, le scelte sull'avviso del sito, i lavori fermati da una pagina delicata (per categoria, e quando
+    // il filtro si è rotto), le richieste ai modelli partite con un segreto tolto (per tipo e funzione), le uscite fermate
+    // (regola, tipo di segreto e tipo d'azione) e i tetti del codice toccati. Mai un dominio, un indirizzo o un segreto.
+    // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
+    // regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriSicurezza.test.mjs.
+    match /contatori-sicurezza/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriSicurezza(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'sito_verdetto', 'sito_approfondito', 'avviso_scelta', 'pagina_delicata', 'segreto_oscurato', 'uscita_fermata', 'tetto_toccato'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'sito_verdetto', 'sito_approfondito', 'avviso_scelta', 'pagina_delicata', 'segreto_oscurato', 'uscita_fermata', 'tetto_toccato'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.sito_verdetto, '^((safe|sospetto|pericoloso)([:](gsb_malware|gsb_phishing|gsb_unwanted|gsb_listed|strict_impersonation|broad_impersonation|weak_typo|young_domain|cert_expired|cert_mismatch|cert_self_signed|cert_untrusted|cert_absent|cert_revoked|sandbox_dangerous|llm|insecure_form|insecure_transport|sensitive_input|auto_download|double_extension|hosted_content|whitelisted|clean|local_host|unparsable|altro))?(#(safe|sospetto|pericoloso)([:](gsb_malware|gsb_phishing|gsb_unwanted|gsb_listed|strict_impersonation|broad_impersonation|weak_typo|young_domain|cert_expired|cert_mismatch|cert_self_signed|cert_untrusted|cert_absent|cert_revoked|sandbox_dangerous|llm|insecure_form|insecure_transport|sensitive_input|auto_download|double_extension|hosted_content|whitelisted|clean|local_host|unparsable|altro))?)*)?$', 3600, 1700)
+          && conti(d.sito_approfondito, '^(((gsb|rdap|ct|sandbox|llm)[:]((ok|transitorio|fallito)[:](ms500|s1|s2|s5|s10|s30|oltre)|non_configurato)|cert[:](ok|fallito)|cambiato[:](si|no))(#((gsb|rdap|ct|sandbox|llm)[:]((ok|transitorio|fallito)[:](ms500|s1|s2|s5|s10|s30|oltre)|non_configurato)|cert[:](ok|fallito)|cambiato[:](si|no)))*)?$', 3800, 2300)
+          && conti(d.avviso_scelta, '^((procedi|continua|indietro|copia|chiedi|segnala_falso_allarme)[:](sospetto|pericoloso)[:](prima_di_aprire|dopo)(#(procedi|continua|indietro|copia|chiedi|segnala_falso_allarme)[:](sospetto|pericoloso)[:](prima_di_aprire|dopo))*)?$', 1500, 500)
+          && conti(d.pagina_delicata, '^((utente|posta|banche|sanita|pa|campi|altro|filtro_guasto)[:](descrizione_automatica|spiegazione_preparata|contesto_correttore|riquadri|schermo|riordino_schede|riassunto_schede)(#(utente|posta|banche|sanita|pa|campi|altro|filtro_guasto)[:](descrizione_automatica|spiegazione_preparata|contesto_correttore|riquadri|schermo|riordino_schede|riassunto_schede))*)?$', 2700, 1200)
+          && conti(d.segreto_oscurato, '^((portafoglio|accesso|identita|feedback|chiave|altro)[:][a-z][a-z0-9-]{0,39}(#(portafoglio|accesso|identita|feedback|chiave|altro)[:][a-z][a-z0-9-]{0,39})*)?$', 51840, 9600)
+          && conti(d.uscita_fermata, '^((custodito[:](portafoglio|accesso|identita|feedback|chiave|altro)|(codice|password|chiave|iban|carta|guasto|altro))[:](NAVIGA|LEGGI_PAGINA|CERCA_WEB|ESEGUI_COMANDO|INVIA_FEEDBACK|APRI_FILE|APRI_SALVATA|CERCA_DOCUMENTI|CAMPO_PAGINA|SCARICA_COLLEGAMENTO|altro)(#(custodito[:](portafoglio|accesso|identita|feedback|chiave|altro)|(codice|password|chiave|iban|carta|guasto|altro))[:](NAVIGA|LEGGI_PAGINA|CERCA_WEB|ESEGUI_COMANDO|INVIA_FEEDBACK|APRI_FILE|APRI_SALVATA|CERCA_DOCUMENTI|CAMPO_PAGINA|SCARICA_COLLEGAMENTO|altro))*)?$', 7200, 2900)
+          && conti(d.tetto_toccato, '^((automatiche_spiegazioni|automatiche_correttore|riquadri_visioni|geo_budget|safebrowse_approfondimenti|link_accorciati|segreti_saturo|contatori_combinazioni)(#(automatiche_spiegazioni|automatiche_correttore|riquadri_visioni|geo_budget|safebrowse_approfondimenti|link_accorciati|segreti_saturo|contatori_combinazioni))*)?$', 400, 200);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriSicurezza(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── I riquadri AI e l'Editor dei contatori (#1465) ───────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi: com'era la risposta preparata in anticipo
+    // quando la persona l'ha aperta (Spiega, il correttore su una parola), i riquadri chiusi prima della risposta con
+    // l'attesa in fasce, cosa se ne è fatto (Copia, quante domande dopo, Approfondisci, la risposta ricominciata), la
+    // riscrittura (scorciatoia, esito, proposte), l'OCR, la traduzione della pagina (esito, parte rimasta, ritorno
+    // all'originale entro un minuto), il titolo automatico dell'Editor e la sua chat. Mai un testo, un titolo o un
+    // sito. Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le
+    // stesse regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatori.test.mjs.
+    // Dopo la v1 (#1586), in campi facoltativi e con la stessa versione: l'anticipo che una pagina delicata non lascia
+    // partire e il gesto che costa (la spiegazione, il segnaposto), le correzioni automatiche per fonte, «Valuta» e i
+    // segnaposti del correttore. Le copie vecchie non li mandano, e un'ora che non li ha non li porta.
+    match /contatori-riquadri/{docId} {
+      function contatoriRiquadri(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat', 'anticipo_privacy', 'correttore_automatica', 'correttore_valuta', 'correttore_segnaposto'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'anticipo_al_gesto', 'riquadro_chiuso_prima', 'riquadro_uso', 'riscrittura', 'ocr', 'traduzione_pagina', 'editor_titolo', 'editor_chat'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && chiuse(d.anticipo_al_gesto, ['spiega', 'correttore_parola'], 100, '^([0-9]{1,9}(,[0-9]{1,9}){4}(#[0-9]{1,9}(,[0-9]{1,9}){4})*)?$')
+          && chiuse(d.riquadro_chiuso_prima, ['explain', 'explain-deep', 'translate-selection', 'explain-link', 'describe-image'], 350, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.riquadro_uso, ['explain', 'explain-deep', 'translate-selection', 'explain-link', 'describe-image'], 350, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.riscrittura, ['formale', 'informale', 'riassumi', 'traduci', 'correggi', 'libera'], 600, '^([0-9]{1,9}(,[0-9]{1,9}){9}(#[0-9]{1,9}(,[0-9]{1,9}){9})*)?$')
+          && chiuse(d.ocr, ['copiato', 'vuoto', 'annullato', 'tagliato'], 40, '^([0-9]{1,9}(#[0-9]{1,9})*)?$')
+          && chiuse(d.traduzione_pagina, ['intera', 'parziale', 'fermata'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$')
+          && chiuse(d.editor_titolo, ['automatico', 'rigenerato'], 140, '^([0-9]{1,9}(,[0-9]{1,9}){6}(#[0-9]{1,9}(,[0-9]{1,9}){6})*)?$')
+          && chiuse(d.editor_chat, ['intero', 'oltre_tetto'], 120, '^([0-9]{1,9}(,[0-9]{1,9}){5}(#[0-9]{1,9}(,[0-9]{1,9}){5})*)?$')
+          && (!('anticipo_privacy' in d) || chiuse(d.anticipo_privacy, ['spiega', 'segnaposto'], 40, '^([0-9]{1,9}(,[0-9]{1,9}){1}(#[0-9]{1,9}(,[0-9]{1,9}){1})*)?$'))
+          && (!('correttore_automatica' in d) || chiuse(d.correttore_automatica, ['personale', 'fisso', 'nome'], 90, '^([0-9]{1,9}(,[0-9]{1,9}){2}(#[0-9]{1,9}(,[0-9]{1,9}){2})*)?$'))
+          && (!('correttore_valuta' in d) || chiuse(d.correttore_valuta, ['chiesta', 'con_correzioni', 'senza_correzioni', 'correzione_mostrata', 'correzione_accettata', 'correzione_tolta'], 60, '^([0-9]{1,9}(#[0-9]{1,9})*)?$'))
+          && (!('correttore_segnaposto' in d) || chiuse(d.correttore_segnaposto, ['da_solo', 'su_richiesta', 'memoria'], 240, '^([0-9]{1,9}(,[0-9]{1,9}){7}(#[0-9]{1,9}(,[0-9]{1,9}){7})*)?$'));
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriRiquadri(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // La home e quello che Filo fa da sé sulla pagina in un'ora dei contatori (#1473), per nome da elenchi chiusi: i
+    // comandi della barra della home, le ricerche nel filo (risultati, tipo e posto di quello aperto, quanto per
+    // aprirlo, in fasce), i «risali» di fila, l'intervista rifatta dalle Preferenze e il passo dove si ferma, le
+    // proposte sulla pagina per tipo ed esito, gli automatismi fatti e disfatti. Mai un testo, un sito o un paese.
+    // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
+    // regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriHomePagina.test.mjs.
+    match /contatori-home-pagina/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriHomePagina(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'comando_home', 'ricerca_home', 'risali', 'intervista_rifatta', 'proposta_sulla_pagina', 'automatismo_fatto', 'automatismo_disfatto'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'comando_home', 'ricerca_home', 'risali', 'intervista_rifatta', 'proposta_sulla_pagina', 'automatismo_fatto', 'automatismo_disfatto'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.comando_home, '^(((home|clear|clear_all|kill|newtab|models|modelli|sicurezza|preferenze|editor|feedback|pulisci|pulizia|riordina|set|invito|users|gift|help|sito_diretto|shell|sconosciuto_inviato)|sito_non_risolto[:](apri_lo_stesso|lascia))(#((home|clear|clear_all|kill|newtab|models|modelli|sicurezza|preferenze|editor|feedback|pulisci|pulizia|riordina|set|invito|users|gift|help|sito_diretto|shell|sconosciuto_inviato)|sito_non_risolto[:](apri_lo_stesso|lascia)))*)?$', 600, 500)
+          && conti(d.ricerca_home, '^((risultati[:](r0|r1_3|r4_10|oltre)|aperto[:](messaggio|pagina|scheda_chiusa|conversazione_nascosta)[:](p1|p2_3|p4_10|oltre)[:](ms500|s1|s2|s5|s10|s30|oltre)|vuota_ripetuta)(#(risultati[:](r0|r1_3|r4_10|oltre)|aperto[:](messaggio|pagina|scheda_chiusa|conversazione_nascosta)[:](p1|p2_3|p4_10|oltre)[:](ms500|s1|s2|s5|s10|s30|oltre)|vuota_ripetuta))*)?$', 7000, 2400)
+          && conti(d.risali, '^((n1|n2_3|n4_10|oltre)(#(n1|n2_3|n4_10|oltre))*)?$', 100, 100)
+          && conti(d.intervista_rifatta, '^((riaperta|fine[:][a-z][a-z0-9_]{0,29})(#(riaperta|fine[:][a-z][a-z0-9_]{0,29}))*)?$', 1440, 400)
+          && conti(d.proposta_sulla_pagina, '^(((apri_da_altro_paese|email_account|riquadro_rotto|resta_connesso)[:](accettata|rifiutata|spenta_per_sempre|ignorata)|email_account[:]accettata[:](clic|tastiera|menu))(#((apri_da_altro_paese|email_account|riquadro_rotto|resta_connesso)[:](accettata|rifiutata|spenta_per_sempre|ignorata)|email_account[:]accettata[:](clic|tastiera|menu)))*)?$', 1200, 400)
+          && conti(d.automatismo_fatto, '^((banner_cookie|zoom_ricordato|segnalazione_automatica|pubblicita_saltata)(#(banner_cookie|zoom_ricordato|segnalazione_automatica|pubblicita_saltata))*)?$', 200, 100)
+          && conti(d.automatismo_disfatto, '^((banner_cookie|zoom_ricordato|segnalazione_automatica)(#(banner_cookie|zoom_ricordato|segnalazione_automatica))*)?$', 200, 100);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriHomePagina(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // ── Il servizio dei contatori (#1472) ────────────────────────────────────
+    //
+    // Per ogni ora che ne ha, solo numeri sotto chiavi di elenchi chiusi, copie di quelli del codice: chi ha servito
+    // fuori dalla politica dei modelli (funzione, modello, host, motivo e chi pagava), le risposte di cui non si è
+    // saputo chi le ha servite, il «nessun host ammesso» per motivo, i modelli che «solo pesi aperti» ha sostituito o
+    // tolto e il suo stato, la ritenzione zero, le chiamate mai partite per motivo, i tentativi rotti e le decisioni del
+    // classificatore, la chiave che ha pagato e il ripiego sui crediti, l'avviso dei crediti, saldo e spesa in fasce,
+    // l'esito di un riscatto d'invito, i guasti dell'identità, l'accesso con Google, le segnalazioni automatiche e la
+    // coda dei feedback. Mai una chiave, un codice d'invito o un'email. Stesso pseudonimo, stessa ora e stesso id
+    // dell'ora, in un documento suo per il tetto delle espressioni; le stesse regole: sola creazione con l'identità
+    // anonima, forma fissa, legge solo l'admin. Sentinella: tests/unit/firestoreRulesContatoriServizio.test.mjs.
+    match /contatori-servizio/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriServizio(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'politica_violata', 'servita_ignota', 'nessun_host', 'pesi_aperti', 'zdr', 'mai_partita', 'ripiego', 'chiave_fonte', 'chiave_ripiego', 'avviso_crediti', 'saldo_spesa', 'invito', 'identita', 'accesso', 'f4', 'f4_proposta', 'coda_feedback'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'politica_violata', 'servita_ignota', 'nessun_host', 'pesi_aperti', 'zdr', 'mai_partita', 'ripiego', 'chiave_fonte', 'chiave_ripiego', 'avviso_crediti', 'saldo_spesa', 'invito', 'identita', 'accesso', 'f4', 'f4_proposta', 'coda_feedback'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.politica_violata, '^(([a-z][a-z0-9-]{0,39}[|][a-z0-9][a-z0-9._-]{0,59}([/][a-z0-9][a-z0-9._-]{0,79})?([:][a-z0-9._-]{1,30})?[|][A-Za-z0-9][A-Za-z0-9 ._-]{0,47}[|](excluded|not_producer)[|](own|personal|factory|none))(#([a-z][a-z0-9-]{0,39}[|][a-z0-9][a-z0-9._-]{0,59}([/][a-z0-9][a-z0-9._-]{0,79})?([:][a-z0-9._-]{1,30})?[|][A-Za-z0-9][A-Za-z0-9 ._-]{0,47}[|](excluded|not_producer)[|](own|personal|factory|none)))*)?$', 11200, 500)
+          && conti(d.servita_ignota, '^(([a-z][a-z0-9-]{0,39}[|][a-z0-9][a-z0-9._-]{0,59}([/][a-z0-9][a-z0-9._-]{0,79})?([:][a-z0-9._-]{1,30})?)(#([a-z][a-z0-9-]{0,39}[|][a-z0-9][a-z0-9._-]{0,59}([/][a-z0-9][a-z0-9._-]{0,79})?([:][a-z0-9._-]{1,30})?))*)?$', 6700, 500)
+          && conti(d.nessun_host, '^(([a-z][a-z0-9-]{0,39}[|][a-z0-9][a-z0-9._-]{0,59}([/][a-z0-9][a-z0-9._-]{0,79})?([:][a-z0-9._-]{1,30})?[|](excluded|mixed|unknown|zdr|zdrmixed|zdrunknown|produttore|crediti|data_policy|no_provider_allowed|model_unavailable|no_tool_host|parametri_host|altro))(#([a-z][a-z0-9-]{0,39}[|][a-z0-9][a-z0-9._-]{0,59}([/][a-z0-9][a-z0-9._-]{0,79})?([:][a-z0-9._-]{1,30})?[|](excluded|mixed|unknown|zdr|zdrmixed|zdrunknown|produttore|crediti|data_policy|no_provider_allowed|model_unavailable|no_tool_host|parametri_host|altro)))*)?$', 9900, 600)
+          && conti(d.pesi_aperti, '^(([a-z][a-z0-9-]{0,39}[|](sostituito|tolto|blocco_provider|blocco_model)|(stato)[|](acceso|spento))(#([a-z][a-z0-9-]{0,39}[|](sostituito|tolto|blocco_provider|blocco_model)|(stato)[|](acceso|spento)))*)?$', 36600, 6500)
+          && conti(d.zdr, '^(([a-z][a-z0-9-]{0,39}[|](partita|rifiutata))(#([a-z][a-z0-9-]{0,39}[|](partita|rifiutata)))*)?$', 16400, 3200)
+          && conti(d.mai_partita, '^(([a-z][a-z0-9-]{0,39}[|](no_api_key|limit_reached|no_model_for_action|no_open_weights_model|gate_method|provider_method_missing|no_key_info))(#([a-z][a-z0-9-]{0,39}[|](no_api_key|limit_reached|no_model_for_action|no_open_weights_model|gate_method|provider_method_missing|no_key_info)))*)?$', 72800, 11200)
+          && conti(d.ripiego, '^(([a-z][a-z0-9-]{0,39}[|](spezzato|lento|passeggero|fatale|scarta))(#([a-z][a-z0-9-]{0,39}[|](spezzato|lento|passeggero|fatale|scarta)))*)?$', 41600, 8000)
+          && conti(d.chiave_fonte, '^(([a-z][a-z0-9-]{0,39}[|](own|personal|factory|none))(#([a-z][a-z0-9-]{0,39}[|](own|personal|factory|none)))*)?$', 32000, 6400)
+          && conti(d.chiave_ripiego, '^(((401|402|403)[|](riuscito|fallito|non_ammesso))(#((401|402|403)[|](riuscito|fallito|non_ammesso)))*)?$', 200, 100)
+          && conti(d.avviso_crediti, '^(((scattato)[|](proiezione|percento)|(rimedio)[|](modello|automatiche|chiave)|(spenta)[|](spiegaAnticipata|riassuntoSchede|riordinoSchede|correttore|suggerimenti|categorie|nomiFile)|(finiti)[|](mostrato))(#((scattato)[|](proiezione|percento)|(rimedio)[|](modello|automatiche|chiave)|(spenta)[|](spiegaAnticipata|riassuntoSchede|riordinoSchede|correttore|suggerimenti|categorie|nomiFile)|(finiti)[|](mostrato)))*)?$', 300, 200)
+          && conti(d.saldo_spesa, '^(((saldo)[|](c0|c1|c10|c50|c100|c500|oltre)|(spesa)[|](e0|e0_1|e1|e5|e20|oltre)[|](limite_si|limite_no))(#((saldo)[|](c0|c1|c10|c50|c100|c500|oltre)|(spesa)[|](e0|e0_1|e1|e5|e20|oltre)[|](limite_si|limite_no)))*)?$', 400, 200)
+          && conti(d.invito, '^(((ok|bad_code|invalid_code|code_used|own_code|already_in|invites_exhausted|global_cap|missing_exchange_rate|not_configured|provider_error|too_many_reissues|internal|not_reachable|inviter_not_linked|network_cap|no_identity|altro))(#((ok|bad_code|invalid_code|code_used|own_code|already_in|invites_exhausted|global_cap|missing_exchange_rate|not_configured|provider_error|too_many_reissues|internal|not_reachable|inviter_not_linked|network_cap|no_identity|altro)))*)?$', 400, 200)
+          && conti(d.identita, '^(((identity_lost|identity_unreadable|illeggibile_da_parte|registrazione_fallita|salvataggio_fallito))(#((identity_lost|identity_unreadable|illeggibile_da_parte|registrazione_fallita|salvataggio_fallito)))*)?$', 200, 100)
+          && conti(d.accesso, '^(((esito)[|](ok|rete|annullato|scaduto|browser|non_configurato|servizio)|(browser)[|](rete|disallowed_useragent|rifiutato|errore|senza_scheda)|(rinnovo)[|](rifiutato|irraggiungibile))(#((esito)[|](ok|rete|annullato|scaduto|browser|non_configurato|servizio)|(browser)[|](rete|disallowed_useragent|rifiutato|errore|senza_scheda)|(rinnovo)[|](rifiutato|irraggiungibile)))*)?$', 400, 200)
+          && conti(d.f4, '^(((capability-gap|complaint|capability-uncommandable)[|][a-z][a-z0-9-]{0,39}[|](inviata|in_coda|fallita|annullata|sostituita|spenta))(#((capability-gap|complaint|capability-uncommandable)[|][a-z][a-z0-9-]{0,39}[|](inviata|in_coda|fallita|annullata|sostituita|spenta)))*)?$', 4500, 600)
+          && conti(d.f4_proposta, '^(((mostrata|confermata))(#((mostrata|confermata)))*)?$', 100, 100)
+          && conti(d.coda_feedback, '^(((voci)[|](n0|n1|n5|n20|oltre)|(eta)[|](h1|h6|h24|oltre)|(rinuncia)[|](cifratura|scaduta|troppe)|(attesa_accesso)[|](assente|rifiutato))(#((voci)[|](n0|n1|n5|n20|oltre)|(eta)[|](h1|h6|h24|oltre)|(rinuncia)[|](cifratura|scaduta|troppe)|(attesa_accesso)[|](assente|rifiutato)))*)?$', 300, 200);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriServizio(request.resource.data);
+      allow update, delete: if false;
+    }
+
+    // Le strade di un'ora dei contatori (#1468), per nome da elenchi chiusi: da quale strada parte ogni azione (scorciatoia,
+    // barra, menu, tasto destro, chat…), i tasti dei browser e quelli che tornano indietro subito, le scorciatoie mute e
+    // perché, il menu nativo scelto, su che cosa si apre il tasto destro, indietro e avanti per strada, le pagine di Filo
+    // aperte e quanto restano davanti in fasce, l'Aiuto aperto. Mai un testo, un indirizzo, un sito o un tasto scritto.
+    // Stesso pseudonimo, stessa ora e stesso id dell'ora, in un documento suo per il tetto delle espressioni; le stesse
+    // regole: sola creazione con l'identità anonima, forma fissa, legge solo l'admin. Sentinella:
+    // tests/unit/firestoreRulesContatoriStrade.test.mjs.
+    match /contatori-strade/{docId} {
+      function conti(m, chiavi, tettoChiavi, tetto) {
+        return m is map && m.keys().join('#').size() <= tettoChiavi && m.keys().join('#').matches(chiavi)
+          && m.values().join('#').size() <= tetto && m.values().join('#').matches('^([0-9]{1,9}(#[0-9]{1,9})*)?$');
+      }
+      function contatoriStrade(d) {
+        return d.keys().hasOnly(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'via_azione', 'tasto_da_browser', 'scorciatoia_a_vuoto', 'menu_nativo_scelto', 'contesto_box', 'navigazione_cronologia', 'pagina_di_filo_aperta', 'aiuto_aperto'])
+          && d.keys().hasAll(['v', 'pseudonimo', 'giorno', 'mese', 'ora', 'app', 'os', 'via_azione', 'tasto_da_browser', 'scorciatoia_a_vuoto', 'menu_nativo_scelto', 'contesto_box', 'navigazione_cronologia', 'pagina_di_filo_aperta', 'aiuto_aperto'])
+          && d.v == 1
+          && d.pseudonimo is string && d.pseudonimo.matches('^[0-9a-f]{20}$')
+          && d.giorno is string && d.giorno.matches('^20[0-9]{2}-[01][0-9]-[0-3][0-9]$')
+          && d.mese is string && d.mese.matches('^20[0-9]{2}-[01][0-9]$')
+          && d.giorno.matches(d.mese + '-[0-3][0-9]')
+          && d.ora is string && d.ora.matches('^([01][0-9]|2[0-3])$')
+          && docId == d.pseudonimo + '_' + d.giorno + '_' + d.ora
+          && d.app is string && d.app.matches('^[0-9]{1,4}[.][0-9]{1,4}[.][0-9]{1,6}$')
+          && d.os in ['win', 'mac', 'linux', 'altro']
+          && conti(d.via_azione, '^((help|translate|screenshot|screenshotCrop|transcribe|share|saveForLater|qrCode|colorPicker|fullscreen|back|forward|reload|closeTab|newTab|openOptions|home|editorApp|feedbackApp|explain[-]selection|translate[-]selection|zoom_piu|zoom_meno|zoom_reset|barra_laterale|altro)[:](scorciatoia|barra|tasto_destro_riga|tasto_destro_altro|menu_scheda|menu_app|pulsante_scheda|clic_centrale|tasto_mouse|swipe|comando_slash|carta_home|chat)(#(help|translate|screenshot|screenshotCrop|transcribe|share|saveForLater|qrCode|colorPicker|fullscreen|back|forward|reload|closeTab|newTab|openOptions|home|editorApp|feedbackApp|explain[-]selection|translate[-]selection|zoom_piu|zoom_meno|zoom_reset|barra_laterale|altro)[:](scorciatoia|barra|tasto_destro_riga|tasto_destro_altro|menu_scheda|menu_app|pulsante_scheda|clic_centrale|tasto_mouse|swipe|comando_slash|carta_home|chat))*)?$', 16000, 7000)
+          && conti(d.tasto_da_browser, '^(((ctrl_t|ctrl_shift_t|ctrl_w|ctrl_l|ctrl_r|salto_scheda|alt_freccia|ctrl_tab|ctrl_shift_tab|ctrl_h|ctrl_j|ctrl_d|ctrl_f|f5|f6|f11)|aspettativa_mancata[:](ctrl_shift_t|ctrl_l))(#((ctrl_t|ctrl_shift_t|ctrl_w|ctrl_l|ctrl_r|salto_scheda|alt_freccia|ctrl_tab|ctrl_shift_tab|ctrl_h|ctrl_j|ctrl_d|ctrl_f|f5|f6|f11)|aspettativa_mancata[:](ctrl_shift_t|ctrl_l)))*)?$', 500, 400)
+          && conti(d.scorciatoia_a_vuoto, '^((explain[-]selection|translate[-]selection|save[-]for[-]later|open[-]help[-]sidebar)[:](pagina_interna|avviso_sito|filo_spento_sul_sito)(#(explain[-]selection|translate[-]selection|save[-]for[-]later|open[-]help[-]sidebar)[:](pagina_interna|avviso_sito|filo_spento_sul_sito))*)?$', 1000, 300)
+          && conti(d.menu_nativo_scelto, '^((shift_tasto_destro|menu_del_sito[:]voce|menu_del_sito[:]sempre_acceso|menu_del_sito[:]sempre_spento)(#(shift_tasto_destro|menu_del_sito[:]voce|menu_del_sito[:]sempre_acceso|menu_del_sito[:]sempre_spento))*)?$', 200, 100)
+          && conti(d.contesto_box, '^((selezione|collegamento|immagine|media|campo|livelli|pagina|avviso|file|selezione[+]collegamento|selezione[+]campo|collegamento[+]immagine|collegamento[+]livelli|immagine[+]livelli|media[+]livelli|collegamento[+]immagine[+]livelli|misto)(#(selezione|collegamento|immagine|media|campo|livelli|pagina|avviso|file|selezione[+]collegamento|selezione[+]campo|collegamento[+]immagine|collegamento[+]livelli|immagine[+]livelli|media[+]livelli|collegamento[+]immagine[+]livelli|misto))*)?$', 500, 400)
+          && conti(d.navigazione_cronologia, '^((indietro|avanti)[:]((alt_freccia|tasto_mouse|swipe|barra|tasto_destro_riga|menu_app)|barra_lista[:](p1|p2_3|p4_6|p7_15))(#(indietro|avanti)[:]((alt_freccia|tasto_mouse|swipe|barra|tasto_destro_riga|menu_app)|barra_lista[:](p1|p2_3|p4_6|p7_15)))*)?$', 1000, 400)
+          && conti(d.pagina_di_filo_aperta, '^(((newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](barra|menu_app|comando_slash|carta_home|collegamento_interno|chat|sessione_ripristinata)|vista[:](newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](ms500|s1|s2|s5|s10|s30|oltre))(#((newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](barra|menu_app|comando_slash|carta_home|collegamento_interno|chat|sessione_ripristinata)|vista[:](newtab|options|options_altro|security|preferences|editor|feedback|history|quaderno|home|spellcheck|archive|credits|board|decks|downloads|transparency|altro)[:](ms500|s1|s2|s5|s10|s30|oltre)))*)?$', 11000, 5500)
+          && conti(d.aiuto_aperto, '^((scorciatoia|tasto_destro|menu_scheda|menu_app|avviso_sito|barra|chat)(#(scorciatoia|tasto_destro|menu_scheda|menu_app|avviso_sito|barra|chat))*)?$', 200, 150);
+      }
+      allow get, list: if isAdmin();
+      allow create: if request.auth != null && contatoriStrade(request.resource.data);
       allow update, delete: if false;
     }
 

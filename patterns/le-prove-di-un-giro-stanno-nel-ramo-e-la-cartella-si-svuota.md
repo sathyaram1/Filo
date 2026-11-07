@@ -23,6 +23,20 @@ la cartella.
 - La prova di un rilievo che esce dal giro in un feedback suo (esterno, o interno lasciato
   fuori) si CANCELLA: il testo del rilievo viaggia nel feedback, e una prova rossa lasciata
   indietro è un rosso da rispiegare a ogni giro.
+- **La pulizia che non dipende dall'esito sta prima del verdetto** (#1555). Gli esterni e i
+  `?` che contano al più 1 escono in ogni esito: le loro prove si tolgono nel commit della
+  critica, e la registrazione (`dispatch.mjs --record-verifier`) rifiuta la critica che ne
+  ha ancora una scritta in questa verifica. Quello che si sa già esce con la critica perché
+  ogni commit dopo il verdetto è un passo in più che i cancelli devono controllare (lì si
+  può solo togliere). Il lavoro non perde la fiducia per questo: quel commit lo spedisce il
+  rilascio, che ne registra la punta nel registro del ramo (#2021). Dopo il verdetto restano da togliere solo le prove dei rilievi che il bilancio
+  mette da parte, che la risposta del server elenca per numero: quelle non si possono
+  sapere prima. Una critica con un `[3i?]` o un `[2i?!]` la cui domanda blocca ferma di
+  sicuro il lavoro, e lì i `?` restano a chi riprende con la loro prova: esce solo quella
+  degli esterni. Un `[2i?]` non ferma e si corregge con la consigliata: la sua prova resta
+  (#1202). Con `"blocca": false` il lavoro va avanti, e lo sa già chi registra (#1555.1).
+  Una prova che copre anche un rilievo che resta perde il caso di quello che esce e il suo
+  numero dal nome: guardare solo le prove intere lasciava il caso rosso nel ramo.
 - Si cancella anche quella di un rilievo corretto, nello stesso commit in cui si scrive la
   prova durevole che lo tiene chiuso. Se una prova durevole non c'è, la prova del giro
   resta.
@@ -34,9 +48,9 @@ la cartella.
   rossa la respinge (#679, una prova rossa cancellata insieme alla correzione; togliere il
   solo caso rosso e tenere il file è la stessa porta). Dopo un riallineamento contano solo
   le prove che ha toccato il ramo: quelle che main ha cambiato nel frattempo sono di altri
-  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono PRIMA di ogni
-  correzione, in un commit che toglie solo quelle registrato da chi ha scritto la critica
-  (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
+  lavori e non si rilanciano. Le prove dei rilievi messi da parte escono appena la risposta
+  alla critica li elenca, in un commit che toglie solo quelle registrato da chi ha scritto la
+  critica (`verify-local.mjs pulizia`, `dispatch.mjs --record-pulizia`): il confronto parte da lì,
   e una prova tolta ancora rossa ferma la consegna sempre (`scripts/lib/prove-tolte.mjs`).
   Dopo un «pass» la pulizia non si registra: la sigilla il rilascio di chi ha verificato (il punto fermo
   porta il ruolo), e un riallineamento confronta da quel punto fermo se dalla critica ha solo tolto prove
@@ -48,8 +62,8 @@ la cartella.
   prova rossa di uno da correggere.
 - **Una prova che la pulizia ha dimenticato** (#747) e chi corregge toglie ancora rossa ferma
   la consegna lo stesso, ma il rifiuto la riconosce dallo stesso numero (nel nome, o nel titolo
-  del caso rosso) e manda a pulirla, non a correggere un rilievo che sta in un feedback suo. La
-  pulizia si registra anche dopo le correzioni: è l'ultimo commit da solo, toglie solo prove o
+  del caso rosso) e manda a pulirla, non a correggere un rilievo che sta in un feedback suo. Una
+  pulizia dimenticata si registra più tardi: è l'ultimo commit da solo, toglie solo prove o
   loro casi di rilievi messi da parte (niente righe di supporto), com'erano alla base, e un caso
   di un rilievo da correggere non esce nemmeno verde. Non sposta la base: la consegna non rilancia
   le prove che ha tolto per intero, e quelle a cui ha tolto un caso le rilancia com'erano dopo di lei.

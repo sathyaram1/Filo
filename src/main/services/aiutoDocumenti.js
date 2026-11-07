@@ -197,8 +197,14 @@ function percorsoDi(wc, chiave) {
 const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
 const nonCe = { ok: false, frase: 'Il file non c’è più: forse è stato spostato o cancellato' };
 
+// L'apertura entra nel filo da qui, com'è andata, come quella dei bottoni della chat (#1561).
 async function apri(wc, chiave) {
   const p = percorsoDi(wc, chiave);
+  const r = await apriFile(p);
+  if (p) { try { require('./accaduti').fileAperto({ percorso: p }, r); } catch (_) {} }
+  return r;
+}
+async function apriFile(p) {
   if (!p || !esiste(p)) return nonCe;
   try {
     const errore = await require('electron').shell.openPath(p);
@@ -253,15 +259,17 @@ async function iconaDi(p) {
   return foglio();
 }
 
-async function trascina(wc, chiave) {
+// `da`: il webContents dove è partito il trascinamento (lo strato dei riquadri sopra la scheda, o la scheda).
+async function trascina(wc, chiave, da = wc) {
   const p = percorsoDi(wc, chiave);
   if (!p || !esiste(p)) return nonCe;
   try {
-    wc.startDrag({ file: p, icon: await iconaDi(p) });
+    da.startDrag({ file: p, icon: await iconaDi(p) });
     return { ok: true };
   } catch (_) {
     return { ok: false, frase: 'Non sono riuscito a prendere il file: aprilo dalla sua cartella e trascinalo da lì' };
   }
 }
 
-module.exports = { configura, cerca, ferma, perIlModello, percorsoDi, apri, mostra, trascina, _domanda: domanda };
+// iconaDi la usa anche il trascinamento dei file scaricati (downloads.js).
+module.exports = { configura, cerca, ferma, perIlModello, percorsoDi, apri, mostra, trascina, iconaDi, _domanda: domanda };

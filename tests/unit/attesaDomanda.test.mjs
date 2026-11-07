@@ -67,13 +67,49 @@ test('senza domandaId tutto resta com’era: Ricevuti, rombo e casella', () => {
 });
 
 test('i blocchi di sicurezza e la richiesta di fiducia restano nei Ricevuti anche con un domandaId', () => {
-  for (const [status, motivo] of [['design', 'secaudit'], ['design', 'l5'], ['design', 'fidato'], ['design', 'guasto'], ['attack', ''], ['spam', 'worker'], ['suspicious_file', ''], ['aligned', '']]) {
+  for (const [status, motivo] of [['design', 'secaudit'], ['design', 'l5'], ['design', 'fidato'], ['attack', ''], ['spam', 'worker'], ['suspicious_file', ''], ['aligned', '']]) {
     const f = fb(status, motivo, { domandaId: 'D-9' });
     assert.equal(MR.aspettaDomanda(f), '', `${status}/${motivo}`);
     assert.equal(MR.manageTabFor(f), 'inbox', `${status}/${motivo}`);
   }
   assert.equal(MR.aspettaDomanda(fb('design', 'clarify', { domandaId: 'D-0' })), '', 'un id storto non vale');
   assert.equal(MR.aspettaDomanda(fb('design', 'clarify', { domandaId: '<b>D-1</b>' })), '');
+});
+
+// #1577: il guasto porta la sua domanda con la fermata; nei Ricevuti restano solo i blocchi di sicurezza e la fiducia.
+test('un guasto con la sua domanda sta In coda col segno; senza, nei Ricevuti', () => {
+  const f = fb('design', 'guasto', { domandaId: 'D-21' });
+  assert.equal(MR.aspettaDomanda(f), 'D-21');
+  assert.equal(MR.manageTabFor(f), 'queue');
+  assert.equal(MR.segnoFermata(f), null, 'non è un fermo dei Ricevuti');
+  assert.deepEqual(MR.ownerActions(f).map((a) => a.key), ['archive'], 'si risponde alla domanda, o si archivia');
+  assert.match(MR.livelloL3(f).titolo, /domanda D-21/);
+  const vecchio = fb('design', 'guasto');
+  assert.equal(MR.aspettaDomanda(vecchio), '');
+  assert.equal(MR.manageTabFor(vecchio), 'inbox', 'un guasto di prima, senza domandaId, resta dove l’owner lo trova');
+});
+
+// #1577: una domanda bloccante aperta toglie il lavoro alla coda; il server la scrive in `domandeBloccanti`.
+test('un todo o un lavoro in revisione fermo su una domanda bloccante sta fra quelli che aspettano, col segno che apre la domanda', () => {
+  for (const status of ['todo', 'revision_capability', 'revision_security']) {
+    const f = fb(status, '', { domandeBloccanti: ['D-38', 'D-71'] });
+    assert.equal(MR.manageTabFor(f), 'waiting', status);
+    assert.equal(MR.aspettaDomanda(f), 'D-38', `${status}: il segno apre la prima`);
+    assert.deepEqual(MR.domandeBloccantiDi(f), ['D-38', 'D-71']);
+    assert.deepEqual(MR.ownerActions(f).map((a) => a.key), ['archive'], `${status}: non si dà per risolto`);
+  }
+  // Un vecchio motivo rimasto sul todo non cambia niente: decide la domanda.
+  assert.equal(MR.manageTabFor(fb('todo', 'clarify', { domandeBloccanti: ['D-5'], domandaId: 'D-2' })), 'waiting');
+  assert.equal(MR.aspettaDomanda(fb('todo', 'clarify', { domandeBloccanti: ['D-5'], domandaId: 'D-2' })), 'D-5');
+  for (const [f, perche] of [
+    [fb('todo', '', { domandeBloccanti: [] }), 'risposta data: elenco vuoto'],
+    [fb('todo', '', { domandeBloccanti: ['<b>D-1</b>', 'D-0'] }), 'id storti non valgono'],
+    [fb('working', '', { domandeBloccanti: ['D-5'] }), 'in mano a qualcuno: resta In coda'],
+  ]) {
+    assert.equal(MR.manageTabFor(f), 'queue', perche);
+    assert.equal(MR.aspettaDomanda(f), '', perche);
+  }
+  assert.equal(MR.aspettaDomanda(fb('done', '', { domandeBloccanti: ['D-5'] })), '', 'un fuso non aspetta niente');
 });
 
 test('una fusione che aspetta l’owner vince sulla domanda', () => {
@@ -100,8 +136,9 @@ test('la richiesta di renderlo fidato ha il suo segno, nei Ricevuti L3', () => {
   assert.match(MR.reasonText('fidato'), /fidato/);
 });
 
-test('domandaId arriva alle righe della lista, e nessuna regola lo lascia scrivere a un client', () => {
+test('domandaId e domandeBloccanti arrivano alle righe della lista, e nessuna regola li lascia scrivere a un client', () => {
   assert.ok(FB.CAMPI_LISTA.includes('domandaId'));
+  assert.ok(FB.CAMPI_LISTA.includes('domandeBloccanti'));
   const rules = readFileSync(join(ROOT, 'firestore.rules'), 'utf8');
   const da = rules.indexOf('match /feedback/{');
   const a = rules.indexOf('match /feedback-public/{');
@@ -110,4 +147,5 @@ test('domandaId arriva alle righe della lista, e nessuna regola lo lascia scrive
   const liste = [...blocco.matchAll(/hasOnly\(\[([^\]]*)\]\)/g)].map((m) => m[1]);
   assert.ok(liste.length >= 3, 'le liste hasOnly del blocco feedback');
   for (const l of liste) assert.doesNotMatch(l, /['"]domandaId['"]/, 'domandaId lo scrive solo il server (Admin SDK)');
+  for (const l of liste) assert.doesNotMatch(l, /['"]domandeBloccanti['"]/, 'un client che lo togliesse ridarebbe il lavoro alla coda');
 });

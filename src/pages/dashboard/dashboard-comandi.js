@@ -31,7 +31,13 @@
   let isTerminalMode = () => false;
   let getShell = () => 'powershell';
   let getCwd = () => '';
-  let runShellCommand = () => {};
+  let runShellCommand = async () => false;
+  let rimettiNellaBarra = () => {};
+
+  // I contatori della barra (#1473): il nome del comando o la strada, mai quello che si è scritto dopo.
+  function contaComando(cosa, scelta = '') {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'comando-home', cosa, ...(scelta ? { scelta } : {}) })).catch(() => {}); } catch (_) {}
+  }
 
   // Vero se l'account loggato è l'owner (admin): abilita i comandi /users e
   // /gift in /help. Il gate forte resta nel main (auth.isAdmin) e sul server.
@@ -43,12 +49,12 @@
     '/clear': () => { goHome({ nuova: true }); },
     '/clear all': () => { send({ type: MSG.CLOSE_ALL_TABS }); },
     '/kill': () => { send({ type: MSG.QUIT_APP }); },
-    '/newtab': () => { send({ type: MSG.OPEN_URL, url: 'filo://newtab/' }); },
-    '/models': () => { send({ type: MSG.OPEN_OPTIONS }); },
-    '/modelli': () => { send({ type: MSG.OPEN_OPTIONS }); },
-    '/sicurezza': () => { send({ type: MSG.OPEN_URL, url: 'filo://security/security.html' }); },
-    '/preferenze': () => { send({ type: MSG.OPEN_URL, url: 'filo://preferences/preferences.html' }); },
-    '/editor': () => { send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }); },
+    '/newtab': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://newtab/' }); },
+    '/models': () => { send({ type: MSG.OPEN_OPTIONS, via: 'comando_slash' }); },
+    '/modelli': () => { send({ type: MSG.OPEN_OPTIONS, via: 'comando_slash' }); },
+    '/sicurezza': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://security/security.html' }); },
+    '/preferenze': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://preferences/preferences.html' }); },
+    '/editor': () => { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://editor/editor.html' }); },
     // #583 — apre la POSTA delle segnalazioni, che legge solo chi le gestisce:
     // a chiunque altro darebbe una pagina vuota. Chi vuole MANDARE un feedback
     // lo fa dal menu del tasto destro → "Invia feedback", oppure chiedendolo a
@@ -57,10 +63,10 @@
       if (!isOwner) {
         // #986 — chi cerca le sue segnalazioni ci arriva, non legge solo dove sono.
         showFiloLine('I feedback li vede chi li gestisce: ti apro quelli che hai mandato tu. Per mandarne uno: tasto destro → «Invia feedback», oppure scrivimi cosa non va e lo scrivo io.', chat);
-        send({ type: MSG.OPEN_URL, url: 'filo://board/board.html#segnalazioni' });
+        send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://board/board.html#segnalazioni' });
         return;
       }
-      send({ type: MSG.OPEN_URL, url: 'filo://feedback/feedback.html' });
+      send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://feedback/feedback.html' });
     },
     '/incognito': () => { send({ type: MSG.OPEN_INCOGNITO }); },
     '/pulisci': (text, chat) => { runTabCleanup(chat); },
@@ -313,7 +319,7 @@
   // basta, senza riportare a schermo una chat che l'utente aveva chiuso.
   async function handleInviteCommand(text, chat) {
     const resto = String(text || '').trim().replace(/^\/invito/i, '').trim();
-    if (!resto) { send({ type: MSG.OPEN_URL, url: 'filo://credits/credits.html' }); return; }
+    if (!resto) { send({ type: MSG.OPEN_URL, via: 'comando_slash', url: 'filo://credits/credits.html' }); return; }
     let r = null;
     try { r = await send({ type: MSG.WALLET_REDEEM, code: resto }); } catch (_) { r = null; }
     showFiloLine((r && r.message) || 'Non ci sono riuscito: riprova.', chat);
@@ -421,8 +427,7 @@
   }
 
   // Cache "il comando shell esiste?" (shell + token → bool), per non rifare lo
-  // spawn di controllo a ogni tasto. Il risultato non dipende dalla cwd per i comandi
-  // su PATH; per i casi limite (script relativi) la piccola imprecisione è ok.
+  // spawn di controllo a ogni tasto: decide anche se l'Invio va alla shell o a Filo (#892.1).
   // Tiene solo risposte certe: un controllo scaduto (macchina carica) resta senza
   // colore e si ritenta passati RIPROVA_INCERTO_MS, alla prossima battitura (#1176).
   const shellCmdCache = new Map();
@@ -430,7 +435,8 @@
   const shellCmdInVolo = new Set();
   const RIPROVA_INCERTO_MS = 20000;
   let whichTimer = null;
-  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${cmd}`;
+  // Un programma dato col percorso dipende dalla cartella: lo stesso «./x» c'è in una e non nell'altra.
+  const chiaveShell = (cmd) => `${getShell() || ''}\u0000${/[\\/]/.test(cmd) ? getCwd() || '' : ''}\u0000${cmd}`;
 
   // Cache "il dominio /sito.tld esiste?" (host → bool). Evita di rifare il
   // lookup DNS a ogni tasto; popolata sia dalla verifica live sia da quella
@@ -460,7 +466,9 @@
     if (isTerminalMode()) {
       // In terminale "/x" è un comando shell: azzurro se esiste, rosso se no.
       const cmd = programmaDi(t);
-      if (!cmd) return 'none';
+      if (cmd === SINTASSI) return 'incerto';
+      // Senza programma va a Filo: rosso, salvo mentre si sta ancora aprendo la riga («/», «/(»).
+      if (!cmd) return /^\/[\s({!&]*$/.test(t) ? 'none' : 'unknown';
       const chiave = chiaveShell(cmd);
       if (shellCmdCache.has(chiave)) return shellCmdCache.get(chiave) ? 'shell' : 'unknown';
       if (Date.now() - (shellCmdIncerti.get(chiave) ?? -Infinity) < RIPROVA_INCERTO_MS) return 'incerto';
@@ -485,10 +493,25 @@
     );
   }
 
-  // Il programma di un "/comando": un percorso fra virgolette (#968) è uno solo, anche con gli spazi.
+  // Il programma che la shell lancerebbe, sempre da cercare (#892.1): oltre i segni d'apertura e le assegnazioni, fino
+  // al primo segno che chiude la parola. «(nota) …», «ciao; …», «$5 …» non esistono e restano messaggi per Filo.
+  // SINTASSI: una riga senza programma da cercare (`$x = 1`, `X=1`, `` `date` ``); un percorso fra virgolette è uno (#968).
+  const SINTASSI = Symbol('sintassi');
   function programmaDi(t) {
+    let s = String(t).trim().slice(1).trimStart();
+    for (let prima = null; prima !== s;) {
+      prima = s;
+      s = s.replace(/^[({!&]+\s*/, '');
+      const a = s.match(/^[\p{L}_][\p{L}\p{N}_]*=("[^"]*"|'[^']*'|\S*)(\s+|$)/u);
+      if (a) { s = s.slice(a[0].length); if (!s) return SINTASSI; }
+    }
+    if (/^\$[\p{L}_{(]/u.test(s) || s.startsWith('`') || /^\[[\p{L}\p{N}_.]+\]::/u.test(s)) return SINTASSI;
     const V = global.SN_VIRGOLETTE;
-    return V ? V.primoComando(t.slice(1)) : (t.split(/\s+/)[0] || '').slice(1);
+    if (V && /^["']/.test(s)) return V.primoComando(s);
+    const nome = s.split(/[\s|<>;&(){}`]/)[0] || '';
+    // «:)» e «:(» sono faccine, non il `:` della shell attaccato a una parentesi (#892.5).
+    if (!/[\p{L}\p{N}]/u.test(nome) && /[()]/.test(s.charAt(nome.length))) return '';
+    return nome;
   }
 
   // Verifica (con debounce) se il primo token è un comando shell esistente e
@@ -499,23 +522,38 @@
     clearTimeout(whichTimer);
     whichTimer = setTimeout(async () => {
       const cmd = programmaDi(value.trim());
-      if (!cmd) { updateInputClass(); return; }
+      if (!cmd || cmd === SINTASSI) { updateInputClass(); return; }
       const chiave = chiaveShell(cmd);
       // Lo stesso comando già in controllo non ne lancia un secondo (sotto carico ogni spawn in più allunga gli
       // altri): ricolora quello in volo, quando risponde.
       if (shellCmdInVolo.has(chiave)) return;
       if (shellCmdCache.has(chiave)) { updateInputClass(); return; }
-      shellCmdInVolo.add(chiave);
+      await esisteInShell(cmd);
+      updateInputClass(); // ricolora sullo stato attuale dell'input
+    }, 250);
+  }
+
+  // true/false se la shell ha risposto, null se il controllo non ha saputo dirlo.
+  const controlliInVolo = new Map();
+  function esisteInShell(cmd) {
+    const chiave = chiaveShell(cmd);
+    if (shellCmdCache.has(chiave)) return Promise.resolve(shellCmdCache.get(chiave));
+    if (controlliInVolo.has(chiave)) return controlliInVolo.get(chiave);
+    shellCmdInVolo.add(chiave);
+    const p = (async () => {
       let exists = null;
       try {
         const r = await window.filo?.shellWhich?.({ command: cmd, shell: getShell(), cwd: getCwd() });
         if (r && typeof r.exists === 'boolean') exists = r.exists;
       } catch (_) { exists = null; }
       shellCmdInVolo.delete(chiave);
+      controlliInVolo.delete(chiave);
       if (exists === null) shellCmdIncerti.set(chiave, Date.now());
       else { shellCmdCache.set(chiave, exists); shellCmdIncerti.delete(chiave); }
-      updateInputClass(); // ricolora sullo stato attuale dell'input
-    }, 250);
+      return exists;
+    })();
+    controlliInVolo.set(chiave, p);
+    return p;
   }
 
   // Verifica (immediata) se l'host di un "/sito.tld" risolve, e popola la cache.
@@ -541,6 +579,13 @@
   // lascia comunque aprire con un clic, invece di rifiutare in silenzio.
   // Il testo resta nel campo: se era un typo, si corregge senza riscriverlo.
   let unresolvedLine = null; // { el, host } dell'ultimo avviso ancora non agito
+  // L'avviso che aspetta ancora una scelta per i contatori (#1473): l'invio dopo, o la pagina che se ne va, lo lascia.
+  let nonRisoltoInAttesa = null;
+  function lasciaNonRisolto() {
+    if (!nonRisoltoInAttesa) return;
+    nonRisoltoInAttesa = null;
+    contaComando('sito_non_risolto', 'lascia');
+  }
   function showUnresolvedSite(text, host) {
     // Un secondo invio dello STESSO indirizzo non impila avvisi identici. Uno su
     // un indirizzo diverso, o uno già agito ("Apri comunque"), resta in chat: è
@@ -566,9 +611,11 @@
     btn.addEventListener('click', () => {
       btn.disabled = true;
       if (unresolvedLine && unresolvedLine.el === bubble) unresolvedLine = null;
-      // L'utente ha deciso: da qui in poi quell'host non viene più messo in
-      // dubbio (niente rosso, niente avviso al prossimo invio).
+      if (nonRisoltoInAttesa === bubble) { nonRisoltoInAttesa = null; contaComando('sito_non_risolto', 'apri_lo_stesso'); }
+      // L'utente ha deciso: da qui in poi quel sito non viene più messo in dubbio, in ogni scheda e dopo un
+      // riavvio: entra fra i siti di cui si fida (#967).
       siteResolveCache.set(host, true);
+      send({ type: MSG.SITI_FIDATI_IMPOSTA, fidato: true, indirizzo: host, avvisa: true });
       send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       if (inputEl.value.trim() === text) { inputEl.value = ''; autoGrowInput(); }
       updateInputClass();
@@ -578,6 +625,9 @@
     bubblesEl.appendChild(bubble);
     bubblesEl.scrollTop = bubblesEl.scrollHeight;
     unresolvedLine = { el: bubble, host };
+    lasciaNonRisolto();
+    nonRisoltoInAttesa = bubble;
+    contaComando('sito_non_risolto', 'in_attesa');
   }
 
   // Come sopra ma con debounce, per la verifica live mentre si scrive: parte
@@ -613,7 +663,7 @@
     }
   }
 
-  function handleSlashCommand(text) {
+  async function handleSlashCommand(text, { incollato = false } = {}) {
     if (!text.startsWith('/')) return false;
     const firstToken = text.split(/\s+/)[0];
     // 1) Comandi interni di Filo: vincono SEMPRE, anche in modalità terminale.
@@ -622,6 +672,8 @@
     // Invio: quello che il comando dirà fra dieci secondi appartiene a questa
     // chat anche se intanto l'utente è tornato alla home.
     if (handler) {
+      const chiave = SLASH_COMMANDS[text] ? text : firstToken;
+      if (chiave !== '/incognito') contaComando(chiave);
       handler(text, chatDellaRiga());
       inputEl.value = ''; autoGrowInput(); updateInputClass(); return true;
     }
@@ -631,19 +683,26 @@
     //    indirizzi — SN_URL_NAV.normalizeUrl (#398) — così "/localhost:3000" o
     //    "/192.168.1.1" si aprono davvero invece di partire su un https vuoto.
     if (isSiteToken(text)) {
+      contaComando('sito_diretto');
       send({ type: MSG.OPEN_URL, url: siteUrlOf(text), parole: [text] });
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
       return true;
     }
-    // 3) Modalità terminale: tutto il resto con `/` viene eseguito dalla shell
-    //    (non passa mai all'LLM).
+    // 3) Modalità terminale: alla shell va un programma che c'è (#892.1). Una parola qualsiasi o un percorso incollato
+    //    dopo la barra restano un messaggio per Filo, come col terminale spento; un controllo senza risposta non decide.
     if (isTerminalMode()) {
-      runShellCommand(text.slice(1).trim(), chatDellaRiga());
+      const chat = chatDellaRiga();
+      const programma = programmaDi(text);
+      if (!programma || (programma !== SINTASSI && (await esisteInShell(programma)) === false)) { updateInputClass(); return false; }
       inputEl.value = '';
       autoGrowInput();
       updateInputClass();
+      // Passa dai livelli di autonomia: se la persona dice no, il comando torna nella barra com'era.
+      const partito = await runShellCommand(text.slice(1).trim(), chat, { daFuori: incollato });
+      if (partito === false) rimettiNellaBarra(text, incollato);
+      else contaComando('shell');
       return true;
     }
     // 4) Modalità normale, comando `/` sconosciuto: lascialo all'LLM (storico).
@@ -671,6 +730,7 @@
     if (deps.getShell) getShell = deps.getShell;
     if (deps.getCwd) getCwd = deps.getCwd;
     if (deps.runShellCommand) runShellCommand = deps.runShellCommand;
+    if (deps.rimettiNellaBarra) rimettiNellaBarra = deps.rimettiNellaBarra;
   }
 
   global.SN_DASH_COMANDI = {
@@ -684,6 +744,8 @@
     siteUrlOf,
     ensureSiteResolved,
     showUnresolvedSite,
+    lasciaNonRisolto,
+    contaComando,
     showFiloLine,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

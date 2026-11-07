@@ -1,4 +1,4 @@
-// Commenti dell'editor (pagina "Revisione"): creazione, PERSISTENZA
+// Commenti dell'editor (lo strumento Commenta nel pannello di destra): creazione, PERSISTENZA
 // dell'evidenziazione dopo il reload (feedback #212) e rimozione.
 //
 // Il bug: i commenti venivano salvati nel JSON del documento ma con ancora
@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { argomentiScala } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { apriPannello, strumento } from './helpers/strumentiEditor.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const APP_ROOT = resolve(__dirname, '..');
@@ -89,21 +90,22 @@ test.beforeEach(async () => {
   await chiudiTutteLeSchede();
 });
 
-// Scrive il contenuto del documento e passa alla pagina "Revisione" (dove vive
-// il modulo Commenta).
-async function setupDocOnReviewPage(page, html) {
-  await page.waitForSelector('.ed-grid');
+const commenta = (page) => strumento(page, 'comment');
+const contatore = (page) => commenta(page).locator('.cm-count');
+
+// Scrive il contenuto del documento e apre il pannello, dove sta lo strumento Commenta.
+async function setupDoc(page, html) {
+  await page.waitForSelector('.pd-elemento[data-elemento="comment"]', { state: 'attached' });
   await page.evaluate((h) => {
     const doc = document.getElementById('doc');
     doc.innerHTML = h;
     doc.dispatchEvent(new Event('input', { bubbles: true }));
   }, html);
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('.ed-module[data-type="comment"]');
+  await apriPannello(page);
 }
 
-// Crea un commento sul testo `phrase` (deve esistere nel documento): clicca il
-// modulo Commenta, seleziona la frase come farebbe l'utente col mouse (range +
+// Crea un commento sul testo `phrase` (deve esistere nel documento): clicca
+// «Commenta» nel pannello, seleziona la frase come farebbe l'utente col mouse (range +
 // mouseup) e salva dal prompt.
 function selectPhrase(page, phrase) {
   return page.evaluate((needle) => {
@@ -127,7 +129,8 @@ function selectPhrase(page, phrase) {
 }
 
 async function addComment(page, phrase, commentText) {
-  await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+  await apriPannello(page);
+  await commenta(page).locator('.ed-cm-nuovo').click();
   await selectPhrase(page, phrase);
   await page.waitForSelector('#cmText');
   await page.fill('#cmText', commentText);
@@ -141,12 +144,12 @@ const highlightTexts = (page) => page.evaluate(
 test.describe('commenti: evidenziazione persistente', () => {
   test('il commento evidenzia il testo e l\'evidenziazione SOPRAVVIVE alla riapertura', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>questa è una frase da commentare per il test</p>');
+    await setupDoc(page, '<p>questa è una frase da commentare per il test</p>');
     await addComment(page, 'frase da commentare', 'serve più contesto qui');
 
     // Subito dopo la creazione: testo evidenziato e contatore a 1.
     expect(await highlightTexts(page)).toEqual(['frase da commentare']);
-    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+    await expect(contatore(page)).toHaveText('1');
 
     // L'ancora salvata è reale (offset nel testo + frase), non {0,0}.
     await page.keyboard.press('Control+s');
@@ -174,7 +177,7 @@ test.describe('commenti: evidenziazione persistente', () => {
 
   test('l\'evidenziazione resta sulla frase giusta anche se il testo prima cambia', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>inizio del documento e poi la parte importante alla fine</p>');
+    await setupDoc(page, '<p>inizio del documento e poi la parte importante alla fine</p>');
     await addComment(page, 'parte importante', 'rivedere');
 
     // Modifica il testo PRIMA del commento (gli offset originali slittano).
@@ -197,13 +200,13 @@ test.describe('commenti: evidenziazione persistente', () => {
 
   test('un commento su una selezione che attraversa due paragrafi è evidenziato subito e dopo il reload', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>primo paragrafo che finisce qui</p><p>secondo inizia qua e prosegue</p>');
+    await setupDoc(page, '<p>primo paragrafo che finisce qui</p><p>secondo inizia qua e prosegue</p>');
 
     // Seleziona dalla fine del primo paragrafo all'inizio del secondo, come
     // farebbe l'utente col mouse (Selection.toString() inserisce un newline al
     // confine di blocco: prima del fix il commento nasceva orfano — nessuna
     // evidenziazione né alla creazione né dopo il reload).
-    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    await commenta(page).locator('.ed-cm-nuovo').click();
     await page.evaluate(() => {
       const doc = document.getElementById('doc');
       const walker = document.createTreeWalker(doc, NodeFilter.SHOW_TEXT);
@@ -227,7 +230,7 @@ test.describe('commenti: evidenziazione persistente', () => {
     // Alla creazione: evidenziazione presente in ENTRAMBI i paragrafi.
     const expected = ['finisce qui', 'secondo inizia qua'];
     expect(await highlightTexts(page)).toEqual(expected);
-    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+    await expect(contatore(page)).toHaveText('1');
 
     // L'ancora salvata vive nel testo puro (niente newline dentro).
     await page.keyboard.press('Control+s');
@@ -250,7 +253,7 @@ test.describe('commenti: evidenziazione persistente', () => {
 
   test('un\'ancora salvata con i newline della selezione (formato vecchio) viene comunque ri-evidenziata', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>coda del primo blocco</p><p>testa del secondo blocco</p>');
+    await setupDoc(page, '<p>coda del primo blocco</p><p>testa del secondo blocco</p>');
     await addComment(page, 'coda del primo', 'nota di compatibilità');
     await page.keyboard.press('Control+s');
 
@@ -274,23 +277,21 @@ test.describe('commenti: evidenziazione persistente', () => {
     expect((await highlightTexts(page)).join('')).toBe('primo bloccotesta del secondo');
   });
 
-  // Feedback #335: col PRIMO commento già presente, cliccare il modulo apre la
-  // lista (Risolvi/Elimina/Chiudi) e non c'era alcun modo di crearne un secondo
-  // dalla GUI (solo la scorciatoia, di default non impostata, o svuotare tutto).
-  // Invariante UX: se puoi aggiungere il primo con un click, devi poter aggiungere
-  // anche il secondo. Il test ASSERISCE il successo: il secondo commento arriva
-  // davvero (contatore a 2, entrambe le frasi evidenziate). Senza il bottone
-  // "Nuovo commento" nella lista, la selezione del secondo testo non partirebbe
-  // mai e l'assert su cm-count='2' resta rosso.
-  test('dalla lista si può aggiungere un SECONDO commento (bottone "Nuovo commento")', async () => {
+  // Feedback #335: col PRIMO commento già presente non c'era alcun modo di crearne un secondo dalla GUI.
+  // Invariante UX: se puoi aggiungere il primo con un click, devi poter aggiungere anche il secondo, sia da
+  // «Commenta» sia dalla lista dei commenti. Il test ASSERISCE il successo: il secondo commento arriva davvero
+  // (contatore a 2, entrambe le frasi evidenziate).
+  test('con un commento già presente se ne aggiunge un SECONDO, anche dalla lista (bottone "Nuovo commento")', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>prima frase da commentare e poi la seconda frase da commentare</p>');
+    await setupDoc(page, '<p>prima frase da commentare e poi la seconda frase da commentare</p>');
     await addComment(page, 'prima frase', 'primo commento');
-    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+    await expect(contatore(page)).toHaveText('1');
+    await expect(commenta(page).locator('.ed-cm-elenco')).toContainText('1aperto');
+    // «Commenta» resta lì anche col primo commento.
+    await expect(commenta(page).locator('.ed-cm-nuovo')).toBeVisible();
 
-    // Con un commento presente, cliccare il modulo apre la LISTA: deve esporre
-    // il bottone per crearne uno nuovo.
-    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    // La lista dei commenti espone il bottone per crearne uno nuovo.
+    await commenta(page).locator('.ed-cm-elenco').click();
     await expect(page.locator('.ed-overlay')).toContainText('Nuovo commento');
     await page.click('#ovNew');
 
@@ -302,7 +303,8 @@ test.describe('commenti: evidenziazione persistente', () => {
     await page.click('#cmSave');
 
     // Successo: due commenti, entrambe le frasi evidenziate.
-    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('2');
+    await expect(contatore(page)).toHaveText('2');
+    await expect(commenta(page).locator('.ed-cm-elenco')).toContainText('2aperti');
     expect(await highlightTexts(page)).toEqual(['prima frase', 'seconda frase']);
     await page.screenshot({ path: 'tests/.shots/editor-comment-second.png' }).catch(() => {});
   });
@@ -310,8 +312,8 @@ test.describe('commenti: evidenziazione persistente', () => {
   // L'invito «Seleziona il testo» scade da solo: chi lo chiude prima e seleziona subito si tiene il riquadro (#650).
   test('il riquadro del commento resta aperto quando scade l\'invito a selezionare il testo', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>una frase veloce da commentare</p>');
-    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    await setupDoc(page, '<p>una frase veloce da commentare</p>');
+    await commenta(page).locator('.ed-cm-nuovo').click();
     await expect(page.locator('#overlayBox')).toContainText('Seleziona il testo');
     await page.locator('#overlay').click({ position: { x: 4, y: 4 } });
     await expect(page.locator('#overlay')).toBeHidden();
@@ -321,27 +323,27 @@ test.describe('commenti: evidenziazione persistente', () => {
     await page.waitForTimeout(1600);
     await expect(page.locator('#cmText')).toHaveValue('scritto in fretta');
     await page.click('#cmSave');
-    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('1');
+    await expect(contatore(page)).toHaveText('1');
     expect(await highlightTexts(page)).toEqual(['frase veloce']);
   });
 
   test('eliminare un commento rimuove l\'evidenziazione (anche dopo un reload)', async () => {
     const page = await openTab(EDITOR);
-    await setupDocOnReviewPage(page, '<p>frase con un commento da eliminare subito</p>');
+    await setupDoc(page, '<p>frase con un commento da eliminare subito</p>');
     await addComment(page, 'commento da eliminare', 'via questo');
     await page.keyboard.press('Control+s');
     await page.reload();
     await page.waitForSelector('#doc .ed-commented', { timeout: 8_000 });
 
-    // Apri la lista dal modulo e elimina.
-    await page.locator('.ed-switch-icon').nth(1).click();
-    await page.waitForSelector('.ed-module[data-type="comment"]');
-    await page.locator('.ed-module[data-type="comment"] .ed-mod-pad').click();
+    // Apri la lista dal pannello e elimina.
+    await apriPannello(page);
+    await commenta(page).locator('.ed-cm-elenco').click();
     await page.locator('.ed-overlay [data-del]').click();
 
-    // Niente più evidenziazione né conteggio, e il testo del documento è intatto.
+    // Niente più evidenziazione né lista da aprire, e il testo del documento è intatto.
     await expect(page.locator('#doc .ed-commented')).toHaveCount(0);
-    await expect(page.locator('.ed-module[data-type="comment"] .cm-count')).toHaveText('0');
+    await expect(contatore(page)).toHaveText('0');
+    await expect(commenta(page).locator('.ed-cm-elenco')).toBeHidden();
     await expect(page.locator('#doc')).toContainText('frase con un commento da eliminare subito');
   });
 });

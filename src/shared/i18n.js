@@ -24,6 +24,8 @@
     menu_origin_hint: 'Filo legge solo le etichette che il file si porta dietro. Uno screenshot le cancella, un social pure, e molti generatori non le scrivono affatto.',
     menu_image_unreadable: 'Filo non è riuscito a scaricare questa immagine.',
     menu_origin_hint_unverified: 'Filo non ha ancora scaricato l’elenco ufficiale dei firmatari riconosciuti, quindi per ora sa solo che la firma è valida. Appena lo scarica, lo verifica.',
+    // #946.1 — chi ha firmato sta solo nell'elenco provvisorio, che vale per le firme di prima del suo congelamento.
+    menu_origin_hint_interim: 'Prima dell’elenco ufficiale il C2PA usava un elenco provvisorio, poi congelato. Filo lo usa solo per le firme fatte prima del congelamento.',
     // #889 — la riga viene da un marchio nei pixel, non da un'etichetta del file.
     menu_origin_hint_mark: 'Il programma che ha generato l’immagine ha scritto questo marchio nei pixel. Un ritaglio o un ridimensionamento lo cancellano, e molti generatori non lo mettono.',
     menu_explain_deep: 'Approfondisci',
@@ -81,6 +83,28 @@
     toast_video_save_failed: 'Non sono riuscito a salvare il video',
     toast_audio_save_failed: 'Non sono riuscito a salvare l\'audio',
     toast_media_stream_only: 'Questo contenuto arriva in streaming: non c\'è un file da salvare',
+    // #1488 — il video in streaming lo salva un programma (yt-dlp): le fasi sulla riga dei Download, e i perché di un no.
+    toast_video_streaming_started: 'Salvo il video: l\'avanzamento è nei Download',
+    toast_audio_streaming_started: 'Salvo l\'audio: l\'avanzamento è nei Download',
+    streaming_non_riuscito: '%s',
+    streaming_fase_programma: 'Preparo il programma per i video (solo la prima volta)',
+    streaming_fase_leggo: 'Leggo il video',
+    streaming_fase_unisco: 'Unisco video e audio',
+    streaming_eta: 'Il video ha un limite d\'età e si vede solo con l\'accesso a Google. Filo non usa il tuo account per scaricare: Google potrebbe bloccarlo per giorni',
+    streaming_accesso: 'Il video si vede solo con l\'accesso a un account. Filo non usa il tuo account per scaricare: il sito potrebbe bloccarlo per giorni',
+    streaming_robot: 'Il sito vuole l\'accesso per credere che non sei un programma. Filo non usa il tuo account per scaricare, perché potrebbe essere bloccato per giorni: riprova più tardi',
+    streaming_protetto: 'Il video è protetto contro la copia: non si può salvare',
+    streaming_spazio: 'Non c\'è abbastanza spazio sul disco per il video',
+    streaming_diretta: 'È una diretta: si potrà salvare quando è finita',
+    streaming_sito: 'Da questa pagina Filo non trova il video. Se il video ha una pagina sua, aprila e salvalo da lì',
+    streaming_elenco: 'Questa pagina è un elenco di video: apri quello che vuoi e salvalo dalla sua pagina',
+    streaming_non_disponibile: 'Il video non è disponibile: è stato tolto, è privato o da qui non si vede',
+    streaming_rete: 'La connessione non risponde: riprova fra poco',
+    streaming_aggiornare: 'Il sito è cambiato e il programma per i video non ci riesce più. Di solito si risolve in pochi giorni, e Filo lo aggiorna da solo',
+    streaming_programma: 'Non sono riuscito a scaricare il programma che salva i video: controlla la connessione e riprova',
+    streaming_firma: 'Il programma per i video arrivato non porta la firma dei suoi autori, e non l\'ho usato: riprova più tardi',
+    streaming_piattaforma: 'Su questo computer Filo non sa ancora salvare i video in streaming',
+    streaming_generico: 'Non sono riuscito a salvare il video',
     toast_media_speed: 'Velocità %s',
     toast_media_loop_on: 'Si ripeterà in continuo',
     toast_media_loop_off: 'Ripetizione disattivata',
@@ -88,6 +112,8 @@
     menu_share_link: 'Condividi link',
     menu_redeem_invite: 'Riscatta l’invito',
     menu_edit_selection: 'Modifica',
+    // «Valuta» (#1449): il parere dell'Aiuto sul testo intero del campo.
+    menu_valuta: 'Valuta',
     menu_read_aloud: 'Leggi',
     menu_stop_reading: 'Interrompi lettura',
     tts_not_supported: 'Lettura ad alta voce non supportata in questo browser',
@@ -140,6 +166,22 @@
     toast_region_cancelled: 'Selezione annullata',
     menu_share: 'Condividi',
     menu_overflow: 'Altro…',
+    // #1434 — la fila contestuale in cima al tasto destro.
+    fila_bold: 'Grassetto',
+    fila_italic: 'Corsivo',
+    fila_underline: 'Sottolineato',
+    fila_link: 'Collegamento',
+    fila_highlight: 'Evidenzia',
+    fila_strike: 'Barrato',
+    fila_clear: 'Togli la formattazione',
+    fila_translate: 'Traduci',
+    fila_ask_image: 'Chiedi a Filo',
+    fila_media_play: 'Riproduci o metti in pausa',
+    fila_media_save: 'Salva video o audio',
+    fila_media_copy_link: 'Copia URL video o audio',
+    fila_link_indirizzo: 'Indirizzo del collegamento',
+    fila_link_non_valido: 'Questo non è un indirizzo: scrivine uno come esempio.it',
+    fila_altro_vuoto: 'Trascina qui un\'icona',
     menu_color_picker: 'Color picker',
     menu_close_tab: 'Chiudi pagina',
     menu_open_options: 'Opzioni Filo',
@@ -231,11 +273,21 @@
     err_no_selection: 'Nessuna selezione di testo.',
     err_secret_selection: 'Filo non manda al modello password e dati della carta.',
     help_disabled: 'L\'Aiuto è spento. Lo riaccendi in Preferenze, o chiedendolo a Filo.',
+    help_valuta_richiesta: 'Valuta «%s»',
+    help_valuta_lungo: 'Il testo è lungo: Filo ne valuta i primi %s caratteri.',
+    help_correzione_applica: 'Scrivi nel campo',
+    help_correzione_togli: 'Togli dal campo',
+    help_correzione_manca: 'Nel campo non trovo «%s»: forse il testo è cambiato.',
+    help_correzione_ferma: 'Il campo non si è lasciato scrivere.',
+    help_correzione_sparito: 'Il campo non c\'è più nella pagina.',
+    help_correzione_non_tolta: 'Il testo è cambiato: per togliere la correzione usa %s nel campo.',
     // L'icona Aiuto della barra laterale (#1432): la risposta da leggere, e perché è spenta.
     aiuto_leggi_risposta: 'Leggi la risposta',
     aiuto_spento_barra: 'Aiuto spento in Preferenze',
     aiuto_spento_sito: 'Filo è spento su questo sito',
     aiuto_spento_pagina: 'Qui l\'Aiuto non c\'è',
+    azioni_spente_pagina: 'Su questa pagina Filo non può agire',
+    azioni_spente_interna: 'Questa pagina di Filo non ha un indirizzo da condividere',
     // Configurazione dei modelli: una funzione senza modello NON parte e lo dice
     // (niente ripieghi silenziosi su modelli scritti nel codice). %s = nome della
     // funzione, poi dove si imposta.
@@ -268,7 +320,7 @@
     toast_page_translated: 'Pagina tradotta',
     // Il sito aggiunge testo mentre traduciamo, e a un certo punto si smette di rincorrerlo.
     // Qui sotto si dice sempre cosa è rimasto in inglese: «Pagina tradotta» sarebbe falso.
-    toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: dal tasto destro trovi «Traduci il testo nuovo».',
+    toast_page_translated_new_arrived: 'Pagina tradotta. Il sito ne ha aggiunta dell\'altra mentre lavoravo: l\'icona Traduci della barra laterale ora dice «Traduci il testo nuovo».',
     // #439 — parti della pagina che nessuno script può leggere (componenti chiusi a chiave).
     toast_page_translated_partial: 'Pagina tradotta solo in parte: alcuni componenti di questo sito sono chiusi e restano nella lingua originale.',
     toast_only_closed_components: 'Il testo di questa pagina vive dentro componenti chiusi del sito: non riesco a leggerlo, e resta nella lingua originale.',
@@ -276,9 +328,9 @@
     // che resta in inglese in mezzo a una pagina italiana.
     toast_page_translated_partial_frame: 'Pagina tradotta, tranne un riquadro incorporato. Il sito non lascia leggere il testo lì dentro, e resta nella lingua originale.',
     // Traduzione interrotta a metà (#408): quanto manca, perché si è fermata, come riprendere.
-    toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dal tasto destro senza rifare la parte già tradotta.',
+    toast_page_translate_stopped: 'Traduzione interrotta dopo %s blocchi su %s. %s Puoi riprenderla dall\'icona Traduci della barra laterale senza rifare la parte già tradotta.',
     // Più lunga di quanta ne entri in un giro solo: non è un guasto, è un lavoro a tratti.
-    toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dal tasto destro per continuare.',
+    toast_page_translate_batch: 'Pagina molto lunga: tradotti %s blocchi su %s. Riprendi dall\'icona Traduci della barra laterale per continuare.',
     toast_page_translate_failed: 'Non sono riuscito a tradurre la pagina. %s',
     reason_translate_incomplete: 'Alcuni blocchi sono tornati vuoti dal modello.',
     toast_nothing_to_translate: 'Non ho trovato testo da tradurre in questa pagina',
@@ -307,6 +359,7 @@
     toast_file_save_failed: 'Non sono riuscito a scaricare il file',
     toast_cannot_paste_image: 'Qui non si può incollare un\'immagine (campo di solo testo)',
     toast_paste_failed: 'Non riesco a incollare qui (rifocalizza il campo e riprova)',
+    toast_cut_failed: 'Non riesco a scrivere negli appunti: il testo resta dov\'era',
     clipboard_image_pending: 'Descrizione…',
     // Una selezione di soli spazi (o a capo, o tabulazioni) si copia per
     // sbaglio: senza un'etichetta diventa una riga vuota che non si capisce.
@@ -315,6 +368,7 @@
     clipboard_image_no_model: 'Immagine (nessun modello per la descrizione)',
     clipboard_image_delicata: 'Immagine da una pagina delicata',
     clipboard_image_senza_descrizione: 'Immagine',
+    clipboard_image_non_descritta: 'Immagine (descrizione non arrivata)',
 
     // Categorie default
     category_default: 'Da vedere',
@@ -428,7 +482,6 @@
     options_action_feedback_title: 'Titolo automatico dei feedback',
     options_action_editor_title: 'Editor — titolo automatico del documento',
     options_action_editor_summary: 'Editor — riassunto automatico del documento',
-    options_action_editor_chat: 'Editor — chat col documento',
     options_action_archive_embed: 'Indicizzazione delle schede archiviate',
     options_action_provider_test: 'Prova di un fornitore (pulsante «Prova»)',
     options_action_file_name: 'Nome sensato ai file (legge l\'inizio del file o una miniatura)',
@@ -477,14 +530,14 @@
     reasoning_high: 'Alto',
     admin_defaults_sort: 'host',
     admin_defaults_sort_desc:
-      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi.',
+      'Come OpenRouter sceglie l\'host di questo modello. «Automatico» segue la scelta generale qui sotto. I fornitori esclusi restano esclusi; Claude parte sempre da Anthropic.',
     admin_defaults_sort_general: 'Scelta generale degli host',
     admin_defaults_sort_general_desc:
       'Vale per i modelli lasciati su «Automatico». Di serie Filo non chiede nessun ordine e l\'host lo sceglie OpenRouter.',
     provider_sort_general_auto: 'Lo sceglie OpenRouter',
     options_host_order: 'Host dei modelli',
     options_host_order_desc:
-      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti. I fornitori esclusi restano esclusi.',
+      'Lo stesso modello lo servono più host: i più veloci rispondono prima, i più economici costano meno. Vale per tutti i modelli, anche per quelli predefiniti, tranne Claude, che parte sempre da Anthropic. I fornitori esclusi restano esclusi.',
     options_host_order_filo: 'Li sceglie Filo',
     provider_sort_auto: 'Automatico',
     provider_sort_throughput: 'Più veloce',
@@ -571,6 +624,11 @@
       'che restano nella pagina spariscono. Le liste si scaricano dalla rete, restano ' +
       'in cache sul tuo computer e si aggiornano da sole una volta a settimana. I siti ' +
       'che usi davvero (Google, YouTube, banche…) non vengono mai bloccati.',
+    options_security_ytads: 'Blocca le pubblicità di YouTube',
+    options_security_ytads_desc:
+      'I video di YouTube partono senza pubblicità, anche quelli incorporati in altri siti, con le regole ' +
+      'che uBlock Origin pubblica e aggiorna ogni giorno. Se un giorno YouTube cambia e le regole non reggono, ' +
+      'Filo torna da solo a saltare le pubblicità finché non arrivano quelle nuove.',
     options_security_adskip: 'Salta le pubblicità dei video',
     options_security_adskip_desc:
       'Quando un video, per esempio su YouTube, mostra una pubblicità col pulsante «Salta», ' +
@@ -593,7 +651,7 @@
       'sito arrivano e aspetta. Anche “Apri file” su un programma chiede conferma, ' +
       'perché aprirlo vuol dire eseguirlo. Tutti gli altri file scendono come sempre.',
     options_security_downloads_trusted_label:
-      'Siti di cui ti fidi, uno per riga. Da questi i programmi scendono senza chiedere',
+      'Siti fidati per i programmi, uno per riga. Da questi i programmi scendono senza chiedere',
     options_security_downloads_trusted_invalid:
       'Queste righe non sono domini validi e verranno ignorate (usa un dominio ' +
       'con estensione, es. mozilla.org): %s',
@@ -623,8 +681,9 @@
     options_security_safebrowse_desc:
       'Ti avvisa quando un sito imita un marchio noto, è nella lista nera di Google per phishing o malware, ' +
       'ha un certificato che non torna o ti chiede la password su una connessione non protetta. L\'avviso ' +
-      'copre la pagina finché non scegli. Su un sito sospetto premi «Continua», su uno pericoloso scrivi ' +
-      '«confermo». La scelta vale per quel sito in quella scheda, finché resta aperta. Spento, Filo non ' +
+      'copre la pagina finché non scegli. Su un sito sospetto «Continua» lo mette fra i siti di cui ti fidi, e ' +
+      'lì l\'avviso sospetto non torna. Su uno pericoloso scrivi «confermo», e vale solo per quel sito in quella ' +
+      'scheda, finché resta aperta. Spento, Filo non ' +
       'chiede più niente fuori dal computer, ma ti avvisa ancora sui sosia e sulle password chieste senza ' +
       'connessione protetta, che riconosce da solo.',
     options_security_safebrowse_network: 'Controlli di rete (età del dominio e del certificato)',
@@ -659,7 +718,8 @@
       'Quando chiudi queste schede o Filo le riordina, ne tiene solo titolo e indirizzo e non manda il testo a ' +
       'nessun modello. La chat ne vede solo il nome del sito, i loro screenshot e le immagini copiate da lì non ' +
       'vanno al modello delle immagini, nemmeno incollati altrove, e la spiegazione di quello che selezioni parte ' +
-      'solo dal tasto destro. Il correttore resta acceso: manda al modello quello che scrivi, non la pagina.',
+      'solo dal tasto destro. I file scaricati da qui non prendono un nome da soli, e una pagina salvata prende la ' +
+      'categoria dal solo tipo. Il correttore resta acceso: manda al modello quello che scrivi, non la pagina.',
     options_security_delicate_sites_label:
       'Altri siti delicati, uno per riga',
     options_security_delicate_sites_invalid:
@@ -704,6 +764,11 @@
       'lo togli, in "Privacy massima" Filo butta via ' +
       'quello che aveva salvato.',
     options_cookies_whitelist_placeholder: 'es. google.com',
+    options_security_fidati_title: 'Siti di cui ti fidi',
+    options_security_fidati_desc:
+      'Su questi siti Filo non mostra più l\'avviso «sospetto» e non ti dice più che non trova l\'indirizzo. ' +
+      'L\'avviso «pericoloso» compare sempre, anche per un sito nella lista nera di Google.',
+    options_security_fidati_remove: 'Togli',
     options_cookies_whitelist_add: 'Aggiungi',
     options_cookies_whitelist_remove: 'Rimuovi',
     options_cookies_whitelist_empty: 'Nessun sito fidato. In "Privacy massima" rifai l\'accesso ogni volta che torni su un sito che avevi chiuso.',
@@ -748,6 +813,8 @@
     menu_spegni_filo: 'Spegni Filo su questo sito',
     menu_riaccendi_filo: 'Riaccendi Filo su questo sito',
     filo_spento_fatto: 'Filo è spento su %s.',
+    siti_fidati_fatto: '%s è fra i siti di cui ti fidi, e Filo non lo mette più in dubbio. L\'elenco sta in Sicurezza.',
+    siti_fidati_annulla: 'Annulla',
     filo_riacceso_fatto: 'Filo è di nuovo acceso su %s.',
     filo_spento_annulla: 'Annulla',
     options_cookies_banners_title: 'Qui i banner dei cookie li vedi',
@@ -961,12 +1028,15 @@
     spell_add_dict: 'Aggiungi al dizionario',
     spell_autocorrect: 'Correggi automaticamente',
     spell_manage: 'Gestisci correttore',
+    spell_annulla_correzione: 'Annulla correzione',
     spell_action_semantic_label: 'Errori del correttore (controllo rapido)',
     spell_action_coerenza_label: 'Suggerimenti del correttore (controllo ragionato)',
     spell_switch_errori: 'Errori',
     spell_switch_errori_desc: 'Quello che Filo sa sbagliato: parole che non esistono, una parola al posto di un\'altra, grammatica, fatti sbagliati. Spento, sparisce anche la sottolineatura del browser.',
     spell_switch_suggerimenti: 'Suggerimenti',
     spell_switch_suggerimenti_desc: 'Quello che decidi tu: frasi poco chiare, date e giorni che non tornano, cose diverse da quelle già dette nella pagina.',
+    spell_switch_automatica: 'Correzione automatica',
+    spell_switch_automatica_desc: 'Quando finisci una parola: «perchè» diventa «perché», «marco» diventa «Marco». La scorciatoia di annulla subito dopo, o il tasto destro sulla parola, la riportano com\'era.',
     spell_ripetuta: '«%s» ripetuto',
     spell_fisso: 'Si scrive «%s».',
     spell_perche_dizionario: 'non è nel dizionario',
@@ -981,16 +1051,35 @@
     spell_ocra_data: '%s è %s.',
     spell_ocra_relativa: '%s è %s.',
     spell_ocra_inesistente: '%s non esiste: %s ha %s giorni.',
+    // I segnaposti (#1448)
+    spell_switch_segnaposti: 'Segnaposto',
+    spell_switch_segnaposti_desc: 'Scrivi delle x al posto di un dato che non ricordi («nel 14xx», «un p/e di xx») e Filo lo trova: il valore compare sopra le x, un clic lo mette.',
+    spell_segnaposto_forse: 'Forse un dato da trovare.',
+    spell_segnaposto_cerco: 'Cerco il dato…',
+    spell_segnaposto_nessuno: 'Non ho trovato questo dato.',
+    spell_segnaposto_errore: 'La ricerca non è riuscita.',
+    spell_segnaposto_riprova: 'Cerca di nuovo',
+    spell_segnaposto_delicata: 'Su questa pagina non cerco da solo.',
+    spell_segnaposto_cerca: 'Cerca il dato',
+    spell_segnaposto_bloccata: 'Non cerco: la ricerca porterebbe fuori un dato riservato.',
+    spell_segnaposto_apri_fonte: 'Apri la fonte',
+    spell_segnaposto_fonte: 'Fonte: %s',
+    spell_segnaposto_metti: 'Metti %s',
 
     // Pagina Gestisci correttore
     spell_page_title: 'Filo — Correttore',
     spell_page_heading: 'Correttore',
     spell_page_autocorrect_h: 'Correzioni automatiche',
-    spell_page_autocorrect_desc: 'Quando scrivi una di queste parole seguita da uno spazio, viene sostituita con la correzione.',
+    spell_page_autocorrect_desc: 'Quando finisci di scrivere una di queste parole, Filo la sostituisce con la correzione. Qui arrivano anche le correzioni che scegli più volte per la stessa parola.',
     spell_page_autocorrect_empty: 'Nessuna correzione automatica.',
-    spell_page_dict_h: 'Dizionario personale',
-    spell_page_dict_desc: 'Parole aggiunte al dizionario: il correttore non le segnalerà più come errori.',
-    spell_page_dict_empty: 'Dizionario vuoto.',
+    spell_page_dict_h: 'Parole imparate',
+    spell_page_dict_desc: 'Il correttore non le segna: quelle che aggiungi, che ignori o che scrivi più volte uguali. Se una ha la maiuscola, Filo gliela mette anche quando la scrivi minuscola.',
+    spell_page_dict_empty: 'Nessuna parola imparata.',
+    spell_page_rifiutate_h: 'Da non correggere da sé',
+    spell_page_rifiutate_desc: 'Parole di cui hai annullato la correzione automatica: Filo le lascia come le scrivi.',
+    spell_page_rifiutate_empty: 'Nessuna parola.',
+    spell_page_una_parola: 'Una parola sola, senza spazi.',
+    spell_page_word_empty: 'Una parola vuota non si salva. Per toglierla usa «Rimuovi».',
     spell_page_col_word: 'Parola scritta',
     spell_page_col_correction: 'Correzione',
     spell_page_col_actions: '',
@@ -1002,7 +1091,7 @@
     spell_page_back: '← Opzioni',
     spell_page_conflict: '"%s" esiste già — modifica annullata.',
     spell_page_empty: 'Un campo vuoto non salva la correzione. Per toglierla usa «Rimuovi».',
-    spell_page_dict_conflict: '"%s" è già nel dizionario.',
+    spell_page_dict_conflict: '"%s" c\'è già.',
     toast_added_to_dict: 'Aggiunta al dizionario',
     toast_autocorrect_saved: 'Correzione automatica attiva',
 

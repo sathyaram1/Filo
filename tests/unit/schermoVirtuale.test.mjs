@@ -1,5 +1,5 @@
 // Gli spec nel contenitore senza schermo, lanciati dagli script o con un npx playwright test a mano (#739): xvfb
-// da solo, o uno stop che dice cosa manca. E, nello stesso strumento, gli spec del lato arrivato da main al riallineamento.
+// da solo, o uno stop che dice cosa manca. E, nello stesso strumento, gli spec dei conflitti al riallineamento.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -76,35 +76,75 @@ test('riallineamento: il commit verificato arriva dal marcatore di chi verifica,
   assert.equal(shaDelRiallineamento(null), '');
 });
 
-// Un ramo verificato, poi main che tocca un'altra area, poi il ramo riallineato con un conflitto
-// risolto: la scelta deve vedere anche l'area arrivata da main e il file in conflitto.
-test('riallineamento: la scelta include il lato arrivato da main e il file in conflitto', () => {
+// #1907: un ramo verificato, poi main che tocca un'altra area e due file del lavoro, poi il ramo riallineato con un
+// conflitto risolto e uno risolto col lato di main. Si scelgono il lavoro e i suoi conflitti, non l'area solo di main:
+// presa intera, su un ramo vecchio, erano centinaia di spec e ore di corsa.
+test('riallineamento: la scelta include i file in conflitto, anche risolti col lato di main, e non il resto del lato di main', () => {
   const dir = cartellaTemporanea('riallineamento-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
   try {
     g('init', '-q', '-b', 'main');
     g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
-    scrivi('src/pages/editor/a.js', '1\n'); scrivi('src/pages/history/h.js', '1\n');
+    const lontano = (testa, coda) => `${testa}\n${'riga\n'.repeat(20)}${coda}\n`;
+    scrivi('src/pages/editor/a.js', '1\n'); scrivi('src/pages/history/h.js', '1\n'); scrivi('src/pages/board/c.js', '1\n');
+    scrivi('src/pages/options/o.js', lontano('1', '1'));
+    g('add', '-A'); g('commit', '-qm', 'base');
+    g('checkout', '-qb', 'lavoro');
+    scrivi('src/pages/editor/a.js', 'lavoro\n'); scrivi('src/pages/board/c.js', 'lavoro\n');
+    scrivi('src/pages/options/o.js', lontano('lavoro', '1')); g('commit', '-qam', 'lavoro');
+    const verificato = g('rev-parse', 'HEAD');
+    g('checkout', '-q', 'main');
+    scrivi('src/pages/history/h.js', 'main\n'); scrivi('src/pages/editor/a.js', 'main\n'); scrivi('src/pages/board/c.js', 'main\n');
+    scrivi('src/pages/options/o.js', lontano('1', 'main'));
+    g('commit', '-qam', 'main');
+    g('checkout', '-q', 'lavoro');
+    try { g('rebase', 'main'); } catch (_) { /* conflitti attesi su a.js e c.js */ }
+    scrivi('src/pages/editor/a.js', 'risolto\n'); scrivi('src/pages/board/c.js', 'main\n'); g('add', '-A');
+    execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], { cwd: dir, stdio: 'ignore' });
+
+    const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
+    assert.deepEqual(senza.changed.sort(), ['src/pages/editor/a.js', 'src/pages/options/o.js'], 'il ramo contro main vede solo la sua area');
+    const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
+    assert.deepEqual(con.changed.sort(), ['src/pages/board/c.js', 'src/pages/editor/a.js', 'src/pages/options/o.js'],
+      'il conflitto risolto col lato di main resta scelto; l\'area toccata solo da main no');
+    // La stessa definizione della consegna di un riallineamento: un file del lavoro che main ha cambiato in righe
+    // lontane, senza conflitto, non è un file risolto (lo sceglie già il ramo contro main, se il lavoro ci resta).
+    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 2\./);
+    assert.match(con.nota, /\(2 file\) l'ha già provato la suite di main/);
+    const perso = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: 'f'.repeat(40) }, root: dir });
+    assert.deepEqual(perso.changed.sort(), ['src/pages/editor/a.js', 'src/pages/options/o.js']);
+    assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
+  } finally {
+    togliCartella(dir);
+  }
+});
+
+// #2075: un riallineamento SENZA conflitti su un ramo vecchio, con centinaia di file arrivati da main in aree che
+// hanno spec: si sceglie solo dal lavoro. Presi tutti erano 550 spec e circa sei ore, oltre il tetto di un comando.
+test('riallineamento senza conflitti: tanti file arrivati da main non allargano la scelta oltre il lavoro', () => {
+  const dir = cartellaTemporanea('riallineamento-pulito-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  const daMain = Array.from({ length: 300 }, (_, i) => `src/pages/area${i}/m.js`);
+  try {
+    g('init', '-q', '-b', 'main');
+    g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+    scrivi('src/pages/editor/a.js', '1\n'); scrivi('tests/editor.spec.mjs', '1\n');
     g('add', '-A'); g('commit', '-qm', 'base');
     g('checkout', '-qb', 'lavoro');
     scrivi('src/pages/editor/a.js', 'lavoro\n'); g('commit', '-qam', 'lavoro');
     const verificato = g('rev-parse', 'HEAD');
     g('checkout', '-q', 'main');
-    scrivi('src/pages/history/h.js', 'main\n'); scrivi('src/pages/editor/a.js', 'main\n'); g('commit', '-qam', 'main');
+    for (const f of daMain) scrivi(f, 'main\n');
+    g('add', '-A'); g('commit', '-qm', 'main');
     g('checkout', '-q', 'lavoro');
-    try { g('rebase', 'main'); } catch (_) { /* conflitto atteso su a.js */ }
-    scrivi('src/pages/editor/a.js', 'risolto\n'); g('add', '-A');
-    execFileSync('git', ['-c', 'core.editor=true', 'rebase', '--continue'], { cwd: dir, stdio: 'ignore' });
+    g('rebase', '-q', 'main');
 
-    const senza = cambiatiPerLaScelta({ base: 'main', marker: null, root: dir });
-    assert.deepEqual(senza.changed, ['src/pages/editor/a.js'], 'il ramo contro main vede solo la sua area');
     const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
-    assert.deepEqual(con.changed.sort(), ['src/pages/editor/a.js', 'src/pages/history/h.js']);
-    assert.match(con.nota, /lato arrivato da main/);
-    const perso = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: 'f'.repeat(40) }, root: dir });
-    assert.deepEqual(perso.changed, ['src/pages/editor/a.js']);
-    assert.match(perso.nota, /qui non c'è/, 'un commit introvabile si dice, non si salta in silenzio');
+    assert.deepEqual(con.changed, ['src/pages/editor/a.js'], 'solo il file del lavoro, nessuno dei 300 arrivati da main');
+    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 0\./);
+    assert.match(con.nota, /\(300 file\) l'ha già provato la suite di main/);
   } finally {
     togliCartella(dir);
   }
@@ -138,8 +178,7 @@ const LINUX_CON_XVFB = process.platform === 'linux' && xvfbDisponibile();
 const senzaLinuxXvfb = LINUX_CON_XVFB ? false : 'serve Linux con xvfb-run';
 const numero = (display) => display.slice(1);
 const spento = (display) => aspettaChe(() => !existsSync(`/tmp/.X${numero(display)}-lock`), { cosa: `Xvfb ${display} spento` });
-// Al figlio una temporanea sua: con quella della corsa degli unit test ereditata, il suo teardown la toglierebbe
-// sotto ai file di prova che girano insieme (centotrenta rossi finti).
+// Al figlio una temporanea sua: è lì che si guarda se la corsa che apre se ne va con lui.
 const ambienteSenzaSchermo = (temp) => {
   const env = { ...process.env, TMPDIR: temp, TEMP: temp, TMP: temp };
   for (const k of ['DISPLAY', 'WAYLAND_DISPLAY', 'XAUTHORITY', 'ELECTRON_DISABLE_SANDBOX']) delete env[k];

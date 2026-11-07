@@ -465,7 +465,7 @@ function fetchList(url) {
 // aggiorna lo stato in-memory + la cache. Dedup dei refresh concorrenti.
 function refresh({ force = false, sources = DEFAULT_SOURCES, fetchImpl = fetchList } = {}) {
   if (refreshing) return refreshing;
-  refreshing = (async () => {
+  const giro = (async () => {
     try {
       // force=true salta il controllo di freschezza (pulsante "aggiorna ora").
       if (!force && lastUpdatedAt && (Date.now() - lastUpdatedAt) < REFRESH_INTERVAL_MS) {
@@ -500,11 +500,25 @@ function refresh({ force = false, sources = DEFAULT_SOURCES, fetchImpl = fetchLi
       return { ok: true, count: blockedDomains.size, updatedAt: lastUpdatedAt };
     } catch (e) {
       return { ok: false, error: String(e && e.message || e), count: blockedDomains.size };
-    } finally {
-      refreshing = null;
     }
   })();
+  // Il giro si libera quando è finito, non dentro il suo corpo: un «già fresca» esce prima di qualunque attesa, e
+  // liberato lì il giro restava occupato per sempre, e ogni aggiornamento dopo rispondeva «già fresca».
+  refreshing = giro.then((r) => {
+    refreshing = null;
+    contaLista('adblock', r, lastUpdatedAt, blockedDomains.size);
+    return r;
+  });
   return refreshing;
+}
+
+// I contatori (#1469): come è andato, quanto è vecchia la lista in uso, quanti domini ha. Mai un indirizzo.
+function contaLista(nome, r, aggiornataIl, domini) {
+  try {
+    const N = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.NAV;
+    const M = globalThis.SN_CONTATORI_MAIN;
+    if (N && M) M.navigazione(N.lista(nome, r, aggiornataIl ? Date.now() - aggiornataIl : null, domini), { incognito: false });
+  } catch (_) {}
 }
 
 function isEnabled(settings) {

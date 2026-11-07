@@ -49,7 +49,7 @@ async function apri(openTab, docs, { tempi, pending = [] } = {}) {
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'merge_approvals_get') {
-        return { ok: true, pending: window.__srv.pending, failed: [], recent: [], preapproved: [] };
+        return { ok: true, pending: window.__srv.pending, failed: window.__srv.failed || [], recent: [], preapproved: [] };
       }
       if (t === 'feedback_decrypt_fields') return { ok: true, list: msg.list };
       return orig(msg);
@@ -299,4 +299,23 @@ test('lo scorrimento resta sulla scheda che si guardava quando ne escono di più
   await expect(linguetta(page, 'queue')).toHaveText('In coda (2)', { timeout: 10_000 });
   await expect.poll(() => ids(page).then((l) => l.length), { timeout: 5000 }).toBe(28);
   expect(await primaVisibile()).toBe('f715');
+});
+
+// #1425: anche qui rosso solo ciò che aspetta l'owner. Approvata e finita in conflitto, con la routine che la
+// riallinea, la pratica resta In coda con un'etichetta senza allarme, come in Gestione.
+test('una fusione da riallineare non è rossa né fra le decisioni; una da decidere sì', async ({ openTab }) => {
+  const page = await apri(openTab, [fb('f1124', 1124, 'revision_capability'), fb('f1125', 1125, 'revision_security')]);
+  await page.evaluate(({ p, f }) => { window.__srv.pending = [p]; window.__srv.failed = [f]; }, {
+    p: richiesta('f1125', 1125),
+    f: { ...richiesta('f1124', 1124), id: 'f'.repeat(24), used: true, outcome: 'conflict' },
+  });
+  await page.evaluate(() => window.__fbTest.caricaFusioni());
+  await expect(linguetta(page, 'inbox')).toHaveText('Ricevuti (1)');
+  await linguetta(page, 'queue').click();
+  const chip = scheda(page, 'f1124').locator('.fb-fusione');
+  await expect(chip).toHaveText('da riallineare');
+  await expect(chip).toHaveClass(/fb-fusione--quieta/);
+  await linguetta(page, 'inbox').click();
+  await expect(scheda(page, 'f1125').locator('.fb-fusione')).toHaveText('fusione ferma');
+  await expect(scheda(page, 'f1125').locator('.fb-fusione')).not.toHaveClass(/fb-fusione--quieta/);
 });

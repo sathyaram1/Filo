@@ -319,18 +319,25 @@ test('su Mac Cmd+← in un campo dentro un\'ombra chiusa appesa a un div non por
   await expect.poll(() => page.url(), { timeout: 8_000 }).not.toBe(url);
 });
 
-// La barra laterale aperta da tastiera tiene il fuoco: lì Cmd+← vale come Cmd+[ (#685.1 giro 4).
-test('su Mac Cmd+← dalla barra laterale aperta da tastiera torna indietro e la chiude', async ({ app, openTab, testServer }) => {
-  const { urlA } = await scheda_con_A_e_B({ openTab, testServer });
+// La barra laterale aperta da tastiera tiene il fuoco: lì Cmd+← e Cmd+→ valgono come Cmd+[ e Cmd+] (#685.1 giro 4, #685.2).
+test('su Mac Cmd+← e Cmd+→ dalla barra laterale aperta da tastiera vanno indietro e avanti, e la chiudono', async ({ app, openTab, testServer }) => {
+  const { urlA, urlB } = await scheda_con_A_e_B({ openTab, testServer });
   await diventaMac(app);
+  const urlDavanti = () => app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
+    return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.getURL();
+  });
   await premi(app, 'tab', 'B', ['meta', 'shift']);
   await barraPage(app);
   await expect.poll(async () => (await statoBarra(app)).motivo).toBe('tasto');
   await premi(app, 'barra', 'Left', ['meta']);
-  await expect.poll(() => app.evaluate(({ BrowserWindow }) => {
-    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
-    return w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId).view.webContents.getURL();
-  }), { timeout: 8_000 }).toBe(urlA);
+  await expect.poll(urlDavanti, { timeout: 8_000 }).toBe(urlA);
+  await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
+
+  await premi(app, 'tab', 'B', ['meta', 'shift']);
+  await expect.poll(async () => (await statoBarra(app)).motivo).toBe('tasto');
+  await premi(app, 'barra', 'Right', ['meta']);
+  await expect.poll(urlDavanti, { timeout: 8_000 }).toBe(urlB);
   await expect.poll(async () => (await statoBarra(app)).aperta).toBe(false);
 });
 

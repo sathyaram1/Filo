@@ -28,7 +28,7 @@ Tutte le icone funzionali condividono questi parametri.
 Dimensioni di render correnti (impostate da chi consuma l'icona):
 
 - 16px → cronologia incolla, badge inline
-- 18px → riga primaria del menu contestuale e griglia overflow
+- 18px → fila del menu contestuale e griglia «Altro…»
 - 20px → default della libreria, per quando non viene specificato
 
 ## API della libreria
@@ -121,6 +121,7 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `volume` | Altoparlante a cono con due onde: il volume del computer |
 | `volumeMute` | Lo stesso altoparlante con una croce al posto delle onde: muto |
 | `windowFrame` | Cornice con barra del titolo e due pallini: comando della finestra |
+| `desktopIcons` | Schermo col piede e piccole icone in fila: le icone del desktop messe in ordine |
 | `brush` | Pennello: stile della pagina |
 | `undo` | Freccia che torna indietro: ripristina |
 | `mailOpen` | Busta aperta: posta letta (prevista) |
@@ -135,6 +136,16 @@ self.SN_ICONS_UTIL = { isSvgIcon, wrap };
 | `mic` | Microfono: ascolta (prevista) |
 | `memory` | Cervello a due lobi: la memoria di Filo (prevista) |
 | `copy` | Due fogli sovrapposti: copia (prevista) |
+| `bold` | La «B» a due pance: grassetto (fila del tasto destro) |
+| `italic` | La «I» inclinata fra due traversine: corsivo |
+| `underline` | La «U» sopra una riga: sottolineato |
+| `strike` | La «S» tagliata da una riga: barrato |
+| `link` | Due anelli di catena: collegamento |
+| `highlight` | Evidenziatore inclinato col segno che lascia: evidenzia |
+| `cut` | Forbici aperte: taglia |
+| `play` | Triangolo che punta a destra: riproduci (fila su un filmato) |
+| `pause` | Due sbarre verticali: pausa |
+| `pip` | Schermo con la finestrella nell'angolo: finestra mobile |
 | `bell` | Campanella: promemoria/notifica (prevista) |
 | `repeat` | Due frecce a ciclo: automazione ricorrente (prevista) |
 | `question` | Cerchio con "?": Filo chiede all'utente (prevista) |

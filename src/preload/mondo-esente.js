@@ -34,3 +34,5 @@ module.exports = function mondoEsente(webFrame, finestra = globalThis) {
   } catch (_) {}
   return esenta;
 };
+// Il main ci entra con executeJavaScriptInIsolatedWorld: il numero lo legge da qui (tests/unit/mondoContentScript.test.mjs).
+module.exports.MONDO = MONDO;

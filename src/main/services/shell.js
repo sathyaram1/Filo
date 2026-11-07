@@ -12,7 +12,8 @@
 //
 // PROTOCOLLO marcatori (powershell/cmd/sh):
 //   - FILO_RDY_<sid>            riga di "pronto" (e prompt da rimuovere, con cmd);
-//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory.
+//   - FILO_META_<sid>:<code>:<cwd>  fine comando, con exit code e directory;
+//   - FILO_EFINE_<sid>:<n>      su stderr, fine dello stderr del comando n (solo sh/bash).
 // I comandi vengono serializzati in coda: ne parte uno alla volta e l'output
 // in arrivo è instradato alle callback del comando corrente fino al suo META.
 //
@@ -163,6 +164,22 @@ function randSid() {
   return 'F' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-5);
 }
 
+// #892.4 — nudo sullo stdin, un comando che non si chiude (un apostrofo, un `if` senza `fi`) si prende come testo la
+// riga del marcatore e i comandi dopo: la sessione resta «in corso» per sempre. Fra apici il testo è sempre chiuso, e
+// l'errore di sintassi lo dà `eval`; `command` davanti tiene viva dash, che a un errore di `eval` uscirebbe.
+function comandoPerPosix(command) {
+  return `command eval '${String(command == null ? '' : command).replace(/'/g, "'\\''")}'`;
+}
+
+// stdout e stderr sono due tubi: l'errore di un comando poteva arrivare dopo il suo marcatore e finire sotto il comando
+// dopo. Il segno su stderr chiude anche quel tubo; chi ha chiuso lo stderr della shell lo aspetta al più ATTESA_ERR_MS.
+// Una riga sola: bash legge lo stdin a byte, e un comando che chiede (`cp -i`) si prendeva i marcatori come risposta.
+function righePosix(command, sid, n) {
+  return `${comandoPerPosix(command)}; __filo_s=$?; printf 'FILO_EFINE_${sid}:${n}\\n' >&2; `
+    + `printf 'FILO_META_${sid}:%s:%s\\n' "$__filo_s" "$PWD"\n`;
+}
+const ATTESA_ERR_MS = 800;
+
 // Config per shell: come avviare il processo persistente, la riga di "pronto"
 // da inviare all'avvio, e come "incartare" un comando utente perché stampi il
 // marcatore di fine (exit code + cwd) su una riga propria.
@@ -178,8 +195,8 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       args: [],
       options: { cwd: startCwd || undefined, windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
-      wrap: (command) =>
-        `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
+      wrap: (command, n) => righePosix(command, sid, n),
+      fineErr: true,
     };
   }
   if (shell === 'cmd') {
@@ -220,8 +237,8 @@ function shellConfig(shell, sid, startCwd, { env, autoRun = true } = {}) {
       args,
       options: { windowsHide: true, ...ambiente },
       ready: `printf 'FILO_RDY_${sid}\\n'\n`,
-      wrap: (command) =>
-        `${command}\nprintf 'FILO_META_${sid}:%s:%s\\n' "$?" "$PWD"\n`,
+      wrap: (command, n) => righePosix(command, sid, n),
+      fineErr: true,
     };
   }
   // PowerShell (default). `-Command -` legge ed esegue da stdin in modo
@@ -275,6 +292,12 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   const META_PREFIX = `FILO_META_${sid}:`;
   const RDY_LINE = `FILO_RDY_${sid}`;
+  const ERR_PREFIX = `FILO_EFINE_${sid}:`;
+  const ERR_RE = new RegExp(`${ERR_PREFIX}(\\d+)\\n`);
+  let numero = 0;
+  let errBuf = '';
+  // Il marcatore è arrivato, lo stderr del comando non ancora: { code, cwd, timer }.
+  let inAttesa = null;
 
   let proc;
   try {
@@ -292,19 +315,61 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
   proc.stderr && proc.stderr.on('data', (chunk) => {
     // stderr non passa dal protocollo a righe: si inoltra grezzo al comando corrente,
     // normalizzando solo i fine riga.
-    if (session.current && session.current.cb.onData) {
-      session.current.cb.onData({ chunk: String(chunk).replace(/\r\n/g, '\n'), stream: 'stderr' });
+    const testo = String(chunk).replace(/\r\n/g, '\n');
+    if (!cfg.fineErr) { emitErr(testo); return; }
+    errBuf += testo;
+    let m;
+    while ((m = ERR_RE.exec(errBuf))) {
+      emitErr(errBuf.slice(0, m.index));
+      errBuf = errBuf.slice(m.index + m[0].length);
+      stderrFinito(Number(m[1]));
     }
+    const tieni = segnoAMeta(errBuf);
+    emitErr(errBuf.slice(0, errBuf.length - tieni));
+    errBuf = errBuf.slice(errBuf.length - tieni);
   });
   proc.on('error', (err) => fatal(err.message || String(err)));
   proc.on('close', (uscita) => {
     session.dead = true;
     if (cfg.pulisci) cfg.pulisci();
+    const attesa = inAttesa;
+    if (attesa) { clearTimeout(attesa.timer); inAttesa = null; }
     const cur = session.current;
     session.current = null;
-    if (cur && cur.cb.onExit) cur.cb.onExit({ code: 0, cwd: session.cwd, chiusa: true, uscita });
+    if (cur && cur.cb.onExit) cur.cb.onExit(attesa ? { code: attesa.code, cwd: attesa.cwd } : { code: 0, cwd: session.cwd, chiusa: true, uscita });
     drainQueueErr('shell terminata');
   });
+
+  function emitErr(text) {
+    if (text && session.current && session.current.cb.onData) session.current.cb.onData({ chunk: text, stream: 'stderr' });
+  }
+
+  // Quanto della coda di stderr può essere l'inizio del segno: si trattiene finché non arriva il resto.
+  function segnoAMeta(buf) {
+    for (let k = Math.max(0, buf.length - ERR_PREFIX.length - 16); k < buf.length; k++) {
+      const t = buf.slice(k);
+      if (ERR_PREFIX.startsWith(t) || (t.startsWith(ERR_PREFIX) && /^\d*$/.test(t.slice(ERR_PREFIX.length)))) return buf.length - k;
+    }
+    return 0;
+  }
+
+  function stderrFinito(n) {
+    const cur = session.current;
+    if (!cur || cur.n !== n) return;
+    cur.errFinito = true;
+    if (inAttesa) chiudiComando();
+  }
+
+  function chiudiComando() {
+    const attesa = inAttesa;
+    if (!attesa) return;
+    clearTimeout(attesa.timer);
+    inAttesa = null;
+    const cur = session.current;
+    session.current = null;
+    if (cur && cur.cb.onExit) cur.cb.onExit({ code: attesa.code, cwd: attesa.cwd });
+    pump();
+  }
 
   // Quando la riga di "pronto" torna in output la sessione è operativa e si svuota la coda.
   try { proc.stdin.write(cfg.ready); } catch (_) {}
@@ -356,9 +421,9 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
       const code = codeStr === '' ? 0 : (parseInt(codeStr, 10) || 0);
       if (cwdStr) session.cwd = cwdStr;
       const cur = session.current;
-      session.current = null;
-      if (cur && cur.cb.onExit) cur.cb.onExit({ code, cwd: session.cwd });
-      pump();
+      inAttesa = { code, cwd: session.cwd, timer: null };
+      if (cfg.fineErr && cur && !cur.errFinito) inAttesa.timer = setTimeout(chiudiComando, ATTESA_ERR_MS);
+      else chiudiComando();
       return;
     }
 
@@ -376,7 +441,8 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
     if (!next) return;
     session.current = next;
     session._pendingBlank = 0;
-    try { proc.stdin.write(cfg.wrap(next.command)); }
+    next.n = ++numero;
+    try { proc.stdin.write(cfg.wrap(next.command, next.n)); }
     catch (err) {
       session.current = null;
       next.cb.onError && next.cb.onError({ message: err.message || String(err) });
@@ -402,6 +468,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   function kill() {
     session.dead = true;
+    if (inAttesa) { clearTimeout(inAttesa.timer); inAttesa = null; }
     try {
       if (process.platform === 'win32' && proc.pid) {
         // /T termina anche i figli (npm, build…) che kill() lascerebbe orfani.
@@ -414,6 +481,7 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   function fatal(message) {
     session.dead = true;
+    if (inAttesa) { clearTimeout(inAttesa.timer); inAttesa = null; }
     const cur = session.current;
     session.current = null;
     if (cur && cur.cb.onError) cur.cb.onError({ message });
@@ -502,6 +570,47 @@ async function esitoDeiProbe(probes, cwd, attesaMs = ATTESA_PROBE_MS) {
   return incerto ? null : false;
 }
 
+// Su NTFS, exFAT e /mnt di WSL ogni documento ha il permesso d'esecuzione: un programma lo dicono i primi byte (`#!`,
+// ELF, Mach-O, il PE che WSL lancia). Un file che non si lascia leggere resta quello che diceva il permesso.
+const SEGNI_ESEGUIBILE = [[0x23, 0x21], [0x7f, 0x45, 0x4c, 0x46], [0xfe, 0xed, 0xfa, 0xce], [0xfe, 0xed, 0xfa, 0xcf],
+  [0xce, 0xfa, 0xed, 0xfe], [0xcf, 0xfa, 0xed, 0xfe], [0xca, 0xfe, 0xba, 0xbe]].map((s) => Buffer.from(s));
+const SEGNO_PE = Buffer.from('MZ');
+function contenutoEseguibile(p, { pe = false } = {}) {
+  let fd = null;
+  try {
+    fd = fs.openSync(p, 'r');
+    const testa = Buffer.alloc(4);
+    const letti = fs.readSync(fd, testa, 0, 4, 0);
+    const segni = pe ? [...SEGNI_ESEGUIBILE, SEGNO_PE] : SEGNI_ESEGUIBILE;
+    return segni.some((s) => letti >= s.length && testa.subarray(0, s.length).equals(s));
+  } catch (_) {
+    return true;
+  } finally {
+    if (fd != null) { try { fs.closeSync(fd); } catch (_) {} }
+  }
+}
+
+// PATHEXT più gli script di PowerShell e gli installatori; in WSL il bit d'esecuzione non si vede da qui: decide il contenuto.
+function programmaWindowsAlPercorso(p, shell) {
+  const file = (f) => { try { return fs.statSync(f).isFile(); } catch (_) { return false; } };
+  if (shell === 'bash') return file(p) && contenutoEseguibile(p, { pe: true });
+  const est = new Set(String(process.env.PATHEXT || '.COM;.EXE;.BAT;.CMD;.VBS;.VBE;.JS;.JSE;.WSF;.WSH;.MSC')
+    .toLowerCase().split(';').filter(Boolean).concat(['.ps1', '.msi']));
+  if (est.has(path.extname(p).toLowerCase())) return file(p);
+  return [...est].some((e) => file(p + e));
+}
+
+// #892.5 — dash (il /bin/sh di Debian e Ubuntu) risponde sì a `command -v` per qualunque percorso che c'è, documento o
+// cartella: la regola la tiene Node, uguale per ogni shell POSIX. Il `~` lo espande la shell anche davanti a un programma.
+function programmaPosixAlPercorso(cmd, cwd) {
+  const p = /^~(?=\/|$)/.test(cmd) ? path.join(os.homedir(), cmd.slice(1)) : path.resolve(cwd || defaultCwd(), cmd);
+  try {
+    if (!fs.statSync(p).isFile()) return false;
+    fs.accessSync(p, fs.constants.X_OK);
+  } catch (_) { return false; }
+  return contenutoEseguibile(p);
+}
+
 // true esiste, false non esiste di certo, null non si è potuto sapere (la dashboard lo lascia senza colore).
 async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS } = {}) {
   const cmd = String(command == null ? '' : command).trim();
@@ -512,10 +621,10 @@ async function commandExists({ shell, cwd, command, attesaMs = ATTESA_PROBE_MS }
     return true;
   }
   // Un programma dato col percorso (anche fra virgolette, #968): `where.exe` rifiuta i percorsi e cmd resterebbe
-  // rosso. Fuori da Windows `command -v` qui sotto risolve già un percorso, e controlla anche che sia eseguibile.
-  if (process.platform === 'win32' && /[\\/]/.test(cmd)) {
-    try { if (fs.statSync(path.resolve(cwd || defaultCwd(), cmd)).isFile()) return true; } catch (_) {}
-  }
+  // rosso. Lì un documento esistente non è un programma (#892.1): conta solo un'estensione che si esegue, scritta o
+  // sottintesa. Fuori da Windows decide il bit d'esecuzione (programmaPosixAlPercorso).
+  if (process.platform === 'win32' && /[\\/]/.test(cmd)) return programmaWindowsAlPercorso(path.resolve(cwd || defaultCwd(), cmd), shell);
+  if (process.platform !== 'win32' && cmd.includes('/')) return programmaPosixAlPercorso(cmd, cwd);
   return esitoDeiProbe(existenceProbes({ shell, cmd }), cwd, attesaMs);
 }
 

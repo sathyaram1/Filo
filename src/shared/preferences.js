@@ -322,6 +322,11 @@
   // #876 — i siti fidati si salvano come li usa Filo, uguali alla pagina Sicurezza: mail.google.com vale google.com, e fra
   // i programmi fidati una piattaforma che ospita i siti di chiunque (github.io) non entra, col perché.
   const RIDUZIONI = {
+    // Come la voce del menu della scheda: il sito intero dei cookie (services/cookies.js, registrableOf).
+    'security.cookies.bannerSites': (d) => {
+      const S = stessoSito();
+      return { sito: (S && S.sitoDellaVoce(d)) || d };
+    },
     'security.cookies.trustedSites': (d) => {
       const S = stessoSito();
       const E = eseguibili();
@@ -344,7 +349,8 @@
     const r = riduci(d);
     return (r && r.sito) || d;
   }
-  function opElenco(v, riduci) {
+  // `voceDi`: come un pezzo scritto diventa la voce dell'elenco ('' se non è un sito).
+  function opElenco(v, riduci, voceDi = dominioDa) {
     const s = String(v == null ? '' : v).trim();
     if (!s) return null;
     if (SVUOTA.test(s)) return { op: 'sostituisci', voci: [] };
@@ -354,13 +360,14 @@
       const m = s.match(re);
       if (m) { op = nome; resto = s.slice(m[0].length); break; }
     }
-    const pezzi = resto.split(/[\s,;]+/).map((x) => x.trim()).filter((x) => x && !CONGIUNZIONI.has(x.toLowerCase()));
+    const N = nomiSito();
+    const pezzi = N ? N.pezziDi(resto, CONGIUNZIONI) : [];
     if (!pezzi.length) return null;
     const voci = [];
     const errati = [];
     const rifiuti = [];
     for (const p of pezzi) {
-      let d = dominioDa(p);
+      let d = voceDi(p);
       // Togliere una piattaforma salvata prima che la si rifiutasse deve riuscire: lì resta com'è.
       const r = d && riduci ? riduci(d) : null;
       if (r && r.rifiuto && op !== 'togli') { if (!rifiuti.includes(r.rifiuto)) rifiuti.push(r.rifiuto); continue; }
@@ -434,6 +441,50 @@
         const lista = o.voci.map(sitoLeggibile).join(', ');
         const label = o.op === 'aggiungi' ? `Filo spento su ${lista}` : `Filo riacceso su ${lista}`;
         return { partial: nidifica('blocklist', o.voci), label, elenco: { percorso: 'blocklist', op: o.op, voci: o.voci, nome: 'Siti dove Filo è spento' } };
+      },
+    };
+  }
+
+  // #967 — i siti di cui l'utente si fida: lì l'avviso «sospetto» non torna. Aggiungerne uno abbassa una difesa (costo 3
+  // e la parola «conferma», decisione dell'owner D48); toglierlo la rialza (costo 1). La voce è quella del «Continua»
+  // (SN_SAFEBROWSE.voceFidata, nel main): il sito, o la pagina su una piattaforma dove chiunque pubblica.
+  function voceFidataDa(p) {
+    const SB = global.SN_SAFEBROWSE;
+    if (!SB || !SB.voceFidata) return dominioDa(p);
+    try { return SB.voceFidata(p) || ''; } catch (_) { return ''; }
+  }
+  function voceFidataLeggibile(x) {
+    const s = String(x || '');
+    const i = s.indexOf('/');
+    return i < 0 ? sitoLeggibile(s) : sitoLeggibile(s.slice(0, i)) + s.slice(i);
+  }
+  function sitiFidatiAvviso() {
+    const percorso = 'security.safeBrowse.trustedSites';
+    const nome = 'Siti di cui ti fidi';
+    const base = elenco({
+      keys: ['siti_di_cui_ti_fidi', 'siti di cui ti fidi', 'siti di cui mi fido', 'siti fidati per gli avvisi',
+        'siti fidati avviso sospetto', 'siti senza avviso sospetto', 'fidati del sito', 'mi fido del sito'],
+      percorso,
+      allentaSe: 'aggiungi',
+      nome,
+      aiuto: 'siti dove Filo non mostra più l\'avviso «sospetto» né «Non trovo questo indirizzo»; l\'avviso «pericoloso» resta. '
+        + 'Aggiungere chiede all\'utente la parola «conferma», togliere no. Per il sito aperto: «questo sito» (la scheda web davanti)',
+      risk: 'Su un sito di cui ti fidi Filo non ti mostra più l\'avviso «sospetto»: un nome che somiglia a un marchio, un dominio '
+        + 'nato da poco, una password chiesta senza connessione protetta. Restano l\'avviso «pericoloso» e la lista nera di Google.',
+    });
+    // Il costo dichiarato è quello dell'annullo, che può rimettere un sito tolto; il cambio costa secondo il verso.
+    return {
+      ...base,
+      costo: 2,
+      costoDi: (b) => (b && b.elenco && b.elenco.op !== 'togli' && b.elenco.voci.length ? 3 : 1),
+      build(v) {
+        const o = opElenco(v, null, voceFidataDa);
+        if (!o || o.rifiuto) return o;
+        const lista = o.voci.map(voceFidataLeggibile).join(', ');
+        const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}`
+          : o.op === 'togli' ? `${nome} → togli ${lista}`
+            : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
+        return { partial: nidifica(percorso, o.voci), label, elenco: { percorso, op: o.op, voci: o.voci, nome } };
       },
     };
   }
@@ -633,6 +684,22 @@
     const { min, max } = global.SN_CONST.CORRETTORE_TEMPI[campo];
     if (n < min || n > max) return { rifiuto: `${cifre(n)} ms è fuori dai limiti: da ${cifre(min)} a ${cifre(max)} ms` };
     return { partial: { correttore: { [campo]: n } }, label: etichetta(cifre(n)) };
+  }
+
+  // Quante volte serve per imparare, nella correzione automatica (#1447): un numero intero dentro i limiti.
+  function volteCorrettore(v, campo, etichetta) {
+    const n = parseItalianNumber(String(v == null ? '' : v).trim().toLowerCase().replace(/[^0-9.,-]/g, ''));
+    if (!Number.isFinite(n)) return null;
+    const volte = Math.round(n);
+    const { min, max } = global.SN_CONST.CORRETTORE_SOGLIE[campo];
+    if (volte < min || volte > max) return { rifiuto: `${cifre(volte)} volte è fuori dai limiti: da ${cifre(min)} a ${cifre(max)}` };
+    return { partial: { correttore: { [campo]: volte } }, label: etichetta(cifre(volte)) };
+  }
+
+  // Il pannello di destra delle app (#1433) ha gli stessi tempi della barra, e la stessa lettura.
+  function msPannello(v, campo, etichetta) {
+    const r = msBarra(v, campo, etichetta);
+    return r && r.partial ? { ...r, partial: { pannelloDestro: r.partial.barraLaterale } } : r;
   }
 
   function msBarra(v, campo, etichetta) {
@@ -838,6 +905,75 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { barraLaterale: { striscia: b } }, label: `Striscia della barra laterale → ${b ? 'visibile' : 'nascosta'}` };
+      },
+    },
+    {
+      scrive: ['barraLaterale.schede'],
+      costo: 1,
+      aiuto: 'true | false (a schermo intero le schede compaiono portando il mouse sul bordo alto, e spariscono allontanandolo)',
+      keys: ['barra_schede', 'schede a schermo intero', 'schede dal bordo alto', 'mostra le schede a schermo intero', 'schede in alto a schermo intero'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { schede: b } }, label: `Schede dal bordo alto a schermo intero → ${b ? 'compaiono' : 'restano nascoste'}` };
+      },
+    },
+    {
+      scrive: ['barraLaterale.bloccata'],
+      costo: 1,
+      aiuto: 'true | false (la barra laterale resta aperta e spinge la pagina invece di coprirla)',
+      keys: ['barra_bloccata', 'barra bloccata', 'blocca la barra', 'tieni aperta la barra', 'lucchetto della barra', 'barra laterale fissa'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { barraLaterale: { bloccata: b } }, label: `Barra laterale → ${b ? 'bloccata aperta' : 'si apre sopra la pagina'}` };
+      },
+    },
+    {
+      scrive: ['pannelloDestro.spinta'],
+      costo: 1,
+      aiuto: 'true | false (il pannello degli strumenti delle app di Filo si apre spingendo il mouse sul bordo destro)',
+      keys: ['pannello_spinta', 'pannello spinta', 'apri il pannello dal bordo', 'bordo destro', 'spinta sul bordo destro'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { pannelloDestro: { spinta: b } }, label: `Pannello degli strumenti spingendo sul bordo destro → ${b ? 'si apre' : 'non si apre'}` };
+      },
+    },
+    {
+      scrive: ['pannelloDestro.attesaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 100-3000 (attesa sul bordo destro prima che il pannello degli strumenti si apra)',
+      keys: ['pannello_attesa', 'pannello attesa', 'attesa sul bordo destro', 'ritardo apertura pannello'],
+      build(v) { return msPannello(v, 'attesaMs', (n) => `Attesa sul bordo destro prima che il pannello si apra → ${n} ms`); },
+    },
+    {
+      scrive: ['pannelloDestro.uscitaMs'],
+      costo: 1,
+      aiuto: 'millisecondi 100-5000 (dopo quanto il pannello degli strumenti si chiude quando il mouse esce)',
+      keys: ['pannello_uscita', 'pannello uscita', 'chiusura del pannello', 'ritardo chiusura pannello'],
+      build(v) { return msPannello(v, 'uscitaMs', (n) => `Il pannello si chiude ${n} ms dopo che il mouse esce`); },
+    },
+    {
+      scrive: ['pannelloDestro.striscia'],
+      costo: 1,
+      aiuto: 'true | false (la striscia sottile sul bordo destro delle app di Filo che indica il pannello degli strumenti)',
+      keys: ['pannello_striscia', 'pannello striscia', 'striscia sul bordo destro', 'striscia del pannello'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { pannelloDestro: { striscia: b } }, label: `Striscia del pannello degli strumenti → ${b ? 'visibile' : 'nascosta'}` };
+      },
+    },
+    {
+      scrive: ['pannelloDestro.bloccato'],
+      costo: 1,
+      aiuto: 'true | false (il pannello degli strumenti resta aperto e spinge la pagina invece di coprirla)',
+      keys: ['pannello_bloccato', 'pannello bloccato', 'blocca il pannello', 'tieni aperto il pannello', 'lucchetto del pannello'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { pannelloDestro: { bloccato: b } }, label: `Pannello degli strumenti → ${b ? 'bloccato aperto' : 'si apre sopra la pagina'}` };
       },
     },
     {
@@ -1111,6 +1247,28 @@
       },
     },
     {
+      scrive: ['correttore.segnaposti'],
+      aiuto: 'true | false (i SEGNAPOSTO del correttore: l\'utente scrive delle x al posto di un dato che non ricorda, «nel 14xx», e Filo lo trova e lo propone sopra le x)',
+      costo: 1,
+      keys: ['segnaposto', 'segnaposti', 'dati mancanti', 'riempi le x', 'xx', 'dato da trovare', 'completa i dati'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { segnaposti: b } }, label: `Segnaposto del correttore → ${b ? 'attivi' : 'spenti'}` };
+      },
+    },
+    {
+      scrive: ['correttore.segnapostiWeb'],
+      aiuto: 'true | false (per un segnaposto con un dato che cambia nel tempo, come prezzi e quotazioni, il correttore cerca anche sul web, circa 0,8 centesimi a ricerca; spento cerca solo su Wikipedia)',
+      costo: 1,
+      keys: ['cerca sul web per i segnaposto', 'ricerca web segnaposto', 'segnaposto sul web', 'segnaposti web'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { segnapostiWeb: b } }, label: `Ricerca sul web per i segnaposto → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
       scrive: ['correttore.pausaRapidoMs'],
       costo: 1,
       aiuto: 'millisecondi 200-5000 (pausa nello scrivere prima del controllo degli errori)',
@@ -1130,6 +1288,38 @@
       aiuto: 'millisecondi 1000-30000 (pausa nello scrivere prima del controllo dei suggerimenti)',
       keys: ['pausa suggerimenti', 'controllo ragionato dopo', 'attesa suggerimenti'],
       build(v) { return msCorrettore(v, 'pausaRagionatoMs', (n) => `Controllo dei suggerimenti dopo ${n} ms di pausa`); },
+    },
+    {
+      scrive: ['correttore.automatica'],
+      aiuto: 'true | false (la correzione automatica a fine parola: «perchè» → «perché», «marco» → «Marco»; si annulla subito dopo con la scorciatoia di annulla o col tasto destro sulla parola)',
+      costo: 1,
+      keys: ['correzione automatica', 'autocorrezione', 'autocorrect', 'correggi da solo', 'correggi in automatico', 'correzione a fine parola', 'maiuscole dei nomi'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { correttore: { automatica: b } }, label: `Correzione automatica → ${b ? 'attiva' : 'spenta'}` };
+      },
+    },
+    {
+      scrive: ['correttore.accettiPerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una correzione scelta dal tasto destro per la stessa parola serve perché diventi automatica)',
+      keys: ['correzioni accettate', 'accetti per imparare', 'volte per correzione automatica', 'quante volte accettare'],
+      build(v) { return volteCorrettore(v, 'accettiPerImparare', (n) => `Una correzione scelta ${n} volte diventa automatica`); },
+    },
+    {
+      scrive: ['correttore.annulliPerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una correzione automatica annullata per la stessa parola serve perché non torni più)',
+      keys: ['correzioni annullate', 'annulli per imparare', 'quante volte annullare'],
+      build(v) { return volteCorrettore(v, 'annulliPerImparare', (n) => `Una correzione automatica annullata ${n} volte non torna più`); },
+    },
+    {
+      scrive: ['correttore.riscrittePerImparare'],
+      costo: 1,
+      aiuto: 'volte 1-100 (quante volte una parola che il correttore non conosce, scritta uguale e non corretta, serve perché non sia più segnata)',
+      keys: ['parole imparate', 'riscritte per imparare', 'quante volte riscrivere', 'impara le parole'],
+      build(v) { return volteCorrettore(v, 'riscrittePerImparare', (n) => `Una parola scritta uguale ${n} volte non è più segnata`); },
     },
     {
       scrive: ['featureFlags.help'],
@@ -1175,6 +1365,20 @@
         const b = parsePrefBool(v);
         if (b === null) return null;
         return { partial: { security: { adSkip: { enabled: b } } }, label: `Salta le pubblicità dei video → ${b ? 'attivo' : 'disattivato'}` };
+      },
+    },
+    // #1974 — accanto a «Salta», indipendente da lui: vale dal prossimo video aperto.
+    {
+      scrive: ['security.youtubeAds.enabled'],
+      aiuto: 'true | false (toglie le pubblicità di YouTube prima che partano, coi video incorporati in altri siti)',
+      costo: 1,
+      keys: ['blocca_pubblicita_youtube', 'blocca le pubblicità di youtube', 'blocca le pubblicita di youtube',
+        'pubblicità di youtube', 'pubblicita di youtube', 'pubblicità youtube', 'pubblicita youtube', 'annunci di youtube',
+        'youtube ads', 'blocco youtube'],
+      build(v) {
+        const b = parsePrefBool(v);
+        if (b === null) return null;
+        return { partial: { security: { youtubeAds: { enabled: b } } }, label: `Blocca le pubblicità di YouTube → ${b ? 'attivo' : 'disattivato'}` };
       },
     },
 
@@ -1245,7 +1449,7 @@
     },
     {
       scrive: ['security.cookies.mode'],
-      aiuto: '"manuale" | "automatico" | "privacy"',
+      aiuto: '"manuale" | "automatico" | "privacy" (per tutti i siti; il banner di un sito solo sta in siti_con_banner)',
       keys: ['gestione_cookie', 'gestione cookie', 'gestione dei cookie', 'cookie', 'banner cookie', 'banner dei cookie'],
       costo: 2,
       allenta: (r, at) => scende(RIGORE_COOKIE, r.partial.security.cookies.mode, at && at.security && at.security.cookies && at.security.cookies.mode),
@@ -1259,6 +1463,14 @@
           privacy: 'privacy', riservatezza: 'privacy', massima: 'privacy', isolato: 'privacy', isolata: 'privacy',
         };
         const mode = map[s];
+        // #1279.1 — un sito nominato qui non deve cambiare la modalità di tutti: la strada è l'elenco dei siti coi banner.
+        if (!mode && /\b(sito|siti|qui|pagina|scheda)\b|\.[a-z]{2,}\b/.test(s)) {
+          return {
+            rifiuto: 'la modalità dei cookie vale per tutti i siti',
+            perModello: 'Per un sito solo usa la chiave siti_con_banner: «aggiungi questo sito» fa rivedere il banner, '
+              + '«togli questo sito» torna a rifiutarlo.',
+          };
+        }
         if (!mode) return null;
         const labelMode = { manual: 'Manuale', default: 'Automatico', privacy: 'Privacy' }[mode];
         return { partial: { security: { cookies: { mode } } }, label: `Gestione cookie → ${labelMode}` };
@@ -1325,10 +1537,11 @@
     },
     {
       scrive: ['scorciatoie.explain-selection', 'scorciatoie.translate-selection', 'scorciatoie.save-for-later', 'scorciatoie.open-help-sidebar'],
+      // Uguale su ogni sistema: la descrizione finisce negli strumenti della chat, che sono gli stessi per tutti.
       aiuto: () => {
         const T = tastiDiFilo();
-        const esempio = T ? T.etichettaFilo('Ctrl+Shift+Y') : '';
-        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. "Traduci: ${esempio}"); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
+        const esempio = T ? `"Traduci: ${T.etichettaFilo('Ctrl+Shift+Y', 'win32')}", su Mac "Traduci: ${T.etichettaFilo('Ctrl+Shift+Y', 'darwin')}"` : '"Traduci: Ctrl+Shift+Y"';
+        return `"<azione>: <combinazione>", azione fra Spiega, Traduci, Salva per dopo e Aiuto (es. ${esempio}); "<azione>: di serie" la rimette com'era, "tutte di serie" tutte e quattro`;
       },
       keys: ['scorciatoia', 'scorciatoie', 'scorciatoia da tastiera', 'scorciatoie da tastiera', 'tasto di scelta rapida',
         'scorciatoia di spiega', 'scorciatoia di traduci', 'scorciatoia di salva per dopo', 'scorciatoia di aiuto'],
@@ -1710,11 +1923,12 @@
       spentoAllenta: false,
       nome: 'Contatori anonimi d\'uso',
       stati: ['accesi', 'spenti'],
-      aiuto: 'true | false (una volta al giorno manda a chi sviluppa Filo solo numeri: quante volte si usa ogni funzione, '
-        + 'quanto si aspetta la risposta, quante chiamate falliscono; spenti, non si conta niente e non parte niente)',
-      risk: 'Decide se Filo manda una volta al giorno a chi lo sviluppa dei numeri senza contenuto (usi e attese per '
-        + 'funzione, chiamate fallite, versione e sistema), con uno pseudonimo che cambia ogni mese: mai testi, '
-        + 'indirizzi o nomi di file.',
+      aiuto: 'true | false (ogni ora manda a chi sviluppa Filo solo numeri e nomi da elenchi fissi: usi e attese di funzioni '
+        + 'e azioni, impostazioni cambiate, ricerche nei pannelli, proposte del correttore, conferme, annulli, errori visti, '
+        + 'scelte dell\'intervista; spenti, non si conta niente e non parte niente, nemmeno lo spegnimento)',
+      risk: 'Decide se Filo manda ogni ora a chi lo sviluppa dei numeri senza contenuto (usi e attese di funzioni e azioni, '
+        + 'impostazioni cambiate, ricerche nei pannelli, correttore, conferme, annulli, errori visti, intervista, versione e '
+        + 'sistema), con uno pseudonimo che cambia ogni mese: mai testi, indirizzi, titoli, nomi di file o parole.',
     }),
     elenco({
       keys: ['siti_bloccati', 'siti bloccati', 'blacklist', 'domini in blacklist', 'elenco dei siti bloccati', 'lista dei siti bloccati'],
@@ -1747,11 +1961,14 @@
         + 'l’altra, così resti connesso, e il sito ti riconosce.',
     }),
     elenco({
-      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie'],
+      keys: ['siti_con_banner', 'siti con banner', 'banner visibili', 'siti dove vedo i banner', 'mostra i banner dei cookie',
+        'rivedi il banner dei cookie', 'mostra il banner dei cookie', 'rifiuta i cookie in automatico qui'],
       percorso: 'security.cookies.bannerSites',
       allentaSe: 'aggiungi',
       nome: 'Siti dove vedi i banner dei cookie',
-      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere',
+      aiuto: 'siti dove Filo non rifiuta i banner dei cookie e li lascia vedere. Per il sito aperto: «questo sito» (la scheda '
+        + 'web davanti): «fammi rivedere il banner qui» è aggiungi questo sito, «torna a rifiutarli qui» è togli questo sito; '
+        + 'la pagina si ricarica da sola. Per un sito solo si usa questo elenco, mai la modalità dei cookie',
       risk: 'Cambia i siti dove Filo lascia i banner dei cookie a te invece di rifiutarli da solo: lì una scelta '
         + 'sbagliata sul banner fa accettare i cookie di tracciamento.',
     }),
@@ -1775,6 +1992,7 @@
     }),
     elencoCartelle(),
     sitiFiloSpento(),
+    sitiFidatiAvviso(),
     // #975 — non abbassa niente: cambia quale menu arriva per primo, e l'altro resta a Shift. Costo 1, come un tema.
     {
       ...elenco({
@@ -1940,6 +2158,31 @@
         return { partial: { spiegaAnticipata: { enabled: b } }, label: `Spiegazione preparata alla selezione → ${b ? 'attiva' : 'spenta'}` };
       },
     },
+    // D61 (#1290): «traduci tutto» o «traduci solo quando apro». Un sì (tradurle) vale «subito», un no «quando le apro»:
+    // per questo nessuna chiave nomina una delle due scelte, che rovescerebbe il senso del sì.
+    {
+      scrive: ['traduzionePagina.nascoste'],
+      aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, dal menu, e spende meno)',
+      costo: 1,
+      keys: ['traduzione_sezioni_nascoste', 'traduzione delle sezioni nascoste', 'traduzione delle sezioni chiuse',
+        'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre', 'traduzionepagina.nascoste'],
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase().replace(/\s+/g, ' ');
+        const { TRADUCI, RIMANDA } = global.SN_CONST.NASCOSTE_TRADUZIONE;
+        const parole = {
+          [TRADUCI]: ['subito', 'tutto', 'traduci tutto', 'sempre', 'in sottofondo', 'di serie', 'predefinito'],
+          [RIMANDA]: ['apertura', 'aperte', 'quando apro', 'quando le apro', 'solo quando apro', 'traduci solo quando apro',
+            'all\'apertura', 'dopo', 'su richiesta'],
+        };
+        const b = parsePrefBool(v);
+        const modo = Object.keys(parole).find((k) => parole[k].includes(s)) || (b === null ? null : (b ? TRADUCI : RIMANDA));
+        if (!modo) return null;
+        return {
+          partial: { traduzionePagina: { nascoste: modo } },
+          label: `Sezioni chiuse di una pagina → ${modo === TRADUCI ? 'tradotte subito, insieme al resto' : 'tradotte solo quando le apri'}`,
+        };
+      },
+    },
     {
       scrive: ['descriviImmagini.enabled'],
       aiuto: 'true | false (ogni screenshot, intero o di una parte, e ogni immagine copiata da una pagina va intera al modello delle immagini, che ne scrive il nome del file e la riga della cronologia appunti; spenta, l\'immagine non parte e il file si chiama con data e ora. Da una pagina delicata non parte mai)',
@@ -1979,8 +2222,9 @@
       risk: 'Decide se le funzioni che partono da sole mandano ai modelli anche le pagine delicate: posta, banca, sanità, '
         + 'pubblica amministrazione, pagine dove hai visto un campo password o carta. Spegnerlo fa arrivare al modello '
         + 'saldi, movimenti, mail e referti delle schede che chiudi; la chat torna a vedere i titoli delle schede di banca '
-        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, e la '
-        + 'spiegazione si prepara anche lì appena selezioni un testo.',
+        + 'e posta, gli screenshot e le immagini copiate da quelle pagine tornano al modello delle immagini, la '
+        + 'spiegazione si prepara anche lì appena selezioni un testo, e con le funzioni accese i file scaricati da lì '
+        + 'tornano al modello dei nomi e le pagine salvate a quello delle categorie con titolo e testo.',
     }),
     elenco({
       keys: ['siti_delicati', 'siti delicati', 'elenco dei siti delicati', 'pagine delicate aggiunte', 'sito delicato'],
@@ -2014,7 +2258,8 @@
       keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo'],
       costo: 3,
       elencoFisso: 'regole',
-      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo».',
+      dove: 'Il livello di autonomia lo sceglie l\'utente in Preferenze, sotto «Autonomia di Filo»: aprigli la pagina lì '
+        + 'con NAVIGA filo://preferences/preferences.html#autonomia',
       build(v) {
         const A = global.SN_AUTONOMIA;
         const s = String(v == null ? '' : v).trim().toLowerCase();
@@ -2128,9 +2373,12 @@
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
+    // `costoDi`: un elenco che costa diverso nei due versi (#967); senza, il costo dichiarato.
+    let costo = setter.costo;
+    try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
     return {
       ...b,
-      costo: setter.costo,
+      costo,
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
@@ -2191,6 +2439,6 @@
   global.SN_PREF = {
     buildPreferencePartial, parsePrefBool, parseItalianNumber, PREF_SETTERS, lezioneDaAzione,
     applicaElenco, righeDescrizione, setterDi, setterDellaChiave, spiegaNonValida, PARAMETRI_COLORE_TAB,
-    SENZA_CHIAVE_PROPRIA,
+    SENZA_CHIAVE_PROPRIA, tonoDa, TONI_ETICHETTE,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

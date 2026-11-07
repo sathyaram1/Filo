@@ -84,6 +84,11 @@ const chiedi = (app, msg, mittente) => app.evaluate(
   [msg, mittente],
 );
 const inviate = (app) => app.evaluate(() => globalThis.__inviate);
+const automatismi = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  const n = (m) => Object.values(s.ore || {}).reduce((t, o) => t + ((((o.homePagina || {})[m]) || {}).segnalazione_automatica || 0), 0);
+  return { fatto: n('automatismo_fatto'), disfatto: n('automatismo_disfatto') };
+});
 const scritture = (app) => app.evaluate(() => globalThis.__scritture);
 
 test('senza l\'accesso del proprietario «Annulla» ferma la segnalazione prima che parta, e quando è tardi lo dice', async ({ app, shell, avvisi }) => {
@@ -108,6 +113,8 @@ test('senza l\'accesso del proprietario «Annulla» ferma la segnalazione prima 
   expect(await inviate(app), '«Annulla» non ha fermato la segnalazione').toEqual([]);
   expect(await scritture(app)).toEqual([]);
   await expect(primo.vista.locator('.shell-notif.show', { hasText: /ritirar/ })).toHaveCount(0);
+  // I contatori (#1473): Filo ha segnalato da sé, e «Annulla» l'ha disfatto.
+  await expect.poll(() => automatismi(app)).toEqual({ fatto: 1, disfatto: 1 });
 
   // 2. Chiuso senza Annulla, la segnalazione parte: una volta sola, e da lì chi non è l'owner non la ritira.
   const secondo = await chiediUnBuco(app, page, avvisi, 2);
@@ -116,6 +123,7 @@ test('senza l\'accesso del proprietario «Annulla» ferma la segnalazione prima 
   const tardi = await chiedi(app, { type: 'CANCEL_AUTO_FEEDBACK', id: secondo.biglietto }, BARRA);
   expect(tardi).toMatchObject({ ok: false, tardi: true });
   expect(tardi.frase).toContain('già partita');
+  expect(await automatismi(app), 'una segnalazione già partita non è disfatta').toEqual({ fatto: 2, disfatto: 1 });
 
   // 3. Partita col toast ancora a schermo (il tetto di sicurezza): Annulla dice che è tardi, non finge.
   const terzo = await chiediUnBuco(app, page, avvisi, 3);

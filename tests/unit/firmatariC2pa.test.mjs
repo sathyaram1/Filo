@@ -153,3 +153,43 @@ test('l’elenco delle autorità di marcatura si scarica col resto e resta su di
   assert.equal(F.stato().autoritaMarca, 1, 'anche su disco');
   assert.equal(P.frase(await F.analizzaImmagine(scaduta)), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate.');
 });
+
+// #946.1 — l'elenco provvisorio (autorità e firmatari ammessi) arriva col resto, resta su disco, e uno che
+// non arriva non fa perdere quello di prima né l'elenco ufficiale.
+test('l’elenco provvisorio si scarica col resto, resta su disco e riconosce le firme di prima del congelamento', async () => {
+  F._dimentica();
+  const RADICE_PROVV = certificato({ organizzazione: 'Truepic', nomeComune: 'RootCA', ca: true, da: new Date('2021-12-09'), a: new Date('2036-12-05') });
+  const prima = new Date(P.CONGELAMENTO_PROVVISORIO - 100 * 86400000);
+  const daTruepic = pngFirmato({ cert: certificato({ organizzazione: 'OpenAI', emittente: RADICE_PROVV, da: prima }) });
+  const ammesso = certificato({ organizzazione: 'Stability AI Ltd', da: prima });
+  const daStability = pngFirmato({ cert: ammesso });
+  risposte.set('/elenco.pem', { corpo: elencoPem(RADICE) });
+  risposte.set('/provvisorio.pem', { corpo: elencoPem(RADICE_PROVV) });
+  risposte.set('/ammessi.pem', { corpo: elencoPem(ammesso) });
+  const tutti = { forza: true, url: `${base}/elenco.pem`, urlProvvisorio: `${base}/provvisorio.pem`, urlAmmessi: `${base}/ammessi.pem` };
+
+  assert.equal((await F.aggiorna({ forza: true, url: `${base}/elenco.pem` })).ok, true);
+  assert.equal((await F.analizzaImmagine(daTruepic)).firmatario, 'sconosciuto', 'solo l’elenco ufficiale');
+
+  assert.equal((await F.aggiorna(tutti)).ok, true);
+  assert.deepEqual(F.stato().provvisorio, { autorita: 1, ammessi: 1 });
+  const r = await F.analizzaImmagine(daTruepic);
+  assert.equal(r.firmatario, 'provvisorio');
+  assert.equal(P.frase(r), 'Generata con l’AI, lo dichiara OpenAI nelle credenziali firmate. Il firmatario è riconosciuto dall’elenco provvisorio del C2PA.');
+  assert.equal((await F.analizzaImmagine(daStability)).firmatario, 'provvisorio');
+  assert.equal((await F.analizzaImmagine(IMMAGINE)).firmatario, 'riconosciuto', 'l’elenco ufficiale vale come prima');
+
+  // Un elenco provvisorio che non arriva, o una pagina d'errore al suo posto, non fa perdere quello buono.
+  risposte.set('/rotto.pem', { corpo: '<html>Manutenzione</html>' });
+  const esito = await F.aggiorna({ ...tutti, urlProvvisorio: `${base}/manca.pem`, urlAmmessi: `${base}/rotto.pem` });
+  assert.equal(esito.ok, true);
+  F._dimentica();
+  assert.equal(await F.carica(), true);
+  assert.deepEqual(F.stato().provvisorio, { autorita: 1, ammessi: 1 }, 'anche su disco');
+  assert.equal((await F.analizzaImmagine(daTruepic)).firmatario, 'provvisorio');
+});
+
+test('le fonti vere dell’elenco provvisorio sono quelle del verificatore di riferimento', () => {
+  assert.match(F.FONTE_PROVVISORIO, /^https:\/\/raw\.githubusercontent\.com\/contentauth\/verify-site\/main\/static\/trust\/anchors\.pem$/);
+  assert.match(F.FONTE_AMMESSI, /^https:\/\/raw\.githubusercontent\.com\/contentauth\/verify-site\/main\/static\/trust\/allowed\.pem$/);
+});

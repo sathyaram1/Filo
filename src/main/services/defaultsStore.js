@@ -11,6 +11,9 @@ require('../../shared/feedbackThread.js');
 require('../../shared/routineSessioni.js');
 // Registra SN_ROUTINE_MODELLI: modello e sforzo per fase, stesse regole della pagina.
 require('../../shared/routineModelli.js');
+// Registra SN_SPESA_GIUDICI (#1515), che legge i numeri con SN_CAMPO_NUMERO: stesse regole della pagina.
+require('../../shared/campoNumero.js');
+require('../../shared/spesaGiudici.js');
 
 const PROJECT_ID = 'filo-8b9cb';
 const API_KEY = 'AIzaSyDN_fpshLW_K78QLV0MMiX1gd-OfO7x-CY'; // pubblica per design
@@ -88,8 +91,10 @@ function fsDocToObject(doc) {
 // configurazione che non ha fino alla scadenza lunga.
 // `tokenMancato`: chi usa Filo è dentro ma la sessione non ha dato il token, e
 // il «non ti riguarda» detto a un anonimo non parla di lui (#679.2).
-async function leggiDoc(docPath, idToken, { tokenMancato = false } = {}) {
-  const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}`;
+// `campi`: solo questi percorsi del documento (la maschera di Firestore), per non scaricare il resto a ogni giro.
+async function leggiDoc(docPath, idToken, { tokenMancato = false, campi = null } = {}) {
+  const maschera = Array.isArray(campi) ? campi.map((c) => `&mask.fieldPaths=${encodeURIComponent(c)}`).join('') : '';
+  const url = `${FIRESTORE_BASE}/${docPath}?key=${API_KEY}${maschera}`;
   const headers = {};
   if (idToken) headers.Authorization = `Bearer ${idToken}`;
   let res;
@@ -811,6 +816,43 @@ async function setCreditsKnobs(patch, idToken) {
   return getCreditsKnobs(idToken);
 }
 
+// Il tetto di spesa dei giudici per i non fidati e la lunghezza che ricevono (#1515): campi di config/automation,
+// regole in SN_SPESA_GIUDICI. La spesa di oggi la scrive solo il server; `spesa: null` = non letta, non zero.
+async function getJudgeBudget(idToken) {
+  const SG = globalThis.SN_SPESA_GIUDICI;
+  const cfg = await leggiDoc(AUTOMATION_DOC, idToken);
+  if (!cfg.risposto || !cfg.doc) throw new Error('Impostazioni dei giudici non raggiungibili.');
+  const conto = await leggiDoc(SG.DOC_SPESA, idToken);
+  const oraMs = adesso();
+  return {
+    ...SG.leggiImpostazioni(cfg.doc),
+    spesa: conto.risposto && conto.doc ? SG.spesaDiOggi(conto.doc, oraMs) : null,
+    oraMs,
+  };
+}
+
+async function setJudgeBudget(patch, idToken) {
+  if (!idToken) throw new Error('Serve un ID token admin per cambiare il tetto dei giudici.');
+  const SG = globalThis.SN_SPESA_GIUDICI;
+  const esito = SG.valida(patch);
+  if (!esito.ok) throw new Error(esito.testo);
+  const mask = Object.keys(esito.valori);
+  if (!mask.length) throw new Error('Non c’è niente da salvare.');
+  const fields = {};
+  for (const k of mask) fields[k] = toFsValue(esito.valori[k]);
+  await patchDoc(AUTOMATION_DOC, fields, mask, idToken);
+  try {
+    return await getJudgeBudget(idToken);
+  } catch (_) {
+    // Scritto ma non riletto: tornano i soli campi scritti, gli altri restano ignoti.
+    const scritto = SG.leggiImpostazioni(esito.valori);
+    const out = { spesa: null, oraMs: adesso(), letto: false };
+    if (SG.CAMPI.tetto in esito.valori) out.tettoUsd = scritto.tettoUsd;
+    if (SG.CAMPI.caratteri in esito.valori) out.maxCaratteri = scritto.maxCaratteri;
+    return out;
+  }
+}
+
 // Log dei worker delle routine (config/automation, campo `workerLog`): elenco
 // delle ultime esecuzioni di scripts/dispatch.mjs, ciascuna { role, startedAt,
 // num }. Lo scrive dispatch a ogni worker spawnato; qui lo LEGGIAMO soltanto
@@ -834,6 +876,14 @@ async function getWorkerLog(idToken, { severo = false } = {}) {
     // Più recenti prima: dispatch le accoda in ordine cronologico.
     .sort((a, b) => String(b.startedAt).localeCompare(String(a.startedAt)));
   return entries;
+}
+
+// Lo stato dei giudici fermi (#906) che il server scrive in config/automation: { risposto, raw }. Il campo assente con
+// la lettura riuscita vuol dire «giudici a posto»; una lettura non riuscita non dice niente (services/giudiciFermi.js).
+async function getGiudiciFermi(idToken) {
+  const campi = ['causa', 'da', 'ultimoErrore', 'inAttesa'].map((c) => `giudiciFermi.${c}`);
+  const letto = await leggiDoc(AUTOMATION_DOC, idToken, { campi });
+  return { risposto: letto.risposto && !!letto.doc, raw: (letto.doc && letto.doc.giudiciFermi) || null };
 }
 
 module.exports = {
@@ -864,6 +914,8 @@ module.exports = {
   setRoutineSessions,
   getRoutineRoleModels,
   setRoutineRoleModel,
+  getJudgeBudget,
+  setJudgeBudget,
   getCreditsKnobs,
   setCreditsKnobs,
   getRedteamOpen,
@@ -871,4 +923,5 @@ module.exports = {
   getApertoATutti,
   setApertoATutti,
   getWorkerLog,
+  getGiudiciFermi,
 };

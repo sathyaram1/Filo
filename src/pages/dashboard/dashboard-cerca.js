@@ -12,6 +12,42 @@
   let attesa = null;
   let voci = [];
   let scelta = -1;
+  // La ricerca in corso, per i contatori (#1461): dall'apertura del pannello alla scelta, la posizione della voce, o niente.
+  let sessione = null;
+  function contaRicerca(evento) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura: 'ricerca', pannello: 'cerca-filo', ...evento })).catch(() => {}); } catch (_) {}
+  }
+  // La ricerca nei propri dati, per i contatori della home (#1473): quanti risultati, quale si apre, a che posto e dopo
+  // quanto. Le parole cercate restano qui, e nemmeno la loro lunghezza esce.
+  const H = () => global.SN_CONTATORI_HOME_PAGINA || { RIPETUTA_MS: 10000, ASSESTATA_MS: 800 };
+  let corrente = null;
+  let ultimaVuota = 0;
+  let assestata = null;
+  function contaHome(misura, campi) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura, ...campi })).catch(() => {}); } catch (_) {}
+  }
+  function contaCorrente() {
+    clearTimeout(assestata);
+    const c = corrente;
+    if (!c || c.contata) return;
+    c.contata = true;
+    const ripetuta = ultimaVuota > 0 && c.t - ultimaVuota <= H().RIPETUTA_MS;
+    ultimaVuota = c.n === 0 ? c.t : 0;
+    contaHome('ricerca-home', { risultati: c.n, ...(ripetuta ? { ripetuta: true } : {}) });
+  }
+  // `n`: i risultati a schermo. La stessa ricerca ridisegnata (il fuoco che torna nel campo) non è una ricerca nuova.
+  function nuovaCorrente(q, n) {
+    clearTimeout(assestata);
+    if (corrente && !corrente.contata && corrente.q !== q) corrente = null;
+    const stessa = corrente && corrente.q === q;
+    corrente = { q, n, t: Date.now(), contata: !!(stessa && corrente.contata) };
+    if (!corrente.contata) assestata = setTimeout(contaCorrente, H().ASSESTATA_MS);
+  }
+  function tipoDi(r) {
+    if (r.k === 'nascosta') return 'conversazione_nascosta';
+    if (r.k === 'pagina') return r.archivio ? 'scheda_chiusa' : 'pagina';
+    return 'messaggio';
+  }
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;
@@ -32,6 +68,9 @@
   }
 
   function chiudi({ svuota = false } = {}) {
+    contaCorrente();
+    if (sessione && !sessione.scelto) contaRicerca({ esito: 'vuota' });
+    sessione = null;
     pannello.hidden = true;
     pannello.replaceChildren();
     voci = [];
@@ -70,12 +109,23 @@
 
   async function apri(r) {
     if (r.k === 'significato') return significato(r);
+    const i = voci.findIndex((v) => v._risultato === r);
+    if (sessione) {
+      contaRicerca({ esito: 'scelta', attesaMs: Date.now() - sessione.t0, posizione: i >= 0 ? i + 1 : null });
+      sessione.scelto = true;
+    }
+    if (corrente && i >= 0) {
+      const c = corrente;
+      contaCorrente();
+      contaHome('ricerca-home-aperta', { tipo: tipoDi(r), posizione: i + 1, ms: Date.now() - c.t });
+    }
     if (r.k === 'nascosta') return rimetti(r);
     if (r.k === 'pagina') {
       const dove = global.SN_FILO_CODA.daAprire(r);
       if (!dove) return;
       // Una scheda chiusa si riapre com'era (scroll, paese); se la sua voce non c'è più, come una pagina qualunque.
-      const riaperta = r.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio }) : null;
+      const riaperta = r.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: r.archivio })
+        : !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, url: dove.url, perIndirizzo: true }) : null;
       if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
       return;
     }
@@ -177,6 +227,11 @@
     }
     pannello.hidden = false;
     campo.setAttribute('aria-expanded', 'true');
+    nuovaCorrente(q, voci.filter((b) => b._risultato && b._risultato.k !== 'significato').length);
+    if (!sessione) {
+      sessione = { t0: Date.now(), scelto: false };
+      contaRicerca({ esito: 'aperta' });
+    }
   }
 
   async function cerca() {
@@ -194,6 +249,8 @@
     const mio = ++giro;
     const res = await d.send({ type: MSG.FILO_CERCA, nascoste: 'tutte' });
     if (mio !== giro || !res || !res.ok) return;
+    contaCorrente();
+    corrente = null;
     const tutte = Array.isArray(res.nascoste) ? res.nascoste : [];
     pannello.replaceChildren();
     voci = [];
@@ -219,14 +276,14 @@
   function vociMenu(target) {
     const e = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
     if (e && e.closest && e.closest('.dash-cerca-campo')) {
-      return [{ type: 'item', icon: icona('eyeOff', 16), label: 'Mostra le conversazioni nascoste', onClick: () => { mostraNascoste().catch(() => {}); } }];
+      return [{ type: 'item', icon: icona('eyeOff', 16), label: 'Mostra le conversazioni nascoste', azione: 'chat-archive', onClick: () => { mostraNascoste().catch(() => {}); } }];
     }
     const b = e && e.closest ? e.closest('.dash-cerca-voce') : null;
     if (!b || !b._risultato) return [];
     const r = b._risultato;
     if (r.k === 'nascosta') {
       return [
-        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { rimetti(r).catch(() => {}); } },
+        { type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
         { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
       ];
     }
@@ -239,7 +296,7 @@
       ];
     }
     return [
-      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', onClick: () => { apri(r).catch(() => {}); } },
+      { type: 'item', icon: icona('filoLogo', 16), label: 'Vai a questo punto del filo', azione: 'chat-archive', onClick: () => { apri(r).catch(() => {}); } },
       { type: 'item', icon: icona('copy', 16), label: 'Copia il testo', onClick: () => { navigator.clipboard.writeText(r.testo).catch(() => {}); } },
     ];
   }

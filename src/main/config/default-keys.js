@@ -1,6 +1,6 @@
-// Chiavi API di default: Filo funziona appena installato, senza configurare niente.
-// Non stanno nel repo pubblico: le scrive la CI in un file generato e gitignorato, e
-// vivono solo nel main. Precedenza: file generato, poi env FILO_DEFAULT_*, poi vuoto.
+// Chiavi API di default: Filo funziona appena installato, senza configurare niente. Precedenza: file generato, env FILO_DEFAULT_*, vuoto.
+// Il file generato dal bake finisce in chiaro nell'installer, che è pubblico: ogni chiave che porta la legge chiunque lo scarichi.
+// Quali chiavi può portare lo decide l'elenco chiuso di tests/unit/chiaviNelPacchettoPubblico.test.mjs, non questo file né il bake.
 
 const fs = require('fs');
 const path = require('path');
@@ -28,7 +28,6 @@ function fromGeneratedFile() {
       || (typeof keys.safeBrowsing === 'string' && keys.safeBrowsing)
       || '';
     return {
-      openrouter: pick('openrouter'),
       tavily: pick('tavily'),
       safeBrowsingKey: String(sbRaw).trim(),
     };
@@ -38,10 +37,11 @@ function fromGeneratedFile() {
 }
 
 // Snapshot letto una volta all'avvio del processo main: file generato > env.
+// OpenRouter solo dall'ambiente di sviluppo: è uscita dal pacchetto (#598), e una copia rimasta nel file non deve arrivare a nessuno.
 function readSnapshot() {
   const gen = fromGeneratedFile() || {};
   return {
-    openrouter: gen.openrouter || fromEnv('FILO_DEFAULT_OPENROUTER_KEY'),
+    openrouter: fromEnv('FILO_DEFAULT_OPENROUTER_KEY'),
     tavily: gen.tavily || fromEnv('FILO_DEFAULT_TAVILY_KEY'),
     safeBrowsingKey: gen.safeBrowsingKey || fromEnv('FILO_DEFAULT_SAFEBROWSING_KEY'),
   };

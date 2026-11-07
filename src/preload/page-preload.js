@@ -121,7 +121,12 @@ try {
     const prima = typeof contextMenuHandler === 'function' && sitoPrima();
     // Shift lascia l'evento alla pagina: se non mostra un menu suo, compare quello del browser. Sui siti dove il tasto
     // destro apre il loro menu, Shift è la strada per quello di Filo.
-    if (e.shiftKey && !prima) { riservaSeLaPaginaTace(e, clic); return; }
+    if (e.shiftKey && !prima) {
+      // Chi scavalca il menu di Filo (#1468): solo il conto, mai il sito.
+      try { Promise.resolve(filoMessage({ type: 'contatori_evento', misura: 'menu-nativo', voce: 'shift_tasto_destro' })).catch(() => {}); } catch (_) {}
+      riservaSeLaPaginaTace(e, clic);
+      return;
+    }
     if (prima && !e.shiftKey) {
       MenuDelSito.lasciaAllaPagina(e, (copia) => apriMenuDiFilo(copia, clic));
       return;
@@ -192,6 +197,7 @@ if (!IS_SUBFRAME) {
 
 // In ogni frame, riquadri compresi: il tasto arriva solo al frame che ha il fuoco.
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] cmd-freccia', e); }
+try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] trascina-bordo', e); }
 
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
@@ -214,6 +220,34 @@ if (!IS_SUBFRAME) try {
     }
   }
 } catch (e) { /* la protezione non deve MAI bloccare il caricamento della pagina */ }
+
+// Il mondo della pagina come in Chrome (window.chrome pieno, passkey condizionale in sospeso, passkey del telefono dal
+// QR): regole in preload/mondo-chrome.js. In ogni frame http(s), finestrelle di accesso comprese, prima degli script del sito.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) webFrame.executeJavaScript(require('./mondo-chrome.js').buildSource(), false).catch(() => {});
+} catch (_) { /* mai bloccare il caricamento */ }
+
+// Il testo mandato su un collegamento sempre aperto e a cui il server ha risposto è arrivato al sito (#824.4): la sonda
+// sta in preload/collegamento-aperto.js, il nome del suo evento lo legge content.js. In ogni frame http(s).
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./collegamento-aperto.js').installa({ webFrame });
+} catch (_) { /* mai bloccare il caricamento */ }
+
+// #1974 — le pubblicità di YouTube tolte prima che partano, in ogni frame di YouTube (anche i video incorporati), prima
+// degli script del sito; la guardia rimanda al solo «Salta» quando le regole non reggono. Regole in preload/youtube-guardia.js.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./youtube-guardia.js').avvia({ ipcRenderer, webFrame, window, href: loc });
+} catch (_) { /* mai bloccare il caricamento */ }
+
+// Gli alberi chiusi dei componenti del sito, per l'avviso della traduzione (#472): regole in preload/ombre-chiuse.js.
+// In ogni frame http(s): un riquadro incorporato ha i suoi componenti, e lì si giudicano come nella pagina.
+try {
+  const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+  if (/^https?:/i.test(loc)) require('./ombre-chiuse.js').installa({ webFrame });
+} catch (_) { /* mai bloccare il caricamento */ }
 
 // #576 — i riquadri della pubblicità che il blocco di rete lascia vuoti o che il sito serve da sé: regole in preload/nascondi-pubblicita.js.
 // Ciò che il blocco ferma si chiude in ogni frame, riquadri compresi: lì può stare l'annuncio.
@@ -259,6 +293,15 @@ try {
     const { buildRiquadriVuotiSource } = require('./riquadri-vuoti.js');
     const corpi = [buildSchermoVecchioCorpo()];
     const ascolti = [[EVENTO_SCHERMO_VECCHIO, () => { try { ipcRenderer.sendSync('filo:schermo-vecchio'); } catch (_) {} }]];
+    // La diagnostica delle passkey (#1608, preload/diagnosi-passkey.js): spenta, qui non entra niente.
+    const passkey = require('./diagnosi-passkey.js');
+    const modoPasskey = passkey.modoDiagnosiPasskey(process.env[passkey.VARIABILE_PASSKEY]);
+    if (modoPasskey && /^(https?|blob):/i.test(loc)) {
+      corpi.push(passkey.buildPasskeyCorpo(modoPasskey));
+      ascolti.push([passkey.EVENTO_PASSKEY, (e) => {
+        try { if (typeof e.detail === 'string') ipcRenderer.send('filo:passkey-diagnosi', e.detail.slice(0, 32768)); } catch (_) {}
+      }]);
+    }
     // Anche un documento blob è la pagina del sito che l'ha creato (#591, giro 20).
     if (!IS_SUBFRAME && /^(https?|blob):/i.test(loc)) try {
       const { buildStatoPermessiCorpo, SCRITTURA, SCRITTURA_FINE, SCRITTURA_NIENTE, SI_DATO, PARTI_LETTE } = require('./stato-permessi.js');
@@ -377,7 +420,8 @@ if (IS_SUBFRAME) try {
     if (!runId) return;
     const visto = d.visible === true;
     verdettiRiquadro.delete(runId);
-    verdettiRiquadro.set(runId, visto);
+    // Nascosto ma da tradurre in sottofondo (D61): si sveglia, e lo dice nel conto come fuori conto.
+    verdettiRiquadro.set(runId, { visto, fuoriConto: visto && d.fuoriConto === true });
     if (verdettiRiquadro.size > 20) verdettiRiquadro.delete(verdettiRiquadro.keys().next().value);
     // Nascosto io, nascosti quelli dentro di me: nessuno qui dentro può farsi vedere.
     if (!visto) {
@@ -401,13 +445,15 @@ function conVerdetto(runId, fn) {
     fn(visto);
   };
   const guarda = () => { if (verdettiRiquadro.has(runId)) chiudi(verdettiRiquadro.get(runId)); };
-  const timer = setTimeout(() => chiudi(true), VERDETTO_ATTESA_MS);
+  const timer = setTimeout(() => chiudi({ visto: true, fuoriConto: false }), VERDETTO_ATTESA_MS);
   inAttesaDiVerdetto.add(guarda);
 }
 
 ipcRenderer.on('filo:broadcast', (_event, msg) => {
   if (IS_SUBFRAME && msg && msg.type === 'frame_translate' && msg.mode !== 'restore') {
-    conVerdetto(String(msg.runId || ''), (visto) => { if (visto) consegnaBroadcast(msg); });
+    conVerdetto(String(msg.runId || ''), (v) => {
+      if (v.visto) consegnaBroadcast(v.fuoriConto ? Object.assign({}, msg, { fuoriConto: true }) : msg);
+    });
     return;
   }
   consegnaBroadcast(msg);
@@ -554,6 +600,34 @@ try {
     window.addEventListener(ev, claim, { capture: true, passive: true });
   }
 } catch (_) { /* mai bloccare il caricamento della pagina */ }
+
+// Prima degli script della pagina: un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623). Il pannello
+// vive nel frame principale: da un riquadro, che Filo forse non l'ha ancora montato, le immagini lette passano dal main.
+try {
+  const leggi = (f) => new Promise((ok) => {
+    const r = new FileReader();
+    r.onload = () => ok(typeof r.result === 'string' ? r.result : '');
+    r.onerror = () => ok('');
+    r.readAsDataURL(f);
+  });
+  require('./rilascio-file.js')(window, IS_SUBFRAME ? {
+    pronta: () => true,
+    consegna: async (files) => {
+      const voci = [];
+      for (const f of files) {
+        if (!/^image\//i.test(f.type || '')) { voci.push({ nome: f.name || '', altro: true }); continue; }
+        const dataUrl = await leggi(f);
+        if (dataUrl) voci.push({ nome: f.name || '', dataUrl });
+      }
+      if (voci.length) { try { ipcRenderer.send('filo:rilascio-riquadro', voci); } catch (_) {} }
+    },
+  } : {
+    pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+    consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+    pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+    nelPannello: (e) => globalThis.SN_SIDEBAR?.rilascio?.(e),
+  });
+} catch (e) { console.error('[Filo CS] rilascio', e); }
 
 // Il gesto che vale per finestre e schermo pieno lo dice solo questo ascolto, in ogni frame, prima della pagina: è
 // l'unico a sapere se l'input è caduto sull'interfaccia di Filo (#737.1 giri 6 e 7). Solo l'input vero: la pagina non
@@ -753,7 +827,11 @@ try {
     return stratoMenu;
   };
   // Le voci del menu di Filo che aprono un indirizzo lo dichiarano qui prima di aprirlo.
-  globalThis.SN_APERTURA_SCELTA = (url) => { try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || '')); } catch (_) {} };
+  // `azione`: l'azione del menu che apre (#1461), misurata dal main fino alla pagina caricata.
+  globalThis.SN_APERTURA_SCELTA = (url, azione) => {
+    const a = azione && typeof azione === 'object' ? { id: String(azione.id || ''), t0: Number(azione.t0) } : null;
+    try { ipcRenderer.sendSync('filo:apertura-scelta', String(url || ''), a); } catch (_) {}
+  };
 } catch (_) {}
 
 // Electron fa di window.close() la chiusura dell'intera finestra di Filo, da ogni pagina e riquadro: qui la pagina chiede
@@ -853,6 +931,7 @@ function loadScripts() {
   // tab): in un riquadro descriverebbero il rettangolo sbagliato e lì non si caricano.
   const PAGE_ONLY = !IS_SUBFRAME;
   try { require(path.join(SHARED_DIR, 'constants.js')); } catch (e) { console.error('[Filo CS] constants', e); }
+  try { require(path.join(SHARED_DIR, 'immaginiChat.js')); } catch (e) { console.error('[Filo CS] immaginiChat', e); } // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   try { require(path.join(SHARED_DIR, 'contenutoEsterno.js')); } catch (e) { console.error('[Filo CS] contenutoEsterno', e); } // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js e spellcheck.js
   // Per primo fra i moduli che toccano il DOM: chi disegna un pezzo di UI di
   // Filo dentro la pagina lo marca alla nascita, e chi cammina sulla pagina
@@ -863,7 +942,10 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'messages.js')); } catch (e) { console.error('[Filo CS] messages', e); }
   try { require(path.join(SHARED_DIR, 'tasti.js')); } catch (e) { console.error('[Filo CS] tasti', e); } // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
+  try { require(path.join(SHARED_DIR, 'gestiContati.js')); } catch (e) { console.error('[Filo CS] gestiContati', e); } // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
+  try { require(path.join(SHARED_DIR, 'ricercaCampo.js')); } catch (e) { console.error('[Filo CS] ricercaCampo', e); } // #824 — "è una ricerca?": PRIMA di content.js
+  try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo CS] accessoFisso', e); } // #1808 — la password dell'accesso fisso: PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   try { require(path.join(SHARED_DIR, 'nomiSito.js')); } catch (e) { console.error('[Filo CS] nomiSito', e); } // #843 — il sito di «Spegni Filo su questo sito»
   try { require(path.join(SHARED_DIR, 'wallet.js')); } catch (e) { console.error('[Filo CS] wallet', e); } // #664 — «è un link d'invito?» per il tasto destro
@@ -881,15 +963,18 @@ function loadScripts() {
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo CS] extractContext', e); }
   try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo CS] gesto', e); } // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo CS] avvisiTempo', e); } // tempi della pila degli avvisi: PRIMA di popup.js
+  try { require(path.join(CONTENT_DIR, 'riquadriSopraLaScheda.js')); } catch (e) { console.error('[Filo CS] riquadriSopraLaScheda', e); } // #1509.1 — i riquadri nello strato sopra la scheda: PRIMA di popup.js
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo CS] popup', e); }
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo CS] vistoDavvero', e); } // #589.11 — un clic sul menu conta solo se la voce si vedeva: PRIMA di menu.js
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo CS] menu', e); }
   try { require(path.join(SHARED_DIR, 'menuDescritto.js')); } catch (e) { console.error('[Filo CS] menuDescritto', e); } // #1054 — il menu come dati per lo strato
   try { require(path.join(CONTENT_DIR, 'menuNelloStrato.js')); } catch (e) { console.error('[Filo CS] menuNelloStrato', e); } // #1054 — DOPO menu.js, PRIMA di chi lo usa
   try { require(path.join(CONTENT_DIR, 'highlight.js')); } catch (e) { console.error('[Filo CS] highlight', e); }
+  try { require(path.join(CONTENT_DIR, 'aiutoPagina.js')); } catch (e) { console.error('[Filo CS] aiutoPagina', e); } // #1509.3 — quello che l'Aiuto fa sulla pagina, anche dallo strato: DOPO highlight.js
   try { require(path.join(CONTENT_DIR, 'sidebar.js')); } catch (e) { console.error('[Filo CS] sidebar', e); }
   try { require(path.join(CONTENT_DIR, 'coerenza.js')); } catch (e) { console.error('[Filo CS] coerenza', e); } // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'correttoreRegole.js')); } catch (e) { console.error('[Filo CS] correttoreRegole', e); } // #1446 — PRIMA di spellcheck.js
+  try { require(path.join(CONTENT_DIR, 'correttoreAutomatica.js')); } catch (e) { console.error('[Filo CS] correttoreAutomatica', e); } // #1447 — DOPO correttoreRegole.js, PRIMA di spellcheck.js
   try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e); } // #1446 — PRIMA di spellcheck.js
   try { require(path.join(CONTENT_DIR, 'spellcheck.js')); } catch (e) { console.error('[Filo CS] spellcheck', e); }
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'safebrowse.js')); } catch (e) { console.error('[Filo CS] safebrowse', e); }
@@ -1006,9 +1091,26 @@ function startSafebrowse() {
   try { require(path.join(CONTENT_DIR, 'safebrowseLinks.js')); } catch (e) { console.error('[Filo CS] safebrowseLinks', e); } // #965
 }
 
+// Il colore del sito sulla scheda non aspetta la pagina letta per intero: uno script lento a metà pagina lo tratteneva
+// per secondi a pagina già a schermo (#1701.r1). Dopo startSafebrowse(), che carica i messaggi.
+function startColoreSito() {
+  try {
+    require(path.join(SHARED_DIR, 'tabColor.js'));
+    require(path.join(CONTENT_DIR, 'pageColor.js'));
+  } catch (e) { console.error('[Filo CS] colore del sito', e); return; }
+  let params = null;
+  const parti = () => { try { globalThis.SN_PAGE_COLOR.reportTabIdentityColor(() => params); } catch (_) {} };
+  try {
+    Promise.resolve(chrome.runtime.sendMessage({ type: globalThis.SN_MSG.MSG.GET_SETTINGS }))
+      .then((res) => { params = (res && res.settings && res.settings.tabColor) || null; }, () => {})
+      .then(parti);
+  } catch (_) { parti(); }
+}
+
 if (!IS_SUBFRAME) {
   contentScriptsStarted = true;
   startSafebrowse();
+  startColoreSito();
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', start, { once: true });
   } else {

@@ -17,10 +17,31 @@ function modifica(mossa) {
   const giro = coda.then(async () => {
     const esito = Carte().applica(await leggi(), mossa);
     if (esito.cambiato) await chrome.storage.local.set({ [chiave()]: esito.layout });
+    if (!esito.errore) contaMossa(mossa);
     return esito;
   });
   coda = giro.catch(() => {});
   return giro;
 }
 
-module.exports = { leggi, modifica };
+// Per i contatori (#1471): la mossa, e la carta che muove (del catalogo, o il tipo di una carta di sinistra).
+function contaMossa(mossa) {
+  const K = globalThis.SN_CONTATORI_MAIN;
+  const v = K && globalThis.SN_CONTATORI?.cartaDellaMossa(mossa);
+  if (!v) return;
+  try {
+    K.gesto('carta_home', v);
+    if (v.mossa === 'ripristina') K.gesto('ripristino', { cosa: 'carte_home' });
+  } catch (_) {}
+}
+
+// Il segno dell'accoglienza si legge dal disco anche per una finestra incognito, che non lo vede (#1661).
+async function primoIncontro(settings) {
+  try {
+    const K = globalThis.SN_CONST;
+    const onb = await require('../shim/storage').runNormale(() => globalThis.SN_FILO_MEMORY.getOnboarding());
+    return Carte().primoIncontro(onb, K.whyCannotServe(settings, [K.ACTIONS.FILO_DASHBOARD, K.ACTIONS.FILO_CHAT]));
+  } catch (_) { return false; }
+}
+
+module.exports = { leggi, modifica, primoIncontro };

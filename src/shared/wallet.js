@@ -38,23 +38,80 @@
     return Math.ceil(usd * creditsPerUsd(params) * 10 - 1e-6) / 10;
   }
 
+  // I tetti di lunghezza della stessa regola: un nome di modello più lungo farebbe rifiutare la
+  // riga intera, accorciato arriva. Sentinella in tests/unit/wallet.test.mjs.
+  const USAGE_LIMITS = Object.freeze({ at: 40, action: 80, model: 200, servedBy: 100 });
+
   // Scarta tutto ciò che non è nel contratto. `at` è ISO UTC: il server confronta per
   // intervallo di tempo.
   function usageRow({ pseudonym, at, action, model, servedBy, usage, costUsd, credits } = {}) {
     if (!pseudonym) return null;
     const u = usage || {};
     const usd = Number(costUsd != null ? costUsd : u.costUsd);
+    const L = USAGE_LIMITS;
     return {
       pseudonym: String(pseudonym),
-      at: at || new Date().toISOString(),
-      action: String(action || ''),
-      model: String(model || ''),
-      servedBy: String(servedBy || ''),
+      at: String(at || new Date().toISOString()).slice(0, L.at),
+      action: String(action || '').slice(0, L.action),
+      model: String(model || '').slice(0, L.model),
+      servedBy: String(servedBy || '').slice(0, L.servedBy),
       promptTokens: Math.max(0, Math.floor(Number(u.promptTokens) || 0)),
       completionTokens: Math.max(0, Math.floor(Number(u.completionTokens) || 0)),
       costUsd: Number.isFinite(usd) && usd > 0 ? usd : 0,
       credits: Math.max(0, Number(credits) || 0),
     };
+  }
+
+  // La regola o il contenuto rifiutano la riga, e ritentarla non la fa mai passare (#1601). Una chiave API
+  // ruotata o bloccata risponde con gli stessi codici ma vale per tutte le righe: è un guasto, si ritenta.
+  function rifiutoDellaRigaUso(status, testo) {
+    const t = String(testo || '');
+    return (status === 403 && /insufficient permissions/i.test(t)) || (status === 400 && !/api.?key/i.test(t));
+  }
+
+  // Il commit di Firestore è atomico: una riga che la regola rifiuta respinge tutto il lotto (#1601).
+  // Al rifiuto il lotto si divide a metà finché la riga cattiva resta sola, e le buone passano.
+  // `commit(righe)` dà { ok: true } o { ok: false, motivo } per un rifiuto, e lancia per un guasto
+  // passeggero: allora ci si ferma, e ciò che non è stato né scritto né rifiutato sta in `rimaste`.
+  async function scriviIsolando(righe, commit) {
+    const esito = { scritte: [], rifiutate: [], rimaste: [], errore: null };
+    const daFare = righe && righe.length ? [righe.slice()] : [];
+    while (daFare.length) {
+      const lotto = daFare.shift();
+      let r;
+      try { r = await commit(lotto); } catch (e) {
+        esito.errore = e;
+        esito.rimaste = [lotto, ...daFare].flat();
+        return esito;
+      }
+      if (r && r.ok) esito.scritte.push(...lotto);
+      else if (lotto.length === 1) esito.rifiutate.push({ riga: lotto[0], motivo: String((r && r.motivo) || '') });
+      else {
+        const meta = Math.ceil(lotto.length / 2);
+        daFare.unshift(lotto.slice(0, meta), lotto.slice(meta));
+      }
+    }
+    return esito;
+  }
+
+  // Le righe del registro uscite dalla coda senza arrivare al server, dette alla pagina Crediti.
+  // `perMotivo`: { rifiutata, altra_identita, ricomincia, coda_piena } → quante. '' se nessuna.
+  const SCARTATE_MOTIVI = Object.freeze({
+    rifiutata: ['rifiutato dal server', 'rifiutati dal server'],
+    altra_identita: ['di un portafoglio di prima', 'di un portafoglio di prima'],
+    ricomincia: ['tolto ricominciando con un nuovo invito', 'tolti ricominciando con un nuovo invito'],
+    coda_piena: ['perso perché ce n\'erano troppi in attesa', 'persi perché ce n\'erano troppi in attesa'],
+  });
+  function registroScartateTesto(perMotivo) {
+    const voci = Object.keys(SCARTATE_MOTIVI)
+      .map((m) => [m, Math.max(0, Math.floor(Number(perMotivo && perMotivo[m]) || 0))])
+      .filter(([, n]) => n > 0);
+    const tot = voci.reduce((s, [, n]) => s + n, 0);
+    if (!tot) return '';
+    const testa = tot === 1 ? 'Un consumo non è stato registrato' : `${tot} consumi non sono stati registrati`;
+    const frase = (m, n) => SCARTATE_MOTIVI[m][n === 1 ? 0 : 1];
+    if (voci.length === 1) return `${testa}: ${frase(voci[0][0], tot)}.`;
+    return `${testa}: ${voci.map(([m, n]) => `${n} ${frase(m, n)}`).join(', ')}.`;
   }
 
   // Il messaggio per l'utente quando la chiamata è stata rifiutata per crediti.
@@ -208,6 +265,8 @@
     missing_exchange_rate: 'Il server non è ancora pronto (manca il cambio del giorno): riprova fra qualche minuto.',
     not_configured: 'Il server non è ancora configurato per i crediti.',
     provider_error: 'Il servizio dei modelli non ha risposto: riprova fra poco.',
+    // Le chiavi spente si rileggono per un mese (#1520): oltre trenta in quel mese il server dice di no.
+    too_many_reissues: 'Hai chiesto troppe chiavi nuove nell’ultimo mese: riprova fra qualche giorno.',
     internal: 'Qualcosa è andato storto sul server: riprova.',
     not_reachable: 'Non riesco a raggiungere il server: controlla la connessione.',
     // Dà inviti solo chi ha collegato Google (#1120): il codice resta suo, e torna buono quando si collega.
@@ -569,6 +628,47 @@
     return { rileggi };
   }
 
+  // Le pagine che si rileggono dal server quando i crediti si muovono (#2059): fuori vista (`inVista()` falso) un
+  // avviso segna solo la vista vecchia, e `mostrata()` la rilegge subito. In vista una lettura alla volta, e fra due
+  // partite per un avviso almeno `ogniMs`: gli avvisi arrivati in mezzo fanno UNA lettura dopo, che vede l'ultimo stato.
+  const VISTA_OWNER_OGNI_MS = 60 * 1000;
+  function rilettoreVista({ leggi, inVista = () => true, ogniMs = 0, now = () => Date.now(), timer = null } = {}) {
+    const T = timer || { set: (fn, ms) => setTimeout(fn, ms), clear: (t) => clearTimeout(t) };
+    let passo = Math.max(0, Number(ogniMs) || 0);
+    let vecchia = false;
+    let inVolo = false;
+    let partita = -Infinity;
+    let attesa = null;
+    function ferma() { if (attesa) { T.clear(attesa); attesa = null; } }
+    function prova(subito) {
+      if (!vecchia || inVolo || !inVista()) return;
+      const resta = subito ? 0 : partita + passo - now();
+      if (resta > 0) {
+        if (!attesa) attesa = T.set(() => { attesa = null; prova(false); }, resta);
+        return;
+      }
+      ferma();
+      vecchia = false;
+      inVolo = true;
+      partita = now();
+      let p;
+      try { p = Promise.resolve(leggi()); } catch (e) { p = Promise.reject(e); }
+      p.catch(() => {}).then(() => { inVolo = false; prova(false); });
+    }
+    return {
+      cambiato() { vecchia = true; prova(false); },
+      mostrata() { prova(true); },
+      // Per gli spec, che non aspettano un minuto.
+      tempi({ ogniMs: ms } = {}) {
+        if (!Number.isFinite(Number(ms)) || Number(ms) < 0) return;
+        passo = Number(ms);
+        ferma();
+        prova(false);
+      },
+      vecchia: () => vecchia,
+    };
+  }
+
   // Il conteggio locale sta a schermo come saldo solo senza portafoglio e con una chiave che parte davvero, la
   // propria o quella di fabbrica (#1138). Chi lo vedeva, al riscatto sente dire dove va (#1353).
   function conteggioLocaleInVista({ hasWallet = false, keySource = '', identityLost = false } = {}) {
@@ -745,6 +845,65 @@
     return { dire: (conto.allarmi || []).filter((a) => !prima.includes(a.kind)), detti: accesi };
   }
 
+  // ── La riconciliazione segnata (#1520) ─────────────────────────────────────
+  // Il server scrive in `reconcile` i motivi (`reasons`) e gli usi fuori politica (`offPolicy`: [{ model, provider,
+  // usd, requests, violation }], `violation` di SN_POLITICA_MODELLI.creditsUsageViolation); la scheda della persona
+  // porta `router` ({ rows } della stessa forma, o { error }). Un segno senza `reasons` viene da prima: scarto positivo.
+  const MOTIVI_SCARTO = Object.freeze({
+    unrecorded: 'non registrato', excess_rows: 'righe in eccesso', off_policy: 'fuori politica',
+  });
+  const FRASI_SCARTO = Object.freeze({
+    unrecorded: 'qualcuno consuma senza scrivere il registro d\'uso',
+    excess_rows: 'il registro d\'uso conta più di quanto il router ha fatto pagare',
+    off_policy: 'la chiave dei crediti ha pagato modelli o fornitori fuori dalla politica sui modelli',
+  });
+  const VIOLAZIONI_USO = Object.freeze({
+    model: 'modello fuori politica', excluded: 'fornitore escluso', 'not-producer': 'non servito dal produttore',
+  });
+  const testoCorto = (v, max) => (typeof v === 'string' ? v.trim().slice(0, max) : '');
+  const perSpesa = (a, b) => (b.usd || 0) - (a.usd || 0);
+
+  function usoDelRouter(u) {
+    if (!u || typeof u !== 'object') return null;
+    const model = testoCorto(u.model, 200);
+    if (!model) return null;
+    const violation = typeof u.violation === 'string' && Object.prototype.hasOwnProperty.call(VIOLAZIONI_USO, u.violation) ? u.violation : '';
+    return {
+      model, provider: testoCorto(u.provider, 200), usd: numeroO(u.usd), requests: numeroO(u.requests),
+      violation, fuori: violation ? VIOLAZIONI_USO[violation] : '',
+    };
+  }
+
+  function usiFuoriPolitica(rec) {
+    const lista = rec && typeof rec === 'object' && Array.isArray(rec.offPolicy) ? rec.offPolicy : [];
+    return lista.map(usoDelRouter).filter((u) => u && u.violation).sort(perSpesa);
+  }
+
+  // I motivi di un portafoglio segnato, coi dollari che li misurano (null se non si sanno); [] se non è segnato.
+  function motiviScarto(rec) {
+    if (!rec || typeof rec !== 'object' || !rec.flagged) return [];
+    const drift = numeroO(rec.driftUsd);
+    const chiavi = Array.isArray(rec.reasons) ? [...new Set(rec.reasons.filter((k) => typeof k === 'string' && k))] : [];
+    if (!chiavi.length) chiavi.push(drift != null && drift < 0 ? 'excess_rows' : 'unrecorded');
+    const fuori = usiFuoriPolitica(rec);
+    return chiavi.map((chiave) => {
+      if (chiave === 'off_policy') {
+        return { chiave, testo: MOTIVI_SCARTO.off_policy, usd: fuori.some((u) => u.usd != null) ? fuori.reduce((a, u) => a + (u.usd || 0), 0) : null };
+      }
+      if (chiave === 'unrecorded' || chiave === 'excess_rows') return { chiave, testo: MOTIVI_SCARTO[chiave], usd: drift == null ? null : Math.abs(drift) };
+      return { chiave, testo: 'segnato', usd: null };
+    });
+  }
+
+  // Il consumo della chiave secondo il router, per modello e fornitore, dalla spesa più alta. `letto` è falso se il
+  // server non l'ha letto (campo assente) o non ci è riuscito (`errore`): un consumo non letto non è un consumo zero.
+  function consumoRouter(router) {
+    if (!router || typeof router !== 'object') return { letto: false, errore: '', righe: [] };
+    if (router.error) return { letto: false, errore: testoCorto(String(router.error), 300) || 'errore', righe: [] };
+    const righe = (Array.isArray(router.rows) ? router.rows : []).map(usoDelRouter).filter(Boolean).sort(perSpesa);
+    return { letto: true, errore: '', righe };
+  }
+
   // ── Gli avvisi all'owner fra le notifiche della home (#855) ─────────────────
   // Un caso per ogni cosa che ferma gli utenti, un marcatore per ogni soglia superata. Un caso che la vista non dice
   // (campo assente) non è rientrato: non compare nell'elenco, e la sua carta resta com'era.
@@ -816,14 +975,28 @@
     const rs = o.reconcile && typeof o.reconcile === 'object' && o.reconcile.summary && typeof o.reconcile.summary === 'object' ? o.reconcile.summary : null;
     const riassunto = rs ? numeroO(rs.flagged) : null;
     if (utenti || riassunto != null) {
-      const segnati = [...new Set((utenti || [])
-        .filter((u) => u && u.reconcile && u.reconcile.flagged && typeof u.pseudonym === 'string' && u.pseudonym)
-        .map((u) => u.pseudonym))].sort();
+      // Un motivo nuovo su un portafoglio già segnato (#1520) è un marcatore nuovo: un uso fuori politica si dice anche lì.
+      const motivi = new Map();
+      for (const u of utenti || []) {
+        if (!u || typeof u.pseudonym !== 'string' || !u.pseudonym) continue;
+        const chiavi = motiviScarto(u.reconcile).map((m) => m.chiave);
+        if (chiavi.length) motivi.set(u.pseudonym, [...new Set([...(motivi.get(u.pseudonym) || []), ...chiavi])]);
+      }
+      const segnati = [...motivi.keys()].sort();
       const n = segnati.length || Math.max(0, Math.floor(riassunto || 0));
+      const cause = [...new Set(segnati.flatMap((p) => motivi.get(p)))].filter((k) => FRASI_SCARTO[k]);
+      const soloScarto = cause.length === 1 && cause[0] === 'unrecorded';
+      const quanti = n === 1 ? '1 portafoglio' : `${n} portafogli`;
+      const chi = segnati.length ? ` (${elencoBreve(segnati)})` : '';
+      const frase = cause.map((k) => FRASI_SCARTO[k]).join('; ');
       casi.push({
         caso: 'scarto', numero: n,
-        marcatori: segnati.length ? segnati.map((p) => `scarto:${p}`) : (n > 0 ? ['scarto:?'] : []),
-        testo: `La riconciliazione ha trovato uno scarto su ${n === 1 ? '1 portafoglio' : `${n} portafogli`}${segnati.length ? ` (${elencoBreve(segnati)})` : ''}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`,
+        marcatori: segnati.length
+          ? segnati.flatMap((p) => motivi.get(p).map((k) => (k === 'unrecorded' ? `scarto:${p}` : `scarto:${p}:${k}`)))
+          : (n > 0 ? ['scarto:?'] : []),
+        testo: soloScarto
+          ? `La riconciliazione ha trovato uno scarto su ${quanti}${chi}. Qualcuno consuma senza scrivere il registro d'uso, e trovi le righe segnate ${DOVE}.`
+          : `La riconciliazione ha segnato ${quanti}${chi}${frase ? `: ${frase}` : ''}. Trovi le righe segnate ${DOVE}.`,
       });
     }
     return casi;
@@ -875,7 +1048,7 @@
   }
 
   global.SN_WALLET = {
-    USAGE_FIELDS, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
+    USAGE_FIELDS, USAGE_LIMITS, rifiutoDellaRigaUso, scriviIsolando, registroScartateTesto, isOutOfCredits, creditsPerUsd, creditsForUsd, usageRow, outOfCreditsMessage, redeemMessage, redeemOkMessage, networkCapMessage, extractCode, REDEEM_MESSAGES,
     isKeyRefusalStatus, isKeyRefusal, isModerationBlock, keyRefusalOf, keyRefusalReason, ownKeyFallbackLine, ownKeyRefusalNote, keyTail, ownKeyBalanceLine,
     // Inviti e link d'invito (#651)
     CODE_ALPHABET, CODE_LEN, INVITE_LINK_BASE,
@@ -888,9 +1061,13 @@
     formatCredits, PREMIO_ATTESA_MS, resolutionReward, premioInvio, premioInvioEsauritoTesto,
     // Il saldo della chat senza attese, e il conteggio locale che il riscatto sostituisce (#1353)
     SALDO_CHAT_VALIDO_MS, saldoPerChat, rilettoreSaldo, conteggioLocaleInVista,
+    // Le pagine che si rileggono dal server ai movimenti di crediti, solo in vista (#2059)
+    VISTA_OWNER_OGNI_MS, rilettoreVista,
     // Chi usa Filo e se il conto OpenRouter regge (#820)
     creditiDaUsd, usdDaCrediti, euroDaCrediti, euroDaUsd, usoPersone, contoOwner, allarmiDaDire,
     // Gli avvisi all'owner nella home (#855)
     AVVISO_OWNER, PAGINA_OWNER, SOGLIE_TETTO, INVITI_POCHI, avvisiOwner, avvisiOwnerPiano, applicaAvvisiOwner,
+    // La riconciliazione col consumo che il router dichiara per chiave (#1520)
+    MOTIVI_SCARTO, VIOLAZIONI_USO, motiviScarto, usiFuoriPolitica, consumoRouter,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

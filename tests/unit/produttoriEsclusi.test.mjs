@@ -50,7 +50,7 @@ test('ogni modello di serie ha il produttore fra i fornitori esclusi (Anthropic 
     assert.ok(C.modelProducer(id), `${dove}: «${id}» non dice chi l'ha prodotto (manca il prefisso «autore/»)`);
     const nome = C.unexcludedProducer(id, LISTA);
     assert.equal(nome, '', `${dove}: «${id}» è di ${nome}, che non è fra i fornitori esclusi: `
-      + 'aggiungilo a DEFAULT_EXCLUDED_PROVIDERS (e alla copia del server), o al nome in MODEL_AUTHOR_PROVIDERS se lo è già con un altro nome');
+      + 'aggiungilo a DEFAULT_EXCLUDED_PROVIDERS in shared/politicaModelli.js (il server la incorpora al deploy), o al nome in MODEL_AUTHOR_PROVIDERS se lo è già con un altro nome');
   }
 });
 

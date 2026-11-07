@@ -50,6 +50,11 @@
   }
 
   let flashTimer = null;
+  // Un errore letto qui si conta come nella barra delle schede, per chiave dell'elenco chiuso (#1461): mai il testo.
+  function flashErrore(text, chiave) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave })).catch(() => {}); } catch (_) {}
+    flash(text);
+  }
   function flash(text) {
     let el = $('dl-flash');
     if (!el) {
@@ -90,7 +95,7 @@
       if (ok) await openFile(r, true);
       return;
     }
-    flash(res.error || 'Impossibile aprire il file');
+    flashErrore(res.error || 'Impossibile aprire il file', 'file_non_aperto');
     if (res.missing) reload();
   }
 
@@ -108,9 +113,9 @@
   async function openFolder(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_OPEN_FOLDER, id: r.id });
     if (!res) return;
-    if (res.ok === false) { flash(res.error || 'Cartella non disponibile'); if (res.missing) reload(); return; }
+    if (res.ok === false) { flashErrore(res.error || 'Cartella non disponibile', 'cartella_non_aperta'); if (res.missing) reload(); return; }
     // Cartella aperta ma senza il file dentro: dillo, invece di lasciarlo cercare.
-    if (res.missing) { flash('Il file non c’è più: ho aperto la cartella dov’era'); reload(); }
+    if (res.missing) { flashErrore('Il file non c’è più: ho aperto la cartella dov’era', 'file_non_aperto'); reload(); }
   }
   async function copyPath(r) {
     const p = r.savePath || '';
@@ -131,11 +136,20 @@
   }
   async function redownload(r) {
     if (!isHttp(r.url)) { flash('Sorgente non disponibile per il ri-scaricamento'); return; }
+    // L'indirizzo di un video in streaming è la sua pagina: lo rifà chi l'aveva salvato, non un download del link.
+    if (r.via === 'streaming') { await riprova(r); return; }
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_LINK, url: r.url });
     if (res && res.ok === false) flash('Ri-scaricamento non avviato');
     else flash('Ri-scaricamento avviato');
     // Il nuovo download comparirà via broadcast; ricarichiamo comunque subito.
     setTimeout(reload, 150);
+  }
+  // #1287 — uno scaricamento fallito riparte nella stessa riga, dallo stesso indirizzo.
+  async function riprova(r) {
+    const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_RIPROVA, id: r.id });
+    if (res && res.items) items = res.items;
+    render();
+    if (res && res.ok === false) flashErrore(res.error || 'Non sono riuscito a far ripartire lo scaricamento', 'download_failed');
   }
   async function removeItem(r) {
     const res = await chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_REMOVE, id: r.id });
@@ -218,7 +232,7 @@
       acts.push(['Apri cartella', () => openFolder(r)]);
     }
     if (r.savePath) acts.push(['Copia percorso', () => copyPath(r)]);
-    if (isHttp(r.url)) acts.push(['Ri-scarica', () => redownload(r)]);
+    if (isHttp(r.url)) acts.push(r.state === 'interrupted' ? ['Riprova', () => riprova(r)] : ['Ri-scarica', () => redownload(r)]);
     acts.push(['Rimuovi dalla lista', () => removeItem(r)]);
     return acts;
   }
@@ -288,9 +302,14 @@
     meta.className = 'dl-meta';
     const p = pct(r);
     if (isActive(r)) {
-      meta.textContent = p != null
-        ? `${stateLabel(r)} · ${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
-        : `${stateLabel(r)} · ${fmtBytes(r.receivedBytes)} scaricati`;
+      // #1488 — un video in streaming dice cosa sta facendo quando non sono byte del file («Unisco video e audio»).
+      const stato = r.nota || stateLabel(r);
+      const base = p != null
+        ? `${stato} · ${p}% · ${fmtBytes(r.receivedBytes)} / ${fmtBytes(r.totalBytes)}`
+        : (r.receivedBytes ? `${stato} · ${fmtBytes(r.receivedBytes)} scaricati` : stato);
+      let corsa = '';
+      try { corsa = window.SN_SCARICAMENTI_AVANZAMENTO.velocitaEResto(r); } catch (_) {}
+      meta.textContent = corsa ? `${base} · ${corsa}` : base;
     } else if (r.state === 'pending') {
       // Da quale sito arriva è la cosa su cui si decide: sta nella riga, non
       // solo nell'avviso che l'utente può aver già chiuso.
@@ -300,7 +319,13 @@
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
       const label = r.missing ? 'Non più sul disco' : stateLabel(r);
-      meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
+      // Il perché di un salvataggio non riuscito resta sulla riga, per chi non ha visto l'avviso.
+      if (r.state === 'interrupted' && r.nota) {
+        meta.textContent = `${label} · ${r.nota} · ${formatDate(r.startedAt)}`;
+        meta.classList.add('dl-perche');
+      } else {
+        meta.textContent = `${label} · ${size} · ${formatDate(r.startedAt)}`;
+      }
     }
     row.appendChild(meta);
 
@@ -347,11 +372,25 @@
     } else if (r.missing) {
       // Senza il file la cosa utile è riaverlo; la cartella resta a portata dal tasto destro.
       if (isHttp(r.url)) addBtn('Ri-scarica', () => redownload(r));
+    } else if (r.state === 'interrupted' && isHttp(r.url)) {
+      addBtn('Riprova', () => riprova(r));
     } else if (isHttp(r.url)) {
       addBtn('Ri-scarica', () => redownload(r));
     }
     addBtn('Rimuovi', () => removeItem(r));
     row.appendChild(actions);
+
+    // #588.8 — il file si trascina dalla sua riga dove serve: un campo per caricare file, la chat, il desktop.
+    if (r.state === 'completed' && !r.missing) {
+      row.draggable = true;
+      row.dataset.trascina = '1';
+      row.addEventListener('dragstart', (e) => {
+        e.preventDefault();
+        chrome.runtime.sendMessage({ type: MSG.DOWNLOAD_TRASCINA, id: r.id }).then((res) => {
+          if (res && res.ok === false) { flashErrore(res.error || 'Non sono riuscito a prendere il file', 'file_non_aperto'); if (res.missing) reload(); }
+        }).catch(() => {});
+      });
+    }
 
     // Clic sinistro = azione primaria: apre solo se completato e il file c'è ancora.
     if (r.state === 'completed' && !r.missing) {

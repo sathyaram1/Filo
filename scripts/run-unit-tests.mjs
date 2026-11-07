@@ -619,6 +619,16 @@ async function main() {
     }
   }
 
+  // Una libreria nuova del lock arriva prima delle prove che la usano (#1572); le prove del lanciatore stesso no.
+  if (!process.env.FILO_UNIT_DIR) {
+    try {
+      const { allineaPerLeProve } = await import('./lib/pacchetti.mjs');
+      allineaPerLeProve(REPO_ROOT, { prefisso: '[test:unit]' });
+    } catch (e) {
+      console.log(`[test:unit] controllo dei pacchetti saltato: ${e && e.message ? e.message : e}`);
+    }
+  }
+
   const temp = await temporaneaDellaCorsa();
 
   // Dentro la temporanea della corsa: interrotta, il suo nome è l'unico che la pulizia del giorno dopo riconosce.

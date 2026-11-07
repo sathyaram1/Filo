@@ -109,6 +109,34 @@ test('fermo sul bordo sinistro la barra si apre anche dove il sistema ridimensio
   }
 });
 
+// #1292 — a finestra staccata dal bordo dello schermo la fascia è la presa per ridimensionarla: chi si ferma lì per
+// prenderla non apre la barra. Contro il bordo dello schermo il puntatore si spinge, e vale l'attesa scelta.
+test('a finestra staccata dal bordo dello schermo la spinta aspetta di più; contro il bordo dello schermo no', async () => {
+  test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
+  test.setTimeout(90_000);
+  let f = await avvia();
+  try {
+    const { app, x0, y, px } = f;
+    await barraPage(app);
+    // Mezzo secondo fermo sulla fascia (l'attesa scelta è 250 ms): è ancora chiusa.
+    puntatore(`move:${x0 + px(400)}:${y};wait:150;move:${x0 + 1}:${y};wait:40;move:${x0 + 1}:${y + 2};wait:500`);
+    expect(await aperta(app)).toBe(false);
+    // Chi resta lì la vuole: si apre.
+    await expect.poll(() => aperta(app), { timeout: 2000 }).toBe(true);
+  } finally {
+    await f.chiudi();
+  }
+  f = await avvia({ xFinestra: 0 });
+  try {
+    const { app, x0, y, px } = f;
+    await barraPage(app);
+    puntatore(`move:${x0 + px(400)}:${y};wait:150;move:${x0}:${y};wait:40;move:${x0}:${y + 2};wait:500`);
+    expect(await aperta(app)).toBe(true);
+  } finally {
+    await f.chiudi();
+  }
+});
+
 test('con l\'apertura dal bordo spenta, fermo sul bordo non si apre; la maniglia sì', async () => {
   test.skip(!xtestDisponibile(), 'serve uno schermo X con XTest (contenitore Linux sotto xvfb-run)');
   test.setTimeout(90_000);

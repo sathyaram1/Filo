@@ -19,6 +19,7 @@
     open: Menu.open,
     close: Menu.close,
     openIconGridSubmenu: Menu.openIconGridSubmenu,
+    openLinkSubmenu: Menu.openLinkSubmenu,
     refreshIconRow: Menu.refreshIconRow,
     refreshIconGrid: Menu.refreshIconGrid,
     isSubMenuOpen: Menu.isSubMenuOpen,
@@ -35,7 +36,8 @@
     return inerte;
   }
 
-  // Un bottone dello strato passato a una voce (l'ancora della griglia «Altro…»): qui è solo il suo segno.
+  // Un bottone dello strato passato a una voce (l'ancora della griglia «Altro…» o del campo del collegamento, #1434): qui
+  // è solo il suo segno.
   class Ancora {
     constructor(segno) { this.segno = String(segno); }
   }
@@ -119,6 +121,7 @@
     if (corrente) chiudi();
     const m = { id: nuovoId(), funzioni: [], pulizie: [], inline: new Map(), montaggi: [], sezioni: 0 };
     corrente = m;
+    if (opzioni && typeof opzioni.alChiudere === 'function') m.pulizie.push(opzioni.alChiudere);
     // La pagina che scorre chiude il menu normale, come nel documento: lo strato non scorre con lei e resterebbe sopra un
     // punto che non è più quello cliccato.
     if (!(opzioni && opzioni.keepOnScroll)) {
@@ -238,8 +241,9 @@
     if (msg.type === MSG.STRATO_MENU_CHIUSO && corrente && msg.id === corrente.id) pulisci(corrente);
   });
 
-  Menu.open = (o) => (acceso() ? apri(o) : locale.open(o));
+  Menu.open = (o) => { if (o) Menu.misuraLeAzioni(o.items); return acceso() ? apri(o) : locale.open(o); };
   Menu.close = () => (acceso() ? chiudi() : locale.close());
+  // La fila in cima e i suoi pannelli (#1434): le voci restano qui, lo strato li disegna.
   Menu.openIconGridSubmenu = (ancora, items, opts) => {
     if (!acceso()) return locale.openIconGridSubmenu(ancora, items, opts);
     const m = corrente;
@@ -247,9 +251,15 @@
     const op = opDi(m);
     aggiorna(m, 'griglia-apri', { ancora: ancora.segno, items: D.descrivi(items || [], op), opts: D.descrivi(opts || {}, op) });
   };
-  Menu.refreshIconRow = (items) => {
-    if (!acceso()) return locale.refreshIconRow(items);
-    if (corrente) aggiorna(corrente, 'riga', { items: D.descrivi(items || [], opDi(corrente)) });
+  Menu.openLinkSubmenu = (ancora, opts) => {
+    if (!acceso()) return locale.openLinkSubmenu(ancora, opts);
+    const m = corrente;
+    if (!m || !(ancora instanceof Ancora)) return;
+    aggiorna(m, 'collegamento-apri', { ancora: ancora.segno, opts: D.descrivi(opts || {}, opDi(m)) });
+  };
+  Menu.refreshIconRow = (items, o) => {
+    if (!acceso()) return locale.refreshIconRow(items, o);
+    if (corrente) aggiorna(corrente, 'riga', { items: D.descrivi(items || [], opDi(corrente)), vuota: !!(o && o.vuota) });
   };
   Menu.refreshIconGrid = (items) => {
     if (!acceso()) return locale.refreshIconGrid(items);
@@ -266,10 +276,17 @@
     }
     locale.testoNascosto(labelEl, btnEl, s);
   };
-  // Un'icona portata dalla barra laterale sopra il menu aperto (#871): il gesto è della barra, lo strato la posa.
+  // Un'icona portata dalla barra laterale sopra il menu aperto (#871, #1434): il gesto è della barra, lo strato la posa.
   Menu.trascinaDaFuori = (d) => {
     if (!acceso()) return locale.trascinaDaFuori(d);
-    if (!corrente || !d) return false;
+    if (!d) return false;
+    // Nessun menu aperto: l'icona lasciata qui dalla barra non va da nessuna parte (#1471), come nella pagina.
+    if (!corrente) {
+      if (d.fase === 'rilascia') {
+        try { global.SN_POPUP?.conta?.({ misura: 'gesto', gesto: 'trascinamento', da: 'icona_barra', a: 'nessuna', esito: 'annullato' }); } catch (_) {}
+      }
+      return false;
+    }
     aggiorna(corrente, 'fuori', {
       fase: String(d.fase || ''), icona: String(d.id || ''), x: Number(d.x) || 0, y: Number(d.y) || 0,
       svg: typeof d.icon === 'string' ? d.icon : '',

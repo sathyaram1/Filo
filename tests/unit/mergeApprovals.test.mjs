@@ -177,12 +177,6 @@ describe('i motivi del blocco', () => {
     assert.match(UI.blockLabel({}), /Controllo di sicurezza/);
   });
 
-  test('i file toccati si vedono, e il troncamento si dichiara', () => {
-    assert.deepEqual(UI.blockItems({ items: ['a.js', 'b.js'] }), ['a.js', 'b.js']);
-    assert.deepEqual(UI.blockItems({ items: ['a.js'], more: 4 }), ['a.js', '… e altri 4']);
-    assert.deepEqual(UI.blockItems({}), []);
-  });
-
   // #1404: ogni riga dice dove sta, e i blocchi si leggono divisi per tipo.
   test('dove sta una voce: file e riga, o il solo file', () => {
     assert.equal(UI.doveVoce({ file: 'src/a.js', riga: 12 }), 'src/a.js:12');
@@ -222,6 +216,19 @@ describe('l’esito di un’approvazione', () => {
     assert.equal(m.kind, 'ok');
     assert.match(m.text, /su main/);
     assert.match(m.text, /abcdef12/);
+  });
+
+  test('sì a un ramo del server: approvata, la fusione la porta il server (#1497)', () => {
+    const m = UI.outcomeMessage({ ok: true, result: 'server', esito: 'server:attesa_suite' });
+    assert.equal(m.kind, 'ok');
+    assert.match(m.text, /^Approvata/);
+    assert.doesNotMatch(m.text, /nessuna fusione|inatteso/i);
+    // Il blocco l'ha messo la fusione dal PC: lì torna il lavoro.
+    const pc = UI.outcomeMessage({ ok: true, result: 'server', esito: 'al_pc' });
+    assert.equal(pc.kind, 'ok');
+    assert.match(pc.text, /^Approvata: .*tuo PC/);
+    assert.equal(UI.branchLabel({ branch: 'worker/x', repo: 'server' }), 'server · worker/x');
+    assert.equal(UI.branchLabel({ branch: 'worker/x' }), 'worker/x');
   });
 
   test('conflitto e ramo cambiato portano a due gesti diversi', () => {
@@ -336,7 +343,10 @@ describe('la provenienza della richiesta', () => {
 test('di un’automazione si dice il ruolo che lavorava, non "un accesso senza email"', () => {
   // Un'automazione un'email non ce l'ha: la frase pensata per una sessione
   // umana senza indirizzo, qui, è vera e inutile.
-  assert.equal(UI.requestedBy('secaudit · notturna', { origin: 'routine' }), 'chiesta da secaudit · notturna');
+  // Il ruolo detto come nel Log di Gestione (#555), non l'id grezzo.
+  assert.equal(UI.requestedBy('secaudit · notturna', { origin: 'routine' }), 'chiesta da Audit sicurezza · notturna');
+  assert.equal(UI.requestedBy('new-work', { origin: 'routine' }), 'chiesta da Nuovo lavoro');
+  assert.equal(UI.requestedBy('ruolo-nuovo · x', { origin: 'routine' }), 'chiesta da ruolo-nuovo · x');
   assert.match(UI.requestedBy('K3nD9xQw1aZ7mB2pL0rT', { origin: 'locale' }), /senza email/);
   assert.equal(UI.requestedBy('sathya@esempio.it', { origin: 'routine' }), 'chiesta da sathya@esempio.it');
 });
@@ -382,9 +392,12 @@ describe('il riallineamento fatto dal server', () => {
   });
 
   test('conflict + realignReason: aggiunge che il server ci ha provato, col motivo in italiano', () => {
-    const m = UI.outcomeMessage({ ok: true, result: 'conflict', realignReason: 'riallineamento automatico non riuscito: realign_branch_moved (genitori: abc)' }, { origin: 'routine' });
+    const req = { origin: 'routine', feedbackId: 'fb1' };
+    const m = UI.outcomeMessage({ ok: true, result: 'conflict', realignReason: 'riallineamento automatico non riuscito: realign_branch_moved (genitori: abc)' }, req);
     assert.equal(m.kind, 'warn');
-    assert.match(m.text, /giro nuovo dell’automazione/);
+    // Il giro parte da solo (#1328): la frase lo dice, come la scheda delle fusioni approvate e non avvenute.
+    assert.match(m.text, /torna da solo alla routine, che riallinea il ramo/);
+    assert.doesNotMatch(m.text, /serve un giro nuovo/);
     assert.match(m.text, /Il server ha provato a riallineare da sé, senza riuscirci: /);
     assert.match(m.text, /si era mosso/);
     assert.doesNotMatch(m.text, /realign_branch_moved/);
@@ -480,5 +493,115 @@ describe('la prova degli unit sulla fusione nella richiesta (#929)', () => {
     assert.match(UI.provaNote({ provaUnit: { esito: 'rosso_anche_su_main', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /già rossi su main/);
     assert.match(UI.provaNote({ provaUnit: { esito: 'conflitto', mainSha: 'b'.repeat(40), atMs: ORA } }, ORA).testo, /conflitto/);
     assert.equal(UI.provaNote({}, ORA), null, 'una richiesta di prima non dice niente');
+  });
+});
+
+// #1328 e #1425: dopo un sì finito in conflitto la frase dice chi riallinea, e se tocca all'owner cosa fare.
+test('dopoIlConflitto: il lavoro di una routine si riallinea da solo, il resto dice cosa fare', () => {
+  assert.equal(UI.siRiallineaDaSola({ origin: 'routine', feedbackId: 'x' }), true);
+  assert.equal(UI.siRiallineaDaSola({ origin: 'routine' }), false, 'senza pratica il server non la riallinea');
+  assert.equal(UI.siRiallineaDaSola({ origin: 'locale', feedbackId: 'x' }), false);
+  assert.match(UI.dopoIlConflitto({ origin: 'routine', feedbackId: 'x' }), /da solo/);
+  assert.match(UI.dopoIlConflitto({ origin: 'locale' }), /npm run finish/);
+  assert.match(UI.dopoIlConflitto({ origin: 'routine' }), /In coda/);
+  // L'esito al clic e la scheda delle fusioni non avvenute dicono la stessa cosa.
+  const m = UI.outcomeMessage({ ok: true, result: 'conflict' }, { origin: 'routine', feedbackId: 'x' });
+  assert.ok(m.text.includes(UI.RIALLINEA_DA_SOLA));
+});
+
+// Chi non conosce la pratica (pagina da browser) non promette il riallineamento: Gestione potrebbe dirla ferma.
+test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il browser leggono la stessa frase', () => {
+  const ria = { origin: 'routine', feedbackId: 'x' };
+  assert.equal(UI.testoRiallineamento(ria, true), UI.RIALLINEA_DA_SOLA);
+  assert.match(UI.testoRiallineamento(ria, false), /non è andato: rimetti la sua pratica In coda/);
+  const ignoto = UI.testoRiallineamento(ria, null);
+  assert.notEqual(ignoto, UI.RIALLINEA_DA_SOLA);
+  assert.match(ignoto, /se in Gestione è ferma, rimettila In coda/);
+  // Chi non si riallinea da solo dice cosa fare, qualunque cosa si sappia della pratica.
+  for (const s of [false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s), /npm run finish/);
+  assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
+  // Il quadrato di Gestione prende le stesse parole.
+  require(join(__dirname, '..', '..', 'src', 'shared', 'feedbackStatus.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'domande.js'));
+  require(join(__dirname, '..', '..', 'src', 'shared', 'manageReview.js'));
+  const MR = globalThis.SN_MANAGE_REVIEW;
+  const opts = { fusioni: { failed: [{ id: 'f', ...ria, used: true }] }, fusioniLette: true };
+  assert.ok(MR.livelloL5({ _id: 'x', status: 'revision_capability' }, opts).pannello.testo.includes(UI.RIALLINEA_DA_SOLA));
+  assert.ok(MR.livelloL5({ _id: 'x', status: 'design', statusReason: 'arenato' }, opts).pannello.testo.includes(UI.testoRiallineamento(ria, false)));
+  const senzaPratica = { fusioni: { failed: [{ id: 'g', origin: 'routine', feedbackId: 'y', num: '#5', used: true }] }, fusioniLette: true };
+  assert.ok(MR.livelloL5({ _id: 'y', seq: 5, status: 'todo' }, senzaPratica).pannello.testo.includes(UI.RIALLINEA_DA_SOLA));
+});
+
+test('etichettaRuolo: i ruoli delle routine in italiano, uno sconosciuto com’è', () => {
+  assert.equal(UI.etichettaRuolo('secaudit'), 'Audit sicurezza');
+  assert.equal(UI.etichettaRuolo('verifier'), 'Verifica');
+  assert.equal(UI.etichettaRuolo('nuovo'), 'nuovo');
+  assert.equal(UI.etichettaRuolo(''), '');
+});
+
+// «Salta il controllo»: le frasi sono le stesse nella scheda di Filo e nella pagina da browser (#489), e sul blocco
+// del cancello dicono lo stato vero della richiesta (#486).
+describe('esito di «Salta il controllo»', () => {
+  test('in attesa: il via libera, dove sta sulla superficie che chiama', () => {
+    const r = { ok: true, esito: 'bloccato', requestId: 'r1', requestState: 'pending' };
+    assert.deepEqual(UI.skipOutcomeMessage(r), { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera sul quadrato.' });
+    assert.match(UI.skipOutcomeMessage(r, { doveSiApprova: 'qui, fra le fusioni da approvare' }).text, /via libera qui, fra le fusioni da approvare\.$/);
+    // Un server che non dice lo stato: come prima, in attesa.
+    assert.match(UI.skipOutcomeMessage({ esito: 'bloccato', requestId: 'r1' }).text, /aspetta il tuo via libera/);
+  });
+
+  test('già decisa o non registrata: niente via libera promesso', () => {
+    const casi = [
+      [{ requestId: 'r1', requestState: 'discarded' }, 'warn', /già stata scartata: una richiesta decisa non si riapre, non c’è niente da approvare/],
+      [{ requestId: 'r1', requestState: 'used', requestOutcome: 'conflict' }, 'warn', /già stata approvata, ma la fusione era finita in conflitto: un’approvazione vale una volta sola/],
+      [{ requestId: 'r1', requestState: 'used', requestOutcome: 'merged' }, 'warn', /già stata approvata e fusa su main/],
+      [{ requestId: '' }, 'err', /non si è registrata/],
+    ];
+    for (const [r, kind, re] of casi) {
+      const m = UI.skipOutcomeMessage({ ok: true, esito: 'bloccato', ...r });
+      assert.equal(m.kind, kind);
+      assert.match(m.text, re);
+      assert.doesNotMatch(m.text, /via libera/);
+    }
+  });
+
+  test('gli altri esiti: una frase ciascuno, e uno sconosciuto si scrive grezzo, mai come un fatto', () => {
+    assert.equal(UI.skipOutcomeMessage({ esito: 'fuso' }).kind, 'ok');
+    for (const e of ['conflitto', 'ramo_assente', 'feedback_assente', 'non_saltabile', 'non_owner', 'guasto']) {
+      assert.equal(UI.skipOutcomeMessage({ esito: e }).kind, 'err', e);
+    }
+    assert.deepEqual(UI.skipOutcomeMessage({ esito: 'boh' }), { kind: 'err', text: 'Il server ha risposto: boh.' });
+    assert.deepEqual(UI.skipOutcomeMessage(null), { kind: 'err', text: 'Il server ha risposto: niente.' });
+  });
+
+  test('elenco delle bocciature: titolo, e cosa si dice quando la spiegazione non c’è per intero', () => {
+    assert.equal(UI.skipsHeadline(0), '');
+    assert.equal(UI.skipsHeadline(1), 'Un lavoro bocciato dal controllo di sicurezza');
+    assert.equal(UI.skipsHeadline(3), '3 lavori bocciati dal controllo di sicurezza');
+    assert.equal(UI.skipReasonNote({ motivo: 'tutto qui' }), '');
+    assert.match(UI.skipReasonNote({ motivo: 'x', motivoTagliato: true }), /continua/);
+    assert.match(UI.skipReasonNote({ motivo: '', motivoIlleggibile: true }), /non si apre/);
+    assert.match(UI.skipReasonNote({ motivo: '   ' }), /non ha lasciato una spiegazione/);
+  });
+});
+
+describe('voci che si vedono davvero (#1502)', () => {
+  test('i caratteri di controllo e di formato si scrivono per esteso, tabulazione e a capo restano', () => {
+    assert.equal(UI.caratteriVisibili('if (ok)‮ { evil() }⁦'), 'if (ok)⟨U+202E⟩ { evil() }⟨U+2066⟩');
+    assert.equal(UI.caratteriVisibili('a\u0000b​c­d'), 'a⟨U+0000⟩b⟨U+200B⟩c⟨U+00AD⟩d');
+    assert.equal(UI.caratteriVisibili('tag\u{E0041}'), 'tag⟨U+E0041⟩');
+    assert.equal(UI.caratteriVisibili('\triga\nseconda\r'), '\triga\nseconda\r');
+    assert.equal(UI.caratteriVisibili('שלום ok'), 'שלום ok', 'le lettere da destra a sinistra sono testo, non invisibili');
+    assert.equal(UI.caratteriVisibili(null), '');
+    assert.equal(UI.doveVoce({ file: 'src/‮sj.txt', riga: 3 }), 'src/⟨U+202E⟩sj.txt:3');
+  });
+
+  test('si contano le voci oltre le prime dodici e quelle che il server non ha mandato', () => {
+    const voci = (n) => Array.from({ length: n }, (_, i) => ({ file: `f${i}.js`, testo: 'x' }));
+    assert.equal(UI.vociNascoste({ voci: voci(12) }), 0);
+    assert.equal(UI.vociNascoste({ voci: voci(14) }), 2);
+    assert.equal(UI.vociNascoste({ voci: voci(12), more: 5 }), 5);
+    assert.equal(UI.vociNascoste({ items: Array.from({ length: 13 }, String) }), 1, 'anche le righe di un server di prima');
+    assert.equal(UI.vociNascoste(null), 0);
   });
 });

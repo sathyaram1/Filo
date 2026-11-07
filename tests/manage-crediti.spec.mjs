@@ -10,9 +10,9 @@ const URL = 'filo://manage/manage.html';
 
 const STATO = {
   ok: true, freni: 'attivi',
-  numeri: { riservaA: 10, tettoB: null, usdPer100: 2150, rinnovoA: null, rinnovoB: null },
+  numeri: { riservaA: 10, tettoB: null, usdPer100: 2000, rinnovoA: null, rinnovoB: null },
   accounts: {
-    A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12.4, giornoDaMs: Date.parse('2026-10-12T17:00:00Z') }, rinnovoAtMs: Date.parse('2026-10-13T17:00:00Z'), fermo: '', basseAperte: false },
+    A: { pct: 50, limite: 90, passo: { spesoPct: 3, quotaPct: 12.4, giornoDaMs: Date.parse('2026-10-12T17:00:00Z') }, rinnovoAtMs: Date.parse('2026-10-13T17:00:00Z'), fermo: '', basseAperte: false, usdSettimana: 1000, usd24h: 120, accensioniSettimana: 14, accensioni24h: 3 },
     B: { pct: 20, limite: null, passo: { spesoPct: 21, quotaPct: 20, giornoDaMs: Date.parse('2026-10-13T07:00:00Z') }, rinnovoAtMs: Date.parse('2026-10-14T07:00:00Z'), fermo: 'passo', basseAperte: false },
   },
 };
@@ -51,9 +51,11 @@ test('la scheda Crediti sta fra le Routine e mostra i numeri del server, uno per
   const page = await apri(openTab);
   await expect(page.locator('#mgCrRiservaA')).toHaveValue('10');
   await expect(page.locator('#mgCrTettoB')).toHaveValue('', { timeout: 5000 });
-  await expect(page.locator('#mgCrTaratura')).toHaveValue('2150');
+  await expect(page.locator('#mgCrTaratura')).toHaveValue('2000');
   await expect(page.locator('#mgCrRinnovoA')).toHaveValue('');
-  await expect(page.locator('#mgCrRigaA')).toContainText('46,5% della settimana, limite 90% · oggi 3% su 12,4%');
+  await expect(page.locator('#mgCrRigaA')).toContainText('50% della settimana (≈ 1.000 $), limite 90% · resta 40% (≈ 800 $) · oggi 3% su 12,4% (≈ 60 $ su ≈ 248 $) · ultime 24 ore ≈ 120 $ · accensioni: 14 in settimana, 3 nelle ultime 24 ore');
+  // B senza dollari dal server: la taratura salvata dall'owner (2.000 $ per il 100%), non la predefinita.
+  await expect(page.locator('#mgCrRigaB')).toContainText('20% della settimana (≈ 400 $) · resta 80% (≈ 1.600 $)');
   await expect(page.locator('#mgCrRigaB')).toContainText('fermo fino a');
   await expect(page.locator('#mgCrAvviso')).toBeHidden();
   // Nessun campo mente su una lettura: niente «non letto» se la lettura c'è.

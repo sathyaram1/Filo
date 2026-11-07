@@ -427,3 +427,77 @@ test('#953 un titolo già scelto parte com’è, senza rigenerarlo', async () =>
   assert.equal(state.calls.find((c) => c.submissionId === 'box-1').name, 'titolo generato');
   assert.equal(generati, 1, 'il titolo si genera solo per chi non ne aveva uno');
 });
+
+// #1667 — un feedback rimasto vuoto per sempre (nessun allegato salito, e riprovare dà lo stesso no) non resta in coda
+// un giorno a ritentare: si rinuncia subito e lo si dice; se riprovare può servire, resta in coda come per la rete.
+function erroreVuoto(permanente) {
+  return Object.assign(new Error('Il feedback non è partito: senza testo, e nessun allegato è salito («foto.png»: rifiutato dal deposito).'),
+    { vuoto: true, permanente });
+}
+
+test('#1667 vuoto per sempre: rinuncia al primo tentativo e lo dice, vuoto per la rete: resta in coda', async () => {
+  const { OB, state } = setup();
+  const avvisi = [];
+  OB.init({ onGiveUp: (item, motivo) => avvisi.push({ id: item.id, motivo }), backoffMin: 999999 });
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  globalThis.SN_FEEDBACK.submit = async (p) => { state.calls.push(p.submissionId); throw erroreVuoto(p.submissionId === 'per-sempre'); };
+  await OB.enqueue({ submissionId: 'per-sempre', text: '' });
+  await OB.enqueue({ submissionId: 'per-la-rete', text: '' });
+  await OB.flush();
+  assert.deepEqual(OB._peek().map((x) => x.id), ['per-la-rete']);
+  assert.deepEqual(avvisi.map((a) => a.id), ['per-sempre']);
+  assert.match(avvisi[0].motivo, /«foto\.png»: rifiutato dal deposito/);
+});
+
+// #1667 — chi preme «Invia» aspetta il primo tentativo della sua voce: «inviato» solo a consegna avvenuta.
+test('#1667 il primo tentativo dice com’è andata: consegnato, in coda, rinuncia; e allo scadere dell’attesa in coda', async () => {
+  const { OB, state } = setup();
+  OB.init({ onGiveUp: () => true, backoffMin: 999999 });
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  let lento = null;
+  globalThis.SN_FEEDBACK.submit = async (p) => {
+    state.calls.push(p.submissionId);
+    if (p.submissionId === 'lento') await new Promise((r) => { lento = r; });
+    if (p.submissionId === 'offline') throw new Error('fetch failed');
+    if (p.submissionId === 'vuoto') throw erroreVuoto(true);
+    return { id: 'srv_' + p.submissionId, failed: [] };
+  };
+  OB._setAuto(true);
+  // I timer della coda non tengono vivo il processo (in Filo ci pensa Electron): qui lo tiene vivo la prova.
+  const vivo = setInterval(() => {}, 1000);
+  try {
+    const ok = await OB.enqueue({ submissionId: 'ok', text: 'a' }, { attendiMs: 5000 });
+    assert.deepEqual(await ok.tentativo, { esito: 'consegnato', id: 'srv_ok' });
+    const off = await OB.enqueue({ submissionId: 'offline', text: 'b' }, { attendiMs: 5000 });
+    assert.deepEqual(await off.tentativo, { esito: 'in_coda' });
+    const vu = await OB.enqueue({ submissionId: 'vuoto', text: '' }, { attendiMs: 5000 });
+    assert.equal((await vu.tentativo).esito, 'rinuncia');
+    const le = await OB.enqueue({ submissionId: 'lento', text: 'c' }, { attendiMs: 30 });
+    assert.deepEqual(await le.tentativo, { esito: 'in_coda' }, 'oltre l’attesa il riquadro non aspetta più');
+    lento();
+  } finally { OB._setAuto(false); clearInterval(vivo); }
+  // Senza giri automatici nessun tentativo è in arrivo: non si aspetta niente.
+  const fermo = await OB.enqueue({ submissionId: 'fermo', text: 'd' }, { attendiMs: 5000 });
+  assert.deepEqual(await fermo.tentativo, { esito: 'in_coda' });
+});
+
+// #1681 — la rinuncia al primo tentativo la dice il riquadro che aspetta: la coda non la ripete nella cornice. Senza
+// nessuno che aspetta (attesa scaduta, invio da un'altra strada) l'avviso della coda resta.
+test('#1681 rinuncia con qualcuno che aspetta: niente secondo avviso; senza nessuno: avviso', async () => {
+  const { OB } = setup();
+  const avvisi = [];
+  OB.init({ onGiveUp: (item) => { avvisi.push(item.id); return true; }, backoffMin: 999999 });
+  globalThis.SN_FEEDBACK.isEncryptionError = (e) => !!(e && e.cifratura === true);
+  globalThis.SN_FEEDBACK.submit = async () => { throw erroreVuoto(true); };
+  OB._setAuto(true);
+  const vivo = setInterval(() => {}, 1000);
+  try {
+    const atteso = await OB.enqueue({ submissionId: 'atteso', text: '' }, { attendiMs: 5000 });
+    assert.equal((await atteso.tentativo).esito, 'rinuncia');
+  } finally { OB._setAuto(false); clearInterval(vivo); }
+  assert.deepEqual(avvisi, [], 'chi aspettava lo dice lui');
+  assert.equal(OB.size(), 0, 'e la voce non resta in coda');
+  await OB.enqueue({ submissionId: 'da-solo', text: '' });
+  await OB.flush();
+  assert.deepEqual(avvisi, ['da-solo']);
+});

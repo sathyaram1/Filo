@@ -49,8 +49,8 @@ export const OWNER_MERGE_APPROVALS_URL = `${BASE}/ownerMergeApprovals`;
 
 /**
  * In che stato è la richiesta `id` secondo l'elenco del deposito (`ownerMergeApprovals`, op list). PURA.
- * Il server dà il nome della richiesta anche quando il deposito ha rifiutato di riaprirla perché già decisa (#486):
- * una richiesta rinfrescata adesso è la più nuova, quindi se non sta fra quelle in attesa è stata decisa.
+ * Il ripiego per un server che non dice `requestState` (#486): una richiesta rinfrescata adesso è la più nuova,
+ * quindi se non sta fra quelle in attesa è stata decisa.
  * @returns {{ state: 'pending'|'discarded'|'used'|'decided'|'', outcome?: string, motivo?: string }} '' = elenco illeggibile
  */
 export function statoDellaRichiesta(id, elenco) {
@@ -97,7 +97,10 @@ export function classifyOwnerMerge(status, body) {
     // (deposito non raggiungibile, oppure server non ancora rideployato): sono
     // due situazioni diverse per chi legge, e vanno dette diverse.
     if (r.result === 'blocked') {
-      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || ''), ...campiLocali(r) };
+      // Il server dice da sé se la richiesta aspetta o era già decisa (#486); uno vecchio no, e allora si rilegge l'elenco.
+      const stato = ['pending', 'discarded', 'used'].includes(r.requestState) ? { requestState: r.requestState } : {};
+      if (stato.requestState === 'used' && r.requestOutcome) stato.requestOutcome = String(r.requestOutcome).slice(0, 40);
+      return { outcome: 'blocked', reason: String(r.reason || ''), requestId: String(r.requestId || ''), ...stato, ...campiLocali(r) };
     }
     if (r.result === 'conflict') return { outcome: 'conflict', reason: String(r.reason || '') };
     if (r.result === 'stale') return { outcome: 'stale', headSha: String(r.headSha || '') };
@@ -350,7 +353,7 @@ export async function askServerMerge({ branch, sha = '', feedbackId = '', pendin
     let body = {};
     try { body = text ? JSON.parse(text) : {}; } catch (_) { body = {}; }
     const reply = classifyOwnerMerge(res.status, body);
-    if (reply.outcome !== 'blocked' || !reply.requestId) return reply;
+    if (reply.outcome !== 'blocked' || !reply.requestId || reply.requestState) return reply;
     const stato = await statoDalDeposito({ id: reply.requestId, idToken, fetchImpl, listUrl });
     return Object.assign(reply, { requestState: stato.state },
       stato.outcome ? { requestOutcome: stato.outcome } : {}, stato.motivo ? { requestCheck: stato.motivo } : {});
@@ -399,7 +402,8 @@ export function erroreDiConnessione(e) {
 // ── Il ramo del server, dopo il passo 10 (#1159 fase 2) ─────────────────────
 // Su main di filo-security scrive solo il cancello: server:fondi prova la spinta e, rifiutata, chiede a lui.
 
-const ESITI_SERVER = new Set(['merged', 'aspetta_suite', 'suite_rossa', 'non_rapido', 'rifiutata', 'main_moved']);
+// `registrato`: la risposta a `registraMain`, la spinta su main fatta dal PC entrata nel registro di chi porta main (#1521).
+const ESITI_SERVER = new Set(['merged', 'aspetta_suite', 'suite_rossa', 'non_rapido', 'rifiutata', 'main_moved', 'registrato', 'chiedi_si']);
 
 /** La risposta di ownerMerge con `repo: 'server'` in un esito. PURA. */
 export function classifyServerMerge(status, body) {
@@ -435,6 +439,8 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
     case 'non_rapido': return `${ramo} non contiene main di filo-security: nel ramo git merge origin/main, prove, spinta, poi rilancia.`;
     case 'rifiutata': return `Anche il cancello è stato rifiutato da GitHub (${String(r.detail || '').slice(0, 160)}): controlla il bypass della regola di main di filo-security.`;
     case 'main_moved': return 'main di filo-security si è mosso mentre il cancello fondeva: rilancia lo stesso comando.';
+    case 'registrato': return `Il server sa che main di filo-security${sha ? ` (${sha})` : ''} l’ha portato server:fondi dal PC.`;
+    case 'chiedi_si': return `Il cancello non porta ${ramo} su main di filo-security senza il tuo sì: ${String(r.detail || 'il ramo tocca le guardie del server').slice(0, 1200)}`;
     case 'no_owner_credential': return 'Su questa macchina non c’è la credenziale admin per chiedere la fusione al server.';
     case 'not_deployed': return 'Il server non conosce ancora la fusione del ramo del server (ownerMerge senza repo «server»): va pubblicato il server della fase 2.';
     case 'denied': return `Il server non riconosce l’owner: ${String(r.reason || '').slice(0, 160)}`;
@@ -445,10 +451,10 @@ export function messageForServerMerge(reply, ramo = 'il ramo') {
 }
 
 /**
- * «Porta questo sha del ramo del server su main di filo-security»: ownerMerge con `repo: 'server'`. Ritorna sempre un
- * esito classificato, mai un'eccezione.
+ * «Porta questo sha del ramo del server su main di filo-security»: ownerMerge con `repo: 'server'`. Con `registraMain`
+ * invece «main è su questo sha perché l'ho spinto io dal PC». Ritorna sempre un esito classificato, mai un'eccezione.
  */
-export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl = fetch, mintImpl = fetch, attese = null, url = OWNER_MERGE_URL } = {}) {
+export async function askServerMergeServer({ branch, sha, feedbackId, registraMain = false, fetchImpl = fetch, mintImpl = fetch, attese = null, url = OWNER_MERGE_URL } = {}) {
   const refresh = findAdminRefreshToken();
   if (!refresh) return { outcome: 'no_owner_credential' };
   let idToken;
@@ -462,7 +468,7 @@ export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl 
     const res = await fetchRitentato(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-      body: JSON.stringify({ data: { repo: 'server', branch: String(branch || ''), sha: String(sha || ''), feedbackId: String(feedbackId || '') } }),
+      body: JSON.stringify({ data: Object.assign({ repo: 'server', branch: String(branch || ''), sha: String(sha || ''), feedbackId: String(feedbackId || '') }, registraMain ? { registraMain: true } : {}) }),
     }, { fetchImpl, ...(attese ? { attese } : {}) });
     const text = await res.text();
     let body = {};
@@ -472,3 +478,6 @@ export async function askServerMergeServer({ branch, sha, feedbackId, fetchImpl 
     return { outcome: 'unreachable', reason: `rete verso il server: ${descriviErroreDiRete(e)}`.slice(0, 300) };
   }
 }
+
+/** La spinta su main del server fatta dal PC entra nel registro di chi porta main: senza, il server alza un allarme. */
+export const registraSpintaServer = (x) => askServerMergeServer(Object.assign({}, x, { registraMain: true }));

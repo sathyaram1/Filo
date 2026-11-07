@@ -22,7 +22,7 @@ import { readFileSync, readdirSync, existsSync, mkdirSync, writeFileSync } from 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { specsForChangedFiles, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
+import { specsForChangedFiles, PROVE_DI_CHI_DECIDE, isProtectedBranch, pushArgs, resolveDiffBase, behindMainStop, behindMainNota, lottiPerRigaDiComando } from '../../scripts/finish-local.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const SORGENTE = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
@@ -107,6 +107,35 @@ describe('quali spec lanciare', () => {
     test('un handler ha un nome suo e vale come area', () => {
       const out = specsForChangedFiles(['src/main/services/handlers/editor.js'], tracked);
       assert.ok(out.includes('tests/editor-chat'), out.join(','));
+    });
+
+    // #600.1: il costo di «dimentica» cambiò nel registro (#872) e lo spec dell'autonomia arrivò rosso su main.
+    test('il registro dei costi delle azioni porta lo spec dell’autonomia, che ne prova le conseguenze', () => {
+      const conAutonomia = [...tracked, 'tests/autonomia.spec.mjs'];
+      assert.ok(specsForChangedFiles(['src/shared/actionLevels.js'], conAutonomia).includes('tests/autonomia'));
+      assert.ok(!specsForChangedFiles(['src/shared/actionLevels.js'], tracked).includes('tests/autonomia'),
+        'con l’elenco non si inventa uno spec che non c’è');
+      assert.deepEqual(specsForChangedFiles(['src/shared/constructor.js', 'src/shared/toString.js'], conAutonomia), []);
+    });
+
+    // #600.2: il punto del main che chiede se un'azione parte non portava nessuna prova nell'app. Un file nuovo che
+    // prende la stessa decisione fa rosso qui finché non entra nella mappa.
+    test('chi decide se un’azione parte, chiede o è rifiutata porta le prove dell’autonomia, sui file veri', () => {
+      const veri = readdirSync(resolve(ROOT, 'tests')).filter((f) => f.endsWith('.spec.mjs')).map((f) => `tests/${f}`);
+      const sorgenti = (dir) => readdirSync(resolve(ROOT, dir), { withFileTypes: true }).flatMap((d) =>
+        d.isDirectory() ? sorgenti(`${dir}/${d.name}`) : d.name.endsWith('.js') ? [`${dir}/${d.name}`] : []);
+      const decidono = sorgenti('src').filter((f) => {
+        const s = readFileSync(resolve(ROOT, f), 'utf8');
+        return f !== 'src/shared/autonomia.js' && s.includes('SN_AUTONOMIA') && /\.decide(?:Dettaglio)?\(/.test(s);
+      });
+      assert.ok(decidono.includes('src/main/services/handlers.js'), decidono.join(','));
+      for (const f of new Set([...decidono, ...PROVE_DI_CHI_DECIDE.keys()])) {
+        assert.ok(existsSync(resolve(ROOT, f)), `${f} non c’è più: la mappa punta a un file che non esiste`);
+        const out = specsForChangedFiles([f], veri);
+        assert.ok(out.includes('tests/autonomia') && out.includes('tests/filo-action-levels'), `${f} → ${out.join(',')}`);
+        assert.deepEqual(out.filter((s) => s.startsWith('tests/filo-')), ['tests/filo-action-levels'],
+          'il nome esatto, non la famiglia filo-*');
+      }
     });
 
     test('le prove dei giri (tests/verifica) non entrano per prefisso, e con l’elenco non si inventano nomi', () => {
@@ -582,6 +611,12 @@ describe('unit rossi sul ramo da solo: decide la prova come arriverebbero su mai
       }
     }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M } }).messaggio, /fusione con main cccccccc/);
+    // #1580.1: chi aveva riprovato il rosso sulla base del ramo lo trovava rosso «su main da solo» e credeva sbagliato questo messaggio.
+    const vecchio = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, baseRamo: 'b'.repeat(40) } }).messaggio;
+    assert.match(vecchio, /non sono del ramo, proseguo\. Il ramo parte da main bbbbbbbb, più vecchio: [^\n]*su main da solo si usa cccccccc, non la base del ramo\./);
+    for (const prova of [{ esito: 'verde', mainSha: M }, { esito: 'verde', mainSha: M, contenuto: true }, { esito: 'rosso_anche_su_main', mainSha: M, baseRamo: 'b'.repeat(40) }]) {
+      assert.doesNotMatch(esitoUnitDelRamo({ checkOnly: false, prova }).messaggio, /parte da main/, JSON.stringify(prova));
+    }
     assert.match(esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'rosso_anche_su_main', mainSha: M } }).messaggio, /anche su main da solo/);
     const instabili = esitoUnitDelRamo({ checkOnly: false, prova: { esito: 'verde', mainSha: M, instabili: ['tests/unit/a.test.mjs › lento'] } });
     assert.match(instabili.messaggio, /tests\/unit\/a\.test\.mjs › lento/, 'gli instabili si nominano');
@@ -709,4 +744,38 @@ test('senza pratica la chiusura si ferma e dice come aprirla; --check e una prat
   assert.match(msg, /Non ho toccato niente/);
   assert.equal(senzaPraticaStop({ checkOnly: true, pratica: null }), '');
   assert.equal(senzaPraticaStop({ checkOnly: false, pratica: { id: 'abc', seq: 908 } }), '');
+});
+
+// La durata dei controlli cresce con gli spec scelti (#2178): chi li aspetta la legge prima che partano, non da un
+// intervallo fisso nei ruoli che un ramo largo supera.
+import { stimaDurataControlli } from '../../scripts/finish-local.mjs';
+
+test('la durata prevista cresce con gli spec, e un ramo largo passa l’ora', () => {
+  const largo = stimaDurataControlli(192);
+  assert.ok(largo.da >= 60, `192 spec: da ${largo.da} minuti`);
+  assert.ok(largo.a > largo.da);
+  assert.match(largo.testo, /da \d+ a \d+ minuti/);
+  assert.match(largo.testo, /192 spec/);
+  const pochi = stimaDurataControlli(4);
+  assert.ok(pochi.a < largo.da, 'quattro spec durano meno di duecento');
+  const niente = stimaDurataControlli(0);
+  assert.ok(niente.da > 0, 'gli unit girano anche senza spec');
+  assert.deepEqual(stimaDurataControlli(undefined), niente);
+});
+
+test('la durata prevista si stampa dopo la scelta degli spec e prima degli unit', () => {
+  const src = readFileSync(resolve(ROOT, 'scripts', 'finish-local.mjs'), 'utf8');
+  const main = src.slice(src.indexOf('async function main('));
+  const scelta = main.indexOf('specsForChangedFiles(changed');
+  const stima = main.indexOf('stimaDurataControlli(specs.length)');
+  const unit = main.indexOf("'run-unit-tests.mjs'");
+  assert.ok(scelta > 0 && stima > scelta && unit > stima, `scelta ${scelta}, stima ${stima}, unit ${unit}`);
+});
+
+test('i ruoli non promettono più una durata fissa ai controlli', () => {
+  const ruoli = resolve(ROOT, 'routines', 'roles');
+  for (const f of readdirSync(ruoli).filter((n) => n.endsWith('.md'))) {
+    const testo = readFileSync(resolve(ruoli, f), 'utf8');
+    assert.doesNotMatch(testo, /finish:check[^.]{0,120}\d+\s*(?:-|a)\s*\d+\s*minuti|quarantacinque minuti/, f);
+  }
 });

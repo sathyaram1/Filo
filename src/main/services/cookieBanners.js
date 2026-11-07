@@ -183,7 +183,7 @@ async function saveCache() {
 
 function refresh({ force = false } = {}) {
   if (refreshing) return refreshing;
-  refreshing = (async () => {
+  const giro = (async () => {
     try {
       if (!force && lastUpdatedAt && (Date.now() - lastUpdatedAt) < REFRESH_INTERVAL_MS) return { ok: true, skipped: true };
       const { fetchList } = require('./adblock');
@@ -199,10 +199,19 @@ function refresh({ force = false } = {}) {
       return { ok: true };
     } catch (e) {
       return { ok: false, error: String((e && e.message) || e) };
-    } finally {
-      refreshing = null;
     }
   })();
+  // Liberato dentro il corpo, un «già fresca» (che non aspetta niente) lasciava il giro occupato per sempre.
+  refreshing = giro.then((r) => {
+    refreshing = null;
+    // I contatori (#1469): l'esito, l'età della lista in uso e i siti con regole loro. Mai un indirizzo.
+    try {
+      const N = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.NAV;
+      const M = globalThis.SN_CONTATORI_MAIN;
+      if (N && M) M.navigazione(N.lista('cookie_banner', r, lastUpdatedAt ? Date.now() - lastUpdatedAt : null, list.specific.size), { incognito: false });
+    } catch (_) {}
+    return r;
+  });
   return refreshing;
 }
 

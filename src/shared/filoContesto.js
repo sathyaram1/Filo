@@ -15,9 +15,8 @@
     const s = String(v == null ? '' : v).trim().toLowerCase();
     return DURATE_CACHE.includes(s) ? s : null;
   }
-  // Quanto vive nel contesto l'esito di una lettura (pagina, documento, comando) e il ragionamento di una risposta,
-  // finché l'owner non decide (#553.2): nella sua conversazione gli ultimi venti messaggi di quella, come prima del filo
-  // unico; nelle altre schede al più gli ultimi venti del filo, così una conversazione ferma non lo tiene per giorni.
+  // Gli esiti delle letture e il ragionamento restano nel tratto vivo finché il tratto non si chiude (SPEC-CONTESTO § Gli
+  // esiti degli strumenti): un messaggio passato non si riscrive. Qui resta la misura con cui la scheda confronta i suoi.
   const MESSAGGI_CON_ESITI = 20;
   // Una conversazione ripresa da prima dei tetti porta con sé i suoi ultimi messaggi, come faceva la chat da sola,
   // ma dentro il tetto in token: al più un quarto, e la finestra si stringe di quanto prendono.
@@ -31,9 +30,9 @@
   const TOKEN_PER_IMMAGINE = 1500;
   const MAX_IMMAGINI_RIMANDATE = 16;
   const MAX_CARATTERI_IMMAGINI = 24 * 1024 * 1024;
-  // Il primo messaggio del tratto che al turno dopo perde esito, ragionamento o foto: da lì la storia già mandata
-  // cambia, e un punto di cache più avanti non verrebbe mai riletto (pianoDellaCache). Per identità: al modello non va.
-  const CAMBIANO_AL_TURNO_DOPO = new WeakSet();
+  // La domanda di questo turno fra i messaggi che partono (pianoDellaCache): il punto del tratto le sta subito prima.
+  // Per identità: al modello non va. Se un segreto oscurato la ricopia, la si ritrova dall'intestazione.
+  const DOMANDE = new WeakSet();
 
   function numeroIn(v, [min, max]) {
     if (v === null || v === undefined || v === '' || typeof v === 'boolean') return null;
@@ -163,23 +162,102 @@
   }
   // Lo stesso testo quando torna dall'archivio (un ricordo, una ricerca, una rilettura): l'azione che lo riporta lo
   // dichiara in `_output.daFuori`, e uscite e conferme lo contano come la lettura che era (urlExfil, actionLevels).
+  // Così le parole scritte nell'Aiuto sopra un sito (`daPagina`, src/shared/filoApp.js → conProvenienza, #1508).
+  const ESTERNO_AIUTO = "dall'Aiuto, in un messaggio scritto sopra un sito";
+  const daPaginaIl = (m) => !!m && m.role === 'user' && m.daPagina === true;
   function daFuoriDi(messaggi) {
-    return (Array.isArray(messaggi) ? messaggi : []).filter(daFuoriIl)
-      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: m.esterno }))
+    return (Array.isArray(messaggi) ? messaggi : []).filter((m) => daFuoriIl(m) || daPaginaIl(m))
+      .map((m) => ({ testo: String(m.text == null ? '' : m.text), fonte: daPaginaIl(m) ? ESTERNO_AIUTO : m.esterno }))
       .filter((x) => x.testo.trim());
+  }
+
+  // La risposta di Filo che l'utente cita col suo messaggio (#1620), già ritrovata nel filo (SN_RISPOSTA_A.risolvi). Un
+  // testo arrivato da fuori resta fuori anche qui, come nel resto del filo: l'ora e l'id bastano a rileggerlo.
+  function notaRisposta(r) {
+    if (!r || typeof r !== 'object') return '';
+    if (r.manca) return "(l'utente risponde a un tuo messaggio che nel filo non c'è più)";
+    const dove = r.ts || r.chat ? ` ${intestazione(r.ts, r.chat)}` : '';
+    const di = r.role === 'user' ? 'a un suo messaggio' : 'al tuo messaggio';
+    if (r.esterno) {
+      const come = r.chat ? `: si rilegge con CERCA_CHAT e l'id "${r.chat}"` : '';
+      return `(l'utente risponde al testo arrivato ${r.esterno}${dove}${come})`;
+    }
+    const t = String(r.testo == null ? '' : r.testo).trim();
+    return t ? `(l'utente risponde ${di}${dove}: «${t}»)` : `(l'utente risponde ${di}${dove})`;
+  }
+
+  // Una risposta di Filo riletta altrove vale la classe peggiore che la sua chat aveva letto (#1508); una salvata prima
+  // del campo, la peggiore fra le fonti della chat. Testi da fuori e parole dell'utente li conta daFuoriDi.
+  function classeDelMessaggio(m, fontiDellaChat = null) {
+    if (!m || m.role === 'user' || daFuoriIl(m)) return 1;
+    const c = Number(m.classeLetta);
+    if (Number.isInteger(c) && c >= 1 && c <= 5) return c;
+    let peggiore = 1;
+    for (const f of Array.isArray(fontiDellaChat) ? fontiDellaChat : []) {
+      const k = Number(f && f.classe);
+      if (Number.isInteger(k) && k > peggiore && k <= 5) peggiore = k;
+    }
+    return peggiore;
+  }
+  function classeDelleRisposte(messaggi, fontiDellaChat = null) {
+    let peggiore = 1;
+    for (const m of Array.isArray(messaggi) ? messaggi : []) peggiore = Math.max(peggiore, classeDelMessaggio(m, fontiDellaChat));
+    return peggiore;
+  }
+
+  // Le risposte di altre chat nel tratto (#1508) hanno la forma di una ricerca fra le chat, come i ricordi: stato, uscite e
+  // accoglienza le contano uguali. `classeLetta` è già risolta da src/main/services/contestoFilo.js (messaggiDi).
+  function trattoComeAzione(visti, { chatCorrente = null } = {}) {
+    const altre = (Array.isArray(visti) ? visti : []).filter((m) => m && !m.riga && m.chat !== chatCorrente);
+    const classe = classeDelleRisposte(altre);
+    if (classe <= 1) return null;
+    return { type: 'CERCA_CHAT', _tratto: true, _executed: true, _output: { tratto: true, classeLetta: classe } };
+  }
+
+  // Cosa porta nel compito una conversazione dell'archivio riletta per intero (#1508): i testi da fuori, le parole
+  // dell'utente (per la regola dell'indirizzo scritto, #553) e la classe peggiore delle risposte di Filo.
+  function provenienzaDellaChat(chat) {
+    const A = global.SN_FILO_APP;
+    const msgs = A ? A.conProvenienza(chat) : (Array.isArray(chat && chat.messages) ? chat.messages : []);
+    return {
+      daFuori: daFuoriDi(msgs),
+      parole: msgs.filter((m) => m && m.role === 'user' && !m.daModello && !daPaginaIl(m)).map((m) => String(m.text || '')).join('\n'),
+      classeLetta: classeDelleRisposte(msgs, chat && chat.fonti),
+    };
+  }
+
+  // Di una conversazione trovata dalla ricerca torna solo il frammento: porta la lettura dei messaggi da cui viene. Se
+  // non si riconosce da dove, vale la chat intera.
+  function provenienzaDelFrammento(chat, frammento) {
+    const A = global.SN_FILO_APP;
+    const msgs = A ? A.conProvenienza(chat) : (Array.isArray(chat && chat.messages) ? chat.messages : []);
+    const pezzo = String(frammento || '').replace(/^…|…$/g, '').trim();
+    const da = pezzo ? msgs.filter((m) => m && String(m.text == null ? '' : m.text).replace(/\s+/g, ' ').includes(pezzo)) : [];
+    const fuori = daFuoriDi(da);
+    return {
+      daFuori: fuori.length ? [{ testo: pezzo, fonte: fuori[0].fonte }] : [],
+      classeLetta: classeDelleRisposte(da.length ? da : msgs, chat && chat.fonti),
+    };
   }
 
   // `prima`: il messaggio che precede nel blocco. Ora e conversazione stanno sui messaggi dell'utente; su quelli di
   // Filo solo quando aprono un tratto di un'altra conversazione, così il modello non impara a scriverle nelle risposte.
   // `foto`: le immagini del messaggio che tornano davanti al modello in questo turno (la finestra decide quali).
-  function rendi(m, prima, { tetto, esito, osserva, foto = null }) {
+  // `preambolo`: quello che Filo scrive in testa al messaggio dell'utente (src/shared/filoTrattoVivo.js); `dopo`: le note
+  // del suo turno (l'origine delle immagini) che tornano con lui; `intero`: la domanda di adesso non si accorcia.
+  function rendi(m, prima, { tetto, esito, osserva, foto = null, preambolo = '', dopo = null, intero = false }) {
     const cambia = !prima || prima.chat !== m.chat;
     const daFuori = daFuoriIl(m);
-    const testo = daFuori ? '' : tienilo(m.text, tetto, m.chat);
+    const testo = daFuori ? '' : (intero ? String(m.text == null ? '' : m.text) : tienilo(m.text, tetto, m.chat));
     if (m.role === 'user') {
-      const detto = `${intestazione(m.ts, m.chat)} ${testo}`.trim();
+      const nota = notaRisposta(m.rispostaA);
+      const pre = String(preambolo || '').trim();
+      const detto = pre
+        ? `${intestazione(m.ts, m.chat)}\n${pre}\n${nota ? `${nota}\n` : ''}${testo}`.trim()
+        : `${intestazione(m.ts, m.chat)} ${nota ? `${nota}\n` : ''}${testo}`.trim();
+      const note = (Array.isArray(dopo) ? dopo : []).map((x) => String(x || '').trim()).filter(Boolean);
       const quante = numeroImmagini(m);
-      if (!quante) return { role: 'user', content: detto };
+      if (!quante) return { role: 'user', content: note.length ? `${detto}\n\n${note.join('\n\n')}` : detto };
       if (Array.isArray(foto) && foto.length) {
         const mancano = quante - foto.length;
         return {
@@ -188,16 +266,19 @@
             { type: 'text', text: detto },
             ...foto.map((url) => ({ type: 'image_url', image_url: { url } })),
             ...(mancano > 0 ? [{ type: 'text', text: notaImmagini(mancano, { altre: true }) }] : []),
+            ...note.map((text) => ({ type: 'text', text })),
           ],
         };
       }
-      return { role: 'user', content: `${detto}\n${notaImmagini(quante)}` };
+      return { role: 'user', content: [`${detto}\n${notaImmagini(quante)}`, ...note].join('\n\n') };
     }
     const parti = [];
     if (cambia) parti.push(intestazione(m.ts, m.chat));
     if (testo.trim()) parti.push(testo);
     const tipi = Array.isArray(m.actions) ? m.actions.filter((t) => typeof t === 'string' && t) : [];
-    const oss = esito && Array.isArray(esito.azioni) && esito.azioni.length && typeof osserva === 'function' ? osserva(esito.azioni) : '';
+    // I ricordi ripescati da soli stanno nel messaggio dell'utente del loro turno, non qui.
+    const azioni = esito && Array.isArray(esito.azioni) ? esito.azioni.filter((a) => !(a && a._auto)) : [];
+    const oss = azioni.length && typeof osserva === 'function' ? osserva(azioni) : '';
     if (oss) parti.push(oss);
     else if (daFuori) parti.push(`(qui c'era un testo arrivato ${m.esterno}: non è più davanti, si rilegge con CERCA_CHAT e l'id ${m.chat})`);
     else if (tipi.length) parti.push(`(azioni di questo turno: ${tipi.join(', ')})`);
@@ -208,36 +289,41 @@
       parti.push(`(qui avevo guardato ${nomi}: quello che c'era non è conservato)`);
     }
     const out = { role: 'assistant', content: parti.join('\n\n') || '(nessun testo)' };
-    // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda: tolto solo all'ultima cambierebbe a
-    // ogni turno un messaggio che la cache aveva già. Verso Claude parte solo col prefisso con cui è nato
-    // (src/main/services/providers/ragionamentoRimandato.js).
+    // Il ragionamento vive quanto gli esiti, su ogni risposta e in ogni scheda. Verso Claude parte solo col prefisso con
+    // cui è nato (src/main/services/providers/ragionamentoRimandato.js).
     const rd = esito && Array.isArray(esito.reasoningDetails) && esito.reasoningDetails.length ? esito.reasoningDetails : null;
     if (rd) out.reasoning_details = rd;
     return out;
   }
 
+  // Il turno di una risposta come è andato (strumenti, esiti, seguiti), quando la memoria lo ha ancora: torna così,
+  // perché un turno passato riscritto rompe la cache da lì e il ragionamento nato dentro i suoi giri. Solo se nel tratto
+  // la risposta segue la sua domanda: con un'altra conversazione in mezzo il giro non è più quello che il modello ha visto.
+  function conGiro(m, prima, giro) {
+    if (!giro || !Array.isArray(giro.messaggi) || !prima || prima.chat !== m.chat || prima.role !== 'user') return null;
+    const finale = { role: 'assistant', content: String(giro.testo == null ? '' : giro.testo) || '(nessun testo)' };
+    if (Array.isArray(giro.reasoningDetails) && giro.reasoningDetails.length) finale.reasoning_details = giro.reasoningDetails;
+    return [...giro.messaggi, finale];
+  }
+
   // Il tratto del filo che il modello ha davanti. `messaggi` è tutto il filo in ordine di tempo, senza la domanda di
   // adesso; `ancora` è l'inizio scelto al turno prima, che si tiene finché i tetti lo permettono.
-  // `immagini(m)`: i data URL ancora in memoria del messaggio, o null.
-  function finestra(messaggi, { ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null } = {}) {
-    const lista = Array.isArray(messaggi) ? messaggi : [];
+  // `immagini(m)`: i data URL ancora in memoria del messaggio, o null. `preambolo(m)`: quello che Filo scrive in testa a
+  // un messaggio dell'utente; `note(m)`: le note del suo turno. `giro(m)`: il turno di una risposta come è andato, e
+  // `salta(m)`: i seguiti che quel turno porta già dentro. `intero(m)`: un messaggio dell'utente già mandato intero, che
+  // torna com'era invece di accorciarsi.
+  function finestra(messaggi, {
+    ora = Date.now(), giorni, token, ancora = null, chatCorrente = null, esiti = null, osserva = null, immagini = null,
+    preambolo = null, note = null, giro = null, salta = null, intero = null,
+  } = {}) {
+    const lista0 = Array.isArray(messaggi) ? messaggi : [];
+    const lista = typeof salta === 'function' ? lista0.filter((m) => !salta(m)) : lista0;
     const n = lista.length;
     const t0 = taglio(ora, giorni);
     const stessaAncora = ancora && ancora.giorni === giorni && ancora.token === token && Number.isFinite(Date.parse(ancora.ts));
     const da = Math.max(t0, stessaAncora ? Date.parse(ancora.ts) : -Infinity);
     let inizio = 0;
     while (inizio < n && Date.parse(lista[inizio].ts) < da) inizio++;
-    const recente = new Array(n).fill(false);
-    // Recente adesso e non più al turno dopo, che aggiunge domanda e risposta in questa scheda.
-    const scade = new Array(n).fill(false);
-    const contati = new Map();
-    const vive = (c, i, quanti) => c <= MESSAGGI_CON_ESITI && (lista[i].chat === chatCorrente || quanti - i <= MESSAGGI_CON_ESITI);
-    for (let i = n - 1; i >= 0; i--) {
-      const c = (contati.get(lista[i].chat) || 0) + 1;
-      contati.set(lista[i].chat, c);
-      recente[i] = vive(c, i, n);
-      scade[i] = recente[i] && !vive(c + (chatCorrente && lista[i].chat === chatCorrente ? 2 : 0), i, n + 2);
-    }
     // Il comando di un esito scritto in chat è l'ultima riga «/…» dell'utente nella sua conversazione.
     const comandi = new Array(n).fill('');
     const ultimoComando = new Map();
@@ -247,53 +333,101 @@
       else if (m.role !== 'user') comandi[i] = ultimoComando.get(m.chat) || '';
     }
     const esitoDi = (i) => {
-      if (!recente[i]) return null;
       const e = esiti ? esiti(lista[i]) : null;
       const fuori = letturaDaFuori(lista[i], comandi[i]);
       return fuori ? { ...(e || {}), azioni: [...((e && e.azioni) || []), fuori] } : e;
     };
-    // Le immagini tornano con la vita delle letture, dalle più nuove: oltre i tetti quelle prima lasciano la nota.
+    // Le immagini tornano col loro messaggio, dalle più nuove, da `ancora.foto` in poi: oltre i tetti quelle prima
+    // lasciano la nota, e il taglio scende di un quarto come per i token, così non riscrive il tratto a ogni foto nuova.
     const fotoDi = new Map();
+    let fotoDa = stessaAncora && Number.isFinite(Date.parse(ancora.foto)) ? ancora.foto : null;
     if (typeof immagini === 'function') {
-      let quante = 0;
-      let caratteri = 0;
-      for (let i = n - 1; i >= 0; i--) {
-        const m = lista[i];
-        if (!recente[i] || m.role !== 'user' || !numeroImmagini(m)) continue;
+      const urlsDi = (m) => {
+        if (m.role !== 'user' || !numeroImmagini(m)) return [];
         const date = immagini(m);
-        const urls = (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
-        if (!urls.length) continue;
-        // Un messaggio che non ci sta intero tiene le sue prime foto che ci stanno: le altre lasciano la nota.
-        const tenute = [];
-        for (const u of urls) {
-          if (quante + 1 > MAX_IMMAGINI_RIMANDATE || caratteri + u.length > MAX_CARATTERI_IMMAGINI) break;
-          quante += 1;
-          caratteri += u.length;
-          tenute.push(u);
+        return (Array.isArray(date) ? date : []).filter((u) => typeof u === 'string' && u);
+      };
+      // `scala`: la parte dei tetti da riempire. Un messaggio che non ci sta intero tiene le prime foto che ci stanno
+      // nei tetti pieni solo se è il più nuovo con foto; altrimenti il taglio cade dopo di lui.
+      const scegli = (da, scala) => {
+        const out = new Map();
+        let quante = 0;
+        let caratteri = 0;
+        let primo = null;
+        for (let i = n - 1; i >= 0; i--) {
+          const m = lista[i];
+          if (da != null && Date.parse(m.ts) < Date.parse(da)) break;
+          const urls = urlsDi(m);
+          if (!urls.length) continue;
+          const peso = urls.reduce((k, u) => k + u.length, 0);
+          if (quante + urls.length <= MAX_IMMAGINI_RIMANDATE * scala && caratteri + peso <= MAX_CARATTERI_IMMAGINI * scala) {
+            quante += urls.length;
+            caratteri += peso;
+            out.set(i, urls);
+            primo = m.ts;
+            continue;
+          }
+          if (scala === 1 || out.size) return { out, primo, oltre: true };
+          const tenute = [];
+          for (const u of urls) {
+            if (tenute.length + 1 > MAX_IMMAGINI_RIMANDATE || caratteri + u.length > MAX_CARATTERI_IMMAGINI) break;
+            caratteri += u.length;
+            tenute.push(u);
+          }
+          if (tenute.length) out.set(i, tenute);
+          return { out, primo: tenute.length ? m.ts : primo, oltre: true };
         }
-        if (tenute.length) fotoDi.set(i, tenute);
-        if (tenute.length < urls.length) break;
+        return { out, primo, oltre: false };
+      };
+      let scelta = scegli(fotoDa, 1);
+      if (scelta.oltre) {
+        scelta = scegli(null, RIENTRO);
+        fotoDa = scelta.primo;
       }
+      for (const [i, urls] of scelta.out) fotoDi.set(i, urls);
     }
-    const rendiIl = (i, prima) => rendi(lista[i], prima, { tetto: token, esito: esitoDi(i), osserva, foto: fotoDi.get(i) || null });
+    const opzioni = (i) => {
+      const m = lista[i];
+      if (m.role === 'user') {
+        return {
+          tetto: token, foto: fotoDi.get(i) || null, intero: typeof intero === 'function' && !!intero(m),
+          preambolo: typeof preambolo === 'function' ? preambolo(m) : '', dopo: typeof note === 'function' ? note(m) : null,
+        };
+      }
+      return { tetto: token, esito: esitoDi(i), osserva };
+    };
+    // Un messaggio diventa uno o più messaggi per il modello (una risposta col suo giro).
+    const rendiIl = (i, prima) => {
+      const m = lista[i];
+      const g = m.role !== 'user' && typeof giro === 'function' ? conGiro(m, prima, giro(m)) : null;
+      return g || [rendi(m, prima, opzioni(i))];
+    };
     const memo = new Map();
     const pesa = (i) => {
-      if (!memo.has(i)) memo.set(i, tokenDi(rendiIl(i, lista[i - 1]).content));
+      if (!memo.has(i)) memo.set(i, rendiIl(i, lista[i - 1]).reduce((k, x) => k + tokenDi(x.content), 0));
       return memo.get(i);
     };
-    // La conversazione di questa scheda, se è ripresa da prima dei tetti: i suoi ultimi messaggi restano davanti,
-    // dentro la loro quota. Il tetto in token vale per loro e per la finestra insieme.
+    // Le conversazioni riprese da prima dei tetti: i loro ultimi messaggi restano davanti, dentro la loro quota, e il tetto
+    // in token vale per loro e per la finestra insieme. Sono del tratto, non della scheda: finché l'inizio tiene restano
+    // davanti da ogni scheda, o il tratto si riscriverebbe a ogni cambio di scheda (#1562).
+    const tieni = stessaAncora && inizio < n && lista[inizio].ts === ancora.ts && Array.isArray(ancora.riprese);
+    const riprese = new Set(tieni ? ancora.riprese : []);
+    if (chatCorrente) riprese.add(chatCorrente);
     const mie = [];
-    if (chatCorrente) for (let i = 0; i < n; i++) if (lista[i].chat === chatCorrente) mie.push(i);
+    for (let i = 0; i < n; i++) if (riprese.has(lista[i].chat)) mie.push(i);
     let mieDavanti = 0;
     while (mieDavanti < mie.length && mie[mieDavanti] < inizio) mieDavanti++;
     const riprendi = () => {
       const indici = [];
+      const perChat = new Map();
       let peso = 0;
-      for (let k = mieDavanti - 1; k >= 0 && indici.length < MESSAGGI_DELLA_CHAT; k--) {
+      for (let k = mieDavanti - 1; k >= 0; k--) {
+        const c = lista[mie[k]].chat;
+        if ((perChat.get(c) || 0) >= MESSAGGI_DELLA_CHAT) continue;
         const p = pesa(mie[k]);
         if (peso + p > token * QUOTA_RIPRESI) break;
         peso += p;
+        perChat.set(c, (perChat.get(c) || 0) + 1);
         indici.unshift(mie[k]);
       }
       return { indici, peso };
@@ -304,26 +438,24 @@
     if (totale + ripresi.peso > token) {
       while (inizio < n && totale + ripresi.peso > token * RIENTRO) {
         totale -= pesa(inizio);
-        if (lista[inizio].chat === chatCorrente) { mieDavanti++; ripresi = riprendi(); }
+        if (riprese.has(lista[inizio].chat)) { mieDavanti++; ripresi = riprendi(); }
         inizio++;
       }
     }
     const indici = [...ripresi.indici, ...Array.from({ length: n - inizio }, (_, k) => inizio + k)];
+    const ripreseOra = [...new Set(ripresi.indici.map((i) => lista[i].chat))].sort();
     const out = [];
     const azioni = [];
+    // Gli esiti che avrebbe davanti anche una conversazione nuova: quelli fra gli ultimi messaggi di tutto il filo.
+    const perUnaNuova = [];
     const visti = [];
     let prima = null;
-    let cambiaGia = false;
     for (const i of indici) {
       const m = lista[i];
-      const e = esitoDi(i);
-      const reso = rendiIl(i, prima);
-      if (!cambiaGia && scade[i] && JSON.stringify(reso) !== JSON.stringify(rendi(m, prima, { tetto: token, esito: null, osserva, foto: null }))) {
-        CAMBIANO_AL_TURNO_DOPO.add(reso);
-        cambiaGia = true;
-      }
-      out.push(reso);
+      const e = m.role !== 'user' ? esitoDi(i) : null;
+      out.push(...rendiIl(i, prima));
       if (e && Array.isArray(e.azioni)) azioni.push(...e.azioni);
+      if (e && Array.isArray(e.azioni) && n - i <= MESSAGGI_CON_ESITI) perUnaNuova.push(...e.azioni);
       visti.push(m);
       prima = m;
     }
@@ -331,10 +463,14 @@
       messaggi: out,
       visti,
       azioni,
+      perUnaNuova,
       inizio,
       ripresi: ripresi.indici.length,
       vecchi: lista.slice(0, inizio),
-      ancora: inizio < n ? { ts: lista[inizio].ts, giorni, token } : (stessaAncora ? ancora : null),
+      ultimo: visti.length ? visti[visti.length - 1] : null,
+      ancora: inizio < n
+        ? { ts: lista[inizio].ts, giorni, token, ...(fotoDa ? { foto: fotoDa } : {}), ...(ripreseOra.length ? { riprese: ripreseOra } : {}) }
+        : (stessaAncora ? ancora : null),
       token: totale + ripresi.peso,
     };
   }
@@ -349,13 +485,14 @@
       if (!m || !m.chat || m.riga) continue;
       let t = aperti.get(m.chat);
       if (m.role === 'user' || !t) {
-        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
+        t = { chiave: chiave(m), chat: m.chat, ts: m.ts, fine: m.ts, righe: [], daFuori: [], classeLetta: 1, titolo: (titoli ? titoli(m.chat) : m.titolo) || '' };
         aperti.set(m.chat, t);
         out.push(t);
       }
       const testo = String(m.text || '').replace(/\s+/g, ' ').trim();
       if (testo) t.righe.push(`${m.role === 'user' ? 'Utente' : 'Filo'}: ${testo}`);
       t.daFuori.push(...daFuoriDi([m]));
+      t.classeLetta = Math.max(t.classeLetta, classeDelMessaggio(m));
       t.fine = m.ts;
     }
     return out.filter((t) => t.righe.length).map((t) => ({ ...t, testo: t.righe.join('\n') }));
@@ -429,12 +566,25 @@
     const st = Number(err && err.status);
     if (Number.isFinite(st) && st > 0 && ![400, 413, 422].includes(st)) return null;
     const s = String((err && (err.message || err.error)) || err || '');
-    if (!/maximum context|context[ _-]?(length|window)|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
+    if (!/maximum context|context[ _-]?(length|window)|context limit:|too many tokens|prompt is too long|input is too long|reduce the length of the (messages|prompt)/i.test(s)) return null;
+    // Anthropic ha due forme: «prompt is too long: 214263 tokens > 200000 maximum» (il solo ingresso) e, quando a far
+    // sforare è il tetto della risposta, «exceed context limit: 188240 + 21333 > 200000» (ingresso + tetto > finestra).
+    const somma = s.match(new RegExp(`context limit:?\\s*${NUMERO}\\s*\\+\\s*${NUMERO}\\s*>\\s*${NUMERO}`, 'i'));
+    if (somma) {
+      const [a, b, f] = somma.slice(1, 4).map((x) => Number(String(x).replace(/[,.']/g, '')));
+      if (a > 0 && b > 0 && f > 0) return { ingresso: a, max: f, chiesti: a + b };
+    }
+    // OpenRouter mette nel chiesto anche il tetto della risposta e dice a parte l'ingresso («69000 of text input»):
+    // solo quando c'è, `ingresso`.
+    const ingresso = numeroDa(s, new RegExp(`${NUMERO} of (?:text )?input`, 'i'));
     return {
+      ...(ingresso ? { ingresso } : {}),
       max: numeroDa(s, new RegExp(`maximum context (?:length|window) (?:is|of) ${NUMERO}`, 'i'))
-        || numeroDa(s, new RegExp(`context (?:length|window|limit)[^0-9]{0,24}${NUMERO}`, 'i')),
+        || numeroDa(s, new RegExp(`context (?:length|window|limit)[^0-9]{0,24}${NUMERO}`, 'i'))
+        || numeroDa(s, new RegExp(`tokens? > ${NUMERO} maximum`, 'i')),
       chiesti: numeroDa(s, new RegExp(`requested (?:about )?${NUMERO}`, 'i'))
-        || numeroDa(s, new RegExp(`(?:prompt|input) (?:is|has|contains) ${NUMERO}`, 'i')),
+        || numeroDa(s, new RegExp(`(?:prompt|input) (?:is|has|contains) ${NUMERO}`, 'i'))
+        || numeroDa(s, new RegExp(`too long: ${NUMERO} tokens? >`, 'i')),
     };
   }
 
@@ -463,11 +613,14 @@
   // Una rilettura (CERCA_CHAT con l'id) sta nella finestra fin dal primo tentativo (#868.7), con la richiesta già fatta
   // (`occupati`) e il tetto della risposta, che il fornitore conta dentro. Mai sotto il minimo: il resto si legge a pezzi.
   const RILETTURA_MIN = 8000;
+  // Lo spazio della finestra che si lascia alla risposta prima di mandare: al più un quarto, perché un tetto largo non
+  // tolga contesto alla chat; se testo più tetto sforano, il fornitore rifà la richiesta col tetto che ci sta (#1302).
+  const riservaRisposta = (risposta, finestra) => Math.min(Math.max(0, Number(risposta) || 0), finestra / 4);
   function capRilettura({ tetto = TETTI_DI_SERIE.token, finestra = null, occupati = 0, risposta = 0 } = {}) {
     let token = Number(tetto) > 0 ? Number(tetto) : TETTI_DI_SERIE.token;
     const f = Number(finestra);
     if (Number.isFinite(f) && f > 0) {
-      const riserva = Math.min(Math.max(0, Number(risposta) || 0), f / 2);
+      const riserva = riservaRisposta(risposta, f);
       token = Math.min(token, f * MARGINE_FINESTRA - Math.max(0, Number(occupati) || 0) - riserva);
     }
     return Math.max(RILETTURA_MIN, Math.floor(token * CARATTERI_PER_TOKEN));
@@ -485,6 +638,81 @@
       resta = Math.min(resta, capRilettura({ tetto: Infinity, finestra: max, occupati, risposta }));
     }
     return Math.max(minimo, resta);
+  }
+
+  // I caratteri da togliere perché la richiesta (strumenti compresi) stia nella finestra insieme al tetto della risposta,
+  // che il fornitore conta dentro: 0 se ci sta o se la finestra non si sa.
+  function eccessoNellaFinestra({ finestra = null, caratteri = 0, risposta = 0, margine = MARGINE_FINESTRA } = {}) {
+    const f = Number(finestra);
+    if (!Number.isFinite(f) || f <= 0) return 0;
+    const riserva = riservaRisposta(risposta, f);
+    return Math.max(0, Math.ceil((Number(caratteri) || 0) - (f * margine - riserva) * CARATTERI_PER_TOKEN));
+  }
+  // Le pagine si accorciano prima di mandare con un margine stretto: sbagliare la stima costa un rifiuto, che non si
+  // paga e porta le misure; un margine largo toglierebbe al modello pagine che ci stavano.
+  const MARGINE_PAGINE = 0.95;
+
+  // Dopo un rifiuto per finestra, i caratteri da togliere: in proporzione con le misure, dalla stima con la sola
+  // finestra; null se il rifiuto non dice abbastanza (chi taglia dimezza). Il tetto della risposta occupa la finestra
+  // ma non si accorcia togliendo caratteri: va fuori dalla proporzione, o le pagine si tagliano molto oltre (#1596).
+  // Margine stretto come prima di mandare: un taglio corto costa un altro rifiuto, con misure nuove.
+  function eccessoDopoRifiuto({ max = null, chiesti = null, ingresso = null, caratteri = 0, risposta = 0 } = {}) {
+    const c = Math.max(0, Number(caratteri) || 0);
+    if (max && chiesti && chiesti > max && c > 0) {
+      const dentro = ingresso && ingresso < chiesti ? ingresso : chiesti;
+      const fuori = dentro < chiesti ? chiesti - dentro : Math.min(Math.max(0, Number(risposta) || 0), max / 2);
+      const posto = max - fuori;
+      const e = posto > 0 ? Math.ceil(c - c * (posto / dentro) * MARGINE_PAGINE) : 0;
+      return e > 0 ? e : null;
+    }
+    const stimato = max ? eccessoNellaFinestra({ finestra: max, caratteri: c, risposta }) : 0;
+    return stimato > 0 ? stimato : null;
+  }
+
+  // #1596 — quanto resta, in caratteri, di ogni pagina letta nel turno perché insieme stiano nella finestra. `pagine`:
+  // le lunghezze nell'ordine in cui tenerle. Le prime restano intere, la prima che non ci sta resta a metà se ne avanza
+  // il minimo, le altre scendono a 0 (titolo e indirizzo, che costano PESO_RIMANDO ciascuna, la prima esclusa: resta
+  // quasi sempre, e il margine della finestra copre il caso in cui no).
+  const PAGINA_MIN = 4000;
+  const PESO_RIMANDO = 800;
+  function pagineDaTenere(pagine, eccesso) {
+    const lunghe = (Array.isArray(pagine) ? pagine : []).map((n) => Math.max(0, Math.floor(Number(n) || 0)));
+    const e = Math.max(0, Math.ceil(Number(eccesso) || 0));
+    if (!e) return lunghe;
+    let resta = lunghe.reduce((s, n) => s + n, 0) - e - PESO_RIMANDO * Math.max(0, lunghe.length - 1);
+    return lunghe.map((n) => {
+      if (n <= resta) { resta -= n; return n; }
+      if (resta < PAGINA_MIN) return 0;
+      const tenuti = resta;
+      resta = 0;
+      return tenuti;
+    });
+  }
+
+  // La riga sotto la risposta sulle pagine rimaste fuori (#1596): `pagine` è [{ url, parziale }]. Nomina i siti e non i
+  // titoli, perché la frase resta fra le parole di Filo e un titolo lo scrive chi possiede la pagina.
+  function sitoDi(url) {
+    try { return new URL(String(url || '')).hostname.replace(/^www\./, ''); } catch (_) { return ''; }
+  }
+  function elencoSiti(lista) {
+    const siti = [...new Set(lista.map((p) => sitoDi(p.url)).filter(Boolean))];
+    if (!siti.length) return '';
+    return ` (${siti.length === 1 ? siti[0] : `${siti.slice(0, -1).join(', ')} e ${siti[siti.length - 1]}`})`;
+  }
+  function frasePagineLasciate(pagine) {
+    const lista = (Array.isArray(pagine) ? pagine : []).filter((p) => p && typeof p === 'object');
+    if (!lista.length) return '';
+    const fuori = lista.filter((p) => !p.parziale);
+    const meta = lista.filter((p) => p.parziale);
+    const parti = [];
+    if (fuori.length) parti.push(`ho lasciato fuori ${fuori.length === 1 ? 'una pagina' : `${fuori.length} pagine`}${elencoSiti(fuori)}`);
+    if (meta.length) {
+      const quali = meta.length === 1 ? (fuori.length ? 'un\'altra' : 'una pagina') : (fuori.length ? `altre ${meta.length}` : `${meta.length} pagine`);
+      parti.push(`di ${quali}${elencoSiti(meta)} ho tenuto solo l'inizio`);
+    }
+    const piu = lista.length > 1;
+    return `Il modello non riusciva a leggere tutto insieme, così ${parti.join(' e ')}. `
+      + `Se ${piu ? 'ti servono, chiedimi di rileggerle' : 'ti serve, chiedimi di rileggerla'}.`;
   }
 
   // Quello che il modello ha già davanti dall'archivio: i pezzi ripescati nei turni prima e le conversazioni rilette
@@ -544,9 +772,10 @@
     // Lo stesso testo che il modello ha davanti (testa e coda), così le uscite contano tutto quello che ha letto.
     const results = lista.map((r) => ({ id: r.tratto.chat, title: r.tratto.titolo || '', date: r.tratto.ts, snippet: testoRicordo(r.tratto) }));
     const daFuori = lista.flatMap((r) => (Array.isArray(r.tratto.daFuori) ? r.tratto.daFuori : []));
+    const classeLetta = lista.reduce((c, r) => Math.max(c, Number(r.tratto.classeLetta) || 1), 1);
     return {
       type: 'CERCA_CHAT', _auto: true, _callId: `ricordo_${Number(ora).toString(36)}`, _executed: true,
-      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}) },
+      _output: { automatica: true, results, ...(daFuori.length ? { daFuori } : {}), ...(classeLetta > 1 ? { classeLetta } : {}) },
     };
   }
 
@@ -566,28 +795,15 @@
       + blocchi.join('\n\n');
   }
 
-  const INTESTAZIONE_CODA = '═══ CONTESTO DI ADESSO (lo scrive Filo, non l\'utente: vale per il messaggio qui sotto) ═══';
-
-  // Il blocco subito prima della domanda: tutto ciò che cambia a ogni turno, così il filo davanti resta identico.
-  function coda({ contesto = '', ricordi = '', chatCorrente = null, nuova = false } = {}) {
-    const dove = chatCorrente
-      ? (nuova ? `Questa scheda ha appena aperto la chat ${etichettaChat(chatCorrente)}.` : `Questa scheda è la chat ${etichettaChat(chatCorrente)}.`)
-      : '';
-    return [
-      INTESTAZIONE_CODA,
-      dove,
-      contesto,
-      ricordi,
-    ].filter((x) => String(x || '').trim()).join('\n\n');
-  }
-
-  // L'ordine dei messaggi per il modello: il tratto del filo (identico fra un turno e l'altro), quello che la scheda
-  // ha in più, il contesto di adesso con i ricordi, la domanda. Tutto ciò che cambia sta dopo il tratto.
-  function assembla({ tratto = [], scheda = [], contesto = '', domanda = null } = {}) {
-    const out = [...tratto, ...scheda];
-    if (String(contesto || '').trim()) out.push({ role: 'user', content: contesto });
-    if (domanda) out.push(domanda);
-    return out;
+  // La richiesta della chat nei quattro blocchi di SPEC-CONTESTO § La richiesta: strumenti (a parte), system con la
+  // parte fissa e il CONTESTO dell'utente, il tratto vivo che finisce con la domanda, il giro di strumenti di adesso.
+  function richiesta({ sistema = '', tratto = [], scheda = [], domanda = null, giro = [] } = {}) {
+    const out = [{ role: 'system', content: String(sistema || '') }, ...tratto, ...scheda];
+    if (domanda) {
+      DOMANDE.add(domanda);
+      out.push(domanda);
+    }
+    return out.concat(Array.isArray(giro) ? giro : []);
   }
 
   // Anthropic rifiuta un punto di cache su un testo vuoto o di soli spazi.
@@ -597,11 +813,29 @@
     return Array.isArray(m.content) && m.content.some((p) => p && p.type === 'text' && String(p.text || '').trim());
   }
 
-  // Dove la richiesta della chat smette di ripetersi (SPEC-CONTESTO § La richiesta): fine della parte fissa del system,
-  // fine del tratto, ultimo messaggio. Solo la chat e il correttore: un prompt che cambia a ogni chiamata pagherebbe
-  // scritture mai rilette. `caratteri` divide il testo del messaggio e il punto va sulla prima parte. Sentinella:
-  // tests/unit/puntiDiCache.test.mjs. `durata`: quella della parte fissa della chat ('5m' o '1h', da tetti().cache);
-  // assente o non valida vale quella di serie.
+  const INTESTAZIONE_RE = new RegExp(`^\\[(${GIORNI.join('|')}) \\d`);
+  const testoIniziale = (m) => {
+    if (!m) return '';
+    if (typeof m.content === 'string') return m.content;
+    const p = Array.isArray(m.content) ? m.content.find((x) => x && x.type === 'text') : null;
+    return p ? String(p.text || '') : '';
+  };
+  // La domanda fra i messaggi che partono: per identità, o l'ultimo messaggio dell'utente con l'ora e la chat in testa.
+  function indiceDellaDomanda(messages) {
+    const i = messages.findIndex((m) => m && DOMANDE.has(m));
+    if (i > 0) return i;
+    for (let k = messages.length - 1; k > 0; k--) {
+      const m = messages[k];
+      if (m && m.role === 'user' && INTESTAZIONE_RE.test(testoIniziale(m))) return k;
+    }
+    return -1;
+  }
+
+  // Dove la richiesta della chat smette di ripetersi (SPEC-CONTESTO § La richiesta): fine della parte fissa e fine del
+  // CONTESTO dell'utente (tutte e due della durata scelta), fine del tratto prima della domanda, ultimo messaggio. Anthropic
+  // ne prende al più quattro. Solo la chat e il correttore: un prompt che cambia a ogni chiamata pagherebbe scritture mai
+  // rilette. `caratteri` divide il testo del messaggio e il punto va sulla parte prima. Sentinella:
+  // tests/unit/puntiDiCache.test.mjs. `durata`: '5m' o '1h' (da tetti().cache); assente o non valida vale quella di serie.
   function pianoDellaCache(action, messages, { durata } = {}) {
     const C = global.SN_CONST;
     if (!C || !C.ACTIONS || !Array.isArray(messages) || !messages.length) return null;
@@ -616,18 +850,19 @@
     const sys = messages[0];
     const lunga = (durataIn(durata) || TETTI_DI_SERIE.cache) === '1h' ? { durata: '1h' } : {};
     if (sys && sys.role === 'system' && typeof sys.content === 'string') {
-      const inizi = (C.INIZI_VARIABILI_CHAT || []).map((s) => sys.content.indexOf(s)).filter((i) => i > 0);
-      const taglio = inizi.length ? Math.min(...inizi) : sys.content.length;
-      if (sys.content.slice(0, taglio).trim()) {
-        punti.push(taglio < sys.content.length ? { indice: 0, caratteri: taglio, ...lunga } : { indice: 0, ...lunga });
-      }
+      const testo = sys.content;
+      const utente = C.INIZIO_PARTE_UTENTE ? testo.indexOf(C.INIZIO_PARTE_UTENTE) : -1;
+      // Quello che nel ripiego senza filo cambia a ogni turno (l'ora, l'intervista) sta in fondo, fuori dai punti.
+      const variabili = [C.INIZIO_ACCOGLIENZA, C.INIZIO_CONTESTO_CHAT].filter(Boolean).map((x) => testo.indexOf(x)).filter((i) => i > 0 && i > utente);
+      const fine = variabili.length ? Math.min(...variabili) : testo.length;
+      const punto = (n) => (n < testo.length ? { indice: 0, caratteri: n, ...lunga } : { indice: 0, ...lunga });
+      if (utente > 0 && testo.slice(0, utente).trim()) punti.push(punto(utente));
+      if (testo.slice(Math.max(0, utente), fine).trim()) punti.push(punto(fine));
     }
-    const indiceCoda = messages.findIndex((m) => m && m.role === 'user' && typeof m.content === 'string' && m.content.startsWith(INTESTAZIONE_CODA));
-    // La storia regge fino al primo messaggio che il turno dopo cambia: il punto va prima, dove verrà riletto.
-    const cambia = messages.findIndex((m, i) => i > 0 && i < indiceCoda && CAMBIANO_AL_TURNO_DOPO.has(m));
-    let fine = cambia > 0 ? cambia - 1 : indiceCoda - 1;
-    while (fine > 0 && !haTesto(messages[fine])) fine--;
-    if (fine > 0) punti.push({ indice: fine });
+    const iDomanda = indiceDellaDomanda(messages);
+    let fineTratto = iDomanda > 0 ? iDomanda - 1 : -1;
+    while (fineTratto > 0 && !haTesto(messages[fineTratto])) fineTratto--;
+    if (fineTratto > 0) punti.push({ indice: fineTratto });
     let ultimo = messages.length - 1;
     while (ultimo > 0 && !haTesto(messages[ultimo])) ultimo--;
     if (ultimo > 0 && !punti.some((p) => p.indice === ultimo)) punti.push({ indice: ultimo });
@@ -636,10 +871,12 @@
 
   global.SN_FILO_CONTESTO = {
     TETTI_DI_SERIE, LIMITI, DURATE_CACHE, durataIn, CARATTERI_PER_TOKEN, MESSAGGI_CON_ESITI, MESSAGGI_DELLA_CHAT, QUOTA_RIPRESI, SOGLIA_RICORDO, MAX_RICORDI,
-    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini,
+    TOKEN_PER_IMMAGINE, MAX_IMMAGINI_RIMANDATE, MAX_CARATTERI_IMMAGINI, tokenDi, caratteriDi, numeroImmagini, notaImmagini, notaRisposta,
     tetti, numeroIn, stimaToken, taglio, passoTaglio, etichettaChat, quando, intestazione, chiave,
-    ESTERNO_COMANDO, letturaDaFuori, daFuoriDi, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
-    coda, assembla, troppoLungo, tettoDopoRifiuto, rifiutaImmagini, INTESTAZIONE_CODA, pianoDellaCache,
+    ESTERNO_COMANDO, ESTERNO_AIUTO, letturaDaFuori, daFuoriDi, classeDelMessaggio, classeDelleRisposte, trattoComeAzione,
+    provenienzaDellaChat, provenienzaDelFrammento, finestra, tratti, testoPerIndice, scegliRicordi, ricordiPerParole, testoRicordo, rendiRicordi,
+    troppoLungo, tettoDopoRifiuto, rifiutaImmagini, pianoDellaCache, richiesta, indiceDellaDomanda, rendiMessaggio: rendi, conGiro,
     RILETTURA_MIN, capRilettura, rilettureDopoRifiuto, giaDavanti, senzaCancellati, ricordoComeAzione,
+    eccessoNellaFinestra, MARGINE_PAGINE, eccessoDopoRifiuto, PAGINA_MIN, PESO_RIMANDO, pagineDaTenere, frasePagineLasciate,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

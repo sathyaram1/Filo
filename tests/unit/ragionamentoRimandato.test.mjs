@@ -13,6 +13,7 @@ require('../../src/shared/actionLevels.js');
 require('../../src/shared/actionTools.js');
 require('../../src/shared/contenutoEsterno.js');
 require('../../src/shared/filoContesto.js');
+require('../../src/shared/filoTrattoVivo.js');
 require('../../src/main/services/providers/openrouter.js');
 
 const C = globalThis.SN_CONST;
@@ -119,19 +120,18 @@ test('gli altri modelli ricevono il ragionamento come prima, anche dopo un tagli
   assert.deepEqual(corpo.messages[2].reasoning_details, [pensiero(2)]);
 });
 
-// La richiesta come la compone il main per la chat (handlers.js, ramo FILO_CHAT col tratto del filo).
+// La richiesta come la compone il main per la chat (handlers.js, ramo FILO_CHAT; SPEC-CONTESTO § La richiesta): parte
+// fissa e CONTESTO dell'utente nel system, il tratto vivo dal filo, la domanda resa come la renderà il tratto dopo.
 const ORA = Date.parse('2026-10-21T10:00:00Z');
 const CHAT = 'ab12cd34';
-const BASE = { capacita: globalThis.SN_CAPABILITIES.renderIndexForPrompt(), sistema: 'linux', profilo: 'Si chiama Mario.', files: '(nessuno)' };
-function richiestaChat({ filo, esiti = null, stato, domanda, onboarding = '' }) {
-  const p = { ...BASE, stato, onboarding, onboardingTurns: 1, onboardingMax: 5 };
-  const f = FC.finestra(filo, { ora: ORA, giorni: 3, token: 100000, chatCorrente: CHAT, esiti });
-  const messages = FC.assembla({
-    tratto: [{ role: 'system', content: PROMPTS.filoChatStatic(p) + PROMPTS.filoChatOnboarding(p) }, ...f.messaggi],
-    contesto: FC.coda({ contesto: PROMPTS.filoChatContext({ ...p, onboarding: '' }), chatCorrente: CHAT }),
-    domanda: { role: 'user', content: domanda },
-  });
-  return C.injectAgentStyle(messages, ACTIONS.FILO_CHAT, 'Rispondi in modo asciutto.');
+const TV = globalThis.SN_TRATTO_VIVO;
+const SISTEMA = PROMPTS.filoChatStatic() + TV.parteUtente(TV.sezioniUtente({
+  capacita: globalThis.SN_CAPABILITIES.renderIndexForPrompt(), sistema: 'linux', profilo: 'Si chiama Mario.', files: '(nessuno)', stile: 'Rispondi in modo asciutto.',
+}), { ts: '2026-10-21T09:00:00Z' });
+function richiestaChat({ filo, esiti = null }) {
+  const domanda = filo[filo.length - 1];
+  const f = FC.finestra(filo.slice(0, -1), { ora: ORA, giorni: 3, token: 100000, chatCorrente: CHAT, esiti });
+  return FC.richiesta({ sistema: SISTEMA, tratto: f.messaggi, domanda: FC.rendiMessaggio(domanda, f.ultimo, { tetto: 100000, intero: true }) });
 }
 const ts = (min) => new Date(ORA - min * 60000).toISOString();
 
@@ -140,10 +140,11 @@ test('dentro un giro di strumenti ogni messaggio dell\'assistente del turno ripo
   const filo = [
     { chat: CHAT, role: 'user', text: 'ciao', ts: ts(60) },
     { chat: CHAT, role: 'filo', text: 'Ciao Mario!', ts: ts(59) },
+    { chat: CHAT, role: 'user', text: 'che tempo fa domani?', ts: ts(1) },
   ];
   const vecchio = (await chiama({ messages: [{ role: 'user', content: 'altro' }], n: 0 })).r.reasoningDetails;
   const esiti = (m) => (m.role === 'filo' ? { azioni: [], reasoningDetails: vecchio } : null);
-  const inizio = richiestaChat({ filo, esiti, stato: 'Data: martedì 21 ottobre 2026, 10:00', domanda: 'che tempo fa domani?', onboarding: '- scopri il nome' });
+  const inizio = richiestaChat({ filo, esiti });
   const giro = [];
   const turno = async (n, chiamate) => {
     const messages = [...inizio, ...giro];
@@ -164,23 +165,22 @@ test('dentro un giro di strumenti ogni messaggio dell\'assistente del turno ripo
   assert.ok(JSON.stringify(terzo.messages.at(-1)).includes('cache_control'), 'il punto di cache non si è spostato sull\'ultimo esito');
 });
 
-// Perché oggi verso Claude il ragionamento dei turni passati non torna mai: davanti alla domanda di un turno c'è il
-// CONTESTO DI ADESSO, che al turno dopo non c'è più, e nel tratto la domanda prende ora e chat in testa.
-test('chat vera: la risposta del turno prima è nel tratto col suo ragionamento, ma la richiesta davanti a lei è cambiata', async () => {
+// SPEC-CONTESTO fase 3: il tratto cresce solo in coda, la domanda di un turno è già quella che il tratto renderà dopo,
+// e il CONTESTO dell'utente sta fermo nel system. Così il ragionamento del turno prima torna a Claude.
+test('chat vera: la risposta del turno prima torna a Claude col suo ragionamento, perché la richiesta davanti a lei è la stessa', async () => {
   const filo = [{ chat: CHAT, role: 'user', text: 'ciao', ts: ts(10) }];
-  const primo = richiestaChat({ filo: [], stato: 'Data: martedì 21 ottobre 2026, 09:50', domanda: 'ciao' });
+  const primo = richiestaChat({ filo });
   const nato = await chiama({ messages: primo, cache: FC.pianoDellaCache(ACTIONS.FILO_CHAT, primo), n: 1 });
-  filo.push({ chat: CHAT, role: 'filo', text: nato.r.text, ts: ts(9) });
+  filo.push({ chat: CHAT, role: 'filo', text: nato.r.text, ts: ts(9) }, { chat: CHAT, role: 'user', text: 'e domani?', ts: ts(1) });
   const esiti = (m) => (m.role === 'filo' ? { azioni: [], reasoningDetails: nato.r.reasoningDetails } : null);
-  const dopo = richiestaChat({ filo, esiti, stato: 'Data: martedì 21 ottobre 2026, 10:00', domanda: 'e domani?' });
+  const dopo = richiestaChat({ filo, esiti });
   const j = dopo.findIndex((m) => m.role === 'assistant');
   assert.ok(dopo[j].reasoning_details, 'il tratto non porta più il ragionamento: la prova non prova niente');
+  assert.deepEqual(dopo.slice(0, j), primo, 'il turno dopo ha riscritto il prefisso del primo');
 
   const { corpo } = await chiama({ messages: dopo, cache: FC.pianoDellaCache(ACTIONS.FILO_CHAT, dopo), n: 2 });
-  assert.deepEqual(conRagionamento(corpo), [], 'il ragionamento è partito con un prefisso diverso da quello con cui è nato');
-  const testo = (m) => (typeof m.content === 'string' ? m.content : m.content.map((p) => p.text || '').join(''));
-  assert.ok(testo(nato.corpo.messages.at(-2)).startsWith(FC.INTESTAZIONE_CODA), 'alla nascita il contesto di adesso stava davanti alla domanda');
-  assert.notEqual(testo(corpo.messages[j - 1]), testo(nato.corpo.messages.at(-1)), 'nel tratto la domanda è la stessa di quando è nato');
+  assert.deepEqual(conRagionamento(corpo), [j], 'il ragionamento del turno prima non è tornato a Claude');
+  assert.deepEqual(corpo.messages[j].reasoning_details, [pensiero(1)]);
 
   const aperto = await chiama({ model: APERTO, messages: dopo, n: 2 });
   assert.deepEqual(aperto.corpo.messages[j].reasoning_details, [pensiero(1)], 'un modello aperto ha perso il ragionamento');

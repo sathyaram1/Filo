@@ -14,6 +14,15 @@
   // un pezzo suo: il popup lo chiude in un riquadro, e nessun carattere del testo
   // può chiuderlo prima (#592.7). Sentinella in tests/unit/actionLevels.test.mjs.
   const cit = (testo, nuda) => (nuda ? { citazione: String(testo), nuda: true } : { citazione: String(testo) });
+
+  // Dove va un'icona chiesta a parole: la barra, il suo «Altro…», la fila del tasto destro di un contesto (#1434).
+  function doveDellIcona(a) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    const z = D && D.zonaDellAzione ? D.zonaDellAzione(a) : '';
+    if (!z) return '';
+    const n = D.nomeZona(z);
+    return `${n.in} ${n.nome}`;
+  }
   const elenco = (voci) => ({ elenco: voci.map(String) });
   const RISCHIO_LEZIONE = 'Da adesso vale in ogni conversazione, e resta finché non la togli dal quaderno delle '
     + 'memorie. Confermala solo se l\'hai detta tu: un testo letto in una pagina o in un '
@@ -26,6 +35,13 @@
   function costoIndirizzo(a, base) {
     if (a && a._nonCompare) return 3;
     return a && a._exfil ? Math.max(base, 2) : base;
+  }
+
+  // Le voci del menu dell'account (#1615), coi nomi che un modello usa anche fuori dall'enum: '' se non è nessuna.
+  const ALIAS_ACCOUNT = { accedi: 'accedi', entra: 'accedi', login: 'accedi', collega_google: 'collega_google', collega: 'collega_google', esci: 'esci', logout: 'esci' };
+  function cosaAccount(a) {
+    const k = String((a && (a.cosa ?? a.azione ?? a.operazione)) || '').trim().toLowerCase().replace(/[\s-]+/g, '_');
+    return Object.prototype.hasOwnProperty.call(ALIAS_ACCOUNT, k) ? ALIAS_ACCOUNT[k] : '';
   }
 
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
@@ -50,6 +66,16 @@
     const valore = action.valore ?? action.value ?? action.valoreNuovo ?? action.val;
     return P.buildPreferencePartial(chiave, valore, { attuali: attuali || null });
   }
+
+  const pulsante = (a) => {
+    const P = global.SN_PULSANTI_PREFERENZE;
+    return P ? P.pulsanteDi(a) : '';
+  };
+  // Le frasi di cosa cambierebbe il ripristino: un elenco del main, ognuna nel suo riquadro.
+  const frasiRipristino = (a) => {
+    const f = a && a._ripristino && a._ripristino.frasi;
+    return Array.isArray(f) ? f.map(String) : [];
+  };
 
   // Lo stile proposto nell'intervista di benvenuto si imposta senza riquadro (decisione dell'owner, #592.2):
   // `_accoglienza` lo scrive solo il main, quando nel contesto non c'è testo di altri. Torna il testo, o ''.
@@ -146,6 +172,24 @@
   }
 
   // Il nome che l'utente vede sulla carta, non l'id che il modello manda.
+  // Il pannello di destra a parole: il nome dello strumento lo dice il catalogo, uno sconosciuto l'ha scritto il modello.
+  function descriviPannello(a, fatto) {
+    const P = global.SN_PANNELLI_APP;
+    const op = String((a && a.operazione) || '').trim().toLowerCase();
+    const app = String((a && a.app) || 'editor');
+    const id = P ? P.risolvi(app, a && a.elemento) : null;
+    const nome = id ? `«${P.nome(app, id)}»` : (a && a.elemento ? `«${String(a.elemento).slice(0, 60)}»` : 'uno strumento');
+    if (op === 'aggiungi') return fatto ? `${nome} ora sta nel pannello degli strumenti` : `Mettere ${nome} nel pannello degli strumenti`;
+    if (op === 'togli') return fatto ? `${nome} non sta più nel pannello degli strumenti` : `Togliere ${nome} dal pannello degli strumenti`;
+    const frasi = {
+      apri: ['Aprire il pannello degli strumenti', 'Il pannello degli strumenti è aperto'],
+      chiudi: ['Chiudere il pannello degli strumenti', 'Il pannello degli strumenti è chiuso'],
+      blocca: ['Tenere aperto il pannello degli strumenti', 'Il pannello degli strumenti resta aperto e spinge la pagina'],
+      sblocca: ['Sbloccare il pannello degli strumenti', 'Il pannello degli strumenti si apre sopra la pagina'],
+    }[op] || ['Cambiare il pannello degli strumenti', 'Pannello degli strumenti cambiato'];
+    return frasi[fatto ? 1 : 0];
+  }
+
   function descriviCarta(a, fatto) {
     const C = global.SN_CARTE_HOME;
     // Un nome di destra si riconosce solo esatto: «lo scaricamento del file» è una carta di sinistra, non l'Editor.
@@ -199,6 +243,12 @@
     return t || SPIEGAZIONE_DI_FILO;
   }
   const SPIEGAZIONE_DI_FILO = 'Uso il terminale del computer';
+  const PERCHE_SENZA_CESTINO = 'cancella per sempre, senza passare dal cestino';
+  function cancellaColComando(a) {
+    const C = global.SN_CMD_CLASSIFY;
+    const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
+    return !!(C && C.cancellaPerSempre && C.cancellaPerSempre(cmd));
+  }
 
   function nomeLeggibile(n) {
     const N = global.SN_NOMI_FILE;
@@ -217,6 +267,38 @@
     }
     if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
     t.push('\n\nL\'estensione non cambia e nessun file viene sovrascritto. Dopo puoi rimettere i nomi di prima con «Annulla».');
+    return t;
+  }
+
+  const perSempre = (a) => !!(a && a.per_sempre === true);
+  // Nomi e cartelle vengono dal disco: stanno nei riquadri, una voce per elemento.
+  function descriviEliminazione(a) {
+    const file = (Array.isArray(a && a._file) ? a._file : []).filter((f) => f && f.nome);
+    const saltati = Array.isArray(a && a._saltati) ? a._saltati : [];
+    const per = perSempre(a);
+    const quanti = (f) => (f.dentro > 0 ? `con ${f.oltre ? 'più di ' : ''}${f.dentro} ${f.dentro === 1 ? 'elemento' : 'elementi'} dentro` : 'vuota');
+    const verbo = per ? 'Cancellare per sempre' : 'Spostare nel cestino';
+    let t;
+    if (!file.length) t = [per ? 'Cancellare per sempre dei file' : 'Spostare dei file nel cestino'];
+    else if (file.length === 1) {
+      const f = file[0];
+      t = [`${verbo} ${f.tipo === 'cartella' ? `questa cartella, ${quanti(f)}` : 'questo file'}:\n`, cit(nomeLeggibile(f.nome)),
+        ...(f.cartella ? ['\nNella cartella:\n', cit(f.cartella, true)] : [])];
+    } else {
+      t = [`${verbo} questi ${file.length} elementi:\n`,
+        elenco(file.map((f) => `${f.percorso || nomeLeggibile(f.nome)}${f.tipo === 'cartella' ? ` (cartella ${quanti(f)})` : ''}`))];
+    }
+    if (saltati.length) {
+      t.push('\n\nRestano dove sono:\n', elenco(saltati.map((x) => `«${nomeLeggibile(x && x.nome)}»: ${nomeLeggibile(x && x.perche)}`)));
+    }
+    if (a && a._oltre > 0) t.push(`\n\nNe restano altri ${Number(a._oltre)}: chiedimelo di nuovo dopo questi.`);
+    const uno = file.length <= 1;
+    const cartella = uno && file.length === 1 && file[0].tipo === 'cartella';
+    let dopo = 'Li ritrovi nel cestino, se vuoi rimetterli al loro posto.';
+    if (uno) dopo = cartella ? 'La ritrovi nel cestino, se vuoi rimetterla al suo posto.' : 'Lo ritrovi nel cestino, se vuoi rimetterlo al suo posto.';
+    t.push(per
+      ? `\n\nNon ${uno ? 'passa' : 'passano'} dal cestino: non si ${uno ? 'potrà' : 'potranno'} più recuperare.`
+      : `\n\n${dopo}`);
     return t;
   }
 
@@ -275,6 +357,24 @@
         const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
         const n = fatti ? fatti.length : (Array.isArray(a && a._proposte) ? a._proposte.length : 0);
         return n === 1 ? 'Rinominato un file (si rimette com\'era con «Annulla»)' : `Rinominati ${n} file (si rimettono com'erano con «Annulla»)`;
+      },
+    },
+    // #1909 — cancellare un file del computer vuol dire spostarlo nel cestino: si rimedia, costo 2, e chiede sempre con
+    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 3 e la parola a ogni livello. I file li trova il
+    // main (`_file`) prima del gate, mai il modello.
+    ELIMINA_FILE: {
+      costo: (a) => (perSempre(a) ? 3 : 2),
+      campo: 'file',
+      parola: perSempre,
+      perimetro: () => false,
+      perchePerimetro: 'Te lo chiedo sempre, prima di toccare i tuoi file.',
+      describe: (a) => descriviEliminazione(a),
+      // Senza i nomi: vengono dal disco, e questa frase torna al modello fuori dal recinto. Li dicono riga e bottone.
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const n = Array.isArray(o.eliminati) ? o.eliminati.length : 0;
+        if (o.perSempre) return n === 1 ? 'Cancellato per sempre un elemento, senza cestino' : `Cancellati per sempre ${n} elementi, senza cestino`;
+        return n === 1 ? 'Spostato nel cestino un elemento (si rimette da lì)' : `Spostati nel cestino ${n} elementi (si rimettono da lì)`;
       },
     },
     SVEGLIA: {
@@ -448,13 +548,23 @@
       },
     },
     CERCA_CHAT: {
-      // #525 — Filo rilegge le conversazioni passate con lo stesso utente per
-      // riprendere un discorso di ieri. Sola lettura di dati che sono già
-      // dell'utente e che sono già passati da questo contesto (le ha scritte
-      // lui, con Filo): niente scritture, niente cancellazioni, niente che
-      // esca dal computer → costo 0, come LEGGI_FILE. Sono di classe 1: non sporcano il compito.
+      // #525 — Filo rilegge il filo per riprendere un discorso di ieri: sola lettura, niente esce → costo 0. Le parole
+      // dell'utente e di Filo sono di classe 1; sporcano le pagine visitate, le risposte nate da testo di altri e le
+      // parole scritte nell'Aiuto sopra un sito (#1508, le ultime da `daFuori`).
       costo: 0,
       campo: null,
+      fonte: (a, out) => {
+        const pagine = Array.isArray(out.pagine) ? out.pagine.filter(Boolean) : [];
+        const viste = !pagine.length ? null : pagine.some((p) => String(p.riassunto || '').trim())
+          ? { classe: 5, campo: 'web', chiave: 'visitate:riassunti', motivo: 'ho letto il riassunto di una pagina che avevi aperto, fatto col testo del sito' }
+          : { classe: 3, campo: 'web', chiave: 'visitate:titoli', motivo: 'ho letto i titoli delle pagine che hai visitato, scritti dai siti' };
+        const c = Number(out.classeLetta);
+        // Quelle del tratto le ha davanti anche una conversazione nuova: `ereditata` toglie quella strada dal «no».
+        const risposte = Number.isInteger(c) && c > 1 && c <= 5
+          ? { classe: c, campo: null, chiave: 'filo:altra-chat', motivo: c === 2 ? 'ho riletto risposte di altre conversazioni nate dai tuoi file' : 'ho riletto risposte di altre conversazioni nate da testo scritto da altri', ...(out.tratto ? { ereditata: true } : {}) }
+          : null;
+        return viste && (!risposte || viste.classe >= risposte.classe) ? viste : risposte;
+      },
       describe: (a) => {
         const q = String((a && (a.query ?? a.testo)) || '').trim();
         if (a && a.id && !q) return 'Rileggere una conversazione passata';
@@ -479,6 +589,10 @@
     APRI_SALVATA: {
       costo: 1,
       campo: 'web',
+      // Il titolo che torna l'ha scritto il sito, come in CERCA_SALVATE.
+      fonte: (a, out) => (out.aperta
+        ? { classe: 3, campo: 'web', chiave: 'salvate:titoli', motivo: 'ho letto il titolo di una pagina che hai salvato per dopo, scritto dal sito' }
+        : null),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         const quale = t ? cit(t) : 'una pagina salvata per dopo';
@@ -656,6 +770,33 @@
         return n ? `Schede riordinate: archiviate ${n} non più utili` : 'Schede riordinate: nessuna da archiviare';
       },
     },
+    // Le schede (`_targets`, `_targetIds`) le sceglie il main, mai l'LLM (#413). Una si riapre dal filo della home:
+    // costo 1; più d'una insieme è il freno di CANCELLA_SVEGLIA, così dopo una pagina letta «chiudile tutte» chiede.
+    CHIUDI_SCHEDE: {
+      costo: (a) => (targetCount(a) === 1 ? 1 : 2),
+      campo: null,
+      describe: (a) => {
+        const list = targetList(a);
+        const dove = a && a._inIncognito ? '\n\nIn incognito non restano nel filo della home.'
+          : '\n\nLe pagine chiuse restano nel filo della home, da dove le riapri.';
+        if (!list.length) {
+          const sito = String((a && (a.sito ?? a.dominio)) || '').trim();
+          if (sito) return ['Chiudere le schede di ', cit(sito, true), dove];
+          return [`${a && (a.tutte === true || a.tranne) ? 'Chiudere tutte le schede tranne questa' : 'Chiudere delle schede'}${dove}`];
+        }
+        const MOSTRATE = 15;
+        const oltre = list.length > MOSTRATE ? `\n…e altre ${list.length - MOSTRATE}` : '';
+        return [`Chiudere ${list.length === 1 ? 'questa scheda' : `queste ${list.length} schede`}:\n`,
+          elenco(list.slice(0, MOSTRATE)), `${oltre}${dove}`];
+      },
+      describeDone: (a) => {
+        const out = a && a._output;
+        const n = out && Number.isFinite(Number(out.chiuse)) ? Number(out.chiuse) : targetList(a).length;
+        if (!n) return 'Nessuna scheda chiusa';
+        const dove = a && a._inIncognito ? '' : (n === 1 ? ': resta nel filo della home' : ': restano nel filo della home');
+        return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${dove}`;
+      },
+    },
     CANCELLA_ARCHIVIO: {
       costo: 3,
       campo: null,
@@ -710,9 +851,12 @@
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
         const per = a && a.per_sempre === true;
-        return [`Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${righe.length === 1 ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
-          elenco(righe), per ? '\n\nNon entreranno più nelle conversazioni, e il testo sparisce anche dal quaderno delle memorie.'
-            : '\n\nNon entreranno più nelle conversazioni. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.'];
+        const una = righe.length === 1;
+        const dove = per ? ', e il testo sparisce anche dal quaderno delle memorie.'
+          : (una ? '. La ritrovi nascosta nel quaderno delle memorie, se vuoi rimetterla.'
+            : '. Le ritrovi nascoste nel quaderno delle memorie, se vuoi rimetterle.');
+        return [`Filo sta per ${per ? 'cancellare per sempre' : 'dimenticare'} ${una ? 'questa riga' : `queste ${righe.length} righe`} della sua memoria:\n`,
+          elenco(righe), `\n\n${una ? 'Non entrerà' : 'Non entreranno'} più nelle conversazioni${dove}`];
       },
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
@@ -858,6 +1002,8 @@
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       campo: 'terminale',
+      // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
+      parola: (a) => cancellaColComando(a),
       fonte: (a, out) => {
         if (out.blocked) return null;
         const t = `${typeof out.stdout === 'string' ? out.stdout : ''}${typeof out.stderr === 'string' ? out.stderr : ''}`;
@@ -880,6 +1026,7 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
+        if (cancellaColComando(a)) perche = PERCHE_SENZA_CESTINO;
         // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
         const sp = spiegazioneComando(a);
         return [sp === SPIEGAZIONE_DI_FILO ? sp : cit(sp, true), '\n\nIl comando, nel terminale:\n', cmd ? cit(cmd, true) : '(comando vuoto)',
@@ -951,7 +1098,7 @@
     // sa già fare l'assistente di pagina. Tutti costo 1: azionare un controllo
     // della finestra è benigno e completamente reversibile (uno schermo intero si
     // toglie, un menu si richiude). "close" è ESCLUSO di proposito: l'AI non
-    // chiude finestra né schede.
+    // chiude la finestra; le schede le chiude CHIUDI_SCHEDE.
     COMANDO_FINESTRA: {
       costo: 1,
       campo: null,
@@ -964,8 +1111,37 @@
           settings: 'Aprire il menu Impostazioni',
           apps: 'Aprire il menu App',
           account: 'Aprire il menu Account',
+          aiuto: 'Aprire l\'Aiuto sulla scheda davanti',
+          sidebar: 'Aprire la barra laterale',
+          sidebar_close: 'Chiudere la barra laterale',
+          sidebar_lock: 'Tenere aperta la barra laterale accanto alla pagina',
+          sidebar_unlock: 'Sbloccare la barra laterale',
         };
         return labels[cmd] || 'Azionare un comando della finestra di Filo';
+      },
+    },
+    // #1615 — le voci del menu dell'account a parole. Entrare e collegare aprono una pagina dove sceglie l'utente (1);
+    // uscire ferma sincronia e segnalazioni finché non si rientra, che si fa con un gesto (2).
+    ACCOUNT: {
+      costo: (a) => (cosaAccount(a) === 'esci' ? 2 : 1),
+      campo: null,
+      describe: (a) => ({
+        accedi: 'Aprire l\'accesso a Filo con Google',
+        collega_google: 'Collegare YouTube, Gmail e Drive nelle schede al tuo account Google',
+        esci: 'Uscire dall\'account di Filo',
+      }[cosaAccount(a)] || 'Usare il menu dell\'account di Filo'),
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const gia = {
+          dentro: 'Eri già dentro Filo col tuo account Google',
+          collegato: 'YouTube, Gmail e Drive nelle schede erano già collegati',
+          fuori: 'Non eri dentro nessun account di Filo',
+        }[o.gia];
+        return gia || {
+          accedi: 'Aperto l\'accesso a Filo con Google',
+          collega_google: 'Aperto il collegamento di YouTube, Gmail e Drive al tuo account Google',
+          esci: 'Uscito dall\'account di Filo',
+        }[o.voce || cosaAccount(a)] || 'Usato il menu dell\'account';
       },
     },
     // #870 — le carte della home, come le dispone l'utente trascinandole. Costo 1: ogni mossa si annulla con
@@ -1006,18 +1182,25 @@
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
         // Un nome che Filo non conosce l'ha scritto il modello: nel riquadro.
-        const nome = D && D.noto(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
-        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
-        const d = dove[String((a && a.dove) || '').trim().toLowerCase()];
+        const nome = D && D.esiste(id) ? `«${D.nome(id)}»` : (id ? cit(id) : 'un\'icona');
+        const d = doveDellIcona(a);
         return ['Spostare ', nome, d ? ` ${d}` : ''];
       },
       describeDone: (a) => {
         const D = global.SN_DISPOSIZIONE_ICONE;
         const id = String((a && (a.icona ?? a.id)) || '').trim();
-        const nome = D && D.noto(id) ? D.nome(id) : id;
-        const dove = { barra: 'nella barra laterale', menu: 'nella riga del tasto destro', altro: 'in «Altro…» del tasto destro' };
-        return `«${nome}» ora sta ${dove[String((a && a.dove) || '').trim().toLowerCase()] || 'al suo nuovo posto'}`;
+        const nome = D && D.esiste(id) ? D.nome(id) : id;
+        return `«${nome}» ora sta ${doveDellIcona(a) || 'al suo nuovo posto'}`;
       },
+    },
+    // ── il pannello di destra delle app di Filo a parole (#1433) ──────────────
+    // Costo 1: è quello che l'utente fa col mouse (aprirlo, bloccarlo, trascinarci dentro o fuori uno strumento), e si
+    // disfa allo stesso modo.
+    PANNELLO_APP: {
+      costo: 1,
+      campo: null,
+      describe: (a) => descriviPannello(a, false),
+      describeDone: (a) => descriviPannello(a, true),
     },
     // ── rimettere com'era un cambio di stato (#867) ─────────────────────────
     // Il costo è quello del cambio da rimettere: `_livelloCambio` lo scrive il main dal registro,
@@ -1037,6 +1220,65 @@
       describeDone: (a) => {
         const f = String((a && a._fraseCambio) || '').trim();
         return f ? `Rimesso com'era prima di: ${f}` : 'Cambio annullato';
+      },
+    },
+    // ── i pulsanti della pagina Preferenze chiesti in chat (#1619) ───────────
+    // Le prove suonano e basta: 0. Rifare l'intervista lascia quella di prima da rileggere: 1. Il ripristino si
+    // annulla dal segno sulla bolla, e pesa quanto il suo annullo: `_ripristino` (cosa cambia e a che livello) lo
+    // scrive il main prima del cancello, con la stessa funzione che poi scrive le impostazioni.
+    PULSANTE_PREFERENZE: {
+      costo: (a) => {
+        const p = pulsante(a);
+        if (p.startsWith('prova_')) return 0;
+        // L'aspetto si rimette dal segno come un IMPOSTA_ESTETICA: 1.
+        if (p !== 'ripristina_tutto') return 1;
+        return frasiRipristino(a).length ? 2 : 0;
+      },
+      campo: null,
+      difesa: (a) => pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0
+        && !(a && a._ripristino && a._ripristino.livello === 1),
+      // Tutte insieme non si rimettono senza un clic, a nessun livello: un «rimetti com'era» capito male le perderebbe.
+      perimetro: (a) => !(pulsante(a) === 'ripristina_tutto' && frasiRipristino(a).length > 0),
+      perchePerimetro: 'Rimettere tutte le impostazioni di serie te lo chiedo sempre prima.',
+      describe: (a) => {
+        const p = pulsante(a);
+        if (p === 'prova_suono' || p === 'prova_suoneria') {
+          const t = global.SN_PREF && a && a.tono != null ? global.SN_PREF.tonoDa(String(a.tono)) : null;
+          const nome = t ? ` «${global.SN_PREF.TONI_ETICHETTE[t]}»` : '';
+          return p === 'prova_suono' ? `Far sentire il suono degli avvisi${nome}` : `Far sentire la suoneria di timer e sveglie${nome}`;
+        }
+        if (p === 'prova_voce') {
+          const v = String((a && a.voce) || '').trim();
+          return v ? ['Far sentire la voce della lettura ', cit(v.slice(0, 80))] : 'Far sentire la voce della lettura ad alta voce';
+        }
+        if (p === 'prova_voce_sistema') return 'Far sentire la voce di riserva del sistema';
+        if (p === 'ripristina_aspetto') {
+          return 'Riportare colori, caratteri e misure dell\'aspetto ai valori di serie. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.';
+        }
+        if (p === 'rifai_intervista') {
+          return 'Ricominciare l\'intervista di benvenuto in una home nuova. Quella di prima resta da rileggere in Preferenze.';
+        }
+        if (p === 'ripristina_tutto') {
+          const f = frasiRipristino(a);
+          if (!f.length) return 'Riportare le impostazioni ai valori di serie: lo sono già tutte';
+          const base = [`Riportare ai valori di serie ${f.length === 1 ? 'un\'impostazione' : `${f.length} impostazioni`}:\n`, elenco(f),
+            '\n\nRestano le chiavi API, il registro dei modelli e l\'autonomia di Filo. Si rimette com\'era con «annulla» sul segno accanto al tuo messaggio.'];
+          if (a && a._ripristino && a._ripristino.livello === 1) return base;
+          return [...base, '\n\nTocca impostazioni di sicurezza, dei modelli o delle spese: conferma solo se l\'hai chiesto tu.'];
+        }
+        return 'Usare un pulsante delle Preferenze';
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const p = pulsante(a);
+        if (p === 'prova_suono') return `Suonato il suono degli avvisi${o.etichetta ? ` «${o.etichetta}»` : ''}`;
+        if (p === 'prova_suoneria') return `Suonata la suoneria${o.etichetta ? ` «${o.etichetta}»` : ''}`;
+        if (p === 'prova_voce') return 'Letta una frase con la voce della lettura';
+        if (p === 'prova_voce_sistema') return 'Letta una frase con la voce di riserva del sistema';
+        if (p === 'ripristina_aspetto') return 'Aspetto riportato ai valori di serie';
+        if (p === 'rifai_intervista') return 'Ricominciata l\'intervista di benvenuto in una home nuova';
+        if (p === 'ripristina_tutto') return 'Impostazioni riportate ai valori di serie';
+        return 'Fatto';
       },
     },
     // ── volume, Bluetooth e Wi-Fi del computer (#874) ───────────────────────
@@ -1114,6 +1356,16 @@
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.nome) return `Collegato il computer alla rete Wi-Fi «${nome}»`;
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
+      },
+    },
+    // ── icone del desktop del computer (#1621) ───────────────────────────────
+    // Costo 1: ogni riordino è un cambio del filo, e l'annullo rimette ogni icona dov'era.
+    ORDINA_DESKTOP: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const come = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
+        return `Mettere le icone del desktop ${come.get(String((a && a.ordine) || 'nome').trim().toLowerCase()) || 'in ordine'}`;
       },
     },
     // ── zoom della pagina via chat (#686) ────────────────────────────────────
@@ -1221,9 +1473,12 @@
     BLUETOOTH: accesaOSpenta,
     IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),
     IMPOSTA_ESTETICA: fatta,
+    PULSANTE_PREFERENZE: senza('muto', 'spento'),
     COMANDO_FINESTRA: senza('already'),
+    PANNELLO_APP: fatta,
     TIENI_APERTA: fatta,
     NON_TENERE_APERTA: fatta,
+    CHIUDI_SCHEDE: senza('restano'),
     STILE_PAGINA: fatta,
     RIPRISTINA_STILE_PAGINA: fatta,
     SALVA_APPUNTO: fatta,
@@ -1325,5 +1580,5 @@
     return '';
   }
 
-  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo };
+  global.SN_ACTION_LEVELS = { REGISTRY, LETTURE, diSolaLettura, TERMINALI, parlaDaSe, costoFor, campoFor, fonteDi, ingressi, describe, describeParts, describeDone, spiegazioneComando, stileDellAccoglienza, lezioneDellAccoglienza, indirizzoDi, costoIndirizzo, cosaAccount };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

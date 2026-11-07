@@ -8,7 +8,7 @@
 //     (a differenza del titolo, una-tantum);
 //  3) il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo
 //     aggiorna il riassunto salvato;
-//  4) chat del documento, titolo e riassunto leggono il documento intero (#1475).
+//  4) la chat del documento (l'Aiuto, #1433), titolo e riassunto leggono il documento intero (#1475).
 //
 // L'AI è stubbata sovrascrivendo chrome.runtime.sendMessage nella pagina (lo
 // shim è writable): AI_REQUEST torna un riassunto canonico, FILO_GET_MEMORY una
@@ -16,6 +16,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync } from 'node:fs';
+import { apriAiuto, chiediAllAiuto } from './helpers/strumentiEditor.mjs';
 
 const COLLECTION_KEY = 'filo.editor.collection';
 
@@ -29,7 +30,7 @@ async function stubAI(page, initialSummary) {
       let r = null;
       if (msg && msg.type === MSG.AI_REQUEST) {
         window.__aiCalls.push(msg);
-        r = { ok: true, text: window.__summaryReply };
+        r = window.__summaryFail || { ok: true, text: window.__summaryReply };
       } else if (msg && msg.type === MSG.FILO_GET_MEMORY) {
         r = { ok: true, memory: { PROFILO: '', PREFERENZE: '' } };
       }
@@ -123,6 +124,40 @@ test('il riassunto si rigenera quando il file cambia in modo significativo', asy
   expect(await page.evaluate(() => window.__aiCalls.length)).toBeGreaterThan(firstCalls);
 });
 
+test('un riassunto automatico fermato dal tetto si dice una volta e non si richiede a ogni pausa (#1302)', async ({ openTab }) => {
+  test.setTimeout(60_000);
+  const page = await openTab('filo://editor/editor.html');
+  await page.waitForSelector('#doc');
+  await stubAI(page, null);
+  await page.evaluate(() => {
+    window.__summaryFail = {
+      ok: false, code: 'RISPOSTA_TAGLIATA', finishReason: 'length',
+      error: 'La risposta del modello ha raggiunto la lunghezza massima prima di finire.',
+    };
+  });
+  const scrivi = (txt) => page.evaluate((t) => {
+    const doc = document.getElementById('doc');
+    doc.innerHTML = '<p>' + t + '</p>';
+    doc.dispatchEvent(new Event('input', { bubbles: true }));
+  }, txt);
+  const chiamate = () => page.evaluate(() => window.__aiCalls.filter((m) => m.action === 'editor_summary').length);
+
+  await scrivi(longText(90));
+  await expect.poll(chiamate, { timeout: 15_000 }).toBe(1);
+  await expect(page.locator('.ed-toast', { hasText: 'riassunto automatico' })).toContainText('lunghezza massima');
+  expect(await activeSummary(page)).toBeNull();
+
+  // Qualche parola in più e un'altra pausa: lo stesso testo col tetto di prima si fermerebbe uguale, e si pagherebbe.
+  await scrivi(`${longText(90)} ancora due parole`);
+  await page.waitForTimeout(9_000);
+  expect(await chiamate(), 'nessuna richiesta nuova senza un cambio vero').toBe(1);
+
+  // Un cambio vero merita un riassunto nuovo.
+  await page.evaluate(() => { window.__summaryFail = null; window.__summaryReply = 'Riassunto dopo il cambio.'; });
+  await scrivi(longText(200, 'z'));
+  await expect.poll(() => activeSummary(page), { timeout: 15_000 }).toBe('Riassunto dopo il cambio.');
+});
+
 test('il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo aggiorna il riassunto', async ({ openTab }) => {
   const page = await openTab('filo://editor/editor.html');
   await page.waitForSelector('#docSwitch');
@@ -152,7 +187,8 @@ test('il tasto destro sul titolo espone "Rigenera riassunto" e rigenerarlo aggio
 });
 
 // #1475 — chat del documento, titolo e riassunto leggono il documento intero (prima i primi 6000 caratteri, in silenzio);
-// oltre il tetto largo il taglio si dice, a chi scrive e al modello. Qui l'AI è finta nel main: la pagina resta com'è.
+// oltre il tetto largo il taglio si dice, a chi scrive e al modello. La chat è l'Aiuto, che nell'Editor riceve il
+// documento (#1433). Qui l'AI è finta nel main: la pagina resta com'è.
 const SHOTS = 'tests/.shots';
 const FONDO = 'La chiave del magazzino sta sotto il vaso di gerani.';
 const RIEMPIMENTO = 'Il bilancio del trimestre segue le stesse voci del precedente, con qualche spesa in più per la manutenzione. ';
@@ -165,7 +201,8 @@ async function prepara(app) {
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
       models: {
-        [C.ACTIONS.EDITOR_CHAT]: 'deepseek-flash', [C.ACTIONS.EDITOR_TITLE]: 'deepseek-flash',
+        ...globalThis.SN_TEST_MODELS.models,
+        [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.EDITOR_TITLE]: 'deepseek-flash',
         [C.ACTIONS.EDITOR_SUMMARY]: 'deepseek-flash',
       },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
@@ -177,9 +214,9 @@ async function prepara(app) {
       const sistema = String((messages.find((m) => m.role === 'system') || {}).content || '');
       const utente = String((messages.find((m) => m.role === 'user') || {}).content || '');
       const vede = (sistema + utente).includes(fondo);
-      if (sistema.includes('assistente di scrittura dentro un editor')) {
+      if (sistema.includes('# Protocollo di risposta')) {
         globalThis.__richieste.push({ tipo: 'chat', sistema });
-        return fatto(vede ? 'Sotto il vaso di gerani.' : 'Nel documento non lo trovo.');
+        return fatto(JSON.stringify({ text: vede ? 'Sotto il vaso di gerani.' : 'Nel documento non lo trovo.' }));
       }
       if (sistema.includes('Genera un TITOLO')) {
         globalThis.__richieste.push({ tipo: 'titolo', utente });
@@ -213,13 +250,13 @@ async function scriviDocumento(editor, caratteri) {
   }, { caratteri, riempimento: RIEMPIMENTO, fondo: FONDO });
 }
 
-async function chiediAllaChat(editor, domanda) {
-  const chat = editor.locator('.ed-module[data-type="chat"]');
-  if (!await chat.count()) await editor.locator('.ed-switch-icon').nth(1).click();
-  await chat.locator('[data-chat="input"]').fill(domanda);
-  await chat.locator('[data-chat="send"]').click();
-  return chat;
+async function chiediAllaChat(app, editor, domanda) {
+  await apriAiuto(app, editor);
+  await chiediAllAiuto(editor, domanda);
+  return editor.locator('.sn-sidebar');
 }
+// La riga sotto la risposta che dice quanto del documento è arrivato al modello.
+const notaTaglio = (chat) => chat.locator('.sn-sidebar-log', { hasText: 'Il documento è lungo' });
 
 async function dalMenuDelTitolo(editor, voce) {
   await editor.locator('#docTitle').click({ button: 'right' });
@@ -236,12 +273,18 @@ test('un documento lungo arriva intero: la chat trova la frase in fondo, titolo 
   // Dieci volte il vecchio tetto.
   await scriviDocumento(editor, 60_000);
 
-  const chat = await chiediAllaChat(editor, 'Dove sta la chiave del magazzino?');
-  await expect(chat.locator('.ed-chat-msg.assistant')).toHaveText('Sotto il vaso di gerani.', { timeout: 15_000 });
-  await expect(chat.locator('.ed-chat-note')).toHaveCount(0);
+  const chat = await chiediAllaChat(app, editor, 'Dove sta la chiave del magazzino?');
+  await expect(chat.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Sotto il vaso di gerani.', { timeout: 15_000 });
+  await expect(notaTaglio(chat)).toHaveCount(0);
 
   // Il titolo automatico, partito dall'input, ha già letto il documento fino in fondo; quello rifatto a mano anche.
   await expect(editor.locator('#docTitle')).toHaveText('Gerani e magazzino', { timeout: 15_000 });
+  // A documento identico la richiesta identica la servirebbe la cache delle risposte: si rifà dopo un ritocco in cima.
+  await editor.evaluate(() => {
+    const d = document.getElementById('doc');
+    d.insertAdjacentHTML('afterbegin', '<p>Bozza aggiornata a marzo.</p>');
+    d.dispatchEvent(new Event('input', { bubbles: true }));
+  });
   await dalMenuDelTitolo(editor, 'Rigenera titolo');
   await expect.poll(async () => (await richieste(app, 'titolo')).length, { timeout: 15_000 }).toBe(2);
   expect((await richieste(app, 'titolo')).every((r) => r.utente.includes(FONDO))).toBe(true);
@@ -260,9 +303,9 @@ test('oltre il tetto il taglio si dice: sotto la risposta, nell\'avviso del tito
   const totale = await scriviDocumento(editor, 400_000);
   const nota = `Il documento è lungo: ho letto i primi 350.000 caratteri su ${totale.toLocaleString('it-IT')}.`;
 
-  const chat = await chiediAllaChat(editor, 'Dove sta la chiave del magazzino?');
-  await expect(chat.locator('.ed-chat-msg.assistant')).toHaveText('Nel documento non lo trovo.', { timeout: 15_000 });
-  await expect(chat.locator('.ed-chat-note')).toHaveText(nota);
+  const chat = await chiediAllaChat(app, editor, 'Dove sta la chiave del magazzino?');
+  await expect(chat.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Nel documento non lo trovo.', { timeout: 15_000 });
+  await expect(notaTaglio(chat)).toContainText(nota);
   const [domanda] = await richieste(app, 'chat');
   expect(domanda.sistema).toContain('Il resto non lo vedi');
   mkdirSync(SHOTS, { recursive: true });
@@ -290,7 +333,7 @@ test('con un modello da 32.000 token il documento lungo si rilegge dentro la fin
     await globalThis.SN_STORAGE.updateSettings({
       useDefaultModels: false,
       apiKeys: { openrouter: 'k-test' },
-      models: { [C.ACTIONS.EDITOR_CHAT]: 'deepseek-flash', [C.ACTIONS.EDITOR_TITLE]: 'deepseek-flash', [C.ACTIONS.EDITOR_SUMMARY]: 'deepseek-flash' },
+      models: { ...globalThis.SN_TEST_MODELS.models, [C.ACTIONS.HELP]: 'deepseek-flash', [C.ACTIONS.EDITOR_TITLE]: 'deepseek-flash', [C.ACTIONS.EDITOR_SUMMARY]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
     });
     globalThis.__rifiuti = 0;
@@ -306,7 +349,9 @@ test('con un modello da 32.000 token il documento lungo si rilegge dentro la fin
       }
       const sistema = String(messages[0].content || '');
       const vede = tutto.includes(inizio);
-      const text = sistema.includes('Genera un TITOLO') ? (vede ? 'Nomina della segretaria' : 'Senza inizio') : (vede ? 'Giulia fa la segretaria.' : 'Non lo trovo.');
+      const risposta = vede ? 'Giulia fa la segretaria.' : 'Non lo trovo.';
+      const text = sistema.includes('Genera un TITOLO') ? (vede ? 'Nomina della segretaria' : 'Senza inizio')
+        : sistema.includes('# Protocollo di risposta') ? JSON.stringify({ text: risposta }) : risposta;
       return { text, finishReason: 'stop', model: attempts[0].model, provider: attempts[0].provider, usage: {}, toolCalls: [], reasoningDetails: [] };
     };
     P.completeWithFallback = async (o) => risposta(o);
@@ -320,9 +365,9 @@ test('con un modello da 32.000 token il documento lungo si rilegge dentro la fin
     d.dispatchEvent(new Event('input', { bubbles: true }));
   }, { inizio: INIZIO, riempimento: RIEMPIMENTO });
 
-  const chat = await chiediAllaChat(editor, 'Chi fa la segretaria?');
-  await expect(chat.locator('.ed-chat-msg.assistant').last()).toHaveText('Giulia fa la segretaria.', { timeout: 15_000 });
-  await expect(chat.locator('.ed-chat-note')).toContainText('ho letto i primi');
+  const chat = await chiediAllaChat(app, editor, 'Chi fa la segretaria?');
+  await expect(chat.locator('.sn-sidebar-msg-assistant').last()).toHaveText('Giulia fa la segretaria.', { timeout: 15_000 });
+  await expect(notaTaglio(chat)).toContainText('ho letto i primi');
 
   await dalMenuDelTitolo(editor, 'Rigenera titolo');
   await expect(editor.locator('#docTitle')).toHaveText('Nomina della segretaria', { timeout: 15_000 });

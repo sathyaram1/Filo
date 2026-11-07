@@ -31,9 +31,8 @@
     spiegaAnticipata: () => !(settings && settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false),
   });
   MenuIcons.init({
-    isContentFullscreen: () => contentFullscreen,
     aiutoPasso: () => aiutoPasso(),
-    aiutoStato: () => Sidebar.stato(),
+    aiutoStato: () => Sidebar?.stato?.(),
     aiutoAcceso: () => aiutoAcceso(),
   });
   TTS.init({
@@ -117,7 +116,8 @@
 
   // Dentro un riquadro incorporato il menu sull'ELEMENTO vale identico; ciò che riguarda
   // la PAGINA no: il riquadro conosce solo sé e parlerebbe del rettangolo sbagliato (#405).
-  const IS_SUBFRAME = (() => {
+  // Lo strato dei riquadri sopra un sito (#1509.1) parla come la pagina ma non la descrive: vale come un riquadro.
+  const IS_SUBFRAME = self.SN_FILO_UI?.nelloStrato === true || (() => {
     try { return window.top !== window.self; } catch (_) { return true; }
   })();
 
@@ -137,8 +137,9 @@
 
       // Colore identità del sito (§1.2): calcolato una volta (theme-color →
       // manifest → favicon → fallback) e mandato al main, che lo cacha per dominio
-      // e lo mescola col fondo della barra nelle tab inattive.
-      try { PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
+      // e lo mescola col fondo della barra nelle tab inattive. Sulle pagine web è già
+      // partito dalla preload, a pagina ancora in lettura (#1701.r1).
+      try { if (!PageColor.identitaPartita?.()) PageColor.reportTabIdentityColor(() => settings && settings.tabColor); } catch (_) {}
 
       // Segnali di attività (§2.1): ultima interazione, % di scroll.
       // Servono all'LLM per decidere cosa archiviare.
@@ -230,8 +231,8 @@
     } catch (_) {}
     document.addEventListener('fullscreenchange', () => {
       if (!document.fullscreenElement) restituisciEsc();
-      // Il nome della voce guarda anche lo schermo pieno della PAGINA: l'annuncio del main
-      // arriva mentre il documento sta ancora uscendo, e la voce si ridisegnerebbe identica.
+      // Il nome dell'icona guarda anche lo schermo pieno della PAGINA: l'annuncio del main arriva mentre il documento
+      // sta ancora uscendo, e l'icona si ridisegnerebbe identica.
       try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
     });
 
@@ -313,7 +314,14 @@
       // composedPath()[0] vede oltre lo shadow DOM; controlliamo anche
       // activeElement nel caso il keydown arrivi sul body con un campo a fuoco.
       const target = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
-      if (isEditable(target) || isEditable(document.activeElement)) return;
+      if (isEditable(target) || isEditable(document.activeElement)) {
+        // In un campo vuoto non c'è niente da disfare: subito dopo un'azione di Filo (chiesta in chat, col cursore
+        // rimasto nella casella) è lei che si vuole annullare (#1461). Il campo resta suo: niente indietro.
+        if (campoVuoto(isEditable(target) ? target : document.activeElement)) {
+          chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'tasto-annulla' }).catch(() => {});
+        }
+        return;
+      }
       // Il campo dentro un componente chiuso lo vede solo la regola intera (src/shared/campoTesto.js).
       if (self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.scriveQui(document) === true) return;
       // Una pagina di Filo in cui l'utente ha dato Ctrl+Z a un suo comando (un
@@ -321,7 +329,8 @@
       if (PAGINA_DI_FILO && document.documentElement.dataset.filoCtrlZ === 'pagina') return;
       e.preventDefault();
       e.stopPropagation();
-      chrome.runtime.sendMessage({ type: MSG.NAV_BACK }).catch(() => {});
+      // `daAnnulla`: subito dopo un'azione di Filo è anche il suo annullo, per i contatori (#1461).
+      chrome.runtime.sendMessage({ type: MSG.NAV_BACK, daAnnulla: true }).catch(() => {});
     }, { capture: true });
 
     // Filo spento sul sito si decide a ogni gesto, non al caricamento (#589.2): tutto si monta, e ogni porta chiede
@@ -354,6 +363,12 @@
       onRuntimeMessage(msg, sender, sendResponse);
       return true; // mantieni il canale aperto per sendResponse asincrono
     });
+    // Tornati su Filo da un'altra applicazione, o arrivati in una scheda dopo un sito spento: gli avvisi rimasti in coda
+    // arrivano qui (#1478.1).
+    if (!IS_SUBFRAME) {
+      window.addEventListener('focus', () => { prendiAvvisiInCoda(); });
+      prendiAvvisiInCoda();
+    }
 
     // Marker per i test: `filoReady` dice solo che i moduli sono caricati, questo che i
     // listener sono attivi, spellcheck compreso. Innocuo a runtime.
@@ -365,12 +380,17 @@
   // ------------------------------------------------------------
   // Segnali di attività della tab (spec §2.1)
   // ------------------------------------------------------------
-  // Riporta al main: quando l'utente ha interagito l'ultima volta e quanto ha
-  // scrollato (0-100%). Throttled per non inondare l'IPC.
+  // Riporta al main quanto ha scrollato (0-100%) e, solo dopo un gesto fisico vero, l'ultima interazione: il
+  // caricamento e lo scorrimento fatto dalla pagina (chat, feed, caroselli) non azzerano l'inattività (#1618).
   function startTabActivityReporter() {
+    // Uno scorrimento è dell'utente se parte entro questo tempo da un suo tasto, clic, rotella o dito.
+    const SCORRE_DOPO_GESTO_MS = 1000;
+    const INTERAZIONE_OGNI_MS = 2000;
     let lastSentScroll = -1;
     let pending = false;
-    let lastSend = 0;
+    let ultimoGesto = -Infinity;
+    let ultimaInterazione = -Infinity;
+    let scrollDaGesto = false;
 
     function scrollPct() {
       const doc = document.documentElement;
@@ -380,38 +400,50 @@
       return Math.max(0, Math.min(100, (y / max) * 100));
     }
 
-    function send(extra) {
-      const payload = { type: MSG.TAB_ACTIVITY, lastInteractionAt: Date.now(), ...extra };
+    function send(extra, interazione) {
+      const payload = { type: MSG.TAB_ACTIVITY, ...extra };
+      if (interazione) {
+        payload.lastInteractionAt = Date.now();
+        ultimaInterazione = performance.now();
+      }
       try {
         Promise.resolve(chrome.runtime.sendMessage(payload)).catch(() => {});
       } catch (_) {}
-      lastSend = performance.now();
     }
 
-    function onInteract() {
-      const since = performance.now() - lastSend;
-      if (since < 2000) return;
-      send({});
+    // Un evento lanciato da uno script della pagina non è un gesto (isTrusted falso).
+    function onGesto(e) {
+      if (!e || e.isTrusted !== true) return;
+      ultimoGesto = performance.now();
+      if (ultimoGesto - ultimaInterazione < INTERAZIONE_OGNI_MS) return;
+      send({}, true);
     }
 
     function onScroll() {
+      if (performance.now() - ultimoGesto <= SCORRE_DOPO_GESTO_MS) scrollDaGesto = true;
       if (pending) return;
       pending = true;
       setTimeout(() => {
         pending = false;
+        const daGesto = scrollDaGesto;
+        scrollDaGesto = false;
         const pct = Math.round(scrollPct());
         if (pct !== lastSentScroll) {
           lastSentScroll = pct;
-          send({ scrollPct: pct });
+          send({ scrollPct: pct }, daGesto);
         }
       }, 500);
     }
 
-    window.addEventListener('pointerdown', onInteract, { passive: true, capture: true });
-    window.addEventListener('keydown', onInteract, { passive: true, capture: true });
+    for (const tipo of ['pointerdown', 'keydown', 'wheel', 'touchmove']) {
+      window.addEventListener(tipo, onGesto, { passive: true, capture: true });
+    }
     window.addEventListener('scroll', onScroll, { passive: true });
 
-    setTimeout(() => send({ scrollPct: Math.round(scrollPct()) }), 600);
+    setTimeout(() => {
+      lastSentScroll = Math.round(scrollPct());
+      send({ scrollPct: lastSentScroll }, false);
+    }, 600);
   }
 
   // Testo scritto dall'utente e non ancora inviato: finché ce n'è la pulizia non chiude la scheda
@@ -432,6 +464,11 @@
     const orfani = [];
     // Le righe di ogni area all'ultima rilettura: tolta dalla pagina, un editor non le dà più.
     const righeViste = new WeakMap();
+    // Testo uscito dal campo senza una prova d'arrivo (un dialogo chiuso col nome ricomparso nella pagina): se il sito
+    // poi respinge la richiesta che lo porta, torna da proteggere (#1808). { t, righe }
+    const spariti = [];
+    // Le ultime righe non vuote scritte in ogni area: la pagina può svuotarla prima della rilettura a riposo.
+    const ultimeRighe = new WeakMap();
     // Impronte dei testi lunghi mandati al server: la risposta può rimetterli in un campo.
     const partiti = new Set();
     let ultimoMandato = null;
@@ -446,19 +483,15 @@
       if (tag === 'TEXTAREA') return t;
       if (tag === 'INPUT') return TIPI_DI_TESTO.test(String(t.type || 'text').toLowerCase()) ? t : null;
       if (!t.isContentEditable) return null;
-      while (t.parentElement && t.parentElement.isContentEditable) t = t.parentElement;
+      // Col documento tutto modificabile (designMode) il testo dell'utente è il corpo: sopra stanno gli strati di Filo.
+      while (t.parentElement && t.parentElement.isContentEditable && t !== t.ownerDocument.body) t = t.parentElement;
       return t;
     }
     // Una ricerca non è una bozza: si riscrive in un attimo, e quella dal vivo ha già
-    // dato i risultati senza un invio da riconoscere.
+    // dato i risultati senza un invio da riconoscere. Senza la regola, nel dubbio è un messaggio.
     function diRicerca(el) {
-      const tag = el.tagName.toUpperCase();
-      if (tag !== 'INPUT' && tag !== 'TEXTAREA') return false;
-      if (/^searchbox$/i.test(el.getAttribute('role') || '') || el.closest('[role="search" i]')) return true;
-      if (/^(q|s|k|query|search|search_query|keywords?|field-keywords)$/i.test(el.name || '')) return true;
-      if (tag === 'TEXTAREA') return false;
-      if (String(el.type).toLowerCase() === 'search') return true;
-      return /(search|cerca|ricerca|busca|recherche|suche)/i.test(`${el.getAttribute('aria-label') || ''} ${el.placeholder || ''}`);
+      const R = globalThis.SN_RICERCA_CAMPO;
+      try { return !!R && R.eRicerca(R.trattiDi(el)); } catch (_) { return false; }
     }
     const grande = (el) => { try { const r = el.getBoundingClientRect(); return r.width >= 8 && r.height >= 8; } catch (_) { return true; } };
     function primoGrande(da, body) {
@@ -538,19 +571,58 @@
       if (!t || t === pulito(base) || orfani.some((o) => o.t === t)) return;
       if (ricevuti.get(area) === t || sostituito(area)) return;
       const viste = righeViste.get(area);
-      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t] });
+      orfani.push({ t, righe: viste && viste.join('') === t ? viste : [t], dialogo: nelDialogo.get(area) || null });
       if (orfani.length > 100) orfani.shift();
+    }
+    // Un dialogo chiuso dopo «Crea» si porta via il campo, e la pagina mostra il nome come suo contenuto: quel testo
+    // non è più a rischio. Lo dice la pagina che lo mostra più volte di quando il dialogo era aperto; chiuso con
+    // Annulla non ricompare, e resta protetto. Solo i campi di una riga: un messaggio in un riepilogo non è partito.
+    const nelDialogo = new WeakMap();
+    const inDialogo = new Set();
+    const DIALOGO = 'dialog, [role="dialog" i], [role="alertdialog" i], [aria-modal="true" i]';
+    function volteNellaPagina(doc, ess) {
+      let s = '';
+      try { s = essenziale((doc.body && doc.body.innerText) || ''); } catch (_) { return 0; }
+      let n = 0;
+      for (let i = s.indexOf(ess); i >= 0; i = s.indexOf(ess, i + ess.length)) n++;
+      return n;
+    }
+    function fotografaDialoghi() {
+      for (const area of inDialogo) {
+        if (!aree.has(area) || !viva(area)) { inDialogo.delete(area); continue; }
+        if (!area.getClientRects().length) continue;
+        const ess = essenziale(testo(area));
+        if (ess) nelDialogo.set(area, { ess, volte: volteNellaPagina(area.ownerDocument, ess), doc: area.ownerDocument });
+      }
+    }
+    function ricomparsi() {
+      for (let i = orfani.length - 1; i >= 0; i--) {
+        const d = orfani[i].dialogo;
+        if (d && essenziale(orfani[i].t) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) {
+          const [o] = orfani.splice(i, 1);
+          spariti.push({ t: o.t, righe: o.righe });
+          if (spariti.length > 20) spariti.shift();
+        }
+      }
+      // Un dialogo chiuso senza toglierlo dalla pagina tiene il campo nascosto, col testo dentro.
+      for (const area of inDialogo) {
+        const d = nelDialogo.get(area);
+        if (!d || !aree.has(area) || !viva(area) || area.getClientRects().length) continue;
+        const ora = testo(area);
+        if (essenziale(ora) === d.ess && volteNellaPagina(d.doc, d.ess) > d.volte) aree.set(area, ora);
+      }
     }
     // Ricevuto = una richiesta riuscita ne porta ogni riga. Una casella a più righe protegge finché il
     // testo è lì (un'anteprima lo porta come un salvataggio); tolta dalla pagina, non lascia un orfano.
+    function porta(inviato, t, righe) {
+      const tutto = essenziale(t);
+      if (tutto && inviato.includes(tutto)) return true;
+      const r = righe.map(essenziale).filter(Boolean);
+      return r.length > 0 && r.every((x) => inviato.includes(x));
+    }
     function partito(inviato) {
       if (typeof inviato !== 'string' || !inviato) return;
-      const dentro = (t, righe) => {
-        const tutto = essenziale(t);
-        if (tutto && inviato.includes(tutto)) return true;
-        const r = righe.map(essenziale).filter(Boolean);
-        return r.length > 0 && r.every((x) => inviato.includes(x));
-      };
+      const dentro = (t, righe) => porta(inviato, t, righe);
       // Il campo può sparire mentre la richiesta è in viaggio: prima diventa un orfano, poi si cerca.
       stato();
       for (const area of [...aree.keys()]) {
@@ -561,6 +633,28 @@
       }
       for (let i = orfani.length - 1; i >= 0; i--) if (dentro(orfani[i].t, orfani[i].righe)) orfani.splice(i, 1);
       aggiorna(false);
+    }
+    // Una richiesta respinta dal sito che porta un testo già uscito dalla casella (svuotata dalla pagina, o il dialogo
+    // chiuso): quel testo non è arrivato, e torna a proteggere la scheda finché una richiesta riuscita non lo porta.
+    function respinto(inviato) {
+      if (typeof inviato !== 'string' || !inviato) return;
+      stato();
+      const candidati = spariti.splice(0);
+      for (const [area, base] of aree) {
+        const ora = viva(area) ? pulito(testo(area)) : '';
+        if (ora && ora !== pulito(base)) continue;
+        const righe = ultimeRighe.get(area);
+        if (righe && righe.length) candidati.push({ t: righe.join(''), righe });
+      }
+      for (const c of candidati) {
+        if (!porta(inviato, c.t, c.righe)) continue;
+        if (!orfani.some((o) => o.t === c.t)) orfani.push({ t: c.t, righe: c.righe, dialogo: null });
+        if (orfani.length > 100) orfani.shift();
+      }
+      // Un dialogo chiuso il cui nome il sito ha respinto: la pagina che lo mostra non basta più a dirlo arrivato.
+      for (const o of orfani) if (o.dialogo && porta(inviato, o.t, o.righe)) o.dialogo = null;
+      aggiorna(false);
+      mandaImpronte();
     }
     function impronta(s) {
       let h1 = 0xdeadbeef;
@@ -635,8 +729,14 @@
       clearTimeout(rilettura);
       rilettura = setTimeout(() => {
         stato();
-        for (const area of aree.keys()) righeViste.set(area, righeDi(area));
+        for (const area of aree.keys()) {
+          const r = righeDi(area);
+          righeViste.set(area, r);
+          if (r.length) ultimeRighe.set(area, r);
+        }
         adotta(null);
+        ricomparsi();
+        fotografaDialoghi();
         aggiorna(false);
         mandaImpronte();
       }, 400);
@@ -645,8 +745,12 @@
     const aPiuRighe = (el) => !!el && (el.tagName.toUpperCase() === 'TEXTAREA' || el.isContentEditable);
     function scritto(area, base, campo) {
       if (!aree.has(area)) aree.set(area, base);
+      if (/^(input|textarea)$/i.test(area.tagName)) { const r = righeDi(area); if (r.length) ultimeRighe.set(area, r); }
       if (aPiuRighe(area) || aPiuRighe(campo)) lunghe.add(area);
-      else digitati.set(area, essenziale(testo(area)));
+      else {
+        digitati.set(area, essenziale(testo(area)));
+        try { if (area.closest(DIALOGO)) inDialogo.add(area); } catch (_) {}
+      }
       aggiorna(true);
       aRiposo();
     }
@@ -657,7 +761,26 @@
       aggiorna(true);
     }
     const iniziale = (a) => (/^(input|textarea)$/i.test(a.tagName) ? a.defaultValue || '' : '');
-    function onTocco(e) { ultimoTocco = bersaglio(e); }
+    // Il clic su «Crea» arriva col dialogo ancora aperto: l'ultimo momento per contare il nome nella pagina.
+    function onTocco(e) {
+      ultimoTocco = bersaglio(e);
+      fotografaRighe();
+      if (inDialogo.size) fotografaDialoghi();
+    }
+    function onTasto(e) {
+      if (e.key !== 'Enter') return;
+      fotografaRighe();
+      if (inDialogo.size) fotografaDialoghi();
+    }
+    // Un editor non rilegge le righe a ogni tasto come una casella: il clic o l'Invio che manda sono l'ultimo momento
+    // prima che la pagina lo svuoti, e senza le righe un rifiuto del sito non ritrova il testo (#1808.2).
+    function fotografaRighe() {
+      for (const area of aree.keys()) {
+        if (/^(input|textarea)$/i.test(area.tagName) || !viva(area)) continue;
+        const r = righeDi(area);
+        if (r.length) ultimeRighe.set(area, r);
+      }
+    }
     function onPrima(e) {
       if (!gesto(e)) return;
       const campo = campoDa(e);
@@ -700,36 +823,57 @@
           if (a.form !== form && !(form.contains && form.contains(a))) continue;
           const ora = pulito(testo(a));
           if (ora && ora !== pulito(base) && !sostituito(a)) conTesto = true;
-          const t = lunghe.has(a) ? ora : '';
-          if (t && t !== pulito(base)) partiti.add(impronta(t));
+          inPartenza(a, base);
         }
-        // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main).
         // Un modulo con la password è un accesso o un'iscrizione, non una bozza.
         let dest = '';
+        let azione = '';
         try {
           if (form.querySelector('input[type=password]')) conTesto = false;
           dest = (e.submitter && e.submitter.getAttribute('formtarget')) || form.getAttribute('target') || '';
+          azione = (e.submitter && e.submitter.getAttribute('formaction')) || '';
         } catch (_) {}
-        if (conTesto && !IS_SUBFRAME && /^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+        if (conTesto) segnalaInvio(form, dest, azione);
         aggiorna(false);
         mandaImpronte();
       }, 0);
     }
-    // L'accesso in testata c'è in ogni pagina del sito: nella pagina dopo non vuol dire sessione scaduta.
-    function passwordFuori(form) {
+    // L'impronta del testo lungo che parte: la pagina che risponde può rimetterlo in un campo, ed è ancora suo.
+    function inPartenza(a, base) {
+      const t = lunghe.has(a) ? pulito(testo(a)) : '';
+      if (t && t !== pulito(base)) partiti.add(impronta(t));
+    }
+    // Il testo ora sta nella pagina di prima: se il sito respinge l'invio la pulizia deve saperlo (main). Da un
+    // riquadro cambia pagina il riquadro, e il main ne riconosce la risposta dall'indirizzo del modulo.
+    function segnalaInvio(form, dest, azione = '') {
+      let url = '';
       try {
-        return Array.prototype.some.call(document.querySelectorAll('input[type=password]'),
-          (el) => !form.contains(el) && el.getClientRects().length > 0);
-      } catch (_) { return false; }
+        if (/^dialog$/i.test(form.getAttribute('method') || '')) return;
+        url = new URL(azione || form.getAttribute('action') || '', form.ownerDocument.baseURI).href;
+      } catch (_) {}
+      const nelRiquadro = IS_SUBFRAME || form.ownerDocument !== document;
+      if (!nelRiquadro || /^_top$/i.test(dest)) {
+        if (/^(|_self|_top)$/i.test(dest)) invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
+      } else if (/^(|_self)$/i.test(dest) && /^https?:/i.test(url)) {
+        let titoloPrima = '';
+        try { titoloPrima = form.ownerDocument.title || ''; } catch (_) {}
+        invia({ type: MSG.TAB_ACTIVITY, invioRiquadro: url, pwPrima: passwordFuori(form), titoloPrima });
+      }
+    }
+    // Una password già nella pagina dell'invio, fuori dal modulo: nella pagina dopo non vuol dire sessione scaduta.
+    function passwordFuori(form) {
+      const A = globalThis.SN_ACCESSO_FISSO;
+      try { return !!A && A.passwordDiAccesso(form.ownerDocument, form); } catch (_) { return false; }
     }
     // Il modulo parte anche senza il suo bottone (uno script, un controllo antispam, un editor in un
     // riquadro che copia il testo nel modulo): conta quello che il modulo porta, non da dove si è scritto.
     function onDatiModulo(e) {
       const form = e.target;
-      if (IS_SUBFRAME || !form || !aree.size || !e.formData) return;
+      if (!form || !aree.size || !e.formData) return;
+      let dest = '';
       try {
         if (form.querySelector('input[type=password]')) return;
-        if (!/^(|_self|_top)$/i.test(form.getAttribute('target') || '')) return;
+        dest = form.getAttribute('target') || '';
       } catch (_) { return; }
       const valori = [];
       try {
@@ -739,16 +883,21 @@
           valori.push(essenziale(t));
         }
       } catch (_) {}
+      let conTesto = false;
       for (const [a, base] of aree) {
         if (!viva(a) || sostituito(a)) continue;
         const ora = testo(a);
         if (!pulito(ora) || pulito(ora) === pulito(base)) continue;
         const ess = essenziale(ora);
         if (ess && valori.some((v) => v.includes(ess))) {
-          invia({ type: MSG.TAB_ACTIVITY, invioPagina: true, pwPrima: passwordFuori(form) });
-          return;
+          inPartenza(a, base);
+          conTesto = true;
         }
       }
+      if (!conTesto) return;
+      // Senza il bottone non c'è onSubmit: le impronte partono qui, prima che la pagina se ne vada (#1808.2).
+      mandaImpronte();
+      segnalaInvio(form, dest);
     }
 
     // Il documento e le radici aperte dei componenti che contiene. Costa un giro di tutta la
@@ -794,6 +943,7 @@
       segnaScrittureDiFilo(win);
       try {
         win.addEventListener('pointerdown', onTocco, o);
+        win.addEventListener('keydown', onTasto, o);
         win.addEventListener('beforeinput', onPrima, o);
         win.addEventListener('input', onFormInput, o);
         win.addEventListener('change', onFormInput, o);
@@ -856,12 +1006,26 @@
       ultimeImpronte = '';
       mandaImpronte();
     });
+    // Il testo partito su un collegamento sempre aperto e confermato dal server, o respinto: il main lo legge come una
+    // richiesta riuscita o respinta.
+    const collegamento = globalThis.SN_COLLEGAMENTO_APERTO;
+    if (typeof collegamento === 'string' && collegamento) {
+      window.addEventListener(collegamento, (e) => {
+        if ((!aree.size && !orfani.length) || typeof e.detail !== 'string' || !e.detail) return;
+        invia({ type: MSG.TAB_ACTIVITY, collegamento: e.detail });
+      }, true);
+      window.addEventListener(`${collegamento}:r`, (e) => {
+        if (!aree.size || typeof e.detail !== 'string' || !e.detail) return;
+        invia({ type: MSG.TAB_ACTIVITY, collegamentoRespinto: e.detail });
+      }, true);
+    }
     chrome.runtime.onMessage.addListener((msg) => {
-      if (msg && msg.type === MSG.FORM_SENT) { try { partito(msg.testo); } catch (_) {} return; }
+      if (msg && msg.type === MSG.FORM_SENT) { try { if (msg.respinto === true) respinto(msg.testo); else partito(msg.testo); } catch (_) {} return; }
       if (!msg || msg.type !== MSG.FORM_RECHECK) return;
       osserva(window);
       stato();
       try { adotta(msg.impronte); } catch (_) {}
+      try { ricomparsi(); } catch (_) {}
       manda(stato(), false);
       mandaImpronte();
     });
@@ -869,6 +1033,29 @@
 
   // Le richieste di fuori che agiscono sulla pagina: con Filo spento sul sito non partono (#843).
   const AZIONI_DA_FUORI = new Set([MSG.TOP_FRAME_COMMAND, MSG.BARRA_FUORI, MSG.BARRA_ETICHETTE_CHIEDI, MSG.SHOW_TOAST]);
+
+  // Gli avvisi di sistema li mostra solo la pagina che si sta guardando: in un'altra applicazione nessuno li vedrebbe.
+  function inVistaAdesso() {
+    return !IS_SUBFRAME && document.visibilityState === 'visible' && document.hasFocus();
+  }
+
+  function mostraAvviso(msg) {
+    // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
+    Popup?.showToast?.(String(msg.text || ''), {
+      duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
+    });
+  }
+
+  // Un avviso che il main tiene in coda (#1478.1) si prende prima di mostrarlo: chi lo prende l'ha davanti, e nessun'altra
+  // pagina lo ripete. Senza `id` quelli rimasti in coda. Se la finestra è davanti lo dice il main: il fuoco può stare sulla barra.
+  async function prendiAvvisiInCoda(id) {
+    if (IS_SUBFRAME || document.visibilityState !== 'visible' || isBlocked()) return;
+    let r = null;
+    try { r = await chrome.runtime.sendMessage({ type: MSG.AVVISI_IN_CODA, fuoco: document.hasFocus(), ...(id ? { id } : {}) }); } catch (_) { return; }
+    for (const m of (r && Array.isArray(r.avvisi) ? r.avvisi : [])) {
+      try { mostraAvviso(m); } catch (_) {}
+    }
+  }
 
   // Il segno che legge il ponte del tasto destro (page-preload.js) a ogni clic, rifatto a ogni cambio dell'elenco.
   // Spegnendosi se ne va il menu di Filo già aperto; l'Aiuto aperto resta, perché ci si sta parlando.
@@ -1029,6 +1216,7 @@
     if (!sito) return;
     items.unshift({
       type: 'split',
+      azione: 'site-own-menu',
       label: I18n.t('menu_del_sito').replace('%s', () => sito.nome),
       onClick: () => apriMenuDelSito(sito),
       arrowTitle: I18n.t('menu_del_sito_scelta'),
@@ -1040,6 +1228,7 @@
 
   // Dopo il clic sulla voce, non dentro: il clic che risale al documento chiuderebbe il menu appena aperto.
   function apriMenuDelSito(sito) {
+    Popup.conta({ misura: 'menu-nativo', voce: 'menu_del_sito:voce' });
     setTimeout(async () => {
       let esito = null;
       try { esito = await self.__snMenuDelSito.apri(sito); } catch (_) { esito = null; }
@@ -1055,7 +1244,10 @@
   // `conMaiusc`: sui siti dove il tasto destro apre il loro menu, Shift porta qui (#975).
   async function onContextMenu(e, opzioni) {
     // Se l'utente tiene Shift premuto, lascia passare il menu nativo (escape hatch); Shift+F10 è la tastiera che chiede il nostro.
-    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) return;
+    if (e.shiftKey && !(opzioni && opzioni.conMaiusc) && !(Menu.daTastiera && Menu.daTastiera())) {
+      if (e.isTrusted) Popup.conta({ misura: 'menu-nativo', voce: 'shift_tasto_destro' });
+      return;
+    }
     // Prima di ogni attesa: dopo, il cammino dell'evento non c'è più.
     const sito = statoMenuDelSito(e, opzioni);
 
@@ -1064,20 +1256,28 @@
     e.stopPropagation();
 
     const avviso = self.SN_AVVISI?.avvisoSotto?.(realTarget(e));
-    if (avviso) { openAvvisoMenu(avviso, e); return; }
+    if (avviso) { contaContesto(['avviso']); openAvvisoMenu(avviso, e); return; }
     // Il documento trovato dall'Aiuto (#947.3): le azioni di un file, non quelle della pagina.
     const file = self.SN_SIDEBAR?.fileSotto?.(realTarget(e));
-    if (file) { Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
+    if (file) { contaContesto(['file']); Menu.open({ x: e.clientX, y: e.clientY, items: file.map((a) => ({ type: 'item', label: a.label, onClick: () => a.fn() })) }); return; }
 
     // Il correttore (#1446): su un segno, il menu del segno; nelle caselle di una riga, che Filo non segna, la parola
     // sotto il cursore. Il resto è il menu normale, che sul campo porta «Correggi tutti gli errori».
     try {
-      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi())) {
+      if (SpellCheck && (SpellCheck.erroriAttivi() || SpellCheck.suggerimentiAttivi() || SpellCheck.segnapostiAttivi())) {
         const rt = realTarget(e);
+        // Il valore sopra un segnaposto (#1448) ha il menu del suo segnaposto.
+        const valore = SpellCheck.valoreSotto(rt);
+        if (valore) {
+          contaContesto(['campo']);
+          await openSpellMarksMenu(valore.el, { errore: null, suggerimento: valore.segno }, e, sito);
+          return;
+        }
         const editableEl = SpellCheck.findSupportedEditable(rt);
         if (editableEl) {
           const sotto = SpellCheck.segniSotto(editableEl, e.clientX, e.clientY);
           if (sotto.errore || sotto.suggerimento) {
+            contaContesto(['campo']);
             await openSpellMarksMenu(editableEl, sotto, e, sito);
             return;
           }
@@ -1086,6 +1286,7 @@
           const wordCtx = SpellCheck.erroriAttivi() ? SpellCheck.getWordAt(editableEl, e.clientX, e.clientY) : null;
           if (wordCtx && !SpellCheck.parolaGiusta(editableEl, wordCtx.word)
             && (SpellCheck.getNativeSuggestions(wordCtx.word).length || SpellCheck.sbagliataPerIlBrowser(wordCtx.word))) {
+            contaContesto(['campo']);
             await openSpellWordMenu(editableEl, wordCtx, e, sito);
             return;
           }
@@ -1094,6 +1295,7 @@
         if (inputEl && isTextLikeInput(inputEl) && !SpellCheck.campoEscluso(inputEl)) {
           const wordCtx = SpellCheck.getInputWordAt?.(inputEl, e.clientX, e.clientY);
           if (wordCtx && !SpellCheck.isInDictionary(wordCtx.word)) {
+            contaContesto(['campo']);
             await openSpellWordMenu(inputEl, wordCtx, e, sito);
             return;
           }
@@ -1104,6 +1306,20 @@
     }
 
     await openNormalMenuAt(e, sito);
+  }
+
+  // Su che cosa si apre il box (#1468): bandiere da un elenco chiuso; la chiave, o «misto», la fa il main.
+  function contaContesto(bandiere) { Popup.conta({ misura: 'contesto-box', bandiere }); }
+  // «livelli»: l'elemento trovato sotto un altro che lo copre (i `*Under` ci sono solo senza quello diretto).
+  function bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }) {
+    const b = [];
+    if (selInfo) b.push('selezione');
+    if (linkEl || linkUnder) b.push('collegamento');
+    if (imgEl || imgUnder) b.push('immagine');
+    if (mediaEl || mediaUnder) b.push('media');
+    if (editable) b.push('campo');
+    if (linkUnder || imgUnder || mediaUnder) b.push('livelli');
+    return b.length ? b : ['pagina'];
   }
 
   // Le azioni dell'avviso e «Chiudi», nello stesso ordine del menu degli avvisi della barra.
@@ -1154,14 +1370,13 @@
     const {
       linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, e.clientX, e.clientY);
+    selInfo = selezioneSottoIlMouse(selInfo, e, { imgEl, linkEl, mediaEl });
+    contaContesto(bandiereDelContesto({ selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, editable }));
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const [clipboardHistory, navState] = await Promise.all([
-      Actions.getClipboardHistory(),
-      Actions.getNavState(),
-    ]);
+    const clipboardHistory = await primaDelMenu();
     const items = buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
     });
 
     // Slot riservato per la correzione ortografica nativa: nascosto finché
@@ -1186,6 +1401,8 @@
     let updateCorrection = null;
     const tutti = campoDiFilo ? voceCorreggiTutti(campoDiFilo, 1) : null;
     if (tutti) items.unshift(tutti, { type: 'separator' });
+    const annulla = campoDiFilo ? voceAnnullaCorrezione(campoDiFilo, e) : null;
+    if (annulla) items.unshift(annulla, { type: 'separator' });
     if (wantCorrection) {
       items.unshift(
         {
@@ -1234,6 +1451,7 @@
   // correttore: è l'unica strada nei blocchi sigillati (#438), dove il campo è fuori mano.
   function applyNativeCorrection(word, suggestion) {
     if (!suggestion) return;
+    if (word && SpellCheck?.accettata) SpellCheck.accettata(word, suggestion);
     try {
       const sel = window.getSelection && window.getSelection();
       const selected = sel ? String(sel) : '';
@@ -1241,6 +1459,13 @@
           && document.execCommand('insertText', false, suggestion)) return;
     } catch (_) {}
     chrome.runtime.sendMessage({ type: MSG.REPLACE_MISSPELLING, suggestion });
+  }
+
+  // Quello che il menu chiede al main prima di aprirsi, insieme: la cronologia degli appunti e lo stato delle icone della
+  // finestra portate nella fila (Indietro spento senza dove tornare).
+  async function primaDelMenu() {
+    const [cronologia] = await Promise.all([Actions.getClipboardHistory(), Promise.resolve(MenuIcons?.prepara?.()).catch(() => {})]);
+    return cronologia;
   }
 
   // Salva il target editabile e la sua selezione/range al momento dell'apertura
@@ -1603,6 +1828,12 @@
     return !!(self.SN_CAMPO_TESTO && self.SN_CAMPO_TESTO.campoDiTesto(el));
   }
 
+  function campoVuoto(el) {
+    if (!el) return false;
+    const v = 'value' in el && typeof el.value === 'string' ? el.value : el.textContent;
+    return typeof v === 'string' && v.trim() === '';
+  }
+
   // Menu correzione: rosso = parola sotto il cursore, blu = errore contestuale.
 
   function getInputSelectionInfo(target) {
@@ -1614,33 +1845,53 @@
     const value = el.value || '';
     const selection = value.slice(start, end).trim();
     if (!selection) return null;
-    if (Extract.campoSegreto?.(el)) return { selection, sentence: selection, segreto: true };
+    const s = Extract.segretezza?.(null, el);
+    if (s && s.segreto) return { selection, sentence: selection, ...s };
     return { selection, sentence: value.trim() || selection };
   }
 
-  async function buildBaseItemsAt(mouseEvent) {
+  // Una selezione rimasta altrove non decide il menu di un'immagine, un collegamento o un filmato sotto il mouse: vale
+  // solo se il clic le sta sopra. Senza, una frase selezionata prima dava a una foto la fila e le voci del testo.
+  function selezioneSottoIlMouse(selInfo, punto, { imgEl, linkEl, mediaEl }) {
+    if (!selInfo || !(imgEl || linkEl || mediaEl)) return selInfo;
+    try {
+      const g = window.getSelection();
+      if (!g || !g.rangeCount) return selInfo;
+      const x = punto.clientX;
+      const y = punto.clientY;
+      for (let i = 0; i < g.rangeCount; i++) {
+        for (const r of g.getRangeAt(i).getClientRects()) {
+          if (x >= r.left - 2 && x <= r.right + 2 && y >= r.top - 2 && y <= r.bottom + 2) return selInfo;
+        }
+      }
+      return null;
+    } catch (_) {
+      return selInfo;
+    }
+  }
+
+  async function buildBaseItemsAt(mouseEvent, { senzaValuta = false } = {}) {
     const target = realTarget(mouseEvent);
     let selInfo = Extract.getSelectionWithSentence(target);
     if (!selInfo) selInfo = getInputSelectionInfo(target);
     const {
       linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable,
     } = detectContext(target, mouseEvent.clientX, mouseEvent.clientY);
+    selInfo = selezioneSottoIlMouse(selInfo, mouseEvent, { imgEl, linkEl, mediaEl });
     // Il contesto d'incolla si cattura anche per i menu di correzione: senza, «Incolla»
     // usava un contesto stantio e incollava all'inizio del campo.
     if (editable) capturePasteContext(target);
     else pasteContext = null;
-    const [clipboardHistory, navState] = await Promise.all([
-      Actions.getClipboardHistory(),
-      Actions.getNavState(),
-    ]);
+    const clipboardHistory = await primaDelMenu();
     return buildMenuItems({
-      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target,
+      selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
     });
   }
 
   // La freccetta di una correzione: le altre proposte del dizionario, poi aggiungi, correggi da sé, gestisci.
   // `parola`: il segno è una parola sola, e allora si può aggiungere al dizionario o correggere da sé d'ora in poi.
-  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true) {
+  // `esito`: chi tiene la proposta per i contatori sa cosa ne ha fatto la persona (#1461).
+  function buildRedSubItems(editableEl, wordCtx, correction, altSuggestions = [], parola = true, esito = () => {}) {
     const items = [];
     const seen = new Set([String(correction || '').toLowerCase()]);
     for (const s of altSuggestions) {
@@ -1649,9 +1900,10 @@
       seen.add(v.toLowerCase());
       items.push({
         label: v,
-        onClick: () => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, {
-          expectedSegment: wordCtx.word,
-        }),
+        onClick: () => {
+          esito('accettata');
+          SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, v, { expectedSegment: wordCtx.word });
+        },
       });
       if (items.length >= 4) break;
     }
@@ -1660,6 +1912,7 @@
       items.push({
         label: I18n.t('spell_add_dict'),
         onClick: () => {
+          esito('rifiutata');
           SpellCheck.addToDictionary(wordCtx.word);
           Popup.showToast(I18n.t('toast_added_to_dict'));
         },
@@ -1669,6 +1922,7 @@
       items.push({
         label: I18n.t('spell_autocorrect'),
         onClick: async () => {
+          esito('accettata');
           await SpellCheck.setAutocorrect(wordCtx.word, correction);
           SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, correction, { expectedSegment: wordCtx.word });
           Popup.showToast(I18n.t('toast_autocorrect_saved'));
@@ -1691,9 +1945,17 @@
         const scrivi = (s) => {
           el.textContent = '';
           const perche = document.createElement('div');
-          const ripiego = s.segno !== 'errore' ? 'spell_ocra_controlla' : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
+          const ripiego = s.cercando ? 'spell_segnaposto_cerco' : s.segno !== 'errore' ? 'spell_ocra_controlla'
+            : (s.fonte === 'dizionario' ? 'spell_errore_forse' : 'spell_errore_generico');
           perche.textContent = s.motivo || I18n.t(ripiego);
           el.appendChild(perche);
+          // La fonte del valore di un segnaposto (#1448), col giorno a cui il dato si riferisce.
+          if (s.fonteDato && s.fonteDato.nome) {
+            const fonte = document.createElement('div');
+            fonte.className = 'sn-menu-segno-citazione';
+            fonte.textContent = I18n.t('spell_segnaposto_fonte', [s.fonteDato.nome, s.fonteDato.data].filter(Boolean).join(', '));
+            el.appendChild(fonte);
+          }
           if (s.citazione) {
             const prova = document.createElement('div');
             prova.className = 'sn-menu-segno-citazione';
@@ -1726,7 +1988,8 @@
         label: c === undefined ? '' : etichetta(s, c),
         loading: false,
         onClick: c === undefined ? null : () => SpellCheck.correggi(editableEl, s, c),
-        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment)),
+        subItems: buildRedSubItems(editableEl, parola, c || '', s.dubbio ? native.slice(1) : native, unaParola(s.segment),
+          (e) => SpellCheck.esitoSegno?.(editableEl, s, e)),
       };
     };
     const ascolti = [];
@@ -1735,9 +1998,13 @@
     const avvia = () => {
       if (staccato || !ascolti.length) return;
       staccato = SpellCheck.seguiSegno(editableEl, errore, (nuovo) => { if (nuovo && !nuovo.dubbio) for (const fn of ascolti) fn(nuovo); });
-      SpellCheck.giudicaOra(editableEl, errore);
+      const giudizio = SpellCheck.giudicaOra(editableEl, errore);
+      if (giudizio) contaAnticipoParola(giudizio === 'in_volo' ? 'in_volo' : 'assente');
     };
-    if (!errore.dubbio && (errore.fonte === 'rapido' || errore.giudicatoDa === 'rapido')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_SEMANTIC);
+    if (!errore.dubbio && (errore.fonte === 'rapido' || errore.giudicatoDa === 'rapido')) {
+      contaUsoDelCorrettore(ACTIONS.SPELLCHECK_SEMANTIC);
+      contaAnticipoParola('pronto');
+    }
     const items = [
       {
         type: 'correction', ...riga(errore),
@@ -1761,7 +2028,8 @@
       rigaDelPerche(errore, errore.dubbio ? (scrivi) => { segui(scrivi); avvia(); } : null),
       { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, errore) },
     ];
-    if (unaParola(errore.segment)) {
+    // Un errore fisso resta un errore anche nel dizionario (#1447): la voce non farebbe niente.
+    if (unaParola(errore.segment) && errore.fonte !== 'fisso') {
       items.push({
         type: 'item', label: I18n.t('spell_add_dict'),
         onClick: () => { SpellCheck.aggiungiAlDizionario(editableEl, errore); Popup.showToast(I18n.t('toast_added_to_dict')); },
@@ -1771,8 +2039,46 @@
     return items;
   }
 
-  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora». Mai applicato da solo.
-  function vociSuggerimento(editableEl, sugg) {
+  // Su un segnaposto (#1448): il valore in cima, un clic; il perché con la fonte e la data; «Ignora». Mentre Filo cerca,
+  // la riga del valore aspetta e si riempie quando la ricerca risponde.
+  function vociSegnaposto(editableEl, sp) {
+    if (!sp.dubbio) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
+    const riga = (s) => {
+      if (s.cercando) return { hidden: false, label: I18n.t('spell_segnaposto_cerco'), loading: true, onClick: null };
+      const v = s.correzioni && s.correzioni[0];
+      return v ? { hidden: false, label: v, loading: false, onClick: () => SpellCheck.riempi(editableEl, s) } : { hidden: true, label: '', loading: false, onClick: null };
+    };
+    const ascolti = [];
+    let staccato = null;
+    const segui = (fn) => {
+      ascolti.push(fn);
+      if (!staccato) staccato = SpellCheck.seguiSegno(editableEl, sp, (nuovo) => { if (nuovo && !nuovo.cercando) for (const f of ascolti) f(nuovo); });
+    };
+    const righe = [
+      {
+        type: 'correction', ...riga(sp), senzaFreccia: true,
+        onMount: (_root, update) => {
+          if (sp.cercando) segui((nuovo) => update(riga(nuovo)));
+          return () => { if (staccato) staccato(); };
+        },
+      },
+      rigaDelPerche(sp, sp.cercando ? segui : null),
+    ];
+    if (sp.fonteDato && sp.fonteDato.url) {
+      righe.push({ type: 'item', label: I18n.t('spell_segnaposto_apri_fonte'), onClick: () => Actions.apriInSchedaNuova(sp.fonteDato.url) });
+    }
+    if (sp.ricercaFallita) righe.push({ type: 'item', label: I18n.t(sp.vocePerCercare || 'spell_segnaposto_riprova'), onClick: () => SpellCheck.cercaDiNuovo(editableEl, sp) });
+    righe.push(
+      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sp) },
+      { type: 'separator' },
+    );
+    return righe;
+  }
+
+  // Su un suggerimento: il perché con la frase della pagina, la correzione se c'è, «Ignora», e «Valuta» per il parere
+  // sul testo intero (#1449). Mai applicato da solo.
+  function vociSuggerimento(editableEl, sugg, valutaQui = null) {
+    if (sugg.tipo === 'segnaposto') return vociSegnaposto(editableEl, sugg);
     if (!sugg.dubbio && (sugg.fonte === 'ragionato' || sugg.giudicatoDa === 'ragionato')) contaUsoDelCorrettore(ACTIONS.SPELLCHECK_CONTEXT);
     const righe = [rigaDelPerche(sugg)];
     for (const c of sugg.correzioni || []) {
@@ -1784,10 +2090,9 @@
         senzaFreccia: true,
       });
     }
-    righe.push(
-      { type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) },
-      { type: 'separator' },
-    );
+    righe.push({ type: 'item', label: I18n.t('spell_ocra_ignora'), onClick: () => SpellCheck.ignora(editableEl, sugg) });
+    if (valutaQui) righe.push(buildValutaItem(valutaQui));
+    righe.push({ type: 'separator' });
     return righe;
   }
 
@@ -1803,13 +2108,30 @@
   function contaUsoDelCorrettore(action) {
     try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_USO, action, attesaMs: 0 })).catch(() => {}); } catch (_) {}
   }
+  // Com'era il giudizio del modello sulla parola quando la persona ha aperto il menu (#1465).
+  function contaAnticipoParola(stato) {
+    Popup.conta?.({ misura: 'riquadro', cosa: 'anticipo_al_gesto', funzione: 'correttore_parola', stato });
+  }
+
+  // La parola che il correttore ha corretto da sé (#1447): «Annulla correzione» la riporta com'era scritta, e conta
+  // come un rifiuto da cui Filo impara.
+  function voceAnnullaCorrezione(editableEl, mouseEvent) {
+    const v = SpellCheck?.automaticaSotto?.(editableEl, mouseEvent.clientX, mouseEvent.clientY);
+    if (!v) return null;
+    return { type: 'item', label: I18n.t('spell_annulla_correzione'), onClick: () => SpellCheck.annullaAutomatica(editableEl, v) };
+  }
 
   async function openSpellMarksMenu(editableEl, { errore, suggerimento }, mouseEvent, sito = null) {
-    const items = await buildBaseItemsAt(mouseEvent);
+    // Su un suggerimento «Valuta» sta col suggerimento, e una volta sola nel menu.
+    const valutaQui = suggerimento ? campoDaValutare(editableEl) : null;
+    const items = await buildBaseItemsAt(mouseEvent, { senzaValuta: !!valutaQui });
     const sopra = [];
+    const annulla = voceAnnullaCorrezione(editableEl, mouseEvent);
+    if (annulla) sopra.push(annulla, { type: 'separator' });
     if (errore) sopra.push(...vociErrore(editableEl, errore));
-    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento));
-    const tutti = voceCorreggiTutti(editableEl, errore && !errore.dubbio ? 2 : 1);
+    if (suggerimento) sopra.push(...vociSuggerimento(editableEl, suggerimento, valutaQui));
+    const correggibile = (s) => s && !s.dubbio && (s.segno === 'errore' || (s.tipo === 'segnaposto' && !s.cercando && s.correzioni?.length));
+    const tutti = voceCorreggiTutti(editableEl, 1 + [errore, suggerimento].filter(correggibile).length);
     if (tutti) sopra.push(tutti, { type: 'separator' });
     items.unshift(...sopra);
     conMenuDelSito(items, sito);
@@ -1824,11 +2146,17 @@
     let native = SpellCheck.getNativeSuggestions?.(wordCtx.word) || [];
     if (!native.length && SpellCheck.sbagliataPerIlBrowser(wordCtx.word)) native = SpellCheck.proposteDelBrowser(wordCtx.word);
     let updateCorrection = null;
-    const applyAt = (corr) => SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    // La proposta del menu, per i contatori (#1461): chi l'ha fatta, e cosa ne ha fatto la persona.
+    const chiave = `${wordCtx.word}|${wordCtx.start}`;
+    const esito = (e) => SpellCheck.esitoProposta?.(editableEl, 'ortografia', chiave, e);
+    const applyAt = (corr) => {
+      esito('accettata');
+      return SpellCheck.applyFix(editableEl, { start: wordCtx.start, end: wordCtx.end }, corr, { expectedSegment: wordCtx.word });
+    };
     const riga = (corr, alts) => ({
       hidden: !corr, label: corr || '', loading: false,
       onClick: corr ? () => applyAt(corr) : null,
-      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || []),
+      subItems: buildRedSubItems(editableEl, wordCtx, corr || '', alts || [], true, esito),
     });
     let mostrata = native[0] || '';
     items.unshift(
@@ -1836,18 +2164,26 @@
       { type: 'separator', hidden: !mostrata },
     );
     conMenuDelSito(items, sito);
-    Menu.open({ x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true });
+    // Chiuso senza una scelta: la proposta è ignorata. Dopo, perché il clic che lo chiude arriva prima di chiuderlo.
+    Menu.open({
+      x: mouseEvent.clientX, y: mouseEvent.clientY, items, keepOnScroll: true,
+      alChiudere: () => setTimeout(() => esito('ignorata'), 1500),
+    });
+    if (mostrata) SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, 'nativo');
+    // Qui il modello non aveva preparato niente: il controllo parte adesso.
+    if (SpellCheck.modelloErrori?.()) contaAnticipoParola('assente');
 
-    const mostra = (corr, alts) => {
+    const mostra = (corr, alts, modello = 'nativo') => {
       if (!updateCorrection || !corr || corr === wordCtx.word) return;
       mostrata = corr;
       updateCorrection(riga(corr, alts));
+      SpellCheck.propostaMostrata?.(editableEl, 'ortografia', chiave, modello);
     };
     if (!mostrata) {
       SpellCheck.onNativeSuggestions?.(wordCtx.word, (sugg) => { if (!mostrata && sugg?.length) mostra(sugg[0], sugg.slice(1)); });
     }
-    const esito = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
-    if (esito && esito.errore && esito.correzione) mostra(esito.correzione, native.filter((p) => p !== esito.correzione));
+    const giudizio = await SpellCheck.controlloSuRichiesta(editableEl, wordCtx);
+    if (giudizio && giudizio.errore && giudizio.correzione) mostra(giudizio.correzione, native.filter((p) => p !== giudizio.correzione), giudizio.modello);
   }
 
   function buildFeedbackItem() {
@@ -1870,6 +2206,7 @@
     if (!self.SN_NOMI_SITO.daScritto(host)) return null;
     return {
       type: 'item',
+      azione: 'filo-off-on-site',
       label: I18n.t('menu_spegni_filo'),
       onClick: () => {
         try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_SPENTO_IMPOSTA, spento: true, avvisa: true })).catch(() => {}); } catch (_) {}
@@ -1891,17 +2228,22 @@
     } catch (_) {}
   }
 
-  // Ordine: icone globali, Aiuto, zona contestuale, Feedback. La riga globale è stabile e
-  // fa da ancora, la zona contestuale cambia col click.
+  // Ordine: Aiuto, zona contestuale, Feedback. Le icone delle azioni sulla pagina stanno nella barra laterale (#1246).
   function buildMenuItems({
-    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, navState, target = null,
+    selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
+    senzaValuta = false,
   }) {
     const items = [];
+    // La fila in cima (#1434): il contesto lo decide lo stesso ramo che sceglie le voci, qui sotto.
+    const contesto = {};
+    // Il separatore sta solo fra due sezioni che hanno qualcosa: mai in cima al menu.
+    const sezione = (voci) => {
+      if (!voci.length) return;
+      if (items.length) items.push({ type: 'separator' });
+      items.push(...voci);
+    };
 
-    // Registro, layout persistente e drag delle icone: src/content/menuIcons.js.
-    items.push(MenuIcons.buildGlobalIconRow(navState));
-
-    // 2. Aiuto, se è acceso, e le voci di stato qui sotto: il separatore c'è solo se la sezione ha qualcosa.
+    // 1. Aiuto, se è acceso, e le voci di stato qui sotto.
     const sezioneAiuto = [];
     if (aiutoAcceso()) sezioneAiuto.push(buildHelpItem());
 
@@ -1920,41 +2262,47 @@
       sezioneAiuto.push(TranslatePage.buildRestoreOriginalItem());
     }
 
-    // 2d. Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
+    // Zoom — solo quando la pagina NON è alla dimensione reale (#686). È
     // lo stato meno visibile che il tasto destro può raccontare: una pagina
     // rimasta zoomata da un'altra visita spiega da sé perché è così, e la voce
     // è anche la via d'uscita. Il livello lo sa il preload: glielo si chiede
     // con un evento, la risposta arriva nel dataset nello stesso dispatch.
     const zoomItem = buildZoomItem();
     if (zoomItem) sezioneAiuto.push(zoomItem);
-    if (sezioneAiuto.length) items.push({ type: 'separator' }, ...sezioneAiuto);
+    sezione(sezioneAiuto);
 
-    // 3. Zona contestuale — assente se non c'è contesto utile.
+    // 2. Zona contestuale — assente se non c'è contesto utile.
     // #760 — il tasto destro dentro un riquadro di un altro sito riattiva o toglie i cookie del suo servizio.
     const vociRiquadro = (self.SN_RIQUADRO_COOKIE && self.SN_RIQUADRO_COOKIE.voci()) || [];
     const contextItems = [
       ...vociDellaPagina(target),
       ...buildContextualItems({
-        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target,
+        selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target, senzaValuta,
+        contesto,
       }),
       ...vociRiquadro,
     ];
-    if (contextItems.length > 0) {
-      items.push({ type: 'separator' });
-      // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
-      const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
-      contextItems.forEach((it, i) => items.push(i === prima ? { ...it, primaDaTastiera: true } : it));
-    }
+    // Da tastiera il fuoco parte da qui: è quello che si può fare proprio sull'elemento (#1295).
+    const prima = contextItems.findIndex((it) => it && (it.type === 'item' || !it.type));
+    sezione(contextItems.map((it, i) => (i === prima ? { ...it, primaDaTastiera: true } : it)));
 
-    items.push({ type: 'separator' });
-    items.push(buildFeedbackItem());
     const spegni = buildSpegniFiloItem();
-    if (spegni) items.push(spegni);
-    // In pausa (#896) la voce c'è solo per chi vede il Red Team. Si richiede a ogni apertura: vale dalla successiva.
-    refreshRedteamVisibile();
-    if (redteamVisibile) items.push(buildRedteamAttackItem());
+    sezione([buildFeedbackItem(), ...(spegni ? [spegni] : [])]);
+    // Solo a chi ha un codice Red Team (#991), e in pausa (#896) solo se lo vede. Si richiede a ogni apertura: vale dalla successiva.
+    refreshVoceAttacco();
+    if (voceAttacco) items.push(buildRedteamAttackItem());
 
+    const fila = filaContestuale(contesto, { selInfo, target, clipboardHistory });
+    if (fila) items.unshift(fila);
     return items;
+  }
+
+  // Il Copia del tasto destro non passa dall'evento «copy»: a una pagina di Filo lo dice «filo-copia», sull'elemento
+  // cliccato (la chat conta da quale bolla si copia, #1463). Mai sui siti.
+  function copiatoNellaPagina(target) {
+    if (!PAGINA_DI_FILO) return;
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    try { if (el) el.dispatchEvent(new CustomEvent('filo-copia', { bubbles: true })); } catch (_) {}
   }
 
   // Le voci che una pagina di Filo dà ai suoi elementi (il segno di un cambio sulla bolla, #867): ogni
@@ -1973,15 +2321,22 @@
   }
 
   // Parte nascosta: per difetto la voce manca a chi la vedrebbe fino alla risposta, per eccesso porta tutti in un vicolo cieco.
-  let redteamVisibile = false;
-  function refreshRedteamVisibile() {
+  // La prima domanda aspetta la lettura del main, così la voce c'è già al primo tasto destro; un cambio lo spinge il
+  // main (REDTEAM_VERIFICATO_CHANGED).
+  let voceAttacco = false;
+  function refreshVoceAttacco(attendi = false) {
     try {
-      Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY }))
-        .then((r) => { redteamVisibile = !!(r && r.ok && r.visible); })
-        .catch(() => {});
-    } catch (_) {}
+      return Promise.resolve(chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi }))
+        .then((r) => { voceAttacco = !!(r && r.ok && r.visible && r.verificato); return voceAttacco; })
+        .catch(() => voceAttacco);
+    } catch (_) { return Promise.resolve(voceAttacco); }
   }
-  refreshRedteamVisibile();
+  refreshVoceAttacco(true);
+
+  // Scelta da un riquadro incorporato: decide la risposta di adesso, non la copia di questa pagina.
+  function apriAttaccoSeConsentito() {
+    refreshVoceAttacco(true).then((si) => { if (si) self.SN_REDTEAM_ATTACK_UI?.open(); });
+  }
 
   // Red-team — "Invia attacco" (spec §8.1): apre un pannello dedicato (mirrors
   // il flusso feedback) con due campi separati (testo attacco + descrizione) e
@@ -2024,8 +2379,62 @@
       // cosa non si chiamano in due modi.
       label: `Dimensione reale (ora ${p}%)`,
       shortcut: Tasti.etichetta('Ctrl+0'),
-      onClick: () => { try { zoomPagina()?.azzera(); } catch (_) {} },
+      onClick: () => {
+        Popup.conta({ misura: 'strada', id: 'zoom_reset', via: 'tasto_destro_altro' });
+        try { zoomPagina()?.azzera(); } catch (_) {}
+      },
     };
+  }
+
+  // «Valuta» (#1449): il campo di testo sotto il tasto destro, se c'è qualcosa da valutare. Mai una password né un pezzo
+  // di Filo. L'Aiuto vive nella pagina: un riquadro dello stesso sito (gli editor dei CMS) le passa il campo, che lei
+  // legge e corregge da sé; in quello di un altro sito la pagina non arriva, e la voce non c'è.
+  function campoDaValutare(target) {
+    if (!target || !aiutoAcceso() || !SpellCheck?.testoDelCampo) return null;
+    if (IS_SUBFRAME ? !paginaArrivaQui() : !Sidebar?.valuta) return null;
+    if (self.SN_FILO_UI?.inside?.(target)) return null;
+    let campo = target.closest?.('input, textarea') || null;
+    if (campo) {
+      if (!isEditable(campo) || Extract.campoSegreto?.(campo)) return null;
+      const tipo = String(campo.getAttribute('type') || '').toLowerCase();
+      if (campo.tagName === 'INPUT' && !['', 'text', 'search'].includes(tipo)) return null;
+    } else {
+      for (let el = target.nodeType === 1 ? target : target.parentElement; el && el.isContentEditable; el = el.parentElement) campo = el;
+    }
+    // Il testo vero si legge al clic: qui basta sapere che non è vuoto, senza misurare ogni riga del campo.
+    return campo && String(campo.value ?? campo.textContent ?? '').trim() ? campo : null;
+  }
+
+  function buildValutaItem(campo) {
+    return {
+      type: 'item',
+      label: I18n.t('menu_valuta'),
+      onClick: () => {
+        if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+        if (!IS_SUBFRAME) { Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) }); return; }
+        // Il campo lo ritrova la pagina dal fuoco: il ponte fra i riquadri non porta elementi.
+        try { campo.focus({ preventScroll: true }); } catch (_) {}
+        openSurface('valuta', () => {});
+      },
+    };
+  }
+
+  // Ogni riquadro fra qui e la pagina è dello stesso sito: per uno di un altro sito `frameElement` è null.
+  function paginaArrivaQui() {
+    try {
+      for (let w = window; w !== w.top; w = w.parent) if (!w.frameElement) return false;
+      return true;
+    } catch (_) { return false; }
+  }
+
+  // Nella pagina: il campo del riquadro dove «Valuta» ha lasciato il fuoco.
+  function valutaDalRiquadro() {
+    let el = document.activeElement;
+    try {
+      while (el && /^(IFRAME|FRAME)$/.test(el.tagName)) el = self.SN_RIQUADRI_IN_ARRIVO?.documento(el)?.activeElement || null;
+    } catch (_) { el = null; }
+    const campo = el && el.ownerDocument !== document ? campoDaValutare(el) : null;
+    if (campo) Sidebar.valuta({ campo, testo: SpellCheck.testoDelCampo(campo) });
   }
 
   function buildHelpItem() {
@@ -2033,33 +2442,72 @@
       type: 'item',
       label: I18n.t('menu_help'),
       shortcut: Tasti.etichettaFilo(Tasti.scorciatoiaFilo('open-help-sidebar')),
-      onClick: () => openSurface('help', () => openHelpSidebar()),
+      onClick: () => {
+        Popup.conta({ misura: 'strada', id: 'help', via: 'tasto_destro_altro' });
+        openSurface('help', () => openHelpSidebar());
+      },
     };
   }
 
   // Azioni sull'immagine, senza la sezione «Spiega»: la compone il chiamante, così quando
   // l'immagine è anche un link non partono due box AI a ogni apertura.
   function buildImageActionItems(imgEl) {
+    const a = azioniDellImmagine(imgEl);
     return [
-      { type: 'item', label: I18n.t('menu_copy_image'), onClick: () => Actions.copyImage(imgEl) },
-      { type: 'item', label: I18n.t('menu_save_image_as'), onClick: () => Actions.downloadImage(imgEl) },
-      {
-        type: 'item',
-        label: I18n.t('menu_copy_image_link'),
-        onClick: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
-      },
-      {
-        type: 'item',
-        label: I18n.t('menu_search_image'),
-        onClick: () => Actions.searchImageOnWeb(imgEl),
-      },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image'), onClick: a.copy },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_save_image_as'), onClick: a.save },
+      { type: 'item', azione: 'copy-download-image', label: I18n.t('menu_copy_image_link'), onClick: a.copyLink },
+      { type: 'item', azione: 'search-image', label: I18n.t('menu_search_image'), onClick: a.search },
     ];
   }
 
-  function buildLinkActionItems(linkEl) {
+  // Le azioni di un'immagine e di un collegamento, una volta sola: le voci del menu e le icone della fila (#1434) fanno
+  // la stessa cosa.
+  function azioniDellImmagine(imgEl) {
+    return {
+      copy: () => Actions.copyImage(imgEl),
+      save: () => Actions.downloadImage(imgEl),
+      copyLink: () => Actions.copyUrlToClipboard(imgEl.currentSrc || imgEl.src),
+      search: () => Actions.searchImageOnWeb(imgEl),
+      ask: () => chiediDellImmagine(imgEl),
+    };
+  }
+  function azioniDelLink(linkEl) {
     // Un collegamento scritto da un modello di Filo si apre e si scarica solo dal main, dopo la porta delle uscite (#810).
     const diFilo = !!(linkEl.classList && linkEl.classList.contains('filo-md-link') && Popup && Popup.apriCollegamento);
     const indirizzo = Actions.indirizzoDelLink(linkEl);
+    return {
+      diFilo,
+      indirizzo,
+      openTab: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(indirizzo)),
+      download: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
+      copy: () => Actions.copyUrlToClipboard(indirizzo),
+      saveForLater: () => Actions.saveLink(linkEl),
+      share: () => Actions.shareLink(linkEl),
+    };
+  }
+
+  // «Chiedi a Filo» su un'immagine: l'Aiuto si apre con l'immagine allegata, e la domanda la scrive la persona.
+  async function chiediDellImmagine(imgEl) {
+    if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
+    const src = imgEl.currentSrc || imgEl.src;
+    let blob = null;
+    try { blob = Actions.blobDaDataUrl(await Actions.scaricaImmagine(src, imgEl)); } catch (_) {}
+    if (!blob || !/^image\//i.test(blob.type || '')) { Popup.showToast(I18n.t('menu_image_unreadable')); return; }
+    // Un'immagine data: o blob: non ha un nome nell'indirizzo, solo i suoi dati: prende quello dal tipo.
+    const nome = (() => {
+      try {
+        const u = new URL(src);
+        return /^(https?|file):$/.test(u.protocol) ? decodeURIComponent(u.pathname.split('/').pop() || '') : '';
+      } catch (_) { return ''; }
+    })();
+    const estensione = (String(blob.type).split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*$/, '');
+    try { await Sidebar.allega([new File([blob], nome || `immagine.${estensione}`, { type: blob.type })]); } catch (_) {}
+  }
+
+  function buildLinkActionItems(linkEl) {
+    const a = azioniDelLink(linkEl);
+    const indirizzo = a.indirizzo;
     const out = [];
     // Un link d'invito esiste per portare l'invito dentro Filo: è la sua prima voce (#664).
     if (self.SN_WALLET && self.SN_WALLET.inviteCodeFromLink(indirizzo)) {
@@ -2069,13 +2517,7 @@
         onClick: () => { chrome.runtime.sendMessage({ type: MSG.WALLET_INVITE_OPEN, link: indirizzo }).catch(() => {}); },
       });
     }
-    out.push(
-      {
-        type: 'item',
-        label: I18n.t('menu_open_in_new_tab'),
-        onClick: () => (diFilo ? Popup.apriCollegamento(linkEl) : Actions.apriInSchedaNuova(indirizzo)),
-      },
-    );
+    out.push({ type: 'item', label: I18n.t('menu_open_in_new_tab'), onClick: a.openTab });
     // "Salva file" — gemello di "Salva immagine come" per i link a un file
     // (PDF, ZIP, allegato). Compare SOLO quando il link punta davvero a un
     // file (vedi isDownloadableLink): su un link a un'altra pagina scaricare
@@ -2083,26 +2525,15 @@
     if (Actions.isDownloadableLink(linkEl)) {
       out.push({
         type: 'item',
+        azione: 'download-progress',
         label: I18n.t('menu_save_file'),
-        onClick: () => (diFilo ? Popup.scaricaCollegamento(linkEl) : Actions.downloadLink(linkEl)),
+        onClick: a.download,
       });
     }
     out.push(
-      {
-        type: 'item',
-        label: I18n.t('menu_copy_link'),
-        onClick: () => Actions.copyUrlToClipboard(indirizzo),
-      },
-      {
-        type: 'item',
-        label: I18n.t('menu_save_link_for_later'),
-        onClick: () => Actions.saveLink(linkEl),
-      },
-      {
-        type: 'item',
-        label: I18n.t('menu_share_link'),
-        onClick: () => Actions.shareLink(linkEl),
-      },
+      { type: 'item', azione: 'share-copy-link', label: I18n.t('menu_copy_link'), onClick: a.copy },
+      { type: 'item', azione: 'save-link', label: I18n.t('menu_save_link_for_later'), onClick: a.saveForLater },
+      { type: 'item', azione: 'share-copy-link', label: I18n.t('menu_share_link'), onClick: a.share },
     );
     return out;
   }
@@ -2124,14 +2555,21 @@
   // Costruisce gli item della zona contestuale in base a cosa è stato cliccato.
   // Matrice: testo / testo+editabile / video-audio / immagine (+ link) / link /
   // casella input / niente.
+  // `contesto` (#1434): qui si scrive per quale elemento è il menu, per la fila in cima: lo decide lo stesso ramo che
+  // sceglie le voci, così fila e voci parlano sempre della stessa cosa.
   function buildContextualItems({
     selInfo, linkEl, imgEl, mediaEl, mediaUnder, imgUnder, linkUnder, layers, editable, clipboardHistory, target = null,
+    senzaValuta = false, contesto = {},
   }) {
     const items = [];
+    const di = (nome, campi = {}) => Object.assign(contesto, { nome, ...campi });
+    const valutaQui = editable && !senzaValuta ? campoDaValutare(target) : null;
+    const sel = azioniDellaSelezione(selInfo, target);
 
     if (selInfo && editable) {
-      items.push({ type: 'item', label: I18n.t('menu_cut'), onClick: () => Actions.cutSelection() });
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      di(contestoDelCampo(selInfo, target), { segreto: !!selInfo.segreto });
+      if (sel.cut) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_cut'), onClick: sel.cut });
+      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
       if (selInfo.segreto) return items;
@@ -2143,17 +2581,15 @@
         label: I18n.t('menu_edit_selection'),
         onClick: () => EditBox.openEditBox(selInfo.selection),
       });
+      if (valutaQui) items.push(buildValutaItem(valutaQui));
       return items;
     }
 
     if (selInfo) {
-      items.push({ type: 'item', label: I18n.t('menu_copy'), onClick: () => Actions.copyToClipboard(selInfo.selection) });
+      di('testo', { segreto: !!selInfo.segreto });
+      if (sel.copy) items.push({ type: 'item', azione: 'copy-cut', label: I18n.t('menu_copy'), onClick: sel.copy });
       if (selInfo.segreto) return items;
-      items.push({
-        type: 'item',
-        label: I18n.t('menu_search_text'),
-        onClick: () => Actions.searchTextOnWeb(selInfo.selection),
-      });
+      items.push({ type: 'item', azione: 'search-web', label: I18n.t('menu_search_text'), onClick: sel.search });
       { const ra = TTS.buildReadAloudItem(selInfo.selection); if (ra) items.push(ra); }
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplain(selInfo, { withDeepArrow: true }));
@@ -2163,10 +2599,11 @@
     // Video/audio cliccato direttamente: le sue azioni vengono prima (un filmato
     // dentro una scheda-link resta soprattutto un filmato)…
     if (mediaEl) {
-      for (const it of Actions.buildMediaItems(mediaEl)) items.push(it);
       // Un media dentro un <a> è ANCHE un collegamento e spesso è il link che si vuole (#434).
       // Non è sempre un antenato: nelle home l'anteprima si stende sopra il link (#444).
       const link = linkEl || linkUnder;
+      di('media', { media: mediaEl, link });
+      for (const it of Actions.buildMediaItems(mediaEl, link)) items.push(it);
       if (link) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(link)) items.push(it);
@@ -2183,6 +2620,7 @@
       // Un'immagine dentro un <a> è ANCHE un collegamento e le due famiglie di voci vanno
       // insieme (#401). La copertina può essere STESA SOPRA il link invece che dentro (#444).
       const linkOfImg = linkEl || linkUnder;
+      di('immagine', { img: imgEl, link: linkOfImg });
       if (linkOfImg) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkOfImg)) items.push(it);
@@ -2198,6 +2636,7 @@
       // La zona di una mappa d'immagine è il collegamento cliccato, disegnato su un'immagine (#725.6): prima le sue voci,
       // poi quelle dell'immagine, e la sezione parla del collegamento, col suo avviso.
       const immagineZona = immagineDellaZona(linkEl, layers);
+      di('link', { link: linkEl });
       if (immagineZona) {
         for (const it of buildLinkActionItems(linkEl)) items.push(it);
         items.push({ type: 'separator' });
@@ -2216,13 +2655,15 @@
       // caso un link sopra non deve intrufolarsi nel menu di quel link.
       const mediaInLink = belongsTo(mediaUnder, linkEl, layers) ? mediaUnder : null;
       if (mediaInLink) {
-        for (const it of Actions.buildMediaItems(mediaInLink)) items.push(it);
+        di('media', { media: mediaInLink, link: linkEl });
+        for (const it of Actions.buildMediaItems(mediaInLink, linkEl)) items.push(it);
         items.push({ type: 'separator' });
       }
       // Stessa storia con la copertina ferma: le schede la coprono con un velo che regge il
       // titolo, e il clic arriva lì invece che sull'<img> (#444).
       const imgInLink = (!mediaInLink && belongsTo(imgUnder, linkEl, layers)) ? imgUnder : null;
       if (imgInLink) {
+        di('immagine', { img: imgInLink, link: linkEl });
         for (const it of buildImageActionItems(imgInLink)) items.push(it);
         items.push({ type: 'separator' });
       }
@@ -2237,18 +2678,22 @@
     }
 
     if (editable) {
+      di('cursore');
       items.push(Actions.buildPasteItem(clipboardHistory));
       items.push(TTS.buildDictateItem(target));
+      if (valutaQui) items.push({ type: 'separator' }, buildValutaItem(valutaQui));
       return items;
     }
 
     // Nessun altro contesto, ma sotto al punto cliccato c'è un filmato coperto
     // dall'overlay del player: sono comunque le sue azioni che l'utente cerca.
     if (mediaUnder) {
-      for (const it of Actions.buildMediaItems(mediaUnder)) items.push(it);
       // Due cose prese entrambe da sotto devono stare insieme anche fra loro, o il menu
       // unirebbe due schede diverse (#444).
-      if (belongsTo(mediaUnder, linkUnder, layers)) {
+      const linkDelMedia = belongsTo(mediaUnder, linkUnder, layers) ? linkUnder : null;
+      di('media', { media: mediaUnder, link: linkDelMedia });
+      for (const it of Actions.buildMediaItems(mediaUnder, linkDelMedia)) items.push(it);
+      if (linkDelMedia) {
         items.push({ type: 'separator' });
         for (const it of buildLinkActionItems(linkUnder)) items.push(it);
         items.push({ type: 'separator' });
@@ -2260,6 +2705,7 @@
     // Stessa scheda con l'anteprima ferma: senza questo ramo lo stesso pixel dava menu
     // completo mentre il filmatino suonava e menu vuoto un istante dopo (#444).
     if (imgUnder) {
+      di('immagine', { img: imgUnder });
       for (const it of buildImageActionItems(imgUnder)) items.push(it);
       const linkOfCover = belongsTo(imgUnder, linkUnder, layers) ? linkUnder : null;
       if (linkOfCover) {
@@ -2274,13 +2720,167 @@
     // Un velo trasparente sopra una scheda-link basta a far sparire le voci del collegamento
     // (#444). Barre fisse, modali e manti li ha già scartati `linkUnder`.
     if (linkUnder) {
+      di('link', { link: linkUnder });
       for (const it of buildLinkActionItems(linkUnder)) items.push(it);
       items.push({ type: 'separator' });
       items.push(Actions.buildInlineExplainLink(linkUnder));
       return items;
     }
 
+    // Niente sotto il mouse: la fila della pagina, vuota di partenza, dove la persona può portare un'icona della barra.
+    di('pagina');
     return items;
+  }
+
+  // Taglia, Copia e Cerca sul testo selezionato, una volta sola: le voci e la fila (#1434) fanno la stessa cosa. Su un
+  // campo coperto (una password) Taglia e Copia mancano, come nel menu del sistema; su uno segreto manca Cerca.
+  function azioniDellaSelezione(selInfo, target) {
+    const out = {};
+    if (!selInfo) return out;
+    if (!selInfo.coperto) {
+      out.cut = () => Actions.cutSelection();
+      out.copy = () => { Actions.copySelection(selInfo.selection); copiatoNellaPagina(target); };
+    }
+    if (!selInfo.segreto) out.search = () => Actions.searchTextOnWeb(selInfo.selection);
+    return out;
+  }
+
+  // Il testo selezionato dove si scrive: con la formattazione la fila mette grassetto e corsivo, in una casella (una
+  // barra di ricerca, un'area di testo, un campo «solo testo») taglia, copia e incolla.
+  function contestoDelCampo(selInfo, target) {
+    return campoRicco(target) && !selInfo.segreto ? 'scrivibile' : 'campo';
+  }
+
+  // Il campo dove si scrive con la formattazione (il foglio dell'Editor, un campo ricco di un sito): lì la fila mette
+  // grassetto e corsivo. Un campo «solo testo» non ne ha, e resta una casella.
+  function campoRicco(target) {
+    let el = target && (target.nodeType === 1 ? target : target.parentElement);
+    if (!el || !el.isContentEditable) return null;
+    while (el.parentElement && el.parentElement.isContentEditable) el = el.parentElement;
+    return String(el.getAttribute('contenteditable') || '').toLowerCase() === 'plaintext-only' ? null : el;
+  }
+
+  // Un comando di formattazione sulla selezione catturata al tasto destro: il clic sulla fila non sposta il fuoco, il
+  // campo del collegamento sì, e la selezione si rimette da lì.
+  const COLORE_EVIDENZIA = 'rgba(255, 196, 0, 0.42)';
+  const coloreUguale = (a, b) => String(a || '').replace(/\s+/g, '') === String(b || '').replace(/\s+/g, '');
+  function formatta(comando, valore) {
+    restorePasteContext();
+    const conCss = comando === 'hiliteColor';
+    try {
+      if (conCss) document.execCommand('styleWithCSS', false, true);
+      document.execCommand(comando, false, valore);
+    } catch (_) {
+    } finally {
+      if (conCss) { try { document.execCommand('styleWithCSS', false, false); } catch (_) {} }
+    }
+  }
+  // Chromium risponde '' a queryCommandValue('hiliteColor'): il fondo della selezione lo dice solo 'backColor'.
+  function evidenziato() {
+    try { return coloreUguale(document.queryCommandValue('backColor'), COLORE_EVIDENZIA); } catch (_) { return false; }
+  }
+  function evidenzia() {
+    restorePasteContext();
+    formatta('hiliteColor', evidenziato() ? 'transparent' : COLORE_EVIDENZIA);
+  }
+  // Quali stili ha già la selezione, per accendere le loro icone nella fila: chi preme sa se mette o toglie.
+  function statoFormattazione() {
+    const s = (c) => { try { return !!document.queryCommandState(c); } catch (_) { return false; } };
+    const g = window.getSelection && window.getSelection();
+    const nodo = g && g.anchorNode ? (g.anchorNode.nodeType === 1 ? g.anchorNode : g.anchorNode.parentElement) : null;
+    return {
+      bold: s('bold'), italic: s('italic'), underline: s('underline'), strike: s('strikeThrough'),
+      highlight: evidenziato(), link: !!(nodo && nodo.closest && nodo.closest('a[href]')),
+    };
+  }
+  // Il campo vuoto toglie il collegamento che c'era: è quello che vuole chi cancella l'indirizzo e preme Invio.
+  function collega(scritto) {
+    if (!String(scritto || '').trim()) { formatta('unlink'); return; }
+    const url = self.SN_URL_NAV?.collegamentoScritto?.(scritto) || '';
+    if (!url) { Popup.showToast(I18n.t('fila_link_non_valido')); return; }
+    formatta('createLink', url);
+  }
+  // Il collegamento proposto: quello che c'è già, la selezione stessa se è un indirizzo, o l'ultima cosa copiata se lo
+  // è. Gli appunti solo nelle pagine di Filo: il campo sta nel documento della pagina, e un sito lo leggerebbe.
+  function collegamentoProposto(selInfo, clipboardHistory) {
+    const U = self.SN_URL_NAV;
+    if (!U?.collegamentoScritto) return '';
+    const g = window.getSelection && window.getSelection();
+    const nodo = g && g.anchorNode ? (g.anchorNode.nodeType === 1 ? g.anchorNode : g.anchorNode.parentElement) : null;
+    const gia = nodo && nodo.closest ? nodo.closest('a[href]') : null;
+    if (gia) return U.collegamentoScritto(gia.getAttribute('href')) || '';
+    const dallaSelezione = U.collegamentoScritto(selInfo && selInfo.selection);
+    if (dallaSelezione || !PAGINA_DI_FILO) return dallaSelezione;
+    const ultima = Array.isArray(clipboardHistory) ? clipboardHistory.find((e) => e && e.type === 'text') : null;
+    return (ultima && U.collegamentoScritto(ultima.text)) || '';
+  }
+
+  // Un'immagine o un filmato dentro un collegamento: nella fila anche apri e copia il collegamento, come nelle voci.
+  function azioniDellAnteprima(link) {
+    if (!link) return {};
+    const a = azioniDelLink(link);
+    return { openTab: { onClick: a.openTab }, linkCopy: { onClick: a.copy } };
+  }
+
+  // La fila in cima al menu (#1434): per il contesto scelto da buildContextualItems, chi esegue le sue azioni.
+  // Le azioni che qui non hanno senso (una selezione segreta non si cerca) mancano, e la fila non le mostra.
+  function filaContestuale(contesto, { selInfo, target, clipboardHistory }) {
+    const nome = contesto && contesto.nome;
+    if (!nome || !MenuIcons?.fila) return null;
+    const testo = selInfo ? selInfo.selection : '';
+    const sel = azioniDellaSelezione(selInfo, target);
+    const daSel = (k) => (sel[k] ? { onClick: sel[k] } : null);
+    const azioni = {};
+    if (nome === 'scrivibile') {
+      Object.assign(azioni, {
+        bold: { onClick: () => formatta('bold') },
+        italic: { onClick: () => formatta('italic') },
+        underline: { onClick: () => formatta('underline') },
+        strike: { onClick: () => formatta('strikeThrough') },
+        highlight: { onClick: () => evidenzia() },
+        clear: { onClick: () => { formatta('removeFormat'); formatta('unlink'); } },
+        link: {
+          tieneAperto: true,
+          onClick: (ancora) => Menu.openLinkSubmenu(ancora, { valore: collegamentoProposto(selInfo, clipboardHistory), onApplica: (v) => collega(v) }),
+        },
+        cut: daSel('cut'),
+        copy: daSel('copy'),
+        search: daSel('search'),
+      });
+      const stato = statoFormattazione();
+      for (const k of Object.keys(stato)) azioni[k].acceso = stato[k];
+    } else if (nome === 'campo') {
+      Object.assign(azioni, {
+        cut: daSel('cut'),
+        copy: daSel('copy'),
+        paste: { onClick: () => Actions.pasteFromClipboard() },
+        search: daSel('search'),
+      });
+    } else if (nome === 'testo') {
+      Object.assign(azioni, { copy: daSel('copy') });
+      if (!contesto.segreto) {
+        azioni.search = daSel('search');
+        azioni.translate = { onClick: () => Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, selectionAnchor()) };
+        const leggi = TTS.buildReadAloudItem(testo);
+        if (leggi) azioni.readAloud = { onClick: leggi.onClick };
+      }
+    } else if (nome === 'immagine' && contesto.img) {
+      Object.assign(azioni, azioniDellImmagine(contesto.img));
+      for (const k of Object.keys(azioni)) azioni[k] = { onClick: azioni[k] };
+      if (!aiutoAcceso()) delete azioni.ask;
+      Object.assign(azioni, azioniDellAnteprima(contesto.link));
+    } else if (nome === 'link' && contesto.link) {
+      const a = azioniDelLink(contesto.link);
+      for (const k of ['openTab', 'copy', 'saveForLater', 'share']) azioni[k] = { onClick: a[k] };
+    } else if (nome === 'media' && contesto.media) {
+      Object.assign(azioni, Actions.azioniDelMedia(contesto.media, contesto.link || null), azioniDellAnteprima(contesto.link));
+    } else if (nome === 'cursore') {
+      azioni.paste = { onClick: () => Actions.pasteFromClipboard() };
+      const detta = TTS.buildDictateItem(target);
+      if (detta && typeof detta.onClick === 'function') azioni.dictate = { onClick: detta.onClick, disabled: !!detta.disabled };
+    }
+    for (const k of Object.keys(azioni)) if (!azioni[k]) delete azioni[k];
+    return MenuIcons.fila(nome, azioni);
   }
 
 
@@ -2306,8 +2906,12 @@
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.open(context);
   }
+  // Le immagini lasciate sulla pagina (#1623): il pannello vive nel frame principale, o nello strato sopra il sito, che
+  // nasce solo dove Filo è acceso.
+  const nelloStratoQui = self.SN_FILO_UI?.nelloStrato === true;
+  Sidebar?.suChiusura?.(() => ((IS_SUBFRAME && !nelloStratoQui) || (!nelloStratoQui && motivoBlocco()) ? 'sito' : aiutoAcceso() ? '' : 'aiuto'));
 
-  // L'icona Aiuto (barra laterale, riga del tasto destro): apre, poi detta, poi ferma (#1432).
+  // L'icona Aiuto della barra laterale: apre, poi detta, poi ferma (#1432).
   function aiutoPasso() {
     if (!aiutoAcceso()) { Popup.showToast(I18n.t('help_disabled')); return; }
     Sidebar.passo();
@@ -2354,13 +2958,18 @@
   }
 
   function onRuntimeMessage(msg, sender, sendResponse) {
-    // #871 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
+    // #871, #1434 — la disposizione delle icone è cambiata altrove, o un'icona arriva dalla barra laterale.
     if (msg?.type === MSG.ICON_LAYOUT_CHANGED) {
       try { MenuIcons.layoutCambiato?.(msg.layout); } catch (_) {}
       return;
     }
     if (msg?.type === MSG.BARRA_FUORI) {
       try { MenuIcons.dallaBarra?.(msg); } catch (_) {}
+      return;
+    }
+    // Le immagini lasciate sulla fila delle schede o sulla barra (#1623): quelle per la home le prende la home.
+    if (msg?.type === MSG.CHAT_ALLEGA) {
+      if (msg.dove === 'aiuto' && !IS_SUBFRAME) { try { Promise.resolve(Sidebar?.allegaDaFuori?.(msg)).catch(() => {}); } catch (_) {} }
       return;
     }
     if (msg?.type === MSG.BARRA_ETICHETTE_CHIEDI) {
@@ -2370,8 +2979,7 @@
     if (msg?.type === MSG.FULLSCREEN_CHANGED) {
       fullscreenAnnunciato = true;
       contentFullscreen = !!msg.fullscreen;
-      // Se un menu è aperto adesso, la sua voce dello schermo intero sta mentendo: si
-      // ridisegna sul posto invece di lasciarla lì fino alla chiusura (#514).
+      // Un'icona dello schermo intero portata nella fila mentirebbe fino alla chiusura del menu (#514).
       try { if (Menu?.isOpen?.()) MenuIcons.redrawIconRows?.(); } catch (_) {}
       return;
     }
@@ -2393,14 +3001,19 @@
       try { Menu.close(); } catch (_) {}
       return;
     }
-    // Azione di PAGINA scelta dal menu aperto dentro un riquadro: rimandata qui perché solo
+    if (msg?.type === MSG.REDTEAM_VERIFICATO_CHANGED) {
+      refreshVoceAttacco(true);
+      return;
+    }
+    // Azione di PAGINA dalla barra laterale, o scelta dal menu aperto dentro un riquadro: qui perché solo
     // il frame principale è «la pagina» (#405).
     if (msg?.type === MSG.TOP_FRAME_COMMAND) {
       try {
         if (msg.surface === 'feedback') self.SN_FEEDBACK_UI?.open();
-        else if (msg.surface === 'redteam') { if (redteamVisibile) self.SN_REDTEAM_ATTACK_UI?.open(); }
+        else if (msg.surface === 'redteam') apriAttaccoSeConsentito();
         else if (msg.surface === 'help') openHelpSidebar();
-        else MenuIcons.runIconAction(msg.iconId);
+        else if (msg.surface === 'valuta') valutaDalRiquadro();
+        else if (msg.daBarra) MenuIcons.runIconAction(msg.iconId, msg.colore);
       } catch (e) { console.error('[SN] azione di pagina dal riquadro', e); }
       // Premuta dalla barra laterale: la barra rilegge come si chiama adesso (Traduci → Mostra originale).
       if (msg.daBarra) setTimeout(() => rispondiEtichetteBarra([msg.iconId]), 60);
@@ -2411,18 +3024,14 @@
       // ogni riquadro incorporato li duplicherebbe (#405).
       if (IS_SUBFRAME) return;
       try {
-        if (document.visibilityState === 'visible' && document.hasFocus()) {
-          // `rimedio` sceglie solo fra le pagine note di SN_CHAT_ERRORS: l'indirizzo non viaggia nel messaggio.
-          Popup?.showToast?.(String(msg.text || ''), {
-            duration: Number(msg.duration) || 2800, rimedio: msg.rimedio || null, segnala: typeof msg.segnala === 'string' ? msg.segnala : '',
-          });
-        }
+        if (typeof msg.avviso === 'string' && msg.avviso) prendiAvvisiInCoda(msg.avviso);
+        else if (inVistaAdesso()) mostraAvviso(msg);
       } catch (_) {}
       return;
     }
     // Stato della lettura condiviso fra le schede: «Interrompi lettura» deve esserci anche
     // quando a leggere è un'altra.
-    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP) {
+    if (msg?.type === MSG.TTS_GLOBAL_READING || msg?.type === MSG.TTS_STOP || msg?.type === MSG.TTS_PROVA) {
       TTS.handleBroadcast(msg);
       return;
     }
@@ -2447,7 +3056,11 @@
     if (msg?.type === MSG.SHORTCUT_TRIGGERED) {
       // Alt+S è un gesto rivolto a Filo: salva anche dove Filo è spento (#839); le altre scorciatoie lì tacciono.
       if (COMANDI_SALVA.has(msg.command)) { suSalvaPerDopo(msg, sendResponse); return; }
-      if (isBlocked()) return;
+      if (isBlocked()) {
+        // La scorciatoia che qui tace, e perché (#1468): Filo spento sul sito, o una pagina dove Filo non c'è.
+        Popup.conta({ misura: 'a-vuoto', comando: String(msg.command || ''), motivo: motivoBlocco() === 'sito' ? 'filo_spento_sul_sito' : 'pagina_interna' });
+        return;
+      }
       handleShortcut(msg.command, msg.context);
       sendResponse({ ok: true });
     }
@@ -2490,10 +3103,10 @@
     if (command === 'explain-selection') {
       // La spiegazione breve è già inline nel menu: la scorciatoia apre l'approfondimento.
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.EXPLAIN_DEEP, selInfo, anchor);
-      else Popup.showToast(I18n.t('err_no_selection'));
+      else Popup.toastErrore('err_no_selection');
     } else if (command === 'translate-selection') {
       if (selInfo) Actions.triggerExplainOrTranslate(ACTIONS.TRANSLATE_SELECTION, selInfo, anchor);
-      else Popup.showToast(I18n.t('err_no_selection'));
+      else Popup.toastErrore('err_no_selection');
     } else if (command === 'open-help-sidebar') {
       openHelpSidebar(context);
     } else if (command === 'aiuto-dalla-barra') {

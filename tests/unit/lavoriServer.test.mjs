@@ -4,11 +4,11 @@ import '../helpers/senzaSessione.mjs';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, realpathSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 // Come in dispatch.test.mjs: stato e marcatori in una cartella usa-e-getta, letti all'import.
@@ -18,7 +18,9 @@ process.env.FILO_REPO_ROOT = TMP;
 process.env.FILO_TOOLS_ROOT = REPO;
 process.env.CLAUDE_CONFIG_DIR = cartellaTemporanea('filo-claude-utente-');
 
-const { cartellaCloneServer, cloneDentroIlRepo, testoLavoroServer, serverCtx, readRoleInstructions } = await import('../../scripts/dispatch.mjs');
+const {
+  cartellaCloneServer, cloneDentroIlRepo, rigaCartellaDiPartenza, testoLavoroServer, serverCtx, readRoleInstructions,
+} = await import('../../scripts/dispatch.mjs');
 
 test('il clone del server non si committa: .gitignore lo esclude ovunque stia', () => {
   const righe = readFileSync(join(REPO, '.gitignore'), 'utf8').split(/\r?\n/).map((l) => l.trim());
@@ -55,6 +57,9 @@ test('le istruzioni del lavoro server: git verso GitHub solo da git-server, perc
   assert.ok(!/credential\.|git-credenziali|--global/.test(t), 'niente aiutanti né configurazione di credenziali');
   assert.ok(!/git (-C "[^"]+" )?(clone|fetch|push|pull|ls-remote)\b/.test(t), 'nessun git di rete fuori da git-server');
   assert.match(t, /messaggio esatto/, 'un blocco del controllo dei permessi si riporta parola per parola');
+  // #2093: chi risolve conta anche le prove del server, con lo strumento messo da parte e non con quello del ramo.
+  const conta = `node "${REPO.split('\\').join('/')}/scripts/conta-prove.mjs" --server "/home/user/filo-security"`;
+  assert.ok(t.includes(conta), `il conto delle prove col clone vero: ${conta}`);
 });
 
 test('token negato: ogni ruolo trova la sua strada nel testo che riceve, e chi verifica non passa senza il server', () => {
@@ -81,4 +86,34 @@ test('la busta del server passa il segno `lavoroServer` ai ruoli che lavorano, m
   }
   assert.equal(serverCtx({ role: 'verifier' }, { payload: { feedback: { text: 'x' } } }).lavoroServer, undefined);
   assert.equal(serverCtx({ role: 'secaudit' }, busta).lavoroServer, undefined);
+});
+
+test('una sessione partita sopra i cloni: il preflight manda l’orchestratore nella radice di Filo (#1761)', () => {
+  const sopra = resolve('/home/user');
+  const filo = join(sopra, 'Filo');
+  const riga = rigaCartellaDiPartenza(sopra, filo);
+  assert.ok(riga.includes(`cd "${filo.split('\\').join('/')}"`), riga);
+  for (const cwd of [filo, join(filo, 'scripts'), '']) assert.equal(rigaCartellaDiPartenza(cwd, filo), '', cwd);
+  const src = readFileSync(join(REPO, 'scripts', 'dispatch.mjs'), 'utf8');
+  assert.match(src, /rigaCartellaDiPartenza\(process\.cwd\(\), ROOT\)[^]*Le tue istruzioni/, 'la riga esce prima delle istruzioni');
+});
+
+test('il comando del compito programmato trova dispatch sopra i cloni e dentro Filo, qualunque nome abbia la cartella', { skip: process.platform === 'win32' && 'il comando gira nella shell della cloud' }, () => {
+  const spec = readFileSync(join(REPO, 'ROUTINE-AUTH-SPEC.md'), 'utf8');
+  const comando = (spec.match(/^\s*(node "\$\(ls -d [^\n]*--preflight)\s*$/m) || [])[1];
+  assert.ok(comando, 'il comando sta in ROUTINE-AUTH-SPEC.md § 14');
+  const sopra = cartellaTemporanea('filo-sopra-i-cloni-');
+  try {
+    const filo = join(sopra, 'un nome qualunque');
+    mkdirSync(join(filo, 'scripts'), { recursive: true });
+    mkdirSync(join(sopra, 'filo-security', 'functions'), { recursive: true });
+    const finto = join(filo, 'scripts', 'dispatch.mjs');
+    writeFileSync(finto, "import { realpathSync } from 'node:fs';\nconsole.log(JSON.stringify([realpathSync(process.argv[1]), ...process.argv.slice(2)]));\n");
+    for (const cwd of [sopra, filo]) {
+      const out = execFileSync('bash', ['-c', comando], { cwd, encoding: 'utf8' });
+      assert.deepEqual(JSON.parse(out), [realpathSync(finto), '--preflight'], cwd);
+    }
+  } finally {
+    togliCartella(sopra);
+  }
 });

@@ -4,7 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { nelMondoDiFilo, clicca } from './helpers/riquadri.mjs';
+import { neiRiquadri, clicca, tastieraDi } from './helpers/riquadri.mjs';
 
 const RISPOSTA = 'La fotosintesi trasforma la luce in zuccheri.';
 // Una barra di scorrimento è larga almeno una decina di px; sotto i 4 è l'arrotondamento dei bordi a scala 125%.
@@ -66,7 +66,7 @@ async function apriRiquadroDaMenu(app, page) {
 }
 
 function misura(app, page) {
-  return nelMondoDiFilo(app, page, () => {
+  return neiRiquadri(app, page, () => {
     const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
     const trova = (s) => (T ? T.trova(s) : document.querySelector(s));
     const el = trova('.sn-popup-input');
@@ -91,14 +91,15 @@ function misura(app, page) {
 }
 
 async function scriviNellaCasella(app, page, testo) {
-  await clicca(app, page, '.sn-popup-input');
-  await page.keyboard.insertText(testo);
+  const dove = await clicca(app, page, '.sn-popup-input');
+  await dove.keyboard.insertText(testo);
+  return dove;
 }
 
 async function svuota(app, page) {
-  await clicca(app, page, '.sn-popup-input');
-  await page.keyboard.press('Control+A');
-  await page.keyboard.press('Delete');
+  const dove = await clicca(app, page, '.sn-popup-input');
+  await dove.keyboard.press('Control+A');
+  await dove.keyboard.press('Delete');
 }
 
 async function provaLaCasella(app, page, nome) {
@@ -109,10 +110,11 @@ async function provaLaCasella(app, page, nome) {
   expect(vuota.barra).toBeLessThan(BARRA);
   expect(Math.abs(vuota.alto - vuota.altoInvio)).toBeLessThanOrEqual(1);
   expect(vuota.larghezzaSuggerimento).toBeLessThan(vuota.spazio);
-  try { await page.screenshot({ path: `tests/.shots/popup-casella-${nome}-vuota.png` }); } catch (_) {}
+  // Il riquadro sta dove lo disegna Filo: nello strato sopra un sito, nella pagina su filo://.
+  try { await (await tastieraDi(app, page)).screenshot({ path: `tests/.shots/popup-casella-${nome}-vuota.png` }); } catch (_) {}
 
   // Un suggerimento più largo della casella (riquadro stretto, testo più lungo) resta su una riga: niente frecce.
-  const lungo = await nelMondoDiFilo(app, page, () => {
+  const lungo = await neiRiquadri(app, page, () => {
     const T = globalThis.SN_FILO_UI && globalThis.SN_FILO_UI._test;
     const el = T ? T.trova('.sn-popup-input') : document.querySelector('.sn-popup-input');
     const prima = el.placeholder;
@@ -127,7 +129,7 @@ async function provaLaCasella(app, page, nome) {
   expect(lungo.barra).toBeLessThan(BARRA);
 
   // Una riga scritta: stessa altezza, niente frecce.
-  await scriviNellaCasella(app, page, 'e in inglese?');
+  const dove = await scriviNellaCasella(app, page, 'e in inglese?');
   await expect.poll(async () => (await misura(app, page)).alto).toBeGreaterThan(0);
   const una = await misura(app, page);
   expect(Math.abs(una.alto - vuota.alto)).toBeLessThanOrEqual(1);
@@ -135,15 +137,15 @@ async function provaLaCasella(app, page, nome) {
   expect(una.barra).toBeLessThan(BARRA);
 
   // Tre righe: la casella si allunga per tutte e tre, sempre senza frecce.
-  await page.keyboard.insertText('\nseconda riga\nterza riga');
+  await dove.keyboard.insertText('\nseconda riga\nterza riga');
   const tre = await misura(app, page);
   expect(tre.alto).toBeGreaterThanOrEqual(vuota.alto + 2 * tre.rigaPx - 1);
   expect(tre.eccesso).toBeLessThanOrEqual(0);
   expect(tre.barra).toBeLessThan(BARRA);
-  try { await page.screenshot({ path: `tests/.shots/popup-casella-${nome}-tre-righe.png` }); } catch (_) {}
+  try { await dove.screenshot({ path: `tests/.shots/popup-casella-${nome}-tre-righe.png` }); } catch (_) {}
 
   // Oltre il tetto la casella smette di crescere e scorre al suo interno.
-  await page.keyboard.insertText('\nriga'.repeat(20));
+  await dove.keyboard.insertText('\nriga'.repeat(20));
   const tante = await misura(app, page);
   expect(tante.alto).toBeLessThanOrEqual(121);
   expect(tante.eccesso).toBeGreaterThan(0);

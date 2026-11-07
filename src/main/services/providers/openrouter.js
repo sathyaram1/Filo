@@ -79,6 +79,7 @@
       }
       if (alt && alt.key && !(await ammessoCoiCrediti(model, providerRouting))) {
         try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+        contaRipiego(res.status, 'non_ammesso');
         throw erroreCrediti(model, { chiaveRifiutata: res.status });
       }
       if (alt && alt.key && typeof ripiegoAmmesso === 'function') {
@@ -86,6 +87,7 @@
         try { ammesso = await ripiegoAmmesso(); } catch (_) { ammesso = false; }
         if (!ammesso) {
           try { await K.noteOwnKeyRefusal({ status: res.status, detail, served: false }); } catch (_) {}
+          contaRipiego(res.status, 'non_ammesso');
           alt = null;
         }
       }
@@ -97,9 +99,11 @@
           res = await fetch(url, makeInit(alt.key, { own: false }));
         } catch (e) {
           try { await K.noteOwnKeyRefusal({ ...refused, served: false }); } catch (_) {}
+          contaRipiego(refused.status, 'fallito');
           throw e;
         }
         try { await K.noteOwnKeyRefusal({ ...refused, served: res.ok }); } catch (_) {}
+        contaRipiego(refused.status, res.ok ? 'riuscito' : 'fallito');
         keyUsed = alt.key;
         keyFallback = { status: refused.status, from: 'own', to: alt.source || 'personal' };
         if (!res.ok) keyFallback.failed = res.status;
@@ -116,6 +120,11 @@
     // (e ha fallito), e chi lo racconta all'utente può dirlo per esteso.
     try { res.keySource = keySource; res.keyFallback = keyFallback; } catch (_) {}
     return { res, keyUsed, keySource, keyFallback };
+  }
+
+  // Il ripiego dalla chiave propria ai crediti, per status ed esito: lo contano i contatori del servizio (#1472).
+  function contaRipiego(status, esito) {
+    try { require('../contatoriServizio').misura('ripiegoChiave', status, esito); } catch (_) {}
   }
 
   // Chiavi che spendono i crediti di Filo. Una chiave di provenienza ignota ('') è quella dei test senza portafoglio.
@@ -189,6 +198,8 @@
   // del prezzo. `allow_fallbacks` resta acceso: fra gli host AMMESSI il ripiego
   // serve. Un modello da comprare solo dal produttore (#904) porta `only` anche senza `routing`, e
   // nessun ripiego: se il produttore non risponde l'errore deve vedersi (#1059).
+  // Per lui anche `order` con il produttore primo, e niente `sort` che lo scavalchi (#1583): col solo `only` il router
+  // ha servito Claude da AWS coi suoi crediti, e la chiave Anthropic dell'owner data a OpenRouter (BYOK) restava ferma.
   // `ownKey`: la chiamata è pagata con la chiave propria (la lista la sceglie excludedFor).
   function providerBlock(routing, model, { tools = false, ownKey = false } = {}) {
     const p = {};
@@ -206,6 +217,8 @@
     const rule = C && typeof C.producerOnlyRule === 'function' ? C.producerOnlyRule(model) : null;
     if (rule) {
       p.only = rule.only.slice();
+      p.order = rule.only.slice();
+      delete p.sort;
       p.allow_fallbacks = false;
     }
     if (zdrApplies(model, ownKey)) p.zdr = true;
@@ -242,12 +255,19 @@
   function routerRefusal(text) {
     const t = String(text || '');
     if (/data policy|settings\/privacy/i.test(t)) return 'DATA_POLICY';
+    // Il modello non legge quel contenuto (#1345): non c'entrano né i fornitori ammessi né gli strumenti.
+    if (ingressoDi(t)) return 'INGRESSO_NON_LETTO';
     if (/requested parameters|tool/i.test(t)) return 'PARAMS';
     if (/no endpoints found for\b/i.test(t)) return 'MODEL_UNAVAILABLE';
     if (/no allowed providers|no endpoints (found|available)/i.test(t)) return 'NO_PROVIDER_ALLOWED';
     return null;
   }
   const isParamsRefusal = (text) => routerRefusal(text) === 'PARAMS';
+  // La regola sta in SN_CHAT_ERRORS, che la usa anche per gli errori senza codice.
+  function ingressoDi(text) {
+    const CE = global.SN_CHAT_ERRORS;
+    return CE && typeof CE.ingressoRifiutato === 'function' ? CE.ingressoRifiutato(text) : '';
+  }
 
   // Una chiamata di chat (con o senza streaming). `require_parameters` scarta anche gli host che non
   // conoscono `reasoning`, e per un modello che non ragiona non ne resterebbe nessuno: il ragionamento
@@ -277,6 +297,8 @@
     const detail = await first.res.clone().text().catch(() => '');
     if (!isParamsRefusal(detail)) return first;
     const second = await send(senzaRagionamento, first.keyUsed);
+    // I contatori (#1464) la contano: una richiesta in più, e una risposta senza ragionamento.
+    second.ragionamentoTolto = true;
     if (second.res.ok) reasoningRefused.set(refusalKey, Date.now() + REASONING_REFUSED_MS);
     if (!second.keyFallback && first.keyFallback) {
       second.keyFallback = first.keyFallback;
@@ -374,6 +396,8 @@
     return Ragionamento.daRimandare(conPuntiDiCache(model, messages, cache), { strumenti: tools, controlla: daAnthropic(model) });
   }
 
+  // `caratteri` conta sul testo intero del messaggio: su un messaggio già diviso da un punto prima (la parte fissa e il
+  // CONTESTO dell'utente stanno nello stesso system) si divide la parte in cui cade.
   function partiConPunto(content, caratteri, cacheControl) {
     if (typeof content === 'string') {
       const n = Number.isInteger(caratteri) && caratteri > 0 && caratteri < content.length ? caratteri : content.length;
@@ -383,6 +407,18 @@
       return parti;
     }
     if (!Array.isArray(content)) return null;
+    if (Number.isInteger(caratteri) && caratteri > 0 && content.every((p) => p && p.type === 'text')) {
+      let fatti = 0;
+      for (let i = 0; i < content.length; i++) {
+        const t = String(content[i].text || '');
+        if (fatti + t.length < caratteri) { fatti += t.length; continue; }
+        const n = caratteri - fatti;
+        if (!content.slice(0, i).map((p) => p.text).join('').concat(t.slice(0, n)).trim()) return null;
+        if (n === t.length) return content.map((p, j) => (j === i ? { ...p, cache_control: cacheControl } : p));
+        if (n === 0) return null;
+        return [...content.slice(0, i), { ...content[i], text: t.slice(0, n), cache_control: cacheControl }, { type: 'text', text: t.slice(n) }, ...content.slice(i + 1)];
+      }
+    }
     let k = -1;
     content.forEach((p, i) => { if (p && p.type === 'text' && String(p.text || '').trim()) k = i; });
     return k < 0 ? null : content.map((p, i) => (i === k ? { ...p, cache_control: cacheControl } : p));
@@ -393,7 +429,11 @@
     const punti = piano && Array.isArray(piano.punti) ? piano.punti : [];
     if (!punti.length || !Array.isArray(messages) || !vuoleCacheEsplicita(model)) return messages;
     const out = messages.slice();
-    for (const p of punti.slice(0, MAX_PUNTI_CACHE)) {
+    // Sullo stesso messaggio le divisioni si fanno da sinistra: ognuna conta sul testo intero.
+    const ordinati = punti.slice(0, MAX_PUNTI_CACHE).map((p, i) => ({ p, i }))
+      .sort((a, b) => ((a.p && a.p.indice) - (b.p && b.p.indice)) || ((Number.isInteger(a.p && a.p.caratteri) ? a.p.caratteri : Infinity) - (Number.isInteger(b.p && b.p.caratteri) ? b.p.caratteri : Infinity)) || (a.i - b.i))
+      .map((x) => x.p);
+    for (const p of ordinati) {
       const m = out[p && p.indice];
       if (!m || typeof m !== 'object') continue;
       const cc = p.durata === '1h' ? { type: 'ephemeral', ttl: '1h' } : { type: 'ephemeral' };
@@ -403,19 +443,36 @@
     return out;
   }
 
+  // Il costo in dollari che il router dichiara, null se non lo dice. Con una chiave del fornitore data a OpenRouter
+  // (BYOK, #1582) `cost` è solo la sua commissione: il resto, `upstream_inference_cost`, conta lo stesso nel tetto.
+  const numeroDetto = (v) => (v == null || v === '' ? NaN : Number(v));
+  function costoDichiarato(cost, byok, upstream, parti) {
+    const c = Number(cost);
+    const base = Number.isFinite(c) ? c : null;
+    if (byok !== true) return base;
+    let up = numeroDetto(upstream);
+    if (!Number.isFinite(up)) up = (parti || []).map(numeroDetto).filter(Number.isFinite).reduce((a, b) => a + b, 0);
+    return up > 0 ? (base || 0) + up : base;
+  }
+
+  function costoDaUsage(usage) {
+    const u = usage && typeof usage === 'object' ? usage : {};
+    const d = u.cost_details && typeof u.cost_details === 'object' ? u.cost_details : {};
+    return costoDichiarato(u.cost, u.is_byok, d.upstream_inference_cost, [d.upstream_inference_prompt_cost, d.upstream_inference_completions_cost]);
+  }
+
+  // 0 se assente: chi lo legge sa che deve stimare.
+  function costUsdOf(usage) {
+    const c = costoDaUsage(usage);
+    return Number.isFinite(c) && c > 0 ? c : 0;
+  }
+
   // Quanta parte del testo in ingresso è stata RIUSATA invece che ricalcolata
   // (#422). OpenRouter riporta i token letti dalla cache del fornitore in
   // `usage.prompt_tokens_details.cached_tokens` (0 o campo assente = nessun
   // riuso). È la sola prova che il prefisso immutabile dei prompt sta davvero
   // funzionando: senza questo numero "riuso a zero" e "riuso pieno" sono
   // indistinguibili.
-  // Il costo in dollari che il router dichiara (`usage.cost`, con
-  // `usage.include`). 0 se assente: chi lo legge sa che deve stimare.
-  function costUsdOf(usage) {
-    const c = usage && Number(usage.cost);
-    return Number.isFinite(c) && c > 0 ? c : 0;
-  }
-
   function cachedPromptTokens(usage) {
     if (!usage || typeof usage !== 'object') return 0;
     const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
@@ -424,6 +481,21 @@
       : usage.cached_tokens;
     const n = Number(v);
     return Number.isFinite(n) && n > 0 ? n : 0;
+  }
+
+  // L'host dice quanta parte del contesto ha letto dalla cache? Uno zero detto e un campo assente sono due cose (#1464).
+  function cacheDetta(usage) {
+    if (!usage || typeof usage !== 'object') return false;
+    const d = usage.prompt_tokens_details || usage.promptTokensDetails || null;
+    return Boolean(d && (d.cached_tokens != null || d.cachedTokens != null)) || usage.cached_tokens != null;
+  }
+
+  // I token di ragionamento della risposta; null se l'host non li dice (#1464).
+  function reasoningTokensOf(usage) {
+    const d = usage && typeof usage === 'object' ? (usage.completion_tokens_details || usage.completionTokensDetails || null) : null;
+    const v = d ? (d.reasoning_tokens != null ? d.reasoning_tokens : d.reasoningTokens) : null;
+    const n = v == null ? NaN : Number(v);
+    return Number.isFinite(n) && n >= 0 ? n : null;
   }
 
   // I token SCRITTI in cache (i modelli coi punti espliciti): con le letture dicono se la cache scatta davvero.
@@ -459,10 +531,33 @@
     }));
   }
 
+  // Un 'length' speso quasi tutto nel ragionamento si dice a parte (#1302): la regola sta in SN_CHAT_ERRORS.
+  const motivoFine = (fr, usage) => {
+    const CE = global.SN_CHAT_ERRORS;
+    return CE && typeof CE.motivoFine === 'function' ? CE.motivoFine(fr, usage) : fr;
+  };
+
   // Il tetto della risposta (#1097.3): un modello che si incarta si ferma lì, e `finish_reason: 'length'` lo dice.
   function maxTokensField(maxTokens) {
     const n = Math.round(Number(maxTokens));
     return Number.isFinite(n) && n > 0 ? { max_tokens: n } : {};
+  }
+
+  // L'invio con l'errore già tradotto. Un rifiuto per il tetto non fa fallire: si rifà una volta col tetto che regge, o
+  // senza, e la risposta porta `tettoSceso` (#1302). Il rifiuto arriva prima di qualunque token: non costa niente.
+  async function postOppureErrore(body, apiKey, signal, providerRouting, { stream = false } = {}) {
+    const opts = { tools: !!body.tools, apiKey, model: body.model, providerRouting };
+    const first = await postChat(body, apiKey, signal, providerRouting);
+    if (first.res.ok && (!stream || first.res.body)) return first;
+    const err = await httpError(first.res, { ...opts, maxTokens: body.max_tokens });
+    if (err.tettoRetto == null || !body.max_tokens || (signal && signal.aborted)) throw err;
+    const { max_tokens: tettoChiesto, ...senza } = body;
+    const b2 = err.tettoRetto ? { ...senza, max_tokens: err.tettoRetto } : senza;
+    const second = await postChat(b2, first.keyUsed || apiKey, signal, providerRouting);
+    if (second.res.ok && (!stream || second.res.body)) {
+      return { ...second, tettoSceso: { chiesto: tettoChiesto, usato: err.tettoRetto || null } };
+    }
+    throw await httpError(second.res, { ...opts, maxTokens: b2.max_tokens, tettoProvato: tettoChiesto });
   }
 
   async function complete({ apiKey, model, messages, cache, reasoning, maxTokens, providerRouting, tools, toolChoice, signal }) {
@@ -473,25 +568,29 @@
     const body = { model, messages: inviati.messaggi, stream: false, usage: { include: true }, ...maxTokensField(maxTokens), ...toolsFields(tools, toolChoice) };
     const r = reasoningField(reasoning, false);
     if (r) body.reasoning = r;
-    const { res, keyUsed, keySource, keyFallback } = await postChat(body, apiKey, signal, providerRouting);
     // status/provider strutturati sull'errore: chi lo mostra all'utente può
     // tradurlo in una frase comprensibile invece del codice HTTP nudo (#331).
-    if (!res.ok) throw await httpError(res, { tools: !!body.tools, maxTokens: body.max_tokens, apiKey, model, providerRouting });
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto, tettoSceso } = await postOppureErrore(body, apiKey, signal, providerRouting);
     const data = await res.json();
     const message = data.choices?.[0]?.message || {};
     const text = message.content || '';
     const usage = data.usage || {};
+    const fine = motivoFine(data.choices?.[0]?.finish_reason || null, { reasoningTokens: reasoningTokensOf(usage), completionTokens: usage.completion_tokens });
     return {
       text,
       toolCalls: flatToolCalls(message.tool_calls),
       reasoningDetails: Ragionamento.conImpronta(message.reasoning_details, inviati.impronta),
-      finishReason: data.choices?.[0]?.finish_reason || null,
+      finishReason: fine,
       servedBy: extractServedBy(data),
       keyUsed, keyFallback,
+      ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
+      ...(tettoSceso ? { tettoSceso } : {}),
       usage: {
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: usage.completion_tokens || 0,
         cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
+        reasoningTokens: reasoningTokensOf(usage),
         cacheWriteTokens: cacheWriteTokens(usage),
         costUsd: costUsdOf(usage),
         servedBy: extractServedBy(data),
@@ -514,8 +613,7 @@
     if (r) reqBody.reasoning = r;
     // Il rifiuto della chiave arriva con lo status, prima di qualunque delta:
     // il ripiego qui non ha ancora niente da azzerare nel chiamante.
-    const { res, keyUsed, keySource, keyFallback } = await postChat(reqBody, apiKey, signal, providerRouting);
-    if (!res.ok || !res.body) throw await httpError(res, { tools: !!reqBody.tools, maxTokens: reqBody.max_tokens, apiKey, model, providerRouting });
+    const { res, keyUsed, keySource, keyFallback, ragionamentoTolto, tettoSceso } = await postOppureErrore(reqBody, apiKey, signal, providerRouting, { stream: true });
 
     const reader = res.body.getReader();
     const decoder = new TextDecoder('utf-8');
@@ -525,7 +623,7 @@
     let finishReason = null;
     const calls = createToolCallAccumulator(onToolCall);
     const details = createReasoningDetailsAccumulator();
-    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0 };
+    let usage = { promptTokens: 0, completionTokens: 0, cachedPromptTokens: 0, cacheWriteTokens: 0, cacheDetta: false, reasoningTokens: null };
     let generationId = null;
 
     // Una risposta rotta a metà si paga per quanto il modello aveva scritto: l'errore porta con sé l'id per chiederne il costo.
@@ -575,6 +673,8 @@
               promptTokens: obj.usage.prompt_tokens || 0,
               completionTokens: obj.usage.completion_tokens || 0,
               cachedPromptTokens: cachedPromptTokens(obj.usage),
+              cacheDetta: cacheDetta(obj.usage),
+              reasoningTokens: reasoningTokensOf(obj.usage),
               cacheWriteTokens: cacheWriteTokens(obj.usage),
               costUsd: costUsdOf(obj.usage),
               servedBy: servedBy || extractServedBy(obj),
@@ -590,12 +690,23 @@
       err.status = 502;
       err.provider = 'openrouter';
       if (servedBy) err.hostFallito = servedBy;
+      // Il ragionamento scritto prima dell'errore si paga lo stesso: senza l'id il suo costo spariva dai conti (#1302).
+      if (generationId) {
+        err.generationId = generationId;
+        err.keySource = keySource;
+        Object.defineProperty(err, 'keyUsed', { value: keyUsed, enumerable: false, configurable: true });
+      }
       produttoreNonRisponde(err, model);
       throw err;
     }
+    // Senza usage (interrotta dopo aver scritto, #1302) il costo si chiede dopo con l'id, come per i tentativi rotti.
+    const senzaConto = !(usage.costUsd > 0) && !usage.promptTokens && !usage.completionTokens;
     return {
-      text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason, servedBy,
+      text: fullText, toolCalls: calls.list(), reasoningDetails: Ragionamento.conImpronta(details.list(), inviati.impronta), finishReason: motivoFine(finishReason, usage), servedBy,
+      ...(senzaConto && generationId ? { generationId } : {}),
       keyUsed, keyFallback, usage: { ...usage, keySource, keyFallback },
+      ...(ragionamentoTolto ? { ragionamentoTolto: true } : {}),
+      ...(tettoSceso ? { tettoSceso } : {}),
     };
   }
 
@@ -617,7 +728,9 @@
 
   // Un rifiuto per il tetto della risposta: nessun host ammesso regge quel `max_tokens`. Si dice, col numero (#1097.3).
   const RIFIUTO_TETTO = /max[_ ]?(?:new[_ ])?tokens|max(?:imum)?[_ ](?:output|completion)[_ ]tokens|output token limit/i;
-  const CONTESTO = /maximum context|context[ _-]?(?:length|window)|tokens? limit exceeded/i;
+  // Anthropic, anche dietro OpenRouter: «input length and `max_tokens` exceed context limit: 188240 + 21333 > 200000».
+  const CONTESTO = /maximum context|context[ _-]?(?:length|window)|tokens? limit exceeded|context limit:/i;
+  const SOMMA_ANTHROPIC = /context limit:?\s*([\d.,]+)\s*\+\s*([\d.,]+)\s*>\s*([\d.,]+)/i;
   const numeroIn = (s, re) => {
     const m = re.exec(s);
     const n = m ? Number(String(m[1]).replace(/[.,]/g, '')) : NaN;
@@ -627,30 +740,61 @@
   function sforoDiFinestra(errText, maxTokens) {
     const s = String(errText || '');
     if (!CONTESTO.test(s)) return null;
+    const somma = SOMMA_ANTHROPIC.exec(s);
+    const nella = (i) => (somma ? numeroIn(somma[i], /([\d.,]+)/) : null);
     const finestra = numeroIn(s, /maximum context (?:length|window) (?:is|of) ([\d.,]+)/i)
-      || numeroIn(s, /limit exceeded:?\s*[\d.,]+\s*>\s*([\d.,]+)/i);
+      || numeroIn(s, /limit exceeded:?\s*[\d.,]+\s*>\s*([\d.,]+)/i) || nella(3);
     const chiesti = numeroIn(s, /requested (?:about )?([\d.,]+)/i) || numeroIn(s, /limit exceeded:?\s*([\d.,]+)\s*>/i);
-    const testo = numeroIn(s, /([\d.,]+) (?:tokens )?of (?:text )?input/i) || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
+    const testo = numeroIn(s, /([\d.,]+) (?:tokens )?of (?:text )?input/i) || nella(1)
+      || (chiesti && chiesti > maxTokens ? chiesti - maxTokens : null);
     return { finestra, testo };
   }
-  // Il tetto è la causa quando ne prende più di metà finestra, o quando il testo da solo ci starebbe: un rifiuto per
-  // un testo che da solo non ci sta resta di contesto. `stringibile`: la chat può anche accorciare la conversazione.
+  // Il tetto più alto che l'host dice di reggere, quando lo scrive («max_tokens > 8192», «must be <= 4096»).
+  const LIMITE_DICHIARATO = /max[_ ]?(?:new[_ ])?tokens`?[^0-9]{0,40}?(?:>|<=|≤|at most|less than or equal to|up to|maximum (?:is|of)|limit (?:is|of))\s*([\d.,]+)/i;
+  // Un testo che da solo non ci sta è un rifiuto di contesto, qualunque sia il tetto. `memoria`: testo più tetto superano
+  // la memoria, anche senza le misure. `stringibile`: la chat accorcia la conversazione; non quando il tetto ne prende più
+  // di metà finestra e sotto il testo resta posto per una risposta: lì la cura è il tetto (#1302).
   function causaTetto(status, errText, maxTokens) {
     if (!maxTokens || ![400, 404, 413, 422].includes(status)) return null;
     const s = String(errText || '');
     if (/unsupported (?:parameter|value)/i.test(s)) return null;
     const sforo = sforoDiFinestra(s, maxTokens);
-    if (!sforo) return RIFIUTO_TETTO.test(s) ? {} : null;
+    if (!sforo) {
+      if (!RIFIUTO_TETTO.test(s)) return null;
+      const limite = numeroIn(s, LIMITE_DICHIARATO);
+      return { ...(limite && limite < maxTokens ? { limite } : {}), ...(/\btools?\b/i.test(s) ? { strumenti: true } : {}) };
+    }
     const { finestra, testo } = sforo;
-    if (finestra && maxTokens > finestra / 2) return { finestra };
-    if (finestra && testo && testo < finestra) return { finestra, stringibile: true };
+    if (!finestra) return { memoria: true, stringibile: true };
+    if (testo && testo >= finestra) return null;
+    if (maxTokens > finestra / 2) {
+      const senzaPosto = testo && finestra - testo - MARGINE_FINESTRA < TETTO_MINIMO;
+      return { finestra, memoria: true, ...(testo ? { testo } : {}), ...(senzaPosto ? { stringibile: true } : {}) };
+    }
+    if (testo) return { finestra, testo, memoria: true, stringibile: true };
     return null;
   }
 
-  // Un «nessun host per i parametri chiesti» con gli strumenti e un tetto: gli host dichiarati dicono quale dei due manca.
-  // false: nessun host ammesso regge gli strumenti, il tetto non c'entra; true: li reggono, ma nessuno fino a quel
-  // tetto; null: non si sa, e la frase li nomina tutti e due.
-  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey = false }) {
+  // Sotto questo tetto una risposta non vale la richiesta: meglio dirlo che rispondere a metà frase.
+  const TETTO_MINIMO = 1024;
+  // Quello che si toglie alla finestra oltre al testo: la stima del router e quella dell'host non coincidono al token.
+  const MARGINE_FINESTRA = 256;
+  // Il tetto con cui rifare una richiesta rifiutata per il tetto (#1302): il massimo che regge, invece di fallire.
+  // 0 = senza tetto (l'host usa il suo massimo); null = non si rifà. `hostMax`: il più alto degli host utili, se noto.
+  function tettoDaRiprovare(perTetto, maxTokens, hostMax) {
+    const sotto = (n) => (Number.isFinite(n) && n >= TETTO_MINIMO && n < maxTokens ? Math.floor(n) : null);
+    if (perTetto.limite) return sotto(perTetto.limite);
+    if (perTetto.memoria) {
+      if (perTetto.finestra && perTetto.testo) return sotto(perTetto.finestra - perTetto.testo - MARGINE_FINESTRA);
+      if (perTetto.finestra) return sotto(perTetto.finestra / 2);
+      return sotto(maxTokens / 4);
+    }
+    if (hostMax != null) return Number.isFinite(hostMax) ? sotto(hostMax) : null;
+    return 0;
+  }
+
+  // Gli host ammessi e utili (con gli strumenti, se servono) e cosa dicono di sé; null se l'elenco non si legge.
+  async function hostUtili({ apiKey, model, providerRouting, tools, ownKey = false }) {
     let hosts = null;
     try { hosts = await modelHosts({ apiKey, model }); } catch (_) { hosts = null; }
     if (!Array.isArray(hosts) || !hosts.length) return null;
@@ -658,10 +802,24 @@
     const excluded = excludedFor(providerRouting, ownKey);
     const ammessi = C && typeof C.hostPolicyViolation === 'function'
       ? hosts.filter((h) => !C.hostPolicyViolation(h, model, excluded)) : hosts;
-    if (ammessi.some((h) => h.tools == null || h.maxOut == null)) return null;
-    const utili = tools ? ammessi.filter((h) => h.tools) : ammessi;
-    if (!utili.length) return tools ? false : null;
-    return utili.every((h) => h.maxOut < maxTokens) ? true : (tools ? null : false);
+    const noti = ammessi.filter((h) => h.tools != null && h.maxOut != null);
+    const utili = tools ? noti.filter((h) => h.tools) : noti;
+    const maxOut = utili.length ? Math.max(...utili.map((h) => h.maxOut)) : null;
+    return { ammessi, utili, maxOut, tuttiNoti: noti.length === ammessi.length };
+  }
+
+  // Un «nessun host per i parametri chiesti» con un tetto: gli host dichiarati dicono di chi è la colpa.
+  // 'strumenti': nessun ammesso li regge; 'tetto': li reggono, ma nessuno fino a quel tetto; 'altro': uno regge
+  // strumenti e tetto, quindi il router rifiuta per un altro parametro; null: non si sa (elenco illeggibile, o un host
+  // che non dichiara cosa regge), e lo dice il tentativo senza tetto (#1302).
+  async function tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey = false }) {
+    const h = await hostUtili({ apiKey, model, providerRouting, tools, ownKey });
+    if (!h) return { colpa: null, maxOut: null };
+    const reggono = h.utili.some((x) => x.maxOut >= maxTokens);
+    if (reggono) return { colpa: 'altro', maxOut: h.maxOut };
+    if (!h.tuttiNoti) return { colpa: null, maxOut: null };
+    if (!h.utili.length) return { colpa: tools ? 'strumenti' : null, maxOut: null };
+    return { colpa: 'tetto', maxOut: h.maxOut };
   }
 
   // L'host che ha dato l'errore, quando il router lo dice (`error.metadata.provider_name`): lo contano i contatori (#969).
@@ -673,7 +831,9 @@
     } catch (_) { return ''; }
   }
 
-  async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null } = {}) {
+  // `tettoProvato`: la richiesta è già il secondo tentativo, col tetto sceso o senza; se il router rifiuta ancora per i
+  // parametri, il tetto non c'entra. Sull'errore `tettoRetto` è il tetto con cui rifarla (vedi tettoDaRiprovare).
+  async function httpError(res, { tools = false, maxTokens = null, apiKey = '', model = '', providerRouting = null, tettoProvato = null } = {}) {
     const errText = await res.text().catch(() => '');
     const err = new Error(`OpenRouter ${res.status}: ${errText.slice(0, 300)}`);
     err.status = res.status;
@@ -691,19 +851,45 @@
     // Con gli strumenti il router cerca solo host che li reggono: il suo 404 vuol dire che fra gli
     // ammessi non ce n'è, e chi lo racconta deve dire questo, non «riprova».
     const refusal = res.status === 404 ? routerRefusal(errText) : null;
-    const perTetto = causaTetto(res.status, errText, maxTokens);
+    // La frase nomina il tetto delle Preferenze, anche quando l'ultimo tentativo è partito con uno più basso.
+    const tetto = tettoProvato || maxTokens;
+    const perTetto = causaTetto(res.status, errText, maxTokens || tettoProvato || 0);
     if (perTetto && refusal !== 'PARAMS') {
-      err.code = 'TETTO_RISPOSTA';
-      err.maxTokens = maxTokens;
+      // Un host che nomina insieme strumenti e tetto («tools are not supported with max_tokens > 8192») lo dice la frase.
+      err.code = perTetto.strumenti && tools ? 'NO_TOOL_HOST' : 'TETTO_RISPOSTA';
+      err.maxTokens = tetto;
       if (perTetto.finestra) err.finestra = perTetto.finestra;
+      if (perTetto.memoria) err.memoria = true;
       if (perTetto.stringibile) err.stringibile = true;
+      if (maxTokens && !tettoProvato) {
+        let hostMax = null;
+        if (!perTetto.limite && !perTetto.memoria) {
+          const h = await hostUtili({ apiKey, model, providerRouting, tools, ownKey });
+          hostMax = h && h.tuttiNoti ? h.maxOut : null;
+        }
+        const n = tettoDaRiprovare(perTetto, maxTokens, hostMax);
+        if (n != null) err.tettoRetto = n;
+      }
+    } else if (refusal === 'PARAMS' && tettoProvato) {
+      // Rifiutata anche col tetto sceso o senza: la causa è un'altra, e la frase non dice di abbassarlo.
+      err.code = tools ? 'NO_TOOL_HOST' : 'PARAMETRI_HOST';
+    } else if (refusal === 'PARAMS' && !maxTokens) {
+      if (tools) err.code = 'NO_TOOL_HOST';
     } else if (refusal === 'PARAMS') {
       // Il tetto è uno dei parametri che il router fa reggere agli host: il suo «nessun host» può venire da lì.
-      const colpa = maxTokens ? await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey }) : false;
-      if (tools) err.code = 'NO_TOOL_HOST';
-      else if (maxTokens && colpa !== false) err.code = 'TETTO_RISPOSTA';
-      if (maxTokens && colpa !== false) err.maxTokens = maxTokens;
+      const { colpa, maxOut } = await tettoFraLeCause({ apiKey, model, maxTokens, providerRouting, tools, ownKey });
+      if (colpa === 'altro') err.code = 'PARAMETRI_HOST';
+      else if (colpa === 'strumenti') err.code = 'NO_TOOL_HOST';
+      else {
+        err.code = tools ? 'NO_TOOL_HOST' : 'TETTO_RISPOSTA';
+        err.maxTokens = maxTokens;
+        const n = colpa === 'tetto' ? tettoDaRiprovare({}, maxTokens, maxOut) : 0;
+        if (n != null) err.tettoRetto = n;
+      }
     } else if (refusal) err.code = refusal;
+    // Un host che dice di non leggere quel contenuto è lo stesso rifiuto del router (#1345).
+    if (!err.code && [400, 415, 422].includes(res.status) && ingressoDi(errText)) err.code = 'INGRESSO_NON_LETTO';
+    if (err.code === 'INGRESSO_NON_LETTO') err.ingresso = ingressoDi(errText);
     produttoreNonRisponde(err, model, errText);
     return err;
   }
@@ -1016,7 +1202,7 @@
         cachedPromptTokens: 0,
         seconds: Number(usage.seconds) || 0,
         // Per l'audio non ci sono token: l'unico numero sensato è il costo in dollari del router.
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        costUsd: costoDaUsage(usage),
         keySource, keyFallback,
       },
     };
@@ -1050,7 +1236,7 @@
         promptTokens: usage.prompt_tokens || 0,
         completionTokens: 0,
         cachedPromptTokens: 0,
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        costUsd: costoDaUsage(usage),
         keySource, keyFallback,
       },
     };
@@ -1080,8 +1266,9 @@
       usage: {
         promptTokens: num(usage.input_tokens != null ? usage.input_tokens : usage.prompt_tokens),
         completionTokens: num(usage.output_tokens != null ? usage.output_tokens : usage.completion_tokens),
-        cachedPromptTokens: 0,
-        costUsd: Number.isFinite(Number(usage.cost)) ? Number(usage.cost) : null,
+        cachedPromptTokens: cachedPromptTokens(usage),
+        cacheDetta: cacheDetta(usage),
+        costUsd: costoDaUsage(usage),
         keySource, keyFallback,
       },
     };
@@ -1099,8 +1286,7 @@
     if (!res.ok) throw await httpError(res);
     const data = (await res.json()).data || {};
     const name = typeof data.provider_name === 'string' ? data.provider_name.trim() : '';
-    const cost = Number(data.total_cost);
-    return { servedBy: name || null, costUsd: Number.isFinite(cost) ? cost : null };
+    return { servedBy: name || null, costUsd: costoDichiarato(data.total_cost, data.is_byok, data.upstream_inference_cost) };
   }
 
   // ─── Cosa sa OpenRouter di una chiave ─────────────────────────────────────
@@ -1145,7 +1331,7 @@
 
   global.SN_PROVIDER_OPENROUTER = {
     listModels, complete, streamComplete, reasoningField, providerBlock, extractServedBy,
-    cachedPromptTokens, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
+    cachedPromptTokens, cacheDetta, reasoningTokensOf, cacheWriteTokens, conPuntiDiCache, vuoleCacheEsplicita, synthesizeSpeech, transcribe, embed, decisions, lookupServedBy, keyInfo, fetchWithKey,
     modelHosts, forgetModelHosts, hostVerdict, forgetReasoningRefusals, zdrApplies, zdrHostsOf,
     createToolCallAccumulator, createReasoningDetailsAccumulator, toolsFields, maxTokensField, attesaChiesta, httpError,
     ENDPOINT, MODELS_ENDPOINT, SPEECH_ENDPOINT, TRANSCRIPTIONS_ENDPOINT, EMBEDDINGS_ENDPOINT, DECISIONS_ENDPOINT,

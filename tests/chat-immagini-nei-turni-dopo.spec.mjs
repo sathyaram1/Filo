@@ -19,7 +19,8 @@ async function preparaModello(app, copione, { rifiuta = null } = {}) {
     const foto = (messages) => messages.reduce((n, m) => n + (Array.isArray(m.content) ? m.content.filter((p) => p && p.type === 'image_url').length : 0), 0);
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, onDelta }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {} };
-      const chat = messages.some((m) => m.role === 'user' && String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+      // La chat è la richiesta che apre con la parte fissa: il messaggio della home comincia con le stesse parole (#1562).
+      const chat = !!messages[0] && messages[0].role === 'system' && String(messages[0].content || '').startsWith(globalThis.SN_CONST.PROMPTS.filoChatStatic());
       if (!chat) return { ...base, text: '{}', toolCalls: [], finishReason: 'stop' };
       // Come i fornitori veri: un modello di solo testo, o uno che regge al più una foto per richiesta.
       if (rifiuta === 'testo' && foto(messages) > 0) {
@@ -74,7 +75,12 @@ async function scrivi(home, testo) {
 const chiamate = (app) => app.evaluate(() => globalThis.__chiamate);
 const testo = (m) => (typeof m.content === 'string' ? m.content : m.content.filter((p) => p.type === 'text').map((p) => p.text).join('\n'));
 const fotoDi = (m) => (Array.isArray(m.content) ? m.content.filter((p) => p.type === 'image_url').map((p) => p.image_url.url) : []);
-const posContesto = (msgs) => msgs.findIndex((m) => m.role === 'user' && testo(m).startsWith('═══ CONTESTO DI ADESSO'));
+// La domanda di adesso (SPEC-CONTESTO fase 3): l'ultimo messaggio dell'utente con l'ora e la chat in testa.
+const INTESTAZIONE = /^\[\w{3} \d+ \w{3} \d{4}, \d\d:\d\d · chat \w{4}\]/;
+const posDomanda = (msgs) => {
+  for (let i = msgs.length - 1; i > 0; i--) if (msgs[i].role === 'user' && INTESTAZIONE.test(typeof msgs[i].content === 'string' ? msgs[i].content : ((msgs[i].content || [])[0] || {}).text || '')) return i;
+  return -1;
+};
 
 test('le foto mandate in chat il modello le ha ancora davanti al messaggio dopo, e a quello dopo ancora', async ({ app, openTab }) => {
   test.setTimeout(90_000);
@@ -102,16 +108,16 @@ test('le foto mandate in chat il modello le ha ancora davanti al messaggio dopo,
   expect(conFoto).toHaveLength(1);
   expect(testo(conFoto[0])).toContain('cosa c’è nella mia dispensa?');
   expect(fotoDi(conFoto[0])).toEqual(mandate);
-  expect(secondo.indexOf(conFoto[0])).toBeLessThan(posContesto(secondo));
+  expect(secondo.indexOf(conFoto[0])).toBeLessThan(posDomanda(secondo));
   const domanda = testo(secondo[secondo.length - 1]);
-  expect(domanda).toMatch(/^e con i ceci cosa ci faccio\?/);
+  expect(domanda).toMatch(/^\[[^\]]+\] e con i ceci cosa ci faccio\?/);
   // L'esito delle etichette d'origine viaggia ancora, e non dice più che le immagini non arrivano.
   expect(domanda).toContain('etichette di origine');
   expect(domanda).not.toContain('non ti arrivano');
   expect(JSON.stringify(secondo)).not.toContain('non hai più davanti');
 
   // Al terzo ci sono ancora, e quello che il secondo turno aveva davanti è rimasto identico: la cache lo riusa.
-  const n = posContesto(secondo);
+  const n = posDomanda(secondo) + 1;
   expect(JSON.stringify(terzo.slice(0, n))).toBe(JSON.stringify(secondo.slice(0, n)));
   expect(terzo.filter((m) => fotoDi(m).length).flatMap(fotoDi)).toEqual(mandate);
 });

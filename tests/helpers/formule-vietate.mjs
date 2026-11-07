@@ -32,14 +32,17 @@ export const TITOLI = [
 ];
 
 export const OVUNQUE = [
-  /verificatore[^'"\n]{0,30}corregg/i,
+  // «rilievi da correggere» non dice chi corregge: la riga di FEEDBACK-STATES.md
+  // che lo usa è legittima; «ha da correggere» invece lo dice (feedback #794).
+  /verificatore[^'"\n]{0,30}(?<!(?<!\b(?:ho|hai|ha|hanno|avrà|avrai|avranno) )\bda )corregg/i,
   // La stessa frase detta al contrario, o col sostantivo al posto del verbo:
   // «la consegna dallo STESSO verificatore», «del verificatore, non del
   // correttore». Guardare una faccia sola voleva dire non guardare
-  // (feedback #565).
+  // (feedback #565). Fra le due parole al più una virgola: con due è un elenco
+  // di ruoli distinti («verificatore, controllo di sicurezza, correttore»).
   /stess[oa][^.\n]{0,20}verificator/i,
-  /corre(?:ttore|zione)(?:(?! chi )[^.\n]){0,40}verificator/i,
-  /verificator(?:(?! chi )[^.\n]){0,40}corre(?:ttore|zione)/i,
+  /corre(?:ttore|zione)(?:(?! chi )[^.\n,]){0,40}(?:,(?:(?! chi )[^.\n,]){0,40})?verificator/i,
+  /verificator(?:(?! chi )[^.\n,]){0,40}(?:,(?:(?! chi )[^.\n,]){0,40})?corre(?:ttore|zione)/i,
   // Il « chi » in mezzo è la differenza fra la frase che svela («chi ha
   // criticato corregge») e quella che dice il contrario, elencando due ruoli
   // distinti («chi verifica E CHI corregge»): la seconda va lasciata stare.
@@ -47,4 +50,28 @@ export const OVUNQUE = [
   /corregg(?:(?! chi )[^.\n]){0,60}chi (?:ha )?(?:verific|critic|scritto la critica)/i,
   /stessa istanza/i,
   /(?:seconda fase|fase 2)[^.\n]{0,40}(?:la fa|la scrive|tocca a)/i,
+  // Le forme tornate nel testo del ruolo, nei documenti e nell'intestazione
+  // di dispatch (feedback #794).
+  /\bti (?:manda|rimanda|chiede di|fa) (?:a )?corregg/i,
+  /corregg\w* chi l[ioae] ha (?:scritt|trovat|registrat)/i,
+  /chi l[ioae] ha (?:scritt|trovat|registrat)\w*(?:(?! chi )[^.\n]){0,30}corregg/i,
+  /stess[oa] (?:agente|worker|sessione)(?:(?! chi )[^.\n]){0,40}(?:critic|verific)/i,
 ];
+
+// Frasi che tengono ferme le formule: le prime le prendono, le seconde no.
+export const ESEMPI = {
+  vietati: [
+    'il verificatore ha da correggere i suoi rilievi',
+    'Se poi il server ti manda a correggere, una segnalazione ferma il lavoro',
+    'i rilievi di una verifica: li corregge chi li ha scritti',
+    'Con esito fix corregge lo stesso agente che ha scritto la critica',
+    'la consegna è del verificatore, non del correttore',
+    'la correzione la fa il verificatore, dopo la critica',
+  ],
+  legittimi: [
+    'critica del verificatore senza rilievi INTERNI da correggere',
+    'chi verifica e chi corregge sono due ruoli',
+    'Resta: canale autenticato e biglietti; verificatore, controllo di sicurezza, correttore; L5',
+    'restano correttore, controllo di sicurezza, verificatore e cancello',
+  ],
+};

@@ -6,6 +6,8 @@ const path = require('node:path');
 const SHARED = path.join(__dirname, '..', '..', 'shared');
 const SVC = __dirname;
 
+// La politica sui modelli (#1520): constants.js la riespone, il server la incorpora col bake.
+require(path.join(SHARED, 'politicaModelli.js'));
 require(path.join(SHARED, 'constants.js'));
 // #593 — la porta unica da cui passa il contenuto esterno (pagina, ricerca
 // web, percorsi di altri) prima di entrare in un prompt. Va PRIMA di chi la
@@ -24,6 +26,7 @@ require(path.join(SHARED, 'clipboardHistory.js'));
 require(path.join(SHARED, 'tasti.js'));
 // Dove sta ogni icona globale (riga, «Altro…», barra laterale): la legge la barra, la scrive il main.
 require(path.join(SHARED, 'disposizioneIcone.js'));
+require(path.join(SHARED, 'pannelliApp.js')); // #1433 — il pannello di destra delle app: cataloghi e mosse (logica pura)
 // "Il cursore è in un campo di testo?": la regola che decide se Ctrl/Cmd+Z
 // annulla o torna indietro. La barra dei menu la manda a valutare nelle pagine
 // (src/main/menu.js), i content script la chiamano direttamente.
@@ -33,6 +36,12 @@ require(path.join(SHARED, 'modelCaps.js'));
 // Va PRIMA dell'editor delle catene, che da qui prende l'elenco delle funzioni impostabili.
 require(path.join(SHARED, 'modelUsage.js'));
 require(path.join(SHARED, 'contatoriGiornalieri.js')); // #969 — i contatori giornalieri: elenchi chiusi e forma del documento
+require(path.join(SHARED, 'contatoriFinestra.js')); // #1470 — i contatori della finestra, dopo quelli che ne danno gli errori
+require(path.join(SHARED, 'contatoriSicurezza.js')); // #1474 — i contatori della sicurezza, dopo quelli che ne danno le funzioni
+require(path.join(SHARED, 'contatoriHomePagina.js')); // #1473 — i contatori della home e degli automatismi, dopo quelli che ne danno i passi
+require(path.join(SHARED, 'contatoriStrade.js')); // #1468 — i contatori delle strade, dopo i tasti che ne danno indietro e avanti
+require(path.join(SHARED, 'contatoriServizio.js')); // #1472 — i contatori del servizio, dopo quelli che ne danno funzioni e tetti
+require(path.join(SHARED, 'gestiContati.js')); // #1471 — i gesti contati: segno dei trascinamenti, nome letto su un'icona
 // Elenco delle funzioni impostabili + le loro etichette: serve al main per
 // chiamare una funzione scoperta con lo STESSO nome che l'utente legge nelle
 // Opzioni (il messaggio d'errore gli dice di andare lì). Il modulo tocca il DOM
@@ -45,9 +54,12 @@ require(path.join(SHARED, 'tabTriage.js')); // §2.1 — candidati/dedup riordin
 require(path.join(SHARED, 'downloadTabs.js')); // #412/#441 — schede usa e getta dei download (logica pura)
 require(path.join(SHARED, 'stessoSito.js')); // #876 — «stesso sito» e Public Suffix List: prima di eseguibili e preferences
 require(path.join(SHARED, 'dominiGoogle.js')); // #1123 — i domini di Google sono un accesso solo (dopo stessoSito)
+require(path.join(SHARED, 'accessoFisso.js')); // #1808 — la password dell'accesso fisso, per la pulizia delle schede
 require(path.join(SHARED, 'nomiSito.js')); // #590 — quando un dominio scritto a mano è valido, e come si legge (prima di eseguibili)
+require(path.join(SHARED, 'restanoAperte.js')); // #1695 — perché una scheda resta aperta dopo una chiusura in blocco
 require(path.join(SHARED, 'pagineDelicate.js')); // #1004 — quali pagine non mandano testo ai modelli nei lavori automatici
 require(path.join(SHARED, 'eseguibili.js')); // #588 — quali file il sistema ESEGUE (logica pura)
+require(path.join(SHARED, 'scaricamentiAvanzamento.js')); // #1287 — velocità e tempo che resta di uno scaricamento (logica pura)
 require(path.join(SHARED, 'nomiFile.js')); // #950 — nome sensato ai file dell'utente (logica pura)
 // #585 — pulizia e incapsulamento dei percorsi condivisi. Va PRIMA di paths.js
 // (che la usa in scrittura) e di handlers.js (che la usa in lettura).
@@ -63,11 +75,14 @@ require(path.join(SHARED, 'filoState.js'));
 require(path.join(SHARED, 'carteHome.js')); // #870 — carte della home: catalogo e mosse (logica pura)
 // #525 — archivio delle chat con Filo: titoli, tipi, ricerca (logica pura).
 // Va PRIMA di services/filoChats.js, che ci si appoggia per scrivere.
+require(path.join(SHARED, 'rispostaA.js'));  // #1620 — la risposta a un messaggio preciso: riferimento e citazione
 require(path.join(SHARED, 'chatArchive.js'));
 require(path.join(SHARED, 'filoEventi.js'));  // #866 — forma degli eventi del filo: prima di services/ilFilo.js
+require(path.join(SHARED, 'filoAccaduti.js'));  // #1561 — cosa di azioni, sistema ed editor entra nel filo (logica pura)
 require(path.join(SHARED, 'filoApp.js'));  // #974 — le chat delle app come righe ripiegate del filo (logica pura)
 require(path.join(SHARED, 'filoCoda.js'));  // #869 — la home come coda del filo: righe, pezzi, ricerca (logica pura)
 require(path.join(SHARED, 'filoContesto.js'));  // #868 — il tratto del filo che la chat ha davanti (logica pura)
+require(path.join(SHARED, 'filoTrattoVivo.js'));  // #1562 — il CONTESTO dell'utente fotografato e quello che succede fra i messaggi (logica pura)
 require(path.join(SHARED, 'lunghezzaRisposte.js'));  // #1097.3 — il tetto delle risposte dei modelli per famiglia di funzioni
 require(path.join(SHARED, 'dashboardRefresh.js'));
 require(path.join(SHARED, 'feedback.js'));
@@ -75,6 +90,7 @@ require(path.join(SHARED, 'feedbackMine.js')); // #678 — il registro dei feedb
 require(path.join(SHARED, 'feedbackLive.js')); // confronto versioni + fusione per l'aggiornamento continuo della dashboard
 require(path.join(SHARED, 'feedbackTransitions.js')); // DATI della macchina a stati (fonte unica, SPEC-RIDISEGNO-MAX.md §7)
 require(path.join(SHARED, 'verifierRound.js')); // regole del giro di verifica (fonte unica, feedback #561)
+require(path.join(SHARED, 'ambiti.js')); // #1153 — operazioni e ambiti dei biglietti (fonte unica, incorporata dal server); prima di domande per le etichette
 require(path.join(SHARED, 'domande.js')); // #1149 — azioni delle domande all'owner come dati (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'mittenti.js')); // #1162 — classe del mittente, solo statistica (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'feedbackStatus.js')); // prima di manageReview: vocabolario stati (consuma i dati qui sopra)
@@ -104,6 +120,9 @@ require(path.join(SHARED, 'campoNumero.js'));
 require(path.join(SHARED, 'routineSessioni.js'));
 require(path.join(SHARED, 'routineCrediti.js'));  // #1356 — i numeri dell'owner sui crediti: stesse regole in pagina e nel main
 require(path.join(SHARED, 'routineModelli.js'));  // #1193 — modello e sforzo per fase: stesse regole in pagina e nel main
+require(path.join(SHARED, 'spesaGiudici.js'));  // #1515 — tetto di spesa dei giudici: stesse regole in pagina e nel main
+require(path.join(SHARED, 'compiti.js'));  // #1196 — i compiti delle routine: stesse regole in pagina, nel main e nello script
+require(path.join(SHARED, 'ricorrenti.js'));  // #1153 — cadenza dei compiti ricorrenti (fonte unica, incorporata dal server)
 require(path.join(SHARED, 'calcMarkers.js'));  // #724.1 — calcolatrice dei marker [[calc:]]: la chat li risolve nel main
 // #711 — cosa dichiara un'immagine sulla propria origine, letto dai suoi byte.
 // Usa node:crypto per verificare le firme: vive solo dove Node c'è (main).
@@ -122,12 +141,14 @@ require(path.join(SHARED, 'vociImpostazioni.js'));  // #949 — le voci delle pa
 require(path.join(SHARED, 'ttsChunk.js'));
 require(path.join(SHARED, 'ttsCache.js'));
 require(path.join(SHARED, 'ttsVoices.js'));
+require(path.join(SHARED, 'pulsantiPreferenze.js'));  // #1619 — i pulsanti delle Preferenze chiesti in chat
 require(path.join(SHARED, 'dictationSegmenter.js'));
 // Solo nei test: l'app non ha modelli scritti nel codice.
 if (process.env.NODE_ENV === 'test') {
   try { require(path.join(__dirname, '..', '..', '..', 'tests', 'fixtures', 'testModels.js')); } catch (e) { console.warn('[loader] testModels non caricato:', e.message); }
 }
 require(path.join(SHARED, 'patchNotes.js'));
+require(path.join(SHARED, 'novita.js'));  // #1956 — la pagina Novità: versioni uscite e filtro (logica pura)
 require(path.join(SHARED, 'capabilities.js'));
 require(path.join(SHARED, 'serviziEsterni.js'));  // #849 — i servizi esterni che Filo contatta, come dati
 // Documenti di trasparenza (generati da transparency/*.md): servono all'agente

@@ -20,7 +20,7 @@ configurazione delle routine veniva riletta dal server a ogni invocazione di
 dispatch e di verify-local: decine di letture per sessione, per nove sessioni, per
 una risposta che cambia quando l'owner tocca un interruttore.
 
-## Le quattro mosse
+## Le cinque mosse
 
 1. **I campi.** `select` (structuredQuery), `mask.fieldPaths` (REST), `fields:`
    (le liste di `SN_FEEDBACK`). L'elenco dei campi vive accanto alla decisione che
@@ -39,27 +39,34 @@ una risposta che cambia quando l'owner tocca un interruttore.
    pagava.
 4. **Una volta per giro.** La prova a secco mette da parte quello che ha letto;
    l'applicazione che la segue lo riusa e lo dice. Una prova a secco invece **non**
-   riusa niente: chi la lancia vuole vedere il database di adesso. E se il
-   conteggio appena chiesto al server NON combacia con quello che la copia
-   descrive, la copia è di un altro server e si rilegge: il riordino della
-   numerazione assegna i numeri contando quelli che ci sono, e una segnalazione
-   arrivata dopo la prova a secco si prende da sé il primo numero libero — cioè
-   quello che il giro sta per dare a un'altra.
+   riusa niente: chi la lancia vuole vedere il database di adesso.
+5. **Il riuso si confronta col presente** (#680.2). La copia si riusa solo se un
+   confronto dice che vale ancora; un confronto che manca, fallisce o non sa
+   rispondere (il conteggio che il server non dà) vale «non so», e si rilegge. Il
+   riordino della numerazione confronta i conteggi e chiede se i numeri che sta per
+   dare sono ancora liberi: una segnalazione arrivata dopo la prova a secco si
+   prende da sé il primo numero libero, cioè quello che il giro sta per dare a
+   un'altra, e un numero doppio non si aggiusta da sé. Poi **ogni scrittura**
+   riguarda la sua riga: l'archiviazione scrive solo se lo stato è quello su cui ha
+   deciso, il riordino scrive solo sul documento com'era quando l'ha letto
+   (`currentDocument.updateTime`). Una riga cambiata nel frattempo si salta e si
+   elenca nell'uscita: è una decisione dell'owner da non coprire.
 
 ## Quello che il database non sa filtrare
 
 Filtrare lato server abbassa il numero di documenti letti, che è la voce che si
-paga. Ma due filtri che sembrerebbero ovvi non si possono scrivere:
+paga. Ma Firestore non indicizza i campi assenti, e un filtro su un campo che non
+tutti hanno lascia fuori chi non ce l'ha senza dirlo:
 
-- **«solo quelli senza numero»** (il riordino della numerazione): Firestore non
-  indicizza i campi assenti, quindi nessun filtro seleziona i documenti a cui
-  manca `seq`. Il rimedio è il conteggio: se i numerati sono quanti i totali, non
-  c'è niente da numerare e la collezione non si tocca.
-- **«solo i risolti»** (l'archiviazione automatica): l'unico campo sempre in
-  chiaro che distingue un chiuso è `statusPublic`, e i documenti più vecchi della
-  sua introduzione non l'hanno. Filtrarci sopra li lascerebbe fuori dal verdetto —
-  un taglio silenzioso su una decisione, non su un elenco. Restano la proiezione e
-  il conteggio.
+- **«solo quelli senza numero»** (il riordino della numerazione): nessun filtro
+  seleziona i documenti a cui manca `seq`. Il rimedio è il conteggio: se i numerati
+  sono quanti i totali, non c'è niente da numerare e la collezione non si tocca.
+- **«solo i risolti»** (l'archiviazione automatica): l'unico campo in chiaro che
+  distingue un chiuso è `statusPublic`, e i documenti più vecchi della sua
+  introduzione possono non averlo. Il filtro `statusPublic == closed` si chiede al
+  database solo quando due conteggi (tutte, e quelle con `statusPublic`) dicono che
+  ce l'hanno tutte (#1335); altrimenti si leggono tutte, e l'uscita lo dice. Un
+  taglio silenzioso su una decisione no, un filtro che si è provato completo sì.
 
 ## Una copia in una cartella di tutti si difende da sola
 
@@ -83,7 +90,9 @@ copia è scaduta.
 ## Dove vive
 
 `scripts/lib/copia-su-file.mjs` (la copia con scadenza),
-`scripts/lib/scansione-secco.mjs` (prova a secco → applicazione, una volta sola),
+`scripts/lib/scansione-secco.mjs` (prova a secco → applicazione, una volta sola,
+col confronto obbligatorio), `scripts/lib/firma-ora.mjs` (la scrittura, e quando
+una scrittura condizionata è stata respinta),
 `scripts/lib/config-routine-copia.mjs` (la configurazione delle routine, un
 minuto, condivisa fra dispatch e verify-local),
 `scripts/lib/firestore-conta.mjs` (il conteggio),
@@ -98,24 +107,38 @@ un colpo solo `FB?.list…`, il metodo preso dal modulo e chiamato da solo, la
 query scritta dentro la richiesta, la chiave prima di `pageSize`, l'indirizzo
 messo insieme con un più (#680.1). Tutte producono la STESSA richiesta.
 
-Quindi il freno sta sulla `fetch` (`scripts/lib/freno-letture.mjs`) e ferma,
-prima che parta, una scansione senza proiezione: una lista REST di una
-collezione senza `mask.fieldPaths`, una `:runQuery` senza `select`. Non è una
-scansione una query che porta via al massimo dieci documenti senza cursore (il
-massimo di `seq`); lo è qualunque pagina con un cursore (`pageToken`,
-`startAt`), anche piccola, perché è un pezzo di un giro intero. Un conteggio,
-un `batchGet`, una lettura per nome e le scritture passano. Chi sbatte contro il
-freno lo scopre alla prima prova a secco, e senza aver pagato niente.
+Quindi il freno sta sulla `fetch` (`scripts/lib/freno-letture.cjs`, che l'`.mjs`
+riesporta) e ferma, prima che parta, una scansione senza proiezione: una lista
+REST di una collezione senza `mask.fieldPaths`, una `:runQuery` senza `select`, un
+`batchGet` senza `mask` di più di dieci documenti. Una scelta dei campi vuota vale
+come nessuna (il database restituisce il documento intero). Il corpo si legge
+comunque sia stato mandato: testo, blocco binario, `Blob`, dentro un oggetto
+`Request` già pronto; un corpo che il freno non sa aprire ferma la lettura.
+
+Non è una scansione una lettura che porta via al massimo dieci documenti interi
+senza cursore (il massimo di `seq`), ma il conto vale per il **giro**, non per la
+richiesta: dieci pagine da dieci avanzate con un filtro sul numero invece del
+cursore, o i nomi presi con una proiezione e poi chiesti tutti a gruppi o uno per
+uno, sono cento documenti interi, e il pezzo che porta il giro oltre i dieci si
+ferma (#1335). Lo stesso documento riletto (il contatore, la configurazione) conta
+una volta sola. Qualunque pagina con un cursore (`pageToken`, `startAt`) lo è
+subito. Un conteggio, una lettura per nome con la maschera e le scritture passano. Chi sbatte contro il freno
+lo scopre alla prima prova a secco, e senza aver pagato niente.
 
 Il freno si installa da sé con `lib/firestore-auth.mjs`, l'unica strada per le
-credenziali che la collezione privata vuole. Le schede pubbliche si leggono
-senza: chi carica il modulo dei feedback importa il freno in testa, e la
-sentinella lo controlla.
+credenziali che la collezione privata vuole, e con `src/shared/feedback.js`
+caricato fuori da Electron, comunque lo si nomini (con o senza `.js`, da `require`
+o da `import`): le schede pubbliche si leggono senza credenziali. Nell'app il freno
+non c'è: lì le liste le chiede la Gestione, con i suoi campi.
 
 Le sentinelle: `tests/unit/letturePerCampi.test.mjs` fa girare davvero uno
 strumento in ogni grafia trovata finora sotto il freno, e guarda che si fermi
 prima della rete e che la stessa scansione coi campi passi.
-`tests/unit/archiviazioneLetture.test.mjs` tiene il conto del passo che scrive.
+`tests/unit/archiviazioneLetture.test.mjs` tiene il conto del passo che scrive;
+`tests/unit/archiviazioneConfronto.test.mjs` e
+`tests/unit/riusoConfrontatoColPresente.test.mjs` il filtro sulle chiuse e il
+confronto col presente; `tests/unit/campiDallePagine.test.mjs` i campi chiesti da
+una pagina filo://, che arrivano al main e tornano quelli.
 `tests/unit/copiaSuFile.test.mjs` tiene le regole della copia: fresca risponde,
 scaduta o illeggibile no, dopo un'applicazione si butta, e quello che qualcun
 altro ha preparato nella cartella temporanea non si legge né si riscrive.

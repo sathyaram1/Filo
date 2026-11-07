@@ -6,6 +6,7 @@ import { existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { test, expect } from './fixtures/electron.mjs';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { nelMondoDiFilo, nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 const MONDO_CONTENT_SCRIPT = 999;
 
@@ -101,12 +102,10 @@ test('dalla barra d\'aiuto di un sito «apri il link» apre la scheda, ma non un
   const host = new URL(web.url()).host;
   const indirizzi = () => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
     .find((w) => w._filoTabs)._filoTabs.tabs.map((t) => String(t.url || '')));
-  const barra = (codice) => app.evaluate(async ({ BrowserWindow }, { h, codice, mondo }) => {
-    const tab = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.tabs.find((t) => String(t.url || '').includes(h));
-    return tab.view.webContents.executeJavaScriptInIsolatedWorld(mondo, [{ code: codice }]);
-  }, { h: host, codice, mondo: MONDO_CONTENT_SCRIPT });
-
-  const aperto = await barra(`globalThis.__filoSidebarTest.runPageAction({ op: 'open_link', selector: '#l' })`);
+  // Su un sito la barra d'aiuto sta nello strato sopra la scheda (#1509.3) e il link lo cerca la pagina sotto.
+  await nelMondoDiFilo(app, web, () => { globalThis.SN_SIDEBAR.open(); return 1; });
+  await (await paginaDelloStrato(app, web)).waitForSelector('.sn-sidebar-input textarea');
+  const aperto = await nelloStrato(app, web, () => globalThis.__filoSidebarTest.runPageAction({ op: 'open_link', selector: '#l' }));
   await expect.poll(indirizzi, { timeout: 8000 }).toContain(destinazione);
   expect(aperto, 'la barra scrive «apri link in nuova scheda: non riuscita»').toBe(true);
 

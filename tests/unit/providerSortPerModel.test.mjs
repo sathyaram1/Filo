@@ -171,11 +171,13 @@ test('la scelta generale regge maiuscole e spazi, e un valore ignoto vale «ness
 });
 
 // La politica sui modelli resta intera con un ordinamento: `ignore`, `only` per i modelli da comprare dal
-// produttore (#904) e `require_parameters` con gli strumenti (#700) convivono con `sort`.
+// produttore (#904) e `require_parameters` con gli strumenti (#700) restano. Per quei modelli l'ordine è il
+// produttore per primo e `sort` non lo scavalca (#1583).
 test('sort convive con ignore, only e require_parameters', () => {
   const routing = C.providerRoutingFor({ excludedProviders: ['Google'] }, 'throughput');
   const claude = OpenRouter.providerBlock(routing, 'anthropic/claude-sonnet-4.5', { tools: true });
-  assert.equal(claude.sort, 'throughput');
+  assert.equal(claude.sort, undefined);
+  assert.deepEqual(claude.order, C.producerOnlyRule('anthropic/claude-sonnet-4.5').only);
   assert.deepEqual(claude.ignore, ['Google']);
   assert.deepEqual(claude.only, C.producerOnlyRule('anthropic/claude-sonnet-4.5').only);
   assert.equal(claude.require_parameters, true);

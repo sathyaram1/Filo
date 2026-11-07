@@ -38,11 +38,13 @@ export const PASSI = {
   node: 'la preparazione di Node',
   dipendenze: "l'installazione delle dipendenze (npm ci)",
   versione: 'il controllo che il codice qui sia davvero quello di questa versione',
+  novita: 'le novità riscritte dal redattore al posto delle righe dei worker (non ferma mai: senza, escono le righe dei worker)',
   bake: "l'incastonatura delle chiavi di default nel pacchetto",
   build: 'la costruzione del pacchetto e il suo caricamento sulla release',
   istruzioni: 'il caricamento del foglietto del primo avvio',
   controllo: 'il controllo che i file siano davvero nella release',
   impronte: 'la scrittura delle impronte SHA-256 dei file nella sezione «Verifica» della pagina della versione',
+  ancora: "la richiesta al server di ancorare le impronte dei file (#1501): senza, Filo con l'àncora accesa non installa questa versione",
 };
 
 const numeri = (tag) => {

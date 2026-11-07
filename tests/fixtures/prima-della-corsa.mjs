@@ -4,13 +4,16 @@
 import { dirname } from 'node:path';
 import { datiWorker } from '../../scripts/lib/dati-worker.mjs';
 import { accendiSchermo } from '../../scripts/lib/schermo-virtuale.mjs';
+import { allineaPerLeProve } from '../../scripts/lib/pacchetti.mjs';
 import { assicuraMotore } from '../helpers/motoreDelleProve.mjs';
-import { temporaneaDellaCorsa, togliCartella } from '../helpers/percorsi.mjs';
+import { chiudiLaCorsa, temporaneaDellaCorsa } from '../helpers/percorsi.mjs';
 
 // Il motore si controlla prima di qualunque attesa: sul motore sbagliato si ferma subito, senza aver acceso niente.
 export default function primaDellaCorsa(config) {
   const radice = config?.configFile ? dirname(config.configFile) : null;
   assicuraMotore(radice ? { radice } : {});
+  // Una libreria nuova del lock arriva prima degli spec che la usano (#1572).
+  if (radice) allineaPerLeProve(radice, { prefisso: '[prove]' });
   return preparaLaCorsa(radice);
 }
 
@@ -22,6 +25,6 @@ async function preparaLaCorsa(radice) {
   Object.assign(process.env, { TMPDIR: temp, TEMP: temp, TMP: temp });
   return async () => {
     await schermo.spegni();
-    try { togliCartella(temp, { tentativi: 2, attesa: 100 }); } catch (_) {}
+    chiudiLaCorsa(temp);
   };
 }

@@ -77,7 +77,8 @@ body { min-height: 100vh; }
 }
 .ap-accedi { font-size: 14px; padding: 10px 20px; }
 
-.ap-fusioni {
+.ap-fusioni,
+.ap-salti {
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -89,7 +90,7 @@ body { min-height: 100vh; }
   color: var(--sn-muted);
 }
 
-.ap-account[hidden], .ap-accesso[hidden], .ap-fusioni[hidden] { display: none; }
+.ap-account[hidden], .ap-accesso[hidden], .ap-fusioni[hidden], .ap-salti[hidden] { display: none; }
 
 @media (max-width: 520px) {
   .ap { padding: 18px 16px 48px; }

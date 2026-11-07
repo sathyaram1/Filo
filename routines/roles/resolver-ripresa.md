@@ -26,6 +26,8 @@ giri passati, dalla più vecchia: le porte già trovate si tengono chiuse.
 `payload.decisioni` tiene TUTTE le risposte dell'owner su questo feedback, in
 ordine e con la loro domanda, anche quelle di fermate precedenti: `ripresa`
 porta solo l'ultima.
+
+<!-- includi: _decisioni-owner.md -->
 <!-- includi: _note-per-agenti.md -->
 
 <!-- includi: _immagini.md -->
@@ -49,16 +51,18 @@ porta solo l'ultima.
 
 <!-- includi: _criteri-verifica.md -->
 
+<!-- includi: _criteri-struttura.md -->
+
 <!-- includi: _segnala.md -->
 
 <!-- includi: _solo-in-locale.md -->
 
-<!-- includi: _guasto-in-attesa.md -->
-
 ## Consegna
 
+<!-- includi: _motivo-correttore.md -->
+
 ```bash
-node scripts/dispatch.mjs --record-fixed <id> "[report]" [--frase "[la frase]"] [--domanda <file.json>]
+node scripts/dispatch.mjs --record-fixed <id> "[report]" --motivo ripresa [--frase "[la frase]"] [--domanda <file.json>]
 ```
 
 Il lavoro torna in verifica sul commit nuovo. Infine rilascia il biglietto:

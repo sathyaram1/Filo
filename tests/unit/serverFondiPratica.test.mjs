@@ -75,12 +75,13 @@ const fissaFinta = (_c, ramo, sha) => ({ ok: true, ramo: `${ramo}-verificato-${s
 // Il registro dei rami (#1159): per difetto il ramo non ne ha uno, come i lavori locali di prima.
 const SENZA_REGISTRO = async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: 'il ramo non ha un registro' });
 
-function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false }) {
+function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, fissa = fissaFinta, lavoroDelRamo = SENZA_REGISTRO, puntaRamo = () => 'c'.repeat(40), cancello = null, daGitHub = false, registro = () => ({ outcome: 'registrato' }), mainPrima = () => 'b'.repeat(40) }) {
   return conRete(docs, async (scritture) => {
     const lanci = [];
     const righe = [];
     const chiesti = [];
     const alCancello = [];
+    const registrati = [];
     const k = await esegui(argv, {
       env: {}, bearer: 'finto', base: FIRESTORE_BASE, funzioni: '/srv/functions',
       log: (s) => righe.push(String(s)), err: (s) => righe.push(String(s)),
@@ -89,8 +90,9 @@ function giro({ docs, argv, codiceServer = 0, ramiAperti = [], verdetto = null, 
       lavoroDelRamo: async (x) => { chiesti.push(x); return lavoroDelRamo(x); }, puntaRamo,
       chiediAlCancello: async (x) => { alCancello.push(x); return cancello ? cancello(x) : { outcome: 'fault', reason: 'nessun cancello nella prova' }; },
       allinea: () => {}, deployDaGitHub: () => daGitHub,
+      registraMain: async (x) => { registrati.push(x); return registro(x); }, mainPrima,
     });
-    return { k, lanci, scritture, chiesti, alCancello, testo: righe.join('\n') };
+    return { k, lanci, scritture, chiesti, alCancello, registrati, testo: righe.join('\n') };
   });
 }
 
@@ -254,6 +256,30 @@ test('pratica chiusa da poco dalla fusione dell’app dello stesso lavoro, e nes
   assert.match(r.scritture[0], /localMerges\.server&updateMask\.fieldPaths=localMerges\.ramo&updateMask\.fieldPaths=updatedAt$/);
   assert.match(r.testo, /meno di 48 ore fa/);
   assert.match(r.testo, /resta chiusa/);
+});
+
+// #1428.1: le note di server:fondi le compone lo strumento; un terminale senza biglietto pulito le scrive lo stesso.
+test('ultima parte di una pratica fidata già chiusa, da un terminale senza biglietto pulito: la nota di fine resta scritta, uscita 0', async () => {
+  const { SPORCO } = await import('../helpers/bigliettoFinto.mjs');
+  const veri = { ...sessione };
+  const tolte = [];
+  sessione.biglietto = async () => SPORCO;
+  sessione.togliFiducia = async (id) => { tolte.push(id); return { ok: false, motivo: 'da chiusa non si toglie' }; };
+  try {
+    const d = doc('p', { status: 'done', parti: { app: ORA - 3 * ORE, ramo: 'claude/x' } });
+    d.fields.statusPublic = { stringValue: 'closed' };
+    const r = await giro({ docs: { p: d }, argv: ['claude/x', '--feedback', 'p'] });
+    assert.equal(r.k, 0, r.testo);
+    assert.equal(r.scritture.length, 2, 'la parte e la nota di fine');
+    assert.match(r.scritture[1], /updateMask\.fieldPaths=notes/);
+    assert.doesNotMatch(r.testo, /non l'ha annotato/);
+    assert.deepEqual(tolte, [], 'la nota di uno strumento non tocca la fiducia');
+    // Le altre note dello strumento passano allo stesso modo: presa in carico su una pratica aperta, e chiusura.
+    const aperta = await giro({ docs: { p: doc('p', { status: 'todo', parti: { app: ORA - ORE } }) }, argv: ['claude/x', '--feedback', 'p'] });
+    assert.equal(aperta.k, 0, aperta.testo);
+    assert.match(aperta.testo, /chiusa: claude\/x è su main del server/);
+    assert.deepEqual(tolte, []);
+  } finally { Object.assign(sessione, veri); }
 });
 
 test('pratica chiusa che non viene da poco dall’app dello stesso lavoro: si rifiuta prima di toccare il server, col perché', async () => {
@@ -446,6 +472,41 @@ test('GitHub rifiuta la spinta su main: la stessa fusione la chiede il cancello,
   assert.match(r.testo, /Pratica #910 chiusa/);
 });
 
+// #1521: il server allarma su un main che nessun cammino registrato ha portato.
+test('la spinta su main riuscita dal PC si registra sul server; quella del cancello la registra lui', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const dalPc = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato });
+  assert.equal(dalPc.k, 0, dalPc.testo);
+  assert.deepEqual(dalPc.registrati, [{ branch: 'claude/x', sha: 'a'.repeat(40), feedbackId: 'p' }], 'lo sha su cui main è davvero');
+  assert.doesNotMatch(dalPc.testo, /fuori registro/);
+  const cancello = await giro({
+    docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato,
+    codiceServer: USCITA_SPINTA_RIFIUTATA, cancello: () => ({ outcome: 'merged', sha: 'c'.repeat(40) }),
+  });
+  assert.deepEqual(cancello.registrati, []);
+  const fermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, codiceServer: 1 });
+  assert.deepEqual(fermo.registrati, [], 'main non si è mosso: niente da registrare');
+  // Il server dice di no: main è spinto, la pratica si chiude come sempre, e l'owner sa dell'allarme che arriverà.
+  const no = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, registro: () => ({ outcome: 'unreachable', reason: 'rete giù' }) });
+  assert.equal(no.k, 0, no.testo);
+  assert.match(no.testo, /non l’ha registrato come portato da server:fondi \(Server non raggiungibile: rete giù\)\. Aprirà un allarme su main fuori registro/);
+  assert.match(no.testo, /Pratica #910 chiusa/);
+  assert.equal(classifyServerMerge(200, { result: { ok: true, result: 'registrato', sha: 'a'.repeat(40) } }).outcome, 'registrato');
+});
+
+// #1521: server:fondi esce 0 anche col ramo già dentro main; main non si è mosso e lo sha su cui sta non è del PC.
+test('server:fondi che non ha spinto niente non registra main; main non letto prima non si registra e si dice', async () => {
+  const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
+  const fermo = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, mainPrima: () => 'a'.repeat(40) });
+  assert.equal(fermo.k, 0, fermo.testo);
+  assert.deepEqual(fermo.registrati, []);
+  assert.doesNotMatch(fermo.testo, /fuori registro/);
+  const ignoto = await giro({ docs: { p: doc('p') }, argv: ['claude/x', '--feedback', 'p', '--solo-server'], lavoroDelRamo: fidato, mainPrima: () => null });
+  assert.equal(ignoto.k, 0, ignoto.testo);
+  assert.deepEqual(ignoto.registrati, []);
+  assert.match(ignoto.testo, /non ho letto main del server prima della fusione.*non lo registro.*per aaaaaaaaa/);
+});
+
 test('il cancello non fonde (suite non verde): la pratica resta in lavorazione, col motivo', async () => {
   const fidato = async () => ({ ok: true, registro: true, lavoroFidato: true, attesa: '', motivo: '' });
   const r = await giro({
@@ -474,4 +535,8 @@ test('classifyServerMerge e messageForServerMerge: gli esiti del cancello per il
   assert.match(messageForServerMerge({ outcome: 'non_rapido' }, 'claude/x'), /claude\/x non contiene main di filo-security/);
   assert.match(messageForServerMerge({ outcome: 'rifiutata', detail: '422' }), /bypass della regola di main/);
   assert.match(messageForServerMerge({ outcome: 'not_deployed' }), /server della fase 2/);
+  // Le guardie del server toccate (#1497): un esito, non un guasto, e la riga dice cosa manca.
+  const si = ok('chiedi_si', { sha: 'c'.repeat(40), detail: 'il ramo del server tocca functions/src/l5/gates.js' });
+  assert.equal(si.outcome, 'chiedi_si');
+  assert.match(messageForServerMerge(si, 'worker/x'), /^Il cancello non porta worker\/x su main di filo-security senza il tuo sì: .*functions\/src\/l5\/gates\.js/);
 });

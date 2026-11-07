@@ -1,4 +1,5 @@
-/* Editor di Filo — layout testo (60%) + griglia moduli (40%). */
+/* Editor di Filo: il foglio a tutta larghezza, la colonna di testo al centro; gli strumenti stanno nel pannello di
+   destra (src/styles/pannelloDestro.css), che bloccato spinge il foglio. */
 
 * { box-sizing: border-box; }
 html, body {
@@ -16,23 +17,20 @@ html, body {
 }
 
 .ed-text-pane {
-  flex: 1 1 60%;
+  flex: 1 1 auto;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  border-right: 1px solid var(--sn-border);
   /* Àncora della topbar flottante. */
   position: relative;
 }
-.ed-root.sidebar-hidden .ed-text-pane { border-right: none; }
-.ed-root.sidebar-hidden .ed-sidebar { display: none; }
 
 /* La topbar è un gruppo di controlli flottante, non una barra a tutta larghezza: niente bordo né
    sfondo, così il documento parte direttamente dall'alto. */
 .ed-topbar {
   position: absolute;
   top: 10px;
-  right: 14px;
+  right: calc(14px + var(--pd-barra, 0px) + var(--pd-spinta, 0px));
   z-index: 5;
   display: flex;
   align-items: center;
@@ -72,7 +70,11 @@ html, body {
 .ed-doc-wrap {
   flex: 1 1 auto;
   overflow-y: auto;
-  padding: 32px 56px 120px;
+  /* La barra di scorrimento sta sul bordo destro anche a testo corto: striscia e pannello non saltano. */
+  scrollbar-gutter: stable;
+  /* Il pannello bloccato è una colonna della pagina: il foglio si restringe, la barra di scorrimento resta sul bordo. */
+  padding: 32px calc(56px + var(--pd-spinta, 0px)) 120px 56px;
+  transition: padding-right calc(200ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .ed-doc {
@@ -132,216 +134,18 @@ html, body {
 
 .ed-root.commenting .ed-doc { cursor: crosshair; }
 
-.ed-settings-view {
-  flex: 1 1 auto;
-  overflow-y: auto;
-  padding: 28px 40px;
-}
-.ed-settings-view h2 { margin: 0 0 6px; font-size: 20px; }
-.ed-settings-hint { color: var(--sn-muted); font-size: 13px; margin: 0 0 18px; }
+/* ── Gli strumenti nel pannello di destra ── */
+.ed-mod-pad { padding: 10px; display: flex; flex-direction: column; min-width: 0; }
 
-.ed-grid-size {
-  margin: 0 0 18px;
-  padding: 12px 14px;
-  border: 1px solid var(--sn-border);
-  border-radius: var(--sn-radius);
-  background: var(--sn-hover);
+.ed-wc {
+  flex-direction: row; align-items: baseline; gap: 6px;
+  width: 100%; border: none; background: transparent; color: inherit; font: inherit;
+  text-align: left; cursor: pointer; border-radius: var(--sn-radius, 10px);
+  transition: background calc(150ms * var(--sn-motion, 1));
 }
-.ed-gs-title { font-weight: 600; font-size: 14px; margin-bottom: 10px; }
-.ed-gs-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
-.ed-gs-cap { color: var(--sn-muted); font-size: 13px; }
-.ed-gs-sep { flex: 0 0 16px; }
-.ed-gs-val { min-width: 20px; text-align: center; font-variant-numeric: tabular-nums; font-weight: 600; }
-.ed-gs-btn {
-  width: 26px; height: 26px;
-  border: 1px solid var(--sn-border);
-  border-radius: 7px;
-  background: var(--sn-bg);
-  color: var(--sn-text);
-  cursor: pointer;
-  font-size: 16px; line-height: 1;
-  display: inline-flex; align-items: center; justify-content: center;
-}
-.ed-gs-btn:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
-
-.ed-palette {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
-.ed-palette-item {
-  border: 1px solid var(--sn-border);
-  border-radius: var(--sn-radius);
-  padding: 14px;
-  cursor: grab;
-  background: var(--sn-hover);
-}
-.ed-palette-item:active { cursor: grabbing; }
-.ed-palette-item .pi-title { font-weight: 600; font-size: 14px; display: flex; align-items: center; gap: 8px; }
-.ed-palette-item .pi-ico { color: var(--sn-accent); display: inline-flex; }
-.ed-palette-item .pi-desc { color: var(--sn-muted); font-size: 12px; margin-top: 6px; }
-.ed-palette-item .pi-size { color: var(--sn-muted); font-size: 11px; margin-top: 4px; }
-
-.ed-splitter {
-  flex: 0 0 5px;
-  cursor: col-resize;
-  background: transparent;
-  position: relative;
-  z-index: 2;
-}
-.ed-splitter::after {
-  content: '';
-  position: absolute;
-  inset: 0 -3px;
-}
-.ed-splitter:hover, .ed-splitter.dragging {
-  background: var(--sn-accent);
-  opacity: 0.4;
-}
-.ed-root.sidebar-hidden .ed-splitter { display: none; }
-
-.ed-sidebar {
-  flex: 0 0 40%;
-  max-width: 60%;
-  min-width: 200px;
-  display: flex;
-  flex-direction: column;
-  background: var(--sn-bg);
-}
-.ed-grid {
-  flex: 1 1 auto;
-  display: grid;
-  grid-template-columns: repeat(7, 1fr);
-  grid-template-rows: repeat(10, 1fr);
-  gap: 6px;
-  padding: 14px;
-  min-height: 0;
-}
-
-.ed-cell-empty {
-  border: 1px dashed var(--sn-border);
-  border-radius: 10px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: var(--sn-muted);
-  /* I "+" devono vedersi appena, non rubare l'occhio. Tornano pienamente visibili al passaggio
-     del mouse e durante un drop. */
-  opacity: 0.14;
-  cursor: pointer;
-  transition: opacity calc(0.12s * var(--sn-motion, 1)) ease;
-}
-.ed-cell-empty:hover { opacity: 1; border-color: var(--sn-accent); color: var(--sn-accent); }
-.ed-cell-empty.drop-target { opacity: 1; border-color: var(--sn-accent); background: rgba(var(--sn-accent-rgb), 0.08); }
-
-/* Il fantasma occupa l'impronta completa nella posizione di atterraggio, a opacità ridotta. */
-.ed-drag-ghost {
-  border: 2px dashed var(--sn-accent);
-  border-radius: 12px;
-  background: rgba(var(--sn-accent-rgb), 0.10);
-  color: var(--sn-accent);
-  opacity: 0.5;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 18px;
-  z-index: 4;
-}
-
-.ed-module {
-  border: 1px solid var(--sn-border);
-  border-radius: 12px;
-  background: var(--sn-hover);
-  overflow: hidden;
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  min-width: 0;
-}
-.ed-module.dragging { opacity: 0.4; pointer-events: none; }
-.ed-root.settings-mode .ed-module { cursor: pointer; outline: 1px dashed transparent; }
-.ed-root.settings-mode .ed-module:hover { outline-color: var(--sn-accent); }
-
-.ed-mod-drag {
-  position: absolute;
-  top: 2px;
-  right: 4px;
-  font-size: 14px;
-  line-height: 1;
-  padding: 2px 4px;
-  color: var(--sn-muted);
-  cursor: grab;
-  opacity: 0.3;
-  user-select: none;
-  z-index: 3;
-}
-.ed-module:hover .ed-mod-drag { opacity: 0.85; }
-.ed-mod-drag:active { cursor: grabbing; }
-/* Tenendo premuto il cursore deve diventare una "mano che afferra", ovunque si passi. */
-body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
-
-.ed-mod-resize {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  width: 14px;
-  height: 14px;
-  cursor: nwse-resize;
-  opacity: 0;
-  z-index: 2;
-}
-.ed-mod-resize::after {
-  content: '';
-  position: absolute;
-  bottom: 3px;
-  right: 3px;
-  width: 7px;
-  height: 7px;
-  border-right: 2px solid var(--sn-muted);
-  border-bottom: 2px solid var(--sn-muted);
-}
-.ed-module:hover .ed-mod-resize { opacity: 0.6; }
-.ed-mod-resize:hover { opacity: 1 !important; }
-.ed-mod-resize-h {
-  position: absolute;
-  bottom: 0;
-  right: 0;
-  top: 0;
-  width: 6px;
-  cursor: ew-resize;
-  opacity: 0;
-  z-index: 2;
-}
-.ed-module:hover .ed-mod-resize-h { opacity: 0.4; }
-.ed-mod-resize-h:hover { opacity: 1 !important; background: var(--sn-accent); border-radius: 0 6px 6px 0; }
-
-.ed-mod-pad { padding: 10px; flex: 1 1 auto; display: flex; flex-direction: column; min-height: 0; }
-.ed-mod-label { font-size: 11px; text-transform: uppercase; letter-spacing: 0.04em; color: var(--sn-muted); }
-
-.ed-wc { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
-.ed-wc .wc-num { font-size: 26px; font-weight: 700; line-height: 1; }
-/* La didascalia vale ovunque compaia, non solo nel word-count: il modulo Commenta la riusa e senza
-   questa regola ereditava il font del corpo, che alla larghezza minima tagliava "commenti". */
-.wc-cap { font-size: 11px; color: var(--sn-muted); margin-top: 4px; line-height: 1.1; }
-
-.ed-switch { flex-direction: row; align-items: stretch; gap: 0; padding: 0; }
-.ed-switch-arrow {
-  flex: 0 0 16px;
-  display: flex; align-items: center; justify-content: center;
-  color: var(--sn-muted); cursor: pointer; font-size: 12px;
-}
-.ed-switch-arrow:hover { color: var(--sn-accent); }
-.ed-switch-arrow.disabled { opacity: 0.25; cursor: default; }
-.ed-switch-icons { flex: 1 1 auto; display: flex; align-items: stretch; }
-.ed-switch-icon {
-  flex: 1 1 0; display: flex; align-items: center; justify-content: center;
-  cursor: pointer; font-size: 13px; font-weight: 600; color: var(--sn-muted);
-  border-right: 1px solid var(--sn-border);
-}
-.ed-switch-icon:last-child { border-right: none; }
-.ed-switch-icon.active { color: #fff; background: var(--sn-accent); }
-.ed-switch-icon svg { display: block; }
+.ed-wc:hover { background: var(--sn-hover); }
+.ed-wc .wc-num { font-size: 22px; font-weight: 700; line-height: 1; font-variant-numeric: tabular-nums; }
+.wc-cap { font-size: 12px; color: var(--sn-muted); line-height: 1.1; }
 
 .ed-sr input {
   width: 100%; margin-bottom: 6px; padding: 5px 8px;
@@ -356,64 +160,26 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
   background: var(--sn-bg); color: var(--sn-fg); cursor: pointer;
 }
 .ed-sr-row button:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
-.ed-sr-count { font-size: 11px; color: var(--sn-muted); margin-bottom: 4px; }
-
-.ed-chat { padding: 8px; container-type: size; }
-.ed-chat-log { flex: 1 1 auto; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; margin-bottom: 6px; }
-.ed-chat-msg { font-size: 12px; padding: 6px 9px; border-radius: 10px; max-width: 92%; white-space: pre-wrap; }
-.ed-chat-msg.user { align-self: flex-end; background: var(--sn-accent); color: #fff; }
-.ed-chat-msg.assistant { align-self: flex-start; background: var(--sn-bg); border: 1px solid var(--sn-border); }
-/* La risposta non è arrivata: la frase dice perché, e si distingue da una risposta (#663). */
-.ed-chat-msg.assistant.errore { color: var(--sn-error); }
-/* Risposta pagata coi crediti di Filo (chiave dell'utente rifiutata): non è un errore, è una nota. */
-.ed-chat-note { align-self: flex-start; font-size: 11px; font-style: italic; color: var(--sn-muted); padding: 0 9px; }
-.ed-chat-continua {
-  align-self: flex-start; margin-left: 9px; padding: 3px 10px; border-radius: 999px; font: inherit; font-size: 12px;
-  border: 1px solid var(--sn-border); background: transparent; color: inherit; cursor: pointer; transition: background calc(120ms * var(--sn-motion, 1)) ease;
-}
-.ed-chat-continua:hover { background: var(--sn-hover); }
-.ed-chat-input { display: flex; gap: 4px; align-items: flex-end; --sn-voce-size: 30px; --sn-voce-ink: var(--sn-muted); }
-.ed-chat-input .sn-voce-btn { margin-bottom: 2px; }
-/* Cresce col testo: quattro righe finché sopra resta una riga di conversazione, in una chat alta tutto meno qualche
-   riga; oltre scorre. Tasti messi sotto contati: in una chat bassa vincono microfono e invio interi (owner, #256.4). */
-.ed-chat-input textarea {
-  flex: 1 1 auto; resize: none; field-sizing: content; min-height: 34px;
-  max-height: max(34px, min(84px, calc(100cqh - 28px - var(--ed-chat-tasti, 0px))), calc(100cqh - 72px - var(--ed-chat-tasti, 0px)));
-  overflow-y: auto; scrollbar-width: thin; padding: 7px 8px; line-height: 1.4;
-  border: 1px solid var(--sn-border); border-radius: 8px;
-  background: var(--sn-bg); color: var(--sn-fg); font-size: 12px;
-  font-family: inherit; outline: none;
-}
-.ed-chat-input textarea:focus { border-color: var(--sn-accent); }
-.ed-chat-input button[data-chat="send"] {
-  flex: 0 0 auto; height: 34px; padding: 0 10px; border: none; border-radius: 8px;
-  background: var(--sn-accent); color: #fff; cursor: pointer; font-size: 12px;
-}
-/* Tasti sotto, a destra, e la casella su tutta la riga: sempre in una chat stretta (accanto teneva due parole spezzate
-   a metà), e quando sotto la richiesta si legge intera e accanto no (la regola sta nel modulo chat dell'editor). */
-.ed-chat-input.ed-chat-sotto { flex-wrap: wrap; justify-content: flex-end; --ed-chat-tasti: 38px; }
-.ed-chat-input.ed-chat-sotto textarea { flex-basis: 100%; }
-@container (max-width: 180px) {
-  .ed-chat-input { flex-wrap: wrap; justify-content: flex-end; --ed-chat-tasti: 38px; }
-  .ed-chat-input textarea { flex-basis: 100%; }
+.ed-sr-row + .ed-sr-row { margin-top: 4px; }
+/* Il conto sta dentro il campo Cerca: comparendo non sposta i tasti sotto. */
+.ed-sr-campo { position: relative; }
+.ed-sr-campo input { padding-right: 84px; }
+.ed-sr-count {
+  position: absolute; right: 8px; top: 0; height: calc(100% - 6px);
+  display: flex; align-items: center; pointer-events: none;
+  font-size: 11px; color: var(--sn-muted); white-space: nowrap;
 }
 
-.ed-settings-mod {
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  color: var(--sn-muted);
-}
-.ed-settings-mod:hover { color: var(--sn-accent); }
-.ed-settings-mod svg { display: block; }
-.ed-root.settings-mode .ed-module[data-type="settings"] { color: var(--sn-accent); outline-color: var(--sn-accent); }
-/* L'ingranaggio non è eliminabile, quindi niente maniglia di trascinamento ambigua: resta
-   comunque spostabile come gli altri, dal cell. */
+.ed-strumento { display: flex; align-items: center; gap: 10px; width: 100%; justify-content: flex-start; margin-bottom: 6px; text-align: left; }
+.ed-strumento-icona { display: inline-flex; color: var(--sn-accent); }
+.ed-strumento-nome { flex: 1 1 auto; }
+.ed-strumento-nota { color: var(--sn-muted); font-size: 12px; }
+.ed-glifo { display: inline-flex; min-width: 16px; justify-content: center; font-size: 14px; line-height: 1; }
 
-.ed-fmt { padding: 6px; gap: 4px; }
+.ed-fmt { gap: 4px; }
 .ed-fmt-row { flex-direction: row; }
 .ed-fmt-btn {
-  flex: 1 1 0; min-width: 0;
+  flex: 1 1 0; min-width: 0; min-height: 32px;
   display: inline-flex; align-items: center; justify-content: center;
   border: 1px solid var(--sn-border); border-radius: 8px;
   background: var(--sn-bg); color: var(--sn-fg);
@@ -425,17 +191,19 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-fmt-btn svg { display: block; }
 .ed-fmt-btn small { font-size: 0.75em; }
 .ed-fmt-btn big { font-size: 1.25em; }
+/* Uno strumento di un tasto solo (grassetto, indietro…) dice anche il suo nome: nel pannello c'è posto. */
+.ed-fmt-largo { justify-content: flex-start; gap: 10px; padding: 0 10px; font-size: 13px; }
+.ed-fmt-glifo { display: inline-flex; min-width: 18px; justify-content: center; font-size: 16px; }
+.ed-fmt-nome { color: var(--sn-fg); }
 .ed-fmt-row .ed-fmt-btn { font-size: 14px; }
 .ed-align .ed-fmt-btn { color: var(--sn-muted); }
 .ed-align .ed-fmt-btn:hover { color: var(--sn-accent); }
-.ed-font { padding: 6px; }
 /* Il <select> nativo resta nel DOM come sorgente di verità e per i test; a nasconderlo è la regola
    condivisa .sn-select-wrap > select di theme.css. */
 .ed-font-wrap { display: flex; flex: 1 1 auto; min-width: 0; align-items: stretch; }
 .ed-font-button { width: 100%; }
 .ed-font-button:hover { border-color: var(--sn-accent); }
-/* Fixed così il popup non viene tagliato da .ed-module { overflow: hidden }: nessun antenato crea un
-   containing block, quindi sfugge al ritaglio. Le coordinate le mette il JS all'apertura. */
+/* Fixed così il popup non viene tagliato dal pannello che scorre: le coordinate le mette il JS all'apertura. */
 .sn-select-pop.ed-font-pop {
   position: fixed; right: auto;
   flex-direction: column;
@@ -456,20 +224,26 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 .ed-font-list { overflow-y: auto; padding: 4px 0; }
 .ed-font-list:empty::after,
 .ed-font-list .sn-select-option { font-size: 14px; }
-/* Suggerisce che il modulo è afferrabile tenendo premuto (drag da ovunque). */
-.ed-module.ed-arming { cursor: grabbing; }
-/* In modalità modifica i bottoni non devono "rubare" il click di configurazione. */
-.ed-root.settings-mode .ed-fmt-btn { pointer-events: none; }
-
-.ed-comment-mod { align-items: center; justify-content: center; text-align: center; cursor: pointer; }
-.ed-comment-mod .cm-count { font-size: 22px; font-weight: 700; }
-.ed-root.commenting .ed-module[data-type="comment"] { outline: 2px solid var(--sn-accent); }
+.ed-comment-mod { flex-direction: row; align-items: center; gap: 8px; }
+.ed-comment-mod button {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; min-height: 32px;
+  border: 1px solid var(--sn-border); border-radius: 8px; background: var(--sn-bg); color: var(--sn-fg);
+  font: inherit; font-size: 13px; cursor: pointer;
+  transition: border-color calc(150ms * var(--sn-motion, 1)), color calc(150ms * var(--sn-motion, 1));
+}
+.ed-comment-mod button[hidden] { display: none; }
+.ed-comment-mod button:hover { border-color: var(--sn-accent); color: var(--sn-accent); }
+.ed-cm-nuovo { flex: 1 1 auto; }
+.ed-comment-mod svg { width: 14px; height: 14px; }
+.ed-comment-mod .cm-count { font-weight: 700; font-variant-numeric: tabular-nums; }
+.ed-root.commenting ~ .pd-pannello [data-elemento="comment"] { outline: 2px solid var(--sn-accent); }
 
 .ed-overlay {
   position: fixed; inset: 0;
   background: rgba(0,0,0,0.32);
   display: flex; align-items: center; justify-content: center;
-  z-index: 100;
+  /* Sopra il pannello degli strumenti, che lo apre, e sotto l'Aiuto. */
+  z-index: 2147482500;
 }
 .ed-overlay[hidden] { display: none; }
 .ed-overlay-box {
@@ -562,13 +336,15 @@ body.ed-dragging, body.ed-dragging * { cursor: grabbing !important; }
 /* Gli avvisi si IMPILANO (uno nuovo non cancella il precedente e il suo "Annulla"), col tetto al numero nel
    JS e all'altezza qui, sopra la pila della barra quando c'è (--filo-avvisi-barra, dal main). */
 .ed-toasts {
-  position: fixed; right: 18px; bottom: max(18px, var(--filo-avvisi-barra, 0px));
+  position: fixed; right: calc(18px + var(--pd-barra, 0px)); bottom: max(18px, var(--filo-avvisi-barra, 0px));
   display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
   max-height: calc(100vh - 18px - max(18px, var(--filo-avvisi-barra, 0px)));
   overflow-y: auto; overflow-x: hidden;
   scrollbar-width: thin;
-  pointer-events: none; z-index: 200;
+  pointer-events: none; z-index: 2147482600;
 }
+/* Col pannello aperto gli avvisi stanno alla sua sinistra: l'«Annulla» resta da cliccare. */
+html.pd-aperto .ed-toasts { right: calc(18px + var(--pd-destra, 0px) + var(--pd-larghezza, 272px)); }
 /* Attiva i pointer-events solo quando c'è davvero overflow (finestra bassa):
    serve ad afferrare la scrollbar senza rubare i click al foglio sotto. */
 .ed-toasts.scrolling { pointer-events: auto; padding-right: 4px; }

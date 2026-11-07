@@ -238,7 +238,8 @@ test('una pagina appena aperta non apre da sola il menu e non legge appunti né 
   expect(visto).not.toContain(IBAN);
   expect(await page.locator('#campo').inputValue()).toBe('');
   expect(await statoCronologia(app, page)).toBeNull();
-  await expect(page.locator('.sn-sidebar')).toHaveCount(0);
+  // Nella pagina e nello strato sopra di lei (#1509.3), dove l'Aiuto starebbe.
+  expect(await conta(app, page, '.sn-sidebar')).toBe(0);
   expect(await conta(app, page, '.sn-fb-modal')).toBe(0);
 
   // Il tasto destro dell'utente apre il menu, e la cronologia mostra a lui le due voci.
@@ -266,7 +267,7 @@ test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'
       await expect(voce(testo)).toBeVisible();
       expect(await preme(testo, fuori)).toBe(true);
       await page.waitForTimeout(600);
-      await expect(page.locator('.sn-sidebar'), `il sito non apre l'Aiuto premendo «${testo}»`).toHaveCount(0);
+      expect(await conta(app, page, '.sn-sidebar'), `il sito non apre l'Aiuto premendo «${testo}»`).toBe(0);
       expect(await conta(app, page, '.sn-fb-modal'), `il sito non apre il feedback premendo «${testo}»`).toBe(0);
       await page.keyboard.press('Escape');
       await page.evaluate(() => { for (const b of document.body.querySelectorAll(':scope > button[class^="sn-"]')) b.remove(); });
@@ -281,7 +282,7 @@ test('a menu aperto dall\'utente il sito non preme Invia feedback né Aiuto; l\'
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1');
   await page.locator('#campo').click({ button: 'right' });
   await voce('Aiuto').click();
-  await expect(page.locator('.sn-sidebar')).toBeVisible({ timeout: 8_000 });
+  await expect.poll(() => conta(app, page, '.sn-sidebar'), { timeout: 8_000 }).toBe(1);
 });
 
 test('la cronologia aperta dall\'utente non si fa leggere dal sito con la ricerca testuale del browser', async ({ app, shell, openTab, testServer }) => {

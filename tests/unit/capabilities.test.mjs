@@ -179,6 +179,8 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // di memoria, che l'utente conosce già come "filo-memory". Non è una voce a
     // sé: nessuno chiede "compatta le lezioni", chiede "ricordati questo".
     'FILO_COMPACT_MEMORY',
+    // La home vista, per i contatori anonimi (#1467): non fa niente per l'utente.
+    'FILO_HOME_VISTA',
   ]);
 
   // Mappa handler → id della capacità che lo descrive nel manifesto. Più handler
@@ -194,6 +196,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     FILO_DECIDI_PAGINA: 'autonomy-levels',
     FILO_AIUTO_NUOVO: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
+    FILO_CONFIRM_RIFIUTATA: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
     FILO_APRI_PROPOSTA: 'agent-actions',
     FILO_GET_MEMORY: 'filo-memory',
@@ -350,33 +353,20 @@ test('ogni icona fissa della home che apre una pagina filo:// è coperta dal man
 
 // ── Anti-stale: il manifesto non può citare strade che non esistono più ──────
 
-// Etichette italiane delle icone del menu del tasto destro, per id, e insieme
-// delle icone che un utente può DAVVERO vedere (registro meno le ritirate,
-// limitato a quelle presenti nel layout di default o aggiunte per migrazione).
+// Etichette italiane delle icone della barra laterale, per id, e quelle che il tasto destro ha davvero: dal #1246
+// nessuna icona sta nel menu, e resta valida solo un'etichetta che è anche una voce vera del menu («Aiuto»).
 function menuIconLabels() {
-  const src = readFileSync(join(ROOT, 'src', 'content', 'menuIcons.js'), 'utf8');
   const i18n = readFileSync(join(ROOT, 'src', 'shared', 'i18n.js'), 'utf8');
   const label = (key) => {
     const m = i18n.match(new RegExp(`\\b${key}:\\s*'([^']+)'`));
     return m ? m[1] : null;
   };
-  // id → etichetta, per le voci del registro con label statica.
-  const byId = new Map();
-  for (const m of src.matchAll(/\bid:\s*'(\w+)'[^\n]*?label:\s*I18n\.t\('([a-z0-9_]+)'\)/g)) {
-    const text = label(m[2]);
-    if (text) byId.set(m[1], text);
-  }
-  // Dove sta ogni icona lo dice src/shared/disposizioneIcone.js (#871): dal tasto destro si
-  // raggiungono la riga e «Altro…», più le icone nate dopo che la migrazione mette in «Altro…».
-  // Le globali (indietro, avanti, ricarica…) stanno nella barra laterale, non nel menu.
   require(join(ROOT, 'src', 'shared', 'disposizioneIcone.js'));
   const D = globalThis.SN_DISPOSIZIONE_ICONE;
-  const retired = new Set(D.RITIRATE);
-  const reachable = new Set(
-    [...D.DEFAULT.primary, ...D.DEFAULT.secondary, ...D.AGGIUNTE.filter((id) => !D.GLOBALI.includes(id))]
-      .filter((id) => !retired.has(id)),
-  );
-  return { byId, retired, reachable };
+  const byId = new Map(Object.entries(D.ICONE).map(([id, d]) => [id, label(d.etichetta)]).filter(([, t]) => t));
+  const voci = menuVoiceLabels();
+  const reachable = new Set([...byId].filter(([, t]) => voci.has(t)).map(([id]) => id));
+  return { byId, reachable };
 }
 
 test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'è più', () => {
@@ -386,8 +376,8 @@ test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'
   // Qui incrociamo OGNI etichetta citata come voce del tasto destro con le icone
   // davvero raggiungibili: se una capacità cita un'icona ritirata, il test è rosso.
   const { byId, reachable } = menuIconLabels();
-  assert.ok(byId.size >= 8, `mi aspetto ≥8 icone con etichetta statica, trovate ${byId.size}`);
-  assert.ok(reachable.size >= 8, `mi aspetto ≥8 icone raggiungibili, trovate ${reachable.size}`);
+  assert.ok(byId.size >= 15, `mi aspetto ≥15 icone con etichetta, trovate ${byId.size}`);
+  assert.ok(reachable.size < byId.size, 'le icone stanno nella barra laterale: nel tasto destro solo le etichette che sono anche voci vere');
 
   // Etichette che NON sono più raggiungibili dal menu del tasto destro.
   const unreachableLabels = new Map();
@@ -403,7 +393,7 @@ test('nessuna capacità promette un\'icona del menu del tasto destro che non c\'
       const id = unreachableLabels.get(q);
       assert.ok(!id,
         `la capacità "${c.id}" promette «tasto destro → ${q}», ma quell'icona (${id}) non è più raggiungibile dal menu: `
-        + 'correggi il manifesto (o rimetti l\'icona nel layout)');
+        + 'correggi il manifesto: le icone stanno nella barra laterale (#1246)');
     }
   }
 });
@@ -486,7 +476,8 @@ test('nessuna capacità cita la barra in alto / degli indirizzi, rimossa dalla s
 function menuVoiceLabels() {
   const i18n = readFileSync(join(ROOT, 'src', 'shared', 'i18n.js'), 'utf8');
   const dir = join(ROOT, 'src', 'content');
-  const content = readdirSync(dir).filter((f) => f.endsWith('.js'))
+  // Le azioni della pagina che stanno nella barra laterale (menuIcons.js) non sono voci del menu (#1246).
+  const content = readdirSync(dir).filter((f) => f.endsWith('.js') && f !== 'menuIcons.js')
     .map((f) => readFileSync(join(dir, f), 'utf8')).join('\n');
   // Anche le pagine filo:// hanno il loro menu del tasto destro, e il manifesto
   // ne promette le voci: cercarle solo fra i content script le dava per assenti.
@@ -573,25 +564,28 @@ test('nessuna capacità descrive come voce da cliccare una spiegazione che arriv
   }
 });
 
-// #545: la chat deve sapere quali moduli dell'Editor prendono una scorciatoia;
-// l'elenco vero è la tabella delle azioni dell'Editor, il manifesto la segue.
-test('il manifesto nomina ogni modulo dell\'Editor che prende una scorciatoia, e solo quelli', () => {
+// #545: la chat deve sapere quali strumenti dell'Editor prendono una scorciatoia; l'elenco vero è la tabella delle
+// azioni dell'Editor, i nomi li dà il catalogo del pannello (#1433), il manifesto li segue.
+test('il manifesto nomina ogni strumento dell\'Editor che prende una scorciatoia, e solo quelli', () => {
   const src = readFileSync(join(ROOT, 'src', 'pages', 'editor', 'editor.js'), 'utf8');
   const blocco = /const AZIONE_SCORCIATOIA = \{([\s\S]*?)\n  \};/.exec(src);
   assert.ok(blocco, 'tabella delle azioni delle scorciatoie non trovata nell\'Editor');
   const tipi = [...blocco[1].matchAll(/^\s+'?([a-z-]+)'?:/gm)].map((m) => m[1]);
+  require(join(ROOT, 'src', 'shared', 'pannelliApp.js'));
+  const cat = globalThis.SN_PANNELLI_APP.catalogo('editor');
+  assert.deepEqual(cat.elementi.filter((e) => e.azione).map((e) => e.id).sort(), tipi.slice().sort(),
+    'il catalogo dice che prendono una scorciatoia strumenti diversi da quelli che l\'Editor sa far partire');
   const etichetta = (tipo) => {
-    const m = new RegExp(`^\\s+'?${tipo}'?:\\s*\\{\\s*label: '([^']+)'`, 'm').exec(src);
-    assert.ok(m, `etichetta del modulo ${tipo} non trovata`);
-    return m[1];
+    const n = globalThis.SN_PANNELLI_APP.nome('editor', tipo);
+    assert.ok(n, `nome dello strumento ${tipo} non trovato nel catalogo`);
+    return n;
   };
   const frase = /[^.]*prendono una scorciatoia[^.]*\./.exec(CAP.get('editor').desc);
-  assert.ok(frase, 'la voce «editor» non dice quali moduli prendono una scorciatoia');
+  assert.ok(frase, 'la voce «editor» non dice quali strumenti prendono una scorciatoia');
   for (const tipo of tipi) {
     assert.ok(frase[0].includes(etichetta(tipo)), `il manifesto non dice che «${etichetta(tipo)}» prende una scorciatoia`);
   }
-  const tutti = [...src.matchAll(/^\s+'?([a-z-]+)'?:\s*\{\s*label: '([^']+)'/gm)].map((m) => m[2]);
-  for (const altro of tutti.filter((l) => !tipi.map(etichetta).includes(l))) {
+  for (const altro of cat.elementi.map((e) => e.nome).filter((l) => !tipi.map(etichetta).includes(l))) {
     assert.ok(!frase[0].includes(altro), `il manifesto promette una scorciatoia a «${altro}», che non la prende`);
   }
 });

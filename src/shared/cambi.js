@@ -109,12 +109,24 @@
     'autoArchive.idleHours': { nome: 'ore di inattività prima di archiviare', valore: numero, livello: 1 },
     'autoArchive.onClose': { nome: 'riordino alla riapertura', valore: ATTIVO, livello: 1 },
     'barraLaterale.spinta': { nome: 'apertura della barra laterale dal bordo', valore: ATTIVA, livello: 1 },
+    'barraLaterale.schede': { nome: 'schede dal bordo alto a schermo intero', valore: sino('compaiono', 'restano nascoste'), livello: 1 },
     'barraLaterale.striscia': { nome: 'striscia della barra laterale', valore: sino('visibile', 'nascosta'), livello: 1 },
     'barraLaterale.attesaMs': { nome: 'attesa sul bordo prima che la barra laterale si apra', valore: millisecondi, livello: 1 },
     'barraLaterale.uscitaMs': { nome: 'tempo prima che la barra laterale si chiuda', valore: millisecondi, livello: 1 },
+    'barraLaterale.bloccata': { nome: 'barra laterale bloccata aperta', valore: sino('bloccata', 'sopra la pagina'), livello: 1 },
+    'pannelloDestro.spinta': { nome: 'apertura del pannello degli strumenti dal bordo destro', valore: ATTIVA, livello: 1 },
+    'pannelloDestro.striscia': { nome: 'striscia del pannello degli strumenti', valore: sino('visibile', 'nascosta'), livello: 1 },
+    'pannelloDestro.attesaMs': { nome: 'attesa sul bordo prima che il pannello degli strumenti si apra', valore: millisecondi, livello: 1 },
+    'pannelloDestro.uscitaMs': { nome: 'tempo prima che il pannello degli strumenti si chiuda', valore: millisecondi, livello: 1 },
+    'pannelloDestro.bloccato': { nome: 'pannello degli strumenti bloccato aperto', valore: sino('bloccato', 'sopra la pagina'), livello: 1 },
     'avvisoSchermoPieno.durataMs': { nome: 'durata dell\'avviso del sito a schermo intero', valore: millisecondi, livello: 1 },
     'riassuntoSchede.enabled': { nome: 'riassunto delle schede chiuse', valore: ATTIVO, livello: 1 },
     'spiegaAnticipata.enabled': { nome: 'spiegazione preparata alla selezione', valore: ATTIVA, livello: 1 },
+    'traduzionePagina.nascoste': {
+      nome: 'traduzione delle sezioni chiuse di una pagina',
+      valori: { subito: 'subito, insieme al resto', apertura: 'solo quando le apri' },
+      livello: 1,
+    },
     'descriviImmagini.enabled': { nome: 'descrizione di screenshot e immagini copiate', valore: ATTIVA, livello: 1 },
     'contatori.attivi': { nome: 'contatori anonimi d\'uso', valore: ATTIVI, livello: 2 },
     'avvisoCrediti.attivo': { nome: 'avviso prima che i crediti finiscano', valore: ATTIVO, livello: 1 },
@@ -131,6 +143,12 @@
     'correttore.pausaRapidoMs': { nome: 'pausa prima del controllo degli errori', valore: millisecondi, livello: 1 },
     'correttore.ogniRapidoMs': { nome: 'controllo degli errori mentre si scrive senza pause', valore: millisecondi, livello: 1 },
     'correttore.pausaRagionatoMs': { nome: 'pausa prima del controllo dei suggerimenti', valore: millisecondi, livello: 1 },
+    'correttore.automatica': { nome: 'correzione automatica a fine parola', valore: ATTIVA, livello: 1 },
+    'correttore.accettiPerImparare': { nome: 'volte che una correzione scelta serve per diventare automatica', valore: numero, livello: 1 },
+    'correttore.annulliPerImparare': { nome: 'volte che una correzione annullata serve per non tornare più', valore: numero, livello: 1 },
+    'correttore.riscrittePerImparare': { nome: 'volte che una parola scritta uguale serve per non essere più segnata', valore: numero, livello: 1 },
+    'correttore.segnaposti': { nome: 'segnaposto del correttore', valore: ATTIVI, livello: 1 },
+    'correttore.segnapostiWeb': { nome: 'ricerca sul web per i segnaposto', valore: ATTIVA, livello: 1 },
     'featureFlags.help': { nome: 'Aiuto nelle pagine', valore: ATTIVO, livello: 1 },
     'featureFlags.categorize': { nome: 'categorie automatiche in «Aperti per dopo»', valore: ATTIVE, livello: 1 },
     blocklist: { nome: 'siti dove Filo è spento', elenco: true, livello: 1 },
@@ -163,6 +181,7 @@
     'security.safeBrowse.networkSignals': { nome: 'controlli di rete sui siti', valore: sino('attivi', 'spenti'), livello: 2 },
     'security.safeBrowse.llmJudge': { nome: 'giudizio AI sui siti sospetti', valore: ATTIVO, livello: 2 },
     'security.safeBrowse.sandbox': { nome: 'link sospetti in una finestra isolata', valore: sino('sì', 'no'), livello: 2 },
+    'security.safeBrowse.trustedSites': { nome: 'siti di cui ti fidi', elenco: true, livello: 2 },
     'security.cookies.mode': { nome: 'gestione dei cookie', valori: { manual: 'manuale', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.cookies.trustedSites': { nome: 'siti fidati dove resti connesso', elenco: true, livello: 2 },
     'security.cookies.bannerSites': { nome: 'siti dove vedi i banner dei cookie', elenco: true, livello: 2 },
@@ -172,6 +191,7 @@
     'security.fingerprint.mode': { nome: 'protezione dal fingerprinting', valori: { off: 'spenta', default: 'automatica', privacy: 'privacy massima' }, livello: 2 },
     'security.adblock.enabled': { nome: 'blocco di pubblicità e tracker', valore: ATTIVO, livello: 2 },
     'security.adSkip.enabled': { nome: 'salta le pubblicità dei video', valore: ATTIVO, livello: 1 },
+    'security.youtubeAds.enabled': { nome: 'blocca le pubblicità di YouTube', valore: ATTIVO, livello: 1 },
     'security.siteBlock.enabled': { nome: 'blocco dei siti in blacklist', valore: ATTIVO, livello: 2 },
     'security.siteBlock.useAdblockLists': { nome: 'liste pubbliche come blacklist', valore: sino('in uso', 'spente'), livello: 2 },
     'security.siteBlock.blacklist': { nome: 'domini in blacklist', elenco: true, livello: 2 },
@@ -274,14 +294,17 @@
   // `normalizza`: lo stesso di getSettings (default fusi), così una chiave assente non sembra tolta.
   function cambiImpostazioni(primaGrezze, dopoGrezze, normalizza) {
     const n = typeof normalizza === 'function' ? normalizza : (x) => x || {};
+    const dopo = n(dopoGrezze);
+    // Coi modelli predefiniti accesi quelli scelti funzione per funzione non valgono: si dicono in una riga (#1619).
+    const coperti = !dopo || dopo.useDefaultModels !== false;
     const out = [];
-    for (const c of foglie(n(primaGrezze), n(dopoGrezze), '', [])) {
+    for (const c of foglie(n(primaGrezze), dopo, '', [])) {
       if (esclusa(c.chiave)) continue;
       const v = voce(c.chiave);
       if (v && v.segreto) {
         out.push({ chiave: c.chiave, segreto: true, vuotoPrima: !c.prima, vuotoDopo: !c.dopo });
       } else {
-        out.push(c);
+        out.push(coperti && c.chiave.startsWith('models.') ? { ...c, coperto: true } : c);
       }
     }
     return out;
@@ -331,6 +354,42 @@
       if (!uguale(nucleo(ra), nucleo(rb))) out.push({ chiave: `proxy:${dom}`, prima: ra, dopo: rb });
     }
     return out;
+  }
+
+  // La disposizione delle icone della barra e della fila del tasto destro (#867.1, #1434): un cambio per icona spostata,
+  // con dov'era e dove è finita.
+  function cambiIcone(prima, dopo, { mossa = null } = {}) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    if (!D) return [];
+    const a = D.migra(prima).layout;
+    const b = D.migra(dopo).layout;
+    return D.spostate(a, b, { mossa }).map((id) => ({ chiave: `icona:${id}`, prima: D.posizione(a, id), dopo: D.posizione(b, id) }));
+  }
+  const iconaDi = (c) => String((c && c.chiave) || '').slice(6);
+
+  // Le icone rimesse com'erano sulla disposizione di adesso, una alla volta e dall'ultima: quelle spostate dopo
+  // restano dove sono.
+  function annulloIcone(evento, attuale) {
+    const D = global.SN_DISPOSIZIONE_ICONE;
+    let l = D.migra(attuale).layout;
+    for (const c of ((evento && evento.cambi) || []).slice().reverse()) {
+      const posa = D.posaPer(l, iconaDi(c), c.prima);
+      l = (posa && D.applicaPosa(l, posa)) || l;
+    }
+    return l;
+  }
+
+  // Le icone del desktop del computer (#1621): `prima` e `dopo` sono { auto, voci: [[id, x, y]], finder? (Mac) }, `come` l'ordine chiesto.
+  const ORDINI_DESKTOP = new Map([['nome', 'in ordine alfabetico'], ['tipo', 'per tipo'], ['data', 'per data'], ['dimensione', 'per dimensione']]);
+  function fraseOrdineDesktop(come) {
+    const c = come || {};
+    const verso = c.verso === 'colonne' ? 'a colonne' : 'a righe';
+    return `${ORDINI_DESKTOP.get(c.ordine) || 'in ordine'}${c.alContrario ? ' al contrario' : ''}, ${verso}${c.cartellePrima ? ', cartelle prima' : ''}`;
+  }
+  function spostateSulDesktop(c) {
+    const voci = (d) => (d && Array.isArray(d.voci) ? d.voci : []);
+    const prima = new Map(voci(c.prima).map((v) => [v[0], `${v[1]},${v[2]}`]));
+    return voci(c.dopo).filter((v) => prima.has(v[0]) && prima.get(v[0]) !== `${v[1]},${v[2]}`).length;
   }
 
   // ── Le frasi ────────────────────────────────────────────────────────────────
@@ -407,6 +466,26 @@
       const p = (x) => (Number.isFinite(Number(x)) ? `${Math.round(Number(x))}%` : '?');
       return `zoom di ${k.slice(5)}: ${p(c.prima)} → ${p(c.dopo)}`;
     }
+    if (k.startsWith('icona:')) {
+      const D = global.SN_DISPOSIZIONE_ICONE;
+      const id = iconaDi(c);
+      const nome = `icona «${D && D.nome ? D.nome(id) : id}»`;
+      const zona = (p) => (D && D.nomeZona ? D.nomeZona(p && p.zona) : { nome: 'barra laterale', in: 'nella' });
+      const posto = (p) => `${Number(p && p.posto) || '?'}° posto`;
+      if (c.prima && c.dopo && c.prima.zona === c.dopo.zona) {
+        return `${nome} ${zona(c.dopo).in} ${zona(c.dopo).nome}: ${posto(c.prima)} → ${posto(c.dopo)}`;
+      }
+      return `${nome}: ${zona(c.prima).nome} → ${zona(c.dopo).nome}`;
+    }
+    if (k === 'desktop') {
+      if (c.come) return `icone del desktop ${fraseOrdineDesktop(c.come)}`;
+      const n = spostateSulDesktop(c);
+      const auto = !!(c.prima && c.prima.auto) !== !!(c.dopo && c.dopo.auto);
+      const parti = [n === 1 ? 'spostata 1' : `spostate ${n}`];
+      const mac = !!((c.prima && c.prima.finder) || (c.dopo && c.dopo.finder));
+      if (auto) parti.push(`${mac ? '«Ordina per» del Finder' : '«Disponi automaticamente»'} ${c.dopo && c.dopo.auto ? 'acceso' : 'spento'}`);
+      return `icone del desktop: ${parti.join(', ')}`;
+    }
     const v = voce(k);
     const nome = v ? v.nome : 'un\'impostazione di Filo';
     if (c.segreto) {
@@ -435,7 +514,15 @@
 
   // Le frasi di un evento, una per cambio: chi le mostra sceglie quante.
   function frasi(evento) {
-    return (evento && Array.isArray(evento.cambi) ? evento.cambi : []).map(fraseCambio);
+    const cambi = evento && Array.isArray(evento.cambi) ? evento.cambi : [];
+    const out = cambi.filter((c) => !(c && c.coperto)).map(fraseCambio);
+    const coperti = cambi.filter((c) => c && c.coperto);
+    if (coperti.length) {
+      const tolti = coperti.every((c) => !c.dopo);
+      const quanti = coperti.length === 1 ? 'una funzione' : `${coperti.length} funzioni`;
+      out.push(`modelli scelti a mano per ${quanti}: ${tolti ? 'tolti' : 'cambiati'}, valgono quelli predefiniti di Filo`);
+    }
+    return out;
   }
   function frase(evento, max = 3) {
     const f = frasi(evento);
@@ -455,6 +542,8 @@
     'menu-scheda': 'dal menu della scheda',
     'proposta-accesso': 'dalla proposta dopo un accesso',
     zoom: 'con un gesto sulla pagina',
+    barra: 'dalla barra laterale',
+    'tasto-destro': 'dal menu del tasto destro',
   };
   function provenienza(evento) {
     const e = evento || {};
@@ -516,7 +605,7 @@
     let max = cambi.filter((c) => String(c.chiave || '').startsWith('timer:')).length > 1 ? 2 : 1;
     for (const c of cambi) {
       const k = String(c.chiave || '');
-      if (k.startsWith('timer:') || k.startsWith('zoom:')) continue;
+      if (k.startsWith('timer:') || k.startsWith('zoom:') || k.startsWith('icona:') || k === 'desktop') continue;
       if (k.startsWith('proxy:')) { max = Math.max(max, 1); continue; }
       const v = voce(k);
       max = Math.max(max, v && v.livello === 1 ? 1 : 2);
@@ -660,6 +749,8 @@
     cambiImpostazioni,
     cambiTimer,
     cambiRegoleProxy,
+    cambiIcone,
+    iconaDi,
     fraseCambio,
     valore: (chiave, x) => valoreDi(voce(chiave), x),
     frasi,
@@ -673,6 +764,8 @@
     annulloImpostazioni,
     annulloTimer,
     annulloRegoleProxy,
+    annulloIcone,
+    fraseOrdineDesktop,
     righePerModello,
     nomePaese,
   };

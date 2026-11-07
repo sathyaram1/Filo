@@ -54,7 +54,10 @@
     // Chi usa la home sta per mandare un turno anche senza scrivere (un suggerimento, «Riprova», «Continua»), e una
     // bozza lasciata lì parte con un Invio anche dopo una pausa lunga: finché è così il lettore resta sveglio (#1097.1).
     for (const t of ['pointermove', 'pointerdown', 'keydown', 'wheel']) document.addEventListener(t, () => scrive(), { passive: true, capture: true });
-    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive(); }, 60 * 1000);
+    // A tempo è un riscaldamento, non un gesto: con l'utente via da minuti il main non legge (#1302).
+    setInterval(() => { if (deps.bozza && deps.bozza() && document.hasFocus()) scrive({ riscalda: true }); }, 60 * 1000);
+    // Tornati alla finestra (Alt+Tab) con una bozza, il prossimo gesto è un Invio: il lettore parte adesso (#1302).
+    window.addEventListener('focus', () => { if (deps.bozza && deps.bozza()) scrive({ entra: true }); });
   }
 
   async function chiedi({ subito = false } = {}) {
@@ -68,14 +71,15 @@
   // subito, così all'invio la lettura è pronta (#1097.1). Anche con la home che lo segue: dopo una pausa dorme.
   // `entra`: il campo ha appena preso il fuoco, cosa rara: non aspetta il passo dei tasti e non lo consuma, così il
   // primo tasto dopo un fuoco preso all'apertura della home sveglia comunque il lettore che nel frattempo dorme.
-  function scrive({ entra = false } = {}) {
+  function scrive({ entra = false, riscalda = false } = {}) {
     if (!send || document.visibilityState === 'hidden') return;
     if (!entra) {
       const adesso = Date.now();
       if (adesso - svegliatoPerChat < 20 * 1000) return;
-      svegliatoPerChat = adesso;
+      // Un riscaldamento a vuoto (utente assente) non consuma il passo dei gesti veri.
+      if (!riscalda) svegliatoPerChat = adesso;
     }
-    send({ type: MSG.SISTEMA_STATO, perChat: true }).catch(() => {});
+    send({ type: MSG.SISTEMA_STATO, perChat: true, ...(riscalda ? { riscalda: true } : {}) }).catch(() => {});
   }
 
   function programmaRichiamo() {
@@ -111,6 +115,12 @@
     cambiaVisibili(Sis().vociVisibili(settings));
   }
 
+  // I gesti sul riquadro (#1471): per voce, come la si apre o la si trascina, e i comandi dati da qui.
+  function contaGesto(campi) {
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', ...campi })).catch(() => {}); } catch (_) {}
+  }
+  const contaVoce = (voce, come) => contaGesto({ gesto: 'riquadro_sistema', voce, come });
+
   function creaVoce(v) {
     const el = document.createElement('div');
     el.className = 'dash-sis-voce';
@@ -124,14 +134,16 @@
     const testo = document.createElement('span');
     testo.className = 'dash-sis-testo';
     el.append(icona, testo);
-    el.addEventListener('click', () => apriBox(v, el));
+    el.addEventListener('click', () => { contaVoce(v, 'clic'); apriBox(v, el); });
     el.addEventListener('contextmenu', (e) => {
       e.preventDefault();
+      contaVoce(v, 'tasto_destro');
       apriBox(v, el, { x: e.clientX, y: e.clientY });
     });
     el.addEventListener('keydown', (e) => {
       if (e.key === 'Enter' || e.key === ' ' || e.key === 'ContextMenu' || (e.shiftKey && e.key === 'F10')) {
         e.preventDefault();
+        contaVoce(v, 'tastiera');
         apriBox(v, el);
       }
     });
@@ -141,6 +153,13 @@
       if (!d || !e.dataTransfer) { e.preventDefault(); return; }
       e.dataTransfer.setData('text/plain', d.copia);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'voce_sistema');
+    });
+    // Presa da una chat, la voce è trascinata in chat; lasciata dove nessuno la prende, un trascinamento a vuoto.
+    el.addEventListener('dragend', (e) => {
+      const ev = global.SN_GESTI && global.SN_GESTI.fine(e, 'voce_sistema');
+      if (ev) contaGesto(ev);
+      else if (global.SN_GESTI) contaVoce(v, 'trascina_in_chat');
     });
     if (v === 'ora') host.append(el, riga);
     else riga.appendChild(el);
@@ -278,6 +297,7 @@
     dove.replaceChildren();
     dove.hidden = !r;
     if (!r) return;
+    try { Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'avviso', chiave: 'comando_sistema_non_riuscito' })).catch(() => {}); } catch (_) {}
     const frase = document.createElement('div');
     frase.textContent = r.frase || 'Il sistema non ha eseguito il comando.';
     dove.appendChild(frase);
@@ -302,6 +322,7 @@
     const questo = box;
     inAttesa(opt, true);
     const r = await comanda(richiesta);
+    if (r.ok && questo) contaVoce(questo.voce, 'comando_dato');
     if (!questo || box !== questo) return;
     inAttesa(opt, false);
     // L'annuncio del nuovo stato può arrivare mentre l'opzione aspettava: la si rietichetta adesso.
@@ -321,6 +342,7 @@
       const n = volumeVoluto;
       volumeVoluto = null;
       const r = await comanda({ cosa: 'volume', livello: n });
+      if (r.ok) contaVoce('volume', 'comando_dato');
       if (box && box === questo) mostraErrore(questo.errore, r.ok ? null : r);
       if (!r.ok) volumeVoluto = null;
     }

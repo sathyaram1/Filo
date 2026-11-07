@@ -2,6 +2,8 @@
 // script della pagina. Non legge mai il master secret: riceve solo il seed per sito (HMAC in main).
 // Il rumore è legato alla posizione del pixel nell'immagine: stesso pixel, stesso rumore, da ogni porta.
 
+const { SORGENTE: SEMBRA_NATIVA } = require('./sembraNativa.js');
+
 function buildGuardSource(seed, level) {
   const s = (seed >>> 0);
   const lvl = level | 0;
@@ -42,24 +44,9 @@ function buildGuardSource(seed, level) {
     }
   }
 
-  // Un sostituto deve somigliare a un nativo anche a chi lo ispeziona: metodo senza prototype né new,
-  // nessuna proprietà propria in più, testo nativo anche da Function.prototype.toString.call (#799).
-  var masked = new WeakMap();
-  function mask(fn, orig, name) {
-    var m = fn;
-    try {
-      m = ({ [name]() { return fn.apply(this, arguments); } })[name];
-      Object.defineProperty(m, 'length', { value: orig.length, configurable: true });
-      masked.set(m, 'function ' + name + '() { [native code] }');
-    } catch (e) {}
-    return m;
-  }
-  try {
-    var FP = Function.prototype, oFnToString = FP.toString;
-    FP.toString = mask(function toString() {
-      return (typeof this === 'function' && masked.get(this)) || oFnToString.apply(this, arguments);
-    }, oFnToString, 'toString');
-  } catch (e) {}
+  ${SEMBRA_NATIVA}
+  var mask = maschera;
+  try { mascheraToString(); } catch (e) {}
 
   // ---- Canvas (elemento e OffscreenCanvas) ----
   // Il contesto di un canvas si annota quando la pagina lo crea: chiederlo alla guardia con

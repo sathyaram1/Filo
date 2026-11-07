@@ -6,8 +6,9 @@
   'use strict';
 
   const PRIORITA = Object.freeze(['bloccante', 'importante', 'quando_puoi']);
-  const STATI = Object.freeze(['aperta', 'in_lavorazione', 'chiusa', 'superata']);
-  const SCHEDE = Object.freeze(['da_rispondere', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
+  // `in_smistamento`: il compito «Gestisci la domanda» (§3.5) la sta smistando o riscrivendo, prima che arrivi all'owner.
+  const STATI = Object.freeze(['in_smistamento', 'aperta', 'in_lavorazione', 'chiusa', 'superata']);
+  const SCHEDE = Object.freeze(['da_rispondere', 'in_smistamento', 'in_lavorazione', 'risposte_automatiche', 'archivio']);
   const FIDUCIA = Object.freeze(['fidato', 'non_fidato']);
   const ORIGINI = Object.freeze(['feedback', 'ramo', 'compito', 'domanda', 'locale', 'server']);
   const COLLEGAMENTI = Object.freeze(['feedback', 'ramo', 'domanda']);
@@ -29,6 +30,21 @@
     testoTurno: 10000,
     conversazioneByte: 300 * 1024,
     aperteBiglietto: 20,
+    principio: 2000,
+    // La forma (§3.1): il titolo dice di cosa si parla, e un'opzione sola non è una domanda.
+    paroleTitolo: 10,
+    opzioniMinime: 2,
+  });
+
+  // La forma che il compito «Gestisci la domanda» dà a ciò che pubblica per l'owner (§3.5). Una riga sono
+  // `caratteriRiga` caratteri, un a capo ne apre un'altra.
+  const FORMA_OWNER = Object.freeze({
+    opzioniMassime: 4,
+    righeContesto: 5,
+    righeProblema: 3,
+    righeOpzione: 1,
+    righePerche: 1,
+    caratteriRiga: 140,
   });
 
   // Le chiavi che un'azione `automazione` può scrivere: solo booleani già in Automazioni. `spegne`: il vero spegne.
@@ -36,6 +52,8 @@
     'routine.enabled': Object.freeze({ nome: 'Routine', spegne: false }),
     'routine.accountAOff': Object.freeze({ nome: 'Routine dell’account A', spegne: true }),
     'routine.accountBOff': Object.freeze({ nome: 'Routine dell’account B', spegne: true }),
+    // Accenderlo da una risposta lo fa ripartire subito anche se è fermo su un guasto suo (SPEC-MANUTENTORE § 7).
+    'routine.manutentoreAcceso': Object.freeze({ nome: 'Manutentore', spegne: false }),
   });
 
   const FEEDBACK_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
@@ -44,6 +62,12 @@
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
+    // La forma soltanto: operazioni dell'elenco chiuso e triade le controlla il server prima di approvare (ambiti.js).
+    nomeAmbito: (v) => typeof v === 'string' && /^[a-z][a-z_]{2,30}$/.test(v),
+    operazioniAmbito: (v) => Array.isArray(v) && v.length >= 1 && v.length <= 30 && v.every((o) => typeof o === 'string' && /^[a-z_]{1,30}(\.[a-z_]{1,30})?$/.test(o)),
+    testoAmbito: (v) => typeof v === 'string' && v.trim().length >= 1 && v.length <= 1000,
+    // Il numero nella forma che scrivono le attese («1959», «663.2»): senza SN_FB_ATTESE caricato non passa niente.
+    numeroFeedback: (v) => typeof v === 'string' && v !== '' && !!global.SN_FB_ATTESE && global.SN_FB_ATTESE.normalizzaNumero(v) === v,
   });
 
   // `bulk`: ammessa in «applica il consiglio» su più domande. `consenso`: vale solo da un gesto dell'owner nella finestra.
@@ -54,9 +78,10 @@
     riprendi: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
     priorita: tipo({ feedbackId: 'feedbackId', valore: 'valorePriorita' }, { bulk: true, consenso: false, attivo: true }),
     archivia: tipo({ feedbackId: 'feedbackId' }, { bulk: true, consenso: false, attivo: true }),
-    approva_locale: tipo({ feedbackId: 'feedbackId' }, { bulk: false, consenso: true, attivo: true }),
+    // `aspetta` per numero: chi applica conosce il feedback atteso dalle parole dell'owner; esistenza e giri li controlla il server.
+    attendi: tipo({ feedbackId: 'feedbackId', aspetta: 'numeroFeedback' }, { bulk: true, consenso: false, attivo: true }),
     automazione: tipo({ chiave: 'chiave', valore: 'valoreBooleano' }, { bulk: false, consenso: false, attivo: true }),
-    ambito: tipo({}, { bulk: false, consenso: true, attivo: false }),
+    ambito: tipo({ nome: 'nomeAmbito', operazioni: 'operazioniAmbito', nonPuo: 'testoAmbito' }, { bulk: false, consenso: true, attivo: true }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
     compito: tipo({}, { bulk: true, consenso: false, attivo: true }),
   });
@@ -96,23 +121,31 @@
     return troppo || { ok: true, valore: input[campo] };
   }
 
-  const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo']);
+  const CAMPI_DOMANDA = Object.freeze(['titolo', 'contesto', 'problema', 'opzioni', 'consiglio', 'priorita', 'origine', 'collegamenti', 'notePerAgenti', 'gruppo', 'blocca']);
   // Li decide il server: nell'ingresso si ignorano, così un «fidato» scritto da chi chiede non vale niente.
-  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito']);
+  const CAMPI_DEL_SERVER = Object.freeze(['fiducia', 'stato', 'numero', 'id', 'creataIl', 'modificataIl', 'conversazione', 'esito', 'legata', 'provvisoria', 'principio',
+    'smistamento', 'principioContestato']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
-  function validaOpzione(o, i) {
+  function validaOpzione(o, i, perOwner) {
     const n = i + 1;
-    if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`);
+    if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`, { campo: `opzioni[${i}]` });
     const ignoti = Object.keys(o).filter((k) => !CAMPI_OPZIONE.includes(k));
     if (ignoti.length) return no('campo_sconosciuto', `l'opzione ${n} ha campi sconosciuti: ${ignoti.map((k) => k.slice(0, 40)).join(', ')}`);
-    if (typeof o.testo !== 'string' || !o.testo.trim()) return no('opzione_non_valida', `l'opzione ${n} non ha il testo`);
+    if (typeof o.testo !== 'string' || !o.testo.trim()) return no('opzione_non_valida', `l'opzione ${n} non ha il testo`, { campo: `opzioni[${i}].testo` });
     const troppo = lunghezzaOk(o.testo, `opzioni[${i}].testo`, TETTI.testoOpzione);
     if (troppo) return troppo;
     const pro = testoFacoltativo(o, 'pro', TETTI.pro);
     if (!pro.ok) return Object.assign(pro, { dettaglio: `opzione ${n}: ${pro.dettaglio}` });
     const contro = testoFacoltativo(o, 'contro', TETTI.contro);
     if (!contro.ok) return Object.assign(contro, { dettaglio: `opzione ${n}: ${contro.dettaglio}` });
+    if (perOwner) {
+      for (const [campo, r] of [['pro', pro], ['contro', contro]]) {
+        if (r.valore.trim()) continue;
+        return no(`${campo}_mancante`, `l'opzione ${n} non ha il ${campo}: ogni opzione dice cosa guadagna e cosa costa, in una riga ciascuno`,
+          { campo: `opzioni[${i}].${campo}` });
+      }
+    }
     if (!ha(o, 'azione')) return no('parametri_non_validi', `l'opzione ${n} non ha l'azione: ogni opzione dice cosa fa il suo pulsante`);
     const a = validaAzione(o.azione);
     if (!a.ok) return Object.assign(a, { dettaglio: `opzione ${n}: ${a.dettaglio}` });
@@ -173,9 +206,10 @@
         cosa.push(lineette === 1 ? 'ha una lineetta (— o –)' : `ha ${lineette} lineette (— o –)`);
         tipi.add('lineette');
       }
-      if (/\.pro$/.test(campo) && PRO_VUOTO_RE.test(valore.trim())) {
-        cosa.push(`ha come pro «${valore.trim()}»`);
-        tipi.add('pro');
+      const lato = /\.(pro|contro)$/.exec(campo);
+      if (lato && PRO_VUOTO_RE.test(valore.trim())) {
+        cosa.push(`ha come ${lato[1]} «${valore.trim()}»`);
+        tipi.add(lato[1]);
       }
       if (cosa.length) problemi.push({ campo, testo: `«${campo}» ${cosa.join(' e ')}` });
     }
@@ -184,25 +218,39 @@
     if (tipi.has('file')) rimedi.push('sposta i nomi di file in notePerAgenti, con gli altri dettagli tecnici (lì il testo è libero)');
     if (tipi.has('lineette')) rimedi.push('al posto delle lineette metti un punto o una virgola');
     if (tipi.has('pro')) rimedi.push('un\'opzione senza un pro vero si toglie, o si scrive il pro vero');
+    if (tipi.has('contro')) rimedi.push('scrivi il contro vero (cosa costa, cosa rischia, cosa lascia indietro)');
     return no('testo_non_per_owner', `nel testo per l'owner ${problemi.map((p) => p.testo).join('; ')}. Cosa fare: ${rimedi.join('; ')}`,
       { campo: problemi[0].campo, campi: problemi.map((p) => p.campo) });
   }
 
+  // Una parola ha almeno una lettera o una cifra: «:» o «·» da soli non contano, «l'owner» e «D-186» valgono una.
+  function paroleDi(testo) {
+    return String(testo || '').split(/\s+/).filter((p) => /[\p{L}\p{N}]/u.test(p)).length;
+  }
+
   /**
    * Una domanda in ingresso, controllata e normalizzata. `conOrigine` false: l'origine la mette il server (biglietto).
-   * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string }}
+   * `perOwner` false solo per una domanda che il server apre per il compito e non arriva all'owner (il terzo guasto
+   * uguale, §3.8): lì un'opzione sola, i pro e contro vuoti, i nomi di file e le lineette passano, perché a smistarla e
+   * riscriverla per l'owner è il compito (#1790.1: il nome di un programma nel guasto la faceva cadere).
+   * @returns {{ ok:true, domanda:object } | { ok:false, errore:string, dettaglio:string, campo?:string }}
    */
-  function validaDomanda(input, { conOrigine = true } = {}) {
+  function validaDomanda(input, { conOrigine = true, perOwner = true } = {}) {
     if (!isOggetto(input)) return no('domanda_non_valida', 'la domanda deve essere un oggetto JSON');
     const ignoti = Object.keys(input).filter((k) => !CAMPI_DOMANDA.includes(k) && !CAMPI_DEL_SERVER.includes(k));
     if (ignoti.length) {
       return no('campo_sconosciuto', `campi sconosciuti: ${ignoti.slice(0, 8).map((k) => k.slice(0, 40)).join(', ')}. I campi sono ${CAMPI_DOMANDA.join(', ')}`);
     }
     const titolo = typeof input.titolo === 'string' ? input.titolo.trim() : '';
-    if (!titolo) return no('titolo_mancante', 'manca il titolo: una riga che dice cosa si chiede');
+    if (!titolo) return no('titolo_mancante', 'manca il titolo: una riga che dice di cosa si parla', { campo: 'titolo' });
     const t = lunghezzaOk(titolo, 'titolo', TETTI.titolo);
     if (t) return t;
-    if (!PRIORITA.includes(input.priorita)) return no('priorita_non_valida', `la priorità va scelta fra ${PRIORITA.join(', ')}`);
+    const parole = paroleDi(titolo);
+    if (perOwner && parole > TETTI.paroleTitolo) {
+      return no('titolo_troppo_lungo', `il titolo ha ${parole} parole, il massimo è ${TETTI.paroleTitolo}: dice di cosa si parla, il resto va nel contesto`,
+        { campo: 'titolo', lunghezza: parole, massimo: TETTI.paroleTitolo });
+    }
+    if (!PRIORITA.includes(input.priorita)) return no('priorita_non_valida', `la priorità va scelta fra ${PRIORITA.join(', ')}`, { campo: 'priorita' });
     const testi = {};
     for (const campo of ['contesto', 'problema', 'notePerAgenti', 'gruppo']) {
       const r = testoFacoltativo(input, campo, TETTI[campo]);
@@ -210,13 +258,19 @@
       testi[campo] = campo === 'gruppo' ? r.valore.trim() : r.valore;
     }
     const grezze = input.opzioni == null ? [] : input.opzioni;
-    if (!Array.isArray(grezze)) return no('domanda_non_valida', '«opzioni» deve essere un elenco');
+    if (!Array.isArray(grezze)) return no('domanda_non_valida', '«opzioni» deve essere un elenco', { campo: 'opzioni' });
     if (grezze.length > TETTI.opzioni) {
-      return no('troppe_opzioni', `${grezze.length} opzioni, il massimo è ${TETTI.opzioni}`, { lunghezza: grezze.length, massimo: TETTI.opzioni });
+      return no('troppe_opzioni', `${grezze.length} opzioni, il massimo è ${TETTI.opzioni}`, { campo: 'opzioni', lunghezza: grezze.length, massimo: TETTI.opzioni });
+    }
+    if (perOwner && grezze.length < TETTI.opzioniMinime) {
+      const quante = grezze.length ? 'un\'opzione sola' : 'nessuna opzione';
+      return no('opzioni_insufficienti', `${quante}, ne servono almeno ${TETTI.opzioniMinime}: con una scelta sola non c'è niente da decidere `
+        + '(è un feedback o una nota). Aggiungi la strada che resta, per esempio archiviare il lavoro o tenerlo com\'è',
+      { campo: 'opzioni', lunghezza: grezze.length, minimo: TETTI.opzioniMinime });
     }
     const opzioni = [];
     for (let i = 0; i < grezze.length; i++) {
-      const r = validaOpzione(grezze[i], i);
+      const r = validaOpzione(grezze[i], i, perOwner);
       if (!r.ok) return r;
       opzioni.push(r.opzione);
     }
@@ -224,11 +278,11 @@
     if (opzioni.length) {
       const c = input.consiglio;
       if (!isOggetto(c) || !Number.isInteger(c.opzione) || c.opzione < 0 || c.opzione >= opzioni.length) {
-        return no('consiglio_non_valido', `con le opzioni serve il consiglio: { opzione: l'indice da 0 a ${opzioni.length - 1}, perche: il motivo }`);
+        return no('consiglio_non_valido', `con le opzioni serve il consiglio: { opzione: l'indice da 0 a ${opzioni.length - 1}, perche: il motivo }`, { campo: 'consiglio' });
       }
       const ignotiC = Object.keys(c).filter((k) => k !== 'opzione' && k !== 'perche');
       if (ignotiC.length) return no('campo_sconosciuto', `il consiglio ha campi sconosciuti: ${ignotiC.map((k) => k.slice(0, 40)).join(', ')}`);
-      if (typeof c.perche !== 'string' || !c.perche.trim()) return no('consiglio_non_valido', 'il consiglio deve dire perché');
+      if (typeof c.perche !== 'string' || !c.perche.trim()) return no('consiglio_non_valido', 'il consiglio deve dire perché', { campo: 'consiglio.perche' });
       const p = lunghezzaOk(c.perche, 'consiglio.perche', TETTI.perche);
       if (p) return p;
       consiglio = { opzione: c.opzione, perche: c.perche };
@@ -247,6 +301,10 @@
       collegamenti.push(r.collegamento);
     }
     const domanda = Object.assign({ titolo, priorita: input.priorita, opzioni, consiglio, collegamenti }, testi);
+    if (input.blocca != null) {
+      if (typeof input.blocca !== 'boolean') return no('domanda_non_valida', '«blocca» è true o false: dice se la domanda ferma il lavoro finché l’owner non risponde');
+      domanda.blocca = input.blocca;
+    }
     if (conOrigine && input.origine != null) {
       const o = input.origine;
       const id = isOggetto(o) && typeof o.id === 'string' ? o.id.trim() : '';
@@ -255,9 +313,98 @@
       }
       domanda.origine = { tipo: o.tipo, id };
     }
-    const sporco = controllaTestoOwner(domanda);
+    const sporco = perOwner ? controllaTestoOwner(domanda) : null;
     if (sporco) return sporco;
     return { ok: true, domanda };
+  }
+
+  function righeDi(testo) {
+    return String(testo || '').split('\n').filter((r) => r.trim())
+      .reduce((n, r) => n + Math.ceil(r.trim().length / FORMA_OWNER.caratteriRiga), 0);
+  }
+
+  /**
+   * La forma di ciò che il compito «Gestisci la domanda» pubblica per l'owner (§3.5), sopra a `validaDomanda`: da 2 a
+   * 4 opzioni, contesto e problema corti, pro, contro e perché di una riga. null se va bene. PURA.
+   */
+  function controllaFormaOwner(domanda) {
+    const d = isOggetto(domanda) ? domanda : {};
+    const opzioni = Array.isArray(d.opzioni) ? d.opzioni : [];
+    if (opzioni.length > FORMA_OWNER.opzioniMassime) {
+      return no('troppe_opzioni', `${opzioni.length} opzioni, per l'owner al massimo ${FORMA_OWNER.opzioniMassime}: tieni le strade che hanno un pro vero`,
+        { campo: 'opzioni', lunghezza: opzioni.length, massimo: FORMA_OWNER.opzioniMassime });
+    }
+    const campi = [['contesto', d.contesto, FORMA_OWNER.righeContesto], ['problema', d.problema, FORMA_OWNER.righeProblema]];
+    opzioni.forEach((o, i) => {
+      campi.push([`opzioni[${i}].pro`, o && o.pro, FORMA_OWNER.righeOpzione], [`opzioni[${i}].contro`, o && o.contro, FORMA_OWNER.righeOpzione]);
+    });
+    if (isOggetto(d.consiglio)) campi.push(['consiglio.perche', d.consiglio.perche, FORMA_OWNER.righePerche]);
+    for (const [campo, valore, massimo] of campi) {
+      const righe = righeDi(valore);
+      if (righe <= massimo) continue;
+      const max = massimo * FORMA_OWNER.caratteriRiga;
+      return no('forma_non_per_owner', `«${campo}» occupa ${righe} righe, per l'owner al massimo ${massimo} (una riga è ${FORMA_OWNER.caratteriRiga} caratteri, `
+        + `quindi ${max} in tutto): frasi corte, i dettagli in notePerAgenti`, { campo, lunghezza: righe, massimo });
+    }
+    return null;
+  }
+
+  // Le azioni che scrivono la decisione nella conversazione del loro feedback e lo fanno ripartire se è fermo (#1965):
+  // legame, blocco, peso e fermate le contano da qui, nell'app e nel server.
+  const AZIONI_CHE_RIPRENDONO = Object.freeze(['riprendi', 'attendi']);
+  const riprendeIlLavoro = (azione) => isOggetto(azione) && AZIONI_CHE_RIPRENDONO.includes(azione.tipo);
+
+  /** Un'opzione riprende il lavoro su `feedbackId` ('' = su qualunque feedback). PURA. */
+  function riprende(domanda, feedbackId = '') {
+    return (isOggetto(domanda) && Array.isArray(domanda.opzioni) ? domanda.opzioni : [])
+      .some((o) => isOggetto(o) && riprendeIlLavoro(o.azione) && (!feedbackId || o.azione.feedbackId === feedbackId));
+  }
+
+  const BLOCCA_REGOLA = 'Blocca (true) se andare avanti con la consigliata, e poi l’owner sceglie altro, lascia un danno che un altro giro '
+    + 'non rimedia (soldi, dati dell’utente, sicurezza e segreti, politica sui modelli, terzi, account e credenziali), o se serve un fatto '
+    + 'che sa solo l’owner; nel dubbio blocca. Non blocca (false): il lavoro va avanti con la consigliata come decisione provvisoria';
+
+  /**
+   * Chi apre una domanda che riprende il lavoro su `feedbackId` dice se lo ferma (#1577); null se la domanda è in
+   * regola. `feedbackId` '' vale per qualunque feedback ripreso. PURA.
+   */
+  function controllaBlocca(domanda, feedbackId = '') {
+    const d = isOggetto(domanda) ? domanda : {};
+    const lega = riprende(d, feedbackId);
+    if (lega && typeof d.blocca !== 'boolean') {
+      return no('blocca_mancante', `manca «blocca»: la domanda riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}, dì se lo ferma finché l’owner non risponde. ${BLOCCA_REGOLA}`);
+    }
+    if (!lega && d.blocca === true) {
+      return no('blocca_senza_ripresa', `«blocca» vale per una domanda che riprende il lavoro${feedbackId ? ` su ${feedbackId}` : ''}: aggiungi un’opzione ${AZIONI_CHE_RIPRENDONO.map((t) => `«${t}»`).join(' o ')}, o togli «blocca»`);
+    }
+    return null;
+  }
+
+  // Le azioni che il compito «Gestisci la risposta» (§3.5) applica da sé: quelle che l'owner applica anche in blocco.
+  // Una di consenso resta a un gesto dell'owner nella finestra (§1.4), e un compito non ne fa nascere un altro.
+  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia', 'attendi']);
+
+  /** Il rifiuto per un'azione che il compito non applica, o null se la può applicare. PURA. */
+  function vietataAlCompito(azione) {
+    const v = validaAzione(azione);
+    if (!v.ok) return v;
+    const t = v.azione.tipo;
+    if (TIPI[t].consenso === true) {
+      return no('azione_di_consenso', `«${t}» vuole il consenso dell'owner: la applica solo lui, dalla finestra di Filo. Scrivigli un chiarimento che gli dica quale opzione scegliere`);
+    }
+    if (!DEL_COMPITO.includes(t)) return no('azione_non_del_compito', `«${t}» non la applica un agente: le sue azioni sono ${DEL_COMPITO.join(', ')}`);
+    return null;
+  }
+
+  // §3.6: una risposta che una sessione locale registra dalla chat vale come dell'owner (decisione del 01/11, #2007).
+  // Il segno resta: 'owner' da qui, 'sessione' dalla chat; '' per chiunque altro, le cui parole restano materiale.
+  function mittenteRisposta(turno) {
+    if (!isOggetto(turno)) return '';
+    const a = isOggetto(turno.autore) ? turno.autore : {};
+    if (a.tipo === 'owner') return 'owner';
+    if (turno.tipo !== 'risposta') return '';
+    if (turno.registrataDa === 'sessione' || (a.tipo === 'biglietto' && a.ruolo === 'sessione')) return 'sessione';
+    return '';
   }
 
   function riferimentoDi(riferimenti, id) {
@@ -271,6 +418,12 @@
     if (!v.ok) return null;
     const a = v.azione;
     if (a.tipo === 'compito') return 'Affida a un agente';
+    if (a.tipo === 'ambito') {
+      // Le operazioni dette con le parole dell'elenco chiuso (ambiti.js), mai con quelle di chi propone.
+      const A = global.SN_AMBITI;
+      const descr = (o) => (A && A.OPERAZIONI && A.OPERAZIONI[o] ? A.OPERAZIONI[o].descr : o);
+      return `Approva l’ambito «${a.nome}»: ${a.operazioni.map(descr).join('; ')}`;
+    }
     if (a.tipo === 'automazione') {
       const k = CHIAVI_AUTOMAZIONE[a.chiave];
       return `${k.nome}: ${a.valore !== k.spegne ? 'accendi' : 'spegni'}`;
@@ -279,7 +432,7 @@
     if (!r) return null;
     if (a.tipo === 'riprendi') return `Riprendi ${r.num} con questa scelta`;
     if (a.tipo === 'archivia') return `Archivia ${r.num}`;
-    if (a.tipo === 'approva_locale') return `Affida ${r.num} ai lavori server`;
+    if (a.tipo === 'attendi') return `${r.num} aspetta #${a.aspetta}`;
     if (a.tipo === 'priorita') return Number.isInteger(r.priorita) ? `Priorità di ${r.num}: ${r.priorita} → ${a.valore}` : null;
     return null;
   }
@@ -326,13 +479,43 @@
     return out.map(({ priorita, gruppo, domande: ds }) => ({ priorita, gruppo, domande: ds }));
   }
 
-  /** La scheda della sezione Domande. Uno stato ignoto resta davanti all'owner. */
+  /**
+   * La scheda della sezione Domande. «Da rispondere» tiene solo le aperte (#1791): uno stato ignoto si vede fra quelle
+   * in lavorazione, senza contare come una che aspetta l'owner.
+   */
   function schedaDi(domanda) {
     const s = isOggetto(domanda) ? domanda.stato : '';
-    if (s === 'in_lavorazione') return 'in_lavorazione';
+    if (s === 'aperta') return 'da_rispondere';
+    if (s === 'in_smistamento') return 'in_smistamento';
     if (s === 'chiusa' && isOggetto(domanda.esito) && domanda.esito.automatica === true) return 'risposte_automatiche';
     if (s === 'chiusa' || s === 'superata') return 'archivio';
-    return 'da_rispondere';
+    return 'in_lavorazione';
+  }
+
+  /**
+   * La domanda coi testi degli autori non fidati passati da `visibile` (#1502): titolo, contesto, opzioni e turni di una
+   * domanda non fidata, e i turni non fidati di ogni domanda. Azioni, id e testi dell'owner restano com'erano. PURA.
+   */
+  function testiVisibili(domanda, visibile) {
+    if (!isOggetto(domanda) || typeof visibile !== 'function') return domanda;
+    const v = (s) => (typeof s === 'string' ? visibile(s) : s);
+    const nonFidata = domanda.fiducia !== FIDUCIA[0];
+    const out = Object.assign({}, domanda);
+    if (nonFidata) {
+      for (const k of ['titolo', 'contesto', 'problema', 'notePerAgenti', 'gruppo']) if (ha(out, k)) out[k] = v(out[k]);
+      if (Array.isArray(domanda.opzioni)) {
+        out.opzioni = domanda.opzioni.map((o) => (isOggetto(o) ? Object.assign({}, o, { testo: v(o.testo), pro: v(o.pro), contro: v(o.contro) }) : o));
+      }
+      if (isOggetto(domanda.consiglio)) out.consiglio = Object.assign({}, domanda.consiglio, { perche: v(domanda.consiglio.perche) });
+    }
+    if (Array.isArray(domanda.conversazione)) {
+      out.conversazione = domanda.conversazione.map((t) => {
+        const a = (isOggetto(t) && isOggetto(t.autore)) ? t.autore : {};
+        const daMostrare = a.tipo !== 'owner' && (nonFidata || (a.tipo !== 'server' && a.fiducia !== FIDUCIA[0]));
+        return isOggetto(t) && daMostrare ? Object.assign({}, t, { testo: v(t.testo) }) : t;
+      });
+    }
+    return out;
   }
 
   const ID_RE = /^D-([1-9]\d{0,8})$/;
@@ -342,9 +525,21 @@
     return m ? Number(m[1]) : null;
   }
 
+  // «Discutiamone» (SPEC-SEDI §4.5): con la parola d'ordine «owner non fidato» davanti, una sola incollata apre la
+  // sessione cloud con tutto quello che serve; senza, resta la riga per una sessione locale.
+  function rigaDiscuti(id) { return `Discutiamo la domanda ${id}`; }
+  // La stessa etichetta la toglie il main quando l'owner reincolla in Gestione la riga copiata.
+  const ETICHETTA_PAROLA = "Parola d'ordine";
+  const ETICHETTA_PAROLA_RE = new RegExp(`^${ETICHETTA_PAROLA.replace(/['’]/g, "['’]")}\\s*:\\s*`, 'i');
+  function testoDiscuti(id, parola) {
+    const p = typeof parola === 'string' ? parola.trim() : '';
+    return p ? `${ETICHETTA_PAROLA}: ${p}\n${rigaDiscuti(id)}` : rigaDiscuti(id);
+  }
+
   global.SN_DOMANDE = {
-    PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
-    validaAzione, validaDomanda, controllaTestoOwner, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi,
+    PRIORITA, STATI, SCHEDE, FIDUCIA, ORIGINI, COLLEGAMENTI, TETTI, FORMA_OWNER, CHIAVI_AUTOMAZIONE, TIPI, CAMPI_DOMANDA, CAMPI_DEL_SERVER, ID_RE,
+    validaAzione, validaDomanda, controllaTestoOwner, controllaFormaOwner, paroleDi, etichettaAzione, ordina, raggruppa, schedaDi, idDi, numeroDi, riprende, controllaBlocca, testiVisibili,
+    AZIONI_CHE_RIPRENDONO, riprendeIlLavoro, DEL_COMPITO, vietataAlCompito, mittenteRisposta, rigaDiscuti, testoDiscuti, ETICHETTA_PAROLA, ETICHETTA_PAROLA_RE,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

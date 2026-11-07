@@ -102,6 +102,27 @@
     return '';
   }
 
+  // I ruoli delle routine in italiano, in un posto solo: li usano il Log di Gestione e le card, anche nella pagina da
+  // browser (#555). Un ruolo che questa tabella non conosce si scrive com'è.
+  var RUOLI = {
+    'new-work': 'Nuovo lavoro',
+    verifier: 'Verifica',
+    fixer: 'Correzione',
+    secaudit: 'Audit sicurezza',
+    risposta: 'Gestisci la risposta',
+    smistamento: 'Gestisci la domanda',
+    compito: 'Compito',
+    manutentore: 'Manutenzione',
+    prober: 'Esplorazione',
+    idle: 'Fermo',
+    off: 'Routine spente',
+  };
+  /** Il nome di un ruolo per l'owner; '' se manca. PURA. */
+  function etichettaRuolo(role) {
+    var r = String(role == null ? '' : role).trim();
+    return Object.prototype.hasOwnProperty.call(RUOLI, r) ? RUOLI[r] : r;
+  }
+
   // Chi ha chiesto la fusione: la superficie esiste per SEPARARE chi chiede da chi approva.
   // Un identificativo tecnico non si stampa: si dice «un accesso senza email». PURA.
   function requestedBy(who, req) {
@@ -109,8 +130,12 @@
     if (!s) return 'chi l’ha chiesta non risulta';
     if (s.indexOf('@') > 0) return 'chiesta da ' + s;
     // Un'automazione un'email non ce l'ha e non l'avrà mai: il server manda il ruolo che stava
-    // lavorando, e quello SÌ dice qualcosa a chi decide.
-    if (originOf(req) === 'routine') return 'chiesta da ' + s;
+    // lavorando («secaudit · slug»), e quello SÌ dice qualcosa a chi decide, detto come nel Log.
+    if (originOf(req) === 'routine') {
+      var parti = s.split(' · ');
+      parti[0] = etichettaRuolo(parti[0]);
+      return 'chiesta da ' + parti.join(' · ');
+    }
     return 'chiesta da un accesso senza email';
   }
 
@@ -131,6 +156,23 @@
     // Da #908 anche il lavoro locale porta la sua pratica.
     if (originOf(req) !== 'routine') return num ? 'lavoro locale · feedback #' + num : 'lavoro tuo, in locale';
     return num ? 'automazione · feedback #' + num : 'automazione';
+  }
+
+  // Accanto alla provenienza, cosa dice il documento con l'id della richiesta (#1517): il numero da solo può essere
+  // anche di un estraneo. `o.descriviFeedback(req)` → { testo, doppi } o null, lo dà la pagina che sa leggerlo.
+  function aggiungiInfoFeedback(head, req, o) {
+    var d = o && typeof o.descriviFeedback === 'function' ? o.descriviFeedback(req) : null;
+    if (!d) return;
+    if (d.testo) {
+      var info = el('span', 'sn-mac-fbinfo', d.testo);
+      info.title = 'Stato e mittente della segnalazione di questa richiesta, letti dal documento.';
+      head.appendChild(info);
+    }
+    if (Number(d.doppi) > 1) {
+      var doppio = el('span', 'sn-mac-fbdoppio', 'numero doppio');
+      doppio.title = 'Il numero #' + feedbackNum(req) + ' è di ' + d.doppi + ' segnalazioni: il bottone apre quella di questa richiesta.';
+      head.appendChild(doppio);
+    }
   }
 
   function originHint(req) {
@@ -169,24 +211,28 @@
     return gate ? 'Controllo di sicurezza scattato (' + gate + ')' : 'Controllo di sicurezza scattato';
   }
 
-  function blockItems(block) {
-    var b = block || {};
-    var items = Array.isArray(b.items) ? b.items.map(String) : [];
-    var more = Math.max(0, Math.floor(Number(b.more) || 0));
-    if (more > 0) items = items.concat(['… e altri ' + more]);
-    return items;
-  }
-
   /** Un collegamento che si apre: solo pagine https di GitHub, gli altri indirizzi no. PURA. */
   function linkGitHub(url) {
     var s = String(url || '');
     return /^https:\/\/github\.com\/[^\s"'<>\\]+$/.test(s) ? s : '';
   }
 
+  // I caratteri di controllo e di formato (marche di direzione, larghezza zero, «tag») si mostrano come ⟨U+XXXX⟩:
+  // invisibili rigirerebbero o nasconderebbero ciò che l'owner approva (#1502). Li usano anche le domande non fidate.
+  var INVISIBILI_RE = /[\p{Cc}\p{Cf}]/gu;
+  /** Il testo coi caratteri invisibili scritti per esteso; tabulazione e a capo restano. PURA. */
+  function caratteriVisibili(testo) {
+    return String(testo == null ? '' : testo).replace(INVISIBILI_RE, function (c) {
+      if (c === '\t' || c === '\n' || c === '\r') return c;
+      var hex = c.codePointAt(0).toString(16).toUpperCase();
+      return '⟨U+' + ('0000' + hex).slice(-Math.max(4, hex.length)) + '⟩';
+    });
+  }
+
   /** Dove sta una voce: «file:riga», «file» o ''. PURA. */
   function doveVoce(voce) {
     var v = voce || {};
-    var file = String(v.file || '');
+    var file = caratteriVisibili(v.file || '');
     var riga = Math.floor(Number(v.riga) || 0);
     if (!file) return '';
     return riga > 0 ? file + ':' + riga : file;
@@ -196,6 +242,16 @@
   function blockVoci(block) {
     var b = block || {};
     return Array.isArray(b.voci) ? b.voci.filter(function (v) { return v && (v.file || v.testo); }) : [];
+  }
+
+  // Le voci a vista di un blocco: le altre si aprono, e finché restano chiuse «Approva e fondi» è spento (#1502).
+  var VOCI_A_VISTA = 12;
+
+  /** Quante voci di un blocco non si vedono a card appena disegnata: oltre le prime, più quelle mai mandate. PURA. */
+  function vociNascoste(block) {
+    var b = block || {};
+    var n = blockVoci(b).length || (Array.isArray(b.items) ? b.items.length : 0);
+    return Math.max(0, n - VOCI_A_VISTA) + Math.max(0, Math.floor(Number(b.more) || 0));
   }
 
   // Le guardie toccate, le capacità nuove e ciò che il controllo non ha potuto leggere si guardano con occhi diversi:
@@ -232,10 +288,37 @@
     return s ? s.charAt(0).toLowerCase() + s.slice(1) : s;
   }
 
+  /** Il ramo come lo legge l'owner: quello del server (filo-security) lo dice, perché ha lo stesso nome di quello dell'app. PURA. */
+  function branchLabel(req) {
+    var b = req && req.branch ? caratteriVisibili(req.branch) : '(ramo sconosciuto)';
+    return req && req.repo === 'server' ? 'server · ' + b : b;
+  }
+
+  function branchEl(req) {
+    var span = el('span', 'sn-mac-branch', branchLabel(req));
+    if (req && req.repo === 'server') span.title = 'Il ramo del server (filo-security): col tuo sì il server riprende e lo porta su main.';
+    return span;
+  }
+
   function howToRetry(req) {
     return originOf(req) === 'routine'
       ? 'Il lavoro torna alla routine, che riallinea il ramo e rifà i controlli: poi ti arriva una nuova richiesta da approvare.'
       : 'Rilancia npm run finish.';
+  }
+
+  // Dopo un sì finito in conflitto il lavoro di una routine torna da sé a riallinearsi (routeRealignment del server):
+  // l'owner non deve far partire niente (#1328, #1425).
+  var RIALLINEA_DA_SOLA = 'Il lavoro torna da solo alla routine, che riallinea il ramo e rifà i controlli: ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.';
+  /** Una fusione approvata e non avvenuta la riallinea il server da sé? Solo il lavoro di una routine con la sua pratica. PURA. */
+  function siRiallineaDaSola(req) {
+    return originOf(req) === 'routine' && !!String((req && req.feedbackId) || '').trim();
+  }
+  /** Cosa succede, o cosa fa l'owner, dopo un sì finito in conflitto. PURA. */
+  function dopoIlConflitto(req) {
+    if (siRiallineaDaSola(req)) return RIALLINEA_DA_SOLA;
+    return originOf(req) === 'routine'
+      ? 'Questo lavoro non si riallinea da solo: rimetti la sua pratica In coda per un giro nuovo.'
+      : 'Rifai la base del ramo e rilancia npm run finish.';
   }
 
   // Il motivo del server porta un'etichetta tecnica: qui diventa una frase, il dettaglio fra
@@ -342,11 +425,9 @@
         : { kind: 'ok', text: 'Fatto: il lavoro è su main' + shaTxt + '.' };
     }
     if (r.result === 'conflict') {
-      var base = originOf(req) === 'routine'
-        ? 'Main è andato avanti e le modifiche non si incastrano da sole: serve un giro nuovo dell’automazione.'
-        : 'Main è andato avanti e le modifiche non si incastrano da sole: rifai la base del ramo e rilancia npm run finish.';
       var tentativo = realignFailureText(r.realignReason);
-      return { kind: 'warn', text: tentativo ? base + ' ' + tentativo : base };
+      return { kind: 'warn', text: 'Main è andato avanti e le modifiche non si incastrano da sole. '
+        + (tentativo ? tentativo + ' ' : '') + dopoIlConflitto(req) };
     }
     if (r.result === 'stale') {
       // Riallineata dal server: la richiesta vecchia è consumata ma il lavoro non è perso e non
@@ -361,14 +442,82 @@
       return { kind: 'warn', text: 'Il ramo è andato avanti dopo i controlli: la richiesta decade. ' + retry };
     }
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
+    // Il sì a un ramo del server: la fusione la fa il server, quando i suoi controlli sono verdi.
+    if (r.result === 'server' && r.esito === 'al_pc') return { kind: 'ok', text: 'Approvata: il lavoro lo porta su main il tuo PC, alla prossima fusione dei lavori del server.' };
+    if (r.result === 'server') return { kind: 'ok', text: 'Approvata: il server riprende e porta il lavoro su main appena i suoi controlli sono verdi.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
+
+  // «Salta il controllo»: ogni esito del server in italiano, uguale nella scheda di Filo e nella pagina da browser.
+  var SALTA_ESITI = {
+    // Il salto segue la strada di un controllo passato: unit sulla fusione da GitHub, poi il cancello (#1502).
+    attesa_unit: { kind: 'ok', text: 'Saltato. GitHub prova gli unit sulla fusione con main, poi il cancello fonde il ramo o lo ferma per il tuo via libera.' },
+    riverifica: { kind: 'err', text: 'Non c’era più un controllo da saltare, perché i verdetti erano stati azzerati. Il lavoro torna alle routine per la verifica e un controllo nuovo.' },
+    ricontrollo: { kind: 'err', text: 'Questo controllo non dice su quale commit è stato fatto, quindi non si può saltare. Il lavoro torna al controllo di sicurezza sulla punta di adesso: se boccia ancora, potrai saltare quello.' },
+    fuso: { kind: 'ok', text: 'Saltato: il lavoro è entrato in main.' },
+    conflitto: { kind: 'err', text: 'Saltato, ma il ramo è in conflitto con main: torna in lavorazione per riallinearlo.' },
+    ramo_assente: { kind: 'err', text: 'Il ramo di questa pratica non c’è più: non c’è niente da fondere.' },
+    feedback_assente: { kind: 'err', text: 'Il server non trova questa segnalazione.' },
+    non_saltabile: { kind: 'err', text: 'Qui non c’è un controllo da saltare: l’audit non ha bocciato niente.' },
+    non_owner: { kind: 'err', text: 'Questo lo può fare solo il proprietario.' },
+    guasto: { kind: 'err', text: 'GitHub non risponde. Il salto è registrato: ripremi quando torna su.' },
+    // Un lavoro anche sul server passa dal cancello del server: prima l'app, poi il server.
+    attesa_server: { kind: 'ok', text: 'Saltato. Il lavoro tocca anche il server: entra in main quando la suite di filo-security è verde, prima l’app e poi il server.' },
+    server_al_pc: { kind: 'ok', text: 'Saltato. La parte del server la porta su main il tuo PC: npm run orchestra -- fusioni-server.' },
+    rimandato: { kind: 'err', text: 'Saltato, ma il lavoro torna alle routine per un altro giro prima di entrare in main.' },
+    all_owner: { kind: 'err', text: 'Saltato, ma il cancello del server non lo fonde: la pratica torna a te, col motivo nella conversazione.' },
+    // Il salto vale per la versione che verifica e audit hanno letto (#1040.1): niente fusione e niente richiesta.
+    mosso: { kind: 'err', text: 'Dopo i controlli il ramo ha preso commit che nessuno ha letto, quindi non entra in main e non chiede il tuo via libera. Rimandala in lavorazione e un giro nuovo li leggerà.', giroNuovo: true },
+    senza_controllo: { kind: 'err', text: 'Non trovo quale versione del ramo hanno letto i controlli, e senza quella il ramo non entra in main. Rimandala in lavorazione per un giro nuovo.', giroNuovo: true },
+  };
+
+  /**
+   * L'esito di «Salta il controllo», detto all'owner. PURA. Un esito sconosciuto si scrive grezzo, mai come un «fatto».
+   * Sul blocco del cancello conta lo stato della richiesta (#486): in attesa, già decisa, o non registrata.
+   * `opts.doveSiApprova` dice dove sta il via libera sulla superficie che chiama.
+   */
+  function skipOutcomeMessage(reply, opts) {
+    var r = reply || {};
+    var esito = String(r.esito || '');
+    if (esito !== 'bloccato') return SALTA_ESITI[esito] || { kind: 'err', text: 'Il server ha risposto: ' + (esito || 'niente') + '.' };
+    var base = 'Saltato, ma il cancello di fusione ha fermato il ramo';
+    var stato = String(r.requestState || '');
+    if (!r.requestId) return { kind: 'err', text: base + ', e la richiesta di fusione non si è registrata: nessuna fusione è avvenuta.' };
+    if (stato === 'discarded') {
+      return { kind: 'warn', text: base + ', e questa versione era già stata scartata: una richiesta decisa non si riapre, non c’è niente da approvare.' };
+    }
+    if (stato === 'used') {
+      if (r.requestOutcome === 'merged') return { kind: 'warn', text: base + ', e questa versione era già stata approvata e fusa su main: non c’è niente da approvare.' };
+      var come = r.requestOutcome === 'conflict' ? ', ma la fusione era finita in conflitto' : '';
+      return { kind: 'warn', text: base + ', e questa versione era già stata approvata' + come + ': un’approvazione vale una volta sola, non c’è niente da approvare.' };
+    }
+    var dove = (opts && opts.doveSiApprova) || 'sul quadrato';
+    return { kind: 'ok', text: 'Saltato. Il cancello di fusione ha fermato il ramo: ora aspetta il tuo via libera ' + dove + '.' };
+  }
+
+  // ── Costruzione (DOM) ─────────────────────────────────────────────────────
 
   function el(tag, cls, text) {
     var n = document.createElement(tag);
     if (cls) n.className = cls;
     if (text != null) n.textContent = String(text);
     return n;
+  }
+
+  // Un carattere invisibile scritto per esteso si stacca dal codice intorno: è il segno da notare, non una parentesi.
+  var MARCA_RE = /(⟨U\+[0-9A-F]{4,6}⟩)/;
+  function segnaInvisibili(nodo) {
+    var t = nodo && nodo.textContent;
+    if (!t || !MARCA_RE.test(t)) return nodo;
+    nodo.textContent = '';
+    t.split(MARCA_RE).forEach(function (pezzo, i) {
+      if (!pezzo) return;
+      if (i % 2 === 0) { nodo.appendChild(document.createTextNode(pezzo)); return; }
+      var m = el('span', 'sn-mac-invisibile', pezzo);
+      m.title = 'Un carattere che non si vede: nel file c’è, qui è scritto per esteso.';
+      nodo.appendChild(m);
+    });
+    return nodo;
   }
 
   /** Un collegamento a GitHub che si apre in una scheda; un indirizzo che non lo è resta testo. */
@@ -392,10 +541,11 @@
     var li = el('li', 'sn-mac-voce');
     var testa = el('span', 'sn-mac-voce-testa');
     var dove = doveVoce(v);
-    if (dove) testa.appendChild(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub'));
-    if (v.testo) testa.appendChild(el('code', 'sn-mac-voce-testo', v.testo));
-    var prima = Array.isArray(v.prima) ? v.prima.map(String) : [];
-    var dopo = Array.isArray(v.dopo) ? v.dopo.map(String) : [];
+    if (dove) testa.appendChild(segnaInvisibili(linkEsterno('sn-mac-voce-dove', dove, v.url, 'Apri questa riga nel diff su GitHub')));
+    var testo = v.testo ? caratteriVisibili(v.testo) : '';
+    if (testo) testa.appendChild(segnaInvisibili(el('code', 'sn-mac-voce-testo', testo)));
+    var prima = Array.isArray(v.prima) ? v.prima.map(caratteriVisibili) : [];
+    var dopo = Array.isArray(v.dopo) ? v.dopo.map(caratteriVisibili) : [];
     if (!v.testo || (!prima.length && !dopo.length)) {
       li.appendChild(testa);
       return li;
@@ -407,23 +557,39 @@
     det.appendChild(sum);
     var pre = el('pre', 'sn-mac-intorno');
     var riga = function (testo, scattata) {
-      var r = el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo);
+      var r = segnaInvisibili(el('span', 'sn-mac-intorno-riga' + (scattata ? ' is-voce' : ''), testo));
       r.dataset.segno = testo.charAt(0) === '+' ? 'piu' : testo.charAt(0) === '-' ? 'meno' : 'uguale';
       return r;
     };
     prima.forEach(function (t) { pre.appendChild(riga(t, false)); });
-    pre.appendChild(riga('+' + v.testo, true));
+    pre.appendChild(riga('+' + testo, true));
     dopo.forEach(function (t) { pre.appendChild(riga(t, false)); });
     det.appendChild(pre);
     li.appendChild(det);
     return li;
   }
 
+  /** Il tasto che apre le voci nascoste di un blocco: aperte, il tasto se ne va e lo dice a `onApri`. */
+  function tastoTutte(nascoste, quante, onApri) {
+    nascoste.forEach(function (r) { r.hidden = true; });
+    var b = el('button', 'sn-mac-tutte', quante === 1 ? 'Mostra l’altra voce' : 'Mostra le altre ' + quante + ' voci');
+    b.type = 'button';
+    b.title = 'Approvare vale anche per queste: si apre l’elenco intero.';
+    b.addEventListener('click', function () {
+      nascoste.forEach(function (r) { r.hidden = false; });
+      if (b.parentNode) b.parentNode.removeChild(b);
+      if (typeof onApri === 'function') onApri();
+    });
+    return b;
+  }
+
   /**
    * I blocchi di una richiesta: divisi in guardie toccate, capacità nuove e diff da guardare, ognuno con l'elenco
    * intero delle sue voci (#1404). Un blocco di un server di prima, senza voci, mostra le sue righe come allora.
+   * Oltre le prime voci un blocco si apre col suo tasto (`sn-mac-tutte`); `aperti` li disegna già aperti.
    */
-  function buildBlocchi(blocks) {
+  function buildBlocchi(blocks, opts) {
+    var o = opts || {};
     var box = el('div', 'sn-mac-gruppi');
     var gruppi = gruppiDiBlocchi(blocks);
     for (var g = 0; g < gruppi.length; g++) {
@@ -438,14 +604,20 @@
         li.appendChild(el('span', 'sn-mac-block-label', blockLabel(b)));
         var voci = blockVoci(b);
         var lista = el('ul', 'sn-mac-block-list');
-        if (voci.length) {
-          voci.forEach(function (v) { lista.appendChild(buildVoce(v)); });
-          var more = Math.max(0, Math.floor(Number(b.more) || 0));
-          if (more > 0) lista.appendChild(el('li', 'sn-mac-block-items', '… e altre ' + more + ' che non entrano nell’elenco: sono nel diff su GitHub'));
-        } else {
-          blockItems(b).forEach(function (t) { lista.appendChild(el('li', 'sn-mac-block-items', t)); });
+        var righe = voci.length ? voci.map(buildVoce)
+          : (Array.isArray(b.items) ? b.items : []).map(function (t) { return segnaInvisibili(el('li', 'sn-mac-block-items', caratteriVisibili(t))); });
+        righe.forEach(function (r) { lista.appendChild(r); });
+        var nascoste = righe.slice(VOCI_A_VISTA);
+        var more = Math.max(0, Math.floor(Number(b.more) || 0));
+        if (more > 0) {
+          // Un server di prima ne manda una parte: quelle che mancano si dicono, con la strada per vederle.
+          var mancanti = el('li', 'sn-mac-block-items sn-mac-mancanti', '… e altre ' + more + ' che il server non ha mandato: ');
+          mancanti.appendChild(linkEsterno('sn-mac-mancanti-link', linkGitHub(o.diffUrl) ? 'sono nel diff su GitHub' : 'sono nel diff del ramo', o.diffUrl));
+          lista.appendChild(mancanti);
+          nascoste.push(mancanti);
         }
         if (lista.childNodes.length) li.appendChild(lista);
+        if (nascoste.length && !o.aperti) li.appendChild(tastoTutte(nascoste, vociNascoste(b), o.onApri));
         ul.appendChild(li);
       }
       sez.appendChild(ul);
@@ -457,6 +629,8 @@
   // Una conferma a metà (tasto armato, o richiesta in volo) blocca ogni ridisegno automatico
   // di `root`: rifatta sotto il cursore, la card perdeva la conferma e spostava i tasti (#550).
   var LIBERA = 'sn-mac-libera';
+  // Le richieste di cui l'owner ha già aperto tutte le voci, per «id@sha».
+  var APERTE = {};
   var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere…' };
   function occupata(root) {
     return !!(root && root.querySelector
@@ -550,7 +724,8 @@
       origin.title = originHint(req);
     }
     head.appendChild(origin);
-    head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
+    aggiungiInfoFeedback(head, req, o);
+    head.appendChild(branchEl(req));
     var sha = linkEsterno('sn-mac-sha', shortSha(req.sha), req.diffUrl);
     sha.title = 'Il commit esaminato: ' + String(req.sha || '') + (linkGitHub(req.diffUrl) ? '\nApri il diff su GitHub' : '');
     head.appendChild(sha);
@@ -559,8 +734,11 @@
     who.title = 'La richiesta è arrivata con questa identità; approvarla è un gesto tuo, qui.';
     head.appendChild(who);
     var when = el('span', 'sn-mac-when', timeAgo(req.createdAtMs, now));
+    when.dataset.da = String(Number(req.createdAtMs) || '');
     head.appendChild(when);
     var exp = el('span', 'sn-mac-expiry', expiresIn(req.expiresAtMs, now));
+    exp.dataset.scade = String(Number(req.expiresAtMs) || 0);
+    card.classList.toggle('is-expired', exp.textContent === 'scaduta');
     // Anche il suggerimento sotto il puntatore deve sapere di chi è il lavoro: mandare l'owner a
     // pubblicare in locale un ramo di un'automazione è un consiglio che non porta a niente.
     exp.title = 'Vale per il commit esaminato e per una settimana. Passata la scadenza, ' + lowerFirst(howToRetry(req));
@@ -583,10 +761,22 @@
     }
 
     var blocks = Array.isArray(req.blocks) ? req.blocks : [];
+    // Aperte una volta, le voci restano aperte anche quando la card si ridisegna: la chiave è richiesta e commit.
+    var chiave = String(req.id || '') + '@' + String(req.sha || '');
+    var blocchi = null;
     if (blocks.length) {
       card.appendChild(el('p', 'sn-mac-why', nota ? 'Bloccata perché (solo il nuovo):' : 'Bloccata perché:'));
-      card.appendChild(buildBlocchi(blocks));
+      blocchi = buildBlocchi(blocks, {
+        aperti: APERTE[chiave] === true,
+        diffUrl: req.diffUrl,
+        onApri: function () {
+          if (!daAprire()) APERTE[chiave] = true;
+          aggiornaApprova();
+        },
+      });
+      card.appendChild(blocchi);
     }
+    function daAprire() { return !!(blocchi && blocchi.querySelector('.sn-mac-tutte')); }
 
     var status = el('p', 'sn-mac-status');
     status.setAttribute('role', 'status');
@@ -598,7 +788,16 @@
     discardBtn.title = 'Toglila dall’elenco senza fondere niente. ' + howToRetry(req);
     var approveBtn = el('button', 'sn-mac-btn sn-mac-btn-go', 'Approva e fondi');
     approveBtn.type = 'button';
-    approveBtn.title = 'Fonde su main esattamente il commit esaminato.';
+    var serveAprire = el('span', 'sn-mac-serve-aprire', 'Apri tutte le voci per approvare');
+    var occupato = false;
+    // Il sì vale per tutto il commit: finché una voce resta chiusa non si dà (#1502).
+    function aggiornaApprova() {
+      var chiuse = daAprire();
+      approveBtn.disabled = occupato || chiuse;
+      serveAprire.hidden = !chiuse;
+      approveBtn.title = chiuse ? 'Prima apri tutte le voci: approvare vale anche per quelle che non hai visto.'
+        : 'Fonde su main esattamente il commit esaminato.';
+    }
 
     var armed = false;
     var armTimer = null;
@@ -612,7 +811,8 @@
       liberata(card);
     }
     function setBusy(on) {
-      approveBtn.disabled = !!on;
+      occupato = !!on;
+      aggiornaApprova();
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
       if (!on) {
@@ -700,8 +900,10 @@
         });
     });
 
+    actions.appendChild(serveAprire);
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
+    aggiornaApprova();
     // L'esito sotto i tasti: comparendo sopra li spingeva giù, e il clic per riprovare cadeva fuori.
     card.appendChild(actions);
     card.appendChild(status);
@@ -716,6 +918,23 @@
       if (prima.kind === 'ok' || prima.reload) { setBusy(true); finita(); }
     }
     return card;
+  }
+
+  // Chi la riallinea, e la frase che lo dice: la sola copia, letta anche dal quadrato di Gestione (manageReview).
+  // `inCorso` lo sa solo chi conosce la pratica (Gestione, dal suo stato); `null` = non si sa (pagina da browser, richiesta
+  // senza pratica in lista): allora la frase non promette niente e dice dove guardare.
+  var RIALLINEAMENTO_NON_ANDATO = 'Il riallineamento automatico non è andato: rimetti la sua pratica In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
+  var RIALLINEAMENTO_DA_GUARDARE = 'Se la sua pratica è ancora in lavorazione, la routine riallinea il ramo da sola e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto; se in Gestione è ferma, rimettila In coda per un giro nuovo.';
+  /** La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea. PURA. */
+  function testoRiallineamento(req, inCorso) {
+    if (inCorso === true) return RIALLINEA_DA_SOLA;
+    if (!siRiallineaDaSola(req)) return dopoIlConflitto(req);
+    return inCorso === false ? RIALLINEAMENTO_NON_ANDATO : RIALLINEAMENTO_DA_GUARDARE;
+  }
+  function riallineamentoDi(req, o) {
+    var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
+    var inCorso = dato ? !!dato.inCorso : null;
+    return { inCorso: inCorso, testo: testoRiallineamento(req, inCorso) };
   }
 
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
@@ -740,18 +959,24 @@
       origin.title = originHint(req);
     }
     head.appendChild(origin);
-    head.appendChild(el('span', 'sn-mac-branch', req.branch || '(ramo sconosciuto)'));
+    aggiungiInfoFeedback(head, req, o);
+    head.appendChild(branchEl(req));
     var sha = el('span', 'sn-mac-sha', shortSha(req.sha));
     sha.title = 'Il commit che avevi approvato: ' + String(req.sha || '');
     head.appendChild(sha);
     head.appendChild(el('span', 'sn-mac-who', requestedBy(req.who, req)));
-    head.appendChild(el('span', 'sn-mac-when', 'approvata ' + timeAgo(req.decidedAtMs || req.usedAtMs, now)));
+    var quando = el('span', 'sn-mac-when', 'approvata ' + timeAgo(req.decidedAtMs || req.usedAtMs, now));
+    quando.dataset.da = String(Number(req.decidedAtMs || req.usedAtMs) || '');
+    quando.dataset.prima = 'approvata ';
+    head.appendChild(quando);
     card.appendChild(head);
 
     var tentativo = realignFailureText(req.realignReason);
+    var ria = riallineamentoDi(req, o);
+    card.dataset.riallineamento = ria.inCorso === true ? 'in_corso' : ria.inCorso === false ? 'fallito' : 'da_guardare';
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
-      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + howToRetry(req)
+      + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
       + ' Quando il lavoro rifatto verrà fuso, questa scheda si toglie da sola.'));
 
     var status = el('p', 'sn-mac-status');
@@ -783,8 +1008,37 @@
     return card;
   }
 
+  // Il tempo sulle card cammina da solo (#487): si riscrivono solo le scritte, mai la card, così un «Confermi?»
+  // armato o una fusione in volo restano dove sono. Passata la scadenza la card dice «scaduta».
+  var OROLOGIO_MS = 15000;
+  function aggiornaTempi(root, nowMs) {
+    var r = root || global.document;
+    if (!r || !r.querySelectorAll) return;
+    var now = Number(nowMs) || Date.now();
+    var scadenze = r.querySelectorAll('.sn-mac-expiry[data-scade]');
+    for (var i = 0; i < scadenze.length; i++) {
+      var t = expiresIn(Number(scadenze[i].dataset.scade), now);
+      if (scadenze[i].textContent !== t) scadenze[i].textContent = t;
+      var card = scadenze[i].closest ? scadenze[i].closest('.sn-mac-card') : null;
+      if (card) card.classList.toggle('is-expired', t === 'scaduta');
+    }
+    var quando = r.querySelectorAll('.sn-mac-when[data-da]');
+    for (var k = 0; k < quando.length; k++) {
+      var fa = timeAgo(Number(quando[k].dataset.da), now);
+      var testo = (quando[k].dataset.prima || '') + fa;
+      if (fa && quando[k].textContent !== testo) quando[k].textContent = testo;
+    }
+  }
+  var orologio = null;
+  function avviaOrologio() {
+    if (orologio || typeof global.setInterval !== 'function' || !global.document) return;
+    orologio = global.setInterval(function () { aggiornaTempi(global.document); }, OROLOGIO_MS);
+    if (orologio && typeof orologio.unref === 'function') orologio.unref();
+  }
+
   function render(host, opts) {
     if (!host) return 0;
+    avviaOrologio();
     var o = opts || {};
     var list = Array.isArray(o.requests) ? o.requests : [];
     var failed = Array.isArray(o.failed) ? o.failed : [];
@@ -799,17 +1053,18 @@
 
     // Prima delle richieste in attesa: più invecchia, più costa accorgersene.
     if (failed.length) {
-      var fbox = el('section', 'sn-mac sn-mac-failed');
+      // Se le riallinea tutte la routine, il titolo non suona l'allarme: non c'è niente da fare (#1425).
+      var tutteInCorso = failed.every(function (r) { return riallineamentoDi(r, o).inCorso === true; });
+      var fbox = el('section', 'sn-mac sn-mac-failed' + (tutteInCorso ? ' sn-mac-failed--in-corso' : ''));
       fbox.setAttribute('aria-label', 'Fusioni approvate ma non avvenute');
       var ftitle = el('div', 'sn-mac-title');
       var fico = el('span', 'sn-mac-ico');
       var ficons = global.SN_ICONS;
       fico.innerHTML = (ficons && typeof ficons.lock === 'function') ? ficons.lock(18) : '';
       ftitle.appendChild(fico);
-      ftitle.appendChild(el('span', 'sn-mac-title-text',
-        failed.length === 1
-          ? 'Una fusione approvata non è avvenuta'
-          : failed.length + ' fusioni approvate non sono avvenute'));
+      ftitle.appendChild(el('span', 'sn-mac-title-text', tutteInCorso
+        ? (failed.length === 1 ? 'Una fusione approvata è da riallineare' : failed.length + ' fusioni approvate sono da riallineare')
+        : (failed.length === 1 ? 'Una fusione approvata non è avvenuta' : failed.length + ' fusioni approvate non sono avvenute')));
       fbox.appendChild(ftitle);
       for (var k = 0; k < failed.length; k++) fbox.appendChild(buildFailedCard(failed[k], o));
       host.appendChild(fbox);
@@ -835,6 +1090,172 @@
       host.appendChild(box);
     }
     return list.length + failed.length;
+  }
+
+  // ── «Salta il controllo» fuori da Filo (#489) ─────────────────────────────
+
+  var SALTA_ETICHETTA = 'Salta il controllo';
+  var ATTESA_SALTA = { kind: 'wait', text: 'Chiedo al server…' };
+
+  /** Il titolo dell'elenco delle bocciature. PURA. */
+  function skipsHeadline(count) {
+    var n = Number(count) || 0;
+    if (n <= 0) return '';
+    return n === 1 ? 'Un lavoro bocciato dal controllo di sicurezza' : n + ' lavori bocciati dal controllo di sicurezza';
+  }
+
+  /** Cosa dice la card del perché, quando il perché non c'è per intero. PURA. '' se c'è tutto. */
+  function skipReasonNote(b) {
+    var v = b || {};
+    if (v.motivoIlleggibile) return 'La spiegazione del controllo non si apre qui: leggila nella scheda della pratica in Filo.';
+    if (!String(v.motivo || '').trim()) return 'Il controllo non ha lasciato una spiegazione per questa pratica.';
+    if (v.motivoTagliato) return 'La spiegazione continua: il resto lo leggi nella scheda della pratica in Filo.';
+    return '';
+  }
+
+  /**
+   * Una bocciatura del controllo = una card, con lo stesso gesto della scheda di Filo: «Salta il controllo»
+   * con la conferma sul posto. Il cancello di fusione gira comunque dopo il salto.
+   */
+  function buildSkipCard(b, opts) {
+    var o = opts || {};
+    var now = Number(o.nowMs) || Date.now();
+    var card = el('div', 'sn-mac-card sn-mac-card-skip');
+    card.dataset.feedbackId = String(b.feedbackId || '');
+    card.dataset.origin = 'routine';
+
+    var head = el('div', 'sn-mac-head');
+    var num = String(b.num || '').replace(/^#+/, '');
+    var origin = el('span', 'sn-mac-origin', num ? 'automazione · feedback #' + num : 'automazione');
+    origin.title = 'Lavoro di un’automazione: l’ha fermato il suo controllo di sicurezza.';
+    head.appendChild(origin);
+    head.appendChild(el('span', 'sn-mac-branch', b.branch || '(ramo sconosciuto)'));
+    if (b.atMs) head.appendChild(el('span', 'sn-mac-when', timeAgo(b.atMs, now)));
+    card.appendChild(head);
+
+    if (String(b.titolo || '').trim()) card.appendChild(el('p', 'sn-mac-skip-title', b.titolo));
+    card.appendChild(el('p', 'sn-mac-why', 'Cosa ha trovato il controllo:'));
+    if (String(b.motivo || '').trim()) card.appendChild(el('p', 'sn-mac-skip-reason', b.motivo));
+    var nota = skipReasonNote(b);
+    if (nota) card.appendChild(el('p', 'sn-mac-status', nota));
+
+    var status = el('p', 'sn-mac-status');
+    status.setAttribute('role', 'status');
+    status.hidden = true;
+    var actions = el('div', 'sn-mac-actions');
+    var btn = el('button', 'sn-mac-btn sn-mac-btn-go', SALTA_ETICHETTA);
+    btn.type = 'button';
+    btn.title = 'Hai letto cosa ha trovato il controllo e vai avanti lo stesso. Il cancello di fusione resta: può fermare il ramo comunque.';
+
+    var armed = false;
+    var armTimer = null;
+    function disarm() {
+      armed = false;
+      btn.textContent = SALTA_ETICHETTA;
+      btn.classList.remove('is-armed');
+      btn.style.minWidth = '';
+      btn.style.minHeight = '';
+      if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      liberata(card);
+    }
+    function say(msg) {
+      status.hidden = !msg;
+      status.textContent = msg ? msg.text : '';
+      if (msg) status.dataset.kind = msg.kind; else delete status.dataset.kind;
+    }
+    function messaggio(reply) {
+      var r = reply || {};
+      if (r.ok === false) return { kind: 'err', text: String(r.error || 'Non è riuscito.') };
+      return skipOutcomeMessage(r, { doveSiApprova: o.doveSiApprova });
+    }
+    // Ogni esito con ok vuol dire salto registrato e pratica uscita dalle bocciature, anche quelli del cancello
+    // del server: un elenco chiuso qui lasciava la card premibile e l'esito perso alla rilettura.
+    function definitivo(reply) {
+      return !!(reply && reply.ok !== false && reply.esito);
+    }
+
+    btn.addEventListener('click', function (e) {
+      // La coda di un doppio clic non è la conferma: salterebbe il controllo in un gesto solo.
+      if (armed && e && e.detail > 1) return;
+      if (!armed) {
+        armed = true;
+        var scatola = btn.getBoundingClientRect();
+        btn.style.minWidth = scatola.width + 'px';
+        btn.style.minHeight = scatola.height + 'px';
+        btn.textContent = 'Confermi?';
+        btn.classList.add('is-armed');
+        armTimer = setTimeout(disarm, 5000);
+        return;
+      }
+      disarm();
+      btn.disabled = true;
+      card.classList.add('is-busy');
+      say(ATTESA_SALTA);
+      Promise.resolve(o.onSkip ? o.onSkip(b) : null)
+        .then(function (reply) {
+          say(messaggio(reply));
+          if (definitivo(reply)) {
+            card.classList.add('is-done');
+            liberata(card);
+            if (o.onDone) o.onDone(b, reply, messaggio(reply));
+            return;
+          }
+          btn.disabled = false;
+          card.classList.remove('is-busy');
+          liberata(card);
+        })
+        .catch(function (err) {
+          say({ kind: 'err', text: (err && err.message) || String(err) });
+          btn.disabled = false;
+          card.classList.remove('is-busy');
+          liberata(card);
+        });
+    });
+
+    actions.appendChild(btn);
+    card.appendChild(actions);
+    card.appendChild(status);
+    var prima = o.esitoIniziale ? o.esitoIniziale(b) : null;
+    if (prima) say(prima);
+    return card;
+  }
+
+  /**
+   * Le bocciature del controllo dentro `host`; niente da mostrare = `host` vuoto e nascosto. Come `render`, non
+   * ridisegna sotto una conferma a metà. `o.illeggibili`: pratiche ferme che il server non ha potuto aprire.
+   * @returns {number} quante card sono state disegnate
+   */
+  function renderSkips(host, opts) {
+    if (!host) return 0;
+    var o = opts || {};
+    var list = Array.isArray(o.skips) ? o.skips : [];
+    var illeggibili = Number(o.illeggibili) || 0;
+    if (occupata(host)) {
+      quandoLibera(host, function () { renderSkips(host, o); });
+      return list.length;
+    }
+    host.__snMacDopo = null;
+    host.replaceChildren();
+    host.hidden = list.length === 0 && illeggibili === 0;
+    if (host.hidden) return 0;
+    var box = el('section', 'sn-mac sn-mac-skips');
+    box.setAttribute('aria-label', 'Lavori bocciati dal controllo di sicurezza');
+    var title = el('div', 'sn-mac-title');
+    var ico = el('span', 'sn-mac-ico');
+    var icons = global.SN_ICONS;
+    ico.innerHTML = (icons && typeof icons.warning === 'function') ? icons.warning(18) : '';
+    title.appendChild(ico);
+    title.appendChild(el('span', 'sn-mac-title-text', skipsHeadline(list.length) || 'Lavori bocciati dal controllo di sicurezza'));
+    box.appendChild(title);
+    if (list.length) box.appendChild(el('p', 'sn-mac-intro', 'Saltare il controllo non fonde da solo: il cancello di fusione gira comunque.'));
+    for (var i = 0; i < list.length; i++) box.appendChild(buildSkipCard(list[i], o));
+    if (illeggibili) {
+      box.appendChild(el('p', 'sn-mac-status', (illeggibili === 1 ? 'Una pratica ferma per il controllo non si apre' : illeggibili + ' pratiche ferme per il controllo non si aprono')
+        + ' qui: la chiave del server non le legge. Le vedi in Filo, nei Ricevuti di Gestione.'));
+    }
+    if (o.oltre) box.appendChild(el('p', 'sn-mac-status', 'Ce ne sono altre oltre queste: le vedi in Filo, nei Ricevuti di Gestione.'));
+    host.appendChild(box);
+    return list.length;
   }
 
   /**
@@ -1031,7 +1452,8 @@
       } else {
         head.appendChild(el('span', 'sn-mac-recent-origin', originLabel(r)));
       }
-      head.appendChild(el('span', 'sn-mac-recent-branch', r.branch || '—'));
+      aggiungiInfoFeedback(head, r, o);
+      head.appendChild(el('span', 'sn-mac-recent-branch', r.branch ? caratteriVisibili(r.branch) : '—'));
       var sha = linkEsterno('sn-mac-sha', shortSha(r.mergeSha || r.sha), r.diffUrl);
       sha.title = 'Il commit esaminato: ' + String(r.sha || '') + (r.mergeSha ? '\nIl commit di fusione: ' + String(r.mergeSha) : '')
         + (linkGitHub(r.diffUrl) ? '\nApri il diff su GitHub' : '');
@@ -1047,7 +1469,7 @@
       li.appendChild(head);
       var blocks = Array.isArray(r.blocks) ? r.blocks : [];
       if (blocks.length) {
-        li.appendChild(buildBlocchi(blocks));
+        li.appendChild(buildBlocchi(blocks, { diffUrl: r.diffUrl }));
       } else {
         li.appendChild(el('p', 'sn-mac-status', 'Nessun dettaglio registrato su cosa era stato segnalato.'));
       }
@@ -1080,12 +1502,18 @@
     isFiducia: isFiducia,
     howToRetry: howToRetry,
     blockLabel: blockLabel,
-    blockItems: blockItems,
     blockVoci: blockVoci,
+    vociNascoste: vociNascoste,
+    caratteriVisibili: caratteriVisibili,
     doveVoce: doveVoce,
     linkGitHub: linkGitHub,
     gruppiDiBlocchi: gruppiDiBlocchi,
     outcomeMessage: outcomeMessage,
+    skipOutcomeMessage: skipOutcomeMessage,
+    skipsHeadline: skipsHeadline,
+    skipReasonNote: skipReasonNote,
+    renderSkips: renderSkips,
+    branchLabel: branchLabel,
     render: render,
     occupata: occupata,
     quandoLibera: quandoLibera,
@@ -1099,5 +1527,13 @@
     preapprovedMoreText: preapprovedMoreText,
     preapprovedIntro: preapprovedIntro,
     renderPreapproved: renderPreapproved,
+    specieFusaSenzaChiedere: specieFusaSenzaChiedere,
+    etichettaRuolo: etichettaRuolo,
+    aggiornaTempi: aggiornaTempi,
+    OROLOGIO_MS: OROLOGIO_MS,
+    siRiallineaDaSola: siRiallineaDaSola,
+    dopoIlConflitto: dopoIlConflitto,
+    testoRiallineamento: testoRiallineamento,
+    RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -94,6 +94,7 @@ async function serverFondi(argv, { ramiAperti = [] } = {}) {
     fissa: (_c, ramo) => ({ ok: true, ramo, togli: () => ({ ok: true }) }),
     lavoroDelRamo: async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '', motivo: '' }),
     puntaRamo: () => 'c'.repeat(40), allinea: () => {}, deployDaGitHub: () => false,
+    registraMain: async () => ({ outcome: 'registrato' }),
   });
   return { k, lanci, testo: righe.join('\n') };
 }

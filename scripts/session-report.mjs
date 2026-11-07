@@ -3,7 +3,7 @@
 // PERCHÉ ESISTE (giro del 14/09/2026)
 //   Di come è andata una sessione di routine — quanto è durata, quanto è
 //   costata, quante volte ha ricominciato da freddo, quali strumenti hanno
-//   sforato — il server non sapeva niente: il worker "riportava" a parole, e
+//   sforato o sono falliti, quanto si è aspettato — il server non sapeva niente: il worker "riportava" a parole, e
 //   le parole non si sommano. Il transcript JSONL di Claude Code contiene già
 //   tutti i numeri: qui si leggono e si impacchettano in un oggetto che
 //   `routine-channel.mjs release` allega da solo al rilascio.
@@ -27,7 +27,8 @@
 //   fra la sua chiamata Agent e il risultato) e si sommano nel suo rapporto,
 //   come quelli di una sessione (figliDelSottoAgente). Da una cartella di lavoro separata (git
 //   worktree) si guarda anche la cartella del checkout principale, dove Claude
-//   Code li scrive davvero.
+//   Code li scrive davvero. E la cartella che contiene `<CLAUDE_CODE_SESSION_ID>.jsonl`: una sessione con più
+//   repository parte da quella sopra i cloni, che non è nessuna delle due (#1761).
 //   `since` (il rilascio lo prende dal marcatore del biglietto) limita il conto
 //   a quello che è successo da quel momento.
 //
@@ -49,6 +50,10 @@ import { execFileSync } from 'node:child_process';
 import os from 'node:os';
 import { resolve, join, dirname, basename } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { marcatoreWorker } from './lib/dati-worker.mjs';
+
+// Una riga dell'assistente col modello «<synthetic>» è una richiesta interrotta o un errore dell'API, non un turno.
+export const rigaSintetica = (msg) => /^<[^>]*>$/.test(String((msg && msg.model) || ''));
 
 // ─── Prezzi ($ per milione di token) ─────────────────────────────────────────
 // Fonte: skill `claude-api` (tabella modelli del 2026-06-24 e note su cache):
@@ -176,7 +181,13 @@ export function valutaUso(u, model) {
   const p = oltreSoglia ? listino.oltre : listino;
   const velocita = velocitaPrezzo(u, fam);
   const costo = velocita.molt * (input * p.input + cw5m * p.cacheWrite + cw1h * p.cacheWrite1h + cacheRead * p.cacheRead + output * p.output) / 1e6;
-  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, fam, oltreSoglia, velocita };
+  // Le scritture già a un'ora non hanno né sovrapprezzo né risparmio: l'ora c'è già.
+  const cache = {
+    scritta: velocita.molt * (cw5m * p.cacheWrite + cw1h * p.cacheWrite1h) / 1e6,
+    sovrapprezzoOra: velocita.molt * cw5m * (p.cacheWrite1h - p.cacheWrite) / 1e6,
+    risparmioOra: velocita.molt * cw5m * (p.cacheWrite - p.cacheRead) / 1e6,
+  };
+  return { input, cacheWrite: cw5m + cw1h, cacheRead, output, costo, cache, fam, oltreSoglia, velocita };
 }
 
 /** Il nome della cartella dei transcript per una cartella di lavoro. PURA. */
@@ -234,8 +245,100 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
     subagentRuns: 0,
     subagentCostUsd: 0,
     longestToolS: 0,
+    // SPEC-MANUTENTORE § 6: quali strumenti falliscono e cosa è successo dopo, e le attese sopra i 30 s. Dal
+    // transcript, non dal worker; elenchi a budget di byte (ELENCO_MAX_BYTE), i conti interi in tools.errors e qui.
+    falliti: [],
+    attese: [],
+    atteseOltre30: 0,
+    // La cache in dollari, ogni richiesta col suo listino: il conto della cache a un'ora (`manutentore rapporti
+    // --cache`, #2121) legge questi e non riprezza i token. Ora = se le scritture a 5 minuti fossero a un'ora.
+    cache: cacheVuota(),
     notes: [],
   };
+}
+
+/** Le voci in dollari di `rep.cache`: scritta, riscaldata, sovrapprezzo dell'ora, risparmio sui rewarm e su tutto. */
+export const CACHE_VOCI = Object.freeze(['scrittaUsd', 'rewarmUsd', 'sovrapprezzoOraUsd', 'risparmioOraUsd', 'risparmioSeTuttoUsd']);
+export const cacheVuota = () => Object.fromEntries(CACHE_VOCI.map((k) => [k, 0]));
+
+// Gli elenchi viaggiano fuori dal rapporto, nei campi che il server tiene sul biglietto fino a 200 voci
+// (manutentoreRegole.RILASCIO): il tetto qui è il suo, con un margine in byte che una sessione vera non tocca.
+export const ATTESA_MIN_S = 30;
+export const ELENCO_MAX_VOCI = 200;
+export const ELENCO_MAX_BYTE = 60_000;
+const RIGA_ERRORE_MAX = 120;
+const RIGA_COSA_MAX = 60;
+
+/**
+ * Una riga da mettere nel rapporto: una riga sola, corta, senza le stringhe lunghe che potrebbero essere un biglietto o
+ * una chiave (anche un errore può citarli). PURA.
+ */
+export function rigaPulita(s, max) {
+  const t = String(s == null ? '' : s)
+    .replace(/<\/?tool_use_error>/g, '')
+    .replace(/[\u0000-\u001f\u007f]+/g, ' ')
+    .replace(/[A-Za-z0-9_-]{32,}/g, '[…]')
+    .replace(/\s+/g, ' ')
+    .trim();
+  return t.length > max ? `${t.slice(0, max - 1)}…` : t;
+}
+
+// Le righe che dicono l'errore. La prima dell'uscita è spesso l'intestazione di npm («> filo@… test:unit») o il remoto di
+// git («To github.com:…»): il manutentore deve leggere perché è fallito, non cosa si stava lanciando. Prima i segni di
+// un fallimento (TAP «not ok», ✖ ✘, «XxxError:», git «! [rejected]»), poi le parole: il nome di una prova PASSATA che
+// contiene «errore» è la prima riga con una parola d'errore in quasi ogni uscita delle prove di logica.
+const RIGA_DI_FALLIMENTO = /^not ok\b|^[✖✘×]|^!\s*\[[a-z ]*rejected\]|^(?:npm ERR!|npm error\b|fatal:|error:|remote: error\b)|(?:^|[\s(])(?:[A-Z][A-Za-z]*)?Error(?:\s*\[[A-Z_]+\])?:\s/;
+const RIGA_DI_ERRORE = /\b(error|errore|fatal|failed|failure|rejected|refused|denied|not ok|exception|cannot|can't|unable|timed? ?out|no such|not found|ENOENT|EACCES|ERR!|RIFIUTATO|✘)\b|^\s*[!✘×]/i;
+const RIGA_DI_CONTORNO = /^(>\s|To\s\S+$|npm (notice|warn)\b|\$\s)/i;
+const RIGA_PASSATA = /^(#\s*Subtest:|ok\s+\d+\b|[✔✓]\s)/;
+
+/** La riga che dice perché uno strumento è fallito: «exit 1: <la riga d'errore, o la prima utile>». PURA. */
+export function rigaErrore(content) {
+  const righe = testoDi(content).split('\n').map((r) => r.replace(/<\/?tool_use_error>/g, '').trim()).filter(Boolean);
+  let codice = '';
+  const m = righe.length ? /^Exit code (\d+)$/i.exec(righe[0]) : null;
+  if (m) { codice = `exit ${m[1]}`; righe.shift(); }
+  const utili = righe.filter((r) => !RIGA_DI_CONTORNO.test(r) && !RIGA_PASSATA.test(r));
+  const scelta = utili.find((r) => RIGA_DI_FALLIMENTO.test(r)) || utili.find((r) => RIGA_DI_ERRORE.test(r)) || utili[0] || righe[0] || '';
+  return rigaPulita([codice, scelta].filter(Boolean).join(': '), RIGA_ERRORE_MAX) || '(senza testo)';
+}
+
+/** Cosa ha fatto chi lavorava subito dopo un fallimento, dalla chiamata che segue. PURA. */
+export function rigaDopo(fallita, seguente) {
+  if (!seguente) return 'niente: la sessione finisce lì';
+  if (seguente.nome === fallita.nome && seguente.firma === fallita.firma) return 'riprovato uguale';
+  if (seguente.nome === fallita.nome) return rigaPulita(`riprovato diverso${seguente.cosa ? `: ${seguente.cosa}` : ''}`, RIGA_COSA_MAX + 20);
+  return rigaPulita(`${seguente.nome}${seguente.cosa ? `: ${seguente.cosa}` : ''}`, RIGA_COSA_MAX + 20);
+}
+
+/** Le voci che stanno in `max` byte di JSON e nel numero che il server accetta, nell'ordine dato. PURA. */
+export function dentroBudget(voci, max = ELENCO_MAX_BYTE, maxVoci = ELENCO_MAX_VOCI) {
+  const out = [];
+  let byte = 2;
+  for (const v of voci) {
+    const n = Buffer.byteLength(JSON.stringify(v), 'utf8') + 1;
+    if (byte + n > max || out.length >= maxVoci) break;
+    out.push(v);
+    byte += n;
+  }
+  return out;
+}
+
+/**
+ * Gli elenchi dentro il budget, e la nota quando ne resta fuori qualcosa: i falliti in ordine di tempo, le attese dalla
+ * più lunga. Muta `rep`. PURA.
+ */
+export function stringiElenchi(rep) {
+  const falliti = Array.isArray(rep.falliti) ? rep.falliti : [];
+  const attese = (Array.isArray(rep.attese) ? rep.attese : []).slice().sort((a, b) => (Number(b.s) || 0) - (Number(a.s) || 0));
+  rep.falliti = dentroBudget(falliti);
+  rep.attese = dentroBudget(attese);
+  rep.notes = (rep.notes || []).filter((n) => !/^(strumenti falliti|attese oltre)/.test(n));
+  const errori = Math.max(Number(rep.tools && rep.tools.errors) || 0, falliti.length);
+  if (errori > rep.falliti.length) rep.notes.push(`strumenti falliti ${errori}, elencati i primi ${rep.falliti.length}`);
+  const lunghe = Math.max(Number(rep.atteseOltre30) || 0, attese.length);
+  if (lunghe > rep.attese.length) rep.notes.push(`attese oltre ${ATTESA_MIN_S} s ${lunghe}, elencate le ${rep.attese.length} più lunghe`);
+  return rep;
 }
 
 /**
@@ -245,6 +348,9 @@ export function rapportoVuoto({ role = '', ticket = '' } = {}) {
  * sessione è partita: chi lavora in `.claude/worktrees/<nome>` li trova lì.
  */
 export function checkoutPrincipale(cwd) {
+  // Il clone di un worker ha la sua .git: la sessione è partita dalla cartella che il marcatore nomina (#1182).
+  const worker = marcatoreWorker(cwd);
+  if (worker) return resolve(worker.principale);
   try {
     const comune = execFileSync('git', ['rev-parse', '--path-format=absolute', '--git-common-dir'],
       { cwd, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
@@ -383,7 +489,19 @@ export function cartelleTranscript({ env = process.env, cwd = process.cwd(), con
     const c = join(base, 'projects', slugProgetto(dir));
     if (!cartelle.includes(c)) cartelle.push(c);
   }
+  const s = cartellaDellaSessione(join(base, 'projects'), env.CLAUDE_CODE_SESSION_ID);
+  if (s && !cartelle.includes(s)) cartelle.push(s);
   return cartelle;
+}
+
+/** La cartella di progetto col transcript della sessione `id`, o ''. */
+function cartellaDellaSessione(progetti, id) {
+  const s = String(id || '').trim();
+  if (!/^[A-Za-z0-9_-]+$/.test(s)) return '';
+  let nomi = [];
+  try { nomi = readdirSync(progetti); } catch (_) { return ''; }
+  const n = nomi.find((d) => existsSync(join(progetti, d, `${s}.jsonl`)));
+  return n ? join(progetti, n) : '';
 }
 
 export function trovaTranscript({ explicit = '', env = process.env, cwd = process.cwd(), configDir = '' } = {}) {
@@ -438,6 +556,9 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   const modelli = new Set();
   const sconosciuti = new Map();
   const velocitaIgnote = new Map();
+  // Nome, descrizione e forma di ogni chiamata, per i falliti e le attese; i falliti che aspettano la chiamata dopo.
+  const chiamate = new Map();
+  let senzaSeguito = [];
   // `since`: solo quello che è successo da quel momento (il biglietto di
   // questo giro): quando l'orchestratore rilascia il biglietto di un worker
   // morto, il suo transcript è quello scelto, e senza finestra ci finirebbero
@@ -466,7 +587,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     // turni e lasciavano in ogni rapporto la nota del modello sconosciuto
     // (giro del 14/09, terza verifica: 36 righe così nei transcript di una
     // macchina sola).
-    if (e.type === 'assistant' && /^<[^>]*>$/.test(String(msg.model || ''))) continue;
+    if (e.type === 'assistant' && rigaSintetica(msg)) continue;
 
     if (e.type === 'assistant') {
       const u = msg.usage && typeof msg.usage === 'object' ? msg.usage : null;
@@ -489,6 +610,15 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
           if (Array.isArray(finestreAgent) && Number.isFinite(ms)) finestreAgent.push({ id: bid, inizio: ms, fine: Infinity });
         }
         if (Number.isFinite(ms)) inCorso.set(bid, ms);
+        const input = b.input && typeof b.input === 'object' ? b.input : {};
+        let firma = '';
+        try { firma = JSON.stringify(input); } catch (_) { firma = ''; }
+        // Senza descrizione, la prima riga del comando: quaranta prove fallite non devono diventare quaranta «Bash» uguali.
+        const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
+        const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
+        chiamate.set(bid, info);
+        for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, info);
+        senzaSeguito = [];
       }
     } else if (e.type === 'user') {
       const blocchi = Array.isArray(msg.content) ? msg.content : [];
@@ -501,6 +631,12 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         // nessun comando fosse scaduto.
         if (b.is_error === true && /timed out/i.test(testoDi(b.content).split('\n')[0])) rep.tools.timeouts += 1;
         if (b.is_error === true) rep.tools.errors += 1;
+        const chiamata = chiamate.get(b.tool_use_id) || { nome: '_', cosa: '', firma: '' };
+        if (b.is_error === true) {
+          const voce = { strumento: chiamata.nome, ...(chiamata.cosa ? { cosa: chiamata.cosa } : {}), errore: rigaErrore(b.content), dopo: '' };
+          rep.falliti.push(voce);
+          senzaSeguito.push({ voce, chiamata });
+        }
         if (Array.isArray(finestreAgent) && Number.isFinite(ms)) {
           const f = finestreAgent.find((x) => x.id === b.tool_use_id);
           if (f) f.fine = ms;
@@ -508,7 +644,14 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         const inizio = inCorso.get(b.tool_use_id);
         if (inizio !== undefined) {
           inCorso.delete(b.tool_use_id);
-          if (Number.isFinite(ms)) rep.longestToolS = Math.max(rep.longestToolS, Math.round(((ms - inizio) / 1000) * 10) / 10);
+          if (Number.isFinite(ms)) {
+            const s = Math.round(((ms - inizio) / 1000) * 10) / 10;
+            rep.longestToolS = Math.max(rep.longestToolS, s);
+            if (s > ATTESA_MIN_S) {
+              rep.atteseOltre30 += 1;
+              rep.attese.push({ strumento: chiamata.nome, cosa: chiamata.cosa, s: Math.round(s) });
+            }
+          }
         }
       }
     }
@@ -517,13 +660,21 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   // I conti, a fine lettura, con l'ULTIMA usage di ogni messaggio (in ordine
   // di prima comparsa: il primo turno non è mai «freddo»).
   let costo = 0;
+  const dollariCache = cacheVuota();
   for (const { u, model, effort } of usi.values()) {
-    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, oltreSoglia, velocita } = valutaUso(u, model);
+    const { input, cacheWrite: cw, cacheRead: cr, output: out, fam, costo: c, cache, oltreSoglia, velocita } = valutaUso(u, model);
     rep.turns += 1;
     if (oltreSoglia) rep.oltreSoglia[chiaveSicura(model)] = (rep.oltreSoglia[chiaveSicura(model)] || 0) + 1;
     if (effort) rep.effort[chiaveSicura(effort)] = (rep.effort[chiaveSicura(effort)] || 0) + 1;
     if ((rep.turns > 1 || continua) && cr === 0 && cw >= 20000) rep.coldTurns += 1;
-    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) { rep.rewarmTurns += 1; rep.rewarmTokens += cw; }
+    dollariCache.scrittaUsd += cache.scritta;
+    dollariCache.sovrapprezzoOraUsd += cache.sovrapprezzoOra;
+    dollariCache.risparmioSeTuttoUsd += cache.risparmioOra;
+    if ((rep.turns > 1 || continua) && cw >= 20000 && cw > cr) {
+      rep.rewarmTurns += 1; rep.rewarmTokens += cw;
+      dollariCache.rewarmUsd += cache.scritta;
+      dollariCache.risparmioOraUsd += cache.risparmioOra;
+    }
     rep.maxContextTokens = Math.max(rep.maxContextTokens, input + cw + cr);
     rep.tokens.input += input;
     rep.tokens.cacheWrite += cw;
@@ -544,6 +695,7 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
   if (Number.isFinite(ultimoMs)) rep.endedAt = new Date(ultimoMs).toISOString();
   if (Number.isFinite(primoMs) && Number.isFinite(ultimoMs)) rep.durationS = Math.round((ultimoMs - primoMs) / 1000);
   rep.costUsd = Math.round(costo * 10000) / 10000;
+  for (const k of CACHE_VOCI) rep.cache[k] = Math.round(dollariCache[k] * 10000) / 10000;
   for (const [m, key] of sconosciuti) rep.notes.push(`modello sconosciuto «${m}»: costo calcolato a tariffa ${NOMI_TARIFFA[key]}`);
   for (const v of velocitaIgnote.values()) {
     const turni = v.turni === 1 ? '1 turno calcolato' : `${v.turni} turni calcolati`;
@@ -551,7 +703,8 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
     rep.notes.push(`velocità «${v.speed}» non a listino per «${v.model || '(senza modello)'}»: ${turni} ${tariffa}`);
   }
   if (illeggibili) rep.notes.push(`${illeggibili} righe del transcript non erano JSON e sono state saltate`);
-  return rep;
+  for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, null);
+  return stringiElenchi(rep);
 }
 
 /** Le righe di un file, una alla volta. */
@@ -691,6 +844,8 @@ export function sommaSottoAgente(rep, sub) {
   rep.coldTurns += Number(sub.coldTurns) || 0;
   rep.rewarmTurns += Number(sub.rewarmTurns) || 0;
   rep.rewarmTokens += Number(sub.rewarmTokens) || 0;
+  rep.cache = rep.cache || cacheVuota();
+  for (const k of CACHE_VOCI) rep.cache[k] = arrotonda((Number(rep.cache[k]) || 0) + (Number(sub.cache && sub.cache[k]) || 0));
   rep.maxContextTokens = Math.max(rep.maxContextTokens, Number(sub.maxContextTokens) || 0);
   for (const k of Object.keys(rep.tokens)) rep.tokens[k] += Number(sub.tokens && sub.tokens[k]) || 0;
   const st = sub.tools || {};
@@ -704,10 +859,15 @@ export function sommaSottoAgente(rep, sub) {
   rep.longestToolS = Math.max(rep.longestToolS, Number(sub.longestToolS) || 0);
   for (const m of Array.isArray(sub.models) ? sub.models : []) if (!rep.models.includes(m)) rep.models.push(m);
   for (const n of Array.isArray(sub.notes) ? sub.notes : []) {
+    // Le note sui tagli degli elenchi si rifanno qui sotto sui conti sommati.
+    if (/^(strumenti falliti|attese oltre)/.test(n)) continue;
     const nota = `sotto-agente: ${n}`;
     if (!rep.notes.includes(nota)) rep.notes.push(nota);
   }
-  return rep;
+  rep.falliti = [...(rep.falliti || []), ...(Array.isArray(sub.falliti) ? sub.falliti : [])];
+  rep.attese = [...(rep.attese || []), ...(Array.isArray(sub.attese) ? sub.attese : [])];
+  rep.atteseOltre30 = (Number(rep.atteseOltre30) || 0) + (Number(sub.atteseOltre30) || 0);
+  return stringiElenchi(rep);
 }
 
 /**
@@ -764,7 +924,7 @@ export function finestraOrchestratore(linee) {
     const blocchi = Array.isArray(msg.content) ? msg.content : [];
     if (e.type === 'assistant') {
       // Una richiesta fallita («<synthetic>», usage a zero) non ha toccato la cache: non accorcia l'attesa.
-      if (msg.usage && !/^<[^>]*>$/.test(String(msg.model || ''))) turni.push(ms);
+      if (msg.usage && !rigaSintetica(msg)) turni.push(ms);
       for (const b of blocchi) {
         if (!b || b.type !== 'tool_use') continue;
         if (b.name === 'Agent' || b.name === 'Task') chiamate.set(b.id, { inizio: ms, fine: NaN });
@@ -950,7 +1110,7 @@ export function riassunto(rep) {
     `durata ${durata}, ${rep.turns} turni (${rep.coldTurns} freddi), modelli: ${rep.models.join(', ') || '(nessuno)'}, sforzo: ${Object.entries(rep.effort || {}).map(([k, n]) => `${k} ${n}`).join(', ') || '(non dichiarato)'}`,
     `token: input ${rep.tokens.input}, cache letta ${rep.tokens.cacheRead}, cache scritta ${rep.tokens.cacheWrite}, output ${rep.tokens.output}`,
     `costo stimato: $${rep.costUsd.toFixed(4)} (listino ${rep.listino || 'non dichiarato'})${rep.orchestrator ? ` + orchestratore $${rep.orchestrator.costUsd.toFixed(4)} (${rep.orchestrator.turns} turni, contesto ${rep.orchestrator.maxContextTokens}, ${rep.orchestrator.rewarmTurns} da riscaldare, fermo ${rep.orchestrator.attesaPrimaS}s${oltreOrch ? `, oltre soglia: ${oltreOrch}` : ''})` : ''} · cache riscaldata ${rep.rewarmTurns} volte${oltre ? ` · richieste oltre la soglia del prompt: ${oltre}` : ''}`,
-    `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
+    `strumenti: ${rep.tools.total} (timeout ${rep.tools.timeouts}, errori ${rep.tools.errors}, sotto-agenti ${rep.subagents}, il più lungo ${rep.longestToolS}s, attese oltre ${ATTESA_MIN_S} s ${Number(rep.atteseOltre30) || 0}) · sotto-agenti letti: ${Number(rep.subagentRuns) || 0}, il loro costo $${(Number(rep.subagentCostUsd) || 0).toFixed(4)}${rep.notes.length ? ` — note: ${rep.notes.join(' | ')}` : ''}`,
   ];
 }
 

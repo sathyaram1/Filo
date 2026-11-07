@@ -1,15 +1,19 @@
 // Preload della shell: espone window.filoShell (tab, download, finestra, account).
 
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webUtils } = require('electron');
 
 contextBridge.exposeInMainWorld('filoShell', {
   // Alla barra serve per nominare il tasto giusto: regola in CLAUDE.md § Mac.
   sistema: process.platform,
+  // #1623 — le immagini lasciate sulla fila delle schede vanno alla chat della scheda davanti.
+  percorsoDelFile: (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } },
+  rilascioNellaChat: (voci) => ipcRenderer.send('shell:rilascio-nella-chat', Array.isArray(voci) ? voci : []),
   // Dove sta il puntatore quando è fuori dal documento della barra (#428).
   puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {
-    open: (url) => ipcRenderer.invoke('tabs:open', { url }),
-    close: (id) => ipcRenderer.invoke('tabs:close', { id }),
+    open: (url, via) => ipcRenderer.invoke('tabs:open', { url, via }),
+    // `via`: come la si chiude, per i contatori (#1470).
+    close: (id, via) => ipcRenderer.invoke('tabs:close', { id, via }),
     activate: (id) => ipcRenderer.invoke('tabs:activate', { id }),
     navigate: (id, url) => ipcRenderer.invoke('tabs:navigate', { id, url }),
     move: (id, toIndex) => ipcRenderer.invoke('tabs:move', { id, toIndex }),
@@ -17,10 +21,15 @@ contextBridge.exposeInMainWorld('filoShell', {
     setChromeCompact: (on) => ipcRenderer.invoke('tabs:set-chrome-compact', { on }),
     back: (id) => ipcRenderer.invoke('tabs:back', { id }),
     forward: (id) => ipcRenderer.invoke('tabs:forward', { id }),
-    reload: (id) => ipcRenderer.invoke('tabs:reload', { id }),
+    reload: (id, via) => ipcRenderer.invoke('tabs:reload', { id, via }),
     // Toggle se `muted` è omesso.
     setMuted: (id, muted) => ipcRenderer.invoke('tabs:set-muted', { id, muted }),
     duplicate: (id) => ipcRenderer.invoke('tabs:duplicate', { id }),
+    // Ctrl/Cmd+Shift+T e Ctrl/Cmd+L con la barra a fuoco (#1476); `via: 'menu'` dai menu della linguetta e del «+».
+    riapriChiusa: (via) => ipcRenderer.invoke('tabs:riapri-chiusa', { via }),
+    ciSonoChiuse: () => ipcRenderer.invoke('tabs:ci-sono-chiuse'),
+    chiudiAltre: (id) => ipcRenderer.invoke('tabs:chiudi-altre', { id }),
+    scriviIndirizzo: (id) => ipcRenderer.invoke('tabs:scrivi-indirizzo', { id }),
     help: (id) => ipcRenderer.invoke('tabs:help', { id }),
     snapshot: () => ipcRenderer.invoke('tabs:snapshot'),
     setActiveVisible: (visible) => ipcRenderer.invoke('tabs:set-active-visible', { visible }),
@@ -72,23 +81,29 @@ contextBridge.exposeInMainWorld('filoShell', {
     remove: (id) => ipcRenderer.invoke('filo:message', { type: 'download_remove', id }),
     // `confirmed` = la shell ha già mostrato la seconda conferma su un
     // programma (#588); senza, il main risponde needsConfirm e non apre niente.
-    openFile: (id, confirmed) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed }),
+    // `luogo`: da dove arriva il gesto, per i contatori (#1470); senza, il pannello.
+    openFile: (id, confirmed, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_open_file', id, confirmed: !!confirmed, luogo }),
     // Risposta all'avviso "questo è un programma: scaricarlo?".
     confirm: (id, allow) => ipcRenderer.invoke('filo:message', { type: 'download_confirm', id, allow: !!allow }),
-    openFolder: (id) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id }),
+    openFolder: (id, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_open_folder', id, luogo }),
     cancel: (id) => ipcRenderer.invoke('filo:message', { type: 'download_cancel', id }),
     pause: (id) => ipcRenderer.invoke('filo:message', { type: 'download_pause', id }),
     resume: (id) => ipcRenderer.invoke('filo:message', { type: 'download_resume', id }),
     // #950 — rimette il nome con cui il file era arrivato (l'«Annulla» dell'avviso «Nome dato»).
-    rimettiNome: (id) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id }),
-    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item }
+    rimettiNome: (id, luogo) => ipcRenderer.invoke('filo:message', { type: 'download_rimetti_nome', id, luogo }),
+    riprova: (id) => ipcRenderer.invoke('filo:message', { type: 'download_riprova', id }),
+    trascina: (id) => ipcRenderer.invoke('filo:message', { type: 'download_trascina', id }),
+    // La risposta alla domanda della finestra in incognito che si chiude: 'finire' | 'annulla'.
+    chiusura: (scelta) => ipcRenderer.invoke('filo:message', { type: 'download_chiusura', scelta }),
+    // Aggiornamenti live: { kind:'start'|'progress'|'done'|'error'|'missing'|'removed'|'ask', item },
+    // e { kind:'chiusura', items } quando la finestra in incognito chiede prima di chiudersi.
     onEvent: (fn) => {
       const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
       ipcRenderer.on('shell:download', wrapped);
       return () => ipcRenderer.removeListener('shell:download', wrapped);
     },
   },
-  popupMenu: (entries, x, y) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y }),
+  popupMenu: (entries, x, y, { prepara } = {}) => ipcRenderer.invoke('shell:popup-menu', { entries, x, y, prepara }),
   // Scelta di una voce di menu con `action` custom (vedi popup-menu.js).
   onMenuAction: (fn) => {
     const wrapped = (_event, action) => { try { fn(action); } catch (_) {} };
@@ -108,13 +123,19 @@ contextBridge.exposeInMainWorld('filoShell', {
   anteprima: {
     prepara: () => ipcRenderer.send('anteprima:prepara'),
     mostra: (dati) => ipcRenderer.send('anteprima:mostra', dati),
-    nascondi: () => ipcRenderer.send('anteprima:nascondi'),
+    nascondi: (dati) => ipcRenderer.send('anteprima:nascondi', { clic: !!(dati && dati.clic === true) }),
   },
   // §2.3 — toast informativo (es. dopo il riordino automatico delle schede).
   onToast: (fn) => {
     const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
     ipcRenderer.on('shell:toast', wrapped);
     return () => ipcRenderer.removeListener('shell:toast', wrapped);
+  },
+  // #1619 — un tono suonato dalla chat («fammi sentire la suoneria»): la shell ha SN_SOUNDS, come le notifiche.
+  onSuona: (fn) => {
+    const wrapped = (_event, info) => { try { fn(info); } catch (_) {} };
+    ipcRenderer.on('shell:suona', wrapped);
+    return () => ipcRenderer.removeListener('shell:suona', wrapped);
   },
   // #588.5 — la pila degli avvisi va a schermo in una vista sopra la pagina; i suoi clic tornano qui.
   avvisi: {

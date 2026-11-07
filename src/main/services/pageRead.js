@@ -23,7 +23,7 @@ const TEMPO_ESTRAZIONE_MS = 20000;
 // una pagina enorme su una macchina lenta tiene occupata la scheda per decine di secondi, e scaduta non arriva niente.
 const TEMPO_SCHEDA_MS = 6000;
 const SCADENZA_SCHEDA_MS = 30000;
-const tempi = { scheda: TEMPO_SCHEDA_MS };
+const tempi = { scheda: TEMPO_SCHEDA_MS, scadenzaScheda: SCADENZA_SCHEDA_MS };
 // Quello che Filo ha letto dove l'utente ha fatto l'accesso (la sua scheda, un documento, un comando), per il freno.
 const RISERVATE_TTL_MS = 60 * 60 * 1000;
 const RISERVATE_MAX = 20;
@@ -316,7 +316,7 @@ async function leggiDallaScheda(wc) {
     // La scadenza si fissa qui, non nella pagina: conta anche l'attesa di una pagina ancora occupata a fare altro.
     const opz = { scadenza: Date.now() + tempi.scheda, minimo: MAX_TEXT_CHARS * 2 };
     const codice = `(${serializzaVisibile.toString()})(${JSON.stringify(opz)})`;
-    return conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), SCADENZA_SCHEDA_MS);
+    return conScadenza(wc.executeJavaScriptInIsolatedWorld(MONDO_ISOLATO, [{ code: codice }]), tempi.scadenzaScheda);
   });
   return r && typeof r.html === 'string' ? r : null;
 }
@@ -563,7 +563,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   const richiesto = String(input == null ? '' : input).trim();
   const vuoto = {
     pageRead: richiesto, ok: false, url: '', titolo: '', testo: '', fonte: '', da: 0, fino: 0, totale: 0,
-    troncata: false, soloJavaScript: false, sospetto: '', errore: null, dettaglio: '', stato: 0,
+    troncata: false, soloJavaScript: false, sospetto: '', errore: null, dettaglio: '', stato: 0, schedaNonRisponde: false,
   };
   const n = normalizzaUrl(richiesto);
   if (n.errore) {
@@ -583,6 +583,8 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
   // Una scheda che non mostra testo (il visore di un PDF, una pagina ancora bianca) non è l'ultima parola: si prova
   // anche a scaricarla, e se nemmeno la rete la dà si riferisce la scheda vuota.
   let schedaVuota = null;
+  // La scheda c'era ma non ha risposto in tempo: quello che arriva dalla rete non è la pagina che l'utente ha davanti.
+  let schedaNonRisponde = false;
   const scheda = trovaScheda(url, schede);
   if (scheda) {
     const chiave = `${scheda.wc.id}|${url}`;
@@ -604,7 +606,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
             ricordaLetturaRiservata(letto.testo, letto.url);
           } else schedaVuota = letto;
         }
-      } catch (_) { esito = null; }
+      } catch (_) { esito = null; schedaNonRisponde = true; }
     }
   }
   if (!esito) {
@@ -616,7 +618,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     }
     if (schedaVuota && (!esito.ok || !String(esito.testo || '').trim())) { esito = schedaVuota; fonte = 'scheda'; }
   }
-  if (!esito.ok) return { ...vuoto, ...esito, pageRead: richiesto, url: esito.url || url };
+  if (!esito.ok) return { ...vuoto, ...esito, pageRead: richiesto, url: esito.url || url, schedaNonRisponde };
   const dopo = pericolo(esito.url);
   if (dopo) return dopo;
   const v = verdetto(esito.url, analizza);
@@ -631,6 +633,7 @@ async function leggiPagina(input, { da = 0, schede = [], analizza = null } = {})
     pagine: esito.pagine || 0,
     scaricataInParte: !!esito.scaricataInParte,
     lettaInParte: !!esito.lettaInParte,
+    schedaNonRisponde,
     soloJavaScript: !!esito.soloJavaScript,
     sospetto: v && v.livello === 'sospetto' ? (v.messaggio || 'sito sospetto') : '',
     ...p,

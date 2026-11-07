@@ -17,7 +17,11 @@
    ottenere la stessa cosa non resta senza supporto senza una ragione.
 7. **Pattern.** La UI toccata rispetta `PATTERNS.md`.
 8. **Miglioramenti.** Uno **senza trade-off** che manca fa parte del lavoro.
-   Uno **con trade-off** (costi, complessità, gusto) lo decide l'owner.
+   Un **trade-off di costo** lo decide chi lavora (CLAUDE.md § Iniziativa):
+   con la stima e le opzioni esposte non è un rilievo. Lo è, senza `?`, se
+   manca la stima (costo al mese e tempo di risposta) o non sta accanto
+   all'opzione, se le opzioni non si cambiano senza codice o se quella di
+   partenza non regge i numeri. Uno che non si misura lo decide l'owner.
 9. **Una causa, tutte le porte.** Davanti a un difetto si cerca lo stato
    sbagliato che lo produce e **tutte le strade che portano a quello stato**:
    la cura è una regola sola sulla causa, non una pezza sulla porta vista.

@@ -6,7 +6,7 @@
 // («OpenRouter 402: {…}»), e l'Aiuto nominava la pagina Crediti senza portarci.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, clicca } from './helpers/riquadri.mjs';
+import { statoDi, clicca, paginaDellAiuto } from './helpers/riquadri.mjs';
 
 // Sui siti la spiegazione sta in uno shadow root chiuso (#1071): la bolla si legge dal mondo dei content script.
 const BOLLA = '.sn-popup .sn-msg-assistant .sn-msg-text';
@@ -113,15 +113,16 @@ test('senza chiave, l’Aiuto su una pagina web dice cosa manca e porta ai Credi
   await configModelli(app, '');
   const page = await testServer.openReady(openTab, PAGINA);
   await comandoAllaPagina(app, { type: 'top_frame_command', surface: 'help' });
-  await page.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
-  await page.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
-  await page.press('.sn-sidebar-input textarea', 'Enter');
+  const aiuto = await paginaDellAiuto(app, page);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 20_000 });
+  await aiuto.fill('.sn-sidebar-input textarea', 'cosa posso fare qui?');
+  await aiuto.press('.sn-sidebar-input textarea', 'Enter');
 
-  const bolla = page.locator('.sn-sidebar-msg-error').last();
+  const bolla = aiuto.locator('.sn-sidebar-msg-error').last();
   await expect(bolla).toBeVisible({ timeout: 30_000 });
   await expect(bolla).toContainText(/invito|crediti/i, { timeout: 15_000 });
 
-  const via = page.locator('.sn-sidebar-choice').filter({ hasText: /crediti/i });
+  const via = aiuto.locator('.sn-sidebar-choice').filter({ hasText: /crediti/i });
   await expect(via.first()).toBeVisible({ timeout: 10_000 });
   await via.first().click();
   await expect.poll(

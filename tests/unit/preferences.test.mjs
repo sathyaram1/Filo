@@ -390,7 +390,7 @@ test('i toni che la chat sa scegliere sono quelli che Filo sa suonare', () => {
   }
   // E il modello li legge nell'elenco delle chiavi, insieme alla durata.
   require(join(__dirname, '..', '..', 'src', 'shared', 'actionTools.js'));
-  const desc = globalThis.SN_ACTION_TOOLS.definitions({ sistema: 'linux' })
+  const desc = globalThis.SN_ACTION_TOOLS.definitions()
     .find((d) => d.function.name === 'IMPOSTA_PREFERENZA').function.description;
   assert.match(desc, /durata_notifiche/);
   assert.match(desc, /suono_notifiche/);
@@ -445,6 +445,28 @@ test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è 
   assert.match(build('soglia_percento_crediti', '250').rifiuto, /250 è fuori dai limiti: da 0 a 100/);
   assert.deepEqual(build('avviso_crediti', 'spento').partial, { avvisoCrediti: { attivo: false } });
   assert.deepEqual(build('spiegazione_anticipata', 'no').partial, { spiegaAnticipata: { enabled: false } });
+});
+
+test('#1290 — le sezioni chiuse da tradurre, a parole: «solo quando apro» le rimanda, «traduci tutto» le traduce subito', () => {
+  const modo = (k, v) => build(k, v) && build(k, v).partial && build(k, v).partial.traduzionePagina;
+  assert.deepEqual(modo('traduzione delle sezioni nascoste', 'solo quando apro'), { nascoste: 'apertura' });
+  assert.deepEqual(modo('traduzione_sezioni_nascoste', 'traduci tutto'), { nascoste: 'subito' });
+  assert.deepEqual(modo('traduzione_sezioni_nascoste', 'no'), { nascoste: 'apertura' });
+  assert.equal(build('traduzione_sezioni_nascoste', 'boh'), null);
+  // La lettura della scelta: solo 'apertura' rimanda, ogni altro valore (anche mancante) è il di serie.
+  const C = globalThis.SN_CONST;
+  assert.equal(C.nascosteDellaTraduzione({ traduzionePagina: { nascoste: 'apertura' } }), 'apertura');
+  assert.equal(C.nascosteDellaTraduzione({}), 'subito');
+  assert.equal(C.nascosteDellaTraduzione(C.DEFAULT_SETTINGS), 'subito');
+  assert.equal(C.modoNascoste('qualcos\'altro'), C.NASCOSTE_TRADUZIONE.TRADUCI);
+  assert.equal(C.modoNascoste(C.NASCOSTE_TRADUZIONE.RIMANDA), C.NASCOSTE_TRADUZIONE.RIMANDA);
+});
+
+test('#1290 — i due valori delle sezioni chiuse stanno in un posto solo: chi legge la scelta lo chiede a lui', () => {
+  const leggi = (p) => readFileSync(join(__dirname, '..', '..', p), 'utf8');
+  for (const p of ['src/content/extractContext.js', 'src/content/translatePage.js', 'src/pages/preferences/preferences.js']) {
+    assert.doesNotMatch(leggi(p), /['"](subito|apertura)['"]/, `${p} riscrive a mano un valore delle sezioni chiuse`);
+  }
 });
 
 test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {
@@ -517,4 +539,13 @@ test('#876 — i siti fidati dalla chat: il sito che la voce copre, e nessuna pi
     { security: { cookies: { trustedSites: [], loggedSites: ['esempio.it'] } } });
   assert.ok(P.applicaElenco(build('non restare connesso', 'togli esempio.it').elenco, entrato('privacy')).invariato);
   assert.ok(P.applicaElenco(build('non restare connesso', 'togli altro.it').elenco, entrato('default')).invariato);
+});
+
+test('#1279.1: il banner di un sito solo si chiede all\'elenco, ridotto al sito intero; la modalità dei cookie lo rifiuta', () => {
+  assert.deepEqual(build('siti_con_banner', 'aggiungi www.Shop.Esempio.co.uk').elenco.voci, ['esempio.co.uk']);
+  assert.deepEqual(build('siti_con_banner', 'togli https://news.esempio.it/articolo').elenco.voci, ['esempio.it']);
+  const rif = build('gestione_cookie', 'aggiungi esempio.it');
+  assert.match(rif.rifiuto, /tutti i siti/);
+  assert.match(rif.perModello, /siti_con_banner/);
+  assert.deepEqual(build('banner dei cookie', 'automatico').partial, { security: { cookies: { mode: 'default' } } });
 });

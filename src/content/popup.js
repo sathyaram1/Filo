@@ -57,6 +57,7 @@
   // insieme da qui perché ogni superficie che scriveva solo la frase lasciava l'utente senza strada (#663).
   function scriviErrore(host, res, opts) {
     if (!host) return null;
+    conta({ misura: 'errore-modello', code: String((res && (res.code || res.errorCode)) || ''), status: Number(res && res.status) || 0 });
     host.textContent = frasePerLUtente(res);
     return mostraRimedio(host, res, opts);
   }
@@ -136,7 +137,7 @@
       if (!(await chiediOk(r))) return { ok: false, annullato: true };
       try { r = await chrome.runtime.sendMessage({ ...msg, confermato: true }); } catch (_) { r = null; }
     }
-    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) showToast(I18n.t('toast_file_save_failed'));
+    if (r && r.frase) { if (!r.avvisato) avvisaFermata(a, r.frase); } else if (!r || r.ok === false) toastErrore('toast_file_save_failed');
     return r;
   }
 
@@ -692,8 +693,19 @@
     };
   }
 
+  // Com'è finito il riquadro, per i contatori (#1465): chiuso prima della prima risposta, o con quante domande scritte
+  // dopo. Una volta sola, anche se la pagina se ne va con il riquadro aperto.
+  function contaFine(popup) {
+    if (!popup || popup.fineContata || !popup.action) return;
+    popup.fineContata = true;
+    if (!popup.primaRisposta) conta({ misura: 'riquadro', cosa: 'riquadro_chiuso_prima', action: popup.action, attesaMs: Date.now() - popup.apertoIl });
+    else conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, domande: popup.domande });
+  }
+  try { global.addEventListener?.('pagehide', () => { for (const p of popups) contaFine(p); }); } catch (_) {}
+
   function closePopup(popup) {
     if (!popup) return;
+    contaFine(popup);
     try { popup.activePort?.disconnect(); } catch (_) {}
     try { popup.cleanupZoom?.(); } catch (_) {}
     try { popup.pose?.dispose(); } catch (_) {}
@@ -783,6 +795,9 @@
       metaEl: root.querySelector('.sn-popup-meta'),
       inputEl: root.querySelector('.sn-popup-input'),
       sendEl: root.querySelector('.sn-popup-send'),
+      apertoIl: Date.now(),
+      primaRisposta: false,
+      domande: 0,
     };
 
     root.querySelector('.sn-popup-close').addEventListener('click', () => closePopup(popup));
@@ -858,6 +873,28 @@
     try { popup?.pose?.reflow(); } catch (_) {}
   }
 
+  // Ogni ridisegno della risposta rifà il markdown intero: uno per pezzo costa col quadrato della lunghezza (#2119),
+  // quindi al più uno per fotogramma. Il timer copre la scheda che non disegna, dove rAF resta fermo.
+  const RIDISEGNO_MAX_MS = 100;
+  function unoPerFotogramma(fai) {
+    let pendente = false, raf = 0, timer = 0;
+    const annulla = () => {
+      pendente = false;
+      try { cancelAnimationFrame(raf); } catch (_) {}
+      clearTimeout(timer);
+    };
+    const esegui = () => { if (!pendente) return; annulla(); fai(); };
+    return {
+      chiedi() {
+        if (pendente) return;
+        pendente = true;
+        try { raf = requestAnimationFrame(esegui); } catch (_) {}
+        timer = setTimeout(esegui, RIDISEGNO_MAX_MS);
+      },
+      annulla,
+    };
+  }
+
   // La risposta l'hanno pagata i crediti di Filo perché OpenRouter ha rifiutato
   // la chiave dell'utente: la stessa riga che la chat mette sotto la risposta (#662).
   // Vale come detta solo se `el`, dove sta la frase, resta a schermo il tempo di leggerla: un riquadro
@@ -895,7 +932,8 @@
       btn.className = 'sn-msg-rimedio';
       btn.textContent = 'Continua';
       btn.title = 'Continua la risposta da dove si è interrotta';
-      btn.addEventListener('click', () => { btn.remove(); onContinua(); });
+      // `false`: il seguito non è partito (un turno in corso), e il tasto resta per dopo.
+      btn.addEventListener('click', () => { if (onContinua() !== false) btn.remove(); });
       el.appendChild(btn);
     }
     parent.appendChild(el);
@@ -915,7 +953,7 @@
     try { await navigator.clipboard.writeText(testo); return true; } catch (_) { return false; }
   }
   const iconaCopia = (nome) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](14) : '');
-  function tastoCopia(wrap, sorgente) {
+  function tastoCopia(wrap, sorgente, alClic = null) {
     const Md = global.SN_MARKDOWN;
     const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
     if (!wrap || !testo.trim()) return null;
@@ -937,6 +975,7 @@
     btn.addEventListener('mousedown', (e) => e.preventDefault());
     btn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
+      if (typeof alClic === 'function') { try { alClic(); } catch (_) {} }
       const ok = await copiaTesto(testo);
       clearTimeout(timer);
       mostra(ok ? 'ok' : 'no');
@@ -965,6 +1004,8 @@
   function startTurn(popup, messages, onAssistantDone, opts) {
     // Disconnetti eventuale port precedente
     try { popup.activePort?.disconnect(); } catch (_) {}
+    // «Continua» vale solo sotto l'ultima risposta: un turno nuovo spegne quelli sotto le vecchie (#1302).
+    popup.root.querySelectorAll('.sn-risposta-interrotta .sn-msg-rimedio').forEach((b) => b.remove());
 
     const bubble = appendBubble(popup, 'assistant');
     const loading = document.createElement('span');
@@ -976,6 +1017,7 @@
     try {
       port = chrome.runtime.connect({ name: PORTS.AI_STREAM });
     } catch (_) {
+      popup.primaRisposta = true;
       bubble.text.textContent = I18n.t('err_provider_failed');
       bubble.wrap.classList.add('sn-msg-error');
       return;
@@ -983,8 +1025,17 @@
     popup.activePort = port;
     let buf = '';
     let firstDelta = true;
+    // Il seguito di una risposta fermata dentro un blocco di codice riapre il blocco, o si leggerebbe come testo (#1302).
+    const prima = opts && typeof opts.prima === 'string' ? opts.prima : null;
+    const conRecinto = (t) => (prima !== null && global.SN_CHAT_ERRORS?.seguitoNelRecinto ? global.SN_CHAT_ERRORS.seguitoNelRecinto(prima, t) : t);
+    // La posa si rifà insieme al disegno, non al prossimo passo di rendering (#502); reset, fine ed errore lo annullano,
+    // o un disegno in ritardo coprirebbe quello che hanno scritto loro.
+    const ridisegno = unoPerFotogramma(() => scrollaConservando(popup, () => {
+      bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(conRecinto(buf), { streaming: true }));
+    }));
 
     port.onMessage.addListener((m) => {
+      if (m.type === 'reset' || m.type === 'done' || m.type === 'error') ridisegno.annulla();
       if (m.type === 'meta') {
         popup.model = m.model; popup.provider = m.provider;
         // Il prompt vero è quello composto dal main: le domande successive
@@ -992,19 +1043,17 @@
         if (Array.isArray(m.messages) && m.messages.length) popup.conversation = m.messages.slice();
         setMeta(popup, `${I18n.t('popup_model')}: ${popup.model}`);
       } else if (m.type === 'delta') {
+        popup.primaRisposta = true;
         if (firstDelta) {
           bubble.text.innerHTML = '';
           firstDelta = false;
         }
         buf += m.delta;
-        // Ogni delta allunga il riquadro: la posa va rifatta subito, non al prossimo disegno
-        // (#502), e la lettura resta dov'è se l'utente era tornato su a rileggere.
-        scrollaConservando(popup, () => {
-          bubble.text.innerHTML = renderMarkdown(resolveCalcMarkers(buf, { streaming: true }));
-        });
+        ridisegno.chiedi();
       } else if (m.type === 'reset') {
         // Il provider è caduto a metà risposta e si riparte su un ripiego: il testo parziale si
         // butta, così il messaggio finale è SOLO la risposta del provider che riesce.
+        conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'ricominciata' });
         buf = '';
         firstDelta = true;
         // Si riparte da zero su un altro provider: il testo parziale sparisce e
@@ -1017,6 +1066,7 @@
           bubble.text.appendChild(retry);
         }, true);
       } else if (m.type === 'done') {
+        popup.primaRisposta = true;
         const vuota = firstDelta;   // nessun delta arrivato (es. cache vuota errore)
         const resolved = resolveCalcMarkers(buf);
         const eur = m.costEur || 0;
@@ -1024,24 +1074,28 @@
         // senza rimettere la posizione, chi stava rileggendo viene sbalzato dal clamp del browser.
         scrollaConservando(popup, () => {
           if (vuota) bubble.text.textContent = '';
-          const daMostrare = popup.action === ACTIONS.EXPLAIN
-            ? spiegazioneDaMostrare(resolved) : resolved;
+          const daMostrare = conRecinto(popup.action === ACTIONS.EXPLAIN
+            ? spiegazioneDaMostrare(resolved) : resolved);
           if (popup.action === ACTIONS.EXPLAIN && !daMostrare) {
             bubble.text.textContent = I18n.t('popup_no_explanation');
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
-            tastoCopia(bubble.wrap, daMostrare);
+            tastoCopia(bubble.wrap, daMostrare, () => conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'copia' }));
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));
           setMeta(popup, `${I18n.t('popup_model')}: ${popup.model} • ${I18n.t('popup_estimated_cost')}: €${eur.toFixed(4)}`);
         });
         // Salva la versione risolta in conversazione: i follow-up vedono i numeri,
-        // non i marker, così l'LLM non si confonde nei turni successivi.
-        try { onAssistantDone && onAssistantDone(resolved); } catch (_) {}
+        // non i marker, così l'LLM non si confonde nei turni successivi. Fermata prima del testo (#1302): la nota, perché
+        // un turno del modello vuoto alcuni host lo rifiutano al «Continua». Col blocco riaperto, o il «Continua» dopo
+        // cerca il blocco nel solo seguito.
+        const salvata = String(resolved || '').trim() ? conRecinto(resolved) : (global.SN_CHAT_ERRORS?.rispostaInterrotta?.(m.finishReason) || resolved);
+        try { onAssistantDone && onAssistantDone(salvata); } catch (_) {}
         popup.activePort = null;
       } else if (m.type === 'error') {
+        popup.primaRisposta = true;
         // L'errore va LETTO: è l'unica cosa rimasta da leggere, la vista ci va.
         // E va letto in italiano: la riga grezza del servizio («OpenRouter 402:
         // {…}») non dice niente a chi ha finito i crediti (#663).
@@ -1067,34 +1121,56 @@
     if (popup.activePort) return; // già in streaming
     popup.inputEl.value = '';
     popup.inputEl.style.height = 'auto';
+    if (popup.primaRisposta) popup.domande += 1;
     chiedi(popup, txt);
   }
 
   // «Continua» sotto una risposta interrotta è una domanda come le altre, già scritta.
   const CONTINUA_RISPOSTA = global.SN_CHAT_ERRORS?.CHIEDI_SEGUITO || 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  // La richiesta del seguito la scrive Filo, non chi legge: niente bolla sua (#1302).
   function continuaRisposta(popup) {
-    if (!popup || popup.activePort) return;
-    chiedi(popup, CONTINUA_RISPOSTA);
+    if (!popup || popup.activePort) return false;
+    const prima = [...popup.conversation].reverse().find((m) => m && m.role === 'assistant');
+    chiedi(popup, CONTINUA_RISPOSTA, { nascosta: true, prima: prima ? String(prima.content || '') : '' });
+    return true;
   }
 
-  function chiedi(popup, txt) {
-    // Mostra bolla utente
-    const userBubble = appendBubble(popup, 'user');
-    userBubble.text.textContent = txt;
+  function chiedi(popup, txt, { nascosta = false, prima = null } = {}) {
+    if (!nascosta) {
+      const userBubble = appendBubble(popup, 'user');
+      userBubble.text.textContent = txt;
+    }
 
     popup.conversation.push({ role: 'user', content: txt });
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });
-    });
+    }, prima !== null ? { prima } : undefined);
   }
 
-  function openStreaming({ action, payload, anchor, title }) {
+  // Su un sito la risposta si apre nello strato sopra la scheda, mai nel suo documento (#1509.1).
+  function openStreaming(richiesta) {
+    const qui = () => apriRisposta(richiesta);
+    if (global.SN_RIQUADRI_SOPRA?.apri('risposta', richiesta, qui)) return null;
+    return qui();
+  }
+
+  // `seguito`: la risposta interrotta mostrata altrove (la spiegazione nel menu del tasto destro): il riquadro la riprende
+  // e chiede subito il resto (#1302).
+  function apriRisposta({ action, payload, anchor, title, seguito = '' }) {
     installEscOnce();
     const popup = createPopup({ title, anchor });
     popup.action = action;
 
     const initialPrompt = buildInitialPrompt(action, payload);
     popup.conversation.push({ role: 'user', content: initialPrompt });
+    if (seguito) {
+      const prima = appendBubble(popup, 'assistant');
+      prima.text.innerHTML = renderMarkdown(resolveCalcMarkers(String(seguito)));
+      popup.conversation.push({ role: 'assistant', content: String(seguito) });
+      popup.primaRisposta = true;
+      continuaRisposta(popup);
+      return;
+    }
 
     startTurn(popup, popup.conversation, (assistantText) => {
       popup.conversation.push({ role: 'assistant', content: assistantText });
@@ -1143,6 +1219,7 @@
       toastHostEl = document.createElement('div');
       toastHostEl.className = 'sn-toasts';
       toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
+      toastHostEl.classList.toggle('sn-toasts-accanto-aiuto', pilaAccantoAiuto);
       global.SN_FILO_UI?.mark(toastHostEl);
       document.documentElement.appendChild(toastHostEl);
     }
@@ -1155,6 +1232,14 @@
   function sottoIlMenu(on) {
     pilaSottoMenu = !!on;
     if (toastHostEl) toastHostEl.classList.toggle('sn-toasts-sotto-menu', pilaSottoMenu);
+  }
+
+  // Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3) e la regola di sidebar.css non lo vede: è lui a dire
+  // quando è nel suo angolo, e la pila gli si mette a sinistra come nel documento (#845).
+  let pilaAccantoAiuto = false;
+  function accantoAllAiuto(on) {
+    pilaAccantoAiuto = !!on;
+    if (toastHostEl) toastHostEl.classList.toggle('sn-toasts-accanto-aiuto', pilaAccantoAiuto);
   }
 
   // Sfratta subito (senza attendere il timeout) gli avvisi più vecchi oltre il
@@ -1295,13 +1380,45 @@
 
   // Un errore dell'AI detto con un avviso (le strade senza un riquadro dove scriverlo): frase e tasto insieme.
   function avvisoErrore(res, opts = {}) {
+    conta({ misura: 'errore-modello', code: String((res && (res.code || res.errorCode)) || ''), status: Number(res && res.status) || 0 });
     return showToast(frasePerLUtente(res), { duration: 9000, ...opts, rimedio: res });
   }
+
+  // Un avviso d'errore per chiave del testo: chi lo vede lo legge tradotto, i contatori ne sanno la chiave e basta (#1461).
+  function toastErrore(chiave, opts = {}, ...args) {
+    conta({ misura: 'avviso', chiave: String(chiave || '') });
+    return showToast(I18n.t(chiave, ...args), opts);
+  }
+
+  // Un gesto contato dove la persona lo fa (#1461): solo nomi da elenchi chiusi e numeri, li controlla il main.
+  function conta(evento) {
+    try {
+      const r = chrome.runtime.sendMessage({ ...evento, type: MSG.CONTATORI_EVENTO });
+      if (r && typeof r.catch === 'function') r.catch(() => {});
+    } catch (_) {}
+  }
+
+  // Disfare nel campo che Filo ha appena cambiato (una correzione, una riscrittura) si conta col tempo passato, e il
+  // main decide se era «subito dopo» (#1461). Si ascolta l'annullo e non il tasto: su Mac Cmd+Z lo prende il menu.
+  let ultimaModifica = null;
+  function modificaDiFilo(el, tipo) { ultimaModifica = el ? { el, tipo, t: Date.now() } : null; }
+  // Chi scrive dopo la modifica di Filo, col suo Ctrl+Z disfa prima quello che ha scritto lui: non è un annullo di Filo.
+  document.addEventListener('input', (e) => {
+    const m = ultimaModifica;
+    if (!m || !e.isTrusted) return;
+    const qui = (typeof e.composedPath === 'function' && e.composedPath()[0]) || e.target;
+    if (qui !== m.el && !(m.el.contains && m.el.contains(qui))) return;
+    ultimaModifica = null;
+    if (e.inputType === 'historyUndo') conta({ misura: 'annullato', tipo: m.tipo, msDopo: Date.now() - m.t });
+  }, true);
 
   // close API legacy: chiude il topmost (compatibilità con codice che chiamava SN_POPUP.close())
   function close() { closeTopmost(); }
 
   global.SN_POPUP = {
+    toastErrore,
+    conta,
+    modificaDiFilo,
     openStreaming,
     notaRipiego, ripiegoMostrato, notaInterrotta,
     close,
@@ -1310,6 +1427,7 @@
     mountToast,
     unmountToast,
     sottoIlMenu,
+    accantoAllAiuto,
     tempoAvviso,
     attachZoomCompensation,
     renderMarkdown,

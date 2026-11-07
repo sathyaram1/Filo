@@ -172,6 +172,18 @@
     return null;
   }
 
+  // Che riga è e quando è nata, per i contatori (#1467): il modulo e la data, mai il testo.
+  async function descriviRiga(via) {
+    if (via && via.lezione && typeof via.lezione === 'object') return { modulo: '', lezione: true, nata: via.lezione.ts || null };
+    if (!via || typeof via.modulo !== 'string' || typeof via.riga !== 'string') return null;
+    const m = Q() ? Q().metaDi(await getFonti(), via.modulo, via.riga) : null;
+    return { modulo: via.modulo, lezione: false, nata: (m && m.nata) || null };
+  }
+  async function descriviNascosta(id) {
+    const n = (await getFonti()).nascoste.find((x) => x.id === id);
+    return n ? { modulo: n.modulo || 'PREFERENZE', lezione: !!n.lezione, nata: n.nata || null } : null;
+  }
+
   // Una nascosta torna dov'era: nel suo modulo, o fra le lezioni da riordinare.
   async function restoreHidden(id) {
     const meta = await getFonti();
@@ -959,8 +971,9 @@
     list.unshift(entry);
     if (list.length > NOTIFICATIONS_CAP) list.length = NOTIFICATIONS_CAP;
     await setRaw(KEYS.FILO_NOTIFICATIONS, list);
-    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869).
+    // Nel main un avviso nuovo è una cosa successa: Filo lo scrive nel filo (#869), e c'è come evento suo (#1561).
     try { global.SN_FILO_PARLA?.segnala({ tipo: 'avviso', testo: entry.text }); } catch (_) {}
+    try { global.SN_ACCADUTI?.notifica(entry); } catch (_) {}
     return entry;
   }
 
@@ -1116,6 +1129,7 @@
     setOnMemoryChange, viewForUser, findLines, linesWithText, forgetLine: inFila(forgetLine),
     // quaderno delle memorie (#872)
     getFonti, quaderno, righeTolte, svuotaQuaderno: inFila(svuotaQuaderno), hideLine: inFila(hideLine), restoreHidden: inFila(restoreHidden),
+    descriviRiga, descriviNascosta,
     forgetHiddenForever: inFila(forgetHiddenForever), editLine: inFila(editLine), applicaCompattazione: inFila(applicaCompattazione),
     // onboarding (#524)
     getOnboarding, setOnboarding,

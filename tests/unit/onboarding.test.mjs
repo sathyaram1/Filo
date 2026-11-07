@@ -43,10 +43,11 @@ test('si registra su globalThis con la sua API', () => {
 
 test("l'elenco copre le cose da scoprire E quelle da dire", () => {
   const ids = O.ITEMS.map((i) => i.id);
-  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'modelli', 'crediti']) {
+  for (const id of ['profilo', 'stile', 'autonomia', 'estetica', 'privacy', 'contatori', 'modelli', 'crediti']) {
     assert.ok(ids.includes(id), `manca la voce "${id}"`);
   }
-  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia']);
+  // I contatori anonimi sono una scelta da fare, non una cosa da dire (#1461).
+  assert.deepEqual(O.ITEMS.filter((i) => i.kind === 'scoprire').map((i) => i.id), ['profilo', 'stile', 'autonomia', 'contatori']);
   assert.equal(new Set(ids).size, ids.length, 'id duplicati');
   for (const i of O.ITEMS) {
     assert.ok(i.label && i.detail, `voce ${i.id} senza etichetta o dettaglio`);
@@ -390,9 +391,9 @@ test('il prompt della chat riceve l’elenco di cosa resta da scoprire e da dire
 
   const conOnb = C.PROMPTS.filoChat({ capacita: 'x', onboarding: checklist, onboardingTurns: 1, onboardingMax: 5 });
   assert.match(conOnb, /STAI ACCOGLIENDO QUESTO UTENTE/);
-  // L'azione è uno strumento nativo (actionTools.js) che entra solo durante
-  // l'intervista: il prompt deve dirlo, altrimenti il modello non sa che ce l'ha.
-  assert.match(conOnb, /strumento in più[^\n]*ONBOARDING/, 'senza l’azione non può spuntare niente');
+  // L'azione è uno strumento nativo (actionTools.js) che c'è sempre ma vale solo durante l'intervista: il prompt
+  // deve dirlo, altrimenti il modello non sa che può usarlo adesso.
+  assert.match(conOnb, /strumento ONBOARDING vale solo adesso/, 'senza l’azione non può spuntare niente');
   assert.match(conOnb, /basta così/, 'deve saper chiudere quando glielo si chiede');
   // …e altrettanto esplicitamente NON deve chiudere per un rifiuto: la
   // distinzione la fa anche l'app, ma il modello è l'altra porta da cui lo
@@ -581,6 +582,19 @@ test('rifatta o ripresa, l’intervista porta il segno che la lega alle pagine c
   assert.equal(O.normalize({ rifatta: 'si' }).rifatta, undefined);
 });
 
+test('#1398 — rifatta o ripresa, il prompt non dice al modello che l’utente è appena arrivato', () => {
+  const checklist = O.renderChecklistForPrompt(O.emptyState());
+  const primo = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5 });
+  assert.match(primo, /appena arrivato su Filo/);
+  const rifatta = C.PROMPTS.filoChatOnboarding({ onboarding: checklist, onboardingTurns: 1, onboardingMax: 5, onboardingRifatta: true });
+  assert.doesNotMatch(rifatta, /appena arrivato|prima conversazione/, 'con memoria e filo davanti, «appena arrivato» è falso');
+  assert.match(rifatta, /Non è il primo avvio/);
+  assert.match(rifatta, /non tirare in ballo cose delle conversazioni passate/);
+  assert.ok(rifatta.includes(checklist), 'l’elenco arriva lo stesso');
+  const intero = C.PROMPTS.filoChat({ capacita: 'x', onboarding: checklist, onboardingRifatta: true });
+  assert.match(intero, /Non è il primo avvio/, 'anche dal prompt in un pezzo solo');
+});
+
 test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto né nomina la Bacheca', () => {
   // La Bacheca è in pausa per chi non è owner: l'intervista non può promettere una cosa che il nuovo utente non vede.
   for (const i of O.ITEMS) {
@@ -588,4 +602,17 @@ test('#1592 — l’intervista di benvenuto non lega l’accesso Google al voto 
     assert.doesNotMatch(testo, /\bvot|bacheca|ancora rotto/i, `la voce «${i.id}» nomina il voto o la Bacheca`);
   }
   assert.match(O.ITEMS.find((i) => i.id === 'crediti').detail, /L’accesso Google serve per dare inviti ad altri/);
+});
+
+// #1461 — chi risponde a parole alla domanda sui contatori deve ottenere quello che ha detto: l'istruzione nomina lo
+// strumento e la chiave della chat che li accendono e li spengono davvero, e non dice al modello che non può farlo.
+test('la voce dei contatori dice come applicare una risposta data a parole, con una chiave che esiste', () => {
+  for (const m of ['tabColor', 'constants', 'contenutoEsterno', 'preferences']) require(join(ROOT, 'src', 'shared', `${m}.js`));
+  const voce = O.ITEMS.find((i) => i.id === 'contatori');
+  assert.match(voce.applica, /a parole/);
+  assert.doesNotMatch(voce.applica, /non hai un.azione/i);
+  const m = /IMPOSTA_PREFERENZA, chiave "([^"]+)"/.exec(voce.applica);
+  assert.ok(m, 'l’istruzione nomina IMPOSTA_PREFERENZA e la sua chiave');
+  assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], false).partial, { contatori: { attivi: false } });
+  assert.deepEqual(globalThis.SN_PREF.buildPreferencePartial(m[1], true).partial, { contatori: { attivi: true } });
 });

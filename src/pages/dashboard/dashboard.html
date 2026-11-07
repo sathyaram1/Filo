@@ -10,13 +10,16 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/aestheticRefiner.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
+  <script src="filo://shared/immaginiChat.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
   <script src="filo://shared/urlNav.js"></script>
   <script src="filo://shared/virgoletteShell.js"></script>
   <script src="filo://shared/i18n.js"></script>
   <script src="filo://shared/tasti.js"></script>
+  <script src="filo://shared/pannelliApp.js"></script>
   <script src="filo://shared/filoMarkdown.js"></script>
   <script src="filo://shared/calcMarkers.js"></script>
   <script src="filo://shared/timeFormat.js"></script>
@@ -33,14 +36,18 @@
   <script src="filo://shared/filoMemory.js"></script>
   <script src="filo://shared/filoState.js"></script>
   <script src="filo://shared/filoApp.js"></script>
+  <script src="filo://shared/rispostaA.js"></script>
+  <script src="filo://shared/restanoAperte.js"></script>
   <script src="filo://shared/filoCoda.js"></script>
   <script src="filo://shared/carteHome.js"></script>
+  <script src="filo://shared/scaricamentiAvanzamento.js"></script>
   <script src="filo://shared/sistema.js"></script>
   <!-- Il tasto microfono della chat: lo collega dashboard.js, prima che arrivino i content script. -->
   <script src="filo://shared/dictationSegmenter.js"></script>
   <script src="filo://shared/ascolto.js"></script>
   <script src="filo://shared/voceChat.js"></script>
   <script src="filo://shared/esitoAzione.js"></script>
+  <script src="filo://shared/contatoriHomePagina.js"></script>
 </head>
 <body data-state="home">
   <main class="dash" id="dash">
@@ -76,6 +83,8 @@
 
     <form class="dash-input-wrap" id="inputForm" autocomplete="off">
       <div class="dash-dir" id="dashDir" hidden></div>
+      <!-- La risposta di Filo a cui si sta rispondendo (#1620): la disegna dashboard-rispondi.js. -->
+      <div class="dash-citazione" id="citazione" hidden></div>
       <div class="dash-img-previews" id="imgPreviews" hidden></div>
       <textarea
         class="dash-input"
@@ -110,6 +119,7 @@
   <script src="dashboard-terminale.js"></script>
   <script src="dashboard-carte.js"></script>
   <script src="dashboard-sistema.js"></script>
+  <script src="dashboard-rispondi.js"></script>
   <script src="dashboard.js"></script>
 </body>
 </html>

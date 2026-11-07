@@ -22,6 +22,18 @@ const IS_FILO_ORIGIN = (() => {
 try { require('../shared/riquadriInArrivo.js'); } catch (e) { console.error('[Filo internal] riquadri in arrivo', e); }
 try { require('./wheel-zoom.js')(webFrame, { pageZoom: true, ipcRenderer, interna: IS_FILO_ORIGIN }); } catch (e) { console.error('[Filo internal] wheel-zoom', e); }
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] cmd-freccia', e); }
+try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console.error('[Filo internal] trascina-bordo', e); }
+// Un'immagine lasciata dove la pagina non la vuole va all'Aiuto (#1623); la home la prende da sé, nel suo campo.
+if (IS_FILO_ORIGIN) {
+  try {
+    require('./rilascio-file.js')(window, {
+      pronta: () => globalThis.SN_SIDEBAR?.accoglieRilascio?.() === true,
+      consegna: (files) => globalThis.SN_SIDEBAR.allega(files),
+      pannello: (t) => globalThis.SN_SIDEBAR?.contiene?.(t) === true,
+      nelPannello: (e) => globalThis.SN_SIDEBAR?.rilascio?.(e),
+    });
+  } catch (e) { console.error('[Filo internal] rilascio', e); }
+}
 
 let streamCounter = 0;
 
@@ -100,7 +112,7 @@ const filoApi = {
   // Esecuzione shell (modalità terminale della dashboard), gemella di aiStream.
   // onData({chunk, stream}), onExit({code, cwd}), onError({message}).
   // Ritorna { sendInput(text), abort() }.
-  shellExec: ({ command, cwd, shell, chat, onData, onExit, onError }) => {
+  shellExec: ({ command, cwd, shell, chat, gettone, daFuori, onData, onExit, onError }) => {
     const execId = `sh${Date.now()}_${++streamCounter}`;
     const offData = (_e, data) => onData && onData(data);
     const offExit = (_e, data) => { cleanup(); onExit && onExit(data); };
@@ -113,13 +125,16 @@ const filoApi = {
     ipcRenderer.on(`shell:${execId}:data`, offData);
     ipcRenderer.on(`shell:${execId}:exit`, offExit);
     ipcRenderer.on(`shell:${execId}:error`, offError);
-    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat });
+    ipcRenderer.invoke('shell:start', { execId, command, cwd, shell, chat, gettone, daFuori: daFuori === true });
     return {
       sendInput: (text) => ipcRenderer.send('shell:input', { execId, text }),
       abort: () => { ipcRenderer.send('shell:abort', { execId }); cleanup(); },
     };
   },
   shellHome: () => ipcRenderer.invoke('shell:home'),
+  // #892.1 — cosa chiede un comando scritto a mano prima di partire, coi livelli di quelli di Filo; il no della persona.
+  shellVaglia: (opts) => ipcRenderer.invoke('shell:vaglia', opts),
+  shellAnnulla: (gettone) => ipcRenderer.send('shell:annulla', { gettone }),
   shellWhich: (opts) => ipcRenderer.invoke('shell:which', opts),
   // #968 — le virgolette a un percorso con spazi: appena incollato nel comando, e proposte dopo un errore.
   shellVirgoletteIncolla: (opts) => ipcRenderer.invoke('shell:virgolette-incolla', opts),
@@ -281,6 +296,7 @@ function loadContentScripts() {
   const safe = (p) => { try { require(p); } catch (e) { console.error('[Filo CS]', p, e.message); } };
   // L'ordine conta: le ragioni stanno in fila nella gemella src/preload/page-preload.js.
   safe(path.join(SHARED, 'constants.js'));
+  safe(path.join(SHARED, 'immaginiChat.js')); // #1623 — le immagini date all'Aiuto: PRIMA di sidebar.js
   safe(path.join(SHARED, 'contenutoEsterno.js')); // #593 — imbusta il contenuto esterno: PRIMA di sidebar.js
   // Il marchio della UI di Filo (menu, avvisi, popup): lo mettono i moduli che
   // la disegnano, lo legge chi cammina sulla pagina.
@@ -290,7 +306,10 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'messages.js'));
   safe(path.join(SHARED, 'tasti.js')); // nomi delle scorciatoie per il sistema di chi legge: PRIMA di menu/actions/content
   safe(path.join(SHARED, 'disposizioneIcone.js')); // dove sta ogni icona globale: PRIMA di menuIcons
+  safe(path.join(SHARED, 'gestiContati.js')); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   safe(path.join(SHARED, 'campoTesto.js')); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
+  safe(path.join(SHARED, 'ricercaCampo.js')); // #824 — "è una ricerca?": PRIMA di content.js
+  safe(path.join(SHARED, 'accessoFisso.js')); // #1808 — la password dell'accesso fisso: PRIMA di content.js
   safe(path.join(SHARED, 'urlNav.js')); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi
   safe(path.join(SHARED, 'nomiSito.js')); // #843 — il sito di «Spegni Filo su questo sito»
   safe(path.join(SHARED, 'wallet.js')); // #664 — «è un link d'invito?» per il tasto destro
@@ -312,9 +331,11 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
   safe(path.join(CONTENT, 'highlight.js'));
+  safe(path.join(CONTENT, 'aiutoPagina.js')); // #1509.3 — quello che l'Aiuto fa sulla pagina: DOPO highlight.js
   safe(path.join(CONTENT, 'sidebar.js'));
   safe(path.join(CONTENT, 'coerenza.js')); // #1115 — date e citazioni del segno ocra: PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'correttoreRegole.js')); // #1446 — candidati e risposte del correttore: PRIMA di spellcheck.js
+  safe(path.join(CONTENT, 'correttoreAutomatica.js')); // #1447 — correzione a fine parola: PRIMA di spellcheck.js
   try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
   safe(path.join(SHARED, 'feedback.js'));

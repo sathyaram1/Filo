@@ -2,7 +2,7 @@
 // dati, cronologia appunti (clipboard), cronologia AI e costi.
 
 module.exports = function register(on, ctx) {
-  const { MSG, winOf, applySettingsUpdate } = ctx;
+  const { MSG, winOf, applySettingsUpdate, ripristinaImpostazioni } = ctx;
   const { SN_CONST } = globalThis;
   const Storage = globalThis.SN_STORAGE;
   const History = globalThis.SN_HISTORY;
@@ -47,6 +47,10 @@ module.exports = function register(on, ctx) {
     await globalThis.chrome.storage.local.remove(msg.keys);
     return { ok: true };
   });
+
+  // Quello che il correttore impara e il dizionario personale (#1447): una fila sola nel main, perché le schede e la
+  // pagina del correttore riscrivono le stesse chiavi. Dai siti si impara scrivendo; cambiare e togliere solo da filo://.
+  on(MSG.CORRETTORE_IMPARA, async (msg, sender, origin) => require('../correttoreImpara').passo(msg, { daFilo: isFilo(origin), origine: origin }));
 
   on('_storage:clear', async (msg, sender, origin) => {
     // Azzerare tutti i dati non è mai legittimo per una pagina web: solo le pagine interne.
@@ -96,18 +100,7 @@ module.exports = function register(on, ctx) {
 
   on(MSG.RESET_SETTINGS, async (msg, sender, origin) => {
     if (!isFilo(origin)) return { ok: false, error: 'forbidden' };
-    // Ripristino completo: sostituisce l'INTERO oggetto settings, non un merge, così spariscono
-    // anche le chiavi residue. Si preservano solo le credenziali dei provider AI.
-    const current = await Storage.getSettings();
-    const defaults = JSON.parse(JSON.stringify(SN_CONST.DEFAULT_SETTINGS));
-    if (current && current.apiKeys) defaults.apiKeys = current.apiKeys;
-    if (current && current.modelRegistry) defaults.modelRegistry = current.modelRegistry;
-    // Tornare al predefinito non alza l'autonomia di Filo: alzarla vuole «conferma» (#530).
-    const A = globalThis.SN_AUTONOMIA;
-    if (A && current) defaults.autonomia = A.unisciPiuStretta(current.autonomia, defaults.autonomia);
-    await Storage.setSettings(defaults);
-    const merged = await applySettingsUpdate({});
-    return { ok: true, settings: merged };
+    return { ok: true, settings: await ripristinaImpostazioni() };
   });
 
   on(MSG.EXPORT_DATA, async (msg, sender, origin) => {
@@ -122,8 +115,14 @@ module.exports = function register(on, ctx) {
       const { buildExportZip } = require('../exportData');
 
       const allData = await DiskStorage.get(null);
+      // Le copie delle icone stanno in file loro (#1273): nel backup tornano immagini, e l'importazione ne rifà la copia.
+      const Copie = require('../copieIcone');
+      const conIcone = (voci) => Promise.all(voci.map(async (v) => (
+        v && Copie.eCopia(v.favicon) ? { ...v, favicon: await Copie.comeDato(v.favicon) } : v)));
+      const SALVATE = SN_CONST.STORAGE_KEYS.SAVED_PAGES;
+      if (Array.isArray(allData[SALVATE])) allData[SALVATE] = await conIcone(allData[SALVATE]);
       // L'archivio delle schede ha file suoi: nel backup torna sotto la chiave di sempre.
-      const archivio = await globalThis.SN_ARCHIVED_TABS.list();
+      const archivio = await conIcone(await globalThis.SN_ARCHIVED_TABS.list());
       if (archivio.length) allData[ARCHIVE_KEY] = archivio;
       const cronologia = await History.list();
       if (cronologia.length) allData[HISTORY_KEY] = cronologia;
@@ -350,6 +349,8 @@ module.exports = function register(on, ctx) {
       // Un backup di una versione vecchia porta le miniature a piena risoluzione (#839).
       globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {});
       await annunciaAllePagine(new Set(Object.keys(rest)), sender);
+      // Le icone del backup arrivano come immagini: diventano copie, e quelle di un backup di prima si chiedono una volta (#1273).
+      try { require('../iconeVecchie').pianifica(1000); } catch (_) {}
 
       return { ok: true, added: stats.added, updated: stats.updated, unchanged: stats.unchanged };
     } catch (e) {
@@ -402,8 +403,32 @@ module.exports = function register(on, ctx) {
     if (!text) return { ok: false, error: 'empty' };
     const entry = { type: 'text', text };
     if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, entry)) return vietato;
-    try { require('electron').clipboard.writeText(text); } catch (_) { return { ok: false, error: 'clipboard' }; }
+    // Con `html` la formattazione della selezione, come la scrive il Copia del sistema (#1434.2).
+    const html = typeof msg.html === 'string' ? msg.html : '';
+    try {
+      const { clipboard, ClipboardItem } = require('electron');
+      if (html) {
+        await clipboard.write([new ClipboardItem({
+          'text/plain': new Blob([text], { type: 'text/plain' }),
+          'text/html': new Blob([html], { type: 'text/html' }),
+        })]);
+      } else await clipboard.writeText(text);
+    } catch (_) { return { ok: false, error: 'clipboard' }; }
     await inCronologia(entry);
+    return { ok: true };
+  });
+
+  // Lo screenshot premuto dalla barra laterale: la pagina senza fuoco (il visore PDF) non può scrivere gli appunti.
+  on(MSG.COPY_IMAGE_TO_CLIPBOARD, async (msg, sender, origin) => {
+    const dataUrl = typeof msg.dataUrl === 'string' && msg.dataUrl.startsWith('data:image/png;base64,') ? msg.dataUrl : '';
+    if (!dataUrl) return { ok: false, error: 'empty' };
+    if (!AppuntiDaiSiti.scritturaAmmessa(sender, origin, { type: 'image', dataUrl })) return vietato;
+    try {
+      const { clipboard, ClipboardItem } = require('electron');
+      const png = Buffer.from(dataUrl.slice(dataUrl.indexOf(',') + 1), 'base64');
+      if (!png.length) return { ok: false, error: 'image' };
+      await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+    } catch (_) { return { ok: false, error: 'clipboard' }; }
     return { ok: true };
   });
 

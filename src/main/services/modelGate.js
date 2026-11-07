@@ -48,6 +48,11 @@
     return e;
   }
 
+  // I contatori del servizio (#1472): nomi e numeri, mai un testo; un contatore rotto non ferma una chiamata.
+  function contaServizio(nome, ...a) {
+    try { require('./contatoriServizio').misura(nome, ...a); } catch (_) {}
+  }
+
   function providerOf(name) {
     try { return (name && providers() && providers().getProvider(name)) || null; } catch (_) { return null; }
   }
@@ -61,7 +66,11 @@
 
   async function keyInfo({ provider = 'openrouter', apiKey, signal } = {}) {
     const P = providerOf(provider);
-    if (!P || typeof P.keyInfo !== 'function') throw codeError(`Il fornitore ${provider} non dice il residuo delle chiavi`, 'NO_KEY_INFO');
+    if (!P || typeof P.keyInfo !== 'function') {
+      const e = codeError(`Il fornitore ${provider} non dice il residuo delle chiavi`, 'NO_KEY_INFO');
+      contaServizio('maiPartita', '', e);
+      throw e;
+    }
     return P.keyInfo({ apiKey, signal });
   }
 
@@ -100,7 +109,10 @@
       noteServed = plainNoteServed,
       costs = global.SN_COSTS,
       auditDelaysMs = AUDIT_DELAYS_MS,
+      // Stringhe, o { valore, tipo } quando chi li dà sa di che tipo sono (#1474).
       segreti = async () => [],
+      // Una richiesta partita con almeno un segreto tolto: la funzione e i tipi tolti, mai i valori.
+      segretiTolti = () => {},
       ricordaEsterni = () => {},
       funzioneDi = () => '',
       rimedioDi = () => '',
@@ -110,14 +122,58 @@
     } = deps;
 
     // I contatori giornalieri (#969): ogni chiamata è un uso della sua funzione, con l'attesa fino alla prima cosa
-    // visibile e il guasto di ogni tentativo fallito. Un contatore rotto non ferma mai una risposta.
-    const MUTO = { visto() {}, errore() {}, fine() {} };
+    // visibile e il guasto di ogni tentativo fallito; il tentativo che ha servito porta i suoi numeri (#1464), e il
+    // costo chiesto dopo arriva da sé. Un contatore rotto non ferma mai una risposta.
+    // I tentativi falliti li vedono anche i contatori del servizio (#1472), che non dipendono da quelli dell'uso.
+    const MUTO = { visto() {}, errore() {}, fine() {}, chiamata() {}, tardiva() {} };
     function misura(action) {
       let m = null;
       try { const c = contatore(); m = c && typeof c.apri === 'function' ? c.apri(action) : null; } catch (_) { m = null; }
-      if (!m) return MUTO;
-      const quieto = (fn) => (...a) => { try { fn(...a); } catch (_) {} };
-      return { visto: quieto(m.visto), errore: quieto(m.errore), fine: quieto(m.fine) };
+      const base = m || MUTO;
+      const quieto = (fn) => (...a) => { try { fn.apply(base, a); } catch (_) {} };
+      const errore = quieto(base.errore);
+      return {
+        visto: quieto(base.visto), fine: quieto(base.fine), chiamata: quieto(base.chiamata), tardiva: quieto(base.tardiva),
+        errore: (err, info) => { errore(err, info); contaServizio('tentativoFallito', action, err, info); },
+      };
+    }
+    // Una chiamata che finisce in un errore: se è di quelle che non partono, la contano i contatori del servizio.
+    function maiPartita(action, e) { contaServizio('maiPartita', action, e); }
+
+    // Quello che i contatori leggono di una risposta servita: numeri e nome del modello, mai il testo. Senza token
+    // detti la risposta non dice niente del contesto; ragionamento e fine ci sono solo nelle risposte di testo.
+    function chiamataDi(res, modello, { tentativo, spesa } = {}) {
+      const r = res || {};
+      const u = r.usage || {};
+      const n = (v) => (Number.isFinite(Number(v)) && Number(v) >= 0 ? Number(v) : 0);
+      const detto = n(u.promptTokens) > 0 || n(u.completionTokens) > 0;
+      const testo = r.finishReason !== undefined;
+      return {
+        modello,
+        ingresso: detto ? n(u.promptTokens) : null,
+        cacheLetti: n(u.cachedPromptTokens),
+        cacheDetta: u.cacheDetta === undefined ? undefined : Boolean(u.cacheDetta),
+        ragionamento: testo && detto && u.reasoningTokens !== undefined ? u.reasoningTokens : undefined,
+        uscita: testo && detto ? n(u.completionTokens) : null,
+        fine: testo ? r.finishReason : undefined,
+        tentativo,
+        ricominciata: Boolean(r.ricominciata),
+        ragionamentoTolto: Boolean(r.ragionamentoTolto),
+        spesa,
+      };
+    }
+
+    // Il costo in dollari di una risposta: quello detto dal router, o la stima dal listino delle Opzioni.
+    function spesaDi(s, model, usage) {
+      const u = usage || {};
+      const usd = Number(u.costUsd);
+      if (Number.isFinite(usd) && usd > 0) return { usd, origine: 'router' };
+      const pricing = (s && s.pricing && s.pricing[model]) || null;
+      if (!pricing || !costs || typeof costs.estimateCostEur !== 'function') return null;
+      let stima = 0;
+      // Con un cambio di 1 la stima del listino resta in dollari.
+      try { stima = Number(costs.estimateCostEur({ usage: u, pricing, usdToEur: 1 })); } catch (_) { stima = 0; }
+      return stima > 0 ? { usd: stima, origine: 'stima' } : null;
     }
     function vedendo(m, fn) {
       return typeof fn === 'function' ? (...a) => { m.visto(); return fn(...a); } : fn;
@@ -145,13 +201,32 @@
     // ha, il modello non lo può far uscire. Sentinella: tests/unit/usciteSegreti.test.mjs.
     // Di qui passa anche tutto quello che da fuori arriva a un modello, qualunque strada abbia preso: i segreti che
     // contiene diventano letti, e la porta delle uscite li ferma (#810).
-    async function senzaSegreti(messages) {
+    async function senzaSegreti(messages, action) {
       try { ricordaEsterni(messages); } catch (_) {}
       const G = global.SN_GUARDIANO_STATICO;
       if (!G || typeof G.oscuraSegreti !== 'function') return messages;
+      const lista = await custoditi();
+      const fuori = G.oscuraSegreti(messages, lista);
+      if (fuori !== messages) contaTolti(action, lista, (valori) => G.oscuraSegreti(messages, valori) !== messages);
+      return fuori;
+    }
+
+    async function custoditi() {
       let lista = [];
       try { lista = await segreti(); } catch (_) { lista = []; }
-      return G.oscuraSegreti(messages, lista);
+      return (Array.isArray(lista) ? lista : [])
+        .map((x) => (typeof x === 'string' ? { valore: x, tipo: '' } : { valore: String((x && x.valore) || ''), tipo: String((x && x.tipo) || ''), password: !!(x && x.password) }))
+        .filter((x) => x.valore);
+    }
+
+    // Chiamata solo quando qualcosa è sparito, cioè quasi mai: `toglie(valori)` rifà l'oscuramento per un tipo (#1474).
+    function contaTolti(action, lista, toglie) {
+      try {
+        const perTipo = new Map();
+        for (const x of lista) perTipo.set(x.tipo, [...(perTipo.get(x.tipo) || []), x]);
+        const tipi = perTipo.size === 1 ? [...perTipo.keys()] : [...perTipo].filter(([, valori]) => toglie(valori)).map(([t]) => t);
+        segretiTolti(action, tipi.length ? tipi : ['']);
+      } catch (_) {}
     }
 
     // Il piano si fa sui messaggi già oscurati: sono quelli che partono, e un taglio a caratteri deve cadere su di loro.
@@ -180,19 +255,36 @@
       }
     }
 
-    async function chainFor({ action, settings, attempts }) {
+    async function chainFor({ action, settings, attempts, messages }) {
       const s = settings || await getSettings();
-      const chain = attempts || buildChain(s, modelFor(s, action), action);
+      const chain = conSpazioPerIlSeguito(attempts || buildChain(s, modelFor(s, action), action), messages);
       await ensureUnderLimit(s);
+      contaServizio('catena', action, chain);
       return { s, chain };
     }
 
-    async function settleChain(s, action, chain, r) {
+    // Un «Continua» riparte con un tetto più largo (#1302): copie, perché la catena che arriva da fuori torna a ogni giro.
+    function conSpazioPerIlSeguito(chain, messages) {
+      const CE = globalThis.SN_CHAT_ERRORS;
+      const LR = globalThis.SN_LUNGHEZZA_RISPOSTE;
+      if (!CE || !LR || !Array.isArray(chain) || !CE.chiedeIlSeguito(messages)) return chain;
+      return chain.map((a) => (a && a.maxTokens ? { ...a, maxTokens: LR.perSeguito(a.maxTokens) } : a));
+    }
+
+    async function settleChain(s, action, chain, r, m = MUTO, onCostoTardivo) {
       const res = r || {};
       const provider = res.provider || (chain[0] && chain[0].provider);
       const model = res.model || (chain[0] && chain[0].model);
       const { servedBy, violation } = noteServed(s, action, { ...res, model });
       const costEur = await recordCost(s, action, provider, model, res.usage);
+      // Una risposta tornata senza conto (interrotta dopo aver scritto, #1302) si è pagata: il costo lo dice il router dopo.
+      if (res.generationId && !carriesCost(res.usage)) {
+        const keySource = (res.usage && res.usage.keySource) || '';
+        auditLater({ s, action, provider, model, apiKey: res.keyUsed || (chain[0] && chain[0].apiKey), generationId: res.generationId, withCost: true, keySource, m, onCosto: onCostoTardivo });
+      }
+      m.chiamata(chiamataDi(res, model, { tentativo: res.tentativo, spesa: spesaDi(s, model, res.usage) }));
+      // Testo e streaming dicono chi ha servito nella risposta, o non lo dicono più.
+      contaServizio('servita', action, { modello: model, provider, keySource: res.usage && res.usage.keySource, ignota: !servedBy });
       return { ...res, provider, model, servedBy, violation, costEur };
     }
 
@@ -202,27 +294,28 @@
         const r = await completeMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function completeMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onFallback } = {}, m) {
-      const { s, chain } = await chainFor({ action, settings, attempts });
+      const { s, chain } = await chainFor({ action, settings, attempts, messages });
       let r;
       try {
-        const daMandare = await senzaSegreti(messages);
+        const daMandare = await senzaSegreti(messages, action);
         r = await providers().completeWithFallback({
           attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal, onFallback, onTentativoFallito: m.errore,
         });
       } catch (e) {
         throw conLaFunzione(e, s, action);
       }
-      return settleChain(s, action, chain, r);
+      return settleChain(s, action, chain, r, m);
     }
 
     // Un tentativo rotto a metà si è già pagato: il suo costo il router lo dice solo dopo, e lo si chiede come per la voce.
-    function auditBroken(s, action, list) {
+    function auditBroken(s, action, list, m, onCosto) {
+      if (Array.isArray(list) && list.length) contaServizio('ripiego', action, 'spezzato', list.length);
       for (const b of list || []) {
-        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource });
+        auditLater({ s, action, provider: b.provider, model: b.model, apiKey: b.apiKey, generationId: b.generationId, withCost: true, keySource: b.keySource, m, onCosto });
       }
     }
 
@@ -232,26 +325,27 @@
         const r = await streamMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
-    async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset } = {}, m) {
-      const { s, chain } = await chainFor({ action, settings, attempts });
+    // `onCostoTardivo(eur)`: il costo che il router dice dopo (tentativi rotti, risposta senza conto), per chi scrive la Cronologia.
+    async function streamMisurato({ action, settings, attempts, messages, tools, toolChoice, signal, onDelta, onReasoning, onToolCall, onFallback, onReset, onCostoTardivo } = {}, m) {
+      const { s, chain } = await chainFor({ action, settings, attempts, messages });
       let r;
       try {
-        const daMandare = await senzaSegreti(messages);
+        const daMandare = await senzaSegreti(messages, action);
         r = await providers().streamCompleteWithFallback({
           attempts: chain, messages: daMandare, cache: pianoCache(action, daMandare, s), tools, toolChoice, signal,
           onDelta: vedendo(m, onDelta), onReasoning: vedendo(m, onReasoning), onToolCall: vedendo(m, onToolCall),
           onFallback, onReset, onTentativoFallito: m.errore,
         });
       } catch (e) {
-        auditBroken(s, action, e && e.brokenAttempts);
+        auditBroken(s, action, e && e.brokenAttempts, m, onCostoTardivo);
         throw conLaFunzione(e, s, action);
       }
       const { brokenAttempts, ...rest } = r || {};
-      auditBroken(s, action, brokenAttempts);
-      return settleChain(s, action, chain, rest);
+      auditBroken(s, action, brokenAttempts, m, onCostoTardivo);
+      return settleChain(s, action, chain, rest, m, onCostoTardivo);
     }
 
     // Chi chiede solo il testo lo legge come dati (un'etichetta, un giudizio, un JSON): un pezzo tagliato è un errore.
@@ -263,13 +357,20 @@
     }
 
     // Chi ha servito e quanto è costato, chiesti a posteriori: best-effort e fuori dal cammino della risposta.
-    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy }) {
+    // `ignota`: una risposta servita, che a tentativi finiti senza chi l'ha servita conta fra le ignote (#1472).
+    function auditLater({ s, action, provider, model, apiKey, generationId, withCost, keySource, onServedBy, onCosto, m = MUTO, ignota = false }) {
       const P = providerOf(provider);
-      if (!P || typeof P.lookupServedBy !== 'function') return;
+      if (!P || typeof P.lookupServedBy !== 'function') {
+        if (ignota) contaServizio('servitaIgnota', action, model);
+        return;
+      }
       let i = 0;
       let costDone = !withCost;
       const schedule = () => {
-        if (i >= auditDelaysMs.length) return;
+        if (i >= auditDelaysMs.length) {
+          if (ignota) contaServizio('servitaIgnota', action, model);
+          return;
+        }
         const t = setTimeout(tick, auditDelaysMs[i++]);
         if (t && typeof t.unref === 'function') t.unref();
       };
@@ -278,7 +379,9 @@
         try { r = await P.lookupServedBy({ apiKey, generationId }); } catch (_) { r = null; }
         if (r && !costDone && Number.isFinite(r.costUsd) && r.costUsd > 0) {
           costDone = true;
-          await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
+          const eur = await recordCost(s, action, provider, model, { costUsd: r.costUsd, keySource: keySource || '' });
+          m.tardiva(model, r.costUsd);
+          if (typeof onCosto === 'function' && eur > 0) { try { onCosto(eur); } catch (_) {} }
         }
         if (!r || !r.servedBy) { schedule(); return; }
         const seen = noteServed(s, action, { servedBy: r.servedBy, model, keySource: keySource || '' });
@@ -297,7 +400,7 @@
         const r = await callMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function callMisurato({ action, settings, attempt, method, args, onLateServedBy } = {}, m) {
@@ -311,7 +414,7 @@
       }
       const testi = {};
       for (const k of CAMPI_TESTO) if (args && args[k] != null) testi[k] = args[k];
-      const oscurati = Object.keys(testi).length ? await senzaSegreti(testi) : {};
+      const oscurati = Object.keys(testi).length ? await senzaSegreti(testi, action) : {};
       const input = {
         ...(args || {}),
         ...oscurati,
@@ -327,7 +430,7 @@
       try {
         r = (await (viaRouter ? router[method]({ ...input, provider: a.provider }) : P[method](input))) || {};
       } catch (e) {
-        m.errore(e, { modello: a.model, host: e && e.hostFallito });
+        m.errore(e, { modello: a.model, host: e && e.hostFallito, provider: a.provider });
         throw conLaFrase(e, s, action, method);
       }
       const usage = r.usage;
@@ -335,6 +438,9 @@
       const later = !servedBy && Boolean(r.generationId);
       const costNow = carriesCost(usage) || (!later && Boolean(usage));
       const costEur = costNow ? await recordCost(s, action, a.provider, a.model, usage) : 0;
+      m.chiamata(chiamataDi(r, r.model || a.model, { spesa: costNow ? spesaDi(s, a.model, usage) : null }));
+      const keySourceUsata = r.keySource || (usage && usage.keySource) || '';
+      contaServizio('servita', action, { modello: r.model || a.model, provider: a.provider, keySource: keySourceUsata, ignota: !servedBy && !later });
       if (later) {
         auditLater({
           s, action, provider: a.provider, model: a.model,
@@ -342,8 +448,10 @@
           apiKey: r.keyUsed || a.apiKey,
           generationId: r.generationId,
           withCost: !costNow,
-          keySource: r.keySource || (usage && usage.keySource) || '',
+          keySource: keySourceUsata,
           onServedBy: onLateServedBy,
+          m,
+          ignota: true,
         });
       }
       return { ...r, servedBy, violation, costEur };
@@ -366,7 +474,7 @@
         const r = await decideAllMisurato(opts, m);
         m.fine(true);
         return r;
-      } catch (e) { m.fine(false); throw e; }
+      } catch (e) { m.fine(false); maiPartita(opts.action, e); throw e; }
     }
 
     async function decideAllMisurato({ action, settings, attempts, requests, parallel, onAnswer, signal } = {}, m) {
@@ -375,20 +483,22 @@
       if (!usable.length) throw codeError('Nessun fornitore della catena sa classificare', 'PROVIDER_METHOD_MISSING');
       const Coda = global.SN_CODA_ADATTIVA;
       if (!Coda) throw codeError('Coda dei lavori non caricata', 'GATE_METHOD');
-      let lista = [];
-      try { lista = await segreti(); } catch (_) { lista = []; }
+      const lista = await custoditi();
       const G = global.SN_GUARDIANO_STATICO;
-      const oscura = (v) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, lista) : v);
-      const richieste = (Array.isArray(requests) ? requests : []).map((r) => ({
-        state: oscura(r && r.state), questions: oscura(r && r.questions),
-      }));
+      const oscura = (v, valori = lista) => (G && typeof G.oscuraSegreti === 'function' ? G.oscuraSegreti(v, valori) : v);
+      const prima = (Array.isArray(requests) ? requests : []).map((r) => ({ state: r && r.state, questions: r && r.questions }));
+      const richieste = prima.map((r) => ({ state: oscura(r.state), questions: oscura(r.questions) }));
+      const toglie = (valori) => prima.some((r) => oscura(r.state, valori) !== r.state || oscura(r.questions, valori) !== r.questions);
+      if (richieste.some((r, i) => r.state !== prima[i].state || r.questions !== prima[i].questions)) contaTolti(action, lista, toglie);
       let ultimo = null;
-      for (const a of usable) {
+      for (const [indice, a] of usable.entries()) {
         const P = providerOf(a.provider);
         const somma = { promptTokens: 0, completionTokens: 0, costUsd: 0, keySource: '' };
         let risposte = 0;
         let inVolo = 0;
         let servedBy = null;
+        // I numeri di ogni richiesta servita, per i contatori: partono insieme alla fine del giro.
+        const servite = [];
         const fai = async (req) => {
           inVolo++;
           let r;
@@ -399,7 +509,9 @@
             })) || {};
           } finally { inVolo--; }
           risposte++;
+          servite.push(chiamataDi(r, r.model || a.model, { tentativo: indice + 1, spesa: spesaDi(s, a.model, r.usage) }));
           const u = r.usage || {};
+          contaServizio('servita', action, { modello: r.model || a.model, provider: a.provider, keySource: u.keySource, ignota: !r.servedBy });
           somma.promptTokens += Number(u.promptTokens) || 0;
           somma.completionTokens += Number(u.completionTokens) || 0;
           somma.costUsd += Number(u.costUsd) || 0;
@@ -409,14 +521,19 @@
         };
         const esito = await Coda.esegui(richieste, fai, {
           parallelo: parallel, signal,
-          classifica: (err, tentativo) => esitoDecisione(err, risposte > 0, tentativo, inVolo > 0),
+          classifica: (err, tentativo) => {
+            const tipo = esitoDecisione(err, risposte > 0, tentativo, inVolo > 0);
+            contaServizio('ripiego', action, tipo);
+            return tipo;
+          },
           attesa: (tentativo, err) => {
             const ms = Coda.attesaPredefinita(tentativo, err);
             return risposte > 0 || Number(err && err.status) === 429 ? ms : Math.min(ms, ATTESA_PRIMA_RISPOSTA_MS);
           },
           suEsito: (r, _req, i) => { if (onAnswer) onAnswer(i, (r && r.answers) || {}); },
         });
-        if (esito.fermo) m.errore(esito.fermo, { modello: a.model, host: servedBy || (esito.fermo && esito.fermo.hostFallito) });
+        if (servite.length) m.chiamata(servite);
+        if (esito.fermo) m.errore(esito.fermo, { modello: a.model, host: servedBy || (esito.fermo && esito.fermo.hostFallito), provider: a.provider });
         let seen = { servedBy: null, violation: false };
         let costEur = 0;
         if (risposte) {

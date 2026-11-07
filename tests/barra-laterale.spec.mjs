@@ -1,6 +1,6 @@
-// #871 — la barra laterale dal bordo sinistro: si apre spingendo sul bordo, dalla striscia, dalla
-// maniglia e dalla scorciatoia; porta indietro/avanti/ricarica/home; riceve le icone trascinate dal
-// tasto destro e le restituisce; un sito non la comanda; a schermo intero resta raggiungibile.
+// #871 — la barra laterale dal bordo sinistro: si apre spingendo sul bordo, dalla striscia, dalla maniglia e dalla
+// scorciatoia; porta la finestra e le azioni sulla pagina; le icone si riordinano, vanno in «Altro…» e restano dopo un
+// riavvio; un sito non la comanda; a schermo intero resta raggiungibile.
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
 import { _electron as electron } from '@playwright/test';
@@ -9,14 +9,25 @@ import { createServer } from 'node:http';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
-import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, puntatoreCheSegue } from './helpers/barra.mjs';
+import { barraPage, statoBarra, comandaBarra, pannelloFermo, premi, puntatoreCheSegue, mettiNellaBarra, menuAperto, scegliNelMenu } from './helpers/barra.mjs';
 import { apriRedteamATutti } from './helpers/redteam.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const pausa = (ms) => new Promise((r) => setTimeout(r, ms));
 const aperta = async (app) => (await statoBarra(app)).aperta;
+const BARRA_DI_PARTENZA = ['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab',
+  'translate', 'screenshot', 'share', 'saveForLater', 'qrCode', 'newTab'];
+
+// Trascina l'icona `id` col mouse vero della vista della barra fino a `y` (px della vista).
+async function trascina(barra, id, y) {
+  const b = await barra.locator(`#nav .ico[data-id="${id}"]`).boundingBox();
+  await barra.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+  await barra.mouse.down();
+  await barra.mouse.move(b.x + b.width / 2 + 2, b.y + b.height / 2 - 6, { steps: 3 });
+  await barra.mouse.move(b.x + b.width / 2, y, { steps: 8 });
+  await barra.mouse.up();
+}
 
 const SITO = `<!doctype html><html><body style="margin:0;padding:40px;font:16px sans-serif;height:1400px">
   <h1>Pagina di prova</h1><p id="p">Clic destro qui.</p><a id="vai" href="#">vai</a>
@@ -261,21 +272,15 @@ test('Indietro e Avanti premuti di fila, prima che la pagina si carichi, non per
   await expect.poll(async () => (await scheda()).davanti).toEqual(['filo://newtab/']);
 });
 
-test('«Altro…» non ha più le voci globali, e la barra le ha', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, SITO);
-  await page.locator('#p').click({ button: 'right' });
-  const menu = menuDi(page).locator('.sn-menu').first();
-  await expect(menu).toBeVisible();
-  await menu.locator('.sn-menu-row-overflow').first().hover();
-  const grid = menuDi(page).locator('.sn-menu-icon-grid');
-  await expect(grid).toBeVisible();
-  for (const id of ['back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']) {
-    await expect(menuDi(page).locator(`.sn-menu [data-sn-icon-id="${id}"], .sn-menu-icon-grid [data-sn-icon-id="${id}"]`)).toHaveCount(0);
-  }
-  await expect(grid.locator('[data-sn-icon-id="openOptions"]')).toHaveCount(1);
+test('le voci globali stanno fra le icone in vista, e «Altro…» tiene le altre', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
-  const ids = await barra.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
-  expect(ids).toEqual(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  await comandaBarra(app, 'clic');
+  await pannelloFermo(barra);
+  expect(await barra.$$eval('#nav .ico[data-id]', (els) => els.map((e) => e.dataset.id))).toEqual(BARRA_DI_PARTENZA);
+  await barra.locator('#nav [data-altro]').click();
+  expect(await barra.$$eval('#nav .ico.riserva[data-id]', (els) => els.map((e) => e.dataset.id)))
+    .toEqual(['openOptions', 'editorApp', 'screenshotCrop', 'transcribe', 'colorPicker']);
 });
 
 test('un sito non apre la barra e non la comanda con eventi finti', async ({ app, openTab, testServer }) => {
@@ -287,23 +292,8 @@ test('un sito non apre la barra e non la comanda con eventi finti', async ({ app
       document.dispatchEvent(new KeyboardEvent(t, { key: 'B', code: 'KeyB', ctrlKey: true, metaKey: true, shiftKey: true, bubbles: true }));
     }
   });
-  // Un trascinamento finto dal menu aperto per davvero.
-  await page.locator('#p').click({ button: 'right' });
-  const icona = menuDi(page).locator('.sn-menu [data-sn-icon-id="screenshot"]').first();
-  await expect(icona).toBeVisible();
-  const prima = (await statoBarra(app)).bar;
-  await menuDi(page).valuta(() => {
-    const el = document.querySelector('.sn-menu [data-sn-icon-id="screenshot"]');
-    const r = el.getBoundingClientRect();
-    const opts = (x, y, extra = {}) => ({ bubbles: true, cancelable: true, pointerId: 1, button: 0, buttons: 1, clientX: x, clientY: y, isPrimary: true, ...extra });
-    el.dispatchEvent(new PointerEvent('pointerdown', opts(r.x + 5, r.y + 5)));
-    for (let i = 1; i <= 20; i++) window.dispatchEvent(new PointerEvent('pointermove', opts(r.x + 5 - i * 20, 200)));
-    window.dispatchEvent(new PointerEvent('pointerup', opts(10, 200, { buttons: 0 })));
-  });
   await pausa(600);
-  const dopo = await statoBarra(app);
-  expect(dopo.aperta).toBe(false);
-  expect(dopo.bar).toEqual(prima);
+  expect(await aperta(app)).toBe(false);
 });
 
 test('a schermo intero la barra resta raggiungibile, e il primo Esc chiude lei, il secondo esce', async ({ app, openTab, testServer }) => {
@@ -365,7 +355,7 @@ test('le voci che stavano in alto nella home sono in fondo alla barra; in alto a
   expect(app.windows().length).toBeGreaterThanOrEqual(vistaPrima);
 });
 
-test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio, riportato nel menu sparisce dalla barra', async () => {
+test('trascino «Screenshot» sopra Home nella barra: resta lì dopo il riavvio', async () => {
   test.setTimeout(90_000);
   const userData = cartellaTemporanea('filo-barra-');
   const avvia = async () => {
@@ -395,56 +385,22 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
   };
   try {
     let { app, shell } = await avvia();
-    let page = await apriSito(app, shell, 1);
+    await apriSito(app, shell, 1);
     const barra = await barraPage(app);
-    await page.locator('#p').click({ button: 'right' });
-    const icona = menuDi(page).locator('.sn-menu [data-sn-icon-id="screenshot"]').first();
-    await expect(icona).toBeVisible();
-    const box = await icona.boundingBox();
-    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-    await page.mouse.down();
-    await page.mouse.move(box.x + 12, box.y + 12, { steps: 3 });
-    // Il trascinamento apre la barra.
-    await expect.poll(() => aperta(app)).toBe(true);
+    await comandaBarra(app, 'clic');
     await pannelloFermo(barra);
     const home = await barra.locator('#nav .ico[data-id="home"]').boundingBox();
-    await page.mouse.move(30, home.y + 4, { steps: 8 });
-    await expect(barra.locator('#nav')).toHaveClass(/mira/);
-    await page.mouse.up();
-    await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['help', 'back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
-    await expect(barra.locator('#nav .ico[data-id="screenshot"]')).toBeVisible();
-    // Il menu aperto non ce l'ha più.
-    await expect(menuDi(page).locator('.sn-menu [data-sn-icon-id="screenshot"]')).toHaveCount(0);
+    await trascina(barra, 'screenshot', home.y + 4);
+    const atteso = ['help', 'back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab',
+      'translate', 'share', 'saveForLater', 'qrCode', 'newTab'];
+    await expect.poll(async () => (await statoBarra(app)).bar).toEqual(atteso);
     await chiudiApp(app);
 
     ({ app, shell } = await avvia());
-    page = await apriSito(app, shell, 2);
+    await apriSito(app, shell, 2);
     const barra2 = await barraPage(app);
-    await expect.poll(async () => (await statoBarra(app)).bar).toContain('screenshot');
-    await expect(barra2.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(1);
-
-    // Dalla barra al menu aperto: la barra manda il gesto, la pagina lo posa nella sua riga.
-    await page.locator('#p').click({ button: 'right' });
-    const riga = menuDi(page).locator('.sn-menu .sn-menu-row[data-sn-drop-target="primary"]').first();
-    await expect(riga).toBeVisible();
-    await comandaBarra(app, 'clic');
-    await pannelloFermo(barra2);
-    const src = await barra2.locator('#nav .ico[data-id="screenshot"]').boundingBox();
-    const dst = await riga.boundingBox();
-    const s = await statoBarra(app);
-    // Stessa origine per la barra e la scheda: le coordinate della pagina valgono nella barra.
-    const alto = s.bounds.y - s.alto;
-    await barra2.mouse.move(src.x + src.width / 2, src.y + src.height / 2);
-    await barra2.mouse.down();
-    await barra2.mouse.move(src.x + 30, src.y + 10, { steps: 3 });
-    await barra2.mouse.move(dst.x + dst.width - 20, dst.y + dst.height / 2 - alto, { steps: 10 });
-    await expect(menuDi(page).trascinamento).toHaveCount(1);
-    await barra2.mouse.up();
-    await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('screenshot');
-    const dopo = await statoBarra(app);
-    expect([...dopo.primary, ...dopo.secondary]).toContain('screenshot');
-    await expect(barra2.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(0);
-    await expect(menuDi(page).trascinamento).toHaveCount(0);
+    await expect.poll(async () => (await statoBarra(app)).bar).toEqual(atteso);
+    await expect.poll(() => barra2.$$eval('#nav .ico[data-id]', (els) => els.map((e) => e.dataset.id))).toEqual(atteso);
     await chiudiApp(app);
   } finally {
     try { server.close(); } catch (_) {}
@@ -452,30 +408,16 @@ test('trascino «Screenshot» dal tasto destro alla barra: resta dopo il riavvio
   }
 });
 
-test('col tasto destro un\'icona della barra torna nel menu', async ({ app, openTab, testServer }) => {
+test('col tasto destro un\'icona della barra va in «Altro…»', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   await comandaBarra(app, 'clic');
   await pannelloFermo(barra);
   await barra.locator('#nav .ico[data-id="incognito"]').click({ button: 'right' });
-  let popup = null;
-  const fine = Date.now() + 5000;
-  // Anche il suggerimento è una finestra data:: il menu è quella con le voci.
-  while (!popup && Date.now() < fine) {
-    for (const w of app.windows()) {
-      let url = '';
-      try { url = w.url(); } catch (_) { continue; }
-      if (url.startsWith('data:text/html') && await w.$('.menu').catch(() => null)) { popup = w; break; }
-    }
-    if (!popup) await pausa(100);
-  }
+  const popup = await menuAperto(app);
   expect(popup, 'il menu della voce non si è aperto').toBeTruthy();
-  await expect(popup.locator('button.item', { hasText: 'Rimetti nel menu del tasto destro' })).toBeVisible();
-  // La scelta chiude il menu: il clic non aspetta una pagina che non c'è più.
-  await popup.evaluate(() => {
-    const b = [...document.querySelectorAll('button.item')].find((x) => x.textContent.includes('Rimetti nel menu'));
-    b.click();
-  }).catch(() => {});
+  await expect(popup.locator('button.item', { hasText: 'Sposta in «Altro…»' })).toBeVisible();
+  await scegliNelMenu(popup, 'Sposta in «Altro…»');
   await expect.poll(async () => (await statoBarra(app)).bar).not.toContain('incognito');
   expect((await statoBarra(app)).secondary).toContain('incognito');
   await expect(barra.locator('#nav .ico[data-id="incognito"]')).toHaveCount(0);
@@ -513,24 +455,6 @@ test('aperta col mouse, il puntatore che torna sulla pagina la chiude', async ({
   await expect.poll(async () => { const s = await statoBarra(app); return s.bounds.width === s.chiusa; }).toBe(true);
 });
 
-test('un trascinamento dal menu interrotto da una pagina che ricarica non lascia la barra appesa', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, SITO);
-  await barraPage(app);
-  await page.locator('#p').click({ button: 'right' });
-  const icona = menuDi(page).locator('.sn-menu [data-sn-icon-id="share"]').first();
-  await expect(icona).toBeVisible();
-  const box = await icona.boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + 14, box.y + 14, { steps: 3 });
-  await expect.poll(() => aperta(app)).toBe(true);
-  await page.evaluate(() => location.reload());
-  await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8000 });
-  await page.mouse.up();
-  await expect.poll(() => aperta(app), { timeout: 4000 }).toBe(false);
-  expect((await statoBarra(app)).bar).not.toContain('share');
-});
-
 test('Nuova finestra incognito dalla barra: anche lei ha la sua barra, con le stesse icone', async ({ app, openTab, testServer }) => {
   await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
@@ -545,8 +469,8 @@ test('Nuova finestra incognito dalla barra: anche lei ha la sua barra, con le st
   }
   expect(privata, 'la finestra incognito non ha la barra').toBeTruthy();
   await privata.waitForFunction(() => document.querySelectorAll('#nav .ico').length > 0, null, { timeout: 5000 });
-  const ids = await privata.$$eval('#nav .ico', (els) => els.map((e) => e.dataset.id));
-  expect(ids).toEqual(['help', 'back', 'forward', 'reload', 'home', 'incognito', 'fullscreen', 'closeTab']);
+  const ids = await privata.$$eval('#nav .ico[data-id]', (els) => els.map((e) => e.dataset.id));
+  expect(ids).toEqual((await statoBarra(app)).bar);
   const { larga, chiusa } = await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && x._filoIncognito);
     return { larga: w._filoTabs.barra.vista.getBounds().width, chiusa: w._filoTabs.barra._larghezzaChiusa() };
@@ -582,15 +506,13 @@ test('finestra bassa e barra piena: il gruppo sfuma dove ci sono altre icone, e 
   const barra = await barraPage(app);
   await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).setSize(900, 540));
   await pausa(400);
-  for (const id of ['translate', 'screenshot', 'screenshotCrop', 'transcribe', 'share', 'saveForLater', 'qrCode', 'colorPicker', 'newTab']) {
-    await app.evaluate(async (_, i) => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: i, target: 'bar' }, {}), id);
-  }
+  await mettiNellaBarra(app, ['screenshotCrop', 'transcribe', 'colorPicker']);
   await comandaBarra(app, 'tasto');
   await pannelloFermo(barra);
   // Non ci stanno tutte: sotto c'è altro, e il gruppo lo dice.
   await expect(barra.locator('#nav')).toHaveClass(/altre-sotto/);
   // L'ultima arriva in fondo, come la posa un trascinamento che cade sotto le icone visibili.
-  await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'icon_layout_drop', id: 'editorApp', target: 'bar' }, {}));
+  await mettiNellaBarra(app, ['editorApp']);
   await expect(barra.locator('#nav .ico[data-id="editorApp"]')).toHaveCount(1);
   await pausa(500);
   const dove = await barra.evaluate(() => {
@@ -602,47 +524,16 @@ test('finestra bassa e barra piena: il gruppo sfuma dove ci sono altre icone, e 
   await expect(barra.locator('#nav')).toHaveClass(/altre-sopra/);
 });
 
-test('menu aperto vicino al bordo: riordinandolo la barra non gli va sopra; al bordo si apre e riceve l\'icona', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="margin:0;padding:12px 16px;font:16px sans-serif;height:1400px">
-    <p id="p">Un paragrafo che comincia vicino al bordo sinistro.</p></body></html>`);
-  const barra = await barraPage(app);
-  await page.mouse.click(20, 24, { button: 'right' });
-  const icona = menuDi(page).locator('.sn-menu [data-sn-icon-id="share"]').first();
-  await expect(icona).toBeVisible();
-  const box = await icona.boundingBox();
-  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
-  await page.mouse.down();
-  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2 + 2, { steps: 4 });
-  await pausa(400);
-  expect(await aperta(app), 'sopra il menu la barra resta chiusa').toBe(false);
-  // Al bordo, a sinistra del menu, la barra si apre e mira.
-  await page.mouse.move(6, 200, { steps: 8 });
-  await expect.poll(() => aperta(app)).toBe(true);
-  await pannelloFermo(barra);
-  await expect(barra.locator('#nav')).toHaveClass(/mira/);
-  // Tornando sopra il menu si richiude, e di nuovo al bordo si riapre.
-  await page.mouse.move(box.x + box.width / 2 + 30, box.y + box.height / 2, { steps: 6 });
-  await expect.poll(() => aperta(app)).toBe(false);
-  await page.mouse.move(6, 200, { steps: 6 });
-  await expect.poll(() => aperta(app)).toBe(true);
-  await page.mouse.up();
-  await expect.poll(async () => (await statoBarra(app)).bar).toContain('share');
-});
-
-test('a parole: Filo mette un\'icona del tasto destro nella barra e la toglie, come il trascinamento', async ({ app, openTab, testServer }) => {
-  const page = await testServer.openReady(openTab, SITO);
+test('a parole: Filo porta un\'icona da «Altro…» nella barra e ne mette una in «Altro…», come il trascinamento', async ({ app, openTab, testServer }) => {
+  await testServer.openReady(openTab, SITO);
   const barra = await barraPage(app);
   const esegui = (azione) => app.evaluate((_e, a) => globalThis.SN_EXECUTE_FILO_ACTION(a), azione);
 
-  let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'screenshot', dove: 'barra', prima_di: 'home' });
+  let r = await esegui({ type: 'SPOSTA_ICONA', icona: 'colorPicker', dove: 'barra', prima_di: 'home' });
   expect(r.executed).toBe(true);
-  await expect.poll(async () => (await statoBarra(app)).bar).toEqual(['help', 'back', 'forward', 'reload', 'screenshot', 'home', 'incognito', 'fullscreen', 'closeTab']);
-  await expect(barra.locator('#nav .ico[data-id="screenshot"]')).toHaveCount(1);
-  // Il menu del tasto destro non ce l'ha più.
-  await page.locator('#p').click({ button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
-  await expect(menuDi(page).locator('.sn-menu [data-sn-icon-id="screenshot"]')).toHaveCount(0);
-  await page.keyboard.press('Escape');
+  await expect.poll(async () => (await statoBarra(app)).bar.slice(0, 6)).toEqual(['help', 'back', 'forward', 'reload', 'colorPicker', 'home']);
+  expect((await statoBarra(app)).secondary).not.toContain('colorPicker');
+  await expect(barra.locator('#nav .ico[data-id="colorPicker"]:not(.riserva)')).toHaveCount(1);
 
   r = await esegui({ type: 'SPOSTA_ICONA', icona: 'closeTab', dove: 'altro' });
   expect(r.executed).toBe(true);
@@ -655,5 +546,5 @@ test('a parole: Filo mette un\'icona del tasto destro nella barra e la toglie, c
   expect((await esegui({ type: 'SPOSTA_ICONA', icona: 'volante', dove: 'barra' })).executed).toBe(false);
   expect((await esegui({ type: 'SPOSTA_ICONA', icona: 'reload', dove: 'cassetto' })).executed).toBe(false);
   const dopo = await statoBarra(app);
-  expect([dopo.bar, dopo.primary, dopo.secondary]).toEqual([prima.bar, prima.primary, prima.secondary]);
+  expect([dopo.bar, dopo.secondary]).toEqual([prima.bar, prima.secondary]);
 });

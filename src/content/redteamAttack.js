@@ -1,4 +1,4 @@
-// Pannello «Invia attacco» del canale Red-team (spec §8.1), dal tasto destro su una pagina.
+// Pannello «Invia attacco» del canale Red-team (spec §8.1): dal tasto destro (chi ha un codice) e dalla pagina Red Team.
 // Due campi separati: l'attacco va ai 4 giudici, la descrizione solo al giudice di validità.
 // Il backend può mancare: un REDTEAM_SUBMIT in errore diventa un messaggio, non un crash.
 
@@ -17,6 +17,8 @@
 
   let activeRoot = null;
   let activeStack = null;
+  // Stacca ciò che l'apertura ha agganciato fuori dal pannello (#1096).
+  let pulizia = null;
 
   function icon(name, size) {
     try { return typeof Icons[name] === 'function' ? Icons[name](size) : ''; }
@@ -25,6 +27,9 @@
 
   function close() {
     if (!activeRoot) return;
+    const stacca = pulizia;
+    pulizia = null;
+    try { stacca?.(); } catch (_) {}
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
     if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
@@ -59,7 +64,14 @@
     }
   }
 
+  // Su un sito il pannello sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
   function open() {
+    if (activeRoot) return;
+    if (global.SN_RIQUADRI_SOPRA?.apri('redteam', {}, apriQui)) return;
+    apriQui();
+  }
+
+  function apriQui() {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-rt-overlay';
@@ -73,6 +85,7 @@
             <span class="sn-rt-head-icon">${icon('redteam', 18)}</span>
             <span class="sn-rt-head-title">Invia un attacco</span>
           </div>
+          <p class="sn-rt-avviso" hidden>Ogni tentativo costa ${COST} crediti, e senza un codice Red Team il risultato non lo vedi.</p>
           <label class="sn-rt-field">
             <span class="sn-rt-label">Testo dell’attacco</span>
             <textarea class="sn-rt-attack" rows="4" placeholder="Il prompt che prova a ingannare i giudici di sicurezza."></textarea>
@@ -91,7 +104,8 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
-    Popup?.attachZoomCompensation?.(root);
+    // La compensazione zoom ascolta window e visualViewport: senza staccarla ogni apertura resta in memoria (#1096).
+    const staccaZoom = Popup?.attachZoomCompensation?.(root);
     activeStack = Popup?.registerStack?.(root) || null;
 
     const modal = root.querySelector('.sn-rt-modal');
@@ -101,9 +115,12 @@
     const statusEl = root.querySelector('.sn-rt-status');
     const sendBtn = root.querySelector('.sn-rt-send');
     const cancelBtn = root.querySelector('.sn-rt-cancel');
+    const avvisoEl = root.querySelector('.sn-rt-avviso');
 
     let signedIn = false;
     let balance = null; // null = sconosciuto (non blocchiamo finché non lo sappiamo)
+    // Chi non ha un codice (#991) legge prima il prezzo e che il risultato non lo vede. null = non ancora saputo.
+    let verificato = null;
 
     function sendLabel() {
       // Mostra SEMPRE il costo (spec §8.1, punto 3).
@@ -138,6 +155,10 @@
 
     // Bozze persistenti: sopravvivono a chiusura e riapertura.
     let saveTimer = null;
+    pulizia = () => {
+      try { if (typeof staccaZoom === 'function') staccaZoom(); } catch (_) {}
+      if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveDraft(); }
+    };
     function saveDraft() {
       if (!DRAFT_ATTACK_KEY) return;
       try {
@@ -153,7 +174,7 @@
     }
     const onInput = () => {
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveDraft, 250);
+      saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
       refreshSendState({ daInput: true });
     };
     attackEl.addEventListener('input', onInput);
@@ -167,27 +188,62 @@
       }).catch(() => {});
     } catch (_) {}
 
+    (async function loadVerificato() {
+      try {
+        const r = await chrome.runtime.sendMessage({ type: MSG.REDTEAM_VISIBILITY, attendi: true });
+        if (r && r.ok && typeof r.verificato === 'boolean') verificato = r.verificato;
+      } catch (_) {}
+      if (activeRoot === root) avvisoEl.hidden = verificato !== false;
+    })();
+
+    async function leggiSaldo() {
+      if (!signedIn) return;
+      try {
+        const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
+        if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
+      } catch (_) {}
+    }
+
     (async function loadAuthAndBalance() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
         signedIn = !!(a && a.signedIn);
       } catch (_) { signedIn = false; }
-      if (signedIn) {
-        try {
-          const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-          if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
-        } catch (_) {}
-      }
+      await leggiSaldo();
       if (activeRoot === root) refreshSendState();
     })();
+
+    // L'esito dell'accesso cambia il pannello aperto (#810.15) e un fallimento dice il perché (#678.5). Sopra un sito
+    // l'accesso passa solo col clic che l'ha chiesto (#1132).
+    async function accedi() {
+      setStatus('Completa l’accesso nella pagina di Google che si è aperta.');
+      let r = null;
+      try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN_CLIC }); } catch (_) { r = null; }
+      if (activeRoot !== root) return;
+      if (r && r.ok && (r.signedIn || r.profile)) {
+        signedIn = true;
+        await leggiSaldo();
+        if (activeRoot !== root) return;
+        setStatus('');
+        refreshSendState();
+        if (!statusEl.classList.contains('sn-rt-status--err')) setStatus('Sei dentro: ora puoi inviare l’attacco.', 'ok');
+        return;
+      }
+      setStatus((r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.', 'err');
+    }
 
     // ---- invio: costa crediti, parte solo dal clic dell'utente (#1071) ----
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
+      // Un accesso fatto altrove (menu del Profilo, un'altra scheda) col pannello aperto vale qui: si chiede adesso (#1351).
       if (!signedIn) {
-        setStatus('Accedi al tuo account per inviare un attacco.', 'err');
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-        return;
+        try { const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }); signedIn = !!(a && a.signedIn); } catch (_) {}
+        if (activeRoot !== root) return;
+        if (!signedIn) { accedi(); return; }
+        await leggiSaldo();
+        if (activeRoot !== root) return;
+        refreshSendState();
+        if (sendBtn.disabled) return;
       }
       const attackText = attackEl.value.trim();
       const description = descEl.value.trim();
@@ -205,7 +261,21 @@
         res = { status: 'error' };
       }
       const msg = submitStatusMessage(res);
+      if (msg.ok && res && res.attemptId && verificato === false) {
+        // Senza codice non c'è una pagina del risultato da aprire: il pannello resta, pronto per un altro.
+        clearTimeout(saveTimer);
+        saveTimer = null;
+        clearDraft();
+        attackEl.value = '';
+        descEl.value = '';
+        cancelBtn.disabled = false;
+        refreshSendState();
+        setStatus('Attacco inviato.', 'ok');
+        return;
+      }
       if (msg.ok && res && res.attemptId) {
+        clearTimeout(saveTimer);
+        saveTimer = null;
         clearDraft();
         setStatus(msg.text, 'ok');
         // Naviga alla pagina red-team sul tentativo: lì parte la rivelazione live.
@@ -215,11 +285,14 @@
         return;
       }
       setStatus(msg.text, 'err');
-      if (msg.needLogin) {
-        try { chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) {}
-      }
       cancelBtn.disabled = false;
       sendBtn.disabled = false;
+      if (msg.needLogin) {
+        signedIn = false;
+        refreshSendState();
+        accedi();
+        return;
+      }
       refreshSendState();
     });
 

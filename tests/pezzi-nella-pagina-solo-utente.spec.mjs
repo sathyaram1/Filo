@@ -3,8 +3,8 @@
 // Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDiFilo } from './helpers/riquadri.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { nelMondoDiFilo, nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
 const PAGINA = `<!doctype html><html><head><meta charset="utf-8"><title>Pagina ostile</title></head>
 <body style="margin:0;height:100vh;font:16px sans-serif"><p id="t" style="margin:120px 40px;font-size:28px">Un testo da trascrivere</p></body></html>`;
@@ -19,22 +19,11 @@ const premeDaSola = (page, sel) => page.evaluate((s) => {
   return true;
 }, sel);
 
-async function voceDelMenu(page, id) {
-  await page.locator('#t').click({ button: 'right', position: { x: 5, y: 5 } });
-  await expect(menuDi(page).locator('.sn-menu').first()).toBeVisible({ timeout: 8000 });
-  const voce = menuDi(page).locator(`[data-sn-icon-id="${id}"]`);
-  if (await voce.count() === 0) {
-    await menuDi(page).locator('.sn-menu-row-overflow').first().hover();
-    await menuDi(page).locator('.sn-menu-row-overflow').first().click().catch(() => {});
-  }
-  return voce.first();
-}
-
 const listaAperta = (app) => app.windows().some((w) => { try { return w.url().startsWith('filo://home/home.html'); } catch (_) { return false; } });
 
 test('la conferma di «Salva per dopo»: premuta dal codice della pagina non apre la lista, dall\'utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
-  await (await voceDelMenu(page, 'saveForLater')).click();
+  await premiNellaBarra(app, 'saveForLater');
   const pill = page.locator('.sn-save-confirm');
   await expect(pill).toBeVisible({ timeout: 5000 });
   // Col puntatore sopra la conferma aspetta: la scheda non si chiude mentre la pagina prova.
@@ -61,7 +50,7 @@ test('trascrivi una parte della pagina: il riquadro lo sceglie il mouse dell\'ut
     return true;
   });
   const trascrizioni = () => nelMondoDiFilo(app, page, () => window.__trascrizioni);
-  await (await voceDelMenu(page, 'transcribe')).click();
+  await premiNellaBarra(app, 'transcribe');
   const overlay = page.locator('.sn-region-overlay');
   await expect(overlay).toBeVisible({ timeout: 10_000 });
 
@@ -90,7 +79,7 @@ test('QR della pagina: «Scarica» e «Copia link» premuti dal codice della pag
   const page = await testServer.openReady(openTab, PAGINA);
   const appunti = () => app.evaluate(({ clipboard }) => clipboard.readText());
   await app.evaluate(({ clipboard }) => clipboard.writeText('appunti dell\'utente'));
-  await (await voceDelMenu(page, 'qrCode')).click();
+  await premiNellaBarra(app, 'qrCode');
   const overlay = page.locator('.sn-qr-overlay');
   await expect(overlay).toBeVisible({ timeout: 8000 });
 
@@ -106,9 +95,13 @@ test('QR della pagina: «Scarica» e «Copia link» premuti dal codice della pag
   await expect.poll(appunti).toBe(page.url());
 });
 
+// Su un sito l'Aiuto sta nello strato sopra la scheda (#1509.3): il codice della pagina non trova nemmeno il rimedio.
 test('il rimedio sotto un errore dell\'Aiuto: premuto dal codice della pagina non apre niente, dall\'utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA);
-  await nelMondoDiFilo(app, page, () => {
+  await nelMondoDiFilo(app, page, () => { globalThis.SN_SIDEBAR.open(); return true; });
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+  await nelloStrato(app, page, () => {
     window.__aperte = [];
     const M = globalThis.SN_MSG.MSG;
     const A = globalThis.SN_CONST.ACTIONS;
@@ -118,18 +111,20 @@ test('il rimedio sotto un errore dell\'Aiuto: premuto dal codice della pagina no
       if (m && m.type === M.OPEN_URL) { window.__aperte.push(m.url); return Promise.resolve({ ok: true }); }
       return orig(m, ...r);
     };
-    globalThis.SN_SIDEBAR.open();
     return true;
   });
-  const aperte = () => nelMondoDiFilo(app, page, () => window.__aperte.slice());
-  await page.waitForSelector('.sn-sidebar-input textarea');
-  await page.click('.sn-sidebar-input textarea');
-  await page.keyboard.type('aiutami');
-  await page.keyboard.press('Enter');
-  const rimedio = page.locator('.sn-sidebar-choice', { hasText: 'Apri Crediti' });
+  const aperte = () => nelloStrato(app, page, () => window.__aperte.slice());
+  await strato.click('.sn-sidebar-input textarea');
+  await strato.keyboard.type('aiutami');
+  await strato.keyboard.press('Enter');
+  const rimedio = strato.locator('.sn-sidebar-choice', { hasText: 'Apri Crediti' });
   await expect(rimedio).toBeVisible({ timeout: 10_000 });
 
-  await page.evaluate(() => [...document.querySelectorAll('.sn-sidebar-choice')].forEach((b) => b.click()));
+  expect(await page.evaluate(() => {
+    const b = [...document.querySelectorAll('.sn-sidebar-choice')];
+    b.forEach((x) => x.click());
+    return b.length;
+  })).toBe(0);
   await page.waitForTimeout(800);
   expect(await aperte()).toEqual([]);
 

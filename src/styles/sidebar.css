@@ -94,6 +94,13 @@
   color: var(--sn-fg);
 }
 
+/* Le immagini date all'Aiuto (#1623): sopra la casella prima dell'invio, in cima alla bolla dopo. Il contenuto sta in
+   un'ombra chiusa (sidebar.js), qui solo il posto. */
+.sn-sidebar-allegati { flex-shrink: 0; border-top: 1px solid var(--sn-border); }
+.sn-sidebar-allegati[hidden] { display: none; }
+.sn-sidebar-allegati:not([hidden]) + .sn-sidebar-input,
+.sn-sidebar.sn-sidebar-collapsed .sn-sidebar-allegati { border-top: 0; }
+.sn-sidebar-msg-immagini { display: block; }
 .sn-sidebar-msg-loading { color: var(--sn-muted); font-style: italic; }
 .sn-sidebar-msg-error   { color: var(--sn-error); }
 
@@ -161,6 +168,71 @@
   background: var(--sn-bg);
   color: var(--sn-muted);
   border-color: var(--sn-border);
+}
+
+/* Le correzioni di «Valuta» (#1449): una riga per correzione, il pezzo di prima barrato e quello nuovo; scritta nel
+   campo prende la spunta e il colore dell'accento, e un altro clic la toglie. */
+.sn-sidebar-correzioni {
+  align-self: stretch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: -4px;
+  min-width: 0;
+}
+.sn-sidebar-correzione {
+  all: unset;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-width: 100%;
+  padding: 6px 10px 6px 28px;
+  position: relative;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-radius: 10px;
+  font-size: 12px;
+  line-height: 1.35;
+  cursor: pointer;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  transition: border-color calc(120ms * var(--sn-motion, 1)) ease, background calc(120ms * var(--sn-motion, 1)) ease, transform calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-correzione::before {
+  content: '';
+  position: absolute;
+  left: 9px;
+  top: 8px;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border: 1.5px solid var(--sn-muted);
+  border-radius: 50%;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, border-color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-correzione:hover { border-color: var(--sn-accent); background: var(--sn-hover, rgba(127,127,127,0.10)); }
+.sn-sidebar-correzione:hover::before { border-color: var(--sn-accent); }
+.sn-sidebar-correzione:active { transform: scale(0.99); }
+.sn-sidebar-correzione:focus-visible { outline: 2px solid var(--sn-accent); outline-offset: 2px; }
+.sn-sidebar-correzione-prima { color: var(--sn-muted); text-decoration: line-through; }
+.sn-sidebar-correzione-freccia { color: var(--sn-muted); margin: 0 6px; }
+.sn-sidebar-correzione-dopo { font-weight: 600; }
+.sn-sidebar-correzione-perche { color: var(--sn-muted); font-size: 11px; }
+.sn-sidebar-correzione-fatta { border-color: var(--sn-accent); }
+.sn-sidebar-correzione-fatta::before { border-color: var(--sn-accent); background: var(--sn-accent); }
+/* La spunta è l'angolo di un rettangolo ruotato: niente immagini, sta dentro il cerchio dell'accento scelto. */
+.sn-sidebar-correzione-fatta::after {
+  content: '';
+  position: absolute;
+  left: 13px;
+  top: 9.5px;
+  width: 3px;
+  height: 6px;
+  border: solid #fff;
+  border-width: 0 1.5px 1.5px 0;
+  transform: rotate(45deg);
 }
 
 /* Il documento trovato (#947.3): un bottone che si apre o si trascina nella pagina, come il file in una cartella. */
@@ -239,7 +311,8 @@
 
 /* Gli avvisi in basso a destra stanno a sinistra dell'Aiuto rimasto nel suo angolo: sopra ne coprivano la casella
    e l'invio, anche col pannello collassato (la conferma di «Salva per dopo» chiesta all'Aiuto, #845). */
-html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
+html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts,
+.sn-toasts.sn-toasts-accanto-aiuto {
   right: calc(16px + 360px + 12px);
   max-width: max(200px, calc(100vw - 408px));
 }
@@ -325,37 +398,94 @@ html:has(> .sn-sidebar:not([data-spostata])) > .sn-toasts {
 .sn-sidebar-input button[type="submit"]:hover { transform: translateY(-1px); }
 .sn-sidebar-input button[type="submit"]:active { transform: translateY(0); opacity: 0.85; }
 
-/* Tre righe di ragionamento che scorrono: la prima quasi trasparente sta uscendo, l'ultima è piena.
-   Le frasi cambiano ogni ~900ms con uno shift verso l'alto. */
-.sn-sidebar-thinking {
-  align-self: flex-start;
+/* Il quadrato che ferma (#578.1): stesso posto dell'invio, colore d'accento, come nella home. */
+.sn-sidebar-input button[type="submit"][data-modo="ferma"] {
+  background: var(--sn-accent);
+  color: #fff;
+  animation: sn-sidebar-arma var(--sn-pausa-quadrato) ease-in;
+}
+.sn-sidebar-input button[type="submit"][data-modo="ferma"]::before {
+  content: '';
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  background: currentColor;
+}
+.sn-sidebar-input button[type="submit"][data-modo="ferma"]:hover { transform: scale(1.07); }
+/* Appena comparso sotto il dito che ha mandato ignora i clic: si accende in quel tempo vero (SN_CONST.PAUSA_QUADRATO_MS). */
+@keyframes sn-sidebar-arma { from { opacity: 0.45; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+  .sn-sidebar-input button[type="submit"][data-modo="ferma"] { animation-timing-function: step-end; }
+}
+
+/* L'attesa di un passo (#578.1): una rotella finché non c'è niente di vero, poi l'azione in corso o la trama del
+   ragionamento, piccola e sfumata come nella home (patterns/il-filo-dell-attesa.md). Un clic la apre per intero. */
+.sn-sidebar-attesa {
+  align-self: stretch;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  padding: 4px 6px;
+  min-width: 0;
   font-size: 11px;
-  font-style: italic;
   color: var(--sn-muted);
-  line-height: 1.35;
-  max-width: 92%;
-  overflow: hidden;
 }
-.sn-sidebar-thinking-line {
+.sn-sidebar-attesa-testa {
+  all: unset;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 2px 6px;
+  border-radius: 6px;
+  line-height: 18px;
+  transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
+}
+.sn-sidebar-attesa-pensata .sn-sidebar-attesa-testa { cursor: pointer; }
+.sn-sidebar-attesa-pensata .sn-sidebar-attesa-testa:hover,
+.sn-sidebar-attesa-aperta .sn-sidebar-attesa-testa { background: var(--sn-hover); color: var(--sn-fg); }
+.sn-sidebar-rotella {
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 10px;
+  height: 10px;
+  border: 2px solid var(--sn-border);
+  border-top-color: var(--sn-accent);
+  border-radius: 50%;
+  animation: sn-sidebar-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
+}
+.sn-sidebar-attesa[data-fase="fatto"] .sn-sidebar-rotella,
+.sn-sidebar-attesa[data-fase="fermato"] .sn-sidebar-rotella { display: none; }
+@keyframes sn-sidebar-gira { to { transform: rotate(360deg); } }
+.sn-sidebar-attesa-riga {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
   white-space: nowrap;
-  overflow: hidden;
   text-overflow: ellipsis;
-  transition: opacity calc(350ms * var(--sn-motion, 1)) ease;
 }
-.sn-sidebar-thinking-line[data-slot="0"] { opacity: 0.25; }
-.sn-sidebar-thinking-line[data-slot="1"] { opacity: 0.55; }
-.sn-sidebar-thinking-line[data-slot="2"] { opacity: 0.95; }
-.sn-sidebar-thinking-line.sn-sidebar-thinking-enter {
-  animation: sn-thinking-enter calc(350ms * var(--sn-motion, 1)) ease-out;
+/* La trama non si legge, si intravede: la coda del ragionamento, sfumata ai bordi. */
+.sn-sidebar-attesa[data-fase="pensa"] .sn-sidebar-attesa-riga {
+  direction: rtl;
+  text-align: left;
+  text-overflow: clip;
+  font-size: 10.5px;
+  opacity: var(--sn-filo-trama-opacity, 0.5);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
+  mask-image: linear-gradient(90deg, transparent, #000 25%, #000 75%, transparent);
 }
-@keyframes sn-thinking-enter {
-  from { opacity: 0; transform: translateY(6px); }
-  to   { opacity: 0.95; transform: translateY(0); }
+.sn-sidebar-attesa-riga > span { direction: ltr; unicode-bidi: isolate; }
+.sn-sidebar-attesa[data-fase="fermato"] .sn-sidebar-attesa-testa { color: var(--sn-fg); }
+.sn-sidebar-attesa-corpo {
+  margin: 2px 0 4px 10px;
+  padding: 2px 8px;
+  border-left: 2px solid var(--sn-border);
+  max-height: 180px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.4;
 }
+.sn-sidebar-attesa-corpo[hidden] { display: none; }
+.sn-sidebar-log.sn-sidebar-log-fermato { opacity: 0.9; }
 
 /* Popup di fine lavoro: appare in chat quando Filo dichiara di aver finito. */
 .sn-sidebar-feedback {

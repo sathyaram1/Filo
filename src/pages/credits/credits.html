@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="credits.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
@@ -33,6 +34,8 @@
         <p class="sn-wallet-msg" id="redeemMsg" role="status" hidden></p>
       </form>
       <p class="sn-muted sn-wallet-note" id="walletNote" role="status" hidden></p>
+      <!-- I consumi usciti dalla coda del registro senza arrivare al server (#1601): nessuno sparisce senza dirlo. -->
+      <p class="sn-muted sn-wallet-note" id="usageLogNote" role="status" hidden></p>
       <button type="button" class="sn-btn sn-btn-secondary" id="reissueBtn" hidden>Richiedi una nuova chiave</button>
       <button type="button" class="sn-btn sn-btn-secondary" id="resetIdentityBtn" hidden>Ricomincia con un nuovo invito</button>
       <span class="sn-wallet-inline" id="resetIdentityConfirm" hidden>
@@ -99,6 +102,7 @@
       <h2>I tuoi inviti</h2>
       <div id="invitesLocked" class="sn-wallet-invites-locked" hidden>
         <button type="button" id="linkGoogleBtn" class="sn-wallet-link-google"></button>
+        <button type="button" id="linkGoogleLascia" class="sn-wallet-link-google" hidden>Lascia stare</button>
         <p id="invitesLockedNote" class="sn-muted sn-wallet-note" role="status" hidden></p>
       </div>
       <ul id="invites" class="sn-wallet-invites"></ul>

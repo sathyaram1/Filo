@@ -304,6 +304,8 @@ export async function captureCompositeElectron(app, outPath) {
     const png = nativeImage.createFromBitmap(tela, { width: W, height: H, scaleFactor: 1 }).toPNG();
     return { png: png.toString('base64'), saltate };
   });
+  // In un clone pulito la cartella delle foto non c'è ancora.
+  mkdirSync(dirname(resolve(outPath)), { recursive: true });
   writeFileSync(outPath, Buffer.from(esito.png, 'base64'));
   if (esito.saltate.length) console.warn(`[captureComposite] superfici che non si sono lasciate fotografare: ${esito.saltate.join(', ')}`);
   return outPath;
@@ -333,7 +335,7 @@ export async function activeView(app, shell) {
 
 // Script eseguito in pagina: trova elementi interagibili visibili e ne ritorna i rect.
 function COLLECT_FN() {
-  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .ed-switch-icon, .ed-cell-empty, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
+  const sel = 'a[href], button, input, textarea, select, [role="button"], [role="menuitem"], [contenteditable="true"], [data-add], [data-sr], .pd-striscia, .pd-voce, .dash-carta, .dash-carta-voce, .dash-altro-app, .apps-item';
   const els = Array.from(document.querySelectorAll(sel));
   const out = [];
   for (const el of els) {

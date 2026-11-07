@@ -19,8 +19,9 @@
 //   C) ogni scrittura nella macchina a stati RICALCOLA l'identità e rifiuta la
 //      transizione se non corrisponde (identityVerdict + checkDelivery); ogni
 //      transizione accettata lascia un PUNTO FERMO (withCheckpoint);
-//   D) un'interruzione riporta il branch all'ULTIMO punto fermo, spostando di
-//      lato — senza distruggerli — i commit scartati (prepareBranch);
+//   D) il branch riparte dalla punta pubblicata, o dal punto fermo locale se è
+//      quella punta o più avanti, spostando di lato — senza distruggerli — i
+//      commit scartati (prepareBranch);
 //   B) l'identità attesa viene esposta su file (writeExpectation) perché una
 //      guardia FUORI dalla sessione (.claude/hooks/branch-guard.sh) possa
 //      confrontarla dopo ogni comando.
@@ -33,8 +34,11 @@ import { mkdirSync, writeFileSync, readFileSync, readdirSync, existsSync, rmSync
 import { resolve, sep } from 'node:path';
 import { installaControlloSpedizione } from './copie-di-dati.mjs';
 import { ensureCommentChar } from './carattere-commento.mjs';
+import { senzaToken } from './git-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
+import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { lineaPrincipale, numeroFeedback, ultimaFusionePropria } from './su-main.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
 
@@ -113,9 +117,111 @@ export function attemptStamp(nowMs = Date.now()) {
  * poterlo ricalcolare.
  */
 export function newWorkBranch(id, nowMs = Date.now()) {
-  const safe = String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+  const safe = idNelRamo(id);
   if (!safe) throw new Error('newWorkBranch: id non valido');
   return `worker/${safe}-${attemptStamp(nowMs)}`;
+}
+
+function idNelRamo(id) {
+  return String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+}
+
+/** Lo stampo se `ramo` è un tentativo di lavoro nuovo su `id` (`worker/<id>-<stampo>`), se no ''. PURA. */
+export function stampoDelTentativo(ramo, id) {
+  const safe = idNelRamo(id);
+  const t = leggiTentativo(ramo);
+  return safe && t && t.id === safe ? t.stampo : '';
+}
+
+/**
+ * I tentativi di lavoro nuovo su `id` rimasti su origin con commit propri fuori dalla linea principale: uno morto prima
+ * di consegnare non è legato al feedback, e chi riparte da main lo rifà e lo lascia lì per sempre (#2152). `scelto` è
+ * il più recente fra quelli che nessun altro contiene, `altri` quelli che lui non contiene; `superati` quelli che la
+ * regola dei tentativi dà per morti, da chiudere. Un no di origin è un «non so», non un «non ce ne sono» (#1632).
+ * `num`, se c'è, aggiunge alla regola la fusione del feedback letta su main.
+ */
+export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', escludi = '' }) {
+  const safe = idNelRamo(id);
+  if (!safe) return { ok: true, scelto: null, altri: [], superati: [] };
+  const elenco = tentativiSuOrigin(root, `refs/heads/worker/${safe}-*`);
+  if (!elenco.ok) return elenco;
+  const rami = elenco.rami.filter((t) => t.ramo !== escludi && stampoDelTentativo(t.ramo, id));
+  if (!rami.length) return { ok: true, scelto: null, altri: [], superati: [] };
+  const g = gitIn(root);
+  const f = scaricaTentativi(g, mainBranch, rami);
+  if (!f.ok) return f;
+  const main = `origin/${mainBranch}`;
+  const conFusi = statoDeiTentativi(root, g, main, rami);
+  // La fusione del feedback letta su main regge anche quando la potatura ha già tolto il ramo fuso.
+  let fusioni = {};
+  try {
+    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main }) : '';
+    if (data) fusioni = { [safe]: attemptStamp(Date.parse(data)) };
+  } catch (_) { /* senza la storia di main resta la regola sui rami */ }
+  const superati = tentativiSuperati(conFusi, { fusioni });
+  const vivi = conFusi.filter((t) => !t.fuso && !superati.has(t.ramo)).map((t) => {
+    const n = g(['rev-list', '--count', `${main}..${t.head}`]);
+    return { ...t, propri: n.ok ? Number(n.out) || 0 : 0 };
+  });
+  const [scelto = null, ...altri] = viviInCima(vivi, (a, b) => antenato(g, a.head, b.head));
+  return { ok: true, scelto, altri, superati: [...superati] };
+}
+
+/** I rami su origin che rispondono a `glob` → { ok, rami: [{ head, ramo }] }. */
+function tentativiSuOrigin(root, glob) {
+  try {
+    const out = execFileSync('git', ['ls-remote', 'origin', glob], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'] });
+    const rami = String(out).split('\n').map((r) => r.trim().split(/\s+/)).filter((p) => p.length === 2)
+      .map(([head, ref]) => ({ head, ramo: ref.replace(/^refs\/heads\//, '') }));
+    return { ok: true, rami };
+  } catch (e) {
+    return { ok: false, errore: rigaDiErrore(e.stderr, e.message) };
+  }
+}
+
+function scaricaTentativi(g, mainBranch, rami) {
+  // Refspec esplicita: in un clone a ramo singolo `fetch origin <ramo>` scriverebbe solo FETCH_HEAD.
+  const f = g(['fetch', 'origin', `+refs/heads/${mainBranch}:refs/remotes/origin/${mainBranch}`,
+    ...rami.map((t) => `+refs/heads/${t.ramo}:refs/remotes/origin/${t.ramo}`)]);
+  return f.ok ? { ok: true } : { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+}
+
+/** `vuoto`: la punta sta sulla linea principale, cioè il tentativo è nato da main e non ci ha mai scritto. */
+function statoDeiTentativi(root, g, main, rami) {
+  const linea = lineaPrincipale(root, main);
+  return rami.map((t) => ({ ...t, fuso: antenato(g, t.head, main), vuoto: linea.has(t.head) }));
+}
+
+/**
+ * Chiude su origin i tentativi superati di tutti i feedback, non solo di quello che riparte: va fatto mentre il ramo
+ * fuso c'è ancora, prima che la potatura lo tolga, e un feedback chiuso non riparte più (#2152). Best-effort.
+ */
+export function chiudiSuperatiOvunque({ root, mainBranch = 'main' }) {
+  const elenco = tentativiSuOrigin(root, 'refs/heads/worker/*');
+  if (!elenco.ok) return { ok: false, chiusi: [], errore: elenco.errore };
+  const perId = new Map();
+  for (const t of elenco.rami) {
+    const l = leggiTentativo(t.ramo);
+    if (l) perId.set(l.id, [...(perId.get(l.id) || []), t]);
+  }
+  const candidati = [...perId.values()].filter((v) => v.length > 1).flat();
+  if (!candidati.length) return { ok: true, chiusi: [] };
+  const g = gitIn(root);
+  const f = scaricaTentativi(g, mainBranch, candidati);
+  if (!f.ok) return { ok: false, chiusi: [], errore: f.errore };
+  const superati = tentativiSuperati(statoDeiTentativi(root, g, `origin/${mainBranch}`, candidati));
+  return chiudiTentativi({ root, rami: [...superati] });
+}
+
+/**
+ * Toglie da origin i tentativi superati: lasciati lì nessuno li fonde, e la potatura dei fusi non li vede mai (#2152).
+ * Best-effort: un no di origin lascia i rami come sono, e lo dice.
+ */
+export function chiudiTentativi({ root, rami }) {
+  const elenco = (Array.isArray(rami) ? rami : []).filter((r) => leggiTentativo(r));
+  if (!elenco.length) return { ok: true, chiusi: [] };
+  const p = gitIn(root)(['push', 'origin', ...elenco.map((r) => `:refs/heads/${r}`)]);
+  return p.ok ? { ok: true, chiusi: elenco } : { ok: false, chiusi: [], errore: rigaDiErrore(p.out, 'push fallito') };
 }
 
 // (Qui viveva preferredBase: col "Modello B" i pezzi #N.M di una feature
@@ -260,15 +366,11 @@ export function clearExpectation(root) {
 
 // ─── Sigillo di fine giro (#507) ─────────────────────────────────────────────
 //
-// Il ripristino D preferisce il punto fermo locale al ramo remoto, ed è giusto
-// così: l'hook di salvataggio spinge anche il lavoro di un'istanza morta a
-// metà, quindi "origin è più avanti" non distingue una consegna da un moncone.
-// A distinguere è il SIGILLO: ogni fine giro legittima deve lasciare il punto
-// fermo sul contenuto che consegna. Le consegne di verifica/correzione/audit lo
-// facevano (sealTransition in dispatch.mjs); la consegna del primo passaggio e
-// il rilascio del biglietto no — e al posizionamento successivo nello stesso
-// clone il ripristino riportava il ramo alla base, parcheggiando su discarded/
-// una consegna intera (feedback #507: due lavori interi buttati in tre giorni).
+// Ogni fine giro legittima lascia il punto fermo sul contenuto che consegna: è
+// ciò che al posizionamento dopo tiene un lavoro sigillato e non ancora spedito
+// (#1486), e che la pulizia dopo un «pass» ritrova (#880). Senza sigillo, il
+// primo passaggio e il rilascio del biglietto lasciavano il punto fermo alla
+// base, e una consegna intera finiva su discarded/ (#507).
 
 /** L'id del feedback il cui stato nomina questo branch, o ''. */
 export function findStateIdByBranch(root, branch) {
@@ -391,6 +493,25 @@ function commitExists(g, sha) {
 }
 
 /**
+ * Il ref di tracciamento di `branch` con un reflog suo. `git clone` scrive quelli di origin senza, e lì
+ * --force-if-includes confronta con un'ora mai scritta: il rinvio dopo un rebase viene rifiutato (#1930). Si toglie e si
+ * rimette uguale, perché un aggiornamento allo stesso valore git non lo registra. ok falso se resta senza.
+ */
+export function assicuraReflogTracciamento(root, branch) {
+  const g = gitIn(root);
+  const ref = `refs/remotes/origin/${branch}`;
+  const sha = g(['rev-parse', '--verify', '--quiet', ref]);
+  if (!sha.ok || !sha.out) return { ok: false, creato: false, motivo: `${ref} non c'è` };
+  if (g(['reflog', 'exists', ref]).ok) return { ok: true, creato: false, motivo: '' };
+  const via = g(['update-ref', '-d', ref, sha.out]);
+  if (!via.ok) return { ok: false, creato: false, motivo: via.out.slice(0, 200) };
+  const rimesso = g(['update-ref', '--create-reflog', '-m', 'filo: tracciamento col suo reflog', ref, sha.out, '']);
+  if (rimesso.ok) return { ok: true, creato: true, motivo: '' };
+  g(['update-ref', ref, sha.out]);
+  return { ok: false, creato: false, motivo: rimesso.out.slice(0, 200) };
+}
+
+/**
  * I marcatori di sessione: biglietto, battito, ruolo, identità attesa, stato
  * locale. Vivono in `.claude/` DENTRO il progetto, quindi hanno due nemici che
  * il `.gitignore` del ramo GIUSTO tiene a bada, ma quello di un ramo VECCHIO
@@ -460,19 +581,23 @@ export function ensureSessionExcludes(root) {
  *   root         directory del repo
  *   branch       branch su cui posizionarsi (per `create` è il nome da creare)
  *   create       true = lavoro NUOVO (crea il branch dalla base)
+ *   createIfMissing  true = il nome è già deciso (il ramo del biglietto): si riprende se c'è, sennò nasce dalla base
  *   base         base da cui creare (default: mainBranch)
  *   mainBranch   linea principale (default 'main')
- *   checkpoint   ultimo punto fermo (SHA) a cui riportare il branch, o null
+ *   checkpoint   ultimo punto fermo locale (SHA), o null
  *   now          per i test
  *
- * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null}}
+ * @returns {{ok:true, head:string, discarded:string|null, rewritten?:string|null, superato?:string|null, avviso?:string, ripreso?:boolean}}
+ *          ripreso   = con createIfMissing, il ramo c'era già ed è stato ripreso
  *          rewritten = il punto fermo lasciato perché il ramo su origin è stato riscritto
+ *          superato  = il punto fermo lasciato perché più vecchio della punta pubblicata (un giro passato altrove)
+ *          avviso    = origin/<branch> senza reflog: il rinvio dopo un rebase verrà rifiutato
  *        | {ok:false, kind:'transient'|'permanent', message:string}
  *
  * FAIL CLOSED: se non riesce, il chiamante NON consegna il lavoro. Meglio un
  * giro a vuoto che un giro sull'albero sbagliato.
  */
-export function prepareBranch({ root, branch, create = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
+export function prepareBranch({ root, branch, create = false, createIfMissing = false, base = '', mainBranch = 'main', checkpoint = null, now = Date.now() }) {
   const g = gitIn(root);
   if (!branch) return { ok: false, kind: 'transient', message: 'nessun branch da preparare' };
   // Sulla linea principale non si LAVORA: il cancello fonde un ramo, quindi un
@@ -490,10 +615,21 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   try { installaControlloSpedizione(root); } catch (_) { /* senza, restano i controlli delle singole strade */ }
   ensureCommentChar(root);
 
+  // «Su origin non c'è» va saputo, non dedotto da un fetch fallito: con la rete giù il ramo del biglietto
+  // rinascerebbe da main accanto al lavoro già spinto (#1632).
+  let remoto = null;
+  if (createIfMissing) {
+    remoto = ramoSuOrigin(root, branch);
+    if (remoto.errore) return { ok: false, kind: 'transient', message: `non riesco a chiedere a origin se ${branch} c'è: ${remoto.errore}` };
+    create = !remoto.presente && !refExists(g, `refs/heads/${branch}`);
+  }
+
   if (create) {
     const wanted = base || mainBranch;
-    g(['fetch', 'origin', wanted]);
-    g(['fetch', 'origin', mainBranch]);
+    for (const ref of new Set([wanted, mainBranch])) {
+      const s = scaricaDaOrigin(root, ref);
+      if (!s.ok) return { ok: false, kind: 'transient', message: `non riesco a scaricare ${ref} da origin, e la base sarebbe quella dell'ultimo scaricamento di questa cartella: ${s.errore}` };
+    }
     // Base: il branch chiesto se esiste, altrimenti la linea principale.
     // MAI HEAD: se il giro precedente ci ha lasciati su un
     // altro branch di lavoro, partire da HEAD erediterebbe il lavoro altrui.
@@ -513,7 +649,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   }
 
   // Branch esistente (verifier / fixer / secaudit).
-  g(['fetch', 'origin', branch]);
+  const scaricato = scaricaDaOrigin(root, branch, remoto);
+  if (!scaricato.ok) return { ok: false, kind: 'transient', message: `non riesco a scaricare ${branch} da origin, e la punta che questa cartella ricorda può essere di un giro passato: ${scaricato.errore}` };
   const hasLocal = refExists(g, `refs/heads/${branch}`);
   const hasRemote = refExists(g, `refs/remotes/origin/${branch}`);
   if (!hasLocal && !hasRemote) {
@@ -521,21 +658,24 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
     // chiamante porta il feedback fuori dal giro automatico (`design`).
     return { ok: false, kind: 'permanent', message: `il branch ${branch} non esiste più (né in locale né su origin)` };
   }
+  // Prima del checkout: --force-if-includes cerca la punta remota solo fra le voci del ramo locale scritte dopo
+  // l'ultima del reflog remoto, e la voce che la porta la scrive il checkout (o il reset) qui sotto.
+  const reflog = hasRemote ? assicuraReflogTracciamento(root, branch) : { ok: true };
+  const avviso = reflog.ok ? {} : { avviso: `origin/${branch} resta senza reflog (${reflog.motivo}): dopo un rebase il rinvio del ramo verrà rifiutato` };
   const co = hasLocal ? g(['checkout', branch]) : g(['checkout', '-B', branch, `origin/${branch}`]);
   if (!co.ok) return { ok: false, kind: 'transient', message: `checkout di ${branch} fallito: ${co.out.slice(0, 200)}` };
 
-  // Bersaglio del ripristino: l'ultimo punto fermo se lo conosciamo e se è
-  // raggiungibile; altrimenti lo stato remoto del branch (che È la consegna).
   // NB: senza punto fermo NON si torna a main — su un branch di revisione il
   // contenuto consegnato è tutto ciò che abbiamo.
   const tip = hasRemote ? g(['rev-parse', `origin/${branch}`]) : null;
   const remoteTip = tip && tip.ok ? tip.out : '';
   let target = commitExists(g, checkpoint) ? checkpoint : null;
-  // Un punto fermo fuori dalla linea della punta pubblicata è di una storia riscritta altrove (un riallineamento):
-  // vince la punta. Antenato della punta resta il caso dell'interruzione (#507), discendente è lavoro non spedito (#1486).
+  // La punta pubblicata è l'ultima consegna, da qualunque cartella: il punto fermo locale vince solo se è lei o sta
+  // più avanti (non spedito, #1486); più vecchio (un giro passato altrove, D-207) o fuori linea (riscritto) vince lei.
   let rewritten = null;
-  if (target && remoteTip && !sullaStessaLinea(g, target, remoteTip)) {
-    rewritten = target;
+  let superato = null;
+  if (target && remoteTip && target !== remoteTip && !antenato(g, remoteTip, target)) {
+    if (antenato(g, target, remoteTip)) superato = target; else rewritten = target;
     target = remoteTip;
   }
   if (!target) target = remoteTip || headSha(root);
@@ -543,7 +683,8 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
 
   const before = headSha(root);
   let discarded = null;
-  if (before && before !== target) {
+  // Una cartella rimasta indietro avanza e basta: di lato vanno solo i commit che il bersaglio non contiene.
+  if (before && before !== target && !antenato(g, before, target)) {
     // I commit scartati NON si distruggono: sono la traccia con cui si
     // ricostruisce cosa è successo. Si spostano di lato su un branch di
     // servizio (pushato se possibile) e solo allora si riporta indietro.
@@ -570,14 +711,45 @@ export function prepareBranch({ root, branch, create = false, base = '', mainBra
   // lasciano residui che al checkout successivo verrebbero TRASPORTATI sul
   // branch del compito dopo, finendo nel diff che va al cancello di sicurezza.
   g(['clean', '-fd']);
-  return { ok: true, head: headSha(root), discarded, rewritten };
+  return { ok: true, head: headSha(root), discarded, rewritten, superato, ...avviso, ...(createIfMissing ? { ripreso: true } : {}) };
+}
+
+/** `ls-remote --exit-code` esce 2 quando il ramo non c'è: ogni altro no (rete, permessi) è un «non so». */
+function ramoSuOrigin(root, branch) {
+  try {
+    execFileSync('git', ['ls-remote', '--exit-code', 'origin', `refs/heads/${branch}`], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+    return { presente: true };
+  } catch (e) {
+    if (e.status === 2) return { presente: false };
+    return { errore: rigaDiErrore(e.stderr, e.message) };
+  }
+}
+
+/**
+ * `fetch` di `ref`; un no passa solo se origin risponde che il ramo non c'è. Ogni altro no (rete, servizio) lascia la
+ * punta dell'ultimo scaricamento, magari di un giro passato, da non dare per l'ultima consegna (#1779.1).
+ */
+function scaricaDaOrigin(root, ref, noto = null) {
+  const f = gitIn(root)(['fetch', 'origin', ref]);
+  if (f.ok) return { ok: true };
+  if ((noto || ramoSuOrigin(root, ref)).presente === false) return { ok: true, assente: true };
+  return { ok: false, errore: rigaDiErrore(f.out, 'fetch fallito') };
+}
+
+/** La riga di git che dice il motivo, da ricopiare dentro le virgolette di `--guasto "…"` (il guasto di halt). PURA. */
+export function rigaDiErrore(testo, riserva = '') {
+  const righe = String(testo || '').split('\n').map((r) => r.trim()).filter(Boolean);
+  const riga = senzaToken(righe.find((r) => /^(fatal|error):/.test(r)) || righe[0] || riserva);
+  return riga.replace(/\\/g, '/').replace(/["`$]/g, "'").slice(0, 300);
+}
+
+function antenato(g, a, b) {
+  return g(['merge-base', '--is-ancestor', a, b]).ok;
 }
 
 /** `a` e `b` stanno sulla stessa storia: uguali, o uno antenato dell'altro. */
 function sullaStessaLinea(g, a, b) {
-  return a === b
-    || g(['merge-base', '--is-ancestor', a, b]).ok
-    || g(['merge-base', '--is-ancestor', b, a]).ok;
+  return a === b || antenato(g, a, b) || antenato(g, b, a);
 }
 
 // ─── C: il controllo che ogni scrittura di stato deve fare ───────────────────
@@ -816,6 +988,9 @@ export const USCITA_LAVORO_VIVO = 5;
 // Il gancio rinnova il timbro al più ogni 5 minuti: 10 coprono un salvataggio e il successivo.
 export const TIMBRO_VIVO_MS = 10 * 60 * 1000;
 export const SEGNI_TUTTI = Object.freeze(['battito', 'timbro', 'processi']);
+// Ciò che fa rifiutare il rilascio di un worker: l'attesa `aspetta` legge questo stesso, o dice «finito» a un rilascio
+// che poi rifiuta e il worker gira in tondo (#2185).
+export const SEGNI_RILASCIO_WORKER = Object.freeze(['processi']);
 // Il battito si conta dal suo marcatore: i battiti singoli del gancio e il ciclo di un biglietto non sono lavoro.
 const COMANDO_BATTITO = /routine-channel\.mjs["']?\s+heartbeat\b/;
 

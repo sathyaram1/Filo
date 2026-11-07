@@ -38,7 +38,7 @@ const comeScritto = (p) => resolve(p).split('\\').join('/');
 
 import {
   PINNED_PATHS, TOOLS_ROOT, pinTools, pinnedRepoRoot, absolutizeRecipe, pinWorkerTools, pinnedDirWorker,
-  absolutizeOutput, absolutizePrinted,
+  absolutizeOutput, absolutizePrinted, pinnedCommit, lavoroGiaPreso,
 } from '../../scripts/lib/tools-pin.mjs';
 
 function progettoFinto() {
@@ -419,6 +419,10 @@ test('il preflight FISSA gli strumenti e consegna istruzioni che puntano lì', a
     assert.ok(existsSync(resolve(dove, 'routines', 'roles', 'orchestrator.md')),
       'anche le ricette dei ruoli devono seguire gli strumenti');
     assert.equal(pinnedRepoRoot(dove), resolve(REPO), 'la copia deve ricordare il progetto');
+    // Senza il commit la sessione vecchia non si riconosce più, in silenzio (#1796).
+    assert.equal(pinnedCommit(dove), execFileSync('git', ['rev-parse', 'HEAD'], { cwd: REPO, encoding: 'utf8' }).trim(),
+      'la copia deve ricordare il commit intero da cui viene');
+    assert.equal(lavoroGiaPreso(dove), false, 'una copia appena fissata non ha ancora preso biglietti');
     // E le istruzioni consegnate devono puntare alla copia, non al progetto.
     assert.ok(!/node scripts\//.test(out.so),
       `le istruzioni rimandano ancora agli strumenti del ramo:\n${out.so.slice(0, 400)}`);
@@ -735,6 +739,10 @@ async function laboratorioGit() {
   g(['init', '-q', '-b', 'main']);
   g(['config', 'user.email', 't@t']);
   g(['config', 'user.name', 't']);
+  // Come Windows di serie, così il suo rosso si vede anche dal cancello su Linux; la fine riga la decide
+  // `.gitattributes` del repo, come nel progetto vero: senza, un file rimesso dal commit usciva CRLF (#2056).
+  g(['config', 'core.autocrlf', 'true']);
+  cpSync(resolve(REPO, '.gitattributes'), resolve(casa, '.gitattributes'));
   // Gli strumenti veri: la guardia gira dentro dispatch, non da sola.
   // Tutto quello che la copia pretende: enumerarlo a mano qui vorrebbe dire
   // ricostruire lo stesso elenco in due posti, e vederli divergere.
@@ -861,6 +869,33 @@ test('cartella sporca: ci si ferma ANCHE se il commit è quello giusto', async (
     const out = await preflightIn(casa);
     assert.equal(out.code, 3, `doveva fermarsi: ${out.so.slice(0, 200)}`);
     assert.match(out.se, /non salvata|non salvato/, 'e dire che la cartella non è pulita');
+  } finally {
+    togliCartella(casa, { tentativi: 10 });
+    if (typeof altrove === 'string') togliCartella(altrove);
+  }
+});
+
+// Un install fatto prima del preflight (dall'ambiente, o in una sessione ripresa) riscrive package-lock.json: non è
+// roba di nessuno, e non deve costare il giro (#2040). Il resto della cartella sporca ferma ancora, qui sopra.
+test('lockfile riscritto da npm prima del preflight: torna com\'è nel commit e il giro parte', async () => {
+  const { casa, altrove, g } = await laboratorioGit();
+  try {
+    const lock = (v) => `{\n  "name": "filo",\n  "version": "${v}",\n  "lockfileVersion": 3\n}\n`;
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.246'), 'utf8');
+    g(['add', '-A']); g(['commit', '-qm', 'lockfile']); g(['push', '-q', 'origin', 'main']);
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.256'), 'utf8');
+    const out = await preflightIn(casa);
+    assert.equal(out.code, 0, `doveva passare: ${out.se.slice(-300)}`);
+    assert.match(out.se, /package-lock\.json riscritto da npm: rimesso com'è nel commit/);
+    assert.equal(g(['status', '--porcelain']), '');
+    assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.246'));
+
+    // Con altro di sporco accanto non si tocca niente: la cartella ferma il giro com'è.
+    writeFileSync(resolve(casa, 'package-lock.json'), lock('0.2.256'), 'utf8');
+    writeFileSync(resolve(casa, 'routines', 'roles', 'orchestrator.md'), 'ricetta mezza\n', 'utf8');
+    const ferma = await preflightIn(casa);
+    assert.equal(ferma.code, 3, `doveva fermarsi: ${ferma.so.slice(0, 200)}`);
+    assert.equal(readFileSync(resolve(casa, 'package-lock.json'), 'utf8'), lock('0.2.256'));
   } finally {
     togliCartella(casa, { tentativi: 10 });
     if (typeof altrove === 'string') togliCartella(altrove);

@@ -18,6 +18,9 @@
 }
 .shell-notif.show { opacity: 1; transform: translateX(0); }
 .shell-notif-msg { line-height: 1.4; word-break: break-word; }
+/* L'avviso di un file arrivato si prende col mouse come il file (#588.8). */
+.shell-notif[data-trascina="1"] { cursor: grab; }
+.shell-notif[data-trascina="1"] button { cursor: pointer; }
 .shell-notif-close {
   position: absolute;
   top: 4px;

@@ -310,7 +310,7 @@ test('owner: un rifiuto bad_slot si legge, col messaggio e l\'elenco del server'
 
 test('owner: l\'aiuto elenca gli slot veri', () => {
   const e = owner.leggiArgomenti(['inventato']).errore;
-  assert.match(e, /orchestrator, worker, new-work, fixer, verifier, secaudit$/m);
+  assert.match(e, /tutti, orchestrator, worker, new-work, fixer, verifier, secaudit, compito, compito:<ricorrente>/m);
   assert.doesNotMatch(e, /resolver/);
 });
 
@@ -336,4 +336,23 @@ test('i testi di ruolo chiedono la domanda, e il comando viene riscritto col per
     // Prima del rilascio: col biglietto già morto la domanda non si può più chiedere.
     assert.ok(t.indexOf('domanda --biglietto') < t.indexOf('release <biglietto> --role'), `${chi}: la domanda viene prima del rilascio`);
   }
+});
+
+// ─── la domanda del manutentore al rilascio (#1961.2) ───────────────────────
+
+test('il rilascio del worker chiede la domanda del manutentore e la stampa col comando per rispondere; senza richiesta non c’è', async () => {
+  const corpi = [];
+  const opts = (extra) => Object.assign({
+    sleep: async () => {}, misureCrediti: () => ({}),
+    fetchImpl: async (url, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true, domanda: 'Cosa ti ha rallentato?' }); },
+  }, extra);
+  const r = await canale.release(TK, '', opts({ domandaAlRilascio: true }));
+  assert.equal(corpi[0].domandaAlRilascio, true);
+  const t = canale.testoDomandaAlRilascio(r.body, '/strumenti/scripts/routine-channel.mjs', TK);
+  assert.match(t, /Cosa ti ha rallentato\?/);
+  assert.ok(t.includes(`node "/strumenti/scripts/routine-channel.mjs" risposta --biglietto ${TK} <<'FINE'`), t);
+  await canale.release(TK, '', opts({}));
+  assert.equal(corpi[1].domandaAlRilascio, undefined, 'l’orchestratore che rilascia per un morto non la chiede');
+  assert.equal(canale.testoDomandaAlRilascio({ ok: true }, '/x', TK), '');
+  assert.equal(canale.testoDomandaAlRilascio({ ok: true, domanda: '   ' }, '/x', TK), '');
 });

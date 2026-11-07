@@ -12,42 +12,6 @@ let tipReady = false;
 let pendingShow = null;
 let giro = 0;
 
-function buildHTML() {
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"><style>
-*{margin:0;padding:0;box-sizing:border-box}
-html,body{background:transparent;overflow:hidden;height:100%;
-  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
-#tip{
-  display:inline-block;
-  padding:4px 8px;
-  border-radius:6px;
-  font-size:12px;
-  line-height:1.2;
-  white-space:nowrap;
-  border:1px solid var(--border);
-  background:var(--bg);
-  color:var(--fg);
-  box-shadow:0 4px 16px rgba(0,0,0,0.18);
-}
-:root{--bg:#fdf6ec;--fg:#2a221a;--border:#e2d3b5}
-:root.dark{--bg:#1d1a16;--fg:#f1e7d6;--border:#3b332a}
-</style></head><body><div id="tip"></div>
-<script>
-  // Il main manda {text, dark, giro} (tooltip-preload.js); la misura torna col suo giro.
-  const tip = document.getElementById('tip');
-  window.fumetto.onTesto(({ text, dark, giro }) => {
-    document.documentElement.classList.toggle('dark', !!dark);
-    tip.textContent = text || '';
-    // Misura sincrona: requestAnimationFrame non scatta quando la BrowserWindow
-    // e' hidden (Electron sospende il rAF), e dopo il primo hide il tooltip
-    // restava bloccato. getBoundingClientRect forza un layout reflow sincrono
-    // anche con window nascosta, quindi le misure sono affidabili.
-    const r = tip.getBoundingClientRect();
-    window.fumetto.misura({ w: Math.ceil(r.width), h: Math.ceil(r.height), giro });
-  });
-</script></body></html>`;
-}
-
 function ensureWin(parentWin) {
   if (tipWin && !tipWin.isDestroyed()) return tipWin;
   tipWin = new BrowserWindow({
@@ -69,19 +33,23 @@ function ensureWin(parentWin) {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
+      // Da nascosta risponde come da visibile: il primo fumetto non aspetta un processo in secondo piano (#871.4).
+      backgroundThrottling: false,
     },
   });
   // Il fumetto compare sotto il puntatore: se prendesse lui il mouse, la barra non saprebbe che il
   // puntatore l'ha lasciata (resterebbero aperti il fumetto e le larghezze ferme dopo una chiusura, #428).
   tipWin.setIgnoreMouseEvents(true);
   tipReady = false;
-  tipWin.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(buildHTML()));
+  // Un indirizzo che non condivide l'inizio con nessun'altra finestra: da data: era preso per il menu, da filo://shell/
+  // per la finestra principale (#1722). La regola per le prove: tests/unit/proveRiconosconoFinestre.test.mjs.
+  tipWin.loadURL('filo://src/renderer/fumetto.html');
   tipWin.webContents.once('did-finish-load', () => {
     tipReady = true;
     if (pendingShow) {
-      const { text, x, y } = pendingShow;
+      const { madre, text, x, y } = pendingShow;
       pendingShow = null;
-      doShow(parentWin, text, x, y);
+      if (madre && !madre.isDestroyed()) doShow(madre, text, x, y);
     }
   });
   // Col processo morto il fumetto non comparirebbe più: si butta, e il prossimo ne fa uno nuovo.
@@ -123,7 +91,7 @@ function showTooltip(parentWin, text, x, y) {
     if (mio !== giro || !parentWin || parentWin.isDestroyed()) return;
     ensureWin(parentWin);
     if (!tipReady) {
-      pendingShow = { text, x, y };
+      pendingShow = { madre: parentWin, text, x, y };
       return;
     }
     doShow(parentWin, text, x, y);
@@ -136,4 +104,10 @@ function hideTooltip() {
   pendingShow = null;
 }
 
-module.exports = { showTooltip, hideTooltip };
+// La finestra madre è pronta: il fumetto nasce adesso, così il primo passaggio dopo l'avvio non aspetta un processo
+// nuovo e compare come i successivi (#871.4, la regola del menu: #1090).
+function preparaSuggerimento(parentWin) {
+  if (parentWin && !parentWin.isDestroyed()) ensureWin(parentWin);
+}
+
+module.exports = { showTooltip, hideTooltip, preparaSuggerimento };

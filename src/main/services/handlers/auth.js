@@ -8,7 +8,7 @@ const SupportModels = require('../supportModelsStore');
 const { permissionDeniedHelp, attachmentForbiddenHelp, attachmentNotForYouHelp } = require('../feedbackError');
 const { daFilo, soloFilo } = require('./origine');
 const { spiegaErroreAccesso } = require('../../auth/esitoAccesso');
-const { avvisoNellaFinestra } = require('../avvisoFinestra');
+const { avvisoNellaFinestra, avvisoQuandoPronta, ritiraAvviso } = require('../avvisoFinestra');
 const { consiglioPortachiavi } = require('../../portachiavi');
 require('../../../shared/routineCrediti.js');
 
@@ -40,14 +40,16 @@ async function callSecurityFunction(name, data = {}) {
   if (!res.ok) {
     let detail = '';
     let code = '';
+    let reason = '';
     try {
       const err = (await res.json())?.error || {};
       detail = err.message || '';
       code = err.status || '';
+      reason = (err.details && typeof err.details.reason === 'string') ? err.details.reason : '';
     } catch (_) {}
     // Codice e spiegazione del server restano attaccati all'errore: chi chiama sceglie la frase per l'owner.
     throw Object.assign(new Error(`callable ${name} ${res.status}${detail ? ': ' + detail : ''}`),
-      { httpStatus: res.status, code: String(code), detail: String(detail) });
+      { httpStatus: res.status, code: String(code), detail: String(detail), reason });
   }
   const body = await res.json();
   return body && body.result;
@@ -72,10 +74,11 @@ function erroreSegno(e) {
 
 // Un errore di ownerDomande detto all'owner. Prima del deploy la callable non esiste (404 senza codice del
 // protocollo): lo si dice, non «riprova». Un 404 col codice è una domanda che non c'è, e la frase è del server.
-function erroreDomande(e) {
+function erroreDomande(e, nonAncora) {
   const code = String(e?.code || '').toUpperCase();
   const detail = String(e?.detail || '').trim();
   if (e?.httpStatus === 404 && !code) return 'Le domande non sono ancora pubblicate sul server: arrivano col prossimo aggiornamento del server.';
+  if (nonAncora && e?.reason === 'operazione_sconosciuta') return nonAncora;
   if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere le domande: serve quello del proprietario.';
   if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
   if (detail) return detail;
@@ -97,9 +100,25 @@ function erroreCrediti(e) {
   return e?.message || 'Non riuscito.';
 }
 
+// Un errore di ownerCompiti detto all'owner. Prima del deploy la callable non esiste (404 senza codice), e un server
+// più vecchio dell'app non conosce l'op (`op_sconosciuta`): lo si dice, con `nonAncora` per le op nuove.
+function erroreCompiti(e, nonAncora) {
+  const code = String(e?.code || '').toUpperCase();
+  const detail = String(e?.detail || '').trim();
+  if (e?.httpStatus === 404 && !code) return 'I compiti non sono ancora pubblicati sul server: arrivano col prossimo aggiornamento del server.';
+  if (nonAncora && e?.reason === 'op_sconosciuta') return nonAncora;
+  if (code === 'PERMISSION_DENIED') return 'Il server dice che questo account non può vedere i compiti: serve quello del proprietario.';
+  if (code === 'UNAUTHENTICATED') return 'Sessione scaduta: rifai l\'accesso.';
+  if (detail) return detail;
+  if (e?.httpStatus) return `Il server ha risposto con un errore ${e.httpStatus}.`;
+  if (e?.name === 'TypeError') return 'Il server non risponde: controlla la connessione e riprova.';
+  return e?.message || 'Non riuscito.';
+}
+
 // Dallo stato dei crediti la scheda usa questi campi per account; le sessioni restano sul server.
 const CREDITI_CAMPI_ACCOUNT = Object.freeze(['pct', 'lettura', 'stima', 'fonte', 'limite', 'taratura', 'taraturaDa',
-  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte']);
+  'letturaAtMs', 'usdSettimana', 'settimanaDaMs', 'rinnovoAtMs', 'passo', 'fermo', 'basseAperte',
+  'usd24h', 'accensioniSettimana', 'accensioni24h']);
 function accountsCrediti(r) {
   const out = {};
   for (const a of ['A', 'B']) {
@@ -241,6 +260,7 @@ async function probeServerAdmin(claims) {
 
 module.exports = function register(on, ctx) {
   const { MSG } = ctx;
+  let giudiciFermi = null;
   // L'avviso porta l'email di chi usa Filo: va alle superfici di Filo, mai a tutte le schede,
   // dove arrivano anche i content script dei siti visitati.
   const avvisaLeSuperficiDiFilo = (m) => {
@@ -249,6 +269,12 @@ module.exports = function register(on, ctx) {
     // L'owner entrato o uscito cambia chi vede Bacheca e Mazzi senza che l'interruttore si muova (#1592).
     try { require('../inPausa').accessoCambiato(); } catch (_) {}
   };
+  // La copia della foto del profilo arriva dopo l'accesso (#1273): barra, shell e home la ridisegnano da qui.
+  if (typeof auth.suFoto === 'function') {
+    auth.suFoto((profile) => avvisaLeSuperficiDiFilo({
+      type: MSG.AUTH_CHANGED, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin(), profile, remembered: auth.isRemembered(),
+    }));
+  }
 
   // I token restano nel main process: qui torniamo solo il profilo pubblico
   // + se l'utente è admin (può triagiare i feedback). `uid` è il claim
@@ -290,9 +316,18 @@ module.exports = function register(on, ctx) {
     catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
 
-  // Un sito può chiedere l'accesso (il pannello del red-team gira nelle sue
-  // pagine), ma come per lo stato gli torna solo l'esito, mai chi è entrato.
-  on(MSG.AUTH_SIGNIN, async (msg, sender, origin) => {
+  // Ai siti la porta dell'accesso è chiusa (#1132): il pannello del red-team che gira sopra di loro chiede con
+  // AUTH_SIGNIN_CLIC, legato a un clic vero. A un sito torna solo l'esito, mai chi è entrato.
+  on(MSG.AUTH_SIGNIN, soloFilo((msg, sender, origin) => accedi(origin, sender)));
+  on(MSG.AUTH_SIGNIN_CLIC, async (msg, sender, origin) => {
+    const Permessi = require('../permessiPagine');
+    if (!daFilo(origin, sender) && !Permessi.gestoDellUtente(sender && sender.wc)) {
+      return { ok: false, code: 'gesto', error: 'Premi di nuovo per accedere.' };
+    }
+    return accedi(origin, sender);
+  });
+  on(MSG.AUTH_SIGNIN_LASCIA, soloFilo(() => { auth.lasciaStare(); return { ok: true }; }));
+  async function accedi(origin, sender) {
     try {
       const profile = await auth.signIn();
       const remembered = auth.isRemembered();
@@ -300,7 +335,7 @@ module.exports = function register(on, ctx) {
       // Nel main e non nelle pagine: all'accesso si arriva da molte porte
       // (menu account, bacheca, posta, red-team, siti), e l'avviso vale per tutte.
       if (auth.isSignedIn() && !remembered) {
-        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO });
+        avvisoNellaFinestra(testoAccessoNonRicordato(), { chiave: CHIAVE_AVVISO_NON_RICORDATO, tipo: 'accesso_non_ricordato' });
       }
       // Rinfresca la config condivisa in background. Le chiavi ruotate
       // dall'admin NON si leggono più qui (#581: config/secrets è admin-only e
@@ -310,12 +345,13 @@ module.exports = function register(on, ctx) {
       if (auth.isAdmin()) scheduleViewSync({ delayMs: 4000, force: true });
       // I feedback dell'owner fermi ad aspettare la sua firma (#912) partono adesso, non al prossimo giro della coda.
       if (auth.isAdmin()) { try { globalThis.SN_FEEDBACK_OUTBOX?.accessoCambiato?.(); } catch (_) {} }
+      giudiciFermi?.colpo('accesso');
       if (!daFilo(origin, sender)) return { ok: true, signedIn: auth.isSignedIn(), isAdmin: auth.isAdmin() };
       return { ok: true, profile, isAdmin: auth.isAdmin(), remembered };
     } catch (e) {
       return { ok: false, ...spiegaErroreAccesso(e) };
     }
-  });
+  }
 
   // L'uscita dall'account la chiede solo Filo: da un sito era un modo per buttare fuori
   // chi lo sta usando, e da lì posta delle segnalazioni e bacheca si fermano.
@@ -323,37 +359,66 @@ module.exports = function register(on, ctx) {
     try {
       auth.signOut();
       avvisaLeSuperficiDiFilo({ type: MSG.AUTH_CHANGED, signedIn: false, isAdmin: false, profile: null });
+      giudiciFermi?.colpo('accesso');
       return { ok: true };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
   }));
 
-  // «Aspetta #N» (#903): la pagina manda i numeri come li ha scritti l'owner; li risolve e li controlla il main, che
-  // legge i documenti col token (la pagina ne vede una finestra). Vuoto = togliere. Regole: SN_FB_ATTESE.valida.
-  // `tieni`: id delle attese già scritte che la pagina non sa rinumerare (aspettato cancellato o non letto): restano come sono.
-  async function prepareAttese(id, valore, idToken, tieni) {
+  // «Aspetta #N» (#903): la pagina manda il gesto, non l'elenco: `waitsAggiungi` (i numeri come li ha scritti l'owner) e
+  // `waitsTogli` (id). Il main li applica alle attese lette adesso col token (la pagina ne vede una finestra, magari vecchia).
+  function richiestaAttese(msg) {
+    const A = globalThis.SN_FB_ATTESE;
+    const letti = A.leggiNumeri(msg.waitsAggiungi == null ? '' : msg.waitsAggiungi);
+    if (!letti.ok) return letti;
+    const togli = msg.waitsTogli === undefined ? [] : msg.waitsTogli;
+    if (!Array.isArray(togli) || togli.length > A.MAX || togli.some((x) => typeof x !== 'string')) {
+      return { ok: false, motivo: 'elenco delle attese da togliere non valido' };
+    }
+    return { ok: true, aggiungi: letti.numeri, togli };
+  }
+
+  // Le attese insieme a `campi`, scritte solo sull'elenco letto (SN_FB_ATTESE.scriviSullaLettura). Regole: SN_FB_ATTESE.valida.
+  async function scriviAttese(id, richiesta, campi, idToken) {
     const A = globalThis.SN_FB_ATTESE;
     const FB = globalThis.SN_FEEDBACK;
-    const letti = A.leggiNumeri(valore === null || valore === false ? '' : valore);
-    if (!letti.ok) return letti;
-    if (tieni !== undefined && (!Array.isArray(tieni) || tieni.length > A.MAX || tieni.some((x) => typeof x !== 'string'))) {
-      return { ok: false, motivo: 'elenco delle attese da tenere non valido' };
-    }
-    if (!letti.numeri.length && !(tieni || []).length) return { ok: true, attese: [] };
-    const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
-    if (!proprio) return { ok: false, motivo: 'il feedback non esiste più' };
-    return A.valida({
-      id, num: FB.formatNum(proprio.seq, proprio.subSeq), numeri: letti.numeri, gia: A.atteseDi(proprio), tieni: tieni || [],
-      risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
-      leggiAttese: async (ids) => {
-        const out = new Map();
-        for (let i = 0; i < ids.length; i += 100) {
-          // eslint-disable-next-line no-await-in-loop
-          const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
-          for (const r of righe) out.set(r._id, A.atteseDi(r));
+    return A.scriviSullaLettura({
+      leggi: async () => {
+        const [proprio] = await FB.getMany([id], { idToken, fields: ['seq', 'subSeq', A.CAMPO], timeoutMs: 20000 });
+        return proprio ? { proprio, versione: proprio._updateTime || '' } : null;
+      },
+      calcola: async (letto) => {
+        if (!letto) return { fine: { ok: false, motivo: 'il feedback non esiste più' } };
+        const gia = A.atteseDi(letto.proprio);
+        const { numeri, tieni } = A.daScrivereSu(gia, richiesta);
+        // Un numero di più feedback (#1517) non si lega al primo che capita: lo si dice all'owner, con gli id.
+        const v = await A.valida({
+          id, num: FB.formatNum(letto.proprio.seq, letto.proprio.subSeq), numeri, gia, tieni,
+          risolvi: (n) => FB.idDelNumero(n, { idToken, timeoutMs: 20000 }),
+          leggiAttese: async (ids) => {
+            const out = new Map();
+            for (let i = 0; i < ids.length; i += 100) {
+              // eslint-disable-next-line no-await-in-loop
+              const righe = await FB.getMany(ids.slice(i, i + 100), { idToken, fields: [A.CAMPO], timeoutMs: 20000 });
+              for (const r of righe) out.set(r._id, A.atteseDi(r));
+            }
+            return out;
+          },
+        }).catch((e) => {
+          if (e && Array.isArray(e.numeroDoppio)) return { ok: false, motivo: e.message };
+          throw e;
+        });
+        return v.ok ? { scrivi: v.attese } : { fine: v };
+      },
+      scrivi: async (attese, versione) => {
+        try {
+          await FB.updateStatus(id, { ...campi, waitsFor: attese }, { idToken, versione });
+        } catch (e) {
+          if (e && e.conflitto) return { conflitto: true };
+          throw e;
         }
-        return out;
+        return { ok: true, attese };
       },
     });
   }
@@ -393,12 +458,8 @@ module.exports = function register(on, ctx) {
         try { email = String(auth.getTokenClaims()?.email || ''); } catch (_) {}
         localApproval = { by: email || 'owner', at: Date.now() };
       }
-      let waitsFor;
-      if (msg.waitsFor !== undefined) {
-        const r = await prepareAttese(id, msg.waitsFor, idToken, msg.waitsTieni);
-        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
-        waitsFor = r.attese;
-      }
+      const attese = msg.waitsAggiungi !== undefined || msg.waitsTogli !== undefined ? richiestaAttese(msg) : null;
+      if (attese && !attese.ok) return { ok: false, error: attese.motivo, rifiutato: true };
       // Una riapertura (Riapri, Ripristina, da qualunque pagina) svuota il registro delle parti (#938): lo stato di
       // partenza si chiede al documento, non alla copia della pagina.
       const FB = globalThis.SN_FEEDBACK;
@@ -407,11 +468,15 @@ module.exports = function register(on, ctx) {
         const [ora] = await FB.getMany([id], { idToken, fields: ['statusPublic', 'localMerges'] });
         if (ora && ora.localMerges && FB.riapre(ora.statusPublic, status)) localMerges = null;
       }
-      await globalThis.SN_FEEDBACK.updateStatus(
-        id,
-        { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges, waitsFor },
-        { idToken },
-      );
+      const campi = { status, notes, userNote, priority, priorityManual, reviewDecision, reviewComment, reviewedAt, starred, archiveOverride, localOnly, localApproval, localMerges };
+      let waitsFor;
+      if (attese) {
+        const r = await scriviAttese(id, attese, campi, idToken);
+        if (!r.ok) return { ok: false, error: r.motivo, rifiutato: true };
+        waitsFor = r.attese;
+      } else {
+        await FB.updateStatus(id, campi, { idToken });
+      }
       // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
       // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
       await syncOneCard(id, idToken);
@@ -652,7 +717,7 @@ module.exports = function register(on, ctx) {
   // solo i campi scritti: gli altri restano ignoti invece di valere il default.
   const sessionsReply = (s) => {
     const r = { ok: true, letto: s.letto !== false };
-    for (const k of ['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff']) {
+    for (const k of globalThis.SN_ROUTINE_SESSIONI.CHIAVI) {
       if (s[k] !== undefined) r[k] = s[k];
     }
     return r;
@@ -672,15 +737,32 @@ module.exports = function register(on, ctx) {
     try {
       const idToken = await auth.getIdToken();
       if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
-      return sessionsReply(await Defaults.setRoutineSessions({
-        maxSessions: msg.maxSessions,
-        priorityAccount: msg.priorityAccount,
-        accountAOff: msg.accountAOff,
-        accountBOff: msg.accountBOff,
-      }, idToken));
+      const patch = {};
+      for (const k of globalThis.SN_ROUTINE_SESSIONI.CHIAVI) patch[k] = msg[k];
+      return sessionsReply(await Defaults.setRoutineSessions(patch, idToken));
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
+  }));
+
+  // Il recap del manutentore e la sua N (SPEC-MANUTENTORE § 9): due letture di ownerManutentore, indipendenti. Il
+  // testo è suo, scritto leggendo testo di chiunque: la pagina lo mostra come testo, mai come markup.
+  on(MSG.MANUTENTORE_RECAP_GET, ownerOnly(async () => {
+    const [recap, stato] = await Promise.allSettled([
+      callSecurityFunction('ownerManutentore', { op: 'recap', limite: 30 }),
+      callSecurityFunction('ownerManutentore', { op: 'stato' }),
+    ]);
+    if (recap.status === 'rejected' || !recap.value || recap.value.ok === false) {
+      const e = recap.status === 'rejected' ? recap.reason : null;
+      if (e?.httpStatus === 404 && !e?.code) return { ok: false, error: 'Il recap del manutentore non è ancora pubblicato sul server.' };
+      return { ok: false, error: e ? erroreDomande(e) : String(recap.value?.detail || recap.value?.reason || 'Il server non ha dato il recap.') };
+    }
+    const fogli = (Array.isArray(recap.value.recap) ? recap.value.recap : [])
+      .filter((f) => f && /^\d{4}-\d{2}-\d{2}$/.test(String(f.giorno)) && typeof f.testo === 'string')
+      .map((f) => ({ giorno: String(f.giorno), testo: f.testo, at: typeof f.at === 'string' ? f.at : null }));
+    const s = stato.status === 'fulfilled' && stato.value && stato.value.ok !== false ? stato.value : null;
+    const intero = (v) => (Number.isInteger(v) ? v : null);
+    return { ok: true, recap: fogli, stato: s ? { parallelismo: intero(s.parallelismo), parallelismoEffettivo: intero(s.parallelismoEffettivo), freno: intero(s.freno) } : null };
   }));
 
   // I numeri dell'owner sui crediti delle routine (#1356): il main fa da tramite verso ownerCrediti e rifà i
@@ -718,13 +800,15 @@ module.exports = function register(on, ctx) {
     return out;
   }));
 
-  // Le pause in corso degli account e della routine server, col motivo (#996). Lo stato del pacemaker non lo legge
-  // nessun client: passa dal registro delle routine, con le credenziali dell'owner (mai dalla callable dello storico).
+  // Le pause in corso degli account e delle routine server e riservati, col motivo (#996), e lo stato della riservati
+  // (#2069). Lo stato del pacemaker non lo legge nessun client: passa dal registro delle routine, con le credenziali
+  // dell'owner (mai dalla callable dello storico).
   on(MSG.AUTOMATION_PAUSE_GET, ownerOnly(async () => {
     try {
       const r = await callSecurityFunction('routineLog', { op: 'pause' });
       const pause = r && r.pause && typeof r.pause === 'object' ? r.pause : {};
-      return { ok: true, pause, oraMs: Number(r && r.oraMs) || Date.now() };
+      const voci = r && r.voci && typeof r.voci === 'object' ? r.voci : {};
+      return { ok: true, pause, voci, oraMs: Number(r && r.oraMs) || Date.now() };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -753,6 +837,28 @@ module.exports = function register(on, ctx) {
     }
   }));
 
+  // Il tetto di spesa dei giudici per i non fidati (#1515): tocca SOLO i campi che riceve.
+  on(MSG.AUTOMATION_JUDGE_BUDGET_GET, ownerOnly(async () => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      return Object.assign({ ok: true }, await Defaults.getJudgeBudget(idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+  on(MSG.AUTOMATION_JUDGE_BUDGET_SET, ownerOnly(async (msg) => {
+    try {
+      const idToken = await auth.getIdToken();
+      if (!idToken) return { ok: false, error: 'Sessione scaduta: rifai l\'accesso.' };
+      const patch = {};
+      for (const k of ['tettoUsd', 'maxCaratteri']) if (msg && msg[k] !== undefined) patch[k] = msg[k];
+      return Object.assign({ ok: true }, await Defaults.setJudgeBudget(patch, idToken));
+    } catch (e) {
+      return { ok: false, error: e?.message || String(e) };
+    }
+  }));
+
   // Log dei worker delle routine (config/automation, campo `workerLog`). Owner-
   // only, SOLA LETTURA dal client: chi spawna i worker (scripts/dispatch.mjs) lo
   // scrive lato routine con le proprie credenziali. Qui lo esponiamo alla tab
@@ -774,7 +880,7 @@ module.exports = function register(on, ctx) {
     try {
       const limit = Number(msg && msg.limit);
       const r = await callSecurityFunction('routineLog', Number.isFinite(limit) ? { limit } : {});
-      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [], proveFusione: (r && r.proveFusione) || null };
+      return { ok: true, rejections: (r && r.rejections) || [], comparisons: (r && r.comparisons) || [], proveFusione: (r && r.proveFusione) || null, postiLasciati: (r && r.postiLasciati) || [], letture: (r && r.letture) || [] };
     } catch (e) {
       return { ok: false, error: e?.message || String(e) };
     }
@@ -847,9 +953,12 @@ module.exports = function register(on, ctx) {
   // rileggeva tutte le schede (centinaia di letture) per riunirne due o tre.
   const SCHEDE_MIRATE_MAX = 100;
 
-  async function mergeCardFields(rows, { mirate = false } = {}) {
+  // `campi`: quelli che la pagina ha chiesto. Riceve quelli (#1335): niente voti non chiesti, né schede lette per loro.
+  async function mergeCardFields(rows, { mirate = false, campi = null } = {}) {
     const V = PUBLIC_VIEW();
     if (!V || !Array.isArray(rows) || rows.length === 0) return rows;
+    const daUnire = Array.isArray(campi) ? V.USER_FIELDS.filter((f) => campi.includes(f)) : V.USER_FIELDS;
+    if (!daUnire.length) return rows;
     let cards;
     const FB = FEEDBACK();
     const ids = rows.map((r) => r && r._id).filter(Boolean);
@@ -860,6 +969,11 @@ module.exports = function register(on, ctx) {
     } catch (e) {
       console.warn('[feedback] schede pubbliche non lette:', e?.message || e);
       return rows; // meglio i voti storici che nessun feedback
+    }
+    if (daUnire.length < V.USER_FIELDS.length) {
+      cards = (Array.isArray(cards) ? cards : []).map((c) => Object.fromEntries(
+        Object.entries(c || {}).filter(([k]) => k === '_id' || daUnire.includes(k)),
+      ));
     }
     return V.mergeUserFields(rows, cards);
   }
@@ -876,7 +990,7 @@ module.exports = function register(on, ctx) {
       const ids = Array.isArray(msg.ids) ? msg.ids : [];
       const soloCampi = (Array.isArray(msg.fields) && msg.fields.length) ? msg.fields : null;
       const rows = await FB.getMany(ids, { timeoutMs, idToken, fields: soloCampi });
-      return { ok: true, rows: await mergeCardFields(rows, { mirate: true }) };
+      return { ok: true, rows: await mergeCardFields(rows, { mirate: true, campi: soloCampi }) };
     }
     // La lettura COMPLETA (#496): la chiede la scheda delle statistiche, che
     // fa domande sull'INSIEME («quanti ne sono arrivati in tutto»), e a una
@@ -897,7 +1011,7 @@ module.exports = function register(on, ctx) {
       scheduleViewSync({ rows });
       const w = liveWatcherDi();
       if (w && complete) w.allineato(startedAt, rows, readTime);
-      return { ok: true, rows: await mergeCardFields(rows), complete, readTime };
+      return { ok: true, rows: await mergeCardFields(rows, { campi: fields }), complete, readTime };
     }
     if (op !== 'list' && op !== 'versions') return { ok: false, error: `lettura non prevista: ${op}` };
 
@@ -915,7 +1029,7 @@ module.exports = function register(on, ctx) {
     // sincronizzazione: gliele passiamo invece di far rileggere mezzo database
     // un attimo dopo.
     scheduleViewSync({ rows });
-    return { ok: true, rows: await mergeCardFields(rows) };
+    return { ok: true, rows: await mergeCardFields(rows, { campi: fields }) };
   }));
 
   // ── #676: il giro dei cambiati della Gestione, uno solo, qui nel main ────
@@ -1331,6 +1445,23 @@ module.exports = function register(on, ctx) {
     console.warn('[Filo] campanello fusioni non agganciato:', e?.message || e);
   }
 
+  // I giudici fermi (#906): barra una volta per episodio e carta nella home, solo per l'owner. Vedi services/giudiciFermi.js.
+  try {
+    giudiciFermi = require('../giudiciFermi').start({
+      isAdmin: () => auth.isAdmin(),
+      leggi: async () => Defaults.getGiudiciFermi(await auth.getIdToken()),
+      mem: () => globalThis.SN_FILO_MEMORY,
+      storage: () => globalThis.SN_STORAGE,
+      avvisa: (testo, opts) => avvisoQuandoPronta(testo, opts),
+      ritira: (chiave) => ritiraAvviso(chiave),
+      broadcast: () => ctx.broadcastLiveUpdate(),
+    });
+    // Le prove lo rileggono senza aspettare l'orologio.
+    globalThis.SN_GIUDICI_FERMI = giudiciFermi;
+  } catch (e) {
+    console.warn('[Filo] giudici fermi non agganciati:', e?.message || e);
+  }
+
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
@@ -1360,11 +1491,14 @@ module.exports = function register(on, ctx) {
   // Non è un via libera cieco: il server segna l'audit come saltato e poi fa
   // partire il cancello di fusione, che può fermare tutto lo stesso. Quello che
   // torna è l'esito VERO di quel cancello, non un "fatto" generico.
-  const ESITI_SALTA = ['fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner'];
+  const ESITI_SALTA = ['attesa_unit', 'riverifica', 'ricontrollo', 'fuso', 'bloccato', 'conflitto', 'ramo_assente', 'attesa_server', 'server_al_pc', 'rimandato', 'all_owner', 'mosso', 'senza_controllo'];
   on(MSG.LIVELLO4_SALTA, ownerOnly(async (msg) => {
     const feedbackId = String(msg?.feedbackId || '').trim();
     if (!feedbackId) return { ok: false, error: 'Manca la segnalazione su cui saltare il controllo.' };
-    const r = await callSecurityFunction('ownerSkipSecaudit', { feedbackId });
+    // Il commit che l'owner ha visto bocciato: il server salta solo quello (#1502).
+    const sha = String(msg?.sha || '').trim();
+    if (sha && !/^[0-9a-f]{40}$/.test(sha)) return { ok: false, error: 'Il commit da saltare non è uno sha valido.' };
+    const r = await callSecurityFunction('ownerSkipSecaudit', sha ? { feedbackId, sha } : { feedbackId });
     if (!r || r.ok === false) {
       // `error` è la frase del server per l'owner; `reason` il codice, solo se la frase manca.
       return { ok: false, error: (r && (r.error || r.detail || r.reason)) || 'Il server non ha saltato il controllo.' };
@@ -1373,6 +1507,9 @@ module.exports = function register(on, ctx) {
     const esito = String(r.esito || r.result || '').trim();
     const out = { ok: true, esito: ESITI_SALTA.includes(esito) ? esito : esito };
     if (r.requestId) out.requestId = String(r.requestId);
+    // In attesa o già decisa (#486): la scheda non annuncia un via libera che non c'è.
+    if (r.requestState) out.requestState = String(r.requestState).slice(0, 20);
+    if (r.requestOutcome) out.requestOutcome = String(r.requestOutcome).slice(0, 40);
     if (r.sha) out.sha = String(r.sha);
     if (r.error) out.error = String(r.error);
     return out;
@@ -1410,12 +1547,12 @@ module.exports = function register(on, ctx) {
 
   // Le domande all'owner (#1149): il main fa solo da tramite verso ownerDomande. Le azioni le applica il server,
   // che decide anche chi ha scritto ogni turno: la pagina non può dichiararlo.
-  async function chiamaDomande(data) {
+  async function chiamaDomande(data, nonAncora) {
     let r;
     try {
       r = await callSecurityFunction('ownerDomande', data);
     } catch (e) {
-      return { ok: false, error: erroreDomande(e) };
+      return { ok: false, error: erroreDomande(e, nonAncora) };
     }
     if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason || r.error)) || 'Il server non ha risposto sulle domande.' };
     return r;
@@ -1471,9 +1608,21 @@ module.exports = function register(on, ctx) {
       if (!id) return { ok: false, error: 'Manca la domanda.' };
       const r = await chiamaDomande({ op, id });
       if (!r.ok) return r;
-      return { ok: true, domanda: r.domanda || null };
+      // Riaprire una risposta disfa quello che ha applicato dove si può (§3.6): il resto lo dice il server, e si legge.
+      const resoconto = typeof r.resoconto === 'string' ? r.resoconto.trim() : '';
+      return resoconto ? { ok: true, domanda: r.domanda || null, resoconto } : { ok: true, domanda: r.domanda || null };
     }));
   }
+
+  // «Segna fidata» su una domanda chiusa (#2078), `fidata: false` per toglierla: come per i feedback la scrive solo il server.
+  on(MSG.DOMANDA_FIDUCIA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!id) return { ok: false, error: 'Manca la domanda.' };
+    const r = await chiamaDomande({ op: 'fiducia', id, fidata: msg?.fidata !== false },
+      'Il server non sa ancora dare fiducia a una domanda: arriva col prossimo aggiornamento del server.');
+    if (!r.ok) return r;
+    return { ok: true, fiducia: r.fiducia === 'fidato' ? 'fidato' : 'non_fidato', domanda: r.domanda || null };
+  }));
 
   // «Segna fidato» (#1148), e `fidato: false` per toglierla: la fiducia la scrive solo il server, mai la pagina né il main col token.
   on(MSG.FIDUCIA_SEGNA, ownerOnly(async (msg) => {
@@ -1493,10 +1642,129 @@ module.exports = function register(on, ctx) {
     return Object.assign({ ok: true, fiducia: togli ? 'non_fidato' : 'fidato' }, r.rimessoInCoda === true ? { rimessoInCoda: true } : {});
   }));
 
+  // I compiti delle routine (SPEC-DOMANDE.md §6): il main fa da tramite verso ownerCompiti e rifà il controllo della
+  // pagina (SN_COMPITI); fiducia e numeri li decide il server. Dalla finestra scrive l'owner, mai una sessione.
+  async function chiamaCompiti(data, nonAncora) {
+    let r;
+    try {
+      r = await callSecurityFunction('ownerCompiti', data);
+    } catch (e) {
+      return { ok: false, error: erroreCompiti(e, nonAncora) };
+    }
+    if (nonAncora && r && r.ok === false && r.errore === 'op_sconosciuta') return { ok: false, error: nonAncora };
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.dettaglio || r.errore || r.detail)) || 'Il server non ha risposto sui compiti.' };
+    return r;
+  }
+  on(MSG.COMPITI_ELENCO, ownerOnly(async (msg) => {
+    const data = { op: 'elenco' };
+    if (Number.isInteger(msg?.storico) && msg.storico > 0) data.storico = msg.storico;
+    if (Number.isFinite(msg?.prima) && msg.prima > 0) data.prima = msg.prima;
+    // Gli ultimi già visti allo stesso istante del cursore: senza, una pagina che si chiude lì ne salterebbe.
+    if (data.prima && Array.isArray(msg?.visti)) data.visti = msg.visti.filter((x) => /^C-\d{1,9}$/.test(String(x))).slice(0, 500);
+    const r = await chiamaCompiti(data);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      aperti: Array.isArray(r.aperti) ? r.aperti : [],
+      storico: Array.isArray(r.storico) ? r.storico : [],
+      // Oltre la pagina dello storico il server lo dice: la scheda non deve credere di vederli tutti.
+      altri: r.altri === true,
+      adesso: Number(r.adesso) || 0,
+      ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
+    };
+  }));
+  on(MSG.COMPITO_CREA, ownerOnly(async (msg) => {
+    const v = globalThis.SN_COMPITI.validaNuovo(msg?.compito);
+    if (!v.ok) return { ok: false, error: v.testo };
+    const r = await chiamaCompiti({ op: 'crea', compito: v.compito });
+    if (!r.ok) return r;
+    return { ok: true, id: String(r.id || '') };
+  }));
+  on(MSG.COMPITO_ANNULLA, ownerOnly(async (msg) => {
+    const id = String(msg?.id || '').trim();
+    if (!/^C-\d{1,9}$/.test(id)) return { ok: false, error: 'Manca il compito da annullare.' };
+    const r = await chiamaCompiti({ op: 'annulla', id });
+    if (!r.ok) return r;
+    return { ok: true, id };
+  }));
+
+  // I compiti ricorrenti (SPEC-DOMANDE.md §4.1): li scrive solo l'owner. Il main rifà i controlli della scheda
+  // (ricorrenti.js per i campi suoi, SN_COMPITI per le scelte); un ambito non ancora attivo vale: il ricorrente lo aspetta.
+  const NON_ANCORA_RICORRENTI = 'I compiti ricorrenti non sono ancora sul server: arrivano col prossimo aggiornamento del server.';
+  const idRicorrente = (v) => {
+    const s = typeof v === 'string' ? v.trim() : '';
+    return /^[A-Za-z0-9_.:-]{1,200}$/.test(s) ? s : '';
+  };
+  on(MSG.RICORRENTI_ELENCO, ownerOnly(async () => {
+    const r = await chiamaCompiti({ op: 'ricorrenti' }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return {
+      ok: true,
+      adesso: Number(r.adesso) || 0,
+      ricorrenti: Array.isArray(r.ricorrenti) ? r.ricorrenti : [],
+      ambiti: Array.isArray(r.ambiti) ? r.ambiti : [],
+    };
+  }));
+  on(MSG.RICORRENTE_SALVA, ownerOnly(async (msg) => {
+    const raw = msg?.ricorrente;
+    const K = globalThis.SN_COMPITI;
+    const c = globalThis.SN_RICORRENTI.validaCampi(raw);
+    if (!c.ok) return { ok: false, error: K.frase(c.dettaglio) };
+    const s = K.validaScelte(raw, undefined, { spenti: true });
+    if (!s.ok) return { ok: false, error: s.testo };
+    const ricorrente = Object.assign({}, c.campi, s.scelte);
+    if (raw.id !== undefined && raw.id !== null && raw.id !== '') {
+      ricorrente.id = idRicorrente(raw.id);
+      if (!ricorrente.id) return { ok: false, error: 'Il ricorrente da salvare non ha un identificativo valido.' };
+    }
+    const r = await chiamaCompiti({ op: 'ricorrente_salva', ricorrente }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id: String(r.id || ricorrente.id || '') };
+  }));
+  on(MSG.RICORRENTE_TOGLI, ownerOnly(async (msg) => {
+    const id = idRicorrente(msg?.id);
+    if (!id) return { ok: false, error: 'Manca il ricorrente da togliere.' };
+    const r = await chiamaCompiti({ op: 'ricorrente_togli', id }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id };
+  }));
+  on(MSG.RICORRENTE_AVVIA, ownerOnly(async (msg) => {
+    const id = idRicorrente(msg?.id);
+    if (!id) return { ok: false, error: 'Manca il ricorrente da avviare.' };
+    const r = await chiamaCompiti({ op: 'ricorrente_avvia', id }, NON_ANCORA_RICORRENTI);
+    if (!r.ok) return r;
+    return { ok: true, id, compitoId: String(r.compitoId || '') };
+  }));
+  // Chi può aggiungere un ambito (sì a una domanda) deve poterlo togliere: gli iniziali e quelli in uso li rifiuta il server.
+  on(MSG.AMBITO_TOGLI, ownerOnly(async (msg) => {
+    const nome = typeof msg?.nome === 'string' ? msg.nome.trim() : '';
+    if (!/^[a-z][a-z_]{2,30}$/.test(nome)) return { ok: false, error: 'Manca l’ambito da togliere.' };
+    const r = await chiamaCompiti({ op: 'ambito_togli', nome }, 'Togliere un ambito non è ancora sul server: arriva col prossimo aggiornamento del server.');
+    if (!r.ok) return r;
+    return { ok: true, nome };
+  }));
+
   on(MSG.MERGE_APPROVAL_DISCARD, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'discard', id: String(msg?.id || '') });
     if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Non riuscita.' };
     return { ok: true, result: 'discarded' };
+  }));
+
+  on(MSG.MERGE_APPROVAL_RIAPRI, ownerOnly(async (msg) => {
+    const feedbackId = String(msg?.feedbackId || '').trim();
+    if (!feedbackId) return { ok: false, error: 'Manca la pratica di cui chiedere la fusione.' };
+    let r;
+    try {
+      r = await callSecurityFunction('ownerMergeApprovals', { op: 'riapri', feedbackId });
+    } catch (e) {
+      if (e?.name === 'TypeError') return { ok: false, error: 'Il server non risponde: controlla la connessione e riprova.' };
+      return { ok: false, error: e?.detail || e?.message || 'Il server non ha riaperto la richiesta.' };
+    }
+    if (!r || r.ok === false) return { ok: false, error: (r && (r.detail || r.reason)) || 'Il server non ha riaperto la richiesta.' };
+    // Un esito sconosciuto passa com'è: la pagina lo scrive invece di inventarsi un successo.
+    const out = { ok: true, esito: String(r.esito || r.result || '') };
+    if (r.requestId) out.requestId = String(r.requestId);
+    return out;
   }));
 
   // All'editor servono anche la catena in uso negli slot spostati mai salvati e

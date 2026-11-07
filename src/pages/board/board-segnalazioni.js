@@ -17,7 +17,10 @@
     chiusa: { testo: 'chiusa', hover: 'Chiusa senza modifiche' },
   };
 
-  let tutte = location.hash === '#segnalazioni';
+  // `#segnalazione=1956` porta a quella riga, aperta (ci arriva la pagina Novità); `#segnalazioni` all'elenco intero.
+  const chiestoElenco = () => /^#segnalazion(i|e=\d+)$/.test(location.hash);
+  const numeroChiesto = () => { const m = /^#segnalazione=(\d+)$/.exec(location.hash); return m ? m[1] : null; };
+  let tutte = chiestoElenco();
   // Con la Bacheca in pausa (#1592) la pagina è solo questa: tutte le righe, sempre, col titolo della pagina.
   const soloLoro = () => document.body.dataset.bachecaPausa === '1';
   let voci = [];
@@ -79,12 +82,12 @@
 
     el.append(testa, stato, togli, corpo);
 
-    testa.addEventListener('click', () => {
-      const aperta = corpo.hidden;
+    function mostraCorpo(aperta) {
       corpo.hidden = !aperta;
       testa.setAttribute('aria-expanded', String(aperta));
       el.classList.toggle('bd-mia-aperta', aperta);
-    });
+    }
+    testa.addEventListener('click', () => mostraCorpo(corpo.hidden));
 
     // Togliere non si annulla: il pulsante chiede conferma sul posto e torna com'era da solo.
     let timer = null;
@@ -119,7 +122,7 @@
       apriMenu(e.clientX, e.clientY, vociMenu(v));
     });
 
-    return { el, titolo, sub, stato, testo, allegati, risposta };
+    return { el, testa, titolo, sub, stato, testo, allegati, risposta, apri: () => mostraCorpo(true) };
   }
 
   // Il tasto destro su una riga: quello che si fa con QUELLA segnalazione (filo_design, tasto destro).
@@ -252,7 +255,7 @@
     const n = tutteLe.length;
     conto.textContent = n ? String(n) : '';
     // Chi ha segnalazioni di prima la trova anche aprendo la Bacheca dal menu, con la frase che spiega il vuoto.
-    const mostra = n > 0 || precedenti || location.hash === '#segnalazioni' || soloLoro();
+    const mostra = n > 0 || precedenti || chiestoElenco() || soloLoro();
     sezione.hidden = !mostra;
     titoloSezione.classList.toggle('bd-h2-pagina', soloLoro());
     if (titoloMigliorie) titoloMigliorie.hidden = !mostra;
@@ -285,9 +288,15 @@
     voci = Array.isArray(r.voci) ? r.voci : [];
     precedenti = !!r.precedenti;
     disegna();
-    if (location.hash === '#segnalazioni' && !carica.portata) {
+    if (chiestoElenco() && !carica.portata) {
       carica.portata = true;
-      sezione.scrollIntoView({ block: 'start' });
+      const n = numeroChiesto();
+      const v = n && voci.find((x) => String(x.num || '').trim().replace(/^#/, '') === n);
+      const r = v && righe.get(v.id);
+      if (!r) { sezione.scrollIntoView({ block: 'start' }); return; }
+      r.apri();
+      r.el.scrollIntoView({ block: 'center' });
+      r.testa.focus({ preventScroll: true });
     }
   }
 
@@ -304,7 +313,7 @@
     altre.addEventListener('click', () => { tutte = !tutte; disegna(); });
 
     window.addEventListener('hashchange', () => {
-      if (location.hash !== '#segnalazioni') return;
+      if (!chiestoElenco()) return;
       tutte = true;
       carica.portata = false;
       carica();

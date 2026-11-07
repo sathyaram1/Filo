@@ -37,12 +37,16 @@ function onFinestraNormale(cb) { if (typeof cb === 'function') osservatoriFinest
 let inChiusura = false;
 try { require('electron').app.on('before-quit', () => { inChiusura = true; }); } catch (_) {}
 
+function finestraNormaleViva() {
+  return BrowserWindow.getAllWindows().find((w) => {
+    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
+  }) || null;
+}
+
 // Suono e pulsante che ferma vivono in una finestra che la scadenza la vede, e
 // non è detto che ce ne sia una: senza garanzia il timer resta vivo e muto.
 function assicuraFinestraNormale() {
-  const esistente = BrowserWindow.getAllWindows().find((w) => {
-    try { return !w.isDestroyed() && !!w._filoTabs && !w._filoIncognito; } catch (_) { return false; }
-  });
+  const esistente = finestraNormaleViva();
   if (esistente) return esistente;
   if (inChiusura) return null;
   const win = createMainWindow();
@@ -50,8 +54,51 @@ function assicuraFinestraNormale() {
   return win;
 }
 
+// Chi vuole vedere Filo (seconda apertura, invito da fuori, clic sulla notifica) la finestra la chiede qui, mai a un
+// riferimento tenuto da parte: chiusa la principale con un'altra aperta, quello punta a una distrutta (#1606).
+function mostraFinestraNormale() {
+  const win = assicuraFinestraNormale();
+  if (!win || win.isDestroyed()) return null;
+  try { if (win.isMinimized()) win.restore(); } catch (_) {}
+  revealWindow(win);
+  return win;
+}
+
+// Su Mac riaprire Filo acceso (Dock, Launchpad, Finder) arriva come `activate`, non come seconda copia: chi clicca
+// l'icona vuole le sue schede anche con la finestrella di accesso aperta (#1606.1). Con la normale viva e qualcosa a
+// schermo il sistema porta davanti da sé.
+function riaperturaDaSistema(visibili) {
+  if (visibili && finestraNormaleViva()) return null;
+  return mostraFinestraNormale();
+}
+
+// Su Mac la barra dei menu c'è prima della finestra dell'avvio: una voce premuta lì non ne fa una seconda.
+let finestraDellAvvio = false;
+
+// Chi chiede la finestra da fuori (seconda apertura, invito, voci della barra su Mac, #2031) passa da qui: prima che sia
+// nata quella dell'avvio non si crea niente, la fa l'avvio.
+function ridaiFinestraNormale() {
+  return finestraDellAvvio ? mostraFinestraNormale() : null;
+}
+
+// Chi agisce su una finestra appena nata aspetta le sue schede: aperta prima, la sua scheda finirebbe dietro quelle
+// riaperte. Risolve `{ ripristinata }`, o null se la finestra si chiude prima.
+function quandoPronta(win) {
+  return (win && win._filoPronta) || Promise.resolve(win && !win.isDestroyed() ? { ripristinata: false } : null);
+}
+
+// Gli init che la prima scheda deve trovare fatti (ad-blocker, impronta, permessi…) li aspetta qualunque finestra
+// normale nata durante l'avvio, prima di riaprire le schede: la finestra intanto si apre e la barra si carica (#1092).
+let avvioPronto = Promise.resolve();
+function attendiAvvio(pronti) { avvioPronto = Promise.resolve(pronti).catch(() => {}); }
+
 // Wiring comune a finestra normale e incognito: carica le impostazioni di
 // sicurezza e collega i listener di resize/fullscreen al layout dei tab.
+// Una finestra in incognito con scaricamenti in corso chiede prima cosa farne (#1287, downloads.js).
+function scaricamentiTrattengono(win) {
+  try { return require('./services/downloads').trattieniChiusura(win) === true; } catch (_) { return false; }
+}
+
 function wireWindowCommon(win, tabs) {
   // Le impostazioni di sicurezza vanno applicate PRIMA del primo tab: policy
   // WebRTC e blocco dei popup devono valere già sul newtab.
@@ -68,13 +115,20 @@ function wireWindowCommon(win, tabs) {
   // caselle da spedire perdeva l'ultima modifica. Si aspetta come alla chiusura di una scheda (chiusuraConCaselle).
   let congedoChiusuraFatto = false;
   win.on('close', (e) => {
-    if (congedoChiusuraFatto) return;
-    congedoChiusuraFatto = true;
-    const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
-    if (!attesa) return;
-    e.preventDefault();
-    const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
-    attesa.then(chiudi, chiudi);
+    // Prima del congedo: chi sceglie di non chiudere trova le schede come le aveva.
+    if (scaricamentiTrattengono(win)) { e.preventDefault(); return; }
+    if (!congedoChiusuraFatto) {
+      congedoChiusuraFatto = true;
+      const attesa = require('./tabs/chiusuraConCaselle').congedaSchede(tabs);
+      if (attesa) {
+        e.preventDefault();
+        const chiudi = () => { try { if (!win.isDestroyed()) win.close(); } catch (_) {} };
+        attesa.then(chiudi, chiudi);
+        return;
+      }
+    }
+    // Da qui la chiusura va avanti: la sessione resta quella di adesso, prima che le schede si smontino (#2191).
+    tabs.chiudiSessione();
   });
 
   win.on('resize', () => tabs.layout());
@@ -110,7 +164,11 @@ function wireWindowCommon(win, tabs) {
 
   // Il menu a comparsa nasce con la barra pronta: il primo clic lo trova carico (#1090). Il setTimeout fa partire prima il ripristino delle schede.
   win.webContents.once('did-finish-load', () => {
-    setTimeout(() => { try { require('./popup-menu').preparaMenu(win); } catch (_) {} }, 0);
+    setTimeout(() => {
+      try { require('./popup-menu').preparaMenu(win); } catch (_) {}
+      // Il fumetto, uno per l'app, nasce con la prima barra pronta: il primo suggerimento è come i successivi (#871.4).
+      try { require('./popup-tooltip').preparaSuggerimento(win); } catch (_) {}
+    }, 0);
   });
 
   // Indietro e avanti senza tastiera (#685). Le due strade non si sovrappongono
@@ -121,9 +179,19 @@ function wireWindowCommon(win, tabs) {
   //   · scorrimento orizzontale a due dita su Mac → swipe (l'utente lo accende
   //     nelle impostazioni di sistema; se è spento l'evento non arriva e basta).
   // Dove andare lo decide tabs.navigaCronologia: senza cronologia è un no-op.
+  // Indietro e avanti da qui sono la stessa azione contata della barra e dei tasti (#1461).
+  const naviga = (verso) => require('./services/azioniContate').azione('navigate-back-forward', () => tabs.navigaCronologia(verso), { incognito: !!win._filoIncognito });
+  // Da quale strada (#1468): accanto alla porta unica, i tasti laterali del mouse e lo scorrimento.
+  const strada = (verso, via) => require('./services/contatoriStrade').misura('cronologia', verso, via, { incognito: !!win._filoIncognito });
+  win.on('app-command', (_e, comando) => {
+    if (comando === 'browser-backward' || comando === 'browser-forward') strada(comando === 'browser-backward' ? 'indietro' : 'avanti', 'tasto_mouse');
+  });
+  win.on('swipe', (_e, direzione) => {
+    if (direzione === 'right' || direzione === 'left') strada(direzione === 'right' ? 'indietro' : 'avanti', 'swipe');
+  });
   win.on('app-command', (event, comando) => {
-    if (comando === 'browser-backward') tabs.navigaCronologia('indietro');
-    else if (comando === 'browser-forward') tabs.navigaCronologia('avanti');
+    if (comando === 'browser-backward') naviga('indietro');
+    else if (comando === 'browser-forward') naviga('avanti');
     else return;
     // Senza questo Windows lascia agire anche il comportamento di serie.
     try { event.preventDefault(); } catch (_) {}
@@ -131,12 +199,27 @@ function wireWindowCommon(win, tabs) {
   // La direzione è quella delle dita: si spinge la pagina a destra per tornare
   // indietro, come in ogni browser su Mac.
   win.on('swipe', (event, direzione) => {
-    if (direzione === 'right') tabs.navigaCronologia('indietro');
-    else if (direzione === 'left') tabs.navigaCronologia('avanti');
+    if (direzione === 'right') naviga('indietro');
+    else if (direzione === 'left') naviga('avanti');
   });
 }
 
+// Il tempo di avvio di Filo (#1461): dall'inizio del processo alla finestra visibile, e alla prima scheda caricata.
+// Solo la prima finestra del processo: le altre si aprono a Filo già avviato.
+let avvioContato = false;
+function misuraAvvio() {
+  if (avvioContato) return null;
+  avvioContato = true;
+  try {
+    const C = globalThis.SN_CONTATORI_MAIN;
+    return C ? C.azione('avvio', { t0: Date.now() - process.uptime() * 1000, incognito: false }) : null;
+  } catch (_) { return null; }
+}
+
 function createMainWindow() {
+  const avvio = misuraAvvio();
+  const tCrea = Date.now();
+  const contatori = () => globalThis.SN_CONTATORI_MAIN || null;
   const win = new BrowserWindow({
     width: 1280,
     height: 840,
@@ -167,14 +250,37 @@ function createMainWindow() {
 
   const tabs = new TabManager(win, null, { shellHeight: SHELL_HEIGHT });
   win._filoTabs = tabs;
+  finestraDellAvvio = true;
+  let pronta = () => {};
+  win._filoPronta = new Promise((r) => { pronta = r; });
+  win.once('closed', () => pronta(null));
 
   wireWindowCommon(win, tabs);
+  // Quando non risponde, e lo spegnimento del sistema su Windows, che non passa dall'uscita (#1466).
+  try { contatori()?.seguiFinestra(win); } catch (_) {}
+  win.on('session-end', () => { try { contatori()?.fineChiusura({ sistema: true }); } catch (_) {} });
 
   win.webContents.once('did-finish-load', async () => {
+    // I passi dell'avvio (#1466) solo per la prima finestra del processo, come il tempo di avvio.
+    const passo = (nome, t0) => { if (avvio) { try { contatori()?.passoAvvio(nome, Date.now() - t0); } catch (_) {} } };
+    passo('finestra_creata', tCrea);
+    await avvioPronto;
+    if (win.isDestroyed()) return;
+    const tSessione = Date.now();
     let restored = false;
     try { restored = await tabs.restoreSession(); } catch (_) { restored = false; }
     if (!restored) tabs.openTab('filo://newtab/');
+    pronta({ ripristinata: restored });
+    passo('sessione_ripristinata', tSessione);
     revealWindow(win);
+    if (avvio) {
+      avvio.visto();
+      const davanti = tabs.tabs.find((t) => t.id === tabs.activeId);
+      const wc = davanti && davanti.view && davanti.view.webContents;
+      try { contatori()?.passoAvvioFino('prima_scheda_visibile', Date.now(), wc); } catch (_) {}
+      if (wc && !wc.isDestroyed() && wc.isLoading()) avvio.scheda(wc);
+      else avvio.fine();
+    }
   });
 
   return win;
@@ -219,6 +325,8 @@ function createIncognitoWindow() {
   wireWindowCommon(win, tabs);
 
   win.webContents.once('did-finish-load', async () => {
+    await avvioPronto;
+    if (win.isDestroyed()) return;
     // Niente restore in incognito. Una scheda aperta qui prima che la barra finisse di caricarsi resta davanti.
     if (!tabs.tabs.length) tabs.openTab('filo://newtab/');
     revealWindow(win);
@@ -228,7 +336,7 @@ function createIncognitoWindow() {
   // lo stesso overlay in RAM.
   win.on('closed', () => {
     try { require('./services/downloads').forgetScope(partition); } catch (_) {}
-    const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito);
+    const stillOpen = BrowserWindow.getAllWindows().some((w) => w !== win && w._filoIncognito && w._filoTabs);
     if (!stillOpen) {
       try { require('./shim/storage').resetIncognito(); } catch (_) {}
       try { require('./services/ilFilo').resetIncognito(); } catch (_) {}
@@ -244,5 +352,6 @@ function createIncognitoWindow() {
 
 module.exports = {
   createMainWindow, createIncognitoWindow, revealWindow, SHELL_HEIGHT,
-  assicuraFinestraNormale, onFinestraNormale,
+  assicuraFinestraNormale, mostraFinestraNormale, onFinestraNormale, riaperturaDaSistema, attendiAvvio,
+  ridaiFinestraNormale, quandoPronta,
 };

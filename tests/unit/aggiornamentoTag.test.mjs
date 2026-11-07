@@ -7,11 +7,17 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
+import { createHash } from 'node:crypto';
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { cartellaTemporanea } from '../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const R = require(join(ROOT, 'src', 'main', 'aggiornamentoRegole.js'));
 const U = require(join(ROOT, 'src', 'main', 'updater.js'));
+const A = require(join(ROOT, 'src', 'main', 'ancoraRilascio.js'));
+// Niente Firestore nelle prove: dove non si dice altro, nessuna àncora in tutta la raccolta.
+U.ancoraPerProva();
 const { AppUpdater } = require('electron-updater/out/AppUpdater');
 // Il semver di electron-updater: una SemVer di un'altra copia non la riconosce.
 const semver = createRequire(require.resolve('electron-updater'))('semver');
@@ -249,4 +255,266 @@ test('tagDiGitHubAccettato: solo v più la versione, e niente tag non passa', ()
   assert.equal(R.tagDiGitHubAccettato(null, '1.2.3'), false);
   assert.equal(R.tagDiGitHubAccettato(undefined, undefined), false);
   assert.equal(R.tagDiGitHubAccettato('vundefined', undefined), false);
+});
+
+// ── L'àncora del server (#1501) ──
+// Chi ha un token che scrive i contenuti del repo sostituisce installer e latest.yml di una release senza toccare il
+// tag: tag e percorsi restano giusti, cambia solo l'impronta. Passa solo l'impronta che il server ha ancorato.
+
+const CONTENUTO = 'MZ installatore vero';
+const SHA_VERO = createHash('sha512').update(CONTENUTO).digest('base64');
+const SHA_SOSTITUITO = createHash('sha512').update('MZ installatore sostituito').digest('base64');
+const TAG = 'v0.2.240';
+
+// L'AppUpdater vero col GitHubProvider vero: finti github.com, la cache dello scaricamento e l'installatore.
+const { BaseUpdater } = require('electron-updater/out/BaseUpdater.js');
+class ReleaseRiscritta extends BaseUpdater {
+  constructor({ sha, piattaforma }) {
+    const allaChiusura = [];
+    super(null, { version: '0.2.233', isPackaged: true, whenReady: async () => {}, onQuit: (f) => allaChiusura.push(f), quit() {} });
+    this._logger = { info() {}, warn() {}, error() {}, debug() {} };
+    Object.assign(this, { allaChiusura, chiamateDownload: 0, scaricamenti: 0, installazioni: 0 });
+    const executor = {
+      async request(o) {
+        const p = String(o.path);
+        if (p.endsWith('/releases/latest')) return JSON.stringify({ tag_name: TAG });
+        if (p.endsWith('/releases.atom')) {
+          return '<?xml version="1.0" encoding="UTF-8"?><feed xmlns="http://www.w3.org/2005/Atom"><entry>'
+            + `<link rel="alternate" type="text/html" href="https://github.com/sathyaram1/Filo/releases/tag/${TAG}"/>`
+            + `<title>${TAG}</title><content type="html">note</content></entry></feed>`;
+        }
+        if (p.startsWith(`/sathyaram1/Filo/releases/download/${TAG}/`) && /latest[^/]*\.yml$/.test(p)) {
+          return `version: 0.2.240\nfiles:\n  - url: Filo-Setup.exe\n    sha512: ${sha}\n    size: 20\n`
+            + `path: Filo-Setup.exe\nsha512: ${sha}\nreleaseDate: '2026-10-21T11:00:00.000Z'\n`;
+        }
+        throw new Error(`richiesta inattesa: ${p}`);
+      },
+    };
+    this.github = new GitHubProvider({ provider: 'github', owner: 'sathyaram1', repo: 'Filo' }, this,
+      { executor, isUseMultipleRangeRequest: false, platform: piattaforma });
+    const vero = this.downloadUpdate.bind(this);
+    this.downloadUpdate = (...a) => { this.chiamateDownload += 1; return vero(...a); };
+  }
+
+  async getUpdateInfoAndProvider() {
+    return { info: await this.github.getLatestVersion(), provider: this.github };
+  }
+
+  async doDownloadUpdate({ updateInfoAndProvider }) {
+    this.scaricamenti += 1;
+    const cache = cartellaTemporanea('filo-ancora-cache-');
+    const file = join(cache, 'Filo-Setup.exe');
+    writeFileSync(file, CONTENUTO);
+    writeFileSync(join(cache, 'update-info.json'),
+      JSON.stringify({ fileName: 'Filo-Setup.exe', sha512: updateInfoAndProvider.info.files[0].sha512, isAdminRightsRequired: false }));
+    this.dispatchUpdateDownloaded({ ...updateInfoAndProvider.info, downloadedFile: file });
+    this.addQuitHandler();
+    return [file];
+  }
+
+  install() { this.installazioni += 1; return true; }
+  quitAndInstall() { this.installazioni += 1; }
+  chiudi() { for (const f of this.allaChiusura) f(0); }
+}
+
+const calma = () => new Promise((r) => setImmediate(r));
+const ANCORATA = async (tag) => ({ letta: true, impronte: tag === TAG ? { 'Filo-Setup.exe': SHA_VERO } : null, altre: true });
+const SENZA_ANCORA = async () => ({ letta: true, impronte: null, altre: true });
+const ILLEGGIBILE = async () => ({ letta: false });
+
+async function avviaRelease({ sha, ancora, piattaforma = 'win32', modo, automatici = true }) {
+  const dati = cartellaTemporanea('filo-ancora-dati-');
+  const { registro } = U.perProva({ piattaforma, versione: '0.2.233', cartella: dati, avvisoVero: false, ancora });
+  const carte = memoriaFinta();
+  const u = new ReleaseRiscritta({ sha, piattaforma });
+  await U.avviaAggiornatore(u, { automatici, chiesta: null, modo });
+  await calma();
+  const file = join(dati, 'aggiornamento-pronto.json');
+  const ricordo = () => (existsSync(file) ? JSON.parse(readFileSync(file, 'utf8')) : null);
+  return { u, registro, carte, ricordo };
+}
+
+const SISTEMI = [
+  { nome: 'Windows', piattaforma: 'win32' },
+  { nome: 'Windows, installa alla chiusura', piattaforma: 'win32', modo: 'chiusura' },
+  { nome: 'Linux', piattaforma: 'linux' },
+];
+const CASI_RIFIUTATI = [
+  { cosa: 'impronta diversa da quella ancorata', sha: SHA_SOSTITUITO, ancora: ANCORATA },
+  { cosa: 'release senza àncora', sha: SHA_SOSTITUITO, ancora: SENZA_ANCORA },
+  { cosa: 'release senza àncora, anche con l\'impronta del file vero', sha: SHA_VERO, ancora: SENZA_ANCORA },
+];
+
+for (const s of SISTEMI) {
+  test(`tag e percorsi giusti ma impronta non ancorata: mai a downloadUpdate né all'installazione (${s.nome})`, async () => {
+    try {
+      for (const caso of CASI_RIFIUTATI) {
+        const { u, registro, carte, ricordo } = await avviaRelease({ ...s, ...caso, automatici: true });
+        assert.equal(u.chiamateDownload, 0, `${caso.cosa}: chiesto lo scaricamento`);
+        assert.equal(u.scaricamenti, 0, `${caso.cosa}: scaricata`);
+        assert.equal(ricordo(), null);
+        u.chiudi();
+        assert.equal(u.installazioni, 0, `${caso.cosa}: installata alla chiusura`);
+        const impostazioni = { aggiornamenti: { automatici: true, ...(s.modo ? { installa: s.modo } : {}) } };
+        assert.equal(await U.installaAllAvvioSeServe(impostazioni, { forza: true }), false);
+        assert.equal(registro.lanciati.length, 0, `${caso.cosa}: all'apertura dopo è partito l'installatore`);
+        assert.deepEqual(carte.filter((n) => !n.dismissed).map((n) => n.text), [], `${caso.cosa}: una carta promette la versione`);
+
+        const r = await U.installaAggiornamento();
+        await calma();
+        assert.equal(r.stato, 'rifiutata', `${caso.cosa}: ${JSON.stringify(r)}`);
+        const c = await U.aggiornaDaChat({ riavvio: true });
+        await calma();
+        assert.equal(c.esito, 'rifiutata', c.frase);
+        assert.equal(u.chiamateDownload, 0, `${caso.cosa}: «Installa» o la chat hanno chiesto lo scaricamento`);
+        u.chiudi();
+        assert.equal(u.installazioni, 0);
+      }
+    } finally {
+      U.perProva({ piattaforma: 'win32' });
+      delete globalThis.SN_FILO_MEMORY;
+    }
+  });
+}
+
+test('con l\'impronta uguale all\'àncora scarica come prima, e il ricordo tiene quella ancorata', async () => {
+  try {
+    for (const s of SISTEMI) {
+      const { u, registro, ricordo } = await avviaRelease({ ...s, sha: SHA_VERO, ancora: ANCORATA, automatici: true });
+      assert.equal(u.scaricamenti, 1, `${s.nome}: la versione ancorata non si scarica`);
+      assert.equal(ricordo()?.versione, '0.2.240', s.nome);
+      assert.equal(ricordo()?.sha512, SHA_VERO, s.nome);
+      if (s.piattaforma === 'win32' && !s.modo) {
+        assert.equal(await U.installaAllAvvioSeServe({ aggiornamenti: { automatici: true } }, { forza: true }), true);
+        assert.equal(registro.lanciati.length, 1, 'all\'apertura dopo l\'installatore ancorato non parte');
+      } else {
+        u.chiudi();
+        assert.equal(u.installazioni, 1, `${s.nome}: alla chiusura non si installa`);
+      }
+    }
+  } finally {
+    U.perProva({ piattaforma: 'win32' });
+    delete globalThis.SN_FILO_MEMORY;
+  }
+});
+
+test('àncora che non si legge: niente scaricamento, lo si dice come un controllo non riuscito e si riprova dopo', async () => {
+  try {
+    const { u } = await avviaRelease({ sha: SHA_VERO, ancora: ILLEGGIBILE, automatici: true });
+    assert.equal(u.chiamateDownload, 0);
+    const c = await U.aggiornaDaChat({ riavvio: true });
+    await calma();
+    assert.equal(c.esito, 'errore', c.frase);
+    assert.doesNotMatch(c.frase, /controllo di sicurezza/, 'Firestore che non risponde non rende falsa la release');
+    assert.equal(u.chiamateDownload, 0);
+    U.ancoraPerProva(ANCORATA);
+    await u.checkForUpdates();
+    await calma();
+    assert.equal(u.scaricamenti, 1, 'al controllo dopo, con l\'àncora che si legge, non scarica');
+  } finally {
+    U.perProva({ piattaforma: 'win32' });
+    delete globalThis.SN_FILO_MEMORY;
+  }
+});
+
+test('nessuna àncora in tutta la raccolta: il server non ne scrive ancora e vale il solo latest.yml, come prima', async () => {
+  try {
+    const { u } = await avviaRelease({ sha: SHA_VERO, ancora: null, automatici: true });
+    assert.equal(u.scaricamenti, 1);
+  } finally {
+    U.perProva({ piattaforma: 'win32' });
+    delete globalThis.SN_FILO_MEMORY;
+  }
+});
+
+test('esitoAncora: ogni file del feed con la sua impronta ancorata, o niente', () => {
+  const impronte = { 'Filo-Mac.zip': 'Z', 'Filo-Mac.dmg': 'D' };
+  const letta = { letta: true, impronte, altre: true };
+  const esito = (file, ancora = letta) => R.esitoAncora({ file, ancora });
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }, { nome: 'Filo-Mac.dmg', sha512: 'D' }]).esito, 'coincide');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }]).esito, 'coincide');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }, { nome: 'altro.zip', sha512: 'Z' }]).esito, 'diversa', 'un file in più non ancorato');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'X' }]).esito, 'diversa');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip' }]).esito, 'diversa', 'senza sha512 (solo sha2) non si confronta');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: '' }]).esito, 'diversa');
+  assert.equal(esito([]).esito, 'diversa');
+  assert.equal(esito(null).esito, 'diversa');
+  assert.equal(esito([{ nome: 'constructor', sha512: String(Object) }], { letta: true, impronte: {}, altre: true }).esito, 'diversa');
+  assert.equal(esito([{ nome: '__proto__', sha512: 'x' }], { letta: true, impronte: {}, altre: true }).esito, 'diversa');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }], { letta: true, impronte: null, altre: true }).esito, 'manca');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }], { letta: true, impronte: null }).esito, 'manca', 'nel dubbio il controllo è acceso');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }], { letta: true, impronte: null, altre: false }).esito, 'spenta');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }], { letta: false }).esito, 'illeggibile');
+  assert.equal(esito([{ nome: 'Filo-Mac.zip', sha512: 'Z' }], null).esito, 'illeggibile');
+});
+
+test('fileDaAncorare: i file che electron-updater può scaricare, coi nomi e le impronte del yml', () => {
+  assert.deepEqual(R.fileDaAncorare({ files: [{ url: 'a.exe', sha512: 'A' }], path: 'vecchio.exe', sha512: 'V' }), [{ nome: 'a.exe', sha512: 'A' }]);
+  assert.deepEqual(R.fileDaAncorare({ path: 'a.exe', sha512: 'A' }), [{ nome: 'a.exe', sha512: 'A' }]);
+  assert.deepEqual(R.fileDaAncorare({ files: [], path: 'a.exe', sha512: 'A' }), [{ nome: 'a.exe', sha512: 'A' }]);
+  assert.deepEqual(R.fileDaAncorare({ files: [{ url: 'a.exe', sha512: 'A' }], packages: { x64: { path: 'p.7z', sha512: 'P' } } }),
+    [{ nome: 'a.exe', sha512: 'A' }, { nome: 'p.7z', sha512: 'P' }]);
+  assert.deepEqual(R.fileDaAncorare({ files: [{ url: 'a.exe', sha2: 'H' }] }), [{ nome: 'a.exe', sha512: undefined }]);
+  assert.deepEqual(R.fileDaAncorare(null), []);
+});
+
+test('impronteDellAncora: legge il documento come lo dà Firestore, e scarta le voci fuori forma', () => {
+  const doc = { fields: { versione: { stringValue: '0.2.240' }, file: { mapValue: { fields: {
+    'Filo-Setup.exe': { mapValue: { fields: { sha512: { stringValue: 'S' }, ancoratoIl: { timestampValue: '2026-10-21T11:00:00Z' } } } },
+    'Filo Mac.dmg': { mapValue: { fields: { sha512: { stringValue: 'D' } } } },
+    'vuoto.zip': { mapValue: { fields: { sha512: { stringValue: '' } } } },
+    'numero.zip': { mapValue: { fields: { sha512: { integerValue: '3' } } } },
+    'piatto.zip': { stringValue: 'S' },
+  } } } } };
+  assert.deepEqual({ ...R.impronteDellAncora(doc) }, { 'Filo-Setup.exe': 'S', 'Filo Mac.dmg': 'D' });
+  assert.deepEqual({ ...R.impronteDellAncora({ fields: {} }) }, {});
+  assert.deepEqual({ ...R.impronteDellAncora(null) }, {});
+  assert.equal(Object.getPrototypeOf(R.impronteDellAncora(doc)), null);
+});
+
+test('improntaDaRicordare: con l\'àncora accesa il ricordo tiene solo un\'impronta ancorata di quella versione', () => {
+  const ancora = { versione: '0.2.240', impronte: { 'Filo-Setup.exe': 'S' } };
+  assert.equal(R.improntaDaRicordare({ versione: '0.2.240', sha512: 'S', ancora }), 'S');
+  assert.equal(R.improntaDaRicordare({ versione: '0.2.240', sha512: 'X', ancora }), null);
+  assert.equal(R.improntaDaRicordare({ versione: '0.2.241', sha512: 'S', ancora }), null);
+  assert.equal(R.improntaDaRicordare({ versione: '0.2.240', sha512: null, ancora }), null);
+  assert.equal(R.improntaDaRicordare({ versione: '0.2.240', sha512: 'X', ancora: null }), 'X', 'controllo spento: come prima');
+});
+
+function risposta(status, corpo) {
+  return { status, ok: status >= 200 && status < 300, json: async () => corpo };
+}
+
+test('leggiAncora: il documento del tag, e se manca se la raccolta ha almeno un\'àncora', async () => {
+  const chieste = [];
+  const con = (...risposte) => async (url) => {
+    chieste.push(url);
+    const r = risposte.shift();
+    if (r instanceof Error) throw r;
+    return r;
+  };
+  const doc = { fields: { file: { mapValue: { fields: { 'Filo-Setup.exe': { mapValue: { fields: { sha512: { stringValue: 'S' } } } } } } } } };
+  assert.deepEqual(await A.leggiAncora(TAG, con(risposta(200, doc))), { letta: true, impronte: Object.assign(Object.create(null), { 'Filo-Setup.exe': 'S' }), altre: true });
+  assert.match(chieste[0], /\/documents\/ancoreRilascio\/v0\.2\.240\?key=/);
+  assert.equal(R.COLLEZIONE_ANCORE, 'ancoreRilascio');
+
+  assert.deepEqual(await A.leggiAncora(TAG, con(risposta(404), risposta(200, {}))), { letta: true, impronte: null, altre: false });
+  assert.match(chieste.at(-1), /\/documents\/ancoreRilascio\?pageSize=1&/);
+  assert.deepEqual(await A.leggiAncora(TAG, con(risposta(404), risposta(200, { documents: [{ name: 'x' }] }))), { letta: true, impronte: null, altre: true });
+
+  for (const [cosa, f] of [
+    ['regola non pubblicata', con(risposta(403))],
+    ['server giù', con(risposta(503))],
+    ['rete assente', con(new Error('ENOTFOUND'))],
+    ['elenco rifiutato', con(risposta(404), risposta(403))],
+    ['elenco senza rete', con(risposta(404), new Error('ECONNRESET'))],
+    ['risposta non JSON', async () => ({ status: 200, ok: true, json: async () => { throw new Error('non JSON'); } })],
+  ]) assert.deepEqual(await A.leggiAncora(TAG, f), { letta: false }, cosa);
+});
+
+test('l\'àncora si legge con la sessione di rete di electron-updater: proxy e filtri sono quelli con cui legge GitHub', () => {
+  const { NET_SESSION_NAME } = require('electron-updater/out/electronHttpExecutor');
+  const src = readFileSync(join(ROOT, 'src', 'main', 'ancoraRilascio.js'), 'utf8');
+  assert.ok(src.includes(`fromPartition('${NET_SESSION_NAME}'`),
+    `electron-updater usa la sessione «${NET_SESSION_NAME}»: un'àncora letta da un'altra strada può non passare dove passa GitHub`);
 });

@@ -29,7 +29,7 @@ Module._load = function (request, parent, isMain) {
 const Disco = require(join(ROOT, 'src', 'main', 'shim', 'storage.js'));
 globalThis.self = globalThis;
 globalThis.chrome = { storage: { local: { get: Disco.get, set: Disco.set, remove: Disco.remove } } };
-for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences', 'cambi']) {
+for (const m of ['constants', 'contenutoEsterno', 'timeFormat', 'storage', 'themeTokens', 'tabColor', 'ttsVoices', 'filoMemory', 'preferences', 'cambi', 'filoEventi']) {
   require(join(ROOT, 'src', 'shared', `${m}.js`));
 }
 const Registro = require(join(ROOT, 'src', 'main', 'services', 'registroCambi.js'));
@@ -38,9 +38,7 @@ const K = globalThis.SN_CONST.STORAGE_KEYS;
 Registro.avvia();
 
 async function eventi(tipo) {
-  await Registro.attesa();
-  const r = await Disco.get(K.FILO_CAMBI);
-  return (r[K.FILO_CAMBI] || []).filter((e) => e.tipo === tipo);
+  return (await Registro.lista()).filter((e) => e.tipo === tipo);
 }
 
 test('ogni timer aggiunto è un cambio suo, anche il primo dopo un riavvio, e l\'annullo toglie l\'ultimo', async () => {

@@ -10,6 +10,10 @@ stato verificato: non rifarlo.
 Sei già sul ramo del lavoro: non cambiarlo. Una critica emessa da un'altra
 versione del codice viene rifiutata.
 
+Leggi il perimetro in fondo prima di lanciare qualunque cosa: se dice che il
+riallineamento non è su questo ramo, quello che chiede lì vale sopra il resto
+di questo testo.
+
 <!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _immagini.md -->

@@ -1,43 +1,6 @@
-// Scrive le chiavi di default nell'eseguibile, a build-time.
-//
-// COSA FA
-//   Prima di ogni build CI, raccoglie le chiavi API di default e le scrive in
-//   src/main/config/default-keys.generated.json (gitignorato, finisce SOLO nel
-//   binario impacchettato). A runtime default-keys.js legge quel file con
-//   precedenza sui valori d'ambiente.
-//
-//   Questo è il pezzo che fa propagare la rotazione chiavi dell'admin a TUTTI
-//   gli utenti, anche quelli senza login: l'admin ruota le chiavi dalla pagina
-//   "Modelli predefiniti" (→ Firestore config/secrets); il prossimo build (ogni
-//   6h) le rilegge da Firestore e le incastona nel nuovo installer; l'auto-update
-//   le consegna a tutti.
-//
-//   Dal #581 è l'UNICA strada: `config/secrets` è leggibile solo dall'admin, e
-//   nessuna installazione lo apre più a runtime. Prima bastava un account Google
-//   qualsiasi per scaricarlo per intero con una GET REST.
-//
-// FONTI DELLE CHIAVI (in ordine di precedenza, per ciascuna chiave):
-//   1. il server di sicurezza      → l'override admin più recente, chiesto con
-//                                    FILO_BUILD_PASSPHRASE (un segreto che apre
-//                                    SOLO questo, e nient'altro)
-//   2. env FILO_DEFAULT_*         → secret del job CI (fallback se non c'è override)
-//   3. nessuna delle due          → la pubblicazione si FERMA: una versione senza
-//                                    chiavi arriva agli utenti muta, e nessuno se
-//                                    ne accorgerebbe finché non prova a usarla
-//
-// Quando si ferma dice QUALE chiave manca, da quali fonti l'ha cercata e dove
-// si mette; e ciò che cambia quel che arriva agli utenti va in EVIDENZA, non in
-// coda al registro: la sentinella tests/unit/bakeGuastoParlante.test.mjs lo tiene fermo.
-//
-// SICUREZZA
-//   - Lo script NON stampa mai i valori delle chiavi (solo "presente/assente").
-//   - Il file generato è gitignorato: non torna mai nel repo pubblico.
-//   - Se manca la parola d'ordine si degrada ai secret del job; se manca ANCHE
-//     quello, ci si ferma (vedi sopra).
-//   - Prima qui c'era il token dell'account ROBOT: una credenziale piena, che
-//     apriva le chiavi API a pagamento dell'owner e viveva nell'ambiente — e un
-//     ambiente lo eredita chiunque ci passi. Adesso il segreto fa una cosa sola
-//     (spec ROUTINE-AUTH-SPEC.md, "un segreto, un potere").
+// Scrive nel file generato le chiavi di default dell'installer: prima dal server di sicurezza, poi dai segreti FILO_DEFAULT_* del job; senza nessuna la pubblicazione si ferma.
+// L'installer è pubblico e il file ci sta in chiaro: ogni chiave scritta qui la legge chiunque lo scarichi. Quali possono entrarci lo decide l'elenco chiuso di tests/unit/chiaviNelPacchettoPubblico.test.mjs.
+// Non stampa mai i valori; i guasti vanno in evidenza col nome della chiave e della fonte (tests/unit/bakeGuastoParlante.test.mjs).
 
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -147,29 +110,12 @@ function envKey(name) {
   return typeof v === 'string' ? v.trim() : '';
 }
 
-// Le chiavi dei provider che l'applicazione legge DAVVERO dal file generato,
-// cioè quelle che `src/main/config/default-keys.js` va a cercare. Stanno in una
-// lista sola, e non sparse in un oggetto scritto a mano, perché il controllo
-// «questa versione ha almeno una chiave?» più sotto conta proprio queste: una
-// chiave incastonata che nessuno legge non è neutra, mente a quel controllo.
-//
-// Chi non c'è, e perché.
-//   · OpenRouter (#598): ogni utente riceve la sua chiave dal server quando
-//     riscatta un invito, col tetto di spesa pari ai suoi crediti. Una chiave
-//     di fabbrica nell'installer la apriva a chiunque scaricasse il pacchetto.
-//   · Gemini (#581, secondo giro): il collegamento a Gemini in Filo non esiste
-//     più e default-keys.js non la legge. Finiva dentro l'installer, che
-//     chiunque può scaricare e aprire, senza servire a niente; e siccome il
-//     controllo la contava, da sola bastava a far passare una pubblicazione da
-//     cui l'applicazione non ricavava nessuna chiave.
-// Se un giorno l'applicazione torna a leggere una chiave nuova, va aggiunta
-// qui: la sentinella `tests/unit/bakeChiaviLette.test.mjs` diventa rossa se le
-// due parti divergono.
-//
-// `server` è il campo ESATTO del documento dei segreti: un guasto che dice
-// «manca» senza dire dove si rimedia costa a chi legge un giro d'indagine (#642).
-// Il server consegna questi campi e nessun altro: la sua sentinella legge le
-// righe `server: '…'` di questo file (#1074).
+// Le chiavi dei provider che l'applicazione legge dal file generato: il controllo «questa versione ha almeno una
+// chiave?» conta queste, e una chiave che nessuno legge gli mentirebbe (tests/unit/bakeChiaviLette.test.mjs).
+// Aggiungerne una qui non basta: l'installer è pubblico, e tests/unit/chiaviNelPacchettoPubblico.test.mjs la rifiuta
+// finché l'owner non la ammette; lì stanno anche le uscite col loro compito di revoca (OpenRouter #598, Gemini #581).
+// `server` è il campo ESATTO del documento dei segreti, perché un guasto dica dove si rimedia (#642); il server
+// consegna questi campi e nessun altro, e la sua sentinella legge le righe `server: '…'` di questo file (#1074).
 const CHIAVI_DEL_PACCHETTO = [
   { nome: 'tavily', env: 'FILO_DEFAULT_TAVILY_KEY', server: 'config/secrets.apiKeys.tavily' },
 ];

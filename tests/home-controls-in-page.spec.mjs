@@ -47,17 +47,23 @@ test("L'icona profilo della barra mostra l'avatar quando loggato", async ({ app 
   await expect(account.locator('img.avatar')).toHaveCount(0);
   await expect(account).toHaveAttribute('aria-label', 'Accedi');
 
-  // Il login arriva alla shell come dopo il sign-in; la shell lo passa alla barra. Una foto vera
-  // (https) non si carica nei test: l'errore riporta l'icona, quindi si guarda l'etichetta e la src.
-  const picture = 'https://lh3.googleusercontent.com/a/foto-di-prova';
-  await app.evaluate(({ BrowserWindow }, pic) => {
+  // Il login arriva alla shell come dopo il sign-in; la shell lo passa alla barra. La foto è la copia che il main
+  // tiene nella cartella dati (#1273): un indirizzo di Google la barra non lo carica.
+  const accedi = (pic) => app.evaluate(({ BrowserWindow }, p) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w.webContents.send('filo:broadcast', {
       type: 'auth_changed', signedIn: true,
-      profile: { name: 'Mario Rossi', email: 'mario@example.it', picture: pic },
+      profile: { name: 'Mario Rossi', email: 'mario@example.it', picture: p },
     });
-  }, picture);
+  }, pic);
+  await accedi('https://lh3.googleusercontent.com/a/foto-di-prova');
   await expect(account).toHaveAttribute('aria-label', 'Profilo: Mario Rossi');
+  await expect(account.locator('img.avatar')).toHaveCount(0);
+  const copia = await app.evaluate(() => globalThis.__filoCopieIcone.conserva(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAADElEQVR4nGM4YaMBAAL8AS3/gzpXAAAAAElFTkSuQmCC'));
+  await accedi(copia);
+  await expect(account.locator('img.avatar')).toHaveAttribute('src', copia);
+  await expect.poll(() => account.locator('img.avatar').evaluate((i) => i.naturalWidth)).toBe(1);
 
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);

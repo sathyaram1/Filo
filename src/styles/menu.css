@@ -99,26 +99,34 @@
   margin: 4px 0;
 }
 
+/* La fila contestuale in cima (#1434): le icone delle azioni più probabili sull'elemento, poi il «+» con le altre. */
+/* Tante icone portate nella fila vanno a capo: mai fuori dal bordo del menu. */
 .sn-menu-row {
   display: flex;
-  gap: 4px;
-  padding: 4px 8px;
+  flex-wrap: wrap;
+  gap: 2px;
+  padding: 2px 6px 6px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid var(--sn-border);
 }
+.sn-menu-row[hidden] { display: none; }
 
 .sn-menu-row-btn {
   all: unset;
-  flex: 1;
+  box-sizing: border-box;
+  flex: 1 1 0;
+  min-width: 30px;
   display: flex;
   align-items: center;
   justify-content: center;
-  text-align: center;
   padding: 6px 0;
-  border-radius: 4px;
+  border-radius: 6px;
   cursor: pointer;
   color: var(--sn-fg);
   font-family: var(--sn-font);
   font-size: 14px;
-  min-height: 28px;
+  min-height: 30px;
+  transition: background calc(80ms * var(--sn-motion, 1)) ease-out, transform calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 .sn-menu-row-btn svg,
 .sn-menu-icon-btn svg,
@@ -128,16 +136,29 @@
   flex: 0 0 auto;
 }
 
-.sn-menu-row-btn:hover:not(:disabled):not(.sn-menu-btn-disabled) {
+.sn-menu-row-btn:hover:not(.sn-menu-btn-disabled),
+.sn-menu-icon-btn:hover:not(.sn-menu-btn-disabled) {
   background: rgba(var(--sn-accent-rgb), 0.35);
 }
-
-.sn-menu-row-btn:disabled,
-.sn-menu-row-btn.sn-menu-btn-disabled {
+/* Uno stile che la selezione ha già: un fondo più leggero dell'hover, così l'hover resta visibile sopra. */
+.sn-menu-row-btn.sn-menu-btn-acceso,
+.sn-menu-icon-btn.sn-menu-btn-acceso {
+  background: rgba(var(--sn-accent-rgb), 0.18);
+  color: var(--sn-accent, var(--sn-fg));
+}
+.sn-menu-row-btn:active:not(.sn-menu-btn-disabled),
+.sn-menu-icon-btn:active:not(.sn-menu-btn-disabled) { transform: scale(0.92); }
+.sn-menu-row-btn.sn-menu-btn-disabled,
+.sn-menu-icon-btn.sn-menu-btn-disabled {
   color: var(--sn-muted);
   opacity: 0.4;
 }
-.sn-menu-row-btn:disabled { cursor: not-allowed; }
+/* Il «+» non è un'azione: più sottile, e diviso dalle icone. */
+.sn-menu-row-btn.sn-menu-row-overflow {
+  flex: 0 0 30px;
+  color: var(--sn-muted);
+}
+.sn-menu-row-btn.sn-menu-row-overflow:hover { color: var(--sn-fg); }
 
 .sn-menu-inline {
   padding: 8px 12px;
@@ -334,16 +355,6 @@
 .sn-menu-split-arrow:hover {
   background: rgba(var(--sn-accent-rgb), 0.35);
   color: var(--sn-fg);
-}
-
-.sn-menu-row-btn.sn-menu-row-overflow {
-  border-left: 1px solid var(--sn-border);
-  color: var(--sn-muted);
-}
-.sn-menu-row-btn.sn-menu-row-empty {
-  opacity: 0.25;
-  cursor: default;
-  pointer-events: none;
 }
 
 .sn-menu-correction {
@@ -707,6 +718,10 @@
   min-width: 0;
   max-width: none;
 }
+.sn-menu-icon-grid .sn-menu-grid-vuota {
+  grid-column: 1 / -1;
+  white-space: nowrap;
+}
 .sn-menu-icon-btn {
   all: unset;
   box-sizing: border-box;
@@ -720,25 +735,46 @@
   color: var(--sn-fg);
   font-size: 16px;
   font-family: var(--sn-font);
+  transition: background calc(80ms * var(--sn-motion, 1)) ease-out, transform calc(80ms * var(--sn-motion, 1)) ease-out;
 }
-.sn-menu-icon-btn:hover:not(:disabled):not(.sn-menu-btn-disabled) {
-  background: rgba(var(--sn-accent-rgb), 0.35);
+
+/* Il collegamento sul testo selezionato: un campo e la spunta, accanto all'icona. */
+.sn-menu-link {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px;
+  min-width: 0;
 }
-.sn-menu-icon-btn:disabled,
-.sn-menu-icon-btn.sn-menu-btn-disabled {
-  color: var(--sn-muted);
-  opacity: 0.4;
+.sn-menu-link-campo {
+  box-sizing: border-box;
+  width: 240px;
+  padding: 6px 8px;
+  border: 1px solid var(--sn-border);
+  border-radius: 6px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  font: 13px var(--sn-font);
+  outline: none;
 }
-.sn-menu-icon-btn:disabled { cursor: not-allowed; }
+.sn-menu-link-campo:focus { border-color: var(--sn-accent); }
+.sn-menu-link-ok {
+  all: unset;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border-radius: 6px;
+  cursor: pointer;
+  color: var(--sn-fg);
+  transition: background calc(80ms * var(--sn-motion, 1)) ease-out;
+}
+.sn-menu-link-ok:hover { background: rgba(var(--sn-accent-rgb), 0.35); }
 
 .sn-menu-row-btn[data-sn-draggable="1"],
 .sn-menu-icon-btn[data-sn-draggable="1"] {
-  cursor: grab;
   touch-action: none;
-}
-.sn-menu-row-btn[data-sn-draggable="1"]:active,
-.sn-menu-icon-btn[data-sn-draggable="1"]:active {
-  cursor: grabbing;
 }
 .sn-dragging { opacity: 0.3; }
 .sn-drop-hover {
@@ -746,6 +782,8 @@
   outline-offset: -2px;
   border-radius: 6px;
 }
+/* La fila vuota aperta per un'icona portata dalla barra: un posto dove lasciarla. */
+.sn-menu-row[data-sn-vuota="1"] { min-height: 30px; }
 /* Stesso piano del menu e montata dopo: sopra i pannelli, sotto le sonde che vedono i veli del sito (#589.11). */
 .sn-drag-preview {
   position: fixed;
@@ -763,7 +801,6 @@
   font-family: var(--sn-font);
   font-size: 18px;
   transform: scale(1.08);
-  transition: transform calc(80ms * var(--sn-motion, 1)) ease-out;
 }
 
 .sn-tooltip {

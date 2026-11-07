@@ -2,7 +2,7 @@
 // finché il server dà `prossimo`, conti sommati, un errore ferma e lo dice. Il server vero non si tocca.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { leggiArgomenti, migraTutto, rigaConto } from '../../scripts/fiducia-migra.mjs';
+import { chiamaLotto, leggiArgomenti, migraTutto, rigaConto } from '../../scripts/fiducia-migra.mjs';
 
 function serverFinto(lotti) {
   const chiamate = [];
@@ -61,4 +61,22 @@ test('un rifiuto del server (non admin) ferma col suo motivo; un cursore che non
   const tetto = await migraTutto({ chiama: async () => { n += 1; return { ok: true, prossimo: `p${n}` }; }, tetto: 3 });
   assert.equal(tetto.ok, false);
   assert.match(tetto.motivo, /tetto/);
+});
+
+// #2021.1: i lotti passano dalla chiamata comune, come la sanatoria e la fiducia tolta da una nota.
+test('un lotto ritenta la connessione caduta e dice a parole la credenziale che il server non riconosce', async () => {
+  const visti = [];
+  const caduta = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }) });
+  const fetchImpl = async (url, init) => {
+    visti.push(JSON.parse(init.body));
+    if (visti.length === 1) throw caduta;
+    return new Response(JSON.stringify({ result: { ok: true, fidati: 2 } }), { status: 200 });
+  };
+  const r = await chiamaLotto({ op: 'migra', dryRun: true }, { fetchImpl, idToken: async () => 'tok' });
+  assert.deepEqual(r, { ok: true, fidati: 2 });
+  assert.equal(visti.length, 2);
+  assert.deepEqual(visti[1], { data: { op: 'migra', dryRun: true } });
+  const t = await migraTutto({ chiama: (data) => chiamaLotto(data, { fetchImpl: async () => new Response('{}', { status: 403 }), idToken: async () => 'tok' }) });
+  assert.equal(t.ok, false);
+  assert.equal(t.motivo, 'il server non riconosce questa credenziale come proprietario');
 });

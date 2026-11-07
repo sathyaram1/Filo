@@ -37,7 +37,7 @@ const DATI_DI_FILO = [
 ];
 const IDENTITA = ['identity.bin', 'identity.bin.prev', 'wallet.bin', 'wallet.bin.illeggibile-2026', 'wallet-stato.bin'];
 const INFRA = ['Local State', 'Dictionaries/it-IT-3-0.bdic', 'adblock/lists.json', 'firmatari-c2pa/elenco.json',
-  'preload-pacchetto/page-preload.js', 'aggiornamento-pronto.json'];
+  'preload-pacchetto/page-preload.js', 'aggiornamento-pronto.json', 'codice-compilato/v24.22.2-x64-19d46f6e-0/de1a5a82'];
 
 function riempi(segno) {
   const dir = cartellaTemporanea('filo-cancella-');
@@ -211,7 +211,7 @@ test('ogni file che Filo scrive nella cartella dei dati se ne va, tranne quelli 
   giro(join(ROOT, 'src', 'main'));
   assert.ok(trovati.has('storage.json') && trovati.has('identity.bin'), 'la lettura del codice trova i file veri');
   const tenuti = [...trovati].filter((n) => n in C.RESTA || C.IDENTITA.includes(n)).sort();
-  assert.deepEqual(tenuti, ['Dictionaries', 'adblock', 'firmatari-c2pa', 'identity.bin', 'preload-pacchetto', 'wallet-stato.bin', 'wallet.bin'],
+  assert.deepEqual(tenuti, ['Dictionaries', 'adblock', 'codice-compilato', 'firmatari-c2pa', 'identity.bin', 'preload-pacchetto', 'wallet-stato.bin', 'wallet.bin'],
     'un file nuovo tenuto dopo «Cancella tutto» va deciso qui, col suo perché in RESTA');
 });
 

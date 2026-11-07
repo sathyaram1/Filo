@@ -1,12 +1,12 @@
-// Le regole Storage degli allegati (#582) provate col MOTORE VERO.
+// Le regole Storage degli allegati (#582) provate con l'EMULATORE ufficiale.
 //
 // NON è uno spec: il nome finisce in `.mjs` e non in `.spec.mjs` apposta, così
 // la suite non prova a lanciarlo. Per girare ha bisogno di due cose che nella
 // suite non ci sono e non ci devono essere — gli emulatori ufficiali Firebase
 // (centinaia di MB) e Java. La sentinella sempre accesa è
 // `tests/unit/storageRulesAllegati.test.mjs`, che rilegge il file che si
-// deploya in millisecondi; questo file è l'altra metà: la prova che quel file,
-// dato in pasto al motore vero, si comporta come dice.
+// deploya in millisecondi; questo file prova che le porte chiuse restano chiuse.
+// Che un allegato vero passi NON lo prova (sotto, «Quel che l'emulatore non dice»).
 //
 // Si lanciano DUE emulatori, non uno. Non più perché le regole interroghino
 // Firestore — quel ramo non c'è più, la lettura è negata a tutti — ma perché i
@@ -33,10 +33,19 @@
 //     "node storage-allegati-motore-vero.mjs"
 //
 // Esito atteso: tutte le righe verdi, uscita 0, più le righe NOTA di ciò che
-// l'emulatore non sa misurare. Al passaggio di #1518 (2026-10-23, firebase-tools
-// 15.34): 47/47 con due NOTE (Cache-Control e Content-Language non arrivano alle
-// regole; il codice di scarico scelto da chi carica l'emulatore lo toglie dai
-// metadati prima di valutarle).
+// l'emulatore non sa misurare. A #1769 (2026-10-29, firebase-tools 15.34.2):
+// 54/54 con tre NOTE; con le regole di prima 53/54, rosso «come-il-deposito-vero».
+// Senza le guardie `in` sui due campi letti, 43/54: l'emulatore nega ogni
+// caricamento normale, perché metadati e nome di scarico gli arrivano assenti.
+//
+// QUEL CHE L'EMULATORE NON DICE (#1666, #1769): il deposito vero, prima di
+// valutare le regole, scrive da sé il codice di scarico nei metadati, il nome di
+// scarico e (probabile) la codifica «identity»; l'emulatore alle regole li passa
+// assenti. Qui era tutto verde e dal 23/10 al 29/10 ogni allegato vero prendeva
+// 403. Il caso «come-il-deposito-vero» qui sotto è la nostra migliore stima di
+// quello che vede il deposito, non una prova. Dopo ogni pubblicazione delle
+// regole la prova che conta è un caricamento vero dall'app (o `sealForUpload`
+// più POST al deposito): se risponde 403, il verde di questo file non vale.
 //
 // CONTROPROVA, che è la metà che conta: le stesse chiamate con le regole di
 // PRIMA (`git show origin/main:storage.rules > vecchie.rules`, poi
@@ -207,12 +216,12 @@ await prova('nome di scarico travestito da quello di serie (inline; fattura.exe)
   carica(fuori, nome(), BLOB, { contentType: OPACO, contentDisposition: "inline; filename*=utf-8''fattura.exe" }));
 await prova('chiave personalizzata (un segno «già sistemato»): NEGATA', 'ko',
   carica(fuori, nome(), BLOB, { contentType: OPACO, customMetadata: { filoSistemato: 'si' } }));
-await prova('codifica scelta (Content-Encoding: gzip): NEGATA', 'ko',
-  carica(fuori, nome(), BLOB, { contentType: OPACO, contentEncoding: 'gzip' }));
-nota('Cache-Control e Content-Language scelti: l’emulatore non li passa alle regole, quindi qui passano. '
-  + 'La riga c’è, e la sua espressione si prova più sotto su una risorsa scritta a mano.');
-nota('Codice di scarico scelto da chi carica: l’emulatore lo toglie dai metadati prima delle regole e lo usa come codice. '
-  + 'Se il motore vero lo lasciasse vedere, la stessa riga che vieta le chiavi personalizzate lo rifiuterebbe (provato più sotto).');
+nota('Codifica, cache e lingua scelte da chi carica passano: le regole non le leggono, perché il deposito vero le '
+  + 'riempie da sé e ogni controllo su di loro negava ogni allegato (#1769). Rischio accettato, scritto in storage.rules.');
+nota('Codice di scarico: l’emulatore lo toglie dai metadati prima delle regole, il deposito vero ce lo scrive (#1666). '
+  + 'Che da solo passi e con un’altra chiave no si prova più sotto.');
+nota('Campi che il deposito scrive da sé: l’emulatore li passa assenti (#1769). Che la forma stimata del deposito '
+  + 'passi si prova più sotto; la prova che conta resta un caricamento dall’app pubblicata.');
 
 // ── Nomi: il percorso deve restare non indovinabile ─────────────────────────
 await prova('nome indovinabile (screenshot.octetstream): NEGATO', 'ko',
@@ -243,9 +252,21 @@ const CASI = {
   'metadati-assenti': ["{'metadata': null, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
   'campi-vuoti': ["{'metadata': {}, 'contentDisposition': '', 'contentEncoding': '', 'cacheControl': '', 'contentLanguage': ''}", 'ok'],
   'cache-nulla': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': null, 'contentLanguage': null}", 'ok'],
-  'cache-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'cacheControl': 'public, max-age=31536000'}", 'ko'],
-  'lingua-scelta': ["{'metadata': {}, 'contentDisposition': null, 'contentEncoding': null, 'contentLanguage': 'it'}", 'ko'],
-  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ko'],
+  // Il codice di scarico lo scrive il deposito vero prima delle regole (#1666): da solo passa, con un'altra chiave no.
+  'codice-visibile': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'codice-e-chiave': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'filoSistemato': 'si'}}", 'ko'],
+  // La stima di ciò che vede il deposito vero (#1769): codice di scarico, nome di scarico di serie, codifica
+  // «identity» come nella sua risposta. Con le regole di #1728 era rosso.
+  'come-il-deposito-vero': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': \"inline; filename*=utf-8''n.octetstream\", 'contentEncoding': 'identity', 'cacheControl': '', 'contentLanguage': ''}", 'ok'],
+  'deposito-vero-col-nome-scelto': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': \"inline; filename*=utf-8''fattura.exe\", 'contentEncoding': 'identity'}", 'ko'],
+  'deposito-vero-con-chiave': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee', 'filoSistemato': 'si'}, 'contentDisposition': 'inline', 'contentEncoding': 'identity'}", 'ko'],
+  // Campi ASSENTI, non nulli: all'emulatore il nome di scarico e i metadati non arrivano, e letti nudi negano.
+  'senza-codifica': ["{'metadata': {'firebaseStorageDownloadTokens': 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'}, 'contentDisposition': 'inline'}", 'ok'],
+  'senza-nome-di-scarico': ["{'metadata': {}, 'contentEncoding': null}", 'ok'],
+  'senza-chiavi': ["{'contentDisposition': null, 'contentEncoding': null}", 'ok'],
+  'nessun-campo': ['{}', 'ok'],
+  'solo-nome-scelto': ["{'contentDisposition': 'attachment; filename=\"fattura.exe\"'}", 'ko'],
+  'solo-chiave-scelta': ["{'metadata': {'filoSistemato': 'si'}}", 'ko'],
 };
 const regole = readFileSync(REGOLE_STORAGE, 'utf8');
 const coda = regole.lastIndexOf('match /{path=**}');

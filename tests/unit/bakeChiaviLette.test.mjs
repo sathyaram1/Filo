@@ -1,20 +1,6 @@
-// Le chiavi che la costruzione incastona nell'eseguibile devono essere quelle
-// che l'applicazione legge davvero. Sentinella nata dal secondo giro di
-// verifica del #581.
-//
-// Il caso. La costruzione scriveva nel file generato anche una chiave Gemini.
-// L'applicazione non la legge (`default-keys.js` cerca solo openrouter e
-// tavily), quindi quella chiave faceva due danni: viaggiava dentro un installer
-// che chiunque scarica senza servire a niente, e soprattutto veniva contata dal
-// cancello «questa versione ha almeno una chiave?». Bastava lei presente e la
-// chiave della ricerca web assente perché la pubblicazione andasse avanti
-// dicendo che era tutto a posto, mentre quello che l'applicazione ricavava dal
-// file era vuoto: la versione arrivava ai tester senza ricerca web e col primo
-// stadio del rilevamento siti pericolosi spento. È esattamente il caso che quel
-// cancello esiste per fermare.
-//
-// La regola che questa sentinella tiene ferma è una sola: se la costruzione
-// esce contenta, l'applicazione da quel file ricava almeno una chiave.
+// Sentinella: le chiavi che il bake scrive nel file generato sono quelle che l'applicazione ne legge, valore per valore.
+// Una chiave scritta e non letta viaggia nell'installer pubblico per niente, e inganna il cancello «almeno una chiave» (#581, secondo giro).
+// Quali chiavi possono entrare nell'installer lo decide tests/unit/chiaviNelPacchettoPubblico.test.mjs.
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -63,6 +49,9 @@ function cosaLeggeLApplicazione(contenuto) {
   assert.equal(existsSync(FILE_VERO), false,
     'c\'è già un file di chiavi generato: questa prova non deve calpestarlo');
   writeFileSync(FILE_VERO, JSON.stringify(contenuto), 'utf8');
+  // Un FILO_DEFAULT_* nell'ambiente di chi lancia la prova si spaccerebbe per una chiave letta dal file.
+  const ambiente = Object.entries(process.env).filter(([n]) => n.startsWith('FILO_DEFAULT_'));
+  for (const [n] of ambiente) delete process.env[n];
   try {
     const require = createRequire(import.meta.url);
     const percorso = join(RADICE, 'src', 'main', 'config', 'default-keys.js');
@@ -74,6 +63,7 @@ function cosaLeggeLApplicazione(contenuto) {
       safeBrowsing: dk.getBuildSafeBrowsingKey(),
     };
   } finally {
+    for (const [n, v] of ambiente) process.env[n] = v;
     rmSync(FILE_VERO, { force: true });
     const require = createRequire(import.meta.url);
     try { delete require.cache[require.resolve(join(RADICE, 'src', 'main', 'config', 'default-keys.js'))]; } catch (_) {}
@@ -104,13 +94,13 @@ test('nessuna chiave incastonata che l’applicazione non legga', () => {
   });
   assert.equal(r.uscita, 0);
 
-  const incastonate = Object.keys(r.contenuto.apiKeys || {});
   const letto = cosaLeggeLApplicazione(r.contenuto);
-  const lette = Object.keys(letto.chiavi);
-
-  const diPiu = incastonate.filter((k) => !lette.includes(k));
+  // Per valore e non per nome: OpenRouter fra le chiavi lette c'è ancora, ma solo dall'ambiente di sviluppo.
+  const diPiu = Object.entries(r.contenuto.apiKeys || {})
+    .filter(([k, v]) => typeof v === 'string' && v.trim() && letto.chiavi[k] !== v.trim())
+    .map(([k]) => k);
   assert.deepEqual(diPiu, [],
-    `chiavi incastonate che l'applicazione non legge mai: ${diPiu.join(', ')}`);
+    `chiavi incastonate che l'applicazione non legge dal file: ${diPiu.join(', ')}`);
 
   // La chiave del rilevamento siti pericolosi sta fuori dalla mappa dei
   // provider, ma per la stessa strada: deve arrivare.

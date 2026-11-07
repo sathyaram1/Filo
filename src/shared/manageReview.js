@@ -77,6 +77,14 @@
     if (!fb || normalizeStatus(fb).status !== 'revision_security') return '';
     return Object.prototype.hasOwnProperty.call(ATTESE_SERVER, fb.attesa) ? ATTESE_SERVER[fb.attesa] : '';
   }
+  // Un lavoro server che nessuna routine prende perché il suo biglietto nascerebbe non fidato (#2036): i motivi li
+  // scrive il server (`restaLocale { motivi, ruolo, atMs }`) e li toglie quando passano; conta solo in coda.
+  function restaLocale(fb) {
+    const r = fb && fb.restaLocale;
+    if (!r || typeof r !== 'object' || !isLocalOnly(fb) || !STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status)) return null;
+    const motivi = (Array.isArray(r.motivi) ? r.motivi : []).map((m) => String(m || '').trim()).filter(Boolean);
+    return motivi.length ? { motivi, atMs: Number(r.atMs) || 0 } : null;
+  }
   function inAttesaFusioneServer(fb) {
     return attesaServer(fb) === 'pc';
   }
@@ -482,6 +490,13 @@
         const num = o && typeof o === 'object' ? String(o.num || '').trim() : '';
         return { text: `Aspetta la fusione di ${num || 'il feedback da cui nasce'}, poi entra in coda da solo.`, color: null };
       }
+      // Un non fidato che i giudici non hanno visto (#1515): è fermo per l'owner, non in attesa del giudizio.
+      if (statusReason === 'budget_giudici' || statusReason === 'lunghezza_giudici') {
+        const perche = statusReason === 'budget_giudici'
+          ? 'Non giudicato, perché oggi i giudici dei non fidati hanno già speso il tetto.'
+          : 'Non giudicato, perché è troppo lungo per i giudici.';
+        return { text: `${perche} Leggilo e decidi tu, o mandalo ai giudici lo stesso con «Ri-valuta i non filtrati».`, color: null };
+      }
       if (panelComplete(fb)) {
         const worst = worstVerdictBlock(fb);
         if (worst) {
@@ -493,6 +508,9 @@
       }
       const p = fb && fb.pipeline;
       const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
+      // Fermata prima dei giudici: il perché lo scrive il server nella scheda del filtro d'ingresso.
+      const sch = verdicts.length ? null : schedaIngresso(fb);
+      if (sch && sch.breve) return { text: `${sch.breve}.`, color: sch.classe ? LIVELLO_COLORI[sch.classe] : null };
       if (!verdicts.length) return { text: 'In attesa del giudizio.', color: null };
       const missing = Math.max(0, panelSize(p) - verdicts.length);
       return { text: `Panel incompleto: ${missing} giudic${missing === 1 ? 'e' : 'i'} senza verdetto.`, color: null };
@@ -514,12 +532,16 @@
     decisione: 'fermo: aspetta una tua scelta',
     locale: 'richiede lavoro locale',
     fidato: 'chiede di renderlo fidato: il lavoro tocca il server',
+    permesso: 'chiede un permesso',
     worker: 'segnalato da chi ci lavorava',
     attesa_chiusa: 'un feedback che aspettava si è chiuso senza fusione',
     arenato: 'lavorazione arenata',
     guasto: 'fermo per un guasto',
     judges: 'verdetto dei giudici',
     duplicate: 'duplicato',
+    // #1515: i due motivi con cui il server lascia un non fidato all'owner senza giudici.
+    budget_giudici: 'tetto di spesa dei giudici raggiunto',
+    lunghezza_giudici: 'troppo lungo per i giudici',
   };
   function reasonText(statusReason) {
     const k = String(statusReason || '');
@@ -552,26 +574,37 @@
     const shipped = status === 'done' ? isShipped(fb, opts && opts.releasedVersion) : false;
     const tab = FS().tabFor(status, { shipped });
     // Una richiesta di fusione che aspetta l'owner è una sua decisione: Ricevuti anche se lo stato
-    // non è arrivato al cancello. Solo `pending`: una fallita per conflitto la riallinea la routine.
+    // non è arrivato al cancello. Una fallita per conflitto solo se la routine non la riallinea (richiestaInAttesa).
     if (tab && tab !== 'archived' && richiestaInAttesa(fb, opts)) return 'inbox';
     // Un'attesa con la sua domanda (SPEC-DOMANDE §3.8): si risponde nella domanda, il lavoro sta in coda col segno.
     if (tab === 'inbox' && aspettaDomanda(fb)) return 'queue';
     // Il segno dei lavori server non sposta di scheda (#1575): lo dice l'etichetta «server» sulla riga.
-    // Chi aspetta un feedback non ancora fuso la coda non lo dà a nessuno (#903): sta fra quelli che aspettano.
-    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && aspettaAncora(fb, opts)) return 'waiting';
+    // Chi aspetta un feedback non ancora fuso (#903), o una domanda aperta che lo ferma (#1577), la coda non lo dà a
+    // nessuno: sta fra quelli che aspettano.
+    if (tab === 'queue' && STATI_CHE_ASPETTANO.includes(status) && (aspettaAncora(fb, opts) || fermoSuDomanda(fb))) return 'waiting';
     return tab;
   }
 
   // Le attese che aprono una domanda (functions/src/domande/attese.js): mai i blocchi di sicurezza né `fidato`.
   const ATTESE_CON_DOMANDA = {
-    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa'],
+    design: ['clarify', 'decisione', 'loop', 'arenato', 'locale', 'attesa_chiusa', 'guasto'],
     aligned: ['origine_chiusa', 'origine_mancante'],
   };
   const DOMANDA_ID_RE = /^D-[1-9]\d{0,8}$/;
 
-  /** L'id della domanda che questo feedback aspetta (`D-12`), o ''. PURA. */
+  /** Le domande aperte che fermano questo feedback in coda (#1577): le scrive il server in `domandeBloccanti`. PURA. */
+  function domandeBloccantiDi(fb) {
+    const l = fb && fb.domandeBloccanti;
+    return Array.isArray(l) ? l.map(String).filter((id) => DOMANDA_ID_RE.test(id)) : [];
+  }
+  function fermoSuDomanda(fb) {
+    return !!fb && !statusUnreadable(fb) && STATI_CHE_ASPETTANO.includes(normalizeStatus(fb).status) && domandeBloccantiDi(fb).length > 0;
+  }
+
+  /** L'id della domanda che questo feedback aspetta (`D-12`), o '': quella della sua attesa, o la prima che lo ferma in coda. PURA. */
   function aspettaDomanda(fb) {
     if (!fb || statusUnreadable(fb)) return '';
+    if (fermoSuDomanda(fb)) return domandeBloccantiDi(fb)[0];
     const id = String(fb.domandaId || '');
     if (!DOMANDA_ID_RE.test(id)) return '';
     const { status, statusReason } = normalizeStatus(fb);
@@ -617,6 +650,28 @@
     const p = fb && fb.pipeline;
     if (p !== undefined && p !== null && p !== '' && typeof p !== 'object') return 'il giudizio non si decifra: non so se è segnalato come attacco';
     return segnaliDeiGiudici(p).attacco ? 'è nei Ricevuti col giudizio d’attacco del filtro o dei giudici' : '';
+  }
+
+  /**
+   * Cosa dice il giudizio a chi sta per leggerne il testo (#1514). PURA. `leggibile`: panel completo, o giudici saltati
+   * su un fidato; `mai_giudicato` è tutto il resto (filtro all'ingresso, panel parziale o degradato, nessun giudizio),
+   * che dai segni d'attacco da solo non si distingue da un pulito. Un completo con attacco fuori dai Ricevuti l'ha
+   * spostato l'owner: la decisione è sua.
+   */
+  function giudizioPerLettura(fb) {
+    const segnalato = segnalatoComeAttacco(fb);
+    if (segnalato) return { esito: 'segnalato', motivo: segnalato };
+    if (judgesSkippedText(fb) || panelComplete(fb)) return { esito: 'leggibile', motivo: '' };
+    const p = fb && fb.pipeline;
+    const mai = (motivo) => ({ esito: 'mai_giudicato', motivo });
+    if (p === undefined || p === null || p === '') return mai('nessun giudizio registrato');
+    if (typeof p !== 'object') return mai('il giudizio non si decifra');
+    const verdetti = Array.isArray(p.verdicts) ? p.verdicts.filter((v) => v && v.class).length : 0;
+    if (p.skipped && !verdetti) return mai('giudici saltati su una pratica non fidata');
+    if (!verdetti && (p.l1Category || p.action)) return mai('fermato dal filtro all’ingresso, nessun giudice');
+    if (p.l2Unfiltered === true || p.l2Degraded === true) return mai('panel dei giudici degradato');
+    if (verdetti) return mai(`panel parziale, ${verdetti} giudic${verdetti === 1 ? 'e' : 'i'} su ${panelSize(p)}`);
+    return mai('nessun verdetto dei giudici');
   }
 
   /**
@@ -740,10 +795,23 @@
     return `${base} il ${d.toLocaleDateString('it-IT', { day: 'numeric', month: 'long' })}.`;
   }
 
+  // Una richiesta che è una decisione dell'owner: da approvare, o approvata e finita in conflitto senza che nessuno la
+  // riallinei (#1425). Quella che la routine sta riallineando resta dov'è.
   function richiestaInAttesa(fb, opts) {
     const f = opts && opts.fusioni;
-    const pending = f && Array.isArray(f.pending) ? f.pending : [];
-    return pending.some((r) => richiestaDiQuesto(r, fb));
+    const di = (k) => (f && Array.isArray(f[k]) ? f[k] : []).some((r) => richiestaDiQuesto(r, fb));
+    if (di('pending')) return true;
+    return di('failed') && statoFusione(fb, opts) === 'riallineamento_fallito';
+  }
+
+  // Finché una richiesta aspetta l'owner, o il ramo approvato non è entrato in main, nessuna chiusura (Risolto,
+  // Archivia, le conferme) scavalca la fusione: sulla fusione si decide nel quadrato (#928). Senza `opts.fusioni`
+  // non si sa niente delle richieste, e la riga resta quella dello stato.
+  const AZIONI_CHE_CHIUDONO = ['done', 'archived', 'attack_confirmed', 'spam_confirmed'];
+  function senzaChiusureSullaFusione(fb, acts, opts) {
+    const f = fusioneDi(fb, opts);
+    if (!f || f.chiusure) return acts;
+    return acts.filter((a) => !AZIONI_CHE_CHIUDONO.includes(a.to));
   }
 
   // UNA tabella delle azioni dell'owner per tutte le superfici: sezione e status decidono
@@ -772,7 +840,7 @@
         acts.push({ key: 'confirm_spam', kind: 'reject', to: 'spam_confirmed', label: 'Conferma spam', primary: false });
       }
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
-      return acts;
+      return senzaChiusureSullaFusione(fb, acts, opts);
     }
     if (tab === 'queue' || tab === 'waiting') {
       // Chi aspetta una domanda non è risolto: si risponde alla domanda, o si archivia.
@@ -781,7 +849,7 @@
       const acts = [];
       if (status !== 'done') acts.push({ key: 'resolve', kind: 'resolve', to: 'done', label: '✓ Risolto', primary: true });
       acts.push({ key: 'archive', kind: 'archive', to: 'archived', label: 'Archivia', primary: false });
-      return acts;
+      return senzaChiusureSullaFusione(fb, acts, opts);
     }
     if (tab === 'resolved') {
       // Fix uscito: si archivia (verifica umana ok) o si riapre spiegando cosa
@@ -1027,6 +1095,8 @@
         return 'Un modello dei giudici non è valido o non esiste più: controlla i modelli in Automazioni, fra i Modelli di supporto.';
       case 'timeout':
         return 'I giudici non hanno risposto in tempo: alza il "Timeout dei giudici" in Automazioni se usi modelli lenti.';
+      case 'non_decifrabile':
+        return 'Il server non riesce ancora a decifrare il feedback: l’allarme dice cosa riparare.';
       default:
         return null;
     }
@@ -1049,29 +1119,11 @@
     locale:  LOCALE.color,           // azzurro — chiede lavoro locale
   };
 
-  // Perché il filtro d'ingresso ha deciso così. Un codice che questa tabella non conosce si
-  // scrive lo stesso, coi trattini bassi sciolti: un motivo grezzo dice più di uno nascosto.
+  // I motivi delle pratiche fermate prima che il server componesse lui le righe del triangolo
+  // (pipeline.ingresso): solo codici che manda davvero. Uno che la tabella non conosce si scrive
+  // lo stesso, coi trattini bassi sciolti: un motivo grezzo dice più di uno nascosto.
   const L1_MOTIVI = {
     linked_prior_attack: 'collegato a un attacco precedente',
-    prior_attack: 'chi l’ha scritta aveva già tentato un attacco',
-    flagged_identity: 'identità già segnalata',
-    blocked_identity: 'identità bloccata',
-    new_account: 'account nuovo',
-    new_account_vpn: 'account nuovo da VPN',
-    vpn: 'connessione da VPN',
-    obfuscation: 'offuscamento',
-    encoding: 'testo codificato per nascondere il contenuto',
-    instruction_override: 'prova a scavalcare le istruzioni',
-    prompt_injection: 'tentativo di iniezione di istruzioni',
-    secrets: 'chiede chiavi o segreti',
-    rate_limit: 'troppe segnalazioni in poco tempo',
-    flood: 'troppe segnalazioni in poco tempo',
-    duplicate: 'già inviata',
-    too_long: 'testo fuori misura',
-    empty: 'testo vuoto',
-    link_spam: 'pieno di link',
-    gibberish: 'testo senza senso',
-    suspicious_file: 'allegato sospetto',
     origine_bloccata: 'il feedback da cui nasce è stato bloccato',
   };
   function l1MotivoText(code) {
@@ -1145,10 +1197,59 @@
     return righe;
   }
 
-  // Livello 1: il filtro d'ingresso (identità, forma, indizi).
+  /**
+   * La scheda del filtro d'ingresso che compone il server (`pipeline.ingresso`): righe, testo reso leggibile coi
+   * punti segnati, colore, se si può ri-giudicare e una frase breve per la lista. Qui si ripulisce e basta: cosa
+   * vuol dire lo sa solo il server. null se manca o è storta. PURA.
+   */
+  function schedaIngresso(fb) {
+    const p = fb && fb.pipeline;
+    const s = p && typeof p === 'object' ? p.ingresso : null;
+    if (!s || typeof s !== 'object' || !Array.isArray(s.righe)) return null;
+    const str = (v) => String(v == null ? '' : v);
+    const parti = (Array.isArray(s.parti) ? s.parti : [])
+      .filter((x) => x && typeof x === 'object' && Array.isArray(x.segmenti))
+      .map((x) => ({
+        titolo: str(x.titolo),
+        segmenti: x.segmenti
+          .filter((g) => g && typeof g === 'object' && str(g.t))
+          .map((g) => (str(g.nota).trim() ? { t: str(g.t), nota: str(g.nota) } : { t: str(g.t) })),
+      }))
+      .filter((x) => x.segmenti.length);
+    return {
+      classe: Object.hasOwn(LIVELLO_COLORI, s.classe) ? s.classe : null,
+      esito: str(s.esito).trim(),
+      breve: str(s.breve).trim(),
+      rigiudica: s.rigiudica === true,
+      righe: s.righe.filter((r) => r && typeof r === 'object').map((r) => riga(r.etichetta, r.valore)),
+      parti,
+    };
+  }
+
+  /**
+   * Ri-giudica si offre su una pratica fermata prima dei giudici, ancora nelle mani della pipeline: per quelle con
+   * la scheda lo dice il server, per le vecchie basta lo stadio L1 senza il segno (che ha il suo gesto). PURA.
+   */
+  function rigiudicabile(fb) {
+    if (!fb || statusUnreadable(fb)) return false;
+    if (!['unlabeled', 'attack', 'spam'].includes(normalizeStatus(fb).status)) return false;
+    const sch = schedaIngresso(fb);
+    if (sch) return sch.rigiudica;
+    const p = fb.pipeline;
+    return !!(p && typeof p === 'object' && p.stage === 'L1' && !fermatoDalSegno(fb));
+  }
+
+  /** Livello 1: il filtro d'ingresso. Con la scheda del server si mostrano le sue righe e il suo testo. PURA. */
   function livelloL1(fb) {
     const titolo = 'Filtro d’ingresso';
     const p = (fb && fb.pipeline && typeof fb.pipeline === 'object') ? fb.pipeline : null;
+    const azioni = rigiudicabile(fb) ? ['rigiudica'] : [];
+    const sch = schedaIngresso(fb);
+    if (sch) {
+      return forma('l1', 'triangolo', titolo, sch.classe, sch.esito || (sch.classe ? 'fatto' : 'assente'), {
+        titolo, righe: sch.righe.concat(righeStato(fb)), testo: '', azioni, parti: sch.parti,
+      });
+    }
     const verdicts = (p && Array.isArray(p.verdicts)) ? p.verdicts.filter((v) => v && v.class) : [];
     // Senza categoria ma coi verdetti dei giudici: L2 gira solo se L1 ha fatto passare, quindi
     // «pulito» è un fatto dedotto, non un'ipotesi.
@@ -1170,7 +1271,7 @@
     righe.push(riga('Chi ha deciso', 'il filtro automatico, prima dei giudici'));
     if (azione) righe.push(riga('Cosa ha fatto', L1_AZIONI[azione] || azione.replace(/_/g, ' ')));
     return forma('l1', 'triangolo', titolo, cat.classe, cat.esito, {
-      titolo, righe: righe.concat(righeStato(fb)), testo: '', azioni: [],
+      titolo, righe: righe.concat(righeStato(fb)), testo: '', azioni,
     });
   }
 
@@ -1438,6 +1539,9 @@
       });
     }
     const righe = [riga('Esito', info.etichetta)];
+    // Il commit che l'audit ha letto: il salto lo rimanda al server, che salta solo quello (#1502).
+    const sha = /^[0-9a-f]{40}$/.test(String(l.sha || '')) ? String(l.sha) : '';
+    if (sha) righe.push(riga('Commit esaminato', sha.slice(0, 8)));
     if (l.by) righe.push(riga('Deciso da', l.by === 'owner' ? 'te' : String(l.by)));
     if (l.at) righe.push(riga('Quando', String(l.at)));
     const testo = String(l.testo || '').trim();
@@ -1449,6 +1553,7 @@
       // Bocciato: l'owner legge e può andare avanti lo stesso. Il cancello di fusione (L5) resta,
       // quindi non è un via libera cieco.
       azioni: esito === 'fail' ? ['salta_l4'] : [],
+      sha,
     });
   }
 
@@ -1466,32 +1571,62 @@
     return Number.isInteger(sub) && sub > 0 ? `${s}.${sub}` : String(s);
   }
 
+  // Con l'id della pratica il numero non conta: può essere anche di un documento estraneo (#1517), che porterebbe la
+  // richiesta e il suo via libera nel dettaglio sbagliato. Il numero vale solo per le richieste che l'id non l'hanno.
   function richiestaDiQuesto(req, fb) {
     if (!req || !fb) return false;
     const id = String(req.feedbackId || '').trim();
-    if (id && id === String(fb._id || '')) return true;
+    if (id) return id === String(fb._id || '');
     const num = String(req.num || '').trim().replace(/^#+/, '');
     return !!num && num === numeroOf(fb);
+  }
+
+  // La classe del mittente detta accanto a un numero: al singolare, corta.
+  const CLASSE_BREVE = {
+    owner: 'owner', utente: 'utente', filo_per_utente: 'Filo per un utente', sessione_locale: 'sessione locale',
+    routine: 'routine', server: 'allarme del server', test: 'collaudo',
+  };
+
+  // Accanto al numero di una pratica nominata da una fusione o da una domanda (#1517): stato e mittente del documento
+  // `fb` (o della `riserva` del server se non è in pagina) e `doppi`, quanti documenti hanno quel numero. PURA.
+  function descriviRiferimento(fb, riserva, doppi) {
+    const n = Number(doppi) || 0;
+    const r = riserva && typeof riserva === 'object' ? riserva : {};
+    let stato = '';
+    let classe = '';
+    if (fb) {
+      stato = statusUnreadable(fb) ? publicStateLabel(fb) : ((FS().STATUSES[normalizeStatus(fb).status] || {}).label || '');
+      const MT = global.SN_MITTENTI;
+      const m = MT && MT.mittenteDi ? MT.mittenteDi(fb) : null;
+      classe = (m && CLASSE_BREVE[m.classe]) || '';
+    } else {
+      stato = (FS().STATUSES[String(r.stato || '')] || {}).label || '';
+      classe = CLASSE_BREVE[String(r.mittenteClasse || '')] || '';
+    }
+    const testo = [stato, classe].filter(Boolean).join(' · ');
+    return testo || n > 1 ? { testo, doppi: n } : null;
   }
 
   // Fermata al cancello senza una richiesta da approvare (#1556): il motivo è la nota con cui il server l'ha fermata,
   // e le strade sono le due azioni di stato che la pratica offre. Mai «aspetta»: lì non arriva nessun via libera.
   const L5_SENZA_RICHIESTA = 'Nessuna richiesta di fusione è aperta, quindi non c’è un via libera da dare.';
   const L5_ELENCHI_ASSENTI = 'I controlli del server l’hanno fermata. Le richieste di fusione non sono ancora arrivate a questa pagina.';
+  const L5_SERVER = 'È un lavoro anche sul server. Qui non c’è una richiesta da approvare, e da qui non se ne riapre una. Il motivo dello stop è nella conversazione. Rimandala in lavorazione per farla rifare, o archiviala.';
   const L5_NOTA_CIFRATA = 'Il perché sta nella conversazione, che è cifrata e su questo computer non si legge.';
-  // La nota è del cancello solo se è nata dopo l'audit, che viene subito prima: un report o una domanda di un giro
-  // passato non passa per il motivo della fermata. Al minuto, perché i marcatori portano solo i minuti. Il marcatore
-  // è nell'ora di chi scrive, senza fuso: il server scrive in UTC, gli strumenti dell'owner nella sua ora, e l'audit
-  // ha il fuso. Vale quindi la lettura più tarda delle due, o in Italia la nota del server sembra nata prima.
+  // Come il server apre la nota con cui ferma una pratica al cancello (functions/src/routine: fusioneServer notaOwner e
+  // notaPc, skipSecaudit, stall notaBlocco, unitFusione notaBloccoL5). Si riconosce dalla forma e non dall'ora, che nel
+  // marcatore non ha fuso: un report qualunque non diventa il motivo della fermata, in nessun fuso (#1556.2).
+  const NOTE_DEL_CANCELLO = [
+    /^Il cancello non fonde il ramo del server\b/,
+    /^Il cancello non porta il ramo su main di filo-security\b/,
+    /^Il cancello di fusione \(L5\) ha fermato\b/,
+    /^Verifica e controllo di sicurezza erano passati ma la fusione non era mai partita\b/,
+    /^Verifica e controllo di sicurezza sono passati, e [^\n]*\bcancello \(L5\) hanno fermato\b/,
+  ];
   function notaDelCancello(fb) {
     const nota = ultimaDomanda(fb);
-    const l4 = livelliOf(fb).l4;
-    const audit = Date.parse(String((l4 && l4.at) || ''));
-    const locale = nota && Date.parse(istanteDelTurno(nota.ts) || '');
-    if (!nota || !Number.isFinite(audit) || !Number.isFinite(locale)) return null;
-    const scritta = Math.max(locale, locale - new Date(locale).getTimezoneOffset() * 60000);
-    const minuto = (t) => Math.floor(t / 60000);
-    return minuto(scritta) >= minuto(audit) ? nota : null;
+    const testo = nota ? String(nota.body || '').trim() : '';
+    return testo && NOTE_DEL_CANCELLO.some((re) => re.test(testo)) ? nota : null;
   }
   function l5SenzaRichiesta(fb, opts) {
     const letto = !(opts && opts.dettaglioLetto === false);
@@ -1500,13 +1635,98 @@
     // Senza gli elenchi letti «nessuna richiesta» sarebbe un'ipotesi: la frase lo dice, e la lista resta generica.
     const lette = !!(opts && opts.fusioniLette);
     const righe = nota && nota.ts ? [riga('Quando', istanteDelTurno(nota.ts))] : [];
-    const generica = lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
+    // Un lavoro anche sul server lo ferma pure il cancello del server, che non apre richieste: da qui non si riapre.
+    const server = lette && isLocalOnly(fb);
+    const generica = server ? L5_SERVER : lette ? L5_SENZA_RICHIESTA : L5_ELENCHI_ASSENTI;
     return forma('l5', 'quadrato', 'Fusione', 'attack', 'bloccato', {
       titolo: 'Fusione',
       righe,
       testo: (nota && nota.body) || (cifrata ? `${generica} ${L5_NOTA_CIFRATA}` : generica),
-      azioni: ['rimanda', 'archivia'],
-    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null });
+      // A elenchi letti, una pratica senza richiesta viva (mai registrata, scaduta, scartata) si può riaprire (#1040).
+      azioni: (lette && !server ? ['riapri_fusione'] : []).concat(['rimanda', 'archivia']),
+    }, { richiesta: null, richieste: [], conflitto: false, fusione: lette ? 'senza' : null, statoFusione: lette ? 'senza' : 'ferma' });
+  }
+
+  /**
+   * In che stato è la fusione di una pratica, in un posto solo (#1425, #1040.2): chip, ordine, segno, quadrato e riga
+   * dei tasti lo leggono da qui. `attende`: è una decisione dell'owner (rosso e in cima). `chiusure`: la riga dei tasti
+   * può chiudere la pratica (#928: mai mentre una richiesta aspetta o il ramo non è in main).
+   */
+  const STATI_FUSIONE = {
+    da_decidere: {
+      attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Una fusione aspetta il tuo via libera',
+      testo: 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+    },
+    volo: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'in fusione',
+      titolo: 'Approvata: il server sta fondendo il ramo',
+      testo: 'Approvata: il server sta fondendo il ramo.',
+    },
+    decisa: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'fusione decisa',
+      titolo: 'Hai già deciso: esce da qui alla prossima rilettura',
+      testo: 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.',
+    },
+    fusa: {
+      attende: false, chiusure: true, classe: 'design', etichetta: 'approvata e fusa',
+      titolo: 'Approvata e fusa: esce da qui appena arriva il suo stato nuovo',
+      testo: 'Approvata e fusa: la pratica esce da qui appena arriva il suo stato nuovo.',
+    },
+    da_riallineare: {
+      attende: false, chiusure: false, classe: 'spam', etichetta: 'da riallineare',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main: la routine lo riallinea e ti arriva una richiesta nuova solo se serve',
+      testo: '',
+    },
+    riallineamento_fallito: {
+      attende: true, chiusure: false, classe: 'attack', etichetta: 'fusione non avvenuta',
+      titolo: 'Avevi detto sì, ma il ramo era in conflitto con main e nessuno lo sta riallineando',
+      testo: '',
+    },
+    senza: {
+      attende: true, chiusure: true, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Ferma al cancello senza una richiesta aperta. Decidi tu se rifarla o archiviarla',
+      testo: '',
+    },
+    // Ferma al cancello, con gli elenchi delle richieste non ancora letti: non si sa se aspetta un via libera.
+    ferma: {
+      attende: true, chiusure: true, classe: 'attack', etichetta: 'fusione ferma',
+      titolo: 'Ferma al cancello di fusione: le richieste non sono ancora arrivate a questa pagina',
+      testo: '',
+    },
+  };
+
+  // Chi riallinea da sé, le sue frasi e la specie di una fusione senza richiesta stanno solo nel modulo della scheda di
+  // approvazione (copiato anche nella pagina da browser): qui si leggono da lì, senza copie che si separano.
+  function schedaFusioni() {
+    if (!global.SN_MERGE_APPROVALS && typeof require === 'function') require('./mergeApprovals.js');
+    return global.SN_MERGE_APPROVALS;
+  }
+
+  // Approvata e finita in conflitto: la routine riallinea da sé solo ciò che la scheda dice (siRiallineaDaSola), e solo
+  // finché la pratica è in lavorazione (routeRealignment del server). Uscita dalla lavorazione (ferma, arenata): non è andato.
+  function riallineamentoDi(fb, failed) {
+    const { status } = normalizeStatus(fb);
+    const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
+    return inLavoro && failed.every((r) => schedaFusioni().siRiallineaDaSola(r)) ? 'da_riallineare' : 'riallineamento_fallito';
+  }
+  function testoRiallineamento(failed, inCorso) {
+    const MA = schedaFusioni();
+    // La richiesta che decide la frase è quella che non si riallinea da sola, se c'è.
+    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed[0];
+    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, inCorso)}`;
+  }
+
+  // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
+  const TESTI_FUSA_SENZA_CHIEDERE = {
+    fiducia: 'Lavoro fidato: controllo registrato nel Log.',
+    locale: 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.',
+    approvazione: 'Fusa senza chiedere: aveva solo blocchi che avevi già approvato, col tuo sì a una richiesta precedente su questa pratica.',
+    // Il segno a mano non nasce più (#1148): la frase resta per le fusioni di prima.
+    pieno: 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+  };
+  function specieFusa(r) {
+    return schedaFusioni().specieFusaSenzaChiedere(r);
   }
 
   /**
@@ -1527,27 +1747,48 @@
     // possono non essere arrivati, o essere vuoti su un altro computer, e il grigio mentirebbe.
     const fermaDaStato = status === 'design' && statusReason === 'l5';
 
-    // Una fusione approvata e mai avvenuta pesa quanto una richiesta ferma (vedi mergeApprovals).
-    const ferme = failed.concat(pending);
-    if (!ferme.length && fermaDaStato) return l5SenzaRichiesta(fb, opts);
-    if (ferme.length) {
-      const req = ferme[0];
-      const inConflitto = failed.length > 0;
+    // Le richieste da decidere prima di quelle approvate e non avvenute: il pannello le mostra tutte.
+    const ferme = pending.concat(failed);
+    if (!ferme.length && fermaDaStato) {
+      // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
+      // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
+      const ultima = lista('recent').slice().sort((a, b) => (Number(b.createdAtMs) || 0) - (Number(a.createdAtMs) || 0))[0];
+      const ramo = String(fb.branch || '');
+      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
+        && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
+      if (fusa) {
+        return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
+          titolo,
+          righe: [],
+          testo: STATI_FUSIONE.fusa.testo,
+          azioni: [],
+        }, { richiesta: null, richieste: [], conflitto: false, statoFusione: 'fusa' });
+      }
+      return l5SenzaRichiesta(fb, opts);
+    }
+    if (pending.length) {
       // Una richiesta già mandata a fondere (tasto o segno), o già decisa, non aspetta più il via libera (#702).
       const statoDi = (opts && typeof opts.statoRichiesta === 'function') ? opts.statoRichiesta : () => null;
       const stati = pending.map((r) => statoDi(r));
-      const fusione = inConflitto || stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
+      const fusione = stati.some((s) => s !== 'volo' && s !== 'decisa') ? null
         : (stati.includes('volo') ? 'volo' : 'decisa');
-      return forma('l5', 'quadrato', titolo, 'attack', inConflitto ? 'conflitto' : 'bloccato', {
+      const stato = fusione || 'da_decidere';
+      return forma('l5', 'quadrato', titolo, fusione ? 'spam' : 'attack', fusione ? 'attesa' : 'bloccato', {
         titolo,
         righe: [],
-        testo: inConflitto
-          ? 'Avevi detto sì, ma la fusione non è avvenuta: il ramo non entra in main finché non si sistema.'
-          : fusione === 'volo' ? 'Approvata: il server sta fondendo il ramo.'
-            : fusione === 'decisa' ? 'Hai già deciso: la richiesta esce da qui appena la pagina rilegge le fusioni.'
-              : 'I controlli del server l’hanno fermata: entra in main solo col tuo via libera.',
+        testo: STATI_FUSIONE[stato].testo,
         azioni: [],
-      }, { richiesta: req, richieste: ferme, conflitto: inConflitto, fusione });
+      }, { richiesta: pending[0], richieste: ferme, conflitto: false, fusione, statoFusione: stato });
+    }
+    if (failed.length) {
+      const stato = riallineamentoDi(fb, failed);
+      const fallito = stato === 'riallineamento_fallito';
+      return forma('l5', 'quadrato', titolo, fallito ? 'attack' : 'spam', fallito ? 'conflitto' : 'riallinea', {
+        titolo,
+        righe: [],
+        testo: testoRiallineamento(failed, !fallito),
+        azioni: [],
+      }, { richiesta: failed[0], richieste: ferme, conflitto: true, fusione: null, statoFusione: stato });
     }
 
     const versione = String((fb && fb.resolvedInVersion) || '').trim();
@@ -1555,10 +1796,7 @@
       return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
         titolo,
         righe: versione ? [riga('Uscito nella versione', versione)] : [],
-        testo: !preapproved.length ? 'Il lavoro è entrato in main.'
-          : preapproved[0].motivo === 'fiducia' ? 'Lavoro fidato: controllo registrato nel Log.'
-            : preapproved[0].skippedL5 === true ? 'Fusa senza chiedere: lavoro locale, i blocchi sono registrati nel Log.'
-              : 'Fusa senza chiedere: avevi messo il segno su questa pratica.',
+        testo: !preapproved.length ? 'Il lavoro è entrato in main.' : TESTI_FUSA_SENZA_CHIEDERE[specieFusa(preapproved[0])],
         azioni: [],
       }, { richiesta: preapproved[0] || null, richieste: preapproved, conflitto: false });
     }
@@ -1591,11 +1829,22 @@
     return livelli(fb, opts).find((l) => l.key === String(key)) || null;
   }
 
-  // Questa segnalazione ha una fusione ferma che aspetta l'owner? È quello che fa diventare
+  /** La chiave di STATI_FUSIONE di questa pratica, o null se al cancello non c'è niente. PURA. */
+  function statoFusione(fb, opts) {
+    if (!fb) return null;
+    return livelloL5(fb, opts).statoFusione || null;
+  }
+  /** Lo stato della fusione con le sue parole ({ stato, attende, chiusure, classe, etichetta, titolo }), o null. PURA. */
+  function fusioneDi(fb, opts) {
+    const stato = statoFusione(fb, opts);
+    return stato ? Object.assign({ stato }, STATI_FUSIONE[stato]) : null;
+  }
+
+  // Questa segnalazione ha una fusione che aspetta una decisione dell'owner? È quello che fa diventare
   // rossa la scheda in lista e la porta in cima alle cose da decidere.
   function fusioneInAttesa(fb, opts) {
-    const l5 = livelloL5(fb, opts);
-    return l5.esito === 'bloccato' || l5.esito === 'conflitto';
+    const f = fusioneDi(fb, opts);
+    return !!(f && f.attende);
   }
 
   /** Le pratiche con una fusione ferma davanti, le altre nell'ordine che avevano (`sort` è stabile). PURA. */
@@ -1626,6 +1875,9 @@
     guasto:   { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Fermo per un guasto: la domanda dice cosa fare', domanda: true },
     locale:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_LOCALE },
     fidato:   { forma: 'rombo', livello: 'l3', classe: 'locale', testo: L3_FIDATO },
+    // Lo scrive l'attesa delle routine (functions/src/routine/waits.js), non i giudici (#1425); `origine_bloccata`,
+    // che nomina l'origine, sta in segnoFermata.
+    attesa_chiusa: { forma: 'rombo', livello: 'l3', classe: 'design', testo: 'Aspettava un feedback che si è chiuso senza fusione: decidi tu se rifarlo o archiviarlo' },
   };
 
   /** Il segno di un design fermo al livello 3 che non aspetta né una risposta né il lavoro locale, o null. PURA. */
@@ -1639,24 +1891,23 @@
 
   /**
    * Il simbolo in lista che dice cosa ha fermato una pratica dei Ricevuti: la stessa forma del dettaglio
-   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null fuori
-   * dai Ricevuti o a stato illeggibile. PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
+   * (triangolo L1, cerchio giudici, rombo L3, pentagono L4, quadrato L5), il motivo in parole. null a stato
+   * illeggibile, e fuori dai Ricevuti salvo una fusione che aspetta l'owner (la porta lui nei Ricevuti, manageTabFor).
+   * PURA. Regola: patterns/il-colore-di-una-card-dice-che-decisione-serve-non-lo-stato.md
    */
   function segnoFermata(fb, opts) {
     if (!fb || statusUnreadable(fb)) return null;
     const out = (forma, livello, classe, testo) => ({ forma, livello, classe: classe || null, testo });
-    if (fusioneInAttesa(fb, opts)) {
-      const l5 = livelloL5(fb, opts);
-      return out('quadrato', 'l5', 'attack', l5.esito === 'conflitto'
-        ? 'Fusione non avvenuta: avevi detto sì, ma il ramo non è entrato in main'
-        : l5.fusione === 'senza' ? 'Fermo al cancello senza una richiesta aperta. Decidi tu se rifarlo o archiviarlo'
-          : 'Fermo al cancello di fusione: aspetta il tuo via libera');
-    }
+    const fusione = fusioneDi(fb, opts);
+    if (fusione && fusione.attende) return out('quadrato', 'l5', fusione.classe, fusione.titolo);
     // Chi aspetta una domanda sta In coda col suo segno: non è un fermo dei Ricevuti.
     if (aspettaDomanda(fb)) return null;
     const { status, statusReason } = normalizeStatus(fb);
     if (!isRicevutiStatus(status)) return null;
+    // Al cancello, ma non per una decisione dell'owner (fusa, in volo, decisa): il quadrato col suo colore, mai rosso.
+    if (fusione && status === 'design' && statusReason === 'l5') return out('quadrato', 'l5', fusione.classe, fusione.titolo);
     if (status === 'design') {
+      if (statusReason === 'origine_bloccata') return out('rombo', 'l3', 'attack', `Bloccato perché ${origineText(fb)} è stato bloccato: decidi tu`);
       const s = SEGNO_DESIGN[String(statusReason || '')];
       if (s) return out(s.forma, s.livello, s.classe, s.testo);
       if (aspettaRisposta(fb)) return out('rombo', 'l3', 'design', SEGNO_DESIGN.clarify.testo);
@@ -1677,6 +1928,10 @@
     }
     const worst = worstVerdictBlock(fb);
     if (status === 'unlabeled') {
+      const sch = schedaIngresso(fb);
+      if (sch && sch.breve && !(Array.isArray(p.verdicts) && p.verdicts.some((v) => v && v.class))) {
+        return out('triangolo', 'l1', sch.classe, sch.breve);
+      }
       if (panelComplete(fb) && worst) return out('cerchio', 'l2', worst.reason, `Un giudice l’ha segnalata come ${worst.label.toLowerCase()}`);
       const nota = judgesNote(fb);
       return out('cerchio', 'l2', null, (nota && nota.text) ? nota.text.replace(/\.$/, '') : 'Non filtrato: manca il verdetto di un giudice');
@@ -1700,16 +1955,71 @@
       .filter((r) => !list.some((fb) => richiestaDiQuesto(r, fb)));
   }
 
+  // ── Registro dei rifiuti delle routine (#773.2) ────────────────────────────
+  // Ogni motivo che il server scrive nel registro (filo-security: policy.REJECT, gitToken.MOTIVO, compiti), detto
+  // all'owner. Più i codici delle righe vecchie (stale, secaudit_stale, fault_declared, bad_ticket, routines_off).
+  const MOTIVI_RIFIUTO = {
+    bad_passphrase: 'parola d’ordine non valida o revocata',
+    bad_ticket: 'biglietto inesistente',
+    dead_ticket: 'biglietto scaduto o già rilasciato',
+    role_forbids: 'azione fuori dal ruolo',
+    branch_mismatch: 'ramo diverso da quello assegnato',
+    illegal_transition: 'passaggio di stato non permesso',
+    rate_limited: 'troppe richieste',
+    malformed: 'richiesta non interpretabile',
+    routines_off: 'routine spente',
+    l5_blocked: 'fusione fermata dai controlli di sicurezza',
+    not_approved: 'fusione chiesta senza verifica e controllo di sicurezza superati',
+    stale: 'il ramo è andato avanti dopo i controlli: niente fusione, si ricontrolla la punta',
+    secaudit_stale: 'il controllo di sicurezza valeva per un altro commit: si rifà',
+    no_critique: 'codice consegnato da un verificatore senza una critica registrata',
+    self_review: 'verdetto dato dallo stesso biglietto che aveva scritto la correzione',
+    config_incomplete: 'mancano i tetti di spesa delle routine in Automazioni',
+    fermata_senza_domanda: 'fermata senza la domanda scritta per te',
+    domanda_non_valida: 'domanda per te scritta male',
+    domanda_troppo_grande: 'domanda per te troppo lunga',
+    troppe_domande: 'troppe domande aperte da questo lavoro',
+    domanda_doppia: 'domanda già aperta con lo stesso titolo',
+    risposta_non_valida: 'risposta a una domanda scritta male',
+    risposta_chiusa: 'risposta a una domanda che non è più sua',
+    domanda_cambiata: 'hai scritto nella domanda dopo che la routine l’aveva letta',
+    azione_vietata: 'azione che una domanda non può chiedere',
+    smistamento_non_valido: 'smistamento di una domanda scritto male',
+    smistamento_chiuso: 'smistamento di una domanda che non è più sua',
+    fuori_ambito: 'operazione fuori da ciò che il biglietto permette',
+    fuori_ambiente: 'testo riservato chiesto fuori dall’ambiente riservato',
+    fuori_riservati: 'testi riservati chiesti fuori dall’ambiente dei riservati',
+    troppi_numeri: 'troppi feedback in una richiesta',
+    bad_request: 'richiesta non interpretabile',
+    scheda_non_valida: 'scheda non valida',
+    compito_inesistente: 'il compito del biglietto non esiste più',
+    repo_non_ammesso: 'credenziale chiesta per un repository non ammesso',
+    biglietto_non_vivo: 'credenziale chiesta con un biglietto non più valido',
+    biglietto_sporco: 'credenziale negata: il biglietto non è più pulito',
+    feedback_non_fidato: 'credenziale negata: il feedback non è fidato',
+    troppi_token: 'troppe credenziali chieste con lo stesso biglietto',
+    server_error: 'errore del server',
+    fault_declared: 'guasto dichiarato dalla routine',
+  };
+
+  /** Una riga del registro dei rifiuti in parole: { frase, dettaglio }. Mai il solo codice. PURA. */
+  function testoRifiuto(r) {
+    const codice = String((r && r.reason) || '').trim();
+    const frase = Object.hasOwn(MOTIVI_RIFIUTO, codice) ? MOTIVI_RIFIUTO[codice]
+      : codice ? `motivo che questa pagina non conosce (${codice})` : 'motivo non scritto';
+    return { frase, dettaglio: String((r && r.detail) || '').trim() };
+  }
+
   // ── Sezioni di Gestione (SPEC-DOMANDE §2.1) ───────────────────────────────
   // Le sezioni raggruppano SCHEDE, non stati: lo stato → scheda resta in feedbackStatus.js.
   // Una scheda o sezione nuova (Risposte automatiche…) entra qui quando esiste la cosa che mostra: un pulsante che non
   // apre niente sembra rotto. I Modelli di supporto stanno in Automazioni (#1110). Utenti e Impostazioni predefinite sono
   // le pagine dell'owner che avevano un ingresso loro (#1414): i loro vecchi indirizzi li rigira il protocollo.
   const SEZIONI = Object.freeze([
-    { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-lavoro', 'domande-archivio'] },
+    { id: 'domande', nome: 'Domande', schede: ['domande', 'domande-smistamento', 'domande-lavoro', 'domande-automatiche', 'domande-archivio'] },
     { id: 'feedback', nome: 'Feedback', schede: ['inbox', 'queue', 'waiting', 'resolved', 'archived', 'fbstats', 'stats'] },
-    { id: 'routine', nome: 'Routine', schede: ['automation', 'crediti', 'log'] },
-    { id: 'utenti', nome: 'Utenti', schede: ['utenti'] },
+    { id: 'routine', nome: 'Routine', schede: ['automation', 'compiti', 'ricorrenti', 'crediti', 'log'] },
+    { id: 'utenti', nome: 'Utenti', schede: ['utenti', 'contatori'] },
     { id: 'predefinite', nome: 'Impostazioni predefinite', schede: ['predefiniti'] },
   ]);
 
@@ -1748,9 +2058,9 @@
   }
 
   // La regola stato → scheda è SN_DOMANDE.schedaDi (src/shared/domande.js); qui solo il nome della scheda di Gestione.
-  // Le risposte automatiche stanno in Archivio finché la loro scheda non ha una fonte (#1154): mai fuori da ogni scheda.
   const SCHEDA_DOMANDA = Object.freeze({
-    da_rispondere: 'domande', in_lavorazione: 'domande-lavoro', risposte_automatiche: 'domande-archivio', archivio: 'domande-archivio',
+    da_rispondere: 'domande', in_smistamento: 'domande-smistamento', in_lavorazione: 'domande-lavoro',
+    risposte_automatiche: 'domande-automatiche', archivio: 'domande-archivio',
   });
   function schedaDomanda(d) {
     const D = global.SN_DOMANDE;
@@ -1758,7 +2068,7 @@
     return SCHEDA_DOMANDA[D.schedaDi(d)] || null;
   }
   function contaDomande(domande) {
-    const n = { domande: 0, 'domande-lavoro': 0, 'domande-archivio': 0 };
+    const n = Object.fromEntries(Object.values(SCHEDA_DOMANDA).map((t) => [t, 0]));
     for (const d of (Array.isArray(domande) ? domande : [])) {
       const t = schedaDomanda(d);
       if (t) n[t]++;
@@ -1858,17 +2168,17 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
-    segnaliDeiGiudici, segnalatoComeAttacco,
+    segnaliDeiGiudici, segnalatoComeAttacco, giudizioPerLettura,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
     ownerActions, ownerActionFor, ownerActionAllowsStatus, stateBadge,
     classifyReevalResult, reevalErrorHint, REEVAL_WASTE_LIMIT,
     livelli, livelloPer, livelloL1, livelloL2, livelloL3, livelloL4, livelloL5, righeStato,
-    fusioneInAttesa, fusioniFermeInCima, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf,
-    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI,
-    aspettaRisposta, aspettaDomanda, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
+    fusioneInAttesa, fusioniFermeInCima, statoFusione, fusioneDi, STATI_FUSIONE, MOTIVI_RIFIUTO, testoRifiuto, segnoFermata, FORME_SVG, fusioniSenzaFeedback, richiestaDiQuesto, numeroOf, descriviRiferimento,
+    l1MotivoText, LIVELLO_COLORI, L1_MOTIVI, schedaIngresso, rigiudicabile,
+    aspettaRisposta, aspettaDomanda, domandeBloccantiDi, chiedeFiducia, ultimaDomanda, TESTO_CIFRATO, chiedeLavoroLocale, LOCALE,
     FRASE_SEGNO_ERRATO, fermatoDalSegno, motivoSegnoText,
     SEZIONI, sezioneDiScheda, schedaPredefinita, schedaDaIndirizzo, leggiSceltaSezione, sezioneDiApertura,
     schedaDomanda, contaDomande, bloccanteAperta,

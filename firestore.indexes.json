@@ -17,6 +17,24 @@
         { "fieldPath": "success", "order": "ASCENDING" },
         { "fieldPath": "createdAt", "order": "DESCENDING" }
       ]
+    },
+    {
+      "//": "Registro d'uso dei crediti (#2060, filo-security): le righe di uno pseudonimo dopo un'ora, sommate e contate dalla riconciliazione dopo una nuova chiave (where pseudonym == X and at > R). Uguaglianza più intervallo su campi diversi vuole un indice composto.",
+      "collectionGroup": "wallet-usage",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pseudonym", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "ASCENDING" }
+      ]
+    },
+    {
+      "//": "Registro d'uso dei crediti (#2060, filo-security): le ultime 200 righe di una persona nella sua scheda in Gestione (where pseudonym == X orderBy at desc limit 200). Senza questo indice il server rilegge tutte le righe della persona e le ordina lui.",
+      "collectionGroup": "wallet-usage",
+      "queryScope": "COLLECTION",
+      "fields": [
+        { "fieldPath": "pseudonym", "order": "ASCENDING" },
+        { "fieldPath": "at", "order": "DESCENDING" }
+      ]
     }
   ],
   "fieldOverrides": []

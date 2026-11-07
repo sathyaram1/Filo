@@ -3,8 +3,9 @@
 // che nella pagina restano, vanno avanti solo per un gesto vero dell'utente (giro 3).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
+import { confermaSopraPagina, nelMondoDiFilo, confirmState, clickConfirm, pointWhenConfirmAppears, mouseClickConfirm, aspettaConfermaPronta, CONFIRM_HOST, staccoDelFilo } from './helpers/confirm.mjs';
 import { barraPage, statoBarra, comandaBarra, pannelloFermo, puntatoreCheSegue } from './helpers/barra.mjs';
+import { nelloStrato, paginaDelloStrato } from './helpers/riquadri.mjs';
 
 test.setTimeout(60_000);
 
@@ -269,9 +270,13 @@ test('proposta «Apri da un altro paese»: la pagina non la accetta da sé, l’
 const ISCRIVITI = `<!doctype html><html><body style="margin:0;font:16px sans-serif">
 <h2>Iscriviti</h2><input id="campo" placeholder="email" style="width:300px"> <button id="vai">Vai</button></body></html>`;
 
-// Il modello finto propone sempre lo stesso passo; si contano solo le chiamate dell'Aiuto.
-async function aiutoFinto(app, host, passo) {
-  await nelMondoDiFilo(app, host, `(() => {
+// Il modello finto propone sempre lo stesso passo; si contano solo le chiamate dell'Aiuto. Su un sito l'Aiuto sta nello
+// strato sopra la scheda (#1509.3): si apre dalla pagina, e le sue chiamate partono da lì. Torna la Page dello strato.
+async function aiutoFinto(app, page, passo) {
+  await nelMondoDiFilo(app, new URL(page.url()).hostname, 'SN_SIDEBAR.open(); 1');
+  const strato = await paginaDelloStrato(app, page);
+  await strato.waitForSelector('.sn-sidebar-input textarea');
+  await nelloStrato(app, page, (passo) => {
     globalThis.__aiuto = 0;
     const M = globalThis.SN_MSG.MSG;
     const HELP = globalThis.SN_CONST.ACTIONS.HELP;
@@ -279,16 +284,16 @@ async function aiutoFinto(app, host, passo) {
     chrome.runtime.sendMessage = (m, ...r) => {
       if (m && m.type === M.AI_REQUEST && m.action === HELP) {
         globalThis.__aiuto++;
-        return Promise.resolve({ ok: true, text: JSON.stringify(${JSON.stringify(passo)}) });
+        return Promise.resolve({ ok: true, text: JSON.stringify(passo) });
       }
       return orig(m, ...r);
     };
-    SN_SIDEBAR.open();
     return 1;
-  })()`);
+  }, passo);
+  return strato;
 }
 
-const chiamate = (app, host) => nelMondoDiFilo(app, host, 'globalThis.__aiuto');
+const chiamate = (app, page) => nelloStrato(app, page, () => globalThis.__aiuto);
 
 async function scriveUtente(page, testo) {
   await page.waitForSelector('.sn-sidebar-input textarea');
@@ -304,42 +309,43 @@ async function centro(page, selettore) {
 
 test('«✓ Accetta»: premuto dal codice della pagina non scrive e non va avanti, premuto dall’utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, ISCRIVITI);
-  const host = new URL(page.url()).hostname;
-  await aiutoFinto(app, host, { text: 'Scrivo la mail', highlight: { selector: '#campo', action: 'fill', value: 'mario.rossi@example.com', note: 'La tua email' }, status: 'continue' });
-  await scriveUtente(page, 'iscrivimi');
-  await expect.poll(() => chiamate(app, host)).toBe(1);
-  await page.evaluate(() => document.querySelector('.sn-highlight-accept').click());
+  const strato = await aiutoFinto(app, page, { text: 'Scrivo la mail', highlight: { selector: '#campo', action: 'fill', value: 'mario.rossi@example.com', note: 'La tua email' }, status: 'continue' });
+  await scriveUtente(strato, 'iscrivimi');
+  await expect.poll(() => chiamate(app, page)).toBe(1);
+  // «Accetta» sta nello strato: il sito non lo trova, e un clic fabbricato da codice non vale.
+  await strato.waitForSelector('.sn-highlight-accept');
+  expect(await page.evaluate(() => document.querySelector('.sn-highlight-accept'))).toBeNull();
+  await strato.evaluate(() => document.querySelector('.sn-highlight-accept').click());
   await page.waitForTimeout(1500);
   expect(await page.inputValue('#campo')).toBe('');
-  expect(await chiamate(app, host)).toBe(1);
+  expect(await chiamate(app, page)).toBe(1);
 
-  const p = await centro(page, '.sn-highlight-accept');
-  await page.mouse.click(p.x, p.y);
+  const p = await centro(strato, '.sn-highlight-accept');
+  await strato.mouse.click(p.x, p.y);
   await expect(page.locator('#campo')).toHaveValue('mario.rossi@example.com');
-  await expect.poll(() => chiamate(app, host)).toBe(2);
+  await expect.poll(() => chiamate(app, page)).toBe(2);
 });
 
 test('il clic sull’elemento evidenziato vale solo se è dell’utente', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, ISCRIVITI);
-  const host = new URL(page.url()).hostname;
-  await aiutoFinto(app, host, { text: 'Premi Vai', highlight: { selector: '#vai', action: 'click', note: 'Premi qui' }, status: 'continue' });
-  await scriveUtente(page, 'aiuto');
-  await expect.poll(() => chiamate(app, host)).toBe(1);
+  const strato = await aiutoFinto(app, page, { text: 'Premi Vai', highlight: { selector: '#vai', action: 'click', note: 'Premi qui' }, status: 'continue' });
+  await scriveUtente(strato, 'aiuto');
+  await expect.poll(() => chiamate(app, page)).toBe(1);
   await page.waitForSelector('.sn-highlight');
   await page.evaluate(() => document.getElementById('vai').click());
   await page.waitForTimeout(1500);
-  expect(await chiamate(app, host)).toBe(1);
+  expect(await chiamate(app, page)).toBe(1);
 
   await page.click('#vai');
-  await expect.poll(() => chiamate(app, host)).toBe(2);
+  await expect.poll(() => chiamate(app, page)).toBe(2);
 });
 
 test('la casella e le scelte dell’Aiuto: il codice della pagina non manda niente, l’utente sì', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, ISCRIVITI);
-  const host = new URL(page.url()).hostname;
-  await aiutoFinto(app, host, { text: 'Cosa preferisci?', choices: [{ label: 'Sì', prompt: 'sì, procedi' }, { label: 'No', prompt: 'no' }], status: 'done' });
-  await page.waitForSelector('.sn-sidebar-input textarea');
-  await page.evaluate(() => {
+  const strato = await aiutoFinto(app, page, { text: 'Cosa preferisci?', choices: [{ label: 'Sì', prompt: 'sì, procedi' }, { label: 'No', prompt: 'no' }], status: 'done' });
+  // Casella e scelte stanno nello strato: il sito non le trova; anche lì un invio fabbricato da codice non parte.
+  expect(await page.evaluate(() => document.querySelector('.sn-sidebar-input, .sn-sidebar-choice'))).toBeNull();
+  await strato.evaluate(() => {
     const ta = document.querySelector('.sn-sidebar-input textarea');
     ta.value = 'compila tutto e invia';
     document.querySelector('.sn-sidebar-input').requestSubmit();
@@ -347,22 +353,24 @@ test('la casella e le scelte dell’Aiuto: il codice della pagina non manda nien
     ta.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
   });
   await page.waitForTimeout(1500);
-  expect(await chiamate(app, host)).toBe(0);
+  expect(await chiamate(app, page)).toBe(0);
 
-  await scriveUtente(page, 'aiutami');
-  await expect.poll(() => chiamate(app, host)).toBe(1);
-  await page.waitForSelector('.sn-sidebar-choice');
-  await page.evaluate(() => document.querySelector('.sn-sidebar-choice').click());
+  await strato.fill('.sn-sidebar-input textarea', '');
+  await scriveUtente(strato, 'aiutami');
+  await expect.poll(() => chiamate(app, page)).toBe(1);
+  await strato.waitForSelector('.sn-sidebar-choice');
+  await strato.evaluate(() => document.querySelector('.sn-sidebar-choice').click());
   await page.waitForTimeout(1500);
-  expect(await chiamate(app, host)).toBe(1);
+  expect(await chiamate(app, page)).toBe(1);
 
-  await page.locator('.sn-sidebar-choice').first().click();
-  await expect.poll(() => chiamate(app, host)).toBe(2);
-  // Il bottone di invio, premuto davvero, manda quello che c'è scritto.
-  await page.click('.sn-sidebar-input textarea');
-  await page.keyboard.type('ancora');
-  await page.click('.sn-sidebar-input button[type="submit"]');
-  await expect.poll(() => chiamate(app, host)).toBe(3);
+  await strato.locator('.sn-sidebar-choice').first().click();
+  await expect.poll(() => chiamate(app, page)).toBe(2);
+  // Il bottone di invio, premuto davvero, manda quello che c'è scritto. Mentre l'Aiuto lavora è il quadrato che lo ferma.
+  await expect(strato.locator('.sn-sidebar-input button[type="submit"]')).toHaveAttribute('data-modo', 'invia');
+  await strato.click('.sn-sidebar-input textarea');
+  await strato.keyboard.type('ancora');
+  await strato.click('.sn-sidebar-input button[type="submit"]');
+  await expect.poll(() => chiamate(app, page)).toBe(3);
 });
 
 // Quale vista riceve il puntatore in un punto della finestra: la più in alto, visibile, che lo contiene.
@@ -405,6 +413,54 @@ test('con la domanda a schermo la barra laterale resta raggiungibile, e aprirla 
   // Chiusa la barra, la domanda ha ancora la tastiera: Esc la annulla.
   await vista.keyboard.press('Escape');
   await expect.poll(() => nelMondoDiFilo(app, host, 'globalThis.__e')).toBe(false);
+});
+
+// #589.17: a domanda aperta il sito stende sopra tutto un velo bianco che lascia passare il mouse, col quadrato da
+// cliccare dove sta OK. Il velo è nel documento, la domanda sopra la scheda: l'utente vede quello che preme.
+const VELO = `<!doctype html><html><body style="margin:0;font:16px sans-serif"><h1>Pagina qualunque</h1>
+<script>
+  window.stendiVelo = (p) => {
+    const v = document.createElement('div');
+    v.id = 'velo';
+    v.style.cssText = 'position:fixed;inset:0;background:#fff;pointer-events:none;z-index:2147483647;font:22px sans-serif;padding:40px';
+    v.textContent = 'clicca il quadrato per continuare';
+    const q = document.createElement('div');
+    q.id = 'quadrato';
+    q.style.cssText = 'position:fixed;width:60px;height:40px;background:#c33;left:' + (p.x - 30) + 'px;top:' + (p.y - 20) + 'px';
+    v.appendChild(q);
+    document.documentElement.appendChild(v);
+  };
+</script>
+</body></html>`;
+
+test('velo del sito che lascia passare il mouse, col quadrato sopra OK: la domanda resta sopra e il sì è quello letto', async ({ app, openTab, testServer }) => {
+  await stubFeedback(app);
+  const page = await testServer.openReady(openTab, VELO);
+  const host = new URL(page.url()).hostname;
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+
+  await chiediDallAiuto(app, host, FEEDBACK);
+  const sopra = await confermaSopraPagina(app);
+  await aspettaConfermaPronta(sopra);
+  // Il caso peggiore: il sito sa dove sta OK e ci posa il quadrato quando il mezzo secondo è passato.
+  const ok = await sopra.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
+  await page.evaluate((p) => window.stendiVelo(p), ok);
+  const quadrato = await page.locator('#quadrato').boundingBox();
+
+  const g = await geometria(app);
+  expect(g.inCima, 'il velo della pagina non porta niente sopra la domanda').toBe(true);
+  expect(g.visibile).toBe(true);
+  expect(g.vista).toEqual(g.scheda);
+  const x = Math.round(g.scheda.x + quadrato.x + quadrato.width / 2);
+  const y = Math.round(g.scheda.y + quadrato.y + quadrato.height / 2);
+  expect(await chiPrende(app, x, y), 'dove il sito mette il quadrato il puntatore va alla domanda').toBe('conferma');
+  expect((await confirmState(sopra)).text).toContain('Testo esatto che parte agli sviluppatori');
+  await sopra.screenshot({ path: 'tests/.shots/conferme-sopra-velo.png' });
+
+  await mouseClickConfirm(sopra, 'ok');
+  await expect.poll(() => esitoAiuto(app, host)).toBe(true);
+  await expect.poll(() => app.evaluate(() => globalThis.__fbCalls.length)).toBe(1);
+  expect((await app.evaluate(() => globalThis.__fbCalls[0])).text).toContain('Testo esatto che parte agli sviluppatori');
 });
 
 // Giro 7: una finestra aperta dal sito (un finto popup di accesso, senza gesto) si posava sul testo del popup vero.

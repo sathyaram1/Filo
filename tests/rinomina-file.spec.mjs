@@ -3,7 +3,7 @@
 // dagli scaricamenti, dalla chat (elenco vecchio → nuovo con conferma), da un file trascinato e da sole sugli
 // scaricamenti quando l'utente le accende. Il modello è finto: risponde con le prime righe del documento che riceve.
 
-import { test, expect } from './fixtures/electron.mjs';
+import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { createServer } from 'node:http';
 import { existsSync, writeFileSync, rmSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
@@ -96,8 +96,9 @@ async function scarica(nome, corpo, { shell, openTab, testServer }) {
     res.end(corpo);
   });
   await new Promise((r) => srv.listen(0, '127.0.0.1', r));
-  const url = `http://127.0.0.1:${srv.address().port}/${nome}`;
-  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`);
+  // Pagina e file con un nome da internet: da 127.0.0.1, rete di casa, il nome automatico non parte (#1274.1).
+  const url = `http://sito-pubblico.test:${srv.address().port}/${nome}`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`, { pubblico: true });
   await page.locator('#dl').click();
   let rec = null;
   await expect.poll(async () => {
@@ -417,6 +418,42 @@ test('acceso in Preferenze, uno scaricamento col nome che non dice niente prende
   } finally { await chiudi(); }
 });
 
+// #1357.2 — col nome automatico acceso, uno scaricamento che non prende il nome lo dice, con la strada per darlo a mano.
+test('col nome automatico acceso, il PDF che non prende un nome lo dice con «Dai un nome»; senza modello lo dice una volta', async ({ app, shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(120_000);
+  await modelloDeiNomi(app);
+  // Il modello legge il file ma non capisce cosa sia.
+  await app.evaluate(() => {
+    const legge = globalThis.SN_PROVIDERS.completeWithFallback;
+    globalThis.SN_PROVIDERS.completeWithFallback = async (o) => ({ ...(await legge(o)), text: 'NESSUN NOME' });
+  });
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pref.locator('#nomiSensatiScaricamenti').check();
+  await expect.poll(() => app.evaluate(async () => !!(await globalThis.SN_STORAGE.getSettings()).nomiSensati?.scaricamenti)).toBe(true);
+  const primo = await scarica('scan_00888.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const vista = await avvisi();
+    const carta = vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00888.pdf' });
+    await expect(carta).toBeVisible({ timeout: 20000 });
+    expect(existsSync(primo.rec.savePath)).toBe(true);
+    await carta.locator('.shell-notif-action', { hasText: 'Dai un nome' }).click();
+    const dl = await aspettaFinestra(app, (w) => w.url().startsWith('filo://downloads/'), '«Dai un nome» non ha aperto la pagina Download');
+    await expect(dl.locator('.sn-rinomina-campo')).toBeVisible({ timeout: 15000 });
+  } finally { await primo.chiudi(); }
+
+  // Il modello che non risponde: l'avviso arriva al primo file, non a ogni file della stessa serie.
+  await app.evaluate(() => { globalThis.SN_PROVIDERS.completeWithFallback = async () => { throw new Error('rete giù'); }; });
+  const secondo = await scarica('scan_00889.pdf', BOLLETTA, { shell, openTab, testServer });
+  const terzo = await scarica('scan_00890.pdf', BOLLETTA, { shell, openTab, testServer });
+  try {
+    const vista = await avvisi();
+    await expect(vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00889.pdf' })).toBeVisible({ timeout: 20000 });
+    await vista.waitForTimeout(3000);
+    await expect(vista.locator('.shell-notif', { hasText: 'Nessun nome dato a scan_00890.pdf' })).toHaveCount(0);
+    expect(existsSync(secondo.rec.savePath) && existsSync(terzo.rec.savePath)).toBe(true);
+  } finally { await secondo.chiudi(); await terzo.chiudi(); }
+});
+
 // Clic altrove dopo «Rinomina»: il riquadro con «Annulla» se ne va, il nome di prima resta al tasto destro.
 async function rinominaEChiudi(page) {
   await page.locator('.sn-rinomina-menu .sn-select-option', { hasText: 'Dai un nome sensato' }).click();
@@ -647,4 +684,15 @@ test('una scansione in bianco e nero e un PDF da 30 MB prendono un nome: dal tas
     await ripristina(app);
     rmSync(dir, { recursive: true, force: true });
   }
+});
+
+// Perché un file resta com'è: le stesse parole che usa il cestino. Un file nascosto non «sta fuori» dalla cartella personale.
+test('in chat, un file nascosto della cartella personale non si rinomina, e il perché dice che è nascosto', async ({ app }) => {
+  const dir = cartellaInCasa('filo-nomi-nascosto-');
+  const nascosto = join(dir, '.scan_00231.pdf');
+  writeFileSync(nascosto, BOLLETTA);
+  const r = await app.evaluate((_e, p) => globalThis.SN_EXECUTE_FILO_ACTION({ type: 'RINOMINA_FILE', percorsi: [p] }), nascosto);
+  expect(r.executed).toBe(false);
+  expect(r.output.saltati.map((x) => x.perche)).toEqual(['è un file nascosto o di un programma']);
+  expect(existsSync(nascosto)).toBe(true);
 });

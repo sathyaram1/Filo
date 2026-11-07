@@ -236,8 +236,11 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
   await page.screenshot({ path: `${SHOTS}/home-coda-pagine.png` });
   const schede = async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.map((t) => t.url);
   const quante = (await schede()).filter((u) => u === urls[1]).length;
+  // La visita cliccata: tornati alla home la riga ha anche quella nuova che il clic apre, con lo stesso titolo.
+  const visita = await balene.getAttribute('data-id');
   await balene.click();
   await expect.poll(async () => (await schede()).filter((u) => u === urls[1]).length).toBe(quante + 1);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_IL_FILO.pagine()).length)).toBe(4);
 
   await page.bringToFront();
   await shell.evaluate(async () => {
@@ -245,8 +248,9 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
     const t = s.tabs.filter((x) => String(x.url).startsWith('filo://newtab')).pop();
     await window.filoShell.tabs.activate(t.id);
   });
-  const visita = await balene.getAttribute('data-id');
-  await balene.click({ button: 'right' });
+  // La visita nuova sta sul disco prima che sulla riga: tolta la vecchia prima del ridisegno, la riga restava senza.
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('4 pagine, fra cui balene');
+  await riga.locator(`.dash-pagina[data-id="${visita}"]`).click({ button: 'right' });
   await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
   // Via quella visita; la riga si rifà sul filo, dove c'è anche la visita nuova che il clic ha aperto.
   await expect(riga.locator(`.dash-pagina[data-id="${visita}"]`)).toHaveCount(0);
@@ -261,6 +265,36 @@ test('le pagine visitate entrano ripiegate: si aprono, riaprono la pagina scelta
   expect(sulDisco).toContain(urls[2]);
   expect(await app.evaluate(async (_e, id) => (await globalThis.SN_IL_FILO.pagine()).some((p) => p.id === id), visita)).toBe(false);
   void casa;
+});
+
+// #1307.4 — una visita si scrive a pagina caricata: se arriva con la home già davanti, nessun ritorno in vista la porta.
+test('una pagina che finisce di caricarsi con la home davanti entra nel suo gruppo, anche dopo una tolta, e il titolo che si dà dopo le dà il nome', async ({ app, openTab }) => {
+  test.setTimeout(60_000);
+  await home(app);
+  const pagine = ['orche che cacciano', 'balene', 'delfini'].map((titolo, i) => ({ url: `https://esempio.test/${i}`, titolo, ts: oggiFa(0.05 - i * 0.01, 1000 * (i + 1)) }));
+  await semina(app, { pagine });
+  const page = await openTab('filo://newtab/');
+  const riga = page.locator('.dash-pagine').last();
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui delfini');
+  await riga.locator('.dash-pagine-testa').click();
+  await riga.locator('.dash-pagina', { hasText: 'balene' }).click({ button: 'right' });
+  await menuDi(page).locator('.sn-menu').getByText('Togli dal filo', { exact: true }).click();
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('2 pagine, fra cui delfini');
+  const id = await app.evaluate(async () => (await globalThis.SN_IL_FILO.registraVisita({ url: 'https://esempio.test/1', titolo: 'Caricamento…' })).id);
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui Caricamento…');
+  await app.evaluate((_e, visita) => globalThis.SN_IL_FILO.aggiornaTitolo({ visita, titolo: 'balene' }), id);
+  await expect(riga.locator('.dash-pagine-testo')).toHaveText('3 pagine, fra cui balene');
+  await expect(page.locator('.dash-pagine')).toHaveCount(1);
+  await expect(riga).toHaveClass(/dash-pagine-aperte/);
+  await expect(riga.locator(`.dash-pagina[data-id="${id}"]`)).toContainText('balene');
+});
+
+test('con la home vuota davanti, una pagina che finisce di caricarsi entra nel filo', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await expect(page.locator('.dash-pagine')).toHaveCount(0);
+  await app.evaluate(() => globalThis.SN_IL_FILO.registraVisita({ url: 'https://esempio.test/orche', titolo: 'orche' }));
+  await expect(page.locator('.dash-pagine .dash-pagine-testo')).toHaveText(['1 pagina: orche']);
 });
 
 test('cerco «orche» nel campo: trovo lo scambio e la pagina senza che la chat risponda, e il clic porta lì', async ({ app, openTab }) => {
@@ -307,7 +341,7 @@ async function zoomDi(app, page) {
     return null;
   }, url);
 }
-const cambiDelRegistro = (app) => app.evaluate(async () => (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi || []);
+const cambiDelRegistro = (app) => app.evaluate(async () => globalThis.SN_REGISTRO_CAMBI.lista());
 
 test('#1490 — lo zoom ritoccato a più riprese è una riga sola, da com’era a com’è, e da lì torna com’era', async ({ app, openTab, testServer }) => {
   test.setTimeout(60_000);
@@ -344,12 +378,14 @@ test('#1490 — con la home aperta il ritocco riscrive la riga che c’è già, 
     await R.attesa();
   }, { prima, dopo });
   await semina(app, { pagine: [{ url: 'https://www.youtube.com/watch?v=j', titolo: 'jazz music - YouTube', ts: new Date(Date.now() - 120_000).toISOString() }] });
-  await zoom(125, 114);
   // Il primo ritocco è di mezzo minuto fa: oltre i passi di un cursore trascinato, dentro i ritocchi di chi cerca il valore.
   await app.evaluate(async () => {
-    const lista = (await globalThis.chrome.storage.local.get('filo_cambi')).filo_cambi;
-    lista[lista.length - 1].ts = new Date(Date.now() - 30_000).toISOString();
-    await globalThis.chrome.storage.local.set({ filo_cambi: lista });
+    const E = globalThis.SN_FILO_EVENTI;
+    const primo = {
+      id: 'c00zoom0001', ts: new Date(Date.now() - 30_000).toISOString(), tipo: 'zoom', via: 'interfaccia', dove: 'zoom',
+      cambi: [{ chiave: 'zoom:youtube.com', prima: 125, dopo: 114 }],
+    };
+    await globalThis.SN_IL_FILO.transazione((t) => t.scrivi([E.eventoCambio(primo, { dispositivo: t.dispositivo })]));
   });
   const casa = await openTab('filo://newtab/');
   const righe = casa.locator('.dash-cambio', { hasText: 'zoom di youtube.com' });

@@ -19,7 +19,7 @@ class VuotoDellaVista {
     this.canale = canale;
     this.primaDelClic = primaDelClic;
     this.inoltroSu = null;
-    this.cursori = new WeakSet();
+    this.cursori = new Map();
     this.forme = new WeakMap();
   }
 
@@ -52,17 +52,29 @@ class VuotoDellaVista {
   // Si ascolta da quando la vista copre la scheda, così si sa anche quello che la pagina ha detto prima.
   segui(wc) {
     if (!wc || this.cursori.has(wc)) return;
-    this.cursori.add(wc);
-    wc.on('cursor-changed', (_e, forma) => {
+    const ascolta = (_e, forma) => {
       this.forme.set(wc, testo(forma));
       if (this.inoltroSu === wc) this._puntatore(forma);
-    });
+    };
+    this.cursori.set(wc, ascolta);
+    wc.on('cursor-changed', ascolta);
   }
 
+  // Chi butta la vista smette di seguire la pagina: un ascoltatore rimasto lì si accumulerebbe a ogni vista nuova.
+  stacca() {
+    for (const [wc, ascolta] of this.cursori) {
+      try { if (!wc.isDestroyed()) wc.removeListener('cursor-changed', ascolta); } catch (_) {}
+    }
+    this.cursori.clear();
+    this.inoltroSu = null;
+  }
+
+  // Un errore qui è un errore non preso del processo principale, che blocca Filo con la sua finestra (#1509.1).
   _puntatore(forma) {
-    const vista = this.vista();
-    if (!vista || vista.webContents.isDestroyed()) return;
-    try { vista.webContents.send(this.canale, testo(forma)); } catch (_) {}
+    let wc = null;
+    try { const vista = this.vista(); wc = vista && vista.webContents; } catch (_) { wc = null; }
+    if (!wc || wc.isDestroyed()) return;
+    try { wc.send(this.canale, testo(forma)); } catch (_) {}
   }
 }
 

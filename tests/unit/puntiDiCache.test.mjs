@@ -11,6 +11,7 @@ require('../../src/shared/capabilities.js');
 require('../../src/shared/constants.js');
 require('../../src/shared/contenutoEsterno.js');
 require('../../src/shared/filoContesto.js');
+require('../../src/shared/filoTrattoVivo.js');
 require('../../src/shared/guardianoStatico.js');
 require('../../src/main/services/providers/openrouter.js');
 require('../../src/main/services/providers/index.js');
@@ -24,83 +25,84 @@ const HAIKU = 'anthropic/claude-haiku-5.5';
 const APERTO = 'deepseek/deepseek-v4-pro';
 
 const CAPS = globalThis.SN_CAPABILITIES.renderIndexForPrompt();
-const BASE = { capacita: CAPS, sistema: 'linux', profilo: 'Si chiama Mario.', stato: 'Data: martedì 21 ottobre 2026, 09:14', files: '(nessuno)' };
+const TV = globalThis.SN_TRATTO_VIVO;
+// Il CONTESTO dell'utente come lo fotografa il main (contestoFilo.fotografa), stile compreso.
+const utenteDi = (profilo, stile = 'Rispondi in modo asciutto.') => TV.parteUtente(TV.sezioniUtente({
+  capacita: CAPS, sistema: 'linux', profilo, stile, files: '(nessuno)',
+  statoSezioni: [{ chiave: 'TAB APERTE', testo: 'TAB APERTE\n(nessuna)' }],
+}), { ts: '2026-10-21T09:00:00Z' });
+const SISTEMA = PROMPTS.filoChatStatic() + utenteDi('Si chiama Mario.');
 const TRATTO = [
-  { role: 'user', content: '[lun 20/10 10:02 · chat ab12] ciao' },
+  { role: 'user', content: '[lun 20 ott 2026, 10:02 · chat ab12] ciao' },
   { role: 'assistant', content: 'Ciao Mario!', reasoning_details: [{ type: 'reasoning.text', text: 'saluto', signature: 'firma' }] },
-  { role: 'user', content: '[lun 20/10 10:05 · chat ab12] apri wikipedia' },
+  { role: 'user', content: '[lun 20 ott 2026, 10:05 · chat ab12] apri wikipedia' },
   { role: 'assistant', content: 'Aperta.' },
 ];
-const DOMANDA = { role: 'user', content: '[mar 21/10 09:14 · chat ab12] che tempo fa domani?' };
+const DOMANDA = { role: 'user', content: '[mar 21 ott 2026, 09:14 · chat ab12] che tempo fa domani?' };
 const GIRO = [
   { role: 'assistant', content: '', tool_calls: [{ id: 'c1', type: 'function', function: { name: 'CERCA_WEB', arguments: '{"q":"meteo"}' } }] },
   { role: 'tool', tool_call_id: 'c1', content: 'Domani sole, 18 gradi.' },
 ];
 
-// La stessa richiesta che compone il main (handlers.js, ramo FILO_CHAT col tratto), stile dell'utente compreso.
-function richiestaChat({ onboarding = '', tratto = TRATTO, giro = [] } = {}) {
-  const p = { ...BASE, onboarding, onboardingTurns: 1, onboardingMax: 5 };
-  const messages = [
-    ...FC.assembla({
-      tratto: [{ role: 'system', content: PROMPTS.filoChatStatic(p) + PROMPTS.filoChatOnboarding(p) }, ...tratto],
-      scheda: [],
-      contesto: FC.coda({ contesto: PROMPTS.filoChatContext({ ...p, onboarding: '' }), chatCorrente: 'ab12cd34' }),
-      domanda: DOMANDA,
-    }),
-    ...giro,
-  ];
-  return C.injectAgentStyle(messages, ACTIONS.FILO_CHAT, 'Rispondi in modo asciutto.');
+// La stessa richiesta che compone il main (handlers.js, ramo FILO_CHAT col tratto: SN_FILO_CONTESTO.richiesta).
+function richiestaChat({ tratto = TRATTO, giro = [], domanda = DOMANDA, sistema = SISTEMA } = {}) {
+  return FC.richiesta({ sistema, tratto, domanda: { ...domanda }, giro });
 }
 
-const indiceCoda = (msgs) => msgs.findIndex((m) => m.role === 'user' && String(m.content).startsWith(FC.INTESTAZIONE_CODA));
 const testoDi = (m) => (typeof m.content === 'string' ? m.content : m.content.map((p) => p.text || '').join(''));
 const conPunto = (m) => Array.isArray(m.content) && m.content.some((p) => p && p.cache_control);
+const indiceDomanda = (msgs) => FC.indiceDellaDomanda(msgs);
 
-test('gli inizi delle parti che cambiano sono quelli che i prompt scrivono davvero, e la parte fissa non ne contiene', () => {
-  const [accoglienza, contesto] = C.INIZI_VARIABILI_CHAT;
-  assert.ok(PROMPTS.filoChatOnboarding({ onboarding: '- scopri il nome' }).startsWith(accoglienza));
-  assert.ok(PROMPTS.filoChatContext({}).startsWith(contesto));
-  assert.ok(FC.coda({ contesto: 'x' }).startsWith(FC.INTESTAZIONE_CODA));
-  const fissa = PROMPTS.filoChatStatic(BASE);
-  for (const inizio of [...C.INIZI_VARIABILI_CHAT, FC.INTESTAZIONE_CODA]) assert.ok(!fissa.includes(inizio), `la parte fissa contiene ${inizio}`);
+test('la parte fissa è uguale byte per byte per due utenti e due turni, e non contiene gli inizi delle parti che cambiano', () => {
+  const fissa = PROMPTS.filoChatStatic();
+  assert.equal(PROMPTS.filoChatStatic(), fissa);
+  for (const inizio of C.INIZI_VARIABILI_CHAT) assert.ok(!fissa.includes(inizio), `la parte fissa contiene ${inizio}`);
+  const anna = PROMPTS.filoChatStatic() + utenteDi('Si chiama Anna.', '');
+  assert.ok(anna.startsWith(fissa) && SISTEMA.startsWith(fissa));
+  assert.ok(utenteDi('x').startsWith(C.INIZIO_PARTE_UTENTE));
+  assert.ok(PROMPTS.filoChatOnboarding({ onboarding: '- scopri il nome' }).startsWith(C.INIZIO_ACCOGLIENZA));
+  assert.ok(PROMPTS.filoChatContext({}).startsWith(C.INIZIO_CONTESTO_CHAT));
 });
 
-test('chat: un punto a fine parte fissa (un\'ora), uno a fine tratto, uno sull\'ultimo messaggio', () => {
+test('chat: un punto a fine parte fissa e uno a fine CONTESTO (un\'ora), uno a fine tratto, uno sull\'ultimo messaggio', () => {
   const msgs = richiestaChat();
   const piano = FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs);
   assert.deepEqual(piano.punti, [
+    { indice: 0, caratteri: PROMPTS.filoChatStatic().length, durata: '1h' },
     { indice: 0, durata: '1h' },
-    { indice: indiceCoda(msgs) - 1 },
+    { indice: indiceDomanda(msgs) - 1 },
     { indice: msgs.length - 1 },
   ]);
-  assert.equal(msgs[indiceCoda(msgs) - 1].content, 'Aperta.');
-  assert.equal(msgs[msgs.length - 1], DOMANDA);
+  assert.equal(msgs[indiceDomanda(msgs) - 1].content, 'Aperta.');
+  assert.equal(indiceDomanda(msgs), msgs.length - 1);
+  assert.ok(piano.punti.length <= 4, 'Anthropic ne prende al più quattro');
 });
 
-test('accoglienza in corso: il punto della parte fissa cade dove comincia l\'intervista, che cambia a ogni messaggio', () => {
-  const msgs = richiestaChat({ onboarding: '- scopri il nome' });
-  const [sys] = FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs).punti;
-  const testo = msgs[0].content;
-  assert.equal(sys.caratteri, testo.indexOf(C.INIZI_VARIABILI_CHAT[0]));
-  assert.ok(testo.slice(0, sys.caratteri).includes('Rispondi in modo asciutto.'), 'lo stile dell\'utente sta nella parte fissa');
-  assert.ok(!testo.slice(0, sys.caratteri).includes('scopri il nome'));
-});
-
-test('richiesta senza filo: STATO e ora restano fuori dalla parte in cache', () => {
-  const p = { ...BASE, onboarding: '' };
-  const msgs = C.injectAgentStyle([{ role: 'system', content: PROMPTS.filoChat(p) }, DOMANDA], ACTIONS.FILO_CHAT, 'Asciutto.');
+test('l\'intervista di benvenuto sta nella domanda: il system in cache non la contiene', () => {
+  const onb = PROMPTS.filoChatOnboarding({ onboarding: '- scopri il nome', onboardingTurns: 1, onboardingMax: 5 });
+  const msgs = richiestaChat({ domanda: { role: 'user', content: `[mar 21 ott 2026, 09:14 · chat ab12]\n${TV.preambolo({ turno: onb })}\nciao` } });
   const piano = FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs);
-  const fissa = msgs[0].content.slice(0, piano.punti[0].caratteri);
-  assert.ok(!fissa.includes('09:14') && !fissa.includes('Mario'), 'nella parte in cache è finito un dato che cambia');
-  assert.ok(msgs[0].content.slice(piano.punti[0].caratteri).startsWith(C.INIZI_VARIABILI_CHAT[1]));
-  assert.deepEqual(piano.punti.slice(1), [{ indice: 1 }]);
+  assert.ok(!msgs[0].content.includes('scopri il nome'));
+  assert.deepEqual(piano.punti.slice(0, 2), [{ indice: 0, caratteri: PROMPTS.filoChatStatic().length, durata: '1h' }, { indice: 0, durata: '1h' }]);
+  assert.equal(indiceDomanda(msgs), msgs.length - 1, 'la domanda col blocco di Filo in testa non si riconosce');
+});
+
+test('richiesta senza filo: l\'ora e l\'intervista restano fuori dalla parte in cache', () => {
+  const sys = `${SISTEMA}\n\n${PROMPTS.filoChatContext({ adesso: 'mar 21 ott 2026, 09:14', onboarding: '- scopri il nome' })}`;
+  const msgs = [{ role: 'system', content: sys }, { role: 'user', content: 'che tempo fa domani?' }];
+  const piano = FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs);
+  const inCache = sys.slice(0, piano.punti[1].caratteri);
+  assert.ok(!inCache.includes('09:14') && !inCache.includes('scopri il nome'), 'nella parte in cache è finito un dato che cambia');
+  assert.ok(inCache.includes('Si chiama Mario.'), 'il CONTESTO dell\'utente è rimasto fuori dalla cache');
+  assert.ok(sys.slice(piano.punti[1].caratteri).startsWith(C.INIZIO_CONTESTO_CHAT));
+  assert.deepEqual(piano.punti.slice(2), [{ indice: 1 }]);
 });
 
 test('i giri di strumenti spostano l\'ultimo punto sull\'esito; un messaggio vuoto non prende mai un punto', () => {
   const msgs = richiestaChat({ giro: GIRO, tratto: [...TRATTO, { role: 'assistant', content: '   ' }] });
   const piano = FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs);
-  assert.equal(piano.punti[1].indice, indiceCoda(msgs) - 2, 'il tratto finisce con una risposta vuota: il punto va su quella prima');
-  assert.equal(piano.punti[2].indice, msgs.length - 1);
+  assert.equal(piano.punti[2].indice, indiceDomanda(msgs) - 2, 'il tratto finisce con una risposta vuota: il punto va su quella prima');
+  assert.equal(piano.punti[3].indice, msgs.length - 1);
   assert.equal(msgs[msgs.length - 1].role, 'tool');
 });
 
@@ -204,7 +206,7 @@ const flusso = (usage) => ({
 });
 
 test('Anthropic: i punti arrivano nel corpo come cache_control, e il testo mandato è identico', async () => {
-  const msgs = richiestaChat({ onboarding: '- scopri il nome', giro: GIRO });
+  const msgs = richiestaChat({ giro: GIRO });
   const cache = FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs);
   let r;
   const [corpo] = await corpiDi(async () => {
@@ -213,10 +215,14 @@ test('Anthropic: i punti arrivano nel corpo come cache_control, e il testo manda
 
   assert.equal(corpo.messages.length, msgs.length, 'nessun messaggio aggiunto o tolto');
   corpo.messages.forEach((m, i) => assert.equal(testoDi(m), testoDi(msgs[i]), `testo cambiato nel messaggio ${i}`));
-  assert.deepEqual(corpo.messages[0].content[0].cache_control, { type: 'ephemeral', ttl: '1h' });
-  assert.ok(corpo.messages[0].content[1].text.startsWith(C.INIZI_VARIABILI_CHAT[0]) && !corpo.messages[0].content[1].cache_control);
+  const [fissa, utente] = corpo.messages[0].content;
+  assert.equal(corpo.messages[0].content.length, 2);
+  assert.equal(fissa.text, PROMPTS.filoChatStatic());
+  assert.deepEqual(fissa.cache_control, { type: 'ephemeral', ttl: '1h' });
+  assert.ok(utente.text.startsWith(C.INIZIO_PARTE_UTENTE));
+  assert.deepEqual(utente.cache_control, { type: 'ephemeral', ttl: '1h' });
   const segnati = corpo.messages.map((m, i) => (conPunto(m) ? i : -1)).filter((i) => i >= 0);
-  assert.deepEqual(segnati, [0, indiceCoda(msgs) - 1, msgs.length - 1]);
+  assert.deepEqual(segnati, [0, indiceDomanda(msgs) - 1, msgs.length - 1]);
   assert.deepEqual(corpo.messages.at(-1).content, [{ type: 'text', text: 'Domani sole, 18 gradi.', cache_control: { type: 'ephemeral' } }]);
   assert.equal(corpo.messages.at(-1).tool_call_id, 'c1');
   assert.equal(corpo.messages[2].reasoning_details, undefined, 'senza il prefisso con cui è nato il ragionamento non parte verso Claude (#1552)');
@@ -262,8 +268,8 @@ test('lettura e scrittura in cache si registrano anche senza flusso; nessun dato
 
 test('il cancello fa il piano sui messaggi già oscurati: il taglio cade giusto anche se un segreto ha cambiato lunghezza', async () => {
   const segreto = 'sk-or-v1-SEGRETISSIMO-0123456789';
-  const msgs = richiestaChat({ onboarding: '- scopri il nome' });
-  msgs[0] = { ...msgs[0], content: msgs[0].content.replace('Rispondi in modo asciutto.', `Rispondi in modo asciutto. ${segreto}`) };
+  const sys = `${PROMPTS.filoChatStatic()}${utenteDi(`Si chiama Mario. ${segreto}`)}\n\n${PROMPTS.filoChatContext({ adesso: 'mar 21 ott 2026, 09:14' })}`;
+  const msgs = [{ role: 'system', content: sys }, { ...DOMANDA }];
   let visto = null;
   const prima = globalThis.SN_PROVIDERS;
   globalThis.SN_PROVIDERS = {
@@ -281,15 +287,17 @@ test('il cancello fa il piano sui messaggi già oscurati: il taglio cade giusto 
     await gate.complete({ action: ACTIONS.FILO_CHAT, messages: msgs });
   } finally { globalThis.SN_PROVIDERS = prima; }
   assert.ok(!visto.messages[0].content.includes(segreto), 'il segreto è uscito');
-  assert.equal(visto.cache.punti[0].caratteri, visto.messages[0].content.indexOf(C.INIZI_VARIABILI_CHAT[0]));
+  assert.equal(visto.cache.punti[0].caratteri, PROMPTS.filoChatStatic().length);
+  assert.equal(visto.cache.punti[1].caratteri, visto.messages[0].content.indexOf(C.INIZIO_CONTESTO_CHAT));
 });
 
 test('la durata della parte fissa segue le impostazioni: cinque minuti tolgono il ttl, un valore strano torna all\'ora', async () => {
   const msgs = richiestaChat();
-  assert.deepEqual(FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: '5m' }).punti[0], { indice: 0 });
-  assert.deepEqual(FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: 'sempre' }).punti[0], { indice: 0, durata: '1h' });
+  const fine = PROMPTS.filoChatStatic().length;
+  assert.deepEqual(FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: '5m' }).punti.slice(0, 2), [{ indice: 0, caratteri: fine }, { indice: 0 }]);
+  assert.deepEqual(FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: 'sempre' }).punti.slice(0, 2), [{ indice: 0, caratteri: fine, durata: '1h' }, { indice: 0, durata: '1h' }]);
   const corpo5m = OR.conPuntiDiCache(HAIKU, msgs, FC.pianoDellaCache(ACTIONS.FILO_CHAT, msgs, { durata: '5m' }));
-  assert.deepEqual(corpo5m[0].content[0].cache_control, { type: 'ephemeral' });
+  assert.deepEqual(corpo5m[0].content.map((p) => p.cache_control), [{ type: 'ephemeral' }, { type: 'ephemeral' }]);
 
   let visto = null;
   const prima = globalThis.SN_PROVIDERS;
@@ -307,34 +315,30 @@ test('la durata della parte fissa segue le impostazioni: cinque minuti tolgono i
     });
     await gate.complete({ action: ACTIONS.FILO_CHAT, messages: msgs });
   } finally { globalThis.SN_PROVIDERS = prima; }
-  assert.deepEqual(visto.punti[0], { indice: 0 });
+  assert.deepEqual(visto.punti[0], { indice: 0, caratteri: fine });
 });
 
-// Dopo venti messaggi la risposta che esce dalla finestra degli esiti perde il ragionamento: la storia già mandata
-// cambia lì, e il punto della storia deve stare prima, dove il turno dopo la ritrova identica (#1412, secondo giro).
-test('il punto della storia sta sull\'ultimo messaggio che il turno dopo ritrova identico', () => {
+// Il tratto vivo cresce solo in coda (SPEC-CONTESTO fase 3): esiti e ragionamento restano col loro messaggio, quindi il
+// punto della storia sta sulla fine del tratto, e il turno dopo ritrova tutto quello che c'è fino a lì.
+test('il punto della storia sta sull\'ultimo messaggio prima della domanda, e il turno dopo lo ritrova identico', () => {
   const ORA = Date.parse('2026-10-21T10:00:00Z');
   const chat = 'ab12cd34';
   const filo = Array.from({ length: 40 }, (_, i) => ({
-    role: i % 2 ? 'assistant' : 'user',
+    role: i % 2 ? 'filo' : 'user',
     text: i % 2 ? `Risposta ${i}.` : `Domanda ${i}?`,
     ts: new Date(ORA - (40 - i) * 60000).toISOString(),
     chat,
   }));
-  const ragiona = (m) => (m.role === 'assistant' ? { azioni: [], reasoningDetails: [{ type: 'reasoning.text', text: m.ts, signature: 'f' }] } : null);
+  const ragiona = (m) => (m.role === 'filo' ? { azioni: [], reasoningDetails: [{ type: 'reasoning.text', text: m.ts, signature: 'f' }] } : null);
   const richiesta = (n) => {
     const f = FC.finestra(filo.slice(0, n), { ora: ORA, giorni: 3, token: 100000, chatCorrente: chat, esiti: ragiona });
-    return FC.assembla({
-      tratto: [{ role: 'system', content: PROMPTS.filoChatStatic(BASE) }, ...f.messaggi],
-      contesto: FC.coda({ contesto: `STATO ${n}`, chatCorrente: chat }),
-      domanda: { role: 'user', content: filo[n].text },
-    });
+    return FC.richiesta({ sistema: SISTEMA, tratto: f.messaggi, domanda: FC.rendiMessaggio(filo[n], f.ultimo, { tetto: 100000, intero: true }) });
   };
-  for (const [n, atteso] of [[10, 10], [20, 1], [30, 11]]) {
+  for (const n of [10, 20, 30]) {
     const adesso = richiesta(n);
     const storia = FC.pianoDellaCache(ACTIONS.FILO_CHAT, adesso).punti.find((p) => p.indice > 0 && p.indice < adesso.length - 1);
-    assert.equal(storia && storia.indice, atteso, `turno ${n}`);
-    const fin = (msgs) => JSON.stringify(msgs.slice(1, storia.indice + 1));
-    assert.equal(fin(richiesta(n + 2)), fin(adesso), `turno ${n}: la storia fino al punto cambia al turno dopo`);
+    assert.equal(storia && storia.indice, adesso.length - 2, `turno ${n}`);
+    const dopo = richiesta(n + 2);
+    assert.equal(JSON.stringify(dopo.slice(0, adesso.length)), JSON.stringify(adesso), `turno ${n}: la richiesta di prima non è il prefisso di quella dopo`);
   }
 });

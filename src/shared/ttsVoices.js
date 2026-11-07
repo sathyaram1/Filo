@@ -131,6 +131,17 @@
   // Ordine nelle tendine: prima l'italiano, poi l'inglese, poi le altre come nel catalogo.
   const LANG_ORDER_HEAD = ['it', 'en'];
 
+  // La frase che fa sentire una voce: «Ascolta» delle Preferenze e la prova chiesta in chat dicono la stessa.
+  const FRASI_DI_PROVA = Object.freeze({
+    it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.',
+    en: 'Hi, I am Filo. This is the natural voice chosen for reading aloud.',
+    es: 'Hola, soy Filo. Esta es la voz natural elegida para la lectura en voz alta.',
+    fr: 'Bonjour, je suis Filo. Voici la voix naturelle choisie pour la lecture à voix haute.',
+    pt: 'Olá, eu sou o Filo. Esta é a voz natural escolhida para a leitura em voz alta.',
+  });
+  // E quella della voce di riserva del sistema, dal suo «Prova la voce».
+  const FRASE_DI_PROVA_SISTEMA = 'Ciao, sono Filo. Questa è la voce scelta per la lettura ad alta voce.';
+
   // 'it-IT' → 'it'.
   function langOf(tag) {
     return String(tag == null ? '' : tag).trim().toLowerCase().split(/[-_]/)[0];
@@ -245,7 +256,7 @@
   }
 
   global.SN_TTS_VOICES = {
-    CATALOGS, VOICES: KOKORO_VOICES, LANG_LABELS,
+    CATALOGS, VOICES: KOKORO_VOICES, LANG_LABELS, FRASI_DI_PROVA, FRASE_DI_PROVA_SISTEMA,
     catalogFor, voicesFor, allVoices, catalogOfVoice, isKnownVoice, langOfVoice, labelOfVoice,
     defaultVoiceFor, resolveVoice, voicesFromError, isVoiceRequiredError, pickFromList,
     langOf, groupedByLang,

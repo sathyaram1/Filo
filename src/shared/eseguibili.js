@@ -24,8 +24,10 @@
     // Mac: pacchetti, immagini disco e script che il Finder lancia.
     'dmg', 'pkg', 'mpkg', 'app', 'command', 'term', 'workflow', 'action',
     'scpt', 'scptd', 'applescript', 'prefpane', 'kext', 'osax',
-    // Linux: installatori, immagini eseguibili e lanciatori.
+    // Linux: installatori, immagini eseguibili e lanciatori. Snap e Flatpak li installa il centro software al
+    // doppio clic, anche dalla rete (.flatpakref, .flatpakrepo) (#1399.4).
     'sh', 'bash', 'zsh', 'csh', 'ksh', 'run', 'appimage', 'deb', 'rpm',
+    'snap', 'flatpak', 'flatpakref', 'flatpakrepo',
     'desktop', 'out', 'elf',
     // Interpretati ovunque ci sia l'interprete (su Windows basta il doppio clic).
     'jar', 'js', 'py', 'pyw', 'pyc', 'pyo', 'pyz', 'pyzw',

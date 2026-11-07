@@ -189,10 +189,42 @@
     if (!msg) return false;
     if (msg.type === MSG.TTS_GLOBAL_READING) { globalReading = !!msg.active; return true; }
     if (msg.type === MSG.TTS_STOP) { stopReading(); return true; }
+    // La prova di una voce chiesta in chat (#1619): la manda il main solo alla pagina della chat.
+    if (msg.type === MSG.TTS_PROVA) {
+      readAloud(msg.testo, null, { voce: typeof msg.voce === 'string' ? msg.voce : '', sistema: msg.sistema === true });
+      return true;
+    }
     return false;
   }
 
+  // Una lettura si conta una volta, quando finisce o si ferma (#1467): con che voce, perché il ripiego, fin dove.
+  // Escono il codice del guasto e la quota letta, mai il testo.
+  // Finché legge, il main ne tiene l'ultimo stato e la conta lui se la scheda si chiude (chiudere non dà eventi).
+  function datiLettura(s, finita) {
+    const r = s.ripiego && s.ripiego.res;
+    return {
+      misura: 'lettura', voce: !s.ripiego ? 'modello' : s.pezziModello > 0 ? 'mista' : 'browser', ripiego: !!s.ripiego,
+      codice: String((r && r.errorCode) || ''), chiaveRifiutata: !!(r && r.keyRefused), senzaModello: !!(r && r.error === 'no_tts_model'),
+      // Finita senza che si sia sentito niente (l'audio rifiutato) non è letta fino in fondo.
+      quota: Math.min(1, (s.letti || 0) / s.totale), finita: finita === true && (s.letti || 0) > 0, id: s.idConto,
+    };
+  }
+  function contaLettura(s, finita) {
+    if (!s || s.contata || !s.totale) return;
+    s.contata = true;
+    try { Popup.conta(datiLettura(s, finita)); } catch (_) {}
+  }
+  function segnaLettura(s, subito = false) {
+    if (!s || s.contata || !s.totale) return;
+    const ora = Date.now();
+    if (!subito && ora - (s.segnata || 0) < 1000) return;
+    s.segnata = ora;
+    try { Popup.conta({ ...datiLettura(s, false), misura: 'in-corso', cosa: 'lettura' }); } catch (_) {}
+  }
+  try { window.addEventListener('pagehide', () => { if (session && !session.cancelled) contaLettura(session, false); }); } catch (_) {}
+
   function stopReading() {
+    if (session && !session.cancelled) contaLettura(session, false);
     if (session) session.cancelled = true;
     if (ttsAudio) {
       const a = ttsAudio;
@@ -233,7 +265,7 @@
   // `baseChar` è l'offset di `utterText` nel testo completo: mappa l'onboundary sui token
   // globali quando il ripiego parte a metà.
   function playBrowserChunk(s, utterText, baseChar) {
-    if (!ttsSupported()) { Popup.showToast(I18n.t('tts_not_supported')); clearHighlight(); reportReadingState(false); return; }
+    if (!ttsSupported()) { Popup.toastErrore('tts_not_supported'); clearHighlight(); reportReadingState(false); contaLettura(s, false); return; }
     const synth = window.speechSynthesis;
     synth.cancel();
     const u = new SpeechSynthesisUtterance(utterText);
@@ -248,18 +280,18 @@
       const v = voices.find((vo) => vo.voiceURI === tts.voice || vo.name === tts.voice);
       if (v) { u.voice = v; u.lang = v.lang; }
     }
-    // La voce del browser dà tempi esatti per parola (onboundary): evidenziazione precisa.
-    if (readTokens.length) {
-      u.onboundary = (e) => {
-        if (!sessionAlive(s)) return;
-        if (e.name && e.name !== 'word') return;
-        setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
-      };
-    }
-    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); } };
+    // La voce del browser dà tempi esatti per parola (onboundary): evidenziazione precisa, e fin dove è arrivata.
+    u.onboundary = (e) => {
+      if (!sessionAlive(s)) return;
+      s.letti = Math.max(s.letti || 0, baseChar + (e.charIndex || 0));
+      segnaLettura(s);
+      if (!readTokens.length || (e.name && e.name !== 'word')) return;
+      setHighlight(Chunk.charIndexToToken(readTokens, baseChar + (e.charIndex || 0)));
+    };
+    u.onend = () => { if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); contaLettura(s, true); } };
     // Se la voce del browser fallisce la lettura finisce comunque: uno stato «sta leggendo»
     // appeso darebbe alle altre schede uno stop morto. L'evidenziazione qui NON si azzera.
-    u.onerror = () => { if (sessionAlive(s)) reportReadingState(false); };
+    u.onerror = () => { if (sessionAlive(s)) { reportReadingState(false); contaLettura(s, false); } };
     synth.speak(u);
   }
 
@@ -281,6 +313,14 @@
       };
       audio.onended = () => finish(true);
       audio.onerror = () => finish(false);
+      audio.addEventListener('timeupdate', () => {
+        const d = audio.duration;
+        if (!sessionAlive(s) || !d || !isFinite(d)) return;
+        s.letti = Math.max(s.letti || 0, chunk.start + (chunk.end - chunk.start) * (audio.currentTime / d));
+        segnaLettura(s);
+      });
+      // La voce del modello conta da quando si sente, non da quando l'audio è arrivato.
+      audio.addEventListener('playing', () => { if (!chunk.sentito && sessionAlive(s)) { chunk.sentito = true; s.pezziModello += 1; } });
       // Se l'utente ferma (stopReading mette in pausa), sblocca la pipeline.
       audio.onpause = () => { if (!sessionAlive(s)) finish(true); };
       if (chunk.from >= 0 && readTokens.length) {
@@ -305,24 +345,41 @@
     // imposta — mostrarlo com'è vale molto più di una frase generica.
     // Stesso trattamento quando il modello c'è ma pretende il nome di una voce
     // che Filo non conosce: il messaggio dice dove scriverlo.
-    // E quando nessun fornitore ammesso serve il modello: la richiesta non è partita.
-    const spiegato = ['NO_MODEL_FOR_ACTION', 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN', 'NO_ALLOWED_HOST'];
+    // E quando nessun fornitore ammesso serve il modello, o manca l'invito: la richiesta non è partita.
+    // L'avviso porta il tasto della pagina che la frase nomina (#663, #1344.1).
+    const CE = global.SN_CHAT_ERRORS;
+    const rimedio = { code: res.errorCode, keyRefused: !!res.keyRefused, reason: res.reason };
+    const spiegato = [...((CE && CE.CODICI_GIA_SCRITTI) || ['NO_MODEL_FOR_ACTION', 'NO_ALLOWED_HOST', 'NO_API_KEY']), 'TTS_VOICE_REQUIRED', 'TTS_VOICE_UNKNOWN'];
     if (spiegato.includes(res.errorCode) && res.error) {
-      try { Popup.showToast(I18n.t('tts_model_fallback_reason', String(res.error)), { duration: 9000, rimedio: { code: res.errorCode } }); } catch (_) {}
+      try { Popup.toastErrore('tts_model_fallback_reason', { duration: 9000, rimedio }, String(res.error)); } catch (_) {}
+      return;
+    }
+    // La chiave rifiutata (crediti finiti compresi): il perché in italiano, non «non disponibile ora».
+    if (res.keyRefused && CE) {
+      const frase = CE.sentence(CE.fromResponse({
+        error: res.error, status: res.status, provider: res.provider, userMessage: res.userMessage, keyRefused: true,
+      }, ''));
+      try { Popup.toastErrore('tts_model_fallback_reason', { duration: 9000, rimedio }, frase); } catch (_) {}
       return;
     }
     const key = res.error === 'no_tts_model' ? 'tts_model_fallback_nokey' : 'tts_model_fallback';
-    try { Popup.showToast(I18n.t(key)); } catch (_) {}
+    try { Popup.toastErrore(key); } catch (_) {}
   }
 
   // Anti-attesa: la prima frase, corta, suona subito mentre le altre si preparano in
   // parallelo; il tempo prima della prima parola crolla.
-  async function readAloud(text, tokens) {
+  // `voce`: una voce naturale da provare al posto di quella scelta, senza salvarla. `sistema`: solo la voce di riserva.
+  async function readAloud(text, tokens, { voce = '', sistema = false } = {}) {
     const full = String(text == null ? '' : text);
     if (!full.trim()) return;
     // Due letture sovrapposte sono incomprensibili: prima si ferma quella in corso.
     stopReading();
     const s = newSession();
+    Object.assign(s, {
+      totale: full.length, letti: 0, pezziModello: 0, ripiego: null, contata: false,
+      idConto: `l${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`,
+    });
+    segnaLettura(s, true);
     reportReadingState(true);
     readTokens = Array.isArray(tokens) ? tokens.slice() : [];
     ensureReadStyle();
@@ -332,6 +389,7 @@
       document.dispatchEvent(new CustomEvent('filo:read-aloud', { detail: { text: full.trim() } }));
     } catch (_) {}
 
+    if (sistema) { playBrowserChunk(s, full, 0); return; }
     // Senza token non c'è evidenziazione possibile: un chunk unico, from=-1.
     const chunks = readTokens.length
       ? Chunk.chunkTokens(readTokens, {})
@@ -347,7 +405,9 @@
       // disponibile ci serve `error`/`firstFallback` per spiegare all'utente
       // perché la lettura passa alla voce del browser (vedi notifyModelFallback).
       // Una lettura è un uso: lo conta il primo pezzo, gli altri solo se si guastano (#969).
-      fetches[ci] = chrome.runtime.sendMessage({ type: MSG.TTS_SYNTH, text: ctext, lang: pageLang(), ...(ci > 0 ? { parteDiUnUso: true } : {}) })
+      fetches[ci] = chrome.runtime.sendMessage({
+        type: MSG.TTS_SYNTH, text: ctext, lang: pageLang(), ...(voce ? { voice: voce } : {}), ...(ci > 0 ? { parteDiUnUso: true } : {}),
+      })
         .then((res) => res || null)
         .catch(() => null);
     };
@@ -360,17 +420,21 @@
       if (!sessionAlive(s)) return;
       if (res && res.ok && res.audioBase64) {
         startFetch(ci + 1); // mantieni il successivo in volo mentre si suona
-        await playModelChunk(s, res, chunks[ci]);
+        const suonato = await playModelChunk(s, res, chunks[ci]);
         if (!sessionAlive(s)) return;
+        if (suonato && chunks[ci].sentito) s.letti = Math.max(s.letti, chunks[ci].end);
+        segnaLettura(s, true);
       } else {
         // Dal chunk fallito in poi la voce del browser legge tutto il resto, in un'unica
         // utterance con onboundary.
+        s.ripiego = { res };
+        segnaLettura(s, true);
         notifyModelFallback(res);
         playBrowserChunk(s, full.slice(chunks[ci].start), chunks[ci].start);
         return;
       }
     }
-    if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); }
+    if (sessionAlive(s)) { clearHighlight(); reportReadingState(false); contaLettura(s, true); }
   }
 
   // Mentre si legge questa voce non si ripropone: lo stop è una voce globale di ogni menu.
@@ -384,6 +448,7 @@
     const readWords = (model && model.tokens) || null;
     return {
       type: 'item',
+      azione: 'read-aloud',
       icon: Icons.readAloud(18),
       label: I18n.t('menu_read_aloud'),
       onClick: () => readAloud(readText, readWords),
@@ -479,7 +544,7 @@
         settings: { models: { [ACTIONS.TRANSCRIBE_AUDIO]: nickname } },
       });
     } catch (_) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
       return;
     }
     // Lo stesso avviso delle Opzioni (#1141): il modello resta scelto, ma si sa subito che con lui non parte.
@@ -503,11 +568,11 @@
   async function startDictation() {
     if (_dictateState) { stopDictation(); return; }
     if (!dictationSupported()) {
-      Popup.showToast(I18n.t('menu_dictate_not_supported'));
+      Popup.toastErrore('menu_dictate_not_supported');
       return;
     }
     if (!deps.restorePasteContext()) {
-      Popup.showToast(I18n.t('err_provider_failed'));
+      Popup.toastErrore('err_provider_failed');
       return;
     }
     // Nella casella di una chat di Filo dettare è parlare a Filo: stessa strada del tasto microfono, stesso invio.
@@ -547,7 +612,8 @@
       // Dove il cursore si trova ADESSO: mentre si detta si può continuare a scrivere o spostarsi nel campo.
       suFrase: (text) => deps.insertDictatedText(text + ' '),
       suStato: (st) => { if (st === 'trascrive') label.textContent = I18n.t('menu_dictate_transcribing'); },
-      suFine: chiudi,
+      // Nel campo di una pagina il testo resta dov'è: non c'è un invio da contare.
+      suFine: (esito) => { chiudi(); global.SN_ASCOLTO.contaSessione(esito, 'nessuno'); },
     });
     if (!sessione) { chiudi(); return; }
     state.sessione = sessione;

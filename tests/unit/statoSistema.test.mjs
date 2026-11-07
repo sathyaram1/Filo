@@ -598,3 +598,42 @@ const S = require(MODULO);
 })();`);
   assert.deepEqual(mac, [false, false, false, false, false, false]);
 });
+
+test('con un adattatore virtuale Chromium dice online a rete giù: la sorveglianza rilegge poche volte, non ogni 30 secondi', () => {
+  const g = { visto: null, riletture: 0 };
+  const giri = Array.from({ length: 120 }, () => L.reteDaRileggere(g, true, false));
+  assert.equal(giri.filter(Boolean).length, L.RILETTURE_RETE, 'un\'ora di rete giù rilegge il sistema a ogni giro');
+  // Chromium che cambia idea è un fatto nuovo: si rilegge di nuovo, e quando i due sono d'accordo no.
+  assert.equal(L.reteDaRileggere(g, false, true), true);
+  assert.equal(L.reteDaRileggere(g, false, false), false);
+  assert.equal(L.reteDaRileggere(g, null, false), false);
+});
+
+// #1302: il riscaldamento a tempo della home (una bozza lasciata lì) non sveglia il lettore con l'utente via da minuti;
+// un gesto vero (un tasto, il ritorno alla finestra) sì, anche dopo una pausa lunga.
+test('il riscaldamento a tempo non legge con l\'utente assente; un gesto per la chat sì', () => {
+  const esito = simula(`
+const S = require(MODULO);
+let letture = 0;
+(async () => {
+  await S._perProve.usaLettore(async () => { letture += 1; return { batteria: null, rete: null, bluetooth: null }; });
+  const prima = letture;
+  S._perProve.inattivita('idle');
+  S.richiedi({ unaVolta: true, riscalda: true });
+  await attesa(S._perProve.GIRO_MS * 2);
+  const assente = { letture: letture - prima, attivo: S._perProve.attivo() };
+  S.richiedi({ unaVolta: true });
+  await attesa(50);
+  const gesto = letture - prima;
+  S.ferma();
+  S._perProve.inattivita('active');
+  S.richiedi({ unaVolta: true, riscalda: true });
+  await attesa(50);
+  const presente = letture - prima - gesto;
+  S.ferma();
+  console.log(JSON.stringify({ assente, gesto, presente })); process.exit(0);
+})();`);
+  assert.deepEqual(esito.assente, { letture: 0, attivo: false });
+  assert.ok(esito.gesto >= 1, 'un gesto per la chat legge comunque');
+  assert.ok(esito.presente >= 1, 'con l\'utente presente il riscaldamento legge');
+});

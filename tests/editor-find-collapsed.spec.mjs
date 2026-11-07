@@ -11,11 +11,12 @@
 // (`display:none`) e Playwright lo vede come non visibile.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { apriPannello } from './helpers/strumentiEditor.mjs';
 
 const EDITOR = 'filo://editor/editor.html';
 
 // Due sezioni: la seconda contiene la parola cercata. Ritorna la pagina pronta
-// con il riquadro Cerca/Sostituisci aperto e la seconda sezione CHIUSA.
+// col pannello aperto su Cerca e sostituisci e la seconda sezione CHIUSA.
 async function setupCollapsedDoc(page) {
   await page.waitForSelector('#doc');
   await page.evaluate(() => {
@@ -27,9 +28,7 @@ async function setupCollapsedDoc(page) {
   // Chiudi "Capitolo segreto" con la sua freccia.
   await page.locator('#doc h2', { hasText: 'Capitolo segreto' }).locator('.ed-collapse-toggle').click();
   await expect(page.locator('#doc #segreto')).toBeHidden();
-  // Pagina "Revisione" (seconda icona dello switch) → modulo cerca e sostituisci.
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('[data-sr="find"]');
+  await apriPannello(page);
 }
 
 test('Cerca: una corrispondenza in una sezione chiusa apre la sezione e si evidenzia (#385)', async ({ openTab }) => {
@@ -79,8 +78,7 @@ test('Prec/Succ su corrispondenze in sezioni diverse riaprono quella di destinaz
   });
   await page.locator('#doc h2', { hasText: 'Seconda' }).locator('.ed-collapse-toggle').click();
   await expect(page.locator('#doc #p2')).toBeHidden();
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('[data-sr="find"]');
+  await apriPannello(page);
 
   await page.fill('[data-sr="find"]', 'parola');
   await expect(page.locator('[data-sr="count"]')).toHaveText('1/2');
@@ -125,8 +123,7 @@ async function setupThreeClosedSections(page) {
   await expect(page.locator('#doc #s1')).toBeHidden();
   await expect(page.locator('#doc #s2')).toBeHidden();
   await expect(page.locator('#doc #s3')).toBeHidden();
-  await page.locator('.ed-switch-icon').nth(1).click();
-  await page.waitForSelector('[data-sr="find"]');
+  await apriPannello(page);
 }
 
 test('Cercando lettera per lettera si apre SOLO la sezione della parola cercata (#385)', async ({ openTab }) => {
@@ -152,9 +149,10 @@ test('Svuotare il campo Cerca richiude le sezioni aperte dalla ricerca, non le t
   const page = await openTab(EDITOR);
   await setupThreeClosedSections(page);
 
-  // L'utente riapre a mano la prima sezione: è una sua scelta, va rispettata.
+  // L'utente riapre a mano la prima sezione: è una sua scelta, va rispettata. Il clic sul foglio chiude il pannello.
   await page.locator('#doc h2', { hasText: 'Uno' }).locator('.ed-collapse-toggle').click();
   await expect(page.locator('#doc #s1')).toBeVisible();
+  await apriPannello(page);
 
   await page.fill('[data-sr="find"]', 'ornitorinco');
   await expect(page.locator('#doc #s3')).toBeVisible(); // aperta dalla ricerca

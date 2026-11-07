@@ -28,6 +28,8 @@ require(join(__dirname, '..', '..', 'src', 'shared', 'messages.js'));
 // Come nel main (loader.js): serve alla sostituzione a pesi aperti per sapere
 // se il sostituto fa il mestiere della funzione.
 require(join(__dirname, '..', '..', 'src', 'shared', 'modelCaps.js'));
+// La frase di un rifiuto del router, la stessa della chat (#1345).
+require(join(__dirname, '..', '..', 'src', 'shared', 'chatErrors.js'));
 const { MSG } = globalThis.SN_MSG;
 
 // ── harness: registra l'handler con dipendenze finte ────────────────────────
@@ -48,7 +50,7 @@ const state = {
 const fornitoreFinto = (provider) => ({
   streamComplete: async ({ apiKey, model, messages, providerRouting, reasoning, onDelta }) => {
     state.calls.push({ provider, apiKey, model, providerRouting, reasoning });
-    if (state.streamError) throw new Error(state.streamError);
+    if (state.streamError) throw (typeof state.streamError === 'string' ? new Error(state.streamError) : state.streamError);
     if (state.emptyStream) return { usage: { completionTokens: 0 } };
     onDelta('1, 2, 3');
     return { usage: { completionTokens: 7 } };
@@ -160,6 +162,38 @@ test('errore del provider propagato come ok:false (es. modello inesistente su Op
   const res = await testModel({ provider: 'openrouter', model: 'finto/modello' });
   assert.equal(res.ok, false);
   assert.match(String(res.error), /No endpoints found/);
+});
+
+// #1345: un rifiuto del router, nei due «Prova», con la stessa causa che direbbe la chat e mai il JSON del servizio.
+test('rifiuto del router: il «Prova» dice la causa come la chat, non il messaggio grezzo', async () => {
+  const CE = globalThis.SN_CHAT_ERRORS;
+  const rifiuto = (code, testo, extra = {}) => Object.assign(
+    new Error(`OpenRouter 404: {"error":{"message":"${testo}","code":404}}`),
+    { status: 404, provider: 'openrouter', code, ...extra },
+  );
+  const casi = [
+    [rifiuto('NO_PROVIDER_ALLOWED', 'No allowed providers are available for the selected model.'), /fra quelli ammessi/],
+    [rifiuto('DATA_POLICY', 'No endpoints found matching your data policy.'), /privacy/],
+    [rifiuto('INGRESSO_NON_LETTO', 'No endpoints found that support input audio', { ingresso: 'audio' }), /non ascolta l'audio/],
+    [rifiuto('NO_TOOL_HOST', 'No endpoints found that support tool use'), /nessun fornitore ammesso sa usare gli strumenti/],
+    [Object.assign(new Error(CE.fraseNessunHost({ modello: 'finto/modello', motivo: CE.motivoHostEsclusi(['DeepSeek']) })), {
+      code: 'NO_ALLOWED_HOST', reason: 'excluded', model: 'finto/modello', hosts: ['DeepSeek'],
+    }), /Lo serve solo DeepSeek, che Filo esclude/],
+  ];
+  state.admin = true;
+  state.defaults.apiKeys = { openrouter: 'sk-or-default' };
+  for (const [errore, causa] of casi) {
+    state.streamError = errore;
+    for (const res of [
+      await testModel({ provider: 'openrouter', model: 'finto/modello' }),
+      await testProvider({ provider: 'openrouter', apiKey: 'sk-or-utente', model: 'finto/modello' }),
+    ]) {
+      assert.equal(res.ok, false);
+      assert.match(String(res.error), causa, errore.code);
+      assert.doesNotMatch(String(res.error), /OpenRouter 404|\{"error"/, errore.code);
+      assert.equal(res.error, CE.sentence(errore), 'la stessa frase della chat');
+    }
+  }
 });
 
 // ── { nickname }: lista read-only delle Opzioni ──────────────────────────────

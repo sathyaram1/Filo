@@ -78,8 +78,8 @@ const REPORT = 'Report per l’owner: la causa era altrove, il pulsante non veni
 test('dispatch: --ticket davanti a un --record-* fa quello che fa messo in coda', async () => {
   const esiti = [];
   for (const argv of [
-    ['--ticket', BIGLIETTO, '--record-fixed', 'fid-900', REPORT],
-    ['--record-fixed', 'fid-900', REPORT, '--ticket', BIGLIETTO],
+    ['--ticket', BIGLIETTO, '--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa'],
+    ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', '--ticket', BIGLIETTO],
   ]) {
     const { srv, ricevuti, port } = await fintoServer();
     const casa = depositoSulRamo();
@@ -252,8 +252,8 @@ test('battito senza biglietto: uscita 1, non 3 («canale giù»), e nessuna chia
 
 test('dispatch: --ticket=<codice> vale come --ticket <codice>, davanti e dopo', async () => {
   for (const argv of [
-    [`--ticket=${BIGLIETTO}`, '--record-fixed', 'fid-900', REPORT],
-    ['--record-fixed', 'fid-900', REPORT, `--ticket=${BIGLIETTO}`],
+    [`--ticket=${BIGLIETTO}`, '--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa'],
+    ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', `--ticket=${BIGLIETTO}`],
   ]) {
     await conServer(async ({ ricevuti, env }) => {
       const r = await esegui('dispatch.mjs', argv, env);
@@ -325,7 +325,7 @@ test('canale: un biglietto vero col trattino davanti è un biglietto, non un\'op
 
 test('registrazioni: un biglietto vero con due trattini passa col segno uguale', async () => {
   await conServer(async ({ ricevuti, env }) => {
-    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, `--ticket=${VERO_DUE_TRATTINI}`], env);
+    const r = await esegui('dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', `--ticket=${VERO_DUE_TRATTINI}`], env);
     assert.equal(r.code, 0, `stderr: ${r.se}`);
     assert.equal(ricevuti.find((x) => x.url.includes('routineDeliver'))?.body.ticket, VERO_DUE_TRATTINI);
   });
@@ -342,7 +342,7 @@ test('canale e registrazioni danno lo stesso esito sui casi fuori dal comune del
   for (const c of casi) {
     for (const [script, argv] of [
       ['routine-channel.mjs', ['deliver', 'note', '--text', 'Una nota.', ...c.canale]],
-      ['dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, ...c.canale]],
+      ['dispatch.mjs', ['--record-fixed', 'fid-900', REPORT, '--motivo', 'ripresa', ...c.canale]],
     ]) {
       await conServer(async ({ ricevuti, env }) => {
         const r = await esegui(script, argv, env);

@@ -5,7 +5,7 @@
   'use strict';
 
   const { MSG } = window.SN_MSG;
-  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniAvvisoSchermoPieno, tempiCorrettore } = window.SN_CONST;
+  const { AGENT_STYLE_PRESETS, AGENT_STYLE_MAX, agentStyleLength, testoLeggibile, dictationTimes, opzioniBarraLaterale, opzioniPannelloDestro, opzioniAvvisoSchermoPieno, tempiCorrettore, soglieCorrettore, nascosteDellaTraduzione, modoNascoste } = window.SN_CONST;
   const Storage = window.SN_STORAGE;
   const Bootstrap = window.SN_PAGE_BOOTSTRAP;
   const Tokens = window.SN_THEME_TOKENS;
@@ -244,7 +244,13 @@
     caselle.cambiato('token', e);
   }
 
+  // Chi torna indietro dalla personalizzazione (#1471): cosa rimette di serie, per nome dell'elenco, mai il valore.
+  function contaRipristino(campi) {
+    try { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.CONTATORI_EVENTO, misura: 'gesto', gesto: 'ripristino', ...campi })).catch(() => {}); } catch (_) {}
+  }
+
   function resetToken(name) {
+    contaRipristino({ cosa: 'token', token: name });
     delete currentOverrides[name];
     tokenInCorso.delete(name);
     tokenDaSalvare.add(name);
@@ -255,12 +261,27 @@
   }
 
   function resetAllTokens() {
+    contaRipristino({ cosa: 'tutti_token' });
     currentOverrides = {};
     tokenInCorso.clear();
     tokenAzzeraTutti = true;
     if (Tokens) for (const name of Tokens.names()) renderTokenRow(name);
     applyTokensLive();
     persistTokens();
+  }
+
+  // La sezione delle impostazioni avanzate arrivata sotto gli occhi, una volta per apertura della pagina (#1471).
+  let avanzateGuardate = false;
+  function guardaLeAvanzate() {
+    const sezione = document.getElementById('sec-advanced');
+    if (avanzateGuardate || !sezione || typeof IntersectionObserver !== 'function') return;
+    avanzateGuardate = true;
+    const io = new IntersectionObserver((voci) => {
+      if (!voci.some((v) => v.isIntersecting)) return;
+      io.disconnect();
+      contaRipristino({ cosa: 'avanzate_viste' });
+    });
+    io.observe(sezione);
   }
 
   // Un solo bottone riporta TUTTE le impostazioni ai predefiniti: una personalizzazione
@@ -270,10 +291,11 @@
     const text = 'Riporta TUTTE le impostazioni di Filo ai valori predefiniti: '
       + 'tema, colori e aspetto, colore delle schede, dimensione del testo, '
       + 'notifiche, gestione delle schede e ogni altra preferenza. '
-      + 'Le tue chiavi API restano salvate. L’operazione non si può annullare.';
+      + 'Le tue chiavi API e l’autonomia di Filo restano come sono. Si rimette com’era con «annulla» sulla riga del cambio nella home, o chiedendolo a Filo.';
     const ok = Ui
       ? await Ui.confirm({ title: 'Ripristina tutte le impostazioni', text, okLabel: 'Ripristina tutto' })
       : window.confirm(`${text} Procedo?`);
+    contaRipristino({ cosa: 'tutte_impostazioni', esito: ok ? 'confermato' : 'annullato' });
     if (!ok) return;
     await chrome.runtime.sendMessage({ type: MSG.RESET_SETTINGS });
     // Ricarica la pagina: si ri-bootstrappa dai predefiniti, senza stato residuo.
@@ -483,6 +505,7 @@
   function resetTabColorParam(key) {
     const m = tabColorMeta(key);
     if (!m) return;
+    contaRipristino({ cosa: 'colore_schede', parametro: key });
     currentTabColor[key] = m.def;
     tabColInCorso.delete(key);
     tabColDaSalvare.add(key);
@@ -491,6 +514,7 @@
   }
 
   function resetAllTabColor() {
+    contaRipristino({ cosa: 'tutto_colore_schede' });
     currentTabColor = TabColor ? TabColor.defaultParams() : {};
     tabColInCorso.clear();
     if (TabColor && Array.isArray(TabColor.IDENTITY_PARAM_META)) {
@@ -660,13 +684,7 @@
     syncCustomVoiceField();
   }
 
-  const MODEL_VOICE_SAMPLES = {
-    it: 'Ciao, sono Filo. Questa è la voce naturale scelta per la lettura ad alta voce.',
-    en: 'Hi, I am Filo. This is the natural voice chosen for reading aloud.',
-    es: 'Hola, soy Filo. Esta es la voz natural elegida para la lectura en voz alta.',
-    fr: 'Bonjour, je suis Filo. Voici la voix naturelle choisie pour la lecture à voix haute.',
-    pt: 'Olá, eu sou o Filo. Esta é a voz natural escolhida para a leitura em voz alta.',
-  };
+  const MODEL_VOICE_SAMPLES = window.SN_TTS_VOICES.FRASI_DI_PROVA;
 
   // PCM 16 bit mono → WAV in un blob URL (stesso incapsulamento del content script).
   function pcmBase64ToWavUrl(base64, sampleRate) {
@@ -721,7 +739,7 @@
     if (!ttsSupported()) return;
     const synth = window.speechSynthesis;
     synth.cancel();
-    const u = new SpeechSynthesisUtterance('Ciao, sono Filo. Questa è la voce scelta per la lettura ad alta voce.');
+    const u = new SpeechSynthesisUtterance(window.SN_TTS_VOICES.FRASE_DI_PROVA_SISTEMA);
     u.rate = parseFloat($('ttsRate').value) || 1;
     u.pitch = parseFloat($('ttsPitch').value) || 1;
     const voiceId = $('ttsVoice').value;
@@ -843,8 +861,15 @@
       case 'notifications.sound': return $('notifSound').value || 'default';
       case 'barraLaterale.spinta': return $('barraSpinta').checked;
       case 'barraLaterale.striscia': return $('barraStriscia').checked;
+      case 'barraLaterale.schede': return $('barraSchede').checked;
+      case 'barraLaterale.bloccata': return $('barraBloccata').checked;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale({ attesaMs: $('barraAttesa').value }).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale({ uscitaMs: $('barraUscita').value }).uscitaMs;
+      case 'pannelloDestro.spinta': return $('pannelloSpinta').checked;
+      case 'pannelloDestro.striscia': return $('pannelloStriscia').checked;
+      case 'pannelloDestro.bloccato': return $('pannelloBloccato').checked;
+      case 'pannelloDestro.attesaMs': return opzioniPannelloDestro({ attesaMs: $('pannelloAttesa').value }).attesaMs;
+      case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro({ uscitaMs: $('pannelloUscita').value }).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno({ durataMs: $('avvisoSchermoPienoDurata').value }).durataMs;
       case 'notifications.soundVolume': return volumeDa('notifSoundVolume');
       case 'dictation.autoSend': return $('dictationAutoSend').value !== 'no';
@@ -860,6 +885,7 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', $('avvisoCreditiGiorni').value);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', $('avvisoCreditiPercento').value);
       case 'spiegaAnticipata.enabled': return $('spiegaAnticipata').checked;
+      case 'traduzionePagina.nascoste': return modoNascoste($('traduzioneNascoste').value);
       case 'descriviImmagini.enabled': return $('descriviImmagini').checked;
       case 'contatori.attivi': return $('contatoriAttivi').checked;
       case 'featureFlags.help': return $('aiutoAcceso').checked;
@@ -868,9 +894,15 @@
       case 'featureFlags.categorize': return $('categorieAutomatiche').checked;
       case 'correttore.modelloErrori': return $('correttoreModello').checked;
       case 'correttore.ripetizioni': return $('correttoreRipetizioni').checked;
+      case 'correttore.segnaposti': return $('correttoreSegnaposti').checked;
+      case 'correttore.segnapostiWeb': return $('correttoreSegnapostiWeb').checked;
       case 'correttore.pausaRapidoMs': return tempoCorrettoreDelCampo('pausaRapidoMs');
       case 'correttore.ogniRapidoMs': return tempoCorrettoreDelCampo('ogniRapidoMs');
       case 'correttore.pausaRagionatoMs': return tempoCorrettoreDelCampo('pausaRagionatoMs');
+      case 'correttore.automatica': return $('correttoreAutomatica').checked;
+      case 'correttore.accettiPerImparare': return sogliaCorrettoreDelCampo('accettiPerImparare');
+      case 'correttore.annulliPerImparare': return sogliaCorrettoreDelCampo('annulliPerImparare');
+      case 'correttore.riscrittePerImparare': return sogliaCorrettoreDelCampo('riscrittePerImparare');
       default: return undefined;
     }
   }
@@ -880,6 +912,9 @@
   // I tempi del correttore (#1446): campo per chiave; limiti e predefiniti in SN_CONST.CORRETTORE_TEMPI.
   const CAMPI_TEMPI_CORRETTORE = { pausaRapidoMs: 'correttorePausaRapido', ogniRapidoMs: 'correttoreOgniRapido', pausaRagionatoMs: 'correttorePausaRagionato' };
   const tempoCorrettoreDelCampo = (campo) => tempiCorrettore({ correttore: { [campo]: $(CAMPI_TEMPI_CORRETTORE[campo]).value } })[campo];
+  // Quante volte serve per imparare (#1447): limiti e predefiniti in SN_CONST.CORRETTORE_SOGLIE.
+  const CAMPI_SOGLIE_CORRETTORE = { accettiPerImparare: 'correttoreAccetti', annulliPerImparare: 'correttoreAnnulli', riscrittePerImparare: 'correttoreRiscritte' };
+  const sogliaCorrettoreDelCampo = (campo) => soglieCorrettore({ correttore: { [campo]: $(CAMPI_SOGLIE_CORRETTORE[campo]).value } })[campo];
   const interruttore = (s, nome, diSerie) => {
     const v = s.featureFlags && s.featureFlags[nome];
     return diSerie ? v !== false : v === true;
@@ -926,8 +961,15 @@
       case 'notifications.sound': return notif.sound || 'default';
       case 'barraLaterale.spinta': return opzioniBarraLaterale(s.barraLaterale).spinta;
       case 'barraLaterale.striscia': return opzioniBarraLaterale(s.barraLaterale).striscia;
+      case 'barraLaterale.schede': return opzioniBarraLaterale(s.barraLaterale).schede;
+      case 'barraLaterale.bloccata': return opzioniBarraLaterale(s.barraLaterale).bloccata;
       case 'barraLaterale.attesaMs': return opzioniBarraLaterale(s.barraLaterale).attesaMs;
       case 'barraLaterale.uscitaMs': return opzioniBarraLaterale(s.barraLaterale).uscitaMs;
+      case 'pannelloDestro.spinta': return opzioniPannelloDestro(s.pannelloDestro).spinta;
+      case 'pannelloDestro.striscia': return opzioniPannelloDestro(s.pannelloDestro).striscia;
+      case 'pannelloDestro.bloccato': return opzioniPannelloDestro(s.pannelloDestro).bloccato;
+      case 'pannelloDestro.attesaMs': return opzioniPannelloDestro(s.pannelloDestro).attesaMs;
+      case 'pannelloDestro.uscitaMs': return opzioniPannelloDestro(s.pannelloDestro).uscitaMs;
       case 'avvisoSchermoPieno.durataMs': return opzioniAvvisoSchermoPieno(s.avvisoSchermoPieno).durataMs;
       case 'notifications.soundVolume': return volumeSalvato(notif.soundVolume);
       case 'dictation.autoSend': return !(s.dictation && s.dictation.autoSend === false);
@@ -943,13 +985,20 @@
       case 'avvisoCrediti.giorni': return sogliaCrediti('giorni', s.avvisoCrediti && s.avvisoCrediti.giorni);
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
+      case 'traduzionePagina.nascoste': return nascosteDellaTraduzione(s);
       case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
       case 'correttore.ripetizioni': return !(s.correttore && s.correttore.ripetizioni === false);
+      case 'correttore.segnaposti': return !(s.correttore && s.correttore.segnaposti === false);
+      case 'correttore.segnapostiWeb': return !(s.correttore && s.correttore.segnapostiWeb === false);
       case 'correttore.pausaRapidoMs':
       case 'correttore.ogniRapidoMs':
       case 'correttore.pausaRagionatoMs': return tempiCorrettore(s)[k.split('.')[1]];
+      case 'correttore.automatica': return !(s.correttore && s.correttore.automatica === false);
+      case 'correttore.accettiPerImparare':
+      case 'correttore.annulliPerImparare':
+      case 'correttore.riscrittePerImparare': return soglieCorrettore(s)[k.split('.')[1]];
       case 'featureFlags.help':
       case 'featureFlags.spellcheck':
       case 'featureFlags.spellcheckContext':
@@ -1090,8 +1139,16 @@
     const barra = opzioniBarraLaterale(settings.barraLaterale);
     if (vuole('barraLaterale.spinta')) $('barraSpinta').checked = barra.spinta;
     if (vuole('barraLaterale.striscia')) $('barraStriscia').checked = barra.striscia;
+    if (vuole('barraLaterale.schede')) $('barraSchede').checked = barra.schede;
+    if (vuole('barraLaterale.bloccata')) $('barraBloccata').checked = barra.bloccata;
     if (vuole('barraLaterale.attesaMs')) $('barraAttesa').value = String(barra.attesaMs);
     if (vuole('barraLaterale.uscitaMs')) $('barraUscita').value = String(barra.uscitaMs);
+    const pannello = opzioniPannelloDestro(settings.pannelloDestro);
+    if (vuole('pannelloDestro.spinta')) $('pannelloSpinta').checked = pannello.spinta;
+    if (vuole('pannelloDestro.striscia')) $('pannelloStriscia').checked = pannello.striscia;
+    if (vuole('pannelloDestro.bloccato')) $('pannelloBloccato').checked = pannello.bloccato;
+    if (vuole('pannelloDestro.attesaMs')) $('pannelloAttesa').value = String(pannello.attesaMs);
+    if (vuole('pannelloDestro.uscitaMs')) $('pannelloUscita').value = String(pannello.uscitaMs);
     if (vuole('avvisoSchermoPieno.durataMs')) $('avvisoSchermoPienoDurata').value = String(opzioniAvvisoSchermoPieno(settings.avvisoSchermoPieno).durataMs);
 
     const terminal = settings.terminal || {};
@@ -1149,6 +1206,7 @@
       if (vuole(`avvisoCrediti.${k}`)) $(id).value = String(sogliaCrediti(k, ac[k]));
     }
     if (vuole('spiegaAnticipata.enabled')) $('spiegaAnticipata').checked = !(settings.spiegaAnticipata && settings.spiegaAnticipata.enabled === false);
+    if (vuole('traduzionePagina.nascoste')) $('traduzioneNascoste').value = nascosteDellaTraduzione(settings);
     if (vuole('descriviImmagini.enabled')) $('descriviImmagini').checked = !(settings.descriviImmagini && settings.descriviImmagini.enabled === false);
     if (vuole('contatori.attivi')) $('contatoriAttivi').checked = !(settings.contatori && settings.contatori.attivi === false);
     for (const [nome, id, diSerie] of INTERRUTTORI) {
@@ -1157,9 +1215,16 @@
     const corr = settings.correttore || {};
     if (vuole('correttore.modelloErrori')) $('correttoreModello').checked = corr.modelloErrori !== false;
     if (vuole('correttore.ripetizioni')) $('correttoreRipetizioni').checked = corr.ripetizioni !== false;
+    if (vuole('correttore.segnaposti')) $('correttoreSegnaposti').checked = corr.segnaposti !== false;
+    if (vuole('correttore.segnapostiWeb')) $('correttoreSegnapostiWeb').checked = corr.segnapostiWeb !== false;
     const tempiCorr = tempiCorrettore(settings);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       if (vuole(`correttore.${campo}`)) $(id).value = String(tempiCorr[campo]);
+    }
+    if (vuole('correttore.automatica')) $('correttoreAutomatica').checked = corr.automatica !== false;
+    const soglieCorr = soglieCorrettore(settings);
+    for (const [campo, id] of Object.entries(CAMPI_SOGLIE_CORRETTORE)) {
+      if (vuole(`correttore.${campo}`)) $(id).value = String(soglieCorr[campo]);
     }
 
     if (vuole('timerRingtone')) {
@@ -1209,6 +1274,9 @@
   // ── Memoria di Filo: si legge e si corregge nel quaderno delle memorie (#872) ─────────
   function apriQuaderno() {
     try { chrome.tabs.create({ url: 'filo://quaderno/quaderno.html' }); } catch (_) {}
+  }
+  function apriNovita() {
+    try { chrome.tabs.create({ url: 'filo://novita/novita.html' }); } catch (_) {}
   }
 
   // ── Ricerca nei documenti (#947) ─────────────────────────────────────────
@@ -1415,12 +1483,12 @@
   let scorciatoieSalvate = {};
   let registrando = null;
 
-  // I moduli dell'Editor tengono le loro combinazioni nei documenti: una delle quattro sopra le spegnerebbe.
-  const COLLEZIONE_EDITOR = 'filo.editor.collection';
+  // Gli elementi dei pannelli delle app tengono le loro combinazioni (#1433): una delle quattro sopra le spegnerebbe.
+  const PANNELLI = 'sn_pannelli_app';
   async function caricaModuliEditor() {
     try {
-      const r = await chrome.storage.local.get(COLLEZIONE_EDITOR);
-      window.SN_TASTI?.usaScorciatoieModuli(r && r[COLLEZIONE_EDITOR]);
+      const r = await chrome.storage.local.get(PANNELLI);
+      window.SN_TASTI?.usaScorciatoiePannelli(r && r[PANNELLI]);
     } catch (_) {}
   }
 
@@ -1721,6 +1789,7 @@
       : { ...(settings.tabColor || {}) };
     buildTabColorSection();
     caricato = true;
+    guardaLeAvanzate();
     // La sezione chiesta dall'indirizzo (la carta dell'aggiornamento manda a #sec-aggiornamenti) si raggiunge solo
     // adesso: le sezioni costruite qui sopra l'hanno spostata in giù dopo lo scorrimento del browser.
     try {
@@ -1764,6 +1833,7 @@
     } catch (_) {}
     load();
     $('apriQuaderno').addEventListener('click', apriQuaderno);
+    $('apriNovita').addEventListener('click', apriNovita);
     $('documentiAggiungi').addEventListener('click', aggiungiCartella);
     window.addEventListener('keydown', tastoRegistrato, true);
     window.addEventListener('keyup', (e) => {
@@ -1826,15 +1896,23 @@
     }
     $('avvisoCreditiAttivo').addEventListener('change', persist);
     $('spiegaAnticipata').addEventListener('change', persist);
+    $('traduzioneNascoste').addEventListener('change', persist);
     $('descriviImmagini').addEventListener('change', persist);
     $('contatoriAttivi').addEventListener('change', persist);
     for (const [, id] of INTERRUTTORI) $(id).addEventListener('change', persist);
     $('correttoreModello').addEventListener('change', persist);
     $('correttoreRipetizioni').addEventListener('change', persist);
+    $('correttoreSegnaposti').addEventListener('change', persist);
+    $('correttoreSegnapostiWeb').addEventListener('change', persist);
     for (const [campo, id] of Object.entries(CAMPI_TEMPI_CORRETTORE)) {
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(tempiCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
+    }
+    $('correttoreAutomatica').addEventListener('change', persist);
+    for (const [campo, id] of Object.entries(CAMPI_SOGLIE_CORRETTORE)) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(soglieCorrettore({ correttore: { [campo]: $(id).value } })[campo]); });
     }
     for (const [, id] of CAMPI_CREDITI) {
       $(id).addEventListener('change', persist);
@@ -1845,10 +1923,17 @@
     $('terminalShell').addEventListener('change', persist);
     $('barraSpinta').addEventListener('change', persist);
     $('barraStriscia').addEventListener('change', persist);
+    $('barraSchede').addEventListener('change', persist);
+    $('barraBloccata').addEventListener('change', persist);
     for (const [id, campo] of [['barraAttesa', 'attesaMs'], ['barraUscita', 'uscitaMs']]) {
       $(id).addEventListener('change', persist);
       // Al blur il campo mostra il valore davvero in uso: uno fuori dai limiti torna dentro, a vista.
       $(id).addEventListener('blur', () => { $(id).value = String(opzioniBarraLaterale({ [campo]: $(id).value })[campo]); });
+    }
+    for (const id of ['pannelloSpinta', 'pannelloStriscia', 'pannelloBloccato']) $(id).addEventListener('change', persist);
+    for (const [id, campo] of [['pannelloAttesa', 'attesaMs'], ['pannelloUscita', 'uscitaMs']]) {
+      $(id).addEventListener('change', persist);
+      $(id).addEventListener('blur', () => { $(id).value = String(opzioniPannelloDestro({ [campo]: $(id).value })[campo]); });
     }
     $('avvisoSchermoPienoDurata').addEventListener('change', persist);
     $('avvisoSchermoPienoDurata').addEventListener('blur', () => {

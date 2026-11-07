@@ -33,17 +33,23 @@ async function apri(openTab, testServer, csp, html = HTML) {
   return page;
 }
 
+// Su una frase selezionata, come chi la vuole spiegare: lì il menu ha «Leggi ad alta voce», una voce con l'icona.
+async function tastoDestroSullaFrase(frase) {
+  await frase.selectText();
+  await frase.click({ button: 'right', position: { x: 20, y: 8 } });
+}
+
 async function menuCompleto(menu) {
   await expect(menu).toBeVisible();
   await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
-  // Le icone sono SVG costruite da stringa: devono esserci davvero, non riquadri vuoti.
-  expect(await menu.locator('svg').count()).toBeGreaterThan(3);
+  // Le icone delle voci sono SVG costruite da stringa: devono esserci davvero, non riquadri vuoti.
+  await expect(menu.locator('.sn-menu-item-icon svg').first()).toBeVisible();
 }
 
 for (const [caso, csp] of Object.entries(CSP)) {
   test(`Trusted Types (${caso}): il tasto destro apre il menu di Filo, e la sua voce apre il riquadro`, async ({ app, openTab, testServer }) => {
     const page = await apri(openTab, testServer, csp);
-    await page.locator('#paragraph').click({ button: 'right' });
+    await tastoDestroSullaFrase(page.locator('#paragraph'));
     const menu = menuDi(page).locator('.sn-menu');
     await menuCompleto(menu);
     await menu.getByText('Invia feedback', { exact: true }).click();
@@ -60,7 +66,7 @@ for (const [caso, csp] of Object.entries(CSP)) {
       const b = document.createElement('iframe'); document.body.append(b); b.contentWindow.document.body.textContent = 'vuoto';
     }, figlio);
     await page.waitForTimeout(1200);
-    await page.locator('#paragraph').click({ button: 'right' });
+    await tastoDestroSullaFrase(page.locator('#paragraph'));
     await menuCompleto(menuDi(page).locator('.sn-menu'));
   });
 }
@@ -70,7 +76,7 @@ test('Trusted Types: il tasto destro dentro un riquadro della pagina apre il men
   const figlio = testServer.html('<body style="padding:20px"><p id="inner">Testo dentro il riquadro</p></body>', { headers: { 'Content-Security-Policy': csp } });
   const page = await apri(openTab, testServer, csp, HTML.replace('</body>', `<iframe id="embed" src="${figlio}" width="500" height="200"></iframe></body>`));
   const frame = page.frameLocator('#embed');
-  await frame.locator('#inner').click({ button: 'right' });
+  await tastoDestroSullaFrase(frame.locator('#inner'));
   await menuCompleto(menuDi(frame).locator('.sn-menu'));
 });
 

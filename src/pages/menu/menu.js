@@ -22,6 +22,15 @@
     queueMicrotask(() => { if (chiusoOra) { chiusoOra = false; api.fuori(s); } });
   });
 
+  // La ricerca nella cronologia degli appunti fatta nello strato: il main la conta come quella nella pagina (#1461).
+  // Così i gesti del menu (#1471): il riquadro «Altro…», il nome letto su un'icona, un trascinamento finito nel vuoto.
+  globalThis.SN_MENU_CONTA = (evento) => {
+    if (!evento) return;
+    if (evento.misura === 'gesto') { api.chiedi('conta', { ...evento }); return; }
+    if (evento.misura !== 'ricerca') return;
+    api.chiedi('conta', { pannello: evento.pannello, esito: evento.esito, attesaMs: evento.attesaMs, posizione: evento.posizione });
+  };
+
   function chiedi(canale, dati = {}) {
     if (!m) return;
     const chiude = chiusoOra;
@@ -52,20 +61,6 @@
     const op = { speciale: (v) => (v instanceof Element ? { $ancora: segno(v) } : undefined) };
     chiedi('esegui', { n, args: D.descrivi(args, op) });
   }, { n });
-
-  // Il contagocce chiede un gesto vero, e la pagina sotto non ce l'ha: lo apre lo strato, e alla voce va il colore.
-  // Lo strato resta a schermo, vuoto, finché l'utente non sceglie un punto o rinuncia.
-  const contagocce = (fn) => () => {
-    if (!m || typeof window.EyeDropper !== 'function') { fn(); return; }
-    chiusoOra = false;
-    const s = seq;
-    new window.EyeDropper().open().then((r) => r && r.sRGBHex, () => null).then((hex) => {
-      if (!m || seq !== s) return;
-      if (!hex) { api.fuori(s); return; }
-      chiusoOra = true;
-      chiedi('esegui', { n: fn.n, args: [String(hex)], contagocce: true });
-    });
-  };
 
   // ── quello che arriva dalla scheda non diventa codice qui ───────────────
   const SVG_VIETATI = new Set(['script', 'foreignobject', 'use', 'image', 'a', 'iframe', 'style', 'animate', 'set', 'animatemotion', 'animatetransform']);
@@ -137,7 +132,6 @@
       if (k === 'icon') v[k] = pulisciIcona(v[k]);
       else if (v[k] && typeof v[k] === 'object') v[k] = voce(v[k]);
     }
-    if (v.nelloStrato === 'contagocce' && typeof v.onClick === 'function' && Number.isInteger(v.onClick.n)) v.onClick = contagocce(v.onClick);
     return v;
   }
 
@@ -250,20 +244,21 @@
     if (!m || !d || d.id !== m.id) return;
     if (d.cosa === 'inline' && Number.isInteger(d.n)) applicaInline(d.n, d);
     else if (d.cosa === 'correzione' && Number.isInteger(d.n)) applicaCorrezione(d.n, d);
-    else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []));
+    else if (d.cosa === 'riga') Menu.refreshIconRow(costruisci(d.items, []), { vuota: d.vuota === true });
     else if (d.cosa === 'griglia') Menu.refreshIconGrid(costruisci(d.items, []));
     else if (d.cosa === 'fuori') {
       // L'anteprima finisce in innerHTML: passa solo un SVG ripulito, il resto come testo.
       const ic = pulisciIcona(String(d.svg || ''));
       const icon = /^<svg[\s>]/.test(ic) ? ic : ic.replace(/[&<>"']/g, (c) => `&#${c.charCodeAt(0)};`);
       Menu.trascinaDaFuori({ fase: String(d.fase || ''), id: String(d.icona || ''), x: Number(d.x) || 0, y: Number(d.y) || 0, icon });
-    }
-    else if (d.cosa === 'griglia-apri') {
+    } else if (d.cosa === 'griglia-apri' || d.cosa === 'collegamento-apri') {
       m.inVolo.clear();
       const el = m.ancore.get(String(d.ancora || ''));
       // Arrivata tardi, con un altro pannello già aperto dall'utente: vale quello.
-      if (!el || !el.isConnected || Menu.isSubMenuOpen()) return;
-      Menu.openIconGridSubmenu(el, costruisci(d.items, []), D.ricostruisci(d.opts || {}, { funzione: chiamata }));
+      if (!el || !el.isConnected) return;
+      const opts = D.ricostruisci(d.opts || {}, { funzione: chiamata });
+      if (d.cosa === 'collegamento-apri') Menu.openLinkSubmenu(el, { valore: String(opts.valore || ''), onApplica: opts.onApplica });
+      else if (!Menu.isSubMenuOpen()) Menu.openIconGridSubmenu(el, costruisci(d.items, []), opts);
     }
   });
 
@@ -274,41 +269,18 @@
     ancora.hidden = true;
   });
 
-  // La cronologia degli appunti si cerca scrivendo: aperta, lo strato prende la tastiera.
+  // La cronologia degli appunti si cerca scrivendo, e l'indirizzo di un collegamento si scrive (#1434): aperte, lo strato
+  // prende la tastiera.
   let cerca = null;
   new MutationObserver(() => {
-    const c = m ? document.querySelector('.sn-menu-history-search-input') : null;
+    const c = m ? document.querySelector('.sn-menu-history-search-input, .sn-menu-link-campo') : null;
     if (c && c !== cerca) chiedi('tastiera');
     cerca = c;
   }).observe(document.documentElement, { childList: true });
 
-  // Le icone trascinate dal menu verso la barra laterale: i px dello strato sono quelli della scheda (#871).
-  let barra = null;
-  let mira = null;
-  const trascina = (d) => Promise.resolve(api.barra(d)).catch(() => null);
-  Menu.setPonteBarra({
-    inizio(id, menuSinistra) {
-      barra = null;
-      mira = null;
-      trascina({ fase: 'inizio', id, menuSinistra }).then((r) => { if (r && r.ok) barra = { larghezza: Number(r.larghezza) || 0 }; });
-    },
-    sopra(x, y) {
-      const dentro = !!barra && x <= barra.larghezza;
-      const nuova = dentro ? Math.round(y) : null;
-      if (nuova !== mira) { mira = nuova; trascina({ fase: 'sopra', y: nuova }); }
-      return dentro;
-    },
-    posa(id, x, y) {
-      if (!barra || x > barra.larghezza) return false;
-      trascina({ fase: 'posa', id, x: Math.round(x), y: Math.round(y) });
-      return true;
-    },
-    fine() {
-      barra = null;
-      mira = null;
-      trascina({ fase: 'fine' });
-    },
-  });
+  // Le icone trascinate dalla fila verso la barra laterale: i px dello strato sono quelli della scheda (#871, #1434). Il
+  // gesto e quale icona può andare nella barra li decide menu.js, lo stesso della pagina.
+  Menu.setPonteBarra((d) => api.barra(d));
 
   // Fuori dal menu c'è solo lo strato vuoto: chiude, e un tasto destro lì apre il menu nuovo sulla scheda (il Ctrl+clic
   // del Mac arriva già come tasto destro).

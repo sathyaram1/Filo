@@ -9,6 +9,7 @@ const { VuotoDellaVista } = require('./vuotoDellaVista');
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
 const AZIONE = /^(chiudi|\d{1,2})$/;
 const PILA = /^(apri|riduci|chiudi-tutti)$/;
+const ID_SCARICAMENTO = /^[A-Za-z0-9-]{1,64}$/;
 
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const lato = (v) => Math.max(0, Math.min(10000, Math.round(Number(v) || 0)));
@@ -23,6 +24,8 @@ function pulisci(stato) {
       testo: testo(c.testo),
       azioni: (Array.isArray(c.azioni) ? c.azioni : []).map(testo),
       chiusa: c.chiusa === true,
+      indirizzo: /^https?:\/\//i.test(testo(c.indirizzo)) ? testo(c.indirizzo) : '',
+      trascina: ID_SCARICAMENTO.test(testo(c.trascina)) ? testo(c.trascina) : '',
     }));
   const altre = Math.max(0, Math.min(100000, Math.round(Number(stato && stato.altre) || 0)));
   const aperta = !!(stato && stato.aperta === true);
@@ -52,6 +55,7 @@ class AvvisiSopraPagina {
     this.stato = { carte: [], altre: 0, aperta: false, tema: { vars: {} } };
     this.misura = { w: 0, h: 0 };
     this.altezza = 0;
+    this.larghezza = 0;
     this.riserve = new WeakMap();
     this.suggerimento = false;
     this.vuoto = new VuotoDellaVista({
@@ -65,12 +69,27 @@ class AvvisiSopraPagina {
 
   aggiorna(stato) {
     this.stato = pulisci(stato);
+    this._nelFilo(this.stato.carte);
     if (!this.stato.carte.length) {
       if (this.vista) { this._invia(); this.posa(); }
       return;
     }
     if (!this._vista()) return;
     this._invia();
+  }
+
+  // Ogni carta che la cornice mette a schermo, o il cui testo cambia, è un avviso visto: entra nel filo da qui, chiunque
+  // l'abbia mandato (#1561). Una rinnovata con lo stesso testo no.
+  _nelFilo(carte) {
+    const prima = this.viste || new Map();
+    const ora = new Map();
+    for (const c of carte) {
+      if (c.chiusa) continue;
+      ora.set(c.id, c.testo);
+      if (prima.get(c.id) === c.testo) continue;
+      try { require('./services/accaduti').avvisoInCornice(c.testo, { incognito: !!(this.win && this.win._filoIncognito), url: c.indirizzo }); } catch (_) {}
+    }
+    this.viste = ora;
   }
 
   // Chiamata dal layout delle schede (ridimensionamenti, schede nuove, schermo intero).
@@ -85,49 +104,66 @@ class AvvisiSopraPagina {
       vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
       this._nascondiSuggerimento();
       this.altezza = 0;
-      this._riserva(0);
+      this.larghezza = 0;
+      this._riserva(0, 0);
       return;
     }
     vista.setBounds({ x: W - w, y: H - h, width: w, height: h });
     this._inCima();
     vista.setVisible(true);
     this.altezza = h;
-    this._riserva(h);
+    this.larghezza = w;
+    this._riserva(h, w);
     const sotto = this._sottoIlVuoto();
     if (sotto) this.vuoto.segui(sotto.webContents);
   }
 
-  // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la
-  // pila della barra (--filo-avvisi-barra, letta dalle loro pile in popup.css ed editor.css).
-  _riserva(px) {
+  // L'angolo in basso a destra è uno: gli avvisi di Filo dentro la scheda attiva salgono sopra la pila della barra
+  // (--filo-avvisi-barra), e quello che ci sta accanto si stringe a sinistra della sua larghezza (--filo-avvisi-barra-larga).
+  _riserva(h, w) {
     const wc = this._wcAttiva();
-    if (wc) this._scriviRiserva(wc, px);
+    if (wc) this._scriviRiserva(wc, h, w);
+    // Anche lo strato dei riquadri sopra la scheda (#1509.3): l'Aiuto di un sito sta lì.
+    let strato = null;
+    try { strato = wc ? require('./stratoDeiRiquadri').stratoDellaPagina(wc) : null; } catch (_) { strato = null; }
+    if (strato) this._scriviRiserva(strato, h, w);
+  }
+
+  // Uno strato nato dopo gli avvisi: si mette subito al passo con la sua scheda, se è quella davanti.
+  nelloStrato(v, wc) {
+    if (v && wc && this._wcAttiva() === wc) this._scriviRiserva(v, this.altezza, this.larghezza);
   }
 
   // Un foglio inserito mentre la scheda carica può finire nel documento nuovo senza che se ne tenga la chiave, e
   // restare lì col vecchio valore: quindi il valore nuovo si mette SOPRA (stessa origine e peso, vince il più
   // recente) e solo dopo si toglie il precedente. Foglio d'autore: uno di origine 'user' non si toglie più.
-  _scriviRiserva(wc, px) {
+  _scriviRiserva(wc, px, larga = 0) {
     let r = this.riserve.get(wc);
     if (!r) {
-      r = { px: 0, chiave: null, gen: 0, coda: Promise.resolve() };
+      r = { px: '0x0', chiave: null, gen: 0, coda: Promise.resolve() };
       this.riserve.set(wc, r);
       // Documento nuovo: la chiave del vecchio non vale più, e lì dentro può esserci un foglio di cui non si sa.
       wc.on('did-navigate', () => { r.gen++; r.chiave = null; r.px = null; });
-      wc.on('dom-ready', () => { r.px = null; this._scriviRiserva(wc, this._wcAttiva() === wc ? this.altezza : 0); });
+      wc.on('dom-ready', () => {
+        r.px = null;
+        const davanti = this._wcAttiva() === wc;
+        this._scriviRiserva(wc, davanti ? this.altezza : 0, davanti ? this.larghezza : 0);
+      });
       // Il valore è in px CSS della scheda: cambiato lo zoom (da qualunque parte), va riscritto.
-      try { wc.ipc.on('filo:zoom-cambiato', () => { if (this._wcAttiva() === wc) this._scriviRiserva(wc, this.altezza); }); } catch (_) {}
+      try { wc.ipc.on('filo:zoom-cambiato', () => { if (this._wcAttiva() === wc) this._scriviRiserva(wc, this.altezza, this.larghezza); }); } catch (_) {}
     }
     let zoom = 1;
     try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
     const css = px > 0 ? Math.ceil(px / zoom) : 0;
-    if (css === r.px) return;
-    r.px = css;
+    const cssLarga = px > 0 && larga > 0 ? Math.ceil(larga / zoom) : 0;
+    const valore = `${css}x${cssLarga}`;
+    if (valore === r.px) return;
+    r.px = valore;
     const gen = r.gen;
     r.coda = r.coda.then(async () => {
       if (wc.isDestroyed()) return;
       let k = null;
-      try { k = await wc.insertCSS(`:root:root{--filo-avvisi-barra:${css}px!important}`); } catch (_) { return; }
+      try { k = await wc.insertCSS(`:root:root{--filo-avvisi-barra:${css}px!important;--filo-avvisi-barra-larga:${cssLarga}px!important}`); } catch (_) { return; }
       if (gen !== r.gen) return;
       const prima = r.chiave;
       r.chiave = k;
@@ -278,6 +314,12 @@ class AvvisiSopraPagina {
         this._menu(dati);
       } else if (canale === 'avvisi:sopra') {
         this._sopra(!!(dati && dati.sopra));
+      } else if (canale === 'avvisi:trascina') {
+        // #588.8 — il file lo sceglie la carta che la shell ha mandato, non la vista.
+        const carta = ((this.stato && this.stato.carte) || []).find((c) => c.id === testo(dati && dati.id));
+        if (!carta || !carta.trascina) return;
+        const D = require('./services/downloads');
+        D.trascina(wc, carta.trascina, D.scopeOfWindow(this.win)).catch(() => {});
       }
     });
     wc.once('did-finish-load', () => { this.pronta = true; this._invia(); });
@@ -297,7 +339,8 @@ class AvvisiSopraPagina {
     this._nascondiSuggerimento();
     this._sopra(false);
     this.altezza = 0;
-    try { this._riserva(0); } catch (_) {}
+    this.larghezza = 0;
+    try { this._riserva(0, 0); } catch (_) {}
     try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(vista); } catch (_) {}
     try { if (!vista.webContents.isDestroyed()) vista.webContents.close(); } catch (_) {}
   }

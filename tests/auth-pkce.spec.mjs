@@ -39,18 +39,22 @@ test('PKCE: verifier e state sono unici a ogni chiamata', () => {
 
 test('loopback OAuth: code valido col giusto state viene accettato', async () => {
   const expectedState = pkce.createState();
-  const { redirectUri, waitForCode } = await _internals.startLoopback(expectedState);
-  // simula il redirect di Google verso il loopback
-  await fetch(`${redirectUri}/?code=abc123&state=${encodeURIComponent(expectedState)}`);
+  const { redirectUri, waitForCode, concludi } = await _internals.startLoopback(expectedState);
+  // simula il redirect di Google verso il loopback: la pagina risponde solo a esito noto (#678.6)
+  const pagina = fetch(`${redirectUri}/?code=abc123&state=${encodeURIComponent(expectedState)}`);
   const code = await waitForCode();
   expect(code).toBe('abc123');
+  concludi();
+  expect((await pagina).status).toBe(200);
 });
 
 test('loopback OAuth: state errato viene RIFIUTATO (anti-CSRF) e l\'accesso vero resta in ascolto (#1086)', async () => {
   const expectedState = pkce.createState();
-  const { redirectUri, waitForCode } = await _internals.startLoopback(expectedState);
+  const { redirectUri, waitForCode, concludi } = await _internals.startLoopback(expectedState);
   const falso = await fetch(`${redirectUri}/?code=abc123&state=stato-falso`);
   expect(falso.status).toBe(400);
-  await fetch(`${redirectUri}/?code=vero&state=${encodeURIComponent(expectedState)}`);
+  const pagina = fetch(`${redirectUri}/?code=vero&state=${encodeURIComponent(expectedState)}`);
   expect(await waitForCode()).toBe('vero');
+  concludi();
+  expect((await pagina).status).toBe(200);
 });

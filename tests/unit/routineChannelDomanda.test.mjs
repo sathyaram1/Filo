@@ -52,7 +52,10 @@ function file(nome, contenuto) {
 
 const DOMANDA = {
   titolo: 'Quale strada?', priorita: 'quando_puoi',
-  opzioni: [{ testo: 'Riprendi', azione: { tipo: 'riprendi', feedbackId: 'abc' } }],
+  opzioni: [
+    { testo: 'Riprendi', pro: 'Il lavoro va avanti.', contro: 'Un giro in più.', azione: { tipo: 'riprendi', feedbackId: 'abc' } },
+    { testo: 'Archivia', pro: 'Niente spesa.', contro: 'Il lavoro si perde.', azione: { tipo: 'archivia', feedbackId: 'abc' } },
+  ],
   consiglio: { opzione: 0, perche: 'la più corta' },
 };
 
@@ -74,8 +77,8 @@ test('deliver domanda: JSON storto, tipo non attivo o campi in più si fermano p
   const storto = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('storto.json', '{"titolo":')]);
   assert.equal(storto.code, 1);
   assert.match(storto.stderr, /JSON malformato/);
-  const ambito = { ...DOMANDA, opzioni: [{ testo: 'x', azione: { tipo: 'ambito' } }] };
-  const nonAttivo = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('ambito.json', JSON.stringify(ambito))]);
+  const esperimento = { ...DOMANDA, opzioni: [{ testo: 'x', pro: 'p', contro: 'c', azione: { tipo: 'esperimento' } }, DOMANDA.opzioni[1]] };
+  const nonAttivo = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('esperimento.json', JSON.stringify(esperimento))]);
   assert.equal(nonAttivo.code, 1);
   assert.match(nonAttivo.stderr, /tipo_non_attivo/);
   const conNote = await lancia(['deliver', BIGLIETTO, 'domanda', '--domanda', file('ok2.json', JSON.stringify(DOMANDA)), '--notes', 'altro']);
@@ -98,6 +101,53 @@ test('deliver status --domanda (#1358): la domanda viaggia controllata accanto a
   assert.match(storta.stderr, /JSON malformato/);
   const suNota = await lancia(['deliver', BIGLIETTO, 'note', '--notes', 'x', '--domanda', p]);
   assert.equal(suNota.code, 1);
-  assert.match(suNota.stderr, /--domanda vale solo su deliver domanda, status, fixed e verdict/);
+  assert.match(suNota.stderr, /--domanda vale solo su deliver domanda, status e fixed/);
+  const suCritica = await lancia(['deliver', BIGLIETTO, 'verdict', '--domanda', p]);
+  assert.equal(suCritica.code, 1);
+  assert.match(suCritica.stderr, /su una critica la porta il rilievo col «\?»/);
   assert.equal(arrivate.length, 1, 'gli errori non chiamano il server');
+});
+
+// #1790: il server non compone più domande, e la fermata senza la domanda di chi si ferma non parte.
+test('deliver status --status design senza --domanda si ferma prima del server, tranne il lavoro server', async () => {
+  arrivate = [];
+  for (const motivo of ['clarify', 'decisione', 'loop', '']) {
+    const r = await lancia(['deliver', BIGLIETTO, 'status', '--status', 'design', ...(motivo ? ['--reason', motivo] : []), '--notes', 'Mi fermo.']);
+    assert.equal(r.code, 1, motivo);
+    assert.match(r.stderr, /senza la tua domanda non parte: il server non compone domande/, motivo);
+    assert.match(r.stderr, /almeno due opzioni/);
+  }
+  assert.equal(arrivate.length, 0, 'il server non è stato chiamato');
+  const locale = await lancia(['deliver', BIGLIETTO, 'status', '--status', 'design', '--reason', 'locale', '--notes', 'Per regola: serve il server.']);
+  assert.equal(locale.code, 0, locale.stderr);
+  assert.equal(arrivate.length, 1, 'il lavoro server non chiede una domanda');
+  const { fermataSenzaDomanda } = await import('../../scripts/routine-channel.mjs');
+  assert.equal(fermataSenzaDomanda('status', { status: 'design', reason: 'clarify', domanda: DOMANDA }), '');
+  assert.equal(fermataSenzaDomanda('status', { status: 'revision_capability' }), '');
+  assert.equal(fermataSenzaDomanda('note', { status: 'design' }), '');
+  assert.match(fermataSenzaDomanda('status', { status: 'design', reason: 'guasto', domanda: DOMANDA }), /Dichiaralo nel rilascio/);
+});
+
+// #1577: con «blocca» false il server non ferma, e chi consegna lo legge: non un «server vecchio?».
+test('una consegna con una domanda che non ferma lo dice; una che ferma resta FERMA', async () => {
+  const { testoConsegnaRiuscita } = await import('../../scripts/routine-channel.mjs');
+  const data = { domanda: { ...DOMANDA, blocca: false } };
+  const avanti = testoConsegnaRiuscita({ num: '#1577', reply: { outcome: 'provvisoria', status: 'revision_capability', domanda: 'D-7' } }, data, 'status');
+  assert.equal(avanti, "OK: #1577. La domanda D-7 non ferma il lavoro: vale la consigliata finché l'owner non risponde.");
+  const critica = testoConsegnaRiuscita({ reply: { outcome: 'fix', domandaProvvisoria: 'D-8' } }, data, 'verdict');
+  assert.match(critica, /La domanda D-8 non ferma il lavoro/);
+  assert.doesNotMatch(critica, /server vecchio/);
+  const ferma = testoConsegnaRiuscita({ num: '#1577', reply: { outcome: 'stop', domanda: 'D-9' } }, { domanda: DOMANDA }, 'status');
+  assert.match(ferma, /il lavoro è FERMO e aspetta l'owner \(la domanda è consegnata, domanda D-9\)/);
+  assert.match(testoConsegnaRiuscita({ reply: {} }, { domanda: DOMANDA }, 'status'), /server vecchio/);
+});
+
+test('le consegne di chi corregge e di chi verifica dicono anche loro che la domanda non ferma', async () => {
+  const { fixedReplyText, verifierReplyText } = await import('../../scripts/dispatch.mjs');
+  assert.match(fixedReplyText('f1', { outcome: 'provvisoria', domanda: 'D-7' }, true), /torna in coda per la verifica\. La domanda D-7 non ferma il lavoro/);
+  assert.doesNotMatch(fixedReplyText('f1', { outcome: 'provvisoria', domanda: 'D-7' }, true), /ATTENZIONE/);
+  for (const reply of [{ outcome: 'pass', domandaProvvisoria: 'D-8' }, { outcome: 'fix', phase2: { findings: [], derived: [] }, domandaProvvisoria: 'D-8' }]) {
+    assert.match(verifierReplyText(reply), /La domanda D-8 non ferma il lavoro/, reply.outcome);
+  }
+  assert.doesNotMatch(verifierReplyText({ outcome: 'pass' }), /non ferma il lavoro/);
 });

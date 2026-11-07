@@ -28,7 +28,9 @@
   let paroleUtente = () => [];
   let apriProposta = () => {};
   let archiviaAzione = () => {};
+  let chatAttuale = () => '';
   let sceltaAutonomiaEl = () => null;
+  let sceltaContatoriEl = () => null;
   let prosegui = () => {};
   // #778 — mentre i popup di una risposta si aprono in fila, la ripresa aspetta l'ultimo: un turno partito a metà
   // fila troverebbe le altre richieste ancora senza risposta, e le rifarebbe.
@@ -473,7 +475,7 @@
         if (!fineLavoro) fineLavoro = Date.now();
         if (viva && (viva.stato === 'pensa' || viva.stato === 'coda') && wrap.dataset.filo !== 'gomitolo') {
           statoSeg(viva, 'fermato');
-          scrivi(viva, 'Fermato qui');
+          scrivi(viva, global.SN_CHAT_ERRORS.FERMATO_QUI);
           apri(viva, true);
         }
         filo.taglia();
@@ -502,7 +504,7 @@
           // diventata la risposta. Vuota se ne va, con una nota resta com'è.
           if (!s.attese.size) { if (!s.testo && !s.corpo.querySelector('.dash-activity-note') && !s.esiti.childElementCount) togliSeg(s); continue; }
           // Nominata ma mai partita (fermata prima, o persa per strada): il nodo non tiene e la riga lo dice.
-          scrivi(s, fermato ? 'Fermato qui' : 'Non partita');
+          scrivi(s, fermato ? global.SN_CHAT_ERRORS.FERMATO_QUI : 'Non partita');
           if (s.nodo && !s.esito) { s.esito = 'cede'; s.nodo.cede(); }
         }
         if (viva && viva.stato === 'pensa') statoSeg(viva, fermato ? 'fermato' : 'coda');
@@ -563,6 +565,7 @@
     CERCA_SALVATE: (n) => (n > 1 ? `cercato fra le pagine salvate ${n} volte` : 'cercato fra le pagine salvate'),
     APRI_SALVATA: (n) => (n > 1 ? `aperto ${n} pagine salvate` : 'aperto una pagina salvata'),
     RINOMINA_FILE: () => 'dato un nome ai file',
+    ELIMINA_FILE: () => 'tolto dei file',
     LEGGI_FILE: (n) => (n > 1 ? `letto ${n} file` : 'letto un file'),
     LEGGI_TRASPARENZA: () => 'riletto la trasparenza',
     CAPACITA_DETTAGLIO: () => 'verificato cosa sa fare',
@@ -596,17 +599,22 @@
     STILE_PAGINA: () => 'cambiato l\'aspetto della pagina',
     RIPRISTINA_STILE_PAGINA: () => 'rimesso la pagina com\'era',
     COMANDO_FINESTRA: () => 'azionato un comando della finestra',
+    ACCOUNT: () => 'sistemato l\'accesso',
     SPOSTA_ICONA: () => 'spostato un\'icona',
+    PANNELLO_APP: () => 'sistemato il pannello degli strumenti',
     INSTALLA_AGGIORNAMENTO: () => 'chiesto la versione nuova di Filo',
     RIMEDIO_CREDITI: () => 'lavorato sui crediti',
+    PULSANTE_PREFERENZE: () => 'usato un pulsante delle Preferenze',
     CARTA_HOME: (n) => (n > 1 ? `sistemato ${n} carte della home` : 'sistemato una carta della home'),
     CANCELLA_PAGINE: () => 'cancellato pagine visitate',
     ZOOM_PAGINA: () => 'cambiato lo zoom',
     VOLUME: () => 'cambiato il volume',
     BLUETOOTH: () => 'comandato il Bluetooth',
     WIFI: () => 'comandato il Wi-Fi',
+    ORDINA_DESKTOP: (n) => (n > 1 ? `sistemato le icone del desktop ${n} volte` : 'sistemato le icone del desktop'),
     INVIA_FEEDBACK: () => 'preparato una segnalazione',
     PULISCI_TAB: () => 'riordinato le schede',
+    CHIUDI_SCHEDE: (n) => (n > 1 ? `chiuso schede ${n} volte` : 'chiuso delle schede'),
     CANCELLA_ARCHIVIO: () => 'eliminato schede dall\'archivio',
   };
   // Le azioni che Filo propone e l'utente finisce col bottone: finché il click non arriva il riassunto dice la
@@ -679,6 +687,11 @@
   // di controllo (un byte nullo nell'etichetta finiva tale e quale nel diario).
   function pulito(v) {
     return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]/g, '').trim();
+  }
+  // Perché qualche scheda non si è chiusa (#413): dopo «tutte» l'utente non ne ha indicata nessuna, e deve sapere il motivo.
+  function restanoAperte(o) {
+    const R = global.SN_RESTANO_APERTE;
+    return R ? R.frase(o) : '';
   }
   // «lunedì 28 set»: il giorno di una conversazione senza titolo.
   function quandoBreve(ts) {
@@ -796,6 +809,7 @@
     LEGGI_TRASPARENZA: () => ({ icon: '📄', text: 'Rileggo la pagina di trasparenza' }),
     LEGGI_PAGINA: (a) => ({ icon: '🌐', text: rigaLetturaPagina(a), title: indirizzoLetto(a) }),
     RINOMINA_FILE: (a) => ({ icon: '✎', text: testoRinominati(a._output) }),
+    ELIMINA_FILE: (a) => ({ icon: '🗑', text: testoEliminati(a._output) }),
     // Le azioni che non lasciano niente da cliccare in chat: prima sparivano
     // del tutto, e l'utente non sapeva dove fosse finito il suo appunto.
     SALVA_APPUNTO: (a) => {
@@ -833,6 +847,7 @@
     },
     ONBOARDING: (a) => {
       if (sceltaAutonomia(a)) return { icon: '👋', text: 'Accoglienza · scelta dell’autonomia' };
+      if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
       return { icon: '👋', text: `Accoglienza · ${ids.join(', ') || 'passo fatto'}` };
@@ -867,6 +882,14 @@
     PULISCI_TAB: (a) => {
       const n = Number(a._output && a._output.archived) || 0;
       return { icon: '🧹', text: n ? `Schede riordinate · ${n} ${n === 1 ? 'archiviata' : 'archiviate'}` : 'Schede riordinate · nessuna da archiviare' };
+    },
+    CHIUDI_SCHEDE: (a) => {
+      const o = a._output || {};
+      const n = Number(o.chiuse) || 0;
+      const parti = restanoAperte(o);
+      const resto = parti ? ` · ${parti}` : '';
+      if (!n) return { icon: '✕', text: `Nessuna scheda chiusa${resto}`, failed: true };
+      return { icon: '✕', text: `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${resto}` };
     },
     CANCELLA_ARCHIVIO: (a) => {
       const n = Number(a._output && a._output.eliminate) || 0;
@@ -903,6 +926,15 @@
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
+    // #1621 — l'ordine chiesto e quante icone Windows ha davvero spostato.
+    ORDINA_DESKTOP: (a) => {
+      const o = a._output || {};
+      if (o.vuoto) return { icon: '🖥', text: 'Icone del desktop · nessuna da spostare' };
+      const come = pulito(o.detto) || 'in ordine';
+      if (o.gia) return { icon: '🖥', text: `Icone del desktop · già ${come}` };
+      const n = Number(o.spostate) || 0;
+      return { icon: '🖥', text: `Icone del desktop · ${come} · ${n === 1 ? '1 spostata' : `${n} spostate`}` };
+    },
     RIMEDIO_CREDITI: (a) => {
       const op = String(a.operazione || '').toLowerCase();
       const r = String(a.rimedio || '').toLowerCase();
@@ -911,6 +943,26 @@
         'applica:automatiche': 'Funzioni automatiche spente', 'annulla:automatiche': 'Funzioni automatiche riaccese',
       };
       return { icon: '◎', text: testi[`${op}:${r}`] || 'Crediti guardati' };
+    },
+    // #1619 — quello che il pulsante ha fatto davvero, coi nomi che l'esito conferma.
+    PULSANTE_PREFERENZE: (a) => {
+      const o = a._output || {};
+      const p = String(a.pulsante || '').toLowerCase();
+      const coda = o.muto ? ' · volume a zero' : '';
+      if (p === 'prova_suono') return { icon: '🔔', text: `Suono degli avvisi${o.etichetta ? ` · ${o.etichetta}` : ''}${coda}` };
+      if (p === 'prova_suoneria') return { icon: '⏰', text: `Suoneria di timer e sveglie${o.etichetta ? ` · ${o.etichetta}` : ''}${coda}` };
+      if (p === 'prova_voce') return { icon: '🗣', text: `Voce della lettura${o.voce ? ` · ${o.voce}` : ''}` };
+      if (p === 'prova_voce_sistema') return { icon: '🗣', text: `Voce di riserva${o.voce ? ` · ${o.voce}` : ''}` };
+      if (p === 'ripristina_aspetto') {
+        const n = Number(o.ripristinati) || 0;
+        return { icon: '🎨', text: n ? `Aspetto di serie · ${n === 1 ? '1 valore cambiato' : `${n} valori cambiati`}` : 'Aspetto di serie' };
+      }
+      if (p === 'rifai_intervista') return { icon: '👋', text: 'Intervista di benvenuto ricominciata in una home nuova' };
+      if (p === 'ripristina_tutto') {
+        const n = Number(o.ripristinate) || 0;
+        return { icon: '↺', text: n ? `Impostazioni di serie · ${n === 1 ? '1 cambiata' : `${n} cambiate`}` : 'Impostazioni di serie' };
+      }
+      return { icon: '⚙', text: 'Pulsante delle Preferenze' };
     },
     INSTALLA_AGGIORNAMENTO: (a) => {
       const o = a._output || {};
@@ -925,7 +977,8 @@
       const labels = {
         fullscreen: 'Schermo intero', minimize: 'Finestra ridotta a icona', home: 'Home aperta',
         settings: 'Impostazioni aperte', apps: 'Menu App aperto', account: 'Menu Account aperto',
-        sidebar: 'Barra laterale aperta',
+        sidebar: 'Barra laterale aperta', sidebar_close: 'Barra laterale chiusa',
+        sidebar_lock: 'Barra laterale bloccata aperta', sidebar_unlock: 'Barra laterale sbloccata', aiuto: 'Aiuto aperto',
       };
       const cmd = String(a.comando || a.command || a.cmd || '').toLowerCase();
       // La home chiesta dalla home non ricarica niente (butterebbe via lavoro e
@@ -933,12 +986,33 @@
       if (cmd === 'home' && a._output && a._output.already) return { icon: '🏠', text: 'Sei già nella home', failed: true };
       return { icon: '🪟', text: labels[cmd] || 'Comando della finestra' };
     },
+    ACCOUNT: (a) => {
+      const o = a._output || {};
+      // Chi era già dove chiedeva non ha avuto niente di nuovo: la riga lo dice e resta fuori dal riassunto.
+      const gia = { dentro: 'Eri già dentro Filo', collegato: 'YouTube, Gmail e Drive erano già collegati', fuori: 'Non eri dentro nessun account' }[o.gia];
+      if (gia) return { icon: '👤', text: gia, failed: true };
+      const fatto = { accedi: 'Accesso con Google aperto', collega_google: 'Collegamento di YouTube, Gmail e Drive aperto', esci: 'Uscito dall\'account di Filo' }[o.voce];
+      return { icon: '👤', text: fatto || 'Account' };
+    },
     SPOSTA_ICONA: (a) => {
       const D = window.SN_DISPOSIZIONE_ICONE;
       const id = String(a.icona || a.id || '');
-      const nome = D && D.noto && D.noto(id) ? D.nome(id) : id;
-      const dove = { barra: 'nella barra laterale', menu: 'nel tasto destro', altro: 'in «Altro…»' }[String(a.dove || '').toLowerCase()] || '';
+      const nome = D && D.esiste && D.esiste(id) ? D.nome(id) : id;
+      const zona = D && D.zonaDellAzione ? D.zonaDellAzione(a) : '';
+      const dove = zona ? `${D.nomeZona(zona).in} ${D.nomeZona(zona).nome}` : '';
       return { icon: '📌', text: `Icona spostata · ${nome}${dove ? ` ${dove}` : ''}` };
+    },
+    PANNELLO_APP: (a) => {
+      const P = window.SN_PANNELLI_APP;
+      const op = String(a.operazione || '').toLowerCase();
+      const id = P ? P.risolvi('editor', a.elemento) : null;
+      const nome = id ? P.nome('editor', id) : '';
+      const testo = {
+        apri: 'Pannello degli strumenti aperto', chiudi: 'Pannello degli strumenti chiuso',
+        blocca: 'Pannello degli strumenti tenuto aperto', sblocca: 'Pannello degli strumenti sbloccato',
+        aggiungi: `Nel pannello degli strumenti · ${nome}`, togli: `Tolto dal pannello degli strumenti · ${nome}`,
+      }[op] || 'Pannello degli strumenti';
+      return { icon: '🧰', text: testo };
     },
   };
   // Che cosa NON è andato a buon fine, detto come lo direbbe l'utente: la riga
@@ -951,6 +1025,7 @@
     TOGLI_CHAT: 'Conversazione non trovata', RIMETTI_CHAT: 'Conversazione nascosta non trovata',
     CORREGGI_MEMORIA: 'Niente da correggere',
     CERCA_WEB: 'Ricerca non riuscita', LEGGI_FILE: 'File non letto', RINOMINA_FILE: 'Nessun file rinominato',
+    ELIMINA_FILE: 'Niente cancellato',
     CERCA_CHAT: 'Conversazione non ritrovata',
     LEGGI_DOCUMENTO: 'Documento non letto', LEGGI_TRASPARENZA: 'Documento non disponibile',
     LEGGI_PAGINA: 'Pagina non letta',
@@ -966,16 +1041,21 @@
     PROXY_TAB: 'Scheda non instradata', RIMUOVI_PROXY: 'Proxy non tolto',
     RIMUOVI_PROXY_TUTTE: 'Proxy non tolti', REGOLA_PROXY_DOMINIO: 'Regola non salvata',
     RIMUOVI_REGOLA_PROXY: 'Regola non tolta', COMANDO_FINESTRA: 'Comando non eseguito', SPOSTA_ICONA: 'Icona non spostata',
+    ACCOUNT: 'Account non cambiato',
+    PANNELLO_APP: 'Pannello degli strumenti non cambiato',
     TIENI_APERTA: 'Sito non salvato', NON_TENERE_APERTA: 'Nessun sito da togliere',
     INSTALLA_AGGIORNAMENTO: 'Aggiornamento non partito',
     RIMEDIO_CREDITI: 'Rimedio dei crediti non applicato',
+    PULSANTE_PREFERENZE: 'Pulsante delle Preferenze non premuto',
     CARTA_HOME: 'Carta della home non cambiata',
     CANCELLA_PAGINE: 'Pagine non cancellate', ZOOM_PAGINA: 'Zoom non cambiato',
     EVENTO_CALENDARIO: 'Evento non proposto', ONBOARDING: 'Accoglienza non aggiornata',
     VOLUME: 'Volume non cambiato', BLUETOOTH: 'Bluetooth non cambiato', WIFI: 'Wi-Fi non cambiato',
+    ORDINA_DESKTOP: 'Icone del desktop non spostate',
     ESEGUI_COMANDO: 'Comando non eseguito', CANCELLA_MEMORIA: 'Memoria non cancellata',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
     PULISCI_TAB: 'Riordino non riuscito', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
+    CHIUDI_SCHEDE: 'Nessuna scheda chiusa',
   };
   function rigaRadio(a, radio) {
     const o = a._output || {};
@@ -995,7 +1075,7 @@
   // Detto di un'azione che la regola ha fermato prima di cominciare: dove l'etichetta di sopra parla di un esito.
   const NO_LABELS = {
     ESEGUI_COMANDO: 'Comando non eseguito', DIMENTICA: 'Non dimenticato', CORREGGI_MEMORIA: 'Non corretto',
-    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa',
+    TOGLI_CHAT: 'Conversazione non tolta', RIMETTI_CHAT: 'Conversazione non rimessa', ELIMINA_FILE: 'Non cancellato',
     CANCELLA_SVEGLIA: 'Non cancellata', MODIFICA_SVEGLIA: 'Non spostata',
     CANCELLA_MEMORIA: 'Memoria non cancellata', CANCELLA_ARCHIVIO: 'Archivio non svuotato',
     INVIA_FEEDBACK: 'Segnalazione non inviata',
@@ -1106,6 +1186,12 @@
     if (o.ok === false && o.errore && o.frase) return String(o.frase);
     if (o.ok === false && o.detail) return String(o.detail);
     if (o.ok === false && o.dettaglio) return String(o.dettaglio);
+    if (isType(a, 'CHIUDI_SCHEDE')) {
+      if (o.error) return 'schede non riconosciute';
+      if (o.restano) return restanoAperte(o);
+      if (o.nessuna === 'sito') return 'nessuna di quel sito';
+      if (o.nessuna === 'niente') return 'c\'è solo questa';
+    }
     if (o.error) return String(o.error);
     return '';
   }
@@ -1212,7 +1298,7 @@
       if (btn.disabled) return;
       btn.disabled = true;
       let r = null;
-      try { r = await send({ type: MSG.FILO_MEMORY_FORGET, lezione: { ts: o.ricordo.ts, text: o.ricordo.text } }); } catch (_) { r = null; }
+      try { r = await send({ type: MSG.FILO_MEMORY_FORGET, lezione: { ts: o.ricordo.ts, text: o.ricordo.text }, da: 'chat' }); } catch (_) { r = null; }
       btn.disabled = false;
       if (r && r.ok) { o.dimenticato = r.tolta ? 'si' : 'tardi'; mostra(); return; }
       btn.textContent = 'Annulla non riuscito: riprova';
@@ -1224,6 +1310,10 @@
   }
 
   // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
+  function sceltaContatori(a) {
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaContatori === true;
+  }
+
   function sceltaAutonomia(a) {
     return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
   }
@@ -1239,7 +1329,7 @@
   // delle impostazioni dove si concede (l'indirizzo lo sceglie il main da un elenco suo, qui passa solo la chiave).
   function permessoDaConcedere(a) {
     const o = a && a._output;
-    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO')) && a._executed === false
+    return (isType(a, 'VOLUME') || isType(a, 'BLUETOOTH') || isType(a, 'WIFI') || isType(a, 'VEDI_SCHERMO') || isType(a, 'ORDINA_DESKTOP')) && a._executed === false
       && !!o && typeof o.apri === 'string' && !!o.apri;
   }
 
@@ -1338,7 +1428,7 @@
       // che aspetta una conferma: la riga dice che Filo l'ha chiesta, il
       // bottone è come si risponde.
       const anche = aspettaUtente(a) || rigaEBottone(a)
-        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a)
+        || apribileComunque(a) || permessoDaConcedere(a) || stileAccoglienza(a) || lezioneAccoglienza(a) || sceltaAutonomia(a) || sceltaContatori(a)
         || salvateDaMostrare(a).length > 0;
       if (activity) {
         if (told) {
@@ -1464,7 +1554,7 @@
     link.title = 'Apri le Preferenze del terminale';
     link.addEventListener('click', (e) => {
       e.preventDefault();
-      send({ type: MSG.OPEN_URL, url: PREF_TERMINALE });
+      send({ type: MSG.OPEN_URL, url: PREF_TERMINALE, via: 'chat' });
     });
     nota.append(link, '.');
     return nota;
@@ -1490,7 +1580,7 @@
       apri.className = 'dash-action-btn dash-cmd-blocked-btn';
       apri.textContent = 'Apri Preferenze';
       apri.title = 'Preferenze → Modalità terminale';
-      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: PREF_TERMINALE }));
+      apri.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: PREF_TERMINALE, via: 'chat' }));
       wrap.append(testo, apri);
       return wrap;
     }
@@ -1583,6 +1673,12 @@
   }
   // #947 — il documento trovato: un clic lo apre col programma del sistema, il tasto destro ha le azioni di un file,
   // e si trascina nel campo dove si scrive a Filo (o fuori, in un altro programma, col suo percorso).
+  // Un file o una pagina presi da una risposta e lasciati dove nessuno li prende (#1471): il rilascio preso lo conta
+  // chi lo prende.
+  function contaFineTrascinamento(e, origine) {
+    const ev = global.SN_GESTI && global.SN_GESTI.fine(e, origine);
+    if (ev && send) Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, ...ev })).catch(() => {});
+  }
   function bottoneFile(a) {
     const btn = document.createElement('button');
     btn.type = 'button';
@@ -1623,7 +1719,9 @@
       e.dataTransfer.setData('application/x-filo-file', p);
       e.dataTransfer.setData('text/plain', p);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'file_da_chat');
     });
+    btn.addEventListener('dragend', (e) => contaFineTrascinamento(e, 'file_da_chat'));
     menuDelFile(btn, a, { disegna, locale: true });
     return btn;
   }
@@ -1718,14 +1816,34 @@
     btn.classList.add('dash-salvata-aperta');
     btn.title = `Riapri ${p.title || p.url} · non è più in «Aperti per dopo»`;
   }
-  // Il posto dell'icona resta finché il main la cerca; se non la trova resta il solo nome, come quando non si caricava.
+  // Il posto dell'icona resta finché il main la cerca; se non la trova resta il solo nome, e l'icona arriva quando una
+  // scheda di quel sito la trova (#848), senza ridisegnare la riga. Il sito si legge come nel main: www.x.it è x.it.
+  const sitoDi = (url) => {
+    try {
+      const u = new URL(String(url || ''));
+      return /^https?:$/.test(u.protocol) ? u.host.replace(/^www\./, '') : '';
+    } catch (_) { return ''; }
+  };
   function iconaSitoEl(url) {
     const img = document.createElement('img');
     img.className = 'dash-action-favicon';
     img.alt = '';
-    img.onerror = () => img.remove();
-    iconaDelSito(url).then((dato) => { if (dato) img.src = dato; else img.remove(); });
+    const sito = sitoDi(url);
+    if (sito) img.dataset.sito = sito;
+    img.onerror = () => { img.removeAttribute('src'); img.hidden = true; };
+    iconaDelSito(url).then((dato) => {
+      if (img.getAttribute('src')) return;
+      if (dato) img.src = dato; else img.hidden = true;
+    });
     return img;
+  }
+  function iconaDellaScheda(sito, dato) {
+    if (typeof sito !== 'string' || !sito || typeof dato !== 'string' || !/^data:image\//i.test(dato)) return;
+    for (const img of document.querySelectorAll('img.dash-action-favicon[data-sito]')) {
+      if (img.dataset.sito !== sito || img.getAttribute('src')) continue;
+      img.hidden = false;
+      img.src = dato;
+    }
   }
 
   function bottoneSalvata(p) {
@@ -1747,7 +1865,9 @@
       e.dataTransfer.setData('text/uri-list', p.url);
       e.dataTransfer.setData('text/plain', p.url);
       e.dataTransfer.effectAllowed = 'copy';
+      global.SN_GESTI?.marca(e.dataTransfer, 'pagina_salvata');
     });
+    btn.addEventListener('dragend', (e) => contaFineTrascinamento(e, 'pagina_salvata'));
     const R = window.SN_RINOMINA_UI;
     const apriMenu = (e) => {
       if (!R || typeof R.menu !== 'function') return;
@@ -1782,6 +1902,20 @@
     const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
     const quanti = n === 1 ? 'Rinominato un file' : `Rinominati ${n} file`;
     return no ? `${quanti} · ${no} non riusciti` : quanti;
+  }
+  // #1909 — i nomi vengono dal disco: entrano solo come testo.
+  function testoEliminati(o) {
+    const fatti = o && Array.isArray(o.eliminati) ? o.eliminati.map(pulito) : [];
+    const no = o && Array.isArray(o.falliti) ? o.falliti.length : 0;
+    const per = !!(o && o.perSempre);
+    const quanti = fatti.length === 1
+      ? `${per ? 'Cancellato per sempre' : 'Nel cestino'} «${fatti[0]}»`
+      : `${per ? 'Cancellati per sempre' : 'Nel cestino'} ${fatti.length} elementi`;
+    return no ? `${quanti} · ${no} non riusciti` : quanti;
+  }
+  function motivoNessunaEliminazione(o) {
+    const f = o && Array.isArray(o.falliti) && o.falliti[0];
+    return f && f.perche ? `Non cancellato: ${pulito(f.perche)}` : 'Non cancellato';
   }
   function motivoNessunaRinomina(o) {
     const f = o && Array.isArray(o.falliti) && o.falliti[0];
@@ -1898,7 +2032,7 @@
       // partirebbe a nome dell'utente. Il popup non invia nulla: mostra il testo
       // e aspetta l'OK, esattamente come nella sidebar (che già fa così).
       // Le azioni distruttive (livello 3) e i comandi restano a click esplicito.
-      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO'];
+      const AUTO_CONFIRM_TYPES = ['IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'INVIA_FEEDBACK', 'SALVA_LEZIONE', 'DIMENTICA', 'CORREGGI_MEMORIA', 'RINOMINA_FILE', 'ELIMINA_FILE', 'BLUETOOTH', 'WIFI', 'INSTALLA_AGGIORNAMENTO', 'VEDI_SCHERMO', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'];
       // Una difesa abbassata (#530) vuole la parola, ma non è distruttiva: il box si apre da solo come il popup.
       if (AUTO_CONFIRM_TYPES.includes(type) && (a._confirm.level === 2 || a._confirm.avviso)) {
         btn.dataset.autoConfirm = '1';
@@ -1915,11 +2049,15 @@
         const ok = Ui
           ? await (a._confirm.level >= 3 ? Ui.confirmTyped(opts) : Ui.confirm(opts))
           : window.confirm(opts.text); // fallback se il modulo non è caricato
-        if (!ok) return;
+        if (!ok) {
+          // Il no non fa partire niente: lo sanno solo i contatori (#1461).
+          try { Promise.resolve(send({ type: MSG.FILO_CONFIRM_RIFIUTATA, action: a })).catch(() => {}); } catch (_) {}
+          return;
+        }
         btn.disabled = true;
         // Catturare e far leggere una finestra prende qualche secondo: il bottone dice che Filo ci sta lavorando.
         if (type === 'VEDI_SCHERMO') btn.textContent = 'Guardo la finestra…';
-        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente() });
+        const r = await send({ type: MSG.FILO_CONFIRM_ACTION, action: a, parole: paroleUtente(), chatId: chatAttuale() || '' });
         // Nemmeno l'OK fa uscire un segreto (#810): la riga dice cosa è stato fermato.
         if (r && r.output && r.output.blocked === 'segreto') {
           a._output = r.output;
@@ -1979,6 +2117,9 @@
         if (type === 'RINOMINA_FILE') {
           btn.textContent = (r && r.executed) ? `✓ ${testoRinominati(r.output)}` : `✗ ${motivoNessunaRinomina(r && r.output)}`;
           if (r && r.executed) btn.after(bottoneRimettiNomi(a));
+        }
+        if (type === 'ELIMINA_FILE') {
+          btn.textContent = (r && r.executed) ? `✓ ${testoEliminati(r.output)}` : `✗ ${motivoNessunaEliminazione(r && r.output)}`;
         }
         // #146.4 — modifica estetica illeggibile (livello 2): confermata ed
         // applicata, offriamo subito il box per correggere il valore.
@@ -2047,6 +2188,7 @@
     if (stileAccoglienza(a)) return rigaStileAccoglienza(a);
     if (lezioneAccoglienza(a)) return rigaLezioneAccoglienza(a);
     if (sceltaAutonomia(a)) return sceltaAutonomiaEl(a);
+    if (sceltaContatori(a)) return sceltaContatoriEl(a);
     if (type === 'APRI_FILE' && percorsoLocale(a.percorso || a.path)) return bottoneFile(a);
     if (type === 'APRI_FILE') {
       const btn = document.createElement('a');
@@ -2084,7 +2226,7 @@
       btn.dataset.action = 'openNotes';
       btn.textContent = '✎ Salvato';
       btn.title = 'Apri l’editor';
-      btn.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html' }));
+      btn.addEventListener('click', () => send({ type: MSG.OPEN_URL, url: 'filo://editor/editor.html', via: 'chat' }));
       return btn;
     }
     if (type === 'SVEGLIA') {
@@ -2264,7 +2406,7 @@
     btn.textContent = '🧹 Riordina e archivia le schede';
     btn.addEventListener('click', async () => {
       if (btn.disabled) return;
-      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche))) return;
+      if (!(await chiediSecondoRegola(a._domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, a._perche, 'PULISCI_TAB'))) return;
       btn.disabled = true;
       btn.textContent = '🧹 Riordino in corso…';
       const r = await send({ type: MSG.RUN_TAB_TRIAGE });
@@ -2283,12 +2425,14 @@
 
   // Come chiedere lo dice la regola di autonomia del main (#530), mai il pannello. Senza risposta: la parola.
   // `perche`: la frase della regola quando a far chiedere è ciò che il compito ha letto.
-  async function chiediSecondoRegola(domanda, opts, perche = '') {
+  // `tipo`: l'azione del pannello, perché i contatori sappiano cosa ha scelto la persona (#1461).
+  async function chiediSecondoRegola(domanda, opts, perche = '', tipo = '') {
     if (domanda === 'si') return true;
     if (perche) opts = { ...opts, text: `${opts.text}\n\n${perche}` };
     const Ui = window.SN_CONFIRM_UI;
-    if (!Ui) return window.confirm(opts.text);
-    return domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts);
+    const ok = Ui ? await (domanda === 'chiede' ? Ui.confirm(opts) : Ui.confirmTyped(opts)) : window.confirm(opts.text);
+    if (tipo) Promise.resolve(send({ type: MSG.CONTATORI_EVENTO, misura: 'conferma', chiave: `pannello:${tipo}`, esito: ok ? 'approvata' : 'rifiutata' })).catch(() => {});
+    return ok;
   }
 
   const TESTO_RIORDINO = 'Filo valuterà tutte le schede aperte e archivierà quelle non più utili. '
@@ -2296,7 +2440,7 @@
   // Il riordino chiesto fuori dalla chat (/pulisci, il suggerimento della home) passa dalla stessa regola della
   // chat: parte nel main, o torna la domanda da fare. `{ annullato }`, o l'esito come lo legge l'utente (`esitoRiordino`).
   async function riordinaSchede() {
-    const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' }, parole: paroleUtente() });
+    const r = await send({ type: MSG.FILO_RUN_ACTION, action: { type: 'PULISCI_TAB' }, parole: paroleUtente(), interfaccia: true });
     if (r && r.executed) return esitoRiordino({ ok: true, ...(r.output || {}) });
     if (!r || !r.kept) {
       const o = (r && r.output) || {};
@@ -2305,7 +2449,7 @@
     }
     // Chiesto come assistente (#825.3) torna dal popup generico, che dice `needsConfirm` invece di `domanda`.
     const domanda = r.domanda || (r.needsConfirm === 3 ? 'conferma' : 'chiede');
-    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche))) return { annullato: true };
+    if (!(await chiediSecondoRegola(domanda, { title: 'Riordino delle schede', text: TESTO_RIORDINO, okLabel: 'Procedi' }, r.perche, 'PULISCI_TAB'))) return { annullato: true };
     return esitoRiordino(await send({ type: MSG.RUN_TAB_TRIAGE }));
   }
 
@@ -2409,7 +2553,7 @@
         const scelta = spuntate();
         if (!scelta.length) return;
         const text = `Eliminare definitivamente ${quante(scelta.length)} dall’archivio.`;
-        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche);
+        const ok = await chiediSecondoRegola(a._domanda, { title: 'Eliminazione definitiva', text, okLabel: 'Elimina' }, a._perche, 'CANCELLA_ARCHIVIO');
         if (!ok || del.disabled) return;
         del.disabled = true;
         scelte.forEach((x) => { x.box.disabled = true; });
@@ -2443,7 +2587,9 @@
     if (deps.paroleUtente) paroleUtente = deps.paroleUtente;
     if (deps.apriProposta) apriProposta = deps.apriProposta;
     if (deps.archiviaAzione) archiviaAzione = deps.archiviaAzione;
+    if (deps.chatAttuale) chatAttuale = deps.chatAttuale;
     if (deps.sceltaAutonomia) sceltaAutonomiaEl = deps.sceltaAutonomia;
+    if (deps.sceltaContatori) sceltaContatoriEl = deps.sceltaContatori;
     if (deps.prosegui) prosegui = deps.prosegui;
   }
 
@@ -2464,5 +2610,7 @@
     summarizeActivity,
     riordinaSchede,
     activityRowFor,
+    // Main → la prima icona di una scheda (ICONA_SCHEDA): la prendono le righe di quel sito rimaste senza.
+    iconaDellaScheda,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

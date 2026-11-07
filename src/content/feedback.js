@@ -13,8 +13,8 @@
   const AttachTypes = global.SN_FEEDBACK_ATTACH;
 
   // Vale sia per «Allega» sia per il drag & drop.
-  const ATTACH_REJECT_MSG =
-    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+  const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
+    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
   // Fallback prudente se il modulo condiviso non fosse caricato: si consentono solo le immagini
   // raster note.
@@ -34,7 +34,11 @@
 
   let activeRoot = null;
   let activeStack = null;
+  // Stacca ciò che l'apertura ha agganciato fuori dal riquadro (#1096).
+  let pulizia = null;
   let clientIdCache = null;
+  // I testi in viaggio verso il server: un riquadro riaperto mentre aspettano non li ripropone come bozza (#1681).
+  const inVolo = new Set();
 
   // Avvisa la shell dell'ingresso in annotazione, così l'ombra copre TUTTO Filo e non la sola area
   // pagina.
@@ -62,6 +66,9 @@
 
   function close() {
     if (!activeRoot) return;
+    const stacca = pulizia;
+    pulizia = null;
+    try { stacca?.(); } catch (_) {}
     try { activeStack?.unregister?.(); } catch (_) {}
     activeStack = null;
     if (Popup?.togliRiquadro) Popup.togliRiquadro(activeRoot);
@@ -79,10 +86,13 @@
     });
   }
 
+  // La schermata esce dal computer: la copre il main come la foto per un modello. `{ segreti: true, motivo }` se
+  // coprirla non riesce, e allora la pagina non parte.
   async function captureScreenshot() {
     try {
-      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB });
-      if (r?.ok && r.dataUrl) return r.dataUrl;
+      const r = await chrome.runtime.sendMessage({ type: MSG.CAPTURE_VISIBLE_TAB, coperta: true });
+      if (r?.ok && r.dataUrl) return { dataUrl: r.dataUrl };
+      if (r?.code === 'coperture') return { segreti: true, motivo: String(r.motivo || '') };
     } catch (_) {}
     return null;
   }
@@ -204,7 +214,15 @@
   }
 
   // `testo`: una segnalazione già scritta da Filo (il falso allarme dal tasto destro sull'avviso di un sito, #813.5).
-  function open({ testo: proposta = '' } = {}) {
+  // Su un sito il box sta nello strato sopra la scheda, mai nel suo documento (#1509.1).
+  function open({ testo = '' } = {}) {
+    if (activeRoot) return;
+    const qui = () => apriQui({ testo });
+    if (global.SN_RIQUADRI_SOPRA?.apri('feedback', { testo: String(testo || '') }, qui)) return;
+    qui();
+  }
+
+  function apriQui({ testo: proposta = '' } = {}) {
     if (activeRoot) return;
     const root = document.createElement('div');
     root.className = 'sn-fb-overlay';
@@ -232,11 +250,20 @@
     `;
     document.documentElement.appendChild(Popup?.riquadro ? Popup.riquadro(root) : root);
     activeRoot = root;
+    // Ciò che si aggancia fuori dal riquadro (window, documento, messaggi) si stacca alla chiusura (#1096): un
+    // ascoltatore rimasto tiene in memoria tela, immagini e allegati di ogni apertura, e lo strato sopra un sito vive a lungo.
+    const stacchi = [];
+    const aggancia = (bersaglio, tipo, fn, opz) => {
+      bersaglio.addEventListener(tipo, fn, opz);
+      stacchi.push(() => bersaglio.removeEventListener(tipo, fn, opz));
+    };
+    pulizia = () => { for (const s of stacchi.splice(0).reverse()) { try { s(); } catch (_) {} } };
     setShellDim(true);
     // Abbandonando la pagina senza close() il content script muore e il velo della shell resterebbe
     // appeso: va chiesto di toglierlo.
-    window.addEventListener('pagehide', () => setShellDim(false), { once: true });
-    Popup?.attachZoomCompensation?.(root);
+    aggancia(window, 'pagehide', () => setShellDim(false), { once: true });
+    const staccaZoom = Popup?.attachZoomCompensation?.(root);
+    if (typeof staccaZoom === 'function') stacchi.push(staccaZoom);
     // Stacking dei popup: sopra i box aperti prima, sotto quelli dopo. Il menu del tasto destro ha
     // z-index più alto e resta sempre sopra.
     activeStack = Popup?.registerStack?.(root) || null;
@@ -252,13 +279,15 @@
     const cancelBtn = root.querySelector('.sn-fb-cancel');
     const canvas = root.querySelector('.sn-fb-canvas');
     const fileInput = root.querySelector('.sn-fb-file');
+    if (AttachTypes && AttachTypes.ACCEPT) fileInput.accept = AttachTypes.ACCEPT;
 
+    const LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
     const images = [];
-    const MAX_IMAGES = 5;
+    const MAX_IMAGES = LIMITI.immagini;
     // Allegati NON immagine (pdf, txt, md, json, …): { name, type, size, dataUrl }
     const files = [];
-    const MAX_FILES = 5;
-    const MAX_ATTACH_BYTES = 4 * 1024 * 1024;
+    const MAX_FILES = LIMITI.file;
+    const MAX_ATTACH_BYTES = LIMITI.byte;
 
     // Id STABILE della composizione, condiviso da tutti i tentativi: se l'invio va in timeout
     // ma riesce sul server, ripremere «Invia» non duplica (#370). Cambia col contenuto.
@@ -272,19 +301,27 @@
     function bumpSubmissionId() { submissionId = newSubmissionId(); }
 
     let saveTimer = null;
+    // Chiudendo entro i 250 ms la bozza si scrive subito, non da un timer che sopravvive al riquadro.
+    stacchi.push(() => { if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; saveDraft(); } });
     function saveDraft() {
       if (!DRAFT_KEY) return;
       try { chrome.storage.local.set({ [DRAFT_KEY]: textEl.value }); } catch (_) {}
     }
-    function clearDraft() {
+    // Solo se la bozza è ancora quella partita: un riquadro riaperto intanto può averne scritta un'altra (#1681).
+    function clearDraft(inviata) {
       if (!DRAFT_KEY) return;
-      try { chrome.storage.local.remove([DRAFT_KEY]); } catch (_) {}
+      try {
+        if (inviata === undefined) { chrome.storage.local.remove([DRAFT_KEY]); return; }
+        chrome.storage.local.get([DRAFT_KEY]).then((r) => {
+          if (r?.[DRAFT_KEY] === inviata) chrome.storage.local.remove([DRAFT_KEY]);
+        }).catch(() => {});
+      } catch (_) {}
     }
     textEl.addEventListener('input', () => {
       // Contenuto cambiato → composizione nuova, id di invio fresco.
       bumpSubmissionId();
       clearTimeout(saveTimer);
-      saveTimer = setTimeout(saveDraft, 250);
+      saveTimer = setTimeout(() => { saveTimer = null; saveDraft(); }, 250);
     });
     // Ripristina l'eventuale bozza salvata (solo se l'utente non ha già scritto). Il testo proposto da Filo si
     // aggiunge alla bozza, non la sostituisce: la bozza è dell'utente.
@@ -292,7 +329,7 @@
     if (typeof proposta === 'string' && proposta) { textEl.value = proposta; inFondo(); }
     try {
       if (DRAFT_KEY) chrome.storage.local.get([DRAFT_KEY]).then((r) => {
-        const saved = r?.[DRAFT_KEY];
+        const saved = inVolo.has(r?.[DRAFT_KEY]) ? '' : r?.[DRAFT_KEY];
         if (activeRoot !== root) return;
         if (saved && !textEl.value) textEl.value = saved;
         else if (saved && proposta && textEl.value === proposta && !saved.includes(proposta)) {
@@ -375,8 +412,10 @@
     }
     canvas.addEventListener('pointerup', endStroke);
     canvas.addEventListener('pointercancel', endStroke);
-    window.addEventListener('resize', sizeCanvas);
+    aggancia(window, 'resize', sizeCanvas);
     sizeCanvas();
+    // La tela a tutto schermo pesa larghezza × altezza × dpr²: si libera alla chiusura, non quando passa il GC.
+    stacchi.push(() => { canvas.width = 0; canvas.height = 0; });
 
     // «Cancella disegno» pulisce i tratti della pagina E quelli della barra in alto, che vivono
     // nella shell: un bottone solo cancella tutto.
@@ -396,23 +435,25 @@
     // La shell dice se c'è o non c'è più un disegno sulla barra, così «Cancella disegno» compare
     // anche quando si è disegnato SOLO lassù.
     function onBroadcast(message) {
-      // Auto-rimozione quando il box non è più questo (chiuso e riaperto).
-      if (activeRoot !== root) {
-        try { chrome.runtime.onMessage.removeListener(onBroadcast); } catch (_) {}
-        return;
-      }
+      if (activeRoot !== root) return;
       if (message?.type === MSG.FEEDBACK_DRAW_STATE) {
         topbarHasDrawing = !!message.topbar;
         refreshClear();
       }
     }
-    try { chrome.runtime.onMessage.addListener(onBroadcast); } catch (_) {}
+    try {
+      chrome.runtime.onMessage.addListener(onBroadcast);
+      stacchi.push(() => chrome.runtime.onMessage.removeListener(onBroadcast));
+    } catch (_) {}
 
-    function renderThumbs() {
-      // Revoca eventuali object URL precedenti per evitare leak
+    function revocaMiniature() {
       thumbsEl.querySelectorAll('img[data-sn-objurl="1"]').forEach((img) => {
         try { URL.revokeObjectURL(img.src); } catch (_) {}
       });
+    }
+    stacchi.push(revocaMiniature);
+    function renderThumbs() {
+      revocaMiniature();
       thumbsEl.innerHTML = '';
       images.forEach((img, i) => {
         const wrap = document.createElement('div');
@@ -468,43 +509,34 @@
       return `${(b / (1024 * 1024)).toFixed(1)} MB`;
     }
 
+    // Un allegato lasciato fuori si dice col suo nome e il perché, anche in mezzo ad altri entrati (#1681). Ritornano
+    // null se l'allegato è entrato, sennò { name, reason }.
+    const TIPO_NO = 'tipo non supportato';
+    const scarto = (f, reason, ripiego) => ({ name: String(f?.name || ripiego), reason });
     async function addImageFromBlob(blob) {
       // Solo immagini raster note: esclude image/svg+xml, che è un documento attivo, e ogni altro
       // tipo che si spacci per immagine.
-      if (!blob || classifyAttachment(blob) !== 'image') return;
-      if (images.length >= MAX_IMAGES) {
-        statusEl.textContent = `Massimo ${MAX_IMAGES} immagini.`;
-        return;
-      }
-      if (blob.size > 4 * 1024 * 1024) {
-        statusEl.textContent = 'Immagine troppo grande (max 4 MB).';
-        return;
-      }
+      if (!blob) return null;
+      if (classifyAttachment(blob) !== 'image') return scarto(blob, TIPO_NO, 'immagine');
+      if (images.length >= MAX_IMAGES) return scarto(blob, `oltre le ${MAX_IMAGES} immagini ammesse`, 'immagine incollata');
+      if (blob.size > MAX_ATTACH_BYTES) return scarto(blob, 'troppo grande (max 4 MB)', 'immagine incollata');
       const dataUrl = await blobToDataUrl(blob);
       // Il nome resta sul computer: lo leggono l'avviso degli allegati non partiti e l'elenco delle segnalazioni.
       images.push({ dataUrl, name: String(blob.name || '') });
       bumpSubmissionId();
       renderThumbs();
+      return null;
     }
 
     async function addAttachment(file) {
-      if (!file) return;
+      if (!file) return null;
       // Stesso filtro per «Allega» e per il drop: `accept` non vincola né il drop né la scelta
       // «Tutti i file», quindi la whitelist va applicata qui, sul tipo reale.
       const kind = classifyAttachment(file);
-      if (!kind) {
-        statusEl.textContent = ATTACH_REJECT_MSG;
-        return;
-      }
-      if (kind === 'image') { await addImageFromBlob(file); return; }
-      if (files.length >= MAX_FILES) {
-        statusEl.textContent = `Massimo ${MAX_FILES} file.`;
-        return;
-      }
-      if (file.size > MAX_ATTACH_BYTES) {
-        statusEl.textContent = 'File troppo grande (max 4 MB).';
-        return;
-      }
+      if (!kind) return scarto(file, TIPO_NO, 'allegato');
+      if (kind === 'image') return addImageFromBlob(file);
+      if (files.length >= MAX_FILES) return scarto(file, `oltre i ${MAX_FILES} file ammessi`, 'allegato');
+      if (file.size > MAX_ATTACH_BYTES) return scarto(file, 'troppo grande (max 4 MB)', 'allegato');
       const dataUrl = await blobToDataUrl(file);
       files.push({
         name: file.name || 'allegato',
@@ -513,71 +545,94 @@
         dataUrl,
       });
       bumpSubmissionId();
-      statusEl.textContent = '';
       renderThumbs();
+      return null;
     }
 
-    function composeAnnotated(shotDataUrl) {
+    // Tutti gli allegati di un gesto (una scelta, un rilascio, un incolla), poi un messaggio solo per quelli rimasti fuori.
+    async function allega(lista, aggiungi = addAttachment) {
+      const fuori = [];
+      for (const f of lista) {
+        const no = await aggiungi(f);
+        if (no) fuori.push(no);
+      }
+      if (!fuori.length) { if (lista.length) statusEl.textContent = ''; return; }
+      const elenco = Feedback?.fraseAllegatiSaltati ? Feedback.fraseAllegatiSaltati(fuori)
+        : fuori.map((f) => `«${f.name}»: ${f.reason}`).join('; ');
+      const tipi = fuori.some((f) => f.reason === TIPO_NO)
+        ? ` ${(AttachTypes && AttachTypes.AMMESSI) ? `Ammessi: ${AttachTypes.AMMESSI}.` : ATTACH_REJECT_MSG}` : '';
+      statusEl.textContent = `${fuori.length === 1 ? 'Non allegato' : 'Non allegati'} ${elenco}.${tipi}`;
+    }
+
+    function caricaImmagine(src) {
       return new Promise((resolve) => {
-        const img = new Image();
-        img.onload = () => {
-          try {
-            const w = img.naturalWidth || window.innerWidth;
-            const h = img.naturalHeight || window.innerHeight;
-            const c = document.createElement('canvas');
-            c.width = w; c.height = h;
-            const cx = c.getContext('2d');
-            cx.drawImage(img, 0, 0, w, h);
-            const sx = w / Math.max(1, window.innerWidth);
-            const sy = h / Math.max(1, window.innerHeight);
-            cx.lineCap = 'round';
-            cx.lineJoin = 'round';
-            for (const s of strokes) {
-              if (s.points.length < 1) continue;
-              cx.strokeStyle = s.color;
-              cx.lineWidth = s.width * Math.max(sx, sy);
-              cx.beginPath();
-              s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, p.y * sy) : cx.moveTo(p.x * sx, p.y * sy)));
-              if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, s.points[0].y * sy + 0.1);
-              cx.stroke();
-            }
-            resolve(c.toDataURL('image/png'));
-          } catch (_) {
-            resolve(shotDataUrl);
+        if (!src) { resolve(null); return; }
+        const im = new Image();
+        im.onload = () => resolve(im);
+        im.onerror = () => resolve(null);
+        im.src = src;
+      });
+    }
+
+    // La schermata sale solo sotto il tetto degli allegati (#1667): PNG se ci sta, poi WebP più leggero, poi più
+    // piccola. Un PNG di uno schermo grande ad alta densità passa facilmente i 4 MB, e il deposito lo rifiuterebbe.
+    function entroIlTetto(c) {
+      const sotto = (u) => Feedback.byteDiDataUrl(u) < MAX_ATTACH_BYTES;
+      let u = c.toDataURL('image/png');
+      if (sotto(u)) return u;
+      for (const q of [0.92, 0.8, 0.65]) {
+        u = c.toDataURL('image/webp', q);
+        if (sotto(u)) return u;
+      }
+      let w = c.width;
+      let h = c.height;
+      for (let i = 0; i < 8 && w > 64 && h > 64; i++) {
+        w = Math.round(w * 0.75);
+        h = Math.round(h * 0.75);
+        const r = document.createElement('canvas');
+        r.width = w; r.height = h;
+        r.getContext('2d').drawImage(c, 0, 0, w, h);
+        u = r.toDataURL('image/webp', 0.8);
+        r.width = 0; r.height = 0;
+        if (sotto(u)) return u;
+      }
+      return null;
+    }
+
+    // Un'immagine sola di tutta l'app: la barra in alto (se ci si è disegnato) sopra la pagina coi suoi tratti.
+    async function schermataAnnotata(shotDataUrl, topbarDataUrl) {
+      const [pagina, barra] = await Promise.all([caricaImmagine(shotDataUrl), caricaImmagine(topbarDataUrl)]);
+      if (!pagina && !barra) return null;
+      const c = document.createElement('canvas');
+      try {
+        const w = pagina ? (pagina.naturalWidth || window.innerWidth) : barra.naturalWidth;
+        const barH = barra ? Math.round(barra.naturalHeight * (w / Math.max(1, barra.naturalWidth))) : 0;
+        const pagH = pagina ? (pagina.naturalHeight || window.innerHeight) : 0;
+        c.width = w; c.height = barH + pagH;
+        const cx = c.getContext('2d');
+        if (barra) cx.drawImage(barra, 0, 0, w, barH);
+        if (pagina) {
+          cx.drawImage(pagina, 0, barH, w, pagH);
+          const sx = w / Math.max(1, window.innerWidth);
+          const sy = pagH / Math.max(1, window.innerHeight);
+          cx.lineCap = 'round';
+          cx.lineJoin = 'round';
+          for (const s of strokes) {
+            if (s.points.length < 1) continue;
+            cx.strokeStyle = s.color;
+            cx.lineWidth = s.width * Math.max(sx, sy);
+            cx.beginPath();
+            s.points.forEach((p, i) => (i ? cx.lineTo(p.x * sx, barH + p.y * sy) : cx.moveTo(p.x * sx, barH + p.y * sy)));
+            if (s.points.length === 1) cx.lineTo(s.points[0].x * sx + 0.1, barH + s.points[0].y * sy + 0.1);
+            cx.stroke();
           }
-        };
-        img.onerror = () => resolve(shotDataUrl);
-        img.src = shotDataUrl;
-      });
-    }
-
-    // Impila lo scatto della barra sopra quello della pagina: un'unica immagine di tutta l'app coi
-    // tratti di entrambe; senza, resta la sola pagina.
-    function stackTopbar(pageDataUrl, topbarDataUrl) {
-      return new Promise((resolve) => {
-        if (!topbarDataUrl) { resolve(pageDataUrl); return; }
-        const pageImg = new Image();
-        pageImg.onload = () => {
-          const barImg = new Image();
-          barImg.onload = () => {
-            try {
-              const w = pageImg.naturalWidth;
-              const barH = Math.round(barImg.naturalHeight * (w / Math.max(1, barImg.naturalWidth)));
-              const c = document.createElement('canvas');
-              c.width = w;
-              c.height = barH + pageImg.naturalHeight;
-              const cx = c.getContext('2d');
-              cx.drawImage(barImg, 0, 0, w, barH);
-              cx.drawImage(pageImg, 0, barH, w, pageImg.naturalHeight);
-              resolve(c.toDataURL('image/png'));
-            } catch (_) { resolve(pageDataUrl); }
-          };
-          barImg.onerror = () => resolve(pageDataUrl);
-          barImg.src = topbarDataUrl;
-        };
-        pageImg.onerror = () => resolve(pageDataUrl);
-        pageImg.src = pageDataUrl;
-      });
+        }
+        return entroIlTetto(c);
+      } catch (_) {
+        return null;
+      } finally {
+        c.width = 0; c.height = 0;
+      }
     }
 
     cancelBtn.addEventListener('click', close);
@@ -588,7 +643,7 @@
       lb.remove();
     }
     function openLightbox(dataUrl) {
-      const prev = activeRoot.querySelector('.sn-fb-lightbox');
+      const prev = root.querySelector('.sn-fb-lightbox');
       if (prev) closeLightbox(prev);
       const lb = document.createElement('div');
       lb.className = 'sn-fb-lightbox';
@@ -597,24 +652,18 @@
       im.alt = '';
       lb.appendChild(im);
       lb.addEventListener('click', () => closeLightbox(lb));
-      activeRoot.appendChild(lb);
+      root.appendChild(lb);
     }
+    stacchi.push(() => { const lb = root.querySelector('.sn-fb-lightbox'); if (lb) closeLightbox(lb); });
 
-    document.addEventListener('keydown', function onKey(e) {
-      if (!activeRoot) { document.removeEventListener('keydown', onKey, true); return; }
-      if (e.key === 'Escape') {
-        // Se è aperta la lightbox di uno screenshot, ESC chiude prima quella.
-        const lb = activeRoot.querySelector('.sn-fb-lightbox');
-        if (lb) {
-          e.stopImmediatePropagation();
-          closeLightbox(lb);
-          return;
-        }
-        // Evita che lo stesso ESC inneschi anche la chiusura del topmost gestita dal modulo Popup.
-        e.stopImmediatePropagation();
-        close();
-        document.removeEventListener('keydown', onKey, true);
-      }
+    aggancia(document, 'keydown', (e) => {
+      if (activeRoot !== root || e.key !== 'Escape') return;
+      // Se è aperta la lightbox di uno screenshot, ESC chiude prima quella.
+      const lb = root.querySelector('.sn-fb-lightbox');
+      // Evita che lo stesso ESC inneschi anche la chiusura del topmost gestita dal modulo Popup.
+      e.stopImmediatePropagation();
+      if (lb) closeLightbox(lb);
+      else close();
     }, true);
 
     // Paste immagini nel modal. Allegare è dell'utente: un incolla fabbricato non porta niente (il trascinamento
@@ -623,12 +672,8 @@
       if (!e.isTrusted) return;
       const items = e.clipboardData?.items;
       if (!items) return;
-      for (const it of items) {
-        if (it.type?.startsWith('image/')) {
-          const blob = it.getAsFile();
-          if (blob) await addImageFromBlob(blob);
-        }
-      }
+      const blobs = Array.from(items).filter((it) => it.type?.startsWith('image/')).map((it) => it.getAsFile()).filter(Boolean);
+      if (blobs.length) await allega(blobs, addImageFromBlob);
     });
 
     // Immagini incollate col tasto destro: evento su misura da content.js.
@@ -636,7 +681,7 @@
       if (!global.SN_FILO_UI?.veroONostro?.(e)) return;
       if (e.detail?.blob) {
         e.preventDefault();
-        await addImageFromBlob(e.detail.blob);
+        await allega([e.detail.blob], addImageFromBlob);
       }
     });
 
@@ -649,8 +694,10 @@
     }));
     modal.addEventListener('drop', async (e) => {
       const dropped = e.dataTransfer?.files;
+      // Qui servono solo i file: un testo lasciato nel riquadro non va da nessuna parte (#1471).
+      if (e.isTrusted) try { Popup?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'campo_feedback', !!(dropped && dropped.length))); } catch (_) {}
       if (!dropped || !dropped.length) return;
-      for (const f of dropped) await addAttachment(f);
+      await allega(Array.from(dropped));
     });
 
     // "Allega": apre il selettore file. Si possono allegare immagini E altri
@@ -659,8 +706,8 @@
     attachBtn.addEventListener('click', (e) => { if (e.isTrusted) { try { fileInput.click(); } catch (_) {} } });
     fileInput.addEventListener('change', async () => {
       const picked = Array.from(fileInput.files || []);
-      for (const f of picked) await addAttachment(f);
       fileInput.value = '';
+      await allega(picked);
     });
 
     // Invio: solo dal clic dell'utente sul tasto (#1071).
@@ -672,9 +719,19 @@
         statusEl.textContent = 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.';
         return;
       }
+      // Un esito che arriva col riquadro già chiuso (Esc durante l'invio) si legge in un avviso.
+      const dici = (testo) => {
+        statusEl.classList.remove('sn-fb-status--attesa');
+        if (activeRoot === root) statusEl.textContent = testo;
+        else Popup?.showToast?.(testo, { duration: 6000 });
+      };
+      const riprova = (testo) => { dici(testo); sendBtn.disabled = false; cancelBtn.disabled = false; };
+      const testoInviato = textEl.value;
+      inVolo.add(testoInviato);
       sendBtn.disabled = true;
       cancelBtn.disabled = true;
       statusEl.textContent = 'Invio in corso…';
+      statusEl.classList.add('sn-fb-status--attesa');
       try {
         const clientId = await getClientId();
         // S1.F2.2: hash deterministico del clientId per il match C5. Il confronto lo fa il main,
@@ -694,11 +751,16 @@
           } catch (_) { return ''; }
         })();
         const outImages = images.slice();
-        if (wantShot) {
+        let senzaSchermata = '';
+        // Il deposito tiene cinque immagini: la schermata che non ci sta si dice, non sparisce (#1681).
+        if (wantShot && outImages.length >= MAX_IMAGES) {
+          senzaSchermata = `La schermata annotata non è partita: c'erano già ${MAX_IMAGES} immagini, il massimo.`;
+        } else if (wantShot) {
           // Overlay nascosto (box + ombra) per non finire dentro lo scatto.
           root.style.visibility = 'hidden';
           await new Promise((r) => setTimeout(r, 60));
-          const shot = await captureScreenshot();
+          const foto = await captureScreenshot();
+          const shot = foto?.dataUrl || null;
           // Lo scatto annotato della barra in alto si chiede solo se ci si ha disegnato sopra.
           let topbarShot = null;
           if (topbarHasDrawing) {
@@ -708,23 +770,36 @@
             } catch (_) {}
           }
           root.style.visibility = '';
-          if (shot) {
-            const annotated = await composeAnnotated(shot);
-            const full = await stackTopbar(annotated, topbarShot);
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: full, name: 'schermata annotata' });
-          } else if (topbarShot) {
-            // La pagina non si lascia catturare ma la barra sì: allega almeno quella.
-            if (outImages.length < MAX_IMAGES) outImages.push({ dataUrl: topbarShot, name: 'schermata annotata' });
+          const full = (shot || topbarShot) ? await schermataAnnotata(shot, topbarShot) : null;
+          const perche = foto?.motivo === 'misura'
+            ? 'la pagina non ha risposto in tempo, e senza sapere dove sono i campi password o carta non la mando.'
+            : foto?.motivo === 'riquadri'
+              ? 'nella pagina c’è un riquadro di un altro sito che non sono riuscito a coprire.'
+              : 'nella pagina c’è un campo riservato (password o carta) che non sono riuscito a coprire.';
+          if (full) {
+            outImages.push({ dataUrl: full, name: 'schermata annotata' });
+            if (foto?.segreti) senzaSchermata = `Della schermata è partita solo la barra in alto: ${perche}`;
+          } else if (foto?.segreti) {
+            senzaSchermata = `La schermata non è partita: ${perche}`;
           } else {
-            statusEl.textContent = 'Screenshot non disponibile su questa pagina.';
+            senzaSchermata = (shot || topbarShot)
+              ? 'Non sono riuscito a preparare la schermata annotata.'
+              : 'Screenshot non disponibile su questa pagina.';
           }
+        }
+        // Senza testo né allegati partirebbe un feedback vuoto (#1667): il riquadro resta aperto e dice perché.
+        if (!text && outImages.length === 0 && files.length === 0) {
+          riprova(senzaSchermata || 'Scrivi qualcosa, allega un file/immagine o annota lo schermo.');
+          return;
         }
         // Instradato dal main perché la CSP della pagina ospite blocca i fetch verso firestore e
         // firebasestorage dal preload; il main usa undici (Node) e non è soggetto a quella CSP.
+        // Nello strato la pagina è quella sotto, non il documento dello strato.
+        const sotto = global.SN_FILO_UI?.nelloStrato ? global.SN_PAGINA_SOTTO : null;
         const payload = {
           text,
-          url: location.href,
-          title: document.title,
+          url: sotto ? String(sotto.url || '') : location.href,
+          title: sotto ? String(sotto.titolo || '') : document.title,
           userAgent: navigator.userAgent,
           clientId,
           clientIdHash,
@@ -735,16 +810,24 @@
         const res = await chrome.runtime.sendMessage({ type: MSG.SUBMIT_FEEDBACK, payload });
         if (!res?.ok) {
           const err = new Error(res?.error || 'invio fallito');
-          // #602 — quando il no arriva dalla cifratura, il main manda già la
-          // frase intera per chi legge: mostrarla così com'è.
-          err.fraseGiaPronta = !!res?.cifratura;
+          // #602 — quando il no arriva dalla cifratura (o è un feedback che partirebbe vuoto), il main manda già
+          // la frase intera per chi legge: mostrarla così com'è.
+          err.fraseGiaPronta = !!(res?.cifratura || res?.frase);
           throw err;
         }
         statusEl.textContent = '';
-        clearDraft();
+        statusEl.classList.remove('sn-fb-status--attesa');
         // Posizione del box PRIMA di chiuderlo: da lì partono le monete.
         const originRect = modal.getBoundingClientRect();
-        close();
+        // Chiuso con Esc durante l'attesa, il riquadro aperto adesso è un altro, con un altro testo: resta (#1681).
+        if (activeRoot === root) {
+          clearTimeout(saveTimer);
+          saveTimer = null;
+          clearDraft();
+          close();
+        } else {
+          clearDraft(testoInviato);
+        }
         // Ricompensa C3: +5 crediti subito all'invio. Best-effort, non blocca;
         // l'importo effettivo lo decide il main (CREDIT.FEEDBACK_SEND). Con un
         // portafoglio (#816) il premio lo dà il server dopo i controlli: qui
@@ -757,24 +840,19 @@
           else if (ar?.ok && Number(ar.credits) > 0) awarded = Number(ar.credits);
         } catch (_) {}
         if (!premio) flyCredits(originRect, awarded);
-        // Se qualche allegato non è riuscito a caricarsi, il feedback parte
-        // comunque (testo + allegati ok) ma avvisiamo l'utente di QUALI file
-        // sono andati persi, così non resta convinto che siano stati inviati.
-        const failed = Array.isArray(res.failed) ? res.failed : [];
+        // «Inviato» solo a consegna avvenuta (#1667); gli allegati saltati li dice l'avviso nella finestra.
+        const detto = res.consegnato ? 'Grazie! Feedback inviato.' : 'Feedback in partenza: arriva da solo appena c’è rete.';
         const dopo = premio?.inArrivo ? ' Il premio arriva sul tuo saldo dopo i controlli.'
           : (premio?.senzaPremio ? ` ${premio.senzaPremio}` : '');
-        if (failed.length) {
-          const names = failed.map((f) => f?.name || 'allegato').join(', ');
-          const inviato = premio ? 'Feedback inviato' : `Feedback inviato (+${awarded} crediti)`;
-          Popup?.showToast?.(`${inviato}, ma non sono riuscito a caricare: ${names}${dopo ? `.${dopo}` : ''}`, { duration: 6000 });
-        } else {
-          Popup?.showToast?.(premio ? `Grazie! Feedback inviato.${dopo}` : `Grazie! Feedback inviato. +${awarded} crediti.`, { duration: premio?.senzaPremio ? 5500 : (premio ? 4000 : 2800) });
-        }
+        const conSchermata = senzaSchermata ? ` ${senzaSchermata}` : '';
+        Popup?.showToast?.(premio ? `${detto}${dopo}${conSchermata}` : `${detto} +${awarded} crediti.${conSchermata}`,
+          { duration: (premio?.senzaPremio || senzaSchermata) ? 5500 : (premio || !res.consegnato ? 4000 : 2800) });
       } catch (e) {
         console.error('[SN feedback] submit', e);
-        statusEl.textContent = e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e));
-        sendBtn.disabled = false;
-        cancelBtn.disabled = false;
+        root.style.visibility = '';
+        riprova(e?.fraseGiaPronta ? String(e.message) : ('Errore invio: ' + (e?.message || e)));
+      } finally {
+        inVolo.delete(testoInviato);
       }
     });
 

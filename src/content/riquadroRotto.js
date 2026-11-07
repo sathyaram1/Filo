@@ -344,6 +344,7 @@ button:focus-visible { outline: 2px solid var(--sn-accent, #c45a3b); outline-off
       const f = trovaRiquadro(m.url, m.origin, m.segno);
       if (f) { disegna(m, f); return; }
       if (Date.now() < fino) setTimeout(cerca, 250);
+      else ask({ type: T_RISPOSTA, token: m.token, nonTrovato: true });
     };
     cerca();
   }

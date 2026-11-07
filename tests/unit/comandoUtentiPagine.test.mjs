@@ -37,6 +37,8 @@ function persone(n) {
 let tutti = [];
 let righe = [];
 let richieste = [];
+// I contatori della barra (#1473) non sono richieste al server: si tengono a parte.
+let contati = [];
 let vista = null;   // (msg) => risposta di WALLET_OWNER_OVERVIEW
 let regalo = null;  // (msg) => risposta di WALLET_OWNER_GRANT
 
@@ -44,6 +46,7 @@ function inizia(n = 120) {
   tutti = persone(n);
   righe = [];
   richieste = [];
+  contati = [];
   vista = () => ({ ok: true, overview: { users: tutti.slice().reverse() } });
   regalo = (msg) => {
     const p = tutti.find((u) => u.pseudonym === msg.pseudonym);
@@ -53,6 +56,7 @@ function inizia(n = 120) {
   };
   C.init({
     send: async (msg) => {
+      if (msg.type === MSG.CONTATORI_EVENTO) { contati.push(msg); return { ok: true }; }
       richieste.push(msg);
       if (msg.type === MSG.WALLET_OWNER_OVERVIEW) return JSON.parse(JSON.stringify(vista(msg)));
       if (msg.type === MSG.WALLET_OWNER_GRANT) return regalo(msg);
@@ -116,6 +120,7 @@ test('«/users altri» senza aver chiesto niente non lascia a mani vuote', async
   const riga = await comando('/users altri');
   assert.match(riga, /\/users/);
   assert.equal(richieste.length, 0);
+  assert.deepEqual(contati.map((m) => [m.misura, m.cosa]), [['comando-home', '/users']], 'si conta il comando, non quello che lo segue');
 });
 
 test('«/users» resta un comando riconosciuto, anche con qualcosa dietro', () => {

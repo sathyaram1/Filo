@@ -178,6 +178,8 @@ function hashesOf(input) {
 
 const SEVERITY = ['malware', 'phishing', 'unwanted'];
 const MIN = 60 * 1000;
+const GRAVITA_ESITI = ['non_configurato', 'fallito', 'transitorio'];
+const peggiore = (esiti) => GRAVITA_ESITI.find((e) => esiti.some((x) => x && x.esito === e)) || 'fallito';
 
 // `search(prefissi)` → { ok, matches:[{ hash, threatType, category }], cacheMs } | { ok:false, status } | null (nessuna chiave).
 function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {}) {
@@ -246,11 +248,13 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
     return decide(hs, got);
   }
 
-  async function request(prefixes) {
+  // `info.esito`, per i contatori (#1474): senza chiave, rete o servizio sovraccarico, rifiuto, risposta.
+  async function request(prefixes, info = {}) {
     let res;
     try { res = await search(prefixes); } catch (_) { res = { ok: false, status: 0 }; }
-    if (!res) return null;
+    if (!res) { info.esito = 'non_configurato'; return null; }
     if (!res.ok) {
+      info.esito = !res.status || res.status === 429 || res.status >= 500 ? 'transitorio' : 'fallito';
       // Solo i rifiuti del servizio rallentano le richieste: offline si riprova alla pagina dopo.
       if (res.status) {
         failures++;
@@ -259,6 +263,7 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
       return null;
     }
     failures = 0;
+    info.esito = 'ok';
     const ttl = Math.max(0, Number(res.cacheMs) || 0);
     const got = new Map(prefixes.map((p) => [p, { exp: now() + ttl, full: new Map() }]));
     for (const m of Array.isArray(res.matches) ? res.matches : []) {
@@ -274,30 +279,40 @@ function createLookup({ search, now = () => Date.now(), maxEntries = 50000 } = {
   }
 
   // null quando il verdetto non si conosce (senza chiave, offline, errore del servizio): mai «pulito» per ripiego.
-  async function check(url) {
+  // `info.esito` dice perché, col peggiore fra le richieste da cui il verdetto dipendeva; in pausa vale «fallito».
+  async function check(url, info = {}) {
     const hs = hashesFor(url);
     if (!hs.length) return null;
     const prefixes = [...new Set(hs.map((h) => h.prefix))];
     const found = new Map();
     const waits = [];
     const missing = [];
+    const esiti = [];
     for (const p of prefixes) {
       const e = fresh(p);
       if (e) found.set(p, e);
-      else if (pending.has(p)) waits.push(pending.get(p).then((e2) => { if (e2) found.set(p, e2); }));
-      else missing.push(p);
+      else if (pending.has(p)) {
+        const pend = pending.get(p);
+        esiti.push(pend.info);
+        waits.push(pend.then((e2) => { if (e2) found.set(p, e2); }));
+      } else missing.push(p);
     }
     if (missing.length && now() >= pausedUntil) {
-      const req = request(missing).catch(() => null);
+      const mio = {};
+      esiti.push(mio);
+      const req = request(missing, mio).catch(() => null);
       for (const p of missing) {
         const one = req.then((m) => (m && m.get(p)) || null);
+        one.info = mio;
         pending.set(p, one);
         one.finally(() => { if (pending.get(p) === one) pending.delete(p); });
       }
       waits.push(req.then((m) => { if (m) for (const [p, e] of m) found.set(p, e); }));
-    }
+    } else if (missing.length) esiti.push({ esito: 'fallito' });
     await Promise.all(waits);
-    return decide(hs, found) || null;
+    const v = decide(hs, found) || null;
+    info.esito = v ? 'ok' : peggiore(esiti);
+    return v;
   }
 
   function clear() {

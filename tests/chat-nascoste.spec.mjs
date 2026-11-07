@@ -145,6 +145,43 @@ test('dal tasto destro: «Nascondi la conversazione» lascia la riga che la rime
   expect((await inVista(app)).map((c) => c.id)).toContain('c-kant');
 });
 
+// #1461 — le voci del tasto destro sulle conversazioni del filo sono azioni del catalogo: si misura la loro attesa.
+const azioniChat = (app) => app.evaluate(async () => {
+  const s = await globalThis.SN_CONTATORI_MAIN.letto();
+  return Object.values(s.ore || {}).reduce((n, o) => n + ((o.azioni && o.azioni['chat-archive'] && o.azioni['chat-archive'].n) || 0), 0);
+});
+// Una bolla in cima al filo può stare sotto la barra «Cerca nel filo»: il clic destro al suo centro prende la barra.
+async function ferma(loc) {
+  await expect.poll(() => loc.evaluate((el) => {
+    el.scrollIntoView({ block: 'center' });
+    const r = el.getBoundingClientRect();
+    return el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+  }), { timeout: 10_000 }).toBe(true);
+}
+
+test('nascondere e rimettere una conversazione dal tasto destro contano l’attesa dell’azione', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await configura(app);
+  await modello(app, { titoli: { Hegel: 'Hegel' } });
+  await chatPronta(app, 'c-hegel', 'Parliamo di Hegel e della dialettica');
+
+  const home = await openTab(HOME);
+  const bolla = home.locator('.dash-bubble[data-chat="c-hegel"]').first();
+  await expect(bolla).toBeVisible({ timeout: 15_000 });
+  await ferma(bolla);
+  await bolla.click({ button: 'right' });
+  await menuDi(home).voce('Nascondi la conversazione').first().click();
+  const riga = home.locator('.dash-nascosta');
+  await expect(riga).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => azioniChat(app), { timeout: 8_000 }).toBe(1);
+
+  await ferma(riga);
+  await riga.click({ button: 'right' });
+  await menuDi(home).voce('Rimetti la conversazione nel filo').first().click();
+  await expect(home.locator('.dash-bubble[data-chat="c-hegel"]').first()).toBeVisible({ timeout: 10_000 });
+  await expect.poll(() => azioniChat(app), { timeout: 8_000 }).toBe(2);
+});
+
 test('anche la riga di una conversazione dell’Editor si nasconde e si rimette', async ({ app, openTab }) => {
   test.setTimeout(90_000);
   await configura(app);

@@ -48,7 +48,10 @@
 
   // L'attributo risponde a «questo pezzo lo salto?» e se lo può scrivere anche il sito;
   // a «l'ho disegnato IO?» risponde solo questo elenco, nel mondo isolato (#514).
+  // Riferimenti deboli (#1096): un riquadro chiuso non resta vivo per l'elenco, con la tela e gli allegati che tiene.
   const nostre = new Set();
+  const rifDi = new WeakMap();
+  const debole = (el) => (typeof WeakRef === 'function' ? new WeakRef(el) : { deref: () => el });
   // `mark()` arriva anche prima che l'elemento sia attaccato: qui `isConnected` non si guarda.
   // Si buttano le più vecchie: una radice dimenticata vale «non è successo niente».
   const TETTO = 256;
@@ -65,8 +68,10 @@
   function mark(el) {
     try { if (el && el.setAttribute) el.setAttribute(ATTR, '1'); } catch (_) {}
     try {
-      if (el) {
-        nostre.add(el);
+      if (el && typeof el === 'object') {
+        let r = rifDi.get(el);
+        if (!r) { r = debole(el); rifDi.set(el, r); }
+        nostre.add(r);
         while (nostre.size > TETTO) nostre.delete(nostre.values().next().value);
       }
     } catch (_) {}
@@ -79,7 +84,11 @@
   function aperti() {
     const vive = [];
     try {
-      for (const el of nostre) if (el && el.isConnected) vive.push(el);
+      for (const r of nostre) {
+        const el = r.deref();
+        if (!el) nostre.delete(r);
+        else if (el.isConnected) vive.push(el);
+      }
     } catch (_) {}
     return vive;
   }
@@ -200,12 +209,19 @@
     } catch (_) {}
   }
 
+  // Lo strato dei riquadri sopra un sito (#1509.1): pagina di Filo che parla come il sito sotto.
+  const nelloStrato = (() => {
+    try { return location.protocol === 'filo:' && location.host === 'riquadri' && !!global.SN_STRATO_RIQUADRI; } catch (_) { return false; }
+  })();
+
   // La chiave di una bozza scritta in un riquadro: resta al sito dove è nata, e il main concede a ogni riquadro solo
   // quella con la sua origine (BOZZE_PER_SITO in impostazioniPerOrigine.js). Senza origine non c'è bozza (null).
+  // Nello strato l'origine è quella della pagina sotto, la stessa che il main gli riconosce.
   function chiaveDiBozza(nome) {
     try {
-      if (location.protocol === 'filo:') return nome;
-      return location.origin && location.origin !== 'null' ? `${nome}@${location.origin}` : null;
+      const origine = nelloStrato ? String(global.SN_STRATO_RIQUADRI.pagina?.origine || '') : location.origin;
+      if (location.protocol === 'filo:' && !nelloStrato) return nome;
+      return origine && origine !== 'null' ? `${nome}@${origine}` : null;
     } catch (_) { return null; }
   }
 
@@ -238,6 +254,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, _test,
+    ombra, ombraDi, bersaglio, tastoNelRiquadro, chiaveDiBozza, nelloStrato, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

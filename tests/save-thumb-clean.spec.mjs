@@ -1,29 +1,17 @@
-// "Salva per dopo" dal menu del tasto destro: la miniatura salvata NON deve
-// contenere il menu di Filo (#325). Il menu veniva rimosso dal DOM in modo
-// sincrono al click, ma la cattura fotografava il frame del compositor non
-// ancora ridisegnato: il menu finiva "stampato" dentro la thumbnail persistita.
-//
-// Strategia di assert deterministica: la pagina di test è COMPLETAMENTE
-// bianca. Se la miniatura salvata contiene pixel scuri (testo/icone/bordi del
-// menu), il menu è finito nella cattura → rosso. Senza il fix questo test
-// fallisce (migliaia di pixel scuri); col fix la miniatura è bianca.
+// #325 — la miniatura di «Salva per dopo» è solo la pagina: niente di Filo dentro (il menu ci finiva stampato, la barra
+// laterale da cui si salva non deve). La pagina è tutta bianca: pixel scuri nella miniatura sono un pezzo di Filo.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { menuDi } from './helpers/menuContestuale.mjs';
+import { premiNellaBarra } from './helpers/barra.mjs';
 
-test('la miniatura salvata dal menu tasto destro non contiene il menu', async ({ openTab, testServer }) => {
+test('la miniatura salvata dalla barra laterale non contiene niente di Filo', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(
     openTab,
     `<!doctype html><html><head><title>Pagina bianca</title></head>
      <body style="margin:0;height:100vh;background:#fff"></body></html>`,
   );
 
-  // Apre il menu del tasto destro al centro della pagina e salva con l'icona
-  // "Salva per dopo" nella fila in alto (il cammino principale dell'utente).
-  await page.click('body', { button: 'right', position: { x: 400, y: 300 } });
-  const btn = menuDi(page).locator('.sn-menu [data-sn-icon-id="saveForLater"]');
-  await expect(btn).toBeVisible();
-  await btn.click();
+  await premiNellaBarra(app, 'saveForLater');
   // Attende che il salvataggio (cattura + persistenza) sia concluso. La tab
   // viene chiusa automaticamente ~600ms dopo il toast di conferma.
   await page.waitForTimeout(2000).catch(() => {});
@@ -56,10 +44,8 @@ test('la miniatura salvata dal menu tasto destro non contiene il menu', async ({
 
   expect(stats.error, stats.error || '').toBeUndefined();
   expect(stats.total).toBeGreaterThan(0);
-  // La pagina è bianca: pixel scuri = menu (testo, icone, bordi) dentro la
-  // miniatura. Tolleranza minima per rumore di encoding.
+  // Tolleranza minima per il rumore della codifica.
   expect(stats.dark, `pixel scuri nella miniatura: ${stats.dark}/${stats.total}`).toBeLessThan(50);
-  // Anche il fondo beige del menu e la sua ombra devono essere assenti:
-  // la quota di pixel non-bianchi deve restare trascurabile (<0.5%).
+  // Anche un fondo beige e un'ombra di Filo, che scuri non sono.
   expect(stats.nonWhite / stats.total, `pixel non bianchi: ${stats.nonWhite}/${stats.total}`).toBeLessThan(0.005);
 });

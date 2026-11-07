@@ -10,6 +10,18 @@ const OCCUPATO = new Set(['EPERM', 'EBUSY', 'EACCES']);
 const TENTATIVI_RINOMINA = 5;
 const TENTATIVI_LETTURA = 4;
 const attesaMs = (i) => 50 * (i + 1);
+// Le rinomine riprovate, per codice d'errore: le ritira lo storage per i contatori anonimi (#1466), che le riducono a
+// un elenco chiuso. Valgono per ogni file scritto da qui: l'antivirus che tiene un file tiene anche gli altri.
+const ritenti = new Map();
+function ritento(e) {
+  const c = typeof (e && e.code) === 'string' ? e.code : '';
+  ritenti.set(c, (ritenti.get(c) || 0) + 1);
+}
+function ritentiRinomina() {
+  const out = Object.fromEntries(ritenti);
+  ritenti.clear();
+  return out;
+}
 
 let progressivo = 0;
 // Un temporaneo per scrittura: la scrittura di chiusura (sincrona) e una in volo non si rubano il file.
@@ -50,6 +62,7 @@ function rinominaSync(da, a) {
   for (let i = 0; ; i++) {
     try { return fs.renameSync(da, a); } catch (e) {
       if (i >= TENTATIVI_RINOMINA - 1 || !OCCUPATO.has(e.code)) throw e;
+      ritento(e);
       dormiSync(attesaMs(i));
     }
   }
@@ -59,6 +72,7 @@ async function rinomina(da, a) {
   for (let i = 0; ; i++) {
     try { return await fsp.rename(da, a); } catch (e) {
       if (i >= TENTATIVI_RINOMINA - 1 || !OCCUPATO.has(e.code)) throw e;
+      ritento(e);
       await dorme(attesaMs(i));
     }
   }
@@ -182,5 +196,5 @@ function togliTemporaneiUnaVolta(target) {
 
 module.exports = {
   scriviSync, scrivi, leggiSync, leggi, togliBom, mettiDaParte, mettiDaParteSync, togliTemporanei, togliTemporaneiUnaVolta, nomeRovinato,
-  OCCUPATO, TENTATIVI_RINOMINA,
+  OCCUPATO, TENTATIVI_RINOMINA, ritentiRinomina,
 };

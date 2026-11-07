@@ -61,9 +61,13 @@ async function depositoConLeRegole(app, { pub, priv }) {
         if (opts.method === 'PATCH') return new Response('{}', { status: 200 });
         return new Response(JSON.stringify({ fields: { value: { integerValue: '41' } }, updateTime: '2026-10-01T00:00:00Z' }), { status: 200 });
       }
-      if (u.startsWith('https://firestore.googleapis.com/') && opts.method === 'POST' && /\/documents\/feedback\?/.test(u)) {
-        D.documenti.push(JSON.parse(opts.body));
-        return new Response(JSON.stringify({ name: 'projects/p/databases/(default)/documents/feedback/doc-1518' }), { status: 200 });
+      // La create passa da `:commit` (#1517): il documento è la scrittura su `feedback/`.
+      if (u.startsWith('https://firestore.googleapis.com/') && opts.method === 'POST' && u.includes('/documents:commit')) {
+        const w = (JSON.parse(opts.body).writes || []).find((x) => x.update && /\/documents\/feedback\/[^/]+$/.test(x.update.name));
+        if (w) {
+          D.documenti.push({ fields: w.update.fields });
+          return new Response(JSON.stringify({ writeResults: [{ updateTime: '2026-10-01T00:00:00Z' }], commitTime: '2026-10-01T00:00:00Z' }), { status: 200 });
+        }
       }
       return fetchVero(url, opts);
     };

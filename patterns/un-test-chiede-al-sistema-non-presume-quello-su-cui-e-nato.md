@@ -34,6 +34,9 @@ Tre unit test rossi solo su Windows.
   nella shell vera), si asserisce la relazione e non il valore:
   `encodingPrelude(s) === PRELUDI_CODIFICA[resolveShell(s)]`. Vale su ogni sistema e
   diventa rossa se qualcuno lega il risultato alla richiesta.
+- Un percorso che il codice compone con `path` si aspetta componendolo allo stesso modo,
+  non scritto a mano: `join('/x/schede', '12.json')` su Windows è `\x\schede\12.json`
+  (#1780, `tests/unit/schede.test.mjs`).
 - Se il caso non c'entra con la proprietà, si scelgono dati che non ne dipendono: due
   nomi che differiscono per l'accento, non per le maiuscole, danno la stessa ambiguità
   dappertutto.
@@ -145,12 +148,18 @@ il rosso ferma le versioni per tutti:
   `fuoriDa(cartella, percorso)` (`tests/helpers/percorsi.mjs`). E un nome relativo
   rimesso insieme con `join(radice, nome)` incolla i due dischi
   (`D:\a\Filo\Filo\C:\Users\…`): si usa `resolve`.
+- **Le barre.** `relative(ROOT, f)` su Windows dà `src\shared\x.js`: confrontato con
+  un `'src/shared/x.js'` scritto a mano non si trova mai (#2186). Un percorso che fa da
+  chiave si normalizza prima, `.split(sep).join('/')`; in un messaggio può restare com'è.
 - **Il node che gira.** Il processo che esegue la prova tiene aperto il proprio
   eseguibile, e su Windows nessun nome di quel file si cancella finché gira: un
   collegamento fisso a `process.execPath` (per fingere un comando) fa fallire la pulizia
   con EPERM. Si copia.
+- **L'import di un percorso.** `import(join(ROOT, 'x.js'))` su Windows legge `D:` come
+  schema di un URL e lancia `ERR_UNSUPPORTED_ESM_URL_SCHEME` (#2223): si importa
+  `pathToFileURL(percorso).href`.
 
-Sentinella delle due forme: `tests/unit/cartelleTemporanee.test.mjs`.
+Sentinella di queste forme: `tests/unit/cartelleTemporanee.test.mjs`.
 
 **Il codice che fa una cosa diversa per sistema** (#1135). Su Windows la versione
 nuova si installa all'apertura dopo, altrove alla chiusura (#1039): la prova scritta
@@ -329,6 +338,11 @@ al secondo, anche a finestra nascosta. Lo stesso Electron senza Playwright rispo
   `ResizeObserver`, `visibilitychange`, timer rallentati) si prova con
   `apriFiloSenzaPlaywright()` di `tests/helpers/filoSenzaPlaywright.mjs`: guida il main
   dal suo ispettore, come `app.evaluate`, e lascia le pagine senza client di debug.
+  Anche il Node è parte del sistema: il contenitore delle routine ha il 22, la suite e
+  gli unit su GitHub girano sul `node-version` dei workflow (oggi 20), senza il
+  `WebSocket` globale. Il client dell'ispettore è perciò il `ws` di Playwright, e le
+  quattro prove nate così erano rosse solo su main (#1611, sentinella
+  `tests/unit/filoSenzaPlaywright.test.mjs`).
 - La prova asserisce prima la precondizione, `document.visibilityState === 'hidden'`
   nella pagina: senza, crede di guardare una scheda dietro e ne guarda una visibile.
 - Le anteprime delle schede svegliano per un attimo la scheda dietro che cambia

@@ -36,16 +36,11 @@ export function menuDi(scheda) {
     /** Ogni pannello del menu aperto, principale e sottomenu. */
     pannelli: locator('.sn-menu'),
     principale: locator('.sn-menu:not(.sn-menu-sub)'),
+    /** La prima voce del pannello principale: sotto la fila contestuale, che sta sempre in cima (#1434). */
+    primaVoce: locator('.sn-menu:not(.sn-menu-sub) > :not(.sn-menu-row):not(.sn-menu-sep):visible').first(),
     voci: locator('.sn-menu-item'),
     voce: (testo) => locator('.sn-menu-item', { hasText: testo }),
-    icona: (id) => locator(`[data-sn-icon-id="${id}"]`),
     sottomenu: locator('.sn-menu-sub'),
-    /** La griglia di «Altro…». */
-    griglia: locator('.sn-menu-icon-grid'),
-    /** L'etichetta che compare sopra un'icona del menu. */
-    etichetta: locator('.sn-tooltip'),
-    /** L'icona che segue il puntatore mentre la si trascina nel menu, o dal menu. */
-    trascinamento: locator('.sn-drag-preview'),
   };
 }
 

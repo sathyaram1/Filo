@@ -36,7 +36,7 @@ module.exports = function register(on, ctx) {
     if (!win || win.isDestroyed() || !cambiati.length) return;
     const testo = t(spento ? 'filo_spento_fatto' : 'filo_riacceso_fatto', leggibili(cambiati));
     const actions = [{ label: t('filo_spento_annulla'), filoSpento: { siti: cambiati, spento: !spento } }];
-    try { win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 12, key: 'filo-spento', actions } }); } catch (_) {}
+    try { win.webContents.send('shell:toast', { text: testo, opts: { durationSec: 12, key: 'filo-spento', tipo: 'filo_spento_sito', actions } }); } catch (_) {}
   }
 
   // `indirizzi`: la scheda (e il riquadro) di chi chiede; `siti`, se c'è, li nomina una superficie di Filo.

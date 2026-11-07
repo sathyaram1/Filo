@@ -4,12 +4,17 @@
 module.exports = function register(on, ctx) {
   const {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
-    providerRouting, openWeightsBlockReason, modelGate,
-    Defaults, isAdmin, broadcastToTabs, controllaUscita, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
+    providerRouting, openWeightsBlockReason, modelGate, avvisiFuoriPolitica,
+    Defaults, isAdmin, broadcastToTabs, controllaUscita: portaUscite, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
   const PathsCollector = globalThis.SN_PATHS_COLLECTOR;
+  require('../fontiSegnaposto');
+  const ContatoriSicurezza = require('../contatoriSicurezza');
+  const ContatoriServizio = require('../contatoriServizio');
+  // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
+  const controllaUscita = ContatoriSicurezza.contaUscite(portaUscite);
 
   // Cache audio in memoria: rileggere lo stesso testo con la stessa voce e lo stesso modello
   // è istantaneo invece di rifare la chiamata lenta. Dura quanto la sessione.
@@ -85,9 +90,12 @@ module.exports = function register(on, ctx) {
     const preparata = Boolean(msg && msg.action === A.EXPLAIN && msg.suRichiesta !== true);
     if (!immagine && !preparata) return false;
     const url = String(sender?.tab?.url || sender?.url || '');
+    const lavoro = immagine ? 'descrizione_automatica' : 'spiegazione_preparata';
     let delicata = null;
-    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { return true; }
-    const daQui = /^https?:/i.test(url) && Boolean(delicata(url));
+    try { delicata = await globalThis.SN_DELICATE.filtro(); } catch (_) { ContatoriSicurezza.misura('filtroGuasto', lavoro); return true; }
+    const motivo = /^https?:/i.test(url) ? delicata(url) : null;
+    const daQui = Boolean(motivo);
+    if (daQui) ContatoriSicurezza.misura('paginaDelicata', motivo, lavoro);
     if (!immagine) return daQui;
     const Immagini = require('../immaginiDelicate').perFilo();
     const dataUrl = msg.payload.dataUrl;
@@ -99,8 +107,7 @@ module.exports = function register(on, ctx) {
       if (typeof originale === 'string' && originale !== dataUrl) await Immagini.segna(originale, { incognito }).catch(() => {});
       return true;
     }
-    if (delicata.attivo === false) return false;
-    try { return await Immagini.daDelicata(dataUrl); } catch (_) { return true; }
+    try { return await Immagini.restaFuori(dataUrl, delicata); } catch (_) { return true; }
   }
 
   // Spenta in Preferenze (#1274), la descrizione di screenshot e immagini copiate non parte: il file prende data e ora.
@@ -122,14 +129,45 @@ module.exports = function register(on, ctx) {
     if (!msg || !DEL_CORRETTORE.has(msg.action) || !msg.payload || typeof msg.payload !== 'object') return false;
     const url = String(sender?.tab?.url || sender?.url || '');
     if (!/^https?:/i.test(url)) return false;
-    let delicata = true;
-    try { delicata = Boolean((await globalThis.SN_DELICATE.filtro())(url)); } catch (_) {}
+    let motivo = 'filtro_guasto';
+    try { motivo = (await globalThis.SN_DELICATE.filtro())(url) || null; } catch (_) {}
+    const delicata = Boolean(motivo);
     if (delicata) {
+      ContatoriSicurezza.misura('paginaDelicata', motivo, 'contesto_correttore');
       const sito = msg.payload.luogo && typeof msg.payload.luogo.sito === 'string' ? msg.payload.luogo.sito : '';
       msg.payload = { ...msg.payload, contesto: {}, luogo: sito ? { sito } : {} };
     }
     return delicata;
   }
+
+  // «Valuta» dell'Aiuto (#1449) risponde col modello della chat. Se quello non vede le immagini la pagina gli arriva
+  // senza la foto: outline, indirizzo e testo del campo bastano a giudicare.
+  async function chiediValuta(payload, origin, sender, diretta = {}) {
+    const chiedi = (p) => handleAIRequest({ action: SN_CONST.ACTIONS.HELP, payload: p, origin, sender, modelloDi: SN_CONST.ACTIONS.FILO_CHAT, ...diretta });
+    try {
+      return await chiedi(payload);
+    } catch (e) {
+      const FC = globalThis.SN_FILO_CONTESTO;
+      if (!payload.screenshot || !FC || !FC.rifiutaImmagini(e)) throw e;
+      const { screenshot, ...senzaFoto } = payload;
+      return chiedi(senzaFoto);
+    }
+  }
+
+  // Gli avvisi fuori politica in coda (#1478.1) li prende solo la pagina davanti agli occhi: il frame principale della
+  // scheda attiva. Un riquadro, una scheda dietro o la home pronta in riserva li toglierebbero a chi li deve vedere.
+  // Davanti agli occhi vuol dire la finestra davanti: il fuoco può stare sulla barra delle schede, non sulla pagina.
+  on(MSG.AVVISI_IN_CODA, async (msg, sender) => {
+    const win = sender && sender.win;
+    const tm = win && win._filoTabs;
+    const principale = !(sender && sender.frame && sender.frame.parent);
+    const attiva = !!(tm && sender.tab && !sender.riserva && !sender.strato && tm.activeId === sender.tab.id);
+    let davanti = Boolean(msg && msg.fuoco === true);
+    try { davanti = davanti || Boolean(win && !win.isDestroyed() && win.isFocused()); } catch (_) {}
+    if (!attiva || !principale || !davanti || !avvisiFuoriPolitica) return { ok: true, avvisi: [] };
+    const id = typeof (msg && msg.id) === 'string' ? msg.id : '';
+    return { ok: true, avvisi: avvisiFuoriPolitica.prendi(id) };
+  });
 
   const tettoAutomatiche = require('../tettoAutomatiche').crea();
   const { spingiAllaScheda } = require('../impostazioniPerOrigine');
@@ -142,16 +180,151 @@ module.exports = function register(on, ctx) {
     const frase = I18n ? I18n.t(`toast_tetto_${fermo.gruppo}`, fermo.tetto) : `${fermo.gruppo}: ${fermo.tetto}`;
     if (fermo.primo) {
       try { spingiAllaScheda(wc, { type: MSG.SHOW_TOAST, text: frase, duration: 9000 }, { inVista: true }); } catch (_) {}
+      try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:tetto_automatiche'); } catch (_) {}
+      ContatoriSicurezza.misura('tetto', `automatiche_${fermo.gruppo}`);
     }
     return { ok: false, code: 'TROPPE_AUTOMATICHE', error: frase };
   }
 
+  // #1448 — la ricerca di un segnaposto del correttore: le fonti le prende il main (Wikipedia e Wikidata, poi il web se
+  // è acceso), il modello del controllo ragionato ne legge il valore, e la riga torna con la fonte vera. Da una pagina
+  // delicata, o con un dato riservato nella ricerca, non si cerca. Regole: tests/unit/fontiSegnaposto.test.mjs.
+  const SENZA_VALORE = '[][][][nessuno]';
+  function segnapostoDaPagina(payload) {
+    const s = payload && payload.segnaposto;
+    if (!s || typeof s !== 'object') return null;
+    const R = require('../correttoreRiservati');
+    const testo = (v, max) => R.oscura(typeof v === 'string' ? v : '').slice(0, max);
+    const dove = typeof s.dove === 'string' && /^(?:web|wiki:[a-z]{2,3})$/.test(s.dove) ? s.dove : 'wiki:en';
+    const g = s.giaLette && typeof s.giaLette === 'object' ? s.giaLette : null;
+    const giaLette = g && typeof g.domanda === 'string' && typeof g.dove === 'string' ? { domanda: testo(g.domanda, 200), dove: g.dove } : null;
+    return { pezzo: testo(s.pezzo, 40), frase: testo(s.frase, 2000), domanda: testo(s.domanda, 200), dove, suRichiesta: s.suRichiesta === true, giaLette };
+  }
+  // Le fonti da cui un segnaposto ha avuto il suo valore, per sito e domanda: la stessa x richiesta con altre parole, o
+  // precisata, si rilegge prima lì e ripaga la ricerca solo se lì il dato non c'è. Dati che cambiano: durano mezz'ora.
+  const FONTI_LETTE_MAX = 200;
+  const FONTI_LETTE_MS = 30 * 60 * 1000;
+  const fontiLette = new Map();
+  const chiaveLette = (sito, domanda, dove) => [sito, dove, String(domanda).toLowerCase().replace(/\s+/g, ' ').trim()].join('\u0000');
+  async function cercaSegnaposto(sp, { sender, origin, delicata }) {
+    const settings = await getEffectiveSettings();
+    const corr = settings.correttore || {};
+    if (corr.segnaposti === false) return { ok: false, code: 'SEGNAPOSTI_SPENTI' };
+    const R = require('../correttoreRiservati');
+    if (!sp.domanda.trim()) return { text: SENZA_VALORE };
+    // Una ricerca non fatta non è un dato che non c'è: la pagina dice perché. Da una pagina delicata parte solo col
+    // clic di chi scrive; con un dato riservato, o fermata dalla porta delle uscite, non parte mai.
+    if (sp.domanda.includes(R.SEGNAPOSTO)) return { ok: false, code: 'RICERCA_BLOCCATA' };
+    if (delicata && !sp.suRichiesta) return { ok: false, code: 'PAGINA_DELICATA' };
+    const u = await controllaUscita({ type: 'CERCA_WEB', query: sp.domanda }, { sender });
+    if (u.blocca) return { ok: false, code: 'RICERCA_BLOCCATA' };
+    const F = globalThis.SN_FONTI_SEGNAPOSTO;
+    const sito = sitoDi(String(sender?.tab?.url || sender?.url || ''));
+    const ricorda = (fonti) => {
+      const k = chiaveLette(sito, sp.domanda, sp.dove);
+      fontiLette.delete(k);
+      fontiLette.set(k, { fonti, alle: Date.now() });
+      while (fontiLette.size > FONTI_LETTE_MAX) fontiLette.delete(fontiLette.keys().next().value);
+    };
+    const lette = sp.giaLette && fontiLette.get(chiaveLette(sito, sp.giaLette.domanda, sp.giaLette.dove));
+    if (lette && Date.now() - lette.alle < FONTI_LETTE_MS) {
+      const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti: lette.fonti }, origin });
+      const riga = F.ricomponi(r && r.text, lette.fonti);
+      if (riga) { ricorda(lette.fonti); return { ...r, text: riga }; }
+    }
+    let ultima = null;
+    let fallita = '';
+    for (const giro of F.giri(sp.dove, corr.segnapostiWeb !== false)) {
+      let fonti = [];
+      try {
+        fonti = giro === 'web'
+          ? await F.web(sp.domanda, settings.apiKeys?.tavily || '')
+          : await F.wikipedia(sp.domanda, giro.replace(/^wiki:/, ''));
+      } catch (e) {
+        fallita = String(e?.message || e);
+        console.warn('[SN] segnaposto, fonti:', fallita);
+      }
+      if (!fonti.length) continue;
+      const r = await handleAIRequest({ action: SN_CONST.ACTIONS.SPELLCHECK_CONTEXT, payload: { segnaposto: sp, fonti }, origin });
+      ultima = r;
+      const riga = F.ricomponi(r && r.text, fonti);
+      if (riga) { ricorda(fonti); return { ...r, text: riga }; }
+    }
+    // Fonti che non hanno risposto non dicono che il dato non c'è: la ricerca è fallita, e si può rifare.
+    if (!ultima && fallita) return { ok: false, code: 'FONTI_NON_RAGGIUNTE', error: fallita };
+    return { ...(ultima || {}), text: SENZA_VALORE };
+  }
+
+  // L'Aiuto (#578.1): il suo turno riceve il ragionamento in diretta e il quadrato lo interrompe. La chiave è del
+  // mittente vero (lo strato, se l'Aiuto sta lì): un'altra pagina non ferma né ascolta un turno che non è suo.
+  const turniAiuto = new Map();
+  // Uno stop arrivato prima della sua richiesta (i messaggi non si aspettano fra loro) vale quando lei arriva.
+  const fermatiPrima = new Map();
+  const FERMATI_PRIMA_MS = 60 * 1000;
+  const FERMATI_PRIMA_MAX = 500;
+  function chiaveTurno(sender, turno) {
+    const wc = sender && (sender.strato || sender.wc);
+    const t = typeof turno === 'string' && /^[\w-]{1,64}$/.test(turno) ? turno : '';
+    return wc && typeof wc.id === 'number' && t ? `${wc.id}:${t}` : '';
+  }
+  function direttaAiuto(msg, sender) {
+    const chiave = msg && msg.action === SN_CONST.ACTIONS.HELP ? chiaveTurno(sender, msg.turno) : '';
+    if (!chiave) return null;
+    const controller = new AbortController();
+    if (fermatiPrima.delete(chiave)) controller.abort();
+    turniAiuto.set(chiave, controller);
+    const dest = sender.strato || sender.frame || sender.wc;
+    const diretta = {
+      // Intero anche nella risposta: gli eventi in diretta possono arrivare dopo di lei e la coda andrebbe persa (#1321).
+      ragionamento: '',
+      signal: controller.signal,
+      onReasoning: (testo) => {
+        if (!testo || controller.signal.aborted) return;
+        diretta.ragionamento += String(testo);
+        try { dest.send('filo:broadcast', { type: MSG.AIUTO_RAGIONAMENTO, turno: msg.turno, testo: String(testo) }); } catch (_) {}
+      },
+      fine: () => { if (turniAiuto.get(chiave) === controller) turniAiuto.delete(chiave); },
+    };
+    return diretta;
+  }
+  on(MSG.AIUTO_FERMA, async (msg, sender) => {
+    const chiave = chiaveTurno(sender, msg && msg.turno);
+    if (!chiave) return { ok: false, code: 'BAD_TURNO' };
+    const c = turniAiuto.get(chiave);
+    if (c) {
+      turniAiuto.delete(chiave);
+      try { c.abort(); } catch (_) {}
+      return { ok: true };
+    }
+    const ora = Date.now();
+    for (const [k, t] of fermatiPrima) if (ora - t > FERMATI_PRIMA_MS || fermatiPrima.size >= FERMATI_PRIMA_MAX) fermatiPrima.delete(k);
+    fermatiPrima.set(chiave, ora);
+    return { ok: true };
+  });
+
   on(MSG.AI_REQUEST, async (msg, sender, origin) => {
+    const diretta = direttaAiuto(msg, sender);
+    try {
+      if (diretta && diretta.signal.aborted) return { ok: false, code: 'FERMATO', error: 'fermato' };
+      const r = await richiestaAI(msg, sender, origin, diretta ? { signal: diretta.signal, onReasoning: diretta.onReasoning } : {});
+      return diretta && diretta.ragionamento && r && r.ok ? { ...r, ragionamento: diretta.ragionamento } : r;
+    } finally {
+      if (diretta) diretta.fine();
+    }
+  });
+  async function richiestaAI(msg, sender, origin, diretta) {
     if (await automaticaDaDelicata(msg, sender)) return { ok: false, code: 'PAGINA_DELICATA' };
     if (await descrizioneSpenta(msg)) return { ok: false, code: 'DESCRIZIONE_SPENTA' };
     const fermata = fermataDalTetto(msg, sender);
     if (fermata) return fermata;
     const senzaContesto = await senzaPaginaDelicata(msg, sender);
+    const segnaposto = msg && msg.action === SN_CONST.ACTIONS.SPELLCHECK_CONTEXT ? segnapostoDaPagina(msg.payload) : null;
+    if (segnaposto) {
+      const Cont = globalThis.SN_CONTATORI_MAIN;
+      const giro = () => cercaSegnaposto(segnaposto, { sender, origin, delicata: senzaContesto });
+      const r = await (msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, giro) : giro());
+      return r && r.ok === false ? r : { ok: true, ...r };
+    }
     // Chiavi, password e carte scritte nel campo restano sul computer (#1446); il sito lo dice chi ha mandato, non la pagina.
     if (msg && DEL_CORRETTORE.has(msg.action) && msg.payload && typeof msg.payload === 'object') {
       msg.payload = require('../correttoreRiservati').richiestaSenzaRiservati(msg.payload);
@@ -168,6 +341,9 @@ module.exports = function register(on, ctx) {
     if (msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && typeof msg.payload === 'object') {
       msg.payload.schedaApertaIl = (sender && sender.tab && sender.tab.openedAt) || null;
       msg.payload.paginaDal = (sender && sender.tab && sender.tab.paginaDal) || null;
+      // Il documento dell'Editor (#1433) entra nel prompt come testo dell'utente solo se lo manda l'Editor: da un sito
+      // sarebbe testo di fuori presentato per suo.
+      if ('documento' in msg.payload && !/^filo:\/\/editor\//i.test(String(origin || ''))) delete msg.payload.documento;
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.
@@ -179,18 +355,29 @@ module.exports = function register(on, ctx) {
     const AC = globalThis.SN_AVVISO_CREDITI_MAIN;
     const daSola = msg && msg.action === SN_CONST.ACTIONS.EXPLAIN && msg.suRichiesta !== true && AC && AC.comeAnticipata;
     // Il correttore ripete una volta la domanda la cui risposta era illeggibile (#1580): la cache la ridarebbe uguale.
-    const noCache = Boolean(msg && msg.riprova === true && DEL_CORRETTORE.has(msg.action));
+    // «Rigenera titolo» e «Rigenera riassunto» dell'Editor vogliono una risposta nuova anche a documento uguale (#1433).
+    const rigenera = msg && msg.rigenera === true && [SN_CONST.ACTIONS.EDITOR_TITLE, SN_CONST.ACTIONS.EDITOR_SUMMARY].includes(msg.action);
+    const noCache = Boolean(msg && ((msg.riprova === true && DEL_CORRETTORE.has(msg.action)) || rigenera));
+    const valuta = msg && msg.action === SN_CONST.ACTIONS.HELP && msg.payload && msg.payload.valuta === true;
+    // `intera`: la pagina usa la risposta come dato (un riassunto salvato, un nome, una traduzione, una scelta) e un
+    // pezzo fermato dal tetto torna come errore che lo dice, mai come risposta (#1302).
+    const intera = msg && msg.intera === true;
+    // `conSeguito`: la pagina ha «Continua» sotto la risposta, e una tagliata senza testo le arriva con la nota (#1302).
+    const conSeguito = !intera && msg && msg.conSeguito === true;
     const chiedi = daSola
-      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender }))
-      : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache });
+      ? () => AC.comeAnticipata(() => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, intera, conSeguito }))
+      : valuta ? () => chiediValuta(msg.payload, origin, sender, diretta)
+        : () => handleAIRequest({ action: msg.action, payload: msg.payload, origin, sender, noCache, intera, conSeguito, ...diretta });
     const K = globalThis.SN_WALLET_MAIN;
     const conRipiego = () => (msg && msg.diceRipiego === true && K && K.conRipiegoDetto ? K.conRipiegoDetto(chiedi) : chiedi());
     // `parteDiUnUso`: un anticipo o un pezzo di una richiesta già contata; per i contatori vale solo se si guasta (#969).
     const Cont = globalThis.SN_CONTATORI_MAIN;
     const r = await (msg && msg.parteDiUnUso === true && Cont && Cont.parteDiUnUso ? Cont.parteDiUnUso(msg.action, conRipiego) : conRipiego());
+    // `anticipo`: la risposta preparata prima che la persona la chieda è pronta; se la apre lo dice la pagina (#1461).
+    if (msg && msg.anticipo === true && r && typeof r.text === 'string' && Cont && Cont.anticipoPronto) Cont.anticipoPronto(msg.action);
     if (lettura) await lettura;
     return { ok: true, ...r, ...(senzaContesto ? { senzaContesto: true } : {}) };
-  });
+  }
 
   // ─── Classificatore della ricerca fra i feedback (#1118) ──────────────────
   // Il giro gira qui e la pagina chiede a che punto è: così il conto si registra una volta per ricerca, e la
@@ -267,6 +454,7 @@ module.exports = function register(on, ctx) {
       settings = await settingsForOwnerAction(await getEffectiveSettings(), action);
       attempts = buildAttemptChain(settings, modelForAction(settings, action), action);
     } catch (e) {
+      ContatoriServizio.misura('maiPartita', action, e);
       return { ok: false, code: (e && e.code) || 'NO_MODEL', error: fraseErrore(e) };
     }
     if (!attempts.some((a) => modelGate.supports(a.provider, 'decisions'))) {
@@ -356,15 +544,23 @@ module.exports = function register(on, ctx) {
     }
   }
 
-  const ttsFallback = (error, errorCode) => {
+  const ttsFallback = (error, errorCode, err = null) => {
+    // Chiave rifiutata o crediti finiti (#1344.1): l'avviso dice perché e porta alla pagina Crediti, non «non disponibile ora».
+    const W = globalThis.SN_WALLET;
+    const keyRefused = Boolean(err && W && typeof W.keyRefusalOf === 'function' && W.keyRefusalOf(err));
     // I guasti tecnici hanno testi che cambiano a ogni frase: contano come un motivo solo.
-    const motivo = errorCode ? `${errorCode}|${error}` : 'guasto';
+    const motivo = errorCode ? `${errorCode}|${error}` : (keyRefused ? 'chiave' : 'guasto');
     const firstFallback = ttsFallbackAnnounced !== motivo;
     ttsFallbackAnnounced = motivo;
     // `errorCode` distingue i guasti tecnici (che il content script traduce in
     // una frase generica) dagli errori di CONFIGURAZIONE dei modelli, il cui
     // messaggio è già scritto per l'utente e va mostrato tale e quale.
-    return { ok: false, error, errorCode: errorCode || '', firstFallback };
+    return {
+      ok: false, error, errorCode: errorCode || '', firstFallback,
+      ...(keyRefused ? { keyRefused: true, status: Number(err.status) || 0, provider: err.provider || '' } : {}),
+      ...(err && typeof err.userMessage === 'string' && err.userMessage ? { userMessage: err.userMessage } : {}),
+      ...(err && err.reason === 'crediti' ? { reason: 'crediti' } : {}),
+    };
   };
 
   // Una lettura coi suoi ripieghi di voce e di fornitore è un uso solo, per i contatori giornalieri (#969); i pezzi
@@ -385,6 +581,7 @@ module.exports = function register(on, ctx) {
     // Seam di test OPT-IN: nel CI headless non c'è né chiave né motore vocale, quindi si torna
     // PCM silenzioso. Opt-in per non alterare i test del degrado senza chiave.
     if (process.env.NODE_ENV === 'test' && globalThis.__filoTestTtsCanned) {
+      if (Array.isArray(globalThis.__filoTestTtsChieste)) globalThis.__filoTestTtsChieste.push({ text: String(msg.text || ''), voice: String(msg.voice || '') });
       const rate = 8000, seconds = 6;
       const audioBase64 = Buffer.alloc(rate * seconds * 2).toString('base64'); // PCM16 mono
       return { ok: true, audioBase64, mimeType: `audio/L16;rate=${rate}`, provider: 'test', model: 'test-tts' };
@@ -402,7 +599,8 @@ module.exports = function register(on, ctx) {
       } catch (e) {
         // Nessun modello di sintesi configurato: si legge col browser, ma il motivo vero passa al
         // content script, così l'avviso dice cosa manca invece di un codice interno.
-        return ttsFallback(e?.message || 'no_tts_model', e?.code);
+        ContatoriServizio.misura('maiPartita', SN_CONST.ACTIONS.TTS, e);
+        return ttsFallback(e?.message || 'no_tts_model', e?.code, e);
       }
       const Voices = globalThis.SN_TTS_VOICES;
       const ttsPrefs = (settings && settings.tts) || {};
@@ -440,6 +638,7 @@ module.exports = function register(on, ctx) {
             };
           }
         }
+        ContatoriServizio.misura('catena', SN_CONST.ACTIONS.TTS, attempts);
         try {
           // Chi ha servito e quanto è costato il router lo dice solo dopo: lo chiede il cancello, senza far aspettare la lettura.
           const r = await synthesizeWithVoiceRecovery((v) => modelGate.call({
@@ -460,9 +659,9 @@ module.exports = function register(on, ctx) {
           console.warn('[SN] TTS fallito:', e.message || e);
         }
       }
-      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code);
+      return ttsFallback((lastErr && lastErr.message) || 'tts_failed', lastErr && lastErr.code, lastErr);
     } catch (e) {
-      return ttsFallback(e?.message || String(e));
+      return ttsFallback(e?.message || String(e), '', e);
     }
   }
 
@@ -694,11 +893,15 @@ module.exports = function register(on, ctx) {
     return K && typeof K.senzaRipiego === 'function' ? K.senzaRipiego(call) : call();
   }
 
-  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché.
+  // L'errore di una prova, detto all'utente: un rifiuto della chiave col suo perché, un rifiuto del router con la stessa
+  // causa che direbbe la chat (#1345). Il resto col messaggio del servizio, che a chi prova un modello serve.
+  const RIFIUTI_DEL_ROUTER = new Set(['NO_ALLOWED_HOST', 'DATA_POLICY', 'NO_PROVIDER_ALLOWED', 'MODEL_UNAVAILABLE', 'NO_TOOL_HOST', 'PARAMETRI_HOST', 'TETTO_RISPOSTA', 'INGRESSO_NON_LETTO']);
   function provaFallita(e) {
     const W = globalThis.SN_WALLET;
     const st = W ? W.keyRefusalOf(e) : 0;
     if (st) return `OpenRouter ha rifiutato questa chiave (${W.keyRefusalReason(st)}).`;
+    const CE = globalThis.SN_CHAT_ERRORS;
+    if (CE && e && RIFIUTI_DEL_ROUTER.has(e.code)) return CE.sentence(e);
     return e?.message || String(e);
   }
 
@@ -902,13 +1105,23 @@ module.exports = function register(on, ctx) {
       const parole = (Array.isArray(msg && msg.parole) ? msg.parole : [])
         .filter((x) => typeof x === 'string').join('\n').slice(-200000);
       const u = await controllaUscita({ type: 'CERCA_WEB', query: msg && msg.query }, { sender, parole });
-      if (u.blocca) return { ok: false, blocked: 'segreto', frase: u.frase, results: [] };
+      if (u.blocca) {
+        ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg && msg.query }, { executed: false, output: { blocked: 'segreto' } }, sender);
+        return { ok: false, blocked: 'segreto', frase: u.frase, results: [] };
+      }
       const settings = await getEffectiveSettings();
       const tavilyKey = settings.apiKeys?.tavily || '';
-      const r = await WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5 });
+      // La ricerca porta la conversazione dell'Aiuto che l'ha chiesta, e se ne va con lei (#1561).
+      const chat = ctx.chatAiutoDi(sender);
+      const cerca = () => WebSearch.search({ query: msg.query, tavilyKey, maxResults: 5, da: 'aiuto' });
+      const r = await (chat ? require('../registroCambi').con({ chat }, cerca) : cerca());
       segnaLetturaAiuto(sender, { type: 'CERCA_WEB', query: msg.query, _output: r });
+      const results = Array.isArray(r?.results) ? r.results : [];
+      ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg.query },
+        { executed: results.length > 0, output: { search: msg.query, results, provider: r?.provider || '', reason: r?.reason || '' } }, sender);
       return { ok: true, ...r };
     } catch (e) {
+      ctx.azioneDellAiuto({ type: 'CERCA_WEB', query: msg && msg.query }, { executed: false, output: { error: e.message || String(e) } }, sender);
       return { ok: false, error: e.message || String(e), results: [] };
     }
   });

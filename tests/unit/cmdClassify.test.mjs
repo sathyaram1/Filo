@@ -1211,3 +1211,35 @@ test('git push — al remoto configurato si rimedia (2); a un indirizzo scritto 
     assert.equal(lvl(cmd), 3, `"${cmd}" (manda il codice a un server scelto nel comando) dovrebbe essere livello 3`);
   }
 });
+
+// #1909 — cancellare senza cestino si riconosce dal programma di ogni pezzo, anche nascosto dietro un altro comando.
+test('cancellaPerSempre: i comandi che cancellano senza cestino, in ogni shell', () => {
+  for (const cmd of [
+    'Remove-Item -LiteralPath "C:\\Users\\agenti AI\\Downloads\\bolletta.pdf"', 'ri x', 'rm -rf build', '/bin/rm x', 'sudo rm x',
+    'del /f /q a.txt', 'erase a.txt', 'rd /s /q vecchi', 'rmdir vuota', 'unlink a', 'shred -u a', 'cmd /c del x',
+    'bash -c "rm x"', 'powershell -NoProfile -Command Remove-Item x', 'ls && rm x', 'gci *.tmp | Remove-Item',
+    'gci | % { Remove-Item $_ }', 'gci | ForEach-Object { $_.Delete() }', '[System.IO.File]::Delete("a")',
+    'find . -name "*.log" -delete', 'find . -exec rm {} ;', 'ls | xargs rm', 'git clean -fdx', 'robocopy a b /MIR',
+    'Clear-RecycleBin -Force', 'r^m x', 'Re`move-Item x', 'env A=1 rm x', 'mkfs.ext4 /dev/sdb1',
+    // Il programma che cancella non in testa al comando.
+    '$null = Remove-Item -LiteralPath "a b.pdf"', '[void]$r = Remove-Item x', 'sudo -u root rm x', 'doas -u io rm x',
+    'FOR %f IN (*.tmp) DO del %f', 'for f in *.tmp; do rm "$f"; done', 'if [ -f x ]; then rm x; fi',
+    'forfiles /p "C:\\Users\\a" /m *.tmp /c "cmd /c del @file"', 'Start-Process powershell -ArgumentList "Remove-Item x"',
+    'Get-ChildItem x | ForEach-Object Delete', 'gci x | % Delete', 'python -c "import os; os.remove(\'x\')"',
+    'python3 -c "import shutil; shutil.rmtree(\'d\')"', 'node -e "require(\'fs\').rmSync(\'x\')"',
+    'node -e "fs.unlinkSync(\'x\')"', 'ruby -e "FileUtils.rm_rf(\'d\')"',
+  ]) assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+  for (const cmd of ['ls', 'dir', 'grep del a.txt', 'echo rm', 'mv a b', 'git status', 'git rm --cached x', 'Get-ChildItem',
+    'Move-Item a b', 'cat rm.txt', 'mkdir rm', 'find . -name x', '', '   ', 'echo do rm', 'grep unlink a.c', 'sudo -E ls rm.txt',
+    'git commit -m "do rm later"', '$x = Get-Item a', 'gci | % Name', 'Start-Process notepad']) {
+    assert.equal(C.cancellaPerSempre(cmd), false, cmd);
+  }
+});
+
+// Un elenco solo dei programmi che cancellano: chi chiede la parola è anche al costo più alto.
+test('cancellaPerSempre: ogni programma che cancella senza cestino è anche livello 3', () => {
+  for (const cmd of ['rm x', 'srm x', 'wipe x', 'rimraf x', 'Remove-Item x', 'ri x', 'Clear-RecycleBin', 'shred x', 'deltree x']) {
+    assert.equal(C.cancellaPerSempre(cmd), true, cmd);
+    assert.equal(lvl(cmd), 3, cmd);
+  }
+});

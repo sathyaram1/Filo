@@ -231,6 +231,97 @@ test('troppo grande e poi malformato sul listino: arriva quello snello senza lis
   assert.match(r.avviso, /9000.*8000/);
 });
 
+// SPEC-MANUTENTORE § 6: falliti e attese escono dal rapporto e vanno nei campi che il server tiene sul biglietto
+// (strumentiFalliti, attese); un server che non li conosce riceve tutto il resto.
+const conDati = {
+  ...RAPPORTO, listino: '2026-10-06', falliti: [{ strumento: 'Bash', errore: 'exit 1', dopo: 'riprovato uguale' }, { strumento: 'Bash', cosa: 'Run spec salva', errore: 'exit 1: ✘ salva' }],
+  attese: [{ strumento: 'Bash', cosa: 'Run unit tests', s: 240 }, { strumento: 'Read', cosa: '', s: 30 }], atteseOltre30: 1,
+};
+const conCampi = (b) => 'strumentiFalliti' in b || 'attese' in b;
+
+test('falliti e attese arrivano coi nomi del server, fuori dal rapporto; le attese da 30 s non partono', async () => {
+  const corpi = [];
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(r.rapporto, 'allegato');
+  assert.equal(corpi.length, 1);
+  assert.deepEqual(corpi[0].strumentiFalliti, [{ nome: 'Bash', errore: 'exit 1', poi: 'riprovato uguale' }, { nome: 'Bash: Run spec salva', errore: 'exit 1: ✘ salva' }]);
+  assert.deepEqual(corpi[0].attese, [{ cosa: 'Bash: Run unit tests', secondi: 240 }]);
+  assert.equal('falliti' in corpi[0].report, false);
+  assert.equal('attese' in corpi[0].report, false);
+  assert.equal(corpi[0].report.atteseOltre30, 1, 'il conto resta nel rapporto');
+  assert.equal(conDati.falliti.length, 2, 'l\'originale non viene mutilato');
+});
+
+test('la domanda di processo viaggia nel rilascio come domandaProcesso', async () => {
+  const corpi = [];
+  await releaseConRapporto('t', '', RAPPORTO, { processo: '  quale ordine per i due rilievi?  ', fetchImpl: async (u, init) => { corpi.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal(corpi[0].domandaProcesso, 'quale ordine per i due rilievi?');
+  const senza = [];
+  await releaseConRapporto('t', '', RAPPORTO, { fetchImpl: async (u, init) => { senza.push(JSON.parse(init.body)); return reply(200, { ok: true }); }, ...quiet });
+  assert.equal('domandaProcesso' in senza[0], false);
+});
+
+test('400 report_malformed su falliti e attese: il rapporto parte senza di loro, listino compreso, e lo si dice', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && conCampi(b) ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo strumentiFalliti' }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.equal(conCampi(corpi[1]), false);
+  assert.equal('atteseOltre30' in corpi[1].report, false);
+  assert.equal(corpi[1].report.listino, '2026-10-06', 'il listino, che il server conosce, resta');
+  assert.deepEqual(corpi[1].report.tools.byName, { Bash: 2 });
+  assert.match(r.avviso, /strumenti falliti e attese \(report_malformed: campo strumentiFalliti\): allegato senza/);
+});
+
+test('malformato anche senza falliti e attese: poi senza listino, poi senza rapporto, col dettaglio del primo rifiuto', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: `campo ${corpi.length}` }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'scartato');
+  assert.equal(corpi.length, 4);
+  assert.equal('listino' in corpi[2].report, false);
+  assert.equal('report' in corpi[3], false);
+  assert.match(r.avviso, /report_malformed: campo 1\): rilasciato SENZA rapporto/);
+});
+
+test('413 con falliti e attese: prima si tolgono loro, e l\'elenco degli strumenti resta', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return conCampi(b) ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8192 }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.deepEqual(corpi[1].report.tools.byName, { Bash: 2 });
+  assert.deepEqual(corpi[1].report.notes, ['una nota']);
+  assert.match(r.avviso, /9000 byte, massimo 8192\): allegato senza strumenti falliti e attese/);
+});
+
+test('413 anche senza falliti e attese: l\'ultimo tentativo è quello snello, senza nessuno dei due elenchi', async () => {
+  const corpi = [];
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && b.report.tools && b.report.tools.byName ? reply(413, { ok: false, reason: 'report_too_big', bytes: 9000, max: 8192 }) : reply(200, { ok: true });
+  };
+  const r = await releaseConRapporto('t', '', conDati, { fetchImpl, ...quiet });
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 3);
+  const ultimo = corpi[2];
+  assert.equal('byName' in ultimo.report.tools, false);
+  assert.equal(conCampi(ultimo), false);
+  assert.match(r.avviso, /senza l'elenco degli strumenti e le note, né falliti e attese/);
+});
+
 test('un altro rifiuto del server NON viene ritentato senza rapporto: il no è una risposta', async () => {
   let n = 0;
   const fetchImpl = async () => { n += 1; return reply(401, { ok: false, reason: 'dead_ticket' }); };
@@ -273,7 +364,7 @@ describe('pushRamoCorrente', () => {
     g(work, ['checkout', '-q', '-b', 'worker/7']);
     commitFile(work, 'a.js');
     const primo = pushRamoCorrente(work);
-    assert.deepEqual(primo, { ok: true, skipped: false, branch: 'worker/7' });
+    assert.deepEqual(primo, { ok: true, skipped: false, branch: 'worker/7', punta: g(work, ['rev-parse', 'HEAD']) });
     assert.equal(remoteSha(origin, 'worker/7'), g(work, ['rev-parse', 'HEAD']));
     // Rebase: A sparisce, al suo posto C. Origin ha A.
     g(work, ['reset', '-q', '--hard', 'HEAD~1']);
@@ -283,6 +374,7 @@ describe('pushRamoCorrente', () => {
     assert.equal(secondo.forced, true);
     assert.equal(remoteSha(origin, 'worker/7'), g(work, ['rev-parse', 'HEAD']),
       'il commit finale del worker deve essere su origin: il contenitore muore dopo il rilascio');
+    assert.equal(secondo.punta, remoteSha(origin, 'worker/7'), 'anche dopo il lease la punta è quella spinta');
   });
 
   test('qualcun altro ha spinto nel frattempo: il lease rifiuta e il push non riesce, con la causa', () => {
@@ -314,6 +406,8 @@ describe('pushRamoCorrente', () => {
     g(work, ['checkout', '-q', '--detach', 'HEAD']);
     const staccata = pushRamoCorrente(work);
     assert.equal(staccata.ok, true); assert.equal(staccata.skipped, true); assert.match(staccata.reason, /staccata/);
+    assert.equal(suMain.punta, undefined, 'niente spinto, niente punta da registrare');
+    assert.equal(staccata.punta, undefined);
   });
 
   test('origin irraggiungibile: ok falso con il motivo di git', () => {
@@ -417,6 +511,43 @@ describe('release da riga di comando', () => {
       assert.equal(rilascio.body.report.role, 'resolver');
       assert.equal(rilascio.body.report.ticket, 'tkt-cli');
       assert.ok(Array.isArray(rilascio.body.report.notes) && rilascio.body.report.notes.length >= 1, 'senza transcript: la nota c\'è');
+      // #2021: la punta lasciata dal rilascio arriva al server, che la scrive nel registro del ramo.
+      assert.equal(rilascio.body.branch, 'worker/10');
+      assert.equal(rilascio.body.sha, remoteSha(origin, 'worker/10'));
+    } finally { srv.close(); }
+  });
+
+  // #2021: la pulizia dopo il verdetto la committa e la spinge il rilascio; se la sua punta non arriva al server, il
+  // registro del ramo trova all'emissione dopo un commit che nessuna voce copre e segna il buco per sempre.
+  test('il commit fatto dopo l\'ultima consegna parte col rilascio, e il rilascio porta la sua punta', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { origin, work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/10b']);
+      commitFile(work, 'prova-del-giro.spec.mjs');
+      g(work, ['push', '-q', 'origin', 'HEAD:refs/heads/worker/10b']);
+      const consegnato = g(work, ['rev-parse', 'HEAD']);
+      g(work, ['rm', '-q', 'prova-del-giro.spec.mjs']);
+      g(work, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '-m', 'via le prove dei rilievi messi da parte']);
+      const r = await cli(['release', 'tkt-cli', '--role', 'verifier', '--senza-rapporto'], {
+        FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
+      });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      const punta = remoteSha(origin, 'worker/10b');
+      assert.notEqual(punta, consegnato, 'la pulizia è arrivata su origin');
+      const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', domandaAlRilascio: true, branch: 'worker/10b', sha: punta });
+    } finally { srv.close(); }
+  });
+
+  test('push saltato (ramo protetto): il rilascio non dichiara nessuna punta', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { work } = scena();
+    try {
+      const r = await cli(['release', 'tkt-cli', '--senza-rapporto'], { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1' });
+      assert.equal(r.code, 0, `stderr: ${r.se}`);
+      assert.match(r.se, /push saltato/);
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli', domandaAlRilascio: true });
     } finally { srv.close(); }
   });
 
@@ -435,6 +566,27 @@ describe('release da riga di comando', () => {
     } finally { srv.close(); }
   });
 
+  // Un push a mano in cloud resta fermo sul controllo dei permessi (#1797): in routine la strada è il guasto, e regge.
+  test('push fallito in una routine: niente push a mano, e il rilascio col guasto che suggerisce passa', async () => {
+    const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
+    const { work } = scena();
+    try {
+      g(work, ['checkout', '-q', '-b', 'worker/11b']);
+      g(work, ['remote', 'set-url', 'origin', resolve(work, 'non-esiste.git')]);
+      commitFile(work, 'lavoro.js');
+      const env = { FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1', FILO_ROUTINE: '1' };
+      const r = await cli(['release', 'tkt-cli'], env);
+      assert.notEqual(r.code, 0);
+      assert.match(r.se, /Non spingere a mano/);
+      assert.doesNotMatch(r.se, /sistema il push/);
+      assert.match(r.se, /--guasto "guasto: github: [^"]*" --senza-push/);
+      const g2 = await cli(['release', 'tkt-cli', '--guasto', 'guasto: github: push rifiutato', '--senza-push'], env);
+      assert.equal(g2.code, 0, `stderr: ${g2.se}`);
+      assert.match(g2.so, /guasto dichiarato/);
+      assert.equal(ricevute.filter((x) => x.url.includes('routineRelease')).length, 1);
+    } finally { srv.close(); }
+  });
+
   test('--senza-push e --senza-rapporto: rilascio nudo, come prima', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
     const { work } = scena();
@@ -446,7 +598,7 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' });
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true });
     } finally { srv.close(); }
   });
 
@@ -462,7 +614,7 @@ describe('release da riga di comando', () => {
     try {
       const r = await cli(nudo, env, { ...process.env, FILO_ROUTINE: '1', FILO_TRANSCRIPT: transcript });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
-      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo' });
+      assert.deepEqual(rilasci()[0].body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true });
       const d = await cli(nudo, { ...env, FILO_TRANSCRIPT: transcript });
       assert.equal(d.code, 0, `stderr: ${d.se}`);
       assert.equal(rilasci()[1].body.consumo.sessionId, 'sessione-viva', 'il transcript finto si misura: la prova sopra distingue');
@@ -497,7 +649,7 @@ describe('release da riga di comando', () => {
         FILO_ROUTINE_API: `http://127.0.0.1:${port}`, FILO_REPO_ROOT: work, FILO_NO_BEAT: '1',
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
-      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli' });
+      assert.deepEqual(ricevute.find((x) => x.url.includes('routineRelease')).body, { ticket: 'tkt-cli', domandaAlRilascio: true });
       assert.equal(g(work, ['status', '--porcelain']), '');
     } finally {
       for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
@@ -509,7 +661,7 @@ describe('release da riga di comando', () => {
   // lo trovava col ripiego del «più recente». Qui la si ricrea anche fuori da una routine.
   test('una routine che lancia le prove non entra nel rilascio provato: né il suo consumo nel corpo, né il suo stato nella cartella', async () => {
     const { srv, port, ricevute } = await fintoServer(() => ({ status: 200, reply: { ok: true } }));
-    const { base, work } = scena();
+    const { base, origin, work } = scena();
     const config = resolve(base, 'claude-di-chi-lancia');
     const progetto = resolve(config, 'projects', slugProgetto(process.cwd()));
     mkdirSync(progetto, { recursive: true });
@@ -526,7 +678,8 @@ describe('release da riga di comando', () => {
       });
       assert.equal(r.code, 0, `stderr: ${r.se}`);
       const rilascio = ricevute.find((x) => x.url.includes('routineRelease'));
-      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo' }, 'il consumo di chi lancia non è del rilascio provato');
+      assert.deepEqual(rilascio.body, { ticket: 'tkt-cli', fault: 'motivo', domandaAlRilascio: true, branch: 'worker/14', sha: remoteSha(origin, 'worker/14') },
+        'il consumo di chi lancia non è del rilascio provato');
       assert.equal(g(work, ['status', '--porcelain']), '', 'niente di chi lancia resta nella cartella di prova');
       assert.equal(g(work, ['log', '-1', '--format=%an']), 'claude-local', 'chi committa è la prova, non la routine che la lancia');
     } finally {
@@ -539,7 +692,7 @@ describe('release da riga di comando', () => {
 // ─── Giro 2 della verifica (16/09/2026): il lease dopo un fetch ─────────────
 // --force-with-lease senza valore atteso si fida del ref remoto che la copia
 // conosce: dopo un `git fetch` quel ref è già il commit dell'altro, il lease
-// combacia e il rinvio lo sovrascrive. --force-if-includes lo rifiuta.
+// combacia e il rinvio lo sovrascrive. Il valore atteso, che deve essere passato dal reflog del ramo, lo rifiuta.
 test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: il rinvio NON sovrascrive il suo commit', () => {
   const { base, origin, work } = scena();
   g(work, ['checkout', '-q', '-b', 'worker/9']);
@@ -557,6 +710,80 @@ test('qualcun altro ha spinto E questa copia lo ha già scaricato con un fetch: 
   const r = pushRamoCorrente(work);
   assert.equal(r.ok, false, `il push doveva essere rifiutato: ${JSON.stringify(r)}`);
   assert.equal(remoteSha(origin, 'worker/9'), b, 'il commit dell\'altro resta su origin');
+});
+
+// ─── #1776: il clone delle routine nasce senza reflog delle tracce remote ────
+// --force-if-includes lo rifiutava sempre («remote ref updated since checkout»): il riallineamento non arrivava.
+function cloneDelGiro(base, origin, ramo, nome) {
+  const copia = resolve(base, nome);
+  g(base, ['clone', '-q', origin, copia]);
+  g(copia, ['checkout', '-q', ramo]);
+  return copia;
+}
+function ramoSuOriginEMainAvanti(nome) {
+  const { base, origin, work } = scena();
+  g(work, ['checkout', '-q', '-b', nome]);
+  commitFile(work, 'lavoro.js');
+  g(work, ['push', '-q', 'origin', nome]);
+  g(work, ['checkout', '-q', 'main']);
+  commitFile(work, 'main-avanti.js');
+  g(work, ['push', '-q', 'origin', 'main']);
+  return { base, origin, work };
+}
+
+test('#1776 clone appena nato, ramo riallineato a main: il rilascio lo spedisce', () => {
+  const { base, origin } = ramoSuOriginEMainAvanti('worker/11');
+  const copia = cloneDelGiro(base, origin, 'worker/11', 'giro');
+  assert.throws(() => g(copia, ['reflog', 'exists', 'refs/remotes/origin/worker/11']),
+    'la condizione del difetto: la traccia remota non ha reflog');
+  g(copia, ['fetch', '-q', 'origin', 'main']);
+  g(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+  const r = pushRamoCorrente(copia);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(r.forced, true);
+  assert.equal(remoteSha(origin, 'worker/11'), g(copia, ['rev-parse', 'HEAD']), 'su origin c\'è il ramo riallineato');
+  assert.ok(g(origin, ['ls-tree', '--name-only', 'worker/11']).includes('main-avanti.js'));
+});
+
+test('#1776 clone appena nato, e qualcun altro ha spinto sul ramo prima del fetch: il suo commit resta', () => {
+  const { base, origin } = ramoSuOriginEMainAvanti('worker/12');
+  const copia = cloneDelGiro(base, origin, 'worker/12', 'giro');
+  const altro = cloneDelGiro(base, origin, 'worker/12', 'altro');
+  commitFile(altro, 'di-un-altro.js');
+  g(altro, ['push', '-q', 'origin', 'worker/12']);
+  const suo = g(altro, ['rev-parse', 'HEAD']);
+  g(copia, ['fetch', '-q', 'origin']);
+  g(copia, ['-c', 'user.email=t@t', '-c', 'user.name=t', 'rebase', '-q', 'origin/main']);
+  const r = pushRamoCorrente(copia);
+  assert.equal(r.ok, false, JSON.stringify(r));
+  assert.match(r.reason, /qualcun altro ha spinto/);
+  assert.equal(remoteSha(origin, 'worker/12'), suo, 'il commit dell\'altro resta su origin');
+});
+
+test('#1776 la traccia remota è un antenato di un commit passato dal ramo, anche oltre i primi 200 del reflog: si spedisce', () => {
+  const { origin, work } = scena();
+  const radice = g(work, ['rev-parse', 'main']);
+  g(work, ['checkout', '-q', '--detach']);
+  commitFile(work, 'a.js');
+  const a = g(work, ['rev-parse', 'HEAD']);
+  commitFile(work, 'b.js');
+  const b = g(work, ['rev-parse', 'HEAD']);
+  g(work, ['push', '-q', 'origin', `${a}:refs/heads/worker/13`]);
+  g(work, ['fetch', '-q', 'origin']);
+  g(work, ['checkout', '-q', '-b', 'worker/13', b]);
+  // 250 commit distinti che non contengono a: il passato che lo contiene finisce nel secondo blocco.
+  const flusso = Array.from({ length: 250 }, (_, i) => `commit refs/heads/riempitivo\ncommitter t <t@t> ${1700000000 + i} +0000\ndata ${String(i).length}\n${i}\n${i ? '' : `from ${radice}\n`}\n`).join('');
+  execFileSync('git', ['fast-import', '--quiet'], { cwd: work, input: flusso, stdio: ['pipe', 'pipe', 'pipe'] });
+  const riempitivi = g(work, ['rev-list', 'riempitivo', `^${radice}`]).split('\n');
+  assert.equal(riempitivi.length, 250);
+  const log = resolve(work, '.git', 'logs', 'refs', 'heads', 'worker', '13');
+  writeFileSync(log, readFileSync(log, 'utf8') + riempitivi.map((s) => `${b} ${s} t <t@t> 1700000000 +0000\triempitivo\n`).join(''), 'utf8');
+  g(work, ['reset', '-q', '--hard', radice]);
+  commitFile(work, 'c.js');
+  assert.equal(mod.leaseAtteso(work, 'worker/13'), a);
+  const r = pushRamoCorrente(work);
+  assert.equal(r.ok, true, JSON.stringify(r));
+  assert.equal(remoteSha(origin, 'worker/13'), g(work, ['rev-parse', 'HEAD']));
 });
 
 // ─── commitRestante nel mezzo di un conflitto ────────────────────────────────
@@ -628,4 +855,24 @@ test('«[remote rejected]» (pre-receive, regola del repo, push protection): non
   assert.doesNotMatch(r.reason, /force-with-lease|qualcun altro ha spinto/i, 'non è storia divergente: un rebase non lo cura');
   assert.match(r.reason, /GH013/, 'col motivo del remoto');
   assert.notEqual(remoteSha(origin, 'worker/10'), g(work, ['rev-parse', 'HEAD']));
+});
+
+// #2121: un server che non conosce ancora i dollari della cache toglie quelli, non strumenti falliti e attese.
+test('400 report_malformed sui dollari della cache: escono solo quelli, falliti e attese arrivano', async () => {
+  const corpi = [];
+  const conCache = {
+    ...RAPPORTO, cache: { scrittaUsd: 1, rewarmUsd: 0, sovrapprezzoOraUsd: 0, risparmioOraUsd: 0, risparmioSeTuttoUsd: 0 },
+    attese: [{ strumento: 'Bash', cosa: 'unit', s: 400 }],
+  };
+  const fetchImpl = async (u, init) => {
+    const b = JSON.parse(init.body); corpi.push(b);
+    return b.report && 'cache' in b.report ? reply(400, { ok: false, reason: 'report_malformed', detail: 'campo cache' }) : reply(200, { ok: true });
+  };
+  const r = await mod.releaseConRapporto('t', '', conCache, { fetchImpl, ...quiet });
+  assert.equal(r.ok, true);
+  assert.equal(r.rapporto, 'ridotto');
+  assert.equal(corpi.length, 2);
+  assert.equal('cache' in corpi[1].report, false);
+  assert.deepEqual(corpi[1].attese, [{ cosa: 'Bash: unit', secondi: 400 }]);
+  assert.match(r.avviso, /campo cache \(report_malformed: campo cache\): allegato senza\./);
 });

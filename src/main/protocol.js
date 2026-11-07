@@ -1,6 +1,6 @@
 // Protocollo filo://: serve pagine interne e asset dal disco (la tabella
 // host → cartella sta in filoHandler). Registrato standard+secure+fetch, quindi
-// non deve MAI servire un file fuori dalla root del progetto.
+// non deve MAI servire un file fuori dalla root del progetto (filo://icone: dalla cartella dati).
 
 const { protocol, net } = require('electron');
 const path = require('node:path');
@@ -20,6 +20,8 @@ const FILO_PAGE_CSP = [
   "font-src 'self' filo: data:",
   "connect-src 'self' filo: https: data: blob:",
   "frame-src 'self' filo: https:",
+  // Un sito non incornicia una pagina di Filo (#1506).
+  "frame-ancestors 'self' filo:",
   "object-src 'none'",
   "base-uri 'none'",
 ].join('; ');
@@ -97,12 +99,17 @@ async function filoHandler(request) {
 
     const spostato = indirizzoSpostato(host, rel);
     if (spostato) return new Response(null, { status: 302, headers: { Location: spostato } });
+    // Le icone che Filo tiene per pagine salvate e schede archiviate (#1273) stanno nella cartella dati, non nel pacchetto.
+    if (host === 'icone') return require('./services/copieIcone').risposta(rel);
 
     let fsPath;
     if (host === 'shell') {
       fsPath = path.join(SRC, 'renderer', rel || 'shell.html');
     } else if (host === 'newtab') {
-      fsPath = path.join(SRC, 'pages', 'dashboard', rel || 'dashboard.html');
+      // La home sta nella cartella dashboard: «newtab.html» è il nome che la regola <host>/<host>.html delle altre
+      // pagine fa scrivere, e deve aprire la home invece di un file che non c'è (#830.4).
+      const home = !rel || rel.toLowerCase() === 'newtab.html';
+      fsPath = path.join(SRC, 'pages', 'dashboard', home ? 'dashboard.html' : rel);
     } else if (host === 'asset') {
       fsPath = path.join(ASSETS, rel);
     } else if (host === 'style') {

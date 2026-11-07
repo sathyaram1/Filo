@@ -366,6 +366,18 @@ jobs:
             fi
           fi
 
+      # Le novita' riscritte dal redattore del manutentore (SPEC-MANUTENTORE
+      # § 8), in locale come il numero. Non ferma mai la pubblicazione: senza
+      # risposta escono le righe dei worker, con l'avviso.
+      - name: Le novita' del redattore (in locale)
+        id: novita
+        if: steps.check.outputs.should_release == 'true'
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          VERSIONE: ${{ steps.bump.outputs.version }}
+        shell: bash
+        run: node scripts/release-novita.mjs "$VERSIONE" || echo "::warning::novita' del redattore non messe"
+
       - name: Build e upload su GitHub Releases (come bozza)
         if: steps.check.outputs.should_release == 'true'
         env:
@@ -519,6 +531,7 @@ jobs:
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
@@ -598,6 +611,18 @@ jobs:
             echo "::error::qui non c'e' il codice di ${ATTESA} (${CODICE:-niente}): non allego un pacchetto sbagliato."
             exit 1
           fi
+
+      # Le novita' del redattore, le stesse della meta' Windows: il server le
+      # ha fermate alla prima lettura. Dallo strumento di questa corsa, perche'
+      # una versione vecchia non ce l'ha.
+      - name: Le novita' del redattore (in locale)
+        id: novita
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          # Il numero di un avvio a mano lo scrive una persona: entra come variabile, mai dentro lo script.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+        shell: bash
+        run: node "${{ runner.temp }}/strumenti/release-novita.mjs" "$VERSIONE" || echo "::warning::novita' del redattore non messe"
 
       # Stesso passo dell'altra meta', e per lo stesso motivo: senza le chiavi
       # incastonate l'app arriva muta. Va rifatto qui perche' il file generato
@@ -777,6 +802,7 @@ jobs:
           mkdir -p "${{ runner.temp }}/allarme/scripts" "${{ runner.temp }}/strumenti"
           cp scripts/release-platform-alarm.mjs scripts/build-alarm.mjs scripts/release-impronte.mjs "${{ runner.temp }}/allarme/scripts/"
           cp scripts/npm-ci-ritenta.mjs "${{ runner.temp }}/strumenti/"
+          cp scripts/release-novita.mjs "${{ runner.temp }}/strumenti/"
           cp scripts/release-impronte.mjs "${{ runner.temp }}/strumenti/"
 
       # Il numero della versione e il codice da costruire vengono da due posti
@@ -856,6 +882,18 @@ jobs:
             echo "::error::qui non c'e' il codice di ${ATTESA} (${CODICE:-niente}): non allego un pacchetto sbagliato."
             exit 1
           fi
+
+      # Le novita' del redattore, le stesse della meta' Windows: il server le
+      # ha fermate alla prima lettura. Dallo strumento di questa corsa, perche'
+      # una versione vecchia non ce l'ha.
+      - name: Le novita' del redattore (in locale)
+        id: novita
+        env:
+          FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
+          # Il numero di un avvio a mano lo scrive una persona: entra come variabile, mai dentro lo script.
+          VERSIONE: ${{ steps.bersaglio.outputs.versione }}
+        shell: bash
+        run: node "${{ runner.temp }}/strumenti/release-novita.mjs" "$VERSIONE" || echo "::warning::novita' del redattore non messe"
 
       # Senza le chiavi incastonate l'app arriva muta. Va rifatto anche qui
       # perche' il file generato non sta nel repo: vive solo dentro la macchina

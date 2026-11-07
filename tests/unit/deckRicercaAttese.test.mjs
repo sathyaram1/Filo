@@ -44,3 +44,31 @@ test('un lotto fermato dal tetto della risposta non si ripaga', async () => {
   assert.equal(chiamate, 1);
   assert.equal(r.error.code, 'RISPOSTA_TAGLIATA');
 });
+
+// #1302: venti lotti a servizio occupato. Deciso che è giù, i lotti rimasti non chiamano più (prima ognuno faceva la sua
+// chiamata con la sua attesa: cinquanta-ottanta secondi prima di dirlo), e le loro carte restano non controllate.
+test('a servizio giù i lotti rimasti non chiamano più', async () => {
+  const molte = {};
+  for (let i = 0; i < 1000; i++) molte[`c${i}`] = { id: `c${i}`, name: `Carta ${i}`, type_line: 'Artifact', oracle_text: '{T}: Add {C}.' };
+  const ora = Date.now;
+  let avanti = 0;
+  Date.now = () => ora() + avanti;
+  let chiamate = 0;
+  try {
+    const r = await S.filterSearch({
+      criterion: 'artefatti che danno mana', cardIds: Object.keys(molte), cards: molte,
+      handleAIRequest: async ({ signal }) => {
+        chiamate += 1;
+        avanti += 6000;
+        await new Promise((ok) => setTimeout(ok, 20));
+        if (signal && signal.aborted) throw Object.assign(new Error('fermata'), { name: 'AbortError' });
+        throw Object.assign(new Error('OpenRouter 429: rate limited'), { status: 429 });
+      },
+    });
+    assert.ok(r.error, 'il servizio giù si dice');
+    assert.equal(r.unverifiedIds.length, 1000, 'nessuna carta sparisce');
+    assert.ok(chiamate < 20, `chiamate: ${chiamate}`);
+  } finally {
+    Date.now = ora;
+  }
+});

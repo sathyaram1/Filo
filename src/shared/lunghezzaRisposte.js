@@ -6,7 +6,9 @@
   'use strict';
 
   const FAMIGLIE = Object.freeze(['conversazioni', 'testi', 'brevi']);
-  const DI_SERIE = Object.freeze({ conversazioni: 16384, testi: 16384, brevi: 8192 });
+  // Dimensionati su un modello che ragiona a sforzo alto (#1302): il ragionamento sta dentro il tetto, e a un tetto
+  // stretto la risposta resta a metà. Un host che non regge il tetto fa scendere la richiesta al massimo che regge.
+  const DI_SERIE = Object.freeze({ conversazioni: 65536, testi: 65536, brevi: 32768 });
   const LIMITI = Object.freeze([1024, 262144]);
   const NOMI = Object.freeze({
     conversazioni: 'chat e conversazioni',
@@ -17,7 +19,7 @@
   const A = () => (global.SN_CONST && global.SN_CONST.ACTIONS) || {};
   // Le funzioni che non scrivono testo (voce, dettatura, vettori, classificatori a domande chiuse) non hanno tetto.
   const SENZA = ['TTS', 'TRANSCRIBE_AUDIO', 'ARCHIVE_EMBED', 'MANAGE_SEARCH_CLASSIFY'];
-  const CONVERSAZIONI = ['FILO_CHAT', 'FILO_DASHBOARD', 'HELP', 'EDITOR_CHAT', 'DECKS_CHAT', 'EXPLAIN_DEEP'];
+  const CONVERSAZIONI = ['FILO_CHAT', 'FILO_DASHBOARD', 'HELP', 'DECKS_CHAT', 'EXPLAIN_DEEP'];
   const BREVI = [
     'EXPLAIN', 'EXPLAIN_LINK', 'DESCRIBE_IMAGE', 'CATEGORIZE', 'SPELLCHECK_SEMANTIC',
     'HELP_INTENT_GUESS', 'HELP_INTENT_JUDGE', 'FILO_TAB_TRIAGE', 'FILO_CHAT_TRIAGE', 'FILO_TAB_SEARCH',
@@ -62,6 +64,13 @@
     return f ? tetti(utente, owner)[f] : null;
   }
 
+  // Il tetto di un «Continua»: la risposta di prima ci è già finita contro, e ripartire con lo stesso la fermerebbe allo
+  // stesso punto quando il tetto è andato nel ragionamento (#1302).
+  function perSeguito(tetto) {
+    const n = Number(tetto);
+    return Number.isFinite(n) && n > 0 ? Math.min(LIMITI[1], Math.round(n * 2)) : tetto;
+  }
+
   // Solo le famiglie note, coi valori nei limiti: quello che si salva (owner o utente).
   function pulisci(o) {
     const src = o && typeof o === 'object' ? o : {};
@@ -70,5 +79,5 @@
     return out;
   }
 
-  global.SN_LUNGHEZZA_RISPOSTE = { FAMIGLIE, DI_SERIE, LIMITI, NOMI, famigliaDi, numeroIn, tetti, perAzione, pulisci };
+  global.SN_LUNGHEZZA_RISPOSTE = { FAMIGLIE, DI_SERIE, LIMITI, NOMI, famigliaDi, numeroIn, tetti, perAzione, perSeguito, pulisci };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

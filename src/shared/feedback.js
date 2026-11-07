@@ -17,6 +17,18 @@
   const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${PROJECT_ID}/databases/(default)/documents`;
   const STORAGE_BASE = `https://firebasestorage.googleapis.com/v0/b/${BUCKET}/o`;
 
+  // Fuori da Electron chi carica questo modulo è uno strumento, e può scansionare le schede pubbliche senza credenziali:
+  // il freno sulle scansioni si installa qui, comunque il modulo sia stato nominato (#1335). Una copia del modulo fuori
+  // dal repo non ha il freno accanto, e va avanti senza.
+  if (typeof require === 'function' && typeof __dirname === 'string' && typeof process !== 'undefined'
+      && process.versions && process.versions.node && !process.versions.electron) {
+    try {
+      require(require('path').join(__dirname, '..', '..', 'scripts', 'lib', 'freno-letture.cjs'));
+    } catch (e) {
+      if (!e || e.code !== 'MODULE_NOT_FOUND') throw e;
+    }
+  }
+
   // L'uuid è ANCHE il segreto del percorso di un allegato: storage.rules concede la creazione
   // solo su un nome che lo contiene, quindi i bit vengono dal generatore crittografico.
   function uuid() {
@@ -46,6 +58,20 @@
   function attachmentPath(label) {
     const et = String(label || '').toLowerCase().replace(/[^a-z]/g, '').slice(0, 16);
     return `${COLLECTION}/${et ? `${et}_` : ''}${Date.now()}_${uuid()}.${ATTACHMENT_EXT}`;
+  }
+
+  // La voce di `files[]` come la ammettono le regole (documentoAllegato in firestore.rules): solo url, nome e tipo,
+  // nei tetti. Un nome oltre il tetto perde la parte centrale, non l'estensione; un tipo oltre il tetto non è un tipo.
+  const VOCE_DOCUMENTO = Object.freeze({ NOME_MAX: 500, TIPO_MAX: 255 });
+  function voceDocumento(url, name, type) {
+    let nome = Array.from(String(name || 'allegato'));
+    if (nome.length > VOCE_DOCUMENTO.NOME_MAX) {
+      const punto = nome.lastIndexOf('.');
+      const ext = punto > 0 && nome.length - punto <= 20 ? nome.slice(punto) : [];
+      nome = nome.slice(0, VOCE_DOCUMENTO.NOME_MAX - ext.length - 1).concat('…', ext);
+    }
+    const tipo = String(type || '');
+    return { url: String(url), name: nome.join(''), type: tipo.length <= VOCE_DOCUMENTO.TIPO_MAX ? tipo : '' };
   }
 
   // Host → inizi ammessi, NOME DEL DEPOSITO compreso: REST di Firebase e diretto di Storage.
@@ -95,12 +121,23 @@
     return `${host}${resto.slice(0, limite - host.length - 1)}…`;
   }
 
-  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo
-  // invio uguale viene rifiutato. Id non ammesso → '', cioè nessuna idempotenza.
+  // Anti-duplicati (#370): col submissionId il documento nasce con QUELL'id, e un secondo invio uguale viene rifiutato.
+  // Id fuori dalla forma che le regole chiedono alla create anonima (#1517) → '', cioè nessuna idempotenza.
   function sanitizeDocId(id) {
     if (!id) return '';
-    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 200);
-    if (!s || s === '.' || s === '..' || /^__.*__$/.test(s)) return '';
+    const s = String(id).replace(/[^A-Za-z0-9_-]/g, '').slice(0, 128);
+    if (s.length < 20 || /^__.*__$/.test(s)) return '';
+    return s;
+  }
+
+  // Un id che nessuno indovina, della forma degli id automatici di Firestore: un invio che occupa un id ricavato da
+  // dati pubblici fa passare un 409 per «già scritto da me» (#1517).
+  const ALFABETO_ID = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  function idCasuale(lunghezza = 24) {
+    const byte = new Uint8Array(lunghezza);
+    global.crypto.getRandomValues(byte);
+    let s = '';
+    for (const b of byte) s += ALFABETO_ID[b % ALFABETO_ID.length];
     return s;
   }
 
@@ -141,7 +178,7 @@
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
-      throw new Error(`upload storage fallito (${res.status}): ${text.slice(0, 200)}`);
+      throw Object.assign(new Error(`upload storage fallito (${res.status}): ${text.slice(0, 200)}`), { status: res.status });
     }
     const json = await res.json();
     const token = json.downloadTokens || (json.metadata?.downloadTokens) || '';
@@ -260,6 +297,76 @@
     constructor(message) { super(message); this.name = 'ErroreCifratura'; this.cifratura = true; }
   }
   function isEncryptionError(e) { return !!(e && e.cifratura === true); }
+
+  // Un feedback senza testo e senza nessun allegato salito non nasce (#1667): per chi lo legge sarebbe una scheda
+  // vuota. `permanente`: riprovare non cambia niente (troppo grande, vuoto, rifiutato dal deposito).
+  const TETTO_ALLEGATO = 4 * 1024 * 1024;
+  const TROPPO_GRANDE = 'troppo grande (max 4 MB)';
+  function messaggioVuoto(failed) {
+    const elenco = fraseAllegatiSaltati(failed);
+    return elenco
+      ? `Il feedback non è partito: senza testo, e nessun allegato è salito (${elenco}).`
+      : 'Il feedback non è partito: era vuoto.';
+  }
+  class ErroreVuoto extends Error {
+    constructor(failed) {
+      super(messaggioVuoto(failed));
+      this.name = 'ErroreVuoto';
+      this.vuoto = true;
+      this.allegatiFalliti = Array.isArray(failed) ? failed : [];
+      this.permanente = this.allegatiFalliti.every((f) => f && f.permanente);
+    }
+  }
+
+  /** «nome»: motivo; «nome»: motivo. PURA. */
+  function fraseAllegatiSaltati(failed) {
+    return (Array.isArray(failed) ? failed : [])
+      .map((f) => `«${String((f && f.name) || 'allegato')}»: ${String((f && f.reason) || 'caricamento non riuscito')}`)
+      .join('; ');
+  }
+
+  /** I byte di un data URL base64, senza decodificarlo. PURA. */
+  function byteDiDataUrl(dataUrl) {
+    const s = String(dataUrl || '');
+    const corpo = s.slice(s.indexOf(',') + 1);
+    const pad = corpo.endsWith('==') ? 2 : (corpo.endsWith('=') ? 1 : 0);
+    return Math.max(0, Math.floor((corpo.length * 3) / 4) - pad);
+  }
+
+  /** Gli allegati che non saliranno comunque, decisi senza rete: lo stesso vaglio per chi accoda e per submit. PURA. */
+  function vagliaAllegati(images, files) {
+    const failed = [];
+    const immagini = [];
+    (Array.isArray(images) ? images.slice(0, 5) : []).forEach((img, i) => {
+      if (!img || !img.dataUrl) return;
+      const name = String(img.name || `immagine ${i + 1}`);
+      if (byteDiDataUrl(img.dataUrl) > TETTO_ALLEGATO) failed.push({ name, reason: TROPPO_GRANDE, permanente: true });
+      else immagini.push({ name, dataUrl: img.dataUrl });
+    });
+    const documenti = [];
+    for (const f of (Array.isArray(files) ? files.slice(0, 5) : [])) {
+      const name = String((f && f.name) || 'allegato');
+      if (!f || !f.dataUrl) failed.push({ name, reason: 'file vuoto', permanente: true });
+      else if (byteDiDataUrl(f.dataUrl) > TETTO_ALLEGATO) failed.push({ name, reason: TROPPO_GRANDE, permanente: true });
+      else documenti.push({ name, type: f.type, dataUrl: f.dataUrl });
+    }
+    return { immagini, documenti, failed };
+  }
+
+  /** null se il feedback avrebbe qualcosa dentro, altrimenti gli allegati che già si sa che non saliranno. PURA. */
+  function vuotoInPartenza({ text, images, files } = {}) {
+    if (String(text || '').trim()) return null;
+    const v = vagliaAllegati(images, files);
+    return v.immagini.length || v.documenti.length ? null : v.failed;
+  }
+
+  // Un 4xx del deposito (tranne attesa e troppe richieste) è un no: riprovare dà lo stesso no.
+  function motivoCaricamento(e) {
+    const s = Number(e && e.status) || 0;
+    return s >= 400 && s < 500 && s !== 408 && s !== 429
+      ? { reason: 'rifiutato dal deposito', permanente: true }
+      : { reason: 'caricamento non riuscito', permanente: false };
+  }
 
   // Cifra i byte di un allegato prima dell'upload su Storage. Ritorna un Blob
   // con contentType application/octet-stream (il contenuto è opaco: ciphertext
@@ -562,7 +669,9 @@
     // `soloAdmin`: chi chiama vuole la prova o niente (lo script delle sessioni locali).
     // #903: le attese le scrive solo l'admin; da anonimo il feedback partirebbe senza, e senza dirlo.
     const attese = (opts && Array.isArray(opts.waitsFor) && opts.waitsFor.length) ? attesePerScrittura(opts.waitsFor) : [];
-    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length);
+    // Le segnalazioni unite da un pacchetto (SPEC-RIDISEGNO-LAVORO.md § 2): stessa forma e stesso tetto delle attese.
+    const unite = (opts && Array.isArray(opts.unisce) && opts.unisce.length) ? attesePerScrittura(opts.unisce) : [];
+    const soloAdmin = !!((opts && opts.soloAdmin) || localOnly || attese.length || unite.length);
     // `accessoOwner`: chi chiama distingue l'accesso che manca dalla rete che manca (la coda d'invio aspetta, non rinuncia).
     if (soloAdmin && !idToken) throw Object.assign(new Error('create senza token admin (401): questo feedback non parte da anonimo'), { accessoOwner: true });
     // NIENTE PARTE SE NON SI PUÒ CIFRARE (#602). Il controllo sta QUI, prima di
@@ -576,22 +685,15 @@
     // Allegati che NON sono riusciti a caricarsi: li riportiamo al chiamante
     // così la UI può avvisare l'utente (un upload fallito veniva ingoiato in
     // silenzio e il feedback partiva senza il file, senza alcun segnale).
-    const failed = [];
-    const imgs = Array.isArray(images) ? images.slice(0, 5) : [];
+    // Il limite si misura sul raw: la cifratura aggiunge una novantina di byte fissi.
+    const vaglio = vagliaAllegati(images, files);
+    const failed = vaglio.failed.slice();
     const uploaded = [];
-    for (let i = 0; i < imgs.length; i++) {
-      const img = imgs[i];
-      if (!img?.dataUrl) continue;
-      const rawBlob = dataUrlToBlob(img.dataUrl);
-      // Limite misurato sul raw: la cifratura aggiunge una novantina di byte fissi.
-      if (rawBlob.size > 4 * 1024 * 1024) {
-        failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'troppo grande (max 4 MB)' });
-        continue;
-      }
+    for (const img of vaglio.immagini) {
       try {
         // S1.2: cifra i byte prima dell'upload. Da #602 `sealForUpload` lancia
         // invece di ripiegare sul blob in chiaro.
-        const blobToUpload = await sealForUpload(rawBlob);
+        const blobToUpload = await sealForUpload(dataUrlToBlob(img.dataUrl));
         const u = await uploadImage(blobToUpload);
         uploaded.push(u.url);
       } catch (e) {
@@ -600,29 +702,32 @@
         // immagini già caricate sono cifrate, e il documento non esiste ancora.
         if (isEncryptionError(e)) throw e;
         console.warn('[SN feedback] upload immagine fallito:', e);
-        failed.push({ name: String(img.name || `immagine ${i + 1}`), reason: 'caricamento non riuscito' });
+        failed.push({ name: img.name, ...motivoCaricamento(e) });
       }
     }
 
     // Nome e tipo originali si conservano: in dashboard diventano link scaricabili.
-    const docs = Array.isArray(files) ? files.slice(0, 5) : [];
     const uploadedFiles = [];
-    for (const f of docs) {
-      const fname = String(f?.name || 'allegato');
-      if (!f?.dataUrl) { failed.push({ name: fname, reason: 'file vuoto' }); continue; }
-      const rawBlob = dataUrlToBlob(f.dataUrl);
-      if (rawBlob.size > 4 * 1024 * 1024) { failed.push({ name: fname, reason: 'troppo grande (max 4 MB)' }); continue; }
+    for (const f of vaglio.documenti) {
+      const fname = f.name;
       try {
         // S1.2: cifra anche gli allegati non-immagine.
+        const rawBlob = dataUrlToBlob(f.dataUrl);
         const blobToUpload = await sealForUpload(rawBlob);
         const u = await uploadImage(blobToUpload); // upload generico (usa blob.type)
-        uploadedFiles.push({ url: u.url, name: fname, type: String(f.type || rawBlob.type || '') });
+        uploadedFiles.push(voceDocumento(u.url, fname, f.type || rawBlob.type || ''));
       } catch (e) {
         if (isEncryptionError(e)) throw e; // come sopra: si ferma tutto
         console.warn('[SN feedback] upload file fallito:', e);
-        failed.push({ name: fname, reason: 'caricamento non riuscito' });
+        failed.push({ name: fname, ...motivoCaricamento(e) });
       }
     }
+    // `interi`: chi chiama vuole tutti gli allegati o niente feedback (un pacchetto non nasce monco, FEEDBACK-STATES.md
+    // § 3a). Il documento non esiste ancora; i blob già saliti restano cifrati e non li nomina nessuno.
+    if (opts && opts.interi && failed.length) {
+      throw Object.assign(new Error(`allegati non caricati: ${failed.map((f) => `${f.name} (${f.reason})`).join(', ')}`), { allegatiFalliti: failed });
+    }
+    if (!String(text || '').trim() && !uploaded.length && !uploadedFiles.length) throw new ErroreVuoto(failed);
 
     // Best-effort: il feedback parte anche senza numero, invece di bloccare l'invio.
     let seq = null;
@@ -661,7 +766,6 @@
       if (/^[0-9a-f]{16}$/.test(raw)) walletPseudonym = raw;
     } catch (_) {}
 
-    const nowIso = new Date().toISOString();
     const doc = {
       fields: {
         text: toFsValue(encText),
@@ -674,14 +778,11 @@
         images: toFsValue(uploaded),
         files: toFsValue(uploadedFiles),
         statusPublic: toFsValue('open'),
-        createdAt: { timestampValue: nowIso },
-        // L'ORA DELL'ULTIMA SCRITTURA, scritta da chi scrive. È il campo su cui
-        // la dashboard chiede «cosa è cambiato da allora?»: un feedback che non
-        // ce l'ha non compare più in quella domanda, quindi OGNI cammino che
-        // tocca un feedback deve rimetterlo (vedi `touchUpdatedAt`).
-        updatedAt: { timestampValue: nowIso },
       },
     };
+    // Le due date le mette Firestore (REQUEST_TIME), come le regole chiedono alla create anonima (#1517). Su `updatedAt`
+    // la dashboard chiede «cosa è cambiato da allora?»: OGNI cammino che tocca un feedback lo rimette (`touchUpdatedAt`).
+    let dateDelServer = ['createdAt', 'updatedAt'];
     if (seq) {
       doc.fields.seq = { integerValue: String(seq) };
       doc.fields.subSeq = { integerValue: '0' };
@@ -698,10 +799,23 @@
       doc.fields.capabilityGapId = toFsValue(String(capabilityGapId).slice(0, 100));
     }
 
-    // Idempotenza: vedi sanitizeDocId (#370).
-    const docId = sanitizeDocId(submissionId);
-    const idParam = docId ? `documentId=${encodeURIComponent(docId)}&` : '';
-    const endpoint = `${FIRESTORE_BASE}/${COLLECTION}?${idParam}key=${API_KEY}`;
+    // Idempotenza: vedi sanitizeDocId (#370). Senza un id d'invio valido il documento ne prende uno casuale: la
+    // create passa da `:commit` (le date di Firestore, sotto) e lì l'id lo sceglie chi scrive.
+    const idInvio = sanitizeDocId(submissionId);
+    const docId = idInvio || idCasuale();
+    const endpoint = `${FIRESTORE_BASE}:commit?key=${API_KEY}`;
+    // `exists: false` è la create: un id già scritto torna 409 ALREADY_EXISTS, come la POST di prima.
+    const scrivi = (headers) => fetch(endpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...(headers || {}) },
+      body: JSON.stringify({
+        writes: [{
+          update: { name: `projects/${PROJECT_ID}/databases/(default)/documents/${COLLECTION}/${docId}`, fields: doc.fields },
+          currentDocument: { exists: false },
+          updateTransforms: dateDelServer.map((fieldPath) => ({ fieldPath, setToServerValue: 'REQUEST_TIME' })),
+        }],
+      }),
+    });
     let res = null;
     let senderProof = '';
     let authRefused = 0;
@@ -717,6 +831,8 @@
         });
       }
       if (attese.length) doc.fields.waitsFor = toFsValue(attese);
+      // Alla fusione del pacchetto il server chiude queste, con la sua frase (FEEDBACK-STATES.md §3a).
+      if (unite.length) doc.fields.unisce = toFsValue(unite);
       // La priorità scelta da chi apre nasce col documento (#914): il server decide alla nascita se giudicarla,
       // e una scritta dopo arriverebbe quando il giudice ha già scelto. Solo admin: il create anonimo non la ammette.
       const prioritaScelta = opts && opts.priority;
@@ -724,11 +840,7 @@
         doc.fields.priority = { stringValue: await maybeEncrypt(String(prioritaScelta)) };
         doc.fields.priorityManual = { booleanValue: true };
       }
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-        body: JSON.stringify(doc),
-      });
+      res = await scrivi({ Authorization: `Bearer ${idToken}` });
       // #912: un nome riservato col token rifiutato non riparte da anonimo: sarebbe un utente che nessuno può dire suo.
       if ((soloAdmin || NOME_RISERVATO_RE.test(String(clientId || ''))) && (res.status === 401 || res.status === 403)) {
         throw Object.assign(new Error(`firestore create fallito (${res.status}): token admin rifiutato, e questo feedback non parte da anonimo`), { accessoOwner: true });
@@ -750,22 +862,13 @@
       if (NOME_RISERVATO_RE.test(String(clientId || ''))) {
         doc.fields.clientId = toFsValue(await maybeEncrypt('non-provato:' + String(clientId)));
       }
-      res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(doc),
-      });
+      res = await scrivi();
     }
-    const riprova = () => fetch(endpoint, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(doc),
-    });
-    if (!senderProof && res.status === 403 && doc.fields.updatedAt) {
+    if (!senderProof && res.status === 403 && dateDelServer.includes('updatedAt')) {
       // Regole senza `updatedAt` ancora in produzione: si toglie solo quello,
       // non numero e titolo con tutto lo schema.
-      delete doc.fields.updatedAt;
-      res = await riprova();
+      dateDelServer = dateDelServer.filter((f) => f !== 'updatedAt');
+      res = await scrivi();
     }
     if (!senderProof && res.status === 403) {
       // Rules non ancora aggiornate ai campi nuovi (name/seq/subSeq/parentId/clientIdHash):
@@ -778,21 +881,20 @@
       delete doc.fields.clientIdHash; // S1.F2.2: rules vecchie potrebbero rifiutarlo
       delete doc.fields.walletPseudonym; // #652: idem, finché le regole non sono deployate
       seq = null;
-      res = await riprova();
+      res = await scrivi();
     }
-    // 409 ALREADY_EXISTS con documentId → il feedback è già stato scritto da un
+    // 409 ALREADY_EXISTS con l'id d'invio → il feedback è già stato scritto da un
     // tentativo precedente (identico submissionId). Non è un errore: successo
     // idempotente, nessun duplicato creato.
     const prova = idToken ? { senderProof, ...(authRefused ? { authRefused } : {}), ...(localOnly ? { localOnly: true } : {}) } : {};
-    if (docId && res.status === 409) {
+    if (idInvio && res.status === 409) {
       return { id: docId, seq: null, images: uploaded, files: uploadedFiles, failed, deduped: true, ...prova };
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
       throw new Error(`firestore create fallito (${res.status}): ${errText.slice(0, 300)}`);
     }
-    const json = await res.json();
-    return { id: json.name?.split('/').pop() || '', seq, images: uploaded, files: uploadedFiles, failed, ...prova };
+    return { id: docId, seq, images: uploaded, files: uploadedFiles, failed, ...prova };
   }
 
   // È un TETTO, non un totale: oltre la soglia i più vecchi restano fuori,
@@ -822,9 +924,9 @@
   const CAMPI_LISTA = [
     'archiveOverride', 'attesa', 'beatAt', 'blockReason', 'branch', 'capabilityGapId',
     'claimExpiresAt', 'claimNum', 'claimedAt', 'claimedBy', 'clientId',
-    'clientIdHash', 'createdAt', 'domandaId', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly',
+    'clientIdHash', 'createdAt', 'domandaId', 'domandeBloccanti', 'fiducia', 'fiduciaDa', 'genitori', 'localApproval', 'localMerges', 'localOnly',
     'mittenteClasse', 'mittenteRuolo', 'name', 'parentId', 'pipeline',
-    'priority', 'priorityManual', 'reopenRequests', 'resolvedAt',
+    'priority', 'priorityManual', 'reopenRequests', 'resolvedAt', 'restaLocale',
     'resolvedInVersion', 'reviewDecision', 'reviewedAt', 'senderProof', 'seq', 'stalls',
     'starred', 'status', 'statusPublic', 'statusReason', 'subSeq', 'text',
     'title', 'url', 'userAgent', 'userNote', 'verifiedAt', 'votes',
@@ -881,7 +983,10 @@
   // sapere se vale la pena riunire le schede pubbliche e rimettere in pari la
   // bacheca (una lista vera sì, il giro leggero del battito no) — e la
   // domanda non si può dedurre dai campi senza indovinare.
-  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list' } = {}) {
+  // `uguale` ({ campo, valore }): il filtro che il database applica da sé, solo nella lettura col cursore sul nome.
+  async function list({ pageSize = 200, timeoutMs = 0, fields = null, idToken = '', afterName = null, op = 'list', uguale = null } = {}) {
+    // Un filtro che la strada scelta non sa portare si rifiuta: ignorato, tornerebbe tutto in silenzio (#1335).
+    if (uguale && typeof afterName !== 'string') throw new Error('filtro sul server disponibile solo nella lettura completa');
     // Da una pagina filo:// la lettura passa dal main, che ha il token admin
     // (#583): qui non c'è nessuna credenziale, e la collezione non è più
     // pubblica. Il main torna le righe già decodificate.
@@ -893,7 +998,7 @@
       return marcaProiezione(await readViaMain(bridge, { op, pageSize, timeoutMs, fields }), fields);
     }
     if (typeof afterName === 'string') {
-      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields });
+      const { rows, readTime } = await listByNameDirect(COLLECTION, { pageSize, timeoutMs, afterName, idToken, fields, uguale });
       if (readTime) Object.defineProperty(rows, 'readTime', { value: readTime, enumerable: false });
       return marcaProiezione(rows, fields);
     }
@@ -990,7 +1095,8 @@
   // pagine non mente — se scatta, la risposta lo dice.
   // `lista` (solo da una pagina): è il caricamento della Gestione, e il main ci
   // riunisce le schede e ci fa ripartire il giro (#676).
-  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false } = {}) {
+  // `uguale` ({ campo, valore }): solo le righe che il database trova uguali, filtrate da lui (#1335).
+  async function listAllPaged({ pageSize = LIST_PAGE_SIZE, timeoutMs = 0, idToken = '', maxPages = ALL_PAGES_MAX, fields = null, lista = false, uguale = null } = {}) {
     // Da una pagina filo:// il cursore non è percorribile: `list` rifiuta
     // apposta `afterName` (le credenziali stanno nel main, non qui). Quindi la
     // lettura completa la fa il main e torna di là, col suo `complete`. Senza
@@ -998,6 +1104,8 @@
     // alla prima riga (#496).
     const bridge = pageBridge();
     if (bridge) {
+      // Il main il filtro non lo riceve: senza questo rifiuto la pagina avrebbe tutte le righe credendole filtrate.
+      if (uguale) throw new Error('il filtro sul server non passa dalla porta delle pagine: chiedi le righe e filtrale qui');
       const r = await replyViaMain(bridge, { op: 'listAll', timeoutMs, ...(fields ? { fields } : {}), ...(lista ? { lista: true } : {}) });
       return { rows: marcaProiezione(Array.isArray(r.rows) ? r.rows : [], fields), complete: r.complete !== false, readTime: String(r.readTime || '') };
     }
@@ -1010,7 +1118,7 @@
     for (let page = 0; page < Math.max(1, Number(maxPages) || ALL_PAGES_MAX); page += 1) {
       const porta = (global.SN_FEEDBACK && global.SN_FEEDBACK.list) || list;
       // eslint-disable-next-line no-await-in-loop
-      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields });
+      const batch = await porta({ pageSize: limit, timeoutMs, idToken, afterName: cursor, fields, ...(uguale ? { uguale } : {}) });
       // Le pagine si leggono in momenti diversi: il giro della Gestione riparte dalla PRIMA (#676).
       if (page === 0 && batch && batch.readTime) readTime = String(batch.readTime);
       const arr = Array.isArray(batch) ? batch : [];
@@ -1284,6 +1392,25 @@
     return out;
   }
 
+  // Quanti documenti si leggono per un numero: il padre e i suoi figli stanno larghi qui dentro. Pieno vuol dire
+  // che oltre ce ne possono essere altri, e allora non si sceglie.
+  const NUMERO_RIGHE_MAX = 200;
+
+  // Il solo documento #seq.sub fra le righe lette per quel `seq`, o null. Due o più (un numero doppio, #1517) o una
+  // lettura piena: lancia con gli id in `numeroDoppio`, invece di legare il primo che capita. PURA.
+  function unicoDelNumero(rows, seq, sub, limite = NUMERO_RIGHE_MAX) {
+    const righe = Array.isArray(rows) ? rows : [];
+    const etichetta = `#${seq}${sub ? `.${sub}` : ''}`;
+    const trovati = righe.filter((r) => r && (Number(r.subSeq) || 0) === sub).map((r) => String(r._id));
+    if (trovati.length > 1) {
+      throw Object.assign(new Error(`${etichetta} è il numero di ${trovati.length} feedback (${trovati.join(', ')}): non scelgo io quale`), { numeroDoppio: trovati });
+    }
+    if (righe.length >= limite) {
+      throw Object.assign(new Error(`${etichetta}: più di ${limite - 1} feedback col numero ${seq}, non so dire se è uno solo`), { numeroDoppio: trovati });
+    }
+    return trovati[0] || null;
+  }
+
   // L'id del feedback col numero dato («676», «#676.1»): il registro dei
   // worker porta il numero, il giro vuole l'id (#676.1). Si legge chi ha quel
   // `seq` (il padre e i suoi figli), non la lista.
@@ -1296,10 +1423,9 @@
       from: [{ collectionId: COLLECTION }],
       where: { fieldFilter: { field: { fieldPath: 'seq' }, op: 'EQUAL', value: { integerValue: String(seq) } } },
       select: selectFields(['seq', 'subSeq']),
-      limit: 200,
+      limit: NUMERO_RIGHE_MAX,
     }, { timeoutMs, idToken, what: 'numero' });
-    const trovato = rows.find((r) => (Number(r && r.subSeq) || 0) === sub);
-    return trovato ? String(trovato._id) : null;
+    return unicoDelNumero(rows, seq, sub);
   }
 
   // Quanti invii in tutto: il contatore avanza PRIMA che il documento sia
@@ -1624,13 +1750,19 @@
   // righe non serve — ordina lui come gli pare. `idToken` serve per la
   // collezione vera, che senza credenziali non si legge (#583); la vista
   // pubblica lo lascia vuoto.
-  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null } = {}) {
+  async function listByNameDirect(collectionId, { pageSize = LIST_PAGE_SIZE, timeoutMs = 0, afterName = '', idToken = '', fields = null, uguale = null } = {}) {
     const endpoint = `${FIRESTORE_BASE}:runQuery?key=${API_KEY}`;
     const structuredQuery = {
       from: [{ collectionId }],
       orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
       limit: pageSize,
     };
+    if (uguale) {
+      if (!uguale.campo || typeof uguale.valore !== 'string') throw new Error('filtro sul server senza campo o valore');
+      structuredQuery.where = {
+        fieldFilter: { field: { fieldPath: String(uguale.campo) }, op: 'EQUAL', value: { stringValue: uguale.valore } },
+      };
+    }
     // La proiezione vale anche qui: è la porta da cui passano le letture
     // COMPLETE (il cursore sul nome), cioè quelle che pagano di più. Senza,
     // chiedere tutta la collezione voleva dire scaricarne i documenti interi
@@ -1855,6 +1987,7 @@
     }
     // Le attese (#903): [{ id, num }] già controllate da SN_FB_ATTESE.valida; vuota o null le toglie (campo cancellato).
     if (waitsFor !== undefined) {
+      if (!opts.versione) throw new Error('attese non scritte: si scrivono solo sulla versione letta (SN_FB_ATTESE.scriviSullaLettura)');
       const lista = attesePerScrittura(waitsFor);
       if (lista.length) fields.waitsFor = toFsValue(lista);
       mask.push('waitsFor');
@@ -1889,9 +2022,11 @@
     touchUpdatedAt(fields, mask);
     const headers = { 'Content-Type': 'application/json' };
     if (idToken) headers.Authorization = `Bearer ${idToken}`;
+    // `opts.versione` (l'updateTime letto): si scrive solo se il documento è ancora quello (SN_FB_ATTESE.scriviSullaLettura).
+    const condizione = opts.versione ? `&currentDocument.updateTime=${encodeURIComponent(opts.versione)}` : '';
     const scrivi = () => {
       const qs = mask.map((m) => `updateMask.fieldPaths=${encodeURIComponent(m)}`).join('&');
-      const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}&key=${API_KEY}`;
+      const endpoint = `${FIRESTORE_BASE}/${COLLECTION}/${encodeURIComponent(id)}?${qs}${condizione}&key=${API_KEY}`;
       return fetch(endpoint, { method: 'PATCH', headers, body: JSON.stringify({ fields }) });
     };
     let res = await scrivi();
@@ -1904,7 +2039,10 @@
     }
     if (!res.ok) {
       const errText = await res.text().catch(() => '');
-      throw new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
+      const err = new Error(`firestore update fallito (${res.status}): ${errText.slice(0, 300)}`);
+      const A = global.SN_FB_ATTESE;
+      if (condizione && A && A.conflittoDiScrittura(res.status, errText)) err.conflitto = true;
+      throw err;
     }
     return true;
   }
@@ -2052,6 +2190,7 @@
 
   global.SN_FEEDBACK = {
     submit,
+    vuotoInPartenza, messaggioVuoto, fraseAllegatiSaltati, byteDiDataUrl, TETTO_ALLEGATO,
     list,
     listResolved,
     listAll,
@@ -2063,7 +2202,7 @@
     listChangedDirect,
     getMany,
     versionsOf,
-    idDelNumero,
+    idDelNumero, unicoDelNumero,
     submissionCount,
     // #583 — la vista pubblica: l'unica lettura dei feedback che non chiede
     // credenziali. Ci sono dentro i soli campi pubblici dei feedback chiusi.
@@ -2130,6 +2269,8 @@
     attachmentPath,
     ATTACHMENT_CONTENT_TYPE,
     ATTACHMENT_EXT,
+    VOCE_DOCUMENTO,
+    voceDocumento,
     isAttachmentUrl,
     attachmentFetchHeaders,
     // La scritta di un collegamento che arriva da fuori: dice dove si va (#582).

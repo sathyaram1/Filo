@@ -1,0 +1,185 @@
+/* Il pannello di destra delle app di Filo (#1433): la striscia sul bordo, a sinistra della barra di scorrimento, e il
+   pannello che scivola da lì. Gemello della barra laterale (src/renderer/barra.css), dal lato opposto. */
+
+.pd-striscia {
+  position: fixed;
+  top: 0;
+  bottom: 0;
+  right: var(--pd-barra, 0px);
+  width: 8px;
+  z-index: 2147482000;
+  cursor: pointer;
+}
+.pd-striscia::before {
+  content: "";
+  position: absolute;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  background: linear-gradient(rgba(var(--sn-accent-rgb), 0.5), var(--sn-accent));
+  opacity: 0.45;
+  transition: opacity calc(200ms * var(--sn-motion, 1)), width calc(200ms * var(--sn-motion, 1));
+}
+.pd-striscia:hover::before, .pd-striscia.pd-bordo::before { opacity: 1; width: 4px; }
+/* Filo ha risposto nel pannello mentre era chiuso: accesa e ferma, finché non lo si apre (#1432). */
+.pd-striscia.pd-risposta::before { opacity: 1; width: 4px; background: var(--sn-accent); }
+html.pd-senza-striscia .pd-striscia:not(.pd-bordo):not(.pd-risposta)::before { opacity: 0; }
+/* Con l'Aiuto aperto accanto, la striscia sta dove si apre il pannello, alla sua sinistra: sotto non si vedrebbe. */
+html.pd-accanto .pd-striscia { right: var(--pd-destra, 0px); }
+html.pd-aperto .pd-striscia::before { opacity: 0; }
+
+.pd-pannello {
+  position: fixed;
+  top: 8px;
+  bottom: 8px;
+  right: var(--pd-destra, 0px);
+  width: var(--pd-larghezza, 272px);
+  z-index: 2147482001;
+  display: flex;
+  flex-direction: column;
+  box-sizing: border-box;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-border);
+  border-right: none;
+  border-radius: 14px 0 0 14px;
+  box-shadow: -4px 2px 14px rgba(0, 0, 0, calc(0.16 * var(--sn-ombra, 1)));
+  font-family: var(--sn-font);
+  font-size: 13px;
+  transform: translateX(calc(100% + var(--pd-destra, 0px) + 24px));
+  visibility: hidden;
+  transition: transform calc(200ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0s linear calc(200ms * var(--sn-motion, 1));
+}
+/* Accanto all'Aiuto non tocca il bordo: è una carta intera. */
+html.pd-accanto .pd-pannello { border-right: 1px solid var(--sn-border); border-radius: 14px; }
+html.pd-aperto .pd-pannello {
+  transform: none;
+  visibility: visible;
+  transition: transform calc(200ms * var(--sn-motion, 1)) cubic-bezier(0.4, 0, 0.2, 1), visibility 0s;
+}
+/* Bloccato spinge il contenuto: niente ombra di una carta posata sopra, è una colonna della pagina. */
+html.pd-bloccato .pd-pannello {
+  box-shadow: none;
+  top: 0;
+  bottom: 0;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+}
+
+.pd-testa {
+  flex: 0 0 auto;
+  display: flex;
+  justify-content: flex-end;
+  padding: 6px 8px 0;
+}
+.pd-lucchetto, .pd-piu {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--sn-muted);
+  cursor: pointer;
+  transition: background calc(150ms * var(--sn-motion, 1)), color calc(150ms * var(--sn-motion, 1));
+}
+.pd-lucchetto:hover, .pd-piu:hover { background: var(--sn-hover); color: var(--sn-fg); }
+.pd-lucchetto.pd-acceso { color: var(--sn-accent); }
+.pd-lucchetto svg, .pd-piu svg { width: 16px; height: 16px; }
+
+.pd-corpo {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  padding: 2px 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pd-elementi { display: flex; flex-direction: column; gap: 6px; }
+.pd-elementi.pd-mira-fondo::after {
+  content: "";
+  height: 2px;
+  border-radius: 2px;
+  background: var(--sn-accent);
+}
+
+.pd-elemento {
+  position: relative;
+  border: 1px solid var(--sn-border);
+  border-radius: var(--sn-radius, 10px);
+  background: var(--sn-bg);
+  transition: border-color calc(150ms * var(--sn-motion, 1)), opacity calc(150ms * var(--sn-motion, 1));
+}
+.pd-elemento:hover { border-color: rgba(var(--sn-accent-rgb), 0.45); }
+.pd-elemento.pd-mira { box-shadow: 0 -3px 0 -1px var(--sn-accent); }
+.pd-elemento.pd-in-volo { opacity: 0.35; }
+.pd-maniglia {
+  display: none;
+  position: absolute;
+  left: -2px;
+  top: 50%;
+  transform: translateY(-50%);
+  padding: 4px 2px;
+  color: var(--sn-muted);
+  cursor: grab;
+  font-size: 12px;
+  line-height: 1;
+}
+.pd-espanso .pd-maniglia { display: block; }
+.pd-espanso .pd-elemento { cursor: grab; padding-left: 8px; }
+.pd-contenuto { min-width: 0; }
+.pd-espanso .pd-contenuto { pointer-events: none; }
+
+.pd-piu { align-self: center; }
+.pd-catalogo[hidden] { display: none; }
+.pd-catalogo {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding-top: 8px;
+  border-top: 1px dashed var(--sn-border);
+}
+.pd-voce {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  padding: 7px 8px;
+  border: 1px solid var(--sn-border);
+  border-radius: 8px;
+  cursor: grab;
+  user-select: none;
+  transition: background calc(150ms * var(--sn-motion, 1)), border-color calc(150ms * var(--sn-motion, 1));
+}
+.pd-voce:hover, .pd-voce:focus-visible { background: var(--sn-hover); border-color: rgba(var(--sn-accent-rgb), 0.45); outline: none; }
+.pd-voce-icona { flex: 0 0 auto; display: inline-flex; color: var(--sn-accent); }
+.pd-voce-icona svg { width: 16px; height: 16px; }
+/* Un nome lungo va a capo invece di tagliarsi: «Dimensione…» non dice quale strumento è. */
+.pd-voce-nome { min-width: 0; overflow-wrap: break-word; line-height: 1.25; font-size: 12px; }
+.pd-catalogo-pieno { grid-column: 1 / -1; color: var(--sn-muted); font-size: 12px; text-align: center; padding: 4px 0; }
+
+.pd-fantasma {
+  position: fixed;
+  z-index: 2147483000;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--sn-bg);
+  color: var(--sn-fg);
+  border: 1px solid var(--sn-accent);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
+  font-size: 12px;
+}
+.pd-fantasma.pd-toglie { border-color: var(--sn-error); opacity: 0.8; }
+html.pd-trascina, html.pd-trascina * { cursor: grabbing !important; }
+.pd-menu { position: fixed; z-index: 2147483001; }

@@ -50,6 +50,7 @@ let failGuard;  // castReopenRequest (scrittura A) fallisce come rete instabile
 let failSubmit; // submit (scrittura B) fallisce come rete instabile
 let refunds;    // crediti rimborsati (compensazione best-effort)
 let spends;     // quante volte l'handler ha davvero scalato crediti
+let invii;      // l'id d'invio di ogni tentativo di creazione (#1517)
 
 beforeEach(() => {
   server = { reopenRequests: {}, feedbacks: [] };
@@ -57,6 +58,8 @@ beforeEach(() => {
   failSubmit = false;
   refunds = [];
   spends = [];
+  invii = [];
+  delete globalThis.SN_STORAGE;
 });
 
 globalThis.SN_CREDITS = {
@@ -79,6 +82,7 @@ globalThis.SN_FEEDBACK = {
   // (#370), un id d'invio gia' visto NON crea un secondo documento: torna
   // quello di prima.
   submit: async (fb) => {
+    invii.push(fb.submissionId);
     if (failSubmit === 'dopo-aver-scritto') {
       // Il caso cattivo: il documento nasce, la risposta si perde per strada.
       server.feedbacks.push({ id: `fb-child-${++seq}`, ...fb });
@@ -240,4 +244,44 @@ test('da un sito visitato la riapertura non scala crediti e non scrive niente', 
   assert.equal(spends.length, 0, 'nessun credito scalato');
   assert.equal(server.feedbacks.length, 0, 'nessuna segnalazione aperta a nome dell\'utente');
   assert.deepEqual(server.reopenRequests, {}, 'nessun segnale scritto sul fix');
+});
+
+// #1517 — l'id d'invio era `reopen-<idScheda>-<uid>`: dati pubblici. Un create anonimo poteva occuparlo prima, e il
+// 409 della riapertura vera passava per «già scritto da me»: il tester pagava e il suo testo si perdeva.
+test('l\'id d\'invio della riapertura è casuale e non contiene né la scheda né l\'utente', async () => {
+  const r = await reopen(msgFor());
+  assert.equal(r.ok, true);
+  assert.equal(invii.length, 1);
+  assert.match(invii[0], /^[A-Za-z0-9_-]{20,128}$/, 'la forma che le regole chiedono alla create anonima');
+  assert.ok(!invii[0].includes(ORIGINAL_ID) && !invii[0].includes(UID), 'niente che un altro possa ricavare');
+});
+
+function storageFinto() {
+  const dati = {};
+  globalThis.SN_STORAGE = {
+    getRaw: async (k, d) => (k in dati ? JSON.parse(JSON.stringify(dati[k])) : d),
+    setRaw: async (k, v) => { dati[k] = JSON.parse(JSON.stringify(v)); },
+  };
+  return dati;
+}
+
+test('il secondo tentativo della stessa voce riusa il suo id, salvato; riuscito, si dimentica', async () => {
+  const dati = storageFinto();
+  failSubmit = 'dopo-aver-scritto';
+  assert.equal((await reopen(msgFor())).ok, false);
+  const salvato = Object.values(dati.boardReopenInvii || {})[0];
+  assert.ok(salvato && salvato.id === invii[0], 'l\'id nasce al primo tentativo e resta scritto (regge un riavvio)');
+
+  failSubmit = false;
+  const r2 = await reopen(msgFor());
+  assert.equal(r2.ok, true);
+  assert.equal(invii[1], invii[0], 'il ritentativo usa lo stesso id');
+  assert.equal(server.feedbacks.length, 1, 'e il documento nato al primo giro non si raddoppia');
+  assert.deepEqual(dati.boardReopenInvii, {}, 'riuscita: la voce non serve più');
+
+  // Lo stesso fix riaperto di nuovo più avanti (il guard tolto, come dopo una nuova risoluzione): è un'altra voce.
+  server.reopenRequests = {};
+  assert.equal((await reopen(msgFor())).ok, true);
+  assert.notEqual(invii[2], invii[0], 'una riapertura nuova ha un id suo: un 409 non la inghiotte');
+  assert.equal(server.feedbacks.length, 2);
 });

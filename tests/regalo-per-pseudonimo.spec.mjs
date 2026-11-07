@@ -197,8 +197,9 @@ test('la pagina Crediti mostra il proprio pseudonimo solo con un portafoglio, e 
   }
 });
 
-test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il movimento; un’email non regala niente', async ({ app, openTab }) => {
+test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il movimento; un’email non regala niente', async ({ app, openTab, shell }) => {
   const crediti = await openTab('filo://credits/credits.html');
+  const schedaCrediti = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs.activeId);
   await riscatta(crediti);
   await expect(crediti.locator('#balance')).toHaveText(await crediti.evaluate(() => window.SN_WALLET.formatCredits(5000)));
   expect(await simulaOwner(app)).toBe(true);
@@ -225,7 +226,9 @@ test('«/gift NUMERO INIZIO» fa salire quel portafoglio e la persona vede il mo
   expect(stato.richieste.filter((r) => r.url === '/walletGrant').map((r) => r.data))
     .toEqual([{ pseudonym: MIO, credits: 500, why: 'owner' }]);
 
-  // La persona (qui la stessa installazione) vede il saldo e il movimento.
+  // La persona (qui la stessa installazione) vede il saldo e il movimento quando torna sulla pagina: dietro
+  // un'altra scheda la pagina Crediti non chiede niente al server (#2059).
+  await shell.evaluate((id) => window.filoShell.tabs.activate(id), schedaCrediti);
   await expect(crediti.locator('#balance')).toHaveText(await fmt(5500), { timeout: 15_000 });
   const movimento = crediti.locator('#moves li').first();
   await expect(movimento).toContainText('+500');

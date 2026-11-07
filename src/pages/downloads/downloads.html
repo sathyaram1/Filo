@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="filo://style/pages.css" />
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
@@ -17,6 +18,7 @@
   <script src="filo://shared/icons.js"></script>
   <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/eseguibili.js"></script>
+  <script src="filo://shared/scaricamentiAvanzamento.js"></script>
   <script src="filo://shared/righeVive.js"></script>
   <script src="filo://shared/nomiFile.js"></script>
   <script src="filo://shared/rinominaUi.js"></script>
@@ -88,6 +90,8 @@
       font-size: 11px; color: var(--sn-muted);
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
+    /* Il perché di un salvataggio non riuscito si legge intero: troncato perderebbe la parte che spiega. */
+    .dl-meta.dl-perche { white-space: normal; }
     .dl-path {
       grid-column: 2 / span 2; grid-row: 3;
       font-size: 11px; color: var(--sn-muted);

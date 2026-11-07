@@ -33,6 +33,10 @@
   const adminBanner = document.getElementById('adminBanner');
   const adminBannerText = document.getElementById('adminBannerText');
   const adminSignInBtn = document.getElementById('adminSignIn');
+  const adminSpin = document.getElementById('adminSpin');
+  const adminLasciaBtn = document.getElementById('adminLascia');
+  let accessoInAttesa = false;
+  let accessoN = 0; // scarta l'esito di un accesso lasciato stare
   // Interruttore master «gestione automatica» (owner-only, filo-security DESIGN §2). Default
   // OFF: finché è OFF anche i feedback sicuri richiedono verifica umana (config/automation).
   const automationRow = document.getElementById('automationRow');
@@ -51,6 +55,13 @@
     isAdmin = nuovo;
     fbImgCache.clear();
     fbFileWhyCache.clear();
+  }
+
+  // Quello che arriva nel campo del feedback, per i contatori (#1471): da dove viene e se è servito, mai cosa porta.
+  // Un testo lo scrive il browser nel campo; un file diventa un allegato.
+  function contaRilascio(e, usato) {
+    const ev = window.SN_GESTI && window.SN_GESTI.rilascio(e.dataTransfer, 'campo_feedback', usato);
+    if (ev) Promise.resolve(sendToMain({ type: window.SN_MSG?.MSG?.CONTATORI_EVENTO, ...ev })).catch(() => {});
   }
 
   // Su pagine filo:// il ponte col main è sempre presente.
@@ -225,12 +236,12 @@
 
   // Una fusione ferma è il motivo per cui una pratica con uno stato di lavoro sta nei Ricevuti: la scheda lo dice.
   // Il sì si dà in Gestione, dove c'è la richiesta con quello che ha fermato i controlli.
+  // Le parole e il rosso dalla stessa funzione della Gestione (#1425): rosso solo ciò che aspetta l'owner.
   function fusioneChipHtml(f) {
-    const l5 = MR.livelloL5(f, { fusioni });
-    if (!l5 || (l5.esito !== 'bloccato' && l5.esito !== 'conflitto')) return '';
-    const testo = l5.esito === 'conflitto' ? 'fusione non avvenuta' : 'fusione ferma';
-    const titolo = `${(l5.pannello && l5.pannello.testo) || ''} Si decide in Gestione.`.trim();
-    return `<span class="fb-fusione" title="${escapeHtml(titolo)}">${escapeHtml(testo)}</span>`;
+    const fusione = MR.fusioneDi(f, opzSezioni());
+    if (!fusione) return '';
+    const titolo = fusione.attende ? `${fusione.titolo}. Si decide in Gestione.` : `${fusione.titolo}.`;
+    return `<span class="fb-fusione${fusione.attende ? '' : ' fb-fusione--quieta'}" title="${escapeHtml(titolo)}">${escapeHtml(fusione.etichetta)}</span>`;
   }
 
   // «Aspetta #N» (#903): cosa aspetta e lo stato di ciascuno, come in Gestione (dove si mette e si toglie).
@@ -256,7 +267,7 @@
 
   // Il segno dei Ricevuti, gemello di quello della gestione (D93): stessa forma, stesso motivo sotto il puntatore.
   function segnoFermataHtml(f) {
-    const s = MR.segnoFermata(f, { fusioni });
+    const s = MR.segnoFermata(f, opzSezioni());
     if (!s || !MR.FORME_SVG[s.forma]) return '';
     const cls = 'fb-segno' + (s.classe ? ` fb-segno--${s.classe}` : ' fb-segno--vuoto');
     return `<span class="${escapeHtml(cls)}" data-forma="${escapeHtml(s.forma)}" title="${escapeHtml(s.testo)}" aria-label="${escapeHtml(s.testo)}" role="img">`
@@ -291,8 +302,8 @@
   // Allegati ANCORATI al turno (#190.3): righe-marcatore dentro `notes`, così non cambiano
   // schema né regole. Allowlist dei tipi UNA, condivisa col riquadro dentro i siti (#582).
   const AttachTypes = window.SN_FEEDBACK_ATTACH;
-  const ATTACH_REJECT_MSG =
-    'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
+  const ATTACH_REJECT_MSG = (AttachTypes && AttachTypes.MESSAGGIO_TIPO)
+    || 'Tipo di file non supportato. Ammessi: immagini, PDF, testo, markdown, CSV e JSON.';
 
   // Se l'allowlist condivisa non si carica il ripiego deve CHIUDERE (solo immagini raster),
   // non aprire: un gate che sparisce in silenzio quando manca un pezzo è un gate che non c'è.
@@ -304,10 +315,11 @@
     return /^image\/(png|jpe?g|gif|webp|bmp)$/.test(t) ? 'image' : null;
   }
 
-  const ATTACH_MAX_IMAGES = 5;
-  const ATTACH_MAX_FILES = 5;
-  const ATTACH_MAX_BYTES = 4 * 1024 * 1024;
-  const ATTACH_ACCEPT = 'image/*,application/pdf,application/json,text/*,.pdf,.txt,.md,.markdown,.json,.csv,.log,.yml,.yaml';
+  const ATTACH_LIMITI = (AttachTypes && AttachTypes.LIMITI) || { immagini: 5, file: 5, byte: 4 * 1024 * 1024 };
+  const ATTACH_MAX_IMAGES = ATTACH_LIMITI.immagini;
+  const ATTACH_MAX_FILES = ATTACH_LIMITI.file;
+  const ATTACH_MAX_BYTES = ATTACH_LIMITI.byte;
+  const ATTACH_ACCEPT = (AttachTypes && AttachTypes.ACCEPT) || 'image/png,image/jpeg,image/gif,image/webp,image/bmp';
 
   const FILE_SVG = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/></svg>';
 
@@ -572,8 +584,8 @@
 
     async function addFile(file) {
       if (!file) return;
-      // Il TIPO si guarda PRIMA di caricare: il selettore offre anche image/* e text/*, che il
-      // deposito rifiuta — e se ne leggeva il numero d'errore invece della frase giusta.
+      // Il TIPO si guarda PRIMA di caricare: «Tutti i file» del selettore e il drop passano anche quello che il
+      // deposito rifiuta, e se ne leggeva il numero d'errore invece della frase giusta.
       const kind = classificaAllegato(file);
       if (!kind) { setStatus(ATTACH_REJECT_MSG); return; }
       const isImg = kind === 'image';
@@ -623,6 +635,7 @@
     ['dragleave', 'drop'].forEach((ev) => textarea.addEventListener(ev, (e) => { textarea.classList.remove('fb-drop-hover'); }));
     textarea.addEventListener('drop', async (e) => {
       const dropped = e.dataTransfer && e.dataTransfer.files;
+      contaRilascio(e, !!(dropped && dropped.length) || !!(e.dataTransfer && e.dataTransfer.getData('text/plain')));
       if (!dropped || !dropped.length) return;
       e.preventDefault();
       for (const f of dropped) await addFile(f);
@@ -694,7 +707,7 @@
     // decisione che la pagina non offre più — è così che un attacco confermato
     // si ritrovava riscritto ad "archiviato".
     if (payload && payload.status !== undefined
-        && !MR.ownerActionAllowsStatus(item, payload.status, { releasedVersion })) {
+        && !MR.ownerActionAllowsStatus(item, payload.status, opzSezioni())) {
       alert('Lo stato di questa segnalazione è cambiato: questa azione non è più disponibile. Aggiorna la lista e riprova.');
       return false;
     }
@@ -747,7 +760,7 @@
     const id = escapeHtml(f._id);
     const EXTRA = { accept: ' data-accept="1"', reject: ' data-reject="1"',
       archive: ' data-archive="1"', restore: ' data-restore="1"' };
-    return MR.ownerActions(f, { releasedVersion }).map((a) => {
+    return MR.ownerActions(f, opzSezioni()).map((a) => {
       // "Riapri" non scrive subito: apre il modulo che chiede COSA manca ancora.
       if (a.kind === 'reopen') {
         return `<button class="sn-btn sn-btn-secondary fb-reopen-start" data-id="${id}">${escapeHtml(a.label)}</button>`;
@@ -1857,11 +1870,16 @@
     // Lo switch automazione è un controllo da owner: visibile solo agli admin.
     if (automationRow) automationRow.hidden = !isAdmin;
     if (isAdmin) loadAutomation();
+    // Un account entrato da qualunque strada chiude l'attesa dell'accesso chiesto da qui.
+    if (profile?.email && accessoInAttesa) mostraAttesaAccesso(false);
     if (!isAdmin && adminBannerText) {
       adminBannerText.classList.remove('fb-admin-ko');
       // Distingui "non loggato" da "loggato ma non admin": il secondo non può
       // diventare admin cliccando Accedi, quindi nascondiamo il pulsante.
-      if (profile?.email) {
+      if (accessoInAttesa) {
+        adminBannerText.textContent = 'Completa l\'accesso nella pagina di Google che si è aperta.';
+        if (adminSignInBtn) adminSignInBtn.hidden = false;
+      } else if (profile?.email) {
         // #583: senza essere admin i feedback non si leggono affatto — dirlo com'è vale più di un
         // invito che non porta da nessuna parte.
         adminBannerText.textContent = `L'account ${profile.email} non è un amministratore: i feedback li vede chi li gestisce.`;
@@ -1891,20 +1909,38 @@
     adminBannerText.classList.add('fb-admin-ko');
   }
 
+  // #678.6 — un accesso che aspetta un browser chiuso non spegne il pulsante: lo dice, si riapre o si lascia stare,
+  // come in bacheca.
+  function mostraAttesaAccesso(on) {
+    accessoInAttesa = on;
+    if (adminSpin) adminSpin.hidden = !on;
+    if (adminLasciaBtn) adminLasciaBtn.hidden = !on;
+    if (adminSignInBtn) adminSignInBtn.textContent = on ? 'Torna all\'accesso' : 'Accedi';
+  }
+
   if (adminSignInBtn) {
     adminSignInBtn.addEventListener('click', async () => {
-      adminSignInBtn.disabled = true;
-      try {
-        const r = await sendToMain({ type: 'auth_signin' });
-        setIsAdmin(r?.isAdmin);
-        renderAuthState(r?.profile);
-        applyFilter(); // ridisegna con/senza controlli admin
-        if (r?.ok === false) mostraAccessoFallito(r.error);
-      } catch (_) {
-        mostraAccessoFallito();
-      } finally {
-        adminSignInBtn.disabled = false;
-      }
+      // Il main tiene un accesso solo: chiederlo di nuovo riporta davanti la sua pagina, e l'esito arriva alla prima richiesta.
+      if (accessoInAttesa) { sendToMain({ type: 'auth_signin' }).catch(() => {}); return; }
+      const n = ++accessoN;
+      mostraAttesaAccesso(true);
+      renderAuthState(null);
+      let r = null;
+      try { r = await sendToMain({ type: 'auth_signin' }); } catch (_) { r = null; }
+      if (n !== accessoN) return;
+      mostraAttesaAccesso(false);
+      setIsAdmin(r?.isAdmin);
+      renderAuthState(r?.profile);
+      applyFilter(); // ridisegna con/senza controlli admin
+      if (!r || r.ok === false) mostraAccessoFallito(r && r.error);
+    });
+  }
+  if (adminLasciaBtn) {
+    adminLasciaBtn.addEventListener('click', () => {
+      sendToMain({ type: 'auth_signin_lascia' }).catch(() => {});
+      accessoN++;
+      mostraAttesaAccesso(false);
+      refreshAuth();
     });
   }
 

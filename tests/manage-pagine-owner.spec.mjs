@@ -9,7 +9,7 @@ import { paginaDellaScheda } from './helpers/schede.mjs';
 import { GESTIONE, apriScheda, ricaricaSu } from './helpers/gestione.mjs';
 
 const SHOTS = 'tests/.shots';
-const IMPOSTAZIONI_DI_TUTTI = ['Modelli', 'Altro', 'Sicurezza', 'Trasparenza', 'Preferenze'];
+const IMPOSTAZIONI_DI_TUTTI = ['Modelli', 'Altro', 'Sicurezza', 'Trasparenza', 'Novità', 'Preferenze'];
 const APP_DI_TUTTI = ['Editor', 'Deck builder MTG', 'Aperti per dopo', 'Download', 'Memorie', 'Bacheca'];
 
 const popupAperti = (app) => app.windows().filter((w) => { try { return !w.isClosed() && w.url().startsWith('data:text/html'); } catch (_) { return false; } });

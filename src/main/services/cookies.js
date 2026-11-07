@@ -1,5 +1,5 @@
-// Cookie e consenso, lato main: GPC, blocco dei tracker, partizione per sito, wipe mirato.
-// Modalità in settings.security.cookies.mode: manual, default, privacy.
+// Cookie e consenso, lato main: GPC (non sulle pagine di accesso dei provider noti, senzaGpc), client hints,
+// blocco dei tracker, partizione per sito, wipe mirato. Modalità in settings.security.cookies.mode: manual, default, privacy.
 // Banner CMP ed embed YouTube stanno in src/content/cookies.js; l'iniezione GPC in tabs.js.
 
 'use strict';
@@ -7,6 +7,7 @@
 const { session } = require('electron');
 const Sito = require('../../shared/stessoSito');
 const Google = require('../../shared/dominiGoogle');
+const { completaClientHints } = require('./clientHints');
 
 const MODES = { MANUAL: 'manual', DEFAULT: 'default', PRIVACY: 'privacy' };
 
@@ -175,6 +176,27 @@ function sessioneEffimera(site) {
 
 const gpcState = new WeakMap(); // session → { enabled }
 
+// Chi deve presentare un Referer che Chromium non lascia passare altrove (il «Riprova» degli scaricamenti): `fn(details, ses)`.
+let refererFn = null;
+function presentaReferer(fn) { refererFn = typeof fn === 'function' ? fn : null; }
+
+// Le pagine di accesso dei provider noti (la lista dell'esenzione anti-fingerprint) non ricevono il GPC, né l'header
+// né la proprietà in tabs.js: con quel segnale Google respinge l'accesso in un profilo nuovo (#1616). Altrove resta.
+function senzaGpc(href) {
+  try {
+    require('../../shared/authPopup');
+    const A = globalThis.SN_AUTH_POPUP;
+    return !!(A && A.isIdentityAuthSurface(String(href || '')));
+  } catch (_) { return false; }
+}
+
+// Le risorse che la pagina di accesso carica da altri host (script, immagini) contano come la pagina: si guarda il frame
+// che chiede. Non per una navigazione: lì il frame è ancora sulla pagina che si lascia, e conta solo la meta.
+function urlDelFrame(details) {
+  if (!details || details.resourceType === 'mainFrame' || details.resourceType === 'subFrame') return '';
+  try { return (details.frame && details.frame.url) || ''; } catch (_) { return ''; }
+}
+
 // Registra il listener se manca, SENZA toccare lo stato GPC.
 function ensureHeaderHook(ses) {
   if (!ses || !ses.webRequest) return null;
@@ -184,8 +206,11 @@ function ensureHeaderHook(ses) {
     gpcState.set(ses, state);
     ses.webRequest.onBeforeSendHeaders((details, callback) => {
       const s = gpcState.get(ses);
-      let headers = details.requestHeaders;
-      if (s && s.enabled) headers = { ...headers, 'Sec-GPC': '1' };
+      const headers = /^(https?|wss?):/i.test(details.url) ? completaClientHints(details.requestHeaders) : { ...details.requestHeaders };
+      if (s && s.enabled && !senzaGpc(details.url) && !senzaGpc(urlDelFrame(details))) headers['Sec-GPC'] = '1';
+      if (refererFn && !Object.keys(headers).some((h) => h.toLowerCase() === 'referer')) {
+        try { const r = refererFn(details, ses); if (r) headers.Referer = r; } catch (_) {}
+      }
       callback({ requestHeaders: headers });
     });
   }
@@ -597,9 +622,10 @@ function wipeChanged(prev, next, sessions, scope) {
 let listChange = null;
 function setListChangeHandler(fn) { listChange = typeof fn === 'function' ? fn : null; }
 
-// Modalità o elenchi cambiati: chi tiene dati per sito li riguarda (tabs/tabCookies.js, cosa resta sul disco).
-let configChange = null;
-function setConfigChangeHandler(fn) { configChange = typeof fn === 'function' ? fn : null; }
+// Modalità o fidati cambiati: chi tiene dati per sito riguarda cosa resta sul disco (tabs/tabCookies.js,
+// services/pagineDelicate.js). Sono più d'uno: ognuno si aggiunge.
+const configChange = new Set();
+function onConfigChange(fn) { if (typeof fn === 'function') configChange.add(fn); }
 
 // Un sito entra o esce dai fidati, da qualunque strada (proposta, menu della scheda, chat, Sicurezza, import,
 // annulla): chi tiene le schede (tabs/tabRestaConnesso.js) sposta l'accesso nel jar giusto. Il sito è quello del
@@ -612,7 +638,7 @@ function fiduciaCambiata(prev, next) {
     const out = new Set();
     for (const d of l) {
       const s = String(d || '').toLowerCase();
-      if (s) out.add(Google.diGoogle(s) ? Google.SITO_GOOGLE : s);
+      if (s) out.add(Google.sitoDelContenitore(s));
     }
     return out;
   };
@@ -686,7 +712,7 @@ function configureFromSettings(settings) {
   }
   _configured = true;
   if (prevMode !== _cached.mode || prevTrusted !== trustedOra) {
-    try { if (configChange) configChange(); } catch (_) {}
+    for (const fn of configChange) { try { fn(); } catch (_) {} }
   }
   return changed;
 }
@@ -763,7 +789,7 @@ module.exports = {
   isConsentName,
   wipeConsentCookies,
   setListChangeHandler,
-  setConfigChangeHandler,
+  onConfigChange,
   setTrustChangeHandler,
   sitoFidato,
   partitionForSite,
@@ -780,7 +806,10 @@ module.exports = {
   partitionForUrl,
   partitionForTab,
   ensureHeaderHook,
+  presentaReferer,
   applyGpc,
+  senzaGpc,
+  urlDelFrame,
   applyTrackerBlocking,
   coverAdblock,
   ensureRequestHook,

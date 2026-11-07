@@ -2,6 +2,7 @@
 // resoconto di «/pulisci») si legge una volta sola, sotto il comando che l'ha chiesta e non sotto la conversazione dopo.
 
 import { test, expect } from './fixtures/electron.mjs';
+import { clickConfirm } from './helpers/confirm.mjs';
 
 const HOME = 'filo://newtab/';
 
@@ -64,6 +65,8 @@ async function kantConComandoLento(app, openTab) {
   await expect(dash.locator('.dash-bubble-filo').first()).toBeVisible({ timeout: 30_000 });
   await dash.locator('#input').fill("/sleep 4; echo ESIT''O-TARDIVO");
   await dash.locator('#input').press('Enter');
+  // Un comando che il terminale non riconosce chiede un OK anche scritto a mano (#892.1).
+  await clickConfirm(dash, 'ok');
   await dash.waitForTimeout(700);
   await dash.locator('#input').fill('/clear');
   await dash.locator('#input').press('Enter');

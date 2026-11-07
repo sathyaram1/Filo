@@ -20,6 +20,13 @@ let inflight = null;
 let lost = false;
 // Il file c'è ma non si è lasciato leggere né spostare: un'identità nuova scritta sopra perderebbe il portafoglio (#1087).
 let fileIntoccabile = false;
+// «identity_unreadable» si ripete a ogni richiesta: i contatori del servizio (#1472) lo contano una volta per avvio.
+let illeggibileContata = false;
+
+// Un guasto dell'identità, per nome: lo contano i contatori del servizio (#1472). Mai un token o un uid.
+function contaGuasto(evento) {
+  try { require('../services/contatoriServizio').misura('identita', evento); } catch (_) {}
+}
 
 function erroreIdentita(code) {
   const err = new Error(code === 'identity_lost'
@@ -57,6 +64,7 @@ function persist() {
     return true;
   } catch (e) {
     console.error('[identity] salvataggio fallito:', e?.message || e);
+    contaGuasto('salvataggio_fallito');
     return false;
   }
 }
@@ -91,6 +99,7 @@ function load() {
     if (dati) return dati;
     console.warn('[identity] file illeggibile, lo metto da parte');
     if (!guasti.metteDaParte(file, 'illeggibile-' + guasti.timbro())) fileIntoccabile = true;
+    else contaGuasto('illeggibile_da_parte');
     return null;
   }
   if (!walletStore.suDisco()) return null;
@@ -123,8 +132,12 @@ async function signUpAnonymous() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ returnSecureToken: true }),
     });
-  } catch (e) { throw humanNetworkError(e); }
+  } catch (e) {
+    contaGuasto('registrazione_fallita');
+    throw humanNetworkError(e);
+  }
   if (!res.ok) {
+    contaGuasto('registrazione_fallita');
     const text = await res.text().catch(() => '');
     const err = new Error(/ADMIN_ONLY_OPERATION/.test(text)
       ? 'identità anonima non abilitata sul server (Firebase → Authentication → Anonymous)'
@@ -160,6 +173,7 @@ async function refresh() {
     const testo = await res.text().catch(() => '');
     if (!guasti.rinnovoRifiutato(testo)) throw guasti.nonRaggiungibile(res.status);
     lost = true;
+    contaGuasto('identity_lost');
     throw erroreIdentita('identity_lost');
   }
   const j = await res.json();
@@ -179,7 +193,10 @@ async function getIdToken() {
   // Il portachiavi può sbloccarsi dopo l'avvio: prima di arrendersi si rilegge il disco. Fuori dalla
   // corsa in volo: un errore sincrono lì dentro lascerebbe `inflight` fermo su un rifiuto per sempre.
   if (!session?.refreshToken && walletStore.suDisco()) restore();
-  if (isUnreadable()) throw erroreIdentita('identity_unreadable');
+  if (isUnreadable()) {
+    if (!illeggibileContata) { illeggibileContata = true; contaGuasto('identity_unreadable'); }
+    throw erroreIdentita('identity_unreadable');
+  }
   inflight = (async () => {
     try {
       if (session?.refreshToken) return await refresh();
@@ -202,7 +219,7 @@ function _expireToken() { if (session) { session.idToken = null; session.idToken
 // Ricomincia da zero: scelta confermata dall'utente dopo che l'identità è persa o illeggibile.
 // Il file resta accanto; la prossima richiesta crea un'identità nuova.
 function resetIdentity() {
-  session = null; lost = false; inflight = null; fileIntoccabile = false;
+  session = null; lost = false; inflight = null; fileIntoccabile = false; illeggibileContata = false;
   try { guasti.metteDaParte(filePath(), 'prev'); } catch (_) {}
 }
 

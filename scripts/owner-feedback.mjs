@@ -39,7 +39,8 @@
 //   node scripts/owner-feedback.mjs <n|id> --solo-locale    (segno «solo in locale»)
 //   node scripts/owner-feedback.mjs <n|id> --non-locale
 //   node scripts/owner-feedback.mjs <n|id> --serve-locale ["perché"]
-//   node scripts/owner-feedback.mjs <n|id> --aspetta 676,663.2   (l'elenco intero: sostituisce quello di prima, e dice cosa toglie)
+//   node scripts/owner-feedback.mjs <n|id> --aspetta-anche 676,663.2   (le aggiunge a quelle che ci sono)
+//   node scripts/owner-feedback.mjs <n|id> --aspetta 676,663.2 [--sostituisci]   (l'elenco intero; se toglie attese non fuse rifiuta, a meno di --sostituisci)
 //   node scripts/owner-feedback.mjs <n|id> --aspetta-niente
 //
 //   <n|id>: il numero del feedback (910, #910, 22.1) o il suo id.
@@ -57,7 +58,8 @@
 //   tasto «💻 Lavoro server» dei Ricevuti in Gestione (#957). Salta L5, e una sessione ingannata da un testo
 //   d'utente, con le credenziali dell'owner, se lo darebbe da sola. `--approva-locale` si rifiuta. Per la
 //   stessa ragione la fiducia (#1148): «Segna fidato» lo dà solo l'owner, in Gestione, dopo aver letto il testo.
-//   E una nota nuova su un feedback fidato, da una sessione senza biglietto pulito, gliela toglie prima (#1428).
+//   E una nota nuova su un feedback fidato, da una sessione senza biglietto pulito, gliela toglie prima (#1428). Non
+//   quella composta da uno strumento con un modello di lib/note-fisse.mjs (#1428.1): dalla riga di comando non si chiede.
 //   `--riconosci`, `--preapprova` e `--chiedi-prima` non ci sono più e si rifiutano col perché.
 //
 //   `--come-routine`: la macchina a stati distingue chi scrive. L'owner decide
@@ -82,7 +84,8 @@ import { isRoutineInstance } from './lib/routine-role.mjs';
 import { fetchRitentato } from './lib/rete.mjs';
 import { avvisoDaCampi, parseRiferimento, risolviFeedback } from './lib/pratica-locale.mjs';
 import { PARTI, RAMO_RE, partiDaCampi } from './lib/parti-lavoro.mjs';
-import { firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { cambiataNelFrattempo, firmaOra, patchFirmato } from './lib/firma-ora.mjs';
+import { notaFissa } from './lib/note-fisse.mjs';
 import { PRIORITA_AMMESSE, parsePriorita } from './lib/priorita.mjs';
 // Moduli IIFE: importarli li registra su globalThis.
 import '../src/shared/feedbackThread.js';
@@ -95,6 +98,7 @@ import '../src/shared/feedback.js';
 import '../src/shared/feedbackStatus.js';
 import '../src/shared/feedbackAttese.js';
 import '../src/shared/manageReview.js';
+import { atteseDaCampo, rigaAttesa, statiInRete } from './lib/stati-attese.mjs';
 
 const THREAD = globalThis.SN_FEEDBACK_THREAD;
 const FS = globalThis.SN_FB_STATUS;
@@ -267,59 +271,151 @@ async function togliScheda(id, bearer) {
 /**
  * Le attese (#903), stato invariato: `numeri` come li scrive l'owner («676,663.2»), '' per toglierle. Le regole sono
  * quelle di Gestione (SN_FB_ATTESE.valida): numeri inesistenti, sé stesso, giri e più di venti si rifiutano col motivo.
- * @returns {Promise<{ ok: true, attese: Array<{id,num}>, dryRun?: true } | { ok: false, motivo: string }>}
+ * `aggiungi`: li unisce a quelle che ci sono. Senza, è l'elenco intero, e togliere un'attesa non fusa vuole `sostituisci`
+ * (#1756: chi ne metteva una senza aver letto l'elenco cancellava le altre): il rifiuto porta `vive`.
+ * @returns {Promise<{ ok: true, attese: Array<{id,num}>, prima, tolte, aggiunte, invariato?: true, dryRun?: true }
+ *   | { ok: false, motivo: string, vive?: Array<{id,num,stato}> }>}
  */
 export async function segnaAttese(id, numeri, opts = {}) {
-  const ATT = globalThis.SN_FB_ATTESE;
-  const letti = ATT.leggiNumeri(numeri || '');
+  const letti = globalThis.SN_FB_ATTESE.leggiNumeri(numeri || '');
   if (!letti.ok) return letti;
-  const bearer = opts.bearer || await acquireBearer();
-  // Anche le attese di adesso e lo stato: la risposta dice cosa sostituisce e cosa succede dopo, non lo presume.
-  const doc = await getDoc(id, bearer, ['seq', 'subSeq', 'status', 'localOnly', ATT.CAMPO]);
-  if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
-  if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
-  const f = doc.fields || {};
-  const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) });
-  const { from, leggibile } = await statoAttuale(doc);
-  const pratica = { stato: leggibile ? from : '', locale: !!f.localOnly?.mapValue };
-  let attese = [];
-  if (letti.numeri.length) {
-    const v = await ATT.valida({
-      id,
-      num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
-      numeri: letti.numeri,
-      gia: prima,
-      risolvi: async (n) => {
-        const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
-        if (r.ok) return r.id;
-        if (/^nessun feedback/.test(r.motivo)) return null;
-        throw new Error(r.motivo);
-      },
-      leggiAttese: async (ids) => new Map(await Promise.all(ids.map(async (x) => {
-        const d = await getDoc(x, bearer, [ATT.CAMPO]);
-        return [x, ATT.atteseDi({ waitsFor: atteseDaCampo(d?.fields?.[ATT.CAMPO]) })];
-      }))),
-    });
-    if (!v.ok) return v;
-    attese = v.attese;
-  }
-  const tolte = prima.filter((w) => !attese.some((a) => a.id === w.id));
-  if (opts.dryRun) return { ok: true, dryRun: true, attese, prima, tolte, pratica };
-  const fields = attese.length ? { [ATT.CAMPO]: toFsValue(attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
-  const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
-    body: JSON.stringify({ fields }),
-  });
-  if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true, attese, prima, tolte, pratica };
+  if (opts.aggiungi && !letti.numeri.length) return { ok: false, motivo: 'per aggiungere servono i numeri' };
+  const richiesta = opts.aggiungi ? { aggiungi: letti.numeri } : { numeri: letti.numeri };
+  return scriviAttese(id, () => richiesta, opts);
 }
 
-/** La risposta a `--aspetta`/`--aspetta-niente`: l'elenco nuovo, quelle che sostituisce, e cosa succede dopo per QUESTO stato. */
+/**
+ * Ogni scrittura delle attese da riga di comando passa di qui (SN_FB_ATTESE.scriviSullaLettura): `richiestaSu(prima)`
+ * dice cosa fare sulle attese lette adesso ({ numeri } | { aggiungi, togli, sostituisci }), o chiude con { fine }.
+ */
+async function scriviAttese(id, richiestaSu, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const bearer = opts.bearer || await acquireBearer();
+  return ATT.scriviSullaLettura({
+    leggi: async () => {
+      // Anche lo stato: la risposta dice cosa succede dopo, non lo presume.
+      const doc = await getDoc(id, bearer, ['seq', 'subSeq', 'status', 'localOnly', ATT.CAMPO]);
+      if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
+      return doc && { doc, versione: doc.updateTime || '' };
+    },
+    calcola: async (letto) => {
+      if (!letto) return { fine: { ok: false, motivo: `feedback ${id} inesistente` } };
+      const f = letto.doc.fields || {};
+      const prima = ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) });
+      const richiesta = richiestaSu(prima);
+      if (richiesta.fine) return richiesta;
+      const { from, leggibile } = await statoAttuale(letto.doc);
+      const pratica = { stato: leggibile ? from : '', locale: !!f.localOnly?.mapValue };
+      const { numeri: daScrivere, tieni } = ATT.daScrivereSu(prima, richiesta);
+      let attese = [];
+      if (daScrivere.length || tieni.length) {
+        const v = await ATT.valida({
+          id,
+          num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)),
+          numeri: daScrivere,
+          gia: prima,
+          tieni,
+          risolvi: async (n) => {
+            const r = await risolviFeedback(n, { bearer, base: FIRESTORE_BASE });
+            if (r.ok) return r.id;
+            if (/^nessun feedback/.test(r.motivo)) return null;
+            throw new Error(r.motivo);
+          },
+          leggiAttese: async (ids) => new Map(await Promise.all(ids.map(async (x) => {
+            const d = await getDoc(x, bearer, [ATT.CAMPO]);
+            return [x, ATT.atteseDi({ waitsFor: atteseDaCampo(d?.fields?.[ATT.CAMPO]) })];
+          }))),
+        });
+        if (!v.ok) return { fine: v };
+        attese = v.attese;
+      }
+      const tolte = prima.filter((w) => !attese.some((a) => a.id === w.id));
+      const aggiunte = attese.filter((a) => !prima.some((w) => w.id === a.id));
+      const esito = { ok: true, attese, prima, tolte, aggiunte, pratica };
+      if (richiesta.aggiungi && !tolte.length && !aggiunte.length) return { fine: { ...esito, invariato: true, ...(opts.dryRun ? { dryRun: true } : {}) } };
+      if (tolte.length && !opts.sostituisci && !richiesta.sostituisci) {
+        const vive = (await statiInRete(tolte, { bearer })).filter((w) => w.stato !== ATT.STATO.FUSO);
+        if (vive.length) return { fine: { ok: false, vive, motivo: `toglierebbe ${vive.length === 1 ? 'l’attesa' : 'le attese'} su ${vive.map(rigaAttesa).join(', ')}` } };
+      }
+      if (opts.dryRun) return { fine: { ...esito, dryRun: true } };
+      return { scrivi: esito };
+    },
+    scrivi: async (esito, versione) => {
+      const fields = esito.attese.length ? { [ATT.CAMPO]: toFsValue(esito.attese), updatedAt: firmaOra() } : { updatedAt: firmaOra() };
+      const maschera = `updateMask.fieldPaths=${ATT.CAMPO}&updateMask.fieldPaths=updatedAt`;
+      const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${maschera}&currentDocument.updateTime=${encodeURIComponent(versione)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields }),
+      });
+      if (res.ok) return esito;
+      const testo = await res.text();
+      if (ATT.conflittoDiScrittura(res.status, testo)) return { conflitto: true };
+      return { ok: false, motivo: `scrittura fallita (${res.status}): ${testo.slice(0, 200)}` };
+    },
+  });
+}
+
+/**
+ * Una segnalazione che un pacchetto vuole unire, letta per i controlli di `feedback:apri --pacchetto`
+ * (SPEC-RIDISEGNO-LAVORO.md §3, regola 1). `stato` e `priorita` restano '' e null se non si decifrano.
+ * @returns {Promise<{ ok: true, id, num, stato, priorita, locale, attese, ramo, unisce, unitoIn, fidato } | { ok: false, motivo, inesistente? }>}
+ */
+export async function segnalazioneDaUnire(riferimento, opts = {}) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const bearer = opts.bearer || await acquireBearer();
+  const r = await risolviFeedback(riferimento, { bearer, base: FIRESTORE_BASE });
+  if (!r.ok) return { ok: false, motivo: r.motivo, inesistente: /^nessun feedback/.test(r.motivo) };
+  const doc = await getDoc(r.id, bearer, ['seq', 'subSeq', 'status', 'priority', 'localOnly', 'branch', 'unisce', 'unitoIn', 'fiducia', ATT.CAMPO]);
+  if (!doc) return { ok: false, motivo: `nessun feedback ${riferimento}`, inesistente: true };
+  const f = doc.fields || {};
+  const { from, leggibile } = await statoAttuale(doc);
+  return {
+    ok: true, id: r.id,
+    num: globalThis.SN_FEEDBACK.formatNum(Number(f.seq?.integerValue), Number(f.subSeq?.integerValue)) || String(riferimento),
+    stato: leggibile ? from : '', priorita: await prioritaPrecedente(doc), locale: !!f.localOnly?.mapValue,
+    attese: ATT.atteseDi({ [ATT.CAMPO]: atteseDaCampo(f[ATT.CAMPO]) }),
+    ramo: String(f.branch?.stringValue || '').trim(),
+    unisce: (f.unisce?.arrayValue?.values || []).map((v) => String(v?.mapValue?.fields?.num?.stringValue || '')).filter(Boolean),
+    // Il rimando che il server scrive alla nascita di un pacchetto: una unita rimasta in coda lo porta senza attesa.
+    unitoIn: String(f.unitoIn?.stringValue || '').trim(),
+    // La fiducia la scrive solo il server (#1148): un pacchetto che porta i suoi allegati non è più fidato di lei.
+    fidato: MR.isFidato({ fiducia: f.fiducia?.stringValue }),
+  };
+}
+
+/**
+ * Le attese di `id` sulle segnalazioni `togli` (id) diventano una sola su `voce` ({ id, num }), le altre restano: chi
+ * aspettava una segnalazione unita in un pacchetto aspetta il pacchetto. Stesse regole di segnaAttese.
+ */
+export async function spostaAttese(id, togli, voce, opts = {}) {
+  const via = (Array.isArray(togli) ? togli : []).map(String);
+  // Le unite tolte sono ancora aperte di proposito: si archiviano subito dopo.
+  return scriviAttese(id, (prima) => (prima.some((w) => via.includes(w.id))
+    ? { togli: via, aggiungi: [String(voce.num)], sostituisci: true }
+    : { fine: { ok: true, attese: prima, gia: true } }), opts);
+}
+
+/** Il rifiuto di `--aspetta` che toglierebbe attese non fuse, con le due righe per proseguire. PURA. */
+export function rifiutoSostituzione(rif, numeri, r) {
+  const n = String(rif).replace(/^#+/, '');
+  const valore = (Array.isArray(numeri) ? numeri : [numeri]).join(',');
+  return [`RIFIUTATO: --aspetta sostituisce l’elenco intero, e ${r.motivo}: non ho toccato niente.`,
+    `  per aggiungere senza togliere: npm run feedback -- ${n} --aspetta-anche ${valore}`,
+    `  per sostituire davvero:        npm run feedback -- ${n} --aspetta ${valore} --sostituisci`].join('\n');
+}
+
+/** La risposta a `--aspetta`/`--aspetta-anche`/`--aspetta-niente`: l'elenco nuovo, cosa cambia, e cosa succede dopo per QUESTO stato. */
 export function rispostaAttese(rif, r) {
   const ATT = globalThis.SN_FB_ATTESE;
   const tolte = (r.tolte || []).length ? ATT.testoAttese(r.tolte) : '';
   const una = (r.tolte || []).length === 1;
+  const aggiunte = (r.aggiunte || []).length && (r.prima || []).length ? ATT.testoAttese(r.aggiunte) : '';
+  const unaAggiunta = (r.aggiunte || []).length === 1;
+  if (r.invariato) {
+    return `${r.dryRun ? '[dry-run] ' : ''}${rif}: aspettava già ${ATT.testoAttese(r.attese)}: non ${r.dryRun ? 'scriverei' : 'ho scritto'} niente.`;
+  }
+  if (r.dryRun && aggiunte && !tolte) return `[dry-run] ${rif}: aggiungerei ${aggiunte}, e aspetterebbe ${ATT.testoAttese(r.attese)}, stato invariato`;
   if (r.dryRun) {
     const cosa = r.attese.length ? `scriverei «aspetta ${ATT.testoAttese(r.attese)}»` : (tolte ? 'toglierei le attese' : 'non c’è nessuna attesa da togliere');
     return `[dry-run] ${rif}: ${cosa}${r.attese.length && tolte ? ` e toglierei ${una ? "quella" : "quelle"} su ${tolte}, che c’${una ? "era" : "erano"} prima` : ''}${!r.attese.length && tolte ? ` (${tolte})` : ''}, stato invariato`;
@@ -334,14 +430,8 @@ export function rispostaAttese(rif, r) {
   else if (s === 'working') dopo = 'Una routine ci sta lavorando adesso: le attese contano dal giro dopo, finché non sono tutti fusi.';
   else if (s === 'todo') dopo = 'Nessuna routine lo prende finché non sono tutti fusi; poi entra in coda da solo.';
   else dopo = 'Nessuna routine lo riprende finché non sono tutti fusi; poi il giro riparte da solo.';
-  return `${rif}: aspetta ${ATT.testoAttese(r.attese)}.${tolte ? ` ${una ? "Tolta l’attesa" : "Tolte le attese"} su ${tolte}, che c’${una ? "era" : "erano"} prima.` : ''} ${dopo}`;
-}
-
-/** Il campo `waitsFor` letto dall'API REST: [{ id, num }]. */
-function atteseDaCampo(v) {
-  return (v?.arrayValue?.values || []).map((x) => ({
-    id: x?.mapValue?.fields?.id?.stringValue || '', num: x?.mapValue?.fields?.num?.stringValue || '',
-  }));
+  const novita = aggiunte ? ` ${unaAggiunta ? 'Aggiunta l’attesa' : 'Aggiunte le attese'} su ${aggiunte}.` : '';
+  return `${rif}: aspetta ${ATT.testoAttese(r.attese)}.${novita}${tolte ? ` ${una ? "Tolta l’attesa" : "Tolte le attese"} su ${tolte}, che c’${una ? "era" : "erano"} prima.` : ''} ${dopo}`;
 }
 
 /**
@@ -730,8 +820,17 @@ async function bigliettoDiChiScrive() {
   try { return await sessione.biglietto(); } catch (e) { return { errore: String((e && e.message) || e) }; }
 }
 
+/**
+ * `nota`: un testo, o una nota fissa di lib/note-fisse.mjs (composta da uno strumento, fuori dalla regola del biglietto).
+ * `opts.statoAtteso`: lo `status` com'era quando chi chiama ha deciso (una prova a secco riusata); se adesso è un altro
+ * non si scrive niente e torna `cambiata` (#680.2).
+ */
 export async function scrivi(id, to, nota, opts = {}) {
   if (!ALLOWED.includes(to)) return { ok: false, motivo: `stato non valido: "${to}"` };
+  // La regola del biglietto (#1428) vale per il testo che sceglie la sessione, non per quello composto da un modello.
+  const fissa = notaFissa(nota);
+  if (!fissa && nota != null && typeof nota !== 'string') return { ok: false, motivo: 'nota non valida: un testo, o una nota fissa composta da uno strumento' };
+  const testoNota = fissa ? nota.testo : nota;
   if (typeof opts.frase === 'string') {
     const lunga = fraseTroppoLunga(opts.frase.trim());
     if (lunga) return { ok: false, motivo: lunga };
@@ -750,6 +849,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes', 'seq', 'subSeq']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
+  const cambiataDaAllora = 'la pratica è cambiata da quando è stata letta per decidere: non la riscrivo';
+  if (opts.statoAtteso !== undefined && (doc.fields?.status?.stringValue || '') !== String(opts.statoAtteso || '')) {
+    return { ok: false, cambiata: true, motivo: cambiataDaAllora };
+  }
 
   const { from, leggibile } = await statoAttuale(doc);
   if (!leggibile) {
@@ -786,10 +889,10 @@ export async function scrivi(id, to, nota, opts = {}) {
   // cifrato, la frase per chi ha mandato il feedback resta in chiaro — la legge
   // sulla sua macchina, che la chiave non ce l'ha.
   let notaNuova = false;
-  if (typeof nota === 'string' && nota.trim()) {
+  if (typeof testoNota === 'string' && testoNota.trim()) {
     // Si fonde e si taglia sul testo IN CHIARO, poi si cifra.
     const esistenti = await notePrecedentiInChiaro(doc);
-    const fuse = THREAD ? THREAD.mergeModelReport(esistenti, nota) : nota;
+    const fuse = THREAD ? THREAD.mergeModelReport(esistenti, testoNota) : testoNota;
     notaNuova = fuse !== esistenti;
     const capped = THREAD?.capNotes ? THREAD.capNotes(fuse) : fuse;
     if (CRYPTO?.isEnabled?.()) {
@@ -822,7 +925,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   // #1428: chi lavora legge le note come decisioni dell'owner, e un fidato salta giudici e L5. Da una sessione senza
   // biglietto pulito la nota non si distingue da una falsa: il feedback perde prima la fiducia, e senza questo niente nota.
   let fiduciaTolta = '';
-  if (notaNuova && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
+  if (notaNuova && !fissa && MR.isFidato({ fiducia: doc.fields?.fiducia?.stringValue })) {
     fiduciaTolta = bigliettoNonPulito(await bigliettoDiChiScrive());
   }
   // Il server toglie la fiducia solo a una pratica aperta (MR.fiduciaTogliCheck): chi la riapre la riapre prima e scrive
@@ -834,22 +937,29 @@ export async function scrivi(id, to, nota, opts = {}) {
   }
   // La prova a vuoto lo dice solo a chi l'ha chiesta (la riga di comando): server:fondi la usa come controllo prima di scrivere.
   if (opts.dryRun) return { ok: true, from, to, dryRun: true, campi: mask, ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  // Con uno stato atteso la prima scrittura vale solo sul documento appena letto: chi lo cambia in mezzo la respinge.
+  let condizione = opts.statoAtteso !== undefined && doc.updateTime ? `&currentDocument.updateTime=${encodeURIComponent(doc.updateTime)}` : '';
+  let respinta = false;
   const scriviCampi = async (m) => {
-    const q = m.map((k) => `updateMask.fieldPaths=${k}`).join('&');
+    const q = m.map((k) => `updateMask.fieldPaths=${k}`).join('&') + condizione;
+    condizione = '';
     const corpo = Object.fromEntries(Object.entries(fields).filter(([k]) => m.includes(k)));
     const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(id)}?${q}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
       body: JSON.stringify({ fields: corpo }),
     }, { fetchImpl: fetchRitentato });
-    return res.ok ? '' : `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}`;
+    if (res.ok) return '';
+    const testo = (await res.text()).slice(0, 200);
+    respinta = cambiataNelFrattempo(res.status, testo);
+    return `scrittura fallita (${res.status}): ${testo}`;
   };
   let daScrivere = mask;
   let riaperta = false;
   if (fiduciaTolta) {
     if (chiusaPrima) {
       const errore = await scriviCampi(mask.filter((k) => k !== 'notes'));
-      if (errore) return { ok: false, motivo: `${errore}. Non ho toccato niente`, from };
+      if (errore) return { ok: false, motivo: respinta ? cambiataDaAllora : `${errore}. Non ho toccato niente`, from, ...(respinta ? { cambiata: true } : {}) };
       riaperta = true;
       daScrivere = ['notes', 'updatedAt'];
     }
@@ -869,6 +979,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   }
 
   const errore = await scriviCampi(daScrivere);
+  if (errore && respinta && !fiduciaTolta) return { ok: false, cambiata: true, motivo: cambiataDaAllora, from };
   if (errore) return { ok: false, motivo: `${errore}${fiduciaTolta ? `. La fiducia l’ho già tolta${riaperta ? ' e la pratica è riaperta, senza la nota' : ''}` : ''}`, from };
   return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
 }
@@ -898,7 +1009,8 @@ if (isMain) {
     console.error('     node scripts/owner-feedback.mjs <numero|id> --priorita <0-3>              (solo la priorità, decisa a mano: stato invariato, anche nei Ricevuti)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --solo-locale | --non-locale    (segno «solo in locale», stato invariato)');
     console.error('     node scripts/owner-feedback.mjs <numero|id> --serve-locale ["perché"]       (feedback di un utente → Ricevuti, «richiede lavoro locale»)');
-    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta 676,663.2 | --aspetta-niente   (l’elenco intero delle attese, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta-anche 676,663.2      (aggiunge attese a quelle che ci sono, stato invariato)');
+    console.error('     node scripts/owner-feedback.mjs <numero|id> --aspetta 676,663.2 [--sostituisci] | --aspetta-niente   (l’elenco intero delle attese, stato invariato; togliere attese non fuse vuole --sostituisci)');
     console.error(`     status ∈ ${ALLOWED.join(' | ')}`);
   };
   if (argv.includes('--help') || argv.includes('-h')) { uso(); process.exit(0); }
@@ -915,8 +1027,8 @@ if (isMain) {
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata } = await import('./lib/argomenti.mjs');
   const OPZ = {
     opzioni: ['--branch', '--reason', '--frase', '--priorita', '--dry-run', '--come-routine', '--starred', '--unstar',
-      '--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente'],
-    conValore: ['--branch', '--reason', '--frase', '--priorita', '--aspetta'],
+      '--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-anche', '--aspetta-niente', '--sostituisci'],
+    conValore: ['--branch', '--reason', '--frase', '--priorita', '--aspetta', '--aspetta-anche'],
   };
   argv = espandiUguali(argv, OPZ.conValore);
   const storpiata = opzioneStorpiata(process.env, OPZ.opzioni);
@@ -966,7 +1078,7 @@ if (isMain) {
     if (!p.ok) { console.error(`RIFIUTATO: ${p.motivo} — non ho toccato niente.`); process.exit(1); }
     priorita = p.valore;
     const conStato = ['--frase', '--branch', '--reason', '--starred', '--unstar', '--come-routine'];
-    const altre = ['--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-niente', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
+    const altre = ['--solo-locale', '--non-locale', '--serve-locale', '--aspetta', '--aspetta-anche', '--aspetta-niente', ...(status ? [] : conStato)].filter((o) => argv.includes(o));
     if (altre.length) {
       console.error(`RIFIUTATO: --priorita ${status ? 'non va' : 'senza stato va da sola, non'} con ${altre.join(' ')}: lancia un comando per ciascuno — non ho toccato niente.`);
       process.exit(1);
@@ -981,12 +1093,16 @@ if (isMain) {
       console.error(`RIFIUTATO: ${soloConStato.join(' ')} vale solo insieme a uno stato (<n> <stato> "nota"): senza, non lo scriverei — non ho toccato niente.`);
       process.exit(1);
     }
-    const comandi = [['--frase'], ['--solo-locale', '--non-locale', '--serve-locale'], ['--aspetta', '--aspetta-niente']]
+    const comandi = [['--frase'], ['--solo-locale', '--non-locale', '--serve-locale'], ['--aspetta', '--aspetta-anche', '--aspetta-niente']]
       .map((g) => g.find((o) => argv.includes(o))).filter(Boolean);
     if (comandi.length > 1) {
       console.error(`RIFIUTATO: ${comandi.join(' e ')} sono due comandi: lancia un comando per ciascuno — non ho toccato niente.`);
       process.exit(1);
     }
+  }
+  if (argv.includes('--sostituisci') && !argv.includes('--aspetta')) {
+    console.error('RIFIUTATO: --sostituisci vale solo con --aspetta <numeri>, l’elenco intero — non ho toccato niente.');
+    process.exit(1);
   }
 
   // #914: le routine non aprono lavoro locale; quello che si fa solo in locale lo rimandano dal canale.
@@ -1004,18 +1120,27 @@ if (isMain) {
     id = r.id;
   }
 
-  // Le attese (#903): da sole, senza stato. Il valore di --aspetta è uno solo: «676,663.2» (o fra virgolette, con gli spazi).
-  const attese = ['--aspetta', '--aspetta-niente'].filter((o) => argv.includes(o));
+  // Le attese (#903): da sole, senza stato. Il valore è uno solo: «676,663.2» (o fra virgolette, con gli spazi).
+  const attese = ['--aspetta', '--aspetta-anche', '--aspetta-niente'].filter((o) => argv.includes(o));
   if (attese.length) {
     if (!id) { uso(); process.exit(1); }
-    if (attese.length > 1) { console.error('RIFIUTATO: --aspetta e --aspetta-niente insieme — non ho toccato niente.'); process.exit(1); }
+    if (attese.length > 1) { console.error(`RIFIUTATO: ${attese.join(' e ')} insieme — non ho toccato niente.`); process.exit(1); }
+    const [cmd] = attese;
     if (status) {
-      console.error(`RIFIUTATO: ${attese[0]} va da solo, senza stato né nota — non ho toccato niente.`);
+      console.error(`RIFIUTATO: ${cmd} va da solo, senza stato né nota — non ho toccato niente.`);
       process.exit(1);
     }
-    const valore = attese[0] === '--aspetta' ? String(flag('aspetta') || '') : '';
-    if (attese[0] === '--aspetta' && !valore.trim()) { console.error('RIFIUTATO: --aspetta vuole i numeri (--aspetta 676,663.2); per toglierle --aspetta-niente.'); process.exit(1); }
-    const r = await segnaAttese(id, valore, { dryRun, bearer });
+    const valore = cmd === '--aspetta-niente' ? '' : String(flag(cmd.slice(2)) || '');
+    if (cmd !== '--aspetta-niente' && !valore.trim()) { console.error(`RIFIUTATO: ${cmd} vuole i numeri (${cmd} 676,663.2); per toglierle --aspetta-niente.`); process.exit(1); }
+    const r = await segnaAttese(id, valore, {
+      dryRun, bearer, aggiungi: cmd === '--aspetta-anche',
+      // «Niente» è già la richiesta esplicita di toglierle tutte.
+      sostituisci: cmd === '--aspetta-niente' || argv.includes('--sostituisci'),
+    });
+    if (!r.ok && r.vive) {
+      console.error(rifiutoSostituzione(riferimento, globalThis.SN_FB_ATTESE.leggiNumeri(valore).numeri, r));
+      process.exit(3);
+    }
     if (!r.ok) { console.error(`RIFIUTATO: ${r.motivo} — non ho toccato niente.`); process.exit(3); }
     console.log(rispostaAttese(riferimento, r));
     process.exit(0);

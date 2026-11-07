@@ -65,8 +65,8 @@ test('il system prompt della chat nomina il modello con il suo id concreto, non 
       globalThis.SN_PROVIDERS.completeWithFallback = orig;
     }
 
-    // Istruzioni e contesto di adesso: dal #868 il nome del modello sta nel contesto, subito prima della domanda.
-    const parti = (captured.messages || []).filter((m) => m.role === 'system' || String(m.content).startsWith('═══ CONTESTO DI ADESSO'));
+    // Il nome del modello sta nel CONTESTO dell'utente, nel system (SPEC-CONTESTO fase 3).
+    const parti = (captured.messages || []).filter((m, i, tutti) => m.role === 'system' || i === tutti.length - 1);
     const sysContent = parti.length ? parti.map((m) => (typeof m.content === 'string' ? m.content : JSON.stringify(m.content))).join('\n') : null;
     const primaryModel = captured.attempts && captured.attempts[0] ? captured.attempts[0].model : null;
 

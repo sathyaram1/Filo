@@ -128,11 +128,16 @@ test('da un sito si chiedono solo le azioni della barra d\'aiuto, confermate o n
 test('sentinella: ogni azione di Filo che la barra d\'aiuto chiede è fra quelle ammesse dai siti', () => {
   require(join(ROOT, 'src', 'shared', 'preferences.js'));
   require(join(ROOT, 'src', 'shared', 'actionLevels.js'));
-  const src = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
+  // La parte del prompt che vede solo l'Editor (#1433, `documentoEditorAiuto`) non arriva mai a un sito.
+  const tutto = readFileSync(join(ROOT, 'src', 'shared', 'constants.js'), 'utf8');
+  const soloEditor = /\n {4}documentoEditorAiuto: \(documento\) => \{[\s\S]*?\n {4}\},\n/.exec(tutto);
+  assert.ok(soloEditor, 'la sentinella non trova più la parte del prompt dell\'Aiuto riservata all\'Editor');
+  const src = tutto.replace(soloEditor[0], '\n');
   const descritte = [...src.matchAll(/"action":\s*"filo",\s*"filo":\s*\{\s*"type":\s*"([A-Z_]+)"/g)].map((m) => m[1]);
   assert.ok(descritte.includes('INVIA_FEEDBACK'), 'la sentinella non vede più le azioni del prompt della barra d\'aiuto');
   const siti = scriptDeiSiti().map((x) => x.src).join('\n');
-  const mandate = [...siti.matchAll(/runFiloAction\(\s*\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
+  // Anche quelle che la pagina rimanda all'Aiuto da far partire (src/content/aiutoPagina.js, `{ filo: { action } }`).
+  const mandate = [...siti.matchAll(/(?:runFiloAction\(\s*|\{\s*filo:\s*\{\s*action:\s*)\{\s*type:\s*['"]([A-Za-z_]+)['"]/g)].map((m) => m[1].toUpperCase());
   assert.ok(mandate.includes('NAVIGA'), 'la sentinella non vede più le azioni che la barra manda da sé');
   // #843 — IMPOSTA_PREFERENZA passa solo nella forma stretta del prompt (Filo spento sul sito stesso): la prova sotto.
   assert.deepEqual([...descritte, ...mandate].filter((t) => !W.AZIONI_WEB.has(t) && t !== 'IMPOSTA_PREFERENZA'), [], 'azioni della barra d\'aiuto non ammesse dai siti');
@@ -253,7 +258,9 @@ test('un sito chiede al magazzino solo gli scomparti dei content script, in ogni
   assert.deepEqual(W.chiaviStoragePerOrigine(null, web), [...W.CHIAVI_STORAGE_WEB]);
   assert.deepEqual(W.chiaviStoragePerOrigine('filo_memory', web), []);
   assert.equal(W.chiaviStoragePerOrigine('sn_personal_dict', web), 'sn_personal_dict');
-  assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory', 'savedPages', 'sn_icon_layout', 7], web), ['sn_icon_layout']);
+  assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory', 'savedPages', 'sn_personal_dict', 7], web), ['sn_personal_dict']);
+  // La disposizione delle icone la legge solo la barra laterale, dal main (#1246): a un sito non serve.
+  assert.deepEqual(W.chiaviStoragePerOrigine(['sn_icon_layout', 'sn_qr_in_primary_migrated'], web), []);
   assert.deepEqual(W.chiaviStoragePerOrigine({ clipboardHistory: [], sn_autocorrect: {} }, web), { sn_autocorrect: {} });
   assert.equal(W.chiaviStoragePerOrigine(null, 'filo://options/options.html'), null);
   assert.deepEqual(W.chiaviStoragePerOrigine(['filo_memory'], 'filo://options/options.html'), ['filo_memory']);
@@ -408,7 +415,7 @@ test('sentinella: ogni campo letto dai siti dentro una sezione elencata campo pe
 // Un campo nuovo in una di queste sezioni non arriva ai siti finché qualcuno non
 // sceglie: nella lista se il codice dei siti lo usa, qui se resta a casa. I modelli
 // per funzione restano fuori: se ne aggiungono spesso e ai siti ne serve uno solo.
-const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['categorize'], tabColor: [], notifications: ['soundEnabled', 'sound', 'soundVolume'], dictation: [], menuDelSito: [], correttore: [] };
+const RESTANO_A_CASA = { tts: ['modelVoice'], featureFlags: ['categorize'], tabColor: [], notifications: ['soundEnabled', 'sound', 'soundVolume'], dictation: [], menuDelSito: [], correttore: ['segnapostiWeb'] };
 test('sentinella: ogni campo delle sezioni elencate campo per campo è stato deciso', () => {
   for (const S of SEZIONI_A_CAMPI.filter((k) => k !== 'models')) {
     assert.ok(S in RESTANO_A_CASA, `sezione ${S} elencata campo per campo senza la sua decisione qui`);

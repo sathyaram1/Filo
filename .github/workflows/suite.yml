@@ -233,11 +233,68 @@ jobs:
           grep -E '^[[:space:]]*(not ok|location:)' unit.log 2>/dev/null | head -80 || echo "(nessuna riga not ok: gli unit non sono partiti, guarda i passi sopra)"
           exit 1
 
+  # Gli unit rossi rifatti su Windows sulla punta di main, a fine suite: una fusione arrivata intanto può averli già
+  # corretti, e il feedback chiederebbe un lavoro fatto (#2148, come il cancello di pubblicazione per #1185). Qui gira
+  # il codice della punta: niente segreti. Senza esito (lavoro rosso, registro assente) l'avviso apre come prima.
+  unit-windows-punta:
+    needs: [suite, verdetto, unit-windows]
+    if: always() && !cancelled() && github.ref == 'refs/heads/main' && needs.unit-windows.result == 'failure'
+    runs-on: windows-latest
+    timeout-minutes: 60
+    outputs:
+      punta: ${{ steps.rifai.outputs.punta }}
+      gia_verdi: ${{ steps.rifai.outputs.gia_verdi }}
+      tutti: ${{ steps.rifai.outputs.tutti }}
+    steps:
+      # Con la storia intera, come la prima corsa: in una copia corta un unit che legge la storia si salta e passa.
+      - name: Checkout della punta di main
+        uses: actions/checkout@v4
+        with:
+          ref: main
+          fetch-depth: 0
+
+      - name: Punta di main
+        id: punta
+        shell: bash
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+      # Main fermo sul commit provato: i rossi sono già stati rifatti una volta dalla riprova, qui non c'è niente di nuovo.
+      - name: Setup Node
+        if: steps.punta.outputs.sha != github.sha
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dipendenze
+        if: steps.punta.outputs.sha != github.sha
+        shell: bash
+        run: node scripts/npm-ci-ritenta.mjs
+
+      - name: Registro degli unit del commit provato
+        if: steps.punta.outputs.sha != github.sha
+        continue-on-error: true
+        uses: actions/download-artifact@v4
+        with:
+          name: unit-windows-registro
+          path: esiti-unit
+
+      - name: Rifai i rossi sulla punta
+        id: rifai
+        if: steps.punta.outputs.sha != github.sha
+        continue-on-error: true
+        env:
+          PUNTA: ${{ steps.punta.outputs.sha }}
+        shell: bash
+        run: |
+          if [ ! -s esiti-unit/unit.log ]; then echo "Nessun registro degli unit: niente da rifare."; exit 0; fi
+          if VERDI=$(node scripts/rossi-sulla-punta.mjs esiti-unit/unit.log); then TUTTI=true; else TUTTI=false; fi
+          { echo "punta=$PUNTA"; echo "gia_verdi=$(echo $VERDI)"; echo "tutti=$TUTTI"; } >> "$GITHUB_OUTPUT"
+
   # I feedback dei rossi su main, in un lavoro a parte: la parola della costruzione sta solo qui, nell'ambiente fisso,
   # lontano da npm ci e dalle prove (gli strumenti dell'avviso usano solo moduli di Node). Su un ramo il lavoro si salta
   # prima di arrivare all'ambiente, che lo respingerebbe (#1504).
   avviso:
-    needs: [suite, verdetto, unit-windows]
+    needs: [suite, verdetto, unit-windows, unit-windows-punta]
     if: always() && !cancelled() && github.ref == 'refs/heads/main' && (needs.suite.result != 'success' || needs.verdetto.result != 'success' || needs.unit-windows.result != 'success')
     runs-on: ubuntu-latest
     environment: rilascio
@@ -271,6 +328,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           PARTI_ESITO: ${{ needs.suite.result }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_PROVATO: ${{ github.sha }}
         shell: bash
         run: |
           PREMESSA="La suite Playwright completa, che gira a ogni fusione sul ramo principale, ha trovato dei rossi NUOVI su questo commit (fuori dai rossi noti del contenitore in tests/rossi-noti.json): questo commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala; se invece e un rosso d ambiente del contenitore senza schermo, aggiungilo a tests/rossi-noti.json (contenitore.specs) col titolo esatto del test, il motivo e questo feedback. Il JSON dei risultati e le tracce dei rossi (screenshot, trace, una cartella per parte della suite) stanno negli artifact di questa esecuzione, per sette giorni: ${ESECUZIONE}"
@@ -317,10 +375,12 @@ jobs:
 
           Verdetto:
           ${VERDETTO}"
-          # Senza il file delle chiavi (verdetto mai partito) il guasto e' la suite che non parte.
+          # Senza il file delle chiavi (verdetto mai partito) il guasto e' la suite che non parte. Il commit fa riconoscere al
+          # server un rosso che una fusione arrivata dopo ha gia' corretto (#1788): saltare qui l'avviso su un commit non piu'
+          # in punta perderebbe il rosso quando la corsa piu' nuova viene annullata.
           if [ -s esiti-suite/chiavi-allarme.txt ]; then CHIAVI=(--chiavi-da esiti-suite/chiavi-allarme.txt); else CHIAVI=(--chiave suite:non-partita); fi
           # Rosso solo se il feedback non parte: il rosso della corsa lo tengono già i lavori provati.
-          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
+          node scripts/build-alarm.mjs "Suite Playwright rossa su main: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "$COMMIT_PROVATO" || { echo "::error::Allarme della suite non consegnato: nessun feedback per questo rosso."; exit 1; }
 
       - name: Registro degli unit su Windows
         if: always() && !cancelled() && needs.unit-windows.result != 'success'
@@ -337,8 +397,25 @@ jobs:
           FILO_BUILD_PASSPHRASE: ${{ secrets.FILO_BUILD_PASSPHRASE }}
           GH_TOKEN: ${{ github.token }}
           ESECUZIONE: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT_PROVATO: ${{ github.sha }}
+          PUNTA: ${{ needs.unit-windows-punta.outputs.punta }}
+          GIA_VERDI: ${{ needs.unit-windows-punta.outputs.gia_verdi }}
+          TUTTI_GIA_VERDI: ${{ needs.unit-windows-punta.outputs.tutti }}
         shell: bash
         run: |
+          # Il commit resta non pubblicabile (la corsa e' rossa); il rosso che una fusione dopo non avesse corretto lo
+          # riapre la corsa sulla punta.
+          if [ "$TUTTI_GIA_VERDI" = "true" ]; then
+            echo "::warning::Gli unit rossi su Windows di ${COMMIT_PROVATO:0:10} sono gia' verdi sulla punta di main (${PUNTA:0:10}): nessun feedback."
+            { echo "## Unit rossi gia' corretti su main"; echo; echo "Rossi su ${COMMIT_PROVATO:0:10}, verdi su Windows sulla punta ${PUNTA:0:10}:"; printf -- '- %s\n' $GIA_VERDI; } >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          SULLA_PUNTA=""
+          if [ -n "$GIA_VERDI" ]; then
+            SULLA_PUNTA="
+
+          Gia verdi su Windows sulla punta di main (${PUNTA:0:10}), da non correggere: ${GIA_VERDI}"
+          fi
           PREMESSA="Gli unit test, rifatti su Windows a ogni fusione sul ramo principale come li rifa il cancello di pubblicazione, sono rossi su questo commit anche rifatti una volta: il commit NON verra pubblicato, e la pubblicazione resta sull ultimo commit con la suite verde finche un commit dopo questo non torna verde. Su Linux (contenitore delle routine, cancello di fusione) gli stessi test possono essere verdi: il rosso e di Windows (percorsi, fine riga, piattaforma presunta invece che iniettata, tempi). Capisci quale modifica li ha rotti (i commit entrati dopo l ultima suite verde sono elencati sotto) e sistemala. Registro: ${ESECUZIONE}"
           ROSSI_TUTTE=$(grep -E '^[[:space:]]*(not ok|location:)' esiti-unit/unit.log 2>/dev/null || true)
           ROSSI=$(printf '%s\n' "$ROSSI_TUTTE" | head -80)
@@ -371,11 +448,11 @@ jobs:
           TESTO="${PREMESSA}
 
           Test rossi (${N_TUTTE:-0} righe):
-          ${ROSSI:-(nessuna riga not ok: guarda la coda)}
+          ${ROSSI:-(nessuna riga not ok: guarda la coda)}${SULLA_PUNTA}
 
 
           ${DOPO_VERDE}
 
 
           ${CODA}"
-          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }
+          node scripts/build-alarm.mjs "Unit test rossi su Windows: commit non pubblicabile" "$TESTO" "${CHIAVI[@]}" --commit "$COMMIT_PROVATO" || { echo "::error::Allarme degli unit su Windows non consegnato: nessun feedback per questo rosso."; exit 1; }

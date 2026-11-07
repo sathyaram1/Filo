@@ -6,7 +6,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, stileDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
@@ -33,7 +33,8 @@ async function apri(app, openTab, testServer, opz = {}) {
       models: { [C.ACTIONS.SPELLCHECK_SEMANTIC]: 'deepseek-flash', [C.ACTIONS.SPELLCHECK_CONTEXT]: 'deepseek-flash' },
       modelRegistry: globalThis.SN_TEST_MODELS.registry,
       featureFlags: { spellcheck: true, spellcheckContext: opz.suggerimenti !== undefined },
-      correttore: { modelloErrori: true, ripetizioni: true, ...(opz.correttore || {}) },
+      // La correzione automatica (#1447) cambierebbe gli errori fissi battuti qui: la prova sta in correttore-automatica.spec.mjs.
+      correttore: { modelloErrori: true, ripetizioni: true, automatica: false, ...(opz.correttore || {}) },
     });
     Object.assign(globalThis, {
       __rapide: [], __ragionate: [], __errori: opz.errori || {},
@@ -61,7 +62,9 @@ async function apri(app, openTab, testServer, opz = {}) {
       const sistema = String(messages[0].content);
       const t = String(messages[messages.length - 1].content);
       const fine = (text) => ({ text, model: 'finto', provider: 'openrouter', costEur: 0, usage: {} });
-      const righe = (nuovo, voci, tipo) => Object.entries(voci).filter(([p]) => nuovo.includes(p)).map(([p, [c, m]]) => `[${p}][${c}][${m}][${tipo}]`);
+      // Una voce che è già una riga va com'è: il modello che cita il pezzo con altri spazi o altri apici (#1580.2).
+      const righe = (nuovo, voci, tipo) => Object.entries(voci).filter(([p]) => nuovo.includes(p))
+        .map(([p, v]) => (typeof v === 'string' ? v : `[${p}][${v[0]}][${v[1]}][${tipo}]`));
       if (sistema.includes('Sei il controllo rapido')) {
         const nuovo = tag(t, 'testo_nuovo');
         const candidati = tag(t, 'candidati');
@@ -90,7 +93,7 @@ async function apri(app, openTab, testServer, opz = {}) {
 const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
 const suggerimento = (page, testo) => page.locator('.sn-spell-overlay .sn-suggerimento', { hasText: testo });
 const rapide = (app) => app.evaluate(() => globalThis.__rapide);
-const coloreDelSegno = (loc) => loc.evaluate((el) => getComputedStyle(el).textDecorationColor);
+const coloreDelSegno = async (loc) => (await stileDelSegno(loc, ['text-decoration-color']))['text-decoration-color'];
 
 async function tastoDestroSu(page, loc) {
   const b = await riquadroDelSegno(loc);
@@ -113,9 +116,11 @@ test('«quseta» compare sbiadito e diventa pieno alla conferma, con «questa» 
   await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 4000 });
   await expect.poll(() => coloreDelSegno(segno)).not.toBe(sbiadito);
   const menu = await tastoDestroSu(page, segno);
-  const prima = menu.principale.locator(':scope > *').first();
+  const prima = menu.primaVoce;
   await expect(prima).toHaveClass(/sn-menu-correction/);
   await expect(prima).toHaveText(/questa/);
+  // La fila contestuale resta sopra anche alla correzione (#1434), che le sta subito sotto.
+  await expect(menu.principale.locator(':scope > .sn-menu-row + .sn-menu-correction')).toHaveText(/questa/);
   await expect(menu.locator('.sn-menu-segno')).toHaveText('Refuso: «questa».');
   await expect(menu.voce('Ignora')).toBeVisible();
   await expect(menu.voce('Aggiungi al dizionario')).toBeVisible();
@@ -186,7 +191,7 @@ test('«qual\'è» e «il il» hanno il segno pieno subito, prima che il modello
   expect(prima.candidati).toBe('');
   expect(prima.sistema, 'le regole viaggiano nel messaggio di sistema').toBe(true);
   const menu = await tastoDestroSu(page, errore(page, 'qual'));
-  await expect(menu.principale.locator(':scope > *').first()).toHaveText(/qual è/);
+  await expect(menu.primaVoce).toHaveText(/qual è/);
   await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
   await app.evaluate(() => globalThis.__rilascia());
 });
@@ -216,10 +221,35 @@ test('«oggi sonno andato al mare»: un errore su «sonno», con «sono» in cim
   await expect(segno).toHaveText('sonno', { timeout: 6000 });
   await expect(segno).not.toHaveClass(/sn-dubbio/);
   const menu = await tastoDestroSu(page, segno);
-  const prima = menu.principale.locator(':scope > *').first();
+  const prima = menu.primaVoce;
   await expect(prima).toHaveText(/^sono/);
   await prima.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('oggi sono andato al mare ');
+});
+
+test('il modello cita il pezzo con uno spazio in più e l\'altro apice: il segno sta su «sonno» e la correzione non incolla le parole', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { errori: { sonno: "[l’amico  sonno andato][l'amico sono andato][verbo essere][errore]" } });
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi l’amico sonno andato al mare ');
+  const segno = errore(page, 'sonno');
+  await expect(segno).toHaveText('sonno', { timeout: 6000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(1);
+  const menu = await tastoDestroSu(page, segno);
+  const prima = menu.primaVoce;
+  await expect(prima).toHaveText(/^sono/);
+  await prima.locator('.sn-menu-correction-main').click();
+  await expect(page.locator('#ta')).toHaveValue('oggi l’amico sono andato al mare ');
+});
+
+test('«Filo» e filo.red non hanno segni, nemmeno se il modello dice sbagliato «Filo»', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {
+    errori: { Filo: '[aperto Filo][aperto filo][maiuscola a metà frase][errore]', quseta: ['questa', 'Refuso.'] },
+  });
+  await page.locator('#ta').click();
+  await page.keyboard.type('ho aperto Filo e poi filo.red per quseta ');
+  await expect(errore(page, 'quseta')).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(1);
+  for (const r of await rapide(app)) expect(r.candidati).not.toMatch(/\bred\b|Filo/);
 });
 
 test('la parola che si sta scrivendo non è mai segnata e non parte; chiusa, sì', async ({ app, openTab, testServer }) => {
@@ -302,7 +332,7 @@ test('«quasi quasi» non è segnato, «il il» sì', async ({ app, openTab, tes
   await expect(errore(page, 'quasi')).toHaveCount(0);
   await expect(errore(page, 'piano')).toHaveCount(0);
   const menu = await tastoDestroSu(page, errore(page, 'il'));
-  await menu.principale.locator(':scope > *').first().locator('.sn-menu-correction-main').click();
+  await menu.primaVoce.locator('.sn-menu-correction-main').click();
   await expect(page.locator('#ta')).toHaveValue('quasi quasi vado piano piano con il cane ');
 });
 
@@ -348,7 +378,7 @@ test('spenta la parte del modello restano i segni del codice, pieni i sicuri e s
   expect(await rapide(app)).toEqual([]);
   // Il tasto destro sul candidato propone lo stesso la correzione che il codice conosce.
   const menu = await tastoDestroSu(page, errore(page, 'qual'));
-  await expect(menu.principale.locator(':scope > *').first()).toHaveText(/qual è/);
+  await expect(menu.primaVoce).toHaveText(/qual è/);
 });
 
 test('lo zigzag del browser si spegne dove i segni li disegna Filo; con «Errori» spento anche nelle caselle di una riga', async ({ app, openTab, testServer }) => {
@@ -441,4 +471,17 @@ test('il controllo ragionato, a fine frase, non porta la password data in rispos
   const tutti = await partiti();
   expect(tutti.some((t) => t.includes('proponi SUGGERIMENTI') && t.includes('certo, [dato riservato].'))).toBe(true);
   for (const t of tutti) expect(t).not.toContain('Gatto2024');
+});
+
+// #1447 — una chat che all'invio svuota la casella da script non manda input: i segni del testo partito non restano
+// sulla casella vuota.
+test('svuotata la casella da script, i segni del testo di prima spariscono', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, {});
+  await page.locator('#ta').click();
+  await page.keyboard.type('qual\'è il il motivo');
+  await expect(errore(page, 'qual\'è')).toHaveCount(1, { timeout: 4000 });
+  await page.evaluate(() => { document.getElementById('ta').value = ''; });
+  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 2000 });
+  await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.sn-spell-overlay')).map((o) => o.textContent).join('')))
+    .toBe('');
 });

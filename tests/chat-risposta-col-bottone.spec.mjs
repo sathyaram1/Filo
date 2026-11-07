@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { join } from 'node:path';
 import { mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { home, modelloFinto, chiamateAlModello, ripristina, chiedi } from './helpers/chatFinta.mjs';
+import { quadratoPronto } from './helpers/copione.mjs';
 
 const RISPOSTA = 'Hai pagato 305,40 € di TARI per il 2026, in due rate.';
 const DOPO = 'Ti ho messo anche il bottone per aprirlo.';
@@ -169,6 +170,8 @@ test('risposta scritta insieme al solo promemoria dopo una lettura: il modello s
     await expect(bolla).toContainText('Il promemoria suona', { timeout: 15_000 });
     const esito = (await chiamateAlModello(app))[2].find((m) => m.role === 'tool' && m.tool_call_id === 't1');
     expect(esito.content).toContain('riscrivila per intero');
+    // #1921.1: GLM spiegava all'utente perché riscriveva; l'avviso gli dice che è solo per lui.
+    expect(esito.content).toContain('non dire all\'utente che stai riscrivendo');
     await expect(bolla).toHaveCount(1);
     expect((await bolla.evaluate((el) => el.textContent)).split('305,40').length - 1).toBe(1);
   } finally {
@@ -305,6 +308,8 @@ test('fermato mentre il modello scrive il giro dopo: la risposta col bottone res
     await chiedi(page, 'quanto ho pagato di tari?');
     await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(3);
     await expect(page.locator('.dash-bubble-filo')).toContainText('Hai pagato 305,40 €');
+    // Su una macchina veloce si arriva qui prima che il quadrato accetti i clic (#2180).
+    await quadratoPronto(page);
     await page.locator('#stopBtn').click();
     await expect(page.locator('.dash-bubble-fermato')).toHaveText('Fermato a metà della risposta.', { timeout: 5_000 });
     const bolla = page.locator('.dash-bubble-filo');

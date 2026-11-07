@@ -214,8 +214,8 @@ test('invio di una segnalazione col portafoglio: niente +5, il conteggio locale 
   const page = await homeDiAvvio(app);
   await riscatta(app);
   await app.evaluate(() => {
+    // La rete finta consegna subito: il riquadro dice «inviato» solo a consegna avvenuta (#1667).
     globalThis.SN_FEEDBACK.submit = async () => ({ id: 'fbNuovo', failed: [] });
-    globalThis.SN_FEEDBACK_OUTBOX._setAuto(false);
   });
   const prima = await saldoLocale(app);
 
@@ -249,7 +249,6 @@ test('invio oltre il tetto giornaliero dei premi: il messaggio dice che questo a
   await riscatta(app);
   await app.evaluate(async () => {
     globalThis.SN_FEEDBACK.submit = async () => ({ id: `fb${Date.now()}`, failed: [] });
-    globalThis.SN_FEEDBACK_OUTBOX._setAuto(false);
     await globalThis.SN_WALLET_MAIN.readState();
   });
   const invia = async (testo) => {

@@ -299,6 +299,23 @@ test('ordine: grigi chiari dal più chiaro, poi i colori per tinta, poi i grigi 
   ]);
 });
 
+test('ordine: i rossi che tendono al magenta aprono l\'arcobaleno accanto al rosso pieno, i magenta lo chiudono (#822.1)', () => {
+  const schede = [
+    { n: 'blu', c: 'rgb(0, 0, 255)' },
+    { n: 'netflix', c: 'rgb(229, 9, 20)' },
+    { n: 'arancio', c: 'rgb(255, 140, 0)' },
+    { n: 'magenta', c: 'rgb(255, 0, 255)' },
+    { n: 'youtube', c: 'rgb(255, 0, 0)' },
+    { n: 'rosaShocking', c: 'rgb(255, 20, 147)' },
+    { n: 'pinterest', c: 'rgb(230, 0, 35)' },
+    { n: 'viola', c: 'rgb(128, 0, 255)' },
+  ];
+  assert.deepEqual(ordina(schede), ['pinterest', 'netflix', 'youtube', 'arancio', 'blu', 'viola', 'magenta', 'rosaShocking']);
+  // Il taglio sta a metà fra magenta e rosso (330°): appena sopra si apre, appena sotto si chiude.
+  assert.ok(TC.rainbowKey('rgb(255, 0, 127)')[1] < TC.rainbowKey('rgb(255, 0, 0)')[1]);
+  assert.ok(TC.rainbowKey('rgb(255, 0, 129)')[1] > TC.rainbowKey('rgb(255, 0, 255)')[1]);
+});
+
 test('ordine: è grigio quello che hasIdentity scarta, alla stessa soglia di croma', () => {
   for (const c of ['rgb(123, 100, 100)', 'rgb(124, 100, 100)', 'rgb(15, 15, 15)', 'rgb(29, 161, 242)', 'rgb(250, 250, 252)']) {
     assert.equal(TC.rainbowKey(c)[0] === 1, TC.hasIdentity(c), c);

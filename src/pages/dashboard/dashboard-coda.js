@@ -15,7 +15,7 @@
 
   const GIORNI = ['domenica', 'lunedì', 'martedì', 'mercoledì', 'giovedì', 'venerdì', 'sabato'];
   const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto', 'settembre', 'ottobre', 'novembre', 'dicembre'];
-  const ICONE_CAMBIO = { impostazioni: 'options', timer: 'timer', proxy: 'globe', zoom: 'zoom' };
+  const ICONE_CAMBIO = { impostazioni: 'options', timer: 'timer', proxy: 'globe', zoom: 'zoom', icone: 'pin', desktop: 'desktopIcons' };
 
   function icona(nome, size = 14) {
     const I = global.SN_ICONS;
@@ -48,12 +48,31 @@
     return n;
   }
 
+  // I clic su «risali» di fila, per i contatori (#1473): la serie finisce con un'altra cosa fatta nella home, con
+  // l'inizio del filo o con la pagina che se ne va; se la scheda si chiude la conta il main.
+  let pezziDiFila = 0;
+  function contaRisali(misura, campi = {}) {
+    try { Promise.resolve(d.send({ type: MSG.CONTATORI_EVENTO, misura, ...campi })).catch(() => {}); } catch (_) {}
+  }
+  function fineRisali() {
+    if (!pezziDiFila) return;
+    pezziDiFila = 0;
+    contaRisali('risali-fine');
+  }
+  async function risaliCliccato() {
+    if (caricando || finito || !primo) return;
+    pezziDiFila += 1;
+    contaRisali('risali', { pezzi: pezziDiFila });
+    await sali();
+    if (finito) fineRisali();
+  }
+
   function bottoneRisali() {
     if (risali && risali.isConnected) return risali;
     risali = el('div', 'dash-risali');
     const b = el('button', 'dash-risali-btn', 'risali il filo');
     b.type = 'button';
-    b.addEventListener('click', () => { sali().catch(() => {}); });
+    b.addEventListener('click', () => { risaliCliccato().catch(() => {}); });
     risali.appendChild(b);
     d.bubblesEl.insertBefore(risali, d.bubblesEl.firstChild);
     return risali;
@@ -160,8 +179,7 @@
       a.title = dove && dove.sito ? `${dove.url} · indirizzo troppo lungo, si apre il sito` : p.url;
       a.append(el('span', 'dash-pagina-titolo', String(p.titolo || '').trim() || sito(p.url)), el('span', 'dash-pagina-sito', `${sito(p.url)} · ${ora(p.ts)}`));
       if (p.altrove) a.append(el('span', 'dash-pagina-sito', 'da un altro dispositivo'));
-      a.addEventListener('click', (e) => { e.preventDefault(); riapri(p).catch(() => {}); });
-      return a;
+      a.addEventListener('click', (e) => { e.preventDefault(); riapri(p).catch(() => {}); });      return a;
     }));
   }
   function apriGruppo(r, aperta = !r.classList.contains('dash-pagine-aperte')) {
@@ -175,7 +193,8 @@
   async function riapri(p) {
     const dove = global.SN_FILO_CODA.daAprire(p);
     if (!dove) return;
-    const riaperta = p.archivio && !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio }) : null;
+    const riaperta = p.archivio ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, id: p.archivio })
+      : !dove.sito ? await d.send({ type: MSG.REOPEN_ARCHIVED_TAB, url: dove.url, perIndirizzo: true }) : null;
     if (!riaperta || !riaperta.ok) d.send({ type: MSG.OPEN_URL, url: dove.url });
   }
 
@@ -358,7 +377,9 @@
       for (let n = a.lastElementChild; n && n !== ancora; n = n.previousElementSibling) if (aSchermo(n)) { fondo = n; break; }
       cima = sopra ? Math.max(0, Math.ceil(y(sopra.getBoundingClientRect().bottom))) : 0;
       const base = (parseFloat(getComputedStyle(a).paddingBottom) || 0) - vuoto;
-      serve = Math.max(0, Math.ceil(cima + a.clientHeight - y(fondo.getBoundingClientRect().bottom) - base));
+      // Il margine sotto l'ultima riga (lo spazio dei tasti di una risposta, #1620) allunga lo scorrimento come il vuoto.
+      const giu = y(fondo.getBoundingClientRect().bottom) + (parseFloat(getComputedStyle(fondo).marginBottom) || 0);
+      serve = Math.max(0, Math.ceil(cima + a.clientHeight - giu - base));
       // Uno scambio che ha riempito lo schermo ha consumato il vuoto: non torna se poi qualcosa si accorcia.
       if (!serve && !inApertura()) ancora = null;
     }
@@ -390,7 +411,14 @@
 
   // ── I pezzi ───────────────────────────────────────────────────────────────
 
-  async function carica() {
+  // In fila con chi allinea e ripassa: un annuncio arrivato mentre la coda si legge rilegge dopo di lei, non a vuoto.
+  function carica() {
+    const p = coda.then(caricaOra, caricaOra);
+    coda = p.then(() => {}, () => {});
+    return p;
+  }
+  async function caricaOra() {
+    fineRisali();
     primo = null;
     finito = false;
     const res = await d.send({ type: MSG.FILO_CODA });
@@ -475,7 +503,10 @@
     const testo = String(v.text || '').trim();
     if (!testo) return false;
     for (const b of d.bubblesEl.querySelectorAll(`.dash-bubble-${v.role === 'user' ? 'user' : 'filo'}:not([data-key])`)) {
-      if (String((b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent) || '').trim() !== testo) continue;
+      // Una risposta formattata a schermo non ha più gli asterischi del filo: si confronta il testo com'era arrivato.
+      const scritto = d.scritto ? d.scritto(b) : null;
+      const suo = scritto || (b.dataset.cambiTesto != null ? b.dataset.cambiTesto : b.textContent);
+      if (String(suo || '').trim() !== testo) continue;
       b.dataset.key = v.key;
       b.dataset.chat = v.chat;
       // Con l'ora la bolla fa da segno: una riga tardiva posata dopo si mette prima di lei, non in fondo (#1295).
@@ -492,16 +523,23 @@
     else if (v.k === 'msg' && v.spontaneo && n.classList.contains('dash-bubble')) d.setBubbleText(n, v.text);
   }
 
-  // Pagine tolte da qualunque strada: le righe delle pagine già disegnate si rifanno su quelle che il filo ha adesso. Un
-  // gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga, e la vecchia se ne va.
+  // Pagine entrate, rititolate o tolte da qualunque strada: le righe si rifanno su quelle che il filo ha adesso, le nuove
+  // entrano al loro posto. Un gruppo si chiama come la sua prima pagina: tolta quella, è un'altra riga e la vecchia va.
   // `importate`: un backup ha messo nel tratto già disegnato anche chat e pagine sue, che compaiono al loro posto (#1256).
+  const stessoGruppo = (g, v) => !!g && g.ts === v.ts && JSON.stringify(g.pagine) === JSON.stringify(v.pagine);
   function ripassaPagine({ importate = false } = {}) {
     if (!d) return Promise.resolve();
-    // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
-    if (!primo) return importate && ultimo != null && !d.occupata() ? carica().then(() => {}) : Promise.resolve();
     const fai = async () => {
+      // Un filo che era vuoto si carica come all'apertura: l'ultimo pezzo, non tutto il backup una riga alla volta.
+      if (!primo) {
+        if (ultimo == null || d.occupata()) return;
+        await (importate ? caricaOra() : allineaOra(false));
+        return;
+      }
       const res = await d.send({ type: MSG.FILO_CODA, fino: primo });
       if (!res || !res.ok || !primo) return;
+      const giu = inFondo();
+      let messi = 0;
       const da = ms(primo);
       const gruppi = new Map((res.elementi || []).filter((v) => v.k === 'pagine' && ms(v.ts) >= da).map((v) => [v.key, v]));
       const perPagina = new Map();
@@ -514,18 +552,21 @@
         gruppi.delete(v.key);
         r.dataset.key = v.key;
         r.dataset.ts = v.ts;
-        disegnaGruppo(r, v);
+        // Ripassa a ogni visita: un gruppo che non è cambiato non si ridisegna, così non perde il fuoco né il passaggio.
+        if (!stessoGruppo(r._gruppo, v)) disegnaGruppo(r, v);
       }
-      for (const v of gruppi.values()) metti(v, { scorri: false });
+      for (const v of gruppi.values()) { metti(v, { scorri: false }); messi++; }
       if (importate) {
         const qui = d.chatId();
         for (const v of res.elementi || []) {
           if (v.k === 'pagine' || ms(v.ts) < da || conChiave(v.key)) continue;
           if (v.k === 'msg' && v.chat === qui) { riconosci(v); continue; }
           metti(v, { scorri: false });
+          messi++;
         }
       }
       segnaGiorni();
+      if (messi) seguiNuove(giu);
     };
     const p = coda.then(fai, fai);
     coda = p.then(() => {}, () => {});
@@ -550,6 +591,7 @@
 
   // Va al punto del filo dove sta una conversazione (o un suo messaggio), caricando i pezzi che mancano.
   async function vaiA({ chat, i = null, app = false, ts = null }) {
+    fineRisali();
     const chiave = app ? `a:${chat}` : (i != null ? `m:${chat}:${i}` : null);
     const trova = () => (chiave && conChiave(chiave))
       || [...d.bubblesEl.querySelectorAll('[data-chat]')].find((n) => n.dataset.chat === chat) || null;
@@ -669,17 +711,18 @@
       if (v.annullabile) return [{ type: 'item', icon: icona('undo', 16), label: `Annulla · ${v.frase}`, onClick: () => annullaCambio(cambio) }];
     }
     // Una conversazione della home si toglie dal filo da una sua bolla: la Cronologia, che lo faceva, non c'è più (#872).
+    // `azione`: il menu del tasto destro misura l'attesa delle voci del catalogo (#1461).
     const bolla = e.closest('.dash-bubble[data-chat]');
     if (bolla && bolla.dataset.chat) {
       const id = bolla.dataset.chat;
       return [
-        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
-        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', onClick: () => { togliConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('eyeOff', 16), label: 'Nascondi la conversazione', azione: 'chat-archive', onClick: () => { nascondiConversazione(id).catch(() => {}); } },
+        { type: 'item', icon: icona('trash', 16), label: 'Togli la conversazione dal filo', azione: 'chat-archive', onClick: () => { togliConversazione(id).catch(() => {}); } },
       ];
     }
     const nascosta = e.closest('.dash-nascosta');
     if (nascosta && nascosta.dataset.nascosta) {
-      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', onClick: () => { nascosta.querySelector('button').click(); } }];
+      return [{ type: 'item', icon: icona('restore', 16), label: 'Rimetti la conversazione nel filo', azione: 'chat-archive', onClick: () => { nascosta.querySelector('button').click(); } }];
     }
     return [];
   }
@@ -697,6 +740,7 @@
   }
 
   let attesaCambi = null;
+  let attesaPagine = null;
   function init(deps) {
     d = deps;
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
@@ -726,10 +770,16 @@
     }, { passive: true });
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') allinea({ daAltrove: true }).catch(() => {});
+      else fineRisali();
     });
     try {
       global.chrome.runtime.onMessage.addListener((m) => {
-        if (m && m.type === MSG.FILO_PAGINE_TOLTE) { ripassaPagine().catch(() => {}); return; }
+        if (m && m.type === MSG.FILO_PAGINE_CAMBIATE) {
+          // Una visita e il titolo che la pagina si dà subito dopo: una rilettura sola.
+          clearTimeout(attesaPagine);
+          attesaPagine = setTimeout(() => { ripassaPagine().catch(() => {}); }, 120);
+          return;
+        }
         if (m && m.type === MSG.DATI_IMPORTATI) { ripassaPagine({ importate: true }).catch(() => {}); return; }
         if (!m || m.type !== MSG.CAMBI_AGGIORNATI) return;
         clearTimeout(attesaCambi);
@@ -742,6 +792,6 @@
   }
 
   global.SN_DASH_CODA = {
-    init, carica, sali, allinea, metti, vaiA, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
+    init, carica, sali, fineRisali, allinea, metti, vaiA, daCapo, togliChat, rimettiChat, nascondi: nascondiConversazione, nascostaAltrove, togliIndirizzo, segnaGiorni, nomeDelGiorno,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : window);

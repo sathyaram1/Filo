@@ -1,0 +1,18 @@
+/* Il fumetto dei pulsanti della barra (src/main/popup-tooltip.js): una scritta su carta calda, chiara o scura. */
+*{margin:0;padding:0;box-sizing:border-box}
+html,body{background:transparent;overflow:hidden;height:100%;
+  font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
+#tip{
+  display:inline-block;
+  padding:4px 8px;
+  border-radius:6px;
+  font-size:12px;
+  line-height:1.2;
+  white-space:nowrap;
+  border:1px solid var(--border);
+  background:var(--bg);
+  color:var(--fg);
+  box-shadow:0 4px 16px rgba(0,0,0,0.18);
+}
+:root{--bg:#fdf6ec;--fg:#2a221a;--border:#e2d3b5}
+:root.dark{--bg:#1d1a16;--fg:#f1e7d6;--border:#3b332a}

@@ -49,7 +49,6 @@
       [A.FEEDBACK_TITLE, 'options_action_feedback_title'],
       [A.EDITOR_TITLE, 'options_action_editor_title'],
       [A.EDITOR_SUMMARY, 'options_action_editor_summary'],
-      [A.EDITOR_CHAT, 'options_action_editor_chat'],
       [A.ARCHIVE_EMBED, 'options_action_archive_embed'],
       [A.PROVIDER_TEST, 'options_action_provider_test'],
       [A.FILE_NAME, 'options_action_file_name'],

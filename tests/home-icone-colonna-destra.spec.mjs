@@ -106,16 +106,9 @@ async function chiudiMenu(app, menu) {
   }), { timeout: 4_000 }).toBe(false);
 }
 
-function sottoLIcona(m, i) {
-  expect(m.top, 'il menu copre l\'icona').toBeGreaterThanOrEqual(i.bottom - 1);
-  expect(m.top, 'il menu si apre lontano dall\'icona').toBeLessThanOrEqual(i.bottom + 24);
-  expect(m.left, 'il menu non sta sotto l\'icona').toBeLessThan(i.right);
-  expect(m.right, 'il menu non sta sotto l\'icona').toBeGreaterThan(i.left);
-}
-
-test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona, anche con la home ingrandita', async ({ app, openTab }) => {
-  test.setTimeout(60_000);
-  // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
+// La risposta allo stato chiesto dalla barra all'avvio, partita prima del finto, tornava dopo l'avviso e lo cancellava
+// (#1273.8): la domanda fatta qui dopo il finto torna dopo quella, e l'avviso che segue resta l'ultima parola.
+async function entraFinto(app, shell) {
   await app.evaluate(() => {
     const M = process.getBuiltinModule('module');
     const k = Object.keys(M._cache).find((x) => /auth[\\/]google-auth\.js$/.test(x));
@@ -125,12 +118,27 @@ test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona
     ga.getProfile = () => ({ name: 'Mario Rossi', email: 'mario@example.it' });
     ga.isRemembered = () => true;
   });
+  expect((await shell.evaluate(() => window.filoShell.auth.status())).signedIn).toBe(true);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);
     w.webContents.send('filo:broadcast', {
       type: 'auth_changed', signedIn: true, profile: { name: 'Mario Rossi', email: 'mario@example.it' },
     });
   });
+  await expect(shell.locator('#nav-account')).toHaveClass(/signed-in/);
+}
+
+function sottoLIcona(m, i) {
+  expect(m.top, 'il menu copre l\'icona').toBeGreaterThanOrEqual(i.bottom - 1);
+  expect(m.top, 'il menu si apre lontano dall\'icona').toBeLessThanOrEqual(i.bottom + 24);
+  expect(m.left, 'il menu non sta sotto l\'icona').toBeLessThan(i.right);
+  expect(m.right, 'il menu non sta sotto l\'icona').toBeGreaterThan(i.left);
+}
+
+test('il menu di Impostazioni e quello del profilo si aprono sotto la loro icona, anche con la home ingrandita', async ({ app, shell, openTab }) => {
+  test.setTimeout(60_000);
+  // Dentro Filo: il menu dell'account aspetta lo stato dell'accesso prima di aprirsi.
+  await entraFinto(app, shell);
   const page = await home(openTab);
   await app.evaluate(({ BrowserWindow }) => {
     const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x._filoIncognito);

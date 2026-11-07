@@ -13,7 +13,9 @@ nella pagina, in uno Shadow DOM chiuso.
   le variabili del tema attraversano lo shadow root, e un `--sn-fg: transparent` sul suo `<html>`
   cancella il testo. Ci si arriva dall'Aiuto, che legge la pagina: la stessa pagina che convince il
   modello a proporre un'azione copre il testo esatto con uno innocuo (#592.6). Nessuna pezza nel
-  documento regge (riportare l'opacità, sorvegliare lo stile): il sito arriva sempre dopo.
+  documento regge (riportare l'opacità, sorvegliare lo stile): il sito arriva sempre dopo. Nemmeno
+  il mezzo secondo d'attesa: un velo che lascia passare il mouse, steso sopra un OK nel documento,
+  resta lì quanto vuole (#589.17). Fuori dal documento il velo sta sotto la domanda.
 - **Una porta sola.** Chi chiede un sì chiama `SN_CONFIRM_UI` come sempre. Su una pagina web il
   preload (`page-preload.js`) dà `SN_CONFERMA_FUORI`, e `confirmUi.js` manda lì la domanda invece di
   disegnarla: nessun chiamante sceglie la strada, quindi nessuno la sbaglia. Un content script nuovo
@@ -57,19 +59,21 @@ nella pagina, in uno Shadow DOM chiuso.
   scrivendo nella pagina continua a scrivere nel suo campo: la vista gli rimanda i tasti
   (`conferma:tasto` → il frame che ha chiesto), e alla risposta il fuoco torna a lui.
 - **Quello che resta nella pagina va avanti solo col gesto.** I passi dell'Aiuto («✓ Accetta», il clic
-  sull'elemento evidenziato), le sue scelte e la sua casella stanno nel documento del sito, che li premeva
-  e li inviava da codice: ogni passo era una chiamata al modello pagata dall'utente, in un giro senza fine
+  sull'elemento evidenziato) stanno nel documento del sito (le scelte e la casella, sui siti, nello strato sopra la
+  scheda: [I riquadri di Filo su un sito stanno sopra la scheda](i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md)),
+  e il sito li premeva e li inviava da codice: ogni passo era una chiamata al modello pagata dall'utente, in un giro senza fine
   (#592.6, giro 3). Chi fa avanzare qualcosa di Filo da un pezzo che sta nella pagina chiede
   `SN_FILO_UI.gestoVero(e)`. L'evento `submit` non basta: quello partito da `requestSubmit()` o da un clic
   di codice sul bottone arriva come vero, quindi conta il tasto o il clic che lo fa partire.
 - **Test:** la domanda si fa partire dal mondo isolato del preload (`nelMondoDiFilo` in
   `tests/helpers/confirm.mjs`: `page.evaluate` gira nel mondo della pagina e non ci arriva), e il popup
   si guarda nella sua vista (`confermaSopraPagina`), dove valgono gli hook `_test` di sempre.
-  `tests/conferme-sopra-pagina.spec.mjs` prova la pagina ostile del rilievo e i gesti finti sull'Aiuto.
+  `tests/conferme-sopra-pagina.spec.mjs` prova la pagina ostile del rilievo, il velo sopra OK e i gesti finti
+  sull'Aiuto.
 
 ## Quando il sì apre i dati dell'utente: i documenti dall'Aiuto (#947.3)
 
-La regola: quando l'Aiuto, che vive nel documento di un sito, deve toccare i dati dell'utente, il lavoro e il
+La regola: quando l'Aiuto di un sito, che legge quella pagina, deve toccare i dati dell'utente, il lavoro e il
 sì li fa il main, nella vista sopra la scheda. Alla pagina tornano solo cose da mostrare e chiavi a caso valide
 per quella scheda, mai un percorso.
 
@@ -97,8 +101,7 @@ La strada che regge:
   chiave.
 - **Il modello non vede percorsi.** I candidati per il modello li mette il main
   nel messaggio (`payload.esterno.documenti` viene sempre riscritto, la pagina
-  manda solo il segno), con `PROMPTS.documentiTrovati(…, { per: 'aiuto' })`:
-  la risposta dell'Aiuto la legge il sito. Il modello sceglie col numero
+  manda solo il segno), con `PROMPTS.documentiTrovati(…, { per: 'aiuto' })`. Il modello sceglie col numero
   (`"file": 1`), non con un percorso.
 - **Il file arriva al sito solo col gesto dell'utente.** Il bottone si
   trascina col trascinamento del sistema (`webContents.startDrag`): la pagina

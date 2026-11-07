@@ -27,31 +27,33 @@ const F = (s) => V.parseFindings(s).findings;
 const decide = (s, counts = {}) => V.decideRound({ findings: F(s), caps: CAPS, counts });
 
 test('allo stop gli altri interni della critica sono «sospesi»: restano con quello che ha fermato, senza pagare niente', () => {
-  const d = decide('[2i?] a\n[1i] b\n[0i] c\n[1e] d');
+  const d = decide('[2i?!] a\n[1i] b\n[0i] c\n[1e] d');
   assert.equal(d.stop, true);
   assert.deepEqual(d.blocking.map((f) => f.text), ['a']);
   assert.deepEqual(d.sospesi.map((f) => f.text), ['b', 'c']);
   assert.deepEqual(d.external.map((f) => f.text), ['d']);
   assert.equal(d.consume, null);
   assert.deepEqual(d.counts, { count3: 0, count2: 0, count1: 0, count0: 0 });
-  // A bilancio del 3 esaurito, uguale (il 2 a bilancio finito non ferma: esce a parte).
-  const d2 = decide('[3i] a\n[1i] b', { count3: 10 });
+  // A bilanci esauriti dal 3 in giù, uguale (il 2 a bilanci finiti non ferma: esce a parte).
+  const d2 = decide('[3i] a\n[1i] b', { count3: 10, count2: 10, count1: 1 });
   assert.deepEqual(d2.sospesi.map((f) => f.text), ['b']);
   // Fuori dallo stop non c'è niente di sospeso.
   assert.deepEqual(decide('[2i] a\n[1i] b').sospesi, []);
 });
 
 test('la nota per la chat e la risposta stampata dicono che i sospesi restano davanti a chi riprende', () => {
-  const findings = F('[2i?] a\n[1i] b');
-  const decision = decide('[2i?] a\n[1i] b');
+  const findings = F('[3i?] a\n[1i] b');
+  const decision = decide('[3i?] a\n[1i] b');
   assert.match(V.roundNote({ summary: '', findings, decision }), /Un altro rilievo interno resta davanti a chi riprende/);
   const stampa = verifierReplyText({ outcome: 'stop', blocking: decision.blocking, sospesi: decision.sospesi, derived: [] });
   assert.match(stampa, /restano davanti a chi riprende/);
   assert.match(stampa, /\[1i\] b/);
-  // Fermo per la segnalazione allegata: lo dice, e i rilievi da correggere restano.
-  const perSegnalazione = verifierReplyText({ outcome: 'stop', motivo: 'segnalazione', blocking: [], sospesi: F('[2i] x'), derived: [] });
-  assert.match(perSegnalazione, /segnalazione è consegnata all'owner/);
-  assert.match(perSegnalazione, /\[2i\] x/);
+  // Fermo per la domanda allegata: lo dice, e i rilievi da correggere restano.
+  for (const motivo of ['domanda', 'segnalazione']) {
+    const perDomanda = verifierReplyText({ outcome: 'stop', motivo, blocking: [], sospesi: F('[2i] x'), derived: [] });
+    assert.match(perDomanda, /domanda è consegnata all'owner/, motivo);
+    assert.match(perDomanda, /\[2i\] x/);
+  }
 });
 
 test('il compito della verifica locale insegna il formato che il lettore accetta', () => {

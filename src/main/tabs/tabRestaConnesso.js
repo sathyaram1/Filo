@@ -18,10 +18,35 @@ const FINESTRELLA_MS = 30 * 1000;
 const RIGUARDA_MS = [1500, 4000, 10000, 25000, 60000];
 // La memoria della pagina portata nel jar nuovo vale per il primo caricamento, non per sempre.
 const SEMINA_MS = 60 * 1000;
+// Chiusa la finestrella d'accesso, una pagina che riceve l'esito da sé (OAuth col messaggio all'opener) si muove
+// entro questo: la ricarica di Filo arriva dopo, e solo se la pagina è rimasta ferma.
+const REAZIONE_MS = 1500;
 
-// Siti già proposti o tolti dall'utente: non si ripropongono. Solo in memoria, perché in Privacy Filo non tiene
-// sul disco cosa sa dei siti non fidati (services/cookies.js, keepsSiteData), nemmeno dove accedi.
+// I token anti-falsificazione li mette ogni pagina d'accesso, anche a chi non entra.
+const ANTI_FALSIFICAZIONE = /csrf|xsrf/i;
+
+// I cookie d'accesso che la scheda manda al suo sito; per un sito di Google solo quelli dell'account Google, perché la
+// pagina d'accesso di Google ne mette altri anche a chi non entra.
+async function cookieDAccesso(ses, url, sito) {
+  const out = new Set();
+  const filtri = [{ url }];
+  const google = Google.diGoogle(sito);
+  if (google) filtri.push({ domain: Google.SITO_GOOGLE });
+  const vale = google ? Google.cookieDiAccesso : (c) => looksLikeLoginCookie(c) && !ANTI_FALSIFICAZIONE.test(c.name);
+  for (const f of filtri) {
+    let lista = [];
+    try { lista = await ses.cookies.get(f); } catch (_) {}
+    for (const c of lista) if (vale(c)) out.add(`${c.domain}|${c.path}|${c.name}`);
+  }
+  return out;
+}
+
+// Siti già proposti o tolti dall'utente in questa sessione: non si ripropongono. Dopo un riavvio vale il «no»
+// ricordato, che sul disco è un'impronta da cui il sito non si legge (services/noRestaConnesso.js).
 const proposti = new Set();
+const ricordaNo = () => require('../services/noRestaConnesso').perFilo();
+// Google e YouTube hanno un jar solo, e un «no» solo.
+const chiaveNo = Google.sitoDelContenitore;
 
 // L'accesso non è finito finché resta in vista un campo password (password sbagliata) o il campo del codice di un
 // secondo fattore: sulla pagina del codice il sito ha già messo i suoi cookie, ma l'utente non è ancora dentro.
@@ -129,12 +154,19 @@ function managersNormali() {
 // Un cambio alla volta: «resta» e «non restare» di fila non devono incrociare le copie dei jar.
 let coda = Promise.resolve();
 const inCorso = new Map();
+function inFila(lavoro) {
+  const p = coda.then(lavoro);
+  coda = p.catch(() => {});
+  return p;
+}
 // Sito cambiato dal menu o dalla proposta → la finestra che l'ha chiesto: lì l'avviso di conferma dice già se c'è
 // da rientrare, e l'esito le resta in `esiti` anche se lo spostamento finisce prima che lo chieda.
 const conAvviso = new Map();
 const esiti = new Map();
 
 function onTrustChange(sito, fidato) {
+  // Un sì da qualunque strada (proposta, menu, chat, Sicurezza) toglie il «no» ricordato.
+  if (fidato) { try { ricordaNo().togli(chiaveNo(sito)).catch(() => {}); } catch (_) {} }
   const lavoro = coda.then(() => spostaAccesso(sito, fidato)).catch(() => []);
   coda = lavoro;
   inCorso.set(sito, lavoro);
@@ -154,7 +186,7 @@ function testoRientro(nome, fidato) {
 
 function avvisaRientro(tm, sito, fidato) {
   try {
-    tm.win.webContents.send('shell:toast', { text: testoRientro(nomeLeggibile(sito), fidato), opts: { durationSec: 10, key: `resta-connesso-rientro:${sito}` } });
+    tm.win.webContents.send('shell:toast', { text: testoRientro(nomeLeggibile(sito), fidato), opts: { durationSec: 10, key: `resta-connesso-rientro:${sito}`, tipo: 'resta_connesso_rientro' } });
   } catch (_) {}
 }
 Cookies.setTrustChangeHandler(onTrustChange);
@@ -205,7 +237,7 @@ const restaConnessoMethods = {
   // Il sito del jar della scheda in Privacy, come lo nomina services/cookies.js quando cambia la fiducia.
   _jarDi(tab) {
     const sito = this._propostaSito(tab);
-    return sito && Google.diGoogle(sito) ? Google.SITO_GOOGLE : sito;
+    return sito && Google.sitoDelContenitore(sito);
   },
 
   _fidato(sito) {
@@ -277,11 +309,46 @@ const restaConnessoMethods = {
     if (sito && sito === partito) this._accessoSegna(tab, sito);
   },
 
+  // Aperta una finestrella d'accesso dalla scheda: i cookie d'accesso che la scheda ha adesso, per riconoscere alla
+  // chiusura un accesso riuscito (#1629).
+  _finestrellaAperta(tab) {
+    const wc = tab && tab.view && tab.view.webContents;
+    const url = String((tab && tab.url) || '');
+    if (!wc || wc.isDestroyed() || !/^https?:/i.test(url)) return null;
+    const sito = Cookies.registrableOf(url);
+    if (!sito) return null;
+    return { wc, sito, prima: cookieDAccesso(wc.session, url, sito) };
+  },
+
   // Chiusa la finestrella d'accesso aperta dalla scheda: il sito della scheda potrebbe averla appena usata.
-  _accessoDopoFinestrella(tab) {
+  _accessoDopoFinestrella(tab, seguita = null) {
     if (!tab || !this.tabs.includes(tab)) return;
     const sito = this._propostaSito(tab);
     if (sito) this._accessoSegna(tab, sito, { dopoCarico: true });
+    if (seguita) this._ricaricaDopoFinestrella(tab, seguita).catch(() => {});
+  },
+
+  // Accesso riuscito nella finestrella (un cookie d'accesso che prima non c'era: un valore rinnovato lo dà anche il
+  // sito che rinnova la sessione da sé): la scheda che
+  // l'ha aperta si ricarica e il sito la vede dentro. Non se la pagina ha già reagito da sé, se è passata ad altro,
+  // o se ha qualcosa da perdere.
+  async _ricaricaDopoFinestrella(tab, seguita) {
+    const { wc, sito } = seguita;
+    const valida = () => this.tabs.includes(tab) && tab.view && tab.view.webContents === wc && !wc.isDestroyed();
+    if (!valida()) return;
+    const allaChiusura = wc.getURL();
+    const prima = await seguita.prima;
+    await new Promise((r) => { const t = setTimeout(r, REAZIONE_MS); if (t.unref) t.unref(); });
+    if (!valida() || wc.isLoading() || wc.getURL() !== allaChiusura) return;
+    const url = wc.getURL();
+    const ora = /^https?:/i.test(url) ? Cookies.registrableOf(url) : null;
+    const AP = globalThis.SN_AUTH_POPUP;
+    const stesso = ora === sito || (Google.diGoogle(ora) && Google.diGoogle(sito)) || !!(AP && AP.isIdentityAuthSurface(url));
+    if (!stesso || this._qualcosaDaPerdere(tab)) return;
+    const dopo = await cookieDAccesso(wc.session, tab.url, sito);
+    if (![...dopo].some((k) => !prima.has(k))) return;
+    if (!valida() || wc.isLoading() || wc.getURL() !== allaChiusura || this._qualcosaDaPerdere(tab)) return;
+    try { wc.reload(); } catch (_) {}
   },
 
   // Riuscito vuol dire: nessun campo password in vista sul sito, e il sito si è segnato un accesso.
@@ -301,12 +368,18 @@ const restaConnessoMethods = {
     if (!pagina.chiave && !cookies.some(looksLikeLoginCookie)) return;
     if (tab._accesso !== a || proposti.has(a.sito) || this._propostaSito(tab) !== a.sito) return;
     tab._accesso = null;
+    proposti.add(a.sito);
+    let detto = false;
+    try { detto = await ricordaNo().detto(chiaveNo(a.sito)); } catch (_) {}
+    if (detto || this._fidato(a.sito)) return;
     this._proponiConnesso(a.sito);
   },
 
-  // Una volta per sito: chiusa, scaduta o accettata, non torna.
+  // Una volta per sito: chiusa, scaduta o accettata, non torna. Il «no» si ricorda già adesso; il sì lo toglie
+  // (onTrustChange), quindi resta quello di chi la chiude o la lascia scadere, anche chiudendo Filo.
   _proponiConnesso(sito) {
     proposti.add(sito);
+    ricordaNo().segna(chiaveNo(sito)).catch(() => {});
     try {
       this.win.webContents.send('shell:toast', {
         text: `Hai fatto l'accesso a ${nomeLeggibile(sito)}. Vuoi restare connesso anche quando chiudi la scheda o riapri Filo?`,
@@ -314,6 +387,7 @@ const restaConnessoMethods = {
           durationSec: 15,
           sound: false,
           key: `resta-connesso:${sito}`,
+          tipo: 'resta_connesso_proposta',
           actions: [{ label: 'Resta connesso', restaConnesso: sito }],
         },
       });
@@ -348,7 +422,7 @@ const restaConnessoMethods = {
       if (entrati.length !== ck.loggedSites.length) cambio.loggedSites = entrati;
     }
     const { applySettingsUpdate } = require('../services/handlers');
-    const jar = Google.diGoogle(s) ? Google.SITO_GOOGLE : s;
+    const jar = Google.sitoDelContenitore(s);
     let persi = [];
     conAvviso.set(jar, this);
     esiti.delete(jar);
@@ -360,34 +434,65 @@ const restaConnessoMethods = {
     return { ok: true, sito: s, nome: nomeLeggibile(s), fidato: !!on, modo, rientra: persi.includes(this) };
   },
 
-  // Le schede del sito passano nel jar giusto: i cookie del sito vanno con loro, e la memoria della pagina
-  // arriva alla pagina nuova prima dei suoi script (takeSemina). La pagina si ricarica. Torna quanti database
-  // sono rimasti indietro.
+  // Le schede del sito passano nel jar giusto. Una scheda con qualcosa da perdere (testo scritto, audio) non si
+  // ricarica in silenzio: resta nel jar di prima, coi cookie già copiati, e passa al cambio di pagina o quando la
+  // ricarichi (#759.2). Torna quanti database sono rimasti indietro.
   async _spostaSchede(sito, dest) {
-    const propri = new Set([Cookies.partitionForSite(sito, true), Cookies.partitionForSite(sito, false)]);
     let persi = 0;
     for (const tab of this.tabs.slice()) {
       if (this._jarDi(tab) !== sito) continue;
-      const url = tab.url;
-      if (!this._needsRepartition(tab, url)) continue;
-      const wc = tab.view && tab.view.webContents;
-      if (!wc || wc.isDestroyed()) continue;
-      // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito.
-      if (!propri.has(tab.partition)) await Cookies.copiaBarattolo(wc.session, dest, sito);
-      let mem = null;
-      try { mem = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
-      if (!this.tabs.includes(tab) || !tab.view || tab.view.webContents !== wc) continue;
-      let origin = '';
-      try { origin = new URL(wc.getURL()).origin; } catch (_) {}
-      const locale = mem && Array.isArray(mem.locale) ? mem.locale : [];
-      const sessione = mem && Array.isArray(mem.sessione) ? mem.sessione : [];
-      const database = mem && Array.isArray(mem.database) ? mem.database : [];
-      if (mem && Array.isArray(mem.persi)) persi += mem.persi.length;
-      tab._semina = (locale.length || sessione.length || database.length) && origin
-        ? { origin, locale, sessione, database, at: Date.now() } : null;
-      this._recreateView(tab, url);
+      tab._passaggioRinviato = null;
+      if (!this._needsRepartition(tab, tab.url)) continue;
+      if (this._qualcosaDaPerdere(tab)) {
+        tab._passaggioRinviato = { sito, partition: this._partitionForTab(tab, tab.url) || null };
+        continue;
+      }
+      persi += await this._passaScheda(tab, sito, dest);
     }
     return persi;
+  },
+
+  // I cookie del sito vanno con la scheda, e la memoria della pagina arriva alla pagina nuova prima dei suoi script
+  // (takeSemina). La pagina si ricarica.
+  async _passaScheda(tab, sito, dest, { rinviato = false } = {}) {
+    const url = tab.url;
+    const wc = tab.view && tab.view.webContents;
+    if (!wc || wc.isDestroyed()) return 0;
+    const propri = new Set([Cookies.partitionForSite(sito, true), Cookies.partitionForSite(sito, false)]);
+    // Un ritorno da un altro sito con un redirect del server lascia la pagina nel jar di quel sito. Rinviato, il jar
+    // di prima ha i cookie arrivati dopo la copia (un invio, una sessione rinnovata): ripassano tutti.
+    if (!propri.has(tab.partition)) await Cookies.copiaBarattolo(wc.session, dest, sito);
+    else if (rinviato) await Cookies.copiaBarattolo(wc.session, dest);
+    let mem = null;
+    try { mem = await wc.executeJavaScriptInIsolatedWorld(1001, [{ code: LEGGI_MEMORIA }]); } catch (_) {}
+    if (!this.tabs.includes(tab) || !tab.view || tab.view.webContents !== wc) return 0;
+    let origin = '';
+    try { origin = new URL(wc.getURL()).origin; } catch (_) {}
+    const locale = mem && Array.isArray(mem.locale) ? mem.locale : [];
+    const sessione = mem && Array.isArray(mem.sessione) ? mem.sessione : [];
+    const database = mem && Array.isArray(mem.database) ? mem.database : [];
+    tab._semina = (locale.length || sessione.length || database.length) && origin
+      ? { origin, locale, sessione, database, at: Date.now() } : null;
+    this._recreateView(tab, url);
+    return mem && Array.isArray(mem.persi) ? mem.persi.length : 0;
+  },
+
+  // Pagina cambiata (o ricarica chiesta) su una scheda col passaggio rinviato. La pagina arrivata da un invio non si
+  // richiede: mostra l'esito (o il testo respinto) che una seconda richiesta perderebbe; si passa alla pagina dopo.
+  _passaggioDopoCambio(tab, { chiesta = false } = {}) {
+    const r = tab && tab._passaggioRinviato;
+    if (!r) return;
+    if (!chiesta && (this._qualcosaDaPerdere(tab) || tab._invioRespinto)) return;
+    tab._passaggioRinviato = null;
+    const ricarica = () => { if (chiesta) { try { tab.view.webContents.reload(); } catch (_) {} } };
+    if (!this.tabs.includes(tab) || this._jarDi(tab) !== r.sito || !this._needsRepartition(tab, tab.url)) { ricarica(); return; }
+    // Il jar d'arrivo si richiede adesso: quello effimero può essere già alla generazione dopo.
+    inFila(() => {
+      const dest = Cookies.ensureSiteSession(Cookies.partitionForSite(r.sito, this._fidato(r.sito)), { gpc: true });
+      return this._passaScheda(tab, r.sito, dest, { rinviato: true });
+    }).then((persi) => {
+      if (persi > 0) avvisaRientro(this, r.sito, this._fidato(r.sito));
+    }, ricarica);
   },
 
   // Il preload della pagina che sta per caricarsi chiede se c'è memoria da rimettere (src/main/ipc.js).

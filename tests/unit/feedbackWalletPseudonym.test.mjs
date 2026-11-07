@@ -34,7 +34,9 @@ function installFetch(stati = [200]) {
       if (opts && opts.method === 'PATCH') return { ok: true, status: 200, json: async () => ({}) };
       return { ok: true, status: 200, json: async () => ({ fields: { value: { integerValue: '5' } }, updateTime: '2026-09-01T00:00:00Z' }) };
     }
-    corpi.push(JSON.parse(opts.body));
+    // La create passa da `:commit` (#1517): i campi stanno nella scrittura, le date fra le trasformazioni.
+    const w = JSON.parse(opts.body).writes[0];
+    corpi.push({ fields: w.update.fields, date: w.updateTransforms.map((t) => t.fieldPath) });
     const status = stati[i++] ?? 200;
     if (status === 200) return { ok: true, status, json: async () => ({ name: 'projects/p/databases/(default)/documents/feedback/DOC_' + i }) };
     return { ok: false, status, text: async () => `simulato ${status}` };
@@ -101,8 +103,8 @@ test('il primo rifiuto toglie SOLO il campo più recente: numero e titolo restan
   try {
     const r = await FB.submit({ text: 'ciao', submissionId: 'a-5' });
     assert.equal(f.corpi.length, 2);
-    assert.ok('updatedAt' in f.corpi[0].fields, 'il primo tentativo firma l\'ora');
-    assert.equal('updatedAt' in f.corpi[1].fields, false);
+    assert.ok(f.corpi[0].date.includes('updatedAt'), 'il primo tentativo firma l\'ora');
+    assert.equal(f.corpi[1].date.includes('updatedAt'), false);
     assert.ok('seq' in f.corpi[1].fields, 'il numero non si perde per un campo nuovo');
     assert.deepEqual(f.corpi[1].fields.walletPseudonym, { stringValue: 'abcdef0123456789' });
     assert.ok(r && r.seq, 'la segnalazione tiene il suo numero');

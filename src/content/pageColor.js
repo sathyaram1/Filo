@@ -106,6 +106,21 @@
   // ------------------------------------------------------------
   // Colore identità del sito (spec §1.2)
   // ------------------------------------------------------------
+  // Un favicon si scarica una volta per pagina: ritentativi e cambi di impostazioni ridisegnano la copia (#1795). Un errore
+  // di rete o i 3 s scaduti non restano, così il calcolo dopo riprova; la richiesta rimasta appesa si chiude.
+  const iconeScaricate = new Map();
+  function scaricaIcona(href) {
+    if (iconeScaricate.has(href)) return iconeScaricate.get(href);
+    const ctrl = new AbortController();
+    const scade = setTimeout(() => ctrl.abort(), 3000);
+    const copia = fetch(href, { signal: ctrl.signal })
+      .then((res) => (res && res.ok ? res.blob() : null))
+      .catch(() => { iconeScaricate.delete(href); return null; })
+      .finally(() => clearTimeout(scade));
+    iconeScaricate.set(href, copia);
+    return copia;
+  }
+
   // Si calcola UNA VOLTA per pagina (con qualche retry per i siti che settano
   // theme-color/favicon dopo il paint) e si manda al main, che lo cacha per
   // dominio. La shell lo mescola col fondo della barra nelle tab inattive.
@@ -168,6 +183,8 @@
       } catch (_) { return null; }
     }
 
+    // Il favicon si scarica con fetch e si disegna dalla copia in memoria: un'immagine chiesta alla rete tratterrebbe il
+    // «load» della pagina finché il sito non la manda, e un favicon che non arriva la lasciava in caricamento (#1456).
     function fromFavicon() {
       return new Promise((resolve) => {
         let href = '';
@@ -178,10 +195,16 @@
           href = (link && link.href) || (location.origin + '/favicon.ico');
         } catch (_) { href = ''; }
         if (!href) return resolve(null);
-        const img = new Image();
-        img.crossOrigin = 'anonymous';
         let done = false;
-        const finish = (v) => { if (!done) { done = true; resolve(v); } };
+        let copia = '';
+        const finish = (v) => {
+          if (done) return;
+          done = true;
+          if (copia) { try { URL.revokeObjectURL(copia); } catch (_) {} }
+          resolve(v);
+        };
+        setTimeout(() => finish(null), 3000);
+        const img = new Image();
         img.onerror = () => finish(null);
         img.onload = () => {
           try {
@@ -192,7 +215,7 @@
             cv.width = W; cv.height = H;
             const cx = cv.getContext('2d', { willReadFrequently: true });
             cx.drawImage(img, 0, 0, W, H);
-            const data = cx.getImageData(0, 0, W, H).data; // può lanciare se tainted
+            const data = cx.getImageData(0, 0, W, H).data;
             const TC = self.SN_TAB_COLOR;
             if (TC && TC.extractIdentityFromPixels) {
               return finish(TC.extractIdentityFromPixels(data, W, H, params()));
@@ -209,9 +232,11 @@
             finish(`rgb(${Math.round(acc[0] / n)}, ${Math.round(acc[1] / n)}, ${Math.round(acc[2] / n)})`);
           } catch (_) { finish(null); }
         };
-        img.src = href;
-        // Failsafe: se l'immagine non carica entro 3s, rinuncia e chiude la richiesta, che appesa resterebbe aperta.
-        setTimeout(() => { if (!done) { finish(null); img.removeAttribute('src'); } }, 3000);
+        scaricaIcona(href).then((blob) => {
+          if (done || !blob) return finish(null);
+          copia = URL.createObjectURL(blob);
+          img.src = copia;
+        });
       });
     }
 
@@ -240,15 +265,26 @@
       } catch (_) {}
     }
 
-    // A pagina caricata: un'immagine chiesta prima trattiene il «load» della pagina finché il sito non la manda, e un
-    // favicon che non arriva lascerebbe la scheda in caricamento. Una pagina che il suo «load» non lo dà mai aspetta 5 s.
+    // Si parte a testa della pagina letta (c'è il corpo), dove stanno icona e theme-color: non al «load», che su un sito
+    // lento arriva dopo secondi (#1456.2), e non prima, quando un sito già visto rischia di perdere il colore ricordato.
+    // Si guarda il parser e non un timer, che in una scheda dietro rallenta. I ritentativi servono ai siti che li mettono dopo.
+    identitaPartita = true;
     const parti = () => { send(); setTimeout(send, 800); setTimeout(send, 2000); };
-    if (document.readyState === 'complete') { parti(); return; }
+    const testaLetta = () => !!document.body || document.readyState !== 'loading';
+    if (testaLetta()) { parti(); return; }
     let partito = false;
-    const una = () => { if (!partito) { partito = true; parti(); } };
-    global.addEventListener('load', una, { once: true });
-    setTimeout(una, 5000);
+    let spia = null;
+    const prova = () => {
+      if (partito || !testaLetta()) return;
+      partito = true;
+      try { spia && spia.disconnect(); } catch (_) {}
+      document.removeEventListener('readystatechange', prova);
+      parti();
+    };
+    try { spia = new MutationObserver(prova); spia.observe(document, { childList: true, subtree: true }); } catch (_) {}
+    document.addEventListener('readystatechange', prova);
   }
+  let identitaPartita = false;
 
-  global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor };
+  global.SN_PAGE_COLOR = { startTabColorSampler, reportTabIdentityColor, identitaPartita: () => identitaPartita };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

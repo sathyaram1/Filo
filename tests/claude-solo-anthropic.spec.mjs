@@ -1,17 +1,19 @@
 // #904: Claude chiesto a OpenRouter parte legato agli host di Anthropic, e se lo serve un altro host
-// (Amazon, Microsoft) la cronologia lo marca; se Anthropic non risponde lo si dice (#829).
+// (Amazon, Microsoft) la cronologia lo marca; se Anthropic non risponde lo si dice (#829). Anthropic è il primo
+// anche con un ordinamento scelto, e una risposta pagata con la chiave dell'owner (BYOK) costa il suo totale (#1583).
 // Regole pure: tests/unit/claudeSoloDaAnthropic.test.mjs e tests/unit/claudeProduttoreGiu.test.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const CLAUDE = 'anthropic/claude-haiku-4.5';
+const BYOK = { prompt_tokens: 1000, completion_tokens: 200, cost: 0.0001, is_byok: true, cost_details: { upstream_inference_cost: 0.05 } };
 const SPIEGAZIONE = `non può usare «${CLAUDE}» perché questo modello lo serve solo Anthropic, e adesso non risponde. Scegline un altro in Opzioni → Modelli per azione.`;
 
 test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato, un rifiuto si vede', async ({ app, shell, openTab }) => {
   test.setTimeout(90_000);
   await shell.waitForLoadState('domcontentloaded');
 
-  const out = await app.evaluate(async () => {
+  const out = await app.evaluate(async (_e, { BYOK }) => {
     const C = globalThis.SN_CONST;
     const MSG = globalThis.SN_MSG.MSG;
     const Storage = globalThis.SN_STORAGE;
@@ -21,6 +23,7 @@ test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato
       useDefaultModels: false,
       openWeightsOnly: false,
       apiKeys: { openrouter: 'k-test' },
+      ordineHost: 'latency',
       modelRegistry: {
         'mio-claude': { provider: 'openrouter', model: 'anthropic/claude-haiku-4.5' },
         'mio-aperto': { provider: 'openrouter', model: 'deepseek/deepseek-v4-flash' },
@@ -45,11 +48,14 @@ test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato
       if (rifiuta) {
         return new Response(JSON.stringify({ error: { code: 404, message: 'No endpoints found matching your data policy and provider restrictions.' } }), { status: 404, headers: { 'content-type': 'application/json' } });
       }
+      // Anthropic serve con la chiave dell'owner: il router fa pagare la sua commissione, il resto lo dice a parte.
+      const usage = host === 'Anthropic' ? BYOK : {};
       if (body.stream) {
-        const sse = `data: ${JSON.stringify({ provider: host, choices: [{ delta: { content: 'risposta' } }] })}\n\ndata: [DONE]\n\n`;
+        const sse = `data: ${JSON.stringify({ provider: host, choices: [{ delta: { content: 'risposta' } }] })}\n\n`
+          + `data: ${JSON.stringify({ choices: [], usage })}\n\ndata: [DONE]\n\n`;
         return new Response(sse, { status: 200, headers: { 'content-type': 'text/event-stream' } });
       }
-      return new Response(JSON.stringify({ provider: host, choices: [{ message: { content: 'risposta' } }], usage: {} }), { status: 200, headers: { 'content-type': 'application/json' } });
+      return new Response(JSON.stringify({ provider: host, choices: [{ message: { content: 'risposta' } }], usage }), { status: 200, headers: { 'content-type': 'application/json' } });
     };
 
     const run = async (action, payload) => {
@@ -64,7 +70,7 @@ test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato
     const ultimaVoce = async () => {
       const items = await History.list();
       const v = items && items[0];
-      return v ? { servedBy: v.servedBy, policyViolation: v.policyViolation, model: v.model } : null;
+      return v ? { servedBy: v.servedBy, policyViolation: v.policyViolation, model: v.model, costEur: v.costEur } : null;
     };
 
     const res = {};
@@ -83,7 +89,7 @@ test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato
       globalThis.fetch = origFetch;
     }
     return res;
-  });
+  }, { BYOK });
 
   // La richiesta di Claude porta il vincolo, anche quando a servirla è poi chi non dovrebbe.
   expect(out.amazon.ok, JSON.stringify(out.amazon)).toBe(true);
@@ -92,15 +98,22 @@ test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato
   for (const b of [...out.amazon.bodies, ...out.anthropic.bodies]) {
     expect(b.model).toBe('anthropic/claude-haiku-4.5');
     expect(b.provider.only).toEqual(['anthropic', 'claude-on-aws']);
+    expect(b.provider.order).toEqual(['anthropic', 'claude-on-aws']);
+    expect(b.provider.sort).toBeUndefined();
     expect(b.provider.ignore.map((s) => s.toLowerCase())).toContain('google');
   }
-  expect(out.voceAmazon).toEqual({ servedBy: 'Amazon Bedrock', policyViolation: true, model: 'anthropic/claude-haiku-4.5' });
+  expect(out.voceAmazon).toMatchObject({ servedBy: 'Amazon Bedrock', policyViolation: true, model: 'anthropic/claude-haiku-4.5' });
   expect(out.voceAnthropic.servedBy).toBe('Anthropic');
   expect(out.voceAnthropic.policyViolation).toBe(false);
+  // Commissione più la parte di Anthropic (0,0501 $ in euro): la stima dal listino sui 1200 token sarebbe venti volte più bassa.
+  expect(out.voceAnthropic.costEur).toBeGreaterThan(0.04);
+  expect(out.voceAnthropic.costEur).toBeLessThanOrEqual(0.0501);
 
   // Un modello a pesi aperti resta libero di andare su qualunque host non escluso.
   expect(out.aperto.ok, JSON.stringify(out.aperto)).toBe(true);
   expect(out.aperto.bodies[0].provider.only).toBeUndefined();
+  expect(out.aperto.bodies[0].provider.order).toBeUndefined();
+  expect(out.aperto.bodies[0].provider.sort, 'l\'ordinamento scelto arriva ai modelli aperti').toBe('latency');
   expect(out.voceAperto.policyViolation).toBe(false);
 
   // Anthropic non risponde: la richiesta fallisce e lo dice (#829), senza un secondo tentativo altrove.
@@ -114,6 +127,7 @@ test('Claude solo da Anthropic: la richiesta lo impone, un altro host è marcato
   await expect(avviso).toHaveCount(1);
   await expect(avviso).toHaveText('⚠ fornitore non ammesso');
   await expect(page.locator('.sn-history-meta').filter({ has: avviso })).toContainText('via Amazon Bedrock');
+  await expect(page.locator('body')).toContainText(`€${out.voceAnthropic.costEur.toFixed(4)}`);
   await page.screenshot({ path: 'tests/.shots/904-cronologia-host-non-ammesso.png' });
 });
 
@@ -164,6 +178,7 @@ test('il «Prova» di una riga con Claude parte legato ad Anthropic, e se Anthro
   expect(corpi.length).toBe(1);
   expect(corpi[0].model).toBe(CLAUDE);
   expect(corpi[0].provider.only).toEqual(['anthropic', 'claude-on-aws']);
+  expect(corpi[0].provider.order).toEqual(['anthropic', 'claude-on-aws']);
   expect(corpi[0].provider.ignore.map((x) => x.toLowerCase())).toContain('google');
 
   await app.evaluate(() => { globalThis.__anthropicGiu = true; globalThis.__corpi = []; });

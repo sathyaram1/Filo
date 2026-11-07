@@ -34,7 +34,7 @@
 //     Vero per i guasti di rete PASSEGGERI (connessione caduta, DNS, timeout,
 //     socket chiusa): quelli per cui vale la pena riprovare da soli.
 //
-//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | ''
+//   SN_CHAT_ERRORS.rimedio(code) → 'crediti' | 'opzioni' | 'preferenze' | 'voce' | ''
 //     La pagina dove l'utente può togliere l'ostacolo, per chi affianca un
 //     collegamento al «Riprova» (che su questi codici non porta da nessuna
 //     parte finché non si cambia qualcosa).
@@ -97,6 +97,40 @@
     'NO_ALLOWED_HOST', 'FEEDBACK_READ_DENIED',
   ];
 
+  // Dove chi usa Filo cambia il modello di una funzione. «Modelli predefiniti» è una scheda della Gestione: chi non
+  // gestisce Filo non ce l'ha (#1344.1).
+  const DOVE_ALTRO_MODELLO = 'in Opzioni → Modelli per azione';
+  const FRASE_CONTESTO_PIENO = 'c\'è più testo di quanto il modello riesca a leggere insieme: chiedimi meno pagine alla volta, '
+    + 'accorcia il messaggio o ricomincia in una chat nuova.';
+
+  // Il tipo di contenuto che il modello non legge (#1345), dal testo del rifiuto: il 404 del router («No endpoints found
+  // that support image input») o un host che dice di non accettarlo. '' per ogni altro rifiuto, «troppe immagini» compreso.
+  const INGRESSI = [['immagini', /imag|vision/i], ['audio', /audio/i], ['video', /video/i], ['pdf', /pdf|file|document/i]];
+  const ROUTER_INGRESSO = /no endpoints? found that supports? ([^.,;]+)/i;
+  // «Unable to process input image» è una foto che quel modello, che le legge, non è riuscito ad aprire: non è un rifiuto.
+  const HOST_INGRESSO = new RegExp([
+    /(?:does ?n[o']t|do not|can ?not) (?:support|accept|process|handle|read)s? (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /unable to (?:support|accept) (?:the |an? )?(?:input )?(image_url|input_audio|input_file|images?|vision|audio|video|pdfs?|files?|documents?)/,
+    /(image_url|input_audio|input_file|images?|audio|video|pdfs?|files?|documents?)(?: inputs?| content)? (?:is|are) (?:not|only) supported/,
+    /unsupported (?:content type|input|modality)[^.]{0,30}?(image|audio|video|pdf|file)/,
+  ].map((r) => r.source).join('|'), 'i');
+  function ingressoRifiutato(testo) {
+    const t = String(testo || '');
+    const router = ROUTER_INGRESSO.exec(t);
+    const parola = router
+      ? (/tool|parameter/i.test(router[1]) ? '' : router[1])
+      : ((HOST_INGRESSO.exec(t) || []).slice(1).find(Boolean) || '');
+    const hit = parola ? INGRESSI.find(([, re]) => re.test(parola)) : null;
+    return hit ? hit[0] : '';
+  }
+  const FRASI_INGRESSO = {
+    immagini: `il modello scelto non legge le immagini, e questa richiesta ne porta: scegline uno che le legga ${DOVE_ALTRO_MODELLO}.`,
+    audio: `il modello scelto non ascolta l'audio, e questa richiesta ne porta: scegline uno che lo ascolti ${DOVE_ALTRO_MODELLO}.`,
+    pdf: `il modello scelto non legge i PDF, e questa richiesta ne porta: scegline uno che li legga ${DOVE_ALTRO_MODELLO}.`,
+    video: `il modello scelto non guarda i video, e questa richiesta ne porta: scegline uno che li guardi ${DOVE_ALTRO_MODELLO}.`,
+  };
+  const FRASE_INGRESSO_IGNOTO = `il modello scelto non legge un tipo di contenuto che questa richiesta porta: scegline un altro ${DOVE_ALTRO_MODELLO}.`;
+
   // Dove si rimedia, per chi mostra l'errore: «Riprova» da solo, su questi
   // codici, è un vicolo cieco (la risposta sarà identica finché non si cambia
   // qualcosa), quindi accanto ci va il collegamento al posto giusto.
@@ -106,8 +140,19 @@
     NO_OPEN_WEIGHTS_MODEL: 'opzioni',
     NO_ALLOWED_HOST: 'opzioni',
     LIMIT_REACHED: 'opzioni',
+    // Errori la cui cura è un altro modello: la frase dice DOVE_ALTRO_MODELLO, il tasto porta lì.
+    NO_TOOL_HOST: 'opzioni',
+    MODEL_UNAVAILABLE: 'opzioni',
+    DATA_POLICY: 'opzioni',
+    NO_PROVIDER_ALLOWED: 'opzioni',
+    PARAMETRI_HOST: 'opzioni',
+    INGRESSO_NON_LETTO: 'opzioni',
+    ALTRO_MODELLO: 'opzioni',
     TETTO_RISPOSTA: 'preferenze',
     RISPOSTA_TAGLIATA: 'preferenze',
+    // Il modello di lettura vuole il nome di una voce, o non conosce quello scritto: si scrive in Preferenze.
+    TTS_VOICE_REQUIRED: 'voce',
+    TTS_VOICE_UNKNOWN: 'voce',
   };
   // Accetta il codice da solo o la risposta intera. Con la risposta si sa anche
   // se il servizio ha rifiutato la CHIAVE (credito finito compreso): lì la
@@ -131,6 +176,7 @@
     crediti: { url: 'filo://credits/credits.html', label: 'Apri Crediti', title: 'Controlla o togli la chiave OpenRouter' },
     opzioni: { url: 'filo://options/options.html', label: 'Apri Opzioni', title: 'Scegli il modello per questa funzione' },
     preferenze: { url: 'filo://preferences/preferences.html#sec-lunghezza', label: 'Apri Preferenze', title: 'Cambia quanto può essere lunga una risposta' },
+    voce: { url: 'filo://preferences/preferences.html#sec-lettura', label: 'Apri Preferenze', title: 'Scegli o scrivi la voce di lettura' },
   };
   function rimedioPagina(x) {
     const dove = rimedio(x);
@@ -226,6 +272,19 @@
 
   // Chi mostra un errore venuto dall'IPC lo ricompone da qui: un `new Error`
   // a mano perde il codice, e la frase già scritta torna generica (#663).
+  // Quello che di un errore viaggia verso le pagine perché fromResponse ricomponga frase e tasto: un posto solo, per
+  // ogni canale (ipc, chat della home).
+  function dettagliDelTetto(err) {
+    if (!err) return {};
+    return {
+      ...(Number(err.maxTokens) > 0 ? { maxTokens: Number(err.maxTokens) } : {}),
+      ...(Number(err.finestra) > 0 ? { finestra: Number(err.finestra) } : {}),
+      ...(err.memoria ? { memoria: true } : {}),
+      ...(err.code === 'RISPOSTA_TAGLIATA' ? { finishReason: err.finishReason || null, vuota: !!err.vuota } : {}),
+      ...(err.reason === 'crediti' ? { reason: 'crediti' } : {}),
+    };
+  }
+
   function fromResponse(res, fallbackMessage) {
     const e = new Error(String((res && res.error) || fallbackMessage || ''));
     if (res && res.code && res.code !== 'UNKNOWN') e.code = res.code;
@@ -238,6 +297,7 @@
     if (res && res.reason === 'crediti') e.reason = 'crediti';
     if (res && Number(res.maxTokens) > 0) e.maxTokens = Number(res.maxTokens);
     if (res && Number(res.finestra) > 0) e.finestra = Number(res.finestra);
+    if (res && res.memoria) e.memoria = true;
     if (res && typeof res.finishReason === 'string' && res.finishReason) e.finishReason = res.finishReason;
     if (res && res.vuota) e.vuota = true;
     return e;
@@ -251,6 +311,8 @@
     if (e && CODICI_GIA_SCRITTI.includes(e.code)) return raw;
 
     if (e && e.code === 'RISPOSTA_TAGLIATA') return fraseTagliata(e.finishReason, { vuota: !!e.vuota });
+    // #1596 — la chat ha già accorciato pagine e conversazione e ancora non ci sta: cambiare modello non è il rimedio.
+    if (e && e.code === 'CONTESTO_PIENO') return FRASE_CONTESTO_PIENO;
     // Guasto di rete: la prima cosa da controllare è la connessione. Va PRIMA
     // dell'analisi HTTP perché qui non c'è nessuna risposta da interpretare.
     if (isTransientNetwork(e)) {
@@ -267,42 +329,51 @@
       // Con la chiave dell'utente la rimedia lui; con quella di Filo resta solo un altro modello.
       if ((e && e.code === 'DATA_POLICY') || (st === 404 && /data policy/i.test(raw))) {
         return e && e.keySource === 'own'
-          ? 'nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello in Modelli predefiniti.'
-          : 'nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello in Modelli predefiniti.';
+          ? `nessun fornitore di questo modello rispetta le impostazioni sulla privacy del tuo account OpenRouter: allentale su openrouter.ai/settings/privacy, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
+          : `nessun fornitore di questo modello rispetta le regole sulla privacy dei dati: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
+      // #1345: non è la politica sui fornitori, è il modello che non legge quel contenuto.
+      const ingresso = e && (e.code === 'INGRESSO_NON_LETTO' || (!e.code && [400, 404, 415, 422].includes(st)))
+        ? (e.ingresso || ingressoRifiutato(raw)) : '';
+      if (ingresso || (e && e.code === 'INGRESSO_NON_LETTO')) return FRASI_INGRESSO[ingresso] || FRASE_INGRESSO_IGNOTO;
       // #700: gli altri «nessun host» del router hanno ciascuno il suo rimedio, e nessuno riguarda gli strumenti.
       if (e && e.code === 'NO_PROVIDER_ALLOWED') {
         return e.keySource === 'own'
-          ? 'nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello in Modelli predefiniti.'
-          : 'nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello in Modelli predefiniti.';
+          ? `nessun fornitore di questo modello è fra quelli ammessi, dalle regole sui fornitori di Filo o dalle impostazioni del tuo account OpenRouter: allarga i fornitori ammessi nel tuo account, o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`
+          : `nessun fornitore di questo modello è fra quelli ammessi dalle regole sui fornitori: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #1097.3: fra gli host ammessi nessuno regge il tetto di lunghezza della risposta di questa funzione.
       if (e && e.code === 'TETTO_RISPOSTA') {
         const n = Number(e.maxTokens);
         const tetto = Number.isFinite(n) && n > 0 ? ` di ${n.toLocaleString('it-IT', { useGrouping: true })} token` : '';
-        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava.
+        // Testo più tetto oltre la memoria del modello: il testo da solo ci stava, o il fornitore non dà le misure.
         const f = Number(e.finestra);
-        if (Number.isFinite(f) && f > 0) {
-          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto (${f.toLocaleString('it-IT', { useGrouping: true })} token): abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», accorcia il testo, o scegli un modello con più memoria in Modelli predefiniti.`;
+        if ((Number.isFinite(f) && f > 0) || e.memoria) {
+          const misura = Number.isFinite(f) && f > 0 ? ` (${f.toLocaleString('it-IT', { useGrouping: true })} token)` : '';
+          return `la richiesta, insieme al tetto${tetto} per la risposta, supera la memoria del modello scelto${misura}: accorcia il testo, abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un modello con più memoria ${DOVE_ALTRO_MODELLO}.`;
         }
-        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
+        return `nessun fornitore ammesso per il modello scelto regge risposte lunghe quanto il tetto${tetto}: abbassalo in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
+      }
+      // #1302: un host regge strumenti e tetto, eppure il router non ne trova uno per questa richiesta.
+      if (e && e.code === 'PARAMETRI_HOST') {
+        return `nessun fornitore ammesso per il modello scelto accetta tutte le opzioni di questa richiesta (il tetto di lunghezza non c'entra): scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       if (e && e.code === 'MODEL_UNAVAILABLE') {
-        return 'il modello scelto non è più disponibile sul servizio AI: scegli un altro modello in Modelli predefiniti.';
+        return `il modello scelto non è più disponibile sul servizio AI: scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // #700: fra gli host ammessi per quel modello nessuno regge gli strumenti, e riprovare non serve.
       if (e && e.code === 'NO_TOOL_HOST') {
         const n = Number(e.maxTokens);
         if (Number.isFinite(n) && n > 0) {
-          return `per il modello scelto nessun fornitore ammesso regge insieme gli strumenti della chat (cercare, leggere, impostare) e risposte lunghe quanto il tetto di ${n.toLocaleString('it-IT', { useGrouping: true })} token: abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello in Modelli predefiniti.`;
+          return `per il modello scelto nessun fornitore ammesso regge insieme gli strumenti della chat (cercare, leggere, impostare) e risposte lunghe quanto il tetto di ${n.toLocaleString('it-IT', { useGrouping: true })} token: abbassa il tetto in Preferenze, «Quanto può essere lunga una risposta», o scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
         }
-        return 'per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+        return `per il modello scelto nessun fornitore ammesso sa usare gli strumenti (cercare, leggere, impostare), e la chat di Filo ne ha bisogno. Scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // Il router non ha trovato un host che accetti gli strumenti (tool
       // calling) per il modello scelto: la chat della home non funziona senza.
       // Non è un guasto passeggero, è una scelta di modello da cambiare.
       if (/tool/i.test(raw) && (st === 404 || st === 400)) {
-        return 'il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello in Modelli predefiniti.';
+        return `il modello scelto nelle Impostazioni non sa usare gli strumenti (cercare, leggere, impostare): la chat di Filo ne ha bisogno. Scegli un altro modello ${DOVE_ALTRO_MODELLO}.`;
       }
       // Chiave rifiutata (#629): se c'era un portafoglio, il ripiego sui
       // crediti di Filo è già scattato prima di arrivare qui; se l'errore
@@ -313,7 +384,7 @@
       // verifica del ramo: dava la colpa alla chiave, che era a posto).
       const W = globalThis.SN_WALLET;
       if (st === 403 && W && W.isModerationBlock(raw)) {
-        return 'OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione in Modelli predefiniti.';
+        return `OpenRouter ha bloccato questa richiesta per la moderazione dei contenuti (la tua chiave è a posto): cambia il testo, o scegli un modello senza moderazione ${DOVE_ALTRO_MODELLO}.`;
       }
       if (st === 401 || st === 403) {
         return 'il servizio AI ha rifiutato la tua chiave API: controlla che sia giusta (e ancora valida) nella pagina Crediti.';
@@ -375,11 +446,23 @@
   // Una risposta che il modello ha dovuto fermare al tetto di lunghezza (finish_reason 'length', #1097.3): non è un
   // errore, ma chi la legge deve sapere che non è intera. La stessa frase su ogni superficie; '' se la risposta è intera.
   // Un 'error' a metà flusso è lo stesso taglio con un'altra causa: mai in cache, mai presentato come intero.
+  // `tetto_ragionamento`: il tetto è finito quasi tutto nel ragionamento (#1302). La frase non promette più spazio: compare
+  // anche dove «Continua» non c'è, e un host già al suo massimo fa ripartire il seguito col tetto di prima.
   const FRASI_INTERROTTA = {
     length: 'La risposta si è interrotta qui: ha raggiunto la lunghezza massima.',
+    tetto_ragionamento: 'La risposta si è interrotta qui: il modello ha speso quasi tutta la lunghezza massima ragionando.',
     error: 'La risposta si è interrotta qui: il servizio AI si è fermato a metà.',
   };
   const troncata = (finishReason) => Object.prototype.hasOwnProperty.call(FRASI_INTERROTTA, String(finishReason || ''));
+  // Il motivo della fine come lo legge Filo: un 'length' speso per più di metà nel ragionamento lo dice a parte.
+  function motivoFine(finishReason, usage) {
+    if (finishReason !== 'length') return finishReason || null;
+    const u = usage || {};
+    const pensati = Number(u.reasoningTokens);
+    const scritti = Number(u.completionTokens);
+    return Number.isFinite(pensati) && pensati > 0 && Number.isFinite(scritti) && scritti > 0 && pensati >= scritti / 2
+      ? 'tetto_ragionamento' : 'length';
+  }
   function rispostaInterrotta(finishReason) {
     return troncata(finishReason) ? FRASI_INTERROTTA[finishReason] : '';
   }
@@ -388,14 +471,36 @@
     const s = String(t || '');
     return (s.match(/^\s*```/gm) || []).length % 2 ? `${s.replace(/\s+$/, '')}\n\`\`\`` : s;
   }
+  // Le righe di un lavoro fermato col quadrato, uguali nella chat della home e nell'Aiuto (#578.1).
+  const FERMATO_QUI = 'Fermato qui';
+  const FERMATO_PRIMA = 'Fermato prima della risposta.';
   // Il messaggio con cui ogni chat chiede il seguito di una risposta interrotta.
-  const CHIEDI_SEGUITO = 'Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
-  const eFraseInterrotta = (s) => Object.values(FRASI_INTERROTTA).includes(String(s || '').trim());
+  const CHIEDI_SEGUITO ='Continua da dove ti sei interrotto, senza ripetere quello che hai già scritto.';
+  // La home lo chiede con un messaggio interno, che l'utente non vede.
+  const CHIEDI_SEGUITO_HOME = '[L\'utente ti ha chiesto di continuare la tua ultima risposta, che si è interrotta perché era più lunga del '
+    + 'tetto. Riprendi esattamente da dove si è fermata, senza ripetere quello che hai già scritto.]';
+  // L'ultima domanda dell'utente in `messages` è la richiesta del seguito: il giro ha più spazio (#1302).
+  function chiedeIlSeguito(messages) {
+    const lista = Array.isArray(messages) ? messages : [];
+    for (let i = lista.length - 1; i >= 0; i--) {
+      const m = lista[i];
+      if (!m || m.role !== 'user') continue;
+      const c = m.content;
+      const testo = typeof c === 'string' ? c : (Array.isArray(c) ? c.map((p) => (p && typeof p.text === 'string' ? p.text : '')).join('\n') : '');
+      return testo.includes(CHIEDI_SEGUITO) || testo.includes(CHIEDI_SEGUITO_HOME);
+    }
+    return false;
+  }
+  // Il tetto ha tagliato i dati di un'azione della chat (#1302): la frase resta nella risposta salvata, e al turno dopo il
+  // modello sa che l'azione non è partita e come rifarla, invece di ripeterla uguale a ogni «Continua».
+  const FRASE_AZIONE_TAGLIATA = 'La risposta si è interrotta qui: i dati di un\'azione erano più lunghi della lunghezza massima, '
+    + 'e l\'azione non è partita. Continuando la rifaccio più corta, o divisa in più parti.';
+  const eFraseInterrotta = (s) => [...Object.values(FRASI_INTERROTTA), FRASE_AZIONE_TAGLIATA].includes(String(s || '').trim());
   // Per chi legge la risposta come dati (JSON, memoria riscritta, un nome): un pezzo non si usa, si dice.
   // `vuota`: il tetto è finito prima di una sola parola da mostrare, di solito nel ragionamento.
   function fraseTagliata(finishReason, { vuota = false } = {}) {
     if (finishReason === 'error') return 'il servizio AI si è fermato a metà della risposta, e un pezzo non basta a questa funzione. Riprova.';
-    return vuota
+    return vuota || finishReason === 'tetto_ragionamento'
       ? 'il modello ha speso tutta la lunghezza massima prima di scrivere la risposta, di solito ragionando: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.'
       : 'la risposta del modello ha raggiunto la lunghezza massima prima di finire, e un pezzo non basta a questa funzione: alza il tetto in Preferenze, «Quanto può essere lunga una risposta», e riprova.';
   }
@@ -408,11 +513,14 @@
     return e;
   }
   // Una risposta tagliata che non si può mostrare: chi la legge come dati (`intera`) non ne usa un pezzo, e un taglio
-  // senza testo né azioni non ha niente da mostrare a nessuno. null se la risposta si può usare.
-  function erroreDelTaglio(r, { intera = false } = {}) {
+  // senza testo né azioni non ha niente da mostrare. Salvo il tetto finito nel ragionamento dove c'è «Continua»: la nota
+  // e il seguito, che riparte con un tetto più largo, sono la strada (#1302); `senzaSeguito` dice che lì non c'è.
+  function erroreDelTaglio(r, { intera = false, senzaSeguito = false } = {}) {
     if (!r || !troncata(r.finishReason)) return null;
     const vuota = !String(r.text || '').trim() && !(Array.isArray(r.toolCalls) && r.toolCalls.length);
-    return intera || vuota ? erroreTagliata(r.finishReason, { vuota }) : null;
+    if (intera) return erroreTagliata(r.finishReason, { vuota });
+    if (!vuota || (r.finishReason === 'tetto_ragionamento' && !senzaSeguito)) return null;
+    return erroreTagliata(r.finishReason, { vuota });
   }
 
   // Il testo di un campo di una risposta JSON tagliata a metà (l'involucro dell'Aiuto o dei mazzi): quello che il
@@ -426,10 +534,17 @@
     }
     if (inizio < 0) return null;
     const ESC = { n: '\n', t: '\t', r: '\r', b: '\b', f: '\f', '"': '"', '\\': '\\', '/': '/' };
+    // Una " non escapata chiude il campo solo se dopo vengono la fine, una graffa o la chiave seguente: altrimenti è
+    // una citazione scritta male («Clicca su "Salva" in alto») e fa parte del testo.
+    const CHIUDE = /^\s*(?:$|[}\]]|,\s*(?:$|"[A-Za-z_$][\w$]*(?:"\s*(?::|$)|$)))/;
     let out = '';
     for (let i = inizio; i < s.length; i++) {
       const ch = s[i];
-      if (ch === '"') break;
+      if (ch === '"') {
+        if (CHIUDE.test(s.slice(i + 1, i + 80))) break;
+        out += ch;
+        continue;
+      }
       if (ch !== '\\') { out += ch; continue; }
       const nx = s[i + 1];
       if (nx === undefined) break;
@@ -446,10 +561,81 @@
     return out;
   }
 
+  // Il blocco di codice dentro cui una risposta interrotta si era fermata, da riaprire in testa al seguito (#1302): la
+  // riga d'apertura (```js), o ''. `prima` è la risposta com'era, o com'è salvata nella home: chiusa da chiudiRecinto e
+  // con la frase dell'interruzione in fondo.
+  function recintoDaRiaprire(prima) {
+    let s = String(prima || '').replace(/\s+$/, '');
+    const paragrafi = s.split(/\n{2,}/);
+    const conNota = paragrafi.length > 1 && eFraseInterrotta(paragrafi[paragrafi.length - 1]);
+    if (conNota) s = paragrafi.slice(0, -1).join('\n\n').replace(/\s+$/, '');
+    let recinti = s.match(/^[ \t]*```.*$/gm) || [];
+    if (conNota && recinti.length && recinti.length % 2 === 0 && /\n[ \t]*```[ \t]*$/.test(s)) recinti = recinti.slice(0, -1);
+    return recinti.length % 2 ? recinti[recinti.length - 1].trim() : '';
+  }
+  function seguitoNelRecinto(prima, seguito) {
+    const r = recintoDaRiaprire(prima);
+    const t = String(seguito == null ? '' : seguito);
+    return r && !/^\s*```/.test(t) ? `${r}\n${t}` : t;
+  }
+
+  // Dove si chiude l'oggetto che comincia in `da` (indice della graffa di chiusura), -1 se arriva in fondo aperto.
+  function fineOggetto(s, da) {
+    let prof = 0; let inStringa = false;
+    for (let i = da; i < s.length; i++) {
+      const ch = s[i];
+      if (inStringa) {
+        if (ch === '\\') i += 1;
+        else if (ch === '"') inStringa = false;
+      } else if (ch === '"') inStringa = true;
+      else if (ch === '{') prof += 1;
+      else if (ch === '}' && --prof === 0) return i;
+    }
+    return -1;
+  }
+
+  // L'involucro JSON di una risposta (Aiuto, mazzi): da solo, su righe sue o in un recinto ```json, anche con una frase
+  // attorno («Certo!\n```json\n{…}\n```»). Un oggetto in mezzo a una frase è un esempio, e la risposta è prosa (#1302).
+  function involucroIntero(raw) {
+    let s = String(raw || '').trim();
+    const recinto = /```(?:json)?[ \t]*\n([\s\S]*?)\n?[ \t]*```/i.exec(s);
+    if (recinto) s = recinto[1].trim();
+    const a = s.indexOf('{');
+    const b = s.lastIndexOf('}');
+    if (a < 0 || b < a) return null;
+    const prima = s.slice(0, a);
+    const dopo = s.slice(b + 1);
+    if ((prima.trim() && !/\n[ \t]*$/.test(prima)) || (dopo.trim() && !/^[ \t]*\n/.test(dopo))) return null;
+    s = s.slice(a, b + 1);
+    try {
+      const o = JSON.parse(s);
+      return o && typeof o === 'object' && !Array.isArray(o) ? o : null;
+    } catch (_) { return null; }
+  }
+
+  // Il testo da mostrare di una risposta che doveva essere un involucro JSON e non si legge (#1302). Solo se il tetto
+  // l'ha fermata dentro l'involucro: una risposta intera ma scritta male, o della prosa con un esempio fra graffe chiuso,
+  // si mostra com'è (null). Fermata prima del campo del testo: niente da mostrare (''), mai la graffa.
+  function testoDaInvolucro(raw, campi, finishReason) {
+    if (!troncata(finishReason)) return null;
+    const s = String(raw || '').trim().replace(/^```(?:json)?\s*/i, '');
+    const graffa = s.indexOf('{');
+    if (graffa < 0) return null;
+    const prima = s.slice(0, graffa).trim();
+    if (!prima) {
+      const t = campoDaJsonTagliato(s, campi);
+      return t == null ? '' : t;
+    }
+    // Una frase prima dell'involucro aperto («Ecco la risposta: {"text":"…»): la frase e il testo, mai la graffa.
+    if (fineOggetto(s, graffa) >= 0) return null;
+    const t = campoDaJsonTagliato(s.slice(graffa), campi);
+    return [prima, t].filter(Boolean).join(' ');
+  }
+
   global.SN_CHAT_ERRORS = {
-    friendly, sentence, fromResponse, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, eFraseInterrotta, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, chiudiRecinto, CHIEDI_SEGUITO, CODICI_GIA_SCRITTI,
+    friendly, sentence, fromResponse, dettagliDelTetto, isTransientNetwork, rimedio, rimedioPagina, rispostaInterrotta, troncata, motivoFine, eFraseInterrotta, fraseTagliata, erroreTagliata, erroreDelTaglio, campoDaJsonTagliato, testoDaInvolucro, involucroIntero, chiudiRecinto, recintoDaRiaprire, seguitoNelRecinto, FRASE_AZIONE_TAGLIATA, FERMATO_QUI, FERMATO_PRIMA, CHIEDI_SEGUITO, CHIEDI_SEGUITO_HOME, chiedeIlSeguito, CODICI_GIA_SCRITTI,
     fraseNessunHost, motivoHostEsclusi, motivoNessunHost, motivoProduttoreGiu, NESSUN_HOST_MOTIVO, NESSUN_HOST_ZDR, RIMEDI_NESSUN_HOST, rimedioNessunHost,
-    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti,
+    MOTIVO_CREDITI, motivoCrediti, rimedioCrediti, DOVE_ALTRO_MODELLO, ingressoRifiutato,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

@@ -76,11 +76,13 @@ function firestore({ contatore, documenti }) {
       const top = db.documenti.filter((d) => Number.isInteger(d.seq)).sort((a, b) => b.seq - a.seq)[0];
       return risposta(200, top ? [{ document: { name: `x/feedback/${top._id}`, fields: { seq: { integerValue: String(top.seq) } } } }] : [{ readTime: 'T' }]);
     }
-    if (metodo === 'POST' && u.pathname.endsWith('/feedback')) {
-      const seq = corpo.fields.seq ? Number(corpo.fields.seq.integerValue) : null;
-      const id = u.searchParams.get('documentId') || `auto${db.creati.length + 1}`;
+    // La create passa da `:commit` (#1517): id e campi stanno nella scrittura.
+    if (metodo === 'POST' && u.pathname.endsWith(':commit')) {
+      const w = corpo.writes[0];
+      const seq = w.update.fields.seq ? Number(w.update.fields.seq.integerValue) : null;
+      const id = w.update.name.split('/').pop();
       db.creati.push({ id, seq, owner });
-      return risposta(200, { name: `x/feedback/${id}` });
+      return risposta(200, { writeResults: [{}] });
     }
     throw new Error(`domanda non prevista: ${metodo} ${u.pathname}`);
   };

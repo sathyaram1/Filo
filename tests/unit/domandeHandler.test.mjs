@@ -107,4 +107,27 @@ test('archivia e riapri: al server l’operazione e l’id, alla pagina la doman
   const r = await chiama({ type: MSG.DOMANDA_RIAPRI, id: 'D-5' });
   assert.equal(r.domanda.stato, 'aperta');
   assert.deepEqual(ricevute[0].data, { op: 'riapri', id: 'D-5' });
+  assert.equal('resoconto' in r, false);
+  // #2007: quello che la riapertura non ha potuto disfare arriva alla pagina.
+  rispondi = (data) => ({ status: 200, body: { result: { ok: true, domanda: { id: data.id, stato: 'aperta' }, resoconto: ' #813 era già fuso: resta. ' } } });
+  const disfatta = await chiama({ type: MSG.DOMANDA_RIAPRI, id: 'D-5' });
+  assert.deepEqual(disfatta, { ok: true, domanda: { id: 'D-5', stato: 'aperta' }, resoconto: '#813 era già fuso: resta.' });
+});
+
+test('fiducia (#2078): al server op, id e fidata; senza id non si chiama; un server vecchio si dice col nome', async () => {
+  rispondi = (data) => ({ status: 200, body: { result: { ok: true, fiducia: data.fidata ? 'fidato' : 'non_fidato', domanda: { id: data.id, fiducia: data.fidata ? 'fidato' : 'non_fidato' } } } });
+  const r = await chiama({ type: MSG.DOMANDA_FIDUCIA, id: ' D-257 ', sessione: true, biglietto: 'x' });
+  assert.deepEqual(r, { ok: true, fiducia: 'fidato', domanda: { id: 'D-257', fiducia: 'fidato' } });
+  assert.deepEqual(ricevute[0].data, { op: 'fiducia', id: 'D-257', fidata: true }, 'la pagina non dichiara una sessione');
+  const via = await chiama({ type: MSG.DOMANDA_FIDUCIA, id: 'D-257', fidata: false });
+  assert.equal(via.fiducia, 'non_fidato');
+  assert.deepEqual(ricevute[0].data, { op: 'fiducia', id: 'D-257', fidata: false });
+  const vuota = await chiama({ type: MSG.DOMANDA_FIDUCIA, id: '  ' });
+  assert.equal(vuota.ok, false);
+  assert.equal(ricevute.length, 0);
+  rispondi = () => ({ status: 400, body: { error: { status: 'INVALID_ARGUMENT', message: 'operazione «fiducia» sconosciuta', details: { reason: 'operazione_sconosciuta' } } } });
+  const vecchio = await chiama({ type: MSG.DOMANDA_FIDUCIA, id: 'D-257' });
+  assert.deepEqual(vecchio, { ok: false, error: 'Il server non sa ancora dare fiducia a una domanda: arriva col prossimo aggiornamento del server.' });
+  rispondi = () => ({ status: 400, body: { error: { status: 'FAILED_PRECONDITION', message: 'D-257 è «aperta»: la fiducia si dà a una domanda chiusa, dopo averla letta', details: { reason: 'non_chiusa' } } } });
+  assert.match((await chiama({ type: MSG.DOMANDA_FIDUCIA, id: 'D-257' })).error, /si dà a una domanda chiusa/);
 });

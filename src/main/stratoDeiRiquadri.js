@@ -1,0 +1,694 @@
+// I riquadri di Filo sopra un sito (#1509.1): spiegazione, Modifica, feedback e attacco red-team si disegnano in una vista
+// sopra la scheda, una per pagina, fuori dal documento del sito, che così non li legge, non li cerca e non li tocca.
+// Regole: patterns/i-riquadri-di-filo-su-un-sito-stanno-sopra-la-scheda.md
+
+const { webContents: WebContents } = require('electron');
+const { collegaScorciatoie } = require('./shortcuts');
+const { VuotoDellaVista } = require('./vuotoDellaVista');
+const { percorsoDelPreload } = require('./preloadPacchetto');
+const { zoomDaTasto, rotellaZoom } = require('./tabs/tabZoom');
+
+const INDIRIZZO = 'filo://riquadri/riquadri.html';
+const PRELOAD = 'src/preload/riquadri-preload.js';
+const TIPI = new Set(['feedback', 'modifica', 'redteam', 'risposta', 'aiuto']);
+// L'Aiuto nello strato lavora sulla pagina sotto (#1509.3): cosa può chiederle e quanto aspetta la risposta. Un'azione
+// può aspettare il sì dell'utente; le altre sono letture o tocchi che finiscono in pochi secondi.
+const OP_PAGINA = Object.freeze({ stato: 5000, leggi: 60000, azione: 600000, evidenzia: 15000, accetta: 15000, auto: 15000, pulisci: 15000, campo: 15000 });
+const COMANDI_AIUTO = new Set(['passo', 'chiudi', 'posa', 'azione']);
+const AIUTO_CHIUSO = Object.freeze({ pannello: 'chiuso', voce: 'pronto', nonLetta: false });
+// Abbondanti: una selezione da spiegare o un testo da modificare possono essere lunghi quanto la pagina. Oltre, la
+// richiesta si rifiuta col numero, mai tagliata.
+const DATI_MAX_BYTE = 8 * 1024 * 1024;
+// Un ultimo punto del puntatore sulla scheda vale come ancora di una risposta chiesta da un riquadro incorporato.
+const PUNTATORE_MS = 15000;
+const ID_MAX = 80;
+// Uno strato rimasto vuoto resta pronto per il riquadro dopo, poi se ne va: ogni strato è un processo.
+const VUOTO_MS = 60000;
+const RITORNO_MS = 50;
+// Chi apre un riquadro e scrive subito scrive per lui, ma lo strato freddo prende la tastiera qualche decimo dopo: le
+// lettere battute sulla pagina in quell'attesa si trattengono e gli arrivano dopo, o tornano alla pagina se resta lei.
+const TRATTIENI_MS = 5000;
+const TRATTENUTI_MAX = 2000;
+const NOMI_TASTO = Object.freeze({ ' ': 'Space' });
+
+// Un tasto che scrive, non un comando: le scorciatoie restano a chi le prende. Su Mac Opzione scrive, e AltGr (Ctrl+Alt
+// su Windows) scrive i simboli.
+function scrive(input, piattaforma = process.platform) {
+  if (!input || (input.type !== 'keyDown' && input.type !== 'keyUp') || input.meta || input.isComposing) return false;
+  const k = String(input.key || '');
+  if (k.length !== 1 && k !== 'Backspace' && k !== 'Enter') return false;
+  if (!input.control && !input.alt) return true;
+  if (input.alt && !input.control) return piattaforma === 'darwin' && k.length === 1;
+  return !!(input.control && input.alt) && k.length === 1 && !/^[a-z0-9]$/i.test(k);
+}
+
+function eventiDi(t) {
+  const keyCode = NOMI_TASTO[t.key] || t.key;
+  if (t.type === 'keyUp') return [{ type: 'keyUp', keyCode, modifiers: t.modifiers }];
+  const out = [{ type: 'keyDown', keyCode, modifiers: t.modifiers }];
+  if (t.key.length === 1) out.push({ type: 'char', keyCode: t.key, modifiers: t.modifiers });
+  return out;
+}
+
+// Le viste vive, per webContents: chi parla da qui parla come la pagina sotto (src/main/ipc.js, senderInfo).
+const perVista = new Map();
+
+const msg = () => (globalThis.SN_MSG && globalThis.SN_MSG.MSG) || {};
+
+function pesa(v) {
+  try { return JSON.stringify(v).length; } catch (_) { return Infinity; }
+}
+
+function vivo(wc) {
+  try { return !!wc && !wc.isDestroyed(); } catch (_) { return false; }
+}
+
+function numero(v) {
+  const n = Number(v);
+  return Number.isFinite(n) ? n : undefined;
+}
+
+// La parte dello strato che ha qualcosa sopra, in px della vista: { x, y, width, height }, null per la scheda intera.
+function zonaValida(z) {
+  if (!z || typeof z !== 'object') return null;
+  const n = ['x', 'y', 'width', 'height'].map((k) => numero(z[k]));
+  if (n.some((v) => v === undefined) || n[2] <= 0 || n[3] <= 0) return null;
+  const [x, y, width, height] = n.map((v) => Math.round(Math.max(-100000, Math.min(100000, v))));
+  return { x, y, width, height };
+}
+
+// Le immagini date all'Aiuto dalla pagina (#1623), già lette lì: solo immagini in data URL, coi conti di quelle che
+// non entrano, perché l'avviso le dica.
+function allegatiPuliti(a) {
+  if (!a || typeof a !== 'object') return null;
+  const conta = (n) => Math.max(0, Math.min(1e6, Math.floor(Number(n) || 0)));
+  const immagini = (Array.isArray(a.immagini) ? a.immagini : [])
+    .filter((im) => im && typeof im.dataUrl === 'string' && /^data:image\//i.test(im.dataUrl))
+    .map((im) => ({ dataUrl: im.dataUrl, nome: typeof im.nome === 'string' ? im.nome.slice(0, 500) : '' }));
+  const out = { immagini, grandi: conta(a.grandi), rotte: conta(a.rotte), altri: conta(a.altri) };
+  return immagini.length || out.grandi || out.rotte || out.altri ? out : null;
+}
+
+const SCATOLE_MAX = 50;
+function scatoleValide(l) {
+  return Array.isArray(l) ? l.slice(0, SCATOLE_MAX).map(zonaValida).filter(Boolean) : [];
+}
+
+function principaleDi(sender) {
+  try { return !!sender && !sender.frame?.parent; } catch (_) { return false; }
+}
+
+// L'ancora di una risposta arriva in px della pagina; lo strato, a zoom 1, la vuole in px della vista.
+function ancoraNellaVista(ancora, zoom) {
+  if (!ancora || typeof ancora !== 'object') return null;
+  const out = {};
+  for (const k of ['x', 'y', 'top', 'bottom', 'left', 'right']) {
+    const v = numero(ancora[k]);
+    if (v !== undefined) out[k] = Math.round(v * zoom);
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+class StratoDeiRiquadri {
+  // area(wc): dove sta la pagina nella finestra, null se non si vede o se qualcosa la copre; sopraA(wc): la vista sopra
+  // cui posarlo (null: in cima alla finestra); scheda(wc): { id, url, title } della pagina, null se non è sua;
+  // tastoDellaScheda(wc, input): i tasti che la scheda prende prima della pagina, true se preso; pronta(v, wc): lo
+  // strato `v` della pagina `wc` ha appena caricato (chi scrive nella scheda scrive anche lì, come l'angolo degli avvisi);
+  // input(wc, input): un input vero sullo strato, che per chi guarda la scheda vale come sulla pagina `wc`.
+  constructor(win, { area = () => null, sopraA = () => null, scheda = () => null, tastoDellaScheda = () => false, pronta = () => {}, input = () => {} } = {}) {
+    this.win = win;
+    this.area = area;
+    this.sopraA = sopraA;
+    this.scheda = scheda;
+    this.tastoDellaScheda = tastoDellaScheda;
+    this.suPronta = pronta;
+    this.suInput = input;
+    this.strati = new Map(); // wc della pagina → { wc, vista, pronta, coda, aperti, riquadri, modale, inPagina }
+    this.seguite = new WeakSet();
+    this.seq = 0;
+    if (win && typeof win.once === 'function') win.once('closed', () => { for (const s of [...this.strati.values()]) this._butta(s); });
+  }
+
+  // RIQUADRO_APRI dal content script della pagina: il riquadro nasce nello strato, mai nel documento del sito.
+  apri(sender, d) {
+    const wc = sender && sender.wc;
+    if (!vivo(wc) || !this.win || this.win.isDestroyed() || !this.scheda(wc)) return { ok: false };
+    const tipo = String((d && d.tipo) || '');
+    const dati = d && d.dati && typeof d.dati === 'object' && !Array.isArray(d.dati) ? d.dati : {};
+    if (!TIPI.has(tipo)) return { ok: false, error: 'tipo' };
+    if (pesa(dati) > DATI_MAX_BYTE) return { ok: false, error: 'troppo', limite: DATI_MAX_BYTE };
+    const s = this._strato(wc);
+    if (!s) return { ok: false };
+    clearTimeout(s.timerVuoto);
+    const id = `r${++this.seq}`;
+    const richiesta = { id, tipo, dati: this._datiPuliti(tipo, dati, sender, wc), pagina: this._pagina(wc) };
+    if (tipo === 'modifica') s.inPagina.set(id, sender.frame || null);
+    // Chi apre un riquadro scrive lì: la tastiera va allo strato appena c'è.
+    s.vuoleTastiera = true;
+    this._trattieni(s);
+    if (s.pronta) this._consegna(s, richiesta);
+    else s.coda.push(richiesta);
+    return { ok: true, id };
+  }
+
+  // Il riquadro si posa sulle misure della finestra dello strato: prima di aprirlo lo strato prende quelle della pagina,
+  // o una risposta nata in uno strato largo zero sceglierebbe il lato sbagliato e non lo cambierebbe più.
+  _consegna(s, richiesta) {
+    const b = this._area(s.wc);
+    // Il riquadro nuovo può nascere ovunque: finché lo strato non ridice la sua zona, la cornice è la scheda intera.
+    s.zona = null;
+    if (b) {
+      this._bordi(s, b);
+      this._inCima(s);
+    }
+    this._manda(s, 'riquadri:apri', { ...richiesta, misura: b ? { w: b.width, h: b.height } : null });
+  }
+
+  _datiPuliti(tipo, dati, sender, wc) {
+    const testo = (v) => String(v == null ? '' : v);
+    if (tipo === 'feedback') return { testo: testo(dati.testo) };
+    if (tipo === 'modifica') return { testo: testo(dati.testo) };
+    if (tipo === 'redteam') return {};
+    if (tipo === 'aiuto') {
+      const c = dati.invocazione && typeof dati.invocazione === 'object' ? dati.invocazione : null;
+      const v = dati.valuta && typeof dati.valuta === 'object' ? dati.valuta : null;
+      const campo = v ? testo(v.campo) : '';
+      return {
+        invocazione: c ? { source: testo(c.source), title: testo(c.title), url: testo(c.url) } : null,
+        // «Valuta» (#1449): il testo del campo e il numero con cui lo strato lo ritrova nella pagina.
+        valuta: campo && campo.length <= ID_MAX && testo(v.testo).trim() ? { campo, testo: testo(v.testo) } : null,
+        allegati: allegatiPuliti(dati.allegati),
+      };
+    }
+    let zoom = 1;
+    try { zoom = wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+    let principale = true;
+    try { principale = !sender.frame || !sender.frame.parent; } catch (_) { principale = true; }
+    // Un riquadro incorporato conosce solo la sua finestra: l'ancora è l'ultimo punto del puntatore sulla scheda.
+    let ancora = principale ? ancoraNellaVista(dati.anchor, zoom) : null;
+    if (!principale) {
+      const p = wc._filoUltimoPuntatore;
+      if (p && Date.now() - p.alle < PUNTATORE_MS) ancora = { x: p.x, y: p.y, top: p.y, bottom: p.y };
+    }
+    return {
+      action: testo(dati.action),
+      payload: dati.payload && typeof dati.payload === 'object' ? dati.payload : {},
+      title: testo(dati.title),
+      anchor: ancora,
+      // La spiegazione interrotta del tasto destro, da riprendere nel riquadro (#1302): solo testo, mostrato come risposta.
+      ...(typeof dati.seguito === 'string' && dati.seguito ? { seguito: dati.seguito } : {}),
+    };
+  }
+
+  _pagina(wc) {
+    const s = this.scheda(wc) || {};
+    let url = '';
+    let origine = '';
+    try { url = String(wc.getURL() || ''); origine = String(wc.mainFrame.origin || ''); } catch (_) {}
+    return { url, origine, titolo: String(s.title || '') };
+  }
+
+  // Dallo strato: cosa ha aperto (posa e tastiera), un'azione sulla pagina (Sostituisci della Modifica), i gesti del vuoto.
+  _dalloStrato(s, canale, d) {
+    if (canale === 'riquadri:stato') {
+      const prima = s.aperti;
+      s.aperti = Math.max(0, Math.min(1000, Number(d && d.aperti) || 0));
+      s.riquadri = Math.max(0, Math.min(1000, Number(d && d.riquadri) || 0));
+      s.modale = !!(d && d.modale);
+      // Un Aiuto chiuso mentre Filo risponde non si vede ma c'è: la sua risposta resta da aprire (#1432).
+      s.aiuto = !!(d && d.aiuto);
+      s.zona = zonaValida(d && d.zona);
+      s.scatole = scatoleValide(d && d.scatole);
+      if (!s.aperti && prima) this._restituisci(s);
+      clearTimeout(s.timerVuoto);
+      const vuoto = () => !s.aperti && !s.aiuto;
+      if (vuoto()) s.timerVuoto = setTimeout(() => { if (vuoto() && this.strati.get(s.wc) === s) this._butta(s); }, VUOTO_MS);
+      this.posa();
+      return;
+    }
+    if (canale === 'riquadri:in-pagina') {
+      const id = String((d && d.id) || '');
+      const frame = s.inPagina.get(id);
+      if (!id || id.length > ID_MAX || !s.inPagina.has(id)) return;
+      s.inPagina.delete(id);
+      if (!d || d.cosa !== 'sostituisci' || typeof d.testo !== 'string' || pesa(d.testo) > DATI_MAX_BYTE) return;
+      // Il testo va nel campo della pagina col fuoco già tornato a lei, come una battuta.
+      this._restituisci(s, { forza: true });
+      const dati = { type: msg().RIQUADRO_SOSTITUISCI, id, testo: d.testo };
+      try {
+        if (frame && !frame.detached) frame.send('filo:broadcast', dati);
+        else s.wc.send('filo:broadcast', dati);
+      } catch (_) {}
+      return;
+    }
+    if (canale === 'riquadri:vuoto') s.vuoto.inoltra(d);
+    // Un trascinamento sul vuoto (un file da allegare al sito, un pezzo della pagina) non si può rigirare: lo strato si
+    // toglie finché il puntatore non torna sulla pagina, così il rilascio cade dove l'utente lo vede.
+    if (canale === 'riquadri:lascia-passare' && !s.modale && s.visibile) {
+      s.lasciaPassare = true;
+      this._nascondi(s);
+      this._aspettaIlRitorno(s);
+    }
+  }
+
+  // Lo strato tolto per un trascinamento torna quando il puntatore arriva sopra un riquadro: un pezzo di pagina si
+  // trascina anche nella casella dell'Aiuto, e per arrivarci passa dal margine dell'ombra, che è vuoto.
+  _aspettaIlRitorno(s) {
+    clearInterval(s.timerRitorno);
+    s.timerRitorno = setInterval(() => {
+      if (!s.lasciaPassare || this.strati.get(s.wc) !== s || !this.win || this.win.isDestroyed()) {
+        clearInterval(s.timerRitorno);
+        return;
+      }
+      const b = this._area(s.wc);
+      if (!b || !s.scatole || !s.scatole.length) return;
+      let p = null;
+      try { p = require('electron').screen.getCursorScreenPoint(); } catch (_) { return; }
+      const cb = this.win.getContentBounds();
+      const x = p.x - cb.x - b.x;
+      const y = p.y - cb.y - b.y;
+      if (!s.scatole.some((r) => x >= r.x && x < r.x + r.width && y >= r.y && y < r.y + r.height)) return;
+      clearInterval(s.timerRitorno);
+      s.lasciaPassare = false;
+      this.posa();
+    }, RITORNO_MS);
+  }
+
+  // L'Aiuto nello strato chiede alla pagina sotto (#1509.3): la domanda va al suo frame principale, che risponde con
+  // AIUTO_ESITO. Una pagina che non risponde (andata via, ferma) dà un esito mancato, mai un'attesa senza fine.
+  _allaPagina(s, op, args) {
+    if (!Object.prototype.hasOwnProperty.call(OP_PAGINA, op) || !vivo(s.wc)) return Promise.resolve({ ok: false });
+    if (pesa(args) > DATI_MAX_BYTE) return Promise.resolve({ ok: false, error: 'troppo', limite: DATI_MAX_BYTE });
+    const rid = `a${++this.seq}`;
+    return new Promise((fatto) => {
+      let timer = null;
+      const chiudi = (r) => { if (!s.attese.delete(rid)) return; clearTimeout(timer); fatto(r); };
+      s.attese.set(rid, chiudi);
+      timer = setTimeout(() => chiudi({ ok: false, error: 'tempo' }), OP_PAGINA[op]);
+      try { s.wc.send('filo:broadcast', { type: msg().AIUTO_DALLO_STRATO, rid, op, args: args == null ? {} : args }); } catch (_) { chiudi({ ok: false }); }
+    });
+  }
+
+  // AIUTO_ESITO dal frame principale della pagina.
+  esitoDallaPagina(sender, d) {
+    const s = sender && !sender.strato ? this.strati.get(sender.wc) : null;
+    const principale = principaleDi(sender);
+    const rid = String((d && d.rid) || '');
+    if (!s || !principale || !rid || rid.length > ID_MAX || !s.attese.has(rid)) return { ok: false };
+    if (pesa(d.esito) > DATI_MAX_BYTE) { s.attese.get(rid)({ ok: false, error: 'troppo', limite: DATI_MAX_BYTE }); return { ok: false }; }
+    s.attese.get(rid)({ ok: true, esito: d.esito === undefined ? null : d.esito });
+    return { ok: true };
+  }
+
+  // AIUTO_ALLO_STRATO dalla pagina: l'icona Aiuto premuta di nuovo, l'Aiuto spento, dove sta il bersaglio del passo
+  // (la sua nota e il pannello da scostare), il gesto dell'utente sul passo indicato. Senza un Aiuto vivo nello strato non va da nessuna parte.
+  comandoAiuto(sender, d) {
+    const s = sender && !sender.strato ? this.strati.get(sender.wc) : null;
+    const comando = String((d && d.comando) || '');
+    if (!s || !s.pronta || !s.aiuto || !COMANDI_AIUTO.has(comando) || !vivo(s.vista.webContents)) return { ok: false };
+    // Il passo e la sua cornice stanno nel documento principale: un riquadro incorporato non li ha.
+    if ((comando === 'posa' || comando === 'azione') && !principaleDi(sender)) return { ok: false };
+    const out = { comando };
+    if (comando === 'chiudi') out.davvero = !!d.davvero;
+    if (comando === 'posa') {
+      // Il bersaglio del passo, in px della pagina: nello strato, a zoom 1, in px della vista. null: non c'è più.
+      out.id = Math.max(0, Math.min(1e9, Math.round(Number(d.id) || 0)));
+      out.rect = null;
+      if (d.rect) {
+        let zoom = 1;
+        try { zoom = s.wc.getZoomFactor() || 1; } catch (_) { zoom = 1; }
+        const r = {};
+        for (const k of ['left', 'top', 'right', 'bottom']) {
+          const v = numero(d.rect[k]);
+          if (v === undefined) return { ok: false };
+          r[k] = v * zoom;
+        }
+        out.rect = r;
+      }
+    }
+    if (comando === 'azione') {
+      out.id = Math.max(0, Math.min(1e9, Math.round(Number(d.id) || 0)));
+      out.etichetta = String(d.etichetta == null ? '' : d.etichetta);
+      out.daUrl = String(d.daUrl == null ? '' : d.daUrl);
+      if (pesa(out) > DATI_MAX_BYTE) return { ok: false };
+    }
+    this._manda(s, 'riquadri:aiuto', out);
+    return { ok: true };
+  }
+
+  // Chiamata dal layout: lo strato si vede solo sopra la sua pagina, quando è davanti e ha qualcosa aperto.
+  posa() {
+    if (!this.win || this.win.isDestroyed()) return;
+    for (const s of this.strati.values()) {
+      const b = s.pronta && s.aperti > 0 && !s.lasciaPassare ? this._area(s.wc) : null;
+      if (!b) { this._nascondi(s); continue; }
+      this._bordi(s, b);
+      this._inCima(s);
+      if (!s.visibile) {
+        s.visibile = true;
+        s.cornice.setVisible(true);
+        s.vista.setVisible(true);
+        // Un riquadro che copre la pagina, tornato a vedersi, riprende la tastiera: dietro di lui non si scrive. Così chi
+        // scriveva nello strato prima di cambiare scheda: i tasti dopo il ritorno sono suoi, non del sito.
+        if (s.modale || s.scriveQui) s.vuoleTastiera = true;
+      }
+      if (s.vuoleTastiera) {
+        s.vuoleTastiera = false;
+        this._tastiera(s);
+        if (s.trattenuti) this._rilascia(s, this._haTastiera(s) ? s.vista.webContents : s.wc);
+      }
+    }
+  }
+
+  // Da quando l'utente chiede un riquadro scrivendo sulla pagina, i tasti che scrivono non le arrivano: sono per lui.
+  _trattieni(s) {
+    let col = null;
+    try { col = WebContents.getFocusedWebContents(); } catch (_) { col = null; }
+    if (s.trattenuti || col !== s.wc) return;
+    s.trattenuti = [];
+    clearTimeout(s.timerTrattenuti);
+    s.timerTrattenuti = setTimeout(() => this._rilascia(s, s.wc), TRATTIENI_MS);
+  }
+
+  _rilascia(s, dove) {
+    clearTimeout(s.timerTrattenuti);
+    const tasti = s.trattenuti;
+    s.trattenuti = null;
+    if (!tasti || !tasti.length || !vivo(dove)) return;
+    for (const t of tasti) for (const ev of eventiDi(t)) { try { dove.sendInputEvent(ev); } catch (_) {} }
+  }
+
+  // La vista è grande quanto la scheda, così i riquadri si posano come nella pagina; la cornice la ritaglia alla zona
+  // dove c'è qualcosa, e fuori la pagina riceve i suoi gesti veri: trascinamenti, file dal computer, dita.
+  _bordi(s, area) {
+    const z = s.zona;
+    const x = z ? Math.max(0, z.x) : 0;
+    const y = z ? Math.max(0, z.y) : 0;
+    const w = z ? Math.min(area.width, z.x + z.width) - x : area.width;
+    const h = z ? Math.min(area.height, z.y + z.height) - y : area.height;
+    const c = { x: area.x + x, y: area.y + y, width: Math.max(1, w), height: Math.max(1, h) };
+    s.cornice.setBounds(c);
+    s.vista.setBounds({ x: area.x - c.x, y: area.y - c.y, width: area.width, height: area.height });
+    if (this._tagliata(s) && !s.ritaglioAttaccato && this._inFinestra(s)) this._riattacca(s);
+  }
+
+  // Chromium ritaglia anche i trascinamenti alla cornice solo se la vista ci è stata attaccata già tagliata: senza, i
+  // file e gli elementi trascinati sulla pagina cadrebbero sullo strato. Si riattacca alla prima volta che la cornice
+  // la taglia, e dopo ogni volta che la cornice rientra nella finestra.
+  _tagliata(s) {
+    const c = s.cornice.getBounds();
+    const v = s.vista.getBounds();
+    return v.x < 0 || v.y < 0 || v.x + v.width > c.width || v.y + v.height > c.height;
+  }
+
+  _inFinestra(s) {
+    try { return (this.win.contentView.children || []).includes(s.cornice); } catch (_) { return false; }
+  }
+
+  _riattacca(s) {
+    const aveva = this._haTastiera(s);
+    try { s.cornice.removeChildView(s.vista); s.cornice.addChildView(s.vista); } catch (_) {}
+    s.ritaglioAttaccato = true;
+    if (aveva) { try { s.vista.webContents.focus(); } catch (_) {} }
+  }
+
+  // I bordi della vista nella finestra (quelli di setBounds sono nella cornice): per chi rigira i gesti del suo vuoto.
+  _bordiVista(s) {
+    const c = s.cornice.getBounds();
+    const v = s.vista.getBounds();
+    return { x: c.x + v.x, y: c.y + v.y, width: v.width, height: v.height };
+  }
+
+  inCima() {
+    for (const s of this.strati.values()) if (s.visibile) this._inCima(s);
+  }
+
+  // Subito sopra la sua pagina: avvisi, conferme, barra e menu restano sopra, come sopra la pagina.
+  _inCima(s) {
+    const cv = this.win.contentView;
+    let sotto = null;
+    try { sotto = this.sopraA(s.wc); } catch (_) { sotto = null; }
+    const figli = () => cv.children || [];
+    const i = sotto ? figli().indexOf(sotto) : -1;
+    const mia = figli().indexOf(s.cornice);
+    let rientrata = false;
+    if (i < 0) {
+      if (mia !== figli().length - 1) { cv.addChildView(s.cornice); rientrata = true; }
+    } else if (mia !== i + 1) {
+      if (mia >= 0) cv.removeChildView(s.cornice);
+      cv.addChildView(s.cornice, figli().indexOf(sotto) + 1);
+      rientrata = true;
+    }
+    if (rientrata) s.ritaglioAttaccato = this._tagliata(s);
+  }
+
+  _nascondi(s) {
+    if (!s.visibile) return;
+    s.visibile = false;
+    if (!s.aperti) s.scriveQui = false;
+    const aveva = this._haTastiera(s);
+    try { s.cornice.setVisible(false); } catch (_) {}
+    try { s.vista.setVisible(false); } catch (_) {}
+    if (aveva) this._restituisci(s, { forza: true });
+  }
+
+  _area(wc) {
+    let b = null;
+    try { b = this.area(wc); } catch (_) { b = null; }
+    return b && b.width > 0 && b.height > 0 ? { x: b.x, y: b.y, width: b.width, height: b.height } : null;
+  }
+
+  _haTastiera(s) {
+    try { return WebContents.getFocusedWebContents() === s.vista.webContents; } catch (_) { return false; }
+  }
+
+  // Chi apre un riquadro ci scrive: lo strato prende la tastiera, anche da un menu o dalla barra laterale. Solo chi
+  // scriveva nella barra in alto la tiene.
+  _tastiera(s) {
+    if (!this.win.isFocused() || !s.visibile) return;
+    let col = null;
+    try { col = WebContents.getFocusedWebContents(); } catch (_) { col = null; }
+    const shell = this.win._filoShell && this.win._filoShell.webContents;
+    if (col && (col === this.win.webContents || col === shell)) return;
+    try { s.vista.webContents.focus(); } catch (_) {}
+  }
+
+  _restituisci(s, { forza = false } = {}) {
+    if (!this.win || this.win.isDestroyed() || !this.win.isFocused() || !vivo(s.wc)) return;
+    if (!forza && !this._haTastiera(s)) return;
+    try { s.wc.focus(); } catch (_) {}
+  }
+
+  // Esc sulla pagina con un riquadro aperto lo chiude, prima di ogni altro uso del tasto (schermo intero compreso).
+  tasto(wc, input) {
+    const s = this.strati.get(wc);
+    if (!s || !s.visibile || !s.riquadri || !input || input.type !== 'keyDown') return false;
+    if (input.key !== 'Escape' && input.code !== 'Escape') return false;
+    this._manda(s, 'riquadri:esc', {});
+    return true;
+  }
+
+  // La scorciatoia che lavora sulla selezione va dove l'utente sta scrivendo o leggendo: nello strato, se ha la tastiera.
+  conTastiera(wc) {
+    const s = this.strati.get(wc);
+    return s && s.visibile && this._haTastiera(s) ? s.vista.webContents : null;
+  }
+
+  // Quello che l'utente vede sopra la pagina: i gesti del vuoto delle viste più in alto vanno qui, non alla pagina.
+  vistaSopra(wc) {
+    const s = this.strati.get(wc);
+    return s && s.visibile ? s.perIlVuoto : null;
+  }
+
+  // La tastiera che torna alla scheda va allo strato se copre la pagina (feedback, Modifica, red-team) o se l'utente
+  // scriveva lì l'ultima volta (la casella dell'Aiuto): tornati da un'altra scheda o dalla barra, i tasti non vanno al sito.
+  tastieraPer(wc) {
+    const s = this.strati.get(wc);
+    return s && s.visibile && (s.modale || s.scriveQui) && vivo(s.vista.webContents) ? s.vista.webContents : null;
+  }
+
+  stato(wc) {
+    const s = this.strati.get(wc);
+    if (!s) return null;
+    return {
+      pronta: s.pronta, aperti: s.aperti, riquadri: s.riquadri, modale: s.modale, visibile: !!s.visibile,
+      vista: vivo(s.vista.webContents) ? s.vista.webContents.id : null,
+      bounds: this._bordiVista(s),
+      cornice: s.cornice.getBounds(),
+      tastiera: this._haTastiera(s),
+    };
+  }
+
+  _manda(s, canale, dati) {
+    try { if (vivo(s.vista.webContents)) s.vista.webContents.send(canale, dati); } catch (_) {}
+  }
+
+  // Una pagina nuova, chiusa o morta si porta via i suoi riquadri, come quando stavano nel suo documento. Si segue da
+  // quando la pagina nasce: il primo riquadro chiesto da un riquadro incorporato ha già bisogno dell'ultimo puntatore.
+  segui(wc) {
+    if (this.seguite.has(wc)) return;
+    this.seguite.add(wc);
+    const via = () => { const s = this.strati.get(wc); if (s) this._butta(s); };
+    wc.once('destroyed', via);
+    wc.on('render-process-gone', via);
+    wc.on('did-navigate', via);
+    wc.on('focus', () => { const s = this.strati.get(wc); if (s && s.visibile) s.scriveQui = false; });
+    wc.on('before-input-event', (e, input) => {
+      const s = this.strati.get(wc);
+      if (!s || !s.trattenuti || !scrive(input)) return;
+      // Oltre il tetto (mai raggiunto scrivendo) i tasti tornano alla pagina, nell'ordine: nessuno si perde.
+      if (s.trattenuti.length >= TRATTENUTI_MAX) { this._rilascia(s, wc); return; }
+      e.preventDefault();
+      const modifiers = ['shift', 'control', 'alt'].filter((m) => input[m]);
+      s.trattenuti.push({ type: input.type, key: String(input.key), modifiers });
+    });
+    // Il punto dove l'utente ha appena cliccato o selezionato: l'ancora di una risposta chiesta da un riquadro incorporato.
+    wc.on('input-event', (_e, input) => {
+      const t = input && input.type;
+      if ((t === 'mouseDown' || t === 'mouseUp') && Number.isFinite(input.x) && Number.isFinite(input.y)) {
+        wc._filoUltimoPuntatore = { x: input.x, y: input.y, alle: Date.now() };
+      }
+      // Finito il trascinamento, il primo gesto del mouse sulla pagina rimette lo strato.
+      const s = this.strati.get(wc);
+      // Un clic sulla pagina mentre lo strato nasce la sceglie: quello che si era scritto torna a lei.
+      if (s && s.trattenuti && t === 'mouseDown') this._rilascia(s, wc);
+      if (s && s.lasciaPassare && /^mouse/.test(String(t || ''))) {
+        s.lasciaPassare = false;
+        this.posa();
+      }
+    });
+  }
+
+  _strato(wc) {
+    const c = this.strati.get(wc);
+    if (c && vivo(c.vista.webContents)) return c;
+    if (c) this._butta(c);
+    const { WebContentsView, View } = require('electron');
+    const vista = new WebContentsView({
+      webPreferences: {
+        // Come le schede web: i riquadri nel mondo isolato, in sandbox; la pagina dello strato non ha né Node né lo shim.
+        preload: percorsoDelPreload(PRELOAD),
+        contextIsolation: true,
+        sandbox: true,
+        nodeIntegration: false,
+        spellcheck: false,
+        backgroundThrottling: false,
+      },
+    });
+    vista.setBackgroundColor('#00000000');
+    vista.setVisible(false);
+    vista.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    const cornice = new View();
+    cornice.setVisible(false);
+    cornice.setBounds({ x: 0, y: 0, width: 0, height: 0 });
+    cornice.addChildView(vista);
+    const s = {
+      wc, vista, cornice, pronta: false, coda: [], aperti: 0, riquadri: 0, modale: false, visibile: false,
+      vuoleTastiera: false, scriveQui: false, inPagina: new Map(), aiuto: false, attese: new Map(), zona: null, ritaglioAttaccato: false,
+    };
+    // Chi rigira i gesti di un vuoto allo strato conta in px della finestra, non della cornice.
+    s.perIlVuoto = { webContents: vista.webContents, getBounds: () => this._bordiVista(s) };
+    s.vuoto = new VuotoDellaVista({
+      vista: () => s.perIlVuoto,
+      scheda: () => (vivo(s.wc) ? this._vistaDellaPagina(s.wc) : null),
+      canale: 'riquadri:cursore',
+      primaDelClic: () => this._restituisci(s),
+    });
+    this.strati.set(wc, s);
+    perVista.set(vista.webContents, { strato: this, s });
+    this.segui(wc);
+    const v = vista.webContents;
+    v.setWindowOpenHandler(() => ({ action: 'deny' }));
+    v.on('will-navigate', (e) => e.preventDefault());
+    collegaScorciatoie(v, this.win);
+    // Scrivendo in un riquadro i tasti del browser (chiudi, indietro, salto di scheda) e quelli dello zoom valgono come
+    // nella pagina sotto: lo zoom è suo, anche col fuoco qui.
+    v.on('before-input-event', (e, input) => {
+      let preso = false;
+      try { preso = vivo(s.wc) && (this.tastoDellaScheda(s.wc, input) || zoomDaTasto(s.wc, input)); } catch (_) { preso = false; }
+      if (preso) e.preventDefault();
+    });
+    // Un gesto sui riquadri è dell'interfaccia di Filo: vale per ciò che Filo fa (appunti, il suo menu), mai per il sito.
+    v.on('input-event', (_e, input) => {
+      try { require('./services/permessiPagine').gestoNelloStrato(s.wc, input); } catch (_) {}
+      try { if (vivo(s.wc)) this.suInput(s.wc, input); } catch (_) {}
+    });
+    v.on('ipc-message', (_e, canale, dati) => {
+      if (/^riquadri:(stato|in-pagina|vuoto|lascia-passare)$/.test(canale)) this._dalloStrato(s, canale, dati);
+    });
+    v.on('ipc-message-sync', (e, canale) => {
+      if (canale !== 'riquadri:chi') return;
+      e.returnValue = vivo(s.wc) ? this._pagina(s.wc) : null;
+    });
+    v.once('did-finish-load', () => {
+      // I px dello strato devono essere quelli della scheda: uno zoom rimasto sull'host «riquadri» li sposterebbe.
+      try { v.setZoomFactor(1); } catch (_) {}
+      s.pronta = true;
+      try { this.suPronta(v, wc); } catch (_) {}
+      for (const r of s.coda.splice(0)) this._consegna(s, r);
+      this.posa();
+    });
+    // Ctrl+rotella sopra un riquadro zooma la pagina sotto, come quando il riquadro stava nel suo documento.
+    v.on('zoom-changed', (_e, dir) => {
+      try { v.setZoomFactor(1); } catch (_) {}
+      if (vivo(s.wc)) rotellaZoom(s.wc, dir);
+    });
+    v.on('render-process-gone', () => this._butta(s));
+    // Dove l'utente scriveva l'ultima volta, fra la pagina e lo strato: un fuoco dato alla pagina mentre lo strato è
+    // nascosto (cambio di scheda) non conta, l'utente non l'ha scelto.
+    v.on('focus', () => { s.scriveQui = true; });
+    // Carica FUORI dalla finestra (ci entra alla prima posa): dentro si prenderebbe la tastiera di chi scrive.
+    // L'ancora dice di quale pagina è: con più schede gli strati sono uguali.
+    v.loadURL(`${INDIRIZZO}#${wc.id}`);
+    return s;
+  }
+
+  _vistaDellaPagina(wc) {
+    let sotto = null;
+    try { sotto = this.sopraA(wc); } catch (_) { sotto = null; }
+    return sotto || { webContents: wc, getBounds: () => ({ x: 0, y: 0 }) };
+  }
+
+  _butta(s) {
+    clearTimeout(s.timerVuoto);
+    clearInterval(s.timerRitorno);
+    this._rilascia(s, s.wc);
+    try { s.vuoto.stacca(); } catch (_) {}
+    if (this.strati.get(s.wc) === s) this.strati.delete(s.wc);
+    for (const chiudi of [...s.attese.values()]) chiudi({ ok: false });
+    // L'Aiuto se ne va con lo strato: la pagina, che lo dice alla barra laterale, lo sa chiuso.
+    if (s.aiuto && vivo(s.wc)) {
+      s.aiuto = false;
+      try { s.wc.send('filo:broadcast', { type: msg().AIUTO_DALLO_STRATO, op: 'stato', args: AIUTO_CHIUSO }); } catch (_) {}
+    }
+    const aveva = s.visibile && this._haTastiera(s);
+    s.visibile = false;
+    const v = s.vista;
+    try { perVista.delete(v.webContents); } catch (_) {}
+    try { if (this.win && !this.win.isDestroyed()) this.win.contentView.removeChildView(s.cornice); } catch (_) {}
+    try { if (vivo(v.webContents)) v.webContents.close(); } catch (_) {}
+    if (aveva) this._restituisci(s, { forza: true });
+  }
+}
+
+// Chi sta sotto uno strato: la pagina per cui parla. null se il webContents non è uno strato dei riquadri.
+function paginaDelloStrato(wc) {
+  const r = wc ? perVista.get(wc) : null;
+  if (!r || !vivo(r.s.wc)) return null;
+  return { wc: r.s.wc, win: r.strato.win };
+}
+
+// Lo strato pronto sopra una pagina: le spinte che vanno alla pagina vanno anche a lui, ritagliate per lei.
+function stratoDellaPagina(wc) {
+  for (const [v, r] of perVista) if (r.s.wc === wc && r.s.pronta && vivo(v)) return v;
+  return null;
+}
+
+// AIUTO_ALLA_PAGINA: solo uno strato chiede, e solo alla sua pagina.
+function aiutoAllaPagina(stratoWc, op, args) {
+  const r = stratoWc ? perVista.get(stratoWc) : null;
+  if (!r || !vivo(r.s.wc)) return Promise.resolve({ ok: false });
+  return r.strato._allaPagina(r.s, String(op || ''), args);
+}
+
+module.exports = { StratoDeiRiquadri, paginaDelloStrato, stratoDellaPagina, aiutoAllaPagina, ancoraNellaVista, scrive, INDIRIZZO, TIPI, OP_PAGINA };

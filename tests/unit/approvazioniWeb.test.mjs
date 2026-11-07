@@ -60,6 +60,7 @@ test('le intestazioni vietano di incorniciarla e la CSP non apre a script in lin
   assert.doesNotMatch(script, /unsafe-inline|unsafe-eval|\*/);
   const connect = (csp.match(/connect-src ([^;]+)/) || [])[1] || '';
   assert.ok(connect.split(/\s+/).includes(new URL(W.FUNZIONE).origin), 'la CSP deve lasciar parlare la pagina col server');
+  assert.ok(connect.split(/\s+/).includes(new URL(W.FUNZIONE_SALTA).origin), 'anche con la funzione di «Salta il controllo»');
   assert.equal(h['Referrer-Policy'], 'no-referrer');
 });
 
@@ -75,6 +76,10 @@ test('ogni file che la pagina carica esiste, e l\'SDK di Google è una versione 
 
 test('l\'indirizzo del server e quello della pagina non si prendono da fuori', () => {
   assert.equal(W.FUNZIONE, 'https://europe-west1-filo-8b9cb.cloudfunctions.net/ownerMergeApprovals');
+  // Il salto passa dalla stessa funzione della scheda di Filo (handlers/auth.js), non da una sua.
+  assert.equal(W.FUNZIONE_SALTA, 'https://europe-west1-filo-8b9cb.cloudfunctions.net/ownerSkipSecaudit');
+  const app = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers', 'auth.js'), 'utf8');
+  assert.match(app, /callSecurityFunction\('ownerSkipSecaudit'/);
   assert.doesNotMatch(SORGENTE, /location\.(search|hash)|URLSearchParams|addEventListener\(\s*['"]message/);
   assert.ok(W.fraseAccesso('auth/unauthorized-domain').includes(PAGINA_APPROVAZIONI), 'il terminale e la pagina devono nominare lo stesso indirizzo');
 });
@@ -110,6 +115,13 @@ test('l\'impronta cambia quando cambia qualcosa da decidere, non quando passa il
   assert.notEqual(W.impronta({ pending: [{ ...r, used: true }] }), uno);
   assert.notEqual(W.impronta({ pending: [], failed: [], recent: [r] }), uno);
   assert.equal(W.impronta(null), W.impronta({}));
+  // Una bocciatura nuova, o una spiegazione cambiata, ridisegna; il tempo che passa no.
+  const b = { feedbackId: 'f', branch: 'worker/f', atMs: 1, motivo: 'perché', titolo: 't' };
+  const conSalto = W.impronta({ pending: [r] }, { bocciature: [b] });
+  assert.notEqual(conSalto, W.impronta({ pending: [r] }, { bocciature: [] }));
+  assert.notEqual(conSalto, W.impronta({ pending: [r] }, { bocciature: [{ ...b, motivo: 'altro perché' }] }));
+  assert.notEqual(conSalto, W.impronta({ pending: [r] }, { bocciature: [b], oltre: true }));
+  assert.equal(W.impronta({ pending: [r] }, null), W.impronta({ pending: [r] }));
 });
 
 test('la risposta del server arriva alle card nella forma dell\'app', () => {

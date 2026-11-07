@@ -1,5 +1,5 @@
 // La riga che dice all'utente quale indirizzo Filo ha fermato per sicurezza e perché (#482). PURA, senza electron.
-// Non decide cosa fermare (lo fa isWebUnsafeNav in tabs.js) e non offre «Apri comunque»: qui non c'è niente da scavalcare.
+// Non decide cosa fermare (isWebUnsafeNav in tabs.js, navigazioneVersoFilo.js) e non offre «Apri comunque»: qui non c'è niente da scavalcare.
 // Prova: tests/unit/indirizzoFermato.test.mjs.
 
 // L'indirizzo lo può aver scritto una pagina o un modello: si accorcia in mezzo, così restano l'inizio e il nome del file.
@@ -31,6 +31,9 @@ function avvisoIndirizzoFermato(rawUrl) {
     if (u.hostname) testo = `Percorso di rete bloccato per sicurezza: ${accorciato(`//${u.hostname}${percorso}`)}`;
     else if (/\/$/.test(percorso)) testo = `Cartella del computer bloccata per sicurezza: ${accorciato(percorso)}`;
     else testo = `File del computer bloccato per sicurezza: ${accorciato(percorso)}`;
+  } else if (schema === 'filo:') {
+    // Lo ferma solo il confine fra i siti e Filo (#1506): le pagine di Filo restano raggiungibili dal suo menu.
+    testo = 'Un sito non può aprire le pagine di Filo';
   } else if (/^[a-z]:$/.test(schema)) {
     // «C:\Users\…» scritto così si legge come lo schema «c:»: è un percorso di Windows, e si mostra com'è.
     testo = `File del computer bloccato per sicurezza: ${accorciato(String(rawUrl).trim())}`;

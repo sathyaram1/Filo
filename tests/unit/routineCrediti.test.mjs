@@ -50,15 +50,49 @@ test('leggiNumeri: un numero assente è null, non zero', () => {
 test('rigaAccount: percentuale, limite, passo di oggi, rinnovo, e perché è fermo; un numero mancante è un trattino', () => {
   const rinnovo = new Date(2026, 9, 13, 19, 0).getTime();
   const riga = RC.rigaAccount('A', { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12.4, giornoDaMs: rinnovo - 24 * 3600e3 }, rinnovoAtMs: rinnovo, fermo: '' });
-  assert.match(riga, /^46,5% della settimana, limite 90% · oggi 3% su 12,4% · rinnova /);
-  assert.doesNotMatch(riga, /fermo/);
+  // Senza taratura dal server i dollari vengono dalla predefinita (2.150 $ per il 100%), anche quelli della quota di oggi.
+  assert.match(riga.replace(/ /g, ' '), /^46,5% della settimana \(≈ 1\.000 \$\), limite 90% · resta 43,5% \(≈ 935 \$\) · oggi 3% su 12,4% \(≈ 65 \$ su ≈ 267 \$\) · rinnova /);
+  assert.doesNotMatch(riga, /fermo|accensioni|ultime 24 ore|routine/, 'senza accensioni né spesa del giorno dal server non se ne inventano');
   assert.match(RC.rigaAccount('A', { pct: 91, limite: 90, fermo: 'riserva' }), /fermo: riserva raggiunta/);
   assert.match(RC.rigaAccount('B', { pct: 81, limite: 80, fermo: 'riserva' }), /fermo: tetto raggiunto/);
   assert.match(RC.rigaAccount('B', { pct: 20, passo: { spesoPct: 21, quotaPct: 20, giornoDaMs: rinnovo }, fermo: 'passo' }), /fermo fino a /);
   assert.match(RC.rigaAccount('B', { pct: 20, basseAperte: true }), /ultime 24 ore: priorità basse aperte/);
   const vuota = RC.rigaAccount('B', {});
   assert.match(vuota, /^–% della settimana|^– della settimana/);
-  assert.doesNotMatch(vuota, /0%/);
+  assert.doesNotMatch(vuota, /0%|resta|\$/);
+});
+
+// #1787: il manutentore e la scheda Crediti leggono la spesa anche in dollari, con quanto resta e le accensioni.
+const piana = (...a) => RC.rigaAccount(...a).replace(/\u00a0/g, ' ');
+test('rigaAccount: dollari della settimana e di quanto resta, ultime 24 ore e accensioni quando il server li dà', () => {
+  const riga = piana('A', { pct: 40, limite: 90, usdSettimana: 860, usd24h: 123.4, accensioniSettimana: 14, accensioni24h: 3 });
+  assert.match(riga, /^40% della settimana \(≈ 860 \$\), limite 90% · resta 50% \(≈ 1\.075 \$\) · ultime 24 ore ≈ 123 \$ · accensioni: 14 in settimana, 3 nelle ultime 24 ore · rinnova /);
+  // Settimana appena rinnovata: niente spesa da cui tarare, vale la taratura dell'owner.
+  assert.match(piana('B', { pct: 0, usdSettimana: 0 }, { usdPer100: 2000 }), /^0% della settimana \(≈ 0 \$\) · resta 100% \(≈ 2\.000 \$\)/);
+  assert.match(piana('B', { pct: 10 }, { usdPer100: 2150 }), /^10% della settimana \(≈ 215 \$\) · resta 90% \(≈ 1\.935 \$\)/);
+  // Oltre il limite non resta un numero negativo; un conteggio storto non compare.
+  assert.match(piana('B', { pct: 85, limite: 80, usdSettimana: 1700, accensioni24h: -2, accensioniSettimana: 'x' }), /resta 0% \(≈ 0 \$\)/);
+  assert.doesNotMatch(piana('B', { pct: 85, accensioni24h: -2, accensioniSettimana: 'x' }), /accensioni/);
+  assert.match(piana('A', { pct: 5, accensioni24h: 0 }), /accensioni: 0 nelle ultime 24 ore/);
+  assert.match(RC.rigaAccount('A', { pct: 40, usdSettimana: 860 }), /\(≈\u00a0860\u00a0\$\)/, 'una cifra non si spezza fra due righe');
+});
+
+// Verifica #1787 giro 1: la percentuale letta dalla barra conta anche le sessioni locali, i dollari solo le routine.
+test('rigaAccount: con una lettura vera i dollari vengono dalla taratura, quelli delle routine restano a parte', () => {
+  const riga = piana('A', { pct: 70, lettura: 70, taratura: 2150, limite: 90, usdSettimana: 1000 }, { usdPer100: 3000 });
+  assert.match(riga, /^70% della settimana \(≈ 1\.505 \$, routine ≈ 1\.000 \$\), limite 90% · resta 20% \(≈ 430 \$\)/,
+    'la taratura dell’account dal server vince sul numero passato');
+  assert.match(piana('A', { pct: 70, lettura: 70, usdSettimana: 1000 }, { usdPer100: 2000 }), /\(≈ 1\.400 \$, routine ≈ 1\.000 \$\).* resta 30% \(≈ 600 \$\)/);
+  // Una taratura assente, zero o storta non è un dollaro per punto: vale la predefinita.
+  for (const usdPer100 of [null, 0, -5, 'x', undefined]) assert.match(piana('B', { pct: 10 }, { usdPer100 }), /resta 90% \(≈ 1\.935 \$\)/);
+  assert.match(piana('B', { pct: 10, taratura: 0 }, { usdPer100: 2000 }), /resta 90% \(≈ 1\.800 \$\)/);
+});
+
+test('rigaAccount: la quota di oggi anche in dollari, quelli del server se ci sono', () => {
+  const passo = { spesoPct: 5, quotaPct: 10, spesoUsd: 107.5, quotaUsd: 215, giornoDaMs: 0 };
+  assert.match(piana('A', { pct: 40, passo }), /oggi 5% su 10% \(≈ 108 \$ su ≈ 215 \$\)/);
+  assert.match(piana('A', { pct: 40, passo: { spesoPct: 5, quotaPct: 10 } }, { usdPer100: 2000 }), /oggi 5% su 10% \(≈ 100 \$ su ≈ 200 \$\)/);
+  assert.doesNotMatch(piana('A', { pct: 40, passo: { quotaPct: 10 } }), /oggi – su 10% \(/, 'senza lo speso di oggi niente dollari a metà');
 });
 
 // ── La porta del main ────────────────────────────────────────────────────────
@@ -115,7 +149,7 @@ function chiama(msg) {
 
 const STATO = {
   ok: true, riserva: 'attivi', numeri: { riservaA: 10, usdPer100: 2150 },
-  accounts: { A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12 }, fermo: '', rinnovoAtMs: 1 }, B: { pct: 10, limite: null } },
+  accounts: { A: { pct: 46.5, limite: 90, passo: { spesoPct: 3, quotaPct: 12 }, fermo: '', rinnovoAtMs: 1, usdSettimana: 1000, usd24h: 80, accensioniSettimana: 9, accensioni24h: 2 }, B: { pct: 10, limite: null } },
   sessioni: [{ sessionId: 's1', costUsd: 3 }],
 };
 
@@ -126,6 +160,7 @@ test('lettura: op stato, alla pagina numeri, account e freni; le sessioni restan
   assert.deepEqual(ricevute[0].data, { op: 'stato' });
   assert.deepEqual(r.numeri, { riservaA: 10, tettoB: null, usdPer100: 2150, rinnovoA: null, rinnovoB: null });
   assert.equal(r.accounts.A.passo.quotaPct, 12);
+  assert.deepEqual([r.accounts.A.usdSettimana, r.accounts.A.usd24h, r.accounts.A.accensioniSettimana, r.accounts.A.accensioni24h], [1000, 80, 9, 2]);
   assert.equal(r.freni, 'attivi');
   assert.equal(r.sessioni, undefined);
 });

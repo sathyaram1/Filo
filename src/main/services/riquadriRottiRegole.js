@@ -17,49 +17,59 @@ const CHIEDE_COOKIE = new RegExp([
 ].join('|'), 'i');
 
 // Servizi che incorporano contenuti e, senza i loro cookie, mostrano un segnaposto riconoscibile. `segnaposto`
-// si aggiunge alla frase che chiede i cookie; i domini valgono anche per i sottodomini.
+// si aggiunge alla frase che chiede i cookie; i domini valgono anche per i sottodomini. `id` è quello che contano i
+// contatori (#1469), che ne tengono la copia: un servizio nuovo va anche lì.
 const SERVIZI = [
   {
+    id: 'instagram',
     nome: 'Instagram',
     domini: ['instagram.com', 'cdninstagram.com'],
     segnaposto: [/log ?in to (see|view|continue)|sign up to see|accedi per (vedere|continuare)|registrati per vedere/i],
   },
   {
+    id: 'x',
     nome: 'X',
     domini: ['twitter.com', 'x.com', 'twimg.com'],
     segnaposto: [/something went wrong, but don.t fret|qualcosa è andato storto|(log|sign) ?in to (x|twitter)|accedi a (x|twitter)/i],
   },
   {
+    id: 'tiktok',
     nome: 'TikTok',
     domini: ['tiktok.com', 'tiktokcdn.com'],
     segnaposto: [/log ?in to tiktok|accedi a tiktok/i],
   },
   {
+    id: 'facebook',
     nome: 'Facebook',
     domini: ['facebook.com', 'fbcdn.net'],
     segnaposto: [/you must log ?in to continue|devi accedere per continuare|log ?in to facebook|accedi a facebook/i],
   },
   {
+    id: 'spotify',
     nome: 'Spotify',
     domini: ['spotify.com'],
     segnaposto: [/log ?in to spotify|accedi a spotify|sign up to listen|registrati per ascoltare/i],
   },
   {
+    id: 'soundcloud',
     nome: 'SoundCloud',
     domini: ['soundcloud.com'],
     segnaposto: [/sign ?in to soundcloud|accedi a soundcloud/i],
   },
   {
+    id: 'vimeo',
     nome: 'Vimeo',
     domini: ['vimeo.com', 'vimeocdn.com'],
     segnaposto: [/log ?in to (watch|vimeo)|accedi per guardare|verify (that )?you.re (a )?human/i],
   },
   {
+    id: 'youtube',
     nome: 'YouTube',
     domini: ['youtube.com', 'youtube-nocookie.com'],
     segnaposto: [/sign in to confirm (that )?you.re not a bot|accedi per confermare che non sei un bot/i],
   },
   {
+    id: 'google-maps',
     nome: 'Google Maps',
     domini: ['google.com'],
     // Su google.com solo l'indirizzo delle mappe: il resto di Google non è questo servizio.
@@ -67,21 +77,25 @@ const SERVIZI = [
     segnaposto: [/sign in to (google|continue)|accedi (a google|per continuare)/i],
   },
   {
+    id: 'disqus',
     nome: 'Disqus',
     domini: ['disqus.com', 'disquscdn.com'],
     segnaposto: [/we were unable to load disqus|impossibile caricare disqus/i],
   },
   {
+    id: 'pinterest',
     nome: 'Pinterest',
     domini: ['pinterest.com', 'pinimg.com'],
     segnaposto: [/log ?in to (see|pinterest)|accedi a pinterest/i],
   },
   {
+    id: 'linkedin',
     nome: 'LinkedIn',
     domini: ['linkedin.com'],
     segnaposto: [/sign ?in to (view|linkedin)|accedi (a linkedin|per visualizzare)/i],
   },
   {
+    id: 'twitch',
     nome: 'Twitch',
     domini: ['twitch.tv'],
     segnaposto: [/log ?in to twitch|accedi a twitch/i],

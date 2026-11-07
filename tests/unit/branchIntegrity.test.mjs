@@ -26,7 +26,7 @@ import {
   readBranchState, writeBranchState,
   writeExpectation, readExpectation, clearExpectation, expectationFile,
   ensureSessionExcludes, SESSION_MARKERS,
-  sealCurrentWork, findStateIdByBranch,
+  sealCurrentWork, findStateIdByBranch, rigaDiErrore,
 } from '../../scripts/lib/branch-integrity.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
@@ -80,12 +80,13 @@ describe('A — nomi di branch unici per tentativo', () => {
     assert.ok(t2 > t1, 'i nomi devono ordinarsi come il tempo, per l’archeologia');
   });
 
-  test('un lavoro nuovo nasce sempre dalla linea principale (niente basi feature/N)', () => {
+  test('un lavoro nuovo nasce dalla linea principale o dal suo tentativo precedente (niente basi feature/N)', () => {
     // I sotto-feedback e il Modello B sono aboliti (SPEC-RIDISEGNO-MAX.md §1):
     // se preferredBase o le basi feature/* riappaiono, questo diventa rosso.
     const src = readFileSync(resolve(ROOT, 'scripts', 'dispatch.mjs'), 'utf8');
     assert.ok(!src.includes('preferredBase'), 'dispatch non deve più calcolare basi dal numero del feedback');
-    assert.match(src, /base: '',/, 'la base del branch di un lavoro nuovo è la linea principale');
+    assert.match(src, /base: precedenti\.scelto \? precedenti\.scelto\.ramo : '',/,
+      'la base di un lavoro nuovo è il tentativo precedente dello stesso feedback (#2152), se no la linea principale');
   });
 });
 
@@ -140,6 +141,59 @@ describe('A — posizionarsi sul branch (prepareBranch)', () => {
     git(work, ['branch', 'worker/gia-usato']);
     const r = prepareBranch({ root: work, branch: 'worker/gia-usato', create: true });
     assert.equal(r.ok, false, 'riusare un nome riporterebbe il guasto che il nome unico elimina');
+  });
+
+  // Il ramo del biglietto (#1632): il nome è già deciso, si riprende se c'è e nasce solo se non c'è da nessuna parte.
+  test('ramo del biglietto solo in locale: si riprende, non si rifà da main', () => {
+    const { work } = makeRepo();
+    git(work, ['checkout', '-q', '-b', 'worker/del-biglietto']);
+    const sha = commit(work, 'locale.txt', 'non spinto\n');
+    git(work, ['checkout', '-q', 'main']);
+    const r = prepareBranch({ root: work, branch: 'worker/del-biglietto', createIfMissing: true, checkpoint: sha });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.ripreso, true);
+    assert.equal(currentBranch(work), 'worker/del-biglietto');
+    assert.equal(r.head, sha);
+  });
+
+  test('ramo del biglietto con origin che non risponde: guasto temporaneo, niente ramo nato da main', () => {
+    const { work, base } = makeRepo();
+    git(work, ['remote', 'set-url', 'origin', resolve(base, 'non-esiste.git')]);
+    const r = prepareBranch({ root: work, branch: 'worker/del-biglietto', createIfMissing: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'transient', 'con la rete giù non si sa se il ramo c\'è: si riprova, non si rifà');
+    assert.equal(currentBranch(work), 'main');
+    assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
+  });
+
+  // Con origin muto la base sarebbe la linea principale dell'ultimo scaricamento, magari di giorni prima (#1779.1).
+  test('lavoro nuovo con origin che non risponde: guasto temporaneo, niente ramo nato da una main vecchia', () => {
+    const { work, base } = makeRepo();
+    git(work, ['remote', 'set-url', 'origin', resolve(base, 'non-esiste.git')]);
+    const branch = newWorkBranch('feed-muto');
+    const r = prepareBranch({ root: work, branch, create: true });
+    assert.equal(r.ok, false);
+    assert.equal(r.kind, 'transient');
+    assert.match(r.message, /main/);
+    assert.equal(currentBranch(work), 'main');
+    assert.equal(git(work, ['branch', '--list', 'worker/*']), '');
+  });
+
+  test('rigaDiErrore: la riga del motivo, senza credenziali, ricopiabile dentro --guasto "…"', () => {
+    const stderr = 'warning: redirecting\nfatal: unable to access \'https://x-access-token:segreto@github.com/o/r.git/\': Could not resolve host: github.com\n';
+    const riga = rigaDiErrore(stderr);
+    assert.match(riga, /^fatal: unable to access/);
+    assert.ok(!riga.includes('segreto'), riga);
+    assert.equal(rigaDiErrore('fatal: \'C:\\Users\\agenti AI\\o.git\' "x" `y` $z'), 'fatal: \'C:/Users/agenti AI/o.git\' \'x\' \'y\' \'z');
+    assert.equal(rigaDiErrore('\n\n', 'fetch fallito'), 'fetch fallito');
+  });
+
+  test('lavoro nuovo da una base che su origin non c\'è: si ripiega sulla linea principale come prima', () => {
+    const { work } = makeRepo();
+    const branch = newWorkBranch('feed-base');
+    const r = prepareBranch({ root: work, branch, create: true, base: 'feature/sparita' });
+    assert.equal(r.ok, true, r.message);
+    assert.equal(r.base, 'origin/main');
   });
 
   // Gli endpoint di fusione del server rifiutano già `main`; qui il controllo
@@ -342,10 +396,9 @@ describe('D — l’interruzione torna all’ultimo punto fermo', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', () => {
   // Lo scenario dell'incidente, per intero: new-work si posiziona (punto fermo
-  // = base), lavora, l'hook pusha, consegna via canale. Se la consegna NON
-  // sigilla, il posizionamento successivo nello stesso clone riporta il ramo
-  // alla base e parcheggia il lavoro su discarded/ — è quello che è successo a
-  // #502 (8 commit, 828 righe) e a #495.
+  // = base), lavora, l'hook pusha, consegna via canale. Un punto fermo rimasto
+  // alla base riportava il ramo lì e parcheggiava il lavoro su discarded/
+  // (#502: 8 commit, 828 righe; #495).
   function scenaConsegna() {
     const { work, origin } = makeRepo();
     const id = 'feed507';
@@ -364,13 +417,13 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     return { work, origin, id, branch, base, consegna };
   }
 
-  test('senza sigillo il posizionamento successivo SCARTA la consegna (il guasto)', () => {
+  test('anche senza sigillo la consegna spedita resta: un punto fermo più vecchio della punta è di un giro passato (D-207)', () => {
     const { work, id, branch, base, consegna } = scenaConsegna();
     const r = prepareBranch({ root: work, branch, checkpoint: lastCheckpoint(readBranchState(work, id)) });
     assert.equal(r.ok, true, r.message);
-    assert.equal(r.head, base, 'questo è il guasto documentato dal #507: la consegna sparisce');
-    assert.notEqual(r.head, consegna);
-    assert.ok(r.discarded, 'la consegna finisce parcheggiata su discarded/');
+    assert.equal(r.head, consegna, 'la punta pubblicata è l’ultima consegna: il guasto del #507 non torna');
+    assert.equal(r.superato, base, 'il punto fermo lasciato si dice');
+    assert.equal(r.discarded, null);
   });
 
   test('con il sigillo alla consegna il lavoro RESTA (la cura)', () => {
@@ -422,12 +475,13 @@ describe('D — il sigillo di fine giro (#507): la consegna non è un moncone', 
     assert.equal(r.discarded, null);
   });
 
-  test('l’interruzione riporta indietro anche origin: il punto fermo è antenato della punta pubblicata', () => {
-    const { work, origin, branch, base } = scenaConsegna();
+  test('un punto fermo antenato della punta pubblicata non riporta indietro né il ramo né origin', () => {
+    const { work, origin, branch, base, consegna } = scenaConsegna();
     const r = prepareBranch({ root: work, branch, checkpoint: base });
     assert.equal(r.ok, true, r.message);
-    assert.equal(r.rewritten, null, 'un moncone spedito dall’hook non è una riscrittura');
-    assert.equal(git(origin, ['rev-parse', `refs/heads/${branch}`]), base, 'origin torna al punto fermo come il ramo locale');
+    assert.equal(r.rewritten, null, 'una punta più avanti non è una riscrittura');
+    assert.equal(r.head, consegna);
+    assert.equal(git(origin, ['rev-parse', `refs/heads/${branch}`]), consegna, 'origin resta sull’ultima consegna');
   });
 });
 
@@ -655,7 +709,7 @@ describe('B — l’identità attesa esposta alla guardia', () => {
       let r;
       try {
         execFileSync(process.execPath, [resolve(ROOT, 'scripts', 'dispatch.mjs'), '--record-fixed', 'f12',
-          'Riallineato il ramo sopra main, risolto il conflitto nel file c, nessun altro cambiamento in questo giro.'],
+          'Riallineato il ramo sopra main, risolto il conflitto nel file c, nessun altro cambiamento in questo giro.', '--motivo', 'conflitto: c'],
         { encoding: 'utf8', env, stdio: ['ignore', 'pipe', 'pipe'] });
         assert.fail('durante il rebase la consegna deve essere rifiutata');
       } catch (e) {

@@ -219,16 +219,19 @@ test('i tasti laterali del mouse e lo scorrimento a due dita sono attaccati', ()
   assert.match(win, /'swipe'/, 'nessuno ascolta lo scorrimento a due dita (Mac)');
   // La direzione è quella delle dita: si spinge la pagina a destra per tornare
   // indietro. Invertirla manderebbe avanti chi voleva tornare.
-  assert.match(win, /direzione === 'right'\) tabs\.navigaCronologia\('indietro'\)/);
-  assert.match(win, /direzione === 'left'\) tabs\.navigaCronologia\('avanti'\)/);
+  assert.match(win, /direzione === 'right'\) naviga\('indietro'\)/);
+  assert.match(win, /direzione === 'left'\) naviga\('avanti'\)/);
+  // `naviga` è la stessa porta, contata come gli altri indietro e avanti (#1461).
+  assert.match(win, /const naviga = \(verso\) => [^\n]*tabs\.navigaCronologia\(verso\)/);
 });
 
 test('la barra dei menu del Mac chiama la stessa porta', () => {
   const menu = sorgente('src', 'main', 'menu.js');
   assert.match(menu, /label: 'Indietro'/);
   assert.match(menu, /label: 'Avanti'/);
-  assert.match(menu, /navigaCronologia\('indietro'/);
-  assert.match(menu, /navigaCronologia\('avanti'/);
+  assert.match(menu, /c\.tabs\.navigaCronologia\(verso, c\.tab\.id\)/);
+  assert.match(menu, /muovi\('indietro', ev\)/);
+  assert.match(menu, /muovi\('avanti', ev\)/);
   // Il nome del tasto non si scrive a mano nemmeno qui.
   assert.match(menu, /acceleratoreElectron/);
 });

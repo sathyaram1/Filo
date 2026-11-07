@@ -12,6 +12,8 @@
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
     Object.freeze({ id: 'fixer', nome: 'Correzione' }),
     Object.freeze({ id: 'secaudit', nome: 'Controllo cieco' }),
+    // Non è una fase di un cambio: è la regia (SPEC-MANUTENTORE § 1), ultima perché fuori da quell'ordine.
+    Object.freeze({ id: 'manutentore', nome: 'Manutentore' }),
   ]);
   const SCELTE = Object.freeze({
     model: Object.freeze([

@@ -27,14 +27,29 @@ function codiceMisuraRadice() {
     try { return (${globalThis.SN_CAMPI_SEGRETI.crea})(window, cartaValida).campiInVista(this); } catch (_) { return []; } }`;
 }
 
-// Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno.
+// Dove un riquadro mostra il suo documento, nel documento che lo ospita: dentro bordo e margine interno. `sx`/`sy`:
+// quanto la pagina lo disegna più grande o più piccolo (transform), e le misure di dentro vanno in quella scala.
+// `storto`: ruotato, inclinato o capovolto, e una scala non basta a riportarle (#1721, giro 3).
 function misuraRiquadro(el) {
   const r = el.getBoundingClientRect();
-  const cs = getComputedStyle(el);
+  const win = el.ownerDocument.defaultView;
+  const cs = win.getComputedStyle(el);
   const pl = parseFloat(cs.paddingLeft) || 0, pt = parseFloat(cs.paddingTop) || 0;
   const pr = parseFloat(cs.paddingRight) || 0, pb = parseFloat(cs.paddingBottom) || 0;
-  return { left: r.left + el.clientLeft + pl, top: r.top + el.clientTop + pt,
-    width: el.clientWidth - pl - pr, height: el.clientHeight - pt - pb };
+  const sx = el.offsetWidth > 0 ? r.width / el.offsetWidth : 1;
+  const sy = el.offsetHeight > 0 ? r.height / el.offsetHeight : 1;
+  let storto = false;
+  for (let n = el; n && n.nodeType === 1 && !storto; n = n.parentElement || (n.getRootNode() && n.getRootNode().host)) {
+    const s = win.getComputedStyle(n);
+    if ((s.rotate && s.rotate !== 'none') || (s.scale && /-/.test(s.scale))) { storto = true; break; }
+    if (!s.transform || s.transform === 'none') continue;
+    try {
+      const m = new DOMMatrixReadOnly(s.transform);
+      storto = !m.is2D || Math.abs(m.b) > 1e-6 || Math.abs(m.c) > 1e-6 || m.a <= 0 || m.d <= 0;
+    } catch (_) { storto = true; }
+  }
+  return { left: r.left + (el.clientLeft + pl) * sx, top: r.top + (el.clientTop + pt) * sy,
+    width: (el.clientWidth - pl - pr) * sx, height: (el.clientHeight - pt - pb) * sy, sx, sy, storto };
 }
 
 // Il riquadro che contiene `figlio`, misurato nel documento che lo ospita: il genitore riconosce il mittente di
@@ -73,30 +88,38 @@ function interseca(a, b) {
   return right > left && bottom > top ? { left, top, width: right - left, height: bottom - top } : null;
 }
 
-// Dai riquadri annidati alla pagina (`scatole` dal più interno): ogni livello sposta le coordinate e ritaglia quello
-// che il riquadro non mostra. Null se un livello non mostra niente.
+// Dai riquadri annidati alla pagina (`scatole` dal più interno): ogni livello sposta e scala le coordinate e ritaglia
+// quello che il riquadro non mostra. Null se un livello non mostra niente.
 function componi(scatole) {
-  let dx = 0, dy = 0;
+  let dx = 0, dy = 0, sx = 1, sy = 1;
   let vista = null;
   for (const box of scatole) {
+    const bx = box.sx == null ? 1 : Number(box.sx), by = box.sy == null ? 1 : Number(box.sy);
     const qui = { left: box.left, top: box.top, width: box.width, height: box.height };
-    vista = vista ? interseca({ ...vista, left: vista.left + box.left, top: vista.top + box.top }, qui) : qui;
-    dx += box.left;
-    dy += box.top;
+    vista = vista ? interseca({ left: box.left + vista.left * bx, top: box.top + vista.top * by,
+      width: vista.width * bx, height: vista.height * by }, qui) : qui;
+    dx = box.left + dx * bx;
+    dy = box.top + dy * by;
+    sx *= bx;
+    sy *= by;
     if (!vista) return null;
   }
-  return { dx, dy, vista };
+  return { dx, dy, sx, sy, vista };
 }
 
 function nellaPagina(campi, posa) {
+  const sx = posa.sx == null ? 1 : posa.sx, sy = posa.sy == null ? 1 : posa.sy;
   const out = [];
   for (const c of campi) {
-    const spostato = { left: c.left + posa.dx, top: c.top + posa.dy, width: c.width, height: c.height };
+    const spostato = { left: posa.dx + c.left * sx, top: posa.dy + c.top * sy, width: c.width * sx, height: c.height * sy };
     const r = posa.vista ? interseca(spostato, posa.vista) : spostato;
     if (r) out.push({ ...c, ...r });
   }
   return out;
 }
+
+// Un riquadro ruotato o capovolto nella catena: i campi di dentro non si sanno mettere al posto giusto.
+const storta = (scatole) => scatole.some((b) => b && b.storto);
 
 // `{ campi, nonCoperti }`: `nonCoperti` quando un riquadro ha campi segreti ma non si è riusciti a ritrovarlo nella
 // pagina, e l'immagine non deve partire.
@@ -117,6 +140,7 @@ async function campiSegretiNeiRiquadri(webContents) {
       if (!box) { nonCoperti = true; return; }
       scatole.push(box);
     }
+    if (storta(scatole)) { nonCoperti = true; return; }
     const posa = componi(scatole);
     if (posa) campi.push(...nellaPagina(dentro, posa));
   }));
@@ -141,41 +165,125 @@ function radiciChiuse(radice) {
   return { chiuse, riquadri };
 }
 
-// L'albero intero di una pagina grande costa secondi e ferma Filo: si legge solo se la ricerca del protocollo, che
-// entra anche nei componenti chiusi, trova più campi di quanti ne vedano gli script della pagina. Nel dubbio si legge.
-const CAMPI_VISIBILI = `(function () {
-  var n = 0;
-  function radice(r, prof) {
-    n += r.querySelectorAll('input, textarea').length;
-    if (prof > 30) return;
-    var tutti = r.querySelectorAll('*');
-    for (var i = 0; i < tutti.length; i++) if (tutti[i].shadowRoot) radice(tutti[i].shadowRoot, prof + 1);
-  }
-  function finestra(w, prof) {
-    radice(w.document, 0);
-    for (var i = 0; prof < 12 && i < w.frames.length; i++) {
-      var f = w.frames[i];
-      try { if (!f.document) continue; } catch (e) { continue; }
-      finestra(f, prof + 1);
+// I nomi dei campi delle regole comuni: la ricerca e il conto degli script non ne tengono una copia loro.
+let nomi = null;
+function nomiDeiCampi() {
+  if (!nomi) nomi = globalThis.SN_CAMPI_SEGRETI.crea({}, () => false).NOMI_DEI_CAMPI;
+  return nomi;
+}
+
+// L'albero intero di una pagina grande ferma Filo per secondi: si legge solo per un campo segreto compilato in un
+// componente chiuso (#810.18). Prima, a costo fisso, i risultati della ricerca del protocollo contro quelli che gli
+// script di ogni riquadro sanno contare con le sue regole.
+const codiceConta = () => `(function () {
+  var nomi = ${JSON.stringify(nomiDeiCampi())}, n = 0;
+  function conta(nodo) {
+    var t = nodo.nodeType;
+    if (t === 3 || t === 4 || t === 8) {
+      var d = nodo.data;
+      if (d.indexOf('<') < 0) return;
+      d = d.toLowerCase();
+      for (var i = 0; i < nomi.length; i++) if (d.indexOf('<' + nomi[i] + '>') >= 0) n++;
+      return;
+    }
+    if (t !== 1) return;
+    var nome = nodo.nodeName.toLowerCase(), at = nodo.attributes;
+    for (var j = 0; j < nomi.length; j++) {
+      if (nome === nomi[j]) { n++; continue; }
+      for (var k = 0; k < at.length; k++) if (at[k].value.toLowerCase().indexOf('<' + nomi[j] + '>') >= 0) { n++; break; }
     }
   }
-  finestra(window, 0);
+  function giro(radice) {
+    var w = document.createTreeWalker(radice, 1 | 4 | 8 | 128);
+    for (var nodo = w.currentNode; nodo; nodo = w.nextNode()) {
+      conta(nodo);
+      if (nodo.nodeType === 1 && nodo.shadowRoot) giro(nodo.shadowRoot);
+    }
+  }
+  if (document.documentElement) giro(document.documentElement);
   return n;
 })()`;
-async function campoInUnChiuso(cmd, sid) {
+
+async function quantiVistiDagliScript(webContents) {
+  let cornici = [];
+  try { cornici = webContents.mainFrame.framesInSubtree.filter((f) => f === webContents.mainFrame || riquadroArrivato(f)); } catch (_) {}
+  const codice = codiceConta();
+  const conti = await Promise.all(cornici.map((f) => entro(f.executeJavaScript(codice), ATTESA_MS)));
+  return conti.every(Number.isFinite) ? conti.reduce((s, c) => s + c, 0) : null;
+}
+
+// Null se la ricerca non risponde: nel dubbio si guardano i componenti chiusi.
+async function quantiTrovaLaRicerca(cmd, sid) {
   try {
     await cmd('DOM.getDocument', { depth: 0 }, sid);
-    let trovati = 0;
-    for (const query of ['<input>', '<textarea>']) {
-      const { searchId, resultCount } = await cmd('DOM.performSearch', { query, includeUserAgentShadowDOM: false }, sid);
+    let n = 0;
+    for (const nome of nomiDeiCampi()) {
+      const { searchId, resultCount } = await cmd('DOM.performSearch', { query: `<${nome}>`, includeUserAgentShadowDOM: false }, sid);
       cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {});
-      trovati += resultCount;
+      n += resultCount;
     }
-    if (!trovati) return false;
-    const { result } = await cmd('Runtime.evaluate', { expression: CAMPI_VISIBILI, returnByValue: true }, sid);
-    return !(result && result.value === trovati);
+    return n;
+  } catch (_) { return null; }
+}
+
+// Una sessione d'ispezione per ogni radice locale dei riquadri: con una in meno, i campi che gli script vedono lì
+// compenserebbero un campo chiuso altrove.
+function radiciLocali(webContents) {
+  try {
+    return webContents.mainFrame.framesInSubtree
+      .filter((f) => f === webContents.mainFrame || (f.parent && f.parent.processId !== f.processId)).length;
+  } catch (_) { return Infinity; }
+}
+
+// I conti tornano solo se coincidono esattamente, con la ricerca rifatta dopo gli script: una pagina che toglie un
+// campo fra un conto e l'altro farebbe sparire un campo chiuso (#810.18).
+async function contiTornano(webContents, cmd, sessioni, prima) {
+  if (prima.includes(null) || sessioni.length < radiciLocali(webContents)) return false;
+  const visti = await quantiVistiDagliScript(webContents);
+  if (visti === null) return false;
+  const dopo = await Promise.all(sessioni.map((s) => quantiTrovaLaRicerca(cmd, s.sid)));
+  const somma = (l) => l.reduce((a, b) => a + b, 0);
+  return !dopo.includes(null) && somma(prima) === visti && somma(dopo) === visti;
+}
+
+// Quando i conti non tornano: la strada verso ogni risultato della ricerca passa dai componenti chiusi che lo
+// contengono, e il protocollo la manda da sé. Si misurano quei componenti, non i campi uno per uno.
+async function chiusiConSegreti(dbg, cmd, sid) {
+  const chiuse = new Set();
+  const raccogli = (n) => {
+    if (!n) return;
+    if (n.shadowRootType === 'closed') chiuse.add(n.nodeId);
+    for (const f of n.children || []) raccogli(f);
+    for (const f of n.shadowRoots || []) raccogli(f);
+    raccogli(n.contentDocument);
+  };
+  const suEvento = (_e, metodo, p, sessione) => {
+    if ((sessione || '') !== sid || !p) return;
+    if (metodo === 'DOM.setChildNodes') (p.nodes || []).forEach(raccogli);
+    else if (metodo === 'DOM.shadowRootPushed') raccogli(p.root);
+  };
+  const gruppo = 'filo-campi-cerca';
+  dbg.on('message', suEvento);
+  try {
+    await cmd('DOM.getDocument', { depth: 0 }, sid);
+    for (const nome of nomiDeiCampi()) {
+      const { searchId, resultCount } = await cmd('DOM.performSearch', { query: `<${nome}>`, includeUserAgentShadowDOM: false }, sid);
+      try { if (resultCount) await cmd('DOM.getSearchResults', { searchId, fromIndex: 0, toIndex: resultCount }, sid); }
+      finally { cmd('DOM.discardSearchResults', { searchId }, sid).catch(() => {}); }
+    }
+    const radice = codiceMisuraRadice();
+    const esiti = await Promise.all([...chiuse].map(async (nodeId) => {
+      const { object } = await cmd('DOM.resolveNode', { nodeId, objectGroup: gruppo }, sid);
+      const { result } = await cmd('Runtime.callFunctionOn',
+        { objectId: object.objectId, functionDeclaration: radice, returnByValue: true }, sid);
+      return !(result && Array.isArray(result.value) && !result.value.length);
+    }));
+    return esiti.some(Boolean);
   } catch (_) {
     return true;
+  } finally {
+    dbg.removeListener('message', suEvento);
+    cmd('Runtime.releaseObjectGroup', { objectGroup: gruppo }, sid).catch(() => {});
   }
 }
 
@@ -206,7 +314,10 @@ async function misuraComponentiChiusi(webContents) {
   try {
     attese.push(segui(''));
     while (attese.length) await Promise.all(attese.splice(0));
-    const conCampi = await Promise.all(sessioni.map((s) => campoInUnChiuso(cmd, s.sid)));
+    const trovati = await Promise.all(sessioni.map((s) => quantiTrovaLaRicerca(cmd, s.sid)));
+    if (trovati.every((n) => n === 0)) return { campi: [], nonCoperti: false };
+    if (await contiTornano(webContents, cmd, sessioni, trovati)) return { campi: [], nonCoperti: false };
+    const conCampi = await Promise.all(sessioni.map((s) => chiusiConSegreti(dbg, cmd, s.sid)));
     if (!conCampi.some(Boolean)) return { campi: [], nonCoperti: false };
     const alberi = await Promise.all(sessioni.map(async (s) => {
       try { return { ...s, ...radiciChiuse((await cmd('DOM.getDocument', { depth: -1, pierce: true }, s.sid)).root) }; }
@@ -245,7 +356,7 @@ async function misuraComponentiChiusi(webContents) {
       const dentro = await chiama(albero.sid, id, radice);
       if (!Array.isArray(dentro) || !dentro.length) return;
       const lista = await scatole(albero, catena);
-      if (!lista) { nonCoperti = true; return; }
+      if (!lista || storta(lista)) { nonCoperti = true; return; }
       const posa = componi(lista);
       if (posa) campi.push(...nellaPagina(dentro, posa));
     })));
@@ -272,4 +383,7 @@ async function campiSegretiFuoriPagina(webContents) {
   return { campi: riquadri.campi.concat(chiusi.campi), nonCoperti: riquadri.nonCoperti || chiusi.nonCoperti };
 }
 
-module.exports = { campiSegretiFuoriPagina, campiSegretiNeiRiquadri, campiSegretiNeiComponentiChiusi, codiceMisura, radiciChiuse, componi };
+module.exports = {
+  campiSegretiFuoriPagina, campiSegretiNeiRiquadri, campiSegretiNeiComponentiChiusi, codiceMisura, radiciChiuse, componi,
+  misuraRiquadro, interseca,
+};

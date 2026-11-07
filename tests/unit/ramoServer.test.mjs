@@ -8,7 +8,8 @@ import { execFileSync, spawnSync } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cartellaTemporanea } from '../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
+import { cartellaConsegna } from '../../scripts/lib/consegna-file.mjs';
 import { avviaConfigRoutinesFinto } from '../helpers/server-finto.mjs';
 import {
   checkoutDelRamo, confrontaServer, soloFusioniPulite, statoRamoServer, testoServerMossoDallAvvio,
@@ -16,6 +17,7 @@ import {
 import { perimetroNote } from '../../scripts/lib/verifier-scope.mjs';
 import { sessione } from '../../scripts/owner-feedback.mjs';
 import { PULITO } from '../helpers/bigliettoFinto.mjs';
+import { faiLaLettura } from '../helpers/letturaDiff.mjs';
 
 // Una sessione col biglietto pulito: la nota su un fidato da una sessione sporca ha le sue prove in notaTogliFiducia.test.mjs.
 sessione.biglietto = async () => PULITO;
@@ -154,6 +156,7 @@ function scenario() {
 }
 
 function vl(work, ...args) {
+  if (args[0] === 'critica') faiLaLettura(work);
   const r = spawnSync(process.execPath, [VERIFY, ...args], {
     cwd: work, encoding: 'utf8',
     env: { ...process.env, FILO_REPO_ROOT: work, FILO_ROUTINE_CONFIG_URL: FINTO, FILO_ADMIN_ID_TOKEN: 'finto-id-token' },
@@ -170,6 +173,18 @@ function verificato(sc) {
   assert.equal(c.code, 0, c.out);
   assert.match(c.out, /verifica superata per 'claude\/prova' su [0-9a-f]{8} e il server claude\/prova su [0-9a-f]{8}/);
 }
+
+test('#2049: in locale la lettura del diff legge anche il ramo omonimo del server, con le sue prove', (t) => {
+  const sc = scenario();
+  t.after(() => togliCartella(sc.base));
+  t.after(() => togliCartella(cartellaConsegna(sc.work)));
+  commit(sc.server, 'functions/test/lavoro.test.js', "test('il lavoro del server regge', () => {});\n", 'prova del server');
+  assert.equal(vl(sc.work, 'start', 'fai X su app e server').code, 0);
+  const r = faiLaLettura(sc.work);
+  assert.equal(r.status, 0, r.stderr);
+  assert.match(r.stdout, /## Il diff del server\n\nQuesto è un lavoro server\. Il ramo `claude\/prova` di filo-security/);
+  assert.match(r.stdout, /## Le prove del server contate[\s\S]*prove aggiunte 1 \(unit 1, spec 0\)[\s\S]*Codice cambiato fuori da functions\/test\/: 1 file[\s\S]*- functions\/lavoro\.js/);
+});
 
 test('#715: una correzione fatta solo sul ramo del server non passa per «verifica superata»', () => {
   const sc = scenario();
@@ -358,6 +373,7 @@ async function fondi(sc, radice, primaDelServer = () => {}, argv = [RAMO, '--fee
       env: {}, radice, funzioni: join(sc.server, 'functions'), bearer: 'finto', base: FIRESTORE_BASE, ramiAperti: () => [],
       // Un lavoro locale di prima del registro dei rami (#1159): vale la verifica, come qui si prova.
       lavoroDelRamo: async () => ({ ok: true, registro: false, lavoroFidato: false, attesa: '' }),
+      registraMain: async () => ({ outcome: 'registrato' }),
       log: (x) => righe.push(String(x)), err: (x) => righe.push(String(x)),
       lancia: (_cartella, args) => {
         primaDelServer();

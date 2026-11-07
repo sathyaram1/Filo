@@ -247,6 +247,7 @@ module.exports = function register(on, ctx) {
   }
   async function leggiStato(piuNuova = () => true) {
     const own = await ownKey();
+    await loadQueue().catch(() => {});
     const out = {
       ok: true, identity: { ok: false }, hasPersonalKey: Boolean(walletStore.personalKey()), pseudonym: walletStore.pseudonym(),
       usingOwnKey: Boolean(own), keySource: await keySource(), isOwner: Boolean(ctx.isAdmin()), server: null,
@@ -284,6 +285,7 @@ module.exports = function register(on, ctx) {
         }
         if (out.hasPersonalKey) walletStore.saveLastServer({ ...out.server, readAt: new Date().toISOString() });
       }
+      out.chiaveStaccata = chiaveStaccata(out);
     } catch (e) {
       out.error = /callable \w+ 5\d\d|fetch failed|ENOTFOUND|ECONN/i.test(String(e?.message || e)) ? 'not_reachable' : String(e?.message || e);
       // Server muto ma chiave personale qui: si mostra l'ultimo stato letto, dichiarato vecchio.
@@ -294,6 +296,14 @@ module.exports = function register(on, ctx) {
       }
     }
     return out;
+  }
+
+  // La chiave personale qui non è del portafoglio che il server lega a questa identità (#1601): ogni riga
+  // del registro firmata con lo pseudonimo locale la regola la rifiuta, e la pagina Crediti lo dice.
+  function chiaveStaccata({ hasPersonalKey, pseudonym, server }) {
+    if (!hasPersonalKey || !server) return '';
+    if (!server.hasWallet) return server.configured === false ? '' : 'senza_portafoglio';
+    return server.pseudonym && pseudonym && server.pseudonym !== pseudonym ? 'altro_pseudonimo' : '';
   }
 
   // Questa installazione ha un portafoglio (#816): i crediti veri li tiene il
@@ -381,12 +391,13 @@ module.exports = function register(on, ctx) {
     if (!msg || msg.confermato !== true) return { ok: false, status: 'needs_confirm' };
     identity.resetIdentity();
     walletStore.metteDaParte();
+    const righeTolte = await svuotaCodaPerRicominciare();
     lastServer = null;
     ultimaLettura = null;
     letturaValida = letturePartite;
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
     rinfrescaHome();
-    return { ok: true, state: await readState() };
+    return { ok: true, righeTolte, state: await readState() };
   }));
 
   // L'identità dell'installazione che non si crea è un problema diverso da «il server non
@@ -403,7 +414,13 @@ module.exports = function register(on, ctx) {
   // caratteri sul campo, niente taglio: o dentro c'è un codice, o si dice.
   // La lettura è lineare (#664): qui gira nel main, e un conto lento ferma
   // tutte le schede.
+  // L'esito di ogni riscatto, da qualunque strada, lo contano i contatori del servizio (#1472): lo status, mai il codice.
   async function doRedeem(rawCode) {
+    const out = await riscatta(rawCode);
+    require('../contatoriServizio').misura('invito', (out && out.status) || 'internal');
+    return out;
+  }
+  async function riscatta(rawCode) {
     const codes = W.codesFromInput(rawCode || '');
     if (!codes.length) return { ok: false, status: 'bad_code', message: W.redeemMessage('bad_code') };
     const idErr = await identityProblem();
@@ -601,6 +618,7 @@ module.exports = function register(on, ctx) {
   async function riscattaInvito(code) {
     if (walletStore.personalKey()) {
       const rec = await setNotice('already_in', 'Hai già i crediti di Filo su questo computer. Questo invito puoi darlo a qualcun altro.');
+      require('../contatoriServizio').misura('invito', 'already_in');
       return { ok: false, status: 'already_in', message: rec.text };
     }
     const out = await doRedeem(code);
@@ -619,7 +637,13 @@ module.exports = function register(on, ctx) {
   function portaDentroInvito(code, win) {
     // Il portafoglio è dell'installazione: da una finestra incognito si scrive sul disco lo stesso.
     Disco.runNormale(() => redeemFromInvite(code)).catch(() => {});
-    try { win?._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+    // Una finestra appena nata (avvio, o rinata da fuori) riapre ancora le sue schede: Crediti dopo, o finisce dietro (#2191).
+    let pronta;
+    try { pronta = require('../../window').quandoPronta(win); } catch (_) { pronta = Promise.resolve(win ? {} : null); }
+    Promise.resolve(pronta).then((ok) => {
+      if (!ok || !win || win.isDestroyed()) return;
+      try { win._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
+    }).catch(() => {});
   }
 
   // Un collegamento d'invito cliccato davvero in una pagina, o «Riscatta
@@ -755,6 +779,12 @@ module.exports = function register(on, ctx) {
   on(MSG.WALLET_OWNER_USER_DETAIL, ownerOnly(async (msg) => ({
     detail: await callable('walletUserDetail', { pseudonym: String((msg && msg.pseudonym) || '') }, { asOwner: true }),
   })));
+  on(MSG.WALLET_OWNER_OFF_POLICY_SEEN, ownerOnly(async (msg) => {
+    const shown = Array.isArray(msg && msg.shown) ? msg.shown : [];
+    const result = await callable('walletAckOffPolicy', { pseudonym: String((msg && msg.pseudonym) || ''), shown }, { asOwner: true });
+    vistaLetta = null;
+    return { result };
+  }));
 
   // Le manopole dei crediti (#652). Non passano da una callable: `config/credits`
   // è un documento che l'account admin scrive direttamente, come già fa per i
@@ -775,10 +805,10 @@ module.exports = function register(on, ctx) {
   // ── Registro d'uso ────────────────────────────────────────────────────────
   // Le righe si accodano e si scrivono a gruppi (una commit Firestore ogni
   // pochi secondi): una chat con strumenti fa più chiamate al turno, e una
-  // scrittura per chiamata sarebbe rumore. Se la scrittura fallisce si
-  // ritenta al giro dopo; la coda non cresce oltre un tetto largo, e oltre si
-  // perde il più vecchio dicendolo nel log (una riga persa la trova la
-  // riconciliazione, non è un segreto).
+  // scrittura per chiamata sarebbe rumore. Un guasto passeggero si ritenta al
+  // giro dopo; una riga che il server rifiuta esce dalla coda (#1601). Ogni
+  // riga che esce senza arrivare, anche oltre il tetto largo della coda, si
+  // conta per motivo (`scarta`).
   //
   // La coda sta anche su disco (#629): le righe ancora da scrivere alla
   // chiusura di Filo ripartono all'avvio dopo, invece di sparire con il
@@ -788,23 +818,91 @@ module.exports = function register(on, ctx) {
   const queue = [];
   const QUEUE_CAP = 2000;
   const QUEUE_KEY = 'walletUsageQueue';
+  // Il conto delle righe scartate sta su disco: lo scarto avviene di solito appena dopo l'avvio, e chi apre Crediti
+  // dopo un riavvio deve trovarlo ancora (#1601).
+  const SCARTI_KEY = 'walletUsageLog';
   let flushTimer = null;
   let flushing = false;
-  let queueLoaded = false;
-  const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null };
+  let caricamentoCoda = null;
+  let scartiLetti = false;
+  // Cresce a ogni «Ricomincia»: un invio partito prima non rimette in coda le righe dell'identità di prima.
+  let generazioneCoda = 0;
+  const log = { written: 0, lastWriteAt: null, lastError: '', lastErrorAt: null, discardedBy: {}, lastDiscardReason: '', lastDiscardAt: null };
 
   function usageLogStatus() {
-    return { pending: queue.length, written: log.written, lastWriteAt: log.lastWriteAt, lastError: log.lastError, lastErrorAt: log.lastErrorAt };
+    const discarded = Object.values(log.discardedBy).reduce((s, n) => s + n, 0);
+    return {
+      pending: queue.length, written: log.written, lastWriteAt: log.lastWriteAt, lastError: log.lastError, lastErrorAt: log.lastErrorAt,
+      discarded, discardedBy: { ...log.discardedBy }, lastDiscardReason: log.lastDiscardReason, lastDiscardAt: log.lastDiscardAt,
+    };
   }
 
-  async function loadQueue() {
-    if (queueLoaded) return;
-    queueLoaded = true;
+  // Nessuna riga esce dalla coda senza dirlo: conta per motivo, la pagina Crediti lo mostra.
+  function scarta(n, motivo, dettaglio = '') {
+    if (!n) return;
+    log.discardedBy[motivo] = (log.discardedBy[motivo] || 0) + n;
+    log.lastDiscardReason = dettaglio || motivo;
+    log.lastDiscardAt = new Date().toISOString();
+    console.warn(`[wallet] registro d'uso: ${n} righe tolte dalla coda (${motivo})${dettaglio ? `: ${dettaglio}` : ''}`);
+    if (scartiLetti) salvaScarti();
+  }
+
+  function salvaScarti() {
+    const { discardedBy, lastDiscardReason, lastDiscardAt } = log;
+    const dato = Object.keys(discardedBy).length ? { discardedBy: { ...discardedBy }, lastDiscardReason, lastDiscardAt } : null;
+    try { Promise.resolve(globalThis.SN_STORAGE.setRaw(SCARTI_KEY, dato)).catch(() => {}); } catch (_) {}
+  }
+
+  // Si sommano a quelli scartati prima della lettura, che altrimenti la lettura cancellerebbe.
+  async function leggiScarti() {
+    let dato = null;
+    try { dato = await globalThis.SN_STORAGE.getRaw(SCARTI_KEY, null); } catch (_) {}
+    const prima = Object.keys(log.discardedBy).length > 0;
+    if (dato && dato.discardedBy && typeof dato.discardedBy === 'object') {
+      for (const [m, v] of Object.entries(dato.discardedBy)) {
+        const n = Math.max(0, Math.floor(Number(v) || 0));
+        if (n) log.discardedBy[m] = (log.discardedBy[m] || 0) + n;
+      }
+      if (!log.lastDiscardAt) {
+        log.lastDiscardReason = String(dato.lastDiscardReason || '');
+        log.lastDiscardAt = dato.lastDiscardAt || null;
+      }
+    }
+    scartiLetti = true;
+    if (prima) salvaScarti();
+  }
+
+  function tagliaCoda() {
+    if (queue.length <= QUEUE_CAP) return;
+    scarta(queue.length - QUEUE_CAP, 'coda_piena', `oltre ${QUEUE_CAP} righe, le più vecchie`);
+    queue.splice(0, queue.length - QUEUE_CAP);
+  }
+
+  // Le righe firmate con lo pseudonimo di un'altra identità la regola non le prende mai. Senza pseudonimo
+  // attuale (portafoglio che non si legge adesso) non si giudica: decide il server.
+  function togliAltreIdentita() {
+    const mio = walletStore.pseudonym();
+    if (!mio) return;
+    const prima = queue.length;
+    for (let i = queue.length - 1; i >= 0; i--) if (queue[i].pseudonym !== mio) queue.splice(i, 1);
+    scarta(prima - queue.length, 'altra_identita');
+  }
+
+  // Chi arriva mentre la lettura è in corso la aspetta: la pagina Crediti non deve vedere coda e conto ancora vuoti.
+  function loadQueue() {
+    if (!caricamentoCoda) caricamentoCoda = caricaCoda();
+    return caricamentoCoda;
+  }
+
+  async function caricaCoda() {
+    await leggiScarti();
     try {
       const saved = await globalThis.SN_STORAGE.getRaw(QUEUE_KEY, null);
       if (Array.isArray(saved) && saved.length) {
         queue.unshift(...saved.filter((r) => r && r.pseudonym));
-        if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+        togliAltreIdentita();
+        tagliaCoda();
+        if (queue.length !== saved.length) await saveQueue();
         if (queue.length) scheduleFlush(5000);
       }
     } catch (_) {}
@@ -814,45 +912,80 @@ module.exports = function register(on, ctx) {
     try { await globalThis.SN_STORAGE.setRaw(QUEUE_KEY, queue.length ? queue.slice() : null); } catch (_) {}
   }
 
+  async function commitRighe(righe) {
+    const idToken = await identity.getIdToken();
+    const writes = righe.map((row) => ({
+      update: {
+        name: `${FB.rest.FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/wallet-usage/${newId()}`,
+        fields: Object.fromEntries(Object.entries(row).map(([k, v]) => [k, FB.toFsValue(v)])),
+      },
+      currentDocument: { exists: false },
+    }));
+    const res = await fetch(`${FB.rest.FIRESTORE_BASE}:commit?key=${FB.rest.API_KEY}`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ writes }),
+    });
+    if (res.ok) return { ok: true };
+    const testo = await res.text().catch(() => '');
+    const motivo = `wallet-usage commit ${res.status}: ${testo.slice(0, 200)}`;
+    if (W.rifiutoDellaRigaUso(res.status, testo)) return { ok: false, motivo };
+    throw new Error(motivo);
+  }
+
   async function flush() {
     flushTimer = null;
     if (flushing || !queue.length || !FB?.rest) return;
     flushing = true;
+    const generazione = generazioneCoda;
+    togliAltreIdentita();
     const batch = queue.splice(0, 200);
     try {
-      const idToken = await identity.getIdToken();
-      const writes = batch.map((row) => ({
-        update: {
-          name: `${FB.rest.FIRESTORE_BASE.replace(/^https:\/\/firestore\.googleapis\.com\/v1\//, '')}/wallet-usage/${newId()}`,
-          fields: Object.fromEntries(Object.entries(row).map(([k, v]) => [k, FB.toFsValue(v)])),
-        },
-        currentDocument: { exists: false },
-      }));
-      const res = await fetch(`${FB.rest.FIRESTORE_BASE}:commit?key=${FB.rest.API_KEY}`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${idToken}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ writes }),
-      });
-      if (!res.ok) throw new Error(`wallet-usage commit ${res.status}: ${(await res.text().catch(() => '')).slice(0, 200)}`);
-      log.written += batch.length;
-      log.lastWriteAt = new Date().toISOString();
-      log.lastError = '';
-      log.lastErrorAt = null;
-    } catch (e) {
-      log.lastError = String(e?.message || e);
-      log.lastErrorAt = new Date().toISOString();
-      console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
-      queue.unshift(...batch);
-      if (queue.length > QUEUE_CAP) {
-        console.warn(`[wallet] registro d'uso: coda oltre ${QUEUE_CAP} righe, scarto le più vecchie`);
-        queue.splice(0, queue.length - QUEUE_CAP);
+      if (!batch.length) return;
+      const esito = await W.scriviIsolando(batch, commitRighe);
+      if (esito.scritte.length) {
+        log.written += esito.scritte.length;
+        log.lastWriteAt = new Date().toISOString();
       }
-      scheduleFlush(30000);
+      if (esito.rifiutate.length) scarta(esito.rifiutate.length, 'rifiutata', esito.rifiutate[esito.rifiutate.length - 1].motivo);
+      if (!esito.errore) {
+        log.lastError = '';
+        log.lastErrorAt = null;
+        return;
+      }
+      ritenta(esito.errore, esito.rimaste, generazione);
+    } catch (e) {
+      // Prima di ogni invio (scriviIsolando non lancia): il lotto torna intero.
+      ritenta(e, batch, generazione);
     } finally {
       flushing = false;
       await saveQueue();
       if (queue.length && !flushTimer) scheduleFlush(5000);
     }
+  }
+
+  function ritenta(errore, rimaste, generazione) {
+    log.lastError = String(errore?.message || errore);
+    log.lastErrorAt = new Date().toISOString();
+    if (generazione !== generazioneCoda) {
+      scarta(rimaste.length, 'ricomincia');
+      return;
+    }
+    console.warn('[wallet] registro d\'uso non scritto, ritento:', log.lastError);
+    queue.unshift(...rimaste);
+    tagliaCoda();
+    scheduleFlush(30000);
+  }
+
+  // «Ricomincia con un nuovo invito»: le righe in coda sono del portafoglio che si lascia, e nessuna passerebbe più.
+  async function svuotaCodaPerRicominciare() {
+    await loadQueue();
+    generazioneCoda += 1;
+    const n = queue.length;
+    queue.length = 0;
+    scarta(n, 'ricomincia');
+    await saveQueue();
+    return n;
   }
 
   function scheduleFlush(ms) {
@@ -889,7 +1022,7 @@ module.exports = function register(on, ctx) {
     if (!row) return;
     try { globalThis.SN_AVVISO_CREDITI_MAIN?.registraConsumo({ action, credits: row.credits, usage }); } catch (_) {}
     queue.push(row);
-    if (queue.length > QUEUE_CAP) queue.splice(0, queue.length - QUEUE_CAP);
+    tagliaCoda();
     await saveQueue();
     scheduleFlush(3000);
   }
@@ -940,6 +1073,8 @@ module.exports = function register(on, ctx) {
     lastNoticeAt = now;
     // L'avviso nomina la pagina Crediti: porta il tasto per andarci, come ogni frase sui crediti (#663).
     try { broadcastToTabs({ type: MSG.SHOW_TOAST, text: text.charAt(0).toUpperCase() + text.slice(1), duration: 8000, rimedio: { keyRefused: true } }); } catch (_) {}
+    try { globalThis.SN_CONTATORI_MAIN?.erroreVisto('avviso:crediti_finiti'); } catch (_) {}
+    require('../contatoriServizio').misura('avviso', 'finiti', 'mostrato');
     try { broadcastToFiloPages({ type: MSG.CREDITS_CHANGED }); } catch (_) {}
   }
 
@@ -974,6 +1109,15 @@ module.exports = function register(on, ctx) {
     senzaRipiego, conRipiegoDetto,
     // Solo per i test (NODE_ENV=test): simula il riavvio senza rete.
     expireIdentityForTest: () => { if (process.env.NODE_ENV === 'test') identity._expireToken(); },
+    // …e il riavvio per la coda del registro: la si rilegge dal disco come all'avvio.
+    rileggiCodaPerTest: async () => {
+      if (process.env.NODE_ENV !== 'test') return;
+      queue.length = 0;
+      Object.assign(log, { discardedBy: {}, lastDiscardReason: '', lastDiscardAt: null });
+      scartiLetti = false;
+      caricamentoCoda = null;
+      await loadQueue();
+    },
   };
 
   // All'avvio: identità pronta e stato del server letto una volta, così la

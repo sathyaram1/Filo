@@ -260,7 +260,7 @@ test('la correzione registrata da dispatch col lavoro in un worktree: non regist
     };
     delete env.FILO_DISPATCH_STATE_DIR;
     const DISPATCH = fileURLToPath(new URL('../../scripts/dispatch.mjs', import.meta.url));
-    const r = await new Promise((ok) => execFile(process.execPath, [DISPATCH, '--record-fixed', ID, `${REPORT} Il resto del ramo resta com'era, senza altre modifiche.`], { env, cwd: work },
+    const r = await new Promise((ok) => execFile(process.execPath, [DISPATCH, '--record-fixed', ID, `${REPORT} Il resto del ramo resta com'era, senza altre modifiche.`, '--motivo', 'ripresa'], { env, cwd: work },
       (err, so, se) => ok({ code: err ? (err.code ?? 1) : 0, se: String(se || '') })));
     assert.equal(r.code, 1, r.se);
     assert.match(r.se, /NON REGISTRATO: .*non contiene un commit fatto dopo l'inizio di questo lavoro/);

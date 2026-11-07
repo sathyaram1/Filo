@@ -11,7 +11,7 @@
 
 import { createServer } from 'node:http';
 import { test, expect } from './fixtures/electron.mjs';
-import { statoDi, conta } from './helpers/riquadri.mjs';
+import { statoDi, nelMondoDiFilo } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { riquadriInRitardo, apriConRiquadriInRitardo } from './helpers/riquadriInRitardo.mjs';
 
@@ -49,6 +49,27 @@ test('tasto destro nel riquadro dello stesso sito arrivato dopo la pagina: compa
     const menu = menuDi(frame).locator('.sn-menu');
     await expect(menu).toBeVisible();
     await expect(menu.getByText('Invia feedback', { exact: true })).toBeVisible();
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+// #775.2 — stessa causa, l'altra porta: il riquadro senza preload non riceveva Alt+E. Selezione col mouse e tasto vero.
+test('Alt+E sul testo selezionato nel riquadro dello stesso sito arrivato dopo la pagina: la spiegazione si apre lì', async ({ app, openTab }) => {
+  const sito = await riquadriInRitardo(outer('/riquadro/1'), INNER);
+  try {
+    const page = await apriConRiquadriInRitardo(openTab, sito, 1);
+    const frame = page.frames().find((f) => f.url().includes('/riquadro'));
+    await page.frameLocator('#embed').locator('#inner-text').click({ clickCount: 3 });
+    expect(await frame.evaluate(() => String(getSelection()).trim())).toContain('Testo dentro il riquadro');
+    await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      const wc = w._filoTabs.tabs.find((t) => t.id === w._filoTabs.activeId).view.webContents;
+      for (const type of ['keyDown', 'keyUp']) wc.sendInputEvent({ type, keyCode: 'E', modifiers: ['alt'] });
+    });
+    await expect.poll(async () => (await statoDi(app, page, '.sn-popup .sn-popup-title', frame))?.testo, { timeout: 8000 })
+      .toBe('Approfondimento');
+    expect(await nelMondoDiFilo(app, page, () => document.querySelectorAll('.sn-popup').length)).toBe(0);
   } finally {
     await sito.chiudi();
   }
@@ -230,11 +251,11 @@ test('Alt+E sul testo selezionato DENTRO il riquadro arriva al riquadro', async 
     const win = BrowserWindow.getAllWindows().find((w) => w._filoTabs);
     globalThis.__filoShortcuts.dispatch('explain-selection', win);
   });
-  // La spiegazione si apre DENTRO il riquadro, sul testo selezionato lì.
-  // Prima la scorciatoia finiva sempre nel frame principale, che non ha
-  // nessuna selezione: non succedeva nulla. Sui siti il riquadro sta in uno shadow root chiuso (#1071).
+  // La spiegazione parte DAL riquadro, sul testo selezionato lì: prima la scorciatoia finiva sempre nel frame
+  // principale, che non ha nessuna selezione, e non succedeva nulla. Il riquadro della risposta sta nello strato sopra
+  // la scheda (#1509.1), non nel documento della pagina.
   await expect.poll(async () => (await statoDi(app, page, '.sn-popup', frame))?.visibile, { timeout: 8000 }).toBe(true);
-  expect(await conta(app, page, '.sn-popup')).toBe(0);
+  expect(await nelMondoDiFilo(app, page, () => document.querySelectorAll('.sn-popup').length)).toBe(0);
 });
 
 test('un solo menu alla volta: aprirlo nel riquadro chiude quello della pagina', async ({ openTab, testServer }) => {

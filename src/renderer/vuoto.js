@@ -28,9 +28,10 @@
     return m;
   }
 
-  // proprio(e, 'giu' | 'muovi' | 'rotella'): il gesto è della vista, non della pagina.
+  // proprio(e, 'giu' | 'muovi' | 'rotella' | 'trascina'): il gesto è della vista, non della pagina.
   // versoLaPagina(e): uscendo dalla vista di lì il puntatore entra nella pagina, che da lì riceve i gesti veri.
-  function collega({ inoltra, onCursore, proprio, versoLaPagina }) {
+  // lasciaPassare(): un trascinamento entrato nel vuoto (un file, un pezzo di pagina) è della pagina: la vista si toglie.
+  function collega({ inoltra, onCursore, proprio, versoLaPagina, lasciaPassare = null }) {
     const root = document.documentElement;
     let gestoDellaPagina = false;
     let sopraIlVuoto = false;
@@ -77,6 +78,28 @@
       const riga = e.deltaMode === 1 ? 40 : e.deltaMode === 2 ? innerHeight : 1;
       manda('mouseWheel', e, { dx: -e.deltaX * riga, dy: -e.deltaY * riga });
     }, { capture: true, passive: false });
+    // Il dito sul vuoto scorre la pagina: un tocco non si può rigirare, uno scorrimento sì, come la rotella.
+    let dito = null;
+    document.addEventListener('touchstart', (e) => {
+      dito = e.touches.length === 1 && !proprio(e, 'rotella') ? { x: e.touches[0].clientX, y: e.touches[0].clientY } : null;
+    }, { capture: true, passive: true });
+    document.addEventListener('touchmove', (e) => {
+      if (!dito || e.touches.length !== 1) { dito = null; return; }
+      const t = e.touches[0];
+      const dx = t.clientX - dito.x;
+      const dy = t.clientY - dito.y;
+      dito = { x: t.clientX, y: t.clientY };
+      if (e.cancelable) e.preventDefault();
+      if (dx || dy) inoltra({ tipo: 'mouseWheel', x: t.clientX, y: t.clientY, mod: [], dx, dy });
+    }, { capture: true, passive: false });
+    const lasciaIlDito = () => { dito = null; };
+    document.addEventListener('touchend', lasciaIlDito, true);
+    document.addEventListener('touchcancel', lasciaIlDito, true);
+    if (lasciaPassare) {
+      const trascina = (e) => { if (!proprio(e, 'trascina')) lasciaPassare(); };
+      document.addEventListener('dragenter', trascina, true);
+      document.addEventListener('dragover', trascina, true);
+    }
     // L'ultimo puntatore della pagina vale anche se è arrivato mentre si era sopra la vista: entrando nel vuoto si usa.
     if (onCursore) {
       onCursore((forma) => {

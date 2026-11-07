@@ -10,6 +10,14 @@ export const FINESTRA_PARTE_TARDIVA_MS = 48 * 60 * 60 * 1000;
 export const NOME_PARTE = Object.freeze({ app: 'dell’app', server: 'del server' });
 
 export const RAMO_RE = /^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
+// I lavori server delle routine hanno su filo-security il nome del ramo dell'app, `worker/<id>-<ora>` (#1159).
+export const RAMO_ROUTINE_RE = /^worker\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/;
+
+/** Un ramo che server:fondi porta su main: claude/<nome> o worker/<nome>, senza le forme che git rifiuta. PURA. */
+export function ramoValido(ramo) {
+  const r = String(ramo || '');
+  return (RAMO_RE.test(r) || RAMO_ROUTINE_RE.test(r)) && !/\.\.|\.lock$|\.$|\/\./.test(r);
+}
 
 /**
  * `localMerges` dai campi REST del feedback: { app?: ms, server?: ms }, le parti già su main, `solo` se una parte

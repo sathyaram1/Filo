@@ -8,6 +8,22 @@
   // Un segreto più corto di così è una parola, non una chiave: confrontarlo
   // fermerebbe avvisi innocui che la contengono per caso.
   const SEGRETO_MIN = 12;
+  // Una password nota come tale (#2134) la sceglie l'utente, e 8-11 caratteri sono comuni: lì la soglia scende.
+  const PASSWORD_MIN = 8;
+
+  // Chi custodisce una password la segna qui: vale col suo minimo anche dove arriva come semplice stringa.
+  const PASSWORD_NOTE = new Set();
+  function segnaPassword(v) {
+    const t = testo(v).trim();
+    if (t.length >= PASSWORD_MIN && PASSWORD_NOTE.size < 1000) PASSWORD_NOTE.add(t);
+  }
+
+  // Un segreto è una stringa o { valore, password }.
+  function segretoDi(x) {
+    const oggetto = !!x && typeof x === 'object';
+    const v = testo(oggetto ? x.valore : x).trim();
+    return { v, min: (oggetto && x.password) || PASSWORD_NOTE.has(v) ? PASSWORD_MIN : SEGRETO_MIN };
+  }
 
   // Qui NON si indovina se un codice è una credenziale: si riconoscono solo le
   // forme che in una frase onesta non compaiono. Un codice «di verifica», «di
@@ -173,8 +189,8 @@
     if (!s.trim() && !link.length) return no;
 
     for (const seg of segreti) {
-      const v = testo(seg).trim();
-      if (v.length >= SEGRETO_MIN && s.includes(v)) {
+      const { v, min } = segretoDi(seg);
+      if (v.length >= min && s.includes(v)) {
         return { blocca: true, regola: 'segreto', motivo: 'conteneva un segreto che custodisco io' };
       }
     }
@@ -598,9 +614,9 @@
     const chiavi = [];
     const finestre = new Set();
     for (const x of Array.isArray(segreti) ? segreti : []) {
-      const v = testo(x).trim();
+      const { v, min } = segretoDi(x);
       const p = partiSegreto(v);
-      if (v.length < SEGRETO_MIN || p.norm.length < SEGRETO_MIN) continue;
+      if (v.length < min || p.norm.length < min) continue;
       chiavi.push({ v, norm: p.norm, rov: rovescio(p.norm), nuclei: p.nuclei, re: new RegExp(`${escRe(v)}|${escRe(rovescio(v))}`, 'gi') });
       for (const f of finestreSegreto(p)) finestre.add(f);
     }
@@ -623,6 +639,7 @@
 
   global.SN_GUARDIANO_STATICO = {
     controlla, ibanValido, luhn, cartaValida, hostNominato, hostDi, stessoSito, linkNelTesto,
-    segretiNelTesto, oscuraSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, OSCURATO, FINESTRA,
+    segretiNelTesto, oscuraSegreti, partiSegreto, finestreDi, finestreSegreto, haFinestra, SEGRETO_MIN, PASSWORD_MIN, segretoDi, segnaPassword, OSCURATO, FINESTRA,
+    sembraPassword,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

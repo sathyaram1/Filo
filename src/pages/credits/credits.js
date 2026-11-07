@@ -273,6 +273,9 @@
     box.hidden = false;
     const note = $('walletNote');
     note.hidden = true;
+    const registro = W.registroScartateTesto(w.usageLog && w.usageLog.discardedBy);
+    $('usageLogNote').textContent = registro;
+    $('usageLogNote').hidden = !registro;
     // Senza nessuna chiave (né personale, né propria, né di fabbrica) il
     // conteggio locale non compra niente: saldo, ricarica a mezzanotte e
     // invito al login sono promesse vuote, e si tolgono. Restano per chi ha
@@ -297,7 +300,12 @@
       $('balance').textContent = b.credits != null ? formatCredits(b.credits) : '—';
       $('offlineHint').hidden = true;
       $('redeemForm').hidden = true;
-      if (w.usingOwnKey) {
+      if (w.chiaveStaccata === 'altro_pseudonimo') {
+        // Una chiave nuova è di questo portafoglio: da lì i consumi tornano a registrarsi.
+        note.textContent = 'La chiave personale salvata qui non è quella del tuo portafoglio, e quello che consumi non si registra. Chiedine una nuova.';
+        note.hidden = false;
+        reissue.hidden = false;
+      } else if (w.usingOwnKey) {
         note.textContent = 'Stai usando la tua chiave OpenRouter: i crediti di Filo servono solo se OpenRouter la rifiuta.';
         note.hidden = false;
       } else if (server.cached) {
@@ -343,6 +351,9 @@
       note.textContent = noKey || w.keySource === 'own'
         ? 'Il server dei crediti non risponde adesso: riprova fra poco.'
         : 'Il server dei crediti non risponde adesso: il saldo qui sopra è quello locale.';
+      note.hidden = false;
+    } else if (w.chiaveStaccata === 'senza_portafoglio') {
+      note.textContent = 'La chiave personale salvata qui non è di nessun portafoglio sul server, e quello che consumi non si registra. Con un invito ne ricevi una tua.';
       note.hidden = false;
     } else if (server && server.invitesOpen === false) {
       note.textContent = 'Per ora i posti sono finiti: il tuo codice resta valido, riprova fra qualche giorno.';
@@ -463,29 +474,38 @@
   let accessoGoogle = false;
   let collegaInCorso = false;
   let esitoCollega = null;
+  // Un accesso che aspetta un browser chiuso non spegne il pulsante (#678.6): si torna alla pagina o si lascia stare,
+  // e l'esito di uno lasciato stare non parla più.
+  let collegaN = 0;
 
   function renderCollega() {
     const btn = $('linkGoogleBtn');
     const note = $('invitesLockedNote');
     btn.hidden = false;
-    btn.disabled = collegaInCorso;
+    btn.disabled = false;
     btn.textContent = collegaInCorso
-      ? 'Continua nella scheda di Google…'
+      ? 'Torna all’accesso'
       : (accessoGoogle ? 'Riprova a collegare Google' : 'Collega Google per dare i tuoi inviti');
-    const frase = esitoCollega || (accessoGoogle && !collegaInCorso
-      ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer. Gli inviti si danno da quella.'
-      : '');
+    $('linkGoogleLascia').hidden = !collegaInCorso;
+    const frase = collegaInCorso
+      ? 'Completa l’accesso nella pagina di Google che si è aperta.'
+      : (esitoCollega || (accessoGoogle
+        ? 'Sei dentro con Google, ma il tuo account è già legato a un’altra copia di Filo, per esempio su un altro computer. Gli inviti si danno da quella.'
+        : ''));
     note.textContent = frase;
     note.hidden = !frase;
   }
 
   async function collegaGoogle() {
-    if (collegaInCorso) return;
+    // Il main tiene un accesso solo: chiederlo di nuovo ne riporta davanti la pagina, e l'esito arriva alla prima richiesta.
+    if (collegaInCorso) { Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN })).catch(() => {}); return; }
+    const n = ++collegaN;
     collegaInCorso = true;
     esitoCollega = null;
     renderCollega();
     let r = null;
     try { r = await chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN }); } catch (_) { r = null; }
+    if (n !== collegaN) return;
     collegaInCorso = false;
     if (!r || !r.ok) esitoCollega = (r && r.error) || 'L’accesso a Google non è riuscito: riprova.';
     else accessoGoogle = true;
@@ -498,6 +518,7 @@
   // di nuovo non cambierebbe niente.
   function renderGiaUsato() {
     $('linkGoogleBtn').hidden = true;
+    $('linkGoogleLascia').hidden = true;
     const note = $('invitesLockedNote');
     note.textContent = 'Il tuo account Google ha già dato i suoi inviti da un’altra copia di Filo: si danno da quella.';
     note.hidden = false;
@@ -830,18 +851,44 @@
   });
 
   $('linkGoogleBtn').addEventListener('click', () => { collegaGoogle().catch(() => {}); });
+  $('linkGoogleLascia').addEventListener('click', () => {
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.AUTH_SIGNIN_LASCIA })).catch(() => {});
+    collegaN++;
+    collegaInCorso = false;
+    esitoCollega = null;
+    renderCollega();
+  });
 
   // Aggiorna live quando il saldo cambia (consumo in background, refill, ricompensa) e quando cambia l'accesso a
   // Google da un'altra porta (menu dell'account): collegarsi è ciò che sblocca gli inviti.
+  // Il saldo lo chiede al server, e l'avviso arriva a ogni risposta del modello (#2059): solo con la pagina davanti,
+  // una lettura alla volta; dietro la pagina si segna vecchia e si rilegge al ritorno.
+  let paginaInVista = true;
+  let spesaChiaveVecchia = false;
+  const rilettura = W.rilettoreVista({
+    leggi: () => {
+      const chiave = spesaChiaveVecchia && !$('ownKeyHave').hidden;
+      spesaChiaveVecchia = false;
+      return Promise.all([load(), chiave ? loadOwnKeyInfo({ quiet: true }) : null]);
+    },
+    inVista: () => paginaInVista,
+  });
   if (chrome.runtime && chrome.runtime.onMessage) {
     chrome.runtime.onMessage.addListener((msg) => {
       if (msg && msg.type === MSG.AUTH_CHANGED) { load().catch(() => {}); return; }
+      if (msg && msg.type === MSG.TAB_IN_VISTA) {
+        paginaInVista = msg.inVista !== false;
+        rilettura.mostrata();
+        return;
+      }
       if (!msg || msg.type !== MSG.CREDITS_CHANGED) return;
-      load().catch(() => {});
       // Una chiamata pagata con la chiave propria (o il suo rifiuto superato):
       // spesa e residuo sono cambiati, si richiedono senza svuotare la riga.
-      if (msg.ownKeyUsed && !$('ownKeyHave').hidden) loadOwnKeyInfo({ quiet: true }).catch(() => {});
+      if (msg.ownKeyUsed) spesaChiaveVecchia = true;
+      rilettura.cambiato();
     });
+    Promise.resolve(chrome.runtime.sendMessage({ type: MSG.TAB_IN_VISTA_GET }))
+      .then((r) => { if (r && r.ok) paginaInVista = r.inVista !== false; }, () => {});
   }
 
   load().catch((e) => { console.error('[credits] load fallito', e); });

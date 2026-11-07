@@ -48,11 +48,52 @@ async function sitoConAccesso() {
     if (u.pathname === '/pubblica') {
       res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': 'visita=1; Path=/; HttpOnly' });
       res.end(`<!doctype html><html><head><title>Benvenuto</title></head><body style="padding:30px">
+        ${dentro ? '<h1 id="dentro">Ciao Sara</h1>' : ''}
         <button id="google" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y', 'accesso', 'width=420,height=420')">Continua con Google</button>
+        <button id="google-entra" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y&entra=1', 'accesso', 'width=420,height=420')">Entra con Google</button>
+        <button id="google-token" onclick="window.open('/oauth/authorize?client_id=x&redirect_uri=y&token=1', 'accesso', 'width=420,height=420')">Accedi</button>
+        <input id="campo" placeholder="Un commento">
+        ${u.searchParams.get('vivo') ? '<script>setInterval(() => fetch(\'/ping\'), 300)</script>' : ''}
         </body></html>`);
       return;
     }
+    // La finestrella che fa l'accesso da sé (#1629): mette il cookie della sessione e si chiude, senza dirlo alla pagina.
+    if (u.pathname === '/oauth/authorize' && u.searchParams.get('entra') === '1') {
+      const nuovo = Math.random().toString(36).slice(2);
+      sessioni.add(nuovo);
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': `sid=${nuovo}; Max-Age=86400; Path=/; HttpOnly` });
+      res.end('<!doctype html><title>Fatto</title><p>Accesso fatto</p><script>setTimeout(() => window.close(), 400)</script>');
+      return;
+    }
+    // Come quasi ogni pagina d'accesso, mette il token del modulo anche a chi non entra (#1725).
+    if (u.pathname === '/oauth/authorize' && u.searchParams.get('token') === '1') {
+      res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Set-Cookie': `csrftoken=${Math.random().toString(36).slice(2)}; Path=/; HttpOnly` });
+      res.end('<!doctype html><title>Scegli un account</title><p>Account</p>');
+      return;
+    }
     if (u.pathname === '/oauth/authorize') { html('<!doctype html><title>Scegli un account</title><p>Account</p>'); return; }
+    // Il sito che rinnova da sé la sessione a ogni richiesta, come molti framework.
+    if (u.pathname === '/ping') {
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Set-Cookie': `XSRF-TOKEN=${Math.random().toString(36).slice(2)}; Path=/` });
+      res.end('ok');
+      return;
+    }
+    // Un commento pubblicato con la pagina dell'esito, senza rimandare a un'altra pagina.
+    if (u.pathname === '/commenta' && req.method === 'POST') {
+      html('<!doctype html><title>Pubblicato</title><p id="pubblicato">Commento pubblicato</p><a id="vai" href="/home">Casa</a>');
+      return;
+    }
+    if (u.pathname === '/commenta') {
+      html(`<!doctype html><title>Commenta</title><body style="padding:30px"><form method="post" action="/commenta">
+        <input id="campo" name="testo" placeholder="Il tuo commento"> <button id="manda">Pubblica</button></form></body>`);
+      return;
+    }
+    // Una pagina del sito con un campo da scrivere (#759.2).
+    if (u.pathname === '/modulo') {
+      html(`<!doctype html><html><head><title>Modulo</title></head><body style="padding:30px">
+        <input id="campo" placeholder="Scrivi qui"> <a id="vai" href="/home">Casa</a></body></html>`);
+      return;
+    }
     if (u.pathname === '/oauth-ritorno') {
       const nuovo = Math.random().toString(36).slice(2);
       sessioni.add(nuovo);
@@ -771,5 +812,321 @@ test('«Resta connesso qui» porta con sé il database del sito; quando non si p
     await expect(vista.locator('.shell-notif.show', { hasText: 'Rientra una volta' })).toBeVisible({ timeout: 10_000 });
   } finally {
     await sito.chiudi();
+  }
+});
+
+// ── niente ricariche che fanno perdere qualcosa (#759.2, #1629) ────────────
+
+const schedaSu = async (shell, prefisso) =>
+  (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.find((t) => String(t.url).startsWith(prefisso));
+
+// Una pagina col segno è la stessa di prima: ricaricata, il segno non c'è più.
+const segna = (page) => page.evaluate(() => { window.__filoSegno = 1; });
+const segnata = async (app, prefisso) => {
+  try { return await (await pagina(app, prefisso, { timeout: 3000 })).evaluate(() => window.__filoSegno === 1); } catch (_) { return null; }
+};
+
+async function scriviNelCampo(app, shell, prefisso, testo) {
+  const page = await pagina(app, prefisso);
+  await page.locator('#campo').click();
+  await page.keyboard.type(testo);
+  await expect.poll(async () => (await schedaSu(shell, prefisso))?.formDirty, { timeout: 8_000 }).toBe(true);
+  return page;
+}
+
+async function dueSchedeUnaScritta(app, shell, base) {
+  const modulo = await apri(app, shell, `${base}/modulo`);
+  await scriviNelCampo(app, shell, `${base}/modulo`, 'una bozza a metà');
+  await segna(modulo);
+  return modulo;
+}
+
+async function laScrittaAspettaIlCambioDiPagina(app, base, sito, partizione, { shell = null } = {}) {
+  // La scheda senza niente da perdere è già passata, ricaricata e dentro.
+  await expect.poll(() => partizioneDi(app, `${base}/home`)).toBe(partizione);
+  await dentro(app, `${base}/home`);
+  // Quella scritta no: stessa pagina, il testo c'è ancora.
+  await sleep(2500);
+  expect(await segnata(app, `${base}/modulo`)).toBe(true);
+  expect(await (await pagina(app, `${base}/modulo`)).locator('#campo').inputValue()).toBe('una bozza a metà');
+  expect(await partizioneDi(app, `${base}/modulo`)).toMatch(new RegExp(`^filo-priv-${sito.replace(/\./g, '\\.')}(~\\d+)?$`));
+  // Ricaricata da chi la usa, passa subito: chi ricarica accetta di perdere il testo.
+  if (shell) {
+    const { id } = await schedaSu(shell, `${base}/modulo`);
+    await shell.evaluate((i) => window.filoShell.tabs.reload(i), id);
+    await expect.poll(() => partizioneDi(app, `${base}/modulo`), { timeout: 15_000 }).toBe(partizione);
+    expect(await segnata(app, `${base}/modulo`)).toBe(false);
+  }
+  // Cambiata pagina, passa anche lei: dentro, nel posto che resta.
+  await (await pagina(app, `${base}/modulo`)).locator('#vai').click();
+  await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
+    const out = [];
+    for (const w of BrowserWindow.getAllWindows()) {
+      for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) out.push(t.partition);
+    }
+    return out;
+  }, `${base}/home`), { timeout: 15_000 }).toEqual([partizione, partizione]);
+}
+
+test('«Resta connesso qui» dal menu della scheda: la scheda dove stai scrivendo non si ricarica, e passa al cambio di pagina', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    await segna(await pagina(app, `${sito.a}/home`));
+    await dueSchedeUnaScritta(app, shell, sito.a);
+    await scegliNelMenu(app, shell, 'Resta connesso qui', async () => (await fidati(app)).includes('127.0.0.1'));
+    expect(await segnata(app, `${sito.a}/home`)).not.toBe(true);
+    await laScrittaAspettaIlCambioDiPagina(app, sito.a, '127.0.0.1', 'persist:filo-priv-127.0.0.1');
+    await dentro(app, `${sito.a}/home`);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Resta connesso» dalla proposta dopo l\'accesso: la scheda dove stai scrivendo non si ricarica, e passa al cambio di pagina', async ({ app, shell, avvisi }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    await dueSchedeUnaScritta(app, shell, sito.b);
+    await accedi(await apri(app, shell, `${sito.b}/login`));
+    await dentro(app, `${sito.b}/home`);
+    await segna(await pagina(app, `${sito.b}/home`));
+    await accetta(await proposta(await avvisi(), 'localhost'));
+    await expect.poll(() => fidati(app)).toEqual(['localhost']);
+    await laScrittaAspettaIlCambioDiPagina(app, sito.b, 'localhost', 'persist:filo-priv-localhost', { shell });
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+async function finestrellaDa(app, page, bottone, { chiudi = false } = {}) {
+  await page.locator(bottone).click();
+  let w = null;
+  await expect.poll(() => {
+    w = app.windows().find((x) => { try { return x.url().includes('/oauth/authorize'); } catch (_) { return false; } });
+    return !!w;
+  }, { timeout: 10_000 }).toBe(true);
+  if (chiudi) await w.evaluate(() => window.close()).catch(() => {});
+  await expect.poll(() => app.windows().some((x) => { try { return x.url().includes('/oauth/authorize'); } catch (_) { return false; } }), { timeout: 10_000 }).toBe(false);
+}
+
+async function esci(app, shell, base) {
+  await (await pagina(app, `${base}/pubblica`)).evaluate(() => { location.href = '/esci'; });
+  await pagina(app, `${base}/login`);
+  await (await pagina(app, `${base}/login`)).evaluate(() => { location.href = '/pubblica'; });
+  const page = await pagina(app, `${base}/pubblica`);
+  await expect(page.locator('#dentro')).toHaveCount(0);
+  return page;
+}
+
+test('accesso riuscito in una finestrella: la scheda che l\'ha aperta si aggiorna da sola; senza accesso o col testo scritto resta com\'è', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    // Automatico, come chi non ha toccato i cookie: la finestrella divide i cookie con la scheda.
+    let page = await apri(app, shell, `${sito.a}/pubblica`);
+    await expect(page.locator('#dentro')).toHaveCount(0);
+
+    // Chiusa senza accedere: la scheda resta ferma.
+    await segna(page);
+    await finestrellaDa(app, page, '#google', { chiudi: true });
+    await sleep(4000);
+    expect(await segnata(app, `${sito.a}/pubblica`)).toBe(true);
+
+    // Accesso fatto nella finestrella, che si chiude da sola senza dire niente alla pagina: la scheda si aggiorna.
+    await finestrellaDa(app, page, '#google-entra');
+    await expect.poll(() => segnata(app, `${sito.a}/pubblica`), { timeout: 10_000 }).toBe(false);
+    await expect((await pagina(app, `${sito.a}/pubblica`)).locator('#dentro')).toBeVisible();
+
+    // Col testo scritto nel campo la scheda non si ricarica, nemmeno dopo un accesso riuscito.
+    page = await esci(app, shell, sito.a);
+    await scriviNelCampo(app, shell, `${sito.a}/pubblica`, 'un commento a metà');
+    await segna(page);
+    await finestrellaDa(app, page, '#google-entra');
+    await sleep(4000);
+    expect(await segnata(app, `${sito.a}/pubblica`)).toBe(true);
+    expect(await page.locator('#campo').inputValue()).toBe('un commento a metà');
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('Privacy massima: dopo l\'accesso nella finestrella la scheda si aggiorna e arriva la proposta', async ({ app, shell, avvisi }) => {
+  test.setTimeout(90_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    const page = await apri(app, shell, `${sito.a}/pubblica`);
+    await segna(page);
+    await finestrellaDa(app, page, '#google-entra');
+    await expect.poll(() => segnata(app, `${sito.a}/pubblica`), { timeout: 10_000 }).toBe(false);
+    await expect((await pagina(app, `${sito.a}/pubblica`)).locator('#dentro')).toBeVisible();
+    await proposta(await avvisi(), '127.0.0.1');
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('finestrella chiusa senza entrare: la scheda resta ferma anche se la pagina d\'accesso mette il suo token o il sito rinnova la sessione da sé', async ({ app, shell }) => {
+  test.setTimeout(90_000);
+  const sito = await sitoConAccesso();
+  try {
+    let page = await apri(app, shell, `${sito.a}/pubblica`);
+    await segna(page);
+    await finestrellaDa(app, page, '#google-token', { chiudi: true });
+    await sleep(4000);
+    expect(await segnata(app, `${sito.a}/pubblica`)).toBe(true);
+
+    page = await apri(app, shell, `${sito.b}/pubblica?vivo=1`);
+    await sleep(1000);
+    await segna(page);
+    await finestrellaDa(app, page, '#google', { chiudi: true });
+    await sleep(4000);
+    expect(await segnata(app, `${sito.b}/pubblica`)).toBe(true);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Resta connesso» e poi l\'invio del modulo scritto: la pagina dell\'esito resta, e la scheda passa alla pagina dopo', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    await apri(app, shell, `${sito.a}/commenta`);
+    await scriviNelCampo(app, shell, `${sito.a}/commenta`, 'bellissimo articolo');
+    await app.evaluate(async () => {
+      await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { trustedSites: ['127.0.0.1'] } } });
+    });
+    await expect.poll(() => partizioneDi(app, `${sito.a}/home`)).toBe('persist:filo-priv-127.0.0.1');
+
+    await (await pagina(app, `${sito.a}/commenta`)).locator('#manda').click();
+    await expect((await pagina(app, `${sito.a}/commenta`)).locator('#pubblicato')).toBeVisible({ timeout: 10_000 });
+    await segna(await pagina(app, `${sito.a}/commenta`));
+    await sleep(4000);
+    expect(await segnata(app, `${sito.a}/commenta`)).toBe(true);
+    expect(await partizioneDi(app, `${sito.a}/commenta`)).toMatch(/^filo-priv-127\.0\.0\.1(~\d+)?$/);
+
+    await (await pagina(app, `${sito.a}/commenta`)).locator('#vai').click();
+    await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
+      const out = [];
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) out.push(t.partition);
+      }
+      return out;
+    }, `${sito.a}/home`), { timeout: 15_000 }).toEqual(['persist:filo-priv-127.0.0.1', 'persist:filo-priv-127.0.0.1']);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+test('«Resta connesso» con una scheda del sito che sta suonando: non si ricarica, e passa al cambio di pagina', async ({ app, shell }) => {
+  test.setTimeout(120_000);
+  const sito = await sitoConAccesso();
+  try {
+    await privacy(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    const modulo = await apri(app, shell, `${sito.a}/modulo`);
+    await segna(modulo);
+    // Lo schermo virtuale non suona: la scheda si dice in riproduzione come la segnerebbe l'evento dell'audio.
+    await app.evaluate(({ BrowserWindow }, pre) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) t.audible = true;
+      }
+    }, `${sito.a}/modulo`);
+    await app.evaluate(async () => {
+      await globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { trustedSites: ['127.0.0.1'] } } });
+    });
+    await expect.poll(() => partizioneDi(app, `${sito.a}/home`)).toBe('persist:filo-priv-127.0.0.1');
+    await sleep(2500);
+    expect(await segnata(app, `${sito.a}/modulo`)).toBe(true);
+    expect(await partizioneDi(app, `${sito.a}/modulo`)).toMatch(/^filo-priv-127\.0\.0\.1(~\d+)?$/);
+
+    await app.evaluate(({ BrowserWindow }, pre) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) t.audible = false;
+      }
+    }, `${sito.a}/modulo`);
+    await (await pagina(app, `${sito.a}/modulo`)).locator('#vai').click();
+    await expect.poll(() => app.evaluate(({ BrowserWindow }, pre) => {
+      const out = [];
+      for (const w of BrowserWindow.getAllWindows()) {
+        for (const t of (w._filoTabs && w._filoTabs.tabs) || []) if (String(t.url || '').startsWith(pre)) out.push(t.partition);
+      }
+      return out;
+    }, `${sito.a}/home`), { timeout: 15_000 }).toEqual(['persist:filo-priv-127.0.0.1', 'persist:filo-priv-127.0.0.1']);
+  } finally {
+    await sito.chiudi();
+  }
+});
+
+// ── il «no» ricordato (#759.1) ─────────────────────────────────────────────
+
+test('un «no» alla proposta resta dopo il riavvio, senza scrivere il sito sul disco; «Resta connesso qui» dal menu lo toglie', async () => {
+  test.setTimeout(180_000);
+  const sito = await sitoConAccesso();
+  const userData = cartellaTemporanea('filo-connesso-no-');
+  const lancia = () => electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, NODE_ENV: 'test' },
+  });
+  const { readFileSync, readdirSync, lstatSync } = await import('node:fs');
+  const impronte = () => {
+    try { return JSON.parse(readFileSync(join(userData, 'resta-connesso-no.json'), 'utf8')).impronte.length; } catch (_) { return 0; }
+  };
+  let app = await lancia();
+  try {
+    let shell = await primaFinestra(app);
+    await privacy(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    let vista = await vistaAvvisi(app);
+    const carta = await proposta(vista, '127.0.0.1');
+    await carta.locator('.shell-notif-close').click();
+    await expect.poll(impronte, { timeout: 10_000 }).toBe(1);
+    // Una scheda riaperta al riavvio su /home, ormai fuori, confonderebbe la ricerca della scheda dopo l'accesso.
+    await chiudiScheda(app, shell, sito.a);
+
+    await chiudiApp(app);
+    app = await lancia();
+    shell = await primaFinestra(app);
+    await accedi(await apri(app, shell, `${sito.a}/login`));
+    await dentro(app, `${sito.a}/home`);
+    // Controprova: Filo sta guardando, e su un altro sito la proposta arriva.
+    await accedi(await apri(app, shell, `${sito.b}/login`));
+    await dentro(app, `${sito.b}/home`);
+    vista = await vistaAvvisi(app);
+    await proposta(vista, 'localhost');
+    expect(await vista.locator('.shell-notif', { hasText: 'accesso a 127.0.0.1' }).count()).toBe(0);
+    await expect.poll(impronte, { timeout: 10_000 }).toBe(2);
+
+    // Il «no» non lascia l'indirizzo del sito sul disco: né nei suoi file né nello storage. Le schede aperte, che si
+    // riaprono al riavvio, l'indirizzo lo tengono per forza; l'elenco dei siti coi campi è un'altra cosa.
+    const fileNo = readdirSync(userData).filter((n) => /^resta-connesso-no\./.test(n));
+    expect(fileNo.sort()).toEqual(['resta-connesso-no.json', 'resta-connesso-no.sale']);
+    for (const nome of fileNo) expect(readFileSync(join(userData, nome), 'utf8'), nome).not.toContain('127.0.0.1');
+    expect(lstatSync(join(userData, 'storage.json')).isFile()).toBe(true);
+    const storage = JSON.parse(readFileSync(join(userData, 'storage.json'), 'utf8'));
+    delete storage.sn_open_tabs;
+    delete storage.filo_siti_con_campi;
+    expect(JSON.stringify(storage)).not.toContain('127.0.0.1');
+
+    // Il «no» non chiude la strada: dal menu della scheda si resta connessi, e il «no» se ne va.
+    const id = (await schedaSu(shell, `${sito.a}/home`)).id;
+    await shell.evaluate((i) => window.filoShell.tabs.activate(i), id);
+    await scegliNelMenu(app, shell, 'Resta connesso qui', async () => (await fidati(app)).includes('127.0.0.1'));
+    await expect.poll(impronte, { timeout: 10_000 }).toBe(1);
+  } finally {
+    await chiudiApp(app);
+    await sito.chiudi();
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
   }
 });

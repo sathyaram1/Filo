@@ -1,6 +1,6 @@
 // Il registro dei cambi (#867): ogni scrittura dello stato (impostazioni, timer e sveglie, regole del
-// proxy) diventa un evento del filo nel momento in cui si salva, chiunque l'abbia chiesta. Chi chiede
-// dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
+// proxy, disposizione delle icone, icone del desktop) diventa un evento del filo (src/main/services/ilFilo.js) nel momento in cui si salva,
+// chiunque l'abbia chiesta. Chi chiede dichiara solo da dove viene (`con`). Frasi, esclusioni e annullo: src/shared/cambi.js.
 
 const { AsyncLocalStorage } = require('node:async_hooks');
 const { randomUUID } = require('node:crypto');
@@ -9,6 +9,8 @@ const Disco = require('../shim/storage');
 const provenienze = new AsyncLocalStorage();
 const K = () => globalThis.SN_CAMBI;
 const CHIAVI = () => globalThis.SN_CONST.STORAGE_KEYS;
+const Filo = () => require('./ilFilo');
+const E = () => globalThis.SN_FILO_EVENTI;
 
 // Quello che il registro deve far fare al resto dell'app per annullare: lo passa handlers.js.
 const app = {
@@ -16,7 +18,11 @@ const app = {
   aggiornaVivo: () => {},
   aggiornaRegoleProxy: () => {},
   zoomSu: null,
+  // (cambia(disposizione) → disposizione, { mossa }) passando dalla porta unica delle icone (layoutIcone.js).
+  disposizioneIcone: null,
   annuncia: () => {},
+  // Un annullo riuscito, con l'id chiesto e quello dell'evento trovato: lo contano i contatori (#1461).
+  annullato: () => {},
 };
 function collega(f) { Object.assign(app, f || {}); }
 
@@ -29,28 +35,48 @@ function con(prov, fn) {
 function corrente() {
   return provenienze.getStore() || null;
 }
+// Un dettaglio per chi osserva la scrittura (l'icona spostata), con la provenienza di chi l'ha chiesta.
+function conDettaglio(extra, fn) {
+  const c = corrente();
+  const eredita = {};
+  if (c) for (const k of ['via', 'dove', 'annulla']) if (c[k] !== undefined) eredita[k] = c[k];
+  return con({ ...eredita, ...extra }, fn);
+}
 
 function nuovoId() {
   return `c${randomUUID().replace(/-/g, '').slice(0, 10)}`;
 }
 
-// Una coda per lato: le scritture del disco e quelle dell'incognito non si mescolano mai.
-const code = { normale: Promise.resolve(), incognito: Promise.resolve() };
-function inCoda(incognito, lavoro) {
-  const lato = incognito ? 'incognito' : 'normale';
-  const corri = () => (incognito ? Disco.runIncognito(lavoro) : Disco.runNormale(lavoro));
-  const p = code[lato].then(corri, corri);
-  code[lato] = p.then(() => {}, () => {});
+// Una coda sola: l'ordine dei cambi è quello in cui si sono salvati. Il lato (disco o incognito) lo decide il filo.
+let coda = Promise.resolve();
+function inCoda(lavoro) {
+  const p = coda.then(lavoro, lavoro);
+  coda = p.then(() => {}, () => {});
   return p;
 }
 function attesa() {
-  return Promise.all([code.normale, code.incognito]);
+  return coda;
 }
 
 async function leggiLista() {
-  const r = await globalThis.chrome.storage.local.get(CHIAVI().FILO_CAMBI);
-  const l = r && r[CHIAVI().FILO_CAMBI];
-  return Array.isArray(l) ? l : [];
+  return Filo().cambi({ incognito: Disco.inIncognito() });
+}
+
+// Il ritocco della stessa cosa riscrive il cambio di prima con un evento in coda (`fonde`), e tornato al valore di
+// partenza lo ritira: il filo non si riscrive, si piega.
+function salva(evento, incognito) {
+  return Filo().transazione(async (t) => {
+    const ultimo = t.ultimoCambio();
+    const opz = { dispositivo: t.dispositivo };
+    let ev;
+    if (K().fondibile(ultimo, evento)) {
+      const fuso = K().fondi(ultimo, evento);
+      ev = E().eventoCambio(fuso || { ...ultimo, cambi: [] }, { ...opz, fonde: true, ts: evento.ts });
+    } else {
+      ev = E().eventoCambio(evento, opz);
+    }
+    await t.scrivi([ev]);
+  }, { incognito });
 }
 
 function raccogli(ctx, evento) {
@@ -74,18 +100,8 @@ function registra({ tipo, cambi }, { incognito = Disco.inIncognito(), vuoto = fa
     cambi,
   };
   raccogli(ctx, evento);
-  inCoda(incognito, async () => {
-    const lista = await leggiLista();
-    const ultimo = lista[lista.length - 1];
-    let nuova;
-    if (K().fondibile(ultimo, evento)) {
-      const fuso = K().fondi(ultimo, evento);
-      nuova = fuso ? [...lista.slice(0, -1), fuso] : lista.slice(0, -1);
-    } else {
-      nuova = [...lista, evento];
-    }
-    await globalThis.chrome.storage.local.set({ [CHIAVI().FILO_CAMBI]: nuova });
-  }).then(() => app.annuncia([evento.id])).catch((e) => console.warn('[Filo cambi] evento non salvato:', e?.message || e));
+  inCoda(() => salva(evento, !!incognito))
+    .then(() => app.annuncia([evento.id])).catch((e) => console.warn('[Filo cambi] evento non salvato:', e?.message || e));
   return evento;
 }
 
@@ -103,12 +119,16 @@ function osserva(changes, { incognito }) {
   if (t && Array.isArray(t.newValue)) registra({ tipo: 'timer', cambi: K().cambiTimer(t.oldValue, t.newValue, adesso) }, { incognito });
   const r = changes[C.FILO_PROXY_RULES];
   if (r && r.newValue && typeof r.newValue === 'object') registra({ tipo: 'proxy', cambi: K().cambiRegoleProxy(r.oldValue, r.newValue) }, { incognito });
+  const i = changes[C.ICON_LAYOUT];
+  if (i && i.newValue && typeof i.newValue === 'object') {
+    registra({ tipo: 'icone', cambi: K().cambiIcone(i.oldValue, i.newValue, { mossa: corrente()?.mossa }) }, { incognito });
+  }
 }
 
 let staccato = null;
 function avvia() {
   const C = CHIAVI();
-  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES]);
+  if (!staccato) staccato = Disco.onScrittura(osserva, [C.SETTINGS, C.FILO_TIMERS, C.FILO_PROXY_RULES, C.ICON_LAYOUT]);
 }
 
 // Lo zoom non passa dallo storage: lo salva Chromium per sito. Il punto in cui il main lo viene a
@@ -164,6 +184,12 @@ async function tutti() {
   }));
 }
 
+// I cambi così come il filo li ha piegati, nel contesto di chi chiede (prove, migrazioni).
+async function lista() {
+  await attesa();
+  return leggiLista();
+}
+
 async function ultimi({ max = 40 } = {}) {
   await attesa();
   const lista = await leggiLista();
@@ -210,6 +236,8 @@ async function annullaOra(id, prov = {}) {
   const raccolti = [];
   let saltati = [];
   let riuscito = true;
+  let motivo = 'la pagina di quel sito non è aperta';
+  let perche = 'perché nel frattempo sarebbero già scaduti';
   await con({ via: prov.via || 'interfaccia', ...(prov.dove ? { dove: prov.dove } : {}), annulla: e.id, raccolti }, async () => {
     if (e.tipo === 'impostazioni') {
       const correnti = await globalThis.SN_STORAGE.getSettings();
@@ -227,16 +255,33 @@ async function annullaOra(id, prov = {}) {
       const regole = K().annulloRegoleProxy(e, await FM.listProxyRules());
       await globalThis.chrome.storage.local.set({ [CHIAVI().FILO_PROXY_RULES]: regole });
       app.aggiornaRegoleProxy();
+    } else if (e.tipo === 'icone') {
+      const rimetti = (attuale) => K().annulloIcone(e, attuale);
+      if (app.disposizioneIcone) await app.disposizioneIcone(rimetti, { mossa: e.cambi.length === 1 ? K().iconaDi(e.cambi[0]) : null });
+      else {
+        const C = CHIAVI();
+        const letta = await globalThis.chrome.storage.local.get(C.ICON_LAYOUT);
+        await globalThis.chrome.storage.local.set({ [C.ICON_LAYOUT]: rimetti(letta && letta[C.ICON_LAYOUT]) });
+      }
     } else if (e.tipo === 'zoom') {
       const c = e.cambi[0];
       riuscito = !!(app.zoomSu && await app.zoomSu(String(c.chiave).slice(5), c.prima));
+    } else if (e.tipo === 'desktop') {
+      const r = await require('./iconeDesktop').rimetti(e.cambi[0].prima);
+      riuscito = !!(r && r.ok);
+      if (!riuscito) motivo = [r && r.frase, r && r.dove].filter(Boolean).join(' ') || 'le icone del desktop non si sono spostate';
+      else if (r.sparite) {
+        saltati = [r.sparite === 1 ? 'un\'icona' : `${r.sparite} icone`];
+        perche = 'perché non sono più sul desktop';
+      }
     }
     // Lo stato era già quello di prima (rimesso a mano nel frattempo): l'annullo resta come evento.
     if (riuscito && !raccolti.length) registra({ tipo: e.tipo, cambi: [] }, { vuoto: true });
   });
-  if (!riuscito) return { ok: false, motivo: 'la pagina di quel sito non è aperta', id: e.id };
-  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati };
+  if (!riuscito) return { ok: false, motivo, id: e.id };
+  try { app.annullato([...new Set([String(id || ''), String(trovato.id), String(e.id)])].filter(Boolean), trovato); } catch (_) {}
+  return { ok: true, id: e.id, frase: K().frase(e), eventi: raccolti, saltati, ...(saltati.length ? { saltatiPerche: perche } : {}) };
 }
 
-module.exports = { avvia, con, corrente, registra, registraZoom, leggi, tutti, ultimi, livelloDi, annulla, collega, attesa };
+module.exports = { avvia, con, conDettaglio, corrente, registra, registraZoom, leggi, tutti, lista, ultimi, livelloDi, annulla, collega, attesa };
 globalThis.SN_REGISTRO_CAMBI = module.exports;

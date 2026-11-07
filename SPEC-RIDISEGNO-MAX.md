@@ -280,7 +280,8 @@ l'unico che può.
 - **`releaseBump`** (filo-security, parola d'ordine di scopo `build` come
   `buildKeys`/`buildAlarm`): legge il manifesto vero su `main`, calcola lui il
   numero successivo, e scrive lui un commit che cambia **solo** il campo della
-  versione. Dal chiamante non si accetta niente — né il numero, né il
+  versione, nel manifesto e nel lockfile (#2040, ROUTINE-AUTH-SPEC.md § 12).
+  Dal chiamante non si accetta niente — né il numero, né il
   contenuto, né il ramo: accettarli sarebbe un push diretto travestito.
 - **Freno anti-raffica** con lo stato sul server: al massimo un aumento ogni 20
   minuti e 12 al giorno (il cron pubblica ogni sei ore: non intralcia).

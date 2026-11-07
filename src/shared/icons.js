@@ -145,16 +145,28 @@
   const colorPicker =
     `<path d="M14 4l6 6l-3 3l-2-2l-9 9h-3v-3l9-9l-1-1z"/>`;
 
-  // Lucchetto: voce «Sicurezza» del menu Impostazioni.
+  // Lucchetto: voce «Sicurezza» del menu Impostazioni, e il pannello di destra bloccato aperto (#1433).
   const lock =
     `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
     `<path d="M8 11V8a4 4 0 0 1 8 0v3"/>`;
+  // Lucchetto aperto: il pannello di destra si apre sopra la pagina e si richiude da sé.
+  const lockOpen =
+    `<rect x="5" y="11" width="14" height="9" rx="1.5"/>` +
+    `<path d="M8 11V8a4 4 0 0 1 7.6-1.7"/>`;
 
   // Trasparenza: libro APERTO — «sta scritto e lo puoi leggere».
   // Copia gemella in src/main/popup-menu.js (BrowserWindow a parte): cambiala insieme.
   const transparency =
     `<path d="M12 6.6C10.4 5.1 8.3 4.6 4 4.6v12.6c4.3 0 6.4.5 8 2 1.6-1.5 3.7-2 8-2V4.6c-4.3 0-6.4.5-8 2z"/>` +
     `<path d="M12 6.6v14.6"/>`;
+
+  // Novità: un pacchetto col fiocco, quello che arriva con ogni versione. Copia gemella in src/main/popup-menu.js.
+  const novita =
+    `<rect x="3.5" y="8" width="17" height="4" rx="1"/>` +
+    `<path d="M5 12v8h14v-8"/>` +
+    `<path d="M12 8v12"/>` +
+    `<path d="M12 8c-1.4-2.8-5-3.4-5-1.3C7 8 9.6 8 12 8z"/>` +
+    `<path d="M12 8c1.4-2.8 5-3.4 5-1.3C17 8 14.4 8 12 8z"/>`;
 
   // Incognito: tesa del cappello e due lenti tonde. Menu Impostazioni e menu secondario.
   const incognito =
@@ -524,6 +536,17 @@
     `<path d="M6 6.75h.01"/>` +
     `<path d="M8.5 6.75h.01"/>`;
 
+  // --- Icone del desktop in ordine: schermo col piede e le icone in fila, la seconda riga ancora a metà.
+  const desktopIcons =
+    `<rect x="3" y="3.5" width="18" height="12.5" rx="2"/>` +
+    `<path d="M12 16v4"/>` +
+    `<path d="M8.5 20h7"/>` +
+    `<path d="M7.5 7.75h.01"/>` +
+    `<path d="M12 7.75h.01"/>` +
+    `<path d="M16.5 7.75h.01"/>` +
+    `<path d="M7.5 11.75h.01"/>` +
+    `<path d="M12 11.75h.01"/>`;
+
   // --- Stile della pagina: pennello (manico diagonale + ciuffo).
   const brush =
     `<path d="M20 4c-3.5 1-8 5.5-10 9l1.5 1.5c3.5-2 8-7 8.5-10.5z"/>` +
@@ -594,6 +617,49 @@
   const memory =
     `<path d="M9.5 4a3 3 0 0 0-3 3 3 3 0 0 0-2 5 3 3 0 0 0 1.5 5A3 3 0 0 0 9.5 20c1.3 0 2.5-.8 2.5-2V6a2.5 2.5 0 0 0-2.5-2z"/>` +
     `<path d="M14.5 4a3 3 0 0 1 3 3 3 3 0 0 1 2 5 3 3 0 0 1-1.5 5A3 3 0 0 1 14.5 20c-1.3 0-2.5-.8-2.5-2V6a2.5 2.5 0 0 1 2.5-2z"/>`;
+
+  // --- Rispondi a un messaggio: la freccia che torna indietro piegata, come nelle app di messaggi.
+  const reply =
+    `<path d="M9 17l-5-5 5-5"/>` +
+    `<path d="M20 18v-2a4 4 0 0 0-4-4H4"/>`;
+
+  // --- La fila del tasto destro sul testo (#1434): formattazione, collegamento, evidenziatore, forbici.
+  const bold =
+    `<path d="M7 5h5.5a3.5 3.5 0 0 1 0 7H7z"/>` +
+    `<path d="M7 12h6.5a3.5 3.5 0 0 1 0 7H7z"/>`;
+  const italic =
+    `<path d="M10 5h8"/>` +
+    `<path d="M6 19h8"/>` +
+    `<path d="M14 5l-4 14"/>`;
+  const underline =
+    `<path d="M7 4v7a5 5 0 0 0 10 0V4"/>` +
+    `<path d="M5 20h14"/>`;
+  const strike =
+    `<path d="M16.5 7.5c-.6-1.8-2.3-3-4.5-3-2.6 0-4.5 1.5-4.5 3.5 0 1.2.6 2.1 1.6 2.8"/>` +
+    `<path d="M14.5 13c1.2.7 2 1.6 2 3 0 2-2 3.5-4.5 3.5-2.4 0-4.2-1.2-4.8-3"/>` +
+    `<path d="M4 12h16"/>`;
+  const link =
+    `<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/>` +
+    `<path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>`;
+  // Evidenziatore: il pennarello inclinato con la punta a scalpello, e sotto la riga che lascia.
+  const highlight =
+    `<path d="M16.5 2.5l4.5 4.5-7.5 7.5-4.5-4.5z"/>` +
+    `<path d="M9 10l-3 5.5 2 2 5.5-3"/>` +
+    `<path d="M3.5 21h9"/>`;
+  const cut =
+    `<circle cx="6" cy="17" r="3"/>` +
+    `<circle cx="18" cy="17" r="3"/>` +
+    `<path d="M8.2 14.8L19 4"/>` +
+    `<path d="M15.8 14.8L5 4"/>`;
+  // La fila su un filmato: il triangolo che parte, le due sbarre che fermano, lo schermo con la finestrella nell'angolo.
+  const play =
+    `<path d="M8 5.5v13l10.5-6.5z"/>`;
+  const pause =
+    `<path d="M8.5 5.5v13"/>` +
+    `<path d="M15.5 5.5v13"/>`;
+  const pip =
+    `<rect x="3" y="5" width="18" height="14" rx="2"/>` +
+    `<rect x="12" y="12" width="6" height="4.5" rx="1"/>`;
 
   // PREVISTE: copia (due fogli sovrapposti).
   const copy =
@@ -687,7 +753,9 @@
     options:      (size) => wrap(options, { size }),
     colorPicker:  (size) => wrap(colorPicker, { size }),
     lock:         (size) => wrap(lock, { size }),
+    lockOpen:     (size) => wrap(lockOpen, { size }),
     transparency: (size) => wrap(transparency, { size }),
+    novita:       (size) => wrap(novita, { size }),
     incognito:    (size) => wrap(incognito, { size }),
     user:         (size) => wrap(user, { size }),
     plus:         (size) => wrap(plus, { size }),
@@ -747,6 +815,7 @@
     volume:       (size) => wrap(volume, { size }),
     volumeMute:   (size) => wrap(volumeMute, { size }),
     windowFrame:  (size) => wrap(windowFrame, { size }),
+    desktopIcons: (size) => wrap(desktopIcons, { size }),
     brush:        (size) => wrap(brush, { size }),
     undo:         (size) => wrap(undo, { size }),
     mailOpen:     (size) => wrap(mailOpen, { size }),
@@ -761,6 +830,17 @@
     mic:          (size) => wrap(mic, { size }),
     memory:       (size) => wrap(memory, { size }),
     copy:         (size) => wrap(copy, { size }),
+    bold:         (size) => wrap(bold, { size }),
+    italic:       (size) => wrap(italic, { size }),
+    underline:    (size) => wrap(underline, { size }),
+    strike:       (size) => wrap(strike, { size }),
+    link:         (size) => wrap(link, { size }),
+    highlight:    (size) => wrap(highlight, { size }),
+    cut:          (size) => wrap(cut, { size }),
+    play:         (size) => wrap(play, { size }),
+    pause:        (size) => wrap(pause, { size }),
+    pip:          (size) => wrap(pip, { size }),
+    reply:        (size) => wrap(reply, { size }),
     bell:         (size) => wrap(bell, { size }),
     repeat:       (size) => wrap(repeat, { size }),
     question:     (size) => wrap(question, { size }),

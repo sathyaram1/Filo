@@ -8,14 +8,16 @@
 //   4. Dal tasto destro sulla scheda si arriva alla casella, e si toglie tutto in un gesto.
 //   5. «Non aspettare più» sotto il campo c'è solo con due attese o più: con una basta la sua ×.
 //   6. Un gesto fatto mentre una scrittura è in volo parte dall'elenco già scritto, non da quello di prima.
-//   7. Un'attesa su un aspettato che la pagina non legge (cancellato) viaggia per id e resta: le altre si toccano.
+//   7. Un'attesa su un aspettato che la pagina non legge (cancellato) resta: le altre si toccano.
+//   8. La pagina manda il gesto, non l'elenco: un'attesa scritta da altri dopo che la pagina ha letto resta (#1756.1).
+//
+// Il main finto applica il gesto alle attese «sul server» (window.__sulServer) come fa quello vero, la cui regola di
+// scrittura ha la sua prova in manage-attese-concorrenti.spec.mjs.
 
 import { test, expect } from './fixtures/electron.mjs';
 
 const MANAGE = 'filo://manage/manage.html';
 const ID_DEL_NUMERO = { 12: 'f12', 13: 'f13' };
-// Le attese già scritte che il main tiene per id, col numero che hanno sul documento.
-const TENUTE = { via951: '951' };
 
 function fb(over = {}) {
   return Object.assign({
@@ -34,29 +36,39 @@ async function apri(page, lista = LISTA) {
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await page.evaluate(({ ids, tenute }) => {
+  await page.evaluate((ids) => {
     window.__updates = [];
+    window.__sulServer = {};
     const orig = window.filo.message.bind(window.filo);
     window.filo.message = async (msg) => {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'feedback_update') {
         window.__updates.push(msg);
-        if (msg.waitsFor === undefined) return { ok: true };
-        const numeri = String(msg.waitsFor).split(/[\s,]+/).filter(Boolean).map((n) => n.replace('#', ''));
+        if (msg.waitsAggiungi === undefined && msg.waitsTogli === undefined) return { ok: true };
+        const numeri = String(msg.waitsAggiungi || '').split(/[\s,]+/).filter(Boolean).map((n) => n.replace('#', ''));
         const ignoto = numeri.find((n) => !ids[n]);
         if (ignoto) return { ok: false, error: `#${ignoto} non esiste` };
-        const tenuti = (msg.waitsTieni || []).filter((id) => tenute[id]).map((id) => ({ id, num: tenute[id] }));
-        return { ok: true, waitsFor: [...tenuti, ...numeri.map((n) => ({ id: ids[n], num: n }))] };
+        const via = msg.waitsTogli || [];
+        const ora = (window.__sulServer[msg.id] || []).filter((w) => !via.includes(w.id));
+        for (const n of numeri) if (!ora.some((w) => w.id === ids[n])) ora.push({ id: ids[n], num: n });
+        window.__sulServer[msg.id] = ora;
+        return { ok: true, waitsFor: ora.map((w) => ({ ...w })) };
       }
       return orig(msg);
     };
-  }, { ids: ID_DEL_NUMERO, tenute: TENUTE });
-  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, lista);
+  }, ID_DEL_NUMERO);
+  await page.evaluate((l) => {
+    for (const f of l) if (f.waitsFor) window.__sulServer[f._id] = f.waitsFor.map((w) => ({ ...w }));
+    window.__mgTest.setAdmin(true);
+    window.__mgTest.setData(l);
+  }, lista);
   await page.evaluate(() => window.__mgTest.setTab('queue'));
 }
 
 const tabBtn = (page, tab) => page.locator(`.mg-tab[data-tab="${tab}"]`);
+// Quello che la pagina ha chiesto al main: i numeri da aggiungere, o gli id da togliere.
+const gesto = (u) => (u.waitsAggiungi !== undefined ? u.waitsAggiungi : u.waitsTogli);
 
 test('dal dettaglio: «aspetta #12, #13» si scrive, mostra lo stato di ciascuno, e si toglie', async ({ openTab }) => {
   const page = await openTab(MANAGE);
@@ -74,7 +86,7 @@ test('dal dettaglio: «aspetta #12, #13» si scrive, mostra lo stato di ciascuno
   await page.locator('#mgAtteseInput').press('Enter');
 
   await expect(page.locator('#mgManageMsg')).toContainText('aspetta #12, #13');
-  expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'feedback_update', id: 'f903', waitsFor: '12, 13' }]);
+  expect(await page.evaluate(() => window.__updates)).toEqual([{ type: 'feedback_update', id: 'f903', waitsAggiungi: '12, 13' }]);
   const chip = (n) => page.locator('#mgAtteseLista .mg-attesa', { hasText: `#${n}` });
   await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(2);
   await expect(chip(12)).toContainText('in coda');
@@ -96,14 +108,14 @@ test('dal dettaglio: «aspetta #12, #13» si scrive, mostra lo stato di ciascuno
   await page.evaluate(() => window.__mgTest.openDetail('f903'));
   await chip(12).locator('.mg-attesa-togli').click();
   await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(1);
-  expect((await page.evaluate(() => window.__updates))[1]).toEqual({ type: 'feedback_update', id: 'f903', waitsFor: '13' });
+  expect((await page.evaluate(() => window.__updates))[1]).toEqual({ type: 'feedback_update', id: 'f903', waitsTogli: ['f12'] });
   // Resta solo un aspettato già fuso: torna In coda.
   await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (0)');
   await chip(13).locator('.mg-attesa-togli').click();
   await expect(page.locator('#mgManageMsg')).toContainText('non aspetta più niente');
   await expect(page.locator('#mgAttese')).toBeHidden();
   await expect(toggle).toHaveText('⏳ Aspetta');
-  expect((await page.evaluate(() => window.__updates))[2]).toEqual({ type: 'feedback_update', id: 'f903', waitsFor: '' });
+  expect((await page.evaluate(() => window.__updates))[2]).toEqual({ type: 'feedback_update', id: 'f903', waitsTogli: ['f13'] });
   await expect(tabBtn(page, 'queue')).toHaveText('In coda (2)');
 });
 
@@ -141,7 +153,7 @@ test('tasto destro sulla scheda: «Aspetta un altro feedback…» apre la casell
   await page.locator('.mg-item[data-id="f903"]').click({ button: 'right' });
   await menu.locator('.sn-select-option', { hasText: 'Non aspettare più' }).click();
   await expect(tabBtn(page, 'waiting')).toHaveText('Aspettano (0)');
-  expect((await page.evaluate(() => window.__updates)).map((u) => u.waitsFor)).toEqual(['12', '']);
+  expect((await page.evaluate(() => window.__updates)).map(gesto)).toEqual(['12', ['f12']]);
 });
 
 test('la pagina gemella dei feedback ha la stessa sezione, e la scheda dice cosa aspetta', async ({ openTab }) => {
@@ -195,7 +207,7 @@ test('un gesto mentre una scrittura è in volo non cancella quella prima', async
   await campo.fill('13');
   await campo.press('Enter');
   await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(2, { timeout: 10000 });
-  expect((await page.evaluate(() => window.__updates)).map((u) => u.waitsFor)).toEqual(['12', '12, 13']);
+  expect((await page.evaluate(() => window.__updates)).map(gesto)).toEqual(['12', '13']);
 
   // La × premuta mentre un'aggiunta è in volo toglie solo la sua.
   await page.locator('#mgAtteseLista .mg-attesa', { hasText: '#13' }).locator('.mg-attesa-togli').click();
@@ -203,7 +215,7 @@ test('un gesto mentre una scrittura è in volo non cancella quella prima', async
   await campo.press('Enter');
   await page.locator('#mgAtteseLista .mg-attesa', { hasText: '#12' }).locator('.mg-attesa-togli').click();
   await expect.poll(() => page.evaluate(() => window.__updates.length), { timeout: 10000 }).toBe(5);
-  expect((await page.evaluate(() => window.__updates)).slice(2).map((u) => u.waitsFor)).toEqual(['12', '12, 13', '13']);
+  expect((await page.evaluate(() => window.__updates)).slice(2).map(gesto)).toEqual([['f13'], '13', ['f12']]);
   await expect(page.locator('#mgAtteseLista .mg-attesa')).toHaveCount(1);
   await expect(page.locator('#mgAtteseLista')).toContainText('#13');
 });
@@ -277,7 +289,7 @@ test('otto attese stanno dentro la scheda, in Gestione e nella pagina dei feedba
   expect(sfora).toBe(0);
 });
 
-test('un aspettato cancellato non blocca le altre attese: viaggia per id e resta', async ({ openTab }) => {
+test('un aspettato cancellato non blocca le altre attese: resta', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apri(page, [fb({ waitsFor: [{ id: 'via951', num: '951' }, { id: 'f12', num: '12' }] }), ...LISTA.slice(1)]);
   await page.evaluate(() => window.__mgTest.openDetail('f903'));
@@ -291,6 +303,5 @@ test('un aspettato cancellato non blocca le altre attese: viaggia per id e resta
   await expect(righe).toHaveCount(2);
   await expect(page.locator('#mgAtteseLista')).toContainText('#951');
   await expect(page.locator('#mgAtteseLista')).toContainText('#13');
-  const inviati = await page.evaluate(() => window.__updates);
-  expect(inviati.map((u) => [u.waitsFor, u.waitsTieni])).toEqual([['', ['via951']], ['13', ['via951']]]);
+  expect((await page.evaluate(() => window.__updates)).map(gesto)).toEqual([['f12'], '13']);
 });

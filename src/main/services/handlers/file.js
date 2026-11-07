@@ -64,7 +64,12 @@ module.exports = function register(on, ctx) {
     const esiti = await NomiFile.rimetti(coppie);
     return { ok: esiti.length > 0 && esiti.every((e) => e.ok), esiti };
   }));
-  on(MSG.DOWNLOAD_RIMETTI_NOME, soloFilo(async (msg, sender) => DL().rimettiNome(msg.id, ambito(sender))));
+  on(MSG.DOWNLOAD_RIMETTI_NOME, soloFilo(async (msg, sender) => {
+    // Il nome proposto da Filo rifiutato (#1470): si conta col luogo, mai il nome.
+    const F = require('../contatoriFinestra');
+    F.misura('download', F.luogoDownload(msg, sender), 'rimetti_nome', { incognito: !!ambito(sender) });
+    return DL().rimettiNome(msg.id, ambito(sender));
+  }));
 
   // #947 — il bottone di un file trovato in chat. Il percorso può averlo scritto un modello che ha letto un documento
   // ostile: si apre solo un documento o un'immagine, mai un programma.
@@ -74,8 +79,15 @@ module.exports = function register(on, ctx) {
   const IMMAGINI = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp', '.bmp', '.heic', '.tif', '.tiff']);
   const apribile = (p) => !!Testo.tipoDi(p) || IMMAGINI.has(path.extname(p).toLowerCase());
   const esiste = (p) => { try { return fs.statSync(p).isFile(); } catch (_) { return false; } };
+  // L'apertura entra nel filo da qui, com'è andata (#1561).
   on(MSG.FILE_APRI, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
+    const r = await apriDalBottone(p);
+    const chiesto = p || (typeof msg?.percorso === 'string' ? msg.percorso.trim() : '');
+    if (chiesto) { try { require('../accaduti').fileAperto({ percorso: chiesto }, r); } catch (_) {} }
+    return r;
+  }));
+  async function apriDalBottone(p) {
     if (!p) return senza(p);
     // Il tipo si guarda sul nome, prima di chiedere niente al disco.
     if (!apribile(p)) {
@@ -88,7 +100,7 @@ module.exports = function register(on, ctx) {
     } catch (_) {
       return { ok: false, errore: 'sistema', frase: 'Il computer non ha un programma per aprire questo file' };
     }
-  }));
+  }
   on(MSG.FILE_MOSTRA_CARTELLA, soloFilo(async (msg) => {
     const p = percorsoDi(msg);
     if (!p) return senza(p);
@@ -109,7 +121,7 @@ module.exports = function register(on, ctx) {
     return { ok: true, ...(await Indice.dimentica(p)) };
   }));
 
-  // #947.3 — l'Aiuto di una scheda: aperti ai siti, perché l'Aiuto vive nella pagina. Il sì e le chiavi li tiene
+  // #947.3 — l'Aiuto di una scheda: aperti ai siti, perché l'Aiuto parla come la pagina. Il sì e le chiavi li tiene
   // aiutoDocumenti; qui solo la porta: una scheda, e dal suo documento principale (un riquadro è un altro sito).
   const AiutoDoc = require('../aiutoDocumenti');
   const daScheda = (fn) => async (msg, sender) => {
@@ -127,7 +139,8 @@ module.exports = function register(on, ctx) {
       cartella: msg.cartella,
       origine,
       avanzamento: (fatti, totali) => {
-        try { (sender.frame || wc).send('filo:broadcast', { type: MSG.AIUTO_DOCUMENTI_AVANZAMENTO, fatti, totali }); } catch (_) {}
+        // Dall'Aiuto nello strato sopra il sito (#1509.3) l'avanzamento va a lui, non alla pagina.
+        try { (sender.strato || sender.frame || wc).send('filo:broadcast', { type: MSG.AIUTO_DOCUMENTI_AVANZAMENTO, fatti, totali }); } catch (_) {}
       },
     });
     if (r.ok) {
@@ -135,12 +148,17 @@ module.exports = function register(on, ctx) {
       const scaricato = r.candidati.some((c) => ctx.fileScaricato(AiutoDoc.percorsoDi(wc, c.chiave)));
       try { ctx.segnaLetturaAiuto(sender, { type: 'CERCA_DOCUMENTI', cosa: r.cercato, _output: { cercato: r.cercato, risultati: r.candidati, scaricato } }); } catch (_) {}
     }
+    try {
+      ctx.azioneDellAiuto({ type: 'CERCA_DOCUMENTI', cosa: msg.cosa, ...(msg.cartella ? { cartella: msg.cartella } : {}) },
+        { executed: !!(r && r.ok), output: r && r.ok ? { cercato: r.cercato, risultati: r.candidati } : { error: (r && (r.error || r.code)) || 'non riuscita' } }, sender);
+    } catch (_) {}
     return r;
   }));
   on(MSG.AIUTO_DOCUMENTI_FERMA, daScheda(async (_msg, _sender, wc) => ({ ok: AiutoDoc.ferma(wc) })));
   on(MSG.AIUTO_APRI_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.apri(wc, msg.chiave)));
   on(MSG.AIUTO_MOSTRA_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.mostra(wc, msg.chiave)));
-  on(MSG.AIUTO_TRASCINA_FILE, daScheda(async (msg, _sender, wc) => AiutoDoc.trascina(wc, msg.chiave)));
+  // Il trascinamento parte dove l'utente ha preso il bottone: lo strato, se l'Aiuto sta lì.
+  on(MSG.AIUTO_TRASCINA_FILE, daScheda(async (msg, sender, wc) => AiutoDoc.trascina(wc, msg.chiave, sender.strato || wc)));
   on(MSG.DOCUMENTI_SCEGLI_CARTELLA, soloFilo(async (msg, sender) => {
     const { dialog, BrowserWindow } = electron();
     const win = (sender && sender.win) || BrowserWindow.getFocusedWindow() || undefined;

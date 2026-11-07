@@ -50,8 +50,8 @@
     + 'Se cambi idea la rifacciamo quando vuoi, da Preferenze → «Rifai '
     + 'l’intervista di benvenuto».';
 
-  // Sei scambi in tutto, non di più, salvo che sia l'utente ad allungare: uno per voce da scoprire più le cose da dire.
-  const MAX_EXCHANGES = 6;
+  // Sette scambi in tutto, non di più, salvo che sia l'utente ad allungare: uno per voce da scoprire più le cose da dire.
+  const MAX_EXCHANGES = 7;
   // Tetto duro: l'intervista non può diventare infinita nemmeno se il modello
   // si dimentica di chiuderla. Oltre questo, la chiude il codice.
   const HARD_MAX_EXCHANGES = 12;
@@ -96,6 +96,14 @@
       kind: 'dire',
       label: 'La privacy è protetta già così',
       detail: 'Cookie rifiutati, pubblicità bloccate, siti pericolosi bloccati. Una frase, e che se ne può parlare o cambiare qualcosa. Se ti chiede quali dati escono dal suo computer e verso chi, leggi il documento con LEGGI_TRASPARENZA doc "privacy" prima di rispondere.',
+    },
+    {
+      // #1461: i contatori anonimi sono una scelta concreta, accanto a quello che Filo dice della privacy.
+      id: 'contatori',
+      kind: 'scoprire',
+      label: 'Se Filo può mandare numeri senza contenuto per migliorare',
+      detail: 'Quante volte si usa ogni funzione, quanto si aspetta, cosa non va: solo numeri, mai testi, indirizzi o nomi di file, con uno pseudonimo che cambia ogni mese. Spenti, non esce niente.',
+      applica: 'Diglielo in una riga con parole tue e nello stesso turno emetti ONBOARDING con "contatori": true: sotto la tua risposta compaiono Sì e No, e sceglie lui con un clic, che ti arriva come suo messaggio già applicato. Se invece risponde a parole, applica tu quello che ha detto con IMPOSTA_PREFERENZA, chiave "contatori" e valore true o false; se non si capisce, rimostra la scelta. Spunta la voce quando ha scelto, col clic o a parole, non nel turno in cui mostri la scelta.',
     },
     {
       id: 'modelli',
@@ -209,6 +217,7 @@
     return {
       ...(m && m.daFuori === true ? { daFuori: true } : {}),
       ...(m && m.role === 'filo' && m.autonomia === true ? { autonomia: true } : {}),
+      ...(m && m.role === 'filo' && m.contatori === true ? { contatori: true } : {}),
       ...(m && m.role === 'filo' && m.congedo === true ? { congedo: true } : {}),
     };
   }
@@ -255,9 +264,12 @@
       notice: s.notice === 'early' ? 'early' : '',
       ...(s.fermato ? { fermato: true } : {}),
       ...(s.autonomiaInSospeso === true ? { autonomiaInSospeso: true } : {}),
+      ...(s.contatoriInSospeso === true ? { contatoriInSospeso: true } : {}),
       ...(Number(s.scambiPrima) > 0 ? { scambiPrima: Math.floor(Number(s.scambiPrima)) } : {}),
       // Rifatta o ripresa: non è più il primo avvio, e la home la mostra solo nelle pagine che l'hanno chiesta (#1297).
       ...(s.rifatta === true ? { rifatta: true } : {}),
+      // Rifatta da capo dalle Preferenze, anche se poi ripresa: i contatori la tengono fuori da quelli della prima volta.
+      ...(s.daCapo === true ? { daCapo: true } : {}),
     };
   }
 
@@ -268,6 +280,16 @@
   }
   function autonomiaInSospeso(state) {
     return normalize(state).autonomiaInSospeso === true;
+  }
+  // #1461 — la scelta dei contatori, con la stessa regola: a schermo e senza risposta, l'intervista non si chiude.
+  function mostraSceltaContatori(state) {
+    return { ...normalize(state), contatoriInSospeso: true };
+  }
+  function contatoriInSospeso(state) {
+    return normalize(state).contatoriInSospeso === true;
+  }
+  function sceltaInSospeso(state) {
+    return autonomiaInSospeso(state) || contatoriInSospeso(state);
   }
 
   function isActive(state) {
@@ -320,7 +342,7 @@
         thread: cur.thread,
       }].slice(-PAST_CAP)
       : cur.past;
-    return { ...emptyState(), past, startedAt: at, rifatta: true };
+    return { ...emptyState(), past, startedAt: at, rifatta: true, daCapo: true };
   }
 
   // «Riprendiamola» (#1297): l'intervista chiusa a metà si riapre dov'era, con le spunte e la stessa targa. Il congedo
@@ -342,11 +364,12 @@
     if (!congedoApp && ultimo && ultimo.role === 'filo' && prima > 0) {
       thread.push({ role: 'user', text: RESUME_REPLY });
     }
-    const { autonomiaInSospeso: _sospesa, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
+    const { autonomiaInSospeso: _sospesa, contatoriInSospeso: _contatori, fermato: _fermato, scambiPrima: _prima, ...resto } = cur;
     const fine = thread[thread.length - 1];
     const riaperta = {
       ...resto, done: false, closedAt: null, notice: '', thread, rifatta: true,
       ...(fine && fine.role === 'filo' && fine.autonomia ? { autonomiaInSospeso: true } : {}),
+      ...(fine && fine.role === 'filo' && fine.contatori ? { contatoriInSospeso: true } : {}),
     };
     return prima > 0 ? { ...riaperta, scambiPrima: prima } : riaperta;
   }
@@ -377,7 +400,7 @@
     const cur = normalize(state);
     return cur.done
       ? { ...emptyState(), done: true, closedAt: cur.closedAt }
-      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}) };
+      : { ...emptyState(), ...(cur.rifatta ? { rifatta: true } : {}), ...(cur.daCapo ? { daCapo: true } : {}) };
   }
 
   // Le interviste conservate, dalla più recente: la corrente (appena ha una conversazione) e
@@ -428,7 +451,7 @@
     const text = String((turn && turn.text) || '');
     if (!text) return normalize(state);
     const tutto = togliFermato(state);
-    const { autonomiaInSospeso: _sospesa, ...senza } = tutto;
+    const { autonomiaInSospeso: _sospesa, contatoriInSospeso: _contatori, ...senza } = tutto;
     const cur = role === 'user' ? senza : tutto;
     const last = cur.thread[cur.thread.length - 1];
     const nuovi = segni({ ...turn, role });
@@ -478,7 +501,7 @@
   function shouldForceClose(state) {
     const cur = normalize(state);
     if (cur.done) return false;
-    return (isComplete(cur) && !cur.autonomiaInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
+    return (isComplete(cur) && !cur.autonomiaInSospeso && !cur.contatoriInSospeso) || userTurns(cur) >= HARD_MAX_EXCHANGES;
   }
 
   // Elenco per il prompt: cosa resta da scoprire e da dire, con la spunta di ciò che è fatto.
@@ -500,7 +523,7 @@
     emptyState, normalize, isActive, isTicked, tick, close, restart, riprendi, conversations,
     chiaveConversazione, togliConversazione, dimentica,
     remaining, isComplete, appendTurn, haTestoDiAltri, userTurns, hasPendingTurn, segnaFermato, togliFermato, shouldForceClose,
-    mostraSceltaAutonomia, autonomiaInSospeso,
+    mostraSceltaAutonomia, autonomiaInSospeso, mostraSceltaContatori, contatoriInSospeso, sceltaInSospeso,
     isStopRequest, isDecline, isExitRequest, dismissNotice, renderChecklistForPrompt,
     chatId,
   };

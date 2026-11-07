@@ -39,7 +39,8 @@ function senzaRiprova(prima, nuovi) {
 }
 
 // `rif` dice quale conversazione dell'app (documento e modulo, mazzo, apertura dell'Aiuto); `dove` riapre l'app lì.
-function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
+// `daPagina`: l'Aiuto parla da sopra un sito, che vede le parole dell'utente (#1508, src/shared/filoApp.js → conProvenienza).
+function annota({ app: nome, rif, soggetto, dove, messaggi, daPagina = false } = {}, opts) {
   const R = A();
   if (!R.eApp(nome)) return Promise.resolve(null);
   const chiave = String(rif == null ? '' : rif).slice(0, 400);
@@ -66,7 +67,7 @@ function annota({ app: nome, rif, soggetto, dove, messaggi } = {}, opts) {
     }
     for (const m of senzaRiprova(c ? c.messages : [], nuovi)) {
       eventi.push(t.evento(T().MESSAGGIO, {
-        chat: id, msg: { role: m.role, text: m.text, ...(m.role === 'filo' ? { esterno: ESTERNO[nome] } : {}) },
+        chat: id, msg: { role: m.role, text: m.text, ...(m.role === 'filo' ? { esterno: ESTERNO[nome] } : (daPagina === true ? { daPagina: true } : {})) },
       }, { autore: m.role === 'user' ? 'utente' : 'filo' }));
     }
     await t.scrivi(eventi);

@@ -21,7 +21,7 @@ La regola, in tre pezzi:
   peso a schermo. In mezzo ci sono i casi che vanno detti per nome: firma che non
   torna, firmatario fuori dall'elenco, file cambiato dopo la firma. Quando una
   firma non regge non si riferisce nemmeno cosa affermava: ripeterlo è darle voce.
-- **Chi ha firmato si riconosce da una cosa sola: l'elenco ufficiale.** La catena
+- **Chi ha firmato si riconosce da un elenco pubblicato, mai dal nome.** La catena
   del certificato deve arrivare a un'autorità dell'elenco dei firmatari che
   pubblica chi gestisce lo standard, e il certificato deve essere fatto per
   firmare credenziali. Il nome scritto nel certificato non conta: un certificato
@@ -34,6 +34,16 @@ La regola, in tre pezzi:
   la cui firma regge e la cui autorità sta nel secondo elenco ufficiale, quello
   delle autorità di marcatura (#946). Senza una marca così, il certificato
   scaduto rende le credenziali «incomplete».
+- **L'elenco provvisorio vale solo per il passato, e si nomina.** Prima del
+  programma ufficiale il C2PA (col verificatore di riferimento) riconosceva un
+  elenco provvisorio, congelato il 1° gennaio 2026: autorità come Truepic,
+  Microsoft e Adobe G2, più singoli certificati ammessi per impronta esatta. Ci
+  arrivano le immagini di ChatGPT, Firefly e Bing di prima, che altrimenti non
+  direbbero mai chi le ha fatte. Filo lo scarica col resto e lo usa solo se
+  l'elenco ufficiale non riconosce il firmatario, solo per le firme di prima del
+  congelamento (lo dice una marca che regge; senza, il certificato deve essere
+  nato prima), e la frase lo dice: «Il firmatario è riconosciuto dall'elenco
+  provvisorio del C2PA» (#946.1, scelta dell'owner).
 - **«Non so verificarla» non è «non è valida».** «La firma non è valida» si
   dice solo quando la verifica è stata fatta e ha fallito. Una forma che Filo non
   sa leggere (un algoritmo che non conosce, una chiave che il motore crittografico
@@ -54,6 +64,9 @@ La regola, in tre pezzi:
   programma che tiene le credenziali dice «generata» nel manifesto del passo
   prima: si segue l'ingrediente, se la sua impronta è quella firmata dal passo
   dopo e se la sua firma regge, e a dichiarare è chi ha firmato quel manifesto.
+  Un componente generato rende l'immagine «modificata», salvo quando è tutta
+  l'immagine: unico ingrediente, stesso certificato, nessuna lavorazione
+  dichiarata dal passo dopo. ChatGPT firma così ogni sua immagine (#946.1).
 - **Dai pixel non si stima niente.** Niente classificatori a percentuale, e il
   modello che descrive l'immagine non parla della sua origine. Un marchio
   invisibile aperto invece è un messaggio fisso che il generatore scrive nei

@@ -13,10 +13,16 @@ const TARDI = 'La segnalazione è già partita e non posso più ritirarla';
 const inAttesa = new Map();
 // biglietto → Promise dell'esito: { id } col documento scritto, { inCoda } aspetta l'owner, {} non è partita.
 const partite = new Map();
+// Partenza → la sua voce, per l'esito di un ritiro dopo la partenza.
+const voci = new WeakMap();
 // Gli invii non ancora finiti: l'uscita da Filo li aspetta, o chi non ha detto no perde la segnalazione.
 const inVolo = new Set();
 // Tetto dell'attesa all'uscita: una rete ferma non deve tenere Filo aperto.
 const USCITA_MS = 5000;
+
+function di(voce, nome) {
+  try { if (voce && typeof voce.esito === 'function') voce.esito(nome); } catch (_) {}
+}
 
 function sgancia(biglietto) {
   const voce = inAttesa.get(biglietto);
@@ -28,10 +34,10 @@ function sgancia(biglietto) {
 }
 
 // `spedisci` torna l'esito dell'invio ({ id } o { queued }); `finestra` è quella dell'avviso: chiusa lei, l'avviso non
-// c'è più e nessuno ha detto no.
-function trattieni(spedisci, finestra) {
+// c'è più e nessuno ha detto no. `esito(nome)` lo sentono i contatori (#1472): inviata, in_coda, fallita, annullata.
+function trattieni(spedisci, finestra, { esito = null } = {}) {
   const biglietto = crypto.randomUUID();
-  const voce = { spedisci, timer: null, finestra: null, allaChiusura: null };
+  const voce = { spedisci, timer: null, finestra: null, allaChiusura: null, esito };
   voce.timer = setTimeout(() => parti(biglietto), TETTO_MS);
   if (finestra && typeof finestra.once === 'function') {
     voce.finestra = finestra;
@@ -50,6 +56,8 @@ function parti(biglietto) {
     .then(voce.spedisci)
     .then((r) => (r && r.queued ? { inCoda: true } : { id: r && r.id ? String(r.id) : '' }))
     .catch((e) => { console.warn('[F4] submit auto-feedback fallito:', (e && e.message) || e); return {}; });
+  partenza.then((x) => di(voce, x.inCoda ? 'in_coda' : x.id ? 'inviata' : 'fallita'));
+  voci.set(partenza, voce);
   inVolo.add(partenza);
   partenza.then(() => inVolo.delete(partenza));
   partite.set(b, partenza);
@@ -85,7 +93,8 @@ try {
 async function annulla(biglietto) {
   const b = String(biglietto || '');
   if (!b) return { ok: false, error: 'id mancante' };
-  if (sgancia(b)) return { ok: true };
+  const ferma = sgancia(b);
+  if (ferma) { di(ferma, 'annullata'); return { ok: true }; }
   const partenza = partite.get(b);
   if (!partenza) return { ok: false, error: NON_DA_QUI };
   const esito = await partenza;
@@ -104,6 +113,7 @@ async function annulla(biglietto) {
   try {
     const idToken = await auth.getIdToken().catch(() => null);
     await FB.updateStatus(esito.id, { status: 'ignored', notes: 'Annullato dall\'utente (undo toast F4)' }, { idToken: idToken || undefined });
+    di(voci.get(partenza), 'annullata');
     return { ok: true };
   } catch (e) {
     partite.set(b, partenza);

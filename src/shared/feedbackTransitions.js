@@ -67,18 +67,20 @@
     todo: {
       working:  ['routine'], // presa in carico (il semaforo lo tiene il server)
       design:   ['routine'], // la routine ha domande → chat + statusReason clarify
-      archived: ['owner'],   // un doppione, o una cosa che non si farà più
+      // routine: solo il riordino della coda e l'unione (ambiti `coda` e `unisci`, #1153), su un lavoro non iniziato.
+      archived: ['owner', 'routine'], // un doppione, o una cosa che non si farà più
       // Il worker che l'ha letto da vicino lo giudica attacco o spam (statusReason worker): Ricevuti L3 (#1358).
       attack:   ['routine'],
       spam:     ['routine'],
-      // NB: il passo diretto todo→done (attore routine) è stato RITIRATO col
-      // ridisegno (SPEC-RIDISEGNO-MAX.md §1): esisteva per il pianificatore che
-      // spezzava le spec in sotto-feedback, che non esiste più. Le chiusure
-      // manuali senza branch (npm run feedback -- <id> done --come-routine)
-      // restano legali come CATENA di passi (canReach attraversa l'iter).
+      // Una segnalazione unita a un pacchetto: la chiude il server alla fusione del pacchetto, con la sua frase
+      // (FEEDBACK-STATES.md §3a). Per una routine il passo diretto todo→done resta ritirato (SPEC-RIDISEGNO-MAX.md §1).
+      done:     ['pipeline'],
     },
     working: {
       revision_capability: ['routine'], // fix pronto su branch
+      // «Già risolto su main» (FEEDBACK-STATES.md §3a): il server la accetta solo dal primo lavoro con `gia_risolto` e
+      // la fusione provata (linea principale, cita il feedback, dopo nascita e riapertura); ogni altra consegna no.
+      done:                ['routine'],
       design:              ['routine'], // domande a metà lavorazione
       // Arenato: il ramo fermo da un'ora torna in coda da solo (FEEDBACK-STATES.md §6a).
       // Alla terza volta va in `design`.
@@ -148,17 +150,11 @@
   // `verifierRound.js` (decideRound), incorporato anch'esso dal server al
   // deploy; una sentinella tiene questa lista uguale alla sua e ai campi della
   // dashboard.
-  //   cap3: giri di correzione per i rilievi di livello 3 (sicurezza, soldi,
-  //         Filo inutilizzabile). A bilancio finito un 3 ferma la pratica e
-  //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
-  //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
-  //         caso normale). A bilancio finito un 2 NON ferma: diventa un
-  //         feedback a parte a priorità 2, e il lavoro passa (2026-09-23).
-  //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
-  //         bilancio finito un 1 va nel feedback derivato.
-  //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
-  //         soli non si correggono mai: solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto corretto.
+  //   cap3/cap2/cap1/cap0: giri per i rilievi di livello 3/2/1/0. Finito il suo,
+  //   un rilievo paga col più alto aperto sotto (D88, #744); senza più bilanci
+  //   un 3 ferma la pratica (statusReason `loop`), gli altri escono in un
+  //   feedback derivato e il lavoro passa. Chi paga, e quanto: decideRound.
+  //   I vicini non pagano e da soli non fanno partire un giro (#1202).
   const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {

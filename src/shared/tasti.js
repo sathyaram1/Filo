@@ -234,6 +234,24 @@
       : 'Vai alla scheda in quella posizione (0 = la decima)';
   }
 
+  // ── La scheda dopo e quella prima ──────────────────────────────────────────
+  // Ctrl+Tab e Ctrl+Shift+Tab di ogni browser, su Mac col Control vero (Cmd+Tab è il cambio di app del
+  // sistema): l'etichetta resta «Ctrl+Tab» anche lì. Gira in tondo. Torna l'indice (0-based) o null.
+  function indiceSchedaVicina(ev, attiva, quante) {
+    if (!ev || !(String(ev.code || '') === 'Tab' || String(ev.key || '') === 'Tab')) return null;
+    if (!modificatore(ev, 'ctrl') || modificatore(ev, 'alt') || modificatore(ev, 'meta')) return null;
+    const n = Number(quante);
+    if (!Number.isInteger(n) || n < 1) return null;
+    const indietro = modificatore(ev, 'shift');
+    const i = Number(attiva);
+    if (!Number.isInteger(i) || i < 0 || i >= n) return indietro ? n - 1 : 0;
+    return (i + (indietro ? n - 1 : 1)) % n;
+  }
+
+  function etichettaSchedaVicina(verso) {
+    return verso === 'prima' ? 'Ctrl+Shift+Tab' : 'Ctrl+Tab';
+  }
+
   // ── Indietro e avanti ──────────────────────────────────────────────────────
   // Chi arriva da un browser qualunque prova Alt+freccia e i due tasti laterali
   // del mouse. Nome e comportamento stanno qui insieme per lo stesso motivo del
@@ -293,6 +311,29 @@
     return String(ev.key || '').toLowerCase() === 'b';
   }
   function etichettaBarra(esplicita) { return etichetta(ACCEL_BARRA, esplicita); }
+  // Il lucchetto della barra (#1431): lo stesso tasto con Alt in più. Su Mac Opzione con Cmd non scrive accenti.
+  const ACCEL_LUCCHETTO_BARRA = 'Ctrl+Alt+Shift+B';
+  function comandoLucchettoBarra(ev) {
+    if (!ev || !modificatore(ev, 'alt') || !modificatore(ev, 'shift')) return false;
+    if (!(modificatore(ev, 'ctrl') || modificatore(ev, 'meta'))) return false;
+    const code = String(ev.code || '');
+    if (code) return code === 'KeyB';
+    return String(ev.key || '').toLowerCase() === 'b';
+  }
+  function etichettaLucchettoBarra(esplicita) { return etichetta(ACCEL_LUCCHETTO_BARRA, esplicita); }
+
+  // ── Il pannello di destra delle app di Filo (#1433) ───────────────────────
+  // Ctrl+\ era già il tasto che nell'Editor mostrava e nascondeva gli strumenti: ora li apre dal bordo destro in
+  // ogni app di Filo che ha il pannello. Sui siti non è preso. Il tasto fisico cambia con la tastiera: vale il carattere.
+  const ACCEL_PANNELLO = 'Ctrl+\\';
+  function comandoPannello(ev) {
+    if (!ev || modificatore(ev, 'alt') || modificatore(ev, 'shift')) return false;
+    if (!(modificatore(ev, 'ctrl') || modificatore(ev, 'meta'))) return false;
+    const key = String(ev.key || '');
+    if (key) return key === '\\';
+    return String(ev.code || '') === 'Backslash';
+  }
+  function etichettaPannello(esplicita) { return etichetta(ACCEL_PANNELLO, esplicita); }
 
   // ── Lo schermo intero ─────────────────────────────────────────────────────
   // Il tasto abituale di ogni sistema, quindi un tasto DIVERSO e non una riscrittura: F11 su Windows e
@@ -385,7 +426,7 @@
   // ognuno quello che fa: lo legge chi si vede rifiutare la combinazione.
   const PRESI_OVUNQUE = [
     // La shell del browser se li prende prima della pagina, con Shift o senza (src/main/tabs.js, #545.5).
-    ['Ctrl+T', 'apre una scheda nuova'], ['Ctrl+Shift+T', 'apre una scheda nuova'],
+    ['Ctrl+T', 'apre una scheda nuova'], ['Ctrl+Shift+T', 'riapre l\'ultima scheda chiusa'],
     ['Ctrl+W', 'chiude la scheda'], ['Ctrl+Shift+W', 'chiude la scheda'],
     ['Ctrl+L', 'porta alla home per scrivere un indirizzo'], ['Ctrl+Shift+L', 'porta alla home per scrivere un indirizzo'],
     ['Ctrl+R', 'ricarica la pagina'], ['Ctrl+Shift+R', 'ricarica la pagina'],
@@ -395,6 +436,7 @@
     ['Alt+\u2190', 'torna alla pagina precedente'], ['Alt+\u2192', 'va alla pagina successiva'],
     // La barra laterale (src/main/barraLaterale.js), da qualunque vista abbia il fuoco.
     [ACCEL_BARRA, 'apre e chiude la barra laterale'],
+    [ACCEL_LUCCHETTO_BARRA, 'tiene aperta la barra laterale accanto alla pagina, o la sblocca'],
   ];
   const PRESI_SU_MAC = [
     // Le voci della barra dei menu (src/main/menu.js), anche col tasto che un role di Electron
@@ -421,6 +463,8 @@
       ...'0123456789'.split('').map((d) => [`Alt+${d}`, 'porta alla scheda in quella posizione']),
     ].map(([a, cosa]) => [etichetta(a, esplicita), cosa]);
     lista.push([etichettaSchermoIntero(esplicita), 'mette e toglie lo schermo intero']);
+    lista.push([etichettaSchedaVicina('dopo'), 'porta alla scheda successiva']);
+    lista.push([etichettaSchedaVicina('prima'), 'porta alla scheda precedente']);
     if (!senzaFilo) {
       for (const a of AZIONI_FILO) lista.push([etichettaFilo(scorciatoiaFilo(a.id), esplicita), `«${a.nome}»`]);
     }
@@ -618,7 +662,7 @@
     ['Ctrl+Shift+V', 'incolla senza formattazione'], ['Ctrl+A', 'seleziona tutto'],
     ['Ctrl+B', 'mette il grassetto'], ['Ctrl+I', 'mette il corsivo'], ['Ctrl+U', 'sottolinea'],
     ['Ctrl+S', 'salva il documento nell\'Editor'], ['Ctrl+F', 'porta alla ricerca dell\'Editor'],
-    ['Ctrl+\\', 'mostra e nasconde la barra laterale dell\'Editor'],
+    [ACCEL_PANNELLO, 'apre e chiude il pannello degli strumenti nelle app di Filo'],
     ['Ctrl+Plus', 'ingrandisce la pagina'], ['Ctrl+-', 'rimpicciolisce la pagina'],
     ['Ctrl+_', 'rimpicciolisce la pagina'], ['Ctrl+0', 'riporta la pagina al 100%'],
   ];
@@ -760,18 +804,18 @@
     return null;
   }
 
-  // Le combinazioni date ai moduli dell'Editor, in tutti i documenti: le quattro le prenderebbero prima del modulo.
-  // Chi controlla una delle quattro passa qui la collezione dell'Editor (filo.editor.collection) e i suoi cambi.
+  // Le combinazioni date agli elementi dei pannelli delle app (#1433): le quattro le prenderebbero prima dell'elemento.
+  // Chi controlla una delle quattro passa qui i pannelli salvati (sn_pannelli_app) e i loro cambi.
   let moduliPresi = [];
-  function usaScorciatoieModuli(collezione) {
+  function usaScorciatoiePannelli(pannelli) {
     const lista = [];
-    const files = collezione && Array.isArray(collezione.files) ? collezione.files : [];
-    for (const file of files) {
-      for (const m of (file && Array.isArray(file.modules) ? file.modules : [])) {
-        const sc = m && m.data && typeof m.data.shortcut === 'string' ? m.data.shortcut.trim() : '';
-        if (!sc || sc.length > 80 || !forma(sc)) continue;
-        const titolo = String((file.meta && file.meta.title) || 'Documento senza titolo').slice(0, 60);
-        lista.push([sc, `la usa un modulo dell'Editor nel documento «${titolo}»`]);
+    const P = global.SN_PANNELLI_APP;
+    const tutti = pannelli && typeof pannelli === 'object' ? pannelli : {};
+    for (const app of Object.keys(tutti)) {
+      if (!P || !P.catalogo(app)) continue;
+      for (const e of P.scorciatoie(app, tutti[app])) {
+        if (!forma(e.shortcut)) continue;
+        lista.push([e.shortcut, `la usa «${e.nome}» fra gli strumenti dell'${P.catalogo(app).nome}`]);
       }
     }
     moduliPresi = lista;
@@ -1011,13 +1055,13 @@
 
   global.SN_TASTI = {
     piattaforma, suMac, etichetta, etichettaScritta, frase, acceleratoreElectron,
-    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda,
+    indiceSaltoScheda, etichettaSaltoScheda, descrizioneSaltoScheda, indiceSchedaVicina, etichettaSchedaVicina,
     comandoNavigazione, comandoNavigazioneFuoriDalCampo, etichettaIndietro, etichettaAvanti,
-    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoSchermoIntero, etichettaSchermoIntero,
+    comandoBarra, etichettaBarra, ACCEL_BARRA, comandoLucchettoBarra, etichettaLucchettoBarra, ACCEL_LUCCHETTO_BARRA, comandoPannello, etichettaPannello, ACCEL_PANNELLO, comandoSchermoIntero, etichettaSchermoIntero,
     tastiRiservati, riservato,
     tastoRiconosciuto, tipoModificatore, pezzoSconosciuto, soloModificatori, combacia, pressioneScritta, delSistema,
     modificatoreCheCambiaSimbolo, chiLaPrende, rifiutoScritta,
-    AZIONI_FILO, usaScorciatoieFilo, usaScorciatoieModuli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
+    AZIONI_FILO, usaScorciatoieFilo, usaScorciatoiePannelli, scorciatoiaFilo, scorciatoieFilo, etichettaFilo, valoreDaSalvare,
     scorciatoiaDaEvento, scorciatoiaDaScritta, rifiutoScorciatoiaFilo, testoRifiutoFilo, combaciaFilo, azioneFiloDaTasto,
     tastoValido, tastoFisicoDaEvento, tastoFisicoDaScritta, nomeTastoFisico, combaciaFisico, pressioneFisica, rifiutoFisico,
   };

@@ -13,7 +13,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 
 const AREAS = [
   { name: 'dashboard', start: 'filo://newtab/', area: 'dashboard/new tab: messaggio centrale, suggerimenti a sinistra, colonna live a destra, barra input' },
-  { name: 'editor', start: 'filo://editor/editor.html', area: 'editor: scrittura nel foglio, griglia moduli, switch pagine, conteggio parole, cerca/sostituisci' },
+  { name: 'editor', start: 'filo://editor/editor.html', area: 'editor: scrittura nel foglio, pannello degli strumenti sul bordo destro (conteggio parole, cerca/sostituisci, commenti, «+» per aggiungerne), Aiuto sul documento' },
   { name: 'shell-tabs', start: 'filo://newtab/', area: 'shell: apertura/chiusura tab, menu App, pulsanti barra, navigazione tra pagine interne' },
   { name: 'history', start: 'filo://history/history.html', area: 'cronologia: lista elementi, layout, azioni' },
   { name: 'options', start: 'filo://options/options.html', area: 'impostazioni: campi, tema, salvataggio, layout' },

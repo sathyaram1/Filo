@@ -12,9 +12,9 @@ import ts from 'typescript';
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const TESTS = join(ROOT, 'tests');
 const AIUTO = 'menuContestuale.mjs';
-// Oltre a `sn-menu…`, ogni classe che solo il menu assegna (etichetta delle icone, immagine del trascinamento…): un
-// pezzo nuovo del menu entra da sé. Una classe assegnata anche altrove (sn-disabled) è uno stato condiviso, non il menu.
-const SORGENTI_MENU = ['src/content/menu.js', 'src/content/menuIcons.js'];
+// Oltre a `sn-menu…`, ogni classe che solo il menu assegna (la voce con l'icona…): un pezzo nuovo del menu entra da
+// sé. Una classe assegnata anche altrove (sn-disabled) è uno stato condiviso, non il menu.
+const SORGENTI_MENU = ['src/content/menu.js'];
 const ASSEGNATE = /(?:className\s*=\s*|classList\.(?:add|toggle)\(\s*|class=\\?)(['"`])([^'"`\\]*)/g;
 function classiAssegnate(testo) {
   const out = new Set();
@@ -203,16 +203,15 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
     ["const SEL = '.sn-menu-paste-main';\nawait page.locator(SEL).click();", 1],
     ["const menu = page.locator('.sn-menu');\nawait menu.locator('.sn-menu-item').first().click();", 2],
     [`${imp}await menuDi(page).locator('.sn-menu-item').click();`, 0],
-    [`${imp}const menu = menuDi(page);\nconst g = menu.locator('.sn-menu-icon-grid');\nawait g.locator('.sn-menu-icon-btn').click();`, 0],
+    [`${imp}const menu = menuDi(page);\nconst g = menu.locator('.sn-menu-sub');\nawait g.locator('.sn-menu-item').click();`, 0],
     [`${imp}await menuDi(page).valuta(() => document.querySelector('.sn-menu').scrollTop);`, 0],
     [`${imp}const SEL = '.sn-menu-paste-main';\nawait menuDi(page).locator(SEL).click();`, 0],
     [`${imp}const voce = (p, sel) => menuDi(p).locator(sel);\nawait voce(page, '.sn-menu-item').click();`, 0],
     [`${imp}const voce = (p, sel) => p.locator(sel);\nawait voce(page, '.sn-menu-item').click();`, 1],
     ["// menu-dal-sito: lo script della pagina prova a premere Incolla\nawait page.evaluate(() => document.querySelector('.sn-menu-paste-main')?.click());", 0],
-    ["await expect(riga).toHaveClass('sn-menu-row');", 0],
-    ["await expect(page.locator('.sn-drag-preview')).toHaveCount(1);", 1],
-    ["await expect(page.locator('.sn-tooltip')).toBeVisible();", 1],
-    [`${imp}await expect(menuDi(page).locator('.sn-drag-preview')).toHaveCount(0);`, 0],
+    ["await expect(riga).toHaveClass('sn-menu-item');", 0],
+    ["await expect(page.locator('.sn-has-icon')).toHaveCount(1);", 1],
+    [`${imp}await expect(menuDi(page).locator('.sn-has-icon')).toHaveCount(1);`, 0],
     ["await expect(pop.locator('.sn-select-option')).toHaveClass(/sn-disabled/);", 0],
     // #1452.1: la prova del pannello red team cercava «Invia attacco» sulla pagina, ed era rossa anche su main.
     ["const voce = page.locator('.sn-menu .sn-menu-item', { hasText: 'Invia attacco' }).first();\nawait expect.poll(async () => voce.isVisible()).toBe(true);\nawait voce.click();", 1],
@@ -221,7 +220,7 @@ test('la sentinella riconosce chi cerca il menu senza l\'aiuto', () => {
   for (const [codice, attese] of casi) assert.equal(cercheFuoriDallAiuto(codice).length, attese, codice);
 });
 
-test('i pezzi del menu fuori dalle voci (etichetta delle icone, immagine del trascinamento) contano come menu', () => {
-  for (const c of ['sn-tooltip', 'sn-drag-preview']) assert.ok(CLASSI_DEL_MENU.includes(c), c);
+test('le classi che solo il menu assegna, anche fuori da «sn-menu…», contano come menu', () => {
+  assert.ok(CLASSI_DEL_MENU.includes('sn-has-icon'), 'sn-has-icon');
   assert.ok(!CLASSI_DEL_MENU.includes('sn-disabled'), 'sn-disabled la assegnano anche altri riquadri');
 });

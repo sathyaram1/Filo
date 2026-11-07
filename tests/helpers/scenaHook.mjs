@@ -111,8 +111,8 @@ export const stdinEdit = (file, extra = {}) => JSON.stringify({ hook_event_name:
 /** Un clone del finto origin, come lo fa scripts/lib/clone-worker.mjs: fuori dalle worktree, stesso origin. */
 export function clone(origin, base, nome, ramo) {
   const dir = resolve(base, nome);
-  execFileSync('git', ['clone', '-q', origin, dir], { stdio: 'ignore' });
-  git(dir, ['config', 'core.autocrlf', 'false']);
+  // autocrlf va spento prima del checkout: dopo, su Windows i file già scritti a CRLF risultano modificati (#1993).
+  execFileSync('git', ['clone', '-q', '-c', 'core.autocrlf=false', origin, dir], { stdio: 'ignore' });
   if (ramo) git(dir, ['checkout', '-q', '-b', ramo]);
   return dir;
 }

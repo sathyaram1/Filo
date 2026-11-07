@@ -185,16 +185,14 @@ biglietto_finito() {
 # lavoro ha pubblicato il proprio codice direttamente, saltando il cancello di
 # sicurezza — che nel frattempo esaminava un gemello abbandonato.
 #
-# Ora la sessione si DICHIARA. `FILO_ROUTINE=1` (lo esporta l'orchestratore, e
-# lo eredita ogni worker) significa: nessuna pubblicazione automatica, mai,
-# qualunque sia il nome del ramo. Al ramo principale le porta solo il server,
-# dopo verifica e controllo di sicurezza.
-#
-# È anche la risposta alla domanda "questo commit da dove è arrivato?": senza
-# marcatura, nella storia il lavoro di una routine e quello di una sessione
-# locale sono indistinguibili (stesso autore, stesso ramo, stesso aspetto).
+# Ora al ramo principale non pubblica niente, mai (piu' sotto). La routine si
+# riconosce per dire nella storia da dove arriva un commit (l'autore): e' la
+# domanda di isRoutineInstance (scripts/lib/routine-role.mjs), nella forma che
+# non costa un processo. L'export di FILO_ROUTINE non arriva al gancio, che
+# Claude Code lancia col suo ambiente (#1966): vale il biglietto che dispatch
+# scrive nella cartella.
 is_routine_session() {
-  [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]
+  { [ -n "$FILO_ROUTINE" ] && [ "$FILO_ROUTINE" != "0" ]; } || [ -f "$CARTELLA/.claude/routine-ticket.json" ]
 }
 
 # I prefissi restano come RETE, non più come regola primaria: proteggono anche
@@ -237,12 +235,19 @@ spedisci_ramo() {
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Il server remoto ha RIFIUTATO il push (una regola del repo, un pre-receive, il push protection?): $(motivo_git "$esito")"
       return 1 ;;
     *rejected*|*non-fast-forward*|*"fetch first"*|*"stale info"*)
-      # --force-if-includes: il lease da solo si fida del ref remoto che questa
-      # copia conosce, e dopo un `git fetch` quel ref e' gia' il commit
-      # dell'altro: il lease combacia e il rinvio lo sovrascrive (verifica del
-      # giro 2). Con --force-if-includes git rifiuta se quel commit non e' mai
-      # passato dalla storia locale di questo ramo.
-      esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      # Il lease col valore atteso di lease-atteso.mjs, stessa regola del rilascio (#1776). Senza node resta
+      # --force-if-includes: in un clone appena nato rifiuta sempre, ma non calpesta nessuno.
+      local regola="$dove/scripts/lib/lease-atteso.mjs" atteso
+      [ -f "$regola" ] || regola="$HOOK_SCRIPTS/lib/lease-atteso.mjs"
+      if [ -f "$regola" ] && command -v node >/dev/null 2>&1; then
+        if ! atteso=$(node "$regola" "$dove" "$ramo" 2>/dev/null); then
+          segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e il rinvio con --force-with-lease non parte: su origin '$ramo' e' a un commit che questo ramo non ha mai avuto (qualcun altro ha spinto su questo ramo?)"
+          return 1
+        fi
+        esito2=$(git push --force-with-lease="refs/heads/$ramo:$atteso" origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      else
+        esito2=$(git push --force-with-lease="refs/heads/$ramo" --force-if-includes origin "refs/heads/$ramo:refs/heads/$ramo" 2>&1) && return 0
+      fi
       segnala_fallimento "$dove" "il ramo '$ramo' NON e' arrivato su origin. Storia divergente, e anche il rinvio con --force-with-lease e' stato rifiutato (qualcun altro ha spinto su questo ramo?): $(motivo_git "$esito2")"
       return 1 ;;
   esac
@@ -505,6 +510,9 @@ if [ -s "$FALLIMENTI_FILE" ] || [ -s "$AVVISI_FILE" ]; then
   TESTO=$(cat "$FALLIMENTI_FILE" "$AVVISI_FILE" 2>/dev/null | stringa_json)
   CODA=""
   [ -s "$FALLIMENTI_FILE" ] && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: sistemalo prima di consegnare (git push del ramo; se la storia diverge, un rebase su origin e poi il push)."
+  # In una routine un push a mano resta fermo sul controllo dei permessi, che in cloud nessuno approva (#1797).
+  is_routine_session && [ -s "$FALLIMENTI_FILE" ] \
+    && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: il salvataggio riprova al prossimo file che modifichi e il rilascio lo rispedisce da se'. Non spingere a mano: in cloud il controllo dei permessi lo ferma. Se anche il rilascio non riesce a spedirlo, e' un guasto da dichiarare."
   # Con una copia dei dati nei commit il push e' proprio cio' che non va fatto: prima la copia esce dalla storia.
   grep -q 'NON spedisco il ramo:' "$FALLIMENTI_FILE" 2>/dev/null \
     && CODA="\\nIl lavoro e' committato in locale ma NON e' su origin: prima togli la copia dalla storia come detto sopra, poi il salvataggio spedisce da solo; un push a mano viene fermato dallo stesso controllo."

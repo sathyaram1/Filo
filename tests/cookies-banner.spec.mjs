@@ -9,6 +9,7 @@ import { join, resolve, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea } from './helpers/percorsi.mjs';
 import { primaFinestra } from './helpers/primaFinestra.mjs';
+import { CONFIRM_HOST } from './helpers/confirm.mjs';
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
@@ -322,27 +323,31 @@ test('in una scheda nuova dello stesso sito, senza più il banner, il menu dice 
   expect(menu).toContain('Mostra il banner dei cookie');
 });
 
+// Filo con una cartella dati che resta fra un avvio e l'altro: per le prove che riaprono l'app.
+async function avviaFilo(userData) {
+  const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
+  const app = await electron.launch({
+    args: [...argomentiScala, '.'],
+    cwd: APP_ROOT,
+    env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
+  });
+  const shell = await primaFinestra(app);
+  await shell.waitForLoadState('domcontentloaded');
+  const open = async (url) => {
+    const prima = new Set(app.windows());
+    await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
+    let page = null;
+    await expect.poll(() => { page = app.windows().find((w) => w.url() === url && !prima.has(w)); return !!page; }, { timeout: 10_000 }).toBe(true);
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+    return page;
+  };
+  return { app, shell, open };
+}
+
 test('dopo aver riaperto Filo il menu della scheda offre ancora «Mostra il banner dei cookie» sul sito rifiutato', async ({ testServer }) => {
   test.setTimeout(90_000);
-  const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
   const userData = cartellaTemporanea('filo-test-');
-  const avvia = async () => {
-    const app = await electron.launch({
-      args: [...argomentiScala, '.'],
-      cwd: APP_ROOT,
-      env: { ...process.env, FILO_USER_DATA: userData, FILO_DOWNLOAD_DIR: join(userData, 'downloads'), NODE_ENV: 'test' },
-    });
-    const shell = await primaFinestra(app);
-    await shell.waitForLoadState('domcontentloaded');
-    const open = async (url) => {
-      await shell.evaluate((u) => window.filoShell.tabs.open(u), url);
-      let page = null;
-      await expect.poll(() => { page = app.windows().find((w) => w.url() === url); return !!page; }, { timeout: 10_000 }).toBe(true);
-      await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
-      return page;
-    };
-    return { app, shell, open };
-  };
+  const avvia = () => avviaFilo(userData);
   const url = testServer.html(RICORDA);
   try {
     let run = await avvia();
@@ -921,4 +926,291 @@ test('Sicurezza elenca i siti dove Filo ha rifiutato, e da lì «Mostra il banne
   await expect.poll(() => page.evaluate(() => !!document.getElementById('onetrust-banner-sdk')).catch(() => false), { timeout: 10_000 }).toBe(true);
   await sleep(1500);
   expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(true);
+});
+
+// ── #1279.4: il collegamento per riaprire le preferenze non è un banner ──────────────────────────────────
+
+// Il sito ricorda la risposta in un cookie: alla seconda pagina il banner non c'è, il collegamento sì.
+const OT_PIEDE = `<title>OT_PIEDE</title>
+  <style>body{margin:0} .page{height:2000px}</style>
+  <div class="page">contenuto</div>
+  <div id="onetrust-consent-sdk"><div id="onetrust-banner-sdk" style="position:fixed;bottom:60px;left:0;right:0;height:130px;background:#fff;z-index:99">
+    <p>Usiamo i cookie per migliorare la tua esperienza.</p>
+    <button id="onetrust-reject-all-handler" onclick="document.cookie='OptanonAlertBoxClosed=1; path=/; max-age=86400';document.getElementById('onetrust-banner-sdk').remove()">Rifiuta tutti</button>
+    <button id="onetrust-accept-btn-handler" onclick="window.__acc=1">Accetta tutti</button>
+  </div></div>
+  <footer style="position:fixed;bottom:0;left:0;right:0;height:40px;background:#eee">
+    <a href="#chi">Chi siamo</a> <button id="ot-sdk-btn" class="ot-sdk-show-settings">Impostazioni cookie</button>
+  </footer>
+  <script>if (document.cookie.includes('OptanonAlertBoxClosed=')) document.getElementById('onetrust-banner-sdk').remove();</script>`;
+
+const CLI_LINGUETTA = `<title>CLI</title>
+  <style>body{margin:0} .page{height:2000px}</style>
+  <div class="page">contenuto</div>
+  <div id="cookie-law-info-bar" style="position:fixed;bottom:0;left:0;right:0;height:100px;background:#fff;z-index:99">
+    <span>Questo sito usa i cookie per la pubblicità.</span>
+    <a role="button" href="#" id="cookie_action_close_header_reject" onclick="document.cookie='viewed_cookie_policy=no; path=/; max-age=86400';document.getElementById('cookie-law-info-bar').remove();document.getElementById('cookie-law-info-again').style.display='block';return false">Rifiuta</a>
+    <a role="button" href="#" id="cookie_action_close_header" onclick="window.__acc=1;return false">Accetta</a>
+  </div>
+  <div id="cookie-law-info-again" style="display:none;position:fixed;bottom:0;right:100px;padding:6px 12px;background:#fff;z-index:99">
+    <span id="cookie_hdr_showagain">Privacy e cookie</span>
+  </div>
+  <script>if (document.cookie.includes('viewed_cookie_policy=')) {
+    document.getElementById('cookie-law-info-bar').remove();
+    document.getElementById('cookie-law-info-again').style.display = 'block';
+  }</script>`;
+
+for (const [nome, html, lista, link] of [
+  ['OneTrust, «Impostazioni cookie» nel piè di pagina', OT_PIEDE, '###onetrust-consent-sdk\n###onetrust-banner-sdk\n###ot-sdk-btn\n##.ot-sdk-show-settings', '#ot-sdk-btn'],
+  ['CookieLawInfo, la linguetta «Privacy e cookie»', CLI_LINGUETTA, '###cookie-law-info-bar\n###cookie-law-info-again', '#cookie-law-info-again'],
+]) {
+  test(`${nome}: alla seconda pagina il collegamento resta e il menu non dice «Banner nascosto»`, async ({ app, openTab, testServer, shell }) => {
+    test.setTimeout(60_000);
+    await app.evaluate((_e, l) => globalThis.__filoCookieBanners.setListForTest(l), lista);
+    const page = await testServer.openReady(openTab, html);
+    await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 12_000 }).toBe(true);
+    await page.goto(testServer.html(html));
+    await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
+    await sleep(4500);
+    expect(await page.evaluate((s) => getComputedStyle(document.querySelector(s)).display, link)).not.toBe('none');
+    expect(await page.evaluate(() => window.__acc || null)).toBeNull();
+    expect(await tabCookies(shell)).toEqual({ rejected: true, hidden: false, shown: false });
+    const menu = await openAndRead(app, () => rightClickTab(shell), 'Mostra il banner dei cookie');
+    expect(menu).not.toContain('Banner dei cookie nascosto');
+  });
+}
+
+// ── #1279.2: la risposta scritta poco dopo il clic, con un nome tutto del sito ───────────────────────────
+
+function spSceltaPrivacy(testServer) {
+  const frame = testServer.html(`<title>SP_SCELTA</title>
+    <div class="message-container"><div class="message type-modal" style="padding:20px">
+      <p>Usiamo i cookie per personalizzare la pubblicità.</p>
+      <button class="message-component message-button sp_choice_type_11" title="Accept"
+        onclick="parent.postMessage('sp:accept','*')">Accetta</button>
+      <button class="message-component message-button sp_choice_type_13" title="Reject All"
+        onclick="parent.postMessage('sp:reject','*')">Rifiuta</button>
+    </div></div>`).replace('127.0.0.1', 'blocked.test');
+  return `<title>SP_SCELTA_TOP</title>
+    <div id="sp_message_container_1"
+      style="position:fixed;inset:0;background:rgba(0,0,0,.5);z-index:99;display:flex;align-items:center;justify-content:center">
+      <iframe id="sp_message_iframe_1" src="${frame}" style="width:520px;height:320px;border:0;background:#fff"></iframe>
+    </div>
+    <p>contenuto</p>
+    <script>
+      document.cookie = 'sessione=utente; path=/; max-age=86400';
+      if (document.cookie.includes('scelta_privacy=')) document.getElementById('sp_message_container_1').remove();
+      addEventListener('message', (e) => {
+        if (e.data !== 'sp:reject' && e.data !== 'sp:accept') return;
+        document.cookie = 'scelta_privacy=' + (e.data === 'sp:reject' ? 'no' : 'si') + '; path=/; max-age=86400';
+        document.getElementById('sp_message_container_1').remove();
+      });
+    </script>`;
+}
+
+const SCELTA_DAL_SERVER = `<title>SCELTA_SITO</title>
+  <div id="avviso-privacy" class="cookie-consent" style="position:fixed;top:0;left:0;right:0;height:90px;background:#fff;z-index:10">
+    <p>Usiamo i cookie per la pubblicità.</p>
+    <button onclick="window.__acc=1">Accetta</button>
+    <button onclick="fetch(location.href).then(() => new Promise((r) => setTimeout(r, 400))).then(() => {
+      document.cookie = 'scelta_sito=no; path=/; max-age=86400';
+      document.getElementById('avviso-privacy').remove();
+    })">Rifiuta</button>
+  </div>
+  <script>
+    document.cookie = 'sessione=utente; path=/; max-age=86400';
+    if (document.cookie.includes('scelta_sito=')) document.getElementById('avviso-privacy').remove();
+  </script>`;
+
+for (const [nome, html, sel, risposta] of [
+  ['banner in un riquadro (forma Sourcepoint), la pagina scrive «scelta_privacy»', spSceltaPrivacy, '#sp_message_container_1', 'scelta_privacy=no'],
+  ['banner in pagina, «scelta_sito» scritta al ritorno da una richiesta', () => SCELTA_DAL_SERVER, '#avviso-privacy', 'scelta_sito=no'],
+]) {
+  test(`${nome}: «Mostra il banner dei cookie» dal menu della scheda lo riporta`, async ({ app, openTab, testServer, shell }) => {
+    test.setTimeout(90_000);
+    const page = await testServer.openReady(openTab, html(testServer));
+    await page.waitForFunction((r) => document.cookie.includes(r), risposta, { timeout: 15_000 });
+    await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+    await sleep(4500);
+    await clickUntil(app, {
+      open: () => rightClickTab(shell),
+      needle: 'Mostra il banner dei cookie', labelRe: 'Mostra il banner dei cookie',
+      until: async () => (await tabCookies(shell))?.shown === true,
+    });
+    await expect.poll(() => page.evaluate((s) => !!document.querySelector(s), sel).catch(() => false), { timeout: 10_000 }).toBe(true);
+    await sleep(1500);
+    expect(await page.evaluate((s) => !!document.querySelector(s), sel)).toBe(true);
+    expect(await page.evaluate(() => document.cookie)).toContain('sessione=utente');
+    expect(await page.evaluate(() => window.__acc || null)).toBeNull();
+  });
+}
+
+// ── #1279.3: cosa Filo ricorda di un sito segue la modalità in cui lo si è visitato ────────────────────────
+
+test('visita in Privacy, poi Automatico: il sito rifiutato non finisce sul disco', async ({ app, openTab, testServer, shell }) => {
+  test.setTimeout(60_000);
+  await setMode(openTab, 'privacy');
+  const page = await testServer.openReady(openTab, RICORDA);
+  await page.waitForFunction(() => !document.getElementById('onetrust-banner-sdk'), null, { timeout: 8_000 });
+  await expect.poll(async () => (await tabCookies(shell))?.rejected, { timeout: 8_000 }).toBe(true);
+  await setMode(openTab, 'default');
+  await sleep(2000);
+  const salvato = await app.evaluate(async () => globalThis.SN_STORAGE.getRaw('cookieSites', null));
+  expect(salvato && salvato['127.0.0.1']).toBeFalsy();
+});
+
+test('rifiuto in Automatico, poi Privacy e riavvio, poi Automatico: il rifiuto e la voce del menu restano', async ({ testServer }) => {
+  test.setTimeout(120_000);
+  const userData = cartellaTemporanea('filo-test-');
+  const modo = (run, mode) => run.app.evaluate((_e, m) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { mode: m } } }), mode);
+  const url = testServer.html(RICORDA);
+  try {
+    let run = await avviaFilo(userData);
+    try {
+      const a = await run.open(url);
+      await a.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+      await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      await modo(run, 'privacy');
+      await sleep(2000);
+      await run.app.evaluate(async ({ session }) => { await session.defaultSession.cookies.flushStore(); });
+    } finally {
+      await chiudiApp(run.app);
+    }
+    run = await avviaFilo(userData);
+    try {
+      // Il rifiuto fatto in Automatico è ancora sul disco, anche ripartiti in Privacy.
+      const salvato = await run.app.evaluate(async () => globalThis.SN_STORAGE.getRaw('cookieSites', null));
+      expect(salvato && salvato['127.0.0.1'] && salvato['127.0.0.1'].rejected).toBe(true);
+      await modo(run, 'default');
+      const b = await run.open(url);
+      await sleep(1500);
+      expect(await b.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+      const menu = await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      expect(menu).toContain('Mostra il banner dei cookie');
+    } finally {
+      await chiudiApp(run.app);
+    }
+  } finally {
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+test('rifiuto in Automatico, visita dello stesso sito in Privacy, ritorno ad Automatico e riavvio: il rifiuto e la voce del menu restano', async ({ testServer }) => {
+  test.setTimeout(150_000);
+  const userData = cartellaTemporanea('filo-test-');
+  const modo = (run, mode) => run.app.evaluate((_e, m) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: { mode: m } } }), mode);
+  const url = testServer.html(RICORDA);
+  try {
+    let run = await avviaFilo(userData);
+    try {
+      const a = await run.open(url);
+      await a.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+      await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      await modo(run, 'privacy');
+      await sleep(1000);
+      // In Privacy il sito riparte da un barattolo suo: il banner torna e Filo lo rifiuta lì.
+      const b = await run.open(url);
+      await b.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 10_000 });
+      await sleep(1500);
+      await modo(run, 'default');
+      await sleep(2000);
+      await run.app.evaluate(async ({ session }) => { await session.defaultSession.cookies.flushStore(); });
+    } finally {
+      await chiudiApp(run.app);
+    }
+    run = await avviaFilo(userData);
+    try {
+      const salvato = await run.app.evaluate(async () => globalThis.SN_STORAGE.getRaw('cookieSites', null));
+      expect(salvato && salvato['127.0.0.1'] && salvato['127.0.0.1'].rejected).toBe(true);
+      const c = await run.open(url);
+      await sleep(1500);
+      expect(await c.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
+      const menu = await openAndRead(run.app, () => rightClickTab(run.shell), 'Cookie non necessari rifiutati');
+      expect(menu).toContain('Mostra il banner dei cookie');
+    } finally {
+      await chiudiApp(run.app);
+    }
+  } finally {
+    try { rmSync(userData, { recursive: true, force: true }); } catch (_) {}
+  }
+});
+
+// ── #1279.4, la regola per forma: un comando solo, senza scritta fuori da lui, è un collegamento ────────
+
+const PER_FORMA = {
+  icona: `<title>ICONA</title><style>body{margin:0} .page{height:2000px}</style><div class="page">contenuto</div>
+    <button class="riapri-consenso" aria-label="Preferenze cookie"
+      style="position:fixed;bottom:12px;left:12px;width:44px;height:44px;border-radius:50%;background:#eee;z-index:99">
+      <svg width="24" height="24" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/></svg></button>`,
+  scritta: `<title>SCRITTA</title><style>body{margin:0} .page{height:2000px}</style><div class="page">contenuto</div>
+    <div class="riapri-consenso" style="position:fixed;bottom:0;right:80px;padding:6px 12px;background:#eee;z-index:99">
+      <a href="#" role="button" onclick="return false">Preferenze privacy</a></div>`,
+  banner: `<title>UN_PULSANTE</title><style>body{margin:0} .page{height:2000px}</style><div class="page">contenuto</div>
+    <div class="riapri-consenso" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:#fff;z-index:99">
+      <p>Usiamo i cookie per la pubblicità.</p><button onclick="window.__acc=1">OK</button></div>`,
+};
+
+for (const [nome, html, resta] of [
+  ['icona fissa senza scritta, che la lista nomina', PER_FORMA.icona, true],
+  ['linguetta con la sola scritta del suo collegamento, che la lista nomina', PER_FORMA.scritta, true],
+  ['banner vero con la scritta fuori dal suo unico pulsante «OK»', PER_FORMA.banner, false],
+]) {
+  test(`per forma, ${nome}: ${resta ? 'resta, e il menu non dice «Banner nascosto»' : 'nascosto, senza accettare'}`, async ({ app, openTab, testServer, shell }) => {
+    test.setTimeout(60_000);
+    await app.evaluate(() => globalThis.__filoCookieBanners.setListForTest('##.riapri-consenso'));
+    const page = await testServer.openReady(openTab, html);
+    const visibile = () => page.evaluate(() => getComputedStyle(document.querySelector('.riapri-consenso')).display !== 'none');
+    if (resta) {
+      await sleep(5000);
+      expect(await visibile()).toBe(true);
+      expect((await tabCookies(shell))?.hidden).toBeFalsy();
+    } else {
+      await expect.poll(visibile, { timeout: 12_000 }).toBe(false);
+      await expect.poll(async () => (await tabCookies(shell))?.hidden, { timeout: 6_000 }).toBe(true);
+      expect(await page.evaluate(() => window.__acc || null)).toBeNull();
+    }
+  });
+}
+
+// ── #1279.1: dalla chat, per il sito della scheda ─────────────────────────────────────────────────────
+
+async function dallaChat(home, valore) {
+  const corsa = home.evaluate((v) => window.__filoSidebarTest.runFiloAction(
+    { type: 'IMPOSTA_PREFERENZA', chiave: 'siti_con_banner', valore: v }), valore);
+  // A Normale il costo 2 può partire da solo: la conferma si dà solo se compare.
+  const fine = await Promise.race([corsa.then(() => 'fatto'), home.locator(CONFIRM_HOST).waitFor({ timeout: 10_000 }).then(() => 'conferma', () => 'fatto')]);
+  if (fine === 'conferma') {
+    // Abbassare una difesa si conferma scrivendo «conferma»; OK si accende dopo aver letto il testo fino in fondo (#592).
+    await expect.poll(() => home.evaluate(() => {
+      const T = window.SN_CONFIRM_UI._test;
+      T.scrollToEnd();
+      if (T.state() && T.state().hasInput) T.fill('conferma');
+      return T.click('ok') || T.click('danger');
+    }), { timeout: 8_000 }).toBe(true);
+  }
+  await corsa;
+}
+
+test('in chat «fammi rivedere il banner su questo sito» lo riporta, «torna a rifiutarli qui» lo rifiuta di nuovo', async ({ app, openTab, testServer, shell }) => {
+  test.setTimeout(90_000);
+  // Un nome di dominio come quelli veri: l'elenco a parole non prende gli indirizzi numerici.
+  const page = await testServer.openReady(openTab, RICORDA, { pubblico: true });
+  await page.waitForFunction(() => document.cookie.includes('OptanonConsent=rifiutato'), null, { timeout: 8_000 });
+  const home = await openTab('filo://newtab/');
+  await home.evaluate(() => window.SN_SIDEBAR.open());
+
+  await dallaChat(home, 'aggiungi questo sito');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.bannerSites), { timeout: 6_000 })
+    .toEqual(['sito-pubblico.test']);
+  await expect.poll(() => page.evaluate(() => !!document.getElementById('onetrust-banner-sdk')).catch(() => false), { timeout: 10_000 }).toBe(true);
+  await sleep(1500);
+  expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(true);
+  expect(await page.evaluate(() => document.cookie)).toContain('sessione=utente');
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.mode || 'default')).toBe('default');
+
+  await dallaChat(home, 'togli questo sito');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.cookies.bannerSites), { timeout: 6_000 })
+    .toEqual([]);
+  await expect.poll(() => page.evaluate(() => document.cookie).catch(() => ''), { timeout: 12_000 }).toContain('OptanonConsent=rifiutato');
+  expect(await page.evaluate(() => !!document.getElementById('onetrust-banner-sdk'))).toBe(false);
 });

@@ -59,6 +59,9 @@ lavorare: ce la mette.
 - Per `new-work` **crea** il branch e ci si posiziona.
 - **Fail closed**: se il checkout/creazione non riesce, non consegna il lavoro
   (vedi E per l'esito). Meglio un giro a vuoto che un giro sull'albero sbagliato.
+  Vale anche per lo scaricamento: un fetch che fallisce senza che origin dica
+  «il ramo non c'è» è un guasto passeggero, perché la punta che la cartella
+  ricorda è quella dell'ultimo scaricamento, magari di un giro passato (#1779.1).
 - Registra nello stato del branch l'**identità attesa del contenuto** (il commit
   SHA risultante). È il valore che C e D confronteranno.
 
@@ -73,6 +76,28 @@ stesso nome).
 nome viene creato una volta sola e mai riusato: la classe di guasto sparisce
 invece di essere gestita. Il nome vero vive già nello stato e nel campo `branch`
 del feedback, quindi non serve poterlo ricalcolare.
+
+Il tentativo è il **biglietto**, non il lancio di dispatch: il server lega il
+biglietto al primo ramo dichiarato e rifiuta ogni altro. Un lavoro nuovo
+ripartito sullo stesso biglietto (una sessione ripresa) riceve quel ramo nella
+busta e lo riprende, o lo crea con quel nome se non c'è; una presa in carico
+rifiutata per il ramo ferma dispatch prima del lavoratore (#1632).
+
+Un biglietto nuovo dopo un tentativo morto prima di consegnare non porta ramo
+(il server lega il ramo al feedback solo alla consegna): il nome nuovo nasce
+dalla punta dell'ultimo tentativo `worker/<id>-*` rimasto su origin con commit
+fuori da main, e la busta lo dice al lavoratore (`payload.ripartenza`). Il ramo
+superato diventa antenato del nuovo e se ne va con lui alla fusione (#2152).
+Un tentativo più vecchio dell'ultimo lavoro dello stesso feedback arrivato su
+main è superato anche se nessuno l'ha fuso (un feedback riaperto): non si
+riprende. Arrivato è un tentativo fuso con commit suoi (uno nato da main e mai
+scritto ha la punta sulla linea principale e non conta) o la fusione
+`merge-gate: #N` letta su main, che regge anche dopo la potatura del ramo fuso.
+A ogni lavoro nuovo dispatch toglie da origin i superati di tutti i feedback,
+anche di quelli chiusi che non ripartiranno. La regola è una sola
+(`scripts/lib/tentativi.mjs`), con la scelta del tentativo vivo: l'elenco dei
+rami in corso del manutentore mostra quello che la ripresa sceglierebbe.
+Se origin non risponde, guasto temporaneo: non si rifà da main.
 
 ### Niente worktree separati nelle routine
 
@@ -143,7 +168,16 @@ Esempio richiesto dall'owner: A lavora → B verifica e trova un problema → C
 inizia a correggere e viene interrotto → **D riparte dal branch come l'aveva
 lasciato A, più la critica di B**, non da zero.
 
-- Il ripristino riporta il branch all'**ultimo punto fermo registrato** (C).
+- Il ripristino parte dalla **punta pubblicata** del ramo: è l'ultima consegna,
+  da qualunque cartella sia partita. Il punto fermo locale (C) vince solo se è
+  quella punta o sta più avanti (lavoro sigillato e non ancora spedito).
+- **Giro passato altrove** (D-207): una cartella riusata può avere i punti fermi
+  di un giro di ore prima, mentre i giri dopo hanno consegnato da altre
+  cartelle. Un punto fermo più vecchio della punta si lascia, e con lui tutto lo
+  stato locale (punti fermi, esiti, pulizie). Quindi un moncone già spinto dal
+  salvataggio automatico resta sul ramo e lo giudica chi viene dopo; uno mai
+  spedito va di lato. Per scartare anche quello spinto servirebbe nel biglietto
+  l'ultima consegna registrata dal server.
 - **Ramo riscritto altrove** (#1486): se il punto fermo non sta sulla linea
   della punta pubblicata (né suo antenato né suo discendente), il ramo è stato
   rifatto da un riallineamento e si riparte dalla punta pubblicata; i punti
@@ -224,9 +258,10 @@ Tutto testabile **senza Electron**, con unit test (`npm run test:unit`,
   qualunque sia il comando che l'ha causato.
 - C: una transizione con identità non corrispondente viene **rifiutata**; una
   corretta viene accettata e **lascia il punto fermo**.
-- D: dato un branch con punto fermo di A e commit sparsi di C, il ripristino
-  riporta esattamente al punto fermo, la directory resta pulita, e i commit di C
-  **restano raggiungibili**.
+- D: dato un branch con punto fermo di A e commit sparsi di C mai spediti, il
+  ripristino riporta esattamente al punto fermo, la directory resta pulita, e i
+  commit di C **restano raggiungibili**; con una punta pubblicata più avanti del
+  punto fermo si parte da lei (`tests/unit/branchIntegrityGiroPassato.test.mjs`).
 - E: coda illeggibile → guasto, non "niente da fare"; branch inesistente → il
   feedback finisce in `design`.
 

@@ -1,5 +1,5 @@
-// #1004 — le pagine delicate non partono verso i modelli nelle funzioni automatiche, e il riassunto delle schede
-// chiuse si spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
+// #1004, #1545, #1274.1 — le pagine delicate non partono verso i modelli nelle funzioni automatiche, e il
+// riassunto delle schede chiuse si spegne. Modello ed embedding finti registrano tutto quello che ricevono: si guarda cosa è partito.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { clickConfirm, confirmText, CONFIRM_HOST } from './helpers/confirm.mjs';
@@ -111,13 +111,14 @@ test('con il riassunto delle schede chiuse spento non parte niente, e la scheda 
 
 test('la pulizia automatica delle schede: di una pagina delicata al modello va solo il tipo, mai titolo, indirizzo o testo', async ({ app }) => {
   await modelliFinti(app);
+  // Il modello finto non risponde col JSON delle decisioni, e il giudizio fallisce: qui conta cosa è partito.
   await app.evaluate(() => globalThis.SN_TAB_TRIAGE_DECIDE({
     trigger: 'idle',
     tabs: [
       { url: 'https://mail.google.com/mail/u/0/#inbox', title: 'Posta in arrivo (3) - mario.rossi@gmail.com', contentExtract: 'Il tuo codice di verifica è 482913', idleMin: 400 },
       { url: 'https://it.wikipedia.org/wiki/Gatto', title: 'Gatto - Wikipedia', contentExtract: 'Il gatto domestico', idleMin: 400 },
     ],
-  }));
+  }).catch(() => null));
   const [chiamata] = (await mandato(app)).filter((m) => m.tipo === 'altro');
   expect(chiamata.testo).toContain('[pagina delicata: posta]');
   expect(chiamata.testo).not.toContain('mario.rossi');
@@ -150,11 +151,12 @@ test('in Sicurezza un sito aggiunto all\'elenco diventa delicato, e l\'interrutt
   const sinistra = (sel) => sicurezza.locator(sel).evaluate((e) => Math.round(e.getBoundingClientRect().left));
   expect(await sinistra('#sec-delicate-sites')).toBe(await sinistra('#sec-delicate-desc'));
   expect(await sinistra('#sec-delicate-sites')).toBeGreaterThan(await sinistra('#sec-delicate'));
-  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi');
+  // Un nome con lo spazio si ridice intero anche accanto a un sito sulla stessa riga (#718.3).
+  await sicurezza.locator('#sec-delicate-sites').fill('sito-pubblico.test\nstudio rossi\nmario bianchi, altro-studio.test');
   await sicurezza.locator('#sec-delicate-sites').blur();
   await expect.poll(async () => (await impostazioni(shell)).security.pagineDelicate.siti, { timeout: 4000 })
-    .toEqual(['sito-pubblico.test']);
-  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi');
+    .toEqual(['sito-pubblico.test', 'altro-studio.test']);
+  await expect(sicurezza.locator('#sec-delicate-sites-error')).toContainText('studio rossi, mario bianchi');
 
   const t = await apriEChiudi({ app, shell, openTab, testServer }, 'Area clienti dello studio', `<p>${SEGRETO}</p>`);
   await t.chiudi();
@@ -319,6 +321,25 @@ test('in Sicurezza si vedono i siti segnati per il campo password: uno tolto tor
   await t2.chiudi();
   await expect.poll(() => voceDi(app, 'Il mio conto'), { timeout: 8_000 })
     .toEqual({ delicata: 'campi', summary: '', snippet: '', embedding: false });
+});
+
+// #2219 — in Privacy massima Filo non tiene sul disco cosa sa dei siti non fidati: nemmeno dove ha visto un campo password.
+test('in Privacy massima un sito non fidato col campo password è delicato e in Sicurezza, ma il suo nome non resta sul disco', async ({ app, openTab, testServer }) => {
+  const sulDisco = () => app.evaluate(() => globalThis.SN_STORAGE.getRaw(globalThis.SN_CONST.STORAGE_KEYS.SITI_CON_CAMPI, []));
+  const imposta = (cookies) => app.evaluate((_electron, c) => globalThis.__filoHandlers.applySettingsUpdate({ security: { cookies: c } }), cookies);
+  await imposta({ mode: 'privacy', trustedSites: [] });
+  await testServer.openReady(openTab, `<!doctype html><html><head><title>Accesso</title></head><body>${CON_PASSWORD}</body></html>`, { pubblico: true });
+  await expect.poll(() => app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), { timeout: 8_000 }).toBe(true);
+  expect(await sulDisco()).not.toContain('sito-pubblico.test');
+
+  const sicurezza = await openTab('filo://security/security.html');
+  await expect(sicurezza.locator('#sec-delicate-campi-list li', { hasText: 'sito-pubblico.test' })).toBeVisible({ timeout: 8000 });
+
+  await imposta({ trustedSites: ['sito-pubblico.test'] });
+  await expect.poll(sulDisco, { timeout: 4000, message: 'un sito fidato si ricorda anche dopo un riavvio' }).toContain('sito-pubblico.test');
+  await imposta({ trustedSites: [] });
+  await expect.poll(sulDisco, { timeout: 4000, message: 'tolto dai fidati, il nome lascia il disco' }).not.toContain('sito-pubblico.test');
+  expect(await app.evaluate(() => globalThis.SN_DELICATE.haCampi('sito-pubblico.test')), 'per la sessione resta delicato').toBe(true);
 });
 
 test('un campo carta nel riquadro di un servizio di pagamento rende delicata la pagina che lo contiene', async ({ app, openTab, testServer }) => {
@@ -584,4 +605,142 @@ test('spenta in Preferenze la descrizione di screenshot e immagini, lo screensho
   const acceso = await screenshotDi(app, ricetta, 'Ricetta');
   expect(acceso.nome).not.toMatch(/^screenshot-/);
   expect((await mandato(app)).filter((m) => m.testo.includes('image_url')).length).toBe(1);
+});
+
+// #1545, #1274.1 — due funzioni facoltative che partono da sole, la categoria delle pagine salvate e il nome dei file
+// scaricati: da una pagina delicata la prima manda solo il tipo, la seconda niente.
+const DALLE_PREFERENZE = { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' };
+const impostaDaFilo = (app, settings) => app.evaluate(async ({}, { s, da }) => globalThis.SN_HANDLE_MESSAGE({ type: 'update_settings', settings: s }, da), { s: settings, da: DALLE_PREFERENZE });
+const categorizzazioni = async (app) => (await mandato(app)).filter((m) => m.testo.includes('Categorizza'));
+
+test('salvata per dopo con le categorie accese: di una pagina di posta al modello va il tipo, di una qualunque titolo e testo', async ({ app }) => {
+  await modelliFinti(app);
+  await impostaDaFilo(app, { featureFlags: { categorize: true } });
+  const salva = (page) => app.evaluate(async ({}, p) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.SAVE_PAGE, page: p }), page);
+  await salva({ url: 'https://mail.google.com/mail/u/0/#inbox', title: 'Posta in arrivo (3) - mario.rossi@gmail.com', description: '', excerpt: SEGRETO });
+  await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(1);
+  const [posta] = await categorizzazioni(app);
+  expect(posta.testo).toContain('posta');
+  for (const segreto of ['mail.google.com', 'mario.rossi', 'Posta in arrivo', '12.345,67']) expect(posta.testo).not.toContain(segreto);
+
+  await salva({ url: 'https://it.wikipedia.org/wiki/Gatto', title: 'Gatto - Wikipedia', description: '', excerpt: 'Il gatto domestico' });
+  await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(2);
+  const normale = (await categorizzazioni(app))[1];
+  expect(normale.testo).toContain('Gatto - Wikipedia');
+  expect(normale.testo).toContain('Il gatto domestico');
+});
+
+// Il segno dell'incognito arriva davvero dalla finestra: lo stesso salvataggio, dal tasto destro della scheda, nelle due finestre.
+test('salvata per dopo da una finestra in incognito con le categorie accese, al modello non parte niente; da una normale sì', async ({ app, shell, testServer }) => {
+  await modelliFinti(app);
+  await impostaDaFilo(app, { featureFlags: { categorize: true } });
+  await shell.evaluate(() => window.filoShell.openIncognito());
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) =>
+    !!BrowserWindow.getAllWindows().find((w) => w._filoIncognito && w._filoTabs)), { timeout: 15_000 }).toBe(true);
+  const url = testServer.html('<!doctype html><title>Ricetta del pane</title><body><p>Farina, acqua e lievito madre.</p></body>', { pubblico: true });
+  const salvaDa = (incognito) => app.evaluate(async ({ BrowserWindow }, { url, incognito }) => {
+    const tm = BrowserWindow.getAllWindows().find((w) => !!w._filoIncognito === incognito && w._filoTabs)._filoTabs;
+    const id = tm.openTab(url);
+    const t0 = Date.now();
+    let tab = null;
+    while (Date.now() - t0 < 10_000) {
+      tab = tm.tabs.find((t) => t.id === id);
+      const pronta = tab && tab.view && await tab.view.webContents.executeJavaScript(
+        'document.documentElement.dataset.filoContentReady === "1"').catch(() => false);
+      if (pronta) break;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    const code = `chrome.runtime.sendMessage({ type: 'save_page', page: { url: location.href, title: document.title, description: '', excerpt: document.body.innerText } })`;
+    const res = await tab.view.webContents.executeJavaScriptInIsolatedWorld(999, [{ code }], true);
+    return Boolean(res && res.ok);
+  }, { url, incognito });
+
+  expect(await salvaDa(true)).toBe(true);
+  await new Promise((r) => setTimeout(r, 2500));
+  expect(await categorizzazioni(app)).toEqual([]);
+
+  expect(await salvaDa(false)).toBe(true);
+  await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(1);
+  expect((await categorizzazioni(app))[0].testo).toContain('lievito madre');
+});
+
+async function scaricaDa(nome, corpo, { shell, openTab, testServer }) {
+  const { createServer } = await import('node:http');
+  const srv = createServer((req, res) => {
+    res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': Buffer.byteLength(corpo), 'Content-Disposition': `attachment; filename="${nome}"` });
+    res.end(corpo);
+  });
+  await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+  const url = `http://sito-pubblico.test:${srv.address().port}/${nome}`;
+  const page = await testServer.openReady(openTab, `<!doctype html><html><title>Estratti</title><body style="padding:40px"><a id="dl" href="${url}">Scarica</a></body></html>`, { pubblico: true });
+  await page.locator('#dl').click();
+  let rec = null;
+  await expect.poll(async () => {
+    const r = await shell.evaluate(() => window.filoShell.downloads.list());
+    rec = ((r && r.items) || []).find((it) => it.url === url) || null;
+    return rec ? rec.state : null;
+  }, { timeout: 20000 }).toBe('completed');
+  try { srv.closeAllConnections?.(); } catch (_) {}
+  await new Promise((r) => srv.close(r));
+  return rec;
+}
+
+test('col nome automatico acceso, un file scaricato da un sito delicato tiene il suo nome e non va al modello; da uno qualunque sì', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const { existsSync } = await import('node:fs');
+  await modelliFinti(app);
+  await impostaDaFilo(app, { nomiSensati: { scaricamenti: true }, security: { pagineDelicate: { siti: ['sito-pubblico.test'] } } });
+  const s = await app.evaluate(async () => globalThis.SN_STORAGE.getSettings());
+  expect([s.nomiSensati.scaricamenti, s.security.pagineDelicate.siti]).toEqual([true, ['sito-pubblico.test']]);
+  const delicato = await scaricaDa('documento.txt', SEGRETO, { shell, openTab, testServer });
+  await new Promise((r) => setTimeout(r, 3000));
+  expect((await mandato(app)).filter((m) => m.testo.includes('12.345,67'))).toEqual([]);
+  expect(existsSync(delicato.savePath)).toBe(true);
+
+  // Lo stesso sito tolto dai delicati: il file dopo prende il nome dal modello.
+  await impostaDaFilo(app, { security: { pagineDelicate: { siti: [] } } });
+  const normale = await scaricaDa('download.txt', 'Verbale della riunione di condominio', { shell, openTab, testServer });
+  await expect.poll(async () => (await mandato(app)).filter((m) => m.testo.includes('Verbale della riunione')).length, { timeout: 15000 }).toBe(1);
+  // Il nome lo dà il modello appena il file è sceso: si guarda dove arriva, non la foto presa a scaricamento finito.
+  await expect.poll(async () => {
+    const r = await shell.evaluate(() => window.filoShell.downloads.list());
+    return (((r && r.items) || []).find((it) => it.id === normale.id) || {}).filename;
+  }, { timeout: 15000 }).toBe('Riassunto finto della pagina.txt');
+});
+
+// #1823 — molte banche aprono il documento in una scheda nuova, servito da un altro dominio: conta la pagina che l'ha aperta.
+test.describe('un file da un altro dominio aperto in una scheda nuova', () => {
+  test.use({ hostInPiu: ['cdn-documenti.test'] });
+
+  test('dalla banca tiene il suo nome e non va al modello dei nomi', async ({ app, shell, openTab, testServer }) => {
+    test.setTimeout(90_000);
+    await modelliFinti(app);
+    await impostaDaFilo(app, { nomiSensati: { scaricamenti: true }, security: { pagineDelicate: { siti: ['sito-pubblico.test'] } } });
+    const { createServer } = await import('node:http');
+    const srv = createServer((req, res) => {
+      res.writeHead(200, { 'Content-Type': 'text/plain', 'Content-Length': Buffer.byteLength(SEGRETO), 'Content-Disposition': 'attachment; filename="documento.txt"' });
+      res.end(SEGRETO);
+    });
+    await new Promise((r) => srv.listen(0, '127.0.0.1', r));
+    try {
+      const url = `http://cdn-documenti.test:${srv.address().port}/documento.txt`;
+      const page = await testServer.openReady(openTab,
+        `<!doctype html><title>La mia banca</title><body style="padding:40px"><a id="dl" target="_blank" href="${url}">Scarica l'estratto conto</a></body>`,
+        { pubblico: true });
+      await page.locator('#dl').click();
+      let rec = null;
+      await expect.poll(async () => {
+        const r = await shell.evaluate(() => window.filoShell.downloads.list());
+        rec = ((r && r.items) || []).find((it) => it.url === url) || null;
+        return rec ? rec.state : null;
+      }, { timeout: 20000 }).toBe('completed');
+      await new Promise((r) => setTimeout(r, 4000));
+      expect((await mandato(app)).filter((m) => m.testo.includes('12.345,67'))).toEqual([]);
+      const r = await shell.evaluate(() => window.filoShell.downloads.list());
+      expect((((r && r.items) || []).find((it) => it.id === rec.id) || {}).filename).toBe('documento.txt');
+    } finally {
+      try { srv.closeAllConnections?.(); } catch (_) {}
+      await new Promise((r) => srv.close(r));
+    }
+  });
 });

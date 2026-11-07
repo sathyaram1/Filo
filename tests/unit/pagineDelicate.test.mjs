@@ -129,6 +129,10 @@ test('a parole: si spegne il riassunto, si spegne la protezione con conferma, si
   const s = P.buildPreferencePartial('siti_delicati', 'aggiungi https://www.studiorossi.it/area-clienti');
   assert.deepEqual(s.elenco.voci, ['studiorossi.it']);
   assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi commercialista').rifiuto, /«commercialista» non è un dominio/);
+  // Un nome con lo spazio si ridice intero, come nell'avviso della pagina Sicurezza (#718.3).
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi il sito studio rossi e banca.it').rifiuto,
+    /^«studio rossi» non è un dominio/);
+  assert.match(P.buildPreferencePartial('siti_delicati', 'aggiungi faceb e youtub').rifiuto, /^«faceb», «youtub» non sono domini/);
 });
 
 test('main: il campo password visto resta dopo un riavvio, e dall\'incognito non si scrive', async () => {
@@ -169,6 +173,61 @@ test('main: il campo password visto resta dopo un riavvio, e dall\'incognito non
   }
 });
 
+// #2219 — in Privacy Filo non tiene sul disco cosa sa dei siti non fidati, nemmeno dove ha visto un campo password.
+test('main: in Privacy un sito non fidato col campo password vale per la sessione e non va sul disco', async () => {
+  const disco = { filo_siti_con_campi: ['vecchio-non-fidato.example', 'banca-fidata.example'] };
+  const prima = globalThis.SN_STORAGE;
+  globalThis.SN_STORAGE = {
+    getRaw: async (k, d) => (k in disco ? JSON.parse(JSON.stringify(disco[k])) : d),
+    setRaw: async (k, v) => { disco[k] = JSON.parse(JSON.stringify(v)); },
+    getSettings: async () => ({}),
+  };
+  // La regola dei cookie la dà services/cookies.js: qui una finta con la stessa domanda e lo stesso avviso.
+  let modo = 'privacy';
+  let fidati = ['banca-fidata.example'];
+  const avvisi = new Set();
+  const cookiesFinti = { keepsSiteData: (s) => modo !== 'privacy' || fidati.includes(s), onConfigChange: (fn) => avvisi.add(fn) };
+  const percorsoCookies = require.resolve('../../src/main/services/cookies.js');
+  const cookiesVeri = require.cache[percorsoCookies];
+  require.cache[percorsoCookies] = { id: percorsoCookies, filename: percorsoCookies, loaded: true, exports: cookiesFinti };
+  const nuovo = () => {
+    avvisi.clear();
+    delete require.cache[require.resolve('../../src/main/services/pagineDelicate.js')];
+    return require('../../src/main/services/pagineDelicate.js');
+  };
+  const passa = () => new Promise((r) => setTimeout(r, 20));
+  const cambia = async (m, f) => { modo = m; fidati = f; for (const fn of avvisi) fn(); await passa(); };
+  try {
+    const D = nuovo();
+    const f = await D.filtro();
+    assert.deepEqual(disco.filo_siti_con_campi, ['banca-fidata.example'], 'un elenco di prima perde i non fidati alla prima lettura');
+    assert.equal(f('https://vecchio-non-fidato.example/'), 'campi', 'per questa sessione resta delicato');
+
+    await D.segnaCampi('http://127.0.0.1:8080/login');
+    await D.segnaCampi('http://localhost:3000/accedi');
+    assert.deepEqual(disco.filo_siti_con_campi, ['banca-fidata.example']);
+    assert.equal((await D.filtro())('http://localhost:3000/area'), 'campi');
+    assert.deepEqual(await D.elencoCampi(), ['127.0.0.1', 'banca-fidata.example', 'localhost', 'vecchio-non-fidato.example'],
+      'Sicurezza li mostra tutti, anche quelli che durano la sessione');
+
+    await cambia('privacy', ['banca-fidata.example', 'localhost']);
+    assert.deepEqual(disco.filo_siti_con_campi, ['banca-fidata.example', 'localhost'], 'un sito che diventa fidato va sul disco');
+    await cambia('privacy', ['banca-fidata.example']);
+    assert.deepEqual(disco.filo_siti_con_campi, ['banca-fidata.example'], 'uno che esce dai fidati lo lascia');
+    await cambia('default', []);
+    assert.deepEqual(disco.filo_siti_con_campi, ['127.0.0.1', 'banca-fidata.example', 'localhost', 'vecchio-non-fidato.example']);
+    await cambia('privacy', []);
+    assert.deepEqual(disco.filo_siti_con_campi, [], 'accesa la Privacy, il disco si svuota dei non fidati');
+
+    const dopo = await nuovo().filtro();
+    assert.equal(dopo('http://127.0.0.1:8080/area'), null, 'dopo un riavvio Filo non sa più dove hai visto il campo');
+  } finally {
+    globalThis.SN_STORAGE = prima;
+    if (cookiesVeri) require.cache[percorsoCookies] = cookiesVeri; else delete require.cache[percorsoCookies];
+    delete require.cache[require.resolve('../../src/main/services/pagineDelicate.js')];
+  }
+});
+
 test('a parole: «questo sito» e «scheda: <titolo>» diventano il sito della scheda aperta', () => {
   const schede = [
     { url: 'https://www.studiorossi.it/area-clienti', title: 'Studio Rossi – Area clienti' },
@@ -205,7 +264,7 @@ test('la pagina Privacy, fra quello che parte senza che lo si chieda, nomina anc
   const sezione = testo.slice(da, testo.indexOf('\n\n', testo.indexOf('\n- ', da) + 1) + 1 || undefined);
   const voci = sezione.split('\n').filter((r) => r.startsWith('- **'));
   assert.ok(voci.some((r) => /selezion/i.test(r)), 'manca la spiegazione preparata quando si seleziona del testo');
-  const numeri = { tre: 3, quattro: 4, cinque: 5, sei: 6 };
+  const numeri = { tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9 };
   const detto = /\*\* (\p{L}+) funzioni/u.exec(sezione);
   assert.equal(numeri[(detto && detto[1] || '').toLowerCase()], voci.length, 'il numero detto e le voci elencate coincidono');
 });

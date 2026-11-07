@@ -6,9 +6,14 @@ const path = require('node:path');
 const { collegaScorciatoie } = require('./shortcuts');
 const { VuotoDellaVista } = require('./vuotoDellaVista');
 const Layout = require('./services/layoutIcone');
+const Registro = require('./services/registroCambi');
 const RedteamGate = require('./services/redteamGate');
+const AzioniContate = require('./services/azioniContate');
+const Strade = require('./services/contatoriStrade');
 const { tastoPremuto } = require('./tastoDelMouse');
 const RisposteInAttesa = require('./risposteInAttesa');
+const RilascioNellaChat = require('./rilascioNellaChat');
+const { BordoDestro } = require('./bordoDestro');
 
 const STRISCIA = 4;
 const PANNELLO = 56;
@@ -27,6 +32,9 @@ const SONDA_LONTANO_MS = 150;
 const QUIETE_MS = 600;
 // Dopo un trascinamento dal menu la barra resta un attimo, per vedere dove è finita l'icona.
 const DOPO_POSA_MS = 900;
+// A finestra staccata dal bordo dello schermo la fascia è la presa per ridimensionarla (#1292): chi ci si ferma
+// la sta prendendo, e la spinta aspetta di più. Contro il bordo dello schermo resta l'attesa scelta.
+const ATTESA_STACCATA_MS = 450;
 // Le pagine elencate dal tasto destro su Indietro e Avanti; le altre si contano in fondo, non spariscono.
 const PAGINE_NEL_MENU = 15;
 
@@ -37,23 +45,45 @@ const PAGINE_FISSE = {
   history: 'filo://quaderno/quaderno.html',
   redteam: 'filo://redteam/redteam.html',
 };
-const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 const NOME_VAR = /^--[a-z][a-z0-9-]*$/;
+const FASI_FUORI = new Set(['muovi', 'rilascia', 'annulla']);
 // Le icone che un'azione della pagina può cambiare (lo stesso bottone traduce o riporta all'originale).
 const ICONE_DELLA_PAGINA = { translate: new Set(['translate', 'showOriginal']) };
 // Perché l'icona Aiuto è spenta, nel suggerimento: chiavi i18n per i motivi che la pagina riferisce.
 const MOTIVI_AIUTO_SPENTO = { aiuto: 'aiuto_spento_barra', sito: 'aiuto_spento_sito', pagina: 'aiuto_spento_pagina' };
+// Le azioni sulla pagina le esegue Filo dentro la pagina: dove non c'è si spengono dicendo perché (#1343 r1).
+const MOTIVI_AZIONI_SPENTE = { sito: 'aiuto_spento_sito', pagina: 'azioni_spente_pagina', interna: 'azioni_spente_interna' };
+// Quelle che portano via l'indirizzo della pagina: una pagina di Filo (tranne l'errore, che sta per il sito) non ne ha uno.
+const AZIONI_CON_INDIRIZZO = new Set(['share', 'qrCode', 'saveForLater']);
+// Quanto un'azione premuta su una pagina in arrivo aspetta che Filo ci sia dentro: oltre, il clic è vecchio.
+const ATTESA_DELLA_PAGINA_MS = 20_000;
+// Le icone che aprono una pagina di Filo, per le strade delle pagine (#1468).
+const PAGINA_DELL_ICONA = {
+  openOptions: 'filo://options/options.html', editorApp: 'filo://editor/editor.html', feedbackApp: 'filo://feedback/feedback.html',
+  home: 'filo://newtab/', newTab: 'filo://newtab/',
+};
+// I comandi della barra che mandano le chat (COMANDO_FINESTRA della home, l'azione «shell» dell'Aiuto), e cosa fanno.
+const COMANDI_CHAT = Object.freeze({ sidebar: 'apri', sidebar_close: 'chiudi', sidebar_lock: 'blocca', sidebar_unlock: 'sblocca' });
 const PAGINE_DAL_MENU = {
   ai: 'filo://history/history.html',
   preferenze: 'filo://preferences/preferences.html',
   regola: 'filo://preferences/preferences.html#sec-barra',
 };
 
+// Staccata: subito a sinistra del suo bordo, all'altezza del puntatore, c'è ancora uno schermo dove il puntatore va.
+function staccataDalBordo(xBordo, y, schermi) {
+  const x = xBordo - 1;
+  return (Array.isArray(schermi) ? schermi : []).some((d) => {
+    const b = d && d.bounds;
+    return !!b && x >= b.x && x < b.x + b.width && y >= b.y && y < b.y + b.height;
+  });
+}
+
 const numero = (v, min = -10000, max = 10000) => Math.max(min, Math.min(max, Math.round(Number(v) || 0)));
 const testo = (v) => (typeof v === 'string' ? v : String(v == null ? '' : v));
 const opzioniDi = (v) => (globalThis.SN_CONST && globalThis.SN_CONST.opzioniBarraLaterale
   ? globalThis.SN_CONST.opzioniBarraLaterale(v)
-  : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true });
+  : { spinta: true, attesaMs: 250, uscitaMs: 400, striscia: true, bloccata: false });
 
 class BarraLaterale {
   constructor(win, tabs, { alto = () => 0 } = {}) {
@@ -63,16 +93,18 @@ class BarraLaterale {
     this.vista = null;
     this.pronta = false;
     this.aperta = false;
+    this.cimaAperta = null;
     this.motivo = null;
     this.dentro = false;
     this.layout = null;
     this.tema = {};
     this.account = null;
+    this.suggerimento = false;
+    // Un'icona trascinata dalla fila del tasto destro verso la barra (#1434): dove cadrebbe, e le misure per saperlo.
     this.misure = [];
     this.mira = null;
     this.trascinamento = null;
-    this.suggerimento = false;
-    this.timer = { uscita: null, stringi: null, fine: null, trascina: null, sonda: null };
+    this.timer = { uscita: null, stringi: null, fine: null, sonda: null, trascina: null };
     this.ultimoNav = '';
     this.opzioni = opzioniDi(null);
     this.bordo = false;
@@ -82,8 +114,14 @@ class BarraLaterale {
     this.quieteFino = 0;
     this.ultimaSonda = 0;
     this.etichettePagina = null;
+    this.comandoInAttesa = null;
     this.ultimaPagina = '';
     this.strisciaPx = STRISCIA;
+    // Quanto la pagina si sposta a destra per la barra bloccata aperta (#1431), e se il lucchetto valeva all'ultimo sguardo.
+    this.spazioPagina = 0;
+    this.teneva = false;
+    // Il bordo destro delle pagine di Filo col pannello (#1433): stessi gesti, gli stessi feed della pagina e della shell.
+    this.destro = new BordoDestro(this);
     this.vuoto = new VuotoDellaVista({
       vista: () => (this.vista && !this.vista.webContents.isDestroyed() ? this.vista : null),
       scheda: () => this.tabs.vistaSottoIlVuoto(),
@@ -106,7 +144,9 @@ class BarraLaterale {
     Layout.leggi({ incognito: this._incognito() }).then((l) => this.disposizione(l)).catch(() => {});
     try {
       const letta = globalThis.SN_STORAGE?.getSettings?.();
-      if (letta && typeof letta.then === 'function') letta.then((st) => this.impostazioni(st && st.barraLaterale)).catch(() => {});
+      if (letta && typeof letta.then === 'function') {
+        letta.then((st) => { this.impostazioni(st && st.barraLaterale); this.destro.impostazioni(st && st.pannelloDestro); }).catch(() => {});
+      }
     } catch (_) {}
   }
 
@@ -114,6 +154,73 @@ class BarraLaterale {
   impostazioni(v) {
     this.opzioni = opzioniDi(v);
     if (!this.opzioni.spinta) { this._ferma('sonda'); this._segnaBordo(false); } else this._guarda();
+    this._seguiLucchetto();
+    this._invia();
+  }
+
+  // ── il lucchetto (#1431) ─────────────────────────────────────────────────
+  // Bloccata, la barra resta aperta e spinge la pagina; a tutto schermo vale da sbloccata, come il pannello di destra
+  // in una finestra stretta. Il tasto e la chat la chiudono lo stesso; si riapre bloccata col gesto dopo o al riavvio.
+
+  _tiene() { return !!this.opzioni.bloccata && !this.tabs.contentFullscreen; }
+
+  // Il margine sinistro della pagina, letto da tabs._areaPagina.
+  spazio() { return this.spazioPagina; }
+
+  // true se la pagina è stata ridisposta (la ridisposizione ha già riposato la barra).
+  _spingi() {
+    const s = this.aperta && this._tiene() ? PANNELLO : 0;
+    if (s === this.spazioPagina) return false;
+    this.spazioPagina = s;
+    try { this.tabs.layout(); } catch (_) { return false; }
+    this._invia();
+    return true;
+  }
+
+  // Appena il lucchetto vale la barra si apre; quando smette chiude, ma non sotto il puntatore né alla tastiera.
+  _seguiLucchetto() {
+    const t = this._tiene();
+    if (t === this.teneva) return;
+    this.teneva = t;
+    if (t) {
+      this._ferma('uscita');
+      if (!this.aperta) { this.apri('bloccata'); return; }
+      if (this.motivo !== 'tasto') this.motivo = 'bloccata';
+    } else if (this.aperta && this.motivo !== 'tasto' && !this.dentro) {
+      this.chiudi();
+      return;
+    } else if (this.aperta && this.motivo !== 'tasto') {
+      this.motivo = 'clic';
+    }
+    this._spingi();
+  }
+
+  // Subito qui, poi su disco: due clic di fila sul lucchetto non leggono lo stesso valore vecchio.
+  blocca(v, prov) {
+    this.impostazioni({ ...this.opzioni, bloccata: !!v });
+    return this._scriviOpzioni({ bloccata: !!v }, prov);
+  }
+
+  // Da ogni chat (#1292): chiudere vale anche bloccata, come il tasto. Il lucchetto si scrive nel registro di chi chiama
+  // (la chat, l'Aiuto). null se il comando non è della barra; `gia`: era già così.
+  async comandoChat(comando) {
+    const op = COMANDI_CHAT[String(comando || '')];
+    if (!op) return null;
+    if (op === 'apri') { const gia = this.aperta; this.apri('chat'); return { op, gia }; }
+    if (op === 'chiudi') { const gia = !this.aperta; this.chiudi({ forza: true }); return { op, gia }; }
+    const v = op === 'blocca';
+    const gia = !!this.opzioni.bloccata === v;
+    await this.blocca(v, null);
+    // Già bloccata ma chiusa col tasto: chiederlo a parole la riapre.
+    if (v && this._tiene() && !this.aperta) this.apri('bloccata');
+    return { op, gia };
+  }
+
+  // Bloccata, finita una scelta da tastiera: la tastiera torna alla pagina e la barra resta.
+  _lasciaTastiera() {
+    if (this.motivo !== 'tasto') return;
+    this.motivo = 'bloccata';
+    this._restituisciTastiera();
     this._invia();
   }
 
@@ -129,27 +236,38 @@ class BarraLaterale {
     this._segnaBordo(false);
     const giaAperta = this.aperta;
     this.aperta = true;
-    if (!giaAperta || motivo === 'tasto') this.motivo = motivo;
+    if (!giaAperta) this._apertaRicerca();
+    // Il perché dell'apertura, per i contatori (#1471): resta quello del primo gesto anche se poi ne arriva un altro.
+    if (!giaAperta) this.apertura = { motivo, t0: Date.now(), esito: '' };
+    // Bloccata resta aperta qualunque gesto l'abbia aperta: solo la tastiera tiene il suo motivo, per il fuoco.
+    const come = this._tiene() && motivo !== 'tasto' ? 'bloccata' : motivo;
+    if (!giaAperta || come === 'tasto') this.motivo = come;
     if (!giaAperta) this.dentro = false;
-    this.posa();
-    this._invia({ fuoco: motivo === 'tasto' });
-    if (motivo === 'tasto' && this.vista) { try { this.vista.webContents.focus(); } catch (_) {} }
+    if (!this._spingi()) this.posa();
+    this._invia({ fuoco: come === 'tasto' });
+    if (come === 'tasto' && this.vista) { try { this.vista.webContents.focus(); } catch (_) {} }
     if (!giaAperta) this._chiediEtichette();
     // Aperta dal bordo che la vista non vede: la sonda resta a guardare dove va il puntatore.
-    if (motivo === 'spinta' && !giaAperta) this._sonda();
+    if (come === 'spinta' && !giaAperta) this._sonda();
   }
 
-  chiudi() {
+  // `forza`: il tasto, la chat, una voce «Chiudi». Senza, la barra bloccata resta (uscita, clic sulla pagina, una scelta).
+  chiudi({ forza = false } = {}) {
     this._ferma('uscita');
     this._ferma('fine');
     if (!this.aperta) return;
+    if (!forza && this._tiene()) { this._lasciaTastiera(); return; }
     // Da tastiera il fuoco l'ha preso lei: torna alla scheda anche se il sistema non lo dice ancora.
     const avevaFuoco = this._haFuoco() || this.motivo === 'tasto';
+    if (this.ricerca && !this.ricerca.scelta) this._contaRicerca({ esito: 'vuota' });
+    this.ricerca = null;
+    this._contaApertura();
     this.aperta = false;
     this.motivo = null;
     this.dentro = false;
     this.mira = null;
     this._nascondiSuggerimento();
+    this._spingi();
     this._invia();
     this._ferma('stringi');
     this.timer.stringi = setTimeout(() => { this.timer.stringi = null; if (!this.aperta) this.posa(); }, require('./movimento').ms(CHIUSURA_MS));
@@ -160,9 +278,56 @@ class BarraLaterale {
     this._guarda();
   }
 
-  commuta(motivo = 'clic') {
-    if (this.aperta) this.chiudi();
-    else this.apri(motivo);
+  // La barra come pannello in cui si cerca una voce (#1461): dall'apertura alla prima scelta, a che posto era la voce
+  // scelta fra quelle in vista, o chiusa senza scegliere. Solo esiti e numeri.
+  _contaRicerca(evento) {
+    try { globalThis.SN_CONTATORI_MAIN?.ricerca('barra-laterale', evento, { incognito: this._incognito() }); } catch (_) {}
+  }
+  _apertaRicerca() {
+    this.ricerca = { t0: Date.now(), scelta: false };
+    this._contaRicerca({ esito: 'aperta' });
+  }
+  _sceltaRicerca(posizione) {
+    if (!this.ricerca || this.ricerca.scelta) return;
+    this.ricerca.scelta = true;
+    this._contaRicerca({ esito: 'scelta', attesaMs: Date.now() - this.ricerca.t0, posizione: posizione > 0 ? posizione : null });
+  }
+  // Un'apertura della barra (#1471): perché, cosa ci si è fatto (la prima cosa: un'azione, una voce di sistema, il
+  // tasto destro) e quanto è rimasta aperta. Chiusa senza niente è «a vuoto».
+  _esito(esito) { if (this.apertura && !this.apertura.esito) this.apertura.esito = esito; }
+  // Un'icona portata fuori dalla barra e presa dal menu della pagina: l'apertura è servita a qualcosa.
+  iconaPresaFuori() { this._esito('azione'); }
+  _contaApertura() {
+    this._lettura().via();
+    const a = this.apertura;
+    this.apertura = null;
+    if (a) this._contaGesto('barra_aperta', { motivo: a.motivo, esito: a.esito || 'a_vuoto', apertaMs: Date.now() - a.t0 });
+  }
+  _contaGesto(misura, dati) {
+    try { globalThis.SN_CONTATORI_MAIN?.gesto(misura, dati, { incognito: this._incognito() }); } catch (_) {}
+  }
+  // Il nome comparso su un'icona, e se la si sceglie subito dopo (#1471): la regola dei tempi sta in SN_GESTI.
+  _lettura() {
+    if (!this.letture) {
+      const G = globalThis.SN_GESTI;
+      this.letture = G ? G.lettore((ev) => this._contaGesto('suggerimento_letto', ev)) : { mostrato() {}, clic() {}, via() {} };
+    }
+    return this.letture;
+  }
+
+  // Le voci fisse stanno sotto le icone, in quest'ordine (src/renderer/barra.js); il red-team solo se si vede.
+  _posizioneFissa(comando) {
+    const fisse = ['history', 'apps', 'redteam', 'account', 'settings'].filter((c) => c !== 'redteam' || RedteamGate.visibile());
+    const i = fisse.indexOf(comando);
+    return i < 0 ? 0 : this._icone().length + i + 1;
+  }
+
+  // `via`: da quale strada il gesto, per le strade delle azioni (#1468); lo spunto dal bordo e la maniglia no.
+  commuta(motivo = 'clic', via = '') {
+    if (via) Strade.misura('azione', 'barra_laterale', via, { incognito: this._incognito() });
+    if (this.aperta) { this.chiudi({ forza: true }); return; }
+    // Aperta da un gesto (tasto, clic, barra dei menu): un'azione contata (#1461). Lo spunto dal bordo no.
+    AzioniContate.azione('sidebar', () => this.apri(motivo), { incognito: !!(this.win && this.win._filoIncognito) });
   }
 
   // Tasto della barra ed Esc, da qualunque vista della finestra abbia il fuoco. true = preso.
@@ -170,10 +335,17 @@ class BarraLaterale {
     if (!input || input.type !== 'keyDown') return false;
     const T = globalThis.SN_TASTI;
     if (T && T.comandoBarra(input)) {
-      if (!input.isAutoRepeat) this.commuta('tasto');
+      if (!input.isAutoRepeat) this.commuta('tasto', 'scorciatoia');
       return true;
     }
+    if (T && T.comandoLucchettoBarra && T.comandoLucchettoBarra(input)) {
+      if (!input.isAutoRepeat) this.blocca(!this.opzioni.bloccata);
+      return true;
+    }
+    if (this.destro.tasto(input)) return true;
     if (this.aperta && String(input.key || '') === 'Escape') {
+      // Bloccata, l'Esc è della pagina; dalla barra presa da tastiera rende la tastiera alla pagina.
+      if (this._tiene() && this.motivo !== 'tasto') return false;
       this.chiudi();
       return true;
     }
@@ -184,26 +356,30 @@ class BarraLaterale {
   // sito quando copre la scheda, sennò la scheda), la stessa regola del vuoto (#871 giro 6).
   inputDa(wc, input) {
     const sotto = this.tabs.vistaSottoIlVuoto();
-    if (wc && sotto && sotto.webContents === wc) this.inputAltrove(input);
+    // Anche la pagina sotto i riquadri di Filo (#1509.3): fuori dalla loro cornice i gesti arrivano a lei.
+    const t = this._attiva();
+    const pagina = !!t && t.view && t.view.webContents === wc && this.tabs.paginaScoperta(t);
+    if (wc && ((sotto && sotto.webContents === wc) || pagina)) this.inputAltrove(input);
   }
 
   inputAltrove(input) {
     if (!input) return;
     this._tasti('scheda', input);
-    if (!this.aperta) {
-      // Uscendo dalla pagina il puntatore può andare dove la pagina non lo vede più (la fascia del sistema,
-      // fuori dalla finestra): da lì lo guarda il main, anche arrivando di corsa.
-      if (input.type === 'mouseLeave') this._guarda();
-      else if (input.type === 'mouseMove') this._forseBordo();
-    }
-    // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più
-    // «fine» (ha navigato, è caduta), la barra non resta ferma ad aspettarla.
+    this.destro.input(input);
+    // Il rilascio di un trascinamento dal menu arriva sempre qui: se la pagina non dice più «fine» (ha navigato, è
+    // caduta), la barra non resta ferma ad aspettarla.
     if (this.trascinamento) {
       if (input.type === 'mouseUp') {
         this._ferma('trascina');
         this.timer.trascina = setTimeout(() => { this.timer.trascina = null; this._fineTrascinamento(); }, 500);
       }
       return;
+    }
+    if (!this.aperta) {
+      // Uscendo dalla pagina il puntatore può andare dove la pagina non lo vede più (la fascia del sistema,
+      // fuori dalla finestra): da lì lo guarda il main, anche arrivando di corsa.
+      if (input.type === 'mouseLeave') this._guarda();
+      else if (input.type === 'mouseMove') this._forseBordo();
     }
     if (!this.aperta) return;
     if (input.type === 'mouseDown' && (input.button || 'left') === 'left') { this.chiudi(); return; }
@@ -215,7 +391,7 @@ class BarraLaterale {
   }
 
   _programmaUscita() {
-    if (this.timer.uscita || this.trascinamento) return;
+    if (this.timer.uscita || this.trascinamento || this._tiene()) return;
     this.timer.uscita = setTimeout(() => {
       this.timer.uscita = null;
       if (!this.dentro && !this.trascinamento) this.chiudi();
@@ -265,7 +441,7 @@ class BarraLaterale {
       if (dove === 'bordo' && !fermo && this._mosso(punto)) {
         if (!this.bordoDal) this.bordoDal = Date.now();
         this._segnaBordo(true);
-        if (Date.now() - this.bordoDal >= this.opzioni.attesaMs) { this.apri('spinta'); return; }
+        if (Date.now() - this.bordoDal >= this._attesaSulBordo(punto)) { this.apri('spinta'); return; }
       } else {
         this._segnaBordo(false);
       }
@@ -273,6 +449,16 @@ class BarraLaterale {
       if (dove === 'lontano' && nellaPagina) return;
       this._sonda(dove === 'lontano' ? SONDA_LONTANO_MS : SONDA_MS);
     }, dopo);
+  }
+
+  // Solo dove la fascia è del sistema (finestra non massimizzata): lì si ridimensiona.
+  _attesaSulBordo(punto) {
+    const base = this.opzioni.attesaMs;
+    if (!punto || this._larghezzaChiusa() === STRISCIA) return base;
+    try {
+      const cb = this.win.getContentBounds();
+      return staccataDalBordo(cb.x, punto.y, require('electron').screen.getAllDisplays()) ? base + ATTESA_STACCATA_MS : base;
+    } catch (_) { return base; }
   }
 
   // Dopo un rilascio o una chiusura il bordo conta solo quando il puntatore si muove: chi finisce lì una
@@ -294,6 +480,7 @@ class BarraLaterale {
       this.tasti[chi] = false;
       this.puntoFermo = this._punto();
       this._guarda();
+      this.destro.tastoLasciato();
     } else if (t === 'mouseMove') {
       this.tasti[chi] = Boolean(tastoPremuto(input));
     }
@@ -304,6 +491,7 @@ class BarraLaterale {
     this._tasti('shell', input);
     // Dalla fila delle schede il puntatore scende lungo il bordo senza passare dalla pagina.
     if (input.type === 'mouseMove' || input.type === 'mouseLeave') this._guarda();
+    this.destro.inputDellaShell(input);
   }
 
   _punto() {
@@ -354,13 +542,22 @@ class BarraLaterale {
 
   posa() {
     if (!this.win || this.win.isDestroyed()) return;
+    this._seguiLucchetto();
+    if (this._spingi()) return;
     const vista = this._vista();
     if (!vista) return;
     const [, H] = this.win.getContentSize();
-    const y = Math.max(0, Math.round(this.alto()));
+    // Aperta a schermo intero sotto le schede scese: quando la fila risale la barra resta dov'è, sotto il puntatore (#1343).
+    const altoOra = Math.max(0, Math.round(this.alto()));
+    const schermoIntero = !!this.tabs.contentFullscreen;
+    const c = this.aperta ? this.cimaAperta : null;
+    const ferma = !!c && c.schermoIntero && schermoIntero && altoOra < c.y;
+    const y = ferma ? c.y : altoOra;
+    this.cimaAperta = this.aperta && !ferma ? { y, schermoIntero } : c;
     const largo = this.aperta || this.timer.stringi;
     const chiusa = this._larghezzaChiusa();
-    const w = largo ? PANNELLO + OMBRA : chiusa;
+    // Bloccata accanto alla pagina non le sta sopra: niente ombra, e la vista finisce dove lei comincia.
+    const w = largo ? PANNELLO + (this.spazioPagina ? 0 : OMBRA) : chiusa;
     vista.setBounds({ x: 0, y, width: w, height: Math.max(0, H - y) });
     this._inCima();
     vista.setVisible(true);
@@ -407,16 +604,21 @@ class BarraLaterale {
   disposizione(layout) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     if (!D || !D.valida(layout)) return;
-    this.layout = { primary: [...layout.primary], secondary: [...layout.secondary], bar: [...(layout.bar || [])] };
+    const l = D.migra(layout).layout;
+    this.layout = { bar: l.bar, secondary: l.secondary };
+    // Le icone della barra portate in una fila del tasto destro: lì le esegue questa stessa barra (#1434.2).
+    this.inFila = new Set(D.ZONE_FILA.flatMap((z) => l[z]).filter((id) => D.noto(id)));
     this._invia();
   }
 
   // La scheda è cambiata (navigazione, caricamento, schermo intero): si ridice solo se cambia qualcosa.
   aggiornaNav() {
+    this.destro.aggiorna();
     const t = this._attiva();
     const dove = t ? `${t.id}|${t.url || ''}` : '';
     const cambiataPagina = dove !== this.ultimaPagina;
     this.ultimaPagina = dove;
+    this._consegnaInAttesa();
     if (cambiataPagina && this.aperta) this._chiediEtichette();
     const n = JSON.stringify(this._nav());
     if (n === this.ultimoNav && !cambiataPagina) return;
@@ -429,7 +631,9 @@ class BarraLaterale {
     return {
       scheda: !!t,
       // Sotto l'avviso del sito pericoloso la pagina non si vede: le sue azioni aspettano la conferma (regola del vuoto).
-      pagina: !!t && this.tabs.vistaSottoIlVuoto() === t.view,
+      pagina: !!t && this.tabs.paginaScoperta(t),
+      azioniFerme: this._azioniFerme(t),
+      interna: !!t && /^filo:\/\//i.test(t.url || '') && !/^filo:\/\/error\//i.test(t.url || ''),
       indietro: !!(t && t.canBack),
       avanti: !!(t && t.canFwd),
       schermoIntero: !!this.tabs.contentFullscreen,
@@ -443,15 +647,35 @@ class BarraLaterale {
   _aiuto(t) {
     if (!t) return { spenta: 'pagina' };
     const a = t.aiuto;
-    if (this.tabs.vistaSottoIlVuoto() !== t.view) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
+    if (!this.tabs.paginaScoperta(t)) return { pannello: 'chiuso', spenta: a && a.spento === 'aiuto' ? 'aiuto' : '' };
     // Nessuna notizia dalla pagina: si sta ancora caricando, o Filo lì dentro non c'è (il visore PDF).
     if (!a) return t.loading ? { pannello: 'chiuso' } : { spenta: 'pagina' };
     if (a.spento) return { spenta: a.spento };
     return { pannello: a.pannello, voce: a.voce, risposta: RisposteInAttesa.inAttesa(t, 'aiuto') };
   }
 
+  // La stessa notizia dell'Aiuto: Filo spento sul sito, o nessun Filo dentro la pagina (il visore PDF). Su una pagina
+  // ancora in arrivo le azioni restano accese, e il clic aspetta che Filo ci sia (_consegnaInAttesa).
+  _azioniFerme(t) {
+    if (!t) return 'pagina';
+    const a = t.aiuto;
+    if (!a) return t.loading ? '' : 'pagina';
+    return a.spento === 'sito' || a.spento === 'pagina' ? a.spento : '';
+  }
+
+  // Perché l'azione `id` sulla pagina non può partire adesso ('' se può): la regola unica per l'icona e per il clic.
+  _motivoAzione(id, nav) {
+    if (nav.azioniFerme) return nav.azioniFerme;
+    return nav.interna && AZIONI_CON_INDIRIZZO.has(id) ? 'interna' : '';
+  }
+
   _attiva() {
     return this.tabs.tabs.find((t) => t.id === this.tabs.activeId) || null;
+  }
+
+  // Le icone che la barra mostra: quelle in vista e quelle di «Altro…».
+  _inBarra() {
+    return this.layout ? [...this.layout.bar, ...this.layout.secondary] : [];
   }
 
   // Tema e profilo li tiene la shell, come per gli avvisi: qui arrivano già calcolati.
@@ -475,26 +699,52 @@ class BarraLaterale {
 
   _icone() {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
-    const I18n = globalThis.SN_I18N;
     if (!D || !this.layout) return [];
     const nav = this._nav();
     const owner = this._owner();
     const dallaPagina = this._etichetteAttive();
     const out = [];
-    for (const id of this.layout.bar) {
-      const d = D.ICONE[id];
-      if (!d || (d.soloOwner && !owner)) continue;
-      if (d.tipo === 'aiuto') { out.push(this._iconaAiuto(id, nav.aiuto)); continue; }
-      let icona = d.icona;
-      let chiave = d.etichetta;
-      if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
-      let etichetta = I18n ? I18n.t(chiave) : id;
-      const sp = dallaPagina && dallaPagina[id];
-      if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
-      const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
-        || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && !nav.pagina);
-      const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
-      out.push({ id, icona, etichetta, tasto, spenta, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' });
+    const zone = [...this.layout.bar.map((id) => [id, false]), ...this.layout.secondary.map((id) => [id, true])];
+    for (const [id, riserva] of zone) {
+      const it = this._descrivi(id, { nav, owner, dallaPagina });
+      if (it) out.push({ ...it, riserva });
+    }
+    return out;
+  }
+
+  // Un'icona come la vede chi la usa adesso, nella barra e nella fila del tasto destro: disegno, nome, spenta e perché.
+  // null per chi non la vede.
+  _descrivi(id, { nav, owner, dallaPagina = null }) {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    const I18n = globalThis.SN_I18N;
+    const d = D.ICONE[id];
+    if (!d || (d.soloOwner && !owner)) return null;
+    if (d.tipo === 'aiuto') return this._iconaAiuto(id, nav.aiuto);
+    let icona = d.icona;
+    let chiave = d.etichetta;
+    if (id === 'fullscreen' && nav.schermoIntero) { icona = 'shrink'; chiave = 'menu_exit_fullscreen'; }
+    let etichetta = I18n ? I18n.t(chiave) : id;
+    const sp = dallaPagina && dallaPagina[id];
+    if (sp) { icona = sp.icona; if (sp.etichetta) etichetta = sp.etichetta; }
+    const ferma = d.tipo === 'pagina' && nav.pagina ? this._motivoAzione(id, nav) : '';
+    const spenta = (id === 'back' && !nav.indietro) || (id === 'forward' && !nav.avanti)
+      || ((id === 'reload' || id === 'closeTab') && !nav.scheda) || (d.tipo === 'pagina' && (!nav.pagina || !!ferma));
+    const motivo = ferma && I18n ? I18n.t(MOTIVI_AZIONI_SPENTE[ferma]) : '';
+    const tasto = id === 'fullscreen' && globalThis.SN_TASTI ? globalThis.SN_TASTI.etichettaSchermoIntero() : '';
+    return { id, icona, etichetta, tasto, spenta, motivo, accesa: id === 'fullscreen' && nav.schermoIntero, pagina: d.tipo === 'pagina' };
+  }
+
+  // Le icone della finestra per la fila del tasto destro della scheda davanti, per id: quelle che questa persona vede.
+  iconeFila() {
+    const D = globalThis.SN_DISPOSIZIONE_ICONE;
+    if (!D) return {};
+    const nav = this._nav();
+    const owner = this._owner();
+    const out = {};
+    for (const id of Object.keys(D.ICONE)) {
+      if (D.ICONE[id].tipo !== 'finestra') continue;
+      const it = this._descrivi(id, { nav, owner });
+      if (it) out[id] = { icona: it.icona, etichetta: it.etichetta, tasto: it.tasto, spenta: !!it.spenta, accesa: !!it.accesa };
     }
     return out;
   }
@@ -526,7 +776,7 @@ class BarraLaterale {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const t = this._attiva();
     if (!D || !t || !this.layout) return;
-    const ids = this.layout.bar.filter((id) => D.ICONE[id] && D.ICONE[id].tipo === 'pagina');
+    const ids = this._inBarra().filter((id) => D.ICONE[id] && D.ICONE[id].tipo === 'pagina');
     if (!ids.length) return;
     const tipo = globalThis.SN_MSG?.MSG?.BARRA_ETICHETTE_CHIEDI || 'barra_etichette_chiedi';
     try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, ids }); } catch (_) {}
@@ -543,7 +793,7 @@ class BarraLaterale {
     for (const v of (Array.isArray(voci) ? voci : []).slice(0, 50)) {
       const id = testo(v && v.id);
       const d = D.noto(id) ? D.ICONE[id] : null;
-      if (!d || d.tipo !== 'pagina' || !this.layout.bar.includes(id)) continue;
+      if (!d || d.tipo !== 'pagina' || !this._inBarra().includes(id)) continue;
       const ammesse = ICONE_DELLA_PAGINA[id];
       const icona = ammesse && ammesse.has(testo(v.icona)) ? testo(v.icona) : d.icona;
       mappa[id] = { etichetta: testo(v.etichetta).slice(0, 200), icona };
@@ -563,13 +813,18 @@ class BarraLaterale {
       redteam: RedteamGate.visibile(),
       account: this.account,
       tema: this.tema,
-      mira: this.mira,
-      trascinamento: !!this.trascinamento,
       tasto: T ? T.etichettaBarra() : 'Ctrl+Shift+B',
       bordo: this.bordo,
+      mira: this.mira,
+      trascinamento: !!this.trascinamento,
       // Una risposta di Filo da leggere nella scheda davanti (#1432).
       risposta: this._nav().risposta,
+      // A tutto schermo la striscia non resta sopra il film (#871.6, D-11): spenta come da Preferenze, il bordo vivo.
+      schermoIntero: !!this.tabs.contentFullscreen,
       strisciaPx: this.strisciaPx || STRISCIA,
+      bloccata: !!this.opzioni.bloccata,
+      spinge: this.spazioPagina > 0,
+      tastoLucchetto: T && T.etichettaLucchettoBarra ? T.etichettaLucchettoBarra() : '',
       opzioni: { spinta: this.opzioni.spinta, attesaMs: this.opzioni.attesaMs, striscia: this.opzioni.striscia },
     };
   }
@@ -581,42 +836,89 @@ class BarraLaterale {
 
   // ── azioni ──────────────────────────────────────────────────────────────
 
-  esegui(id) {
+  // `colore`: quello che la barra ha già preso col contagocce (#1246), da passare alla pagina.
+  // `daAltro`: scelta dentro «Altro…», per i contatori (#1471).
+  // `via` 'fila': premuta nella fila del tasto destro della scheda davanti, dove sta un'icona della finestra (#1434.2);
+  // lì è spenta come nella barra, e non conta come una scelta fatta nella barra.
+  esegui(id, { colore = '', daAltro = false, via = 'barra' } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const d = D && D.noto(id) ? D.ICONE[id] : null;
-    if (!d || !this.layout || !this.layout.bar.includes(id)) return;
+    const dallaFila = via === 'fila';
+    if (!d || !this.layout || !(dallaFila ? this.inFila && this.inFila.has(id) && d.tipo === 'finestra' : this._inBarra().includes(id))) return;
     if (d.soloOwner && !this._owner()) return;
+    if (dallaFila) {
+      const it = this._descrivi(id, { nav: this._nav(), owner: this._owner() });
+      if (!it || it.spenta) return;
+    } else {
+      if (daAltro && Array.isArray(this.layout.secondary) && this.layout.secondary.includes(id)) this._contaGesto('altro_del_menu', { icona: id });
+      this._lettura().clic(id);
+      this._esito('azione');
+      this._sceltaRicerca(this._icone().findIndex((i) => i.id === id) + 1);
+    }
+    const strada = dallaFila ? 'tasto_destro_riga' : 'barra';
     const tabs = this.tabs;
     const attiva = this._attiva();
+    const incognito = this._incognito();
     if (d.tipo === 'aiuto') { this._passoAiuto(attiva); return; }
     if (d.tipo === 'pagina') {
-      if (!attiva || !this._nav().pagina) return;
+      const nav = this._nav();
+      if (!attiva || !nav.pagina || this._motivoAzione(id, nav)) return;
+      Strade.misura('azione', id, 'barra', { incognito });
       this.chiudi();
       this._restituisciTastiera();
-      const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
-      try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: id, daBarra: true }); } catch (_) {}
+      const scelto = id === 'colorPicker' && /^#[0-9a-f]{6}$/i.test(testo(colore)) ? testo(colore) : undefined;
+      this.comandoInAttesa = { tabId: attiva.id, url: attiva.url || '', iconId: id, ...(scelto ? { colore: scelto } : {}), scade: Date.now() + ATTESA_DELLA_PAGINA_MS };
+      this._consegnaInAttesa();
       return;
     }
-    const daTastiera = this.motivo === 'tasto';
-    switch (id) {
-      case 'back': tabs.navigaCronologia('indietro'); break;
-      case 'forward': tabs.navigaCronologia('avanti'); break;
-      case 'reload': if (attiva) tabs.reload(attiva.id); break;
-      case 'home':
-        if (attiva) tabs.navigate(attiva.id, 'filo://newtab/');
-        else tabs.openTab('filo://newtab/');
-        break;
-      case 'newTab': tabs.openTab('filo://newtab/'); break;
-      case 'closeTab': if (attiva) tabs.closeTab(attiva.id); break;
-      case 'fullscreen': tabs.toggleContentFullscreen(); break;
-      case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
-      case 'openOptions': tabs.openTab('filo://options/options.html'); break;
-      case 'editorApp': tabs.openTab('filo://editor/editor.html'); break;
-      case 'feedbackApp': tabs.openTab('filo://feedback/feedback.html'); break;
-      default: return;
-    }
+    const daTastiera = !dallaFila && this.motivo === 'tasto';
+    const fai = () => {
+      switch (id) {
+        case 'back': tabs.navigaCronologia('indietro'); break;
+        case 'forward': tabs.navigaCronologia('avanti'); break;
+        case 'reload': if (attiva) tabs.reload(attiva.id); break;
+        case 'home':
+          if (attiva) tabs.navigate(attiva.id, 'filo://newtab/');
+          else tabs.openTab('filo://newtab/');
+          break;
+        case 'newTab': tabs.openTab('filo://newtab/'); break;
+        case 'closeTab': if (attiva) tabs.closeTab(attiva.id, { via: strada }); break;
+        case 'fullscreen': tabs.toggleContentFullscreen(); break;
+        case 'incognito': try { require('./window').createIncognitoWindow(); } catch (_) {} break;
+        case 'openOptions': tabs.openTab('filo://options/options.html'); break;
+        case 'editorApp': tabs.openTab('filo://editor/editor.html'); break;
+        case 'feedbackApp': tabs.openTab('filo://feedback/feedback.html'); break;
+        default: return false;
+      }
+      return true;
+    };
+    const azione = globalThis.SN_CONTATORI && globalThis.SN_CONTATORI.AZIONE_DI_ICONA[id];
+    // Le strade (#1468): indietro e avanti contano anche nella cronologia, un'icona che apre una pagina anche fra le pagine;
+    // la chiusura la conta la scheda che si chiude, dalla sua via.
+    if (id === 'back' || id === 'forward') Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', strada, { incognito });
+    else if (id !== 'closeTab') Strade.misura('azione', id, strada, { incognito });
+    if (PAGINA_DELL_ICONA[id] && !dallaFila) Strade.misura('pagina', PAGINA_DELL_ICONA[id], 'barra', { finestra: tabs, incognito });
+    const fatto = azione ? AzioniContate.azione(azione, fai, { incognito: !!this.win._filoIncognito }) : fai();
+    if (!fatto) return;
     // Da tastiera si torna a chi scriveva; col mouse la barra resta finché il puntatore ci sta sopra.
     if (daTastiera) this.chiudi();
+  }
+
+  // Un'azione premuta su una pagina in arrivo aspetta che Filo ci sia dentro: mandata prima nessuno l'ascolterebbe.
+  // Vale per la scheda e l'indirizzo su cui si è premuto, finché restano davanti.
+  _consegnaInAttesa() {
+    const c = this.comandoInAttesa;
+    if (!c) return;
+    const t = this._attiva();
+    if (!t || t.id !== c.tabId || (t.url || '') !== c.url || Date.now() > c.scade) { this.comandoInAttesa = null; return; }
+    if (!t.aiuto) return;
+    this.comandoInAttesa = null;
+    const nav = this._nav();
+    if (!nav.pagina || this._motivoAzione(c.iconId, nav)) return;
+    // Un gesto sull'interfaccia di Filo, come la voce di un menu: vale per gli appunti di Filo, non apre niente alla pagina.
+    try { require('./services/permessiPagine').gestoDiFilo(t.view.webContents); } catch (_) {}
+    const tipo = globalThis.SN_MSG?.MSG?.TOP_FRAME_COMMAND || 'top_frame_command';
+    try { t.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, iconId: c.iconId, daBarra: true, ...(c.colore ? { colore: c.colore } : {}) }); } catch (_) {}
   }
 
   // Col mouse la barra resta aperta: il secondo clic, senza spostarsi, detta. La pagina decide dal suo stato vero, e
@@ -626,7 +928,10 @@ class BarraLaterale {
     const a = this._aiuto(attiva);
     if (a.spenta) return;
     const daTastiera = this.motivo === 'tasto';
-    if (this.tabs.vistaSottoIlVuoto() !== attiva.view) {
+    const scoperta = this.tabs.paginaScoperta(attiva);
+    Strade.misura('azione', 'help', 'barra', { incognito: this._incognito() });
+    Strade.misura('aiuto', scoperta ? 'barra' : 'avviso_sito', { incognito: this._incognito() });
+    if (!scoperta) {
       require('./services/interruttoreAiuto').seAcceso(this.win, () => this.tabs._sbScelta(attiva, 'chiedi'));
       if (daTastiera) this.chiudi();
       return;
@@ -639,7 +944,12 @@ class BarraLaterale {
   sistema(comando, dati) {
     if (!FISSE.has(comando)) return;
     if (comando === 'redteam' && !RedteamGate.visibile()) return;
+    this._lettura().clic(comando);
+    this._esito('sistema');
+    this._sceltaRicerca(this._posizioneFissa(comando));
     if (PAGINE_FISSE[comando]) {
+      // L'azione della pagina la conta l'apertura della scheda (src/main/tabs.js).
+      Strade.misura('pagina', PAGINE_FISSE[comando], 'barra', { finestra: this.tabs, incognito: this._incognito() });
       this.tabs.openTab(PAGINE_FISSE[comando]);
       if (this.motivo === 'tasto') this.chiudi();
       return;
@@ -650,13 +960,13 @@ class BarraLaterale {
     try { this.win.webContents.send('shell:trigger-button', { command: comando, anchor }); } catch (_) {}
   }
 
-  // Tasto destro su un'icona della barra: la sua azione, e la strada per rimetterla nel menu.
+  // Tasto destro su un'icona della barra: la sua azione, e la strada fra la barra e il suo «Altro…».
   _menu(dati) {
     if (!this.vista || !this.win || this.win.isDestroyed()) return;
     const d = dati && typeof dati === 'object' ? dati : {};
     let voci = null;
     let scegli = null;
-    if (d.striscia) {
+    if (d.striscia || d.lucchetto) {
       ({ voci, scegli } = this._vociDelBordo());
     } else if (d.ora) {
       ({ voci, scegli } = this._vociDellOra());
@@ -682,17 +992,23 @@ class BarraLaterale {
       if (pagine.length) voci.push({ type: 'separator' });
       else if (!icona.spenta) voci.push({ label: icona.etichetta, action: 'barra:esegui' });
       else if (icona.motivo) voci.push({ label: icona.motivo, disabled: true });
-      voci.push({ label: 'Rimetti nel menu del tasto destro', action: 'barra:al-menu' });
+      voci.push(icona.riserva ? { label: 'Porta fra le icone in vista', action: 'barra:in-vista' } : { label: 'Sposta in «Altro…»', action: 'barra:in-altro' });
       scegli = (a) => {
-        if (a === 'barra:esegui') this.esegui(id);
-        else if (a === 'barra:al-menu') Layout.posa({ id, target: 'secondary', beforeId: null }, { incognito: this._incognito() }).catch(() => {});
+        if (a === 'barra:esegui') this.esegui(id, { daAltro: !!icona.riserva });
+        else if (a === 'barra:in-altro') this._posa({ id, target: 'secondary', beforeId: null }, { via: 'rimessa_nel_menu' });
+        else if (a === 'barra:in-vista') this._posa({ id, target: 'bar', beforeId: null }, { via: 'rimessa_nel_menu' });
         else if (a.startsWith('barra:voce:') && scheda) {
-          this.tabs.vaiAllaVoce(scheda.id, Number(a.slice('barra:voce:'.length)));
+          const indice = Number(a.slice('barra:voce:'.length));
+          // Il posto della pagina nell'elenco, dalla più vicina (#1468): dice se le quindici servono.
+          const posto = pagine.findIndex((p) => p.indice === indice) + 1;
+          Strade.misura('cronologia', id === 'back' ? 'indietro' : 'avanti', 'barra_lista', { posizione: posto, incognito: this._incognito() });
+          this.tabs.vaiAllaVoce(scheda.id, indice);
           if (this.motivo === 'tasto') this.chiudi();
         }
       };
     }
     if (!voci || !voci.length) return;
+    if (this.aperta && !d.striscia && !d.lucchetto) { this._esito('tasto_destro'); this._lettura().via(); }
     const b = this.vista.getBounds();
     this._nascondiSuggerimento();
     this._ferma('uscita');
@@ -719,7 +1035,8 @@ class BarraLaterale {
   _vociDelBordo() {
     const o = this.opzioni;
     const voci = [
-      { label: 'Apri la barra laterale', action: 'barra:apri' },
+      this.aperta ? { label: 'Chiudi la barra laterale', action: 'barra:chiudi' } : { label: 'Apri la barra laterale', action: 'barra:apri' },
+      { label: o.bloccata ? 'Sblocca la barra laterale' : 'Tieni aperta la barra laterale', action: 'barra:lucchetto' },
       { type: 'separator' },
       { label: o.striscia ? 'Nascondi la striscia sul bordo' : 'Mostra la striscia sul bordo', action: 'barra:striscia' },
       { label: o.spinta ? 'Non aprirla spingendo sul bordo' : 'Aprila spingendo sul bordo', action: 'barra:spinta' },
@@ -727,6 +1044,8 @@ class BarraLaterale {
     ];
     const scegli = (a) => {
       if (a === 'barra:apri') this.apri('clic');
+      else if (a === 'barra:chiudi') this.chiudi({ forza: true });
+      else if (a === 'barra:lucchetto') this.blocca(!this.opzioni.bloccata);
       else if (a === 'barra:striscia') this._scriviOpzioni({ striscia: !this.opzioni.striscia });
       else if (a === 'barra:spinta') this._scriviOpzioni({ spinta: !this.opzioni.spinta });
       else if (a === 'barra:regola') this._apriPagina('regola');
@@ -777,24 +1096,35 @@ class BarraLaterale {
   _apriPagina(chiave) {
     const url = PAGINE_DAL_MENU[chiave];
     if (!url) return;
+    Strade.misura('pagina', url, 'barra', { finestra: this.tabs, incognito: this._incognito() });
     try { this.tabs.openTab(url); } catch (_) {}
   }
 
-  _scriviOpzioni(parziale) {
+  // Un gesto della persona (via `interfaccia`), e in incognito resta all'incognito, come dalle Preferenze aperte lì.
+  // `prov` null: la scrittura entra nel registro dei cambi di chi chiama (una chat).
+  _scriviOpzioni(parziale, prov = { via: 'interfaccia', dove: 'barra' }) {
     try {
       const { applySettingsUpdate } = require('./services/handlers');
-      Promise.resolve(applySettingsUpdate({ barraLaterale: parziale })).catch(() => {});
-    } catch (_) {}
+      const aggiorna = () => applySettingsUpdate({ barraLaterale: parziale });
+      const scrivi = () => (prov ? require('./services/registroCambi').con(prov, aggiorna) : aggiorna());
+      return Promise.resolve(this._incognito() ? require('./shim/storage').runIncognito(scrivi) : scrivi()).catch(() => {});
+    } catch (_) { return Promise.resolve(); }
   }
 
   _mostraSuggerimento(dati) {
     const t = testo(dati && dati.testo).slice(0, 300);
     // L'etichetta è della barra aperta: chiusa, la vista si stringe sotto il puntatore senza dirgli che è uscito,
     // e un'etichetta arrivata in ritardo resterebbe sopra la pagina (#1201).
-    if (!t || !this.aperta || !this.vista || !this.win || this.win.isDestroyed()) { this._nascondiSuggerimento(); return; }
+    if (!t || !this.aperta || !this.vista || !this.win || this.win.isDestroyed()) {
+      // Il puntatore ha lasciato l'icona: il nome letto non è diventato un clic. Premuta, invece, il clic arriva dopo.
+      if (dati && dati.lasciato === true) this._lettura().via();
+      this._nascondiSuggerimento();
+      return;
+    }
     const b = this.vista.getBounds();
     this.suggerimento = true;
     try { require('./popup-tooltip').showTooltip(this.win, t, b.x + numero(dati.x, 0, 10000), b.y + numero(dati.y, 0, 10000)); } catch (_) {}
+    if (dati.ridetto !== true) this._lettura().mostrato(testo(dati.id), 'barra');
   }
 
   _nascondiSuggerimento() {
@@ -805,9 +1135,9 @@ class BarraLaterale {
 
   // ── trascinamenti ────────────────────────────────────────────────────────
 
-  // Da una scheda: il menu del tasto destro trascina un'icona verso la barra. La scheda ha il
-  // puntatore per tutto il trascinamento, quindi le coordinate arrivano da lei (px della pagina).
-  // `zoom`: dallo strato del menu sopra la scheda (#1054) i px sono già della vista, non della pagina.
+  // Dalla fila del tasto destro di una scheda verso la barra (#1434). La scheda ha il puntatore per tutto il
+  // trascinamento, quindi le coordinate arrivano da lei (px della pagina). `zoom`: dallo strato del menu sopra la
+  // scheda (#1054) i px sono già della vista, non della pagina.
   dallaScheda(msg, tabId, { zoom: zoomDato = null } = {}) {
     const D = globalThis.SN_DISPOSIZIONE_ICONE;
     const fase = testo(msg.fase);
@@ -822,12 +1152,13 @@ class BarraLaterale {
     };
     if (fase === 'inizio') {
       const id = testo(msg.id);
+      // Solo le icone della barra: un'azione dell'elemento (grassetto, salva immagine) qui non avrebbe su cosa agire.
       if (!D || !D.noto(id)) return { ok: false };
       this._ferma('fine');
       const piena = Math.ceil((PANNELLO + 8) / zoom);
       const sinistra = msg.menuSinistra == null ? NaN : Number(msg.menuSinistra);
-      // Il menu sta dove si aprirebbe la barra: aperta subito coprirebbe i posti in cui si riordina. Si apre
-      // quando il puntatore va al bordo, a sinistra del menu, e si richiude se ci torna sopra.
+      // Il menu sta dove si aprirebbe la barra: aperta subito coprirebbe i posti in cui si riordina. Si apre quando il
+      // puntatore va al bordo, a sinistra del menu, e si richiude se ci torna sopra.
       const rimandata = !this.aperta && Number.isFinite(sinistra) && sinistra < piena;
       this.trascinamento = { id, tabId, rimandata };
       if (!rimandata && !this.aperta) this.apri('trascina');
@@ -850,7 +1181,10 @@ class BarraLaterale {
       const beforeId = this._primaDi(yLocale(msg.y), id);
       this.mira = null;
       this.trascinamento.posata = true;
-      Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
+      this._esito('azione');
+      // Il gesto è cominciato nel menu del tasto destro: il cambio viene da lì.
+      Promise.resolve().then(() => Registro.con({ via: 'interfaccia', dove: 'tasto-destro' },
+        () => Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito(), origine: 'icona_menu' }))).catch(() => {});
       return { ok: true };
     }
     if (fase === 'fine') {
@@ -873,7 +1207,7 @@ class BarraLaterale {
     }
   }
 
-  // L'icona davanti alla quale posare, dalle misure che la barra ha mandato (px della vista).
+  // L'icona in vista davanti alla quale posare, dalle misure che la barra ha mandato (px della vista).
   _primaDi(y, escluso) {
     for (const m of this.misure) {
       if (m.id === escluso) continue;
@@ -882,8 +1216,8 @@ class BarraLaterale {
     return null;
   }
 
-  // Dalla barra: un'icona trascinata fuori dal pannello, sopra la pagina. La barra ha il puntatore
-  // per tutto il gesto, e la scheda davanti ne riceve le coordinate per il suo menu aperto.
+  // Dalla barra: un'icona trascinata fuori dal pannello, sopra la pagina. La barra ha il puntatore per tutto il gesto,
+  // e la scheda davanti ne riceve le coordinate per il suo menu aperto, che la posa nella fila.
   _fuori(dati) {
     const fase = testo(dati && dati.fase);
     const id = testo(dati && dati.id);
@@ -902,45 +1236,70 @@ class BarraLaterale {
     try { attiva.view.webContents.mainFrame.send('filo:broadcast', { type: tipo, fase, id, x, y }); } catch (_) {}
   }
 
+  // Un gesto della persona nella barra: diventa un cambio del filo «dalla barra laterale» (#867.1).
+  // `opzioni`: `via` e `origine` per i contatori (#1471).
+  _posa(drop, opzioni = {}) {
+    const scrivi = () => Registro.con({ via: 'interfaccia', dove: 'barra' }, () => Layout.posa(drop, { incognito: this._incognito(), ...opzioni }));
+    Promise.resolve().then(scrivi).catch(() => {});
+  }
+
   // ── la vista ─────────────────────────────────────────────────────────────
 
   _messaggio(canale, dati) {
     const d = dati && typeof dati === 'object' ? dati : {};
     switch (canale) {
       case 'barra:pronta': this.pronta = true; this._invia(); break;
-      case 'barra:spinta': if (!this.aperta) this.apri('spinta'); break;
+      // La pagina conta l'attesa scelta: dove vale quella più lunga (#1292) decide la sonda, con la stessa regola.
+      case 'barra:spinta':
+        if (this.aperta) break;
+        if (this._attesaSulBordo(this._punto()) > this.opzioni.attesaMs) this._guarda();
+        else this.apri('spinta');
+        break;
       case 'barra:apri': if (!this.aperta) this.apri('clic'); break;
       case 'barra:chiudi': this.chiudi(); break;
+      case 'barra:lucchetto': this._esito('sistema'); this.blocca(!this.opzioni.bloccata); break;
       case 'barra:dentro':
         this.dentro = true;
         this._ferma('uscita');
         this._ferma('fine');
-        if (this.motivo === 'tasto' && !this._haFuoco()) this.motivo = 'clic';
+        if (this.motivo === 'tasto' && !this._haFuoco()) this.motivo = this._tiene() ? 'bloccata' : 'clic';
         break;
       case 'barra:fuori':
         this.dentro = false;
+        this._lettura().via();
         this._nascondiSuggerimento();
         if (this.aperta && (this.motivo !== 'tasto' || !this._haFuoco())) this._programmaUscita();
         break;
-      case 'barra:azione': this.esegui(testo(d.id)); break;
+      case 'barra:azione': this.esegui(testo(d.id), { colore: testo(d.colore), daAltro: d.daAltro === true }); break;
+      case 'barra:altro': if (this.aperta) this._contaGesto('altro_del_menu', { aperto: true }); break;
       case 'barra:sistema': this.sistema(testo(d.comando), d); break;
       case 'barra:menu': this._menu(d); break;
       case 'barra:suggerimento': this._mostraSuggerimento(d); break;
+      case 'barra:posa': {
+        const D = globalThis.SN_DISPOSIZIONE_ICONE;
+        const id = testo(d.id);
+        const target = testo(d.target) || 'bar';
+        if (!D || !D.noto(id) || !D.ZONE.includes(target)) break;
+        const beforeId = d.beforeId && D.noto(testo(d.beforeId)) ? testo(d.beforeId) : null;
+        this._esito('azione');
+        this._posa({ id, target, beforeId }, { origine: 'icona_barra' });
+        break;
+      }
+      // Un'icona presa nella barra e lasciata andare (Esc, gesto interrotto): un trascinamento finito nel vuoto (#1471).
+      case 'barra:annullato': {
+        const D = globalThis.SN_DISPOSIZIONE_ICONE;
+        if (D && D.noto(testo(d.id))) this._contaGesto('trascinamento', { da: 'icona_barra', a: 'nessuna', esito: 'annullato' });
+        break;
+      }
       case 'barra:misure':
         this.misure = (Array.isArray(d.icone) ? d.icone : []).slice(0, 200)
           .map((m) => ({ id: testo(m && m.id), alto: numero(m && m.alto), basso: numero(m && m.basso) }))
           .filter((m) => m.id);
         break;
-      case 'barra:posa': {
-        const D = globalThis.SN_DISPOSIZIONE_ICONE;
-        const id = testo(d.id);
-        if (!D || !D.noto(id)) break;
-        const beforeId = d.beforeId ? testo(d.beforeId) : null;
-        Layout.posa({ id, target: 'bar', beforeId }, { incognito: this._incognito() }).catch(() => {});
-        break;
-      }
       case 'barra:trascina-fuori': this._fuori(d); break;
       case 'barra:inoltra': this.vuoto.inoltra(d); break;
+      // #1623 — un'immagine lasciata sulla barra va alla chat della scheda davanti.
+      case 'barra:rilascio': RilascioNellaChat.consegna(this.win, d.voci).catch(() => {}); break;
       case 'barra:chiedi': this._chiediEtichette(); break;
       default: break;
     }
@@ -1003,8 +1362,11 @@ class BarraLaterale {
     }
     this.aperta = false;
     this.motivo = null;
+    this.apertura = null;
+    this.teneva = false;
+    if (this.spazioPagina) { this.spazioPagina = 0; try { if (this.win && !this.win.isDestroyed()) this.tabs.layout(); } catch (_) {} }
     if (rinasci && this.win && !this.win.isDestroyed()) setTimeout(() => this.posa(), 0);
   }
 }
 
-module.exports = { BarraLaterale, STRISCIA, PANNELLO };
+module.exports = { BarraLaterale, STRISCIA, PANNELLO, COMANDI_CHAT, ATTESA_STACCATA_MS, staccataDalBordo };

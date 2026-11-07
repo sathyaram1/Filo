@@ -43,16 +43,22 @@ test('il menu App mostra Feedback e Gestione solo all\'owner', () => {
     'il Deck builder segue il suo interruttore');
 });
 
-test('l\'icona «Feedback» del menu del tasto destro esiste solo per l\'owner', () => {
-  const icons = leggi('src', 'content', 'menuIcons.js');
-  assert.match(icons, /if \(isOwner\)\s*\{[\s\S]{0,400}?registry\.feedbackApp/,
-    'feedbackApp deve entrare nel registro solo con isOwner: un id assente dal registro '
-    + 'sparisce anche dai layout che l\'utente si era salvato');
-  assert.match(icons, /MSG\.AUTH_STATUS/,
-    'lo stato di owner va CHIESTO al main: senza, resterebbe un valore inventato in pagina');
-  assert.match(icons, /let isOwner = false;/,
-    'deve partire da "non owner": sbagliare per difetto costa un\'icona a una persona, '
-    + 'sbagliare per eccesso manda tutti gli altri in un vicolo cieco');
+test('l\'icona «Feedback» della barra laterale, e della fila del tasto destro, esiste solo per l\'owner', () => {
+  // Le icone stanno nella barra (#1246): la disegna e la esegue il main, che sa chi è l'owner. Portate nella fila del
+  // tasto destro (#1434) le descrive ed esegue lo stesso main, con la stessa regola: la pagina non la riscrive.
+  const disp = leggi('src', 'shared', 'disposizioneIcone.js');
+  assert.match(disp, /feedbackApp: \{[^}]*soloOwner: true/, 'feedbackApp deve dichiararsi del solo owner');
+  const barra = leggi('src', 'main', 'barraLaterale.js');
+  assert.match(barra, /_descrivi\(id, \{[^\n]*\{\n[\s\S]{0,300}?if \(!d \|\| \(d\.soloOwner && !owner\)\) return null;/,
+    'la barra non deve disegnare un\'icona del solo owner a chi non lo è');
+  assert.match(barra, /_icone\(\) \{[\s\S]{0,700}?this\._descrivi\(id,/, 'la barra disegna con _descrivi');
+  assert.match(barra, /iconeFila\(\) \{[\s\S]{0,500}?this\._descrivi\(id,/, 'la fila del tasto destro riceve le icone da _descrivi');
+  const fila = leggi('src', 'content', 'menuIcons.js');
+  assert.doesNotMatch(fila, /feedbackApp|isAdmin|AUTH_STATUS/, 'la fila non decide da sé chi vede «Feedback»');
+  assert.match(barra, /esegui\(id[^\n]*\{\n[\s\S]{0,400}?if \(d\.soloOwner && !this\._owner\(\)\) return;/,
+    'né eseguirla: un clic arrivato lo stesso non apre la posta delle segnalazioni');
+  assert.match(barra, /_owner\(\) \{\s*try \{ return !!require\('\.\/auth\/google-auth'\)\.isAdmin\(\); \} catch \(_\) \{ return false; \}/,
+    'lo stato di owner lo dice l\'accesso, e nel dubbio è «non owner»');
 });
 
 test('il comando /feedback della home è riservato all\'owner e dice l\'altra strada', () => {

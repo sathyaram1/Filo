@@ -9,6 +9,7 @@
   <script src="filo://shared/themeTokens.js"></script>
   <script src="filo://shared/tabColor.js"></script>
   <script src="filo://shared/pageBootstrap.js"></script>
+  <script src="filo://shared/politicaModelli.js"></script>
   <script src="filo://shared/constants.js"></script>
   <script src="filo://shared/contenutoEsterno.js"></script>
   <script src="filo://shared/messages.js"></script>
@@ -22,6 +23,7 @@
   <script src="filo://shared/caselleAlSicuro.js"></script>
   <script src="filo://shared/nomiSito.js"></script>
   <script src="filo://shared/tasti.js"></script>
+  <script src="filo://shared/pannelliApp.js"></script>
   <script src="filo://shared/vociImpostazioni.js"></script>
   <script src="filo://shared/filoContesto.js"></script>
   <script src="filo://shared/lunghezzaRisposte.js"></script>
@@ -271,7 +273,7 @@
       <div id="onboardingArchive" class="onb-archive" hidden></div>
     </section>
 
-    <section>
+    <section id="sec-lettura">
       <h2>Lettura ad alta voce</h2>
       <p class="sn-muted">Seleziona del testo in una pagina e scegli <strong>🔊 Leggi</strong> dal menu del tasto destro per ascoltarlo. Legge con una voce naturale, scelta in base alla lingua del testo; se non è raggiungibile, usa una voce installata sul tuo sistema operativo, che funziona anche offline.</p>
       <label for="ttsModelVoice" class="sn-muted" style="display:block;margin-bottom:4px;">Voce naturale</label>
@@ -356,7 +358,7 @@
 
     <section id="sec-terminal">
       <h2>Modalità terminale</h2>
-      <p class="sn-muted">Filo usa il terminale del computer per le richieste che lo vogliono, come «quanto spazio ho sul disco?». Quello che legge parte subito, quello che cambia qualcosa ti chiede prima un OK, e per cancellare o per un comando che non riconosce devi scrivere «conferma». Nella home, un messaggio che inizia con <code>/</code> va dritto alla shell, se non è un comando di Filo.</p>
+      <p class="sn-muted">Filo usa il terminale del computer per le richieste che lo vogliono, come «quanto spazio ho sul disco?». Quello che legge parte subito. Per il resto vale il livello di autonomia che hai scelto: con Normale, prima di cancellare o di lanciare un comando che non riconosce ti chiede un OK, e la parola «conferma» se nella conversazione ha letto cose scritte da altri. Nella home, un messaggio che inizia con <code>/</code> seguito da un programma del computer va alla shell con le stesse regole; il resto è un messaggio per Filo. Un comando incollato o trascinato conta come scritto da altri: per cancellare ti chiede la parola «conferma».</p>
       <div class="sn-toggle-row">
         <label>
           <input type="checkbox" id="terminalEnabled" />
@@ -468,18 +470,41 @@
             <span>Segna le parole ripetute per sbaglio, come «il il»</span>
           </label>
         </div>
+        <div class="sn-toggle-row">
+          <label title="Quando finisci una parola: «perchè» diventa «perché», «marco» diventa «Marco». Si annulla subito dopo con la scorciatoia di annulla, o col tasto destro sulla parola.">
+            <input type="checkbox" id="correttoreAutomatica" />
+            <span>Correzione automatica</span>
+          </label>
+        </div>
+        <label for="correttoreAccetti" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una correzione che scegli diventa automatica dopo (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreAccetti" min="1" max="100" step="1" style="width:120px;" />
+        <label for="correttoreAnnulli" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una correzione automatica che annulli non torna più dopo (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreAnnulli" min="1" max="100" step="1" style="width:120px;" />
+        <label for="correttoreRiscritte" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Una parola che il correttore non conosce smette di essere segnata dopo che la scrivi uguale (volte, da 1 a 100)</label>
+        <input type="number" id="correttoreRiscritte" min="1" max="100" step="1" style="width:120px;" />
+          <label title="Scrivi delle x al posto di un dato che non ricordi («nel 14xx», «un p/e di xx») e Filo lo trova: il valore compare sopra le x, un clic lo mette.">
+            <input type="checkbox" id="correttoreSegnaposti" />
+            <span>Segnaposto</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label title="Per un dato che cambia nel tempo, come un prezzo o una quotazione, Filo cerca anche sul web (circa 0,8 centesimi a ricerca). Spento, cerca solo su Wikipedia e Wikidata, gratis.">
+            <input type="checkbox" id="correttoreSegnapostiWeb" />
+            <span>Cerca sul web per i segnaposto</span>
+          </label>
+        </div>
         <label for="correttorePausaRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo degli errori (millisecondi, da 200 a 5.000)</label>
         <input type="number" id="correttorePausaRapido" min="200" max="5000" step="50" style="width:120px;" />
         <label for="correttoreOgniRapido" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Mentre scrivi senza pause, un controllo degli errori ogni (millisecondi, da 1.000 a 60.000)</label>
         <input type="number" id="correttoreOgniRapido" min="1000" max="60000" step="500" style="width:120px;" />
         <label for="correttorePausaRagionato" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Pausa prima del controllo dei suggerimenti (millisecondi, da 1.000 a 30.000)</label>
         <input type="number" id="correttorePausaRagionato" min="1000" max="30000" step="500" style="width:120px;" />
-        <p class="sn-muted" style="margin-top:12px;"><a id="correttoreModelli" href="filo://options/options.html">I modelli dei due controlli</a></p>
+        <p class="sn-muted" style="margin-top:12px;"><a id="correttoreModelli" href="filo://options/options.html">I modelli dei due controlli</a> · <a id="correttoreGestisci" href="filo://spellcheck/spellcheck.html">Parole imparate e correzioni</a></p>
       </section>
 
       <section id="sec-barra">
         <h2>Barra laterale</h2>
-        <p class="sn-muted">La barra che si apre dal bordo sinistro con indietro, avanti, ricarica e home. Resta sempre raggiungibile dalla linguetta a sinistra delle schede e con la scorciatoia.</p>
+        <p class="sn-muted">La barra che si apre dal bordo sinistro con indietro, avanti, ricarica, home e le azioni sulla pagina. Resta sempre raggiungibile dalla linguetta a sinistra delle schede e con la scorciatoia.</p>
         <div class="sn-toggle-row">
           <label>
             <input type="checkbox" id="barraSpinta" />
@@ -492,10 +517,49 @@
             <span>Mostra la striscia sottile sul bordo sinistro</span>
           </label>
         </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="barraBloccata" />
+            <span>Tienila aperta accanto alla pagina invece di aprirla sopra</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="barraSchede" />
+            <span>A schermo intero, mostra le schede quando il mouse va sul bordo alto</span>
+          </label>
+        </div>
         <label for="barraAttesa" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Attesa sul bordo prima che si apra (millisecondi, da 100 a 3.000)</label>
         <input type="number" id="barraAttesa" min="100" max="3000" step="50" style="width:120px;" />
         <label for="barraUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5.000)</label>
         <input type="number" id="barraUscita" min="100" max="5000" step="50" style="width:120px;" />
+      </section>
+
+      <section id="sec-pannello">
+        <h2>Pannello degli strumenti</h2>
+        <p class="sn-muted">Il pannello che si apre dal bordo destro delle app di Filo, come l'Editor, con gli strumenti dell'app. Resta sempre raggiungibile dalla striscia sul bordo e con la scorciatoia.</p>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="pannelloSpinta" />
+            <span>Aprilo quando il mouse si ferma contro il bordo destro</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="pannelloStriscia" />
+            <span>Mostra la striscia sottile sul bordo destro</span>
+          </label>
+        </div>
+        <div class="sn-toggle-row">
+          <label>
+            <input type="checkbox" id="pannelloBloccato" />
+            <span>Tienilo aperto accanto alla pagina invece di aprirlo sopra</span>
+          </label>
+        </div>
+        <label for="pannelloAttesa" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Attesa sul bordo prima che si apra (millisecondi, da 100 a 3.000)</label>
+        <input type="number" id="pannelloAttesa" min="100" max="3000" step="50" style="width:120px;" />
+        <label for="pannelloUscita" class="sn-muted" style="display:block;margin-top:12px;margin-bottom:4px;">Dopo quanto si chiude quando il mouse esce (millisecondi, da 100 a 5.000)</label>
+        <input type="number" id="pannelloUscita" min="100" max="5000" step="50" style="width:120px;" />
       </section>
 
       <section id="sec-schermo-pieno">
@@ -574,6 +638,19 @@
         </div>
       </section>
 
+      <!-- D61 (#1290) — sezioni chiuse: subito in sottofondo, o quando si aprono. Stime a 3 pagine al giorno, modello da
+           0,26 $ e 0,38 $ per milione di token (OpenRouter), un terzo di testo in più nelle sezioni chiuse. -->
+      <section id="sec-traduzione">
+        <h2>Traduzione della pagina</h2>
+        <label class="sn-muted" style="display:flex;flex-direction:column;gap:4px;" title="Menu, fisarmoniche, schede e pannelli che ancora non si vedono. Subito: quando li apri sono già tradotti, e paghi anche quelli che non apri. Solo quando li apri: li traduci dal menu, aspettando un paio di secondi.">
+          <span>Sezioni chiuse</span>
+          <select id="traduzioneNascoste" style="width:460px;max-width:100%;">
+            <option value="subito">Subito, insieme al resto (circa 0,40 $ al mese, già pronte all'apertura)</option>
+            <option value="apertura">Solo quando le apro (circa 0,30 $ al mese, 2 s dopo l'apertura)</option>
+          </select>
+        </label>
+      </section>
+
       <!-- #818 — quando Filo avvisa che i crediti stanno per finire, e il pre-calcolo che li consuma senza che si veda. -->
       <section id="sec-crediti">
         <h2>Crediti</h2>
@@ -636,12 +713,13 @@
             <option value="chiusura">In silenzio, quando chiudo Filo</option>
           </select>
         </div>
+        <button type="button" class="sn-btn sn-btn-secondary" id="apriNovita" style="margin-top:14px;">Novità</button>
       </section>
 
-      <!-- #969 — i contatori giornalieri: cosa esce lo dice la pagina Privacy, che dice anche come spegnerli. -->
+      <!-- #969, #1461 — i contatori anonimi: cosa esce lo dice la pagina Privacy, che dice anche come spegnerli. -->
       <section id="sec-contatori">
         <h2>Contatori anonimi</h2>
-        <p class="sn-muted">Una volta al giorno Filo manda a chi lo sviluppa solo dei numeri: quante volte usi ogni funzione, quanto aspetti la risposta, quante chiamate falliscono. Niente testi, indirizzi o nomi di file, con un codice che cambia ogni mese. In incognito non conta niente. <a id="contatoriPrivacy" href="filo://transparency/transparency.html?doc=privacy">Cosa esce, nel dettaglio</a></p>
+        <p class="sn-muted">Ogni ora Filo manda a chi lo sviluppa solo dei numeri: quante volte usi ogni funzione e quanto aspetti, quali impostazioni cambi, cosa non va. Niente testi, indirizzi o nomi di file, con un codice che cambia ogni mese. In incognito non conta niente. <a id="contatoriPrivacy" href="filo://transparency/transparency.html?doc=privacy">Cosa esce, nel dettaglio</a></p>
         <div class="sn-toggle-row">
           <label>
             <input type="checkbox" id="contatoriAttivi" />
@@ -652,7 +730,7 @@
 
       <section id="sec-reset-all" style="margin-top:24px;border-top:1px solid var(--sn-border);padding-top:16px;">
         <h2>Ripristina tutto</h2>
-        <p class="sn-muted">Riporta <strong>tutte</strong> le impostazioni di Filo ai valori predefiniti in un colpo solo — tema, colori e token estetici, colore delle schede, dimensione del testo, notifiche, gestione delle schede e ogni altra preferenza. Le tue chiavi API restano salvate, così non perdi l'accesso ai provider AI.</p>
+        <p class="sn-muted">Riporta <strong>tutte</strong> le impostazioni di Filo ai valori predefiniti in un colpo solo — tema, colori e token estetici, colore delle schede, dimensione del testo, notifiche, gestione delle schede e ogni altra preferenza. Le tue chiavi API restano salvate, così non perdi l'accesso ai provider AI, e l'autonomia di Filo resta quella che hai scelto.</p>
         <div class="sn-row" style="margin-top:12px;">
           <button class="sn-btn sn-btn-danger" id="resetAllSettings" type="button">Ripristina tutte le impostazioni predefinite</button>
           <span id="resetAllSavedHint" class="sn-saved-indicator">Ripristinato</span>

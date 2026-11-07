@@ -1,11 +1,12 @@
 // Le richieste che il main fa per conto di una scheda (anteprima di un link, llms.txt, byte di un'immagine): escono come
-// uscirebbero da lei, dalla sua sessione (proxy, certificati, cache, identità, protezioni), mai verso la rete interna e
-// col Referer ridotto all'origine. Prove: tests/unit/perContoDellaScheda.test.mjs, tests/proxy-tab.spec.mjs.
+// uscirebbero da lei, dalla sua sessione (proxy, certificati, cache, identità, protezioni, cookie concessi), mai verso la
+// rete interna e col Referer ridotto all'origine. Prove: tests/unit/perContoDellaScheda.test.mjs, tests/proxy-tab.spec.mjs.
 
 'use strict';
 
 const netNode = require('node:net');
 const { assertPublicHost, isPrivateAddr } = require('./safe-fetch');
+const Sito = require('../../shared/stessoSito');
 
 // ── Referer ────────────────────────────────────────────────────────────────
 
@@ -65,6 +66,40 @@ function paginaDi(sender) {
   let f = '';
   try { f = String((sender && sender.frame && sender.frame.url) || ''); } catch (_) { f = ''; }
   return f || String((sender && (sender.url || (sender.tab && sender.tab.url))) || '');
+}
+
+// ── cookie ─────────────────────────────────────────────────────────────────
+
+// Per i cookie http e https sono due siti; fuori dal web nessuno.
+function sitoWeb(indirizzo) {
+  let u;
+  try { u = new URL(String(indirizzo || '')); } catch (_) { return ''; }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') return '';
+  const s = Sito.sitoDi(u.href);
+  return s ? `${u.protocol}//${s}` : '';
+}
+
+function stessoSitoWeb(a, b) {
+  const s = sitoWeb(a);
+  return !!s && s === sitoWeb(b);
+}
+
+// L'origine del documento che chiede, se lui e tutti i suoi antenati stanno su un sito solo; '' altrimenti: lì Chromium
+// tratta ogni richiesta del documento come partita da un altro sito.
+function origineDellaPagina(sender) {
+  const origini = [];
+  try {
+    for (let f = sender && sender.frame, i = 0; f && i < 64; f = f.parent, i++) origini.push(String(f.origin || f.url || ''));
+  } catch (_) { return ''; }
+  origini.push(String((sender && (sender.url || (sender.tab && sender.tab.url))) || ''));
+  if (!origini.every((o) => stessoSitoWeb(o, origini[0]))) return '';
+  try { return new URL(origini[0]).origin; } catch (_) { return ''; }
+}
+
+// Con un iniziatore Chromium sceglie i cookie come per la pagina (SameSite): a un altro sito solo quelli che concede alle
+// richieste altrui. Per un altro sito l'iniziatore è opaco: stessi cookie, e nessun blocco Cross-Origin-Resource-Policy in più.
+function iniziatorePer(origine, url) {
+  return origine && stessoSitoWeb(origine, url) ? origine : 'null';
 }
 
 // ── rete interna ───────────────────────────────────────────────────────────
@@ -144,7 +179,7 @@ const SENZA_CORPO = new Set([101, 103, 204, 205, 304]);
 
 // Un passo solo, senza seguire i rimandi: torna { rimando } o { risposta } (una Response del fetch). Il net di Electron
 // e non il fetch della sessione: quello non sa né fermarsi a un rimando né rispondere al proxy che chiede la password.
-function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', referrerPolicy = 'no-referrer', signal } = {}) {
+function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', iniziatore = '', referrerPolicy = 'no-referrer', signal } = {}) {
   const { net } = require('electron');
   return new Promise((resolve, reject) => {
     let finito = false;
@@ -153,7 +188,7 @@ function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', referre
     try {
       req = net.request({
         url, session: ses, method: 'GET', redirect: 'manual', credentials: credenziali,
-        useSessionCookies: credenziali === 'include', referrerPolicy,
+        useSessionCookies: credenziali === 'include', referrerPolicy, ...(iniziatore ? { origin: iniziatore } : {}),
       });
     } catch (e) { reject(e); return; }
     const annulla = () => { try { req.abort(); } catch (_) {} fine(reject, new Error('aborted')); };
@@ -189,7 +224,7 @@ function richiestaDiRete(ses, url, { headers = {}, credenziali = 'omit', referre
 const dip = { richiesta: richiestaDiRete };
 
 // GET per conto della scheda di `sender`. Torna una Response; lancia su schema, rete interna, rimando rifiutato.
-//   credenziali       'omit' (anteprime, llms.txt) o 'include' (i byte di un'immagine, come li chiede la pagina)
+//   credenziali       'omit' (anteprime, llms.txt) o 'include' (i byte di un'immagine, coi cookie che avrebbe la pagina)
 //   conReferer        presenta la pagina come la presenterebbe lei, al massimo l'origine; `politiche` la stringono
 //   redirectAmmesso   (partenza, prossimo) → vero se il rimando si segue
 //   lanSeGiaDiPartenza  un indirizzo di casa in https si legge restando sulla sua origine (vedi safe-fetch.js)
@@ -203,6 +238,7 @@ async function perContoDellaScheda(sender, url, {
   const ses = wc.session;
   const pagina = paginaDi(sender);
   const dette = [politicaDocumento(wc.id, pagina), ...[].concat(politiche || [])];
+  const origine = credenziali === 'include' ? origineDellaPagina(sender) : '';
   let ua = '';
   try { ua = typeof wc.getUserAgent === 'function' ? wc.getUserAgent() : ''; } catch (_) { ua = ''; }
   let paginaDiCasa = null;
@@ -233,7 +269,8 @@ async function perContoDellaScheda(sender, url, {
     const headers = { 'User-Agent': ua, Accept: accetta, Referer: referer };
     // La politica dichiarata deve dare lo stesso Referer che mandiamo: il servizio di rete di Chromium annulla le
     // richieste che non tornano.
-    const passo = await dip.richiesta(ses, u.href, { headers, credenziali, referrerPolicy: referer ? 'strict-origin' : 'no-referrer', signal });
+    const iniziatore = credenziali === 'include' ? iniziatorePer(origine, u.href) : '';
+    const passo = await dip.richiesta(ses, u.href, { headers, credenziali, iniziatore, referrerPolicy: referer ? 'strict-origin' : 'no-referrer', signal });
     if (passo.rimando) {
       let prossimo;
       try { prossimo = new URL(passo.rimando, u.href); } catch (_) { throw new Error('bad-url'); }
@@ -255,5 +292,6 @@ module.exports = {
   ricordaPoliticaDocumento,
   politicaDocumento,
   paginaDi,
+  stessoSitoWeb,
   _dip: dip,
 };

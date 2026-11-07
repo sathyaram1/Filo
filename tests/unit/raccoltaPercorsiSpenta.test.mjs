@@ -148,7 +148,8 @@ test('il manifesto e le note di versione dicono che i passi non vanno al server'
   const aiuto = globalThis.SN_CAPABILITIES.get('help-sidebar');
   assert.match(`${aiuto.desc} ${aiuto.doesNot}`, /non vanno né al server di Filo né ad altri utenti/);
   // In un blocco qualunque: uscita la versione che la porta, la riga resta lì e sopra se ne apre un altro.
-  const righe = globalThis.SN_PATCH_NOTES.NOTES.flatMap((n) => [...(n.features || []), ...(n.fixes || [])]);
+  const PN = globalThis.SN_PATCH_NOTES;
+  const righe = PN.NOTES.flatMap((n) => [...(n.features || []), ...(n.fixes || [])]).map(PN.testo);
   assert.ok(righe.some((r) => /Ha funzionato/.test(r) && /non escono dal computer/.test(r)),
     'chi aggiorna deve sapere che la domanda è sparita, e perché');
 });
