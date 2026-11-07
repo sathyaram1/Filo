@@ -267,7 +267,7 @@
           ta.setRangeText(t, da, a, 'end');
           ta.dispatchEvent(new Event('input', { bubbles: true }));
         }
-        schede._via = null;
+        inArrivo = [];
         riallinea();
         ricalca();
         return true;
