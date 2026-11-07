@@ -725,6 +725,15 @@ e la prova la dichiarava lui al server. Adesso:
   repo usa le cache di Actions (sentinella: `tests/unit/unitFusioneAzione.test.mjs`).
   Gli strumenti della prova vengono da main (`scripts/unit-fusione-azione.mjs`),
   le dipendenze dal ramo, come sulla macchina che provava prima;
+- **Linux e Windows** (#2225): la coppia la provano in parallelo due lavori,
+  `linux` (tutti gli unit) e `windows` (di default solo gli unit che il ramo
+  cambia o che nominano un file cambiato: pochi minuti, dentro la corsa Linux;
+  `client_payload.windows` = `tutti` li fa tutti, circa venti minuti di cancello
+  in più, `spento` toglie la parte). Ognuno passa il suo esito come uscita del
+  lavoro, e la riga `FILO-UNIT-FUSIONE` la scrive solo il terzo lavoro, `unit`,
+  che li unisce: conflitto, poi rossi sulla fusione (quelli di Windows portano
+  `[Windows]` in coda), poi una parte caduta (`non_provata`), poi l'esito che
+  fonde. Al codice provato non arrivano i file dei comandi di Actions;
 - **il server si fida solo di quello che legge da GitHub per quella coppia**
   (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
   `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo
