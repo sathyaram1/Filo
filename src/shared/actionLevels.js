@@ -87,7 +87,7 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-  const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+  const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase()
   function unoDiDistanza(a, b) {
     if (a === b) return true;
     if (Math.abs(a.length - b.length) > 1) return false;
