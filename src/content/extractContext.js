@@ -1031,11 +1031,15 @@
           const proprioNascosto = isOwnTextHidden(el);
           if (proprioNascosto && !tutto) {
             if (hidden.length < MAX_HIDDEN) hidden.push({ el, own: true });
-          } else if (nascosto || proprioNascosto) nascostiTesto.push({ el, text: txt, nascosto: true });
-          else visti.push({ el, text: txt });
+          } else if (nascosto || proprioNascosto) {
+            nascostiTesto.push({ el, text: txt, nascosto: true });
+            if (sezione) sezioniConTesto.add(sezione);
+          } else visti.push({ el, text: txt });
         }
       }
-      if (isClosedComponent(el, fuoriConto, sezione) && !el.shadowRoot) unreachable++;
+      const chiuso = isClosedComponent(el, fuoriConto, sezione);
+      if (chiuso === 'sezione') chiusiInSezione.push(sezione);
+      else if (chiuso && !el.shadowRoot) unreachable++;
       pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null, sezione);
     }
     let posto = maxBlocks;
