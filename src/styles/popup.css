@@ -241,8 +241,6 @@
 .sn-azioni-msg-tasto.sn-azioni-msg-ok::after { color: var(--sn-success); }
 .sn-azioni-msg-tasto.sn-azioni-msg-no::after { color: var(--sn-error); }
 .sn-azioni-msg:has(.sn-azioni-msg-ok, .sn-azioni-msg-no) .sn-azioni-msg-tasto:not(.sn-azioni-msg-ok):not(.sn-azioni-msg-no)::after { opacity: 0; }
-/* L'ultimo paragrafo resta l'ultimo anche con la barra in fondo al messaggio. */
-.sn-con-azioni-msg p:has(+ .sn-azioni-msg:last-child) { margin-bottom: 0; }
 
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }
