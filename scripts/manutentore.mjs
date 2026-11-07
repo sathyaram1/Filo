@@ -1184,7 +1184,7 @@ export function controlliLocali(cmd, argv) {
     case 'priorita': return num(a, cmd) || (controlloPriorita(null, b).ok ? '' : controlloPriorita(null, b).motivo);
     case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
-    case 'pacchetto': return num(a, cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
+    case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
     case 'taccuino': return a === 'scrivi' && !/^\d+$/.test(String(opzione(argv, '--versione') ?? '')) ? 'taccuino scrivi vuole --versione <V>, il numero che hai letto col taccuino: senza, un\'indicazione dell\'owner scritta in mezzo sparirebbe' : '';
     case 'sveglia-tra': return Number(a) >= 5 ? '' : 'la sveglia più vicina è fra 5 minuti';
     case 'account': return a === 'primo' ? (['A', 'B', 'alterna'].includes(b) ? '' : 'account primo A, B o alterna')
