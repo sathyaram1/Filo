@@ -3768,14 +3768,7 @@ async function eseguiAzioneFilo(action, {
           if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
           else url = t.url || '';
         }
-        if (!r) {
-          try {
-            r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender), analizza: analizzaPer(sender) });
-          } catch (e) {
-            console.warn('[Filo] lettura pagina fallita', e?.message || e);
-          }
-        }
-        if (!r) r = { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+        if (!r) r = await leggiPaginaDa(url, da, sender);
         return { executed: !!r.ok, kept: true, output: r };
       }
       case 'CERCA_DOCUMENTI': {
