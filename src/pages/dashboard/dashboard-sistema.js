@@ -512,8 +512,36 @@
   }
 
   // Letto da src/content/content.js: le voci del tasto destro sulle righe del riquadro aperto.
+  // Una riga di sistema nella chat (dashboard-attivita.js, segnaSistema): il riquadro della sua voce, e il comando che
+  // la disfa dove c'è.
+  const FRASI_ANNULLA = (a) => (a.livello != null ? `Rimetti il volume al ${a.livello}%`
+    : a.preferito != null ? (a.preferito ? 'Rimetti fra i preferiti' : 'Togli dai preferiti')
+      : a.collega != null ? (a.collega ? 'Ricollega' : 'Scollega')
+        : a.acceso != null ? `${a.acceso ? 'Riaccendi' : 'Rispegni'} ${a.cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth'}` : 'Annulla');
+  function vociRigaChat(riga) {
+    const s = riga._sistema;
+    const out = [voceMenu('Apri il riquadro di sistema', s.voce === 'rete' ? 'wifi' : s.voce, () => apri(s.voce))];
+    if (s.annulla) {
+      out.push(voceMenu(`Annulla · ${FRASI_ANNULLA(s.annulla)}`, 'undo', async () => {
+        const r = await comanda(s.annulla);
+        if (r.ok) s.annulla = null;
+        else apri(s.voce, r);
+      }));
+    }
+    return out;
+  }
+  // Il riquadro di una voce aperto da fuori (una riga della chat); `errore`, se c'è, lo dice subito.
+  function apri(v, errore = null) {
+    const x = voci[v];
+    if (!x) return;
+    apriBox(v, x.el);
+    if (errore && box && box.errore) mostraErrore(box.errore, errore);
+  }
+
   function vociMenu(target) {
     const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const rigaChat = el && el.closest('.dash-activity-row');
+    if (rigaChat && rigaChat._sistema) return vociRigaChat(rigaChat);
     if (!el || !box || !box.el.contains(el)) return [];
     const opt = el.closest('.sn-select-option');
     if (opt && opt._riga) return vociRiga(opt);
