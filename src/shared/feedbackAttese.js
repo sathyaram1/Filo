@@ -91,6 +91,18 @@
     return statiDelleAttese(fb, trova).some((w) => w.stato !== STATO.FUSO);
   }
 
+  /**
+   * Le attese per la scheda del manutentore (#2262), con la regola di aspettaAncora: `aspetta` solo quelle che
+   * bloccano, ciascuna col suo stato ([{ num, stato }]); `aspettava` i numeri di quelle già fuse.
+   */
+  function atteseDellaScheda(fb, trova) {
+    const stati = statiDelleAttese(fb, trova);
+    return {
+      aspetta: stati.filter((w) => w.stato !== STATO.FUSO).map((w) => ({ num: w.num, stato: w.stato })),
+      aspettava: stati.filter((w) => w.stato === STATO.FUSO).map((w) => w.num),
+    };
+  }
+
   function etichetta(w) {
     return w && w.num ? `#${w.num}` : 'un feedback senza numero';
   }
