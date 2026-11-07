@@ -10,6 +10,7 @@
 // protezione accesa e quindi NON maschera regressioni).
 
 import { test, expect, argomentiScala, chiudiApp } from './fixtures/electron.mjs';
+import { guardiaAccesa } from './helpers/guardia.mjs';
 import { _electron as electron } from '@playwright/test';
 import { createServer } from 'node:http';
 import { rmSync } from 'node:fs';
@@ -38,7 +39,7 @@ const PROBE = `(() => {
   }
   for (let i = 0; i < a.length; i++) { if (a[i] !== b[i]) { identical = false; break; } }
   return { total: (W*H), deviating, alphaViolations, maxDev, identical,
-           guard: !!window.__filoFpGuard };
+           guard: deviating > 0 };
 })()`;
 
 async function setFpMode(openTab, mode) {
@@ -52,7 +53,7 @@ async function setFpMode(openTab, mode) {
 test('default: il canvas viene perturbato (1 LSB), alpha intatto, deterministico', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
   // La guardia deve essere stata iniettata nel main world.
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const r = await page.evaluate(PROBE);
   // Rumore applicato: qualche pixel deviato, ma NON tutti (perturbazione mirata).
   expect(r.deviating).toBeGreaterThan(0);
@@ -79,7 +80,7 @@ test('off: i pixel del canvas tornano esatti (controprova)', async ({ openTab, t
 
 test('toDataURL: stabile su letture ripetute, non lancia eccezioni', async ({ openTab, testServer }) => {
   const page = await testServer.openReady(openTab, '<title>FP_DATA</title><p>ok</p>');
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const r = await page.evaluate(`(() => {
     const c = document.createElement('canvas');
     c.width = 80; c.height = 40;
@@ -178,7 +179,7 @@ testSiti('due siti diversi leggono impronte diverse, due pagine dello stesso sit
   for (const nome of NOMI) {
     const id = new URL(testServer.html(`<title>FP ${nome}</title><p>${nome}</p>`)).pathname;
     const page = await openTab(`http://${nome}:${porta}${id}`);
-    await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 8_000 });
+    await page.waitForFunction(guardiaAccesa, null, { timeout: 8_000 });
     impronte[nome] = await page.evaluate(IMPRONTA);
     expect(impronte[nome]).toMatch(/^[0-9a-f]{16}$/);
   }
@@ -273,12 +274,12 @@ testSiti.describe('siti fidati in Privacy', () => {
 
 async function protettaPoiOff(openTab, testServer, probe, arg) {
   const page = await testServer.openReady(openTab, '<title>FP_ON</title><p>ok</p>');
-  await page.waitForFunction(() => window.__filoFpGuard === true, null, { timeout: 6_000 });
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
   const on = await page.evaluate(probe, arg);
   await setFpMode(openTab, 'off');
   await page.goto(testServer.html('<title>FP_OFF</title><p>ok</p>'));
   await page.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 8_000 });
-  expect(await page.evaluate(() => !!window.__filoFpGuard)).toBe(false);
+  expect(await page.evaluate(guardiaAccesa)).toBe(false);
   const off = await page.evaluate(probe, arg);
   return { page, on, off };
 }
@@ -542,4 +543,72 @@ test('audio: l\'impronta letta nel gestore complete esce col rumore, uguale a qu
   expect(on.entrambi).toEqual({ evento: on.evento, promessa: on.evento, riletto: on.evento, stessoBuffer: true });
   expect(on.sintetico).toBe(off.sintetico);
   expect(on2).toEqual(on);
+});
+
+// La pagina riscrive per un istante ciò che la guardia legge dopo il nativo (dimensioni, canali, then, un valueOf che
+// cambia risposta): le letture restano col rumore, uguali a quelle senza trucco.
+async function trucchi() {
+  const fnv = (s) => { let a = 2166136261; for (let i = 0; i < s.length; i++) a = Math.imul(a ^ s.charCodeAt(i), 16777619) >>> 0; return a.toString(16); };
+  const hashPx = (a) => fnv(Array.prototype.join.call(a, ','));
+  const disegna = () => {
+    const c = document.createElement('canvas'); c.width = 80; c.height = 40;
+    const x = c.getContext('2d'); x.fillStyle = '#1e90ff'; x.fillRect(0, 0, 80, 40); x.fillStyle = '#000'; x.font = '16px sans-serif'; x.fillText('filo', 4, 24);
+    return [c, x];
+  };
+  const perUnIstante = (P, nome, desc, fn) => { const d = Object.getOwnPropertyDescriptor(P, nome); Object.defineProperty(P, nome, { ...desc, configurable: true }); try { return fn(); } finally { Object.defineProperty(P, nome, d); } };
+  const out = {};
+  { const [c, x] = disegna(); out.toDataURL = fnv(c.toDataURL()); out.px = hashPx(x.getImageData(0, 0, 80, 40).data); }
+  { const [c] = disegna(); Object.defineProperty(c, 'width', { value: 0 }); out.toDataURLLarghezza = fnv(c.toDataURL()); }
+  { const [c] = disegna(); out.toDataURLAltezzaProto = perUnIstante(HTMLCanvasElement.prototype, 'height', { get() { return 1e9; } }, () => fnv(c.toDataURL())); }
+  { const [, x] = disegna(); out.pxLarghezza = hashPx(perUnIstante(ImageData.prototype, 'width', { get() { return 0; } }, () => x.getImageData(0, 0, 80, 40)).data); }
+  { const [, x] = disegna(); let n = 0; const sw = { valueOf() { return n++ ? 1e6 : 80; } }; out.pxValueOf = hashPx(x.getImageData(0, 0, sw, 40).data); }
+  const gc = document.createElement('canvas'); gc.width = 32; gc.height = 16;
+  const gl = gc.getContext('webgl', { preserveDrawingBuffer: true });
+  if (gl) {
+    gl.clearColor(0.2, 0.4, 0.6, 1); gl.clear(gl.COLOR_BUFFER_BIT);
+    const leggi = (w) => { const px = new Uint8Array(32 * 16 * 4); gl.readPixels(0, 0, w, 16, gl.RGBA, gl.UNSIGNED_BYTE, px); return hashPx(px); };
+    out.gl = leggi(32);
+    let n = 0; out.glValueOf = leggi({ valueOf() { return n++ ? 0 : 32; } });
+  }
+  const suono = async (trucco) => {
+    const ctx = new OfflineAudioContext(1, 4410, 44100);
+    const o = ctx.createOscillator(); o.type = 'triangle'; o.frequency.value = 1000; o.connect(ctx.destination); o.start(0);
+    let buf;
+    if (trucco === 'canali') {
+      const P = AudioBuffer.prototype, d = Object.getOwnPropertyDescriptor(P, 'numberOfChannels');
+      Object.defineProperty(P, 'numberOfChannels', { get() { return 0; }, configurable: true });
+      try { buf = await ctx.startRendering(); } finally { Object.defineProperty(P, 'numberOfChannels', d); }
+    }
+    else if (trucco === 'then') {
+      const oThen = Promise.prototype.then;
+      Promise.prototype.then = function () { Promise.prototype.then = oThen; return this; };
+      const p = ctx.startRendering();
+      Promise.prototype.then = oThen;
+      buf = await p;
+    } else buf = await ctx.startRendering();
+    return hashPx(new Uint8Array(buf.getChannelData(0).buffer));
+  };
+  out.audio = await suono(null);
+  out.audioCanali = await suono('canali');
+  out.audioThen = await suono('then');
+  return out;
+}
+
+test('riscrivere per un istante dimensioni, canali, then o argomenti non toglie il rumore', async ({ openTab, testServer }) => {
+  const url = testServer.html('<title>FP_TRUCCHI</title><p>ok</p>');
+  let page = await openTab(url);
+  await page.waitForFunction(guardiaAccesa, null, { timeout: 6_000 });
+  const on = await page.evaluate(trucchi);
+  await setFpMode(openTab, 'off');
+  page = await openTab(url + '?off');
+  await page.waitForFunction(() => document.readyState === 'complete', null, { timeout: 8_000 });
+  const off = await page.evaluate(trucchi);
+  expect(on.toDataURL).not.toBe(off.toDataURL);
+  expect(on.audio).not.toBe(off.audio);
+  for (const [k, base] of [['toDataURLLarghezza', 'toDataURL'], ['toDataURLAltezzaProto', 'toDataURL'],
+    ['pxLarghezza', 'px'], ['pxValueOf', 'px'], ['glValueOf', 'gl'], ['audioCanali', 'audio'], ['audioThen', 'audio']]) {
+    if (on[base] === undefined) continue;
+    expect.soft(off[k], `${k}: con Off uguale alla lettura senza trucco`).toBe(off[base]);
+    expect.soft(on[k], `${k}: col rumore`).toBe(on[base]);
+  }
 });

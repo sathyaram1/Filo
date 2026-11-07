@@ -30,6 +30,7 @@
         { testo: 'Nell\'Editor un testo lungo incollato entra subito anche se comincia con una riga vuota, in un elenco, in una citazione, all\'inizio di un paragrafo o al posto di tutto il documento, e lo togli tutto con un solo annulla.', segnalazione: 1475 },
         { testo: 'Il titolo che l\'Editor dà da solo a un documento cambia quando cambi l\'argomento del testo. Un titolo che hai scritto tu resta com\'è, e un documento non prende più il titolo di quello aperto prima.', segnalazione: 1570 },
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
+        'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
       ],
     },
     {

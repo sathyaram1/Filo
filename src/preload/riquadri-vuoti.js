@@ -4,15 +4,21 @@
 
 // `corpi`: espressioni che valgono ciascuna una funzione (finestra). Per indice (window[i]) un riquadro si prende senza
 // passare da niente di intercettabile: va sistemato appena nasce, dopo ogni via che lo crea e al suo load.
+const V = require('./vie-dei-riquadri.js');
+
 function buildRiquadriVuotiSource(corpi) {
   return `(function(){
   'use strict';
-  var D = Object.getOwnPropertyDescriptor, def = Object.defineProperty;
+  // Presi prima degli script della pagina: una pagina che riscrive call, apply o Object.prototype non deve far lanciare
+  // i sostituti né vederli passare (#798). Per questo niente .call/.apply e descrittori senza prototipo.
+  var D = Object.getOwnPropertyDescriptor, def = Object.defineProperty, R = Reflect.apply, protoDi = Object.getPrototypeOf;
+  var proprio = Object.prototype.hasOwnProperty, suEvento = EventTarget.prototype.addEventListener;
+  function campo(x, k) { return x && R(proprio, x, [k]) ? x[k] : undefined; }
   // I sostituti somigliano ai nativi a chi li ispeziona (#799): niente prototype né new, stessa lunghezza, testo nativo;
   // i corpi lo usano per i loro.
   var finti = new WeakMap();
   function comeNativo(f, v, nome) {
-    try { def(f, 'length', { value: v.length, configurable: true }); } catch (e) {}
+    try { def(f, 'length', { __proto__: null, value: v.length, configurable: true }); } catch (e) {}
     finti.set(f, 'function ' + nome + '() { [native code] }');
     return f;
   }
@@ -21,8 +27,11 @@ function buildRiquadriVuotiSource(corpi) {
   var urlDi = (D(Document.prototype, 'URL') || {}).get;
   var vistaDi = (D(Document.prototype, 'defaultView') || {}).get;
   var chiusa = (D(window, 'closed') || D(Window.prototype, 'closed') || {}).get;
+  var CORNICI = ${JSON.stringify(V.CORNICI)}, GETTER_FINESTRA = ${JSON.stringify(V.GETTER_FINESTRA)};
+  var CON_SVG = ${JSON.stringify(V.CON_SVG)}, VIE_NODI = ${JSON.stringify(V.VIE_NODI)};
+  var VIE_TESTO = ${JSON.stringify(V.VIE_TESTO)}, RISCRIVONO = ${JSON.stringify(Object.fromEntries(V.RISCRIVONO.map((n) => [n, 1])))};
   // Un riquadro dentro una radice ombra non sta fra quelli per indice: si raggiunge dal suo elemento.
-  var finestreDi = ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'].map(function (c) {
+  var finestreDi = CORNICI.map(function (c) {
     return ((window[c] && D(window[c].prototype, 'contentWindow')) || {}).get;
   }).filter(Boolean);
   // Un documento a about:blank non ha un preload suo: il riquadro appena nato, o rimandato lì dalla pagina.
@@ -39,7 +48,7 @@ function buildRiquadriVuotiSource(corpi) {
     if (!d || visti.has(d)) return d;
     visti.add(d);
     var u = '';
-    try { u = String(urlDi.call(d)); } catch (e) {}
+    try { u = String(R(urlDi, d, [])); } catch (e) {}
     if (!VUOTO.test(u)) return d;
     for (var i = 0; i < corpi.length; i++) { try { corpi[i](w); } catch (e) {} }
     aggancia(w, d);
@@ -50,41 +59,29 @@ function buildRiquadriVuotiSource(corpi) {
     if (!r || typeof r !== 'object') return;
     if (finestra(r)) { applica(r); return; }
     var v = null;
-    try { v = vistaDi.call(r); } catch (e) {}
+    try { v = R(vistaDi, r, []); } catch (e) {}
     if (v) applica(v);
   }
   function delRiquadro(t) {
-    for (var i = 0; i < finestreDi.length; i++) { try { var w = finestreDi[i].call(t); if (w) return w; } catch (e) {} }
+    for (var i = 0; i < finestreDi.length; i++) { try { var w = R(finestreDi[i], t, []); if (w) return w; } catch (e) {} }
     return null;
   }
-  function aperta(w) { try { return !chiusa.call(w); } catch (e) { return false; } }
+  function aperta(w) { try { return !R(chiusa, w, []); } catch (e) { return false; } }
   var OSPITI = 'iframe,frame,object,embed', OSPITE = /^(iframe|frame|object|embed)$/;
   var nomeDi = (D(Element.prototype, 'localName') || {}).get;
-  var perNome = Document.prototype.getElementsByTagName, haAttr = Element.prototype.hasAttribute, attr = Element.prototype.getAttribute;
-  var baseDi = (D(Node.prototype, 'baseURI') || {}).get, Indirizzo = URL;
-  var ORIGINE = String(self.origin);
+  var perNome = Document.prototype.getElementsByTagName;
   var arrivati = new WeakSet();
   // Le raccolte vive costano poco a ogni giro: il giro parte a ogni cambio del documento.
   var raccolte = new WeakMap();
   function ospitiDi(d) {
     var r = raccolte.get(d);
-    if (!r) { r = ['iframe', 'frame', 'object', 'embed'].map(function (n) { return perNome.call(d, n); }); raccolte.set(d, r); }
+    if (!r) { r = ['iframe', 'frame', 'object', 'embed'].map(function (n) { return R(perNome, d, [n]); }); raccolte.set(d, r); }
     return r;
   }
   // Toccato prima del suo load, un riquadro che arriva a un indirizzo dello stesso sito tiene la finestra e perde il
   // preload: niente accesso, menu, cookie lì dentro. Non si tocca finché non arriva; resta fuori finché è in volo.
-  function inVolo(t, d) {
-    if (arrivati.has(t)) return false;
-    try {
-      var n = nomeDi.call(t);
-      if (n === 'iframe' && haAttr.call(t, 'srcdoc')) return true;
-      var a = n === 'object' ? 'data' : 'src';
-      if (!haAttr.call(t, a)) return false;
-      var v = String(attr.call(t, a)).trim();
-      if (!v || VUOTO.test(v)) return false;
-      return new Indirizzo(v, baseDi.call(d)).origin === ORIGINE;
-    } catch (e) { return false; }
-  }
+  var inArrivo = ${V.sorgenteInArrivo()};
+  function inVolo(t) { return !arrivati.has(t) && inArrivo(t); }
   var inGiro = false;
   function spazza() {
     if (inGiro) return;
@@ -105,7 +102,7 @@ function buildRiquadriVuotiSource(corpi) {
         }
         // Per indice si vedono anche i riquadri nelle radici ombra, ma non si sa se sono in volo.
         if (volo) continue;
-        try { k = lungo ? lungo.call(w) : w.length; } catch (e) {}
+        try { k = lungo ? R(lungo, w, []) : w.length; } catch (e) {}
         for (var i = 0; i < k && i < 4096; i++) {
           var f = null;
           try { f = w[i]; } catch (e) {}
@@ -118,15 +115,15 @@ function buildRiquadriVuotiSource(corpi) {
   var cercaIn = [Element.prototype.querySelector, DocumentFragment.prototype.querySelector];
   // Il giro costa: si fa solo se l'inserimento può aver fatto nascere un riquadro.
   function ospite(n) {
-    try { return OSPITE.test(nomeDi.call(n)); } catch (e) { return false; }
+    try { return OSPITE.test(R(nomeDi, n, [])); } catch (e) { return false; }
   }
   function conOspiti(n) {
     if (!n || typeof n !== 'object') return false;
     if (ospite(n)) return true;
-    for (var i = 0; i < cercaIn.length; i++) { try { return cercaIn[i].call(n, OSPITI) !== null; } catch (e) {} }
+    for (var i = 0; i < cercaIn.length; i++) { try { return R(cercaIn[i], n, [OSPITI]) !== null; } catch (e) {} }
     return false;
   }
-  function inPagina(t) { try { return connesso.call(t); } catch (e) { return true; } }
+  function inPagina(t) { try { return R(connesso, t, []); } catch (e) { return true; } }
   // Una stringa che nomina un ospite; ciò che non è una stringa si converte da sé, e si guarda dopo.
   function testoConOspiti(v) { return typeof v !== 'string' || /<\s*(i?frame|object|embed)/i.test(v); }
   var tuttiIn = [Element.prototype.querySelectorAll, DocumentFragment.prototype.querySelectorAll];
@@ -134,7 +131,7 @@ function buildRiquadriVuotiSource(corpi) {
   function ripartono(n) {
     if (ospite(n)) { arrivati.delete(n); return; }
     for (var i = 0; i < tuttiIn.length; i++) {
-      try { var l = tuttiIn[i].call(n, OSPITI); for (var j = 0; j < l.length; j++) arrivati.delete(l[j]); return; } catch (e) {}
+      try { var l = R(tuttiIn[i], n, [OSPITI]); for (var j = 0; j < l.length; j++) arrivati.delete(l[j]); return; } catch (e) {}
     }
   }
   var SE = {
@@ -160,7 +157,8 @@ function buildRiquadriVuotiSource(corpi) {
     if (w) applica(w);
     spazza();
   }
-  function ascolta(t) { try { t.addEventListener('load', alLoad, true); } catch (e) {} }
+  // Nella finestra della pagina addEventListener può essere già un sostituto di Filo: per un riquadro nuovo vale il suo.
+  function ascolta(t, su) { try { R(su || suEvento, t, ['load', alLoad, true]); } catch (e) {} }
   function mascheraIn(w) {
     try {
       var FP = w.Function.prototype, t = FP.toString;
@@ -169,75 +167,72 @@ function buildRiquadriVuotiSource(corpi) {
         var f = typeof this === 'function' && finti.get(this);
         if (f) return f;
         if (typeof this === 'function') {
-          try { var casa = Object.getPrototypeOf(this); if (typeof casa === 'function' && casa !== FP && casa.toString !== m) return casa.toString.call(this); } catch (e) {}
+          try { var casa = protoDi(this); if (typeof casa === 'function' && casa !== FP && casa.toString !== m) return R(casa.toString, this, []); } catch (e) {}
         }
-        return t.apply(this, arguments);
+        return R(t, this, arguments);
       } }.toString;
-      def(FP, 'toString', { value: comeNativo(m, t, 'toString'), writable: true, enumerable: false, configurable: true });
+      def(FP, 'toString', { __proto__: null, value: comeNativo(m, t, 'toString'), writable: true, enumerable: false, configurable: true });
     } catch (e) {}
   }
   function dopo(o, nome, se, poi) {
     var x = o && D(o, nome);
-    if (!x || typeof x.value !== 'function') return;
-    var v = x.value;
+    var v = campo(x, 'value');
+    if (typeof v !== 'function') return;
     var m = { [nome]() {
       var giro = se(this, arguments), r;
-      try { r = v.apply(this, arguments); } finally { if (giro) spazza(); }
+      try { r = R(v, this, arguments); } finally { if (giro) spazza(); }
       if (poi) { try { poi(this, r); } catch (e) {} }
       return r;
     } }[nome];
-    try { def(o, nome, { value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    try { def(o, nome, { __proto__: null, value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function prima(o, nome) {
     var x = o && D(o, nome);
     if (!x) return;
-    if (typeof x.value === 'function') {
-      var v = x.value;
-      var m = { [nome]() { spazza(); var r = v.apply(this, arguments); applicaA(r); return r; } }[nome];
-      try { def(o, nome, { value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var v = campo(x, 'value');
+    if (typeof v === 'function') {
+      var m = { [nome]() { spazza(); var r = R(v, this, arguments); applicaA(r); return r; } }[nome];
+      try { def(o, nome, { __proto__: null, value: comeNativo(m, v, nome), writable: x.writable, enumerable: x.enumerable, configurable: true }); } catch (e) {}
       return;
     }
-    if (typeof x.get !== 'function') return;
-    var g = x.get;
-    var nuovo = D({ get [nome]() { spazza(); var r = g.call(this); applicaA(r); return r; } }, nome).get;
-    try { def(o, nome, { get: comeNativo(nuovo, g, 'get ' + nome), set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var g = campo(x, 'get');
+    if (typeof g !== 'function') return;
+    var nuovo = D({ get [nome]() { spazza(); var r = R(g, this, []); applicaA(r); return r; } }, nome).get;
+    try { def(o, nome, { __proto__: null, get: comeNativo(nuovo, g, 'get ' + nome), set: x.set, enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function dopoLaScrittura(o, nome) {
     var x = o && D(o, nome);
-    if (!x || typeof x.set !== 'function') return;
-    var s = x.set, se = SE.testo(0);
-    var nuovo = D({ set [nome](v) { var giro = se(this, [v]); try { s.call(this, v); } finally { if (giro) spazza(); } } }, nome).set;
-    try { def(o, nome, { get: x.get, set: comeNativo(nuovo, s, 'set ' + nome), enumerable: x.enumerable, configurable: true }); } catch (e) {}
+    var s = campo(x, 'set');
+    if (typeof s !== 'function') return;
+    var se = SE.testo(0);
+    var nuovo = D({ set [nome](v) { var giro = se(this, [v]); try { R(s, this, [v]); } finally { if (giro) spazza(); } } }, nome).set;
+    try { def(o, nome, { __proto__: null, get: x.get, set: comeNativo(nuovo, s, 'set ' + nome), enumerable: x.enumerable, configurable: true }); } catch (e) {}
   }
   function proto(w, nome) { var c = w[nome]; return c && c.prototype; }
   function finestra(r) { return r && typeof r === 'object' && r === r.window; }
   function aggancia(w, d) {
     mascheraIn(w);
-    ascolta(d);
-    try { new w.MutationObserver(spazza).observe(d, { childList: true, subtree: true }); } catch (e) {}
-    var N = proto(w, 'Node');
-    ['appendChild', 'insertBefore', 'replaceChild'].forEach(function (m) { dopo(N, m, SE.nodi); });
-    var conTesto = { insertAdjacentHTML: SE.testo(1), setHTMLUnsafe: SE.testo(0), setHTML: SE.testo(0) };
-    ['Element', 'Document', 'DocumentFragment', 'CharacterData', 'DocumentType', 'ShadowRoot'].forEach(function (c) {
-      var P = proto(w, c);
-      if (!P) return;
-      ['append', 'prepend', 'replaceChildren', 'before', 'after', 'replaceWith', 'moveBefore', 'insertAdjacentElement',
-        'insertAdjacentHTML', 'setHTMLUnsafe', 'setHTML'].forEach(function (m) { if (Object.hasOwn(P, m)) dopo(P, m, conTesto[m] || (m === 'moveBefore' ? SE.sposta : SE.nodi)); });
-      if (c !== 'Document') ['innerHTML', 'outerHTML'].forEach(function (p) { if (Object.hasOwn(P, p)) dopoLaScrittura(P, p); });
-    });
-    var Doc = proto(w, 'Document');
-    dopo(Doc, 'write', SE.sempre);
-    dopo(Doc, 'writeln', SE.sempre);
-    dopo(Doc, 'execCommand', SE.testo(2));
-    // La riscrittura da capo toglie gli ascolti del documento; con tre argomenti apre una finestra.
-    dopo(Doc, 'open', SE.sempre, function (doc, r) { ascolta(doc); if (finestra(r)) applica(r); });
-    var R = proto(w, 'Range');
-    ['insertNode', 'surroundContents'].forEach(function (m) { dopo(R, m, SE.gamma); });
-    dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice); });
-    ['HTMLIFrameElement', 'HTMLFrameElement', 'HTMLObjectElement'].forEach(function (c) {
-      ['contentWindow', 'contentDocument'].forEach(function (p) { prima(proto(w, c), p); });
-    });
-    ['HTMLIFrameElement', 'HTMLObjectElement', 'HTMLEmbedElement'].forEach(function (c) { prima(proto(w, c), 'getSVGDocument'); });
+    var su = null;
+    try { su = campo(D(w.EventTarget.prototype, 'addEventListener'), 'value'); } catch (e) {}
+    ascolta(d, su);
+    try { new w.MutationObserver(spazza).observe(d, { __proto__: null, childList: true, subtree: true }); } catch (e) {}
+    var i, v, P;
+    for (i = 0; i < VIE_NODI.length; i++) {
+      v = VIE_NODI[i]; P = proto(w, v[0]);
+      if (P && R(proprio, P, [v[1]])) dopo(P, v[1], v[2] === 'sposta' ? SE.sposta : v[2] === 'gamma' ? SE.gamma : SE.nodi);
+    }
+    // La riscrittura da capo (anche write a documento chiuso) toglie gli ascolti del documento; open con tre argomenti
+    // apre una finestra.
+    var riapre = function (doc, r) { ascolta(doc, su); if (finestra(r)) applica(r); };
+    for (i = 0; i < VIE_TESTO.length; i++) {
+      v = VIE_TESTO[i]; P = proto(w, v[0]);
+      if (!P || !R(proprio, P, [v[1]])) continue;
+      if (typeof campo(D(P, v[1]), 'set') === 'function') { dopoLaScrittura(P, v[1]); continue; }
+      dopo(P, v[1], v[2] < 0 ? SE.sempre : SE.testo(v[2]), R(proprio, RISCRIVONO, [v[1]]) ? riapre : null);
+    }
+    dopo(proto(w, 'Element'), 'attachShadow', function () { return false; }, function (el, radice) { ascolta(radice, su); });
+    for (i = 0; i < CORNICI.length; i++) for (var j = 0; j < GETTER_FINESTRA.length; j++) prima(proto(w, CORNICI[i]), GETTER_FINESTRA[j]);
+    for (i = 0; i < CON_SVG.length; i++) prima(proto(w, CON_SVG[i]), 'getSVGDocument');
     dopo(D(w, 'open') ? w : proto(w, 'Window'), 'open', SE.sempre, function (_, r) { if (finestra(r)) applica(r); });
   }
   visti.add(document);

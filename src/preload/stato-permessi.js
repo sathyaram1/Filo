@@ -17,8 +17,10 @@ function buildStatoPermessiCorpo(stato) {
   const gestoMs = Number(stato && stato.gestoMs) > 0 ? Number(stato.gestoMs) : 5000;
   return `(function(){
   'use strict';
+  // Presi prima della pagina: un riquadro vuoto nato dopo che lei li ha riscritti si prepara lo stesso (#798).
+  var gOPD = Object.getOwnPropertyDescriptor, defP = Object.defineProperty;
   var N = window.Notification;
-  var d = typeof N === 'function' ? Object.getOwnPropertyDescriptor(N, 'permission') : null;
+  var d = typeof N === 'function' ? gOPD(N, 'permission') : null;
   var vero = d && typeof d.get === 'function' ? d.get : null;
   var deciso = ${JSON.stringify(iniziale)};
   // Il sì vero lo dice Chromium; un no lo dice solo l'utente, mai il silenzio di una domanda non fatta.
@@ -59,16 +61,16 @@ function buildStatoPermessiCorpo(stato) {
       try { w.addEventListener(t, gesto, true); } catch (e) {}
     });
     var WN = w.Notification;
-    var wd = typeof WN === 'function' ? Object.getOwnPropertyDescriptor(WN, 'permission') : null;
+    var wd = typeof WN === 'function' ? gOPD(WN, 'permission') : null;
     if (vero && wd && typeof wd.get === 'function') {
-      var g = Object.getOwnPropertyDescriptor({ get permission() { return leggi(); } }, 'permission').get;
-      try { Object.defineProperty(WN, 'permission', { get: nativo(g, wd.get, 'get permission'), enumerable: wd.enumerable, configurable: true }); } catch (e) {}
+      var g = gOPD({ get permission() { return leggi(); } }, 'permission').get;
+      try { defP(WN, 'permission', { __proto__: null, get: nativo(g, wd.get, 'get permission'), enumerable: wd.enumerable, configurable: true }); } catch (e) {}
       if (typeof chiedi === 'function' && typeof WN.requestPermission === 'function') {
-        try { Object.defineProperty(WN, 'requestPermission', { value: nativo(r.requestPermission, chiedi, 'requestPermission'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
+        try { defP(WN, 'requestPermission', { __proto__: null, value: nativo(r.requestPermission, chiedi, 'requestPermission'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
       }
     }
     var P = w.Permissions && w.Permissions.prototype;
-    var S = w.PermissionStatus && Object.getOwnPropertyDescriptor(w.PermissionStatus.prototype, 'state');
+    var S = w.PermissionStatus && gOPD(w.PermissionStatus.prototype, 'state');
     if (P && typeof P.query === 'function' && S && typeof S.get === 'function') {
       var q = P.query, stato = S.get;
       var o = { query(richiesta) {
@@ -88,7 +90,7 @@ function buildStatoPermessiCorpo(stato) {
           return st;
         });
       } };
-      try { Object.defineProperty(P, 'query', { value: nativo(o.query, q, 'query'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
+      try { defP(P, 'query', { __proto__: null, value: nativo(o.query, q, 'query'), writable: true, configurable: true, enumerable: true }); } catch (e) {}
     }
   };
 })()`;

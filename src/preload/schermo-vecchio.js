@@ -74,7 +74,7 @@ function buildSchermoVecchioCorpo() {
   }
   var nativo = typeof comeNativo === 'function' ? comeNativo : function (f) { return f; };
   function metti(o, nome, f) {
-    try { Object.defineProperty(o, nome, { value: nativo(f, o[nome], nome), writable: true, configurable: true, enumerable: true }); } catch (e) {}
+    try { defP(o, nome, { __proto__: null, value: nativo(f, o[nome], nome), writable: true, configurable: true, enumerable: true }); } catch (e) {}
   }
   return function (w) {
     var WP = w.MediaDevices && w.MediaDevices.prototype;

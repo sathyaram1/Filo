@@ -142,6 +142,17 @@ function isIdentityProviderHref(href) {
   }
 }
 
+// Un sito dove solo alcune pagine sono esenti (gli accessi di github.com, x.com…): un suo documento che la guardia
+// della pagina non sa riconoscere potrebbe essere una di quelle (#798).
+function esentiNelSito(href) {
+  try {
+    const o = new URL(String(href || '')).origin;
+    return !isIdentityProviderHref(o + '/') && isIdentityProviderHref(o + '/login');
+  } catch (_) {
+    return false;
+  }
+}
+
 // App Google dove l'utente è già autenticato (#299): lì il rumore non protegge — il cookie
 // identifica comunque — e fa scattare gli avvisi. Lista CURATA, non l'eTLD+1 google.com.
 const GOOGLE_APP_HOSTS = [
@@ -193,6 +204,24 @@ function configForHref(href, ambito = '') {
   return { level, seed: seedForHref(href, String(ambito || '')) };
 }
 
+// Un riquadro, dato con gli indirizzi dei frame da lui alla pagina principale: ha la protezione della pagina col suo
+// seme se è dello stesso sito, o se non ha un indirizzo web (srcdoc, data:, blob:) e quindi è contenuto del frame che
+// lo contiene. Un riquadro di un altro sito resta com'è, e un riquadro esente per conto suo (un accesso) resta esente.
+function configForFrames(catena, ambito = '') {
+  const OFF = { level: 0, seed: 0 };
+  if (!Array.isArray(catena) || !catena.length) return OFF;
+  const cima = String(catena[catena.length - 1] || '');
+  const pagina = configForHref(cima, ambito);
+  if (!pagina.level) return OFF;
+  for (let i = 0; i < catena.length - 1; i++) {
+    const u = String(catena[i] || '');
+    if (!/^https?:/i.test(u)) continue;
+    const sito = Sito.sitoDi(u);
+    return sito && sito === Sito.sitoDi(cima) && configForHref(u, ambito).level ? pagina : OFF;
+  }
+  return pagina;
+}
+
 module.exports = {
   MODES,
   getMode,
@@ -204,6 +233,8 @@ module.exports = {
   seedForOrigin,
   seedForHref,
   isIdentityProviderHref,
+  esentiNelSito,
   isGoogleAppSurface,
   configForHref,
+  configForFrames,
 };

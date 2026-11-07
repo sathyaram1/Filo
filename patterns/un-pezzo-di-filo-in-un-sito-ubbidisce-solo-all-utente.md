@@ -250,7 +250,8 @@ scelta: nella pagina la gira su `getDisplayMedia` e avvisa il main, che dopo la 
 vuoti** che la pagina si crea (#1057): un `about:blank` non ha preload, e la sua funzione di fabbrica, presa anche per
 indice (`window[i]`), con una combinazione come «solo l'audio del computer» per Chromium è un messaggio guasto, che
 chiude la scheda prima di chiedere a Filo. Quindi ciò che Filo mette nel mondo della pagina si applica a ogni riquadro
-vuoto appena nasce (`preload/riquadri-vuoti.js`): dopo ogni via che inserisce nodi, al load (che per un riquadro vuoto
+vuoto appena nasce (`preload/riquadri-vuoti.js`; le vie e la regola del riquadro in volo stanno in
+`preload/vie-dei-riquadri.js`, le stesse della guardia anti-fingerprint): dopo ogni via che inserisce nodi, al load (che per un riquadro vuoto
 arriva dentro l'inserimento), dai getter `contentWindow`/`contentDocument` (un riquadro in una radice ombra non sta fra
 quelli per indice) e da `window.open`; e lì dentro si legge e si chiede come nella pagina. Resta fuori solo il codice
 della pagina che gira **dentro** un inserimento prima che finisca (uno `<script>` o un elemento personalizzato inseriti
