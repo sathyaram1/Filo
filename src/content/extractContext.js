@@ -1036,7 +1036,7 @@
             if (sezione) sezioniConTesto.add(sezione);
           } else visti.push({ el, text: txt });
         }
-      }
+      } else if (sezione) sezioniConTesto.add(sezione);
       const chiuso = isClosedComponent(el, fuoriConto, sezione);
       if (chiuso === 'sezione') chiusiInSezione.push(sezione);
       else if (chiuso && !el.shadowRoot) unreachable++;
