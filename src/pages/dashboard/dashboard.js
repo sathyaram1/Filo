@@ -2063,6 +2063,7 @@
   }
   function attachImageLightbox(img, src) {
     img.style.cursor = 'zoom-in';
+    img.title = 'Ingrandisci';
     img.addEventListener('click', (e) => {
       e.stopPropagation();
       openLightbox(src);
