@@ -1067,7 +1067,22 @@ const IMPOSTAZIONI = {
   'mac-wifi': 'x-apple.systempreferences:com.apple.wifi-settings-extension',
   'mac-registrazione-schermo': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
   'mac-automazione': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation',
+  'win-wifi': 'ms-settings:network-wifi',
+  'win-audio': 'ms-settings:sound',
+  'mac-bluetooth-dispositivi': 'x-apple.systempreferences:com.apple.BluetoothSettings',
+  'mac-audio': 'x-apple.systempreferences:com.apple.Sound-Settings.extension',
 };
+
+// #2096 — il pannello delle impostazioni del sistema per Bluetooth, Wi-Fi e audio. Linux non ha un indirizzo comune a
+// tutti i desktop: lì la voce non c'è (chi la mostra chiede pannelliImpostazioni).
+const PANNELLI = {
+  win32: { bluetooth: 'win-bluetooth', wifi: 'win-wifi', audio: 'win-audio' },
+  darwin: { bluetooth: 'mac-bluetooth-dispositivi', wifi: 'mac-wifi', audio: 'mac-audio' },
+  linux: {},
+};
+function pannelliImpostazioni(piattaforma = process.platform) {
+  return { ...(PANNELLI[piattaforma] || {}) };
+}
 
 function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
   const radio = cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth';
