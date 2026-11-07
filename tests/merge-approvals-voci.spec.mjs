@@ -149,7 +149,7 @@ test('tema scuro: la scheda e l’intorno restano leggibili', async ({ openTab }
 });
 
 // Il sì vale per tutto il commit: con voci chiuse non si dà, e nessun carattere invisibile cambia quello che si legge (#1502).
-test('quattordici voci: tutte visibili a elenco aperto, e «Approva e fondi» spento finché è chiuso', async ({ openTab }) => {
+test('quattordici voci: tutte visibili a elenco aperto, e il sì aspetta che l’elenco sia aperto', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   const quattordici = Array.from({ length: 14 }, (_, i) => voce(`src/main/modulo${i}.js`, 5 + i, `spawn('passo-${i}');`));
   quattordici[13] = voce('src/main/modulo13.js', 18, 'if (admin)\u202E { consenti(); }\u2066 // ok');
