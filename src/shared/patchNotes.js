@@ -11,6 +11,7 @@
     {
       version: '0.2.272', date: '2026-11-07',
       features: [
+        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
         { testo: 'Le schede si trascinano come ti aspetti: seguono il mouse, e puoi lasciarle in un campo di testo per incollare il link.', segnalazione: 2084 },
         { testo: 'Trascina una scheda nella chat per parlarne con Filo.', segnalazione: 2085 },
         { testo: 'Passando col mouse su un tasto, in tutte le pagine di Filo il nome compare in un fumetto caldo come quello della barra in alto, non più nel rettangolo bianco. Ce l\'hanno anche le icone che prima non dicevano niente: l\'invio, le crocette, le immagini da ingrandire. Colori e attesa si cambiano in Preferenze o chiedendolo a Filo.', segnalazione: 2095 },
@@ -37,9 +38,6 @@
       features: [
         { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo. «Metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un\'altra.', segnalazione: 1397 },
         { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
-      ],
-      features: [
-        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
       ],
     },
     {
