@@ -1042,12 +1042,14 @@
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
+        // Cancellare senza cestino è un «per sempre» (#1909): costo 4 come ELIMINA_FILE, quindi no dopo una lettura (#1840).
+        if (cancellaColComando(a)) return 4;
         const lvl = C.classify(cmd, a._perimetro);
         return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
       },
       campo: 'terminale',
-      // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
       parola: (a) => cancellaColComando(a),
+      dove: (a) => (cancellaColComando(a) ? 'Il comando lo puoi scrivere tu nel terminale della home' : ''),
       // Il comando che si collega fuori dal computer porta fuori il suo testo, come link e ricerca (#530.3): una chiave
       // in un curl o in un git clone passa dagli stessi controlli dei segreti. Uno che resta sul computer (sola lettura,
       // un docker, un .env, un database su localhost) non porta fuori niente e chiede come gli altri (#1312).
