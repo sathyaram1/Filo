@@ -257,10 +257,12 @@ Rivede il § 3a dove dice altro. Il manutentore è una sessione **non fidata** c
 nell'ambiente dei riservati) e scrive solo ordini che il server applica. Mai fusioni, L5, codice, risposte
 all'owner, il freno.
 
-- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = la rosa del giorno,
-  scelta ogni mattina dal manutentore; 1 = da fare, non oggi; 0 = rimandato a lungo. I giudici assegnano 3 o
-  lasciano 1: la 2 è del manutentore. Una 3 la può creare, non abbassare. Le 2 di prima scendono a 1 con
-  l'operazione una tantum `transizione` di `ownerManutentore`.
+- **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2, 1 e 0 sono la classe
+  che il manutentore dà a un lavoro (importante, da fare, rimandato a lungo). **L'ordine è l'unica condizione per
+  cominciare** (#2269): un primo lavoro nell'ordine parte qualunque sia la sua priorità da 0 a 2, fuori dall'ordine
+  parte solo una 3. Con l'ordine vuoto o senza lavori pronti vale il ripiego per urgenza, e solo lì le basse aspettano
+  l'ultimo giorno prima del rinnovo. I giudici assegnano 3 o lasciano 1. Una 3 il manutentore la può creare, non
+  abbassare. Le 2 di prima scendono a 1 con l'operazione una tantum `transizione` di `ownerManutentore`.
 - **Quante insieme.** Niente tetti per priorità: le 3 partono sempre, il resto fino al parallelismo **N** del
   manutentore, sotto il **freno d'emergenza** dell'owner (`config/routines.maxSessions`, 1–20, predefinito 20,
   Gestione → Automazioni). Senza N vale il freno.
