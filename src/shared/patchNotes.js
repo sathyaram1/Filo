@@ -9,13 +9,17 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.271', date: '2026-11-07',
+      features: [
+        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
+      ],
+    },
+    {
       version: '0.2.270', date: '2026-11-07',
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
       ],
-      features: [
-        'Nella Bacheca, sotto il titolo di ogni miglioramento c\'è il testo della segnalazione, senza dati personali e con gli errori corretti. Così capisci cosa provare prima di votare. Se è lungo, passaci sopra col puntatore e lo leggi intero.',
-      ],
+      features: [],
     },
     {
       version: '0.2.268', date: '2026-11-06',
