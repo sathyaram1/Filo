@@ -235,22 +235,27 @@
     if (anteprima && anteprima.contains(el) && citata) {
       return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { annulla(); d.inputEl.focus(); } }];
     }
-    const b = d.bubblesEl.contains(el) ? bollaDi(el) : null;
-    if (!b) return [];
-    // Prima l'azione che porta avanti la conversazione, come nei tasti a schermo dopo Copia.
-    const ordine = azioniDi(b).sort((x, y) => (x === 'copia') - (y === 'copia'));
-    return ordine.map((a) => ({ type: 'item', icon: icona(AZIONI[a].icona, 16), label: AZIONI[a].voce, onClick: () => fai(a, b) }));
+    if (!tasti || !d.bubblesEl.contains(el)) return [];
+    return tasti.voci(el).map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
   }
 
   function init(deps) {
     d = deps;
     creaAnteprima(d.anteprimaEl);
-    const sopra = (e) => {
-      const b = bollaDi(e.target);
-      if (b) mettiBarra(b);
-    };
-    d.bubblesEl.addEventListener('mouseover', sopra);
-    d.bubblesEl.addEventListener('focusin', sopra);
+    tasti = global.SN_AZIONI_MESSAGGIO.attacca(d.bubblesEl, {
+      messaggio: '.dash-bubble-filo, .dash-bubble-user',
+      pronto: rispondibile,
+      testo: testoDi,
+      ruolo: (b) => (diUtente(b) ? 'user' : 'filo'),
+      azioni: azioniDi,
+      copia: (_testo, b) => copia(b),
+      classi: { barra: 'dash-msg-azioni', tasto: 'dash-msg-azione', ok: 'dash-copiato', no: 'dash-non-copiato', destra: '' },
+      extra: {
+        rispondi: { icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi', fai: (b) => rispondi(b) },
+        modifica: { icona: 'pencil', etichetta: 'Modifica', voce: 'Modifica', fai: (b) => { if (d.modifica) d.modifica(b); } },
+        cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita', fai: (b) => rispondi(b) },
+      },
+    });
     d.bubblesEl.addEventListener('click', (e) => {
       const q = elDi(e.target) && elDi(e.target).closest('.dash-citata');
       if (q && d.bubblesEl.contains(q)) { e.stopPropagation(); vaiDallaCitazione(q).catch(() => {}); }
