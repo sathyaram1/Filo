@@ -2218,26 +2218,9 @@
     box.appendChild(range.cloneContents());
     return box.innerHTML;
   }
-  // Il carattere preso in prestito torna dentro gli stessi tag in linea (grassetto, link…) che aveva nel blocco.
-  function carattereVestito(range, blocco, suo = range.startContainer) {
-    let pezzo = spaziVisibili(range.toString());
-    for (let n = suo.parentNode; n && n !== blocco; n = n.parentNode) {
-      const vuoto = n.cloneNode(false).outerHTML;
-      const chiude = vuoto.lastIndexOf('</');
-      pezzo = chiude > 0 ? vuoto.slice(0, chiude) + pezzo + vuoto.slice(chiude) : pezzo;
-    }
-    return pezzo;
-  }
-  // Un carattere solo, senza immagini o a capo in mezzo: il frammento lo può riscrivere com'era.
-  function carattereSemplice(range) {
-    if (range.toString().length !== 1) return false;
-    return !range.cloneContents().querySelector('img, br');
-  }
-  function ultimoTesto(el) {
-    const w = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
-    let ultimo = null;
-    for (let t = w.nextNode(); t; t = w.nextNode()) if (t.nodeValue.length) ultimo = t;
-    return ultimo;
+  // Qualcosa dell'utente, testo o immagine, in questo pezzo di blocco.
+  function pieno(range) {
+    return !!range.toString().length || !!range.cloneContents().querySelector('img');
   }
   // Dopo l'incolla il cursore sta in fondo a quello che è entrato: si riporta prima di ciò che c'era dopo.
   function cursoreIndietro(caratteri) {
