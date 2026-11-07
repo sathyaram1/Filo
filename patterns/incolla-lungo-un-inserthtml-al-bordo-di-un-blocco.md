@@ -24,8 +24,9 @@ al bordo di un blocco con testo 20-70 ms.
   prima riga (un `<p>`, che si unisce a qualunque blocco) si attacca al testo, e quello che seguiva la selezione chiude
   l'ultima riga.
 - **Testo solo dopo**: l'HTML entra prima del blocco, e l'ultima riga, un `<p>`, si unisce al testo che resta.
-- **Voce di elenco**: la selezione prende la voce da capo fino in fondo al blocco dove finisce, e il frammento è un
-  elenco: Chrome lo inserisce voce per voce (`InsertAsListItems`), in fretta.
+- **Voce di elenco**: la selezione prende la voce da capo fino in fondo al blocco dove finisce, e il frammento sono le
+  sole `<li>`, senza `<ul>`/`<ol>` intorno. Un elenco intero passa da `InsertAsListItems`, che con altre voci dopo il
+  punto d'arrivo paga al quadrato (4.000 righe: 5 s; le sole voci 0,1 s).
 - **Il blocco resterebbe vuoto**: un carattere invisibile (`ANCORA`) gli tiene il posto, piantato FUORI dall'annulla.
   - in un paragrafo sta in coda: l'ultima riga ci si unisce, e Chrome lo travasa nel suo nodo di testo;
   - in un titolo o in una citazione sta in un `<p>` suo, prima: un blocco così non si unisce, e il `<p>` si toglie.
