@@ -21,7 +21,7 @@ function lancia(argv, risposte = {}, input = '', envExtra = {}) {
     const M = await import(${JSON.stringify(MODULO)});
     const R = ${JSON.stringify(risposte)};
     globalThis.fetch = async (_u, init) => { const b = JSON.parse(init.body); console.log('INVIATO ' + JSON.stringify({ op: b.op, dati: b.dati, cred: b.passphrase ? 'chiave' : 'biglietto' })); return { status: 200, ok: true, text: async () => JSON.stringify(R[b.op] || { ok: true, versione: 4 }) }; };
-    process.exitCode = await M.main(${JSON.stringify(argv)}, { env: { FILO_MANUTENTORE_KEY: 'k' }, root: ${JSON.stringify(root)} });`;
+    process.exitCode = await M.main(${JSON.stringify(argv)}, { env: ${JSON.stringify({ FILO_MANUTENTORE_KEY: 'k', ...envExtra })}, root: ${JSON.stringify(root)} });`;
   const r = spawnSync(process.execPath, ['--input-type=module', '-e', codice], { input, encoding: 'utf8', cwd: root });
   const inviati = r.stdout.split('\n').filter((l) => l.startsWith('INVIATO ')).map((l) => JSON.parse(l.slice(8)));
   return { status: r.status, out: r.stdout + r.stderr, inviati, root };
