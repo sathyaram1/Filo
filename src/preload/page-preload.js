@@ -945,6 +945,40 @@ if (riscrittura) {
 const SHARED_DIR = path.join(__dirname, '..', 'shared');
 const CONTENT_DIR = path.join(__dirname, '..', 'content');
 
+// I moduli che servono solo a richiesta (#1093): il primo che legge uno dei loro nomi su globalThis li carica, nell'ordine
+// dell'elenco; fino ad allora la pagina non li paga. Su un sito dove Filo è spento non si caricano: chi li cerca trova il
+// vuoto, come prima che arrivassero. Quali sono e quanto pesa il resto: tests/unit/moduliSubito.test.mjs.
+const inAttesaDiRichiesta = new Set();
+function segnaInAttesa() {
+  try { document.documentElement.dataset.filoSuRichiesta = [...inAttesaDiRichiesta].join(','); } catch (_) {}
+}
+function suRichiesta(nomi, carica) {
+  let partito = false;
+  const avvia = () => {
+    if (partito || globalThis.__snFiloSpento === true) return;
+    partito = true;
+    try { carica(); } finally {
+      for (const n of nomi) inAttesaDiRichiesta.delete(n);
+      segnaInAttesa();
+    }
+  };
+  for (const nome of nomi) {
+    if (Object.prototype.hasOwnProperty.call(globalThis, nome)) continue;
+    inAttesaDiRichiesta.add(nome);
+    Object.defineProperty(globalThis, nome, {
+      configurable: true,
+      get() {
+        avvia();
+        const d = Object.getOwnPropertyDescriptor(globalThis, nome);
+        return d && 'value' in d ? d.value : undefined;
+      },
+      // Il modulo che si registra rimette il nome come un valore qualunque.
+      set(v) { Object.defineProperty(globalThis, nome, { value: v, writable: true, configurable: true, enumerable: true }); },
+    });
+  }
+  segnaInAttesa();
+}
+
 // Stesso elenco di loadContentScripts() in internal-preload.js: le differenze
 // ammesse stanno in tests/unit/contentScriptPreload.test.mjs.
 function loadScripts() {
