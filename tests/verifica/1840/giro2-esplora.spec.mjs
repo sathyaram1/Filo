@@ -88,7 +88,7 @@ for (const lv of ['conservativo', 'automatico']) {
       await modelloFinto(app, [chiamata('a1', ...TETTO), { text: 'Serve la parola.' }]);
       await chiedi(page, 'alza il tetto di spesa a 800 euro');
       const bottone = page.locator('button.dash-action-btn', { hasText: 'Limite di spesa' });
-      await expect(page.locator(CONFIRM_HOST).or(bottone)).toBeVisible({ timeout: 15000 });
+      await expect(page.locator(CONFIRM_HOST).or(bottone).first()).toBeVisible({ timeout: 15000 });
       if (await bottone.isVisible()) await bottone.click();
       await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
       expect((await confirmState(page)).hasInput).toBe(true);
