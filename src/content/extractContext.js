@@ -914,7 +914,8 @@
     const root = document.body || document.documentElement;
     if (!root) return Object.assign([], { unreachable: 0, truncated: 0, attrs: [], mirrors: [], shadowRoots: [], frameDocs: [], hidden: [] });
     const tutto = nascoste === NASCOSTE.TRADUCI;
-    const dentroNascosto = new WeakSet();
+    // Elemento → la cima della sezione nascosta che lo contiene.
+    const dentroNascosto = new WeakMap();
     // Il tetto si applica a fine camminata, in ordine di priorità: quel che si vede prima delle sezioni nascoste.
     const visti = [];
     const vistiAttr = [];
