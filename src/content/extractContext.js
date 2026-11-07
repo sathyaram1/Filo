@@ -1023,8 +1023,8 @@
           else visti.push({ el, text: txt });
         }
       }
-      if (isClosedComponent(el, fuoriConto) && !el.shadowRoot) unreachable++;
-      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null);
+      if (isClosedComponent(el, fuoriConto, sezione) && !el.shadowRoot) unreachable++;
+      pushKids(el, stack, shadowRoots, nascosto ? dentroNascosto : null, sezione);
     }
     let posto = maxBlocks;
     const prendi = (da, a) => {
