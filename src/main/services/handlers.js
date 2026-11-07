@@ -1969,6 +1969,8 @@ function esitoSistemaPerModello(o) {
   if (typeof o.acceso === 'boolean') return `${radio} ${o.acceso ? 'acceso' : 'spento'}.`;
   const nome = o.dispositivo || o.rete;
   const acceso = o.accesoPrima ? ` ${radio} era spento: acceso prima.` : '';
+  if (o.dimenticato) return `Dimenticato: per riusarlo va riabbinato dalle impostazioni del sistema.\n${busta([nome])}`;
+  if (o.dimenticata) return `Rete dimenticata: per ricollegarsi servirà di nuovo la password.\n${busta([nome])}`;
   if (o.gia) return `Era già così, niente da cambiare:\n${busta([nome])}`;
   if (o.cosa === 'bluetooth') {
     if (o.collegato === null) return `Collegamento chiesto, ma Windows non l'ha ancora confermato: lo vedi nella home fra poco.${acceso}\n${busta([nome])}`;
