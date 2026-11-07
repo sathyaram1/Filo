@@ -151,14 +151,15 @@
 
   // Un titolo che l'utente non ha scritto segue il contenuto (#1570): con la stessa soglia del riassunto, o quando
   // l'argomento cambia, e nella sua stessa chiamata. Quello scritto a mano non cambia mai da solo; il primo lo dà il
-  // tiro a 100 parole.
+  // tiro a 100 parole. Una risposta che non l'ha portato (tagliata, o senza la riga del titolo) non si richiede sullo
+  // stesso testo: ogni pausa nella scrittura sarebbe una chiamata pagata.
   function titoloDaRifare(file, currentWords) {
     const meta = (file && file.meta) || {};
     if (meta.titleManual || !meta.titleAuto) return false;
+    if (stessoTesto(meta.titleFailSig, file, currentWords)) return false;
     const sig = meta.titleSig;
     if (sig == null || typeof sig.words !== 'number') return true;
-    return !pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file))
-      || argomentoCambiato(sig, fileText(file));
+    return !stessoTesto(sig, file, currentWords);
   }
 
   // La risposta della chiamata unica: «TITOLO: …» e «RIASSUNTO: …». Senza etichette è tutta riassunto, e il titolo resta.
