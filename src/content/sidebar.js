@@ -1940,12 +1940,15 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   function buildPayload(userMessage, userAction, esterno, letta) {
     const qui = paginaOra();
     // history per l'AI: solo {role, content}, niente metadati UI.
-    const aiHistory = history.map(({ role, content, immagini }) => (immagini && immagini.length
-      ? { role, content: [
-        { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
-        ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
-      ] }
-      : { role, content }));
+    const aiHistory = history.map(({ role, content, immagini, schede }) => ({
+      ...(immagini && immagini.length
+        ? { role, content: [
+          { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
+          ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
+        ] }
+        : { role, content }),
+      ...(role === 'user' && schede && schede.length ? { schede } : {}),
+    }));
     return {
       url: letta.url || qui.url,
       title: letta.titolo ?? qui.titolo,
