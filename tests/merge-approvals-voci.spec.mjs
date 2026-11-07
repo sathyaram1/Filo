@@ -161,8 +161,7 @@ test('quattordici voci: tutte visibili a elenco aperto, e il sÃ¬ aspetta che lâ€
   const approva = card.locator('.sn-mac-btn-go');
   await expect(voci).toHaveCount(14);
   await expect(voci.nth(12)).toBeHidden();
-  await expect(approva).toBeDisabled();
-  await expect(card.locator('.sn-mac-serve-aprire')).toBeVisible();
+  await expect(approva).toHaveText('Apri le 2 voci');
   await expect(card.locator('.sn-mac-btn-quiet')).toBeEnabled();
   await card.screenshot({ path: 'tests/.shots/merge-approvals-14-chiuse.png' }).catch(() => {});
 
