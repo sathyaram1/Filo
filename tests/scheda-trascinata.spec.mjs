@@ -512,9 +512,12 @@ test('#2084 lasciata sul campo di un riquadro incorporato, di un altro sito o de
     }, { timeout: 8000 }).toBe(1);
     const r = await frame.locator('#t').evaluate((el) => { const b = el.getBoundingClientRect(); return { x: b.left + 24, y: b.top + b.height / 2 }; });
     const off = await pagina.locator('iframe').evaluate((f) => { const b = f.getBoundingClientRect(); return { x: b.left + f.clientLeft, y: b.top + f.clientTop }; });
-    const base = await puntoInPagina(app, pagina, 'body');
-    const corpo = await pagina.locator('body').evaluate((el) => { const b = el.getBoundingClientRect(); return { x: b.left + Math.min(24, b.width / 2), y: b.top + b.height / 2 }; });
-    const verso = { x: base.x - corpo.x + off.x + r.x, y: base.y - corpo.y + off.y + r.y };
+    const v = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
+      const t = w._filoTabs.tabs.find((x) => x.id === w._filoTabs.activeId);
+      return { b: t.view.getBounds(), z: t.view.webContents.getZoomFactor() || 1, zs: w.webContents.getZoomFactor() || 1 };
+    });
+    const verso = { x: (v.b.x + (off.x + r.x) * v.z) / v.zs, y: (v.b.y + (off.y + r.y) * v.z) / v.zs };
     await prendi(shell, await linguetta(shell, sorgente));
     await shell.mouse.move(verso.x, verso.y, { steps: 8 });
     await shell.mouse.up();
