@@ -960,9 +960,10 @@ test('chat: «cancella tutto quello che sai di me» vuole la parola «conferma»
       { text: 'Serve la tua conferma.' },
     ]);
     await chiedi(page, 'cancella tutto quello che sai di me');
-    await expect(page.locator('.dash-bubble').filter({ hasText: 'Serve la tua conferma.' })).toBeVisible({ timeout: 15000 });
+    const bottone = page.locator('button.dash-action-btn', { hasText: 'Eliminare DEFINITIVAMENTE tutta la memoria' });
+    await expect(bottone).toBeVisible({ timeout: 15000 });
     expect(await lezioni(app)).toContain('Vive a Bologna.');
-    await page.locator('button.dash-action-btn', { hasText: 'Eliminare DEFINITIVAMENTE tutta la memoria' }).click();
+    await bottone.click();
     await expect(page.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8000 });
     expect((await confirmState(page)).hasInput).toBe(true);
     await fillConfirmInput(page, 'conferma');
