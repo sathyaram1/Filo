@@ -3095,6 +3095,15 @@
     return modoNascoste(settings && settings.traduzionePagina && settings.traduzionePagina.nascoste);
   }
 
+  // Sottoalberi che la traduzione della pagina non apre mai: niente prosa, o testo che è codice o valore e tradurlo lo
+  // romperebbe. SELECT non c'è perché si scende fino alle OPTION. Li legge anche la sonda dei componenti chiusi (#1290.2).
+  const TAG_SENZA_PROSA = Object.freeze([
+    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH', 'CANVAS',
+    'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'PRE', 'CODE', 'KBD',
+    'SAMP', 'VAR', 'TEXTAREA', 'INPUT', 'OPTION',
+    'DATALIST', 'HEAD', 'TITLE',
+  ]);
+
   // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
   const AVVISO_SCHERMO_PIENO_LIMITI = Object.freeze({ durataMs: Object.freeze([1000, 10000]) });
   function opzioniAvvisoSchermoPieno(v) {
