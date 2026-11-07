@@ -53,7 +53,6 @@
       version: '0.2.270', date: '2026-11-07',
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
-<<<<<<< HEAD
         { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
         { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
         { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
