@@ -2560,8 +2560,7 @@
         ruolo: (el) => (el.classList.contains('dk-msg-user') ? 'user' : 'filo'),
         rispondi: (_el, testo) => A.citaNelCampo($('chatInput'), testo),
       });
-      const vociMessaggio = (target) => azioniChat.voci(target)
-        .map((v) => ({ type: 'item', icon: window.SN_ICONS?.[v.icona]?.(16) || '', label: v.label, onClick: () => { v.fai(); } }));
+      const vociMessaggio = azioniChat.vociMenu;
       window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
       if (!window.SN_VOCI_PAGINA.includes(vociMessaggio)) window.SN_VOCI_PAGINA.push(vociMessaggio);
     }
