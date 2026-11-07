@@ -1860,6 +1860,7 @@
       wrap.appendChild(rm);
       if (percorsiImmagini.has(dataUrl)) {
         wrap.title = percorsiImmagini.get(dataUrl);
+        img.title = `Ingrandisci\n${percorsiImmagini.get(dataUrl)}`;
         conMenuFile(img, () => ({
           percorso: percorsiImmagini.get(dataUrl),
           togli: () => { pendingImages = pendingImages.filter((d) => d !== dataUrl); percorsiImmagini.delete(dataUrl); renderImagePreviews(); },
