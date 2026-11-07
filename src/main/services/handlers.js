@@ -6332,6 +6332,11 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Un'immagine incollata o trascinata in chat l'ha fatta qualcun altro: guardarla è una lettura (#1312).
   if (imageList.length && !internal) {
     await segnaFonte(chatId, fontiLette, { classe: 5, campo: null, chiave: 'chat:immagine', motivo: 'ho guardato un\'immagine che hai incollato' });
+  } else if (!internal && (daFuori === true || daModello === true)) {
+    // Così un testo incollato o trascinato nel campo, o un suggerimento scritto da un modello: la strada B lo conta (#1840).
+    await segnaFonte(chatId, fontiLette, daFuori === true
+      ? { classe: 5, campo: null, chiave: 'chat:testo-di-altri', motivo: 'è entrato in chat un testo che non hai scritto tu' }
+      : { classe: 5, campo: null, chiave: 'chat:suggerimento', motivo: 'hai mandato un suggerimento scritto da un modello' });
   }
   // Cosa ha scritto l'utente nel compito: le coordinate bancarie che ci stanno dentro le ha chieste lui (#530).
   // Il compito è la conversazione di questa scheda come la vede il modello: nel filo, più la coda.
