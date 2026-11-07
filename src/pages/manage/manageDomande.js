@@ -992,7 +992,10 @@
       if (!d || d.stato !== 'aperta') { fuori.push({ id, perche: 'non aspetta più una risposta' }); continue; }
       const o = consigliata(d);
       const etichetta = etichettaDi(o);
-      if (!etichetta) { fuori.push({ id, perche: o ? 'il consiglio da qui non si applica' : 'nessun consiglio' }); continue; }
+      if (!etichetta) {
+        fuori.push({ id, perche: D.daFare(d) ? 'da fare: la segni tu, con «Fatto», quando l’hai fatta' : o ? 'il consiglio da qui non si applica' : 'nessun consiglio' });
+        continue;
+      }
       const v = D.validaAzione(o.azione);
       if (tante && v.ok && !D.TIPI[v.azione.tipo].bulk) { fuori.push({ id, perche: `una per una: ${etichetta}` }); continue; }
       voci.push({ id, etichetta });
