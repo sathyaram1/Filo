@@ -92,43 +92,6 @@
     const unico = typeof valore === 'string' ? valore.trim() : '';
     if (unico.length >= 8 && /\d/.test(unico) && /[a-z]/i.test(unico)
       && new RegExp(`(?<![\\w-])${unico.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i').test(testo)) return true;
-    const v = P.paroleDellaVoce(chiave, valore);
-    const righe = righeScritte(testo);
-    const tema = righe.some(({ scritte }) => nominaUna(scritte, v.frasi));
-    const siNo = (w) => (P.parsePrefBool ? P.parsePrefBool(w) !== null : false);
-    for (const { riga, scritte } of righe) {
-      const numeri = riga.match(NUMERO_DETTO) || [];
-      const nega = scritte.includes('non');
-      const toglie = nega || haVerbo(scritte, VERBI_TOGLIE);
-      const siti = (riga.match(SITO_DETTO) || []).map((s) => `${toglie ? 'togli' : 'aggiungi'} ${s}`);
-      if (nominaUna(scritte, v.contrarie)) {
-        if (!nega && !haVerbo(scritte, VERBI_SPEGNE) && haVerbo(scritte, VERBI_ACCENDE) && stesso('false')) return true;
-        continue;
-      }
-      if (nominaUna(scritte, v.allenta)) return true;
-      if (nominaUna(scritte, v.frasi)) {
-        if ([...numeri, ...siti].some(stesso)) return true;
-        // «non aggiornarti da solo»: il no sul nome della voce la spegne; con un altro verbo il verso non è sicuro.
-        if (nega) {
-          if (!haVerbo(scritte, [...VERBI_ACCENDE, ...VERBI_SPEGNE]) && !scritte.some(siNo) && (stesso('false') || stesso('0'))) return true;
-          continue;
-        }
-        if (scritte.some(stesso)) return true;
-        if ([...numeri, ...scritte].some(altro)) continue;
-        if (haVerbo(scritte, VERBI_SPEGNE) && (stesso('false') || stesso('0'))) return true;
-        if (haVerbo(scritte, VERBI_ACCENDE) && stesso('true')) return true;
-        if (v.alza && haVerbo(scritte, VERBI_ALZA)) return true;
-        continue;
-      }
-      // Senza il nome della voce: il sito scritto da lui con un verbo che aggiunge o toglie, o la risposta secca a una
-      // domanda («Automatico.»; un numero solo se la conversazione ha nominato la voce, un sì o un no mai).
-      if (siti.length && haVerbo(scritte, toglie ? VERBI_TOGLIE : VERBI_AGGIUNGE) && siti.some(stesso)) return true;
-      if (scritte.length <= 3 && scritte.some((w) => (/^\d/.test(w) ? tema : w.length >= 4 && !siNo(w)) && stesso(w))) return true;
-    }
-    return false;
-  }
-  const richiestaDi = (ctx) => String((ctx && ctx.richiesta) || '');
-
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati. Contano in ogni uscita: l'elenco chiesto, i candidati di un
   // nome non trovato o ambiguo, il nome vero trovato da quello detto (`_nomeTrovato`, lo scrive il main).
