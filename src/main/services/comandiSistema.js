@@ -751,6 +751,8 @@ const AMBIENTE = {
   'bt-collega': ['INDIRIZZO', 'COLLEGA'],
   'wifi-elenco': [],
   'wifi-collega': ['RETE', 'UUID'],
+  'bt-dimentica': ['INDIRIZZO'],
+  'wifi-dimentica': ['RETE', 'UUID'],
 };
 
 const INDIRIZZO = {
