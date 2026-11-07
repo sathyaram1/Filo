@@ -166,20 +166,21 @@
       return;
     }
     pageTranslating = true;
+    clearTimeout(aperturaTimer);
     ripiegoDelGiro = '';
     // Ripresa o nuovo giro: chi continua non è tornato all'originale.
-    if (!quiet) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
+    if (!quiet && !daSola) { contaFinale(false); avanzamento = { applied: 0, total: 0 }; }
     // Una traduzione è un uso, non un uso per blocco: la conta la prima richiesta del giro, le altre (e quelle dei
     // riquadri incorporati) contano solo se si guastano (#969).
-    usoContato = quiet;
+    usoContato = quiet || daSola;
     const myRun = ++runSeq;
     const aborted = () => myRun !== runSeq;
     // L'avviso "sto traducendo" dura quanto la traduzione e viene SOSTITUITO
     // dall'esito: due riquadri sovrapposti nell'angolo sono illeggibili.
-    const progress = quiet
+    const progress = quiet || daSola
       ? silentToast()
       : Popup.showToast(I18n.t('toast_translating_page'), { duration: 0 });
-    if (!quiet) progressToast = progress;
+    if (!quiet && !daSola) progressToast = progress;
     // Sorveglianza accesa PRIMA di cominciare: scorrere mentre si aspetta è normale, e quel
     // testo resterebbe in lingua originale. Le nostre sostituzioni nascono già marcate.
     newContentSeen = false;
