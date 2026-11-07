@@ -2345,7 +2345,7 @@ if (isMain) {
     if (!biglietto) { console.error('NESSUN BIGLIETTO: il server non è stato chiamato. Passalo con --ticket <codice>.'); process.exit(1); }
     const r = await operazione(biglietto, nome, dati);
     if (r.outcome === 'ok') {
-      if (cmd === 'segnala') console.log(`OK: segnalazione ${r.body.num || r.body.id} aperta (${r.body.fiducia === 'fidato' ? 'fidata' : 'non fidata'}).`);
+      if (cmd === 'segnala') console.log(testoSegnalaRiuscita(r.body));
       else if (cmd === 'rapporto') console.log(`OK: rapporto consegnato${r.body.chiuso ? `, ${r.body.compito} chiuso` : ''}.`);
       else console.log(JSON.stringify(r.body, null, 2));
       process.exit(0);
