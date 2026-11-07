@@ -65,6 +65,37 @@ test('A riaperta: OK al primo, no al secondo: una ripresa sola, col primo esito'
   }
 });
 
+for (const riaperta of [false, true]) {
+  test(`D ${riaperta ? 'riaperta' : 'in diretta'}: OK al primo, no al secondo: la ripresa sa del no?`, async ({ app }) => {
+    test.setTimeout(60_000);
+    const dir = cartellaTemporanea('g11-');
+    try {
+      const page = await preparaDue(app, dir, [{ text: 'Fatta la sei.' }, { text: 'extra' }]);
+      const chat = await chatCon(app, 'crea le cartelle sei e otto');
+      if (riaperta) {
+        await dimenticaLaMemoria(app, chat.id);
+        await riapri(app, page, chat.id);
+      }
+      const bottoni = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: /Creo la cartella/ });
+      await expect(bottoni).toHaveCount(2, { timeout: 8_000 });
+      await rispondi(page, bottoni.filter({ hasText: 'sei' }), true);
+      await page.waitForTimeout(1000);
+      await rispondi(page, bottoni.filter({ hasText: 'otto' }), false);
+      await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatta la sei' })).toBeVisible({ timeout: 10_000 });
+      await page.waitForTimeout(1500);
+      const ch = await chiamateAlModello(app);
+      const s = JSON.stringify(ch[2]);
+      console.log('D', riaperta, 'RIPRESA', s.slice(-900));
+      const c2 = await chatCon(app, 'crea le cartelle sei e otto');
+      console.log('D', riaperta, 'ARCHIVIO', JSON.stringify(c2.messages.map((m) => ({ r: m.role, t: m.text, e: (m.esiti || []).map((v) => `${v.esito}:${v.motivo || ''}`) }))));
+      expect(s, 'la ripresa dice al modello che otto ha avuto un no').toMatch(/otto[^\n]*detto no|NO alla conferma[^\n]*otto|otto[^\n]*NO alla conferma/);
+    } finally {
+      await ripristina(app);
+      togliCartella(dir);
+    }
+  });
+}
+
 test('B in diretta OK al primo, poi riaperta: OK al secondo riprende una volta e il modello sa di tutti e due', async ({ app }) => {
   test.setTimeout(60_000);
   const dir = cartellaTemporanea('g11-');
