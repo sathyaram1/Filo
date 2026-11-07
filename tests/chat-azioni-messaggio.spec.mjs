@@ -178,8 +178,9 @@ test('uno scambio di un’app nella home: Copia e Rispondi, e la risposta parte 
   await casa.screenshot({ path: 'tests/.shots/2096-righe-citazione.png' });
   await casa.locator('#input').fill('quali carte?');
   await casa.locator('#input').press('Enter');
-  await expect.poll(() => app.evaluate(() => globalThis.__domande.at(-1) || ''), { timeout: 20_000 }).toContain("l'utente risponde al tuo messaggio");
-  expect(await app.evaluate(() => globalThis.__domande.at(-1))).toContain('servono più pescate');
+  // La domanda arriva al modello con la citazione in testa, e il testo citato è quello dei Mazzi.
+  const conCitazione = () => app.evaluate(() => globalThis.__domande.flatMap((t) => t.split('\n')).find((r) => r.includes("l'utente risponde al tuo messaggio")) || '');
+  await expect.poll(conCitazione, { timeout: 20_000 }).toContain('servono più pescate');
 });
 
 // Il riquadro di Traduci: la risposta ha Copia e Rispondi sempre a schermo, la domanda dopo li ha al passaggio del mouse.
