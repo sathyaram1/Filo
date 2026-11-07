@@ -10,6 +10,8 @@
   const { MISURA, taglia } = require('./misurePagine');
   const Disco = require('../shim/storage');
   const Copie = require('./copieIcone');
+  // Chi l'ha chiusa (#884): la regola sta in cercaSchedeChiuse.js.
+  const { motivoDi } = require('./cercaSchedeChiuse');
 
   // La chiave dove l'archivio stava in storage.json: serve solo a migrarlo.
   const CHIAVE_VECCHIA = global.SN_CONST.STORAGE_KEYS.ARCHIVED_TABS;
@@ -156,6 +158,11 @@
       reason: meta.reason || 'manual',
       // Chiusa dalla pagina stessa o da un crash: né la persona né la pulizia (i contatori delle riaperte, #1467).
       ...(meta.chiusaDaSola === true ? { chiusaDaSola: true } : {}),
+      motivo: motivoDi(meta),
+      // Il giro della pulizia che l'ha archiviata: 'idle' (inattività), 'reopen' (riapertura), 'manual', 'chat'.
+      ...(meta.giro && /^[a-z]{1,12}$/.test(String(meta.giro)) ? { giro: String(meta.giro) } : {}),
+      // L'ultima volta che ha suonato (#1397): «rimettimi la musica» la riapre anche chiusa.
+      ...(Date.parse(meta.audioAt) > 0 ? { audioAt: new Date(Date.parse(meta.audioAt)).toISOString() } : {}),
       // URL delle altre tab aperte nello stesso momento (contesto di lavoro).
       coOpenUrls: insieme.map((x) => x.testo),
       ...(insiemeTagliati.length ? { coOpenUrlsTagliati: insiemeTagliati } : {}),

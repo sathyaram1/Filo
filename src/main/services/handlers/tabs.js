@@ -94,7 +94,8 @@ module.exports = function register(on, ctx) {
   on(MSG.RUN_TAB_TRIAGE, soloFilo(async (msg, sender) => {
     const win = winOf(sender);
     if (win && win._filoTabs) {
-      const res = await win._filoTabs.runAutoTriage({ trigger: 'manual' });
+      // Il bottone del riordino in chat dice `da: 'chat'`, come la stessa azione partita senza chiedere.
+      const res = await win._filoTabs.runAutoTriage({ trigger: 'manual', da: msg && msg.da === 'chat' ? 'chat' : '' });
       return {
         ok: true,
         archived: (res && res.archived) || 0,
@@ -102,6 +103,8 @@ module.exports = function register(on, ctx) {
         // da archiviare» da «il riordino non è partito».
         giudizioMancato: !!(res && res.giudizioMancato),
         giaInCorso: !!(res && res.giaInCorso),
+        incognito: !!(res && res.incognito),
+        error: globalThis.SN_TAB_TRIAGE ? globalThis.SN_TAB_TRIAGE.riordinoNonRiuscito({ ...(res || {}), ok: !!res }) : '',
       };
     }
     return { ok: false, archived: 0 };
@@ -236,9 +239,8 @@ module.exports = function register(on, ctx) {
     const url = voce ? voce.url : msg.url;
     if (win && win._filoTabs && typeof url === 'string' && /^(https?|file):/i.test(url)) {
       // Scroll e paese come li aveva: la stessa porta di Ctrl+Shift+T, che dopo questa non la riapre di nuovo.
-      const px = voce ? voce.proxy : msg && msg.proxy;
-      const id = await win._filoTabs.riapri(voce ? daArchivio(voce) : daArchivio({ url, scrollPosition: msg.scrollPct, proxy: px }));
-      if (id && voce) win._filoTabs.tornata(voce);
+      if (voce) await win._filoTabs.riapriDallArchivio(voce);
+      else await win._filoTabs.riapri(daArchivio({ url, scrollPosition: msg.scrollPct, proxy: msg && msg.proxy }));
     }
     return { ok: true };
   }));

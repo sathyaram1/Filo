@@ -183,3 +183,60 @@ test('alla chat ogni scheda ha il suo numero fino a cento, gli altri prompt ne v
   const tante = Array.from({ length: FS.SCHEDE_NUMERATE_CHAT + 5 }, (_, i) => ({ id: i + 1, url: 'https://x.example/', title: `P${i + 1}`, chat: i === 0 }));
   assert.ok(FS.renderForPrompt(baseState({ tabs: tante })).includes('...altre 5 tab'), 'oltre il tetto lo dice');
 });
+
+test('#413.2 — alla chat le schede arrivano nell\'ordine della barra («la seconda» è la seconda), agli altri dalla più recente', async () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'contenutoEsterno.js'));
+  const prima = { chrome: globalThis.chrome, M: globalThis.SN_FILO_MEMORY, C: globalThis.SN_CREDITS };
+  const t0 = new Date(2026, 9, 27, 14, 0).getTime();
+  // Barra: home, Alfa, Beta, Gamma; usata per ultima Gamma, poi Alfa.
+  const barra = [
+    { id: 1, url: 'filo://newtab/', title: 'Nuova scheda', active: true, lastAccessed: t0 + 4 * 60000 },
+    { id: 2, url: 'https://alfa.example/', title: 'Alfa', active: false, lastAccessed: t0 + 2 * 60000 },
+    { id: 3, url: 'https://beta.example/', title: 'Beta', active: false, lastAccessed: t0 + 60000 },
+    { id: 4, url: 'https://gamma.example/', title: 'Gamma', active: false, lastAccessed: t0 + 3 * 60000 },
+  ];
+  globalThis.chrome = { tabs: { query: async () => barra.map((t) => ({ ...t })) } };
+  globalThis.SN_CREDITS = { getPublic: async () => ({ balance: 1 }) };
+  globalThis.SN_FILO_MEMORY = {
+    getSession: async () => ({}), listTimers: async () => [], listNotifications: async () => [],
+    getDashboardCache: async () => null,
+  };
+  try {
+    assert.deepEqual((await FS.listTabs()).map((t) => t.id), [1, 4, 2, 3]);
+    assert.deepEqual((await FS.listTabs({ barra: true })).map((t) => t.id), [1, 2, 3, 4]);
+    const chat = await FS.assemble({ schedaChat: 1, sistema: false });
+    assert.deepEqual(chat.state.tabs.map((t) => t.id), [1, 2, 3, 4]);
+    const testo = chat.sezioniChat.find((s) => s.chiave === 'TAB APERTE').testo;
+    assert.match(testo, /(^|\n)2\. Alfa/);
+    assert.match(testo, /posizione nella barra/);
+    // «L'ultima che ho usato» resta leggibile: l'ora assoluta, non «3 min fa» che scade a ogni turno.
+    assert.match(testo, /4\. Gamma \(davanti l'ultima volta: 27\/10 14:03\)/);
+    assert.ok(!/min fa/.test(testo));
+    const altri = await FS.assemble({ sistema: false });
+    assert.deepEqual(altri.state.tabs.map((t) => t.id), [1, 4, 2, 3]);
+  } finally {
+    globalThis.chrome = prima.chrome;
+    globalThis.SN_FILO_MEMORY = prima.M;
+    globalThis.SN_CREDITS = prima.C;
+  }
+});
+
+test('#823.1 — fra i siti tenuti sempre aperti il modello vede anche un nome della rete di casa senza punto («nas»)', async () => {
+  const prima = { chrome: globalThis.chrome, M: globalThis.SN_FILO_MEMORY, C: globalThis.SN_CREDITS };
+  globalThis.chrome = { tabs: { query: async () => [] } };
+  globalThis.SN_CREDITS = { getPublic: async () => ({ balance: 1 }) };
+  globalThis.SN_FILO_MEMORY = {
+    getSession: async () => ({}), listTimers: async () => [], listNotifications: async () => [],
+    getDashboardCache: async () => null,
+    listKeepOpen: async () => ({ nas: {}, 'youtube.com': {}, '<b>altro</b>': {} }),
+  };
+  try {
+    const { state, stateText } = await FS.assemble({ sistema: false });
+    assert.deepEqual(state.sempreAperte, ['nas', 'youtube.com']);
+    assert.match(stateText, /SITI SEMPRE APERTI[^\n]*\n[^\n]*nas, youtube\.com/);
+  } finally {
+    globalThis.chrome = prima.chrome;
+    globalThis.SN_FILO_MEMORY = prima.M;
+    globalThis.SN_CREDITS = prima.C;
+  }
+});

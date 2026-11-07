@@ -12,6 +12,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import '../../src/shared/messages.js';
 import '../../src/shared/esitoAzione.js';
+import '../../src/shared/tabTriage.js';
 import '../../src/pages/dashboard/dashboard-attivita.js';
 
 const { esitoRiordino } = globalThis.SN_DASH_ATTIVITA;
@@ -44,15 +45,31 @@ test('il riordino già in corso non si racconta come finito', () => {
   assert.match(e.motivo, /già in corso/);
 });
 
-// I doppioni li decide Filo da sé, senza modello: se qualcosa è stato
-// archiviato il riordino è servito, anche quando il giudizio non è arrivato.
-test('il riordino che ha archiviato qualcosa è riuscito anche senza giudizio', () => {
-  const e = esitoRiordino({ ok: true, archived: 2, giudizioMancato: true });
-  assert.equal(e.ok, true);
-  assert.equal(e.testo, 'Archiviate 2 schede');
+// #1626 — i doppioni li chiude Filo da sé, ma chi ha chiesto il riordino voleva le schede valutate: senza giudizio
+// non è riuscito, lo dice col motivo del main e dice anche quanti doppioni ha chiuso.
+test('senza giudizio il riordino non è riuscito anche se ha chiuso i doppioni, e il motivo è quello del main', () => {
+  const e = esitoRiordino({ ok: true, archived: 2, giudizioMancato: true, error: 'Filo non è riuscito a valutare le schede: ha chiuso solo 2 doppioni. I crediti sono finiti.' });
+  assert.equal(e.ok, false);
+  assert.equal(e.testo, 'Chiusi solo 2 doppioni');
+  assert.match(e.motivo, /crediti sono finiti\.$/);
+  assert.equal(esitoRiordino({ ok: true, archived: 1, giudizioMancato: true }).testo, 'Chiusi solo un doppione');
+});
+
+test('in incognito il riordino non parte e lo dice', () => {
+  const e = esitoRiordino({ ok: true, archived: 0, incognito: true });
+  assert.equal(e.ok, false);
+  assert.match(e.motivo, /incognito/);
 });
 
 test('una risposta mancante o negata è un riordino non riuscito', () => {
   assert.equal(esitoRiordino(null).ok, false);
   assert.equal(esitoRiordino({ ok: false, archived: 0 }).ok, false);
+});
+
+test('senza la frase del main, la home dice il perché con la sua stessa regola, motivo compreso', () => {
+  const T = globalThis.SN_TAB_TRIAGE;
+  for (const r of [{ incognito: true }, { giaInCorso: true }, { giudizioMancato: true, motivo: 'I crediti sono finiti' }]) {
+    assert.equal(esitoRiordino(r).motivo, T.riordinoNonRiuscito(r));
+  }
+  assert.match(esitoRiordino({ giudizioMancato: true, archived: 2, motivo: 'I crediti sono finiti' }).motivo, /crediti sono finiti/);
 });

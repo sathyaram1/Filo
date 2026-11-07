@@ -453,6 +453,21 @@ function buildNativeContextMenu(wc, params) {
   return menu.items.length ? menu : null;
 }
 
+// L'ultima volta che la scheda ha suonato (#1397): se suona ancora è adesso, non quando è partita. Chi la chiude o salva
+// la sessione mentre suona la legge da qui, o perderebbe contro un video fermato dopo l'inizio della musica.
+function ultimoSuono(tab) {
+  if (!tab) return 0;
+  return tab.audible && tab._suonaOra ? Date.now() : (tab.audioAt || 0);
+}
+
+// Una regola sola per «suona adesso»: un lettore in corsa E il motore che lo sente, qualunque dei due arrivi per ultimo.
+// Dopo una pausa breve o un cambio di brano il motore non ridice «suona» (#1686): lo stato si ricalcola a ogni evento.
+function aggiornaSuono(tab) {
+  const ora = !!(tab.audible && tab._mediaInCorso);
+  if (ora || tab._suonaOra) tab.audioAt = Date.now();
+  tab._suonaOra = ora;
+}
+
 class TabManager {
   constructor(window, shellView, { shellHeight = 88, incognito = false, partition = null } = {}) {
     this.win = window;
@@ -1325,7 +1340,7 @@ class TabManager {
     if (strada) Strade.misura('azione', 'closeTab', strada, { incognito: this.incognito });
     for (const tab of chiuse) {
       ContatoriFinestra.misura('chiusa', tab, via, { incognito: this.incognito });
-      this._smontaScheda(tab);
+      this._smontaScheda(tab, via === 'chat' ? { motivo: 'filo' } : {});
     }
     this.tabs = this.tabs.filter((t) => !prese.has(t.id));
     if (eraAttiva) {
@@ -1365,7 +1380,7 @@ class TabManager {
   }
 
   // Quello che ogni chiusura chiesta fa a una scheda prima di toglierla dall'elenco.
-  _smontaScheda(tab, { daSola = false } = {}) {
+  _smontaScheda(tab, { daSola = false, motivo = '' } = {}) {
     const id = tab.id;
     Strade.misura('chiusa', this, tab);
     this._avvisaSorvegliante(tab, 'chiusa');
@@ -1384,7 +1399,7 @@ class TabManager {
     this.annullaUscitaSchermoIntero();
     // §3.1/§4 — chiudere è archiviare: i metadati si salvano PRIMA di
     // distruggere la vista, o non c'è più niente da leggere.
-    this._archiveClosedTab(tab, 'manual', { daSola, voce: this._ricordaChiusa(tab) });
+    this._archiveClosedTab(tab, 'manual', { daSola, motivo, voce: this._ricordaChiusa(tab) });
     ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
     ChiusuraConCaselle.chiudi(tab.view.webContents);
@@ -1488,7 +1503,8 @@ class TabManager {
 
   // §3.1 — non bloccante: la chiusura non aspetta l'archivio. NON archivia
   // incognito (§5), pagine interne e nuova scheda: non sono cose da ritrovare.
-  _archiveClosedTab(tab, reason = 'manual', { daSola = false, voce = null } = {}) {
+  // `motivo` e `giro` (#884): chi l'ha chiusa, per ritrovarla in chat («quelle che ha archiviato la pulizia»).
+  _archiveClosedTab(tab, reason = 'manual', { daSola = false, voce = null, motivo = '', giro = '' } = {}) {
     try {
       if (!tab || this.incognito || tab._passaggio) return;
       const Archive = globalThis.SN_ARCHIVED_TABS;
@@ -1511,6 +1527,9 @@ class TabManager {
           closedAt: new Date().toISOString(),
           reason: reason || 'manual',
           ...(daSola ? { chiusaDaSola: true } : {}),
+          ...(motivo ? { motivo } : {}),
+          ...(giro ? { giro } : {}),
+          ...(ultimoSuono(tab) > 0 ? { audioAt: new Date(ultimoSuono(tab)).toISOString() } : {}),
           coOpenUrls,
           scrollPosition: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
           // La location si salva, o riaprendo dall'archivio la scheda
@@ -1553,6 +1572,7 @@ class TabManager {
       scroll: typeof tab.scrollPct === 'number' ? tab.scrollPct : null,
       proxy: tab.proxy && tab.proxy.country ? { country: tab.proxy.country, tier: tab.proxy.tier || null } : null,
       colore: tab.identityColor || null,
+      ...(ultimoSuono(tab) > 0 ? { audioAt: ultimoSuono(tab), titolo: tab.title || '' } : {}),
     });
   }
 
@@ -1576,6 +1596,8 @@ class TabManager {
     const s = voce.storia;
     if (s && (s.prima.length || s.dopo.length)) tab.storia = { prima: s.prima.slice(), dopo: s.dopo.slice() };
     if (voce.colore) this.setTabIdentityColor(id, voce.colore);
+    // Tornata aperta resta la musica che suonava: «rimettimi la musica» riprende lei, non ne riapre una copia (#1686).
+    if (voce.audioAt > 0 && !(tab.audioAt >= voce.audioAt)) tab.audioAt = voce.audioAt;
     if (Number.isInteger(voce.indice) && voce.indice >= 0) this.moveTab(id, voce.indice, { trascinata: false });
     // La scheda era instradata da un altro paese: rinasce passando dallo stesso.
     if (voce.proxy && voce.proxy.country) {
@@ -1594,15 +1616,9 @@ class TabManager {
     };
     const pila = this._pilaChiuse();
     const voce = pila.prendi();
-    if (voce) {
-      if (voce.voceArchivio) this._contaTornata(voce.voceArchivio);
-      return attendi(this.riapri(voce));
-    }
+    if (voce) return attendi(this._riapriDallaPila(voce));
     const e = await this._chiusaDallArchivio();
-    if (e) {
-      this.tornata(e);
-      return attendi(this.riapri(SchedeChiuse.daArchivio(e)));
-    }
+    if (e) return attendi(this.riapriDallArchivio(e));
     try {
       this.win.webContents.send('shell:toast', { text: 'Nessuna scheda chiusa da riaprire', opts: { unica: 'nessuna-chiusa', tipo: 'nessuna_chiusa' } });
     } catch (_) {}
@@ -1620,12 +1636,127 @@ class TabManager {
     try { return this._pilaChiuse().dallArchivio(await A.listMeta()); } catch (_) { return null; }
   }
 
+  // ─── «rimettimi la musica» (#1397) ──────────────────────────────────────
+  // La scheda chiusa che ha suonato per ultima, dalla pila di questa sessione o dall'archivio: { voce | archivio, at, titolo,
+  // url }, o null.
+  async ultimaChiusaCheSuonava() {
+    const pila = this._pilaChiuse();
+    const v = pila.ultimaCheSuonava();
+    let e = null;
+    const A = !this.incognito && globalThis.SN_ARCHIVED_TABS;
+    if (A) {
+      try { e = pila.dallArchivio(await A.listMeta(), { suonata: true }); } catch (_) {}
+    }
+    const ta = e ? Date.parse(e.audioAt) : -Infinity;
+    if (v && v.audioAt >= ta) return { voce: v, at: v.audioAt, titolo: v.titolo || '', url: v.url };
+    return e ? { archivio: e, at: ta, titolo: e.title || '', url: e.url } : null;
+  }
+
+  // Riapre quella scelta da ultimaChiusaCheSuonava, dietro: chi ascolta non perde la pagina che ha davanti.
+  async riapriCheSuonava(scelta) {
+    if (scelta && scelta.voce) {
+      const v = this._pilaChiuse().riprendi(scelta.voce);
+      return v ? this._riapriDallaPila(v, { activate: false }) : null;
+    }
+    if (!scelta || !scelta.archivio) return null;
+    return this.riapriDallArchivio(scelta.archivio, { activate: false });
+  }
+
+  // La scheda aperta sulla stessa pagina di una chiusa: una chiusa già tornata non si riapre una seconda volta (#1686).
+  // «Stessa pagina» è quella dei doppioni del riordino: una regola sola.
+  apertaCon(url) {
+    const pagina = globalThis.SN_TAB_TRIAGE.normalizeForDedup;
+    const p = pagina(url);
+    return p ? this.tabs.find((t) => pagina(t.url) === p) || null : null;
+  }
+
+  // Fa ripartire l'audio della scheda: la carica se era rinviata e preme play sul lettore fermo, anche dentro un
+  // riquadro, finché la pagina non ne mostra uno o scade `tetto`. 'suona', 'nessuno' o 'bloccato' (rifiutato dalla pagina).
+  async riprendiAudio(id, { tetto = 12_000 } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    if (!tab) return 'nessuno';
+    if (tab._rinviata) this._caricaRinviata(tab);
+    const fine = Date.now() + tetto;
+    let esito = 'nessuno';
+    while (this.tabs.includes(tab)) {
+      esito = await premiPlay(tab.view.webContents);
+      if (esito !== 'nessuno' || Date.now() >= fine) break;
+      await new Promise((r) => setTimeout(r, 600));
+    }
+    return esito;
+  }
+
+  // Ferma ogni lettore che suona nella scheda, anche dentro un riquadro: quanti ne ha fermati.
+  async pausaAudio(id) {
+    const tab = this.tabs.find((t) => t.id === id);
+    let wc = null;
+    try { wc = tab && tab.view.webContents; } catch (_) {}
+    if (!wc || wc.isDestroyed()) return 0;
+    let riquadri = [];
+    try { riquadri = wc.mainFrame ? wc.mainFrame.framesInSubtree : []; } catch (_) {}
+    let n = 0;
+    for (const f of riquadri) {
+      if (!riquadroArrivato(f)) continue;
+      try { n += Number(await f.executeJavaScript(PREMI_PAUSA_JS, false)) || 0; } catch (_) {}
+    }
+    return n;
+  }
+
+  // #884 — riaperta una scheda chiusa, la sua pagina c'è ancora? 'ok', 'sparita' (404, 410, server in errore, rete)
+  // o 'attesa' se dopo `tetto` non si sa ancora.
+  esitoRiapertura(id, { tetto = 15_000 } = {}) {
+    const tab = this.tabs.find((t) => t.id === id);
+    let wc = null;
+    try { wc = tab && tab.view.webContents; } catch (_) {}
+    if (!wc || wc.isDestroyed()) return Promise.resolve('attesa');
+    return new Promise((resolve) => {
+      let timer = null;
+      const fine = (esito) => {
+        clearTimeout(timer);
+        try { wc.removeListener('did-navigate', arrivata); wc.removeListener('did-fail-load', fallita); } catch (_) {}
+        resolve(esito);
+      };
+      const arrivata = (_e, url, codice) => {
+        if (/^filo:/i.test(String(url || ''))) return;
+        const c = Number(codice) || 0;
+        fine(c === 404 || c === 410 || c >= 500 ? 'sparita' : 'ok');
+      };
+      const fallita = (_e, codice, _d, _u, principale) => { if (principale && codice !== -3) fine('sparita'); };
+      timer = setTimeout(() => fine('attesa'), tetto);
+      wc.on('did-navigate', arrivata);
+      wc.on('did-fail-load', fallita);
+    });
+  }
+
   // Una scheda d'archivio tornata, da qualunque strada: si conta fra le riaperte, e Ctrl/Cmd+Shift+T non la ridà.
   // Sentinella: tests/tab-browser-shortcuts.spec.mjs.
   tornata(e) {
     if (!e || typeof e.id !== 'string' || this.incognito) return;
     this._pilaChiuse().segnaRiaperta(e.id);
     this._contaTornata(e);
+  }
+
+  // Riapre com'era una voce dell'archivio, da ogni porta (Ctrl/Cmd+Shift+T, il filo della home, la chat, la musica).
+  // Segnata prima, perché un secondo gesto non la ridia; contata solo se la scheda nasce, altrimenti torna riapribile.
+  async riapriDallArchivio(e, opts = {}) {
+    if (!e || typeof e.url !== 'string') return null;
+    const pila = typeof e.id === 'string' && !this.incognito ? this._pilaChiuse() : null;
+    if (pila) pila.segnaRiaperta(e.id);
+    let id = null;
+    try { id = await this.riapri(SchedeChiuse.daArchivio(e), opts); } catch (_) {}
+    if (pila && id) this._contaTornata(e);
+    else if (pila) pila.annullaRiaperta(e.id);
+    return id;
+  }
+
+  // Lo stesso per una voce già uscita dalla pila (`prendi`, `riprendi`): se la scheda non nasce, la sua copia
+  // nell'archivio torna riapribile.
+  async _riapriDallaPila(v, opts = {}) {
+    let id = null;
+    try { id = await this.riapri(v, opts); } catch (_) {}
+    if (id && v.voceArchivio) this._contaTornata(v.voceArchivio);
+    else if (!id && v.archivio) this._pilaChiuse().annullaRiaperta(v.archivio);
+    return id;
   }
 
   // Chi apre un indirizzo che è quello di una scheda chiusa (la chat, un collegamento del filo della home) la riapre.
@@ -2047,7 +2178,8 @@ class TabManager {
   // deve funzionare anche senza modello. All'LLM restano i casi di giudizio.
   // `da`: 'chat' quando l'ha chiesto la chat, per i contatori della finestra (#1470).
   async runAutoTriage({ trigger = 'idle', da = '' } = {}) {
-    if (this.incognito) return { archived: 0 };
+    // In incognito il riordino non parte: chi l'ha chiesto lo sa, invece di leggere «nessuna da archiviare».
+    if (this.incognito) return { archived: 0, incognito: true };
     // Chi chiede il riordino mentre ne gira già uno non ha ottenuto niente:
     // rispondergli «nessuna scheda da archiviare» è la frase di un riordino
     // riuscito, e i due casi si confondono.
@@ -2058,7 +2190,7 @@ class TabManager {
     this._triageRunning = true;
     // Un ordine scelto a mano mentre il giro aspettava (alla riapertura: da quando Filo si è riaperto) vince sul colore (#349).
     const dal = trigger === 'reopen' && this._riapertaAlle ? this._riapertaAlle : Date.now();
-    const opzioni = () => ({ via: da === 'chat' ? 'chat' : 'riordino_automatico', riordina: !(this._spostataAManoAlle >= dal) });
+    const opzioni = () => ({ via: da === 'chat' ? 'chat' : 'riordino_automatico', riordina: !(this._spostataAManoAlle >= dal), giro: trigger });
     try {
       await this._ricontrollaModuli();
       await this._caricaSempreAperte();
@@ -2134,7 +2266,9 @@ class TabManager {
       const esito = this.applyTriageDecisions(cands, [...byIndex.values()], opzioni());
       ContatoriFinestra.misura('giroRiordino', trigger, { duplicati: esito.duplicati, modello: esito.archived - esito.duplicati, giudizioMancato });
       contaGiro(esito.archived, dupIdx.size, giudizioMancato);
-      return this._esitoTriage(giudizioMancato ? { ...esito, giudizioMancato: true } : esito, { trigger, valutate: cands.length });
+      const motivo = giudizioMancato ? percheGiudizioMancato(errore).perche : '';
+      const conGiudizio = giudizioMancato ? { ...esito, giudizioMancato: true, ...(motivo ? { motivo } : {}) } : esito;
+      return this._esitoTriage(conGiudizio, { trigger, valutate: cands.length });
     } finally {
       this._triageRunning = false;
     }
@@ -2147,13 +2281,7 @@ class TabManager {
     if (!mancato) { this._giudizioMancatoDetto = null; return; }
     console.warn(`[Filo] pulizia delle schede (${trigger}) senza giudizio del modello:`, errore ? (errore.message || errore) : 'nessuna funzione di giudizio');
     if (trigger === 'manual') return;
-    let perche = '';
-    let pagina = null;
-    try {
-      const CE = globalThis.SN_CHAT_ERRORS;
-      perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
-      pagina = errore && CE ? CE.rimedioPagina(errore) : null;
-    } catch (_) {}
+    const { perche, pagina } = percheGiudizioMancato(errore);
     if (this._giudizioMancatoDetto === perche) return;
     this._giudizioMancatoDetto = perche;
     const testo = `La pulizia automatica non è riuscita a valutare le schede.${perche ? ` ${perche}` : ''}`;
@@ -2180,7 +2308,7 @@ class TabManager {
 
   // Applica le decisioni LLM: archivia+chiude le tab marcate 'archive', poi
   // riordina cromaticamente i superstiti (§1.3). `cands` è l'elenco indicizzato passato all'LLM.
-  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico', riordina = true } = {}) {
+  applyTriageDecisions(cands, decisions, { via = 'riordino_automatico', riordina = true, giro = '' } = {}) {
     const byIndex = new Map();
     for (const d of (decisions || [])) {
       if (d && typeof d.i === 'number') byIndex.set(d.i, d);
@@ -2213,7 +2341,7 @@ class TabManager {
           },
         });
       }
-      this._archiveClosedTab(tab, reason, { voce });
+      this._archiveClosedTab(tab, reason, { voce, giro: via === 'chat' ? 'chat' : giro });
       ProxyTab.clearPartitionAuth(`proxy:${tab.id}`);
       const idx = this.tabs.findIndex((t) => t.id === tab.id);
       if (idx >= 0) {
@@ -3656,8 +3784,15 @@ class TabManager {
     // versione di Electron all'altra: audibleFromEvent le normalizza tutte.
     wc.on('audio-state-changed', (e, arg) => {
       const audible = audibleFromEvent(e, arg);
-      if (tab.audible !== audible) { tab.audible = audible; this._broadcast(); }
+      // Quando ha suonato un lettore della pagina: «rimettimi la musica» riprende questa, anche chiusa o dopo un riavvio
+      // (#1397). Un suono di notifica o un video muto non contano: serve un lettore in corsa che si sente.
+      const cambia = tab.audible !== audible;
+      tab.audible = audible;
+      aggiornaSuono(tab);
+      if (cambia) this._broadcast();
     });
+    wc.on('media-started-playing', () => { tab._mediaInCorso = true; aggiornaSuono(tab); });
+    wc.on('media-paused', () => { tab._mediaInCorso = false; aggiornaSuono(tab); });
 
     // #151 — un video via proxy brucia GB in fretta: dopo un po' una nota discreta, una volta
     // per sessione. Soglia e regola in geoBlockRules.shouldNoteVideoData; qui solo l'accumulo.
@@ -4646,9 +4781,11 @@ class TabManager {
     const usate = kept.map((t) => (t.lastInteractionAt > 0 ? new Date(Math.floor(t.lastInteractionAt / 60_000) * 60_000).toISOString() : null));
     // Riaperta, la scheda resta quella di prima anche per il filo (#1561): le sue visite portano questo id.
     const ids = kept.map((t) => t.id);
+    // Quando ha suonato l'ultima volta, al minuto come `usate`: dopo un riavvio «rimettimi la musica» la ritrova (#1397).
+    const audio = kept.map((t) => (ultimoSuono(t) > 0 ? new Date(Math.floor(ultimoSuono(t) / 60_000) * 60_000).toISOString() : null));
     let activeIndex = kept.findIndex((t) => t.id === this.activeId);
     if (activeIndex < 0) activeIndex = 0;
-    return { tabs, colors, aperte, pagine, usate, ids, activeIndex };
+    return { tabs, colors, aperte, pagine, usate, ids, audio, activeIndex };
   }
 
   _sessionKey() {
@@ -4713,6 +4850,7 @@ class TabManager {
     const aperte = [];
     const pagine = [];
     const usate = [];
+    const audio = [];
     const ids = [];
     let activeIndex = 0;
     try {
@@ -4724,6 +4862,7 @@ class TabManager {
         const savedAperte = Array.isArray(saved.aperte) ? saved.aperte : [];
         const savedPagine = Array.isArray(saved.pagine) ? saved.pagine : [];
         const savedUsate = Array.isArray(saved.usate) ? saved.usate : [];
+        const savedAudio = Array.isArray(saved.audio) ? saved.audio : [];
         const savedIds = Array.isArray(saved.ids) ? saved.ids : [];
         saved.tabs.forEach((u, i) => {
           if (typeof u === 'string' && u) {
@@ -4732,6 +4871,7 @@ class TabManager {
             aperte.push(aperturaValida(savedAperte[i]));
             pagine.push(aperturaValida(savedPagine[i]));
             usate.push(aperturaValida(savedUsate[i]));
+            audio.push(aperturaValida(savedAudio[i]));
             ids.push(idRimettibile(savedIds[i]));
           }
         });
@@ -4768,6 +4908,7 @@ class TabManager {
         if (colors[i]) this.setTabIdentityColor(id, colors[i]);
         if (aperte[i]) nata.openedAt = aperte[i];
         if (usate[i]) nata.lastInteractionAt = Date.parse(usate[i]);
+        if (audio[i]) nata.audioAt = Date.parse(audio[i]);
         // Riaperta parte dall'inizio della pagina: «scroll 0%» direbbe al riordino «letta a metà», e la terrebbe.
         nata._scrollIgnoto = true;
         nata._dallaSessione = true;
@@ -4920,6 +5061,53 @@ function segnaPagina(tab, url) {
 }
 
 // Una pulizia senza giudizio che Filo sa spiegare da sé: la frase va all'utente così com'è, il codice dice dove si rimedia.
+// Preme play nella pagina (#1397). Il clic finto sulla finestra libera il blocco dell'autoplay delle schede riaperte
+// (#145, page-preload.js): lì play() verrebbe rimesso in pausa subito.
+const PREMI_PLAY_JS = `(async () => {
+  try { window.dispatchEvent(new Event('pointerdown')); } catch (_) {}
+  const media = Array.from(document.querySelectorAll('video, audio')).filter((m) => m.currentSrc || m.src);
+  if (!media.length) return 'nessuno';
+  if (media.some((m) => !m.paused && !m.ended)) return 'suona';
+  const m = media.find((x) => x.currentTime > 0 && !x.ended) || media[0];
+  try { await m.play(); return m.paused ? 'bloccato' : 'suona'; } catch (_) { return 'bloccato'; }
+})()`;
+
+const PREMI_PAUSA_JS = `(() => {
+  let n = 0;
+  for (const m of document.querySelectorAll('video, audio')) {
+    if (!m.paused && !m.ended) { try { m.pause(); n += 1; } catch (_) {} }
+  }
+  return n;
+})()`;
+
+// Senza il gesto dell'utente (#737.1): play() non ne ha bisogno, l'autoplay delle schede è libero.
+async function premiPlay(wc) {
+  if (!wc || wc.isDestroyed()) return 'nessuno';
+  let riquadri = [];
+  try { riquadri = wc.mainFrame ? wc.mainFrame.framesInSubtree : []; } catch (_) {}
+  let esito = 'nessuno';
+  for (const f of riquadri) {
+    if (!riquadroArrivato(f)) continue;
+    let r = 'nessuno';
+    try { r = await f.executeJavaScript(PREMI_PLAY_JS, false); } catch (_) {}
+    if (r === 'suona') return r;
+    if (r === 'bloccato') esito = r;
+  }
+  return esito;
+}
+
+// Perché il giudizio sulle schede non è arrivato, detto all'utente, e la pagina dove si rimedia.
+function percheGiudizioMancato(errore) {
+  let perche = '';
+  let pagina = null;
+  try {
+    const CE = globalThis.SN_CHAT_ERRORS;
+    perche = String((errore && errore.userMessage) || (errore && CE ? CE.sentence(errore) : '') || '');
+    pagina = errore && CE ? CE.rimedioPagina(errore) : null;
+  } catch (_) {}
+  return { perche, pagina };
+}
+
 function erroreDiPulizia(frase, code = '') {
   const e = new Error(frase);
   e.userMessage = frase;

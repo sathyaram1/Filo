@@ -24,6 +24,7 @@ function daArchivio(e) {
     scroll: typeof e.scrollPosition === 'number' ? e.scrollPosition : null,
     proxy: e.proxy && e.proxy.country ? { country: e.proxy.country, tier: e.proxy.tier || null } : null,
     colore: e.identityColor || null,
+    ...(Date.parse(e.audioAt) > 0 ? { audioAt: Date.parse(e.audioAt) } : {}),
   };
 }
 
@@ -80,6 +81,11 @@ function crea({ tetto = TETTO } = {}) {
     togliDove((v) => v.archivio === id);
   }
 
+  // La riapertura segnata non è riuscita: la voce torna fra quelle che l'archivio può ridare.
+  function annullaRiaperta(id) {
+    if (id) riaperte.delete(id);
+  }
+
   // Schede cancellate dall'archivio: non tornano nemmeno da qui. `null` = l'archivio svuotato tutto.
   function dimentica(ids) {
     if (ids == null) { pila.length = 0; return; }
@@ -87,21 +93,31 @@ function crea({ tetto = TETTO } = {}) {
     togliDove((v) => v.archivio && via.has(v.archivio));
   }
 
-  // La scheda d'archivio chiusa più di recente che non è già stata riaperta e che si può riaprire com'era.
-  function dallArchivio(voci) {
+  // La scheda d'archivio chiusa più di recente che non è già stata riaperta e che si può riaprire com'era. Con
+  // `suonata` (#1397) solo quelle che hanno suonato, dalla più recente a suonare: una regola sola per le due porte.
+  function dallArchivio(voci, { suonata = false } = {}) {
     let scelta = null;
     let quando = -Infinity;
     for (const v of Array.isArray(voci) ? voci : []) {
       if (!v || typeof v.id !== 'string' || riaperte.has(v.id) || v.urlTagliato || !web(v.url)) continue;
-      const t = Date.parse(v.closedAt);
+      if (suonata && !(Date.parse(v.audioAt) > 0)) continue;
+      const t = Date.parse(suonata ? v.audioAt : v.closedAt);
       const c = Number.isFinite(t) ? t : -Infinity;
       if (!scelta || c > quando) { scelta = v; quando = c; }
     }
     return scelta;
   }
 
+  // La voce che ha suonato per ultima (#1397): «rimettimi la musica» con la scheda già chiusa.
+  function ultimaCheSuonava() {
+    let scelta = null;
+    for (const v of pila) if (!v.riaperta && v.audioAt > 0 && web(v.url) && (!scelta || v.audioAt > scelta.audioAt)) scelta = v;
+    return scelta;
+  }
+
   return {
-    ricorda, archiviata, prendi, riprendi, segnaRiaperta, dimentica, dallArchivio,
+    ricorda, archiviata, prendi, riprendi, segnaRiaperta, annullaRiaperta, dimentica, dallArchivio, ultimaCheSuonava,
+    eRiaperta: (id) => riaperte.has(id),
     get quante() { return pila.length; },
   };
 }

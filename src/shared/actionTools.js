@@ -209,7 +209,7 @@
     // Chiedere subito il testo intero di otto chat riempirebbe il contesto di
     // roba che non serve.
     CERCA_CHAT: {
-      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno (anche quelle nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito), le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quella pagina sulle orche che ho chiuso ieri": poi la riapri con NAVIGA e il suo indirizzo), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Le conversazioni che l\'utente ha nascosto tornano a parte, solo col nome: quelle che combaciano, o tutte se la `query` è vuota o le chiede («quali chat ho nascosto?»). Sola lettura: non modifica e non cancella niente.',
+      description: 'Cerca in tutto il filo, salvato sul computer dell\'utente: le conversazioni con te di ogni scheda e di ogni giorno (anche quelle nell\'Editor, nei Mazzi e nell\'Aiuto sopra un sito), le pagine visitate (anche il contenuto delle schede chiuse) e i cambi di impostazioni, aspetto, sveglie e zoom. Usalo per ciò che non hai già davanti: una chat di giorni fa ("riprendi la discussione di lunedì sulla coscienza", "cosa mi avevi detto su X?"), una pagina ("quel sito di ricette che ho visto lunedì": poi la apri con NAVIGA e il suo indirizzo; una scheda chiusa si riapre com\'era con RIAPRI_SCHEDA e il suo id, e si cerca anche per data e motivo con SCHEDE_CHIUSE), un cambio da rimettere com\'era (ANNULLA_CAMBIO con l\'id). Due passi per le chat: con `query` ti tornano chat, pagine e cambi che combaciano; poi, se ti serve leggere una chat per intero, richiamalo con `id`. Le conversazioni che l\'utente ha nascosto tornano a parte, solo col nome: quelle che combaciano, o tutte se la `query` è vuota o le chiede («quali chat ho nascosto?»). Sola lettura: non modifica e non cancella niente.',
       properties: {
         query: S('Le parole da cercare nel filo (argomento, nomi, titolo o sito di una pagina, frasi). Ometti solo quando passi `id`.'),
         id: S('L\'id di una chat trovata prima: la fa tornare per intero.'),
@@ -406,7 +406,7 @@
       risultato: true,
     },
     PULISCI_TAB: {
-      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede e lascia a Filo la scelta; per chiudere quelle che dice lui c\'è CHIUDI_SCHEDE.',
+      description: 'Valuta le schede aperte e archivia quelle non più utili (restano nel filo della home, dove l\'utente le ritrova cercandole). Se il livello di autonomia lo consente parte subito e ti torna quante ne ha archiviate, o perché non è riuscito a valutarle; se no compare un bottone che l\'utente conferma. Usalo solo se l\'utente chiede di riordinare le schede e lascia a Filo la scelta; per chiudere quelle che dice lui c\'è CHIUDI_SCHEDE.',
       properties: {},
       required: [],
     },
@@ -419,10 +419,30 @@
       properties: {
         schede: { type: 'array', items: { type: 'integer' }, description: 'I numeri delle schede da chiudere, presi da TAB APERTE.' },
         sito: S('Chiude tutte le schede di questo sito ("youtube.com", o il nome "youtube").'),
-        tutte: B('true per chiudere tutte le schede della finestra tranne [QUESTA CHAT] e quelle in `tranne`.'),
+        tutte: B('true per chiudere tutte le schede della finestra tranne [QUESTA CHAT] e quelle in `tranne`. Con `sito` non serve: chiude solo le schede di quel sito.'),
         tranne: { type: 'array', items: { type: 'integer' }, description: 'Con `tutte` o `sito`: i numeri (da TAB APERTE) delle schede da lasciare aperte.' },
       },
       required: [],
+    },
+    // #884 — le schede chiuse o archiviate: si cercano per contenuto, data e motivo, poi si riaprono per id.
+    SCHEDE_CHIUSE: {
+      description: 'Cerca fra le schede CHIUSE o ARCHIVIATE dell\'utente, per contenuto, data e motivo: "quella pagina sulle orche che ho chiuso ieri", "cosa ha archiviato la pulizia stamattina?", "le schede che mi hai chiuso tu", "le schede chiuse la settimana scorsa". Ti tornano id, titolo, sito, quando e perché è stata chiusa e il suo riassunto, le più pertinenti (o, senza `cerca`, le più recenti) prima. Per riaprirne una usa RIAPRI_SCHEDA con l\'id: non NAVIGA. Sola lettura.',
+      properties: {
+        cerca: S('Di cosa parlava la pagina, o il suo titolo o sito ("orche", "ricetta del pane", "youtube"). Vuoto per averle in ordine di chiusura.'),
+        da: S('Chiuse da questo momento: istante ISO con l\'ora locale, o giorno AAAA-MM-GG (dalla sua mezzanotte).'),
+        a: S('Chiuse fino a questo momento, come `da` (un giorno vale fino alla sua fine).'),
+        motivo: S('Solo quelle chiuse così: "mano" dall\'utente, "filo" da te su richiesta in chat, "pulizia" archiviate dal riordino o dall\'inattività, "doppione" chiuse perché aperte due volte, "pagina" chiuse dalla pagina stessa.', { enum: ['mano', 'filo', 'pulizia', 'doppione', 'pagina'] }),
+      },
+      required: [],
+      risultato: true,
+    },
+    RIAPRI_SCHEDA: {
+      description: 'RIAPRE una scheda chiusa o archiviata trovata con SCHEDE_CHIUSE, com\'era (stesso indirizzo, punto della pagina e paese): "riaprila", "riapri la seconda". Passa l\'id; per più schede chiamalo una volta per scheda. Se la pagina non c\'è più o non risponde, l\'esito te lo dice e l\'utente vede il riassunto salvato: raccontaglielo da lì.',
+      properties: {
+        id: S('L\'id della scheda, preso dall\'esito di SCHEDE_CHIUSE.'),
+      },
+      required: ['id'],
+      risultato: true,
     },
     CANCELLA_ARCHIVIO: {
       description: 'Cerca nell\'archivio le schede pertinenti a `query` e mostra un pannello di conferma per eliminarle DEFINITIVAMENTE. È distruttiva e permanente: spiega in una frase che è un\'eliminazione definitiva.',
@@ -590,6 +610,29 @@
         verso: S('Un passo per volta, come i tasti: "in" più grande, "out" più piccolo, "reset" torna al 100%.', { enum: ['in', 'out', 'reset'] }),
       },
       required: [],
+    },
+    // #1397 — «rimettimi la musica» riprende quella che suonava, non ne cerca una nuova.
+    RIPRENDI_AUDIO: {
+      description: 'Fa RIPARTIRE l\'audio che l\'utente stava ascoltando ("rimettimi la musica", "fai ripartire la canzone", "riprendi il podcast", "rimetti il video di prima"): la scheda che suonava riparte da dove era; se è stata chiusa si riapre lo stesso indirizzo e riparte. Senza `scheda` prende l\'ultima che ha suonato (in TAB APERTE è segnata [AUDIO FERMO], oppure una chiusa); con `scheda` quella col suo numero in TAB APERTE. Non cerca niente di nuovo: se l\'esito dice che non c\'è niente da riprendere, chiedi all\'utente cosa vuole ascoltare o cercalo con NAVIGA. La scheda resta dietro, se l\'utente non chiede di andarci ("rimettimi la musica e portamici"); esegue subito.',
+      properties: {
+        scheda: I('Il numero in TAB APERTE della scheda da far ripartire; ometti per l\'ultima che ha suonato.'),
+        vai: B('true porta l\'utente sulla scheda che riparte, solo se lo chiede.'),
+      },
+      required: [],
+    },
+    PAUSA_AUDIO: {
+      description: 'METTE IN PAUSA l\'audio o il video che suona in una scheda ("metti in pausa la musica", "ferma il video", "stop al podcast"). Senza `scheda` ferma tutte quelle segnate [SUONA] in TAB APERTE; con `scheda` quella col suo numero. Dopo, «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO. Non chiude niente; esegue subito.',
+      properties: {
+        scheda: I('Il numero in TAB APERTE della scheda da fermare; ometti per tutte quelle che suonano.'),
+      },
+      required: [],
+    },
+    MOSTRA_SCHEDA: {
+      description: 'PORTA L\'UTENTE su una scheda GIÀ APERTA ("portami alla musica", "torna alla scheda del meteo", "fammi vedere la seconda scheda"): la mette davanti, senza ricaricarla. Per una pagina già aperta usa questo, non NAVIGA, che ne aprirebbe un doppione. Esegue subito.',
+      properties: {
+        scheda: I('Il numero della scheda in TAB APERTE.'),
+      },
+      required: ['scheda'],
     },
     VOLUME: {
       description: 'Cambia il volume del COMPUTER (l\'uscita audio del sistema, come i tasti del volume della tastiera): "alza il volume al 40%", "abbassa un po\'", "metti muto", "togli il muto". Non è il volume di un video dentro un sito. Il volume di adesso è nella sezione SISTEMA dello STATO: usalo per capire "un po\' più alto" e passa il numero. Dare un livello o alzare toglie anche il muto, come fanno i tasti. Esegue subito; l\'esito ti dice il numero vero.',

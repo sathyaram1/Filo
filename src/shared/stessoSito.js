@@ -14,8 +14,11 @@
   const NORMAL = new Set();
   const WILDCARD = new Set();
   const EXCEPTION = new Set();
+  // I domini di primo livello delegati: «com» da solo non è una macchina della rete di casa come «nas» (#823.1).
+  const TLD = new Set();
   for (const riga of ICANN.trim().split('\n')) {
     const [tld, ...regole] = riga.trim().split(/\s+/);
+    TLD.add(tld);
     for (const r of regole) {
       if (r.startsWith('!')) EXCEPTION.add(`${r.slice(1)}.${tld}`);
       else if (r === '*') WILDCARD.add(tld);
@@ -249,9 +252,11 @@
     has(sito) { return super.has(sito) || copertura(String(sito || '').toLowerCase(), this) !== null; }
   }
 
+  const dominioDiPrimoLivello = (etichetta) => TLD.has(String(etichetta || '').toLowerCase().replace(/^\.|\.$/g, ''));
+
   const api = {
     getDomainInfo, isIpAddress, hostDi, sitoDi, stessoSito, piattaforma, condiviso, sitoDellaVoce, sitiDelleVociIn, voceSalvata,
-    ElencoSiti, S3, PRIVATE_AVVISO, DEL_MARCHIO,
+    ElencoSiti, S3, PRIVATE_AVVISO, DEL_MARCHIO, dominioDiPrimoLivello,
   };
   global.SN_STESSO_SITO = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;

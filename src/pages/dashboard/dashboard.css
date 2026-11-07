@@ -2256,6 +2256,19 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   color: var(--dash-ink-mute);
   padding: 0 12px;
 }
+/* #884 — il riassunto di una scheda chiusa la cui pagina non c'è più: un foglietto tenuto da parte, non un errore. */
+.dash-riassunto-chiusa {
+  align-self: stretch;
+  margin: 2px 12px 0;
+  padding: 10px 14px;
+  border-left: 2px solid var(--dash-accent-2);
+  border-radius: 0 8px 8px 0;
+  background: var(--dash-card);
+  display: flex; flex-direction: column; gap: 4px;
+}
+.dash-riassunto-chiusa-titolo { font-size: 13.5px; font-weight: 600; color: var(--dash-ink-soft); overflow-wrap: anywhere; }
+.dash-riassunto-chiusa-quando { font-size: 12px; color: var(--dash-ink-mute); }
+.dash-riassunto-chiusa-testo { font-size: 13px; line-height: 1.5; color: var(--dash-ink-soft); white-space: pre-line; overflow-wrap: anywhere; }
 /* #818 — l'avviso dei crediti: la frase e sotto i rimedi, uno per riga col suo pulsante a destra. */
 .dash-crediti-avviso .sn-crediti-rimedi { list-style: none; margin: 10px 0 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
 .dash-crediti-avviso .sn-crediti-rimedio {

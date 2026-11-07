@@ -605,6 +605,36 @@
         return `Aperta «${titolo || 'la pagina salvata'}»${o.tolta ? ' e tolta da «Aperti per dopo»' : ', ancora in «Aperti per dopo»'}`;
       },
     },
+    // #884 — le schede chiuse: titoli e riassunti scritti dai siti (o da un modello che li ha letti).
+    SCHEDE_CHIUSE: {
+      costo: 0,
+      campo: null,
+      fonte: (a, out) => (Array.isArray(out.schede) && out.schede.length
+        ? { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto titoli e riassunti delle schede chiuse, scritti dai siti' }
+        : null),
+      describe: (a) => {
+        const q = String((a && (a.cerca ?? a.query)) || '').replace(/\s+/g, ' ').trim();
+        return q ? ['Cercare fra le schede chiuse ', cit(q.slice(0, 60))] : 'Guardare le schede chiuse';
+      },
+    },
+    // Riaprire si disfa chiudendo: costo 1. L'indirizzo è quello dell'archivio, mai uno scritto dal modello.
+    RIAPRI_SCHEDA: {
+      costo: 1,
+      campo: 'web',
+      fonte: (a, out) => (out.titolo
+        ? { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto il titolo di una scheda chiusa, scritto dal sito' }
+        : null),
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return ['Riaprire ', t ? cit(t) : 'una scheda chiusa'];
+      },
+      describeDone: (a) => {
+        const o = (a && a._output) || {};
+        const t = String((a && a._titolo) || o.titolo || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        if (o.nonRaggiungibile) return `«${t || 'La pagina'}» non risponde più: c'è il suo riassunto`;
+        return o.riaperta ? `Riaperta «${t || 'la scheda'}»` : 'Scheda non riaperta';
+      },
+    },
     LEGGI_FILE: {
       // Filo apre per intero un file dell'EDITOR di cui vede solo il riassunto
       // (#379.5). Sola lettura di dati che sono già in parte nel contesto (i
@@ -1411,6 +1441,32 @@
         return 'Cambiare lo zoom della pagina';
       },
     },
+    // #1397 — riparte la scheda che suonava, o si riapre il suo indirizzo: si disfa mettendo in pausa o chiudendo.
+    RIPRENDI_AUDIO: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Far ripartire ', cit(t)] : 'Far ripartire la musica di prima';
+      },
+    },
+    // Si disfa con RIPRENDI_AUDIO.
+    PAUSA_AUDIO: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Mettere in pausa ', cit(t)] : 'Mettere in pausa quello che suona';
+      },
+    },
+    MOSTRA_SCHEDA: {
+      costo: 1,
+      campo: null,
+      describe: (a) => {
+        const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
+        return t ? ['Portarti su ', cit(t)] : 'Portarti su una scheda aperta';
+      },
+    },
   };
 
   function voce(action) {
@@ -1451,7 +1507,7 @@
   // (#1097.2); un turno muto dopo sole letture non ha detto niente all'utente (#557).
   const LETTURE = Object.freeze([
     'CERCA_WEB', 'LEGGI_PAGINA', 'CERCA_CHAT', 'CERCA_DOCUMENTI', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_IMPOSTAZIONI', 'LEGGI_TRASPARENZA', 'CAPACITA_DETTAGLIO',
-    'VEDI_SCHERMO', 'CERCA_SALVATE',
+    'VEDI_SCHERMO', 'CERCA_SALVATE', 'SCHEDE_CHIUSE',
   ]);
   const diSolaLettura = (type) => LETTURE.includes(String(type || '').toUpperCase());
 
@@ -1469,6 +1525,10 @@
     MODIFICA_SVEGLIA: fatta,
     ZOOM_PAGINA: senza('limitato'),
     VOLUME: senza('limitato'),
+    RIPRENDI_AUDIO: senza('nonPartita'),
+    PAUSA_AUDIO: senza('nessuna'),
+    MOSTRA_SCHEDA: fatta,
+    RIAPRI_SCHEDA: senza('nonRaggiungibile'),
     WIFI: accesaOSpenta,
     BLUETOOTH: accesaOSpenta,
     IMPOSTA_PREFERENZA: senza('costoModello', 'avviso'),

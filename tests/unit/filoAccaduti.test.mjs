@@ -377,14 +377,15 @@ const SEGNO_DAI_TASTI = {
   // PULSANTE_PREFERENZE: il ripristino dalla pagina lascia il suo cambio; le prove di suoni e voci non lasciano niente.
   stato: ['NAVIGA', 'TIMER', 'SVEGLIA', 'CANCELLA_SVEGLIA', 'MODIFICA_SVEGLIA', 'SALVA_APPUNTO', 'CERCA_WEB', 'APRI_SALVATA',
     'CANCELLA_PAGINE', 'TOGLI_CHAT', 'RIMETTI_CHAT', 'IMPOSTA_PREFERENZA', 'IMPOSTA_ESTETICA', 'REGOLA_PROXY_DOMINIO',
-    'RIMUOVI_REGOLA_PROXY', 'ANNULLA_CAMBIO', 'ZOOM_PAGINA', 'RIMEDIO_CREDITI', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE'],
+    'RIMUOVI_REGOLA_PROXY', 'ANNULLA_CAMBIO', 'ZOOM_PAGINA', 'RIMEDIO_CREDITI', 'CHIUDI_SCHEDE', 'PULSANTE_PREFERENZE',
+    'RIAPRI_SCHEDA'],
   // I tasti della finestra e il pannello degli strumenti delle app sono gesti, non azioni di Filo.
   barra: ['COMANDO_FINESTRA', 'ACCOUNT', 'PANNELLO_APP'],
   // Nessun tasto la fa: letture, proposte e comandi che si chiedono solo a parole.
   soloFilo: ['SALVA_LEZIONE', 'ONBOARDING', 'CAPACITA_DETTAGLIO', 'LEGGI_IMPOSTAZIONI', 'CERCA_CHAT',
     'CERCA_SALVATE', 'LEGGI_FILE', 'LEGGI_DOCUMENTO', 'LEGGI_PAGINA', 'VEDI_SCHERMO', 'CERCA_DOCUMENTI', 'LEGGI_TRASPARENZA',
     'CANCELLA_MEMORIA', 'ESEGUI_COMANDO', 'RIMUOVI_PROXY_TUTTE', 'TIENI_APERTA', 'STILE_PAGINA', 'RIPRISTINA_STILE_PAGINA',
-    'ORDINA_DESKTOP', 'ELIMINA_FILE'],
+    'ORDINA_DESKTOP', 'ELIMINA_FILE', 'SCHEDE_CHIUSE', 'RIPRENDI_AUDIO', 'PAUSA_AUDIO', 'MOSTRA_SCHEDA'],
 };
 
 test('ogni azione del catalogo dice dove nasce il suo segno quando la fa l\'utente coi tasti, e ogni tasto dichiarato esiste', () => {

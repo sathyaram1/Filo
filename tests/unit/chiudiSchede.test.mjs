@@ -51,6 +51,17 @@ test('per sito: tutte le sue schede, sottodomini compresi, col nome o col domini
   assert.equal(nessuna.sito, 'netflix.com');
 });
 
+test('#413.2 — «chiudi tutte le schede di YouTube» detto con `tutte` e `sito` chiude solo quelle del sito', () => {
+  assert.deepEqual(ids(risolvi({ tutte: true, sito: 'youtube' }, base)), [2, 4]);
+  assert.deepEqual(ids(risolvi({ tutte: 'sì', sito: 'youtube.com', tranne: [4] }, base)), [2]);
+  const nessuna = risolvi({ tutte: true, sito: 'netflix.com' }, base);
+  assert.deepEqual(ids(nessuna), [], 'un sito senza schede non diventa «tutte»');
+  assert.equal(nessuna.tutte, false);
+  // A «tutte» un sito sempre aperto resta; nominato col sito si chiude, anche se il modello aggiunge `tutte`.
+  const resta = (tab, modo) => (tab.id === 2 && modo === 'tutte' ? 'sempre' : '');
+  assert.deepEqual(ids(risolvi({ tutte: true, sito: 'youtube' }, { ...base, resta })), [2, 4]);
+});
+
 test('la scheda della chat si chiude solo nominata col suo numero, mai con «tutte» o col sito', () => {
   assert.deepEqual(ids(risolvi({ schede: [1, 2] }, base)), [1, 2]);
   assert.deepEqual(risolvi({ tutte: true }, base).restano, [], 'in un «tutte» la chat resta in silenzio');

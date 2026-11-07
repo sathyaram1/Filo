@@ -504,6 +504,14 @@
         nonFidato = true;
         if (out.url) linkNoti.add(chiaveLink(out.url));
         daFuori(`${testo(out.titolo)}\n${testo(out.testo)}`, out.url ? `dalla pagina ${hostDi(out.url)}` : 'da una pagina letta');
+      } else if (type === 'SCHEDE_CHIUSE' || type === 'RIAPRI_SCHEDA') {
+        // #884 — titoli e riassunti delle schede chiuse li hanno scritti i siti (o un modello leggendoli): testo di fuori.
+        const schede = type === 'RIAPRI_SCHEDA' ? (out.titolo || out.riassunto ? [out] : [])
+          : (Array.isArray(out.schede) ? out.schede : []).filter(Boolean);
+        if (schede.length) nonFidato = true;
+        for (const p of schede) if (p.url) linkNoti.add(chiaveLink(p.url));
+        const t = schede.map((p) => `${testo(p.titolo)}\n${testo(p.riassunto)}`).join('\n');
+        if (t.trim()) { pezzi.push(t); daFuori(t, 'dalle schede chiuse'); }
       } else if (type === 'CERCA_SALVATE' || type === 'APRI_SALVATA') {
         // #845 — cosa ha salvato l'utente, con titoli scritti dai siti. Una pagina si riapre tale e quale, come i link di
         // una ricerca; i suoi pezzi dentro un altro indirizzo chiedono l'OK (`salvate`, in assess). Gli indirizzi non

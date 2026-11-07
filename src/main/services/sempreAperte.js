@@ -4,19 +4,27 @@
 'use strict';
 
 const { getDomainInfo } = require('./safebrowse/psl');
+const { dominioDiPrimoLivello } = require('../../shared/stessoSito.js');
 
 const T = () => globalThis.SN_TAB_TRIAGE;
 const FM = () => globalThis.SN_FILO_MEMORY;
 
 // La voce per `input` (dominio o indirizzo), o '' se non è un sito. Un suffisso pubblico («co.uk», «github.io»)
 // terrebbe aperto mezzo web: lo è se un nome subito sotto di lui è già un sito a sé.
-function voceDa(input) {
+// `daScheda`: `input` è l'indirizzo di una scheda aperta, quindi di una macchina che esiste.
+function voceDa(input, { daScheda = false } = {}) {
   const host = T().hostTenuto(input);
   if (!host) return '';
-  // Una macchina senza punto (localhost, il NAS) non ha suffissi pubblici: per la lista sarebbe un dominio di primo livello.
-  if (!host.includes('.') || host.startsWith('[')) return host;
+  if (host.startsWith('[')) return host;
+  // Una macchina senza punto (localhost, il NAS) sì; un dominio di primo livello detto nudo («https://com») no. Con la
+  // porta o da una scheda aperta è una macchina di casa che si chiama così («casa:8123»), e la voce copre solo lei.
+  if (!host.includes('.')) return dominioDiPrimoLivello(host) && !daScheda && !conPorta(input) ? '' : host;
   const sotto = getDomainInfo(`a.${host}`, { soloPsl: true });
   return sotto && sotto.registrable === `a.${host}` ? '' : host;
+}
+
+function conPorta(input) {
+  return /^(?:[a-z][a-z0-9+.-]*:\/\/)?[^\s/?#:@]+:\d{1,5}(?:[/?#]|$)/i.test(String(input == null ? '' : input).trim());
 }
 
 async function voci() {
