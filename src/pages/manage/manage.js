@@ -66,6 +66,8 @@
   const mgMaxSessionsMsg  = document.getElementById('mgMaxSessionsMsg');
   const mgPriorityAccountMsg = document.getElementById('mgPriorityAccountMsg');
   const mgPriorityRadios  = Array.from(document.querySelectorAll('input[name="mgPriorityAccount"]'));
+  const mgUnitWindowsMsg  = document.getElementById('mgUnitWindowsMsg');
+  const mgUnitWindowsRadios = Array.from(document.querySelectorAll('input[name="mgUnitWindows"]'));
   const mgAccountA        = document.getElementById('mgAccountA');
   const mgAccountB        = document.getElementById('mgAccountB');
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
