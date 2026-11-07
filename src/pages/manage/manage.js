@@ -3900,8 +3900,8 @@
     });
     const n = Number(r.stato) || 0;
     // Quando e da chi: l'owner trova fra le note quelle da leggere senza rileggerle tutte.
-    const chi = { unito: 'da un feedback unito', manutentore: 'del manutentore' };
-    const scritti = (r.scritti || []).map((s) => [chi[s.ruolo] || (s.ruolo ? `di ${roleLabel(s.ruolo)}` : ''), formatDateTime(s.at)].filter(Boolean).join(', ')).filter(Boolean);
+    const chi = (ruolo) => (ruolo === 'unito' ? 'da un feedback unito' : ruolo ? roleLabel(ruolo) : '');
+    const scritti = (r.scritti || []).map((s) => [chi(s.ruolo), formatDateTime(s.at)].filter(Boolean).join(' ')).filter(Boolean);
     if (n) righe.push(esc(`${n === 1 ? 'Uno scritto' : `${n} scritti`} di biglietti non fidati fra note e critiche`) + (scritti.length ? `: ${esc(scritti.join('; '))}` : ''));
     return righe;
   }
