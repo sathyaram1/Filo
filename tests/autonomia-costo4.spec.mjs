@@ -24,7 +24,7 @@ async function preparaUtente(app) {
 }
 const stato = async (app) => {
   const s = await impostazioni(app);
-  return { livello: (s.autonomia || {}).livello, tetto: s.monthlyLimitEur, popup: JSON.stringify(s.popupBlock ?? s.security?.popupBlock ?? null), memoria: await memoria(app) };
+  return { livello: (s.autonomia || {}).livello, tetto: s.monthlyLimitEur, popup: s.security?.blockPopups, memoria: await memoria(app) };
 };
 
 // Il riquadro del costo 4 si apre da sé, o dal bottone dell'azione (la memoria): in entrambi i casi vuole la parola.
