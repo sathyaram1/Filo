@@ -2168,6 +2168,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           role: 'user', content: userMessage, kind: 'real',
           ...(daScelta ? { daScelta: true } : {}),
           ...(immagini.length ? { immagini: immagini.map((im) => im.dataUrl) } : {}),
+          // Le schede lasciate restano col turno: i messaggi dopo ne riportano la pagina, come nella home (#2085).
+          ...(schede.length && !valuta ? { schede } : {}),
         });
       }
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
