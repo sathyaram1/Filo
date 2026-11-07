@@ -213,8 +213,10 @@ test('#1909 — ELIMINA_FILE: il cestino chiede con un clic a ogni livello, anch
   assert.equal(AL.campoFor(cestino), 'file');
   for (const livello of ['conservativo', 'default', 'automatico']) {
     assert.equal(risposta(cestino, { livello }), 'chiede', `${livello}, compito pulito`);
-    assert.equal(risposta(cestino, { livello, azioni: [ricercaFatta] }), 'chiede', `${livello}, dopo una lettura: mai la parola`);
-    assert.equal(risposta(cestino, { livello, paginaWeb: true }), 'chiede', `${livello}, dopo una pagina web`);
+    // Dopo una lettura un clic, salvo Conservativo, che dalla tabella del 30/09 vuole la parola per ciò che dura.
+    const dopo = livello === 'conservativo' ? 'conferma' : 'chiede';
+    assert.equal(risposta(cestino, { livello, azioni: [ricercaFatta] }), dopo, `${livello}, dopo una lettura`);
+    assert.equal(risposta(cestino, { livello, paginaWeb: true }), dopo, `${livello}, dopo una pagina web`);
     assert.equal(risposta(sempre, { livello }), 'conferma', `${livello}, per sempre`);
     assert.equal(risposta(sempre, { livello, paginaWeb: true }), 'no', `${livello}, per sempre dopo una pagina web`);
   }
