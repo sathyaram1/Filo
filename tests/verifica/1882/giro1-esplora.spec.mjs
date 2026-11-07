@@ -49,11 +49,13 @@ test('Cerca dall’Editor misura fino alla pagina dei risultati', async ({ app, 
   await motoreLento(app, testServer, openTab);
   const page = await openTab(EDITOR);
   await page.waitForSelector('#doc');
-  await page.locator('#doc').click();
-  await page.keyboard.type('parola da cercare nel documento');
-  const testo = page.locator('#doc').locator('p, div').first();
-  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1' || true);
-  const fine = await cercaDa(app, page, (await testo.count()) ? testo : page.locator('#doc'));
+  // Nel documento (un campo) il menu non offre Cerca: la prova usa un testo fuori dal campo, come la risposta dell'Aiuto.
+  await page.evaluate(() => {
+    const p = Object.assign(document.createElement('p'), { id: 'p-prova', textContent: 'una risposta dell’Aiuto' });
+    p.style.cssText = 'position:fixed;top:200px;left:200px;font-size:22px;z-index:99999;background:#fff';
+    document.body.appendChild(p);
+  });
+  const fine = await cercaDa(app, page, page.locator('#p-prova'));
   expect(Object.keys(fine)).toEqual(['s5']);
 });
 
