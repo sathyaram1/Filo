@@ -1088,6 +1088,31 @@ export async function conSpinteDichiarate(intent, data, opts = {}) {
 }
 
 /**
+ * Una consegna che porta la punta della cartella la porta anche su origin, prima del server (#2263): lui la confronta
+ * leggendola da GitHub, e un commit fatto a mano (il `git rm` di una prova) restava qui fino al rilascio, con la critica
+ * respinta come «stale». Un guasto non ferma la consegna: torna la riga che lo dice ('' quando non c'è niente da dire).
+ */
+export function spedisciPuntaConsegnata(data, opts = {}) {
+  const o = opts || {};
+  const sha = String((data && data.sha) || '').toLowerCase();
+  if (!/^[0-9a-f]{40}$/.test(sha)) return '';
+  if (!o.root && process.env.NODE_TEST_CONTEXT) return '';
+  const root = o.root || ROOT;
+  const exec = o.exec || execFileSync;
+  let head = '';
+  try {
+    head = String(exec('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }) || '').trim().toLowerCase();
+  } catch (_) { return ''; }
+  // Uno sha che non è la punta di questa cartella non è un commit da spedire da qui.
+  if (head !== sha) return '';
+  const p = (o.spedisci || pushRamoCorrente)(root, { exec, env: o.env || process.env });
+  const righe = p.avviso ? [p.avviso] : [];
+  if (!p.ok) righe.push(`Il ramo non è arrivato su origin prima della consegna: ${p.reason}. Il server legge la punta ${sha.slice(0, 12)} da GitHub, e senza trovarla può respingere la consegna.`);
+  else if (p.punta && p.punta.toLowerCase() !== sha) righe.push(`La spedizione ha rifatto i commit: la consegna porta ${sha.slice(0, 12)}, su origin c'è ${p.punta.slice(0, 12)}. Rilancia lo stesso comando, che porta la punta nuova.`);
+  return righe.join('\n');
+}
+
+/**
  * Consegna un intento al server. `data` NON contiene mai il feedback su cui si
  * agisce: quello il server lo legge dal biglietto.
  * `reply` è ciò che il server ha da dire a chi ha consegnato: per la critica
@@ -1096,6 +1121,9 @@ export async function conSpinteDichiarate(intent, data, opts = {}) {
  * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num?, reply? }}
  */
 export async function deliver(t, intent, data, opts) {
+  // Prima delle spinte dichiarate: il pre-push di questa spedizione accoda i commit che conSpinteDichiarate manda.
+  const spedita = spedisciPuntaConsegnata(data || {}, opts);
+  if (spedita) console.error(spedita);
   const corpo = await conSpinteDichiarate(intent, data || {}, opts);
   const { status, body } = await call('routineDeliver', { ticket: t, intent, data: corpo }, opts);
   const outcome = classifyReply(status, body);
