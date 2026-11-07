@@ -14,6 +14,13 @@
   const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto',
     'settembre', 'ottobre', 'novembre', 'dicembre'];
 
+  // «al 25%», ma «allo 0%» e «all'8%», «all'11%», «all'80%»: l'articolo si legge col numero detto a voce.
+  function alPercento(n) {
+    const s = String(n);
+    if (s === '0') return 'allo 0%';
+    return /^(1|8|11|8\d)$/.test(s) ? `all'${s}%` : `al ${s}%`;
+  }
+
   // Il nome di una rete o di un dispositivo lo sceglie chi la gestisce: niente caratteri invisibili né a capo.
   function pulisciNome(v) {
     if (typeof v !== 'string') return null;
