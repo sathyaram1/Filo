@@ -3915,7 +3915,7 @@
       return;
     }
     setManageMsg('', '');
-    posto.innerHTML = `<div class="mg-dichiara-cosa">Diventano fidati così come sono:<ul>${righeDichiara(r).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+    posto.innerHTML = `<div class="mg-dichiara-cosa">Diventano fidati così come sono:<ul>${righeDichiara(r, (allFeedbacks.find((f) => f._id === id) || {}).branch).map((x) => `<li>${x}</li>`).join('')}</ul></div>
       <div class="mg-dichiara-tasti"><button type="button" class="mg-star-btn mg-fiducia-btn" id="mgDichiaraSi">Li ho letti: dichiara fidati</button>
       <button type="button" class="mg-star-btn" id="mgDichiaraNo">Annulla</button></div>`;
     const si = posto.querySelector('#mgDichiaraSi');
