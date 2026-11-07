@@ -183,6 +183,7 @@ function loadContentScripts() {
   try { require(path.join(SHARED_DIR, 'filoMarkdown.js')); } catch (e) { console.error('[Filo riquadri] filoMarkdown.js', e); }
   try { require(path.join(SHARED_DIR, 'linkSospetto.js')); } catch (e) { console.error('[Filo riquadri] linkSospetto.js', e); }
   try { require(path.join(SHARED_DIR, 'themeTokens.js')); } catch (e) { console.error('[Filo riquadri] themeTokens.js', e); }
+  try { require(path.join(SHARED_DIR, 'suggerimento.js')); } catch (e) { console.error('[Filo riquadri] suggerimento.js', e); }
   try { require(path.join(SHARED_DIR, 'confirmUi.js')); } catch (e) { console.error('[Filo riquadri] confirmUi.js', e); }
   try { require(path.join(SHARED_DIR, 'chatErrors.js')); } catch (e) { console.error('[Filo riquadri] chatErrors.js', e); }
   try { require(path.join(SHARED_DIR, 'icons.js')); } catch (e) { console.error('[Filo riquadri] icons.js', e); }
