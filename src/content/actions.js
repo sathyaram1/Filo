@@ -1688,8 +1688,7 @@
 
   // Lens-style reverse search (più affidabile di searchbyimage)
   function imageSearchUrlFor(imgEl) {
-    const src = imgEl && (imgEl.currentSrc || imgEl.src);
-    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+    return global.SN_URL_NAV.indirizzoRicercaImmagine(imgEl && (imgEl.currentSrc || imgEl.src));
   }
 
   function searchImageOnWeb(imgEl) {
