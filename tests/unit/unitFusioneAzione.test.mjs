@@ -187,10 +187,10 @@ function repoFinto() {
   return { casa, lavoro, git, commit };
 }
 
-function azione(r, ramo, main) {
-  const { NODE_TEST_CONTEXT: _figlio, GITHUB_STEP_SUMMARY: _riassunto, ...env } = process.env;
-  const p = spawnSync(process.execPath, [join(ROOT, 'scripts', 'unit-fusione-azione.mjs'), '--root', r.lavoro, '--ramo', ramo, '--main', main], {
-    cwd: r.casa, env, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
+function azione(r, ramo, main, { args = ['--root', r.lavoro], extra = {} } = {}) {
+  const { NODE_TEST_CONTEXT: _figlio, GITHUB_STEP_SUMMARY: _riassunto, GITHUB_OUTPUT: _uscita, ...env } = process.env;
+  const p = spawnSync(process.execPath, [join(ROOT, 'scripts', 'unit-fusione-azione.mjs'), ...args, '--ramo', ramo, '--main', main], {
+    cwd: r.casa, env: { ...env, ...extra }, encoding: 'utf8', timeout: TETTO_ATTESA_MS,
   });
   const righe = String(p.stdout || '').split('\n').filter((l) => l.startsWith(`${MARCA} `));
   return { codice: p.status, campo: righe.length ? JSON.parse(righe[righe.length - 1].slice(MARCA.length + 1)) : null, uscita: `${p.stdout}${p.stderr}` };
