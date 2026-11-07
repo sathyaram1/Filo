@@ -2412,9 +2412,16 @@
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
-      dove: setter.dove || '',
+      dove: setter.dove || doveAMano(setter),
       risk: setter.risk || '',
     };
+  }
+  // La strada a mano che il «no» del costo 4 dice dopo una lettura (#1312, #835.1): la pagina dove sta la voce.
+  function doveAMano(setter) {
+    const scrive = Array.isArray(setter && setter.scrive) ? setter.scrive : [];
+    return scrive.some((p) => String(p).startsWith('security.'))
+      ? 'Si cambia a mano nella pagina Sicurezza (filo://security/security.html).'
+      : 'Si cambia a mano nelle impostazioni di Filo, dove sta la voce.';
   }
 
   // Come l'utente nomina una voce, per sapere se un freno tolto l'ha chiesto lui (#1312): chiavi, nome in pagina e `detto`
