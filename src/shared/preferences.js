@@ -2019,6 +2019,9 @@
       build(v) {
         // Si salva nella forma dell'elenco dei dispositivi di questo sistema, l'unica che i preferiti confrontano: la regola
         // la tiene src/main/services/comandiSistema.js (normalizzaIndirizzo).
+        if (!global.SN_COMANDI_SISTEMA && typeof require === 'function') {
+          try { require('../main/services/comandiSistema.js'); } catch (_) {}
+        }
         const N = global.SN_COMANDI_SISTEMA && global.SN_COMANDI_SISTEMA.normalizzaIndirizzo;
         const indirizzo = (p) => (N ? N(String(p).trim()) : null);
         const s = String(v == null ? '' : v).trim();
