@@ -225,7 +225,7 @@ let ricontrolli = null;
 function ricontrolla() {
   if (ricontrolli) return;
   ricontrolli = setInterval(() => {
-    if (!spente.size || !acceso) { clearInterval(ricontrolli); ricontrolli = null; return; }
+    if (!acceso || !inAttesa()) { clearInterval(ricontrolli); ricontrolli = null; return; }
     cercaRegoleNuove();
   }, FORZATO_MS);
   if (ricontrolli.unref) ricontrolli.unref();
