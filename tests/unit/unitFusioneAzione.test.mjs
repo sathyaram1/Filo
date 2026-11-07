@@ -155,6 +155,24 @@ test('un rosso di tutti e due i sistemi esce una volta, senza firma; la firma è
   assert.ok(ruolo.includes(`\`${firmaSistema('windows').trim()}\``), 'il ruolo del riallineamento nomina la firma che esce dall\'unione');
 });
 
+// #2214: il server sposta le novità solo se la riga unita gli dice che basta; il campo non deve perdersi nell'unione.
+test('l\'esito unico porta le novità spostate solo se le portano tutte le parti rosse, col «dopo» peggiore', () => {
+  const N = (dopo) => ({ verso: '0.2.267', dopo, righe: [{ version: '0.2.266', riga: 'Del ramo' }] });
+  const parte = (nome, campo) => ({ nome, risultato: 'success', campo: JSON.stringify({ ramo: A, main: B, mainSha: B, ...campo }) });
+  const rossa = (nome, dopo, rossi = ['p › novità']) => parte(nome, { esito: 'rosso_sulla_fusione', rossi, novita: N(dopo) });
+  const spenta = { nome: 'windows', risultato: 'skipped', campo: '' };
+  assert.deepEqual(unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), spenta] }).novita, N('verde'), 'Windows spento');
+  assert.equal(unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), rossa('windows', 'verde')] }).novita.dopo, 'verde');
+  assert.equal(unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), rossa('windows', 'rosso_anche_su_main')] }).novita.dopo, 'rosso_anche_su_main');
+  assert.equal(unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), rossa('windows', 'rosso_sulla_fusione', ['p › novità', 'x › y'])] }).novita.dopo, 'rosso_sulla_fusione',
+    'un rosso vero di Windows: lo spostamento da solo non basta');
+  // Windows con i soli unit toccati, verde: la riga resta quella di Linux, con le sue novità.
+  assert.deepEqual(unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), parte('windows', { esito: 'verde' })] }).novita, N('verde'));
+  const senza = unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), parte('windows', { esito: 'rosso_sulla_fusione', rossi: ['x › y'] })] });
+  assert.equal(senza.novita, undefined, 'una parte rossa senza novità: la causa è un altra');
+  assert.equal(unisciParti({ ramo: A, main: B, parti: [parte('linux', { esito: 'rosso_sulla_fusione', rossi: ['x › y'] })] }).novita, undefined);
+});
+
 test('la riga dell\'esito: una riga, la coppia, il campo della richiesta di fusione', () => {
   const rosso = campoEsito({ ramo: A, main: B, prova: { esito: 'rosso_sulla_fusione', mainSha: B, rossi: ['t › uno\nfinto'] } });
   assert.equal(rosso.ramo, A);
