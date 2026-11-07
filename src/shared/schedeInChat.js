@@ -125,7 +125,9 @@
 
     const vive = () => schede.filter(Boolean);
     let inArrivo = [];
-    function riallinea() { schede = allinea(ta.value, vive().concat(inArrivo)); }
+    // Le schede già passate dal campo: un gettone che esce e torna (Annulla, Taglia e Incolla) ritrova la sua.
+    let viste = [];
+    function riallinea() { schede = allinea(ta.value, vive().concat(inArrivo, viste)); }
 
     let colori = null;
     function ricalca() {
