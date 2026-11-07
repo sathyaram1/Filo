@@ -7,8 +7,9 @@ import { test, expect } from './fixtures/electron.mjs';
 const NEWTAB = 'filo://newtab/';
 const URL_RE = 'http://127\\.0\\.0\\.1:\\d+/\\d+';
 const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
-// Una finestra dove la chat sta con una pagina e mezza: il resto lo prendono istruzioni, strumenti e tetto della risposta.
-const FINESTRA = 72000;
+// Il posto, in caratteri, oltre istruzioni, strumenti e tetto della risposta: una pagina intera e un pezzo dell'altra.
+// La finestra si misura sulla prima richiesta della chat: con 72.000 token fissi bastavano cinque strumenti nuovi (#2276).
+const POSTO = 64000;
 
 // Una pagina da circa 60.000 token: il marchio sta in cima, dentro il primo pezzo che Filo legge.
 function paginaEnorme(nome) {
