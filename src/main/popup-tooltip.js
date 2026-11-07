@@ -65,7 +65,14 @@ function ensureWin(parentWin) {
       if (!payload || payload.giro !== giro) return;
       const w = Math.max(20, payload.w + 4);
       const h = Math.max(16, payload.h + 4);
-      tipWin.setBounds({ x: tipWin.getBounds().x, y: tipWin.getBounds().y, width: w, height: h });
+      const b = tipWin.getBounds();
+      // Un testo lungo vicino al bordo destro dello schermo non ne esce: il fumetto si sposta a sinistra.
+      let x = b.x;
+      try {
+        const area = screen.getDisplayMatching({ x: b.x, y: b.y, width: w, height: h }).workArea;
+        x = Math.max(area.x, Math.min(b.x, area.x + area.width - w));
+      } catch (_) {}
+      tipWin.setBounds({ x, y: b.y, width: w, height: h });
       // Nei test resta invisibile: è una finestra a sé (vedi test-window-mode.js).
       hideForTests(tipWin);
       if (!tipWin.isVisible()) tipWin.showInactive();
