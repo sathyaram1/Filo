@@ -47,7 +47,5 @@ test('r2 il nome nel gettone non ha la sottolineatura del correttore mentre si s
   await casa.waitForTimeout(2500);
   const campo = await casa.locator('#input').boundingBox();
   const g = await casa.locator('.sn-gettone').first().boundingBox();
-  const esito = await rossiSotto(app, campo, g);
-  try { writeFileSync('tests/.shots/2091-g3-r2-campo.png', Buffer.from(esito.png, 'base64')); } catch (_) {}
-  expect(esito.n).toBe(0);
+  expect((await rossiSotto(app, campo, g)).n).toBe(0);
 });
