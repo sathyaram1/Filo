@@ -2282,7 +2282,7 @@ function fontiDellAiuto(sender) {
 }
 function nuovaConversazioneAiuto(sender) {
   const wc = sender && sender.wc;
-  if (wc) { fontiPerAiuto.delete(wc); chatAiutoPer.delete(wc); }
+  if (wc) { fontiPerAiuto.delete(wc); chatAiutoPer.delete(wc); lettureGettoniAiuto.delete(wc); }
 }
 function segnaLetturaAiuto(sender, action) {
   const wc = sender && sender.wc;
