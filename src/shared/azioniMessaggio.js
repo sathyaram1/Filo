@@ -133,7 +133,7 @@
       if (!barra) barra = creaBarra();
       if (barra.parentElement === m) return;
       const volute = azioniDi(m);
-      if (volute.join() !== [...barra.children].map((t) => t.dataset.azione).join()) barra.replaceChildren(...volute.map(tasto));
+      if (volute.join() !== [...barra.children].map((t) => t.dataset.azione).join()) barra.replaceChildren(...volute.map(tastoDi));
       for (const t of barra.querySelectorAll(`.${cl.tasto}`)) esito(t, null);
       if (cl.destra) barra.classList.toggle(cl.destra, o.ruolo ? o.ruolo(m) === 'user' : false);
       m.appendChild(barra);
