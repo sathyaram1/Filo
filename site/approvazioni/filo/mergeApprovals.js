@@ -72,6 +72,24 @@
     return d === 1 ? 'scade fra 1 giorno' : 'scade fra ' + d + ' giorni';
   }
 
+  // Il tempo dal sì, al secondo: una fusione dura minuti, e senza un tempo che scorre l'attesa sembra un blocco (#2250). PURA.
+  function trascorsoText(fromMs, nowMs) {
+    var da = Number(fromMs);
+    if (!isFinite(da) || da <= 0) return '';
+    var s = Math.max(0, Math.floor(((Number(nowMs) || Date.now()) - da) / 1000));
+    if (s < 60) return 'da ' + s + ' s';
+    var m = Math.floor(s / 60);
+    var resto = s % 60;
+    if (m < 60) return 'da ' + m + ' min ' + (resto < 10 ? '0' : '') + resto + ' s';
+    return 'da ' + Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  }
+
+  /** L'etichetta di «Approva e fondi» finché restano `n` voci chiuse: il tasto dice cosa fa il clic. PURA. */
+  function apriVociText(n) {
+    var k = Math.max(0, Math.floor(Number(n) || 0));
+    return k === 1 ? 'Apri l’altra voce' : 'Apri le ' + k + ' voci';
+  }
+
   /**
    * Il titolo dell'avviso. PURA.
    * Zero richieste → stringa vuota: chi non ne ha non deve vedere niente.
@@ -244,7 +262,7 @@
     return Array.isArray(b.voci) ? b.voci.filter(function (v) { return v && (v.file || v.testo); }) : [];
   }
 
-  // Le voci a vista di un blocco: le altre si aprono, e finché restano chiuse «Approva e fondi» è spento (#1502).
+  // Le voci a vista di un blocco: le altre si aprono, e finché restano chiuse il sì non parte (#1502).
   var VOCI_A_VISTA = 12;
 
   /** Quante voci di un blocco non si vedono a card appena disegnata: oltre le prime, più quelle mai mandate. PURA. */
@@ -574,6 +592,7 @@
     nascoste.forEach(function (r) { r.hidden = true; });
     var b = el('button', 'sn-mac-tutte', quante === 1 ? 'Mostra l’altra voce' : 'Mostra le altre ' + quante + ' voci');
     b.type = 'button';
+    b.dataset.quante = String(quante);
     b.title = 'Approvare vale anche per queste: si apre l’elenco intero.';
     b.addEventListener('click', function () {
       nascoste.forEach(function (r) { r.hidden = false; });
@@ -631,7 +650,7 @@
   var LIBERA = 'sn-mac-libera';
   // Le richieste di cui l'owner ha già aperto tutte le voci, per «id@sha».
   var APERTE = {};
-  var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere…' };
+  var ATTESA_CLIC = { kind: 'wait', text: 'Chiedo al server di fondere: di solito ci vuole qualche minuto.' };
   function occupata(root) {
     return !!(root && root.querySelector
       && root.querySelector('.sn-mac-btn-go.is-armed, .sn-mac-card.is-busy:not(.is-done)'));
@@ -683,7 +702,7 @@
     var cards = root.querySelectorAll('.sn-mac-card');
     for (var i = 0; i < cards.length; i++) {
       if (cards[i].dataset.requestId === String(id) && typeof cards[i].__snMacSegui === 'function') {
-        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta);
+        cards[i].__snMacSegui(volo.attesa || ATTESA_CLIC, volo.risposta, volo.daMs);
       }
     }
   }
@@ -788,35 +807,80 @@
     discardBtn.title = 'Toglila dall’elenco senza fondere niente. ' + howToRetry(req);
     var approveBtn = el('button', 'sn-mac-btn sn-mac-btn-go', 'Approva e fondi');
     approveBtn.type = 'button';
-    var serveAprire = el('span', 'sn-mac-serve-aprire', 'Apri tutte le voci per approvare');
     var occupato = false;
-    // Il sì vale per tutto il commit: finché una voce resta chiusa non si dà (#1502).
-    function aggiornaApprova() {
-      var chiuse = daAprire();
-      approveBtn.disabled = occupato || chiuse;
-      serveAprire.hidden = !chiuse;
-      approveBtn.title = chiuse ? 'Prima apri tutte le voci: approvare vale anche per quelle che non hai visto.'
-        : 'Fonde su main esattamente il commit esaminato.';
-    }
-
     var armed = false;
     var armTimer = null;
+    // Il sì vale per tutto il commit: finché una voce resta chiusa il tasto le apre, e approva solo dopo (#1502).
+    // Spento resta solo mentre aspetta il server, e allora lo dice: «aspetta te» e «aspetta il server» non si somigliano (#2250).
+    function quanteChiuse() {
+      var tasti = blocchi ? blocchi.querySelectorAll('.sn-mac-tutte') : [];
+      var n = 0;
+      for (var i = 0; i < tasti.length; i++) n += Math.max(1, Number(tasti[i].dataset.quante) || 0);
+      return n;
+    }
+    function aggiornaApprova() {
+      var fonde = card.classList.contains('is-merging');
+      var chiuse = occupato ? 0 : quanteChiuse();
+      approveBtn.disabled = occupato;
+      approveBtn.classList.toggle('is-fondendo', fonde);
+      approveBtn.classList.toggle('is-apre', !fonde && chiuse > 0);
+      if (!armed) approveBtn.textContent = fonde ? 'Sto fondendo' : chiuse ? apriVociText(chiuse) : 'Approva e fondi';
+      approveBtn.title = fonde ? 'Il server sta fondendo: il tempo dal tuo sì scorre qui sotto.'
+        : chiuse ? 'Approvare vale anche per le voci che non hai ancora visto: il primo clic le apre tutte, poi il tasto approva.'
+          : 'Fonde su main esattamente il commit esaminato.';
+    }
+    // Apre le voci di tutti i blocchi, come i loro «Mostra le altre», e porta in vista la prima appena aperta.
+    function apriTutte() {
+      var tasti = blocchi ? Array.prototype.slice.call(blocchi.querySelectorAll('.sn-mac-tutte')) : [];
+      var prima = null;
+      tasti.forEach(function (t) {
+        var lista = t.parentNode && t.parentNode.querySelector('.sn-mac-block-list');
+        var r = lista ? lista.querySelector(':scope > [hidden]') : null;
+        if (!prima && r) prima = r;
+        t.click();
+      });
+      if (prima && typeof prima.scrollIntoView === 'function') prima.scrollIntoView({ block: 'nearest' });
+    }
+
     function disarm() {
       armed = false;
-      approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
       approveBtn.style.minWidth = '';
       approveBtn.style.minHeight = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      aggiornaApprova();
       liberata(card);
     }
+
+    // Il tempo dal clic, accanto alla frase d'attesa: si aggiorna da sé finché la fusione è in volo.
+    var trascorso = el('span', 'sn-mac-trascorso');
+    trascorso.setAttribute('role', 'timer');
+    var voloDa = 0;
+    var ticTimer = null;
+    function fermaTic() {
+      voloDa = 0;
+      if (ticTimer) { clearInterval(ticTimer); ticTimer = null; }
+      if (trascorso.parentNode) trascorso.parentNode.removeChild(trascorso);
+    }
+    function tic() {
+      // Una card tolta dallo schermo non tiene vivo il suo orologio.
+      if (card.isConnected) card.__snMacVista = true;
+      else if (card.__snMacVista) { fermaTic(); return; }
+      trascorso.textContent = trascorsoText(voloDa);
+    }
+    function avviaTic(daMs) {
+      voloDa = Number(daMs) > 0 ? Number(daMs) : Date.now();
+      if (!ticTimer) ticTimer = setInterval(tic, 1000);
+      tic();
+    }
+
     function setBusy(on) {
       occupato = !!on;
+      if (!on) card.classList.remove('is-merging');
       aggiornaApprova();
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
       if (!on) {
-        card.classList.remove('is-merging');
         rititola(card.closest ? card.closest('.sn-mac') : null);
         liberata(card);
       }
@@ -825,6 +889,7 @@
     function finita() {
       card.classList.add('is-done');
       card.classList.remove('is-merging');
+      aggiornaApprova();
       rititola(card.closest ? card.closest('.sn-mac') : null);
       liberata(card);
     }
@@ -833,11 +898,16 @@
       status.hidden = false;
       status.textContent = msg.text;
       status.dataset.kind = msg.kind;
+      if (voloDa && msg.kind === 'wait') { status.appendChild(trascorso); tic(); }
     }
 
+    var appenaAperte = false;
     approveBtn.addEventListener('click', function (e) {
-      // La coda di un doppio clic (`detail > 1`) non è la conferma: fonderebbe in un gesto solo.
-      if (armed && e && e.detail > 1) return;
+      // La coda di un doppio clic (`detail > 1`) non è la conferma, né il sì dopo il clic che ha aperto le voci.
+      var coda = !!(e && e.detail > 1);
+      if (coda && (armed || appenaAperte)) return;
+      appenaAperte = false;
+      if (quanteChiuse()) { apriTutte(); appenaAperte = true; return; }
       if (!armed) {
         // Conferma sul posto: un click solo non manda niente su main. Il secondo
         // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550);
@@ -852,36 +922,40 @@
         return;
       }
       disarm();
-      segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null);
+      segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null, Date.now());
     });
 
     // Un'approvazione in volo, partita da qui o da un'altra strada (il segno «fondi senza
     // chiedermelo»): finché il server non risponde la card lo dice e non se ne manda un'altra (#702).
+    // `daMs` è l'istante del sì: una card ridisegnata a metà volo conta da lì, non da quando è nata.
     var seguita = null;
-    function segui(attesa, risposta) {
+    function segui(attesa, risposta, daMs) {
       // La stessa risposta arriva anche da seguiSulPosto: seguita due volte, l'esito si direbbe due volte.
       if (risposta && seguita === risposta) return;
       seguita = risposta;
-      setBusy(true);
       card.classList.add('is-merging');
+      setBusy(true);
       rititola(card.closest ? card.closest('.sn-mac') : null);
+      avviaTic(daMs);
       say(attesa);
       Promise.resolve(risposta)
         .then(function (reply) {
           var msg = outcomeMessage(reply, req);
+          fermaTic();
           say(msg);
           if ((msg.kind === 'ok' || msg.reload) && o.onDone) { finita(); o.onDone(); }
           else setBusy(false);
         })
         .catch(function (e) {
+          fermaTic();
           say(outcomeMessage({ ok: false, error: (e && e.message) || String(e) }, req));
           setBusy(false);
         });
     }
-    card.__snMacSegui = function (attesa, risposta) {
+    card.__snMacSegui = function (attesa, risposta, daMs) {
       if (card.classList.contains('is-done')) return;
       if (armed) disarm();
-      segui(attesa, risposta);
+      segui(attesa, risposta, daMs);
     };
 
     discardBtn.addEventListener('click', function () {
@@ -900,7 +974,6 @@
         });
     });
 
-    actions.appendChild(serveAprire);
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
     aggiornaApprova();
@@ -911,7 +984,7 @@
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
     var volo = o.inVolo ? o.inVolo(req) : null;
     var prima = volo ? null : (o.esitoIniziale ? o.esitoIniziale(req) : null);
-    if (volo) segui(volo.attesa || ATTESA_CLIC, volo.risposta);
+    if (volo) segui(volo.attesa || ATTESA_CLIC, volo.risposta, volo.daMs);
     else if (prima) {
       say(prima);
       // Già fusa, scartata o sostituita: non c'è più niente da approvare finché la rilettura non la toglie.
@@ -1504,6 +1577,8 @@
     blockLabel: blockLabel,
     blockVoci: blockVoci,
     vociNascoste: vociNascoste,
+    apriVociText: apriVociText,
+    trascorsoText: trascorsoText,
     caratteriVisibili: caratteriVisibili,
     doveVoce: doveVoce,
     linkGitHub: linkGitHub,

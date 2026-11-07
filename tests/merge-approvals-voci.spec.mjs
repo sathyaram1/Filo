@@ -191,11 +191,60 @@ test('voci che un server di prima non ha mandato: si dice quante, dove stanno, e
   await apriGestione(page, { pending: [req] });
   const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
   await expect(card).toBeVisible({ timeout: 8_000 });
-  await expect(card.locator('.sn-mac-btn-go')).toBeDisabled();
+  await expect(card.locator('.sn-mac-btn-go')).toHaveText('Apri le 7 voci');
   await card.locator('.sn-mac-tutte').filter({ hasText: 'Mostra le altre 7 voci' }).click();
   const mancanti = card.locator('.sn-mac-mancanti');
   await expect(mancanti).toBeVisible();
   await expect(mancanti).toContainText('… e altre 7 che il server non ha mandato');
   await expect(mancanti.locator('a')).toHaveAttribute('href', DIFF);
+  await expect(card.locator('.sn-mac-btn-go')).toHaveText('Approva e fondi');
   await expect(card.locator('.sn-mac-btn-go')).toBeEnabled();
+});
+
+// #2250: con voci chiuse il tasto non è spento, che sembrerebbe una fusione in corso: dice di aprirle e le apre.
+test('voci chiuse: «Apri le 8 voci» è acceso, le apre tutte e porta in vista la prima, poi diventa «Approva e fondi»', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const venti = Array.from({ length: 20 }, (_, i) => voce(`src/main/venti${i}.js`, 1 + i, `spawn('v-${i}');`));
+  const sedici = Array.from({ length: 16 }, (_, i) => voce(`src/main/sedici${i}.js`, 1 + i, `exec('s-${i}');`));
+  const req = richiesta({ blocks: [
+    { gate: 'child_process', gruppo: 'capacita', label: 'Avvia un programma esterno', voci: venti, more: 0 },
+    { gate: 'guard_the_guards', gruppo: 'guardie', label: 'Tocca aree protette', voci: sedici, more: 0 },
+  ] });
+  await apriGestione(page, { pending: [req] });
+  const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  const approva = card.locator('.sn-mac-btn-go');
+  // Le nascoste di tutti i blocchi: 8 delle venti più 4 delle sedici.
+  await expect(approva).toHaveText('Apri le 12 voci');
+  await expect(approva).toBeEnabled();
+  await expect(approva).toHaveAttribute('title', /non hai ancora visto/);
+  await expect(card.locator('.sn-mac-serve-aprire')).toHaveCount(0);
+  await card.locator('.sn-mac-gruppo[data-gruppo="guardie"] .sn-mac-tutte').click();
+  await expect(approva).toHaveText('Apri le 8 voci');
+  await expect(approva).toBeEnabled();
+  await card.screenshot({ path: 'tests/.shots/merge-approvals-apri-voci.png' }).catch(() => {});
+
+  // Il clic apre, non arma: niente «Confermi?» e niente chiamate al server.
+  await approva.click();
+  const capacita = card.locator('.sn-mac-gruppo[data-gruppo="capacita"] .sn-mac-voce');
+  for (let i = 12; i < 20; i++) await expect(capacita.nth(i)).toBeVisible();
+  await expect(card.locator('.sn-mac-tutte')).toHaveCount(0);
+  await expect(capacita.nth(12)).toBeInViewport();
+  await expect(approva).toHaveText('Approva e fondi');
+  await expect(approva).toBeEnabled();
+  expect(await page.evaluate(() => window.__macCalls || [])).toEqual([]);
+
+  // Poi il sì di sempre, con la sua conferma.
+  await approva.click();
+  await expect(approva).toHaveText('Confermi?');
+});
+
+test('un doppio clic su «Apri le voci» le apre e basta: non arma il sì', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const venti = Array.from({ length: 20 }, (_, i) => voce(`src/main/d${i}.js`, 1 + i, `spawn('d-${i}');`));
+  await apriGestione(page, { pending: [richiesta({ blocks: [{ gate: 'child_process', gruppo: 'capacita', label: 'Avvia un programma esterno', voci: venti, more: 0 }] })] });
+  const approva = page.locator('#mgMergeApprovalsOrphans .sn-mac-card .sn-mac-btn-go');
+  await expect(approva).toHaveText('Apri le 8 voci', { timeout: 8_000 });
+  await approva.dblclick();
+  await expect(approva).toHaveText('Approva e fondi');
 });
