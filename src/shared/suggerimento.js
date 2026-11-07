@@ -329,9 +329,12 @@
   function suPuntatore(e) {
     if (!e.isTrusted || e.pointerType === 'touch' || e.buttons) return;
     const t = bersaglio(e);
-    if (e.type === 'pointermove' && t === ultimoBersaglio) return;
+    // Fermo sullo stesso pezzo si rifà il conto solo se nella sua catena è comparso un title (scritto dal codice
+    // mentre il puntatore era già sopra): il nativo lo leggerebbe a questo movimento.
+    if (e.type === 'pointermove' && t === ultimoBersaglio && !ultimaCatena.some(haTitolo)) return;
     ultimoBersaglio = t;
     const cat = catena(t);
+    ultimaCatena = cat;
     spoglia(cat);
     restituisci(cat);
     const lab = etichettaDi(cat);
