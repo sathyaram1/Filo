@@ -346,20 +346,20 @@ function loadContentScripts() {
   safe(path.join(CONTENT, 'correttoreAutomatica.js')); // #1447 — correzione a fine parola: PRIMA di spellcheck.js
   try { globalThis.SN_DIZIONARIO = require('./dizionario.js')(ipcRenderer, webFrame); } catch (e) { console.error('[Filo CS] dizionario', e.message); } // #1446 — PRIMA di spellcheck.js
   safe(path.join(CONTENT, 'spellcheck.js'));
-  safe(path.join(SHARED, 'feedback.js'));
-  safe(path.join(SHARED, 'feedbackClientIdHash.js'));
-  safe(path.join(SHARED, 'feedbackAttachTypes.js')); // allowlist tipi allegato
+  safe(path.join(SHARED, 'feedback.js'), 'SN_FEEDBACK');
+  safe(path.join(SHARED, 'feedbackClientIdHash.js'), 'SN_FEEDBACK_CLIENT_ID_HASH');
+  safe(path.join(SHARED, 'feedbackAttachTypes.js'), 'SN_FEEDBACK_ATTACH'); // allowlist tipi allegato
   safe(path.join(CONTENT, 'feedback.js'));
   safe(path.join(CONTENT, 'redteamAttack.js'));
-  safe(path.join(SHARED, 'tabColor.js'));
+  safe(path.join(SHARED, 'tabColor.js'), 'SN_TAB_COLOR');
   safe(path.join(CONTENT, 'pageColor.js'));
   safe(path.join(CONTENT, 'translatePage.js'));
-  safe(path.join(SHARED, 'ttsChunk.js'));
-  safe(path.join(SHARED, 'modelCaps.js'));
-  safe(path.join(SHARED, 'ttsVoices.js'));
-  safe(path.join(SHARED, 'dictationSegmenter.js'));
-  safe(path.join(SHARED, 'ascolto.js')); // microfono e trascrizione: Detta e le chat
-  safe(path.join(SHARED, 'voceChat.js')); // tasto microfono delle chat, a cui «Detta» passa la mano
+  safe(path.join(SHARED, 'ttsChunk.js'), 'SN_TTS_CHUNK');
+  safe(path.join(SHARED, 'modelCaps.js'), 'SN_MODEL_CAPS');
+  safe(path.join(SHARED, 'ttsVoices.js'), 'SN_TTS_VOICES');
+  safe(path.join(SHARED, 'dictationSegmenter.js'), 'SN_DICTATION_SEGMENTER');
+  safe(path.join(SHARED, 'ascolto.js'), 'SN_ASCOLTO'); // microfono e trascrizione: Detta e le chat
+  safe(path.join(SHARED, 'voceChat.js'), 'SN_VOCE_CHAT'); // tasto microfono delle chat, a cui «Detta» passa la mano
   // Solo nei test: modelli di prova (vedi loader.js).
   if (process.env.NODE_ENV === 'test') safe(path.join(SHARED, '..', '..', 'tests', 'fixtures', 'testModels.js'));
   safe(path.join(CONTENT, 'tts.js'));
