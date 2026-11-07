@@ -172,7 +172,7 @@ test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui prefer
   ]);
   await chiedi(page, 'spegni il bluetooth');
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio').map((c) => c[1].acceso), { timeout: 20_000 }).toContain(false);
-  const spento = await rigaDi('Bluetooth');
+  const spento = await rigaDi('Bluetooth spento');
   await spento.click({ button: 'right' });
   await menuDi(page).voce('Annulla · Riaccendi il Bluetooth').first().click();
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio').map((c) => c[1].acceso)).toEqual([false, true]);
