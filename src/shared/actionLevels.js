@@ -14,6 +14,11 @@
   // un pezzo suo: il popup lo chiude in un riquadro, e nessun carattere del testo
   // può chiuderlo prima (#592.7). Sentinella in tests/unit/actionLevels.test.mjs.
   const cit = (testo, nuda) => (nuda ? { citazione: String(testo), nuda: true } : { citazione: String(testo) });
+  // L'articolo davanti alla percentuale: la regola sta in src/shared/sistema.js.
+  const alPercento = (p) => {
+    if (!global.SN_SISTEMA && typeof require === 'function') require('./sistema.js');
+    return global.SN_SISTEMA.alPercento(p);
+  };
 
   // Dove va un'icona chiesta a parole: la barra, il suo «Altro…», la fila del tasto destro di un contesto (#1434).
   function doveDellIcona(a) {
