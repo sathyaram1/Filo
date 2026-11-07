@@ -142,6 +142,26 @@ test('Gestione: anche le pagine dell\'owner escono nel fumetto', async ({ openTa
   await provaUnTitolo(page);
 });
 
+// La spazzata: i pezzi cliccabili che si vedono, senza parole scritte e senza niente da dire al passaggio del mouse.
+function muti(page, radice) {
+  return page.evaluate((sel) => {
+    const S = window.SN_SUGGERIMENTO;
+    const out = [];
+    for (const r of document.querySelectorAll(sel)) {
+      for (const el of r.querySelectorAll('button, [role="button"], a[href], img')) {
+        const b = el.getBoundingClientRect();
+        if (b.width < 2 || b.height < 2 || !el.checkVisibility({ opacityProperty: true, visibilityProperty: true })) continue;
+        const cs = getComputedStyle(el);
+        if (el.tagName === 'IMG' && cs.cursor !== 'zoom-in' && cs.cursor !== 'pointer') continue;
+        if (/[\p{L}\p{N}]/u.test(el.textContent || '')) continue;
+        if (el.hasAttribute('data-etichetta') || S.testoPer(el)) continue;
+        out.push(el.outerHTML.slice(0, 200));
+      }
+    }
+    return out;
+  }, radice);
+}
+
 // Le foto vere, fatte da un canvas e incollate come dagli appunti.
 async function incollaFoto(home) {
   await home.evaluate(async () => {
