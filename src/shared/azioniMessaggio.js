@@ -11,6 +11,21 @@
   const icona = (nome, size = 15) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](size) : '');
   const elDi = (t) => (t && t.nodeType === 1 ? t : (t && t.parentElement) || null);
   const CLASSI = { barra: 'sn-azioni-msg', tasto: 'sn-azioni-msg-tasto', ok: 'sn-azioni-msg-ok', no: 'sn-azioni-msg-no', destra: 'sn-azioni-msg-destra' };
+  // Nome, icona e voce del tasto destro delle azioni comuni: chi ha un tasto suo (la risposta del riquadro) li prende da qui.
+  const AZIONI = Object.freeze({
+    copia: Object.freeze({ icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' }),
+    rispondi: Object.freeze({ icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi' }),
+  });
+  // Un tasto della barra: l'etichetta (aria-label e quella che compare al passaggio) e l'icona vengono dalla definizione.
+  function tasto(def, classe, size = 15) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = classe;
+    b.dataset.etichetta = def.etichetta;
+    b.setAttribute('aria-label', def.etichetta);
+    b.innerHTML = icona(def.icona, size);
+    return b;
+  }
 
   // Gli appunti li scrive il main, che mette il testo anche nella cronologia degli appunti come il Copia del tasto
   // destro; se dice no (o il canale non c'è), ci prova la pagina.
