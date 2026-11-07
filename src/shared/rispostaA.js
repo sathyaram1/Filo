@@ -58,7 +58,7 @@
   function risolvi(ref, trovaChat, { max = ANTEPRIMA } = {}) {
     const r = riferimento(ref);
     if (!r) return null;
-    if (r.testo != null) return { role: 'filo', testo: taglia(r.testo, max) };
+    if (r.testo != null) return { role: r.role === 'user' ? 'user' : 'filo', testo: taglia(r.testo, max) };
     let c = null;
     try { c = typeof trovaChat === 'function' ? trovaChat(r.chat) : null; } catch (_) { c = null; }
     const m = c && Array.isArray(c.messages) ? c.messages[r.i] : null;
