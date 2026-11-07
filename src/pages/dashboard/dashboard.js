@@ -576,7 +576,7 @@
     if (m.role === 'user') {
       return {
         role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
-        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}),
+        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
       };
     }
     return {
