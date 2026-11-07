@@ -106,7 +106,8 @@ test('un dispositivo Bluetooth: le sue voci, i preferiti in cima anche riaprendo
   await menuDi(page).voce('Copia il nome').first().click();
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText()).catch(() => '')).toBe('Cuffie');
 
-  // Dimentica chiede conferma; il no non tocca niente, il sì toglie il dispositivo (e dai preferiti).
+  // Dimentica chiede conferma; il no non tocca niente, il sì toglie il dispositivo. Il preferito resta: toglierlo darebbe
+  // al filo un Annulla che rimette fra i preferiti un dispositivo che il computer non conosce più.
   await opzione(page, 'Tastiera').click({ button: 'right' });
   await menuDi(page).voce('Dimentica…').first().click();
   expect(await confirmText(page)).toContain('Tastiera');
