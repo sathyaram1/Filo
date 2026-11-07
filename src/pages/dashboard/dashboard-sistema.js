@@ -441,8 +441,8 @@
     const posto = (v) => { const i = preferiti.findIndex((p) => p.indirizzo === v.indirizzo); return i < 0 ? Infinity : i; };
     return elenco.map((v, i) => [v, i]).sort((a, b) => (posto(a[0]) - posto(b[0])) || (a[1] - b[1])).map(([v]) => v);
   }
-  const icona = (nome) => (typeof ICONS[nome] === 'function' ? ICONS[nome](16) : '');
-  const voce = (label, nomeIcona, fai) => ({ type: 'item', icon: icona(nomeIcona), label, onClick: () => { Promise.resolve(fai()).catch(() => {}); } });
+  const iconaMenu = (nome) => (typeof ICONS[nome] === 'function' ? ICONS[nome](16) : '');
+  const voceMenu = (label, nomeIcona, fai) => ({ type: 'item', icon: iconaMenu(nomeIcona), label, onClick: () => { Promise.resolve(fai()).catch(() => {}); } });
   const apriPannello = (pannello) => send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, pannello }).catch(() => {});
 
   async function copiaNome(nome) {
