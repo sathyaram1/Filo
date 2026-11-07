@@ -1223,6 +1223,13 @@
       o.addEventListener('click', () => { closeTitleMenu(); onClick(); });
       menu.appendChild(o);
     };
+    if (file) {
+      const voce = () => docPopEl && docPopEl.querySelector(`.ed-doc-item[data-id="${CSS.escape(file.id)}"]`);
+      if (file.id !== collection.activeId) add('Apri', () => { switchToFile(file.id); closeDocPop(); });
+      add('Rinomina', () => { const it = voce(); if (it) startInlineRename(it, file); });
+      add('Duplica', () => duplicateFile(file.id));
+      add('Elimina', () => deleteFile(file.id));
+    } else {
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
     add('Rigenera riassunto', () => {
       const id = doc && doc.id;
