@@ -2160,7 +2160,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
         if (elBolla && schede.length && !valuta) global.SN_SCHEDE_IN_CHAT?.nellaBolla(elBolla, bolla, schede, global.SN_SCHEDE_IN_CHAT.azioni());
         immaginiNellaBolla(elBolla, immagini, riferimenti);
         // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
-        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
+        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'), valuta ? [] : schede);
       }
       // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
       if (testoCampo === null) {
