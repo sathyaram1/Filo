@@ -225,6 +225,7 @@ test('Aiuto e riquadro: le crocette, l\'invio e la freccia hanno il loro fumetto
   await expect(fumetto(page)).toHaveText('Chiudi');
   await riquadro.locator('.sn-popup-send').hover({ force: true });
   await expect(fumetto(page)).toHaveText('Invia');
+  expect(await muti(page, '.sn-popup')).toEqual([]);
 });
 
 test('home: la X del ringraziamento per un feedback risolto e quella delle Novità hanno il loro fumetto', async ({ app }) => {
