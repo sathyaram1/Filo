@@ -137,6 +137,23 @@ test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono
   await pref.locator('.sn-token-row[data-token="fumetto.ritardo"] .sn-token-reset').click();
 });
 
+test('su un sito i title del sito restano nativi, l\'Aiuto sopra la scheda ha il fumetto di Filo', async ({ app, shell, openTab, testServer }) => {
+  const sito = await testServer.openReady(openTab, '<!doctype html><html><body style="padding:40px">'
+    + '<button id="delSito" title="Del sito">Bottone</button></body></html>');
+  await sito.waitForFunction(() => document.documentElement.dataset.filoReady === '1', null, { timeout: 15_000 });
+  await sito.locator('#delSito').hover();
+  await sito.waitForTimeout(800);
+  expect(await haTitolo(sito.locator('#delSito')), 'il title del sito non si tocca').toBe(true);
+  expect(await sito.locator('[data-sn-fumetto]').count()).toBe(0);
+
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const strato = await paginaDelloStrato(app, sito);
+  await strato.waitForSelector('.sn-sidebar-close', { timeout: 10_000 });
+  await strato.locator('.sn-sidebar-close').hover();
+  await expect(fumetto(strato)).toHaveText('Chiudi');
+});
+
 test('tema scuro: il fumetto prende la carta scura della barra', async ({ openTab }) => {
   const page = await openTab('filo://preferences/preferences.html');
   await pronta(page);
