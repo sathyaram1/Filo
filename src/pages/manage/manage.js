@@ -2651,8 +2651,16 @@
     };
     const d = DOMANDE ? DOMANDE.stato() : null;
     const nd = d && d.lette ? MR.contaDomande(d.domande) : null;
-    const bd = scrivi('domande', nd ? `(${nd.domande})` : '',
-      nd ? `${nd.domande} da rispondere${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
+    // Le cose da fare si contano a parte da quelle da decidere (#2229): «(2 · 1 da fare)», «(1 da fare)», «(2)».
+    const daRispondere = (lista) => {
+      const n = MR.contaDaRispondere(lista);
+      const testo = n.daFare ? [n.daDecidere ? String(n.daDecidere) : '', `${n.daFare} da fare`].filter(Boolean).join(' · ') : String(n.daDecidere);
+      const titolo = n.daFare ? `${n.daDecidere} da decidere, ${n.daFare} da fare` : `${n.daDecidere} da rispondere`;
+      return { testo, titolo };
+    };
+    const rd = nd ? daRispondere(d.domande) : null;
+    const bd = scrivi('domande', rd ? `(${rd.testo})` : '',
+      rd ? `${rd.titolo}${d.aggiornamento ? ' · l’ultimo aggiornamento non è riuscito' : ''}` : '');
     if (bd) bd.classList.toggle('mg-sezione--urgente', !!(nd && MR.bloccanteAperta(d.domande)));
     // Le schede contano quello che mostrano, col filtro della fiducia; la sezione, come Feedback, a filtro spento.
     const nt = nd && soloNonFidate ? MR.contaDomande(MR.filtraFiducia(d.domande, true)) : nd;
