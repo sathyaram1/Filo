@@ -337,7 +337,7 @@ test('prova vera (#2214): le righe di novità sotto la versione uscita intanto s
     assert.equal(p.esito, 'rosso_sulla_fusione', 'chi fonde prende il ramo com\'è, con la riga sotto una versione uscita');
     assert.deepEqual(p.novita, { verso: '0.2.267', righe: [{ version: '0.2.266', chiave: 'features', riga: 'Del ramo' }], dopo: 'verde' }, JSON.stringify(p));
     assert.ok(BASTA_SPOSTARE.includes(p.novita.dopo));
-    assert.deepEqual(registroDa(viste[0]).slice(0, 2), [
+    assert.deepEqual(JSON.parse(JSON.stringify(registroDa(viste[0]).slice(0, 2))), [
       { version: '0.2.267', date: new Date().toISOString().slice(0, 10), features: ['Del ramo'] },
       { version: '0.2.266', date: '2026-11-05', features: ['Di main, in arrivo'] },
     ], 'gli unit girano sulla fusione con la riga nel blocco della prossima versione');
