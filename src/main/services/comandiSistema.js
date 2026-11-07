@@ -1441,6 +1441,7 @@ async function bluetooth(q) {
   if (q.dimentica) {
     const r = await computer().btDimentica({ indirizzo: d.indirizzo });
     if (!r.ok) return { ...fallito(r.errore, { ...q, nome: d.nome }), dispositivo: d.nome };
+    try { await segnaPreferito(d, false); } catch (_) {}
     annunciaCambio({ bluetooth: {} });
     return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, dimenticato: true };
   }
