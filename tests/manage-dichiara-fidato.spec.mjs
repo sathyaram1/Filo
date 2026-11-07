@@ -44,7 +44,7 @@ test.beforeAll(async () => {
         const d = body.data || {};
         chiamate.push(d);
         if (d.prova) {
-          return json(res, 200, { result: { ok: true, prova: true, stato: 1, visto: { stato: 1, app: PUNTA_APP, server: PUNTA_SRV }, rami: [
+          return json(res, 200, { result: { ok: true, prova: true, stato: 1, scritti: [{ at: QUANDO, ruolo: 'fixer' }, { at: 0, ruolo: 'x' }], visto: { stato: 1, app: PUNTA_APP, server: PUNTA_SRV }, rami: [
             { repo: 'app', punta: PUNTA_APP, motivo: 'una voce di biglietti non fidati' },
             { repo: 'server', punta: PUNTA_SRV, motivo: 'un buco nel registro' },
           ] } });
