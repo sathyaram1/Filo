@@ -9,6 +9,9 @@ const BASI = ['youtube.com', 'youtube-nocookie.com', 'youtubekids.com'];
 // Quelli che servono solo il lettore incorporato in un altro sito: lì il «Salta» vale dentro il riquadro, mai in scheda.
 const SOLO_INCORPORATI = ['youtube-nocookie.com'];
 
+// Dal main ai frame di YouTube rimasti senza regole: ce ne sono di nuove, chiedetele.
+const CANALE_PRONTE = 'filo:youtube-regole-pronte';
+
 const sotto = (h, basi) => basi.some((b) => h === b || h.endsWith('.' + b));
 
 function hostYouTube(host) {
