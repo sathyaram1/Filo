@@ -915,7 +915,12 @@ async function leggiStdin() {
 
 const stampaJson = (o) => console.log(JSON.stringify(o, null, 2));
 
-export async function main(argv, { root = ROOT, env = process.env } = {}) {
+export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
+  // Senza il doppio trattino npm si prende le opzioni e le lascia nell'ambiente: si riprendono e si dice (#2217).
+  const daNpm = await opzioniDaNpm(argvIn && argvIn[0], env);
+  if (daNpm.errore) { console.error(`RIFIUTATO: ${daNpm.errore}. Non ho scritto niente.`); return 1; }
+  if (daNpm.nota) console.error(daNpm.nota);
+  const argv = daNpm.args.length ? [...argvIn, ...daNpm.args] : argvIn;
   const [cmd, arg] = argv;
   if (!SOTTOCOMANDI.includes(cmd) || (['incroci', 'leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
     console.error(USO);
