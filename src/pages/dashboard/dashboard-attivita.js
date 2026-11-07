@@ -2222,6 +2222,8 @@
     const wrap = document.createElement('div');
     wrap.className = 'dash-bubble-actions dash-esiti-archiviati';
     const riuscite = [];
+    // Le conferme ridate di una stessa risposta restano un passo solo, come in diretta.
+    const gruppo = { pendenti: new Set(), voci: [] };
     for (const v of lista) {
       // Il file si racconta col suo bottone, come nella risposta in diretta.
       if (v.type === 'APRI_FILE' && v.file && percorsoLocale(v.file.percorso)) {
