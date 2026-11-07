@@ -69,4 +69,4 @@ function riceve(win, dati, zoom = 1) {
   if (fase === 'sopra') ultima.set(win, sotto.wc);
 }
 
-module.exports = { riceve, vistaSotto, descrivi };
+module.exports = { riceve, vistaSotto, descrivi, cornice };
