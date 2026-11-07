@@ -20,10 +20,12 @@ regola**.
   ```
 
 - **Serve un passo che solo l'owner può fare** (un segreto, un'automazione
-  GitHub, una prova sulla sua macchina). Chiediglielo con una domanda scritta
-  come dice la sezione «Una domanda per l'owner si scrive per lui», e consegnala
-  con lo stesso comando, aggiungendo `--domanda <file.json>`: il lavoro aspetta
-  la sua risposta e poi riparte dal ramo.
+  GitHub, una prova sulla sua macchina). È un «da fare» (`"tipo": "da_fare"`,
+  sezione «Una domanda per l'owner si scrive per lui»): i passi da fare, perché
+  servono, e il pulsante «Fatto» che riprende questo lavoro. Consegnalo con lo
+  stesso comando, aggiungendo `--domanda <file.json>`: il lavoro aspetta che lo
+  segni fatto e poi riparte dal ramo. Mai una frase nel testo o nelle note: lì
+  nessuno la vede finché un worker non ci arriva.
 
 Se invece si farebbe da qui ma qualcosa è rotto (un clone, una credenziale, la
 rete, uno strumento, i permessi della sessione), non è per regola: è un
