@@ -152,10 +152,9 @@
       const barra = Math.max(0, ta.offsetWidth - ta.clientWidth - bl - br);
       fondo.style.paddingRight = `${(parseFloat(cs.paddingRight) || 0) + barra}px`;
       fondo.style.whiteSpace = ta.localName === 'input' ? 'pre' : 'pre-wrap';
-      fondo.style.color = ta.dataset.snColore || (ta.dataset.snColore = cs.color);
-      fondo.style.backgroundColor = ta.dataset.snFondo || (ta.dataset.snFondo = cs.backgroundColor);
-      fondo.style.caretColor = 'transparent';
-      ta.style.caretColor = ta.dataset.snColore;
+      fondo.style.color = colori.testo;
+      fondo.style.backgroundColor = colori.fondo;
+      ta.style.caretColor = colori.testo;
       fondo.style.left = `${ta.offsetLeft}px`;
       fondo.style.top = `${ta.offsetTop}px`;
       fondo.style.width = `${ta.offsetWidth}px`;
