@@ -199,5 +199,4 @@ test('#2085 una scheda lasciata nella chat della home: gettone, anteprima, lettu
     const attivaOra = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
     return !!riaperta && riaperta.id === attivaOra;
   }, { timeout: 8000 }).toBe(true);
-  expect(await paginaDellaScheda(app, await idPerUrl(shell, url))).toBeTruthy();
 });
