@@ -308,13 +308,20 @@ export function controllaUnite(lette, { aspetta = [], pacchetti = [], pacchettiP
 
 /**
  * Le attese con cui nasce il pacchetto: quelle di `--aspetta` più quelle delle unite, che archiviate non contano più da
- * nessuna parte; quelle su un'altra unita cadono. Il tetto di un feedback si conta qui, mai un taglio. PURA.
- * `proprie`: [{ id, num }]; `unite`: [{ id, num, attese }]. → { attese: [{ id, num }], ereditate: [{ id, num, da: [num] }], motivo }
+ * nessuna parte; quelle su un'altra unita cadono, e quelle su un aspettato letto non più vivo (attesaViva, la regola
+ * condivisa che usa anche il server) pure: manderebbero il pacchetto all'owner come attesa rotta. Il tetto di un
+ * feedback si conta qui, mai un taglio. PURA. `proprie`: [{ id, num }]; `unite`: [{ id, num, attese }]; `attesi`: gli
+ * aspettati letti ({ ok, id, num, stato }). → { attese: [{ id, num }], ereditate: [{ id, num, da: [num] }], motivo }
  */
-export function atteseDelPacchetto(proprie, unite) {
+export function atteseDelPacchetto(proprie, unite, { attesi = [] } = {}) {
   const MAX = globalThis.SN_FB_ATTESE.MAX;
   const lista = Array.isArray(unite) ? unite.filter(Boolean) : [];
   const dentro = new Set(lista.map((u) => u.id));
+  const letti = (Array.isArray(attesi) ? attesi : []).filter((a) => a && a.ok);
+  const morta = (w) => {
+    const a = letti.find((x) => (x.id ? x.id === w.id : Boolean(w.num) && String(x.num) === String(w.num)));
+    return Boolean(a) && !attesaViva(a);
+  };
   const attese = [];
   const ereditate = [];
   const viste = new Map();
@@ -325,7 +332,7 @@ export function atteseDelPacchetto(proprie, unite) {
   }
   for (const u of lista) {
     for (const w of u.attese || []) {
-      if (!w || !w.id || dentro.has(w.id)) continue;
+      if (!w || !w.id || dentro.has(w.id) || morta(w)) continue;
       if (!viste.has(w.id)) {
         const e = { id: w.id, num: w.num || '', da: [] };
         viste.set(w.id, e);
@@ -346,6 +353,16 @@ export function atteseDelPacchetto(proprie, unite) {
     ].join(', ')}), e un feedback ne aspetta al più ${MAX}: togline ${attese.length - MAX} dalle unite o da --aspetta, o dividi il pacchetto`;
   }
   return { attese, ereditate, motivo };
+}
+
+/**
+ * Un aspettato letto (`stato` dal server) tiene ancora fermo chi lo aspetta e un giorno si scioglierà: aperto, o non
+ * letto, per la regola delle attese (SN_FB_ATTESE.statoAttesa). Fuso, chiuso senza fusione o cancellato no. PURA.
+ */
+export function attesaViva(a) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const stato = ATT.statoAttesa(a && a.ok ? { status: a.stato } : undefined);
+  return stato === ATT.STATO.APERTO || stato === ATT.STATO.IGNOTO;
 }
 
 /** La priorità del pacchetto senza `--priorita`: la più alta fra le unite, perché nessuna scenda aspettandolo. PURA. */
@@ -729,10 +746,12 @@ export async function main(argvIn) {
     ])];
     let pacchetti = [];
     const pacchettiPerId = {};
+    let attesiLetti = [];
     if (attesi.length) {
       try {
-        const aperti = (await pacchetto.leggi(attesi, cred.idToken))
-          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && !['done', 'archived'].includes(p.stato));
+        attesiLetti = await pacchetto.leggi(attesi, cred.idToken);
+        const aperti = attesiLetti
+          .filter((p) => p && p.ok && Array.isArray(p.unisce) && p.unisce.length && attesaViva(p));
         pacchetti = aperti.map((p) => String(p.num));
         for (const p of aperti) if (p.id) pacchettiPerId[p.id] = String(p.num);
       } catch (e) {
@@ -741,7 +760,7 @@ export async function main(argvIn) {
       }
     }
     const motivi = controllaUnite(lette, { aspetta: numeriAttesa.numeri, pacchetti, pacchettiPerId });
-    delPacchetto = atteseDelPacchetto(listaAttese, leggibili);
+    delPacchetto = atteseDelPacchetto(listaAttese, leggibili, { attesi: attesiLetti });
     if (delPacchetto.motivo) motivi.push(delPacchetto.motivo);
     const delTesto = prerequisitiMancanti(testoSpec, {
       unite: numeriUnite.numeri, aspetta: numeriAttesa.numeri, ereditate: delPacchetto.ereditate.map((e) => e.num).filter(Boolean),

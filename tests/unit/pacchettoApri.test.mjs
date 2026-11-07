@@ -177,6 +177,17 @@ test('chi aspetta una unita ed è aspettato dal pacchetto chiuderebbe un giro: s
   assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700 \(--aspetta\): si aspetterebbero a vicenda/);
 });
 
+test('un giro che passa da un\'unita conta anche le attese ereditate: il pacchetto aspetterebbe chi lo aspetta', async () => {
+  // Nessun --aspetta: #815 aspetta #700, l'attesa passa al pacchetto; #700 aspetta #812, che entra nel pacchetto.
+  const r = await conRete({
+    lette: { 812: seg('812'), 815: seg('815', { attese: [{ id: 'id700', num: '700' }] }), 700: seg('700') },
+    attesi: [{ id: 'id700', num: '700', togli: ['id812'], quali: ['812'], tenute: [] }],
+  }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
+  assert.equal(r.code, 3, r.err.join('\n'));
+  assert.equal(r.submit.length, 0, 'il pacchetto non nasce');
+  assert.match(r.err.join('\n'), /#700 aspetta #812, che entra nel pacchetto, e il pacchetto aspetta #700 \(l'attesa di #815\): si aspetterebbero a vicenda/);
+});
+
 test('un pacchetto nato senza numero non archivia niente, e dice i passi in ordine', async () => {
   const r = await conRete({
     lette: { 812: seg('812') }, seq: null,
@@ -352,6 +363,20 @@ test('#1903.1: il pacchetto nasce con le attese delle unite, che archiviate non 
   const solo = await conRete({ lette: { 812: seg('812'), 815: seg('815') } }, () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
   assert.equal(solo.submit[0].opts.waitsFor, undefined, 'senza attese il campo non si scrive');
   assert.doesNotMatch(solo.out.join('\n'), /Attese prese/);
+});
+
+test('un\'attesa di un\'unita su un aspettato chiuso senza fusione non passa al pacchetto; uno non letto o aperto sì', async () => {
+  for (const stato of ['archived', 'spam_confirmed', 'attack_confirmed', 'done']) {
+    const r = await conRete({ lette: { 812: seg('812'), 815: seg('815', { attese: [{ id: 'id700', num: '700' }] }), 700: seg('700', { stato }) } },
+      () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
+    assert.equal(r.code, 0, r.err.join('\n'));
+    assert.equal(r.submit[0].opts.waitsFor, undefined, `#700 ${stato}: il pacchetto finirebbe dall'owner come attesa rotta`);
+  }
+  for (const lette700 of [{ 700: seg('700', { stato: 'working' }) }, {}]) {
+    const r = await conRete({ lette: { 812: seg('812'), 815: seg('815', { attese: [{ id: 'id700', num: '700' }] }), ...lette700 } },
+      () => SCRIPT.main(['t', spec('812,815'), '--non-locale', '--pacchetto', '812,815']));
+    assert.deepEqual(r.submit[0].opts.waitsFor, [{ id: 'id700', num: '700' }], 'aperto, o non letto: il pacchetto lo aspetta');
+  }
 });
 
 test('#1903.1: il tetto delle 20 attese si conta sul pacchetto, coi conti per unita; una unita con 20 attese da sola entra', async () => {

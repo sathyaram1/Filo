@@ -226,6 +226,41 @@ test('il primo lavoro riceve il piano di chi l\'ha preceduto e le fusioni su mai
   assert.equal(ripresa.piano, 'p', 'anche chi riprende dopo una risposta riceve il piano');
 });
 
+test('la fusione approvata dall\'owner del ramo del feedback è la sua, non una prova che è già risolto', async () => {
+  const { segnaProprie, inizioRicerca } = await import('../../scripts/dispatch.mjs');
+  const fusioni = [
+    { sha: 'a'.repeat(40), oggetto: 'finish: worker/fQKUghQyy99qfrg4qSel-20261101T214313Z via server (approvazione dell’owner)' },
+    { sha: 'b'.repeat(40), oggetto: 'finish: worker/AltroFeedback1234567-20261101T214313Z via server (approvazione dell’owner)' },
+    { sha: 'c'.repeat(40), oggetto: 'merge-gate: #75 via server (unisce #77)' },
+  ];
+  assert.deepEqual(segnaProprie(fusioni, '77', 'fQKUghQyy99qfrg4qSel').map((f) => !!f.propria), [true, false, false]);
+  assert.deepEqual(segnaProprie(fusioni, '77').map((f) => !!f.propria), [false, false, false], 'senza id resta il solo messaggio del cancello');
+  assert.deepEqual(segnaProprie(fusioni, '77', 'a.b').map((f) => !!f.propria), [false, false, false], 'un id storto non entra nell\'espressione');
+  // L'id ha la forma dei rami (newWorkBranch): un uuid coi trattini è il suo tentativo; il punto non vale «un carattere».
+  const uu = 'b493d90e-af97-4313-bec1-55961a7bb376';
+  const dellOwner = [{ oggetto: `finish: worker/${uu}-20261022T171141Z via server (approvazione dell’owner)` }];
+  assert.equal(segnaProprie(dellOwner, '1488', uu)[0].propria, true);
+  assert.equal(segnaProprie([{ oggetto: 'finish: worker/aXb-20261022T171141Z via server' }], '1', 'a.b')[0].propria, undefined);
+  assert.equal(segnaProprie([{ oggetto: 'merge-gate: #16801 via server' }], '#1680.1')[0].propria, undefined, '#1680.1 non è #16801');
+  assert.equal(segnaProprie([{ oggetto: 'merge-gate: #1680.1 via server' }], '#1680.1')[0].propria, true);
+  // La ricerca parte dall'ultima riapertura, se il server la manda: un tentativo fuso prima non conta.
+  assert.equal(inizioRicerca({ createdAt: '2026-10-01T00:00:00Z' }), Date.parse('2026-10-01T00:00:00Z'));
+  assert.equal(inizioRicerca({ createdAt: '2026-10-01T00:00:00Z', riapertoAt: Date.parse('2026-10-20T00:00:00Z') }), Date.parse('2026-10-20T00:00:00Z'));
+  assert.equal(inizioRicerca({ createdAt: '2026-10-01T00:00:00Z', riapertoAt: '2026-10-21T00:00:00Z' }), Date.parse('2026-10-21T00:00:00Z'));
+  assert.equal(inizioRicerca(null), 0);
+});
+
+test('un correttore chiamato per gli unit rossi alla fusione manda alla verifica intera anche con un rebase pulito', async () => {
+  const { esitoRiallineamento } = await import('../../scripts/dispatch.mjs');
+  const pulito = { ok: true, file: [], conflitti: [] };
+  const rossi = esitoRiallineamento(pulito, { tipo: 'prove-rosse', prove: ['tests/unit/a.test.mjs'] });
+  assert.deepEqual(rossi.riallineamento, { fileRiscritti: [], fileInConflitto: [], giro: 'pieno' });
+  assert.match(rossi.riga, /unit rossi: serve la verifica intera/);
+  const servizio = esitoRiallineamento({ ok: true, file: [], conflitti: ['PATTERNS.md'] }, { tipo: 'prove-rosse', prove: ['x'] });
+  assert.equal(servizio.riallineamento.giro, 'pieno', 'anche con un conflitto solo in un file di servizio');
+  assert.equal(esitoRiallineamento(pulito, { tipo: 'conflitto', file: [] }).riallineamento.giro, 'nessuno');
+});
+
 test('il motivo è obbligatorio per il correttore e per nessun altro ruolo, come sul server', async () => {
   const { motivoDellaConsegna } = await import('../../scripts/dispatch.mjs');
   assert.deepEqual(motivoDellaConsegna(undefined, 'verifier'), { ok: true, motivo: null });

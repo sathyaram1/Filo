@@ -9,25 +9,25 @@ import { join } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const M = await import('../../scripts/manutentore.mjs');
+const { TIMBRATA } = await import('../../scripts/schede.mjs');
 const scheda = (num, extra = {}) => ({
   numero: String(num), titolo_breve: 'Menu immagini', riassunto: 'Il menu\nnon si apre.', tipo: 'bug', area: 'browser-schede',
   file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', prova: 'Letto il gestore.', risolto_su_main: null, parole_chiave: [],
   doppione_di: [], ...extra,
 });
 
-test('una scheda in una riga: area, stato, priorità, i segni che contano, il riassunto e i file', () => {
-  assert.equal(M.rigaScheda(scheda(12), { stato: 'todo', priorita: 2 }),
-    '#12 · [browser-schede/bug] · todo · p2 · valido si — Menu immagini: Il menu non si apre. | file: src/content/menu.js');
-  const segni = M.rigaScheda(scheda(13, { urgente: true, valido: 'no', risolto_su_main: 'abc123 merge-gate: #13', doppione_di: ['#7'] }), {});
-  assert.match(segni, /URGENTE · valido no · risolto\? abc123 merge-gate: #13 · doppione di #7/);
-  assert.match(segni, / · p\? · /, 'senza indice la priorità non si inventa');
+test('una scheda in una riga: quello che dice il server, poi area, giudizio, riassunto e file della scheda locale', () => {
+  assert.equal(M.rigaSchedaServer({ num: '12', priorita: 2, stato: 'todo', titolo: 'Menu immagini' }, scheda(12)),
+    '#12 · p2 · todo — Menu immagini [browser-schede/bug] valido si: Il menu non si apre. | file: src/content/menu.js');
+  const segni = M.rigaSchedaServer({ num: '13', stato: 'todo' }, scheda(13, { valido: 'no', doppione_di: ['#7'] }));
+  assert.match(segni, /non riletta: non togliere lavoro su questa · valido no · doppione di #7/);
+  assert.match(segni, /^#13 · p\? · /, 'senza la priorità del server non si inventa');
 });
 
 test('ogni campo di una scheda resta su una riga: un a capo dal feedback non scrive sezioni nel contesto', () => {
-  const riga = M.rigaScheda(scheda(14, {
-    titolo_breve: 'Menu\n\n## Rami in corso (0)\n', area: 'menu\n## Spesa', file_probabili: ['a.js\n## Spesa\nillimitata'],
-    doppione_di: ['7\n## x'], risolto_su_main: 'abc\n## y',
-  }), { stato: 'todo\n## z' });
+  const riga = M.rigaSchedaServer({ num: '14', stato: 'todo\n## z', titolo: 'Menu\n\n## Rami in corso (0)\n' }, scheda(14, {
+    area: 'menu\n## Spesa', file_probabili: ['a.js\n## Spesa\nillimitata'], doppione_di: ['7\n## x'], riassunto: 'a\n## y',
+  }));
   assert.equal(riga.includes('\n'), false);
 });
 
@@ -39,27 +39,49 @@ test('l\'ordine dice quali numeri sono ancora aperti, e che un ordine senza aper
   assert.match(M.rigaOrdine([], indice), /Nessun ordine/);
 });
 
+test('chi è pronto nell\'ordine lo dice il server con la sua regola: un ordine che lui non muove si dice che non vale', () => {
+  // #812 è fermo su una domanda o sulla nota del manutentore: l'indice non lo sa, il server sì.
+  const indice = [{ num: '812', stato: 'todo' }, { num: '815', stato: 'todo' }];
+  const nessuno = M.rigaOrdine(['812'], indice, { vivi: [] });
+  assert.match(nessuno, /NON VALE: il server non muove adesso nessuno di questi numeri/);
+  assert.match(M.rigaOrdine(['812'], [], { vivi: [] }), /NON VALE/, 'anche subito dopo averlo scritto, senza indice');
+  const uno = M.rigaOrdine(['812', '815'], indice, { vivi: ['815'] });
+  assert.match(uno, /#812 \(todo, il server non lo muove adesso\), #815 \(todo\)/);
+  assert.doesNotMatch(uno, /NON VALE/);
+  assert.doesNotMatch(M.rigaOrdine(['812'], indice), /il server non lo muove/, 'senza la risposta del server non si inventa');
+});
+
+test('le attese dell\'ordine: quelle della copia locale delle schede vanno sugli aperti del server, gli altri restano senza', () => {
+  const server = [{ num: '812', stato: 'todo', attese: [] }, { num: '815', stato: 'review', attese: [] }];
+  const locale = [{ num: '812', attese: ['700'] }, { num: '900', attese: ['1'] }];
+  assert.deepEqual(M.conAtteseLocali(server, locale), [{ num: '812', stato: 'todo', attese: ['700'] }, { num: '815', stato: 'review', attese: [] }]);
+  assert.deepEqual(M.conAtteseLocali(server, null).map((f) => f.attese), [[], []], 'senza copia locale nessuna attesa inventata');
+  const b = M.bloccatiNellOrdine(['812'], M.conAtteseLocali(server, locale));
+  assert.deepEqual(b.map((x) => [x.num, x.chiusi]), [['812', ['700']]], '#700 non è fra gli aperti del server: non si scioglie');
+});
+
 test('i rami lasciati fuori si dicono, e un ramo coi suoi feedback non ne perde nessuno in silenzio', () => {
   assert.equal(M.rigaFuori({ vecchi: 0, altri: [] }, 30), '');
   assert.match(M.rigaFuori({ vecchi: 3, altri: ['prova/x'] }, 30), /3 rami fermi da più di 30 giorni.*1 rami che non sono di lavoro \(prova\/x\)/);
   assert.match(M.rigaRamo({ ramo: 'claude/x', avanti: 1, data: '2026-10-28', file: ['a.js'], feedback: ['1', '2', '3', '4'] }), /\(#1, #2, #3 e altri 1\)/);
 });
 
-test('il contesto porta il ruolo, le schede in ordine, chi non ha scheda, i rami e la spesa da chiedere', () => {
-  const t = M.testoContesto({
-    ruolo: '# Ruolo: manutentore',
-    schede: [scheda(20), scheda(3), scheda(99)],
-    indice: [{ num: '3', stato: 'todo', priorita: 1 }, { num: '20', stato: 'design', priorita: null }, { num: '44', stato: 'todo' }],
+test('il contesto porta il ruolo, le schede del server in ordine con la parte locale, e dice quando le schede locali mancano o non valgono', () => {
+  const base = {
+    ruolo: '# Ruolo: manutentore', stato: {}, taccuino: { testo: '', versione: 1 },
+    schede: [{ num: '20', stato: 'design', priorita: 1 }, { num: '3', stato: 'todo', priorita: 1 }, { num: '44', stato: 'todo', priorita: 0 }],
     rami: [{ ramo: 'claude/x', feedback: ['3'], avanti: 2, data: '2026-10-28T10:00:00Z', file: ['a.js'] }],
-  });
+  };
+  const t = M.testoIntero({ ...base, locali: [scheda(3), scheda(20, { valido: 'no' })], scartate: ['13.json'] });
   assert.ok(t.startsWith('# Ruolo: manutentore'));
   assert.ok(t.indexOf('#3 ·') < t.indexOf('#20 ·'), 'in ordine di numero');
-  assert.match(t, /## Schede \(2\)/);
-  assert.match(t, /Senza scheda \(1\): #44/);
-  assert.doesNotMatch(t, /#99 ·/, 'la scheda di un feedback chiuso da allora non è lavoro');
-  assert.match(t, /Fuori: 1 schede/);
-  assert.match(t, /## Rami in corso \(1\)\n\nclaude\/x \(#3\), 2 commit, 2026-10-28: a\.js/);
-  assert.match(t, /consumo della settimana dell'account/);
+  assert.match(t, /#20 · p1 · design \[browser-schede\/bug\] non riletta: non togliere lavoro su questa · valido no/);
+  assert.match(t, /Scartate \(1\): 13\.json; il numero dentro non è quello del nome del file/);
+  assert.doesNotMatch(t, /SCHEDE LOCALI MANCANTI/);
+  assert.match(t, /## Rami in corso dell'app \(1\)\n\nI rami del server non li vedo: non cercati\.\n\nclaude\/x \(#3\), 2 commit, 2026-10-28: a\.js/);
+  assert.match(M.testoIntero({ ...base, locali: [] }), /SCHEDE LOCALI MANCANTI: area, riassunto, file, giudizio e doppioni non ci sono/);
+  const senzaTimbro = Object.assign(scheda(3), { [TIMBRATA]: false });
+  assert.match(M.testoIntero({ ...base, locali: [senzaTimbro] }), /SCHEDE SENZA IL TIMBRO DELLO SCRIPT \(1\): #3/);
 });
 
 // #1790: il manutentore riceve una riga per ogni domanda che ferma un feedback; non la smista lui.
@@ -78,11 +100,12 @@ test('le domande che fermano un feedback: una riga ciascuna, prima quelle dell\'
     'D-7 «Guasto npm» ferma #812.2 dal ieri (in smistamento · nell\'ordine)',
     'D-3 «Bordo caldo?» ferma #1790 (aspetta l\'owner)',
   ]);
-  const t = M.testoContesto({ ruolo: '# Ruolo', schede: [], indice: [], rami: [], ferme: righe });
+  const intero = (extra) => M.testoIntero({ ruolo: '# R', stato: {}, taccuino: { testo: '', versione: 1 }, schede: [], ...extra });
+  const t = intero({ ferme: righe });
   assert.match(t, /## Domande che fermano un feedback \(2\)\n\nD-7 /);
   assert.match(t, /tu non le rispondi, ma un feedback fermo non si accende/);
-  assert.match(M.testoContesto({ ruolo: '# R', schede: [], indice: [], rami: [], ferme: [] }), /Nessuna: nessun feedback aperto aspetta una domanda/);
-  assert.match(M.testoContesto({ ruolo: '# R', schede: [], indice: [], rami: [], ferme: 'Non so quali domande fermano un feedback: niente credenziali.' }),
+  assert.match(intero({ ferme: [] }), /Nessuna: nessun feedback aperto aspetta una domanda/);
+  assert.match(intero({ ferme: 'Non so quali domande fermano un feedback: niente credenziali.' }),
     /## Domande che fermano un feedback \(\?\)\n\nNon so quali/, 'senza server il contesto esce lo stesso, e lo dice');
 });
 
@@ -90,8 +113,23 @@ test('il ramo di un worker prende il numero del suo feedback dall\'indice', () =
   const rami = M.conNumeri([
     { ramo: 'worker/HNgzAr4lreN25OPInPXq-20261029T021625Z', feedback: ['12', '1680'] },
     { ramo: 'claude/altro', feedback: ['5'] },
-  ], [{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }]);
-  assert.deepEqual(rami.map((r) => r.feedback), [['1680', '12'], ['5']]);
+    { ramo: 'worker/b493d90e-af97-4313-bec1-55961a7bb376-20261022T171141Z', feedback: [] },
+  ], [{ id: 'HNgzAr4lreN25OPInPXq', num: '1680' }, { id: 'b493d90e-af97-4313-bec1-55961a7bb376', num: '1488' }]);
+  assert.deepEqual(rami.map((r) => r.feedback), [['1680', '12'], ['5'], ['1488']], 'anche un id uuid, coi trattini');
+});
+
+test('un numero dell\'ordine che aspetta l\'owner, o un feedback chiuso senza fusione, non parte: si dice col rimedio', () => {
+  const indice = [
+    { num: '80', stato: 'design', attese: [] }, { num: '81', stato: 'aligned', attese: [] }, { num: '82', stato: 'unlabeled', attese: [] },
+    { num: '71', stato: 'todo', attese: ['50'] }, { num: '90', stato: 'todo', attese: [] },
+  ];
+  assert.deepEqual(M.bloccatiNellOrdine(['80', '81', '82', '71', '90', '999'], indice).map((b) => b.num), ['80', '81', '82', '71'],
+    '#999 non è fra gli aperti: il server lo salta');
+  const [design, , , chiuso] = M.bloccatiNellOrdine(['80', '81', '82', '71'], indice);
+  assert.match(M.rigaBloccato(design), /#80 è in design: aspetta l'owner, nessuna routine lo prende/);
+  assert.match(M.rigaBloccato(chiuso), /#71 aspetta #50, chiuso senza fusione: non si scioglie, e il server lo sposta in design; togli l'attesa o togli #71/);
+  assert.match(M.rigaOrdine(['71', '90'], indice), /#71 \(todo, non parte: aspetta #50 \(chiuso senza fusione: non si scioglie\)\)/);
+  assert.match(M.rigaOrdine(['80'], indice), /#80 \(design, non parte: aspetta l'owner\)/);
 });
 
 test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o che nessuno li tocca', async (t) => {
@@ -115,7 +153,8 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
   assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
   assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
-  assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
+  assert.match(out.join('\n'), /^Non so se un ramo in corso tocca #13: non\/esiste\.js non c'è fra i file di git dell'app\./m,
+    'un file che git non conosce non dà «nessun ramo»');
   assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo }), 1);
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
@@ -133,17 +172,18 @@ test('una scheda di cui non fidarsi lo dice nella sua riga: non buona, vecchia, 
   const f = { id: 'A', num: '12', stato: 'todo', priorita: 1, aggiornato: 't2' };
   const fonte = (aggiornato) => ({ _fonte: { id: 'A', stato: 'todo', aggiornato } });
   assert.equal(M.avvisoScheda(scheda(12, fonte('t2')), f), '');
-  assert.match(M.rigaScheda(scheda(12, { riassunto: '' }), f), /^#12 · SCHEDA NON BUONA/);
-  assert.match(M.rigaScheda(scheda(12, fonte('t1')), f), /^#12 · SCHEDA VECCHIA/);
-  assert.match(M.rigaScheda(scheda(12, { ...fonte('t2'), valido: 'no' }), f), /^#12 · non riletta/);
-  assert.match(M.rigaScheda(scheda(12, { ...fonte('t2'), doppione_di: ['#7'] }), f), /^#12 · non riletta/);
+  assert.match(M.avvisoScheda(scheda(12, { riassunto: '' }), f), /^SCHEDA NON BUONA/);
+  assert.match(M.avvisoScheda(scheda(12, fonte('t1')), f), /^SCHEDA VECCHIA/);
+  assert.match(M.avvisoScheda(scheda(12, { ...fonte('t2'), valido: 'no' }), f), /^non riletta/);
+  assert.match(M.avvisoScheda(scheda(12, { ...fonte('t2'), doppione_di: ['#7'] }), f), /^non riletta/);
   assert.equal(M.avvisoScheda(scheda(12, { ...fonte('t2'), valido: 'no', _riletta: { at: 'x', modello: 'opus' } }), f), '');
+  // Il contesto vero: la riga del server porta l'avviso della scheda locale.
+  assert.match(M.rigaSchedaServer({ num: '12', stato: 'todo' }, scheda(12, { riassunto: '' })), /SCHEDA NON BUONA, da rifare/);
 });
 
 test('la riga di una scheda dice se il feedback aspetta un pacchetto, o se è lui il pacchetto', () => {
-  const riga = M.rigaScheda(scheda(812), { stato: 'todo', priorita: 1, attese: ['950'] });
-  assert.match(riga, / · aspetta #950/);
-  assert.match(M.rigaScheda(scheda(950), { stato: 'todo', priorita: 1, unisce: ['812', '815'] }), / · pacchetto di #812, #815/);
+  assert.match(M.rigaSchedaServer({ num: '812', stato: 'todo', priorita: 1, aspetta: ['950'] }, scheda(812)), / · aspetta #950/);
+  assert.match(M.rigaSchedaServer({ num: '950', stato: 'todo', priorita: 1, unisce: ['812', '815'] }, scheda(950)), / · pacchetto di #812, #815/);
 });
 
 test('un ramo i cui feedback sono tutti chiusi secondo l\'indice non è in corso, e si dice fra i lasciati fuori', () => {
@@ -251,7 +291,7 @@ test('contesto intero: tutte le schede coi conti per priorità, la parte delle s
     schede: ottocento(), locali: [scheda(40, { file_probabili: ['src/a.js'] })], rami: [], ferme: [] });
   assert.match(t, /## Schede \(800: 3 a 3, 25 a 2, 387 a 1, 385 a 0\)/);
   assert.equal((t.match(/^#\d+ · p/gm) || []).length, 800);
-  assert.match(t, /^#40 · p0 · todo — Titolo del feedback numero 40 .* \[browser-schede\/bug\] Il menu non si apre\. \| file: src\/a\.js$/m);
+  assert.match(t, /^#40 · p0 · todo — Titolo del feedback numero 40 .* \[browser-schede\/bug\] valido si: Il menu non si apre\. \| file: src\/a\.js$/m);
   assert.match(t, /Indicazione dell'owner \(2026-10-31\): grafica/);
   assert.match(t, /npm run manutentore -- registro/);
   assert.ok(t.startsWith('# Ruolo: manutentore'));
@@ -476,4 +516,132 @@ test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non
   const spec = readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\s+/g, ' ');
   assert.match(spec, /censimento delle schede parte da lui/);
   assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
+});
+
+test('un ordine con chi aspetta un feedback aperto fuori dall\'ordine si rifiuta prima di scrivere, col rimedio', async (t) => {
+  const indice = [
+    { id: 'a', num: '812', stato: 'todo', attese: [] }, { id: 'b', num: '815', stato: 'todo', attese: ['700'] },
+    { id: 'c', num: '700', stato: 'todo', attese: [] }, { id: 'd', num: '920', stato: 'todo', attese: ['950'] },
+    { id: 'e', num: '950', stato: 'todo', attese: [], unisce: ['920', '921'] }, { id: 'f', num: '930', stato: 'todo', attese: ['600'] },
+  ];
+  assert.deepEqual(M.bloccatiNellOrdine(['812', '815', '920', '930'], indice), [
+    { num: '815', attesi: ['700'], chiusi: [], pacchetto: '' },
+    { num: '920', attesi: ['950'], chiusi: [], pacchetto: '950' },
+    { num: '930', attesi: [], chiusi: ['600'], pacchetto: '' },
+  ], '#930 aspetta #600, fuori dall\'indice: l\'indice tiene solo le attese che fermano, quindi è chiuso senza fusione');
+  assert.deepEqual(M.bloccatiNellOrdine(['700', '815'], indice), [], 'con l\'aspettato nell\'ordine il primo si sblocca da sé');
+  assert.match(M.rigaBloccato({ num: '815', attesi: ['700'], pacchetto: '' }), /#815 aspetta #700, ancora aperto e fuori dall'ordine: metti anche lui, o togli #815/);
+  assert.match(M.rigaBloccato({ num: '920', attesi: ['950'], pacchetto: '950' }), /#920 è unita nel pacchetto #950, che non è nell'ordine: al suo posto metti #950/);
+  assert.match(M.rigaOrdine(['815', '700'], indice), /#815 \(todo\), #700 \(todo\)/);
+  const r = M.rigaOrdine(['815'], indice);
+  assert.match(r, /#815 \(todo, non parte: aspetta #700\)/);
+  assert.match(r, /Non possono partire 1: #815 aspetta #700/);
+  // Lo strumento rifiuta prima della rete: niente scritto.
+  const dir = cartellaTemporanea('manutentore-ordine');
+  const err = [];
+  const e = console.error;
+  console.error = (...a) => err.push(a.join(' '));
+  t.after(() => { console.error = e; togliCartella(dir); });
+  writeFileSync(join(dir, 'indice.json'), JSON.stringify(indice));
+  assert.equal(await M.main(['accendi', '812,815,920', '--cartella', dir]), 1);
+  assert.match(err.join('\n'), /RIFIUTATO: nell'ordine ci sono feedback che non possono partire/);
+  assert.match(err.join('\n'), /- #815 aspetta #700/);
+  assert.match(err.join('\n'), /- #920 è unita nel pacchetto #950/);
+  assert.match(err.join('\n'), /Non ho scritto niente/);
+});
+
+test('incroci dice «non so» quando non lo può sapere: senza file, con percorsi fuori dal repo, o coi rami del server non visti', () => {
+  const rami = [
+    { ramo: 'claude/menu', feedback: ['44', '45'], file: ['src/content/menu.js', 'src/pages/manage/a.js'] },
+    { ramo: 'worker/Abc-20261101T000000Z', server: true, feedback: ['1512'], file: ['filo-security/functions/src/routine/accensioni.js'] },
+  ];
+  const radice = '/casa/Filo';
+  assert.equal(M.testoIncroci(scheda(12, { file_probabili: ['src/pages/manage'] }), rami, { radice }),
+    'claude/menu (#44, #45): src/pages/manage/a.js', 'una cartella senza la barra in fondo vale come cartella, e il ramo dice tutti i suoi feedback');
+  assert.equal(M.testoIncroci(scheda(12, { file_probabili: ['/casa/Filo/src/content/menu.js'] }), rami, { radice }), 'claude/menu (#44, #45): src/content/menu.js');
+  assert.equal(M.testoIncroci(scheda(12, { file_probabili: ['C:\\Users\\agenti AI\\Filo\\src\\content\\menu.js'] }), rami, { radice: 'C:\\Users\\agenti AI\\Filo' }),
+    'claude/menu (#44, #45): src/content/menu.js', 'un percorso di Windows dentro la radice si riconosce');
+  assert.match(M.testoIncroci(scheda(12, { file_probabili: [] }), rami, { radice }), /^Non so se un ramo in corso tocca #12: la scheda non ha file probabili\./);
+  assert.match(M.testoIncroci(scheda(12, { file_probabili: ['/altrove/x.js'] }), rami, { radice }), /^Non so se un ramo in corso tocca #12: \/altrove\/x\.js non è un percorso del repo/);
+  assert.match(M.testoIncroci(scheda(12, { file_probabili: ['src/x.js'] }), rami, { radice }), /^Nessun ramo in corso dell'app né del server tocca/);
+  assert.equal(M.testoIncroci(scheda(12, { area: 'server-filo-security', file_probabili: ['filo-security/functions/src/routine/'] }), rami, { radice }),
+    '[server] worker/Abc-20261101T000000Z (#1512): filo-security/functions/src/routine/accensioni.js');
+  assert.match(M.testoIncroci(scheda(12, { area: 'server-filo-security', file_probabili: ['filo-security/functions/src/x.js'] }), [], { radice, motivoServer: 'manca il checkout' }),
+    /^Nessun ramo in corso dell'app tocca .*; ma i rami del server non li vedo \(manca il checkout\)\.$/);
+});
+
+test('i rami del server si leggono dal checkout di filo-security, coi file col prefisso; senza checkout lo si dice', (t) => {
+  const base = cartellaTemporanea('manutentore-server');
+  t.after(() => togliCartella(base));
+  const repo = join(base, 'filo-security');
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  mkdirSync(join(repo, 'functions', 'src'), { recursive: true });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't');
+  writeFileSync(join(repo, 'functions', 'src', 'a.js'), 'a'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  g('checkout', '-qb', 'lavoro'); writeFileSync(join(repo, 'functions', 'src', 'a.js'), 'b'); g('commit', '-qam', '#1512 accensioni');
+  g('update-ref', 'refs/remotes/origin/worker/Abc123-20261101T000000Z', 'HEAD');
+  const r = M.ramiDelServer(base, { scarica: false, server: join(repo, 'functions') });
+  assert.equal(r.motivo, '');
+  assert.deepEqual(r.rami.map((x) => [x.ramo, x.server, x.file, x.feedback]), [['worker/Abc123-20261101T000000Z', true, ['filo-security/functions/src/a.js'], ['1512']]]);
+  assert.match(M.rigaRamo(r.rami[0]), /^\[server\] worker\/Abc123/);
+  assert.deepEqual(M.titoloRami(r.rami, ''), ['## Rami in corso (1: 0 dell\'app, 1 del server)']);
+  assert.match(M.ramiDelServer(base, { scarica: false, server: '' }).motivo, /manca il checkout di filo-security/);
+});
+
+test('il contesto vero dice quanto è grosso, e si divide per priorità e a turni', () => {
+  const schede = Array.from({ length: 9 }, (_, i) => scheda(i + 1, i === 8 ? { urgente: true } : {}));
+  const indice = schede.map((s, i) => ({ num: s.numero, stato: 'todo', priorita: i < 2 ? 2 : 0 }));
+  const delServer = indice.map((f) => ({ num: f.num, stato: f.stato, priorita: f.priorita }));
+  const intero = (extra) => M.testoIntero({ ruolo: '# R', stato: {}, taccuino: { testo: '', versione: 1 }, schede: delServer, locali: schede, ...extra });
+  const piccolo = intero({});
+  assert.match(piccolo, /Misura del contesto: [\d.,\s]+ caratteri, circa [\d.,\s]+ token\./);
+  assert.doesNotMatch(piccolo, /conviene dividerlo/, 'piccolo: niente consiglio');
+  const grosso = intero({ ruolo: `# R\n${'x'.repeat(M.TOKEN_DA_DIVIDERE * 4)}` });
+  assert.match(grosso, /conviene dividerlo: --priorita 2 .* e --turno 1\/3/);
+  const alte = intero({ filtro: { priorita: 2 } });
+  assert.match(alte, /## Schede \(3 su 9:/);
+  assert.match(alte, /Giro ridotto: 3 schede su 9 \(3 da priorità 2 in su o urgenti\); fuori da questo giro 6\./);
+  assert.ok(alte.includes('#1 ·') && alte.includes('#2 ·') && alte.includes('#9 ·') && !alte.includes('#3 ·'), 'l\'urgente della scheda locale entra');
+  const turno = M.schedeDelGiro(schede, new Map(indice.map((f) => [f.num, f])), { priorita: 2, turno: { i: 2, n: 3 } });
+  assert.deepEqual(turno.scelte.map((s) => s.numero), ['1', '2', '5', '6', '9'], 'le alte sempre, e il secondo terzo delle altre');
+  assert.match(turno.nota, /2 delle altre, turno 2 di 3 \(da #5 a #6\).*Gli altri turni: --turno 1\/3, 3\/3\./);
+  const tutti = [1, 2, 3].flatMap((i) => M.schedeDelGiro(schede, new Map(), { turno: { i, n: 3 } }).scelte.map((s) => s.numero));
+  assert.deepEqual([...new Set(tutti)].sort((a, b) => a - b), schede.map((s) => s.numero), 'i turni insieme le danno tutte');
+  assert.deepEqual(M.filtroDaArgomenti(['contesto', '--priorita', '2', '--turno', '1/3']), { ok: true, filtro: { priorita: 2, turno: { i: 1, n: 3 } } });
+  assert.equal(M.filtroDaArgomenti(['contesto', '--turno', '4/3']).ok, false);
+  assert.equal(M.filtroDaArgomenti(['contesto', '--priorita', 'alta']).ok, false);
+  assert.equal('testoContesto' in M, false, 'una versione sola del contesto, quella che i comandi usano');
+});
+
+test('incroci e scheda usano la stessa regola: un file probabile che non si confronta con git non dà mai «nessun ramo»', async () => {
+  const S = await import('../../scripts/schede.mjs');
+  const { trovaInGit } = await import('../../scripts/lib/su-main.mjs');
+  const rami = [
+    { ramo: 'claude/lavoro', feedback: ['44'], file: ['src/pages/manage/a.js'] },
+    { ramo: 'claude/srv', server: true, feedback: ['46'], file: ['filo-security/functions/src/routine/acc.js'] },
+  ];
+  const opz = { radice: '/radice/Filo', motivoServer: '' };
+  for (const f of ['src/**/*.js', 'src/pages/*', 'src/pages/manage/{a,b}.js', 'src/pages/manage/a.js:12']) {
+    assert.ok(S.validaScheda(scheda(9, { file_probabili: [f] }), '9').length > 0, `la scheda si rifiuta: ${f}`);
+    assert.match(M.testoIncroci(scheda(9, { file_probabili: [f] }), rami, opz), /^Non so se un ramo in corso tocca #9: .* non è un percorso del repo/, f);
+  }
+  // Senza git da interrogare: le maiuscole non contano, e un file del server senza prefisso vale per i rami del server.
+  assert.equal(M.testoIncroci(scheda(9, { file_probabili: ['SRC/Pages/manage/a.js'] }), rami, opz), 'claude/lavoro (#44): src/pages/manage/a.js');
+  assert.equal(M.testoIncroci(scheda(9, { area: 'server-filo-security', file_probabili: ['functions/src/routine/acc.js'] }), rami, opz),
+    '[server] claude/srv (#46): filo-security/functions/src/routine/acc.js');
+  // Con git: le maiuscole si correggono, il file del server prende il prefisso, quello che non c'è è «non so».
+  const trova = trovaInGit(['src/pages/manage/a.js', 'functions/x.js'], ['functions/src/routine/acc.js', 'package.json']);
+  assert.equal(trova('SRC/Pages/manage/a.js'), 'src/pages/manage/a.js');
+  assert.equal(trova('src/pages/manage'), 'src/pages/manage');
+  assert.equal(trova('functions/src/routine/acc.js'), 'filo-security/functions/src/routine/acc.js');
+  assert.equal(trova('filo-security/package.json'), 'filo-security/package.json');
+  assert.equal(trova('src/nuovo.js'), '');
+  assert.equal(M.testoIncroci(scheda(9, { file_probabili: ['functions/src/routine/acc.js'] }), rami, { ...opz, trova }),
+    '[server] claude/srv (#46): filo-security/functions/src/routine/acc.js');
+  assert.match(M.testoIncroci(scheda(9, { file_probabili: ['src/nuovo.js', 'src/pages/manage/b.js'] }), [], { ...opz, trova: trovaInGit(['src/pages/manage/b.js'], []) }),
+    /^Non so se un ramo in corso tocca #9: src\/nuovo\.js non c'è fra i file di git dell'app né del server\. Di src\/pages\/manage\/b\.js nessun ramo in corso\./);
+  const senzaServer = trovaInGit(['src/a.js'], null);
+  assert.equal(senzaServer('functions/src/routine/acc.js'), '', 'senza il checkout del server un file che l\'app non ha è «non so»');
+  assert.equal(senzaServer('filo-security/functions/x.js'), 'filo-security/functions/x.js', 'col prefisso resta: lo dice il motivo del server');
 });

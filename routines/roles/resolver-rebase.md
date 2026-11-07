@@ -12,8 +12,11 @@ Sei già sul ramo: non cambiarlo, e non fondere su `main`.
 toccano nelle righe, si rompono insieme. Tu fai solo il rebase: quei test non
 li correggi, anche se la critica sembra chiederlo. Correggerli vuol dire
 cambiare la logica, e una logica cambiata la giudica la verifica: chi verifica
-dopo di te rilancia gli unit, e ogni rosso diventa un suo rilievo. Nel report
-scrivi l'elenco dei test rossi dopo il rebase.
+dopo di te rilancia gli unit, e ogni rosso diventa un suo rilievo. Per questo
+il motivo è «prove rosse» anche con un rebase pulito o con dei conflitti (i
+file in conflitto li trova git da sé): è quello che fa partire la verifica
+intera, e senza il cancello ritroverebbe gli stessi rossi e ti richiamerebbe.
+Nel report scrivi l'elenco dei test rossi dopo il rebase.
 
 <!-- includi: _decisioni-owner.md -->
 

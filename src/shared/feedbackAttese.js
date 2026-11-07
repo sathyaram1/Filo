@@ -304,8 +304,61 @@
     return `priorità ${a.dopo}: la eredita da ${etichetta(a.da)}, che lo aspetta`;
   }
 
+  // Fin dove scende la frase di un pacchetto nei pacchetti dentro: lo stesso tetto della chiusura (PROFONDITA_MAX sul server).
+  const PROFONDITA_PACCHETTI = 5;
+
+  /** `unisce` già letto ([{ id, num }]) ripulito; altro → []. */
+  function uniteDelCampo(raw) {
+    return (Array.isArray(raw) ? raw : [])
+      .map((u) => ({ id: String((u && u.id) || '').trim(), num: normalizzaNumero(u && u.num) }))
+      .filter((u) => ID_RE.test(u.id));
+  }
+
+  /**
+   * Le unite che la frase del pacchetto `p` ({ id, unisce, resolvedInVersion }) raggiunge, a ogni livello: le `done` con
+   * `statusReason: pacchetto`, e di una che è a sua volta un pacchetto le sue. Ogni strada che scrive la frase di un
+   * pacchetto passa di qui. Una chiusa da un altro pacchetto resta fuori: aspetta solo pacchetti fuori da questa catena,
+   * o porta un'altra versione (la chiusura le dà quella del pacchetto). `leggi(ids)` → documenti
+   * { _id, status in chiaro ('' se non si legge), statusReason, resolvedInVersion, waitsFor, unisce }.
+   * → { unite: [{ id, num }], illeggibili: [{ id, num }] }
+   */
+  async function uniteDellaFrase(p, leggi) {
+    const unite = [];
+    const illeggibili = [];
+    const radice = String((p && p.id) || '');
+    const versione = String((p && p.resolvedInVersion) || '').trim();
+    const viste = new Set([radice]);
+    let livello = [{ catena: [radice], unisce: p && p.unisce }];
+    for (let l = 0; l < PROFONDITA_PACCHETTI && livello.length; l += 1) {
+      const voci = [];
+      for (const q of livello) {
+        for (const u of uniteDelCampo(q.unisce)) if (!viste.has(u.id)) { viste.add(u.id); voci.push({ ...u, catena: q.catena }); }
+      }
+      if (!voci.length) break;
+      // eslint-disable-next-line no-await-in-loop
+      const docs = new Map(((await leggi(voci.map((v) => v.id))) || []).filter(Boolean).map((d) => [String(d._id), d]));
+      livello = [];
+      for (const v of voci) {
+        const d = docs.get(v.id);
+        if (!d) continue;
+        const stato = String(d.status || '').trim();
+        if (!stato) { illeggibili.push({ id: v.id, num: v.num }); continue; }
+        if (stato !== 'done' || d.statusReason !== 'pacchetto') continue;
+        // Chi apre un pacchetto sposta su di lui le attese verso le sue unite: l'unita di un pacchetto dentro può
+        // aspettare quello sopra. Conta la catena intera.
+        const attese = atteseDi(d);
+        if (attese.length && !attese.some((w) => v.catena.includes(w.id))) continue;
+        const sua = String(d.resolvedInVersion || '').trim();
+        if (versione && sua && sua !== versione) continue;
+        unite.push({ id: v.id, num: v.num });
+        if (uniteDelCampo(d.unisce).length) livello.push({ catena: [...v.catena, v.id], unisce: d.unisce });
+      }
+    }
+    return { unite, illeggibili };
+  }
+
   global.SN_FB_ATTESE = {
-    CAMPO, MAX, STATO, ETICHETTA,
+    CAMPO, MAX, STATO, ETICHETTA, PROFONDITA_PACCHETTI, uniteDelCampo, uniteDellaFrase,
     normalizzaNumero, leggiNumeri, atteseDi, statoAttesa, statiDelleAttese, aspettaAncora, etichetta, testoAttese, valida,
     daScrivereSu, conflittoDiScrittura, scriviSullaLettura, RILETTURE,
     prioritaDi, scattaEredita, ereditaPriorita, notaEredita,

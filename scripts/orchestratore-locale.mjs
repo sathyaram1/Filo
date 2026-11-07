@@ -220,11 +220,16 @@ export function trovaClaude(env = process.env, piattaforma = process.platform) {
   return '';
 }
 
-/** Gli argomenti di `claude -p` per un ruolo. PURA. */
-export function argomentiClaude({ model, effort, nome, addDirs = [], permessi = 'auto', budget = '' }) {
+/**
+ * Gli argomenti di `claude -p` per un ruolo. `strumenti` (lista): i soli che l'istanza ha, già permessi, e coi file
+ * chiusi nelle cartelle di lavoro (`--restricted`). PURA.
+ */
+export function argomentiClaude({ model, effort, nome, addDirs = [], permessi = 'auto', budget = '', strumenti = null }) {
+  const soli = Array.isArray(strumenti) ? strumenti.join(',') : '';
   return [
     '-p', '--output-format', 'json', '--model', model, ...(effort ? ['--effort', effort] : []),
     '--permission-mode', permessi, '-n', nome,
+    ...(Array.isArray(strumenti) ? ['--restricted', '--tools', soli, '--allowedTools', soli] : []),
     ...addDirs.flatMap((d) => ['--add-dir', d]),
     ...(budget ? ['--max-budget-usd', String(budget)] : []),
   ];

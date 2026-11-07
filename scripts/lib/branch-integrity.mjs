@@ -37,7 +37,7 @@ import { ensureCommentChar } from './carattere-commento.mjs';
 import { senzaToken } from './git-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
-import { leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { idNelRamo, leggiTentativo, tentativiSuperati, viviInCima } from './tentativi.mjs';
 import { lineaPrincipale, numeroFeedback, ultimaFusionePropria } from './su-main.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
@@ -108,6 +108,8 @@ export function attemptStamp(nowMs = Date.now()) {
   return new Date(nowMs).toISOString().replace(/[-:]/g, '').replace(/\.\d+Z$/, 'Z');
 }
 
+export { idNelRamo };
+
 /**
  * Nome del branch per un lavoro NUOVO. È UNICO PER TENTATIVO: `worker/<id>` era
  * stabile fra tentativi diversi sullo stesso feedback, e due tentativi che si
@@ -120,10 +122,6 @@ export function newWorkBranch(id, nowMs = Date.now()) {
   const safe = idNelRamo(id);
   if (!safe) throw new Error('newWorkBranch: id non valido');
   return `worker/${safe}-${attemptStamp(nowMs)}`;
-}
-
-function idNelRamo(id) {
-  return String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
 }
 
 /** Lo stampo se `ramo` è un tentativo di lavoro nuovo su `id` (`worker/<id>-<stampo>`), se no ''. PURA. */
@@ -155,7 +153,7 @@ export function tentativiPrecedenti({ root, id, num = '', mainBranch = 'main', e
   // La fusione del feedback letta su main regge anche quando la potatura ha già tolto il ramo fuso.
   let fusioni = {};
   try {
-    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main }) : '';
+    const data = numeroFeedback(num) ? ultimaFusionePropria(root, num, { ref: main, id }) : '';
     if (data) fusioni = { [safe]: attemptStamp(Date.parse(data)) };
   } catch (_) { /* senza la storia di main resta la regola sui rami */ }
   const superati = tentativiSuperati(conFusi, { fusioni });

@@ -84,7 +84,8 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
   uguale (quelle già salvate non si rifanno), e una sessione che chiude prima lascia nel taccuino il censimento «in
   corso», che il mattino dopo riprende anche senza FERMO. Solo a censimento finito scrivi il giorno nel taccuino e apri
   un feedback che toglie dal ruolo questa frase e la sua prova. Poi `npm run manutentore -- contesto`
-  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
+  per la lettura intera (in testa dice quanto pesa: oltre la soglia che stampa, chiedilo diviso, con `--priorita 2`
+  per le priorità alte e le urgenti e `--turno 1/3`, `2/3`… per il resto a turni), poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
   (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
@@ -118,7 +119,10 @@ Gestione → Automazioni.
    chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
    nuovo può unire il vecchio e il doppione.
 4. **I rami in corso.** Prima di accendere un feedback guarda se un ramo vivo tocca i suoi file probabili
-   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
+   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine. I rami del server (segnati `[server]`)
+   ci sono se accanto al repo c'è il checkout di filo-security; se manca, il titolo dice «dell'app» e i lavori sul
+   server non li vedi. Quando incroci risponde «Non so», la scheda non ha file utili: rifalla, o decidi tu leggendo i
+   rami.
 5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
 6. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
@@ -128,15 +132,21 @@ Gestione → Automazioni.
    accensioni e se è fermo: un account fermo non accende fino al rinnovo o al giorno dopo.
 
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
-e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta.
+e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta. Nell'ordine conta
+solo un feedback con un lavoro che una routine prende adesso o che si sbloccherà da sé: uno in design, aligned o
+unlabeled aspetta te; uno che aspetta un feedback chiuso senza fusione non partirà mai (il server lo sposta in design);
+uno che aspetta un feedback aperto non parte finché quello non è fuso, e se l'aspettato non è nell'ordine non
+partirebbe mai. Un ordine di soli numeri così vale come nessun ordine. `accendi` li rifiuta e dice il rimedio
+(l'aspettato, il pacchetto al posto della sua unita, o togliere il numero).
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
 deve girare fra i riservati). Se chiude con «ancora fuori», l'indice c'è lo stesso: rilancia quando il server risponde.
 
 Le schede: `aspetta #P` e `pacchetto di …` dicono chi è già in un pacchetto. Una scheda «non riletta» non basta per
-togliere lavoro; una «SCHEDA VECCHIA» o «NON BUONA» va rifatta prima di decidere su di lei
-(`npm run feedback:schede -- scrivi --solo N`). Un feedback fermo su una domanda per l'owner ha la sua riga: aspetta
+togliere lavoro; una «NON BUONA», «SENZA IL TIMBRO DELLO SCRIPT» o fra le «Scartate» va rifatta prima di decidere su
+di lei (`npm run feedback:schede -- scrivi --solo N`); con «SCHEDE LOCALI MANCANTI» decidi su quello che dice il
+server, e prima `elenca`. Un feedback fermo su una domanda per l'owner ha la sua riga: aspetta
 lui, accenderlo non serve.
 
 ## Guasti
@@ -224,7 +234,7 @@ riapri D-n`): le risposte che registri nascono non fidate, e lui le rivede in Ge
 dice il perché: non si aggira.
 
 ```bash
-npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo
+npm run manutentore -- contesto [--priorita 2] [--turno 1/3] | sveglia   # il contesto intero (anche diviso), o il piccolo
 npm run manutentore -- stato | schede              # stato, segnali e N; tutte le schede in una riga
 npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
 npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]

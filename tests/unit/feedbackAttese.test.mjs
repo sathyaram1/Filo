@@ -639,3 +639,25 @@ test('--aspetta senza --sostituisci che dopo la rilettura toglierebbe l\'attesa 
     assert.deepEqual(rete.scritte, []);
   } finally { rete.ripristina(); }
 });
+
+test('le unite che la frase di un pacchetto raggiunge: a ogni livello, senza giri, e chi non si legge si dice', async () => {
+  const A = globalThis.SN_FB_ATTESE;
+  const fatto = (id, extra = {}) => ({ _id: id, status: 'done', statusReason: 'pacchetto', waitsFor: [], ...extra });
+  const docs = {
+    Q: fatto('Q', { waitsFor: [{ id: 'P', num: '900' }], unisce: [{ id: 'U', num: '902' }, { id: 'P', num: '900' }] }),
+    U: fatto('U', { waitsFor: [{ id: 'Q', num: '901' }] }),
+    T: fatto('T', { status: 'todo' }),
+    S: fatto('S', { status: '' }),
+  };
+  const letture = [];
+  const leggi = async (ids) => { letture.push(ids); return ids.map((id) => docs[id]).filter(Boolean); };
+  const r = await A.uniteDellaFrase({ id: 'P', unisce: [{ id: 'Q', num: '#901' }, { id: 'T', num: '903' }, { id: 'S', num: '904' }, { id: 'N', num: '905' }] }, leggi);
+  assert.deepEqual(r.unite, [{ id: 'Q', num: '901' }, { id: 'U', num: '902' }], 'Q aspetta P, U aspetta Q: tutte e due');
+  assert.deepEqual(r.illeggibili, [{ id: 'S', num: '904' }]);
+  assert.deepEqual(letture, [['Q', 'T', 'S', 'N'], ['U']], 'P dentro Q non si rilegge: un giro non gira');
+  // Una catena più lunga del tetto si ferma al tetto, come la chiusura sul server.
+  const catena = {};
+  for (let i = 1; i <= A.PROFONDITA_PACCHETTI + 2; i += 1) catena[`L${i}`] = fatto(`L${i}`, { unisce: [{ id: `L${i + 1}`, num: String(i + 1) }] });
+  const lunga = await A.uniteDellaFrase({ id: 'L0', unisce: [{ id: 'L1', num: '1' }] }, async (ids) => ids.map((id) => catena[id]).filter(Boolean));
+  assert.equal(lunga.unite.length, A.PROFONDITA_PACCHETTI);
+});
