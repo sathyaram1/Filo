@@ -603,13 +603,17 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SUGGERIMENTO_RITARDO);
-    });
-    document.addEventListener('mouseout', (e) => {
+      }, ritardoSuggerimento());
+    };
+    const fuori = (e) => {
       const t = e.target.closest('[data-tip]');
       if (!t) return;
       if (t === currentTarget && (!e.relatedTarget || !t.contains(e.relatedTarget))) hide();
-    });
+    };
+    document.addEventListener('mouseover', sopra);
+    document.addEventListener('pointerover', sopra);
+    document.addEventListener('mouseout', fuori);
+    document.addEventListener('pointerout', fuori);
     document.addEventListener('mousedown', hide, true);
     window.addEventListener('blur', hide);
   })();
