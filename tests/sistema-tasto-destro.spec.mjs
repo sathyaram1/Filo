@@ -3,7 +3,7 @@
 // rete Wi-Fi si dimentica; il volume ha i valori pronti. Il computer è finto (comandiSistema e lettore del main).
 
 import { test, expect } from './fixtures/electron.mjs';
-import { home } from './helpers/chatFinta.mjs';
+import { home, modelloFinto, chiedi } from './helpers/chatFinta.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 
