@@ -67,6 +67,12 @@ test('tempi', async ({ openTab }) => {
     ['tutto ctrl a 3000', '<h1>titolo</h1><p>testo uno</p><ul><li>voce</li></ul><blockquote>cit</blockquote>', async () => {
       await page.keyboard.press(`${ctrl}+a`);
     }, 3000],
+    ['fine paragrafo 1000', '<p>primo paragrafo di testo</p><p>secondo</p>', async () => {
+      await page.evaluate(() => { const p = document.querySelector('#doc p'); getSelection().collapse(p.firstChild, p.firstChild.length); });
+    }, 1000],
+    ['fine titolo 1000', '<h2>titolo</h2><p>secondo</p>', async () => {
+      await page.evaluate(() => { const p = document.querySelector('#doc h2'); const t = document.createTreeWalker(p, NodeFilter.SHOW_TEXT).nextNode(); getSelection().collapse(t, t.length); });
+    }, 1000],
     ['codice pre 3000', '<pre>codice uno\ncodice due</pre><p>sotto</p>', async () => {
       await page.evaluate(() => { const p = document.querySelector('#doc pre'); getSelection().collapse(p.firstChild, 4); });
     }, 3000],
