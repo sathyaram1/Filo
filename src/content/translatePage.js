@@ -602,15 +602,21 @@
     const { shown, skipped, folded, background } = embeddedFrames(modo);
     hiddenFrames = folded;
     const expected = shown.length;
+    caricoAtteso = { riquadri: new WeakSet(), risposto: null, arrivati: 0 };
     if (!expected && !background.length) return null;
     const runId = 'r' + myRun;
     tellFrames(runId, skipped, false);
     tellFrames(runId, shown, true);
     tellFrames(runId, background, true, true);
+    for (const f of shown.concat(background)) {
+      if (global.SN_RIQUADRI_IN_ARRIVO?.caricato(f) === false) caricoAtteso.riquadri.add(f);
+    }
     // Chi non si farà vivo resta nel conto: `expected` sono i riquadri che si
     // VEDONO, e un rettangolo visibile che nessuno script raggiunge è
     // esattamente ciò che l'avviso finale deve confessare. Quelli tradotti in sottofondo hanno un conto a parte.
-    frameRuns.set(runId, { expected, acked: 0, ended: 0, applied: 0, left: 0, extraAcked: 0, extraEnded: 0 });
+    frameRuns.set(runId, {
+      expected, acked: 0, ended: 0, applied: 0, left: 0, extraExpected: background.length, extraAcked: 0, extraEnded: 0,
+    });
     try {
       await chrome.runtime.sendMessage({ type: MSG.TRANSLATE_FRAMES, mode: 'translate', runId });
     } catch (_) {}
