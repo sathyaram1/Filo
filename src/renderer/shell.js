@@ -1634,6 +1634,7 @@
     e.preventDefault();
     openTabContextMenu(s.t, e.clientX, e.clientY);
   });
+  tabsEl.addEventListener('pointerdown', (e) => { ultimoPointerId = e.pointerId; });
   tabsEl.addEventListener('mousedown', (e) => {
     const s = schedaDellEvento(e);
     if (s) startTabDrag(e, s.t, s.el);
