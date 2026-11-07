@@ -2305,3 +2305,19 @@ test('Ricevuti: chi aspetta il timbro col segno lavoro server torna In coda solo
   const fidato = Object.assign({}, fermo, { fiducia: 'fidato' });
   assert.equal(MR.ownerActions(fidato, {})[0].key, 'accept');
 });
+
+// #2217 giro 2: una regola sola per i tasti singoli e per l'approvazione in blocco degli allineati.
+test('chiedeFiduciaPerLaCoda: solo il lavoro server non fidato; il suo tasto è lo stesso del rombo azzurro', () => {
+  const segno = { localOnly: { by: 'routine', at: 1 } };
+  assert.equal(MR.chiedeFiduciaPerLaCoda({ ...segno, fiducia: 'non_fidato' }), true);
+  assert.equal(MR.chiedeFiduciaPerLaCoda({ ...segno }), true, 'fiducia assente vale non fidato');
+  assert.equal(MR.chiedeFiduciaPerLaCoda({ ...segno, fiducia: 'fidato' }), false);
+  assert.equal(MR.chiedeFiduciaPerLaCoda({ fiducia: 'non_fidato' }), false, 'lavoro dell’app');
+  const allineato = { status: 'aligned', fiducia: 'non_fidato', ...segno };
+  const rombo = { status: 'design', statusReason: 'locale', fiducia: 'non_fidato' };
+  const a = MR.ownerActionFor(allineato, 'accept_local');
+  const b = MR.ownerActionFor(rombo, 'accept_local');
+  assert.ok(a && b);
+  assert.deepEqual({ ...a }, { ...b }, 'le due strade danno lo stesso tasto');
+  assert.equal(MR.ownerActionFor(allineato, 'accept'), null, 'niente «→ In coda» che lo lascerebbe non fidato');
+});
