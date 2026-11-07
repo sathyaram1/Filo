@@ -51,7 +51,7 @@ test('conversazione pulita: le richieste vere, comunque dette, aprono il riquadr
       await modelloFinto(app, [chiamata(`v${i}`, nome, args), { text: 'Serve la tua conferma.' }]);
       await chiedi(page, frase);
       await riquadroConLaParola(page);
-      expect(await confirmText(page), frase).toContain('Abbassa una difesa di Filo');
+      expect(await confirmText(page), frase).toContain(nome === 'CANCELLA_MEMORIA' ? 'DEFINITIVAMENTE' : 'Abbassa una difesa di Filo');
       if (i === 0) {
         mkdirSync(SHOTS, { recursive: true });
         await page.screenshot({ path: join(SHOTS, 'autonomia-costo4-pulita.png') });
