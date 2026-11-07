@@ -2391,7 +2391,7 @@
         meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
       } else if (r.state === 'interrupted' && r.nota) {
         meta.textContent = `${stateLabel(r)} · ${r.nota}`;
-        meta.title = r.nota;
+        meta.dataset.tip = r.nota;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
