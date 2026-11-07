@@ -27,6 +27,16 @@ async function linguetta(app, shell, id, dx = 0, dy = 0) {
   return { x: Math.round(o.x + (r.x + r.width / 2 + dx) * o.z), y: Math.round(o.y + (r.y + r.height / 2 + dy) * o.z) };
 }
 
+// Il rilascio sul campo della home dalla stessa strada della barra: la shell dice al main dove ha lasciato la scheda.
+async function lasciaNellaHome(app, shell, casa, id) {
+  const r = await casa.locator('#input').boundingBox();
+  const b = await app.evaluate(({ BrowserWindow }) => {
+    const tm = BrowserWindow.getAllWindows().find((x) => x._filoTabs)._filoTabs;
+    return tm.tabs.find((x) => x.id === tm.activeId).view.getBounds();
+  });
+  await shell.evaluate((d) => window.filoShell.schedaFuori(d), { fase: 'lascia', id, x: b.x + r.x + 20, y: b.y + r.y + r.height / 2 });
+}
+
 async function preparaDue(app, shell, openTab, testServer) {
   await Gesti.finestraASchermo(app);
   const articolo = await testServer.openReady(openTab, ARTICOLO);
