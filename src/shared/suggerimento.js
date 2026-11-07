@@ -378,7 +378,6 @@
     document.addEventListener('focusin', suFuoco, cattura);
     document.addEventListener('focusout', suSfuocato, cattura);
     document.addEventListener('scroll', suScorrimento, cattura);
-    document.addEventListener('wheel', suScorrimento, cattura);
     window.addEventListener('blur', () => { nascondi(); restituisci(null); ultimoBersaglio = null; });
     document.addEventListener('visibilitychange', () => { if (document.hidden) { nascondi(); restituisci(null); } });
   }
