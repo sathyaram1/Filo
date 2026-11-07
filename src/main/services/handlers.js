@@ -235,7 +235,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     })();
     const [llmsRes, pathsRes] = await Promise.all([
       domain ? LlmsTxt.get(domain, { sender }).catch(() => null) : Promise.resolve(null),
-      // Dove il livello di privacy chiede prima (#1589) il nome del sito non va al server a cercare i percorsi noti.
+      // Dove il livello di privacy chiede prima (#1589) il sito non va al server.
       domain && payload.percorsiNoti !== false ? Paths.listByDomain(domain, { onlySuccess: true }).catch(() => []) : Promise.resolve([]),
     ]);
     const siteKnowledge = (llmsRes && llmsRes.present && llmsRes.text) ? llmsRes.text : '';
