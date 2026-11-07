@@ -190,8 +190,10 @@ test('E solo quando apro: la sezione aperta mentre la traduzione lavora si tradu
   const page = await testServer.openReady(openTab, PIEGATA);
   await watchToasts(page);
   await clickTranslateIcon(app);
-  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 10000 }).toMatch(/[Tt]raduc/);
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 10000 }).toContain('in corso');
   await page.locator('#apri').click();
+  // Il presupposto: la sezione si apre prima che la traduzione abbia finito.
+  expect((await toasts(page)).join(' | ')).not.toContain('Pagina tradotta');
   await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
   await expect(page.locator('#psez')).toHaveText(/^IT /, { timeout: 15000 });
 });
