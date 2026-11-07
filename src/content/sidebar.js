@@ -298,6 +298,12 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
+    // #2085 — una scheda lasciata sul campo diventa un gettone; all'invio il main ne legge la pagina.
+    const G = global.SN_SCHEDE_IN_CHAT;
+    gettoni = G ? G.campo(ta, G.azioni()) : null;
+    try { togliRilascioScheda(); } catch (_) {}
+    togliRilascioScheda = gettoni && global.SN_SCHEDA_TRASCINATA
+      ? global.SN_SCHEDA_TRASCINATA.registraChat(form, (s) => !!root && !nascosto && gettoni.aggiungi(s)) : () => {};
     // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
     ta.addEventListener('drop', (e) => {
       if (!e.isTrusted) return;
