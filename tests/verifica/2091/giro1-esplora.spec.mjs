@@ -232,6 +232,7 @@ test('Annulla dopo Backspace: il gettone torna gettone, non testo con le parente
   await casa.keyboard.press('Control+z');
   await casa.waitForTimeout(300);
   const stato = await casa.evaluate(() => ({ v: document.getElementById('input').value, n: document.getElementById('input')._snGettoni.schede().length }));
+  console.log('DOPO ANNULLA', JSON.stringify(stato));
   // O il gettone torna (testo e scheda), o non torna niente: mai il segno senza la scheda.
   expect(stato.v.includes('⟦') ? stato.n : 1).toBe(1);
 });
