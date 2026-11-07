@@ -955,6 +955,7 @@
     const noto = notoSessions;
     if (mgMaxSessions && !maxInScrittura) mgMaxSessions.value = noto('maxSessions') ? String(vista.maxSessions) : '';
     for (const r of mgPriorityRadios) r.checked = noto('priorityAccount') && r.value === vista.priorityAccount;
+    for (const r of mgUnitWindowsRadios) r.checked = noto('unitWindows') && r.value === vista.unitWindows;
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
     if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
     if (mgManutentoreAcceso) mgManutentoreAcceso.checked = noto('manutentoreAcceso') && vista.manutentoreAcceso;
