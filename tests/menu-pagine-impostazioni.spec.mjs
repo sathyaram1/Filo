@@ -75,7 +75,8 @@ for (const url of ['filo://preferences/preferences.html', 'filo://options/option
           preso = null;
           const c = M.vociMenu(el).find((v) => v.label === 'Chiedi a Filo');
           if (c) c.onClick();
-          out.push({ id, percorso, nome: String(preso || '').replace(/^Sull'impostazione «|»:$/g, '') });
+          const scelte = el.tagName === 'SELECT' && el.options.length > 1 ? [...el.options].slice(0, 2).map((o) => o.textContent.trim()).join('') : '';
+          out.push({ id, percorso, scelte, nome: String(preso || '').replace(/^Sull'impostazione «|»:$/g, '') });
         }
       } finally { S.chiediDaPagina = orig; }
       return out;
