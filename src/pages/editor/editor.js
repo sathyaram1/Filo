@@ -2274,7 +2274,7 @@
       while (t && w && t.parentNode.closest('[contenteditable="false"]')) t = w.nextNode();
       r.setStart(t || b, 0);
     }
-    if (r && !r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
+    if (!r.collapsed && r.endContainer === docEl && r.endOffset > 0) {
       const b = dentro(docEl.childNodes[r.endOffset - 1], false);
       r.setEnd(b, b.nodeType === 3 ? b.length : b.childNodes.length);
     }
