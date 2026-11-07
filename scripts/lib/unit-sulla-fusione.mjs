@@ -181,6 +181,7 @@ export function testoProva(prova) {
     case 'rosso_anche_su_main':
       return `▸ Unit ${quali}${dove}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo${p.contenuto ? '.' : ': si fonde.'}`;
     case 'rosso_sulla_fusione': {
+      if (p.novita && Array.isArray(p.novita.righe) && p.novita.righe.length) return testoNovita(p, dove);
       const rossi = Array.isArray(p.rossi) ? p.rossi : [];
       return [
         `✗ Unit ${quali}${dove}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
