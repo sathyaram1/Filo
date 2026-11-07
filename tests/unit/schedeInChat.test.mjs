@@ -19,6 +19,8 @@ test('normalizza: solo indirizzi web, icone immagine, titoli ripuliti dai segni 
   assert.equal(G.normalizza({ ...SCHEDA, url: 'filo://newtab/' }), null);
   assert.equal(G.normalizza({ ...SCHEDA, url: 'javascript:alert(1)' }), null);
   assert.equal(G.normalizza({ ...SCHEDA, icona: 'http://x/i.png' }).icona, '');
+  // Un'icona da un indirizzo farebbe contattare il sito a chi guarda il gettone: passa solo la copia del main.
+  assert.equal(G.normalizza({ ...SCHEDA, icona: 'https://x/i.png' }).icona, '');
   assert.equal(G.normalizza({ ...SCHEDA, icona: 'data:text/html;base64,AA' }).icona, '');
   assert.equal(G.normalizza({ ...SCHEDA, titolo: 'a⟧b\nc' }).titolo, 'a b c');
   assert.equal(G.normalizza({ ...SCHEDA, titolo: '' }).titolo, 'esempio.it');
