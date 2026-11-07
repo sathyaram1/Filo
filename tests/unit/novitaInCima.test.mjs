@@ -15,6 +15,39 @@ import { riportaNelClone } from '../../scripts/routine-channel.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const OGGI = '2026-11-04';
+const PN = (() => { const s = {}; vm.runInNewContext(readFileSync(join(REPO, FILE_NOVITA), 'utf8'), s); return s.SN_PATCH_NOTES; })();
+createRequire(import.meta.url)(join(REPO, 'src', 'shared', 'novitaInCima.js'));
+const REGOLA = globalThis.SN_NOVITA_IN_CIMA;
+
+// #2214: il server legge il registro di rami scritti da altri, quindi lo legge come dati: deve dare quello che il file
+// eseguito registra, con le stesse regole di confronto di patchNotes.js.
+test('il registro vero letto come dati è quello eseguito, e le regole di confronto sono quelle di patchNotes.js', () => {
+  assert.deepEqual(JSON.parse(JSON.stringify(registroDa(readFileSync(join(REPO, FILE_NOVITA), 'utf8')))), JSON.parse(JSON.stringify(PN.NOTES)));
+  assert.equal(REGOLA.FILE_NOVITA, FILE_NOVITA);
+  assert.equal(REGOLA.CAMPO, CAMPO);
+  for (const r of PN.NOTES.flatMap((n) => [...(n.features || []), ...(n.fixes || [])])) assert.equal(REGOLA.testo(r), PN.testo(r));
+  for (const r of [null, undefined, 3, { testo: '' }, { segnalazione: 4 }, {}]) assert.equal(REGOLA.testo(r), PN.testo(r), JSON.stringify(r));
+  const versioni = ['0.2.9', '0.2.10', '0.2.266', '0.2.267', '0.3.0', '1.0', '1.0.0.1', '', 'x', '0.2.x'];
+  for (const a of versioni) for (const b of versioni) assert.equal(REGOLA.cmpVersion(a, b), PN.cmpVersion(a, b), `${a} ${b}`);
+});
+
+test('il registro letto come dati: escape e commenti come in JavaScript, e il codice si rifiuta senza eseguirlo', () => {
+  const dati = registroDa(`const NOTES = [ /* c */ { version: '0.1.0', date: "2026", 'features': [ 'a\\'b', "c\\"d\\n", \`e\`, '\\u00e8\\u{1F600}\\x41', ], fixes: [ { testo: 'x', segnalazione: 12 }, ], n: -1.5e2, t: true, z: null, }, // fine
+  ];`);
+  assert.deepEqual(JSON.parse(JSON.stringify(dati)), [{ version: '0.1.0', date: '2026', features: ['a\'b', 'c"d\n', 'e', 'è😀A'], fixes: [{ testo: 'x', segnalazione: 12 }], n: -150, t: true, z: null }]);
+  delete globalThis.__toccato2214;
+  for (const codice of [
+    "const NOTES = [ (globalThis.__toccato2214 = 1) ];",
+    "const NOTES = [ { version: `${globalThis.__toccato2214 = 1}` } ];",
+    'const NOTES = [ { version: x } ];',
+    "const NOTES = [ { __proto__: { version: '9' } } ];",
+    "const NOTES = [ { version: '0.1.0', features: ['a'].concat(['b']) } ];",
+    "const NOTES = [ 'riga' ];",
+    'const NOTES = [ { version: \'\\101\' } ];',
+    'nessun registro',
+  ]) assert.throws(() => registroDa(codice), Error, codice);
+  assert.equal(globalThis.__toccato2214, undefined, 'niente del registro è stato eseguito');
+});
 
 const scritta = (r) => (typeof r === 'string' ? `'${r}'` : `{ testo: '${r.testo}', segnalazione: ${r.segnalazione} }`);
 /** Un registro scritto come quello vero: un blocco per oggetto, una proprietà e una riga per riga. */
