@@ -133,6 +133,13 @@ test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono
   await expect(fumetto(nuova)).toBeHidden();
   await expect(fumetto(nuova)).toHaveText('Invia', { timeout: 3000 });
   expect(await fumetto(nuova).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(32, 48, 64)');
+
+  // La barra in alto ha il suo fumetto a finestra: stessi colori, stessa attesa.
+  await shell.locator('#settingsBtn').hover();
+  await shell.waitForTimeout(700);
+  expect(await fumettoDellaBarra(app)).toBeNull();
+  await expect.poll(() => fumettoDellaBarra(app), { timeout: 3000 }).toEqual({ testo: expect.any(String), sfondo: 'rgb(32, 48, 64)' });
+  await shell.mouse.move(400, 300);
   await pref.locator('.sn-token-row[data-token="fumetto.sfondo"] .sn-token-reset').click();
   await pref.locator('.sn-token-row[data-token="fumetto.ritardo"] .sn-token-reset').click();
 });
