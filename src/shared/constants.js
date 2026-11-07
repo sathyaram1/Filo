@@ -3104,6 +3104,41 @@
     'DATALIST', 'HEAD', 'TITLE',
   ]);
 
+  // Le etichette che la traduzione legge (ovunque, e per tag) e quando la scritta di un bottone è `value`. Le legge
+  // anche la sonda dei componenti chiusi, che si porta il sorgente delle funzioni: niente chiusure qui dentro (#1290.2).
+  const ETICHETTE_TRADOTTE = Object.freeze({
+    ovunque: Object.freeze(['title', 'aria-label']),
+    perTag: Object.freeze({
+      INPUT: Object.freeze(['placeholder', 'alt']),
+      TEXTAREA: Object.freeze(['placeholder']),
+      IMG: Object.freeze(['alt']),
+      AREA: Object.freeze(['alt']),
+      // Una voce a tendina si traduce scrivendo `label`, mai il testo: quello di una <option> senza `value` è proprio
+      // ciò che il modulo invia.
+      OPTION: Object.freeze(['label']),
+      OPTGROUP: Object.freeze(['label']),
+    }),
+  });
+  // Sui bottoni dei moduli la scritta è `value`: si traduce solo se il bottone non rimanda niente (niente `name`, o non
+  // è di quelli che inviano). `type=image` usa `alt`.
+  function valoreEtichetta(el) {
+    var type = String(el.getAttribute('type') || '').toLowerCase();
+    if (type === 'button' || type === 'reset') return true;
+    if (type !== 'submit') return false;
+    return !el.hasAttribute('name');
+  }
+  // Testo che vale una richiesta al modello: almeno due caratteri, con una lettera.
+  function testoDaTradurre(s) {
+    s = String(s || '').replace(/\s+/g, ' ').trim();
+    return s.length >= 2 && /\p{L}/u.test(s);
+  }
+  // Il sito chiede di non tradurre: `translate="no"`, la classe `notranslate`, o testo che l'utente sta scrivendo.
+  function nonDaTradurre(el) {
+    if (el.isContentEditable) return true;
+    if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
+    return !!(el.classList && el.classList.contains('notranslate'));
+  }
+
   // Stessa regola della barra: fuori dai limiti torna dentro, illeggibile prende il predefinito.
   const AVVISO_SCHERMO_PIENO_LIMITI = Object.freeze({ durataMs: Object.freeze([1000, 10000]) });
   function opzioniAvvisoSchermoPieno(v) {
