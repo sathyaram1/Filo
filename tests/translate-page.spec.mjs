@@ -2410,6 +2410,10 @@ for (const [nome, prima, dopo, scorri] of [
   ['più in basso della prima schermata', '<div style="height:2500px"></div>', '', 0],
   ['in cima, tradotto dopo averlo superato scorrendo', '', '<div style="height:2500px"></div>', 1400],
   ['dentro una fisarmonica chiusa', '<details><summary>Open the box</summary>', '</details>', 0],
+  ['dentro una sezione «Mostra altro» chiusa, accanto a un paragrafo',
+    '<button onclick="this.nextElementSibling.hidden = false">Show more</button><div hidden><p id="psez">A paragraph inside the folded section, long enough to be translated.</p>', '</div>', 0],
+  ['nella scheda spenta di un riquadro a schede, accanto a un paragrafo',
+    '<div role="tabpanel"><p>The first tab, the one shown when the page opens.</p></div><div role="tabpanel" style="display:none"><p id="psez">A paragraph in the second tab, long enough to be translated.</p>', '</div>', 0],
 ]) {
   test(`componente chiuso con testo ${nome}: «solo in parte»`, async ({ app, openTab, testServer }) => {
     await stubTranslationProvider(app);
