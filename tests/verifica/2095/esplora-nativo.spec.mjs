@@ -38,6 +38,27 @@ async function prova(app, page, sel, nome) {
   await page.waitForTimeout(300);
 }
 
+test('conferma in attesa: nativo?', async ({ app, openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await page.waitForFunction(() => !!window.SN_SUGGERIMENTO && !!window.SN_CONFIRM_UI);
+  const LUNGO = Array.from({ length: 120 }, (_, i) => `Riga ${i + 1}.`).join('\n');
+  await page.evaluate((t) => { window.SN_CONFIRM_UI.confirm({ title: 'Prova', text: t, okLabel: 'Esegui' }); }, LUNGO);
+  await expect.poll(() => page.evaluate(() => window.SN_CONFIRM_UI?._test.state()?.okDisabled)).toBe(true);
+  await page.waitForTimeout(800);
+  const pt = await page.evaluate(() => window.SN_CONFIRM_UI._test.point('ok'));
+  const off = await schermo(app, page, 'body');
+  const b = await page.evaluate(() => { const r = document.body.getBoundingClientRect(); return { x: r.x + r.width / 2, y: r.y + r.height / 2 }; });
+  const sx = Math.round(off.x - b.x + pt.x); const sy = Math.round(off.y - b.y + pt.y);
+  x(off.display, 'move', 5, 5);
+  await page.waitForTimeout(300);
+  x(off.display, 'move', sx - 3, sy);
+  await page.waitForTimeout(50);
+  x(off.display, 'move', sx, sy);
+  await page.waitForTimeout(2500);
+  foto(off.display, 'h-conferma');
+  console.log('h', sx, sy);
+});
+
 test('salto unico e title aggiunto sotto il puntatore', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   const pref = await openTab('filo://preferences/preferences.html');
