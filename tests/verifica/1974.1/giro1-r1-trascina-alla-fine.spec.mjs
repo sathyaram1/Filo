@@ -56,8 +56,8 @@ test('r1 trascinare la barra fino alla fine appena partito il video non spegne i
     await page.waitForTimeout(2000);
     await page.mouse.up();
     await page.evaluate(() => { const v = document.getElementById('v'); v.currentTime = v.duration - 0.3; });
-    await expect.poll(() => page.evaluate(() => document.getElementById('v').ended), { timeout: 10_000 }).toBe(true);
-    await page.waitForTimeout(2000);
+    // Il video finisce; un ripiego ricaricherebbe la scheda, e lì la pagina non si legge più: si conta dal server.
+    await page.waitForTimeout(4000);
     let avviso = false;
     for (const w of app.windows()) {
       try { if ((await w.evaluate(() => document.body ? document.body.innerText : '')).includes(RIPIEGO)) avviso = true; } catch (_) {}
