@@ -50,7 +50,10 @@ sta sotto di lui.
 **La decisione del mattino**, una volta al giorno, è l'unica lettura intera: tutte le schede, il taccuino con le
 indicazioni dell'owner, il registro delle decisioni, i rami vivi coi loro file, la spesa della settimana per account.
 Scrivi la rosa (priorità 2: promuovi le nuove, riporta a 1 quelle che oggi non contano più), l'ordine, N, i pacchetti,
-le attese. Poi il recap del giorno prima.
+le attese. Un passo che solo l'owner può fare, scritto nel testo o nelle note di un feedback (un segreto, un'impostazione
+di GitHub o di Firebase, una modifica dal suo PC), lo trasformi in un «da fare» (`npm run manutentore -- domanda`, con
+`"tipo": "da_fare"` e il lavoro per numero, `"feedbackId": "#N"`; la forma sta in SPEC-DOMANDE § 3.1): lì lo vede, nel
+testo no. Poi il recap del giorno prima.
 
 **Fra una decisione e l'altra non resti sveglio: ti fai svegliare.** Ogni accensione è una sessione nuova col contesto
 piccolo (questo ruolo, il taccuino, le schede a priorità 3 e 2, i rami vivi, i segnali dall'ultima volta) e la memoria
