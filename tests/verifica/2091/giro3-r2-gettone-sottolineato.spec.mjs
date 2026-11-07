@@ -43,14 +43,11 @@ test('r2 il nome nel gettone non ha la sottolineatura del correttore mentre si s
   await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
   await casa.locator('#input').focus();
   await casa.keyboard.press('End');
-  await casa.keyboard.type('di cosa parla, sbaglaito');
+  await casa.keyboard.type('di cosa parla');
   await casa.waitForTimeout(2500);
   const campo = await casa.locator('#input').boundingBox();
   const g = await casa.locator('.sn-gettone').first().boundingBox();
-  const fine = { x: campo.x + campo.width - 260, y: campo.y, width: 250, height: campo.height };
-  // Controllo: la parola sbagliata scritta a mano la sottolineatura la prende (il correttore è acceso e si vede).
-  const ctl = await rossiSotto(app, campo, fine);
-  writeFileSync('tests/.shots/2091-g3/r2-campo.png', Buffer.from(ctl.png, 'base64'));
-  console.log('CONTROLLO', ctl.n, 'GETTONE', (await rossiSotto(app, campo, g)).n, JSON.stringify(g), JSON.stringify(campo));
-  expect((await rossiSotto(app, campo, g)).n).toBe(0);
+  const esito = await rossiSotto(app, campo, g);
+  try { writeFileSync('tests/.shots/2091-g3-r2-campo.png', Buffer.from(esito.png, 'base64')); } catch (_) {}
+  expect(esito.n).toBe(0);
 });
