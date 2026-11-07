@@ -87,16 +87,6 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-  // Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312). Mai il testo del modello: lo decide
-  // `ctx.richiesta`. Per una cancellazione basta, in una riga, un verbo che cancella e il nome di ciò che tocca (`frasi`
-  // da sole: «dimentica tutto»); una parola detta per altro («riassumi questa pagina») non è una richiesta.
-  // Radici di verbi: valgono solo con una desinenza da verbo («togli», «mettiti»), così «cambio» non è un verbo.
-  const VERBI_CANCELLA = ['cancell', 'elimin', 'svuot', 'azzer', 'reset', 'resett', 'pulisc', 'pul', 'togl', 'togli', 'butt',
-    'rimuov', 'dimentic', 'scord', 'distrugg'];
-  const DESINENZE = new Set(['', 'a', 'i', 'e', 'are', 'ere', 'ire', 'iamo', 'ate', 'ete', 'ite', 'isci', 'isca', 'ando', 'endo']);
-  const ENCLITICHE = ['', 'mi', 'ti', 'lo', 'la', 'li', 'le', 'ci', 'vi', 'ne', 'gli', 'glielo', 'gliela', 'melo', 'mela', 'telo'];
-  const verbo = (w, radice) => w.startsWith(radice)
-    && ENCLITICHE.some((e) => { const r = w.slice(radice.length); return r.endsWith(e) && DESINENZE.has(r.slice(0, r.length - e.length)); });
   const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ').trim();
   function unoDiDistanza(a, b) {
