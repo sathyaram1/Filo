@@ -313,10 +313,13 @@ test('scheda: chiuso e riaperto il pannello a metà volo, il tempo continua dal 
   const page = await approvaInFondo(openTab);
   const trascorso = page.locator('#mgSideBody .sn-mac-card .sn-mac-trascorso');
   await expect(trascorso).toHaveText(/^da [3-9] s$/, { timeout: 8_000 });
-  await page.evaluate(() => window.__mgTest.openDetail('volo-assente'));
+  await page.evaluate(() => { document.querySelector('#mgSideBody .sn-mac-card').dataset.vecchia = '1'; });
+  await page.locator('#mgSideClose, #mgSide [aria-label="Chiudi"], #mgSide .mg-side-close').first().click();
   await page.evaluate(() => window.__mgTest.openDetail('lunga'));
   await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
   await expect(page.locator('#mgSideBody .sn-mac-card .sn-mac-btn-go')).toHaveText('Sto fondendo');
+  // Una card nuova, disegnata a metà volo: non quella di prima rimasta lì.
+  await expect(page.locator('#mgSideBody .sn-mac-card[data-vecchia]')).toHaveCount(0);
   const secondi = Number((await page.locator('#mgSideBody .sn-mac-card .sn-mac-trascorso').textContent()).match(/\d+/)[0]);
   expect(secondi).toBeGreaterThanOrEqual(3);
 });
