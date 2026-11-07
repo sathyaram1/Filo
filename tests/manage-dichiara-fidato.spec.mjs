@@ -13,6 +13,7 @@ import { test, expect } from './fixtures/electron.mjs';
 const OWNER_EMAIL = 'owner@prova.test';
 const PUNTA_APP = 'a'.repeat(40);
 const PUNTA_SRV = 'b'.repeat(40);
+const QUANDO = Date.parse('2026-11-06T13:32:00Z');
 
 let server;
 let base = '';
