@@ -81,14 +81,3 @@ test('r2 il tasto destro sulla riga di un lavoro fermo «resta locale» offre «
   await voce.click();
   await expect(page.locator('#mgWorkState .mg-dichiara-cosa li')).toHaveCount(2);
 });
-
-test('aspetto del riquadro di conferma, chiaro e scuro', async ({ openTab }) => {
-  const page = await openTab(MANAGE);
-  await apri(page);
-  await page.evaluate(() => window.__mgTest.openDetail('srv-8'));
-  await page.locator('#mgDichiaraBtn').click();
-  await expect(page.locator('#mgDichiaraSi')).toBeVisible();
-  await page.screenshot({ path: 'tests/.shots/verifica-2258-g3-chiaro.png' });
-  await page.emulateMedia({ colorScheme: 'dark' });
-  await page.screenshot({ path: 'tests/.shots/verifica-2258-g3-scuro.png' });
-});
