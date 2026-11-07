@@ -7,6 +7,9 @@
 
   const FILE_NOVITA = 'src/shared/patchNotes.js';
   const CAMPO = 'prossimaVersione';
+  // Gli esiti degli unit, girati con le righe già spostate, dopo i quali lo spostamento da solo rende fondibile il ramo:
+  // li legge la prova sulla fusione dell'app e li legge il server che decide se spostare.
+  const BASTA_SPOSTARE = Object.freeze(['verde', 'rosso_anche_su_main']);
   const A_B_C = /^\d+\.\d+\.\d+$/;
   const CHIAVI = ['features', 'fixes'];
   // Il registro vero pesa qualche centinaio di KB: oltre è un file che non è il registro.
