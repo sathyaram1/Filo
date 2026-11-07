@@ -231,7 +231,7 @@
       return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { annulla(); d.inputEl.focus(); } }];
     }
     if (!tasti || !d.bubblesEl.contains(el)) return [];
-    return tasti.voci(el).map((v) => ({ type: 'item', icon: icona(v.icona, 16), label: v.label, onClick: () => { v.fai(); } }));
+    return tasti.vociMenu(el);
   }
 
   function init(deps) {
