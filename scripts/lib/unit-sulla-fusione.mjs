@@ -348,11 +348,12 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
  * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
  * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
  * (serve a giudicare un unit rosso sul ramo, #1009). `mainSha`: il main da provare lo sceglie chi chiede (l'azione del
- * server, #1207), non la punta di origin di adesso. `lancia` è iniettabile solo per i test.
+ * server, #1207), non la punta di origin di adesso. `unit: 'toccati'`: solo i file di `unitToccati`, anche su main
+ * (la prova veloce su Windows, #2225). `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
   root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
-  ancheContenuto = false, mainSha: mainDato = '',
+  ancheContenuto = false, mainSha: mainDato = '', unit = 'tutti',
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
