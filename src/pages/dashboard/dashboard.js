@@ -1957,6 +1957,16 @@
       handleImageFile(e.detail.blob);
     }
   });
+  // #2085 — una scheda lasciata sul campo diventa un gettone in linea col testo.
+  const Gettoni = window.SN_SCHEDE_IN_CHAT ? window.SN_SCHEDE_IN_CHAT.campo(inputEl, azioniGettone) : null;
+  if (Gettoni && window.SN_SCHEDA_TRASCINATA) {
+    window.SN_SCHEDA_TRASCINATA.registraChat(inputForm, (s) => {
+      if (Accoglienza.isActive()) return false;
+      const ok = Gettoni.aggiungi(s);
+      if (ok) autoGrowInput();
+      return ok;
+    });
+  }
   // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
   // dal disco. Torna se c'erano file.
   function fileNelCampo(dt) {
