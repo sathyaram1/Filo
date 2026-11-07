@@ -413,7 +413,7 @@
 
   // Le azioni che il compito «Gestisci la risposta» (§3.5) applica da sé: quelle che l'owner applica anche in blocco.
   // Una di consenso resta a un gesto dell'owner nella finestra (§1.4), e un compito non ne fa nascere un altro.
-  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia', 'attendi']);
+  const DEL_COMPITO = Object.freeze(['riprendi', 'priorita', 'archivia', 'attendi', 'nessuna']);
 
   /** Il rifiuto per un'azione che il compito non applica, o null se la può applicare. PURA. */
   function vietataAlCompito(azione) {
