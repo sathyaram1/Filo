@@ -223,6 +223,22 @@ function opzione(argv, nome) {
   return argv[i].includes('=') ? argv[i].slice(nome.length + 1) : argv[i + 1];
 }
 
+// Il segno «lavoro server» lo mette chi apre (#2217): dice dove sta il codice, non la fiducia, che resta dell'owner.
+export const OPZIONI_SERVER = Object.freeze(['--server', '--lavoro-server']);
+const OPZIONI_DI = Object.freeze({ feedback: ['--priorita', '--ticket', ...OPZIONI_SERVER], pacchetto: ['--ticket', ...OPZIONI_SERVER] });
+export const vuoleServer = (argv) => (argv || []).some((a) => OPZIONI_SERVER.includes(String(a)));
+// senzaOpzioni toglie ogni `--x`: un `--sever` sparirebbe dal titolo e il feedback nascerebbe senza segno.
+function opzioniIgnote(cmd, argv) {
+  const ammesse = OPZIONI_DI[cmd] || [];
+  return (argv || []).map(String).filter((a) => /^--[^-]/.test(a) && !ammesse.includes(a.split('=')[0]));
+}
+/** La riga sul segno dopo l'apertura: chiesto e non tornato dal server si dice, perché nessuno lo rimetterebbe. PURA. */
+export function rigaSegnoServer(chiesto, r) {
+  if (!chiesto) return '';
+  if (r && r.lavoroServer === true) return 'Segnato lavoro server: lo prendono i lavori server, e la fiducia resta quella di prima.';
+  return 'SEGNO NON MESSO: il server non ha confermato «lavoro server» (forse non lo conosce ancora). Il feedback esiste: non riaprirlo, chiedi all\'owner di segnarlo lavoro server in Gestione.';
+}
+
 const NUMERO_RE = /^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/;
 const numeroDi = (v) => (NUMERO_RE.test(String(v || '').trim()) ? String(v).trim().replace(/^#/, '') : '');
 
