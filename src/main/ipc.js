@@ -111,18 +111,66 @@ function provenienzaDi(info) {
   return { via: 'pagina' };
 }
 
-// Le quattro chiamate sincrone che una pagina fa prima dei suoi script: finché non c'è la risposta la pagina è ferma.
-// Quanto ci mettono, per canale, lo contano i contatori anonimi (#1466); da una finestra incognito no.
-function cronometrata(canale, gestore) {
-  return (event, ...args) => {
-    const t0 = performance.now();
-    try { gestore(event, ...args); } finally {
-      try {
-        const C = globalThis.SN_CONTATORI_MAIN;
-        if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
-      } catch (_) {}
+// Le quattro risposte che una pagina aspetta prima dei suoi script: finché non arrivano la pagina è ferma. Il frame
+// principale le chiede tutte in una chiamata sola (`filo:avvio-pagina`, #1093); i canali singoli restano per chi ne
+// chiede una dopo. Quanto ci mette ognuna lo contano i contatori anonimi (#1466); da una finestra incognito no.
+const RISPOSTE_DI_AVVIO = {
+  // { level, seed }: il master secret NON attraversa mai qui.
+  'fp-config': (event, href) => {
+    try {
+      return require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
+    } catch (_) {
+      return { level: 0, seed: 0 };
     }
-  };
+  },
+  // #754 — la risposta al banner dei cookie da togliere dalla memoria della pagina, se il sito ha cambiato elenco.
+  'cookie-wipe': (event, href) => {
+    let out = null;
+    try {
+      const wc = event.sender;
+      const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
+      if (top) {
+        for (const w of BrowserWindow.getAllWindows()) {
+          const tm = w._filoTabs;
+          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) {
+            out = tm.takeCookieWipe(String(href || ''));
+            // La memoria della pagina che «Resta connesso» ha portato nel jar nuovo (tabs/tabRestaConnesso.js).
+            const semina = tm.takeSemina(wc, String(href || ''));
+            if (semina) out = { ...(out || {}), semina: semina.locale, seminaSessione: semina.sessione, seminaDb: semina.database };
+            break;
+          }
+        }
+      }
+    } catch (_) { out = null; }
+    return out;
+  },
+  // #576 — i riquadri pubblicitari da nascondere, o compaiono prima.
+  'adblock-css': (event, href, gate) => {
+    try {
+      return require('./services/adblock').cosmeticForPage(String(href || ''), gate);
+    } catch (_) {
+      return { css: '', tokens: false };
+    }
+  },
+  // Cosa la pagina legge delle notifiche (#591).
+  'permessi-stato': (event, href) => {
+    try {
+      const Permessi = require('./services/permessiPagine');
+      return { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
+    } catch (_) {
+      return { notifiche: 'default' };
+    }
+  },
+};
+
+function rispostaDiAvvio(canale, event, ...args) {
+  const t0 = performance.now();
+  try { return RISPOSTE_DI_AVVIO[canale](event, ...args); } finally {
+    try {
+      const C = globalThis.SN_CONTATORI_MAIN;
+      if (C) C.ipcSincrono(canale, performance.now() - t0, { incognito: !!ambitoIncognitoDi({ win: null, wc: event.sender }) });
+    } catch (_) {}
+  }
 }
 
 function registerIpcHandlers() {
