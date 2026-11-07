@@ -787,6 +787,17 @@ const INDIRIZZO = {
   darwin: /^[0-9a-f]{2}(-[0-9a-f]{2}){5}$/,
 };
 
+// Un indirizzo scritto a mano («00:11:22:33:44:55», «00-11-…», dodici cifre, maiuscole o no) nella forma che il sistema
+// dà nell'elenco dei dispositivi: è quella che i preferiti confrontano. null se non sono sei byte.
+function normalizzaIndirizzo(v, piattaforma = process.platform) {
+  const cifre = String(v == null ? '' : v).trim().replace(/[\s:.-]/g, '');
+  if (!/^[0-9A-Fa-f]{12}$/.test(cifre)) return null;
+  const coppie = cifre.match(/../g);
+  if (piattaforma === 'win32') return cifre.toLowerCase();
+  if (piattaforma === 'darwin') return coppie.join('-').toLowerCase();
+  return coppie.join(':').toUpperCase();
+}
+
 // Un nome che arriva al sistema: niente caratteri di controllo (un a capo non sta in nessun nome di rete) e un tetto.
 function nomeValido(v) {
   if (typeof v !== 'string' || !v.length) return 'vuoto';
