@@ -13,7 +13,7 @@ test('i difetti rimasti di una verifica non nascono a priorità 2 in nessun test
   assert.doesNotMatch(leggi('src/pages/manage/manage.html'), /figli del lavoro, a priorità 2/);
   assert.doesNotMatch(leggi('routines/roles/_critica-e-livelli.md'), /con la priorità uguale al livello/);
   assert.doesNotMatch(leggi('src/shared/verifierRound.js'), /con priorità uguale al livello\./);
-  assert.match(leggi('FEEDBACK-STATES.md'), /un 2 che nasce a 1/);
+  assert.match(leggi('FEEDBACK-STATES.md'), /a priorità 1, salvo un esterno di livello 3 che nasce a 3/);
 });
 
 test('il ruolo del manutentore non chiede una routine sua', () => {
