@@ -2328,6 +2328,7 @@
     // non è entrato, poi se ne va (#1697.2). Sta in fondo al suo testo, così toglierlo non sposta niente di quello che
     // l'annulla ricorda.
     const z = document.createTextNode(ANCORA);
+    ancorePiantate = true;
     if (tag === 'blockquote' || /^h/.test(tag)) {
       // Titolo e citazione non accolgono un paragrafo in coda: l'ancora sta in un paragrafo suo, prima, che poi si toglie.
       const suo = document.createElement('p');
@@ -2342,13 +2343,12 @@
       fine.collapse(false);
       fine.insertNode(z);
       r.setEndBefore(z);
-      ancorePiantate = true;
       scegli(r);
       inserisci(frammento(tag, { resto }));
-      // Chrome ha travasato l'ancora nell'ultima riga e tiene il suo nodo per l'annulla: lo riporterebbe pieno.
-      if (!z.isConnected) z.data = '';
-      togliAncore();
     }
+    // Chrome travasa l'ancora nell'ultima riga e tiene il suo nodo per l'annulla, che lo rimetterebbe pieno.
+    if (!z.isConnected) z.data = '';
+    togliAncore();
   }
   // L'ancora che un annulla o un ripeti rimettono nel foglio se ne va al primo input. Solo in coda al suo nodo: lì
   // toglierla non sposta niente di quello che l'annulla ricorda.
