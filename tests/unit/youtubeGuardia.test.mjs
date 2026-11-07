@@ -137,10 +137,11 @@ test('senza regole il frame aspetta: quando il main dice che ce ne sono di nuove
     removeListener: (c, f) => { ascolti[c] = (ascolti[c] || []).filter((x) => x !== f); },
   };
   const webFrame = { executeJavaScript: (src) => { eseguiti.push(src); return Promise.resolve(); } };
-  const { window: w } = (() => {
-    const doc = { addEventListener() {}, removeEventListener() {}, getElementsByTagName: () => [] };
-    return { window: { document: doc, location: { href: 'https://www.youtube.com/watch?v=dopo' }, addEventListener() {}, setTimeout() {}, MutationObserver: class { observe() {} disconnect() {} } } };
-  })();
+  const w = {
+    document: { addEventListener() {}, removeEventListener() {}, getElementsByTagName: () => [] },
+    location: { href: 'https://www.youtube.com/watch?v=dopo' },
+    addEventListener() {}, setTimeout() {}, MutationObserver: class { observe() {} disconnect() {} },
+  };
   const pronte = () => (ascolti[R.CANALE_PRONTE] || []).slice().forEach((f) => f());
 
   assert.equal(avvia({ ipcRenderer, webFrame, window: w, href: 'https://www.youtube.com/watch?v=primo' }), false);
