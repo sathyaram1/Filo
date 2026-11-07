@@ -3,7 +3,7 @@
 
 (() => {
   const tip = document.getElementById('tip');
-  const VARIABILI = new Set(['--bg', '--fg', '--border', '--sn-ombra']);
+  const VARIABILI = new Set(['--bg', '--fg', '--border', '--sn-shadow-opacity']);
   window.fumetto.onTesto(({ text, colori, giro }) => {
     for (const [k, v] of Object.entries(colori || {})) {
       if (VARIABILI.has(k) && typeof v === 'string') document.documentElement.style.setProperty(k, v);
