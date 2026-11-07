@@ -806,35 +806,80 @@
     discardBtn.title = 'Toglila dall’elenco senza fondere niente. ' + howToRetry(req);
     var approveBtn = el('button', 'sn-mac-btn sn-mac-btn-go', 'Approva e fondi');
     approveBtn.type = 'button';
-    var serveAprire = el('span', 'sn-mac-serve-aprire', 'Apri tutte le voci per approvare');
     var occupato = false;
-    // Il sì vale per tutto il commit: finché una voce resta chiusa non si dà (#1502).
-    function aggiornaApprova() {
-      var chiuse = daAprire();
-      approveBtn.disabled = occupato || chiuse;
-      serveAprire.hidden = !chiuse;
-      approveBtn.title = chiuse ? 'Prima apri tutte le voci: approvare vale anche per quelle che non hai visto.'
-        : 'Fonde su main esattamente il commit esaminato.';
-    }
-
     var armed = false;
     var armTimer = null;
+    // Il sì vale per tutto il commit: finché una voce resta chiusa il tasto le apre, e approva solo dopo (#1502).
+    // Spento resta solo mentre aspetta il server, e allora lo dice: «aspetta te» e «aspetta il server» non si somigliano (#2250).
+    function quanteChiuse() {
+      var tasti = blocchi ? blocchi.querySelectorAll('.sn-mac-tutte') : [];
+      var n = 0;
+      for (var i = 0; i < tasti.length; i++) n += Math.max(1, Number(tasti[i].dataset.quante) || 0);
+      return n;
+    }
+    function aggiornaApprova() {
+      var chiuse = quanteChiuse();
+      var fonde = card.classList.contains('is-merging');
+      approveBtn.disabled = occupato;
+      approveBtn.classList.toggle('is-fondendo', fonde);
+      approveBtn.classList.toggle('is-apre', !fonde && chiuse > 0);
+      if (!armed) approveBtn.textContent = fonde ? 'Sto fondendo' : chiuse ? apriVociText(chiuse) : 'Approva e fondi';
+      approveBtn.title = fonde ? 'Il server sta fondendo: il tempo dal tuo sì scorre qui sotto.'
+        : chiuse ? 'Approvare vale anche per le voci che non hai ancora visto: il primo clic le apre tutte, poi il tasto approva.'
+          : 'Fonde su main esattamente il commit esaminato.';
+    }
+    // Apre le voci di tutti i blocchi, come i loro «Mostra le altre», e porta in vista la prima appena aperta.
+    function apriTutte() {
+      var tasti = blocchi ? Array.prototype.slice.call(blocchi.querySelectorAll('.sn-mac-tutte')) : [];
+      var prima = null;
+      tasti.forEach(function (t) {
+        var lista = t.parentNode && t.parentNode.querySelector('.sn-mac-block-list');
+        var r = lista ? lista.querySelector(':scope > [hidden]') : null;
+        if (!prima && r) prima = r;
+        t.click();
+      });
+      if (prima && typeof prima.scrollIntoView === 'function') prima.scrollIntoView({ block: 'nearest' });
+    }
+
     function disarm() {
       armed = false;
-      approveBtn.textContent = 'Approva e fondi';
       approveBtn.classList.remove('is-armed');
       approveBtn.style.minWidth = '';
       approveBtn.style.minHeight = '';
       if (armTimer) { clearTimeout(armTimer); armTimer = null; }
+      aggiornaApprova();
       liberata(card);
     }
+
+    // Il tempo dal clic, accanto alla frase d'attesa: si aggiorna da sé finché la fusione è in volo.
+    var trascorso = el('span', 'sn-mac-trascorso');
+    trascorso.setAttribute('role', 'timer');
+    var voloDa = 0;
+    var ticTimer = null;
+    function fermaTic() {
+      voloDa = 0;
+      if (ticTimer) { clearInterval(ticTimer); ticTimer = null; }
+      if (trascorso.parentNode) trascorso.parentNode.removeChild(trascorso);
+    }
+    function tic() {
+      // Una card tolta dallo schermo non tiene vivo il suo orologio.
+      if (card.isConnected) card.__snMacVista = true;
+      else if (card.__snMacVista) { fermaTic(); return; }
+      trascorso.textContent = trascorsoText(voloDa);
+    }
+    function avviaTic(daMs) {
+      voloDa = Number(daMs) > 0 ? Number(daMs) : Date.now();
+      if (!ticTimer) ticTimer = setInterval(tic, 1000);
+      tic();
+    }
+
     function setBusy(on) {
       occupato = !!on;
+      if (!on) card.classList.remove('is-merging');
       aggiornaApprova();
       discardBtn.disabled = !!on;
       card.classList.toggle('is-busy', !!on);
       if (!on) {
-        card.classList.remove('is-merging');
         rititola(card.closest ? card.closest('.sn-mac') : null);
         liberata(card);
       }
@@ -843,6 +888,7 @@
     function finita() {
       card.classList.add('is-done');
       card.classList.remove('is-merging');
+      aggiornaApprova();
       rititola(card.closest ? card.closest('.sn-mac') : null);
       liberata(card);
     }
