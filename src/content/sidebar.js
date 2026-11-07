@@ -2195,6 +2195,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     ricordaPagina(letta);
     const payload = buildPayload(userMessage, userAction, esterno, letta);
     if (valutazione) payload.valuta = true;
+    // #2085 — le schede lasciate nel messaggio: le legge il main, con la cornice delle pagine lette.
+    if (schede.length && userMessage) payload.schede = schede;
     // Il testo del campo entra nella cronologia dopo il payload: questo turno lo porta una volta sola, nel messaggio che parte.
     if (testoCampo !== null) {
       history.push({
