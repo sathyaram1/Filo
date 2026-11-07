@@ -1850,6 +1850,7 @@
       rm.className = 'dash-img-remove';
       rm.textContent = '×';
       rm.setAttribute('aria-label', 'Rimuovi immagine');
+      rm.title = 'Togli';
       rm.addEventListener('click', () => {
         pendingImages.splice(idx, 1);
         percorsiImmagini.delete(dataUrl);
