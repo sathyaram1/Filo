@@ -184,6 +184,7 @@ test('home: la crocetta e l\'immagine incollata hanno il loro fumetto', async ({
   await expect(fumetto(home)).toHaveText('Ingrandisci');
   await home.locator('#imgPreviews .dash-img-remove').hover({ force: true });
   await expect(fumetto(home)).toHaveText('Togli');
+  expect(await muti(home, 'body')).toEqual([]);
 });
 
 test('Aiuto e riquadro: le crocette, l\'invio e la freccia hanno il loro fumetto', async ({ app, openTab }) => {
