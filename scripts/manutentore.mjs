@@ -538,26 +538,40 @@ export function righeSpesa(spesa) {
   return righe;
 }
 
-// Il contesto piccolo di una sveglia (§ 4) sta sui ~25k token: questo è il tetto col margine. Oltre, la rosa è larga.
+// Il contesto piccolo di una sveglia (§ 4) sta sui ~25k token: questo è il tetto col margine. Oltre, l'ordine è lungo.
 export const PICCOLO_TETTO_TOKEN = 30000;
 // Una stima, non un conteggio: ~4 caratteri per token sul testo italiano di Filo.
 export const stimaToken = (testo) => Math.ceil(String(testo || '').length / 4);
-const nelPiccolo = (s) => s && (s.priorita === 3 || s.priorita === 2 || !!s.fermo);
+const perNumero = (a, b) => Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]);
 
 /**
- * Il contesto piccolo: ruolo, stato coi segnali, taccuino, le schede a priorità 3 e 2 (e le ferme), i rami dei loro
- * lavori. → { ok, testo, token } | { ok:false, motivo, token }. PURA.
+ * Le schede del contesto piccolo (#2269): le 3, poi i lavori dell'ordine nella sua sequenza, poi le ferme rimaste
+ * fuori. La priorità 2 non c'entra: decide l'ordine. PURA.
+ */
+export function schedeDelPiccolo(schede, ordine = []) {
+  const perNum = new Map((schede || []).filter((s) => s && s.num).map((s) => [String(s.num), s]));
+  const tre = [...perNum.values()].filter((s) => s.priorita === 3).sort(perNumero);
+  const nellOrdine = [...new Set((ordine || []).map((n) => String(n).replace(/^#/, '')))]
+    .map((n) => perNum.get(n)).filter((s) => s && s.priorita !== 3);
+  const prese = new Set([...tre, ...nellOrdine]);
+  return [...tre, ...nellOrdine, ...[...perNum.values()].filter((s) => s.fermo && !prese.has(s)).sort(perNumero)];
+}
+
+/**
+ * Il contesto piccolo: ruolo, stato coi segnali, taccuino, le schede dell'ordine, delle 3 e delle ferme, i rami dei
+ * loro lavori. → { ok, testo, token } | { ok:false, motivo, token }. PURA.
  */
 export function testoPiccolo({ ruolo, stato, taccuino, schede, rami = [] }) {
-  const scelte = (schede || []).filter(nelPiccolo).sort((a, b) => (b.priorita ?? -1) - (a.priorita ?? -1)
-    || Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]));
+  const ordine = Array.isArray(stato && stato.ordine) ? stato.ordine.map(String) : [];
+  const scelte = schedeDelPiccolo(schede, ordine);
   const numeri = new Set(scelte.map((s) => String(s.num)));
   const suoi = (rami || []).filter((r) => (r.feedback || []).some((n) => numeri.has(String(n))));
   const parti = [
     ['il ruolo', [String(ruolo || '').trim(), '']],
     ['lo stato coi segnali', ['## Stato', '', ...righeStato(stato), '']],
     ['il taccuino', ['## Taccuino', '', ...testoTaccuino(taccuino), '']],
-    [`le ${scelte.length} schede a priorità 3 e 2`, [`## Schede a priorità 3 e 2, e le ferme (${scelte.length} di ${(schede || []).length})`, '',
+    [`le ${scelte.length} schede delle 3, dell'ordine e delle ferme`, [`## Schede: le priorità 3, l'ordine nella sua sequenza, le ferme (${scelte.length} di ${(schede || []).length})`, '',
+      rigaOrdine(ordine, indiceDalServer(schede)), '',
       ...scelte.map((s) => rigaSchedaServer(s))]],
     ['i rami', ['', `## Rami di questi lavori (${suoi.length} di ${(rami || []).length} in corso)`, '', ...suoi.map(rigaRamo)]],
   ];
