@@ -263,5 +263,5 @@
     return out;
   }
 
-  global.SN_SISTEMA = { VOCI, NOME_MAX, normalizza, descrivi, righePrompt, vociVisibili, pulisciNome };
+  global.SN_SISTEMA = { VOCI, NOME_MAX, normalizza, descrivi, righePrompt, vociVisibili, pulisciNome, alPercento };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
