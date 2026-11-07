@@ -259,6 +259,24 @@ test('Annulla dopo Backspace: il gettone torna gettone, non testo con le parente
   expect(stato.v.includes('⟦') ? stato.n : 1).toBe(1);
 });
 
+test('Taglia e incolla un gettone per spostarlo: resta un gettone', async ({ app, shell, openTab, testServer }) => {
+  const { idArticolo } = await preparaDue(app, shell, openTab, testServer);
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const casa = await home(app, { scheda: nuova?.id });
+  await casa.locator('#input').fill('guarda');
+  await lasciaNellaHome(app, shell, casa, idArticolo);
+  await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
+  await casa.locator('#input').focus();
+  await casa.evaluate(() => { const t = document.getElementById('input'); const i = t.value.indexOf('⟦'); t.setSelectionRange(i, t.value.indexOf('⟧') + 1); });
+  await casa.keyboard.press('Control+x');
+  await casa.keyboard.press('Home');
+  await casa.keyboard.press('Control+v');
+  await casa.waitForTimeout(300);
+  const stato = await casa.evaluate(() => ({ v: document.getElementById('input').value, n: document.getElementById('input')._snGettoni.schede().length }));
+  expect(stato.v).toContain('⟦');
+  expect(stato.n).toBe(1);
+});
+
 test('dopo l\'invio, la home ricaricata mostra ancora il gettone nel filo', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
   const { idArticolo } = await preparaDue(app, shell, openTab, testServer);
