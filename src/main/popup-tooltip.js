@@ -2,7 +2,7 @@
 // WebContentsView delle tab coprono qualunque tooltip DOM che sborda.
 // La window si crea una volta e si riusa (hide, non close: il reload a ogni hover si vede).
 
-const { BrowserWindow, nativeTheme, screen } = require('electron');
+const { BrowserWindow, nativeTheme } = require('electron');
 const path = require('node:path');
 const { hideForTests } = require('./test-window-mode');
 const { quandoSparita } = require('./popup-anteprima');
