@@ -1204,10 +1204,14 @@ vale per tutti i compiti di quel tipo.
   (§ 5.3), che decide l'owner.
 - **Un rosso su main già seguito diventa una nota (#2226).** Se il testo nomina
   file di test (`tests/**/*.test.mjs`, `tests/**/*.spec.mjs`,
-  `functions/test/**/*.test.js`) e ognuno è nominato, per percorso o per nome
-  base, da un feedback aperto su un rosso di main (un allarme della
-  costruzione, o un feedback che dice rosso su main), la segnalazione diventa
-  una nota sul più vecchio di quelli, col testo intero e chi l'ha vista, e la
+  `functions/test/**/*.test.js`) e ognuno è seguito da un feedback aperto su
+  un rosso di main, la segnalazione diventa una nota sul più vecchio di quelli.
+  Segue un file: un allarme della costruzione per le sue chiavi (senza chiavi
+  di file, per un nome fra le parentesi del titolo o per il percorso intero);
+  una segnalazione per i file che ha registrato alla nascita (tutti quelli
+  nominati se la prima riga dice rosso su main, se no quelli scritti sulla
+  riga che lo dice); un altro feedback se scrive il percorso sulla riga che lo
+  dice rosso su main. La nota porta il testo intero e chi l'ha vista, e la
   risposta porta `nota: true` col suo numero. Mai quando la nota alzerebbe la
   fiducia di quel feedback, vi porterebbe testo riservato o ne taglierebbe la
   storia: allora si apre come sempre.
