@@ -188,7 +188,8 @@ html[data-chrome-compact="1"] .addr {
 }
 /* Transizione di sfondo spenta durante il trascinamento: così la tab segue il puntatore senza scatti. */
 .tab.dragging {
-  opacity: 0.7;
+  /* Quasi piena: sopra le vicine che le scivolano sotto non deve lasciar trasparire i loro titoli. */
+  opacity: 0.92;
   z-index: 5;
   transition: none;
   cursor: grabbing;
