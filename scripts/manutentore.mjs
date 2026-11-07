@@ -486,7 +486,7 @@ export function rigaSchedaServer(s, locale = null) {
 export function indiceDalServer(schede) {
   return (schede || []).filter((s) => s && s.num).map((s) => ({
     num: String(s.num), stato: s.stato || '', priorita: Number.isInteger(s.priorita) ? s.priorita : null,
-    unisce: s.unisce || [], attese: s.aspetta || [],
+    unisce: s.unisce || [], attese: s.aspetta || [], aspettava: s.aspettava || [],
   }));
 }
 
