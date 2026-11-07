@@ -364,6 +364,34 @@ test('prova vera (#2214): le righe di novità sotto la versione uscita intanto s
   }
 });
 
+test('prova vera (#2214): se le novità non si spostano da sole, gli unit girano sul registro della fusione com\'è', () => {
+  const r = repoFinto();
+  try {
+    const USCITA = { v: '0.2.265', righe: ['Uscita'] };
+    r.suMain(() => {
+      r.scrivi('package.json', '{\n  "name": "filo",\n  "version": "0.2.265"\n}\n');
+      r.scrivi('src/shared/patchNotes.js', registroFinto([{ v: '0.2.266', righe: ['Di main, in arrivo'] }, USCITA]));
+      r.scrivi('tests/unit/novita.test.mjs', TEST_NOVITA);
+    });
+    // Il ramo aggiunge una riga e ne riscrive una che c'era: quale sia l'aggiunta non è meccanico, lo spostamento rifiuta.
+    const scritto = registroFinto([{ v: '0.2.266', righe: ['Di main, riscritta dal ramo', 'Del ramo'] }, USCITA]);
+    const punta = r.ramo('claude/riscritta', () => r.scrivi('src/shared/patchNotes.js', scritto));
+    r.suMain(() => r.scrivi('package.json', '{\n  "name": "filo",\n  "version": "0.2.266"\n}\n'));
+    const viste = [];
+    const lancia = (dir, base, nome, o) => { viste.push(readFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), 'utf8')); return lanciaUnit(dir, base, nome, o); };
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta, lancia, scrivi: (s) => righe.push(s) });
+    assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
+    assert.equal(p.novita, undefined, 'niente da dire al server: lo spostamento non si è fatto');
+    assert.equal(viste[0], scritto, 'gli unit girano sul registro della fusione, non su uno spostato a metà');
+    assert.ok(righe.some((s) => /non si spostano da sole/.test(s)), righe.join('\n'));
+    assert.ok(!righe.some((s) => /Le sposto nel blocco/.test(s)), righe.join('\n'));
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
 test('l\'esito con le novità spostate: solo un esito provato cambia, e il rosso della fusione com\'è si aggiunge (#2214)', () => {
   const novita = { verso: '0.2.267', righe: [{ version: '0.2.266', chiave: 'fixes', riga: 'a' }, { version: '0.2.265', chiave: 'features', riga: 'b' }] };
   const su = conNovita({ esito: 'rosso_anche_su_main', mainSha: SHA, rossiMain: 3 }, novita);
