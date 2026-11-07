@@ -258,7 +258,8 @@ test('Aiuto e riquadro: le crocette, l\'invio e la freccia hanno il loro fumetto
   expect(await muti(page, '.sn-popup')).toEqual([]);
 });
 
-test('home: la X del ringraziamento per un feedback risolto e quella delle Novità hanno il loro fumetto', async ({ app }) => {
+// La X del ringraziamento per un feedback risolto nasce dalle stesse righe (dash-recap-x).
+test('home: la X delle Novità ha il suo fumetto', async ({ app }) => {
   const page = await aspettaFinestra(app, (w) => w.url().startsWith('filo://newtab'), 'la home dell\'avvio non è nata');
   await page.waitForFunction(() => window.__filoDashActions && window.__filoDashActions.ricompenseAvvio, null, { timeout: 0 });
   await page.evaluate(() => window.__filoDashActions.ricompenseAvvio());
