@@ -68,15 +68,8 @@ test('stringere un freno non vuole la parola: tetto più basso e livello più pr
   try {
     await modelloFinto(app, [chiamata('b1', 'IMPOSTA_PREFERENZA', { chiave: 'limite_spesa', valore: '2' }), { text: 'Abbassato.' }]);
     await chiedi(page, 'abbassa il tetto di spesa a 2 euro');
-    await expect(page.locator(CONFIRM_HOST).or(page.locator('.dash-bubble').filter({ hasText: 'Abbassato.' }))
-      .or(page.locator('button.dash-action-btn'))).toBeVisible({ timeout: 15000 });
-    if (await page.locator('button.dash-action-btn').last().isVisible()) await page.locator('button.dash-action-btn').last().click();
-    if (await page.locator(CONFIRM_HOST).isVisible()) {
-      console.log('riquadro tetto basso:', await confirmText(page));
-      expect((await confirmState(page)).hasInput, 'abbassare il tetto non vuole la parola').toBe(false);
-      await clickConfirm(page, 'ok');
-    }
-    await expect.poll(() => tetto(app), { timeout: 8000 }).toBe(2);
+    await expect.poll(() => tetto(app), { timeout: 15000 }).toBe(2);
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
   } finally { await ripristina(app); }
 });
 
