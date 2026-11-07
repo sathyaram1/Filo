@@ -495,7 +495,8 @@ function consegnaBroadcast(msg) {
   const type = msg && msg.type;
   // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto. Né una luce che si spegne.
   const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore' && msg.fase !== 'esci';
-  if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
+  // Svegliato ma non ancora pronto: anche i messaggi che seguono il primo aspettano i suoi ascoltatori.
+  if (IS_SUBFRAME && wakes && (!contentScriptsStarted || !contenutiPronti())) {
     ensureContentScripts();
     waitForContentScripts(deliver);
     return;
