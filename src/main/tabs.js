@@ -3761,7 +3761,6 @@ class TabManager {
       const accesso = tab.isInternal === false && isAuthPopup(url);
       // Si legge prima che la finestra la spenda (perUnaFinestra).
       const scelta = tab.isInternal === false && Permessi.sceltaDallUtente(wc, url);
-      const azioneMisurata = Permessi.azioneDellApertura(wc, url);
       // Anche la finestra di un accesso vero nasce da un clic su «Accedi con…»: l'indirizzo lo sceglie la pagina.
       const riaperta = accesso && this._riaperturaDiAccesso(tab, url);
       // Una finestra senza barra dell'indirizzo la apre solo il clic, anche a blocco spento: da sola la pagina
