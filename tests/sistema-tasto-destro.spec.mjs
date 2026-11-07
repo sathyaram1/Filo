@@ -186,7 +186,8 @@ test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui prefer
   await (await rigaDi('Fra i preferiti')).click({ button: 'right' });
   const voci = await etichette(page);
   expect(voci).toContain('Apri il riquadro di sistema');
-  expect(voci.filter((v) => /preferiti/i.test(v) && /^Annulla · /.test(v))).toEqual([]);
+  // Uno solo: quello del filo, che sa anche rifare.
+  expect(voci.filter((v) => /^Annulla\b/.test(v))).toHaveLength(1);
 });
 
 test('una rete Wi-Fi: Collegati e Dimentica la rete; il volume: valori pronti e muto', async ({ app }) => {
