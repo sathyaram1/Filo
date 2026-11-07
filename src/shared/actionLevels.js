@@ -87,10 +87,6 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-  function chiestaPreferenza(a, ctx) {
-    const P = global.SN_PREF;
-    const unico = typeof valore === 'string' ? valore.trim() : '';
-    if (unico.length >= 8 && /\d/.test(unico) && /[a-z]/i.test(unico)
       && new RegExp(`(?<![\\w-])${unico.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?![\\w-])`, 'i').test(testo)) return true;
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati. Contano in ogni uscita: l'elenco chiesto, i candidati di un
