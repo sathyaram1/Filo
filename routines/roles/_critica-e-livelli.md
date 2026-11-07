@@ -73,7 +73,8 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   **La pulizia che non dipende dall'esito si fa prima del verdetto**, nel
   commit della critica: si sa già, e ogni commit dopo il verdetto è un passo in
   più che i cancelli devono controllare (lì si può solo togliere). La fiducia
-  non c'entra: quel commit lo spedisce il rilascio, che ne registra la punta.
+  non c'entra, e nemmeno il push: quel commit lo spedisce la registrazione
+  stessa, prima di chiedere l'esito al server.
   La registrazione rifiuta una critica che ha ancora nel ramo una prova di
   questi, o un caso col loro numero nel titolo, e dice quale.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
