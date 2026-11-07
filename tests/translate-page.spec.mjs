@@ -2679,3 +2679,114 @@ test('di serie un riquadro nascosto grande come un pixel, o dietro una finestrel
   const sent = await sentText(app);
   expect(['ZZPIX', 'ZZWIN'].filter((t) => sent.includes(t))).toEqual([]);
 });
+
+// #1290.2 giro 1 — le porte rimaste: il riquadro in un componente, la sezione aperta a giro in corso, il pixel spento,
+// il testo da non tradurre chiuso in un componente, il guasto della sezione che si traduce da sola.
+
+test('riquadro avvolto in un componente aperto che finisce di caricarsi dopo: tradotto, e niente «testo nuovo»', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const foto = await immagineLenta(7000);
+  try {
+    const src = testServer.html(`<!doctype html><html lang="en"><body style="font:16px sans-serif;margin:0;padding:10px">
+      <p id="fbody">ZZWRAP an embedded post written in english and long enough to count as text.</p>
+      <img src="${foto.url}" width="40" height="40" alt=""></body></html>`).replace('127.0.0.1', 'blocked.test');
+    const page = await testServer.openReady(openTab, framePage(`<embed-post></embed-post>
+      <script>customElements.define('embed-post', class extends HTMLElement { connectedCallback() {
+        this.attachShadow({ mode: 'open' }).innerHTML = '<iframe id="emb" src="${src}" style="width:520px;height:220px"></iframe>'; } });</script>`));
+    const riquadro = () => page.frames().find((f) => f.url().includes('blocked.test'));
+    await expect.poll(() => !!riquadro(), { timeout: 30000 }).toBe(true);
+    await expect.poll(() => riquadro().evaluate(() => (document.getElementById('fbody') || {}).textContent || ''), { timeout: 30000 }).toMatch(/^ZZWRAP /);
+    // Il presupposto: si preme Traduci con il riquadro ancora in caricamento.
+    expect(await riquadro().evaluate(() => document.readyState)).not.toBe('complete');
+    await watchToasts(page);
+    await clickTranslateIcon(app);
+
+    await expect.poll(() => riquadro().evaluate(() => document.getElementById('fbody').textContent), { timeout: 60000 }).toMatch(/^IT ZZWRAP /);
+    await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+    await expect.poll(() => riquadro().evaluate(() => document.readyState), { timeout: 30000 }).toBe('complete');
+    await page.waitForTimeout(800);
+    expect((await toasts(page)).join(' | ')).not.toContain('aggiunta');
+    await expect(await iconaTraduci(app)).toHaveAttribute('aria-label', 'Mostra originale');
+  } finally { foto.chiudi(); }
+});
+
+const PIEGATA_UNA = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">An article with a folded part</h1>
+  <p id="p1">First paragraph of the body text, long enough to be picked up by the translation.</p>
+  <p id="p2">Second paragraph of the body text, also long enough to be picked up by the translation.</p>
+  <button id="apri" onclick="document.getElementById('sez').hidden = false">Show more</button>
+  <div id="sez" hidden><p id="psez">A paragraph inside the folded section, long enough to be translated.</p></div>
+</body></html>`;
+
+test('solo quando apro: la sezione aperta mentre la traduzione lavora si traduce anche lei', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app, 4000);
+  await soloQuandoApro(app);
+  const page = await testServer.openReady(openTab, PIEGATA_UNA);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 10000 }).toContain('in corso');
+  await page.locator('#apri').click();
+  // Il presupposto: la sezione si apre prima che la traduzione abbia finito.
+  expect((await toasts(page)).join(' | ')).not.toContain('Pagina tradotta');
+
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect(page.locator('#psez')).toHaveText(/^IT /, { timeout: 15000 });
+});
+
+test('solo quando apro: la sezione aperta che non riesce a tradursi lo dice', async ({ app, openTab, testServer }) => {
+  await stubFlakyTranslationProvider(app, -1);
+  await soloQuandoApro(app);
+  const page = await testServer.openReady(openTab, PIEGATA_UNA);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  // La rete salta: la sezione aperta resta in inglese, e l'avviso lo dice invece di tacere.
+  await app.evaluate(() => { globalThis.__filoFailAfter = 0; });
+  await page.locator('#apri').click();
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 15000 }).toMatch(/Traduzione interrotta|Non sono riuscito/);
+  await expect(page.locator('#psez')).not.toHaveText(/^IT /);
+});
+
+test('di serie un riquadro da un pixel spento del tutto non va al modello', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
+  await stubTranslationProvider(app);
+  const cross = (token) => testServer.html(frameInner(token)).replace('127.0.0.1', 'blocked.test');
+  const page = await testServer.openReady(openTab, framePage(`
+    <iframe src="${cross('ZZNONE')}" width="1" height="1" style="display:none"></iframe>
+    <div style="display:none"><iframe src="${cross('ZZTAB')}" style="width:520px;height:220px"></iframe></div>`));
+  await page.waitForTimeout(1000);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  // Il riquadro grande nella sezione spenta si traduce in sottofondo: è il metro che dice che il giro è arrivato fin lì.
+  await expect.poll(async () => (await sentText(app)).includes('ZZTAB'), { timeout: 60000 }).toBe(true);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 60000 }).toBe(true);
+  await page.waitForTimeout(1500);
+  expect(await sentText(app)).not.toContain('ZZNONE');
+});
+
+test('componente chiuso con dentro solo testo da non tradurre o un modulo compilato: «Pagina tradotta»', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+    <h1 id="head">A page with a brand widget sealed by the site</h1>
+    <p id="p1">First paragraph of the page, long enough to be picked up by the translation.</p>
+    <brand-box style="display:block;width:600px;height:120px"></brand-box>
+    <filled-form style="display:block;width:600px;height:120px"></filled-form>
+    <script>
+      customElements.define('brand-box', class extends HTMLElement { connectedCallback() {
+        this.attachShadow({ mode: 'closed' }).innerHTML = '<div class="notranslate" style="font-size:40px">Acme Widget Pro</div>'
+          + '<div translate="no">Acme Corporation Limited</div>';
+      } });
+      customElements.define('filled-form', class extends HTMLElement { connectedCallback() {
+        this.attachShadow({ mode: 'closed' }).innerHTML = '<input value="Mario Rossi" style="width:300px;height:30px">'
+          + '<input type="hidden" value="session token abc"><input type="submit" name="go" value="Send it">';
+      } });
+    </script>
+  </body></html>`);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toMatch(/tradotta/);
+  expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
+});
