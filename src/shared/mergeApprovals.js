@@ -963,6 +963,7 @@
 
     discardBtn.addEventListener('click', function () {
       disarm();
+      mostraEsito = true;
       setBusy(true);
       Promise.resolve(o.onDiscard ? o.onDiscard(req) : null)
         .then(function (reply) {
