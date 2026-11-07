@@ -1052,11 +1052,14 @@ function loadScripts() {
   if (PAGE_ONLY) try { require(path.join(CONTENT_DIR, 'pageColor.js')); } catch (e) { console.error('[Filo CS] pageColor', e); }
   try { require(path.join(CONTENT_DIR, 'translatePage.js')); } catch (e) { console.error('[Filo CS] translatePage', e); }
   try { require(path.join(SHARED_DIR, 'ttsChunk.js')); } catch (e) { console.error('[Filo CS] ttsChunk', e); }
-  try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo CS] modelCaps', e); }
-  try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo CS] ttsVoices', e); }
-  try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
-  try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo CS] ascolto', e); } // microfono e trascrizione: Detta e le chat
-  try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo CS] voceChat', e); } // tasto microfono delle chat, a cui «Detta» passa la mano
+  suRichiesta(['SN_MODEL_CAPS'], () => { try { require(path.join(SHARED_DIR, 'modelCaps.js')); } catch (e) { console.error('[Filo CS] modelCaps', e); } });
+  suRichiesta(['SN_TTS_VOICES'], () => { try { require(path.join(SHARED_DIR, 'ttsVoices.js')); } catch (e) { console.error('[Filo CS] ttsVoices', e); } });
+  // Microfono e trascrizione: Detta e le chat; voceChat è il tasto microfono delle chat, a cui «Detta» passa la mano.
+  suRichiesta(['SN_DICTATION_SEGMENTER', 'SN_ASCOLTO', 'SN_VOCE_CHAT'], () => {
+    try { require(path.join(SHARED_DIR, 'dictationSegmenter.js')); } catch (e) { console.error('[Filo CS] dictationSegmenter', e); }
+    try { require(path.join(SHARED_DIR, 'ascolto.js')); } catch (e) { console.error('[Filo CS] ascolto', e); }
+    try { require(path.join(SHARED_DIR, 'voceChat.js')); } catch (e) { console.error('[Filo CS] voceChat', e); }
+  });
   try { require(path.join(CONTENT_DIR, 'tts.js')); } catch (e) { console.error('[Filo CS] tts', e); }
   try { require(path.join(CONTENT_DIR, 'editBox.js')); } catch (e) { console.error('[Filo CS] editBox', e); }
   try { require(path.join(CONTENT_DIR, 'actions.js')); } catch (e) { console.error('[Filo CS] actions', e); }
