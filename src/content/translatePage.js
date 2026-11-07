@@ -67,6 +67,10 @@
   let modoUltimo = global.SN_CONST.nascosteDellaTraduzione(null);
   // Un riquadro che si carica mentre il giro lavora: il giro gli aveva già passato parola prima che ci fosse (#1290).
   let riquadroNelGiro = false;
+  // I riquadri a cui l'ultimo giro ha passato parola prima che finissero di caricarsi (immagini e script arrivano dopo
+  // il testo): il loro load non è un riquadro nuovo, se il giro li ha sentiti rispondere. `risposto` null finché il giro
+  // aspetta le risposte; `arrivati` quanti load sono venuti nel frattempo (#1290.2).
+  let caricoAtteso = { riquadri: new WeakSet(), risposto: null, arrivati: 0 };
   // Una sezione si apre o si chiude solo se la pagina cambia o se l'utente la tocca: finché nessuna delle due
   // cose succede, la risposta di prima vale ancora.
   let revealedDirty = true;
