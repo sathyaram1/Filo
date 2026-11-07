@@ -314,7 +314,8 @@ test('scheda: chiuso e riaperto il pannello a metà volo, il tempo continua dal 
   const trascorso = page.locator('#mgSideBody .sn-mac-card .sn-mac-trascorso');
   await expect(trascorso).toHaveText(/^da [3-9] s$/, { timeout: 8_000 });
   await page.evaluate(() => { document.querySelector('#mgSideBody .sn-mac-card').dataset.vecchia = '1'; });
-  await page.locator('#mgSideClose, #mgSide [aria-label="Chiudi"], #mgSide .mg-side-close').first().click();
+  await page.locator('#mgSideClose').click();
+  await expect(page.locator('#mgSide')).toBeHidden();
   await page.evaluate(() => window.__mgTest.openDetail('lunga'));
   await page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]').click();
   await expect(page.locator('#mgSideBody .sn-mac-card .sn-mac-btn-go')).toHaveText('Sto fondendo');
