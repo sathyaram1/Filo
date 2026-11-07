@@ -79,7 +79,8 @@ Solo se lo copre davvero: un principio vicino non basta, e nel dubbio decide
 l'owner. Un principio segnato come contestato non si usa: l'owner ha riaperto
 una risposta che lo usava, e finché non risponde vale come assente. La
 risposta finisce fra le risposte automatiche, e l'owner può riaprirla. Le
-opzioni che vogliono un suo gesto il server le rifiuta.
+opzioni che vogliono un suo gesto il server le rifiuta. Un «da fare» non lo
+chiude un principio: il passo lo fa l'owner, non una regola.
 
 ### 3. Decide l'owner: riscrivi la domanda per lui
 
