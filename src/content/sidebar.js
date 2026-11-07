@@ -1040,6 +1040,26 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
+  // I tasti dei messaggi, una volta per conversazione a schermo: Rispondi cita nella casella dell'Aiuto.
+  const azioniConv = new WeakMap();
+  function azioniSu(conv) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (!conv || !A || azioniConv.has(conv)) return;
+    const Md = global.SN_MARKDOWN;
+    azioniConv.set(conv, A.attacca(conv, {
+      messaggio: '.sn-sidebar-msg-user, .sn-sidebar-msg-assistant',
+      testo: (el) => (el.classList.contains('sn-sidebar-msg-assistant') && Md && Md.testo ? Md.testo(el._scritto || '') : el._scritto || ''),
+      ruolo: (el) => (el.classList.contains('sn-sidebar-msg-user') ? 'user' : 'filo'),
+      rispondi: (_el, testo) => A.citaNelCampo(root && root.querySelector('.sn-sidebar-input textarea'), testo),
+    }));
+  }
+  // Le stesse azioni dal tasto destro, sulle pagine di Filo (sui siti il menu non legge le voci della pagina).
+  function vociMessaggio(target) {
+    const conv = convEl();
+    const a = conv && azioniConv.get(conv);
+    return a ? a.voci(target).map((v) => ({ type: 'item', icon: global.SN_ICONS?.[v.icona]?.(16) || '', label: v.label, onClick: () => { v.fai(); } })) : [];
+  }
+
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
   // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
   function nelFiloAiuto(role, text, schede = []) {
