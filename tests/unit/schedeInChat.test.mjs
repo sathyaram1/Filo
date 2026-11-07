@@ -85,9 +85,8 @@ test('filo: un messaggio con le schede le porta nella coda, e la ricerca lo trov
   const S = globalThis.SN_SCHEDE_IN_CHAT;
   const testo = `di cosa parla ${S.gettone(SCHEDA)} `;
   const chats = [{ id: 'c1', createdAt: '2026-11-07T10:00:00Z', messages: [{ role: 'user', text: testo, ts: '2026-11-07T10:00:00Z', schede: [SCHEDA] }] }];
-  const righe = C.righe ? C.righe({ chats }) : null;
-  const msg = (righe && (righe.voci || righe)).find?.((v) => v.k === 'msg');
-  if (msg) assert.deepEqual(msg.schede, [SCHEDA]);
+  const msg = C.elementi({ chats }).find((v) => v.k === 'msg');
+  assert.deepEqual(msg.schede, [SCHEDA]);
   const r = C.cerca({ chats }, 'parla');
   assert.equal(r.messaggi.length, 1);
   assert.ok(!r.messaggi[0].testo.includes('⟦'), r.messaggi[0].testo);
