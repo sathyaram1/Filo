@@ -169,7 +169,7 @@ test('l\'esito unico porta le novità spostate solo se le portano tutte le parti
   // Windows con i soli unit toccati, verde: la riga resta quella di Linux, con le sue novità.
   assert.deepEqual(unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), parte('windows', { esito: 'verde' })] }).novita, N('verde'));
   const senza = unisciParti({ ramo: A, main: B, parti: [rossa('linux', 'verde'), parte('windows', { esito: 'rosso_sulla_fusione', rossi: ['x › y'] })] });
-  assert.equal(senza.novita, undefined, 'una parte rossa senza novità: la causa è un altra');
+  assert.equal(senza.novita, undefined, 'una parte rossa senza novità: la causa è altrove');
   assert.equal(unisciParti({ ramo: A, main: B, parti: [parte('linux', { esito: 'rosso_sulla_fusione', rossi: ['x › y'] })] }).novita, undefined);
 });
 
