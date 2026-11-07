@@ -155,7 +155,7 @@ test('#1290.2 — un riquadro dentro un componente aperto è caricato quando lo 
   // Il componente aperto che lo contiene, come lo vede chi cammina nella pagina.
   const radice = { querySelectorAll: () => [f] };
   win.document.querySelectorAll = (sel) => (sel === '*' ? [{ shadowRoot: radice }] : []);
-  const messaggi = win.__ascolti = [];
+  const messaggi = [];
   assert.equal(R.caricato(f), false, 'il load nel componente non arriva al documento: finché non parla, non è caricato');
   const parla = (data, source) => { for (const fn of messaggi) fn({ data, source }); };
   for (const a of win.ascoltiFinestra()) if (a.tipo === 'message') messaggi.push(a.fn);
