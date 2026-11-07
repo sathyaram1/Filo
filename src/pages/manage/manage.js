@@ -3077,7 +3077,8 @@
     // approvare in blocco quello che non si è potuto leggere è la scrittura
     // più pesante della pagina.
     if (!sezioniAttendibili()) return [];
-    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f));
+    // Un lavoro server non fidato si approva solo col suo tasto, che lo rende anche fidato (#2217).
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f) && !MR.chiedeFiduciaPerLaCoda(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
