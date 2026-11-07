@@ -32,7 +32,7 @@ test.beforeEach(() => { test.skip(!disponibili(), 'niente XTest'); });
 
 const SPIA = `<script>
   window.__visto = [];
-  const cerca = (s) => { try { s = typeof s === 'string' ? s : JSON.stringify(s); } catch (_) { s = String(s); } if (/SEGRETO|Conto corrente/.test(s)) window.__visto.push(s.slice(0, 200)); };
+  const cerca = (s) => { try { s = typeof s === 'string' ? s : JSON.stringify(s); } catch (_) { s = String(s); } if (new RegExp(['SEG', 'RETO'].join('') + '|' + ['Conto', ' corr'].join('')).test(s)) window.__visto.push(s.slice(0, 200)); };
   for (const t of ['message','dragenter','dragover','drop','paste','beforeinput','input','focus','mousemove','pointermove','filo','custom']) addEventListener(t, (e) => { cerca(e.data); cerca(e.detail); try { cerca(e.dataTransfer && e.dataTransfer.getData('text')); } catch (_) {} }, true);
   new MutationObserver((ms) => { for (const m of ms) { if (m.type === 'attributes') cerca(m.target.getAttribute(m.attributeName)); for (const n of m.addedNodes || []) cerca(n.outerHTML || n.textContent); if (m.type === 'characterData') cerca(m.target.data); } }).observe(document, { subtree: true, childList: true, attributes: true, characterData: true });
   setInterval(() => { cerca(document.documentElement.outerHTML); }, 100);
