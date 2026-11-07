@@ -7,10 +7,14 @@ const R = require('../main/services/regoleYouTube.js');
 const { sorgente } = require('./youtube-scriptlet.js');
 
 const AVVISO = 'ytd-enforcement-message-view-model';
+const CANALE_REGOLE = 'filo:youtube-regole';
+const CANALE_PRONTE = 'filo:youtube-regole-pronte';
 // Dal «play» al primo passo avanti del video: oltre, il lettore è fermo.
 const PARTENZA_MS = 8000;
-// Il video che arriva alla fine entro così poco dal suo inizio ci è stato mandato.
+// Il video che arriva alla fine entro così poco dal suo inizio, e più avanti di quanto il tempo gli permetteva, ci è
+// stato mandato.
 const FINE_ENTRO_MS = 5000;
+const SALTO_S = 2;
 const DURATA_MIN_S = 30;
 // Un gesto dell'utente o una pubblicità appena finita spiegano da soli un salto.
 const GESTO_MS = 1500;
