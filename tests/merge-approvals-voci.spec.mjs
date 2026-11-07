@@ -168,7 +168,7 @@ test('quattordici voci: tutte visibili a elenco aperto, e il sì aspetta che l�
   await card.locator('.sn-mac-tutte').filter({ hasText: 'Mostra le altre 2 voci' }).click();
   for (let i = 0; i < 14; i++) await expect(voci.nth(i)).toBeVisible();
   await expect(card.locator('.sn-mac-tutte')).toHaveCount(0);
-  await expect(card.locator('.sn-mac-serve-aprire')).toBeHidden();
+  await expect(approva).toHaveText('Approva e fondi');
   await expect(approva).toBeEnabled();
   // Il carattere che rigira il testo si vede per quello che è.
   await expect(voci.nth(13).locator('.sn-mac-voce-testo')).toHaveText('if (admin)⟨U+202E⟩ { consenti(); }⟨U+2066⟩ // ok');
