@@ -3052,7 +3052,7 @@
         n.className = 'permesso-oggetto';
         const c = Array.from(cosa.nome);
         n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
-        n.title = String(cosa.percorso || cosa.nome);
+        n.dataset.tip = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }
       // Lo schermo (#586): ogni cosa che si può mostrare è il suo «Consenti», e la scelta vale per questa volta.
