@@ -694,7 +694,7 @@
     }
     function cede() {
       if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
-      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, ritardoSuggerimento());
     }
     // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
     function sottoIlPuntatore(id) {
