@@ -135,8 +135,14 @@ test('un file che non si lascia leggere non viene sovrascritto: si lavora in mem
 test('una scrittura che fallisce a metà lascia il file di prima leggibile, avvisa una volta sola e poi riprova', async () => {
   tace();
   const { dir, Storage, file } = avvio({ 'storage.json': '{"v":1}' });
+  // Il carico di #1212.1 reso fisso: la copia dell'avvio resta col suo temporaneo aperto mentre la prova va avanti.
+  sostituisci(fsp, 'open', (vero) => async (p, ...resto) => {
+    const fh = await vero(p, ...resto);
+    if (String(p).includes('storage.json.bak.tmp-')) await new Promise((r) => setTimeout(r, 300));
+    return fh;
+  });
   await Storage.get(null);
-  // Sotto carico la copia dell'avvio è ancora in scrittura, e il suo temporaneo non è della scrittura che fallisce.
+  // Il temporaneo della copia non è della scrittura che fallisce: si conta solo a copia finita.
   await Storage.statoDisco().copia;
   sostituisci(fsp, 'open', (vero) => async (p, ...resto) => {
     const fh = await vero(p, ...resto);
