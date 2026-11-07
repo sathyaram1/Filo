@@ -512,7 +512,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
           // Verde da solo non vuol dire instabile: due test che si pestano i piedi solo girando insieme passano sempre
           // da soli (verifica #929 giro 3). Instabile è solo ciò che torna verde rifacendo la suite intera.
           scrivi(`▸ Verdi da soli (${forse.length}): rifaccio la suite intera ${sulla} per distinguere un instabile da due test che si rompono solo insieme`);
-          const di = lancia(a.dir, base, 'di-nuovo');
+          const di = lancia(a.dir, base, 'di-nuovo', quali);
           if (di.errore) return { errore: di.errore, mainSha };
           const ripetuti = !di.ok && !di.rossi.length ? forse : forse.filter((k) => di.rossi.includes(k));
           ancora = [...ancora, ...ripetuti];
