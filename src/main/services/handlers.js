@@ -2396,7 +2396,12 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', daFuori = 
   // Battuto a mano, il comando sono parole dell'utente: un segreto dentro l'ha scritto lui. Incollato no (#1840).
   const ing = Levels ? Levels.ingressi(action, { impostazioni, richiesta: daFuori === true ? '' : cmd }) : null;
   if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
-  const d = decisioneAutonomia(ing, { impostazioni, fontiLette: daFuori === true ? [FONTE_COMANDO_DA_FUORI] : null });
+  let d = decisioneAutonomia(ing, { impostazioni, fontiLette: daFuori === true ? [FONTE_COMANDO_DA_FUORI] : null });
+  // Il terminale della home è la strada «lo fai tu»: una riga incollata che cancella per sempre vuole la parola, non il
+  // no che riceverebbe Filo dopo una lettura (#1909, #1840). Un segreto incollato resta un no (regola 'chiesta').
+  if (daFuori === true && d.risposta === 'no' && d.regola === 'lettura') {
+    d = { ...decisioneAutonomia(ing, { impostazioni, fontiLette: null }), perche: globalThis.SN_AUTONOMIA.frasePerche(FONTE_COMANDO_DA_FUORI) };
+  }
   const contati = ingressiContati(ing, d, { origine: 'chat', dentroPerimetro: ing.dentroPerimetro });
   if (d.risposta === 'no') return { risposta: 'no', digita: false, no: fraseNo(ing, d, null).breve, contati };
   if (d.risposta === 'si') return { risposta: 'si', digita: false, contati };
