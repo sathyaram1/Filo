@@ -222,8 +222,11 @@
         pageComplete = true;
       }
       progress.close();
-      showResultToast(result, newContentSeen, frames);
-      contaEsito(result, newContentSeen, frames);
+      if (!daSola) {
+        showResultToast(result, newContentSeen, frames);
+        contaEsito(result, newContentSeen, frames);
+      } else if (daDire(result, frames)) showResultToast(result, false, frames);
+      if (result && result.kind === 'done') rimastiPrima = { chiusi: Number(result.unreachable || 0), riquadri: frames.left || 0 };
     } finally {
       progress.close();
       if (framesRunId) frameRuns.delete(framesRunId);
