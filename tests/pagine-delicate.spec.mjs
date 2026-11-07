@@ -644,6 +644,7 @@ const categorizzazioni = async (app) => (await mandato(app)).filter((m) => m.tes
 test('salvata per dopo con le categorie accese: di una pagina di posta al modello va il tipo, di una qualunque titolo e testo', async ({ app }) => {
   await modelliFinti(app);
   await impostaDaFilo(app, { featureFlags: { categorize: true } });
+  await livelloPrivacy(app, 'delicate');
   const salva = (page) => app.evaluate(async ({}, p) => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.SAVE_PAGE, page: p }), page);
   await salva({ url: 'https://mail.google.com/mail/u/0/#inbox', title: 'Posta in arrivo (3) - mario.rossi@gmail.com', description: '', excerpt: SEGRETO });
   await expect.poll(async () => (await categorizzazioni(app)).length, { timeout: 8000 }).toBe(1);
