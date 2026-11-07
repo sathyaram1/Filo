@@ -89,7 +89,52 @@ export function campoPerIlServer(prova) {
     if (rossi.length > TETTO_ROSSI) out.altriRossi = rossi.length - TETTO_ROSSI;
   }
   if (p.esito === 'conflitto' && Array.isArray(p.file)) out.file = p.file.slice(0, TETTO_ROSSI).map((f) => String(f).slice(0, 300));
+  if (p.esito === 'rosso_sulla_fusione' && p.novita) {
+    const righe = Array.isArray(p.novita.righe) ? p.novita.righe : [];
+    out.novita = {
+      verso: String(p.novita.verso || ''), dopo: String(p.novita.dopo || ''),
+      righe: righe.slice(0, TETTO_ROSSI).map((r) => ({ version: String(r.version || ''), riga: String(r.riga || '').slice(0, 300) })),
+      ...(righe.length > TETTO_ROSSI ? { altreRighe: righe.length - TETTO_ROSSI } : {}),
+    };
+  }
   return out;
+}
+
+const PROVATI = ['verde', 'rosso_anche_su_main', 'rosso_sulla_fusione'];
+// Con questi esiti dopo lo spostamento, lo spostamento da solo rende fondibile il ramo.
+export const BASTA_SPOSTARE = Object.freeze(['verde', 'rosso_anche_su_main']);
+
+/** Il rosso che la fusione così com'è avrebbe in più: le righe di novità del ramo sotto versioni già uscite. PURA. */
+export function chiaveNovita(novita) {
+  const righe = Array.isArray(novita && novita.righe) ? novita.righe : [];
+  const uscite = [...new Set(righe.map((r) => String(r.version)))].join(', ');
+  return `${FILE_NOVITA} › ${righe.length === 1 ? 'una riga' : `${righe.length} righe`} del ramo sotto versioni già uscite (${uscite}): vanno nel blocco ${novita.verso}`;
+}
+
+/**
+ * La prova girata con le novità già spostate in cima (#2214). Chi fonde prende il ramo com'è, con le righe sotto una
+ * versione uscita: per lui la fusione resta rossa, e `novita.dopo` dice com'è andata dopo lo spostamento. PURA.
+ */
+export function conNovita(prova, novita) {
+  if (!prova || !novita || !Array.isArray(novita.righe) || !novita.righe.length || !PROVATI.includes(prova.esito)) return prova;
+  const dopo = prova.esito;
+  const rossi = dopo === 'rosso_sulla_fusione' && Array.isArray(prova.rossi) ? prova.rossi : [];
+  return { ...prova, esito: 'rosso_sulla_fusione', rossi: [...rossi, chiaveNovita(novita)], novita: { ...novita, dopo } };
+}
+
+function testoNovita(p, dove) {
+  const n = p.novita;
+  const rossi = (Array.isArray(p.rossi) ? p.rossi : []).filter((r) => !r.startsWith(`${FILE_NOVITA} › `));
+  const dopo = n.dopo === 'verde' ? 'verdi'
+    : n.dopo === 'rosso_anche_su_main' ? 'rossi solo come su main da solo'
+      : `ancora rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}`;
+  return [
+    `✗ Unit ${dove}: la fusione così com'è lascia ${n.righe.length === 1 ? 'una riga' : `${n.righe.length} righe`} di novità del ramo sotto versioni già uscite.`,
+    ...n.righe.map((r) => `    ~ in ${r.version}: ${String(r.riga).slice(0, 100)}`),
+    `  Spostate nel blocco ${n.verso}, gli unit sono ${dopo}${BASTA_SPOSTARE.includes(n.dopo) ? ': basta lo spostamento (node scripts/novita-in-cima.mjs --commit, dopo il riallineamento).' : ':'}`,
+    ...rossi.map((r) => `    ✖ ${r}`),
+    ...(p.coda ? [`  Ultime righe dell'uscita ${p.contenuto ? 'sul ramo' : 'sulla fusione'}:`, ...String(p.coda).split('\n').map((r) => `    ${r}`)] : []),
+  ].join('\n');
 }
 
 /** Quanto era profondo il clone, per il registro del server (#958). PURA. */
