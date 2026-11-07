@@ -1957,8 +1957,6 @@
     elenco({
       keys: ['siti_fidati_cookie', 'siti fidati cookie', 'siti fidati per i cookie', 'resta connesso', 'siti dove resto connesso',
         'siti connessi', 'resta connesso su', 'resta connesso qui', 'non restare connesso'],
-      detto: ['tienimi connesso', 'restare connesso', 'rimanere connesso', 'rimani connesso', 'resto connesso', 'resta collegato',
-        'tienimi collegato', 'restare collegato'],
       percorso: 'security.cookies.trustedSites',
       allentaSe: 'aggiungi',
       nome: 'Siti fidati dove resti connesso',
