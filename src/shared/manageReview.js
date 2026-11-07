@@ -2177,7 +2177,7 @@
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
     isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
-    isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
+    isRicevutiStatus, chiedeFiduciaPerLaCoda, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, giudizioPerLettura,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,
