@@ -24,7 +24,7 @@ const rossiSotto = (app, campo, g) => app.evaluate(async ({ BrowserWindow }, { c
       if (b[i + 2] > 150 && b[i + 2] - b[i + 1] > 50 && b[i + 2] - b[i] > 50) n += 1;
     }
   }
-  return { n, png: img.toPNG().toString('base64') };
+  return { n };
 }, { c: campo, q: g });
 
 test('r2 il nome nel gettone non ha la sottolineatura del correttore mentre si scrive accanto', async ({ app, shell, openTab, testServer }) => {
