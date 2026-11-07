@@ -23,9 +23,12 @@ function carica() {
 
 function finestraFinta(origine = 'https://sito.example') {
   const ascolti = [];
+  const ascoltiDoc = [];
   const osservatori = [];
   const doc = {
     frames: [],
+    addEventListener(tipo, fn, cattura) { ascoltiDoc.push({ tipo, fn, cattura }); },
+    finito(f) { for (const a of ascoltiDoc) if (a.tipo === 'load' && a.cattura) a.fn({ target: f }); },
     URL: `${origine}/pagina`,
     baseURI: `${origine}/pagina`,
     querySelectorAll() { return this.frames.filter((f) => f.ownerDocument === doc); },
