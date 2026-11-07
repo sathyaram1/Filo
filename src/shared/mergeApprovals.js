@@ -818,8 +818,8 @@
       return n;
     }
     function aggiornaApprova() {
-      var chiuse = quanteChiuse();
       var fonde = card.classList.contains('is-merging');
+      var chiuse = occupato ? 0 : quanteChiuse();
       approveBtn.disabled = occupato;
       approveBtn.classList.toggle('is-fondendo', fonde);
       approveBtn.classList.toggle('is-apre', !fonde && chiuse > 0);
