@@ -1346,6 +1346,7 @@
         if (r.nome && r.dimentica) {
           return ['Dimenticare il dispositivo Bluetooth ', cit(nome), '\n\nPer usarlo di nuovo andrà riabbinato dalle impostazioni del sistema, col dispositivo pronto ad abbinarsi.'];
         }
+        if (r.nome && r.preferito != null) return r.preferito ? ['Mettere fra i preferiti ', cit(nome)] : ['Togliere dai preferiti ', cit(nome)];
         if (r.nome && r.collega === false) {
           return ['Scollegare dal Bluetooth ', cit(nome), '\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.'];
         }
