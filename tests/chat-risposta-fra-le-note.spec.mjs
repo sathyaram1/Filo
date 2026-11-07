@@ -83,4 +83,10 @@ test('quali dati escono:la risposta scritta insieme alla spunta arriva all’ute
 
   // Quello che l'utente legge senza aprire niente: la risposta alla sua domanda, non solo il ritorno all'intervista.
   await expect(page.locator('.dash-bubble-filo:visible', { hasText: 'Quasi tutto resta sul tuo computer' })).toBeVisible({ timeout: 5_000 });
+
+  // Riaprendo è ancora lì, una volta sola.
+  await page.reload();
+  await page.waitForLoadState('domcontentloaded');
+  await expect(page.locator('.dash-bubble-filo:visible', { hasText: 'Torniamo a noi' })).toBeVisible({ timeout: 15_000 });
+  await expect(page.locator('.dash-bubble-filo:visible', { hasText: 'Quasi tutto resta sul tuo computer' })).toHaveCount(1);
 });
