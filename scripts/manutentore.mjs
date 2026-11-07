@@ -15,6 +15,7 @@ import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { famigliaPrezzo, PREZZI } from './session-report.mjs';
+import '../src/shared/feedbackAttese.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
