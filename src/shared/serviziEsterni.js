@@ -396,7 +396,7 @@
       occasione: 'quando scrivi nella barra qualcosa che non è un indirizzo, o scegli «cerca» dal tasto destro',
       riceve: 'la ricerca',
       frase: 'la ricerca si apre sulla pagina dei risultati di Google',
-      dove: ['src/shared/urlNav.js', 'src/content/actions.js'],
+      dove: ['src/shared/urlNav.js'],
     },
     {
       id: 'google-lens', nome: 'Google Lens',
