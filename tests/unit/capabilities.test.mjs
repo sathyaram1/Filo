@@ -195,6 +195,7 @@ test('ogni handler MSG.FILO_* dell’assistente è coperto dal manifesto', () =>
     // #530 — l'agente sulla pagina chiede se una sua azione parte, chiede o no.
     FILO_DECIDI_PAGINA: 'autonomy-levels',
     FILO_AIUTO_NUOVO: 'autonomy-levels',
+    FILO_AIUTO_TESTO_DI_ALTRI: 'autonomy-levels',
     FILO_CONFIRM_ACTION: 'agent-actions',
     FILO_CONFIRM_RIFIUTATA: 'agent-actions',
     // #810 — un indirizzo proposto da un modello si apre col clic solo dopo la porta delle uscite.
