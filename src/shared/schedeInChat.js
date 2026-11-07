@@ -141,6 +141,8 @@
         fondo.className = 'sn-gettoni-fondo';
         fondo.setAttribute('aria-hidden', 'true');
         ta.parentNode.insertBefore(fondo, ta);
+        visto = ta.value;
+        requestAnimationFrame(veglia);
       }
       const cs = getComputedStyle(ta);
       const copia = ['fontFamily', 'fontSize', 'fontWeight', 'fontStyle', 'letterSpacing', 'lineHeight', 'textIndent',
