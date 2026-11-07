@@ -5243,6 +5243,26 @@ function avvisoLettaInParte(out, { indirizzo = '', oltre = false, vuota = false 
     + 'concludere che la pagina non lo contiene.]';
 }
 
+// La lettura di LEGGI_PAGINA (#553): dalla scheda se è aperta, se no scaricata.
+async function leggiPaginaDa(url, da, sender) {
+  let r = null;
+  try {
+    r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender), analizza: analizzaPer(sender) });
+  } catch (e) {
+    console.warn('[Filo] lettura pagina fallita', e?.message || e);
+  }
+  return r || { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+}
+
+// Le schede lasciate in una chat (#2085) entrano come letture già fatte: davanti al modello la cornice di LEGGI_PAGINA,
+// e per uscite, fonti e segreti letti contano come la lettura che sono. Sentinella: tests/unit/schedeInChat.test.mjs.
+async function lettureDeiGettoni(schede, sender) {
+  const lista = Array.isArray(schede) ? schede : [];
+  return Promise.all(lista.map(async (s) => ({
+    type: 'LEGGI_PAGINA', url: s.url, _gettone: true, _executed: true, _output: await leggiPaginaDa(s.url, 0, sender),
+  })));
+}
+
 // Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
 // imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
 function pageReadsForPrompt(actions) {
