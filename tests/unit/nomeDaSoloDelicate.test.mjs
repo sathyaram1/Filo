@@ -109,8 +109,9 @@ test('da una pagina normale la chiamata parte e il file prende il nome', async (
   assert.equal(daFilo.chiamate.length, 1);
 });
 
-test('con le pagine delicate spente resta tutto come prima: la chiamata parte anche dalla banca', async () => {
-  const settings = { security: { pagineDelicate: { enabled: false } } };
-  const { chiamate } = await scarica({ settings, nome: 'documento.txt', contenuto: SALDO, url: 'https://www.intesasanpaolo.com/doc/1', pagina: 'https://www.intesasanpaolo.com/conto' });
-  assert.equal(chiamate.length, 1);
+test('col livello di serie, e a «Tutto in anticipo», la chiamata parte anche dalla banca', async () => {
+  for (const settings of [{}, { security: { privacy: { livello: 'anticipo', chiedi: [] } } }]) {
+    const { chiamate } = await scarica({ settings, nome: 'documento.txt', contenuto: SALDO, url: 'https://www.intesasanpaolo.com/doc/1', pagina: 'https://www.intesasanpaolo.com/conto' });
+    assert.equal(chiamate.length, 1);
+  }
 });
