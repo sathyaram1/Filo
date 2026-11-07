@@ -737,6 +737,11 @@
     return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro server' };
   }
 
+  /** Un lavoro server non fidato va in coda solo col timbro (#2217): nessuna routine lo prende, e il server lo riporta nei Ricevuti. PURA. */
+  function chiedeFiduciaPerLaCoda(fb) {
+    return isLocalOnly(fb) && !isFidato(fb);
+  }
+
   /**
    * L'owner può approvare ADESSO questo feedback come lavoro locale (#913)? PURA. Solo nei Ricevuti, solo su chi
    * non è già owner o sessione con la prova (a quelli basta il segno). `segnalato`: il motivo per guardarlo prima;
