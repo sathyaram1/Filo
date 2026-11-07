@@ -35,6 +35,8 @@
     MSG = deps.MSG;
     host = deps.host;
     ICONS = deps.ICONS || {};
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     // L'ora sopra, grande; sotto la riga delle icone, che in una colonna stretta va a capo da sola.
     riga = document.createElement('div');
     riga.className = 'dash-sis-icone';
