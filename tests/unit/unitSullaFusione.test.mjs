@@ -290,6 +290,97 @@ test('prova vera con ancheContenuto: il ramo che contiene main si prova lui, e u
   }
 });
 
+// #2214: la sentinella del registro, ridotta all'essenziale: righe nuove rispetto a main sotto la versione del manifesto.
+const TEST_NOVITA = `import { test } from 'node:test';
+import assert from 'node:assert';
+import { execFileSync } from 'node:child_process';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
+const registro = (src) => { const s = {}; vm.runInNewContext(src, s); return s.SN_PATCH_NOTES.NOTES; };
+const fino = (a, b) => { const x = a.split('.').map(Number), y = b.split('.').map(Number); for (let i = 0; i < 3; i++) if (x[i] !== y[i]) return x[i] < y[i]; return true; };
+const righe = (n) => [...(n.features || []), ...(n.fixes || [])];
+test('nessuna riga nuova sotto una versione già uscita', () => {
+  const base = execFileSync('git', ['merge-base', 'HEAD', 'origin/main'], { encoding: 'utf8' }).trim();
+  const prima = registro(execFileSync('git', ['show', base + ':src/shared/patchNotes.js'], { encoding: 'utf8' }));
+  const ora = registro(readFileSync('src/shared/patchNotes.js', 'utf8'));
+  const uscita = JSON.parse(readFileSync('package.json', 'utf8')).version;
+  const sotto = ora.filter((n) => fino(n.version, uscita))
+    .flatMap((n) => righe(n).filter((r) => !righe(prima.find((p) => p.version === n.version) || {}).includes(r)));
+  assert.deepEqual(sotto, []);
+});
+`;
+const registroFinto = (blocchi) => `(function (global) {\n  'use strict';\n\n  const NOTES = [\n${blocchi.map((b) => `    {\n      version: '${b.v}', date: '2026-11-05',\n      features: [\n${b.righe.map((r) => `        '${r}',\n`).join('')}      ],\n    },\n`).join('')}  ];\n\n  global.SN_PATCH_NOTES = { NOTES };\n})(typeof globalThis !== 'undefined' ? globalThis : self);\n`;
+
+test('prova vera (#2214): le righe di novità sotto la versione uscita intanto si spostano prima degli unit, e l\'esito dice che basta spostarle', () => {
+  const r = repoFinto();
+  try {
+    const IN_ARRIVO = { v: '0.2.266', righe: ['Di main, in arrivo'] };
+    const USCITA = { v: '0.2.265', righe: ['Uscita'] };
+    r.suMain(() => {
+      r.scrivi('package.json', '{\n  "name": "filo",\n  "version": "0.2.265"\n}\n');
+      r.scrivi('src/shared/patchNotes.js', registroFinto([IN_ARRIVO, USCITA]));
+      r.scrivi('tests/unit/novita.test.mjs', TEST_NOVITA);
+      r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE);
+    });
+    const conRiga = () => r.scrivi('src/shared/patchNotes.js', registroFinto([{ ...IN_ARRIVO, righe: [...IN_ARRIVO.righe, 'Del ramo'] }, USCITA]));
+    const punta = r.ramo('claude/novita', conRiga);
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('innocuo.txt', 'x\n'));
+    const rompe = r.ramo('claude/rompe', () => { conRiga(); r.scrivi('valore.txt', 'due\n'); });
+    // Il caso della segnalazione: la 0.2.266, dove il ramo aveva scritto, esce mentre il ramo aspetta il cancello.
+    r.suMain(() => r.scrivi('package.json', '{\n  "name": "filo",\n  "version": "0.2.266"\n}\n'));
+
+    const viste = [];
+    const lancia = (dir, base, nome, o) => { viste.push(readFileSync(join(dir, 'src', 'shared', 'patchNotes.js'), 'utf8')); return lanciaUnit(dir, base, nome, o); };
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta, lancia, scrivi: (s) => righe.push(s) });
+    assert.equal(p.esito, 'rosso_sulla_fusione', 'chi fonde prende il ramo com\'è, con la riga sotto una versione uscita');
+    assert.deepEqual(p.novita, { verso: '0.2.267', righe: [{ version: '0.2.266', chiave: 'features', riga: 'Del ramo' }], dopo: 'verde' }, JSON.stringify(p));
+    assert.ok(BASTA_SPOSTARE.includes(p.novita.dopo));
+    assert.deepEqual(registroDa(viste[0]).slice(0, 2), [
+      { version: '0.2.267', date: new Date().toISOString().slice(0, 10), features: ['Del ramo'] },
+      { version: '0.2.266', date: '2026-11-05', features: ['Di main, in arrivo'] },
+    ], 'gli unit girano sulla fusione con la riga nel blocco della prossima versione');
+    assert.deepEqual(p.rossi, ['src/shared/patchNotes.js › una riga del ramo sotto versioni già uscite (0.2.266): vanno nel blocco 0.2.267']);
+    assert.deepEqual(campoPerIlServer(p).novita, { verso: '0.2.267', dopo: 'verde', righe: [{ version: '0.2.266', riga: 'Del ramo' }] });
+    assert.match(testoProva(p), /Spostate nel blocco 0\.2\.267, gli unit sono verdi: basta lo spostamento/);
+    assert.ok(righe.some((s) => /Le sposto nel blocco 0\.2\.267 prima degli unit/.test(s)), righe.join('\n'));
+    pulita(r);
+
+    const q = provaIn(r, innocuo);
+    assert.deepEqual([q.esito, q.novita], ['verde', undefined], 'senza righe da spostare, niente cambia');
+    pulita(r);
+
+    // Spostate le righe, un rosso vero resta: l'elenco ha anche lui, e lo spostamento da solo non basta.
+    const s = provaIn(r, rompe);
+    assert.equal(s.esito, 'rosso_sulla_fusione', JSON.stringify(s));
+    assert.equal(s.novita.dopo, 'rosso_sulla_fusione');
+    assert.ok(!BASTA_SPOSTARE.includes(s.novita.dopo));
+    assert.deepEqual(s.rossi, ['tests/unit/valore.test.mjs › il valore è uno', p.rossi[0]]);
+    assert.match(testoProva(s), /gli unit sono ancora rossi[^\n]*:\n[\s\S]*✖ tests\/unit\/valore\.test\.mjs › il valore è uno/);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+test('l\'esito con le novità spostate: solo un esito provato cambia, e il rosso della fusione com\'è si aggiunge (#2214)', () => {
+  const novita = { verso: '0.2.267', righe: [{ version: '0.2.266', chiave: 'fixes', riga: 'a' }, { version: '0.2.265', chiave: 'features', riga: 'b' }] };
+  const su = conNovita({ esito: 'rosso_anche_su_main', mainSha: SHA, rossiMain: 3 }, novita);
+  assert.equal(su.esito, 'rosso_sulla_fusione');
+  assert.equal(su.novita.dopo, 'rosso_anche_su_main');
+  assert.deepEqual(su.rossi, ['src/shared/patchNotes.js › 2 righe del ramo sotto versioni già uscite (0.2.266, 0.2.265): vanno nel blocco 0.2.267']);
+  assert.match(testoProva(su), /rossi solo come su main da solo: basta lo spostamento/);
+  for (const p of [{ esito: 'conflitto', file: ['x'] }, { esito: 'main_contenuto' }, { errore: 'git giù' }]) assert.equal(conNovita(p, novita), p);
+  const verde = { esito: 'verde', mainSha: SHA };
+  assert.equal(conNovita(verde, null), verde);
+  assert.equal(conNovita(verde, { verso: '0.2.267', righe: [] }), verde);
+  const tante = { verso: '0.2.267', righe: Array.from({ length: TETTO_ROSSI + 2 }, (_, i) => ({ version: '0.2.266', riga: `r${i}` })) };
+  const c = campoPerIlServer(conNovita(verde, tante));
+  assert.equal(c.novita.righe.length, TETTO_ROSSI);
+  assert.equal(c.novita.altreRighe, 2, 'un taglio si dice');
+  assert.equal(campoPerIlServer(verde).novita, undefined);
+});
+
 test('senza origin la prova si salta e lo si dice; con origin irraggiungibile è un errore', () => {
   const casa = cartellaTemporanea('filo-929-senza-');
   try {
