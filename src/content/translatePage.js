@@ -154,6 +154,8 @@
 
   async function translatePage(opts) {
     const quiet = !!(opts && opts.quiet);
+    // La sezione aperta che si traduce da sola (forseAperta): continua l'uso di prima, e parla solo se c'è da sapere.
+    const daSola = !quiet && !!(opts && opts.daSola);
     const frameRunId = (opts && opts.runId) || '';
     const fuoriConto = !!(opts && opts.fuoriConto);
     const riferisci = (data) => reportToHost(frameRunId, data, fuoriConto);
