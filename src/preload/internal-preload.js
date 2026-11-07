@@ -334,7 +334,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'campiSegreti.js'), 'SN_CAMPI_SEGRETI'); // #810.7 — campi che non vanno al modello: PRIMA di extractContext
   safe(path.join(CONTENT, 'extractContext.js'));
   safe(path.join(CONTENT, 'gesto.js')); // #1070 — «l'utente ha appena fatto qualcosa?»: PRIMA di spellcheck.js e actions.js
-  safe(path.join(SHARED, 'avvisiTempo.js')); // tempi della pila degli avvisi: PRIMA di popup.js
+  safe(path.join(SHARED, 'avvisiTempo.js'), 'SN_AVVISI'); // tempi della pila degli avvisi: PRIMA di popup.js
   safe(path.join(CONTENT, 'popup.js'));
   safe(path.join(CONTENT, 'vistoDavvero.js')); // #589.11 — sulle pagine di Filo resta spento: nessun sito può coprire il menu
   safe(path.join(CONTENT, 'menu.js'));
