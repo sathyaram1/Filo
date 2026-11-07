@@ -505,6 +505,7 @@
   const LEGIBILITY_PAIRS = [
     ['text', 'background'],
     ['button.fg', 'button.bg'],
+    ['fumetto.testo', 'fumetto.sfondo'],
   ];
 
   // Vero se l'override rende illeggibile una coppia testo/sfondo. Calcolato sul valore
