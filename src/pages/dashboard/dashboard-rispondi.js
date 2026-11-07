@@ -246,7 +246,7 @@
       copia: (_testo, b) => copia(b),
       classi: { barra: 'dash-msg-azioni', tasto: 'dash-msg-azione', ok: 'dash-copiato', no: 'dash-non-copiato', destra: '' },
       extra: {
-        rispondi: { icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi', fai: (b) => rispondi(b) },
+        rispondi: { ...global.SN_AZIONI_MESSAGGIO.AZIONI.rispondi, fai: (b) => rispondi(b) },
         modifica: { icona: 'pencil', etichetta: 'Modifica', voce: 'Modifica', fai: (b) => { if (d.modifica) d.modifica(b); } },
         cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita', fai: (b) => rispondi(b) },
       },
