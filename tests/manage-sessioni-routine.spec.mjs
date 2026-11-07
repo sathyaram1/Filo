@@ -384,7 +384,7 @@ test('unit su Windows: la scelta del server si vede con la sua stima, e un clic 
   const page = await apriServer(openTab, { unitWindows: 'tutti' });
   await arrivate(page, 1);
   await expect(page.locator('input[name="mgUnitWindows"][value="tutti"]')).toBeChecked();
-  await expect(pillolaWindows(page, 'toccati')).toContainText('0 $, nessuna attesa in più');
+  await expect(pillolaWindows(page, 'toccati')).toContainText('0 $, al più 3 min in più');
   await expect(pillolaWindows(page, 'tutti')).toContainText('circa 16 min in più a fusione');
   await expect(pillolaWindows(page, 'spento')).toContainText('nessuna prova su Windows');
   await page.locator('#mgUnitWindowsBlock').scrollIntoViewIfNeeded();
