@@ -38,7 +38,7 @@ import { senzaToken, cartellaCloneServer } from './git-server.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 import { beatIsLive, pidAlive, readBeat, stessaCartella } from './routine-beat.mjs';
 import { bigliettoFinito, leggiMarcatoreBiglietto } from './routine-ticket.mjs';
-import { leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { idNelRamo, leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
 import { fileInConflitto, fusioniSuMain, lineaPrincipale, numeroFeedback } from './su-main.mjs';
 
 // ─── git minimale (best-effort, mai eccezioni) ───────────────────────────────
@@ -109,6 +109,8 @@ export function attemptStamp(nowMs = Date.now()) {
   return stampoDi(nowMs);
 }
 
+export { idNelRamo };
+
 /**
  * Nome del branch per un lavoro NUOVO. È UNICO PER TENTATIVO: `worker/<id>` era
  * stabile fra tentativi diversi sullo stesso feedback, e due tentativi che si
@@ -121,10 +123,6 @@ export function newWorkBranch(id, nowMs = Date.now()) {
   const safe = idNelRamo(id);
   if (!safe) throw new Error('newWorkBranch: id non valido');
   return `worker/${safe}-${attemptStamp(nowMs)}`;
-}
-
-function idNelRamo(id) {
-  return String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
 }
 
 /** Lo stampo se `ramo` è un tentativo di lavoro nuovo su `id` (`worker/<id>-<stampo>`), se no ''. PURA. */

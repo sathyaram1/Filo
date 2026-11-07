@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { createServer } from 'node:http';
 import { createRequire } from 'node:module';
-import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { chmodSync, existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
@@ -18,6 +18,9 @@ const FC = await import(pathToFileURL(join(ROOT, 'scripts', 'lib', 'feedback-clo
 const S = await import(pathToFileURL(join(ROOT, 'scripts', 'schede.mjs')).href);
 createRequire(import.meta.url)(join(ROOT, 'src', 'shared', 'schede.js'));
 const SS = globalThis.SN_SCHEDE;
+// Una scheda della cartella come la scrive lo script, col suo timbro: senza, chi legge non le crede (schede.mjs).
+const timbrata = (cartella, o) => JSON.stringify(S.conTimbro(o, S.chiaveTimbri(cartella, { crea: true })));
+const togliConChiave = (cartella) => { togliCartella(cartella); rmSync(S.fileChiave(cartella), { force: true }); };
 
 test('la strada: cloud solo in una routine col biglietto, locale altrimenti', () => {
   assert.equal(FC.stradaFeedback({ routine: true, biglietto: 'abc' }), 'cloud');
@@ -252,8 +255,8 @@ test('nella cartella la scheda salvata vince, tranne su una scritta qui dopo; l�
   try {
     mkdirSync(cartella, { recursive: true });
     const salvata = (num, at) => ({ ...buona(num), _fonte: { id: `f${num}`, stato: 'todo', aggiornato: 'x', at, modello: 'haiku' } });
-    writeFileSync(join(cartella, '1.json'), JSON.stringify(salvata(1, '2026-10-29T12:00:00.000Z')));
-    writeFileSync(join(cartella, '2.json'), JSON.stringify(salvata(2, '2026-10-29T08:00:00.000Z')));
+    writeFileSync(join(cartella, '1.json'), timbrata(cartella, salvata(1, '2026-10-29T12:00:00.000Z')));
+    writeFileSync(join(cartella, '2.json'), timbrata(cartella, salvata(2, '2026-10-29T08:00:00.000Z')));
     const n = S.importaSchede(cartella, [salvata(1, '2026-10-29T10:00:00.000Z'), salvata(2, '2026-10-29T10:00:00.000Z'), salvata(3, '2026-10-29T10:00:00.000Z')]);
     assert.equal(n, 2);
     assert.equal(JSON.parse(readFileSync(join(cartella, '1.json'), 'utf8'))._fonte.at, '2026-10-29T12:00:00.000Z');
@@ -261,7 +264,7 @@ test('nella cartella la scheda salvata vince, tranne su una scritta qui dopo; l�
     const indice = S.indiceAggiornato([{ num: '1', aggiornato: 'a', nelFeedback: '' }, { num: '2', aggiornato: 'b', nelFeedback: '' }],
       new Map([['2', S.dopoIlSalvataggio({ ok: true, aggiornato: 'c' }, salvata(2, 'T'))]]));
     assert.deepEqual(indice.map((f) => [f.aggiornato, f.nelFeedback]), [['a', ''], ['c', 'T']]);
-  } finally { togliCartella(cartella); }
+  } finally { togliConChiave(cartella); }
 });
 
 test('una scheda della cartella più nuova ma ormai vecchia per il feedback lascia il posto a quella salvata, buona', () => {
@@ -270,11 +273,11 @@ test('una scheda della cartella più nuova ma ormai vecchia per il feedback lasc
     mkdirSync(cartella, { recursive: true });
     const scheda = (aggiornato, at) => ({ ...buona(1), _fonte: { id: 'f1', stato: 'todo', aggiornato, at, modello: 'haiku' } });
     // Scritta qui alle 12 su un feedback che poi la nuvola ha toccato alle 11: la sua scheda delle 11 è quella buona.
-    writeFileSync(join(cartella, '1.json'), JSON.stringify(scheda('2026-10-29T09:00:00.000Z', '2026-10-29T12:00:00.000Z')));
+    writeFileSync(join(cartella, '1.json'), timbrata(cartella, scheda('2026-10-29T09:00:00.000Z', '2026-10-29T12:00:00.000Z')));
     const indice = [{ id: 'f1', num: '1', stato: 'todo', aggiornato: '2026-10-29T11:00:00.000Z' }];
     assert.equal(S.importaSchede(cartella, [scheda('2026-10-29T11:00:00.000Z', '2026-10-29T11:00:00.000Z')], indice), 1);
     assert.equal(S.daScrivere(indice[0], JSON.parse(readFileSync(join(cartella, '1.json'), 'utf8'))), false, 'niente da rifare a pagamento');
-  } finally { togliCartella(cartella); }
+  } finally { togliConChiave(cartella); }
 });
 
 test('la scheda dalla routine va al server col biglietto, dalla macchina dell’owner alla sua callable', async () => {
@@ -310,12 +313,12 @@ test('va al feedback, senza agente, ogni scheda buona e fresca della cartella ch
       voce('6', '', { segnalato: 'è segnalato come attacco' })];
     writeFileSync(join(cartella, 'indice.json'), JSON.stringify(indice));
     // 1 e 2 scritte prima che le schede stessero nei feedback (la 2 riletta da Opus); 5 scritta qui dopo quella salvata.
-    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1, 'A') }));
-    writeFileSync(join(cartella, '2.json'), JSON.stringify({ ...buona(2), _fonte: fonte(2, 'A'), _riletta: { at: 'R', modello: 'opus' } }));
-    writeFileSync(join(cartella, '3.json'), JSON.stringify({ ...buona(3), _fonte: fonte(3, 'vecchia') }));
-    writeFileSync(join(cartella, '4.json'), JSON.stringify({ ...buona(4), _fonte: fonte(4, 'A') }));
-    writeFileSync(join(cartella, '5.json'), JSON.stringify({ ...buona(5), _fonte: fonte(5, 'A', '2026-10-28T10:00:00.000Z') }));
-    writeFileSync(join(cartella, '6.json'), JSON.stringify({ ...buona(6), _fonte: fonte(6, 'A') }));
+    writeFileSync(join(cartella, '1.json'), timbrata(cartella, { ...buona(1), _fonte: fonte(1, 'A') }));
+    writeFileSync(join(cartella, '2.json'), timbrata(cartella, { ...buona(2), _fonte: fonte(2, 'A'), _riletta: { at: 'R', modello: 'opus' } }));
+    writeFileSync(join(cartella, '3.json'), timbrata(cartella, { ...buona(3), _fonte: fonte(3, 'vecchia') }));
+    writeFileSync(join(cartella, '4.json'), timbrata(cartella, { ...buona(4), _fonte: fonte(4, 'A') }));
+    writeFileSync(join(cartella, '5.json'), timbrata(cartella, { ...buona(5), _fonte: fonte(5, 'A', '2026-10-28T10:00:00.000Z') }));
+    writeFileSync(join(cartella, '6.json'), timbrata(cartella, { ...buona(6), _fonte: fonte(6, 'A') }));
     assert.equal(S.fuoriDalFeedback({ id: 'f1', num: '1', stato: 'todo', aggiornato: 'A' }, { ...buona(1), _fonte: fonte(1, 'A') }), true,
       'un indice di prima, senza l’ora della scheda salvata: si manda');
     assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).fuoriDalFeedback, 3);
@@ -331,7 +334,7 @@ test('va al feedback, senza agente, ogni scheda buona e fresca della cartella ch
       'al primo guasto si ferma: il server giù non risponde nemmeno alla 5');
     assert.ok(mandati.every((d) => Object.keys(d.scheda).every((k) => !k.startsWith('_'))), 'al server solo i campi dell’agente');
     assert.deepEqual([r.mandate, r.restano, r.motivo], [1, 2, 'server non raggiungibile']);
-    const suDisco = JSON.parse(readFileSync(join(cartella, 'indice.json'), 'utf8'));
+    const suDisco = S.leggiIndice(cartella).aperti;
     assert.deepEqual([suDisco[0].aggiornato, suDisco[0].nelFeedback], ['B', 'S1'], 'il salvataggio è già nell’indice: interrotto qui, non si rifà');
 
     giu = false;
@@ -344,7 +347,7 @@ test('va al feedback, senza agente, ogni scheda buona e fresca della cartella ch
     assert.equal(ancora.mandate + ancora.restano, 0, 'quelle che il feedback ha non si rimandano');
     const letta = (n) => JSON.parse(readFileSync(join(cartella, `${n}.json`), 'utf8'));
     assert.equal(S.daScrivere(indice[2], letta(3)), true, 'la vecchia la riscrive l’agente');
-  } finally { togliCartella(cartella); }
+  } finally { togliConChiave(cartella); }
 });
 
 test('un no definitivo del server non si rimanda: la scheda resta nella cartella col motivo, e il comando non chiede di rilanciare', async () => {
@@ -363,7 +366,7 @@ test('un no definitivo del server non si rimanda: la scheda resta nella cartella
       assert.equal(S.fuoriDalFeedback({ id: 'f5', num: '5', stato: 'todo', aggiornato: 'A', nelFeedback: '' }, s), true);
     }
     const indice = [{ id: 'f1', num: '1', stato: 'todo', aggiornato: 'A', nelFeedback: '' }];
-    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte(1) }));
+    writeFileSync(join(cartella, '1.json'), timbrata(cartella, { ...buona(1), _fonte: fonte(1) }));
     const mandati = [];
     const salva = async (dati) => { mandati.push(dati.numero); return { ok: false, guasto: false, reason: 'feedback_segnalato', motivo: 'è segnalato come attacco' }; };
     const prima = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
@@ -371,7 +374,7 @@ test('un no definitivo del server non si rimanda: la scheda resta nella cartella
     const dopo = await S.mandaFuoriDalFeedback(cartella, indice, { salva });
     assert.deepEqual({ restano: dopo.restano, rifiutate: dopo.rifiutate, mandati }, { restano: 0, rifiutate: 0, mandati: ['1'] }, 'una volta sola');
     assert.equal(S.daScrivere(indice[0], JSON.parse(readFileSync(join(cartella, '1.json'), 'utf8'))), false, 'l’agente non la rifà finché il feedback non cambia');
-  } finally { togliCartella(cartella); }
+  } finally { togliConChiave(cartella); }
 });
 
 test('il motivo del no arriva da tutte e due le strade; il freno del server esaurito è un guasto', async () => {
@@ -466,23 +469,30 @@ test('elenca: dal server col biglietto e dalle righe dell’owner, lo stesso ind
     assert.equal(await S.elenca(locale, false, { lettura: () => S.letturaLocale({ leggiRighe: async () => ({ rows: righeOwner, complete: true }), apri: async (v) => JSON.parse(v) }) }), 0);
 
     const leggi = (c, f) => JSON.parse(readFileSync(join(c, f), 'utf8'));
-    const indice = leggi(cloud, S.INDICE);
+    const indice = leggi(cloud, S.INDICE).aperti;
     assert.deepEqual(indice.map((f) => [f.num, f.stato, f.priorita, f.attese, f.segnalato || '']),
-      [['812', 'todo', 2, ['9'], ''], ['900', 'attack', null, [], motivo]]);
-    assert.deepEqual(leggi(locale, S.INDICE), indice, 'lo stesso indice sulle due strade');
+      [['812', 'todo', 2, [], ''], ['900', 'attack', null, [], motivo]]);
+    // #9 non c'è fra le righe: il server dà solo gli aperti, e di un aspettato che manca non sa se è fuso; le righe
+    // dell'owner sono tutte, e uno che manca è cancellato, quindi tiene ancora fermo. Il resto è uguale.
+    const senzaAttese = (l) => l.map(({ attese, ...f }) => f);
+    assert.deepEqual(leggi(locale, S.INDICE).aperti.map((f) => f.attese), [['9'], []]);
+    assert.deepEqual(senzaAttese(leggi(locale, S.INDICE).aperti), senzaAttese(indice), 'lo stesso indice sulle due strade');
 
     const s812 = leggi(cloud, '812.json');
     assert.equal(s812.titolo_breve, 'Menu che non si apre');
     assert.equal(S.daScrivere(indice[0], s812), false, 'la scheda copiata è fresca: il manutentore non la fa riscrivere');
-    assert.deepEqual(leggi(locale, '812.json'), s812);
-    const senzaOra = (s) => ({ ...s, _fonte: { ...s._fonte, at: '' } });
+    // Ogni cartella ha la sua chiave dei timbri: si confronta il resto.
+    const senzaTimbro = ({ _timbro, ...s }) => s;
+    assert.deepEqual(senzaTimbro(leggi(locale, '812.json')), senzaTimbro(s812));
+    const senzaOra = (s) => senzaTimbro({ ...s, _fonte: { ...s._fonte, at: '' } });
     assert.equal(leggi(cloud, '900.json').valido, 'non letto');
     assert.deepEqual(senzaOra(leggi(locale, '900.json')), senzaOra(leggi(cloud, '900.json')), 'il segnalato ha la sua scheda «non letto», non quella salvata');
     assert.equal(existsSync(join(locale, '700.json')), false, 'un chiuso resta fuori');
-  } finally { togliCartella(cloud); togliCartella(locale); }
+  } finally { togliConChiave(cloud); togliConChiave(locale); }
 });
 
 // #2181: il censimento della fase 0 stava solo nella cartella dell'owner; dal cloud la lettura dava 0 schede su 769 aperti.
+// Le sue schede sono nate prima dei timbri (#1680): il primo elenca le firma, e non tornano agli agenti.
 test('le schede buone della cartella che il feedback non ha si mandano senza agente, confrontate con quello che il feedback ha', async () => {
   const AGG = '2026-10-29T12:00:00.000Z';
   const cartella = cartellaTemporanea('schede-fase0-');
@@ -499,6 +509,7 @@ test('le schede buone della cartella che il feedback non ha si mandano senza age
     // I passi di elenca prima dell'invio; il comando intero contro un canale finto sta nelle prove di #1785.2 più sotto.
     const r = await S.letturaLocale({ leggiRighe: async () => ({ rows: righe, complete: true }), apri: async (v) => JSON.parse(v) });
     const indice = S.conSchedeNelFeedback(S.apertiDaRighe(r.righe, { segnalati: r.segnalati }), r.schede);
+    assert.equal(S.adottaSenzaTimbro(cartella), 3, 'le schede di prima dei timbri si firmano una volta');
     writeFileSync(join(cartella, S.INDICE), JSON.stringify(indice));
     S.importaSchede(cartella, r.schede, indice);
     const letta = (n) => JSON.parse(readFileSync(join(cartella, `${n}.json`), 'utf8'));
@@ -512,11 +523,35 @@ test('le schede buone della cartella che il feedback non ha si mandano senza age
     } });
     assert.deepEqual(mandati.map((d) => [d.numero, d.rilettura, d.modello]), [['1', true, 'opus']], 'la rilettura di Opus resta una rilettura');
     assert.equal(m.mandate, 1);
-    assert.equal(fuori(1, JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'))), false, 'salvata: l’indice sa che il feedback l’ha');
-  } finally { togliCartella(cartella); }
+    assert.equal(fuori(1, S.leggiIndice(cartella).aperti), false, 'salvata: l’indice sa che il feedback l’ha');
+  } finally { togliConChiave(cartella); }
 });
 
-const indiceDi = (quanti) => Array.from({ length: quanti }, (_, i) => ({ id: `f${i + 1}`, num: String(i + 1), stato: 'todo', aggiornato: 'A', attese: [], unisce: [] }));
+test('un comando delle schede lanciato prima di elenca non fa perdere il censimento: la firma una tantum parte prima della chiave', async () => {
+  const AGG = '2026-10-29T12:00:00.000Z';
+  const cartella = cartellaTemporanea('schede-fase0-prima-');
+  try {
+    mkdirSync(cartella, { recursive: true });
+    // La cartella dell'owner com'era su main: indice come elenco, schede senza timbro.
+    writeFileSync(join(cartella, S.INDICE), JSON.stringify([{ id: 'f1', num: '1', stato: 'todo', priorita: 1, aggiornato: AGG, attese: [] }]));
+    const fonte = { id: 'f1', stato: 'todo', aggiornato: AGG, at: '2026-10-28T10:00:00.000Z', modello: 'haiku' };
+    writeFileSync(join(cartella, '1.json'), JSON.stringify({ ...buona(1), _fonte: fonte, _riletta: { at: 'R', modello: 'opus' } }));
+    const l = console.log;
+    const e = console.error;
+    console.log = () => {}; console.error = () => {};
+    try {
+      // Un comando che non legge i feedback (gli altri passano da elenca e dalla rete, che qui non c'è).
+      assert.equal(await S.main(['stato', '--cartella', cartella]), 0);
+      assert.equal(existsSync(S.fileChiave(cartella)), true, 'il comando crea la chiave');
+    } finally { console.log = l; console.error = e; }
+    const f = { ...S.leggiIndice(cartella).aperti.find((x) => x.num === '1'), nelFeedback: '' };
+    const s1 = S.leggiSchede(cartella).find((s) => String(s.numero) === '1');
+    assert.equal(S.fuoriDalFeedback(f, s1), true, 'la scheda del censimento va al feedback senza agente');
+    assert.equal(S.daScrivere(f, s1), false, 'scrivi non la passa a un agente');
+  } finally { togliConChiave(cartella); }
+});
+
+const indiceDi =(quanti) => Array.from({ length: quanti }, (_, i) => ({ id: `f${i + 1}`, num: String(i + 1), stato: 'todo', aggiornato: 'A', attese: [], unisce: [] }));
 
 test('in una routine, nessuna scheda su tanti aperti ferma stato e scrivi invece di riscriverle tutte', () => {
   const tanti = indiceDi(S.SOGLIA_CENSIMENTO);
@@ -619,10 +654,11 @@ test('elenca sulla macchina dell\'owner conta le schede salvate che non si apron
     const testo = out.join('\n');
     assert.match(testo, /0 schede salvate nei feedback, 3 illeggibili \(da riscrivere\)/);
     assert.match(testo, /e 3 non si leggono: è la lettura a non andare/);
-    writeFileSync(join(cartella, '7.json'), JSON.stringify({ ...buona(7), _fonte: { id: 'f7', stato: 'todo', aggiornato: AGG, at: AGG, modello: 'haiku' } }));
-    const indice = JSON.parse(readFileSync(join(cartella, S.INDICE), 'utf8'));
-    assert.equal(S.riepilogo(indice, S.leggiSchede(cartella)).fuoriDalFeedback, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
-  } finally { togliCartella(cartella); }
+    writeFileSync(join(cartella, '7.json'), timbrata(cartella, { ...buona(7), _fonte: { id: 'f7', stato: 'todo', aggiornato: AGG, at: AGG, modello: 'haiku' } }));
+    const { aperti, fidato } = S.leggiIndice(cartella);
+    assert.equal(fidato, true);
+    assert.equal(S.riepilogo(aperti, S.leggiSchede(cartella)).fuoriDalFeedback, 1, 'stato dice quante schede della cartella aspettano di andare nel feedback');
+  } finally { togliConChiave(cartella); }
 });
 
 // ── Il comando intero, contro un canale finto: le schede che il feedback non ha ci arrivano (#1785.2) ──
@@ -687,7 +723,7 @@ const salvataDalServer = (b, at) => ({
     ...(b.rilettura ? { _riletta: { at, modello: b.modello } } : {}), _fiducia: 'fidato' },
 });
 
-/** Un finto `claude` che conta i lanci e scrive `scheda` nella cartella che gli dà il prompt. */
+/** Un finto `claude` che conta i lanci e risponde con `scheda`: nella cartella scrive solo lo script (#1680.1). */
 function claudeFinto(dir, scheda) {
   const conta = join(dir, 'lanci');
   const bin = join(dir, 'claude');
@@ -698,10 +734,7 @@ fs.appendFileSync(${JSON.stringify(conta)}, '1');
 let input = '';
 process.stdin.on('data', (d) => { input += d; });
 process.stdin.on('end', () => {
-  const num = /Feedback: (.+)/.exec(input)[1].trim();
-  const cartella = /Cartella delle schede: (.+)/.exec(input)[1].trim();
-  fs.writeFileSync(require('path').join(cartella, num + '.json'), JSON.stringify(${JSON.stringify(scheda)}));
-  process.stdout.write(JSON.stringify({ result: '#' + num + ': fatta', total_cost_usd: 0.01 }));
+  process.stdout.write(JSON.stringify({ result: JSON.stringify(${JSON.stringify(scheda)}), total_cost_usd: 0.01 }));
 });
 `);
   chmodSync(bin, 0o755);
@@ -782,7 +815,7 @@ test('una scheda dell’agente che il server non ha preso va al feedback al giro
     assert.equal(dopo.code, 0, dopo.out);
     assert.deepEqual(salvate, ['813', '813']);
     assert.equal(claude.lanci(), 1, 'la scheda c’era già: niente agente la seconda volta');
-    assert.equal(JSON.parse(readFileSync(join(cartella, 'indice.json'), 'utf8'))[0].nelFeedback, '2026-11-05T15:00:01.000Z');
+    assert.equal(S.leggiIndice(cartella).aperti[0].nelFeedback, '2026-11-05T15:00:01.000Z');
   } finally {
     await canale.chiudi();
     togliCartella(dir);

@@ -3,7 +3,11 @@
 // Test: tests/unit/suMain.test.mjs.
 
 import { execFileSync } from 'node:child_process';
-import { leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
+import { createRequire } from 'node:module';
+import { idNelRamo, leggiTentativo, stampoDi, tentativiSuperati, viviInCima } from './tentativi.mjs';
+
+// Caricata solo da chi confronta file: dispatch importa questo modulo anche da una copia degli strumenti senza src/.
+const regoleSchede = () => globalThis.SN_SCHEDE || (createRequire(import.meta.url)('../../src/shared/schede.js'), globalThis.SN_SCHEDE);
 
 const git = (root, args) => execFileSync('git', ['-C', root, '-c', 'core.quotepath=off', ...args], {
   encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'pipe'],
@@ -84,40 +88,36 @@ export function fusioniSuMain(root, { ref = 'origin/main', numeri = {} } = {}) {
 }
 
 /**
- * Una diff -U0 di git → Map file → le sole righe tolte e aggiunte, senza i numeri di riga: due versioni della stessa
- * modifica, prima e dopo un riallineamento, danno lo stesso testo. PURA.
+ * Segna `propria` la fusione del lavoro stesso del feedback: quella del cancello (fusionePropria) e quella approvata
+ * dall'owner del suo ramo («finish: worker/<id del feedback>-<ora> …»), che il numero non lo dice. La regola sola per
+ * la ricerca «già risolto» e per i tentativi superati. PURA.
  */
-export function modifichePerFile(diff) {
-  const mappa = new Map();
-  let file = null;
-  let righe = [];
-  let indice = '';
-  let binario = false;
-  let dentro = false;
-  // L'impronta dei blob conta solo per un binario, di cui la diff non mostra il contenuto: per un testo cambia anche
-  // quando cambia solo main.
-  const chiudi = () => { if (file) mappa.set(file, (binario ? [indice, ...righe] : righe).join('\n')); };
-  for (const riga of String(diff || '').split('\n')) {
-    const testa = /^diff --git a\/(.*) b\/(.*)$/.exec(riga);
-    if (testa) { chiudi(); file = testa[2]; righe = []; indice = ''; binario = false; dentro = false; continue; }
-    if (!file) continue;
-    if (riga.startsWith('@@')) { dentro = true; continue; }
-    if (!dentro) {
-      if (riga.startsWith('index ')) indice = riga.replace(/ \d+$/, '');
-      else if (riga.startsWith('Binary files')) binario = true;
-      else if (/^(new|deleted) file mode/.test(riga)) righe.push(riga);
-      continue;
-    }
-    if (/^[-+\\]/.test(riga)) righe.push(riga);
-  }
-  chiudi();
-  return mappa;
+export function segnaProprie(fusioni, num, id = '') {
+  const nelRamo = idNelRamo(id).replace(/[.]/g, '\\.');
+  const delRamo = nelRamo ? new RegExp(`^finish: (?:origin/)?worker/${nelRamo}-\\d{8}T\\d{6}Z\\b`) : null;
+  return (Array.isArray(fusioni) ? fusioni : []).map((f) => {
+    const oggetto = String((f && f.oggetto) || '');
+    return fusionePropria(oggetto, num) || (delRamo && delRamo.test(oggetto)) ? { ...f, propria: true } : f;
+  });
 }
 
-/** I file in cui due mappe di `modifichePerFile` non coincidono, in ordine. PURA. */
-export function fileDiversi(prima, dopo) {
-  const tutti = new Set([...prima.keys(), ...dopo.keys()]);
-  return [...tutti].filter((f) => prima.get(f) !== dopo.get(f)).sort();
+/** La data (ISO) della fusione più recente del lavoro stesso di #N (o del ramo di `id`) su `ref` (segnaProprie), '' se non c'è. */
+export function ultimaFusionePropria(root, num, { ref = 'origin/main', id = '' } = {}) {
+  if (!numeroFeedback(num)) return '';
+  const nelRamo = idNelRamo(id);
+  const greps = [`--grep=^merge-gate: ${regexCitazione(num)}`, ...(nelRamo ? [`--grep=^finish: (origin/)?worker/${nelRamo.replace(/[.]/g, '\\.')}-`] : [])];
+  const righe = git(root, ['log', '--first-parent', ref, '-E', ...greps, '-n50', '--format=%cI%x09%s']).split('\n').filter(Boolean)
+    .map((r) => { const [data, ...o] = r.split('\t'); return { data, oggetto: o.join('\t') }; });
+  const propria = segnaProprie(righe, num, id).find((f) => f.propria);
+  return propria ? propria.data : '';
+}
+
+/** `git merge-tree --write-tree …`: l'uscita anche coi conflitti (uscita 1, albero e file dopo); ogni altra è un guasto. */
+function mergeTree(root, args) {
+  try { return git(root, ['merge-tree', '--write-tree', '--no-messages', ...args]); } catch (e) {
+    if (e.status !== 1) throw e;
+    return String(e.stdout || '');
+  }
 }
 
 /**
@@ -125,27 +125,25 @@ export function fileDiversi(prima, dopo) {
  * risolvere, comunque li abbia risolti (tenere le due parti lascia la modifica del ramo uguale, ma è logica nuova).
  */
 export function fileInConflitto(root, { prima, base = 'origin/main' } = {}) {
-  let out = '';
-  try { out = git(root, ['merge-tree', '--write-tree', '--name-only', '--no-messages', base, prima]); } catch (e) {
-    // Uscita 1 = conflitti, coi file dopo l'albero; ogni altra uscita è un guasto.
-    if (e.status !== 1) throw e;
-    out = String(e.stdout || '');
-  }
+  const out = mergeTree(root, ['--name-only', base, prima]);
   return [...new Set(out.split('\n').slice(1).map((r) => r.trim()).filter(Boolean))].sort();
 }
 
 /**
- * Dopo un riallineamento, i file in cui la modifica del RAMO è cambiata (la punta verificata contro la sua base, e la
- * punta nuova contro la sua) e quelli che erano in conflitto con main. Un riallineamento pulito dà due elenchi vuoti,
- * anche se main ha cambiato le righe accanto.
+ * Dopo un riallineamento, i file in cui la punta nuova non è quello che git ottiene da sé rifacendo la modifica
+ * verificata sopra la base nuova: lì il correttore ha scritto qualcosa, anche solo spostato una riga nello stesso file
+ * (un confronto delle righe cambiate senza la loro posizione non lo vede). Più quelli che erano in conflitto con main.
+ * Un riallineamento pulito dà due elenchi vuoti, anche se main ha cambiato le righe vicine.
  * → { ok: true, file, conflitti, basi } | { ok: false, errore }
  */
 export function fileRiscritti(root, { prima, dopo = 'HEAD', base = 'origin/main' } = {}) {
   try {
     const basePrima = git(root, ['merge-base', prima, base]).trim();
     const baseDopo = git(root, ['merge-base', dopo, base]).trim();
-    const diff = (da, a) => git(root, ['diff', '-U0', '--no-color', '--no-ext-diff', '--no-renames', '--full-index', da, a]);
-    const file = fileDiversi(modifichePerFile(diff(basePrima, prima)), modifichePerFile(diff(baseDopo, dopo)));
+    const rifatto = mergeTree(root, [`--merge-base=${basePrima}`, baseDopo, prima]).split('\n')[0].trim();
+    if (!/^[0-9a-f]{40,64}$/.test(rifatto)) throw new Error(`git merge-tree non ha dato un albero («${rifatto.slice(0, 40)}»)`);
+    const file = git(root, ['diff', '--name-only', '--no-renames', '--no-ext-diff', rifatto, dopo])
+      .split('\n').map((r) => r.trim()).filter(Boolean).sort();
     return { ok: true, file, conflitti: fileInConflitto(root, { prima, base }), basi: { prima: basePrima, dopo: baseDopo } };
   } catch (e) {
     return { ok: false, errore: String((e && (e.stderr || e.message)) || e).trim().split('\n')[0] };
@@ -222,10 +220,10 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
 
-// Un file di filo-security nelle schede e negli elenchi: `filo-security:functions/x.js` (o con la barra); un ramo del
+// Un file di filo-security nelle schede e negli elenchi: `filo-security/functions/x.js` (o coi due punti); un ramo del
 // server (`repo: 'server'`) porta i suoi percorsi nudi, relativi al suo repo.
+const SERVER = 'filo-security/';
 const PREFISSO_SERVER = /^filo-security[:/]/;
-const percorso = (f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '');
 
 /** Il file di un ramo come lo legge chi confronta repo diversi: quelli del server col prefisso. PURA. */
 export function fileConRepo(r, f) {
@@ -233,22 +231,86 @@ export function fileConRepo(r, f) {
 }
 
 /**
- * I rami che toccano uno dei file: uguale, o dentro una cartella dell'elenco (una voce che finisce con «/»). Un ramo
- * del server confronta le voci col prefisso filo-security e quelle nude (le schede non sempre lo scrivono); uno
- * dell'app solo quelle nude. PURA. → [{ ramo, repo, feedback, comuni }]
+ * Gli incroci con la regola dei file probabili della scheda (SN_SCHEDE.fileNormale e fileStorto, la stessa del server):
+ * un assoluto dentro `radice` si rende relativo. `storte`: le voci che non si confrontano. `trova(v)`, se c'è: il
+ * percorso com'è in git (anche con altre maiuscole, o del server col prefisso) o '' se non c'è; una voce che non c'è
+ * resta, ed è fra le `ignote`. → { voci, storte, ignote }
  */
-export function incroci(rami, file) {
-  const voci = (Array.isArray(file) ? file : []).map(percorso).filter(Boolean);
-  const nude = voci.filter((v) => !PREFISSO_SERVER.test(v));
-  const delServer = voci.map((v) => v.replace(PREFISSO_SERVER, ''));
-  const tocca = (elenco) => (f) => elenco.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
+export function vociDiFile(file, { radice = '', trova = null } = {}) {
+  const { fileNormale, fileStorto } = regoleSchede();
+  const base = fileNormale(radice).replace(/\/$/, '');
+  const voci = [];
+  const storte = [];
+  const ignote = [];
+  for (const grezza of Array.isArray(file) ? file : []) {
+    let v = fileNormale(grezza).replace(PREFISSO_SERVER, SERVER);
+    // Windows non distingue le maiuscole nei percorsi: la radice si riconosce comunque.
+    if (base && (v + '/').toLowerCase().startsWith(`${base}/`.toLowerCase())) v = v.slice(base.length + 1);
+    if (fileStorto(v)) { storte.push(String(grezza)); continue; }
+    const vero = typeof trova === 'function' ? trova(v) : v;
+    if (vero) voci.push(vero);
+    else { voci.push(v); ignote.push(v); }
+  }
+  return { voci, storte, ignote };
+}
+
+/**
+ * `trova` per vociDiFile dai file di git dell'app e, se c'è il checkout, del server (null: non si sa). Una cartella
+ * vale se un file ci sta dentro. Le maiuscole diverse si correggono solo se il nome è uno. PURA.
+ */
+export function trovaInGit(fileApp, fileServer = null) {
+  const indice = (l) => {
+    const esatti = new Set();
+    const minuscoli = new Map();
+    for (const f of l || []) {
+      const parti = f.split('/');
+      for (let i = 1; i <= parti.length; i += 1) {
+        const p = parti.slice(0, i).join('/') + (i < parti.length ? '/' : '');
+        esatti.add(p);
+        const k = p.toLowerCase();
+        minuscoli.set(k, minuscoli.has(k) && minuscoli.get(k) !== p ? null : p);
+      }
+    }
+    return (v) => {
+      if (esatti.has(v)) return v;
+      if (!v.endsWith('/') && esatti.has(`${v}/`)) return v;
+      return minuscoli.get(v.toLowerCase()) || minuscoli.get(`${v.toLowerCase()}/`)?.replace(/\/$/, '') || '';
+    };
+  };
+  const app = indice(fileApp);
+  const server = fileServer ? indice(fileServer) : null;
+  return (v) => {
+    if (v.startsWith(SERVER)) {
+      if (!server) return v;
+      const s = server(v.slice(SERVER.length));
+      return s ? SERVER + s : '';
+    }
+    const a = app(v);
+    if (a) return a;
+    const s = server ? server(v) : '';
+    return s ? SERVER + s : '';
+  };
+}
+
+/**
+ * I rami che toccano i file probabili `file`: [{ ramo, repo, feedback, comuni }], i comuni di un ramo del server nudi
+ * (fileConRepo per mostrarli). Senza le maiuscole, come Windows; una voce che git non conferma (senza `trova`, o fra le
+ * ignote) vale anche per un file del server scritto senza prefisso.
+ */
+export function incroci(rami, file, { radice = '', trova = null } = {}) {
+  const { voci: tutte, ignote } = vociDiFile(file, { radice, trova });
+  const incerta = new Set(typeof trova === 'function' ? ignote : tutte);
+  const voci = tutte.map((v) => ({ v: v.replace(/\/$/, '').toLowerCase(), incerta: incerta.has(v) }));
+  const uguale = (f, v) => f === v || f.startsWith(`${v}/`);
+  const confronta = (r, prova) => (f) => {
+    const nudo = f.toLowerCase();
+    const k = r.repo === 'server' ? SERVER + nudo : nudo;
+    return voci.some((x) => prova(k, x.v) || (r.repo === 'server' && x.incerta && prova(nudo, x.v)));
+  };
   return (Array.isArray(rami) ? rami : [])
     // Un file nuovo del ramo ha il nome di chi lavora (#2337): conta solo uguale a uno della scheda, che lo ripete lei.
-    .map((r) => {
-      const elenco = r.repo === 'server' ? delServer : nude;
-      return { ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
-        comuni: [...(r.file || []).filter(tocca(elenco)), ...(r.fileNuovi || []).filter((f) => elenco.includes(f))] };
-    })
+    .map((r) => ({ ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
+      comuni: [...(r.file || []).filter(confronta(r, uguale)), ...(r.fileNuovi || []).filter(confronta(r, (f, v) => f === v))] }))
     .filter((r) => r.comuni.length);
 }
 

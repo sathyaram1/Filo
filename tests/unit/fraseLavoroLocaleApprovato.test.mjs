@@ -117,3 +117,94 @@ test('l’aiuto di npm run finish dice dove si scrive la frase', () => {
   const aiuto = execFileSync(process.execPath, [join(ROOT, 'scripts', 'finish-local.mjs'), '--help'], { encoding: 'utf8', timeout: TETTO_ATTESA_MS });
   assert.match(aiuto, /npm run feedback -- <N> --frase/);
 });
+
+// La frase di un pacchetto scritta dopo la chiusura: le unite chiuse da lui avevano preso quella di ripiego.
+test('la frase scritta su un pacchetto raggiunge le unite che ha chiuso, e il promemoria vale anche per lui', async () => {
+  const unisce = { arrayValue: { values: ['u812', 'u815', 'u816'].map((id, i) => ({ mapValue: { fields: { id: { stringValue: id }, num: { stringValue: String([812, 815, 816][i]) } } } })) } };
+  const docs = {
+    P: documento('P', { clientId: 'local:claude', senderProof: 'admin', status: 'done', statusPublic: 'closed', unisce }),
+    u812: documento('u812', { status: 'done', statusReason: 'pacchetto', userNote: 'Risolto insieme ad altre segnalazioni.' }),
+    u815: documento('u815', { status: 'archived', statusReason: '' }),
+    u816: documento('u816', { status: 'todo' }),
+  };
+  const patch = [];
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const id = decodeURIComponent(u.pathname.split('/').pop());
+    if ((opts.method || 'GET') === 'PATCH') {
+      patch.push({ id, body: JSON.parse(opts.body) });
+      return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+    }
+    const doc = docs[id];
+    if (!doc) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+    const maschera = u.searchParams.getAll('mask.fieldPaths');
+    const fields = maschera.length ? Object.fromEntries(Object.entries(doc.fields).filter(([k]) => maschera.includes(k))) : doc.fields;
+    return { ok: true, status: 200, json: async () => ({ name: doc.name, fields }), text: async () => '' };
+  };
+  try {
+    const promemoria = await mod.fraseDaScrivere('P', '#900', OPTS);
+    assert.match(promemoria, /È un pacchetto senza frase/);
+    assert.match(promemoria, /npm run feedback -- 900 --frase/);
+    const r = await mod.scriviFrase('P', 'Il menu adesso si apre anche sulle immagini.', OPTS);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.unite, { aggiornate: ['812'], fallite: [] }, 'solo l\'unita chiusa dal pacchetto; quella archiviata e quella in coda no');
+    assert.deepEqual(patch.map((p) => [p.id, p.body.fields.userNote.stringValue]), [
+      ['P', 'Il menu adesso si apre anche sulle immagini.'],
+      ['u812', 'Il menu adesso si apre anche sulle immagini.'],
+    ]);
+    assert.deepEqual(mod.righeFraseUnite(r.unite, 'x'), ['La stessa frase sulle unite già chiuse dal pacchetto: #812.']);
+    assert.match(mod.righeFraseUnite({ aggiornate: [], fallite: [{ num: '815', motivo: 'giù' }] }, 'Ora va')[0], /FRASE NON SCRITTA su #815.*npm run feedback -- 815 --frase "Ora va"/);
+  } finally { globalThis.fetch = vero; }
+  assert.equal(mod.avvisoFrase({ clientId: 'local:claude', senderProof: 'admin', unite: 2, userNote: 'scritta' }, '#900'), '', 'con la frase niente promemoria');
+});
+
+// La frase di un pacchetto arriva alle unite a ogni livello, per ogni strada che la scrive (SN_FB_ATTESE.uniteDellaFrase).
+const listaFs = (l) => ({ arrayValue: { values: l.map(([id, num]) => ({ mapValue: { fields: { id: { stringValue: id }, num: { stringValue: num } } } })) } });
+async function conDocs(docs, fn) {
+  const patch = [];
+  const vero = globalThis.fetch;
+  globalThis.fetch = async (url, opts = {}) => {
+    const u = new URL(String(url));
+    const id = decodeURIComponent(u.pathname.split('/').pop());
+    if ((opts.method || 'GET') === 'PATCH') {
+      patch.push(id);
+      return { ok: true, status: 200, json: async () => ({}), text: async () => '' };
+    }
+    const doc = docs[id];
+    if (!doc) return { ok: false, status: 404, json: async () => ({}), text: async () => '' };
+    const m = u.searchParams.getAll('mask.fieldPaths');
+    const fields = m.length ? Object.fromEntries(Object.entries(doc.fields).filter(([k]) => m.includes(k))) : doc.fields;
+    return { ok: true, status: 200, json: async () => ({ name: doc.name, fields }), text: async () => '' };
+  };
+  try { return await fn(patch); } finally { globalThis.fetch = vero; }
+}
+const pacchettiAnnidati = () => ({
+  P: documento('P', { clientId: 'local:claude', senderProof: 'admin', status: 'done', statusPublic: 'closed', resolvedInVersion: '1.2.3',
+    unisce: listaFs([['Q', '901'], ['V', '903'], ['W', '904']]) }),
+  // Q è un pacchetto dentro P; la sua unita U aspetta P, perché aprire P ha spostato su P le attese verso Q.
+  Q: documento('Q', { status: 'done', statusReason: 'pacchetto', resolvedInVersion: '1.2.3', waitsFor: listaFs([['P', '900']]), unisce: listaFs([['U', '902'], ['Z', '905']]) }),
+  U: documento('U', { status: 'done', statusReason: 'pacchetto', resolvedInVersion: '1.2.3', waitsFor: listaFs([['P', '900']]) }),
+  Z: documento('Z', { status: 'done', statusReason: 'pacchetto', waitsFor: listaFs([['X', '700']]) }),
+  V: documento('V', { status: 'done', statusReason: 'pacchetto', resolvedInVersion: '1.2.0' }),
+  W: documento('W', { status: 'done', statusReason: 'pacchetto' }),
+});
+
+test('la frase scritta dopo su un pacchetto scende nei pacchetti dentro, e salta le unite chiuse da un altro', async () => {
+  await conDocs(pacchettiAnnidati(), async (patch) => {
+    const r = await mod.scriviFrase('P', 'Ora il menu si apre.', OPTS);
+    assert.equal(r.ok, true);
+    assert.deepEqual(r.unite, { aggiornate: ['901', '904', '902'], fallite: [] },
+      '#905 aspetta un altro pacchetto e #903 ha la versione di un\'altra chiusura: le ha chiuse qualcun altro');
+    assert.deepEqual(patch, ['P', 'Q', 'W', 'U']);
+  });
+});
+
+test('la frase scritta su un pacchetto insieme a un cambio di stato arriva anche alle unite, a ogni livello', async () => {
+  await conDocs(pacchettiAnnidati(), async (patch) => {
+    const r = await mod.scrivi('P', 'archived', '', { frase: 'Ora il menu si apre.', bearer: 'tok-finto' });
+    assert.equal(r.ok, true, r.motivo);
+    assert.deepEqual(r.unite.aggiornate.slice().sort(), ['901', '902', '904']);
+    assert.deepEqual(patch.slice().sort(), ['P', 'Q', 'U', 'W']);
+  });
+});

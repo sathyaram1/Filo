@@ -117,7 +117,8 @@ usciti dalla lista (chiusi, o non più fra le 3, nell'ordine o fermi), `taccuino
   uguale (quelle già salvate non si rifanno), e una sessione che chiude prima lascia nel taccuino il censimento «in
   corso», che il mattino dopo riprende anche senza FERMO. Solo a censimento finito scrivi il giorno nel taccuino e apri
   un feedback che toglie dal ruolo questa frase e la sua prova. Poi `npm run manutentore -- contesto`
-  per la lettura intera, poi ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
+  per la lettura intera (in testa dice quanto pesa: oltre la soglia che stampa, chiedilo diviso, con `--priorita 2`
+  per le priorità alte e le urgenti e `--turno 1/3`, `2/3`… per il resto a turni), poi ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
   (qui sotto) ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno. **Una volta
   sola** (#2269, la rosa non c'è più): al primo mattino il cui taccuino parla ancora della rosa, togli dal taccuino le
   sue regole (la scelta quotidiana delle 2, l'obiettivo di 2, la rosa che si riempie di giorno) e scrivi al loro posto
@@ -165,9 +166,10 @@ Gestione → Automazioni.
 4. **La classe è il primo criterio, non un filtro.** Scegli prima per classe, poi guarda i rami vivi: un lavoro che
    tocca i file probabili di un ramo vivo (`incroci <N>`) aspetta, in attesa di quel ramo o dopo nell'ordine, e intanto
    entra uno di classe più bassa in un'area libera. `rami` e `incroci` leggono anche i rami di filo-security dal suo
-   clone, che aggiornano da sé in sola lettura; se il clone manca o non si aggiorna lo dicono: allora i lavori del
-   server li decidi alla cieca. Un compito può stare davanti a un feedback. **Un lavoro già iniziato non si mette in
-   attesa di un lavoro non iniziato**: finisce da solo.
+   clone, che aggiornano da sé in sola lettura; se il clone manca o non si aggiorna lo dicono, e il titolo dei rami
+   dice «dell'app»: allora i lavori del server li decidi alla cieca. Quando incroci risponde «Non so», la scheda non
+   ha file utili: rifalla, o decidi tu leggendo i rami. Un compito può stare davanti a un feedback. **Un lavoro già
+   iniziato non si mette in attesa di un lavoro non iniziato**: finisce da solo.
 5. **Insieme.** Lavori che non toccano gli stessi file vanno in parallelo, anche sul server: quanti lavori del server
    tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami (`incroci` senza
    numero). Nell'ordine metti solo ciò che può girare insieme adesso.
@@ -191,7 +193,12 @@ L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, p
 e risposte dell'owner li accende il server da sé, davanti all'ordine. Un numero chiuso o non aperto il server lo salta.
 Le sessioni libere (compiti, sessioni accese a mano) seguono la sequenza dell'ordine come il pacemaker: prima le 3, poi
 i lavori già iniziati, poi l'ordine, poi il resto per urgenza. Una voce dell'ordine parte a ogni priorità anche nella
-sessione che il pacemaker accende per lei.
+sessione che il pacemaker accende per lei. Nell'ordine conta
+solo un feedback con un lavoro che una routine prende adesso o che si sbloccherà da sé: uno in design, aligned o
+unlabeled aspetta te; uno che aspetta un feedback chiuso senza fusione non partirà mai (il server lo sposta in design);
+uno che aspetta un feedback aperto non parte finché quello non è fuso, e se l'aspettato non è nell'ordine non
+partirebbe mai. Un ordine di soli numeri così vale come nessun ordine. `accendi` li rifiuta e dice il rimedio
+(l'aspettato, il pacchetto al posto della sua unita, o togliere il numero).
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
@@ -201,8 +208,9 @@ Le schede: `aspetta #P` e `pacchetto di …` dicono chi è già in un pacchetto.
 bloccano ancora, ognuna col suo stato; `aspettava` quelle già fuse, che non fermano niente; «attese che non fermano
 una priorità 3» le tue su una 3, che parte lo stesso (tornano a fermare se la priorità scende). Una «chiuso senza
 fusione» blocca per sempre: spostala sull'originale (`attesa <B> <vecchio> --togli`, poi `attesa <B> <originale>`). Una scheda «non riletta» non basta per
-togliere lavoro; una «SCHEDA VECCHIA» o «NON BUONA» va rifatta prima di decidere su di lei
-(`npm run feedback:schede -- scrivi --solo N`). Un feedback fermo su una domanda per l'owner ha la sua riga: aspetta
+togliere lavoro; una «SCHEDA VECCHIA», «NON BUONA», «SENZA IL TIMBRO DELLO SCRIPT» o fra le «Scartate» va rifatta
+prima di decidere su di lei (`npm run feedback:schede -- scrivi --solo N`); con «SCHEDE LOCALI MANCANTI» decidi su
+quello che dice il server, e prima `elenca`. Un feedback fermo su una domanda per l'owner ha la sua riga: aspetta
 lui, accenderlo non serve. «RESTA LOCALE (motivi)» è un lavoro server che nessuna routine prende perché il biglietto
 nascerebbe sporco: nel recap scrivi quei motivi, non un'ipotesi; ramo e note sporchi li toglie l'owner da Gestione
 («Dichiara fidato com'è»).
@@ -311,7 +319,7 @@ riapri D-n`): le risposte che registri nascono non fidate, e lui le rivede in Ge
 dice il perché: non si aggira.
 
 ```bash
-npm run manutentore -- contesto | sveglia          # il contesto intero, o quello piccolo intero (non per differenze)
+npm run manutentore -- contesto [--priorita 2] [--turno 1/3] | sveglia   # il contesto intero (anche diviso), o il piccolo intero (non per differenze)
 npm run manutentore -- stato | schede              # stato, segnali, N, pause e perché delle voci; tutte le schede in una riga
 npm run manutentore -- leggi <N>                   # testi e note di un feedback, col suo costo finora
 npm run manutentore -- rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--tutte]

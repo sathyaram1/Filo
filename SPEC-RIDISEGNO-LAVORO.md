@@ -155,9 +155,14 @@ manutentore.
 Fatto dalla parte dell'app, con le regole in FEEDBACK-STATES.md § 3a:
 
 - manutentore: `routines/roles/manutentore.md` e `npm run manutentore --
-  contesto | rami | incroci <N>` (schede in una riga, rami in corso coi file da git);
+  contesto | rami | incroci <N>` (schede in una riga, rami in corso coi file da git, anche
+  quelli del server dal checkout di filo-security; il contesto dice quanto pesa e si
+  divide con `--priorita` e `--turno`, e dice quando manca l'indice);
 - schede: `routines/roles/scheda.md` e `npm run feedback:schede -- elenca |
-  scrivi | rileggi | stato` (Haiku scrive, Opus rilegge chi toglie lavoro e il 10%);
+  scrivi | rileggi | stato` (Haiku scrive, Opus rilegge chi toglie lavoro e il 10%;
+  l'agente ha solo Read, Grep e Glob chiusi nelle radici dei repo, riceve dallo script il
+  feedback e le fusioni che lo citano, risponde con la scheda e solo lo script la timbra e
+  la scrive, con una guardia che rimette com'era la cartella se qualcosa la tocca);
 - pacchetti: `feedback:apri --pacchetto` (campo `unisce`, controlli della regola 1,
   allegati e attese delle unite copiati, unite archiviate alla nascita e attese spostate sul
   pacchetto, #1903, #1903.1); la transizione `todo → done` della pipeline per chiudere le unite
