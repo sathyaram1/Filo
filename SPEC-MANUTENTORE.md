@@ -242,10 +242,10 @@ Oggi ogni worker scrive la sua riga alla consegna e il rilascio le pubblica
 com'erano. Prima di ogni rilascio (ogni sei ore, se la suite è verde) passa un
 **redattore**: un sotto-agente del manutentore con un contesto piccolo e
 apposito, non quello intero. Riceve le righe dei worker dall'ultimo rilascio,
-il manifesto delle capacità e i titoli della rosa e delle priorità 3 in corso.
-Riordina per argomento, dà spazio a ciò che conta, condensa. Può aggiungere una
-promessa («il supporto per altri formati è in arrivo») **solo** su un lavoro
-già nella rosa o a priorità 3: non ogni rilascio ne ha una.
+il manifesto delle capacità e i titoli dei lavori nell'ordine e delle priorità
+3 in corso. Riordina per argomento, dà spazio a ciò che conta, condensa. Può
+aggiungere una promessa («il supporto per altri formati è in arrivo») **solo**
+su un lavoro già nell'ordine o a priorità 3: non ogni rilascio ne ha una.
 
 Le novità le leggono tutti gli utenti e il redattore lavora su testo scritto
 da chiunque: il server accetta la riscrittura solo se non contiene link che
