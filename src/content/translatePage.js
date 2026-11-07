@@ -1183,9 +1183,14 @@
     // apre più spesso: si rifà solo se da allora la pagina è cambiata o l'utente l'ha toccata (#505).
     if (!revealedDirty) return revealedAnswer;
     revealedDirty = false;
-    revealedAnswer = !!(Extract && typeof Extract.hasRevealedText === 'function'
-      && Extract.hasRevealedText(hiddenSkipped)) || framesRevealed();
+    revealedAnswer = scoperto();
     return revealedAnswer;
+  }
+
+  // Una sezione rimandata adesso si vede: la domanda dell'icona e della traduzione da sola all'apertura è una.
+  function scoperto() {
+    return !!(Extract && typeof Extract.hasRevealedText === 'function' && Extract.hasRevealedText(hiddenSkipped))
+      || framesRevealed();
   }
   // C'è dell'altro da tradurre, per un motivo o per l'altro: nei due casi
   // l'icona del menu serve a CONTINUARE, non a tornare all'originale.
