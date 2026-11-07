@@ -17,6 +17,7 @@ test('r1 la conferma sopra un sito ha il fumetto di Filo sul tasto in attesa', a
     window.__filoSidebarTest.runFiloAction(${JSON.stringify({ type: 'INVIA_FEEDBACK', testo: lungo, titolo: 'Prova' })});
     true;`);
   const sopra = await confermaSopraPagina(app);
+  console.log(await sopra.evaluate(() => JSON.stringify({ b: [...document.querySelectorAll('button')].map((b) => [b.className, b.textContent, b.getAttribute('title'), b.getAttribute('aria-disabled')]), t: [...document.querySelectorAll('.sn-confirm-text')].map((e) => [e.clientHeight, e.scrollHeight]) })));
   const ok = sopra.locator('.sn-confirm-row button[aria-disabled="true"]').first();
   await expect(ok, 'il tasto aspetta lo scorrimento').toHaveAttribute('title', 'Scorri fino in fondo per confermare', { timeout: 5000 });
   await ok.hover({ force: true });
