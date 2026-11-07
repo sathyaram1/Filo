@@ -132,14 +132,15 @@ Gestione → Automazioni.
 6. **Pacchetti.** Stessa area; tutte le segnalazioni in coda (`todo`) e non ancora lavorate; nessuna a priorità 3.
    Tetto indicativo: 1.000 righe stimate o 15 file. Un feedback scorrelato resta da solo. Un pacchetto passa o non
    passa intero. Niente figli (#N.M) per spezzare un lavoro: il contenitore è il pacchetto.
-3. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
+7. **Quello che toglie lavoro.** Una scheda con `risolto_su_main` si accende lo stesso: la sessione lo ricontrolla e lo
    chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
    nuovo può unire il vecchio e il doppione.
-4. **I rami in corso.** Prima di accendere un feedback guarda se un ramo vivo tocca i suoi file probabili
-   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
-5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
-   uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
-6. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
+8. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
+   uno alla volta: due lavori server di fila nell'ordine, il secondo in attesa del primo.
+9. **Lavori server.** Un feedback fidato entra nell'ordine anche senza il segno «lavoro server»: quel segno lo mette il
+   server da sé, quando chi lavora si ferma perché serve il codice del server. Non è una cosa che aspetta l'owner: non
+   va nel recap né nelle domande.
+10. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
    non c'è più. Usa prima B, poi A: non c'è riserva su A, perché anche a quote finite Filo resta usabile coi crediti
    API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%). La spesa
    della settimana nel contesto (o `spesa`) dà per account dollari e percentuale, quanto resta, le ultime 24 ore, le
