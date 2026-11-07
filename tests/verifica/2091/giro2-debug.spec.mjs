@@ -8,7 +8,7 @@ test('debug riquadro', async ({ app, shell, openTab, testServer }) => {
   const pagina = await openTab(testServer.html(`<title>Blog</title><p>articolo</p><iframe src="${dentro}" style="margin:40px;width:400px;height:150px"></iframe>`));
   await pagina.waitForTimeout(1500);
   const frame = pagina.frames().find((f) => f.url() === dentro);
-  console.log('mondo', await frame.evaluate(() => typeof window.chrome));
+  pagina.on('console', (m) => { if (m.text().includes('[dbg]') || m.text().includes('Filo')) console.log('CONSOLE', m.text()); });
   await app.evaluate(() => {
     const M = process.mainModule.require(require('path').join(process.cwd(), 'src/main/schedaTrascinata.js'));
     globalThis.__log = [];
