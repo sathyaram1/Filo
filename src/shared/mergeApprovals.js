@@ -950,22 +950,24 @@
    * La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea.
    * `dettagli` = { domanda: 'D-12' che la pratica aspetta, motivo: fermo che la pagina conosce }. PURA.
    */
-  function testoRiallineamento(req, inCorso, dettagli) {
-    if (inCorso === true) return RIALLINEA_DA_SOLA;
-    if (!siRiallineaDaSola(req)) return dopoIlConflitto(req);
+  function esitoRiallineamento(req, inCorso, dettagli) {
+    var fermo = inCorso === false ? 'fallito' : 'da_guardare';
+    if (inCorso === true) return { chiave: 'in_corso', testo: RIALLINEA_DA_SOLA };
+    if (!siRiallineaDaSola(req)) return { chiave: fermo, testo: dopoIlConflitto(req) };
     var d = dettagli || {};
     var domanda = DOMANDA_RE.test(String(d.domanda || '')) ? d.domanda : '';
     if (domanda && !fermoDellOwner(req)) {
-      return 'Si riallinea da sola dopo la tua risposta a ' + domanda
-        + ': la routine riprende il ramo che avevi approvato e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.';
+      return { chiave: 'dopo_domanda', testo: 'Si riallinea da sola dopo la tua risposta a ' + domanda
+        + ': la routine riprende il ramo che avevi approvato e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.' };
     }
-    return inCorso === false ? nonAndato(req, d.motivo) : RIALLINEAMENTO_DA_GUARDARE;
+    return { chiave: fermo, testo: inCorso === false ? nonAndato(req, d.motivo) : RIALLINEAMENTO_DA_GUARDARE };
+  }
+  function testoRiallineamento(req, inCorso, dettagli) {
+    return esitoRiallineamento(req, inCorso, dettagli).testo;
   }
   function riallineamentoDi(req, o) {
     var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
-    var inCorso = dato ? !!dato.inCorso : null;
-    var dopoDomanda = !!(dato && dato.domanda) && inCorso === false && siRiallineaDaSola(req) && !fermoDellOwner(req);
-    return { inCorso: inCorso, dopoDomanda: dopoDomanda, testo: testoRiallineamento(req, inCorso, dato) };
+    return esitoRiallineamento(req, dato ? !!dato.inCorso : null, dato);
   }
 
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
