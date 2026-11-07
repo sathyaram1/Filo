@@ -3,10 +3,19 @@
 // e non dice cosa c'è dentro. La chiede extractContext.js; regole in tests/translate-page.spec.mjs (#472).
 'use strict';
 
+const path = require('node:path');
 const { SORGENTE: SEMBRA_NATIVA } = require('./sembraNativa.js');
+
+// I sottoalberi che la traduzione non apre li dice constants.js, lo stesso elenco che usa lei: un grafico disegnato o un
+// blocco di codice non sono testo da tradurre nemmeno qui dentro (#1290.2).
+function tagSenzaProsa() {
+  if (!globalThis.SN_CONST) require(path.join(__dirname, '..', 'shared', 'constants.js'));
+  return globalThis.SN_CONST.TAG_SENZA_PROSA;
+}
 
 function sorgenteSonda(nome) {
   const n = JSON.stringify(String(nome));
+  const senzaProsa = tagSenzaProsa();
   return `(function(){
   'use strict';
   var EP = typeof Element === 'function' && Element.prototype;
@@ -15,35 +24,40 @@ function sorgenteSonda(nome) {
   var oAttach = EP.attachShadow, radici = new WeakMap();
   var oAdd = EventTarget.prototype.addEventListener;
   var oStop = Event.prototype.stopImmediatePropagation, oPrevent = Event.prototype.preventDefault;
-  var oPath = Event.prototype.composedPath;
-  var LETTERA = /\\p{L}/u, MUTI = { STYLE: 1, SCRIPT: 1, TEMPLATE: 1, NOSCRIPT: 1 };
+  var oPath = Event.prototype.composedPath, oClosest = EP.closest;
+  var LETTERA = /\\p{L}/u, HTML = 'http://www.w3.org/1999/xhtml';
+  var MUTI = ${JSON.stringify(Object.fromEntries(senzaProsa.map((t) => [t, 1])))};
+  var SEL_MUTI = ${JSON.stringify(senzaProsa.map((t) => t.toLowerCase()).join(','))};
   // Di un riquadro o di un oggetto incorporato da qui non si legge il contenuto: non è testo, ma nemmeno vuoto.
   var INCORPORATI = { IFRAME: 1, FRAME: 1, OBJECT: 1, EMBED: 1, PORTAL: 1 };
   var ETICHETTE = ['alt', 'title', 'aria-label', 'placeholder', 'value'];
   ${SEMBRA_NATIVA}
+  // Come la traduzione: almeno due caratteri, con una lettera.
+  function testo(s) { s = String(s || '').replace(/\\s+/g, ' ').trim(); return s.length >= 2 && LETTERA.test(s); }
+  function testoProprio(nodo) {
+    var c = nodo.childNodes || [], s = '';
+    for (var k = 0; k < c.length; k++) if (c[k].nodeType === 3) s += c[k].nodeValue || '';
+    return testo(s);
+  }
   // 2 testo che si legge, anche negli alberi annidati; 1 solo incorporati (o troppo fondo per saperlo); 0 niente.
-  // Lo stile e gli script dentro l'albero non sono testo.
+  // Lì dove la traduzione non entra (stile, script, grafici, codice) non c'è testo; le etichette dell'elemento sì.
   function leggibile(radice, prof) {
     if (!radice || prof > 8) return 1;
     var tutti;
     try { tutti = radice.querySelectorAll('*'); } catch (e) { return 1; }
-    var figli = radice.childNodes || [];
-    for (var i = 0; i < figli.length; i++) {
-      if (figli[i].nodeType === 3 && LETTERA.test(figli[i].nodeValue || '')) return 2;
-    }
+    if (testoProprio(radice)) return 2;
     var esito = 0;
     for (var j = 0; j < tutti.length; j++) {
       var el = tutti[j];
-      if (MUTI[el.tagName]) continue;
-      if (INCORPORATI[el.tagName]) esito = 1;
-      var c = el.childNodes;
-      for (var k = 0; k < c.length; k++) {
-        if (c[k].nodeType === 3 && LETTERA.test(c[k].nodeValue || '')) return 2;
-      }
+      var su = el.parentElement;
+      if (su && oClosest.call(su, SEL_MUTI)) continue;
+      var tag = String(el.tagName || '').toUpperCase();
+      if (INCORPORATI[tag]) esito = 1;
       for (var a = 0; a < ETICHETTE.length; a++) {
-        var v = el.getAttribute(ETICHETTE[a]);
-        if (v && LETTERA.test(v)) return 2;
+        if (testo(el.getAttribute(ETICHETTE[a]))) return 2;
       }
+      if (MUTI[tag] || el.namespaceURI !== HTML) continue;
+      if (testoProprio(el)) return 2;
       var dentro = el.shadowRoot || radici.get(el);
       if (dentro) {
         var d = leggibile(dentro, prof + 1);
