@@ -1203,7 +1203,7 @@
     } else if (!m.reply) {
       parts.push('<p class="dk-msg-text dk-msg-pending">Nessun risultato.</p>');
     }
-    return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
+    return `<div class="dk-msg dk-msg-bot${testo ? ' sn-con-azioni-msg' : ''}" data-msg-i="${m._i}">${parts.join('')}</div>`;
   }
 
   // `stickBottom` = "porta comunque la vista in fondo" (nuovo turno dell'utente:
