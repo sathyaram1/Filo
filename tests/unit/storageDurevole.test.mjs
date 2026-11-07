@@ -143,7 +143,7 @@ test('una scrittura che fallisce a metà lascia il file di prima leggibile, avvi
   });
   await Storage.get(null);
   // Il temporaneo della copia non è della scrittura che fallisce: si conta solo a copia finita.
-  // await Storage.statoDisco().copia;
+  await Storage.statoDisco().copia;
   sostituisci(fsp, 'open', (vero) => async (p, ...resto) => {
     const fh = await vero(p, ...resto);
     if (String(p).includes('storage.json.tmp-')) {
