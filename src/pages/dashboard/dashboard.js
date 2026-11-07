@@ -166,12 +166,15 @@
     // Le righe stanno sempre nel filo al centro (#869).
     send, bubblesEl, homeEl: $('righeApp'), inThread: () => true, chatId: () => chatId,
   });
-  // Copia e Rispondi sotto le risposte di Filo, e la citazione nel campo e nella bolla che parte (#1620).
+  // Copia e Rispondi sotto le risposte di Filo, Copia, Modifica e Cita sotto i messaggi dell'utente, e la citazione nel
+  // campo e nella bolla che parte (#1620, #2096).
   const Rispondi = self.SN_DASH_RISPONDI;
   Rispondi.init({
     send, bubblesEl, inputEl, formEl: inputForm, anteprimaEl: $('citazione'),
     contaCopia: (n) => contaCopia(n),
     vaiA: (o) => Coda.vaiA(o),
+    modificabile: (b) => composizioni.has(b),
+    modifica: (b) => modificaMessaggio(b),
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
