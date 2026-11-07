@@ -807,6 +807,12 @@
     if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
     return voci;
   }
+  // Il menu di una pastiglia delle Impostazioni rapide: le stesse cose del suo clic, più la sua voce in Preferenze.
+  function vociPastiglia(p) {
+    const voci = [{ etichetta: `${p.acceso ? 'Spegni' : 'Accendi'}: ${p.etichetta.toLowerCase()}`, fai: () => scriviImpostazione(p.scrivi()) }];
+    if (p.voce) voci.push({ etichetta: 'Apri la voce in Preferenze', fai: () => apri(`${URL_PREFERENZE}#${p.voce}`) });
+    return voci;
+  }
 
   let menuAperto = null;
   function chiudiMenu() {
