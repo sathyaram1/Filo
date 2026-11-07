@@ -32,6 +32,60 @@ test('Preferenze: «Rimetti di serie» rimette il valore, e la voce si spiega o 
   await expect(campo).toBeFocused();
 });
 
+// Spiega e Chiedi nominano la voce come la pagina: il titolo sopra una tendina, non le sue scelte.
+test('Preferenze: «Spiega cosa fa» sulla tendina del tema manda all’Aiuto la domanda col nome «Tema»', async ({ openTab }) => {
+  test.setTimeout(90_000);
+  const page = await openTab('filo://preferences/preferences.html');
+  await expect(page.locator('#theme')).toBeAttached({ timeout: 10_000 });
+  await page.locator('#theme').locator('xpath=..').locator('.sn-select-button').first().click({ button: 'right' });
+  await menuDi(page).voce('Spiega cosa fa').first().click();
+  await expect(page.locator('.sn-sidebar-msg-user').last()).toHaveText("Cosa fa l'impostazione «Tema»?", { timeout: 8_000 });
+});
+
+// Una tendina è una scelta: si rimette come un interruttore, senza chiedere di un testo che nessuno ha scritto.
+test('Preferenze: «Rimetti di serie» su una tendina la rimette senza chiedere', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ theme: 'dark' }));
+  const page = await openTab('filo://preferences/preferences.html');
+  await expect(page.locator('#theme')).toHaveValue('dark', { timeout: 10_000 });
+  await page.locator('#theme').locator('xpath=..').locator('.sn-select-button').first().click({ button: 'right' });
+  await menuDi(page).voce('Rimetti di serie').first().click();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).theme), { timeout: 5_000 }).toBe('system');
+  expect(await confirmText(page)).toBe('');
+});
+
+// Ogni voce delle quattro pagine prende un nome dalla pagina: mai il nome interno, mai l'elenco delle scelte.
+for (const url of ['filo://preferences/preferences.html', 'filo://options/options.html', 'filo://options/altro.html', 'filo://security/security.html']) {
+  test(`i nomi delle voci in ${url.split('/').pop()}`, async ({ openTab }) => {
+    test.setTimeout(60_000);
+    const page = await openTab(url);
+    await expect.poll(() => page.evaluate(() => !!(window.SN_MENU_IMPOSTAZIONI && window.SN_SIDEBAR))).toBe(true);
+    const nomi = await page.evaluate(() => {
+      const V = window.SN_VOCI_IMPOSTAZIONI;
+      const M = window.SN_MENU_IMPOSTAZIONI;
+      const S = window.SN_SIDEBAR;
+      const orig = S.chiediDaPagina;
+      let preso = null;
+      S.chiediDaPagina = (t) => { preso = t; };
+      const out = [];
+      try {
+        for (const [id, percorso] of Object.entries(V.campi(M.paginaDi()))) {
+          const el = document.getElementById(id);
+          if (!el) continue;
+          preso = null;
+          const c = M.vociMenu(el).find((v) => v.label === 'Chiedi a Filo');
+          if (c) c.onClick();
+          out.push({ id, percorso, nome: String(preso || '').replace(/^Sull'impostazione «|»:$/g, '') });
+        }
+      } finally { S.chiediDaPagina = orig; }
+      return out;
+    });
+    expect(nomi.length).toBeGreaterThan(0);
+    const strani = nomi.filter((n) => !n.nome || n.nome === n.id || n.nome === n.percorso || n.nome.length > 60 || /▾/.test(n.nome));
+    expect(strani).toEqual([]);
+  });
+}
+
 test('Preferenze: i dispositivi Bluetooth preferiti si vedono tutti e si tolgono', async ({ app, openTab }) => {
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ bluetoothPreferiti: ['00:11:22:33:44:55', '66:77:88:99:AA:BB'] }));
   const page = await openTab('filo://preferences/preferences.html');
