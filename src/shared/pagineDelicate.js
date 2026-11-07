@@ -118,8 +118,8 @@
   const piano = (t) => String(t == null ? '' : t).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, ' ').trim();
 
-  // «Questo sito», «questa pagina», «scheda: <titolo o sito>» in un elenco di siti detto a parole: la chat vede solo il
-  // nome del sito delle schede (#1312), l'utente anche il titolo. `schede` [{url, title}], `attiva` la scheda web davanti.
+  // «Questo sito», «questa pagina», «scheda: <titolo o sito>» in un elenco di siti detto a parole: la chat vede i titoli
+  // delle schede, non gli indirizzi. `schede` [{url, title}], `attiva` la scheda web davanti.
   // Torna { valore } coi siti al posto dei riferimenti, o { rifiuto } se un riferimento non porta a un sito solo.
   function risolviSchede(valore, { schede = [], attiva = '' } = {}) {
     let testo = String(valore == null ? '' : valore);
