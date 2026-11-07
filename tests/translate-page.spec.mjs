@@ -2390,8 +2390,9 @@ test('componente chiuso decorativo dentro un componente aperto o dentro un riqua
   expect((await toasts(page)).join(' | ')).not.toMatch(/solo in parte|riquadro incorporato/);
 });
 
-// #1290 — il testo chiuso in un componente si conta dovunque si arrivi: scorrendo, o aprendo una fisarmonica (che di
-// serie si traduce). Negli altri modi di nascondere resta fuori, come gli spazi pubblicitari nascosti (#503).
+// #1290 — il testo chiuso in un componente si conta dovunque si arrivi: scorrendo, o aprendo una sezione che di serie
+// si traduce, se accanto c'è altro testo (#1290.2). Da solo in uno spazio nascosto resta fuori, come gli spazi
+// pubblicitari nascosti (#503).
 const SIGILLATO = (prima, dopo) => `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
   <h1 id="plain">A plain heading outside any component</h1>
   <p id="p1">First paragraph of the article, long enough to be picked up by the translation.</p>
