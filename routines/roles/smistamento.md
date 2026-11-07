@@ -93,6 +93,12 @@ la trova fra quelle da rispondere.
 - da 2 a 4 opzioni, ognuna con l'azione e con pro e contro di una riga;
 - consiglio con un motivo di una riga.
 
+Un «da fare» (`"tipo": "da_fare"`, un passo che solo l'owner può fare) resta un
+«da fare»: niente opzioni inventate, niente consiglio, niente pro e contro.
+Riscrivi i passi (problema) e il perché (contesto) nella stessa forma corta, e
+tieni il «Fatto» e, se c'era, il «Non lo faccio» con le loro azioni. Se invece è
+una scelta travestita, con due strade vere, riscrivila come domanda, senza tipo.
+
 Una riga sono 140 caratteri: lo strumento conta, e rifiuta col campo e il
 numero. Se chi ha chiesto ha scritto un'opzione sola, aggiungi quelle che il
 caso ammette (archiviare il feedback; tenere com'è, per un rilievo di un altro
