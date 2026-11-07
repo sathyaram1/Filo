@@ -96,10 +96,27 @@ function campoStoria(s) {
   return { storia: { superficiale: true, approfondito: Math.max(0, Math.floor(Number(s.approfondito) || 0)), intera: s.intera === true } };
 }
 
+const UNIT_DIR_REL = 'tests/unit';
+const sfuggi = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Gli unit che un ramo può rompere, per la prova veloce (su Windows al cancello, #2225): i file di test che il ramo
+ * cambia e quelli che nominano un file che cambia (modulo, aiuto, documento letto da una sentinella). PURA.
+ * `cambiati` e `tutti` relativi alla radice con le barre normali; `leggi(rel)` il testo di un test.
+ */
+export function unitToccati({ cambiati = [], tutti = [], leggi = () => '' } = {}) {
+  const cambiatiSet = new Set(cambiati.map((f) => String(f).replace(/\\/g, '/')));
+  const nomi = [...new Set([...cambiatiSet].filter((f) => !tutti.includes(f)).map((f) => f.split('/').pop()).filter(Boolean))];
+  // Il nome intero e non un pezzo: `a.js` non deve scegliere ogni test che nomina `data.js`.
+  const cerca = nomi.length ? new RegExp(`(?:^|[^\\w.-])(?:${nomi.map(sfuggi).join('|')})(?![\\w.-])`) : null;
+  return tutti.filter((t) => cambiatiSet.has(t) || (cerca && cerca.test(String(leggi(t) || '')))).sort();
+}
+
 /** Cosa si stampa dopo la prova. PURA. */
 export function testoProva(prova) {
   const p = prova || {};
   const m = String(p.mainSha || '').slice(0, 8);
+  const quali = Number.isInteger(p.toccati) ? `toccati dal ramo (${p.toccati} file) ` : '';
   const dove = p.contenuto ? `sul ramo, che contiene già main ${m}` : `sulla fusione con main ${m}`;
   if (p.saltata) return `▸ Unit sulla fusione: non provati (${p.motivo}). Il server lo registra.`;
   if (p.errore) return `▸ Unit sulla fusione: prova non riuscita (${p.errore}).`;
@@ -107,8 +124,9 @@ export function testoProva(prova) {
     case 'main_contenuto': return `▸ Unit sulla fusione: il ramo contiene già main (${m}), il risultato è il ramo stesso.`;
     case 'verde': {
       const ins = Array.isArray(p.instabili) ? p.instabili : [];
-      if (!ins.length) return `▸ Unit ${dove}: verdi.`;
-      return [`▸ Unit ${dove}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non ${p.contenuto ? 'del ramo' : 'della fusione'}:`,
+      if (p.toccati === 0) return `▸ Unit ${dove}: il ramo non tocca nessun file di unit né file che nominano, niente da provare.`;
+      if (!ins.length) return `▸ Unit ${quali}${dove}: verdi.`;
+      return [`▸ Unit ${quali}${dove}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non ${p.contenuto ? 'del ramo' : 'della fusione'}:`,
         ...ins.map((r) => `    ~ ${r}`)].join('\n');
     }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
