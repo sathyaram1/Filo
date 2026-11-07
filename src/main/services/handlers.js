@@ -6995,7 +6995,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     notaRisposta = notes.pop();
     textReply = unisciTesti([...risposta, notaRisposta]);
   } else {
-    textReply = unisciTesti([...risposta, textReply]);
+    // L'avviso chiede al modello di riscrivere la risposta finita fra le note, ma non lo garantisce (#1921.1).
+    const sepolta = interrotta ? '' : GiroAzioni.rispostaFraLeNote(notes.slice(noteAllaRisposta), textReply);
+    if (sepolta) {
+      notaRisposta = sepolta;
+      notes.splice(notes.lastIndexOf(sepolta), 1);
+    }
+    textReply = unisciTesti([...risposta, sepolta, textReply]);
   }
   if (mutoDopoLetture) {
     senzaRisposta = { passi, motivo: 'muto_dopo_letture' };
