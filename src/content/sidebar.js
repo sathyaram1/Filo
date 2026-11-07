@@ -1069,6 +1069,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (role === 'assistant') { rispostaArrivata(); spegniSeguito(); }
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
+    // #2096 — Copia e Rispondi al passaggio del mouse, come nella home: il testo come l'ha scritto chi parla.
+    if (String(text || '').trim()) { msg.classList.add('sn-con-azioni-msg'); msg._scritto = String(text); }
+    azioniSu(conv);
     // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home;
     // il testo dell'utente resta letterale.
     if (role === 'assistant' && global.SN_MARKDOWN) {
