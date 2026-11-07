@@ -91,7 +91,6 @@
     el.className = 'dash-msg-azioni';
     el.setAttribute('role', 'toolbar');
     el.setAttribute('aria-label', 'Azioni sul messaggio');
-    el.append(tasto('copia', 'copy', 'Copia'), tasto('rispondi', 'reply', 'Rispondi'));
     // Il fuoco resta nel campo: chi copia o cita sta per scrivere.
     el.addEventListener('mousedown', (e) => { if (e.target.closest('.dash-msg-azione')) e.preventDefault(); });
     el.addEventListener('click', (e) => {
@@ -99,14 +98,17 @@
       const b = el.parentElement;
       if (!t || !rispondibile(b)) return;
       e.stopPropagation();
-      if (t.dataset.azione === 'copia') copia(b, t).catch(() => {});
-      else rispondi(b);
+      fai(t.dataset.azione, b, t);
     });
     return el;
   }
   function mettiBarra(b) {
     if (!barra) barra = creaBarra();
     if (barra.parentElement === b) return;
+    const voluti = azioniDi(b);
+    if (voluti.join() !== [...barra.children].map((t) => t.dataset.azione).join()) {
+      barra.replaceChildren(...voluti.map((a) => tasto(a, AZIONI[a].icona, AZIONI[a].etichetta)));
+    }
     for (const t of barra.querySelectorAll('.dash-msg-azione')) esito(t, null);
     b.appendChild(barra);
   }
