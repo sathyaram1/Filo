@@ -50,8 +50,12 @@ test('riga «Volume al 40%» nella chat: il tasto destro annulla e il volume tor
   await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.livello), { timeout: 20_000 }).toBe(40);
   const riga = page.locator('.dash-activity-row', { hasText: 'Volume al 40%' }).first();
   await expect(riga).toBeAttached();
-  await riga.evaluate((el) => { const d = el.closest('details'); if (d) d.open = true; });
-  await riga.click({ button: 'right', force: true });
+  if (!(await riga.isVisible())) {
+    const blocco = page.locator('.dash-activity', { has: riga }).first();
+    await blocco.locator('.dash-activity-head').first().click();
+  }
+  await expect(riga).toBeVisible({ timeout: 5_000 });
+  await riga.click({ button: 'right' });
   const voce = page.locator('.sn-menu-item', { hasText: 'Annulla' });
   await expect(page.locator('.sn-menu-item', { hasText: 'Apri il riquadro di sistema' })).toBeVisible();
   await expect(voce).toBeVisible();
