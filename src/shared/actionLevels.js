@@ -1320,7 +1320,7 @@
       campo: null,
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
-        if (r.livello != null) return `Portare il volume del computer ${global.SN_SISTEMA ? global.SN_SISTEMA.alPercento(r.livello) : `al ${r.livello}%`}`;
+        if (r.livello != null) return `Portare il volume del computer ${alPercento(r.livello)}`;
         if (r.passo != null) return r.passo > 0 ? 'Alzare il volume del computer' : 'Abbassare il volume del computer';
         if (r.muto === true) return 'Mettere muto il computer';
         if (r.muto === false) return 'Togliere il muto al computer';
