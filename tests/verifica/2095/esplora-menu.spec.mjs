@@ -14,7 +14,7 @@ async function prova(page, nome) {
   const cand = await m.valuta(() => [...document.querySelectorAll('.sn-menu button, .sn-menu [title]')].filter((b) => b.getBoundingClientRect().width > 0)
     .map((b, i) => { b.setAttribute('data-cand', String(i)); return [i, b.className, (b.textContent || '').trim().slice(0, 20), b.getAttribute('aria-label'), b.getAttribute('title')]; }));
   console.log(nome, 'cand', JSON.stringify(cand));
-  const scelto = cand.find((c) => c[3] && !/[\p{L}\p{N}]/u.test(c[2])) || cand.find((c) => c[4]);
+  const scelto = cand.find((c) => c[3] === process.env.QUALE) || cand[0];
   const icona = m.locator(`[data-cand="${scelto[0]}"]`);
   await icona.hover({ force: true });
   await m.superficie.waitForTimeout(1200);
