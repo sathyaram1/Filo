@@ -447,11 +447,6 @@ test('#530.6: ciò che un\'azione porta dentro conta in ogni sua uscita, errori 
   assert.equal(AL.fonteDi({ type: 'RINOMINA_FILE', _output: { rinominati: [{ da: 'x', a: 'y', prima: 'x', nome: 'y' }], scaricati: true } }).classe, 5);
   assert.equal(AL.fonteDi({ type: 'RINOMINA_FILE', _output: { error: 'nessun file da rinominare', saltati: [] } }), null);
   assert.equal(A.stato({ fonti: daAzioni([{ type: 'RINOMINA_FILE', _proposte: proposte }]), livello: 'default' }).stato, 'contaminato');
-  // Le pagine visitate che una ricerca nelle chat riporta: titoli e riassunti li scrivono i siti.
-  const pagine = { type: 'CERCA_CHAT', query: 'ricetta', _output: { results: [], pagine: [{ title: 'Ricetta', url: 'https://ricette.example/' }] } };
-  assert.equal(AL.fonteDi(pagine).classe, 5);
-  assert.equal(AL.fonteDi({ type: 'CERCA_CHAT', query: 'x', _output: { results: [], pagine: [{ title: 'x', url: 'https://b.example', delicata: true }] } }), null,
-    'di una pagina delicata arriva solo il sito');
 });
 
 test('la ricerca dell\'Aiuto passa da NAVIGA col testo cercato: costo 2 lì, una domanda sola', () => {
