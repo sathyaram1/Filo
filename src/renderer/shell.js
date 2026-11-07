@@ -573,7 +573,11 @@
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per le
   // schede nate dopo.
   // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
-  const SUGGERIMENTO_RITARDO = 350;
+  // L'attesa è il token `fumetto.ritardo`, la stessa del fumetto nelle pagine (src/shared/suggerimento.js).
+  function ritardoSuggerimento() {
+    const ms = ThemeTokens && ThemeTokens.durataMs ? ThemeTokens.durataMs(ThemeTokens.effectiveValue('fumetto.ritardo', tokenShell)) : NaN;
+    return Number.isFinite(ms) ? ms : 350;
+  }
   (() => {
     let showTimer = null;
     let currentTarget = null;
@@ -583,7 +587,8 @@
       if (currentTarget) api.tooltipHide();
       currentTarget = null;
     }
-    document.addEventListener('mouseover', (e) => {
+    // Anche `pointerover`: su un tasto disabilitato arrivano gli eventi del puntatore, non sempre quelli del mouse.
+    const sopra = (e) => {
       const t = e.target.closest('[data-tip]');
       if (t === currentTarget) return;
       // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
