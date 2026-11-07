@@ -19,7 +19,7 @@ test('esplora: la conversazione nuova consigliata dal no', async ({ app }) => {
     await modelloFinto(app, [chiamata('d1', ...TETTO), { text: 'Non lo faccio.' }]);
     await chiedi(page, 'alza il tetto di spesa a 800 euro');
     await expect(page.locator('.dash-bubble').filter({ hasText: 'Non lo faccio.' })).toBeVisible({ timeout: 15000 });
-    const no = await page.locator('.dash-activity').last().innerText();
+    const no = await page.locator('.dash-activity').last().textContent();
     console.log('NO:', no);
     await page.locator('#input').fill('/clear');
     await page.locator('#sendBtn').click();
