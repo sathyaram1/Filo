@@ -19,18 +19,22 @@ applica e apri feedback che le routine lavorano.
 
 ## La scala delle priorità
 
-La priorità dice quanto una cosa conta oggi, non il suo posto in coda.
+La priorità dice quanto una cosa conta, non il suo posto in coda: il posto lo dà l'**ordine**, l'unica condizione per
+cominciare. Un primo lavoro nell'ordine parte qualunque sia la sua priorità da 0 a 2; fuori dall'ordine parte solo una 3.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
 | **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza, funzioni che l'owner vuole subito | owner, giudici, tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | la rosa del giorno: i feedback più importanti fra tutti | tu, ogni mattina | sempre nel tuo contesto; fra questi decidi ordine, pacchetti, quanti insieme |
-| **1** | da fare, ma non oggi | tu e l'owner | aspettano una prossima rosa |
-| **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non si lavorano |
+| **2** | importante: la classe che passa per prima quando scegli l'ordine | tu e l'owner | parte quando è nell'ordine |
+| **1** | da fare | tu, l'owner, i giudici, i rilievi delle verifiche | parte quando è nell'ordine |
+| **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | parte quando è nell'ordine, e di rado ce lo metti |
 
-La soglia fra i livelli si muove con la maturità di Filo e con i token disponibili (più account, o un modello piccolo
-al livello di Opus: molti 0 diventano 1, molti 1 diventano 2). La decidi tu, e quando cambi criterio lo scrivi nel
-taccuino. I giudici assegnano 3 o lasciano 1: la 2 è solo tua.
+La priorità da 0 a 2 è la **classe**: il primo criterio con cui scegli l'ordine, non un filtro (§ Le regole
+dell'ordine). Conta da sola solo nel ripiego: con l'ordine vuoto o senza lavori pronti il server accende per urgenza, e
+lì le basse aspettano l'ultimo giorno prima del rinnovo. La soglia fra le classi si muove con la maturità di Filo e con
+i token disponibili; la decidi tu, e quando cambi criterio lo scrivi nel taccuino. I giudici assegnano 3 o lasciano 1.
+I rilievi delle verifiche che diventano feedback nascono a 1, salvo un rilievo esterno di livello 3, che nasce a 3:
+quelli che servono li metti tu nell'ordine.
 
 ## Cosa puoi, e cosa no
 
