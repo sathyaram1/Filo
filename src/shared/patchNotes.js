@@ -13,6 +13,7 @@
       features: [
         { testo: 'Le schede si trascinano come ti aspetti: seguono il mouse, e puoi lasciarle in un campo di testo per incollare il link.', segnalazione: 2084 },
         { testo: 'Trascina una scheda nella chat per parlarne con Filo.', segnalazione: 2085 },
+        { testo: 'Passando col mouse su un tasto, in tutte le pagine di Filo il nome compare in un fumetto caldo come quello della barra in alto, non più nel rettangolo bianco. Ce l\'hanno anche le icone che prima non dicevano niente: l\'invio, le crocette, le immagini da ingrandire. Colori e attesa si cambiano in Preferenze o chiedendolo a Filo.', segnalazione: 2095 },
       ],
     },
     {
