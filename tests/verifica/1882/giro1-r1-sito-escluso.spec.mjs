@@ -1,4 +1,4 @@
-// Verifica #1882 giro 1, rilievo 1: su un sito dove Filo è spento la pagina paga lo stesso i moduli pesanti.
+// Verifica #1882 giro 1, rilievo 1: su un sito dove Filo è spento la pagina compila lo stesso i moduli pesanti.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
