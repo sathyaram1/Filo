@@ -50,7 +50,10 @@ async function finché(cond) {
   return cond();
 }
 
-const scheda = { id: 7, isDestroyed: () => false, mainFrame: { frameTreeNodeId: 1 } };
+// La scheda finta: la sua pagina (`principale.url`) può lasciare YouTube, e la scheda si può chiudere.
+const principale = { url: '', frameTreeNodeId: 1, parent: null, send() {} };
+principale.framesInSubtree = [principale];
+const scheda = { id: 7, chiusa: false, isDestroyed() { return this.chiusa; }, mainFrame: principale };
 const regole = (B) => B.regolePer('https://www.youtube.com/watch?v=x', scheda).map((r) => r[1]);
 
 test('all\'avvio la copia di oggi si usa dal disco senza rete; ogni giorno le regole si riscaricano', async (t) => {
