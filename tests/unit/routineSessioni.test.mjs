@@ -32,7 +32,7 @@ test('un documento senza i campi vale come il comportamento di oggi', () => {
 test('il documento si legge com\'è, e un valore storto non fa esplodere la pagina', () => {
   assert.deepEqual(RS.leggiDoc({
     maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, riservatiOff: true, riservatiTetto: 3,
-  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false, riservatiOff: true, riservatiTetto: 3 });
+  }), { maxSessions: 7, priorityAccount: 'B', accountAOff: true, accountBOff: false, manutentoreAcceso: false, riservatiOff: true, riservatiTetto: 3, unitWindows: 'toccati' });
   assert.equal(RS.leggiDoc({ manutentoreAcceso: true }).manutentoreAcceso, true);
   assert.equal(RS.leggiDoc({ manutentoreAcceso: 'sì' }).manutentoreAcceso, false, 'solo un vero booleano lo accende');
   assert.deepEqual(RS.valida({ manutentoreAcceso: true }), { ok: true, valori: { manutentoreAcceso: true } });
