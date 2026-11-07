@@ -571,15 +571,17 @@ test('riordinare le schede e svuotare l\'archivio chiedono come dice la regola, 
   expect(dopoLettura.executed).toBe(false);
   expect(dopoLettura.domanda).toBe('chiede');
   expect(dopoLettura.perche).toContain('ricerca sul web');
-  // Svuotare l'archivio è cancellare per sempre: la parola a ogni livello e in ogni stato.
+  // Svuotare l'archivio è cancellare per sempre: la parola a ogni livello; dopo una lettura no (#1312, strada B).
   const richiesta = 'elimina dall\'archivio le schede sulle ricette';
   expect((await execAction(app, { type: 'CANCELLA_ARCHIVIO', query: 'ricette' }, { richiesta })).domanda).toBe('conferma');
-  expect((await execAction(app, { type: 'CANCELLA_ARCHIVIO', query: 'ricette' }, { contesto: [ricercaFatta], richiesta })).domanda).toBe('conferma');
+  const letta = await execAction(app, { type: 'CANCELLA_ARCHIVIO', query: 'ricette' }, { contesto: [ricercaFatta], richiesta });
+  expect(letta.no).toBe(true);
+  expect(letta.executed).toBe(false);
 });
 
-// Il costo 4 parte solo se l'utente l'ha chiesto con parole sue (#1312): dopo una lettura, con l'utente che chiedeva
-// altro, un freno tolto o una cancellazione per sempre è un no, non il riquadro con la parola.
-test('dopo una lettura, un freno tolto o una cancellazione per sempre che l\'utente non ha chiesto è un no', async ({ app }) => {
+// Il costo 4 lo decide quello che il compito ha letto, non le parole (#1312, strada B): dopo una lettura un freno
+// tolto o una cancellazione per sempre è un no, comunque l'utente l'abbia chiesto; in una conversazione pulita la parola.
+test('dopo una lettura, un freno tolto o una cancellazione per sempre è un no anche chiesto con parole chiare', async ({ app }) => {
   await home(app);
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' }, monthlyLimitEur: 5, openWeightsOnly: true }));
   await app.evaluate(() => globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Vive a Bologna.', PREFERENZE: '' }));
