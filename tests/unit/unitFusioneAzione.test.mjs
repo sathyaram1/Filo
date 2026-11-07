@@ -12,7 +12,15 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   MARCA, MARCA_PARTE, leggiArgomenti, campoEsito, rigaEsito, codiceUscita, unisciParti, partiDaAmbiente, firmaSistema,
+  PESO_DOPO,
 } from '../../scripts/unit-fusione-azione.mjs';
+import { BASTA_SPOSTARE, ESITI_DOPO_NOVITA } from '../../scripts/lib/unit-sulla-fusione.mjs';
+
+test('gli esiti dopo i quali basta spostare le novità sono esiti che si fondono, e l\'unione li pesa tutti (#2214)', () => {
+  for (const e of BASTA_SPOSTARE) assert.equal(codiceUscita({ esito: e }), 0, `${e} deve fondersi`);
+  assert.deepEqual([...PESO_DOPO].sort(), [...ESITI_DOPO_NOVITA].sort());
+  assert.equal(PESO_DOPO.at(-1), 'rosso_sulla_fusione');
+});
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CARTELLA = join(ROOT, '.github', 'workflows');
