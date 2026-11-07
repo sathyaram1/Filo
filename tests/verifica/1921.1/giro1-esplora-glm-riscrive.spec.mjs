@@ -9,7 +9,7 @@ test.use({
 });
 
 const CHIAVE = process.env.OPENROUTER_API_KEY || '';
-const RACCONTO = /riscriv|note di lavoro|non ti è arrivat|non ti era arrivat|ripeto|di nuovo la risposta|come risposta|avviso/i;
+const RACCONTO = /riscriv|note di lavoro|non ti è arrivat|non ti era arrivat|ripeto|di nuovo la risposta|come risposta|riscritt|ripetendo|non ti è arrivata/i;
 
 async function newtabPage(app) {
   const deadline = Date.now() + 15_000;
