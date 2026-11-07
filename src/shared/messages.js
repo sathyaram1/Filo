@@ -482,6 +482,9 @@
     // main → la vista sotto il puntatore (#2084): una scheda portata fuori dalla fila.
     // { fase: sopra|lascia|esci, x, y (px della pagina), scheda: { id, titolo, url, icona } } (src/shared/schedaTrascinata.js).
     SCHEDA_TRASCINATA: 'scheda_trascinata',
+    // Frame di un sito → main, durante quel trascinamento: il punto cade in un suo riquadro incorporato.
+    // { fase, x, y (px del contenuto del riquadro), indice, src }: il main gira SCHEDA_TRASCINATA a quel riquadro.
+    SCHEDA_NEL_RIQUADRO: 'scheda_nel_riquadro',
     // Da una chat, sul gettone di una scheda (#2085): { op: anteprima|nascondi|apri, scheda, rect } → { ok }.
     GETTONE_SCHEDA: 'gettone_scheda',
     // Il pannello di destra delle app di Filo (#1433): solo dalle pagine di Filo (`soloFilo`), un sito non ha un pannello.
