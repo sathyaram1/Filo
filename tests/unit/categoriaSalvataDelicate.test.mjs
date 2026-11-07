@@ -87,8 +87,8 @@ test('un link a una banca salvato dal menu: anche lì solo il tipo', async () =>
   assert.ok(!chiamate[0].prompt.includes('intesasanpaolo') && !chiamate[0].prompt.includes('Il mio conto'));
 });
 
-test('una pagina della rete di casa non parte verso il modello, nemmeno a regola delle delicate spenta', async () => {
-  for (const settings of [{}, { security: { pagineDelicate: { enabled: false } } }]) {
+test('una pagina della rete di casa non parte verso il modello, nemmeno a «Tutto in anticipo»', async () => {
+  for (const settings of [CHIEDI_DELICATE, TUTTO]) {
     const { chiamate, voce } = await salva({ settings, page: { url: 'http://192.168.1.1/', title: 'Router TIM', excerpt: 'Password Wi-Fi: segreta' } });
     assert.equal(chiamate.length, 0);
     assert.ok(voce, 'la pagina resta salvata');
