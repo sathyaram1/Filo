@@ -520,9 +520,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
   padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
   font: inherit; cursor: pointer;
-  transition: background calc(0.14s * var(--sn-motion, 1)) ease, padding-left calc(0.14s * var(--sn-motion, 1)) ease;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease;
 }
-.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); outline: none; }
 .dash-cerca-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
 .dash-cerca-corpo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .dash-cerca-titolo { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
