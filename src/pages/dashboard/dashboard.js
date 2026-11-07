@@ -1394,7 +1394,31 @@
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
     if (c.citata) Rispondi.citaIn(userBubble, c.citata);
+    composizioni.set(userBubble, c);
     return userBubble;
+  }
+  // Quello che un messaggio dell'utente aveva nel campo quando è partito: «Modifica» lo rimette lì (#2096).
+  const composizioni = new WeakMap();
+  // Un messaggio riletto dal filo: i file stanno nel testo come righe «File: …» in coda, le foto ancora in memoria a parte.
+  function composizioneDalFilo(m, foto) {
+    const righe = String(m.text || '').split('\n');
+    const file = [];
+    while (righe.length && /^File: \S/.test(righe[righe.length - 1])) {
+      const p = righe.pop().slice(6).trim();
+      // Il percorso di una foto che torna già come immagine non diventa anche un documento.
+      if (!(foto.length && /\.(png|jpe?g|gif|webp|bmp)$/i.test(p))) file.unshift({ percorso: p, nome: nomeDaPercorso(p) });
+    }
+    let scritto = righe.join('\n');
+    if (foto.length && scritto.trim() === DOMANDA_SOLO_IMMAGINI) scritto = '';
+    const c = Rispondi.dalFilo(m.rispostaA);
+    const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
+    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
+  }
+  function modificaMessaggio(b) {
+    const c = composizioni.get(b);
+    if (!c) return false;
+    rimettiNellaCasella([c]);
+    return true;
   }
   // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
   async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
