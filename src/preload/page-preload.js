@@ -1075,7 +1075,7 @@ function start() {
   try {
     const loaded = ['SN_CONST', 'SN_MSG', 'SN_I18N', 'SN_ICONS', 'SN_EXTRACT',
       'SN_POPUP', 'SN_MENU', 'SN_HIGHLIGHT', 'SN_SIDEBAR', 'SN_SPELLCHECK',
-      'SN_FEEDBACK', 'SN_COOKIES_CS'].filter((k) => typeof globalThis[k] !== 'undefined');
+      'SN_FEEDBACK', 'SN_COOKIES_CS'].filter((k) => 'value' in (Object.getOwnPropertyDescriptor(globalThis, k) || {}));
     document.documentElement.dataset.filoModules = loaded.join(',');
     document.documentElement.dataset.filoReady = '1';
   } catch (_) {}
