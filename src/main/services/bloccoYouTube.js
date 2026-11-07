@@ -196,9 +196,22 @@ function rotto(wc, frame, motivo, { avvisa = avvisoDiRipiego, ricarica = ricaric
   spente.set(id, versione);
   conRegole.delete(id);
   try { avvisa(motivo); } catch (_) {}
-  try { ricarica(wc, frame); } catch (_) {}
+  const cime = cimeYouTube(wc);
+  for (const f of cime.length ? cime : [frame]) { try { ricarica(wc, f); } catch (_) {} }
   if (!inTest()) { cercaRegoleNuove(); ricontrolla(); }
   return { fatto: true };
+}
+
+// Aspettano le regole nuove solo le schede spente ancora aperte su YouTube: una chiusa esce, una andata altrove resta
+// spenta ma non fa scaricare niente finché non ci torna.
+function inAttesa() {
+  let su = 0;
+  for (const id of [...spente.keys()]) {
+    const wc = schede.daId(id);
+    if (!viva(wc)) { spente.delete(id); continue; }
+    if (frameDi(wc).some(suYouTube)) su++;
+  }
+  return su;
 }
 
 function cercaRegoleNuove() {
