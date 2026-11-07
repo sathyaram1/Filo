@@ -3719,6 +3719,7 @@
       const progress = leggibile ? MR.workProgress(fb) : null;
       mgWorkState.hidden = !progress;
       mgWorkState.innerHTML = progress ? workStateHtml(progress, fb) : '';
+      if (progress) aggiungiDichiara(fb);
     }
 
     renderThread(fb);
