@@ -183,7 +183,7 @@ test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui prefer
   ]);
   await chiedi(page, 'metti le cuffie fra i preferiti');
   await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti), { timeout: 20_000 }).toEqual(['00:11:22:33:44:55']);
-  await (await rigaDi('preferiti')).click({ button: 'right' });
+  await (await rigaDi('Fra i preferiti')).click({ button: 'right' });
   const voci = await etichette(page);
   expect(voci).toContain('Apri il riquadro di sistema');
   expect(voci.filter((v) => /preferiti/i.test(v) && /^Annulla · /.test(v))).toEqual([]);
