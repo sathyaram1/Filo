@@ -266,7 +266,7 @@ test('prova vera a parti: la parte veloce trova il test rotto del ramo, la riga 
     });
     assert.equal(finale.codice, 1, finale.uscita);
     assert.equal(finale.campo.esito, 'rosso_sulla_fusione');
-    assert.deepEqual(finale.campo.rossi, ['tests/unit/nuovo.test.mjs › il valore è uno', 'tests/unit/nuovo.test.mjs › il valore è uno [Windows]']);
+    assert.deepEqual(finale.campo.rossi, ['tests/unit/nuovo.test.mjs › il valore è uno'], 'rosso anche su Linux: non è «solo di Windows»');
     assert.deepEqual({ ramo: finale.campo.ramo, main: finale.campo.main }, { ramo, main: m1 });
 
     const senzaWindows = azione(r, ramo, m1, {
