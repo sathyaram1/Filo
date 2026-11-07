@@ -14,7 +14,7 @@
   ]);
   const LIVELLO_PREDEFINITO = 'default';
   // Comune a ogni livello: la riga che le superfici mostrano sotto la scelta, scritta qui una volta sola.
-  const FRASE_COSTO_4 = 'A ogni livello, per togliere un freno che hai messo, cambiare una chiave di un servizio o cancellare per sempre vuole la parola «conferma». Dopo aver letto cose scritte da altri non lo fa: si fa a mano, o in una conversazione nuova.';
+  const FRASE_COSTO_4 = 'A ogni livello, per togliere un freno che hai messo, cambiare una chiave di un servizio o cancellare per sempre vuole la parola «conferma». Dopo aver letto cose scritte da altri non lo fa: lo fai tu a mano, dove sta la voce.';
 
   // Il guardiano dei registri e quello di uscita non esistono ancora (#536): finché mancano, yolo non si sceglie
   // e ogni «sì» da costo 2 in su chiede invece di partire. Quando arrivano diventano veri qui, e solo qui: allora
