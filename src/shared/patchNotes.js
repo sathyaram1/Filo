@@ -12,6 +12,10 @@
       version: '0.2.270', date: '2026-11-07',
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
+        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
+        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
+        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
+        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {
@@ -31,10 +35,6 @@
         { testo: 'Il titolo che l\'Editor dà da solo a un documento cambia quando cambi l\'argomento del testo. Un titolo che hai scritto tu resta com\'è, e un documento non prende più il titolo di quello aperto prima.', segnalazione: 1570 },
         { testo: 'Nel cestino dell\'Editor, dopo il primo clic su «Elimina definitivamente» il tasto non si restringe più: il secondo clic elimina invece di ripristinare il documento.', segnalazione: 256 },
         'La protezione fingerprinting vale anche nei riquadri che un sito crea dentro la sua pagina e in quelli dello stesso sito. Passare da un riquadro non basta più per riconoscere il tuo browser.',
-        { testo: 'Nel riquadro «Invia feedback» il pulsante Allega mostra anche le tabelle .tsv. Prima le vedevi solo passando a «Tutti i file».', segnalazione: 1337 },
-        { testo: 'Ai feedback si allegano anche i file di log e .yaml su Linux e i .csv su Windows con Excel installato: prima Filo li mostrava fra quelli da scegliere e poi li rifiutava.', segnalazione: 1337 },
-        { testo: 'Se una segnalazione rimasta in attesa della rete alla fine non può partire, quello che avevi scritto torna nel riquadro dei feedback e l\'avviso ti dice su quale sito. Prima il testo andava perso.', segnalazione: 1337 },
-        { testo: 'Se premi Invia nel riquadro dei feedback appena finito di scrivere, alla riapertura il riquadro è vuoto. Prima a volte ritrovavi il testo già mandato, pronto per partire una seconda volta.', segnalazione: 1337 },
       ],
     },
     {
