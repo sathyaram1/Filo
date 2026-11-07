@@ -729,6 +729,8 @@
   // disco, e un percorso lo leggerebbe il sito.
   const Allegati = global.SN_CONST.ALLEGATI_CHAT;
   let allegati = { immagini: [], riferimenti: [] };
+  let gettoni = null;
+  let togliRilascioScheda = () => {};
   // Un elemento di Filo trascinato in chat (#1331, filo_design): titolo in grassetto, contenuto in hover e per il
   // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js).
   const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
