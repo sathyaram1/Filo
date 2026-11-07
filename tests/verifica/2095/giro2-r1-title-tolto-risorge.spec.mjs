@@ -51,7 +51,7 @@ test('r1 Preferenze: un title tolto dal codice durante il passaggio non torna al
   await expect(fumetto(page)).toHaveText('Spento finché manca la chiave');
   // Come un tasto che si riaccende mentre lo si guarda: il codice toglie la spiegazione.
   await tasto.evaluate((el) => el.removeAttribute('title'));
-  await expect(fumetto(page)).toBeHidden({ timeout: 2_000 });
+  await expect.soft(fumetto(page), 'tolta la spiegazione, il fumetto se ne va').toBeHidden({ timeout: 2_000 });
   await page.mouse.move(2, 2);
   await page.waitForTimeout(300);
   expect(await tasto.evaluate((el) => el.getAttribute('title'))).toBeNull();
