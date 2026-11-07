@@ -279,7 +279,7 @@ si può perdere senza danno e interessa sapere.
 - #1155 (monitoraggio, taccuino, sveglie): assorbito qui.
 - Tetti per priorità, fermo globale dopo un guasto, riserva su A: tolti.
 - Scala delle priorità: `patterns/` e la scala del 03/09 si riscrivono con il
-  § 2; i giudici assegnano 3 o lasciano 1 (la 2 è del manutentore).
+  § 2; i giudici assegnano 3 o lasciano 1.
 
 ## 11. Da costruire
 
