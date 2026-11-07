@@ -236,6 +236,7 @@
       // nostro, e toccarlo vorrebbe dire spegnere il lavoro di qualcun altro.
       if (myRun === runSeq) {
         pageTranslating = false;
+        if (aperturaInSospeso && !quiet) { aperturaInSospeso = false; forseAperta(); }
         // Nessuna traduzione in piedi: niente da continuare, e nessun motivo di
         // tenere una sentinella addosso alla pagina.
         if (!pageHasTranslation) {
