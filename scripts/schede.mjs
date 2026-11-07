@@ -177,9 +177,10 @@ export const TIMBRATA = Symbol('timbrata');
 /**
  * L'indice di `cartella`: { aperti (null se manca), creato (la data scritta dallo script, '' se non timbrato), fidato }.
  * Un indice senza timbro buono (cambiato dopo elenca, o di prima dei timbri) si legge, ma non è fidato.
+ * `leggi(nome)`: il testo da usare al posto del disco (la guardia, mentre lavorano gli agenti).
  */
-export function leggiIndice(cartella) {
-  const o = leggiJson(join(cartella, INDICE));
+export function leggiIndice(cartella, { leggi = null } = {}) {
+  const o = leggi ? daJson(leggi(INDICE)) : leggiJson(join(cartella, INDICE));
   if (Array.isArray(o)) return { aperti: o, creato: '', fidato: false };
   if (!o || typeof o !== 'object' || !Array.isArray(o.aperti)) return { aperti: null, creato: '', fidato: false };
   const fidato = timbroBuono(o, chiaveTimbri(cartella));
