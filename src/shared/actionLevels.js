@@ -895,7 +895,7 @@
       // quaderno, da dove si rimettono: costo 1 (decisione dell'owner, #872). Il «per sempre» butta il testo: costo 4.
       costo: (a) => (a && a.per_sempre === true ? 4 : 1),
       campo: null,
-      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { verbi: VERBI_CANCELLA, oggetti: ['per sempre', 'definitivo', 'definitiva', 'definitivamente', 'del tutto'] }),
+      dove: (a) => (a && a.per_sempre === true ? 'Senza «per sempre» la riga si nasconde, e dal quaderno delle memorie (filo://quaderno/quaderno.html) si cancella per sempre a mano.' : ''),
       describe: (a) => {
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
