@@ -765,7 +765,7 @@
     root.innerHTML = `
       <div class="sn-popup-header">
         <span class="sn-popup-title"></span>
-        <button class="sn-popup-close" type="button" aria-label="${I18n.t('popup_close')}">×</button>
+        <button class="sn-popup-close" type="button" aria-label="${I18n.t('popup_close')}" title="${I18n.t('popup_close')}">×</button>
       </div>
       <div class="sn-popup-body"></div>
       <div class="sn-popup-footer">
