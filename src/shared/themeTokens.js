@@ -590,6 +590,7 @@
     validate,
     normalize,
     errorMessage,
+    durataMs,
     motionFactor,
     motionMs,
     scrollBehavior,
