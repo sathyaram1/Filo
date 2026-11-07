@@ -285,7 +285,7 @@
       <div class="sn-sidebar-allegati" hidden></div>
       <form class="sn-sidebar-input" autocomplete="off">
         <textarea rows="1" placeholder="${appDellaPagina()?.segnaposto || 'Dimmi cosa vuoi fare sulla pagina…'}"></textarea>
-        <button type="submit">↵</button>
+        <button type="submit" aria-label="${I18n.t('popup_send')}" title="${I18n.t('popup_send')}">↵</button>
       </form>
     `;
     document.documentElement.appendChild(root);
