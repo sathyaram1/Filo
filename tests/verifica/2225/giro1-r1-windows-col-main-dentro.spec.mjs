@@ -25,7 +25,8 @@ function repoFinto() {
   writeFileSync(join(lavoro, 'tests', 'unit', 'base.test.mjs'), "import { test } from 'node:test';\ntest('base', () => {});\n", 'utf8');
   mkdirSync(join(lavoro, 'node_modules'));
   const git = (args) => String(execFileSync('git', args, { cwd: lavoro, encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] })).trim();
-  for (const a of [['init', '-q', '--initial-branch=main'], ['config', 'user.email', 't@t'], ['config', 'user.name', 't'], ['add', '-A'], ['commit', '-qm', 'base']]) git(a);
+  for (const a of [['init', '-q', '--initial-branch=main'], ['config', 'user.email', 't@t'], ['config', 'user.name', 't'], ['add', '-A'], ['commit', '-qm', 'base'],
+    ['remote', 'add', 'origin', origin], ['push', '-q', 'origin', 'main']]) git(a);
   return { casa, lavoro, git };
 }
 
