@@ -237,3 +237,4 @@ function nascondiPubblicita({ ipcRenderer, webFrame, href, gate = '', risposta =
 
 module.exports = nascondiPubblicita;
 module.exports.chiudiBloccati = chiudiBloccati;
+module.exports.attributoDelBlocco = attributoDelBlocco;
