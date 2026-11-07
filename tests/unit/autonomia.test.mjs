@@ -850,3 +850,19 @@ test('sentinella: ogni superficie che fa agire Filo chiede la risposta al modulo
   assert.ok(chiamata > 0 && chat.lastIndexOf('lezioniAutomaticheConsentite(', chiamata) > 0, 'le lezioni automatiche chiedono al modulo');
   assert.match(h, /async function lezioniAutomaticheConsentite[\s\S]*?decisioneAutonomia\(/);
 });
+
+test('#1840: un comando verso il computer stesso, in ogni grafia, resta sul computer come un link', () => {
+  const N = globalThis.SN_URL_NAV;
+  for (const host of ['localhost', '127.0.0.1', '[::1]', '::ffff:127.0.0.1', '[::ffff:7f00:1]', '0.0.0.0']) {
+    assert.equal(N.questoComputer(host), true, host);
+    assert.equal(N.isLocalHost(host), true, `${host}: i link dicono lo stesso`);
+  }
+  for (const host of ['example.com', '192.168.1.5', '::ffff:8.8.8.8', '127.0.0.1.evil.example']) assert.equal(N.questoComputer(host), false, host);
+  for (const url of ['http://[::ffff:127.0.0.1]:8080/x', 'http://127.0.0.1:8080/x', 'http://localhost:8080/x']) {
+    const cmd = `curl -u admin:Sup3rS3gretaPw ${url}`;
+    const ing = AL.ingressi({ type: 'ESEGUI_COMANDO', comando: cmd }, { richiesta: cmd });
+    assert.equal(A.decideDettaglio({ ...ing, livello: 'default', stato: 'pulito' }).risposta, 'chiede', url);
+  }
+  const reg = readFileSync(join(ROOT, 'src', 'shared', 'actionLevels.js'), 'utf8');
+  assert.doesNotMatch(reg, /h === '::1'|\^127/, 'il registro non tiene una sua copia degli indirizzi del computer');
+});
