@@ -91,16 +91,28 @@ function guarda({ window: w, segnala, partenzaMs = PARTENZA_MS, ora = () => Date
   doc.addEventListener('ended', allaFine, true);
 }
 
-/** Dal preload: regole dal main, eseguite nel mondo della pagina, e la guardia se ce n'erano. */
+/**
+ * Dal preload: regole dal main, eseguite nel mondo della pagina, e la guardia se ce n'erano. Senza regole (scheda
+ * tornata al solo «Salta», regole non ancora scaricate, interruttore spento) le richiede quando il main dice che ce ne
+ * sono di nuove: YouTube passa al video dopo senza ricaricare la pagina.
+ */
 function avvia({ ipcRenderer, webFrame, window: w, href }) {
   if (!R.hostYouTube(R.hostDi(href))) return false;
-  let regole = [];
-  try { regole = ipcRenderer.sendSync('filo:youtube-regole', href) || []; } catch (_) { regole = []; }
-  const src = sorgente(regole);
-  if (!src) return false;
-  webFrame.executeJavaScript(src, false).catch(() => {});
-  guarda({ window: w, segnala: (motivo) => { try { ipcRenderer.send('filo:youtube-rotto', motivo); } catch (_) {} } });
-  return true;
+  const prova = () => {
+    let qui = href;
+    try { qui = (w.location && w.location.href) || href; } catch (_) {}
+    let regole = [];
+    try { regole = ipcRenderer.sendSync(CANALE_REGOLE, qui) || []; } catch (_) { regole = []; }
+    const src = sorgente(regole);
+    if (!src) return false;
+    webFrame.executeJavaScript(src, false).catch(() => {});
+    guarda({ window: w, segnala: (motivo) => { try { ipcRenderer.send('filo:youtube-rotto', motivo); } catch (_) {} } });
+    return true;
+  };
+  if (prova()) return true;
+  const pronte = () => { if (prova()) ipcRenderer.removeListener(CANALE_PRONTE, pronte); };
+  try { ipcRenderer.on(CANALE_PRONTE, pronte); } catch (_) {}
+  return false;
 }
 
-module.exports = { avvia, guarda, AVVISO, PARTENZA_MS, FINE_ENTRO_MS };
+module.exports = { avvia, guarda, AVVISO, PARTENZA_MS, FINE_ENTRO_MS, CANALE_PRONTE };
