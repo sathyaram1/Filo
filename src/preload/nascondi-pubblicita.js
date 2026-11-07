@@ -209,7 +209,9 @@ function nascondiPubblicita({ ipcRenderer, webFrame, href, gate = '', risposta =
 
   const accendi = () => {
     let cfg = null;
-    try { cfg = ipcRenderer.sendSync('filo:adblock-css', (window.location && window.location.href) || href, GATE); } catch (_) {}
+    if (primaRisposta) { cfg = primaRisposta; primaRisposta = null; } else {
+      try { cfg = ipcRenderer.sendSync('filo:adblock-css', (window.location && window.location.href) || href, GATE); } catch (_) {}
+    }
     if (!cfg || typeof cfg !== 'object' || !cfg.on) return;
     attivo = true;
     generiche = !!cfg.tokens;
