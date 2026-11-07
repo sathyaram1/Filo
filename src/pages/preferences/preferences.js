@@ -1472,30 +1472,43 @@
     const box = $('menuDelSitoSiti');
     if (!box) return;
     sitiMenuSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
-    box.textContent = '';
     const tasto = $('menuDelSitoTasto');
     if (tasto) tasto.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Shift') : 'Shift';
-    if (!sitiMenuSalvati.length) {
+    righeConCrocetta(box, sitiMenuSalvati, {
+      vuoto: 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.',
+      chiave: 'sito',
+      testo: (sito) => (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito,
+      titolo: 'Torna al menu di Filo',
+      aria: (t) => `Su ${t} torna al menu di Filo`,
+      togli: (sito) => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)),
+    });
+  }
+
+  // Un elenco salvato che qui si vede tutto e si toglie voce per voce con la crocetta.
+  function righeConCrocetta(box, voci, o) {
+    box.textContent = '';
+    if (!voci.length) {
       const p = document.createElement('p');
       p.className = 'sn-muted';
-      p.textContent = 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.';
+      p.textContent = o.vuoto;
       box.appendChild(p);
+      return;
     }
-    for (const sito of sitiMenuSalvati) {
+    for (const v of voci) {
       const row = document.createElement('div');
       row.className = 'mem-riga';
-      row.dataset.sito = sito;
+      row.dataset[o.chiave] = v;
       const t = document.createElement('span');
       t.className = 'mem-testo';
-      t.textContent = (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito;
+      t.textContent = o.testo(v);
       row.appendChild(t);
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'mem-via';
       b.textContent = '×';
-      b.title = 'Torna al menu di Filo';
-      b.setAttribute('aria-label', `Su ${t.textContent} torna al menu di Filo`);
-      b.addEventListener('click', () => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)));
+      if (o.titolo) b.title = o.titolo;
+      b.setAttribute('aria-label', o.aria(t.textContent));
+      b.addEventListener('click', () => o.togli(v));
       row.appendChild(b);
       box.appendChild(row);
     }
