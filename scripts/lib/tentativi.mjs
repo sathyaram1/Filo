@@ -4,6 +4,11 @@
 
 const TENTATIVO = /^(?:origin\/)?worker\/([A-Za-z0-9._-]+)-(\d{8}T\d{6}Z)$/;
 
+/** L'id come lo porta il nome del ramo: chi riconosce un ramo dal suo id (fusioni, rami in corso) usa questa forma. */
+export function idNelRamo(id) {
+  return String(id || '').replace(/[^A-Za-z0-9._-]/g, '');
+}
+
 /** `worker/<id>-<stampo>`, anche con `origin/` davanti → `{ id, stampo }`, se no null. Lo stampo ordina come stringa. */
 export function leggiTentativo(ramo) {
   const m = TENTATIVO.exec(String(ramo || '').trim());

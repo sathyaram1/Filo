@@ -423,6 +423,43 @@ module.exports = function register(on, ctx) {
     });
   }
 
+  // Le unite che la frase del pacchetto `id` raggiunge: regola in SN_FB_ATTESE.uniteDellaFrase. Un'unita non scritta
+  // si dice col numero, il salvataggio del pacchetto resta buono. → null se `id` non unisce niente.
+  async function fraseAlleUnite(id, frase, idToken) {
+    const A = globalThis.SN_FB_ATTESE;
+    const FB = globalThis.SN_FEEDBACK;
+    const S = globalThis.SN_FB_STATUS;
+    const aggiornate = [];
+    const scritte = [];
+    const fallite = [];
+    try {
+      const [p] = await FB.getMany([id], { idToken, fields: ['unisce', 'resolvedInVersion'], timeoutMs: 20000 });
+      if (!p || !A.uniteDelCampo(p.unisce).length) return null;
+      const priv = await getPrivateKey();
+      const trovate = await A.uniteDellaFrase({ id, unisce: p.unisce, resolvedInVersion: p.resolvedInVersion }, async (ids) => {
+        const righe = await FB.getMany(ids, { idToken, fields: ['status', 'statusReason', 'resolvedInVersion', 'unisce', A.CAMPO], timeoutMs: 20000 });
+        return Promise.all(righe.map(async (r) => {
+          const d = await decryptFeedbackObject(r, priv);
+          return { ...d, status: S && !S.isCanonical(d.status) ? '' : d.status };
+        }));
+      });
+      for (const u of trovate.illeggibili) fallite.push({ num: u.num, motivo: 'stato non decifrabile' });
+      for (const u of trovate.unite) {
+        try {
+          // eslint-disable-next-line no-await-in-loop
+          await FB.updateStatus(u.id, { userNote: frase }, { idToken });
+          aggiornate.push(u.num);
+          scritte.push(u.id);
+        } catch (e) {
+          fallite.push({ num: u.num, motivo: String((e && e.message) || e).slice(0, 160) });
+        }
+      }
+    } catch (e) {
+      fallite.push({ num: '', motivo: `lettura delle unite fallita: ${String((e && e.message) || e).slice(0, 160)}` });
+    }
+    return { aggiornate, scritte, fallite };
+  }
+
   // Triage admin di un feedback: solo admin loggati, con Firebase ID token
   // come Bearer (il token non lascia mai il main). La garanzia forte è nelle
   // Firestore rules; questo è il gate applicativo + il trasporto autenticato.
@@ -477,10 +514,16 @@ module.exports = function register(on, ctx) {
       } else {
         await FB.updateStatus(id, campi, { idToken });
       }
+      // La frase di un pacchetto arriva anche alle unite che ha chiuso, come da riga di comando.
+      const unite = typeof userNote === 'string' && userNote.trim() ? await fraseAlleUnite(id, userNote.trim(), idToken) : null;
       // Il triage cambia la bacheca: la vista si rifà subito, non al prossimo caricamento.
       // Prima la scheda di QUESTO id: il giro generale guarda solo i più recenti per data d'invio.
       await syncOneCard(id, idToken);
+      for (const u of (unite && unite.scritte) || []) await syncOneCard(u, idToken);
       scheduleViewSync({ delayMs: 1500, force: true });
+      if (unite && (unite.aggiornate.length || unite.fallite.length)) {
+        return { ok: true, ...(waitsFor ? { waitsFor } : {}), unite: { aggiornate: unite.aggiornate, fallite: unite.fallite } };
+      }
       if (waitsFor) return { ok: true, waitsFor };
       // La pagina mostra subito chi ha messo il segno «solo in locale»: glielo dice il main, l'unico a saperlo.
       return localOnly ? { ok: true, by: localOnly.by, at: localOnly.at } : { ok: true };

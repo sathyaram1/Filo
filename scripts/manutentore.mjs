@@ -8,9 +8,10 @@ import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { espandiInclusioni } from './lib/role-text.mjs';
-import { incroci, ramiInCorso } from './lib/su-main.mjs';
+import { cartellaDelServer } from './lib/ramo-server.mjs';
+import { incroci, ramiInCorso, trovaInGit, vociDiFile } from './lib/su-main.mjs';
 import { leggiTentativo } from './lib/tentativi.mjs';
-import { CARTELLA_PREDEFINITA, INDICE, leggiSchede, validaScheda } from './schede.mjs';
+import { CARTELLA_PREDEFINITA, INDICE, TIMBRATA, leggiIndice, leggiSchede, validaScheda } from './schede.mjs';
 import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.mjs';
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
@@ -47,29 +48,10 @@ export function avvisoScheda(s, f = {}) {
     validaScheda(s, num).length ? 'SCHEDA NON BUONA, da rifare' : '',
     // L'aggiornamento cambia a ogni modifica del feedback, stato compreso.
     f && f.id && (fonte.id !== f.id || fonte.aggiornato !== f.aggiornato) ? 'SCHEDA VECCHIA, il feedback è cambiato' : '',
-    toglie && !s._riletta ? 'non riletta: non togliere lavoro su questa' : '',
+    // Data, fonte e rilettura valgono solo col timbro dello script (schede.mjs): un file riscritto dopo il giro non ce l'ha.
+    s[TIMBRATA] === false ? 'SCHEDA SENZA IL TIMBRO DELLO SCRIPT (cambiata fuori dal giro, o di prima dei timbri): non fidarti, da rifare' : '',
+    toglie && (!s._riletta || s[TIMBRATA] === false) ? 'non riletta: non togliere lavoro su questa' : '',
   ].filter(Boolean).join(' · ');
-}
-
-/** Una scheda in una riga, con stato, priorità e attese dall'indice. PURA. */
-export function rigaScheda(s, f = {}) {
-  const num = unaRiga(s.numero).replace(/^#/, '');
-  const numeri = (l) => (Array.isArray(l) ? l : []).map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ');
-  const pezzi = [
-    `#${num}`,
-    avvisoScheda(s, f),
-    `[${unaRiga(s.area) || '?'}/${unaRiga(s.tipo) || '?'}]`,
-    unaRiga(f.stato || s.stato) || '?',
-    Number.isInteger(f.priorita) ? `p${f.priorita}` : 'p?',
-    s.urgente ? 'URGENTE' : '',
-    `valido ${unaRiga(s.valido) || '?'}`,
-    s.risolto_su_main ? `risolto? ${unaRiga(s.risolto_su_main).slice(0, 60)}` : '',
-    Array.isArray(s.doppione_di) && s.doppione_di.length ? `doppione di ${s.doppione_di.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
-    f && Array.isArray(f.unisce) && f.unisce.length ? `pacchetto di ${numeri(f.unisce)}` : '',
-    f && Array.isArray(f.attese) && f.attese.length ? `aspetta ${numeri(f.attese)}` : '',
-  ].filter(Boolean).join(' · ');
-  const file = Array.isArray(s.file_probabili) && s.file_probabili.length ? ` | file: ${s.file_probabili.map(unaRiga).join(', ')}` : '';
-  return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
 }
 
 /** I rami dei worker (`worker/<id del feedback>-<ora>`) prendono il numero dall'indice, davanti ai citati. PURA. */
@@ -99,11 +81,45 @@ export function senzaChiusi(rami, indice, fuori = {}) {
   });
 }
 
-/** Un ramo in corso in una riga. PURA. */
+/** Un ramo in corso in una riga; quelli del server col segno davanti. PURA. */
 export function rigaRamo(r) {
   const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
   const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')}${altri})` : '';
-  return `${r.ramo}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.join(', ') || '(nessun file)'}`;
+  return `${r.server ? '[server] ' : ''}${r.ramo}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.join(', ') || '(nessun file)'}`;
+}
+
+/** Il titolo dei rami in corso: se mancano quelli del server lo dice, col perché (`motivoServer`). PURA. */
+export function titoloRami(rami, motivoServer) {
+  if (motivoServer) return [`## Rami in corso dell'app (${rami.length})`, '', `I rami del server non li vedo: ${motivoServer}.`];
+  const delServer = rami.filter((r) => r.server).length;
+  return [`## Rami in corso (${rami.length}: ${rami.length - delServer} dell'app, ${delServer} del server)`];
+}
+
+/**
+ * Cosa dice `incroci` per una scheda: i rami che toccano i suoi file probabili, con tutti i loro feedback, o che nessuno
+ * li tocca; «non so» quando non si può sapere (nessun file, percorsi fuori dal repo, rami del server non visti). PURA.
+ */
+export function testoIncroci(s, rami, { radice = '', motivoServer = '', trova = null } = {}) {
+  const num = unaRiga(s.numero).replace(/^#/, '');
+  const { voci, storte, ignote } = vociDiFile(s.file_probabili, { radice, trova });
+  const righe = incroci(rami, s.file_probabili, { radice, trova })
+    .map((c) => `${c.server ? '[server] ' : ''}${c.ramo}${c.feedback.length ? ` (${c.feedback.map((n) => `#${n}`).join(', ')})` : ''}: ${c.comuni.join(', ')}`);
+  const dubbi = [];
+  const sono = (l, uno, tanti) => `${l.map(unaRiga).join(', ')} ${l.length === 1 ? uno : tanti}`;
+  if (storte.length) dubbi.push(`${sono(storte, 'non è un percorso del repo', 'non sono percorsi del repo')}`);
+  if (ignote.length) dubbi.push(`${sono(ignote, 'non c\'è', 'non ci sono')} fra i file di git${motivoServer ? ' dell\'app' : ' dell\'app né del server'}`);
+  const delServer = s.area === 'server-filo-security' || voci.some((v) => v.startsWith('filo-security/'));
+  if (motivoServer && delServer) dubbi.push(`i rami del server non li vedo (${motivoServer})`);
+  const rifai = `Rifai la scheda (npm run feedback:schede -- scrivi --solo ${num}) o guarda i rami (npm run manutentore -- rami).`;
+  if (!voci.length) return `Non so se un ramo in corso tocca #${num}: ${storte.length ? dubbi.join('; ') : `la scheda non ha file probabili${dubbi.length ? `; ${dubbi.join('; ')}` : ''}`}. ${rifai}`;
+  const certe = voci.filter((v) => !ignote.includes(v));
+  if (!righe.length && (storte.length || ignote.length)) {
+    return `Non so se un ramo in corso tocca #${num}: ${dubbi.join('; ')}.${certe.length ? ` Di ${certe.join(', ')} nessun ramo in corso.` : ''} ${rifai}`;
+  }
+  if (!righe.length) {
+    return `Nessun ramo in corso ${motivoServer ? 'dell\'app' : 'dell\'app né del server'} tocca i file probabili di #${num} (${voci.join(', ')})${dubbi.length ? `; ma ${dubbi.join('; ')}` : ''}.`;
+  }
+  return [...righe, ...(dubbi.length ? [`Non so il resto: ${dubbi.join('; ')}.`] : [])].join('\n');
 }
 
 /** Cosa l'elenco dei rami lascia fuori (ramiInCorso, `fuori`), in una riga; '' se niente. PURA. */
@@ -117,17 +133,83 @@ export function rigaFuori(fuori, giorni) {
   return pezzi.length ? `Non elencati: ${pezzi.join('; ')}.` : '';
 }
 
-/** L'ordine con lo stato di ogni numero secondo l'indice: chi non è fra gli aperti il server lo salta. PURA. */
-export function rigaOrdine(numeri, indice) {
+// Gli stati in cui un feedback aspetta l'owner: nessuna routine lo prende, e da sé non si muove.
+const ASPETTANO_L_OWNER = ['design', 'aligned', 'unlabeled'];
+
+/**
+ * I numeri dell'ordine che non possono partire, con la regola del server (un numero conta se ha un lavoro che una
+ * routine prende adesso o che si sbloccherà da sé): in uno stato che aspetta l'owner (`stato`); in attesa di un
+ * feedback chiuso senza fusione o cancellato, cioè fuori dall'indice (`chiusi`, il server lo sposta in design); in
+ * attesa di uno aperto che nell'ordine non c'è (`attesi`; anche l'unita di un pacchetto nato prima del 30/10, che
+ * aspetta il pacchetto). Nell'ordine occuperebbero un posto senza mai partire. Senza indice non si sa. PURA.
+ * → [{ num, attesi, chiusi, pacchetto, stato? }]
+ */
+export function bloccatiNellOrdine(numeri, indice) {
+  const perNum = new Map((indice || []).map((f) => [String(f.num), f]));
+  const nellOrdine = new Set((numeri || []).map(String));
+  const out = [];
+  for (const n of (numeri || []).map(String)) {
+    const f = perNum.get(n);
+    if (!f) continue;
+    if (ASPETTANO_L_OWNER.includes(f.stato)) { out.push({ num: n, attesi: [], chiusi: [], pacchetto: '', stato: f.stato }); continue; }
+    const attese = (f.attese || []).map(String);
+    const chiusi = attese.filter((w) => !perNum.has(w));
+    const attesi = attese.filter((w) => perNum.has(w) && !nellOrdine.has(w));
+    if (!attesi.length && !chiusi.length) continue;
+    out.push({ num: n, attesi, chiusi, pacchetto: attesi.find((w) => (perNum.get(w).unisce || []).map(String).includes(n)) || '' });
+  }
+  return out;
+}
+
+/** Un numero che non può partire, in una riga, col rimedio. PURA. */
+export function rigaBloccato(b) {
+  if (b.stato) return `#${b.num} è in ${b.stato}: aspetta l'owner, nessuna routine lo prende; toglilo dall'ordine o decidi prima`;
+  const elenco = (l) => l.map((w) => `#${w}`).join(', ');
+  const pezzi = [];
+  if (b.chiusi && b.chiusi.length) {
+    const uno = b.chiusi.length === 1;
+    pezzi.push(`#${b.num} aspetta ${elenco(b.chiusi)}, chius${uno ? 'o' : 'i'} senza fusione: non si scioglie, e il server lo sposta in design; togli l'attesa o togli #${b.num}`);
+  }
+  if (b.pacchetto) pezzi.push(`#${b.num} è unita nel pacchetto #${b.pacchetto}, che non è nell'ordine: al suo posto metti #${b.pacchetto}`);
+  else if (b.attesi && b.attesi.length) {
+    const uno = b.attesi.length === 1;
+    pezzi.push(`#${b.num} aspetta ${elenco(b.attesi)}, ancora apert${uno ? 'o' : 'i'} e fuori dall'ordine: metti anche ${uno ? 'lui' : 'loro'}, o togli #${b.num}`);
+  }
+  return pezzi.join('; ');
+}
+
+/** Perché un numero dell'ordine non parte, in poche parole, per la riga dell'ordine. PURA. */
+function percheFermo(b) {
+  if (b.stato) return 'aspetta l\'owner';
+  const chiusi = (b.chiusi || []).length;
+  const nota = chiusi ? ` (${chiusi === 1 ? 'chiuso' : 'chiusi'} senza fusione: non si scioglie)` : '';
+  return `aspetta ${[...(b.attesi || []), ...(b.chiusi || [])].map((w) => `#${w}`).join(', ')}${nota}`;
+}
+
+/**
+ * L'ordine con lo stato di ogni numero secondo l'indice: chi non è fra gli aperti il server lo salta, chi aspetta fuori
+ * non parte. `vivi`: i numeri che il server muove adesso (la sua regola dell'ordine, select.numeriCheSiMuovono), null se
+ * non li ha detti: decidono loro chi è pronto, e un ordine senza nessuno vale come nessun ordine. PURA.
+ */
+export function rigaOrdine(numeri, indice, { vivi = null } = {}) {
   if (!numeri.length) return 'Nessun ordine: il pacemaker accende per priorità, come ripiego.';
   const perNum = new Map((indice || []).map((f) => [String(f.num), f]));
   const conIndice = (indice || []).length > 0;
-  const voce = (n) => (!conIndice ? `#${n}` : perNum.has(n) ? `#${n} (${perNum.get(n).stato || 'aperto'})` : `#${n} (non fra gli aperti)`);
-  const vivi = conIndice ? numeri.filter((n) => perNum.has(n)).length : numeri.length;
-  const coda = !conIndice ? ' Senza l\'indice delle schede non so quali sono ancora aperti.'
-    : vivi ? (numeri.length - vivi ? ` Fuori dagli aperti: ${numeri.length - vivi}, il server li salta.` : '')
+  const bloccati = new Map(bloccatiNellOrdine(numeri, indice).map((b) => [b.num, b]));
+  const dalServer = Array.isArray(vivi) ? new Set(vivi.map((n) => String(n).replace(/^#/, ''))) : null;
+  const fermoDalServer = (n) => (dalServer && !dalServer.has(n) && !bloccati.has(n) ? ', il server non lo muove adesso' : '');
+  const voce = (n) => (!conIndice ? `#${n}${fermoDalServer(n) ? ' (il server non lo muove adesso)' : ''}`
+    : !perNum.has(n) ? `#${n} (non fra gli aperti)`
+      : `#${n} (${perNum.get(n).stato || 'aperto'}${bloccati.has(n) ? `, non parte: ${percheFermo(bloccati.get(n))}` : fermoDalServer(n)})`);
+  if (dalServer && !dalServer.size) {
+    return `Ordine scritto (${numeri.length}): ${numeri.map(voce).join(', ')}. NON VALE: il server non muove adesso nessuno di questi numeri, quindi accende per priorità come senza ordine. Togli i numeri fermi o metti quelli che aspettano.${bloccati.size ? ` ${[...bloccati.values()].map(rigaBloccato).join('; ')}.` : ''}`;
+  }
+  const aperti = conIndice ? numeri.filter((n) => perNum.has(n)).length : numeri.length;
+  const coda = !conIndice ? ' Senza l\'indice delle schede non so quali sono ancora aperti né chi aspetta chi.'
+    : aperti ? (numeri.length - aperti ? ` Fuori dagli aperti: ${numeri.length - aperti}, il server li salta.` : '')
     : ' Nessuno è fra gli aperti: il server fa come senza ordine, per priorità.';
-  return `Ordine da accendere (${numeri.length}): ${numeri.map(voce).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti; un ordine senza feedback aperti vale come nessun ordine.${coda}`.trim();
+  const fermi = bloccati.size ? ` Non possono partire ${bloccati.size}: ${[...bloccati.values()].map(rigaBloccato).join('; ')}.` : '';
+  return `Ordine da accendere (${numeri.length}): ${numeri.map(voce).join(', ')}. Il pacemaker accende una sessione per ciascuno che ha lavoro, una priorità 3 fuori ordine davanti; un ordine senza feedback aperti vale come nessun ordine.${coda}${fermi}`.trim();
 }
 
 const STATI_CHE_FERMANO = Object.freeze({ aperta: 'aspetta l\'owner', in_smistamento: 'in smistamento' });
@@ -154,31 +236,30 @@ export function righeDomandeFerme(domande, { indice = [], ordine = [], quando = 
   return voci.sort((a, b) => a.prima - b.prima || a.num - b.num).map((v) => v.riga);
 }
 
-/** Il contesto intero, in testo. PURA rispetto ai suoi ingressi. `ferme`: le righe di righeDomandeFerme, o il motivo per cui mancano. */
-export function testoContesto({ ruolo, schede, indice, rami, fuori = null, giorni = 30, indiceDel = '', ferme = null }) {
-  const numero = (s) => String(s.numero).replace(/^#/, '');
-  const perNum = new Map((indice || []).map((f) => [f.num, f]));
-  // Con l'indice valgono solo le schede dei feedback ancora aperti: le altre sono di feedback chiusi da allora.
-  const aperte = indice && indice.length ? schede.filter((s) => perNum.has(numero(s))) : schede;
-  const ordinate = [...aperte].sort((a, b) => Number(numero(a)) - Number(numero(b)));
-  const senza = (indice || []).filter((f) => !schede.some((s) => numero(s) === f.num));
-  const chiuse = schede.length - aperte.length;
-  return [
-    ruolo.trim(), '',
-    `## Schede (${aperte.length})`, '',
-    ...(indiceDel ? [`Aperti secondo l'indice del ${indiceDel}: un feedback nato dopo non c'è (npm run feedback:schede -- elenca).`, ''] : []),
-    ...ordinate.map((s) => rigaScheda(s, perNum.get(numero(s)))),
-    ...(senza.length ? ['', `Senza scheda (${senza.length}): ${senza.map((f) => `#${f.num}`).join(', ')}. Si scrivono con npm run feedback:schede -- scrivi.`] : []),
-    ...(chiuse ? ['', `Fuori: ${chiuse} schede di feedback che l'indice non ha più fra gli aperti.`] : []),
-    ...(ferme ? ['', `## Domande che fermano un feedback (${Array.isArray(ferme) ? ferme.length : '?'})`, '',
-      ...(Array.isArray(ferme) ? (ferme.length ? ferme : ['Nessuna: nessun feedback aperto aspetta una domanda.']) : [String(ferme)]),
-      'Le smista il compito «Gestisci la domanda»: tu non le rispondi, ma un feedback fermo non si accende.'] : []),
-    '', `## Rami in corso (${rami.length})`, '',
-    ...rami.map(rigaRamo),
-    ...(rigaFuori(fuori, giorni) ? ['', rigaFuori(fuori, giorni)] : []),
-    '', '## Spesa', '',
-    'Questo strumento non la sa: chiedi all\'owner il consumo della settimana dell\'account (Gestione → Automazioni), non la somma dei biglietti.',
-  ].join('\n');
+// Il contesto si legge intero a ogni turno del manutentore: oltre questa misura conviene dividerlo (la spec ne stima
+// 240k per 791 schede). Il fattore caratteri→token è quello di tutto Filo (schede.mjs carica filoContesto).
+export const TOKEN_DA_DIVIDERE = 200_000;
+const tokenDi = (caratteri) => Math.ceil(caratteri / globalThis.SN_FILO_CONTESTO.CARATTERI_PER_TOKEN);
+
+/**
+ * Le schede di questo giro: senza filtro tutte; con `priorita` le urgenti e quelle da quella priorità in su, con `turno`
+ * ({ i, n }) l'i-esima parte delle altre (la spec: «solo le priorità alte e il resto a turni»). PURA. → { scelte, nota }
+ */
+export function schedeDelGiro(schede, perNum, { priorita = null, turno = null } = {}) {
+  if (priorita === null && !turno) return { scelte: schede, nota: '' };
+  const num = (s) => String(s.numero).replace(/^#/, '');
+  const alta = (s) => s.urgente === true || (priorita !== null && Number.isInteger(perNum.get(num(s))?.priorita) && perNum.get(num(s)).priorita >= priorita);
+  const alte = schede.filter(alta);
+  const resto = schede.filter((s) => !alta(s));
+  const passo = turno ? Math.ceil(resto.length / turno.n) : 0;
+  const delTurno = turno ? resto.slice((turno.i - 1) * passo, turno.i * passo) : [];
+  const scelte = [...alte, ...delTurno].sort((a, b) => Number(num(a)) - Number(num(b)));
+  const pezzi = [
+    priorita !== null ? `${alte.length} da priorità ${priorita} in su o urgenti` : alte.length ? `${alte.length} urgenti` : '',
+    turno ? `${delTurno.length} delle altre, turno ${turno.i} di ${turno.n}${delTurno.length ? ` (da #${num(delTurno[0])} a #${num(delTurno[delTurno.length - 1])})` : ''}` : '',
+  ].filter(Boolean);
+  const altriTurni = turno && turno.n > 1 ? ` Gli altri turni: --turno ${Array.from({ length: turno.n }, (_, k) => k + 1).filter((k) => k !== turno.i).map((k) => `${k}/${turno.n}`).join(', ')}.` : '';
+  return { scelte, nota: `Giro ridotto: ${scelte.length} schede su ${schede.length} (${pezzi.join('; ')}); fuori da questo giro ${schede.length - scelte.length}.${altriTurni}` };
 }
 
 /**
@@ -203,7 +284,7 @@ async function domandeFerme(cred, indice, ordine = []) {
   }
 }
 
-const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite'];
+const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite', '--turno'];
 
 /** Gli argomenti senza le opzioni né i loro valori: un `--ticket X` non deve finire in un testo scritto. PURA. */
 export function senzaOpzioni(args) {
@@ -221,6 +302,62 @@ function opzione(argv, nome) {
   const i = argv.findIndex((a) => a === nome || a.startsWith(`${nome}=`));
   if (i < 0) return undefined;
   return argv[i].includes('=') ? argv[i].slice(nome.length + 1) : argv[i + 1];
+}
+
+/** `--priorita 2` e `--turno 1/3` del contesto → { ok, filtro } o { ok: false, motivo }. PURA. */
+export function filtroDaArgomenti(argv) {
+  const p = opzione(argv, '--priorita');
+  const t = opzione(argv, '--turno');
+  const filtro = {};
+  if (p !== undefined) {
+    if (!/^[0-3]$/.test(String(p))) return { ok: false, motivo: `--priorita vuole un numero da 0 a 3, non «${String(p).slice(0, 20)}»` };
+    filtro.priorita = Number(p);
+  }
+  if (t !== undefined) {
+    const m = /^(\d{1,2})\/(\d{1,2})$/.exec(String(t));
+    if (!m || Number(m[1]) < 1 || Number(m[1]) > Number(m[2])) return { ok: false, motivo: `--turno vuole i/n, con i da 1 a n (--turno 1/3), non «${String(t).slice(0, 20)}»` };
+    filtro.turno = { i: Number(m[1]), n: Number(m[2]) };
+  }
+  return { ok: true, filtro };
+}
+
+/**
+ * I rami in corso del server, dal checkout di filo-security accanto al repo, coi file col prefisso «filo-security/»
+ * (come li scrivono le schede). `server`: la sua cartella functions, se non la si cerca. → { rami, fuori, motivo }
+ */
+export function ramiDelServer(root, { giorni = 30, scarica = true, server } = {}) {
+  const funzioni = server === undefined ? cartellaDelServer(root) : server;
+  if (!funzioni) return { rami: [], fuori: {}, motivo: 'manca il checkout di filo-security accanto al repo' };
+  const radice = dirname(funzioni);
+  if (scarica) {
+    try { execFileSync('git', ['-C', radice, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
+      console.error(`AVVISO: git fetch del server non è riuscito (${String(e.message).split('\n')[0]}): i suoi rami sono quelli dell'ultima volta.`);
+    }
+  }
+  try {
+    const fuori = {};
+    const rami = ramiInCorso(radice, { giorni, fuori }).map((r) => ({ ...r, server: true, file: r.file.map((f) => `filo-security/${f}`) }));
+    return { rami, fuori, motivo: '' };
+  } catch (e) {
+    return { rami: [], fuori: {}, motivo: `git non legge il checkout del server (${String((e && e.message) || e).split('\n')[0].slice(0, 160)})` };
+  }
+}
+
+/** `trova` per i file probabili dai file di git dell'app e del checkout del server (trovaInGit); un git che non legge: null. */
+function trovaDelleSchede(root, server) {
+  // I file di main, non della cartella: chi lancia può stare su un ramo qualunque.
+  const git = (dir, args) => execFileSync('git', ['-C', dir, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 64 * 1024 * 1024 });
+  const elenco = (dir) => {
+    let testo;
+    try { testo = git(dir, ['ls-tree', '-r', '--name-only', '--full-tree', 'origin/main']); } catch (_) { testo = git(dir, ['ls-files']); }
+    return testo.split('\n').filter(Boolean);
+  };
+  try {
+    const funzioni = server === undefined ? cartellaDelServer(root) : server;
+    let delServer = null;
+    if (funzioni) { try { delServer = elenco(dirname(funzioni)); } catch (_) { /* senza, i file del server sono «non so» */ } }
+    return trovaInGit(elenco(root), delServer);
+  } catch (_) { return null; }
 }
 
 const NUMERO_RE = /^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/;
@@ -460,7 +597,10 @@ export function rigaSchedaServer(s, locale = null) {
     s.ramo ? `ramo ${unaRiga(s.ramo)}` : '',
   ].filter(Boolean).join(' · ');
   const titolo = s.titolo ? unaRiga(s.titolo) : (s.riservato ? '(riservato)' : '');
-  const loc = locale ? ` [${unaRiga(locale.area) || '?'}/${unaRiga(locale.tipo) || '?'}] ${unaRiga(locale.riassunto)}${
+  // Della scheda locale contano anche il giudizio e quanto fidarsene (avvisoScheda): «non valido» o «doppione» tolgono lavoro.
+  const giudizio = locale ? [avvisoScheda(locale), `valido ${unaRiga(locale.valido) || '?'}`,
+    Array.isArray(locale.doppione_di) && locale.doppione_di.length ? `doppione di ${numeri(locale.doppione_di)}` : ''].filter(Boolean).join(' · ') : '';
+  const loc = locale ? ` [${unaRiga(locale.area) || '?'}/${unaRiga(locale.tipo) || '?'}] ${giudizio}: ${unaRiga(locale.riassunto)}${
     Array.isArray(locale.file_probabili) && locale.file_probabili.length ? ` | file: ${locale.file_probabili.map(unaRiga).join(', ')}` : ''}` : '';
   return `${pezzi}${titolo ? ` — ${titolo}` : ''}${loc}`;
 }
@@ -471,6 +611,15 @@ export function indiceDalServer(schede) {
     num: String(s.num), stato: s.stato || '', priorita: Number.isInteger(s.priorita) ? s.priorita : null,
     unisce: s.unisce || [], attese: s.aspetta || [],
   }));
+}
+
+/**
+ * L'indice del server con le attese dell'indice locale: il server le dà tutte, anche quelle già sciolte da una fusione,
+ * e l'aspettato fuso, che non è più fra gli aperti, passerebbe per chiuso senza fusione. Senza indice locale nessuna. PURA.
+ */
+export function conAtteseLocali(indiceServer, indiceLocale) {
+  const attese = new Map((indiceLocale || []).map((f) => [String(f.num), f.attese || []]));
+  return (indiceServer || []).map((f) => ({ ...f, attese: attese.get(String(f.num)) || [] }));
 }
 
 /** Lo stato del server in poche righe: accensione, ordine, N sotto il freno, account, sveglia, guasto, segnali. PURA. */
@@ -496,26 +645,46 @@ const testoTaccuino = (t) => (t && typeof t.testo === 'string'
   ? [`Versione ${Number(t.versione) || 0} (la passi a «taccuino scrivi --versione» per riscriverlo).`, '', t.testo.trim() || '(vuoto)']
   : [String(t || 'Non letto.')]);
 
-/** Il contesto intero della decisione del mattino e della chat (§ 4, § 9). PURA rispetto ai suoi ingressi. */
-export function testoIntero({ ruolo, stato, taccuino, schede, locali = [], rami = [], fuori = null, giorni = 30, ferme = null, spesa = null }) {
-  const perNum = new Map((locali || []).map((s) => [String(s.numero).replace(/^#/, ''), s]));
+/**
+ * Il contesto intero della decisione del mattino e della chat (§ 4, § 9). PURA rispetto ai suoi ingressi. `motivoServer`:
+ * perché i rami del server mancano ('' = ci sono); `filtro`: { priorita, turno } di schedeDelGiro.
+ */
+export function testoIntero({
+  ruolo, stato, taccuino, schede, locali = [], scartate = [], rami = [], fuori = null, giorni = 30, ferme = null, spesa = null, motivoServer = 'non cercati', filtro = {},
+}) {
+  // Una scheda locale senza il timbro dello script può averla riscritta chiunque: la sua parte non entra.
+  const senzaTimbro = (locali || []).filter((s) => s[TIMBRATA] === false).map((s) => `#${unaRiga(s.numero).replace(/^#/, '')}`);
+  const perNum = new Map((locali || []).filter((s) => s[TIMBRATA] !== false).map((s) => [String(s.numero).replace(/^#/, ''), s]));
   const elenco = [...(schede || [])].sort((a, b) => Number(String(a.num).split('.')[0]) - Number(String(b.num).split('.')[0]));
   const conteggio = [3, 2, 1, 0].map((p) => `${elenco.filter((s) => s.priorita === p).length} a ${p}`).join(', ');
-  return [
+  const giro = schedeDelGiro(elenco.map((s) => ({ ...s, numero: s.num, urgente: (perNum.get(String(s.num)) || {}).urgente === true })),
+    new Map(elenco.map((s) => [String(s.num), { priorita: s.priorita }])), filtro);
+  const testa = [
     String(ruolo || '').trim(), '',
     '## Stato', '', ...righeStato(stato), '',
     '## Taccuino', '', ...testoTaccuino(taccuino), '',
-    `## Schede (${elenco.length}: ${conteggio})`, '',
-    ...elenco.map((s) => rigaSchedaServer(s, perNum.get(String(s.num)) || null)),
+    `## Schede (${giro.nota ? `${giro.scelte.length} su ` : ''}${elenco.length}: ${conteggio})`, '',
+  ];
+  const corpo = [
+    ...(giro.nota ? [giro.nota, ''] : []),
+    ...giro.scelte.map((s) => rigaSchedaServer(s, perNum.get(String(s.num)) || null)),
+    ...(!(locali || []).length ? ['', 'SCHEDE LOCALI MANCANTI: area, riassunto, file, giudizio e doppioni non ci sono, solo quello che dice il server (npm run feedback:schede -- elenca).'] : []),
+    ...(senzaTimbro.length ? ['', `SCHEDE SENZA IL TIMBRO DELLO SCRIPT (${senzaTimbro.length}): ${senzaTimbro.join(', ')}; area, riassunto, file e giudizio non mostrati. Si rifanno con npm run feedback:schede -- scrivi --solo N.`] : []),
+    ...(scartate.length ? ['', `Scartate (${scartate.length}): ${scartate.map(unaRiga).join(', ')}; il numero dentro non è quello del nome del file, o non si leggono. Non valgono per nessun feedback: si rifanno con npm run feedback:schede -- scrivi.`] : []),
     ...(ferme ? ['', `## Domande che fermano un feedback (${Array.isArray(ferme) ? ferme.length : '?'})`, '',
-      ...(Array.isArray(ferme) ? (ferme.length ? ferme : ['Nessuna: nessun feedback aperto aspetta una domanda.']) : [String(ferme)])] : []),
-    '', `## Rami in corso (${rami.length})`, '',
+      ...(Array.isArray(ferme) ? (ferme.length ? ferme : ['Nessuna: nessun feedback aperto aspetta una domanda.']) : [String(ferme)]),
+      'Le smista il compito «Gestisci la domanda»: tu non le rispondi, ma un feedback fermo non si accende.'] : []),
+    '', ...titoloRami(rami, motivoServer), '',
     ...rami.map(rigaRamo),
     ...(rigaFuori(fuori, giorni) ? ['', rigaFuori(fuori, giorni)] : []),
     '', '## Spesa della settimana', '', ...righeSpesa(spesa),
     '', '## Registro delle decisioni', '',
     'I principi delle domande chiuse: npm run manutentore -- registro <poche parole>, prima di chiedere all\'owner.',
-  ].join('\n');
+  ];
+  const caratteri = [...testa, ...corpo].join('\n').length;
+  const grosso = tokenDi(caratteri) > TOKEN_DA_DIVIDERE
+    ? ` Oltre ${TOKEN_DA_DIVIDERE.toLocaleString('it-IT')} token conviene dividerlo: --priorita 2 (solo le priorità alte e le urgenti) e --turno 1/3 (il resto a turni).` : '';
+  return [...testa, `Misura del contesto: ${caratteri.toLocaleString('it-IT')} caratteri, circa ${tokenDi(caratteri).toLocaleString('it-IT')} token.${grosso}`, '', ...corpo].join('\n');
 }
 
 /** La spesa della settimana per account, dal server; il motivo in parole se non si legge. PURA. */
@@ -870,7 +1039,7 @@ export const SOTTOCOMANDI = Object.freeze([
 ]);
 
 const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
-  contesto | sveglia | stato | schede | leggi <N>
+  contesto [--priorita 2] [--turno 1/3] | sveglia | stato | schede | leggi <N>
   rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
@@ -895,7 +1064,7 @@ async function leggiStdin() {
 
 const stampaJson = (o) => console.log(JSON.stringify(o, null, 2));
 
-export async function main(argv, { root = ROOT, env = process.env } = {}) {
+export async function main(argv, { root = ROOT, env = process.env, server } = {}) {
   const [cmd, arg] = argv;
   if (!SOTTOCOMANDI.includes(cmd) || (['incroci', 'leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
     console.error(USO);
@@ -904,33 +1073,57 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
   const g = opzione(argv, '--giorni');
   const giorni = g !== undefined && Number.isFinite(Number(g)) && Number(g) >= 0 ? Number(g) : 30;
-  const rami = () => {
-    if (!argv.includes('--senza-fetch')) {
+  // I rami vivi dell'app e del server, coi numeri dall'indice; `motivoServer` dice perché quelli del server mancano.
+  const rami = (indice) => {
+    const scarica = !argv.includes('--senza-fetch');
+    if (scarica) {
       try { execFileSync('git', ['-C', root, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
         console.error(`AVVISO: git fetch non è riuscito (${String(e.message).split('\n')[0]}): i rami sono quelli dell'ultima volta.`);
       }
     }
-    return { fuori: {} };
+    const fuori = {};
+    const app = ramiInCorso(root, { giorni, fuori });
+    const delServer = ramiDelServer(root, { giorni, scarica, server });
+    fuori.vecchi = (fuori.vecchi || 0) + (delServer.fuori.vecchi || 0);
+    fuori.altri = [...(fuori.altri || []), ...(delServer.fuori.altri || []).map((x) => `filo-security:${x}`)];
+    const lista = senzaChiusi(conNumeri([...app, ...delServer.rami], indice), indice, fuori)
+      .sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
+    return { lista, fuori, motivoServer: delServer.motivo };
   };
   // Rami e incroci vengono da git e dalle schede locali: non serve il server.
   if (cmd === 'rami' || cmd === 'incroci') {
-    const r = rami();
-    let indice = [];
-    try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
-    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori }), indice), indice, r.fuori);
-    if (cmd === 'rami') { console.log([lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni)].filter(Boolean).join('\n')); return 0; }
+    const r = rami(leggiIndice(cartella).aperti || []);
+    if (cmd === 'rami') {
+      const titolo = titoloRami(r.lista, r.motivoServer).filter(Boolean).map((x) => x.replace(/^## /, ''));
+      console.log([...titolo, r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni)].filter(Boolean).join('\n'));
+      return 0;
+    }
     const num = String(arg).replace(/^#/, '');
     const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
     if (!s) { console.error(`Nessuna scheda per #${num} in ${cartella}: npm run feedback:schede -- scrivi --solo ${num}.`); return 1; }
-    const comuni = incroci(lista, s.file_probabili);
-    console.log(comuni.length
-      ? comuni.map((c) => `${c.ramo}${c.feedback.length ? ` (#${c.feedback[0]})` : ''}: ${c.comuni.join(', ')}`).join('\n')
-      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`);
+    console.log(testoIncroci(s, r.lista, { radice: root, motivoServer: r.motivoServer, trova: trovaDelleSchede(root, server) }));
     return 0;
   }
   // Il controllo sui numeri prima della credenziale: un comando storto si dice anche senza chiave.
   const pre = controlliLocali(cmd, argv);
   if (pre) { console.error(`RIFIUTATO: ${pre}. Non ho scritto niente.`); return 1; }
+  // Un ordine con numeri che non possono partire si rifiuta qui, prima della credenziale: lo dice l'indice locale.
+  if (cmd === 'accendi' && arg !== '--niente') {
+    const numeri = leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).numeri;
+    // Chi aspetta chi lo sa l'indice delle schede, che tiene solo le attese che fermano ancora (schede.mjs, apertiDaRighe).
+    const { aperti: indice, fidato, creato } = leggiIndice(cartella);
+    const indiceDel = creato ? creato.slice(0, 16).replace('T', ' ') : '';
+    const bloccati = bloccatiNellOrdine(numeri, indice);
+    if (bloccati.length) {
+      console.error([
+        'RIFIUTATO: nell\'ordine ci sono feedback che non possono partire: non si accenderebbero mai, e un ordine di soli numeri fermi vale come nessun ordine.',
+        ...bloccati.map((b) => `  - ${rigaBloccato(b)}`),
+        `Non ho scritto niente.${indiceDel ? ` Le attese sono quelle dell'indice del ${indiceDel}: se è vecchio, npm run feedback:schede -- elenca.` : ''}${indice && !fidato ? ' L\'indice non ha il timbro dello script: rilancia npm run feedback:schede -- elenca.' : ''}`,
+      ].join('\n'));
+      return 1;
+    }
+    if (!indice) console.error('AVVISO: senza l\'indice delle schede non so chi aspetta chi: un feedback dell\'ordine che aspetta uno fuori non partirebbe, e fermerebbe gli altri primi lavori (npm run feedback:schede -- elenca).');
+  }
   const { readTicket } = await import('./lib/routine-ticket.mjs');
   const { readRole } = await import('./lib/routine-role.mjs');
   const cred = credenziale({ argv, env, bigliettoDelGiro: readTicket(root), ruoloDelGiro: readRole(root) });
@@ -990,8 +1183,8 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     case 'contesto': case 'sveglia': case 'chat': {
       const [st, tac, sc] = await Promise.all([chiama(cred, 'stato'), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
-      const r = rami();
-      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori }), indiceDalServer(sc.schede)), indiceDalServer(sc.schede), r.fuori);
+      const r = rami(indiceDalServer(sc.schede));
+      const { lista } = r;
       const dirRuoli = join(ROOT, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;
@@ -1004,7 +1197,13 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
         return 0;
       }
       const [ferme, spesa] = await Promise.all([domandeFerme(cred, indiceDalServer(sc.schede), stato.ordine || []), chiama(cred, 'spesa')]);
-      const testo = testoIntero({ ruolo, stato, taccuino, schede: sc.schede, locali: leggiSchede(cartella), rami: lista, fuori: r.fuori, giorni, ferme, spesa });
+      const scartate = [];
+      const testo = testoIntero({
+        ruolo, stato, taccuino, schede: sc.schede, locali: leggiSchede(cartella, { scartate }), scartate, rami: lista, fuori: r.fuori, giorni, ferme, spesa,
+        motivoServer: r.motivoServer, filtro: filtroDaArgomenti(argv).filtro,
+      });
+      const misura = testo.split('\n').find((x) => x.startsWith('Misura del contesto:'));
+      if (misura) console.error(misura);
       if (cmd === 'contesto') { console.log(testo); return 0; }
       const dir = join(tmpdir(), 'filo-manutentore');
       mkdirSync(dir, { recursive: true });
@@ -1023,13 +1222,14 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     case 'ordine': {
       const [st, sc] = await Promise.all([chiama(cred, 'stato'), tutteLeSchede(cred)]);
       if (st.ok === false) return esito(st);
-      return esito(st, () => `${rigaOrdine(st.ordine || [], sc.ok === false ? [] : indiceDalServer(sc.schede))}\nParallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`);
+      const locale = leggiIndice(cartella).aperti;
+      return esito(st, () => `${rigaOrdine(st.ordine || [], sc.ok === false ? (locale || []) : conAtteseLocali(indiceDalServer(sc.schede), locale), { vivi: st.ordineVivi })}\nParallelismo: N ${st.parallelismo ?? 'non scritto'}, vale ${st.parallelismoEffettivo} sotto il freno dell'owner (${st.freno}).`);
     }
     case 'accendi': {
       let numeri = [];
       if (arg !== '--niente') numeri = leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).numeri;
       const r = await chiama(cred, 'ordine', { ordine: numeri });
-      return esito(r, (x) => `${rigaOrdine(x.ordine || numeri, [])}\nVale un parallelismo di ${x.parallelismoEffettivo}.`);
+      return esito(r, (x) => `${rigaOrdine(x.ordine || numeri, [], { vivi: x.ordineVivi })}\nVale un parallelismo di ${x.parallelismoEffettivo}.`);
     }
     case 'parallelo': { const r = await chiama(cred, 'ordine', { parallelismo: Number(arg) }); return esito(r, (x) => `Parallelismo ${x.parallelismo}: ne valgono ${x.parallelismoEffettivo}, sotto il freno dell'owner.`); }
     case 'priorita': {
@@ -1154,6 +1354,7 @@ export function controlliLocali(cmd, argv) {
     case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
+    case 'contesto': case 'chat': { const f = filtroDaArgomenti(argv); return f.ok ? '' : f.motivo; }
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';
     case 'priorita': return num(a, cmd) || (controlloPriorita(null, b).ok ? '' : controlloPriorita(null, b).motivo);
     case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');

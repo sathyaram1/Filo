@@ -787,6 +787,37 @@
   const FORMA_MOTIVO = 'Scrivilo così: --motivo "conflitto: <file in conflitto, separati da virgole>" (o "conflitto: nessuno" '
     + 'se il riallineamento non ne ha trovati), "prove rosse: <prove>", "ripresa", oppure "altro: <cosa è successo>".';
 
+  // Una voce fra virgolette (dritte, tipografiche, apici, «», backtick) resta intera anche con virgole o spazi dentro.
+  const VOCE_MOTIVO = /("[^"]*"|«[^»]*»|`[^`]*`|“[^”]*”|‘[^’]*’|'[^']*')|([,;])|(\s+)|([^\s,;"«`“‘']+|.)/g;
+
+  /** Virgole e punti e virgola separano; gli spazi solo se `spazi` e nessun separatore fuori dalle virgolette. */
+  function vociMotivo(resto, spazi) {
+    const pezzi = [...String(resto).matchAll(VOCE_MOTIVO)];
+    const spaziSeparano = spazi && !pezzi.some((m) => m[2]);
+    const voci = [];
+    let cur = '';
+    let citata = false;
+    const chiudi = () => {
+      // Il punto in coda è della frase («nessuno.»), non del nome; dentro le virgolette resta.
+      const v = citata ? cur.trim() : cur.trim().replace(/\.+$/, '');
+      if (v) voci.push(v);
+      cur = '';
+      citata = false;
+    };
+    for (const m of pezzi) {
+      if (m[2] || (m[3] && spaziSeparano)) chiudi();
+      else if (m[1]) { citata = !cur.trim(); cur += m[1].slice(1, -1); }
+      else { if (m[4] && citata) citata = false; cur += m[0]; }
+    }
+    chiudi();
+    return voci;
+  }
+
+  /** Il nome di un file come lo scrive git: barre dritte, senza `./` davanti. */
+  function percorsoGit(f) {
+    return String(f == null ? '' : f).trim().replace(/\\/g, '/').replace(/^(\.\/)+/, '');
+  }
+
   /**
    * `--motivo` del correttore → { ok: true, motivo: { tipo, file? | prove? | testo? } } o { ok: false, errore } con la
    * forma giusta: senza motivo il biglietto non si chiude (regola 4).
@@ -807,11 +838,12 @@
       if (lunga) return { ok: false, errore: `Una voce del motivo supera i 300 caratteri: "${lunga.slice(0, 40)}…".` };
       return { ok: true, motivo: { tipo, [campo]: voci } };
     };
-    const pezzi = (sep) => resto.split(sep).map((s) => s.trim()).filter(Boolean);
     if (MOTIVI_CORRETTORE[tipo] === 'file') {
-      return /^nessuno$/i.test(resto) ? { ok: true, motivo: { tipo, file: [] } } : elenco('file', pezzi(/[,\s]+/));
+      const voci = vociMotivo(resto, true).map(percorsoGit).filter(Boolean);
+      if (voci.length === 1 && /^nessuno$/i.test(voci[0])) return { ok: true, motivo: { tipo, file: [] } };
+      return elenco('file', voci);
     }
-    if (MOTIVI_CORRETTORE[tipo] === 'prove') return elenco('prove', pezzi(/\s*,\s*/));
+    if (MOTIVI_CORRETTORE[tipo] === 'prove') return elenco('prove', vociMotivo(resto, false));
     if (resto.length > MAX_TESTO_MOTIVO) return { ok: false, errore: `Il motivo è lungo ${resto.length} caratteri, il massimo è ${MAX_TESTO_MOTIVO}.` };
     if (MOTIVI_CORRETTORE[tipo] === 'testo' && !resto) return { ok: false, errore: `«altro» vuole due parole su cosa è successo. ${FORMA_MOTIVO}` };
     return { ok: true, motivo: resto ? { tipo, testo: resto } : { tipo } };
@@ -821,8 +853,10 @@
   function testoMotivo(m) {
     if (!m || !m.tipo) return '';
     const nome = m.tipo === 'prove-rosse' ? 'prove rosse' : m.tipo;
-    if (Array.isArray(m.file)) return `${nome}: ${m.file.length ? m.file.join(', ') : 'nessuno'}`;
-    if (Array.isArray(m.prove)) return `${nome}: ${m.prove.join(', ')}`;
+    // Fra virgolette solo i nomi che senza si spezzerebbero: un separatore dentro, o lo spazio in un nome solo.
+    const cita = (v, soloSpazio) => (/[,;]/.test(v) || (soloSpazio && /\s/.test(v)) ? (v.includes('"') ? `«${v}»` : `"${v}"`) : v);
+    if (Array.isArray(m.file)) return `${nome}: ${!m.file.length ? 'nessuno' : m.file.map((v) => cita(v, m.file.length === 1)).join(', ')}`;
+    if (Array.isArray(m.prove)) return `${nome}: ${m.prove.map((v) => cita(v, false)).join(', ')}`;
     return m.testo ? `${nome}: ${m.testo}` : nome;
   }
 
@@ -830,12 +864,15 @@
    * Dopo un riallineamento, dai file in cui la modifica del ramo è cambiata e da quelli che erano in conflitto con main:
    * tutti di servizio (o nessuno) → niente giro nuovo, bastano le prove del server; uno di codice → verifica intera,
    * c'è logica che nessuno ha guardato. Un elenco che manca vale come codice: nel dubbio si verifica.
+   * `rossiAllaFusione`: la fusione si era fermata per gli unit rossi sul risultato con main. Il correttore li lascia alla
+   * verifica, che li fa diventare rilievi: senza giro il cancello li ritrova e lo richiama senza fine.
    */
   function giroDopoRiallineamento(fileRiscritti, opz) {
     const conflitti = opz && opz.conflitti !== undefined ? opz.conflitti : [];
     if (!Array.isArray(fileRiscritti) || !Array.isArray(conflitti)) return { giro: 'pieno', codice: null };
-    const codice = [...new Set([...fileRiscritti, ...conflitti].map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')))]
+    const codice = [...new Set([...fileRiscritti, ...conflitti].map(percorsoGit))]
       .filter((f) => f && !FILE_DI_SERVIZIO.includes(f)).sort();
+    if (opz && opz.rossiAllaFusione === true) return { giro: 'pieno', codice, rossiAllaFusione: true };
     return { giro: codice.length ? 'pieno' : 'nessuno', codice };
   }
 

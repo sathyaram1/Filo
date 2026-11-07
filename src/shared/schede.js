@@ -14,8 +14,23 @@
     'server-filo-security', 'routine-script', 'test', 'sito', 'pacchetti-rilasci', 'deck-builder', 'altro']);
   // Una scheda sta sotto i 200 token di riassunto: 32 KB serializzata sono dieci volte il massimo dei suoi campi.
   const MAX_BYTE = 32 * 1024;
+  // I 200 token della spec coi caratteri per token di SN_FILO_CONTESTO (la sentinella in schede.test.mjs li tiene uguali).
+  const RIASSUNTO_MAX = 700;
+  // Gli incroci confrontano i file probabili coi rami solo nella forma di git: un glob, una graffa, un numero di riga, un
+  // percorso fuori dal repo non si confrontano, e una scheda che li porta non è buona.
+  const FILE_NON_CONFRONTABILE = /[*?[\]{}]|:\d+(?::\d+)?$/;
 
   const numeroPulito = (n) => String(n == null ? '' : n).replace(/^#/, '');
+
+  /** Un file probabile come lo scrive l'agente, nella forma che si confronta: barre normali, senza «./» in testa. PURA. */
+  function fileNormale(p) {
+    return String(p == null ? '' : p).trim().replace(/\\/g, '/').replace(/\/{2,}/g, '/').replace(/^(\.\/)+/, '');
+  }
+
+  /** Il file (già normale, relativo alla radice) non si può confrontare coi rami: vuoto, fuori dal repo, glob o riga. PURA. */
+  function fileStorto(v) {
+    return !v || /^([A-Za-z]:|\/|~)/.test(v) || v.split('/').indexOf('..') >= 0 || FILE_NON_CONFRONTABILE.test(v);
+  }
 
   /** I motivi per cui una scheda non è buona (vuoto = buona). PURA. */
   function validaScheda(s, num) {
@@ -31,13 +46,15 @@
     };
     if (numeroPulito(s.numero) !== numeroPulito(num)) m.push(`«numero» è ${JSON.stringify(s.numero)}, non ${num}`);
     testo('titolo_breve', 80);
-    testo('riassunto', 2000);
+    testo('riassunto', RIASSUNTO_MAX);
     testo('prova', 1000);
     if (VALIDI.indexOf(s.valido) < 0) m.push(`«valido» deve essere uno fra ${VALIDI.join(', ')}`);
     if (TIPI.indexOf(s.tipo) < 0 && s.valido !== 'non letto') m.push(`«tipo» deve essere uno fra ${TIPI.join(', ')}`);
     if (AREE.indexOf(s.area) < 0 && s.valido !== 'non letto') m.push(`«area» deve essere una fra ${AREE.join(', ')}`);
     if (typeof s.urgente !== 'boolean') m.push('«urgente» deve essere true o false');
     elenco('file_probabili', 5);
+    const storte = (Array.isArray(s.file_probabili) ? s.file_probabili : []).filter((f) => typeof f === 'string' && fileStorto(fileNormale(f)));
+    if (storte.length) m.push(`«file_probabili» vuole un percorso per voce come lo stampa git, relativo alla radice (le cartelle finiscono con «/»), senza glob, graffe né numero di riga: non ${storte.slice(0, 3).map((f) => JSON.stringify(f)).join(', ')}`);
     elenco('doppione_di');
     elenco('parole_chiave', 10);
     if (s.risolto_su_main !== null && typeof s.risolto_su_main !== 'string') m.push('«risolto_su_main» è uno sha con la riga, o null');
@@ -83,8 +100,8 @@
   }
 
   global.SN_SCHEDE = {
-    VERSIONE, STATI_CHIUSI, VALIDI, TIPI, AREE, MAX_BYTE,
-    validaScheda, campiDellAgente, perIlDocumento, dalDocumento, numeroPulito,
+    VERSIONE, STATI_CHIUSI, VALIDI, TIPI, AREE, MAX_BYTE, RIASSUNTO_MAX,
+    validaScheda, campiDellAgente, perIlDocumento, dalDocumento, numeroPulito, fileNormale, fileStorto,
   };
 
 })(typeof globalThis !== 'undefined' ? globalThis : self);

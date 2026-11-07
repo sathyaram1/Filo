@@ -82,7 +82,7 @@ import {
   lavoroVivo, testoLavoroVivo, USCITA_LAVORO_VIVO,
 } from './lib/branch-integrity.mjs';
 import { writeRole, clearRole, readRole, readMarker, isRoutineInstance } from './lib/routine-role.mjs';
-import { fileRiscritti, fusioniCheCitano, numeroFeedback } from './lib/su-main.mjs';
+import { fileRiscritti, fusioniCheCitano, numeroFeedback, segnaProprie } from './lib/su-main.mjs';
 import {
   baseDelConfronto, controllaCasiDellaPulizia, controllaProveTolte, controllaPulizia, esceInOgniEsito, numeraRilievi, proveDaToglierePrimaDelVerdetto,
   proveScritteDa, puliziaDelPass, rigaNumerata, rilieviMessiDaParte, ROSSO_ATTESO_CHIUSO, testiDelleProve, testoProvePrimaDelVerdetto, testoPuliziaFuoriNumero,
@@ -530,14 +530,17 @@ export function esitoRiallineamento(confronto, motivo) {
   // I conflitti dichiarati contano quanto quelli che dice git: un conflitto in un file di codice chiede la verifica.
   const dichiarati = motivo && Array.isArray(motivo.file) ? motivo.file : [];
   const conflitti = [...new Set([...(confronto.conflitti || []), ...dichiarati])];
-  const { giro, codice } = regola(confronto.file, { conflitti });
+  const { giro, codice, rossiAllaFusione } = regola(confronto.file, { conflitti, rossiAllaFusione: !!(motivo && motivo.tipo === 'prove-rosse') });
   const elenco = (l) => `${l.slice(0, 5).join(', ')}${l.length > 5 ? ', …' : ''}`;
   const toccati = [...new Set([...confronto.file, ...conflitti])];
-  const righe = [giro === 'nessuno'
-    ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
-    : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
+  const righe = [rossiAllaFusione
+    ? 'La fusione si era fermata per gli unit rossi: serve la verifica intera, che li fa diventare rilievi, anche se il riallineamento è pulito.'
+    : giro === 'nessuno'
+      ? `Riallineamento pulito${toccati.length ? ` (toccati solo file di servizio: ${elenco(toccati)})` : ''}: per la regola non serve un giro nuovo di verifica, bastano le prove del server.`
+      : `Il riallineamento tocca ${codice.length === 1 ? 'un file di codice' : `${codice.length} file di codice`} (${elenco(codice)}): serve la verifica intera.`];
   const taciuti = motivo && motivo.tipo === 'conflitto' ? (confronto.conflitti || []).filter((f) => !dichiarati.includes(f)) : [];
   if (taciuti.length) righe.push(`Git trova in conflitto anche ${elenco(taciuti)}, che il motivo non nomina: il server confronta da sé, e nel report va cosa hai toccato lì.`);
+  // Al server il perché arriva già col motivo «prove rosse»: il campo resta quello che il server conosce.
   return { riallineamento: { fileRiscritti: confronto.file, fileInConflitto: confronto.conflitti || [], giro }, riga: righe.join(' ') };
 }
 
@@ -1043,27 +1046,28 @@ function conPiano(ctx) {
 }
 
 /**
- * Le fusioni su main che citano il feedback, dopo la sua nascita (regola 5): quelle che il server ha già trovato, o
- * quelle che dice git qui. `propria`: la fusione del suo stesso lavoro, cioè un feedback riaperto dall'owner.
+ * Le fusioni su main che citano il feedback, dopo la sua nascita e la sua ultima riapertura (regola 5): quelle che il
+ * server ha già trovato, o quelle che dice git qui. `propria`: la fusione del suo stesso lavoro, cioè un feedback
+ * riaperto dall'owner.
  */
 function suMainDi(bucket, ctx) {
   const num = numeroFeedback(bucket && bucket.num);
-  if (Array.isArray(ctx && ctx.suMain)) return segnaProprie(ctx.suMain, num);
+  if (Array.isArray(ctx && ctx.suMain)) return segnaProprie(ctx.suMain, num, bucket && bucket.id);
   if (!num) return [];
   try {
-    const nato = Date.parse((ctx && ctx.feedback && ctx.feedback.createdAt) || '') || 0;
-    return segnaProprie(fusioniCheCitano(ROOT, num, { dopo: nato }), num);
+    return segnaProprie(fusioniCheCitano(ROOT, num, { dopo: inizioRicerca(ctx && ctx.feedback) }), num, bucket && bucket.id);
   } catch (_) {
     return [];
   }
 }
 
-/** Segna `propria` la fusione del lavoro stesso del feedback («merge-gate: #N …»). PURA. */
-export function segnaProprie(fusioni, num) {
-  const n = numeroFeedback(num);
-  const propria = new RegExp(`^merge-gate: #${n.replace('.', '\\.')}\\b(?!\\.\\d)`);
-  return (Array.isArray(fusioni) ? fusioni : []).map((f) => (n && propria.test(String(f.oggetto || '')) ? { ...f, propria: true } : f));
+/** Da quando conta una fusione: la nascita del feedback, o la sua ultima riapertura se il server la manda (ms). PURA. */
+export function inizioRicerca(feedback) {
+  const ms = (v) => (typeof v === 'number' && Number.isFinite(v) ? v : Date.parse(String(v || '')) || 0);
+  return Math.max(ms(feedback && feedback.createdAt), ms(feedback && feedback.riapertoAt));
 }
+
+export { segnaProprie };
 
 export function buildPayload(bucket, ctx = {}) {
   switch (bucket.role) {

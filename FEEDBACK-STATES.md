@@ -294,26 +294,34 @@ applicano strumenti e server.
 
 **Una sessione per feedback.** Il manutentore scrive sul server l'ordine dei feedback da
 accendere (`npm run manutentore -- accendi N,M,…`, documento `config/manutentore`, con la
-chiave del manutentore o il biglietto della sua sessione; `accendi --niente` lo svuota). Con un ordine un primo lavoro parte solo per i
+chiave del manutentore o il biglietto della sua sessione; `accendi --niente` lo svuota). Lo
+strumento rifiuta, con l'indice delle schede, un numero che aspetta un feedback aperto fuori
+dall'ordine (anche l'unita di un pacchetto nato prima del 30/10, che aspetta il pacchetto):
+non partirebbe mai; `ordine` segnala quelli la cui attesa è nata dopo. Con un ordine un primo lavoro parte solo per i
 feedback dell'ordine e per le priorità 3; verifica, correzione, controllo di sicurezza,
 riallineamento e risposte dell'owner li assegna il server come sempre, anche per i feedback
 fuori dall'ordine. A ogni giro le due voci del pacemaker (la normale e quella dei lavori
 server) prendono i lavori ammessi dalla scelta di sempre (fiducia, pause, crediti, attese,
-semafori) senza un'accensione già in viaggio, in quest'ordine: una priorità 3 fuori
+semafori) senza un'accensione già in viaggio (una sessione accesa per quel feedback che
+non ha ancora preso il biglietto: dopo il biglietto il lavoro seguente si accende subito, e
+all'arrivo si tolgono le voci delle sessioni arrivate), in quest'ordine: una priorità 3 fuori
 dall'ordine (regola 7), i feedback dell'ordine, il resto nell'ordine della coda; e
 accendono una sessione per ciascuno fino ai posti liberi. Legano ogni sessione al suo
 numero con l'id che la risposta di accensione restituisce (`routine-accensioni/<sessione>`);
 per un primo lavoro la voce normale fa prima la ricerca «già risolto su main» e la lega
 anche quella. La sessione di un compito senza feedback resta libera, e una sessione libera
-con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine, né un
+con un ordine riceve la stessa scelta: niente primo lavoro fuori dall'ordine. Con o senza
+ordine, nessun lavoro (primo lavoro, verifica, correzione, controllo di sicurezza) di un
 feedback legato a un'altra sessione accesa che non ha ancora preso il suo biglietto (entro
 la finestra d'avvio del pacemaker; dopo è nata morta e il feedback torna libero). Quando
 una sessione conta i lavori dell'altra voce per lasciarle il posto, l'ordine vale anche
 lì: un primo lavoro che il pacemaker non accenderà non chiede un posto. Un numero
-dell'ordine chiuso o inesistente non conta, e un ordine senza feedback aperti vale come
-nessun ordine. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
-un pacchetto nato prima del 30/10 si chiudono solo sulle strade della fusione: un «fatto»
-consegnato da un ruolo non è una fusione. La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
+dell'ordine chiuso o inesistente non conta, e un ordine vale solo se almeno un suo numero è
+aperto e non fermo (un primo lavoro che può partire adesso, o un lavoro in corso che non
+aspetta altri feedback, domande o il manutentore); altrimenti vale come nessun ordine anche
+per l'accensione: sessioni libere, nessun legame, nessuna ricerca su main. Senza ordine vale la coda per priorità, come ripiego (SPEC § 4). Le unite di
+un pacchetto nato prima del 30/10 si chiudono su ogni strada che porta il pacchetto a
+`done` (§ Pacchetti). La sessione accesa così è l'orchestratore, cieco, col prompt salvato di
 sempre: il comando `ticket` manda l'id della sessione (`sessione`), e il server, dopo la
 parola d'ordine, le dà il biglietto del suo feedback anche senza numero; dopo quel
 biglietto ogni altra richiesta della stessa sessione è «niente»
@@ -334,10 +342,17 @@ primo lavoro.
 GitHub, le fusioni sulla linea principale di main che portano un commit che cita `#N`
 (la fusione stessa o un commit del ramo fuso) dopo la nascita del feedback e la sua
 ultima riapertura (`riapertoAt`, che il server segna quando un feedback chiuso torna
-aperto), e le passa in `payload.suMain`, anche vuoto; il biglietto se le tiene. Se
+aperto; senza, l'ultima chiusura, `resolvedAt`, che il server scrive anche per ogni chiusura
+sua, `done` o `archived`), e le passa in `payload.suMain`, anche vuoto; il biglietto se le tiene. Se
 GitHub non risponde o la finestra supera i tetti, `suMain` manca e dispatch fa la
-stessa ricerca da sé (`scripts/lib/su-main.mjs`). Dispatch segna `propria` la fusione
-del lavoro stesso del feedback (vuol dire riaperto dall'owner, non risolto). La sessione
+stessa ricerca da sé (`scripts/lib/su-main.mjs`), dall'ultima riapertura se il payload la
+porta (`feedback.riapertoAt`, che il server manda anche quando ha solo l'ora dell'ultima
+chiusura). Una finestra oltre i tetti il server la riconosce con una chiamata e il segno
+passa nel biglietto, così al ritiro non la rifà; dopo un guasto di GitHub sì. Il server e
+dispatch segnano `propria`, con la stessa regola (nella lista e nella prova della chiusura
+`gia_risolto`), la fusione del lavoro stesso del
+feedback, quella del cancello (`merge-gate: #N`) e quella approvata dall'owner del suo
+ramo (`finish: worker/<id>-<ora>`): vuol dire riaperto dall'owner, non risolto. La sessione
 la ricontrolla come primo passo e, se è chiuso davvero, consegna senza ramo `deliver
 status --status done --reason gia_risolto --fusione <sha>` con report e frase: `working
 → done` (routine, `statusReason: gia_risolto`). Lo strumento rifiuta uno sha che non
@@ -413,10 +428,17 @@ archiviati e ne dà gli allegati testuali; delle immagini dà il conteggio, e le
 Alla fusione di P (`done`) il server non ha più unite da chiudere. Resta, per i pacchetti
 nati prima (le unite `todo` che aspettano P), la chiusura di prima: `todo → done`
 (pipeline, `statusReason: pacchetto`) con la frase di P come `userNote` (senza, una frase
-di ripiego, e le note di P lo dicono) e la versione di P se ne ha una, PRIMA di scrivere P
+di ripiego, e le note di P lo dicono; la frase scritta dopo su P con `npm run feedback --
+P --frase` arriva anche alle unite chiuse così, e il promemoria della frase vale anche per
+un pacchetto) e la versione di P se ne ha una, PRIMA di scrivere P
 in `done`, così l'attesa sciolta non le rimette in coda, con un gancio solo per ogni
-strada che porta P a `done` dopo una fusione; un'unita che è a sua volta un pacchetto
-chiude prima le sue. Una unita archiviata col rimando a P non è un'eccezione da scrivere
+strada del server che porta P a `done` (cancello, fusione approvata, recupero, «già
+risolto»). Le scritture che non passano dal server (`server:fondi` dal PC, la chiusura a
+mano) non le rimettono in coda lo stesso: un'unita che aspetta un P fuso ed è nel suo
+`unisce` non parte (attesa `pacchetto`), e il giro delle attese del pacemaker la chiude
+nello stesso modo, con la riga nelle note di P. Un'unita che è a sua volta un pacchetto
+chiude prima le sue, fino a 5 livelli: più in basso le chiude il giro delle attese, e le
+note lo dicono. Una unita archiviata col rimando a P non è un'eccezione da scrivere
 nelle note di P; una in un altro stato, o che non aspetta più P, resta dove sta e le note
 lo dicono. Il messaggio della fusione di P cita le unite (`merge-gate: #P via server
 (unisce #N, #M)`), così la ricerca «già risolto su main» le trova. P archiviato senza
@@ -434,8 +456,10 @@ aprono più: il contenitore è il pacchetto.
 
 **Il motivo del correttore.** Chi corregge (fixer, nel riallineamento e nella ripresa)
 consegna `dispatch.mjs --record-fixed … --motivo "<tipo>: <dettaglio>"`: conflitto coi
-file (o «nessuno»), prove rosse con le prove, ripresa, altro col testo. Forme e parser in
-`SN_VERIFIER_ROUND.leggiMotivoCorrettore`. Senza motivo lo strumento non consegna, e il
+file (o «nessuno»), prove rosse con le prove (ogni volta che la critica elenca unit rossi
+sulla fusione, anche con dei conflitti), ripresa, altro col testo. Le voci si separano con
+virgole o punti e virgola; senza, con gli spazi, e un nome con lo spazio va fra virgolette.
+Forme e parser in `SN_VERIFIER_ROUND.leggiMotivoCorrettore`. Senza motivo lo strumento non consegna, e il
 server rifiuta la consegna `fixed` di un correttore senza un motivo che il parser rilegga
 identico; quello valido lo scrive nel biglietto (`motivo`, più `riallineamento` del
 client) e nelle note per l'owner. Una fermata nella stessa consegna (segnalazione o
@@ -458,19 +482,26 @@ sul commit che un verificatore ha approvato: un salto dopo un riallineamento pul
 passata la punta nuova per il cancello, ma il riallineamento dopo riparte dall'approvato,
 anche nel confronto che decide il giro: per questo anche a chi riallinea dispatch scarica lo
 sha verificato che manca in copia. Alla consegna lo strumento guarda due cose: i file in
-cui la modifica del ramo è cambiata, senza i numeri di riga (`fileRiscritti`), e i file
-in cui la punta verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`),
-più quelli che il motivo dichiara. Manda `riallineamento: { fileRiscritti,
+cui la punta nuova non è quello che git ottiene da sé rifacendo la modifica verificata
+sopra la base nuova (`git merge-tree --merge-base`, `fileRiscritti`: una riga spostata
+nello stesso file conta, le righe cambiate da main accanto no), e i file in cui la punta
+verificata va in conflitto con main (`git merge-tree`, `fileInConflitto`), più quelli che
+il motivo dichiara. Manda `riallineamento: { fileRiscritti,
 fileInConflitto, giro }`. Se tutti stanno fra i file di servizio (`FILE_DI_SERVIZIO`:
 `src/shared/patchNotes.js`, `src/shared/capabilities.js`, `tests/rossi-noti.json`,
 `PATTERNS.md`), o non ce n'è nessuno, niente giro nuovo di verifica: bastano le prove del
 server sulla fusione, e il controllo di sicurezza resta. Un file di codice in conflitto o
 riscritto chiede la verifica intera, perché è logica che nessuno ha guardato (anche un
-conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). La
+conflitto risolto tenendo le due parti, che lascia la modifica del ramo uguale). Una
+fusione fermata dagli unit rossi sul risultato con main chiede sempre la verifica intera
+(`rossiAllaFusione`: dal motivo «prove rosse» nel client, dal perché del fermo sul
+server, che vale anche per la suite del server rossa): il correttore quei test non li corregge, e senza il giro il cancello li
+ritroverebbe e lo richiamerebbe senza fine. La
 regola è `giroDopoRiallineamento` in `verifierRound.js`; il server rifà il confronto da
 sé con l'API di GitHub e non si fida di quello del client: per i conflitti approssima
 `merge-tree` (zone sovrapposte o a contatto nei file toccati da tutte e due le parti;
-nel dubbio, conflitto). Per questo dispatch spinge il ramo prima di consegnare, e se la
+nel dubbio, conflitto), per i riscritti confronta testo e posto delle righe, portati su
+main dalle sue modifiche (nel dubbio, riscritto: giro pieno). Per questo dispatch spinge il ramo prima di consegnare, e se la
 punta non contiene `origin/main`, non parte o su origin non risulta uguale, non consegna
 (#1964: altrimenti chi verifica dopo legge il commit già verificato). Vale anche per
 `deliver fixed`; una consegna che si ferma con una domanda non riallinea e passa. Ogni

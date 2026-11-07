@@ -4828,6 +4828,8 @@
       // la scrittura è riuscita davvero, e rientrando deve trovare quello che ha salvato.
       if (fb) fb.userNote = frase;
       userNoteSpedito.delete(id);
+      // Un'unita del pacchetto rimasta senza frase: il prossimo salvataggio la rimanda invece di dire «Nessuna modifica».
+      if (r.unite && r.unite.fallite.length) userNoteSpedito.set(id, FRASE_IGNOTA);
       // 3) La SCHERMATA si tocca solo se è ancora quella di questo feedback, o il salvataggio
       // dopo manderebbe il messaggio di uno al mittente dell'altro.
       if (selectedId !== id) return true;
@@ -4842,7 +4844,10 @@
       // Il tasto porta il segno di quello che c'è a destinazione: da chiuso è l'unico posto dove si
       // vede che una frase esiste.
       riflettiFrase(frase);
-      setUserNoteMsg(frase ? 'Salvata' : 'Frase rimossa', 'ok');
+      const unite = r.unite || { aggiornate: [], fallite: [] };
+      const nums = (l) => l.map((x) => (x.num ? `#${x.num}` : '')).filter(Boolean).join(', ');
+      if (unite.fallite.length) setUserNoteMsg(`Salvata, ma non sulle unite ${nums(unite.fallite) || 'del pacchetto'}: riprova`, 'err');
+      else setUserNoteMsg(unite.aggiornate.length ? `Salvata, anche su ${nums(unite.aggiornate.map((num) => ({ num })))}` : (frase ? 'Salvata' : 'Frase rimossa'), 'ok');
       renderThread(fb);
       return true;
     } catch (e) {
@@ -4931,6 +4936,8 @@
       // Niente da spedire perché a destinazione c'è già questa riga: è quello che l'owner vuole
       // sapere premendo il tasto.
       const testo = fraseInCasella();
+      // L'esito appena scritto dal salvataggio automatico (partito lasciando la casella) dice anche le unite: resta.
+      if (testo && /^Salvata/.test(mgUserNoteMsg.textContent || '') && /mg-ok/.test(mgUserNoteMsg.className)) return;
       setUserNoteMsg(testo ? 'Salvata' : 'Nessuna frase', 'ok');
       return;
     }

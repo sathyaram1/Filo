@@ -220,11 +220,19 @@ export async function praticaInChiaro(doc) {
     localOnly: lo ? { by: lo.by?.stringValue || '', at: Number(lo.at?.integerValue || 0) } : undefined,
     localApproval: la ? { by: la.by?.stringValue || '', at: Number(la.at?.integerValue || 0) } : undefined,
     userNote: f.userNote?.stringValue || '',
+    unite: uniteDalCampo(f.unisce).length,
     beatAt: f.beatAt?.stringValue || f.beatAt?.timestampValue || '',
     workingSince: f.workingSince?.stringValue || f.workingSince?.timestampValue || '',
   };
 }
-const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'localApproval', 'localMerges', 'userNote', 'beatAt', 'workingSince', 'pipeline', 'fiducia'];
+const CAMPI_PRATICA = ['clientId', 'senderProof', 'status', 'statusPublic', 'localOnly', 'localApproval', 'localMerges', 'userNote', 'beatAt', 'workingSince', 'pipeline', 'fiducia', 'unisce'];
+
+/** Le unite di un pacchetto dal campo `unisce` del documento: [{ id, num }]. PURA. */
+export function uniteDalCampo(campo) {
+  return (campo?.arrayValue?.values || [])
+    .map((v) => ({ id: String(v?.mapValue?.fields?.id?.stringValue || ''), num: String(v?.mapValue?.fields?.num?.stringValue || '') }))
+    .filter((u) => u.id);
+}
 
 /**
  * Il segno «solo in locale» (#908): `valore` true lo mette ({ by, at } in ms), false lo toglie.
@@ -492,11 +500,17 @@ export async function praticaPerLaSessione(id, opts = {}) {
   return { ok: true, avviso, fiducia: fb.fiducia === 'fidato' ? 'fidato' : 'non_fidato', primaDellaMigrazione: fb.fiducia === undefined };
 }
 
-/** Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. PURA. */
+/**
+ * Il promemoria della frase per chi ha segnalato (regola: SN_MANAGE_REVIEW.fraseAttesa), '' se non serve. Anche per un
+ * pacchetto senza frase: le unite che chiude la prendono da lui, e senza leggono quella di ripiego. PURA.
+ */
 export function avvisoFrase(fb, rif) {
-  if (!MR.fraseAttesa(fb)) return '';
   // Il comando si incolla: un «#951» in bash e in PowerShell apre un commento, e npm partirebbe senza argomenti.
   const chi = String(rif ?? '').trim().replace(/^#+/, '');
+  if (fb && fb.unite > 0 && !String(fb.userNote || '').trim()) {
+    return `È un pacchetto senza frase: chi ha mandato le segnalazioni unite, quando il pacchetto le chiude, legge la sua frase, e senza quella di ripiego. Se il lavoro cambia qualcosa che vedono, scrivila (una riga in chiaro, niente dettagli di sicurezza): npm run feedback -- ${chi} --frase "…". Raggiunge anche le unite già chiuse.`;
+  }
+  if (!MR.fraseAttesa(fb)) return '';
   return `Chi l’ha mandato è un utente: a pratica chiusa vede la risoluzione con la sola frase per lui, e questa pratica non ne ha una. Se il lavoro cambia qualcosa che vede, scrivila (una riga in chiaro, niente dettagli di sicurezza): npm run feedback -- ${chi} --frase "…". Vale anche a pratica chiusa.`;
 }
 
@@ -517,8 +531,61 @@ function fraseTroppoLunga(testo) {
 }
 
 /**
+ * La frase del pacchetto `pId` raggiunge le unite che ha chiuso lui, a ogni livello (SN_FB_ATTESE.uniteDellaFrase): alla
+ * chiusura hanno preso la sua frase di allora, o quella di ripiego, e chi le ha segnalate legge quella.
+ * → { aggiornate: [num], fallite: [{ num, motivo }] }
+ */
+async function fraseAlleUnite(pId, unisce, versione, testo, bearer) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const aggiornate = [];
+  const fallite = [];
+  let trovate;
+  try {
+    trovate = await ATT.uniteDellaFrase({ id: pId, unisce, resolvedInVersion: versione }, (ids) => Promise.all(ids.map(async (id) => {
+      const doc = await getDoc(id, bearer, ['status', 'statusReason', 'resolvedInVersion', 'unisce', ATT.CAMPO]);
+      if (!doc) return null;
+      const { from, leggibile } = await statoAttuale(doc);
+      const f = doc.fields || {};
+      return {
+        _id: id, status: leggibile ? from : '', statusReason: f.statusReason?.stringValue || '', resolvedInVersion: f.resolvedInVersion?.stringValue || '',
+        unisce: uniteDalCampo(f.unisce), [ATT.CAMPO]: uniteDalCampo(f[ATT.CAMPO]),
+      };
+    })));
+  } catch (e) {
+    return { aggiornate, fallite, illeggibile: `lettura delle unite fallita: ${String((e && e.message) || e).slice(0, 160)}` };
+  }
+  for (const u of trovate.illeggibili) fallite.push({ num: u.num, motivo: 'stato non decifrabile' });
+  for (const u of trovate.unite) {
+    try {
+      // eslint-disable-next-line no-await-in-loop
+      const res = await patchFirmato(`${FIRESTORE_BASE}/feedback/${encodeURIComponent(u.id)}?updateMask.fieldPaths=userNote&updateMask.fieldPaths=updatedAt`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${bearer}` },
+        body: JSON.stringify({ fields: { userNote: toFsValue(testo), updatedAt: firmaOra() } }),
+      }, { fetchImpl: fetchRitentato });
+      if (res.ok) aggiornate.push(u.num);
+      // eslint-disable-next-line no-await-in-loop
+      else fallite.push({ num: u.num, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 120)}` });
+    } catch (e) {
+      fallite.push({ num: u.num, motivo: String((e && e.message) || e).slice(0, 160) });
+    }
+  }
+  return { aggiornate, fallite };
+}
+
+/** Le righe che dicono dove è arrivata la frase di un pacchetto, e come rimediare dove non è arrivata. PURA. */
+export function righeFraseUnite(esito, testo) {
+  const r = [];
+  if (esito && esito.aggiornate && esito.aggiornate.length) r.push(`La stessa frase sulle unite già chiuse dal pacchetto: ${esito.aggiornate.map((n) => `#${n}`).join(', ')}.`);
+  if (esito && esito.illeggibile) r.push(`FRASE NON SCRITTA sulle unite del pacchetto (${esito.illeggibile}). Rilancia lo stesso comando.`);
+  for (const f of (esito && esito.fallite) || []) r.push(`FRASE NON SCRITTA su #${f.num}, unita del pacchetto (${f.motivo}). Rimedia con: npm run feedback -- ${f.num} --frase ${JSON.stringify(testo)}`);
+  return r;
+}
+
+/**
  * Solo la frase per chi ha segnalato, stato invariato: `<n|id> --frase "…"`. Dai Ricevuti no, come ogni passaggio di una
  * sessione (partenzaVietata): lì decide l'owner. Su una pratica chiusa sì: la bacheca la mostra alla prossima sincronizzazione.
+ * Su un pacchetto arriva anche alle unite che ha chiuso (`unite` nella risposta).
  */
 export async function scriviFrase(id, frase, opts = {}) {
   const testo = String(frase || '').trim();
@@ -526,7 +593,7 @@ export async function scriviFrase(id, frase, opts = {}) {
   const lunga = fraseTroppoLunga(testo);
   if (lunga) return { ok: false, motivo: lunga };
   const bearer = opts.bearer || await acquireBearer();
-  const doc = await getDoc(id, bearer, ['status']);
+  const doc = await getDoc(id, bearer, ['status', 'unisce', 'resolvedInVersion']);
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const { from, leggibile } = await statoAttuale(doc);
   if (!leggibile) return { ok: false, motivo: 'stato attuale non decifrabile: non so dove sta la pratica' };
@@ -540,7 +607,8 @@ export async function scriviFrase(id, frase, opts = {}) {
     body: JSON.stringify({ fields }),
   }, { fetchImpl: fetchRitentato });
   if (!res.ok) return { ok: false, motivo: `scrittura fallita (${res.status}): ${(await res.text()).slice(0, 200)}` };
-  return { ok: true };
+  const unite = uniteDalCampo(doc.fields?.unisce);
+  return { ok: true, ...(unite.length ? { unite: await fraseAlleUnite(id, unite, doc.fields?.resolvedInVersion?.stringValue || '', testo, bearer) } : {}) };
 }
 
 /**
@@ -846,7 +914,7 @@ export async function scrivi(id, to, nota, opts = {}) {
   const bearer = opts.bearer || await acquireBearer();
   // La pratica coi campi di ogni altro passaggio (CAMPI_PRATICA: senza il sì dell'owner un approvato
   // sembra un utente, #913) più le note da fondere. La lettura va nel conto di chi ci ha mandato qui (#680).
-  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes', 'seq', 'subSeq']);
+  const doc = await getDoc(id, bearer, [...CAMPI_PRATICA, 'notes', 'seq', 'subSeq', 'resolvedInVersion']);
   if (opts.letture) opts.letture.aggiungi(1, 'segnalazioni riscritte');
   if (!doc) return { ok: false, motivo: `feedback ${id} inesistente` };
   const cambiataDaAllora = 'la pratica è cambiata da quando è stata letta per decidere: non la riscrivo';
@@ -981,7 +1049,11 @@ export async function scrivi(id, to, nota, opts = {}) {
   const errore = await scriviCampi(daScrivere);
   if (errore && respinta && !fiduciaTolta) return { ok: false, cambiata: true, motivo: cambiataDaAllora, from };
   if (errore) return { ok: false, motivo: `${errore}${fiduciaTolta ? `. La fiducia l’ho già tolta${riaperta ? ' e la pratica è riaperta, senza la nota' : ''}` : ''}`, from };
-  return { ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}) };
+  const unite = mask.includes('userNote') ? uniteDalCampo(doc.fields?.unisce) : [];
+  return {
+    ok: true, from, to, ...(mask.includes('localMerges') ? { partiAzzerate: true } : {}), ...(fiduciaTolta ? { fiduciaTolta } : {}),
+    ...(unite.length ? { unite: await fraseAlleUnite(id, unite, doc.fields?.resolvedInVersion?.stringValue || '', opts.frase.trim(), bearer) } : {}),
+  };
 }
 
 /** «#553» dai campi del documento, '' senza numero: l'avviso deve nominare la pratica come la mostra la Gestione. */
@@ -1199,7 +1271,8 @@ if (isMain) {
     console.log(r.dryRun
       ? `[dry-run] ${riferimento}: scriverei la frase per chi ha segnalato, stato invariato`
       : `${riferimento}: frase per chi ha segnalato scritta; la bacheca la mostra alla prossima sincronizzazione.`);
-    process.exit(0);
+    for (const riga of righeFraseUnite(r.unite, String(frase).trim())) (riga.startsWith('FRASE NON') ? console.error : console.log)(riga);
+    process.exit(r.unite && r.unite.fallite.length ? 3 : 0);
   }
 
   if (!id || !status) {
@@ -1222,6 +1295,7 @@ if (isMain) {
     ? `(prova a vuoto) ${r.from} → ${r.to}; campi che scriverei: ${campiLeggibili(r.campi, priorita)}`
     : `OK: ${riferimento} da "${r.from}" a "${r.to}"${priorita !== undefined ? `, priorità ${priorita} decisa a mano` : ''}${r.partiAzzerate ? '; le parti del lavoro già su main ripartono da zero' : ''}.`);
   if (r.dryRun && r.fiduciaTolta) console.log(avvisoFiduciaTolta(riferimento, r.fiduciaTolta, { dryRun: true }));
+  for (const riga of righeFraseUnite(r.unite, String(frase || '').trim())) (riga.startsWith('FRASE NON') ? console.error : console.log)(riga);
   // Come la chiusura di finish e di server:fondi (#913): la chiusura a mano è quella di un lavoro senza fusione.
   if (!r.dryRun && r.to === 'done' && !(typeof frase === 'string' && frase.trim())) {
     const promemoria = await fraseDaScrivere(id, riferimento, { bearer });
