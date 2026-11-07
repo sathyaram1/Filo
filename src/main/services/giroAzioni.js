@@ -45,10 +45,10 @@ function chiudeIlTurno(esiti, { daLeggere = () => false, testo = '' } = {}) {
 }
 
 // La risposta scritta insieme alle azioni, finita fra le note e non riscritta dall'ultimo giro (#1921.1): GLM a volte
-// chiude con la sola battuta che segue («Torniamo a noi: chi sei?»). Misurato con GLM: le riscritte e i riassunti
-// stavano sopra la metà della nota, le battute sole sotto un sesto.
-const NOTA_DA_RISPOSTA = 300;
-const FINALE_CHE_NON_LA_RIPORTA = 1 / 3;
+// chiude con la sola battuta che segue («Torniamo a noi: chi sei?»). Misurato con GLM: le riscritte stavano sopra il
+// 90% della nota, le battute sole sotto il 15%; le note di lavoro vere («Guardo il documento…») sotto i 100 caratteri.
+const NOTA_DA_RISPOSTA = 150;
+const FINALE_CHE_NON_LA_RIPORTA = 1 / 2;
 function rispostaFraLeNote(note, finale) {
   const lunga = (Array.isArray(note) ? note : []).map((n) => String(n || '').trim())
     .reduce((a, n) => (n.length > a.length ? n : a), '');
