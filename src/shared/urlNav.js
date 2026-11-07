@@ -257,13 +257,13 @@
     if (/^lens\.google\.com$/i.test(u.hostname) && u.pathname === '/uploadbyurl' && chiavi[0] === 'url') return u.searchParams.get('url');
     return null;
   }
-  // L'indirizzo è la ricerca di quelle parole? Il costruttore taglia a 500 caratteri.
+  // L'indirizzo è la ricerca di quelle parole, intere o come le taglia il costruttore?
   function eRicercaDi(url, parole) {
     const cercato = ricercaDi(url);
     if (cercato == null) return false;
     const norma = (t) => String(t == null ? '' : t).replace(/\s+/g, ' ').trim();
     const detto = String(parole == null ? '' : parole);
-    return !!norma(cercato) && (norma(cercato) === norma(detto) || norma(cercato) === norma(detto.slice(0, 500)));
+    return !!norma(cercato) && (norma(cercato) === norma(detto) || norma(cercato) === norma(ricercaDi(indirizzoRicerca(detto))));
   }
 
   global.SN_URL_NAV = {
