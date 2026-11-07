@@ -83,6 +83,7 @@ class AnteprimeSchede {
   }
 
   get(id) { return this.foto.get(id) || null; }
+  chiusa(id) { return (this.chiuse && this.chiuse.get(id)) || null; }
 
   // Nata in secondo piano: resta «visibile» a 0×0 finché non ha la sua foto (nascosta non si disegna più).
   nataDietro(tab) {
