@@ -189,6 +189,7 @@ const FUORI_DALLA_CHAT = {
   'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
   'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
   'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
+  bluetoothPreferiti: 'i preferiti si mettono e si tolgono a parole con BLUETOOTH (preferito), che trova l\'indirizzo vero del dispositivo detto per nome (#2096)',
   'proxy.': 'il proxy si usa dalla chat con le sue azioni (PROXY_TAB, REGOLA_PROXY_DOMINIO); indirizzi con le credenziali e paese vengono dalla configurazione e dalla scheda',
 };
 function foglieDiSerie(o, base = '', out = []) {
