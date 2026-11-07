@@ -5271,6 +5271,30 @@ async function lettureDeiGettoni(schede, sender, { assistente = false } = {}) {
   if (assistente) for (const l of letture) segnaLetturaAiuto(sender, l);
   return letture;
 }
+// L'Aiuto rimanda la sua cronologia a ogni turno: un messaggio con delle schede riporta la lettura fatta quando è
+// partito, come la chat che la tiene col turno. Si rilegge solo se manca (conversazione nuova, Filo riaperto).
+const lettureGettoniAiuto = new WeakMap(); // webContents → indirizzo → lettura
+async function lettureDellAiuto(schede, sender) {
+  const wc = sender && sender.wc;
+  const gia = (wc && lettureGettoniAiuto.get(wc)) || new Map();
+  if (wc) lettureGettoniAiuto.set(wc, gia);
+  const nuove = await lettureDeiGettoni(schede.filter((s) => !gia.has(s.url)), sender);
+  for (const l of nuove) gia.set(l.url, l);
+  const letture = schede.map((s) => gia.get(s.url)).filter(Boolean);
+  for (const l of letture) segnaLetturaAiuto(sender, l);
+  return letture;
+}
+// La cronologia dell'Aiuto con la pagina di ogni scheda accanto al messaggio che l'ha portata.
+async function storiaAiutoConLetture(storia, sender) {
+  const G = globalThis.SN_SCHEDE_IN_CHAT;
+  return Promise.all(storiaAiuto(storia).map(async (m) => {
+    if (!m || !('schede' in m)) return m;
+    const { schede, ...resto } = m;
+    if (resto.role !== 'user' || !G || typeof resto.content !== 'string' || !Array.isArray(schede)) return resto;
+    const nota = notaDeiGettoni(await lettureDellAiuto(G.allinea(resto.content, schede).filter(Boolean), sender));
+    return nota ? { ...resto, content: `${resto.content}\n\n${nota}` } : resto;
+  }));
+}
 function notaDeiGettoni(letture) {
   const pagine = pageReadsForPrompt(letture);
   if (!pagine) return '';
