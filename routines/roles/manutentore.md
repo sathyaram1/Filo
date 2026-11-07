@@ -77,7 +77,10 @@ sua versione e le schede a priorità 3 e 2 (e le ferme). È il contesto piccolo:
   `rileggi` (Opus: tutte quelle che tolgono lavoro, più il campione); in sottofondo, e lo aspetti prima del contesto.
   Un feedback rimasto senza scheda si decide sul titolo, e lo dici nel recap. Un FERMO di `stato` o `scrivi` vuol
   dire che il censimento non sta nei feedback (nessuna scheda, o le poche scritte con `--solo`): si decide sui titoli,
-  e riscriverle tutte (`--da-zero`) è una scelta dell'owner, non tua. Poi `npm run manutentore -- contesto`
+  e riscriverle tutte (`--da-zero`) è una scelta dell'owner, non tua. **Una volta sola, deciso dall'owner** (#2181,
+  le schede di fine ottobre non sono mai arrivate nei feedback): al primo mattino col FERMO, se il taccuino non dice
+  già che l'hai fatto, lancia `scrivi --da-zero` e poi `rileggi`, e scrivi il giorno nel taccuino; poi apri un
+  feedback che toglie dal ruolo questa frase e la sua prova. Poi `npm run manutentore -- contesto`
   per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
   (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
