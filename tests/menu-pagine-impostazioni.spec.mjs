@@ -49,6 +49,51 @@ test('Modelli: la stessa voce sulle impostazioni della pagina', async ({ openTab
   expect(await etichette(page)).toContain('Rimetti di serie');
 });
 
+// Una chiave non entra nel registro dei cambi: tolta, nessun Annulla la riporta. Si chiama per quello che fa, e chiede.
+test('Modelli: sulla chiave OpenRouter la voce è «Togli la chiave», chiede conferma, e il no la lascia', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: 'sk-or-v1-chiave-mia' } }));
+  const page = await openTab('filo://options/options.html');
+  const campo = page.locator('#apiKey');
+  await expect(campo).toBeVisible({ timeout: 10_000 });
+  const chiave = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).apiKeys.openrouter);
+  await campo.click({ button: 'right' });
+  const voci = await etichette(page);
+  expect(voci).toContain('Togli la chiave');
+  expect(voci).not.toContain('Rimetti di serie');
+  await menuDi(page).voce('Togli la chiave').first().click();
+  expect(await confirmText(page)).toContain('incollarla di nuovo');
+  await clickConfirm(page, 'cancel');
+  expect(await chiave()).toBe('sk-or-v1-chiave-mia');
+  await campo.click({ button: 'right' });
+  await menuDi(page).voce('Togli la chiave').first().click();
+  await clickConfirm(page, 'ok');
+  await expect.poll(chiave).toBe('');
+});
+
+test('Sicurezza: «Rimetti di serie» su un elenco scritto dall’utente dice cosa si perde e lo svuota solo col sì', async ({ app, openTab }) => {
+  test.setTimeout(90_000);
+  await app.evaluate(async () => {
+    const s = await globalThis.SN_STORAGE.getSettings();
+    await globalThis.SN_STORAGE.updateSettings({ security: { ...s.security, siteBlock: { ...s.security.siteBlock, blacklist: ['casino.example', 'scommesse.example'] } } });
+  });
+  const elenco = () => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).security.siteBlock.blacklist);
+  const page = await openTab('filo://security/security.html');
+  const campo = page.locator('#sec-siteblock-blacklist');
+  await expect(campo).toBeAttached({ timeout: 10_000 });
+  await campo.click({ button: 'right', force: true });
+  await menuDi(page).voce('Rimetti di serie').first().click();
+  const testo = await confirmText(page);
+  expect(testo).toContain('casino.example');
+  expect(testo).toContain('scommesse.example');
+  await clickConfirm(page, 'cancel');
+  expect(await elenco()).toEqual(['casino.example', 'scommesse.example']);
+  await campo.click({ button: 'right', force: true });
+  await menuDi(page).voce('Rimetti di serie').first().click();
+  await clickConfirm(page, 'ok');
+  await expect.poll(elenco).toEqual([]);
+});
+
 test('Editor: il tasto destro su un documento dell’elenco è di quel documento: Duplica, Rinomina, Elimina', async ({ openTab }) => {
   test.setTimeout(90_000);
   const page = await openTab('filo://editor/editor.html');
