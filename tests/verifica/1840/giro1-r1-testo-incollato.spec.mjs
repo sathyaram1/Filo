@@ -21,9 +21,11 @@ test('r1 un testo incollato in chat è una lettura: il costo 4 dopo un incolla r
     await expect(input).toHaveValue(articolo);
     await page.keyboard.type(' riassumi');
     await page.locator('#sendBtn').click();
-    await expect(page.locator('.dash-bubble').filter({ hasText: 'Ecco il riassunto.' })).toBeVisible({ timeout: 15000 });
-    await expect(page.locator(CONFIRM_HOST), 'dopo un testo incollato il costo 4 non apre il riquadro').toHaveCount(0);
-    await expect(page.locator('.dash-activity').last()).toContainText('Dopo aver letto cose scritte da altri non lo faccio');
+    // Oggi la conversazione resta «pulita»: compare il bottone dell'azione che porta al riquadro con la parola.
+    await expect(page.locator('.dash-activity').last(), 'dopo un testo incollato il costo 4 riceve il no')
+      .toContainText('Dopo aver letto cose scritte da altri non lo faccio', { timeout: 15000 });
+    await expect(page.locator('button.dash-action-btn', { hasText: 'Limite di spesa' })).toHaveCount(0);
+    await expect(page.locator(CONFIRM_HOST)).toHaveCount(0);
     expect((await app.evaluate(() => globalThis.SN_STORAGE.getSettings())).monthlyLimitEur).toBe(5);
   } finally {
     await ripristina(app);
