@@ -279,6 +279,7 @@
         const prima = ta.value.slice(0, da);
         const t = `${prima && !/\s$/.test(prima) ? ' ' : ''}${gettone(n)} `;
         inArrivo = [n];
+        viste = [n, ...viste.filter((s) => s.url !== n.url || s.titolo !== n.titolo)].slice(0, MASSIMO * 4);
         ta.focus();
         ta.setSelectionRange(da, a);
         if (!doc.execCommand('insertText', false, t)) {
