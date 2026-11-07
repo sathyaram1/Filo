@@ -374,7 +374,7 @@
   let ultimoTasto = 0;
   function suFuoco(e) {
     if (Date.now() - ultimoTasto > 1000) return;
-    const t = (e.composedPath && e.composedPath()[0]) || e.target;
+    const t = bersaglio(e);
     let visibileDaTastiera = false;
     try { visibileDaTastiera = t.matches(':focus-visible'); } catch (_) {}
     if (!visibileDaTastiera) return;
