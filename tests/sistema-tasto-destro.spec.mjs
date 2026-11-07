@@ -141,7 +141,7 @@ test('una rete Wi-Fi: Collegati e Dimentica la rete; il volume: valori pronti e 
   await voce(page, 'volume').click();
   await riquadro(page).locator('.dash-sis-cursore input').click({ button: 'right' });
   const delVolume = await etichette(page);
-  for (const v of ['Volume al 0%', 'Volume al 25%', 'Volume al 50%', 'Volume al 100%', 'Metti muto']) expect(delVolume).toContain(v);
+  for (const v of ['Volume allo 0%', 'Volume al 25%', 'Volume al 50%', 'Volume al 100%', 'Metti muto']) expect(delVolume).toContain(v);
   await page.screenshot({ path: 'tests/.shots/2096-sistema-menu-volume.png' });
   await menuDi(page).voce('Volume al 50%').first().click();
   await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.livello)).toBe(50);

@@ -230,3 +230,16 @@ test('le voci si tolgono e si rimettono a parole, una alla volta', () => {
   assert.deepEqual(S.vociVisibili({ homeSistema: { rete: false } }), { ora: true, batteria: true, rete: false, bluetooth: true, volume: true });
   assert.deepEqual(globalThis.SN_CONST.DEFAULT_SETTINGS.homeSistema, { ora: true, batteria: true, rete: true, bluetooth: true, volume: true });
 });
+
+// #2096 — «Volume al 0%» nel tasto destro: l'articolo segue il numero come si legge.
+test('le percentuali si dicono con l\'articolo giusto: allo 0%, all\'8%, al 25%', () => {
+  const S = globalThis.SN_SISTEMA;
+  assert.equal(S.alPercento(0), 'allo 0%');
+  assert.equal(S.alPercento(1), 'all\'1%');
+  assert.equal(S.alPercento(8), 'all\'8%');
+  assert.equal(S.alPercento(11), 'all\'11%');
+  assert.equal(S.alPercento(85), 'all\'85%');
+  assert.equal(S.alPercento(25), 'al 25%');
+  assert.equal(S.alPercento(100), 'al 100%');
+  assert.deepEqual(S.descrivi({ volume: { livello: 0, muto: false } }).volume.dettaglio, ['Volume allo 0%']);
+});
