@@ -187,6 +187,38 @@ test('un agente che scrive nella cartella delle schede non lascia traccia: la gu
   assert.match(err.join('\n'), /CARTELLA DELLE SCHEDE TOCCATA mentre lavoravano gli agenti di #12: 77\.json, 903\.json, indice\.json rimessi com'era/);
 });
 
+// L'indice si aggiorna dopo ogni scheda salvata mentre altri agenti sono ancora in volo (#1680.1 giro 8).
+test('un agente che riscrive l\'indice mentre un altro salva non lo fa passare per buono: la guardia lo rimette e il suo esito non vale', async (t) => {
+  const dir = cartellaTemporanea('schede-indice-in-volo');
+  t.after(() => { togliCartella(dir); rmSync(S.fileChiave(dir), { force: true }); });
+  mkdirSync(dir, { recursive: true });
+  const voci = [{ id: 'a', num: '12', stato: 'todo', aggiornato: 't1' }, { id: 'b', num: '13', stato: 'todo', aggiornato: 't1' }];
+  writeFileSync(join(dir, S.INDICE), JSON.stringify(S.conTimbro({ creato: '2026-11-07T08:00:00.000Z', aperti: voci }, S.chiaveTimbri(dir, { crea: true }))));
+  let partito; const salvaPartita = new Promise((r) => { partito = r; });
+  let fatto; const manomesso = new Promise((r) => { fatto = r; });
+  // #12 legge un testo ostile e, mentre #13 salva (una chiamata di rete), toglie #12 dall'indice; poi lavora ancora.
+  const agente = async ({ num }) => {
+    if (num === '12') {
+      await salvaPartita;
+      writeFileSync(join(dir, S.INDICE), JSON.stringify({ creato: '2026-11-07T08:00:00.000Z', aperti: [voci[1]] }));
+      fatto();
+      await new Promise((r) => setTimeout(r, 50));
+    }
+    return { ok: true, costo: 0, testo: JSON.stringify(buona(num)) };
+  };
+  const salva = async (d) => {
+    if (d.numero === '13') { partito(); await manomesso; }
+    return { ...(await salvaCome(voci)(d)), aggiornato: 't2' };
+  };
+  const err = [];
+  assert.equal(await S.lanciaAgenti(voci, { cartella: dir, modello: 'haiku', paralleli: 2, rilettura: false, dryRun: false, agente, salva, log() {}, err: (m) => err.push(m) }), 3);
+  assert.match(err.join('\n'), /CARTELLA DELLE SCHEDE TOCCATA mentre lavoravano gli agenti di #12: indice\.json/);
+  const letto = S.leggiIndice(dir);
+  assert.deepEqual(letto.aperti.map((f) => [f.num, f.aggiornato]), [['12', 't1'], ['13', 't2']], 'l\'indice è quello dello script, con #13 salvata');
+  assert.equal(letto.fidato, true);
+  assert.equal(existsSync(join(dir, '12.json')), false, 'l\'esito dell\'agente che ha toccato l\'indice non vale');
+});
+
 test('un agente onesto: la scheda la scrive lo script dalla risposta, col timbro; uno fallito non lascia niente', async (t) => {
   const dir = cartellaTemporanea('schede-onesto');
   t.after(() => { togliCartella(dir); rmSync(S.fileChiave(dir), { force: true }); });
