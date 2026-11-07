@@ -94,6 +94,8 @@
     ambito: tipo({ nome: 'nomeAmbito', operazioni: 'operazioniAmbito', nonPuo: 'testoAmbito' }, { bulk: false, consenso: true, attivo: true }),
     esperimento: tipo({}, { bulk: false, consenso: true, attivo: false }),
     compito: tipo({}, { bulk: true, consenso: false, attivo: true }),
+    // Solo in un «da fare» senza lavoro da riprendere: la risposta chiude la domanda e basta (#2229).
+    nessuna: tipo({}, { bulk: false, consenso: false, attivo: true }),
   });
 
   const ha = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
