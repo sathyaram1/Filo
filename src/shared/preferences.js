@@ -2253,8 +2253,8 @@
         + 'tornano a mandare ai modelli.',
     }),
 
-    // Il livello di autonomia è il primo freno: alzarlo è costo 4, abbassarlo 1 (#1312). Il livello attuale ignoto
-    // vale il più stretto, e yolo non si sceglie finché manca il guardiano.
+    // Il livello di autonomia è il primo freno: alzarlo è costo 4, abbassarlo 1 (#1312), con la regola di Preferenze.
+    // Senza le impostazioni attuali ogni cambio vale alzarlo, e yolo non si sceglie finché manca il guardiano.
     // Sta in fondo perché i sinonimi corti («auto») trovino prima le voci di sopra.
     {
       scrive: ['autonomia.livello'],
