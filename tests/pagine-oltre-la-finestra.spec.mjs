@@ -169,7 +169,7 @@ test('le pagine lasciate fuori si rileggono chiedendolo, e la pagina riletta arr
   const page = await openTab(NEWTAB);
   await preparaPagine(app, testServer);
   await modello(app, {
-    finestra: FINESTRA,
+    posto: POSTO,
     piani: [
       ...RICERCA_E_TRE_PAGINE,
       // Turno dopo: l'indirizzo lo prende dal rimando che ha davanti, come farebbe il modello.
