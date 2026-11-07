@@ -983,7 +983,7 @@
     // avviso che passa lo legge solo chi è davanti allo schermo in quel momento.
     var volo = o.inVolo ? o.inVolo(req) : null;
     var prima = volo ? null : (o.esitoIniziale ? o.esitoIniziale(req) : null);
-    if (volo) segui(volo.attesa || ATTESA_CLIC, volo.risposta);
+    if (volo) segui(volo.attesa || ATTESA_CLIC, volo.risposta, volo.daMs);
     else if (prima) {
       say(prima);
       // Già fusa, scartata o sostituita: non c'è più niente da approvare finché la rilettura non la toglie.
