@@ -891,8 +891,8 @@
   const MAX_HIDDEN = 5000;
 
   // Figli della pagina e, se il componente è aperto, quelli del suo albero a parte: in ordine di lettura.
-  // `nascosti` segna i figli come parte di una sezione nascosta.
-  function pushKids(el, stack, shadowRoots, nascosti) {
+  // `nascosti` segna i figli come parte della sezione nascosta `sezione`.
+  function pushKids(el, stack, shadowRoots, nascosti, sezione) {
     const kids = [];
     const shadow = el.shadowRoot;
     if (shadow) {
@@ -901,7 +901,7 @@
     }
     for (const c of el.children) kids.push(c);
     for (let i = kids.length - 1; i >= 0; i--) {
-      if (nascosti) nascosti.add(kids[i]);
+      if (nascosti) nascosti.set(kids[i], sezione);
       stack.push(kids[i]);
     }
   }
