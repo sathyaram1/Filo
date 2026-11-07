@@ -1436,6 +1436,7 @@
     document.removeEventListener('mousedown', onDocPopOutside, true);
   }
   function onDocPopOutside(e) {
+    if (titleMenuEl && titleMenuEl.contains(e.target)) return;
     if (docbarEl && !docbarEl.contains(e.target)) closeDocPop();
   }
   if (docSwitchBtn) {
