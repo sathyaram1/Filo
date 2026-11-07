@@ -263,6 +263,32 @@
       css: '--sn-spell-lampo-durata',
       default: '1000ms',
     },
+    // Il fumetto al passaggio del mouse (#2095): lo stesso nelle pagine (src/shared/suggerimento.js) e nella barra in
+    // alto, dove il main lo passa alla sua finestra (src/main/movimento.js). Il predefinito si legge da qui, non da theme.css.
+    'fumetto.sfondo': {
+      label: 'Sfondo dei suggerimenti al passaggio del mouse',
+      type: 'color',
+      css: '--sn-fumetto-sfondo',
+      default: { light: '#fdf6ec', dark: '#1d1a16' },
+    },
+    'fumetto.testo': {
+      label: 'Testo dei suggerimenti al passaggio del mouse',
+      type: 'color',
+      css: '--sn-fumetto-testo',
+      default: { light: '#2a221a', dark: '#f1e7d6' },
+    },
+    'fumetto.bordo': {
+      label: 'Bordo dei suggerimenti al passaggio del mouse',
+      type: 'color',
+      css: '--sn-fumetto-bordo',
+      default: { light: '#e2d3b5', dark: '#3b332a' },
+    },
+    'fumetto.ritardo': {
+      label: 'Attesa prima che compaia un suggerimento al passaggio del mouse',
+      type: 'time',
+      css: '--sn-fumetto-ritardo',
+      default: '350ms',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
