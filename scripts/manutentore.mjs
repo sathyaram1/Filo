@@ -891,7 +891,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
   ordine | accendi <N,M,…>|--niente | parallelo <N>
-  priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…>
+  priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…> [--server]
   nota <N> - | sblocca <N> [nota] | archivia <N> <originale>
   taccuino | taccuino scrivi - --versione <V> | indicazione "<testo>"
   sveglia-tra <minuti> [--perche "…"] | sveglia-togli | segnali-letti
