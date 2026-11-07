@@ -207,6 +207,8 @@
       // la verità su tutta la pagina. Fino ad allora resta in vista «sto traducendo».
       const frames = await waitForFrames(framesRunId, aborted);
       if (aborted()) return;
+      caricoAtteso.risposto = frames.tutti !== false;
+      if (caricoAtteso.arrivati && !caricoAtteso.risposto) riquadroNelGiro = true;
       // Arrivato a giro avviato, il riquadro è testo nuovo come quello che il sito aggiunge dopo: l'avviso lo dice e
       // l'icona offre di tradurlo.
       if (riquadroNelGiro) newContentSeen = true;
