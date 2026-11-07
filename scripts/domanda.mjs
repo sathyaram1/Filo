@@ -481,6 +481,7 @@ export function formattaElenco(domande) {
     if (b.gruppo) out.push(`  gruppo «${visibile(b.gruppo)}»`);
     for (const d of b.domande) {
       const segni = [visibile(d.stato || '?'), fiduciaDetta(d.fiducia)];
+      if (D.daFare(d)) segni.unshift('da fare');
       if (d.smistamento === 'fallito') segni.push('non riscritta');
       if (D.schedaDi(d) === 'risposte_automatiche') segni.push('automatica');
       out.push(`${b.gruppo ? '    ' : '  '}${visibile(d.id || '?')}  ${visibile(d.titolo || '')}  [${segni.join(' · ')}]`);
