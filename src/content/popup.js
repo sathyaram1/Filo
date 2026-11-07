@@ -999,6 +999,24 @@
     wrap.appendChild(riga);
     return btn;
   }
+  // «Rispondi» accanto a Copia (#2096): la risposta citata apre la domanda dopo, come nelle altre chat.
+  function tastoRispondi(copiaBtn, sorgente, campo) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    const riga = copiaBtn && copiaBtn.parentElement;
+    if (!riga || !A || !campo) return null;
+    const Md = global.SN_MARKDOWN;
+    const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'sn-msg-copia';
+    btn.dataset.etichetta = 'Rispondi';
+    btn.setAttribute('aria-label', 'Rispondi');
+    btn.innerHTML = iconaCopia('reply');
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => { if (e.isTrusted) A.citaNelCampo(campo, testo); });
+    riga.appendChild(btn);
+    return btn;
+  }
 
   // Scrive modello e costo nella riga in basso. Quando lo spazio è così poco
   // che quella riga deve sparire (dentro un riquadro incorporato basso, vedi la
