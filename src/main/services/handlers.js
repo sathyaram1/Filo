@@ -2384,7 +2384,8 @@ async function decisioneComandoAMano({ comando, cwd = '', shell = '', daFuori = 
   let impostazioni = {};
   try { impostazioni = await Storage.getSettings(); } catch (_) {}
   const action = { type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: Object.assign(perimetroLettura(null, cwd), { shell }) };
-  const ing = Levels ? Levels.ingressi(action, { impostazioni }) : null;
+  // Battuto a mano, il comando sono parole dell'utente: un segreto dentro l'ha scritto lui. Incollato no (#1840).
+  const ing = Levels ? Levels.ingressi(action, { impostazioni, richiesta: daFuori === true ? '' : cmd }) : null;
   if (!cmd || !ing) return { risposta: 'no', digita: false, no: 'Questo comando non lo lancio.' };
   const d = decisioneAutonomia(ing, { impostazioni, fontiLette: daFuori === true ? [FONTE_COMANDO_DA_FUORI] : null });
   const contati = ingressiContati(ing, d, { origine: 'chat', dentroPerimetro: ing.dentroPerimetro });
