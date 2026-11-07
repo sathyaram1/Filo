@@ -68,7 +68,7 @@ test('r1 una pagina cancellata dalla cronologia esce subito dal diario sul disco
     await Chats.append('esame1', { role: 'filo', text: 'Qui vicino.', ts: new Date(t0 + 1000).toISOString() });
     return { ts: v.ts, url: 'https://clinica.example/esami' };
   }, ORA_MS);
-  await compattatoreFinto(app);
+  await compattatoreFinto(app, '09:00 cercata la clinica.example per un esame');
   try {
     expect(await compatta(app)).toBe(true);
     expect(await diarioSulDisco(app)).toContain('clinica.example');
