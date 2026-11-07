@@ -925,6 +925,9 @@
     const tutto = nascoste === NASCOSTE.TRADUCI;
     // Elemento → la cima della sezione nascosta che lo contiene.
     const dentroNascosto = new WeakMap();
+    // Le sezioni nascoste con testo da tradurre, e quelle con un componente chiuso che ne ha (isClosedComponent).
+    const sezioniConTesto = new WeakSet();
+    const chiusiInSezione = [];
     // Il tetto si applica a fine camminata, in ordine di priorità: quel che si vede prima delle sezioni nascoste.
     const visti = [];
     const vistiAttr = [];
