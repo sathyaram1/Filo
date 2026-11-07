@@ -1041,7 +1041,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
   // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
-  function nelFiloAiuto(role, text) {
+  function nelFiloAiuto(role, text, schede = []) {
     if (!convFilo || !String(text || '').trim()) return;
     // Nell'Editor la riga è del documento («nell'Editor su tesi»), come quella della chat che c'era lì prima.
     let conv = null;
@@ -1049,7 +1049,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     try {
       chrome.runtime.sendMessage({
         type: MSG.FILO_CONVERSAZIONE_APP, ...(conv || { app: 'aiuto', rif: convFilo, soggetto: paginaOra().titolo }),
-        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text) }],
+        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text), ...(schede.length ? { schede } : {}) }],
       }).catch(() => {});
     } catch (_) {}
   }
