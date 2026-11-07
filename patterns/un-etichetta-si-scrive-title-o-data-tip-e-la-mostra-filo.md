@@ -33,7 +33,7 @@ copre anche il `title` scritto domani da chi non conosce questa regola.
 - Il `title` di un `iframe` resta nativo: serve allo screen reader, e il riquadro è un altro documento.
 
 **Dove si carica.** Dai preload delle pagine di Filo (`internal-preload.js`), dei siti (`page-preload.js`) e dello
-strato dei riquadri, e da `menu.html`. La barra in alto ha il suo fumetto a finestra (`data-tip`, delega in
+strato dei riquadri, e da `menu.html` e `conferma.html` (la conferma sopra un sito, con `filoUi.js` prima). La barra in alto ha il suo fumetto a finestra (`data-tip`, delega in
 `shell.js`), perché la shell sta sotto le pagine. Sentinella: `tests/unit/suggerimentoOvunque.test.mjs`; prove
 nell'app: `tests/suggerimento-filo.spec.mjs`.
 
