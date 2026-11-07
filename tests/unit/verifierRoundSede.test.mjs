@@ -100,9 +100,11 @@ test('solo gli interni contano: un 2e non chiede correzione, un 2i sì', () => {
   assert.equal(interno.consume, 'cap2');
 });
 
-test('gli esterni tornano a parte, ciascuno con la priorità del livello (un 2 nasce a 1), in ogni esito', () => {
+test('gli esterni tornano a parte in ogni esito: un 3 nasce a 3, ogni altro livello a 1 (#2269)', () => {
   const r = decide([f(3, 'e', 'grave altrove'), f(2, 'i', 'qui'), f(0, 'e', 'cosmetico altrove'), f(1, 'e', 'raro altrove', true)]);
-  assert.deepEqual(r.external.map((x) => [x.level, x.priority, x.decision]), [[3, 3, false], [0, 0, false], [1, 1, true]]);
+  assert.deepEqual(r.external.map((x) => [x.level, x.priority, x.decision]), [[3, 3, false], [0, 1, false], [1, 1, true]]);
+  assert.match(R.roundNote({ summary: '', findings: [f(2, 'e', 'altrove')], decision: decide([f(2, 'e', 'altrove')]) }),
+    /a priorità 1 \(un livello 3 a priorità 3, che parte subito\): il resto lo mette in lavoro il manutentore, nell'ordine/);
   assert.deepEqual(livelli(r.fix), ['2i']);
   // Anche a lavoro fermo: sono di un altro lavoro, e ne escono.
   const fermo = decide([f(3, 'i', 'qui', true), f(2, 'e', 'altrove')]);
