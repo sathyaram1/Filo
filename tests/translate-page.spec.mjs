@@ -1575,7 +1575,8 @@ test('solo quando apro: le sezioni ripiegate non si pagano in anticipo, comunque
   expect(pagate, `ripiegature spedite al modello: ${pagate.join(', ')}`).toEqual([]);
 });
 
-test('solo quando apro: aperta una sezione ripiegata, l\'icona Traduci offre di tradurre il testo scoperto', async ({ app, openTab, testServer }) => {
+test('solo quando apro: aperta una sezione ripiegata, si traduce da sola comunque il sito l\'abbia chiusa', async ({ app, openTab, testServer }) => {
+  test.setTimeout(120000);
   await stubTranslationProvider(app);
   await soloQuandoApro(app);
   const page = await testServer.openReady(openTab, RIPIEGATE);
@@ -1584,43 +1585,51 @@ test('solo quando apro: aperta una sezione ripiegata, l\'icona Traduci offre di 
   await expect(page.locator('#vis')).toHaveText(/^IT /, { timeout: 30000 });
   await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
 
+  // Il testo proprio della sezione, senza quello dei figli (la domanda della fisarmonica era già tradotta).
+  const proprio = (id) => page.evaluate((i) => Array.from(document.getElementById(i).childNodes)
+    .filter((n) => n.nodeType === 3).map((n) => n.nodeValue).join('').trim(), id);
   // La sezione la apre l'utente: il suo clic nella pagina è quello che dice a Filo di riguardare cosa si vede.
-  const label = async (apri, chiudi) => {
+  const tradotta = async (apri, id) => {
     await page.evaluate(apri);
     await page.locator('#vis').click();
-    await page.waitForTimeout(120);
-    const btn = await iconaTraduci(app);
-    const offre = await expect(btn).toHaveAttribute('aria-label', 'Traduci il testo nuovo', { timeout: 3000 }).then(() => true, () => false);
-    const l = offre ? 'Traduci il testo nuovo' : await btn.getAttribute('aria-label');
-    await comandaBarra(app, 'chiudi');
-    await page.evaluate(chiudi);
-    await page.waitForTimeout(120);
-    return l;
+    return expect.poll(() => proprio(id), { timeout: 4000 }).toMatch(/^IT /).then(() => true, () => false);
   };
 
-  // Prima di toccare niente l'icona torna all'originale: è il metro degli altri.
+  const casi = [
+    ['fisarmonica con riquadro', () => { document.getElementById('dWrap').open = true; }, 'pWrap'],
+    ['fisarmonica senza riquadro', () => { document.getElementById('dBare').open = true; }, 'dBare'],
+    ['pannello schiacciato', () => { document.getElementById('pMax').style.maxHeight = 'none'; }, 'pMax'],
+    ['pannello spento', () => { document.getElementById('pNone').style.display = 'block'; }, 'pNone'],
+    ['pannello trasformato', () => { document.getElementById('pScale').style.transform = 'none'; }, 'pScale'],
+    ['pannello fuori pagina', () => { document.getElementById('pOff').style.left = '0'; }, 'pOff'],
+    ['pannello trasparente', () => { document.getElementById('pFade').style.opacity = '1'; }, 'pFade'],
+    ['cassetto oltre il bordo destro', () => { document.getElementById('pRight').style.right = '0'; }, 'pRight'],
+    ['cassetto traslato a destra', () => { document.getElementById('pSlide').style.transform = 'none'; }, 'pSlide'],
+    ['pannello mascherato via', () => { document.getElementById('pClip').style.clipPath = 'none'; }, 'pClip'],
+    ['pannello schiacciato dalla scrittura breve', () => { document.getElementById('pProp').style.scale = 'none'; }, 'pProp'],
+    ['pannello trasparente per un filtro', () => { document.getElementById('pFilt').style.filter = 'none'; }, 'pFilt'],
+  ];
+  const inglesi = [];
+  for (const [nome, apri, id] of casi) {
+    if (!await tradotta(apri, id)) inglesi.push(nome);
+  }
+  expect(inglesi, `ripiegature che, aperte, restano in inglese: ${inglesi.join(', ')}`).toEqual([]);
+});
+
+test('solo quando apro: una sezione che si apre senza un clic dell\'utente la offre l\'icona Traduci', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  await soloQuandoApro(app);
+  const page = await testServer.openReady(openTab, RIPIEGATE);
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
   await expect(await iconaTraduci(app)).toHaveAttribute('aria-label', 'Mostra originale');
   await comandaBarra(app, 'chiudi');
-
-  const casi = [
-    ['fisarmonica con riquadro', () => { document.getElementById('dWrap').open = true; }, () => { document.getElementById('dWrap').open = false; }],
-    ['fisarmonica senza riquadro', () => { document.getElementById('dBare').open = true; }, () => { document.getElementById('dBare').open = false; }],
-    ['pannello schiacciato', () => { document.getElementById('pMax').style.maxHeight = 'none'; }, () => { document.getElementById('pMax').style.maxHeight = '0'; }],
-    ['pannello spento', () => { document.getElementById('pNone').style.display = 'block'; }, () => { document.getElementById('pNone').style.display = 'none'; }],
-    ['pannello trasformato', () => { document.getElementById('pScale').style.transform = 'none'; }, () => { document.getElementById('pScale').style.transform = 'scaleY(0)'; }],
-    ['pannello fuori pagina', () => { document.getElementById('pOff').style.left = '0'; }, () => { document.getElementById('pOff').style.left = '-9999px'; }],
-    ['pannello trasparente', () => { document.getElementById('pFade').style.opacity = '1'; }, () => { document.getElementById('pFade').style.opacity = '0'; }],
-    ['cassetto oltre il bordo destro', () => { document.getElementById('pRight').style.right = '0'; }, () => { document.getElementById('pRight').style.right = '-9999px'; }],
-    ['cassetto traslato a destra', () => { document.getElementById('pSlide').style.transform = 'none'; }, () => { document.getElementById('pSlide').style.transform = 'translateX(100%)'; }],
-    ['pannello mascherato via', () => { document.getElementById('pClip').style.clipPath = 'none'; }, () => { document.getElementById('pClip').style.clipPath = 'inset(100%)'; }],
-    ['pannello schiacciato dalla scrittura breve', () => { document.getElementById('pProp').style.scale = 'none'; }, () => { document.getElementById('pProp').style.scale = '1 0'; }],
-    ['pannello trasparente per un filtro', () => { document.getElementById('pFilt').style.filter = 'none'; }, () => { document.getElementById('pFilt').style.filter = 'opacity(0)'; }],
-  ];
-  const muti = [];
-  for (const [nome, apri, chiudi] of casi) {
-    if (await label(apri, chiudi) !== 'Traduci il testo nuovo') muti.push(nome);
-  }
-  expect(muti, `ripiegature che, aperte, non fanno offrire niente: ${muti.join(', ')}`).toEqual([]);
+  await page.evaluate(() => { document.getElementById('pNone').style.display = 'block'; });
+  await page.waitForTimeout(2500);
+  await expect(page.locator('#pNone')).not.toHaveText(/^IT /);
+  await traduciIlTestoNuovo(app);
+  await expect(page.locator('#pNone')).toHaveText(/^IT /, { timeout: 30000 });
 });
 
 test('solo quando apro: il testo scoperto si traduce senza rispedire al modello la pagina già tradotta', async ({ app, openTab, testServer }) => {
