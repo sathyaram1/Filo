@@ -222,14 +222,28 @@ button.sn-mac-origin-link:focus-visible { outline: 2px solid var(--sn-accent); o
 .sn-mac-status[data-kind='warn'] { color: var(--sn-fg); }
 .sn-mac-status[data-kind='err']  { color: var(--sn-error); }
 .sn-mac-status[data-kind='wait'] { color: var(--sn-fg); }
-/* Fusione in volo: la rotella accanto alla frase dice che il server ci sta lavorando. */
-.sn-mac-card.is-merging .sn-mac-status { display: flex; align-items: center; gap: 7px; }
-.sn-mac-card.is-merging .sn-mac-status::before {
+/* Il tempo dal sì accanto alla frase: cifre a larghezza fissa, così il testo non balla a ogni secondo. */
+.sn-mac-trascorso {
+  margin-left: 6px;
+  color: var(--sn-muted);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+/* Fusione in volo: la rotella sta sul tasto, che resta pieno di colore. Spento e sbiadito vuol dire solo «non si può». */
+.sn-mac-btn-go.is-fondendo,
+.sn-mac-btn-go.is-fondendo:disabled {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  opacity: 1;
+  cursor: progress;
+}
+.sn-mac-btn-go.is-fondendo::before {
   content: '';
   flex: 0 0 auto;
-  width: 12px;
-  height: 12px;
-  border: 2px solid var(--sn-border);
+  width: 10px;
+  height: 10px;
+  border: 2px solid color-mix(in srgb, var(--sn-accent) 30%, transparent);
   border-top-color: var(--sn-accent);
   border-radius: 50%;
   animation: sn-mac-gira calc(0.8s * var(--sn-motion, 1)) linear infinite;
