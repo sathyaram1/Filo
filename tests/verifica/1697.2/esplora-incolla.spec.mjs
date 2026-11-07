@@ -168,7 +168,8 @@ test('paragrafo vuoto in mezzo e righe vuote', async ({ openTab }) => {
   const t = Array.from({ length: 200 }, (_, i) => (i % 3 === 0 ? '' : `riga numero ${i} del testo incollato`)).join('\n') + '\n';
   const ms = await incolla(page, t);
   const s = await stato(page);
-  console.log('vuoto in mezzo', ms, JSON.stringify(s).slice(0, 400), s.coda);
+  console.log('vuoto in mezzo', ms, s.html.slice(0, 200));
+  console.log('vuoto in mezzo CODA', s.coda);
   await page.keyboard.press(`${ctrl}+z`);
   console.log('annulla', JSON.stringify(await stato(page)));
 });
