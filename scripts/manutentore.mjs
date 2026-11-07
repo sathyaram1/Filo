@@ -1063,8 +1063,11 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       return esito(r, (x) => (togli ? `#${x.numero} non aspetta più #${x.tolta}.` : x.gia ? `#${numeroDi(arg)} aspettava già #${numeroDi(argv[2])}.` : `#${x.numero} aspetta #${x.aspetta}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : ''}.`));
     }
     case 'pacchetto': {
-      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).numeri });
-      return esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
+      const server = vuoleServer(argv);
+      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).numeri, ...(server ? { lavoroServer: true } : {}) });
+      const fatto = esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
+      if (!fatto) segnoServer(server, r);
+      return fatto;
     }
     case 'nota': case 'sblocca': {
       const testo = cmd === 'nota' ? (await leggiStdin()).trim() : (richiestaSblocca(argv.slice(1)).testo || 'Sbloccato dal manutentore: riprendi.');
