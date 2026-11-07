@@ -513,10 +513,12 @@ test('dopoIlConflitto: il lavoro di una routine si riallinea da solo, il resto d
 test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il browser leggono la stessa frase', () => {
   const ria = { origin: 'routine', feedbackId: 'x' };
   assert.equal(UI.testoRiallineamento(ria, true), UI.RIALLINEA_DA_SOLA);
-  assert.match(UI.testoRiallineamento(ria, false), /non è andato: rimetti la sua pratica In coda/);
+  // #2193: In coda riallinea il ramo approvato, non rifà il lavoro da zero.
+  assert.match(UI.testoRiallineamento(ria, false), /pratica In coda la routine riallinea il ramo che avevi approvato/);
+  assert.doesNotMatch(UI.testoRiallineamento(ria, false), /giro nuovo/);
   const ignoto = UI.testoRiallineamento(ria, null);
   assert.notEqual(ignoto, UI.RIALLINEA_DA_SOLA);
-  assert.match(ignoto, /se in Gestione è ferma, rimettila In coda/);
+  assert.match(ignoto, /se in Gestione è ferma, rimettila In coda e la routine riallinea il ramo che avevi approvato/);
   // Chi non si riallinea da solo dice cosa fare, qualunque cosa si sappia della pratica.
   for (const s of [false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s), /npm run finish/);
   assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
