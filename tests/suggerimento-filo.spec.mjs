@@ -4,6 +4,7 @@
 // a capo. Più gli hover che mancavano: invio, crocette, immagini, Aiuto, riquadro.
 
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
+import { paginaDelloStrato } from './helpers/riquadri.mjs';
 
 const fumetto = (page) => page.locator('[data-sn-fumetto] .tip');
 const haTitolo = (loc) => loc.evaluate((el) => el.hasAttribute('title'));
