@@ -108,14 +108,9 @@
       if (t) esito(t, ok);
       return ok;
     }
-    function tasto(azione) {
-      const b = document.createElement('button');
-      b.type = 'button';
-      b.className = cl.tasto;
+    function tastoDi(azione) {
+      const b = tasto(DEF[azione], cl.tasto);
       b.dataset.azione = azione;
-      b.dataset.etichetta = DEF[azione].etichetta;
-      b.setAttribute('aria-label', DEF[azione].etichetta);
-      b.innerHTML = icona(DEF[azione].icona);
       return b;
     }
     function creaBarra() {
