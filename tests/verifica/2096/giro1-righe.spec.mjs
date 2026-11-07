@@ -50,10 +50,9 @@ test('riga «Volume al 40%» nella chat: il tasto destro annulla e il volume tor
   await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.livello), { timeout: 20_000 }).toBe(40);
   const riga = page.locator('.dash-activity-row', { hasText: 'Volume al 40%' }).first();
   await expect(riga).toBeAttached();
-  if (!(await riga.isVisible())) {
-    const blocco = page.locator('.dash-activity', { has: riga }).first();
-    await blocco.locator('.dash-activity-head').first().click();
-  }
+  const blocco = page.locator('#bubbles .dash-activity').last();
+  if (await blocco.getAttribute('data-filo') === 'gomitolo') await blocco.locator('.dash-activity-head').click();
+  if (!(await riga.isVisible())) await blocco.locator('.dash-activity-seg-head').last().click();
   await expect(riga).toBeVisible({ timeout: 5_000 });
   await riga.click({ button: 'right' });
   const voce = page.locator('.sn-menu-item', { hasText: 'Annulla' });
