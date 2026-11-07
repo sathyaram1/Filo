@@ -525,7 +525,7 @@ test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il b
   assert.doesNotMatch(UI.testoRiallineamento(ria, false, { domanda: '<b>x</b>' }), /<b>/);
   assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'tetto' } }, false, { domanda: 'D-7' }), /si è fermato: si era già riallineato/);
   assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'nuovo_motivo' } }, false), /si è fermato: nuovo_motivo\./);
-  // I fermi passeggeri del server non si stampano come codice: dicono che la pratica è ferma.
+  // I fermi passeggeri del server (#2193) non si stampano come codice: dicono che la pratica è ferma.
   for (const motivo of ['stato', 'domanda']) {
     const t = UI.testoRiallineamento({ ...ria, realignBlocked: { motivo } }, false);
     assert.doesNotMatch(t, new RegExp(`fermato: ${motivo}`), motivo);
