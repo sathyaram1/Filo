@@ -675,13 +675,26 @@ const segnalazioneRiga = (r) => {
 // Il numero è quello che la riga riscritta cita in `da`: features e fixes contati di seguito, come in controllaNovita.
 const rigaPerIlRedattore = (r, n) => `${n}. ${segnalazioneRiga(r) ? `[segnalazione ${segnalazioneRiga(r)}] ` : ''}${unaRiga(testoRiga(r))}`;
 
-/** Il contesto apposito del redattore: le righe dei worker, il manifesto, i titoli della rosa e delle 3. PURA. */
-export function contestoRedattore({ blocco, capacita = '', schede = [], commit = '', motivo = '' }) {
+/**
+ * I lavori su cui il redattore può promettere: quelli nell'ordine, nella sua sequenza, e le priorità 3. La priorità 2
+ * non basta (#2269): un lavoro parte solo dall'ordine. → { ordine: schede[], tre: schede[], ammessi: Map }. PURA.
+ */
+export function lavoriPromettibili(schede = [], ordine = []) {
+  const perNum = new Map((schede || []).filter((s) => s && s.num).map((s) => [String(s.num), s]));
+  const tre = [...perNum.values()].filter((s) => s.priorita === 3);
+  const nellOrdine = [...new Set((ordine || []).map((n) => String(n).replace(/^#/, '')))]
+    .map((n) => perNum.get(n)).filter((s) => s && s.priorita !== 3);
+  return { ordine: nellOrdine, tre, ammessi: new Map([...nellOrdine, ...tre].map((s) => [String(s.num), s])) };
+}
+
+/** Il contesto apposito del redattore: le righe dei worker, il manifesto, i titoli dei lavori dell'ordine e delle 3. PURA. */
+export function contestoRedattore({ blocco, capacita = '', schede = [], ordine = [], commit = '', motivo = '' }) {
   const b = blocco || {};
   const da = commit
     ? [`Le righe sono quelle del commit ${unaRiga(commit).slice(0, 12)}, l'ultimo di main con la suite verde: la pubblicazione costruisce lui o uno dopo, e le righe fuse dopo restano accanto alla riscrittura.`]
     : [`Non so quale commit costruirà la pubblicazione (${unaRiga(motivo || 'nessun motivo')}): le righe sono quelle di questa cartella. Se la pubblicazione costruisce un commit che non le ha tutte, la riscrittura non esce.`];
-  const conTitolo = (p) => (schede || []).filter((s) => s.priorita === p).map((s) => `#${unaRiga(s.num)}${s.titolo ? ` ${unaRiga(s.titolo)}` : ''}`);
+  const lavori = lavoriPromettibili(schede, ordine);
+  const titoli = (elenco) => elenco.map((s) => `#${unaRiga(s.num)}${s.titolo ? ` ${unaRiga(s.titolo)}` : ''}`);
   return [
     '# Il redattore delle novità',
     '',
