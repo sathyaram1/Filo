@@ -35,7 +35,7 @@ test('r1 riaperta, OK a un comando e no all\'altro della stessa risposta: la rip
     await expect(page.locator('.dash-bubble-filo', { hasText: 'Aspetto i tuoi OK' })).toBeVisible({ timeout: 10_000 });
     await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
     const chat = await chatCon(app, 'crea le cartelle sei e otto');
-    // Come dopo un riavvio: al modello resta solo quello che l'archivio ha scritto.
+    // Come dopo un riavvio: al modello resta solo quello che l'archivio ha scritto su disco.
     await app.evaluate((_e, c) => globalThis.SN_CONTESTO_FILO.dimentica(c), chat.id);
     await app.evaluate((_e, c) => globalThis.SN_CLOSE_FILO_CHAT(c), chat.id);
     await page.goto(`filo://dashboard/dashboard.html?chat=${encodeURIComponent(chat.id)}`);
