@@ -162,7 +162,9 @@ test('la riga di sistema nella chat: apre il riquadro della sua voce e si annull
   const blocco = page.locator('#bubbles .dash-activity').last();
   await expect(blocco).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
   if (await blocco.getAttribute('data-filo') === 'gomitolo') await blocco.locator('.dash-activity-head').click();
-  const riga = blocco.locator('.dash-activity-row:visible', { hasText: 'Volume al 60%' }).first();
+  // La riga sta nel nodo del suo giro di azioni: si apre col suo nome.
+  const riga = blocco.locator('.dash-activity-row', { hasText: 'Volume al 60%' }).first();
+  if (!(await riga.isVisible())) await blocco.getByRole('button', { name: 'Cambiato il volume' }).click();
   await expect(riga).toBeVisible();
   await riga.click({ button: 'right' });
   const voci = await etichette(page);
