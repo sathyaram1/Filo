@@ -678,7 +678,6 @@
     if (o.ok !== false && !o.gia && !Array.isArray(o.elenco)) {
       if (cosa === 'volume' && typeof o.prima === 'number' && o.prima !== o.volume) annulla = { cosa, livello: o.prima };
       else if (typeof o.acceso === 'boolean') annulla = { cosa, acceso: !o.acceso };
-      else if (cosa === 'bluetooth' && o.dispositivo && typeof o.preferito === 'boolean') annulla = { cosa, dispositivo: o.dispositivo, preferito: !o.preferito };
       else if (cosa === 'bluetooth' && o.dispositivo && typeof o.collegato === 'boolean') annulla = { cosa, dispositivo: o.dispositivo, collega: !o.collegato };
     }
     riga._sistema = { voce: cosa === 'wifi' ? 'rete' : cosa, annulla };
