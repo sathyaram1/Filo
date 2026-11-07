@@ -114,11 +114,27 @@ function provenienzaDi(info) {
 // Le quattro risposte che una pagina aspetta prima dei suoi script: finché non arrivano la pagina è ferma. Il frame
 // principale le chiede tutte in una chiamata sola (`filo:avvio-pagina`, #1093); i canali singoli restano per chi ne
 // chiede una dopo. Quanto ci mette ognuna lo contano i contatori anonimi (#1466); da una finestra incognito no.
+// `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
+// `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
+const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
+const SONDA_FP = !!process.env.FILO_USER_DATA;
+// `esenti`: nel sito del documento alcune pagine sono esenti, e la guardia non prepara da fuori chi non ha il preload.
+const conCanale = (cfg, href) => (cfg && cfg.level > 0
+  ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP, esenti: require('./services/fingerprint').esentiNelSito(href) } : cfg);
+
 const RISPOSTE_DI_AVVIO = {
   // { level, seed }: il master secret NON attraversa mai qui.
-  'fp-config': (event, href) => {
+  // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
+  'fp-config': (event, href, opts) => {
     try {
-      return require('./services/fingerprint').configForHref(href, ambitoIncognitoDi(senderInfo(event)));
+      const F = require('./services/fingerprint');
+      const ambito = ambitoIncognitoDi(senderInfo(event));
+      const fr = event.senderFrame;
+      if (fr ? !fr.parent : !(opts && opts.riquadro)) return conCanale(F.configForHref(href, ambito), href);
+      const catena = [];
+      for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
+      const web = catena.find((u) => /^https?:/i.test(u)) || '';
+      return catena.length > 1 ? conCanale(F.configForFrames(catena, ambito), web) : { level: 0, seed: 0 };
     } catch (_) {
       return { level: 0, seed: 0 };
     }
@@ -180,62 +196,18 @@ function registerIpcHandlers() {
     shellSessions.clear();
   });
 
-  // SINCRONO perché il preload deve installare gli override PRIMA degli script
-  // di pagina. Passa { level, seed }: il master secret NON attraversa mai qui.
-  // Per un riquadro conta la catena dei frame vista dal main, non l'indirizzo che il riquadro dichiara (#798).
-  // `canale`: il tipo dell'evento con cui un riquadro chiede la guardia di chi lo contiene, segreto per la sessione.
-  // `sonda`: nelle prove la guardia si lascia riconoscere (preload/fingerprint-guard.js), fuori mai.
-  const CANALE_FP = 'x' + require('crypto').randomBytes(16).toString('hex');
-  const SONDA_FP = !!process.env.FILO_USER_DATA;
-  // `esenti`: nel sito del documento alcune pagine sono esenti, e la guardia non prepara da fuori chi non ha il preload.
-  const conCanale = (cfg, href) => (cfg && cfg.level > 0
-    ? { ...cfg, canale: CANALE_FP, sonda: SONDA_FP, esenti: require('./services/fingerprint').esentiNelSito(href) } : cfg);
-  ipcMain.on('filo:fp-config', cronometrata('fp-config', (event, href, opts) => {
-    try {
-      const F = require('./services/fingerprint');
-      const ambito = ambitoIncognitoDi(senderInfo(event));
-      const fr = event.senderFrame;
-      if (fr ? !fr.parent : !(opts && opts.riquadro)) { event.returnValue = conCanale(F.configForHref(href, ambito), href); return; }
-      const catena = [];
-      for (let f = fr; f; f = f.parent) catena.push(String(f.url || ''));
-      const web = catena.find((u) => /^https?:/i.test(u)) || '';
-      event.returnValue = catena.length > 1 ? conCanale(F.configForFrames(catena, ambito), web) : { level: 0, seed: 0 };
-    } catch (_) {
-      event.returnValue = { level: 0, seed: 0 };
-    }
-  }));
-
-  // #754 — la pagina che sta per caricarsi, prima degli script del sito: la risposta al banner dei cookie da
-  // togliere dalla sua memoria, se il sito ha cambiato elenco. SINCRONO per lo stesso motivo di fp-config.
-  ipcMain.on('filo:cookie-wipe', cronometrata('cookie-wipe', (event, href) => {
-    let out = null;
-    try {
-      const wc = event.sender;
-      const top = event.senderFrame && wc.mainFrame && event.senderFrame.frameTreeNodeId === wc.mainFrame.frameTreeNodeId;
-      if (top) {
-        for (const w of BrowserWindow.getAllWindows()) {
-          const tm = w._filoTabs;
-          if (tm && tm.tabs && tm.tabs.some((t) => t.view && t.view.webContents === wc)) {
-            out = tm.takeCookieWipe(String(href || ''));
-            // La memoria della pagina che «Resta connesso» ha portato nel jar nuovo (tabs/tabRestaConnesso.js).
-            const semina = tm.takeSemina(wc, String(href || ''));
-            if (semina) out = { ...(out || {}), semina: semina.locale, seminaSessione: semina.sessione, seminaDb: semina.database };
-            break;
-          }
-        }
-      }
-    } catch (_) { out = null; }
-    event.returnValue = out;
-  }));
-
-  // #576 — i riquadri pubblicitari da nascondere nella pagina che sta per caricarsi: SINCRONO, o compaiono prima.
-  ipcMain.on('filo:adblock-css', cronometrata('adblock-css', (event, href, gate) => {
-    try {
-      event.returnValue = require('./services/adblock').cosmeticForPage(String(href || ''), gate);
-    } catch (_) {
-      event.returnValue = { css: '', tokens: false };
-    }
-  }));
+  // SINCRONI perché il preload deve installare tutto PRIMA degli script di pagina.
+  ipcMain.on('filo:avvio-pagina', (event, href, gate) => {
+    event.returnValue = {
+      fp: rispostaDiAvvio('fp-config', event, href),
+      adblock: rispostaDiAvvio('adblock-css', event, href, gate),
+      cookie: rispostaDiAvvio('cookie-wipe', event, href),
+      permessi: rispostaDiAvvio('permessi-stato', event, href),
+    };
+  });
+  for (const canale of Object.keys(RISPOSTE_DI_AVVIO)) {
+    ipcMain.on(`filo:${canale}`, (event, ...args) => { event.returnValue = rispostaDiAvvio(canale, event, ...args); });
+  }
 
   // #1974 — le regole che tolgono le pubblicità di YouTube: SINCRONO, devono girare prima degli script del sito.
   ipcMain.on('filo:youtube-regole', (event, href) => {
