@@ -66,8 +66,10 @@ mattina dopo, il manutentore toglie dal taccuino le regole che la descrivevano.
 
 Può, da solo e senza passare dall'owner:
 
-- scrivere l'**ordine** dei feedback e il **parallelismo N**; il server accende
-  una sessione per feedback nell'ordine, fino a N, come in #1680;
+- scrivere l'**ordine** dei feedback e dei compiti e il **parallelismo N**; il
+  server accende una sessione per lavoro nell'ordine, fino a N, come in #1680,
+  e le sessioni libere (compiti, sessioni accese a mano) seguono la stessa
+  sequenza;
 - cambiare le **priorità** (0, 1, 2; creare 3; mai abbassare una 3);
 - comporre **pacchetti** (SPEC-RIDISEGNO-LAVORO § 3.1) e mettere **attese**
   fra feedback;
