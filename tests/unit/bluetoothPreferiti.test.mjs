@@ -11,8 +11,13 @@ for (const m of ['constants', 'contenutoEsterno', 'nomiSito', 'tasti', 'preferen
 const P = globalThis.SN_PREF;
 const s = P.setterDi('bluetoothPreferiti');
 
-test('la chiave dei preferiti scrive l\'elenco degli indirizzi, e l\'elenco nuovo parte da quello di adesso', () => {
+test('la chiave dei preferiti scrive l\'elenco degli indirizzi, e l\'elenco nuovo parte da quello di adesso', (t) => {
   assert.ok(s, 'nessuna chiave scrive bluetoothPreferiti');
+  // La forma di Linux, qualunque sia la macchina che prova.
+  const C = require('../../src/main/services/comandiSistema.js');
+  const prima = globalThis.SN_COMANDI_SISTEMA;
+  globalThis.SN_COMANDI_SISTEMA = { normalizzaIndirizzo: (p) => C.normalizzaIndirizzo(p, 'linux') };
+  t.after(() => { globalThis.SN_COMANDI_SISTEMA = prima; });
   const correnti = { bluetoothPreferiti: ['00:11:22:33:44:55', '66:77:88:99:AA:BB'] };
   const togli = s.build('togli 00:11:22:33:44:55');
   assert.deepEqual(togli.elenco, { percorso: 'bluetoothPreferiti', op: 'togli', voci: ['00:11:22:33:44:55'], nome: 'Dispositivi Bluetooth preferiti' });
