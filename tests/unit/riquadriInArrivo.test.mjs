@@ -129,6 +129,23 @@ test('il preload del riquadro, appena parte, dice a chi lo ospita che da adesso 
   assert.equal(f.tocchi, 0);
 });
 
+test('#1290.2 — un riquadro è caricato solo dopo il suo load sul documento; rimesso nella pagina ricomincia', () => {
+  const R = carica();
+  const win = finestraFinta();
+  R.osserva(win);
+  const f = riquadro(win, { src: 'https://altro.example/post' });
+  assert.equal(R.caricato(f), false, 'il testo può esserci già, le immagini e gli script no');
+  win.document.finito(f);
+  assert.equal(R.caricato(f), true);
+  win.rimesso(f);
+  assert.equal(R.caricato(f), false, 'rimesso nella pagina, ricarica da capo');
+  win.document.finito(f);
+  win.rimesso({ nodeType: 1, firstElementChild: {}, getElementsByTagName: () => [f] });
+  assert.equal(R.caricato(f), false, 'rimesso dentro un contenitore');
+  assert.equal(R.caricato(riquadro(win, { src: '/x', ombra: true })), null, 'in una radice ombra il load non arriva: non si sa');
+  assert.equal(carica().caricato(f), null, 'senza il conto dei load non si sa');
+});
+
 test('in una radice ombra il load non si vede: si fa come prima, e lo dice', () => {
   const R = carica();
   const win = finestraFinta();
