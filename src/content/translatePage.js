@@ -804,7 +804,10 @@
   // un clic su Traduci (#1290.2). Si riguarda qualche volta perché il sito la apre spesso con un'animazione.
   const APERTURA_MS = [250, 900, 1800];
   let aperturaTimer = null;
+  // Un tocco a giro in corso si riguarda a giro finito: la sezione aperta mentre si traduce non resta in inglese.
+  let aperturaInSospeso = false;
   function forseAperta() {
+    if (pageTranslating && isTopFrame()) { aperturaInSospeso = true; return; }
     const vale = () => modoUltimo === Extract.NASCOSTE.RIMANDA && isTopFrame() && pageHasTranslation && pageComplete
       && !pageTranslating && (hiddenSkipped.length > 0 || hiddenFrames.length > 0);
     if (!vale()) return;
