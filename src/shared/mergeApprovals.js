@@ -1031,7 +1031,7 @@
   }
   /**
    * La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea.
-   * `dettagli` = { domanda: 'D-12' che la pratica aspetta, motivo: fermo che la pagina conosce }. PURA.
+   * `dettagli.domanda` = la domanda ('D-12') che la pratica aspetta, se la pagina la conosce. PURA.
    */
   function esitoRiallineamento(req, inCorso, dettagli) {
     var fermo = inCorso === false ? 'fallito' : 'da_guardare';
