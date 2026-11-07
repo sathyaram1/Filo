@@ -327,6 +327,33 @@ namespace FiloWlan {
       } finally { WlanCloseHandle(h, IntPtr.Zero); }
       return e;
     }
+
+    // #2096 — il profilo si toglie da ogni interfaccia che lo conosce; Confermato se almeno una l'ha tolto.
+    public static EsitoWlan Dimentica(string profilo) {
+      EsitoWlan e = new EsitoWlan();
+      IntPtr h;
+      int negoziata;
+      e.Codice = WlanOpenHandle(2, IntPtr.Zero, out negoziata, out h);
+      if (e.Codice != 0) return e;
+      try {
+        int c;
+        List<Guid> ids = Interfacce(h, out c);
+        if (c != 0) { e.Codice = c; return e; }
+        e.Interfacce = ids.Count;
+        int negati = 0;
+        foreach (Guid id in ids) {
+          List<string> nomi = Profili(h, id, out c);
+          if (c == 5) negati++;
+          if (c != 0 || !nomi.Contains(profilo)) continue;
+          Guid scelta = id;
+          int d = WlanDeleteProfile(h, ref scelta, profilo, IntPtr.Zero);
+          if (d == 0) e.Confermato = true; else e.Codice = d;
+        }
+        if (e.Confermato) e.Codice = 0;
+        else if (e.Codice == 0) e.Codice = negati > 0 ? 5 : 1168;
+      } finally { WlanCloseHandle(h, IntPtr.Zero); }
+      return e;
+    }
   }
 }
 `;
