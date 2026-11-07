@@ -136,6 +136,18 @@ test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono
   await pref.locator('.sn-token-row[data-token="fumetto.ritardo"] .sn-token-reset').click();
 });
 
+test('tema scuro: il fumetto prende la carta scura della barra', async ({ openTab }) => {
+  const page = await openTab('filo://preferences/preferences.html');
+  await pronta(page);
+  await page.evaluate(() => { document.documentElement.dataset.snTheme = 'dark'; });
+  const { el, titolo } = await unTitoloVisibile(page);
+  await el.hover();
+  await expect(fumetto(page)).toHaveText(titolo);
+  const stile = await fumetto(page).evaluate((e) => ({ sfondo: getComputedStyle(e).backgroundColor, testo: getComputedStyle(e).color }));
+  expect(stile).toEqual({ sfondo: 'rgb(29, 26, 22)', testo: 'rgb(241, 231, 214)' });
+  await page.screenshot({ path: 'tests/.shots/2095-preferenze-scuro.png' });
+});
+
 test('Gestione: anche le pagine dell\'owner escono nel fumetto', async ({ openTab }) => {
   const page = await openTab('filo://manage/manage.html');
   await pronta(page);
