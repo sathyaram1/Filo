@@ -655,6 +655,7 @@
     // Un riquadro fuori conto non copre il silenzio di uno contato: i suoi passi vanno nella colonna a parte.
     const fuori = !!msg.fuoriConto;
     if (msg.phase === 'ack') {
+      st.extraExpected += Number(msg.fuori) || 0;
       if (fuori) { st.extraAcked++; return; }
       st.acked++;
       st.expected += Number(msg.frames) || 0;
