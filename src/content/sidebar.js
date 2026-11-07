@@ -277,7 +277,7 @@
         <span class="sn-sidebar-title">${I18n.t('menu_help')}</span>
         <div class="sn-sidebar-actions">
           <button class="sn-sidebar-collapse" type="button" title="Collassa">▾</button>
-          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}">×</button>
+          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}" title="${I18n.t('popup_close')}">×</button>
         </div>
       </div>
       <div class="sn-sidebar-conv"></div>
