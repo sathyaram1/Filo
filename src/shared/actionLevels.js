@@ -1363,6 +1363,7 @@
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.nome && r.dimentica) return `Dimenticato «${nome}»`;
+        if (r.nome && r.preferito != null) return r.preferito ? `«${nome}» fra i preferiti` : `«${nome}» tolto dai preferiti`;
         if (r.nome) return r.collega === false ? `Scollegato «${nome}» dal Bluetooth` : `Collegato «${nome}» col Bluetooth`;
         return r.acceso === false ? 'Bluetooth spento' : r.acceso === true ? 'Bluetooth acceso' : 'Bluetooth cambiato';
       },
