@@ -713,8 +713,8 @@ export function contestoRedattore({ blocco, capacita = '', schede = [], ordine =
     `## Le righe dei worker (versione ${unaRiga(b.version)})`, '', ...da, '',
     'Novità:', ...(b.features || []).map((r, i) => rigaPerIlRedattore(r, i + 1)), '',
     'Correzioni:', ...(b.fixes || []).map((r, i) => rigaPerIlRedattore(r, (b.features || []).length + i + 1)), '',
-    '## La rosa (priorità 2)', '', ...(conTitolo(2).length ? conTitolo(2) : ['(vuota)']), '',
-    '## Priorità 3 in corso', '', ...(conTitolo(3).length ? conTitolo(3) : ['(nessuna)']), '',
+    '## I lavori nell\'ordine', '', ...(lavori.ordine.length ? titoli(lavori.ordine) : ['(nessuno)']), '',
+    '## Priorità 3 in corso', '', ...(lavori.tre.length ? titoli([...lavori.tre].sort(perNumero)) : ['(nessuna)']), '',
     '## Il manifesto delle capacità', '', String(capacita || '(non letto)').trim(),
   ].join('\n');
 }
