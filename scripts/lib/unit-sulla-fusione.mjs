@@ -316,6 +316,8 @@ export function fileDellaChiave(chiave) {
   return f && f !== '?' && !assoluto(f) && !f.split('/').includes('..') ? f : '';
 }
 
+export const COMANDI_DI_ACTIONS = Object.freeze(['GITHUB_OUTPUT', 'GITHUB_ENV', 'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY']);
+
 /**
  * `npm run test:unit` dell'albero provato, con l'uscita su file; con `file`, solo quei file (la riprova dei rossi).
  * { ok, rossi, coda } | { errore }.
