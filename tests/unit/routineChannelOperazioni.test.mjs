@@ -97,6 +97,15 @@ test('segnala e rapporto: il testo da stdin, la conferma in una riga; senza test
   });
 });
 
+test('segnala finita in nota su un rosso di main già aperto: la riga dice il numero e di non riprovare (#2226)', async () => {
+  await conServer(() => [200, { ok: true, nota: true, id: 'f2168', num: '#2168' }], async ({ port }, casa) => {
+    const s = await esegui(['segnala'], ambiente(port, casa), 'Rosso su main: tests/unit/novitaInCima.test.mjs\n');
+    assert.equal(s.code, 0, s.se);
+    assert.equal(s.so.trim(), 'OK: aggiunta come nota a #2168, che segue già lo stesso rosso su main: non riprovare.');
+    assert.doesNotMatch(s.so, /aperta/);
+  });
+});
+
 test('il server che non ha ancora l’indirizzo è un guasto, non un rifiuto', async () => {
   await conServer(() => [404, {}], async ({ port }, casa) => {
     const r = await esegui(['segnala'], ambiente(port, casa), 'x\n');
