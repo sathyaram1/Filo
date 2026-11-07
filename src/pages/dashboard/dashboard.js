@@ -503,6 +503,9 @@
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
+          window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
+        }
         if (m.spontaneo) b.dataset.spontaneo = '1';
         fotoViste.forEach((src, i) => {
           const img = document.createElement('img');
