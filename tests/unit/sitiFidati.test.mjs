@@ -172,12 +172,12 @@ test('dalla chat: aggiungere è togliere un freno, costo 4 con la parola «confe
   const via = P.buildPreferencePartial('siti_di_cui_ti_fidi', 'togli team.com');
   assert.equal(via.costo, 1);
   assert.equal(via.allenta, false);
-  assert.equal(Levels.costoFor(azione('aggiungi team.com')), 3);
+  assert.equal(Levels.costoFor(azione('aggiungi team.com')), 4);
   assert.equal(Levels.costoFor(azione('togli team.com')), 1);
 
   for (const lv of ['conservativo', 'default', 'automatico']) {
     for (const stato of ['pulito', 'contaminato']) {
-      const d = A.decideDettaglio({ livello: lv, stato, costo: 3, difesa: true });
+      const d = A.decideDettaglio({ livello: lv, stato, costo: 4, difesa: true });
       assert.ok(d.risposta === 'no' || (d.risposta === 'conferma' && d.digita), `${lv}/${stato}: aggiungere senza la parola scritta (${d.risposta})`);
     }
   }
