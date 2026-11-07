@@ -96,12 +96,14 @@
     if (r.aperta && prima && prima.n !== v.n) riempi(r).catch(() => {});
   }
 
-  function messaggio(m) {
+  // `chat` e `i`: il posto del messaggio nel filo, che Rispondi cita nel campo della home (#2096).
+  function messaggio(m, chat, i) {
     const div = document.createElement('div');
-    div.className = `dash-riga-app-msg dash-riga-app-msg-${m.role === 'user' ? 'user' : 'filo'}`;
+    div.className = `dash-riga-app-msg dash-riga-app-msg-${m.role === 'user' ? 'user' : 'filo'} sn-con-azioni-msg`;
+    const testo = String(m.text || '');
+    div._citabile = { chat, i, ts: m.ts || '', role: m.role === 'user' ? 'user' : 'filo', scritto: testo };
     // Le risposte di Filo con la formattazione leggera della home (come nell'app dove sono nate): il renderer escapa
     // l'HTML e filtra i link. Le domande dell'utente restano letterali.
-    const testo = String(m.text || '');
     if (m.role !== 'user' && global.SN_MARKDOWN) {
       div.innerHTML = global.SN_MARKDOWN.render(testo);
       div.classList.add('dash-bubble-md');
