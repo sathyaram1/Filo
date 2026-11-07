@@ -54,6 +54,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
     };
     globalThis.__rifiutate = 0;
     globalThis.__accettate = [];
+    globalThis.__listinoPrimaDellaChat = false;
     const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
