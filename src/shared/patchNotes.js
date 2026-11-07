@@ -75,6 +75,8 @@
       features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
+        { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
+        { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
       ],
     },
     {
