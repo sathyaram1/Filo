@@ -78,6 +78,12 @@
       }
       valori.priorityAccount = p.priorityAccount;
     }
+    if (p.unitWindows != null) {
+      if (!UNIT_WINDOWS.includes(p.unitWindows)) {
+        return { ok: false, testo: `Unit su Windows: vale ${UNIT_WINDOWS.map((m) => `«${m}»`).join(', ')}. Non salvato.` };
+      }
+      valori.unitWindows = p.unitWindows;
+    }
     for (const chiave of ['accountAOff', 'accountBOff', 'manutentoreAcceso', 'riservatiOff']) {
       if (p[chiave] == null) continue;
       if (typeof p[chiave] !== 'boolean') {
