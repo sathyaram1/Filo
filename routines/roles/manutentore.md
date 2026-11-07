@@ -261,7 +261,7 @@ npm run manutentore -- routine spente|accese
 npm run manutentore -- recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
 npm run manutentore -- novita | novita consegna <file.json>
 npm run manutentore -- chat                        # la chat dell'owner, col contesto intero
-npm run manutentore -- feedback "<titolo>" - [--priorita P]   # un feedback nuovo, testo da stdin (di norma a 1)
+npm run manutentore -- feedback "<titolo>" - [--priorita P] [--server]   # un feedback nuovo, testo da stdin (di norma a 1); --server se il codice sta in filo-security
 npm run manutentore -- domanda <file.json>         # una domanda all'owner, coi campi di SPEC-DOMANDE § 3.1
 npm run manutentore -- domanda-fine <ruolo> - | --togli   # la domanda di fine turno di un ruolo, da stdin
 npm run manutentore -- registro <parole>           # i principi delle domande chiuse, prima di chiedere
