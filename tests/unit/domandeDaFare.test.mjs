@@ -114,9 +114,7 @@ test('il contatore della sezione conta a parte i «da fare» che aspettano l\'ow
     { id: 'D-3', stato: 'aperta', priorita: 'quando_puoi', tipo: 'da_fare' },
     { id: 'D-4', stato: 'chiusa', priorita: 'importante', tipo: 'da_fare' },
   ];
-  const n = MR.contaDomande(lista);
-  assert.equal(n.domande, 3);
-  assert.equal(n.daFare, 2);
-  assert.equal(n.daDecidere, 1);
-  assert.equal(MR.contaDomande([]).daFare, 0);
+  assert.equal(MR.contaDomande(lista).domande, 3);
+  assert.deepEqual(MR.contaDaRispondere(lista), { daDecidere: 1, daFare: 2 });
+  assert.deepEqual(MR.contaDaRispondere(null), { daDecidere: 0, daFare: 0 });
 });
