@@ -2156,7 +2156,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // «Continua» chiede il seguito con parole di Filo, non dell'utente: niente bolla sua (#1302).
       const seguito = daScelta && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
       if (!seguito) {
-        immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
+        const elBolla = appendChatMessage('user', bolla, { nelFilo: false });
+        if (elBolla && schede.length && !valuta) global.SN_SCHEDE_IN_CHAT?.nellaBolla(elBolla, bolla, schede, global.SN_SCHEDE_IN_CHAT.azioni());
+        immaginiNellaBolla(elBolla, immagini, riferimenti);
         // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
         nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
       }
