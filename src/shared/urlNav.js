@@ -236,8 +236,17 @@
     return raw;
   }
 
+  // Le ricerche che apre il menu di Filo, costruite solo qui: chi le riconosce (eRicercaDi) usa lo stesso taglio (#1840).
+  const TAGLIO_RICERCA = 500;
+  function indirizzoRicerca(testo) {
+    return `https://www.google.com/search?q=${encodeURIComponent(String(testo == null ? '' : testo).slice(0, TAGLIO_RICERCA))}`;
+  }
+  function indirizzoRicercaImmagine(src) {
+    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+  }
+
   // Le parole che l'indirizzo cerca davvero, se è una ricerca di testo o d'immagine come le costruisce Filo
-  // (src/content/actions.js): null per qualunque altro indirizzo, anche con un parametro in più (#1312).
+  // (qui sopra): null per qualunque altro indirizzo, anche con un parametro in più (#1312).
   function ricercaDi(url) {
     let u;
     try { u = new URL(String(url || '')); } catch (_) { return null; }
