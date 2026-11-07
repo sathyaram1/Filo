@@ -2075,6 +2075,16 @@
     }
     return n;
   }
+  // Quelle che aspettano l'owner, divise fra cose da decidere e cose da fare (#2229): il contatore le dice a parte.
+  function contaDaRispondere(domande) {
+    const D = global.SN_DOMANDE;
+    const n = { daDecidere: 0, daFare: 0 };
+    for (const d of (Array.isArray(domande) ? domande : [])) {
+      if (schedaDomanda(d) !== SCHEDA_DOMANDA.da_rispondere) continue;
+      if (D.daFare(d)) n.daFare++; else n.daDecidere++;
+    }
+    return n;
+  }
   function bloccanteAperta(domande) {
     return (Array.isArray(domande) ? domande : []).some((d) => d && d.stato === 'aperta' && d.priorita === 'bloccante');
   }
