@@ -26,7 +26,7 @@ test('r1 home: il seguito letto da Filo non dice più «In attesa», anche se il
     // Filo legge il seguito: la bolla non è più in attesa.
     const letta = page.locator('.dash-bubble-user', { hasText: 'seguito da leggere' });
     await expect(letta).not.toHaveClass(/dash-bubble-attesa/, { timeout: 20_000 });
-    await expect(fumetto(page), 'col puntatore sopra, il fumetto non dice più «In attesa»').not.toHaveText('In attesa', { timeout: 2_000 });
+    await expect.soft(fumetto(page), 'col puntatore sopra, il fumetto non dice più «In attesa»').not.toHaveText('In attesa', { timeout: 2_000 });
     await page.mouse.move(2, 2);
     await page.waitForTimeout(300);
     expect(await letta.evaluate((el) => el.getAttribute('title')), 'la bolla letta non ha più l\'etichetta «In attesa»').toBeNull();
