@@ -171,7 +171,11 @@ function regolePer(href, wc) {
   const host = R.hostDi(href);
   if (!acceso || !R.hostYouTube(host)) return [];
   const id = wc && typeof wc.id === 'number' ? wc.id : null;
-  if (id !== null && spente.get(id) === versione) return [];
+  if (id !== null && spente.get(id) === versione) {
+    // Tornata su YouTube, la scheda spenta riprende ad aspettare le regole nuove.
+    if (!inTest()) ricontrolla();
+    return [];
+  }
   const out = R.perHost(insieme, host);
   if (out.length && id !== null) conRegole.add(id);
   return out;
