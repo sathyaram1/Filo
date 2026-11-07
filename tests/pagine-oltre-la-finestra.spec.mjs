@@ -152,6 +152,7 @@ for (const caso of [
     await expect(bolla).toContainText('Il modello non riusciva a leggere tutto insieme');
     await expect(bolla).toContainText(/chiedimi di rileggerl[ae]/);
     await expect(bolla).toContainText('127.0.0.1');
+    expect(await app.evaluate(() => globalThis.__listinoPrimaDellaChat), 'il listino letto prima della prima richiesta non sa la finestra').toBe(false);
     caso.rifiuti(await app.evaluate(() => globalThis.__rifiutate));
 
     // Al modello le pagine tolte arrivano come rimando: titolo e indirizzo, nessun testo inventabile.
