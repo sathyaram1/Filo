@@ -156,7 +156,7 @@
     },
     {
       id: 'drag-tab', title: 'Trascina una scheda', category: 'navigation',
-      desc: 'Una scheda trascinata nella barra segue il mouse e le altre le fanno posto; lasciata, resta dove l’hai messa. Portata fuori dalla barra si lascia in un campo di testo di un sito, dove scrive titolo e indirizzo come un link incollato, o nella chat della nuova scheda e dell’Aiuto, dove diventa un gettone (vedi «Parla di una scheda in chat»). Mentre la porti, il punto dove arriverebbe si illumina. Esc annulla.',
+      desc: 'Una scheda trascinata lungo la fila delle schede segue il mouse e le altre le fanno posto; lasciata, resta dove l’hai messa. Portata fuori dalla fila si lascia in un campo di testo di un sito, dove scrive titolo e indirizzo come un link incollato, o nella chat della nuova scheda e dell’Aiuto, dove diventa un gettone (vedi «Parla di una scheda in chat»). Mentre la porti, il punto dove arriverebbe si illumina. Esc annulla.',
       invoke: 'Tieni premuto su una scheda e trascinala.',
       doesNot: 'Lasciata sulla pagina fuori da un campo, o fuori dalla finestra, torna al suo posto: non apre una finestra nuova. Dentro un riquadro incorporato di un altro sito il campo non la riceve.',
     },
