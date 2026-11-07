@@ -855,7 +855,7 @@
 
   function appendBubble(popup, role) {
     const wrap = document.createElement('div');
-    wrap.className = `sn-msg sn-msg-${role}`;
+    wrap.className = `sn-msg sn-msg-${role}${role === 'user' ? ' sn-con-azioni-msg' : ''}`;
     const text = document.createElement('div');
     text.className = 'sn-msg-text';
     wrap.appendChild(text);
