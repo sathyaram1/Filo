@@ -729,7 +729,9 @@ e la prova la dichiarava lui al server. Adesso:
   `linux` (tutti gli unit) e `windows` (di default solo gli unit che il ramo
   cambia o che nominano un file cambiato: pochi minuti, dentro la corsa Linux;
   `client_payload.windows` = `tutti` li fa tutti, circa venti minuti di cancello
-  in più, `spento` toglie la parte). Ognuno passa il suo esito come uscita del
+  in più, `spento` toglie la parte; il server la legge da
+  `config/routines.unitWindows`, che l'owner sceglie in Gestione → Automazioni,
+  e il lavoro di cui legge il registro è solo `unit`). Ognuno passa il suo esito come uscita del
   lavoro, e la riga `FILO-UNIT-FUSIONE` la scrive solo il terzo lavoro, `unit`,
   che li unisce: conflitto, poi rossi sulla fusione (quelli di Windows portano
   `[Windows]` in coda), poi una parte caduta (`non_provata`), poi l'esito che
