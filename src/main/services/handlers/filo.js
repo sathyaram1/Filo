@@ -240,7 +240,8 @@ module.exports = function register(on, ctx) {
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
     if (davanti && segue && msg && msg.subito === true) Sistema.leggiUnaVolta();
-    return { ok: true, stato: Sistema.stato() };
+    // #2096 — quali pannelli del sistema si aprono da qui: il tasto destro della home mostra solo quelli.
+    return { ok: true, stato: Sistema.stato(), pannelli: Object.keys(require('../comandiSistema').pannelliImpostazioni()) };
   }));
 
   // #874 — i tasti della home comandano volume, Bluetooth e Wi-Fi dalla stessa porta dell'azione della chat. È un
