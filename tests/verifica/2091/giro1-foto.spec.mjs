@@ -68,7 +68,15 @@ test('foto a metà: in fila, sopra la textarea, sopra la chat della home', async
   const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
   const casa = await home(app, { scheda: nuova?.id });
   await Gesti.finestraASchermo(app);
-  p = tieni(await linguetta(app, shell, idArticolo), await Gesti.sulloSchermo(app, casa, casa, '#input'));
+  const r = await casa.locator('#input').boundingBox();
+  const o = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+    const tm = w._filoTabs;
+    const cb = w.getContentBounds();
+    const vb = tm.tabs.find((t) => t.id === tm.activeId).view.getBounds();
+    return { x: cb.x + vb.x, y: cb.y + vb.y };
+  });
+  p = tieni(await linguetta(app, shell, idArticolo), { x: Math.round(o.x + r.x + 60), y: Math.round(o.y + r.y + r.height / 2) });
   await shell.waitForTimeout(1800);
   await fotoFinestra(app, '2091-metà-home');
   await new Promise((r) => p.on('exit', r));
