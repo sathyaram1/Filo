@@ -386,6 +386,17 @@
     return { kind: 'stopped', applied, total: grandTotal, reason: reasonFor(lastError), errore: lastError };
   }
 
+  // Quanto era rimasto fuori alla fine dell'ultimo giro completo: la sezione aperta che si traduce da sola lo ridice
+  // solo se è cresciuto, cioè se proprio lei ha portato un pezzo che non si traduce.
+  let rimastiPrima = { chiusi: 0, riquadri: 0 };
+  function daDire(result, frames) {
+    if (!result) return false;
+    if (result.kind === 'done') {
+      return Number(result.unreachable || 0) > rimastiPrima.chiusi || ((frames && frames.left) || 0) > rimastiPrima.riquadri;
+    }
+    return result.kind === 'failed' || result.kind === 'stopped' || result.kind === 'batch';
+  }
+
   // `moreArrived` è l'unica cosa che chi ha fatto il lavoro non può sapere: il sito ha
   // aggiunto testo anche durante l'ultimo giro, e si è smesso di rincorrerlo.
   function showResultToast(result, moreArrived, frames) {
