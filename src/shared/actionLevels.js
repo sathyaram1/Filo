@@ -1332,8 +1332,9 @@
       costo: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
-        // Dimenticato, torna solo riabbinandolo col dispositivo in mano (#2096).
+        // Dimenticato, torna solo riabbinandolo col dispositivo in mano (#2096). I preferiti sono solo un ordine.
         if (r.dimentica) return 3;
+        if (r.preferito != null) return 1;
         if (r.gia === true) return 1;
         return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
       },
