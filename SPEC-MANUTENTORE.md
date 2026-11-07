@@ -118,6 +118,18 @@ volta: ~25k token) e la memoria nel taccuino (§ 5). Si accende:
 
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
+**L'ordine (#2269).** A ogni battito e sveglia l'ordine contiene almeno 2×N
+lavori che possono partire subito (quelli in attesa, fermi o in mano all'owner
+non contano); se mancano, il manutentore lo allunga coi criteri del mattino.
+La spesa si regola con N, non svuotando l'ordine. La classe è il primo
+criterio, non un filtro: un lavoro che tocca i file di un ramo vivo aspetta, e
+intanto entra uno di classe più bassa in un'area libera. L'ordine porta anche
+compiti senza feedback, e un compito può stare davanti a un feedback; un
+feedback può aspettare un compito, e l'attesa si scioglie quando il compito
+chiude. Un lavoro già iniziato non si mette in attesa di uno non iniziato. Un
+feedback fidato entra nell'ordine anche senza il segno «lavoro server», che il
+server mette da sé e che non sta fra le cose che aspettano l'owner.
+
 **Cache.** Il manutentore vuole la cache a **un'ora**: il battito ogni 55
 minuti la tiene calda a costo di una rilettura. Se le sessioni cloud non
 permettono di sceglierla (oggi i worker girano a cinque minuti, e in locale la
