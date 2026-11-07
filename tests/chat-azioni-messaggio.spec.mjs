@@ -208,7 +208,7 @@ test('il riquadro: Rispondi accanto a Copia sotto la risposta, e Copia e Rispond
   await expect.poll(() => conta(app, page, '.sn-msg-rispondi'), { timeout: 15_000 }).toBe(1);
   expect(await conta(app, page, '.sn-msg-copia')).toBe(1);
   await clicca(app, page, '.sn-msg-rispondi');
-  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-input'))?.valore ?? (await statoDi(app, page, '.sn-popup-input'))?.testo ?? '').toContain('> The cat sleeps.');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-popup-input'))?.valore || '').toBe('> The cat sleeps.\n');
 
   const dove = await scrivi(app, page, '.sn-popup-input', 'and the plural?');
   await dove.keyboard.press('Enter');
