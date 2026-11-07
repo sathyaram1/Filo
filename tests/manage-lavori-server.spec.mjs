@@ -260,6 +260,8 @@ test('#2258: l’owner dichiara fidato com’è un lavoro fermo «resta locale»
   const page = await openTab(MANAGE);
   await apriFermo(page, { rifiutaLaPrima: true });
   const stato = page.locator('#mgWorkState');
+  // In coda (todo) non c'è iter: il fermo si dice lo stesso, nell'elenco e nel dettaglio.
+  await expect(page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server')).toHaveText('Fermo: resta locale');
   await expect(stato.locator('.mg-attesa-server')).toHaveText('Fermo: resta locale');
   const btn = page.locator('#mgDichiaraBtn');
   await expect(btn).toBeVisible();
