@@ -830,6 +830,10 @@
         acts[0].primary = false;
         acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok });
       }
+      // Un lavoro server non fidato in coda non lo prende nessuno (#2217): rimetterlo in coda vuol dire anche fidarsene.
+      if (isLocalOnly(fb) && !isFidato(fb)) {
+        acts[0] = { key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok };
+      }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
       // ancora classificato: le conferme possibili sono DUE, non una.
