@@ -174,7 +174,6 @@
   }
 
   const FOGLIO = `
-    :host { all: initial; }
     .tip {
       box-sizing: border-box; display: block; max-width: 320px; max-height: var(--fumetto-altezza, 90vh); overflow: hidden;
       padding: 4px 8px; border-radius: var(--sn-radius, 6px);
