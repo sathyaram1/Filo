@@ -40,12 +40,14 @@ function sorgenteSonda(nome) {
     for (var k = 0; k < c.length; k++) if (c[k].nodeType === 3) s += c[k].nodeValue || '';
     return testoDaTradurre(s);
   }
-  // Un antenato dentro l'albero in cui la traduzione non scende: niente prosa, non HTML, o da non tradurre.
+  // Un antenato in cui la traduzione non scende: 'tag' (niente prosa, o non HTML), 'no' (da non tradurre), o ''.
   function sottoMuto(el) {
+    var esito = '';
     for (var su = el.parentElement; su; su = su.parentElement) {
-      if (MUTI[String(su.tagName || '').toUpperCase()] || su.namespaceURI !== HTML || nonDaTradurre(su)) return true;
+      if (MUTI[String(su.tagName || '').toUpperCase()] || su.namespaceURI !== HTML) return 'tag';
+      if (!esito && nonDaTradurre(su)) esito = 'no';
     }
-    return false;
+    return esito;
   }
   function etichetta(el, tag) {
     var nomi = ETICHETTE.ovunque.concat(ETICHETTE.perTag[tag] || []);
