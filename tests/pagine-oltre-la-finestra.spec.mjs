@@ -25,7 +25,8 @@ ${corpo}
 // rifiuta, con le misure (o senza, `misure: false`). `listino`: il listino di OpenRouter dice la stessa finestra.
 // `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
 // (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti. `posto`: al posto di
-// `finestra`, i caratteri liberi oltre la prima richiesta della chat (la finestra si misura lì).
+// `finestra`, i caratteri liberi oltre la prima richiesta della chat (la finestra si misura lì, e il listino la dice da
+// allora: Filo lo legge prima di mandare le pagine).
 // `anthropic`: il rifiuto arriva com'è dietro OpenRouter, dentro «Provider returned error», e passa dal lettore vero
 // degli errori; `pesante`: il fornitore conta il testo più pesante di come lo stima Filo.
 async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani, anthropic = false, pesante = false }) {
