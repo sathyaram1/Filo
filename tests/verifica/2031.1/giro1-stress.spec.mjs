@@ -16,7 +16,10 @@ const normale = (app) => app.evaluate(({ BrowserWindow }) => {
   const tm = w._filoTabs;
   const url = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
   const davanti = tm.tabs.find((t) => t.id === tm.activeId);
-  const visibili = tm.tabs.filter((t) => { try { return t.view.getVisible ? t.view.getVisible() : true; } catch (_) { return false; } }).map(url);
+  // Le schede dietro restano «visibili» per Chromium ma grandi 0×0: a schermo c'è quella con una misura vera.
+  const visibili = tm.tabs.filter((t) => {
+    try { const r = t.view.getBounds(); return (t.view.getVisible ? t.view.getVisible() : true) && r.width > 0 && r.height > 0; } catch (_) { return false; }
+  }).map(url);
   return {
     finestre: tutte.length,
     visibile: w.isVisible(),
