@@ -147,6 +147,48 @@ test('una rete Wi-Fi: Collegati e Dimentica la rete; il volume: valori pronti e 
   await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.livello)).toBe(50);
 });
 
+test('la riga di sistema nella chat: apre il riquadro della sua voce e si annulla', async ({ app }) => {
+  test.setTimeout(90_000);
+  await computerFinto(app);
+  const page = await home(app);
+  await expect(voce(page, 'volume')).toHaveText('25%', { timeout: 8_000 });
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'v1', name: 'VOLUME', arguments: JSON.stringify({ livello: 60 }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'volume al 60%');
+  await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.livello)).toBe(60);
+  const riga = page.locator('.dash-activity-row', { hasText: 'Volume al 60%' }).first();
+  await expect(riga).toBeAttached();
+  // A lavoro finito il blocco è avvolto: lo si srotola, come farebbe l'utente.
+  if (!(await riga.isVisible())) await page.locator('.dash-activity-head').last().click();
+  await riga.click({ button: 'right' });
+  const voci = await etichette(page);
+  expect(voci).toContain('Apri il riquadro di sistema');
+  expect(voci).toContain('Annulla · Rimetti il volume al 25%');
+  await menuDi(page).voce('Annulla · Rimetti il volume al 25%').first().click();
+  await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.livello)).toBe(25);
+  await riga.click({ button: 'right' });
+  await menuDi(page).voce('Apri il riquadro di sistema').first().click();
+  await expect(riquadro(page)).toHaveAttribute('data-voce', 'volume');
+});
+
+test('una pastiglia delle Impostazioni rapide ha il suo menu: accenderla e la sua voce in Preferenze', async ({ app, shell }) => {
+  const page = await home(app);
+  const pastiglia = page.locator('.dash-pastiglia', { hasText: 'Anteprima schede' });
+  await expect(pastiglia).toBeVisible({ timeout: 8_000 });
+  const acceso = (await pastiglia.getAttribute('aria-pressed')) === 'true';
+  await pastiglia.click({ button: 'right' });
+  const menu = page.locator('.dash-menu');
+  await expect(menu.locator('.dash-menu-voce')).toHaveText([`${acceso ? 'Spegni' : 'Accendi'}: anteprima schede`, 'Apri la voce in Preferenze']);
+  await menu.locator('.dash-menu-voce').first().click();
+  await expect(pastiglia).toHaveAttribute('aria-pressed', acceso ? 'false' : 'true');
+  await pastiglia.click({ button: 'right' });
+  await page.locator('.dash-menu .dash-menu-voce', { hasText: 'Apri la voce in Preferenze' }).click();
+  await expect.poll(async () => (await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs.map((t) => t.url)))
+    .some((u) => u === 'filo://preferences/preferences.html#tabPreviewEnabled')).toBe(true);
+});
+
 test('a parole: «metti le cuffie fra i preferiti» e «dimentica le cuffie» passano dalla stessa porta', async ({ app }) => {
   await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: false }] });
   const r = await app.evaluate(async () => {
