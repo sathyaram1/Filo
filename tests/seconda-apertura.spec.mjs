@@ -41,8 +41,8 @@ const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
     accesso: base ? vive.filter((w) => { try { return !w._filoTabs && w.webContents.getURL().startsWith(base); } catch (_) { return false; } }).length : 0,
     normale: normale ? {
       visibile: normale.isVisible(),
-      // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
-      schede: normale._filoTabs.tabs.map((t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } }),
+      schede: normale._filoTabs.tabs.map(url),
+      davanti: davanti ? url(davanti) : null,
     } : null,
     errori: globalThis.__errori1606 || [],
   };
