@@ -303,7 +303,7 @@ const fiduciaDetta = (f) => (f === 'fidato' ? 'fidata' : 'non fidata');
 /** La domanda intera per il terminale: ogni testo d'agente coi caratteri di controllo resi visibili. PURA. */
 export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) {
   const x = d || {};
-  const righe = [`${visibile(x.id || '?')} · ${visibile(x.priorita || '?')} · ${visibile(x.stato || '?')} · ${fiduciaDetta(x.fiducia)}`];
+  const righe = [`${visibile(x.id || '?')} · ${D.daFare(x) ? 'da fare · ' : ''}${visibile(x.priorita || '?')} · ${visibile(x.stato || '?')} · ${fiduciaDetta(x.fiducia)}`];
   righe.push(visibile(x.titolo || '(senza titolo)'));
   righe.push(`creata il ${quando(x.creataIl)} · modificata il ${quando(x.modificataIl)}${x.gruppo ? ` · gruppo «${visibile(x.gruppo)}»` : ''}`);
   if (x.origine && x.origine.tipo) righe.push(`origine: ${visibile(x.origine.tipo)} ${visibile(x.origine.id || '')}`.trimEnd());
