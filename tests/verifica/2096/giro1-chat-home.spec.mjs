@@ -116,6 +116,23 @@ test('Copia, Modifica e Cita sotto il messaggio dell\'utente, allineati a destra
   await expect(home.locator('#citazione')).toContainText('poesia');
 });
 
+test('chat corta, risposta lunga che arriva in fondo: l\'hover sull\'ultima non fa comparire lo scorrimento', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const lunga = Array.from({ length: 14 }, (_, i) => `Paragrafo numero ${i + 1} della risposta lunga.`).join('\n\n');
+  await preparaModello(app, [{ text: lunga }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'dimmi tanto');
+  const r = home.locator('#bubbles > .dash-bubble-filo').last();
+  await expect(r).toContainText('Paragrafo numero 14', { timeout: 20_000 });
+  await home.mouse.move(2, 2);
+  await home.waitForTimeout(400);
+  const base = await foto(home);
+  await r.hover({ position: { x: 20, y: 10 } });
+  await home.waitForTimeout(300);
+  await expect(r.locator('.dash-msg-azioni')).toBeVisible();
+  expect(await foto(home)).toEqual(base);
+});
+
 test('Modifica premuto due volte non raddoppia il testo nel campo', async ({ app, openTab }) => {
   test.setTimeout(120_000);
   await preparaModello(app, [{ text: 'Risposta.' }]);
