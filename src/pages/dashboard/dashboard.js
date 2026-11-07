@@ -520,6 +520,7 @@
           b.insertBefore(img, b.childNodes[i] || null);
         });
         if (isUser && m.rispostaA) Rispondi.citaIn(b, Rispondi.dalFilo(m.rispostaA));
+        if (isUser) composizioni.set(b, composizioneDalFilo(m, fotoViste));
         metti(b);
         if (isUser) bollaUtente = b;
       }
