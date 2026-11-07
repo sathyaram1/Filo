@@ -486,3 +486,28 @@ test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non
   assert.match(spec, /censimento delle schede parte da lui/);
   assert.match(spec, /\*\*A secco\.\*\*.*nessuna accensione \(mattino, battito, sveglia\) cambia il lavoro/);
 });
+
+// #2269: la rosa si esauriva a metà giornata e i posti restavano vuoti per ore. Il ruolo tiene l'ordine pieno.
+test('il ruolo: l\'ordine è l\'unica condizione per cominciare, con almeno 2×N pronti e la classe come criterio (#2269)', () => {
+  const ruolo = RUOLO.replace(/\s+/g, ' ');
+  const spec = readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\s+/g, ' ');
+  for (const [nome, t] of [['ruolo', ruolo], ['spec', spec]]) {
+    assert.doesNotMatch(t, /\brosa\b/i, `${nome}: niente rosa`);
+    assert.doesNotMatch(t, /la 2 è (solo tua|del manutentore)/, `${nome}: la 2 non è una scelta a parte`);
+    assert.match(t, /un primo lavoro nell'ordine parte qualunque sia la sua priorità da 0 a 2/i, nome);
+    assert.match(t, /fuori dall'ordine parte solo una 3/i, nome);
+  }
+  const regole = ruolo.slice(ruolo.indexOf('## Le regole dell\'ordine'), ruolo.indexOf('## Guasti'));
+  // Il conto dei pronti: chi aspetta non occupa un posto, e la spesa non si regola svuotando l'ordine.
+  assert.match(regole, /A ogni accensione \(mattino, battito, sveglia\) l'ordine contiene almeno 2×N lavori che possono partire subito; quelli in attesa, fermi o in mano all'owner non contano/);
+  assert.match(regole, /La spesa si regola con N, non svuotando l'ordine/);
+  assert.match(regole, /La classe è il primo criterio, non un filtro\.\*\* .*`incroci <N>`.*entra uno di classe più bassa in un'area libera/);
+  assert.match(regole, /un compito può stare davanti a un feedback/);
+  assert.match(regole, /l'attesa si scioglie quando il compito chiude/);
+  assert.match(regole, /Non lo metti in attesa di un lavoro non ancora iniziato/);
+  // Punto 6 (#2261): il segno «lavoro server» non è un cancello d'ingresso né una cosa dell'owner.
+  assert.match(regole, /Un feedback fidato entra nell'ordine anche senza il segno «lavoro server».*non va nel recap né nelle domande/);
+  assert.match(ruolo, /riporta l'ordine ad almeno 2×N lavori pronti/, 'anche battiti e sveglie riempiono l\'ordine');
+  assert.match(ruolo, /le schede dei lavori nell'ordine e quelle a priorità 3/, 'il contesto piccolo porta l\'ordine, non le 2');
+  assert.match(spec, /A ogni battito e sveglia l'ordine contiene almeno 2×N lavori che possono partire subito/);
+});
