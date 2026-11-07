@@ -118,7 +118,76 @@ test('un dispositivo Bluetooth: le sue voci, i preferiti in cima anche riaprendo
   await clickConfirm(page, 'ok');
   await expect(righe(page)).toHaveCount(1, { timeout: 5_000 });
   expect((await chiamate(app)).filter((c) => c[0] === 'btDimentica')).toEqual([['btDimentica', { indirizzo: '66:77:88:99:AA:BB' }]]);
-  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti)).toEqual([]);
+  expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti)).toEqual(['66:77:88:99:AA:BB']);
+});
+
+test('gli interruttori Bluetooth e Wi-Fi del riquadro: il tasto destro li accende o spegne', async ({ app }) => {
+  test.setTimeout(90_000);
+  await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }], reti: ['Casa'] });
+  const page = await home(app);
+  for (const [v, radio, etichetta] of [['bluetooth', 'bluetooth', 'Spegni il Bluetooth'], ['rete', 'wifi', 'Spegni il Wi-Fi']]) {
+    await expect(voce(page, v)).toBeVisible({ timeout: 8_000 });
+    await voce(page, v).click();
+    const interruttore = opzione(page, etichetta);
+    await expect(interruttore).toBeVisible();
+    await interruttore.click({ button: 'right' });
+    expect(await etichette(page)).toContain(etichetta);
+    await menuDi(page).voce(etichetta).first().click();
+    await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio' && c[1].radio === radio).map((c) => c[1].acceso)).toEqual([false]);
+    await page.keyboard.press('Escape');
+  }
+});
+
+// Una riga della chat sa disfare quello che dice: collegare un dispositivo e accendere o spegnere una radio. I preferiti
+// no: sono un'impostazione, e l'Annulla del filo c'è già.
+test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui preferiti non ce n\'è un secondo', async ({ app }) => {
+  test.setTimeout(120_000);
+  await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }] });
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toBeVisible({ timeout: 8_000 });
+  const rigaDi = async (testo) => {
+    const blocco = page.locator('#bubbles .dash-activity').last();
+    await expect(blocco).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
+    if (await blocco.getAttribute('data-filo') === 'gomitolo') await blocco.locator('.dash-activity-head').click();
+    const riga = blocco.locator('.dash-activity-row', { hasText: testo }).first();
+    if (!(await riga.isVisible())) await blocco.locator('.dash-activity-seg-head').last().click();
+    await expect(riga).toBeVisible();
+    return riga;
+  };
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'c1', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'Cuffie', collega: true }) }] },
+    { text: 'Collegate.' },
+  ]);
+  await chiedi(page, 'collega le cuffie');
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1].collega), { timeout: 20_000 }).toEqual([true]);
+  (await rigaDi('Cuffie')).click({ button: 'right' });
+  await expect(menuDi(page).voce('Annulla · Scollega').first()).toBeVisible();
+  await menuDi(page).voce('Annulla · Scollega').first().click();
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1].collega)).toEqual([true, false]);
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 's1', name: 'BLUETOOTH', arguments: JSON.stringify({ acceso: false }) }] },
+    { text: 'Spento.' },
+  ]);
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'autonomo' } })).catch(() => {});
+  await chiedi(page, 'spegni il bluetooth');
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio').map((c) => c[1].acceso), { timeout: 20_000 }).toContain(false);
+  const spento = await rigaDi('Bluetooth');
+  await spento.click({ button: 'right' });
+  await menuDi(page).voce('Annulla · Riaccendi il Bluetooth').first().click();
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio').map((c) => c[1].acceso)).toEqual([false, true]);
+
+  await modelloFinto(app, [
+    { toolCalls: [{ id: 'p1', name: 'BLUETOOTH', arguments: JSON.stringify({ dispositivo: 'Cuffie', preferito: true }) }] },
+    { text: 'Fatto.' },
+  ]);
+  await chiedi(page, 'metti le cuffie fra i preferiti');
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti), { timeout: 20_000 }).toEqual(['00:11:22:33:44:55']);
+  await (await rigaDi('preferiti')).click({ button: 'right' });
+  const voci = await etichette(page);
+  expect(voci).toContain('Apri il riquadro di sistema');
+  expect(voci.filter((v) => /preferiti/i.test(v) && /^Annulla · /.test(v))).toEqual([]);
 });
 
 test('una rete Wi-Fi: Collegati e Dimentica la rete; il volume: valori pronti e muto', async ({ app }) => {
