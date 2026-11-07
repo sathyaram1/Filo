@@ -141,3 +141,54 @@ test('il main inietta sui siti gli stessi fogli di stile del preload', () => {
   const dalMain = [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]);
   assert.deepEqual(dalMain, elencoStili(pageSrc));
 });
+
+// #1093 — un modulo che una pagina interna carica coi suoi <script> il preload lo salta se il suo nome c'è già: senza il
+// nome nella chiamata si compila due volte, e uno con stato (i18n, voceChat) riparte da capo. Le viste dello strato
+// (menu, riquadri) hanno un preload loro.
+const PAGINE_SENZA_INTERNAL_PRELOAD = new Set(['menu', 'riquadri']);
+
+function globaliDelPreloadInterno() {
+  const out = new Map();
+  const corpo = corpoFunzione(internalSrc, 'loadContentScripts');
+  for (const m of corpo.matchAll(/safe\(path\.join\((\w+)((?:,\s*'[^']*')+)\)(?:,\s*'(\w+)')?\)/g)) {
+    const pezzi = [...m[2].matchAll(/'([^']*)'/g)].map((x) => x[1]);
+    out.set(posix.normalize(posix.join(BASI[m[1]], ...pezzi)), m[3] || '');
+  }
+  return out;
+}
+
+function scriptDellaPagina(html) {
+  const out = [];
+  for (const m of html.matchAll(/<script[^>]*\ssrc="([^"]+)"/g)) {
+    const u = m[1];
+    if (u.startsWith('filo://shared/')) out.push(`src/shared/${u.slice('filo://shared/'.length)}`);
+    else if (u.startsWith('filo://src/')) out.push(`src/${u.slice('filo://src/'.length)}`);
+  }
+  return out;
+}
+
+test('nessuna pagina interna compila due volte un modulo condiviso', () => {
+  const globali = globaliDelPreloadInterno();
+  assert.ok(globali.size >= 30, 'elenco del preload interno non letto');
+  const doppi = [];
+  for (const dir of readdirSync(join(ROOT, 'src', 'pages'))) {
+    if (PAGINE_SENZA_INTERNAL_PRELOAD.has(dir)) continue;
+    let files = [];
+    try { files = readdirSync(join(ROOT, 'src', 'pages', dir)).filter((f) => f.endsWith('.html')); } catch (_) { continue; }
+    for (const f of files) {
+      for (const s of scriptDellaPagina(leggi('src', 'pages', dir, f))) {
+        if (globali.has(s) && !globali.get(s)) doppi.push(`${dir}/${f}: ${s}`);
+      }
+    }
+  }
+  assert.deepEqual(doppi, [], 'moduli caricati dalla pagina e di nuovo dal preload: dai a safe() il nome che registrano');
+});
+
+test('il nome dato a safe() è l’ultimo che il modulo registra', () => {
+  for (const [file, nome] of globaliDelPreloadInterno()) {
+    if (!nome) continue;
+    const nomi = [...leggi(file).matchAll(/\bglobal(?:This)?\.(SN_[A-Z0-9_]+)\s*=(?!=)/g)].map((m) => m[1]);
+    assert.ok(nomi.includes(nome), `${file} non registra ${nome}`);
+    assert.equal(nomi.at(-1), nome, `${file}: il nome da guardare è l'ultimo registrato (${nomi.at(-1)}), così c'è solo a modulo finito`);
+  }
+});
