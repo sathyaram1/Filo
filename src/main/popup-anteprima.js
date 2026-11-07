@@ -202,6 +202,26 @@ function mostra(parent, dati) {
   return true;
 }
 
+function mostraChiusa(parent, s, id, dati, chiusa) {
+  if (s.misura) contaUscita(parent, s, 'via');
+  const n = ++s.giri;
+  s.voluta = { n, id: `chiusa:${id}`, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0), dati };
+  const foto = id ? parent._filoTabs.anteprime.chiusa(id) : null;
+  if (foto) invia(s, 'anteprima:immagine', { id: s.voluta.id, src: foto.src, w: foto.w, h: foto.h });
+  invia(s, 'anteprima:mostra', {
+    n,
+    id: s.voluta.id,
+    titolo: testo(chiusa.titolo) || testo(chiusa.url),
+    indirizzo: indirizzoDi(chiusa.url),
+    immagine: !!foto,
+    larghezza: larghezzaDi(dati.misura),
+    margine: MARGINE,
+    tema: temaPulito(dati.tema),
+    scuro: nativeTheme.shouldUseDarkColors,
+  });
+  return true;
+}
+
 function dopoIlMenu(parent, s) {
   if (s.aspettaMenu) return;
   s.aspettaMenu = true;
