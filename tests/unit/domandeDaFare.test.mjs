@@ -107,6 +107,15 @@ test('le azioni accettano il numero col cancelletto; il server lo traduce, un nu
   }
 });
 
+test('dal terminale un «da fare» si riconosce, e il pulsante si legge come in Gestione', async () => {
+  const { formattaDomanda, formattaElenco } = await import('../../scripts/domanda.mjs');
+  const d = { id: 'D-5', stato: 'aperta', priorita: 'importante', tipo: 'da_fare', titolo: 't', opzioni: [FATTO] };
+  const testo = formattaDomanda(d, { f1: { num: '#1736' } }, { quando: () => 'ora' });
+  assert.match(testo.split('\n')[0], /D-5 · da fare · importante/);
+  assert.match(testo, /pulsante: Fatto: riprendi #1736/);
+  assert.match(formattaElenco([d]), /\[da fare · aperta/);
+});
+
 test('il contatore della sezione conta a parte i «da fare» che aspettano l\'owner', () => {
   const lista = [
     { id: 'D-1', stato: 'aperta', priorita: 'importante' },
