@@ -497,7 +497,8 @@ test('battiti e sveglie riempiono la rosa quando l\'ordine non ha lavori pronti 
   const spec = piatto(readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'));
   const quattro = spec.slice(spec.indexOf('## 4. Ritmo'), spec.indexOf('## 5.'));
   assert.match(quattro, /\*\*La rosa si riempie anche di giorno\.\*\* A ogni battito e sveglia, se nell'ordine non resta un lavoro che possa partire adesso/);
-  assert.match(quattro, /sotto il ritmo sostenibile fino al suo rinnovo, riporta le priorità 2 all'obiettivo con le regole della decisione del mattino e riscrive l'ordine/);
+  assert.match(quattro, /dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del mattino e riscrive l'ordine/);
+  assert.doesNotMatch(quattro, /ultimo giorno di ogni account/);
   assert.match(quattro, /Non in una giornata a secco\./);
 });
 
