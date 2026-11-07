@@ -475,11 +475,10 @@
       risk: 'Su un sito di cui ti fidi Filo non ti mostra più l\'avviso «sospetto»: un nome che somiglia a un marchio, un dominio '
         + 'nato da poco, una password chiesta senza connessione protetta. Restano l\'avviso «pericoloso» e la lista nera di Google.',
     });
-    // Il costo dichiarato è quello dell'annullo, che può rimettere un sito tolto; il cambio costa secondo il verso.
+    // Il costo dichiarato è quello dell'annullo, che può rimettere un sito tolto; il cambio costa secondo il verso (freno).
     return {
       ...base,
       costo: 2,
-      costoDi: (b) => (b && b.elenco && b.elenco.op !== 'togli' && b.elenco.voci.length ? 3 : 1),
       build(v) {
         const o = opElenco(v, null, voceFidataDa);
         if (!o || o.rifiuto) return o;
