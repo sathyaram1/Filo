@@ -2560,14 +2560,7 @@
     header.append(title, ver);
     box.appendChild(header);
 
-    const xBtn = document.createElement('button');
-    xBtn.type = 'button';
-    xBtn.className = 'dash-recap-x';
-    xBtn.setAttribute('aria-label', 'Chiudi');
-    xBtn.title = 'Chiudi';
-    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
-    xBtn.addEventListener('click', close);
-    box.appendChild(xBtn);
+    box.appendChild(crocettaDelRiquadro(close));
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'dash-recap-body';
@@ -2886,14 +2879,7 @@
     }
     box.appendChild(header);
 
-    const xBtn = document.createElement('button');
-    xBtn.type = 'button';
-    xBtn.className = 'dash-recap-x';
-    xBtn.setAttribute('aria-label', 'Chiudi');
-    xBtn.title = 'Chiudi';
-    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
-    xBtn.addEventListener('click', close);
-    box.appendChild(xBtn);
+    box.appendChild(crocettaDelRiquadro(close));
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'dash-recap-body dash-thanks-body';
