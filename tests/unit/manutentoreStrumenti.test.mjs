@@ -141,8 +141,8 @@ test('una promessa al futuro non dichiarata si riconosce anche fuori dall\'elenc
 
 test('una promessa si riconosce dal non avere fonte, non dalle parole: ogni riga dice da quali righe dei worker nasce', () => {
   const blocco = { version: '0.2.256', features: ['Le schede si trascinano fra le finestre.', 'Il menu si apre più in fretta.'], fixes: ['Il download non si blocca.'] };
-  const schede = [{ num: '812', priorita: 2 }, { num: '900', priorita: 1 }];
-  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede });
+  const schede = [{ num: '812', priorita: 1 }, { num: '900', priorita: 1 }];
+  const prova = (righe, promesse) => M.controllaNovita({ versione: '0.2.256', features: righe, ...(promesse ? { promesse } : {}) }, { blocco, schede, ordine: ['812'] });
   for (const riga of ['Tra poco potrai allegare i PDF.', 'Stiamo per portare la chat sul telefono.', 'Il supporto ai PDF è quasi pronto.',
     'I PDF sono il prossimo passo.', 'Tra qualche giorno anche i PDF.', 'Potremo leggere i PDF nel prossimo giro.']) {
     const r = prova([riga]);
