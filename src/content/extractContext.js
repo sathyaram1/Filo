@@ -847,7 +847,6 @@
         const attorno = parentOrHost(sezione);
         return !!attorno && !isInvisibleToUser(attorno) && isReachableByUser(attorno, attorno.getBoundingClientRect());
       }
-      if (sezione) return false;
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
       if (isInvisibleToUser(el)) return false;
