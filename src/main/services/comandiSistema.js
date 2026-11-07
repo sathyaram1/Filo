@@ -1530,7 +1530,7 @@ const _perProve = {
   usaComputer(finto) { computerFinto = finto && typeof finto === 'object' ? finto : null; },
 };
 
-const api = { comanda, normalizzaRichiesta, risolviNome, uriImpostazioni, _perProve };
+const api = { comanda, normalizzaRichiesta, risolviNome, uriImpostazioni, pannelliImpostazioni, _perProve };
 globalThis.SN_COMANDI_SISTEMA = api;
 
 module.exports = {
