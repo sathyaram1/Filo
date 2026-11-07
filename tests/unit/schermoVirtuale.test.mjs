@@ -120,6 +120,36 @@ test('riallineamento: la scelta include i file in conflitto, anche risolti col l
   }
 });
 
+// #2075: un riallineamento SENZA conflitti su un ramo vecchio, con centinaia di file arrivati da main in aree che
+// hanno spec: si sceglie solo dal lavoro. Presi tutti erano 550 spec e circa sei ore, oltre il tetto di un comando.
+test('riallineamento senza conflitti: tanti file arrivati da main non allargano la scelta oltre il lavoro', () => {
+  const dir = cartellaTemporanea('riallineamento-pulito-');
+  const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
+  const daMain = Array.from({ length: 300 }, (_, i) => `src/pages/area${i}/m.js`);
+  try {
+    g('init', '-q', '-b', 'main');
+    g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+    scrivi('src/pages/editor/a.js', '1\n'); scrivi('tests/editor.spec.mjs', '1\n');
+    g('add', '-A'); g('commit', '-qm', 'base');
+    g('checkout', '-qb', 'lavoro');
+    scrivi('src/pages/editor/a.js', 'lavoro\n'); g('commit', '-qam', 'lavoro');
+    const verificato = g('rev-parse', 'HEAD');
+    g('checkout', '-q', 'main');
+    for (const f of daMain) scrivi(f, 'main\n');
+    g('add', '-A'); g('commit', '-qm', 'main');
+    g('checkout', '-q', 'lavoro');
+    g('rebase', '-q', 'main');
+
+    const con = cambiatiPerLaScelta({ base: 'main', marker: { role: 'verifier', dal: verificato }, root: dir });
+    assert.deepEqual(con.changed, ['src/pages/editor/a.js'], 'solo il file del lavoro, nessuno dei 300 arrivati da main');
+    assert.match(con.nota, /dovuto risolvere rispetto al lavoro verificato \([0-9a-f]{8}\): 0\./);
+    assert.match(con.nota, /\(300 file\) l'ha già provato la suite di main/);
+  } finally {
+    togliCartella(dir);
+  }
+});
+
 // #1157: `xvfb-run -a` senza base parte da :99 in ogni worker, e due lanci a mano nello stesso momento prendono lo
 // stesso display. Le ricette mandano al lanciatore, che mette la base del worker come finish:check.
 test('ogni lancio a mano di xvfb-run -a che CLAUDE.md e i ruoli chiedono porta la base di display del worker', () => {
