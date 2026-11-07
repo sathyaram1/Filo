@@ -23,7 +23,9 @@ deve sopravvivere alla sessione va REGISTRATO con gli script, mentre lavori:
   problema trovato fuori dal tuo lavoro → la segnalazione libera, anche senza
   nessuna domanda: il server ne fa un feedback di tipo segnalazione, con la
   fiducia del tuo biglietto, che qualcuno valuterà. Nelle note o nel guasto si
-  perde. Non sostituisce la domanda di un guasto che ti ferma:
+  perde. Un rosso su main lo segnali col percorso del file di test, senza
+  cercare se c'è già: se un feedback aperto lo segue, il server ne fa una nota
+  lì e la riga stampata lo dice. Non sostituisce la domanda di un guasto che ti ferma:
 
   ```bash
   node scripts/routine-channel.mjs segnala <<'FINE'
