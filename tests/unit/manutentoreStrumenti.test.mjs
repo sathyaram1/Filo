@@ -53,6 +53,32 @@ test('con la sola chiave il manutentore apre feedback e domande e scrive la doma
   assert.equal(togli.inviati[0].dati.testo, null);
 });
 
+// #2217: il segno «lavoro server» lo manda chi apre, e un server che non lo conferma non lo perde in silenzio.
+test('feedback e pacchetto con --server mandano il segno lavoro server, e dicono se il server non l\'ha messo', () => {
+  const f = lancia(['feedback', 'Il pacemaker sbaglia', '-', '--server', '--priorita', '3'], { feedback: { ok: true, numero: '2215', fiducia: 'non fidato', lavoroServer: true } }, 'Tutto in functions/src.');
+  assert.equal(f.status, 0);
+  assert.deepEqual(f.inviati, [{ op: 'feedback', dati: { titolo: 'Il pacemaker sbaglia', testo: 'Tutto in functions/src.', priorita: 3, lavoroServer: true }, cred: 'chiave' }]);
+  assert.match(f.out, /Aperto #2215 \(non fidato\)\.\nSegnato lavoro server/);
+  const alias = lancia(['feedback', 'Titolo', '-', '--lavoro-server'], { feedback: { ok: true, numero: '2216' } }, 'Testo.');
+  assert.equal(alias.inviati[0].dati.lavoroServer, true);
+  assert.equal(alias.inviati[0].dati.titolo, 'Titolo', 'l\'opzione non finisce nel titolo');
+  assert.match(alias.out, /SEGNO NON MESSO[\s\S]*non riaprirlo/);
+  const senza = lancia(['feedback', 'Titolo', '-'], { feedback: { ok: true, numero: '2218' } }, 'Testo.');
+  assert.equal('lavoroServer' in senza.inviati[0].dati, false);
+  assert.doesNotMatch(senza.out, /lavoro server|SEGNO/);
+  // Un'opzione storpiata sparirebbe dal titolo e il feedback nascerebbe senza segno: non parte.
+  const storta = lancia(['feedback', 'Titolo', '-', '--sever'], {}, 'Testo.');
+  assert.notEqual(storta.status, 0);
+  assert.deepEqual(storta.inviati, []);
+  assert.match(storta.out, /non conosce --sever/);
+
+  const p = lancia(['pacchetto', '2220', '2215,2216', '--server'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215', '2216'], lavoroServer: true } });
+  assert.deepEqual(p.inviati, [{ op: 'pacchetto', dati: { numero: '2220', unisce: ['2215', '2216'], lavoroServer: true }, cred: 'chiave' }]);
+  assert.match(p.out, /Segnato lavoro server/);
+  const pSenza = lancia(['pacchetto', '2220', '2215,2216'], { pacchetto: { ok: true, pacchetto: '2220', unisce: ['2215', '2216'] } });
+  assert.deepEqual(pSenza.inviati[0].dati, { numero: '2220', unisce: ['2215', '2216'] });
+});
+
 test('registro, spesa e domande ferme vengono dalla chiave del manutentore, non dalle credenziali dell\'owner', () => {
   const r = lancia(['registro', 'account', 'quote'], { registro: { ok: true, voci: [{ id: 'D-3', titolo: 'Prima B', principio: 'Si usa B prima di A.' }] } });
   assert.deepEqual(r.inviati, [{ op: 'registro', dati: { parole: 'account quote' }, cred: 'chiave' }]);
