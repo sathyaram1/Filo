@@ -476,19 +476,19 @@
     const { cosa, v, collegato } = opt._riga;
     const out = [];
     if (cosa === 'bluetooth') {
-      out.push(voce(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
+      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
       const fra = preferito(v);
-      out.push(voce(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
+      out.push(voceMenu(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
         () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, preferito: !fra })));
-      out.push(voce('Dimentica…', 'trash', () => dimentica(opt)));
-      out.push(voce('Copia il nome', 'copy', () => copiaNome(v.nome)));
-      if (pannelli.includes('bluetooth')) out.push(voce('Impostazioni Bluetooth del sistema', 'options', () => apriPannello('bluetooth')));
+      out.push(voceMenu('Dimentica…', 'trash', () => dimentica(opt)));
+      out.push(voceMenu('Copia il nome', 'copy', () => copiaNome(v.nome)));
+      if (pannelli.includes('bluetooth')) out.push(voceMenu('Impostazioni Bluetooth del sistema', 'options', () => apriPannello('bluetooth')));
       return out;
     }
-    if (!collegato) out.push(voce('Collegati', 'wifi', () => dallaRiga(opt, { cosa, rete: v.nome })));
-    out.push(voce('Dimentica la rete…', 'trash', () => dimentica(opt)));
-    out.push(voce('Copia il nome', 'copy', () => copiaNome(v.nome)));
-    if (pannelli.includes('wifi')) out.push(voce('Impostazioni Wi-Fi del sistema', 'options', () => apriPannello('wifi')));
+    if (!collegato) out.push(voceMenu('Collegati', 'wifi', () => dallaRiga(opt, { cosa, rete: v.nome })));
+    out.push(voceMenu('Dimentica la rete…', 'trash', () => dimentica(opt)));
+    out.push(voceMenu('Copia il nome', 'copy', () => copiaNome(v.nome)));
+    if (pannelli.includes('wifi')) out.push(voceMenu('Impostazioni Wi-Fi del sistema', 'options', () => apriPannello('wifi')));
     return out;
   }
 
@@ -496,17 +496,17 @@
   function vociComandi(q, el) {
     if (q.voce === 'volume') {
       const muto = !!(q.ultimo && q.ultimo.muto);
-      const out = [0, 25, 50, 100].map((n) => voce(`Volume al ${n}%`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
-      out.push(voce(muto ? 'Togli il muto' : 'Metti muto', muto ? 'volume' : 'volumeMute', () => esegui(q.muto, { cosa: 'volume', muto: !muto })));
-      if (pannelli.includes('audio')) out.push(voce('Impostazioni audio del sistema', 'options', () => apriPannello('audio')));
+      const out = [0, 25, 50, 100].map((n) => voceMenu(`Volume al ${n}%`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
+      out.push(voceMenu(muto ? 'Togli il muto' : 'Metti muto', muto ? 'volume' : 'volumeMute', () => esegui(q.muto, { cosa: 'volume', muto: !muto })));
+      if (pannelli.includes('audio')) out.push(voceMenu('Impostazioni audio del sistema', 'options', () => apriPannello('audio')));
       return out;
     }
     if (!q.radio || !q.radio.contains(el)) return [];
     const wifi = q.voce === 'rete';
     const out = [];
-    if (!q.radio.hidden && q.radio.textContent) out.push(voce(q.radio.textContent, wifi ? 'wifi' : 'bluetooth', () => q.radio.click()));
+    if (!q.radio.hidden && q.radio.textContent) out.push(voceMenu(q.radio.textContent, wifi ? 'wifi' : 'bluetooth', () => q.radio.click()));
     if (pannelli.includes(wifi ? 'wifi' : 'bluetooth')) {
-      out.push(voce(wifi ? 'Impostazioni Wi-Fi del sistema' : 'Impostazioni Bluetooth del sistema', 'options', () => apriPannello(wifi ? 'wifi' : 'bluetooth')));
+      out.push(voceMenu(wifi ? 'Impostazioni Wi-Fi del sistema' : 'Impostazioni Bluetooth del sistema', 'options', () => apriPannello(wifi ? 'wifi' : 'bluetooth')));
     }
     return out;
   }
