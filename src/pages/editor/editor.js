@@ -2305,7 +2305,7 @@
       tutta.setStart(blocco, 0);
       scegli(tutta);
       inserisci(`<${lista}>${voci}</${lista}>`);
-      cursoreIndietro(dopo.toString().length);
+      cursoreIndietro(restoDopo);
       return;
     }
     const tag = /^(H[1-6]|BLOCKQUOTE|DIV)$/.test(blocco.tagName) ? blocco.tagName.toLowerCase() : 'p';
