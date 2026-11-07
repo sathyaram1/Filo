@@ -2315,7 +2315,7 @@
     if (pieno(prima)) {
       scegli(finoInFondo());
       inserisci(frammento('p', { resto, dopo: htmlDi(dopo) }));
-      cursoreIndietro(dopo.toString().length);
+      cursoreIndietro(restoDopo);
       return;
     }
     // Testo solo dopo: l'HTML entra prima del blocco, e l'ultima riga, un paragrafo, si unisce al testo che resta.
