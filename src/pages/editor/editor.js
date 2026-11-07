@@ -2277,27 +2277,75 @@
       const b = dentro(docEl.childNodes[r.endOffset - 1], false);
       r.setEnd(b, b.nodeType === 3 ? b.length : b.childNodes.length);
     }
-    const blocco = r && bloccoDi(r.startContainer);
-    const bloccoFine = r && bloccoDi(r.endContainer);
-    if (!r || !blocco || !bloccoFine) { document.execCommand('insertText', false, righe.join('\n')); return; }
+    const blocco = bloccoDi(r.startContainer);
+    const bloccoFine = bloccoDi(r.endContainer);
+    if (!blocco || !bloccoFine) {
+      // Un foglio senza blocchi e senza testo prende l'HTML così com'è; altrove, fuori da un blocco, riga per riga.
+      if (!docEl.textContent.split(ANCORA).join('').trim() && !docEl.querySelector('img')) inserisci(frammento('p'));
+      else document.execCommand('insertText', false, righe.join('\n'));
+      return;
+    }
+    const prima = document.createRange();
+    prima.setStart(blocco, 0);
+    prima.setEnd(r.startContainer, r.startOffset);
+    const dopo = document.createRange();
+    dopo.setStart(r.endContainer, r.endOffset);
+    dopo.setEnd(bloccoFine, bloccoFine.childNodes.length);
+    const finoInFondo = () => { const f = r.cloneRange(); f.setEnd(bloccoFine, bloccoFine.childNodes.length); return f; };
 
-    // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto.
-    if (blocco.tagName === 'LI' && bloccoFine === blocco) {
-      const prima = document.createRange();
-      prima.setStart(blocco, 0);
-      prima.setEnd(r.startContainer, r.startOffset);
-      const dopo = document.createRange();
-      dopo.setStart(r.endContainer, r.endOffset);
-      dopo.setEnd(blocco, blocco.childNodes.length);
+    // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto, anche
+    // quando la selezione finisce in un'altra voce o fuori dall'elenco.
+    if (blocco.tagName === 'LI') {
       const lista = blocco.parentNode.tagName === 'OL' ? 'ol' : 'ul';
       const voci = righe.map((x, i) => `<li>${i === 0 ? htmlDi(prima) : ''}${(i === 0 && prima.toString()) || (i === ultima && dopo.toString()) ? spaziVisibili(x) : riga(x)}${i === ultima ? htmlDi(dopo) : ''}</li>`).join('');
-      const tutta = document.createRange();
-      tutta.selectNodeContents(blocco);
+      const tutta = finoInFondo();
+      tutta.setStart(blocco, 0);
       scegli(tutta);
-      document.execCommand('insertHTML', false, `<${lista}>${voci}</${lista}>`);
+      inserisci(`<${lista}>${voci}</${lista}>`);
       cursoreIndietro(dopo.toString().length);
       return;
     }
+    const tag = /^(H[1-6]|BLOCKQUOTE|DIV)$/.test(blocco.tagName) ? blocco.tagName.toLowerCase() : 'p';
+    const resto = tag === 'blockquote' ? 'blockquote' : 'p';
+    // Testo prima della selezione: la si porta in fondo al blocco, così l'HTML entra dopo di lui e la prima riga si unisce
+    // al testo (un paragrafo si unisce a qualunque blocco); quello che seguiva chiude l'ultima riga.
+    if (pieno(prima)) {
+      scegli(finoInFondo());
+      inserisci(frammento('p', { resto, dopo: htmlDi(dopo) }));
+      cursoreIndietro(dopo.toString().length);
+      return;
+    }
+    // Testo solo dopo: l'HTML entra prima del blocco, e l'ultima riga, un paragrafo, si unisce al testo che resta.
+    if (pieno(dopo)) {
+      scegli(r);
+      inserisci(frammento(tag, { resto, ultimo: 'p' }));
+      return;
+    }
+    // Il blocco resterebbe vuoto: un carattere invisibile, piantato fuori dall'annulla, gli tiene il posto finché l'HTML
+    // non è entrato, poi se ne va (#1697.2). Sta in fondo al suo testo, così toglierlo non sposta niente di quello che
+    // l'annulla ricorda.
+    const z = document.createTextNode(ANCORA);
+    if (tag === 'blockquote' || /^h/.test(tag)) {
+      // Titolo e citazione non accolgono un paragrafo in coda: l'ancora sta in un paragrafo suo, prima, che poi si toglie.
+      const suo = document.createElement('p');
+      suo.appendChild(z);
+      blocco.parentNode.insertBefore(suo, blocco);
+      r.setStart(z, 1);
+      scegli(r);
+      inserisci(frammento(tag, { resto }));
+      if (suo.isConnected && suo.textContent === ANCORA && !suo.querySelector('img')) suo.remove();
+    } else {
+      const fine = r.cloneRange();
+      fine.collapse(false);
+      fine.insertNode(z);
+      r.setEndBefore(z);
+      scegli(r);
+      inserisci(frammento(tag, { resto }));
+    }
+    if (z.isConnected && z.data.endsWith(ANCORA)) z.deleteData(z.data.length - 1, 1);
+  }
+  // Placeholder rimosso sotto.
+  function __vecchio() {
     // Un carattere invisibile piantato davanti alla selezione: Chrome non incolla in un blocco vuoto, dove paga al
     // quadrato, e la selezione può finire in un elenco o in una citazione (#1697). Il modello non lo salva.
     const conAncora = () => {
