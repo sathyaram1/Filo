@@ -611,7 +611,7 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata, avvisoTrattinoDaNpm } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--pacchetto', '--dry-run'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--server', '--lavoro-server', '--aspetta', '--pacchetto', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega', '--aspetta', '--pacchetto'],
     ripetibili: ['--allega'],
   };
