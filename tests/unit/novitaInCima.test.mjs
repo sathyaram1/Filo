@@ -27,6 +27,7 @@ test('il registro vero letto come dati è quello eseguito, e le regole di confro
   assert.deepEqual(JSON.parse(JSON.stringify(registroDa(readFileSync(join(REPO, FILE_NOVITA), 'utf8')))), JSON.parse(JSON.stringify(PN.NOTES)));
   assert.equal(REGOLA.FILE_NOVITA, FILE_NOVITA);
   assert.equal(REGOLA.CAMPO, CAMPO);
+  assert.deepEqual([...REGOLA.BASTA_SPOSTARE], [...BASTA_SPOSTARE], 'gli esiti dopo i quali basta spostare: uguali per app e server');
   for (const r of PN.NOTES.flatMap((n) => [...(n.features || []), ...(n.fixes || [])])) assert.equal(REGOLA.testo(r), PN.testo(r));
   for (const r of [null, undefined, 3, { testo: '' }, { segnalazione: 4 }, {}]) assert.equal(REGOLA.testo(r), PN.testo(r), JSON.stringify(r));
   const versioni = ['0.2.9', '0.2.10', '0.2.266', '0.2.267', '0.3.0', '1.0', '1.0.0.1', '', 'x', '0.2.x'];
