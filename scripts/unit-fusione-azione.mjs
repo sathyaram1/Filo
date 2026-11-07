@@ -77,7 +77,7 @@ const intero = (n) => Math.max(0, Math.floor(Number(n) || 0));
  * L'esito unico dalle parti (#2225). PURA. `parti`: [{ nome, risultato, campo }], `risultato` quello del lavoro di Actions
  * e `campo` il JSON della parte. Una parte saltata (spenta) non conta; una senza esito valido per la coppia fa
  * `non_provata`. Conflitto > rossi sulla fusione > non provata > l'esito che fonde e dice di più. I rossi di
- * un sistema che non è Linux portano il suo nome in coda, dopo il nome del test.
+ * un sistema che non è Linux, e che Linux non ha, portano `firmaSistema` in coda.
  */
 export function unisciParti({ ramo, main, parti = [] } = {}) {
   const lette = [];
