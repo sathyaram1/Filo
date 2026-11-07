@@ -46,6 +46,9 @@
   let formeDizionario = new Map();
   let autocorrectMap = {}; // { lowercased misspelled: correction }
   let settings = null;
+  // Dove il livello di privacy chiede prima (#1589) i controlli del modello non partono più da soli: il motivo resta
+  // qui finché le impostazioni non cambiano, e il campo ha «Controlla» nel tasto destro.
+  let chiedeQui = null;
   // L'applyFix dell'autocorrect dispatcha un input che rientrerebbe nel listener: questa flag salta una passata.
   let suppressAutocorrect = false;
   // Quello che Filo impara dai rifiuti (#1447), com'è salvato: conti e parole da non correggere più da sé.
@@ -136,6 +139,8 @@
 
   function updateSettings(s) {
     settings = s;
+    // Un livello di privacy cambiato si rilegge alla prossima domanda (#1589).
+    chiedeQui = null;
     segnaRadice();
     if (!attivo()) { detachAll(); return; }
     const state = activeEl && monitored.get(activeEl);
@@ -2160,7 +2165,7 @@
   // Il rapido: dopo la pausa breve, al più ogni `ogniRapidoMs` mentre si continua a scrivere, e subito a ogni candidato
   // nuovo. Senza un gesto (#1070) quello già chiesto si sposta soltanto.
   function programmaRapido(state, { gesto = false, subito = false } = {}) {
-    if (!modelloErrori()) return;
+    if (!modelloErrori() || chiedeQui) return;
     if (!gesto && !state.timerRapido) return;
     const T = tempi();
     if (state.timerRapido) clearTimeout(state.timerRapido);
@@ -2182,13 +2187,13 @@
       state.timerFine = null;
       if (!state.attivo) return;
       aggiornaCodice(state);
-      if (state.restaParola && modelloErrori() && !state.timerRapido) controlloRapido(state);
+      if (state.restaParola && modelloErrori() && !chiedeQui && !state.timerRapido) controlloRapido(state);
     }, tempi().pausaRagionatoMs + 30);
   }
 
   // Il ragionato: a fine frase, sulle frasi chiuse, e dopo la pausa lunga su quello che è cambiato.
   function programmaRagionato(state, { gesto = false, fineFrase = false } = {}) {
-    if (!ragionatoAttivo()) return;
+    if (!ragionatoAttivo() || chiedeQui) return;
     if (!gesto && !state.timerRagionato) return;
     if (state.timerRagionato) clearTimeout(state.timerRagionato);
     state.timerRagionato = setTimeout(() => {
@@ -2231,6 +2236,7 @@
         ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true }),
         ...(ripeti ? { riprova: true } : {}),
       })).then((res) => {
+        if (res && res.code === 'CHIEDI_PRIMA' && !suRichiesta) chiedeQui = res.motivo || 'sempre';
         if (res && res.ok && typeof res.text === 'string') {
           esiti.set(chiave, { ok: true, text: res.text, senzaContesto: !!res.senzaContesto });
           while (esiti.size > ESITI_MAX) esiti.delete(esiti.keys().next().value);
@@ -2333,9 +2339,9 @@
     applicaRisposta(state, res.text, { fonte: 'rapido', viaggio });
   }
 
-  async function controlloRagionato(state, { fineFrase = false } = {}) {
+  async function controlloRagionato(state, { fineFrase = false, suRichiesta = false } = {}) {
     if (!ragionatoAttivo() || !state.el || !state.el.isConnected) return;
-    if (document.hidden) { state.rimandati.add('ragionato'); return; }
+    if (document.hidden && !suRichiesta) { state.rimandati.add('ragionato'); return; }
     const Rg = R();
     seguiIlTesto(state);
     const d = testoDaControllare(state.el);
@@ -2382,7 +2388,7 @@
     let res = null;
     try {
       // Le date relative cambiano a mezzanotte: il giorno è parte della domanda.
-      res = await chiediERipeti(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString() });
+      res = await chiediERipeti(ACTIONS.SPELLCHECK_CONTEXT, payload, { giorno: new Date().toDateString(), suRichiesta });
     } catch (err) {
       console.warn('[SN] correttore, controllo ragionato:', err);
     } finally {
@@ -2977,6 +2983,20 @@
     if (!e) return { errore: false };
     // Il modello va ai contatori del correttore, con la proposta che ne esce (#1461).
     return { errore: true, start: e.start, end: e.end, segment: e.segment, correzione: e.correzioni[0] ?? '', motivo: e.motivo, modello: String(res.model || '') };
+  }
+
+  // «Controlla» (#1589): dove il livello di privacy chiede prima, i due controlli del modello partono sul campo intero
+  // quando l'utente li chiede. Il menu la offre solo lì, e solo se il modello del correttore è acceso.
+  function chiedePrima(el) {
+    return Boolean(chiedeQui && el && (modelloErrori() || ragionatoAttivo()) && monitored.get(el));
+  }
+  async function controllaOra(el) {
+    const state = el && monitored.get(el);
+    if (!state) return;
+    await Promise.all([
+      modelloErrori() ? controlloRapido(state, { suRichiesta: true, ignoraScrittura: true }) : null,
+      ragionatoAttivo() ? controlloRagionato(state, { suRichiesta: true }) : null,
+    ]);
   }
 
   // Cerca di estrarre frase precedente e successiva al campo editabile, per la parola sotto il tasto destro.
@@ -3836,6 +3856,8 @@
     cercaDiNuovo,
     valoreSotto,
     controlloSuRichiesta,
+    chiedePrima,
+    controllaOra,
     proposteDelBrowser,
     sbagliataPerIlBrowser,
     contestoDelCampo,

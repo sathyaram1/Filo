@@ -201,7 +201,11 @@
       return { icon: '📨', text: `Segnalazione inviata${t ? ` · ${t}` : ''}` };
     },
     ONBOARDING: (a) => {
-      if (sceltaAutonomia(a)) return { icon: '👋', text: 'Accoglienza · scelta dell’autonomia' };
+      if (sceltaAutonomia(a)) {
+        const o = a._output;
+        const cosa = [o.sceltaAutonomia ? 'dell’autonomia' : '', o.sceltaPrivacy ? 'della privacy' : ''].filter(Boolean).join(' e ');
+        return { icon: '👋', text: `Accoglienza · scelta ${cosa}` };
+      }
       if (sceltaContatori(a)) return { icon: '👋', text: 'Accoglienza · scelta dei contatori' };
       if (a && (a.fine ?? a.chiudi ?? a.done)) return { icon: '👋', text: 'Accoglienza conclusa' };
       const ids = Array.isArray(a && a.spunta) ? a.spunta : [];
@@ -516,13 +520,15 @@
   function rifiutataDallaRegola(a) {
     return !!(a && a._output && a._output.no);
   }
-  // #1188 — nell'intervista Filo mostra i livelli di autonomia e l'utente sceglie: la scelta la disegna l'accoglienza.
   function sceltaContatori(a) {
     return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaContatori === true;
   }
 
+  // #1188, #1589 — nell'intervista Filo mostra i livelli di autonomia o di privacy e l'utente sceglie: la scelta la
+  // disegna l'accoglienza.
   function sceltaAutonomia(a) {
-    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output && a._output.sceltaAutonomia === true;
+    return isType(a, 'ONBOARDING') && a._executed !== false && !!a._output
+      && (a._output.sceltaAutonomia === true || a._output.sceltaPrivacy === true);
   }
 
   // «Cercato fra i documenti · bolletta luce marzo · 8 trovati»: dice anche quando la ricerca è stata fermata.

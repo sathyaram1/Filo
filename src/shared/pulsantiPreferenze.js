@@ -74,6 +74,12 @@
     if (correnti && correnti.autonomia && typeof correnti.autonomia === 'object') {
       out.autonomia = JSON.parse(JSON.stringify(correnti.autonomia));
     }
+    // Né manda di più ai modelli (#1589): alzarlo vuole «conferma».
+    const LP = global.SN_LIVELLI_PRIVACY;
+    if (LP && correnti && correnti.security && out.security) {
+      out.security.privacy = LP.piuStretta(correnti.security.privacy, out.security.privacy);
+      out.security.pagineDelicate = LP.delicateStrette(correnti.security.pagineDelicate, out.security.pagineDelicate);
+    }
     return out;
   }
 

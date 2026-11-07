@@ -463,9 +463,15 @@
   // «Descrizione…» solo finché può davvero arrivare: un'attesa che non finirà mai è una
   // bugia, meglio dire che manca il modello.
   let imageDescNoModel = false;
-  // L'ultima immagine che non avrà descrizione, e perché: pagina delicata o descrizione spenta (#1004, #1274).
+  // L'ultima immagine che non avrà descrizione, e perché: il livello di privacy della pagina o descrizione spenta (#1589, #1274).
   let ultimaSenza = { dataUrl: null, etichetta: '' };
-  const SENZA_DESCRIZIONE = { PAGINA_DELICATA: 'clipboard_image_delicata', DESCRIZIONE_SPENTA: 'clipboard_image_senza_descrizione' };
+  const senzaDescrizione = (res) => {
+    if (!res) return '';
+    if (res.code === 'DESCRIZIONE_SPENTA') return 'clipboard_image_senza_descrizione';
+    if (res.code !== 'CHIEDI_PRIMA') return '';
+    // Ferma da «Chiedi sempre» o dall'incognito la pagina non è delicata: è il livello a dire di aspettare.
+    return res.motivo === 'sempre' || res.motivo === 'incognito' ? 'clipboard_image_senza_descrizione' : 'clipboard_image_delicata';
+  };
   function imagePlaceholderLabel(dataUrl) {
     if (dataUrl && dataUrl === ultimaSenza.dataUrl) return I18n.t(ultimaSenza.etichetta);
     return I18n.t(imageDescNoModel ? 'clipboard_image_no_model' : 'clipboard_image_pending');
@@ -491,8 +497,8 @@
     } catch (e) {
       res = { ok: false, error: e.message || String(e) };
     }
-    // Nata su una pagina delicata, o con la descrizione spenta, l'immagine non va al modello: lo screenshot prende data e ora.
-    const senza = res && SENZA_DESCRIZIONE[res.code];
+    // Nata dove Filo chiede prima, o con la descrizione spenta, l'immagine non va al modello: lo screenshot prende data e ora.
+    const senza = senzaDescrizione(res);
     if (senza) {
       ultimaSenza = { dataUrl, etichetta: senza };
       chrome.runtime.sendMessage({
@@ -646,7 +652,8 @@
   }
 
   // `suRichiesta`: l'ha chiesta l'utente col tasto destro, e il tetto del main sulle automatiche non la ferma.
-  function startExplainRequest(selInfo, { suRichiesta = false } = {}) {
+  // `anticipata`: parte da sola all'apertura del menu, e i livelli di privacy decidono se aspetta il clic (#1589).
+  function startExplainRequest(selInfo, { suRichiesta = false, anticipata = false } = {}) {
     const key = explainKey(selInfo.selection);
     const entry = { key, sentence: selInfo.sentence, fermata: false };
     entry.promise = chrome.runtime.sendMessage({
@@ -657,16 +664,20 @@
       conSeguito: true,
       // Preparata prima che la persona la chieda: l'uso lo conta l'apertura di Spiega, non questa chiamata (#969).
       ...(suRichiesta ? { suRichiesta: true } : { parteDiUnUso: true, anticipo: true }),
+      ...(anticipata ? { anticipata: true } : {}),
     }).then(
       (res) => {
         // Per i contatori (#1465): l'anticipo era già qui quando la persona ha aperto Spiega, o ancora in volo.
         entry.arrivata = true;
-        // Fermata dal tetto o da una pagina delicata (#1274): al tasto destro si chiede davvero.
-        if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'PAGINA_DELICATA')) entry.fermata = true;
-        // Il livello di privacy nella famiglia degli anticipi (#1586): la spiegazione che la pagina delicata non lascia preparare.
-        if (res && res.code === 'PAGINA_DELICATA') {
-          entry.perPrivacy = true;
-          contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
+        // Fermata dal tetto o dal livello di privacy della pagina (#1274, #1589): al clic si chiede davvero.
+        if (res && (res.code === 'TROPPE_AUTOMATICHE' || res.code === 'CHIEDI_PRIMA')) entry.fermata = true;
+        if (res && res.code === 'CHIEDI_PRIMA') {
+          // Il livello di privacy nella famiglia degli anticipi (#1586): la spiegazione che la pagina non lascia preparare.
+          if (!anticipata) {
+            entry.perPrivacy = true;
+            contaRiquadro('anticipo_privacy', { funzione: 'spiega', esito: 'saltato' });
+          }
+          return { chiedi: res.motivo || 'sempre' };
         }
         // L'errore resta la risposta intera: chi lo mostra ci legge anche dove si rimedia (#663).
         // Fermata dal tetto (#1302): la nota la dice, e già vista non torna al tasto destro dopo.
@@ -689,7 +700,7 @@
   // Restituisce la Promise per la spiegazione di questa selezione.
   // Riusa il prefetch se è dello stesso testo; altrimenti parte ora.
   // Un anticipo fermato dal tetto delle automatiche non è la risposta: al tasto destro si chiede davvero.
-  function getExplainPromise(selInfo) {
+  function getExplainPromise(selInfo, { anticipata = false } = {}) {
     const key = explainKey(selInfo.selection);
     // Com'era l'anticipo al gesto (#1465): contato alla prima apertura della selezione, una riapertura no.
     const anticipo = (stato) => contaRiquadro('anticipo_al_gesto', { funzione: 'spiega', stato });
@@ -697,7 +708,7 @@
       if (stato) anticipo(stato);
       // Con la spiegazione in anticipo spenta la chiede la persona: è il gesto che quella scelta le costa (#1461).
       if (deps.spiegaAnticipata && !deps.spiegaAnticipata()) Popup.conta({ misura: 'chiesto', action: ACTIONS.EXPLAIN });
-      const entry = startExplainRequest(selInfo, { suRichiesta: true });
+      const entry = startExplainRequest(selInfo, { suRichiesta: true, anticipata });
       // Chiesta al tasto destro, è già aperta: interrotta, il tasto destro dopo la richiede.
       entry.aperta = true;
       prefetchedExplain = entry;
@@ -740,6 +751,26 @@
     try { global.SN_MENU?.close?.(); } catch (_) {}
   }
 
+  // Dove il livello di privacy chiede prima (#1589), al posto della risposta c'è il tasto che la chiede: un clic e parte.
+  function chiediPrima(el, body, etichetta, motivo, parti) {
+    el.classList.remove('sn-menu-inline-loading');
+    el.classList.add('sn-menu-inline-chiedi');
+    body.textContent = '';
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'sn-menu-inline-chiedi-tasto';
+    b.textContent = I18n.t(etichetta);
+    b.title = I18n.t(motivo === 'campi' ? 'menu_chiedi_perche_campi' : 'menu_chiedi_perche');
+    b.addEventListener('click', (e) => {
+      e.stopPropagation();
+      el.classList.remove('sn-menu-inline-chiedi');
+      el.classList.add('sn-menu-inline-loading');
+      body.textContent = I18n.t('menu_explain_loading');
+      parti();
+    });
+    body.appendChild(b);
+  }
+
   function buildInlineExplain(selInfo, opts = {}) {
     const withDeepArrow = !!opts.withDeepArrow;
     return {
@@ -776,12 +807,16 @@
         let arrivata = false;
         let approfondita = false;
         const apertaIl = Date.now();
-        getExplainPromise(selInfo).then((res) => {
+        const mostra = (res) => {
           arrivata = true;
           // Una risposta già chiesta prima (l'anticipo alla selezione) non passa dal conto delle chiamate: l'uso lo
           // conta chi la mostra, con l'attesa da quando la persona ha aperto Spiega (#969).
           if (res && res.giaChiesta) contaUso(ACTIONS.EXPLAIN, !cancelled && res.text ? Date.now() - apertaIl : null, res.anticipata);
           if (cancelled) return;
+          if (res && res.chiedi) {
+            chiediPrima(el, body, 'menu_chiedi_spiega', res.chiedi, () => { arrivata = false; getExplainPromise(selInfo).then(mostra); });
+            return;
+          }
           el.classList.remove('sn-menu-inline-loading');
           // Il tetto finito nel ragionamento prima di una parola (#1302): la nota e «Continua» al posto della spiegazione.
           const nota = res && !res.errore && !String(res.text || '').trim()
@@ -812,7 +847,8 @@
               seguito: daMostrare || nota,
             });
           });
-        });
+        };
+        getExplainPromise(selInfo, { anticipata: true }).then(mostra);
         // Il menu chiuso prima della spiegazione (#1465); passare ad Approfondisci non è lasciarla lì.
         return () => {
           cancelled = true;
@@ -955,31 +991,42 @@
             origine.hidden = false;
           }).catch(() => {});
 
-          try {
-            const res = await chrome.runtime.sendMessage({
-              type: MSG.AI_REQUEST,
-              action: ACTIONS.DESCRIBE_IMAGE,
-              payload: { dataUrl },
-              diceRipiego: true,
-            });
-            if (cancelled) return;
-            arrivata = true;
-            el.classList.remove('sn-menu-inline-loading');
-            if (!res?.ok || !res.text) {
+          // Aperto il menu parte da sola; dove il livello di privacy chiede prima (#1589), parte al clic su «Descrivi».
+          const descrivi = async (anticipata) => {
+            try {
+              const res = await chrome.runtime.sendMessage({
+                type: MSG.AI_REQUEST,
+                action: ACTIONS.DESCRIBE_IMAGE,
+                payload: { dataUrl },
+                diceRipiego: true,
+                ...(anticipata ? { anticipata: true } : {}),
+              });
+              if (cancelled) return;
+              // Il tasto che la chiede è la risposta: chiuso il menu senza clic, non si è chiuso prima di lei.
+              if (res && res.code === 'CHIEDI_PRIMA') {
+                arrivata = true;
+                chiediPrima(el, body, 'menu_chiedi_descrivi', res.motivo, () => { arrivata = false; descrivi(false); });
+                return;
+              }
+              arrivata = true;
+              el.classList.remove('sn-menu-inline-loading');
+              if (!res?.ok || !res.text) {
+                el.classList.add('sn-menu-inline-error');
+                Popup.scriviErrore(body, res, { dopo: chiudiMenu });
+                return;
+              }
+              testoChiuso(body, res.text);
+              Popup.notaRipiego(el, res.keyFallback);
+              Popup.notaInterrotta(el, res.finishReason);
+            } catch (e) {
+              if (cancelled) return;
+              arrivata = true;
+              el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              Popup.scriviErrore(body, res, { dopo: chiudiMenu });
-              return;
+              body.textContent = I18n.t('err_provider_failed');
             }
-            testoChiuso(body, res.text);
-            Popup.notaRipiego(el, res.keyFallback);
-            Popup.notaInterrotta(el, res.finishReason);
-          } catch (e) {
-            if (cancelled) return;
-            arrivata = true;
-            el.classList.remove('sn-menu-inline-loading');
-            el.classList.add('sn-menu-inline-error');
-            body.textContent = I18n.t('err_provider_failed');
-          }
+          };
+          await descrivi(true);
         })();
         return () => {
           cancelled = true;
@@ -1028,51 +1075,61 @@
             return;
           }
 
-          let port;
-          try {
-            port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
-          } catch (_) {
-            arrivata = true;
-            el.classList.remove('sn-menu-inline-loading');
-            el.classList.add('sn-menu-inline-error');
-            body.textContent = I18n.t('err_provider_failed');
-            return;
-          }
-          let buf = '';
-          let firstDelta = true;
-          port.onMessage.addListener((m) => {
-            if (m.type === 'delta') {
-              arrivata = true;
-              if (firstDelta) {
-                el.classList.remove('sn-menu-inline-loading');
-                firstDelta = false;
-              }
-              buf += m.delta;
-              // Sicurezza: niente HTML, è testo.
-              body.textContent = buf;
-            } else if (m.type === 'reset') {
-              // Provider caduto a metà risposta, si riparte col fallback:
-              // butta il testo parziale (l'avviso sicurezza resta).
-              buf = '';
-              body.textContent = '';
-              if (!cancelled) contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN_LINK, uso: 'ricominciata' });
-            } else if (m.type === 'done') {
-              arrivata = true;
-              Popup.notaRipiego(el, m.keyFallback);
-              Popup.notaInterrotta(el, m.finishReason);
-            } else if (m.type === 'error') {
+          // Aperto il menu parte da sola; dove il livello di privacy chiede prima (#1589), parte al clic.
+          const spiega = (anticipata) => {
+            let port;
+            try {
+              port = chrome.runtime.connect({ name: global.SN_MSG.PORTS.AI_STREAM });
+            } catch (_) {
               arrivata = true;
               el.classList.remove('sn-menu-inline-loading');
               el.classList.add('sn-menu-inline-error');
-              Popup.scriviErrore(body, m, { dopo: chiudiMenu });
+              body.textContent = I18n.t('err_provider_failed');
+              return;
             }
-          });
-          port.postMessage({
-            type: 'start',
-            action: ACTIONS.EXPLAIN_LINK,
-            payload: { url, anchorText, ogTitle, ogDescription, suspiciousFlags: flags },
-            origin: location.href,
-          });
+            let buf = '';
+            let firstDelta = true;
+            port.onMessage.addListener((m) => {
+              if (cancelled) return;
+              if (m.type === 'error' && m.code === 'CHIEDI_PRIMA') {
+                arrivata = true;
+                chiediPrima(el, body, 'menu_chiedi_link', m.motivo, () => { arrivata = false; spiega(false); });
+                return;
+              }
+              if (m.type === 'delta') {
+                arrivata = true;
+                if (firstDelta) {
+                  el.classList.remove('sn-menu-inline-loading');
+                  firstDelta = false;
+                }
+                buf += m.delta;
+                // Sicurezza: niente HTML, è testo.
+                body.textContent = buf;
+              } else if (m.type === 'reset') {
+                // Provider caduto a metà risposta, si riparte col fallback:
+                // butta il testo parziale (l'avviso sicurezza resta).
+                buf = '';
+                body.textContent = '';
+                contaRiquadro('riquadro_uso', { action: ACTIONS.EXPLAIN_LINK, uso: 'ricominciata' });
+              } else if (m.type === 'done') {
+                arrivata = true;
+                Popup.notaRipiego(el, m.keyFallback);
+                Popup.notaInterrotta(el, m.finishReason);
+              } else if (m.type === 'error') {
+                arrivata = true;
+                el.classList.remove('sn-menu-inline-loading');
+                el.classList.add('sn-menu-inline-error');
+                Popup.scriviErrore(body, m, { dopo: chiudiMenu });
+              }
+            });
+            port.postMessage({
+              type: 'start',
+              action: ACTIONS.EXPLAIN_LINK,
+              payload: { url, anchorText, ogTitle, ogDescription, suspiciousFlags: flags, ...(anticipata ? { anticipata: true } : {}) },
+              origin: location.href,
+            });
+          };
+          spiega(true);
         })();
         return () => {
           cancelled = true;
@@ -1081,7 +1138,6 @@
       },
     };
   }
-
   // ------------------------------------------------------------
   // Salva / condividi / cerca / immagini
   // ------------------------------------------------------------

@@ -418,7 +418,7 @@ test('Preferenze, Notifiche: l’etichetta del suono non spiega l’interfaccia'
 
 test('#530: spegnere una protezione o allargare un\'eccezione della pagina Sicurezza abbassa una difesa', () => {
   const allenta = (k, v, at) => P.buildPreferencePartial(k, v, { attuali: at || null }).allenta;
-  for (const k of ['blocco_pubblicita', 'blocco_siti', 'liste_pubbliche_blocco', 'controlli_rete_siti', 'giudizio_ai_siti', 'link_sospetti_isolati', 'pagine_delicate']) {
+  for (const k of ['blocco_pubblicita', 'blocco_siti', 'liste_pubbliche_blocco', 'controlli_rete_siti', 'giudizio_ai_siti', 'link_sospetti_isolati']) {
     assert.equal(allenta(k, 'off'), true, `${k} spento`);
     assert.equal(allenta(k, 'on'), false, `${k} acceso`);
   }
@@ -436,6 +436,30 @@ test('#530: spegnere una protezione o allargare un\'eccezione della pagina Sicur
   }
   assert.equal(allenta('siti_delicati', 'togli x.com'), true);
   assert.equal(allenta('domini_esclusi', 'aggiungi x.com'), false, 'non è una difesa');
+  // #1589 — alzare quanto esce verso i modelli, da ogni chiave dei livelli di privacy.
+  const di = { security: { privacy: { livello: 'delicate', incognito: 'sempre', chiedi: ['sanita'], sitiAnticipo: [] } } };
+  assert.equal(allenta('livello_privacy', 'anticipo', di), true);
+  assert.equal(allenta('livello_privacy', 'tutto', di), true);
+  assert.equal(allenta('livello_privacy', 'meno', di), false, 'manda meno roba ai modelli');
+  assert.equal(allenta('livello_privacy', 'sempre', di), false);
+  assert.equal(allenta('privacy_incognito', 'delicate', di), true);
+  assert.equal(allenta('privacy_categorie', 'togli sanità', di), true);
+  assert.equal(allenta('privacy_categorie', 'aggiungi posta', di), false);
+  assert.equal(allenta('siti_anticipo', 'aggiungi miodottore.it', di), true);
+  assert.equal(allenta('siti_anticipo', 'togli miodottore.it', di), false);
+  assert.equal(allenta('livello_privacy', 'delicate'), true, 'senza le impostazioni di adesso vale come alzare');
+});
+
+test('#1589: il livello di privacy a parole, anche relativo a quello di adesso', () => {
+  const at = { security: { privacy: { livello: 'anticipo', chiedi: ['sanita'] } } };
+  const p = (k, v, a = at) => P.buildPreferencePartial(k, v, { attuali: a }).partial.security.privacy;
+  assert.deepEqual(p('privacy', 'meno'), { livello: 'delicate' });
+  assert.deepEqual(p('privacy', 'meno', { security: { privacy: { livello: 'delicate' } } }), { livello: 'sempre' });
+  assert.deepEqual(p('privacy', 'manda tutto'), { livello: 'anticipo', chiedi: [] });
+  assert.deepEqual(p('privacy', 'di serie'), { livello: 'anticipo', chiedi: ['sanita'] });
+  assert.deepEqual(p('privacy_categorie', 'aggiungi banca e posta'), { chiedi: ['posta', 'banche', 'sanita'] });
+  assert.match(P.buildPreferencePartial('privacy_categorie', 'aggiungi cucina', { attuali: at }).rifiuto, /non è una categoria/);
+  assert.equal(P.buildPreferencePartial('livello_privacy', 'boh', { attuali: at }), null);
 });
 
 test('l\'avviso dei crediti dalla chat (#818): soglie dentro i limiti, fuori è un rifiuto col numero, e si spegne', () => {
