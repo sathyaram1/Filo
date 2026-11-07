@@ -528,11 +528,13 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       const b = apriAlbero(git, base, 'main', mainSha);
       if (b.dir) alberi.push(b.dir);
       if (b.errore) return { errore: b.errore, mainSha };
-      const main = lancia(b.dir, base, 'main');
+      // Un test che il ramo aggiunge su main non c'è: i suoi rossi sono del ramo.
+      const suMain = scelti ? scelti.filter((f) => existsSync(join(b.dir, f))) : null;
+      const main = suMain && !suMain.length ? { ok: true, rossi: [] } : lancia(b.dir, base, 'main', suMain ? { file: suMain } : {});
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
-    return { ...d, mainSha, ...segno, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
+    return { ...d, mainSha, ...segno, ...toccati, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
   } finally {
     const collegamento = togliCollegamento(join(base, 'node_modules'));
     const rimasti = [...alberi.map((dir) => chiudiAlbero(git, dir)), collegamento].filter((r) => !r.ok);
