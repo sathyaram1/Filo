@@ -70,16 +70,22 @@ function guarda({ window: w, segnala, partenzaMs = PARTENZA_MS, ora = () => Date
     attendi(v);
   }, true);
 
-  doc.addEventListener('playing', (e) => { const v = video(e); if (v && !inizio.has(v)) inizio.set(v, ora()); }, true);
+  doc.addEventListener('playing', (e) => {
+    const v = video(e);
+    if (v && !inizio.has(v)) inizio.set(v, { t: ora(), pos: Number(v.currentTime) || 0 });
+  }, true);
   for (const t of ['loadstart', 'emptied']) doc.addEventListener(t, (e) => { const v = video(e); if (v) inizio.delete(v); }, true);
 
+  // Si conta da dove il video è partito: uno aperto a pochi secondi dalla fine (un indirizzo col minuto dentro) ci
+  // arriva a passo normale.
   const allaFine = (e) => {
     const v = video(e);
     if (!v || detto || spiegato(v)) return;
-    const t0 = inizio.get(v);
+    const s = inizio.get(v);
     const d = v.duration;
-    if (t0 === undefined || !Number.isFinite(d) || d < DURATA_MIN_S || ora() - t0 > FINE_ENTRO_MS) return;
-    if (v.currentTime >= d - 1) di('fine');
+    if (s === undefined || !Number.isFinite(d) || d < DURATA_MIN_S || ora() - s.t > FINE_ENTRO_MS) return;
+    const passati = ((ora() - s.t) / 1000) * Math.max(1, Number(v.playbackRate) || 1);
+    if (v.currentTime >= d - 1 && v.currentTime - s.pos > passati + SALTO_S) di('fine');
   };
   doc.addEventListener('timeupdate', allaFine, true);
   doc.addEventListener('ended', allaFine, true);
