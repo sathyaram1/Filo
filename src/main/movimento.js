@@ -33,7 +33,7 @@ function fumetto(scuro) {
     '--bg': T.effectiveValue('fumetto.sfondo', override, tema),
     '--fg': T.effectiveValue('fumetto.testo', override, tema),
     '--border': T.effectiveValue('fumetto.bordo', override, tema),
-    '--sn-ombra': String(Number(ombra) / 0.18),
+    '--sn-shadow-opacity': ombra,
   };
 }
 
