@@ -1,22 +1,31 @@
 // Verifica #2091 giro 3, rilievo 2: il nome di una scheda dentro il gettone del campo non porta la sottolineatura rossa
 // del correttore (titolo accorciato a metà parola, nomi stranieri), mentre si scrive la domanda accanto.
 
+import { writeFileSync } from 'node:fs';
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home } from '../../helpers/chatFinta.mjs';
 
 const schede = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).tabs);
 
-// I pixel rossi della sottolineatura sotto il testo di un rettangolo della home, letti dalla cattura della sua vista.
-const rossiSotto = (app, r) => app.evaluate(async ({ BrowserWindow }, q) => {
+// I pixel rossi (la sottolineatura del correttore) fra le x di un gettone, nella cattura del campo della home.
+const rossiSotto = (app, campo, g) => app.evaluate(async ({ BrowserWindow }, { c, q }) => {
   const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
   const tm = w._filoTabs;
   const wc = tm.tabs.find((x) => x.id === tm.activeId).view.webContents;
-  const img = await wc.capturePage({ x: Math.round(q.x), y: Math.round(q.y + q.height / 2), width: Math.round(q.width), height: Math.round(q.height / 2 + 4) });
+  const rect = { x: Math.round(c.x), y: Math.round(c.y), width: Math.round(c.width), height: Math.round(c.height) };
+  const img = await wc.capturePage(rect);
+  const { width, height } = img.getSize();
+  const k = width / rect.width;
   const b = img.toBitmap();
   let n = 0;
-  for (let i = 0; i < b.length; i += 4) if (b[i + 2] > 170 && b[i + 1] < 110 && b[i] < 110) n += 1;
-  return n;
-}, r);
+  for (let y = 0; y < height; y++) {
+    for (let x = Math.floor((q.x - c.x) * k); x < Math.ceil((q.x - c.x + q.width) * k) && x < width; x++) {
+      const i = (y * width + x) * 4;
+      if (b[i + 2] > 170 && b[i + 1] < 110 && b[i] < 110) n += 1;
+    }
+  }
+  return { n, png: img.toPNG().toString('base64') };
+}, { c: campo, q: g });
 
 test('r2 il nome nel gettone non ha la sottolineatura del correttore mentre si scrive accanto', async ({ app, shell, openTab, testServer }) => {
   test.setTimeout(90_000);
@@ -34,10 +43,14 @@ test('r2 il nome nel gettone non ha la sottolineatura del correttore mentre si s
   await expect.poll(() => casa.evaluate(() => document.getElementById('input')._snGettoni?.schede().length || 0)).toBe(1);
   await casa.locator('#input').focus();
   await casa.keyboard.press('End');
-  await casa.keyboard.type('di cosa parla');
+  await casa.keyboard.type('di cosa parla, sbaglaito');
   await casa.waitForTimeout(2500);
+  const campo = await casa.locator('#input').boundingBox();
   const g = await casa.locator('.sn-gettone').first().boundingBox();
-  // Controllo: una parola sbagliata scritta a mano nel campo la sottolineatura la prende (il correttore è acceso).
-  expect(g).toBeTruthy();
-  await expect.poll(() => rossiSotto(app, g), { timeout: 3000 }).toBe(0);
+  const fine = { x: campo.x + campo.width - 260, y: campo.y, width: 250, height: campo.height };
+  // Controllo: la parola sbagliata scritta a mano la sottolineatura la prende (il correttore è acceso e si vede).
+  const ctl = await rossiSotto(app, campo, fine);
+  writeFileSync('tests/.shots/2091-g3/r2-campo.png', Buffer.from(ctl.png, 'base64'));
+  console.log('CONTROLLO', ctl.n, 'GETTONE', (await rossiSotto(app, campo, g)).n, JSON.stringify(g), JSON.stringify(campo));
+  expect((await rossiSotto(app, campo, g)).n).toBe(0);
 });
