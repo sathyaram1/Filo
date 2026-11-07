@@ -210,6 +210,7 @@ test('Aiuto e riquadro: le crocette, l\'invio e la freccia hanno il loro fumetto
   await expect(fumetto(page)).toHaveText('Chiudi');
   await aiuto.locator('.sn-sidebar-input button[type="submit"]').hover();
   await expect(fumetto(page)).toHaveText('Invia');
+  expect(await muti(page, '.sn-sidebar')).toEqual([]);
   await page.evaluate(() => window.SN_SIDEBAR.close());
 
   await page.evaluate(() => window.SN_POPUP.openStreaming({
