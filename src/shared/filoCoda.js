@@ -256,7 +256,10 @@
     for (const c of Array.isArray(chats) ? chats : []) {
       if (!c || !Array.isArray(c.messages)) continue;
       c.messages.forEach((m, i) => {
-        const testo = String((m && m.text) || '');
+        // Un gettone (#2085) nell'estratto si legge col suo titolo, senza i segni.
+        const G = global.SN_SCHEDE_IN_CHAT;
+        const grezzo = String((m && m.text) || '');
+        const testo = G && G.RE ? grezzo.replace(G.RE, '$1') : grezzo;
         if (!testo.trim() || !contiene(testo, ts, largo)) return;
         messaggi.push({
           k: 'msg', chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: estratto(testo, ts, 70, largo),
