@@ -225,7 +225,9 @@ const AVVIO = (() => {
 try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (IS_SUBFRAME ? /^(https?|data|blob):|^about:srcdoc$/i.test(loc) : /^https?:/i.test(loc)) {
-    const cfg = ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: IS_SUBFRAME }) || { level: 0, seed: 0 };
+    // Il frame principale l'ha già nella risposta di avvio; un riquadro la chiede da sé.
+    const cfg = (IS_SUBFRAME ? ipcRenderer.sendSync('filo:fp-config', loc, { riquadro: true }) : (AVVIO && AVVIO.fp))
+      || { level: 0, seed: 0 };
     if (cfg && cfg.level > 0) {
       // Un riquadro della stessa origine chiede prima la guardia della finestra che lo contiene: se gliela monta lei,
       // le due finestre condividono ciò che sanno dei canvas (fingerprint-guard.js, ascolta).
