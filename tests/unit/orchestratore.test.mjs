@@ -475,7 +475,8 @@ test('il PC conosce tutte le fonti che il server incorpora: con una sola mancant
   const server = process.env.FILO_SECURITY_DIR || resolve(dirname(fileURLToPath(import.meta.url)), '..', '..', '..', 'filo-security');
   const bake = join(server, 'functions', 'tools', 'bake-shared.js');
   const attese = ['src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
-    'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js', 'src/shared/feedbackAttese.js'];
+    'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js', 'src/shared/feedbackAttese.js',
+    'src/shared/schede.js'];
   assert.deepEqual([...INCORPORATI_DAL_SERVER].sort(), [...attese].sort());
   // Il confronto col diff è per percorso esatto: un nome sbagliato non farebbe mai ripubblicare, anche senza il server accanto.
   assert.deepEqual(INCORPORATI_DAL_SERVER.filter((f) => !existsSync(join(ROOT, f))), [], 'fonti incorporate che nel repo non esistono');
