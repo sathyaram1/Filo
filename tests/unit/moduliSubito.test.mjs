@@ -82,10 +82,13 @@ test('tasto destro, correttore e segnali di pagina restano fra i moduli caricati
 });
 
 // Le risposte che il frame principale aspetta prima degli script della pagina arrivano in una chiamata sola: ognuna in
-// più lo tiene fermo un viaggio in più verso il main. Il documento blob chiede i permessi da solo (non fa la chiamata).
+// più lo tiene fermo un viaggio in più verso il main. Il documento blob chiede i permessi da solo (non fa la chiamata),
+// un riquadro la sua guardia (#798).
 test('il frame principale chiede le risposte d’avvio in una chiamata sincrona sola', () => {
   assert.equal(src.match(/sendSync\('filo:avvio-pagina'/g)?.length, 1);
-  for (const c of ['fp-config', 'cookie-wipe']) assert.ok(!src.includes(`sendSync('filo:${c}'`), `page-preload chiede ancora ${c} da solo`);
+  assert.ok(!src.includes(`sendSync('filo:cookie-wipe'`), 'page-preload chiede ancora cookie-wipe da solo');
+  assert.equal(src.match(/sendSync\('filo:fp-config'/g)?.length, 1);
+  assert.match(src, /IS_SUBFRAME \? ipcRenderer\.sendSync\('filo:fp-config', loc, \{ riquadro: true \}\) : \(AVVIO && AVVIO\.fp\)/);
   assert.equal(src.match(/sendSync\('filo:permessi-stato'/g)?.length, 1);
   assert.match(src, /AVVIO \? AVVIO\.permessi : ipcRenderer\.sendSync\('filo:permessi-stato'/);
 });
