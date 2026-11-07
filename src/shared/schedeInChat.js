@@ -73,7 +73,7 @@
 .sn-con-gettoni { color: transparent !important; background: transparent !important; position: relative; z-index: 1; }
 .sn-con-gettoni::placeholder { color: transparent; }
 .sn-gettone { border-radius: 6px; background: color-mix(in srgb, var(--accent, #c8743c) 16%, transparent);
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #c8743c) 16%, transparent); font-weight: 600; }
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #c8743c) 16%, transparent); }
 .sn-gettoni-fondo .sn-gettone .sn-gettone-segno { color: transparent; }
 .sn-gettone.sopra { background: color-mix(in srgb, var(--accent, #c8743c) 28%, transparent);
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent, #c8743c) 28%, transparent); }
