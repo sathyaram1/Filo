@@ -2498,6 +2498,18 @@
     } catch (_) {}
   }
 
+  // La X dei riquadri Novità e Feedback risolto: una sola, così il suo nome e il suo fumetto non si perdono in una copia.
+  function crocettaDelRiquadro(close) {
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'dash-recap-x';
+    xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.title = 'Chiudi';
+    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
+    xBtn.addEventListener('click', close);
+    return xBtn;
+  }
+
   function renderUpdateRecap({ lastSeen, current, notes }, onClose) {
     // notes è già ordinato dalla più recente: novità in un blocco, correzioni nell'altro.
     const features = [];
