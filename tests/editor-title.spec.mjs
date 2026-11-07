@@ -387,6 +387,17 @@ test('la copia di un documento col titolo scritto a mano lo tiene, e il riassunt
   expect(await page.evaluate(() => window.__aiCalls.filter((c) => c.tipo !== 'riassunto').length)).toBe(0);
 });
 
+test('la copia di un documento che il titolo non l\'ha ancora, arrivata a cento parole, prende il suo', async ({ openTab }) => {
+  test.setTimeout(90_000);
+  const page = await nuovaPagina(openTab);
+  await scrivi(page, 'poche parole sul giardino');
+  await page.click('#docTitle', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Duplica file', { exact: true }).click();
+  await expect.poll(async () => (await documenti(page)).length).toBe(2);
+  await scrivi(page, montagna(150));
+  await expect(page.locator('#docTitle')).toHaveText('La montagna', { timeout: 20_000 });
+});
+
 // #1697 — il titolo in volo di un documento non toglie il suo al documento nuovo, e uno scritto a mano mentre il
 // titolo automatico è in volo resta quello.
 test('il titolo in volo di un altro documento non salta quello del documento nuovo', async ({ openTab }) => {
