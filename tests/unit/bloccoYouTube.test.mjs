@@ -87,7 +87,7 @@ function conFrame(...frame) {
 }
 
 test('regole che non reggono in un articolo con due video: si ricaricano tutti e due i riquadri, l\'articolo no', () => {
-  B.impostaListePerTest([LISTA]);
+  B.impostaListePerTest([LISTA.replace(/www\.youtube\.com/g, 'youtube.com,youtube-nocookie.com')]);
   const articolo = { url: 'https://giornale.it/pezzo' };
   const uno = { url: 'https://www.youtube-nocookie.com/embed/uno', parent: articolo };
   const due = { url: 'https://www.youtube-nocookie.com/embed/due', parent: articolo };
