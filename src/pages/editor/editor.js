@@ -2207,7 +2207,6 @@
   // Racconto e misure: patterns/incolla-lungo-un-insertHTML-al-bordo-di-un-blocco.md
   const INCOLLA_A_RIGHE = 50;
   const BLOCCO = /^(P|DIV|H[1-6]|LI|BLOCKQUOTE|PRE|TD|TH)$/;
-  const PARAGRAFO = /^(P|DIV|H[1-6])$/;
   function bloccoDi(nodo) {
     let b = nodo;
     while (b && b !== docEl && !(b.nodeType === 1 && BLOCCO.test(b.tagName))) b = b.parentNode;
