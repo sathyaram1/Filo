@@ -1182,7 +1182,7 @@
     }, SUMMARY_DEBOUNCE_MS);
   }
 
-  // Il titolo derivato è segnato «a mano» così non viene rigenerato in automatico.
+  // La copia eredita come è nato il titolo (#1697): scritto a mano resta, automatico segue il contenuto della copia.
   function duplicateActiveFile() {
     if (doc) duplicateFile(doc.id);
   }
@@ -1195,8 +1195,9 @@
     delete copy.id;
     if (!copy.meta) copy.meta = {};
     copy.meta.title = ((src.meta && src.meta.title) || STORE.DEFAULT_TITLE) + ' (copia)';
-    copy.meta.titleManual = true;
-    copy.meta.titleAuto = true;
+    // «(copia)» non l'ha scritto Filo: rinominarla non conta come un titolo di Filo riscritto (#1465).
+    delete copy.meta.titleAutoAt;
+    delete copy.meta.titleAutoVia;
     const file = STORE.addFile(collection, copy, () => newId('file'));
     activateFile(file);
     writeCollection();
