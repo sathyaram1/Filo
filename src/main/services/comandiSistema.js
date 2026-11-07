@@ -1442,7 +1442,8 @@ async function radio(q) {
 }
 
 // #2096 — i preferiti sono un'impostazione (bluetoothPreferiti): si scrive dalla porta di tutte le impostazioni, che la
-// fa diventare un cambio del filo. Un dispositivo dimenticato esce anche dai preferiti.
+// fa diventare un cambio del filo. Un dispositivo dimenticato ci resta: toglierlo da qui darebbe al filo un Annulla che
+// rimette fra i preferiti un dispositivo che il computer non conosce più; riabbinato, torna in cima da sé.
 const preferitiDi = (s) => (Array.isArray(s && s.bluetoothPreferiti)
   ? s.bluetoothPreferiti.filter((x) => typeof x === 'string' && x) : []);
 async function segnaPreferito(d, si) {
