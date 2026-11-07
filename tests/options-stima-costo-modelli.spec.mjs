@@ -259,13 +259,11 @@ test('Chat col listino lento: confermato, il cambio parte e la risposta dice che
 
   await modelloFinto(app, [cambia('Chat con Filo: opus'), { text: 'Ti chiedo conferma.' }, { text: 'Fatto.' }]);
   await scrivi(chat, 'usa opus per la chat');
-  // Il modello di una funzione costa 2: senza guardiano chiede l'OK anche a Normale (#1312).
-  await expect(chat.locator('.dash-bubble-filo', { hasText: 'Ti chiedo conferma.' })).toBeVisible({ timeout: 15_000 });
-  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 8_000 });
+  // Il modello di una funzione costa 2: senza guardiano chiede l'OK anche a Normale (#1312), e il giro si chiude lì (#1130).
+  await expect(chat.locator(CONFIRM_HOST)).toBeVisible({ timeout: 15_000 });
   const ritardo = /listino di OpenRouter non è arrivato in tempo/;
-  // Il riquadro e l'esito al modello lo dicono, invece di tacere il costo.
+  // Il riquadro lo dice, invece di tacere il costo.
   expect(await confirmText(chat)).toMatch(ritardo);
-  expect((await app.evaluate(() => globalThis.__costo_tool)).join('\n')).toMatch(ritardo);
   await scrollConfirmToEnd(chat);
   await clickConfirm(chat, 'ok');
   await expect.poll(async () => (await impostazioni(app)).models.filo_chat, { timeout: 15_000 }).toBe('opus');
