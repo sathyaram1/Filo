@@ -92,7 +92,7 @@ test('un dispositivo Bluetooth: le sue voci, i preferiti in cima anche riaprendo
   await expect(righe(page).first()).toContainText('Tastiera', { timeout: 5_000 });
   await expect(righe(page).first()).toHaveClass(/dash-sis-preferito/);
   expect(await app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti))
-    .toEqual([{ indirizzo: '66:77:88:99:AA:BB', nome: 'Tastiera' }]);
+    .toEqual(['66:77:88:99:AA:BB']);
 
   // Riaperta la home, il preferito resta in cima.
   await page.reload();
