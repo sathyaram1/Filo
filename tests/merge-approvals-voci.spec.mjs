@@ -223,7 +223,7 @@ test('voci chiuse: «Apri le 8 voci» è acceso, le apre tutte e porta in vista 
   await expect(approva).toBeEnabled();
   await card.screenshot({ path: 'tests/.shots/merge-approvals-apri-voci.png' }).catch(() => {});
 
-  // Il clic apre, non arma: niente «Confermi?» e niente chiamate al server.
+  // Il clic apre, non arma: niente «Confermi?».
   await approva.click();
   const capacita = card.locator('.sn-mac-gruppo[data-gruppo="capacita"] .sn-mac-voce');
   for (let i = 12; i < 20; i++) await expect(capacita.nth(i)).toBeVisible();
