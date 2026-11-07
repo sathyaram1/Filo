@@ -261,7 +261,7 @@
     return Array.isArray(b.voci) ? b.voci.filter(function (v) { return v && (v.file || v.testo); }) : [];
   }
 
-  // Le voci a vista di un blocco: le altre si aprono, e finché restano chiuse «Approva e fondi» è spento (#1502).
+  // Le voci a vista di un blocco: le altre si aprono, e finché restano chiuse il sì non parte (#1502).
   var VOCI_A_VISTA = 12;
 
   /** Quante voci di un blocco non si vedono a card appena disegnata: oltre le prime, più quelle mai mandate. PURA. */
