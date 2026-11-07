@@ -1,5 +1,6 @@
 // Come partono le azioni di un giro della chat: aperture di pagina e letture di fila insieme, il resto una dopo l'altra
-// perché i suoi esiti decidono i passi dopo, consegnati nell'ordine del modello; e quando un giro chiude il turno.
+// perché i suoi esiti decidono i passi dopo, consegnati nell'ordine del modello; quando un giro chiude il turno, e
+// quando una nota era la risposta.
 // Prove: tests/unit/giroAzioni.test.mjs.
 'use strict';
 
