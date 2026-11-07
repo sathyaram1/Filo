@@ -525,6 +525,12 @@ test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il b
   assert.doesNotMatch(UI.testoRiallineamento(ria, false, { domanda: '<b>x</b>' }), /<b>/);
   assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'tetto' } }, false, { domanda: 'D-7' }), /si è fermato: si era già riallineato/);
   assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'nuovo_motivo' } }, false), /si è fermato: nuovo_motivo\./);
+  // I fermi passeggeri del server non si stampano come codice: dicono che la pratica è ferma.
+  for (const motivo of ['stato', 'domanda']) {
+    const t = UI.testoRiallineamento({ ...ria, realignBlocked: { motivo } }, false);
+    assert.doesNotMatch(t, new RegExp(`fermato: ${motivo}`), motivo);
+    assert.match(t, /^La sua pratica non è in lavorazione/, motivo);
+  }
   for (const s of [false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s), /npm run finish/);
   assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
   // Il quadrato di Gestione prende le stesse parole.
