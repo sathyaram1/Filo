@@ -9,10 +9,10 @@ const oggi = (app) => app.evaluate(async () => {
   const out = {};
   for (const [k, v] of Object.entries(s.ore || {})) {
     if (!k.startsWith(`${g}T`)) continue;
-    for (const [a, x] of Object.entries(v.azioni || {})) {
+    for (const [a, x] of Object.entries((v && v.azioni) || {})) {
       out[a] = out[a] || { n: 0, fine: {} };
-      out[a].n += x.n || 0;
-      for (const [f, c] of Object.entries(x.fine || {})) out[a].fine[f] = (out[a].fine[f] || 0) + c;
+      out[a].n += (x && x.n) || 0;
+      for (const [f, c] of Object.entries((x && x.fine) || {})) out[a].fine[f] = (out[a].fine[f] || 0) + (typeof c === 'number' ? c : 0);
     }
   }
   return out;
