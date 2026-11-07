@@ -812,11 +812,12 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   width: 26px; height: 24px; padding: 0;
   border: none; border-radius: 7px; background: transparent;
   color: var(--dash-ink-mute); cursor: pointer;
-  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease, transform calc(0.1s * var(--sn-motion, 1)) ease;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-msg-azione:hover, .dash-msg-azione:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
-.dash-msg-azione:active { transform: scale(0.9); }
-.dash-msg-azione svg { display: block; }
+/* Si scala l'icona, non il tasto: un tasto trasformato si porterebbe dietro l'etichetta, che salta (#2096). */
+.dash-msg-azione svg { display: block; transition: transform calc(0.1s * var(--sn-motion, 1)) ease; }
+.dash-msg-azione:active svg { transform: scale(0.9); }
 .dash-msg-azione.dash-copiato { color: var(--dash-green); }
 .dash-msg-azione.dash-non-copiato { color: var(--dash-accent); }
 /* L'etichetta compare dopo i tasti, nella stessa riga: due tasti vicini non si coprono il nome a vicenda. */
