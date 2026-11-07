@@ -52,6 +52,19 @@ test('ogni pagina in src/pages è coperta: dal preload interno, dallo strato, o 
   assert.deepEqual(scoperte, []);
 });
 
+test('la conferma sopra un sito carica il fumetto, con filoUi prima della conferma (lo shadow chiuso si apre da lì)', () => {
+  const html = leggi('src', 'renderer', 'conferma.html');
+  const pos = (f) => html.indexOf(`<script src="filo://shared/${f}"></script>`);
+  for (const f of ['filoUi.js', 'suggerimento.js', 'confirmUi.js']) assert.ok(pos(f) >= 0, `conferma.html non carica ${f}`);
+  assert.ok(pos('filoUi.js') < pos('confirmUi.js'), 'filoUi.js deve venire prima di confirmUi.js');
+});
+
+test('il menu del tasto destro non disegna un\'etichetta sua: le icone passano dal fumetto con data-tip', () => {
+  const menu = leggi('src', 'content', 'menu.js');
+  assert.doesNotMatch(menu, /sn-tooltip/);
+  assert.match(menu, /setAttribute\('data-tip', text\)/);
+});
+
 test('la barra in alto non scrive title nativi: i suoi suggerimenti sono data-tip', () => {
   const shell = leggi('src', 'renderer', 'shell.js');
   const titoli = shell.split('\n').map((r, i) => [i + 1, r]).filter(([, r]) => /\.title\s*=|setAttribute\(\s*'title'/.test(r));
