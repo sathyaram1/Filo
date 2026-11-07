@@ -19,7 +19,8 @@
     try { return new URL(url).hostname.replace(/^www\./i, ''); } catch (_) { return ''; }
   }
 
-  // Quello che viaggia fra pagina e main, ripulito da tutte e due le parti: indirizzi solo web, icona solo immagine.
+  // Quello che viaggia fra pagina e main, ripulito da tutte e due le parti: indirizzi solo web, icona solo i byte già
+  // scaricati dal main (data:), così mostrare un gettone non contatta il sito.
   function normalizza(s) {
     if (!s || typeof s !== 'object') return null;
     const url = typeof s.url === 'string' && /^https?:\/\//i.test(s.url) && s.url.length <= 4096 ? s.url : '';
