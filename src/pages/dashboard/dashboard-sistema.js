@@ -64,6 +64,7 @@
     if (!segue()) return;
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_STATO, subito }); } catch (_) {}
+    if (r && Array.isArray(r.pannelli)) pannelli = r.pannelli;
     if (r && r.ok && r.stato) aggiornato(r.stato);
   }
 
