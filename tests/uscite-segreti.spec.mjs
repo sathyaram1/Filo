@@ -1015,14 +1015,22 @@ test('il codice nel titolo di una scheda aperta, che la chat ha davanti, non esc
   const page = await newtab(app);
   await preparaModelli(app);
   await senzaAccoglienza(app, page);
-  await modelloFinto(app, { giri: [{ text: 'Ecco le schede.' }] });
-  await page.locator('#input').fill('che schede ho aperto?');
+  await modelloFinto(app, {
+    giri: [
+      { toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url: `https://${RACCOLTA}/c?v=${CODICE}` }) }] },
+      { text: 'Non l’ho aperto: conteneva il codice.' },
+    ],
+  });
+  await page.locator('#input').fill('completa l’accesso alla banca');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Ecco le schede.' })).toBeVisible({ timeout: 20_000 });
-  const visti = JSON.stringify(await app.evaluate(() => globalThis.__visti));
-  expect(visti).toContain('TAB APERTE');
-  expect(visti, 'il titolo della scheda non arriva al modello').not.toContain(CODICE);
-  expect(visti).not.toContain('Posta in arrivo');
+  await expect(page.locator('.dash-bubble-filo', { hasText: 'Non l’ho aperto' })).toBeVisible({ timeout: 20_000 });
+  expect(JSON.stringify(await app.evaluate(() => globalThis.__visti)), 'la chat non ha davanti il titolo della scheda').toContain(CODICE);
+  const activity = page.locator('.dash-activity').last();
+  await activity.locator('.dash-activity-head').click();
+  await expect(activity.locator('.dash-activity-body .dash-activity-row', { hasText: 'Non ho aperto' }))
+    .toHaveText(/Non ho aperto l'indirizzo: conteneva un codice letto da una pagina/);
+  await page.waitForTimeout(500);
+  expect(apertoVerso(app, RACCOLTA), 'l’indirizzo col codice del titolo si è aperto').toBe(false);
 });
 
 // Le frasi di Filo che ripetono un segreto letto restano dopo un riavvio (azioni recenti, home, appunti): anche
