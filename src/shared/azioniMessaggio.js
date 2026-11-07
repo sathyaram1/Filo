@@ -24,19 +24,21 @@
     try { await navigator.clipboard.writeText(testo); return true; } catch (_) { return false; }
   }
 
-  // La citazione che apre il messaggio dopo, come nelle email: righe che cominciano con «>», che il modello legge.
-  function citazione(testo) {
+  // La citazione che apre il messaggio dopo, come nelle email: una riga che comincia con «>», che il modello legge. In un
+  // campo di una riga sola fra virgolette basse.
+  function citazione(testo, { unaRiga = false } = {}) {
     let t = String(testo == null ? '' : testo).replace(/\s+/g, ' ').trim();
     if (!t) return '';
     if (t.length > CITA_MAX) t = `${t.slice(0, CITA_MAX).trimEnd()}…`;
-    return `> ${t}\n`;
+    return unaRiga ? `«${t}» ` : `> ${t}\n`;
   }
   // Mette la citazione in testa al campo, una sola: citare un altro messaggio sostituisce quella di prima.
   function citaNelCampo(campo, testo) {
     if (!campo) return;
-    const q = citazione(testo);
+    const unaRiga = campo.tagName !== 'TEXTAREA';
+    const q = citazione(testo, { unaRiga });
     if (!q) return;
-    const resto = String(campo.value || '').replace(/^> [^\n]*\n/, '');
+    const resto = String(campo.value || '').replace(unaRiga ? /^«[^»]*» / : /^> [^\n]*\n/, '');
     campo.value = q + resto;
     try { campo.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
     campo.focus();
