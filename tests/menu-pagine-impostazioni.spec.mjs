@@ -60,6 +60,8 @@ for (const url of ['filo://preferences/preferences.html', 'filo://options/option
     test.setTimeout(60_000);
     const page = await openTab(url);
     await expect.poll(() => page.evaluate(() => !!(window.SN_MENU_IMPOSTAZIONI && window.SN_SIDEBAR))).toBe(true);
+    // L'elenco disegnato accanto a ogni tendina c'è solo a pagina pronta: è lui che finiva nel nome.
+    await expect.poll(() => page.evaluate(() => [...document.querySelectorAll('select')].every((s) => s.dataset.snEnhanced))).toBe(true);
     const nomi = await page.evaluate(() => {
       const V = window.SN_VOCI_IMPOSTAZIONI;
       const M = window.SN_MENU_IMPOSTAZIONI;
