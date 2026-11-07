@@ -194,27 +194,10 @@
   // La riga di confine è netta: si traduce ciò che l'utente LEGGE, mai ciò che
   // il sito RIMANDA INDIETRO. Perciò niente `value` (viene inviato col modulo),
   // niente `href`/`src`/`name`/`id`, niente voci di `datalist` (finiscono
-  // dentro al campo come testo digitato).
-  const TRANSLATABLE_ATTRS_ANY = ['title', 'aria-label'];
-  const TRANSLATABLE_ATTRS_BY_TAG = {
-    INPUT: ['placeholder', 'alt'],
-    TEXTAREA: ['placeholder'],
-    IMG: ['alt'],
-    AREA: ['alt'],
-    // Una voce a tendina si traduce scrivendo `label`, mai il testo: quello di una <option>
-    // senza `value` è proprio ciò che il modulo invia.
-    OPTION: ['label'],
-    OPTGROUP: ['label'],
-  };
-
-  // Sui bottoni dei moduli la scritta è `value`: si traduce solo se il bottone non rimanda
-  // niente (niente `name`, o non è di quelli che inviano). `type=image` usa `alt`.
-  function inputValueIsLabel(el) {
-    const type = String(el.getAttribute('type') || '').toLowerCase();
-    if (type === 'button' || type === 'reset') return true;
-    if (type !== 'submit') return false;
-    return !el.hasAttribute('name');
-  }
+  // dentro al campo come testo digitato). Gli elenchi stanno in constants.js: li legge anche la sonda dei componenti chiusi.
+  const TRANSLATABLE_ATTRS_ANY = global.SN_CONST.ETICHETTE_TRADOTTE.ovunque;
+  const TRANSLATABLE_ATTRS_BY_TAG = global.SN_CONST.ETICHETTE_TRADOTTE.perTag;
+  const inputValueIsLabel = global.SN_CONST.valoreEtichetta;
 
   // Valore di partenza di un attributo traducibile. Per l'etichetta di una
   // <option> che non ce l'ha, il testo che si legge è il suo contenuto.
