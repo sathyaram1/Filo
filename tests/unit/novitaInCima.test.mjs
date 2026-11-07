@@ -146,7 +146,7 @@ test('sul registro vero: una riga aggiunta sotto l\'ultima versione uscita finis
   const vero = readFileSync(join(REPO, FILE_NOVITA), 'utf8');
   const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));
   const prima = registroDa(vero);
-  const uscito = prima.find((n) => n.features && n.features.length && globalThis.SN_PATCH_NOTES.cmpVersion(n.version, pkg.version) <= 0);
+  const uscito = prima.find((n) => n.features && n.features.length && PN.cmpVersion(n.version, pkg.version) <= 0);
   const i = vero.indexOf(`version: '${uscito.version}'`);
   const j = vero.indexOf('features: [\n', i) + 'features: [\n'.length;
   const conRiga = `${vero.slice(0, j)}        'Riga tardiva di prova',\n${vero.slice(j)}`;
