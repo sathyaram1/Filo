@@ -116,7 +116,19 @@ test('Preferenze: title, testo su più righe, tasto disabilitato e fuoco da tast
   await expect(fumetto(page)).toBeHidden();
 });
 
-test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono anche nelle altre schede', async ({ openTab }) => {
+function fumettoDellaBarra(app) {
+  return app.evaluate(async ({ BrowserWindow }) => {
+    for (const w of BrowserWindow.getAllWindows()) {
+      if (w.isDestroyed() || !w.isVisible() || w.webContents.getURL() !== 'filo://src/renderer/fumetto.html') continue;
+      return w.webContents.executeJavaScript(
+        "(() => { const t = document.getElementById('tip'); return t && t.textContent ? { testo: t.textContent, sfondo: getComputedStyle(t).backgroundColor } : null; })()",
+      ).catch(() => null);
+    }
+    return null;
+  });
+}
+
+test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono anche nelle altre schede', async ({ app, shell, openTab }) => {
   const home = await openTab('filo://newtab/');
   await pronta(home);
   const pref = await openTab('filo://preferences/preferences.html');
