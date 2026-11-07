@@ -264,7 +264,7 @@ operazione del server che gli dà schede e testi; in locale funziona da subito
 con `npm run manutentore -- contesto` più il taccuino.
 
 **Il recap del mattino.** Breve, in Gestione → Automazioni, un foglio al
-giorno: fusioni e spesa di ieri, scelte prese (rosa, N, pacchetti) e perché,
+giorno: fusioni e spesa di ieri, scelte prese (ordine, N, pacchetti) e perché,
 esperimenti e cosa hanno portato, efficientamenti con la misura, segnali che
 sta seguendo, come ha applicato le indicazioni dell'owner. **Mai cose da fare
 per l'owner né domande**: quelle vanno nelle domande. Il recap è per ciò che
