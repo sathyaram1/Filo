@@ -2354,7 +2354,7 @@
         name.appendChild(tag);
       }
       name.appendChild(document.createTextNode(r.filename || 'download'));
-      name.title = r.filename || '';
+      name.dataset.tip = r.filename || '';
       row.appendChild(name);
 
       if (isActive(r)) {
