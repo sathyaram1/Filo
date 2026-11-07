@@ -80,7 +80,10 @@ test('Cerca dall’editor conta l’attesa fino alla pagina dei risultati', asyn
   await doc.click({ button: 'right' });
   const menu = menuDi(page);
   await expect(menu.principale).toBeVisible({ timeout: 8_000 });
-  await menu.voce('Cerca').first().click();
+  const voci = await menu.valuta(() => [...document.querySelectorAll('.sn-menu-item, [data-id], [title], [aria-label]')].map((e) => (e.textContent || '').trim().slice(0, 30) + '#' + (e.getAttribute('title') || e.getAttribute('aria-label') || e.dataset.id || '')).join(' | '));
+  const sel = await page.evaluate(() => String(getSelection()));
+  console.log('VOCI', voci, 'SEL', sel);
+  await menu.voce('Cerca').first().click({ timeout: 5000 });
   await expect.poll(async () => (await oggi(app))?.azioni?.['search-web']?.n || 0, { timeout: 15_000 }).toBe(1);
   expect(Object.keys((await oggi(app)).azioni['search-web'].fine)).toEqual(['s5']);
 });
