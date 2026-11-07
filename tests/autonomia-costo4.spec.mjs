@@ -291,7 +291,7 @@ test('nell\'Aiuto su Preferenze un testo incollato è una lettura: alzare il tet
   await page.keyboard.type(' riassumi');
   await page.keyboard.press('Enter');
   await expect(casella).toHaveValue('');
-  await expect.poll(async () => (await lancia()).no || '', { timeout: 8000 }).toContain('Dopo aver letto cose scritte da altri');
+  await expect.poll(async () => String((await lancia()).output?.error || ''), { timeout: 8000 }).toContain('Dopo aver letto cose scritte da altri');
   expect((await impostazioni(app)).monthlyLimitEur).toBe(5);
 });
 
