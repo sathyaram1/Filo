@@ -186,7 +186,8 @@ test('main: in Privacy un sito non fidato col campo password vale per la session
   globalThis.SN_STORAGE = {
     getRaw: async (k, d) => (k in disco ? JSON.parse(JSON.stringify(disco[k])) : d),
     setRaw: async (k, v) => { disco[k] = JSON.parse(JSON.stringify(v)); },
-    getSettings: async () => ({}),
+    // A «Chiedi sulle delicate» (#1589) un sito col campo password chiede prima; di serie partirebbe in anticipo.
+    getSettings: async () => ({ security: { privacy: { livello: 'delicate' } } }),
   };
   // La regola dei cookie la dà services/cookies.js: qui una finta con la stessa domanda e lo stesso avviso.
   let modo = 'privacy';
