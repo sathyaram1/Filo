@@ -511,6 +511,7 @@
   function testata(d) {
     const meta = el('div', 'mg-dq-meta');
     meta.appendChild(el('span', 'mg-dq-num', idDi(d)));
+    meta.appendChild(segnoTipo(d, 'mg-dq-tipo'));
     if (PRIORITA[d.priorita]) {
       const p = el('span', 'mg-dq-prio', PRIORITA[d.priorita]);
       p.dataset.priorita = d.priorita;
