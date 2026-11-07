@@ -1,5 +1,5 @@
 // Verifica #1921.1, giro 2: la risposta scritta insieme alla spunta torna nella bolla, ma il testo dell'ultimo giro le
-// va dietro com'è. Il modello è finto e rifà due uscite vere di GLM 5.3 Flash (15 prove col modello vero, una ciascuna).
+// va dietro com'è. Il modello è finto e rifà due uscite vere di GLM 5.3 Flash (15 prove col modello vero: una volta ciascuna).
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test.use({ accoglienzaFatta: false });
