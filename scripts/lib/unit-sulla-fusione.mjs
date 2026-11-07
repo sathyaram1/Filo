@@ -532,6 +532,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
         return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
       }
     }
+    const novita = novitaInCimaNellaProva({ dir: a.dir, mainSha, nessunHook, scrivi });
     let scelti = null;
     if (soloToccati) {
       const s = sceltiDalRamo({ git, dir: a.dir, mainSha, punta });
