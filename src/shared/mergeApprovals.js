@@ -573,6 +573,7 @@
     nascoste.forEach(function (r) { r.hidden = true; });
     var b = el('button', 'sn-mac-tutte', quante === 1 ? 'Mostra l’altra voce' : 'Mostra le altre ' + quante + ' voci');
     b.type = 'button';
+    b.dataset.quante = String(quante);
     b.title = 'Approvare vale anche per queste: si apre l’elenco intero.';
     b.addEventListener('click', function () {
       nascoste.forEach(function (r) { r.hidden = false; });
