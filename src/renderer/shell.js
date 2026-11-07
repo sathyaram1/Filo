@@ -2262,7 +2262,7 @@
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
       allBtn.textContent = 'Vedi tutti';
-      allBtn.title = 'Apri l’elenco completo dei download';
+      allBtn.dataset.tip = 'Apri l’elenco completo dei download';
       allBtn.addEventListener('click', () => {
         api.tabs.open('filo://downloads/downloads.html');
         closePanel();
