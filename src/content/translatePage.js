@@ -539,16 +539,25 @@
 
   // Sotto le misure minime, lui o chi lo contiene: dentro un francobollo non c'è niente da leggere. Conta la finestra
   // da cui si vede, non il rettangolo: un riquadro grande dietro una finestrella da un pixel è un francobollo.
-  // `nascosto`: una misura a zero è la sezione chiusa, non un francobollo (la scheda spenta): non si sa, e si traduce.
+  // `nascosto`: spento, un riquadro non ha misura; vale quella che il sito gli scrive in pixel (il pixel di tracciamento
+  // spento). Senza, è la sezione chiusa (la scheda spenta): non si sa, e si traduce.
   function frameTooSmall(f, nascosto) {
     const misura = (el) => {
       if (Extract && typeof Extract.clippedExtent === 'function') return Extract.clippedExtent(el);
       const r = el.getBoundingClientRect();
       return { w: r.width, h: r.height };
     };
+    const px = (v) => { const m = /^(\d+(?:\.\d+)?)px$/.exec(String(v || '')); return m ? Number(m[1]) : NaN; };
     for (let el = f, hops = 0; el && hops < 16; el = hostFrameOf(el), hops++) {
-      const m = misura(el);
-      if (nascosto && !(m.w > 0 && m.h > 0)) continue;
+      let m = misura(el);
+      if (nascosto && !(m.w > 0 && m.h > 0)) {
+        let cs = null;
+        try { cs = (el.ownerDocument.defaultView || window).getComputedStyle(el); } catch (_) {}
+        const w = px(cs && cs.width);
+        const h = px(cs && cs.height);
+        if (!(w < FRAME_MIN_W || h < FRAME_MIN_H)) continue;
+        m = { w: Number.isNaN(w) ? Infinity : w, h: Number.isNaN(h) ? Infinity : h };
+      }
       if (m.w < FRAME_MIN_W || m.h < FRAME_MIN_H) return true;
     }
     return false;
