@@ -11,7 +11,7 @@ import { tmpdir } from 'node:os';
 import path, { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
-import { FILE_NOVITA, riportaInCima } from './novita-in-cima.mjs';
+import { FILE_NOVITA, BASTA_SPOSTARE, riportaInCima } from './novita-in-cima.mjs';
 
 // Il reporter è quello di QUESTI strumenti, non dell'albero provato: se l'albero lo rompesse, ogni prova uscirebbe
 // «rossa anche su main» e fonderebbe tutto.
