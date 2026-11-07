@@ -1076,6 +1076,13 @@
     });
   }
 
+  for (const radio of mgUnitWindowsRadios) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      saveSessions({ unitWindows: radio.value }, mgUnitWindowsMsg);
+    });
+  }
+
   if (mgManutentoreAcceso) {
     mgManutentoreAcceso.addEventListener('change', () => saveSessions({ manutentoreAcceso: mgManutentoreAcceso.checked }, mgManutentoreMsg));
   }
