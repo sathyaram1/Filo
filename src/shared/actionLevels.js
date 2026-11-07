@@ -910,12 +910,10 @@
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
     // #1295 — «cancella questa chat» la nasconde: esce dalla home e da ciò che Filo ha davanti, e si rimette (costo 1,
-    // decisione dell'owner). Il «per sempre» butta il testo: il costo più alto del registro, e vuole la parola «conferma»
-    // a ogni livello (`parola`) finché il registro non ha un costo suo per questo (#1050). La chat la trova il main.
+    // decisione dell'owner). Il «per sempre» butta il testo: cancellare per sempre, costo 4. La chat la trova il main.
     TOGLI_CHAT: {
-      costo: (a) => (a && a.per_sempre === true ? 3 : 1),
+      costo: (a) => (a && a.per_sempre === true ? 4 : 1),
       campo: null,
-      parola: (a) => !!(a && a.per_sempre === true),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         const quale = a && a._corrente ? 'questa conversazione' : 'la conversazione';
