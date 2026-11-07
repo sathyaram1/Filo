@@ -800,7 +800,11 @@ function parametri(comando, p, piattaforma) {
     if (typeof q.collega !== 'boolean') throw new Error('collega dev\'essere sì o no');
     fuori.INDIRIZZO = ind;
     fuori.COLLEGA = q.collega ? '1' : '0';
-  } else if (comando === 'wifi-collega') {
+  } else if (comando === 'bt-dimentica') {
+    const ind = String(q.indirizzo || '');
+    if (!INDIRIZZO[piattaforma].test(ind)) throw new Error('indirizzo Bluetooth non valido');
+    fuori.INDIRIZZO = ind;
+  } else if (comando === 'wifi-collega' || comando === 'wifi-dimentica') {
     if (piattaforma === 'linux') {
       const u = String(q.uuid || '');
       if (!/^[0-9a-fA-F-]{8,64}$/.test(u)) throw new Error('rete senza identificativo');
