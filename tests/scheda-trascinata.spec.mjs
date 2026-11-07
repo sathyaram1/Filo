@@ -216,3 +216,41 @@ test('#2085 una scheda lasciata nella chat della home: gettone, anteprima, lettu
     return !!riaperta && riaperta.id === attivaOra;
   }, { timeout: 8000 }).toBe(true);
 });
+
+test('#2085 nell\'Aiuto sopra un sito: gettone nel campo, pagina letta all\'invio, gettone nella bolla', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const url = testServer.html('<title>Articolo sulla Tesla</title><p>La Tesla Roadster è volata nello spazio nel 2018 su un Falcon Heavy.</p>');
+  await openTab(url);
+  const sorgente = await idPerUrl(shell, url);
+  const sito = await openTab(testServer.html('<title>Un sito</title><p>un sito qualunque'));
+  const id = await shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+
+  const verso = await puntoNelloStrato(app, aiuto, '.sn-sidebar-input textarea');
+  await prendi(shell, await linguetta(shell, sorgente));
+  await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+  await shell.mouse.up();
+  await expect(aiuto.locator('.sn-gettoni-fondo .sn-gettone')).toContainText('Articolo sulla Tesla', { timeout: 5000 });
+  // Il campo del sito sotto non ha ricevuto niente.
+  expect(await sito.evaluate(() => document.body.innerText.trim())).toBe('un sito qualunque');
+
+  await app.evaluate(() => {
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__visti = [];
+    const risposta = ({ attempts, messages }) => {
+      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
+      return { text: '{"message":"Con un razzo.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => risposta(o);
+  });
+  await aiuto.locator('.sn-sidebar-input textarea').focus();
+  await aiuto.keyboard.press('End');
+  await aiuto.keyboard.type('come ha fatto a volare?');
+  await aiuto.keyboard.press('Enter');
+  await expect(aiuto.locator('.sn-sidebar-msg-user .sn-bolla-gettone')).toContainText('Articolo sulla Tesla', { timeout: 15_000 });
+  await expect.poll(() => app.evaluate(() => JSON.stringify(globalThis.__visti || [])), { timeout: 15_000 }).toContain('Falcon Heavy');
+  await scatta(aiuto, 'gettone-aiuto');
+});
