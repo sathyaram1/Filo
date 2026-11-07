@@ -21,7 +21,7 @@ const rossiSotto = (app, campo, g) => app.evaluate(async ({ BrowserWindow }, { c
   for (let y = 0; y < height; y++) {
     for (let x = Math.floor((q.x - c.x) * k); x < Math.ceil((q.x - c.x + q.width) * k) && x < width; x++) {
       const i = (y * width + x) * 4;
-      if (b[i + 2] > 170 && b[i + 1] < 110 && b[i] < 110) n += 1;
+      if (b[i + 2] > 150 && b[i + 2] - b[i + 1] > 50 && b[i + 2] - b[i] > 50) n += 1;
     }
   }
   return { n, png: img.toPNG().toString('base64') };
