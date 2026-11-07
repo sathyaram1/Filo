@@ -78,6 +78,16 @@ test('main: le schede del messaggio arrivano al modello come letture di pagina, 
   assert.match(lettura, /if \(assistente\) for \(const l of letture\) segnaLetturaAiuto\(sender, l\)/);
 });
 
+// Le icone che la linguetta mostra le mostra anche il gettone: svg, bmp e avif compresi.
+test('forma: il gettone tiene le icone in tutti i formati che il main riconosce in una scheda', () => {
+  const S = globalThis.SN_SCHEDE_IN_CHAT;
+  for (const tipo of ['png', 'x-icon', 'gif', 'jpeg', 'webp', 'bmp', 'avif', 'svg+xml']) {
+    const icona = `data:image/${tipo};base64,AAAA`;
+    assert.equal(S.normalizza({ ...SCHEDA, icona }).icona, icona, tipo);
+  }
+  assert.equal(S.normalizza({ ...SCHEDA, icona: 'data:text/html;base64,AAAA' }).icona, '');
+});
+
 // Il filo riletto dal disco porta le schede del messaggio, e la ricerca le legge col titolo, senza i segni.
 test('filo: un messaggio con le schede le porta nella coda, e la ricerca lo trova senza i segni', async () => {
   await import('../../src/shared/filoCoda.js');
