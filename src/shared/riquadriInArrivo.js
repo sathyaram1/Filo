@@ -47,8 +47,10 @@
         for (const g of giri) {
           for (const n of g.addedNodes) {
             if (n.nodeType !== 1) continue;
-            if (eRiquadro(n)) stato.arrivatoA.delete(n);
-            else if (n.firstElementChild) for (const f of n.getElementsByTagName('iframe')) stato.arrivatoA.delete(f);
+            if (eRiquadro(n)) { stato.arrivatoA.delete(n); stato.caricati.delete(n); }
+            else if (n.firstElementChild) {
+              for (const f of n.getElementsByTagName('iframe')) { stato.arrivatoA.delete(f); stato.caricati.delete(f); }
+            }
           }
         }
       }).observe(win.document, { childList: true, subtree: true });
