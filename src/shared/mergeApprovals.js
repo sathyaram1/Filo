@@ -897,11 +897,16 @@
       status.hidden = false;
       status.textContent = msg.text;
       status.dataset.kind = msg.kind;
+      if (voloDa && msg.kind === 'wait') { status.appendChild(trascorso); tic(); }
     }
 
+    var appenaAperte = false;
     approveBtn.addEventListener('click', function (e) {
-      // La coda di un doppio clic (`detail > 1`) non è la conferma: fonderebbe in un gesto solo.
-      if (armed && e && e.detail > 1) return;
+      // La coda di un doppio clic (`detail > 1`) non è la conferma, né il sì dopo il clic che ha aperto le voci.
+      var coda = !!(e && e.detail > 1);
+      if (coda && (armed || appenaAperte)) return;
+      appenaAperte = false;
+      if (quanteChiuse()) { apriTutte(); appenaAperte = true; return; }
       if (!armed) {
         // Conferma sul posto: un click solo non manda niente su main. Il secondo
         // clic cade dove è caduto il primo: il tasto armato non si accorcia, o Scarta gli scivola sotto (#550);
