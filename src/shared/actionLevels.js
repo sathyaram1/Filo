@@ -411,12 +411,12 @@
       },
     },
     // #1909 — cancellare un file del computer vuol dire spostarlo nel cestino: si rimedia, costo 2, e chiede sempre con
-    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 3 e la parola a ogni livello. I file li trova il
-    // main (`_file`) prima del gate, mai il modello.
+    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 4. I file li trova il main (`_file`) prima del
+    // gate, mai il modello.
     ELIMINA_FILE: {
-      costo: (a) => (perSempre(a) ? 3 : 2),
+      costo: (a) => (perSempre(a) ? 4 : 2),
       campo: 'file',
-      parola: perSempre,
+      dove: (a) => (perSempre(a) ? 'Senza «per sempre» Filo sposta i file nel cestino, da dove si svuotano a mano.' : ''),
       perimetro: () => false,
       perchePerimetro: 'Te lo chiedo sempre, prima di toccare i tuoi file.',
       describe: (a) => descriviEliminazione(a),
