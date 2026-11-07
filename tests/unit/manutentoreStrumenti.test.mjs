@@ -148,8 +148,8 @@ test('una promessa si riconosce dal non avere fonte, non dalle parole: ogni riga
     const r = prova([riga]);
     assert.equal(r.ok, false, riga);
     assert.match(r.errori.join('\n'), /non dice da quali righe dei worker nasce/, riga);
-    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
-    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+    assert.equal(prova([riga], [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nell'ordine)`);
+    assert.equal(prova([riga], [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nell'ordine)`);
   }
   // Una riga copiata uguale ha già la sua fonte; una riscritta la cita, features e fixes contati di seguito.
   assert.equal(prova(['Il menu si apre più in fretta.']).ok, true);
