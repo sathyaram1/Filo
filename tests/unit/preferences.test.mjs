@@ -467,6 +467,25 @@ test('#1290 — i due valori delle sezioni chiuse stanno in un posto solo: chi l
   for (const p of ['src/content/extractContext.js', 'src/content/translatePage.js', 'src/pages/preferences/preferences.js']) {
     assert.doesNotMatch(leggi(p), /['"](subito|apertura)['"]/, `${p} riscrive a mano un valore delle sezioni chiuse`);
   }
+  // #1290.2 — anche la tendina delle Preferenze e la frase con cui Filo annuncia il cambio.
+  const html = leggi('src/pages/preferences/preferences.html');
+  const inizio = html.indexOf('id="traduzioneNascoste"');
+  const tendina = html.slice(inizio, html.indexOf('</select>', inizio));
+  assert.doesNotMatch(tendina, /value=/, 'la tendina delle sezioni chiuse scrive a mano i suoi valori');
+  assert.deepEqual([...tendina.matchAll(/data-modo="(\w+)"/g)].map((m) => m[1]).sort(),
+    Object.keys(globalThis.SN_CONST.NASCOSTE_TRADUZIONE).sort());
+  const cambi = leggi('src/shared/cambi.js');
+  const da = cambi.indexOf("'traduzionePagina.nascoste'");
+  const voce = cambi.slice(da, cambi.indexOf('livello', da));
+  assert.doesNotMatch(voce, /\b(subito|apertura)\s*:|['"](subito|apertura)['"]/, 'il cambio delle sezioni chiuse riscrive a mano un valore');
+});
+
+test('#1290.2 — il cambio delle sezioni chiuse si dice a parole per tutti e due i valori', () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'cambi.js'));
+  const C = globalThis.SN_CONST;
+  const frase = (prima, dopo) => globalThis.SN_CAMBI.fraseCambio({ chiave: 'traduzionePagina.nascoste', prima, dopo });
+  assert.match(frase(C.NASCOSTE_TRADUZIONE.TRADUCI, C.NASCOSTE_TRADUZIONE.RIMANDA), /subito, insieme al resto → solo quando le apri/);
+  assert.match(frase(undefined, C.NASCOSTE_TRADUZIONE.RIMANDA), /solo quando le apri/);
 });
 
 test('#843 — i siti dove Filo è spento: costo 1 nei due versi, un sito alla volta, la risposta nomina il sito', () => {
