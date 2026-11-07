@@ -1136,6 +1136,8 @@
       ...(daFuori ? { daFuori: true } : {}),
       // La risposta di Filo che il messaggio cita (#1620): il main ne ritrova il posto nel filo.
       ...(rispostaA ? { rispostaA } : {}),
+      // #2085 — le schede lasciate nel campo: il main ne legge le pagine.
+      ...(composizione && composizione.schede && composizione.schede.length ? { schede: composizione.schede } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
