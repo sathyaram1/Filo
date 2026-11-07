@@ -50,12 +50,46 @@
     return testo.length > 80 ? `${testo.slice(0, 79)}…` : testo || v.percorso;
   }
 
-  function rimettiDiSerie(v) {
+  // Una chiave non entra nel registro dei cambi: tolta, non si riavrà da nessun Annulla.
+  const segreto = (v) => /^apiKeys\./.test(v.percorso) || ((global.document.getElementById(v.id) || {}).type === 'password');
+
+  // Quello che l'utente ha scritto e che il valore di serie cancellerebbe: le voci di un elenco che spariscono, un
+  // testo (una chiave) che diventa un altro. Numeri e interruttori si rimettono senza chiedere: tornano con Annulla.
+  function cosaSiPerde(attuale, diSerie) {
+    if (Array.isArray(attuale)) {
+      const resta = Array.isArray(diSerie) ? diSerie.map((x) => JSON.stringify(x)) : [];
+      return attuale.filter((x) => !resta.includes(JSON.stringify(x)));
+    }
+    if (typeof attuale === 'string' && attuale.trim() && attuale !== diSerie) return [attuale];
+    return [];
+  }
+
+  async function rimettiDiSerie(v, nome) {
     const V = global.SN_VOCI_IMPOSTAZIONI;
     const MSG = global.SN_MSG && global.SN_MSG.MSG;
     const valore = V.leggi({}, v.percorso);
-    if (valore === undefined || !MSG) return Promise.resolve(false);
-    return global.chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: nidifica(v.percorso, valore) }).then(() => true, () => false);
+    if (valore === undefined || !MSG) return false;
+    const R = global.chrome.runtime;
+    let attuale;
+    try {
+      const r = await R.sendMessage({ type: MSG.GET_SETTINGS });
+      attuale = V.leggi((r && (r.settings || r)) || {}, v.percorso);
+    } catch (_) { attuale = undefined; }
+    const perse = cosaSiPerde(attuale, valore);
+    if (perse.length) {
+      const C = global.SN_CONFIRM_UI;
+      const chiave = segreto(v);
+      const elenco = Array.isArray(attuale);
+      const ok = C ? await C.confirm({
+        title: chiave ? 'Togliere la chiave?' : elenco ? 'Svuotare l’elenco?' : 'Rimettere di serie?',
+        text: chiave ? `La chiave «${nome}» viene tolta. Per riaverla dovrai incollarla di nuovo: Filo non ne tiene una copia.`
+          : elenco ? `«${nome}» perde ${perse.length === 1 ? 'la voce che hai scritto' : `le ${perse.length} voci che hai scritto`}: ${perse.slice(0, 5).map(String).join(', ')}${perse.length > 5 ? '…' : ''}.`
+            : `«${nome}» perde il testo che hai scritto.`,
+        okLabel: chiave ? 'Togli la chiave' : elenco ? 'Svuota' : 'Rimetti di serie',
+      }) : false;
+      if (ok !== true) return false;
+    }
+    return R.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: nidifica(v.percorso, valore) }).then(() => true, () => false);
   }
 
   function vociMenu(target) {
