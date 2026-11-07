@@ -52,7 +52,7 @@ test('un vicino da solo non fa partire il giro, nemmeno con cap0 sopra zero: esc
   assert.equal(senza.stop, false, 'un 3 vicino non ferma il lavoro');
   assert.deepEqual(senza.fix, []);
   assert.equal(senza.consume, null);
-  assert.deepEqual(senza.derived.map((x) => [x.level, x.sede, x.priority]), [[3, 'v', 3]], 'priorità = il livello SCRITTO');
+  assert.deepEqual(senza.derived.map((x) => [x.level, x.sede, x.priority]), [[3, 'v', 1]], 'livello scritto; a 3 nasce solo un esterno (#2269)');
   const con = decide([f(2, 'v', 'a'), f(0, 'v', 'b')], {}, { ...CAPS, cap0: 3 });
   assert.equal(con.stop, false);
   assert.deepEqual(con.fix, [], 'cap0 è il bilancio degli 0 interni: i vicini non lo usano');
