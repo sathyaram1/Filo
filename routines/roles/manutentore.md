@@ -147,7 +147,8 @@ Gestione → Automazioni.
    accensioni e se è fermo: un account fermo non accende fino al rinnovo o al giorno dopo.
 
 L'ordine decide i primi lavori: un feedback già consegnato non ce lo rimetti, perché verifica, correzione, controllo
-e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta.
+e risposte dell'owner li accende il server da sé. Un numero chiuso o non aperto il server lo salta. Le sessioni libere
+(i compiti, quelle accese a mano) seguono la stessa sequenza del pacemaker: l'ordine che scrivi vale per tutte.
 
 Le schede stanno nei feedback: `npm run feedback:schede -- elenca` scrive l'indice, le copia nella cartella e manda
 ai feedback le schede buone della cartella che loro non hanno (in una routine passa dal server col tuo biglietto, che
