@@ -921,8 +921,9 @@
       art.appendChild(risposta(d));
       return art;
     }
-    if (d.contesto) art.appendChild(sezione('', 'Contesto', md(d.contesto)));
-    if (d.problema) art.appendChild(sezione('', 'Problema', md(d.problema)));
+    const nomi = nomiSezioni(d);
+    if (d.contesto) art.appendChild(sezione('', nomi.contesto, md(d.contesto)));
+    if (d.problema) art.appendChild(sezione('', nomi.problema, md(d.problema)));
     // Il principio (§3.6) lo scrive chi ha gestito la risposta: è la regola che entra nel registro, e l'owner la vede.
     const principio = d.principio ? sezione('mg-dq-principio', 'Principio', md(d.principio)) : null;
     if (principio && d.principioContestato) principio.querySelector('.mg-dq-h').appendChild(segnoContestato());
