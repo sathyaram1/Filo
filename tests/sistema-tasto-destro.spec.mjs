@@ -309,6 +309,49 @@ test('una pastiglia delle Impostazioni rapide ha il suo menu: accenderla e la su
     .some((u) => u === 'filo://preferences/preferences.html#tabPreviewEnabled')).toBe(true);
 });
 
+// Le voci che danno un comando si cliccano, non basta che compaiano: Collega, Togli dai preferiti, Collegati, Metti muto.
+test('le voci di comando del tasto destro fanno quello che dicono: Collega, Togli dai preferiti, Collegati, Metti muto', async ({ app }) => {
+  test.setTimeout(120_000);
+  await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }], reti: ['Casa', 'Albergo'] });
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ bluetoothPreferiti: ['00:11:22:33:44:55'] }));
+  const page = await home(app);
+  await expect(voce(page, 'bluetooth')).toBeVisible({ timeout: 8_000 });
+  await voce(page, 'bluetooth').click();
+  await expect(righe(page).first()).toHaveClass(/dash-sis-preferito/);
+
+  await opzione(page, 'Cuffie').click({ button: 'right' });
+  await menuDi(page).voce('Collega').first().click();
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'btCollega').map((c) => c[1].collega)).toEqual([true]);
+
+  await opzione(page, 'Cuffie').click({ button: 'right' });
+  await menuDi(page).voce('Togli dai preferiti').first().click();
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti)).toEqual([]);
+  await expect(righe(page).first()).not.toHaveClass(/dash-sis-preferito/);
+  await page.keyboard.press('Escape');
+
+  await voce(page, 'rete').click();
+  await opzione(page, 'Collegati a Albergo').click({ button: 'right' });
+  await menuDi(page).voce('Collegati').first().click();
+  await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'wifiCollega').map((c) => c[1].rete)).toEqual(['Albergo']);
+  await page.keyboard.press('Escape');
+
+  await voce(page, 'volume').click();
+  await riquadro(page).locator('.dash-sis-cursore input').click({ button: 'right' });
+  await menuDi(page).voce('Metti muto').first().click();
+  await expect.poll(() => app.evaluate(() => globalThis.__pc.volume.muto)).toBe(true);
+});
+
+test('a parole: «togli le cuffie dai preferiti» le toglie, scritte come il sistema le chiama', async ({ app }) => {
+  await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: false }] });
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ bluetoothPreferiti: ['00:11:22:33:44:55', '66:77:88:99:AA:BB'] }));
+  const r = await app.evaluate(async () => {
+    const via = await globalThis.SN_COMANDI_SISTEMA.comanda({ cosa: 'bluetooth', dispositivo: 'cuffie', preferito: false });
+    return { via, fine: (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti };
+  });
+  expect(r.via).toMatchObject({ ok: true, dispositivo: 'Cuffie Sony', preferito: false });
+  expect(r.fine).toEqual(['66:77:88:99:AA:BB']);
+});
+
 test('a parole: «metti le cuffie fra i preferiti» e «dimentica le cuffie» passano dalla stessa porta', async ({ app }) => {
   await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie Sony', collegato: false }] });
   const r = await app.evaluate(async () => {
