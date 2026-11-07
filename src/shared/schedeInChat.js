@@ -222,6 +222,14 @@
     ta.addEventListener('mouseup', fuoriDaiGettoni);
     ta.addEventListener('keyup', (e) => { if (/^Arrow|^Home$|^End$/.test(e.key)) fuoriDaiGettoni(); });
     try { new ResizeObserver(() => { if (fondo) ricalca(); }).observe(ta); } catch (_) {}
+    // Un valore scritto dal codice della pagina non manda `input`: finché ci sono gettoni il fondo lo controlla da sé.
+    let visto = '';
+    const veglia = () => {
+      if (!fondo) return;
+      if (ta.value !== visto) { riallinea(); ricalca(); }
+      visto = ta.value;
+      requestAnimationFrame(veglia);
+    };
 
     function gettoneSotto(x, y) {
       if (!fondo) return -1;
