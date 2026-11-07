@@ -79,6 +79,27 @@ test('lo stato di ciascun aspettato: fuso è done, o archiviato con la versione'
   assert.equal(A.statoAttesa({ status: 'FENC1:xyz' }), S.IGNOTO);
 });
 
+test('scheda del manutentore: fra le attese che bloccano solo le non fuse, col loro stato; le fuse a parte (#2262)', () => {
+  const docs = {
+    fuso: { status: 'done' }, archOk: { status: 'archived', resolvedInVersion: '0.2.230' },
+    aperto: { status: 'todo' }, doppione: { status: 'archived' }, via: { missing: true },
+  };
+  const fb = { waitsFor: [
+    { id: 'fuso', num: '1302' }, { id: 'archOk', num: '1562' }, { id: 'aperto', num: '1563' },
+    { id: 'doppione', num: '1600' }, { id: 'via', num: '1601' }, { id: 'mai', num: '1602' },
+  ] };
+  const r = A.atteseDellaScheda(fb, (id) => docs[id]);
+  assert.deepEqual(r.aspetta, [
+    { num: '1563', stato: 'aperto' }, { num: '1600', stato: 'chiuso' }, { num: '1601', stato: 'cancellato' }, { num: '1602', stato: 'ignoto' },
+  ]);
+  assert.deepEqual(r.aspettava, ['1302', '1562']);
+  assert.equal(r.aspetta.length > 0, A.aspettaAncora(fb, (id) => docs[id]), 'stessa regola della coda');
+  const sciolto = { waitsFor: [{ id: 'fuso', num: '1302' }] };
+  assert.deepEqual(A.atteseDellaScheda(sciolto, (id) => docs[id]), { aspetta: [], aspettava: ['1302'] });
+  assert.equal(A.aspettaAncora(sciolto, (id) => docs[id]), false);
+  assert.deepEqual(A.atteseDellaScheda({}, () => undefined), { aspetta: [], aspettava: [] });
+});
+
 test('in Gestione chi aspetta un non fuso sta fra quelli che aspettano; fusi tutti, torna In coda', () => {
   const b = { _id: 'b', status: 'todo', seq: 12 };
   const a = { _id: 'a', status: 'todo', seq: 903, waitsFor: [{ id: 'b', num: '12' }] };
