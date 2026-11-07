@@ -199,6 +199,19 @@ if (!IS_SUBFRAME) {
 try { require('./cmd-freccia.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] cmd-freccia', e); }
 try { require('./trascina-bordo.js')(window, ipcRenderer); } catch (e) { console.error('[Filo CS] trascina-bordo', e); }
 
+// Quello che il frame principale deve sapere prima degli script della pagina (fingerprint, pubblicità, cookie, permessi)
+// arriva in una chiamata sincrona sola: la pagina resta ferma finché non risponde (#1093). Lato main: ipc.js.
+let GATE_PUBBLICITA = '';
+const AVVIO = (() => {
+  if (IS_SUBFRAME) return null;
+  try {
+    const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
+    if (!/^https?:/i.test(loc)) return null;
+    GATE_PUBBLICITA = require('./nascondi-pubblicita.js').attributoDelBlocco();
+    return ipcRenderer.sendSync('filo:avvio-pagina', loc, GATE_PUBBLICITA) || {};
+  } catch (_) { return {}; }
+})();
+
 // ─── Protezione anti-fingerprinting ────────────────────────────────────────
 //
 // Inietta nel MAIN WORLD (prima degli script di pagina) gli override di
