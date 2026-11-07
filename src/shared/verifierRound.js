@@ -743,7 +743,7 @@
     const applicate = gruppi.filter((g) => g.tipo === 'decisione' && g.findings[0].inCorrezione === true).length;
     const domande = gruppi.filter((g) => g.tipo === 'decisione').length - applicate;
     if (domande) {
-      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
+      parts.push(`${domande === 1 ? 'Un rilievo chiede una tua decisione senza fermare il lavoro: esce in un feedback a parte' : `${domande} rilievi chiedono una tua decisione senza fermare il lavoro: escono ciascuno in un feedback a parte`}, a priorità 1: lo mette in lavoro il manutentore, nell'ordine.`);
     }
     if (applicate) {
       parts.push(`${applicate === 1 ? 'Un rilievo di livello 2 chiede una tua decisione' : `${applicate} rilievi di livello 2 chiedono una tua decisione`} senza fermare il lavoro: chi corregge applica intanto l'opzione consigliata dal verificatore, e la domanda esce in un feedback a parte. Se scegli diversamente, quel feedback cambia il codice già fuso.`);
