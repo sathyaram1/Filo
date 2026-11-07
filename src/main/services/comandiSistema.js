@@ -1338,6 +1338,8 @@ function normalizzaRichiesta(r) {
       const errore = nomeValido(nome);
       if (errore) return { errore: `nome ${errore}` };
       out.nome = nome;
+      // #2096 — dimenticare il dispositivo abbinato o la rete conosciuta: chi la chiede la conferma prima.
+      if (vero(q.dimentica)) { out.dimentica = true; return out; }
       if (cosa === 'bluetooth') {
         // «Spegni le cuffie» arriva come acceso:false col nome: vuol dire scollegarle, non collegarle.
         const c = q.collega == null || q.collega === '' ? booleano(q.acceso) !== false : booleano(q.collega);
