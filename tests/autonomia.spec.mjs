@@ -903,15 +903,16 @@ test('le coordinate bancarie scritte dall\'utente un messaggio prima, nella stes
 
 // ── la tabella del 30/09 (#1312): costo 4, regola del freno, segreti, letture nuove ──────────────────────
 
-test('alzare il tetto di spesa dalla chat vuole «conferma» a ogni livello e in ogni stato; abbassarlo è un freno stretto', async ({ app }) => {
+test('alzare il tetto di spesa dalla chat vuole «conferma» a ogni livello; dopo una lettura è no; abbassarlo è un freno stretto', async ({ app }) => {
   await home(app);
   for (const lv of ['conservativo', 'default', 'automatico']) {
     await app.evaluate((_e, l) => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: l }, monthlyLimitEur: 5 }), lv);
-    for (const opts of [{}, { contesto: [ricercaFatta] }]) {
-      const r = await execAction(app, { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '50' }, { ...opts, richiesta: 'alza il tetto di spesa a 50 euro' });
-      expect(r.executed, lv).toBe(false);
-      expect(r.needsConfirm, `${lv}: la parola`).toBe(3);
-    }
+    const alza = { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '50' };
+    const r = await execAction(app, alza, { richiesta: 'alza il tetto di spesa a 50 euro' });
+    expect(r.executed, lv).toBe(false);
+    expect(r.needsConfirm, `${lv}: la parola`).toBe(3);
+    const letto = await execAction(app, alza, { contesto: [ricercaFatta], richiesta: 'alza il tetto di spesa a 50 euro' });
+    expect([letto.executed, letto.no, letto.needsConfirm], `${lv}: dopo una lettura`).toEqual([false, true, undefined]);
   }
   expect((await impostazioni(app)).monthlyLimitEur).toBe(5);
   const giu = await execAction(app, { type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '2' });
