@@ -113,25 +113,24 @@ test('Preferenze: title, testo su più righe, tasto disabilitato e fuoco da tast
   await expect(fumetto(page)).toBeHidden();
 });
 
-test('Preferenze: colori e attesa del fumetto sono token, cambiati arrivano subito', async ({ app, openTab }) => {
-  const page = await openTab('filo://preferences/preferences.html');
-  await pronta(page);
-  await app.evaluate(async ({ BrowserWindow }) => {
-    const r = await globalThis.SN_HANDLERS_TEST?.aggiorna?.({ themeTokens: { 'fumetto.sfondo': '#203040', 'fumetto.ritardo': '0ms' } });
-    if (r) return;
-    const merged = await globalThis.SN_STORAGE.updateSettings({ themeTokens: { 'fumetto.sfondo': '#203040', 'fumetto.ritardo': '0ms' } });
-    for (const w of BrowserWindow.getAllWindows()) {
-      for (const v of (w._filoTabs?.tabs || [])) {
-        try { v.view.webContents.send('filo:broadcast', { type: 'settings_updated', settings: merged }); } catch (_) {}
-      }
-    }
-  });
-  await expect.poll(() => page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sn-fumetto-sfondo').trim()))
-    .toBe('#203040');
-  const { el } = await unTitoloVisibile(page);
-  await el.hover();
-  await expect(fumetto(page)).toBeVisible({ timeout: 300 });
-  expect(await fumetto(page).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(32, 48, 64)');
+test('Preferenze → Avanzate: colori e attesa del fumetto sono token, e valgono anche nelle altre schede', async ({ openTab }) => {
+  const home = await openTab('filo://newtab/');
+  await pronta(home);
+  const pref = await openTab('filo://preferences/preferences.html');
+  await pronta(pref);
+  await pref.locator('[id="tok-fumetto.sfondo"]').fill('#203040');
+  await pref.locator('[id="tok-fumetto.ritardo"]').fill('1500ms');
+  await expect.poll(() => home.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--sn-fumetto-ritardo').trim()))
+    .toBe('1500ms');
+  await home.bringToFront();
+  await home.locator('#sendBtn').hover();
+  // L'attesa è quella scelta: a 700 ms non c'è ancora, poi compare.
+  await home.waitForTimeout(700);
+  await expect(fumetto(home)).toBeHidden();
+  await expect(fumetto(home)).toHaveText('Invia', { timeout: 3000 });
+  expect(await fumetto(home).evaluate((e) => getComputedStyle(e).backgroundColor)).toBe('rgb(32, 48, 64)');
+  await pref.locator('.sn-token-row[data-token="fumetto.sfondo"] .sn-token-reset').click();
+  await pref.locator('.sn-token-row[data-token="fumetto.ritardo"] .sn-token-reset').click();
 });
 
 test('Gestione: anche le pagine dell\'owner escono nel fumetto', async ({ openTab }) => {
