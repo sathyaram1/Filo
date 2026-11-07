@@ -15,6 +15,8 @@
   const accadeEl = $('accade');
   const inputForm = $('inputForm');
   const inputEl = $('input');
+  // #2085 — sul gettone di una scheda: la carta dell'anteprima, e il clic che la porta davanti (o la riapre).
+  const azioniGettone = window.SN_SCHEDE_IN_CHAT ? window.SN_SCHEDE_IN_CHAT.azioni() : {};
   const sendBtn = $('sendBtn');
   const stopBtn = $('stopBtn');
   const GLIFO_INVIO = sendBtn.innerHTML;
