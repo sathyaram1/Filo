@@ -125,7 +125,8 @@
       }));
       return;
     }
-    const parti = (chat.messages || []).filter((m) => m && String(m.text || '').trim()).map(messaggio);
+    const parti = (chat.messages || []).map((m, i) => [m, i]).filter(([m]) => m && String(m.text || '').trim())
+      .map(([m, i]) => messaggio(m, chat.id || r.vista.id, i));
     const v = r.vista;
     if (v.dove && vai(v.app)) {
       const b = document.createElement('button');
