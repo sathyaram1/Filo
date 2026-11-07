@@ -64,8 +64,11 @@
   });
 
   const FEEDBACK_ID_RE = /^[A-Za-z0-9_-]{1,128}$/;
+  // Chi conosce il feedback solo per numero lo scrive col cancelletto («#1736», «#831.2»): il server lo traduce
+  // nell'id all'ingresso (traduciNumeri), quindi una domanda salvata porta sempre l'id. Senza cancelletto è un id.
+  const NUMERO_IN_AZIONE_RE = /^#([1-9]\d{0,8})(?:\.([1-9]\d{0,5}))?$/;
   const PARAMETRI = Object.freeze({
-    feedbackId: (v) => typeof v === 'string' && FEEDBACK_ID_RE.test(v),
+    feedbackId: (v) => typeof v === 'string' && (FEEDBACK_ID_RE.test(v) || NUMERO_IN_AZIONE_RE.test(v)),
     valorePriorita: (v) => Number.isInteger(v) && v >= 0 && v <= 3,
     chiave: (v) => typeof v === 'string' && Object.prototype.hasOwnProperty.call(CHIAVI_AUTOMAZIONE, v),
     valoreBooleano: (v) => typeof v === 'boolean',
