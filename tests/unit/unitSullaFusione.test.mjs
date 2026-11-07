@@ -15,6 +15,7 @@ import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, provaDaRiusare, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
+  unitToccati, COMANDI_DI_ACTIONS,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 import { pathToFileURL } from 'node:url';
 
