@@ -3863,6 +3863,76 @@
     });
   }
 
+  // ── «Dichiara fidato com'è» (#2258) ───────────────────────────────────────
+  // Un lavoro server fermo perché il suo biglietto nascerebbe sporco: l'owner, letti ramo e note, li dichiara fidati.
+  // Prima il server dice cosa toglierebbe, poi la conferma rimanda quello che l'owner ha visto: se è cambiato, rifiuta.
+  const TITOLO_DICHIARA = 'Ramo e note di questo lavoro diventano fidati così come sono, a tuo nome: il lavoro riparte al giro dopo. La fiducia del feedback non cambia.';
+  function aggiungiDichiara(fb) {
+    if (!isAdmin || !mgWorkState || !MR.restaLocale(fb)) return;
+    const posto = document.createElement('div');
+    posto.className = 'mg-dichiara';
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'mg-star-btn mg-fiducia-btn';
+    btn.id = 'mgDichiaraBtn';
+    btn.textContent = '🤝 Dichiara fidato com’è';
+    btn.title = TITOLO_DICHIARA;
+    btn.addEventListener('click', () => guardaDichiara(fb._id, posto, btn));
+    posto.appendChild(btn);
+    mgWorkState.appendChild(posto);
+  }
+  function righeDichiara(r) {
+    const dove = { app: 'Ramo dell’app', server: 'Ramo del server' };
+    const righe = (r.rami || []).map((x) => `${dove[x.repo] || x.repo}, all’ultimo commit ${String(x.punta || '').slice(0, 7)}: ${x.motivo || 'non pulito'}`);
+    const n = Number(r.stato) || 0;
+    if (n) righe.push(`${n === 1 ? 'Uno scritto' : `${n} scritti`} di biglietti non fidati fra note e critiche`);
+    return righe;
+  }
+  async function guardaDichiara(id, posto, btn) {
+    btn.disabled = true;
+    setManageMsg('Guardo cosa tiene sporco il lavoro…', '');
+    const r = await sendToMain({ type: FIDUCIA_DICHIARA, feedbackId: id, prova: true }).catch((e) => ({ ok: false, error: e.message }));
+    btn.disabled = false;
+    if (selectedId !== id || !posto.isConnected) return;
+    if (!r || r.ok === false) { setManageMsg(`Non riesco a guardarlo: ${(r && r.error) || 'il server non ha risposto'}`, 'err'); return; }
+    if (r.niente) {
+      const fermo = MR.restaLocale(allFeedbacks.find((f) => f._id === id));
+      setManageMsg(`Ramo e note sono già puliti: lo tiene fermo altro${fermo ? ` (${fermo.motivi.join(', ')})` : ''}.`, 'ok');
+      return;
+    }
+    setManageMsg('', '');
+    posto.innerHTML = `<div class="mg-dichiara-cosa">Diventano fidati così come sono:<ul>${righeDichiara(r).map((x) => `<li>${esc(x)}</li>`).join('')}</ul></div>
+      <div class="mg-dichiara-tasti"><button type="button" class="mg-star-btn mg-fiducia-btn" id="mgDichiaraSi">Li ho letti: dichiara fidati</button>
+      <button type="button" class="mg-star-btn" id="mgDichiaraNo">Annulla</button></div>`;
+    const si = posto.querySelector('#mgDichiaraSi');
+    posto.querySelector('#mgDichiaraNo').addEventListener('click', () => {
+      const fb = allFeedbacks.find((f) => f._id === id);
+      posto.remove();
+      if (fb) aggiungiDichiara(fb);
+    });
+    si.addEventListener('click', () => confermaDichiara(id, r.visto, si));
+    si.focus();
+  }
+  async function confermaDichiara(id, visto, si) {
+    const fb = allFeedbacks.find((f) => f._id === id);
+    const num = fb ? FB.formatNum(fb.seq, fb.subSeq) : '';
+    const chi = num ? ` di #${num}` : '';
+    si.disabled = true;
+    setManageMsg('Lo dichiaro fidato…', '');
+    const r = await sendToMain({ type: FIDUCIA_DICHIARA, feedbackId: id, visto }).catch((e) => ({ ok: false, error: e.message }));
+    if (!r || r.ok === false) {
+      si.disabled = false;
+      setManageMsg(`Non dichiarato fidato: ${(r && r.error) || 'il server non ha risposto'}`, 'err');
+      return;
+    }
+    // Il server ha tolto il segno: la rilettura porterà lo stesso, intanto la pagina lo dice subito.
+    if (fb) fb.restaLocale = null;
+    if (selectedId === id) openDetail(id, { ridisegno: true });
+    renderList();
+    updateTabCounts();
+    setManageMsg(`Ramo e note del lavoro${chi} sono fidati: riparte al prossimo giro, se non lo ferma altro.`, 'ok');
+  }
+
   // ── «Aspetta #N» (#903) ───────────────────────────────────────────────────
   // I feedback da fondere prima: finché uno non lo è nessuna routine lo prende, e qui sta fra quelli che aspettano.
   // Numeri, esistenza e giri li controlla il main (MSG.FEEDBACK_UPDATE); la regola sta in SN_FB_ATTESE.
