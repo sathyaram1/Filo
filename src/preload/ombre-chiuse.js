@@ -25,7 +25,7 @@ function sorgenteSonda(nome) {
   var oAttach = EP.attachShadow, radici = new WeakMap();
   var oAdd = EventTarget.prototype.addEventListener;
   var oStop = Event.prototype.stopImmediatePropagation, oPrevent = Event.prototype.preventDefault;
-  var oPath = Event.prototype.composedPath, oClosest = EP.closest;
+  var oPath = Event.prototype.composedPath;
   var HTML = 'http://www.w3.org/1999/xhtml';
   var MUTI = ${JSON.stringify(Object.fromEntries(senzaProsa.map((t) => [t, 1])))};
   var ETICHETTE = ${JSON.stringify(C.ETICHETTE_TRADOTTE)};
