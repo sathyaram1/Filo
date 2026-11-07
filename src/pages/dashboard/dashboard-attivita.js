@@ -972,7 +972,8 @@
     // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
     VOLUME: (a) => {
       const o = a._output || {};
-      return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume al ${o.volume}%${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
+      const al = globalThis.SN_SISTEMA ? globalThis.SN_SISTEMA.alPercento(o.volume) : `al ${o.volume}%`;
+      return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume ${al}${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
