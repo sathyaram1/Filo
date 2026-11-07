@@ -19,7 +19,7 @@
         { testo: 'A Normale Filo ti chiede un OK prima di ricordare una cosa per sempre, installare un pacchetto dal terminale, leggere un file di configurazione fuori dalla tua cartella o aprire un link che porta tuoi dati. Prima, in una conversazione nuova, partiva da solo.', segnalazione: 1312 },
         { testo: 'Un comando con dentro una password o una chiave, come un curl o un git clone con un token, si ferma come un link con la stessa chiave.', segnalazione: 1312 },
         { testo: 'Quando Filo vuole aprire una pagina presentandola come una ricerca, il riquadro mostra le parole cercate solo se la pagina è davvero quella ricerca. Altrimenti mostra l\'indirizzo che si aprirà.', segnalazione: 1312 },
-        { testo: 'Un testo o un\'immagine incollati in chat, un suggerimento della home, i nomi di reti Wi-Fi e dispositivi Bluetooth e i nomi nuovi proposti per i tuoi file contano come testo scritto da altri: dopo averli letti Filo fa meno da solo.', segnalazione: 1312 },
+        { testo: 'Un testo o un\'immagine incollati in chat o nell\'Aiuto, un suggerimento della home, la domanda partita dall\'avviso di un sito pericoloso, i nomi di reti Wi-Fi e dispositivi Bluetooth e i nomi nuovi proposti per i tuoi file contano come testo scritto da altri: dopo averli letti Filo fa meno da solo.', segnalazione: 1312 },
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
       ],
     },
