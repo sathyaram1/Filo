@@ -8200,13 +8200,14 @@ async function summarizeTab(title, content) {
 // è di più.
 // Un messaggio dell'utente entra nella conversazione da qui, che parta col turno o resti a scheda chiusa (#1700).
 // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
-async function archiviaDomanda(chatId, { testo, immagini = [], daModello = false, ref = null }, meta) {
+async function archiviaDomanda(chatId, { testo, immagini = [], daModello = false, ref = null, schede = [] }, meta) {
   const archiviata = await appendToChatArchive(chatId, {
     role: 'user',
     text: String(testo || ''),
     images: immagini.length,
     ...(daModello ? { daModello: true } : {}),
     ...(ref ? { rispostaA: ref } : {}),
+    ...(Array.isArray(schede) && schede.length ? { schede } : {}),
   }, meta);
   const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
   if (immagini.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, immagini);
