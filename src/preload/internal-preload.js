@@ -145,6 +145,10 @@ const filoApi = {
 };
 
 if (IS_FILO_ORIGIN) window.filo = filoApi;
+// Come dalle pagine web: senza, Cerca dal tasto destro chiudeva la misura al clic (#1461.1).
+if (IS_FILO_ORIGIN) {
+  try { globalThis.SN_APERTURA_SCELTA = require('./apertura-scelta.js')(ipcRenderer); } catch (e) { console.error('[Filo internal] apertura scelta', e); }
+}
 
 // Shim chrome.*: i moduli portati lo usano senza sapere che siamo in Electron.
 const chromeShim = {
