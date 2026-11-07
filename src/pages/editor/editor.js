@@ -2180,6 +2180,7 @@
   }
 
   docEl.addEventListener('input', () => {
+    if (ancorePiantate) togliAncore();
     handleMarkdownBlock();
     onDocInput();
   });
