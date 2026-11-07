@@ -39,7 +39,7 @@ test('A home: gettone, carta, invio, clic, scheda chiusa', async ({ app, shell, 
   console.log('VALORE', JSON.stringify(await casa.locator('#input').inputValue()));
   await casa.screenshot({ path: `${OUT}/A-campo.png` });
   console.log('GETTONI-CAMPO', await casa.locator('.sn-gettone').count());
-  await casa.locator('.sn-gettone').first().hover();
+  await sopra(casa, '.sn-gettone');
   await casa.waitForTimeout(1200);
   const carta = await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().filter((x) => !x.isDestroyed() && x.webContents.getURL().includes('anteprima.html') && x.isVisible()).length);
   console.log('CARTA-CAMPO', carta);
