@@ -274,7 +274,7 @@ test('a parole: «metti le cuffie fra i preferiti» e «dimentica le cuffie» pa
   expect(r.pref).toMatchObject({ ok: true, dispositivo: 'Cuffie Sony', preferito: true });
   expect(r.dopo).toEqual(['00:11:22:33:44:55']);
   expect(r.via).toMatchObject({ ok: true, dispositivo: 'Cuffie Sony', dimenticato: true });
-  expect(r.fine).toEqual([]);
+  expect(r.fine).toEqual(['00:11:22:33:44:55']);
   // Dimenticare chiede sempre conferma, a qualunque livello di autonomia: costo 3.
   const costo = await app.evaluate(() => globalThis.SN_ACTION_LEVELS.costoFor({ type: 'BLUETOOTH', _richiestaSistema: { cosa: 'bluetooth', nome: 'Cuffie Sony', dimentica: true } }));
   expect(costo).toBe(3);
