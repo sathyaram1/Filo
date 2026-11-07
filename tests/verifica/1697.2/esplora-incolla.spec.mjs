@@ -206,7 +206,7 @@ test('voce di elenco appena aperta, incolla 600 righe', async ({ openTab }) => {
   console.log('prima voce', JSON.stringify(primo));
 });
 
-test('in fondo a una citazione con testo incolla 600 righe: nessun carattere invisibile, nemmeno nel copiato o dopo annulla', async ({ openTab, electronApp }) => {
+test('in fondo a una citazione con testo incolla 600 righe: nessun carattere invisibile, nemmeno nel copiato o dopo annulla', async ({ openTab }) => {
   const page = await apri(openTab);
   await page.keyboard.type('> citazione');
   await incolla(page, righe(600));
