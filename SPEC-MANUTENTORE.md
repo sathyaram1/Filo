@@ -28,19 +28,26 @@ un suo tetto dentro il limite comune).
 
 ## 2. La scala delle priorità
 
-La priorità non è più una coda: dice quanto una cosa conta oggi.
+La priorità non è una coda: dice quanto una cosa conta. Il posto in coda lo dà
+l'**ordine** del manutentore, l'unica condizione per cominciare (#2269): un
+primo lavoro nell'ordine parte qualunque sia la sua priorità da 0 a 2, fuori
+dall'ordine parte solo una 3. Con l'ordine vuoto o senza lavori pronti il
+server accende per urgenza, come ripiego, e solo lì le basse aspettano l'ultimo
+giorno prima del rinnovo.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
 | **3** | urgentissimo, a prescindere dall'efficienza: buchi di sicurezza, funzioni che l'owner vuole subito e per cui accetta un riallineamento | owner, giudici, manutentore (può crearne, **non toglierne**) | parte subito, sempre in parallelo, fuori da ogni ordine |
-| **2** | la rosa del giorno: i feedback più importanti fra tutti, scelti ogni mattina leggendo tutte le schede | manutentore | sempre nel suo contesto; fra questi decide ordine, pacchetti e quanti insieme |
-| **1** | da fare, ma non oggi | manutentore (e owner) | aspettano una prossima rosa |
-| **0** | da fare idealmente, rimandato a lungo termine: difetti minori per cui lo sforzo oggi non vale (un difetto grafico fra scroll e zoom, un errore raro senza danni permanenti) | manutentore (e owner) | non si lavorano; ne esistono infiniti, e oggi conta più un'analisi per velocizzare Filo che correggerli |
+| **2** | importante: la classe che passa per prima quando il manutentore sceglie l'ordine | manutentore (e owner) | parte quando è nell'ordine |
+| **1** | da fare | manutentore, owner, giudici, rilievi delle verifiche | parte quando è nell'ordine |
+| **0** | da fare idealmente, rimandato a lungo termine: difetti minori per cui lo sforzo oggi non vale (un difetto grafico fra scroll e zoom, un errore raro senza danni permanenti) | manutentore (e owner) | parte quando è nell'ordine, e di rado ci entra; ne esistono infiniti |
 
-La soglia fra i livelli si muove con la maturità di Filo e con i token
-disponibili: con dieci account, o con un modello piccolo al livello di Opus,
-molti 0 diventano 1 e molti 1 diventano 2. Lo decide il manutentore, e lo
-scrive nel taccuino quando cambia il criterio.
+La priorità da 0 a 2 è la **classe**: il primo criterio con cui il manutentore
+sceglie l'ordine, non un filtro (§ 4). La soglia fra le classi si muove con la
+maturità di Filo e con i token disponibili; la decide il manutentore, e la
+scrive nel taccuino quando cambia il criterio. I rilievi delle verifiche che
+diventano feedback nascono a 1, salvo un rilievo esterno di livello 3 che
+nasce a 3; i bilanci dei giri per livello non cambiano.
 
 **Tetti.** I tetti per priorità di oggi (6 lavori a priorità 3 insieme, 4 a
 priorità 2) spariscono: li sostituiscono le priorità 3 che partono sempre e il
