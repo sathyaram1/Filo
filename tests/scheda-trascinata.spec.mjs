@@ -421,3 +421,220 @@ test('#2084 a metà trascinamento sopra una vicina la linguetta la copre del tut
   expect(copre.trascinata).toBe(true);
   expect(copre.visibile).toBeGreaterThanOrEqual(0.99);
 });
+
+// Il modello finto dell'Aiuto: risponde sempre uguale e tiene i messaggi che riceve.
+async function aiutoFinto(app) {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false, apiKeys: { openrouter: 'k-test' }, models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
+    const P = globalThis.SN_PROVIDERS;
+    globalThis.__visti = [];
+    const risposta = ({ attempts, messages }) => {
+      globalThis.__visti.push(JSON.parse(JSON.stringify(messages)));
+      return { text: '{"message":"Con un razzo.","suggestions":[],"issues":[]}', model: attempts[0].model, provider: attempts[0].provider, usage: {} };
+    };
+    P.completeWithFallback = async (o) => risposta(o);
+    P.streamCompleteWithFallback = async (o) => risposta(o);
+  });
+}
+
+// L'Aiuto aperto sopra un sito, con una scheda dell'articolo lasciata nella sua casella.
+async function gettoneNellAiuto(app, shell, openTab, testServer) {
+  const url = testServer.html('<title>Articolo sulla Tesla</title><p>La Tesla Roadster è volata nello spazio su un Falcon Heavy.</p>');
+  await openTab(url);
+  const sorgente = await idPerUrl(shell, url);
+  const sito = await openTab(testServer.html('<title>Un sito</title><p>un sito qualunque'));
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), await davanti(shell));
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  const verso = await puntoNelloStrato(app, aiuto, '.sn-sidebar-input textarea');
+  await prendi(shell, await linguetta(shell, sorgente));
+  await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+  await shell.mouse.up();
+  await expect(aiuto.locator('.sn-gettoni-fondo .sn-gettone')).toHaveCount(1, { timeout: 5000 });
+  return { aiuto, sito, url };
+}
+async function chiediAllAiuto(aiuto, testo) {
+  await aiuto.locator('.sn-sidebar-input textarea').focus();
+  await aiuto.keyboard.press('End');
+  await aiuto.keyboard.type(testo);
+  await aiuto.keyboard.press('Enter');
+}
+
+test('#2085 lo scambio dell\'Aiuto, riaperto dalla sua riga nella home, mostra il gettone e non i segni', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const { aiuto } = await gettoneNellAiuto(app, shell, openTab, testServer);
+  await aiutoFinto(app);
+  await chiediAllAiuto(aiuto, 'come ha fatto?');
+  await expect(aiuto.locator('.sn-sidebar-msg-user .sn-bolla-gettone')).toHaveCount(1, { timeout: 15_000 });
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const casa = await home(app, { scheda: nuova?.id });
+  const riga = casa.locator('.dash-riga-app').first();
+  await expect(riga).toBeVisible({ timeout: 15_000 });
+  await riga.locator('.dash-riga-app-testa').click();
+  const domanda = riga.locator('.dash-riga-app-msg-user').filter({ hasText: 'come ha fatto?' });
+  await expect(domanda).toBeVisible({ timeout: 10_000 });
+  await expect(domanda).not.toContainText('⟦');
+  await expect(domanda.locator('.sn-bolla-gettone')).toContainText('Articolo sulla Tesla');
+});
+
+test('#2085 nell\'Aiuto la pagina di una scheda lasciata resta nella conversazione anche alla domanda dopo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const { aiuto } = await gettoneNellAiuto(app, shell, openTab, testServer);
+  await aiutoFinto(app);
+  await chiediAllAiuto(aiuto, 'come ha fatto a volare?');
+  await expect.poll(() => app.evaluate(() => (globalThis.__visti || []).length), { timeout: 15_000 }).toBeGreaterThan(0);
+  await expect(aiuto.getByText('Con un razzo.').first()).toBeVisible({ timeout: 15_000 });
+  const prima = await app.evaluate(() => globalThis.__visti.length);
+  await chiediAllAiuto(aiuto, 'e chi la ha lanciata?');
+  await expect.poll(() => app.evaluate(() => globalThis.__visti.length), { timeout: 15_000 }).toBeGreaterThan(prima);
+  const seconda = await app.evaluate(() => JSON.stringify(globalThis.__visti.at(-1)));
+  expect(seconda).toContain('e chi la ha lanciata?');
+  expect(seconda).toContain('Falcon Heavy');
+  // Una volta sola: la cronologia la porta, il messaggio nuovo non la ripete.
+  expect(seconda.split('Falcon Heavy').length - 1).toBe(1);
+});
+
+test('#2084 lasciata sul campo di un riquadro incorporato, di un altro sito o dello stesso, ci scrive titolo e indirizzo', async ({ app, shell, openTab, testServer }) => {
+  const sorgenteUrl = testServer.html('<title>Ricetta del pane</title><p>farina');
+  await openTab(sorgenteUrl);
+  const sorgente = await idPerUrl(shell, sorgenteUrl);
+  for (const pubblico of [true, false]) {
+    const dentro = testServer.html('<title>commenti</title><textarea id="t" style="width:300px;height:80px">Commento:</textarea>', { pubblico });
+    const pagina = await openTab(testServer.html(`<title>Blog</title><p>articolo</p><iframe src="${dentro}" style="margin:40px;width:400px;height:150px;border:3px solid"></iframe>`));
+    let frame = null;
+    await expect.poll(async () => {
+      frame = pagina.frames().find((f) => f.url() === dentro) || null;
+      return frame ? frame.locator('#t').count() : 0;
+    }, { timeout: 8000 }).toBe(1);
+    const r = await frame.locator('#t').evaluate((el) => { const b = el.getBoundingClientRect(); return { x: b.left + 24, y: b.top + b.height / 2 }; });
+    const off = await pagina.locator('iframe').evaluate((f) => { const b = f.getBoundingClientRect(); return { x: b.left + f.clientLeft, y: b.top + f.clientTop }; });
+    const base = await puntoInPagina(app, pagina, 'body');
+    const corpo = await pagina.locator('body').evaluate((el) => { const b = el.getBoundingClientRect(); return { x: b.left + Math.min(24, b.width / 2), y: b.top + b.height / 2 }; });
+    const verso = { x: base.x - corpo.x + off.x + r.x, y: base.y - corpo.y + off.y + r.y };
+    await prendi(shell, await linguetta(shell, sorgente));
+    await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+    await shell.mouse.up();
+    await expect.poll(() => frame.locator('#t').inputValue(), { timeout: 5000 }).toContain(sorgenteUrl);
+    const valore = await frame.locator('#t').inputValue();
+    expect(valore).toContain('Ricetta del pane');
+    expect(valore.startsWith('Commento:')).toBe(true);
+  }
+});
+
+test('#2085 due gettoni con lo stesso nome visibile restano ognuno della sua scheda, anche togliendo il primo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const a = testServer.html('<title>Amazon.it: Apple iPhone 15 (128 GB) - Nero</title><p>prodotto A');
+  const b = testServer.html('<title>Amazon.it: Apple iPhone 15 Pro (256 GB) - Titanio</title><p>prodotto B');
+  await openTab(a);
+  await openTab(b);
+  const ia = await idPerUrl(shell, a);
+  const ib = await idPerUrl(shell, b);
+  const casa = (await schede(shell)).find((t) => String(t.url).startsWith('filo://newtab'));
+  await attiva(shell, casa.id);
+  const page = await home(app);
+  await page.locator('#input').fill('confronta');
+  for (const [k, id] of [[1, ia], [2, ib]]) {
+    const verso = await puntoInPagina(app, page, '#input');
+    await prendi(shell, await linguetta(shell, id));
+    await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+    await shell.mouse.up();
+    await expect.poll(async () => (await statoDelCampo(page)).n, { timeout: 5000 }).toBe(k);
+  }
+  const urls = () => page.evaluate(() => document.getElementById('input')._snGettoni.schede().map((x) => x.url));
+  expect(await urls()).toEqual([a, b]);
+  await page.evaluate(() => { const t = document.getElementById('input'); const i = t.value.indexOf('⟧') + 1; t.focus(); t.setSelectionRange(i, i); });
+  await page.keyboard.press('Backspace');
+  await expect.poll(async () => (await urls()).length, { timeout: 5000 }).toBe(1);
+  expect(await urls()).toEqual([b]);
+});
+
+test('#2084 Esc a metà trascinamento, o la finestra che perde il fuoco, rimettono tutto com\'era', async ({ shell, openTab, testServer }) => {
+  await openTab(testServer.html('<title>Uno</title><p>uno'));
+  await openTab(testServer.html('<title>Due</title><p>due'));
+  const prima = await ordine(shell);
+  const mossa = prima[1];
+  for (const annulla of [
+    () => shell.keyboard.press('Escape'),
+    () => shell.evaluate(() => window.dispatchEvent(new Event('blur'))),
+  ]) {
+    const da = await linguetta(shell, mossa);
+    const ultima = await linguetta(shell, prima.at(-1));
+    await prendi(shell, da);
+    await shell.mouse.move(ultima.right - 4, da.y, { steps: 6 });
+    await expect.poll(() => shell.evaluate((i) => document.querySelector(`.tab[data-id="${i}"]`).classList.contains('dragging'), mossa)).toBe(true);
+    await annulla();
+    expect(await shell.evaluate((i) => document.querySelector(`.tab[data-id="${i}"]`).classList.contains('dragging'), mossa)).toBe(false);
+    await shell.mouse.up();
+    await shell.waitForTimeout(400);
+    expect(await ordine(shell)).toEqual(prima);
+  }
+});
+
+test('#2085 la tredicesima scheda in un messaggio resta fuori e lo si dice', async ({ app, shell, openTab, testServer }) => {
+  const { page, sorgente } = await gettoneNellaHome(app, shell, openTab, testServer);
+  await page.evaluate(() => {
+    const G = document.getElementById('input')._snGettoni;
+    for (let i = 0; i < 11; i++) G.aggiungi({ id: `x${i}`, titolo: `Pagina ${i}`, url: `https://esempio.it/${i}` });
+    globalThis.__avvisi = [];
+    const mostra = globalThis.SN_POPUP.showToast;
+    globalThis.SN_POPUP.showToast = (t, ...r) => { globalThis.__avvisi.push(String(t)); return mostra.call(globalThis.SN_POPUP, t, ...r); };
+  });
+  expect((await statoDelCampo(page)).n).toBe(12);
+  const verso = await puntoInPagina(app, page, '#input');
+  await prendi(shell, await linguetta(shell, sorgente));
+  await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+  await shell.mouse.up();
+  await expect.poll(() => page.evaluate(() => globalThis.__avvisi.join(' ')), { timeout: 5000 }).toContain('al massimo 12 schede');
+  expect((await statoDelCampo(page)).n).toBe(12);
+});
+
+// Col mouse vero del sistema: il puntatore passa sopra la pagina (un'altra vista) e la barra deve seguirlo lo stesso.
+test.describe('col mouse vero', () => {
+  test.skip(!Gesti.disponibili(), 'servono un display X e XTest (lo schermo virtuale delle prove su Linux)');
+
+  async function sulloSchermoLaLinguetta(app, shell, id) {
+    const r = await linguetta(shell, id);
+    const o = await app.evaluate(({ BrowserWindow }) => {
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
+      const cb = w.getContentBounds();
+      return { x: cb.x, y: cb.y, z: w.webContents.getZoomFactor() || 1 };
+    });
+    return { x: Math.round(o.x + r.x * o.z), y: Math.round(o.y + r.y * o.z), right: Math.round(o.x + r.right * o.z) };
+  }
+
+  test('#2084 una scheda portata col mouse vero nel campo della home diventa un gettone', async ({ app, shell, openTab, testServer }) => {
+    const url = testServer.html('<title>Articolo sulla Tesla</title><p>Falcon Heavy</p>');
+    await openTab(url);
+    const sorgente = await idPerUrl(shell, url);
+    const casa = (await schede(shell)).find((t) => String(t.url).startsWith('filo://newtab'));
+    await attiva(shell, casa.id);
+    const page = await home(app);
+    await Gesti.finestraASchermo(app);
+    const campo = await Gesti.sulloSchermo(app, page, page, '#input');
+    Gesti.trascina(await sulloSchermoLaLinguetta(app, shell, sorgente), campo);
+    await expect(page.locator('.sn-gettoni-fondo .sn-gettone')).toContainText('Articolo sulla Tesla', { timeout: 5000 });
+  });
+
+  test('#2084 col mouse vero: sopra la pagina e di nuovo nella fila il trascinamento continua, e un campo del sito riceve il link', async ({ app, shell, openTab, testServer }) => {
+    const sorgenteUrl = testServer.html('<title>Ricetta del pane</title><p>farina');
+    await openTab(sorgenteUrl);
+    const sito = await openTab(testServer.html('<title>Modulo</title><textarea id="t" style="margin:120px 80px;width:400px;height:120px">Guarda:</textarea>'));
+    const prima = await ordine(shell);
+    const sorgente = await idPerUrl(shell, sorgenteUrl);
+    await Gesti.finestraASchermo(app);
+    const da = await sulloSchermoLaLinguetta(app, shell, sorgente);
+    const ultima = await sulloSchermoLaLinguetta(app, shell, prima.at(-1));
+    // Giù sopra la pagina, poi in fondo alla fila: la scheda finisce ultima.
+    Gesti.trascina(da, { x: da.x + 40, y: da.y + 300 }, { x: ultima.right - 6, y: da.y });
+    await expect.poll(async () => (await ordine(shell)).at(-1), { timeout: 8000 }).toBe(sorgente);
+    // Fino al campo del sito: ci scrive titolo e indirizzo.
+    const campo = await Gesti.sulloSchermo(app, sito, sito, '#t');
+    Gesti.trascina(await sulloSchermoLaLinguetta(app, shell, sorgente), campo);
+    await expect.poll(() => sito.locator('#t').inputValue(), { timeout: 5000 }).toContain(sorgenteUrl);
+    expect(await sito.locator('#t').inputValue()).toContain('Ricetta del pane');
+  });
+});
