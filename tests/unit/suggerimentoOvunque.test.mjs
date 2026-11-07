@@ -44,8 +44,9 @@ test('ogni pagina in src/pages è coperta: dal preload interno, dallo strato, o 
       const html = leggi('src', 'pages', cartella, f);
       // Un rimando (meta refresh, corpo vuoto) non ha niente da passare col mouse.
       if (/http-equiv="refresh"/i.test(html) && /<body>\s*<\/body>/i.test(html)) continue;
-      // Ogni altra pagina è una scheda filo:// e prende internal-preload, che carica il modulo.
-      if (/data-sn-no-preload/.test(html)) scoperte.push(rel);
+      // Ogni altra pagina è una scheda filo:// (col suo pageBootstrap) e prende internal-preload, che carica il modulo.
+      // Una pagina nuova che non lo è va messa fra gli strati, col modo in cui carica il fumetto.
+      if (!/filo:\/\/shared\/pageBootstrap\.js/.test(html)) scoperte.push(rel);
     }
   }
   assert.deepEqual(scoperte, []);
