@@ -2338,10 +2338,22 @@
       fine.collapse(false);
       fine.insertNode(z);
       r.setEndBefore(z);
+      ancorePiantate = true;
       scegli(r);
       inserisci(frammento(tag, { resto }));
+      // Chrome ha travasato l'ancora nell'ultima riga e tiene il suo nodo per l'annulla: lo riporterebbe pieno.
+      if (!z.isConnected) z.data = '';
+      togliAncore();
     }
-    if (z.isConnected && z.data.endsWith(ANCORA)) z.deleteData(z.data.length - 1, 1);
+  }
+  // L'ancora che un annulla o un ripeti rimettono nel foglio se ne va al primo input. Solo in coda al suo nodo: lì
+  // toglierla non sposta niente di quello che l'annulla ricorda.
+  let ancorePiantate = false;
+  function togliAncore() {
+    const w = document.createTreeWalker(docEl, NodeFilter.SHOW_TEXT);
+    for (let t = w.nextNode(); t; t = w.nextNode()) {
+      while (t.data.endsWith(ANCORA)) t.deleteData(t.data.length - 1, 1);
+    }
   }
   // L'HTML stringe gli spazi: quelli in fila e in testa restano visibili come li vedeva chi ha copiato.
   function spaziVisibili(s) {
