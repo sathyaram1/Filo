@@ -971,7 +971,7 @@
     if (!wrap || !testo.trim()) return null;
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'sn-msg-copia';
+    btn.className = 'sn-msg-tasto sn-msg-copia';
     const mostra = (stato) => {
       const chiave = stato === 'ok' ? 'popup_copied' : stato === 'no' ? 'popup_copy_failed' : 'popup_copy';
       btn.dataset.etichetta = I18n.t(chiave);
