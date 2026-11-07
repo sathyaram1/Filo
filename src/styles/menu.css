@@ -803,25 +803,6 @@
   transform: scale(1.08);
 }
 
-.sn-tooltip {
-  position: fixed;
-  z-index: 2147483646;
-  pointer-events: none;
-  background: var(--sn-overlay-bg);
-  color: var(--sn-fg);
-  border: 1px solid var(--sn-border);
-  border-radius: 6px;
-  box-shadow: var(--sn-shadow);
-  font-family: var(--sn-font);
-  font-size: 12px;
-  line-height: 1.2;
-  padding: 4px 8px;
-  white-space: nowrap;
-  max-width: 240px;
-  backdrop-filter: blur(4px);
-  animation: sn-fade-in calc(80ms * var(--sn-motion, 1)) ease-out;
-}
-
 .sn-editbox-original,
 .sn-editbox-proposed,
 .sn-menu-sub,
