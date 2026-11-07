@@ -123,7 +123,8 @@
     let attesa = null;
 
     const vive = () => schede.filter(Boolean);
-    function riallinea() { schede = allinea(ta.value, vive().concat(schede._via || [])); }
+    let inArrivo = [];
+    function riallinea() { schede = allinea(ta.value, vive().concat(inArrivo)); }
 
     function ricalca() {
       const ci = schede.some(Boolean);
