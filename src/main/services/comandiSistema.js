@@ -955,6 +955,29 @@ function interpretaBtCollega(u, piattaforma, collega) {
   return { ok: true, collegato };
 }
 
+// #2096 — dimenticato: su Windows lo dice lo stato di UnpairAsync, altrove la rilettura dopo il comando.
+function interpretaBtDimentica(u, piattaforma) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') {
+    const stato = String(u.primo('stato') || '');
+    if (stato === 'Unpaired' || stato === 'AlreadyUnpaired') return { ok: true };
+    if (stato === 'AccessDenied') return { ok: false, errore: 'bt-negato' };
+    return { ok: false, errore: 'bt-non-dimenticato' };
+  }
+  if (piattaforma === 'darwin' && intero(u.primo('uscita')) > 128) return { ok: false, errore: 'permesso-bluetooth' };
+  return bit(u.primo('dimenticato')) === true ? { ok: true } : { ok: false, errore: 'bt-non-dimenticato' };
+}
+
+function interpretaWifiDimentica(u, piattaforma) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  const testo = u.grezze.join('\n');
+  if (piattaforma === 'linux' && /not authorized|non autorizzat/i.test(testo)) return { ok: false, errore: 'polkit' };
+  if (piattaforma === 'darwin' && /admin|privileg|authoriz/i.test(testo)) return { ok: false, errore: 'admin-wifi-dimentica' };
+  return intero(u.primo('uscita')) === 0 ? { ok: true } : { ok: false, errore: 'non-dimenticata' };
+}
+
 // nmcli -t: i campi sono separati da «:», e «:» e «\» dentro un valore arrivano come «\:» e «\\».
 function campiNmcli(riga, quanti) {
   const campi = [];
