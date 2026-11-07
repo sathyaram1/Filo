@@ -324,7 +324,7 @@ test('in chat, dopo aver dato un nome a un file scaricato, alzare il tetto di sp
     await chiedi(page, 'dagli un nome sensato');
     await expect.poll(() => confirmText(page), { timeout: 20000 }).toContain('Bolletta luce Enel Marzo 2026.pdf');
     await clickConfirm(page, 'ok');
-    await expect(page.locator('.dash-bubble').filter({ hasText: 'Rinominato.' })).toBeVisible({ timeout: 15000 });
+    await expect(page.locator('.dash-action-btn', { hasText: 'Rinominat' })).toBeVisible({ timeout: 15000 });
     await modelloFinto(app, [
       { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'limite_spesa', valore: '800' }) }] },
       { text: 'Non lo faccio.' },
