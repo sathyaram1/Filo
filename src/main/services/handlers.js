@@ -5262,6 +5262,12 @@ async function lettureDeiGettoni(schede, sender) {
     type: 'LEGGI_PAGINA', url: s.url, _gettone: true, _executed: true, _output: await leggiPaginaDa(s.url, 0, sender),
   })));
 }
+function notaDeiGettoni(letture) {
+  const pagine = pageReadsForPrompt(letture);
+  if (!pagine) return '';
+  return `[Nel messaggio l'utente ha lasciato ${letture.length === 1 ? 'una scheda' : `${letture.length} schede`} `
+    + `(i nomi fra ⟦ ⟧): parla di ${letture.length === 1 ? 'questa pagina' : 'queste pagine'}. Eccone il testo.]\n${pagine}`;
+}
 
 // Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
 // imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
