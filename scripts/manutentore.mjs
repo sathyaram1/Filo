@@ -227,15 +227,19 @@ function opzione(argv, nome) {
 export const OPZIONI_SERVER = Object.freeze(['--server', '--lavoro-server']);
 const OPZIONI_DI = Object.freeze({ feedback: ['--priorita', '--ticket', ...OPZIONI_SERVER], pacchetto: ['--ticket', ...OPZIONI_SERVER] });
 export const vuoleServer = (argv) => (argv || []).some((a) => OPZIONI_SERVER.includes(String(a)));
-// senzaOpzioni toglie ogni `--x`: un `--sever` sparirebbe dal titolo e il feedback nascerebbe senza segno.
+// senzaOpzioni toglie ogni `--x`: un `--sever` sparirebbe dal titolo e il feedback nascerebbe senza segno. Il segno
+// non prende valori: `--server=true` non lo accende, quindi si rifiuta invece di perderlo.
 function opzioniIgnote(cmd, argv) {
   const ammesse = OPZIONI_DI[cmd] || [];
-  return (argv || []).map(String).filter((a) => /^--[^-]/.test(a) && !ammesse.includes(a.split('=')[0]));
+  return (argv || []).map(String).filter((a) => /^--[^-]/.test(a)
+    && (!ammesse.includes(a.split('=')[0]) || (a.includes('=') && OPZIONI_SERVER.includes(a.split('=')[0]))));
 }
 /** La riga sul segno dopo l'apertura: chiesto e non tornato dal server si dice, perché nessuno lo rimetterebbe. PURA. */
 export function rigaSegnoServer(chiesto, r) {
   if (!chiesto) return '';
-  if (r && r.lavoroServer === true) return 'Segnato lavoro server: lo prendono i lavori server, e la fiducia resta quella di prima.';
+  if (r && r.lavoroServer === true && r.fiducia === 'fidato') return 'Segnato lavoro server: è fidato, lo prendono i lavori server.';
+  // Non fidato nessuna routine lo prende: il server lo porta nei Ricevuti dell'owner a chiedere il timbro (#2217).
+  if (r && r.lavoroServer === true) return 'Segnato lavoro server, non fidato: va nei Ricevuti dell\'owner a chiedere la fiducia, e col suo timbro lo prendono i lavori server.';
   return 'SEGNO NON MESSO: il server non ha confermato «lavoro server» (forse non lo conosce ancora). Il feedback esiste: non riaprirlo, chiedi all\'owner di segnarlo lavoro server in Gestione.';
 }
 
