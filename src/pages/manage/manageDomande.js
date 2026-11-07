@@ -601,6 +601,12 @@
   }
 
   function etichettaDi(o) { return o ? D.etichettaAzione(o.azione, stato.riferimenti) : null; }
+  // In un «da fare» il contesto dice perché serve e il problema i passi; le opzioni sono i pulsanti per chiuderlo.
+  function nomiSezioni(d) {
+    return D.daFare(d)
+      ? { contesto: 'Perché serve', problema: 'Cosa fare', opzioni: 'Quando hai finito' }
+      : { contesto: 'Contesto', problema: 'Problema', opzioni: 'Opzioni' };
+  }
   function consigliata(d) {
     return d.consiglio && Number.isInteger(d.consiglio.opzione) ? (d.opzioni || [])[d.consiglio.opzione] || null : null;
   }
