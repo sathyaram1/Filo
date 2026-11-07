@@ -2593,6 +2593,22 @@ for (const [nome, ritardoFoto, ritardoModello] of [
   });
 }
 
+test('solo quando apro: la sezione aperta che si traduce da sola dice se dentro c\'è un pezzo rimasto in inglese', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  await soloQuandoApro(app);
+  const page = await testServer.openReady(openTab, SIGILLATO(
+    '<button id="apri" onclick="this.nextElementSibling.hidden = false">Show more</button><div hidden><p id="psez">A paragraph inside the folded section, long enough to be translated.</p>',
+    '</div>'));
+  await watchToasts(page);
+  await clickTranslateIcon(app);
+  await expect.poll(async () => (await toasts(page)).includes('Pagina tradotta'), { timeout: 30000 }).toBe(true);
+  expect((await toasts(page)).join(' | ')).not.toContain('solo in parte');
+
+  await page.locator('#apri').click();
+  await expect(page.locator('#psez')).toHaveText(/^IT /, { timeout: 4000 });
+  await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 10000 }).toContain('solo in parte');
+});
+
 test('solo quando apro: testo e riquadri in un blocco che compare in dissolvenza più in basso si traducono insieme', async ({ app, openTab, testServer }) => {
   test.setTimeout(120000);
   await stubTranslationProvider(app);
