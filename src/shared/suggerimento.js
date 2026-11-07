@@ -298,6 +298,7 @@
     nascondi({ caldo: true });
     corrente = { el, origine, punto };
     osserva();
+    osservaRadice(el);
     const attesa = Date.now() < caldoFino ? 0 : ritardo();
     timer = setTimeout(mostra, attesa);
   }
