@@ -236,7 +236,14 @@ test('#2085 nell\'Aiuto sopra un sito: gettone nel campo, pagina letta all\'invi
   // Il campo del sito sotto non ha ricevuto niente.
   expect(await sito.evaluate(() => document.body.innerText.trim())).toBe('un sito qualunque');
 
-  await app.evaluate(() => {
+  await app.evaluate(async () => {
+    const C = globalThis.SN_CONST;
+    await globalThis.SN_STORAGE.updateSettings({
+      useDefaultModels: false,
+      apiKeys: { openrouter: 'k-test' },
+      models: { [C.ACTIONS.HELP]: 'deepseek-flash' },
+      modelRegistry: globalThis.SN_TEST_MODELS.registry,
+    });
     const P = globalThis.SN_PROVIDERS;
     globalThis.__visti = [];
     const risposta = ({ attempts, messages }) => {
