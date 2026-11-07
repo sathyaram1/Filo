@@ -260,7 +260,7 @@
         const a = aFuoco ? ta.selectionEnd : fine;
         const prima = ta.value.slice(0, da);
         const t = `${prima && !/\s$/.test(prima) ? ' ' : ''}${gettone(n)} `;
-        schede._via = [n];
+        inArrivo = [n];
         ta.focus();
         ta.setSelectionRange(da, a);
         if (!doc.execCommand('insertText', false, t)) {
