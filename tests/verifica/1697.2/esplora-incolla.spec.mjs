@@ -47,7 +47,7 @@ test('tempi', async ({ openTab }) => {
       await page.evaluate(() => { const p = document.querySelectorAll('#doc p')[1]; getSelection().collapse(p.firstChild, 0); });
     }, 3000],
     ['titolo meta 3000', '<h2>un titolo lungo</h2><p>sotto</p>', async () => {
-      await page.evaluate(() => { const p = document.querySelector('#doc h2'); getSelection().collapse(p.firstChild, 4); });
+      await page.evaluate(() => { const p = document.querySelector('#doc h2'); const t = document.createTreeWalker(p, NodeFilter.SHOW_TEXT).nextNode(); getSelection().collapse(t, 4); });
     }, 3000],
     ['citazione meta 3000', '<blockquote>una citazione lunga</blockquote><p>sotto</p>', async () => {
       await page.evaluate(() => { const p = document.querySelector('#doc blockquote'); getSelection().collapse(p.firstChild, 4); });
