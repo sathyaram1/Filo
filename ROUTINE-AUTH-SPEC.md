@@ -735,7 +735,11 @@ e la prova la dichiarava lui al server. Adesso:
   lavoro, e la riga `FILO-UNIT-FUSIONE` la scrive solo il terzo lavoro, `unit`,
   che li unisce: conflitto, poi rossi sulla fusione (quelli di Windows portano
   `[Windows]` in coda), poi una parte caduta (`non_provata`), poi l'esito che
-  fonde. Al codice provato non arrivano i file dei comandi di Actions;
+  fonde. Con la parte Windows accesa un ramo che contiene già main non si
+  fonde senza la corsa (verifica e sicurezza l'hanno provato solo su Linux):
+  `linux` risponde «main contenuto», `windows` prova il ramo stesso. Un rosso
+  `[Windows]` va corretto anche nel riallineamento: la verifica che segue gira
+  su Linux e non lo vedrebbe. Al codice provato non arrivano i file dei comandi di Actions;
 - **il server si fida solo di quello che legge da GitHub per quella coppia**
   (`src/routine/unitFusione.js`, ogni cinque minuti): una corsa di
   `repository_dispatch` su main col titolo della coppia, conclusa, e nel suo
