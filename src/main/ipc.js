@@ -232,16 +232,6 @@ function registerIpcHandlers() {
     }
   });
 
-  // Cosa la pagina che sta per caricarsi legge delle notifiche (#591): SINCRONO per lo stesso motivo di filo:fp-config.
-  ipcMain.on('filo:permessi-stato', cronometrata('permessi-stato', (event, href) => {
-    try {
-      const Permessi = require('./services/permessiPagine');
-      event.returnValue = { notifiche: Permessi.statoNotifiche(event.sender.session, href), gestoMs: Permessi.GESTO_MS };
-    } catch (_) {
-      event.returnValue = { notifiche: 'default' };
-    }
-  }));
-
   // Il sì vero a fotocamera, microfono o posizione, per il sito del frame che chiede e solo per lui (#1057).
   ipcMain.on('filo:permessi-si', (event, parte) => {
     try {
