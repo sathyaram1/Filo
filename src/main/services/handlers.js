@@ -4813,11 +4813,11 @@ function webSearchResultsForPrompt(actions) {
 // Il tetto è la rete contro un documento fuori misura, non una misura: a 16.000
 // caratteri tagliava l'unico documento che esiste (20.001) e gli portava via i
 // punti deboli della scelta e TUTTO l'elenco delle fonti, cioè proprio la parte
-// che lo strumento ordina all'agente di citare. Ora è dimensionato sul caso
-// peggiore realistico con margine (CLAUDE.md § Limiti: quattro documenti come
-// quello di oggi, e ognuno può quadruplicare), e quando scatta dice quanto è
-// arrivato invece di tagliare in silenzio.
-const TRANSPARENCY_DOC_CAP = 80000;
+// che lo strumento ordina all'agente di citare; a 80.000 tagliava la privacy coi
+// livelli (#1589, 85.000). Dimensionato sul caso peggiore realistico con margine
+// (CLAUDE.md § Limiti: più del doppio del documento più lungo di oggi), e quando
+// scatta dice quanto è arrivato invece di tagliare in silenzio.
+const TRANSPARENCY_DOC_CAP = 200000;
 
 // Taglia un testo al tetto senza spezzare un carattere. Un'emoji occupa DUE
 // unità di testo: tagliando per numero di unità si resta con la prima metà, che
