@@ -1136,12 +1136,20 @@
         return false;
       }
       const parti = conTitolo ? SUMMARY.titoloERiassunto(rawText) : { titolo: '', riassunto: rawText };
+      let titoloMancato = false;
       if (conTitolo && !titoloScrittoAMano(id)) {
         const nuovo = !!parti.titolo && applyGeneratedTitle(id, parti.titolo, 'automatico', firma);
         if (!nuovo) segnaTitoloMancato(id, firma);
+        titoloMancato = !nuovo;
         contaRiquadro('editor_titolo', { via: 'automatico', esito: nuovo ? 'applicato' : 'vuoto' });
       }
       const ok = applyGeneratedSummary(id, parti.riassunto);
+      // Un modello che non segue il formato porta il riassunto senza il titolo: lo si chiede da solo, una volta per testo
+      // (il freno di segnaTitoloMancato resta se anche questa non lo porta).
+      if (titoloMancato && ok && doc && doc.id === id && !titoliInVolo.has(id)) {
+        titoliInVolo.add(id);
+        Promise.resolve(generateTitleForActive({ auto: true })).finally(() => { titoliInVolo.delete(id); });
+      }
       if (manuale && !ok) showEditorToast('Non sono riuscito a generare il riassunto.');
       if (manuale && ok && letto.tagliato) showEditorToast(notaTaglio(letto, 'per il riassunto'));
       return ok;
