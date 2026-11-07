@@ -1857,8 +1857,17 @@
   }
   /** Lo stato della fusione con le sue parole ({ stato, attende, chiusure, classe, etichetta, titolo }), o null. PURA. */
   function fusioneDi(fb, opts) {
-    const stato = statoFusione(fb, opts);
-    return stato ? Object.assign({ stato }, STATI_FUSIONE[stato]) : null;
+    if (!fb) return null;
+    const liv = livelloL5(fb, opts);
+    const stato = liv.statoFusione || null;
+    if (!stato) return null;
+    const out = Object.assign({ stato }, STATI_FUSIONE[stato]);
+    const domanda = stato === 'attende_domanda' ? liv.riallineamento.domanda : '';
+    if (domanda) {
+      out.etichetta = `riallinea dopo ${domanda}`;
+      out.titolo = `${out.titolo} a ${domanda}`;
+    }
+    return out;
   }
 
   // Questa segnalazione ha una fusione che aspetta una decisione dell'owner? È quello che fa diventare
