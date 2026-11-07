@@ -90,8 +90,8 @@ sveglia.
   uguale (quelle già salvate non si rifanno), e una sessione che chiude prima lascia nel taccuino il censimento «in
   corso», che il mattino dopo riprende anche senza FERMO. Solo a censimento finito scrivi il giorno nel taccuino e apri
   un feedback che toglie dal ruolo questa frase e la sua prova. Poi `npm run manutentore -- contesto`
-  per la lettura intera, poi rosa, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
-  (qui sotto) rosa, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
+  per la lettura intera, poi classi, ordine, N, pacchetti e attese; il recap; il taccuino. In una giornata a secco
+  (qui sotto) classi, ordine, N, pacchetti e attese li scrivi nel recap come proposta, senza applicarne nessuno.
 - **gli altri motivi**: i segnali prima di tutto (`stato` per rileggerli, `leggi` e `rapporti` per indagare), poi
   `segnali-letti`, poi il taccuino.
 
