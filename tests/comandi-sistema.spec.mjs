@@ -271,7 +271,7 @@ test('in chat, dopo «collegati alla rete di casa» trovata come «Casa», alzar
     await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Casa');
     await clickConfirm(page, 'ok');
     await expect.poll(async () => (await computer(app)).rete.nome).toBe('Casa');
-    await expect(page.locator('.dash-bubble').filter({ hasText: 'Collegato.' })).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator('.dash-action-btn', { hasText: 'Collegato il computer alla rete Wi-Fi' })).toBeVisible({ timeout: 15_000 });
     await modelloFinto(app, [
       { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'limite_spesa', valore: '800' }) }] },
       { text: 'Non lo faccio.' },
