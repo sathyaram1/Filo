@@ -944,7 +944,8 @@
   function nonAndato(req, motivo) {
     var m = motivo || motivoFermo(req);
     var detto = Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, m) ? FERMI_DELL_OWNER[m] : m;
-    return 'Il riallineamento automatico si è fermato' + (detto ? ': ' + detto : '') + '. ' + RIALLINEAMENTO_NON_ANDATO;
+    return (detto ? 'Il riallineamento automatico si è fermato: ' + detto + '. '
+      : 'La sua pratica non è in lavorazione, e il riallineamento automatico aspetta con lei. ') + RIALLINEAMENTO_NON_ANDATO;
   }
   /**
    * La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea.

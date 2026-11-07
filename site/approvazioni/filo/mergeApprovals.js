@@ -923,18 +923,52 @@
   // Chi la riallinea, e la frase che lo dice: la sola copia, letta anche dal quadrato di Gestione (manageReview).
   // `inCorso` lo sa solo chi conosce la pratica (Gestione, dal suo stato); `null` = non si sa (pagina da browser, richiesta
   // senza pratica in lista): allora la frase non promette niente e dice dove guardare.
-  var RIALLINEAMENTO_NON_ANDATO = 'Il riallineamento automatico non è andato: rimetti la sua pratica In coda per un giro nuovo, o segna la fusione come sistemata se te ne sei già occupato.';
-  var RIALLINEAMENTO_DA_GUARDARE = 'Se la sua pratica è ancora in lavorazione, la routine riallinea il ramo da sola e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto; se in Gestione è ferma, rimettila In coda per un giro nuovo.';
-  /** La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea. PURA. */
-  function testoRiallineamento(req, inCorso) {
-    if (inCorso === true) return RIALLINEA_DA_SOLA;
-    if (!siRiallineaDaSola(req)) return dopoIlConflitto(req);
-    return inCorso === false ? RIALLINEAMENTO_NON_ANDATO : RIALLINEAMENTO_DA_GUARDARE;
+  // Dopo #2193 In coda riallinea il ramo approvato, non rifà il lavoro.
+  var RIALLINEAMENTO_NON_ANDATO = 'Rimettendo la sua pratica In coda la routine riallinea il ramo che avevi approvato, senza rifare il lavoro; se te ne sei già occupato, segna la fusione come sistemata.';
+  var RIALLINEAMENTO_DA_GUARDARE = 'Se la sua pratica è in lavorazione, o aspetta una tua risposta, la routine riallinea il ramo da sola e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto; se in Gestione è ferma, rimettila In coda e la routine riallinea il ramo che avevi approvato.';
+  // Il fermo che il server scrive sulla richiesta quando non riallinea (`realignBlocked.motivo`, #2193). Restano
+  // all'owner solo questi: gli altri fermi passano da soli quando la pratica torna lavorabile.
+  var FERMI_DELL_OWNER = {
+    tetto: 'si era già riallineato da solo il numero di volte previsto, e main è andato di nuovo avanti',
+    locale: 'è un lavoro locale, che la routine non riallinea',
+    archiviata: 'hai archiviato la sua pratica',
+  };
+  var DOMANDA_RE = /^D-[1-9]\d{0,8}$/;
+  function motivoFermo(req) {
+    var b = req && req.realignBlocked;
+    return b && typeof b === 'object' ? String(b.motivo || '').trim() : '';
+  }
+  /** Il server ha fermato il riallineamento automatico per un motivo che decide l'owner? PURA. */
+  function fermoDellOwner(req) {
+    return Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, motivoFermo(req));
+  }
+  function nonAndato(req, motivo) {
+    var m = motivo || motivoFermo(req);
+    var detto = Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, m) ? FERMI_DELL_OWNER[m] : m;
+    return 'Il riallineamento automatico si è fermato' + (detto ? ': ' + detto : '') + '. ' + RIALLINEAMENTO_NON_ANDATO;
+  }
+  /**
+   * La frase su cosa succede dopo un sì finito in conflitto, sapendo (true/false) o no (null) se la routine riallinea.
+   * `dettagli` = { domanda: 'D-12' che la pratica aspetta, motivo: fermo che la pagina conosce }. PURA.
+   */
+  function esitoRiallineamento(req, inCorso, dettagli) {
+    var fermo = inCorso === false ? 'fallito' : 'da_guardare';
+    if (inCorso === true) return { chiave: 'in_corso', testo: RIALLINEA_DA_SOLA };
+    if (!siRiallineaDaSola(req)) return { chiave: fermo, testo: dopoIlConflitto(req) };
+    var d = dettagli || {};
+    var domanda = DOMANDA_RE.test(String(d.domanda || '')) ? d.domanda : '';
+    if (domanda && !fermoDellOwner(req)) {
+      return { chiave: 'dopo_domanda', testo: 'Si riallinea da sola dopo la tua risposta a ' + domanda
+        + ': la routine riprende il ramo che avevi approvato e ti arriva una richiesta nuova solo se c’è qualcosa che non hai ancora visto.' };
+    }
+    return { chiave: fermo, testo: inCorso === false ? nonAndato(req, d.motivo) : RIALLINEAMENTO_DA_GUARDARE };
+  }
+  function testoRiallineamento(req, inCorso, dettagli) {
+    return esitoRiallineamento(req, inCorso, dettagli).testo;
   }
   function riallineamentoDi(req, o) {
     var dato = o && typeof o.riallineamento === 'function' ? o.riallineamento(req) : null;
-    var inCorso = dato ? !!dato.inCorso : null;
-    return { inCorso: inCorso, testo: testoRiallineamento(req, inCorso) };
+    return esitoRiallineamento(req, dato ? !!dato.inCorso : null, dato);
   }
 
   // Una fusione APPROVATA e mai avvenuta (conflitto) non chiede un'altra approvazione, ma non
@@ -973,7 +1007,7 @@
 
     var tentativo = realignFailureText(req.realignReason);
     var ria = riallineamentoDi(req, o);
-    card.dataset.riallineamento = ria.inCorso === true ? 'in_corso' : ria.inCorso === false ? 'fallito' : 'da_guardare';
+    card.dataset.riallineamento = ria.chiave;
     card.appendChild(el('p', 'sn-mac-why',
       'L’avevi approvata, ma la fusione NON è avvenuta: main era andato avanti e le modifiche '
       + 'non si incastrano da sole. ' + (tentativo ? tentativo + ' ' : '') + ria.testo
@@ -1534,6 +1568,7 @@
     siRiallineaDaSola: siRiallineaDaSola,
     dopoIlConflitto: dopoIlConflitto,
     testoRiallineamento: testoRiallineamento,
+    fermoDellOwner: fermoDellOwner,
     RIALLINEA_DA_SOLA: RIALLINEA_DA_SOLA,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
