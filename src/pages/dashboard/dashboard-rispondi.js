@@ -162,6 +162,15 @@
     d.inputEl.focus();
   }
 
+  // Un messaggio del filo che non è una bolla della home (uno scambio di un'altra app, #2096): si cita col suo posto.
+  function cita({ chat = '', i = null, ts = '', role = 'filo', scritto = '', testo = '' } = {}) {
+    if (!d || !String(testo || '').trim()) return false;
+    citata = { bolla: null, chat, i: Number.isInteger(i) ? i : null, ts, role: role === 'user' ? 'user' : 'filo', scritto: scritto || testo, testo: String(testo).trim() };
+    disegnaAnteprima();
+    d.inputEl.focus();
+    return true;
+  }
+
   function disegnaAnteprima() {
     if (!anteprima) return;
     anteprima.hidden = !citata;
