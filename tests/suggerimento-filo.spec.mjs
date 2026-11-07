@@ -19,8 +19,10 @@ async function unTitoloVisibile(page) {
     for (const el of document.querySelectorAll('[title]')) {
       const t = (el.getAttribute('title') || '').trim();
       if (!t || el.tagName === 'IFRAME') continue;
-      const r = el.getBoundingClientRect();
-      if (r.width < 4 || r.height < 4 || r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) continue;
+      let r = el.getBoundingClientRect();
+      if (r.width < 4 || r.height < 4) continue;
+      if (r.top < 0 || r.bottom > innerHeight) { el.scrollIntoView({ block: 'center', behavior: 'instant' }); r = el.getBoundingClientRect(); }
+      if (r.top < 0 || r.left < 0 || r.bottom > innerHeight || r.right > innerWidth) continue;
       const sopra = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       if (!sopra || !(sopra === el || el.contains(sopra))) continue;
       if (sopra !== el && sopra.closest('[title],[data-tip]') !== el) continue;
