@@ -520,6 +520,11 @@ test('testoRiallineamento: in corso, non andato, e non si sa; la Gestione e il b
   assert.notEqual(ignoto, UI.RIALLINEA_DA_SOLA);
   assert.match(ignoto, /se in Gestione è ferma, rimettila In coda e la routine riallinea il ramo che avevi approvato/);
   // Chi non si riallinea da solo dice cosa fare, qualunque cosa si sappia della pratica.
+  // #2193: ferma su una domanda dice quale, e il fermo scritto dal server dice il suo motivo.
+  assert.match(UI.testoRiallineamento(ria, false, { domanda: 'D-7' }), /^Si riallinea da sola dopo la tua risposta a D-7/);
+  assert.doesNotMatch(UI.testoRiallineamento(ria, false, { domanda: '<b>x</b>' }), /<b>/);
+  assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'tetto' } }, false, { domanda: 'D-7' }), /si è fermato: si era già riallineato/);
+  assert.match(UI.testoRiallineamento({ ...ria, realignBlocked: { motivo: 'nuovo_motivo' } }, false), /si è fermato: nuovo_motivo\./);
   for (const s of [false, null]) assert.match(UI.testoRiallineamento({ origin: 'locale' }, s), /npm run finish/);
   assert.match(UI.testoRiallineamento({ origin: 'routine' }, false), /non si riallinea da solo/);
   // Il quadrato di Gestione prende le stesse parole.
