@@ -71,14 +71,14 @@ test('riga Bluetooth: preferito in cima e ancora lì riaprendo la home, Copia il
   for (const v of ['Collega', 'Metti fra i preferiti', 'Dimentica', 'Copia il nome']) await expect(menu.voce(v)).toBeVisible();
   await page.screenshot({ path: 'tests/.shots/verifica-2096-bt-menu.png' });
   await menu.voce('Metti fra i preferiti').click();
-  await expect(riquadro(page).locator('.sn-select-option').first()).toContainText('Casse JBL', { timeout: 5_000 });
+  await expect(riquadro(page).locator('.sn-select-option[title]').first()).toContainText('Casse JBL', { timeout: 5_000 });
   await page.screenshot({ path: 'tests/.shots/verifica-2096-bt-preferito.png' });
 
   await page.reload();
   page = await home(app);
   await expect(voce(page, 'bluetooth')).toBeVisible({ timeout: 8_000 });
   await voce(page, 'bluetooth').click();
-  await expect(riquadro(page).locator('.sn-select-option').first()).toContainText('Casse JBL', { timeout: 5_000 });
+  await expect(riquadro(page).locator('.sn-select-option[title]').first()).toContainText('Casse JBL', { timeout: 5_000 });
 
   // Copia il nome.
   await opzione(page, 'Mouse').click({ button: 'right' });
