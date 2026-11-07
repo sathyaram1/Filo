@@ -1561,7 +1561,7 @@
 
   // Gli ingressi del dispatch per SN_AUTONOMIA. `ctx.richiesta` = cosa ha scritto l'utente nel compito,
   // `ctx.impostazioni` = le impostazioni correnti (per sapere se una preferenza toglie un freno).
-  // Un segreto che uscirebbe è costo 4: `chiesta` dice se l'utente l'ha scritto lui, cioè chiesto con parole sue.
+  // Un segreto che uscirebbe è costo 4: `chiesta` dice se l'utente l'ha scritto lui (la porta delle uscite di #810).
   function ingressi(action, ctx = {}) {
     const entry = voce(action);
     let costo = costoFor(action, ctx);
