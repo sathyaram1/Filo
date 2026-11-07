@@ -6734,7 +6734,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // risponde senza chiamare: quello è il testo. Il tetto ai giri è la rete contro i loop.
   const MAX_ROUNDS = 12;
   const rawActions = [];
-  const renderedActions = [];
+  // Le letture delle schede lasciate nel messaggio restano col turno: nei turni dopo il modello le ritrova come le sue.
+  const renderedActions = [...lettureGettoni];
   // Gli indirizzi scritti dal modello e rifiutati, che il modello non ha poi trovato altrove (#553): a fine turno
   // restano sotto la risposta come bottone da confermare, senza popup.
   const lasciati = new Map();
