@@ -709,7 +709,8 @@ test('la consegna porta su origin la punta che dichiara prima di chiamare il ser
   const fetchImpl = async () => { viste.push(suOrigin()); return { status: 200, text: async () => JSON.stringify({ ok: true, reply: { outcome: 'pass' } }) }; };
   const { deliver } = await import('../../scripts/routine-channel.mjs');
   const inviate = [];
-  const opts = { root: d.pulita, fetchImpl, env, inviaSpinte: async () => { inviate.push(coda(d.pulita).flatMap((v) => v.commits)); return { inviate: 0, rifiutate: 0, restano: 0, errori: [] }; } };
+  const exec = (cmd, args, o) => execFileSync(cmd, args, { ...o, env });
+  const opts = { root: d.pulita, fetchImpl, env, exec, inviaSpinte: async () => { inviate.push(coda(d.pulita).flatMap((v) => v.commits)); return { inviate: 0, rifiutate: 0, restano: 0, errori: [] }; } };
   const r = await deliver(BIGLIETTO, 'verdict', { sha: punta, findings: [], summary: 'ok', critique: 'ok', branch: 'claude/x' }, opts);
   assert.equal(r.outcome, 'ok');
   assert.deepEqual(viste, [punta], 'quando il server la cerca, la punta è già su origin');
