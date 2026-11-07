@@ -649,6 +649,7 @@
         acceso: B('true accende, false spegne.'),
         dispositivo: S('Il dispositivo abbinato da collegare o scollegare, come lo chiama l\'utente (per esempio "le cuffie Sony").'),
         collega: B('Con `dispositivo`: true collega (è il valore se lo ometti), false scollega.'),
+        dimentica: B('Con `dispositivo`: true lo dimentica ("dimentica le cuffie vecchie": toglie l\'abbinamento, per riusarlo va riabbinato dal sistema). Chiede conferma all\'utente.'),
         elenca: B('true per avere i dispositivi abbinati, senza cambiare niente.'),
       },
       required: [],
