@@ -178,6 +178,12 @@ test('uno scambio di un’app nella home: Copia e Rispondi, e la risposta parte 
     await expect(m.locator('.sn-azioni-msg')).toBeVisible();
     expect(await geometria(casa, '#bubbles', '.dash-riga-app-msg, .dash-riga-app')).toEqual(ferma);
   }
+  // Dal tasto destro come dai tasti.
+  await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+  await riga.locator('.dash-riga-app-msg-user').click({ button: 'right' });
+  await expect(menuDi(casa).voce('Rispondi').first()).toBeVisible();
+  await menuDi(casa).voce('Copia il messaggio').first().click();
+  await expect.poll(() => appunti(app)).toBe('che ne pensi del mazzo?');
   await risposta.hover();
   await risposta.getByRole('button', { name: 'Copia' }).click();
   await expect.poll(() => appunti(app)).toBe('Per questo mazzo servono più pescate.');
