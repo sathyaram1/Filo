@@ -142,10 +142,11 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   interni da correggere→ resta
   `revision_capability`: chi corregge consegna `fixed`
   (`revision_capability → revision_capability`), poi un altro verificatore riprova
-  (feedback #561, dal 2026-09-05); —rilievo di livello 3 non correggibile (bilancio
-  dei 3 esaurito)→ `design` (`statusReason: loop`); un 2 a bilancio dei 2 esaurito NON
-  ferma: entra nel feedback derivato dei rimasti e il lavoro passa se non c'è altro
-  (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
+  (feedback #561, dal 2026-09-05); finito il bilancio del suo livello, un rilievo paga
+  col più alto ancora aperto sotto (D88, #744); —rilievo di livello 3 non correggibile
+  (esauriti il bilancio dei 3 e quelli sotto)→ `design` (`statusReason: loop`); un 2
+  nello stesso caso NON ferma: entra nel feedback derivato dei rimasti e il lavoro passa
+  se non c'è altro (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
   decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
   utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
   NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
@@ -670,7 +671,7 @@ giudici (nessun reason o `judges`); (2) domande della routine (appende le domand
 alla chat + `statusReason: clarify`); (2b) un derivato nato da un rilievo col `?`
 (`statusReason: decisione`, domanda in chat dalla nascita, #775): alla risposta torna
 `todo` e lo prende un risolutore da capo, con domanda e risposta nelle `decisioni`; (3) la verifica ha trovato un difetto di livello
-3 che non si può più correggere da soli — bilancio delle correzioni dei 3 esaurito
+3 che non si può più correggere da soli — esauriti il bilancio delle correzioni dei 3 e quelli sotto
 (`statusReason: loop`, con la critica coi livelli in chat) — oppure un 3, o un 2 su una
 scelta difficile da disfare, che chiede una decisione dell'owner (`statusReason:
 decisione`), oppure chi risolve o chi corregge ha consegnato con una segnalazione per

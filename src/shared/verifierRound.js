@@ -351,7 +351,7 @@
     return s === 'e' || s === 'v' ? s : 'i';
   }
 
-  /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono): è quello che paga il giro. PURA. */
+  /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono). PURA. */
   function livelloDegliInterni(list) {
     return maxLevel((Array.isArray(list) ? list : []).filter((f) => f && sedeDi(f.sede) === 'i'));
   }
@@ -476,30 +476,40 @@
   }
 
   /**
+   * Il livello del bilancio con cui un rilievo di livello `level` può pagare
+   * un giro: il suo, o finito quello il più alto ancora aperto sotto (X-1,
+   * poi X-2…: decisione dell'owner D88, #744); null se sono finiti tutti. PURA.
+   */
+  function livelloCheLoPaga(level, left) {
+    for (let n = Math.min(3, Math.max(0, Number(level) || 0)); n >= 0; n -= 1) {
+      if (left(capKeyOf(n)) > 0) return n;
+    }
+    return null;
+  }
+
+  /**
    * L'esito di un giro, calcolato dai livelli e dai bilanci (spec §4). PURA.
    *
    * Regole:
    *   - ferma il lavoro un rilievo che chiede una decisione se è un 3, o un 2
    *     su una scelta difficile da disfare (`[2i?!]`: decisioneFerma);
-   *   - un 3 si corregge se il bilancio dei 3 ha ancora giri; a bilancio
-   *     finito ferma il lavoro (è l'unico livello che ferma per bilancio);
-   *   - un 2 si corregge se nello stesso giro si corregge anche un 3 (il giro
-   *     lo paga il 3) oppure se il bilancio dei 2 ha ancora giri; a bilancio
-   *     finito NON ferma: va nel feedback derivato, a priorità 1, e il giro
-   *     passa se non c'è altro (decisione dell'owner del 2026-09-23);
+   *   - un rilievo di livello X paga col bilancio di X; finito quello, col più
+   *     alto ancora aperto sotto X (D88, #744), anche se nient'altro fa
+   *     partire il giro (livelloCheLoPaga);
+   *   - un 3 che non può pagare nemmeno così ferma il lavoro (è l'unico
+   *     livello che ferma per bilancio); un 2, un 1 o uno 0 NON fermano: vanno
+   *     nel feedback derivato (un 2 a priorità 1), e il giro passa se non c'è
+   *     altro (decisione dell'owner del 2026-09-23);
+   *   - se almeno un interno può pagare il giro parte, e ci salgono tutti gli
+   *     altri, anche chi non può pagare (sta per forza sotto chi paga, e un
+   *     altro verificatore arriva comunque: 2026-09-16);
    *   - un 2 col `?` segue le stesse regole del 2: chi corregge applica
    *     l'opzione consigliata, e il rilievo esce ANCHE fra i `derived` (con
    *     `inCorrezione: true`), in un feedback suo con la domanda: se l'owner
    *     sceglie diversamente, quel feedback cambia il codice già fuso (#1202);
-   *   - un 1 si corregge se nello stesso giro si corregge anche un 3/2 (il
-   *     giro lo paga già il livello più alto, e un altro verificatore arriva
-   *     comunque: decisione dell'owner del 2026-09-16) oppure se il suo
-   *     bilancio ha ancora giri; altrimenti va nel feedback derivato;
-   *   - un 1 che chiede una decisione va nel feedback derivato;
-   *   - gli 0 si correggono solo se nello stesso giro si corregge anche altro
-   *     (un altro verificatore arriva comunque) oppure se l'owner ha dato
-   *     giri al loro bilancio; altrimenti vanno nel feedback derivato;
-   *   - un giro consuma UN giro dal bilancio del livello più alto corretto;
+   *   - un 1 o uno 0 che chiede una decisione va nel feedback derivato;
+   *   - un giro consuma UN giro dal bilancio più alto fra quelli con cui i
+   *     rilievi possono pagare (bilancioPagato lo racconta nella nota);
    *   - se il lavoro si ferma, non si corregge niente: decide l'owner su tutto;
    *   - senza uno dei quattro bilanci LANCIA (`bilanci del verificatore
    *     mancanti: …`): un numero inventato al posto di quello dell'owner è
@@ -539,61 +549,35 @@
     const findings = tutti.filter((f) => f.sede !== 'e');
     const external = tutti.filter((f) => f.sede === 'e').map(conPriorita);
     const blocking = [];
-    const fixable = [];
     const derived = [];
-    const twos = [];
-    const ones = [];
-    const zeros = [];
-    const vicini = [];
+    const candidati = [];
+    // Il livello del bilancio che paga il giro: il più alto fra quelli che i
+    // candidati possono pagare. Chi non può pagare sta per forza sotto chi paga.
+    let paga = null;
     for (const f of findings) {
       if (f.sede === 'v') {
         if (f.decision) derived.push(f);
-        else vicini.push(f);
+        else candidati.push(f);
         continue;
       }
       const level = Number(f.level);
       if (decisioneFerma(f)) {
         blocking.push(f);
-      } else if (level >= 3) {
-        if (left('cap3') <= 0) blocking.push(f);
-        else fixable.push(f);
-      } else if (level === 2) {
-        twos.push(f);
-      } else if (level === 1) {
-        ones.push(f);
-      } else {
-        zeros.push(f);
+        continue;
+      }
+      if (level < 2 && f.decision) {
+        derived.push(f);
+        continue;
+      }
+      const p = livelloCheLoPaga(level, left);
+      if (level >= 3 && p === null) blocking.push(f);
+      else {
+        candidati.push(f);
+        if (p !== null && (paga === null || p > paga)) paga = p;
       }
     }
-    // I 2: con un 3 da correggere nello stesso giro si correggono pure loro
-    // (il giro lo paga il 3); da soli seguono il loro bilancio, e a bilancio
-    // finito non fermano: vanno da parte, ciascuno un feedback a priorità 1.
-    const withThree = fixable.length > 0;
-    for (const f of twos) {
-      if (withThree || left('cap2') > 0) fixable.push(f);
-      else derived.push(f);
-    }
-    // Gli 1: con un 3/2 da correggere nello stesso giro si correggono pure
-    // loro (il giro lo paga il 3/2); da soli seguono il loro bilancio.
-    const withHigher = fixable.length > 0;
-    for (const f of ones) {
-      if (f.decision) derived.push(f);
-      else if (withHigher || left('cap1') > 0) fixable.push(f);
-      else derived.push(f);
-    }
-    // Gli 0: con qualcos'altro da correggere si correggono pure loro; da soli solo se il loro
-    // bilancio lo permette.
-    for (const f of zeros) {
-      if (f.decision) derived.push(f);
-      else if (fixable.length || left('cap0') > 0) fixable.push(f);
-      else derived.push(f);
-    }
-    // I vicini per ultimi: seguono il giro degli interni, non lo fanno partire.
-    const parteComunque = fixable.length > 0;
-    for (const f of vicini) {
-      if (parteComunque) fixable.push(f);
-      else derived.push(f);
-    }
+    const fixable = paga === null ? [] : candidati;
+    if (paga === null) derived.push(...candidati);
 
     const budgets = {};
     for (const k of CAP_KEYS) budgets[k] = { cap: caps[k], used: counts[k.replace('cap', 'count')], left: Math.max(0, left(k)) };
@@ -605,8 +589,7 @@
       return { stop: true, blocking, sospesi, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
     }
 
-    // Ordine stabile: come nella critica. Il bilancio si paga dal livello più
-    // alto fra gli interni corretti. Un 2 col `?` corretto esce anche da parte:
+    // Ordine stabile: come nella critica. Un 2 col `?` corretto esce anche da parte:
     // la domanda all'owner viaggia nel suo feedback mentre il lavoro va avanti.
     const fix = findings.filter((f) => fixable.includes(f));
     const rest = findings
@@ -614,7 +597,7 @@
       .map((f) => (fixable.includes(f) ? Object.assign(conPriorita(f), { inCorrezione: true }) : conPriorita(f)));
     let consume = null;
     if (fix.length) {
-      consume = capKeyOf(livelloDegliInterni(fix));
+      consume = capKeyOf(paga);
       counts[consume.replace('cap', 'count')] += 1;
       budgets[consume].used += 1;
       budgets[consume].left = Math.max(0, budgets[consume].left - 1);
@@ -704,6 +687,30 @@
     return normalizeFindings(findings).some((f) => f.decision);
   }
 
+  // Le frasi sui bilanci stanno qui sole: le stampano anche dispatch e la verifica locale.
+  const RILIEVI_CHE_FERMANO = 'Rilievi interni che non si possono correggere da soli (un 3 con finiti il suo bilancio e quelli dei livelli sotto, o una decisione su un 3 o su una scelta difficile da disfare): decide l\'owner.';
+
+  /** La riga sui 2 interni messi da parte (finiti i bilanci dal 2 in giù), o ''. Un vicino scritto 2 non è il caso. PURA. */
+  function dueDaParteRiga(list) {
+    const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i' && f.decision !== true).length;
+    if (!n) return '';
+    return `I bilanci delle correzioni dei livelli 2, 1 e 0 sono finiti: ${n === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${n} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`;
+  }
+
+  /**
+   * La riga che dice quale bilancio ha pagato il giro quando non è quello del
+   * rilievo interno più grave corretto (D88), o '': senza, un 2 corretto a
+   * bilancio dei 2 finito sembra un conto sbagliato. PURA.
+   */
+  function bilancioPagato(decision) {
+    const d = decision || {};
+    if (!CAP_KEYS.includes(d.consume)) return '';
+    const paga = Number(d.consume.slice(3));
+    const grave = livelloDegliInterni(d.fix);
+    if (grave === null || grave <= paga) return '';
+    return `Il giro lo paga il bilancio del livello ${paga}: ${grave - paga === 1 ? `quello del livello ${grave} è finito` : `quelli dei livelli da ${grave} a ${paga + 1} sono finiti`}.`;
+  }
+
   // La nota per la chat del feedback: zero rilievi = superata; altrimenti l'elenco, e cosa
   // ne è stato fatto.
   function roundNote({ summary, findings, decision } = {}) {
@@ -717,17 +724,16 @@
     if (esterni) {
       parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
     }
-    // I 2 interni messi da parte: il bilancio dei 2 è finito, e a differenza
-    // dei 3 non fermano il lavoro. Un vicino di livello scritto 2 non è il caso.
-    const dueDaParte = Array.isArray(d.derived) ? d.derived.filter((f) => f && Number(f.level) === 2 && sedeDi(f.sede) === 'i' && f.decision !== true).length : 0;
     if (d.stop) {
-      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (bilancio esaurito), o un rilievo interno che chiede una tua decisione di livello 3 o su una scelta difficile da disfare.');
+      parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (finiti il suo bilancio e quelli dei livelli sotto), o un rilievo interno che chiede una tua decisione di livello 3 o su una scelta difficile da disfare.');
       const sospesi = Array.isArray(d.sospesi) ? d.sospesi.length : 0;
       if (sospesi) parts.push(`${sospesi === 1 ? 'Un altro rilievo interno resta' : `Altri ${sospesi} rilievi interni restano`} davanti a chi riprende dopo la tua risposta.`);
     } else if (Array.isArray(d.fix) && d.fix.length) {
       parts.push(`La correzione riguarda ${d.fix.length === list.length ? 'tutti i rilievi' : `${d.fix.length} su ${list.length}`}; poi un'altra verifica ricontrolla.`);
       const vicini = d.fix.filter((f) => f && sedeDi(f.sede) === 'v').length;
       if (vicini) parts.push(`${vicini === 1 ? 'Un rilievo è vicino (di un altro lavoro, ma in un file che il ramo modifica già): si corregge' : `${vicini} rilievi sono vicini (di un altro lavoro, ma in file che il ramo modifica già): si correggono`} insieme al resto.`);
+      const pagato = bilancioPagato(d);
+      if (pagato) parts.push(pagato);
     } else {
       parts.push(esterni === list.length
         ? 'Nessun rilievo interno: il lavoro prosegue.'
@@ -750,9 +756,8 @@
         ? `Il rilievo non corretto in questo giro esce in un feedback derivato, a priorità ${rimasti.priority}: ${voci}`
         : `I ${n} rilievi non corretti in questo giro escono insieme in un solo feedback derivato, a priorità ${rimasti.priority} (la più alta fra loro): ${voci}`);
     }
-    if (dueDaParte) {
-      parts.push(`Il bilancio delle correzioni di livello 2 è finito: ${dueDaParte === 1 ? 'il rilievo interno di livello 2 rimasto non ferma il lavoro ed entra' : `i ${dueDaParte} rilievi interni di livello 2 rimasti non fermano il lavoro ed entrano`} nel feedback dei rimasti.`);
-    }
+    const due = d.stop ? '' : dueDaParteRiga(d.derived);
+    if (due) parts.push(due);
     parts.push(formatFindings(list));
     return parts.join('\n');
   }
@@ -826,7 +831,7 @@
     LEVELS, SEDI, SPIEGAZIONE_SEDE, SPIEGAZIONE_SEGNO, MAX_FINDINGS, MAX_FINDING_TEXT, CAP_KEYS, CAP_MIN, CAP_MAX,
     capKeyOf, countKeyOf, normalizeCritique, parseFindings, unparsedLevelLines, testoRilieviNonRiconosciuti, normalizeFindings, maxLevel, primaFrase,
     sedeDi, livelloDegliInterni, decisioneFerma, missingCaps, normalizeCaps, normalizeCounts,
-    decideRound, derivedGroups, groupLabel,
+    livelloCheLoPaga, decideRound, RILIEVI_CHE_FERMANO, dueDaParteRiga, bilancioPagato, derivedGroups, groupLabel,
     findingTag, formatFinding, formatFindings, hasDecision, roundNote, domandeMancanti, titoloDelDerivato,
     FILE_DI_SERVIZIO, MOTIVI_CORRETTORE, FORMA_MOTIVO, leggiMotivoCorrettore, testoMotivo, giroDopoRiallineamento,
   };

@@ -783,12 +783,7 @@ export function bilanciResiduiText(budgets) {
   return CAP_KEYS.map((k) => (budgets[k] ? `${k}: ${budgets[k].left} giri residui su ${budgets[k].cap}` : null)).filter(Boolean).join(' · ');
 }
 
-/** La riga che dice dei 2 interni messi da parte (bilancio dei 2 finito), o vuota. PURA. */
-export function dueDaParteText(list) {
-  const n = (Array.isArray(list) ? list : []).filter((f) => f && Number(f.level) === 2 && ROUND.sedeDi(f.sede) === 'i' && f.decision !== true).length;
-  if (!n) return '';
-  return `Bilancio delle correzioni di livello 2 finito: ${n === 1 ? 'il rilievo interno di livello 2 rimasto entra' : `i ${n} rilievi interni di livello 2 rimasti entrano`} nel feedback dei rimasti. Il lavoro non si ferma.`;
-}
+export const dueDaParteText = (list) => ROUND.dueDaParteRiga(list);
 
 /** La coda della risposta, in locale: stampata SOLO dopo la critica. PURA. */
 export function codaText({ findings, derived, external, budgets, branch, instructions }) {
@@ -1507,7 +1502,7 @@ if (isMain) {
       const sospesi = Array.isArray(r.decision.sospesi) && r.decision.sospesi.length
         ? `\nAltri rilievi interni della stessa critica, che restano davanti a chi riprende dopo la risposta dell'owner:\n${ROUND.formatFindings(r.decision.sospesi)}`
         : '';
-      console.log(`══ ESITO: il lavoro si ferma ══\nRilievi interni che non si possono correggere da soli (un 3 a bilancio esaurito, o una decisione su un 3 o su una scelta difficile da disfare): decide l'owner.\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
+      console.log(`══ ESITO: il lavoro si ferma ══\n${ROUND.RILIEVI_CHE_FERMANO}\n${ROUND.formatFindings(r.decision.blocking)}${sospesi}`);
       if (r.decision.external && r.decision.external.length) {
         console.log(`Rilievi esterni (non toccano a questo lavoro): ciascuno diventa un feedback suo, lo apre chi guida dal report.\n${derivatiText(r.decision.external)}`);
       }

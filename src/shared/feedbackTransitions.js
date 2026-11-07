@@ -150,18 +150,11 @@
   // `verifierRound.js` (decideRound), incorporato anch'esso dal server al
   // deploy; una sentinella tiene questa lista uguale alla sua e ai campi della
   // dashboard.
-  //   cap3: giri di correzione per i rilievi di livello 3 (sicurezza, soldi,
-  //         Filo inutilizzabile). A bilancio finito un 3 ferma la pratica e
-  //         chiama l'owner (statusReason `loop`): è l'unico che ferma.
-  //   cap2: giri per i rilievi di livello 2 (la cosa chiesta non si ottiene nel
-  //         caso normale). A bilancio finito un 2 NON ferma: diventa un
-  //         feedback a parte a priorità 1, e il lavoro passa (2026-09-23).
-  //   cap1: giri per i rilievi di livello 1 (di rado, cosmetica evidente). A
-  //         bilancio finito un 1 va nel feedback derivato.
-  //   cap0: giri per i soli rilievi di livello 0 (casi rari). Con 0 gli 0 da
-  //         soli non si correggono mai: solo insieme ad altro.
-  // Ogni giro consuma UN giro dal bilancio del livello più alto fra gli interni
-  // corretti: i vicini non pagano niente e da soli non fanno partire un giro (#1202).
+  //   cap3/cap2/cap1/cap0: giri per i rilievi di livello 3/2/1/0. Finito il suo,
+  //   un rilievo paga col più alto aperto sotto (D88, #744); senza più bilanci
+  //   un 3 ferma la pratica (statusReason `loop`), gli altri escono in un
+  //   feedback derivato e il lavoro passa. Chi paga, e quanto: decideRound.
+  //   I vicini non pagano e da soli non fanno partire un giro (#1202).
   const VERIFIER_CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
 
   global.SN_FB_TRANSITIONS = {
