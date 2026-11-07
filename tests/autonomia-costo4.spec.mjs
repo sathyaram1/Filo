@@ -18,7 +18,8 @@ const MEMORIA = ['CANCELLA_MEMORIA', {}];
 
 async function preparaUtente(app) {
   await app.evaluate(async () => {
-    await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' }, monthlyLimitEur: 5 });
+    const s = (await globalThis.SN_STORAGE.getSettings()).security || {};
+    await globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' }, monthlyLimitEur: 5, security: { ...s, blockPopups: true } });
     await globalThis.SN_FILO_MEMORY.setMemory({ PROFILO: 'Vive a Bologna.', PREFERENZE: 'Ama il tè.' });
   });
 }
