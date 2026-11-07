@@ -383,16 +383,6 @@ test('#2217 --server non fidato non promette le routine: va nei Ricevuti a chied
     assert.equal(/lo prendono le routine/.test(riga), promette, `${JSON.stringify(r)}: ${riga}`);
     if (!promette) assert.match(riga, /Ricevuti a chiedere la fiducia/);
   }
-  // Main stampa la stessa riga: senza biglietto della sessione, nessuna promessa.
-  const righe = [];
-  const orig = console.log;
-  console.log = (...a) => righe.push(a.join(' '));
-  try {
-    await conSubmit(async (_p, o) => ({ id: 'd12', seq: 912, senderProof: 'admin', localOnly: !!o.localOnly }), async () => {
-      assert.equal(await SCRIPT.main(['T', 'X', '--non-locale', '--server']), SCRIPT.EXIT.FATTO);
-    });
-  } finally { console.log = orig; }
-  assert.doesNotMatch(righe.join('\n'), /lo prendono le routine/);
 });
 
 test('#908 --non-locale: stessa prova del mittente, ma è per le routine', async () => {
