@@ -644,7 +644,9 @@
     }
     const unfinished = Math.max(0, st.acked - st.ended);
     frameRuns.delete(runId);
-    return { left: silent + unfinished + st.left, applied: st.applied };
+    // `tutti`: ogni riquadro a cui si è passata parola ha risposto, quindi ognuno stava già traducendo il suo documento.
+    const tutti = !silent && st.extraAcked >= st.extraExpected;
+    return { left: silent + unfinished + st.left, applied: st.applied, tutti };
   }
 
   function onFrameReport(msg) {
