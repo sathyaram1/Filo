@@ -1,6 +1,6 @@
 // Verifica #1921.1, giro 1, rilievo 1: nell'intervista, la risposta scritta insieme a lettura e spunta finisce fra le
 // note; se il giro dopo il modello non la riscrive (GLM 5.3 Flash, circa una volta su cinque) l'utente non la vede.
-// Qui il modello è finto e ripete quello che GLM ha fatto davvero: il secondo giro torna solo alla domanda dell'intervista.
+// Qui il modello è finto e rifà quello che GLM ha fatto davvero: il secondo giro torna solo alla domanda dell'intervista.
 import { test, expect } from '../../fixtures/electron.mjs';
 
 test.use({ accoglienzaFatta: false });
