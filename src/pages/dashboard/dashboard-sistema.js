@@ -496,7 +496,7 @@
   function vociComandi(q, el) {
     if (q.voce === 'volume') {
       const muto = !!(q.ultimo && q.ultimo.muto);
-      const out = [0, 25, 50, 100].map((n) => voceMenu(`Volume al ${n}%`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
+      const out = [0, 25, 50, 100].map((n) => voceMenu(`Volume ${Sis().alPercento(n)}`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
       out.push(voceMenu(muto ? 'Togli il muto' : 'Metti muto', muto ? 'volume' : 'volumeMute', () => esegui(q.muto, { cosa: 'volume', muto: !muto })));
       if (pannelli.includes('audio')) out.push(voceMenu('Impostazioni audio del sistema', 'options', () => apriPannello('audio')));
       return out;
