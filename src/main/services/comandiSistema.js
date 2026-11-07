@@ -1116,7 +1116,9 @@ const PANNELLI = {
   darwin: { bluetooth: 'mac-bluetooth-dispositivi', wifi: 'mac-wifi', audio: 'mac-audio' },
   linux: {},
 };
-function pannelliImpostazioni(piattaforma = process.platform) {
+// Le prove su Linux fingono Windows o Mac per attraversare la strada vera dalla voce del menu all'indirizzo aperto.
+let piattaformaPannelli = null;
+function pannelliImpostazioni(piattaforma = piattaformaPannelli || process.platform) {
   return { ...(PANNELLI[piattaforma] || {}) };
 }
 
