@@ -255,11 +255,12 @@ function impostaListePerTest(testi) {
 
 function spentaPerTest(id) { return spente.get(id) === versione; }
 
-// Solo per i test di logica: la rete finta, senza Electron.
+// Solo per i test di logica: la rete e le schede finte, senza Electron.
 function impostaPrendiPerTest(fn) { prendiListe = fn; }
+function impostaSchedePerTest(finte) { schede = finte; }
 
 module.exports = {
   CARTELLA_LISTE, SORGENTI, OGNI_MS, FORZATO_MS, TESTO_RIPIEGO,
   attivo, init, configureFromSettings, aggiorna, regolePer, rotto, status, impostaListePerTest, spentaPerTest,
-  impostaPrendiPerTest,
+  impostaPrendiPerTest, impostaSchedePerTest,
 };
