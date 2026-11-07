@@ -1195,7 +1195,7 @@ export function controlliLocali(cmd, argv) {
       const p = opzione(argv, '--priorita');
       // Una priorità storta arriverebbe al server come null, e un null vale 0: il feedback nascerebbe rimandato.
       if (p !== undefined && !/^[0-3]$/.test(String(p))) return `--priorita: «${String(p).slice(0, 20)}» non è un intero da 0 a 3`;
-      return senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'feedback vuole il titolo, poi - e il testo da stdin';
+      return ignote(cmd) || senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'feedback vuole il titolo, poi - e il testo da stdin';
     }
     case 'domanda-fine': return /^[a-z][a-z0-9-]{1,40}$/.test(String(a)) ? '' : 'domanda-fine vuole il ruolo (per esempio verifier), poi - e il testo da stdin, o --togli';
     case 'novita': return a === 'consegna' && !b ? 'novita consegna vuole il file JSON della riscrittura' : '';
