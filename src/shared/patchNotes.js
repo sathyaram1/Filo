@@ -84,7 +84,9 @@
     },
     {
       version: '0.2.271', date: '2026-11-07',
-      features: [],
+      features: [
+        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
+      ],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
       ],
