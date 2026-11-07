@@ -2929,7 +2929,8 @@
       while (!self.SN_FEEDBACK_UI && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
       self.SN_FEEDBACK_UI?.open({ testo: q.testo });
     } else if (q.tipo === 'chiedi') {
-      if (!inAccoglienza) { submitMessage(q.testo); return; }
+      // Porta l'indirizzo scelto dal sito: è testo di altri, come un incollato (#1840).
+      if (!inAccoglienza) { if (!sending) { testoDaFuori = true; submitMessage(q.testo); } return; }
       inputEl.value = q.testo;
       testoDaFuori = true;
       autoGrowInput();
