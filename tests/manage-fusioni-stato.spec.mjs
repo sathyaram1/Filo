@@ -244,20 +244,31 @@ test('scheda: in volo la rotella gira accanto a una frase leggibile; il ruolo si
   const stato = card.locator('.sn-mac-status');
   await expect(stato).toBeVisible();
   const vista = await stato.evaluate((el) => {
-    const prima = getComputedStyle(el, '::before');
     const card = el.closest('.sn-mac-card');
+    const tasto = card.querySelector('.sn-mac-btn-go');
+    const prima = getComputedStyle(tasto, '::before');
     return {
       rotella: prima.content !== 'none' && prima.animationName === 'sn-mac-gira',
+      tastoOpacita: getComputedStyle(tasto).opacity,
       colore: getComputedStyle(el).color,
       // Il ramo ha il colore del testo normale: la frase d'attesa deve avere lo stesso.
       testo: getComputedStyle(card.querySelector('.sn-mac-branch')).color,
       opacita: getComputedStyle(card).opacity,
     };
   });
+  // #2250: in volo il tasto non somiglia a uno spento: rotella, «Sto fondendo», pieno di colore.
   expect(vista.rotella).toBe(true);
+  expect(vista.tastoOpacita).toBe('1');
   expect(vista.opacita).toBe('1');
   expect(vista.colore).toBe(vista.testo);
   await expect(go).toBeDisabled();
+  await expect(go).toHaveText('Sto fondendo');
+  // Il tempo dal clic scorre da solo.
+  const trascorso = stato.locator('.sn-mac-trascorso');
+  await expect(trascorso).toHaveText(/^da \d+ s$/);
+  const primo = await trascorso.textContent();
+  await expect.poll(() => trascorso.textContent(), { timeout: 5_000 }).not.toBe(primo);
+  await card.screenshot({ path: 'tests/.shots/fusioni-stato-volo-tasto.png' });
   // Il quadrato in cima dice quello che dicono lista e pannello: in volo non è più rosso «bloccato».
   await expect(scheda(page, 'volo')).toContainText('in fusione');
   await expect(page.locator('#mgLivelliRow .mg-forma[data-livello="l5"]')).not.toHaveClass(/mg-forma--attack/);
