@@ -331,6 +331,7 @@
       collegamenti.push(r.collegamento);
     }
     const domanda = Object.assign({ titolo, priorita: input.priorita, opzioni, consiglio, collegamenti }, testi);
+    if (fare) domanda.tipo = 'da_fare';
     if (input.blocca != null) {
       if (typeof input.blocca !== 'boolean') return no('domanda_non_valida', '«blocca» è true o false: dice se la domanda ferma il lavoro finché l’owner non risponde');
       domanda.blocca = input.blocca;
