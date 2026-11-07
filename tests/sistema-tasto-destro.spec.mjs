@@ -161,7 +161,10 @@ test('la riga di sistema nella chat: apre il riquadro della sua voce e si annull
   const riga = page.locator('.dash-activity-row', { hasText: 'Volume al 60%' }).first();
   await expect(riga).toBeAttached();
   // A lavoro finito il blocco è avvolto: lo si srotola, come farebbe l'utente.
-  if (!(await riga.isVisible())) await page.locator('.dash-activity-head').last().click();
+  const blocco = page.locator('.dash-activity', { has: riga }).last();
+  await expect(blocco).toHaveAttribute('data-phase', 'done', { timeout: 10_000 });
+  if (!(await riga.isVisible())) await blocco.locator('.dash-activity-head').click();
+  await expect(riga).toBeVisible();
   await riga.click({ button: 'right' });
   const voci = await etichette(page);
   expect(voci).toContain('Apri il riquadro di sistema');
