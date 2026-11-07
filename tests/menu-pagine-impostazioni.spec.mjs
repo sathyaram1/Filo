@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { clickConfirm, confirmText } from './helpers/confirm.mjs';
 
 const etichette = (page) => menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
 
