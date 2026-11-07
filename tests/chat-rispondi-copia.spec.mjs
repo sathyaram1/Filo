@@ -4,6 +4,9 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const RISPOSTA = '**Tre idee** per cena:\n\n1. Pasta al pomodoro\n2. Risotto ai funghi\n3. Zuppa di lenticchie';
 const COME_SI_LEGGE = 'Tre idee per cena:\n\n1. Pasta al pomodoro\n2. Risotto ai funghi\n3. Zuppa di lenticchie';
