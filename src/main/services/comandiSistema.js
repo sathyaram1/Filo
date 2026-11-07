@@ -1594,6 +1594,7 @@ function uriImpostazioni(chiave) {
 const _perProve = {
   // Un computer finto con la forma di COMPUTER: le prove vedono chat, tasti e home veri sopra un sistema inventato.
   usaComputer(finto) { computerFinto = finto && typeof finto === 'object' ? finto : null; },
+  usaPiattaformaPannelli(p) { piattaformaPannelli = p || null; },
 };
 
 const api = { comanda, normalizzaRichiesta, risolviNome, uriImpostazioni, pannelliImpostazioni, normalizzaIndirizzo, _perProve };
