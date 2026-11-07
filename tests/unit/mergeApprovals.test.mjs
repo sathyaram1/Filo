@@ -604,4 +604,17 @@ describe('voci che si vedono davvero (#1502)', () => {
     assert.equal(UI.vociNascoste({ items: Array.from({ length: 13 }, String) }), 1, 'anche le righe di un server di prima');
     assert.equal(UI.vociNascoste(null), 0);
   });
+
+  // #2250: il tasto dice cosa fa il clic, e la fusione in volo conta il tempo dal sì.
+  test('l’etichetta del tasto a voci chiuse e il tempo trascorso dal sì', () => {
+    assert.equal(UI.apriVociText(8), 'Apri le 8 voci');
+    assert.equal(UI.apriVociText(1), 'Apri l’altra voce');
+    const T = 1_000_000_000;
+    assert.equal(UI.trascorsoText(T, T), 'da 0 s');
+    assert.equal(UI.trascorsoText(T, T + 42_400), 'da 42 s');
+    assert.equal(UI.trascorsoText(T, T + 245_000), 'da 4 min 05 s');
+    assert.equal(UI.trascorsoText(T, T + (2 * 60 + 3) * 60_000), 'da 2 h 3 min');
+    assert.equal(UI.trascorsoText(T, T - 5000), 'da 0 s', 'un orologio indietro non dà tempi negativi');
+    assert.equal(UI.trascorsoText(0, T), '');
+  });
 });
