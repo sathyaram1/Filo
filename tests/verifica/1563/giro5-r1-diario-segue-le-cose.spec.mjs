@@ -14,7 +14,7 @@ const compattatoreFinto = (app, fissa = null) => app.evaluate((_e, fissa) => {
     const testo = messages.map((m) => m.content).join('\n');
     const righe = [];
     if (fissa) righe.push({ testo: fissa });
-    else if (/Lisbona/.test(testo)) righe.push({ testo: '08:00 prenotato il volo TAP per Lisbona del 12' });
+    else if (/posto 14C/.test(testo)) righe.push({ testo: '08:00 prenotato il volo TAP per Lisbona del 12, posto 14C' });
     if (!righe.length) righe.push({ testo: '09:30 salutato Filo' });
     return JSON.stringify({ ore: righe, memorie: [] });
   };
