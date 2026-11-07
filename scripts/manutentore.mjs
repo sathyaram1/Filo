@@ -578,7 +578,7 @@ export function testoPiccolo({ ruolo, stato, taccuino, schede, rami = [] }) {
   const testo = parti.flatMap(([, righe]) => righe).join('\n');
   const token = stimaToken(testo);
   if (token > PICCOLO_TETTO_TOKEN) {
-    // Il consiglio segue la parte che pesa di più: riportare a 1 delle schede non alleggerisce un taccuino lungo.
+    // Il consiglio segue la parte che pesa di più: accorciare l'ordine non alleggerisce un taccuino lungo.
     const pesi = parti.map(([nome, righe]) => [nome, stimaToken(righe.join('\n'))]).sort((a, b) => b[1] - a[1]);
     const [nome, peso] = pesi[0];
     const rimedio = nome === 'il taccuino' ? 'Riscrivi il taccuino più corto'
