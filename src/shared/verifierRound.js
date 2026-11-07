@@ -634,7 +634,7 @@
       if (!f || typeof f !== 'object') continue;
       const level = Number(f.level);
       if (!LEVELS.includes(level)) continue;
-      const priority = LEVELS.includes(Number(f.priority)) ? Number(f.priority) : prioritaDiNascita(level);
+      const priority = LEVELS.includes(Number(f.priority)) ? Number(f.priority) : prioritaDiNascita(level, sedeDi(f.sede));
       const item = Object.assign({}, f, { level, sede: sedeDi(f.sede), priority, decision: f.decision === true });
       if (item.sede === 'e') {
         groups.push({ tipo: 'esterno', priority, decision: item.decision, findings: [item] });
