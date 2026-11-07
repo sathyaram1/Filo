@@ -2020,11 +2020,7 @@
         // Si salva nella forma dell'elenco dei dispositivi di questo sistema, l'unica che i preferiti confrontano: la regola
         // la tiene src/main/services/comandiSistema.js (normalizzaIndirizzo).
         const N = global.SN_COMANDI_SISTEMA && global.SN_COMANDI_SISTEMA.normalizzaIndirizzo;
-        const indirizzo = (p) => {
-          const t = String(p).trim();
-          if (!/^[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{12}$/.test(t)) return null;
-          return N ? N(t) : t;
-        };
+        const indirizzo = (p) => (N ? N(String(p).trim()) : null);
         const s = String(v == null ? '' : v).trim();
         const pezzi = s.replace(/^(aggiungi|togli|solo)\s+/i, '').split(/\s*,\s*|\s+e\s+/).filter(Boolean);
         if (!SVUOTA.test(s) && pezzi.some((p) => !indirizzo(p))) {
