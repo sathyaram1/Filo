@@ -227,6 +227,14 @@ function opzione(argv, nome) {
 export const OPZIONI_SERVER = Object.freeze(['--server', '--lavoro-server']);
 const OPZIONI_DI = Object.freeze({ feedback: ['--priorita', '--ticket', ...OPZIONI_SERVER], pacchetto: ['--ticket', ...OPZIONI_SERVER] });
 export const vuoleServer = (argv) => (argv || []).some((a) => OPZIONI_SERVER.includes(String(a)));
+/** Le opzioni di `cmd` che npm si è preso (`npm_config_*`), come le riprende lo strumento della sessione locale. */
+export async function opzioniDaNpm(cmd, env = {}) {
+  const opzioni = OPZIONI_DI[cmd];
+  if (!opzioni) return { args: [], nota: null };
+  const { argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const r = argomentiDaNpm(env || {}, { opzioni, conValore: opzioni.filter((o) => !OPZIONI_SERVER.includes(o)) });
+  return { args: r.args || [], nota: r.nota || null, ...(r.errore ? { errore: r.errore } : {}) };
+}
 // senzaOpzioni toglie ogni `--x`: un `--sever` sparirebbe dal titolo e il feedback nascerebbe senza segno. Il segno
 // non prende valori: `--server=true` non lo accende, quindi si rifiuta invece di perderlo.
 function opzioniIgnote(cmd, argv) {
