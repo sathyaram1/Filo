@@ -100,7 +100,11 @@ test('Cerca dalla risposta di Filo sopra un sito (strato dei riquadri) apre i ri
     }
     return null;
   }, { timeout: 8_000 }).not.toBeNull();
+  console.log('SUPERFICIE', superficie.url(), await superficie.locator('.sn-menu-item').allTextContents());
   await superficie.locator('.sn-menu-item', { hasText: /^\s*Cerca\s*$/ }).first().click();
+  await p.waitForTimeout(6000);
+  console.log('URLS', await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL())));
+  console.log('AZIONI', JSON.stringify(await oggi(app)));
   await expect.poll(() => caricata(app, 'google\\.com/search'), { timeout: 15_000, message: 'Cerca dallo strato non apre i risultati' }).toBe(true);
   await expect.poll(async () => (await oggi(app))['search-web']?.n || 0, { timeout: 8_000 }).toBe(1);
   expect(Object.keys((await oggi(app))['search-web'].fine)).toEqual(['s5']);
