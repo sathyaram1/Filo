@@ -288,7 +288,7 @@ try {
 if (!IS_SUBFRAME) try {
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
   if (/^https?:/i.test(loc)) {
-    const w = ipcRenderer.sendSync('filo:cookie-wipe', loc);
+    const w = AVVIO && AVVIO.cookie;
     if (w && typeof w.pattern === 'string') {
       const re = new RegExp(w.pattern, 'i');
       const extra = new Set(Array.isArray(w.keys) ? w.keys : []);
