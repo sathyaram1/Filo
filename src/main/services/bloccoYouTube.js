@@ -158,6 +158,7 @@ async function init(settings) {
 function configureFromSettings(settings) {
   const era = acceso;
   acceso = attivo(settings);
+  if (acceso && !era) offri();
   if (inTest() || !acceso || era) return;
   seguiOgniGiorno();
   if (!aggiornateIl || Date.now() - aggiornateIl >= OGNI_MS) inSottofondo().catch(() => {});
