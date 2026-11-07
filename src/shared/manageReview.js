@@ -1709,18 +1709,33 @@
     return global.SN_MERGE_APPROVALS;
   }
 
-  // Approvata e finita in conflitto: la routine riallinea da sé solo ciò che la scheda dice (siRiallineaDaSola), e solo
-  // finché la pratica è in lavorazione (routeRealignment del server). Uscita dalla lavorazione (ferma, arenata): non è andato.
+  // Approvata e finita in conflitto (#1425, #2193): il server riallinea da sé il lavoro di una routine (siRiallineaDaSola)
+  // appena la pratica è lavorabile, anche dopo la risposta a una domanda. Restano dell'owner solo il lavoro locale, la
+  // pratica archiviata, il fermo che il server ha scritto sulla richiesta (tetto) e i fermi senza domanda (arenato, loop).
   function riallineamentoDi(fb, failed) {
-    const { status } = normalizeStatus(fb);
-    const inLavoro = status === 'todo' || WORK_STAGES.includes(status);
-    return inLavoro && failed.every((r) => schedaFusioni().siRiallineaDaSola(r)) ? 'da_riallineare' : 'riallineamento_fallito';
-  }
-  function testoRiallineamento(failed, inCorso) {
     const MA = schedaFusioni();
-    // La richiesta che decide la frase è quella che non si riallinea da sola, se c'è.
-    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed[0];
-    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, inCorso)}`;
+    const { status } = normalizeStatus(fb);
+    const motivo = isLocalOnly(fb) ? 'locale' : (status === 'archived' ? 'archiviata' : '');
+    const fallito = { stato: 'riallineamento_fallito', motivo };
+    if (motivo || !failed.every((r) => MA.siRiallineaDaSola(r)) || failed.some((r) => MA.fermoDellOwner(r))) return fallito;
+    const domanda = aspettaDomanda(fb);
+    if (domanda) return { stato: 'attende_domanda', domanda };
+    return status === 'todo' || WORK_STAGES.includes(status) ? { stato: 'da_riallineare' } : fallito;
+  }
+  function testoRiallineamento(failed, ria) {
+    const MA = schedaFusioni();
+    // La richiesta che decide la frase è quella che non si riallinea da sola, o quella col fermo del server, se c'è.
+    const r = failed.find((x) => !MA.siRiallineaDaSola(x)) || failed.find((x) => MA.fermoDellOwner(x)) || failed[0];
+    return `Avevi detto sì, ma il ramo era in conflitto con main. ${MA.testoRiallineamento(r, ria.stato === 'da_riallineare', ria)}`;
+  }
+
+  // Una pratica chiusa col lavoro in main (#2193): le sue fusioni approvate e non avvenute sono superate, anche se il ramo
+  // fuso è un altro. Fusione registrata = la versione che la contiene, la chiusura «già su main», o una richiesta fusa.
+  function lavoroInMain(fb, recent) {
+    const { status, statusReason } = normalizeStatus(fb);
+    if (status !== 'done' && status !== 'archived') return false;
+    if (String((fb && fb.resolvedInVersion) || '').trim()) return true;
+    return status === 'done' && (statusReason === 'gia_risolto' || recent.some((r) => r && r.used === true && r.outcome === 'merged'));
   }
 
   // Perché una fusione non ha chiesto, nel quadrato: lo stesso conto dell'elenco «Fuse senza chiedere» (#743.1).
