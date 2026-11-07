@@ -11,16 +11,15 @@ import * as B from './biglietto-locale.mjs';
 import { cartellaDelServer } from './ramo-server.mjs';
 
 // Gli strumenti di Claude Code che non portano dentro niente da fuori. Elenco chiuso: uno che non c'è, anche nuovo o
-// sconosciuto, sporca (#1211.2). Read, Artifact, Agent e ToolSearch li decide motivoLettura dai parametri.
+// sconosciuto, sporca (#1211.2). Read, Grep, Skill, SlashCommand, Artifact, Agent e ToolSearch li decide motivoLettura
+// dai parametri.
 export const STRUMENTI_SENZA_LETTURA = Object.freeze([
   // La shell: quello che scarica lo dichiara la sessione (SPEC-DOMANDE.md §1.2).
   'Bash', 'PowerShell', 'BashOutput', 'KillShell', 'Monitor',
-  'Grep', 'Glob', 'LS',
+  'Glob', 'LS',
   'Edit', 'MultiEdit', 'Write', 'NotebookEdit',
   'TodoWrite', 'TaskCreate', 'TaskGet', 'TaskList', 'TaskUpdate', 'TaskStop', 'CronCreate', 'CronDelete', 'CronList',
   'EnterPlanMode', 'ExitPlanMode', 'EnterWorktree', 'ExitWorktree', 'AskUserQuestion',
-  // Le abilità le installa l'owner, e stanno dove Read non sporca: il progetto e la cartella di Claude.
-  'Skill', 'SlashCommand',
   'PushNotification', 'SendUserFile', 'SubagentHandback',
 ]);
 // Artifact non porta dentro niente solo con queste azioni. Pubblicare sì: un rifiuto restituisce la pagina con le
@@ -68,15 +67,68 @@ function cercaSoloStrumentiDiClaude(query) {
   return nomi.length > 0 && nomi.every((n) => mcpSenzaLettura(n) || (/^[A-Za-z][A-Za-z0-9_]*$/.test(n) && !/^mcp/i.test(n)));
 }
 
-function dentro(file, cartella, P, win) {
-  if (!cartella) return false;
+function relativo(file, cartella, P, win) {
+  if (!cartella) return null;
   const rel = win ? P.relative(cartella.toLowerCase(), file.toLowerCase()) : P.relative(cartella, file);
-  return rel === '' || (rel !== '..' && !rel.startsWith(`..${P.sep}`) && !P.isAbsolute(rel));
+  return rel === '' || (rel !== '..' && !rel.startsWith(`..${P.sep}`) && !P.isAbsolute(rel)) ? rel : null;
+}
+const dentro = (file, cartella, P, win) => relativo(file, cartella, P, win) !== null;
+
+// Nella cartella di Claude dell'utente è fidato solo ciò che scrivono l'owner e Claude Code (#1211.3): un elenco
+// ammesso, perché il resto (resoconti delle sessioni, cataloghi e cache delle estensioni) è testo di altri.
+export const CLAUDE_FILE_AMMESSI = Object.freeze(['settings.json', 'settings.local.json', 'keybindings.json', 'CLAUDE.md']);
+export const CLAUDE_CARTELLE_AMMESSE = Object.freeze(['skills', 'commands', 'agents', 'rules', 'output-styles', 'plans']);
+
+/**
+ * `rel` (relativo alla cartella di Claude) è fra le parti ammesse? Dei progetti valgono la memoria e la storia della
+ * sessione stessa (`sessione`), che ha già in contesto: quella di un'altra sessione no. Con `cartella` (una ricerca)
+ * vale anche la cartella ammessa in sé, perché quello che ci sta dentro è tutto ammesso. PURA.
+ */
+export function ammessoInClaude(rel, { win = false, sessione = '', cartella = false } = {}) {
+  const pezzi = String(rel || '').split(win ? /[\\/]+/ : /\/+/).filter(Boolean);
+  const uguale = (a, b) => (win ? String(a).toLowerCase() === String(b).toLowerCase() : a === b);
+  const s = String(sessione || '').trim();
+  if (pezzi.length === 1) {
+    return CLAUDE_FILE_AMMESSI.some((f) => uguale(f, pezzi[0])) || (cartella && CLAUDE_CARTELLE_AMMESSE.some((c) => uguale(c, pezzi[0])));
+  }
+  if (pezzi.length > 1 && CLAUDE_CARTELLE_AMMESSE.some((c) => uguale(c, pezzi[0]))) return true;
+  if (pezzi.length < 3 || !uguale(pezzi[0], 'projects')) return false;
+  if (pezzi.length > 3 && uguale(pezzi[2], 'memory')) return true;
+  if (cartella && pezzi.length === 3 && (uguale(pezzi[2], 'memory') || (!!s && uguale(pezzi[2], s)))) return true;
+  return !!s && (uguale(pezzi[2], s) ? pezzi.length > 3 : pezzi.length === 3 && uguale(pezzi[2], `${s}.jsonl`));
+}
+
+// Le modalità di Grep che restituiscono righe dei file. Il salto veloce di .claude/hooks/letture-esterne.sh le ripete:
+// la sentinella in tests/unit/lettureEsterne.test.mjs tiene insieme le due.
+export const GREP_MODI_CON_RIGHE = Object.freeze(['content']);
+
+// Skill e SlashCommand portano dentro il testo dell'abilità o del comando: quelli dell'owner stanno nel progetto o nella
+// cartella di Claude, quelli di un'estensione di terzi hanno il nome nello spazio dell'estensione («estensione:nome»).
+function richiamoDaEstensione(nome, dati) {
+  const chiesto = String((nome === 'Skill' ? dati.skill : dati.command) || '').trim().replace(/^\//, '').split(/\s+/)[0];
+  return chiesto.includes(':') ? `${nome} da un'estensione (${pulisci(chiesto, 120)})` : '';
+}
+
+// Il percorso che la chiamata legge, se ne legge uno: Read sempre, Grep solo quando restituisce righe dei file (con
+// i soli nomi resta come Glob). null = la chiamata non legge un percorso.
+function percorsoLetto(nome, dati) {
+  if (nome === 'Read') return String(dati.file_path || '').trim();
+  if (nome === 'Grep') return GREP_MODI_CON_RIGHE.includes(String(dati.output_mode || '')) ?String(dati.path || '').trim() || '.' : null;
+  return null;
+}
+
+// Read e Grep di Claude Code leggono «~» e «~/…» dalla cartella di casa: risolto contro la cartella della chiamata,
+// un percorso scritto così sembrerebbe dentro il repo. Senza `casa` nota vale una cartella che non è fidata.
+function conCasa(p, casa, win) {
+  if (p !== '~' && !p.startsWith('~/') && !(win && p.startsWith('~\\'))) return p;
+  const c = String(casa || '').trim() || (win ? 'C:\\~' : '/~');
+  return p === '~' ? c : (win ? path.win32 : path.posix).join(c, p.slice(2));
 }
 
 /**
  * Il motivo con cui la chiamata sporca il biglietto, '' se non porta dentro testo esterno. `input` = lo stdin del
- * gancio; `ctx` = contestoLettura (cartelle e file fidati, `win`, `canonico`). PURA con un `canonico` puro.
+ * gancio; `ctx` = contestoLettura (cartelle e file fidati, cartelle di Claude, `sessione`, `win`, `casa`, `canonico`). PURA
+ * con un `canonico` puro.
  */
 export function motivoLettura(input, ctx = {}) {
   const nome = String((input && input.tool_name) || '');
@@ -96,19 +148,27 @@ export function motivoLettura(input, ctx = {}) {
     const dove = String(dati.isolation || '');
     return dove === '' || dove === 'worktree' ? '' : `${nome} (${pulisci(dove, 40)})`;
   }
+  if (nome === 'Skill' || nome === 'SlashCommand') return richiamoDaEstensione(nome, dati);
   if (nome === 'ToolSearch') return cercaSoloStrumentiDiClaude(dati.query) ? '' : 'ToolSearch';
   if (nome.startsWith('mcp__')) return mcpSenzaLettura(nome) ? '' : pulisci(nome, 160);
-  if (nome !== 'Read') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
-  const grezzo = String(dati.file_path || '').trim();
+  if (nome !== 'Read' && nome !== 'Grep') return puoLeggereFuori(nome) ? pulisci(nome, 160) : '';
+  const grezzo = percorsoLetto(nome, dati);
   if (!grezzo) return '';
   const win = !!ctx.win;
   const P = win ? path.win32 : path.posix;
   const canonico = typeof ctx.canonico === 'function' ? ctx.canonico : (p) => p;
-  const file = canonico(P.resolve(String(ctx.cwd || P.sep), grezzo));
+  const file = canonico(P.resolve(String(ctx.cwd || P.sep), conCasa(grezzo, ctx.casa, win)));
+  const nomeFile = pulisci(P.basename(file), 80);
+  // La cartella di Claude prima delle altre: anche dentro una cartella fidata, lì decide l'elenco ammesso.
+  for (const c of ctx.claude || []) {
+    const rel = relativo(file, c, P, win);
+    if (rel === null) continue;
+    return ammessoInClaude(rel, { win, sessione: ctx.sessione, cartella: nome === 'Grep' }) ? '' : `${nome} dalla cartella di Claude (${nomeFile})`;
+  }
   if ((ctx.cartelle || []).some((c) => dentro(file, c, P, win))) return '';
   const uguale = (a) => (win ? a.toLowerCase() === file.toLowerCase() : a === file);
   if ((ctx.file || []).some(uguale)) return '';
-  return `Read fuori dal repo (${pulisci(P.basename(file), 80)})`;
+  return `${nome} fuori dal repo (${nomeFile})`;
 }
 
 // Il percorso vero, collegamenti e nomi corti di Windows risolti, anche di un file che non c'è più: vale la cartella
@@ -140,10 +200,10 @@ export function cartelleTemporaneeDiClaude(radici, { env = {}, tmp = [], uid = n
 
 /**
  * Dove si legge senza sporcarsi: il repo (anche da una sua worktree, e la cartella del progetto), il checkout del
- * server accanto, la cartella di Claude dell'utente e quella temporanea del progetto; e LOCAL.md sopra il repo, che la
- * sessione locale deve leggere.
+ * server accanto, la cartella temporanea di Claude del progetto, LOCAL.md sopra il repo, che la sessione locale deve
+ * leggere; e nella cartella di Claude dell'utente (`claude`) le parti ammesse, con la storia di `sessione`.
  */
-export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform, biglietti = [] } = {}) {
+export function contestoLettura({ cwd = process.cwd(), env = process.env, sistema = process.platform, biglietti = [], sessione = '' } = {}) {
   const win = sistema === 'win32';
   const P = win ? path.win32 : path.posix;
   // Il repo della cartella corrente vale solo se è il progetto, una sua worktree o il repo che tiene il biglietto della
@@ -163,9 +223,12 @@ export function contestoLettura({ cwd = process.cwd(), env = process.env, sistem
   const uid = typeof process.getuid === 'function' ? process.getuid() : null;
   const tmp = [...new Set([tmpdir(), ...(win ? [] : ['/tmp'])])];
   const temporanee = cartelleTemporaneeDiClaude(radici, { env, tmp, uid, win });
-  const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...claude, ...temporanee].map((c) => canonicoVero(P.resolve(c)));
+  const cartelle = [...radici, ...(server ? [P.dirname(server)] : []), ...temporanee].map((c) => canonicoVero(P.resolve(c)));
   const file = radici.map((r) => canonicoVero(P.join(P.dirname(P.resolve(r)), 'LOCAL.md')));
-  return { cwd, win, cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero };
+  return {
+    cwd, win, casa: homedir(), cartelle: [...new Set(cartelle)], file: [...new Set(file)], canonico: canonicoVero,
+    claude: [...new Set(claude.map((c) => canonicoVero(P.resolve(c))))], sessione: String(sessione || '').trim(),
+  };
 }
 
 /** Lancia in sottofondo la consegna dello sporco annotato accanto al biglietto `percorso` (più `motivo`, se annotarlo
@@ -188,8 +251,8 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
   try {
     if (env.FILO_ROUTINE) return { esito: 'routine' };
     if (!input || typeof input !== 'object' || !puoLeggereFuori(input.tool_name)) return { esito: 'nessuna lettura esterna' };
-    // Le cartelle fidate (altre chiamate a git) servono solo a Read: per il resto il motivo si sa subito.
-    const subito = input.tool_name === 'Read' ? null : motivoLettura(input);
+    // Le cartelle fidate (altre chiamate a git) servono solo a chi legge un percorso: per il resto il motivo si sa subito.
+    const subito = percorsoLetto(String(input.tool_name || ''), input.tool_input || {}) ? null : motivoLettura(input);
     if (subito === '') return { esito: 'nessuna lettura esterna' };
     const cwd = String(input.cwd || env.CLAUDE_PROJECT_DIR || process.cwd());
     const sessione = String(input.session_id || '').trim();
@@ -200,7 +263,7 @@ export function gancio({ input = {}, env = process.env, nowMs = Date.now(), avvi
     const progetto = String(env.CLAUDE_PROJECT_DIR || '').trim();
     if (!biglietti.length && progetto && progetto !== cwd) biglietti = B.trovaBiglietti({ env: envSessione, cwd: progetto });
     if (!biglietti.length) return { esito: 'senza biglietto' };
-    const motivo = subito ?? motivoLettura(input, contesto({ cwd, env, biglietti }));
+    const motivo = subito ?? motivoLettura(input, contesto({ cwd, env, biglietti, sessione }));
     if (!motivo) return { esito: 'nessuna lettura esterna' };
     for (const b of biglietti) {
       let annotato = true;

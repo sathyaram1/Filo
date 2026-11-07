@@ -535,19 +535,45 @@ export function copieNelPush(root, righe) {
   return trovate;
 }
 
-// Il segno che riconosce il pre-push di Filo: uno con un altro contenuto è di qualcun altro e non si tocca.
-export const SEGNO_PRE_PUSH = 'filo-copie-di-dati';
-// Di riserva, se la cartella che spedisce non ha il controllo (un ramo vecchio): quello di chi ha installato.
+// Il segno che riconosce il pre-push di Filo. Quello di prima si riconosce ancora, per sostituirlo; il nuovo non lo porta,
+// così gli strumenti di un ramo vecchio lo vedono altrui e non lo riscrivono senza le spinte.
+export const SEGNO_PRE_PUSH = 'filo-pre-push';
+const SEGNO_VECCHIO = 'filo-copie-di-dati';
+// Di riserva, se la cartella che spedisce non ha lo script (un ramo vecchio): quello di chi ha installato.
 const RISERVA = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'copie-in-scena.mjs').replace(/\\/g, '/');
-const PRE_PUSH = `#!/bin/sh
-# ${SEGNO_PRE_PUSH}: una copia dei dati del server non parte per nessuna strada, nemmeno un git push a mano (#1108).
-# Lo scrive scripts/lib/copie-di-dati.mjs; il controllo è quello della cartella che spedisce.
-radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
-controllo="$radice/scripts/copie-in-scena.mjs"
-[ -f "$controllo" ] || controllo='${RISERVA.replace(/'/g, "'\\''")}'
-[ -f "$controllo" ] && command -v node >/dev/null 2>&1 || exit 0
+const RISERVA_SPINTE = resolve(dirname(fileURLToPath(import.meta.url)), '..', 'dichiara-spinte.mjs').replace(/\\/g, '/');
+const tra = (s) => `'${s.replace(/'/g, "'\\''")}'`;
+
+/**
+ * Lo script delle spinte (#1362): quello di chi installa, mai quello del ramo, che un commit spinto da altri può aver
+ * riscritto e che girerebbe col biglietto di chi spinge (#1362 giro 1 r1). Sparito (una cartella di lavoro tolta), quello
+ * della copia principale, se si spinge da un'altra; sennò nessuno, e la spinta resta non dichiarata.
+ */
+const SCELTA_SPINTE = `principale=$(git rev-parse --path-format=absolute --git-common-dir 2>/dev/null); principale=\${principale%/.git}
+spinte=${tra(RISERVA_SPINTE)}
+[ -f "$spinte" ] || { [ "$principale" != "$radice" ] && spinte="$principale/scripts/dichiara-spinte.mjs"; }
+`;
+
+/** Il pezzo che accoda le spinte (#1362). */
+function bloccoSpinte(repo) {
+  return `radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+command -v node >/dev/null 2>&1 || exit 0
 righe=$(cat)
-# node costa a ogni push: si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
+${SCELTA_SPINTE}# Le spinte col biglietto di chi spinge: node costa a ogni push, quindi solo se c'e' un biglietto da cui farlo.
+if [ -n "$CLAUDE_CODE_SESSION_ID$FILO_BIGLIETTO_FILE$FILO_ROUTINE_TICKET" ] || [ -f "$radice/.claude/routine-ticket.json" ] || [ -f "$principale/.claude/routine-ticket.json" ]; then
+  [ -f "$spinte" ] && printf '%s\\n' "$righe" | node "$spinte" --pre-push ${repo} "$radice" "$2" >/dev/null 2>&1
+fi
+`;
+}
+
+const PRE_PUSH = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: su ogni strada che spinge, anche un git push a mano, accoda le spinte col biglietto di chi spinge (#1362)
+# e ferma una copia dei dati del server (#1108). Lo scrive scripts/lib/copie-di-dati.mjs; le spinte le accoda lo script
+# di chi l'ha installato, il controllo delle copie è quello della cartella che spedisce.
+${bloccoSpinte('app')}controllo="$radice/scripts/copie-in-scena.mjs"
+[ -f "$controllo" ] || controllo=${tra(RISERVA)}
+[ -f "$controllo" ] || exit 0
+# Il controllo delle copie si chiama solo se i commit da spedire portano qualcosa che non e' codice o immagine.
 dati=$(printf '%s\\n' "$righe" | while read -r _ locale _ _; do
   case "$locale" in *[!0]*) ;; *) continue ;; esac
   git log --format= --name-only --diff-filter=ACMR "$locale" --not --remotes 2>/dev/null
@@ -556,20 +582,64 @@ done | grep -vE '\\.(js|mjs|cjs|ts|css|html|sh|ps1|png|jpe?g|gif|webp|svg|ico)$'
 printf '%s\\n' "$righe" | node "$controllo" --pre-push "$radice"
 `;
 
+// Nel clone di filo-security delle sessioni locali: solo le spinte, con lo script di Filo di chi installa.
+const PRE_PUSH_SERVER = `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: su ogni strada che spinge su filo-security accoda le spinte col biglietto della sessione di Filo che
+# spinge (#1362). Lo scrive scripts/lib/copie-di-dati.mjs di Filo.
+${bloccoSpinte('server')}exit 0
+`;
+
+// La traccia (#1362 giro 4 r4): ogni commit nato qui, da chiunque (routine, sessione locale, l'owner dal terminale), una
+// fusione che fa un commit, ogni copia col suo originale. Un commit senza traccia vale arrivato da fuori: non lo dichiara
+// nessuno, e due sessioni nella stessa cartella non si dichiarano a vicenda i commit.
+const traccia = (modo, repo = '') => `#!/bin/sh
+# ${SEGNO_PRE_PUSH}: la traccia di chi ha fatto i commit nati qui, per dichiararli col suo biglietto quando partono (#1362).
+# Lo scrive scripts/lib/copie-di-dati.mjs.
+radice=$(git rev-parse --show-toplevel 2>/dev/null) || exit 0
+command -v node >/dev/null 2>&1 || exit 0
+${SCELTA_SPINTE}[ -f "$spinte" ] && node "$spinte" ${modo} "$radice"${repo ? ` ${repo}` : ''} >/dev/null 2>&1
+exit 0
+`;
+
+function installa(root, contenuto, gancio = 'pre-push') {
+  try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
+  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', `hooks/${gancio}`]).trim());
+  let attuale = null;
+  try { attuale = readFileSync(dove, 'utf8'); } catch (_) { /* non c'è */ }
+  if (attuale === contenuto) return 'presente';
+  if (attuale !== null && !attuale.includes(SEGNO_PRE_PUSH) && !attuale.includes(SEGNO_VECCHIO)) return 'altrui';
+  mkdirSync(dirname(dove), { recursive: true });
+  writeFileSync(dove, contenuto, { mode: 0o755 });
+  try { chmodSync(dove, 0o755); } catch (_) { /* su Windows git lo lancia comunque */ }
+  return 'installato';
+}
+
 /**
  * Mette il controllo prima di ogni push nella copia del repo di `root` (gli hook di git valgono per tutte le sue cartelle).
  * 'installato' | 'presente' | 'altrui' (un pre-push non nostro: non si tocca) | 'altrove' (core.hooksPath: la cartella
  * degli hook è condivisa con altri repo, non ci si scrive).
  */
 export function installaControlloSpedizione(root) {
-  try { if (gitTesto(root, ['config', '--get', 'core.hooksPath']).trim()) return 'altrove'; } catch (_) { /* non impostato */ }
-  const dove = resolve(root, gitTesto(root, ['rev-parse', '--git-path', 'hooks/pre-push']).trim());
-  let attuale = null;
-  try { attuale = readFileSync(dove, 'utf8'); } catch (_) { /* non c'è */ }
-  if (attuale === PRE_PUSH) return 'presente';
-  if (attuale !== null && !attuale.includes(SEGNO_PRE_PUSH)) return 'altrui';
-  mkdirSync(dirname(dove), { recursive: true });
-  writeFileSync(dove, PRE_PUSH, { mode: 0o755 });
-  try { chmodSync(dove, 0o755); } catch (_) { /* su Windows git lo lancia comunque */ }
-  return 'installato';
+  const esito = installa(root, PRE_PUSH);
+  installaTraccia(root, 'app');
+  return esito;
+}
+
+/**
+ * I ganci che scrivono la traccia dei commit nati nella copia di `root` (`repo`: 'app' o 'server'): senza, i suoi commit
+ * non li dichiara nessuno. Mai un'eccezione. → { 'post-commit': esito, … }, gli esiti di installaControlloSpedizione.
+ */
+export function installaTraccia(root, repo = 'app') {
+  const out = {};
+  for (const [gancio, modo] of [['post-commit', '--post-commit'], ['post-merge', '--post-merge'], ['post-rewrite', '--post-rewrite']]) {
+    try { out[gancio] = installa(root, traccia(modo, gancio === 'post-rewrite' ? '' : repo), gancio); } catch (_) { out[gancio] = 'guasto'; }
+  }
+  return out;
+}
+
+/** Lo stesso nel clone di filo-security di una sessione locale: le sue spinte si dichiarano come quelle di Filo (#1362). */
+export function installaSpinteServer(root) {
+  const esito = installa(root, PRE_PUSH_SERVER);
+  installaTraccia(root, 'server');
+  return esito;
 }

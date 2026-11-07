@@ -199,7 +199,16 @@ lo può scrivere anche un agente pulito.
 - `riservato` su feedback, domande, compiti e biglietti (§ 5.1), scritto come
   `fiducia`.
 - `genitori: [id…]` sul feedback derivato.
-- `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5.
+- `scrittoDa: [{biglietto, fiducia}]` sul ramo di lavoro, per il § 1.5, e `dichiarati`: i commit che i
+  biglietti puliti hanno dichiarato spingendoli (#1362). Un commit fra l'ultimo sha controllato (non quello
+  di un'emissione, che fotografa la punta senza sapere chi l'ha spinta) e la punta che nessuno di loro ha
+  dichiarato è un buco, e il lavoro non è fidato. Ogni commit di una sessione locale si dichiara col
+  biglietto della sessione che l'ha fatto, anche se lo spinge un'altra. Chi riscrive (un rebase) o toglie
+  commit visti su origin li dichiara insieme alle copie: una copia vale solo se l'originale l'aveva
+  dichiarato un biglietto pulito, e un riscritto che nessuno di loro ha dichiarato è buco. Chi ha fatto un
+  commit lo dice la traccia che la copia scrive alla sua nascita (`scripts/lib/spinte.mjs`): un commit
+  senza traccia è arrivato da fuori, e uno che porta il lavoro di un'altra sessione o di un commit arrivato
+  da fuori (uno squash, un cherry-pick anche con conflitto) non lo dichiara chi spinge.
 - **Migrazione:** fidati i feedback con mittente provato (`senderProof` admin o
   server, prefisso owner/local) e quelli con `mergePreapproved`; tutti gli
   altri non fidati, `routine:residuo` compreso. I rami già in lavorazione

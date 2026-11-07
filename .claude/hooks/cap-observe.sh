@@ -58,6 +58,9 @@ is_spedibile() {
 }
 
 INPUT=$(cat)
+# Il pre-push dichiara la spinta col biglietto della sessione (#1362): a un hook la sessione la dice stdin.
+SESSIONE=$(printf '%s' "$INPUT" | sed -n 's/.*"session_id"[[:space:]]*:[[:space:]]*"\([A-Za-z0-9_-]*\)".*/\1/p' | head -1)
+[ -n "$SESSIONE" ] && export CLAUDE_CODE_SESSION_ID="$SESSIONE"
 
 # One node pass: parse stdin, apply the re-entrancy guard + failure filter, and
 # emit the JSONL observation line — or emit nothing, in which case we exit.

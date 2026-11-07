@@ -5,9 +5,15 @@ import { createRequire } from 'node:module';
 import { existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { dirname, join } from 'node:path';
+import { cartellaCloneServer } from '../../../scripts/lib/git-server.mjs';
 
 const RADICE = join(import.meta.dirname, '..', '..', '..');
+// Il clone del lavoro server (FILO_SERVER_CLONE, nel contenitore delle routine ~/filo-security) vince su una copia vecchia
+// accanto al repo; senza variabile si cerca prima accanto, come in locale.
 function funzioniDelServer() {
+  const clone = join(cartellaCloneServer(), 'functions');
+  const nelClone = existsSync(join(clone, 'src', 'routine', 'localTicket.js'));
+  if (nelClone && String(process.env.FILO_SERVER_CLONE || '').trim()) return clone;
   let ramo = '';
   try { ramo = execFileSync('git', ['rev-parse', '--abbrev-ref', 'HEAD'], { cwd: RADICE, encoding: 'utf8' }).trim(); } catch (_) {}
   const slug = ramo.replace(/^claude\//, '');
@@ -19,7 +25,7 @@ function funzioniDelServer() {
     }
     d = dirname(d);
   }
-  return '';
+  return nelClone ? clone : '';
 }
 
 const SRV = funzioniDelServer();
@@ -65,8 +71,9 @@ test('r1 un commit di una sessione sporca con la data d’autore spostata indiet
   const s = server();
   const C1 = 'b'.repeat(40);
   const C2 = 'c'.repeat(40);
-  // 8:00-8:30 una sessione pulita scrive C1 e registra il ramo, poi chiude.
+  // 8:00-8:30 una sessione pulita scrive C1 (il suo pre-push lo dichiara, #1362) e registra il ramo, poi chiude.
   const prima = await s.op(T0, 'prendi');
+  await s.op(T0 + 11 * MIN, 'spinte', { ticket: prima.ticket, spinte: [{ repo: 'app', ramo: RAMO, punta: C1, commits: [C1] }] });
   const r1 = await s.op(T0 + 30 * MIN, 'ramo', { ticket: prima.ticket, repo: 'app', ramo: RAMO, sha: C1, feedbackId: 'fb1', commits: [{ sha: C1, at: T0 + 10 * MIN }], ora: T0 + 30 * MIN });
   expect(r1.ramoFidato).toBe(true);
   await s.op(T0 + 31 * MIN, 'chiudi', { ticket: prima.ticket });

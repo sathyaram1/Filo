@@ -73,7 +73,6 @@ import { execFileSync } from 'node:child_process';
 import { mkdirSync, writeFileSync, readFileSync, existsSync, rmSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { basename, dirname, join, resolve, sep } from 'node:path';
-import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 import {
   prepareBranch, newWorkBranch, tentativiPrecedenti, chiudiTentativi, chiudiSuperatiOvunque, withCheckpoint,
@@ -108,7 +107,7 @@ import { scaricaPayload, immaginiSenzaByte, STAMPA_MAX, STAMPA_TETTO, fileRuolo,
 import { sembraOpzioneNelReport } from './lib/argomenti.mjs';
 import { dentroLaBusta } from './lib/busta.mjs';
 import { assicuraStoria, TETTO_STORIA_MS } from './lib/unit-sulla-fusione.mjs';
-import { cloneDentroIlRepo } from './lib/git-server.mjs';
+import { cartellaCloneServer, cloneDentroIlRepo } from './lib/git-server.mjs';
 import { letturaMancante, ramoCorrente, richiestaDalPayload, scriviRichiesta } from './lib/lettura-diff.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -874,12 +873,7 @@ export function serialAwarenessNote(role, history, dropped = 0) {
 
 const LAVORO_SERVER_FILE = '_lavoro-server.md';
 
-/** Dove sta il clone di filo-security di un lavoro server: fuori dal checkout di Filo. PURA (legge l'ambiente). */
-export function cartellaCloneServer(env = process.env) {
-  return resolve(String(env.FILO_SERVER_CLONE || '').trim() || join(homedir(), 'filo-security'));
-}
-
-export { cloneDentroIlRepo };
+export { cloneDentroIlRepo, cartellaCloneServer };
 
 /**
  * Una routine con più repository parte dalla cartella sopra i cloni (#1761): lì i passi dell'orchestratore senza

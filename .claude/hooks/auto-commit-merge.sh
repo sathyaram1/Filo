@@ -65,6 +65,8 @@ percorso_json 'file_path|notebook_path'; HOOK_FILE=$REPLY
 percorso_json cwd; HOOK_CWD=$REPLY
 percorso_json transcript_path; HOOK_TRANSCRIPT=$REPLY
 campo_json session_id; HOOK_SESSION=$REPLY
+# Il pre-push dichiara la spinta col biglietto della sessione (#1362): a un hook la sessione la dice stdin.
+[ -n "$HOOK_SESSION" ] && export CLAUDE_CODE_SESSION_ID="$HOOK_SESSION"
 minuscolo() {
   if [ "${BASH_VERSINFO[0]:-0}" -ge 4 ]; then eval 'REPLY=${1,,}'; else REPLY=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]'); fi
   while [[ $REPLY == */ ]]; do REPLY=${REPLY%/}; done
