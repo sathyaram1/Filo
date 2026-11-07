@@ -126,6 +126,7 @@
     const S = global.SN_SCHEDE_IN_CHAT;
     const scheda = S ? S.normalizza(msg.scheda) : null;
     const b = msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : bersaglio(doc, x, y);
+    console.log('[dbg] ricevi', msg.fase, x, y, !!b, campiDelSito, location.href);
     const fr = b || msg.fase === 'esci' || !scheda || !Number.isFinite(x) || !Number.isFinite(y) ? null : riquadroSotto(doc, x, y);
     if (riquadroOra && riquadroOra !== fr) { inoltra(doc, riquadroOra, 'esci', 0, 0); riquadroOra = null; }
     if (fr && (msg.fase === 'sopra' || msg.fase === 'lascia')) {
