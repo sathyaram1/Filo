@@ -397,10 +397,11 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: background calc(0.12s * var(--sn-motion, 1)) ease, padding-left calc(0.12s * var(--sn-motion, 1)) ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
+/* All'hover cambia solo il fondo: il testo che scivola fa sembrare la voce un'altra (#2096). */
 .dash-menu-voce:hover,
-.dash-menu-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-menu-voce:focus-visible { background: var(--dash-line); outline: none; }
 .dash-menu-sep { height: 1px; margin: 4px 6px; background: var(--dash-line); }
 
 .dash-flash {
