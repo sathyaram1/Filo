@@ -1368,6 +1368,14 @@ function normalizzaRichiesta(r) {
       out.nome = nome;
       // #2096 — dimenticare il dispositivo abbinato o la rete conosciuta: chi la chiede la conferma prima.
       if (vero(q.dimentica)) { out.dimentica = true; return out; }
+      // #2096 — fra i preferiti (in cima all'elenco della home) o fuori: l'indirizzo, se c'è, sceglie fra due nomi uguali.
+      if (cosa === 'bluetooth' && q.preferito != null && q.preferito !== '') {
+        const b = booleano(q.preferito);
+        if (b === null) return { errore: 'preferito non capito: true o false' };
+        out.preferito = b;
+        if (typeof q.indirizzo === 'string' && /^[0-9A-Fa-f:-]{12,17}$/.test(q.indirizzo)) out.indirizzo = q.indirizzo;
+        return out;
+      }
       if (cosa === 'bluetooth') {
         // «Spegni le cuffie» arriva come acceso:false col nome: vuol dire scollegarle, non collegarle.
         const c = q.collega == null || q.collega === '' ? booleano(q.acceso) !== false : booleano(q.collega);
