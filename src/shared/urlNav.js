@@ -36,6 +36,14 @@
     return LOCAL_NET_TLDS.has(h.slice(h.lastIndexOf('.') + 1));
   }
 
+  // Il computer stesso, in ogni grafia (anche l'IPv4 dentro l'IPv6, come la scrive un comando o come la riscrive URL):
+  // la sola regola per i link e per i comandi che escono (#1840).
+  function questoComputer(host) {
+    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
+    return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '0.0.0.0'
+      || /^(?:::ffff:)?127\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(h) || /^::ffff:7f[0-9a-f]{2}:[0-9a-f]{1,4}$/.test(h);
+  }
+
   // Host che parlano quasi sempre in chiaro (dev, router/IoT su IP privato, rete di casa):
   // per loro lo schema di default è http. Accetta anche la forma IPv6 fra parentesi ([::1]).
   function isLocalHost(host) {
