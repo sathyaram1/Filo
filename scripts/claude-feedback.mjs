@@ -27,6 +27,7 @@
 //
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale
+//                                                         [--server]
 //                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
