@@ -264,6 +264,10 @@
         { campo: 'titolo', lunghezza: parole, massimo: TETTI.paroleTitolo });
     }
     if (!PRIORITA.includes(input.priorita)) return no('priorita_non_valida', `la priorità va scelta fra ${PRIORITA.join(', ')}`, { campo: 'priorita' });
+    if (input.tipo != null && !TIPI_DOMANDA.includes(input.tipo)) {
+      return no('domanda_non_valida', `il tipo va scelto fra ${TIPI_DOMANDA.join(', ')}: «da_fare» è un passo che solo l’owner può fare`, { campo: 'tipo' });
+    }
+    const fare = input.tipo === 'da_fare';
     const testi = {};
     for (const campo of ['contesto', 'problema', 'notePerAgenti', 'gruppo']) {
       const r = testoFacoltativo(input, campo, TETTI[campo]);
