@@ -302,10 +302,9 @@
     }
     const b = d.bubblesEl.contains(el) ? bollaDi(el) : null;
     if (!b) return [];
-    return [
-      { type: 'item', icon: icona('reply', 16), label: 'Rispondi', onClick: () => rispondi(b) },
-      { type: 'item', icon: icona('copy', 16), label: 'Copia il messaggio', onClick: () => { copia(b).catch(() => {}); } },
-    ];
+    // Prima l'azione che porta avanti la conversazione, come nei tasti a schermo dopo Copia.
+    const ordine = azioniDi(b).sort((x, y) => (x === 'copia') - (y === 'copia'));
+    return ordine.map((a) => ({ type: 'item', icon: icona(AZIONI[a].icona, 16), label: AZIONI[a].voce, onClick: () => fai(a, b) }));
   }
 
   function init(deps) {
