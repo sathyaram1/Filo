@@ -1395,6 +1395,7 @@
       describeDone: (a) => {
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome && r.dimentica) return `Dimenticata la rete Wi-Fi «${nome}»`;
         if (r.nome) return `Collegato il computer alla rete Wi-Fi «${nome}»`;
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
