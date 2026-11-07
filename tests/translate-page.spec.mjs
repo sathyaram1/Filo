@@ -2423,6 +2423,8 @@ for (const [nome, prima, dopo, scorri] of [
     await clickTranslateIcon(app);
     await expect(page.locator('#p1')).toHaveText(/^IT /, { timeout: 30000 });
     await expect.poll(async () => (await toasts(page)).join(' | '), { timeout: 30000 }).toContain('solo in parte');
+    // Il testo accanto, nella stessa sezione chiusa, è già tradotto: il componente è l'unico pezzo rimasto in inglese.
+    if (await page.locator('#psez').count()) await expect(page.locator('#psez')).toHaveText(/^IT /);
   });
 }
 
