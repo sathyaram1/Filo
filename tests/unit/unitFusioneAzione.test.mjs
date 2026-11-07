@@ -10,7 +10,9 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
-import { MARCA, leggiArgomenti, campoEsito, rigaEsito, codiceUscita } from '../../scripts/unit-fusione-azione.mjs';
+import {
+  MARCA, MARCA_PARTE, leggiArgomenti, campoEsito, rigaEsito, codiceUscita, unisciParti, partiDaAmbiente,
+} from '../../scripts/unit-fusione-azione.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const CARTELLA = join(ROOT, '.github', 'workflows');
