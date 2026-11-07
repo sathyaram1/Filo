@@ -92,7 +92,8 @@ test('#2258: la prova e la conferma passano dal main al server con quello che lâ
   await page.waitForFunction(() => window.filo);
 
   const prova = await manda(page, { type: 'fiducia_dichiara', feedbackId: 'srv-8', prova: true });
-  expect(prova).toEqual({ ok: true, stato: 1, visto: { stato: 1, app: PUNTA_APP, server: PUNTA_SRV }, rami: [
+  // Quando e da chi sono nati gli scritti sporchi arriva alla pagina; uno senza data non passa.
+  expect(prova).toEqual({ ok: true, stato: 1, scritti: [{ at: QUANDO, ruolo: 'fixer' }], visto: { stato: 1, app: PUNTA_APP, server: PUNTA_SRV }, rami: [
     { repo: 'app', punta: PUNTA_APP, motivo: 'una voce di biglietti non fidati' },
     { repo: 'server', punta: PUNTA_SRV, motivo: 'un buco nel registro' },
   ] });
