@@ -122,10 +122,10 @@
       const r = await R.sendMessage({ type: MSG.GET_SETTINGS });
       attuale = V.leggi((r && (r.settings || r)) || {}, v.percorso);
     } catch (_) { attuale = undefined; }
-    const perse = cosaSiPerde(attuale, valore);
+    const chiave = segreto(v);
+    const perse = cosaSiPerde(attuale, valore, chiave || scritto(v));
     if (perse.length) {
       const C = global.SN_CONFIRM_UI;
-      const chiave = segreto(v);
       const elenco = Array.isArray(attuale);
       const ok = C ? await C.confirm({
         title: chiave ? 'Togliere la chiave?' : elenco ? 'Svuotare l’elenco?' : 'Rimettere di serie?',
