@@ -1284,8 +1284,13 @@ async function nomeDellaScheda() {
 const proxyNonDisponibile = () => ({ proxy: 'non_disponibile' });
 const esitoNonDisponibile = (a) => !!(a && a._output && a._output.proxy === 'non_disponibile');
 const RISPOSTA_PROXY_NON_DISPONIBILE = 'Aprire un sito da un altro paese in Filo non si può ancora.';
+// Ogni avviso che chiede di riscrivere la risposta lo dice: GLM raccontava all'utente il perché («riscrivo, che il testo
+// è finito nelle note di lavoro», #1921.1), e per l'utente quella è la prima risposta.
+const RISCRIVI_SENZA_DIRLO = 'Scrivila come la prima volta: questo avviso e le note di lavoro sono solo per te, quindi non dire all\'utente che '
+  + 'stai riscrivendo, ripetendo o correggendo, né perché.';
 const SOLLECITO_DOPO_RIFIUTO = '[Il tuo ultimo messaggio è vuoto. Il testo che hai scritto insieme alle azioni l\'utente non l\'ha letto come risposta, '
-  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra.]';
+  + 'e dava per fatto quello che non è disponibile. Scrivi adesso la risposta completa per l\'utente, tenendo conto degli esiti qui sopra. '
+  + `${RISCRIVI_SENZA_DIRLO}]`;
 
 // Azioni che mettono un bottone in chat e basta: il loro esito si sa già quando le si chiama. Il bottone dell'evento
 // lo aziona l'utente, quindi non risulta «eseguito»: conta che sia in chat.
@@ -1301,7 +1306,7 @@ const giroDiSoliBottoni = (results) => results.length > 0 && results.every(({ ac
 const NON_RIPETERE_LA_RISPOSTA = 'Il testo che hai scritto insieme a questa chiamata l\'utente lo sta leggendo come risposta: non ripeterlo e non '
   + 'annunciare il bottone. Se non hai altro da fare, chiudi senza scrivere altro.';
 const RISPOSTA_FRA_LE_NOTE = 'Il testo che hai scritto insieme a queste chiamate l\'utente lo vede fra le note di lavoro, non come risposta: '
-  + 'se conteneva la risposta, riscrivila per intero nel prossimo messaggio.';
+  + `se conteneva la risposta, riscrivila per intero nel prossimo messaggio. ${RISCRIVI_SENZA_DIRLO}`;
 const doveStaIlTesto = (giro) => (giro && giro.risposta ? ` ${NON_RIPETERE_LA_RISPOSTA}` : '');
 const unisciTesti = (parti) => parti.map((t) => String(t || '').trim()).filter(Boolean).join('\n\n');
 // L'esito al modello di un'azione che il tetto ha tagliato a metà degli argomenti.
@@ -6990,7 +6995,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     notaRisposta = notes.pop();
     textReply = unisciTesti([...risposta, notaRisposta]);
   } else {
-    textReply = unisciTesti([...risposta, textReply]);
+    // L'avviso chiede al modello di riscrivere la risposta finita fra le note, ma non lo garantisce (#1921.1).
+    const sepolta = interrotta ? '' : GiroAzioni.rispostaFraLeNote(notes.slice(noteAllaRisposta), textReply);
+    if (sepolta) {
+      notaRisposta = sepolta;
+      notes.splice(notes.lastIndexOf(sepolta), 1);
+    }
+    textReply = unisciTesti([...risposta, sepolta, textReply]);
   }
   if (mutoDopoLetture) {
     senzaRisposta = { passi, motivo: 'muto_dopo_letture' };

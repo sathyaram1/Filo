@@ -1,5 +1,5 @@
 // Come partono le azioni di un giro della chat: aperture di pagina e letture di fila insieme, il resto una dopo l'altra
-// perché i suoi esiti decidono i passi dopo, consegnati nell'ordine del modello; e quando un giro chiude il turno.
+// perché i suoi esiti decidono i passi dopo; quando un giro chiude il turno, e quando una nota era la risposta.
 // Prove: tests/unit/giroAzioni.test.mjs.
 'use strict';
 
@@ -44,4 +44,16 @@ function chiudeIlTurno(esiti, { daLeggere = () => false, testo = '' } = {}) {
   });
 }
 
-module.exports = { eseguiGiro, chiudeIlTurno };
+// La risposta scritta insieme alle azioni, finita fra le note e non riscritta dall'ultimo giro (#1921.1): GLM a volte
+// chiude con la sola battuta che segue («Torniamo a noi: chi sei?»). Misurato con GLM: le riscritte stavano sopra il
+// 90% della nota, le battute sole sotto il 15%; le note di lavoro vere («Guardo il documento…») sotto i 100 caratteri.
+const NOTA_DA_RISPOSTA = 150;
+const FINALE_CHE_NON_LA_RIPORTA = 1 / 2;
+function rispostaFraLeNote(note, finale) {
+  const lunga = (Array.isArray(note) ? note : []).map((n) => String(n || '').trim())
+    .reduce((a, n) => (n.length > a.length ? n : a), '');
+  if (lunga.length < NOTA_DA_RISPOSTA) return '';
+  return String(finale || '').trim().length < lunga.length * FINALE_CHE_NON_LA_RIPORTA ? lunga : '';
+}
+
+module.exports = { eseguiGiro, chiudeIlTurno, rispostaFraLeNote };
