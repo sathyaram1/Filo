@@ -283,9 +283,7 @@
         return c.role === 'filo' && Md && Md.testo ? Md.testo(c.scritto) : c.scritto;
       },
       ruolo: (m) => (m.classList.contains('dash-riga-app-msg-user') ? 'user' : 'filo'),
-      rispondi: global.SN_DASH_RISPONDI && global.SN_DASH_RISPONDI.cita
-        ? (m, testo) => global.SN_DASH_RISPONDI.cita({ ...m._citabile, testo })
-        : null,
+      rispondi: (m, testo) => { global.SN_DASH_RISPONDI.cita({ ...m._citabile, testo }); },
     }));
   }
 
