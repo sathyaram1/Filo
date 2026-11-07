@@ -266,9 +266,7 @@
   }
 
   function hardSkipForTranslation(el) {
-    if (el.isContentEditable) return true;                  // testo dell'utente
-    if (el.getAttribute && el.getAttribute('translate') === 'no') return true;
-    if (el.classList && el.classList.contains('notranslate')) return true;
+    if (global.SN_CONST.nonDaTradurre(el)) return true;
     if (isFiloOwnUi(el)) return true;
     const nascosto = isVisibilityHidden(el);
     return nascosto ? (nascosto === 'visibility' ? 'visibility' : 'hidden') : false;
