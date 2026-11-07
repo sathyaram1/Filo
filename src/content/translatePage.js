@@ -460,21 +460,15 @@
     if (isInsideFiloUi(f)) return 'skip';
     const nascosto = frameHidden(f);
     if (nascosto) {
-      // Un pixel di tracciamento nascosto resta un pixel; uno senza misura (scheda spenta) non si sa, e si traduce.
-      if (modo === Extract.NASCOSTE.TRADUCI) return pixel(f) ? 'skip' : 'background';
+      // Trasparente fuori dallo schermo: il testo accanto si traduce come visibile, e il riquadro con lui, fuori conto
+      // perché l'avviso non cambi con lo scorrimento (#1290.2).
+      if (modo === Extract.NASCOSTE.TRADUCI || nascosto === 'trasparente') return frameTooSmall(f, true) ? 'skip' : 'background';
       return 'folded';
     }
     // Una scheda spenta del tutto toglie al riquadro anche la misura: per la riapertura conta che sia nascosto,
     // non quanto è grande adesso (la misura la riguarda chi si chiede se si è scoperto).
     if (frameTooSmall(f)) return 'skip';
     return 'shown';
-  }
-
-  function pixel(f) {
-    try {
-      const r = f.getBoundingClientRect();
-      return r.width > 0 && r.height > 0 && (r.width < FRAME_MIN_W || r.height < FRAME_MIN_H);
-    } catch (_) { return false; }
   }
 
   // Anche i riquadri dentro i componenti aperti del sito: un incorporato avvolto in un componente è la norma. E quelli
