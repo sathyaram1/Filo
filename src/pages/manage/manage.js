@@ -679,7 +679,7 @@
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
-      mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
+      mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...mgUnitWindowsRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
       ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
     }
