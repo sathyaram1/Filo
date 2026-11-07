@@ -15,5 +15,5 @@ html,body{background:transparent;overflow:hidden;height:100%;
   border:1px solid var(--border);
   background:var(--bg);
   color:var(--fg);
-  box-shadow:0 4px 16px rgba(0,0,0,calc(0.18 * var(--sn-ombra, 1)));
+  box-shadow:0 4px 16px rgba(0,0,0,var(--sn-shadow-opacity, 0.18));
 }
