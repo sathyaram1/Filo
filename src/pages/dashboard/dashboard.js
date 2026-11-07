@@ -3015,7 +3015,7 @@
   // Hook per i test Playwright: rende azioni come farebbe una bolla di chat, senza l'LLM.
   window.__filoDashActions = {
     renderActions: Att.renderActions,
-    // Le parole dell'utente che una conferma rimanda al main: senza, un costo 4 non risulta chiesto (#1312).
+    // Le parole dell'utente che una conferma rimanda al main: un segreto che ha scritto lui può uscire (#810).
     scriveUtente: (testo) => { threadHistory.push({ role: 'user', text: String(testo || '') }); },
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
