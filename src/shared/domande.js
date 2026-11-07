@@ -139,7 +139,8 @@
     'smistamento', 'principioContestato']);
   const CAMPI_OPZIONE = Object.freeze(['testo', 'pro', 'contro', 'azione']);
 
-  function validaOpzione(o, i, perOwner) {
+  // Pro e contro servono a scegliere: un «da fare» non chiede una scelta, e li ha facoltativi.
+  function validaOpzione(o, i, perOwner, daFare) {
     const n = i + 1;
     if (!isOggetto(o)) return no('opzione_non_valida', `l'opzione ${n} non è un oggetto con testo, pro, contro e azione`, { campo: `opzioni[${i}]` });
     const ignoti = Object.keys(o).filter((k) => !CAMPI_OPZIONE.includes(k));
