@@ -454,10 +454,12 @@ test('il censimento da zero deciso dall\'owner si lancia una volta sola, al FERM
   const mattino = RUOLO.slice(RUOLO.indexOf('- **`mattino`**'), RUOLO.indexOf('- **gli altri motivi**')).replace(/\s+/g, ' ');
   const frase = mattino.slice(mattino.indexOf('**Una volta sola, deciso dall\'owner**'), mattino.indexOf('npm run manutentore -- contesto'));
   assert.ok(frase.startsWith('**Una volta sola'), 'la frase una tantum sta nel mattino, prima del contesto');
-  assert.match(frase, /col FERMO, se il taccuino non dice già che l'hai fatto/);
+  assert.match(frase, /col FERMO, o col censimento «in corso» nel taccuino/);
   assert.ok(frase.indexOf('`scrivi --da-zero`') < frase.indexOf('`rileggi`'), 'prima la scrittura da zero, poi la rilettura');
-  assert.match(frase, /il giorno nel taccuino/);
-  assert.match(frase, /apri un feedback che toglie dal ruolo questa frase/);
+  // Dura ore e il sottofondo si ferma a due: segnarlo fatto al lancio lascerebbe il censimento a metà per sempre.
+  assert.match(frase, /lo rilanci uguale/, 'un giro interrotto si rilancia');
+  assert.match(frase, /lascia nel taccuino il censimento «in corso», che il mattino dopo riprende anche senza FERMO/);
+  assert.match(frase, /Solo a censimento finito scrivi il giorno nel taccuino e apri un feedback che toglie dal ruolo questa frase/);
 });
 
 // La prova a secco è dell'intera giornata: un battito che riscrivesse ordine e N la renderebbe bagnata un'ora dopo.
