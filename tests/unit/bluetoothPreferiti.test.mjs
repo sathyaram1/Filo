@@ -22,6 +22,31 @@ test('la chiave dei preferiti scrive l\'elenco degli indirizzi, e l\'elenco nuov
   assert.deepEqual(P.applicaElenco(s.build('svuota').elenco, correnti).partial, { bluetoothPreferiti: [] });
 });
 
+// Su Windows l'elenco dei dispositivi dà dodici cifre minuscole, su Mac coppie col trattino: un indirizzo scritto nella
+// forma coi due punti deve salvarsi in quella del sistema, o non corrisponde mai a niente.
+test('un indirizzo scritto in un\'altra forma si salva in quella dell\'elenco dei dispositivi, e un «togli» lo trova', () => {
+  const C = require('../../src/main/services/comandiSistema.js');
+  assert.equal(C.normalizzaIndirizzo('00:11:22:33:44:AA', 'win32'), '0011223344aa');
+  assert.equal(C.normalizzaIndirizzo('00:11:22:33:44:AA', 'darwin'), '00-11-22-33-44-aa');
+  assert.equal(C.normalizzaIndirizzo('0011223344aa', 'linux'), '00:11:22:33:44:AA');
+  assert.equal(C.normalizzaIndirizzo('cuffie', 'linux'), null);
+  for (const piattaforma of ['win32', 'darwin', 'linux']) {
+    const vero = C.normalizzaIndirizzo('00:11:22:33:44:aa', piattaforma);
+    assert.ok(C.INDIRIZZO[piattaforma].test(vero), `${piattaforma}: ${vero}`);
+  }
+  const prima = globalThis.SN_COMANDI_SISTEMA;
+  globalThis.SN_COMANDI_SISTEMA = { normalizzaIndirizzo: (p) => C.normalizzaIndirizzo(p, 'win32') };
+  try {
+    const correnti = { bluetoothPreferiti: ['0011223344aa'] };
+    const aggiungi = s.build('aggiungi 66:77:88:99:AA:BB');
+    assert.deepEqual(P.applicaElenco(aggiungi.elenco, correnti).partial.bluetoothPreferiti, ['0011223344aa', '66778899aabb']);
+    const togli = s.build('togli 00:11:22:33:44:AA');
+    assert.deepEqual(P.applicaElenco(togli.elenco, correnti).partial, { bluetoothPreferiti: [] });
+  } finally {
+    globalThis.SN_COMANDI_SISTEMA = prima;
+  }
+});
+
 test('un dispositivo detto per nome non diventa un indirizzo: la risposta dice di usare BLUETOOTH', () => {
   const r = s.build('aggiungi le cuffie Sony');
   assert.match(r.rifiuto, /BLUETOOTH/);
