@@ -71,6 +71,24 @@
     return d === 1 ? 'scade fra 1 giorno' : 'scade fra ' + d + ' giorni';
   }
 
+  // Il tempo dal sì, al secondo: una fusione dura minuti, e senza un tempo che scorre l'attesa sembra un blocco (#2250). PURA.
+  function trascorsoText(fromMs, nowMs) {
+    var da = Number(fromMs);
+    if (!isFinite(da) || da <= 0) return '';
+    var s = Math.max(0, Math.floor(((Number(nowMs) || Date.now()) - da) / 1000));
+    if (s < 60) return 'da ' + s + ' s';
+    var m = Math.floor(s / 60);
+    var resto = s % 60;
+    if (m < 60) return 'da ' + m + ' min ' + (resto < 10 ? '0' : '') + resto + ' s';
+    return 'da ' + Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  }
+
+  /** L'etichetta di «Approva e fondi» finché restano `n` voci chiuse: il tasto dice cosa fa il clic. PURA. */
+  function apriVociText(n) {
+    var k = Math.max(0, Math.floor(Number(n) || 0));
+    return k === 1 ? 'Apri l’altra voce' : 'Apri le ' + k + ' voci';
+  }
+
   /**
    * Il titolo dell'avviso. PURA.
    * Zero richieste → stringa vuota: chi non ne ha non deve vedere niente.
