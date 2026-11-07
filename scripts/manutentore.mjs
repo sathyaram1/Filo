@@ -583,7 +583,7 @@ export function testoPiccolo({ ruolo, stato, taccuino, schede, rami = [] }) {
     const [nome, peso] = pesi[0];
     const rimedio = nome === 'il taccuino' ? 'Riscrivi il taccuino più corto'
       : nome === 'lo stato coi segnali' ? 'Segna letti i segnali che hai già visto (segnali-letti)'
-        : nome.startsWith('le ') ? 'Riporta a 1 le schede che oggi non contano' : 'Leggi il contesto intero';
+        : nome.startsWith('le ') ? 'Togli dall\'ordine i lavori che non partiranno presto (bastano 2×N pronti)' : 'Leggi il contesto intero';
     return { ok: false, token, motivo: `il contesto piccolo stima ${token} token, il tetto è ${PICCOLO_TETTO_TOKEN}: pesa di più ${nome} (${peso} token). ${rimedio}, o leggi il contesto intero` };
   }
   return { ok: true, testo, token };
