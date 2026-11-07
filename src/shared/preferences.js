@@ -2012,12 +2012,19 @@
     {
       keys: ['bluetooth_preferiti', 'dispositivi bluetooth preferiti', 'preferiti bluetooth'],
       scrive: ['bluetoothPreferiti'],
-      aiuto: '"togli <indirizzi>" | "aggiungi <indirizzi>" | "solo <indirizzi>" | "svuota" (indirizzi Bluetooth come 00:11:22:33:44:55, '
-        + 'separati da virgole; per metterne uno detto per nome usa BLUETOOTH con dispositivo e preferito)',
+      aiuto: '"togli <indirizzi>" | "aggiungi <indirizzi>" | "solo <indirizzi>" | "svuota" (indirizzi Bluetooth in qualunque forma, '
+        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa BLUETOOTH con dispositivo e preferito)',
       costo: 1,
       risk: 'Cambia quali dispositivi Bluetooth stanno in cima all\'elenco della home.',
       build(v) {
-        const indirizzo = (p) => (/^[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{12}$/.test(String(p).trim()) ? String(p).trim() : null);
+        // Si salva nella forma dell'elenco dei dispositivi di questo sistema, l'unica che i preferiti confrontano: la regola
+        // la tiene src/main/services/comandiSistema.js (normalizzaIndirizzo).
+        const N = global.SN_COMANDI_SISTEMA && global.SN_COMANDI_SISTEMA.normalizzaIndirizzo;
+        const indirizzo = (p) => {
+          const t = String(p).trim();
+          if (!/^[0-9A-Fa-f]{2}([:-][0-9A-Fa-f]{2}){5}$|^[0-9A-Fa-f]{12}$/.test(t)) return null;
+          return N ? N(t) : t;
+        };
         const s = String(v == null ? '' : v).trim();
         const pezzi = s.replace(/^(aggiungi|togli|solo)\s+/i, '').split(/\s*,\s*|\s+e\s+/).filter(Boolean);
         if (!SVUOTA.test(s) && pezzi.some((p) => !indirizzo(p))) {
