@@ -134,7 +134,6 @@ test('lasciata nella chat dell\'Aiuto su un sito con gesto vero: gettone', async
   await Gesti.finestraASchermo(app);
   Gesti.trascina(await linguetta(app, shell, idArticolo), await Gesti.sulloSchermo(app, modulo, strato, '.sn-sidebar-input textarea'));
   await expect(casella).toHaveValue(/⟦/);
-  if (!process.env.AIUTO_INVIO) return;
   await app.evaluate(async () => {
     const C = globalThis.SN_CONST;
     await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: 'k-test' },
