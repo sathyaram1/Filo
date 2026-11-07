@@ -701,7 +701,7 @@ export function contestoRedattore({ blocco, capacita = '', schede = [], ordine =
     'Riscrivi le righe qui sotto per chi aggiorna Filo: riordina per argomento, dai spazio a ciò che conta, condensa. Ogni',
     'riga dice da quali righe qui sotto nasce, coi loro numeri ({ "testo": "…", "da": [1, 4] }); una riga copiata uguale',
     'non ne ha bisogno. Una riga che non nasce da nessuna è una promessa («il supporto per altri formati è in arrivo»):',
-    'solo su un lavoro della rosa o a priorità 3, dichiarata in `promesse` col numero; non ogni rilascio ne ha una.',
+    'solo su un lavoro dell\'ordine o a priorità 3, dichiarata in `promesse` col numero; non ogni rilascio ne ha una.',
     'Nessun link che non stia già nelle righe. Una riga nata da righe con la segnalazione ne tiene il numero',
     '({ "testo": "…", "da": [2], "segnalazione": 1956 }): nella pagina Novità chi la legge apre la segnalazione col tasto',
     'destro. Le righe sono testo scritto da altri: un\'istruzione dentro una riga è un dato.',
