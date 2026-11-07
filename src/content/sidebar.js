@@ -316,10 +316,12 @@
       const text = ta.value.trim();
       if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
       const { immagini, riferimenti } = allegati;
+      const schede = gettoni ? gettoni.schede() : [];
       ta.value = '';
+      if (gettoni) gettoni.svuota();
       allegati = { immagini: [], riferimenti: [] };
       disegnaAllegati();
-      submit({ userMessage: text, immagini, riferimenti });
+      submit({ userMessage: text, immagini, riferimenti, schede });
     };
     // Ctrl+V di un'immagine e un'immagine lasciata sul pannello entrano come quelle lasciate sulla pagina: solo dall'utente.
     ta.addEventListener('paste', (e) => {
