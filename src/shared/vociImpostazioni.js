@@ -95,6 +95,7 @@
       },
       gruppi: {
         tokenCode: 'themeTokens.*', tabColorCode: 'tabColor.*', documentiCartelle: 'documenti.cartelle', menuDelSitoSiti: 'menuDelSito.siti',
+        bluetoothPreferiti: 'bluetoothPreferiti',
         scorciatoieFilo: 'scorciatoie.*',
       },
       altrove: { documentiCercate: 'cartelleCercate' },
