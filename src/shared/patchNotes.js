@@ -78,6 +78,7 @@
       features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
+        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
       ],
     },
     {
