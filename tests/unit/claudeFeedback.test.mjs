@@ -373,6 +373,22 @@ test('#2217 --server, anche accanto a --non-locale, apre col segno lavoro server
   }
 });
 
+test('#2217 --server non fidato non promette le routine: va nei Ricevuti a chiedere la fiducia; fidato sì', async () => {
+  for (const [biglietto, promette] of [[undefined, false], ['sporco', false], ['pulito', true]]) {
+    const righe = [];
+    const orig = console.log;
+    console.log = (...a) => righe.push(a.join(' '));
+    try {
+      await conSubmit(async (_p, o) => ({ id: 'd12', seq: 912, senderProof: 'admin', localOnly: !!o.localOnly, ...(biglietto ? { biglietto } : {}) }), async () => {
+        assert.equal(await SCRIPT.main(['T', 'X', '--non-locale', '--server']), SCRIPT.EXIT.FATTO);
+      });
+    } finally { console.log = orig; }
+    const testo = righe.join('\n');
+    assert.equal(/lo prendono le routine/.test(testo), promette, `${biglietto}: ${testo}`);
+    if (!promette) assert.match(testo, /Ricevuti a chiedere la fiducia/);
+  }
+});
+
 test('#908 --non-locale: stessa prova del mittente, ma è per le routine', async () => {
   const righe = [];
   const orig = console.log;
