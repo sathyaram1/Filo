@@ -817,9 +817,7 @@
     const guarda = () => {
       aperturaTimer = null;
       if (!vale()) return;
-      const aperta = !!(Extract && typeof Extract.hasRevealedText === 'function' && Extract.hasRevealedText(hiddenSkipped))
-        || framesRevealed();
-      if (aperta) { translatePage({ daSola: true }); return; }
+      if (scoperto()) { translatePage({ daSola: true }); return; }
       if (++i < APERTURA_MS.length) aperturaTimer = setTimeout(guarda, APERTURA_MS[i] - APERTURA_MS[i - 1]);
     };
     aperturaTimer = setTimeout(guarda, APERTURA_MS[0]);
