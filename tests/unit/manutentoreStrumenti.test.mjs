@@ -79,6 +79,23 @@ test('feedback e pacchetto con --server mandano il segno lavoro server, e dicono
   assert.deepEqual(pSenza.inviati[0].dati, { numero: '2220', unisce: ['2215', '2216'] });
 });
 
+// #2217 giro 1: il segno con l'uguale non lo accende `vuoleServer`, quindi si rifiuta invece di perderlo in silenzio.
+test('--server=valore non parte: il segno non prende valori', () => {
+  for (const argv of [['feedback', 'Titolo', '-', '--server=true'], ['pacchetto', '2220', '2215', '--lavoro-server=si']]) {
+    const r = lancia(argv, {}, 'Testo.');
+    assert.notEqual(r.status, 0, argv.join(' '));
+    assert.deepEqual(r.inviati, []);
+    assert.match(r.out, /--server non prende valori/);
+  }
+});
+
+test('la riga sul segno dice se aspetta il timbro dell\'owner', () => {
+  assert.match(M.rigaSegnoServer(true, { lavoroServer: true, fiducia: 'fidato' }), /è fidato, lo prendono i lavori server/);
+  assert.match(M.rigaSegnoServer(true, { lavoroServer: true, fiducia: 'non_fidato' }), /non fidato: va nei Ricevuti/);
+  assert.match(M.rigaSegnoServer(true, { lavoroServer: true }), /non fidato: va nei Ricevuti/);
+  assert.equal(M.rigaSegnoServer(false, { lavoroServer: true }), '');
+});
+
 test('registro, spesa e domande ferme vengono dalla chiave del manutentore, non dalle credenziali dell\'owner', () => {
   const r = lancia(['registro', 'account', 'quote'], { registro: { ok: true, voci: [{ id: 'D-3', titolo: 'Prima B', principio: 'Si usa B prima di A.' }] } });
   assert.deepEqual(r.inviati, [{ op: 'registro', dati: { parole: 'account quote' }, cred: 'chiave' }]);
