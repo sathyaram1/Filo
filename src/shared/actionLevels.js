@@ -87,41 +87,6 @@
     return !nominati.length || nominati.some((h) => !questoComputer(h));
   }
 
-  const pianoTesto = (t) => String(t == null ? '' : t).toLowerCase()
-  function unoDiDistanza(a, b) {
-    if (a === b) return true;
-    if (Math.abs(a.length - b.length) > 1) return false;
-    let i = 0;
-    while (i < a.length && i < b.length && a[i] === b[i]) i++;
-    return a.slice(i + 1) === b.slice(i + 1) || a.slice(i) === b.slice(i + 1) || a.slice(i + 1) === b.slice(i);
-  }
-  // Una parola scritta vale quella cercata se è uguale o, da sei lettere in su, a un errore di battitura. Un numero solo uguale.
-  const simile = (w, p) => w === p || (!/^\d+$/.test(p) && p.length >= 6 && unoDiDistanza(w, p));
-  function contiene(scritte, nome) {
-    const pz = pianoTesto(nome).split(' ').filter(Boolean);
-    if (!pz.length) return false;
-    for (let i = 0; i + pz.length <= scritte.length; i++) if (pz.every((p, k) => simile(scritte[i + k], p))) return true;
-    return false;
-  }
-  const righeScritte = (testo) => String(testo == null ? '' : testo).split(/\n+/)
-    .map((riga) => ({ riga, scritte: pianoTesto(riga).split(' ').filter(Boolean) })).filter((x) => x.scritte.length);
-  const nominaUna = (scritte, nomi) => nomi.some((n) => contiene(scritte, n));
-  const haVerbo = (scritte, verbi) => scritte.some((w) => verbi.some((v) => verbo(w, v)));
-  function nominata(testo, { frasi = [], verbi = [], oggetti = [] } = {}) {
-    return righeScritte(testo).some(({ scritte }) => nominaUna(scritte, frasi) || (haVerbo(scritte, verbi) && nominaUna(scritte, oggetti)));
-  }
-
-  // Un freno tolto è chiesto se l'utente ha chiesto QUEL cambio, nel suo verso: il valore che ha scritto, letto dal setter
-  // stesso, dà la stessa impostazione dell'azione («tetto a 20» non chiede 500, «Conservativo» non chiede Automatico);
-  // senza un valore, un verbo che dice il verso sul nome della voce («spegni», «aumenta»). Le `contrarie` nominano la voce
-  // al rovescio («usa i modelli proprietari» spegne «solo modelli aperti»). Mai la sola parola: «cambio automatico» no.
-  const VERBI_ACCENDE = ['attiv', 'riattiv', 'accend', 'riaccend', 'abilit', 'us', 'consent', 'permett'];
-  const VERBI_SPEGNE = ['spegn', 'disattiv', 'disabilit', 'togl', 'togli', 'lev', 'rimuov'];
-  const VERBI_ALZA = ['alz', 'rialz', 'aument', 'raddopp', 'triplic'];
-  const VERBI_AGGIUNGE = ['aggiung', 'mett', 'inser', 'fid', 'consent', 'permett'];
-  const VERBI_TOGLIE = ['togl', 'togli', 'lev', 'rimuov', 'elimin', 'cancell', 'escl', 'sblocc'];
-  const SITO_DETTO = /(?:[a-z0-9-]+\.)+[a-z]{2,}/gi;
-  const NUMERO_DETTO = /\d+(?:[.,]\d+)?/g;
   function chiestaPreferenza(a, ctx) {
     const P = global.SN_PREF;
     if (!P || !P.paroleDellaVoce || !P.buildPreferencePartial) return false;
