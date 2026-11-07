@@ -39,6 +39,7 @@ function finestraFinta(origine = 'https://sito.example') {
     addEventListener(tipo, fn, cattura) { ascolti.push({ tipo, fn, cattura }); },
     MutationObserver: class { constructor(cb) { this.cb = cb; } observe() { osservatori.push(this.cb); } },
     caricato(f) { for (const a of ascolti) if (a.tipo === 'load' && a.cattura) a.fn({ target: f }); },
+    ascoltiFinestra: () => ascolti,
     rimesso(n) { for (const cb of osservatori) cb([{ addedNodes: [n] }]); },
   };
   doc.defaultView = win;
