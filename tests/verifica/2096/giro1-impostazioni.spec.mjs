@@ -20,7 +20,7 @@ test('Preferenze: Rimetti di serie su un interruttore lo rimette acceso, a scher
 
 test('Modelli: il tasto destro sulla chiave OpenRouter non la cancella con un clic senza ritorno', async ({ app, openTab }) => {
   test.setTimeout(90_000);
-  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ apiKeys: { openrouter: 'sk-or-v1-chiave-mia' } }); });
+  await app.evaluate(async () => { await globalThis.SN_STORAGE.updateSettings({ useDefaultModels: false, apiKeys: { openrouter: 'sk-or-v1-chiave-mia' } }); });
   const page = await openTab('filo://options/options.html');
   const campo = page.locator('#apiKey');
   await expect(campo).toBeVisible({ timeout: 10_000 });
