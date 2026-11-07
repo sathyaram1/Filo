@@ -187,7 +187,10 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   `fidato`, nei Ricevuti L3 come richiesta di renderlo fidato, e «Segna fidato» lo
   rimette `todo` come lavoro server nello stesso gesto. Il segno `localOnly` (by
   `routine`) lo prende già entrando in `design`/`fidato`, da qualunque strada (#2217): la
-  fiducia resta quella di prima.
+  fiducia resta quella di prima. Al contrario, un lavoro server non fidato che andrebbe
+  `todo` (dopo i giudici, o col `pacchetto --server` del manutentore) va in `design`/`fidato`:
+  in coda nessuna routine lo prenderebbe. Dai Ricevuti il tasto che lo rimette in coda
+  lo segna anche fidato.
 
 **Regole dure:** da `unlabeled` il verdetto lo scrive solo la pipeline; l'owner lo mette in
 coda o lo archivia. Da `suspicious_file`, `done`, `archived` e `*_confirmed` esce solo
