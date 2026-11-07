@@ -1,7 +1,7 @@
 // Esplorazione del giro 3 di #1882: Cerca dalle altre pagine di Filo (Editor, home) e un modulo su richiesta (QR).
 import { test, expect } from '../../fixtures/electron.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
-import { nelMondoDiFilo, statoDi } from '../../helpers/riquadri.mjs';
+import { nelMondoDiFilo, statoDi, paginaDelloStrato } from '../../helpers/riquadri.mjs';
 
 const oggi = (app) => app.evaluate(async () => {
   const s = await globalThis.SN_CONTATORI_MAIN.letto();
