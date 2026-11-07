@@ -1171,6 +1171,16 @@ export async function operazione(t, op, dati, opts) {
   };
 }
 
+/**
+ * La riga di `segnala` riuscita. Un rosso su main già aperto il server lo fa nota (#2226, risposta `nota: true` col
+ * numero del feedback che lo copre): la riga lo dice, perché chi l'ha scritta non riprovi né cerchi altrove.
+ */
+export function testoSegnalaRiuscita(body = {}) {
+  const dove = body.num || body.id;
+  if (body.nota) return `OK: aggiunta come nota a ${dove}, che segue già lo stesso rosso su main: non riprovare.`;
+  return `OK: segnalazione ${dove} aperta (${body.fiducia === 'fidato' ? 'fidata' : 'non fidata'}).`;
+}
+
 /** I dati di un'operazione dalla riga (`'{"id":"…"}'`) o da stdin; '' → {}. PURA. → { dati } | { errore } */
 export function datiOperazione(grezzo) {
   const t = String(grezzo || '').trim();
