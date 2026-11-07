@@ -653,7 +653,7 @@ test('regola del freno sulle preferenze: spegnere una difesa o alzare il tetto v
   assert.equal(AL.costoFor({ type: 'IMPOSTA_PREFERENZA', chiave: 'chiave_tavily', valore: 'tvly-abc' }), 4);
 });
 
-test('#1312: il costo 4 parte solo se l\'utente l\'ha chiesto con parole sue, anche con un errore di battitura', () => {
+test('#1312, strada B: il costo 4 lo decide lo stato, non le parole: a compito pulito la parola, dopo una lettura no', () => {
   const att = { autonomia: { livello: 'default' }, monthlyLimitEur: 5, openWeightsOnly: true };
   const casi = [
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['mettiti ad automatico', 'alza la tua autnomia', 'Scelgo Automatico.']],
