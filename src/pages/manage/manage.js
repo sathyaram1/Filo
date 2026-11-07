@@ -5436,8 +5436,9 @@
     if (!UI || !ferme.length || !isAdmin) return host;
     // Chi riallinea una fusione approvata e non avvenuta lo dice lo stato della pratica, come il quadrato (#1425).
     const stato = liv.statoFusione;
-    const riallineamento = stato === 'da_riallineare' || stato === 'riallineamento_fallito'
-      ? () => ({ inCorso: stato === 'da_riallineare' })
+    const ria = liv.riallineamento || {};
+    const riallineamento = stato === 'da_riallineare' || stato === 'riallineamento_fallito' || stato === 'attende_domanda'
+      ? () => ({ inCorso: stato === 'da_riallineare', domanda: ria.domanda || '', motivo: ria.motivo || '' })
       : null;
     UI.render(host, opzioniFusioni({
       requests: ferme.filter((r) => !r.used),
