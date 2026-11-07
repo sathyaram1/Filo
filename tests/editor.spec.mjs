@@ -431,9 +431,11 @@ test('una selezione che parte da una voce di elenco e finisce in un\'altra voce 
   await page.keyboard.type('tre');
   await page.keyboard.press('Shift+ArrowUp');
   await page.keyboard.press('Shift+ArrowUp');
+  // Dove la freccia posa l'inizio della selezione nella prima voce lo decide la larghezza delle lettere.
+  const davanti = await page.evaluate(() => { const r = getSelection().getRangeAt(0); return r.startContainer.nodeValue.slice(0, r.startOffset); });
   let ms = await incolla(app, page, righe.join('\n'));
   expect(ms, `incolla da voce a voce durato ${ms} ms`).toBeLessThan(2_000);
-  expect(await blocchi(page, '#doc li')).toEqual(['unoR0', ...righe.slice(1)]);
+  expect(await blocchi(page, '#doc li')).toEqual([`${davanti}R0`, ...righe.slice(1)]);
 
   const prima = await selezione(page, '<ul><li>voce uno</li><li>voce due</li></ul><p>paragrafo dopo</p>',
     'r.setStart(d.querySelectorAll("li")[1].firstChild, 3); r.setEnd(d.querySelector("p").firstChild, 5);');
