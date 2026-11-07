@@ -736,7 +736,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
    pre-wrap, che renderebbe letterali gli a-capo fra i blocchi. */
 .dash-bubble-md { white-space: normal; }
 .dash-bubble-md p { margin: 0 0 8px 0; }
-.dash-bubble-md p:last-child { margin-bottom: 0; }
+/* I tasti del messaggio stanno in fondo alla bolla ma fuori dal testo: l'ultimo paragrafo resta l'ultimo (#2096). */
+.dash-bubble-md p:last-child, .dash-bubble-md p:has(+ .dash-msg-azioni:last-child) { margin-bottom: 0; }
 .dash-bubble-md h3, .dash-bubble-md h4, .dash-bubble-md h5, .dash-bubble-md h6 {
   margin: 10px 0 4px 0; font-weight: 600; font-size: 1em;
 }
