@@ -206,6 +206,7 @@ namespace FiloWlan {
     [DllImport("wlanapi.dll")] static extern int WlanConnect(IntPtr maniglia, ref Guid interfaccia, ref Parametri parametri, IntPtr riservato);
     [DllImport("wlanapi.dll")] static extern int WlanQueryInterface(IntPtr maniglia, ref Guid interfaccia, int codice, IntPtr riservato, out int dimensione, out IntPtr dati, IntPtr tipo);
     [DllImport("wlanapi.dll")] static extern void WlanFreeMemory(IntPtr memoria);
+    [DllImport("wlanapi.dll", CharSet = CharSet.Unicode)] static extern int WlanDeleteProfile(IntPtr maniglia, ref Guid interfaccia, string profilo, IntPtr riservato);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct Parametri {
