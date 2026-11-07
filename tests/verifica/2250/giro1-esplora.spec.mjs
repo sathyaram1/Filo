@@ -110,6 +110,26 @@ test('scheda come #1867: «Apri le 16 voci»; in volo, richiusa e riaperta, il t
   expect(Number((testo || '').match(/\d+/)?.[0])).toBeGreaterThanOrEqual(3);
 });
 
+test('tema chiaro, Automazioni: i due stati del tasto a pagina intera', async ({ openTab }) => {
+  const blocks = [{ gate: 'child_process', gruppo: 'capacita', label: 'Avvia un programma esterno', voci: voci(20, 'c') }];
+  const page = await apri(openTab, [], { pending: [richiesta('6'.repeat(24), 'nessuno', 1680, blocks)] });
+  await page.evaluate(() => window.__mgTest.selectTab ? window.__mgTest.selectTab('automation') : null);
+  const { apriScheda } = await import('../../helpers/gestione.mjs');
+  await apriScheda(page, 'automation');
+  const card = page.locator('#mgMergeApprovalsOrphans .sn-mac-card');
+  await expect(card).toBeVisible({ timeout: 8_000 });
+  const go = card.locator('.sn-mac-btn-go');
+  await go.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/verifica-2250-chiaro-chiuse.png' });
+  await go.click();
+  await go.click();
+  await go.click();
+  await expect(go).toHaveText('Sto fondendo');
+  await page.waitForTimeout(2_200);
+  await go.scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/verifica-2250-chiaro-volo.png' });
+});
+
 test('tema scuro: in volo rotella visibile sul tasto e tempo leggibile', async ({ openTab }) => {
   const blocks = [{ gate: 'child_process', gruppo: 'capacita', label: 'Avvia un programma esterno', voci: voci(20, 'c') }];
   const page = await apri(openTab, [fb('f1685', 1685, { status: 'design', statusReason: 'l5' })],
