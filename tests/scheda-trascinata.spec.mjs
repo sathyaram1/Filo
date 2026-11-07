@@ -261,3 +261,162 @@ test('#2085 nell\'Aiuto sopra un sito: gettone nel campo, pagina letta all\'invi
   await expect.poll(() => app.evaluate(() => JSON.stringify(globalThis.__visti || [])), { timeout: 15_000 }).toContain('Falcon Heavy');
   await scatta(aiuto, 'gettone-aiuto');
 });
+
+// Una scheda lasciata nel campo della home dalla fila, con la home davanti: torna la Page della home e l'id della scheda.
+async function gettoneNellaHome(app, shell, openTab, testServer, titolo = 'Articolo sulla Tesla') {
+  const url = testServer.html(`<title>${titolo}</title><p>La Tesla Roadster è volata nello spazio su un Falcon Heavy.</p>`);
+  await openTab(url);
+  const sorgente = await idPerUrl(shell, url);
+  const casa = (await schede(shell)).find((t) => String(t.url).startsWith('filo://newtab'));
+  await attiva(shell, casa.id);
+  const page = await home(app);
+  const verso = await puntoInPagina(app, page, '#input');
+  await prendi(shell, await linguetta(shell, sorgente));
+  await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+  await shell.mouse.up();
+  await expect(page.locator('.sn-gettoni-fondo .sn-gettone')).toHaveCount(1, { timeout: 5000 });
+  return { page, sorgente, url, casa: casa.id };
+}
+
+const davanti = (shell) => shell.evaluate(async () => (await window.filoShell.tabs.snapshot()).activeId);
+const statoDelCampo = (page) => page.evaluate(() => ({ v: document.getElementById('input').value, n: document.getElementById('input')._snGettoni.schede().length }));
+
+test('#2085 il clic su un gettone di una scheda aperta la porta davanti, dal campo e dal filo', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const { page, sorgente, casa } = await gettoneNellaHome(app, shell, openTab, testServer);
+  const g = await page.locator('.sn-gettoni-fondo .sn-gettone').boundingBox();
+  await page.mouse.click(g.x + g.width / 2, g.y + g.height / 2);
+  await expect.poll(() => davanti(shell), { timeout: 5000 }).toBe(sorgente);
+  const quante = (await schede(shell)).length;
+
+  await attiva(shell, casa);
+  await modelloFinto(app, [{ text: 'Con un razzo.' }]);
+  try {
+    await page.locator('#sendBtn').click();
+    const b = page.locator('.dash-bubble-user .sn-bolla-gettone').last();
+    await expect(b).toBeVisible({ timeout: 15_000 });
+    await b.click();
+    await expect.poll(() => davanti(shell), { timeout: 5000 }).toBe(sorgente);
+    // Davanti quella che c'era: nessuna scheda nuova.
+    expect((await schede(shell)).length).toBe(quante);
+  } finally { await ripristina(app); }
+});
+
+test('#2085 nell\'Aiuto sopra un sito: la carta sta sotto il gettone, e il clic porta davanti la scheda', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const url = testServer.html('<title>Articolo sulla Tesla</title><p>Falcon Heavy</p>');
+  await openTab(url);
+  const sorgente = await idPerUrl(shell, url);
+  const sito = await openTab(testServer.html('<title>Un sito</title><p>un sito qualunque'));
+  const id = await davanti(shell);
+  await shell.evaluate((tabId) => window.filoShell.tabs.help(tabId), id);
+  const aiuto = await paginaDellAiuto(app, sito);
+  await aiuto.waitForSelector('.sn-sidebar-input textarea', { timeout: 8000 });
+  const verso = await puntoNelloStrato(app, aiuto, '.sn-sidebar-input textarea');
+  await prendi(shell, await linguetta(shell, sorgente));
+  await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+  await shell.mouse.up();
+  const gettone = aiuto.locator('.sn-gettoni-fondo .sn-gettone');
+  await expect(gettone).toHaveCount(1, { timeout: 5000 });
+
+  const g = await gettone.boundingBox();
+  await aiuto.mouse.move(g.x + g.width / 2, g.y + g.height / 2);
+  await aiuto.mouse.move(g.x + g.width / 2 + 1, g.y + g.height / 2);
+  await expect.poll(() => cartaVisibile(app), { timeout: 5000 }).toBe(true);
+  // La carta appena sotto il gettone, nei px della barra: il conto passa dallo strato, non dalla scheda.
+  const sotto = await puntoNelloStrato(app, aiuto, '.sn-gettoni-fondo .sn-gettone');
+  const carta = await app.evaluate(({ BrowserWindow }) => {
+    const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs && !x.isDestroyed() && !x._filoIncognito);
+    const c = BrowserWindow.getAllWindows().find((x) => !x.isDestroyed() && x.webContents.getURL().includes('anteprima.html') && x.isVisible());
+    const cb = w.getContentBounds();
+    const b = c.getBounds();
+    return { x: b.x - cb.x, y: b.y - cb.y, zs: w.webContents.getZoomFactor() || 1 };
+  });
+  expect(Math.abs(carta.x / carta.zs - (sotto.x - Math.min(24, g.width / 2)))).toBeLessThan(40);
+  expect(carta.y / carta.zs).toBeGreaterThan(sotto.y - 4);
+  expect(carta.y / carta.zs).toBeLessThan(sotto.y + 60);
+
+  await aiuto.mouse.click(g.x + g.width / 2, g.y + g.height / 2);
+  await expect.poll(() => davanti(shell), { timeout: 5000 }).toBe(sorgente);
+});
+
+test('#2084 lasciata su un campo modificabile ci scrive titolo e indirizzo, su un campo per indirizzi solo l\'indirizzo', async ({ app, shell, openTab, testServer }) => {
+  const sorgenteUrl = testServer.html('<title>Ricetta del pane</title><p>farina');
+  await openTab(sorgenteUrl);
+  const sorgente = await idPerUrl(shell, sorgenteUrl);
+  const campo = await openTab(testServer.html(`<title>Posta</title>
+    <div id="ce" contenteditable="true" style="margin:40px;width:400px;height:100px;border:1px solid">Ciao, </div>
+    <input id="u" type="url" style="margin:40px;width:400px">`));
+  for (const [sel, leggi] of [['#ce', (p) => p.locator('#ce').innerText()], ['#u', (p) => p.locator('#u').inputValue()]]) {
+    const verso = await puntoInPagina(app, campo, sel);
+    await prendi(shell, await linguetta(shell, sorgente));
+    await shell.mouse.move(verso.x, verso.y, { steps: 8 });
+    await shell.mouse.up();
+    await expect.poll(() => leggi(campo), { timeout: 5000 }).toContain(sorgenteUrl);
+  }
+  const testo = await campo.locator('#ce').innerText();
+  expect(testo.startsWith('Ciao,')).toBe(true);
+  expect(testo).toContain('Ricetta del pane');
+  expect(await campo.locator('#u').inputValue()).toBe(sorgenteUrl);
+});
+
+test('#2085 un messaggio con una scheda, riletto da una home nuova o ricaricata, tiene il gettone', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(90_000);
+  const { page } = await gettoneNellaHome(app, shell, openTab, testServer);
+  await page.locator('#input').focus();
+  await page.keyboard.press('Home');
+  await page.keyboard.type('di cosa parla ');
+  await modelloFinto(app, [{ text: 'Con un razzo.' }]);
+  try {
+    await page.locator('#sendBtn').click();
+    await expect(page.getByText('Con un razzo.')).toBeVisible({ timeout: 15_000 });
+  } finally { await ripristina(app); }
+  const nuova = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+  const altra = await home(app, { scheda: nuova?.id });
+  const bolla = (p) => p.locator('.dash-bubble-user').filter({ hasText: 'di cosa parla' });
+  await expect(bolla(altra).locator('.sn-bolla-gettone')).toContainText('Articolo sulla Tesla', { timeout: 10_000 });
+  await expect(bolla(altra)).not.toContainText('⟦');
+  await page.reload();
+  await expect(bolla(page).locator('.sn-bolla-gettone')).toContainText('Articolo sulla Tesla', { timeout: 10_000 });
+  await expect(bolla(page)).not.toContainText('⟦');
+});
+
+test('#2085 un gettone tolto e rimesso (Annulla, Taglia e Incolla) torna gettone con la sua scheda', async ({ app, shell, openTab, testServer }) => {
+  const { page } = await gettoneNellaHome(app, shell, openTab, testServer);
+  await page.locator('#input').focus();
+  await page.keyboard.press('End');
+  await page.keyboard.press('Backspace');
+  await page.keyboard.press('Backspace');
+  await expect.poll(async () => (await statoDelCampo(page)).n).toBe(0);
+  await page.keyboard.press('ControlOrMeta+z');
+  await expect.poll(async () => (await statoDelCampo(page)).v).toContain('⟦');
+  expect((await statoDelCampo(page)).n).toBe(1);
+
+  await page.evaluate(() => { const t = document.getElementById('input'); t.setSelectionRange(t.value.indexOf('⟦'), t.value.indexOf('⟧') + 1); });
+  await page.keyboard.press('ControlOrMeta+x');
+  await expect.poll(async () => (await statoDelCampo(page)).n).toBe(0);
+  await page.keyboard.type('vedi ');
+  await page.keyboard.press('ControlOrMeta+v');
+  await expect.poll(async () => (await statoDelCampo(page)).n).toBe(1);
+  await expect(page.locator('.sn-gettoni-fondo .sn-gettone')).toContainText('Articolo sulla Tesla');
+});
+
+test('#2084 a metà trascinamento sopra una vicina la linguetta la copre del tutto', async ({ shell, openTab, testServer }) => {
+  await openTab(testServer.html('<title>Articolo sulla Tesla volante</title><p>x'));
+  await openTab(testServer.html('<title>Modulo</title><p>y'));
+  const prima = await ordine(shell);
+  const mossa = prima.at(-2);
+  const da = await linguetta(shell, mossa);
+  await prendi(shell, da);
+  await shell.mouse.move(da.x + 90, da.y, { steps: 6 });
+  const copre = await shell.evaluate((i) => {
+    const el = document.querySelector(`.tab[data-id="${i}"]`);
+    const cs = getComputedStyle(el);
+    const m = cs.backgroundColor.match(/rgba?\(([^)]+)\)/);
+    const p = m ? m[1].split(',').map(parseFloat) : [];
+    return { trascinata: el.classList.contains('dragging'), visibile: Number(cs.opacity) * (p.length > 3 ? p[3] : 1) };
+  }, mossa);
+  await shell.mouse.up();
+  expect(copre.trascinata).toBe(true);
+  expect(copre.visibile).toBeGreaterThanOrEqual(0.99);
+});
