@@ -106,7 +106,7 @@ la memoria nel taccuino (§ 5). Si accende:
   sveglia (minimo 5 minuti), e il pacemaker la rispetta con un tetto suo,
   separato da quello del lavoro.
 
-Fermo su un guasto suo, invece, si accende solo al mattino (§ 7).
+Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
 **Cache.** Il manutentore vuole la cache a **un'ora**: il battito ogni 55
 minuti la tiene calda a costo di una rilettura. Se le sessioni cloud non
@@ -174,29 +174,41 @@ a chi deve indagare e non si ripete da solo (#1589 si è guastato sette volte in
 una notte). Il caso «ambiente rotto per tutti» lo copre la pausa del pacemaker
 sulle accensioni nate morte.
 
-**Un guasto suo** (#1249.3). Una sessione del manutentore che si chiude con un
-guasto (`--guasto` nel rilascio) lo lascia fermo fino alla prossima **sessione
-chiusa bene**, cioè arrivata al rilascio senza guasto. Intanto il pacemaker non
-lo accende per nessun motivo: né il battito, né un segnale (i guasti degli
-altri lavori, la fusione di una correzione che un lavoro aspettava, una domanda
-di processo), né una sveglia chiesta prima, che non suona. Ognuna di quelle
-accensioni cadrebbe sullo stesso guasto e ne dichiarerebbe un altro. Resta la
-decisione del mattino, che è il tentativo del giorno; prima lo riaccende solo
-l'owner, dalla chat. I segnali non letti restano per la prima sessione chiusa
-bene.
+**Un guasto suo** (#1249.3, #1249.4). La regola intera sta qui: gli altri testi
+rimandano a questo paragrafo e non la riscrivono. Una sessione del manutentore
+che si chiude con un guasto (`--guasto` nel rilascio) lo lascia fermo fino alla
+prossima **sessione chiusa bene**, cioè arrivata al rilascio senza guasto.
+Intanto il pacemaker non lo accende per nessun automatismo: né il battito, né
+un segnale (i guasti degli altri lavori, la fusione di una correzione che un
+lavoro aspettava, una domanda di processo, un deploy o una suite rossi), né una
+sveglia chiesta prima, che non suona. Ognuna di quelle accensioni cadrebbe
+sullo stesso guasto e ne dichiarerebbe un altro. Lo accendono solo:
+
+- la **decisione del mattino**, che è il tentativo del giorno;
+- l'**owner dalla chat**, quando chiede di farlo ripartire (di solito dopo aver
+  sistemato l'ambiente): subito, senza aspettare il mattino;
+- la risposta **«lascialo riprovare»** dell'owner alla domanda del controllo
+  qui sotto: subito anche lei;
+- l'**interruttore** del manutentore (o quello delle routine) che l'owner
+  riporta da spento ad acceso, di solito dopo aver scelto «spegnilo» e
+  sistemato l'ambiente: vale come «lascialo riprovare», che scrive la stessa
+  impostazione.
+
+I segnali non letti restano per la prima sessione chiusa bene.
 
 **Chi controlla il manutentore.** A interruttore acceso, se il server non vede
 una sua sessione chiusa bene da 26 ore (contate dall'ultima, o dall'accensione
 dell'interruttore se è più recente), apre una domanda per l'owner coi fatti:
 l'ultima sessione chiusa bene, le accensioni da allora e come sono finite (il
 guasto col suo messaggio, o la caduta senza rilascio), e due strade, spegnerlo
-o lasciarlo riprovare (azione `automazione`). Contano le chiusure, non le
+o lasciarlo riprovare (azione `automazione`, che lo accende subito anche se è
+fermo). Contano le chiusure, non le
 scritture nel taccuino: una sessione che scrive all'inizio e poi cade
 (contesto esaurito, processo ucciso, limite di sessione) non è chiusa bene.
-Una domanda alla volta, e la prima sessione chiusa bene la rende superata. Il
-compito che smista le domande non la tratta come un guasto da curare con un
-lavoro: chi lo curerebbe è il manutentore stesso, quindi arriva all'owner
-(SPEC-DOMANDE § 3.5, passo 1).
+Una domanda alla volta, e la prima sessione chiusa bene la rende superata. Va
+diretta all'owner, senza passare dal compito che smista le domande: lì un
+guasto si chiude con un lavoro che lo cura, e questo lo curerebbe il
+manutentore stesso. Lo decide il server, non le istruzioni di un agente.
 
 **Account.** Il manutentore spegne e riaccende; usa prima B; niente riserva
 su A. La spesa si dosa sulla settimana, più piena all'inizio; il limite delle
@@ -262,8 +274,6 @@ Il minimo di feedback; chi li prende usa sotto-agenti per area.
   dell'owner; via i tetti per priorità e la riserva su A;
 - sveglie (§ 4): segnali che accendono il manutentore, sveglia richiesta,
   tetto suo nel pacemaker; compito ricorrente quotidiano per la decisione;
-  fermo su un guasto suo, solo il mattino; il controllo sulle sessioni chiuse
-  bene (§ 7);
 - guasti (§ 7): via il rispetto globale; lavoro guasto fermo finché una nota del
   manutentore o una correzione non lo sblocca; domanda di processo nel rilascio
   che sveglia il manutentore;

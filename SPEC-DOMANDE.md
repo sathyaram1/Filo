@@ -486,9 +486,8 @@ rispondere.
      nei Ricevuti con la richiesta giusta (il rombo azzurro per la fiducia, il
      segno «chiede un permesso» per il resto), e la domanda si chiude lo
      stesso (`esito.smistata = 'ricevuti'`). All'owner non arriva mai una
-     domanda di guasto, tranne quella del controllo sul manutentore
-     (SPEC-MANUTENTORE.md § 7): il guasto è suo e nessun lavoro lo cura,
-     quindi passa al punto 3.
+     domanda di guasto. Quella del controllo sul manutentore non passa di
+     qui: va diretta all'owner (SPEC-MANUTENTORE.md § 7).
   2. **Il registro risponde.** Se il principio di una domanda chiusa copre il
      caso, risponde lui: l'opzione che il principio indica, e un testo che
      cita il principio e la domanda da cui viene. La domanda si chiude con
@@ -819,8 +818,8 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   contesto, una riga per ogni domanda aperta o in smistamento che ferma un
   feedback del suo ordine. Un guasto non anticipa mai l'istanza di chi ci è
   caduto, che cadrebbe di nuovo e ne aprirebbe un altro, in una fila di
-  accensioni senza fine; e mentre lei è ferma su un guasto suo non gliela
-  anticipa niente (SPEC-MANUTENTORE.md § 7).
+  accensioni senza fine. Mentre lei è ferma su un guasto suo, quali
+  accensioni restano lo dice SPEC-MANUTENTORE.md § 7.
 - **All'owner** arrivano solo le domande di prodotto e le sue, quando dopo
   l'indagine la scelta spetta a lui: soldi, sicurezza, permessi, gusto.
 - **Le sue leve:** ritmo e parallelismo (§ 4.5), quando lanciare riordino e
@@ -838,7 +837,7 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
 - **Una sessione al giorno**, che riparte dal taccuino, non un contesto che vive
   per sempre. Un segnale le anticipa l'istanza (SPEC-MANUTENTORE.md § 4):
   una sessione al giorno non basta a un feedback fermo. Ferma su un guasto
-  suo, invece, resta solo la sessione del giorno. Le indagini lunghe le fanno
+  suo, invece, la regola è in SPEC-MANUTENTORE.md § 7. Le indagini lunghe le fanno
   sotto-agenti, e il suo contesto resta piccolo.
 - **Segue un problema da vicino:**
   - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
@@ -847,7 +846,7 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
     rispetta con un tetto suo, separato da quello del lavoro.
 - **Chi controlla lei:** il server conta le sue sessioni chiuse bene, non le
   scritture nel taccuino, e quando da troppo non ne vede una apre una domanda
-  per l'owner (la soglia sta in SPEC-MANUTENTORE.md § 7).
+  per l'owner (regola, soglia e stato in SPEC-MANUTENTORE.md § 7).
 
 ### 4.4 Cosa minimizzare
 
@@ -1620,8 +1619,8 @@ lavorano in locale.
    gestione del lavoro, segnalazioni e domande di guasto che vanno a lei
    (campo `destinatario`, che manda all'owner i guasti dell'ambiente dei
    riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto,
-   e nessuna oltre al mattino mentre lei è ferma su un guasto suo; controllo
-   sulle sessioni chiuse bene;
+   e il fermo su un guasto suo con le accensioni che restano, chat compresa,
+   e il controllo sulle sessioni chiuse bene: SPEC-MANUTENTORE.md § 7;
    feedback per numero, azione `attendi`), la sua domanda di fine turno consegnata dopo
    l'ultima scrittura (§ 5.4), lanci per numeri, curva del parallelismo applicata dal
    server, indicatori, ambiti `esperimento` e `giudizio` con l'esito

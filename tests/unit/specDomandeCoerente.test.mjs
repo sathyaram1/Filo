@@ -200,24 +200,33 @@ test('un guasto non anticipa l\'istanza di chi ci è caduto, e un compito che no
   assert.match(sezione('## 13').replace(/\s+/g, ' '), /`destinatario`, che manda all'owner i guasti dell'ambiente dei riservati; istanza anticipata da un guasto, mai quella di chi l'ha aperto/);
 });
 
-// #1249.3: fermo su un guasto suo, ogni accensione anticipata (battito, segnali, sveglia) cade sullo stesso guasto; e
-// un controllo sulle scritture nel taccuino non vede una sessione che scrive e poi cade.
-test('fermo su un guasto suo il manutentore si accende solo al mattino, e il controllo conta le sessioni chiuse bene', () => {
-  const man = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\r\n/g, '\n');
-  const s7 = man.slice(man.indexOf('\n## 7.'), man.indexOf('\n## 8.')).replace(/\s+/g, ' ');
+// #1249.3: fermo su un guasto suo, ogni accensione automatica (battito, segnali, sveglia) cade sullo stesso guasto; e
+// un controllo sulle scritture nel taccuino non vede una sessione che scrive e poi cade. #1249.4: l'owner che ha
+// sistemato l'ambiente lo riaccende subito, dalla chat o rispondendo al controllo, senza aspettare il mattino.
+const manutentore = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\r\n/g, '\n');
+const paragrafo7 = manutentore.slice(manutentore.indexOf('\n## 7.'), manutentore.indexOf('\n## 8.'));
+
+test('fermo su un guasto suo il manutentore lo accendono il mattino e l\'owner, e il controllo conta le sessioni chiuse bene', () => {
+  const man = manutentore;
+  const s7 = paragrafo7.replace(/\s+/g, ' ');
   assert.match(s7, /fermo fino alla prossima \*\*sessione chiusa bene\*\*, cioè arrivata al rilascio senza guasto/);
-  assert.match(s7, /non lo accende per nessun motivo: né il battito, né un segnale .{0,160}né una sveglia chiesta prima/);
-  assert.match(s7, /Resta la decisione del mattino/);
+  assert.match(s7, /non lo accende per nessun automatismo: né il battito, né un segnale .{0,200}né una sveglia chiesta prima/);
+  assert.match(s7, /Lo accendono solo: - la \*\*decisione del mattino\*\*/);
+  assert.match(s7, /- l'\*\*owner dalla chat\*\*, quando chiede di farlo ripartire .{0,80}: subito, senza aspettare il mattino/);
+  assert.match(s7, /- la risposta \*\*«lascialo riprovare»\*\* dell'owner alla domanda del controllo .{0,30}: subito anche lei/);
+  assert.match(s7, /- l'\*\*interruttore\*\* del manutentore .{0,200}vale come «lascialo riprovare»/);
+  assert.match(s7, /lasciarlo riprovare \(azione `automazione`, che lo accende subito anche se è fermo\)/);
+  assert.match(s7, /Va diretta all'owner, senza passare dal compito che smista le domande/);
   assert.match(s7, /Contano le chiusure, non le scritture nel taccuino/);
   assert.match(s7, /Una domanda alla volta, e la prima sessione chiusa bene la rende superata/);
   const s4 = man.slice(man.indexOf('\n## 4.'), man.indexOf('\n## 5.')).replace(/\s+/g, ' ');
-  assert.match(s4, /Fermo su un guasto suo, invece, si accende solo al mattino \(§ 7\)/);
+  assert.match(s4, /Fermo su un guasto suo, invece, valgono solo le accensioni del § 7/);
+  // Il segnale dell'owner dalla chat sta nell'elenco del § 4: il rimando non deve toglierlo con un «solo il mattino».
+  assert.match(s4, /richiesta dell'owner dalla chat/);
   assert.doesNotMatch(sezione('### 4.3').replace(/\s+/g, ' '), /scrivere nel taccuino da 26 ore/);
   assert.match(sezione('### 4.3').replace(/\s+/g, ' '), /conta le sue sessioni chiuse bene, non le scritture nel taccuino/);
   assert.match(sezione('### 3.3').replace(/\s+/g, ' '), /`attendi`.{0,250}tranne mentre è ferma su un guasto suo/);
-  assert.match(sezione('### 3.5').replace(/\s+/g, ' '), /tranne quella del controllo sul manutentore \(SPEC-MANUTENTORE\.md § 7\)/);
-  const smista = readFileSync(join(ROOT, 'routines', 'roles', 'smistamento.md'), 'utf8').replace(/\s+/g, ' ');
-  assert.match(smista, /domanda del server sul controllo del manutentore, .{0,140}qualunque sia la soglia: .{0,80}passa al punto 3/);
+  assert.match(sezione('### 3.5').replace(/\s+/g, ' '), /Quella del controllo sul manutentore non passa di qui: va diretta all'owner \(SPEC-MANUTENTORE\.md § 7\)/);
 });
 
 // La soglia del controllo sul manutentore vive solo in SPEC-MANUTENTORE § 7: una copia altrove resta indietro, e lo
@@ -229,6 +238,29 @@ test('la soglia del controllo sul manutentore è scritta in un posto solo', () =
   }
   const man = readFileSync(join(ROOT, 'SPEC-MANUTENTORE.md'), 'utf8').replace(/\s+/g, ' ');
   assert.equal((man.match(/\b\d+ ore\b/g) || []).filter((x) => x !== '5 ore').length, 1, 'una sola soglia in ore nella spec del manutentore');
+});
+
+// #1249.4: le copie riassunte del fermo dicevano «solo il mattino» e lasciavano fuori la chat; chi costruiva
+// l'accensione partendo da una di loro lasciava l'owner senza modo di farlo ripartire fino al giorno dopo.
+test('il fermo del manutentore su un guasto suo è scritto per intero solo nel § 7, gli altri testi rimandano lì', () => {
+  const fuori7 = manutentore.replace(paragrafo7, '\n');
+  const testi = [['SPEC-MANUTENTORE.md fuori dal § 7', fuori7]];
+  const radice = ['SPEC-DOMANDE.md', 'FEEDBACK-STATES.md', 'SPEC-RIDISEGNO-LAVORO.md', 'CLAUDE.md'];
+  for (const f of radice) testi.push([f, readFileSync(join(ROOT, f), 'utf8')]);
+  for (const f of ['manutentore.md', 'smistamento.md', 'pacemaker.md']) {
+    try { testi.push([f, readFileSync(join(ROOT, 'routines', 'roles', f), 'utf8')]); } catch { /* ruolo assente */ }
+  }
+  const riassunto = /solo (il|al) mattino|anticipa niente|oltre al mattino|solo la sessione del giorno|riaccende solo l'owner/i;
+  let menzioni = 0;
+  for (const [nome, t] of testi) {
+    const p = t.replace(/\s+/g, ' ');
+    assert.doesNotMatch(p, riassunto, `${nome}: una versione ridotta della regola del fermo`);
+    for (const m of p.matchAll(/guasto suo/gi)) {
+      menzioni++;
+      assert.match(p.slice(m.index, m.index + 170), /§ 7/, `${nome}: «${p.slice(m.index, m.index + 90)}…» non rimanda al § 7`);
+    }
+  }
+  assert.ok(menzioni >= 6, `i rimandi al fermo sono spariti (${menzioni})`);
 });
 
 test('un guasto non diventa una domanda per l\'owner (#1790)', () => {
