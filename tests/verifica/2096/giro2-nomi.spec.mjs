@@ -30,7 +30,7 @@ for (const [pagina, url] of [['preferences', 'filo://preferences/preferences.htm
       S.chiediDaPagina = orig;
       return out;
     });
-    const strani = Array.isArray(nomi) ? nomi.filter(([id, t]) => !t || t.includes(`«${id}»`) || /«[a-z]+[A-Z.][A-Za-z.]*»/.test(t) || t.length > 120) : nomi;
+    const strani = Array.isArray(nomi) ? nomi.filter(([id, t]) => !t || t.includes(`«${id}»`) || /«[a-z]+[A-Z.][A-Za-z.]*»/.test(t) || /▾/.test(t) || t.length > 90) : nomi;
     console.log(pagina, 'totale', Array.isArray(nomi) ? nomi.length : 0, 'strani', JSON.stringify(strani, null, 1));
   });
 }
