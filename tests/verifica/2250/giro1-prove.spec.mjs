@@ -48,7 +48,7 @@ async function apriGestione(page, { pending = [], approva = 'mai' } = {}) {
       const t = msg && msg.type;
       if (t === 'auth_status') return { ok: true, signedIn: true, isAdmin: true, profile: null };
       if (t === 'merge_approvals_get') {
-        return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: [], preapprovedTotal: 0, ttlMs: 7 * GIORNO };
+        return { ok: true, pending: cfg.pending, failed: [], recent: [], preapproved: [], preapprovedTotal: 0, ttlMs: 7 * 24 * 60 * 60 * 1000 };
       }
       if (t === 'merge_approval_approve') {
         window.__approvate.push(msg.id);
