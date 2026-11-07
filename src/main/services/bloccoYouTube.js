@@ -45,6 +45,32 @@ function usa(nuovo, quando) {
   if (v !== versione) {
     versione = v;
     spente.clear();
+    offri();
+  }
+}
+
+// ─── schede aperte ──────────────────────────────────────────────────────────
+
+// Le schede vere vengono da Electron; i test di logica, che girano senza, ne danno di finte.
+let schede = {
+  daId(id) { try { return require('electron').webContents.fromId(id) || null; } catch (_) { return null; } },
+  tutte() { try { return require('electron').webContents.getAllWebContents(); } catch (_) { return []; } },
+};
+const viva = (wc) => { try { return !!wc && !wc.isDestroyed(); } catch (_) { return false; } };
+const frameDi = (wc) => { try { return wc.mainFrame.framesInSubtree || []; } catch (_) { return []; } };
+const suYouTube = (f) => { try { return !!f && R.hostYouTube(R.hostDi(String(f.url || ''))); } catch (_) { return false; } };
+
+// I frame di YouTube più in alto della scheda: ricaricarli ricarica anche quelli di YouTube che contengono.
+function cimeYouTube(wc) {
+  return frameDi(wc).filter((f) => suYouTube(f) && !suYouTube(f.parent));
+}
+
+// Ai frame di YouTube rimasti senza regole: ce ne sono di nuove. Chi le ha già le ignora.
+function offri() {
+  if (!acceso) return;
+  for (const wc of schede.tutte()) {
+    if (!viva(wc)) continue;
+    for (const f of frameDi(wc)) if (suYouTube(f)) { try { f.send(R.CANALE_PRONTE); } catch (_) {} }
   }
 }
 
