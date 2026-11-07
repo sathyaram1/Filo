@@ -1751,11 +1751,13 @@
     const ferme = pending.concat(failed);
     if (!ferme.length && fermaDaStato) {
       // Approvata e fusa, la pratica aspetta qui solo la chiusura. Vale se la fusa è l'ultima richiesta, del ramo di
-      // adesso, e non di un lavoro server (dopo il sì passa in revisione: se torna qui l'ha fermata il suo cancello).
+      // adesso. Un lavoro server dopo il sì passa in revisione: è ancora fusa finché il documento che la pagina conosce
+      // è di prima della fusione (#2250); cambiato dopo e ancora qui, l'ha fermata il cancello del server.
       const ultima = lista('recent').slice().sort((a, b) => (Number(b.createdAtMs) || 0) - (Number(a.createdAtMs) || 0))[0];
       const ramo = String(fb.branch || '');
-      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged' && !isLocalOnly(fb)
-        && (!ramo || !ultima.branch || String(ultima.branch) === ramo);
+      const fusa = !!ultima && ultima.used === true && ultima.outcome === 'merged'
+        && (!ramo || !ultima.branch || String(ultima.branch) === ramo)
+        && (!isLocalOnly(fb) || documentoDiPrima(fb, ultima.decidedAtMs));
       if (fusa) {
         return forma('l5', 'quadrato', titolo, 'design', 'fuso', {
           titolo,
