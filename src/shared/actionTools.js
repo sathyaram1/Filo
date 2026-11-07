@@ -659,6 +659,7 @@
       properties: {
         acceso: B('true accende, false spegne.'),
         rete: S('La rete conosciuta a cui collegarsi, come la chiama l\'utente.'),
+        dimentica: B('Con `rete`: true la dimentica ("dimentica la rete dell\'albergo": il computer non ci si ricollega più da solo, e servirà di nuovo la password). Chiede conferma all\'utente.'),
         elenca: B('true per avere le reti conosciute, senza cambiare niente.'),
       },
       required: [],
