@@ -1456,7 +1456,9 @@
   if (docbarEl) {
     docbarEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openTitleMenu(e.clientX, e.clientY);
+      const it = e.target && e.target.closest ? e.target.closest('.ed-doc-item') : null;
+      const file = it ? collection.files.find((f) => f.id === it.dataset.id) : null;
+      openTitleMenu(e.clientX, e.clientY, { file });
     });
   }
 
