@@ -1433,6 +1433,56 @@
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 
+  // ── Dispositivi Bluetooth preferiti (#2096) ────────────────────────────────
+  // Si mettono dal tasto destro sul dispositivo nella home o chiedendolo a Filo; qui si vedono tutti e si tolgono. Il
+  // nome lo dice l'elenco dei dispositivi abbinati, letto solo se ce n'è almeno uno; senza, resta l'indirizzo.
+  let preferitiBtSalvati = null;
+  const nomiBt = new Map();
+  let nomiBtLetti = false;
+  function disegnaPreferitiBt(elenco) {
+    const box = $('bluetoothPreferiti');
+    if (!box) return;
+    preferitiBtSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x) : [];
+    box.textContent = '';
+    if (!preferitiBtSalvati.length) {
+      const p = document.createElement('p');
+      p.className = 'sn-muted';
+      p.textContent = 'Nessuno. Li metti col tasto destro su un dispositivo, dal Bluetooth della home, o chiedendolo a Filo.';
+      box.appendChild(p);
+      return;
+    }
+    for (const ind of preferitiBtSalvati) {
+      const row = document.createElement('div');
+      row.className = 'mem-riga';
+      row.dataset.indirizzo = ind;
+      const t = document.createElement('span');
+      t.className = 'mem-testo';
+      t.textContent = nomiBt.has(ind) ? `${nomiBt.get(ind)} · ${ind}` : ind;
+      row.appendChild(t);
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.className = 'mem-via';
+      b.textContent = '×';
+      b.title = 'Togli dai preferiti';
+      b.setAttribute('aria-label', `Togli ${t.textContent} dai preferiti`);
+      b.addEventListener('click', () => salvaPreferitiBt((preferitiBtSalvati || []).filter((x) => x !== ind)));
+      row.appendChild(b);
+      box.appendChild(row);
+    }
+    if (!nomiBtLetti) {
+      nomiBtLetti = true;
+      chrome.runtime.sendMessage({ type: MSG.SISTEMA_COMANDA, richiesta: { cosa: 'bluetooth', elenca: true } }).then((r) => {
+        for (const d of (r && r.ok && Array.isArray(r.elenco) ? r.elenco : [])) if (d && d.indirizzo) nomiBt.set(d.indirizzo, String(d.nome || ''));
+        if (nomiBt.size) disegnaPreferitiBt(preferitiBtSalvati);
+      }).catch(() => {});
+    }
+  }
+  async function salvaPreferitiBt(nuovo) {
+    disegnaPreferitiBt(nuovo);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { bluetoothPreferiti: nuovo } });
+    flashSaved('bluetoothPreferitiHint');
+  }
+
   // ── Siti dove il tasto destro apre il loro menu (#975) ───────────────────
   // Si aggiungono dal tasto destro sul sito o chiedendolo a Filo; qui si vedono tutti e si tolgono.
   let sitiMenuSalvati = null;
