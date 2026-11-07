@@ -97,7 +97,7 @@
     if (!meta.summary) return false;
     const sig = meta.summarySig;
     if (sig == null || typeof sig.words !== 'number') return true;
-    return pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file));
+    return stessoTesto(sig, file, currentWords);
   }
 
   function pocoCambiato(sig, now) {
@@ -105,11 +105,17 @@
     return Math.abs(now - sig.words) < threshold;
   }
 
+  // Il testo è ancora quello firmato in `sig`: poche parole di differenza e lo stesso argomento (#1697).
+  function stessoTesto(sig, file, currentWords) {
+    if (!sig || typeof sig.words !== 'number') return false;
+    return pocoCambiato(sig, Number.isFinite(currentWords) ? currentWords : fileWords(file))
+      && !argomentoCambiato(sig, fileText(file));
+  }
+
   // Un riassunto fermato dal tetto rifatto sullo stesso testo si ferma uguale, e si paga ogni volta (#1302):
   // si riprova solo quando il file è cambiato quanto basta per meritarne uno nuovo.
   function fallitoSuQuestoTesto(file, words) {
-    const sig = file && file.meta && file.meta.summaryFailSig;
-    return Boolean(sig && typeof sig.words === 'number' && pocoCambiato(sig, words));
+    return stessoTesto(file && file.meta && file.meta.summaryFailSig, file, words);
   }
 
   function needsSummary(file, opts) {
