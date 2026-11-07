@@ -2390,13 +2390,11 @@
     try { chiede = typeof setter.chiede === 'function' ? !!setter.chiede(b, attuali) : false; } catch (_) { chiede = true; }
     let avviso = '';
     try { avviso = attuali && typeof setter.avviso === 'function' ? String(setter.avviso(b, attuali) || '') : ''; } catch (_) { avviso = ''; }
-    // Un freno costa 4 tolto e 1 stretto; senza freno, `costoDi` dà il costo nei due versi di un elenco (#967).
+    // Un freno costa 4 tolto e 1 stretto, nei due versi di un elenco come di un interruttore (#1312, #967).
     const freno = typeof setter.allenta === 'function';
     let stringe = false;
     try { stringe = !freno && typeof setter.stringe === 'function' && !!setter.stringe(b, attuali); } catch (_) { stringe = false; }
-    let costo = setter.costo;
-    try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
-    const finale = freno ? (allenta ? 4 : 1) : (stringe ? 1 : costo);
+    const finale = freno ? (allenta ? 4 : 1) : (stringe ? 1 : setter.costo);
     return {
       ...b,
       costo: finale,
