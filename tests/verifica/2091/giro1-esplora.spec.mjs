@@ -250,6 +250,8 @@ test('dopo l\'invio, la home ricaricata mostra ancora il gettone nel filo', asyn
   await expect(casa.getByText('Risposta finta.')).toBeVisible();
   await casa.reload();
   await casa.waitForLoadState('domcontentloaded');
+  await expect(casa.getByText('Risposta finta.')).toBeVisible({ timeout: 10_000 });
+  console.log('DOPO RICARICA', await casa.evaluate(() => [...document.querySelectorAll('*')].filter((e) => /di cosa parla/.test(e.textContent) && !e.children.length).map((e) => e.outerHTML).join('\n')));
   await expect(casa.locator('.sn-bolla-gettone')).toHaveCount(1, { timeout: 10_000 });
   await expect(casa.locator('body')).not.toContainText('⟦');
 });
