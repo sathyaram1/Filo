@@ -57,10 +57,8 @@
   const HOST_URL = /\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s\/?#@"'`^]*@)?(\[[^\]\s]*\]|[^\s\/:?#@"'`^]*)/gi;
   const HOST_UTENTE = /[\w.+-]+@((?:[\w-]+\.)*[\w-]+)(?=[:\s\/]|$)/g;
   const HOST_NUDO = /(?<![\w@.\/-])((?:[\w-]+\.)+[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?![\w-])/gi;
-  function questoComputer(host) {
-    const h = String(host || '').toLowerCase().replace(/^\[|\]$/g, '');
-    return h === 'localhost' || h.endsWith('.localhost') || h === '::1' || h === '0.0.0.0' || /^127(?:\.\d{1,3}){3}$/.test(h);
-  }
+  // La regola è quella dei link (src/shared/urlNav.js); senza il modulo ogni indirizzo vale fuori.
+  const questoComputer = (host) => !!(global.SN_URL_NAV && global.SN_URL_NAV.questoComputer(host));
   // I client dei database e i login ai registri si collegano al server che nominano (#1312): un database senza
   // server nominato è quello del computer, un login senza registro va al registro pubblico. Una cartella è un socket.
   const CLIENT_DB = /\b(?:mysql|mariadb|mysqldump|psql|pg_dump|pg_dumpall|pg_restore|mongo|mongosh|mongodump|mongorestore|redis-cli|sqlcmd|cqlsh|clickhouse-client)\b/i;
