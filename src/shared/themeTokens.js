@@ -358,6 +358,14 @@
     }
   }
 
+  // Una durata del registro in millisecondi, per chi la usa da JS (un'attesa, non un'animazione): NaN se non è valida.
+  function durataMs(value) {
+    const m = typeof value === 'string' ? value.trim().match(RE_TIME) : null;
+    if (!m) return NaN;
+    const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
+    return ms <= 10000 ? ms : NaN;
+  }
+
   // L'errore puntuale per un valore rifiutato: lo mostrano le Preferenze e lo legge la chat.
   function errorMessage(name) {
     const t = TOKENS[name];
