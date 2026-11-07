@@ -1,7 +1,6 @@
 // Verifica #2091 giro 3, rilievo 2: il nome di una scheda dentro il gettone del campo non porta la sottolineatura rossa
 // del correttore (titolo accorciato a metà parola, nomi stranieri), mentre si scrive la domanda accanto.
 
-import { writeFileSync } from 'node:fs';
 import { test, expect } from '../../fixtures/electron.mjs';
 import { home } from '../../helpers/chatFinta.mjs';
 
