@@ -673,15 +673,15 @@ test('#1312, strada B: il costo 4 lo decide lo stato, non le parole: a compito p
     [{ type: 'CANCELLA_PAGINE', periodo: 'oggi' }, ['cancella la cronologia di oggi']],
     [{ type: 'DIMENTICA', testo: 'Bologna', per_sempre: true }, ['dimentica per sempre che vivo a Bologna']],
   ];
+  // Le richieste vere, comunque dette: a compito pulito la parola; dopo una lettura no, con le stesse parole.
   for (const [azione, frasi] of casi) {
-    for (const azioni of [[], [ricercaFatta]]) {
-      for (const richiesta of ['', 'trovami una ricetta per la cena', 'quanto costa spesso un volo?']) {
-        assert.equal(risposta(azione, { impostazioni: att, azioni, richiesta }), 'no', `${JSON.stringify(azione)} con «${richiesta}»`);
-      }
-      for (const richiesta of frasi) assert.equal(risposta(azione, { impostazioni: att, azioni, richiesta }), 'conferma', `${JSON.stringify(azione)} con «${richiesta}»`);
+    for (const richiesta of ['', ...frasi]) {
+      assert.equal(risposta(azione, { impostazioni: att, richiesta }), 'conferma', `${JSON.stringify(azione)} con «${richiesta}»`);
+      assert.equal(risposta(azione, { impostazioni: att, azioni: [ricercaFatta], richiesta }), 'no', `${JSON.stringify(azione)} con «${richiesta}», dopo una ricerca`);
     }
   }
-  // Una parola vicina all'azione detta per altro non è una richiesta, e nemmeno il cambio nel verso opposto.
+  // Le frasi dette per altro non contano più: dopo una lettura no, in una conversazione pulita la parola, che l'utente non scrive
+  // se non vuole. Nessun elenco di parole decide (il riquadro dice «Abbassa una difesa di Filo»).
   const diPassaggio = [
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'limite_spesa', valore: '500' }, ['fammi la lista della spesa per una carbonara', 'metti le uova nella lista della spesa', '500 grammi']],
     [{ type: 'IMPOSTA_PREFERENZA', chiave: 'autonomia', valore: 'automatico' }, ['la batteria di questo telefono che autonomia ha?', 'cosa vuol dire automatico nel cambio di una macchina?']],
