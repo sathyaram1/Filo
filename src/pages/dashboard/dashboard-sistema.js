@@ -513,10 +513,9 @@
 
   // Letto da src/content/content.js: le voci del tasto destro sulle righe del riquadro aperto.
   // Una riga di sistema nella chat (dashboard-attivita.js, segnaSistema): il riquadro della sua voce, e il comando che
-  // la disfa dove c'è.
-  const FRASI_ANNULLA = (a) => (a.livello != null ? `Rimetti il volume al ${a.livello}%`
-    : a.preferito != null ? (a.preferito ? 'Rimetti fra i preferiti' : 'Togli dai preferiti')
-      : a.collega != null ? (a.collega ? 'Ricollega' : 'Scollega')
+  // la disfa dove c'è. I preferiti no: sono un'impostazione, e il filo ha già il suo Annulla per quel cambio.
+  const FRASI_ANNULLA = (a) => (a.livello != null ? `Rimetti il volume ${Sis().alPercento(a.livello)}`
+    : a.collega != null ? (a.collega ? 'Ricollega' : 'Scollega')
         : a.acceso != null ? `${a.acceso ? 'Riaccendi' : 'Rispegni'} ${a.cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth'}` : 'Annulla');
   function vociRigaChat(riga) {
     const s = riga._sistema;
