@@ -170,7 +170,6 @@ test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui prefer
     { toolCalls: [{ id: 's1', name: 'BLUETOOTH', arguments: JSON.stringify({ acceso: false }) }] },
     { text: 'Spento.' },
   ]);
-  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'autonomo' } })).catch(() => {});
   await chiedi(page, 'spegni il bluetooth');
   await expect.poll(async () => (await chiamate(app)).filter((c) => c[0] === 'radio').map((c) => c[1].acceso), { timeout: 20_000 }).toContain(false);
   const spento = await rigaDi('Bluetooth');
