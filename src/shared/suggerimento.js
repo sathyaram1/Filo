@@ -307,9 +307,6 @@
     timer = setTimeout(mostra, attesa);
   }
 
-  // Un pezzo di Filo in uno shadow chiuso (la conferma, il riquadro su un sito) all'ascolto sul documento mostra solo
-  // l'host: si scende col punto del puntatore, o col fuoco. Gli eventi del puntatore hanno detail 0, quindi qui e non
-  // in SN_FILO_UI.bersaglio, che il punto lo usa solo per i clic.
   // Gli shadow chiusi nati fuori da SN_FILO_UI.ombra (gli allegati e la riga del sì/no dell'Aiuto) si dichiarano qui.
   const ombreProprie = new WeakMap();
   function radiceChiusa(el) {
@@ -319,6 +316,8 @@
     return r && r !== el.shadowRoot ? r : null;
   }
 
+  // Da uno shadow chiuso (la conferma, il menu) il documento vede solo l'host: si scende col punto o col fuoco. Qui e non
+  // in SN_FILO_UI.bersaglio, che il punto lo usa solo per i clic (gli eventi del puntatore hanno detail 0).
   function bersaglio(e) {
     let t = null;
     try { t = (e.composedPath && e.composedPath()[0]) || e.target; } catch (_) { t = e.target; }
