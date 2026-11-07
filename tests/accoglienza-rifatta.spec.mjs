@@ -3,7 +3,7 @@
 // prima risposta non aveva la riga corta, i titoli delle schede arrivavano al modello. Il testo incollato è la guardia.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { CONFIRM_HOST, clickConfirm, confirmState } from './helpers/confirm.mjs';
+import { CONFIRM_HOST, clickConfirm, confirmState, confirmText } from './helpers/confirm.mjs';
 
 function newtabWindows(app) {
   return app.windows().filter((w) => w.url().startsWith('filo://newtab'));
