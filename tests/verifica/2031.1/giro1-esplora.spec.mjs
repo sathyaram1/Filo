@@ -80,8 +80,7 @@ test('Crediti era già fra le schede salvate, non davanti: l\'invito da fuori la
   expect(shellUrl).toBe(true);
   const salvate = await preparaSchede(app, openTab, testServer, 2);
   await expect.poll(() => sessioneSalvata(app), { timeout: 10000 }).toEqual(expect.arrayContaining(['filo://credits/credits.html']));
-  await app.evaluate(({ BrowserWindow }) => { BrowserWindow.getAllWindows().find((w) => w._filoTabs && !w._filoIncognito).close(); });
-  await expect.poll(async () => (await stato(app)).normale, { timeout: 10000 }).toBeNull();
+  await chiudiPrincipale(app);
   await app.evaluate(({ app: a }) => { a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCD'); });
   await attendiCreditiDavanti(app, salvate, 'crediti già salvata');
 });
