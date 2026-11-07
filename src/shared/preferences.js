@@ -2271,7 +2271,7 @@
     // per questo nessuna chiave nomina una delle due scelte, che rovescerebbe il senso del sì.
     {
       scrive: ['traduzionePagina.nascoste'],
-      aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, dal menu, e spende meno)',
+      aiuto: '"subito" | "apertura" (le sezioni chiuse e nascoste di una pagina: "subito" le traduce in sottofondo dopo quel che si vede, così aprendole sono già tradotte; "apertura" le traduce solo quando le apri, da sole appena si vedono, e spende meno)',
       costo: 1,
       keys: ['traduzione_sezioni_nascoste', 'traduzione delle sezioni nascoste', 'traduzione delle sezioni chiuse',
         'tradurre le sezioni chiuse', 'sezioni chiuse da tradurre', 'traduzionepagina.nascoste'],
