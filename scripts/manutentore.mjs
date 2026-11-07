@@ -1176,6 +1176,10 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
 export function controlliLocali(cmd, argv) {
   const [, a, b] = argv;
   const num = (v, cosa) => (numeroDi(v) ? '' : `${cosa}: «${String(v ?? '').slice(0, 20)}» non è un numero di feedback`);
+  const ignote = (c) => {
+    const x = opzioniIgnote(c, argv);
+    return x.length ? `${c} non conosce ${x.map((o) => o.slice(0, 30)).join(', ')} (conosce ${OPZIONI_DI[c].join(', ')})` : '';
+  };
   switch (cmd) {
     case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
