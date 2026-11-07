@@ -1266,7 +1266,6 @@
       costo: (a) => (a && a._livelloCambio === 1 ? 1 : 2),
       campo: null,
       difesa: (a) => !(a && a._livelloCambio === 1),
-      chiesta: (a, ctx) => nominata(richiestaDi(ctx), { frasi: ['annulla', 'annullare', 'annullalo', 'ripristina', 'ripristinare', 'com era', 'come era', 'come prima', 'undo'] }),
       describe: (a) => {
         // La frase del cambio riporta testi salvati (uno stile, un'etichetta, una cartella): sta tutta nel riquadro.
         const f = String((a && a._fraseCambio) || '').trim();
