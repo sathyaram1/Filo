@@ -1005,9 +1005,9 @@ test('l’assistente di pagina scrive nel campo un testo senza segreti, e il cod
   await expect(page.locator('#risposta')).toHaveValue(`Il codice è ${CODICE}`);
 });
 
-// Il titolo di una scheda aperta lo sceglie il sito: alla chat arriva solo il nome del sito (#1312), quindi un codice
-// nel titolo non entra nemmeno nel contesto, e non c'è niente da fermare dopo.
-test('il codice nel titolo di una scheda aperta non arriva alla chat: il modello vede solo il nome del sito', async ({ app, openTab, testServer }) => {
+// Quello che da fuori arriva al modello per una strada che non è un'azione (lo stato di Filo: i titoli delle schede
+// aperte) conta come letto: la porta delle uscite lo ferma e la chat dice da dove veniva.
+test('il codice nel titolo di una scheda aperta, che la chat ha davanti, non esce: la chat dice cosa ha fermato', async ({ app, openTab, testServer }) => {
   test.setTimeout(90_000);
   await testServer.openReady(openTab, `<!doctype html><html><head><title>Il tuo codice monouso è ${CODICE} - Posta</title></head>
 <body style="padding:40px;font:16px sans-serif"><h1>Posta in arrivo</h1></body></html>`);
