@@ -2292,6 +2292,8 @@
     const dopo = document.createRange();
     dopo.setStart(r.endContainer, r.endOffset);
     dopo.setEnd(bloccoFine, bloccoFine.childNodes.length);
+    // Si legge prima dell'incolla: un Range segue il foglio, e dopo non dice più cosa seguiva.
+    const restoDopo = dopo.toString().length;
     const finoInFondo = () => { const f = r.cloneRange(); f.setEnd(bloccoFine, bloccoFine.childNodes.length); return f; };
 
     // In una voce di elenco le righe diventano voci: la prima continua la voce, l'ultima si porta dietro il resto, anche
