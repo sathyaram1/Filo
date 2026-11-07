@@ -176,7 +176,7 @@ test('#1290.2 — un riquadro, finito di caricarsi, lo dice a chi lo ospita', ()
     MutationObserver: class { observe() {} },
   });
   for (const a of ascolti) if (a.tipo === 'load' && !a.cattura) a.fn({ target: doc });
-  assert.deepEqual(inviati, [{ filoRiquadroCaricato: 1 }]);
+  assert.equal(JSON.stringify(inviati), JSON.stringify([{ filoRiquadroCaricato: 1 }]));
 });
 
 test('in una radice ombra il load non si vede: si fa come prima, e lo dice', () => {
