@@ -8264,10 +8264,10 @@ async function citazioneDelMessaggio(rispostaA, chatId) {
   try { chat = id && FiloChats ? await FiloChats.get(id) : null; } catch (_) { chat = null; }
   // La sua conversazione è stata cancellata mentre si scriveva: il testo se n'è andato con lei, e qui non rinasce.
   if (p.chat && !chat) return { ref: null, citata: { manca: true } };
-  const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo }) : -1;
+  const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo, role: p.role }) : -1;
   const ref = i >= 0
     ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts })
-    : RispostaA.riferimento({ testo: p.testo });
+    : RispostaA.riferimento({ testo: p.testo, role: p.role });
   return { ref, citata: ref ? RispostaA.risolvi(ref, () => chat, { max: RispostaA.PER_IL_MODELLO }) : null };
 }
 
