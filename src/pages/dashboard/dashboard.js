@@ -2552,6 +2552,7 @@
     xBtn.type = 'button';
     xBtn.className = 'dash-recap-x';
     xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.title = 'Chiudi';
     xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
     xBtn.addEventListener('click', close);
     box.appendChild(xBtn);
@@ -2877,6 +2878,7 @@
     xBtn.type = 'button';
     xBtn.className = 'dash-recap-x';
     xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.title = 'Chiudi';
     xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
     xBtn.addEventListener('click', close);
     box.appendChild(xBtn);
