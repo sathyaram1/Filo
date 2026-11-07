@@ -109,8 +109,8 @@ la memoria nel taccuino (§ 5). Si accende:
 **La rosa si riempie anche di giorno.** A ogni battito e sveglia, se
 nell'ordine non resta un lavoro che possa partire adesso (vuoto, o solo lavori
 fermi, in attesa, che restano locali o che aspettano l'owner) e la spesa
-dell'ultimo giorno di ogni account sta sotto il ritmo sostenibile fino al suo
-rinnovo, riporta le priorità 2 all'obiettivo con le regole della decisione del
+dell'ultimo giorno, sommata sugli account, sta sotto il ritmo sostenibile fino
+ai rinnovi, riporta le priorità 2 all'obiettivo con le regole della decisione del
 mattino e riscrive l'ordine; lo annota nel taccuino, e il recap del giorno
 dopo lo racconta. Non in una giornata a secco. Il 06/11 la rosa del mattino si
 è svuotata a metà giornata, nessun battito l'ha riempita e le quote sono
