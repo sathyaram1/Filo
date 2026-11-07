@@ -44,6 +44,23 @@ test('il posto si ritrova dal testo quando la bolla appena scritta non lo sa anc
   assert.equal(R.posto(null, { i: 1 }), -1);
 });
 
+test('#2096: un messaggio dell\'utente citato da sé si ritrova fra i suoi, e resta suo anche quando si salva col testo', () => {
+  const ripete = chat('c-ripete', [
+    { role: 'user', text: 'ok', ts: '2026-10-28T10:00:00.000Z' },
+    { role: 'filo', text: 'ok', ts: '2026-10-28T10:00:05.000Z' },
+  ]);
+  assert.equal(R.posto(ripete, { testo: 'ok', role: 'user' }), 0);
+  assert.equal(R.posto(ripete, { testo: 'ok' }), 1, 'senza il ruolo resta la risposta di Filo');
+  assert.equal(R.posto(cena, { testo: 'la seconda' }), -1, 'una risposta di Filo non si confonde con le parole dell\'utente');
+
+  assert.deepEqual(R.daPagina({ testo: 'la seconda', role: 'user' }), { testo: 'la seconda', role: 'user' });
+  const ref = R.riferimento({ testo: 'la seconda', role: 'user' });
+  assert.deepEqual(ref, { testo: 'la seconda', role: 'user' });
+  assert.equal(R.risolvi(ref, () => null).role, 'user');
+  assert.equal(FC.notaRisposta(R.risolvi(ref, () => null)), "(l'utente risponde a un suo messaggio: «la seconda»)");
+  assert.equal(R.risolvi({ chat: 'c-cena', i: 0 }, () => cena).role, 'user', 'col posto il ruolo lo dice il filo');
+});
+
 test('la home ritrova la risposta citata col testo di adesso, e dice quando la sua conversazione non c\'è più', () => {
   const righe = FCoda.elementi({ chats: [cena] });
   const mia = righe.find((v) => v.k === 'msg' && v.text === 'la seconda');
