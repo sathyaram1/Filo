@@ -973,7 +973,6 @@
         });
     });
 
-    actions.appendChild(serveAprire);
     actions.appendChild(discardBtn);
     actions.appendChild(approveBtn);
     aggiornaApprova();
