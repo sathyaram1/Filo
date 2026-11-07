@@ -10,7 +10,7 @@ import {
 import { tmpdir } from 'node:os';
 import path, { basename, dirname, join, resolve, win32 } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { sommaRiepiloghi, perLaRiga, SOLO } from '../run-unit-tests.mjs';
+import { sommaRiepiloghi, perLaRiga, SOLO, collectTestFiles } from '../run-unit-tests.mjs';
 
 // Il reporter è quello di QUESTI strumenti, non dell'albero provato: se l'albero lo rompesse, ogni prova uscirebbe
 // «rossa anche su main» e fonderebbe tutto.
@@ -96,10 +96,27 @@ function campoStoria(s) {
   return { storia: { superficiale: true, approfondito: Math.max(0, Math.floor(Number(s.approfondito) || 0)), intera: s.intera === true } };
 }
 
+const UNIT_DIR_REL = 'tests/unit';
+const sfuggi = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+/**
+ * Gli unit che un ramo può rompere, per la prova veloce (su Windows al cancello, #2225): i file di test che il ramo
+ * cambia e quelli che nominano un file che cambia (modulo, aiuto, documento letto da una sentinella). PURA.
+ * `cambiati` e `tutti` relativi alla radice con le barre normali; `leggi(rel)` il testo di un test.
+ */
+export function unitToccati({ cambiati = [], tutti = [], leggi = () => '' } = {}) {
+  const cambiatiSet = new Set(cambiati.map((f) => String(f).replace(/\\/g, '/')));
+  const nomi = [...new Set([...cambiatiSet].filter((f) => !tutti.includes(f)).map((f) => f.split('/').pop()).filter(Boolean))];
+  // Il nome intero e non un pezzo: `a.js` non deve scegliere ogni test che nomina `data.js`.
+  const cerca = nomi.length ? new RegExp(`(?:^|[^\\w.-])(?:${nomi.map(sfuggi).join('|')})(?![\\w.-])`) : null;
+  return tutti.filter((t) => cambiatiSet.has(t) || (cerca && cerca.test(String(leggi(t) || '')))).sort();
+}
+
 /** Cosa si stampa dopo la prova. PURA. */
 export function testoProva(prova) {
   const p = prova || {};
   const m = String(p.mainSha || '').slice(0, 8);
+  const quali = Number.isInteger(p.toccati) ? `toccati dal ramo (${p.toccati} file) ` : '';
   const dove = p.contenuto ? `sul ramo, che contiene già main ${m}` : `sulla fusione con main ${m}`;
   if (p.saltata) return `▸ Unit sulla fusione: non provati (${p.motivo}). Il server lo registra.`;
   if (p.errore) return `▸ Unit sulla fusione: prova non riuscita (${p.errore}).`;
@@ -107,17 +124,18 @@ export function testoProva(prova) {
     case 'main_contenuto': return `▸ Unit sulla fusione: il ramo contiene già main (${m}), il risultato è il ramo stesso.`;
     case 'verde': {
       const ins = Array.isArray(p.instabili) ? p.instabili : [];
-      if (!ins.length) return `▸ Unit ${dove}: verdi.`;
-      return [`▸ Unit ${dove}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non ${p.contenuto ? 'del ramo' : 'della fusione'}:`,
+      if (p.toccati === 0) return `▸ Unit ${dove}: il ramo non tocca nessun file di unit né file che nominano, niente da provare.`;
+      if (!ins.length) return `▸ Unit ${quali}${dove}: verdi.`;
+      return [`▸ Unit ${quali}${dove}: verdi. Rossi al primo giro, verdi da soli e rifacendo la suite intera, quindi instabili e non ${p.contenuto ? 'del ramo' : 'della fusione'}:`,
         ...ins.map((r) => `    ~ ${r}`)].join('\n');
     }
     case 'conflitto': return `▸ Unit sulla fusione con main ${m}: non provati, la fusione va in conflitto${p.file && p.file.length ? ` su ${p.file.join(', ')}` : ''}.`;
     case 'rosso_anche_su_main':
-      return `▸ Unit ${dove}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo${p.contenuto ? '.' : ': si fonde.'}`;
+      return `▸ Unit ${quali}${dove}: rossi, ma rossi anche su main da solo e senza test rotti in più. Non è colpa del ramo${p.contenuto ? '.' : ': si fonde.'}`;
     case 'rosso_sulla_fusione': {
       const rossi = Array.isArray(p.rossi) ? p.rossi : [];
       return [
-        `✗ Unit ${dove}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
+        `✗ Unit ${quali}${dove}: rossi, e su main da solo ${p.rossiMain ? 'questi passano' : 'sono verdi'}.`,
         ...(rossi.length ? rossi.map((r) => `    ✖ ${r}`) : ['    (nessun test rosso registrato: la causa è nell\'uscita qui sotto)']),
         ...(p.coda ? [`  Ultime righe dell'uscita ${p.contenuto ? 'sul ramo' : 'sulla fusione'}:`, ...String(p.coda).split('\n').map((r) => `    ${r}`)] : []),
       ].join('\n');
@@ -298,6 +316,8 @@ export function fileDellaChiave(chiave) {
   return f && f !== '?' && !assoluto(f) && !f.split('/').includes('..') ? f : '';
 }
 
+export const COMANDI_DI_ACTIONS = Object.freeze(['GITHUB_OUTPUT', 'GITHUB_ENV', 'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY']);
+
 /**
  * `npm run test:unit` dell'albero provato, con l'uscita su file; con `file`, solo quei file (la riprova dei rossi).
  * { ok, rossi, coda } | { errore }.
@@ -309,7 +329,9 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
   const log = join(base, `${nome}.log`);
   const fd = openSync(log, 'w');
   // Lanciata da dentro un `node --test`, questa variabile farebbe dei test provati dei figli suoi: niente rapporti.
+  // I file dei comandi di Actions no: il codice provato scriverebbe l'esito della propria prova (#2225).
   const { NODE_TEST_CONTEXT: _figlio, ...env } = process.env;
+  for (const k of COMANDI_DI_ACTIONS) delete env[k];
   let r;
   try {
     const reporter = ['--test-reporter=spec', '--test-reporter-destination=stdout', `--test-reporter=${REPORTER}`, `--test-reporter-destination=${dest}`];
@@ -326,11 +348,12 @@ export function lanciaUnit(dir, base, nome, { file = null } = {}) {
  * La prova. { esito, mainSha, rossi?, rossiMain?, file?, coda?, contenuto? } | { saltata, motivo } | { errore, mainSha? }.
  * `ancheContenuto`: con main già dentro il ramo si prova il ramo stesso invece di rispondere `main_contenuto`
  * (serve a giudicare un unit rosso sul ramo, #1009). `mainSha`: il main da provare lo sceglie chi chiede (l'azione del
- * server, #1207), non la punta di origin di adesso. `lancia` è iniettabile solo per i test.
+ * server, #1207), non la punta di origin di adesso. `unit: 'toccati'`: solo i file di `unitToccati`, anche su main
+ * (la prova veloce su Windows, #2225). `lancia` è iniettabile solo per i test.
  */
 export function provaUnitSullaFusione({
   root, punta, git = gitIn(root), gitStoria = gitIn(root, TETTO_STORIA_MS), lancia = lanciaUnit, scrivi = (s) => console.log(s),
-  ancheContenuto = false, mainSha: mainDato = '',
+  ancheContenuto = false, mainSha: mainDato = '', unit = 'tutti',
 } = {}) {
   const remoti = git(['remote']);
   if (!remoti.ok) return { errore: `git non risponde (${primaRiga(remoti.out)})` };
@@ -348,7 +371,7 @@ export function provaUnitSullaFusione({
   const storia = assicuraStoria({ git: gitStoria, mainSha, punta });
   if (storia.errore) return { errore: storia.errore, mainSha, storia: storia.storia };
   if (storia.storia.superficiale) scrivi(testoStoria(storia.storia));
-  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto }), storia: storia.storia };
+  return { ...provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto, soloToccati: unit === 'toccati' }), storia: storia.storia };
 }
 
 function mainDiOrigin({ git, gitStoria }) {
@@ -414,7 +437,16 @@ export function testoStoria(s) {
   return '▸ Clone poco profondo, ma la base comune con main c\'era già.';
 }
 
-function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto = false }) {
+/** I file di unit toccati dal ramo, nell'albero `dir` già fuso. { file } | { errore }. */
+function sceltiDalRamo({ git, dir, mainSha, punta }) {
+  const d = git(['-c', 'core.quotepath=false', 'diff', '--name-only', `${mainSha}...${punta}`]);
+  if (!d.ok) return { errore: `non riesco a leggere i file toccati dal ramo (${primaRiga(d.out)})` };
+  const tutti = collectTestFiles(join(dir, ...UNIT_DIR_REL.split('/'))).map((f) => path.relative(dir, f).split(path.sep).join('/'));
+  const leggi = (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch (_) { return ''; } };
+  return { file: unitToccati({ cambiati: d.out.split(/\r?\n/).filter(Boolean), tutti, leggi }) };
+}
+
+function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto = false, soloToccati = false }) {
   // Con main già dentro, il risultato della fusione è il ramo stesso: si prova lui.
   const contenuto = git(['merge-base', '--is-ancestor', mainSha, punta]).ok;
   if (contenuto && !ancheContenuto) return { esito: 'main_contenuto', mainSha };
@@ -451,10 +483,20 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
         return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
       }
     }
+    let scelti = null;
+    if (soloToccati) {
+      const s = sceltiDalRamo({ git, dir: a.dir, mainSha, punta });
+      if (s.errore) return { errore: s.errore, mainSha };
+      scelti = s.file;
+      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0 };
+      scrivi(`▸ Solo gli unit toccati dal ramo (${scelti.length} file): ${scelti.join(', ')}`);
+    }
+    const quali = scelti ? { file: scelti } : {};
+    const toccati = scelti ? { toccati: scelti.length } : {};
     scrivi(contenuto
       ? `▸ Unit sul ramo, che contiene già main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`
       : `▸ Unit sul risultato della fusione con main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`);
-    let fusione = lancia(a.dir, base, 'fusione');
+    let fusione = lancia(a.dir, base, 'fusione', quali);
     if (fusione.errore) return { errore: fusione.errore, mainSha };
     // Un rosso si riprova prima di giudicarlo: i test a tempo cedono con la macchina carica, e un instabile non è
     // colpa della fusione. Si rilanciano solo i loro file, sullo stesso albero.
@@ -470,7 +512,7 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
           // Verde da solo non vuol dire instabile: due test che si pestano i piedi solo girando insieme passano sempre
           // da soli (verifica #929 giro 3). Instabile è solo ciò che torna verde rifacendo la suite intera.
           scrivi(`▸ Verdi da soli (${forse.length}): rifaccio la suite intera ${sulla} per distinguere un instabile da due test che si rompono solo insieme`);
-          const di = lancia(a.dir, base, 'di-nuovo');
+          const di = lancia(a.dir, base, 'di-nuovo', quali);
           if (di.errore) return { errore: di.errore, mainSha };
           const ripetuti = !di.ok && !di.rossi.length ? forse : forse.filter((k) => di.rossi.includes(k));
           ancora = [...ancora, ...ripetuti];
@@ -486,11 +528,13 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
       const b = apriAlbero(git, base, 'main', mainSha);
       if (b.dir) alberi.push(b.dir);
       if (b.errore) return { errore: b.errore, mainSha };
-      const main = lancia(b.dir, base, 'main');
+      // Un test che il ramo aggiunge su main non c'è: i suoi rossi sono del ramo.
+      const suMain = scelti ? scelti.filter((f) => existsSync(join(b.dir, f))) : null;
+      const main = suMain && !suMain.length ? { ok: true, rossi: [] } : lancia(b.dir, base, 'main', suMain ? { file: suMain } : {});
       if (main.errore) return { errore: main.errore, mainSha };
       d = decidiEsito({ fusione, main });
     }
-    return { ...d, mainSha, ...segno, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
+    return { ...d, mainSha, ...segno, ...toccati, ...(instabili.length ? { instabili } : {}), ...(d.esito === 'rosso_sulla_fusione' ? { coda: fusione.coda } : {}) };
   } finally {
     const collegamento = togliCollegamento(join(base, 'node_modules'));
     const rimasti = [...alberi.map((dir) => chiudiAlbero(git, dir)), collegamento].filter((r) => !r.ok);

@@ -15,6 +15,7 @@ import { TETTO_ATTESA_MS } from '../helpers/attese.mjs';
 import {
   decidiEsito, campoPerIlServer, chiaveTest, fileDellaChiave, testoProva, togliCollegamento, chiudiAlbero, gitIn,
   provaUnitSullaFusione, chiediConProva, provaDaRiusare, pulisciResti, TETTO_ROSSI, assicuraStoria, testoStoria,
+  unitToccati, COMANDI_DI_ACTIONS,
 } from '../../scripts/lib/unit-sulla-fusione.mjs';
 import { pathToFileURL } from 'node:url';
 
@@ -677,6 +678,77 @@ test('la riprova dei rossi sulla fusione passa dal lanciatore: un file fermo si 
     assert.match(esito.coda, /fermo\.test\.mjs non è andato avanti/);
   } finally {
     togliCartella(casa);
+  }
+});
+
+test('unit toccati: i test cambiati dal ramo e quelli che nominano un file cambiato, col nome intero', () => {
+  const testi = {
+    'tests/unit/a.test.mjs': "import x from '../../src/shared/cacheCodice.js';",
+    'tests/unit/b.test.mjs': "readFileSync(join(ROOT, 'CLAUDE.md'))",
+    'tests/unit/c.test.mjs': "import '../../src/shared/data.js';",
+    'tests/unit/d.test.mjs': 'niente',
+  };
+  const tutti = Object.keys(testi);
+  const leggi = (f) => testi[f];
+  assert.deepEqual(unitToccati({ cambiati: ['src/shared/cacheCodice.js'], tutti, leggi }), ['tests/unit/a.test.mjs']);
+  assert.deepEqual(unitToccati({ cambiati: ['tests/unit/d.test.mjs', 'CLAUDE.md'], tutti, leggi }), ['tests/unit/b.test.mjs', 'tests/unit/d.test.mjs']);
+  assert.deepEqual(unitToccati({ cambiati: ['src/a.js'], tutti, leggi }), [], '`a.js` non sceglie chi nomina `data.js`');
+  assert.deepEqual(unitToccati({ cambiati: ['tests/unit/nuovo.test.mjs'], tutti: [...tutti, 'tests/unit/nuovo.test.mjs'], leggi }), ['tests/unit/nuovo.test.mjs']);
+  assert.deepEqual(unitToccati({ cambiati: [], tutti, leggi }), []);
+});
+
+test('prova dei soli unit toccati: il test nuovo rosso del ramo blocca, il rosso di main che il ramo non tocca no', () => {
+  const r = repoFinto();
+  try {
+    r.suMain(() => r.scrivi('tests/unit/rotto.test.mjs', TEST_ROTTO));
+    const innocuo = r.ramo('claude/innocuo', () => r.scrivi('nuovo.txt', 'x\n'));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    const v = provaUnitSullaFusione({ root: r.lavoro, punta: innocuo, scrivi: () => {}, unit: 'toccati' });
+    assert.deepEqual({ esito: v.esito, toccati: v.toccati }, { esito: 'verde', toccati: 0 }, JSON.stringify(v));
+    assert.match(testoProva(v), /niente da provare/);
+    assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta: innocuo, scrivi: () => {} }).esito, 'rosso_anche_su_main', 'la corsa intera vede il rotto di main');
+
+    const nuovo = r.ramo('claude/nuovo', () => r.scrivi('tests/unit/nuovo.test.mjs', TEST_VALORE.replace("'uno'", "'tre'")));
+    r.suMain(() => r.scrivi('altro2.txt', 'z\n'));
+    const righe = [];
+    const p = provaUnitSullaFusione({ root: r.lavoro, punta: nuovo, scrivi: (s) => righe.push(s), unit: 'toccati' });
+    assert.equal(p.esito, 'rosso_sulla_fusione', `${JSON.stringify(p)}\n${righe.join('\n')}`);
+    assert.deepEqual(p.rossi, ['tests/unit/nuovo.test.mjs › il valore è uno'], 'il rotto di main non è fra i toccati');
+    assert.equal(p.toccati, 1);
+    assert.match(testoProva(p), /^✗ Unit toccati dal ramo \(1 file\) sulla fusione/);
+
+    const tocca = r.ramo('claude/tocca', () => r.scrivi('valore.txt', 'due\n'));
+    r.suMain(() => r.scrivi('tests/unit/valore.test.mjs', TEST_VALORE));
+    const q = provaUnitSullaFusione({ root: r.lavoro, punta: tocca, scrivi: () => {}, unit: 'toccati' });
+    assert.equal(q.esito, 'rosso_sulla_fusione', 'il test di main che legge il file cambiato dal ramo è fra i toccati');
+    assert.deepEqual(q.rossi, ['tests/unit/valore.test.mjs › il valore è uno']);
+    pulita(r);
+  } finally {
+    togliCartella(r.casa);
+  }
+});
+
+test('il codice provato non vede i file dei comandi di Actions: non scrive l\'esito della propria prova', () => {
+  const r = repoFinto();
+  try {
+    const falso = "import { test } from 'node:test';\nimport { appendFileSync } from 'node:fs';\n"
+      + "test('scrive se può', () => { for (const k of ['GITHUB_OUTPUT', 'GITHUB_ENV']) if (process.env[k]) appendFileSync(process.env[k], 'campo=finto\\n'); });\n";
+    const punta = r.ramo('claude/falso', () => r.scrivi('tests/unit/falso.test.mjs', falso));
+    r.suMain(() => r.scrivi('altro.txt', 'y\n'));
+    const uscita = join(r.casa, 'uscita.txt');
+    writeFileSync(uscita, '', 'utf8');
+    const prima = { GITHUB_OUTPUT: process.env.GITHUB_OUTPUT, GITHUB_ENV: process.env.GITHUB_ENV };
+    process.env.GITHUB_OUTPUT = uscita;
+    process.env.GITHUB_ENV = uscita;
+    try {
+      assert.equal(provaUnitSullaFusione({ root: r.lavoro, punta, scrivi: () => {}, unit: 'toccati' }).esito, 'verde');
+    } finally {
+      for (const [k, v] of Object.entries(prima)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; }
+    }
+    assert.equal(readFileSync(uscita, 'utf8'), '');
+    assert.deepEqual([...COMANDI_DI_ACTIONS].sort(), ['GITHUB_ENV', 'GITHUB_OUTPUT', 'GITHUB_PATH', 'GITHUB_STATE', 'GITHUB_STEP_SUMMARY']);
+  } finally {
+    togliCartella(r.casa);
   }
 });
 

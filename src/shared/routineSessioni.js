@@ -6,9 +6,12 @@
   'use strict';
 
   // `manutentoreAcceso`: il pacemaker accende il manutentore (SPEC-MANUTENTORE § 4) solo se l'owner l'ha acceso.
-  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso', 'riservatiOff', 'riservatiTetto']);
+  // `unitWindows`: la parte Windows degli unit al cancello di fusione (#2225); il server la manda alla corsa.
+  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso', 'riservatiOff', 'riservatiTetto', 'unitWindows']);
   // Vuoto = si alternano, che è il comportamento senza il campo.
   const ACCOUNT = Object.freeze(['', 'A', 'B']);
+  // Il primo vale anche senza il campo, come per il server (unitFusione.modoWindowsDi) e il workflow.
+  const UNIT_WINDOWS = Object.freeze(['toccati', 'tutti', 'spento']);
 
   function limiti() {
     const A = (global.SN_CONST && global.SN_CONST.AUTOMATION) || {};
@@ -32,6 +35,7 @@
       manutentoreAcceso: d.manutentoreAcceso === true,
       riservatiOff: d.riservatiOff === true,
       riservatiTetto: tettoDi(d.riservatiTetto, max),
+      unitWindows: UNIT_WINDOWS.includes(d.unitWindows) ? d.unitWindows : UNIT_WINDOWS[0],
     };
   }
 
@@ -73,6 +77,12 @@
         return { ok: false, testo: 'Account prioritario: vale «A», «B», oppure niente (si alternano). Non salvato.' };
       }
       valori.priorityAccount = p.priorityAccount;
+    }
+    if (p.unitWindows != null) {
+      if (!UNIT_WINDOWS.includes(p.unitWindows)) {
+        return { ok: false, testo: `Unit su Windows: vale ${UNIT_WINDOWS.map((m) => `«${m}»`).join(', ')}. Non salvato.` };
+      }
+      valori.unitWindows = p.unitWindows;
     }
     for (const chiave of ['accountAOff', 'accountBOff', 'manutentoreAcceso', 'riservatiOff']) {
       if (p[chiave] == null) continue;
@@ -189,7 +199,7 @@
   }
 
   global.SN_ROUTINE_SESSIONI = {
-    CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa,
+    CHIAVI, ACCOUNT, UNIT_WINDOWS, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa,
     pausaInParole, statoRiservati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);

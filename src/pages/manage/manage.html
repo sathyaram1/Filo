@@ -173,6 +173,8 @@
       transition: background calc(0.15s * var(--sn-motion, 1)), color calc(0.15s * var(--sn-motion, 1)), border-color calc(0.15s * var(--sn-motion, 1));
     }
     .mg-auto-choice-item:hover .mg-auto-choice-text { background: var(--sn-hover); color: var(--sn-fg); }
+    /* La stima accanto alla scelta (filo_design § GESTIONE DEI MODELLI): più leggera del nome, nella stessa pillola. */
+    .mg-auto-choice-stima { margin-left: 8px; font-weight: 400; font-size: 12px; opacity: 0.8; }
     .mg-auto-choice-item input:checked + .mg-auto-choice-text {
       border-color: var(--sn-accent); color: var(--sn-accent); background: var(--sn-hover);
     }
@@ -2714,6 +2716,30 @@
                 <!-- Gli account fermi dopo un'accensione rifiutata, col motivo (#996): le righe le scrive manage.js. -->
                 <div class="mg-auto-pause" id="mgAccountsPausa" role="status" hidden></div>
                 <p class="mg-auto-warn" id="mgAccountsWarn" hidden>Nessun account in uso: non parte nessuna sessione.</p>
+              </section>
+
+              <!-- Gli unit su Windows al cancello di fusione (#2225): il server manda la scelta alla corsa che accende dopo.
+                 I minuti di GitHub non si pagano (repo pubblico): la stima accanto a ogni pillola è l'attesa in più. -->
+              <section class="mg-auto-block" id="mgUnitWindowsBlock">
+                <span class="mg-auto-field-label">Unit su Windows prima di fondere</span>
+                <p class="mg-auto-block-desc">
+                  Accanto alla prova su Linux. Un rosso solo di Windows ferma il ramo invece di arrivare su main.
+                  <span class="mg-action-msg" id="mgUnitWindowsMsg" role="status"></span>
+                </p>
+                <div class="mg-auto-choice" id="mgUnitWindowsChoice" role="radiogroup" aria-label="Unit su Windows prima di fondere">
+                  <label class="mg-auto-choice-item" title="Solo gli unit che il ramo cambia o che nominano un file cambiato: finiscono dentro i 6-7 minuti della prova su Linux. Un ramo che ha già dentro main, prima si fondeva senza prova: ora aspetta Windows, qualche minuto.">
+                    <input type="radio" name="mgUnitWindows" value="toccati" checked />
+                    <span class="mg-auto-choice-text">Toccati dal ramo<span class="mg-auto-choice-stima">0 $, al più 3 min in più</span></span>
+                  </label>
+                  <label class="mg-auto-choice-item" title="Tutti gli unit anche su Windows: una ventina di minuti contro i 6-7 di Linux, e più rifacimenti quando main si muove intanto.">
+                    <input type="radio" name="mgUnitWindows" value="tutti" />
+                    <span class="mg-auto-choice-text">Tutti<span class="mg-auto-choice-stima">0 $, circa 16 min in più a fusione</span></span>
+                  </label>
+                  <label class="mg-auto-choice-item" title="Nessuna prova su Windows prima di fondere: un rosso di Windows si vede solo dopo, nella suite su main.">
+                    <input type="radio" name="mgUnitWindows" value="spento" />
+                    <span class="mg-auto-choice-text">Spento<span class="mg-auto-choice-stima">0 $, nessuna prova su Windows</span></span>
+                  </label>
+                </div>
               </section>
 
               <!-- Le righe le scrive manage.js da SN_ROUTINE_MODELLI: fasi e scelte vivono in un posto solo. -->

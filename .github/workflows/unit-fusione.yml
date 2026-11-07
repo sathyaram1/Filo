@@ -16,10 +16,14 @@ run-name: unit-fusione ${{ github.event.client_payload.corsa }}
 permissions:
   contents: read
 
+# Linux e Windows provano la coppia in parallelo e passano l'esito a `unit`, l'unico lavoro che scrive la riga per il
+# server (#2225): un rosso solo di Windows nasceva su main e fermava la pubblicazione.
 jobs:
-  unit:
+  linux:
     runs-on: ubuntu-latest
     timeout-minutes: 90
+    outputs:
+      campo: ${{ steps.prova.outputs.campo }}
     # La coppia arriva solo come variabile: dentro `run:` un'espressione diventerebbe codice della shell.
     env:
       GIT_TERMINAL_PROMPT: '0'
@@ -60,4 +64,86 @@ jobs:
         run: node ../strumenti/scripts/npm-ci-ritenta.mjs
 
       - name: Unit sulla fusione
-        run: node strumenti/scripts/unit-fusione-azione.mjs --root prova --ramo "$RAMO" --main "$MAIN"
+        id: prova
+        run: node strumenti/scripts/unit-fusione-azione.mjs --root prova --ramo "$RAMO" --main "$MAIN" --parte linux --unit tutti
+
+  # Di default solo gli unit che il ramo tocca (pochi minuti, dentro la corsa Linux); `tutti` costa una ventina di
+  # minuti di cancello in più, `spento` toglie la parte. Lo sceglie il server nella richiesta.
+  windows:
+    if: github.event.client_payload.windows != 'spento'
+    runs-on: windows-latest
+    timeout-minutes: 90
+    defaults:
+      run:
+        shell: bash
+    outputs:
+      campo: ${{ steps.prova.outputs.campo }}
+    env:
+      GIT_TERMINAL_PROMPT: '0'
+      RAMO: ${{ github.event.client_payload.ramo }}
+      MAIN: ${{ github.event.client_payload.main }}
+      MODO: ${{ github.event.client_payload.windows }}
+    steps:
+      - name: La coppia da provare
+        run: |
+          if [[ ! "$RAMO" =~ ^[0-9a-f]{40}$ || ! "$MAIN" =~ ^[0-9a-f]{40}$ ]]; then
+            echo "coppia non valida: servono due sha interi"
+            exit 2
+          fi
+
+      - name: Strumenti di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: strumenti
+          persist-credentials: false
+
+      - name: Il ramo, con la storia di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ env.RAMO }}
+          path: prova
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Dipendenze del ramo
+        working-directory: prova
+        run: node ../strumenti/scripts/npm-ci-ritenta.mjs
+
+      - name: Unit sulla fusione su Windows
+        id: prova
+        run: node strumenti/scripts/unit-fusione-azione.mjs --root prova --ramo "$RAMO" --main "$MAIN" --parte windows --unit "$MODO"
+
+  # Gira anche con una parte caduta: senza riga il server riaccenderebbe la corsa invece di leggere perché.
+  unit:
+    needs: [linux, windows]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    env:
+      RAMO: ${{ github.event.client_payload.ramo }}
+      MAIN: ${{ github.event.client_payload.main }}
+      CAMPO_LINUX: ${{ needs.linux.outputs.campo }}
+      RISULTATO_LINUX: ${{ needs.linux.result }}
+      CAMPO_WINDOWS: ${{ needs.windows.outputs.campo }}
+      RISULTATO_WINDOWS: ${{ needs.windows.result }}
+    steps:
+      - name: Strumenti di main
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.sha }}
+          path: strumenti
+          persist-credentials: false
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: L'esito per il server
+        run: node strumenti/scripts/unit-fusione-azione.mjs --unisci linux,windows --ramo "$RAMO" --main "$MAIN"

@@ -693,8 +693,8 @@
     //                    spenta, e quante sessioni sue insieme (1–20; assente = 20).
     // Le legge il SERVER quando accende le sessioni. Owner-only.
     //   manutentoreAcceso il pacemaker accende il manutentore (campo assente = spento).
-    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff, manutentoreAcceso, riservatiOff, riservatiTetto } | { ok:false, error }
-    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff?, manutentoreAcceso?, riservatiOff?, riservatiTetto? } → come sopra | { ok:false, error }
+    AUTOMATION_SESSIONS_GET: 'automation_sessions_get', // → { ok, maxSessions, priorityAccount, accountAOff, accountBOff, manutentoreAcceso, riservatiOff, riservatiTetto, unitWindows } | { ok:false, error }
+    AUTOMATION_SESSIONS_SET: 'automation_sessions_set', // { maxSessions?, priorityAccount?, accountAOff?, accountBOff?, manutentoreAcceso?, riservatiOff?, riservatiTetto?, unitWindows? } → come sopra | { ok:false, error }
     // I numeri dell'owner sui crediti delle routine (ownerCrediti sul server, regole in src/shared/routineCrediti.js):
     // riserva di A, tetto di B, taratura, rinnovi; `null` toglie un numero. Lo stato dice per account percentuale,
     // limite, passo del giorno e rinnovo. Owner-only.

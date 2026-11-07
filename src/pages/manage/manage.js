@@ -66,6 +66,8 @@
   const mgMaxSessionsMsg  = document.getElementById('mgMaxSessionsMsg');
   const mgPriorityAccountMsg = document.getElementById('mgPriorityAccountMsg');
   const mgPriorityRadios  = Array.from(document.querySelectorAll('input[name="mgPriorityAccount"]'));
+  const mgUnitWindowsMsg  = document.getElementById('mgUnitWindowsMsg');
+  const mgUnitWindowsRadios = Array.from(document.querySelectorAll('input[name="mgUnitWindows"]'));
   const mgAccountA        = document.getElementById('mgAccountA');
   const mgAccountB        = document.getElementById('mgAccountB');
   const mgAccountsMsg     = document.getElementById('mgAccountsMsg');
@@ -677,7 +679,7 @@
     for (const el of [mgCap3, mgCap3Save, mgCap2, mgCap2Save, mgCap1, mgCap1Save, mgCap0, mgCap0Save,
       mgFixInstructions, mgFixInstructionsSave, mgLavoriServer, mgGiroStretto, mgMaxSessions, mgMaxSessionsSave,
       mgRiservati, mgRiservatiTetto, mgRiservatiTettoSave,
-      mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
+      mgAccountA, mgAccountB, mgManutentoreAcceso, ...mgPriorityRadios, ...mgUnitWindowsRadios, ...roleSelects.values(), mgJudgeTimeout, mgJudgeTimeoutSave, ...Object.values(mgAutoApprove),
       ...Object.values(mgJudgeCampi).flatMap(([input, salva, rimetti]) => [input, salva, rimetti])]) {
       if (el) el.disabled = !isAdmin;
     }
@@ -895,7 +897,7 @@
   // un documento intero arriva: da lì in poi l'avviso sarebbe falso (#675).
   const avvisiLettura = new Map();
   const righeSessions = [[mgMaxSessionsMsg, ['maxSessions']], [mgPriorityAccountMsg, ['priorityAccount']], [mgAccountsMsg, ['accountAOff', 'accountBOff']], [mgManutentoreMsg, ['manutentoreAcceso']],
-    [mgRiservatiMsg, ['riservatiOff']], [mgRiservatiTettoMsg, ['riservatiTetto']]];
+    [mgRiservatiMsg, ['riservatiOff']], [mgRiservatiTettoMsg, ['riservatiTetto']], [mgUnitWindowsMsg, ['unitWindows']]];
   // Ultimo esito di ogni riga; l'avviso «non letto» non è un esito: lo decide mostraSessionsMsg.
   const esitiSessions = new Map();
   const sceltePendenti = () => Object.assign({}, ...sessionsInAttesa.map((s) => s.valori));
@@ -953,6 +955,7 @@
     const noto = notoSessions;
     if (mgMaxSessions && !maxInScrittura) mgMaxSessions.value = noto('maxSessions') ? String(vista.maxSessions) : '';
     for (const r of mgPriorityRadios) r.checked = noto('priorityAccount') && r.value === vista.priorityAccount;
+    for (const r of mgUnitWindowsRadios) r.checked = noto('unitWindows') && r.value === vista.unitWindows;
     if (mgAccountA) mgAccountA.checked = !vista.accountAOff;
     if (mgAccountB) mgAccountB.checked = !vista.accountBOff;
     if (mgManutentoreAcceso) mgManutentoreAcceso.checked = noto('manutentoreAcceso') && vista.manutentoreAcceso;
@@ -1070,6 +1073,13 @@
     radio.addEventListener('change', () => {
       if (!radio.checked) return;
       saveSessions({ priorityAccount: radio.value }, mgPriorityAccountMsg);
+    });
+  }
+
+  for (const radio of mgUnitWindowsRadios) {
+    radio.addEventListener('change', () => {
+      if (!radio.checked) return;
+      saveSessions({ unitWindows: radio.value }, mgUnitWindowsMsg);
     });
   }
 

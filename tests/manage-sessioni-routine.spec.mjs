@@ -375,3 +375,41 @@ test('una risposta non riletta che arriva dopo un documento pieno più nuovo non
   await expect(page.locator('#mgAccountsMsg')).toHaveText('Salvato.');
   await expect(page.locator('#mgMaxSessionsMsg')).toHaveText('Salvato.');
 });
+
+// ── Gli unit su Windows prima di fondere (#2225) ────────────────────────────
+const pillolaWindows = (page, valore) => page.locator('.mg-auto-choice-item')
+  .filter({ has: page.locator(`input[name="mgUnitWindows"][value="${valore}"]`) });
+
+test('unit su Windows: la scelta del server si vede con la sua stima, e un clic la scrive sul documento', async ({ openTab }) => {
+  const page = await apriServer(openTab, { unitWindows: 'tutti' });
+  await arrivate(page, 1);
+  await expect(page.locator('input[name="mgUnitWindows"][value="tutti"]')).toBeChecked();
+  await expect(pillolaWindows(page, 'toccati')).toContainText('0 $, al più 3 min in più');
+  await expect(pillolaWindows(page, 'tutti')).toContainText('circa 16 min in più a fusione');
+  await expect(pillolaWindows(page, 'spento')).toContainText('nessuna prova su Windows');
+  await page.locator('#mgUnitWindowsBlock').scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'tests/.shots/manage-unit-windows-2225.png' });
+
+  await pillolaWindows(page, 'spento').click();
+  await arrivate(page, 2);
+  await expect(page.locator('#mgUnitWindowsMsg')).toHaveText('Salvato.');
+  expect(await page.evaluate(() => window.__doc.unitWindows)).toBe('spento');
+  await expect(page.locator('input[name="mgUnitWindows"][value="spento"]')).toBeChecked();
+
+  await pillolaWindows(page, 'toccati').click();
+  await arrivate(page, 3);
+  expect(await page.evaluate(() => window.__doc.unitWindows)).toBe('toccati');
+});
+
+test('unit su Windows mai letti: nessuna pillola accesa, e la riga lo dice; senza il campo valgono i toccati', async ({ openTab }) => {
+  const giu = await apriServer(openTab, {}, { getGiu: true });
+  await arrivate(giu, 1);
+  expect(await giu.locator('input[name="mgUnitWindows"]:checked').count()).toBe(0);
+  await expect(giu.locator('#mgUnitWindowsMsg')).toContainText('Non ho potuto leggere dal server');
+
+  await giu.evaluate(() => { window.__getGiu = false; });
+  await giu.evaluate(() => window.__mgTest.loadSessions());
+  await arrivate(giu, 2);
+  await expect(giu.locator('input[name="mgUnitWindows"][value="toccati"]')).toBeChecked();
+  await expect(giu.locator('#mgUnitWindowsMsg')).toHaveText('');
+});
