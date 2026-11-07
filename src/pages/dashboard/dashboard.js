@@ -1414,10 +1414,16 @@
     const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
     return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
   }
+  // Il messaggio già nel campo (un secondo clic, un doppio clic) non si rimette una seconda volta: ci si torna sopra.
+  let rimesso = null;
   function modificaMessaggio(b) {
     const c = composizioni.get(b);
     if (!c) return false;
+    const testo = String(c.scritto || '').trim();
+    const gia = (rimesso && rimesso.bolla === b && inputEl.value === rimesso.valore) || (!!testo && inputEl.value.includes(testo));
+    if (gia) { inputEl.focus(); return true; }
     rimettiNellaCasella([c]);
+    rimesso = { bolla: b, valore: inputEl.value };
     return true;
   }
   // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
