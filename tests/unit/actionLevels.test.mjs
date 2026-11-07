@@ -202,8 +202,8 @@ test('ESEGUI_COMANDO (#146.6): il costo dipende dal comando, classificato dal re
   // persistente: pretendere "conferma" a ogni spostamento la renderebbe inutile).
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'cd sub' }), 1);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'cd ..' }), 1);
-  // ma un `cd` con metacaratteri (sostituzione/concatenazione) resta 3.
-  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'cd $(rm -rf x)' }), 3);
+  // ma un `cd` con metacaratteri (sostituzione/concatenazione) no: dentro c'è una cancellazione per sempre, 4.
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'cd $(rm -rf x)' }), 4);
   // Modifica recuperabile → 2 (popup).
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'git push' }), 2);
   assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'npm install' }), 2);
