@@ -183,7 +183,8 @@ function regolePer(href, wc) {
 
 /**
  * Il preload di un frame di YouTube vede il video rotto. La scheda torna al solo «Salta» finché le regole non cambiano;
- * il frame si ricarica una volta. Ritorna cosa ha fatto, per i test e per chi chiama.
+ * si ricaricano una volta tutti i suoi frame di YouTube, perché hanno le stesse regole (due video in un articolo), e
+ * l'articolo che li contiene no. Ritorna cosa ha fatto, per i test e per chi chiama.
  */
 function rotto(wc, frame, motivo, { avvisa = avvisoDiRipiego, ricarica = ricaricaFrame } = {}) {
   const id = wc && typeof wc.id === 'number' ? wc.id : null;
