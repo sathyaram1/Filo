@@ -61,6 +61,41 @@
       const su = el && win.parent && win.parent.SN_RIQUADRI_IN_ARRIVO;
       if (su && su !== API && typeof su.arrivato === 'function') su.arrivato(el);
     } catch (_) {}
+    // Il load di un riquadro dentro un componente del sito non esce dal componente: lo dice il riquadro stesso, a
+    // caricamento finito, e chi lo ospita lo cerca nei componenti aperti (#1290.2).
+    try {
+      win.addEventListener('load', (e) => {
+        if (e.target !== win.document || win.parent === win) return;
+        try { win.parent.postMessage({ filoRiquadroCaricato: 1 }, '*'); } catch (_) {}
+      });
+      win.addEventListener('message', (e) => {
+        if (!e || !e.data || e.data.filoRiquadroCaricato !== 1 || !e.source) return;
+        const f = riquadroInOmbra(e.source);
+        if (f) stato.caricati.add(f);
+      });
+    } catch (_) {}
+  }
+
+  // Il riquadro di questo documento, dentro un componente aperto, la cui finestra è `w`. Uno della stessa origine si
+  // riconosce da `frameElement`; degli altri si chiede la finestra, che d'altra origine non toglie il preload (#1560).
+  function riquadroInOmbra(w) {
+    try {
+      const el = w.frameElement;
+      if (eRiquadro(el)) return el.ownerDocument === stato.doc && el.getRootNode() !== stato.doc ? el : null;
+    } catch (_) {}
+    const radici = [];
+    try { for (const el of stato.doc.querySelectorAll('*')) if (el.shadowRoot) radici.push(el.shadowRoot); } catch (_) { return null; }
+    while (radici.length) {
+      const r = radici.pop();
+      let tutti = [];
+      try { tutti = r.querySelectorAll('*'); } catch (_) { continue; }
+      for (const el of tutti) {
+        if (el.shadowRoot) radici.push(el.shadowRoot);
+        if (!eRiquadro(el) || indirizzo(el)) continue;
+        try { if (el.contentWindow === w) return el; } catch (_) {}
+      }
+    }
+    return null;
   }
 
   function inArrivo(f) {
