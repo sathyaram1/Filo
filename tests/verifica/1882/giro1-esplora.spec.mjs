@@ -2,6 +2,7 @@
 
 import { test, expect } from '../../fixtures/electron.mjs';
 import { menuDi } from '../../helpers/menuContestuale.mjs';
+import { barraPage, comandaBarra, pannelloFermo } from '../../helpers/barra.mjs';
 
 const inAttesa = (page) => page.evaluate(() => (document.documentElement.dataset.filoSuRichiesta || '').split(',').filter(Boolean));
 
