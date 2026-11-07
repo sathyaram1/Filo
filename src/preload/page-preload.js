@@ -280,7 +280,7 @@ try {
   const nascondi = require('./nascondi-pubblicita.js');
   nascondi.chiudiBloccati({ ipcRenderer, webFrame });
   const loc = (typeof window !== 'undefined' && window.location && window.location.href) || '';
-  if (!IS_SUBFRAME && /^https?:/i.test(loc)) nascondi({ ipcRenderer, webFrame, href: loc });
+  if (!IS_SUBFRAME && /^https?:/i.test(loc)) nascondi({ ipcRenderer, webFrame, href: loc, gate: GATE_PUBBLICITA, risposta: AVVIO && AVVIO.adblock });
 } catch (e) { /* come sopra: mai bloccare il caricamento */ }
 
 // Il sito è entrato o uscito dall'elenco coi banner dei cookie: la sua risposta va via prima che i suoi script
