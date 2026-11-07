@@ -3883,11 +3883,23 @@
     posto.appendChild(btn);
     mgWorkState.appendChild(posto);
   }
-  function righeDichiara(r) {
+  // Si dichiara fidato dopo averlo letto: ogni ramo apre le sue modifiche rispetto a main.
+  const REPO_DICHIARA = { app: 'sathyaram1/Filo', server: 'sathyaram1/filo-security' };
+  function modificheDelRamo(repo, ramo) {
+    const r = String(ramo || '');
+    if (!REPO_DICHIARA[repo] || !/^[A-Za-z0-9._/-]{1,200}$/.test(r) || r.includes('..')) return '';
+    return `https://github.com/${REPO_DICHIARA[repo]}/compare/main...${r.split('/').map(encodeURIComponent).join('/')}`;
+  }
+  function righeDichiara(r, ramo) {
     const dove = { app: 'Ramo dell’app', server: 'Ramo del server' };
-    const righe = (r.rami || []).map((x) => `${dove[x.repo] || x.repo}, all’ultimo commit ${String(x.punta || '').slice(0, 7)}: ${x.motivo || 'non pulito'}`);
+    const righe = (r.rami || []).map((x) => {
+      const nome = esc(dove[x.repo] || x.repo);
+      const url = modificheDelRamo(x.repo, ramo);
+      const testa = url ? `<a href="${esc(url)}" target="_blank" rel="noopener" title="Le modifiche rispetto a main">${nome}</a>` : nome;
+      return `${testa}, all’ultimo commit ${esc(String(x.punta || '').slice(0, 7))}: ${esc(x.motivo || 'non pulito')}`;
+    });
     const n = Number(r.stato) || 0;
-    if (n) righe.push(`${n === 1 ? 'Uno scritto' : `${n} scritti`} di biglietti non fidati fra note e critiche`);
+    if (n) righe.push(esc(`${n === 1 ? 'Uno scritto' : `${n} scritti`} di biglietti non fidati fra note e critiche`));
     return righe;
   }
   async function guardaDichiara(id, posto, btn) {
