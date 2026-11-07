@@ -923,7 +923,7 @@
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
     if (e.target.closest('.close, .tab-alert, .proxy-ind')) return;
-    drag = { id: t.id, el, startX: e.clientX, moved: false };
+    drag = { id: t.id, el, startX: e.clientX, startY: e.clientY, moved: false, fuori: false, pointerId: e.isTrusted ? ultimoPointerId : null };
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
   }
