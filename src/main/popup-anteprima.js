@@ -167,9 +167,12 @@ function mostra(parent, dati) {
   if (!tabs || !dati) return false;
   const id = testo(dati.id);
   const tab = tabs.tabs.find((t) => t.id === id);
-  if (!tab) { nascondi(parent); return false; }
+  // Il gettone di una scheda chiusa (#2085): titolo e sito, e l'ultima foto se la finestra l'ha ancora.
+  const chiusa = !tab && dati.chiusa && typeof dati.chiusa === 'object' ? dati.chiusa : null;
+  if (!tab && !chiusa) { nascondi(parent); return false; }
   const s = finestra(parent);
   if (!s) return false;
+  if (chiusa) return mostraChiusa(parent, s, id, dati, chiusa);
   if (s.misura && s.misura.id !== id) contaUscita(parent, s, 'via');
   // Il numero non riparte mai: una misura in ritardo non deve combaciare con una carta nuova.
   const n = ++s.giri;
