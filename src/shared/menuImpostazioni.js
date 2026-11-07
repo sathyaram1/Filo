@@ -100,7 +100,8 @@
     const nome = nomeDi(v);
     const voci = [];
     if (global.SN_VOCI_IMPOSTAZIONI.leggi({}, v.percorso) !== undefined) {
-      voci.push({ type: 'item', icon: icona('undo'), label: 'Rimetti di serie', onClick: () => { rimettiDiSerie(v).catch(() => {}); } });
+      const chiave = segreto(v);
+      voci.push({ type: 'item', icon: icona(chiave ? 'trash' : 'undo'), label: chiave ? 'Togli la chiave' : 'Rimetti di serie', onClick: () => { rimettiDiSerie(v, nome).catch(() => {}); } });
     }
     const S = global.SN_SIDEBAR;
     if (aiutoAcceso && S && typeof S.chiediDaPagina === 'function') {
