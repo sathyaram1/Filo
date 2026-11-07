@@ -760,7 +760,12 @@ e la prova la dichiarava lui al server. Adesso:
   un'altra coppia, non decide niente;
 - **gli esiti**: verde (o rosso anche su main da solo, o main già dentro il
   ramo, che non costa una corsa) → cancello e fusione sul main provato, come
-  sempre; rossi solo sulla fusione o conflitto → riallineamento; main o punta
+  sempre; rossi solo sulla fusione o conflitto → riallineamento. Le righe di
+  novità del ramo sotto una versione uscita su main intanto la prova le sposta
+  in cima prima degli unit, con la regola del riallineamento (#2214): l'esito
+  resta `rosso_sulla_fusione`, perché la fusione del ramo com'è le lascerebbe
+  lì, e il campo `novita` (righe, blocco, `dopo` = esito dopo lo spostamento)
+  dice se basta spostarle (`dopo` verde o rosso anche su main); main o punta
   mossi prima della fusione → la prova si rifà, al più tre volte, poi la
   riprende il recupero fra un'ora. Un blocco L5 va all'owner con la spiegazione
   composta dal server dai blocchi. Un'azione che non parte, non finisce o non
