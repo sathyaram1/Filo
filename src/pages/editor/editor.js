@@ -1170,9 +1170,12 @@
 
   // Il titolo derivato è segnato «a mano» così non viene rigenerato in automatico.
   function duplicateActiveFile() {
-    if (!doc) return;
-    syncActiveIntoCollection();
-    const src = STORE.findFile(collection, doc.id);
+    if (doc) duplicateFile(doc.id);
+  }
+  function duplicateFile(id) {
+    if (!id) return;
+    if (doc && doc.id === id) syncActiveIntoCollection();
+    const src = STORE.findFile(collection, id);
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
     delete copy.id;
