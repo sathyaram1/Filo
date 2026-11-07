@@ -1955,9 +1955,10 @@ function esitoSistemaPerModello(o) {
     return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${acceso}${apri} Riporta all'utente queste parole; non riprovare uguale.${quale}${nomi}`;
   }
   if (o.cosa === 'volume') {
-    const prima = typeof o.prima === 'number' ? ` (prima era al ${o.prima}%)` : '';
+    const al = (n) => global.SN_SISTEMA.alPercento(n);
+    const prima = typeof o.prima === 'number' ? ` (prima era ${al(o.prima)})` : '';
     const limite = o.limitato ? ' Il numero chiesto era fuori da 0-100: si è fermato al limite, dillo all\'utente.' : '';
-    return `Volume del computer ora al ${o.volume}%${o.muto ? ', in muto' : ''}${prima}.${limite}`;
+    return `Volume del computer ora ${al(o.volume)}${o.muto ? ', in muto' : ''}${prima}.${limite}`;
   }
   const radio = o.cosa === 'wifi' ? 'Wi-Fi' : 'Bluetooth';
   if (Array.isArray(o.elenco)) {
