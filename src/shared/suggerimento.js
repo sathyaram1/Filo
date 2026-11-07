@@ -134,19 +134,26 @@
     if (!spogliati.size && !corrente) smettiDiOsservare();
   }
 
+  const OSSERVA = { subtree: true, childList: true, attributes: true, attributeFilter: ['title', 'data-tip', 'aria-label'] };
+  // Il documento non vede le mutazioni dentro uno shadow: la radice del pezzo sotto il puntatore si osserva a parte.
+  const radiciOsservate = new Set();
   function osserva() {
     if (osservatore || typeof MutationObserver !== 'function') return;
     osservatore = new MutationObserver(suMutazioni);
-    try {
-      osservatore.observe(document.documentElement, {
-        subtree: true, childList: true, attributes: true, attributeFilter: ['title', 'data-tip', 'aria-label'],
-      });
-    } catch (_) { osservatore = null; }
+    try { osservatore.observe(document.documentElement, OSSERVA); } catch (_) { osservatore = null; }
+  }
+  function osservaRadice(el) {
+    if (!osservatore) return;
+    let r = null;
+    try { r = el.getRootNode(); } catch (_) {}
+    if (!r || r === document || radiciOsservate.has(r)) return;
+    try { osservatore.observe(r, OSSERVA); radiciOsservate.add(r); } catch (_) {}
   }
   function smettiDiOsservare() {
     if (!osservatore) return;
     osservatore.disconnect();
     osservatore = null;
+    radiciOsservate.clear();
   }
 
   // Un title riscritto dal codice mentre il puntatore è sopra: diventa il valore da rimettere, e il nativo resta zitto.
