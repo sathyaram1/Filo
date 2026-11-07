@@ -91,6 +91,7 @@ const IMMAGINI_DAI_DATI = [
   { file: 'src/pages/home/home.js', funzione: 'renderCard', testo: 'url(${JSON.stringify(page.thumbnail)})', perche: 'la miniatura della pagina salvata, un data: fatto dal main (miniature.accettabile)' },
   { file: 'src/pages/home/home.js', funzione: 'renderTile', testo: 'url(${JSON.stringify(t.thumb)})', perche: 'la miniatura della categoria, la stessa della pagina che l’ha creata' },
   { file: 'src/pages/dashboard/dashboard.js', funzione: 'applyAccountProfile', testo: 'img.src = profile.picture;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
+  { file: 'src/shared/schedeInChat.js', funzione: 'icona', testo: 'img.src = s.icona;', perche: 'l’icona della scheda già scaricata dal main, un data: (normalizza non lascia passare altro)' },
   { file: 'src/renderer/shell.js', funzione: 'renderAccount', testo: 'img.src = authProfile.picture;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
   { file: 'src/renderer/barra.js', funzione: 'disegnaAccount', testo: 'img.src = a.foto;', perche: 'la copia della foto del profilo (filo://icone/), controllata sopra' },
   { file: 'src/pages/dashboard/dashboard-carte.js', funzione: 'faviconDi', testo: 'img.src = dato', perche: 'l’icona del sito che il main consegna come data: (voce «icone-dei-siti»)' },
