@@ -161,10 +161,10 @@ test('in Sicurezza un solo elenco si chiama «Siti di cui ti fidi»', () => {
   }
 });
 
-test('dalla chat: aggiungere costa 3 e vuole la parola «conferma» a ogni livello, togliere costa 1 e parte subito', () => {
+test('dalla chat: aggiungere è togliere un freno, costo 4 con la parola «conferma» a ogni livello; togliere costa 1 e parte subito', () => {
   const azione = (valore) => ({ type: 'IMPOSTA_PREFERENZA', chiave: 'siti_di_cui_ti_fidi', valore });
   const add = P.buildPreferencePartial('siti di cui ti fidi', 'aggiungi https://login.team.com/x');
-  assert.equal(add.costo, 3);
+  assert.equal(add.costo, 4);
   assert.equal(add.allenta, true);
   assert.deepEqual(add.elenco.voci, ['team.com'], 'la voce è il sito, come quella del «Continua»');
   assert.deepEqual(add.partial, { security: { safeBrowse: { trustedSites: ['team.com'] } } });
