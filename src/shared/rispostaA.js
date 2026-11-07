@@ -78,7 +78,7 @@
     const i = Number.isInteger(r.i) && r.i >= 0 ? r.i : null;
     const testo = testoDi(r.testo).slice(0, PER_CERCARE);
     if (!chat && !testo.trim()) return null;
-    return { ...(chat ? { chat } : {}), ...(i != null ? { i } : {}), testo };
+    return { ...(chat ? { chat } : {}), ...(i != null ? { i } : {}), testo, ...(r.role === 'user' ? { role: 'user' } : {}) };
   }
 
   global.SN_RISPOSTA_A = { ANTEPRIMA, PER_IL_MODELLO, PER_CERCARE, riferimento, posto, risolvi, daPagina, taglia };
