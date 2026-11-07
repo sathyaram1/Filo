@@ -15,6 +15,13 @@ cambiare la logica, e una logica cambiata la giudica la verifica: chi verifica
 dopo di te rilancia gli unit, e ogni rosso diventa un suo rilievo. Nel report
 scrivi l'elenco dei test rossi dopo il rebase.
 
+L'eccezione sono i rossi con `[Windows]` in coda: li ha trovati la prova su
+Windows del cancello, e la verifica che segue gira su Linux, dove sono verdi.
+Nessuno li vedrebbe più e il ramo tornerebbe al cancello a vuoto: questi li
+correggi tu, nel modo che regge su ogni sistema
+(`patterns/un-test-chiede-al-sistema-non-presume-quello-su-cui-e-nato.md`), e
+la verifica giudica la correzione. Nel report dici quali e come.
+
 <!-- includi: _decisioni-owner.md -->
 
 <!-- includi: _immagini.md -->
