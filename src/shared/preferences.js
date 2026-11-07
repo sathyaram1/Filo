@@ -2397,13 +2397,14 @@
     try { stringe = !freno && typeof setter.stringe === 'function' && !!setter.stringe(b, attuali); } catch (_) { stringe = false; }
     let costo = setter.costo;
     try { if (typeof setter.costoDi === 'function') costo = setter.costoDi(b); } catch (_) { costo = 3; }
+    const finale = freno ? (allenta ? 4 : 1) : (stringe ? 1 : costo);
     return {
       ...b,
-      costo: freno ? (allenta ? 4 : 1) : (stringe ? 1 : costo),
+      costo: finale,
       allenta,
       ...(chiede ? { chiede: true } : {}),
       ...(avviso ? { avviso } : {}),
-      dove: setter.dove || doveAMano(setter),
+      dove: setter.dove || (finale === 4 ? doveAMano(setter) : ''),
       risk: setter.risk || '',
     };
   }
