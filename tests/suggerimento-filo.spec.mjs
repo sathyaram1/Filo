@@ -5,6 +5,8 @@
 
 import { test, expect, aspettaFinestra } from './fixtures/electron.mjs';
 import { paginaDelloStrato } from './helpers/riquadri.mjs';
+import { confermaSopraPagina, nelMondoDiFilo } from './helpers/confirm.mjs';
+import { menuDi } from './helpers/menuContestuale.mjs';
 
 const fumetto = (page) => page.locator('[data-sn-fumetto] .tip');
 const haTitolo = (loc) => loc.evaluate((el) => el.hasAttribute('title'));
