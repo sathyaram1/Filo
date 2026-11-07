@@ -298,6 +298,44 @@ test('titoloDaRifare: un altro argomento a parità di parole si accorge, un rito
   assert.equal(SUM.titoloDaRifare(riscritto), false, 'scritto a mano: mai');
 });
 
+// #1697.2: una risposta senza il titolo (tagliata, o senza la sua riga) non fa richiamare il modello a ogni pausa.
+const tema = (v, n) => Array.from({ length: n }, (_, i) => v[i % v.length]).join(' ');
+const MARE = ['il', 'mare', 'onde', 'spiaggia', 'sabbia', 'barca', 'scogli', 'gabbiani', 'conchiglie', 'marea'];
+const MONTI = ['la', 'montagna', 'neve', 'vetta', 'sentiero', 'rifugio', 'bosco', 'ghiacciaio', 'valle', 'cresta'];
+const LAGO = ['il', 'lago', 'canneto', 'pontile', 'anatre', 'remi', 'riva', 'pescatore', 'nebbia', 'salici'];
+
+test('titoloDaRifare: mancato su questo testo non si richiede, su un altro sì', () => {
+  const mare = fileWith({ id: 'a', lines: [tema(MARE, 150)] });
+  const monti = fileWith({ id: 'a', lines: [tema(MONTI, 150)] });
+  monti.meta = { ...monti.meta, titleAuto: true, titleSig: SUM.makeSig(mare) };
+  assert.equal(SUM.titoloDaRifare(monti), true, 'cambio di argomento: si rifà');
+  monti.meta.titleFailSig = SUM.makeSig(monti);
+  assert.equal(SUM.titoloDaRifare(monti), false, 'la risposta non l\'ha portato: sullo stesso testo non si richiede');
+  const ritoccato = fileWith({ id: 'a', lines: [`${tema(MONTI, 150)} neve neve neve`] });
+  ritoccato.meta = { ...monti.meta };
+  assert.equal(SUM.titoloDaRifare(ritoccato), false, 'tre parole in più: ancora lo stesso testo');
+  const lago = fileWith({ id: 'a', lines: [tema(LAGO, 150)] });
+  lago.meta = { ...monti.meta };
+  assert.equal(SUM.titoloDaRifare(lago), true, 'un altro argomento ancora: si riprova');
+  const cresciuto = fileWith({ id: 'a', lines: [tema(MONTI, 300)] });
+  cresciuto.meta = { ...monti.meta };
+  assert.equal(SUM.titoloDaRifare(cresciuto), true, 'il testo è raddoppiato: si riprova');
+});
+
+test('needsSummary: riscritto su un altro argomento con le stesse parole, il riassunto si rifà', () => {
+  const mare = fileWith({ id: 'a', lines: [tema(MARE, 150)], summary: 'Il mare.' });
+  mare.meta.summarySig = SUM.makeSig(mare);
+  assert.equal(SUM.needsSummary(mare), false, 'stesso testo: il riassunto resta');
+  const monti = fileWith({ id: 'a', lines: [tema(MONTI, 150)], summary: 'Il mare.' });
+  monti.meta.summarySig = mare.meta.summarySig;
+  assert.equal(SUM.needsSummary(monti), true, 'altro argomento: il riassunto del mare non vale più');
+  monti.meta.summaryFailSig = SUM.makeSig(monti);
+  assert.equal(SUM.needsSummary(monti), false, 'fermato dal tetto su questo testo: non si richiede');
+  const lago = fileWith({ id: 'a', lines: [tema(LAGO, 150)], summary: 'Il mare.' });
+  lago.meta = { ...monti.meta };
+  assert.equal(SUM.needsSummary(lago), true, 'fermato su un altro argomento: su questo si riprova');
+});
+
 test('titoloERiassunto legge le due righe, e senza etichette tiene tutto come riassunto', () => {
   assert.deepEqual(SUM.titoloERiassunto('TITOLO: Ricetta della torta\nRIASSUNTO: Come si fa la torta di mele.'),
     { titolo: 'Ricetta della torta', riassunto: 'Come si fa la torta di mele.' });
