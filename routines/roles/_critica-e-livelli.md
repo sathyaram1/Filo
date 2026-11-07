@@ -70,11 +70,12 @@ Provato: incolla immagine, trascinamento, 10.000 caratteri, tema scuro. Funziona
   con `"blocca": false` il lavoro va avanti, e gli altri `?` escono come sempre.
   A una prova che copre anche un rilievo che resta togli solo il caso di quello
   che esce, e il suo numero dal nome (`git mv`).
-  **La pulizia che non dipende dall'esito si fa prima del verdetto**:
-  dopo, ogni commit è una spinta che il registro della fiducia non vede, e un
-  lavoro fidato finisce fermo alla fusione. La registrazione rifiuta una critica
-  che ha ancora nel ramo una prova di questi, o un caso col loro numero nel
-  titolo, e dice quale.
+  **La pulizia che non dipende dall'esito si fa prima del verdetto**, nel
+  commit della critica: si sa già, e ogni commit dopo il verdetto è un passo in
+  più che i cancelli devono controllare (lì si può solo togliere). La fiducia
+  non c'entra: quel commit lo spedisce il rilascio, che ne registra la punta.
+  La registrazione rifiuta una critica che ha ancora nel ramo una prova di
+  questi, o un caso col loro numero nel titolo, e dice quale.
 - **`r<n>` è il numero del rilievo che la prova riproduce**: il suo posto nella
   critica che registri, contando da 1 le righe con livello e sede, interne ed
   esterne, nell'ordine in cui le scrivi. Una prova che ne copre più d'uno li

@@ -4,9 +4,8 @@
 
 import { fileURLToPath } from 'node:url';
 import { resolve } from 'node:path';
+import { risultatoOwnerFiducia } from './lib/owner-fiducia.mjs';
 
-const BASE = process.env.FILO_FUNCTIONS_BASE || 'https://europe-west1-filo-8b9cb.cloudfunctions.net';
-export const OWNER_FIDUCIA_URL = `${BASE}/ownerFiducia`;
 const USO = 'Uso: npm run fiducia:sana -- <ramo> [--server] [--dal-vero]';
 
 /** Le parole della riga di comando. PURA. @returns {{ ramo, repo: 'app'|'server', dalVero } | { errore }} */
@@ -34,25 +33,8 @@ export function rigaEsito(r, { dalVero } = {}) {
     : `Si può sanare (${conto}). Rilancia con --dal-vero per togliere il buco.`;
 }
 
-async function chiamaServer(data, { fetchImpl = fetch, url = OWNER_FIDUCIA_URL } = {}) {
-  const { findAdminRefreshToken, mintIdToken } = await import('./lib/firestore-auth.mjs');
-  const refresh = findAdminRefreshToken();
-  if (!refresh) throw new Error('nessuna credenziale admin su questa macchina: node scripts/admin-login.mjs');
-  const idToken = await mintIdToken(refresh);
-  const res = await fetchImpl(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${idToken}` },
-    body: JSON.stringify({ data }),
-  });
-  let body = {};
-  try { body = await res.json(); } catch (_) { body = {}; }
-  if (res.status === 404) throw new Error('la funzione ownerFiducia non è ancora pubblicata sul server');
-  if (!res.ok) throw new Error((body.error && body.error.message) || `errore ${res.status}`);
-  return body.result || {};
-}
-
-/** deps: { chiama(data) → risultato della callable, scrivi(riga) }. → codice d'uscita. */
-export async function sana(argv, { chiama = chiamaServer, scrivi = console.log } = {}) {
+/** deps: { chiama(data) → risultato della callable, scrivi(riga), rete (i deps della chiamata comune) }. → codice d'uscita. */
+export async function sana(argv, { rete = {}, chiama = (data) => risultatoOwnerFiducia(data, rete), scrivi = console.log } = {}) {
   const args = leggiArgomenti(argv);
   if (args.errore) { scrivi(args.errore); return 2; }
   let r;

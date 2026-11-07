@@ -40,3 +40,42 @@ test('il comando ha il suo nome fra gli script del progetto', () => {
   const pkg = JSON.parse(readFileSync(new URL('../../package.json', import.meta.url), 'utf8'));
   assert.equal(pkg.scripts['fiducia:sana'], 'node scripts/fiducia-sana.mjs');
 });
+
+// #2021.1: la stessa chiamata di chi toglie la fiducia, quindi la rete che cade si ritenta e i rifiuti si dicono a parole.
+function reteFinta(risposte) {
+  const visti = [];
+  const fetchImpl = async (url, init) => {
+    visti.push({ url: String(url), init });
+    const r = risposte[Math.min(visti.length - 1, risposte.length - 1)];
+    if (r instanceof Error) throw r;
+    return new Response(JSON.stringify(r.corpo), { status: r.status });
+  };
+  return { visti, fetchImpl };
+}
+const cadutaDiSocket = () => Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('socket hang up'), { code: 'ECONNRESET' }) });
+
+test('la rete che cade a metà si ritenta: la sanatoria arriva, col token dell’owner e la sola richiesta «sana»', async () => {
+  const righe = [];
+  const rete = reteFinta([cadutaDiSocket(), { status: 200, corpo: { result: { ok: true, prova: true, punta: 'a'.repeat(40), commits: 3 } } }]);
+  const codice = await sana([RAMO], { rete: { fetchImpl: rete.fetchImpl, idToken: async () => 'tok-owner' }, scrivi: (r) => righe.push(r) });
+  assert.equal(codice, 0, righe.join('\n'));
+  assert.match(righe[0], /^Si può sanare \(3 commit/);
+  assert.equal(rete.visti.length, 2, 'un secondo tentativo dopo la connessione caduta');
+  assert.equal(rete.visti[1].init.headers.Authorization, 'Bearer tok-owner');
+  assert.deepEqual(JSON.parse(rete.visti[1].init.body), { data: { op: 'sana', repo: 'app', ramo: RAMO, prova: true } });
+});
+
+test('credenziale non dell’owner, funzione assente, rete assente, nessuna credenziale: ognuno detto a parole', async () => {
+  const prova = async (risposte, idToken = async () => 'tok') => {
+    const righe = [];
+    const codice = await sana([RAMO, '--dal-vero'], { rete: { fetchImpl: reteFinta(risposte).fetchImpl, idToken }, scrivi: (r) => righe.push(r) });
+    assert.equal(codice, 1);
+    return righe[0];
+  };
+  assert.equal(await prova([{ status: 403, corpo: { error: { status: 'PERMISSION_DENIED', message: 'not owner' } } }]),
+    'Non si sana: il server non riconosce questa credenziale come proprietario.');
+  assert.match(await prova([{ status: 404, corpo: {} }]), /^Non si sana: la funzione della fiducia non è pubblicata sul server\.$/);
+  const assente = Object.assign(new TypeError('fetch failed'), { cause: Object.assign(new Error('getaddrinfo ENOTFOUND'), { code: 'ENOTFOUND' }) });
+  assert.match(await prova([assente]), /^Non si sana: fetch failed: getaddrinfo ENOTFOUND/);
+  assert.match(await prova([{ status: 200, corpo: {} }], async () => ''), /nessuna credenziale dell’owner/);
+});
