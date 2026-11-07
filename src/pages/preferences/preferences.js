@@ -1926,6 +1926,8 @@
   }
 
   document.addEventListener('DOMContentLoaded', () => {
+    // I valori della tendina li scrive constants.js: la pagina nomina solo quale dei due (#1290.2).
+    for (const o of $('traduzioneNascoste').options) o.value = NASCOSTE_TRADUZIONE[o.dataset.modo];
     // Prima di ogni altro ascoltatore: quando parte persist() il campo è già segnato.
     for (const [id, k] of Object.entries(CAMPO_DI)) {
       const el = $(id);
