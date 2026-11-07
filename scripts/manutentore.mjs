@@ -84,7 +84,7 @@ export function rigaScheda(s, f = {}) {
     s.risolto_su_main ? `risolto? ${unaRiga(s.risolto_su_main).slice(0, 60)}` : '',
     Array.isArray(s.doppione_di) && s.doppione_di.length ? `doppione di ${s.doppione_di.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
     f && Array.isArray(f.unisce) && f.unisce.length ? `pacchetto di ${numeri(f.unisce)}` : '',
-    ...pezziAttese(f && f.attese, f && f.aspettava),
+    ...pezziAttese(f && f.attese, f && f.aspettava, f && f.nonFermano),
   ].filter(Boolean).join(' · ');
   const file = Array.isArray(s.file_probabili) && s.file_probabili.length ? ` | file: ${s.file_probabili.map(unaRiga).join(', ')}` : '';
   return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
