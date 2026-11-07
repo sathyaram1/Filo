@@ -70,10 +70,11 @@ function sorgenteSonda(nome) {
     var esito = 0;
     for (var j = 0; j < tutti.length; j++) {
       var el = tutti[j];
-      if (sottoMuto(el)) continue;
+      var muto = sottoMuto(el);
+      if (muto === 'tag') continue;
       var tag = String(el.tagName || '').toUpperCase();
       if (INCORPORATI[tag]) esito = 1;
-      if (nonDaTradurre(el)) continue;
+      if (muto || nonDaTradurre(el)) continue;
       if (etichetta(el, tag)) return 2;
       if (MUTI[tag] || el.namespaceURI !== HTML) continue;
       if (testoProprio(el)) return 2;
