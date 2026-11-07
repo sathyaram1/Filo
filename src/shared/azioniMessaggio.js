@@ -70,8 +70,8 @@
     const copia = typeof o.copia === 'function' ? o.copia : copiaTesto;
     const cl = { ...CLASSI, ...(o.classi || {}) };
     const DEF = {
-      copia: { icona: 'copy', etichetta: 'Copia', voce: 'Copia il messaggio' },
-      ...(typeof o.rispondi === 'function' ? { rispondi: { icona: 'reply', etichetta: 'Rispondi', voce: 'Rispondi', fai: (m, t) => o.rispondi(m, t) } } : {}),
+      copia: AZIONI.copia,
+      ...(typeof o.rispondi === 'function' ? { rispondi: { ...AZIONI.rispondi, fai: (m, t) => o.rispondi(m, t) } } : {}),
       ...(o.extra || {}),
     };
     let barra = null;
