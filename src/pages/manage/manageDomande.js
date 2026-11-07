@@ -287,7 +287,9 @@
     if (nelGruppo) li.classList.add('mg-domanda--gruppo');
     if (aperta && aperta.ids.includes(li.dataset.id)) li.classList.add('mg-domanda--aperta');
     if (tab === 'domande') li.appendChild(casella([li.dataset.id], `Scegli ${li.dataset.id} per «Applica il consiglio»`));
+    li.dataset.tipo = tipoDi(d);
     li.appendChild(el('span', 'mg-domanda-num', li.dataset.id));
+    li.appendChild(segnoTipo(d, 'mg-domanda-tipo'));
     const titolo = el('span', 'mg-domanda-titolo', d.illeggibile ? 'Non si legge' : String(d.titolo || '(senza titolo)'));
     // Sotto il titolo quello che la scheda deve dire senza aprire: la scelta e il principio di un'automatica,
     // il lavoro che una in smistamento tiene fermo, chi ha risposto fuori da qui (#2011).
