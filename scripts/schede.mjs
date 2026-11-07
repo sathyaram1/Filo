@@ -780,8 +780,11 @@ export async function lanciaAgenti(voci, {
     const salvata = await salvaScheda({ numero: v.num, scheda: SS.campiDellAgente(scheda), rilettura, modello });
     const daTenere = schedaDopoSalvataggio(stampata, salvata);
     guardia.scrivi(`${v.num}.json`, `${JSON.stringify(conTimbro(daTenere, chiave), null, 1)}\n`);
-    if (salvata && salvata.ok) segnaNellIndice(cartella, v.num, dopoIlSalvataggio(salvata, daTenere), { scrivi: guardia.scrivi });
-    else if (daTenere[RIFIUTATA]) {
+    if (salvata && salvata.ok) {
+      // Dal disco l'indice porterebbe dentro, firmato dalla guardia, quello che un agente ancora in volo ci ha scritto.
+      vigila();
+      segnaNellIndice(cartella, v.num, dopoIlSalvataggio(salvata, daTenere), { scrivi: guardia.scrivi, leggi: guardia.leggi });
+    } else if (daTenere[RIFIUTATA]) {
       rifiutate += 1;
       err(`#${v.num}: il server non salva la scheda (${daTenere[RIFIUTATA]}): resta solo nella cartella.`);
     } else {
