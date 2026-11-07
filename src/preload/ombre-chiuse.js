@@ -54,6 +54,7 @@ function sorgenteSonda(nome) {
       var tag = String(el.tagName || '').toUpperCase();
       if (INCORPORATI[tag]) esito = 1;
       for (var a = 0; a < ETICHETTE.length; a++) {
+        if (ETICHETTE[a] === 'value' && tag !== 'INPUT') continue;
         if (testo(el.getAttribute(ETICHETTE[a]))) return 2;
       }
       if (MUTI[tag] || el.namespaceURI !== HTML) continue;
