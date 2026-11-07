@@ -172,8 +172,8 @@
       livello: v.livello,
       muto: v.muto,
       spento: v.muto,
-      dettaglio: v.muto ? [`Volume al ${v.livello}%`, 'Muto'] : [`Volume al ${v.livello}%`],
-      copia: v.muto ? `Volume al ${v.livello}%, muto` : `Volume al ${v.livello}%`,
+      dettaglio: v.muto ? [`Volume ${alPercento(v.livello)}`, 'Muto'] : [`Volume ${alPercento(v.livello)}`],
+      copia: v.muto ? `Volume ${alPercento(v.livello)}, muto` : `Volume ${alPercento(v.livello)}`,
     };
   }
 
