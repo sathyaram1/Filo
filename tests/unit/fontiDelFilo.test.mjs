@@ -172,17 +172,17 @@ test('il no del costo 4 per una risposta di un\'altra chat non consiglia una con
     return A.stato({ fonti: (await compitoDi(chatId, 'elimina il file vecchio')).map((a) => AL.fonteDi(a)), livello: 'conservativo' });
   };
   const prima = await statoDella('chat-b');
-  const d = A.decideDettaglio({ livello: 'conservativo', stato: prima.stato, costo: 3 });
+  const d = A.decideDettaglio({ livello: 'conservativo', stato: prima.stato, costo: 4 });
   assert.equal(d.risposta, 'no');
-  const no = A.fraseNo({ regola: d.regola, fonte: prima.fonte, livello: 'conservativo' });
+  const no = A.fraseNo({ regola: d.regola, fonte: prima.fonte, dove: 'Si cambia a mano in Preferenze.' });
   assert.doesNotMatch(no.breve, /conversazione nuova/);
-  assert.match(no.breve, /alzando il livello in Preferenze/);
+  assert.match(no.breve, /Puoi farlo tu/);
   assert.doesNotMatch(no.perModello, /conversazione nuova/);
   assert.equal((await statoDella('chat-c')).stato, 'contaminato', 'la conversazione nuova ha davanti la stessa risposta');
   // Una risposta ritrovata cercando in questa chat no: una conversazione nuova non l'avrebbe davanti.
   const cercata = AL.fonteDi({ type: 'CERCA_CHAT', query: 'pagina', _output: { results: [{ id: 'pagina' }], classeLetta: 5 } });
-  assert.match(A.fraseNo({ regola: 'tabella', fonte: cercata, livello: 'conservativo' }).breve, /conversazione nuova/);
-  assert.doesNotMatch(A.fraseNo({ regola: 'tabella', fonte: cercata, livello: 'conservativo', nuovaUguale: true }).breve, /conversazione nuova/);
+  assert.match(A.fraseNo({ regola: 'lettura', fonte: cercata }).breve, /conversazione nuova/);
+  assert.doesNotMatch(A.fraseNo({ regola: 'lettura', fonte: cercata, nuovaUguale: true }).breve, /conversazione nuova/);
 });
 
 test('la finestra dice quali esiti avrebbe davanti una conversazione nuova: gli ultimi del filo, anche di questa chat', () => {
