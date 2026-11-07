@@ -234,3 +234,108 @@ test('tolta la conversazione della risposta citata, la citazione dice che non c\
   await expect(mia.locator('.dash-citata')).toHaveClass(/dash-citata-manca/, { timeout: 15_000 });
   await expect(mia.locator('.dash-citata')).toHaveAttribute('data-testo', 'Messaggio non più nel filo');
 });
+
+// #2096 — la geometria di tutte le bolle e lo scorrimento, al pixel.
+const geometria = (home) => home.evaluate(() => {
+  const el = document.getElementById('bubbles');
+  return {
+    scrollTop: el.scrollTop,
+    largo: el.clientWidth,
+    bolle: [...el.querySelectorAll(':scope > .dash-bubble')].map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.height, r.width]; }),
+  };
+});
+
+test('#2096: passando da un messaggio all\'altro niente si muove, nemmeno con una risposta che finisce con un paragrafo', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const LUNGA = 'Ecco come fare.\n\nPrima scaldi il forno.\n\nPoi inforni per **venti minuti**.';
+  await preparaModello(app, [{ text: LUNGA }, { text: 'Un altro paragrafo.\n\nE l\'ultimo, in fondo.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'come cuocio la torta?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'venti minuti' })).toBeVisible({ timeout: 20_000 });
+  await scrivi(home, 'e dopo?');
+  const ultima = home.locator('#bubbles > .dash-bubble-filo', { hasText: 'in fondo' });
+  await expect(ultima).toBeVisible({ timeout: 20_000 });
+  await home.mouse.move(2, 2);
+  const ferma = await geometria(home);
+  const bolle = home.locator('#bubbles > .dash-bubble');
+  const n = await bolle.count();
+  expect(n).toBeGreaterThanOrEqual(4);
+  for (let k = 0; k < n; k++) {
+    await bolle.nth(k).hover();
+    await expect(bolle.nth(k).locator('.dash-msg-azioni')).toBeVisible();
+    expect(await geometria(home), `passando sulla bolla ${k}`).toEqual(ferma);
+  }
+  // L'ultima risposta in fondo: i tasti stanno nello spazio tenuto, e la chat non scorre.
+  await ultima.hover();
+  const dentro = await home.evaluate(() => { const el = document.getElementById('bubbles'); return el.scrollHeight - el.clientHeight - el.scrollTop; });
+  expect(dentro).toBeLessThanOrEqual(1);
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-copia-ultima.png' });
+});
+
+test('#2096: sotto il proprio messaggio Copia, Modifica e Cita, anche dal tasto destro', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [{ text: 'Domani c\'è il sole.' }, { text: 'Va bene.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'che tempo fa domani a Torino?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'il sole' })).toBeVisible({ timeout: 20_000 });
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'che tempo fa domani a Torino?' });
+
+  await home.mouse.move(2, 2);
+  const ferma = await geometria(home);
+  await mia.hover();
+  const barra = mia.locator('.dash-msg-azioni');
+  await expect(barra).toBeVisible();
+  expect(await geometria(home)).toEqual(ferma);
+  const tasti = await barra.locator('.dash-msg-azione').evaluateAll((ts) => ts.map((t) => t.getAttribute('aria-label')));
+  expect(tasti).toEqual(['Copia', 'Modifica', 'Cita']);
+  // Sotto il messaggio, allineata a destra.
+  const b = await mia.boundingBox();
+  const r = await barra.boundingBox();
+  expect(r.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+  expect(Math.abs((r.x + r.width) - (b.x + b.width))).toBeLessThanOrEqual(6);
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-copia-utente.png' });
+
+  await barra.getByRole('button', { name: 'Copia' }).click();
+  await expect(barra.getByRole('button', { name: 'Copiato' })).toBeVisible();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('che tempo fa domani a Torino?');
+
+  await mia.hover();
+  await barra.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+  await expect(home.locator('#input')).toBeFocused();
+  await home.locator('#input').fill('');
+
+  await mia.hover();
+  await barra.getByRole('button', { name: 'Cita' }).click();
+  await expect(home.locator('#citazione')).toContainText('Tu');
+  await expect(home.locator('#citazione')).toContainText('che tempo fa domani a Torino?');
+  await home.locator('#input').fill('e a Milano?');
+  await home.locator('#input').press('Enter');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 20_000 });
+  const citante = home.locator('#bubbles > .dash-bubble-user', { hasText: 'e a Milano?' });
+  await expect(citante.locator('.dash-citata')).toHaveAttribute('data-chi', 'Tu');
+  expect(await ultimaDomanda(app)).toContain("(l'utente risponde a un suo messaggio");
+
+  // Il tasto destro ha le stesse voci, e fanno la stessa cosa.
+  await mia.click({ button: 'right' });
+  const menu = menuDi(home);
+  await expect(menu.voce('Cita').first()).toBeVisible();
+  await expect(menu.voce('Modifica').first()).toBeVisible();
+  await menu.voce('Copia il messaggio').first().click();
+  await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+  await mia.click({ button: 'right' });
+  await menuDi(home).voce('Copia il messaggio').first().click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('che tempo fa domani a Torino?');
+  await mia.click({ button: 'right' });
+  await menuDi(home).voce('Modifica').first().click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+
+  // Riaprendo la home il messaggio, riletto dal filo, si rimette nel campo lo stesso.
+  await home.reload();
+  const riletta = home.locator('#bubbles > .dash-bubble-user', { hasText: 'che tempo fa domani a Torino?' });
+  await expect(riletta).toBeVisible({ timeout: 15_000 });
+  await home.locator('#input').fill('');
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+});
