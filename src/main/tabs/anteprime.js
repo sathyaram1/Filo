@@ -181,7 +181,14 @@ class AnteprimeSchede {
   pota(idsVivi) {
     const tolte = [];
     for (const id of this.foto.keys()) if (!idsVivi.has(id)) tolte.push(id);
-    for (const id of tolte) this.foto.delete(id);
+    // L'ultima foto di una scheda chiusa resta per il gettone che la nomina in una chat (#2085), fra le ultime trenta.
+    if (!this.chiuse) this.chiuse = new Map();
+    for (const id of tolte) {
+      this.chiuse.delete(id);
+      this.chiuse.set(id, this.foto.get(id));
+      this.foto.delete(id);
+    }
+    while (this.chiuse.size > 30) this.chiuse.delete(this.chiuse.keys().next().value);
     this.coda = this.coda.filter((id) => idsVivi.has(id));
     if (tolte.length) this.suTolte(tolte);
   }
