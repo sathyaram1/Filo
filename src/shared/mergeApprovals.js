@@ -929,8 +929,8 @@
   // all'owner solo questi: gli altri fermi passano da soli quando la pratica torna lavorabile.
   var FERMI_DELL_OWNER = {
     tetto: 'si era già riallineato da solo il numero di volte previsto, e main è andato di nuovo avanti',
-    locale: 'è un lavoro locale, che la routine non riallinea',
-    archiviata: 'hai archiviato la sua pratica',
+    locale: 'è un lavoro fuori dalle routine, che non si riallinea da solo',
+    archiviata: 'la sua pratica è archiviata',
   };
   var DOMANDA_RE = /^D-[1-9]\d{0,8}$/;
   function motivoFermo(req) {
