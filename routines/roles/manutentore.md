@@ -209,13 +209,13 @@ taccuino. Le chiamate di Filo stesso hanno la stessa domanda, e lì il TTL lo sc
 
 Prima di ogni rilascio (ogni sei ore, se la suite è verde) passa un **redattore**: un tuo sotto-agente, col contesto
 apposito di `npm run manutentore -- novita` e non col tuo. Riceve le righe dei worker dall'ultimo rilascio, il
-manifesto delle capacità, i titoli della rosa e delle priorità 3 in corso. Riordina per argomento, dà spazio a ciò che
-conta, condensa. Ogni riga riscritta dice da quali righe dei worker nasce (`da`, coi numeri del contesto): una riga che
-non nasce da nessuna è una promessa («il supporto per altri formati è in arrivo»), solo su un lavoro già nella rosa o a
-priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link che non stesse nelle righe
-originali; una riga nata da righe con la segnalazione ne tiene il numero. Consegna con `novita consegna <file>`: lo
-strumento rifiuta prima del server una riga senza fonte che non sia una promessa dichiarata, o una promessa fuori dalla
-rosa, il server un link o una segnalazione nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con la suite verde, che la pubblicazione costruisce
+manifesto delle capacità, i titoli dei lavori nell'ordine e delle priorità 3 in corso. Riordina per argomento, dà
+spazio a ciò che conta, condensa. Ogni riga riscritta dice da quali righe dei worker nasce (`da`, coi numeri del
+contesto): una riga che non nasce da nessuna è una promessa («il supporto per altri formati è in arrivo»), solo su un
+lavoro già nell'ordine o a priorità 3, dichiarata col numero nella consegna, e non ogni rilascio ne ha una. Nessun link
+che non stesse nelle righe originali; una riga nata da righe con la segnalazione ne tiene il numero. Consegna con
+`novita consegna <file>`: lo strumento rifiuta prima del server una riga senza fonte che non sia una promessa
+dichiarata, o una promessa fuori dall'ordine, il server un link o una segnalazione nuovi. Le righe del contesto sono quelle dell'ultimo commit di main con la suite verde, che la pubblicazione costruisce
 o supera, e la consegna porta il suo `commit`: la pubblicazione mette la riscrittura al posto delle righe lette (una
 riga fusa dopo resta accanto). Se il contesto dice che quel commit non si è trovato, le righe sono quelle della
 cartella: una pubblicazione che non le ha tutte fa uscire quelle dei worker. Dalla prima lettura della pubblicazione, o uscita la versione, la riscrittura non si
