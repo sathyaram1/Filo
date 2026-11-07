@@ -2901,7 +2901,8 @@
         ${priorityDotsHtml(fb)}
         ${fiduciaSegnoHtml(fb)}
       `;
-      item.innerHTML = progress
+      // Un lavoro server in coda fermo «resta locale» (#2258) non ha iter, ma il suo fermo si dice lo stesso.
+      item.innerHTML = progress || (leggibile && MR.restaLocale(fb))
         ? `<div class="mg-item-row">${rowHtml}</div>${workStateHtml(progress, fb)}`
         : rowHtml;
       item.addEventListener('click', (e) => {
