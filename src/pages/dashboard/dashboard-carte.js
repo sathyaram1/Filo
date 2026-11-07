@@ -530,10 +530,11 @@
   function pastiglie() {
     const s = dati.impostazioni || {};
     const scuro = temaScuro(s);
+    // `voce`: il controllo che la cambia in Preferenze, dove porta il suo tasto destro (#2096).
     return [
-      { etichetta: 'Tema scuro', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
-      { etichetta: 'Terminale', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
-      { etichetta: 'Anteprima schede', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
+      { etichetta: 'Tema scuro', voce: 'theme', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
+      { etichetta: 'Terminale', voce: 'terminalEnabled', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
+      { etichetta: 'Anteprima schede', voce: 'tabPreviewEnabled', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
     ];
   }
   function cartaRapide() {
