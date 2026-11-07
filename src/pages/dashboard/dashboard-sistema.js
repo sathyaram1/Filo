@@ -407,10 +407,12 @@
       if (v.attiva && !(questo.ultimo && questo.ultimo.wifi === false)) {
         const opt = creaOpzione(`Collegato a ${v.nome}`, () => {}, 'dash-sis-attuale');
         opt.setAttribute('aria-disabled', 'true');
+        opt._riga = { cosa, v, questo, collegato: true };
         return opt;
       }
       const opt = creaOpzione(`Collegati a ${v.nome}`, (o) => esegui(o, { cosa: 'wifi', rete: v.nome }, () => caricaElenco(questo)));
       opt.title = v.nome;
+      opt._riga = { cosa, v, questo, collegato: false };
       return opt;
     }
     // Col Bluetooth spento niente è collegato, anche se la lettura è arrivata un attimo prima che si spegnesse.
@@ -418,7 +420,98 @@
     const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
     opt.title = v.nome;
     if (collegato) opt.classList.add('dash-sis-attuale');
+    if (preferito(v)) opt.classList.add('dash-sis-preferito');
+    opt._riga = { cosa, v, questo, collegato };
     return opt;
+  }
+
+  // ── I preferiti e il tasto destro sulle righe del riquadro (#2096) ──
+  // I preferiti sono un'impostazione (bluetoothPreferiti, scritta dal main): la pagina li legge per metterli in cima.
+  let preferiti = [];
+  let pannelli = [];
+  const preferito = (v) => !!v && preferiti.some((p) => p.indirizzo === v.indirizzo);
+  function inCimaIPreferiti(elenco) {
+    const posto = (v) => { const i = preferiti.findIndex((p) => p.indirizzo === v.indirizzo); return i < 0 ? Infinity : i; };
+    return elenco.map((v, i) => [v, i]).sort((a, b) => (posto(a[0]) - posto(b[0])) || (a[1] - b[1])).map(([v]) => v);
+  }
+  const icona = (nome) => (typeof ICONS[nome] === 'function' ? ICONS[nome](16) : '');
+  const voce = (label, nomeIcona, fai) => ({ type: 'item', icon: icona(nomeIcona), label, onClick: () => { Promise.resolve(fai()).catch(() => {}); } });
+  const apriPannello = (pannello) => send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, pannello }).catch(() => {});
+
+  async function copiaNome(nome) {
+    try { await navigator.clipboard.writeText(nome); } catch (_) {}
+  }
+  // Un comando dato dal menu di una riga: la riga mostra l'attesa, il riquadro l'errore, e l'elenco si rilegge.
+  async function dallaRiga(opt, richiesta) {
+    const q = opt._riga && opt._riga.questo;
+    if (q && box === q && opt.isConnected) return esegui(opt, richiesta, () => caricaElenco(q));
+    const r = await comanda(richiesta);
+    if (!r.ok && box && box.errore) mostraErrore(box.errore, r);
+    return r;
+  }
+  async function dimentica(opt) {
+    const { cosa, v } = opt._riga;
+    const C = global.SN_CONFIRM_UI;
+    const bt = cosa === 'bluetooth';
+    const ok = C ? await C.confirm({
+      title: bt ? 'Dimenticare il dispositivo?' : 'Dimenticare la rete?',
+      parti: [bt ? 'Il computer dimentica' : 'Il computer dimentica la rete', { citazione: v.nome },
+        bt ? 'Per usarlo di nuovo andrà riabbinato dalle impostazioni del sistema.' : 'Per ricollegarti servirà di nuovo la password.'],
+      text: bt ? `Il computer dimentica «${v.nome}». Per usarlo di nuovo andrà riabbinato dalle impostazioni del sistema.`
+        : `Il computer dimentica la rete «${v.nome}». Per ricollegarti servirà di nuovo la password.`,
+      okLabel: 'Dimentica',
+    }) : false;
+    if (!ok) return null;
+    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
+  }
+
+  function vociRiga(opt) {
+    const { cosa, v, collegato } = opt._riga;
+    const out = [];
+    if (cosa === 'bluetooth') {
+      out.push(voce(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
+      const fra = preferito(v);
+      out.push(voce(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
+        () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, preferito: !fra })));
+      out.push(voce('Dimentica…', 'trash', () => dimentica(opt)));
+      out.push(voce('Copia il nome', 'copy', () => copiaNome(v.nome)));
+      if (pannelli.includes('bluetooth')) out.push(voce('Impostazioni Bluetooth del sistema', 'options', () => apriPannello('bluetooth')));
+      return out;
+    }
+    if (!collegato) out.push(voce('Collegati', 'wifi', () => dallaRiga(opt, { cosa, rete: v.nome })));
+    out.push(voce('Dimentica la rete…', 'trash', () => dimentica(opt)));
+    out.push(voce('Copia il nome', 'copy', () => copiaNome(v.nome)));
+    if (pannelli.includes('wifi')) out.push(voce('Impostazioni Wi-Fi del sistema', 'options', () => apriPannello('wifi')));
+    return out;
+  }
+
+  // Il volume e gli interruttori del riquadro: valori pronti, muto, e il pannello del sistema.
+  function vociComandi(q, el) {
+    if (q.voce === 'volume') {
+      const muto = !!(q.ultimo && q.ultimo.muto);
+      const out = [0, 25, 50, 100].map((n) => voce(`Volume al ${n}%`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
+      out.push(voce(muto ? 'Togli il muto' : 'Metti muto', muto ? 'volume' : 'volumeMute', () => esegui(q.muto, { cosa: 'volume', muto: !muto })));
+      if (pannelli.includes('audio')) out.push(voce('Impostazioni audio del sistema', 'options', () => apriPannello('audio')));
+      return out;
+    }
+    if (!q.radio || !q.radio.contains(el)) return [];
+    const wifi = q.voce === 'rete';
+    const out = [];
+    if (!q.radio.hidden && q.radio.textContent) out.push(voce(q.radio.textContent, wifi ? 'wifi' : 'bluetooth', () => q.radio.click()));
+    if (pannelli.includes(wifi ? 'wifi' : 'bluetooth')) {
+      out.push(voce(wifi ? 'Impostazioni Wi-Fi del sistema' : 'Impostazioni Bluetooth del sistema', 'options', () => apriPannello(wifi ? 'wifi' : 'bluetooth')));
+    }
+    return out;
+  }
+
+  // Letto da src/content/content.js: le voci del tasto destro sulle righe del riquadro aperto.
+  function vociMenu(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (!el || !box || !box.el.contains(el)) return [];
+    const opt = el.closest('.sn-select-option');
+    if (opt && opt._riga) return vociRiga(opt);
+    if (box.comandi && box.comandi.contains(el)) return vociComandi(box, el);
+    return [];
   }
 
   function creaComandi(questo, x) {
