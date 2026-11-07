@@ -673,7 +673,11 @@
     art.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       contaUso(art, 'tasto_destro');
-      apriMenu(e.clientX, e.clientY, vociMenu(art));
+      // Su una pastiglia il menu è suo (#2096): accenderla o spegnerla, e la sua voce in Preferenze.
+      const pas = e.target && e.target.closest ? e.target.closest('.dash-pastiglia') : null;
+      const i = pas ? [...pas.parentElement.children].indexOf(pas) : -1;
+      const p = i >= 0 && art._carta.pastiglie ? art._carta.pastiglie[i] : null;
+      apriMenu(e.clientX, e.clientY, p ? vociPastiglia(p) : vociMenu(art));
     });
     agganciaTrascinamento(art);
     return art;
