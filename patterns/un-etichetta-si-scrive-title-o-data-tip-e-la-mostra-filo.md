@@ -32,4 +32,5 @@ strato dei riquadri, e da `menu.html`. La barra in alto ha il suo fumetto a fine
 nell'app: `tests/suggerimento-filo.spec.mjs`.
 
 **Cosa resta fuori.** Le etichette `::after` dei tasti sotto una risposta (Copia, Rispondi) non sono un fumetto:
-stanno nella riga e danno l'esito del clic («Copiato»). Gli `option` di un `select` a tendina li disegna il sistema.
+stanno nella riga e danno l'esito del clic («Copiato»); un pezzo con `data-etichetta` il fumetto lo salta, per non
+dire due volte la stessa parola. Gli `option` di un `select` a tendina li disegna il sistema.
