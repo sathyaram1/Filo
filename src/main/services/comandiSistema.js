@@ -998,6 +998,12 @@ function interpretaBtDimentica(u, piattaforma) {
 function interpretaWifiDimentica(u, piattaforma) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') {
+    const codice = intero(u.primo('codice'));
+    if (codice) return { ok: false, errore: codice === 1168 ? 'nessuna-rete' : erroreWlan(codice) };
+    if (intero(u.primo('interfacce')) === 0) return { ok: false, errore: 'nessuna-radio' };
+    return bit(u.primo('confermato')) === true ? { ok: true } : { ok: false, errore: 'non-dimenticata' };
+  }
   const testo = u.grezze.join('\n');
   if (piattaforma === 'linux' && /not authorized|non autorizzat/i.test(testo)) return { ok: false, errore: 'polkit' };
   if (piattaforma === 'darwin' && /admin|privileg|authoriz/i.test(testo)) return { ok: false, errore: 'admin-wifi-dimentica' };
