@@ -6,9 +6,12 @@
   'use strict';
 
   // `manutentoreAcceso`: il pacemaker accende il manutentore (SPEC-MANUTENTORE § 4) solo se l'owner l'ha acceso.
-  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso', 'riservatiOff', 'riservatiTetto']);
+  // `unitWindows`: la parte Windows degli unit al cancello di fusione (#2225); il server la manda alla corsa.
+  const CHIAVI = Object.freeze(['maxSessions', 'priorityAccount', 'accountAOff', 'accountBOff', 'manutentoreAcceso', 'riservatiOff', 'riservatiTetto', 'unitWindows']);
   // Vuoto = si alternano, che è il comportamento senza il campo.
   const ACCOUNT = Object.freeze(['', 'A', 'B']);
+  // Il primo vale anche senza il campo, come per il server (unitFusione.modoWindowsDi) e il workflow.
+  const UNIT_WINDOWS = Object.freeze(['toccati', 'tutti', 'spento']);
 
   function limiti() {
     const A = (global.SN_CONST && global.SN_CONST.AUTOMATION) || {};
