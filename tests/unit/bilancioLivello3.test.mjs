@@ -177,9 +177,9 @@ test('gli 1 e gli 0: con un 2 corretto entrano; finiti i bilanci dal 2 in giù e
   assert.equal(insieme.consume, 'cap2');
   const tuttoFinito = decide([f(2, 'i', 'a'), f(1, 'i', 'b'), f(0, 'i', 'c')], FINITI[2]);
   assert.deepEqual(tuttoFinito.fix, []);
-  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 0]);
+  assert.deepEqual(tuttoFinito.derived.map((x) => x.priority), [1, 1, 1], 'nascono a 1: li mette in lavoro l\'ordine (#2269)');
   assert.equal(tuttoFinito.consume, null);
-  // Gli esterni come prima: fuori dal conto, con la priorità del livello (un 2 nasce a 1).
+  // Gli esterni come prima: fuori dal conto; a 3 solo il livello 3.
   const conEsterno = decide([f(2, 'e', 'altrove'), f(3, 'e', 'grave altrove')], FINITI[2]);
   assert.equal(conEsterno.stop, false);
   assert.deepEqual(conEsterno.external.map((x) => x.priority), [1, 3]);
