@@ -248,7 +248,7 @@ npm run manutentore -- accendi 812,815,820 | accendi --niente
 npm run manutentore -- parallelo <N>               # quante sessioni insieme, sotto il freno dell'owner
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
 npm run manutentore -- attesa <B> <A> [--togli]    # B aspetta A
-npm run manutentore -- pacchetto <P> <N,M,…>       # P unisce le segnalazioni in coda
+npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
 npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato
