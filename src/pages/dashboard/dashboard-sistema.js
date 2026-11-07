@@ -436,9 +436,9 @@
   // I preferiti sono un'impostazione (bluetoothPreferiti, scritta dal main): la pagina li legge per metterli in cima.
   let preferiti = [];
   let pannelli = [];
-  const preferito = (v) => !!v && preferiti.some((p) => p.indirizzo === v.indirizzo);
+  const preferito = (v) => !!v && preferiti.includes(v.indirizzo);
   function inCimaIPreferiti(elenco) {
-    const posto = (v) => { const i = preferiti.findIndex((p) => p.indirizzo === v.indirizzo); return i < 0 ? Infinity : i; };
+    const posto = (v) => { const i = preferiti.indexOf(v.indirizzo); return i < 0 ? Infinity : i; };
     return elenco.map((v, i) => [v, i]).sort((a, b) => (posto(a[0]) - posto(b[0])) || (a[1] - b[1])).map(([v]) => v);
   }
   const iconaMenu = (nome) => (typeof ICONS[nome] === 'function' ? ICONS[nome](16) : '');
