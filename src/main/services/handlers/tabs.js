@@ -170,14 +170,7 @@ module.exports = function register(on, ctx) {
     const wc = sender && sender.wc;
     const tab = wc && tm.tabs.find((t) => t.view && t.view.webContents === wc);
     if (!tab) return null;
-    try {
-      if (sender.strato) {
-        const st = tm.riquadri && tm.riquadri.strati && tm.riquadri.strati.get(wc);
-        if (!st) return null;
-        return { b: st.perIlVuoto.getBounds(), zoom: sender.strato.getZoomFactor() || 1 };
-      }
-      return { b: tab.view.getBounds(), zoom: wc.getZoomFactor() || 1 };
-    } catch (_) { return null; }
+    return require('../../schedaTrascinata').cornice(tm, tab, !!sender.strato);
   }
 
   on(MSG.TAB_ACTIVITY, async (msg, sender) => {
