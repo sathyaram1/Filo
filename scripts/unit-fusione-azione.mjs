@@ -110,6 +110,8 @@ export function unisciParti({ ramo, main, parti = [] } = {}) {
     const totale = rosse.reduce((n, l) => n + propri(l).length + intero(l.c.altriRossi), 0);
     const out = { ...base, esito: 'rosso_sulla_fusione', mainSha, ...conStoria, rossi: rossi.slice(0, TETTO_ROSSI) };
     if (totale > out.rossi.length) out.altriRossi = totale - out.rossi.length;
+    const novita = novitaUnite(rosse);
+    if (novita) out.novita = novita;
     return out;
   }
   if (mancate.length || !lette.length) {
