@@ -3036,7 +3036,7 @@
         const s = document.createElement('span');
         s.className = 'permesso-sotto';
         s.textContent = (sotto.length > 24 ? '…' + sotto.slice(-23) : sotto) + '.';
-        s.title = d.host || '';
+        s.dataset.tip = d.host || '';
         chi.appendChild(s);
       }
       const host = document.createElement('strong');
