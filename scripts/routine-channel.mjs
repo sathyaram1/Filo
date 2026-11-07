@@ -1121,6 +1121,9 @@ export function spedisciPuntaConsegnata(data, opts = {}) {
  * @returns {{ outcome:'ok'|'refused'|'fault', reason?, id?, num?, reply? }}
  */
 export async function deliver(t, intent, data, opts) {
+  // Prima delle spinte dichiarate: il pre-push di questa spedizione accoda i commit che conSpinteDichiarate manda.
+  const spedita = spedisciPuntaConsegnata(data || {}, opts);
+  if (spedita) console.error(spedita);
   const corpo = await conSpinteDichiarate(intent, data || {}, opts);
   const { status, body } = await call('routineDeliver', { ticket: t, intent, data: corpo }, opts);
   const outcome = classifyReply(status, body);
