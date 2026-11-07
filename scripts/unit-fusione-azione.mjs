@@ -73,6 +73,22 @@ export function codiceUscita(campo) {
 export const firmaSistema = (nome) => (nome === 'linux' ? '' : ` [${nome.charAt(0).toUpperCase()}${nome.slice(1)}]`);
 const intero = (n) => Math.max(0, Math.floor(Number(n) || 0));
 
+// Dal migliore al peggiore: l'esito dopo lo spostamento delle novità, unito, è il peggiore delle parti (#2214).
+const PESO_DOPO = ['verde', 'rosso_anche_su_main', 'rosso_sulla_fusione'];
+
+/**
+ * Le novità spostate per il server, dalle parti rosse (#2214): solo se le portano tutte, perché un rosso senza dice che
+ * lì lo spostamento non è la causa. PURA. null = nessun campo.
+ */
+export function novitaUnite(rosse) {
+  const conNovita = rosse.filter((l) => l.c.novita && typeof l.c.novita === 'object' && Array.isArray(l.c.novita.righe) && l.c.novita.righe.length);
+  if (!conNovita.length || conNovita.length !== rosse.length) return null;
+  const dopo = conNovita.map((l) => (PESO_DOPO.includes(l.c.novita.dopo) ? l.c.novita.dopo : 'rosso_sulla_fusione'))
+    .reduce((a, b) => (PESO_DOPO.indexOf(b) > PESO_DOPO.indexOf(a) ? b : a));
+  const n = (conNovita.find((l) => l.nome === 'linux') || conNovita[0]).c.novita;
+  return { ...n, dopo };
+}
+
 /**
  * L'esito unico dalle parti (#2225). PURA. `parti`: [{ nome, risultato, campo }], `risultato` quello del lavoro di Actions
  * e `campo` il JSON della parte. Una parte saltata (spenta) non conta; una senza esito valido per la coppia fa
