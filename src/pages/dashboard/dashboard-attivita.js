@@ -1100,6 +1100,7 @@
     if (typeof o.acceso === 'boolean') return { icon, text: `${radio} ${o.acceso ? 'acceso' : 'spento'}` };
     const nome = o.dispositivo || o.rete || '';
     if (o.dimenticato || o.dimenticata) return { icon, text: `${o.dimenticata ? 'Rete dimenticata' : 'Dimenticato'} · ${nome}` };
+    if (typeof o.preferito === 'boolean') return { icon, text: `${o.preferito ? 'Fra i preferiti' : 'Tolto dai preferiti'} · ${nome}` };
     if (o.gia) return { icon, text: `Già così · ${nome}` };
     // Il sistema ha preso la richiesta ma non ha ancora confermato: la riga non promette di più.
     if (radio === 'Wi-Fi') return { icon, text: `${o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi'} · ${nome}` };
