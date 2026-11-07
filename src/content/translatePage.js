@@ -776,6 +776,27 @@
     } catch (_) {}
   }
 
+  // «Solo quando le apro» (D61): la sezione che l'utente apre si traduce da sola appena si vede, invece di aspettare
+  // un clic su Traduci (#1290.2). Si riguarda qualche volta perché il sito la apre spesso con un'animazione.
+  const APERTURA_MS = [250, 900, 1800];
+  let aperturaTimer = null;
+  function forseAperta() {
+    const vale = () => modoUltimo === Extract.NASCOSTE.RIMANDA && isTopFrame() && pageHasTranslation && pageComplete
+      && !pageTranslating && (hiddenSkipped.length > 0 || hiddenFrames.length > 0);
+    if (!vale()) return;
+    clearTimeout(aperturaTimer);
+    let i = 0;
+    const guarda = () => {
+      aperturaTimer = null;
+      if (!vale()) return;
+      const aperta = !!(Extract && typeof Extract.hasRevealedText === 'function' && Extract.hasRevealedText(hiddenSkipped))
+        || framesRevealed();
+      if (aperta) { translatePage({ daSola: true }); return; }
+      if (++i < APERTURA_MS.length) aperturaTimer = setTimeout(guarda, APERTURA_MS[i] - APERTURA_MS[i - 1]);
+    };
+    aperturaTimer = setTimeout(guarda, APERTURA_MS[0]);
+  }
+
   // I componenti aperti del sito sono alberi a parte: vanno sorvegliati uno per
   // uno, o il testo che cambia lì dentro resterebbe invisibile.
   function addWatchRoots(roots) {
