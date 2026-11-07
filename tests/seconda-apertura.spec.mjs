@@ -31,6 +31,9 @@ const stato = (app, accesso = '') => app.evaluate(({ BrowserWindow }, base) => {
   const vive = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed());
   const normali = vive.filter((w) => w._filoTabs && !w._filoIncognito);
   const normale = normali[0];
+  // Una scheda riaperta che aspetta il suo turno non ha ancora un indirizzo caricato: vale quello che aspetta.
+  const url = (t) => { try { return t.view.webContents.getURL() || t.url || ''; } catch (_) { return t.url || ''; } };
+  const davanti = normale && normale._filoTabs.tabs.find((t) => t.id === normale._filoTabs.activeId);
   return {
     normali: normali.length,
     incognito: vive.filter((w) => w._filoIncognito).length,
