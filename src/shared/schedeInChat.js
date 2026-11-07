@@ -126,10 +126,16 @@
     let inArrivo = [];
     function riallinea() { schede = allinea(ta.value, vive().concat(inArrivo)); }
 
+    let colori = null;
     function ricalca() {
       const ci = schede.some(Boolean);
+      // I colori del campo si leggono prima di renderlo trasparente: il fondo disegna il testo al suo posto.
+      if (!ta.classList.contains('sn-con-gettoni')) {
+        const cs0 = getComputedStyle(ta);
+        colori = { testo: cs0.color, fondo: cs0.backgroundColor };
+      }
       ta.classList.toggle('sn-con-gettoni', ci);
-      if (!ci) { if (fondo) { fondo.remove(); fondo = null; } return; }
+      if (!ci) { ta.style.caretColor = ''; if (fondo) { fondo.remove(); fondo = null; } return; }
       if (!fondo) {
         fondo = doc.createElement('div');
         fondo.className = 'sn-gettoni-fondo';
