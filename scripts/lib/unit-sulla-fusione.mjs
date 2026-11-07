@@ -437,7 +437,16 @@ export function testoStoria(s) {
   return '▸ Clone poco profondo, ma la base comune con main c\'era già.';
 }
 
-function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto = false }) {
+/** I file di unit toccati dal ramo, nell'albero `dir` già fuso. { file } | { errore }. */
+function sceltiDalRamo({ git, dir, mainSha, punta }) {
+  const d = git(['-c', 'core.quotepath=false', 'diff', '--name-only', `${mainSha}...${punta}`]);
+  if (!d.ok) return { errore: `non riesco a leggere i file toccati dal ramo (${primaRiga(d.out)})` };
+  const tutti = collectTestFiles(join(dir, ...UNIT_DIR_REL.split('/'))).map((f) => path.relative(dir, f).split(path.sep).join('/'));
+  const leggi = (f) => { try { return readFileSync(join(dir, f), 'utf8'); } catch (_) { return ''; } };
+  return { file: unitToccati({ cambiati: d.out.split(/\r?\n/).filter(Boolean), tutti, leggi }) };
+}
+
+function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheContenuto = false, soloToccati = false }) {
   // Con main già dentro, il risultato della fusione è il ramo stesso: si prova lui.
   const contenuto = git(['merge-base', '--is-ancestor', mainSha, punta]).ok;
   if (contenuto && !ancheContenuto) return { esito: 'main_contenuto', mainSha };
