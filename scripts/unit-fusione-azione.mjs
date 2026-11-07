@@ -103,8 +103,11 @@ export function unisciParti({ ramo, main, parti = [] } = {}) {
   if (conflitto) return { ...base, esito: 'conflitto', mainSha, ...conStoria, ...(Array.isArray(conflitto.c.file) ? { file: conflitto.c.file } : {}) };
   const rosse = lette.filter((l) => l.c.esito === 'rosso_sulla_fusione');
   if (rosse.length) {
-    const rossi = rosse.flatMap((l) => (Array.isArray(l.c.rossi) ? l.c.rossi : []).map((r) => `${String(r).slice(0, 280)}${etichetta(l.nome)}`));
-    const totale = rosse.reduce((n, l) => n + (Array.isArray(l.c.rossi) ? l.c.rossi.length : 0) + intero(l.c.altriRossi), 0);
+    // Un rosso che ha anche Linux esce una volta, senza firma: la firma dice «verde dove girano verifica e riallineamento».
+    const diLinux = new Set(rosse.filter((l) => l.nome === 'linux').flatMap((l) => (Array.isArray(l.c.rossi) ? l.c.rossi : []).map(String)));
+    const propri = (l) => (Array.isArray(l.c.rossi) ? l.c.rossi : []).filter((r) => l.nome === 'linux' || !diLinux.has(String(r)));
+    const rossi = rosse.flatMap((l) => propri(l).map((r) => `${String(r).slice(0, 280)}${firmaSistema(l.nome)}`));
+    const totale = rosse.reduce((n, l) => n + propri(l).length + intero(l.c.altriRossi), 0);
     const out = { ...base, esito: 'rosso_sulla_fusione', mainSha, ...conStoria, rossi: rossi.slice(0, TETTO_ROSSI) };
     if (totale > out.rossi.length) out.altriRossi = totale - out.rossi.length;
     return out;
