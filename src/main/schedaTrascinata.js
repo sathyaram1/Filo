@@ -53,7 +53,8 @@ function riceve(win, dati, zoom = 1) {
   ultima.delete(win);
   if (!sotto || !tab) return;
   const scheda = descrivi(tab);
-  manda(sotto.wc, { fase, x: Math.round(sotto.x), y: Math.round(sotto.y), scheda });
+  // Ai passaggi, uno per fotogramma, l'icona non serve: viaggia solo col rilascio.
+  manda(sotto.wc, { fase, x: Math.round(sotto.x), y: Math.round(sotto.y), scheda: fase === 'lascia' ? scheda : { ...scheda, icona: '' } });
   if (fase === 'sopra') ultima.set(win, sotto.wc);
 }
 
