@@ -178,11 +178,12 @@ test('uno scambio di un’app nella home: Copia e Rispondi, e la risposta parte 
   await casa.screenshot({ path: 'tests/.shots/2096-righe-citazione.png' });
   await casa.locator('#input').fill('quali carte?');
   await casa.locator('#input').press('Enter');
-  // La domanda arriva al modello con la citazione in testa, e il testo citato è quello dei Mazzi.
-  await expect.poll(() => app.evaluate(() => globalThis.__domande.length), { timeout: 20_000 }).toBeGreaterThan(0);
-  console.log('DEBUG', JSON.stringify(await app.evaluate(() => globalThis.__domande.map((t) => t.slice(-600)))));
-  const conCitazione = () => app.evaluate(() => globalThis.__domande.flatMap((t) => t.split('\n')).find((r) => r.includes("l'utente risponde al tuo messaggio")) || '');
-  await expect.poll(conCitazione, { timeout: 20_000 }).toContain('servono più pescate');
+  // La domanda arriva al modello con la citazione in testa: il posto nella chat dei Mazzi, che si rilegge da lì (il
+  // testo di un'altra app resta fuori dal canale di Filo, come nel resto del filo).
+  const chatMazzi = (await app.evaluate(async () => (await globalThis.SN_IL_FILO.chats()).find((c) => c.app === 'mazzi')))?.id;
+  const conCitazione = () => app.evaluate(() => globalThis.__domande.flatMap((t) => t.split('\n')).find((r) => r.includes("(l'utente risponde")) || '');
+  await expect.poll(conCitazione, { timeout: 20_000 }).toContain('dalla chat dei Mazzi');
+  expect(await conCitazione()).toContain(chatMazzi);
 });
 
 // Il riquadro di Traduci: la risposta ha Copia e Rispondi sempre a schermo, la domanda dopo li ha al passaggio del mouse.
