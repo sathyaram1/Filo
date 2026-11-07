@@ -39,12 +39,21 @@
       features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
+        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni dei file, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
+        { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
+        { testo: 'Dopo il tuo OK a un\'azione Filo fa da solo i passi che mancano, senza aspettare un tuo «vai avanti».', segnalazione: 1373 },
+        { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
+        { testo: 'Chiusa una conversazione in una scheda, un\'altra scheda che la mostrava non ci scrive più dentro: il messaggio dopo ne apre una nuova.', segnalazione: 1443 },
+      ],
+      features: [
+        { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
       ],
     },
     {
       version: '0.2.270', date: '2026-11-07',
       fixes: [
         { testo: 'Quando Filo risponde e intanto fa qualcosa, come leggere un documento, la risposta non comincia più spiegando che la sta riscrivendo perché era finita fra le note di lavoro, e non resta più nascosta fra le note.', segnalazione: 1921 },
+<<<<<<< HEAD
         { testo: '«Chiudi la seconda scheda» chiude la seconda della barra, non l\'ultima che hai usato. «Chiudi tutte le schede di YouTube» chiude solo quelle di YouTube.', segnalazione: 413 },
         { testo: 'Un sito della rete di casa tenuto sempre aperto, come «nas», si toglie dicendone il nome. «com» o «it» da soli non diventano più un sito da tenere aperto.', segnalazione: 823 },
         { testo: '«Riordinami le tab» in chat riordina davvero e ti dice quante schede ha archiviato. Se Filo non riesce a valutarle te lo dice, col motivo, anche quando ha chiuso solo i doppioni.', segnalazione: 1626 },
@@ -112,7 +121,6 @@
     {
       version: '0.2.264', date: '2026-11-04',
       features: [
-        { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
         { testo: 'La barra laterale ha un lucchetto in cima: chiuso, la barra resta aperta accanto alla pagina, che si stringe per farle posto, anche dopo un riavvio. Lo trovi anche col tasto destro sulla barra, nelle Preferenze, con Ctrl+Alt+Shift+B (Cmd+Alt+Shift+B su Mac) o chiedendolo a Filo.', segnalazione: 1431 },
         { testo: 'Puoi aprire e chiudere la barra laterale chiedendolo a Filo da qualunque chat, anche dall\'Aiuto su una pagina.', segnalazione: 1292 },
         { testo: 'Quando chiedi a Filo di cancellare un file o una cartella, lo sposta nel cestino con un clic, e da lì lo rimetti quando vuoi. Senza cestino lo cancella solo se dici «per sempre».', segnalazione: 1909 },
@@ -121,11 +129,6 @@
       ],
       fixes: [
         { testo: 'La pulizia delle schede non chiude più una scheda col messaggio respinto dal sito, anche nei forum, nei moduli incorporati da un altro sito e nelle caselle con nomi insoliti. Chiude invece quelle il cui testo è già arrivato, come un post pubblicato o una lista appena creata.', segnalazione: 824 },
-        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni dei file, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
-        { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
-        { testo: 'Dopo il tuo OK a un\'azione Filo fa da solo i passi che mancano, senza aspettare un tuo «vai avanti».', segnalazione: 1373 },
-        { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
-        { testo: 'Chiusa una conversazione in una scheda, un\'altra scheda che la mostrava non ci scrive più dentro: il messaggio dopo ne apre una nuova.', segnalazione: 1443 },
         { testo: 'Con la finestra non accostata al bordo dello schermo, chi si ferma sul suo bordo sinistro per allargarla non apre più la barra laterale: lì l\'attesa è un po\' più lunga.', segnalazione: 1292 },
         { testo: 'A schermo intero la striscia sul bordo sinistro non resta più sopra il video. La barra si apre lo stesso fermandoti sul bordo o con la scorciatoia.', segnalazione: 871 },
         { testo: 'Il primo suggerimento che compare passando sulle icone dopo l\'avvio arriva subito, come gli altri.', segnalazione: 871 },
