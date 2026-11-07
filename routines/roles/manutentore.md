@@ -129,7 +129,12 @@ Gestione → Automazioni.
    (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
 5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
    uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
-6. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
+6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
+   nell'ordine anche senza il segno: il primo giro, quando lo scopre, consegna `design --reason locale`, e il server gli
+   mette il segno da sé e lo passa ai lavori server dal suo ramo. Costa quel giro, non un giorno fuori dall'ordine. Il
+   segno quindi non aspetta l'owner: non va fra le sue cose da fare, né nel recap né nelle domande (a lui resta solo
+   «Segna fidato» per i non fidati). Un segno che ti sembra sbagliato lo scrivi nel recap come informazione.
+7. **Spesa e account.** Si dosa sulla settimana: più lavoro all'inizio, meno vicino al rinnovo; il limite delle 5 ore
    non c'è più. Usa prima B, poi A: non c'è riserva su A, perché anche a quote finite Filo resta usabile coi crediti
    API dell'account. Conta il consumo dell'account, non la somma dei biglietti (che ne vede circa il 60%). La spesa
    della settimana nel contesto (o `spesa`) dà per account dollari e percentuale, quanto resta, le ultime 24 ore, le
