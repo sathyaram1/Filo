@@ -1409,6 +1409,18 @@ async function radio(q) {
   return { ok: true, cosa: q.cosa, acceso: r.acceso };
 }
 
+// #2096 — i preferiti sono un'impostazione (bluetoothPreferiti): si scrive dalla porta di tutte le impostazioni, che la
+// fa diventare un cambio del filo. Un dispositivo dimenticato esce anche dai preferiti.
+const preferitiDi = (s) => (Array.isArray(s && s.bluetoothPreferiti)
+  ? s.bluetoothPreferiti.filter((x) => x && typeof x.indirizzo === 'string') : []);
+async function segnaPreferito(d, si) {
+  const prima = preferitiDi(await globalThis.SN_STORAGE.getSettings());
+  const senza = prima.filter((x) => x.indirizzo !== d.indirizzo);
+  if (!si && senza.length === prima.length) return;
+  const dopo = si ? [...senza, { indirizzo: d.indirizzo, nome: d.nome }] : senza;
+  await require('./handlers').applySettingsUpdate({ bluetoothPreferiti: dopo });
+}
+
 async function bluetooth(q) {
   if (q.acceso != null) return radio(q);
   const elenco = await computer().btElenco();
