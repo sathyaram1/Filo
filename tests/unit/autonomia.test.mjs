@@ -260,10 +260,10 @@ test('il testo di un no: il costo 4 dopo una lettura dice le strade; nessun dopp
 
 test('regola del freno: togliere un freno è costo 4, l\'avviso del riquadro lo dice', () => {
   for (const livello of Object.keys(A.TABELLA)) {
-    for (const stato of ['pulito', 'contaminato']) {
-      const d = A.decideDettaglio({ livello, stato, costo: 1, difesa: true, guardiano: true });
-      assert.deepEqual([d.risposta, d.digita, d.regola], ['conferma', true, 'difesa'], `${livello}/${stato}`);
-    }
+    const d = A.decideDettaglio({ livello, stato: 'pulito', costo: 1, difesa: true, guardiano: true });
+    assert.deepEqual([d.risposta, d.digita, d.regola], ['conferma', true, 'difesa'], livello);
+    const letto = A.decideDettaglio({ livello, stato: 'contaminato', costo: 1, difesa: true, guardiano: true });
+    assert.deepEqual([letto.risposta, letto.regola], ['no', 'lettura'], `${livello}: dopo una lettura`);
   }
   assert.equal(A.decide({ livello: 'yolo', stato: 'pulito', costo: 0, difesa: true, origine: 'automazione' }), 'no',
     'un\'automazione non toglie un freno');
