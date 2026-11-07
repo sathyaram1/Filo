@@ -130,10 +130,10 @@ test('copia di un documento col titolo scritto a mano: resta col titolo a mano a
   await stubAI(page);
   await scrivi(page, testo('mare', 150));
   await expect.poll(async () => (await attivo(page)).summary, { timeout: 20000 }).toBe('Riassunto Mare.');
-  await page.click('#docTitle');
-  await page.keyboard.press('Control+a');
-  await page.keyboard.type('Mio titolo');
-  await page.keyboard.press('Enter');
+  await page.click('#docSwitch', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await page.locator('.ed-doc-title-input').fill('Mio titolo');
+  await page.locator('.ed-doc-title-input').press('Enter');
   await expect.poll(async () => (await attivo(page)).title).toBe('Mio titolo');
   await page.click('#docTitle', { button: 'right' });
   await page.click('.ed-title-ctxmenu .sn-select-option:has-text("Duplica file")');
