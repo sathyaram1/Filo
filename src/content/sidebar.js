@@ -801,6 +801,7 @@
     let o = ombre.get(el);
     if (!o) {
       o = el.attachShadow({ mode: 'closed' });
+      global.SN_SUGGERIMENTO?.ombra?.(el, o);
       const stile = document.createElement('style');
       stile.textContent = css;
       o.appendChild(stile);
