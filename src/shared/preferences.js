@@ -2265,7 +2265,6 @@
         return `${nomi} (quanto Filo fa da solo; abbassarlo vale subito, alzarlo vuole che l'utente scriva «conferma»)`;
       },
       keys: ['autonomia', 'livello di autonomia', 'livello autonomia', 'livello_autonomia', 'quanto fa da solo', 'autonomia di filo'],
-      alzaAllenta: true,
       costo: 2,
       allenta: (r, at) => {
         const A = global.SN_AUTONOMIA;
