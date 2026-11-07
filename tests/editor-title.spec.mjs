@@ -177,6 +177,12 @@ async function stubPerTesto(page) {
     window.__aiCalls = [];
     window.__inAttesa = [];
     window.__trattieni = false;
+    // 'tagliata' o 'senzaTitolo' guastano la risposta della chiamata unica, titolo e riassunto (#1697.2).
+    window.__unica = '';
+    window.__avvisi = 0;
+    new MutationObserver((ms) => {
+      for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.classList.contains('ed-toast')) window.__avvisi++;
+    }).observe(document.body, { childList: true, subtree: true });
     const argomento = (t) => (/montagna/.test(t) ? 'La montagna' : /giardino/.test(t) ? 'Il giardino' : 'Niente');
     const rispondi = (msg, cb, r) => {
       if (typeof cb === 'function') { cb(r); return undefined; }
