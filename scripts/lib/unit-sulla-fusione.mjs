@@ -101,8 +101,7 @@ export function campoPerIlServer(prova) {
 }
 
 const PROVATI = ['verde', 'rosso_anche_su_main', 'rosso_sulla_fusione'];
-// Con questi esiti dopo lo spostamento, lo spostamento da solo rende fondibile il ramo.
-export const BASTA_SPOSTARE = Object.freeze(['verde', 'rosso_anche_su_main']);
+export { BASTA_SPOSTARE };
 
 /** Il rosso che la fusione così com'è avrebbe in più: le righe di novità del ramo sotto versioni già uscite. PURA. */
 export function chiaveNovita(novita) {
