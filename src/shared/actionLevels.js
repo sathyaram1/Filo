@@ -1370,6 +1370,8 @@
       costo: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
+        // Dimenticata, ci si ricollega solo con la password (#2096).
+        if (r.dimentica) return 3;
         if (r.gia === true) return 1;
         return r.acceso === false || !!r.nome ? 2 : 1;
       },
@@ -1378,6 +1380,9 @@
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
+        if (r.nome && r.dimentica) {
+          return ['Dimenticare la rete Wi-Fi ', cit(nome), '\n\nPer ricollegarsi servirà di nuovo la password.'];
+        }
         if (r.nome) {
           return ['Collegare il computer alla rete Wi-Fi ', cit(nome), '\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.'];
         }
