@@ -58,6 +58,8 @@
   // Dopo un clic o un Esc il fumetto di quel pezzo non torna finché il puntatore non va altrove.
   let zittito = null;
   let ultimoBersaglio = null;
+  let ultimaCatena = [];
+  const haTitolo = (el) => !!(el.getAttribute('title') || '').trim();
   // I title tolti al passaggio del puntatore, col valore da rimettere.
   const spogliati = new Map();
   let osservatore = null;
