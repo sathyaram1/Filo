@@ -825,6 +825,18 @@
       // Anche la casella che si allarga alza il riquadro: stessa regola.
       reflow(popup);
     });
+    // #2096 — sotto le domande Copia e Rispondi al passaggio del mouse, come nella home; la risposta ha i suoi tasti
+    // sempre a schermo (tastoCopia).
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (A) {
+      A.attacca(popup.bodyEl, {
+        messaggio: '.sn-msg-user',
+        testo: (el) => el.querySelector('.sn-msg-text')?.textContent || '',
+        ruolo: () => 'user',
+        copia: (t) => copiaTesto(t),
+        rispondi: (_el, t) => A.citaNelCampo(popup.inputEl, t),
+      });
+    }
 
     // Dare il fuoco alla casella spegne la selezione della pagina, ma la parola su cui si è
     // chiesta la spiegazione serve ancora dopo: ce la teniamo da parte e gliela rimettiamo.
