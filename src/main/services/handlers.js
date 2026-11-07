@@ -7691,6 +7691,7 @@ const handlerCtx = {
   ricordaVerdettiArchiviati,
   decisioneAzionePagina,
   segnaLetturaAiuto,
+  segnaTestoNellAiuto,
   azioneDellAiuto,
   segnaChatAiuto,
   chatAiutoDi,
