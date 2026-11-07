@@ -12,7 +12,7 @@ import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import vm from 'node:vm';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { aggiunteSottoUscite, chiaviDoppie, registroDa, sottoUsciteSuMain, spostaInCima, testoRiportaInCima, FILE_NOVITA, CAMPO } from '../../scripts/lib/novita-in-cima.mjs';
+import { aggiunteSottoUscite, chiaviDoppie, registroDa, sottoUsciteSuMain, spostaInCima, testoRiportaInCima, FILE_NOVITA, CAMPO, BASTA_SPOSTARE } from '../../scripts/lib/novita-in-cima.mjs';
 import { riportaNelClone } from '../../scripts/routine-channel.mjs';
 
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
