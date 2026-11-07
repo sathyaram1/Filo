@@ -7,8 +7,9 @@ import { test, expect } from './fixtures/electron.mjs';
 const NEWTAB = 'filo://newtab/';
 const URL_RE = 'http://127\\.0\\.0\\.1:\\d+/\\d+';
 const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
-// Una finestra dove la chat sta con una pagina e mezza: il resto lo prendono istruzioni, strumenti e tetto della risposta.
-const FINESTRA = 72000;
+// Il posto, in caratteri, oltre istruzioni, strumenti e tetto della risposta: una pagina intera e un pezzo dell'altra.
+// La finestra si misura sulla prima richiesta della chat: con 72.000 token fissi bastavano cinque strumenti nuovi (#2276).
+const POSTO = 64000;
 
 // Una pagina da circa 60.000 token: il marchio sta in cima, dentro il primo pezzo che Filo legge.
 function paginaEnorme(nome) {
@@ -24,7 +25,8 @@ ${corpo}
 // rifiuta, con le misure (o senza, `misure: false`). `listino`: il listino di OpenRouter dice la stessa finestra.
 // `piani`: uno per richiesta accettata; `strumenti` chiama azioni prendendo l'indirizzo dagli esiti già tornati
 // (`urlDa`, o il gruppo 1 di `gruppoDa`), `finale` risponde dicendo quali marchi ha davanti. `posto`: al posto di
-// `finestra`, i caratteri liberi oltre la prima richiesta della chat (la finestra si misura lì).
+// `finestra`, i caratteri liberi oltre la prima richiesta della chat (la finestra si misura lì, e il listino la dice da
+// allora: Filo lo legge prima di mandare le pagine).
 // `anthropic`: il rifiuto arriva com'è dietro OpenRouter, dentro «Provider returned error», e passa dal lettore vero
 // degli errori; `pesante`: il fornitore conta il testo più pesante di come lo stima Filo.
 async function modello(app, { finestra = 0, posto = 0, listino = false, misure = true, piani, anthropic = false, pesante = false }) {
@@ -45,6 +47,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
       const url = String((input && input.url) || input);
       if (/^https:\/\/openrouter\.ai\/api\/v1\/models/.test(url)) {
         if (!listino) return new Response('giù', { status: 503 });
+        if (!finestra) globalThis.__listinoPrimaDellaChat = true;
         const data = url.includes('output_modalities') ? [] : [{ id: 'deepseek/deepseek-v4-flash', context_length: finestra, pricing: { prompt: '0.0000001', completion: '0.0000002' } }];
         return new Response(JSON.stringify({ data }), { status: 200, headers: { 'content-type': 'application/json' } });
       }
@@ -52,6 +55,7 @@ async function modello(app, { finestra = 0, posto = 0, listino = false, misure =
     };
     globalThis.__rifiutate = 0;
     globalThis.__accettate = [];
+    globalThis.__listinoPrimaDellaChat = false;
     const MARCHI = ['ALFA', 'BETA', 'GAMMA'];
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = globalThis.SN_PROVIDERS.completeWithFallback = async ({ attempts, messages, tools, onDelta, onToolCall }) => {
       const base = { model: attempts[0].model, provider: attempts[0].provider, usage: {}, reasoningDetails: [] };
@@ -135,7 +139,7 @@ for (const caso of [
     test.setTimeout(120_000);
     const page = await openTab(NEWTAB);
     const urls = await preparaPagine(app, testServer);
-    await modello(app, { finestra: FINESTRA, listino: caso.listino, misure: caso.misure !== false, anthropic: !!caso.anthropic, pesante: !!caso.pesante, piani: RICERCA_E_TRE_PAGINE });
+    await modello(app, { posto: POSTO, listino: caso.listino, misure: caso.misure !== false, anthropic: !!caso.anthropic, pesante: !!caso.pesante, piani: RICERCA_E_TRE_PAGINE });
 
     await chiedi(page, 'confronta le tre guide che trovi');
 
@@ -148,6 +152,7 @@ for (const caso of [
     await expect(bolla).toContainText('Il modello non riusciva a leggere tutto insieme');
     await expect(bolla).toContainText(/chiedimi di rileggerl[ae]/);
     await expect(bolla).toContainText('127.0.0.1');
+    expect(await app.evaluate(() => globalThis.__listinoPrimaDellaChat), 'il listino letto prima della prima richiesta non sa la finestra').toBe(false);
     caso.rifiuti(await app.evaluate(() => globalThis.__rifiutate));
 
     // Al modello le pagine tolte arrivano come rimando: titolo e indirizzo, nessun testo inventabile.
@@ -164,7 +169,7 @@ test('le pagine lasciate fuori si rileggono chiedendolo, e la pagina riletta arr
   const page = await openTab(NEWTAB);
   await preparaPagine(app, testServer);
   await modello(app, {
-    finestra: FINESTRA,
+    posto: POSTO,
     piani: [
       ...RICERCA_E_TRE_PAGINE,
       // Turno dopo: l'indirizzo lo prende dal rimando che ha davanti, come farebbe il modello.
