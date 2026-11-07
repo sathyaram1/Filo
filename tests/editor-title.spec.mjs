@@ -322,6 +322,66 @@ test('riscritto su un altro argomento a parità di parole, il titolo automatico 
   expect(await page.evaluate(() => window.__aiCalls.at(-1).tipo)).toBe('entrambi');
 });
 
+// #1697.2 — una risposta che non porta il titolo (tagliata dal tetto, o senza la sua riga) non fa richiamare il modello
+// a ogni pausa: sullo stesso testo il titolo da rifare aspetta un cambio vero.
+const giardino = (n) => Array.from({ length: n }, (_, i) => ['giardino', 'fiori', 'rose', 'prato', 'siepe', 'erba'][i % 6]).join(' ');
+const montagna = (n) => Array.from({ length: n }, (_, i) => ['montagna', 'neve', 'vetta', 'sentiero', 'rifugio', 'valle'][i % 6]).join(' ');
+for (const [caso, guasto] of [['arriva tagliata', 'tagliata'], ['non ha la riga del titolo', 'senzaTitolo']]) {
+  test(`titolo da rifare e la risposta ${caso}: un ritocco dopo non richiama il modello`, async ({ openTab }) => {
+    test.setTimeout(90_000);
+    const page = await nuovaPagina(openTab);
+    await scrivi(page, giardino(150));
+    await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su Il giardino.');
+    await page.evaluate((g) => { window.__unica = g; }, guasto);
+    await scrivi(page, montagna(150));
+    const unite = () => page.evaluate(() => window.__aiCalls.filter((c) => c.tipo === 'entrambi').length);
+    await expect.poll(unite, { timeout: 20_000 }).toBe(1);
+    await page.waitForTimeout(500);
+    const avvisi = await page.evaluate(() => window.__avvisi);
+    expect(avvisi).toBe(guasto === 'tagliata' ? 1 : 0);
+    await scrivi(page, `${montagna(150)} neve`);
+    await page.waitForTimeout(8_500);
+    expect(await unite(), 'chiamate dopo il ritocco').toBe(1);
+    expect(await page.evaluate(() => window.__avvisi), 'avvisi dopo il ritocco').toBe(avvisi);
+    await expect(page.locator('#docTitle')).toHaveText('Il giardino');
+  });
+}
+
+// #1697.2 — la copia eredita come è nato il titolo: automatico segue il contenuto della copia, scritto a mano resta; il
+// riassunto segue sempre.
+test('la copia di un documento col titolo automatico, riscritta su un altro argomento, prende il suo titolo', async ({ openTab }) => {
+  test.setTimeout(90_000);
+  const page = await nuovaPagina(openTab);
+  await scrivi(page, giardino(150));
+  await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su Il giardino.');
+  await page.click('#docTitle', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Duplica file', { exact: true }).click();
+  await expect(page.locator('#docTitle')).toHaveText('Il giardino (copia)');
+  await scrivi(page, montagna(150));
+  await expect(page.locator('#docTitle')).toHaveText('La montagna', { timeout: 20_000 });
+  const docs = await documenti(page);
+  expect(docs.map((d) => [d.titolo, d.riassunto]).sort()).toEqual([['Il giardino', 'Testo su Il giardino.'], ['La montagna', 'Testo su La montagna.']]);
+});
+
+test('la copia di un documento col titolo scritto a mano lo tiene, e il riassunto segue il nuovo argomento', async ({ openTab }) => {
+  test.setTimeout(90_000);
+  const page = await nuovaPagina(openTab);
+  await page.click('#docSwitch', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Rinomina', { exact: true }).click();
+  await page.locator('.ed-doc-title-input').fill('Appunti');
+  await page.locator('.ed-doc-title-input').press('Enter');
+  await scrivi(page, giardino(150));
+  await expect.poll(async () => (await documenti(page))[0].riassunto, { timeout: 20_000 }).toBe('Testo su Il giardino.');
+  await page.click('#docTitle', { button: 'right' });
+  await page.locator('.ed-title-ctxmenu').getByText('Duplica file', { exact: true }).click();
+  await expect(page.locator('#docTitle')).toHaveText('Appunti (copia)');
+  await scrivi(page, montagna(150));
+  await expect.poll(async () => (await documenti(page)).find((d) => d.titolo === 'Appunti (copia)').riassunto, { timeout: 20_000 })
+    .toBe('Testo su La montagna.');
+  await expect(page.locator('#docTitle')).toHaveText('Appunti (copia)');
+  expect(await page.evaluate(() => window.__aiCalls.filter((c) => c.tipo !== 'riassunto').length)).toBe(0);
+});
+
 // #1697 — il titolo in volo di un documento non toglie il suo al documento nuovo, e uno scritto a mano mentre il
 // titolo automatico è in volo resta quello.
 test('il titolo in volo di un altro documento non salta quello del documento nuovo', async ({ openTab }) => {
