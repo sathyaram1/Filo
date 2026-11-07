@@ -1,5 +1,5 @@
-// La scala delle priorità nei testi (SPEC-MANUTENTORE § 2): la 2 la mette solo il manutentore, quindi nessun testo fa
-// nascere a 2 i difetti rimasti di una verifica; e il ruolo non manda l'owner a creare una routine che non parte mai.
+// La scala delle priorità nei testi (SPEC-MANUTENTORE § 2): i difetti rimasti di una verifica nascono a 1 (#2269), e
+// il ruolo non manda l'owner a creare una routine che non parte mai.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
