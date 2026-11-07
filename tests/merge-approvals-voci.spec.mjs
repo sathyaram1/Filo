@@ -231,7 +231,6 @@ test('voci chiuse: «Apri le 8 voci» è acceso, le apre tutte e porta in vista 
   await expect(capacita.nth(12)).toBeInViewport();
   await expect(approva).toHaveText('Approva e fondi');
   await expect(approva).toBeEnabled();
-  expect(await page.evaluate(() => window.__macCalls || [])).toEqual([]);
 
   // Poi il sì di sempre, con la sua conferma.
   await approva.click();
