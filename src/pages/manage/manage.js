@@ -283,7 +283,7 @@
     verifier: { icon: '🧪', label: 'Claude (verifica)' },
     // I rilievi rimasti fuori dal giro di correzione (feedback #561:
     // esterni al lavoro, o interni messi da parte dal bilancio), aperti dal
-    // server uno per rilievo, figli #N.k, priorità dal livello (un 2 nasce a 1): categoria
+    // server uno per rilievo, figli #N.k, a priorità 1 (a 3 un esterno di livello 3): categoria
     // propria, così leggendo la coda si vede che nasce da una verifica, non da
     // un'esplorazione.
     residuo:  { icon: '🧹', label: 'Claude (rilievi derivati da una verifica)' },
