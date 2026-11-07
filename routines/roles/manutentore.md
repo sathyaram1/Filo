@@ -223,7 +223,7 @@ cambia più. Se non arriva in tempo, restano le righe dei worker.
 
 ## Il recap del mattino
 
-Breve, un foglio al giorno, in Gestione → Automazioni (`recap scrivi -`): fusioni e spesa di ieri, scelte prese (rosa, N,
+Breve, un foglio al giorno, in Gestione → Automazioni (`recap scrivi -`): fusioni e spesa di ieri, scelte prese (ordine, N,
 pacchetti) e perché, esperimenti e cosa hanno portato, efficientamenti con la misura, segnali che segui, come hai
 applicato le indicazioni dell'owner. **Mai cose da fare per l'owner né domande**: quelle vanno nelle domande. Il
 recap è per ciò che si può perdere senza danno e interessa sapere.
