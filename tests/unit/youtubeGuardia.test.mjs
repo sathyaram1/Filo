@@ -6,7 +6,7 @@ import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { guarda, AVVISO } = require('../../src/preload/youtube-guardia.js');
+const { guarda, avvia, AVVISO } = require('../../src/preload/youtube-guardia.js');
 
 function mondo() {
   const ascolti = {};
