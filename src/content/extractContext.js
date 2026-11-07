@@ -849,10 +849,12 @@
       const dentro = ombraChiusa(el);
       if (dentro === 'vuoto') return false;
       // Testo chiuso in una sezione che il giro traduce: aprendola, il resto sarebbe in italiano e lui no, comunque il
-      // sito l'abbia chiusa. Il testo lo sa la sonda: non è lo spazio pubblicitario vuoto di #503 (#1290.2).
+      // sito l'abbia chiusa (#1290.2). Una sezione senza altro testo è lo spazio pubblicitario nascosto di #503, che
+      // non conta; la fisarmonica del browser sì, perché la pagina la dichiara da aprire.
       if (dentro === 'testo' && sezione) {
         const attorno = parentOrHost(sezione);
-        return !!attorno && !isInvisibleToUser(attorno) && isReachableByUser(attorno, attorno.getBoundingClientRect());
+        if (!attorno || isInvisibleToUser(attorno) || !isReachableByUser(attorno, attorno.getBoundingClientRect())) return false;
+        return attorno.tagName === 'DETAILS' ? true : 'sezione';
       }
       const r = el.getBoundingClientRect();
       if (r.width < CLOSED_MIN_W || r.height < CLOSED_MIN_H) return false;
