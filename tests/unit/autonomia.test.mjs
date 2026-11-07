@@ -205,7 +205,7 @@ test('#1295 — TOGLI_CHAT: nascondere parte da sé a Normale (costo 1), il «pe
   assert.equal(AL.ingressi({ type: 'TOGLI_CHAT', id: 'c1' }, {}).parola, false);
 });
 
-test('#1909 — ELIMINA_FILE: il cestino chiede con un clic a ogni livello, anche dopo una lettura; il «per sempre» è un costo 4', () => {
+test('#1909 — ELIMINA_FILE: il cestino chiede sempre, anche a compito pulito; il «per sempre» è un costo 4', () => {
   const cestino = { type: 'ELIMINA_FILE', percorsi: ['~/Downloads/a.pdf'] };
   const sempre = { ...cestino, per_sempre: true };
   assert.equal(AL.costoFor(cestino), 2);
