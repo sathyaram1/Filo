@@ -802,6 +802,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s linear calc(0.14s * var(--sn-motion, 1));
 }
 .dash-bubble-filo:hover > .dash-msg-azioni,
+.dash-bubble-user:hover > .dash-msg-azioni,
 .dash-msg-azioni:focus-within {
   opacity: 1; visibility: visible;
   transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s;
