@@ -325,7 +325,7 @@
       schede: () => vive(),
       // Dopo l'invio (o un valore scritto da codice): il campo rilegge il suo testo.
       rileggi() { riallinea(); ricalca(); },
-      svuota() { schede = []; ricalca(); },
+      svuota() { schede = []; testoPrima = ta.value; ricalca(); },
       ricalca,
     };
     ta._snGettoni = api;
