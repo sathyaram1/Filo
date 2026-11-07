@@ -264,7 +264,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
       : { role: 'user', content: parts };
-    return [sys, ...storiaAiuto(payload.history), userMsg];
+    return [sys, ...await storiaAiutoConLetture(payload.history, sender), userMsg];
   }
   if (action === ACTIONS.CATEGORIZE) {
     return [{ role: 'user', content: PROMPTS.categorize(payload) }];
