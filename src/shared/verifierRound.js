@@ -722,7 +722,7 @@
     if (s) parts.push(s);
     const esterni = Array.isArray(d.external) ? d.external.length : 0;
     if (esterni) {
-      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, con la priorità del livello (un 2 nasce a 1: la rosa la sceglie il manutentore).`);
+      parts.push(`${esterni === 1 ? 'Un rilievo è esterno (non tocca a questo lavoro): diventa' : `${esterni} rilievi sono esterni (non toccano a questo lavoro): diventano`} feedback a parte, a priorità 1 (un livello 3 a priorità 3, che parte subito): il resto lo mette in lavoro il manutentore, nell'ordine.`);
     }
     if (d.stop) {
       parts.push('Il lavoro si ferma: c\'è un rilievo interno di livello 3 che non si può correggere da soli (finiti il suo bilancio e quelli dei livelli sotto), o un rilievo interno che chiede una tua decisione di livello 3 o su una scelta difficile da disfare.');
