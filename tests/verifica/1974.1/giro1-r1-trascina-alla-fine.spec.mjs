@@ -53,7 +53,7 @@ test('r1 trascinare la barra fino alla fine appena partito il video non spegne i
     await page.mouse.move(box.x + 20, box.y + box.height - 5);
     await page.mouse.down();
     await page.mouse.move(box.x + box.width - 2, box.y + box.height - 5, { steps: 20 });
-    await page.waitForTimeout(2000);
+    await page.waitForTimeout(200);
     await page.mouse.up();
     await page.evaluate(() => { const v = document.getElementById('v'); v.currentTime = v.duration - 0.3; });
     // Il video finisce; un ripiego ricaricherebbe la scheda, e lì la pagina non si legge più: si conta dal server.
