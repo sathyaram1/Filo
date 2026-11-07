@@ -1150,7 +1150,8 @@
   }
 
   function chatBubbleHtml(m, isLast) {
-    if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
+    // `sn-con-azioni-msg`: lo spazio sotto per Copia e Rispondi (#2096), tenuto sempre, così comparendo non spostano niente.
+    if (m.who === 'user') return `<div class="dk-msg dk-msg-user sn-con-azioni-msg">${esc(m.text)}</div>`;
     if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
