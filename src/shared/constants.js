@@ -3313,6 +3313,7 @@
     DEFAULT_MODEL_REGISTRY,
     nascosteDellaTraduzione,
     NASCOSTE_TRADUZIONE,
+    TAG_SENZA_PROSA,
     modoNascoste,
     resolveModel,
     parseModelRefs,
