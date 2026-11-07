@@ -134,6 +134,13 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // #2084 — una scheda trascinata sopra un riquadro incorporato in un sito: il frame di sopra dice dove, il main la porta.
+  on(MSG.SCHEDA_NEL_RIQUADRO, async (msg, sender) => {
+    if (!sender || sender.strato || !sender.frame) return { ok: false };
+    const win = winOf(sender);
+    return { ok: require('../../schedaTrascinata').nelRiquadro(win, sender.wc, sender.frame, msg) };
+  });
+
   // #2085 — il gettone di una scheda in una chat (home, Aiuto anche nello strato sopra un sito): la carta dell'anteprima
   // sotto il gettone, e il clic che porta davanti la scheda se è ancora aperta, o ne riapre l'indirizzo.
   on(MSG.GETTONE_SCHEDA, async (msg, sender) => {
