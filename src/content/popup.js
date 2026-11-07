@@ -1006,12 +1006,7 @@
     if (!riga || !A || !campo) return null;
     const Md = global.SN_MARKDOWN;
     const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = 'sn-msg-tasto sn-msg-rispondi';
-    btn.dataset.etichetta = 'Rispondi';
-    btn.setAttribute('aria-label', 'Rispondi');
-    btn.innerHTML = iconaCopia('reply');
+    const btn = A.tasto(A.AZIONI.rispondi, 'sn-msg-tasto sn-msg-rispondi', 14);
     btn.addEventListener('mousedown', (e) => e.preventDefault());
     btn.addEventListener('click', (e) => { if (e.isTrusted) A.citaNelCampo(campo, testo); });
     riga.appendChild(btn);
