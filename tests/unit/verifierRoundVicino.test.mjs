@@ -101,9 +101,11 @@ test('derivedGroups: esterni e domande da soli, tutti gli altri in un feedback s
   assert.deepEqual(g.map((x) => [x.tipo, x.priority, x.decision, tag(x.findings)]), [
     ['esterno', 3, false, ['3e']],
     ['decisione', 1, true, ['1i?']],
-    ['rimasti', 3, false, ['1i', '3v', '0v']],
+    ['rimasti', 1, false, ['1i', '3v', '0v']],
   ]);
-  assert.deepEqual(g[2].findings.map((x) => x.priority), [1, 3, 0], 'ciascuno tiene il suo livello');
+  assert.deepEqual(g[2].findings.map((x) => [x.level, x.priority]), [[1, 1], [3, 1], [0, 1]], 'ciascuno tiene il suo livello, e nasce a 1');
+  // Una priorità già scritta (un derivato riletto dal server) vale com'è.
+  assert.deepEqual(R.derivedGroups([{ level: 3, sede: 'v', text: 'x', priority: 3 }]).map((x) => x.priority), [3]);
 });
 
 test('derivedGroups accetta un elenco piatto e tiene i campi in più (numero, id)', () => {
