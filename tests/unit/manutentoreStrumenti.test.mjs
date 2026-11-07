@@ -109,8 +109,8 @@ test('una promessa scritta con parole comuni senza il suo lavoro nell\'ordine si
   for (const riga of ['I formati audio arriveranno con il prossimo aggiornamento.', 'Nella prossima versione: i formati audio.',
     'Stiamo preparando i formati audio.', 'In futuro anche i formati audio.', 'Coming soon: audio.', 'Sarà disponibile anche l\'audio.']) {
     assert.equal(prova(riga).ok, false, riga);
-    assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 non è nella rosa)`);
-    assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nella rosa)`);
+    assert.equal(prova(riga, [{ numero: '900', riga }]).ok, false, `${riga} (#900 è a 2 ma fuori dall'ordine)`);
+    assert.equal(prova(riga, [{ numero: '812', riga }]).ok, true, `${riga} (#812 è nell'ordine)`);
   }
   assert.equal(prova({ testo: 'Ora il prossimo video parte da solo.', da: [1] }).ok, true);
 });
