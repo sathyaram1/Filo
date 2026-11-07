@@ -924,6 +924,7 @@
         return;
       }
       disarm();
+      mostraEsito = true;
       segui(ATTESA_CLIC, o.onApprove ? o.onApprove(req) : null, Date.now());
     });
 
