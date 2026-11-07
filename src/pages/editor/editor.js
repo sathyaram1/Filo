@@ -2267,7 +2267,7 @@
       }
     }
     // Una selezione appoggiata al foglio (tutto il documento, o fino a un'immagine in fondo) parte e finisce nei blocchi.
-    if (r && !r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
+    if (!r.collapsed && r.startContainer === docEl && docEl.childNodes[r.startOffset]) {
       const b = dentro(docEl.childNodes[r.startOffset], true);
       const w = b.nodeType === 1 ? document.createTreeWalker(b, NodeFilter.SHOW_TEXT) : null;
       let t = w ? w.nextNode() : b;
