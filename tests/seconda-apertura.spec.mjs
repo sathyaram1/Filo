@@ -164,8 +164,7 @@ test('un link d\'invito aperto da fuori con Filo senza finestra apre Crediti, da
   await barra.locator('#win-close').click({ noWaitAfter: true }).catch(() => {});
   await expect.poll(async () => (await stato(app, accesso)).normale, { timeout: 10000 }).toBeNull();
   await app.evaluate(({ app: a }) => { a.emit('open-url', { preventDefault() {} }, 'filo://invito/ABCD'); });
-  await expect.poll(async () => (await stato(app, accesso)).normale?.schede || [], { message: 'su Mac l\'invito non ha aperto Crediti', timeout: 15000 })
-    .toContainEqual(expect.stringMatching(/^filo:\/\/credits\//));
+  await creditiDavanti(app, accesso, negozio, 'su Mac l\'invito non ha aperto Crediti');
   expect((await stato(app, accesso)).errori).toEqual([]);
 });
 
