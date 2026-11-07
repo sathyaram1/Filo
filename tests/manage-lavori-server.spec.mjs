@@ -274,6 +274,11 @@ test('#2258: l’owner dichiara fidato com’è un lavoro fermo «resta locale»
     '2 scritti di biglietti non fidati fra note e critiche',
   ]);
   await expect(stato.locator('.mg-dichiara b')).toHaveCount(0);
+  // Si dichiara dopo aver letto: ogni ramo apre le sue modifiche rispetto a main, nel suo repo.
+  await expect(cosa.nth(0).locator('a')).toHaveAttribute('href', 'https://github.com/sathyaram1/Filo/compare/main...worker/srv-8-20261029T090000Z');
+  await expect(cosa.nth(1).locator('a')).toHaveAttribute('href', 'https://github.com/sathyaram1/filo-security/compare/main...worker/srv-8-20261029T090000Z');
+  await expect(cosa.nth(0).locator('a')).toHaveAttribute('target', '_blank');
+  await expect(cosa.nth(2).locator('a')).toHaveCount(0);
   await page.locator('#mgWorkState').screenshot({ path: 'tests/.shots/manage-dichiara-fidato-2258.png' });
   // Il primo sì trova il lavoro cambiato: lo dice, e la conferma resta lì per riprovare.
   await page.locator('#mgDichiaraSi').click();
