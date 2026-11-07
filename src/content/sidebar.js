@@ -305,11 +305,23 @@
       try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
       try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
     });
+    // Un testo incollato o trascinato nella casella l'ha scritto qualcun altro: la conversazione ha letto (#1840).
+    let testoDiAltri = false;
+    ta.addEventListener('input', (e) => {
+      if (!ta.value) testoDiAltri = false;
+      else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDiAltri = true;
+    });
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
       if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
       const { immagini, riferimenti } = allegati;
+      if (testoDiAltri || immagini.length) {
+        try {
+          Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_TESTO_DI_ALTRI, immagini: !testoDiAltri })).catch(() => {});
+        } catch (_) {}
+      }
+      testoDiAltri = false;
       ta.value = '';
       allegati = { immagini: [], riferimenti: [] };
       disegnaAllegati();
