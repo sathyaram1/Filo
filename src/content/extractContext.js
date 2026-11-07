@@ -174,14 +174,8 @@
   // «Traduci la pagina» vuol dire TUTTA la pagina: qualsiasi elemento con testo VISIBILE,
   // comunque il sito l'abbia scritto. Unità = elemento con un text node figlio DIRETTO.
 
-  // Sottoalberi mai traducibili: niente prosa, o testo che è codice o valore e tradurlo lo
-  // romperebbe. SELECT non c'è perché si scende fino alle OPTION; DATALIST sì.
-  const TRANSLATE_SKIP_TAGS = new Set([
-    'SCRIPT', 'STYLE', 'NOSCRIPT', 'TEMPLATE', 'SVG', 'MATH', 'CANVAS',
-    'IFRAME', 'OBJECT', 'EMBED', 'VIDEO', 'AUDIO', 'PRE', 'CODE', 'KBD',
-    'SAMP', 'VAR', 'TEXTAREA', 'INPUT', 'OPTION',
-    'DATALIST', 'HEAD', 'TITLE',
-  ]);
+  // Sottoalberi mai traducibili: l'elenco sta in constants.js, perché lo legge anche la sonda dei componenti chiusi.
+  const TRANSLATE_SKIP_TAGS = new Set(global.SN_CONST.TAG_SENZA_PROSA);
 
   const HAS_LETTER = /\p{L}/u;
 
