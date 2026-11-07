@@ -1367,10 +1367,13 @@
     inputEl.value = '';
     autoGrowInput();
     const citata = Rispondi.prendi();
-    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata };
+    const schede = Gettoni ? Gettoni.schede() : [];
+    if (Gettoni) Gettoni.svuota();
+    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata, schede };
   }
   function bollaUtente(c) {
     const userBubble = makeBubble({ role: 'user', text: c.text });
+    if (c.schede && c.schede.length) window.SN_SCHEDE_IN_CHAT.nellaBolla(userBubble, c.text, c.schede, azioniGettone);
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     c.immagini.forEach((src, i) => {
       const img = document.createElement('img');
