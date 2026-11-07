@@ -172,6 +172,11 @@ test('la riga dell\'esito: una riga, la coppia, il campo della richiesta di fusi
   assert.equal(codiceUscita({ esito: 'rosso_sulla_fusione' }), 1);
   assert.equal(codiceUscita({ esito: 'conflitto' }), 1);
   assert.equal(codiceUscita({ esito: 'non_provata' }), 2);
+  // #2214: le novità che basta spostare arrivano al server nella riga, e la corsa resta quella di un rosso.
+  const novita = { verso: '0.2.267', righe: [{ version: '0.2.266', chiave: 'features', riga: 'Del ramo' }], dopo: 'verde' };
+  const spostare = campoEsito({ ramo: A, main: B, prova: { esito: 'rosso_sulla_fusione', mainSha: B, rossi: ['x'], novita } });
+  assert.deepEqual(JSON.parse(rigaEsito(spostare).slice(MARCA.length + 1)).novita, { verso: '0.2.267', dopo: 'verde', righe: [{ version: '0.2.266', riga: 'Del ramo' }] });
+  assert.equal(codiceUscita(spostare), 1);
 });
 
 const TEST_VALORE = "import { test } from 'node:test';\nimport assert from 'node:assert';\nimport { readFileSync } from 'node:fs';\n"
