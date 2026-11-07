@@ -544,7 +544,7 @@
     const caps = normalizeCaps(p && p.caps, p && p.defaults);
     const counts = normalizeCounts(p && p.counts);
     const left = (k) => caps[k] - counts[k.replace('cap', 'count')];
-    const conPriorita = (f) => Object.assign({}, f, { priority: prioritaDiNascita(f.level) });
+    const conPriorita = (f) => Object.assign({}, f, { priority: prioritaDiNascita(f.level, f.sede) });
 
     const findings = tutti.filter((f) => f.sede !== 'e');
     const external = tutti.filter((f) => f.sede === 'e').map(conPriorita);
