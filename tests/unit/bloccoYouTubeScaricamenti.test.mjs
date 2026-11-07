@@ -116,3 +116,34 @@ test('dopo un ripiego le regole si richiedono subito e poi ogni ora, finché non
   await scorri(3 * H);
   assert.equal(chieste.length, fatte, 'nessuna scheda aspetta più: niente richieste ogni ora');
 });
+
+test('dopo un falso allarme si riscarica ogni ora solo finché la scheda spenta sta su YouTube; chiusa, esce dall\'elenco', async (t) => {
+  mock.timers.enable({ apis: ['setInterval', 'setTimeout', 'Date'], now: ORA });
+  t.after(() => mock.timers.reset());
+  rete = { 'filters.txt': DISCO, 'quick-fixes.txt': NIENTE };
+  const B = await avvio({ copiaDi: H });
+  await B.init({});
+  await svuota();
+  assert.equal(regole(B).length, 1);
+  assert.equal(B.rotto(scheda, principale, 'fermo', { avvisa() {}, ricarica() {} }).fatto, true);
+  assert.ok(await finché(() => chieste.length === 2), `subito: ${JSON.stringify(chieste)}`);
+  await B.aggiorna();
+
+  principale.url = 'https://esempio.it/';
+  await scorri(3 * H);
+  await svuota();
+  assert.equal(chieste.length, 2, 'la scheda è andata altrove: niente scaricamenti ogni ora');
+  assert.ok(B.spentaPerTest(scheda.id), 'resta col solo «Salta» se torna su YouTube con le stesse regole');
+
+  principale.url = 'https://www.youtube.com/watch?v=y';
+  assert.deepEqual(regole(B), [], 'tornata su YouTube chiede le regole: è ancora spenta');
+  await scorri(H);
+  assert.ok(await finché(() => chieste.length === 4), `tornata su YouTube riprende ad aspettare: ${JSON.stringify(chieste)}`);
+  await B.aggiorna();
+
+  scheda.chiusa = true;
+  await scorri(3 * H);
+  await svuota();
+  assert.equal(chieste.length, 4, 'chiusa, non si scarica più');
+  assert.equal(B.status().spente, 0, 'e la scheda chiusa esce dall\'elenco');
+});
