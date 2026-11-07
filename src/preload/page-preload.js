@@ -493,8 +493,8 @@ function consegnaBroadcast(msg) {
     }
   };
   const type = msg && msg.type;
-  // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto.
-  const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore';
+  // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto. Né una luce che si spegne.
+  const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore' && msg.fase !== 'esci';
   if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
     ensureContentScripts();
     waitForContentScripts(deliver);
