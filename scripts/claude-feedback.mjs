@@ -830,7 +830,7 @@ export async function main(argvIn) {
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati e le loro attese, e alla nascita le archivio)` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${soloLocale ? 'lavoro locale' : server ? 'lavoro server' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati e le loro attese, e alla nascita le archivio)` : ''}.`);
     return EXIT.FATTO;
   }
 
