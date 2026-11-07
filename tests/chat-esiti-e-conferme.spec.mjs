@@ -648,6 +648,40 @@ test('#1685 un comando proposto e mai confermato: riaperta dopo un riavvio, il m
   }
 });
 
+test('#1685 riaperta la chat, due conferme rimaste in sospeso nella stessa risposta restano un passo solo', async ({ app }) => {
+  test.setTimeout(60_000);
+  const dir = cartellaTemporanea('esiti-conferme-');
+  try {
+    const page = await home(app);
+    await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ terminal: { enabled: true } }));
+    await livelloAutonomia(app, 'conservativo');
+    await modelloFinto(app, [
+      { text: 'Creo le due cartelle.', toolCalls: [mkdir('c1', dir, 'quattro'), mkdir('c2', dir, 'cinque')] },
+      { text: 'Aspetto i tuoi OK.' },
+      { text: 'Fatte tutte e due.' },
+    ]);
+    await chiedi(page, 'crea le cartelle quattro e cinque');
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Aspetto i tuoi OK' })).toBeVisible({ timeout: 10_000 });
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    const chat = await chatCon(app, 'crea le cartelle quattro e cinque');
+    await dimenticaLaMemoria(app, chat.id);
+    await riapri(app, page, chat.id);
+    const bottoni = page.locator('.dash-bubble-filo .dash-action-btn', { hasText: /Creo la cartella/ });
+    await expect(bottoni, 'riaperta, tornano tutti e due i bottoni').toHaveCount(2, { timeout: 8_000 });
+    await okAlBottone(page, bottoni.filter({ hasText: 'quattro' }));
+    await page.waitForTimeout(1500);
+    expect((await chiamateAlModello(app)).length, 'col secondo comando ancora da confermare il modello aspetta').toBe(2);
+    await okAlBottone(page, bottoni.filter({ hasText: 'cinque' }));
+    await expect(page.locator('.dash-bubble-filo', { hasText: 'Fatte tutte e due' })).toBeVisible({ timeout: 10_000 });
+    const ch = await chiamateAlModello(app);
+    expect(ch, 'una ripresa sola, dopo il secondo OK').toHaveLength(3);
+    expect(ultimoMessaggio(ch[2])).toMatch(/quattro[\s\S]*cinque/);
+  } finally {
+    await ripristina(app);
+    togliCartella(dir);
+  }
+});
+
 // Il riordino e l'eliminazione dall'archivio chiedono col loro pannello: un no o un guasto restano scritti nella
 // conversazione come per le altre conferme, e un guasto torna al modello (#1373).
 test('#1685 il riordino: un no resta un no, e un riordino che non riesce lo sanno la chat e il modello', async ({ app }) => {
