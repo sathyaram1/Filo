@@ -13,10 +13,15 @@ Nel payload:
   un lavoro;
 - `feedback`: il feedback da cui viene, se c'è, con stato, testo, note e
   conversazione;
+- `vive`: le altre domande vive (in smistamento, aperte, in lavorazione) su
+  quel feedback, provvisorie comprese, ognuna con stato, titolo, problema,
+  opzioni, consiglio, `blocca` e `provvisoria`, senza le note per gli agenti;
+  `viveAltre` quante ne restano fuori se sono troppe. Senza il campo il server
+  non te le ha mandate: non vuol dire che non ce ne siano;
 - `riferimenti`: numero, stato e priorità dei feedback che la domanda nomina,
   per id;
 - `registro`: i principi delle domande chiuse (con `assente` non ti arriva, e
-  il campo dice perché: il passo 2 si salta).
+  il campo dice perché: il passo 3 si salta).
 
 Se `affidata` è `false` la domanda non è più tua (chi l'ha aperta l'ha ritirata,
 l'owner l'ha già chiusa): rilascia il biglietto e basta.
@@ -65,7 +70,28 @@ risponde.
 
   `--richiesta permesso` per un permesso o una chiave.
 
-### 2. Se il registro risponde, rispondi tu
+### 2. Un doppione lo chiudi sulla domanda viva
+
+Se una delle `vive` chiede all'owner la stessa scelta (le stesse strade,
+anche scritte con altre parole), questa è un doppione: l'owner risponde una
+volta sola, lì.
+
+```bash
+node scripts/domanda.mjs smista doppione --di D-<k> --testo "<perché è la stessa scelta di D-k>"
+```
+
+Il server chiude questa e mette il testo intero di chi la chiedeva nelle note
+per gli agenti di D-k, così chi riprende dopo la risposta lo legge. Se questa
+fermava il lavoro e D-k no, il lavoro aspetta la risposta a D-k. D-k deve
+stare fra le `vive`: una domanda di un altro feedback, o già chiusa, il server
+la rifiuta, e rifiuta anche una D-k che non può far aspettare il lavoro al
+posto di questa (già risposta, o senza un'opzione che lo riprende) o le cui
+note supererebbero il tetto. Davanti a un rifiuto pubblica questa (passo 4)
+nominando D-k nel contesto. Una scelta solo vicina non è un doppione: se la nuova porta
+un'opzione o un fatto che cambia la decisione, vai avanti coi passi dopo, e
+nel contesto della riscrittura nomini D-k.
+
+### 3. Se il registro risponde, rispondi tu
 
 Se un principio di una domanda chiusa copre questo caso, rispondi col
 principio: l'opzione che indica, e un testo che cita il principio e la domanda
@@ -81,7 +107,7 @@ una risposta che lo usava, e finché non risponde vale come assente. La
 risposta finisce fra le risposte automatiche, e l'owner può riaprirla. Le
 opzioni che vogliono un suo gesto il server le rifiuta.
 
-### 3. Decide l'owner: riscrivi la domanda per lui
+### 4. Decide l'owner: riscrivi la domanda per lui
 
 Riscrivi la domanda nella forma per l'owner e pubblicala: da lì è aperta, e lui
 la trova fra quelle da rispondere.
@@ -119,14 +145,14 @@ Il file sta fuori dal repo, come ogni domanda.
 
 ## Come finisci
 
-Uno dei comandi qui sopra (`guasto`, `ricevuti`, `automatica`, `pubblica`)
-chiude il compito. Poi rilascia il biglietto:
+Uno dei comandi qui sopra (`guasto`, `ricevuti`, `doppione`, `automatica`,
+`pubblica`) chiude il compito. Poi rilascia il biglietto:
 
 ```bash
 node scripts/routine-channel.mjs release <biglietto> --role smistamento
 ```
 
-Un rilascio senza nessuno dei quattro rimette la domanda in coda per un altro
+Un rilascio senza nessuno dei cinque rimette la domanda in coda per un altro
 tentativo; al terzo esce all'owner com'è, col segno «non riscritta». Se il
 server rifiuta perché la domanda è cambiata mentre lavoravi, rileggila con
 `smista mostra` e rifai la tua parte. Un altro rifiuto che non sai correggere

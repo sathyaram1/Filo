@@ -362,10 +362,28 @@ test('una domanda in smistamento sta nella sua scheda e lo dice; una smistata co
   await page.locator('.mg-tab[data-tab="domande-smistamento"]').click();
   await page.locator('#mgDomandeLista .mg-domanda').first().click();
   const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-20"]');
-  await expect(dq.locator('.mg-dq-esito')).toHaveText('La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto o se una decisione già presa la copre.');
+  await expect(dq.locator('.mg-dq-esito')).toHaveText('La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.');
   await expect(dq.locator('.mg-dq-testo')).toHaveCount(0);
   await dq.screenshot({ path: 'tests/.shots/manage-domande-smistamento.png' });
   await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
   await page.locator('#mgDomandeLista .mg-domanda').first().click();
   await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-21"] .mg-dq-esito')).toHaveText('Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.');
+});
+
+// #1928: lo smistamento chiude un doppione sulla domanda viva che chiede la stessa scelta; l'archivio dice quale, e ci porta.
+test('una domanda chiusa come doppione dice di quale e il collegamento apre quella da rispondere', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  const doppia = domanda(22, { stato: 'chiusa', titolo: 'Tenere Haiku o passare a Kimi?', esito: { ok: true, smistata: 'doppione', doppioneDi: 'D-8' } });
+  const senzaNumero = domanda(23, { stato: 'chiusa', titolo: 'Stessa scelta', esito: { ok: true, smistata: 'doppione' } });
+  await apriDomande(page, [doppia, senzaNumero, IMPORTANTE]);
+  await expect(page.locator('.mg-tab[data-tab="domande"]')).toHaveText('Da rispondere (1)');
+  await page.locator('.mg-tab[data-tab="domande-archivio"]').click();
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-23"]').click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-23"] .mg-dq-esito')).toHaveText('Chiedeva la stessa scelta di un’altra domanda: rispondi lì.');
+  await page.locator('#mgDomandeLista .mg-domanda[data-id="D-22"]').click();
+  const dq = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-22"]');
+  await expect(dq.locator('.mg-dq-esito')).toHaveText('Chiedeva la stessa scelta di D-8: rispondi lì.');
+  await dq.screenshot({ path: 'tests/.shots/manage-domande-doppione.png' });
+  await dq.locator('.mg-dq-esito .mg-dq-legame[data-domanda="D-8"]').click();
+  await expect(page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-8"]')).toBeVisible();
 });

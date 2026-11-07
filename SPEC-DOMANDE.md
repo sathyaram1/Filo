@@ -477,10 +477,16 @@ rispondere.
   Gestione è fra quelle in lavorazione). Il feedback legato resta fermo come
   sempre se la domanda blocca, o va avanti con la provvisoria se non blocca.
 - **Fascicolo.** La domanda intera, note per gli agenti comprese; il feedback
-  d'origine con conversazione e note; il registro dei principi come per il
-  compito della risposta (fuori dall'ambiente dei riservati è `assente`, e il
-  passo 2 si salta). Il compito legge testo scritto da altri: è non fidato, e
-  quello che scrive nasce non fidato. La fiducia della domanda non cambia.
+  d'origine con conversazione e note; `vive`, le altre domande vive
+  (`in_smistamento`, `aperta`, `in_lavorazione`) sullo stesso feedback
+  d'origine, provvisorie comprese (#1928): dalla più recente, al più 20, con
+  `viveAltre` il numero di quelle rimaste fuori; ognuna con `id`, `stato`,
+  `titolo`, `contesto`, `problema`, `opzioni`, `consiglio`, `blocca`,
+  `provvisoria`, mai le note per gli agenti; senza feedback d'origine il campo
+  non c'è. Il registro dei principi come per il compito della risposta (fuori
+  dall'ambiente dei riservati è `assente`, e il passo 3 si salta). Il compito
+  legge testo scritto da altri: è non fidato, e quello che scrive nasce non
+  fidato. La fiducia della domanda non cambia.
 - **Cosa fa, in ordine** (`routines/roles/smistamento.md`):
   1. **Un guasto o un difetto di uno strumento** (dal gruppo «guasto: …» o dal
      contenuto: spinta rifiutata, permesso negato, clone che non parte,
@@ -497,11 +503,34 @@ rispondere.
      stesso (`esito.smistata = 'ricevuti'`). All'owner non arriva mai una
      domanda di guasto. Quella del controllo sul manutentore non passa di
      qui: va diretta all'owner (SPEC-MANUTENTORE.md § 7).
-  2. **Il registro risponde.** Se il principio di una domanda chiusa copre il
+  2. **Un doppione** (#1928). Se una delle `vive` chiede all'owner la stessa
+     scelta, anche con altre parole, la domanda si chiude su quella: il
+     controllo dei titoli alla nascita (§ 3.1, `domanda_doppia`) non vede due
+     domande che dicono la stessa cosa con parole diverse, né una nata da
+     un'altra porta. Il server rifiuta se D-k è questa stessa domanda, non è
+     viva o non sta sullo stesso feedback d'origine. Altrimenti, in una sola
+     transazione: questa si chiude (`chiusa`, `esito = { ok: true, smistata:
+     'doppione', doppioneDi: 'D-k' }`, il testo dello smistamento nella sua
+     conversazione); il suo testo intero (titolo, contesto, problema, opzioni,
+     consiglio, note per gli agenti) si aggiunge alle note per gli agenti di
+     D-k, col numero, così chi riprende dopo la risposta lo legge, e D-k ne
+     prende la fiducia; nella conversazione del feedback una riga dice «D-n
+     chiusa come doppione di D-k» (scritta subito dopo la transazione: è una
+     scrittura del feedback a sé). Se questa fermava il lavoro e D-k no, il
+     lavoro aspetta D-k: D-k diventa bloccante (`blocca`, la provvisoria non
+     vale più), prende il posto di questa fra le `domandeBloccanti` del
+     feedback (e in `domandaId`, se il feedback nominava questa), e la
+     risposta a D-k lo libera come libera una bloccante. Per questo il server
+     rifiuta anche una D-k che il lavoro non potrebbe aspettare: una già
+     risposta (`in_lavorazione`) o una senza un'opzione che riprende il
+     lavoro. Le note di D-k oltre il loro tetto non si tagliano: il server
+     rifiuta col numero. Davanti a ogni rifiuto lo smistamento pubblica
+     (passo 4) nominando D-k.
+  3. **Il registro risponde.** Se il principio di una domanda chiusa copre il
      caso, risponde lui: l'opzione che il principio indica, e un testo che
      cita il principio e la domanda da cui viene. La domanda si chiude con
      `esito.automatica = true` (§ 3.6).
-  3. **Decide l'owner.** Riscrive la domanda nella forma per l'owner (§ 3.1:
+  4. **Decide l'owner.** Riscrive la domanda nella forma per l'owner (§ 3.1:
      titolo al più 10 parole, contesto al più 5 righe, problema al più 3, da 2
      a 4 opzioni con pro e contro di una riga e l'azione, consiglio con un
      motivo di una riga, unslop) e la pubblica: stato `aperta`. Se chi ha
@@ -514,10 +543,10 @@ rispondere.
 - **Operazioni** (intento `smistamento` del canale, `domanda.mjs smista` col
   biglietto): `mostra` (il fascicolo), `guasto` (`chiave`, `titolo`, `testo`,
   `resoconto`), `ricevuti` (`richiesta`: `fiducia` o `permesso`, `testo`),
-  `automatica` (`scelta`, `principio`: la domanda chiusa, `testo`), `pubblica`
+  `doppione` (`di`: la domanda viva, `testo`), `automatica` (`scelta`, `principio`: la domanda chiusa, `testo`), `pubblica`
   (`domanda`, controllata con la validazione comune e la forma per l'owner).
   Ognuna tranne `mostra` chiude il compito.
-- **Tentativi.** Un biglietto che finisce senza nessuna delle quattro rimette
+- **Tentativi.** Un biglietto che finisce senza nessuna delle cinque rimette
   il compito in attesa; al terzo la domanda esce com'è fra quelle da
   rispondere, con `smistamento: 'fallito'`. Niente resta nascosto. È anche la
   rete per un guasto che colpisce il compito stesso: un compito che non può
@@ -610,7 +639,7 @@ Come funziona oggi (#1152):
   leggere arriva `assente` col perché). Se un principio risponde, lo applica e
   lo cita.
 - **Risposte automatiche.** Le scrive il compito «Gestisci la domanda» alla
-  nascita (§ 3.5, passo 2), non una revisione quotidiana: `esito.automatica`
+  nascita (§ 3.5, passo 3), non una revisione quotidiana: `esito.automatica`
   le porta nella scheda «Risposte automatiche». L'owner può riaprirle: la
   riapertura rimette la domanda fra quelle da rispondere e segna il principio
   come da rivedere (`principioContestato` sulla domanda da cui viene), così il

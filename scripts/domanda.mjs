@@ -43,6 +43,7 @@ const USO = [
   '  smista mostra                         rilegge la domanda, il feedback da cui viene e il registro',
   '  smista guasto --chiave "<strumento>: <prima riga del rifiuto>" --titolo "…" --testo "…" | - --resoconto "…"',
   '                                        è un guasto: feedback del difetto aperto o riusato, il lavoro fermo lo aspetta',
+  '  smista doppione --di D-k --testo "…" | -   chiede la stessa scelta di D-k, ancora viva: si chiude lì',
   '  smista ricevuti --richiesta fiducia|permesso --testo "…" | -   serve l\'owner: il lavoro va nei Ricevuti',
   '  smista automatica --scelta N --principio D-k --testo "…" | -   risponde il principio di D-k con l\'opzione N',
   '  smista pubblica <file.json | ->       la domanda riscritta per l\'owner: da lì la vede lui',
@@ -55,6 +56,7 @@ const TESTO_SERVE = Object.freeze(['chiarimento', 'chiudi']);
 const DELLO_SMISTAMENTO = Object.freeze({
   mostra: { ammesse: [], servono: [] },
   guasto: { ammesse: ['chiave', 'titolo', 'testo', 'resoconto'], servono: ['chiave', 'titolo', 'testo', 'resoconto'] },
+  doppione: { ammesse: ['di', 'testo'], servono: ['di', 'testo'] },
   ricevuti: { ammesse: ['richiesta', 'testo'], servono: ['richiesta', 'testo'] },
   automatica: { ammesse: ['scelta', 'principio', 'testo'], servono: ['scelta', 'principio', 'testo'] },
   pubblica: { ammesse: [], servono: [] },
@@ -178,6 +180,10 @@ function argomentiDelloSmistamento(resto) {
     out.scelta = n - 1;
     if (D.numeroDi(out.principio) === null) return { errore: `--principio vuole la domanda chiusa da cui viene il principio, nella forma D-12.` };
     out.principio = out.principio.trim();
+  }
+  if (op === 'doppione') {
+    if (D.numeroDi(out.di) === null) return { errore: '--di vuole la domanda ancora viva che chiede la stessa scelta, nella forma D-12.' };
+    out.di = out.di.trim();
   }
   return out;
 }
@@ -307,7 +313,7 @@ export function formattaDomanda(d, riferimenti = {}, { quando = dataOra } = {}) 
   righe.push(visibile(x.titolo || '(senza titolo)'));
   righe.push(`creata il ${quando(x.creataIl)} · modificata il ${quando(x.modificataIl)}${x.gruppo ? ` · gruppo «${visibile(x.gruppo)}»` : ''}`);
   if (x.origine && x.origine.tipo) righe.push(`origine: ${visibile(x.origine.tipo)} ${visibile(x.origine.id || '')}`.trimEnd());
-  if (x.stato === 'in_smistamento') righe.push('la sta smistando un agente: arriva all\'owner riscritta, o si chiude da sola se è un guasto o se un principio la copre');
+  if (x.stato === 'in_smistamento') righe.push('la sta smistando un agente: arriva all\'owner riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora viva o se un principio la copre');
   if (x.smistamento === 'fallito') righe.push('non riscritta: il compito che la smista non ci è riuscito, ed è uscita come l\'aveva scritta chi chiedeva');
   if (x.legata) righe.push(`${x.blocca ? 'ferma' : 'non ferma'} il lavoro di ${visibile(riferimenti?.[x.legata]?.num || x.legata)}`);
   if (Array.isArray(x.collegamenti) && x.collegamenti.length) {
@@ -405,13 +411,44 @@ export function formattaFeedbackOrigine(fb, { quando = dataOra } = {}) {
   return righe.join('\n');
 }
 
-/** Il fascicolo del compito «Gestisci la domanda»: la domanda, il feedback d'origine, il registro. PURA. */
+/**
+ * Le altre domande vive sul feedback d'origine (#1928): senza, un doppione di una provvisoria arriva all'owner due volte.
+ * Campo assente = server che non le manda: si dice, perché «nessuna» sarebbe una falsa certezza. PURA.
+ */
+export function formattaVive(vive, { altre = 0, conFeedback = true } = {}) {
+  if (!conFeedback) return '';
+  if (!Array.isArray(vive)) return 'Altre domande vive sullo stesso feedback: il server non le ha mandate, non sai se ce ne sono.';
+  const piu = Number.isInteger(altre) && altre > 0 ? altre : 0;
+  const righe = [`Altre domande vive sullo stesso feedback (${vive.length + piu}${piu ? `, qui le ${vive.length} più recenti` : ''})`];
+  if (!vive.length) righe.push('  nessuna');
+  for (const d of vive) {
+    // Una illeggibile non è «senza titolo»: chi smista deve sapere che non sa cosa chiede.
+    if (d.illeggibile) {
+      righe.push(`  ${visibile(d.id || '?')} [${visibile(d.stato || '?')} · illeggibile: il server non l'ha potuta aprire, non sai che scelta chiede]`);
+      continue;
+    }
+    const segni = [visibile(d.stato || '?'), d.blocca ? 'ferma il lavoro' : 'non ferma il lavoro'];
+    if (Number.isInteger(d.provvisoria)) segni.push(`provvisoria: opzione ${d.provvisoria + 1}`);
+    righe.push(`  ${visibile(d.id || '?')} ${visibile(d.titolo || '(senza titolo)')}  [${segni.join(' · ')}]`);
+    if (d.contesto) righe.push(rientro(`Contesto: ${d.contesto}`, '    '));
+    if (d.problema) righe.push(rientro(`Problema: ${d.problema}`, '    '));
+    (Array.isArray(d.opzioni) ? d.opzioni : []).forEach((o, i) => {
+      const consigliata = d.consiglio && d.consiglio.opzione === i ? '  [consigliata]' : '';
+      righe.push(rientro(`${i + 1}. ${o && o.testo ? o.testo : ''}${consigliata}`, '    '));
+    });
+  }
+  return righe.join('\n');
+}
+
+/** Il fascicolo del compito «Gestisci la domanda»: la domanda, il feedback d'origine con le sue domande vive, il registro. PURA. */
 export function formattaFascicoloSmistamento(f) {
   const x = f || {};
   if (x.affidata === false) {
     return `La domanda non è più affidata a te${x.motivo ? ` (${visibile(x.motivo)})` : ''}: non c'è niente da fare, rilascia il biglietto.`;
   }
-  return [formattaDomanda(x.domanda, x.riferimenti), '', formattaFeedbackOrigine(x.feedback), '', formattaRegistro(x.registro)].join('\n');
+  const conFeedback = !!(x.feedback && (x.feedback.num || x.feedback.id));
+  const vive = formattaVive(x.vive, { altre: x.viveAltre, conFeedback });
+  return [formattaDomanda(x.domanda, x.riferimenti), '', formattaFeedbackOrigine(x.feedback), ...(vive ? ['', vive] : []), '', formattaRegistro(x.registro)].join('\n');
 }
 
 /** Cosa stampa un'operazione dello smistamento andata a buon fine. PURA. */
@@ -422,6 +459,11 @@ export function testoDelloSmistamento(op, reply = {}) {
     const difetto = r.difetto ? `${visibile(r.difetto)} ${r.riusato ? '(riusato)' : '(aperto ora)'}` : 'il feedback del difetto';
     const fermo = r.fermo ? `${visibile(r.fermo)} lo aspetta e riparte da solo quando si fonde` : 'nessun lavoro fermo da far aspettare';
     return `OK: guasto smistato, ${difetto}; ${fermo}. La domanda è chiusa e all'owner non arriva.${fine}`;
+  }
+  if (op === 'doppione') {
+    const di = visibile(r.di || 'la domanda viva');
+    const fermo = r.fermo ? ` ${visibile(r.fermo)} ora aspetta la risposta a ${di}.` : '';
+    return `OK: chiusa come doppione di ${di}: l'owner risponde lì, e il testo di chi la chiedeva è nelle sue note per gli agenti.${fermo}${fine}`;
   }
   if (op === 'ricevuti') return `OK: ${r.fermo ? visibile(r.fermo) : 'il lavoro'} va nei Ricevuti con la richiesta per l'owner; la domanda è chiusa.${fine}`;
   if (op === 'automatica') {
@@ -679,7 +721,7 @@ export async function esegui(argv, io = {}) {
           data.provvisoria = p;
         }
       }
-      for (const k of ['chiave', 'titolo', 'resoconto', 'richiesta', 'scelta', 'principio']) if (a[k] !== undefined) data[k] = a[k];
+      for (const k of ['chiave', 'titolo', 'resoconto', 'richiesta', 'scelta', 'principio', 'di']) if (a[k] !== undefined) data[k] = a[k];
       if (a.testo !== undefined) data.testo = a.testo === '-' ? await stdin() : a.testo;
       if (data.testo !== undefined && !String(data.testo).trim()) { errore(`RIFIUTATO: smista ${a.op} vuole un testo che non sia vuoto. Non ho mandato niente.`); return 1; }
       if (typeof data.testo === 'string' && data.testo.length > TETTI_SMISTA.testo) {

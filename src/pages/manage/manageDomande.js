@@ -659,8 +659,15 @@
     let tipo = '';
     if (d.stato === 'superata') testo = 'Superata da un’altra domanda.';
     // Il compito «Gestisci la domanda» (§3.5) la tiene prima che arrivi a te: si dice cosa sta succedendo e com'è finita.
-    else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto o se una decisione già presa la copre.';
+    else if (d.stato === 'in_smistamento') testo = 'La sta smistando un agente: ti arriva riscritta, o si chiude da sola se è un guasto, se ripete una domanda ancora aperta o se una decisione già presa la copre.';
     else if (e && e.smistata === 'guasto') testo = 'Era un guasto: l’ha preso un feedback del difetto, e il lavoro fermo lo aspetta.';
+    // Chiusa sulla domanda viva che chiedeva la stessa scelta (#1928): si risponde una volta, là.
+    else if (e && e.smistata === 'doppione') {
+      const p = el('p', 'mg-dq-esito');
+      if (D.numeroDi(e.doppioneDi) !== null) p.append('Chiedeva la stessa scelta di ', legame('domanda', e.doppioneDi), ': rispondi lì.');
+      else p.textContent = 'Chiedeva la stessa scelta di un’altra domanda: rispondi lì.';
+      return p;
+    }
     else if (e && e.smistata === 'ricevuti') testo = 'Era una richiesta per te: il lavoro è nei Ricevuti.';
     else if (e && e.archiviata) testo = `Archiviata senza azioni${e.applicataIl ? ` ${ilGiorno(e.applicataIl)}` : ''}.`;
     else if (e && e.automatica) return null;

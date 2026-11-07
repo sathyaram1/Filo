@@ -28,8 +28,9 @@ applicalo e citalo nel report invece di chiedere. Se il tuo biglietto non può
 leggere il registro te lo dice: chiedi lo stesso.
 
 Ogni domanda, prima di arrivare all'owner, la smista un agente: la chiude da
-solo se è un guasto o se un principio la copre, e altrimenti la riscrive corta
-per lui. Il tuo testo resta intero nelle note per chi riprende: scrivilo
+solo se è un guasto, se ripete la scelta di una domanda ancora viva sullo
+stesso feedback o se un principio la copre, e altrimenti la riscrive corta per
+lui. Il tuo testo resta intero nelle note per chi riprende: scrivilo
 comunque per l'owner, con quello che hai capito.
 
 `blocca` (`true` o `false`) dice se la domanda ferma il lavoro su `payload.id`
