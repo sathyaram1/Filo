@@ -249,10 +249,15 @@ test('dopo l\'invio, la home ricaricata mostra ancora il gettone nel filo', asyn
   await casa.locator('#sendBtn').click();
   await expect(casa.locator('.sn-bolla-gettone')).toHaveCount(1);
   await expect(casa.getByText('Risposta finta.')).toBeVisible();
+  if (process.env.SCHEDA_NUOVA) {
+    const altra = await shell.evaluate(() => window.filoShell.tabs.open('filo://newtab'));
+    const casa2 = await home(app, { scheda: altra?.id });
+    await expect(casa2.getByText('Risposta finta.')).toBeVisible({ timeout: 10_000 });
+    console.log('NUOVA HOME', await casa2.locator('.sn-bolla-gettone').count(), await casa2.locator('body').innerText().then((t) => t.includes('⟦')));
+  }
   await casa.reload();
   await casa.waitForLoadState('domcontentloaded');
   await expect(casa.getByText('Risposta finta.')).toBeVisible({ timeout: 10_000 });
-  console.log('DOPO RICARICA', await casa.evaluate(() => [...document.querySelectorAll('*')].filter((e) => /di cosa parla/.test(e.textContent) && !e.children.length).map((e) => e.outerHTML).join('\n')));
   await expect(casa.locator('.sn-bolla-gettone')).toHaveCount(1, { timeout: 10_000 });
   await expect(casa.locator('body')).not.toContainText('⟦');
 });
