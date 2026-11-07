@@ -40,6 +40,9 @@ async function avvio({ copiaDi = null } = {}) {
   const B = require(PERCORSO);
   ultimo = B;
   chieste = [];
+  principale.url = 'https://www.youtube.com/watch?v=x';
+  scheda.chiusa = false;
+  B.impostaSchedePerTest({ daId: (id) => (id === scheda.id ? scheda : null), tutte: () => [scheda] });
   B.impostaPrendiPerTest(async (url) => { chieste.push(url); const t = rete[url.slice('https://liste.prova/'.length)]; return t === undefined ? null : t; });
   return B;
 }
