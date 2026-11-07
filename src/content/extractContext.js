@@ -832,6 +832,7 @@
 
   // `fuoriConto`: un riquadro che chi lo ospita non vede non conta i suoi componenti chiusi, come lui non conta (#1290).
   // `sezione`: la cima della sezione nascosta che il giro sta traducendo in sottofondo e che contiene `el`, o null.
+  // 'sezione': conta solo se la sezione ha anche testo che il giro traduce, e lo decide chi cammina.
   function isClosedComponent(el, fuoriConto, sezione) {
     if (fuoriConto) return false;
     const tag = (el.tagName || '').toLowerCase();
