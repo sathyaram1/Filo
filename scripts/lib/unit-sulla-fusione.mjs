@@ -483,10 +483,20 @@ function provaSullaStoria({ root, punta, git, lancia, scrivi, mainSha, ancheCont
         return { errore: `fusione di prova non riuscita (${primaRiga(fusa.out)})`, mainSha };
       }
     }
+    let scelti = null;
+    if (soloToccati) {
+      const s = sceltiDalRamo({ git, dir: a.dir, mainSha, punta });
+      if (s.errore) return { errore: s.errore, mainSha };
+      scelti = s.file;
+      if (!scelti.length) return { ...decidiEsito({ fusione: { ok: true, rossi: [] } }), mainSha, ...segno, toccati: 0 };
+      scrivi(`▸ Solo gli unit toccati dal ramo (${scelti.length} file): ${scelti.join(', ')}`);
+    }
+    const quali = scelti ? { file: scelti } : {};
+    const toccati = scelti ? { toccati: scelti.length } : {};
     scrivi(contenuto
       ? `▸ Unit sul ramo, che contiene già main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`
       : `▸ Unit sul risultato della fusione con main ${mainSha.slice(0, 8)} (l'uscita completa resta in una cartella temporanea)`);
-    let fusione = lancia(a.dir, base, 'fusione');
+    let fusione = lancia(a.dir, base, 'fusione', quali);
     if (fusione.errore) return { errore: fusione.errore, mainSha };
     // Un rosso si riprova prima di giudicarlo: i test a tempo cedono con la macchina carica, e un instabile non è
     // colpa della fusione. Si rilanciano solo i loro file, sullo stesso albero.
