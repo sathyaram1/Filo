@@ -1385,6 +1385,12 @@ async function bluetooth(q) {
     return { ...f, candidati: s.candidati || nomi };
   }
   const d = elenco.dispositivi.find((x) => x.nome === s.scelto);
+  if (q.dimentica) {
+    const r = await computer().btDimentica({ indirizzo: d.indirizzo });
+    if (!r.ok) return { ...fallito(r.errore, { ...q, nome: d.nome }), dispositivo: d.nome };
+    annunciaCambio({ bluetooth: {} });
+    return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, dimenticato: true };
+  }
   if (d.collegato === q.collega) return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, collegato: q.collega, gia: true };
   // Per collegare serve il Bluetooth acceso: chi chiede le cuffie lo vuole acceso, e lo si accende prima.
   let acceso = false;
