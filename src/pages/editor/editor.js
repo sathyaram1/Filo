@@ -1130,12 +1130,15 @@
       const rawText = (r && r.ok && typeof r.text === 'string') ? r.text : null;
       if (rawText == null) {
         // L'automatico lo dice una volta sola: il prossimo tentativo arriva solo dopo un cambio vero del testo.
-        if (segnaRiassuntoFallito(id, firma, r) || manuale) avvisoNonGenerato(manuale ? 'il riassunto' : 'il riassunto automatico', r);
+        const tetto = segnaRiassuntoFallito(id, firma, r);
+        if (tetto && conTitolo) segnaTitoloMancato(id, firma);
+        if (tetto || manuale) avvisoNonGenerato(manuale ? 'il riassunto' : 'il riassunto automatico', r);
         return false;
       }
       const parti = conTitolo ? SUMMARY.titoloERiassunto(rawText) : { titolo: '', riassunto: rawText };
-      if (parti.titolo && !titoloScrittoAMano(id)) {
-        const nuovo = applyGeneratedTitle(id, parti.titolo, 'automatico', firma);
+      if (conTitolo && !titoloScrittoAMano(id)) {
+        const nuovo = !!parti.titolo && applyGeneratedTitle(id, parti.titolo, 'automatico', firma);
+        if (!nuovo) segnaTitoloMancato(id, firma);
         contaRiquadro('editor_titolo', { via: 'automatico', esito: nuovo ? 'applicato' : 'vuoto' });
       }
       const ok = applyGeneratedSummary(id, parti.riassunto);
