@@ -138,6 +138,52 @@ test('gli interruttori Bluetooth e Wi-Fi del riquadro: il tasto destro li accend
   }
 });
 
+// Su Linux la voce non c'è: si finge Windows e Mac per attraversare la strada vera, dal menu all'indirizzo che si apre.
+test('le voci «Impostazioni … del sistema» aprono il pannello giusto di Windows e del Mac', async ({ app }) => {
+  test.setTimeout(120_000);
+  await computerFinto(app, { dispositivi: [{ indirizzo: '00:11:22:33:44:55', nome: 'Cuffie', collegato: false }], reti: ['Casa', 'Ufficio'] });
+  await app.evaluate(({ shell }) => {
+    globalThis.__aperti = [];
+    globalThis.__openExternal = shell.openExternal;
+    shell.openExternal = async (u) => { globalThis.__aperti.push(u); };
+  });
+  const aperti = () => app.evaluate(() => globalThis.__aperti.splice(0));
+  try {
+    for (const [piattaforma, attesi] of [
+      ['win32', ['ms-settings:bluetooth', 'ms-settings:network-wifi', 'ms-settings:sound']],
+      ['darwin', ['x-apple.systempreferences:com.apple.BluetoothSettings', 'x-apple.systempreferences:com.apple.wifi-settings-extension', 'x-apple.systempreferences:com.apple.Sound-Settings.extension']],
+    ]) {
+      await app.evaluate((_, p) => globalThis.SN_COMANDI_SISTEMA._perProve.usaPiattaformaPannelli(p), piattaforma);
+      const page = await home(app);
+      await page.reload();
+      await expect(voce(page, 'bluetooth')).toBeVisible({ timeout: 8_000 });
+
+      await voce(page, 'bluetooth').click();
+      await opzione(page, 'Cuffie').click({ button: 'right' });
+      await menuDi(page).voce('Impostazioni Bluetooth del sistema').first().click();
+      await expect.poll(aperti).toEqual([attesi[0]]);
+      await page.keyboard.press('Escape');
+
+      await voce(page, 'rete').click();
+      await opzione(page, 'Ufficio').click({ button: 'right' });
+      await menuDi(page).voce('Impostazioni Wi-Fi del sistema').first().click();
+      await expect.poll(aperti).toEqual([attesi[1]]);
+      await page.keyboard.press('Escape');
+
+      await voce(page, 'volume').click();
+      await riquadro(page).locator('.dash-sis-cursore').click({ button: 'right' });
+      await menuDi(page).voce('Impostazioni audio del sistema').first().click();
+      await expect.poll(aperti).toEqual([attesi[2]]);
+      await page.keyboard.press('Escape');
+    }
+  } finally {
+    await app.evaluate(({ shell }) => {
+      shell.openExternal = globalThis.__openExternal;
+      globalThis.SN_COMANDI_SISTEMA._perProve.usaPiattaformaPannelli(null);
+    });
+  }
+});
+
 // Una riga della chat sa disfare quello che dice: collegare un dispositivo e accendere o spegnere una radio. I preferiti
 // no: sono un'impostazione, e l'Annulla del filo c'è già.
 test('le righe di Bluetooth nella chat: Annulla scollega, rispegne, e sui preferiti non ce n\'è un secondo', async ({ app }) => {
