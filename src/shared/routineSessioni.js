@@ -199,7 +199,7 @@
   }
 
   global.SN_ROUTINE_SESSIONI = {
-    CHIAVI, ACCOUNT, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa,
+    CHIAVI, ACCOUNT, UNIT_WINDOWS, limiti, leggiDoc, valida, nessunAccount, prioritarioIgnorato, motivoPausa,
     pausaInParole, statoRiservati,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : this);
