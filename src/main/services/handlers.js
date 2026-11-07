@@ -6429,7 +6429,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
     const { archiviata, domanda } = await archiviaDomanda(chatId, {
-      testo: userMessage, immagini: imageList, daModello, ref: citazione.ref,
+      testo: userMessage, immagini: imageList, daModello, ref: citazione.ref, schede: gettoni,
     }, { onboarding: onbActive });
     const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
     if (eidDomanda) fontiTurno.push(eidDomanda);
