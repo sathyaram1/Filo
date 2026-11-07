@@ -63,7 +63,7 @@ function corpoFunzione(src, nome) {
 // diventa un percorso dalla radice del repo.
 function elencoScript(corpo) {
   const out = [];
-  const re = /(?:require|safe)\(path\.join\((\w+)((?:,\s*'[^']*')+)\)\)/g;
+  const re = /(?:require|safe)\(path\.join\((\w+)((?:,\s*'[^']*')+)\)(?:,\s*'\w+')?\)/g;
   for (const m of corpo.matchAll(re)) {
     const base = BASI[m[1]];
     assert.ok(base, `base sconosciuta ${m[1]}`);
