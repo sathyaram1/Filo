@@ -240,7 +240,7 @@ test('prova vera a parti: la parte veloce trova il test rotto del ramo, la riga 
     const m1 = r.commit('main: altro');
     r.git(['push', '-q', 'origin', 'main']);
     r.git(['checkout', '-q', '-b', 'claude/import', 'HEAD~1']);
-    // Il caso di #2223 come lo vede Linux non c'è: qui il test nuovo è rosso ovunque, e basta che la parte lo scelga.
+    // Un rosso di Windows qui non si fabbrica: il test nuovo è rosso ovunque, e conta che la parte veloce lo scelga.
     writeFileSync(join(r.lavoro, 'tests', 'unit', 'nuovo.test.mjs'), TEST_VALORE.replace("'uno'", "'due'"), 'utf8');
     const ramo = r.commit('ramo: test nuovo');
 
