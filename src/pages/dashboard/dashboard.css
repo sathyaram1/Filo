@@ -1687,6 +1687,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-sis-errore[hidden] { display: none; }
 .dash-sis-errore .dash-sis-come { margin-top: 2px; color: var(--sn-muted); }
+/* #2096 — un dispositivo fra i preferiti: in cima all'elenco, con la sua stellina dopo il nome. */
+.dash-sis-box .sn-select-option.dash-sis-preferito::after { content: '★'; margin-left: 6px; color: var(--dash-accent); font-size: 0.85em; }
 .dash-sis-apri {
   margin-top: 6px;
   padding: 4px 10px;
