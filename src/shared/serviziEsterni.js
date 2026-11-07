@@ -404,7 +404,7 @@
       occasione: 'quando cerchi un’immagine dal tasto destro',
       riceve: 'l’indirizzo dell’immagine',
       frase: 'apre Google Lens',
-      dove: ['src/content/actions.js'],
+      dove: ['src/shared/urlNav.js'],
     },
     {
       id: 'pagina-accesso-google', nome: 'La pagina di accesso di Google',
