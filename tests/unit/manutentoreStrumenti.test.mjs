@@ -15,7 +15,7 @@ import { rigaErrore, dentroBudget } from '../../scripts/session-report.mjs';
 const REPO = resolve(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const MODULO = pathToFileURL(join(REPO, 'scripts', 'manutentore.mjs')).href;
 
-function lancia(argv, risposte = {}, input = '') {
+function lancia(argv, risposte = {}, input = '', envExtra = {}) {
   const root = cartellaTemporanea('filo-manutentore-');
   const codice = `
     const M = await import(${JSON.stringify(MODULO)});
