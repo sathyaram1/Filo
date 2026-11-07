@@ -941,8 +941,8 @@
   function fermoDellOwner(req) {
     return Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, motivoFermo(req));
   }
-  function nonAndato(req, motivo) {
-    var m = motivo || motivoFermo(req);
+  function nonAndato(req) {
+    var m = motivoFermo(req);
     var detto = Object.prototype.hasOwnProperty.call(FERMI_DELL_OWNER, m) ? FERMI_DELL_OWNER[m] : m;
     return (detto ? 'Il riallineamento automatico si è fermato: ' + detto + '. '
       : 'La sua pratica non è in lavorazione, e il riallineamento automatico aspetta con lei. ') + RIALLINEAMENTO_NON_ANDATO;
