@@ -53,8 +53,8 @@ test('verify-local: i rilievi non corretti si stampano raggruppati come li aprir
     '  → feedback a parte, priorità 1 (interno, da decidere)',
     '- [2i] a',
     '- [3v] b',
-    '  → un solo feedback per questi 2 rilievi, priorità 3 (rimasti del giro: 2 rilievi ([2i], [3v]))',
-  ].join('\n'));
+    '  → un solo feedback per questi 2 rilievi, priorità 1 (rimasti del giro: 2 rilievi ([2i], [3v]))',
+  ].join('\n'), 'un 3 vicino non è un\'emergenza: i rimasti nascono a 1 (#2269)');
   assert.equal(VL.derivatiText([]), '  (nessuno)');
   assert.equal(VL.dueDaParteText([f(2, 'v', 'vicino')]), '', 'un vicino di livello scritto 2 non è il bilancio dei 2');
   assert.match(VL.dueDaParteText([f(2, 'i', 'x')]), /entra nel feedback dei rimasti/);
