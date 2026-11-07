@@ -790,9 +790,15 @@
   // antenato fino alla pagina, più il punto dove sta dipinto: fuori dall'area a cui si arriva scorrendo è nascosto
   // comunque ce l'abbia spinto il sito. Più in basso della prima schermata no: ci si arriva scorrendo. Trasparente sì,
   // dovunque stia: il conto dell'avviso non può cambiare con lo scorrimento (#503.2, #503.3).
+  // 'trasparente': nascosto solo da una trasparenza fuori dallo schermo, che per il testo vale visibile (#1290.2).
   function isHiddenFromUser(el) {
+    if (!nascostoAllUtente(el, true)) return false;
+    return nascostoAllUtente(el, false) ? true : 'trasparente';
+  }
+
+  function nascostoAllUtente(el, ovunque) {
     try {
-      if (isVisibilityHidden(el, true)) return true;
+      if (isVisibilityHidden(el, ovunque)) return true;
       if (el.ownerDocument === document) {
         const r = el.getBoundingClientRect();
         if ((r.width > 0 || r.height > 0) && !isReachableByUser(el, r, true)) return true;
