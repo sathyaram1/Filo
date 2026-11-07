@@ -5438,7 +5438,7 @@
     const stato = liv.statoFusione;
     const ria = liv.riallineamento || {};
     const riallineamento = stato === 'da_riallineare' || stato === 'riallineamento_fallito' || stato === 'attende_domanda'
-      ? () => ({ inCorso: stato === 'da_riallineare', domanda: ria.domanda || '', motivo: ria.motivo || '' })
+      ? () => ({ inCorso: stato === 'da_riallineare', domanda: ria.domanda || '' })
       : null;
     UI.render(host, opzioniFusioni({
       requests: ferme.filter((r) => !r.used),
