@@ -1729,6 +1729,20 @@
     return schedaFusioni().specieFusaSenzaChiedere(r);
   }
 
+  // Il documento in mano alla pagina è stato scritto prima di `atMs`? L'ora firmata da chi scrive (`updatedAt`), se no
+  // quella di Firestore (`_updateTime`); senza nessuna delle due non si sa, e vale no.
+  function documentoDiPrima(fb, atMs) {
+    const at = Number(atMs);
+    if (!isFinite(at) || at <= 0) return false;
+    const valore = (v) => {
+      if (v && typeof v === 'object' && typeof v.toMillis === 'function') return v.toMillis();
+      const ms = typeof v === 'number' ? v : Date.parse(String(v || ''));
+      return isFinite(ms) && ms > 0 ? ms : 0;
+    };
+    const doc = valore(fb && fb.updatedAt) || valore(fb && fb._updateTime);
+    return doc > 0 && doc < at;
+  }
+
   /**
    * Livello 5: il cancello di fusione. Le richieste arrivano dal server
    * (`MERGE_APPROVALS_GET`) e si legano alla segnalazione per id o per numero.
