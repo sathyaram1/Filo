@@ -71,11 +71,16 @@ test('main: le schede del messaggio arrivano al modello come letture di pagina, 
   assert.match(turno, /renderedActions = \[\.\.\.lettureGettoni\]/);
   assert.match(turno, /notaDeiGettoni\(lettureGettoni\)/);
   const aiuto = src.slice(src.indexOf('if (action === ACTIONS.HELP)'), src.indexOf('if (action === ACTIONS.CATEGORIZE)'));
-  assert.match(aiuto, /notaDeiGettoni\(await lettureDeiGettoni\(/);
+  assert.match(aiuto, /notaDeiGettoni\(await lettureDellAiuto\(/);
   // Nell'Aiuto le stesse letture si segnano fra le fonti della sua conversazione: alzano la guardia sulle azioni come
-  // una lettura chiesta da lui, anche su una pagina di Filo dove l'Aiuto non conta già un sito.
-  assert.match(aiuto, /lettureDeiGettoni\([^;]*\{ assistente: true \}\)/);
-  assert.match(lettura, /if \(assistente\) for \(const l of letture\) segnaLetturaAiuto\(sender, l\)/);
+  // una lettura chiesta da lui, anche su una pagina di Filo dove l'Aiuto non conta già un sito. E tornano coi messaggi
+  // della cronologia che le hanno portate, come nella chat della home.
+  const dellAiuto = src.slice(src.indexOf('async function lettureDellAiuto'), src.indexOf('async function storiaAiutoConLetture'));
+  assert.match(dellAiuto, /lettureDeiGettoni\(/);
+  assert.match(dellAiuto, /for \(const l of letture\) segnaLetturaAiuto\(sender, l\)/);
+  assert.match(aiuto, /await storiaAiutoConLetture\(payload\.history, sender\)/);
+  const storia = src.slice(src.indexOf('async function storiaAiutoConLetture'), src.indexOf('function notaDeiGettoni'));
+  assert.match(storia, /lettureDellAiuto\(/);
 });
 
 // Le icone che la linguetta mostra le mostra anche il gettone: svg, bmp e avif compresi.
