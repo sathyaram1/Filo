@@ -306,5 +306,6 @@ test('cancellare per sempre dal terminale dopo una lettura è un no, come l\'azi
   expect(pulita.executed).toBe(false);
   const letta = await esegui(comando, { contesto: [ricerca] });
   expect(letta.executed).toBe(false);
-  expect(letta.no).toContain('Dopo aver letto cose scritte da altri');
+  expect(letta.no).toBe(true);
+  expect(String(letta.output?.error || '')).toContain('Dopo aver letto cose scritte da altri');
 });
