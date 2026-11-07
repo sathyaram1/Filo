@@ -544,11 +544,11 @@ test('Dimentica: lo script è fisso e l\'indirizzo o la rete stanno solo nell\'a
   assert.deepEqual(C.costruisci('wifi-dimentica', { uuid: '2f1e-ab' + '0'.repeat(10) }, 'linux').env, { FILO_SIS_UUID: `2f1e-ab${'0'.repeat(10)}` });
   assert.deepEqual(C.costruisci('wifi-dimentica', { rete: 'Albergo "Sole"' }, 'darwin').env, { FILO_SIS_RETE: 'Albergo "Sole"' });
   assert.deepEqual(C.costruisci('wifi-dimentica', { rete: 'Albergo' }, 'win32').env, { FILO_SIS_RETE: 'Albergo' });
-  // Windows: Pairing.UnpairAsync di WinRT, sull'indirizzo letto dall'ambiente; la rete passa a netsh come argomento a sé.
+  // Windows: Pairing.UnpairAsync di WinRT sull'indirizzo letto dall'ambiente; il profilo lo toglie WlanDeleteProfile.
   assert.match(C.SCRIPT.win32['bt-dimentica'], /\$env:FILO_SIS_INDIRIZZO/);
   assert.match(C.SCRIPT.win32['bt-dimentica'], /Pairing\.UnpairAsync\(\)/);
-  assert.match(C.SCRIPT.win32['wifi-dimentica'], /& netsh\.exe wlan delete profile \('name=' \+ \$r\)/);
-  assert.match(C.SCRIPT.win32['wifi-dimentica'], /\$r\.Contains\('"'\)/);
+  assert.match(C.SCRIPT.win32['wifi-dimentica'], /\[FiloWlan\.Wlan\]::Dimentica\(\[string\]\$env:FILO_SIS_RETE\)/);
+  assert.match(C._interni.CS_WLAN, /WlanDeleteProfile\(h, ref scelta, profilo, IntPtr\.Zero\)/);
 });
 
 test('Dimentica su Windows: lo stato di UnpairAsync dice com\'è andata, e il no di Windows porta alle impostazioni', () => {
