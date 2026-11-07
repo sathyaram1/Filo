@@ -115,12 +115,11 @@ test('A — appunto e lezione hanno la loro riga nel diario, e il riassunto le c
 
   await page.locator('#input').fill('ricordami di comprare il latte, e sappi che non bevo caffè');
   await page.locator('#sendBtn').click();
-  await expect(page.locator('.dash-bubble-filo', { hasText: 'Segnato.' })).toBeVisible({ timeout: 10_000 });
 
   // La lezione entra in ogni conversazione: costo 2, che finché manca il guardiano
-  // passa dal popup col testo anche a Normale (#592, #1312).
+  // passa dal popup col testo anche a Normale (#592, #1312). Il giro si chiude lì (#1130).
   const host = page.locator(CONFIRM_HOST);
-  await expect(host).toBeVisible({ timeout: 5_000 });
+  await expect(host).toBeVisible({ timeout: 10_000 });
   await scrollConfirmToEnd(page);
   await clickConfirm(page, 'ok');
   await expect(host).toHaveCount(0, { timeout: 5_000 });
