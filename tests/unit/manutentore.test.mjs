@@ -449,6 +449,17 @@ test('la decisione del mattino parte dal censimento delle schede e sa fare la pr
   assert.match(mattino.replace(/\s+/g, ' '), /a secco .*nel recap come proposta, senza applicarne nessuno/);
 });
 
+// Va tolta insieme alla frase del ruolo, dal feedback che il manutentore apre dopo il censimento da zero.
+test('il censimento da zero deciso dall\'owner si lancia una volta sola, al FERMO, e poi si toglie (#2181)', () => {
+  const mattino = RUOLO.slice(RUOLO.indexOf('- **`mattino`**'), RUOLO.indexOf('- **gli altri motivi**')).replace(/\s+/g, ' ');
+  const frase = mattino.slice(mattino.indexOf('**Una volta sola, deciso dall\'owner**'), mattino.indexOf('npm run manutentore -- contesto'));
+  assert.ok(frase.startsWith('**Una volta sola'), 'la frase una tantum sta nel mattino, prima del contesto');
+  assert.match(frase, /col FERMO, se il taccuino non dice già che l'hai fatto/);
+  assert.ok(frase.indexOf('`scrivi --da-zero`') < frase.indexOf('`rileggi`'), 'prima la scrittura da zero, poi la rilettura');
+  assert.match(frase, /il giorno nel taccuino/);
+  assert.match(frase, /apri un feedback che toglie dal ruolo questa frase/);
+});
+
 // La prova a secco è dell'intera giornata: un battito che riscrivesse ordine e N la renderebbe bagnata un'ora dopo.
 test('l\'indicazione a secco vale per ogni accensione e la decisione a secco non la toglie (#1786)', () => {
   const inizio = RUOLO.indexOf('- **`mattino`**');
