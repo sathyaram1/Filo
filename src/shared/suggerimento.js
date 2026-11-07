@@ -334,7 +334,10 @@
     restituisci(null);
   }
 
+  // Solo il fuoco portato dalla tastiera: un campo che si mette a fuoco da solo all'apertura non apre fumetti.
+  let ultimoTasto = 0;
   function suFuoco(e) {
+    if (Date.now() - ultimoTasto > 1000) return;
     const t = (e.composedPath && e.composedPath()[0]) || e.target;
     let visibileDaTastiera = false;
     try { visibileDaTastiera = t.matches(':focus-visible'); } catch (_) {}
