@@ -232,7 +232,8 @@ async function stubDichiara(page, { rifiutaLaPrima = false, niente = false } = {
       window.__dichiara.push(Object.fromEntries(Object.entries(msg).filter(([k]) => k !== 'type')));
       if (cfg.niente) return { ok: true, niente: true };
       if (msg.prova) {
-        return { ok: true, stato: 2, visto: { stato: 2, app: cfg.app, server: cfg.srv }, rami: [
+        const scritti = [{ at: Date.parse('2026-11-06T13:32:00Z'), ruolo: 'fixer' }, { at: Date.parse('2026-11-07T08:10:00Z'), ruolo: 'manutentore' }];
+        return { ok: true, stato: 2, scritti, visto: { stato: 2, app: cfg.app, server: cfg.srv }, rami: [
           { repo: 'app', punta: cfg.app, motivo: 'una voce di biglietti non fidati' },
           { repo: 'server', punta: cfg.srv, motivo: '<b>la punta</b> non è l’ultima registrata' },
         ] };
