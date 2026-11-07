@@ -224,6 +224,9 @@ export function promptScheda(ruolo, { num, radice, radiceServer = '', rilettura 
 function leggiJson(f) {
   try { return JSON.parse(readFileSync(f, 'utf8')); } catch (_) { return null; }
 }
+function daJson(testo) {
+  try { return testo == null ? null : JSON.parse(testo); } catch (_) { return null; }
+}
 const fileScheda = (cartella, num) => join(cartella, `${num}.json`);
 
 /**
