@@ -279,20 +279,33 @@
     if (grezze.length > TETTI.opzioni) {
       return no('troppe_opzioni', `${grezze.length} opzioni, il massimo è ${TETTI.opzioni}`, { campo: 'opzioni', lunghezza: grezze.length, massimo: TETTI.opzioni });
     }
-    if (perOwner && grezze.length < TETTI.opzioniMinime) {
+    if (fare && (!grezze.length || grezze.length > TETTI.opzioniDaFare)) {
+      return no(grezze.length ? 'troppe_opzioni' : 'opzioni_insufficienti', `un «da fare» ha ${grezze.length || 'nessuna opzione'}`
+        + `${grezze.length ? ' opzioni' : ''}: la prima è il pulsante «${PULSANTI_DA_FARE[0]}», la seconda, facoltativa, «${PULSANTI_DA_FARE[1]}»`,
+      { campo: 'opzioni', lunghezza: grezze.length, minimo: 1, massimo: TETTI.opzioniDaFare });
+    }
+    if (perOwner && !fare && grezze.length < TETTI.opzioniMinime) {
       const quante = grezze.length ? 'un\'opzione sola' : 'nessuna opzione';
       return no('opzioni_insufficienti', `${quante}, ne servono almeno ${TETTI.opzioniMinime}: con una scelta sola non c'è niente da decidere `
-        + '(è un feedback o una nota). Aggiungi la strada che resta, per esempio archiviare il lavoro o tenerlo com\'è',
+        + '(è un feedback o una nota). Aggiungi la strada che resta, per esempio archiviare il lavoro o tenerlo com\'è; '
+        + 'un passo che solo l\'owner può fare è un «da fare» (tipo: "da_fare"), che vuole un\'opzione sola',
       { campo: 'opzioni', lunghezza: grezze.length, minimo: TETTI.opzioniMinime });
     }
     const opzioni = [];
     for (let i = 0; i < grezze.length; i++) {
-      const r = validaOpzione(grezze[i], i, perOwner);
+      const r = validaOpzione(grezze[i], i, perOwner, fare);
       if (!r.ok) return r;
+      if (!fare && r.opzione.azione.tipo === 'nessuna') {
+        return no('parametri_non_validi', `opzione ${i + 1}: «nessuna» vale solo in un «da fare»; in una domanda ogni scelta fa qualcosa`, { campo: `opzioni[${i}].azione` });
+      }
       opzioni.push(r.opzione);
     }
     let consiglio = null;
-    if (opzioni.length) {
+    if (fare && input.consiglio != null) {
+      // Un consiglio si applica anche in blocco: su un «da fare» segnerebbe fatto quello che l'owner non ha fatto.
+      return no('consiglio_non_valido', 'un «da fare» non ha consiglio: c\'è una cosa sola da fare, e la segna fatta solo l\'owner', { campo: 'consiglio' });
+    }
+    if (opzioni.length && !fare) {
       const c = input.consiglio;
       if (!isOggetto(c) || !Number.isInteger(c.opzione) || c.opzione < 0 || c.opzione >= opzioni.length) {
         return no('consiglio_non_valido', `con le opzioni serve il consiglio: { opzione: l'indice da 0 a ${opzioni.length - 1}, perche: il motivo }`, { campo: 'consiglio' });
