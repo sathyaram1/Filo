@@ -757,7 +757,7 @@ export function controllaNovita(consegna, { blocco, schede = [], ordine = [] }) 
   for (const p of promesse) {
     const n = numeroDi(p && p.numero);
     if (!n) { errori.push(`promessa senza numero di feedback: «${unaRiga(p && p.riga).slice(0, 80)}»`); continue; }
-    if (!ammessi.has(n)) errori.push(`promessa su #${n}, che non è nella rosa né a priorità 3`);
+    if (!ammessi.has(n)) errori.push(`promessa su #${n}, che non è nell'ordine né a priorità 3`);
     if (!tutte.some((r) => unaRiga(r) === unaRiga(p.riga))) errori.push(`la promessa su #${n} non è fra le righe consegnate`);
   }
   const dichiarate = new Set(promesse.map((p) => unaRiga(p && p.riga)));
