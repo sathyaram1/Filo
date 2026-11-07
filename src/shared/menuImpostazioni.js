@@ -42,18 +42,24 @@
     return null;
   }
 
-  // Il testo di un'etichetta senza i controlli che contiene: una tendina dentro la sua etichetta non vi aggiunge le scelte.
+  // Il testo di un'etichetta senza i controlli che contiene: una tendina dentro la sua etichetta non vi aggiunge le scelte,
+  // nemmeno quelle dell'elenco che Filo le disegna accanto (lo riconosce il ruolo da widget, qualunque classe abbia).
+  const NON_NOME = 'select, option, textarea, input, button, [role="listbox"], [role="option"], [role="menu"], [role="menuitem"], [aria-hidden="true"]';
   function testoSenzaControlli(el) {
     if (!el) return '';
     const copia = el.cloneNode(true);
-    copia.querySelectorAll('select, option, textarea, input, button, .sn-select').forEach((x) => x.remove());
+    copia.querySelectorAll(NON_NOME).forEach((x) => x.remove());
     return String(copia.textContent || '').replace(/\s+/g, ' ').trim();
   }
   // Un'etichetta che continua con la spiegazione («Siti fidati per i programmi, uno per riga. Da questi…») tiene il nome.
+  // Il nome finisce in una domanda all'Aiuto, non in uno spazio stretto: se proprio è lunghissimo si taglia fra due parole.
+  const NOME_MAX = 140;
   function accorcia(t) {
     let s = String(t || '').split(/[.:;](?:\s|$)|\s\(/)[0].trim();
     if (s.length > 60) s = s.split(/,\s/)[0].trim();
-    return s.length > 80 ? `${s.slice(0, 79)}…` : s;
+    if (s.length <= NOME_MAX) return s;
+    const taglio = s.slice(0, NOME_MAX);
+    return `${taglio.slice(0, Math.max(taglio.lastIndexOf(' '), 1)).trim()}…`;
   }
   const TITOLI = 'h1, h2, h3, h4, legend, .sn-info-box-title';
   // Il titolo più vicino che sta prima del controllo: quello della sezione, o l'etichetta del campo accanto.
