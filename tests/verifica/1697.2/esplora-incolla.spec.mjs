@@ -71,15 +71,16 @@ test('tempi', async ({ openTab }) => {
       await page.evaluate(() => { const p = document.querySelector('#doc pre'); getSelection().collapse(p.firstChild, 4); });
     }, 3000],
   ];
-  const out = [];
   for (const [nome, html, sel, n] of casi) {
     await apri(page, html);
-    await sel();
+    try { await sel(); } catch (e) { console.log(nome, 'SEL FALLITA', e.message.slice(0, 100)); continue; }
     const ms = await incolla(page, righe(n));
     const s = await stato(page);
-    out.push(`${nome}: ${ms} ms, entrate ${s.n}/${n}, zeta ${s.zeta}\n  ${s.html.slice(0, 200)}\n  ...${s.coda.slice(-200)}`);
+    const span = await page.evaluate(() => [...document.querySelectorAll('#doc [style]')].map((x) => x.tagName + ':' + x.getAttribute('style')).slice(0, 3));
+    console.log(`${nome}: ${ms} ms, entrate ${s.n}/${n}, zeta ${s.zeta}, stili ${JSON.stringify(span)}`);
+    console.log('   TESTA ' + s.html.replace(/<button.*?<\/button>/g, '[btn]').slice(0, 260));
+    console.log('   CODA ' + s.coda.replace(/<button.*?<\/button>/g, '[btn]').slice(-220));
   }
-  console.log(out.join('\n'));
 });
 
 test('annulla foglio svuotato', async ({ openTab }) => {
