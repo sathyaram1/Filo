@@ -86,6 +86,8 @@
   // null: niente da dire qui, si sale; '': questo pezzo ha scelto il silenzio, e anche chi lo contiene tace.
   function testoProprio(el) {
     if (el.hasAttribute('data-tip')) return (el.getAttribute('data-tip') || '').trim();
+    // Il nome scritto accanto al tasto dal suo CSS (Copia, Rispondi sotto una risposta): un fumetto lo ripeterebbe.
+    if (el.hasAttribute('data-etichetta')) return '';
     if (spogliati.has(el)) return String(spogliati.get(el) || '').trim();
     const titolo = el.getAttribute('title');
     if (titolo && titolo.trim()) return titolo.trim();
