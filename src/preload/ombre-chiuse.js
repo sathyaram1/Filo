@@ -6,16 +6,17 @@
 const path = require('node:path');
 const { SORGENTE: SEMBRA_NATIVA } = require('./sembraNativa.js');
 
-// I sottoalberi che la traduzione non apre li dice constants.js, lo stesso elenco che usa lei: un grafico disegnato o un
-// blocco di codice non sono testo da tradurre nemmeno qui dentro (#1290.2).
-function tagSenzaProsa() {
+// Cosa è testo da tradurre lo dice constants.js, con le regole che usa la traduzione (sottoalberi che non apre,
+// etichette, testo segnato da non tradurre): qui dentro arriva il loro sorgente, non una copia (#1290.2).
+function regole() {
   if (!globalThis.SN_CONST) require(path.join(__dirname, '..', 'shared', 'constants.js'));
-  return globalThis.SN_CONST.TAG_SENZA_PROSA;
+  return globalThis.SN_CONST;
 }
 
 function sorgenteSonda(nome) {
   const n = JSON.stringify(String(nome));
-  const senzaProsa = tagSenzaProsa();
+  const C = regole();
+  const senzaProsa = C.TAG_SENZA_PROSA;
   return `(function(){
   'use strict';
   var EP = typeof Element === 'function' && Element.prototype;
