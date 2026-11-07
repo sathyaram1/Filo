@@ -116,7 +116,7 @@
 
   function applicaImpostazioni(settings) {
     const prima = JSON.stringify(preferiti);
-    preferiti = Array.isArray(settings && settings.bluetoothPreferiti) ? settings.bluetoothPreferiti.filter((p) => p && typeof p.indirizzo === 'string') : [];
+    preferiti = Array.isArray(settings && settings.bluetoothPreferiti) ? settings.bluetoothPreferiti.filter((p) => typeof p === 'string' && p) : [];
     cambiaVisibili(Sis().vociVisibili(settings));
     // Un preferito messo o tolto mentre l'elenco è aperto: l'ordine si rilegge.
     if (box && box.voce === 'bluetooth' && box.elenco && prima !== JSON.stringify(preferiti)) caricaElenco(box);
