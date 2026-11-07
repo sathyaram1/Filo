@@ -336,15 +336,19 @@ for (const [caso, guasto] of [['arriva tagliata', 'tagliata'], ['non ha la riga 
     await page.evaluate((g) => { window.__unica = g; }, guasto);
     await scrivi(page, montagna(150));
     const unite = () => page.evaluate(() => window.__aiCalls.filter((c) => c.tipo === 'entrambi').length);
+    const soloTitolo = () => page.evaluate(() => window.__aiCalls.filter((c) => c.tipo === 'titolo' && c.tema === 'La montagna').length);
     await expect.poll(unite, { timeout: 20_000 }).toBe(1);
+    const titolo = guasto === 'tagliata' ? 'Il giardino' : 'La montagna';
+    await expect(page.locator('#docTitle')).toHaveText(titolo);
     await page.waitForTimeout(500);
     const avvisi = await page.evaluate(() => window.__avvisi);
     expect(avvisi).toBe(guasto === 'tagliata' ? 1 : 0);
     await scrivi(page, `${montagna(150)} neve`);
     await page.waitForTimeout(8_500);
     expect(await unite(), 'chiamate dopo il ritocco').toBe(1);
+    expect(await soloTitolo(), 'titoli chiesti da soli').toBe(guasto === 'tagliata' ? 0 : 1);
     expect(await page.evaluate(() => window.__avvisi), 'avvisi dopo il ritocco').toBe(avvisi);
-    await expect(page.locator('#docTitle')).toHaveText('Il giardino');
+    await expect(page.locator('#docTitle')).toHaveText(titolo);
   });
 }
 
