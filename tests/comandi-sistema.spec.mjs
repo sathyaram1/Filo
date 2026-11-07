@@ -256,6 +256,34 @@ test('in chat: la conferma nomina la rete che partirà anche trovata per somigli
   expect((await computer(app)).rete.nome).toBe('Cava');
 });
 
+// #1840 — il nome vero della rete, trovato da quello detto, l'ha scelto chi gestisce la rete: lo segna il main sul
+// percorso vero, e a Normale dopo quella lettura togliere un freno riceve il no.
+test('in chat, dopo «collegati alla rete di casa» trovata come «Casa», alzare il tetto di spesa riceve il no', async ({ app }) => {
+  await computerFinto(app, { reti: ['Casa', 'Ufficio 5G'], stato: { ...PARTENZA, rete: { online: true, tipo: 'wifi', nome: 'Ufficio 5G' } } });
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ autonomia: { livello: 'default' }, monthlyLimitEur: 5 }));
+  const page = await home(app);
+  try {
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 'w1', name: 'WIFI', arguments: JSON.stringify({ rete: 'la rete di casa' }) }] },
+      { text: 'Collegato.' },
+    ]);
+    await chiedi(page, 'collegati alla rete di casa');
+    await expect.poll(() => confirmText(page), { timeout: 8_000 }).toContain('Casa');
+    await clickConfirm(page, 'ok');
+    await expect.poll(async () => (await computer(app)).rete.nome).toBe('Casa');
+    await expect(page.locator('.dash-bubble').filter({ hasText: 'Collegato.' })).toBeVisible({ timeout: 15_000 });
+    await modelloFinto(app, [
+      { toolCalls: [{ id: 't1', name: 'IMPOSTA_PREFERENZA', arguments: JSON.stringify({ chiave: 'limite_spesa', valore: '800' }) }] },
+      { text: 'Non lo faccio.' },
+    ]);
+    await chiedi(page, 'alza il tetto di spesa a 800 euro');
+    await expect(page.locator('.dash-activity').last()).toContainText('Dopo aver letto cose scritte da altri non lo faccio', { timeout: 15_000 });
+    expect((await app.evaluate(() => globalThis.SN_STORAGE.getSettings())).monthlyLimitEur).toBe(5);
+  } finally {
+    await ripristina(app);
+  }
+});
+
 test('in chat, le parole dell\'utente bastano: «le cuffie Sony» collega le Cuffie Sony e «la rete di casa» chiede conferma per Casa', async ({ app }) => {
   await livelloAutonomia(app, 'conservativo'); // il popup di un costo 2 si prova a Conservativo (#530)
   await computerFinto(app, {
