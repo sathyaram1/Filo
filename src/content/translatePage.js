@@ -745,6 +745,11 @@
       nuovo = !!(body && HAS_LETTER.test(body.textContent || ''));
     }
     if (!nuovo) return;
+    if (caricoAtteso.riquadri.has(f)) {
+      caricoAtteso.riquadri.delete(f);
+      if (caricoAtteso.risposto === null) { caricoAtteso.arrivati++; return; }
+      if (caricoAtteso.risposto) return;
+    }
     if (pageTranslating) riquadroNelGiro = true;
     else newContentSeen = true;
   }
