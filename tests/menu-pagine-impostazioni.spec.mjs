@@ -31,6 +31,16 @@ test('Preferenze: «Rimetti di serie» rimette il valore, e la voce si spiega o 
   await expect(campo).toBeFocused();
 });
 
+test('Preferenze: i dispositivi Bluetooth preferiti si vedono tutti e si tolgono', async ({ app, openTab }) => {
+  await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ bluetoothPreferiti: ['00:11:22:33:44:55', '66:77:88:99:AA:BB'] }));
+  const page = await openTab('filo://preferences/preferences.html');
+  const righe = page.locator('#bluetoothPreferiti .mem-riga');
+  await expect(righe).toHaveCount(2, { timeout: 10_000 });
+  await righe.first().locator('.mem-via').click();
+  await expect(righe).toHaveCount(1);
+  await expect.poll(() => app.evaluate(async () => (await globalThis.SN_STORAGE.getSettings()).bluetoothPreferiti)).toEqual(['66:77:88:99:AA:BB']);
+});
+
 test('Modelli: la stessa voce sulle impostazioni della pagina', async ({ openTab }) => {
   const page = await openTab('filo://options/options.html');
   const casella = page.locator('#useDefaultModels');
