@@ -100,7 +100,7 @@ function avvia({ ipcRenderer, webFrame, window: w, href }) {
     let qui = href;
     try { qui = (w.location && w.location.href) || href; } catch (_) {}
     let regole = [];
-    try { regole = ipcRenderer.sendSync(CANALE_REGOLE, qui) || []; } catch (_) { regole = []; }
+    try { regole = ipcRenderer.sendSync('filo:youtube-regole', qui) || []; } catch (_) { regole = []; }
     const src = sorgente(regole);
     if (!src) return false;
     webFrame.executeJavaScript(src, false).catch(() => {});
