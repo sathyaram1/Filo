@@ -194,7 +194,11 @@ async function stubPerTesto(page) {
         const tema = argomento(user);
         const tipo = /TITOLO: </.test(sys) ? 'entrambi' : /TITOLO/.test(sys) ? 'titolo' : 'riassunto';
         window.__aiCalls.push({ tipo, tema, action: msg.action });
-        const text = tipo === 'entrambi' ? `TITOLO: ${tema}\nRIASSUNTO: Testo su ${tema}.`
+        if (tipo === 'entrambi' && window.__unica === 'tagliata') {
+          return rispondi(msg, cb, { ok: false, code: 'RISPOSTA_TAGLIATA', finishReason: 'length', error: 'risposta tagliata' });
+        }
+        const text = tipo === 'entrambi' && window.__unica === 'senzaTitolo' ? `Testo su ${tema}.`
+          : tipo === 'entrambi' ? `TITOLO: ${tema}\nRIASSUNTO: Testo su ${tema}.`
           : tipo === 'titolo' ? tema : `Testo su ${tema}.`;
         return rispondi(msg, cb, { ok: true, text });
       }
