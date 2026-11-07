@@ -1406,8 +1406,6 @@
       scrive: ['security.blockPopups'],
       aiuto: 'true | false',
       keys: ['blocco_popup', 'blocco popup', 'blocca popup', 'popup', 'finestre popup'],
-      allentaDetto: ['lascia aprire i popup', 'lascia aprire le finestre popup', 'lascia passare i popup', 'permetti i popup',
-        'consenti i popup', 'sblocca i popup', 'apri i popup'],
       costo: 2,
       allenta: (r) => r.partial.security.blockPopups === false,
       risk: 'Controlla il blocco delle finestre popup. Disattivarlo permette ai siti di aprire '
