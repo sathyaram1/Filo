@@ -36,6 +36,23 @@ export function leggiOrdine(testo) {
 const unaRiga = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
 
 /**
+ * «aspetta #1563 (non ancora fuso)» e, a parte, «aspettava #1562» (#2262): chi legge non prende per bloccato un lavoro
+ * libero. Un numero nudo (server di prima) resta com'è. PURA.
+ */
+export function pezziAttese(aspetta, aspettava) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const num = (n) => (unaRiga(n).replace(/^#/, '') ? `#${unaRiga(n).replace(/^#/, '')}` : 'un feedback senza numero');
+  const una = (w) => (w && typeof w === 'object'
+    ? `${num(w.num)} (${ATT.ETICHETTA[w.stato] || ATT.ETICHETTA[ATT.STATO.IGNOTO]})` : num(w));
+  const vive = Array.isArray(aspetta) ? aspetta : [];
+  const sciolte = Array.isArray(aspettava) ? aspettava : [];
+  return [
+    vive.length ? `aspetta ${vive.map(una).join(', ')}` : '',
+    sciolte.length ? `aspettava ${sciolte.map(num).join(', ')}` : '',
+  ];
+}
+
+/**
  * Quanto ci si può fidare della scheda, in parole, o '' se è buona: non buona, scritta su una versione vecchia del
  * feedback, o un «toglie lavoro» che la rilettura non ha confermato. PURA.
  */
