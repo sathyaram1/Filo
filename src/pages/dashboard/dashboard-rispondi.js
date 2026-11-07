@@ -218,7 +218,7 @@
   function perIlMain(c) {
     const R = global.SN_RISPOSTA_A;
     if (!c || !R) return null;
-    return R.daPagina({ chat: c.chat, i: c.i, testo: c.scritto });
+    return R.daPagina({ chat: c.chat, i: c.i, testo: c.scritto, role: c.role });
   }
   // Quello che resta nello storico della scheda: al main serve solo se il filo non si legge, e ne basta l'inizio.
   function perLoStorico(c) {
