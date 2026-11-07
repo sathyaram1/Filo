@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard, contaHomeVista,
     executeFiloAction, controllaUscita: portaUscite, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
-    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
+    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, segnaTestoNellAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, chiaveConferma, ricominciaIntervista,
   } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
