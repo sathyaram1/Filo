@@ -251,7 +251,10 @@ module.exports = function register(on, ctx) {
     return require('../registroCambi').con({ via: 'interfaccia', dove: 'home' }, () => Comandi.comanda(msg && msg.richiesta));
   }));
   on(MSG.SISTEMA_APRI_IMPOSTAZIONI, require('./origine').soloFilo(async (msg) => {
-    const uri = require('../comandiSistema').uriImpostazioni(String((msg && msg.chiave) || ''));
+    const C = require('../comandiSistema');
+    // `pannello` (bluetooth, wifi, audio) lo traduce il main per la piattaforma; `chiave` è già una voce dell'elenco.
+    const chiave = msg && msg.pannello ? C.pannelliImpostazioni()[String(msg.pannello)] : (msg && msg.chiave);
+    const uri = C.uriImpostazioni(String(chiave || ''));
     if (!uri) return { ok: false, error: 'impostazione sconosciuta' };
     try {
       await require('electron').shell.openExternal(uri);
