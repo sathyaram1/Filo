@@ -154,7 +154,7 @@
       chat: k ? k[1] : '',
       i: k ? Number(k[2]) : null,
       ts: b.dataset.ts || '',
-      role: 'filo',
+      role: diUtente(b) ? 'user' : 'filo',
       scritto: scritto(b) ?? testoDi(b),
       testo: testoDi(b),
     };
