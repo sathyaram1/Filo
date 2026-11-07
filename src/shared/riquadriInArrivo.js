@@ -127,6 +127,6 @@
     return null;
   }
 
-  const API = { osserva, arrivato, inArrivo, qualcunoInArrivo, finestra, documento, riquadroDi };
+  const API = { osserva, arrivato, inArrivo, caricato, qualcunoInArrivo, finestra, documento, riquadroDi };
   global.SN_RIQUADRI_IN_ARRIVO = API;
 })(typeof globalThis !== 'undefined' ? globalThis : self);
