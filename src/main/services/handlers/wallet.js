@@ -639,7 +639,7 @@ module.exports = function register(on, ctx) {
     Disco.runNormale(() => redeemFromInvite(code)).catch(() => {});
     // Una finestra appena nata (avvio, o rinata da fuori) riapre ancora le sue schede: Crediti dopo, o finisce dietro (#2191).
     let pronta;
-    pronta = Promise.resolve(win ? {} : null);
+    try { pronta = require('../../window').quandoPronta(win); } catch (_) { pronta = Promise.resolve(win ? {} : null); }
     Promise.resolve(pronta).then((ok) => {
       if (!ok || !win || win.isDestroyed()) return;
       try { win._filoTabs?.openTab('filo://credits/credits.html', { activate: true }); } catch (_) {}
