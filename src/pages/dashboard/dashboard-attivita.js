@@ -666,6 +666,23 @@
   // e non deve sembrarlo.
   // `cambi`: gli id degli eventi del filo che la riga racconta; il tasto destro e lo stato
   // «annullato» li leggono da lì (dashboard-cambi.js).
+  // #2096 — una riga di volume, Bluetooth o Wi-Fi sa quale voce del riquadro di sistema riguarda e, dove si può, il
+  // comando che la disfa: il tasto destro della riga li offre (src/pages/dashboard/dashboard-sistema.js).
+  function segnaSistema(riga, a) {
+    const tipo = a && String(a.type || '').toUpperCase();
+    if (!riga || !['VOLUME', 'BLUETOOTH', 'WIFI'].includes(tipo)) return;
+    const o = a._output || {};
+    const cosa = tipo === 'VOLUME' ? 'volume' : tipo === 'WIFI' ? 'wifi' : 'bluetooth';
+    let annulla = null;
+    if (o.ok !== false && !o.gia && !Array.isArray(o.elenco)) {
+      if (cosa === 'volume' && typeof o.prima === 'number' && o.prima !== o.volume) annulla = { cosa, livello: o.prima };
+      else if (typeof o.acceso === 'boolean') annulla = { cosa, acceso: !o.acceso };
+      else if (cosa === 'bluetooth' && o.dispositivo && typeof o.preferito === 'boolean') annulla = { cosa, dispositivo: o.dispositivo, preferito: !o.preferito };
+      else if (cosa === 'bluetooth' && o.dispositivo && typeof o.collegato === 'boolean') annulla = { cosa, dispositivo: o.dispositivo, collega: !o.collegato };
+    }
+    riga._sistema = { voce: cosa === 'wifi' ? 'rete' : cosa, annulla };
+  }
+
   function makeActivityRow(rowIcon, text, cambi = null, title = '') {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
