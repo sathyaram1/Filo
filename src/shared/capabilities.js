@@ -155,6 +155,12 @@
       doesNot: 'Non chiude né archivia nessuna scheda: le riordina soltanto (per chiudere quelle non più utili c’è /pulisci).',
     },
     {
+      id: 'drag-tab', title: 'Trascina una scheda', category: 'navigation',
+      desc: 'Una scheda trascinata nella barra segue il mouse e le altre le fanno posto; lasciata, resta dove l’hai messa. Portata fuori dalla barra si lascia in un campo di testo di un sito, dove scrive titolo e indirizzo come un link incollato, o nella chat della nuova scheda e dell’Aiuto, dove diventa un gettone (vedi «Parla di una scheda in chat»). Mentre la porti, il punto dove arriverebbe si illumina. Esc annulla.',
+      invoke: 'Tieni premuto su una scheda e trascinala.',
+      doesNot: 'Lasciata sulla pagina fuori da un campo, o fuori dalla finestra, torna al suo posto: non apre una finestra nuova. Dentro un riquadro incorporato di un altro sito il campo non la riceve.',
+    },
+    {
       id: 'tab-preview', title: 'Anteprima di una scheda al passaggio del mouse', category: 'navigation',
       desc: 'Passando il mouse su una scheda della barra compare una carta con il suo titolo, il sito e un’immagine della pagina com’era l’ultima volta che l’hai vista. Le schede aperte in secondo piano hanno la loro immagine appena finiscono di caricare, anche se non le hai mai aperte. Sulla scheda che hai davanti la carta mostra solo il titolo.',
       invoke: 'Passa il mouse su una scheda. In Preferenze → «Anteprima delle schede» la spegni o scegli la dimensione (piccola, media, grande); lo stesso chiedendolo a Filo ("spegni l\'anteprima delle schede", "anteprima delle schede più grande").',
