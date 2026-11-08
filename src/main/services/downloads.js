@@ -655,6 +655,9 @@ function inAttesaPiuFile(scope, origine, scheda) {
   return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile && scopeOf(r) === scope
     && (!origine || sito(r._piuFile) === suo || (scheda != null && r._piuFileScheda === scheda)));
 }
+function schedaDiPagina(webContents) {
+  try { return webContents && !webContents.isDestroyed() ? webContents.id : null; } catch (_) { return null; }
+}
 // Oltre il tetto il file non scende, e la riga più nuova lo dice: chi risponde sa quanti ne mancano.
 function postoPerPiuFile(scope) {
   const attese = inAttesaPiuFile(scope);
