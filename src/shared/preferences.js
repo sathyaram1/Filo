@@ -798,12 +798,11 @@
       keys: ['messaggi_download', 'messaggi sui download', 'ritmo dei download', 'quanto spesso scrive dei download',
         'filo scrive dei download', 'download finiti mentre non c\'ero', 'filoparla.downloadognimin'],
       build(v) {
-        const s = String(v == null ? '' : v).trim().toLowerCase();
-        let n = /\bor[ae]\b/.test(s) ? 60 * (parseItalianNumber(s.replace(/[^0-9.,-]/g, '')) || 1) : parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+        const C = global.SN_CONST;
+        const n = C.minutiDaTesto(v);
         if (!Number.isFinite(n) || n <= 0) return null;
-        const min = global.SN_CONST.minutiFraDownload({ downloadOgniMin: n });
-        const detto = min === 60 ? 'un\'ora' : `${min} minuti`;
-        return { partial: { filoParla: { downloadOgniMin: min } }, label: `Messaggi sui download → al più ogni ${detto}` };
+        const min = C.minutiFraDownload({ downloadOgniMin: n });
+        return { partial: { filoParla: { downloadOgniMin: min } }, label: `Messaggi sui download → ${C.nomeRitmoDownload(min)}` };
       },
     },
     // Ora, batteria, rete, Bluetooth e volume nella home (#873, #874): una voce per chiave, le altre restano come sono.
