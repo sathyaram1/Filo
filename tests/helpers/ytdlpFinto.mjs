@@ -9,7 +9,8 @@ const argv = process.argv.slice(2);
 const leggi = (f) => { try { return JSON.parse(readFileSync(f, 'utf8')); } catch (_) { return {}; } };
 const caso = (process.env.FILO_YTDLP_FINTO_CASO && leggi(process.env.FILO_YTDLP_FINTO_CASO)) || {};
 const registra = (o) => { if (process.env.FILO_YTDLP_FINTO_REGISTRO) appendFileSync(process.env.FILO_YTDLP_FINTO_REGISTRO, `${JSON.stringify(o)}\n`); };
-registra({ argv, pid: process.pid, runAsNode: process.env.ELECTRON_RUN_AS_NODE || '' });
+const proxy = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(https?|all|no)_proxy$/i.test(k)));
+registra({ argv, pid: process.pid, runAsNode: process.env.ELECTRON_RUN_AS_NODE || '', proxy });
 
 const valore = (nome) => { const i = argv.indexOf(nome); return i >= 0 ? argv[i + 1] : ''; };
 const modelli = [];
