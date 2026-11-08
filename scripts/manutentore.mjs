@@ -1208,9 +1208,12 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     }
     case 'archivia': {
       const num = numeroDi(arg);
-      const c = PRIORITA_TRE.archiviazione(await prioritaAttuale(cred, num));
+      const originale = numeroDi(argv[2]);
+      // Doppione di una 3: la 3 resta aperta nell'originale, e il server ricontrolla che quello vada avanti.
+      const [attuale, continuaA] = await prioritaAttuali(cred, num, originale);
+      const c = PRIORITA_TRE.archiviazione(attuale, { continuaA });
       if (!c.ok) { console.error(`RIFIUTATO: #${num}: ${c.motivo}. Non ho scritto niente.`); return 1; }
-      const r = await chiama(cred, 'archivia', { numero: num, doppioneDi: numeroDi(argv[2]) });
+      const r = await chiama(cred, 'archivia', { numero: num, doppioneDi: originale });
       return esito(r, (x) => `#${x.numero} archiviato, doppione di #${x.doppioneDi}.`);
     }
     case 'taccuino': {
