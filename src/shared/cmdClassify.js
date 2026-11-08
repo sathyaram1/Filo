@@ -1147,7 +1147,11 @@
     // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
     // o come riferimento (`.git/refs/<nome>`). Lo si misura come un percorso, come `ls` (#1072.4).
     const reteNome = !!(c.cwd && c.cwd.rete);
-    const percorsi = testi.slice(0, Math.max(k, 0)).filter((a) => GIT_GLOBALE_CARTELLA.test(a)).map((a) => a.slice(a.indexOf('=') + 1));
+    // Di `--git-dir=<x>/.git` conta il repository `<x>`: la sua cartella `.git` è nascosta per costruzione.
+    const percorsi = testi.slice(0, Math.max(k, 0)).filter((a) => GIT_GLOBALE_CARTELLA.test(a)).map((a) => {
+      const p = a.slice(a.indexOf('=') + 1);
+      return /^--git-dir=/.test(a) ? p.replace(/(^|[\\/])\.git[\\/]*$/i, (m, s) => s || '.') : p;
+    });
     args.forEach((a, i) => {
       // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994).
       const contenuto = opzioneLunga(a, 'contents', 3);
