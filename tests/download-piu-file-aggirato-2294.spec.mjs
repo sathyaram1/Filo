@@ -12,7 +12,7 @@ import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = ['a', 'b', 'c', 'd'].map((x) => `${x}.scarica.test`);
-test.use({ hostInPiu: HOST });
+test.use({ hostInPiu: [...HOST, '*.salta.test'] });
 
 const DATI = Buffer.from('dati di prova '.repeat(50));
 
