@@ -150,7 +150,7 @@ test('git: le righe della configurazione, chiave per chiave', () => {
     'local\tcore.repositoryformatversion=0', 'local\tcore.filemode=true', 'local\tcore.bare=false',
     'local\tcore.logallrefupdates=true', 'local\tremote.origin.url=https://example.test/a.git',
     'local\tremote.origin.fetch=+refs/heads/*:refs/remotes/origin/*', 'local\tbranch.main.remote=origin',
-    'local\tbranch.main.merge=refs/heads/main', 'local\tcore.fsmonitor=true'].join('\n');
+    'local\tbranch.main.merge=refs/heads/main', 'local\tcore.fsmonitor=true', 'local\tcore.worktree=../../../sub'].join('\n');
   assert.equal(C.gitConfigLancia(tipico), false, 'un clone normale non fa chiedere');
   for (const riga of ['local\tcore.fsmonitor=programma', 'local\tdiff.external=programma', 'local\tdiff.x.textconv=programma',
     'local\tfilter.x.clean=programma', 'local\tcore.pager=programma', 'worktree\tcore.fsmonitor=programma',
