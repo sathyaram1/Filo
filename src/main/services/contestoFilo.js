@@ -543,6 +543,18 @@ function preamboloPerCompattare(m) {
   const memo = preamboli.get(FC().chiave(m));
   return memo && memo.eventi ? memo.eventi.testo || '' : '';
 }
+// Quanto pesa, in caratteri, tutto quello che il tratto scrive in testa al messaggio: i ricordi ripescati compresi, che
+// da soli valgono più di metà di un turno pesante e il peso del turno deve contarli.
+function caratteriPreambolo(m) {
+  if (!m || m.riga || m.seguito) return 0;
+  const memo = preamboli.get(FC().chiave(m));
+  if (!memo) return 0;
+  return TV().preambolo({
+    eventi: memo.eventi ? memo.eventi.testo : '',
+    stato: memo.stato ? memo.stato.testo : '',
+    turno: Array.isArray(memo.ricordi) && memo.ricordi.length ? FC().rendiRicordi(memo.ricordi) : '',
+  }).length;
+}
 const diIncognito = (chatId) => chatIncognito.has(chatId);
 function ultimaFotografia(incognito = false) {
   const f = fotografie[incognito ? 'incognito' : 'normale'];
