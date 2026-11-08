@@ -9,7 +9,6 @@
   const Popup = global.SN_POPUP;
   const Icons = global.SN_ICONS || {};
 
-  const COST = 50; // crediti per tentativo (spec §8.1 / §11). Non rimborsabili.
   // Le bozze restano al sito dove sono nate, come quella del feedback (#1071).
   const bozza = (nome) => (global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza(nome) : null);
   const DRAFT_ATTACK_KEY = bozza('sn_redteam_attack_draft');
