@@ -198,7 +198,6 @@
       if (k >= 0 && k === t.length - 2) i += 1;
     }
     return ops.length >= 2 && ops[1] !== '-' ? ops[1] : null;
->>>>>>> ORIG_HEAD
   }
 
   // Modifica lo stato ma in modo recuperabile: livello 2.
