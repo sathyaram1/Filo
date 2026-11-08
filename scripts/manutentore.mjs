@@ -291,7 +291,7 @@ async function domandeFerme(cred, indice, ordine = []) {
   }
 }
 
-const CON_VALORE = ['--cartella', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite', '--urgenza', '--alle', '--ambito'];
+const CON_VALORE = ['--cartella', '--clone-server', '--giorni', '--ticket', '--versione', '--giorno', '--priorita', '--perche', '--da', '--a', '--cursore', '--limite', '--urgenza', '--alle', '--ambito'];
 
 /** Gli argomenti senza le opzioni né i loro valori: un `--ticket X` non deve finire in un testo scritto. PURA. */
 export function senzaOpzioni(args) {
