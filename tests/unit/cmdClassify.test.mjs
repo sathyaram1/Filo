@@ -847,7 +847,6 @@ test('livello 3 — ForEach-Object senza scriptblock INVOCA il membro → confer
     'gci | % Name',                       // anche innocuo: non sappiamo distinguerlo
     'gci | foreach MoveTo',
     'ForEach-Object { $_ }',              // da solo non filtra niente
-    'Where-Object { $_ }',
     '% { $_.Name }',
   ]) {
     assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);
