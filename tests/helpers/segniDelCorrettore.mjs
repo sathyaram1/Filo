@@ -71,7 +71,10 @@ class Segni {
   }
   async _leggi(chiama = null, arg = null) {
     const { frame, dx, dy } = await this._frame();
-    const v = await nelMondoDelFrame(this._page, frame, LEGGI, { sel: this._sel, filtri: this._filtri, indice: this._indice, chiama, arg });
+    const dati = { sel: this._sel, filtri: this._filtri, indice: this._indice, arg };
+    // La funzione da applicare non passa da JSON: entra nel sorgente.
+    const fn = chiama ? `(a) => (${LEGGI})({ ...a, chiama: { tutti: ${!!chiama.tutti}, fn: (${chiama.fn}) } })` : LEGGI;
+    const v = await nelMondoDelFrame(this._page, frame, fn, dati);
     if (chiama) return v;
     return v.map((s) => ({ ...s, box: { ...s.box, x: s.box.x + dx, y: s.box.y + dy } }));
   }
