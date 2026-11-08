@@ -1144,7 +1144,7 @@ test.describe('spellcheck-segni-restano', () => {
   }
 
   // Gli errori confermati dal controllo rapido: le parole «xq…» sono anche candidati del dizionario, sbiaditi prima.
-  const blu = (page) => page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)');
+  const blu = (page) => segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)');
   const scan = (app) => app.evaluate(() => globalThis.__scan);
 
   // Per `ms` guarda il riquadro a ogni giro: i segni attesi, sul testo che c'è adesso nella casella.
