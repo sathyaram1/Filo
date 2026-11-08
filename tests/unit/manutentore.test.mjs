@@ -112,11 +112,12 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   g('update-ref', 'refs/remotes/origin/claude/lavoro', 'HEAD');
   writeFileSync(join(dir, '12.json'), JSON.stringify(scheda(12, { file_probabili: ['src/a.js'] })));
   writeFileSync(join(dir, '13.json'), JSON.stringify(scheda(13, { file_probabili: ['non/esiste.js'] })));
-  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  const env = { FILO_SERVER_CLONE: join(dir, 'nessun-clone') };
+  assert.equal(await M.main(['incroci', '12', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /^claude\/lavoro \(#44\): src\/a\.js$/m);
-  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo }), 0);
+  assert.equal(await M.main(['incroci', '#13', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 0);
   assert.match(out.join('\n'), /Nessun ramo in corso tocca i file probabili di #13 \(non\/esiste\.js\)/);
-  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo }), 1);
+  assert.equal(await M.main(['incroci', '99', '--cartella', dir, '--senza-fetch'], { root: repo, env }), 1);
   assert.match(err.join('\n'), /Nessuna scheda per #99/);
   assert.equal(await M.main(['boh']), 1);
 });
