@@ -57,9 +57,11 @@ prima.
 
 **Fra una decisione e l'altra non resti sveglio: ti fai svegliare.** Ogni accensione è una sessione nuova col contesto
 piccolo (questo ruolo, il taccuino, le schede delle 3 e dei lavori nell'ordine, i rami vivi, i segnali dall'ultima
-volta) e la memoria nel taccuino. Ti accendi:
+volta) e la memoria nel taccuino. Il contesto piccolo porta solo quello che è cambiato dall'accensione prima: una scheda, un segnale o una
+sezione del taccuino che non c'è non è cambiata, e se ti serve la rileggi (`schede`, `taccuino`). Porta tutto alla prima
+accensione del giorno e dopo un'accensione nata morta; lo dice in testa. Ti accendi:
 
-- al **battito**, ogni 55 minuti al più: biglietti, guasti, deploy, suite, domande di processo;
+- al **battito**, ogni 2 ore al più: biglietti, guasti, deploy, suite, domande di processo;
 - a una **sveglia del server**, al segnale: guasto dichiarato, deploy del server rosso, suite rossa su main,
   accensione nata morta, domanda di processo di un worker, richiesta dell'owner dalla chat;
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
