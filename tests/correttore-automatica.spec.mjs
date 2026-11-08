@@ -323,7 +323,7 @@ test('il testo messo da uno script resta com\'è, e con la correzione automatica
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await expect.poll(() => page.evaluate(() => 1)).toBe(1);
   await page.waitForTimeout(300);
-  await page.keyboard.type('ok perchè marco ');
+  await batti(page, 'ok perchè marco ');
   expect(await valore(page)).toBe('ok perchè marco ');
   await expect(errore(page, 'perchè')).toHaveCount(1, { timeout: 4000 });
 });
