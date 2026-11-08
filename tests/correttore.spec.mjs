@@ -183,6 +183,8 @@ test('le parole che il sito mette nella casella mentre l\'utente scrive non rice
   await page.waitForTimeout(1500);
   await app.evaluate(() => globalThis.__rilascia());
   const segno = errore(page, 'anno');
+  await page.waitForTimeout(2000);
+  console.log('RAPIDE', JSON.stringify(await rapide(app)), await page.inputValue('#ta'));
   await expect(segno).toHaveCount(1, { timeout: 4000 });
   const ta = await page.locator('#ta').boundingBox();
   expect((await riquadroDelSegno(segno)).x).toBeGreaterThan(ta.x + 180);
