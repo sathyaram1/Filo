@@ -129,8 +129,23 @@ function correttore({ sbagliate = [], impostazioni = {}, protocollo = 'https:' }
     entra: (el) => docListeners.focusin.forEach((f) => f({ target: el })),
     esce: (el) => docListeners.focusout.forEach((f) => f({ target: el })),
     visibile: () => (docListeners.visibilitychange || []).forEach((f) => f()),
-    // Scrive come una tastiera: il cursore resta in fondo. Lo script del sito scrive uguale, ma senza il tasto vero.
-    scrive: (el, v, e = {}) => { el.fire('keydown', { isTrusted: true }); el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', e); },
+    // Scrive l'utente (qui come un incolla vero, che porta il suo testo): il cursore resta in fondo. Lo script del sito
+    // scrive uguale, ma senza un evento vero che lo spieghi.
+    scrive: (el, v, e = {}) => {
+      el.fire('keydown', { isTrusted: true, key: 'Unidentified', ctrlKey: /^history/.test(e.inputType || '') });
+      el.value = v; el.selectionStart = el.selectionEnd = v.length;
+      el.fire('input', { isTrusted: true, inputType: 'insertFromPaste', data: v, ...e });
+    },
+    // Un tasto vero che scrive `c` in fondo; `sito(v)`, se c'è, riscrive la casella dentro l'evento, prima di Filo.
+    batte: (el, c, sito = null) => {
+      el.fire('keydown', { isTrusted: true, key: c });
+      el.value += c;
+      if (sito) el.value = sito(el.value);
+      el.selectionStart = el.selectionEnd = el.value.length;
+      el.fire('input', { isTrusted: true, inputType: 'insertText', data: c });
+      el.fire('keyup', { isTrusted: true, key: c });
+    },
+    clic: (el) => el.fire('pointerdown', { isTrusted: true }),
     scriveDaScript: (el, v) => { el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', {}); },
     risponde: async (r, testo) => { r.r({ ok: true, text: testo }); await tick(); await tick(); },
   };
