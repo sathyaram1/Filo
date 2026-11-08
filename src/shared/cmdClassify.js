@@ -154,12 +154,26 @@
       // `-F`/`--file` è case-sensitive: `-f` = fqdn è lettura e non deve combaciare.
       return rest.some((t) => /^-[A-Za-z]*F/.test(t) || opzioneLunga(t, 'file', 2) != null || !t.startsWith('-'));
     },
-    // Lettori con un'uscita su file (#1994): `uniq IN OUT`, `tree -o FILE` (e `-R`, che scrive 00Tree.html in ogni
-    // cartella), `file -C` (compila `<nome>.mgc` nella cartella di lavoro).
+    // Lettori con un'uscita su file (#1994, #2292): `uniq IN OUT`, `tree -o FILE` (e `-R`, che scrive 00Tree.html in
+    // ogni cartella), `file -C` (compila `<nome>.mgc` nella cartella di lavoro).
     uniq: (cmd) => uniqUscita(tokens(cmd).slice(1)) != null,
-    tree: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*[oR]/.test(t)),
+    tree: (cmd) => treeUscita(tokens(cmd).slice(1)) != null,
     file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || opzioneLunga(t, 'compile', 2) != null),
   };
+
+  // Il file che `tree` scriverà ('' se non si sa quale), o null se stampa e basta.
+  function treeUscita(args) {
+    for (let i = 0; i < args.length; i++) {
+      const t = args[i];
+      const lungo = /^--output(?:=(.*))?$/.exec(t);
+      if (lungo) return lungo[1] != null ? lungo[1] : (args[i + 1] || '');
+      if (!/^-[^-]/.test(t)) continue;
+      const k = t.indexOf('o');
+      if (k > 0) return t.slice(k + 1) || args[i + 1] || '';
+      if (t.includes('R')) return '';
+    }
+    return null;
+  }
 
   // getopt e git accettano un'opzione lunga abbreviata a ogni prefisso non ambiguo (`--comp` è `--compile`, `--outp=x`
   // è `--output=x`): l'opzione si riconosce come la legge il programma. Il valore dopo `=`, o '' senza; null se non è lei.
@@ -184,6 +198,7 @@
       if (k >= 0 && k === t.length - 2) i += 1;
     }
     return ops.length >= 2 && ops[1] !== '-' ? ops[1] : null;
+>>>>>>> ORIG_HEAD
   }
 
   // Modifica lo stato ma in modo recuperabile: livello 2.
@@ -217,6 +232,13 @@
 
   // Valgono solo DENTRO una pipeline: da soli non ricevono niente da filtrare.
   const PS_PIPE_ONLY = new Set(['where-object', 'where', '?', 'foreach-object', 'foreach', '%']);
+  // Quale `where` è: 'cmd' il programma di ricerca (where.exe, o la shell cmd), 'filtro' il Where-Object di PowerShell,
+  // '' se la shell non si sa. L'unico posto che lo decide (#2292): il livello teme il filtro, la rete teme la ricerca.
+  const eWhereExe = (raw) => /^where\.exe$/i.test(unquote(tokens(dequote(raw))[0] || ''));
+  function qualeWhere(raw, shell) {
+    if (eWhereExe(raw) || shell === 'cmd') return 'cmd';
+    return shell === 'powershell' ? 'filtro' : '';
+  }
   // ForEach-Object senza scriptblock usa la forma «nome di membro», che INVOCA il metodo su
   // ogni oggetto: `gci | % Delete` cancella i file. Lo scriptblock validato è obbligatorio.
   const PS_FOREACH = new Set(['foreach-object', 'foreach', '%']);
@@ -260,9 +282,11 @@
     const prog = programOf(norm);
     if (!prog) return false;
     if (ALWAYS_3.has(prog) || ARBITRARY_CODE.has(prog)) return false;
+    // Where-Object da solo (`where node`, `-InputObject`) filtra come in pipeline: esegue solo il blocco, già
+    // preteso inerte qui sopra. ForEach-Object no: senza pipeline resta da chiedere.
     if (PS_PIPE_ONLY.has(prog)) {
-      if (!inPipeline) return false;
-      return PS_FOREACH.has(prog) ? open === 1 : true;
+      if (PS_FOREACH.has(prog)) return inPipeline && open === 1;
+      return true;
     }
     if (PS_READ.has(prog)) return true;
     // In pipeline vale come lettura anche ciò che è già livello 1: `cat file | grep errore`
@@ -442,6 +466,23 @@
     return false;
   }
 
+  // `git config` nella forma con le opzioni (`--unset`, `chiave valore`…): gli argomenti dopo il sotto-comando.
+  function gitConfigForma(args) {
+    const low = args.map((a) => a.toLowerCase());
+    if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
+    const ops = args.filter((a) => !a.startsWith('-'));
+    // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
+    const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
+    if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
+    if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
+    if (ops.length >= 2) return 2; // `chiave valore` imposta
+    // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
+    // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
+    // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
+    if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
+    return /(^|\.)url$|credential|password|token/.test((ops[0] || '').toLowerCase()) ? 2 : 1;
+  }
+
   // Sotto-comandi il cui livello dipende dagli argomenti: i duali ELENCANO (1) da nudi e
   // CREANO (2) con un operando; `checkout` e `stash` hanno anche forme distruttive (3).
   const GIT_DUAL = {
@@ -475,21 +516,20 @@
       const verbs = argVariants(raw).map((v) => v.toLowerCase());
       return verbs.some((v) => v === 'drop' || v === 'clear') ? 3 : 2;
     },
+    // Da git 2.46 il primo operando può essere un verbo (`git config set remote.origin.url …`): una chiave ha
+    // sempre un punto, quindi un verbo senza punto non si confonde. Tolto il verbo, vale la forma di prima.
     config: (cmd) => {
       const args = gitArgsAfterSub(cmd);
-      const low = args.map((a) => a.toLowerCase());
-      if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
-      const ops = args.filter((a) => !a.startsWith('-'));
-      // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
-      const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
-      if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
-      if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
-      if (ops.length >= 2) return 2; // `chiave valore` imposta
-      // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
-      // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
-      // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
-      if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
-      return /(^|\.)url$|credential|password|token/.test((ops[0] || '').toLowerCase()) ? 2 : 1;
+      const i = args.findIndex((a) => !a.startsWith('-'));
+      const verbo = i < 0 ? '' : args[i].toLowerCase();
+      if (!/^(list|get|set|unset|edit|rename-section|remove-section|get-color|get-colorbool)$/.test(verbo)) return gitConfigForma(args);
+      const resto = args.filter((_, k) => k !== i);
+      const low = resto.map((a) => a.toLowerCase());
+      if (verbo === 'unset' || verbo === 'remove-section') return 3;
+      if (verbo === 'list' || verbo === 'edit' || verbo === 'rename-section') return 2;
+      if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
+      if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
+      return gitConfigForma(resto);
     },
     remote: (cmd) => {
       const ops = gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-'));
@@ -504,6 +544,38 @@
     },
   };
 
+<<<<<<< origin/main
+  // Le opzioni globali che non cambiano repository né impostazioni: le altre (`--git-dir`, `--config-env`, …)
+  // portano git dove la sonda delle impostazioni non ha guardato (#2292).
+  const GIT_GLOBALI_INNOCUE = new Set(['--no-pager', '-p', '--paginate', '-P', '--no-optional-locks', '--no-replace-objects',
+    '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--no-advice']);
+  // Il file su cui scrive una lettura di git con `--output` ('' se non si sa quale), o null se stampa e basta (#2292).
+  function gitUscita(args) {
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--output') return args[i + 1] || '';
+      const m = /^--output=(.*)$/.exec(args[i]);
+      if (m) return m[1];
+    }
+    return null;
+  }
+  // Le letture di git che con certe forme scrivono o eseguono: il livello a cui salgono, 0 se restano letture.
+  // Sentinella: ogni nome di GIT_READ sta nella tabella di letturaCheScrive.test.mjs.
+  const GIT_READ_MUTATES = {
+    // `-O`/`--open-files-in-pager` (anche accorciato) apre i risultati nel programma scritto nel comando.
+    grep: (args) => (args.some((a) => /^-[^-]*O/.test(a) || /^--op[a-z-]*(=|$)/.test(a)) ? 3 : 0),
+    // Leggono solo `show`, `list`, `exists` e un riferimento (`HEAD`, `HEAD@{1}`, `refs/…`, `origin/main`): gli altri
+    // verbi (expire, delete, drop, write…) cancellano o scrivono la storia che serve a recuperare i commit persi,
+    // e uno nuovo di git nasce già fra questi. Un altro nome nudo può essere un ramo o un verbo nuovo: chiede.
+    reflog: (args) => {
+      const primo = args.find((a) => !a.startsWith('-')) || '';
+      // Un numero è il valore di un'opzione (`-n 5`), non un verbo.
+      if (!primo || /^(show|list|exists)$/i.test(primo) || /^HEAD$|[@/~^]|^\d+$/.test(primo)) return 0;
+      return /^(expire|delete|drop|write)$/i.test(primo) ? 3 : 2;
+    },
+    // Con due operandi `symbolic-ref` sposta HEAD: cambia il ramo corrente.
+    'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
+  };
+=======
   // Le altre opzioni prima del sotto-comando valgono 3 (`--config-env=core.pager=SHELL` esegue ciò che git stampa, #1994);
   // il repository di `--git-dir=`/`--work-tree=` lo misura il perimetro, come la cartella di `cd`.
   const GIT_GLOBALI_INNOCUE = new Set([
@@ -518,8 +590,12 @@
     return tokens(cmd).slice(1).some((t) => opzioneLunga(t, 'output', 2) != null);
   }
 
+>>>>>>> ORIG_HEAD
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
+    const globali = tokens(cmd).slice(1).map(unquote);
+    const k = globali.findIndex((x) => !x.startsWith('-'));
+    if (sub && globali.slice(0, k).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !VERSION_TOKENS.has(x.toLowerCase()))) return 3;
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
     if (GIT_DESTROY.has(sub)) return 3;
     if (gitPericolosa(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
@@ -528,7 +604,12 @@
     if (gitScriveFile(cmd)) return 3;
     const dual = GIT_DUAL[sub];
     if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
-    if (GIT_READ.has(sub)) return 1;
+    if (GIT_READ.has(sub)) {
+      const args = gitArgsAfterSub(cmd);
+      const sale = GIT_READ_MUTATES[sub] ? GIT_READ_MUTATES[sub](args) : 0;
+      if (sale) return sale;
+      return gitUscita(args) == null ? 1 : 2;
+    }
     // Il push verso il remoto già configurato si rimedia; verso un indirizzo scritto nel comando manda il codice
     // a un server qualsiasi, e non torna indietro (#530).
     if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => /:\/\//.test(a) || /^(--repo=)?[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a))) return 3;
@@ -570,7 +651,7 @@
   }
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
-  function classifyOne(raw) {
+  function classifyOne(raw, shell = '') {
     // Si valuta sempre la forma senza virgolette: `git push "--force"` fa ciò che farebbe senza
     // e deve avere lo stesso livello. I metacaratteri erano già intercettati sul testo grezzo.
     const trimmed = dequote(raw);
@@ -580,7 +661,11 @@
 
     // Superato il backstop, la whitelist si fida solo di un nome invocato nudo: un file su
     // disco che si chiama come un comando fidato è un eseguibile arbitrario → 3.
+    // where.exe senza percorso è il where di cmd, l'unico modo di chiamarlo da PowerShell: lo trova la stessa ricerca.
+    if (eWhereExe(trimmed)) return 1;
     if (!isBareName(tokens(trimmed)[0])) return 3;
+    // In PowerShell Where-Object e `?` sono il filtro di `where`: esegue solo il suo blocco (#2292).
+    if ((prog === 'where-object' || prog === '?') && shell !== 'cmd') return segmentIsRead(raw, false) ? 1 : 3;
 
     if (prog === 'git') return classifyGit(trimmed);
     if (prog === 'npm' || prog === 'pip' || prog === 'pip3') return classifyNpm(trimmed);
@@ -589,6 +674,10 @@
     if (ARBITRARY_CODE.has(prog)) return isVersionQuery(trimmed) ? 1 : 3;
 
     if (LEVEL1.has(prog)) {
+      // `where` legge solo come where.exe di cmd: in PowerShell è Where-Object, che esegue il suo blocco (#2292).
+      if (PS_PIPE_ONLY.has(prog) && qualeWhere(trimmed, shell) !== 'cmd') return segmentIsRead(raw, false) ? 1 : 3;
+      // Sul Mac `arch <opzioni> programma` lancia il programma: legge solo da nudo.
+      if (prog === 'arch' && tokens(trimmed).length > 1) return 3;
       // Quasi tutti i LEVEL1 restano 1 anche con flag; fanno eccezione i pochi che con certi
       // argomenti IMPOSTANO lo stato.
       const mutates = LEVEL1_MUTATES[prog];
@@ -633,6 +722,7 @@
     sistema: 'legge dati del sistema che non sono file',
     processi: 'mostra i programmi aperti con i loro argomenti',
     rete: 'si collega a un altro computer della rete',
+    git: 'le impostazioni di questa cartella git possono avviare dei programmi',
   };
   // Stampano il contenuto dei file che ricevono come operandi.
   const LETTORI = new Set(['cat', 'type', 'more', 'head', 'tail', 'nl', 'cut', 'uniq', 'column', 'get-content', 'gc']);
@@ -1012,6 +1102,7 @@
     const c = {
       win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO,
       esiste: typeof x.esiste === 'function' ? x.esiste : null,
+      gitLancia: typeof x.gitLancia === 'function' ? x.gitLancia : null,
     };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
@@ -1173,9 +1264,22 @@
     return { file: file.concat(pos), ricorsivo: false, ignoto: false };
   }
 
+  // Il percorso di un punto risolto (radice e pezzi) come lo vuole il disco: lo stesso per ogni sonda del main.
+  function assolutoDi(r, c) {
+    return c.win ? `${r.radice}\\${r.segs.join('\\')}` : `/${r.segs.join('/')}`;
+  }
+
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
   function gitPerimetro(raw, c) {
     const sub = subcommandOf(dequote(raw));
+    // Le impostazioni di un repository arrivato da fuori possono far partire programmi anche a una lettura (#2292):
+    // lo dice la sonda del main, `c.gitLancia(cartella)`; senza sonda il livello resta quello del comando.
+    if (typeof c.gitLancia === 'function' && sub) {
+      if (!c.cwd || c.cwd.rete || c.cwd.provider) return due(MOTIVI.ignoto);
+      let lancia = 'ignoto';
+      try { lancia = c.gitLancia(assolutoDi(c.cwd, c)); } catch (_) { lancia = 'ignoto'; }
+      if (lancia) return due(MOTIVI.git);
+    }
     if (sub === 'grep') return due(MOTIVI.ricorsivo);
     // I percorsi come li legge la shell, come per gli altri lettori.
     const testi = argomenti(raw, c).slice(1).map((a) => a.testo).filter(Boolean);
@@ -1192,12 +1296,18 @@
       return /^--git-dir=/.test(a) ? p.replace(/(^|[\\/])\.git[\\/]*$/i, (m, s) => s || '.') : p;
     });
     args.forEach((a, i) => {
+<<<<<<< origin/main
+      // `git blame --contents <file>` stampa riga per riga un file qualsiasi: è una lettura di quel file.
+      if (sub === 'blame' && /^--contents=/.test(a)) { percorsi.push(a.slice('--contents='.length)); return; }
+      if (sub === 'blame' && i > 0 && args[i - 1] === '--contents') { percorsi.push(a); return; }
+=======
       // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994).
       const contenuto = opzioneLunga(a, 'contents', 3);
       if (contenuto != null) {
         percorsi.push(a.includes('=') ? contenuto : args[i + 1] || '');
         return;
       }
+>>>>>>> ORIG_HEAD
       if (a.startsWith('-')) return;
       if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
@@ -1291,7 +1401,7 @@
   // di lavoro: in una cwd di rete lo mandano al remoto come farebbe `ls` (#1072.4).
   // Get-Command/Get-Help cercano il file/comando indicato; where.exe (shell cmd)
   // guarda prima nella cartella corrente. git lo fa in gitPerimetro.
-  function cercaNomeInRete(prog, testi, c) {
+  function cercaNomeInRete(prog, testi, c, raw) {
     if (CERCANO_NOME.has(prog)) {
       return testi.some((t) => {
         const v = valoreDuePunti(t);
@@ -1299,7 +1409,10 @@
         return nome != null && dove(nome, c) === MOTIVI.rete;
       });
     }
-    if (prog === 'where') return testi.some((t) => t && !/^[-/]/.test(t));
+    // In PowerShell `where` da solo è il filtro, che non cerca file.
+    if (prog === 'where' && qualeWhere(raw, c.shell) !== 'filtro') {
+      return testi.some((t) => t && !/^[-/]/.test(t));
+    }
     return false;
   }
 
@@ -1316,7 +1429,7 @@
     const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
     if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
     if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
-    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
+    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c, dequote(raw))) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
     if (!stampaSoltanto && args.some((a) => a.ignoto)) return due(MOTIVI.ignoto);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
@@ -1363,9 +1476,8 @@
   function statoDi(p, c) {
     const r = dove(String(p || ''), c);
     if (!r || typeof r !== 'object') return 'ignoto';
-    const assoluto = c.win ? `${r.radice}\\${r.segs.join('\\')}` : `/${r.segs.join('/')}`;
     let s = null;
-    try { s = c.esiste(assoluto); } catch (_) { s = 'ignoto'; }
+    try { s = c.esiste(assolutoDi(r, c)); } catch (_) { s = 'ignoto'; }
     return s === 'file' || s === 'cartella' || s === null ? s : 'ignoto';
   }
   const nomeDi = (p) => pezzi(p).pop() || '';
@@ -1523,6 +1635,11 @@
         return copiaPosix(testi, c);
       case 'ln':
         return copiaPosix(testi, c, { forza: true });
+      case 'uniq': case 'tree': case 'git': {
+        const dest = { uniq: uniqUscita, tree: treeUscita, git: gitUscita }[prog](testi);
+        if (dest == null) return '';
+        return dest ? copiaSovrascrive([], dest, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
+      }
       case 'robocopy': {
         const ops = testi.filter((t) => !t.startsWith('/'));
         return ops.length >= 2 && statoDi(ops[1], c) !== null ? PUO_SOVRASCRIVERE : '';
@@ -1572,6 +1689,10 @@
     }
   }
 
+<<<<<<< origin/main
+  function classifyOneDet(raw, c) {
+    const base = classifyOne(raw, c.shell);
+=======
   // Il programma riceve il comando dopo la shell: escape tolti, `$'…'` e `$"…"` decodificati, le espansioni che possono
   // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte, gli elenchi di PowerShell spezzati.
   // Le opzioni si cercano anche lì, e vale la lettura peggiore (#1994). Ciò che non si sa riprodurre (una variabile di
@@ -1592,6 +1713,7 @@
 
   function classifyOneDet(raw, c) {
     const base = classifyOneLetto(raw, c);
+>>>>>>> ORIG_HEAD
     if (base === 2) {
       const motivo = sovrascrive(raw, c);
       if (motivo) return { level: 3, motivo };
@@ -1599,18 +1721,30 @@
     return base === 1 ? perimetroDi(raw, c) : { level: base, motivo: '' };
   }
 
-  // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
+  // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce. Dove la shell la risolve in un modo
+  // che qui non si ripete (`cd -P` oltre un collegamento, `cd a b` di zsh) la cartella diventa ignota (#2292).
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
     const args = argomenti(raw, c).slice(1);
     if (prog === 'popd' || args.some((a) => a.variabile || a.ignoto)) return { ...c, cwd: null };
+    const cmd = stileDi(c) === 'cmd';
+    const posix = shellPosix(c);
     let dest = null;
     for (let i = 0; i < args.length; i++) {
       const t = args[i].testo;
-      if (/^-(literalpath|path|lp)$/i.test(t)) { dest = args[i + 1] ? args[i + 1].testo : null; break; }
+      if (!posix && /^-(literalpath|path|lp)$/i.test(t)) { dest = args[i + 1] ? args[i + 1].testo : null; break; }
       if (t === '-' || t === '') break;
-      if (t.startsWith('-') || /^\/[A-Za-z]$/.test(t)) continue;
-      dest = t;
+      if (/^\/[A-Za-z]$/.test(t) && !posix) continue;
+      if (t.startsWith('-') && !cmd) {
+        if (posix && /^-[A-Za-z@]*P/.test(t)) return { ...c, cwd: null };
+        continue;
+      }
+      // cmd prende tutto il resto della riga come nome, spazi compresi; altrove un secondo operando non si segue.
+      const resto = args.slice(i + 1).map((a) => a.testo).filter(Boolean);
+      if (!cmd && resto.some((a) => !a.startsWith('-'))) return { ...c, cwd: null };
+      if (!cmd) { dest = t; break; }
+      if (resto.length && prog !== 'cd' && prog !== 'chdir') return { ...c, cwd: null };
+      dest = [t, ...resto].join(' ');
       break;
     }
     if (dest === null) return { ...c, cwd: null };
@@ -2043,7 +2177,7 @@
   // Chi lancia un altro comando, e le parole di shell che lo precedono (`for …; do rm`, `if …; then rm`): dopo di loro si
   // guarda il comando che segue.
   const DAVANTI = new Set(['sudo', 'doas', 'nohup', 'time', 'env', 'nice', 'ionice', 'xargs', 'command', 'builtin', 'exec',
-    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call',
+    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call', 'arch',
     'do', 'then', 'else']);
   // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
   const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
@@ -2082,7 +2216,62 @@
     return false;
   }
 
+  // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
+  const GIT_CHIAVI_INERTI = [
+    // core.hooksPath sposta solo la cartella degli hook, che la sonda segue già da sé (husky la imposta).
+    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles|hookspath|commentchar|commentstring)$/,
+    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), e una lettura va in
+    // rete solo da un remoto promettente: quelle chiavi chiedono. Le altre le scrivono anche VS Code e GitHub CLI
+    // (gh-resolved). I rami non avviano niente.
+    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs|promisor|partialclonefilter)$)[^.=]+$/,
+    /^branch\.[^=]+\.[^.=]+$/,
+    /^submodule\.[^=]+\.(url|active|branch)$/,
+    /^user\.(name|email|signingkey)$/,
+    /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
+    /^(extensions\.(objectformat|refstorage|worktreeconfig)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
+    // Sezioni intere che una lettura non usa per avviare niente: valgono per comandi che non sono letture (commit,
+    // merge, gc, maintenance…), o sono dati (alias di un nome che una lettura non usa, git-flow, blame, status).
+    /^(commit|tag|merge|rebase|pull|push|fetch|gc|maintenance|rerere|init|gitflow|alias|blame|status|index|feature|advice|format|pretty|i18n|column|checkout|clone)\.[^=]+$/,
+    /^(remote|branch|submodule)\.[^.=]+$/,
+    // diff.external avvia un programma; i driver (`diff.<nome>.*`) restano fuori.
+    /^diff\.(?!external$)[^.=]+$/,
+    // log.showSignature fa partire gpg a ogni git log.
+    /^log\.(?!showsignature$)[^.=]+$/,
+    // git-lfs, per indirizzo: come si autentica e il controllo dei lucchetti. Le estensioni di lfs avviano programmi.
+    /^lfs\.[^=]+\.(access|locksverify)$/,
+    /^core\.(splitindex|multipackindex|commitgraph|fsyncmethod|packedgitlimit|packedgitwindowsize|deltabasecachelimit|bigfilethreshold)$/,
+  ];
+  // Le righe di `git config --list --show-scope --includes`: true se una chiave locale o del worktree non è inerte.
+  // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
+  // Con `-z` (la forma della sonda) i campi sono separati da NUL e la chiave finisce al ritorno a capo: senza, un «=»
+  // nel nome di un remoto (`[remote "a.url=x"]`) spostava il confine e la chiave passava per un'altra.
+  function gitConfigLancia(righe) {
+    const testo = String(righe || '');
+    const voci = [];
+    if (testo.includes('\u0000')) {
+      const p = testo.split('\u0000');
+      for (let i = 0; i + 1 < p.length; i += 2) {
+        const a = p[i + 1].indexOf('\n');
+        voci.push([p[i], a < 0 ? p[i + 1] : p[i + 1].slice(0, a), a < 0 ? '' : p[i + 1].slice(a + 1)]);
+      }
+    } else {
+      for (const riga of testo.split(/\r?\n/)) {
+        const m = /^(local|worktree)\t([^=]+)=?(.*)$/.exec(riga);
+        if (m) voci.push([m[1], m[2], m[3]]);
+      }
+    }
+    return voci.some(([ambito, k, valore]) => {
+      if (ambito !== 'local' && ambito !== 'worktree') return false;
+      const chiave = k.toLowerCase();
+      if (chiave === 'core.fsmonitor') return !/^(true|false|yes|no|on|off|1|0)?$/i.test(valore.trim());
+      return !GIT_CHIAVI_INERTI.some((re) => re.test(chiave));
+    });
+  }
+
   global.SN_CMD_CLASSIFY = {
+    gitConfigLancia,
+    // Per la sentinella che prova su ogni nome le forme che scrivono o eseguono: chi aggiunge un nome la deve aggiornare.
+    nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ], git: [...GIT_READ] }),
     cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
