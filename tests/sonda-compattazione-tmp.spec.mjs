@@ -35,5 +35,10 @@ test('sonda', async ({ app }) => {
   }
   console.log('SONDA ' + JSON.stringify(righe));
   console.log('SONDA COMP ' + JSON.stringify(await app.evaluate(() => globalThis.__compattazioni)));
+  const ultima = (await chiamateAlModello(app)).at(-1);
+  for (const m of ultima.slice(1)) {
+    const t = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
+    console.log('SONDA MSG ' + m.role + ' ' + t.length + ' :: ' + t.replace(/(Le api tornano all'alveare e danzano per le compagne\. )+/g, '[API]').slice(0, 4000));
+  }
   await ripristina(app);
 });
