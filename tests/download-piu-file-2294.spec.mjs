@@ -124,7 +124,8 @@ test('una raffica oltre il tetto: cento file aspettano, gli altri non scendono e
   const srv = await apriServer();
   try {
     const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
-    await openTab(`${srv.base}/?n=103&ogni=30&p=tanti`);
+    // Più fitti di così Chromium stesso lascia cadere dei clic sul link, prima che il file parta.
+    await openTab(`${srv.base}/?n=103&ogni=150&p=tanti`);
     await expect.poll(() => voci(shell, 'tanti').then((v) => v.filter((x) => x.stato === 'pending').length), { timeout: 60_000 }).toBe(100);
     await expect.poll(() => shell.evaluate(async () => {
       const r = await window.filoShell.downloads.list();
