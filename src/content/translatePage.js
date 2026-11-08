@@ -1080,19 +1080,8 @@
       } catch (_) {}
     }
     translatedUnits = [];
-    // Traduzioni di formati precedenti. La ricerca attraversa anche i componenti isolati
-    // (#439): ciò che si può tradurre si deve poter rimettere com'era.
-    Extract.findTranslatedElements().forEach((el) => {
-      if (el.dataset.snOriginalHtml !== undefined) {
-        el.innerHTML = el.dataset.snOriginalHtml;
-        delete el.dataset.snOriginalHtml;
-      } else if (el.dataset.snOriginal !== undefined) {
-        el.textContent = el.dataset.snOriginal;
-        delete el.dataset.snOriginal;
-      }
-      delete el.dataset.snTranslated;
-    });
-    document.querySelectorAll('[data-sn-translation="1"]').forEach((n) => n.remove());
+    // Si torna indietro solo da ciò che teniamo in memoria: un attributo del documento lo può scrivere
+    // anche la pagina, e rimetterlo in pagina come HTML farebbe girare il suo codice (#2298).
     pageHasTranslation = false;
     pageComplete = false;
     missingCount = 0;
