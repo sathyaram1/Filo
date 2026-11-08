@@ -68,7 +68,7 @@ for (const [nome, comando] of [
   });
 }
 
-test('r2 una ricerca su un dominio ospitato col nome di Google non arriva al modello come ricerca dell\'utente', async ({ app }) => {
+test('r3 una ricerca su un dominio ospitato col nome di Google non arriva al modello come ricerca dell\'utente', async ({ app }) => {
   test.setTimeout(60_000);
   await primaScheda(app);
   await app.evaluate(async () => {
