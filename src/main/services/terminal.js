@@ -39,20 +39,49 @@ function ambienteDelModello(base) {
   return out;
 }
 
-// 'si' se il repository di `dir` ha impostazioni che avviano programmi (#2292), '' se no, 'ignoto' se git non risponde.
-function gitLanciaIn(dir) {
+// Oltre questi sottomoduli la sonda non li guarda uno per uno: risponde 'ignoto', e il comando chiede.
+const GIT_SOTTOMODULI_MAX = 200;
+
+// 'si' se il repository di `dir`, o un suo sottomodulo, ha impostazioni che avviano programmi (#2292), '' se no,
+// 'ignoto' se git non risponde. Le impostazioni di un sottomodulo si guardano prima di lanciarci dentro altro.
+function gitLanciaIn(dir, visti = { n: 0 }) {
+  const git = (args, cwd) => execFileSync('git', args, {
+    cwd, env: ambienteComandi(), encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    maxBuffer: 256 * 1024 * 1024,
+  });
   let out = '';
   try {
-    out = execFileSync('git', ['config', '--list', '--show-scope', '--includes'], {
-      cwd: dir, env: ambienteComandi(), encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
-    });
+    out = git(['config', '--list', '--show-scope', '--includes'], dir);
   } catch (e) {
     // Senza git installato il comando git non parte nemmeno: non c'è niente da avviare.
     return e && e.code === 'ENOENT' ? '' : 'ignoto';
   }
   const C = globalThis.SN_CMD_CLASSIFY;
   if (!C || typeof C.gitConfigLancia !== 'function') return 'ignoto';
-  return C.gitConfigLancia(out) ? 'si' : '';
+  if (C.gitConfigLancia(out)) return 'si';
+  // git status e git diff entrano in ogni sottomodulo presente con le sue impostazioni, anche senza .gitmodules.
+  let radice = '';
+  try {
+    radice = git(['rev-parse', '--show-toplevel'], dir).trim();
+  } catch (e) {
+    // 128: fuori da un repository o senza cartella di lavoro, dove nessuna lettura entra in un sottomodulo.
+    return e && e.status === 128 ? '' : 'ignoto';
+  }
+  if (!radice) return '';
+  let voci = '';
+  try { voci = git(['ls-files', '--stage', '-z'], radice); } catch (_) { return 'ignoto'; }
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const voce of voci.split('\u0000')) {
+    if (!voce.startsWith('160000 ')) continue;
+    const sotto = path.join(radice, voce.slice(voce.indexOf('\t') + 1));
+    if (!fs.existsSync(path.join(sotto, '.git'))) continue;
+    visti.n += 1;
+    if (visti.n > GIT_SOTTOMODULI_MAX) return 'ignoto';
+    const r = gitLanciaIn(sotto, visti);
+    if (r) return r;
+  }
+  return '';
 }
 
 // Shell di default per piattaforma quando la preferenza non è impostata.
