@@ -3374,6 +3374,8 @@
     opzioniAvvisoSchermoPieno,
     FILO_PARLA_DOWNLOAD_MIN,
     minutiFraDownload,
+    nomeRitmoDownload,
+    minutiDaTesto,
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,
