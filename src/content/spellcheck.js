@@ -839,7 +839,10 @@
           const vivo = monitored.get(el);
           if (!vivo || !e.isTrusted || (tipo === 'keyup' && e.key !== 'Tab')) return;
           vivo.permesso = Date.now();
-          if (vivo.attivo && vivo.codiceTesto !== vivo.testoCalcolato) aggiornaCodice(vivo);
+          // Dopo l'evento: il tasto che scrive paga il controllo del testo nuovo, non quello di prima.
+          setTimeout(() => {
+            if (vivo.attivo && vivo.permesso && vivo.codiceTesto !== vivo.testoCalcolato) aggiornaCodice(vivo);
+          }, 0);
         }, true);
       }
     }
