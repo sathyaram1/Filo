@@ -175,7 +175,7 @@
     const UI = global.SN_FILO_UI;
     const stile = 'all:initial!important;display:contents!important;';
     let strato;
-    if (UI?.stratoChiuso) strato = UI.stratoChiuso(stile, fogliRiquadro = fogliRiquadro || UI.fogliChiusi(FOGLI_RIQUADRO));
+    if (UI?.stratoChiuso) strato = UI.stratoChiuso(stile, fogliRiquadro = fogliRiquadro || UI.fogliChiusi(UI.FOGLI_DEGLI_STRATI));
     else {
       const host = document.createElement('div');
       host.style.cssText = stile;
