@@ -200,11 +200,11 @@ test('rami e incroci leggono anche i rami del clone di filo-security, e se il cl
 });
 
 test('il clone del server si cerca dove lo mettono le routine e la sessione locale', () => {
-  const c = (dir) => (p) => p === join(dir, '.git');
-  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '/srv/fs' });
-  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', scelta: '/a', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '', cercati: ['/a'] },
+  const c = (dir) => (p) => p === join(resolve(dir), '.git');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: resolve('/srv/fs') });
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', scelta: '/a', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '', cercati: [resolve('/a')] },
     'la cartella scelta vale da sola');
-  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: {}, esiste: c('/x/filo-security') }), { dir: '/x/filo-security' });
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: {}, esiste: c('/x/filo-security') }), { dir: resolve('/x/filo-security') });
 });
 
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
