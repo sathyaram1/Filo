@@ -162,6 +162,17 @@ test('ESEGUI_COMANDO: il registro usa il perimetro iniettato dal main e lo spieg
   assert.doesNotMatch(AL.describe(ok), /Perché/);
 });
 
+test('#1994 — ESEGUI_COMANDO: git con --output non parte da solo; blame --contents misura il file che stampa', () => {
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'git log -1 --format=x --output=/home/mario/.bashrc', _perimetro: LINUX }), 3);
+  assert.equal(AL.costoFor({ type: 'ESEGUI_COMANDO', comando: 'uniq a.txt b.txt', _perimetro: LINUX }), 2);
+  for (const cmd of ['git blame --contents=/etc/passwd -- a.txt', 'git blame --contents /etc/passwd -- a.txt',
+    'git blame --contents ~/.ssh/id_rsa -- a.txt', 'git blame --cont=/etc/passwd -- a.txt']) {
+    assert.equal(lvl(cmd, LINUX), 2, cmd);
+  }
+  assert.equal(lvl('git blame --contents note.txt -- a.txt', LINUX), 1);
+  assert.equal(lvl('git blame a.txt', LINUX), 1);
+});
+
 test('LEGGI_DOCUMENTO: stesso perimetro del terminale', () => {
   const doc = (percorso, ctx = LINUX) => AL.costoFor({ type: 'LEGGI_DOCUMENTO', percorso, _perimetro: ctx });
   assert.equal(doc('~/Scaricati/estratto.pdf'), 0);
