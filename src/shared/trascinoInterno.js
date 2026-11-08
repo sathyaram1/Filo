@@ -49,21 +49,5 @@
     return { aVista, dati };
   }
 
-  // Il testo che non è stato riconosciuto entra nella casella dov'è il cursore, come lo scriverebbe il browser.
-  function versa(campo, testo) {
-    if (!campo || !testo) return false;
-    try { campo.focus(); } catch (_) {}
-    const doc = campo.ownerDocument;
-    let scritto = false;
-    try { scritto = doc.activeElement === campo && doc.execCommand('insertText', false, testo); } catch (_) { scritto = false; }
-    if (!scritto) {
-      const a = typeof campo.selectionStart === 'number' ? campo.selectionStart : campo.value.length;
-      const b = typeof campo.selectionEnd === 'number' ? campo.selectionEnd : a;
-      campo.value = campo.value.slice(0, a) + testo + campo.value.slice(b);
-      campo.dispatchEvent(new Event('input', { bubbles: true }));
-    }
-    return true;
-  }
-
-  global.SN_TRASCINO_INTERNO = { COSE, tipoDi, parte, porta, arriva, versa };
+  global.SN_TRASCINO_INTERNO = { COSE, tipoDi, parte, porta, arriva };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
