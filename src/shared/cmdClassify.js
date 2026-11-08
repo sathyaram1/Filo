@@ -1073,6 +1073,11 @@
     return { file: file.concat(pos), ricorsivo: false, ignoto: false };
   }
 
+  // Il percorso di un punto risolto (radice e pezzi) come lo vuole il disco: lo stesso per ogni sonda del main.
+  function assolutoDi(r, c) {
+    return c.win ? `${r.radice}\\${r.segs.join('\\')}` : `/${r.segs.join('/')}`;
+  }
+
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
   function gitPerimetro(raw, c) {
     const sub = subcommandOf(dequote(raw));
