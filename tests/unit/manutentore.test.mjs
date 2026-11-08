@@ -674,3 +674,29 @@ test('lo stato elenca le corse in coda senza lavori: repository, workflow, sha, 
   assert.ok(sporco.every((r) => !r.includes('\n')));
   assert.match(M.testoPiccolo({ ruolo: RUOLO, stato: { ...STATO, corseFerme }, taccuino: { testo: '', versione: 0 }, schede: [] }).testo || '', /la aspetta #2258/);
 });
+
+// #2340, decisione dell'owner dell'08/11: lavori server in parallelo, battito a 2 ore, contesto e taccuino a pezzi.
+test('i lavori server non vanno più uno alla volta: si decide sui file in comune fra i rami (#2340)', () => {
+  const ordine = RUOLO.slice(RUOLO.indexOf('## Le regole dell\'ordine'), RUOLO.indexOf('## Guasti')).replace(/\s+/g, ' ');
+  assert.doesNotMatch(ordine, /alla volta/);
+  assert.match(ordine, /quanti lavori del server tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami \(`incroci` senza numero\)/);
+  assert.match(ordine, /`rami` e `incroci` leggono anche i rami di filo-security/);
+});
+
+test('battito a 2 ore, contesto piccolo per differenze e taccuino aggiornato a sezioni, nel ruolo e nelle spec (#2340)', () => {
+  const testi = { ruolo: RUOLO, spec: readFileSync(risolvi(RADICE, 'SPEC-MANUTENTORE.md'), 'utf8'),
+    stati: readFileSync(risolvi(RADICE, 'FEEDBACK-STATES.md'), 'utf8'), domande: readFileSync(risolvi(RADICE, 'SPEC-DOMANDE.md'), 'utf8') };
+  for (const [nome, t] of Object.entries(testi)) assert.doesNotMatch(t.replace(/\s+/g, ' '), /ogni 55 minuti/, nome);
+  const ruolo = RUOLO.replace(/\s+/g, ' ');
+  assert.match(ruolo, /al \*\*battito\*\*, ogni 2 ore al più/);
+  assert.match(ruolo, /Il contesto piccolo porta solo quello che è cambiato dall'accensione prima/);
+  assert.match(ruolo, /Porta tutto alla prima accensione del giorno e dopo un'accensione nata morta/);
+  assert.match(ruolo, /`taccuino sezione <nome> - --versione <V>`/);
+  assert.doesNotMatch(ruolo, /riscrivi il taccuino intero|Il taccuino riscritto, intero/);
+  // L'indicazione dell'owner arriva in coda: la sezione delle indicazioni è l'ultima, o finirebbe nelle misure.
+  const sezioni = [...RUOLO.matchAll(/^- `## ([a-z]+)`/gm)].map((m) => m[1]);
+  assert.deepEqual(sezioni, ['stato', 'problemi', 'esperimenti', 'misure', 'indicazioni']);
+  const spec = testi.spec.replace(/\s+/g, ' ');
+  assert.match(spec, /L'operazione `taccuino\.sezione` \(`sezione`, `testo`, `versione`\) riscrive il corpo di una sola sezione e lascia il resto del taccuino identico byte per byte/);
+  assert.match(spec, /battito\*\* ogni 2 ore al massimo/);
+});
