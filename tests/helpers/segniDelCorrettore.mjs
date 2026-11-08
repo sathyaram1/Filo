@@ -99,6 +99,20 @@ class Segni {
     return r.v;
   }
   async evaluateAll(fn, arg = null) { return this._leggi({ fn: fn.toString(), tutti: true }, arg); }
+  // Come Locator.click: aspetta il nodo visibile e fermo (lo strato si anima e si ridisegna), poi un clic vero del mouse
+  // al centro, che arriva a ciò che sta davvero sotto quel punto.
+  async click({ timeout, ...opz } = {}) {
+    let prima = null;
+    const b = await this._aspetta(async () => {
+      const [s] = await this._leggi();
+      const ora = s && s.visibile ? s.box : null;
+      const fermo = ora && prima && ['x', 'y', 'width', 'height'].every((k) => Math.abs(ora[k] - prima[k]) < 0.5);
+      prima = ora;
+      return fermo ? ora : null;
+    }, timeout);
+    if (!b) throw new Error(`${this}: nessun nodo visibile e fermo da cliccare`);
+    await this._page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, opz);
+  }
 
   // Il protocollo dei confronti di expect sui Locator: si rilegge finché il confronto riesce o scade il tempo.
   async _expect(come, { expectedNumber, expectedText, isNot, timeout }) {
