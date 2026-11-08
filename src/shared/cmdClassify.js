@@ -1986,12 +1986,27 @@
   ];
   // Le righe di `git config --list --show-scope --includes`: true se una chiave locale o del worktree non è inerte.
   // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
+  // Con `-z` (la forma della sonda) i campi sono separati da NUL e la chiave finisce al ritorno a capo: senza, un «=»
+  // nel nome di un remoto (`[remote "a.url=x"]`) spostava il confine e la chiave passava per un'altra.
   function gitConfigLancia(righe) {
-    return String(righe || '').split(/\r?\n/).some((riga) => {
-      const m = /^(local|worktree)\t([^=]+)=?(.*)$/.exec(riga);
-      if (!m) return false;
-      const chiave = m[2].toLowerCase();
-      if (chiave === 'core.fsmonitor') return !/^(true|false|yes|no|on|off|1|0)?$/i.test(m[3].trim());
+    const testo = String(righe || '');
+    const voci = [];
+    if (testo.includes('\u0000')) {
+      const p = testo.split('\u0000');
+      for (let i = 0; i + 1 < p.length; i += 2) {
+        const a = p[i + 1].indexOf('\n');
+        voci.push([p[i], a < 0 ? p[i + 1] : p[i + 1].slice(0, a), a < 0 ? '' : p[i + 1].slice(a + 1)]);
+      }
+    } else {
+      for (const riga of testo.split(/\r?\n/)) {
+        const m = /^(local|worktree)\t([^=]+)=?(.*)$/.exec(riga);
+        if (m) voci.push([m[1], m[2], m[3]]);
+      }
+    }
+    return voci.some(([ambito, k, valore]) => {
+      if (ambito !== 'local' && ambito !== 'worktree') return false;
+      const chiave = k.toLowerCase();
+      if (chiave === 'core.fsmonitor') return !/^(true|false|yes|no|on|off|1|0)?$/i.test(valore.trim());
       return !GIT_CHIAVI_INERTI.some((re) => re.test(chiave));
     });
   }
