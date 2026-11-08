@@ -23,8 +23,9 @@ test('r1 git --output con un parametro vuoto di bash scrive un file: non è una 
   }
 });
 
-test('r1 git --output dentro le graffe di bash scrive un file: non è una lettura libera', () => {
+test('r1 git --output dentro le graffe di bash o fra $"…" scrive un file: non è una lettura libera', () => {
   expect(livello('git log -1 --format=x%n --{output=/home/u/.bashrc,}', 'bash')).toBeGreaterThanOrEqual(2);
+  expect(livello('git log -1 --format=x%n $"--output=/home/u/.bashrc"', 'bash')).toBeGreaterThanOrEqual(2);
 });
 
 test('r1 git --output con $null di PowerShell scrive un file: non è una lettura libera', () => {
