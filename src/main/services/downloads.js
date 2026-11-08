@@ -912,6 +912,7 @@ function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '')
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
     _quarantena: attesa,
+    _piuFile: perPiuFile,
     _scope: scope || '',
     _sessione: ses || (webContents && !webContents.isDestroyed?.() ? webContents.session : null),
   };
