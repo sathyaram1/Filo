@@ -226,6 +226,6 @@
     window.filo.onBroadcast((m) => { if (m && m.type === (MSG.AUTH_CHANGED || 'auth_changed')) carica(); });
   }
 
-  window.__mgRedteam = { carica };
+  window.__mgRedteam = { carica, tettiDiFabbrica };
   carica();
 })();
