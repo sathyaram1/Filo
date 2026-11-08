@@ -2377,6 +2377,27 @@
           </label>
           <p class="mg-auto-block-desc mg-rt-stato" id="mgRtOpenMsg" role="status"></p>
         </section>
+        <!-- I tetti dell'invio (#2296): li valida e li applica il server, la stima accanto la fa manageRedteam.js. -->
+        <section class="mg-auto-block sn-manopola mg-rt-tetto" data-tetto="perUserDay" hidden>
+          <label class="mg-auto-field-label" for="mgRtTetto-perUserDay">Tentativi al giorno per account</label>
+          <div class="mg-auto-field-row">
+            <input type="number" id="mgRtTetto-perUserDay" class="mg-auto-number" inputmode="numeric" autocomplete="off" />
+            <button type="button" class="sn-btn" data-tetto-salva>Salva</button>
+            <button type="button" class="sn-btn sn-btn-secondary" data-tetto-rimetti hidden>Rimetti com’era</button>
+            <span class="mg-action-msg" data-tetto-msg role="status"></span>
+          </div>
+          <p class="mg-auto-block-desc mg-rt-stima" data-tetto-stima></p>
+        </section>
+        <section class="mg-auto-block sn-manopola mg-rt-tetto" data-tetto="globalDay" hidden>
+          <label class="mg-auto-field-label" for="mgRtTetto-globalDay">Tentativi al giorno in tutto</label>
+          <div class="mg-auto-field-row">
+            <input type="number" id="mgRtTetto-globalDay" class="mg-auto-number mg-auto-number--largo" inputmode="numeric" autocomplete="off" />
+            <button type="button" class="sn-btn" data-tetto-salva>Salva</button>
+            <button type="button" class="sn-btn sn-btn-secondary" data-tetto-rimetti hidden>Rimetti com’era</button>
+            <span class="mg-action-msg" data-tetto-msg role="status"></span>
+          </div>
+          <p class="mg-auto-block-desc mg-rt-stima" data-tetto-stima></p>
+        </section>
       </div>
       <div class="mg-automation" id="mgIpRoot">
         <section class="mg-auto-block" data-in-pausa="bacheca">
