@@ -127,7 +127,7 @@ Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 **Cache e battito.** Il battito era a 55 minuti per tenere calda una cache a
 un'ora, ma in cloud le scritture in cache durano cinque minuti: fra due
 battiti la cache è sempre fredda. Dall'08/11/2026 (#2340) il battito è ogni
-2 ore; gli eventi non lo aspettano, perché i segnali del server svegliano il
+due ore (in lettere: le ore in cifre di questa spec sono la soglia del § 7); gli eventi non lo aspettano, perché i segnali del server svegliano il
 manutentore da sé. Il costo basso lo tiene il contesto piccolo per
 differenze. Misurato il 05/11/2026 (§ 6): nemmeno per lui l'ora conviene.
 
