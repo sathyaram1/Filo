@@ -343,15 +343,16 @@ test('schede illeggibili: la priorità non scende alla cieca', async (t) => {
   assert.ok(!s.corpi.some((c) => c.op === 'priorita'));
 });
 
-test('un feedback a priorità 3 non si archivia come doppione; uno a 1 sì', async (t) => {
+test('un feedback a priorità 3 non si archivia come doppione, se non di un\'altra 3; uno a 1 sì', async (t) => {
   const s = serverFinto(t, {
-    schede: [200, { ok: true, schede: [schedaServer(812, 3), schedaServer(815, 1)] }],
+    schede: [200, { ok: true, schede: [schedaServer(812, 3), schedaServer(815, 1), schedaServer(700, 1), schedaServer(701, 3)] }],
     archivia: (b) => [200, { ok: true, numero: b.dati.numero, doppioneDi: b.dati.doppioneDi }],
   });
   assert.equal(await M.main(['archivia', '812', '700'], CHIAVE), 1);
   assert.match(s.err.join('\n'), /#812: un feedback a priorità 3 non si archivia/);
   assert.equal(await M.main(['archivia', '815', '700'], CHIAVE), 0);
-  assert.deepEqual(s.corpi.filter((c) => c.op === 'archivia').map((c) => c.dati), [{ numero: '815', doppioneDi: '700' }]);
+  assert.equal(await M.main(['archivia', '812', '701'], CHIAVE), 0, 'la 3 resta aperta nell\'originale');
+  assert.deepEqual(s.corpi.filter((c) => c.op === 'archivia').map((c) => c.dati), [{ numero: '815', doppioneDi: '700' }, { numero: '812', doppioneDi: '701' }]);
 });
 
 test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => {
