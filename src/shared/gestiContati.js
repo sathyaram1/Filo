@@ -38,8 +38,11 @@
     return { misura: 'gesto', gesto: 'trascinamento', da: String(da || ''), a: String(a || ''), esito };
   }
 
-  // Al rilascio su una destinazione: `usato` dice se quello che è arrivato è servito a qualcosa.
-  function rilascio(dt, a, usato = true) { return trascinamento(origineDi(dt), a, usato ? 'posato' : 'annullato'); }
+  // Al rilascio su una destinazione: `usato` dice se quello che è arrivato è servito a qualcosa. Chi lo sa solo dopo
+  // l'evento passa l'origine letta durante, come stringa: il DataTransfer a evento finito è vuoto.
+  function rilascio(dt, a, usato = true) {
+    return trascinamento(typeof dt === 'string' ? dt : origineDi(dt), a, usato ? 'posato' : 'annullato');
+  }
 
   // A fine trascinamento, nella pagina da cui parte: nessuno l'ha preso. Un rilascio preso lo conta chi lo prende.
   function fine(e, da) {
