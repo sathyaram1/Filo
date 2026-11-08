@@ -59,7 +59,10 @@ test('soglia sotto la parte fissa: lo scambio di prima resta grezzo?', async ({ 
     const comp = await app.evaluate(() => globalThis.__compattazioni.map((x) => x.motivo));
     const base = await app.evaluate(() => globalThis.SN_COMPATTAZIONE.base(false));
     console.log('SOTTO', JSON.stringify({ comp, base, tok: await tokenDi(app, c[1]), ofelia: JSON.stringify(c[1].slice(1)).includes('Ofelia') }));
-    const stima = await app.evaluate(async () => globalThis.SN_HANDLE_MESSAGE({ type: 'stima_soglia_compattazione', soglia: 40000 }, { tab: { id: 5, url: 'filo://preferences/preferences.html' }, url: 'filo://preferences/preferences.html' }));
-    console.log('STIMA40', JSON.stringify(stima));
+    const stime = await app.evaluate((_e, base) => {
+      const p = { prompt: 1e-6, completion: 5e-6, cacheRead: 1e-7 };
+      return [20000, 40000, 50000, 70000].map((soglia) => ({ soglia, t: globalThis.SN_FILO_COMPATTAZIONE.stimaSoglia({ soglia, base, prezzoChat: p, prezzoCompattazione: p }).testo }));
+    }, base);
+    console.log('STIME', JSON.stringify(stime));
   } finally { await rimetti(app); await ripristina(app); }
 });
