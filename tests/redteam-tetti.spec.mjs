@@ -117,6 +117,8 @@ async function entraOwner(app) {
     ga.restore();
     await ga.getIdToken();
     await req('./services/redteamGate').rileggiOra();
+    // Un listino letto all'avvio, prima della deviazione, sarebbe quello vero: si rilegge dal finto.
+    await req('./services/costoModelli').listino({ forza: true });
     return ga.isAdmin();
   }, { base, tokenEndpoint: process.env.FILO_SECURE_TOKEN_ENDPOINT, owner: OWNER_EMAIL });
 }
