@@ -76,10 +76,7 @@
     }
     const SC = global.SN_SITI_COMUNI;
     const r = SC && typeof SC.riconosci === 'function' ? SC.riconosci(u.href) : null;
-    if (r && r.tipo === 'cerca' && stringa(r.parole)) return { testo: r.parole.trim(), sito: r.sito };
-    if (!PERCORSO_CERCA.test(u.pathname)) return null;
-    const testo = leggi(CHIAVI_CERCA);
-    return testo ? { testo, sito: host } : null;
+    return r && r.tipo === 'cerca' && stringa(r.parole) ? { testo: r.parole.trim(), sito: r.sito } : null;
   }
 
   // ── Il sistema: solo i cambi che contano, non ogni punto di batteria ──
