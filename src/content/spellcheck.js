@@ -1812,9 +1812,14 @@
       let delSito = false;
       let vista = false;
       for (let i = a; i < b; i++) { if (sito[i]) delSito = true; if (visto[i]) vista = true; }
+      // Contate come le conta il dizionario: «1_zanzottera» e «2_zanzottera» sono la stessa parola.
       if (!delSito && vista && !ripetute) {
-        const chiave = m[0].toLowerCase();
-        if (giaViste.has(chiave)) delSito = true; else giaViste.add(chiave);
+        const parole = R() ? R().parole(m[0]) : [{ start: 0, end: m[0].length, parola: m[0] }];
+        for (const w of parole) {
+          const chiave = w.parola.toLowerCase();
+          if (!giaViste.has(chiave)) { giaViste.add(chiave); continue; }
+          for (let i = a + w.start; i < a + w.end; i++) out[i] = ' ';
+        }
       }
       if (delSito) for (let i = a; i < b; i++) out[i] = ' ';
     }
