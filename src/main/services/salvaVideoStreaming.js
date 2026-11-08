@@ -13,7 +13,7 @@ const t = (k, ...a) => { try { return globalThis.SN_I18N.t(k, ...a); } catch (_)
 
 // Le frasi dei motivi stanno in i18n.js come `streaming_<motivo>`; le pagine le mostrano tali e quali.
 const MOTIVI = Object.freeze(['eta', 'accesso', 'robot', 'protetto', 'spazio', 'diretta', 'sito', 'elenco',
-  'non_disponibile', 'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'generico']);
+  'non_disponibile', 'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'proxy', 'generico']);
 const frase = (motivo) => t(`streaming_${MOTIVI.includes(motivo) ? motivo : 'generico'}`);
 // Quelli che ripetere non cambia: il video resta com'è.
 const DEFINITIVI = Object.freeze(['eta', 'accesso', 'protetto', 'sito', 'elenco', 'piattaforma']);
@@ -99,13 +99,13 @@ function fermaAlbero(figlio, { subito = false } = {}) {
   }
 }
 
-function eseguiYtdlp(comando, argomenti, { suEvento, fermato, cartella }) {
+function eseguiYtdlp(comando, argomenti, { suEvento, fermato, cartella, proxy = '' }) {
   return new Promise((risolvi) => {
     let figlio;
     try {
       figlio = spawn(comando[0], [...comando.slice(1), ...argomenti], {
         // L'Electron di Filo fa da runtime JavaScript per le sfide di YouTube: nessun Node o Deno da installare.
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
+        env: Y.ambiente({ ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }, proxy),
         windowsHide: true,
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
@@ -157,12 +157,15 @@ function nomeSicuro(titolo, ext) {
 }
 
 // `scegli(nome)` → { filePath } | { cancelled } | { error }: la domanda su dove salvare, come per gli altri file.
-// `sposta(da, a)`: la consegna nel posto scelto.
-async function salva({ url, titolo = '', audio = false, scope = '', webContents = null, riusa = '', scegli, sposta,
-  downloads = require('./downloads'), strumenti = () => require('./strumentiVideo').strumenti() }) {
+// `sposta(da, a)`: la consegna nel posto scelto. `sessione` e `paese`: quelli del lavoro da rifare, per «Riprova».
+async function salva({ url, titolo = '', audio = false, scope = '', webContents = null, sessione = null, paese = null,
+  riusa = '', scegli, sposta, downloads = require('./downloads'), strumenti = () => require('./strumentiVideo').strumenti(),
+  uscita = (o) => require('./proxyTab').uscitaPerProgramma(o) }) {
   const ext = audio ? '.m4a' : '.mp4';
   const proposto = nomeSicuro(Y.titoloDaPagina(titolo), ext);
   const voce = downloads.beginManual({ url, filename: proposto, totalBytes: 0, scope, webContents, via: 'streaming', riusa });
+  let ses = sessione;
+  try { if (!ses && webContents && !webContents.isDestroyed?.()) ses = webContents.session; } catch (_) {}
   const fallisci = (motivo, dettaglio) => {
     if (dettaglio) console.warn('[Filo video] salvataggio non riuscito:', motivo, String(dettaglio).slice(0, 400));
     if (voce.cancelled()) return { ok: false, cancelled: true };
@@ -170,6 +173,13 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     // `annunciato`: l'avviso con il perché l'ha già dato la finestra (downloads.js), la pagina non lo ripete.
     return { ok: false, motivo, frase: frase(motivo), annunciato: true };
   };
+
+  // La pagina esce da un proxy (la scheda, o la regola del sito): il programma esce dallo stesso, o non parte (#2301).
+  let rete;
+  try { rete = await uscita({ ses, url, paese }); } catch (_) { rete = { rifiuto: true, paese }; }
+  voce.paese(rete && rete.paese);
+  if (!rete || rete.rifiuto) return fallisci('proxy');
+  if (voce.cancelled()) return { ok: false, cancelled: true };
 
   let programmi;
   const prendi = async (forza) => {
@@ -221,6 +231,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     const esito = await eseguiYtdlp(programmi.comando, Y.argomenti({
       url, cartella: lavoro, audio, ffmpeg: programmi.ffmpeg, nodo: comandoDiProva() ? '' : process.execPath,
     }), {
+      proxy: rete.proxy || '',
       cartella: lavoro,
       fermato: () => voce.cancelled() || noAlDialogo,
       suEvento: (ev, riga) => {

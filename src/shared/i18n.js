@@ -104,6 +104,7 @@
     streaming_programma: 'Non sono riuscito a scaricare il programma che salva i video: controlla la connessione e riprova',
     streaming_firma: 'Il programma per i video arrivato non porta la firma dei suoi autori, e non l\'ho usato: riprova più tardi',
     streaming_piattaforma: 'Su questo computer Filo non sa ancora salvare i video in streaming',
+    streaming_proxy: 'Questo sito lo apri da un altro paese, ma adesso quella connessione non è disponibile: per non mostrare al sito la tua, il video non l\'ho salvato',
     streaming_generico: 'Non sono riuscito a salvare il video',
     toast_media_speed: 'Velocità %s',
     toast_media_loop_on: 'Si ripeterà in continuo',

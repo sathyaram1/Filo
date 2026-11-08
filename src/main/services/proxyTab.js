@@ -133,12 +133,13 @@ function dimenticaSeCambia(ses, chiave) {
 
 // La partition proxata con regole e credenziali di `resolved` (quello di resolve()). Torna la promessa da aspettare
 // prima di caricare quando le credenziali vecchie vanno dimenticate, altrimenti null.
-function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null } = {}) {
+function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null, country = '', tier = '' } = {}) {
   const conAuth = auth && auth.username ? auth : null;
   const rete = proxyRules ? { proxyRules, ...(bypassRules ? { proxyBypassRules: bypassRules } : {}) } : null;
   const dimentica = dimenticaSeCambia(ses, JSON.stringify([proxyRules, bypassRules, conAuth && conAuth.username, conAuth && conAuth.password]));
   if (!conAuth && !rete) { authBySession.delete(partition); return dimentica; }
-  authBySession.set(partition, { ses, auth: conAuth, rete });
+  const paese = normalizeCountry(country) ? { country: normalizeCountry(country), tier: normalizeTier(tier) } : null;
+  authBySession.set(partition, { ses, auth: conAuth, rete, paese });
   if (conAuth) wireLoginHandler();
   return dimentica;
 }
@@ -178,6 +179,43 @@ async function leggiRegole() {
   return (FM && (await FM.listProxyRules())) || {};
 }
 
+// Un programma esterno (yt-dlp) vuole il proxy come indirizzo intero; i socks con i nomi risolti dal proxy, come fa
+// Chromium: il DNS di casa direbbe il sito a chi guarda la rete. '' per uno schema che il programma non sa usare.
+const SCHEMI_PROGRAMMA = Object.freeze({ http: 'http', https: 'https', socks4: 'socks4a', socks5: 'socks5h' });
+function indirizzoPerProgramma(proxyRules, auth = null) {
+  let u;
+  try { u = new URL(String(proxyRules || '').trim()); } catch (_) { return ''; }
+  const schema = SCHEMI_PROGRAMMA[u.protocol.replace(/:$/, '').toLowerCase()];
+  if (!schema || !u.hostname) return '';
+  const chi = auth && auth.username ? `${encodeURIComponent(auth.username)}:${encodeURIComponent(auth.password || '')}@` : '';
+  return `${schema}://${chi}${u.host}`;
+}
+
+const paeseDi = (p) => (p && normalizeCountry(p.country) ? { country: normalizeCountry(p.country), tier: normalizeTier(p.tier) } : null);
+
+// Da dove esce un programma che scarica per conto di una scheda (#2301): dal proxy della sua sessione, dal paese già
+// scelto per quel lavoro (`paese`, per «Riprova») o dalla regola del sito. Se uno di questi vale ma non si può usare,
+// `{ rifiuto }`: mai la connessione vera al suo posto. `paese` torna solo se non viene dalla regola, che si rilegge.
+async function uscitaPerProgramma({ ses = null, url = '', paese = null, regole = leggiRegole,
+  impostazioni = async () => globalThis.SN_STORAGE?.getSettings?.() } = {}) {
+  const voce = voceDellaSessione(ses);
+  if (voce && voce.rete) {
+    const proxy = indirizzoPerProgramma(voce.rete.proxyRules, voce.auth);
+    return proxy ? { proxy, paese: voce.paese || null } : { rifiuto: true, paese: voce.paese || null };
+  }
+  let scelta = paeseDi(paese);
+  const tieni = scelta;
+  if (!scelta) {
+    try { scelta = paeseDi(regolaPer(url, await regole())); } catch (_) { return { rifiuto: true, paese: null }; }
+  }
+  if (!scelta) return { proxy: '', paese: null };
+  let settings = null;
+  try { settings = await impostazioni(); } catch (_) {}
+  const resolved = resolve(scelta.country, { tier: scelta.tier, settings });
+  const proxy = resolved ? indirizzoPerProgramma(resolved.proxyRules, resolved.auth) : '';
+  return proxy ? { proxy, paese: tieni } : { rifiuto: true, paese: tieni };
+}
+
 module.exports = {
   regolaPer,
   leggiRegole,
@@ -194,4 +232,6 @@ module.exports = {
   clearPartitionAuth,
   credenzialiDellaSessione,
   reteDellaSessione,
+  indirizzoPerProgramma,
+  uscitaPerProgramma,
 };

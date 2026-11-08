@@ -395,6 +395,7 @@ function publicRecord(r) {
     // #1488 — `via` dice chi rifà lo scaricamento, `nota` cosa sta facendo o perché non è riuscito.
     via: r.via || '',
     nota: r.nota || '',
+    ...(r.paese ? { paese: r.paese } : {}),
     // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
     ...velocitaDi(r),
   };
@@ -1204,6 +1205,12 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
       broadcast('progress', rec);
     },
+    // Il paese da cui il lavoro è uscito (#2301): «Riprova» esce di nuovo da lì, anche a scheda chiusa o dopo un riavvio.
+    paese(p) {
+      if (p && p.country) rec.paese = { country: String(p.country), tier: String(p.tier || '') };
+      else delete rec.paese;
+      persist();
+    },
     // `perche`: la frase che resta sulla riga chiusa, per chi non ha visto l'avviso.
     fail(perche = '', { riprovabile = true } = {}) {
       rec.nota = String(perche || '');
@@ -1376,7 +1383,10 @@ function riprova(id, scope = '') {
     if (!rifaiStreaming || !/^https?:/i.test(String(rec.url || ''))) {
       return { ok: false, error: 'Questo video non ha un indirizzo da cui salvarlo di nuovo', items: listRecords(scope) };
     }
-    rifaiStreaming({ id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '' });
+    rifaiStreaming({
+      id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '',
+      sessione: rec._sessione || null, paese: rec.paese || null,
+    });
     return { ok: true, items: listRecords(scope) };
   }
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {

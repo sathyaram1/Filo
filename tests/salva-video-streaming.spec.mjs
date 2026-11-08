@@ -6,6 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { createRequire } from 'node:module';
 import { join } from 'node:path';
 import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { createServer as createHttpServer, request as httpRequest } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
 import { cartellaTemporanea, togliCartella } from './helpers/percorsi.mjs';
 
@@ -216,4 +217,106 @@ test('una pagina che è un elenco di video non viene scaricata tutta: si ferma e
   expect(righe().filter((r) => r.voce).length).toBe(1);
   const v = (await elenco(shell)).find((x) => x.via === 'streaming');
   expect(v.state).not.toBe('completed');
+});
+
+// #2301 — un proxy HTTP di prova che inoltra le richieste in chiaro e conta quelle viste.
+async function proxyDiProva() {
+  const viste = [];
+  const server = createHttpServer((req, res) => {
+    viste.push(req.url);
+    let u;
+    try { u = new URL(req.url); } catch (_) { res.writeHead(400); res.end(); return; }
+    const fuori = httpRequest({ host: u.hostname, port: u.port, path: u.pathname + u.search, method: req.method, headers: req.headers }, (r) => {
+      res.writeHead(r.statusCode, r.headers);
+      r.pipe(res);
+    });
+    fuori.on('error', () => { try { res.writeHead(502); res.end(); } catch (_) {} });
+    req.pipe(fuori);
+  });
+  await new Promise((r) => server.listen(0, '127.0.0.1', r));
+  return { port: server.address().port, viste, close: () => new Promise((r) => { server.closeAllConnections?.(); server.close(r); }) };
+}
+
+// La scheda passata dal proxy ha una vista nuova: la pagina viva è quella col lettore pronto.
+async function paginaViva(app, url) {
+  for (let i = 0; i < 150; i++) {
+    for (const p of app.windows().filter((w) => !w.isClosed() && w.url() === url).reverse()) {
+      try { if (await p.evaluate(() => !!document.getElementById('v')?.src.startsWith('blob:'))) return p; } catch (_) {}
+    }
+    await new Promise((r) => setTimeout(r, 150));
+  }
+  throw new Error(`nessuna scheda viva su ${url}`);
+}
+
+const proxyDelProgramma = () => righe().filter((r) => r.argv).map((r) => r.proxy);
+
+test('da una scheda aperta da un altro paese il video esce dal suo proxy, e «Riprova» a scheda chiusa anche', async ({ app, shell, openTab, testServer }) => {
+  test.setTimeout(120_000);
+  const proxy = await proxyDiProva();
+  try {
+    await app.evaluate(async (_e, endpoint) => {
+      await globalThis.SN_STORAGE.updateSettings({ proxy: { datacenter: endpoint, bypass: '<-loopback>' } });
+    }, `http://utente-{country}:segreto@127.0.0.1:${proxy.port}`);
+    nuovoCaso({ errore: 'Unable to download webpage: timed out' });
+    const url = testServer.html(PAGINA);
+    const prima = await openTab(url);
+    await prima.waitForSelector('#v');
+    const tabId = await app.evaluate(({ BrowserWindow }, u) => {
+      for (const w of BrowserWindow.getAllWindows()) {
+        const t = w._filoTabs?.tabs.find((x) => x.url === u);
+        if (t) return t.id;
+      }
+      return null;
+    }, url);
+    const r = await app.evaluate(({ BrowserWindow }, id) =>
+      BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs.some((t) => t.id === id))._filoTabs.setTabProxy(id, 'FR'), tabId);
+    expect(r).toMatchObject({ ok: true, country: 'fr' });
+    const page = await paginaViva(app, url);
+    expect(proxy.viste).toContain(url);
+    await salvaDalMenu(page);
+
+    const atteso = `http://utente-fr:segreto@127.0.0.1:${proxy.port}`;
+    await expect.poll(() => proxyDelProgramma().length, { timeout: 15000 }).toBe(1);
+    const p = proxyDelProgramma()[0];
+    for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']) expect(p[k]).toBe(atteso);
+    expect(p.NO_PROXY).toBeUndefined();
+    await expect.poll(async () => (await elenco(shell)).find((x) => x.via === 'streaming')?.state, { timeout: 15000 }).toBe('interrupted');
+    expect((await elenco(shell)).find((x) => x.via === 'streaming').paese).toEqual({ country: 'fr', tier: 'datacenter' });
+
+    // La scheda si chiude: «Riprova» dai Download esce comunque dal proxy del paese di prima.
+    await app.evaluate(({ BrowserWindow }, id) =>
+      BrowserWindow.getAllWindows().find((w) => w._filoTabs?.tabs.some((t) => t.id === id))._filoTabs.closeTab(id), tabId);
+    ilCaso({ titolo: 'Dal proxy', pausaMs: 20 });
+    const dl = await openTab('filo://downloads/downloads.html');
+    const riga = dl.locator('.dl-item', { has: dl.locator('.dl-meta', { hasText: 'La connessione non risponde' }) });
+    await riga.locator('.dl-btn', { hasText: 'Riprova' }).click();
+    await expect(dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: 'Dal proxy' }) }).locator('.dl-btn', { hasText: 'Apri file' }))
+      .toBeVisible({ timeout: 20000 });
+    expect(proxyDelProgramma().length).toBe(2);
+    expect(proxyDelProgramma()[1].ALL_PROXY).toBe(atteso);
+  } finally {
+    await proxy.close();
+  }
+});
+
+test('un sito con la regola del paese e nessun proxy da usare: il video non scende dalla connessione vera, e l\'avviso dice perché', async ({ app, shell, openTab, testServer, avvisi }) => {
+  test.setTimeout(60_000);
+  await app.evaluate(async () => { await globalThis.SN_FILO_MEMORY.setProxyRule('127.0.0.1', { country: 'us' }); });
+  nuovoCaso({ titolo: 'Non deve scendere', pausaMs: 20 });
+  const page = await testServer.openReady(openTab, PAGINA);
+  await salvaDalMenu(page);
+  const vista = await avvisi();
+  const avviso = vista.locator('.shell-notif', { hasText: 'altro paese' }).last();
+  await expect(avviso).toBeVisible({ timeout: 15000 });
+  await avviso.screenshot({ path: join(SHOTS, 'salva-video-streaming-proxy.png') });
+  const v = (await elenco(shell)).find((x) => x.via === 'streaming');
+  expect(v.state).toBe('interrupted');
+  expect(proxyDelProgramma()).toEqual([]);
+
+  // Tolta la regola, lo stesso video si salva come sempre.
+  await app.evaluate(async () => { await globalThis.SN_FILO_MEMORY.removeProxyRule('127.0.0.1'); });
+  const dl = await openTab('filo://downloads/downloads.html');
+  await dl.locator('.dl-item', { has: dl.locator('.dl-meta', { hasText: 'altro paese' }) }).locator('.dl-btn', { hasText: 'Riprova' }).click();
+  await expect.poll(async () => (await elenco(shell)).find((x) => x.via === 'streaming')?.state, { timeout: 20000 }).toBe('completed');
+  expect(proxyDelProgramma().length).toBe(1);
 });

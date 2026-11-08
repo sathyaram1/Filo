@@ -149,7 +149,7 @@ test('«Riprova» su una riga fallita rifà il salvataggio dalla stessa pagina, 
   try {
     const r = DL.riprova(fallita.id);
     assert.equal(r.ok, true);
-    assert.deepEqual(chiamate, [{ id: fallita.id, url: URL_SEGNALATO, filename: 'Da riprovare.mp4', scope: '' }]);
+    assert.deepEqual(chiamate, [{ id: fallita.id, url: URL_SEGNALATO, filename: 'Da riprovare.mp4', scope: '', sessione: null, paese: null }]);
     ilCaso({ titolo: 'Da riprovare', pausaMs: 5 });
     const ok = await SV.salva({ url: URL_SEGNALATO, titolo: 'Da riprovare', riusa: fallita.id, scegli: async (n) => dentro(n), sposta });
     assert.equal(ok.ok, true);
@@ -161,6 +161,71 @@ test('«Riprova» su una riga fallita rifà il salvataggio dalla stessa pagina, 
   } finally {
     DL.quandoRiprovaStreaming(null);
   }
+});
+
+// #2301 — la scheda aperta da un altro paese: il programma esce dal suo proxy, e «Riprova» dallo stesso paese.
+const ProxyTab = require(join(ROOT, 'src', 'main', 'services', 'proxyTab.js'));
+const proxyDelProgramma = () => JSON.parse(readFileSync(registro, 'utf8').trim().split('\n')[0]).proxy;
+
+test('da una scheda passata da un proxy il programma esce dal proxy, credenziali comprese, e «Riprova» esce dallo stesso paese', async () => {
+  const ses = {};
+  const wc = { session: ses, isDestroyed: () => false, getURL: () => URL_SEGNALATO };
+  const fornitore = { proxy: { datacenter: 'http://utente-{country}:segreto@p.test:8080' } };
+  await ProxyTab.registraRete('proxy:t-video', ses, ProxyTab.resolve('fr', { settings: fornitore }));
+  const prima = globalThis.SN_STORAGE;
+  globalThis.SN_STORAGE = { getSettings: async () => fornitore };
+  const chiamate = [];
+  try {
+    ilCaso({ errore: 'Unable to download webpage: timed out' });
+    const r = await SV.salva({ url: URL_SEGNALATO, titolo: 'Dal proxy', webContents: wc, scegli: async (n) => dentro(n), sposta });
+    assert.equal(r.motivo, 'rete');
+    const atteso = 'http://utente-fr:segreto@p.test:8080';
+    const p = proxyDelProgramma();
+    for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']) assert.equal(p[k], atteso, k);
+    const fallita = ultima();
+    assert.deepEqual(fallita.paese, { country: 'fr', tier: 'datacenter' }, 'la riga ricorda il paese, non le credenziali');
+    assert.ok(!JSON.stringify(DL.list()).includes('segreto'));
+
+    // La scheda si chiude (il suo proxy non è più registrato): «Riprova» esce comunque da lì.
+    ProxyTab.clearPartitionAuth('proxy:t-video');
+    DL.quandoRiprovaStreaming((x) => chiamate.push(x));
+    assert.equal(DL.riprova(fallita.id).ok, true);
+    assert.deepEqual(chiamate[0].paese, { country: 'fr', tier: 'datacenter' });
+    ilCaso({ titolo: 'Dal proxy', pausaMs: 5 });
+    const ok = await SV.salva({ url: chiamate[0].url, titolo: 'Dal proxy', riusa: chiamate[0].id, sessione: chiamate[0].sessione,
+      paese: chiamate[0].paese, scegli: async (n) => dentro(n), sposta });
+    assert.equal(ok.ok, true, JSON.stringify(ok));
+    assert.equal(proxyDelProgramma().ALL_PROXY, atteso);
+  } finally {
+    ProxyTab.clearPartitionAuth('proxy:t-video');
+    DL.quandoRiprovaStreaming(null);
+    globalThis.SN_STORAGE = prima;
+  }
+});
+
+test('un sito con la regola del paese e nessun proxy da usare: il programma non parte, e la riga dice perché', async () => {
+  const prima = globalThis.SN_FILO_MEMORY;
+  globalThis.SN_FILO_MEMORY = { listProxyRules: async () => ({ 'youtube.com': { country: 'us' } }) };
+  try {
+    ilCaso({ titolo: 'Non deve partire', pausaMs: 5 });
+    const r = await SV.salva({ url: URL_SEGNALATO, titolo: 'Bloccato', scegli: async (n) => dentro(n), sposta });
+    assert.equal(r.ok, false);
+    assert.equal(r.motivo, 'proxy');
+    assert.match(r.frase, /altro paese/);
+    assert.equal(existsSync(registro), false, 'yt-dlp non è partito dalla connessione vera');
+    const v = ultima();
+    assert.equal(v.state, 'interrupted');
+    assert.equal(v.nota, r.frase);
+    assert.deepEqual(lavoriRimasti(), []);
+  } finally {
+    globalThis.SN_FILO_MEMORY = prima;
+  }
+  // Senza regola niente cambia: il programma parte, senza proxy suo.
+  ilCaso({ titolo: 'Diretto', pausaMs: 5 });
+  const r = await SV.salva({ url: URL_SEGNALATO, titolo: 'Diretto', scegli: async (n) => dentro(n), sposta });
+  assert.equal(r.ok, true, JSON.stringify(r));
+  const delSistema = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(https?|all|no)_proxy$/i.test(k)));
+  assert.deepEqual(proxyDelProgramma(), delSistema);
 });
 
 test('il titolo del sito diventa un nome di file valido su ogni sistema', () => {
