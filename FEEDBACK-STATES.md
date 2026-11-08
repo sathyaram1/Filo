@@ -270,9 +270,13 @@ all'owner, il freno.
 - **La scala.** 3 = urgentissimo, parte subito e sempre, fuori da ogni ordine e oltre N; 2 = la rosa del giorno,
   scelta ogni mattina dal manutentore; 1 = da fare, non oggi; 0 = rimandato a lungo. I giudici assegnano 3 o
   lasciano 1: la 2 è del manutentore. Una 3 la può creare, non abbassare né archiviare: la toglie solo l'owner,
-  e il limite vale per ogni automazione, riordino del lunedì compreso (#2000, #2291; regola unica in
-  `src/shared/prioritaTre.js`, che rifiuta anche chi scrive senza sapere la priorità di adesso). Le 2 di prima scendono a 1 con
-  l'operazione una tantum `transizione` di `ownerManutentore`.
+  e il limite vale per ogni automazione, riordino del lunedì compreso, giudice di priorità e risposte
+  automatiche delle domande (#2000, #2291; regola unica in `src/shared/prioritaTre.js`, che il server incorpora e
+  ricontrolla sul documento al momento della scrittura, e che rifiuta anche chi scrive senza sapere la priorità di
+  adesso). Archiviarla dentro un lavoro che resta a 3 (doppione di una 3 che avanza, unione col figlio a 3) non la
+  toglie: si sposta. Ogni scrittura lascia sul feedback chi l'ha fatta e quando (`prioritaScritta`, accanto a
+  `prioritaOwner` nelle schede). Le 2 di prima scendono a 1 con l'operazione una tantum `transizione` di
+  `ownerManutentore`.
 - **Quante insieme.** Niente tetti per priorità: le 3 partono sempre, il resto fino al parallelismo **N** del
   manutentore, sotto il **freno d'emergenza** dell'owner (`config/routines.maxSessions`, 1–20, predefinito 20,
   Gestione → Automazioni). Senza N vale il freno.
