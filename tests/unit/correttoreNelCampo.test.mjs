@@ -51,7 +51,7 @@ function correttore({ sbagliate = [], impostazioni = {}, protocollo = 'https:' }
     setInterval: () => 0, clearInterval: () => {},
     requestAnimationFrame: () => 0,
     ResizeObserver: class { observe() {} disconnect() {} },
-    location: { protocol: 'https:', hostname: 'chat.example' },
+    location: { protocol: protocollo, hostname: 'chat.example' },
     document: {
       hidden: false, title: 'Chat', body: node('BODY'), documentElement: { dataset: {} },
       addEventListener(t, f) { (docListeners[t] ||= []).push(f); },
