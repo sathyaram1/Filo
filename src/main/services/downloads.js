@@ -1272,7 +1272,11 @@ function attachSession(ses, { scope = '' } = {}) {
       try { fermo = typeof globalThis.SN_SB_SCARICAMENTO === 'function' && globalThis.SN_SB_SCARICAMENTO(item, webContents) === true; } catch (_) {}
       if (fermo) { e.preventDefault(); return; }
       if (riprovaRitirata(scope, item)) { e.preventDefault(); return; }
-      onWillDownload(item, webContents, scope, ses);
+      let piu = { esito: 'via', origine: null };
+      try { piu = require('./permessiPagine').scaricamentoSenzaGesto(webContents, gestoDi(item, webContents)); } catch (_) {}
+      if (piu.esito === 'no') { e.preventDefault(); return; }
+      if (piu.esito === 'chiedi' && !postoPerPiuFile(scope, piu.origine)) { e.preventDefault(); return; }
+      onWillDownload(item, webContents, scope, ses, piu.esito === 'chiedi' ? piu.origine : '');
     });
   } catch (_) {}
 }
