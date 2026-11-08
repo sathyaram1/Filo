@@ -1608,14 +1608,22 @@
   function ricordaProprietari(state) {
     if (PAGINA_DI_FILO || radiceDi(state.el)) return;
     const m = state.proprietari;
-    const k = improntaDi(state.testo);
-    m.delete(k);
-    m.set(k, { diSito: state.diSito.map((z) => ({ ...z })), visti: state.visti.map((z) => ({ ...z })) });
-    if (m.size > PROPRIETARI_MAX) m.delete(m.keys().next().value);
+    const testo = state.testo;
+    const k = improntaDi(testo);
+    const vecchio = m.get(k);
+    if (vecchio) { m.delete(k); state.proprietariCaratteri -= vecchio.testo.length; }
+    m.set(k, { testo, diSito: state.diSito.map((z) => ({ ...z })), visti: state.visti.map((z) => ({ ...z })) });
+    state.proprietariCaratteri += testo.length;
+    while (m.size > 1 && (m.size > PROPRIETARI_MAX || state.proprietariCaratteri > PROPRIETARI_CARATTERI)) {
+      const primo = m.keys().next().value;
+      state.proprietariCaratteri -= m.get(primo).testo.length;
+      m.delete(primo);
+    }
   }
   function proprietariDi(state, testo) {
     const g = state.proprietari.get(improntaDi(testo));
-    return g ? { diSito: g.diSito.map((z) => ({ ...z })), visti: g.visti.map((z) => ({ ...z })) } : null;
+    if (!g || g.testo !== testo) return null;
+    return { diSito: g.diSito.map((z) => ({ ...z })), visti: g.visti.map((z) => ({ ...z })) };
   }
 
   // Il gesto vero che porta l'utente nella casella (il clic, il rilascio di Tab) fa suo il testo che c'è: una volta per
