@@ -168,7 +168,9 @@ const FORME_GIT = {
   shortlog: [['git shortlog --output=Documenti/tesi.txt', 2]],
   grep: [['git grep -O"sh -c id" foo', 3], ['git grep -nOvim foo', 3], ['git grep --open-files-in-pager="sh -c id" foo', 3],
     ['git grep --open-files=true foo', 3]],
-  reflog: [['git reflog expire --expire=now --all', 3], ['git reflog delete HEAD@{0}', 3]],
+  // drop e write ci sono dalle versioni recenti di git; un verbo che il classificatore non conosce chiede.
+  reflog: [['git reflog expire --expire=now --all', 3], ['git reflog delete HEAD@{0}', 3], ['git reflog drop --all', 3],
+    [`git reflog write refs/heads/main ${'0'.repeat(40)} ${'a'.repeat(40)} m`, 3], ['git reflog cancella HEAD', 2]],
   'symbolic-ref': [['git symbolic-ref HEAD refs/heads/altro', 2]],
 };
 // Stampano e basta, a parte `--output` che vale per tutti.
