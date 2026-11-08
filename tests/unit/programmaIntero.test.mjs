@@ -55,9 +55,9 @@ test('nel controllo di git, nei comandi di Filo e nel terminale nessun programma
       await S.commandExists({ shell: 'powershell', command: 'node', cwd: estratta, attesaMs: 1000 }).catch(() => {});
     });
     assert.ok(chiamate.length >= 3, `le prove devono vedere gli avvii: ${JSON.stringify(chiamate)}`);
-    process.env.PATH = vecchioPath;
     assert.deepEqual(dallaCartella(chiamate, estratta), []);
   } finally {
+    process.env.PATH = vecchioPath;
     togliCartella(base);
   }
 });
