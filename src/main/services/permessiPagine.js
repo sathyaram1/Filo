@@ -802,7 +802,7 @@ function chiediScaricamenti(wc, callback) {
   const ses = wc && wc.session;
   const origine = wc ? origineDi(wc).origine : null;
   if (!ses || !origine) { callback(false, undefined, false); return; }
-  const scelta = sceltePer(ses).get(`${origine}|${SCARICAMENTI}`);
+  const scelta = sceltaScaricamenti(ses, origine);
   if (typeof scelta === 'boolean') { callback(scelta, undefined, true); return; }
   chiedi({ ses, wc, origine, tipo: SCARICAMENTI, parti: [SCARICAMENTI], callback, schedaDi: ses._filoSchedaDi || (() => null) });
 }
