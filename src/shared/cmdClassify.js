@@ -153,7 +153,40 @@
       // `-F`/`--file` è case-sensitive: `-f` = fqdn è lettura e non deve combaciare.
       return rest.some((t) => /^(-F|--file)$/.test(t) || !t.startsWith('-'));
     },
+    // Il secondo operando di `uniq` è il file d'uscita (#2292).
+    uniq: (cmd) => uniqUscita(tokens(cmd).slice(1)) != null,
+    // `tree -o` scrive l'elenco su un file, `-R` lo rifà con `-o 00Tree.html` in ogni cartella.
+    tree: (cmd) => treeUscita(tokens(cmd).slice(1)) != null,
+    // `file -C` compila un file di magia e lo scrive accanto.
+    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || t === '--compile'),
   };
+
+  // Il file che `uniq` scriverà, o null. `-f`, `-s`, `-w` si portano dietro un numero.
+  function uniqUscita(args) {
+    const ops = [];
+    let fine = false;
+    for (let i = 0; i < args.length; i++) {
+      const t = args[i];
+      if (fine || t === '-' || !t.startsWith('-')) { ops.push(t); continue; }
+      if (t === '--') { fine = true; continue; }
+      if (/^-[fsw]$/.test(t) || /^--(skip-fields|skip-chars|check-chars)$/.test(t)) i += 1;
+    }
+    return ops.length >= 2 ? ops[1] : null;
+  }
+
+  // Il file che `tree` scriverà ('' se non si sa quale), o null se stampa e basta.
+  function treeUscita(args) {
+    for (let i = 0; i < args.length; i++) {
+      const t = args[i];
+      const lungo = /^--output(?:=(.*))?$/.exec(t);
+      if (lungo) return lungo[1] != null ? lungo[1] : (args[i + 1] || '');
+      if (!/^-[^-]/.test(t)) continue;
+      const k = t.indexOf('o');
+      if (k > 0) return t.slice(k + 1) || args[i + 1] || '';
+      if (t.includes('R')) return '';
+    }
+    return null;
+  }
 
   // Modifica lo stato ma in modo recuperabile: livello 2.
   const LEVEL2 = new Set([
