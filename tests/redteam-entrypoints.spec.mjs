@@ -3,7 +3,7 @@
 // Assert di COMPORTAMENTO (non "non crasha"):
 //   1) la barra laterale ha un controllo Red-team che apre filo://redteam/;
 //   2) il pannello "Invia attacco" ha DUE campi separati (testo + descrizione)
-//      e un bottone d'invio che mostra il costo (50 cr);
+//      e un bottone d'invio;
 //   3) il bottone d'invio non procede con testo attacco vuoto (validazione);
 //   4) la mappa pura status→messaggio copre i casi della spec §8.1.
 //
