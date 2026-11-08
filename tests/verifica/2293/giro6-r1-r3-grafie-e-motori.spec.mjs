@@ -1,5 +1,5 @@
-// #2293 giro 5 (dal giro 4) — r1: un comando di rete il cui sito non si legge (virgolette $'…', gruppi {…} e […] di
-// curl, IP corto a due parti) parte senza OK dopo un titolo con istruzioni. r3: una ricerca su un dominio ospitato col
+// #2293 giro 6 (dal giro 4) — r1: un comando di rete il cui sito non si legge (virgolette $'…', gruppi {…} e […] di
+// curl, IP corto a due parti, --connect-to/--resolve) parte senza OK dopo un titolo con istruzioni. r3: una ricerca su un dominio ospitato col
 // nome del motore (google.com.de) arriva al modello come ricerca dell'utente.
 
 import { test, expect } from '../../fixtures/electron.mjs';
