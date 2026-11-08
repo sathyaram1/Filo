@@ -39,7 +39,7 @@
 
   // La ricerca scritta nell'indirizzo di un motore o di un sito («cercato orche su YouTube»). Null se non è una ricerca.
   const MOTORI = [
-    { host: /(^|\.)google\.[a-z.]+$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Google' },
+    { host: /(^|\.)google\.[a-z.]+$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Google', marchio: 'google' },
     { host: /(^|\.)bing\.com$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Bing' },
     { host: /(^|\.)duckduckgo\.com$/, percorso: /^\/(html\/?)?$/, chiavi: ['q'], nome: 'DuckDuckGo' },
     { host: /(^|\.)search\.yahoo\.com$/, percorso: /^\/search/, chiavi: ['p'], nome: 'Yahoo' },
