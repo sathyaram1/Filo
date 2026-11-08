@@ -38,7 +38,7 @@ test('sonda', async ({ app }) => {
   const ultima = (await chiamateAlModello(app)).at(-1);
   for (const m of ultima.slice(1)) {
     const t = typeof m.content === 'string' ? m.content : JSON.stringify(m.content);
-    console.log('SONDA MSG ' + m.role + ' ' + t.length + ' :: ' + t.replace(/(Le api tornano all'alveare e danzano per le compagne\. )+/g, '[API]').slice(0, 4000));
+    console.log('SONDA MSG ' + m.role + ' ' + t.length + ' :: ' + t.replace(/(Le api tornano all'alveare e danzano per le compagne\. )+/g, '[API]').replace(/\n/g, ' ⏎ ').slice(0, 4000));
   }
   await ripristina(app);
 });
