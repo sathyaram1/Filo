@@ -1546,7 +1546,8 @@
       }
       // cmd prende tutto il resto della riga come nome, spazi compresi; altrove un secondo operando non si segue.
       const resto = args.slice(i + 1).map((a) => a.testo).filter(Boolean);
-      if (resto.length && !cmd) return { ...c, cwd: null };
+      if (!cmd && resto.some((a) => !a.startsWith('-'))) return { ...c, cwd: null };
+      if (!cmd) { dest = t; break; }
       if (resto.length && prog !== 'cd' && prog !== 'chdir') return { ...c, cwd: null };
       dest = [t, ...resto].join(' ');
       break;
