@@ -146,6 +146,16 @@ test('una raffica oltre il tetto: cento file aspettano, gli altri non scendono e
     await expect(riga).toContainText('La pagina sta scaricando più file da sola, senza un tuo clic');
     await shell.screenshot({ path: `${SHOTS}/2294-pannello-oltre-il-tetto.png` });
 
+    // La pagina Download e la carta della home dicono perché aspetta, e la pagina quanti ne ho fermati.
+    const dl = await openTab('filo://downloads/downloads.html');
+    const voce = dl.locator('.dl-item', { has: dl.locator('.dl-name', { hasText: /^tanti-101\.txt$/ }) });
+    await expect(voce.locator('.dl-meta')).toContainText('partito da solo, senza un tuo clic · altri 2 fermati', { timeout: 10_000 });
+    await shell.locator('#tabs .tab', { hasText: 'Home' }).first().click();
+    const home = app.windows().find((w) => w.url().startsWith('filo://newtab'));
+    await expect(home.locator('.dash-carta[data-tipo="download"]', { hasText: 'tanti-101.txt' }))
+      .toContainText('partito da solo: aspetta il tuo sì', { timeout: 15_000 });
+    await shell.locator('#tabs .tab', { hasText: 'Scarica da sola' }).first().click();
+
     const si = barra(shell).locator('.permesso-si');
     await expect(si).toBeEnabled({ timeout: 5_000 });
     await si.click();
