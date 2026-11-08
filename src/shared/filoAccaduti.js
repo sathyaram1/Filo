@@ -47,7 +47,7 @@
     { host: /(^|\.)startpage\.com$/, percorso: /^\/(sp\/)?search/, chiavi: ['query', 'q'], nome: 'Startpage' },
     { host: /(^|\.)search\.brave\.com$/, percorso: /^\/search$/, chiavi: ['q'], nome: 'Brave' },
     { host: /(^|\.)qwant\.com$/, percorso: /^\/?$/, chiavi: ['q'], nome: 'Qwant' },
-    { host: /(^|\.)yandex\.[a-z.]+$/, percorso: /^\/search/, chiavi: ['text'], nome: 'Yandex' },
+    { host: /(^|\.)yandex\.[a-z.]+$/, percorso: /^\/search/, chiavi: ['text'], nome: 'Yandex', marchio: 'yandex' },
     { host: /(^|\.)baidu\.com$/, percorso: /^\/s$/, chiavi: ['wd'], nome: 'Baidu' },
     { host: /(^|\.)youtube\.com$/, percorso: /^\/results$/, chiavi: ['search_query'], nome: 'YouTube' },
     { host: /(^|\.)amazon\.[a-z.]+$/, percorso: /^\/s\/?$/, chiavi: ['k'], nome: 'Amazon' },
