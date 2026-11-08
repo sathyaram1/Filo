@@ -342,6 +342,18 @@ lo ritenta, perché è una risposta, non un'interruzione di rete. Dal 31/10
 (SPEC-MANUTENTORE.md § 7) il periodo di rispetto non c'è più: il guasto ferma
 solo il lavoro che l'ha dichiarato, finché il manutentore non lo sblocca.
 
+**Il rilascio guarda il biglietto come le consegne (#2295).** Passa dallo
+stesso controllo di vita, meno la finestra di ritiro. Un biglietto già
+rilasciato non scrive più niente: il rilascio ripetuto risponde ok e ridà solo
+la domanda di fine turno già data. Col semaforo perso il biglietto si chiude
+(`dead_ticket`) tenendo solo i numeri, cioè il consumo e i dollari del
+rapporto per il costo del feedback, senza guasto, testo del rapporto né
+domanda di processo; per il manutentore la sessione resta una caduta senza
+rilascio. Con la parola d'ordine revocata o oltre il freno del biglietto il
+rilascio è rifiutato. Un
+fratello sporco nella stessa sessione sporca anche i biglietti già rilasciati,
+senza toccare i loro rami.
+
 **I giri li accende il pacemaker.** Una funzione schedulata nel progetto
 filo-security, ogni 10 minuti, con i freni in quest'ordine: interruttore
 (`config/routines.enabled`) acceso? nessun **battito di sistema** fresco
