@@ -1670,7 +1670,8 @@
     // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
     const segnaposti = segnapostiAttivi() ? Rg.segnaposti(testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
-    const pareri = erroriAttivi() ? pareriDelTesto(testo) : null;
+    const perDizionario = soloDellUtente(state, d, { ripetute: false });
+    const pareri = erroriAttivi() ? pareriDelTesto(perDizionario) : null;
     const errori = pareri ? Rg.senzaSovrapposti([
       ...Rg.erroriFissi(testo),
       ...(ripetizioniAttive() ? Rg.ripetizioni(testo) : []),
