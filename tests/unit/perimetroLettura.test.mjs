@@ -504,7 +504,8 @@ test('#1072.4 — in una cwd di rete un nome dato a git, dal tubo o da un gruppo
 test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK', () => {
   const NOMI = ['Get-Command .\\segreto', 'Get-Command -Name .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto',
     'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log -- segreto'];
-  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+  // `where` legge solo come where.exe di cmd (#2292).
+  for (const ctx of [{ ...WIN, shell: 'cmd', cwd: '\\\\host\\x' }, { ...WIN, shell: 'cmd', cwd: 'Z:\\', reti: ['Z:'] }]) {
     assert.equal(C.classifyDetail('ls segreto', ctx).level, 2, `ls in ${ctx.cwd}`);
     for (const cmd of NOMI) {
       const d = C.classifyDetail(cmd, ctx);
