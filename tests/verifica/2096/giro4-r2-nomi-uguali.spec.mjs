@@ -69,14 +69,7 @@ test('r2 Dimentica sulla seconda riga dimentica il secondo controller, non il pr
   test.setTimeout(90_000);
   await computerFinto(app);
   const page = await apriElenco(app);
-  // La riga che offre Scollega è quella del controller collegato, il secondo.
-  let riga = null;
-  for (let k = 0; k < 2; k++) {
-    await righe(page).nth(k).click({ button: 'right' });
-    const voci = await menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
-    if (voci.includes('Scollega')) { riga = k; break; }
-  }
-  expect(riga).not.toBeNull();
+  await rigaCollegata(page);
   await menuDi(page).voce('Dimentica…').first().click();
   await clickConfirm(page, 'ok');
   await expect.poll(() => chiamate(app), { timeout: 8_000 }).toEqual([['btDimentica', { indirizzo: SECONDO }]]);
