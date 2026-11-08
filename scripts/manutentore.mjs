@@ -1318,7 +1318,7 @@ export function controlliLocali(cmd, argv) {
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
     case 'accendi': return a === '--niente' ? '' : (leggiOrdine(numeriDiAccendi(argv.slice(1)).join(',')).motivo || '');
     case 'parallelo': return /^\d{1,2}$/.test(String(a)) && Number(a) >= 1 ? '' : 'parallelo vuole un intero da 1 in su (il server lo tiene sotto il freno dell\'owner)';
-    case 'priorita': return num(a, cmd) || (controlloPriorita(null, b).ok ? '' : controlloPriorita(null, b).motivo);
+    case 'priorita': return num(a, cmd) || (PRIORITA_TRE.leggi(b) === null ? 'la priorità è 0, 1, 2 o 3' : '');
     case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
     case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
