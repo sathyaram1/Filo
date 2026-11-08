@@ -28,7 +28,7 @@ async function stato(page) {
   });
 }
 
-for (const modo of ['clic-subito', 'menu-scorso-a-mano']) {
+for (const modo of ['clic-subito', 'scorso-47']) {
   test(`esplora ${modo}`, async ({ openTab, testServer }) => {
     const page = await testServer.openReady(openTab, pagina);
     await page.locator('#link').click({ button: 'right' });
