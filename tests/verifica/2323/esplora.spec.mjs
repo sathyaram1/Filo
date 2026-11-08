@@ -21,6 +21,8 @@ async function stato(page) {
       ancora: f ? Math.round(f.getBoundingClientRect().top) : null,
       pann: sub ? Math.round(sub.getBoundingClientRect().top) : null,
       pannH: sub ? Math.round(sub.getBoundingClientRect().height) : null,
+      nSub: document.querySelectorAll('.sn-menu-sub').length,
+      subs: [...document.querySelectorAll('.sn-menu-sub')].map((s) => `${Math.round(s.getBoundingClientRect().top)}:${(s.textContent || '').trim().slice(0, 40)}`),
       vh: window.innerHeight,
     };
   });
