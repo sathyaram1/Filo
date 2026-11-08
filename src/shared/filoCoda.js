@@ -41,6 +41,8 @@
     if (Array.isArray(m.fotoInMemoria) && m.fotoInMemoria.length) v.fotoInMemoria = m.fotoInMemoria.slice();
     if (Array.isArray(m.guardate) && m.guardate.length) v.guardate = m.guardate.slice();
     if (m.spontaneo) v.spontaneo = true;
+    // Le schede lasciate nel messaggio (#2085): senza, il filo riletto mostra i segni ⟦ ⟧ al posto dei gettoni.
+    if (m.role === 'user' && Array.isArray(m.schede) && m.schede.length) v.schede = m.schede.slice();
     // I verdetti dei collegamenti di una frase di Filo (#868.6, #1505): la home li ritrova anche dopo un riavvio.
     if (Array.isArray(m.linkDaConfermare) && m.linkDaConfermare.length) v.linkDaConfermare = m.linkDaConfermare.slice();
     if (m.senzaVerdetto === true) v.senzaVerdetto = true;
@@ -254,7 +256,10 @@
     for (const c of Array.isArray(chats) ? chats : []) {
       if (!c || !Array.isArray(c.messages)) continue;
       c.messages.forEach((m, i) => {
-        const testo = String((m && m.text) || '');
+        // Un gettone (#2085) nell'estratto si legge col suo titolo, senza i segni.
+        const G = global.SN_SCHEDE_IN_CHAT;
+        const grezzo = String((m && m.text) || '');
+        const testo = G && G.RE ? grezzo.replace(G.RE, '$1') : grezzo;
         if (!testo.trim() || !contiene(testo, ts, largo)) return;
         messaggi.push({
           k: 'msg', chat: c.id, i, ts: m.ts, role: m.role === 'user' ? 'user' : 'filo', testo: estratto(testo, ts, 70, largo),

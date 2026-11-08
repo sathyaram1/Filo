@@ -736,63 +736,170 @@
     return state.tabs.find((t) => t.id === state.activeId) || null;
   }
 
-  // Riordino a mouse event, non col drag HTML5: quello è inaffidabile sopra le WebContentsView
-  // e Playwright non lo prova. `moved` scatta oltre la soglia, o un clic sarebbe un drag.
-  let drag = null; // { id, el, startX, moved }
+  // Trascinamento a mouse event, non col drag HTML5: quello è inaffidabile sopra le WebContentsView e Playwright non
+  // lo prova. La linguetta segue il puntatore con un transform e i nodi non si spostano fino al rilascio; fuori dalla
+  // fila la scheda va a chi sta sotto il puntatore (una chat di Filo, un campo di testo), via main (#2084).
+  let drag = null; // { id, el, startX, startY, moved, posti, da, a, fuori, pointerId }
   let suppressClickId = null; // id della tab il cui prossimo click va ignorato
+  let ultimoPointerId = null;
+  const SOGLIA_TRASCINAMENTO = 4;
+  // Oltre questo margine sopra o sotto la fila la scheda esce dalla barra: tirando un po' storto si riordina ancora.
+  const MARGINE_FUORI = 10;
 
-  function tabDragAfter(x) {
-    const els = [...tabsEl.querySelectorAll('.tab:not(.dragging)')];
-    let best = null;
-    let bestOffset = -Infinity;
-    for (const child of els) {
-      const box = child.getBoundingClientRect();
-      const offset = x - (box.left + box.width / 2);
-      if (offset < 0 && offset > bestOffset) { bestOffset = offset; best = child; }
-    }
-    return best;
+  function fuoriDallaFila(x, y) {
+    const r = tabRowEl.getBoundingClientRect();
+    if (y < r.top - MARGINE_FUORI || y > r.bottom + MARGINE_FUORI) return true;
+    return x < 0 || x > window.innerWidth;
   }
 
-  function onTabPointerMove(e) {
-    if (!drag) return;
-    if (!drag.moved && Math.abs(e.clientX - drag.startX) < 4) return;
-    drag.moved = true;
+  // Il posto d'arrivo: quante altre schede hanno il centro prima del centro della linguetta trascinata.
+  function postoDiArrivo(dx) {
+    const io = drag.posti[drag.da];
+    const centro = io.left + io.width / 2 + dx;
+    let a = 0;
+    drag.posti.forEach((p, i) => { if (i !== drag.da && p.left + p.width / 2 < centro) a++; });
+    return a;
+  }
+
+  function disponi(dx) {
+    const { posti, da, el } = drag;
+    const a = drag.fuori ? da : postoDiArrivo(dx);
+    drag.a = a;
+    const largo = posti[da].width;
+    posti.forEach((p, i) => {
+      if (i === da) return;
+      let sposta = 0;
+      if (da < a && i > da && i <= a) sposta = -largo;
+      else if (a < da && i >= a && i < da) sposta = largo;
+      p.el.style.transform = sposta ? `translateX(${sposta}px)` : '';
+    });
+    el.style.transform = drag.fuori ? '' : `translateX(${dx}px)`;
+  }
+
+  function avviaTrascinamento() {
     // Invariante: mai due .tab con lo stesso id. Se il nodo trascinato è stato orfanato da un
-    // ridisegno, reinserirlo ne creerebbe un doppione: si riaggancia quello vivo.
+    // ridisegno, si riaggancia quello vivo.
     if (!drag.el.isConnected) {
       const live = tabsEl.querySelector(`.tab[data-id="${drag.id}"]`);
       if (live) drag.el = live;
     }
+    const nodi = [...tabsEl.querySelectorAll('.tab')];
+    drag.posti = nodi.map((n) => { const r = n.getBoundingClientRect(); return { el: n, left: r.left, width: r.width }; });
+    drag.da = Math.max(0, nodi.indexOf(drag.el));
+    drag.a = drag.da;
+    drag.moved = true;
     drag.el.classList.add('dragging');
-    const after = tabDragAfter(e.clientX);
-    if (after == null) tabsEl.appendChild(drag.el);
-    else if (after !== drag.el.nextSibling) tabsEl.insertBefore(drag.el, after);
+    tabsEl.classList.add('riordino');
+    document.documentElement.classList.add('trascina-scheda');
+    try { ANTEPRIMA.nascondi(); } catch (_) {}
+    // Il puntatore resta alla barra anche sopra la pagina o fuori dalla finestra.
+    if (drag.pointerId != null) { try { tabsEl.setPointerCapture(drag.pointerId); } catch (_) {} }
   }
 
-  function onTabPointerUp() {
+  // Le posizioni fuori dalla fila vanno al main una per fotogramma: è lui che sa quale vista sta sotto.
+  let fuoriInAttesa = null;
+  function mandaFuori(fase, x, y) {
+    if (!api.schedaFuori || !drag) return;
+    const dati = { fase, id: drag.id, x: Math.round(x), y: Math.round(y) };
+    if (fase !== 'sopra') { fuoriInAttesa = null; try { api.schedaFuori(dati); } catch (_) {} return; }
+    const giaInCoda = !!fuoriInAttesa;
+    fuoriInAttesa = dati;
+    if (giaInCoda) return;
+    requestAnimationFrame(() => {
+      const d = fuoriInAttesa;
+      fuoriInAttesa = null;
+      if (d && drag && drag.fuori) { try { api.schedaFuori(d); } catch (_) {} }
+    });
+  }
+
+  function onTabPointerMove(e) {
+    if (!drag) return;
+    if (!drag.moved && Math.hypot(e.clientX - drag.startX, e.clientY - drag.startY) < SOGLIA_TRASCINAMENTO) return;
+    if (!drag.moved) avviaTrascinamento();
+    const eraFuori = drag.fuori;
+    drag.fuori = fuoriDallaFila(e.clientX, e.clientY);
+    drag.el.classList.toggle('fuori', drag.fuori);
+    disponi(e.clientX - drag.startX);
+    if (drag.fuori) mandaFuori('sopra', e.clientX, e.clientY);
+    else if (eraFuori) mandaFuori('esci', e.clientX, e.clientY);
+  }
+
+  function smonta(d) {
     window.removeEventListener('mousemove', onTabPointerMove);
     window.removeEventListener('mouseup', onTabPointerUp);
+    if (d.pointerId != null) { try { tabsEl.releasePointerCapture(d.pointerId); } catch (_) {} }
+    d.el.classList.remove('dragging', 'fuori');
+    document.documentElement.classList.remove('trascina-scheda');
+  }
+
+  // Fine senza effetti (Esc, finestra che perde il fuoco): tutto torna dov'era.
+  function annullaTrascinamento() {
     const d = drag;
-    drag = null;
     if (!d) return;
-    d.el.classList.remove('dragging');
+    if (d.moved && d.fuori) mandaFuori('esci', 0, 0);
+    drag = null;
+    smonta(d);
     if (!d.moved) return;
-    // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
-    ridisegnoRimandato = false;
+    suppressClickId = d.id;
+    tabsEl.classList.remove('riordino');
+    for (const p of d.posti) p.el.style.transform = '';
+    if (ridisegnoRimandato) render();
+  }
+
+  // Al rilascio i nodi prendono l'ordine nuovo e la linguetta scivola nel suo posto dal punto in cui la si è lasciata.
+  function assesta(d, dx) {
+    const nodi = d.posti.map((p) => p.el).filter((n) => n !== d.el);
+    nodi.splice(d.a, 0, d.el);
+    tabsEl.classList.remove('riordino');
+    for (const n of nodi) n.style.transform = '';
+    nodi.forEach((n, i) => { if (tabsEl.children[i] !== n) tabsEl.insertBefore(n, tabsEl.children[i] || null); });
+    const dove = d.posti[d.da].left + dx;
+    const ora = d.el.getBoundingClientRect().left;
+    if (Math.abs(dove - ora) < 1) return;
+    d.el.style.transform = `translateX(${dove - ora}px)`;
+    d.el.getBoundingClientRect();
+    d.el.classList.add('assesta');
+    d.el.style.transform = '';
+    const fine = () => d.el.classList.remove('assesta');
+    d.el.addEventListener('transitionend', fine, { once: true });
+    setTimeout(fine, 400);
+  }
+
+  function onTabPointerUp(e) {
+    const d = drag;
+    if (!d) return;
+    if (d.moved && !d.fuori && e && Number.isFinite(e.clientX)) {
+      d.fuori = fuoriDallaFila(e.clientX, e.clientY);
+      if (!d.fuori) disponi(e.clientX - d.startX);
+    }
+    if (d.moved && d.fuori && e) mandaFuori('lascia', e.clientX, e.clientY);
+    drag = null;
+    smonta(d);
+    if (!d.moved) return;
     // Il click che segue il mouseup non deve riattivare/spostare la tab.
     suppressClickId = d.id;
-    // La posizione si prende dall'IDENTITÀ del nodo, non dall'id: con un
-    // doppione in barra, cercare per id darebbe la posizione sbagliata.
-    const nodes = [...tabsEl.querySelectorAll('.tab')];
-    let toIndex = nodes.indexOf(d.el);
-    if (toIndex < 0) toIndex = nodes.map((x) => x.dataset.id).indexOf(d.id);
-    if (toIndex >= 0) api.tabs.move(d.id, toIndex);
+    if (d.fuori) {
+      tabsEl.classList.remove('riordino');
+      for (const p of d.posti) p.el.style.transform = '';
+      if (ridisegnoRimandato) render();
+      try {
+        Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
+          a: 'fuori_barra', esito: 'posato' })).catch(() => {});
+      } catch (_) {}
+      return;
+    }
+    const dx = e && Number.isFinite(e.clientX) ? e.clientX - d.startX : 0;
+    assesta(d, dx);
+    // Il riordino lo ridisegna il broadcast di api.tabs.move: ridisegnare prima rimetterebbe la scheda dov'era.
+    if (d.a !== d.da) { ridisegnoRimandato = false; api.tabs.move(d.id, d.a); }
     // Una scheda trascinata nella striscia, per i contatori (#1471): dove è finita, mai quale.
     try {
       Promise.resolve(api.message({ type: 'contatori_evento', misura: 'gesto', gesto: 'trascinamento', da: 'scheda',
-        a: toIndex >= 0 ? 'striscia_schede' : 'nessuna', esito: toIndex >= 0 ? 'posato' : 'annullato' })).catch(() => {});
+        a: 'striscia_schede', esito: 'posato' })).catch(() => {});
     } catch (_) {}
   }
+  window.addEventListener('keydown', (e) => { if (e.key === 'Escape' && drag && drag.moved) { e.preventDefault(); annullaTrascinamento(); } }, true);
+  window.addEventListener('blur', () => { if (drag && drag.moved) annullaTrascinamento(); });
 
   // Un clic arriva solo se pressione e rilascio cadono sullo stesso nodo: se un aggiornamento ricrea la
   // striscia in mezzo, la X e il tasto centrale non chiudono niente. Col tasto giù si ridisegna al rilascio.
@@ -816,7 +923,7 @@
     if (e.button !== 0) return;
     // Non iniziare un drag dai controlli interni (chiudi, indicatori audio…).
     if (e.target.closest('.close, .tab-alert, .proxy-ind')) return;
-    drag = { id: t.id, el, startX: e.clientX, moved: false };
+    drag = { id: t.id, el, startX: e.clientX, startY: e.clientY, moved: false, fuori: false, pointerId: e.isTrusted ? ultimoPointerId : null };
     window.addEventListener('mousemove', onTabPointerMove);
     window.addEventListener('mouseup', onTabPointerUp);
   }
@@ -1527,6 +1634,7 @@
     e.preventDefault();
     openTabContextMenu(s.t, e.clientX, e.clientY);
   });
+  tabsEl.addEventListener('pointerdown', (e) => { ultimoPointerId = e.pointerId; });
   tabsEl.addEventListener('mousedown', (e) => {
     const s = schedaDellEvento(e);
     if (s) startTabDrag(e, s.t, s.el);

@@ -316,6 +316,8 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'disposizioneIcone.js'), 'SN_DISPOSIZIONE_ICONE'); // dove sta ogni icona globale: PRIMA di menuIcons
   safe(path.join(SHARED, 'gestiContati.js'), 'SN_GESTI'); // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   safe(path.join(SHARED, 'campoTesto.js'), 'SN_CAMPO_TESTO'); // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
+  safe(path.join(SHARED, 'schedeInChat.js'), 'SN_SCHEDE_IN_CHAT'); // #2085 — gettoni delle schede: PRIMA di sidebar.js
+  safe(path.join(SHARED, 'schedaTrascinata.js'), 'SN_SCHEDA_TRASCINATA'); // #2084 — la scheda lasciata qui: PRIMA di sidebar.js
   safe(path.join(SHARED, 'ricercaCampo.js'), 'SN_RICERCA_CAMPO'); // #824 — "è una ricerca?": PRIMA di content.js
   safe(path.join(SHARED, 'accessoFisso.js'), 'SN_ACCESSO_FISSO'); // #1808 — la password dell'accesso fisso: PRIMA di content.js
   safe(path.join(SHARED, 'urlNav.js'), 'SN_URL_NAV'); // #437 — "è davvero un indirizzo?" per Copia URL/Condividi

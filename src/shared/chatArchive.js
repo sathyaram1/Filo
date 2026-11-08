@@ -444,6 +444,12 @@
     if (rispostaA) out.rispostaA = rispostaA;
     // Scritto nell'Aiuto sopra un sito: riletto è testo da fuori (#1508, src/shared/filoContesto.js → daFuoriDi).
     if (role === 'user' && turn.daPagina === true) out.daPagina = true;
+    // Le schede lasciate nel messaggio (#2085): il filo ridisegna i gettoni anche a scheda chiusa.
+    const G = global.SN_SCHEDE_IN_CHAT;
+    if (role === 'user' && G && Array.isArray(turn.schede) && turn.schede.length) {
+      const schede = G.perIlDisco(turn.schede);
+      if (schede.length) out.schede = schede;
+    }
     // La classe peggiore che la conversazione aveva letto quando Filo ha risposto: riletta da un'altra chat, la porta (#1508).
     if (role === 'filo' && Number.isInteger(turn.classeLetta) && turn.classeLetta >= 1 && turn.classeLetta <= 5) out.classeLetta = turn.classeLetta;
     // Da dove venivano i segreti che una frase di Filo ripete, o il testo stesso se l'ha scritto un comando (#810):

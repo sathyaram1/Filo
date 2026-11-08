@@ -251,6 +251,12 @@ async function buildMessages(action, payload, { sender = null } = {}) {
       ? PROMPTS.richiestaValuta({ testo: campo.testo, domanda: payload.userMessage || '' })
       : (payload.userMessage || testoDelTurnoAutomatico(payload));
     if (userText) parts.push({ type: 'text', text: userText });
+    // #2085 — le schede lasciate nel messaggio, lette come LEGGI_PAGINA.
+    const G = globalThis.SN_SCHEDE_IN_CHAT;
+    if (G && payload.userMessage && Array.isArray(payload.schede) && payload.schede.length) {
+      const nota = notaDeiGettoni(await lettureDellAiuto(G.allinea(String(payload.userMessage), payload.schede).filter(Boolean), sender));
+      if (nota) parts.push({ type: 'text', text: nota });
+    }
     const origine = PROMPTS.origineImmaginiAiuto(payload.origineImmagini);
     if (origine) parts.push({ type: 'text', text: origine });
     if (payload.screenshot) parts.push({ type: 'image_url', image_url: { url: payload.screenshot } });
@@ -258,7 +264,7 @@ async function buildMessages(action, payload, { sender = null } = {}) {
     const userMsg = parts.length === 1 && parts[0].type === 'text'
       ? { role: 'user', content: parts[0].text }
       : { role: 'user', content: parts };
-    return [sys, ...storiaAiuto(payload.history), userMsg];
+    return [sys, ...await storiaAiutoConLetture(payload.history, sender), userMsg];
   }
   if (action === ACTIONS.CATEGORIZE) {
     return [{ role: 'user', content: PROMPTS.categorize(payload) }];
@@ -2276,7 +2282,7 @@ function fontiDellAiuto(sender) {
 }
 function nuovaConversazioneAiuto(sender) {
   const wc = sender && sender.wc;
-  if (wc) { fontiPerAiuto.delete(wc); chatAiutoPer.delete(wc); }
+  if (wc) { fontiPerAiuto.delete(wc); chatAiutoPer.delete(wc); lettureGettoniAiuto.delete(wc); }
 }
 function segnaLetturaAiuto(sender, action) {
   const wc = sender && sender.wc;
@@ -3768,14 +3774,7 @@ async function eseguiAzioneFilo(action, {
           if (!t) r = { pageRead: `scheda ${numero}`, ok: false, errore: 'scheda', dettaglio: `nessuna scheda numero ${numero}`, testo: '' };
           else url = t.url || '';
         }
-        if (!r) {
-          try {
-            r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender), analizza: analizzaPer(sender) });
-          } catch (e) {
-            console.warn('[Filo] lettura pagina fallita', e?.message || e);
-          }
-        }
-        if (!r) r = { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+        if (!r) r = await leggiPaginaDa(url, da, sender);
         return { executed: !!r.ok, kept: true, output: r };
       }
       case 'CERCA_DOCUMENTI': {
@@ -5250,6 +5249,57 @@ function avvisoLettaInParte(out, { indirizzo = '', oltre = false, vuota = false 
     + 'concludere che la pagina non lo contiene.]';
 }
 
+// La lettura di LEGGI_PAGINA (#553): dalla scheda se è aperta, se no scaricata.
+async function leggiPaginaDa(url, da, sender) {
+  let r = null;
+  try {
+    r = await PageRead.leggiPagina(url, { da, schede: schedeLeggibili(sender), analizza: analizzaPer(sender) });
+  } catch (e) {
+    console.warn('[Filo] lettura pagina fallita', e?.message || e);
+  }
+  return r || { pageRead: String(url == null ? '' : url), ok: false, errore: 'rete', dettaglio: 'lettura non riuscita', testo: '' };
+}
+
+// Le schede lasciate in una chat (#2085) entrano come letture già fatte: davanti al modello la cornice di LEGGI_PAGINA,
+// e per uscite, fonti e segreti letti contano come la lettura che sono. La chat le mette fra le azioni viste del turno;
+// l'Aiuto le segna fra le fonti della sua conversazione (lettureDellAiuto). Sentinella: tests/unit/schedeInChat.test.mjs.
+async function lettureDeiGettoni(schede, sender) {
+  const lista = Array.isArray(schede) ? schede : [];
+  return Promise.all(lista.map(async (s) => ({
+    type: 'LEGGI_PAGINA', url: s.url, _gettone: true, _executed: true, _output: await leggiPaginaDa(s.url, 0, sender),
+  })));
+}
+// L'Aiuto rimanda la sua cronologia a ogni turno: un messaggio con delle schede riporta la lettura fatta quando è
+// partito, come la chat che la tiene col turno. Si rilegge solo se manca (conversazione nuova, Filo riaperto).
+const lettureGettoniAiuto = new WeakMap(); // webContents → indirizzo → lettura
+async function lettureDellAiuto(schede, sender) {
+  const wc = sender && sender.wc;
+  const gia = (wc && lettureGettoniAiuto.get(wc)) || new Map();
+  if (wc) lettureGettoniAiuto.set(wc, gia);
+  const nuove = await lettureDeiGettoni(schede.filter((s) => !gia.has(s.url)), sender);
+  for (const l of nuove) gia.set(l.url, l);
+  const letture = schede.map((s) => gia.get(s.url)).filter(Boolean);
+  for (const l of letture) segnaLetturaAiuto(sender, l);
+  return letture;
+}
+// La cronologia dell'Aiuto con la pagina di ogni scheda accanto al messaggio che l'ha portata.
+async function storiaAiutoConLetture(storia, sender) {
+  const G = globalThis.SN_SCHEDE_IN_CHAT;
+  return Promise.all(storiaAiuto(storia).map(async (m) => {
+    if (!m || !('schede' in m)) return m;
+    const { schede, ...resto } = m;
+    if (resto.role !== 'user' || !G || typeof resto.content !== 'string' || !Array.isArray(schede)) return resto;
+    const nota = notaDeiGettoni(await lettureDellAiuto(G.allinea(resto.content, schede).filter(Boolean), sender));
+    return nota ? { ...resto, content: `${resto.content}\n\n${nota}` } : resto;
+  }));
+}
+function notaDeiGettoni(letture) {
+  const pagine = pageReadsForPrompt(letture);
+  if (!pagine) return '';
+  return `[Nel messaggio l'utente ha lasciato ${letture.length === 1 ? 'una scheda' : `${letture.length} schede`} `
+    + `(i nomi fra ⟦ ⟧): parla di ${letture.length === 1 ? 'questa pagina' : 'queste pagine'}. Eccone il testo.]\n${pagine}`;
+}
+
 // Re-immissione del TESTO di una pagina web letta con LEGGI_PAGINA (#553). Lo scrive chi possiede il sito: entra
 // imbustato, e nelle righe di Filo il titolo, l'indirizzo e il motivo di un rifiuto passano solo ripuliti.
 function pageReadsForPrompt(actions) {
@@ -5520,7 +5570,9 @@ function schedeChiuseForPrompt(actions) {
 // documenti letti, documenti di trasparenza. Mai istruzioni: fuori dalla busta
 // resta solo ciò che scrive Filo (capacità, trasparenza); il resto, file
 // dell'editor compresi, arriva imbustato (#593, #592.4).
-function observationsForPrompt(actions) {
+function observationsForPrompt(tutte) {
+  // Le pagine delle schede lasciate in un messaggio stanno già con la domanda (notaDeiGettoni): non si ripetono qui.
+  const actions = Array.isArray(tutte) ? tutte.filter((a) => !(a && a._gettone)) : tutte;
   return [
     commandOutputsForPrompt(actions), capabilityDetailsForPrompt(actions), impostazioniLetteForPrompt(actions), webSearchResultsForPrompt(actions),
     pageReadsForPrompt(actions), fileReadsForPrompt(actions), documentReadsForPrompt(actions), documentSearchesForPrompt(actions), salvateTrovateForPrompt(actions),
@@ -6373,9 +6425,12 @@ async function handleFiloChat(richiesta) {
   }
 }
 
-async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, sender = null }, volo) {
+async function turnoFiloChat({ userMessage, threadHistory, image, images, reasoningReqId = null, internal = false, daModello = false, daFuori = false, chatId = null, rispostaA = null, schede = null, sender = null }, volo) {
   const inizioTurno = Date.now();
-  // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
+  // #2085 — le schede lasciate nel campo: valgono solo quelle il cui gettone è ancora nel testo.
+  const gettoni = internal || !globalThis.SN_SCHEDE_IN_CHAT ? []
+    : globalThis.SN_SCHEDE_IN_CHAT.allinea(String(userMessage || ''), schede).filter(Boolean);
+  const lettiDaiGettoni = gettoni.length ? lettureDeiGettoni(gettoni, sender) : Promise.resolve([]);  // Un messaggio vero dell'utente è una richiesta nuova: le finestre guardate prima tornano a chiedere (#778).
   if (!internal) Schermo.nuovoTurno(chiaveSchermo(sender));
   await FiloMem.touchSession();
   // #524 — l'intervista di benvenuto si legge PRIMA di qualsiasi altra cosa,
@@ -6412,7 +6467,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     if (sender && sender.wc && !onbActive) affidaChat(chatId, sender.wc);
     if (onbActive) await archiviaAperturaAccoglienza(chatId, onbBefore);
     const { archiviata, domanda } = await archiviaDomanda(chatId, {
-      testo: userMessage, immagini: imageList, daModello, ref: citazione.ref,
+      testo: userMessage, immagini: imageList, daModello, ref: citazione.ref, schede: gettoni,
     }, { onboarding: onbActive });
     const eidDomanda = domanda && domanda.role === 'user' && archiviata.eids ? archiviata.eids[archiviata.eids.length - 1] : '';
     if (eidDomanda) fontiTurno.push(eidDomanda);
@@ -6544,6 +6599,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Le azioni il cui esito il modello ha davanti, da qualunque scheda e giorno: decidono se un NAVIGA di questo
   // turno può portare fuori dati (#587).
   const azioniViste = filo ? [...filo.azioni] : [];
+  const lettureGettoni = await lettiDaiGettoni;
+  azioniViste.push(...lettureGettoni);
   const FCx = globalThis.SN_FILO_CONTESTO;
   for (const m of codaScheda) {
     if (m && Array.isArray(m.actions)) azioniViste.push(...m.actions);
@@ -6622,11 +6679,13 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   const giaLetta = origineGiaLettaInChat(chatId);
   const notaCitazione = FCx.notaRisposta(citazione.citata);
   const domandaConCitazione = notaCitazione ? `${notaCitazione}\n${String(userMessage || '')}` : String(userMessage || '');
+  const gettoniLetti = notaDeiGettoni(lettureGettoni);
   // Le note di questo turno sulla domanda: tornano con lei nei turni dopo (src/main/services/contestoFilo.js).
   let origineImmagini = '';
   if (imageList.length) {
     const parts = [];
     if (domandaConCitazione) parts.push({ type: 'text', text: domandaConCitazione });
+    if (gettoniLetti) parts.push({ type: 'text', text: gettoniLetti });
     for (const im of imageList) parts.push({ type: 'image_url', image_url: { url: im } });
     // #711 — «questa foto è fatta con l'AI?» deve avere in chat la stessa
     // risposta del tasto destro, quindi il controllo si fa SEMPRE: capire
@@ -6638,7 +6697,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     threadMessages.push({ role: 'user', content: parts });
     ricordaOrigineInChat(chatId, origine);
   } else {
-    threadMessages.push({ role: 'user', content: giaLetta ? `${domandaConCitazione}\n\n${giaLetta}` : domandaConCitazione });
+    threadMessages.push({ role: 'user', content: [domandaConCitazione, gettoniLetti, giaLetta].filter(Boolean).join('\n\n') });
   }
 
   // Reasoning in diretta: se il client ha aperto un canale, i thought summary arrivano alla
@@ -6707,7 +6766,8 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // risponde senza chiamare: quello è il testo. Il tetto ai giri è la rete contro i loop.
   const MAX_ROUNDS = 12;
   const rawActions = [];
-  const renderedActions = [];
+  // Le letture delle schede lasciate nel messaggio restano col turno: nei turni dopo il modello le ritrova come le sue.
+  const renderedActions = [...lettureGettoni];
   // Gli indirizzi scritti dal modello e rifiutati, che il modello non ha poi trovato altrove (#553): a fine turno
   // restano sotto la risposta come bottone da confermare, senza popup.
   const lasciati = new Map();
@@ -6778,7 +6838,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     const resa = filo.domanda({
       stato: fotografia ? fotografia.cambiate : '', epoca: fotografia ? fotografia.epoca : filo.epoca,
       onboarding: onbActive ? PROMPTS.filoChatOnboarding({ onboarding: onboardingText, onboardingTurns: payloadBase.onboardingTurns, onboardingMax: payloadBase.onboardingMax, onboardingRifatta: payloadBase.onboardingRifatta }) : '',
-      ricordi, dopo: [origineImmagini, giaLetta], immagini: imageList,
+      ricordi, dopo: [origineImmagini, gettoniLetti, giaLetta], immagini: imageList,
     });
     if (resa) threadMessages[indiceDomanda] = resa;
   } else if (ricordi.length && threadMessages[indiceDomanda]) {
@@ -8172,13 +8232,14 @@ async function summarizeTab(title, content) {
 // è di più.
 // Un messaggio dell'utente entra nella conversazione da qui, che parta col turno o resti a scheda chiusa (#1700).
 // Le immagini restano accanto al loro messaggio: ai turni dopo tornano al modello con lui (#1166).
-async function archiviaDomanda(chatId, { testo, immagini = [], daModello = false, ref = null }, meta) {
+async function archiviaDomanda(chatId, { testo, immagini = [], daModello = false, ref = null, schede = [] }, meta) {
   const archiviata = await appendToChatArchive(chatId, {
     role: 'user',
     text: String(testo || ''),
     images: immagini.length,
     ...(daModello ? { daModello: true } : {}),
     ...(ref ? { rispostaA: ref } : {}),
+    ...(Array.isArray(schede) && schede.length ? { schede } : {}),
   }, meta);
   const domanda = archiviata && Array.isArray(archiviata.messages) ? archiviata.messages[archiviata.messages.length - 1] : null;
   if (immagini.length && domanda && domanda.role === 'user') ContestoFilo.ricordaImmagini(chatId, domanda.ts, immagini);

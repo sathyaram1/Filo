@@ -83,6 +83,7 @@ class AnteprimeSchede {
   }
 
   get(id) { return this.foto.get(id) || null; }
+  chiusa(id) { return (this.chiuse && this.chiuse.get(id)) || null; }
 
   // Nata in secondo piano: resta «visibile» a 0×0 finché non ha la sua foto (nascosta non si disegna più).
   nataDietro(tab) {
@@ -181,7 +182,14 @@ class AnteprimeSchede {
   pota(idsVivi) {
     const tolte = [];
     for (const id of this.foto.keys()) if (!idsVivi.has(id)) tolte.push(id);
-    for (const id of tolte) this.foto.delete(id);
+    // L'ultima foto di una scheda chiusa resta per il gettone che la nomina in una chat (#2085), fra le ultime trenta.
+    if (!this.chiuse) this.chiuse = new Map();
+    for (const id of tolte) {
+      this.chiuse.delete(id);
+      this.chiuse.set(id, this.foto.get(id));
+      this.foto.delete(id);
+    }
+    while (this.chiuse.size > 30) this.chiuse.delete(this.chiuse.keys().next().value);
     this.coda = this.coda.filter((id) => idsVivi.has(id));
     if (tolte.length) this.suTolte(tolte);
   }

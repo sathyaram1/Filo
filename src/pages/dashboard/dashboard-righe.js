@@ -105,6 +105,9 @@
     if (m.role !== 'user' && global.SN_MARKDOWN) {
       div.innerHTML = global.SN_MARKDOWN.render(testo);
       div.classList.add('dash-bubble-md');
+    } else if (Array.isArray(m.schede) && m.schede.length && global.SN_SCHEDE_IN_CHAT) {
+      // Le schede lasciate nel messaggio (#2085): i gettoni come nella bolla della home.
+      global.SN_SCHEDE_IN_CHAT.nellaBolla(div, testo, m.schede, global.SN_SCHEDE_IN_CHAT.azioni());
     } else {
       div.textContent = testo;
     }

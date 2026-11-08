@@ -1,6 +1,6 @@
 # Mouse e tastiera veri sul display X (XTest): i trascinamenti fra viste li decide il sistema, e solo un gesto suo li
 # prova. Lo usa tests/helpers/gestiVeri.mjs; fuori da Linux con X non serve.
-#   gestiVeri.py trascina x1 y1 x2 y2     premi, scorri a piccoli passi, rilascia
+#   gestiVeri.py trascina x1 y1 x2 y2 [x3 y3 …]   premi, scorri a piccoli passi per ogni tappa, rilascia
 #   gestiVeri.py scrivi parola            lettere minuscole, una per tasto
 import ctypes, sys, time
 
@@ -28,13 +28,17 @@ def tasto(giu):
 
 cosa = sys.argv[1]
 if cosa == 'trascina':
-    x1, y1, x2, y2 = map(int, sys.argv[2:6])
+    v = list(map(int, sys.argv[2:]))
+    tappe = list(zip(v[0::2], v[1::2]))
     passi = 25
+    x1, y1 = tappe[0]
     muovi(x1, y1); time.sleep(0.2)
     tasto(True); time.sleep(0.15)
-    for i in range(1, passi + 1):
-        muovi(x1 + (x2 - x1) * i / passi, y1 + (y2 - y1) * i / passi); time.sleep(0.04)
-    time.sleep(0.3)
+    for (xa, ya), (x2, y2) in zip(tappe, tappe[1:]):
+        for i in range(1, passi + 1):
+            muovi(xa + (x2 - xa) * i / passi, ya + (y2 - ya) * i / passi); time.sleep(0.04)
+        time.sleep(0.3)
+    x2, y2 = tappe[-1]
     muovi(x2 + 1, y2); time.sleep(0.2)
     tasto(False); time.sleep(0.3)
 elif cosa == 'scrivi':

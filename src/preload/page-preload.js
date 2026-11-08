@@ -400,7 +400,8 @@ try {
 const broadcastListeners = new Set();
 // #407 — messaggi che devono SVEGLIARE un riquadro: senza, resterebbe in lingua originale
 // sotto un avviso che dice «fatto». Valore letterale: qui SN_MSG non è ancora caricato.
-const WAKE_BROADCASTS = new Set(['frame_translate']);
+// Una scheda trascinata sopra il riquadro (#2084) lo sveglia: il suo campo la deve poter ricevere.
+const WAKE_BROADCASTS = new Set(['frame_translate', 'scheda_trascinata']);
 
 // #503 — il giudizio di chi ospita il riquadro, arrivato per lettera dalla finestra madre (translatePage.js lo
 // scrive con la stessa chiave). Un riquadro che lei non vede non si sveglia, non risponde al conto e non si paga.
@@ -492,9 +493,10 @@ function consegnaBroadcast(msg) {
     }
   };
   const type = msg && msg.type;
-  // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto.
-  const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore';
-  if (IS_SUBFRAME && !contentScriptsStarted && wakes) {
+  // Il ritorno all'originale non sveglia: un riquadro che dorme non ha tradotto. Né una luce che si spegne.
+  const wakes = WAKE_BROADCASTS.has(type) && msg.mode !== 'restore' && msg.fase !== 'esci';
+  // Svegliato ma non ancora pronto: anche i messaggi che seguono il primo aspettano i suoi ascoltatori.
+  if (IS_SUBFRAME && wakes && (!contentScriptsStarted || !contenutiPronti())) {
     ensureContentScripts();
     waitForContentScripts(deliver);
     return;
@@ -999,6 +1001,8 @@ function loadScripts() {
   try { require(path.join(SHARED_DIR, 'disposizioneIcone.js')); } catch (e) { console.error('[Filo CS] disposizioneIcone', e); } // dove sta ogni icona globale: PRIMA di menuIcons
   try { require(path.join(SHARED_DIR, 'gestiContati.js')); } catch (e) { console.error('[Filo CS] gestiContati', e); } // #1471 — segno dei trascinamenti e nome letto su un'icona: PRIMA di menu.js
   try { require(path.join(SHARED_DIR, 'campoTesto.js')); } catch (e) { console.error('[Filo CS] campoTesto', e); } // "si sta scrivendo qui?": PRIMA di content.js, che ci decide Ctrl+Z
+  try { require(path.join(SHARED_DIR, 'schedeInChat.js')); } catch (e) { console.error('[Filo CS] schedeInChat', e); } // #2085 — gettoni delle schede: PRIMA di sidebar.js
+  try { require(path.join(SHARED_DIR, 'schedaTrascinata.js')); } catch (e) { console.error('[Filo CS] schedaTrascinata', e); } // #2084 — la scheda lasciata qui: PRIMA di content.js e sidebar.js
   try { require(path.join(SHARED_DIR, 'ricercaCampo.js')); } catch (e) { console.error('[Filo CS] ricercaCampo', e); } // #824 — "è una ricerca?": PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'accessoFisso.js')); } catch (e) { console.error('[Filo CS] accessoFisso', e); } // #1808 — la password dell'accesso fisso: PRIMA di content.js
   try { require(path.join(SHARED_DIR, 'urlNav.js')); } catch (e) { console.error('[Filo CS] urlNav', e); } // #437 — "è davvero un indirizzo?" per Copia URL/Condividi

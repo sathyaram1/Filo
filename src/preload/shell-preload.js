@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld('filoShell', {
   // #1623 — le immagini lasciate sulla fila delle schede vanno alla chat della scheda davanti.
   percorsoDelFile: (f) => { try { return (webUtils && webUtils.getPathForFile(f)) || ''; } catch (_) { return ''; } },
   rilascioNellaChat: (voci) => ipcRenderer.send('shell:rilascio-nella-chat', Array.isArray(voci) ? voci : []),
+  // #2084 — una scheda trascinata fuori dalla fila: `fase` sopra, lascia o esci, coi punti della finestra.
+  schedaFuori: (dati) => ipcRenderer.send('shell:scheda-fuori', dati && typeof dati === 'object' ? dati : {}),
   // Dove sta il puntatore quando è fuori dal documento della barra (#428).
   puntatore: () => ipcRenderer.invoke('shell:puntatore'),
   tabs: {

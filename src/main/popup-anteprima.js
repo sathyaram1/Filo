@@ -167,9 +167,12 @@ function mostra(parent, dati) {
   if (!tabs || !dati) return false;
   const id = testo(dati.id);
   const tab = tabs.tabs.find((t) => t.id === id);
-  if (!tab) { nascondi(parent); return false; }
+  // Il gettone di una scheda chiusa (#2085): titolo e sito, e l'ultima foto se la finestra l'ha ancora.
+  const chiusa = !tab && dati.chiusa && typeof dati.chiusa === 'object' ? dati.chiusa : null;
+  if (!tab && !chiusa) { nascondi(parent); return false; }
   const s = finestra(parent);
   if (!s) return false;
+  if (chiusa) return mostraChiusa(parent, s, id, dati, chiusa);
   if (s.misura && s.misura.id !== id) contaUscita(parent, s, 'via');
   // Il numero non riparte mai: una misura in ritardo non deve combaciare con una carta nuova.
   const n = ++s.giri;
@@ -191,6 +194,26 @@ function mostra(parent, dati) {
     indirizzo: indirizzoDi(tab.url),
     // Della scheda davanti la pagina si vede già: la carta dice solo cos'è.
     immagine: !davanti && !!tabs.anteprime.get(id),
+    larghezza: larghezzaDi(dati.misura),
+    margine: MARGINE,
+    tema: temaPulito(dati.tema),
+    scuro: nativeTheme.shouldUseDarkColors,
+  });
+  return true;
+}
+
+function mostraChiusa(parent, s, id, dati, chiusa) {
+  if (s.misura) contaUscita(parent, s, 'via');
+  const n = ++s.giri;
+  s.voluta = { n, id: `chiusa:${id}`, x: Math.round(Number(dati.x) || 0), y: Math.round(Number(dati.y) || 0), dati };
+  const foto = id ? parent._filoTabs.anteprime.chiusa(id) : null;
+  if (foto) invia(s, 'anteprima:immagine', { id: s.voluta.id, src: foto.src, w: foto.w, h: foto.h });
+  invia(s, 'anteprima:mostra', {
+    n,
+    id: s.voluta.id,
+    titolo: testo(chiusa.titolo) || testo(chiusa.url),
+    indirizzo: indirizzoDi(chiusa.url),
+    immagine: !!foto,
     larghezza: larghezzaDi(dati.misura),
     margine: MARGINE,
     tema: temaPulito(dati.tema),

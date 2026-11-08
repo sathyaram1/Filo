@@ -9,7 +9,15 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.272', date: '2026-11-07',
+      features: [
+        { testo: 'Le schede si trascinano come ti aspetti: seguono il mouse, e puoi lasciarle in un campo di testo per incollare il link.', segnalazione: 2084 },
+        { testo: 'Trascina una scheda nella chat per parlarne con Filo.', segnalazione: 2085 },
+      ],
+    },
+    {
       version: '0.2.271', date: '2026-11-07',
+      features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
       ],

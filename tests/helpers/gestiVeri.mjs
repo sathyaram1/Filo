@@ -42,8 +42,10 @@ export async function sulloSchermo(app, scheda, doc, sel) {
   return { x: Math.round(o.x + r.x + r.width / 2), y: Math.round(o.y + r.y + r.height / 2) };
 }
 
-export function trascina(da, a) {
-  execFileSync('python3', ['-I', SCRIPT, 'trascina', da.x, da.y, a.x, a.y].map(String), { env: process.env });
+// `tappe`: punti di passaggio dopo `a`, col tasto sempre giù (uscire da una vista e rientrare).
+export function trascina(da, a, ...tappe) {
+  const punti = [da, a, ...tappe].flatMap((p) => [p.x, p.y]);
+  execFileSync('python3', ['-I', SCRIPT, 'trascina', ...punti].map(String), { env: process.env });
 }
 
 export function scrivi(parola) {

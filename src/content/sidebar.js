@@ -298,6 +298,12 @@
     makeDraggable(root.querySelector('.sn-sidebar-header'));
     const form = root.querySelector('.sn-sidebar-input');
     const ta = form.querySelector('textarea');
+    // #2085 — una scheda lasciata sul campo diventa un gettone; all'invio il main ne legge la pagina.
+    const G = global.SN_SCHEDE_IN_CHAT;
+    gettoni = G ? G.campo(ta, G.azioni()) : null;
+    try { togliRilascioScheda(); } catch (_) {}
+    togliRilascioScheda = gettoni && global.SN_SCHEDA_TRASCINATA
+      ? global.SN_SCHEDA_TRASCINATA.registraChat(form, (s) => !!root && !nascosto && gettoni.aggiungi(s)) : () => {};
     // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
     ta.addEventListener('drop', (e) => {
       if (!e.isTrusted) return;
@@ -310,10 +316,12 @@
       const text = ta.value.trim();
       if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
       const { immagini, riferimenti } = allegati;
+      const schede = gettoni ? gettoni.schede() : [];
       ta.value = '';
+      if (gettoni) gettoni.svuota();
       allegati = { immagini: [], riferimenti: [] };
       disegnaAllegati();
-      submit({ userMessage: text, immagini, riferimenti });
+      submit({ userMessage: text, immagini, riferimenti, schede });
     };
     // Ctrl+V di un'immagine e un'immagine lasciata sul pannello entrano come quelle lasciate sulla pagina: solo dall'utente.
     ta.addEventListener('paste', (e) => {
@@ -721,6 +729,8 @@
   // disco, e un percorso lo leggerebbe il sito.
   const Allegati = global.SN_CONST.ALLEGATI_CHAT;
   let allegati = { immagini: [], riferimenti: [] };
+  let gettoni = null;
+  let togliRilascioScheda = () => {};
   // Un elemento di Filo trascinato in chat (#1331, filo_design): titolo in grassetto, contenuto in hover e per il
   // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js).
   const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
@@ -1031,7 +1041,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
   // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
-  function nelFiloAiuto(role, text) {
+  function nelFiloAiuto(role, text, schede = []) {
     if (!convFilo || !String(text || '').trim()) return;
     // Nell'Editor la riga è del documento («nell'Editor su tesi»), come quella della chat che c'era lì prima.
     let conv = null;
@@ -1039,7 +1049,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     try {
       chrome.runtime.sendMessage({
         type: MSG.FILO_CONVERSAZIONE_APP, ...(conv || { app: 'aiuto', rif: convFilo, soggetto: paginaOra().titolo }),
-        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text) }],
+        messaggi: [{ role: role === 'user' ? 'user' : 'filo', text: String(text), ...(schede.length ? { schede } : {}) }],
       }).catch(() => {});
     } catch (_) {}
   }
@@ -1930,12 +1940,15 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   function buildPayload(userMessage, userAction, esterno, letta) {
     const qui = paginaOra();
     // history per l'AI: solo {role, content}, niente metadati UI.
-    const aiHistory = history.map(({ role, content, immagini }) => (immagini && immagini.length
-      ? { role, content: [
-        { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
-        ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
-      ] }
-      : { role, content }));
+    const aiHistory = history.map(({ role, content, immagini, schede }) => ({
+      ...(immagini && immagini.length
+        ? { role, content: [
+          { type: 'text', text: `${content}\n\n${PROMPTS.allegatiAiuto(immagini.length)}` },
+          ...immagini.map((url) => ({ type: 'image_url', image_url: { url } })),
+        ] }
+        : { role, content }),
+      ...(role === 'user' && schede && schede.length ? { schede } : {}),
+    }));
     return {
       url: letta.url || qui.url,
       title: letta.titolo ?? qui.titolo,
@@ -2102,7 +2115,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     }
   }
 
-  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
+  async function turno({ userMessage: scritto = '', immagini = [], riferimenti = [], schede = [], userAction = '', esterno = null, preActionUrl = '', daScelta = false, dopoDocumenti = false, daGesto = false, valuta = '' } = {}, mia = epoca, vivo = {}) {
     if (!root) return;
     const passo = (op, ms) => prossimoPasso(op, ms, mia);
     // Le sole immagini, senza testo, sono un messaggio dell'utente come un altro. Un riferimento trascinato arriva
@@ -2146,9 +2159,11 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
       // «Continua» chiede il seguito con parole di Filo, non dell'utente: niente bolla sua (#1302).
       const seguito = daScelta && scritto === globalThis.SN_CHAT_ERRORS?.CHIEDI_SEGUITO;
       if (!seguito) {
-        immaginiNellaBolla(appendChatMessage('user', bolla, { nelFilo: false }), immagini, riferimenti);
+        const elBolla = appendChatMessage('user', bolla, { nelFilo: false });
+        if (elBolla && schede.length && !valuta) global.SN_SCHEDE_IN_CHAT?.nellaBolla(elBolla, bolla, schede, global.SN_SCHEDE_IN_CHAT.azioni());
+        immaginiNellaBolla(elBolla, immagini, riferimenti);
         // Nel filo le immagini non si salvano, ma il messaggio c'è e dice quante erano.
-        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'));
+        nelFiloAiuto('user', [Allegati.testoNelFilo(bolla, immagini.length), ...riferimenti.map((r) => `Riferimento: ${r.titolo}`)].filter(Boolean).join('\n'), valuta ? [] : schede);
       }
       // Le immagini restano nel turno in cronologia: i passi che l'Aiuto fa da solo dopo le vedono ancora.
       if (testoCampo === null) {
@@ -2156,6 +2171,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
           role: 'user', content: userMessage, kind: 'real',
           ...(daScelta ? { daScelta: true } : {}),
           ...(immagini.length ? { immagini: immagini.map((im) => im.dataUrl) } : {}),
+          // Le schede lasciate restano col turno: i messaggi dopo ne riportano la pagina, come nella home (#2085).
+          ...(schede.length && !valuta ? { schede } : {}),
         });
       }
       // Salva il messaggio raw per il "judge" lato server (vedi pathsCollector).
@@ -2183,6 +2200,8 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     ricordaPagina(letta);
     const payload = buildPayload(userMessage, userAction, esterno, letta);
     if (valutazione) payload.valuta = true;
+    // #2085 — le schede lasciate nel messaggio: le legge il main, con la cornice delle pagine lette.
+    if (schede.length && userMessage) payload.schede = schede;
     // Il testo del campo entra nella cronologia dopo il payload: questo turno lo porta una volta sola, nel messaggio che parte.
     if (testoCampo !== null) {
       history.push({

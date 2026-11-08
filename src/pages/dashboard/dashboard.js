@@ -15,6 +15,8 @@
   const accadeEl = $('accade');
   const inputForm = $('inputForm');
   const inputEl = $('input');
+  // #2085 — sul gettone di una scheda: la carta dell'anteprima, e il clic che la porta davanti (o la riapre).
+  const azioniGettone = window.SN_SCHEDE_IN_CHAT ? window.SN_SCHEDE_IN_CHAT.azioni() : {};
   const sendBtn = $('sendBtn');
   const stopBtn = $('stopBtn');
   const GLIFO_INVIO = sendBtn.innerHTML;
@@ -503,6 +505,9 @@
       const fotoViste = isUser && Array.isArray(m.fotoInMemoria) ? m.fotoInMemoria.filter((u) => typeof u === 'string' && /^data:image\//i.test(u)) : [];
       if (text.trim() || fotoViste.length) {
         const b = makeBubble({ role: isUser ? 'user' : 'filo', text, markdown: !isUser });
+        if (isUser && Array.isArray(m.schede) && m.schede.length && window.SN_SCHEDE_IN_CHAT) {
+          window.SN_SCHEDE_IN_CHAT.nellaBolla(b, text, m.schede, azioniGettone);
+        }
         if (m.spontaneo) b.dataset.spontaneo = '1';
         fotoViste.forEach((src, i) => {
           const img = document.createElement('img');
@@ -573,7 +578,7 @@
     if (m.role === 'user') {
       return {
         role: 'user', text, ...(quante > 0 ? { images: quante } : {}), ...(m.daModello ? { daModello: true } : {}),
-        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}),
+        ...(m.rispostaA ? { rispostaA: m.rispostaA } : {}), ...(Array.isArray(m.schede) && m.schede.length ? { schede: m.schede } : {}),
       };
     }
     return {
@@ -1136,6 +1141,8 @@
       ...(daFuori ? { daFuori: true } : {}),
       // La risposta di Filo che il messaggio cita (#1620): il main ne ritrova il posto nel filo.
       ...(rispostaA ? { rispostaA } : {}),
+      // #2085 — le schede lasciate nel campo: il main ne legge le pagine.
+      ...(composizione && composizione.schede && composizione.schede.length ? { schede: composizione.schede } : {}),
       // #525 — la chat si archivia nel main, mentre la si fa.
       chatId: ensureChatId(),
     };
@@ -1367,10 +1374,13 @@
     inputEl.value = '';
     autoGrowInput();
     const citata = Rispondi.prendi();
-    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata };
+    const schede = Gettoni ? Gettoni.schede() : [];
+    if (Gettoni) Gettoni.svuota();
+    return { text: text || '', immagini, daFuori, scritto, incollato, file, percorsi, citata, schede };
   }
   function bollaUtente(c) {
     const userBubble = makeBubble({ role: 'user', text: c.text });
+    if (c.schede && c.schede.length) window.SN_SCHEDE_IN_CHAT.nellaBolla(userBubble, c.text, c.schede, azioniGettone);
     // Mostra TUTTE le immagini inviate nella bolla, ognuna ingrandibile al click.
     c.immagini.forEach((src, i) => {
       const img = document.createElement('img');
@@ -1403,6 +1413,7 @@
       ...(c.immagini.length ? { images: c.immagini.length } : {}),
       ...(daModello ? { daModello: true } : {}), ...(c.daFuori ? { daFuori: true } : {}),
       ...(nelloStorico ? { rispostaA: nelloStorico } : {}),
+      ...(c.schede && c.schede.length ? { schede: c.schede } : {}),
     });
     if (!bolla) bubblesEl.appendChild(bollaUtente(c));
     Coda.segnaGiorni();
@@ -1642,7 +1653,9 @@
   // aspetta. Un seguito che il turno di prima non ha preso lo offre anche il turno dopo, appena parte.
   function affidaAlTurno(s, t) {
     const { c } = s;
-    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.citata || c.text.startsWith('/') || Accoglienza.isActive()) return;
+    // Con una scheda lasciata nel testo parte da sé a turno finito: il passo dopo del turno non ne leggerebbe la pagina.
+    if (!t || t.fermato || c.immagini.length || c.file.length || c.daFuori || c.citata || (c.schede && c.schede.length)
+      || c.text.startsWith('/') || Accoglienza.isActive()) return;
     s.turno = t;
     send({ type: MSG.FILO_CHAT_SEGUITO, reqId: t.reqId, id: s.id, testo: c.text })
       .then((r) => { if (!(r && r.accolto) && s.turno === t) s.turno = null; })
@@ -1957,6 +1970,16 @@
       handleImageFile(e.detail.blob);
     }
   });
+  // #2085 — una scheda lasciata sul campo diventa un gettone in linea col testo.
+  const Gettoni = window.SN_SCHEDE_IN_CHAT ? window.SN_SCHEDE_IN_CHAT.campo(inputEl, azioniGettone) : null;
+  if (Gettoni && window.SN_SCHEDA_TRASCINATA) {
+    window.SN_SCHEDA_TRASCINATA.registraChat(inputForm, (s) => {
+      if (Accoglienza.isActive()) return false;
+      const ok = Gettoni.aggiungi(s);
+      if (ok) autoGrowInput();
+      return ok;
+    });
+  }
   // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
   // dal disco. Torna se c'erano file.
   function fileNelCampo(dt) {

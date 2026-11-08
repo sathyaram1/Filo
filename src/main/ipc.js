@@ -14,6 +14,7 @@ const { resolveShell } = require('./services/terminal');
 const { virgoletteIncollando, propostaVirgolette } = require('./services/shellVirgolette');
 const SegretiLetti = require('./services/segretiLetti');
 const RilascioNellaChat = require('./rilascioNellaChat');
+const SchedaTrascinata = require('./schedaTrascinata');
 // Quanto dell'output di un comando lanciato a mano passa dal registro dei segreti letti: quanto una pagina.
 const MAX_STAMPATO = 8000000;
 const { hostResolves } = require('./services/hostResolve');
@@ -305,6 +306,14 @@ function registerIpcHandlers() {
   ipcMain.on('shell:rilascio-nella-chat', (event, voci) => {
     const win = finestraDellaBarra(event.sender);
     if (win) RilascioNellaChat.consegna(win, voci).catch(() => {});
+  });
+  // #2084 — una scheda trascinata fuori dalla fila: solo dalla barra della sua finestra.
+  ipcMain.on('shell:scheda-fuori', (event, dati) => {
+    const win = finestraDellaBarra(event.sender);
+    if (!win) return;
+    let z = 1;
+    try { z = event.sender.getZoomFactor() || 1; } catch (_) {}
+    try { SchedaTrascinata.riceve(win, dati, z); } catch (e) { console.warn('[Filo] scheda trascinata', e?.message || e); }
   });
   // Da un riquadro incorporato in un sito: il pannello sta nel frame principale della sua scheda.
   ipcMain.on('filo:rilascio-riquadro', (event, voci) => {

@@ -188,12 +188,21 @@ html[data-chrome-compact="1"] .addr {
 }
 /* Transizione di sfondo spenta durante il trascinamento: così la tab segue il puntatore senza scatti. */
 .tab.dragging {
-  opacity: 0.7;
+  /* Piena: sopra le vicine che le scivolano sotto non deve lasciar trasparire i loro titoli. */
+  opacity: 1;
   z-index: 5;
   transition: none;
   cursor: grabbing;
   box-shadow: 0 2px 8px rgba(0, 0, 0, calc(0.25 * var(--sn-ombra, 1)));
 }
+/* Mentre una scheda si trascina le vicine scivolano al posto nuovo, e al rilascio lei si assesta nel suo (#2084). */
+.tabs.riordino .tab:not(.dragging),
+.tab.assesta {
+  transition: background calc(0.1s * var(--sn-motion, 1)) ease, transform calc(0.15s * var(--sn-motion, 1)) ease;
+}
+/* Portata fuori dalla fila torna al suo posto, spenta: la sta prendendo chi sta sotto il puntatore. */
+.tab.dragging.fuori { opacity: 0.45; box-shadow: none; }
+html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
 .tab.active {
   background: var(--tab-active);
   color: var(--fg);

@@ -134,6 +134,52 @@ module.exports = function register(on, ctx) {
     return { ok: true };
   });
 
+  // #2084 — una scheda trascinata sopra un riquadro incorporato in un sito: il frame di sopra dice dove, il main la porta.
+  on(MSG.SCHEDA_NEL_RIQUADRO, async (msg, sender) => {
+    if (!sender || sender.strato || !sender.frame) return { ok: false };
+    const win = winOf(sender);
+    return { ok: require('../../schedaTrascinata').nelRiquadro(win, sender.wc, sender.frame, msg) };
+  });
+
+  // #2085 — il gettone di una scheda in una chat (home, Aiuto anche nello strato sopra un sito): la carta dell'anteprima
+  // sotto il gettone, e il clic che porta davanti la scheda se è ancora aperta, o ne riapre l'indirizzo.
+  on(MSG.GETTONE_SCHEDA, async (msg, sender) => {
+    const win = winOf(sender);
+    const tm = win && win._filoTabs;
+    if (!tm || !msg) return { ok: false };
+    const Carta = require('../../popup-anteprima');
+    if (msg.op === 'nascondi') { Carta.nascondi(win); return { ok: true }; }
+    const s = globalThis.SN_SCHEDE_IN_CHAT && globalThis.SN_SCHEDE_IN_CHAT.normalizza(msg.scheda);
+    if (!s) return { ok: false };
+    const stessa = (t) => !!t && String(t.url || '') === s.url;
+    const perId = s.id ? tm.tabs.find((t) => t.id === s.id) : null;
+    const viva = (stessa(perId) ? perId : null) || tm.tabs.find(stessa) || null;
+    if (msg.op === 'apri') {
+      Carta.nascondi(win);
+      if (viva) tm.activate(viva.id);
+      else tm.openTab(s.url);
+      return { ok: true, riaperta: !viva };
+    }
+    if (msg.op !== 'anteprima') return { ok: false };
+    const r = msg.rect && typeof msg.rect === 'object' ? msg.rect : null;
+    const vista = vistaDelMittente(tm, sender);
+    if (!r || !vista) return { ok: false };
+    const x = vista.b.x + Number(r.x) * vista.zoom;
+    const y = vista.b.y + (Number(r.y) + Number(r.h)) * vista.zoom + 4;
+    if (!Number.isFinite(x) || !Number.isFinite(y)) return { ok: false };
+    const dati = { x, y, misura: 'media', titolo: s.titolo };
+    Carta.mostra(win, viva ? { ...dati, id: viva.id } : { ...dati, id: s.id, chiusa: { titolo: s.titolo, url: s.url } });
+    return { ok: true };
+  });
+
+  // La vista da cui parla una pagina, nella finestra: la scheda, o lo strato dei riquadri sopra di lei.
+  function vistaDelMittente(tm, sender) {
+    const wc = sender && sender.wc;
+    const tab = wc && tm.tabs.find((t) => t.view && t.view.webContents === wc);
+    if (!tab) return null;
+    return require('../../schedaTrascinata').cornice(tm, tab, !!sender.strato);
+  }
+
   on(MSG.TAB_ACTIVITY, async (msg, sender) => {
     // Segnali di attività della tab (§2.1) → merge sullo snapshot.
     const win = winOf(sender);

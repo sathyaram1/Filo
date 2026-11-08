@@ -25,7 +25,12 @@ const ESTERNO = Object.freeze({
 function pulisci(messaggi) {
   return (Array.isArray(messaggi) ? messaggi : [messaggi])
     .filter((m) => m && typeof m.text === 'string' && m.text.trim())
-    .map((m) => ({ role: m.role === 'user' ? 'user' : 'filo', text: m.text }));
+    .map((m) => {
+      // Le schede lasciate nel messaggio (#2085): la riga ripiegata ridisegna i gettoni come il filo della home.
+      const G = globalThis.SN_SCHEDE_IN_CHAT;
+      const schede = m.role === 'user' && G ? G.perIlDisco(m.schede) : [];
+      return { role: m.role === 'user' ? 'user' : 'filo', text: m.text, ...(schede.length ? { schede } : {}) };
+    });
 }
 
 // «Riprova» rimanda la stessa domanda subito dopo sé stessa: è lo stesso turno, non si scrive due volte.
@@ -67,7 +72,7 @@ function annota({ app: nome, rif, soggetto, dove, messaggi, daPagina = false } =
     }
     for (const m of senzaRiprova(c ? c.messages : [], nuovi)) {
       eventi.push(t.evento(T().MESSAGGIO, {
-        chat: id, msg: { role: m.role, text: m.text, ...(m.role === 'filo' ? { esterno: ESTERNO[nome] } : (daPagina === true ? { daPagina: true } : {})) },
+        chat: id, msg: { role: m.role, text: m.text, ...(m.schede ? { schede: m.schede } : {}), ...(m.role === 'filo' ? { esterno: ESTERNO[nome] } : (daPagina === true ? { daPagina: true } : {})) },
       }, { autore: m.role === 'user' ? 'utente' : 'filo' }));
     }
     await t.scrivi(eventi);
