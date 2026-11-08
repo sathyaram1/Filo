@@ -1293,3 +1293,18 @@ test('#1994 — i lettori con un file d\'uscita (uniq, tree -o, file -C) scrivon
     }
   }
 });
+
+// Bash toglie i backslash e decodifica `$'…'`: `--out\put=x` arriva a git come `--output=x` e lo scrive davvero.
+test('#1994 — un\'opzione scritta con gli escape della shell vale quanto la grafia piana', () => {
+  const bash = SHELL_1994[0];
+  for (const cmd of [
+    'git log -1 --format=x --out\\put=/home/u/.bashrc', 'git log \\--output=x', 'git log --output\\=x', "git log $'--output=x'",
+    'git diff --no-index a b --out\\put=x', 'git log --out\\put=x | cat', 'cd x && git log --out\\put=x', 'git push --forc\\e',
+  ]) assert.equal(C.classify(cmd, bash), 3, cmd);
+  for (const cmd of ['tree -\\o x', 'file -\\C', 'date -\\s 1', "tree $'-o' x"]) assert.ok(C.classify(cmd, bash) >= 2, cmd);
+  const cmdExe = { shell: 'cmd', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true };
+  for (const x of ['git log --out^put=x', 'git log ^-^-output=x']) assert.equal(C.classify(x, cmdExe), 3, x);
+  assert.ok(C.classify('tree -^o x', cmdExe) >= 2);
+  // Un nome con lo spazio protetto dal backslash resta una lettura.
+  for (const x of ['cat my\\ file.txt', 'cat my\\ file.txt | grep x', 'git log --oneline -- src\\ x']) assert.equal(C.classify(x, bash), 1, x);
+});
