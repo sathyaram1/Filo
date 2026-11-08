@@ -58,6 +58,7 @@ const COMPOSTI = [
   { file: 'src/main/tabs.js', testo: '? src : `https://${src}`', perche: 'il nome del sito delle regole del proxy' },
   { file: 'src/pages/dashboard/dashboard-comandi.js', testo: 'raw : `https://${raw}`', perche: 'il sito scritto dall’utente, che si apre in una scheda' },
   { file: 'src/shared/stessoSito.js', testo: '`http://${s}`', perche: 'ne estrae il nome del sito' },
+  { file: 'src/shared/urlExfil.js', testo: 'metti(`http://${tok}`)', perche: 'l’indirizzo che un comando contatta, per giudicarlo prima che parta (#2293)' },
   { file: 'src/shared/nomiSito.js', testo: '`http://${s}`).hostname', perche: 'ne estrae il nome del sito' },
   { file: 'src/shared/tabTriage.js', testo: 's = `https://${s}`', perche: 'ne estrae il nome del sito da tenere sempre aperto' },
   { file: 'src/shared/urlExfil.js', testo: "new URL('https://' + url)", perche: 'analizza un indirizzo che potrebbe portare fuori dati' },
