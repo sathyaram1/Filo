@@ -553,7 +553,7 @@ test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ri
   // Rientra col fuoco dato dalla pagina (come dopo un «Rispondi»): scrivere deve bastare.
   await page.evaluate(() => { const ta = document.getElementById('ta'); ta.focus(); ta.selectionStart = ta.selectionEnd = ta.value.length; });
   await page.keyboard.type(' poi xqseconda2 ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1', 'xqseconda2'], { timeout: 6000 });
 });
 
 test('spenta la spiegazione preparata (#818), il doppio clic non la paga; il tasto destro sì', async ({ app, openTab, testServer }) => {
