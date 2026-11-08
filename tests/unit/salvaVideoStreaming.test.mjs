@@ -149,7 +149,7 @@ test('«Riprova» su una riga fallita rifà il salvataggio dalla stessa pagina, 
   try {
     const r = DL.riprova(fallita.id);
     assert.equal(r.ok, true);
-    assert.deepEqual(chiamate, [{ id: fallita.id, url: URL_SEGNALATO, filename: 'Da riprovare.mp4', scope: '' }]);
+    assert.deepEqual(chiamate, [{ id: fallita.id, url: URL_SEGNALATO, filename: 'Da riprovare.mp4', scope: '', sessione: null, paese: null }]);
     ilCaso({ titolo: 'Da riprovare', pausaMs: 5 });
     const ok = await SV.salva({ url: URL_SEGNALATO, titolo: 'Da riprovare', riusa: fallita.id, scegli: async (n) => dentro(n), sposta });
     assert.equal(ok.ok, true);
