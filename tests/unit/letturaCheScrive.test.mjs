@@ -194,6 +194,7 @@ test('sentinella: ogni lettura di git sta nella tabella delle forme che scrivono
     }
   }
   for (const cmd of ['git diff', 'git log -1 --format=format:%s', 'git show HEAD', 'git reflog', 'git reflog show',
+    'git reflog list', 'git reflog exists HEAD', 'git reflog HEAD@{2}', 'git reflog origin/main', 'git reflog -n 5',
     'git symbolic-ref HEAD', 'git diff --output-indicator-new=+ HEAD']) {
     assert.equal(C.classify(cmd, pulito(LINUX)), 1, cmd);
   }
