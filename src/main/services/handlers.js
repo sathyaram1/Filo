@@ -6907,7 +6907,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     testi: fotografia ? fotografia.daSiti : sezioniUtente.flatMap((s) => (s && Array.isArray(s.daSiti) ? s.daSiti : [])),
     fonte: 'dalle schede aperte e dai suggerimenti della home',
   }]);
-  if (dalleSchede) {
+  if (false && dalleSchede) {
     azioniViste.push(dalleSchede);
     ricordaLettoInChat([dalleSchede]);
   }
