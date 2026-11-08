@@ -695,6 +695,14 @@
     'computername', 'hostname', 'pwd', 'oldpwd', 'path', 'shell', 'lang', '_', 'psitem', 'true', 'false', 'null',
   ]);
   const DOLLARO_RE = /\$(?:env:)?([A-Za-z_]\w*)/gi;
+  // In PowerShell `$temp` non è `$env:TEMP`: è una variabile qualsiasi, che un comando di lettura della stessa riga
+  // imposta con -OutVariable (#1994). Senza `env:` è nota solo un'automatica; `@nome` passa la variabile a pezzi.
+  const PS_AUTOMATICHE = new Set(['home', 'pwd', 'null', 'true', 'false', '_', 'psitem']);
+  const PS_VARIABILE_RE = /\$(env:)?([A-Za-z_]\w*)|^@[A-Za-z_]/gi;
+  function variabilePowerShell(t) {
+    for (const m of String(t).matchAll(PS_VARIABILE_RE)) if (!m[1] && !PS_AUTOMATICHE.has(String(m[2]).toLowerCase())) return true;
+    return false;
+  }
   // cmd ha anche variabili col nome che comincia per `=` (`%=ExitCode%`, `%=C:%`), tagliabili come le altre.
   const PERCENTO_RE = /%(=?[A-Za-z_][\w()]*)(:[^%]*)?%/gi;
 
