@@ -5,7 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { voceOggi } from './helpers/riquadriOggi.mjs';
 
 // La proposta del correttore per i segnaposti, nell'ora di oggi: [mostrata, accettata, rifiutata, ignorata].
