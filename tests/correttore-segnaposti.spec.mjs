@@ -91,8 +91,8 @@ async function apri(app, openTab, testServer, opz = {}) {
   return page;
 }
 
-const ocra = (page, testo) => page.locator('.sn-spell-overlay .sn-suggerimento', { hasText: testo });
-const valore = (page, testo) => page.locator('.sn-spell-valori .sn-spell-valore', { hasText: testo });
+const ocra = (page, testo) => segniDi(page, '.sn-spell-overlay .sn-suggerimento', { hasText: testo });
+const valore = (page, testo) => segniDi(page, '.sn-spell-valori .sn-spell-valore', { hasText: testo });
 const globale = (app, nome) => app.evaluate((_e, n) => globalThis[n], nome);
 
 async function tastoDestroSu(page, loc) {
@@ -121,8 +121,8 @@ for (const campo of ['#ta', '#ce']) {
     // Un campo modificabile scrive lo spazio in fondo come spazio unificatore.
     const testo = () => page.locator(campo).evaluate((el) => (el.tagName === 'TEXTAREA' ? el.value : el.textContent).replace(/ /g, ' '));
     await expect.poll(testo).toBe("l'America l'hanno scoperta nel 1492. ");
-    await expect(page.locator('.sn-spell-valori .sn-spell-lampo').first()).toBeAttached({ timeout: 1000 });
-    await expect(page.locator('.sn-spell-valori .sn-spell-lampo')).toHaveCount(0, { timeout: 3000 });
+    await expect(segniDi(page, '.sn-spell-valori .sn-spell-lampo').first()).toBeAttached({ timeout: 1000 });
+    await expect(segniDi(page, '.sn-spell-valori .sn-spell-lampo')).toHaveCount(0, { timeout: 3000 });
     await expect(valore(page, '1492')).toHaveCount(0);
     await expect(ocra(page, '14xx')).toHaveCount(0);
     // Il campo ha ancora il fuoco: si continua a scrivere dove si era.
@@ -260,8 +260,8 @@ test('«x te», «3x4» e i baci non hanno segni, e non arrivano al modello come
   await page.keyboard.type('Lo prendo io x te, la stanza è 3x4 e domani gioco alla Xbox. A domani xx');
   await expect.poll(async () => (await globale(app, '__ragionate')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.waitForTimeout(400);
-  await expect(page.locator('.sn-spell-overlay .sn-suggerimento')).toHaveCount(0);
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-suggerimento')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
   for (const r of await globale(app, '__ragionate')) expect(r.candidati).not.toContain('segnaposto');
 });
 
@@ -274,7 +274,7 @@ test('un dato di adesso passa dalla ricerca: mentre cerca respirano i puntini, p
   await app.evaluate(() => { globalThis.__trattieniWeb = true; });
   await page.locator('#ta').click();
   await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toBeVisible({ timeout: 8000 });
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando')).toBeVisible({ timeout: 8000 });
   const menuInAttesa = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menuInAttesa.locator('.sn-menu-correction-loading')).toHaveText(/Cerco il dato/);
   await app.evaluate(() => globalThis.__rilasciaWeb());
@@ -344,7 +344,7 @@ async function webLento(app) {
 }
 async function restaIlValore(page, testo, ms) {
   for (const fine = Date.now() + ms; Date.now() < fine;) {
-    expect(await page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando').count(), 'il valore è tornato ai puntini').toBe(0);
+    expect(await segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando').count(), 'il valore è tornato ai puntini').toBe(0);
     await expect(valore(page, testo)).toHaveCount(1);
     await page.waitForTimeout(200);
   }
@@ -444,7 +444,7 @@ test('«Ci sono xx abitanti a Roma.» e «… a Milano.» hanno ciascuna il suo 
     globalThis.SN_PROVIDERS.completeWithFallback = f;
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = f;
   });
-  const valori = page.locator('.sn-spell-valori .sn-spell-valore:not(.sn-cercando)');
+  const valori = segniDi(page, '.sn-spell-valori .sn-spell-valore:not(.sn-cercando)');
   const ta = page.locator('#ta');
   await ta.click();
   await page.keyboard.type('Ci sono xx abitanti a Roma. ');
@@ -490,7 +490,7 @@ async function sostituisci(page, vecchio, nuovo) {
   await page.keyboard.type(nuovo);
   await page.keyboard.press('End');
 }
-const pronti = (page) => page.locator('.sn-spell-valori .sn-spell-valore:not(.sn-cercando)');
+const pronti = (page) => segniDi(page, '.sn-spell-valori .sn-spell-valore:not(.sn-cercando)');
 
 for (const riga of ['[di soli xx][][Google P/E ratio][cerca][web]', '']) {
   test(`«a» corretto in «ha» dopo il valore, la frase riletta ${riga ? 'con altre parole' : 'tacendo'}: il 27 resta e non si ricerca`, async ({ app, openTab, testServer }) => {
@@ -549,7 +549,7 @@ test('in un sito delicato (accesso fatto) il dato non si cerca da solo: lo dice,
   await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
   await expect.poll(async () => (await globale(app, '__ragionate')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 5000 });
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 5000 });
   expect(await globale(app, '__webChieste')).toEqual([]);
   // Il livello di privacy (#1586): la ricerca che la pagina non lascia partire da sola, e poi il clic che la chiede.
   await expect.poll(() => voceOggi(app, 'anticipo_privacy', 'segnaposto'), { timeout: 5000 }).toEqual({ saltato: 1 });
@@ -581,7 +581,7 @@ test('fonti che non rispondono: «La ricerca non è riuscita» e «Cerca di nuov
   await page.locator('#ta').click();
   await page.keyboard.type('Google ha un p/e di soli xx, davvero basso. ');
   await expect(ocra(page, 'xx')).toHaveCount(1, { timeout: 8000 });
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 8000 });
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore.sn-cercando')).toHaveCount(0, { timeout: 8000 });
   const menu = await tastoDestroSu(page, ocra(page, 'xx'));
   await expect(menu.locator('.sn-menu-segno')).toContainText('La ricerca non è riuscita', { timeout: 3000 });
   await app.evaluate(() => { globalThis.__reteGiu = false; });
@@ -614,10 +614,10 @@ test('un controllo rapido che segna le x come errore non mette l\'onda sui segna
   });
   await page.locator('#ta').click();
   await page.keyboard.type("l'America l'hanno scoperta nel 14xx e la Bastiglia l'hanno presa nel 17xx. ");
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(2, { timeout: 8000 });
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore')).toHaveCount(2, { timeout: 8000 });
   await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.waitForTimeout(600);
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0);
   await expect(ocra(page, '14xx')).toHaveCount(1);
   const menu = await tastoDestroSu(page, ocra(page, '17xx'));
   await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
@@ -637,7 +637,7 @@ test('le x di un segnaposto riconosciuto solo dalla rilettura non prendono l\'er
   await expect.poll(async () => (await globale(app, '__rapide')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.waitForTimeout(600);
   // Protette sono le sole x: il refuso accanto, dentro il pezzo della rilettura, resta un errore.
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveText(['vinot']);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['vinot']);
   const menu = await tastoDestroSu(page, ocra(page, 'XX'));
   await expect(menu.pannelli.first()).toContainText('36');
   await expect(menu.pannelli.first()).not.toContainText('numero scritto a metà');
@@ -649,12 +649,12 @@ test('«Correggi tutti gli errori» riempie i segnaposti che hanno un valore', a
   });
   await page.locator('#ta').click();
   await page.keyboard.type("l'America l'hanno scoperta nel 14xx e la Bastiglia l'hanno presa nel 17xx. ");
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(2, { timeout: 8000 });
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore')).toHaveCount(2, { timeout: 8000 });
   const menu = await tastoDestroSu(page, ocra(page, '17xx'));
   await expect(menu.voce('Correggi tutti gli errori (2)')).toBeVisible();
   await menu.voce('Correggi tutti gli errori (2)').click();
   await expect(page.locator('#ta')).toHaveValue("l'America l'hanno scoperta nel 1492 e la Bastiglia l'hanno presa nel 1789. ");
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
 });
 
 test('con «Segnaposto» spento le x non hanno segni e il modello non riceve la richiesta', async ({ app, openTab, testServer }) => {
@@ -663,8 +663,8 @@ test('con «Segnaposto» spento le x non hanno segni e il modello non riceve la 
   await page.keyboard.type("l'America l'hanno scoperta nel 14xx. ");
   await expect.poll(async () => (await globale(app, '__ragionate')).length, { timeout: 8000 }).toBeGreaterThan(0);
   await page.waitForTimeout(400);
-  await expect(page.locator('.sn-spell-overlay .sn-suggerimento')).toHaveCount(0);
-  await expect(page.locator('.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-suggerimento')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-valori .sn-spell-valore')).toHaveCount(0);
   expect((await globale(app, '__ragionate'))[0].prompt).not.toContain('segnaposto:');
 });
 
