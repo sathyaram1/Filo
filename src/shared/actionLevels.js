@@ -63,12 +63,10 @@
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
   // L'elenco dei programmi sta in cmdClassify; senza, ogni comando conta come uno di rete.
-  const SCARICA = {
-    test: (cmd) => {
-      const re = global.SN_CMD_CLASSIFY && global.SN_CMD_CLASSIFY.PROGRAMMI_RETE;
-      return /https?:\/\//i.test(cmd) || !re || re.test(cmd);
-    },
-  };
+  function scaricaDallaRete(cmd) {
+    const re = global.SN_CMD_CLASSIFY && global.SN_CMD_CLASSIFY.PROGRAMMI_RETE;
+    return /https?:\/\//i.test(cmd) || !re || re.test(cmd);
+  }
 
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati.
