@@ -338,9 +338,10 @@ test('una riga trascinata nella chat dell’Aiuto arriva come riferimento in gra
   await expect(casella).toBeVisible();
   await riga(page, 'D-52').dragTo(casella);
   // Nella casella non si versa il testo: il riferimento sta sopra, col titolo.
+  // Il contenuto lo dà il main dietro il gettone del trascinamento (#2300): arriva un attimo dopo il rilascio.
+  await expect.poll(() => page.evaluate(() => window.__filoSidebarTest.riferimenti().length)).toBe(1);
   await expect(casella).toHaveValue('');
   const rif = await page.evaluate(() => window.__filoSidebarTest.riferimenti());
-  expect(rif).toHaveLength(1);
   expect(rif[0].titolo).toBe('D-52 Colore del bordo');
   expect(rif[0].testo).toContain('Contesto:\nContesto.');
   expect(rif[0].testo).toContain('1. Riprendi (consigliata)');
