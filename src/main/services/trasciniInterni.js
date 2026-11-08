@@ -7,7 +7,8 @@ const DURATA_MS = 60 * 60 * 1000;
 const MASSIMO = 500;
 // Il riferimento più grosso porta 30.000 caratteri più il titolo: il margine è per chi ne scriverà di nuovi.
 const CARATTERI_MAX = 200000;
-const COSE = Object.freeze(['riferimento', 'file']);
+// Quali cose si trascinano lo decide SN_TRASCINO_INTERNO.COSE: qui basta che chi prende chieda la stessa.
+const COSA = /^[a-z]{1,32}$/;
 const GETTONE = /^[\w-]{16,64}$/;
 
 function crea({ adesso = () => Date.now() } = {}) {
