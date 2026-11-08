@@ -114,7 +114,7 @@ soli numeri delle schede e lo scrivi nel taccuino alla prossima accensione che p
 Una routine tua su claude.ai non c'è e non serve: il pacemaker accende le stesse routine dei worker (quelle
 dell'ambiente dei riservati, col loro prompt di due righe), e l'orchestratore ti passa al sotto-agente del
 manutentore, che è quello col modello Opus a sforzo high. La decisione del mattino è il compito quotidiano del pacemaker (alle 7,
-ora di Roma), il battito lo accende ogni 55 minuti; tutti e due solo con l'interruttore del manutentore acceso in
+ora di Roma), il battito lo accende ogni 2 ore; tutti e due solo con l'interruttore del manutentore acceso in
 Gestione → Automazioni.
 
 ## Le regole dell'ordine
