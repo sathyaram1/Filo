@@ -358,6 +358,130 @@ test('annulla e rifai dello script del sito, e un\'immagine incollata, non gli f
   pari(await page.evaluate(() => window.mediane()));
 });
 
+// Il testo trovato entrando nella casella è dell'utente, ma il sito ce lo può mettere un attimo prima del clic, o prima
+// ancora: copie che il dizionario legge tutte uguali («12_zanzottera»), poi cancella un blocco, misura e annulla (#2299,
+// giro 4).
+const SONDA_ENTRANDO = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;padding:40px;font:16px sans-serif">
+  <textarea id="ta" lang="it" style="width:600px;height:200px;font:16px sans-serif"></textarea>
+<script>
+  const ta = document.getElementById('ta');
+  const cmd = (c, v) => document.execCommand(c, false, v);
+  const blocco = (p) => Array.from({ length: 1500 }, (_, i) => i + '_' + p).join(' ');
+  const Z = blocco('zanzottera');
+  const Q = blocco('quseta');
+  window.durate = [];
+  window.metti = () => { ta.value = Z + '\\n' + Q; };
+  let alClic = false;
+  window.alClic = () => { alClic = true; };
+  window.addEventListener('pointerdown', (e) => { if (e.isTrusted && alClic) { alClic = false; window.metti(); } }, true);
+  window.sonda = () => {
+    ta.focus();
+    if (!ta.value.startsWith('0_zanzottera')) return;
+    ta.setSelectionRange(Z.length, ta.value.length);
+    let t0 = performance.now(); cmd('delete'); const z = performance.now() - t0;
+    cmd('undo');
+    ta.setSelectionRange(0, Z.length + 1);
+    t0 = performance.now(); cmd('delete'); const q = performance.now() - t0;
+    cmd('undo');
+    window.durate.push({ z, q });
+  };
+  window.mediane = () => {
+    const med = (k) => window.durate.map((d) => d[k]).sort((a, b) => a - b)[Math.floor(window.durate.length / 2)];
+    const out = { conosciuta: med('z'), ignota: med('q'), prove: window.durate.length };
+    window.durate = [];
+    return out;
+  };
+</script>
+</body>`;
+
+test('il testo che il sito mette nella casella prima del clic dell\'utente non gli fa leggere il dizionario dai tempi', async ({ app, openTab, testServer }) => {
+  await apri(app, openTab, testServer);
+  const pari = (m) => { expect(m.prove).toBe(7); expect(m.ignota).toBeLessThan(m.conosciuta * 1.5 + 3); };
+  for (const quando of ['alClic', 'metti']) {
+    const page = await testServer.openReady(openTab, SONDA_ENTRANDO, { pubblico: true });
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+    await page.evaluate((q) => window[q](), quando);
+    await page.click('#ta');
+    await page.waitForTimeout(300);
+    await page.evaluate(() => { for (let i = 0; i < 7; i++) window.sonda(); });
+    pari(await page.evaluate(() => window.mediane()));
+  }
+});
+
+// Correzione da sé: allo spazio dell'utente il sito porta il cursore dietro una parola che ci aveva messo prima del clic,
+// o ricompone una parola cancellando lettere da quello che l'utente ha scritto.
+const SONDA_ALLO_SPAZIO = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;padding:40px;font:16px sans-serif">
+  <textarea id="ta" lang="it" style="width:600px;height:200px;font:16px sans-serif"></textarea>
+<script>
+  const ta = document.getElementById('ta');
+  window.modo = '';
+  window.letto = [];
+  window.addEventListener('pointerdown', (e) => { if (e.isTrusted && window.modo === 'clic' && !ta.value) ta.value = 'zanzottera bianchi\\n'; }, true);
+  let fatto = false;
+  window.addEventListener('keydown', (e) => {
+    if (!e.isTrusted || e.key !== ' ' || fatto) return;
+    if (window.modo === 'clic' && ta.value.startsWith('zanzottera')) {
+      fatto = true;
+      ta.setSelectionRange(10, 10);
+      setTimeout(() => window.letto.push(ta.value.slice(0, 10)), 50);
+    }
+    if (window.modo === 'cancella' && ta.value === 'le zanzare di otto terra') {
+      fatto = true;
+      const v = ta.value;
+      const voluto = 'le zanzottera';
+      const tieni = new Set();
+      let j = 0;
+      for (let i = 0; i < v.length && j < voluto.length; i++) if (v[i] === voluto[j]) { tieni.add(i); j++; }
+      for (let i = v.length - 1; i >= 0; i--) {
+        if (tieni.has(i)) continue;
+        ta.setSelectionRange(i, i + 1);
+        document.execCommand('delete');
+      }
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+      setTimeout(() => window.letto.push(ta.value.trimEnd()), 50);
+    }
+  }, true);
+</script>
+</body>`;
+
+test('allo spazio dell\'utente Filo non rimette con la maiuscola una parola che non ha battuto lui', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: true },
+    });
+    await globalThis.chrome.storage.local.set({ sn_personal_dict: ['Zanzottera'] });
+  });
+  for (const [modo, testo, atteso] of [['clic', 'ciao ', 'zanzottera'], ['cancella', 'le zanzare di otto terra ', 'le zanzottera']]) {
+    const page = await testServer.openReady(openTab, SONDA_ALLO_SPAZIO, { pubblico: true });
+    await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+    await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+    await page.evaluate((m) => { window.modo = m; }, modo);
+    await page.click('#ta');
+    if (modo === 'clic') { await page.waitForTimeout(300); await page.keyboard.press('End'); }
+    await page.keyboard.type(testo, { delay: 80 });
+    await page.waitForTimeout(400);
+    expect(await page.evaluate(() => window.letto)).toEqual([atteso]);
+  }
+});
+
+test('chi arriva con la tastiera in una casella già scritta, col fuoco già dentro, ritrova i segni al primo tasto', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.evaluate(() => {
+    const ta = document.getElementById('ta');
+    ta.value = 'la bozza di ieri con quseta ';
+    ta.focus();
+  });
+  await page.waitForTimeout(600);
+  const errore = segniDi(page, '.sn-spell-overlay .sn-errore');
+  expect(await errore.count()).toBe(0);
+  await page.keyboard.press('End');
+  await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
+});
+
 test('l\'annulla dell\'utente riporta il suo testo coi suoi segni', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
