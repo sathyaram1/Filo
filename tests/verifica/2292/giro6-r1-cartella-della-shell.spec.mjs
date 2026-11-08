@@ -5,9 +5,9 @@ import { test, expect } from '@playwright/test';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { dirname, join } from 'node:path';
-import { mkdirSync, writeFileSync, symlinkSync, existsSync } from 'node:fs';
+import { mkdirSync, writeFileSync, existsSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
-import { cartellaTemporanea, togliCartella } from '../../helpers/percorsi.mjs';
+import { cartellaTemporanea, togliCartella, collegaCartella } from '../../helpers/percorsi.mjs';
 
 const require = createRequire(import.meta.url);
 const __dirname = dirname(fileURLToPath(import.meta.url));
