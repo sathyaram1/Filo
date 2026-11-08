@@ -532,7 +532,12 @@
     if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
     const dual = GIT_DUAL[sub];
     if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
-    if (GIT_READ.has(sub)) return 1;
+    if (GIT_READ.has(sub)) {
+      const args = gitArgsAfterSub(cmd);
+      const sale = GIT_READ_MUTATES[sub] ? GIT_READ_MUTATES[sub](args) : 0;
+      if (sale) return sale;
+      return gitUscita(args) == null ? 1 : 2;
+    }
     // Il push verso il remoto già configurato si rimedia; verso un indirizzo scritto nel comando manda il codice
     // a un server qualsiasi, e non torna indietro (#530).
     if (sub === 'push' && gitArgsAfterSub(cmd).some((a) => /:\/\//.test(a) || /^(--repo=)?[^\s/:=-][^\s/:=]*@[^\s:]+:/.test(a))) return 3;
