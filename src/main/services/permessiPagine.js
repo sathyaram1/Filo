@@ -767,16 +767,33 @@ function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
   const chi = wc ? origineDi(wc) : {};
   if (!ses || chi.filo || !chi.origine) return { esito: 'via', origine: null };
   const origine = chi.origine;
-  // Il conto è del sito, non dell'indirizzo: una pagina che salta da a.sito a b.sito non riparte da capo.
+  // Il conto sta sul sito (due schede dello stesso) e sulla scheda: una pagina che salta da sola ad altri siti, anche di
+  // domini diversi, non riparte da capo. La scheda la azzera solo un gesto dell'utente su di lei, come in Chrome.
   const sito = sitoDegliScaricamenti(origine);
   if (!ses._filoSenzaGesto) ses._filoSenzaGesto = new Map();
-  if (gestoPerUnoScaricamento(wc, gesto, adesso)) { ses._filoSenzaGesto.set(sito, adesso); return { esito: 'via', origine }; }
+  if (gestoPerUnoScaricamento(wc, gesto, adesso)) {
+    ses._filoSenzaGesto.set(sito, adesso);
+    wc._filoSenzaGestoAlle = adesso;
+    return { esito: 'via', origine };
+  }
   const scelta = sceltaScaricamenti(ses, origine);
   if (scelta === true) return { esito: 'via', origine };
-  if (scelta === false) { segnaNegati(wc, origine, [SCARICAMENTI]); return { esito: 'no', origine }; }
+  if (scelta === false || dopoUltimoGesto(wc, wc._filoScaricamentiNoAlle)) {
+    segnaNegati(wc, origine, [SCARICAMENTI]);
+    return { esito: 'no', origine };
+  }
+  const recente = (t) => t != null && adesso - t < SCARICAMENTI_FINESTRA_MS;
   const prima = ses._filoSenzaGesto.get(sito);
+  const primaQui = dopoUltimoGesto(wc, wc._filoSenzaGestoAlle) ? wc._filoSenzaGestoAlle : null;
   ses._filoSenzaGesto.set(sito, adesso);
-  return { esito: prima != null && adesso - prima < SCARICAMENTI_FINESTRA_MS ? 'chiedi' : 'via', origine };
+  wc._filoSenzaGestoAlle = adesso;
+  return { esito: recente(prima) || recente(primaQui) ? 'chiedi' : 'via', origine };
+}
+
+// Un segno della scheda (l'ultimo file senza clic, il no dato alla domanda) vale finché l'utente non tocca la scheda dopo.
+function dopoUltimoGesto(wc, t) {
+  if (!t) return false;
+  return Math.max(wc._filoGestoVeroAlle || 0, wc._filoGestoUiAlle || 0) <= t;
 }
 
 // Come in Chrome un clic o un tasto vale per un download solo: quelli che la pagina fa partire dopo, nella stessa
