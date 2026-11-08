@@ -2944,7 +2944,7 @@
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
-      if (d.tipo === 'scaricamenti') return { testo: 'vuole scaricare più file da sola, senza un tuo clic', icone: ['download'] };
+      if (d.tipo === 'scaricamenti') return { testo: 'vuole scaricare più file senza un tuo clic', icone: ['download'] };
       if (d.tipo === 'file') {
         const o = d.oggetto || {};
         const nome = String(o.nome || '');
