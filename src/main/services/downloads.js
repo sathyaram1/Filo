@@ -1558,7 +1558,7 @@ function confirmDownload(id, allow, scope = '') {
   if (!rec || rec.state !== 'pending') {
     return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
   }
-  contaProgramma(rec, allow ? 'scaricato' : 'rifiutato');
+  if (!rec._piuFile) contaProgramma(rec, allow ? 'scaricato' : 'rifiutato');
   // «Salva immagine come»: i byte e il file li muove chi l'ha chiesto, che aspetta questa risposta (#1311).
   const manual = liveManual.get(id);
   if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, items: listRecords(scope) }; }
