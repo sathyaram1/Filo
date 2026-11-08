@@ -4,6 +4,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { segniDi } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="font:20px sans-serif;padding:30px;margin:0">
