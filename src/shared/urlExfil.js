@@ -866,6 +866,15 @@
       const v = valutaRicerca(String(action.query ?? action.q ?? action.testo ?? action.text ?? ''), { memoria, azioni });
       if (v.exfil) return { ...niente, exfil: true, reason: v.reason };
     }
+    // Un comando che va in rete porta fuori il suo indirizzo come un NAVIGA (#2293): stesso controllo, uno per indirizzo.
+    if (tipo === 'ESEGUI_COMANDO') {
+      const indirizzi = indirizziDelComando(action).map((url) => {
+        const v = valutaNaviga(url, { memoria, azioni, daPagina, parole, domanda });
+        return { url, exfil: !!v.exfil, reason: v.reason || '' };
+      });
+      const primo = indirizzi.find((x) => x.exfil);
+      return { ...niente, exfil: !!primo, reason: primo ? primo.reason : '', ...(indirizzi.length ? { indirizzi } : {}) };
+    }
     return niente;
   }
 
