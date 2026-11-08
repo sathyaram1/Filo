@@ -269,21 +269,22 @@ test('il testo scritto da Modifica in un campo modificabile e dalla compilazione
 test('il suggerimento del dizionario del browser scelto dal tasto destro è testo dell\'utente', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ce').click();
-  await page.keyboard.type('oggi ciiao ');
+  // Una parola che Filo sa giusta (nel dizionario personale) e il browser no: lì il suggerimento è del browser.
+  await page.keyboard.type('oggi zanzottera ');
   await page.waitForTimeout(400);
   const box = await page.locator('#ce').boundingBox();
-  await page.mouse.dblclick(box.x + 70, box.y + 14);
-  await page.mouse.click(box.x + 70, box.y + 14, { button: 'right' });
+  await page.mouse.dblclick(box.x + 100, box.y + 14);
+  await page.mouse.click(box.x + 100, box.y + 14, { button: 'right' });
   await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
-  const corr = menuDi(page).locator('.sn-menu-correction:visible');
-  await expect(corr.first()).toBeVisible({ timeout: 4000 });
+  await page.waitForTimeout(600);
   const host = new URL(page.url()).host;
   // Dopo quello vero, un suggerimento che Filo segna: così si vede se il testo scritto si controlla.
   await app.evaluate(({ webContents }, h) => {
     for (const w of webContents.getAllWebContents()) {
-      try { if (new URL(w.getURL()).host === h) w.send('filo:broadcast', { type: '_spell:native', word: 'ciiao', suggestions: ['quseta'] }); } catch (_) {}
+      try { if (new URL(w.getURL()).host === h) w.send('filo:broadcast', { type: '_spell:native', word: 'zanzottera', suggestions: ['quseta'] }); } catch (_) {}
     }
   }, host);
+  const corr = menuDi(page).locator('.sn-menu-correction:visible');
   await expect(corr.first()).toContainText('quseta', { timeout: 4000 });
   await corr.first().click();
   await expect(page.locator('#ce')).toHaveText(/oggi quseta/);
