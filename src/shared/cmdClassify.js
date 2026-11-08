@@ -1062,6 +1062,12 @@
     const reteNome = !!(c.cwd && c.cwd.rete);
     const percorsi = [];
     args.forEach((a, i) => {
+      // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994).
+      const contenuto = /^--([a-z-]+)(?:=(.*))?$/.exec(a);
+      if (contenuto && contenuto[1].length >= 3 && 'contents'.startsWith(contenuto[1])) {
+        percorsi.push(contenuto[2] != null ? contenuto[2] : args[i + 1] || '');
+        return;
+      }
       if (a.startsWith('-')) return;
       if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
