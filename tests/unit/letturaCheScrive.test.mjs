@@ -221,7 +221,7 @@ test('git: le impostazioni di un sottomodulo fanno chiedere come quelle del repo
     git(['submodule', '-q', 'add', '../sub', 'dentro/sub'], ostile);
     git(['commit', '-q', '-m', 'i'], ostile);
     const segno = join(base, 'SEGNO');
-    git(['config', '-f', join(ostile, '.git', 'modules', 'dentro', 'sub', 'config'), 'core.fsmonitor', `programma-inesistente-filo-2292 ${segno}`], ostile);
+    git(['config', '-f', join(ostile, '.git', 'modules', 'dentro', 'sub', 'config'), 'core.fsmonitor', programmaSegno(segno)], ostile);
     assert.equal(T.gitLanciaIn(ostile), 'si');
     assert.equal(T.gitLanciaIn(join(ostile, 'dentro')), 'si', 'anche da una sottocartella');
     // Un repository annidato registrato senza .gitmodules: git status ci entra lo stesso.
