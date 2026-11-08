@@ -62,7 +62,7 @@ for (const [nome, comando] of [
     expect(await davantiAlModello(app), 'il titolo era davanti al modello').toContain('riassumi le chat recenti');
     const cmd = r.actions.find((x) => x.type === 'ESEGUI_COMANDO');
     expect(cmd, 'il modello ha chiesto il comando').toBeTruthy();
-    expect(cmd._executed, 'il comando verso raccolta.example non parte da solo').not.toBe(true);
+    expect(cmd._output, 'il comando verso raccolta.example non è partito').toBeUndefined();
     expect(cmd._confirm, 'chiede un OK').toBeTruthy();
   });
 }
