@@ -221,8 +221,9 @@
   const PS_PIPE_ONLY = new Set(['where-object', 'where', '?', 'foreach-object', 'foreach', '%']);
   // Quale `where` è: 'cmd' il programma di ricerca (where.exe, o la shell cmd), 'filtro' il Where-Object di PowerShell,
   // '' se la shell non si sa. L'unico posto che lo decide (#2292): il livello teme il filtro, la rete teme la ricerca.
+  const eWhereExe = (raw) => /^where\.exe$/i.test(unquote(tokens(dequote(raw))[0] || ''));
   function qualeWhere(raw, shell) {
-    if (/^where\.exe$/i.test(unquote(tokens(dequote(raw))[0] || '')) || shell === 'cmd') return 'cmd';
+    if (eWhereExe(raw) || shell === 'cmd') return 'cmd';
     return shell === 'powershell' ? 'filtro' : '';
   }
   // ForEach-Object senza scriptblock usa la forma «nome di membro», che INVOCA il metodo su
