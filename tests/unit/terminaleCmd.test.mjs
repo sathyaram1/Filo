@@ -130,16 +130,17 @@ async function conCmdFinto(fn) {
   writeFileSync(join(dir, 'taskkill'), '#!/bin/sh\nkill -9 "$2" 2>/dev/null\nexit 0\n');
   chmodSync(join(dir, 'taskkill'), 0o755);
   const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
-  const prima = { PATH: process.env.PATH, ComSpec: process.env.ComSpec };
+  const prima = { PATH: process.env.PATH, ComSpec: process.env.ComSpec, NoDefaultCurrentDirectoryInExePath: process.env.NoDefaultCurrentDirectoryInExePath };
   process.env.PATH = `${dir}:${prima.PATH}`;
   process.env.ComSpec = join(dir, 'cmd.js');
+  // Il contenitore che lancia le prove può averla già: la deve mettere Filo, non chi gira i test.
+  delete process.env.NoDefaultCurrentDirectoryInExePath;
   Object.defineProperty(process, 'platform', { ...piattaforma, value: 'win32' });
   try {
     return await fn();
   } finally {
     Object.defineProperty(process, 'platform', piattaforma);
-    process.env.PATH = prima.PATH;
-    if (prima.ComSpec === undefined) delete process.env.ComSpec; else process.env.ComSpec = prima.ComSpec;
+    for (const [k, v] of Object.entries(prima)) if (v === undefined) delete process.env[k]; else process.env[k] = v;
   }
 }
 
