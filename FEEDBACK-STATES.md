@@ -185,7 +185,14 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   non torna più al PC: un feedback fidato prende il segno dei lavori server (`localOnly`)
   e torna `todo` col segnalibro sul ramo; uno non fidato resta `design` col motivo
   `fidato`, nei Ricevuti L3 come richiesta di renderlo fidato, e «Segna fidato» lo
-  rimette `todo` come lavoro server nello stesso gesto.
+  rimette `todo` come lavoro server nello stesso gesto. Il segno `localOnly` (by
+  `routine`) lo prende già entrando in `design`/`fidato`, da qualunque strada (#2217): la
+  fiducia resta quella di prima. Al contrario, un lavoro server non fidato che arriva in
+  uno stato da routine (`todo`, `working`, `revision_*`) va in `design`/`fidato`, da
+  qualunque strada: dopo i giudici, col `pacchetto --server`, con una scrittura dell'owner
+  (ripristino, fiducia tolta) che il trigger degli aggiornamenti riporta nei Ricevuti.
+  Nessuna routine lo prenderebbe. Dai Ricevuti il tasto che lo rimette in coda lo segna
+  anche fidato, e l'approvazione in blocco degli allineati lo lascia al suo tasto.
 
 **Regole dure:** da `unlabeled` il verdetto lo scrive solo la pipeline; l'owner lo mette in
 coda o lo archivia. Da `suspicious_file`, `done`, `archived` e `*_confirmed` esce solo

@@ -27,6 +27,7 @@
 //
 // USO
 //   node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale
+//                                                         [--server]
 //                                                         [--priorita 0..3]
 //                                                         [--url <indirizzo>]
 //                                                         [--allega <file>]…
@@ -588,11 +589,22 @@ export const ambiente = {
   routine() { return isRoutineInstance(resolve(fileURLToPath(import.meta.url), '..', '..')); },
 };
 
+/** Chi lo prende, detto dopo l'apertura. Un lavoro server non fidato non lo prende nessuna routine (#2217). PURA. */
+export function rigaAperto({ soloLocale = false, server = false, r = {} } = {}) {
+  const ref = r.seq || r.id;
+  if (soloLocale) return `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${ref} (o npm run finish -- --feedback ${ref}).`;
+  if (!server) return 'Aperto per le routine.';
+  return !r.nonFidato && r.biglietto === 'pulito'
+    ? 'Aperto come lavoro server: lo prendono le routine dei lavori server, se in Automazioni sono accese.'
+    : 'Aperto come lavoro server, non fidato: dopo i giudici va nei Ricevuti a chiedere la fiducia, e col tuo timbro lo prendono i lavori server.';
+}
+
 function uso() {
-  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
+  console.error('Uso: node scripts/claude-feedback.mjs "<titolo>" "<testo>" --locale|--non-locale [--server] [--priorita 0..3] [--url <indirizzo>] [--allega <file>]… [--aspetta 676,663.2] [--pacchetto 812,815] [--dry-run]');
   console.error('     --pacchetto: il testo è la spec che unisce quelle segnalazioni; il pacchetto ne copia allegati e attese e le archivia, e chi le aspettava aspetta lui.');
   console.error('     La spec sta nel testo o in un --allega (le note non arrivano a chi lavora); un feedback che deve fondersi prima va in --aspetta.');
   console.error('     --non-locale lo apre per le routine; --locale è il lavoro di questa sessione, e nessuna routine lo prende.');
+  console.error('     --server (anche con --non-locale): il lavoro tocca il codice del server, e lo prendono i lavori server.');
   console.error('     "<testo>" può essere "-" per leggerlo da stdin.');
   console.error('     Da npm, opzione e valore attaccati: npm run feedback:apri -- "t" "x" --allega=spec.md');
 }
@@ -611,7 +623,7 @@ export async function main(argvIn) {
   // riga che chi l'ha scritta considera giusta.
   const { controllaArgomenti, argomentiDaNpm, espandiUguali, opzioneStorpiata, avvisoTrattinoDaNpm } = await import('./lib/argomenti.mjs');
   const OPZ = {
-    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--aspetta', '--pacchetto', '--dry-run'],
+    opzioni: ['--priorita', '--url', '--allega', '--locale', '--non-locale', '--server', '--lavoro-server', '--aspetta', '--pacchetto', '--dry-run'],
     conValore: ['--priorita', '--url', '--allega', '--aspetta', '--pacchetto'],
     ripetibili: ['--allega'],
   };
@@ -637,12 +649,16 @@ export async function main(argvIn) {
   }
   // Chi lo lavora si dice sempre: senza scelta, una segnalazione per le routine nasceva lavoro locale e non la
   // prendeva nessuno (verifica di #908, giro 6). Un errore d'uso costa una riga; un feedback perso no.
-  const locale = argv.includes('--locale');
-  if (locale === argv.includes('--non-locale')) {
-    console.error(locale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
+  const soloLocale = argv.includes('--locale');
+  // `--server` è il segno «lavoro server» (`localOnly`, lo stesso di --locale) anche accanto a --non-locale (#2217).
+  const server = argv.includes('--server') || argv.includes('--lavoro-server');
+  const nonLocale = argv.includes('--non-locale');
+  if ((soloLocale && nonLocale) || (!soloLocale && !nonLocale && !server)) {
+    console.error(soloLocale ? 'RIFIUTATO: --locale e --non-locale insieme: scegline uno. Non ho aperto niente.' : SENZA_SCELTA);
     uso();
     return EXIT.USO;
   }
+  const locale = soloLocale || server;
   const prioritaRaw = flag('priorita');
   const url = flag('url');
   const dryRun = argv.includes('--dry-run');
@@ -653,7 +669,7 @@ export async function main(argvIn) {
   // parole «uguali al valore di un'opzione», e una parola del testo scritta
   // identica all'indirizzo passato spariva dal corpo senza dire niente — un
   // taglio muto sul testo di chi segnala (feedback #565).
-  const CON_VALORE = new Set(['--priorita', '--url', '--allega', '--aspetta', '--pacchetto']);
+  const CON_VALORE = new Set(OPZ.conValore);
   const posizionali = [];
   for (let i = 0; i < argv.length; i += 1) {
     const a = argv[i];
@@ -826,7 +842,7 @@ export async function main(argvIn) {
     return r.uso ? EXIT.USO : (r.codice || EXIT.RIFIUTATO);
   }
   if (r.dryRun) {
-    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${locale ? 'lavoro locale' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati e le loro attese, e alla nascita le archivio)` : ''}.`);
+    console.log(`(prova a vuoto) aprirei "${r.name}" come ${r.clientId}, ${soloLocale ? 'lavoro locale' : server ? 'lavoro server' : 'per le routine'}${p.valore != null ? `, priorità ${p.valore}` : ''}${r.allegati ? `, con ${r.allegati} allegati` : ''}${numeriAttesa.numeri.length ? `, che aspetta ${numeriAttesa.numeri.map((n) => `#${n}`).join(', ')}` : ''}${numeriUnite.numeri.length ? `, come pacchetto che unisce ${numeriUnite.numeri.map((n) => `#${n}`).join(', ')} (coi loro allegati e le loro attese, e alla nascita le archivio)` : ''}.`);
     return EXIT.FATTO;
   }
 
@@ -835,9 +851,7 @@ export async function main(argvIn) {
   console.log(r.seq
     ? `OK: feedback #${r.seq} aperto (${r.id}), mittente ${r.clientId}.`
     : `OK: feedback aperto (${r.id}), mittente ${r.clientId}. Numero non assegnato (la numerazione non ha risposto).`);
-  console.log(locale
-    ? `Lavoro locale: nessuna routine lo prende. Legalo al ramo con verify-local start --feedback ${r.seq || r.id} (o npm run finish -- --feedback ${r.seq || r.id}).`
-    : 'Aperto per le routine.');
+  console.log(rigaAperto({ soloLocale, server, r }));
   // La fiducia la decide il server dal biglietto (#1148): pulito salta i giudici, sporco o assente ci passa.
   console.log(r.nonFidato ? `Nasce non fidato perché ${r.nonFidato}: passa dai giudici e la fusione aspetta il tuo sì.`
     : r.biglietto === 'pulito' ? 'Biglietto della sessione pulito: nasce fidato, niente giudici.'

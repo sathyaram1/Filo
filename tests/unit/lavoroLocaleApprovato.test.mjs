@@ -79,7 +79,9 @@ test('il tasto dei Ricevuti: c’è sul rombo azzurro, di chiunque, e da nessun�
   assert.ok(MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin' }, 'accept_local'), 'il proprio non fidato: il clic lo segna fidato');
   const fidato = MR.ownerActionFor({ ...ricevuto, clientId: 'owner:me', senderProof: 'admin', fiducia: 'fidato' }, 'accept_local');
   assert.deepEqual([!!fidato, fidato && fidato.approva], [true, false], 'a un fidato è l’unica uscita, e scrive il solo segno');
-  assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: SEGNO, localApproval: SI }, 'accept_local'), null, 'già approvato');
+  assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: SEGNO, localApproval: SI, fiducia: 'fidato' }, 'accept_local'), null, 'già approvato e fidato');
+  // Approvato ma non fidato le routine non lo prendono (#2217): il tasto c'è, e il clic lo segna fidato.
+  assert.equal(MR.ownerActionFor({ ...ricevuto, localOnly: SEGNO, localApproval: SI }, 'accept_local').approva, false);
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'todo' }, 'accept_local'), null, 'in coda');
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'archived' }, 'accept_local'), null);
   assert.equal(MR.ownerActionFor({ ...ricevuto, status: 'FENC1:xyz' }, 'accept_local'), null, 'stato illeggibile');

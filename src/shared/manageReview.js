@@ -737,6 +737,11 @@
     return { ok: false, utente: true, motivo: 'è il feedback di un utente: in locale si lavora solo se l’owner lo approva come lavoro server' };
   }
 
+  /** Un lavoro server non fidato va in coda solo col timbro (#2217): nessuna routine lo prende, e il server lo riporta nei Ricevuti. PURA. */
+  function chiedeFiduciaPerLaCoda(fb) {
+    return isLocalOnly(fb) && !isFidato(fb);
+  }
+
   /**
    * L'owner può approvare ADESSO questo feedback come lavoro locale (#913)? PURA. Solo nei Ricevuti, solo su chi
    * non è già owner o sessione con la prova (a quelli basta il segno). `segnalato`: il motivo per guardarlo prima;
@@ -823,12 +828,15 @@
     if (tab === 'inbox') {
       // Aspetta una decisione: approvare È scrivere `todo`.
       const acts = [{ key: 'accept', kind: 'accept', to: 'todo', label: '→ In coda', primary: true }];
+      // `approva`: il sì dell'owner (#913) a chi non è fidato né già approvato.
+      const lavoroServer = { key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok };
+      // Un lavoro server non fidato in coda non lo prende nessuno (#2217): rimetterlo in coda vuol dire anche fidarsene.
+      if (chiedeFiduciaPerLaCoda(fb)) acts[0] = lavoroServer;
       // Il rombo azzurro nato prima di #1358 (`design`/`locale` senza domanda) esce solo come lavoro server: il segno
-      // lo mette ormai il server, e altrove il tasto non c'è (#1575). `approva`: il sì dell'owner (#913) a chi non è
-      // fidato né già approvato.
-      if (status === 'design' && statusReason === 'locale' && !isLocalOnly(fb)) {
+      // lo mette ormai il server, e altrove il tasto non c'è (#1575).
+      else if (status === 'design' && statusReason === 'locale' && !isLocalOnly(fb)) {
         acts[0].primary = false;
-        acts.push({ key: 'accept_local', kind: 'accept', to: 'todo', label: '💻 Lavoro server', primary: true, locale: true, approva: localApprovalCheck(fb, opts).ok });
+        acts.push(lavoroServer);
       }
       // Un attacco/spam segnalato si può CONFERMARE: stato terminale, esce dai
       // Ricevuti e resta consultabile negli Archiviati. Il file sospetto non è
@@ -2169,7 +2177,7 @@
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
     isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
-    isRicevutiStatus, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
+    isRicevutiStatus, chiedeFiduciaPerLaCoda, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, giudizioPerLettura,
     panelComplete, judgesNote, reasonText,
     statusUnreadable, valueUnreadable, sectionsReliable, publicStateLabel, PUBLIC_STATE_HINT,

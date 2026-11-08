@@ -223,6 +223,34 @@ function opzione(argv, nome) {
   return argv[i].includes('=') ? argv[i].slice(nome.length + 1) : argv[i + 1];
 }
 
+// Il segno «lavoro server» lo mette chi apre (#2217): dice dove sta il codice, non la fiducia, che resta dell'owner.
+export const OPZIONI_SERVER = Object.freeze(['--server', '--lavoro-server']);
+const OPZIONI_DI = Object.freeze({ feedback: ['--priorita', '--ticket', ...OPZIONI_SERVER], pacchetto: ['--ticket', ...OPZIONI_SERVER] });
+export const vuoleServer = (argv) => (argv || []).some((a) => OPZIONI_SERVER.includes(String(a)));
+/** Le opzioni di `cmd` che npm si è preso (`npm_config_*`), come le riprende lo strumento della sessione locale. */
+export async function opzioniDaNpm(cmd, env = {}) {
+  const opzioni = OPZIONI_DI[cmd];
+  if (!opzioni) return { args: [], nota: null };
+  const { argomentiDaNpm } = await import('./lib/argomenti.mjs');
+  const r = argomentiDaNpm(env || {}, { opzioni, conValore: opzioni.filter((o) => !OPZIONI_SERVER.includes(o)) });
+  return { args: r.args || [], nota: r.nota || null, ...(r.errore ? { errore: r.errore } : {}) };
+}
+// senzaOpzioni toglie ogni `--x`: un `--sever` sparirebbe dal titolo e il feedback nascerebbe senza segno. Il segno
+// non prende valori: `--server=true` non lo accende, quindi si rifiuta invece di perderlo.
+function opzioniIgnote(cmd, argv) {
+  const ammesse = OPZIONI_DI[cmd] || [];
+  return (argv || []).map(String).filter((a) => /^--[^-]/.test(a)
+    && (!ammesse.includes(a.split('=')[0]) || (a.includes('=') && OPZIONI_SERVER.includes(a.split('=')[0]))));
+}
+/** La riga sul segno dopo l'apertura: chiesto e non tornato dal server si dice, perché nessuno lo rimetterebbe. PURA. */
+export function rigaSegnoServer(chiesto, r) {
+  if (!chiesto) return '';
+  if (r && r.lavoroServer === true && r.fiducia === 'fidato') return 'Segnato lavoro server: è fidato, lo prendono i lavori server.';
+  // Non fidato nessuna routine lo prende: il server lo porta nei Ricevuti dell'owner a chiedere il timbro (#2217).
+  if (r && r.lavoroServer === true) return 'Segnato lavoro server, non fidato: va nei Ricevuti dell\'owner a chiedere la fiducia, e col suo timbro lo prendono i lavori server.';
+  return 'SEGNO NON MESSO: il server non ha confermato «lavoro server» (forse non lo conosce ancora). Il feedback esiste: non riaprirlo, chiedi all\'owner di segnarlo lavoro server in Gestione.';
+}
+
 const NUMERO_RE = /^#?[1-9]\d{0,6}(?:\.[1-9]\d{0,3})?$/;
 const numeroDi = (v) => (NUMERO_RE.test(String(v || '').trim()) ? String(v).trim().replace(/^#/, '') : '');
 
@@ -875,14 +903,14 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
   rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
   ordine | accendi <N,M,…>|--niente | parallelo <N>
-  priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…>
+  priorita <N> <0|1|2|3> | attesa <B> <A> [--togli] | pacchetto <P> <N,M,…> [--server]
   nota <N> - | sblocca <N> [nota] | archivia <N> <originale>
   taccuino | taccuino scrivi - --versione <V> | indicazione "<testo>"
   sveglia-tra <minuti> [--perche "…"] | sveglia-togli | segnali-letti
   account <A|B> spento|acceso | account primo <A|B|alterna> | routine spente|accese
   recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
   novita | novita consegna <file.json> | chat [--stampa]
-  feedback "<titolo>" - [--priorita P]     (testo da stdin) | domanda <file.json> | domanda-fine <ruolo> - | --togli
+  feedback "<titolo>" - [--priorita P] [--server]   (testo da stdin; --server: il codice sta nel server) | domanda <file.json> | domanda-fine <ruolo> - | --togli
   registro [parole] | spesa
   transizione [--applica]                  (solo l'owner: le priorità 2 scendono a 1; senza --applica conta e basta)`;
 
@@ -895,7 +923,12 @@ async function leggiStdin() {
 
 const stampaJson = (o) => console.log(JSON.stringify(o, null, 2));
 
-export async function main(argv, { root = ROOT, env = process.env } = {}) {
+export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
+  // Senza il doppio trattino npm si prende le opzioni e le lascia nell'ambiente: si riprendono e si dice (#2217).
+  const daNpm = await opzioniDaNpm(argvIn && argvIn[0], env);
+  if (daNpm.errore) { console.error(`RIFIUTATO: ${daNpm.errore}. Non ho scritto niente.`); return 1; }
+  if (daNpm.nota) console.error(daNpm.nota);
+  const argv = daNpm.args.length ? [...argvIn, ...daNpm.args] : argvIn;
   const [cmd, arg] = argv;
   if (!SOTTOCOMANDI.includes(cmd) || (['incroci', 'leggi', 'parallelo', 'priorita', 'nota', 'archivia', 'sveglia-tra', 'account', 'routine', 'pacchetto', 'attesa', 'indicazione', 'feedback', 'domanda', 'domanda-fine'].includes(cmd) && !arg)) {
     console.error(USO);
@@ -967,6 +1000,10 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
     console.log(typeof riga === 'function' ? riga(r) : riga);
     if (r.avviso) console.error(`AVVISO: ${r.avviso}`);
     return 0;
+  };
+  const segnoServer = (chiesto, r) => {
+    const riga = rigaSegnoServer(chiesto, r);
+    if (riga) (r.lavoroServer === true ? console.log : console.error)(riga);
   };
   switch (cmd) {
     case 'stato': { const r = await chiama(cred, 'stato'); return esito(r, (x) => righeStato(x).join('\n')); }
@@ -1047,8 +1084,11 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       return esito(r, (x) => (togli ? `#${x.numero} non aspetta più #${x.tolta}.` : x.gia ? `#${numeroDi(arg)} aspettava già #${numeroDi(argv[2])}.` : `#${x.numero} aspetta #${x.aspetta}${x.sbloccato ? ': il lavoro fermo riparte quando arriva' : ''}.`));
     }
     case 'pacchetto': {
-      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).numeri });
-      return esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
+      const server = vuoleServer(argv);
+      const r = await chiama(cred, 'pacchetto', { numero: numeroDi(arg), unisce: leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).numeri, ...(server ? { lavoroServer: true } : {}) });
+      const fatto = esito(r, (x) => `#${x.pacchetto} unisce ${x.unisce.map((n) => `#${n}`).join(', ')}: le unite lo aspettano e si chiudono alla sua fusione.`);
+      if (!fatto) segnoServer(server, r);
+      return fatto;
     }
     case 'nota': case 'sblocca': {
       const testo = cmd === 'nota' ? (await leggiStdin()).trim() : (richiestaSblocca(argv.slice(1)).testo || 'Sbloccato dal manutentore: riprendi.');
@@ -1116,8 +1156,11 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
       const testo = (await leggiStdin()).trim();
       if (!testo) { console.error('RIFIUTATO: il feedback vuole il testo da stdin (feedback "<titolo>" - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
       const p = opzione(argv, '--priorita');
-      const r = await chiama(cred, 'feedback', { titolo: senzaOpzioni(argv.slice(1)).filter((a) => a !== '-').join(' '), testo, ...(p !== undefined ? { priorita: Number(p) } : {}) });
-      return esito(r, (x) => `Aperto #${x.numero}${x.fiducia ? ` (${x.fiducia})` : ''}.`);
+      const server = vuoleServer(argv);
+      const r = await chiama(cred, 'feedback', { titolo: senzaOpzioni(argv.slice(1)).filter((a) => a !== '-').join(' '), testo, ...(p !== undefined ? { priorita: Number(p) } : {}), ...(server ? { lavoroServer: true } : {}) });
+      const fatto = esito(r, (x) => `Aperto #${x.numero}${x.fiducia ? ` (${x.fiducia})` : ''}.`);
+      if (!fatto) segnoServer(server, r);
+      return fatto;
     }
     case 'domanda': {
       let domanda;
@@ -1150,6 +1193,11 @@ export async function main(argv, { root = ROOT, env = process.env } = {}) {
 export function controlliLocali(cmd, argv) {
   const [, a, b] = argv;
   const num = (v, cosa) => (numeroDi(v) ? '' : `${cosa}: «${String(v ?? '').slice(0, 20)}» non è un numero di feedback`);
+  const ignote = (c) => {
+    const x = opzioniIgnote(c, argv);
+    const senzaValore = x.some((o) => OPZIONI_SERVER.includes(o.split('=')[0])) ? '; --server non prende valori, si scrive da solo' : '';
+    return x.length ? `${c} non conosce ${x.map((o) => o.slice(0, 30)).join(', ')} (conosce ${OPZIONI_DI[c].join(', ')})${senzaValore}` : '';
+  };
   switch (cmd) {
     case 'leggi': case 'nota': case 'sblocca': return num(a, cmd);
     case 'rapporti': { const q = richiestaRapporti(argv); return q.ok ? '' : q.motivo; }
@@ -1158,7 +1206,7 @@ export function controlliLocali(cmd, argv) {
     case 'priorita': return num(a, cmd) || (controlloPriorita(null, b).ok ? '' : controlloPriorita(null, b).motivo);
     case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
-    case 'pacchetto': return num(a, cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
+    case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
     case 'taccuino': return a === 'scrivi' && !/^\d+$/.test(String(opzione(argv, '--versione') ?? '')) ? 'taccuino scrivi vuole --versione <V>, il numero che hai letto col taccuino: senza, un\'indicazione dell\'owner scritta in mezzo sparirebbe' : '';
     case 'sveglia-tra': return Number(a) >= 5 ? '' : 'la sveglia più vicina è fra 5 minuti';
     case 'account': return a === 'primo' ? (['A', 'B', 'alterna'].includes(b) ? '' : 'account primo A, B o alterna')
@@ -1169,7 +1217,7 @@ export function controlliLocali(cmd, argv) {
       const p = opzione(argv, '--priorita');
       // Una priorità storta arriverebbe al server come null, e un null vale 0: il feedback nascerebbe rimandato.
       if (p !== undefined && !/^[0-3]$/.test(String(p))) return `--priorita: «${String(p).slice(0, 20)}» non è un intero da 0 a 3`;
-      return senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'feedback vuole il titolo, poi - e il testo da stdin';
+      return ignote(cmd) || (senzaOpzioni(argv.slice(1)).filter((x) => x !== '-').join(' ').trim() ? '' : 'feedback vuole il titolo, poi - e il testo da stdin');
     }
     case 'domanda-fine': return /^[a-z][a-z0-9-]{1,40}$/.test(String(a)) ? '' : 'domanda-fine vuole il ruolo (per esempio verifier), poi - e il testo da stdin, o --togli';
     case 'novita': return a === 'consegna' && !b ? 'novita consegna vuole il file JSON della riscrittura' : '';

@@ -70,6 +70,21 @@ test('nessuna scheda «Lavori server»: il lavoro col segno sta nella scheda del
   await expect(page.locator('.mg-item[data-id="srv-1"] .mg-local-badge')).toHaveText('server');
 });
 
+// #2217: le routine prendono un lavoro server solo fidato; a uno non fidato l'etichetta non lo promette.
+test('l’etichetta «server» di un lavoro non fidato dice che aspetta il timbro, quella di un fidato le routine', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); },
+    [fb(), fb({ _id: 'srv-2', seq: 1201, fiducia: 'non_fidato', localOnly: { by: 'routine', at: SEGNO.at } })]);
+  await apriScheda(page, 'queue');
+  await expect(page.locator('.mg-item[data-id="srv-1"] .mg-local-badge')).toHaveAttribute('title', /Lo prendono le routine/);
+  const nonFidato = page.locator('.mg-item[data-id="srv-2"] .mg-local-badge');
+  await expect(nonFidato).toHaveAttribute('title', /non fidato: nessuna routine lo prende finché non lo segni fidato/);
+  await expect(nonFidato).not.toHaveAttribute('title', /Lo prendono le routine/);
+});
+
 test('Automazioni: «Lavori server alle routine» nasce spento, si accende e si spegne, e arriva al main', async ({ openTab }) => {
   const page = await openTab(MANAGE);
   await apriAutomazioni(page);

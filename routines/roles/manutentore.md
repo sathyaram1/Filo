@@ -248,7 +248,7 @@ npm run manutentore -- accendi 812,815,820 | accendi --niente
 npm run manutentore -- parallelo <N>               # quante sessioni insieme, sotto il freno dell'owner
 npm run manutentore -- priorita <N> <0|1|2|3>      # una 3 non si abbassa
 npm run manutentore -- attesa <B> <A> [--togli]    # B aspetta A
-npm run manutentore -- pacchetto <P> <N,M,…>       # P unisce le segnalazioni in coda
+npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnalazioni in coda
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
 npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato
@@ -261,7 +261,7 @@ npm run manutentore -- routine spente|accese
 npm run manutentore -- recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
 npm run manutentore -- novita | novita consegna <file.json>
 npm run manutentore -- chat                        # la chat dell'owner, col contesto intero
-npm run manutentore -- feedback "<titolo>" - [--priorita P]   # un feedback nuovo, testo da stdin (di norma a 1)
+npm run manutentore -- feedback "<titolo>" - [--priorita P] [--server]   # un feedback nuovo, testo da stdin (di norma a 1); --server se il codice sta in filo-security
 npm run manutentore -- domanda <file.json>         # una domanda all'owner, coi campi di SPEC-DOMANDE § 3.1
 npm run manutentore -- domanda-fine <ruolo> - | --togli   # la domanda di fine turno di un ruolo, da stdin
 npm run manutentore -- registro <parole>           # i principi delle domande chiuse, prima di chiedere

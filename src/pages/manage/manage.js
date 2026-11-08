@@ -2951,7 +2951,10 @@
     const m = fb && fb.localOnly;
     if (!m) return '';
     const quando = Number(m.at) > 0 ? ` il ${formatDateTime(new Date(Number(m.at)).toISOString())}` : '';
-    const cosa = !MR.praticaChiusa(fb, { releasedVersion, fusioni }) ? 'Lavoro server. Lo prendono le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.'
+    const aperto = !MR.praticaChiusa(fb, { releasedVersion, fusioni });
+    // Le routine prendono un lavoro server solo fidato (#2217): a uno non fidato la riga non promette niente.
+    const cosa = aperto && !MR.isFidato(fb) ? 'Lavoro server non fidato: nessuna routine lo prende finché non lo segni fidato.'
+      : aperto ? 'Lavoro server. Lo prendono le routine se in Automazioni i lavori server sono accesi, altrimenti una sessione locale.'
       : MR.isPrivateLocalWork(fb) ? 'Era un lavoro server: per questo non sta nella bacheca pubblica.'
         : 'Era un lavoro server: la sua scheda resta nella bacheca pubblica, per chi l’ha mandato.';
     const a = MR.isLocalApproved(fb) ? fb.localApproval : null;
@@ -3074,7 +3077,8 @@
     // approvare in blocco quello che non si è potuto leggere è la scrittura
     // più pesante della pagina.
     if (!sezioniAttendibili()) return [];
-    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f));
+    // Un lavoro server non fidato si approva solo col suo tasto, che lo rende anche fidato (#2217).
+    return MR.filtraFiducia(allFeedbacks, soloNonFidate && !tutti).filter((f) => statoLeggibile(f) && MR.isAligned(f) && !MR.chiedeFiduciaPerLaCoda(f));
   }
   function updateAlignedBar() {
     if (!mgAlignedBar) return;
