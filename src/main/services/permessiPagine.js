@@ -455,14 +455,15 @@ function nomeDaMostrare(origine) {
   try { u = new URL(origine); } catch (_) { return { sotto: '', dominio: String(origine || '') }; }
   const host = u.hostname;
   const porta = u.port ? ':' + u.port : '';
-  let registrabile = host;
-  try {
-    if (!Psl.isIpAddress(host)) registrabile = (Psl.getDomainInfo(host) || {}).registrable || host;
-  } catch (_) {}
+  const registrabile = registrabileDi(host);
   const sotto = host.length > registrabile.length && host.endsWith('.' + registrabile)
     ? host.slice(0, host.length - registrabile.length - 1)
     : '';
   return { sotto, dominio: registrabile + porta };
+}
+function registrabileDi(host) {
+  try { if (!Psl.isIpAddress(host)) return (Psl.getDomainInfo(host) || {}).registrable || host; } catch (_) {}
+  return host;
 }
 
 // `decisa` (terzo argomento di chi aspetta): la risposta viene da una scelta dell'utente, non da una domanda ritirata.
