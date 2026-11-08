@@ -3,7 +3,7 @@
 // chiusa, e un testo nuovo scritto da script si controlla solo al gesto vero dell'utente che segue, uno per gesto.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { nelMondoDelMenu } from './helpers/menuContestuale.mjs';
+import { nelMondoDelMenu, menuDi } from './helpers/menuContestuale.mjs';
 import { segniDi, riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
