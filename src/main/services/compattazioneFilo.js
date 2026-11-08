@@ -341,9 +341,10 @@ async function dimenticaChat(chatId) {
   return tolte;
 }
 
-// Quanto pesa un messaggio del tratto, in token: testo ed esiti.
+// Quanto pesa un messaggio del tratto, in token, come parte: testo, quello che Filo gli scrive in testa, esiti.
 function pesoDi(m) {
   let caratteri = String((m && m.text) || '').length;
+  if (m && m.role === 'user' && typeof CF().caratteriPreambolo === 'function') caratteri += CF().caratteriPreambolo(m);
   if (m && m.role !== 'user') {
     for (const a of CF().esitiPerCompattare(m).azioni) { try { caratteri += JSON.stringify(a._output || '').length; } catch (_) {} }
   }
