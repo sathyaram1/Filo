@@ -122,7 +122,7 @@ function sondaGit(dir, visti) {
   });
   let out = '';
   try {
-    out = git(['config', '--list', '--show-scope', '--includes'], dir);
+    out = git(['config', '--list', '--show-scope', '--includes', '-z'], dir);
   } catch (e) {
     // Senza git installato il comando git non parte nemmeno: non c'è niente da avviare.
     return e && e.code === 'ENOENT' ? '' : 'ignoto';
