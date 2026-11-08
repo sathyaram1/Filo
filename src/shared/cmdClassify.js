@@ -144,21 +144,30 @@
   // Alcuni LEVEL1 leggono finché non ricevono gli argomenti che ne cambiano il senso: `date`
   // legge, `date -s` IMPOSTA. Il predicato riceve il comando intero e torna true se MODIFICA.
   const LEVEL1_MUTATES = {
-    // `date -s`/`--set` imposta l'orologio; `+%F`, `-u`, `-d` sono letture.
-    date: (cmd) => /(^|\s)(-s|--set)(=|\s|$)/i.test(cmd),
+    // `date -s`/`--set` imposta l'orologio, anche in un gruppo (`-us`) o col valore attaccato (`-s1`); `+%F`, `-u`,
+    // `-d` sono letture. `-d`, `-f`, `-r`, `-I` prendono un valore: la `s` dopo di loro è quel valore.
+    date: (cmd) => tokens(cmd).slice(1).map(unquote).some((t) => /^-[uR]*s/.test(t) || opzioneLunga(t, 'set', 1)),
     // `hostname <nome>` o `-F file` imposta il nome host; i flag di lettura no.
     // Attenzione: qui `-s` è «short», non «set».
     hostname: (cmd) => {
       const rest = tokens(cmd).slice(1);
       // `-F`/`--file` è case-sensitive: `-f` = fqdn è lettura e non deve combaciare.
-      return rest.some((t) => /^(-F|--file)$/.test(t) || !t.startsWith('-'));
+      return rest.some((t) => /^-[A-Za-z]*F/.test(t) || opzioneLunga(t, 'file', 2) || !t.startsWith('-'));
     },
     // Lettori con un'uscita su file (#1994): `uniq IN OUT`, `tree -o FILE` (e `-R`, che scrive 00Tree.html in ogni
     // cartella), `file -C` (compila `<nome>.mgc` nella cartella di lavoro).
     uniq: (cmd) => uniqUscita(tokens(cmd).slice(1)) != null,
     tree: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*[oR]/.test(t)),
-    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C|^--compile$/.test(t)),
+    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || opzioneLunga(t, 'compile', 2)),
   };
+
+  // getopt e git accettano un'opzione lunga abbreviata a ogni prefisso non ambiguo (`--comp` è `--compile`, `--outp=x`
+  // è `--output=x`): l'opzione si riconosce come la legge il programma. Il valore dopo `=`, o '' senza; null se non è lei.
+  function opzioneLunga(t, nome, min) {
+    const m = /^--([A-Za-z][A-Za-z-]*)(?:=([\s\S]*))?$/.exec(String(t || ''));
+    if (!m || m[1].length < min || !nome.startsWith(m[1].toLowerCase())) return null;
+    return m[2] != null ? m[2] : '';
+  }
 
   // Il secondo operando di uniq è il file in cui scrive (`-` è il terminale): null se non c'è.
   function uniqUscita(testi) {
