@@ -837,7 +837,7 @@
       for (const tipo of ['pointerdown', 'keydown', 'keyup', 'paste', 'cut', 'drop', 'compositionend']) {
         el.addEventListener(tipo, (e) => {
           const vivo = monitored.get(el);
-          if (!vivo || !e.isTrusted) return;
+          if (!vivo || !e.isTrusted || (tipo === 'keyup' && e.key !== 'Tab')) return;
           vivo.permesso = Date.now();
           if (vivo.attivo && vivo.codiceTesto !== vivo.testoCalcolato) aggiornaCodice(vivo);
         }, true);
