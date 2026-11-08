@@ -810,7 +810,13 @@ function liberaSchede(siti) {
 // Un segno della scheda (l'ultimo file senza clic, il no dato alla domanda) vale finché l'utente non tocca la scheda dopo.
 function dopoUltimoGesto(wc, t) {
   if (!t) return false;
-  return Math.max(wc._filoGestoVeroAlle || 0, wc._filoGestoUiAlle || 0) <= t;
+  return Math.max(wc._filoGestoVeroAlle || 0, wc._filoGestoUiAlle || 0, wc._filoNavDiFiloAlle || 0) <= t;
+}
+
+// Un indirizzo che la scheda apre per l'utente (barra degli indirizzi, Filo che naviga per lui) azzera la scheda come un
+// suo clic: in Chrome lo fa la navigazione che non parte dalla pagina.
+function navigazioneDiFilo(wc) {
+  if (wc) wc._filoNavDiFiloAlle = Date.now();
 }
 
 // Come in Chrome un clic o un tasto vale per un download solo: quelli che la pagina fa partire dopo, nella stessa
