@@ -556,6 +556,31 @@ test('"Mostra originale" riporta indietro tutta la pagina, link compresi', async
   await expect(page.locator('#p2 a#inlink')).toHaveAttribute('href', '#x');
 });
 
+// #2298 — un messaggio di forum può portare attributi data-* scelti da chi scrive: il ritorno all'originale non deve
+// trasformarli in codice della pagina.
+const PLANTED = `<!doctype html><html lang="en"><body style="font:16px sans-serif;padding:20px">
+  <h1 id="head">A forum thread about European football</h1>
+  <p id="post">First reply in the thread, long enough to be translated.</p>
+  <div id="bait" data-sn-translated="1" data-sn-original="spoofed text"
+    data-sn-original-html="&lt;img id=&quot;pwn&quot; src=&quot;x&quot; onerror=&quot;window.__x=1&quot;&gt;">Reply from a stranger</div>
+</body></html>`;
+
+test('"Mostra originale" non esegue l’HTML che la pagina ha messo in un attributo', async ({ app, openTab, testServer }) => {
+  await stubTranslationProvider(app);
+  const page = await testServer.openReady(openTab, PLANTED);
+  await clickTranslateIcon(app);
+  await expect(page.locator('#post')).toHaveText(/^IT /);
+
+  await clickTranslateIcon(app);
+  await expect(page.locator('#post')).toHaveText('First reply in the thread, long enough to be translated.');
+  await expect(page.locator('#head')).toHaveText('A forum thread about European football');
+  // Il tempo per un caricamento d'immagine fallito: senza la correzione qui il gestore della pagina è già partito.
+  await page.waitForTimeout(500);
+  expect(await page.evaluate(() => window.__x)).toBeUndefined();
+  await expect(page.locator('#pwn')).toHaveCount(0);
+  await expect(page.locator('#bait')).toHaveText('Reply from a stranger');
+});
+
 // ───────────────────────────────────────────────────────────────────────────
 // #407 (secondo giro) — testo che si LEGGE ma non sta nel testo.
 //
