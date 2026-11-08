@@ -2193,7 +2193,7 @@
     isStarred, listArchiveTab, manageTabCounts, isShipped, cmpVersion, listBoardTab,
     hasReopenRequest, canReopen, isApproved, isAligned, ALIGNED, ALIGNED_COLOR: ALIGNED.color,
     panelSize, EXPECTED_PANEL_SIZE: DEFAULT_PANEL_SIZE, isFidato, fiduciaCheck, fiduciaTogliCheck, fiduciaText, isUnprovenSender, effectiveClientId,
-    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
+    isLocalOnly, inAttesaFusioneServer, attesaServer, restaLocale, sbloccoFermo, isLocalApproved, isPrivateLocalWork, fraseAttesa, isProvenLocalSender, judgesSkippedText, immaginiNonViste,
     isRicevutiStatus, chiedeFiduciaPerLaCoda, localApprovalCheck, localSignCheck, localSenderCheck, praticaChiusa,
     segnaliDeiGiudici, segnalatoComeAttacco, giudizioPerLettura,
     panelComplete, judgesNote, reasonText,
