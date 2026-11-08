@@ -448,6 +448,23 @@
     return false;
   }
 
+  // `git config` nella forma con le opzioni (`--unset`, `chiave valore`…): gli argomenti dopo il sotto-comando.
+  function gitConfigForma(args) {
+    const low = args.map((a) => a.toLowerCase());
+    if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
+    const ops = args.filter((a) => !a.startsWith('-'));
+    // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
+    const scrive = ops.length >= 2 || low.some((a) => a === '--add' || a === '--replace-all');
+    if (scrive && /^remote\..+\.(push)?url$|^url\..+\.(push)?insteadof$/.test((ops[0] || '').toLowerCase())) return 3;
+    if (low.some((a) => a === '--add' || a === '--replace-all' || a === '--rename-section' || a === '-e' || a === '--edit')) return 2;
+    if (ops.length >= 2) return 2; // `chiave valore` imposta
+    // Lettura: un dump completo, o una chiave che porta credenziali (URL di un
+    // remoto con token, `credential.helper`), stampa un segreto in chiaro nella
+    // conversazione → conferma (#587). Una chiave innocua (`user.email`) resta 1.
+    if (low.some((a) => a === '--list' || a === '-l' || a === '--get-regexp' || a === '--get-urlmatch')) return 2;
+    return /(^|\.)url$|credential|password|token/.test((ops[0] || '').toLowerCase()) ? 2 : 1;
+  }
+
   // Sotto-comandi il cui livello dipende dagli argomenti: i duali ELENCANO (1) da nudi e
   // CREANO (2) con un operando; `checkout` e `stash` hanno anche forme distruttive (3).
   const GIT_DUAL = {
