@@ -1632,6 +1632,78 @@
     return null;
   }
 
+  // Un gesto vero che l'editor ferma per scrivere da sé (Lexical: la prima lettera di un paragrafo, l'incolla) non
+  // porta un `input`: il cambio che arriva subito dopo vale quanto quello che il gesto spiega, e niente di più.
+  const INTENTO_MS = 1000;
+  function siAspettaDallUtente(state, e, ammesso) {
+    if (!ammesso || PAGINA_DI_FILO || radiceDi(state.el)) return;
+    state.intento = { ammesso, alle: Date.now() };
+    setTimeout(() => {
+      if (!e.defaultPrevented || !state.attivo || state.intento?.ammesso !== ammesso) return;
+      if (getEditableText(state.el) !== state.testo) suInput(state, null);
+    }, 0);
+  }
+
+  // Un cambio che né l'utente né Filo spiegano. Quello che il sito scrive è suo; una parola che il sito ricompone
+  // cancellando o spezzando lettere dell'utente («le zanzare di otto terra» → «le zanzottera») è sua anche lei. E il
+  // testo trovato entrando torna del sito: tenerlo dell'utente gli darebbe, cancellando e annullando, una misura a
+  // piacere (#2299, giro 4).
+  const DI_PAROLA = /[\p{L}\p{N}\p{M}'’_-]/u;
+  function cambioDelSito(state, prima, ora, c, nuovo) {
+    const pezzi = [];
+    if (senzaSpazi(nuovo)) pezzi.push({ start: c.p, end: c.fineNuovo });
+    const tolto = prima.slice(c.p, c.fineVecchio);
+    const unisce = !senzaSpazi(nuovo) && DI_PAROLA.test(ora[c.p - 1] || '') && DI_PAROLA.test(ora[c.fineNuovo] || '');
+    if (!senzaSpazi(nuovo) && (senzaSpazi(tolto) || (nuovo && unisce))) {
+      let a = c.p;
+      let b = c.fineNuovo;
+      while (a > 0 && DI_PAROLA.test(ora[a - 1])) a--;
+      while (b < ora.length && DI_PAROLA.test(ora[b])) b++;
+      if (b > a) pezzi.push({ start: a, end: b });
+    }
+    if (!pezzi.length) return;
+    state.diSito = unisciPezzi([...state.diSito, ...pezzi]);
+    revocaVisti(state);
+  }
+  function revocaVisti(state) {
+    if (!state.visti.length && ![...state.proprietari.values()].some((g) => g.visti.length)) return;
+    state.diSito = unisciPezzi([...state.diSito, ...state.visti]);
+    state.visti = [];
+    for (const g of state.proprietari.values()) {
+      if (!g.visti.length) continue;
+      g.diSito = unisciPezzi([...g.diSito, ...g.visti]);
+      g.visti = [];
+    }
+  }
+
+  // Il testo che c'era nella casella prima del gesto che ci porta l'utente, fotografato prima che la pagina lo veda
+  // (ascolto in cattura su window, messo prima dei suoi): quello che il sito ci mette durante il gesto non si adotta.
+  const FOTO_MS = 2000;
+  function primaDelGesto(e) {
+    try {
+      if (!e || !e.isTrusted || PAGINA_DI_FILO || !settings || !attivo()) return;
+      for (const el of new Set([activeEl, editabileDellEvento(e)])) {
+        if (!el || radiceDi(el)) continue;
+        const state = statoDi(el);
+        if (state.attivo && state.entrato) continue;
+        seguiIlTesto(state);
+        state.primaDelGesto = { alle: Date.now(), pezzi: state.diSito.map((z) => ({ ...z })) };
+      }
+    } catch (_) {}
+  }
+  if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+    for (const tipo of ['pointerdown', 'mousedown', 'touchstart', 'keydown']) window.addEventListener(tipo, primaDelGesto, true);
+  }
+  function intersezione(a, b) {
+    const out = [];
+    for (const x of a) for (const y of b) {
+      const s = Math.max(x.start, y.start);
+      const t = Math.min(x.end, y.end);
+      if (t > s) out.push({ start: s, end: t });
+    }
+    return unisciPezzi(out);
+  }
+
   // Chi possedeva ogni testo già visto nella casella: un annulla o un rifai, di chiunque, lo riporta coi suoi
   // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. L'impronta trova, il testo
   // intero conferma: un'impronta corta il sito la falsificherebbe. Un testo dimenticato torna come del sito.
