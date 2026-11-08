@@ -819,6 +819,16 @@ function navigazioneDiFilo(wc) {
   if (wc) wc._filoNavDiFiloAlle = Date.now();
 }
 
+// La scheda che rinasce in una vista nuova (Privacy fra siti, la scheda caduta) resta la stessa scheda: il conto dei file
+// senza clic e il no ancora validi passano alla vista nuova, o una pagina che salta da sola riparte da capo (#2294).
+function passaScheda(da, a) {
+  if (!da || !a || da === a) return;
+  for (const k of ['_filoSenzaGestoAlle', '_filoScaricamentiNoAlle']) if (dopoUltimoGesto(da, da[k])) a[k] = da[k];
+  if (da._filoGestoScaricatoAlle) a._filoGestoScaricatoAlle = da._filoGestoScaricatoAlle;
+  schedeFerme.delete(da);
+  if (a._filoScaricamentiNoAlle) { a._filoScaricamentiNoSito = da._filoScaricamentiNoSito; schedeFerme.add(a); }
+}
+
 // Come in Chrome un clic o un tasto vale per un download solo: quelli che la pagina fa partire dopo, nella stessa
 // raffica, contano come senza clic. `gesto` è il parere di Chromium, per un gesto che qui non si vede (un riquadro di
 // un altro sito): vale se nessun download ha usato un gesto in questa scheda negli ultimi secondi.
