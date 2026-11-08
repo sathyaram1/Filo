@@ -90,8 +90,8 @@ async function apri(app, openTab, testServer, opz = {}) {
   return page;
 }
 
-const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
-const suggerimento = (page, testo) => page.locator('.sn-spell-overlay .sn-suggerimento', { hasText: testo });
+const errore = (page, testo) => segniDi(page, '.sn-spell-overlay .sn-errore', { hasText: testo });
+const suggerimento = (page, testo) => segniDi(page, '.sn-spell-overlay .sn-suggerimento', { hasText: testo });
 const rapide = (app) => app.evaluate(() => globalThis.__rapide);
 const coloreDelSegno = async (loc) => (await stileDelSegno(loc, ['text-decoration-color']))['text-decoration-color'];
 
@@ -233,7 +233,7 @@ test('il modello cita il pezzo con uno spazio in più e l\'altro apice: il segno
   await page.keyboard.type('oggi l’amico sonno andato al mare ');
   const segno = errore(page, 'sonno');
   await expect(segno).toHaveText('sonno', { timeout: 6000 });
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(1);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(1);
   const menu = await tastoDestroSu(page, segno);
   const prima = menu.primaVoce;
   await expect(prima).toHaveText(/^sono/);
@@ -248,7 +248,7 @@ test('«Filo» e filo.red non hanno segni, nemmeno se il modello dice sbagliato 
   await page.locator('#ta').click();
   await page.keyboard.type('ho aperto Filo e poi filo.red per quseta ');
   await expect(errore(page, 'quseta')).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(1);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(1);
   for (const r of await rapide(app)) expect(r.candidati).not.toMatch(/\bred\b|Filo/);
 });
 
@@ -258,7 +258,7 @@ test('la parola che si sta scrivendo non è mai segnata e non parte; chiusa, sì
   await page.keyboard.type('ciao a tutti, quset', { delay: 40 });
   for (let i = 0; i < 6; i++) {
     await page.waitForTimeout(300);
-    await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0);
+    await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0);
   }
   expect((await rapide(app)).some((r) => r.nuovo.includes('quset'))).toBe(false);
   await page.keyboard.type(' ');
@@ -293,7 +293,7 @@ test('una risposta arrivata dopo un cambio del testo si posa sul pezzo giusto, o
   await page.keyboard.type('tutto a posto ');
   await app.evaluate(() => globalThis.__rilascia());
   await page.waitForTimeout(600);
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0);
 });
 
 test('in un campo su più righe il segno sta sotto la parola, sulla sua riga', async ({ app, openTab, testServer }) => {
@@ -343,7 +343,7 @@ test('«Correggi tutti gli errori» corregge gli errori e non tocca i suggerimen
   });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi sonno andato a vedere quseta casa alle 18. ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveCount(2, { timeout: 6000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveCount(2, { timeout: 6000 });
   await expect(suggerimento(page, 'alle 18')).toHaveCount(1, { timeout: 8000 });
   const parola = await page.evaluate(() => {
     const t = document.getElementById('ta').getBoundingClientRect();
@@ -364,7 +364,7 @@ test('un campo con spellcheck="false" e un editor di codice non hanno segni né 
     await page.keyboard.type('ciao quseta con il il cane ');
   }
   await page.waitForTimeout(1500);
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0);
   expect(await rapide(app)).toEqual([]);
 });
 
@@ -372,8 +372,8 @@ test('spenta la parte del modello restano i segni del codice, pieni i sicuri e s
   const page = await apri(app, openTab, testServer, { errori: { quseta: ['questa', 'Refuso.'] }, correttore: { modelloErrori: false } });
   await page.locator('#ta').click();
   await page.keyboard.type('ciao quseta e il il cane, qual\'è? Zanzottera ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore.sn-dubbio')).toHaveText(['quseta', 'Zanzottera'], { timeout: 4000 });
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['il', 'qual\'è']);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore.sn-dubbio')).toHaveText(['quseta', 'Zanzottera'], { timeout: 4000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['il', 'qual\'è']);
   await page.waitForTimeout(1200);
   expect(await rapide(app)).toEqual([]);
   // Il tasto destro sul candidato propone lo stesso la correzione che il codice conosce.
@@ -481,7 +481,7 @@ test('svuotata la casella da script, i segni del testo di prima spariscono', asy
   await page.keyboard.type('qual\'è il il motivo');
   await expect(errore(page, 'qual\'è')).toHaveCount(1, { timeout: 4000 });
   await page.evaluate(() => { document.getElementById('ta').value = ''; });
-  await expect(page.locator('.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 2000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 2000 });
   await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.sn-spell-overlay')).map((o) => o.textContent).join('')))
     .toBe('');
 });
