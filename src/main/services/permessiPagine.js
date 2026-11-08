@@ -471,6 +471,8 @@ function chiudi(id, si, { ricorda, utente = false, fonte, decisa = utente } = {}
   if (!p) return false;
   inAttesa.delete(id);
   if (utente && !si) segnaNegati(p.wc, p.origine, p.parti);
+  // Il no ferma anche la scheda: la pagina che salta da sola su un altro sito non torna a chiedere.
+  if (utente && !si && p.tipo === SCARICAMENTI && p.wc) p.wc._filoScaricamentiNoAlle = Date.now();
   // Lo schermo si sceglie ogni volta: né il sì né il no restano.
   if (p.tipo === 'schermo') ricorda = false;
   if (ricorda) {
