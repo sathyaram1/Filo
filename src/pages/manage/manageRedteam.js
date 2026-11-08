@@ -137,14 +137,21 @@
     let r = null;
     try { r = await send({ type: LIMITI }); } catch (_) { r = null; }
     if (!r || r.ok === false) {
-      for (const t of tetti.values()) t.blocco.hidden = true;
-      if (letto) dici(`${frase()} I tetti dell’invio non si leggono: ${String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '')}.`, 'err');
+      // Il campo resta, spento: un tetto che sparisce sembrerebbe un tetto che non c'è.
+      const perche = `Non letto: ${String((r && r.error) || 'il server non ha risposto').replace(/\.\s*$/, '')}.`;
+      for (const t of tetti.values()) {
+        if (!t.campo) t.input.disabled = true;
+        t.stimaEl.textContent = perche;
+        t.stimaEl.title = '';
+        t.blocco.hidden = false;
+      }
       return;
     }
     limiti = r;
     for (const [chiave, t] of tetti) {
       const regole = r.regole && r.regole[chiave];
       if (!regole || !t.input) continue;
+      t.input.disabled = false;
       if (!t.campo && window.SN_CAMPO_NUMERO) {
         t.campo = window.SN_CAMPO_NUMERO.collega({
           input: t.input,
