@@ -463,7 +463,8 @@ function nomeDaMostrare(origine) {
   return { sotto, dominio: registrabile + porta };
 }
 
-function chiudi(id, si, { ricorda, utente = false, fonte } = {}) {
+// `decisa` (terzo argomento di chi aspetta): la risposta viene da una scelta dell'utente, non da una domanda ritirata.
+function chiudi(id, si, { ricorda, utente = false, fonte, decisa = utente } = {}) {
   const p = inAttesa.get(id);
   if (!p) return false;
   inAttesa.delete(id);
@@ -475,13 +476,13 @@ function chiudi(id, si, { ricorda, utente = false, fonte } = {}) {
     for (const parte of p.parti) scelte.set(`${p.origine}|${parte}`, Boolean(si));
     if (scelte === sceltePersistenti) salva();
   }
-  for (const cb of p.callbacks) { try { cb(Boolean(si), fonte); } catch (_) {} }
+  for (const cb of p.callbacks) { try { cb(Boolean(si), fonte, Boolean(decisa)); } catch (_) {} }
   try { p.avvisa('fine', { id }); } catch (_) {}
   if (ricorda) {
     for (const [altro, q] of [...inAttesa]) {
       if (q.ses !== p.ses || q.origine !== p.origine || q.tipo === 'schermo') continue;
       const decise = q.parti.map((parte) => sceltePer(q.ses).get(`${q.origine}|${parte}`));
-      if (decise.every((x) => x === true)) chiudi(altro, true, { ricorda: false });
+      if (decise.every((x) => x === true)) chiudi(altro, true, { ricorda: false, decisa: true });
       else if (decise.some((x) => x === false)) chiudi(altro, false, { ricorda: false, utente: true });
     }
   }
