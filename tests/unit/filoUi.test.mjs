@@ -164,3 +164,22 @@ test('chiaveDiBozza(): la bozza porta l\'origine del sito; le pagine di Filo ten
     globalThis.location = prima;
   }
 });
+
+// #2299: un foglio nominato fuori dall'elenco degli strati sui siti spariva senza avviso.
+test('ogni foglio chiesto per uno strato chiuso sta nell\'elenco unico degli strati, e i riquadri non ne tengono una copia', async () => {
+  const fs = await import('node:fs');
+  const path = await import('node:path');
+  const radice = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'src');
+  const elenco = UI.FOGLI_DEGLI_STRATI;
+  assert.ok(Array.isArray(elenco) && elenco.includes('popup.css'));
+  for (const f of elenco) assert.ok(fs.existsSync(path.join(radice, 'styles', f)), f);
+  for (const dir of ['content', 'shared']) {
+    for (const nome of fs.readdirSync(path.join(radice, dir)).filter((n) => n.endsWith('.js'))) {
+      const testo = fs.readFileSync(path.join(radice, dir, nome), 'utf8');
+      for (const m of testo.matchAll(/fogliChiusi\(\s*\[([^\]]*)\]/g)) {
+        for (const f of m[1].match(/[\w-]+\.css/g) || []) assert.ok(elenco.includes(f), `${dir}/${nome}: ${f}`);
+      }
+      if (nome !== 'filoUi.js') assert.ok(!/\[[^\]]*'popup\.css'[^\]]*'spellcheck\.css'/.test(testo), `${dir}/${nome} ricopia l'elenco`);
+    }
+  }
+});
