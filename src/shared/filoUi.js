@@ -288,6 +288,6 @@
 
   global.SN_FILO_UI = {
     ATTR, SELECTOR, RIQUADRO, mark, is, inside, aperti, onMark, soloGestiVeri, gestoVero, nostro, veroONostro,
-    ombra, ombraDi, paginaDiFilo, fogliChiusi, stratoChiuso, bersaglio, tastoNelRiquadro, chiaveDiBozza, nelloStrato, _test,
+    ombra, ombraDi, paginaDiFilo, FOGLI_DEGLI_STRATI, fogliChiusi, stratoChiuso, bersaglio, tastoNelRiquadro, chiaveDiBozza, nelloStrato, _test,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
