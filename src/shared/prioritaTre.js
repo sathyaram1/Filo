@@ -31,7 +31,8 @@
 
   /**
    * L'archiviazione di un feedback a priorità `attuale`: senza `owner`, né una 3 né una priorità ignota. `continuaA` è la
-   * priorità del feedback dove il lavoro continua (il figlio di un'unione): a 3 la 3 non si toglie, si sposta.
+   * priorità del feedback dove il lavoro continua (il figlio di un'unione, l'originale di un doppione): a 3 la 3 non si
+   * toglie, si sposta.
    */
   function archiviazione(attuale, opts) {
     if (opts && opts.owner) return { ok: true };
