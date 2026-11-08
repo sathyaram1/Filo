@@ -39,6 +39,7 @@
         { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
         { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
         { testo: 'Un sito che scarica più file da solo, senza un tuo clic, dal secondo ti chiede il permesso: i file aspettano fuori dalla cartella Download finché non rispondi, e la risposta vale per quel sito.', segnalazione: 2294 },
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
@@ -75,7 +76,6 @@
       features: [
         { testo: '«Rimettimi la musica» fa ripartire la scheda che stavi ascoltando, da dove l\'avevi fermata, anche se l\'avevi chiusa o hai riaperto Filo. Prima Filo cercava e apriva un video nuovo. «Metti in pausa la musica» la ferma, e «portami alla musica» ti porta sulla sua scheda senza aprirne un\'altra.', segnalazione: 1397 },
         { testo: 'Le schede chiuse le ritrovi chiedendole alla chat: per argomento, per giorno o per chi le ha chiuse («cosa ha archiviato la pulizia stamattina?»). Filo le riapre dove le avevi lasciate, e se la pagina non c\'è più ti mostra il riassunto che ne aveva tenuto.', segnalazione: 884 },
-        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
     },
     {
