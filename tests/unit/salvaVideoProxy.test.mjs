@@ -25,7 +25,7 @@ test('il proxy si scrive come lo vuole il programma: socks coi nomi risolti dal 
   assert.equal(P.indirizzoPerProgramma('socks4://p.test:1080'), 'socks4a://p.test:1080');
   assert.equal(P.indirizzoPerProgramma('http://p.test:8080', { username: 'utente-country-fr', password: 'p@ss:w/rd' }),
     'http://utente-country-fr:p%40ss%3Aw%2Frd@p.test:8080');
-  assert.equal(P.indirizzoPerProgramma('https://[::1]:443'), 'https://[::1]:443');
+  assert.equal(P.indirizzoPerProgramma('https://[::1]:8443'), 'https://[::1]:8443');
   assert.equal(P.indirizzoPerProgramma('quic://p.test:443'), '', 'uno schema che il programma non sa usare non vale');
   assert.equal(P.indirizzoPerProgramma(''), '');
   assert.equal(P.indirizzoPerProgramma('non un indirizzo'), '');
