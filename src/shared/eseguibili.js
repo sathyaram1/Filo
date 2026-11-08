@@ -291,6 +291,7 @@
     testoApri,
     partiApri,
     partiScarica,
+    partiPiuFile,
     TITOLO_APRI,
     titoloApri,
   };
