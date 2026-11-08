@@ -93,7 +93,12 @@
       const ris = s.riservate || null;
       const giaVisti = v && v.riservate ? v.riservate.visibili : [];
       const visibili = ris ? [...new Set([...giaVisti, ...(ris.visibili || [])])] : null;
-      nuove.set(s.chiave, { confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}) });
+      // Il testo dei siti che la fotografia ha mostrato resta davanti al modello finché lei vive (#2293).
+      const daSiti = [...new Set([...((v && v.daSiti) || []), ...(Array.isArray(s.daSiti) ? s.daSiti : [])])];
+      nuove.set(s.chiave, {
+        confronto: conf, righe: s.righe || null, perId: s.perId || null, rifai: !!s.rifai, ...(ris ? { riservate: { visibili } } : {}),
+        ...(daSiti.length ? { daSiti } : {}),
+      });
       if (ris && (ris.nascosti || []).some((u) => giaVisti.includes(u))) { rifai = true; continue; }
       if (v && v.confronto === conf) continue;
       if (s.rifai) { rifai = true; continue; }
