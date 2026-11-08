@@ -69,7 +69,7 @@ test('il nome diventa il percorso preso dal PATH; fuori dal PATH, la cartella di
       const env = { PATH: ['', '.', estratta.replace(base, '.'), bin].join(delimiter), SystemRoot: 'C:\\Windows' };
       assert.equal(programmaIntero('git', { env }), join(bin, 'git.exe'), 'una voce vuota o relativa del PATH non conta');
       assert.equal(programmaIntero('git', { env: { PATH: '' } }), null);
-      assert.ok(assoluto(programmaIntero('powershell.exe', { env: { PATH: '' } })));
+      assert.ok(assoluto(programmaIntero('powershell.exe', { env: { PATH: '', SystemRoot: 'C:\\Windows' } })));
       assert.equal(programmaIntero('C:\\Programmi\\git.exe', { env }), 'C:\\Programmi\\git.exe');
     });
     const { programmaIntero } = require(join(SERVIZI, 'programmaIntero.js'));
