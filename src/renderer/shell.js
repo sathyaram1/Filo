@@ -602,6 +602,8 @@
         // Ancora provvisoria: il main la rifinisce dopo aver misurato il testo.
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
+        // La carta se ne va adesso, prima della richiesta: due attese uguali non decidono chi arriva prima (#2310).
+        if (ANTEPRIMA.aperta()) ANTEPRIMA.nascondi();
         api.tooltipShow(text, x, y);
       }, ritardoSuggerimento());
     };
