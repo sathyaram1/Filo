@@ -139,6 +139,7 @@
   // reattivi (React, Vue, Svelte) intercettano le scritture dirette di .value.
   function fillElement(el, text) {
     if (!el) return false;
+    try { global.SN_SPELLCHECK?.scriveFilo?.(el, text); } catch (_) {}
     try {
       if (el.matches && el.matches('input, textarea')) {
         const proto = Object.getPrototypeOf(el);
