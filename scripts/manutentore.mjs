@@ -1225,9 +1225,9 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'contesto': case 'sveglia': case 'chat': {
       const [st, tac, sc] = await Promise.all([chiama(cred, 'stato'), chiama(cred, 'taccuino'), tutteLeSchede(cred)]);
       if (sc.ok === false) return esito(sc);
-      const r = rami();
-      const indice = indiceDalServer(sc.schede);
-      const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
+      const r = await leggiRami(indiceDalServer(sc.schede));
+      const lista = r.lista;
+      if (r.server.avviso) console.error(`AVVISO: ${r.server.avviso}`);
       const dirRuoli = join(ROOT, 'routines', 'roles');
       const ruolo = espandiInclusioni(readFileSync(join(dirRuoli, 'manutentore.md'), 'utf8'), dirRuoli);
       const taccuino = tac.ok === false ? `Non letto: ${rifiuto(tac)}` : tac;
