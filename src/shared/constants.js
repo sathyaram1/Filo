@@ -2684,6 +2684,9 @@
     textScale: 1,
     // Il commento proattivo al centro della home, per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Una pagina può far partire un download al secondo mentre l'utente non c'è (#2294): Filo ne scrive al più ogni
+    // `downloadOgniMin` minuti (valori in FILO_PARLA_DOWNLOAD_MIN). Preferenze → Avanzate e IMPOSTA_PREFERENZA.
+    filoParla: { downloadOgniMin: 10 },
     // Barra laterale (#871): apertura spingendo sul bordo, attesa sul bordo, quanto resta aperta dopo
     // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
     // `schede`: a schermo intero la fila delle schede scende col mouse sul bordo alto, con le stesse attese (#1246).
