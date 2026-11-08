@@ -208,14 +208,54 @@ export function ramiInCorso(root, { base = 'origin/main', giorni = 30, adesso = 
   return rami.sort((a, b) => Date.parse(b.data) - Date.parse(a.data));
 }
 
+// Un file di filo-security nelle schede e negli elenchi: `filo-security:functions/x.js` (o con la barra); un ramo del
+// server (`repo: 'server'`) porta i suoi percorsi nudi, relativi al suo repo.
+const PREFISSO_SERVER = /^filo-security[:/]/;
+const percorso = (f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '');
+
+/** Il file di un ramo come lo legge chi confronta repo diversi: quelli del server col prefisso. PURA. */
+export function fileConRepo(r, f) {
+  return r && r.repo === 'server' ? `filo-security:${f}` : f;
+}
+
 /**
- * I rami che toccano uno dei file: uguale, o dentro una cartella dell'elenco (una voce che finisce con «/»). PURA.
- * → [{ ramo, comuni }]
+ * I rami che toccano uno dei file: uguale, o dentro una cartella dell'elenco (una voce che finisce con «/»). Un ramo
+ * del server confronta le voci col prefisso filo-security e quelle nude (le schede non sempre lo scrivono); uno
+ * dell'app solo quelle nude. PURA. → [{ ramo, repo, feedback, comuni }]
  */
 export function incroci(rami, file) {
-  const voci = (Array.isArray(file) ? file : []).map((f) => String(f || '').replace(/\\/g, '/').replace(/^\.\//, '')).filter(Boolean);
-  const tocca = (f) => voci.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
+  const voci = (Array.isArray(file) ? file : []).map(percorso).filter(Boolean);
+  const nude = voci.filter((v) => !PREFISSO_SERVER.test(v));
+  const delServer = voci.map((v) => v.replace(PREFISSO_SERVER, ''));
+  const tocca = (elenco) => (f) => elenco.some((v) => (v.endsWith('/') ? f.startsWith(v) : f === v));
   return (Array.isArray(rami) ? rami : [])
-    .map((r) => ({ ramo: r.ramo, feedback: r.feedback || [], comuni: (r.file || []).filter(tocca) }))
+    .map((r) => ({ ramo: r.ramo, repo: r.repo || 'app', feedback: r.feedback || [],
+      comuni: (r.file || []).filter(tocca(r.repo === 'server' ? delServer : nude)) }))
     .filter((r) => r.comuni.length);
+}
+
+/**
+ * Le coppie di lavori in corso che toccano gli stessi file, app e filo-security insieme: un lavoro è il ramo dell'app
+ * più il suo gemello col nome uguale sul server, e un file del server si confronta solo con file del server. PURA.
+ * → [{ a: { ramo, feedback, repo }, b: {…}, comuni: [file, quelli del server col prefisso] }]
+ */
+export function incrociFraRami(rami) {
+  const lavori = new Map();
+  for (const r of Array.isArray(rami) ? rami : []) {
+    const l = lavori.get(r.ramo) || { ramo: r.ramo, feedback: [], repo: new Set(), file: new Set() };
+    l.repo.add(r.repo || 'app');
+    for (const n of r.feedback || []) if (!l.feedback.includes(n)) l.feedback.push(n);
+    for (const f of r.file || []) l.file.add(fileConRepo(r, f));
+    lavori.set(r.ramo, l);
+  }
+  const elenco = [...lavori.values()];
+  const descr = (l) => ({ ramo: l.ramo, feedback: l.feedback, repo: l.repo.size > 1 ? 'app e server' : [...l.repo][0] });
+  const coppie = [];
+  for (let i = 0; i < elenco.length; i += 1) {
+    for (let j = i + 1; j < elenco.length; j += 1) {
+      const comuni = [...elenco[i].file].filter((f) => elenco[j].file.has(f)).sort();
+      if (comuni.length) coppie.push({ a: descr(elenco[i]), b: descr(elenco[j]), comuni });
+    }
+  }
+  return coppie;
 }
