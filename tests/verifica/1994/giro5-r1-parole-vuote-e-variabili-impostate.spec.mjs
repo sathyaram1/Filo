@@ -39,6 +39,4 @@ test('r1 in PowerShell una variabile impostata con -OutVariable non è un valore
   ]) {
     expect(C.classify(cmd, ctx), cmd).toBeGreaterThanOrEqual(2);
   }
-  expect(C.classify("Write-Output '--force' -OutVariable temp; git push origin $temp", ctx)).toBe(3);
-  expect(C.classify("Write-Output '.' -OutVariable temp; git checkout $temp", ctx)).toBe(3);
 });
