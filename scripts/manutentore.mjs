@@ -1414,7 +1414,11 @@ export function controlliLocali(cmd, argv) {
     case 'attesa': return num(a, cmd) || num(b, 'attesa: chi aspetta');
     case 'archivia': return num(a, cmd) || num(b, 'archivia: l\'originale');
     case 'pacchetto': return num(a, cmd) || ignote(cmd) || (leggiOrdine(numeriDiAccendi(argv.slice(2)).join(',')).motivo || '');
-    case 'taccuino': return a === 'scrivi' && !/^\d+$/.test(String(opzione(argv, '--versione') ?? '')) ? 'taccuino scrivi vuole --versione <V>, il numero che hai letto col taccuino: senza, un\'indicazione dell\'owner scritta in mezzo sparirebbe' : '';
+    case 'taccuino': {
+      if (a === 'sezione' && !/^[a-z][a-z-]{0,39}$/.test(String(b ?? ''))) return `taccuino sezione vuole il nome della sezione, una parola minuscola come nelle intestazioni del taccuino (stato, problemi…), non «${String(b ?? '').slice(0, 30)}»`;
+      const versione = /^\d+$/.test(String(opzione(argv, '--versione') ?? ''));
+      return (a === 'scrivi' || a === 'sezione') && !versione ? `taccuino ${a} vuole --versione <V>, il numero che hai letto col taccuino: senza, un'indicazione dell'owner scritta in mezzo sparirebbe` : '';
+    }
     case 'sveglia-tra': return Number(a) >= 5 ? '' : 'la sveglia più vicina è fra 5 minuti';
     case 'account': return a === 'primo' ? (['A', 'B', 'alterna'].includes(b) ? '' : 'account primo A, B o alterna')
       : (['A', 'B'].includes(a) && ['spento', 'acceso'].includes(b) ? '' : 'account <A|B> spento|acceso');
