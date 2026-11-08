@@ -297,9 +297,11 @@ test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e spar
   const page = await testServer.openReady(openTab, conMenuDelSito(paginaLunga()));
   const menu = await apriMenuSu(page, '#link');
   await rendiScorrevole(page);
+  console.log('DIAG0', JSON.stringify(await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); return { st: m.scrollTop, ae: String(document.activeElement && document.activeElement.className), tip: globalThis.SN_SUGGERIMENTO?.aperto?.()?.testo || null }; })));
   await apriSottomenu(page, menu);
 
   const prima = await ancoraEPannello(page);
+  console.log('DIAG1', JSON.stringify(await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); return { st: m.scrollTop, ae: String(document.activeElement && document.activeElement.className), tip: globalThis.SN_SUGGERIMENTO?.aperto?.()?.testo || null }; })));
 
   // Uno scorrimento breve: la freccetta è ancora lì, il pannello la segue.
   // (Lo scorrimento arriva come evento, quindi si aspetta invece di misurare
