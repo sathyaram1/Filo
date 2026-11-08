@@ -39,12 +39,14 @@ test('il primo file senza clic passa, il secondo entro dieci minuti chiede; dopo
   assert.equal(esito(wc, false, ADESSO + 2000 + P.SCARICAMENTI_FINESTRA_MS), 'via');
 });
 
-test('un clic dell\'utente passa sempre e azzera il conto; le pagine di Filo e i download senza pagina non contano', () => {
+test('un clic dell\'utente passa sempre e vale per un file; le pagine di Filo e i download senza pagina non contano', () => {
   const ses = sessione();
   const wc = pagina(ses, 'https://galleria.example/');
   assert.equal(esito(wc, false, ADESSO), 'via');
   assert.equal(esito(wc, true, ADESSO + 500), 'via');
-  assert.equal(esito(wc, false, ADESSO + 1000), 'via', 'dopo il clic il primo senza clic è di nuovo il primo');
+  assert.equal(esito(wc, false, ADESSO + 1000), 'chiedi', 'dopo il file del clic, uno senza clic chiede');
+  wc._filoGestoVeroAlle = ADESSO + 1500;
+  assert.equal(esito(wc, false, ADESSO + 9000), 'via', 'un clic nuovo vale per il file dopo, anche se arriva tardi');
   const filo = pagina(ses, 'filo://downloads/downloads.html');
   for (let i = 0; i < 3; i++) assert.equal(esito(filo, false, ADESSO + i), 'via');
   for (let i = 0; i < 3; i++) assert.equal(esito(null, false, ADESSO + i), 'via', 'Riprova parte dalla sessione, senza pagina');
