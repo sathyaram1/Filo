@@ -691,7 +691,7 @@ export function righeCorseFerme(cf) {
 }
 
 const testoTaccuino = (t) => (t && typeof t.testo === 'string'
-  ? [`Versione ${Number(t.versione) || 0} (la passi a «taccuino scrivi --versione» per riscriverlo).`, '', t.testo.trim() || '(vuoto)']
+  ? [`Versione ${Number(t.versione) || 0} (la passi a «taccuino sezione <nome> --versione», o a «taccuino scrivi --versione» per riscriverlo intero).`, '', t.testo.trim() || '(vuoto)']
   : [String(t || 'Non letto.')]);
 
 /** Il contesto intero della decisione del mattino e della chat (§ 4, § 9). PURA rispetto ai suoi ingressi. */
