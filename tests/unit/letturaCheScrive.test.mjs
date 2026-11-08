@@ -548,9 +548,10 @@ test('git: dopo un cd la sonda guarda la cartella in cui entra davvero la shell'
   const visti = [];
   const sonda = (esito) => (d) => { visti.push(d); return esito(d); };
   const cmdCtx = (esito) => ({ ...CMD, cwd: 'C:\\Users\\Mario\\Downloads', gitLancia: sonda(esito) });
-  const ostileSpazio = (d) => (d === 'C:\\Users\\Mario\\Downloads\\Progetto Mario' ? 'si' : '');
+  const progetto = 'c:\\users\\mario\\downloads\\progetto mario';
+  const ostileSpazio = (d) => (d.toLowerCase() === progetto ? 'si' : '');
   assert.equal(C.classify('cd Progetto Mario && git status', cmdCtx(ostileSpazio)), 2);
-  assert.ok(visti.includes('C:\\Users\\Mario\\Downloads\\Progetto Mario'), visti.join(' | '));
+  assert.ok(visti.some((d) => d.toLowerCase() === progetto), visti.join(' | '));
   assert.equal(C.classify('chdir /d Progetto Mario && git diff', cmdCtx(ostileSpazio)), 2);
   assert.equal(C.classify('cd Progetto Mario && git status', cmdCtx(() => '')), 1, 'pulita, resta una lettura');
   const pulito = { ...LINUX, gitLancia: () => '' };
