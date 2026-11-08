@@ -1069,6 +1069,11 @@
         const C = global.SN_CMD_CLASSIFY;
         let perche = '';
         try { perche = (cmd && C && C.classifyDetail) ? C.classifyDetail(cmd, a._perimetro).motivo : ''; } catch (_) {}
+        if (a && a._nonCompare) {
+          perche = `si collega a un indirizzo scritto a memoria da Filo, che non compare da nessuna parte${a._exfilReason ? ` e ${a._exfilReason}` : ''}. Può portare fuori tuoi dati: conferma solo se l'hai chiesto tu.`;
+        } else if (a && a._exfil) {
+          perche = `si collega a un indirizzo che ${a._exfilReason || 'porta dei dati'}. Può inviare tuoi dati a un sito esterno: conferma solo se l'hai chiesto tu.`;
+        }
         if (cancellaColComando(a)) perche = PERCHE_SENZA_CESTINO;
         // La spiegazione la scrive il modello: sta in un riquadro come il comando, mai fra le parole di Filo (#592.7).
         const sp = spiegazioneComando(a);
