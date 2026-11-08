@@ -167,11 +167,19 @@ campo e guardava quali restavano senza onda: erano nel dizionario personale, fra
 Il dizionario è uguale su tutti i siti, quindi faceva anche da impronta. Le regole:
 
 - su un sito **gli strati del correttore** (specchio dei segni, valori dei segnaposti, lampi) stanno in un'ombra chiusa
-  sola per documento, coi fogli adottati (`casaDegliStrati` in `src/content/spellcheck.js`); sulle pagine `filo://` e
-  nello strato dei riquadri restano nel documento, dove non c'è uno script del sito;
-- **il codice controlla una casella solo dopo un gesto vero lì dentro** (un tasto, una pressione: `toccato`): il testo
-  che lo script scrive in un campo che l'utente non ha toccato non riceve segni, nemmeno nell'ombra. `input` e `focus`
-  non bastano, sono fidati anche quando li causa uno script.
+  sola per documento (`casaDegliStrati` in `src/content/spellcheck.js`), fatta come quelle del menu e dei riquadri da
+  `SN_FILO_UI.stratoChiuso` e `fogliChiusi`; sulle pagine `filo://` e nello strato dei riquadri restano nel documento,
+  dove non c'è uno script del sito;
+- **si controlla solo il testo dell'utente**, non a tempo ma per provenienza (`diSito`, `soloDellUtente`): quello che
+  batte (un `insertText` vale solo col carattere del tasto vero appena premuto lì: `execCommand` del sito è
+  `isTrusted` anche lui), che incolla o trascina, che fa scrivere a Filo (`scriveFilo`, o un evento `nostro`), e
+  quello che c'era quando è entrato nella casella con un gesto vero, una volta per ingresso. Ogni altro cambio è del
+  sito: le sue parole non arrivano al dizionario né alla correzione da sé, e il modello non le segna. Il giro 2 ha
+  mostrato perché non basta una finestra di tempo dopo il gesto: il sito riscrive la casella dentro l'evento del tasto
+  stesso, prima di Filo, e misura;
+- **fra le parole trovate entrando una ripetuta conta una volta per il dizionario**: mille copie della stessa parola
+  moltiplicavano la differenza di costo fino a renderla misurabile. Resta una misura per ingresso su parole diverse,
+  troppo piccola per leggerla.
 
 Gli spec li leggono con `segniDi` (`tests/helpers/segniDelCorrettore.mjs`), che si usa come un Locator anche dentro
 `expect`; l'attacco sta in `tests/correttore-segni-fuori-dalla-pagina.spec.mjs`.
