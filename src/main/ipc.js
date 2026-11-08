@@ -791,7 +791,7 @@ function registerIpcHandlers() {
     if (!wc) return { scelte: [] };
     const Permessi = require('./services/permessiPagine');
     const { origine, scelte } = Permessi.scelteDi(wc);
-    return { scelte, ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
+    return { scelte: scelte.map(({ parte, si }) => ({ parte, si })), ...(origine ? Permessi.nomeDaMostrare(origine) : {}) };
   });
   ipcMain.handle('tabs:permessi-dimentica', (event, { id } = {}) => {
     const wc = paginaDiScheda(event, id);
