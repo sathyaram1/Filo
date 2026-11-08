@@ -281,7 +281,11 @@
   const FILE = '\u0000file';
   const ALTRO = '\u0000altro';
   const NOMI = { [FILE]: 'file del computer', [ALTRO]: 'pagine senza sito' };
-  function rendiPagine(pagine, { rif = null } = {}) {
+  function rendiPagine(pagine, opts) {
+    return pagineResa(pagine, opts).testo;
+  }
+  // `daSiti`: i titoli e le ricerche che il blocco porta, scritti dai siti: le uscite li contano come testo di sconosciuti (#2293).
+  function pagineResa(pagine, { rif = null } = {}) {
     const gruppi = new Map();
     for (const p of Array.isArray(pagine) ? pagine : []) {
       const t = Date.parse(p && p.ts);
