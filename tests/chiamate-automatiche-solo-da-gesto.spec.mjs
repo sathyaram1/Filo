@@ -547,7 +547,7 @@ test('chi esce dalla casella e ci rientra, anche col fuoco dato dalla pagina, ri
   await app.evaluate(() => { globalThis.__segnaXq = true; });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi xqprima1 frase ');
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1'], { timeout: 6000 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['xqprima1'], { timeout: 6000 });
   await page.locator('#cerca').click();
   await pausa(500);
   // Rientra col fuoco dato dalla pagina (come dopo un «Rispondi»): scrivere deve bastare.
