@@ -158,7 +158,7 @@
     // cartella), `file -C` (compila `<nome>.mgc` nella cartella di lavoro).
     uniq: (cmd) => uniqUscita(tokens(cmd).slice(1)) != null,
     tree: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*[oR]/.test(t)),
-    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || opzioneLunga(t, 'compile', 2)),
+    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || opzioneLunga(t, 'compile', 2) != null),
   };
 
   // getopt e git accettano un'opzione lunga abbreviata a ogni prefisso non ambiguo (`--comp` è `--compile`, `--outp=x`
