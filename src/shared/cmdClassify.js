@@ -1456,8 +1456,8 @@
         return copiaPosix(testi, c);
       case 'ln':
         return copiaPosix(testi, c, { forza: true });
-      case 'uniq': case 'tree': {
-        const dest = prog === 'uniq' ? uniqUscita(testi) : treeUscita(testi);
+      case 'uniq': case 'tree': case 'git': {
+        const dest = { uniq: uniqUscita, tree: treeUscita, git: gitUscita }[prog](testi);
         if (dest == null) return '';
         return dest ? copiaSovrascrive([], dest, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
       }
