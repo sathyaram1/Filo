@@ -546,7 +546,7 @@
   }
 
   // Livello di un SINGOLO comando (senza metacaratteri di sequenza).
-  function classifyOne(raw) {
+  function classifyOne(raw, shell = '') {
     // Si valuta sempre la forma senza virgolette: `git push "--force"` fa ciò che farebbe senza
     // e deve avere lo stesso livello. I metacaratteri erano già intercettati sul testo grezzo.
     const trimmed = dequote(raw);
