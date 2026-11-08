@@ -17,7 +17,7 @@ require(join(ROOT, 'src', 'shared', 'suggerimento.js'));
 const S = globalThis.SN_SUGGERIMENTO;
 const T = globalThis.SN_THEME_TOKENS;
 
-const CARICA = /require\(path\.join\(SHARED(?:_DIR)?, 'suggerimento\.js'\)\)|safe\(path\.join\(SHARED, 'suggerimento\.js'\)\)/;
+const CARICA = /require\(path\.join\(SHARED(?:_DIR)?, 'suggerimento\.js'\)\)|safe\(path\.join\(SHARED, 'suggerimento\.js'\)(?:, 'SN_SUGGERIMENTO')?\)/;
 
 test('i tre preload che portano i content script caricano il fumetto', () => {
   for (const f of ['internal-preload.js', 'page-preload.js', 'riquadri-preload.js']) {
