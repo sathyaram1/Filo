@@ -3108,16 +3108,12 @@
   function minutiDaTesto(raw) {
     const s = String(raw == null ? '' : raw).toLowerCase().replace(/[’`´]/g, "'").trim();
     if (!s) return NaN;
-    const mezza = /\bmezz'?or[ae]\b|\bmezzora\b/.test(s) ? 30 : 0;
-    const ore = /\bor[ae]\b/.test(s.replace(/\bmezz'?or[ae]\b|\bmezzora\b/g, ''));
     const cifre = s.match(/\d+(?:[.,]\d+)?/);
-    let n = cifre ? Number(cifre[0].replace(',', '.')) : NaN;
-    if (!Number.isFinite(n)) {
-      const parola = (s.match(/[a-zà-ù]+/g) || []).find((w) => NUMERI_A_PAROLE[w] != null);
-      n = parola ? NUMERI_A_PAROLE[parola] : NaN;
-    }
-    if (ore) return (Number.isFinite(n) ? n : 1) * 60 + (/\be mezz[ao]\b/.test(s) ? 30 : 0) + (mezza && !/\be mezz/.test(s) ? 0 : 0);
-    if (mezza) return Number.isFinite(n) && !/\bmezz/.test(s.slice(0, s.search(/\d|[a-z]/))) ? (cifre ? n : 30) : 30;
+    const parola = (s.match(/[a-zà-ù]+/g) || []).filter((w) => NUMERI_A_PAROLE[w] != null).pop();
+    const n = cifre ? Number(cifre[0].replace(',', '.')) : (parola ? NUMERI_A_PAROLE[parola] : NaN);
+    const senzaMezzora = s.replace(/\bmezz'?or[ae]\b|\bmezzora\b/g, ' ');
+    if (/\bor[ae]\b/.test(senzaMezzora)) return (Number.isFinite(n) ? n : 1) * 60 + (/\be mezz[ao]\b/.test(s) ? 30 : 0);
+    if (senzaMezzora !== s) return 30;
     return n;
   }
 
