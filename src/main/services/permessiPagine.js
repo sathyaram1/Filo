@@ -994,7 +994,7 @@ function togliPerChat(sito, permesso) {
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
   if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (${PERMESSI_DA_CHAT.join(', ')})` };
   // La risposta sui file senza clic vale per tutto il sito (sceltaScaricamenti): si toglie da qualunque suo indirizzo.
-  const registrato = dominioDegliScaricamenti(`http://${host}`);
+  const registrato = registrabileDi(host);
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
