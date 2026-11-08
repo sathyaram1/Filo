@@ -3087,6 +3087,18 @@
     return { durataMs: buono ? Math.max(min, Math.min(max, n)) : DEFAULT_SETTINGS.avvisoSchermoPieno.durataMs };
   }
 
+  // I minuti fra due messaggi di Filo sui download (#2294): solo le scelte della pagina, la più vicina per un numero
+  // qualunque; illeggibile prende il predefinito.
+  const FILO_PARLA_DOWNLOAD_MIN = Object.freeze([2, 5, 10, 30, 60]);
+  function minutiFraDownload(v) {
+    const raw = v && typeof v === 'object' ? v.downloadOgniMin : undefined;
+    const n = Number(raw);
+    if (raw === null || raw === '' || typeof raw === 'boolean' || !Number.isFinite(n) || n <= 0) {
+      return DEFAULT_SETTINGS.filoParla.downloadOgniMin;
+    }
+    return FILO_PARLA_DOWNLOAD_MIN.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+  }
+
   // Tetto di una lezione, contato come lo stile: una regola su come comportarsi
   // ci sta larga, un testo che nessuno rilegge nel popup no (#592).
   const LESSON_MAX = 800;
