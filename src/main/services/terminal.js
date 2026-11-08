@@ -331,7 +331,7 @@ function extractCwdMark(rawStdout, mark) {
 // esito da mostrare. `tettoUscita`: chi legge l'uscita col codice (un elenco intero) non ha il tetto del modello.
 function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS } = {}) {
   const cmd = String(command || '').trim();
-  const env = ambienteDelModello(chiesto || process.env);
+  const env = ambienteDelModello(chiesto);
   const startedAt = Date.now();
   const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
