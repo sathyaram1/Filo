@@ -949,6 +949,8 @@ function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '')
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
     _quarantena: attesa,
+    // Il «(2)» della quarantena non è del file: uscendo, il nome si sceglie di nuovo fra quelli della cartella Download.
+    ...(attesa ? { _nomeChiesto: filename } : {}),
     _piuFile: perPiuFile,
     _scope: scope || '',
     _sessione: ses || (webContents && !webContents.isDestroyed?.() ? webContents.session : null),
