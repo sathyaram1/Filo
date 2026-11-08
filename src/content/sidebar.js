@@ -769,10 +769,29 @@
       return false;
     }
     e.preventDefault();
-    const r = leggiRiferimento(e.dataTransfer);
-    if (r) aggiungiRiferimento(r);
-    if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!r)); } catch (_) {} }
+    let origine = '';
+    try { origine = global.SN_GESTI?.origineDi(e.dataTransfer) || ''; } catch (_) { origine = ''; }
+    const { aVista, dati } = global.SN_TRASCINO_INTERNO.arriva(e.dataTransfer, 'riferimento');
+    // Un riferimento che il main non conosce l'ha scritto altri (una pagina web, un'altra app): il suo testo entra
+    // nella casella a vista, come un testo qualunque, e non arriva al modello dietro un titolo.
+    dati.then((v) => {
+      const r = formaRiferimento(v);
+      if (r) aggiungiRiferimento(r);
+      else versaNellaCasella(aVista);
+      if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(origine, 'chat_aiuto', !!(r || aVista))); } catch (_) {} }
+    });
     return true;
+  }
+  function versaNellaCasella(testo) {
+    const ta = root?.querySelector('.sn-sidebar-input textarea');
+    if (!ta || !testo || pannelloPerAllegati() !== true) return;
+    ta.focus();
+    let scritto = false;
+    try { scritto = document.execCommand('insertText', false, testo); } catch (_) { scritto = false; }
+    if (!scritto) {
+      ta.setRangeText(testo, ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
   function testoRiferimenti(riferimenti) {
     return riferimenti.map((r) => `Riferimento «${r.titolo}», trascinato dall'utente nella chat:\n${r.testo}`).join('\n\n');
