@@ -1315,7 +1315,8 @@
       const d = r && trova(r.dataset.id);
       if (!d || !e.dataTransfer) return;
       const rif = riferimentoDi(d);
-      e.dataTransfer.setData(TIPO_RIFERIMENTO, JSON.stringify(rif));
+      // Arriva come riferimento nella chat dell'Aiuto (src/content/sidebar.js), che ne chiede il contenuto al main.
+      window.SN_TRASCINO_INTERNO?.parte(e.dataTransfer, 'riferimento', rif);
       // Una chat che non conosce il riferimento riceve il testo: anche lì Filo ne legge il contenuto.
       e.dataTransfer.setData('text/plain', `${rif.titolo}\n\n${rif.testo}`);
       e.dataTransfer.effectAllowed = 'copy';
