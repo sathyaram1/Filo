@@ -320,5 +320,5 @@ pacchetto).
 
 ## Alla fine di ogni accensione
 
-Il taccuino riscritto, intero. Il recap solo la mattina. Le schede che ti sono sembrate sbagliate: un feedback col
+Le sezioni del taccuino che sono cambiate, riscritte. Il recap solo la mattina. Le schede che ti sono sembrate sbagliate: un feedback col
 numero, non una riga nel taccuino.
