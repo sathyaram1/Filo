@@ -215,7 +215,9 @@
       { testo: aperto ? 'Metti in pausa' : 'Apri a tutti', azione: () => imposta(!aperto) },
       { testo: 'Apri la pagina del Red Team', azione: () => { send({ type: MSG.OPEN_URL || 'open_url', url: 'filo://redteam/redteam.html' }).catch(() => {}); } },
       { testo: 'Rileggi dal server', titolo: 'Se l’hai cambiato da un’altra installazione', azione: () => { carica(); } },
-    ]);
+    ].concat(limiti && limiti.regole ? [
+      { testo: 'Rimetti i tetti di fabbrica', titolo: 'Tentativi al giorno per account e in tutto', azione: () => { tettiDiFabbrica(); } },
+    ] : []));
   });
 
   // Si rilegge a ogni apertura della scheda, e quando chi guarda entra o esce.
