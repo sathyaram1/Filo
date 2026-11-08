@@ -66,10 +66,10 @@
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
   // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
-  // L'elenco dei programmi sta in cmdClassify; senza, ogni comando conta come uno di rete.
+  // Decide urlExfil, la stessa regola del controllo delle uscite; senza, ogni comando conta come uno di rete.
   function scaricaDallaRete(cmd) {
-    const re = global.SN_CMD_CLASSIFY && global.SN_CMD_CLASSIFY.PROGRAMMI_RETE;
-    return /https?:\/\//i.test(cmd) || !re || re.test(cmd);
+    const X = global.SN_URL_EXFIL;
+    return !X || typeof X.comandoInRete !== 'function' || X.comandoInRete({ comando: cmd });
   }
 
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
