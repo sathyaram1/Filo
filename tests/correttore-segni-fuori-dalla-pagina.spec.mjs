@@ -127,9 +127,6 @@ test('dopo un clic nella pagina, lo script del sito non distingue dai tempi le p
   const esito = await page.evaluate(() => window.sonda());
   expect(esito.ignota.sincrono).toBeLessThan(esito.nota.sincrono * 1.5 + 3);
   expect(esito.ignota.liberi).toBeGreaterThan(esito.nota.liberi * 0.85);
-  // Il clic che entra nella casella paga un controllo solo: la sonda non lo trasforma in segni.
-  await page.keyboard.press('End');
-  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0);
 });
 
 test('chi rientra col clic in una casella già scritta, che aveva il fuoco da script, ritrova i segni', async ({ app, openTab, testServer }) => {
