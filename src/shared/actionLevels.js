@@ -792,7 +792,10 @@
       },
       // La finisce l'UTENTE con un click in chat: senza questa riga, al turno
       // dopo il modello non sa che è successo e tira a indovinare.
-      describeDone: (a) => `Evento aggiunto al calendario: "${a.title || a.titolo || ''}"`,
+      // Senza un programma che apre l'invito l'evento resta nel file: il modello legge quello che legge l'utente (#1294).
+      describeDone: (a) => (a && a._output && a._output.nonAperto
+        ? `Evento salvato in un file, il calendario non si è aperto: "${a.title || a.titolo || ''}"`
+        : `Evento aggiunto al calendario: "${a.title || a.titolo || ''}"`),
     },
     // La prima riga di describe è quella che il diario mostra mentre si aspetta il clic.
     PULISCI_TAB: {
