@@ -59,7 +59,7 @@ async function apri(app, openTab, testServer, { errori = null, correttore = {} }
   return page;
 }
 
-const errore = (page, testo) => page.locator('.sn-spell-overlay .sn-errore', { hasText: testo });
+const errore = (page, testo) => segniDi(page, '.sn-spell-overlay .sn-errore', { hasText: testo });
 const valore = (page) => page.locator('#ta').inputValue();
 const cursore = (page) => page.evaluate(() => document.getElementById('ta').selectionStart);
 const magazzino = (app, chiave) => app.evaluate(async (_e, k) => (await globalThis.chrome.storage.local.get(k))[k] ?? null, chiave);
