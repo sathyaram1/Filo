@@ -903,6 +903,7 @@ function dimentica(wc) {
   const { origine, scelte } = scelteDi(wc);
   if (!scelte.length) return { tolte: 0, ricarica: false };
   wc._filoScaricamentiNoAlle = 0;
+  schedeFerme.delete(wc);
   const mappa = sceltePer(wc.session);
   for (const s of scelte) if (!s.scheda) mappa.delete(s.chiave || `${origine}|${s.parte}`);
   if (mappa === sceltePersistenti) salva();
