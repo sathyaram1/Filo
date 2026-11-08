@@ -301,7 +301,9 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   let proc;
   try {
-    proc = spawn(cfg.file, cfg.args, cfg.options);
+    const programma = programmaIntero(cfg.file);
+    if (!programma) throw new Error(`${cfg.file} non è nel PATH`);
+    proc = spawn(programma, cfg.args, cfg.options);
   } catch (err) {
     session.dead = true;
     session._spawnError = err.message || String(err);
