@@ -343,7 +343,7 @@ test('schede illeggibili: la priorità non scende alla cieca', async (t) => {
   assert.ok(!s.corpi.some((c) => c.op === 'priorita'));
 });
 
-test('un feedback a priorità 3 non si archiviа come doppione; uno a 1 sì', async (t) => {
+test('un feedback a priorità 3 non si archivia come doppione; uno a 1 sì', async (t) => {
   const s = serverFinto(t, {
     schede: [200, { ok: true, schede: [schedaServer(812, 3), schedaServer(815, 1)] }],
     archivia: (b) => [200, { ok: true, numero: b.dati.numero, doppioneDi: b.dati.doppioneDi }],
