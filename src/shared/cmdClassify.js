@@ -1639,15 +1639,6 @@
       }
       case 'unzip':
         return opzione(/^-[A-Za-z]*o/) ? PUO_SOVRASCRIVERE : '';
-      case 'uniq': {
-        const uscita = uniqUscita(testi);
-        return uscita ? copiaSovrascrive([], uscita, c, { maiDentro: true }) : '';
-      }
-      case 'tree': {
-        if (opzione(/^-[A-Za-z]*R/)) return PUO_SOVRASCRIVERE;
-        const i = testi.findIndex((t) => /^-[A-Za-z]*o$/.test(t));
-        return i >= 0 && testi[i + 1] ? copiaSovrascrive([], testi[i + 1], c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
-      }
       case 'file': {
         let magia = 'magic';
         // Come la legge file: `--mag=x`, `-Cm x`, `-Cmx`; dopo `-e`, `-f`, `-F` o `-P` il resto del gruppo è il loro valore.
