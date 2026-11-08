@@ -129,7 +129,7 @@ test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subit
 test('un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('ok perchè ');
+  await batti(page, 'ok perchè ');
   expect(await valore(page)).toBe('ok perché ');
   await page.keyboard.press('Control+z');
   expect(await valore(page)).toBe('ok perchè ');
@@ -221,7 +221,7 @@ test('una correzione annullata due volte non torna; la pagina del correttore la 
 test('l\'annulla della barra dei menu del Mac riporta indietro la correzione come Ctrl+Z', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('ok perchè ');
+  await batti(page, 'ok perchè ');
   expect(await valore(page)).toBe('ok perché ');
   const host = new URL(page.url()).host;
   await app.evaluate(({ webContents }, h) => {
@@ -475,7 +475,7 @@ test('nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la p
 test('nel campo modificabile semplice un secondo annulla toglie quello che si era scritto, non rimette la correzione', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ce').click();
-  await page.keyboard.type('ok perchè ');
+  await batti(page, 'ok perchè ');
   await expect(page.locator('#ce')).toHaveText('ok perché ');
   await page.keyboard.press('Control+z');
   await expect(page.locator('#ce')).toHaveText('ok perchè ');
