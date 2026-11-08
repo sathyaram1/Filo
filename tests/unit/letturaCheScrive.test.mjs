@@ -314,7 +314,9 @@ test('git: la sonda vera legge il repository della cartella, senza eseguire nien
     // La shell che scioglie un asterisco porta in una cartella che la sonda non vede: si chiede.
     assert.equal(C.classify('cd ostil*/ && git status', { ...ctx, cwd: base }), 2);
     assert.equal(C.classify('cd ost?le && git diff', { ...ctx, cwd: base }), 2);
-    assert.equal(T.gitLanciaIn(join(base, 'non-c-e')), '', 'dove la cartella non c\'è, git non parte');
+    // Una cartella che la sonda non trova vuol dire che la shell entra altrove: non si sa.
+    assert.equal(T.gitLanciaIn(join(base, 'non-c-e')), 'ignoto');
+    assert.equal(C.classify('cd non-c-e && git status', { ...ctx, cwd: base }), 2);
     segnoVero(ostile, segno);
   } finally {
     togliCartella(base);
