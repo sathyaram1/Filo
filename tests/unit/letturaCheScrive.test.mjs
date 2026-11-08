@@ -263,8 +263,15 @@ test('git: le righe della configurazione, chiave per chiave', () => {
   assert.equal(C.gitConfigLancia(tipico), false, 'un clone normale non fa chiedere');
   for (const riga of ['local\tcore.fsmonitor=programma', 'local\tdiff.external=programma', 'local\tdiff.x.textconv=programma',
     'local\tfilter.x.clean=programma', 'local\tcore.pager=programma', 'worktree\tcore.fsmonitor=programma',
-    'local\tinclude.path=altro', 'local\tremote.origin.uploadpack=programma', 'local\textensions.partialclone=origin']) {
+    'local\tinclude.path=altro', 'local\tremote.origin.uploadpack=programma', 'local\textensions.partialclone=origin',
+    'local\tremote.origin.receivepack=programma', 'local\tremote.origin.vcs=programma', 'local\tremote.origin.promisor=true',
+    'local\tremote.a.url=x.uploadpack=programma']) {
     assert.equal(C.gitConfigLancia(`${tipico}\n${riga}`), true, riga);
+  }
+  // Chiavi che VS Code, GitHub CLI e husky scrivono nei repository dell'utente: a una lettura non avviano niente.
+  for (const riga of ['local\tbranch.main.vscode-merge-base=origin/main', 'local\tbranch.fix/x.github-pr-owner-number=a#b#1',
+    'local\tremote.origin.gh-resolved=base', 'local\tcore.hookspath=.husky/_', 'local\tcore.commentchar=;']) {
+    assert.equal(C.gitConfigLancia(`${tipico}\n${riga}`), false, riga);
   }
   // Le impostazioni dell'utente (globali e di sistema) sono sue: non fanno chiedere.
   assert.equal(C.gitConfigLancia('global\tdiff.external=difftool\nsystem\tfilter.lfs.clean=git-lfs clean -- %f'), false);
