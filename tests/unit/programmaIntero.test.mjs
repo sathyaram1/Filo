@@ -39,6 +39,7 @@ const dallaCartella = (chiamate, cartella) => chiamate.filter(({ file, cwd }) =>
 
 test('nel controllo di git, nei comandi di Filo e nel terminale nessun programma parte per nome dalla cartella estratta', async () => {
   const base = cartellaTemporanea('filo-2292-prog-');
+  const vecchioPath = process.env.PATH;
   try {
     const estratta = resolve(join(base, 'Downloads', 'progetto'));
     mkdirSync(estratta, { recursive: true });
@@ -46,7 +47,6 @@ test('nel controllo di git, nei comandi di Filo e nel terminale nessun programma
     const bin = join(base, 'bin');
     mkdirSync(bin);
     for (const f of ['git.exe', 'where.exe', 'powershell.exe']) writeFileSync(join(bin, f), '');
-    const vecchioPath = process.env.PATH;
     process.env.PATH = [bin, vecchioPath].join(delimiter);
     const chiamate = await avviiSuWindows(async (T, S) => {
       T.gitLanciaIn(estratta);
