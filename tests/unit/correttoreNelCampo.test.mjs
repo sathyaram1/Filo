@@ -398,7 +398,14 @@ test('annulla e rifai riportano un testo coi suoi proprietari; un incolla senza 
   for (const x of 'pomodro ') c.batte(el, x);
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
-  // La pila dell'annulla preparata dal sito: la sua sonda, poi di nuovo il testo dell'utente.
+  // Il proprio annulla torna al testo dell'utente, coi suoi segni.
+  for (const x of 'ciao ') c.batte(el, x);
+  el.fire('keydown', { isTrusted: true, key: 'z', ctrlKey: true });
+  el.value = 'pomodro ';
+  el.fire('input', { isTrusted: true, inputType: 'historyUndo' });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
+  // La pila dell'annulla preparata dal sito: la sua sonda, poi di nuovo il testo dell'utente (adesso scritto da lui).
   c.scriveDaScript(el, 'quseta quseta ');
   c.scriveDaScript(el, 'pomodro ');
   for (const tipo of ['historyUndo', 'historyRedo', 'historyUndo']) {
@@ -406,18 +413,13 @@ test('annulla e rifai riportano un testo coi suoi proprietari; un incolla senza 
     el.value = tipo === 'historyRedo' ? 'pomodro ' : 'quseta quseta ';
     el.fire('input', { isTrusted: true, inputType: tipo });
     await c.passa(5000);
-    assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), tipo === 'historyRedo' ? ['pomodro'] : [], tipo);
+    assert.deepEqual(c.segni('sn-errore'), [], tipo);
   }
   // Un'immagine incollata: nessun testo negli appunti, e il sito riscrive la casella nello stesso evento.
   el.value = 'quseta '.repeat(20);
   el.fire('input', { isTrusted: true, inputType: 'insertFromPaste', data: null, dataTransfer: { getData: () => '' } });
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore'), []);
-  // Il proprio annulla torna al testo dell'utente, coi suoi segni.
-  el.value = 'pomodro ';
-  el.fire('input', { isTrusted: true, inputType: 'historyUndo' });
-  await c.passa(5000);
-  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
 });
 
 test('la chiocciola battuta con AltGr (Ctrl+Alt su Windows) è dell\'utente: l\'indirizzo resta un indirizzo', async () => {
