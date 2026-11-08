@@ -122,11 +122,29 @@ export function senzaChiusi(rami, indice, fuori = {}) {
   });
 }
 
-/** Un ramo in corso in una riga. PURA. */
+/** Un ramo in corso in una riga; uno di filo-security lo dice, e i suoi file portano il prefisso. PURA. */
 export function rigaRamo(r) {
   const altri = r.feedback && r.feedback.length > 3 ? ` e altri ${r.feedback.length - 3}` : '';
   const fb = r.feedback && r.feedback.length ? ` (${r.feedback.slice(0, 3).map((n) => `#${n}`).join(', ')}${altri})` : '';
-  return `${r.ramo}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.join(', ') || '(nessun file)'}`;
+  const dove = r.repo === 'server' ? ' sul server' : '';
+  return `${r.ramo}${dove}${fb}, ${r.avanti} commit, ${String(r.data).slice(0, 10)}: ${r.file.map((f) => fileConRepo(r, f)).join(', ') || '(nessun file)'}`;
+}
+
+/**
+ * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no FILO_SERVER_CLONE (le
+ * routine, git-server.mjs), se no accanto al checkout di Filo (la sessione locale) o nella home. Un clone ha `.git`.
+ * → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
+ */
+export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync } = {}) {
+  const dato = String(scelta || '').trim() || String(env.FILO_SERVER_CLONE || '').trim();
+  const cercati = dato ? [resolve(dato)] : [join(dirname(resolve(root)), 'filo-security'), join(homedir(), 'filo-security')];
+  const dir = cercati.find((d) => esiste(join(d, '.git')));
+  return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
+}
+
+/** La riga che dice che i rami del server mancano, e perché: senza, un elenco senza di loro sembrerebbe completo. PURA. */
+export function rigaServerAssente(cercati) {
+  return `Rami del server NON letti: nessun clone di filo-security in ${(cercati || []).join(' né in ')}. Gli incroci coi lavori del server non si vedono: passa la cartella con --clone-server <dir> o FILO_SERVER_CLONE.`;
 }
 
 /** Cosa l'elenco dei rami lascia fuori (ramiInCorso, `fuori`), in una riga; '' se niente. PURA. */
