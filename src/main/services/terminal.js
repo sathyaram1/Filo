@@ -39,6 +39,22 @@ function ambienteDelModello(base) {
   return out;
 }
 
+// 'si' se il repository di `dir` ha impostazioni che avviano programmi (#2292), '' se no, 'ignoto' se git non risponde.
+function gitLanciaIn(dir) {
+  let out = '';
+  try {
+    out = execFileSync('git', ['config', '--list', '--show-scope', '--includes'], {
+      cwd: dir, env: ambienteComandi(), encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    });
+  } catch (e) {
+    // Senza git installato il comando git non parte nemmeno: non c'è niente da avviare.
+    return e && e.code === 'ENOENT' ? '' : 'ignoto';
+  }
+  const C = globalThis.SN_CMD_CLASSIFY;
+  if (!C || typeof C.gitConfigLancia !== 'function') return 'ignoto';
+  return C.gitConfigLancia(out) ? 'si' : '';
+}
+
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
 // Fuori da Windows è la shell di SISTEMA, non bash: dev'essere lo stesso
