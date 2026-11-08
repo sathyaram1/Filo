@@ -1576,7 +1576,7 @@
       const suo = [...k.key].length === 1 && e.data === k.key;
       return suo || (libero && [...e.data].length <= 3) ? dentro(e.data) : null;
     }
-    if (tipo === 'insertLineBreak' || tipo === 'insertParagraph') return (pezzo) => pezzo === '\n';
+    if (tipo === 'insertLineBreak' || tipo === 'insertParagraph') return (pezzo) => !senzaSpazi(pezzo);
     if (tipo === 'insertCompositionText' || tipo === 'insertFromComposition') return typeof e.data === 'string' ? dentro(e.data) : () => true;
     if (tipo === 'insertFromPaste' || tipo === 'insertFromDrop' || tipo === 'insertFromPasteAsQuotation') {
       const fonte = typeof e.data === 'string' ? e.data : e.dataTransfer?.getData?.('text/plain');
