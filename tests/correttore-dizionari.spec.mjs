@@ -135,7 +135,7 @@ test('col browser senza italiano, come su Windows: «andatto» ha il segno anche
   await page.locator('#ta').click();
   // Le parole con l'apostrofo in fondo («va'», «be'») sono giuste come senza.
   await page.keyboard.type("sono andatto al mare, poi sono andato via; di' la verità, va' via, be' ");
-  const segni = page.locator('.sn-spell-overlay .sn-errore');
+  const segni = segniDi(page, '.sn-spell-overlay .sn-errore');
   await expect(segni.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
   await expect(segni).toHaveCount(1);
 
