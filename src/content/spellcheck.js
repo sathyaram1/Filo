@@ -1675,7 +1675,7 @@
     const errori = pareri ? Rg.senzaSovrapposti([
       ...Rg.erroriFissi(testo),
       ...(ripetizioniAttive() ? Rg.ripetizioni(testo) : []),
-      ...Rg.candidatiDizionario(soloDellUtente(state, d, { ripetute: false }), {
+      ...Rg.candidatiDizionario(perDizionario, {
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
