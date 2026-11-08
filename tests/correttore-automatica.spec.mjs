@@ -141,7 +141,7 @@ test('un secondo annulla toglie quello che si era scritto, non rimette la correz
 test('nel campo modificabile il cursore resta dopo lo spazio, e la punteggiatura chiude la parola subito', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ce').click();
-  await page.keyboard.type('un pò di tempo, perchè? ');
+  await batti(page, 'un pò di tempo, perchè? ');
   await expect(page.locator('#ce')).toHaveText('un po\' di tempo, perché? ');
   await page.keyboard.type('fine');
   await expect(page.locator('#ce')).toHaveText('un po\' di tempo, perché? fine');
