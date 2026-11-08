@@ -11,10 +11,11 @@ const radice = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const leggi = (f) => readFileSync(join(radice, f), 'utf8');
 const TIPO = 'application/x-filo-riferimento';
 
-test('chi trascina una domanda e la chat che la riceve usano lo stesso tipo', () => {
-  for (const f of ['src/pages/manage/manageDomande.js', 'src/content/sidebar.js']) {
-    assert.ok(leggi(f).includes(`'${TIPO}'`), `${f} non usa ${TIPO}`);
-  }
+test('chi trascina una domanda e la chat che la riceve parlano lo stesso trascinamento interno', () => {
+  assert.match(leggi('src/pages/manage/manageDomande.js'), /SN_TRASCINO_INTERNO\?\.parte\(e\.dataTransfer, 'riferimento', /);
+  const chat = leggi('src/content/sidebar.js');
+  assert.match(chat, /SN_TRASCINO_INTERNO\?\.porta\(dt, 'riferimento'\)/);
+  assert.match(chat, /SN_TRASCINO_INTERNO\.arriva\(e\.dataTransfer, 'riferimento'\)/);
 });
 
 test('sul pannello dell’Aiuto un rilascio senza file va al pannello, e il sito non lo vede', () => {
