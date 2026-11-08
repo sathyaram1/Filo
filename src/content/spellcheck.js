@@ -1748,9 +1748,12 @@
     if (!G || !G.prendi('codice', undefined, G.dentro(state.el))) return;
     state.entrato = true;
     seguiIlTesto(state);
-    if (!state.diSito.length) return;
-    state.visti = unisciPezzi([...state.visti, ...state.diSito]);
-    state.diSito = [];
+    const foto = state.primaDelGesto;
+    state.primaDelGesto = null;
+    const adottati = foto && Date.now() - foto.alle < FOTO_MS ? intersezione(state.diSito, foto.pezzi) : state.diSito;
+    if (!adottati.length) return;
+    state.visti = unisciPezzi([...state.visti, ...adottati]);
+    state.diSito = sottraiPezzi(state.diSito, adottati);
     ricordaProprietari(state);
     if (state.attivo) aggiornaCodice(state);
   }
