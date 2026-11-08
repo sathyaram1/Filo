@@ -443,11 +443,11 @@ module.exports = function register(on, ctx) {
       sposta: moveInto,
     });
   });
-  require('../downloads').quandoRiprovaStreaming(({ id, url, filename, scope }) => {
+  require('../downloads').quandoRiprovaStreaming(({ id, url, filename, scope, sessione, paese }) => {
     if (!require('../funzioniBuild').salvaVideoInStreaming) return;
     const audio = /\.(m4a|opus|mp3|ogg|weba)$/i.test(String(filename || ''));
     Streaming.salva({
-      url, titolo: String(filename || '').replace(/\.[a-z0-9]{2,5}$/i, ''), audio, scope, riusa: id,
+      url, titolo: String(filename || '').replace(/\.[a-z0-9]{2,5}$/i, ''), audio, scope, riusa: id, sessione, paese,
       scegli: (nome) => scegliDestinazione(null, null, winOf, nome), sposta: moveInto,
     }).catch((e) => console.warn('[Filo video] «Riprova» non riuscito:', e?.message || e));
   });
