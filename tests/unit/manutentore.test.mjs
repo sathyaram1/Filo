@@ -698,5 +698,5 @@ test('battito a 2 ore, contesto piccolo per differenze e taccuino aggiornato a s
   assert.deepEqual(sezioni, ['stato', 'problemi', 'esperimenti', 'misure', 'indicazioni']);
   const spec = testi.spec.replace(/\s+/g, ' ');
   assert.match(spec, /L'operazione `taccuino\.sezione` \(`sezione`, `testo`, `versione`\) riscrive il corpo di una sola sezione e lascia il resto del taccuino identico byte per byte/);
-  assert.match(spec, /battito\*\* ogni 2 ore al massimo/);
+  assert.match(spec, /battito\*\* ogni due ore al massimo/);
 });
