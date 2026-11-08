@@ -10,7 +10,7 @@ import { dirname, join } from 'node:path';
 
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-for (const f of ['contenutoEsterno.js', 'nomiFile.js', 'timeFormat.js', 'actionLevels.js', 'esitoAzione.js', 'righeAttivita.js', 'chatArchive.js', 'filoContesto.js', 'filoEventi.js']) {
+for (const f of ['contenutoEsterno.js', 'nomiFile.js', 'timeFormat.js', 'actionLevels.js', 'sistema.js', 'esitoAzione.js', 'righeAttivita.js', 'chatArchive.js', 'filoContesto.js', 'filoEventi.js']) {
   require(join(ROOT, 'src', 'shared', f));
 }
 const E = globalThis.SN_ESITO;
