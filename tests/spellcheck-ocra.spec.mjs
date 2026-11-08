@@ -289,8 +289,8 @@ const paragrafi = (stile, dentro) => PAGINA
     `<div id="ce" class="ed" contenteditable="true" style="width:420px;min-height:44px;border:1px solid #999;font:20px sans-serif">${dentro}</div>`)
   .replace('<main>', `<style>${stile}</style><main>`);
 
-const sullaParola = (page, parola) => page.evaluate((parola) => {
-  const s = document.querySelector('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect();
+const sullaParola = (page, parola) => nelMondoDelFrame(page, null, (parola) => {
+  const s = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect();
   const w = document.createTreeWalker(document.getElementById('ce'), NodeFilter.SHOW_TEXT);
   for (let n = w.nextNode(); n; n = w.nextNode()) {
     const i = n.nodeValue.indexOf(parola);
