@@ -396,6 +396,8 @@ function publicRecord(r) {
     via: r.via || '',
     nota: r.nota || '',
     ...(r.paese ? { paese: r.paese } : {}),
+    // #2294 — aspetta perché il sito scarica più file senza un clic; `fermati`: quelli oltre il tetto, non scesi.
+    ...(r._piuFile && r.state === 'pending' ? { chiede: 'piuFile', fermati: r._fermati || 0 } : {}),
     // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
     ...velocitaDi(r),
   };
