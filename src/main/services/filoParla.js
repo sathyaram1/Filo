@@ -143,5 +143,5 @@ function _azzera() {
   ultimoDownload = -Infinity;
 }
 
-module.exports = { TIPI, ESTERNO, collega, configura, segnala, giro, forseGiornata, _azzera };
+module.exports = { TIPI, ESTERNO, collega, configura, segnala, giro, forseGiornata, _azzera, _ritmoMs: () => ritmoDownloadMs };
 globalThis.SN_FILO_PARLA = module.exports;
