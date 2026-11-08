@@ -139,7 +139,7 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
       if (segna) f.viste = d.viste;
       f.usata = ora;
       f.ancora = f.ancora || ancora;
-      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false };
+      return { testo: f.testo, epoca: f.epoca, cambiate: TV().rendiCambiate(d.cambiate), nuova: false, daSiti: daSitiDi(d.viste) };
     }
   }
   const nuova = {
