@@ -1974,9 +1974,10 @@
   const GIT_CHIAVI_INERTI = [
     // core.hooksPath sposta solo la cartella degli hook, che la sonda segue già da sé (husky la imposta).
     /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles|hookspath|commentchar|commentstring)$/,
-    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), mai una lettura;
-    // le altre chiavi le scrivono anche VS Code e GitHub CLI (gh-resolved). I rami non avviano niente.
-    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs)$)[^.=]+$/,
+    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), e una lettura va in
+    // rete solo da un remoto promettente: quelle chiavi chiedono. Le altre le scrivono anche VS Code e GitHub CLI
+    // (gh-resolved). I rami non avviano niente.
+    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs|promisor|partialclonefilter)$)[^.=]+$/,
     /^branch\.[^=]+\.[^.=]+$/,
     /^submodule\.[^=]+\.(url|active|branch)$/,
     /^user\.(name|email|signingkey)$/,
