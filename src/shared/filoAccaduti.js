@@ -68,7 +68,10 @@
       }
       return '';
     };
-    const motore = MOTORI.find((m) => m.host.test(host));
+    // Il nome del motore dev'essere il sito, non un sottodominio di un altro: google.inganno.com è di inganno.com (#2293).
+    const SS = global.SN_STESSO_SITO;
+    const sito = SS && typeof SS.sitoDi === 'function' ? SS.sitoDi(host) : null;
+    const motore = MOTORI.find((m) => m.host.test(host) && (!sito || sito.split('.')[0] === m.nome.toLowerCase()));
     if (motore) {
       if (!motore.percorso.test(u.pathname)) return null;
       const testo = leggi(motore.chiavi);
