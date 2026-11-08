@@ -50,8 +50,8 @@
     { host: /(^|\.)yandex\.[a-z.]+$/, percorso: /^\/search/, chiavi: ['text'], nome: 'Yandex', marchio: 'yandex' },
     { host: /(^|\.)baidu\.com$/, percorso: /^\/s$/, chiavi: ['wd'], nome: 'Baidu' },
     { host: /(^|\.)youtube\.com$/, percorso: /^\/results$/, chiavi: ['search_query'], nome: 'YouTube' },
-    { host: /(^|\.)amazon\.[a-z.]+$/, percorso: /^\/s\/?$/, chiavi: ['k'], nome: 'Amazon' },
-    { host: /(^|\.)ebay\.[a-z.]+$/, percorso: /^\/sch\//, chiavi: ['_nkw'], nome: 'eBay' },
+    { host: /(^|\.)amazon\.[a-z.]+$/, percorso: /^\/s\/?$/, chiavi: ['k'], nome: 'Amazon', marchio: 'amazon' },
+    { host: /(^|\.)ebay\.[a-z.]+$/, percorso: /^\/sch\//, chiavi: ['_nkw'], nome: 'eBay', marchio: 'ebay' },
     { host: /(^|\.)wikipedia\.org$/, percorso: /^\/w\/index\.php$/, chiavi: ['search'], nome: 'Wikipedia' },
   ];
   const SUFFISSO_DEL_MARCHIO = /^(?:com|org|[a-z]{2}|(?:co|com)\.[a-z]{2})$/;
