@@ -307,6 +307,7 @@ test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e spar
   await menuDi(page).valuta(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 20; });
   await expect.poll(async () => {
     const s = await ancoraEPannello(page);
+    console.log('DIAG', JSON.stringify({ prima, s, st: await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); return m && [m.scrollTop, m.scrollHeight, m.clientHeight, document.querySelectorAll('.sn-menu').length, document.querySelectorAll('.sn-menu-split-arrow').length]; }) }));
     const deriva = (s.pannelloTop - s.ancoraTop) - (prima.pannelloTop - prima.ancoraTop);
     return { scorso: s.ancoraTop < prima.ancoraTop, attaccato: Math.abs(deriva) <= 2 };
   }, { timeout: 3000 }).toEqual({ scorso: true, attaccato: true });
