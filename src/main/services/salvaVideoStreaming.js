@@ -13,7 +13,7 @@ const t = (k, ...a) => { try { return globalThis.SN_I18N.t(k, ...a); } catch (_)
 
 // Le frasi dei motivi stanno in i18n.js come `streaming_<motivo>`; le pagine le mostrano tali e quali.
 const MOTIVI = Object.freeze(['eta', 'accesso', 'robot', 'protetto', 'spazio', 'diretta', 'sito', 'elenco',
-  'non_disponibile', 'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'generico']);
+  'non_disponibile', 'rete', 'aggiornare', 'programma', 'firma', 'piattaforma', 'proxy', 'generico']);
 const frase = (motivo) => t(`streaming_${MOTIVI.includes(motivo) ? motivo : 'generico'}`);
 // Quelli che ripetere non cambia: il video resta com'è.
 const DEFINITIVI = Object.freeze(['eta', 'accesso', 'protetto', 'sito', 'elenco', 'piattaforma']);
