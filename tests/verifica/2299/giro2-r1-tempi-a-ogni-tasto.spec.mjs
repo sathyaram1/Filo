@@ -92,7 +92,7 @@ test("r1 allo spazio dell'utente lo script del sito non legge dalla casella le p
       featureFlags: { spellcheck: true, spellcheckContext: false },
       correttore: { modelloErrori: false, automatica: true },
     });
-    await globalThis.chrome.storage.local.set({ sn_personal_dict: ['Zanzottera'] });
+    await globalThis.chrome.storage.local.set({ sn_personal_dict: ['Zanzottera'], sn_autocorrect: { qst: 'questo' } });
   });
   const page = await testServer.openReady(openTab, PAGINA_SPAZIO, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
