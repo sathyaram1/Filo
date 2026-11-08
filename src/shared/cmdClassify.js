@@ -1198,7 +1198,7 @@
   // di lavoro: in una cwd di rete lo mandano al remoto come farebbe `ls` (#1072.4).
   // Get-Command/Get-Help cercano il file/comando indicato; where.exe (shell cmd)
   // guarda prima nella cartella corrente. git lo fa in gitPerimetro.
-  function cercaNomeInRete(prog, testi, c) {
+  function cercaNomeInRete(prog, testi, c, raw) {
     if (CERCANO_NOME.has(prog)) {
       return testi.some((t) => {
         const v = valoreDuePunti(t);
