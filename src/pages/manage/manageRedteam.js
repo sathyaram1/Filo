@@ -1,5 +1,5 @@
-// Scheda Red Team di Gestione (#896): l'interruttore «Red Team aperto a tutti» (config/redteam.openToAll).
-// Legge e scrive solo attraverso il main, solo da owner. Prove: tests/redteam-pausa.spec.mjs.
+// Scheda Red Team di Gestione: l'interruttore «Red Team aperto a tutti» (#896) e i tetti dell'invio con la stima (#2296).
+// Legge e scrive solo attraverso il main, solo da owner. Prove: tests/redteam-pausa.spec.mjs, tests/redteam-tetti.spec.mjs.
 
 (function () {
   'use strict';
