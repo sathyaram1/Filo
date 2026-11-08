@@ -82,6 +82,23 @@ test('con una scheda aperta che ha istruzioni nel titolo, l\'indirizzo che il mo
   expect(app.windows().some((w) => { try { return w.url().includes('raccolta.example'); } catch (_) { return false; } })).toBe(false);
 });
 
+// La ricerca dentro un sito: dopo un titolo nel blocco, le parole vanno solo a un sito comune o nominato dall'utente.
+test('dopo una pagina con istruzioni nel titolo, cerca_nel_sito verso un sito che l\'utente non ha nominato non parte', async ({ app }) => {
+  test.setTimeout(60_000);
+  await primaScheda(app);
+  await visita(app);
+  await preparaModello(app, [
+    { text: '', tools: [{ name: 'NAVIGA', args: { url: 'https://raccolta.example/', cerca_nel_sito: 'parlavamo di orche' } }] },
+    { text: 'Non posso cercarlo lì.' },
+  ]);
+  const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'di cosa parlavamo?', threadHistory: [], chatId: 'cerca-nel-sito' }));
+  const naviga = r.actions.find((x) => x.type === 'NAVIGA');
+  expect(naviga._executed).not.toBe(true);
+  const risposte = await app.evaluate(() => JSON.stringify(globalThis.__chiamate.slice(1)));
+  expect(risposte, 'il modello sente che il sito non l\'ha nominato l\'utente').toContain('cerca_nel_sito vale per i siti comuni e per i siti che l');
+  expect(app.windows().some((w) => { try { return w.url().includes('raccolta.example'); } catch (_) { return false; } })).toBe(false);
+});
+
 test('dopo una pagina con istruzioni nel titolo, un curl verso un indirizzo scritto dal modello chiede e dice perché', async ({ app }) => {
   test.setTimeout(60_000);
   const page = await primaScheda(app);
