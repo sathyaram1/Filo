@@ -541,3 +541,48 @@ test('git: la sonda si ricorda un repository senza rischi finché i suoi file no
     togliCartella(base);
   }
 });
+
+// La cartella che si dà alla sonda è quella in cui entra la shell: cmd prende il resto della riga, spazi compresi;
+// `cd -P` e un secondo operando la risolvono in modi che il classificatore non ripete, e la rendono ignota.
+test('git: dopo un cd la sonda guarda la cartella in cui entra davvero la shell', () => {
+  const visti = [];
+  const sonda = (esito) => (d) => { visti.push(d); return esito(d); };
+  const cmdCtx = (esito) => ({ ...CMD, cwd: 'C:\\Users\\Mario\\Downloads', gitLancia: sonda(esito) });
+  const ostileSpazio = (d) => (d === 'C:\\Users\\Mario\\Downloads\\Progetto Mario' ? 'si' : '');
+  assert.equal(C.classify('cd Progetto Mario && git status', cmdCtx(ostileSpazio)), 2);
+  assert.ok(visti.includes('C:\\Users\\Mario\\Downloads\\Progetto Mario'), visti.join(' | '));
+  assert.equal(C.classify('chdir /d Progetto Mario && git diff', cmdCtx(ostileSpazio)), 2);
+  assert.equal(C.classify('cd Progetto Mario && git status', cmdCtx(() => '')), 1, 'pulita, resta una lettura');
+  const pulito = { ...LINUX, gitLancia: () => '' };
+  for (const cmd of ['cd -P Downloads/arc/l/.. && git status', 'cd -LP x && git status', 'cd a b && git status']) {
+    assert.equal(C.classify(cmd, pulito), 2, cmd);
+  }
+  assert.equal(C.classify('cd -L Downloads && git status', pulito), 1);
+  assert.equal(C.classify('Set-Location Downloads -PassThru; git status', { ...PS, gitLancia: () => '' }), 1);
+});
+
+test('git: le chiavi che git-lfs, la manutenzione, git-flow e le istruzioni comuni scrivono non fanno chiedere', () => {
+  for (const riga of ['lfs.https://example.test/a.git/info/lfs.access=basic', 'lfs.https://example.test/a.git/info/lfs.locksverify=true',
+    'maintenance.auto=false', 'maintenance.strategy=incremental', 'blame.ignorerevsfile=.git-blame-ignore-revs',
+    'gitflow.branch.master=main', 'gitflow.prefix.feature=feature/', 'commit.gpgsign=true', 'gc.auto=0', 'alias.st=status',
+    'remote.pushdefault=origin', 'branch.autosetuprebase=always', 'diff.algorithm=histogram', 'log.decorate=short',
+    'status.showuntrackedfiles=no', 'submodule.recurse=true', 'merge.tool=meld', 'rerere.enabled=true']) {
+    assert.equal(C.gitConfigLancia(`local\t${riga}`), false, riga);
+  }
+  // Queste avviano un programma a una lettura (o a una pulizia di lfs che git status chiede): chiedono ancora.
+  for (const riga of ['diff.external=x', 'diff.pdf.textconv=x', 'log.showsignature=true', 'gpg.program=x',
+    'lfs.extension.x.clean=x', 'core.pager=x', 'submodule.a.update=!x']) {
+    assert.equal(C.gitConfigLancia(`local\t${riga}`), true, riga);
+  }
+});
+
+test('git blame --contents legge un file qualsiasi: un file privato chiede come con cat', () => {
+  for (const ctx of [LINUX, MAC]) {
+    for (const cmd of ['git blame --contents ~/.ssh/id_rsa README', 'git blame --contents=~/.netrc f']) {
+      assert.equal(C.classify(cmd, ctx), C.classify('cat ~/.ssh/id_rsa', ctx), cmd);
+      assert.ok(C.classify(cmd, ctx) >= 2, cmd);
+    }
+  }
+  assert.ok(C.classify('git blame --contents $HOME\\.ssh\\id_rsa README', PS) >= 2);
+  assert.equal(C.classify('git blame --contents nuovo.txt README', LINUX), 1);
+});
