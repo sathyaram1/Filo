@@ -895,8 +895,9 @@ solo i numeri (§ 4.1): niente domande, sessioni, registri o taccuino suoi.
   suo, invece, la regola è in SPEC-MANUTENTORE.md § 7. Le indagini lunghe le fanno
   sotto-agenti, e il suo contesto resta piccolo.
 - **Segue un problema da vicino:**
-  - resta accesa quanto serve e si risveglia da sola ogni 55 minuti al
-    massimo, così la cache (60 minuti) resta calda;
+  - resta accesa quanto serve; fra due accensioni la cache non resta calda
+    (in cloud dura cinque minuti), quindi il battito è ogni 2 ore
+    (SPEC-MANUTENTORE.md § 4);
   - per attese più lunghe chiede al server una **sveglia**, che il pacemaker
     rispetta con un tetto suo, separato da quello del lavoro.
 - **Chi controlla lei:** il server conta le sue sessioni chiuse bene, non le
