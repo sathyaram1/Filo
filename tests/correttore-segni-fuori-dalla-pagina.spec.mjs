@@ -70,8 +70,8 @@ test('chi scrive vede i suoi segni, e il sito no', async ({ app, openTab, testSe
   expect(await page.evaluate(() => window.visto())).toEqual({ segni: 0, ombreAperte: 0, testoDiFilo: '' });
   await page.screenshot({ path: 'tests/.shots/correttore-segni-fuori-dalla-pagina.png', clip: { x: 0, y: 0, width: 660, height: 320 } });
 
-  // Il testo che il sito ci rimette da sé aspetta il prossimo gesto dell'utente; col tasto si controlla, nell'ombra.
-  await page.waitForTimeout(1700);
+  // Il testo che il sito ci rimette da sé non si controlla, nemmeno dopo un altro clic o un tasto che non scrive: ogni
+  // gesto sarebbe una misura. Quello che l'utente scrive dopo sì, nell'ombra.
   await page.evaluate(() => {
     const ta = document.getElementById('ta');
     ta.value = 'ancora quseta e zanzottera ';
@@ -79,8 +79,12 @@ test('chi scrive vede i suoi segni, e il sito no', async ({ app, openTab, testSe
   });
   await page.waitForTimeout(600);
   expect(await errore.count()).toBe(0);
+  await page.locator('#ta').click();
   await page.keyboard.press('End');
-  await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
+  await page.waitForTimeout(600);
+  expect(await errore.count()).toBe(0);
+  await page.keyboard.type('poi pomodro ');
+  await expect(errore).toHaveText(['pomodro'], { timeout: 5000 });
   expect((await page.evaluate(() => window.visto())).segni).toBe(0);
 });
 
