@@ -526,11 +526,11 @@
     grep: (args) => (args.some((a) => /^-[^-]*O/.test(a) || /^--op[a-z-]*(=|$)/.test(a)) ? 3 : 0),
     // Leggono solo `show`, `list`, `exists` e un riferimento (`HEAD`, `HEAD@{1}`, `refs/…`, `origin/main`): gli altri
     // verbi (expire, delete, drop, write…) cancellano o scrivono la storia che serve a recuperare i commit persi,
-    // e uno nuovo di git nasce già fra questi. Un nome nudo può essere un ramo o un verbo: chiede.
+    // e uno nuovo di git nasce già fra questi. Un altro nome nudo può essere un ramo o un verbo nuovo: chiede.
     reflog: (args) => {
       const primo = args.find((a) => !a.startsWith('-')) || '';
-      if (!primo || /^(show|list|exists)$/i.test(primo) || /^HEAD|[@/~^]/.test(primo)) return 0;
-      return /^[a-z][a-z-]*$/.test(primo) && !/^(main|master|trunk|develop|dev)$/.test(primo) ? 3 : 2;
+      if (!primo || /^(show|list|exists)$/i.test(primo) || /^HEAD$|[@/~^]/.test(primo)) return 0;
+      return /^(expire|delete|drop|write)$/i.test(primo) ? 3 : 2;
     },
     // Con due operandi `symbolic-ref` sposta HEAD: cambia il ramo corrente.
     'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
