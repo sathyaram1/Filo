@@ -1623,6 +1623,9 @@
     #mgRtRoot, #mgIpRoot { display: block; max-width: 640px; }
     /* Le levette di Bacheca e Deck builder seguono quella del Red Team come un elenco solo. */
     #mgRtRoot { padding-bottom: 0; }
+    /* I tetti dell'invio si vedono solo all'owner, e solo letti dal server. */
+    #mgRtRoot .mg-rt-tetto[hidden] { display: none; }
+    .mg-rt-stima { margin-top: 8px; }
     #mgIpRoot { padding-top: 0; }
     /* Crediti: un riquadro per account più la taratura, affiancati finché c'è posto. */
     .mg-crediti {
