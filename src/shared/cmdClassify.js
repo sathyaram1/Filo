@@ -227,7 +227,7 @@
 
   // Stessa funzione per il cmdlet isolato e per ogni pezzo di pipeline, così i due cammini
   // non divergono. Riceve il segmento GREZZO: i letterali quotati vanno visti prima.
-  function segmentIsRead(seg, inPipeline) {
+  function segmentIsRead(seg, inPipeline, c = SENZA_CONTESTO) {
     // `%{...}` e `?{...}` senza spazio sono PowerShell normale: le graffe si isolano come
     // token a sé prima di guardare programma e blocco.
     const norm = String(seg).replace(/\{/g, ' { ').replace(/\}/g, ' } ');
