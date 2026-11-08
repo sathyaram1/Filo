@@ -1581,13 +1581,39 @@
       return suo || (libero && [...e.data].length <= 3) ? dentro(e.data) : null;
     }
     if (tipo === 'insertLineBreak' || tipo === 'insertParagraph') return (pezzo) => !senzaSpazi(pezzo);
-    if (tipo === 'insertCompositionText' || tipo === 'insertFromComposition') return typeof e.data === 'string' ? dentro(e.data) : () => true;
+    if (tipo === 'insertCompositionText' || tipo === 'insertFromComposition') return dentro(e.data);
     if (tipo === 'insertFromPaste' || tipo === 'insertFromDrop' || tipo === 'insertFromPasteAsQuotation') {
-      const fonte = typeof e.data === 'string' ? e.data : e.dataTransfer?.getData?.('text/plain');
-      return typeof fonte === 'string' && fonte ? dentro(fonte) : () => true;
+      let fonte = typeof e.data === 'string' ? e.data : null;
+      if (!fonte) { try { fonte = e.dataTransfer?.getData?.('text/plain'); } catch (_) { fonte = null; } }
+      return dentro(fonte);
     }
-    if (tipo === 'historyUndo' || tipo === 'historyRedo') return k && k.mod ? () => true : null;
     return null;
+  }
+
+  // Chi possedeva ogni testo già visto nella casella: un annulla o un rifai, di chiunque, lo riporta coi suoi
+  // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. Si ricorda per impronta.
+  const PROPRIETARI_MAX = 2000;
+  function improntaDi(t) {
+    let a = 0x811c9dc5;
+    let b = 0x9747b28c;
+    for (let i = 0; i < t.length; i++) {
+      const c = t.charCodeAt(i);
+      a = Math.imul(a ^ c, 0x01000193);
+      b = Math.imul(b ^ c, 0x5bd1e995);
+    }
+    return `${t.length}:${(a >>> 0).toString(36)}:${(b >>> 0).toString(36)}`;
+  }
+  function ricordaProprietari(state) {
+    if (PAGINA_DI_FILO || radiceDi(state.el)) return;
+    const m = state.proprietari;
+    const k = improntaDi(state.testo);
+    m.delete(k);
+    m.set(k, { diSito: state.diSito.map((z) => ({ ...z })), visti: state.visti.map((z) => ({ ...z })) });
+    if (m.size > PROPRIETARI_MAX) m.delete(m.keys().next().value);
+  }
+  function proprietariDi(state, testo) {
+    const g = state.proprietari.get(improntaDi(testo));
+    return g ? { diSito: g.diSito.map((z) => ({ ...z })), visti: g.visti.map((z) => ({ ...z })) } : null;
   }
 
   // Il gesto vero che porta l'utente nella casella (il clic, il rilascio di Tab) fa suo il testo che c'è: una volta per
