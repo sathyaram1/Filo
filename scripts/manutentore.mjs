@@ -566,6 +566,14 @@ const rifiuto = (r) => `RIFIUTATO dal server: ${r.reason}${r.detail ? `: ${r.det
 
 // ── Schede, contesto intero e contesto piccolo ──────────────────────────────
 
+/** «da <classe>», o «da routine/<ruolo>»: la tabella del recap per origine (filo-ricerche) legge questa forma (#2232). PURA. */
+export function testoMittente(m) {
+  const classe = unaRiga(m && m.classe);
+  if (!classe) return '';
+  const ruolo = classe === 'routine' ? unaRiga(m.ruolo) : '';
+  return `da ${classe}${ruolo ? `/${ruolo}` : ''}`;
+}
+
 /** La scheda del server in una riga, con la parte della scheda locale (area, riassunto, file) se c'è. PURA. */
 export function rigaSchedaServer(s, locale = null) {
   const numeri = (l) => (Array.isArray(l) ? l : []).map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ');
