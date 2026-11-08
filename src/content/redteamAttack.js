@@ -218,8 +218,6 @@
       if (activeRoot !== root) return;
       if (r && r.ok && (r.signedIn || r.profile)) {
         signedIn = true;
-        await leggiSaldo();
-        if (activeRoot !== root) return;
         setStatus('');
         refreshSendState();
         if (!statusEl.classList.contains('sn-rt-status--err')) setStatus('Sei dentro: ora puoi inviare l’attacco.', 'ok');
