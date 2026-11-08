@@ -790,6 +790,22 @@
         return { partial: { showHomeMessage: b }, label: `Filo scrive per primo → ${b ? 'sì' : 'no'}` };
       },
     },
+    // #2294 — i minuti fra due messaggi sui download finiti a utente assente: un numero diventa la scelta più vicina.
+    {
+      scrive: ['filoParla.downloadOgniMin'],
+      aiuto: 'minuti 2 | 5 | 10 | 30 | 60 (quanto spesso al massimo Filo scrive da sé dei download finiti mentre l\'utente non c\'era; quelli arrivati intanto finiscono nel messaggio dopo; un\'ora = 60)',
+      costo: 1,
+      keys: ['messaggi_download', 'messaggi sui download', 'ritmo dei download', 'quanto spesso scrive dei download',
+        'filo scrive dei download', 'download finiti mentre non c\'ero', 'filoparla.downloadogniMin'.toLowerCase()],
+      build(v) {
+        const s = String(v == null ? '' : v).trim().toLowerCase();
+        let n = /\bor[ae]\b/.test(s) ? 60 * (parseItalianNumber(s.replace(/[^0-9.,-]/g, '')) || 1) : parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
+        if (!Number.isFinite(n) || n <= 0) return null;
+        const min = global.SN_CONST.minutiFraDownload({ downloadOgniMin: n });
+        const detto = min === 60 ? 'un\'ora' : `${min} minuti`;
+        return { partial: { filoParla: { downloadOgniMin: min } }, label: `Messaggi sui download → al più ogni ${detto}` };
+      },
+    },
     // Ora, batteria, rete, Bluetooth e volume nella home (#873, #874): una voce per chiave, le altre restano come sono.
     ...[
       ['ora', "l'ora", ['orologio']],
