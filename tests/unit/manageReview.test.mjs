@@ -2159,6 +2159,9 @@ test('sbloccoFermo: ogni motivo del fermo dice il gesto che lo toglie, nessuno p
   assert.match(MR.sbloccoFermo('contenuto scritto da un biglietto sporco'), /non torna pulito.*sessione locale/);
   assert.doesNotMatch(MR.sbloccoFermo('ramo scritto da un biglietto sporco'), /sanatoria/, 'uno sporco non si sana');
   assert.match(MR.sbloccoFermo('feedback non fidato'), /segni fidato/);
+  for (const m of ['note per gli agenti di una domanda non fidata', 'testo di una domanda aperta non fidata']) {
+    assert.match(MR.sbloccoFermo(m), /domanda .*segni fidata in Domande/, 'la fiducia da dare è della domanda, non del feedback');
+  }
   assert.match(MR.sbloccoFermo('motivo nuovo del server'), /«motivo nuovo del server» non passa da solo/);
   for (const m of ['ramo non pulito', 'ramo del server non pulito', 'contenuto scritto da un biglietto sporco', 'feedback non fidato', 'altro']) {
     assert.doesNotMatch(MR.sbloccoFermo(m), /riparte da solo|passa da sé/i, m);
