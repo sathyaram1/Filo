@@ -68,6 +68,8 @@
       fixes: [
         { testo: 'Un video salvato da un sito che apri da un altro paese scende dalla stessa connessione della scheda, anche con «Riprova»: il sito non vede più la tua.', segnalazione: 2301 },
         { testo: 'Con il Prompt dei comandi scelto nelle Preferenze, i comandi che chiedi a Filo usano i programmi installati sul computer anche dentro una cartella che ne contiene uno con lo stesso nome.', segnalazione: 2312 },
+        { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
+        { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
       ],
     },
     {
@@ -75,8 +77,6 @@
       features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
-        { testo: 'Nell\'Editor un testo lungo incollato a metà di un paragrafo, dentro un elenco o sopra una selezione che parte da un elenco, entra subito. In un foglio vuoto Ctrl+Z toglie l\'incolla e riporta anche quello che avevi scritto prima.', segnalazione: 1697 },
-        { testo: 'La copia di un documento col titolo dato da Filo prende un titolo suo quando la riscrivi su un altro argomento. Se Filo non riesce a rifare un titolo, non ci riprova a ogni pausa mentre scrivi.', segnalazione: 1697 },
       ],
     },
     {
