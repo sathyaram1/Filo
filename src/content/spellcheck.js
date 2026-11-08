@@ -1389,8 +1389,7 @@
       if (!ammesso && i && Date.now() - i.alle < INTENTO_MS) ammesso = i.ammesso;
       if (i && ammesso === i.ammesso) state.intento = null;
       const spiegato = !storia && (daFilo || !!(ammesso && ammesso(nuovo)));
-      // Un testo già visto, riportato da un annulla o da chiunque altro, torna coi proprietari che aveva.
-      const riportato = spiegato ? null : proprietariDi(state, ora);
+      const riportato = storia ? proprietariDi(state, ora) : null;
       if (riportato) {
         state.diSito = riportato.diSito;
         state.visti = riportato.visti;
