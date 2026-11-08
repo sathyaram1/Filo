@@ -1564,7 +1564,7 @@
     }
     return out;
   }
-  const toccaPezzi = (lista, a, b) => lista.some((z) => a < z.end && b > z.start);
+  function toccaPezzi(lista, a, b) { return lista.some((z) => a < z.end && b > z.start); }
 
   // Cosa può aver scritto l'utente con questo `input`: un tasto il suo carattere, un incolla o un trascinamento il loro
   // testo, la composizione il suo, l'annulla da tastiera quello che riporta. Uno script ha `isTrusted` anche con
