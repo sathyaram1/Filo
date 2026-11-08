@@ -150,9 +150,9 @@
   // Le pagine di «Aperti per dopo» che la risposta nominava: riaperta, la chat ridà i loro bottoni.
   function salvateDi(lista) {
     const l = (Array.isArray(lista) ? lista : [])
-      .filter((p) => p && p.id != null && /^https?:\/\//i.test(String(p.url || '')) && String(p.url).length <= MAX_PERCORSO
-        && !/[\u0000- \u007f]/.test(String(p.url)))
-      .map((p) => ({ id: breve(p.id, 200), url: String(p.url), ...(p.title ? { title: breve(p.title, 300) } : {}) }));
+      .filter((p) => p && p.id != null && String(p.id).length <= 200 && /^https?:\/\//i.test(String(p.url || ''))
+        && String(p.url).length <= MAX_PERCORSO && !/[\u0000- \u007f]/.test(String(p.url)))
+      .map((p) => ({ id: String(p.id), url: String(p.url), ...(p.title ? { title: breve(p.title, 300) } : {}) }));
     return l.length ? l : null;
   }
   function salvateNominate(x) {
