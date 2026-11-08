@@ -295,7 +295,7 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
   const page = await apri(app, openTab, testServer, { errori: { propio: ['proprio', 'Refuso: «proprio».'] } });
   for (let i = 0; i < 3; i++) {
     await svuota(page);
-    await page.keyboard.type('è propio bello ');
+    await batti(page, 'è propio bello ');
     expect(await valore(page)).toBe('è propio bello ');
     const segno = errore(page, 'propio');
     await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
