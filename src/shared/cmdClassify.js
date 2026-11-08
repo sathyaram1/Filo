@@ -860,7 +860,8 @@
         // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
         const nomi = nomiVariabili(espande, { percento: false })
           .concat(cur.startsWith('+') ? [] : nomiVariabili(cur, { dollaro: false }));
-        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)), ignoto });
+        const variabile = nomi.some((n) => !VAR_INNOCUE.has(n)) || (powershell && variabilePowerShell(espande));
+        out.push({ testo: cur, variabile, ignoto });
       }
       cur = ''; espande = ''; aperto = false; ignoto = false;
     };
