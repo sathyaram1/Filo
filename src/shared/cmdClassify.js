@@ -497,8 +497,15 @@
     },
   };
 
+  // Le opzioni globali che non cambiano repository né impostazioni: le altre (`--git-dir`, `--config-env`, …)
+  // portano git dove la sonda delle impostazioni non ha guardato (#2292).
+  const GIT_GLOBALI_INNOCUE = new Set(['--no-pager', '-p', '--paginate', '-P', '--no-optional-locks', '--no-replace-objects',
+    '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--no-advice']);
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
+    const globali = tokens(cmd).slice(1).map(unquote);
+    const k = globali.findIndex((x) => !x.startsWith('-'));
+    if (sub && globali.slice(0, k).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !VERSION_TOKENS.has(x.toLowerCase()))) return 3;
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
     if (GIT_DESTROY.has(sub)) return 3;
     if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
