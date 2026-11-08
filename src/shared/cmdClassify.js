@@ -1692,8 +1692,9 @@
 
   function classifyOneDet(raw, c) {
     const base = classifyOneLetto(raw, c);
->>>>>>> ORIG_HEAD
-    if (base === 2) {
+    // Git con `--output` vale 3 comunque (#1994); sopra un file che c'è già si dice anche perché (#2292).
+    const gitOutput = base === 3 && programOf(dequote(raw)) === 'git' && gitScriveFile(dequote(raw));
+    if (base === 2 || gitOutput) {
       const motivo = sovrascrive(raw, c);
       if (motivo) return { level: 3, motivo };
     }
