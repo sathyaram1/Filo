@@ -360,7 +360,7 @@ test('git: le impostazioni di un sottomodulo fanno chiedere come quelle del repo
     assert.equal(T.gitLanciaIn(nudo), 'si');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
     for (const cmd of ['git status', 'git diff']) {
-      assert.equal(C.classify(cmd, { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2, cmd);
+      assert.equal(C.classify(cmd, sondaVera(ostile, base)), 2, cmd);
     }
     segnoVero(ostile, segno);
   } finally {
