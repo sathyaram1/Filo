@@ -186,3 +186,53 @@ test('git: la sonda vera legge il repository della cartella, senza eseguire nien
     togliCartella(base);
   }
 });
+
+// git status e git diff entrano nei sottomoduli con le loro impostazioni: la sonda le guarda tutte.
+test('git: le impostazioni di un sottomodulo fanno chiedere come quelle del repository', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2292-sotto-');
+  const git = (args, cwd) => execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', '-c', 'protocol.file.allow=always', ...args],
+    { cwd, stdio: 'ignore' });
+  try {
+    const sub = join(base, 'sub');
+    mkdirSync(sub);
+    git(['init', '-q'], sub);
+    git(['commit', '-q', '--allow-empty', '-m', 's'], sub);
+    const nuovo = (nome) => { const d = join(base, nome); mkdirSync(d); git(['init', '-q'], d); return d; };
+    // Un sottomodulo normale non fa chiedere.
+    const sano = nuovo('sano');
+    git(['submodule', '-q', 'add', '../sub', 'sub'], sano);
+    git(['commit', '-q', '-m', 'i'], sano);
+    assert.equal(T.gitLanciaIn(sano), '');
+    // Le impostazioni del sottomodulo stanno nella cartella nascosta del repository principale.
+    const ostile = nuovo('ostile');
+    git(['submodule', '-q', 'add', '../sub', 'dentro/sub'], ostile);
+    git(['commit', '-q', '-m', 'i'], ostile);
+    const segno = join(base, 'SEGNO');
+    git(['config', '-f', join(ostile, '.git', 'modules', 'dentro', 'sub', 'config'), 'core.fsmonitor', `programma-inesistente-filo-2292 ${segno}`], ostile);
+    assert.equal(T.gitLanciaIn(ostile), 'si');
+    assert.equal(T.gitLanciaIn(join(ostile, 'dentro')), 'si', 'anche da una sottocartella');
+    // Un repository annidato registrato senza .gitmodules: git status ci entra lo stesso.
+    const nudo = nuovo('nudo');
+    git(['clone', '-q', '../sub', 'sub'], nudo);
+    const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: join(nudo, 'sub'), encoding: 'utf8' }).trim();
+    git(['update-index', '--add', '--cacheinfo', `160000,${sha},sub`], nudo);
+    git(['config', 'core.fsmonitor', `programma-inesistente-filo-2292 ${segno}`], join(nudo, 'sub'));
+    assert.equal(T.gitLanciaIn(nudo), 'si');
+    assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
+    for (const cmd of ['git status', 'git diff']) {
+      assert.equal(C.classify(cmd, { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2, cmd);
+    }
+  } finally {
+    togliCartella(base);
+  }
+});
+
+test('il main dà al classificatore la sonda git, per i comandi scritti a mano e per quelli di Filo', () => {
+  const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
+  const i = h.indexOf('function perimetroLettura(');
+  const corpo = h.slice(i, h.indexOf('\n}\n', i));
+  assert.match(corpo, /defineProperty\(perimetro, 'gitLancia'/, 'senza la sonda un repository ostile resta una lettura');
+  assert.match(corpo, /gitLanciaIn\(/, 'la sonda è quella vera di terminal.js');
+  // Il classificatore la riceve dal perimetro: una sonda data nel contesto cambia il livello.
+  assert.equal(C.classify('git status', { ...LINUX, gitLancia: () => 'si' }), 2);
+});
