@@ -1226,7 +1226,7 @@
     const stampaSoltanto = c.stampaLibera && STAMPANO.has(prog);
     if (!stampaSoltanto && scriveRete(cerca ? cerca.file : prog === 'git' ? testiGit(testi) : testi, c)) return due(MOTIVI.rete);
     if (calcolaRete(prog, testi, c)) return due(MOTIVI.rete);
-    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c)) return due(MOTIVI.rete);
+    if (c.cwd && c.cwd.rete && cercaNomeInRete(prog, testi, c, dequote(raw))) return due(MOTIVI.rete);
     if (args.some((a) => a.variabile) || prog === 'printenv') return due(MOTIVI.variabili);
     if (!stampaSoltanto && args.some((a) => a.ignoto)) return due(MOTIVI.ignoto);
     if (PROCESSI.has(prog)) return due(MOTIVI.processi);
