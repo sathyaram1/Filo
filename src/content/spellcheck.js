@@ -834,17 +834,22 @@
         primaDellAnnulla(vivo, e);
       }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
-      // Il rilascio di Tab cade già sulla casella nuova; un clic in quella che aveva il fuoco da script non la rifocalizza.
-      // Anche le ripetizioni di un tasto tenuto: ognuna cambia il testo.
-      for (const tipo of ['pointerdown', 'keydown', 'keyup', 'paste', 'cut', 'drop', 'compositionend']) {
+      // Il tasto spiega il carattere che l'`input` dopo scrive (ammessoDa). Si entra col clic, anche in una casella che
+      // aveva il fuoco da script, o col rilascio di Tab, che cade già sulla casella nuova.
+      for (const tipo of ['pointerdown', 'keydown', 'keyup']) {
         el.addEventListener(tipo, (e) => {
           const vivo = monitored.get(el);
-          if (!vivo || !e.isTrusted || (tipo === 'keyup' && e.key !== 'Tab')) return;
-          vivo.permesso = Date.now();
-          // Dopo l'evento: il tasto che scrive paga il controllo del testo nuovo, non quello di prima.
-          setTimeout(() => {
-            if (vivo.attivo && vivo.permesso && vivo.codiceTesto !== vivo.testoCalcolato) aggiornaCodice(vivo);
-          }, 0);
+          if (!vivo || !e.isTrusted) return;
+          if (tipo === 'keydown') {
+            vivo.tasto = { key: String(e.key || ''), mod: !!(e.ctrlKey || e.metaKey), morto: vivo.tastoPrima === 'Dead' };
+            vivo.tastoPrima = vivo.tasto.key;
+            return;
+          }
+          if (tipo === 'keyup') {
+            if (vivo.tasto && vivo.tasto.key === e.key) vivo.tasto = null;
+            if (e.key !== 'Tab') return;
+          }
+          entra(vivo);
         }, true);
       }
     }
