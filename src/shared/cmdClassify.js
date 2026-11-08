@@ -486,11 +486,30 @@
     },
   };
 
+  // Opzioni prima del sotto-comando che non cambiano repository né configurazione: le altre (`--config-env=
+  // core.pager=SHELL` fa eseguire alla shell quello che git stampa, `--git-dir=`) valgono 3 (#1994).
+  const GIT_GLOBALI_INNOCUE = new Set([
+    '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks',
+    '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs',
+    '-v', '--version', '-h', '--help', '--exec-path', '--html-path', '--man-path', '--info-path',
+  ]);
+  // `--output` (e le sue abbreviazioni) scrive l'uscita in un file scelto dal comando, col testo che sceglie
+  // `--format`: con log, show, diff, shortlog… una lettura diventa la scrittura di un file qualsiasi (#1994).
+  function gitScriveFile(cmd) {
+    return tokens(cmd).slice(1).some((t) => {
+      const m = /^--([a-z-]+)(=|$)/i.exec(t);
+      return !!m && m[1].length >= 2 && 'output'.startsWith(m[1].toLowerCase());
+    });
+  }
+
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
     if (GIT_DESTROY.has(sub)) return 3;
     if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
+    const t = tokens(cmd).slice(1);
+    if (t.slice(0, t.findIndex((x) => !x.startsWith('-'))).some((x) => !GIT_GLOBALI_INNOCUE.has(x))) return 3;
+    if (gitScriveFile(cmd)) return 3;
     const dual = GIT_DUAL[sub];
     if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
     if (GIT_READ.has(sub)) return 1;
