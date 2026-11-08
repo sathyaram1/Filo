@@ -129,8 +129,9 @@ function correttore({ sbagliate = [], impostazioni = {}, protocollo = 'https:' }
     entra: (el) => docListeners.focusin.forEach((f) => f({ target: el })),
     esce: (el) => docListeners.focusout.forEach((f) => f({ target: el })),
     visibile: () => (docListeners.visibilitychange || []).forEach((f) => f()),
-    // Scrive come una tastiera: il cursore resta in fondo.
-    scrive: (el, v, e = {}) => { el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', e); },
+    // Scrive come una tastiera: il cursore resta in fondo. Lo script del sito scrive uguale, ma senza il tasto vero.
+    scrive: (el, v, e = {}) => { el.fire('keydown', { isTrusted: true }); el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', e); },
+    scriveDaScript: (el, v) => { el.value = v; el.selectionStart = el.selectionEnd = v.length; el.fire('input', {}); },
     risponde: async (r, testo) => { r.r({ ok: true, text: testo }); await tick(); await tick(); },
   };
 }
