@@ -35,7 +35,8 @@ test('r1 un sottomodulo che avvia un programma: git status e git diff chiedono, 
       const livello = C.classify(cmd, ctx);
       if (livello >= 2) continue;
       rmSync(segno, { force: true });
-      await T.runCommand(cmd, { cwd: sup, shell: 'sh' });
+      const r = await T.runCommand(cmd, { cwd: sup, shell: 'sh' });
+      console.log('DEBUG', cmd, livello, JSON.stringify(r).slice(0, 400), existsSync(join(sup, '.git', 'modules', 'sub', 'config')));
       expect(existsSync(segno), `«${cmd}» passa senza chiedere e avvia il programma del sottomodulo`).toBe(false);
     }
   } finally {
