@@ -224,6 +224,14 @@
         filo: pct != null ? `Sto scaricando «${nome}»: ${pct}% (${fmtBytes(r.receivedBytes)} di ${fmtBytes(r.totalBytes)}).` : `Sto scaricando «${nome}».`,
       };
     }
+    if (r.state === 'pending' && r.chiede === 'piuFile') {
+      return {
+        ...base,
+        stato: 'partito da solo: aspetta il tuo sì',
+        principale: { etichetta: 'Decidi', fai: () => apri(URL_SCARICAMENTI) },
+        filo: `«${nome}» l'ha fatto partire una pagina da sola, senza un tuo clic: lo scarico solo se mi dici di sì, dai Download.`,
+      };
+    }
     if (r.state === 'pending') {
       return {
         ...base,
