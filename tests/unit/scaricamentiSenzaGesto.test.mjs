@@ -94,14 +94,19 @@ test('la domanda sta nella cornice col sito; Consenti vale per il sito, e le dom
   assert.deepEqual(ritirate, [[false, false]]);
 });
 
-test('Blocca vale per il sito: i file dopo si fermano senza domanda e la scheda ne porta il segno; la chat lo toglie', () => {
-  const ses = sessione();
-  const wc = pagina(ses, 'https://spam.example/');
+function bloccato(ses, url) {
+  const wc = pagina(ses, url);
   const risposte = [];
   P.chiediScaricamenti(wc, (si, _f, decisa) => risposte.push([si, decisa]));
-  const d = ses.avvisi.find((a) => a.evento === 'chiedi');
+  const d = ses.avvisi.findLast((a) => a.evento === 'chiedi');
   P.rispondi(d.dati.id, false);
   assert.deepEqual(risposte, [[false, true]]);
+  return wc;
+}
+
+test('Blocca vale per il sito: i file dopo si fermano senza domanda e la scheda ne porta il segno; il menu lo toglie', () => {
+  const ses = sessione();
+  const wc = bloccato(ses, 'https://spam.example/');
   assert.equal(esito(wc, false, ADESSO), 'no');
   assert.deepEqual(P.segniDi(wc).negati, ['scaricamenti']);
   assert.equal(esito(wc, true, ADESSO + 1), 'via', 'un clic dell\'utente scarica lo stesso');
@@ -109,5 +114,19 @@ test('Blocca vale per il sito: i file dopo si fermano senza domanda e la scheda 
   P.chiediScaricamenti(wc, (si, _f, decisa) => subito.push([si, decisa]));
   assert.deepEqual(subito, [[false, true]], 'con la risposta data non si richiede');
   assert.equal(P.dimentica(wc).tolte, 1, 'il menu della scheda la toglie come gli altri permessi');
-  assert.equal(esito(wc, false, ADESSO + 2), 'via');
+  assert.equal(esito(wc, false, ADESSO + 2), 'chiedi', 'tolto il no, il file dopo quello del clic torna a chiedere');
+});
+
+test('la chat toglie il no ai download automatici di un sito, con le parole che annuncia', () => {
+  P._usaDisco({ get: async () => ({}), set: async () => {} });
+  const ses = sessione();
+  ses.isPersistent = () => true;
+  for (const parole of ['download automatici', 'scaricare più file', 'scaricamenti']) {
+    const wc = bloccato(ses, 'https://www.spam-chat.example/');
+    assert.equal(esito(wc, false, ADESSO), 'no');
+    const r = P.togliPerChat('spam-chat.example', parole);
+    assert.equal(r.tolte.length, 1, `«${parole}»: ${JSON.stringify(r)}`);
+    assert.match(r.tolte[0], /spam-chat\.example/);
+    assert.notEqual(esito(wc, false, ADESSO + 1), 'no', `«${parole}»: tolto il no, il sito non è più bloccato`);
+  }
 });
