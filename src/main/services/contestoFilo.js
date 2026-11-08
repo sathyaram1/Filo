@@ -150,7 +150,12 @@ function fotografa({ incognito = false, sezioni, ancora = null, durata = '1h', o
     usata: ora,
   };
   fotografie[lato] = nuova;
-  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true };
+  return { testo: nuova.testo, epoca: nuova.epoca, cambiate: '', nuova: true, daSiti: daSitiDi(nuova.viste) };
+}
+
+// I titoli scritti dai siti che il CONTESTO ha mostrato (le schede aperte): testo di sconosciuti per le uscite (#2293).
+function daSitiDi(viste) {
+  return [...new Set([...viste.values()].flatMap((v) => (v && Array.isArray(v.daSiti) ? v.daSiti : [])))];
 }
 
 // La chat riaperta mostra le foto che il modello ha ancora davanti: quello che vede lui, l'utente lo deve vedere.
