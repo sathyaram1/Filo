@@ -88,7 +88,7 @@
 
   // I programmi che si collegano a un altro computer: un elenco solo per gli indirizzi che un comando contatta
   // (urlExfil) e per la sua uscita, che arriva dalla rete (actionLevels, #2293).
-  const PROGRAMMI_RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c|lynx|w3m|links|nc|ncat|netcat|telnet|ssh|scp|sftp|ftp|rsync|http|https|xh|ping|nslookup|dig|host|resolve-dnsname|test-netconnection|start-bitstransfer|certutil|bitsadmin)\b/i;
+  const PROGRAMMI_RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|aria2c|lynx|w3m|links|nc|ncat|netcat|telnet|ssh|scp|sftp|ftp|rsync|http|https|xh|ping|nslookup|dig|host|resolve-dnsname|test-netconnection|start-bitstransfer|certutil|bitsadmin|tracert|traceroute|whois|socat|smbclient|git\s+(?:clone|fetch|pull|push|ls-remote|archive))\b/i;
 
   // Codice arbitrario o distruzione di stato: SEMPRE 3, controllati per primi, backstop
   // anche se finissero in una whitelist.
