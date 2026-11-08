@@ -1926,9 +1926,31 @@
 
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
     if (!seq && CHAIN_RE.test(trimmed)) return TRE;
+    if (usaUltimoArg(trimmed, c)) return TRE;
 
     return classifyOneDet(trimmed, c);
   }
+
+  // In sh e bash `$_` vale l'ultimo argomento del comando eseguito prima, che sceglie chi scrive la riga (#1994): si
+  // misura con ognuno dei valori che può prendere. In testa alla riga, in un tubo o da un valore ignoto non si sa.
+  const ULTIMO_ARG_RE = /\$_(?!\w)/g;
+  const ULTIMI_MAX = 16;
+  function usaUltimoArg(s, c) {
+    return (shellPosix(c) || c.sistemaIgnoto) && /\$_(?!\w)/.test(s);
+  }
+  function ultimiArgomenti(raw, c) {
+    const out = [];
+    for (const vuote of [false, true]) {
+      const args = argomenti(raw, { ...c, vuote });
+      const ultimo = args[args.length - 1];
+      if (!ultimo || ultimo.variabile || ultimo.ignoto) return null;
+      const parole = graffe(args.map((a) => a.testo));
+      if (!parole || !parole.length) return null;
+      out.push(parole[parole.length - 1]);
+    }
+    return out;
+  }
+  const comeParola = (v) => (/^[\w./:=@%+,-]+$/.test(v) ? v : `'${v.replace(/'/g, "'\\''")}'`);
 
   // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
   function classify(cmd, ctx) {
