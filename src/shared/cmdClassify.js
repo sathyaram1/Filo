@@ -1231,7 +1231,7 @@
       });
     }
     // In PowerShell `where` da solo è il filtro, che non cerca file.
-    if (prog === 'where' && (c.shell !== 'powershell' || /^where\.exe$/i.test(unquote(tokens(raw)[0] || '')))) {
+    if (prog === 'where' && qualeWhere(raw, c.shell) !== 'filtro') {
       return testi.some((t) => t && !/^[-/]/.test(t));
     }
     return false;
