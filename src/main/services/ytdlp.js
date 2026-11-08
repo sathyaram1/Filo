@@ -91,7 +91,18 @@ function argomenti({ url, cartella, audio = false, ffmpeg = '', nodo = '' }) {
   return a;
 }
 
-const numero = (s) => { const n = Number(s); return Number.isFinite(n) && n >= 0 ? n : 0; };
+// Con un proxy (#2301) ogni richiesta del programma passa da lui, e un NO_PROXY del sistema non apre eccezioni. Sta
+// nell'ambiente e non fra gli argomenti perché porta le credenziali, e la riga di comando la legge ogni utente del computer.
+const VARIABILI_PROXY = /^(https?|all|no)_proxy$/i;
+function ambiente(base, proxy = '') {
+  const env = { ...base };
+  if (!proxy) return env;
+  for (const k of Object.keys(env)) if (VARIABILI_PROXY.test(k)) delete env[k];
+  for (const k of ['HTTP_PROXY', 'HTTPS_PROXY', 'ALL_PROXY']) { env[k] = proxy; env[k.toLowerCase()] = proxy; }
+  return env;
+}
+
+const numero =(s) => { const n = Number(s); return Number.isFinite(n) && n >= 0 ? n : 0; };
 
 function leggiRiga(riga) {
   const r = String(riga || '').replace(/\r$/, '');
