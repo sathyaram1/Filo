@@ -117,6 +117,7 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
     const giro = (n) => {
       if (typeof n.className === 'string' && n.className.split(' ').includes(classe)) out.push({ testo: testoDi(n), dubbio: n.className.includes('sn-dubbio') });
       for (const c of n.children || []) giro(c);
+      if (n.ombra) giro(n.ombra);
     };
     for (const o of sb.document.body.children) giro(o);
     return JSON.parse(JSON.stringify(out));
