@@ -930,6 +930,7 @@ function scelteRicordate() {
 function togliScelta(origine, parte) {
   const ok = sceltePersistenti.delete(`${origine}|${parte}`);
   if (ok) salva();
+  if (parte === SCARICAMENTI) liberaSchede(new Set([sitoDegliScaricamenti(origine)]));
   return ok;
 }
 
