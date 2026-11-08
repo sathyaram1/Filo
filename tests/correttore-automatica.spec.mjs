@@ -308,7 +308,7 @@ test('una correzione scelta tre volte dal tasto destro diventa automatica e comp
   }
   await expect.poll(() => magazzino(app, 'sn_autocorrect')).toEqual({ propio: 'proprio' });
   await svuota(page);
-  await page.keyboard.type('è propio ');
+  await batti(page, 'è propio ');
   expect(await valore(page)).toBe('è proprio ');
 });
 
