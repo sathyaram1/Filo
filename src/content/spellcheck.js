@@ -832,6 +832,15 @@
         primaDellAnnulla(vivo, e);
       }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
+      // Il rilascio di Tab cade già sulla casella nuova; un clic in quella che aveva il fuoco da script non la rifocalizza.
+      for (const tipo of ['pointerdown', 'keydown', 'keyup']) {
+        el.addEventListener(tipo, (e) => {
+          const vivo = monitored.get(el);
+          if (!vivo || vivo.toccato || !e.isTrusted) return;
+          vivo.toccato = true;
+          if (vivo.attivo) aggiornaCodice(vivo);
+        }, true);
+      }
     }
     if (!state.ro) {
       try {
