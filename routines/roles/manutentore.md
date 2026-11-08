@@ -23,7 +23,7 @@ La priorità dice quanto una cosa conta oggi, non il suo posto in coda.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
-| **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza, funzioni che l'owner vuole subito | owner, giudici, tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
+| **3** | urgentissimo a prescindere dall'efficienza: buchi di sicurezza attaccabili oggi (non un irrobustimento: la soglia sta nel prompt del giudice di priorità del server), funzioni che l'owner vuole subito | owner, giudici, tu (crearne sì, **toglierne mai**) | parte subito, sempre in parallelo, fuori da ogni ordine |
 | **2** | la rosa del giorno: i feedback più importanti fra tutti | tu, ogni mattina | sempre nel tuo contesto; fra questi decidi ordine, pacchetti, quanti insieme |
 | **1** | da fare, ma non oggi | tu e l'owner | aspettano una prossima rosa |
 | **0** | da fare idealmente, rimandato a lungo: difetti minori che oggi non valgono lo sforzo | tu e l'owner | non si lavorano |
