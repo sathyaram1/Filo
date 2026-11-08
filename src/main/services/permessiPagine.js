@@ -953,7 +953,7 @@ function siDato(ses, url, parte) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, scaricamentoSenzaGesto, chiediScaricamenti, SCARICAMENTI_FINESTRA_MS, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
+  installa, negaTutto, rispondi, scaricamentoSenzaGesto, chiediScaricamenti, sitoDegliScaricamenti, SCARICAMENTI_FINESTRA_MS, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, gestoSulloStrato, gestoNelloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
