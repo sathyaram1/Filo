@@ -1703,6 +1703,16 @@
     }
     return unisciPezzi(out);
   }
+  function sottraiPezzi(a, b) {
+    let out = unisciPezzi(a);
+    for (const y of b) {
+      out = out.flatMap((x) => [
+        ...(x.start < y.start ? [{ start: x.start, end: Math.min(x.end, y.start) }] : []),
+        ...(x.end > y.end ? [{ start: Math.max(x.start, y.end), end: x.end }] : []),
+      ]);
+    }
+    return unisciPezzi(out);
+  }
 
   // Chi possedeva ogni testo già visto nella casella: un annulla o un rifai, di chiunque, lo riporta coi suoi
   // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. L'impronta trova, il testo
