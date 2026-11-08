@@ -723,8 +723,6 @@
     if (ombraDegliStrati.host.parentNode !== padre) padre.appendChild(ombraDegliStrati.host);
     return ombraDegliStrati.radice;
   }
-  const PAGINA_DI_FILO = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
-  let ombraDegliStrati = null;
   // I fogli della pagina non passano l'ombra. Un font chiamato per nome il sito lo ridefinisce, e dai pezzi che il
   // browser carica sa quali caratteri ha disegnato un valore: lì solo famiglie generiche. Lo specchio tiene il font del
   // campo, che ripete il testo del sito.
