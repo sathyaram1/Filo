@@ -160,7 +160,7 @@ test('git: le righe della configurazione, chiave per chiave', () => {
 const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return true; } catch (_) { return false; } })();
 
 test('git: la sonda vera legge il repository della cartella, senza eseguire niente', { skip: conGit ? false : 'git non installato' }, () => {
-  const base = mkdtempSync(join(cartellaTemporanea(), 'filo-2292-'));
+  const base = cartellaTemporanea('filo-2292-');
   try {
     const sano = join(base, 'sano');
     const ostile = join(base, 'ostile');
