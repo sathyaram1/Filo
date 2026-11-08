@@ -127,7 +127,7 @@ test('#991 — senza codice la voce non c’è nel tasto destro; il bottone dell
   await expect(riquadro.locator('.sn-rt-attack')).toBeVisible();
   const avviso = riquadro.locator('.sn-rt-avviso');
   await expect(avviso).toBeVisible();
-  await expect(avviso).toHaveText('Ogni tentativo costa 50 crediti, e senza un codice Red Team il risultato non lo vedi.');
+  await expect(avviso).toHaveText('Senza un codice Red Team il risultato non lo vedi.');
   // L'avviso sta prima dei campi: si legge prima di scrivere.
   const [ya, yc] = await Promise.all([avviso, riquadro.locator('.sn-rt-attack')].map(async (l) => (await l.boundingBox()).y));
   expect(ya).toBeLessThan(yc);
