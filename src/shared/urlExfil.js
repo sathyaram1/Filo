@@ -837,10 +837,13 @@
   const MAX_INDIRIZZI_COMANDO = 50;
   function indirizziDelComando(action) {
     const a = action && typeof action === 'object' ? action : {};
-    const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^"'`]/g, '');
+    const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^`]/g, '');
     const out = [];
     const metti = (u) => { if (out.length < MAX_INDIRIZZI_COMANDO && !out.includes(u)) out.push(u); };
-    const resto = cmd.replace(/\bhttps?:\/\/[^\s<>()|;]+/gi, (m) => { metti(m); return ' '; });
+    // Fra virgolette un indirizzo tiene anche gli spazi.
+    const resto = cmd.replace(/(["'])\s*(https?:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { metti(u); return ' '; })
+      .replace(/["']/g, '')
+      .replace(/\bhttps?:\/\/[^\s<>()|;]+/gi, (m) => { metti(m); return ' '; });
     if (!PROGRAMMI_RETE.test(resto)) return out;
     for (const pezzo of resto.split(/[\s<>()|;&,]+/)) {
       const tok = pezzo.replace(/^-{1,2}[a-z-]*=/i, '').replace(/^@/, '');
