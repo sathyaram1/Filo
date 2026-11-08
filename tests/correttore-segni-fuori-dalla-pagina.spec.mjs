@@ -244,3 +244,153 @@ test('il testo incollato dal tasto destro di Filo riceve subito i segni, anche s
   await expect(page.locator('#ta')).toHaveValue('oggi quseta e domani ');
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
 });
+
+// Le altre strade da cui Filo scrive in una casella del sito: quello che scrive resta dell'utente, e si controlla.
+test('il testo scritto da Modifica in un campo modificabile e dalla compilazione di Filo riceve i segni', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ce').click();
+  await page.keyboard.type('oggi ');
+  await nelMondoDelMenu(app, page, () => {
+    const el = document.getElementById('ce');
+    const r = document.createRange();
+    r.selectNodeContents(el);
+    r.collapse(false);
+    globalThis.SN_EDITBOX.sostituisci({ kind: 'ce', el, range: r }, 'domani quseta ');
+  });
+  await expect(page.locator('#ce')).toHaveText(/oggi domani quseta/);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+
+  await page.locator('#ta').click();
+  await nelMondoDelMenu(app, page, () => { globalThis.SN_HIGHLIGHT.fillElement(document.getElementById('ta'), 'ieri quseta e oggi '); });
+  await expect(page.locator('#ta')).toHaveValue('ieri quseta e oggi ');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+});
+
+test('il suggerimento del dizionario del browser scelto dal tasto destro è testo dell\'utente', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ce').click();
+  await page.keyboard.type('oggi ciiao ');
+  await page.waitForTimeout(400);
+  const box = await page.locator('#ce').boundingBox();
+  await page.mouse.dblclick(box.x + 70, box.y + 14);
+  await page.mouse.click(box.x + 70, box.y + 14, { button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+  const host = new URL(page.url()).host;
+  // Il suggerimento arriva da Electron come al tasto destro vero; qui è una parola che Filo segna, così si vede se la
+  // controlla.
+  await app.evaluate(({ webContents }, h) => {
+    for (const w of webContents.getAllWebContents()) {
+      try { if (new URL(w.getURL()).host === h) w.send('filo:broadcast', { type: '_spell:native', word: 'ciiao', suggestions: ['quseta'] }); } catch (_) {}
+    }
+  }, host);
+  const corr = menuDi(page).locator('.sn-menu-correction:visible');
+  await expect(corr.first()).toContainText('quseta', { timeout: 4000 });
+  await corr.first().click();
+  await expect(page.locator('#ce')).toHaveText(/oggi quseta/);
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+});
+
+// Un annulla o un rifai riporta un testo coi proprietari che aveva; un'immagine incollata non porta testo dell'utente.
+const SONDA_DELL_ANNULLA = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;padding:40px;font:16px sans-serif">
+  <textarea id="ta" lang="it" style="width:600px;height:200px;font:16px sans-serif"></textarea>
+  <div id="ce" contenteditable="true" lang="it" style="width:600px;min-height:120px;font:16px sans-serif;border:1px solid #999"></div>
+  <div id="altro" style="height:40px">altro</div>
+<script>
+  const ta = document.getElementById('ta');
+  const cmd = (c, v) => document.execCommand(c, false, v);
+  window.prepara = () => {
+    const vero = ta.value;
+    ta.focus();
+    cmd('selectAll'); cmd('insertText', 'zanzottera '.repeat(1500));
+    cmd('selectAll'); cmd('insertText', 'quseta '.repeat(1500));
+    cmd('selectAll'); cmd('insertText', vero);
+  };
+  window.durate = [];
+  window.sonda = () => {
+    ta.focus();
+    let t0 = performance.now(); cmd('undo'); const q = performance.now() - t0;
+    t0 = performance.now(); cmd('undo'); const z = performance.now() - t0;
+    cmd('redo'); cmd('redo');
+    window.durate.push({ q, z });
+  };
+  window.allaScorciatoia = false;
+  document.addEventListener('keydown', (e) => { if (window.allaScorciatoia && e.ctrlKey && e.key === 'a') window.sonda(); });
+  window.sondeImmagine = [];
+  let t0 = 0, sonda = null, vero = '';
+  window.addEventListener('input', (e) => {
+    if (!e.isTrusted || e.inputType !== 'insertFromPaste' || !window.sondeImmagine.length) return;
+    sonda = window.sondeImmagine.shift();
+    vero = e.target.innerHTML;
+    e.target.textContent = (sonda + ' ').repeat(1500);
+    t0 = performance.now();
+  }, true);
+  window.addEventListener('input', (e) => {
+    if (!sonda) return;
+    window.durate.push(sonda === 'quseta' ? { q: performance.now() - t0 } : { z: performance.now() - t0 });
+    e.target.innerHTML = vero;
+    sonda = null;
+  });
+  window.mediane = () => {
+    const med = (k) => { const x = window.durate.map((d) => d[k]).filter((v) => v != null).sort((a, b) => a - b); return x[Math.floor(x.length / 2)]; };
+    const out = { conosciuta: med('z'), ignota: med('q'), prove: window.durate.length };
+    window.durate = [];
+    return out;
+  };
+</script>
+</body>`;
+
+test('annulla e rifai dello script del sito, e un\'immagine incollata, non gli fanno leggere il dizionario dai tempi', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: false },
+    });
+    await globalThis.chrome.storage.local.set({ sn_personal_dict: ['Zanzottera'] });
+  });
+  const page = await testServer.openReady(openTab, SONDA_DELL_ANNULLA, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  const pari = (m) => { expect(m.prove).toBeGreaterThan(3); expect(m.ignota).toBeLessThan(m.conosciuta * 1.5 + 3); };
+
+  // A ogni Ctrl+A nella casella lo script annulla, misura e rifà.
+  await page.click('#ta');
+  await page.keyboard.type('ciao come stai ', { delay: 40 });
+  await page.evaluate(() => window.prepara());
+  await page.evaluate(() => { window.allaScorciatoia = true; });
+  for (let i = 0; i < 5; i++) { await page.keyboard.press('Control+a'); await page.keyboard.press('End'); }
+  pari(await page.evaluate(() => window.mediane()));
+  await expect(page.locator('#ta')).toHaveValue('ciao come stai ');
+  await page.evaluate(() => { window.allaScorciatoia = false; });
+
+  // Dopo un Ctrl+clic fuori dalla casella il rilascio del Ctrl non arriva lì: lo script misura quando vuole.
+  await page.click('#altro', { modifiers: ['Control'] });
+  for (let i = 0; i < 5; i++) await page.evaluate(() => window.sonda());
+  pari(await page.evaluate(() => window.mediane()));
+
+  // Un'immagine incollata in un campo modificabile: lo script mette la sua sonda nello stesso evento.
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const px = Buffer.alloc(48 * 32 * 4);
+    for (let i = 0; i < 48 * 32; i++) px.set([30, 60, 200, 255], i * 4);
+    const png = nativeImage.createFromBitmap(px, { width: 48, height: 32 }).toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+  });
+  await page.click('#ce');
+  await page.keyboard.type('ciao ', { delay: 40 });
+  await page.evaluate(() => { for (let i = 0; i < 4; i++) window.sondeImmagine.push('zanzottera', 'quseta'); });
+  for (let i = 0; i < 8; i++) { await page.keyboard.press('Control+v'); await page.waitForTimeout(100); }
+  pari(await page.evaluate(() => window.mediane()));
+});
+
+test('l\'annulla dell\'utente riporta il suo testo coi suoi segni', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi quseta ', { delay: 30 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+  await page.keyboard.press('Control+a');
+  await page.keyboard.type('poi ', { delay: 30 });
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 5000 });
+  await page.keyboard.press('Control+z');
+  await expect(page.locator('#ta')).toHaveValue('oggi quseta ');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+});
