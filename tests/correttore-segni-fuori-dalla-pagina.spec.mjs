@@ -176,3 +176,71 @@ test('chi rientra col clic in una casella già scritta, che aveva il fuoco da sc
   await page.locator('#ta').click();
   await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
 });
+
+// A ogni tasto vero dell'utente lo script, prima di Filo, metteva nella casella una parola ripetuta, misurava il lavoro
+// di Filo e rimetteva il testo dell'utente; allo spazio ci metteva un cognome in minuscolo e rileggeva se Filo l'aveva
+// rimesso con la maiuscola (o un'abbreviazione insegnata a Filo, sciolta).
+const SONDA_AI_TASTI = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;padding:40px;font:16px sans-serif">
+  <textarea id="ta" lang="it" style="width:600px;height:200px;font:16px sans-serif"></textarea>
+<script>
+  window.durate = [];
+  window.letti = [];
+  window.sonde = [];
+  let t0 = 0, vero = '', sonda = null;
+  window.addEventListener('input', (e) => {
+    if (!e.isTrusted || !window.sonde.length) return;
+    sonda = window.sonde.shift();
+    vero = e.target.value;
+    e.target.value = sonda.spazio ? sonda.parola + ' ' : (sonda.parola + ' ').repeat(1500);
+    e.target.setSelectionRange(e.target.value.length, e.target.value.length);
+    t0 = performance.now();
+  }, true);
+  window.addEventListener('input', (e) => {
+    if (!e.isTrusted || !sonda) return;
+    if (sonda.spazio) window.letti.push(e.target.value); else window.durate.push({ parola: sonda.parola, ms: performance.now() - t0 });
+    e.target.value = vero;
+    sonda = null;
+  });
+</script>
+</body>`;
+
+test('a ogni tasto dell\'utente lo script del sito non legge il dizionario dai tempi né dalla parola che Filo riscrive', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: true },
+    });
+    await globalThis.chrome.storage.local.set({ sn_personal_dict: ['Zanzottera'], sn_autocorrect: { qst: 'questo' } });
+  });
+  const page = await testServer.openReady(openTab, SONDA_AI_TASTI, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  await page.click('#ta');
+  await page.keyboard.type('ciao ', { delay: 80 });
+  await page.waitForTimeout(400);
+
+  await page.evaluate(() => { for (let i = 0; i < 7; i++) window.sonde.push({ parola: 'zanzottera' }, { parola: 'quseta' }); });
+  for (const c of 'come stai oggi') { await page.keyboard.type(c); await page.waitForTimeout(120); }
+  const durate = await page.evaluate(() => window.durate);
+  const med = (p) => { const x = durate.filter((d) => d.parola === p).map((d) => d.ms).sort((a, b) => a - b); return x[Math.floor(x.length / 2)]; };
+  expect(durate).toHaveLength(14);
+  expect(med('quseta')).toBeLessThan(med('zanzottera') * 1.5 + 3);
+
+  await page.evaluate(() => { for (const parola of ['zanzottera', 'brambillasca', 'qst']) window.sonde.push({ parola, spazio: true }); });
+  for (const w of [' va', ' tutto', ' bene']) await page.keyboard.type(w, { delay: 120 });
+  await page.waitForTimeout(300);
+  expect(await page.evaluate(() => window.letti)).toEqual(['zanzottera ', 'brambillasca ', 'qst ']);
+  await expect(page.locator('#ta')).toHaveValue('ciao come stai oggi va tutto bene');
+});
+
+test('il testo incollato dal tasto destro di Filo riceve subito i segni, anche scelto dopo qualche secondo', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await app.evaluate(({ clipboard }) => clipboard.writeText('oggi quseta e domani '));
+  await page.locator('#ta').click({ button: 'right' });
+  await expect(menuDi(page).locator('.sn-menu-paste-main').first()).toBeVisible();
+  await page.waitForTimeout(2000);
+  await menuDi(page).locator('.sn-menu-paste-main').first().click();
+  await expect(page.locator('#ta')).toHaveValue('oggi quseta e domani ');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+});
