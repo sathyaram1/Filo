@@ -1,9 +1,9 @@
-// #2293 giro 4 — r3: «git -c … clone» o «git -C cartella pull» contattano un altro computer, ma quello che stampano
-// conta come uscita del computer, non come testo arrivato dalla rete.
+// #2293 giro 5 (dal giro 4) — r4: «git -c … clone» o «git -C cartella pull» contattano un altro computer, ma quello che
+// stampano conta come uscita del computer, non come testo arrivato dalla rete.
 
 import { test, expect } from '../../fixtures/electron.mjs';
 
-test('r3 un git con un\'opzione prima del comando di rete: quello che stampa conta come testo dalla rete', async ({ app }) => {
+test('r4 un git con un\'opzione prima del comando di rete: quello che stampa conta come testo dalla rete', async ({ app }) => {
   const esiti = await app.evaluate(() => ['git -c http.sslVerify=false clone https://raccolta.example/p.git',
     'git -C progetto pull raccolta.example:p', 'git --no-pager fetch raccolta.example:p'].map((comando) => ({
     comando,
