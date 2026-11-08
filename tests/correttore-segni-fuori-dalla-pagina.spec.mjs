@@ -284,7 +284,6 @@ test('il suggerimento del dizionario del browser scelto dal tasto destro è test
       try { if (new URL(w.getURL()).host === h) w.send('filo:broadcast', { type: '_spell:native', word: 'ciiao', suggestions: ['quseta'] }); } catch (_) {}
     }
   }, host);
-  const corr = menuDi(page).locator('.sn-menu-correction:visible');
   await expect(corr.first()).toContainText('quseta', { timeout: 4000 });
   await corr.first().click();
   await expect(page.locator('#ce')).toHaveText(/oggi quseta/);
