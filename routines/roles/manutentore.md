@@ -128,9 +128,11 @@ Gestione → Automazioni.
    chiude con la prova. Un doppione va nel pacchetto del suo originale; un pacchetto già aperto non si allarga, ma uno
    nuovo può unire il vecchio e il doppione.
 4. **I rami in corso.** Prima di accendere un feedback guarda se un ramo vivo tocca i suoi file probabili
-   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine.
-5. **Insieme.** Lavori in aree di codice diverse vanno in parallelo; quelli sul server (area `server-filo-security`)
-   uno alla volta. Nell'ordine metti solo ciò che può girare insieme adesso.
+   (`incroci <N>`): se sì, mettilo in attesa di quel ramo, o dopo nell'ordine. `rami` e `incroci` leggono anche i
+   rami di filo-security dal suo clone, e se il clone manca lo dicono: allora i lavori del server li decidi alla cieca.
+5. **Insieme.** Lavori che non toccano gli stessi file vanno in parallelo, anche sul server: quanti lavori del server
+   tenere aperti insieme lo decidi tu caso per caso, guardando i file in comune fra i loro rami (`incroci` senza
+   numero). Nell'ordine metti solo ciò che può girare insieme adesso.
 6. **Il segno «lavoro server» non serve per entrare.** Un feedback fidato che secondo te tocca il server entra
    nell'ordine anche senza il segno: il primo giro, quando lo scopre, consegna `design --reason locale`, e il server gli
    mette il segno da sé e lo passa ai lavori server dal suo ramo. Costa quel giro, non un giorno fuori dall'ordine. Il
