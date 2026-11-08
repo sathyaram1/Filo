@@ -157,10 +157,33 @@ test('#2296 — Gestione: i tetti del server con la stima accanto, che segue il 
   expect(scritture).toHaveLength(1);
   await mg.screenshot({ path: 'tests/.shots/redteam-tetti-gestione.png' }).catch(() => {});
 
-  // Dal tasto destro tornano i numeri di fabbrica.
-  await mg.evaluate(() => window.__mgRedteam.tettiDiFabbrica());
+  // Dal tasto destro, con la voce vera del menu, tornano i numeri di fabbrica.
+  await mg.locator('#mgRtRoot').click({ button: 'right' });
+  const voce = mg.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rimetti i tetti di fabbrica' });
+  await expect(voce).toBeVisible();
+  await voce.click();
   await expect(campo).toHaveValue('20');
+  await expect(inTutto.locator('input')).toHaveValue('150');
   expect(scritture.at(-1)).toEqual({ op: 'imposta', perUserDay: 20, globalDay: 150 });
+  expect(tetti).toEqual({ perUserDay: 20, globalDay: 150 });
+});
+
+test('#2296 — Gestione col server dei tetti giù: i campi restano, spenti, col motivo sotto', async ({ app, openTab }) => {
+  limitiGiu = true;
+  expect(await entraOwner(app)).toBe(true);
+  const mg = await openTab('filo://manage/manage.html');
+  await apriScheda(mg, 'stats');
+  for (const chiave of ['perUserDay', 'globalDay']) {
+    const blocco = mg.locator(`.mg-rt-tetto[data-tetto="${chiave}"]`);
+    await expect(blocco).toBeVisible();
+    await expect(blocco.locator('input')).toBeDisabled();
+    await expect(blocco.locator('[data-tetto-stima]')).toHaveText(/^Non letto: .+\.$/);
+  }
+  expect(scritture).toHaveLength(0);
+  // Il menu non offre i tetti di fabbrica: non sapendo i numeri, non c'è niente da rimettere.
+  await mg.locator('#mgRtRoot').click({ button: 'right' });
+  await expect(mg.locator('.mg-ctxmenu')).toBeVisible();
+  await expect(mg.locator('.mg-ctxmenu')).not.toContainText('Rimetti i tetti di fabbrica');
 });
 
 test('#2296 — il rifiuto del server arriva col suo numero; il testo resta e parte intero', async ({ app, openTab }) => {
