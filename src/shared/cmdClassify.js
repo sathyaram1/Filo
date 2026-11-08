@@ -1677,7 +1677,7 @@
   // Le opzioni si cercano anche lì, e vale la lettura peggiore (#1994). Ciò che non si sa riprodurre (una variabile di
   // cmd tagliata) è ignoto e chiede (`nomiVariabili`). cmd toglie i suoi `^` prima, in `comeLaShell`.
   function classifyOneLetto(raw, c) {
-    const base = classifyOne(raw);
+    const base = classifyOne(raw, c.shell);
     if (base === 3 || c.shell === 'cmd' || !/[\\${,]/.test(raw)) return base;
     const elenchi = forsePowerShell(c);
     let det = base;
