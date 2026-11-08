@@ -208,8 +208,8 @@ test('il terminale dove scrive l\'utente resta il cmd di sempre: un programma de
       onError: ({ message }) => { clearTimeout(scade); reject(new Error(message)); },
     });
   }));
+  assert.equal(uscita.testo.trim(), 'suo', 'il programma della cartella non è partito');
   assert.equal(uscita.code, 0);
-  assert.equal(uscita.testo.trim(), 'suo');
 });
 
 test('con cmd vero un whoami.bat nella cartella non prende il posto di whoami', { skip: process.platform !== 'win32' && 'cmd esiste solo su Windows' }, async () => {
