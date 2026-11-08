@@ -1434,6 +1434,7 @@
     strumenti: ['readAloud', '', 'Strumenti musicali negati'],
     rete: ['wifi', '', 'Rete locale negata'],
     file: ['pencil', '', 'Modifica dei file negata'],
+    scaricamenti: ['download', '', 'Più file senza un tuo clic: fermati'],
   };
   // Il primo segno è il più delicato: sulla scheda più stretta del suo contenuto resta solo lui (shell.css), la frase li dice tutti.
   const PESO_SEGNO = ['schermo', 'video', 'audio', 'posizione'];
