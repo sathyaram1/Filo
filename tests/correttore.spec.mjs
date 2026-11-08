@@ -483,6 +483,6 @@ test('svuotata la casella da script, i segni del testo di prima spariscono', asy
   await expect(errore(page, 'qual\'è')).toHaveCount(1, { timeout: 4000 });
   await page.evaluate(() => { document.getElementById('ta').value = ''; });
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 2000 });
-  await expect.poll(() => page.evaluate(() => Array.from(document.querySelectorAll('.sn-spell-overlay')).map((o) => o.textContent).join('')))
+  await expect.poll(() => segniDi(page, '.sn-spell-overlay').allTextContents().then((t) => t.join('')))
     .toBe('');
 });
