@@ -891,18 +891,18 @@
     const C = global.SN_CMD_CLASSIFY;
     if (C && C.PROGRAMMI_RETE && !C.PROGRAMMI_RETE.test(resto)) return out;
     const tld = global.SN_STESSO_SITO && global.SN_STESSO_SITO.dominioDiPrimoLivello;
+    let prima = '';
     for (const pezzo of resto.split(/[\s<>()|;&,]+/)) {
+      const dopoFile = OPZIONI_FILE.test(prima);
+      prima = pezzo;
+      if (!pezzo || dopoFile || /^-{1,2}[a-z-]+=/i.test(pezzo) && OPZIONI_FILE.test(pezzo.split('=')[0])) continue;
       const tok = pezzo.replace(/^-{1,2}[a-z-]*=/i, '').replace(/^@/, '');
       if (!tok || tok.startsWith('-')) continue;
-      // Un nome utente davanti al sito (`dati@evil.example`) esce con lui: il sito è quello dopo la chiocciola.
-      const sito = tok.replace(/^[^\s@/]+@/, '');
-      if (IP.test(sito)) { metti(`http://${tok}`); continue; }
-      const m = /^((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63}))\.?(:\d{1,5})?([/?#].*)?$/i.exec(sito);
-      if (!m) continue;
-      // Senza percorso né porta, un nome di due parti è un sito se finisce con un dominio vero, non con un'estensione.
-      const due = m[1].split('.').length < 3;
-      if (!m[3] && !m[4] && sito === tok && (ESTENSIONI.test(m[2]) || (due && tld && !tld(m[2])))) continue;
-      metti(`http://${tok}`);
+      // La barra rovescia la toglie la shell di Mac e Linux (`raccolta\.com`); su Windows resta: si provano le due letture.
+      for (const forma of new Set([tok, tok.replace(/\\(.)/g, '$1')])) {
+        const sito = sitoDellArgomento(forma, tld);
+        if (sito) { metti(sito.endsWith('/') && !/\/$/.test(forma) ? sito.slice(0, -1) : sito); break; }
+      }
     }
     return out;
   }
