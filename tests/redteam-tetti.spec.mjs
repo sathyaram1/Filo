@@ -102,6 +102,7 @@ test.beforeEach(() => {
   scritture.length = 0;
   invii.length = 0;
   rispostaInvio = () => ({ status: 'ok', attemptId: 'att-1' });
+  limitiGiu = false;
 });
 
 // Firestore e OpenRouter hanno l'indirizzo scritto nel codice: nel main il `fetch` globale li ridirige al finto.
