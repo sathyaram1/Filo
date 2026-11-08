@@ -89,6 +89,21 @@ test('where in PowerShell è Where-Object: il blocco gira, quindi 3; in cmd è w
   // Le due forme già difese e quella nuova ora dicono lo stesso.
   assert.equal(C.classify('echo 1 | where { Start-Process calc }', PS), 3);
   assert.equal(C.classify('Where-Object -InputObject 1 { Start-Process calc }', PS), 3);
+  assert.equal(C.classify('? -InputObject 1 { Start-Process calc }', PS), 3);
+  // Lo stesso filtro scritto per esteso, o col punto interrogativo, vale quanto `where`.
+  for (const cmd of ['Where-Object Name -like a', 'Where-Object -InputObject 1 { $_ -gt 0 }', '? -InputObject 1 { $_ -gt 0 }']) {
+    assert.equal(C.classify(cmd, PS), 1, cmd);
+  }
+  // where.exe è il where di cmd, l'unico modo di chiamarlo da PowerShell.
+  for (const cmd of ['where.exe git', 'where.exe node', 'where.exe /R . *.txt']) {
+    assert.equal(C.classify(cmd, PS), C.classify(cmd.replace('where.exe', 'where'), CMD), cmd);
+    assert.equal(C.classify(cmd, PS), 1, cmd);
+  }
+  assert.equal(C.classify('where.exe $(Start-Process calc)', PS), 3);
+  assert.equal(C.classify('.\\where.exe git', PS), 3, 'un where.exe col percorso è un programma qualunque');
+  // In una cartella di rete il filtro non cerca nomi; where.exe sì.
+  const RETE = { ...PS, cwd: '\\\\server\\condivisa' };
+  assert.equal(C.classify('where.exe git', RETE), 2);
 });
 
 test('arch con un programma dietro chiede «conferma», e una cancellazione dietro arch è un «per sempre»', () => {
