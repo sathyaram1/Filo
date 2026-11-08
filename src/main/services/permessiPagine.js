@@ -796,6 +796,17 @@ function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
   return { esito: recente(prima) || recente(primaQui) ? 'chiedi' : 'via', origine };
 }
 
+// Le schede ferme da un no: toglierlo dalla chat, che non sa in che scheda è stato dato, le libera.
+const schedeFerme = new Set();
+function liberaSchede(siti) {
+  for (const wc of [...schedeFerme]) {
+    let morta = true;
+    try { morta = wc.isDestroyed(); } catch (_) {}
+    if (morta || !wc._filoScaricamentiNoAlle) { schedeFerme.delete(wc); continue; }
+    if (siti.has(wc._filoScaricamentiNoSito)) { wc._filoScaricamentiNoAlle = 0; schedeFerme.delete(wc); }
+  }
+}
+
 // Un segno della scheda (l'ultimo file senza clic, il no dato alla domanda) vale finché l'utente non tocca la scheda dopo.
 function dopoUltimoGesto(wc, t) {
   if (!t) return false;
