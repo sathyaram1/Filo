@@ -103,7 +103,7 @@ contesto dice in testa quale dei due è. Quello che non c'è si rilegge coi
 comandi (`schede`, `taccuino`). Stima con Opus: da circa 46 $ a circa 31 $ al
 giorno. Si accende:
 
-- a un **battito** ogni 2 ore al massimo, per guardare biglietti, guasti,
+- a un **battito** ogni due ore al massimo, per guardare biglietti, guasti,
   deploy, suite, domande di processo;
 - a una **sveglia del server** al segnale, senza aspettare il battito: guasto
   dichiarato, deploy del server rosso, suite rossa su main, accensione nata
