@@ -1402,6 +1402,11 @@
         return copiaPosix(testi, c);
       case 'ln':
         return copiaPosix(testi, c, { forza: true });
+      case 'uniq': case 'tree': {
+        const dest = prog === 'uniq' ? uniqUscita(testi) : treeUscita(testi);
+        if (dest == null) return '';
+        return dest ? copiaSovrascrive([], dest, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
+      }
       case 'robocopy': {
         const ops = testi.filter((t) => !t.startsWith('/'));
         return ops.length >= 2 && statoDi(ops[1], c) !== null ? PUO_SOVRASCRIVERE : '';
