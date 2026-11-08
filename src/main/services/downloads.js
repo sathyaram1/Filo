@@ -659,12 +659,14 @@ function inAttesaPiuFile(scope, origine, scheda) {
 function schedaDiPagina(webContents) {
   try {
     if (!webContents || webContents.isDestroyed()) return null;
+  } catch (_) { return null; }
+  try {
     for (const w of electron().BrowserWindow.getAllWindows()) {
       const t = ((w._filoTabs && w._filoTabs.tabs) || []).find((x) => { try { return x.view.webContents === webContents; } catch (_) { return false; } });
       if (t) return `${w.id}:${t.id}`;
     }
-    return webContents.id;
-  } catch (_) { return null; }
+  } catch (_) {}
+  return webContents.id;
 }
 // Oltre il tetto il file non scende, e la riga più nuova lo dice: chi risponde sa quanti ne mancano.
 function postoPerPiuFile(scope) {
