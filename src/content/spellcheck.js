@@ -1609,7 +1609,7 @@
     const k = state.tasto;
     // Cancella l'utente col suo tasto o col suo taglia; una cancellatura che non spiegano è del sito (cambioDelSito).
     if (tipo.startsWith('delete')) {
-      const tasto = !!k && (k.key === 'Backspace' || k.key === 'Delete');
+      const tasto = !!k && ['Backspace', 'Delete', 'Unidentified', 'Process'].includes(k.key);
       const taglio = tipo === 'deleteByCut' && Date.now() - state.taglio < INTENTO_MS;
       if (!tasto && !taglio) return null;
       if (consuma) { if (tasto) state.tasto = null; else state.taglio = 0; }
