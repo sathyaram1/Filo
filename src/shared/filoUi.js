@@ -182,6 +182,8 @@
     try {
       const fs = require('node:fs');
       const path = require('node:path');
+      const ignoti = nomi.filter((f) => !FOGLI_DEGLI_STRATI.includes(f));
+      if (ignoti.length) console.error(`[filo] fogli fuori da FOGLI_DEGLI_STRATI, sui siti mancheranno: ${ignoti.join(', ')}`);
       testo = nomi.filter((f) => FOGLI_DEGLI_STRATI.includes(f))
         .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
     } catch (_) {}
