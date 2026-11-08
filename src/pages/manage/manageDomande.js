@@ -33,8 +33,6 @@
   };
   // Le schede delle chiuse: dalla più recente, senza gruppi, e oltre il tetto dell'elenco ce ne sono altre.
   const CHIUSE = ['domande-automatiche', 'domande-archivio'];
-  // Una riga trascinata in una chat con Filo arriva come riferimento: lo legge la chat dell'Aiuto (src/content/sidebar.js).
-  const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
   // Il riferimento porta la domanda intera; oltre questo tetto la chat riceve il taglio scritto, mai un testo mozzato muto.
   const RIFERIMENTO_MAX = 30000;
   const PRIORITA = { bloccante: 'Bloccante', importante: 'Importante', quando_puoi: 'Quando puoi' };
