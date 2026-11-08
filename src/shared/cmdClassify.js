@@ -603,7 +603,7 @@
 
     if (LEVEL1.has(prog)) {
       // `where` legge solo come where.exe di cmd: in PowerShell è Where-Object, che esegue il suo blocco (#2292).
-      if (PS_PIPE_ONLY.has(prog) && shell !== 'cmd') return segmentIsRead(raw, false) ? 1 : 3;
+      if (PS_PIPE_ONLY.has(prog) && qualeWhere(trimmed, shell) !== 'cmd') return segmentIsRead(raw, false) ? 1 : 3;
       // Sul Mac `arch <opzioni> programma` lancia il programma: legge solo da nudo.
       if (prog === 'arch' && tokens(trimmed).length > 1) return 3;
       // Quasi tutti i LEVEL1 restano 1 anche con flag; fanno eccezione i pochi che con certi
