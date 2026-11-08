@@ -846,3 +846,43 @@ test('#1685 eliminazione dall\'archivio: un no resta un no, e una non riuscita l
     await ripristina(app);
   }
 });
+
+// Ogni bottone che la risposta lasciava da cliccare torna con la chat riaperta (#1294), non solo quelli dei file.
+test('#1294 riaperta, la pagina aperta da Filo ha ancora il suo collegamento, che la riapre', async ({ app, shell, testServer }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  const url = testServer.html('<title>Posta</title><h1>Posta</h1>');
+  await modelloFinto(app, [{ text: 'Ecco la posta.', toolCalls: [{ id: 'n1', name: 'NAVIGA', arguments: JSON.stringify({ url, etichetta: 'Posta' }) }] }, { text: '' }]);
+  await chiedi(page, 'apri la posta');
+  await expect(shell.locator('.tab')).toHaveCount(2, { timeout: 10_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  const chat = await chatCon(app, 'apri la posta');
+  await dimenticaLaMemoria(app, chat.id);
+  await riapri(app, page, chat.id);
+  const link = page.locator('.dash-bubble-filo .dash-action-link-chip');
+  await expect(link, 'riaperta, il collegamento si clicca ancora').toHaveCount(1, { timeout: 8_000 });
+  await expect(link).toContainText('Posta');
+  await expect(page.locator('.dash-bubble-filo .dash-activity-row', { hasText: 'Aperta ·' })).toHaveCount(0);
+  await shell.evaluate(() => window.filoShell.tabs.snapshot()).then((s) => s.tabs.filter((t) => t.url === url).map((t) => t.id))
+    .then((ids) => app.evaluate(({ BrowserWindow }, ids) => {
+      for (const w of BrowserWindow.getAllWindows()) if (w._filoTabs) for (const id of ids) w._filoTabs.closeTab?.(id);
+    }, ids));
+  await expect.poll(async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.some((t) => t.url === url), { timeout: 8_000 }).toBe(false);
+  await link.click();
+  await expect.poll(async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.some((t) => t.url === url), { timeout: 10_000, message: 'il collegamento riapre la pagina' }).toBe(true);
+  await ripristina(app);
+});
+
+test('#1294 riaperta, l\'appunto salvato da Filo ha ancora il bottone che apre l\'editor', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await modelloFinto(app, [{ text: 'Segnato.', toolCalls: [{ id: 'a1', name: 'SALVA_APPUNTO', arguments: '{"testo":"comprare il latte","contesto":"spesa"}' }] }, { text: '' }]);
+  await chiedi(page, 'segnati di comprare il latte');
+  await expect(page.locator('.dash-bubble-filo [data-action="openNotes"]')).toHaveCount(1, { timeout: 10_000 });
+  await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+  const chat = await chatCon(app, 'segnati di comprare il latte');
+  await dimenticaLaMemoria(app, chat.id);
+  await riapri(app, page, chat.id);
+  await expect(page.locator('.dash-bubble-filo [data-action="openNotes"]'), 'riaperta, l\'appunto si apre ancora dal suo bottone').toHaveCount(1, { timeout: 8_000 });
+  await ripristina(app);
+});
