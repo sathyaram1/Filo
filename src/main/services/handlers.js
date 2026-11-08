@@ -2840,8 +2840,9 @@ async function eseguiAzioneFilo(action, {
     action._nonCompare = true;
     if (u.datiReason) action._exfilReason = u.datiReason;
     // Prima del pannello il rifiuto torna al modello (#553): se trova l'indirizzo in un risultato o in una pagina,
-    // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste.
-    if (!confirmed && !u.insiste && !soloConferma) {
+    // lo apre come copiato e l'utente non vede niente. Il pannello arriva se insiste. Un comando va dritto al pannello:
+    // l'utente ce l'ha davanti intero, indirizzo compreso (#2293).
+    if (!confirmed && !u.insiste && !soloConferma && type !== 'ESEGUI_COMANDO') {
       return { executed: false, kept: false, rejected: true, nonCompare: true, error: rifiutoNonCompare(type), output: { nonCompare: true, url: globalThis.SN_ACTION_LEVELS.indirizzoDi(action) } };
     }
   }
