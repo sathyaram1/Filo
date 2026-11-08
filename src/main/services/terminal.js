@@ -48,6 +48,24 @@ function ambienteDelModello(base) {
 // Oltre questi sottomoduli la sonda non li guarda uno per uno: risponde 'ignoto', e il comando chiede.
 const GIT_SOTTOMODULI_MAX = 200;
 
+// Gli hook che git fa partire a una LETTURA, non a una scrittura: post-index-change lo lanciano git status e
+// git diff a ogni rinfresco dell'indice. Gli hook di scrittura (pre-commit, pre-push…) non partono a una lettura,
+// e sono comuni nei repository dell'utente: chiedere per loro sarebbe solo attrito (#2292).
+const HOOK_DI_LETTURA = ['post-index-change'];
+// 'si' se nella cartella degli hook c'è un programma d'avvio che una lettura farebbe partire. Su Windows git
+// esegue l'hook se il file c'è; su POSIX serve il bit d'esecuzione.
+function hookDiLetturaAttivo(dirHooks) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  for (const nome of HOOK_DI_LETTURA) {
+    try {
+      const st = fs.statSync(path.join(dirHooks, nome));
+      if (st.isFile() && (process.platform === 'win32' || (st.mode & 0o111))) return true;
+    } catch (_) {}
+  }
+  return false;
+}
+
 // 'si' se il repository di `dir`, o un suo sottomodulo, ha impostazioni che avviano programmi (#2292), '' se no,
 // 'ignoto' se git non risponde. Le impostazioni di un sottomodulo si guardano prima di lanciarci dentro altro.
 function gitLanciaIn(dir, visti = { n: 0 }) {
