@@ -1365,8 +1365,8 @@
       state.visti = scorriPezzi(state.visti, c);
       const nuovo = ora.slice(c.p, c.fineNuovo);
       const f = state.filoScrive;
-      const daFilo = f === TUTTO || (typeof f === 'string' && f.includes(nuovo));
-      if (nuovo && !daFilo && !(ammesso && ammesso(nuovo))) state.diSito = unisciPezzi([...state.diSito, { start: c.p, end: c.fineNuovo }]);
+      const daFilo = f === TUTTO || (typeof f === 'string' && senzaSpazi(f).includes(senzaSpazi(nuovo)));
+      if (senzaSpazi(nuovo) && !daFilo && !(ammesso && ammesso(nuovo))) state.diSito = unisciPezzi([...state.diSito, { start: c.p, end: c.fineNuovo }]);
     }
     // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora», e dice come si scrive
     // in questa pagina.
