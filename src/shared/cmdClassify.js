@@ -613,6 +613,7 @@
     sistema: 'legge dati del sistema che non sono file',
     processi: 'mostra i programmi aperti con i loro argomenti',
     rete: 'si collega a un altro computer della rete',
+    git: 'le impostazioni di questa cartella git possono avviare dei programmi',
   };
   // Stampano il contenuto dei file che ricevono come operandi.
   const LETTORI = new Set(['cat', 'type', 'more', 'head', 'tail', 'nl', 'cut', 'uniq', 'column', 'get-content', 'gc']);
