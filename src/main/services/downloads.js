@@ -1610,7 +1610,7 @@ function openFile(id, opts, scope = '') {
 function apriScaricato(rec, opts) {
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   if (rec.state === 'pending') {
-    return { ok: false, error: 'Questo programma non è ancora sul computer. Rispondi prima all’avviso' };
+    return { ok: false, error: `Questo ${rec._piuFile ? 'file' : 'programma'} non è ancora sul computer. Rispondi prima all’avviso` };
   }
   // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
   // dell'apertura non è affidabile su tutte le piattaforme.
