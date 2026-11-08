@@ -846,14 +846,18 @@
     const resto = cmd.replace(/(["'])\s*(https?:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { metti(u); return ' '; })
       .replace(/["']/g, '')
       .replace(/\bhttps?:\/\/[^\s<>()|;]+/gi, (m) => { metti(m); return ' '; });
-    if (!PROGRAMMI_RETE.test(resto)) return out;
+    const C = global.SN_CMD_CLASSIFY;
+    if (C && C.PROGRAMMI_RETE && !C.PROGRAMMI_RETE.test(resto)) return out;
+    const tld = global.SN_STESSO_SITO && global.SN_STESSO_SITO.dominioDiPrimoLivello;
     for (const pezzo of resto.split(/[\s<>()|;&,]+/)) {
       const tok = pezzo.replace(/^-{1,2}[a-z-]*=/i, '').replace(/^@/, '');
       if (!tok || tok.startsWith('-') || /^[a-z][a-z0-9+.-]*:\/\//i.test(tok)) continue;
+      if (IP.test(tok)) { metti(`http://${tok}`); continue; }
       const m = /^((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63}))(:\d{1,5})?([/?#].*)?$/i.exec(tok);
       if (!m) continue;
-      const etichette = m[1].split('.').length;
-      if (!m[3] && !m[4] && (etichette < 3 || ESTENSIONI.test(m[2]))) continue;
+      // Senza percorso né porta, un nome di due parti è un sito se finisce con un dominio vero, non con un'estensione.
+      const due = m[1].split('.').length < 3;
+      if (!m[3] && !m[4] && (ESTENSIONI.test(m[2]) || (due && tld && !tld(m[2])))) continue;
       metti(`http://${tok}`);
     }
     return out;
