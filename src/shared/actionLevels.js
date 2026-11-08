@@ -624,9 +624,7 @@
     RIAPRI_SCHEDA: {
       costo: 1,
       campo: 'web',
-      fonte: (a, out) => (out.titolo
-        ? { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto il titolo di una scheda chiusa, scritto dal sito' }
-        : null),
+      fonte: (a, out) => fonteSchedeChiuse(out.titolo || out.riassunto ? [out] : []),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         return ['Riaprire ', t ? cit(t) : 'una scheda chiusa'];
