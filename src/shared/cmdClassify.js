@@ -408,7 +408,6 @@
   // In git i flag distruttivi sono più ricchi: anche `-f`, `-d`/`-D`, `--delete`, `--prune`.
   // Check git-specifico, perché su `tar -f` quelle lettere vogliono dire altro.
   const GIT_DANGER_RE = /(^|\s)(-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
-  // Le lunghe valgono anche accorciate, come le legge git (`--forc`, `--de`): la regola è quella di `opzioneLunga`.
   const GIT_DANGER_LUNGHE = [...LUNGHE_PERICOLOSE, 'force-with-lease', 'discard-changes'];
   const gitPericolosa = (cmd) => GIT_DANGER_RE.test(cmd) || lungaPericolosa(cmd, GIT_DANGER_LUNGHE);
 
