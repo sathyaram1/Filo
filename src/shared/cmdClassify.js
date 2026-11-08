@@ -902,6 +902,7 @@
     const c = {
       win: !!x.win, maiuscole: !!x.maiuscole, home: null, cwd: null, reti: new Set(reti), shell, sistemaIgnoto: x === SENZA_CONTESTO,
       esiste: typeof x.esiste === 'function' ? x.esiste : null,
+      gitLancia: typeof x.gitLancia === 'function' ? x.gitLancia : null,
     };
     const h = dove(String(x.home || ''), c);
     if (h && typeof h === 'object') c.home = h;
