@@ -56,8 +56,8 @@ test('r1 un no alla domanda del sito toglie tutti i file del sito in attesa, e l
     await page.goto(`http://s6.scarica.test:${srv.porta}/salta?n=6&fino=8`);
     await page.waitForTimeout(5_000);
     await shell.screenshot({ path: 'tests/.shots/2294-v2-dopo-il-no.png' });
-    expect(await inAttesa(shell), 'file in attesa dopo il no al sito').toBe(0);
-    await expect(barra).toBeHidden();
+    expect.soft(await inAttesa(shell) - prima, 'file nuovi in attesa dopo il no al sito').toBe(0);
+    await expect.soft(barra, 'la domanda torna dopo il no al sito').toBeHidden();
     expect(arrivati(dir)).toEqual(['file-salto-0.bin']);
   } finally {
     await srv.close();
