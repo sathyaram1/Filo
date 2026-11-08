@@ -28,7 +28,7 @@ test('r1 un sottomodulo che avvia un programma: git status e git diff chiedono, 
     git(['submodule', '-q', 'add', '../sub', 'sub'], sup);
     git(['commit', '-q', '-m', 'init'], sup);
     const segno = join(base, 'AVVIATO');
-    git(['config', '-f', join(sup, '.git', 'modules', 'sub', 'config'), 'core.fsmonitor', `touch ${segno}`], sup);
+    git(['config', '-f', join(sup, '.git', 'modules', 'sub', 'config'), 'core.fsmonitor', `touch "${segno}"`], sup);
 
     const ctx = { cwd: sup, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn };
     for (const cmd of ['git status', 'git diff']) {
