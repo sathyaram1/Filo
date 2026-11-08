@@ -579,22 +579,7 @@
     // Con due operandi `symbolic-ref` sposta HEAD: cambia il ramo corrente.
     'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
   };
-=======
-  // Le altre opzioni prima del sotto-comando valgono 3 (`--config-env=core.pager=SHELL` esegue ciò che git stampa, #1994);
-  // il repository di `--git-dir=`/`--work-tree=` lo misura il perimetro, come la cartella di `cd`.
-  const GIT_GLOBALI_INNOCUE = new Set([
-    '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks',
-    '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--bare',
-    '-v', '--version', '-h', '--help', '--exec-path', '--html-path', '--man-path', '--info-path',
-  ]);
-  const GIT_GLOBALE_CARTELLA = /^--(git-dir|work-tree)=/;
-  // `--output` (e le sue abbreviazioni) scrive l'uscita in un file scelto dal comando, col testo che sceglie
-  // `--format`: con log, show, diff, shortlog… una lettura diventa la scrittura di un file qualsiasi (#1994).
-  function gitScriveFile(cmd) {
-    return tokens(cmd).slice(1).some((t) => opzioneLunga(t, 'output', 2) != null);
-  }
 
->>>>>>> ORIG_HEAD
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
     const globali = tokens(cmd).slice(1).map(unquote);
