@@ -221,6 +221,34 @@ test('#413.2 — alla chat le schede arrivano nell\'ordine della barra («la sec
   }
 });
 
+test('#2293 — i titoli delle schede sono testo dei siti salvo quelli delle pagine di Filo, anche su about:blank e blob:', async () => {
+  require(join(__dirname, '..', '..', 'src', 'shared', 'contenutoEsterno.js'));
+  const prima = { chrome: globalThis.chrome, M: globalThis.SN_FILO_MEMORY, C: globalThis.SN_CREDITS };
+  const barra = [
+    { id: 1, url: 'filo://newtab/', title: 'Nuova scheda', active: true },
+    { id: 2, url: 'https://alfa.example/', title: 'Alfa detta', active: false },
+    { id: 3, url: 'about:blank', title: 'Vuota detta', active: false },
+    { id: 4, url: 'blob:https://alfa.example/1234', title: 'Blob detto', active: false },
+    { id: 5, url: 'data:text/html,x', title: 'Data detta', active: false },
+  ];
+  globalThis.chrome = { tabs: { query: async () => barra.map((t) => ({ ...t })) } };
+  globalThis.SN_CREDITS = { getPublic: async () => ({ balance: 1 }) };
+  globalThis.SN_FILO_MEMORY = {
+    getSession: async () => ({}), listTimers: async () => [], listNotifications: async () => [],
+    getDashboardCache: async () => null,
+  };
+  try {
+    const chat = await FS.assemble({ schedaChat: 1, sistema: false });
+    const daSiti = chat.sezioniChat.find((s) => s.chiave === 'TAB APERTE').daSiti || [];
+    for (const t of ['Alfa detta', 'Vuota detta', 'Blob detto', 'Data detta']) assert.ok(daSiti.includes(t), t);
+    assert.ok(!daSiti.includes('Nuova scheda'), 'il titolo della pagina di Filo lo scrive Filo');
+  } finally {
+    globalThis.chrome = prima.chrome;
+    globalThis.SN_FILO_MEMORY = prima.M;
+    globalThis.SN_CREDITS = prima.C;
+  }
+});
+
 test('#823.1 — fra i siti tenuti sempre aperti il modello vede anche un nome della rete di casa senza punto («nas»)', async () => {
   const prima = { chrome: globalThis.chrome, M: globalThis.SN_FILO_MEMORY, C: globalThis.SN_CREDITS };
   globalThis.chrome = { tabs: { query: async () => [] } };
