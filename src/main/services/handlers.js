@@ -6738,6 +6738,9 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
   // Le risposte di altre conversazioni davanti al modello portano quello che avevano letto, anche dopo un riavvio (#1508).
   const dalTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: chatId });
   if (dalTratto) azioniViste.push(dalTratto);
+  // Titoli e ricerche delle pagine visitate nei blocchi davanti ai messaggi: testo dei siti senza un'azione (#2293).
+  const dalPreambolo = globalThis.SN_URL_EXFIL.testoDeiSitiComeAzione([{ testi: (filo && filo.daSiti) || [], fonte: 'dalle pagine visitate' }]);
+  if (dalPreambolo) azioniViste.push(dalPreambolo);
   // Quello che una conversazione nuova avrebbe davanti, compresa questa: decide se il «no» può consigliarla.
   const tuttoIlTratto = FCx.trattoComeAzione(vistiDalFilo, { chatCorrente: null });
   LETTURE_DI_UNA_NUOVA.set(azioniViste, [...(filo ? filo.perUnaNuova || [] : []), ...(tuttoIlTratto ? [tuttoIlTratto] : [])]);
