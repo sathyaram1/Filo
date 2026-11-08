@@ -1904,7 +1904,32 @@
     return false;
   }
 
+  // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
+  const GIT_CHIAVI_INERTI = [
+    /^core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles)$/,
+    /^remote\.[^=]+\.(url|pushurl|fetch|push|tagopt|prune|mirror)$/,
+    /^branch\.[^=]+\.(remote|merge|rebase|pushremote|description)$/,
+    /^submodule\.[^=]+\.(url|active|branch)$/,
+    /^user\.(name|email|signingkey)$/,
+    /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
+    /^(extensions\.(objectformat|refstorage)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
+  ];
+  // Le righe di `git config --list --show-scope --includes`: true se una chiave locale o del worktree non è inerte.
+  // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
+  function gitConfigLancia(righe) {
+    return String(righe || '').split(/\r?\n/).some((riga) => {
+      const m = /^(local|worktree)\t([^=]+)=?(.*)$/.exec(riga);
+      if (!m) return false;
+      const chiave = m[2].toLowerCase();
+      if (chiave === 'core.fsmonitor') return !/^(true|false|yes|no|on|off|1|0)?$/i.test(m[3].trim());
+      return !GIT_CHIAVI_INERTI.some((re) => re.test(chiave));
+    });
+  }
+
   global.SN_CMD_CLASSIFY = {
+    gitConfigLancia,
+    // Per la sentinella che prova su ogni nome le forme che scrivono o eseguono: chi aggiunge un nome la deve aggiornare.
+    nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ] }),
     cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
