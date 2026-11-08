@@ -100,13 +100,15 @@ test("r1 allo spazio dell'utente lo script del sito non legge dalla casella le p
 
   await page.click('#ta');
   await page.keyboard.type('ciao', { delay: 80 });
-  await page.evaluate(() => window.sonde.push('zanzottera', 'brambillasca'));
+  await page.evaluate(() => window.sonde.push('zanzottera', 'brambillasca', 'qst'));
   await page.keyboard.type(' come', { delay: 120 });
   await page.keyboard.type(' va', { delay: 120 });
+  await page.keyboard.type(' oggi', { delay: 120 });
   await page.waitForTimeout(300);
   const letti = await page.evaluate(() => window.letti);
   console.log('letti', JSON.stringify(letti));
-  expect(letti.length).toBe(2);
-  // Il successo per l'utente: quello che il sito rilegge non cambia fra un cognome che Filo conosce e uno che non conosce.
-  expect(letti.map((l) => l.letto)).toEqual(['zanzottera ', 'brambillasca ']);
+  expect(letti.length).toBe(3);
+  // Il successo per l'utente: quello che il sito rilegge è quello che ci ha scritto, per un cognome che Filo conosce come
+  // per uno che non conosce, e per un'abbreviazione che l'utente gli ha insegnato.
+  expect(letti.map((l) => l.letto)).toEqual(['zanzottera ', 'brambillasca ', 'qst ']);
 });
