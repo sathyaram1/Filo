@@ -34,6 +34,13 @@ test('r2 un repository con le chiavi di git-lfs e di git maintenance resta una l
     git(['config', 'lfs.https://example.com/gioco.git/info/lfs.access', 'basic'], repo);
     git(['config', 'maintenance.auto', 'false'], repo);
     git(['config', 'maintenance.strategy', 'incremental'], repo);
+    // git-lfs al primo push; le istruzioni di molti progetti per blame; git-flow init; la firma dei commit; gc spento.
+    git(['config', 'lfs.https://example.com/gioco.git/info/lfs.locksverify', 'true'], repo);
+    git(['config', 'blame.ignoreRevsFile', '.git-blame-ignore-revs'], repo);
+    git(['config', 'gitflow.branch.master', 'main'], repo);
+    git(['config', 'gitflow.prefix.feature', 'feature/'], repo);
+    git(['config', 'commit.gpgsign', 'true'], repo);
+    git(['config', 'gc.auto', '0'], repo);
     expect(T.gitLanciaIn(repo), 'nessuna di queste chiavi avvia un programma').toBe('');
     expect(C.classify('git status', { cwd: repo, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn })).toBe(1);
   } finally {
