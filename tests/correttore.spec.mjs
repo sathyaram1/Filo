@@ -165,6 +165,30 @@ test('un dubbio sbiadito che il controllo rapido non conferma sparisce alla risp
   await expect(errore(page, 'quseta')).toHaveCount(0);
 });
 
+// #2299: il sito che mette le sue parole nella casella mentre l'utente scrive non ottiene i segni del modello su di
+// esse: uno che manca su una parola del dizionario personale gli direbbe che c'è.
+test('le parole che il sito mette nella casella mentre l\'utente scrive non ricevono i segni del controllo rapido', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer, { errori: { anno: ['hanno', 'Verbo avere.'] } });
+  await app.evaluate(() => { globalThis.__trattieni = true; });
+  await page.locator('#ta').click();
+  await batti(page, 'loro anno detto ');
+  await expect.poll(async () => (await rapide(app)).length).toBeGreaterThan(0);
+  await page.evaluate(() => {
+    const ta = document.getElementById('ta');
+    ta.value = 'anno e anno ' + ta.value;
+    ta.dispatchEvent(new Event('input', { bubbles: true }));
+  });
+  await app.evaluate(() => globalThis.__rilascia());
+  await batti(page, 'ok ');
+  await page.waitForTimeout(1500);
+  await app.evaluate(() => globalThis.__rilascia());
+  const segno = errore(page, 'anno');
+  await expect(segno).toHaveCount(1, { timeout: 4000 });
+  const ta = await page.locator('#ta').boundingBox();
+  expect((await riquadroDelSegno(segno)).x).toBeGreaterThan(ta.x + 180);
+  expect((await rapide(app)).every((r) => !/anno e anno/.test(r.nuovo))).toBe(true);
+});
+
 test('una parola maiuscola fuori dizionario che il controllo dice sbagliata compare piena alla risposta', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer, { errori: { Zanzotterra: ['Zanzottera', 'Refuso nel cognome.'] } });
   await app.evaluate(() => { globalThis.__trattieni = true; });
