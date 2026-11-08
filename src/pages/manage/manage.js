@@ -2988,7 +2988,7 @@
     const fermo = fb && !progress.active ? MR.restaLocale(fb, { lavoriServer: !!(mgLavoriServer && mgLavoriServer.checked) }) : null;
     if (fermo && !MR.domandeBloccantiDi(fb).includes(MR.aspettaDomanda(fb)) && !(ATT && ATT.aspettaAncora(fb, trovaAtteso))) {
       const dal = fermo.atMs ? ` Visto così il ${formatDateTime(new Date(fermo.atMs).toISOString())}.` : '';
-      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Non riparte da solo. ${fermo.sblocchi.join(' ')}${dal}`;
+      const perche = `Nessuna routine lo prende: il suo biglietto nascerebbe non fidato (${fermo.motivi.join(', ')}). Per farlo ripartire serve un gesto. ${fermo.sblocchi.join(' ')}${dal}`;
       return `<div class="mg-item-state"><span class="mg-work-idle mg-attesa-server" title="${esc(perche)}">Fermo: resta locale</span></div>`;
     }
     // Un lavoro locale non ha l'iter delle routine né il loro rientro in coda: lo porta avanti una sessione.
