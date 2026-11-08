@@ -1763,7 +1763,7 @@
   // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
   // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello la prima (#1072.5).
   function comeLaShell(cmd, c) {
-    if (!c.win) return [cmd];
+    if (!c.win && c.shell !== 'cmd') return [cmd];
     if (c.shell === 'cmd') {
       const l = comeCmd(cmd);
       if (l == null) return null;
