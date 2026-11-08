@@ -274,6 +274,11 @@
     //   scelta dell'intervista). Solo nomi da elenchi chiusi e numeri; il main rifiuta il resto.
     //   { misura, ... } → { ok }
     CONTATORI_EVENTO: 'contatori_evento',
+    // TRASCINO_INTERNO_* (#2300): il contenuto di un trascinamento interno, dietro il gettone casuale che porta il tipo.
+    //   Solo dalle pagine di Filo; ARRIVA lo dà una volta. PARTE { gettone, cosa, dati } → { ok };
+    //   ARRIVA { gettone, cosa } → { ok, dati }
+    TRASCINO_INTERNO_PARTE: 'trascino_interno_parte',
+    TRASCINO_INTERNO_ARRIVA: 'trascino_interno_arriva',
     // WALLET_OWNER_INVITES: genera codici d'invito dell'owner. { count } → { ok, codes }
     WALLET_OWNER_INVITES: 'wallet_owner_invites',
     // WALLET_OWNER_KNOBS_SET (#652): cambia le manopole dei crediti in
