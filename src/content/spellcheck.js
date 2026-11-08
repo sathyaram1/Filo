@@ -1641,18 +1641,18 @@
   // piacere (#2299, giro 4).
   const DI_PAROLA = /[\p{L}\p{N}\p{M}'’_-]/u;
   function cambioDelSito(state, prima, ora, c, nuovo) {
+    const tolto = prima.slice(c.p, c.fineVecchio);
+    const tocca = DI_PAROLA.test(ora[c.p - 1] || '') && DI_PAROLA.test(ora[c.fineNuovo] || '');
+    if (!senzaSpazi(nuovo) && !senzaSpazi(tolto) && !(nuovo && tocca)) return;
     const pezzi = [];
     if (senzaSpazi(nuovo)) pezzi.push({ start: c.p, end: c.fineNuovo });
-    const tolto = prima.slice(c.p, c.fineVecchio);
-    const unisce = !senzaSpazi(nuovo) && DI_PAROLA.test(ora[c.p - 1] || '') && DI_PAROLA.test(ora[c.fineNuovo] || '');
-    if (!senzaSpazi(nuovo) && (senzaSpazi(tolto) || (nuovo && unisce))) {
+    else {
       let a = c.p;
       let b = c.fineNuovo;
       while (a > 0 && DI_PAROLA.test(ora[a - 1])) a--;
       while (b < ora.length && DI_PAROLA.test(ora[b])) b++;
       if (b > a) pezzi.push({ start: a, end: b });
     }
-    if (!pezzi.length) return;
     state.diSito = unisciPezzi([...state.diSito, ...pezzi]);
     revocaVisti(state);
   }
