@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url';
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
+import { batti } from './helpers/tastiera.mjs';
 import { voceOggi } from './helpers/riquadriOggi.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
