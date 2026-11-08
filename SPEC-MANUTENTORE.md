@@ -139,17 +139,29 @@ le scelte vere (SPEC-DOMANDE § 3).
 
 ## 5. Il taccuino
 
-Un documento sul server, letto a ogni accensione e riscritto alla fine. Dentro:
+Un documento sul server, letto a ogni accensione e aggiornato alla fine. È
+diviso in sezioni, ognuna sotto un'intestazione `## <nome>`, in quest'ordine:
 
-- **stato**: criterio del giorno per le priorità, N e perché, account in uso;
-- **problemi che sta seguendo**, uno per riga: segnale, ipotesi, prossimo
+- **`stato`**: criterio del giorno per le priorità, N e perché, account in uso;
+- **`problemi`** che sta seguendo, uno per riga: segnale, ipotesi, prossimo
   controllo e quando;
-- **esperimenti** in corso e conclusi, con misura prima e dopo;
-- **indicazioni dell'owner**, con la data («priorità a ciò che cambia la
+- **`esperimenti`** in corso e conclusi, con misura prima e dopo;
+- **`misure`** che tiene d'occhio (fusioni al giorno, costo per fusione,
+  riallineamenti, guasti per famiglia);
+- **`indicazioni`** dell'owner, con la data («priorità a ciò che cambia la
   grafica», 31/10): la decisione del mattino le legge, il recap dice come le
-  ha applicate; le toglie l'owner o il manutentore quando sono esaurite;
-- **misure** che tiene d'occhio (fusioni al giorno, costo per fusione,
-  riallineamenti, guasti per famiglia).
+  ha applicate; le toglie l'owner o il manutentore quando sono esaurite. È
+  l'ultima perché l'indicazione dell'owner si aggiunge in coda al taccuino, e
+  così cade dentro di lei.
+
+**Aggiornare a sezioni** (08/11/2026, #2340). L'operazione `taccuino.sezione`
+(`sezione`, `testo`, `versione`) riscrive il corpo di una sola sezione e lascia
+il resto del taccuino identico byte per byte; una sezione che manca si
+aggiunge prima di `indicazioni`. Ha la stessa guardia di `taccuino.scrivi`:
+la versione letta, e se nel frattempo il taccuino è cambiato (un'indicazione
+dell'owner, un'altra scrittura) rifiuta con `taccuino_cambiato` e il
+manutentore rilegge. `taccuino.scrivi` resta per riscriverlo intero (la prima
+volta nelle cinque sezioni, o per riordinarlo).
 
 Il taccuino sopravvive al PC spento, ai compattamenti e a una sessione morta.
 Il registro delle decisioni (#1154, i principi delle domande chiuse) resta a
