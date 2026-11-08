@@ -1505,12 +1505,20 @@
     }
   }
 
-  // Una shell POSIX toglie i backslash e decodifica `$'…'` prima di passare gli argomenti: `--out\put=x` è
-  // `--output=x`. Le opzioni si cercano anche nel comando come lo riceve il programma, e vale la lettura peggiore (#1994).
+  // Il programma riceve il comando dopo la shell: escape tolti, `$'…'` e `$"…"` decodificati, le espansioni che possono
+  // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte. Le opzioni si cercano anche lì, e vale
+  // la lettura peggiore (#1994). cmd toglie i suoi `^` prima, in `comeLaShell`.
   function classifyOneLetto(raw, c) {
     const base = classifyOne(raw);
-    if (base === 3 || !shellPosix(c) || !/\\|\$'/.test(raw)) return base;
-    return Math.max(base, classifyOne(argomenti(raw, c).map((a) => a.testo).join(' ')));
+    if (base === 3 || c.shell === 'cmd' || !/[\\${]/.test(raw)) return base;
+    let det = base;
+    for (const vuote of [false, true]) {
+      const parole = argomenti(raw, { ...c, vuote }).map((a) => a.testo);
+      const aperte = shellPosix(c) || c.sistemaIgnoto ? graffe(parole) : parole;
+      if (!aperte) return 3;
+      det = Math.max(det, classifyOne(aperte.join(' ')));
+    }
+    return det;
   }
 
   function classifyOneDet(raw, c) {
