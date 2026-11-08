@@ -695,7 +695,8 @@
     'computername', 'hostname', 'pwd', 'oldpwd', 'path', 'shell', 'lang', '_', 'psitem', 'true', 'false', 'null',
   ]);
   const DOLLARO_RE = /\$(?:env:)?([A-Za-z_]\w*)/gi;
-  const PERCENTO_RE = /%([A-Za-z_][\w()]*)(:[^%]*)?%/gi;
+  // cmd ha anche variabili col nome che comincia per `=` (`%=ExitCode%`, `%=C:%`), tagliabili come le altre.
+  const PERCENTO_RE = /%(=?[A-Za-z_][\w()]*)(:[^%]*)?%/gi;
 
   // Una variabile di cmd tagliata o sostituita (`%PATH:~0,0%` vale niente) non è più il valore innocuo: il suo nome
   // esce col `:` e nessuna lista la riconosce (#1994).
