@@ -503,6 +503,25 @@
   // portano git dove la sonda delle impostazioni non ha guardato (#2292).
   const GIT_GLOBALI_INNOCUE = new Set(['--no-pager', '-p', '--paginate', '-P', '--no-optional-locks', '--no-replace-objects',
     '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--no-advice']);
+  // Il file su cui scrive una lettura di git con `--output` ('' se non si sa quale), o null se stampa e basta (#2292).
+  function gitUscita(args) {
+    for (let i = 0; i < args.length; i++) {
+      if (args[i] === '--output') return args[i + 1] || '';
+      const m = /^--output=(.*)$/.exec(args[i]);
+      if (m) return m[1];
+    }
+    return null;
+  }
+  // Le letture di git che con certe forme scrivono o eseguono: il livello a cui salgono, 0 se restano letture.
+  // Sentinella: ogni nome di GIT_READ sta nella tabella di letturaCheScrive.test.mjs.
+  const GIT_READ_MUTATES = {
+    // `-O`/`--open-files-in-pager` (anche accorciato) apre i risultati nel programma scritto nel comando.
+    grep: (args) => (args.some((a) => /^-[^-]*O/.test(a) || /^--op[a-z-]*(=|$)/.test(a)) ? 3 : 0),
+    // `expire` e `delete` cancellano la storia che serve a recuperare i commit persi.
+    reflog: (args) => (/^(expire|delete)$/i.test(args.find((a) => !a.startsWith('-')) || '') ? 3 : 0),
+    // Con due operandi `symbolic-ref` sposta HEAD: cambia il ramo corrente.
+    'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
+  };
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
     const globali = tokens(cmd).slice(1).map(unquote);
