@@ -1403,7 +1403,7 @@
         if (nome === '--target-directory') target = v.length ? v.join('=') : testi[++i];
         else if (nome === '--no-clobber' || (nome === '--update' && /^none/.test(v.join('=')))) noClobber = true;
         else if (nome === '--no-target-directory') maiDentro = true;
-        else if (nome === '--force') forzato = true;
+        else if (opzioneLunga(nome, 'force', 2) != null) forzato = true;
         else if (nome === '--suffix' && !v.length) i += 1;
         continue;
       }
