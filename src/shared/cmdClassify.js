@@ -1848,7 +1848,7 @@
   // Chi lancia un altro comando, e le parole di shell che lo precedono (`for …; do rm`, `if …; then rm`): dopo di loro si
   // guarda il comando che segue.
   const DAVANTI = new Set(['sudo', 'doas', 'nohup', 'time', 'env', 'nice', 'ionice', 'xargs', 'command', 'builtin', 'exec',
-    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call',
+    'start', 'start-process', 'cmd', 'powershell', 'pwsh', 'sh', 'bash', 'zsh', 'invoke-expression', 'iex', 'call', 'arch',
     'do', 'then', 'else']);
   // Gli script di una riga (python, node, ruby, .NET) che cancellano chiamando una funzione.
   const CANCELLA_IN_UNO_SCRIPT = /(?:\.|::)delete\s*\(|\b(?:os\.(?:remove|unlink|rmdir|removedirs)|shutil\.rmtree|fileutils\.rm(?:_rf|_r|dir)?)\s*\(|(?:\.|\b)(?:unlink|rmsync|unlinksync|rmdirsync|rmtree)\s*\(|\b(?:fs|fsp|promises|fse)\.(?:rm|rmdir|remove)\s*\(/;
