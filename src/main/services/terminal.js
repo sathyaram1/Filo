@@ -427,7 +427,9 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
     let timedOut = false;
     let child;
     try {
-      child = spawn(file, args, {
+      const programma = require('./programmaIntero').programmaIntero(file);
+      if (!programma) throw new Error(`${file} non è nel PATH`);
+      child = spawn(programma, args, {
         cwd: cartella,
         env,
         windowsHide: true,
