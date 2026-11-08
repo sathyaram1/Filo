@@ -109,7 +109,11 @@ test('mappa pura status→messaggio (spec §8.1)', async ({ app, openTab }) => {
     const f = window.SN_REDTEAM_ATTACK_UI.submitStatusMessage;
     return {
       ok: f({ status: 'ok', attemptId: 'x' }).ok,
-      insufficient: f({ status: 'insufficient_credits', have: 10, needed: 50 }),
+      lungo: f({ status: 'too_long', campo: 'attackText', length: 25000, max: 20000 }),
+      descLunga: f({ status: 'too_long', campo: 'description', length: 2100, max: 2000 }),
+      // Le 14:00 dello stesso giorno, e le 9:05 del giorno dopo: l'ora in cui si libera un posto.
+      perAccount: f({ status: 'limit_user', limit: 20, riprovaDopo: new Date(2026, 10, 8, 14, 0).getTime() }, new Date(2026, 10, 8, 10, 0).getTime()),
+      perTutti: f({ status: 'limit_global', limit: 150, riprovaDopo: new Date(2026, 10, 9, 9, 5).getTime() }, new Date(2026, 10, 8, 22, 0).getTime()),
       dormant: f({ status: 'dormant' }).text,
       notSignedIn: f({ status: 'not_signed_in' }),
       empty: f({ status: 'empty' }).text,
