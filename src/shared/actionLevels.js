@@ -42,14 +42,18 @@
     return a && a._exfil ? Math.max(base, 2) : base;
   }
 
-  // Le schede chiuse (#884): i titoli li scrivono i siti, classe 3; un riassunto l'ha scritto un modello col testo della
-  // pagina, classe 5 come i riassunti che ritrova CERCA_CHAT (#2293).
-  function fonteSchedeChiuse(schede) {
-    if (!schede.length) return null;
-    return schede.some((s) => String((s && s.riassunto) || '').trim())
-      ? { classe: 5, campo: 'web', chiave: 'schedeChiuse:riassunti', motivo: 'ho letto il riassunto di una scheda chiusa, fatto col testo del sito' }
-      : { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto i titoli delle schede chiuse, scritti dai siti' };
+  // Pagine viste o schede chiuse (#884, #2293): i titoli li scrivono i siti, classe 3; un riassunto l'ha scritto un
+  // modello col testo della pagina, classe 5. Una regola sola per CERCA_CHAT, SCHEDE_CHIUSE e RIAPRI_SCHEDA.
+  function fonteDiPagine(pagine, nome, motivi) {
+    const tenute = pagine.filter(Boolean);
+    if (!tenute.length) return null;
+    return tenute.some((s) => String(s.riassunto || '').trim())
+      ? { classe: 5, campo: 'web', chiave: `${nome}:riassunti`, motivo: motivi.riassunti }
+      : { classe: 3, campo: 'web', chiave: `${nome}:titoli`, motivo: motivi.titoli };
   }
+  const MOTIVI_VISITATE = { riassunti: 'ho letto il riassunto di una pagina che avevi aperto, fatto col testo del sito', titoli: 'ho letto i titoli delle pagine che hai visitato, scritti dai siti' };
+  const MOTIVI_CHIUSE = { riassunti: 'ho letto il riassunto di una scheda chiusa, fatto col testo del sito', titoli: 'ho letto i titoli delle schede chiuse, scritti dai siti' };
+  const fonteSchedeChiuse = (schede) => fonteDiPagine(schede, 'schedeChiuse', MOTIVI_CHIUSE);
 
   // Le voci del menu dell'account (#1615), coi nomi che un modello usa anche fuori dall'enum: '' se non è nessuna.
   const ALIAS_ACCOUNT = { accedi: 'accedi', entra: 'accedi', login: 'accedi', collega_google: 'collega_google', collega: 'collega_google', esci: 'esci', logout: 'esci' };
