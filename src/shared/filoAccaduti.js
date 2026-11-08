@@ -68,14 +68,10 @@
       }
       return '';
     };
-    // Il motore è il sito col suo nome su .com, .org o un dominio di paese: non google.inganno.com, che è di inganno.com,
-    // né google.xyz o google.blogspot.com, che chiunque può prendere (#2293). Il sito lo dà la regola dei domini ospitati.
-    const SS = global.SN_STESSO_SITO;
-    const sito = SS && typeof SS.sitoDi === 'function' ? SS.sitoDi(host) : host;
-    const delMotore = (m) => {
-      const nome = m.nome.toLowerCase();
-      return !!sito && sito.startsWith(`${nome}.`) && SUFFISSO_DEL_MARCHIO.test(sito.slice(nome.length + 1));
-    };
+    // Un marchio con un dominio per paese vale solo sui suoi domini veri, con la regola dell'accesso Google: non
+    // google.inganno.com, google.xyz, google.blogspot.com o google.com.de, che chiunque può prendere (#2293).
+    const G = global.SN_DOMINI_GOOGLE || (typeof require === 'function' ? require('./dominiGoogle.js') : null);
+    const delMotore = (m) => !m.marchio || (!!G && G.delMarchio(host, m.marchio));
     const motore = MOTORI.find((m) => m.host.test(host) && delMotore(m));
     if (motore) {
       if (!motore.percorso.test(u.pathname)) return null;
