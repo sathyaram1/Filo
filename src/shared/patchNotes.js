@@ -32,6 +32,7 @@
       ],
       fixes: [
         { testo: 'Un file che finisce di scaricarsi subito dopo il tuo «Scarica» non resta più «In corso» nel pannello dei download: la riga dice che è arrivato e offre «Apri file».', segnalazione: 2307 },
+        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
       ],
     },
     {
@@ -71,7 +72,6 @@
       fixes: [
         { testo: 'Un video salvato da un sito che apri da un altro paese scende dalla stessa connessione della scheda, anche con «Riprova»: il sito non vede più la tua.', segnalazione: 2301 },
         { testo: 'Con il Prompt dei comandi scelto nelle Preferenze, i comandi che chiedi a Filo usano i programmi installati sul computer anche dentro una cartella che ne contiene uno con lo stesso nome.', segnalazione: 2312 },
-        { testo: 'Traducendo una pagina con «solo quando le apro», la sezione che apri si traduce da sola in un paio di secondi, senza premere Traduci. L\'avviso finale dice «solo in parte» se in una sezione chiusa c\'è un pezzo che resta in inglese, e non lo dice più per un grafico o un blocco di codice.', segnalazione: 1290 },
       ],
     },
     {
