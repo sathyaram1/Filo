@@ -9,7 +9,7 @@ import vm from 'node:vm';
 
 const src = (p) => readFileSync(fileURLToPath(new URL(`../../${p}`, import.meta.url)), 'utf8');
 
-function correttore({ sbagliate = [], impostazioni = {} } = {}) {
+function correttore({ sbagliate = [], impostazioni = {}, protocollo = 'https:' } = {}) {
   let ora = 1_000_000;
   const timers = [];
   let tid = 0;
