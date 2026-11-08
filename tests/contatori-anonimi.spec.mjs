@@ -638,7 +638,7 @@ test('il correttore conta le proposte mostrate, accettate e ignorate, per tipo e
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await page.locator('#ta').click();
   await page.keyboard.type('oggi ho andato al mare con le ragazzo e basta ');
-  const segno = (testo) => page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)', { hasText: testo });
+  const segno = (testo) => segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)', { hasText: testo });
   await expect(segno('ho andato al')).toHaveCount(1, { timeout: 8000 });
   await expect(segno('le ragazzo')).toHaveCount(1, { timeout: 8000 });
   const frase = async () => Object.entries((await oggi(app))?.correttore?.frase || {});
