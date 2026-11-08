@@ -108,8 +108,7 @@ test('dopo una pagina con istruzioni nel titolo, cerca_nel_sito verso un sito ch
     { text: 'Non posso cercarlo lì.' },
   ]);
   const r = await app.evaluate(() => globalThis.SN_HANDLE_FILO_CHAT({ userMessage: 'di cosa parlavamo?', threadHistory: [], chatId: 'cerca-nel-sito' }));
-  const naviga = r.actions.find((x) => x.type === 'NAVIGA');
-  expect(naviga._executed).not.toBe(true);
+  expect(r.actions.some((x) => x.type === 'NAVIGA' && x._executed), 'la ricerca nel sito non è partita').toBe(false);
   const risposte = await app.evaluate(() => JSON.stringify(globalThis.__chiamate.slice(1)));
   expect(risposte, 'il modello sente che il sito non l\'ha nominato l\'utente').toContain('cerca_nel_sito vale per i siti comuni e per i siti che l');
   expect(app.windows().some((w) => { try { return w.url().includes('raccolta.example'); } catch (_) { return false; } })).toBe(false);
