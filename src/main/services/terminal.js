@@ -129,24 +129,38 @@ function sondaGit(dir, visti) {
   if (!C || typeof C.gitConfigLancia !== 'function') return 'ignoto';
   if (C.gitConfigLancia(out)) return 'si';
   // git status e git diff entrano in ogni sottomodulo presente con le sue impostazioni, anche senza .gitmodules.
-  let radice = '';
+  // Oltre alle impostazioni, git fa partire a una lettura anche un programma d'avvio (hook) che il repository
+  // si porta dietro: lo cerca nella cartella degli hook EFFETTIVA (--git-path la sposta con core.hooksPath).
+  let righe = [];
   try {
-    radice = git(['rev-parse', '--show-toplevel'], dir).trim();
+    righe = git(['rev-parse', '--show-toplevel', '--git-path', 'hooks', '--git-path', 'index', '--git-dir', '--git-common-dir'], dir)
+      .split(/\r?\n/).map((r) => r.trim());
   } catch (e) {
     // 128: fuori da un repository o senza cartella di lavoro, dove nessuna lettura entra in un sottomodulo.
     return e && e.status === 128 ? '' : 'ignoto';
   }
+  const [radice, hooksRel, indice, gitDir, comune] = righe;
   if (!radice) return '';
-  // Oltre alle impostazioni, git fa partire a una lettura anche un programma d'avvio (hook) che il repository
-  // si porta dietro: lo cerca nella cartella degli hook EFFETTIVA (--git-path la sposta con core.hooksPath).
-  let hooks = '';
-  try { hooks = git(['rev-parse', '--git-path', 'hooks'], dir).trim(); } catch (_) { return 'ignoto'; }
-  if (hooks && hookDiLetturaAttivo(path.isAbsolute(hooks) ? hooks : path.join(dir, hooks))) return 'si';
+  const hooks = hooksRel ? path.resolve(dir, hooksRel) : '';
+  if (hooks && hookDiLetturaAttivo(hooks)) return 'si';
+  // Da cosa dipende l'esito: impostazioni, hook, indice, e ogni .git fra la cartella e la radice (uno nuovo la sposta).
+  visti.dentro = true;
+  for (let a = path.resolve(dir); ; a = path.dirname(a)) {
+    visti.file.push(path.join(a, '.git'));
+    if (a === path.resolve(radice) || path.dirname(a) === a) break;
+  }
+  for (const d of [gitDir, comune].filter(Boolean).map((x) => path.resolve(dir, x))) {
+    visti.file.push(path.join(d, 'config'), path.join(d, 'config.worktree'));
+  }
+  if (hooks) visti.file.push(hooks, ...HOOK_DI_LETTURA.flatMap((n) => fileDiHook(hooks, n)));
+  if (indice) visti.file.push(path.resolve(dir, indice));
   let voci = '';
   try { voci = git(['ls-files', '--stage', '-z'], radice); } catch (_) { return 'ignoto'; }
   for (const voce of voci.split('\u0000')) {
     if (!voce.startsWith('160000 ')) continue;
     const sotto = path.join(radice, voce.slice(voce.indexOf('\t') + 1));
+    // Un sottomodulo popolato dopo (senza toccare l'indice di sopra) cambia l'esito: anche la sua assenza conta.
+    visti.file.push(path.join(sotto, '.git'));
     if (!fs.existsSync(path.join(sotto, '.git'))) continue;
     visti.n += 1;
     if (visti.n > GIT_SOTTOMODULI_MAX) return 'ignoto';
