@@ -754,9 +754,8 @@ function negaTutto(ses) {
   } catch (_) {}
 }
 
-// ── Più file senza un clic (#2294): una pagina lasciata aperta ne scaricava uno al secondo. Come in Chrome il primo passa,
-// dal secondo entro SCARICAMENTI_FINESTRA_MS si chiede, e la risposta resta per il sito. Non è un nome di Electron: lo
-// chiama chi prende i download (downloads.js), con `gesto` vero per un clic dell'utente sulla pagina o su Filo.
+// ── Più file senza un clic (#2294): come in Chrome il primo passa, dal secondo vicino si chiede e la risposta resta per
+// il sito. Non è un nome di Electron: lo chiama downloads.js, con `gesto` vero per un clic sulla pagina o su Filo.
 const SCARICAMENTI = 'scaricamenti';
 const SCARICAMENTI_FINESTRA_MS = 10 * 60_000;
 function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
