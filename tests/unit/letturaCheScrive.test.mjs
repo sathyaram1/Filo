@@ -283,6 +283,10 @@ test('git: le righe della configurazione, chiave per chiave', () => {
 });
 
 const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return true; } catch (_) { return false; } })();
+// Con la sonda vera il contesto è quello che il main dà su questo sistema (perimetroLettura): `win: false` su
+// Windows toglierebbe l'unità dal percorso, e la sonda guarderebbe una cartella che non esiste (#2334).
+const QUI = { win: process.platform === 'win32', maiuscole: process.platform === 'win32' || process.platform === 'darwin', shell: 'sh' };
+const sondaVera = (cwd, home) => ({ ...QUI, cwd, home, gitLancia: T.gitLanciaIn });
 // git lancia fsmonitor con la sua shell, anche su Windows: touch c'è ovunque ci sia git.
 const programmaSegno = (segno) => `touch "${segno.replace(/\\/g, '/')}"`;
 // La prova vale solo se il programma del repository parte davvero quando lo lancia git.
