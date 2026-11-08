@@ -1629,8 +1629,9 @@
   }
 
   // Il testo da controllare con le parole del sito spente (spazi, gli a capo restano): fuori dai controlli, e uguali
-  // nel costo qualunque cosa dica il dizionario. Fra quelle trovate entrando, una parola ripetuta conta una volta.
-  function soloDellUtente(state, d) {
+  // nel costo qualunque cosa dica il dizionario. Per il dizionario (`ripetute` falso), fra le parole trovate entrando
+  // una ripetuta conta una volta: mille copie della stessa non moltiplicano la differenza.
+  function soloDellUtente(state, d, { ripetute = true } = {}) {
     if (PAGINA_DI_FILO || radiceDi(state.el) || (!state.diSito.length && !state.visti.length)) return d.testo;
     const n = d.testo.length;
     const sito = new Uint8Array(n);
