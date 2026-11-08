@@ -1534,7 +1534,6 @@
   // Su un sito si controlla solo il testo dell'utente (#2299): quello che scrive coi suoi tasti o tramite Filo, e quello
   // che c'era quando è entrato nella casella. Il resto lo ha scritto il sito, e i segni, la correzione da sé o la durata
   // del controllo gli direbbero cosa c'è nel dizionario personale. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
-  const TUTTO = {};
   function cambio(prima, ora) {
     const corto = Math.min(prima.length, ora.length);
     let p = 0;
