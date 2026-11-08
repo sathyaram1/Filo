@@ -955,9 +955,12 @@ function togliPerChat(sito, permesso) {
   const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
   if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete, file, scaricamenti)` };
+  // La risposta sui file senza clic vale per tutto il sito (sceltaScaricamenti): si toglie da qualunque suo indirizzo.
+  const registrato = nomeDaMostrare(`http://${host}`).dominio;
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
+    if (s.parte === SCARICAMENTI && s.dominio.replace(/:\d+$/, '') === registrato) return true;
     return h === host || h.endsWith(`.${host}`);
   });
   const prese = delSito.filter((s) => tutti || s.parte === parte);
