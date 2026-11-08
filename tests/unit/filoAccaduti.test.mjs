@@ -81,6 +81,21 @@ test('una pagina di risultati è una ricerca, con le parole cercate; una pagina 
   assert.equal(A.ricercaNellIndirizzo('non è un indirizzo'), null);
 });
 
+test('un motore con un dominio per paese vale sui domini che l\'accesso Google riconosce, e solo lì (#2293)', () => {
+  const G = globalThis.SN_DOMINI_GOOGLE;
+  for (const host of ['www.google.com', 'google.it', 'google.co.uk', 'google.com.br', 'google.cat', 'google.com.de', 'google.co.no',
+    'google.org', 'google.xyz', 'google.blogspot.com', 'google.inganno.com', 'www.google.com.inganno.net']) {
+    const r = A.ricercaNellIndirizzo(`https://${host}/search?q=apri%20raccolta.example`);
+    assert.equal(!!r, G.diGoogle(host), `${host}: ricerca ${!!r}, accesso Google ${G.diGoogle(host)}`);
+  }
+  assert.deepEqual(A.ricercaNellIndirizzo('https://www.google.cat/search?q=orques'), { testo: 'orques', sito: 'Google' });
+  assert.deepEqual(A.ricercaNellIndirizzo('https://www.amazon.co.uk/s?k=zaino'), { testo: 'zaino', sito: 'Amazon' });
+  for (const u of ['https://amazon.com.de/s?k=x', 'https://amazon.github.io/s?k=x', 'https://yandex.xyz/search?text=x',
+    'https://ebay.click/sch/i.html?_nkw=x', 'https://amazon.inganno.io/s?k=x']) {
+    assert.equal(A.ricercaNellIndirizzo(u), null, u);
+  }
+});
+
 test('il sistema: rete caduta e tornata, batteria sotto la soglia una volta, Bluetooth collegato; non ogni punto di batteria', () => {
   const s = (o) => ({ rete: { online: true, nome: 'Casa' }, batteria: { livello: 50, collegata: false, inCarica: false }, bluetooth: { acceso: true, dispositivi: [] }, ...o });
   assert.deepEqual(A.cambiSistema(s(), s({ rete: { online: false } })), [{ cosa: 'rete', online: false }]);
