@@ -1503,12 +1503,7 @@
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
     if (!lista.length || vecchio === nuovo) return { issues: lista, perse: false };
-    const corto = Math.min(vecchio.length, nuovo.length);
-    let p = 0;
-    while (p < corto && vecchio[p] === nuovo[p]) p++;
-    let s = 0;
-    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
-    const fineCambio = vecchio.length - s;
+    const { p, fineVecchio: fineCambio } = cambio(vecchio, nuovo);
     const delta = nuovo.length - vecchio.length;
     const out = [];
     for (const it of lista) {
