@@ -160,6 +160,20 @@ test('la riga della scheda del server tiene a parte le attese che bloccano, col 
   assert.match(M.rigaScheda(scheda(1564), f), / · aspetta #1563 \(non ancora fuso\), .* · aspettava #1562/, 'la scheda locale dice lo stesso');
 });
 
+test('la riga della scheda del server dice chi ha mandato il feedback e quando è nato, prima del titolo (#2232)', () => {
+  const s = { num: '2226', stato: 'unlabeled', priorita: 2, fiducia: 'non_fidato', titolo: 'T',
+    mittente: { classe: 'routine', ruolo: 'manutentore' }, nato: '2026-11-06' };
+  assert.equal(M.rigaSchedaServer(s), '#2226 · p2 · unlabeled · non fidato · da routine/manutentore · nato 2026-11-06 — T');
+  assert.match(M.rigaSchedaServer({ ...s, mittente: { classe: 'owner' } }), / · da owner · nato 2026-11-06 — T$/);
+  assert.match(M.rigaSchedaServer({ ...s, mittente: { classe: 'utente', ruolo: 'finto' } }), / · da utente · /, 'il ruolo vale solo per le routine');
+  assert.match(M.rigaSchedaServer({ ...s, mittente: { classe: 'routine' } }), / · da routine · nato /);
+  for (const vuoto of [{}, { mittente: null, nato: '' }, { mittente: { classe: '  ' }, nato: '   ' }]) {
+    const riga = M.rigaSchedaServer({ ...s, mittente: undefined, nato: undefined, ...vuoto });
+    assert.equal(riga, '#2226 · p2 · unlabeled · non fidato — T', 'il server di prima non li manda: nessun segno');
+  }
+  assert.doesNotMatch(M.rigaSchedaServer({ ...s, mittente: { classe: 'routine', ruolo: 'a\nb' } }), /\n/);
+});
+
 test('una priorità 3 la cui attesa non la ferma non sembra bloccata, e l\'attesa si vede a parte (#2262)', () => {
   const s = { num: '1800', stato: 'todo', priorita: 3, titolo: 'T', aspetta: [], aspettava: [], nonFermano: ['1563', ''], unisce: [] };
   const riga = M.rigaSchedaServer(s);
