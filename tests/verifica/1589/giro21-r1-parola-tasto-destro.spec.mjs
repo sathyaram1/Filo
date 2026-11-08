@@ -47,7 +47,7 @@ test('r1 a «Chiedi sempre» il tasto destro su una parola di una casella non ma
     return { x, y: r.top + r.height / 2 };
   }, testo);
   await pagina.mouse.click(punto.x, punto.y, { button: 'right' });
-  await expect(menuDi(pagina).superficie).toBeVisible({ timeout: 10_000 });
+  await expect(menuDi(pagina).principale).toBeVisible({ timeout: 10_000 });
   await pausa(2500);
   expect(await conTesto(), 'aperto il menu, il testo del campo non è partito').toBe(0);
 });
