@@ -29,10 +29,12 @@ test('livello 1 — comandi di sola lettura in whitelist eseguono subito', () =>
     'ls', 'ls -la', 'dir', 'pwd', 'cat package.json', 'type file.txt',
     'echo ciao', 'whoami', 'hostname', 'date', 'head -n 20 log.txt',
     'tail -f out.log', 'tree', 'wc -l file', 'grep foo file', 'findstr foo file',
-    'where node', 'which git',
+    'which git',
   ]) {
     assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
   }
+  // `where` legge solo come where.exe di cmd: senza sapere la shell può essere Where-Object (#2292).
+  assert.equal(C.classify('where node', { win: true, shell: 'cmd' }), 1);
 });
 
 test('livello 1 — git e npm di sola lettura', () => {
