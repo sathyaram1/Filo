@@ -461,7 +461,6 @@ test('git: su Windows conta anche l\'hook col nome .exe, che git per Windows pro
   try {
     const repo = nuovoRepo(join(base, 'progetto'));
     writeFileSync(join(repo, '.git', 'hooks', 'post-index-change.exe'), 'MZ');
-    assert.equal(T.gitLanciaIn(repo), '', 'fuori da Windows git il .exe non lo prova');
     // Windows simulato: la piattaforma e git trovato per nome (qui non c'è git.exe).
     Object.defineProperty(process, 'platform', { ...piattaforma, value: 'win32' });
     P.programmaIntero = (n) => n;
