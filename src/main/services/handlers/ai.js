@@ -6,6 +6,7 @@ module.exports = function register(on, ctx) {
     MSG, handleAIRequest, getEffectiveSettings, modelForAction, buildAttemptChain,
     providerRouting, openWeightsBlockReason, modelGate, avvisiFuoriPolitica,
     Defaults, isAdmin, broadcastToTabs, controllaUscita: portaUscite, ricordaLettoDallAiuto, segnaLetturaAiuto, winOf,
+    segnaPaginaDiFiloNellAiuto,
   } = ctx;
   const { SN_CONST } = globalThis;
   const WebSearch = globalThis.SN_WEB_SEARCH;
@@ -371,6 +372,7 @@ module.exports = function register(on, ctx) {
       // sarebbe testo di fuori presentato per suo.
       if ('documento' in msg.payload && !/^filo:\/\/editor\//i.test(String(origin || ''))) delete msg.payload.documento;
       msg.payload.percorsiNoti = !(await chiedePrima(msg, sender, 'testo'));
+      try { segnaPaginaDiFiloNellAiuto && segnaPaginaDiFiloNellAiuto(sender); } catch (_) {}
     }
     // Quello che l'assistente di pagina ha davanti resta noto alla porta delle uscite (#810),
     // anche se poi la pagina cambia. Si legge mentre il modello risponde.

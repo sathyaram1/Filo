@@ -2,6 +2,7 @@
 // Cancellare a parole le pagine visitate di un sito, confermato, non deve dire «Nessuna pagina visitata».
 
 import { test, expect } from './fixtures/electron.mjs';
+import { fillConfirmInput, scrollConfirmToEnd, clickConfirm } from './helpers/confirm.mjs';
 
 async function homeDi(app) {
   const deadline = Date.now() + 10_000;
@@ -13,7 +14,7 @@ async function homeDi(app) {
   throw new Error('home non trovata');
 }
 
-test('cancellare le pagine di un sito dalla chat: dopo l\'OK il pulsante dice quante ne ha cancellate', async ({ app, shell }) => {
+test('cancellare le pagine di un sito dalla chat: dopo la parola «conferma» il pulsante dice quante ne ha cancellate', async ({ app, shell }) => {
   test.setTimeout(90_000);
   await expect(shell.locator('.tab')).toHaveCount(1, { timeout: 8_000 });
   const chat = await homeDi(app);
@@ -44,7 +45,10 @@ test('cancellare le pagine di un sito dalla chat: dopo l\'OK il pulsante dice qu
   await expect(pulsante).toBeVisible({ timeout: 10_000 });
   await pulsante.click();
   await expect.poll(() => chat.evaluate(() => !!window.SN_CONFIRM_UI._test.state()), { timeout: 5_000 }).toBe(true);
-  await chat.evaluate(() => window.SN_CONFIRM_UI._test.click('danger') || window.SN_CONFIRM_UI._test.click('ok'));
+  // Cancellare per sempre vuole la parola (#1312).
+  await fillConfirmInput(chat, 'conferma');
+  await scrollConfirmToEnd(chat);
+  await clickConfirm(chat, 'danger');
   await expect(pulsante).toHaveText(/^✓/, { timeout: 8_000 });
   await chat.screenshot({ path: 'tests/.shots/chat-pulsante-confermato.png' }).catch(() => {});
   const testo = await pulsante.textContent();

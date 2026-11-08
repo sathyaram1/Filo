@@ -311,12 +311,30 @@
       try { testo = e.dataTransfer.getData('text/plain'); } catch (_) { testo = ''; }
       try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!testo)); } catch (_) {}
     });
+    // Un testo incollato o trascinato nella casella l'ha scritto qualcun altro: la conversazione ha letto (#1840).
+    // Svuotata e riportata con Annulla o Ripeti, una casella che aveva testo di altri lo ha ancora, come nella home.
+    let testoDiAltri = false;
+    const valoriDiAltri = new Set();
+    const impronta = (t) => `${t.length}:${t.slice(0, 64)}:${t.slice(-64)}`;
+    ta.addEventListener('input', (e) => {
+      if (!ta.value) testoDiAltri = false;
+      else if (e.inputType === 'insertFromPaste' || e.inputType === 'insertFromDrop') testoDiAltri = true;
+      else if ((e.inputType === 'historyUndo' || e.inputType === 'historyRedo') && valoriDiAltri.has(impronta(ta.value))) testoDiAltri = true;
+      if (testoDiAltri && ta.value && valoriDiAltri.size < 500) valoriDiAltri.add(impronta(ta.value));
+    });
     // Parte solo da un tasto o un clic veri: l'invio del modulo lo fa anche il codice del sito (#592.6).
     const invia = () => {
       const text = ta.value.trim();
       if (!text && !allegati.immagini.length && !allegati.riferimenti.length) return;
       const { immagini, riferimenti } = allegati;
       const schede = gettoni ? gettoni.schede() : [];
+      // Un riferimento trascinato porta il testo intero dell'elemento, che può citare altri: conta come incollato.
+      if (testoDiAltri || immagini.length || riferimenti.length) {
+        try {
+          Promise.resolve(chrome.runtime.sendMessage({ type: MSG.FILO_AIUTO_TESTO_DI_ALTRI, immagini: !testoDiAltri && !riferimenti.length })).catch(() => {});
+        } catch (_) {}
+      }
+      testoDiAltri = false;
       ta.value = '';
       if (gettoni) gettoni.svuota();
       allegati = { immagini: [], riferimenti: [] };

@@ -1469,8 +1469,9 @@
     copyToClipboard(href);
   }
 
+  // Il costruttore sta in urlNav, dove la conferma riconosce la stessa ricerca (#1840).
   function searchUrlFor(text) {
-    return `https://www.google.com/search?q=${encodeURIComponent((text || '').slice(0, 500))}`;
+    return global.SN_URL_NAV.indirizzoRicerca(text || '');
   }
 
   // Una voce del menu di Filo non usa il gesto della pagina (è di Filo): l'indirizzo scelto lo dichiara prima (#737.1).
@@ -1744,8 +1745,7 @@
 
   // Lens-style reverse search (più affidabile di searchbyimage)
   function imageSearchUrlFor(imgEl) {
-    const src = imgEl && (imgEl.currentSrc || imgEl.src);
-    return src ? `https://lens.google.com/uploadbyurl?url=${encodeURIComponent(src)}` : '';
+    return global.SN_URL_NAV.indirizzoRicercaImmagine(imgEl && (imgEl.currentSrc || imgEl.src));
   }
 
   function searchImageOnWeb(imgEl) {

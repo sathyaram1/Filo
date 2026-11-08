@@ -4,7 +4,8 @@
 
 Ogni azione che Filo (l'AI) può intraprendere dichiara nel **registro**
 `src/shared/actionLevels.js` il suo **costo** di sbagliarla (0 resta in chat,
-1 si disfa, 2 dura o si vede fuori ma si rimedia, 3 irreversibile o costoso) e
+1 si disfa, 2 dura o si vede fuori ma si rimedia, 3 irreversibile o costoso,
+4 toglie un freno messo dall'utente o non torna più) e
 il suo **campo** (posta, messaggistica, file, terminale, web, o nessuno). Se
 l'azione parte da sola, chiede un OK, vuole «conferma» digitato o non parte lo
 decide **una funzione sola**, `decideDettaglio` in `src/shared/autonomia.js`
@@ -16,11 +17,28 @@ l'utente ha davanti**, mai per un contenitore: non per lo storico che la pagina
 rimanda, che si perde riprendendo la chat e si ferma agli ultimi venti messaggi,
 e non per la scheda. La chat lo tiene per targa, anche nel suo archivio; per
 l'Aiuto ogni apertura del pannello, o pagina nuova, è una conversazione nuova), il costo,
-il perimetro e l'origine. Sopra la tabella
-stanno l'elenco fisso (no a ogni livello: segreti, molti destinatari,
-credenziali, regole, cancellazioni definitive), la difesa abbassata («conferma»
-a ogni livello) e `parola`, per un'azione che vuole «conferma» a ogni livello
-senza abbassare difese (il «per sempre» di TOGLI_CHAT, #1295). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
+il perimetro e l'origine. La tabella è quella decisa dall'owner il 30/09 (#1312):
+ogni «sì» da costo 2 in su passa dal guardiano di uscita, che finché non c'è lo
+trasforma in «chiede». Il **costo 4** lo decide lo stato, non le parole (strada
+B, #1312): a compito pulito vuole «conferma» a ogni livello, comunque l'utente
+l'abbia detto; dopo una lettura è «no» a ogni livello (l'unico «no» della
+tabella), e il testo del no dice le strade: a mano (`dove` della voce) o in una
+conversazione nuova, se nasce pulita. Un elenco di parole per riconoscere «l'ha
+chiesto lui» sbagliava nei due versi (frasi dette per altro valevano come
+richiesta, richieste vere ricevevano il no) e non si rimette. Il testo incollato
+in chat conta come una lettura. Mai da un'automazione né su una proposta che
+Filo fa da sé (`chiesta: false`). Sono costo 4 la **regola del freno** (una
+preferenza con `allenta` che lo toglie; stringerla è costo 1, e a Sicurezza
+sbloccare un sito o spegnere un interruttore è un freno tolto, #835.1), le
+credenziali di un servizio, il cancellare per sempre (cancellare dentro Filo è
+nascondere, costo normale) e un segreto in un'uscita: se l'ha scritto l'utente
+vuole «conferma», se no non esce. `parola` resta per un'azione che vuole
+«conferma» a ogni livello senza essere un costo 4 (il comando che cancella senza
+cestino, la cui mappa dei costi è di #538). Lo stesso testo a più di 5
+destinatari nello stesso giorno chiede a ogni livello (`molti`). Un lavoro che
+non ha nessuno a cui chiedere (le lezioni automatiche) parte solo col «sì»
+della tabella o, finché manca il guardiano, a compito pulito
+(`parteSenzaChiedere`, scelta dell'owner su #1312.2). Il dispatch (`executeFiloAction` nel main) **rifiuta le azioni
 non registrate o senza costo**, e nessuna superficie decide da sé: nemmeno le
 azioni che l'agente sulla pagina fa nel content script, che dichiarano il costo
 e chiedono la risposta al main (`MSG.FILO_DECIDI_PAGINA`), né i pannelli propri
@@ -33,6 +51,11 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   `actionLevels.js` con costo, campo e `describe()` (la spiegazione in chiaro
   per il popup); se legge qualcosa dichiara la `fonte` con la sua classe, se
   manda testo fuori dichiara l'`uscita` (ci passano i controlli sui segreti).
+  La `fonte` guarda **ogni uscita** dell'azione, errori compresi (i candidati di
+  un nome non trovato) e l'attesa dell'OK (i nomi di una rinomina): conta ciò
+  che è entrato nel contesto, non la forma dell'elenco (#530.6). Delle schede
+  aperte il modello vede solo il nome del sito; un'immagine incollata è una
+  lettura di classe 5 (#1312).
   Poi in `actionTools.js` con descrizione + parametri: è lì che il modello
   la vede, come strumento nativo (tool calling), non più in un elenco nel
   prompt. Il nome dello strumento È il tipo dell'azione. La sentinella
@@ -90,8 +113,15 @@ della chat (riordino delle schede, svuota archivio), che chiedono come dice la
   che copra le strade che non hai visto: `-P` sceglie la cartella invece del
   nome, `-c`/`-N` accodano o sovrascrivono un file già lì, `-K` prende le opzioni
   da un file. Un check per flag si aggira con un altro flag.
-- **Un comando che manda qualcosa fuori è costo 3 (#530).** Da quando a Normale il
-  costo 2 parte da solo, «2» non vuol più dire «popup»: un file caricato con
+- **Un comando che manda qualcosa fuori è costo 3 (#530).** Il comando dichiara
+  anche la sua `uscita` (#530.3): una chiave in un curl o in un git clone ha la
+  risposta di un link con la stessa chiave. Un comando di sola lettura (costo 1),
+  o uno che non nomina altro che il computer stesso (un docker con la password del
+  database, un `.env`, un database su localhost), resta sul computer e non dichiara
+  niente: altrimenti ogni password scritta dal modello in locale era un «no» (#1312). Un client di database esce
+  quando nomina un server che non è il computer (`-h`, `--host`, `PGHOST=`, `utente@server`), un login a un registro
+  sempre, salvo verso localhost. Quando a Normale il costo 2 partirà
+  da solo (col guardiano), «2» non vorrà più dire «popup»: un file caricato con
   `curl -F`, un `-X DELETE` sul server, un `git push` verso un indirizzo scritto
   nel comando o un remoto riscritto (`remote add`/`set-url`, `remote.*.url`) non
   tornano indietro. Il push verso il remoto già configurato resta 2.

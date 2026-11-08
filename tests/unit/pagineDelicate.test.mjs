@@ -126,8 +126,8 @@ test('a parole: si spegne il riassunto, si cambia il livello di privacy, si aggi
   assert.equal(r.costo, 1);
   const p = P.buildPreferencePartial('pagine_delicate', 'tutto in anticipo', { attuali: livello('delicate') });
   assert.deepEqual(p.partial, { security: { privacy: { livello: 'anticipo' } } });
-  assert.equal(p.costo, 2);
-  assert.equal(p.allenta, true, 'mandare di più abbassa una difesa (#530)');
+  assert.equal(p.costo, 4, 'mandare di più toglie un freno: costo 4 (#1312)');
+  assert.equal(p.allenta, true);
   // Chi alza sa cosa torna ai modelli, e che il pavimento resta.
   for (const cosa of [/posta, banca e sanità/, /correttore/, /password, carte e codici/i]) assert.match(p.risk, cosa);
   const d = P.buildPreferencePartial('descrizione automatica delle immagini', 'no');

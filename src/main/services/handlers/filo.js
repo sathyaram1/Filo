@@ -5,7 +5,7 @@ module.exports = function register(on, ctx) {
   const {
     MSG, winOf, broadcastLiveUpdate, handleFiloChat, fermaFiloChat, seguitoFiloChat, handleFiloGenerateDashboard, contaHomeVista,
     executeFiloAction, controllaUscita: portaUscite, apriDaFilo, SCHEMI_USCITA, ricordaLettoInChat, ricordaVerdettiArchiviati, maybeRunCompactor, closeAndTriageChat,
-    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, nuovaConversazioneAiuto,
+    archiviaCongedoAccoglienza, decisioneAzionePagina, segnaLetturaAiuto, segnaTestoNellAiuto, nuovaConversazioneAiuto,
     saveOnboarding, finishOnboarding, claimOnboardingResume, chiaveConferma, ricominciaIntervista,
   } = ctx;
   // Ogni blocco della porta si conta fra le uscite fermate (#1474), qualunque porta arrivi da ctx.
@@ -215,6 +215,11 @@ module.exports = function register(on, ctx) {
   // Anche da una pagina web: toglie solo ciò che ha letto l'Aiuto di quella scheda, e lì la pagina sporca comunque.
   on(MSG.FILO_AIUTO_NUOVO, async (msg, sender) => {
     nuovaConversazioneAiuto(sender);
+    return { ok: true };
+  });
+  // Anche da una pagina web: può solo restringere quello che l'Aiuto di quella scheda fa da sé.
+  on(MSG.FILO_AIUTO_TESTO_DI_ALTRI, async (msg, sender) => {
+    segnaTestoNellAiuto(sender, { immagini: !!(msg && msg.immagini === true) });
     return { ok: true };
   });
 

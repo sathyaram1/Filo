@@ -4,8 +4,15 @@
 // proponeva le prime 20 schede della ricerca invece delle pertinenti, tutte.
 
 import { test, expect } from './fixtures/electron.mjs';
-import { clickConfirm, CONFIRM_HOST } from './helpers/confirm.mjs';
+import { clickConfirm, fillConfirmInput, scrollConfirmToEnd, CONFIRM_HOST } from './helpers/confirm.mjs';
 import { livelloAutonomia } from './helpers/autonomia.mjs';
+
+async function conParola(page) {
+  await expect(page.locator(CONFIRM_HOST)).toBeVisible();
+  await fillConfirmInput(page, 'conferma');
+  await scrollConfirmToEnd(page);
+  await clickConfirm(page, 'danger');
+}
 
 async function newtabPage(app) {
   const deadline = Date.now() + 10_000;
@@ -172,8 +179,7 @@ test('«cancella dall\'archivio le pagine sui gatti»: il pannello propone solo 
 
   await panel.locator('.dash-action-btn-danger', { hasText: 'Elimina definitivamente 3 schede' }).click();
   await expect(page.locator(CONFIRM_HOST)).toBeVisible();
-  // A Normale, col compito pulito, costo 3 chiede un OK (#530).
-  await clickConfirm(page, 'ok');
+  await conParola(page); // cancellare per sempre: costo 4, la parola a ogni livello (#1312)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });
   const rimaste = await archiviate(app);
   expect(rimaste).toHaveLength(27);
@@ -208,7 +214,7 @@ test('più di 20 schede pertinenti: il pannello le propone e le elimina tutte', 
   await expect(panel.locator('.dash-delete-list li')).toHaveCount(gatti);
   await expect(panel.locator('.dash-action-btn', { hasText: 'Riprova' })).toHaveCount(0);
   await panel.locator('.dash-action-btn-danger', { hasText: `Elimina definitivamente ${gatti} schede` }).click();
-  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
+  await conParola(page); // cancellare per sempre: costo 4, la parola a ogni livello (#1312)
   await expect(panel.locator('.dash-delete-note')).toHaveText(`✓ Eliminate definitivamente ${gatti} schede.`, { timeout: 5_000 });
   const rimaste = await archiviate(app);
   expect(rimaste).toHaveLength(70 - gatti);
@@ -282,7 +288,7 @@ test('assistente sulla pagina: il riordino confermato parte, la cancellazione da
     }
   });
   await seedArchive(app, [{ title: 'Gatti persiani', gatto: true }]);
-  const invia = (type, action) => page.evaluate(([t, a]) => chrome.runtime.sendMessage({ type: t, action: a, assistente: true }), [type, action]);
+  const invia = (type, action) => page.evaluate(([t, a]) => chrome.runtime.sendMessage({ type: t, action: a, assistente: true, parole: ['elimina dall\'archivio le schede sui gatti'] }), [type, action]);
 
   const riordino = { type: 'PULISCI_TAB' };
   expect((await invia('filo_run_action', riordino)).needsConfirm).toBeTruthy();
@@ -361,7 +367,7 @@ test('una scheda proposta per sbaglio si toglie dall\'elenco e resta; senza spun
   await expect(del).toHaveText('🗑 Elimina definitivamente 1 scheda');
 
   await del.click();
-  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
+  await conParola(page); // cancellare per sempre: costo 4, la parola a ogni livello (#1312)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
   expect((await archiviate(app)).sort()).toEqual(['Il Gattopardo, recensione', 'Ricetta della torta']);
 });
@@ -389,7 +395,7 @@ test('chat riaperta dall\'archivio: racconta la cancellazione confermata, non il
   expect((await chat()).messages[1].actions || []).toEqual([]);
 
   await panel.locator('.dash-action-btn-danger').click();
-  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
+  await conParola(page); // cancellare per sempre: costo 4, la parola a ogni livello (#1312)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminata definitivamente 1 scheda.', { timeout: 5_000 });
   await expect.poll(async () => (await chat()).messages.flatMap((m) => m.actions || []), { timeout: 5_000 }).toEqual(['CANCELLA_ARCHIVIO']);
 
@@ -474,7 +480,7 @@ test('«svuota tutto l\'archivio»: il pannello propone tutte le schede, anche q
   await expect(panel.locator('.dash-delete-list li')).toHaveText(['Gatti persiani', 'Ricetta della carbonara', 'Pannello del router']);
   expect(await app.evaluate(() => globalThis.__giudice.chiamate), 'svuotare non chiede niente al giudice').toBe(0);
   await panel.locator('.dash-action-btn-danger').click();
-  await clickConfirm(page, 'ok'); // a Normale, col compito pulito, costo 3 chiede un OK (#530)
+  await conParola(page); // cancellare per sempre: costo 4, la parola a ogni livello (#1312)
   await expect(panel.locator('.dash-delete-note')).toHaveText('✓ Eliminate definitivamente 3 schede.', { timeout: 5_000 });
   expect(await archiviate(app)).toEqual([]);
 });

@@ -1,4 +1,4 @@
-// Registro delle azioni di Filo: per ognuna il COSTO di sbagliarla (0-3) e il CAMPO, statici, mai decisi dall'LLM.
+// Registro delle azioni di Filo: per ognuna il COSTO di sbagliarla (0-4) e il CAMPO, statici, mai decisi dall'LLM.
 // Non decide se un'azione parte: gli ingressi li legge il dispatch e la risposta la dà SN_AUTONOMIA (#530).
 // Un'azione fuori registro o senza costo non parte: sentinella in tests/unit/autonomia.test.mjs.
 
@@ -76,11 +76,47 @@
     return /\b[a-z][a-z0-9+-]+:\/\//i.test(c) || !re || re.test(c);
   }
 
+  // Un comando esce dal computer se nomina un indirizzo che non è il computer stesso, o se usa un programma di rete
+  // verso un posto che non sa dire. I nomi risolti dal DNS escono sempre, anche chiesti a un resolver locale.
+  const RETE = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m|git|ssh|scp|sftp|rsync|ftp|tftp|telnet|nc|ncat|netcat|socat|start-bitstransfer)\b/i;
+  const DNS = /\b(?:ping|nslookup|dig|whois|traceroute|tracert|resolve-dnsname|test-netconnection)\b/i;
+  const HOST_URL = /\b[a-z][a-z0-9+.-]*:\/\/(?:[^\s\/?#@"'`^]*@)?(\[[^\]\s]*\]|[^\s\/:?#@"'`^]*)/gi;
+  const HOST_UTENTE = /[\w.+-]+@((?:[\w-]+\.)*[\w-]+)(?=[:\s\/]|$)/g;
+  const HOST_NUDO = /(?<![\w@.\/-])((?:[\w-]+\.)+[a-z]{2,}|\d{1,3}(?:\.\d{1,3}){3})(?![\w-])/gi;
+  // La regola è quella dei link (src/shared/urlNav.js); senza il modulo ogni indirizzo vale fuori.
+  const questoComputer = (host) => !!(global.SN_URL_NAV && global.SN_URL_NAV.questoComputer(host));
+  // I client dei database e i login ai registri si collegano al server che nominano (#1312): un database senza
+  // server nominato è quello del computer, un login senza registro va al registro pubblico. Una cartella è un socket.
+  const CLIENT_DB = /\b(?:mysql|mariadb|mysqldump|psql|pg_dump|pg_dumpall|pg_restore|mongo|mongosh|mongodump|mongorestore|redis-cli|sqlcmd|cqlsh|clickhouse-client)\b/i;
+  const LOGIN_REGISTRO = /\b(?:docker|podman|buildah|helm(?:\s+registry)?|oras|skopeo)\s+login\b/i;
+  const HOST_OPZIONE = /(?:^|\s)(?:-h|--host|--hostname)(?:=|\s*)["']?([^\s"';|&]+)/g;
+  const HOST_VARIABILE = /\b(?:PGHOST|MYSQL_HOST|REDIS_HOST|MONGO_HOST|DB_HOST|DATABASE_HOST)=["']?([^\s"';|&]+)/g;
+  function serverNominati(testo) {
+    return [...testo.matchAll(HOST_OPZIONE), ...testo.matchAll(HOST_VARIABILE), ...testo.matchAll(HOST_UTENTE)].map((m) => m[1])
+      .filter((h) => h && !h.startsWith('/') && !h.startsWith('-'));
+  }
+  function comandoEsce(testo) {
+    if (DNS.test(testo)) return true;
+    const dagliIndirizzi = [...testo.matchAll(HOST_URL)].map((m) => m[1]).filter(Boolean);
+    if (dagliIndirizzi.some((h) => !questoComputer(h))) return true;
+    if (CLIENT_DB.test(testo) && serverNominati(testo).some((h) => !questoComputer(h))) return true;
+    if (LOGIN_REGISTRO.test(testo)) {
+      const registri = [...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]), ...(testo.match(/\blocalhost\b/gi) || [])];
+      return !registri.length || registri.some((h) => !questoComputer(h));
+    }
+    if (!RETE.test(testo)) return false;
+    const altri = [...testo.matchAll(HOST_UTENTE)].map((m) => m[1]);
+    if (!dagliIndirizzi.length) altri.push(...[...testo.matchAll(HOST_NUDO)].map((m) => m[1]));
+    const nominati = [...dagliIndirizzi, ...altri];
+    return !nominati.length || nominati.some((h) => !questoComputer(h));
+  }
+
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
-  // si è già collegato, classe 3 come i mittenti fidati. Quali nomi: SN_SISTEMA.nomiLetti, la stessa regola delle uscite.
-  function nomiDiSistema(out, cosa) {
+  // si è già collegato, classe 3 come i mittenti fidati. Quali nomi: SN_SISTEMA.nomiLetti, la stessa regola delle uscite,
+  // più il nome vero trovato da quello detto (`_nomeTrovato`, lo scrive il main).
+  function nomiDiSistema(a, out, cosa) {
     if (!global.SN_SISTEMA && typeof require === 'function') require('./sistema.js');
-    if (!global.SN_SISTEMA.nomiLetti(out).length) return null;
+    if (!global.SN_SISTEMA.nomiLetti(out).length && !(a && a._nomeTrovato === true)) return null;
     return cosa === 'wifi'
       ? { classe: 3, campo: null, chiave: 'sistema:wifi', motivo: 'ho letto i nomi delle reti Wi-Fi, che non hai scritto tu' }
       : { classe: 3, campo: null, chiave: 'sistema:bluetooth', motivo: 'ho letto i nomi dei dispositivi Bluetooth, che non hai scritto tu' };
@@ -331,7 +367,7 @@
 
   const REGISTRY = {
     NAVIGA: {
-      // Aprire un link è di norma innocuo → costo 1, diretto. ECCEZIONE
+      // Aprire un link è di norma innocuo → costo 1. ECCEZIONE
       // anti-esfiltrazione: se l'URL trasporta FUORI dati sensibili che il
       // modello aveva nel contesto (taint-match) o ha la forma di un payload di
       // esfiltrazione da origine non fidata (fallback strutturale), sale a
@@ -353,7 +389,11 @@
           return [`Aprire un link${why}:\n`, cit(url, true),
             '\n\nPotrebbe inviare tuoi dati a un sito esterno. Apri solo se l\'hai chiesto tu.'];
         }
-        if (a && typeof a.cerca === 'string' && a.cerca.trim()) return ['Cercare sul web:\n', cit(a.cerca.trim())];
+        // Le parole della ricerca le sceglie chi la chiede: si mostrano solo se l'indirizzo cerca proprio quelle (#1312).
+        const N = global.SN_URL_NAV;
+        if (a && typeof a.cerca === 'string' && a.cerca.trim() && N && N.eRicercaDi && N.eRicercaDi(url, a.cerca)) {
+          return ['Cercare sul web:\n', cit(a.cerca.trim())];
+        }
         return indirizzoDi(a) ? ['Aprire ', cit(url, true)] : 'Aprire una pagina';
       },
     },
@@ -376,9 +416,17 @@
     },
     // Rinominare file dell'utente (#950): si torna indietro con «Annulla», ma un programma che cercava il file
     // per nome non lo trova più → costo 2. L'elenco vecchio → nuovo lo prepara il main (`_proposte`), mai il modello.
+    // I nomi nuovi nascono dall'inizio dei file: tornano in chat come una lettura, anche in attesa dell'OK.
     RINOMINA_FILE: {
       costo: 2,
       campo: 'file',
+      fonte: (a, out) => {
+        const pieno = (l) => Array.isArray(l) && l.length > 0;
+        if (!pieno(a && a._proposte) && !pieno(out.rinominati)) return null;
+        return (a && a._daScaricati === true) || out.scaricati === true
+          ? { classe: 5, campo: 'file', chiave: 'rinomina:scaricati', motivo: 'ho letto l\'inizio di file scaricati per dar loro un nome' }
+          : { classe: 4, campo: 'file', chiave: 'rinomina:file', motivo: 'ho letto l\'inizio dei tuoi file per dar loro un nome' };
+      },
       describe: (a) => elencoRinomine(a),
       describeDone: (a) => {
         const fatti = a && a._output && Array.isArray(a._output.rinominati) ? a._output.rinominati : null;
@@ -387,12 +435,12 @@
       },
     },
     // #1909 — cancellare un file del computer vuol dire spostarlo nel cestino: si rimedia, costo 2, e chiede sempre con
-    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 3 e la parola a ogni livello. I file li trova il
-    // main (`_file`) prima del gate, mai il modello.
+    // un clic (fuori perimetro). Il «per sempre» non si recupera: costo 4. I file li trova il main (`_file`) prima del
+    // gate, mai il modello.
     ELIMINA_FILE: {
-      costo: (a) => (perSempre(a) ? 3 : 2),
+      costo: (a) => (perSempre(a) ? 4 : 2),
       campo: 'file',
-      parola: perSempre,
+      dove: (a) => (perSempre(a) ? 'Senza «per sempre» Filo sposta i file nel cestino, da dove si svuotano a mano.' : ''),
       perimetro: () => false,
       perchePerimetro: 'Te lo chiedo sempre, prima di toccare i tuoi file.',
       describe: (a) => descriviEliminazione(a),
@@ -851,8 +899,9 @@
         return `${n === 1 ? 'Chiusa una scheda' : `Chiuse ${n} schede`}${dove}`;
       },
     },
+    // Cancellare per sempre è costo 4 (#1312).
     CANCELLA_ARCHIVIO: {
-      costo: 3,
+      costo: 4,
       campo: null,
       describe: (a) => (a && a.tutto === true
         ? ["Svuotare l'archivio: tutte le schede chiuse.\nVengono eliminate DEFINITIVAMENTE: non si possono recuperare."]
@@ -866,9 +915,9 @@
       },
     },
     // #866 — come in ogni browser: il popup dice quante pagine e di quale periodo, il conto lo fa il main (`_n`).
-    // Non tornano più: costo 3, che a Normale con il compito pulito chiede un OK (#530).
+    // Non tornano più: cancellare per sempre, costo 4.
     CANCELLA_PAGINE: {
-      costo: 3,
+      costo: 4,
       campo: null,
       describe: (a) => {
         const n = Number(a && a._n);
@@ -884,13 +933,10 @@
       },
     },
     CANCELLA_MEMORIA: {
-      // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni)
-      // e il buffer delle lezioni non ancora compattate. Irreversibile: il profilo
-      // utente che Filo ha costruito nel tempo va perso. Cancellare dati in modo definitivo
-      // sta nell'elenco fisso: Filo non lo fa a nessun livello, e dice all'utente dove farlo da sé.
-      costo: 3,
+      // Cancella tutti i moduli di memoria di Filo (PROFILO, PREFERENZE, espansioni), le lezioni non ancora
+      // compattate e le righe nascoste del quaderno. Irreversibile: cancellare per sempre, costo 4.
+      costo: 4,
       campo: null,
-      elenco: () => 'cancella-definitivo',
       dove: 'Le righe della memoria le può togliere l\'utente, una per una, nel quaderno delle memorie (filo://quaderno/quaderno.html); '
         + 'le interviste di benvenuto conservate, con la × accanto a ciascuna in Preferenze (filo://preferences/preferences.html).',
       describe: () => 'Eliminare DEFINITIVAMENTE tutta la memoria di Filo: '
@@ -901,10 +947,10 @@
     },
     DIMENTICA: {
       // Le righe indicate a voce le risolve il main in `_righe` prima del gate, mai l'LLM. Toglierle le nasconde nel
-      // quaderno, da dove si rimettono: costo 1 (decisione dell'owner, #872). Il «per sempre» butta il testo: il costo
-      // più alto del registro.
-      costo: (a) => (a && a.per_sempre === true ? 3 : 1),
+      // quaderno, da dove si rimettono: costo 1 (decisione dell'owner, #872). Il «per sempre» butta il testo: costo 4.
+      costo: (a) => (a && a.per_sempre === true ? 4 : 1),
       campo: null,
+      dove: (a) => (a && a.per_sempre === true ? 'Senza «per sempre» la riga si nasconde, e dal quaderno delle memorie (filo://quaderno/quaderno.html) si cancella per sempre a mano.' : ''),
       describe: (a) => {
         const righe = Array.isArray(a && a._righe) ? a._righe : [];
         if (!righe.length) return 'Dimenticare una cosa';
@@ -919,12 +965,10 @@
       describeDone: (a) => `${a && a.per_sempre === true ? 'Cancellato per sempre' : 'Dimenticato'}: ${(a._righe || []).map((r) => `«${r}»`).join(', ')}`,
     },
     // #1295 — «cancella questa chat» la nasconde: esce dalla home e da ciò che Filo ha davanti, e si rimette (costo 1,
-    // decisione dell'owner). Il «per sempre» butta il testo: il costo più alto del registro, e vuole la parola «conferma»
-    // a ogni livello (`parola`) finché il registro non ha un costo suo per questo (#1050). La chat la trova il main.
+    // decisione dell'owner). Il «per sempre» butta il testo: cancellare per sempre, costo 4. La chat la trova il main.
     TOGLI_CHAT: {
-      costo: (a) => (a && a.per_sempre === true ? 3 : 1),
+      costo: (a) => (a && a.per_sempre === true ? 4 : 1),
       campo: null,
-      parola: (a) => !!(a && a.per_sempre === true),
       describe: (a) => {
         const t = String((a && a._titolo) || '').replace(/\s+/g, ' ').trim().slice(0, 80);
         const quale = a && a._corrente ? 'questa conversazione' : 'la conversazione';
@@ -970,17 +1014,16 @@
       describeDone: (a) => `Corretto: «${lezione({ testo: a && a.nuovo }).testo}»`,
     },
     IMPOSTA_PREFERENZA: {
-      // Costo, difesa abbassata ed elenco fisso li dichiara il setter in preferences.js. Preferenza sconosciuta,
+      // Costo e freno tolto li dichiara il setter in preferences.js, coi valori di adesso. Preferenza sconosciuta,
       // valore non valido o `rifiuto` → 1: il dispatch la respinge col perché, niente OK a vuoto. Un elenco che
       // resterebbe com'è (`_invariato`, lo mette il main, #949): niente da confermare.
-      costo: (a) => {
+      costo: (a, ctx) => {
         if (a && a._invariato) return 1;
         if (stileDellAccoglienza(a)) return 1;
-        const built = prefBuilt(a);
+        const built = prefBuilt(a, ctx && ctx.impostazioni);
         return built && !built.rifiuto ? built.costo : 1;
       },
       campo: null,
-      elenco: (a) => { const built = prefBuilt(a); return (built && !built.rifiuto && built.elencoFisso) || ''; },
       difesa: (a, ctx) => {
         if (a && a._invariato) return false;
         const built = prefBuilt(a, ctx && ctx.impostazioni);
@@ -1056,13 +1099,25 @@
         const C = global.SN_CMD_CLASSIFY;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
+        // Cancellare senza cestino è un «per sempre» (#1909): costo 4 come ELIMINA_FILE, quindi no dopo una lettura (#1840).
+        if (cancellaColComando(a)) return 4;
         const lvl = C.classify(cmd, a._perimetro);
         // Un indirizzo che il comando contatta segue la regola di NAVIGA (#2293): `_nonCompare`/`_exfil` li scrive il main.
         return costoIndirizzo(a, lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3);
       },
       campo: 'terminale',
-      // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
       parola: (a) => cancellaColComando(a),
+      dove: (a) => (cancellaColComando(a) ? 'Il comando lo puoi scrivere tu nel terminale della home' : ''),
+      // Il comando che si collega fuori dal computer porta fuori il suo testo, come link e ricerca (#530.3): una chiave
+      // in un curl o in un git clone passa dagli stessi controlli dei segreti. Uno che resta sul computer (sola lettura,
+      // un docker, un .env, un database su localhost) non porta fuori niente e chiede come gli altri (#1312).
+      uscita: (a) => {
+        const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
+        const C = global.SN_CMD_CLASSIFY;
+        if (C && cmd.trim() && C.classify(cmd, a && a._perimetro) === 1) return '';
+        const testo = `${cmd}\n${cmd.replace(/[\^"'`]/g, '')}`;
+        return comandoEsce(testo) ? testo : '';
+      },
       fonte: (a, out) => {
         if (out.blocked) return null;
         const t = `${typeof out.stdout === 'string' ? out.stdout : ''}${typeof out.stderr === 'string' ? out.stderr : ''}`;
@@ -1371,7 +1426,7 @@
         if (r.gia === true) return 1;
         return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
       },
-      fonte: (a, out) => nomiDiSistema(out, 'bluetooth'),
+      fonte: (a, out) => nomiDiSistema(a, out, 'bluetooth'),
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
@@ -1411,7 +1466,7 @@
         if (r.gia === true) return 1;
         return r.acceso === false || !!r.nome ? 2 : 1;
       },
-      fonte: (a, out) => nomiDiSistema(out, 'wifi'),
+      fonte: (a, out) => nomiDiSistema(a, out, 'wifi'),
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
@@ -1523,13 +1578,14 @@
   }
   function valore(v, action, ctx) { return typeof v === 'function' ? v(action, ctx) : v; }
 
-  // Costo 0-3, oppure null se l'azione non è registrata o non dichiara un costo valido (il dispatch la rifiuta).
-  function costoFor(action) {
+  // Costo 0-4, oppure null se l'azione non è registrata o non dichiara un costo valido (il dispatch la rifiuta).
+  // `ctx.impostazioni`: i valori di adesso, per sapere se una preferenza toglie o stringe un freno.
+  function costoFor(action, ctx = {}) {
     const entry = voce(action);
     if (!entry) return null;
     let c = null;
-    try { c = valore(entry.costo, action); } catch (_) { c = null; }
-    return Number.isInteger(c) && c >= 0 && c <= 3 ? c : null;
+    try { c = valore(entry.costo, action, ctx); } catch (_) { c = null; }
+    return Number.isInteger(c) && c >= 0 && c <= 4 ? c : null;
   }
 
   function campoFor(action) {
@@ -1600,10 +1656,10 @@
     return !!esito && Object.prototype.hasOwnProperty.call(TERMINALI, t) && TERMINALI[t](esito);
   };
 
+  // Anche un'azione senza esito può aver portato testo nel compito (i nomi di una rinomina in attesa dell'OK).
   function fonteDi(action) {
     const entry = voce(action);
-    const out = action && action._output;
-    if (!out || typeof out !== 'object') return null;
+    const out = action && action._output && typeof action._output === 'object' ? action._output : {};
     let f = null;
     if (entry && typeof entry.fonte === 'function') { try { f = entry.fonte(action, out) || null; } catch (_) { f = null; } }
     const g = fonteDaFuori(out);
@@ -1611,18 +1667,19 @@
   }
 
   // Gli ingressi del dispatch per SN_AUTONOMIA. `ctx.richiesta` = cosa ha scritto l'utente nel compito,
-  // `ctx.impostazioni` = le impostazioni correnti (per sapere se una preferenza abbassa una difesa).
+  // `ctx.impostazioni` = le impostazioni correnti (per sapere se una preferenza toglie un freno).
+  // Un segreto che uscirebbe è costo 4: `chiesta` dice se l'utente l'ha scritto lui (la porta delle uscite di #810).
   function ingressi(action, ctx = {}) {
     const entry = voce(action);
-    const costo = costoFor(action);
+    let costo = costoFor(action, ctx);
     if (!entry || costo == null) return null;
-    let elenco = '';
     let segreto = '';
-    try { elenco = String(valore(entry.elenco, action, ctx) || ''); } catch (_) { elenco = ''; }
+    let chiesta = true;
     const A = global.SN_AUTONOMIA;
-    if (!elenco && typeof entry.uscita === 'function' && A) {
-      try { segreto = A.segreto(entry.uscita(action), { richiesta: ctx.richiesta || '' }); } catch (_) { segreto = ''; }
-      if (segreto) elenco = 'segreto';
+    if (typeof entry.uscita === 'function' && A) {
+      let s = { tipo: '', scritto: false };
+      try { s = A.segretoDettaglio(entry.uscita(action), { richiesta: ctx.richiesta || '' }); } catch (_) { s = { tipo: 'chiave', scritto: false }; }
+      if (s.tipo) { segreto = s.tipo; chiesta = s.scritto; costo = A.COSTO_MAX; }
     }
     let difesa = false;
     try { difesa = !!valore(entry.difesa, action, ctx); } catch (_) { difesa = true; }
@@ -1636,7 +1693,7 @@
     // La frase del popup quando chiede perché l'azione sta fuori dal perimetro: la dice chi conosce l'azione.
     let perchePerimetro = '';
     try { perchePerimetro = dentroPerimetro ? '' : String(valore(entry.perchePerimetro, action, ctx) || ''); } catch (_) { perchePerimetro = ''; }
-    return { costo, campo: campoFor(action), elenco, segreto, difesa, parola, dove, dentroPerimetro, perchePerimetro };
+    return { costo, campo: campoFor(action), segreto, chiesta, difesa, parola, dove, dentroPerimetro, perchePerimetro };
   }
 
   const riquadro = (p) => !!p && typeof p === 'object' && (Array.isArray(p.elenco) || p.citazione != null);

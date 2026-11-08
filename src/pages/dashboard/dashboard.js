@@ -1407,7 +1407,8 @@
     const immagini = pendingImages.slice();
     const file = pendingFiles.slice();
     const percorsi = new Map(immagini.filter((d) => percorsiImmagini.has(d)).map((d) => [d, percorsiImmagini.get(d)]));
-    const daFuori = incollato || immagini.length > 0 || file.length > 0;
+    // Un file allegato entra come percorso: quando Filo lo apre la lettura ha la classe del file, non quella di un incollato.
+    const daFuori = incollato || immagini.length > 0;
     testoDaFuori = false;
     const righeFile = [...file.map((f) => f.percorso), ...immagini.map((d) => percorsi.get(d))]
       .filter(Boolean).map((p) => `File: ${p}`);
@@ -3063,7 +3064,8 @@
       while (!self.SN_FEEDBACK_UI && Date.now() < fine) await new Promise((ok) => setTimeout(ok, 50));
       self.SN_FEEDBACK_UI?.open({ testo: q.testo });
     } else if (q.tipo === 'chiedi') {
-      if (!inAccoglienza) { submitMessage(q.testo); return; }
+      // Porta l'indirizzo scelto dal sito: è testo di altri, come un incollato (#1840).
+      if (!inAccoglienza) { if (!sending) { testoDaFuori = true; submitMessage(q.testo); } return; }
       inputEl.value = q.testo;
       testoDaFuori = true;
       autoGrowInput();
@@ -3149,6 +3151,8 @@
   // Hook per i test Playwright: rende azioni come farebbe una bolla di chat, senza l'LLM.
   window.__filoDashActions = {
     renderActions: Att.renderActions,
+    // Le parole dell'utente che una conferma rimanda al main: un segreto che ha scritto lui può uscire (#810).
+    scriveUtente: (testo) => { threadHistory.push({ role: 'user', text: String(testo || '') }); },
     applyCommandCwd: Term.applyCommandCwd,
     getCwd: Term.getCwd,
     refreshAccountControl,
