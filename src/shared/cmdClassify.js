@@ -1456,8 +1456,16 @@
     }
   }
 
-  function classifyOneDet(raw, c) {
+  // Una shell POSIX toglie i backslash e decodifica `$'…'` prima di passare gli argomenti: `--out\put=x` è
+  // `--output=x`. Le opzioni si cercano anche nel comando come lo riceve il programma, e vale la lettura peggiore (#1994).
+  function classifyOneLetto(raw, c) {
     const base = classifyOne(raw);
+    if (base === 3 || !shellPosix(c) || !/\\|\$'/.test(raw)) return base;
+    return Math.max(base, classifyOne(argomenti(raw, c).map((a) => a.testo).join(' ')));
+  }
+
+  function classifyOneDet(raw, c) {
+    const base = classifyOneLetto(raw, c);
     if (base === 2) {
       const motivo = sovrascrive(raw, c);
       if (motivo) return { level: 3, motivo };
