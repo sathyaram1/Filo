@@ -179,6 +179,6 @@ test('git: la sonda vera legge il repository della cartella, senza eseguire nien
     assert.equal(C.classify('git status', ctx), 2);
     assert.equal(C.classify('git status', { ...ctx, cwd: sano }), 1);
   } finally {
-    rmSync(base, { recursive: true, force: true });
+    togliCartella(base);
   }
 });
