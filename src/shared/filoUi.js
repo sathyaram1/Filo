@@ -167,6 +167,35 @@
     try { return (el && (el.shadowRoot || ombre.get(el))) || null; } catch (_) { return null; }
   }
 
+  // Lo strato chiuso di un pezzo di Filo in un sito (menu, riquadri, correttore), coi suoi fogli: uno solo, perché una
+  // falla chiusa qui valga per tutti. Sui siti, dentro `ambito`, solo caratteri generici: dai pezzi di un font chiamato
+  // per nome che il browser carica il sito saprebbe quali lettere abbiamo disegnato.
+  const paginaDiFilo = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  function fontSoloGenerico(ambito = '') {
+    const dove = ambito ? `${ambito}, ${ambito} *, ${ambito} ::before, ${ambito} ::after, ${ambito} ::placeholder` : '*, ::before, ::after, ::placeholder';
+    return `\n${dove} { font-family: system-ui, sans-serif !important; }\n`;
+  }
+  function fogliChiusi(nomi, { ambito = '' } = {}) {
+    let testo = '';
+    try {
+      const fs = require('node:fs');
+      const path = require('node:path');
+      testo = nomi.map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
+    } catch (_) {}
+    if (!paginaDiFilo) testo += fontSoloGenerico(ambito);
+    const foglio = new CSSStyleSheet();
+    try { foglio.replaceSync(testo); } catch (_) {}
+    return [foglio];
+  }
+  function stratoChiuso(stileHost, fogli) {
+    const host = document.createElement('div');
+    mark(host);
+    host.style.cssText = stileHost;
+    const radice = ombra(host);
+    try { radice.adoptedStyleSheets = fogli; } catch (_) {}
+    return { host, radice };
+  }
+
   // Il nodo vero sotto un evento. Chi ascolta su window o sul documento vede l'host di un riquadro chiuso, non il
   // campo o il collegamento toccati: si scende col punto del puntatore, o col fuoco quando il gesto è da tastiera.
   function bersaglio(e) {
