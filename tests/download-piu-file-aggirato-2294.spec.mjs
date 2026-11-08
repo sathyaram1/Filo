@@ -38,7 +38,7 @@ async function apriServer() {
     } else {
       corpo = `<button id="via" style="font-size:30px">Scarica il modulo</button><script>
         document.getElementById('via').onclick = () => {
-          for (let i = 0; i < 6; i++) setTimeout(() => { ${scarica("file-raffica-' + i + '.bin").replace("'/file-raffica-' + i + '.bin'", "'/file-raffica-' + i + '.bin'")} }, 200 + i * 400);
+          for (let i = 0; i < 6; i++) setTimeout(() => { const a = document.createElement('a'); a.href = '/file-raffica-' + i + '.bin'; a.download = ''; document.body.appendChild(a); a.click(); }, 200 + i * 400);
         };
       </script>`;
     }
