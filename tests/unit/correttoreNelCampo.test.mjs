@@ -17,8 +17,15 @@ function correttore({ sbagliate = [], impostazioni = {} } = {}) {
   function node(tag) {
     const n = {
       tagName: tag, nodeType: 1, children: [], style: new Proxy({ setProperty() {} }, {}), dataset: {}, isConnected: true, className: '',
-      setAttribute() {}, appendChild(c) { if (c.isFrag) n.children.push(...c.children); else n.children.push(c); return c; },
-      remove() { n.isConnected = false; const fratelli = sb.document.body.children; if (fratelli.includes(n)) fratelli.splice(fratelli.indexOf(n), 1); },
+      setAttribute() {},
+      appendChild(c) {
+        if (c.isFrag) n.children.push(...c.children);
+        else if (!n.children.includes(c)) { n.children.push(c); c.parentNode = n; }
+        return c;
+      },
+      remove() { n.isConnected = false; const fratelli = n.parentNode ? n.parentNode.children : []; if (fratelli.includes(n)) fratelli.splice(fratelli.indexOf(n), 1); },
+      // Su un sito gli strati stanno nell'ombra chiusa di un host (#2299).
+      attachShadow() { n.ombra = node('#ombra'); return n.ombra; },
     };
     Object.defineProperty(n, 'innerHTML', { set() { n.children = []; }, get() { return ''; } });
     let testo = '';
