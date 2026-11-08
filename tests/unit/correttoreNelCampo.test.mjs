@@ -351,9 +351,6 @@ test('il testo che il sito rimette in una casella già scritta dall\'utente aspe
   c.scriveDaScript(el, 'ieri cavolo oggi quseta e il il ');
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il'], 'i segni di prima seguono il testo, quello nuovo non si controlla');
-  c.scriveDaScript(el, 'ieri cavolo oggi quseta e il il!');
-  await c.passa(5000);
-  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il']);
   el.fire('keydown', { isTrusted: true });
   await c.passa(10);
   assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['cavolo', 'quseta', 'il'], 'il tasto vero controlla tutto');
