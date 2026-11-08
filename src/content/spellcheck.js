@@ -2860,6 +2860,7 @@
 
   // Una correzione applicata da Filo: Ctrl/Cmd+Z subito dopo la disfa, e i contatori lo sanno (#1461).
   function applyFix(el, range, replacement, opts = {}) {
+    scriveFilo(el);
     const prima = getEditableText(el);
     const r = applicaCorrezione(el, range, replacement, opts);
     try {
