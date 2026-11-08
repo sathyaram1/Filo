@@ -475,7 +475,7 @@ for (const [nome, campo] of [
     await page.locator(sel).click();
     await page.keyboard.type('sì ci vediamo mercoledì');
     await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
-    const distanza = () => page.evaluate((sel) => Math.round(document.querySelector('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect().y
+    const distanza = () => nelMondoDelFrame(page, null, (sel) => Math.round(globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect().y
       - document.querySelector(sel).getBoundingClientRect().y), sel);
     const prima = await distanza();
     await page.evaluate(() => { document.getElementById('sopra').innerHTML = '<div style="height:50px">Anna sta scrivendo…</div>'; });
