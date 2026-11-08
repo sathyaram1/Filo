@@ -346,7 +346,7 @@
       base: [], indirizzo: 'la pagina del video che salvi, e i server da cui il sito manda il video',
       quando: 'funzione',
       occasione: 'quando salvi un video in streaming col tasto destro, o ne riprovi il salvataggio',
-      riceve: 'le richieste della pagina e del video, senza i tuoi cookie e senza il tuo account',
+      riceve: 'le richieste della pagina e del video, senza i tuoi cookie e senza il tuo account; da un sito che apri da un altro paese passano dallo stesso proxy della scheda',
       frase: 'Il video lo scarica yt-dlp dal sito che lo ospita, senza i tuoi cookie',
       dove: ['src/main/services/salvaVideoStreaming.js'], prova: 'eseguiYtdlp(',
     },
