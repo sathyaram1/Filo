@@ -25,15 +25,19 @@ let pendenti = [];
 let attesa = null;
 let corsa = Promise.resolve();
 
-let ritmoDownloadMs = 10 * 60_000;
+let ritmoDownloadMs = minutiDalleImpostazioni(null) * 60_000;
 let ultimoDownload = -Infinity;
 let sospesi = { n: 0, nomi: [] };
 let attesaDownload = null;
 
-function configura(settings) {
+// Le scelte e il predefinito stanno solo nelle costanti; senza (il modulo caricato da solo) vale il più prudente.
+function minutiDalleImpostazioni(settings) {
   const C = globalThis.SN_CONST;
-  const min = C && typeof C.minutiFraDownload === 'function' ? C.minutiFraDownload(settings && settings.filoParla) : 10;
-  ritmoDownloadMs = min * 60_000;
+  return C && typeof C.minutiFraDownload === 'function' ? C.minutiFraDownload(settings && settings.filoParla) : 60;
+}
+
+function configura(settings) {
+  ritmoDownloadMs = minutiDalleImpostazioni(settings) * 60_000;
   if (sospesi.n) armaDownload();
 }
 
