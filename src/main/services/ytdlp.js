@@ -206,5 +206,5 @@ function titoloDaPagina(titolo) {
 
 module.exports = {
   RILASCIO_YTDLP, RILASCIO_FFMPEG, FFMPEG_VERSIONE, FFMPEG_SHA256, FILE_PEZZI,
-  assetYtdlp, assetFfmpeg, leggiSomme, argomenti, leggiRiga, leggiPezzi, motivoErrore, creaAvanzamento, titoloDaPagina,
+  assetYtdlp, assetFfmpeg, leggiSomme, argomenti, ambiente, leggiRiga, leggiPezzi, motivoErrore, creaAvanzamento, titoloDaPagina,
 };
