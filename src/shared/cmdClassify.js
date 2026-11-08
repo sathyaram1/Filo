@@ -1065,6 +1065,14 @@
   // git: `--no-index` confronta file qualsiasi, `rev:percorso` e ciò che segue `--` sono file.
   function gitPerimetro(raw, c) {
     const sub = subcommandOf(dequote(raw));
+    // Le impostazioni di un repository arrivato da fuori possono far partire programmi anche a una lettura (#2292):
+    // lo dice la sonda del main, `c.gitLancia(cartella)`; senza sonda il livello resta quello del comando.
+    if (typeof c.gitLancia === 'function' && sub) {
+      if (!c.cwd || c.cwd.rete || c.cwd.provider) return due(MOTIVI.ignoto);
+      let lancia = 'ignoto';
+      try { lancia = c.gitLancia(c.win ? `${c.cwd.radice}\\${c.cwd.segs.join('\\')}` : `/${c.cwd.segs.join('/')}`); } catch (_) { lancia = 'ignoto'; }
+      if (lancia) return due(MOTIVI.git);
+    }
     if (sub === 'grep') return due(MOTIVI.ricorsivo);
     // I percorsi come li legge la shell, come per gli altri lettori.
     const testi = argomenti(raw, c).slice(1).map((a) => a.testo).filter(Boolean);
