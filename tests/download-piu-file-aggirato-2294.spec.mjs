@@ -93,6 +93,45 @@ test('una pagina che salta da un sottodominio all\'altro dello stesso sito, senz
   }
 });
 
+test('il no alla domanda vale per tutto il sito: toglie i file in attesa di ogni sottodominio, e i salti dopo non scaricano né chiedono', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartella(app);
+    const page = await openTab(`http://s0.salta.test:${srv.porta}/lontano?n=0&fino=5`);
+    await expect.poll(() => inAttesa(shell, 'lontano'), { timeout: 30_000 }).toBe(5);
+    const barra = shell.locator('#permesso-bar');
+    await expect(barra).toContainText('vuole scaricare più file', { timeout: 10_000 });
+    await barra.locator('.permesso-no').click();
+    await expect.poll(() => inAttesa(shell, 'lontano'), { timeout: 10_000 }).toBe(0);
+    await page.goto(`http://s6.salta.test:${srv.porta}/lontano?n=6&fino=8`);
+    await expect(shell.locator('#tabs .segno.negato[data-parte="scaricamenti"]')).toHaveCount(1, { timeout: 10_000 });
+    await page.waitForTimeout(4_000);
+    expect(await inAttesa(shell, 'lontano')).toBe(0);
+    await expect(barra).toBeHidden();
+    expect(arrivati(dir, 'lontano')).toEqual(['file-lontano-0.bin']);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('il tetto dei cento file in attesa è del sito: una pagina che salta fra 110 sottodomini non lo supera', async ({ shell, openTab }) => {
+  test.setTimeout(180_000);
+  const srv = await apriServer();
+  try {
+    await openTab(`http://s0.salta.test:${srv.porta}/lontano?n=0&fino=110&passo=450`);
+    // Il centesimo file in attesa arriva, poi la riga più nuova conta quelli fermati.
+    await expect.poll(() => inAttesa(shell, 'lontano'), { timeout: 120_000, intervals: [1_000] }).toBe(100);
+    await expect.poll(() => shell.evaluate(async () => {
+      const r = await window.filoShell.downloads.list();
+      return ((r && r.items) || []).reduce((n, it) => n + (it.fermati || 0), 0);
+    }), { timeout: 60_000, intervals: [1_000] }).toBeGreaterThan(0);
+    expect(await inAttesa(shell, 'lontano')).toBe(100);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('il ritmo dei messaggi sui download scelto in Preferenze vale anche dopo aver riaperto Filo', async () => {
   test.setTimeout(60_000);
   const userData = cartellaTemporanea('filo-ritmo-');
