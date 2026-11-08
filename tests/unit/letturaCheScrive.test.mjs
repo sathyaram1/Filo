@@ -354,8 +354,8 @@ test('git: un programma d\'avvio che una lettura fa partire fa chiedere; quelli 
       mkdirSync(d);
       execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
       writeFileSync(join(d, 'f'), 'a\n'); // un file tracciato: git status ne rinfresca l'indice
-      execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', 'commit', '-q', '-am', 'i'], { cwd: d, stdio: 'ignore' });
       execFileSync('git', ['add', 'f'], { cwd: d, stdio: 'ignore' });
+      execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', 'commit', '-q', '-m', 'i'], { cwd: d, stdio: 'ignore' });
       if (hook) scriviHook(join(d, '.git', 'hooks'), hook, segno);
       return d;
     };
