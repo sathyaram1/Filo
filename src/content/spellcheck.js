@@ -1646,6 +1646,7 @@
     if (!state.diSito.length) return;
     state.visti = unisciPezzi([...state.visti, ...state.diSito]);
     state.diSito = [];
+    ricordaProprietari(state);
     if (state.attivo) aggiornaCodice(state);
   }
 
