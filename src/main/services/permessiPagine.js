@@ -228,6 +228,8 @@ function seguiGesti(wc) {
       if (avvio) wc._filoGestoDiFilo = false;
       else if (wc._filoGestoDiFilo) return;
       wc._filoGestoAlle = Date.now();
+      // Il conto dei download senza clic (#2294) vuole l'ultimo gesto anche dopo una navigazione, che azzera quello sopra.
+      if (avvio) wc._filoGestoVeroAlle = wc._filoGestoAlle;
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
