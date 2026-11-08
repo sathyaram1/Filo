@@ -877,6 +877,9 @@ function scelteDi(wc) {
     if (da === origine) scelte.push({ parte, si });
     else if (delSito) scelte.push({ parte, si, chiave });
   }
+  // Il no dato su un altro sito della stessa scheda la ferma (scaricamentoSenzaGesto): si vede e si toglie da qui.
+  const fermaScheda = wc._filoScaricamentiNoAlle && dopoUltimoGesto(wc, wc._filoScaricamentiNoAlle);
+  if (fermaScheda && !scelte.some((s) => s.parte === SCARICAMENTI)) scelte.push({ parte: SCARICAMENTI, si: false, scheda: true });
   return { origine, scelte };
 }
 
