@@ -102,6 +102,9 @@ test('il segno apre la domanda, che dice se ferma il suo lavoro', async ({ openT
   const avanti = page.locator('#mgDomandaDettaglio .mg-dq[data-id="D-24"] .mg-dq-ferma');
   await expect(avanti).toHaveText('#1002 va avanti');
   await expect(avanti).not.toHaveClass(/mg-dq-ferma--si/);
+  // Nasce sotto il puntatore rimasto sul segno di D-21: il title lo tiene il fumetto, e si chiede a lui cosa dice.
+  await expect.poll(() => avanti.evaluate((el) => window.SN_SUGGERIMENTO.testoPer(el))).toMatch(/anche se è già fuso/);
+  await page.mouse.move(0, 0);
   await expect(avanti).toHaveAttribute('title', /anche se è già fuso/);
 });
 
