@@ -1524,6 +1524,12 @@ function perimetroLettura(sender, cartella = null) {
   const perimetro = { cwd, home, win, maiuscole: win || process.platform === 'darwin', reti };
   // #892.2 — il classificatore chiede qui se un bersaglio c'è già. Non enumerabile: il perimetro resta un dato.
   Object.defineProperty(perimetro, 'esiste', { value: statoSulDisco });
+  // #2292 — se le impostazioni del repository di una cartella possono avviare programmi anche a una lettura di git.
+  const gitVisti = new Map();
+  Object.defineProperty(perimetro, 'gitLancia', { value: (dir) => {
+    if (!gitVisti.has(dir)) gitVisti.set(dir, require('./terminal').gitLanciaIn(dir));
+    return gitVisti.get(dir);
+  } });
   return perimetro;
 }
 
