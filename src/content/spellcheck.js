@@ -924,6 +924,8 @@
 
   function ensureOverlay(state) {
     if (state.overlay && state.overlay.isConnected) return;
+    // Staccato con l'ombra dal sito, tornerebbe col nuovo quando l'ombra rientra.
+    if (state.overlay) state.overlay.remove();
     const o = document.createElement('div');
     o.className = 'sn-spell-overlay';
     global.SN_FILO_UI?.mark(o);
