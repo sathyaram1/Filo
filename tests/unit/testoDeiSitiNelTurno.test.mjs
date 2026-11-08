@@ -11,7 +11,7 @@ import { dirname, join } from 'node:path';
 const require = createRequire(import.meta.url);
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 for (const f of ['constants.js', 'contenutoEsterno.js', 'capabilities.js', 'cmdClassify.js', 'autonomia.js', 'actionLevels.js',
-  'guardianoStatico.js', 'urlExfil.js', 'filoAccaduti.js']) {
+  'guardianoStatico.js', 'stessoSito.js', 'urlExfil.js', 'filoAccaduti.js', 'filoState.js']) {
   require(join(ROOT, 'src', 'shared', f));
 }
 const X = globalThis.SN_URL_EXFIL;
