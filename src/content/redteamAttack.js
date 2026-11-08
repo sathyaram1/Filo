@@ -98,7 +98,7 @@
             <span class="sn-rt-head-icon">${icon('redteam', 18)}</span>
             <span class="sn-rt-head-title">Invia un attacco</span>
           </div>
-          <p class="sn-rt-avviso" hidden>Ogni tentativo costa ${COST} crediti, e senza un codice Red Team il risultato non lo vedi.</p>
+          <p class="sn-rt-avviso" hidden>Senza un codice Red Team il risultato non lo vedi.</p>
           <label class="sn-rt-field">
             <span class="sn-rt-label">Testo dell’attacco</span>
             <textarea class="sn-rt-attack" rows="4" placeholder="Il prompt che prova a ingannare i giudici di sicurezza."></textarea>
