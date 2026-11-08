@@ -262,9 +262,11 @@
     const prog = programOf(norm);
     if (!prog) return false;
     if (ALWAYS_3.has(prog) || ARBITRARY_CODE.has(prog)) return false;
+    // Where-Object da solo (`where node`, `-InputObject`) filtra come in pipeline: esegue solo il blocco, già
+    // preteso inerte qui sopra. ForEach-Object no: senza pipeline resta da chiedere.
     if (PS_PIPE_ONLY.has(prog)) {
-      if (!inPipeline) return false;
-      return PS_FOREACH.has(prog) ? open === 1 : true;
+      if (PS_FOREACH.has(prog)) return inPipeline && open === 1;
+      return true;
     }
     if (PS_READ.has(prog)) return true;
     // In pipeline vale come lettura anche ciò che è già livello 1: `cat file | grep errore`
