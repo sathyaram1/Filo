@@ -1762,9 +1762,11 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   const origine = sender?.tab?.url || sender?.url || '';
   const daPagina = /^https?:/i.test(origine);
   const indirizzo = (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') ? globalThis.SN_ACTION_LEVELS.indirizzoDi(action) : '';
+  const delComando = tipo === 'ESEGUI_COMANDO' ? Exfil.indirizziDelComando(action) : [];
   let memoria = '';
-  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA') {
-    memoria = [await navExfilCorpus(), indirizzo ? PageRead.materialeRiservato(indirizzo) : ''].filter(Boolean).join('\n');
+  if (tipo === 'NAVIGA' || tipo === 'CERCA_WEB' || tipo === 'LEGGI_PAGINA' || delComando.length) {
+    const riservato = [indirizzo, ...delComando].filter(Boolean).map((u) => PageRead.materialeRiservato(u));
+    memoria = [await navExfilCorpus(), ...riservato].filter(Boolean).join('\n');
   }
   const azioni = Array.isArray(contesto) ? contesto : [];
   const testoParole = typeof parole === 'string' ? parole : '';
