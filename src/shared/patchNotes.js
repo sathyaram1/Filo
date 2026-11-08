@@ -72,6 +72,7 @@
       fixes: [
         { testo: 'Un video salvato da un sito che apri da un altro paese scende dalla stessa connessione della scheda, anche con «Riprova»: il sito non vede più la tua.', segnalazione: 2301 },
         { testo: 'Con il Prompt dei comandi scelto nelle Preferenze, i comandi che chiedi a Filo usano i programmi installati sul computer anche dentro una cartella che ne contiene uno con lo stesso nome.', segnalazione: 2312 },
+        { testo: 'I segni del correttore li vedi solo tu: un sito non li legge più, e non può scoprire quali parole hai nel tuo dizionario personale.', segnalazione: 2299 },
       ],
     },
     {
