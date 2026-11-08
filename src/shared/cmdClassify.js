@@ -725,6 +725,11 @@
     return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
   }
 
+  // PowerShell, o una shell che può esserlo.
+  function forsePowerShell(c) {
+    return !!c.sistemaIgnoto || (!shellPosix(c) && c.shell !== 'cmd');
+  }
+
   // /bin/sh su Debian e Ubuntu è dash, che non conosce `$'…'`: lì `\'` chiude la stringa e il resto diventa
   // altri argomenti. Dove sh può essere dash si misurano tutte e due le letture (#1511).
   function forseDash(c) {
