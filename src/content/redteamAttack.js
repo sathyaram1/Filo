@@ -144,16 +144,11 @@
       statusEl.classList.toggle('sn-rt-status--ok', kind === 'ok');
     }
 
-    // Abilita/disabilita il bottone d'invio in base a stato login, saldo e testo.
+    // Abilita/disabilita il bottone d'invio in base a stato login e testo.
     // Solo chi scrive cancella un errore: un rifiuto appena arrivato (la pausa del server) deve restare leggibile.
     function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
-      if (signedIn && balance != null && balance < COST) {
-        sendBtn.disabled = true;
-        setStatus(`Crediti insufficienti: hai ${balance}, ne servono ${COST}.`, 'err');
-        return;
-      }
       // Non loggato: il bottone resta cliccabile ma porta al login.
       if (!signedIn) {
         sendBtn.disabled = false;
