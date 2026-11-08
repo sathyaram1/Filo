@@ -45,4 +45,6 @@ test('diag', async ({ openTab, testServer }) => {
   console.log('prima', JSON.stringify(await stato(page)));
   await menuDi(page).valuta(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 20; });
   for (let i = 0; i < 6; i++) { console.log('dopo', JSON.stringify(await stato(page))); await page.waitForTimeout(150); }
+  const s = await stato(page);
+  expect(s.ft).toBeLessThan(50);
 });
