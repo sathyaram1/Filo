@@ -1138,9 +1138,9 @@
     const percorsi = testi.slice(0, Math.max(k, 0)).filter((a) => GIT_GLOBALE_CARTELLA.test(a)).map((a) => a.slice(a.indexOf('=') + 1));
     args.forEach((a, i) => {
       // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994).
-      const contenuto = /^--([a-z-]+)(?:=(.*))?$/.exec(a);
-      if (contenuto && contenuto[1].length >= 3 && 'contents'.startsWith(contenuto[1])) {
-        percorsi.push(contenuto[2] != null ? contenuto[2] : args[i + 1] || '');
+      const contenuto = opzioneLunga(a, 'contents', 3);
+      if (contenuto != null) {
+        percorsi.push(a.includes('=') ? contenuto : args[i + 1] || '');
         return;
       }
       if (a.startsWith('-')) return;
