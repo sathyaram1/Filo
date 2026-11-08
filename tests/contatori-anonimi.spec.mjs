@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { mkdirSync, unlinkSync } from 'node:fs';
 import { createServer } from 'node:http';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 import { barraPage, comandaBarra, menuAperto, premiNellaBarra } from './helpers/barra.mjs';
 import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
