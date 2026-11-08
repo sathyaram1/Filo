@@ -1206,7 +1206,10 @@
         return nome != null && dove(nome, c) === MOTIVI.rete;
       });
     }
-    if (prog === 'where') return testi.some((t) => t && !/^[-/]/.test(t));
+    // Fuori da cmd `where` da solo è il filtro di PowerShell, che non cerca file.
+    if (prog === 'where' && (c.shell === 'cmd' || /^where\.exe$/i.test(unquote(tokens(raw)[0] || '')))) {
+      return testi.some((t) => t && !/^[-/]/.test(t));
+    }
     return false;
   }
 
