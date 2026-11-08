@@ -1149,11 +1149,11 @@ test.describe('spellcheck-segni-restano', () => {
 
   // Per `ms` guarda il riquadro a ogni giro: i segni attesi, sul testo che c'è adesso nella casella.
   async function restanoPer(page, attesi, ms) {
-    return page.evaluate(async ([attesi, ms]) => {
+    return nelMondoDelFrame(page, null, async ([attesi, ms]) => {
       const visti = [];
       const fine = performance.now() + ms;
       while (performance.now() < fine) {
-        const o = document.querySelector('.sn-spell-overlay');
+        const o = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay');
         const ta = document.getElementById('ta');
         const segni = o ? [...o.querySelectorAll('.sn-errore:not(.sn-dubbio)')].map((s) => s.textContent) : [];
         const allineato = !!o && o.textContent === ta.value;
