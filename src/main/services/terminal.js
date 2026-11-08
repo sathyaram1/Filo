@@ -23,12 +23,6 @@ const VARIABILE_SEGRETA = /^FILO_(?!SIS_)\w*(?:KEY|SECRET|TOKEN|PASSWORD)/i;
 function ambienteComandi(base = process.env) {
   const out = {};
   for (const [k, v] of Object.entries(base || {})) if (!VARIABILE_SEGRETA.test(k)) out[k] = v;
-  // cmd cerca un programma chiamato per nome prima nella cartella corrente (#2292): dopo un cd in una cartella estratta,
-  // il git.exe o il where.exe dell'archivio prenderebbero il posto di quelli veri. Questa variabile glielo toglie.
-  if (process.platform === 'win32') {
-    for (const k of Object.keys(out)) if (k.toLowerCase() === 'nodefaultcurrentdirectoryinexepath') delete out[k];
-    out.NoDefaultCurrentDirectoryInExePath = '1';
-  }
   return out;
 }
 
