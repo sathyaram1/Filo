@@ -353,6 +353,7 @@ const safebrowseMethods = {
     }
     return this._sbPrimaDelClic(tab, giudicato, (segna) => {
       segna(tab);
+      Permessi.gestoSulloStrato(wc);
       const scarica = () => { try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {} };
       if (costruito) this._sbRifaiDallaPagina(tab, 'SN_RISCARICA', url, scarica, nome);
       else scarica();
