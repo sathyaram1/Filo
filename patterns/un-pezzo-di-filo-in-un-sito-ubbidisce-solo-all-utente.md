@@ -160,6 +160,22 @@ scelto lo strato (D-205): microfono, documento e caselle di Aiuto, feedback e sp
 fuori dalla portata dello script, e la guardia della regola 3 resta del menu. Nel ripiego senza strato tornano
 scoperti, come il testo nel limite noto qui sotto.
 
+## I segni del correttore
+
+Il caso (#2299): un segno che manca è un'informazione. Lo script del sito scriveva da sé una lista di parole nel suo
+campo e guardava quali restavano senza onda: erano nel dizionario personale, fra i nomi noti o fra le parole imparate.
+Il dizionario è uguale su tutti i siti, quindi faceva anche da impronta. Le regole:
+
+- su un sito **gli strati del correttore** (specchio dei segni, valori dei segnaposti, lampi) stanno in un'ombra chiusa
+  sola per documento, coi fogli adottati (`casaDegliStrati` in `src/content/spellcheck.js`); sulle pagine `filo://` e
+  nello strato dei riquadri restano nel documento, dove non c'è uno script del sito;
+- **il codice controlla una casella solo dopo un gesto vero lì dentro** (un tasto, una pressione: `toccato`): il testo
+  che lo script scrive in un campo che l'utente non ha toccato non riceve segni, nemmeno nell'ombra. `input` e `focus`
+  non bastano, sono fidati anche quando li causa uno script.
+
+Gli spec li leggono con `segniDi` (`tests/helpers/segniDelCorrettore.mjs`), che si usa come un Locator anche dentro
+`expect`; l'attacco sta in `tests/correttore-segni-fuori-dalla-pagina.spec.mjs`.
+
 ## Provarlo
 
 Il velo, il velo tolto all'ultimo istante, il foglio che abbassa il menu e i
