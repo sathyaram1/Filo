@@ -906,6 +906,9 @@
   }
 
   function suInput(state, evento) {
+    // Un `input` finto su un testo che non è cambiato non ha niente da rifare: ripetuto, darebbe al sito una misura.
+    if (evento && !evento.isTrusted && !global.SN_FILO_UI?.veroONostro?.(evento) && state.codiceTesto != null
+      && getEditableText(state.el) === state.codiceTesto && getEditableText(state.el) === state.testo) return;
     const storia = !!evento && (evento.inputType === 'historyUndo' || evento.inputType === 'historyRedo');
     seguiIlTesto(state, ammessoDa(state, evento), { storia });
     if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
