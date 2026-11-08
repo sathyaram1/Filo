@@ -1041,7 +1041,8 @@
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '').trim();
         if (!cmd || !C) return 3;
         const lvl = C.classify(cmd, a._perimetro);
-        return lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3;
+        // Un indirizzo che il comando contatta segue la regola di NAVIGA (#2293): `_nonCompare`/`_exfil` li scrive il main.
+        return costoIndirizzo(a, lvl === 1 || lvl === 2 || lvl === 3 ? lvl : 3);
       },
       campo: 'terminale',
       // Un comando che cancella senza cestino è un «per sempre» (#1909): la parola a ogni livello, come ELIMINA_FILE.
