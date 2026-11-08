@@ -198,4 +198,15 @@ module.exports = function register(on, ctx) {
       return { ok: true, openToAll: s.openToAll };
     } catch (e) { return { ok: false, error: e?.message || String(e) }; }
   }));
+
+  // I tetti dell'invio (#2296): il server li valida e li applica, qui solo il trasporto.
+  on(MSG.REDTEAM_LIMITI, soloOwner(async (msg) => {
+    const imposta = !!msg && (msg.perUserDay !== undefined || msg.globalDay !== undefined);
+    try {
+      const r = await callable('redteamLimiti', imposta
+        ? { op: 'imposta', perUserDay: msg.perUserDay, globalDay: msg.globalDay }
+        : { op: 'leggi' });
+      return Object.assign({ ok: true }, r);
+    } catch (e) { return { ok: false, error: e?.message || String(e) }; }
+  }));
 };
