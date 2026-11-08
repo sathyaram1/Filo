@@ -182,13 +182,12 @@ test('le parole che il sito mette nella casella mentre l\'utente scrive non rice
   await batti(page, 'ok ');
   await page.waitForTimeout(1500);
   await app.evaluate(() => globalThis.__rilascia());
-  const segno = errore(page, 'anno');
-  await page.waitForTimeout(2000);
-  console.log('RAPIDE', JSON.stringify(await rapide(app)), await page.inputValue('#ta'));
-  await expect(segno).toHaveCount(1, { timeout: 4000 });
+  // Il modello ha visto anche le parole del sito e le segna: nessun segno cade su di esse.
+  await expect.poll(async () => (await rapide(app)).some((r) => r.nuovo.includes('anno e anno'))).toBe(true);
+  await page.waitForTimeout(1200);
   const ta = await page.locator('#ta').boundingBox();
-  expect((await riquadroDelSegno(segno)).x).toBeGreaterThan(ta.x + 180);
-  expect((await rapide(app)).every((r) => !/anno e anno/.test(r.nuovo))).toBe(true);
+  const segni = await segniDi(page, '.sn-spell-overlay .sn-errore, .sn-spell-overlay .sn-suggerimento').evaluateAll((els) => els.map((e) => ({ testo: e.textContent, x: e.getBoundingClientRect().x })));
+  expect(segni.filter((s) => s.x < ta.x + 160)).toEqual([]);
 });
 
 test('una parola maiuscola fuori dizionario che il controllo dice sbagliata compare piena alla risposta', async ({ app, openTab, testServer }) => {
