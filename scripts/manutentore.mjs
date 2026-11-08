@@ -1304,6 +1304,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
         const r = await chiama(cred, 'taccuino.scrivi', { testo, versione: Number(opzione(argv, '--versione')) });
         return esito(r, (x) => `Taccuino riscritto (versione ${x.versione}).`);
       }
+      if (arg === 'sezione') {
+        const sezione = String(argv[2]);
+        const testo = await leggiStdin();
+        if (!testo.trim()) { console.error(`RIFIUTATO: la sezione «${sezione}» da stdin è vuota: se non resta niente scrivi «nessuno» (taccuino sezione ${sezione} - --versione V <<'FINE' … FINE). Non ho scritto niente.`); return 1; }
+        const r = await chiama(cred, 'taccuino.sezione', { sezione, testo, versione: Number(opzione(argv, '--versione')) });
+        return esito(r, (x) => `Sezione «${x.sezione || sezione}» riscritta, il resto del taccuino com'era (versione ${x.versione}).`);
+      }
       const r = await chiama(cred, 'taccuino');
       return esito(r, (x) => testoTaccuino(x).join('\n'));
     }
