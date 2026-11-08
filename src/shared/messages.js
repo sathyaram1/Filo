@@ -1269,6 +1269,9 @@
     //   GET { } → { ok, openToAll, letto } · SET { openToAll } → { ok, openToAll } | { ok:false, error }.
     REDTEAM_OPEN_GET: 'redteam_open_get',
     REDTEAM_OPEN_SET: 'redteam_open_set',
+    // I tetti dell'invio di Gestione (#2296, SOLO owner, solo da Filo): { } legge, { perUserDay?, globalDay? } scrive.
+    //   → { ok, perUserDay, globalDay, regole, maxAttackChars, chiamate:[{ model, prompt, completion }] } | { ok:false, error }.
+    REDTEAM_LIMITI: 'redteam_limiti',
 
     // Bacheca e Deck builder dei Mazzi in pausa per chi non è owner (#1592), `nome` 'bacheca' | 'mazzi'.
     // IN_PAUSA_STATO (solo da Filo): { attendi? } → { ok, bacheca: stato, mazzi: stato },
