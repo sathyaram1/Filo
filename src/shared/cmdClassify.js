@@ -691,12 +691,14 @@
     'computername', 'hostname', 'pwd', 'oldpwd', 'path', 'shell', 'lang', '_', 'psitem', 'true', 'false', 'null',
   ]);
   const DOLLARO_RE = /\$(?:env:)?([A-Za-z_]\w*)/gi;
-  const PERCENTO_RE = /%([A-Za-z_][\w()]*)(?::[^%]*)?%/gi;
+  const PERCENTO_RE = /%([A-Za-z_][\w()]*)(:[^%]*)?%/gi;
 
+  // Una variabile di cmd tagliata o sostituita (`%PATH:~0,0%` vale niente) non è più il valore innocuo: il suo nome
+  // esce col `:` e nessuna lista la riconosce (#1994).
   function nomiVariabili(t, { dollaro = true, percento = true } = {}) {
     const out = [];
     if (dollaro) for (const m of String(t).matchAll(DOLLARO_RE)) out.push(m[1].toLowerCase());
-    if (percento) for (const m of String(t).matchAll(PERCENTO_RE)) out.push(m[1].toLowerCase());
+    if (percento) for (const m of String(t).matchAll(PERCENTO_RE)) out.push(m[1].toLowerCase() + (m[2] ? ':' : ''));
     return out;
   }
 
