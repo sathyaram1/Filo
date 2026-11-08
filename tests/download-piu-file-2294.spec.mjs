@@ -119,6 +119,41 @@ test('Non consentire: i file in attesa se ne vanno, la scheda ne porta il segno 
   }
 });
 
+test('una raffica oltre il tetto: cento file aspettano, gli altri non scendono e la riga lo dice; Consenti fa arrivare i cento', async ({ app, shell, openTab }) => {
+  test.setTimeout(180_000);
+  const srv = await apriServer();
+  try {
+    const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
+    await openTab(`${srv.base}/?n=103&ogni=30&p=tanti`);
+    await expect.poll(() => voci(shell, 'tanti').then((v) => v.filter((x) => x.stato === 'pending').length), { timeout: 60_000 }).toBe(100);
+    await expect.poll(() => shell.evaluate(async () => {
+      const r = await window.filoShell.downloads.list();
+      return ((r && r.items) || []).reduce((n, it) => n + (it.fermati || 0), 0);
+    }), { timeout: 20_000 }).toBe(2);
+    expect(nellaCartella(dir, 'tanti')).toEqual(['tanti-1.txt']);
+
+    // La riga del pannello dice del singolo file e di quelli fermati.
+    await app.evaluate(({ BrowserWindow }) => {
+      const rq = process.mainModule.require;
+      const DL = rq(rq('node:path').join(process.cwd(), 'src/main/services/downloads.js'));
+      const r = [...DL._records.values()].find((x) => x._fermati);
+      const w = BrowserWindow.getAllWindows().find((x) => x._filoTabs);
+      w.webContents.send('shell:download', { kind: 'ask', item: DL._publicRecord(r) });
+    });
+    const riga = shell.locator('#dl-panel .dl-row[data-chiede="1"]', { hasText: 'Altri 2 li ho fermati' });
+    await expect(riga).toHaveCount(1, { timeout: 10_000 });
+    await expect(riga).toContainText('La pagina sta scaricando più file da sola, senza un tuo clic');
+    await shell.screenshot({ path: `${SHOTS}/2294-pannello-oltre-il-tetto.png` });
+
+    const si = barra(shell).locator('.permesso-si');
+    await expect(si).toBeEnabled({ timeout: 5_000 });
+    await si.click();
+    await expect.poll(() => nellaCartella(dir, 'tanti').length, { timeout: 60_000 }).toBe(101);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('il ritmo dei messaggi sui download si sceglie in Preferenze, con la sua stima, e Filo lo usa subito', async ({ app, openTab }) => {
   test.setTimeout(60_000);
   const prefs = await openTab('filo://preferences/preferences.html#sec-filo-parla');
