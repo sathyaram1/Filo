@@ -1328,3 +1328,51 @@ test('#1994 — un\'opzione composta da espansioni o graffe della shell vale qua
   }
   assert.equal(C.classify('Get-ChildItem | ForEach-Object { $_.Name }', ps), 1);
 });
+
+// PowerShell passa un elenco `HEAD,'--output=x'` a git come argomenti separati, e in cmd `%PATH:~0,0%` vale niente:
+// l'opzione è quella che riceve il programma, e una variabile di cmd tagliata o sostituita non si sa cosa valga.
+test('#1994 — un\'opzione dentro un elenco di PowerShell o accanto a una variabile tagliata di cmd non è una lettura libera', () => {
+  const ps = SHELL_1994[1];
+  const bat = 'C:\\Users\\u\\AppData\\Roaming\\Microsoft\\Windows\\Start Menu\\Programs\\Startup\\a.bat';
+  for (const cmd of [
+    `git log -1 --format=x%n HEAD,'--output=${bat}'`, `git log -1 --format=x%n 'HEAD','--output=${bat}'`,
+    "git log 'HEAD' ,'--output=x'", 'git log -1 "--format=x","--output=x"', "git diff --no-index a b,'--output=x'",
+    "git log 'a','--output=x' | Select-Object -First 1", "git push origin,'--force'", "git checkout 'main','--','.'",
+  ]) assert.equal(C.classify(cmd, ps), 3, cmd);
+  for (const cmd of ['Get-ChildItem -Include *.js,*.ts', 'Get-Content a.txt,b.txt', 'Get-ChildItem | Select-Object Name,Length', 'git log --format=%h,%s']) {
+    assert.equal(C.classify(cmd, ps), 1, cmd);
+  }
+  const cmdExe = { shell: 'cmd', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true };
+  for (const cmd of [`git log -1 --out%PATH:~0,0%put="${bat}"`, 'git log --output%USERNAME:~0,0%=x', 'git log --out%PATH:~9999%put=x', 'tree -%PATH:~0,0%o x']) {
+    assert.ok(C.classify(cmd, cmdExe) >= 2, cmd);
+  }
+  assert.equal(C.classify('dir %USERPROFILE%\\Desktop', cmdExe), 1);
+});
+
+// getopt accetta un'opzione lunga abbreviata e le corte raggruppate o col valore attaccato: `file --comp` compila.
+test('#1994 — le opzioni che scrivono si riconoscono anche abbreviate, raggruppate o col valore attaccato', () => {
+  for (const cmd of [
+    'file -m magia --comp', 'file -m magia --compil', 'date --se=1', 'date --s=1', 'date -s1', 'date -us 1', 'date -Rs 1',
+    'hostname --file=x', 'hostname --fi x', 'hostname -vF x',
+  ]) assert.ok(lvl(cmd) >= 2, cmd);
+  for (const cmd of ['date -d 1', 'date -Is', 'date -u', 'date +%F', 'hostname -f', 'hostname -s', 'file a.txt']) assert.equal(lvl(cmd), 1, cmd);
+});
+
+test('#1994 — reflog expire e symbolic-ref con un valore modificano il repository', () => {
+  for (const cmd of ['git reflog expire --expire=now --all', 'git reflog delete HEAD@{1}']) assert.equal(lvl(cmd), 3, cmd);
+  assert.equal(lvl('git symbolic-ref HEAD refs/heads/altro'), 2);
+  for (const cmd of ['git reflog', 'git reflog show main', 'git reflog -n 5', 'git symbolic-ref HEAD', 'git symbolic-ref --short HEAD']) {
+    assert.equal(lvl(cmd), 1, cmd);
+  }
+});
+
+// Le graffe si aprono fino a un tetto: oltre, il comando chiede e la risposta arriva subito, anche da una pagina che
+// fa scrivere al modello un intervallo enorme o graffe che si moltiplicano.
+test('#1994 — graffe enormi o moltiplicate chiedono conferma senza bloccare il conto', () => {
+  const bash = SHELL_1994[0];
+  for (const cmd of ['echo {1..99999999999}', `echo ${'{a,b}'.repeat(30)}`, `git log ${'{a,b}'.repeat(30)} --output=x`, 'echo {a..z}{a..z}{a..z}']) {
+    const t = Date.now();
+    assert.equal(C.classify(cmd, bash), 3, cmd);
+    assert.ok(Date.now() - t < 1000, `"${cmd}" ha richiesto ${Date.now() - t} ms`);
+  }
+});
