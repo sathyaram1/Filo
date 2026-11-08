@@ -131,14 +131,11 @@
     const avvisoEl = root.querySelector('.sn-rt-avviso');
 
     let signedIn = false;
-    let balance = null; // null = sconosciuto (non blocchiamo finché non lo sappiamo)
-    // Chi non ha un codice (#991) legge prima il prezzo e che il risultato non lo vede. null = non ancora saputo.
+    // Chi non ha un codice (#991) legge prima che il risultato non lo vede. null = non ancora saputo.
     let verificato = null;
 
     function sendLabel() {
-      // Mostra SEMPRE il costo (spec §8.1, punto 3).
-      if (!signedIn) return 'Accedi per inviare';
-      return `Invia attacco · ${COST} cr`;
+      return signedIn ? 'Invia attacco' : 'Accedi per inviare';
     }
 
     function setStatus(text, kind) {
