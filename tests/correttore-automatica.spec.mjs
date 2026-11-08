@@ -439,7 +439,7 @@ test('nell\'editor Lexical la parola dopo una correzione resta staccata, e l\'an
   const page = await apriEditore(app, openTab, testServer, editore('lexical', 'avviaLX'));
   const testo = () => page.evaluate(() => window.lxText().replace(/ /g, ' '));
   await page.locator('#m').click();
-  await page.keyboard.type('Ciao marco come va, non so perchè ');
+  await batti(page, 'Ciao marco come va, non so perchè ');
   await expect.poll(testo).toBe('Ciao Marco come va, non so perché ');
   await page.keyboard.press('Control+z');
   await expect.poll(testo).toBe('Ciao Marco come va, non so perchè ');
