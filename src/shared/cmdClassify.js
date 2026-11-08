@@ -859,7 +859,7 @@
     return inerti.size ? [segnata()] : null;
   }
   // Le graffe inerti, segnate così mentre si aprono le altre e rimesse com'erano alla fine.
-  const SEGNI_INERTI = '${dentro}${dopo}`;
+  const SEGNI_INERTI = '${dopo}`;
       j = i;
     }
     return w === parola ? null : [w];
