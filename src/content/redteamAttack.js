@@ -286,6 +286,8 @@
         return;
       }
       refreshSendState();
+      // Il testo troppo lungo resta lì, col cursore dentro, per accorciarlo.
+      if (msg.campo) { try { (msg.campo === 'description' ? descEl : attackEl).focus(); } catch (_) {} }
     });
 
     cancelBtn.addEventListener('click', () => close());
