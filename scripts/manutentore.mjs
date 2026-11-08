@@ -15,6 +15,7 @@ import { CHIAVI, chiaveDallAmbiente, comeCrearla } from './lib/chiave-di-classe.
 import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { famigliaPrezzo, PREZZI } from './session-report.mjs';
+import '../src/shared/feedbackAttese.js';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -34,6 +35,23 @@ export function leggiOrdine(testo) {
 
 // Ogni campo di una scheda viene dal testo di un feedback: una riga per scheda è ciò che lo tiene un dato.
 const unaRiga = (v) => String(v == null ? '' : v).replace(/\s+/g, ' ').trim();
+
+/**
+ * «aspetta #1563 (non ancora fuso)» e, a parte, «aspettava #1562» (#2262): chi legge non prende per bloccato un lavoro
+ * libero. `nonFermano`: le attese che la coda non conta su una priorità 3. Un numero nudo (server di prima) resta com'è. PURA.
+ */
+export function pezziAttese(aspetta, aspettava, nonFermano) {
+  const ATT = globalThis.SN_FB_ATTESE;
+  const num = (n) => ATT.etichetta({ num: unaRiga(n).replace(/^#/, '') });
+  const una = (w) => (w && typeof w === 'object'
+    ? `${num(w.num)} (${ATT.ETICHETTA[w.stato] || ATT.ETICHETTA[ATT.STATO.IGNOTO]})` : num(w));
+  const lista = (l) => (Array.isArray(l) ? l : []);
+  return [
+    lista(aspetta).length ? `aspetta ${lista(aspetta).map(una).join(', ')}` : '',
+    lista(aspettava).length ? `aspettava ${lista(aspettava).map(num).join(', ')}` : '',
+    lista(nonFermano).length ? `attese che non fermano una priorità 3: ${lista(nonFermano).map(num).join(', ')}` : '',
+  ];
+}
 
 /**
  * Quanto ci si può fidare della scheda, in parole, o '' se è buona: non buona, scritta su una versione vecchia del
@@ -66,7 +84,7 @@ export function rigaScheda(s, f = {}) {
     s.risolto_su_main ? `risolto? ${unaRiga(s.risolto_su_main).slice(0, 60)}` : '',
     Array.isArray(s.doppione_di) && s.doppione_di.length ? `doppione di ${s.doppione_di.map((n) => `#${unaRiga(n).replace(/^#/, '')}`).join(', ')}` : '',
     f && Array.isArray(f.unisce) && f.unisce.length ? `pacchetto di ${numeri(f.unisce)}` : '',
-    f && Array.isArray(f.attese) && f.attese.length ? `aspetta ${numeri(f.attese)}` : '',
+    ...pezziAttese(f && f.attese, f && f.aspettava, f && f.nonFermano),
   ].filter(Boolean).join(' · ');
   const file = Array.isArray(s.file_probabili) && s.file_probabili.length ? ` | file: ${s.file_probabili.map(unaRiga).join(', ')}` : '';
   return `${pezzi} — ${unaRiga(s.titolo_breve)}: ${unaRiga(s.riassunto)}${file}`;
@@ -484,7 +502,7 @@ export function rigaSchedaServer(s, locale = null) {
     s.lavoroServer ? 'lavoro server' : '',
     s.fiducia && s.fiducia !== 'fidato' ? unaRiga(s.fiducia).replace(/_/g, ' ') : '',
     Array.isArray(s.unisce) && s.unisce.length ? `pacchetto di ${numeri(s.unisce)}` : '',
-    Array.isArray(s.aspetta) && s.aspetta.length ? `aspetta ${numeri(s.aspetta)}` : '',
+    ...pezziAttese(s.aspetta, s.aspettava, s.nonFermano),
     s.ramo ? `ramo ${unaRiga(s.ramo)}` : '',
   ].filter(Boolean).join(' · ');
   const titolo = s.titolo ? unaRiga(s.titolo) : (s.riservato ? '(riservato)' : '');
@@ -497,7 +515,7 @@ export function rigaSchedaServer(s, locale = null) {
 export function indiceDalServer(schede) {
   return (schede || []).filter((s) => s && s.num).map((s) => ({
     num: String(s.num), stato: s.stato || '', priorita: Number.isInteger(s.priorita) ? s.priorita : null,
-    unisce: s.unisce || [], attese: s.aspetta || [],
+    unisce: s.unisce || [], attese: s.aspetta || [], aspettava: s.aspettava || [], nonFermano: s.nonFermano || [],
   }));
 }
 

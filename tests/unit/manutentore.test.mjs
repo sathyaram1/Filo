@@ -146,6 +146,31 @@ test('la riga di una scheda dice se il feedback aspetta un pacchetto, o se è lu
   assert.match(M.rigaScheda(scheda(950), { stato: 'todo', priorita: 1, unisce: ['812', '815'] }), / · pacchetto di #812, #815/);
 });
 
+test('la riga della scheda del server tiene a parte le attese che bloccano, col loro stato, e quelle già fuse (#2262)', () => {
+  const s = { num: '1564', stato: 'todo', priorita: 2, titolo: 'T',
+    aspetta: [{ num: '1563', stato: 'aperto' }, { num: '1600', stato: 'chiuso' }, { num: '1601', stato: 'ignoto' }, { num: '', stato: 'cancellato' }],
+    aspettava: ['1562'], unisce: [] };
+  const riga = M.rigaSchedaServer(s);
+  assert.match(riga, / · aspetta #1563 \(non ancora fuso\), #1600 \(chiuso senza fusione\), #1601 \(stato non letto\), un feedback senza numero \(cancellato\) · aspettava #1562/);
+  const libera = M.rigaSchedaServer({ ...s, aspetta: [], aspettava: ['1302'] });
+  assert.doesNotMatch(libera, / · aspetta #/, 'tutte fuse: non sembra bloccata');
+  assert.match(libera, / · aspettava #1302/);
+  assert.match(M.rigaSchedaServer({ ...s, aspetta: ['950'], aspettava: undefined }), / · aspetta #950( |$)/, 'il server di prima manda numeri nudi');
+  const [f] = M.indiceDalServer([s]);
+  assert.match(M.rigaScheda(scheda(1564), f), / · aspetta #1563 \(non ancora fuso\), .* · aspettava #1562/, 'la scheda locale dice lo stesso');
+});
+
+test('una priorità 3 la cui attesa non la ferma non sembra bloccata, e l\'attesa si vede a parte (#2262)', () => {
+  const s = { num: '1800', stato: 'todo', priorita: 3, titolo: 'T', aspetta: [], aspettava: [], nonFermano: ['1563', ''], unisce: [] };
+  const riga = M.rigaSchedaServer(s);
+  assert.doesNotMatch(riga, / · aspetta #/);
+  assert.match(riga, / · attese che non fermano una priorità 3: #1563, un feedback senza numero/);
+  const [f] = M.indiceDalServer([s]);
+  assert.match(M.rigaScheda(scheda(1800), f), /attese che non fermano una priorità 3: #1563/, 'la scheda locale dice lo stesso');
+  assert.equal(M.pezziAttese([], ['', '#7'])[1], `aspettava ${globalThis.SN_FB_ATTESE.testoAttese([{ num: '' }, { num: '7' }])}`,
+    'i numeri si scrivono come nei messaggi delle attese');
+});
+
 test('un ramo i cui feedback sono tutti chiusi secondo l\'indice non è in corso, e si dice fra i lasciati fuori', () => {
   const rami = [
     { ramo: 'claude/morto', feedback: ['1728'] }, { ramo: 'claude/vivo', feedback: ['1728', '900'] },
