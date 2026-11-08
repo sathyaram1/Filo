@@ -258,7 +258,7 @@
     if (PS_READ.has(prog)) return true;
     // In pipeline vale come lettura anche ciò che è già livello 1: `cat file | grep errore`
     // non compie niente di più di `cat file`.
-    return inPipeline && classifyOne(seg) === 1;
+    return inPipeline && classifyOneLetto(seg, c) === 1;
   }
 
   // Pura pipeline (solo `|`), senza sequenze, background, redirezioni o sostituzioni:
