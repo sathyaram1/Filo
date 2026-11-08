@@ -165,7 +165,7 @@ test('«marco» prende la maiuscola dove chi scrive usa le maiuscole, e non dove
   await page.waitForTimeout(400);
   await expect(errore(page, 'marco')).toHaveCount(0);
   // Gli errori fissi invece si correggono anche lì.
-  await page.keyboard.type('perchè ');
+  await batti(page, 'perchè ');
   expect(await valore(page)).toBe('ciao come va. tutto bene. domani vedo marco perché ');
   // Dentro un indirizzo o un nome di file niente.
   await svuota(page);
@@ -374,7 +374,7 @@ test('nella chat di casa e in una pagina in autofocus, scritto subito senza clic
   await app.evaluate(() => globalThis.SN_HANDLE_MESSAGE({ type: globalThis.SN_MSG.MSG.UPDATE_SETTINGS, settings: { correttore: { automatica: true } } },
     { tab: { url: 'filo://preferences/' }, url: 'filo://preferences/' }));
   await page.waitForTimeout(500);
-  await page.keyboard.type('perchè ');
+  await batti(page, 'perchè ');
   await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché poi perché ');
 });
 
