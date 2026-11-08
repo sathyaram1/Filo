@@ -368,7 +368,7 @@
   // Fra una compattazione e l'altra: il grezzo che resta, quanto cresce il tratto prima della prossima, cosa riceve chi compatta.
   function ciclo({ soglia, base, uso = USO } = {}) {
     const u = { ...USO, ...(uso || {}) };
-    const grezzo = Math.min(TURNI_GREZZI * u.perMessaggio, Math.max(u.perMessaggio, grezzoMassimo({ soglia, base })));
+    const grezzo = Math.min(TURNI_GREZZI * u.perMessaggio, Math.max(u.perMessaggio, grezzoMassimo({ soglia, base, turno: u.perMessaggio })));
     const spazio = Math.max(u.perMessaggio, sogliaAnticipo({ soglia, base }) - base - grezzo);
     return { u, grezzo, spazio, ingresso: spazio + u.parteUtente };
   }
