@@ -858,7 +858,7 @@
     }
     return inerti.size ? [segnata()] : null;
   }
-  // Le graffe inerti, segnate così mentre si aprono le altre e rimesse com'erano alla fine.
+  // I segni delle graffe inerti mentre si aprono le altre: `graffe` li rimette come erano.
   const SEGNI_INERTI = '';
 
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
