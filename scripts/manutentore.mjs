@@ -1141,7 +1141,8 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   rapporti [N] [--sottonumeri] [--da D [--a D] | --giorni G] [--somma] [--cursore C] [--limite L] [--tutte] [--json]
   rapporti --cache [--giorni G | --da D [--a D]] [--json]   (per ruolo: cache scritta, rewarm, attese, saldo dell'ora)
   rapporti --rifiuti [--giorni G | --da D [--a D]] [--json] (per ruolo: Edit e Write rifiutati, con la causa)
-  rami | incroci <N>                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch]
+  rami | incroci [N]                       [--cartella <dir delle schede>] [--giorni 30] [--senza-fetch] [--clone-server <dir>]
+                                           (app e filo-security; incroci senza N: i file in comune fra i rami in corso)
   ordine | accendi <N,C-12,M,…>|--niente | parallelo <N>
   priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <P> <N,M,…> [--server]
   compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   (istruzioni da stdin; risponde con l'id C-n)
