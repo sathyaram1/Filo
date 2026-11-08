@@ -1905,7 +1905,7 @@
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
-    if ((c.sistemaIgnoto || (!shellPosix(c) && c.shell !== 'cmd')) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
+    if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
     const letture = comeLaShell(cmd, c);
     if (letture == null) return TRE;
     const contesti = forseDash(c) && APICE_CHE_DASH_CHIUDE.test(cmd) ? [c, { ...c, senzaAnsi: true }] : [c];
