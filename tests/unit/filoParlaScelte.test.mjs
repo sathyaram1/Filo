@@ -37,3 +37,19 @@ test('il manifesto dice il predefinito, e il servizio parte da lì', () => {
   const Parla = require('../../src/main/services/filoParla.js');
   assert.equal(Parla._ritmoMs(), PREDEFINITO * 60_000);
 });
+
+test('dalla chat il ritmo si capisce anche a parole, e la conferma lo chiama come l\'elenco dei cambi', async () => {
+  await import('../../src/shared/preferences.js');
+  const build = (v) => globalThis.SN_PREF.buildPreferencePartial('messaggi sui download', v);
+  const casi = { '30': 30, 'mezz\'ora': 30, 'mezz’ora': 30, 'ogni mezzora': 30, 'dieci minuti': 10, 'una volta ogni dieci minuti': 10,
+    'cinque': 5, 'un\'ora': 60, 'ogni ora': 60, '2 ore': 60, '2': 2 };
+  for (const [v, atteso] of Object.entries(casi)) assert.equal(build(v)?.partial.filoParla.downloadOgniMin, atteso, `«${v}»`);
+  for (const v of ['boh', '0', '']) assert.equal(build(v), null, `«${v}»`);
+  const cambi = readFileSync(new URL('../../src/shared/cambi.js', import.meta.url), 'utf8');
+  assert.match(cambi, /'filoParla\.downloadOgniMin':[^\n]*nomeRitmoDownload/, 'l\'elenco dei cambi usa lo stesso nome');
+  for (const min of SCELTE) {
+    const nome = C.nomeRitmoDownload(min);
+    assert.equal(build(String(min)).label, `Messaggi sui download → ${nome}`);
+    assert.doesNotMatch(nome, /ogni un'/);
+  }
+});
