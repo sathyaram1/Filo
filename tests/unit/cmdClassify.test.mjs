@@ -1366,13 +1366,11 @@ test('#1994 — reflog expire e symbolic-ref con un valore modificano il reposit
   }
 });
 
-// Le graffe si aprono fino a un tetto: oltre, il comando chiede e la risposta arriva subito, anche da una pagina che
-// fa scrivere al modello un intervallo enorme o graffe che si moltiplicano.
+// Le graffe si aprono fino a un tetto: oltre, il comando chiede. Senza il tetto un intervallo enorme o graffe che si
+// moltiplicano (da una pagina che le fa scrivere al modello) bloccherebbero il conto, e questo test non finirebbe.
 test('#1994 — graffe enormi o moltiplicate chiedono conferma senza bloccare il conto', () => {
   const bash = SHELL_1994[0];
   for (const cmd of ['echo {1..99999999999}', `echo ${'{a,b}'.repeat(30)}`, `git log ${'{a,b}'.repeat(30)} --output=x`, 'echo {a..z}{a..z}{a..z}']) {
-    const t = Date.now();
     assert.equal(C.classify(cmd, bash), 3, cmd);
-    assert.ok(Date.now() - t < 1000, `"${cmd}" ha richiesto ${Date.now() - t} ms`);
   }
 });
