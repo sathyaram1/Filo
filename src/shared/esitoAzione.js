@@ -140,6 +140,26 @@
     const etichetta = breve(x.etichetta || x.label || '', 200);
     return { percorso: p, ...(etichetta ? { etichetta } : {}) };
   }
+  // La pagina che il collegamento riapriva: riaperta, la chat lo ridisegna (solo indirizzi del web o di Filo).
+  function linkDi(x) {
+    const url = String((x && (x.url || x.href || x.link)) || '');
+    if (!url || url.length > MAX_PERCORSO || /[\u0000- \u007f]/.test(url) || !/^(https?|filo):\/\//i.test(url)) return null;
+    const etichetta = breve(x.etichetta || x.label || '', 200);
+    return { url, ...(etichetta ? { etichetta } : {}) };
+  }
+  // Le pagine di «Aperti per dopo» che la risposta nominava: riaperta, la chat ridà i loro bottoni.
+  function salvateDi(lista) {
+    const l = (Array.isArray(lista) ? lista : [])
+      .filter((p) => p && p.id != null && /^https?:\/\//i.test(String(p.url || '')) && String(p.url).length <= MAX_PERCORSO
+        && !/[\u0000- \u007f]/.test(String(p.url)))
+      .map((p) => ({ id: breve(p.id, 200), url: String(p.url), ...(p.title ? { title: breve(p.title, 300) } : {}) }));
+    return l.length ? l : null;
+  }
+  function salvateNominate(x) {
+    const o = x && x._output;
+    if (!o || !Array.isArray(o.pagine) || !Array.isArray(o.nominate)) return null;
+    return salvateDi(o.nominate.map((id) => o.pagine.find((p) => p && p.id === id)));
+  }
   // Il titolo di un'altra conversazione non resta scritto in questa: tolta o cancellata, lì non deve sopravvivere.
   const SENZA_TITOLO = {
     TOGLI_CHAT: ['Togliere una conversazione dal filo', 'Conversazione tolta dal filo'],
