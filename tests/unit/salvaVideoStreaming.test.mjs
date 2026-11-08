@@ -224,7 +224,8 @@ test('un sito con la regola del paese e nessun proxy da usare: il programma non 
   ilCaso({ titolo: 'Diretto', pausaMs: 5 });
   const r = await SV.salva({ url: URL_SEGNALATO, titolo: 'Diretto', scegli: async (n) => dentro(n), sposta });
   assert.equal(r.ok, true, JSON.stringify(r));
-  assert.equal(proxyDelProgramma().ALL_PROXY, undefined);
+  const delSistema = Object.fromEntries(Object.entries(process.env).filter(([k]) => /^(https?|all|no)_proxy$/i.test(k)));
+  assert.deepEqual(proxyDelProgramma(), delSistema);
 });
 
 test('il titolo del sito diventa un nome di file valido su ogni sistema', () => {
