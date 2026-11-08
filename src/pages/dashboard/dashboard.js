@@ -1984,13 +1984,32 @@
   }
   // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
   // dal disco. Torna se c'erano file.
+  const Trascino = self.SN_TRASCINO_INTERNO;
+  const daChat = (dt) => !!Trascino && Trascino.porta(dt, 'file');
   function fileNelCampo(dt) {
-    const daChat = dt?.getData('application/x-filo-file') || '';
-    if (daChat) addPendingFile(daChat);
-    else if (dt?.files && dt.files.length) for (const f of dt.files) handleDroppedFile(f);
-    else return false;
+    if (daChat(dt)) {
+      const { aVista, dati } = Trascino.arriva(dt, 'file');
+      // Un percorso che il main non riconosce l'ha scritto altri (una pagina web): entra come testo, a vista.
+      dati.then((p) => { if (typeof p === 'string' && p) { addPendingFile(p); inputEl.focus(); } else testoNelCampo(aVista); });
+      return true;
+    }
+    if (!dt?.files || !dt.files.length) return false;
+    for (const f of dt.files) handleDroppedFile(f);
     inputEl.focus();
     return true;
+  }
+  function testoNelCampo(testo) {
+    if (!testo) return;
+    testoDaFuori = true;
+    const prima = inputEl.value.slice(0, inputEl.selectionStart);
+    const dopo = inputEl.value.slice(inputEl.selectionEnd);
+    const spazioDopo = dopo && !/^\s/.test(dopo) ? ' ' : '';
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${spazioDopo}`;
+    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
+    inputEl.focus();
+    autoGrowInput();
+    Comandi.updateInputClass();
+    Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
   }
   // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta. Sul campo e fuori conta uguale.
   const contaNellaChat = (dt, usato) => {
