@@ -1611,7 +1611,9 @@
   // Filo scrive `testo` nella casella (una correzione, l'Incolla del menu, la dettatura): vale come scritto dall'utente.
   // Gli editor che rifanno il testo dopo l'evento lo mostrano al giro dopo: lì si guarda ancora, poi si chiude.
   function scriveFilo(el, testo) {
-    const state = monitored.get(el);
+    let state = el ? monitored.get(el) : null;
+    // Chi scrive in un editor ricco può avere in mano un nodo dentro il campo, o il campo dentro il nodo.
+    if (!state && el && activeEl && (activeEl.contains(el) || (typeof el.contains === 'function' && el.contains(activeEl)))) state = monitored.get(activeEl);
     if (!state) return;
     const t = String(testo ?? '');
     state.filoScrive = t;
