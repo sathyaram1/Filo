@@ -39,11 +39,11 @@
   const porta = (dt, cosa) => tipi(dt).includes(tipoDi(cosa));
 
   // Al drop, dentro l'evento: dopo, il DataTransfer non si legge più. `aVista` è quello che entra nella casella se il
-  // gettone non vale; `dati` dice cosa ha dato il main, null se il gettone non era suo.
+  // gettone non vale; `dati` dice cosa ha dato il main, null se il gettone non era suo. La forma la giudica il main.
   function arriva(dt, cosa) {
     const gettone = leggi(dt, tipoDi(cosa));
     const aVista = leggi(dt, 'text/plain') || gettone;
-    const dati = /^[\w-]{16,64}$/.test(gettone)
+    const dati = gettone
       ? invia({ type: MSG().TRASCINO_INTERNO_ARRIVA, gettone, cosa }).then((r) => (r && r.ok ? r.dati : null))
       : Promise.resolve(null);
     return { aVista, dati };
