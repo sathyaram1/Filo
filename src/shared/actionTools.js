@@ -649,6 +649,8 @@
         acceso: B('true accende, false spegne.'),
         dispositivo: S('Il dispositivo abbinato da collegare o scollegare, come lo chiama l\'utente (per esempio "le cuffie Sony").'),
         collega: B('Con `dispositivo`: true collega (è il valore se lo ometti), false scollega.'),
+        dimentica: B('Con `dispositivo`: true lo dimentica ("dimentica le cuffie vecchie": toglie l\'abbinamento, per riusarlo va riabbinato dal sistema). Chiede conferma all\'utente.'),
+        preferito: B('Con `dispositivo`: true lo mette fra i preferiti (in cima all\'elenco nella home), false lo toglie.'),
         elenca: B('true per avere i dispositivi abbinati, senza cambiare niente.'),
       },
       required: [],
@@ -658,6 +660,7 @@
       properties: {
         acceso: B('true accende, false spegne.'),
         rete: S('La rete conosciuta a cui collegarsi, come la chiama l\'utente.'),
+        dimentica: B('Con `rete`: true la dimentica ("dimentica la rete dell\'albergo": il computer non ci si ricollega più da solo, e servirà di nuovo la password). Chiede conferma all\'utente.'),
         elenca: B('true per avere le reti conosciute, senza cambiare niente.'),
       },
       required: [],

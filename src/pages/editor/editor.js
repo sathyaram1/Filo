@@ -1170,9 +1170,12 @@
 
   // Il titolo derivato è segnato «a mano» così non viene rigenerato in automatico.
   function duplicateActiveFile() {
-    if (!doc) return;
-    syncActiveIntoCollection();
-    const src = STORE.findFile(collection, doc.id);
+    if (doc) duplicateFile(doc.id);
+  }
+  function duplicateFile(id) {
+    if (!id) return;
+    if (doc && doc.id === id) syncActiveIntoCollection();
+    const src = STORE.findFile(collection, id);
     if (!src) return;
     const copy = JSON.parse(JSON.stringify(src));
     delete copy.id;
@@ -1205,9 +1208,10 @@
   function onTitleMenuKeydown(e) {
     if (e.key === 'Escape') closeTitleMenu();
   }
-  function openTitleMenu(x, y) {
+  // `file`: una voce dell'elenco documenti (#2096): il menu è di quel documento, e l'elenco resta aperto.
+  function openTitleMenu(x, y, { file = null } = {}) {
     closeTitleMenu();
-    closeDocPop();
+    if (!file) closeDocPop();
     const menu = document.createElement('div');
     menu.className = 'sn-select-pop ed-title-ctxmenu';
     menu.setAttribute('role', 'menu');
@@ -1219,6 +1223,13 @@
       o.addEventListener('click', () => { closeTitleMenu(); onClick(); });
       menu.appendChild(o);
     };
+    if (file) {
+      const voce = () => docPopEl && docPopEl.querySelector(`.ed-doc-item[data-id="${CSS.escape(file.id)}"]`);
+      if (file.id !== collection.activeId) add('Apri', () => { switchToFile(file.id); closeDocPop(); });
+      add('Rinomina', () => { const it = voce(); if (it) startInlineRename(it, file); });
+      add('Duplica', () => duplicateFile(file.id));
+      add('Elimina', () => deleteFile(file.id));
+    } else {
     add('Rigenera titolo', () => generateTitleForActive({ auto: false }));
     add('Rigenera riassunto', () => {
       const id = doc && doc.id;
@@ -1234,6 +1245,7 @@
     add('Rinomina', () => startDocTitleRename());
     add('Duplica file', () => duplicateActiveFile());
     add('Elimina file', () => { if (doc) deleteFile(doc.id); });
+    }
     document.body.appendChild(menu);
     const vw = window.innerWidth, vh = window.innerHeight;
     const w = menu.offsetWidth, h = menu.offsetHeight;
@@ -1424,6 +1436,7 @@
     document.removeEventListener('mousedown', onDocPopOutside, true);
   }
   function onDocPopOutside(e) {
+    if (titleMenuEl && titleMenuEl.contains(e.target)) return;
     if (docbarEl && !docbarEl.contains(e.target)) closeDocPop();
   }
   if (docSwitchBtn) {
@@ -1443,7 +1456,9 @@
   if (docbarEl) {
     docbarEl.addEventListener('contextmenu', (e) => {
       e.preventDefault();
-      openTitleMenu(e.clientX, e.clientY);
+      const it = e.target && e.target.closest ? e.target.closest('.ed-doc-item') : null;
+      const file = it ? collection.files.find((f) => f.id === it.dataset.id) : null;
+      openTitleMenu(e.clientX, e.clientY, { file });
     });
   }
 

@@ -530,10 +530,11 @@
   function pastiglie() {
     const s = dati.impostazioni || {};
     const scuro = temaScuro(s);
+    // `voce`: il controllo che la cambia in Preferenze, dove porta il suo tasto destro (#2096).
     return [
-      { etichetta: 'Tema scuro', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
-      { etichetta: 'Terminale', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
-      { etichetta: 'Anteprima schede', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
+      { etichetta: 'Tema scuro', voce: 'theme', acceso: scuro, scrivi: () => ({ theme: scuro ? 'light' : 'dark' }) },
+      { etichetta: 'Terminale', voce: 'terminalEnabled', acceso: !!(s.terminal && s.terminal.enabled), scrivi: () => ({ terminal: { enabled: !(s.terminal && s.terminal.enabled) } }) },
+      { etichetta: 'Anteprima schede', voce: 'tabPreviewEnabled', acceso: !(s.tabPreview && s.tabPreview.enabled === false), scrivi: () => ({ tabPreview: { enabled: !!(s.tabPreview && s.tabPreview.enabled === false) } }) },
     ];
   }
   function cartaRapide() {
@@ -672,7 +673,11 @@
     art.addEventListener('contextmenu', (e) => {
       e.preventDefault();
       contaUso(art, 'tasto_destro');
-      apriMenu(e.clientX, e.clientY, vociMenu(art));
+      // Su una pastiglia il menu è suo (#2096): accenderla o spegnerla, e la sua voce in Preferenze.
+      const pas = e.target && e.target.closest ? e.target.closest('.dash-pastiglia') : null;
+      const i = pas ? [...pas.parentElement.children].indexOf(pas) : -1;
+      const p = i >= 0 && art._carta.pastiglie ? art._carta.pastiglie[i] : null;
+      apriMenu(e.clientX, e.clientY, p ? vociPastiglia(p) : vociMenu(art));
     });
     agganciaTrascinamento(art);
     return art;
@@ -805,6 +810,12 @@
     if (at > 0) voci.push({ etichetta: 'Sposta su', fai: () => spostaCarta(art, -1) });
     if (at >= 0 && at < fratelli.length - 1) voci.push({ etichetta: 'Sposta giù', fai: () => spostaCarta(art, 1) });
     if (c.togli) voci.push({ etichetta: c.etichettaTogli || 'Togli', fai: () => c.togli() });
+    return voci;
+  }
+  // Il menu di una pastiglia delle Impostazioni rapide: le stesse cose del suo clic, più la sua voce in Preferenze.
+  function vociPastiglia(p) {
+    const voci = [{ etichetta: `${p.acceso ? 'Spegni' : 'Accendi'}: ${p.etichetta.toLowerCase()}`, fai: () => scriviImpostazione(p.scrivi()) }];
+    if (p.voce) voci.push({ etichetta: 'Apri la voce in Preferenze', fai: () => apri(`${URL_PREFERENZE}#${p.voce}`) });
     return voci;
   }
 

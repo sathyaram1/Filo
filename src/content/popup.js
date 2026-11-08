@@ -825,6 +825,18 @@
       // Anche la casella che si allarga alza il riquadro: stessa regola.
       reflow(popup);
     });
+    // #2096 — sotto le domande Copia e Rispondi al passaggio del mouse, come nella home; la risposta ha i suoi tasti
+    // sempre a schermo (tastoCopia).
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (A) {
+      A.attacca(popup.bodyEl, {
+        messaggio: '.sn-msg-user',
+        testo: (el) => el.querySelector('.sn-msg-text')?.textContent || '',
+        ruolo: () => 'user',
+        copia: (t) => copiaTesto(t),
+        rispondi: (_el, t) => A.citaNelCampo(popup.inputEl, t),
+      });
+    }
 
     // Dare il fuoco alla casella spegne la selezione della pagina, ma la parola su cui si è
     // chiesta la spiegazione serve ancora dopo: ce la teniamo da parte e gliela rimettiamo.
@@ -843,7 +855,7 @@
 
   function appendBubble(popup, role) {
     const wrap = document.createElement('div');
-    wrap.className = `sn-msg sn-msg-${role}`;
+    wrap.className = `sn-msg sn-msg-${role}${role === 'user' ? ' sn-con-azioni-msg' : ''}`;
     const text = document.createElement('div');
     text.className = 'sn-msg-text';
     wrap.appendChild(text);
@@ -959,7 +971,7 @@
     if (!wrap || !testo.trim()) return null;
     const btn = document.createElement('button');
     btn.type = 'button';
-    btn.className = 'sn-msg-copia';
+    btn.className = 'sn-msg-tasto sn-msg-copia';
     const mostra = (stato) => {
       const chiave = stato === 'ok' ? 'popup_copied' : stato === 'no' ? 'popup_copy_failed' : 'popup_copy';
       btn.dataset.etichetta = I18n.t(chiave);
@@ -985,6 +997,19 @@
     riga.className = 'sn-msg-azioni';
     riga.appendChild(btn);
     wrap.appendChild(riga);
+    return btn;
+  }
+  // «Rispondi» accanto a Copia (#2096): la risposta citata apre la domanda dopo, come nelle altre chat.
+  function tastoRispondi(copiaBtn, sorgente, campo) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    const riga = copiaBtn && copiaBtn.parentElement;
+    if (!riga || !A || !campo) return null;
+    const Md = global.SN_MARKDOWN;
+    const testo = Md && Md.testo ? Md.testo(sorgente) : String(sorgente || '');
+    const btn = A.tasto(A.AZIONI.rispondi, 'sn-msg-tasto sn-msg-rispondi', 14);
+    btn.addEventListener('mousedown', (e) => e.preventDefault());
+    btn.addEventListener('click', (e) => { if (e.isTrusted) A.citaNelCampo(campo, testo); });
+    riga.appendChild(btn);
     return btn;
   }
 
@@ -1081,7 +1106,8 @@
             bubble.wrap.classList.add('sn-msg-muted');
           } else {
             bubble.text.innerHTML = renderMarkdown(daMostrare);
-            tastoCopia(bubble.wrap, daMostrare, () => conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'copia' }));
+            const copiaBtn = tastoCopia(bubble.wrap, daMostrare, () => conta({ misura: 'riquadro', cosa: 'riquadro_uso', action: popup.action, uso: 'copia' }));
+            tastoRispondi(copiaBtn, daMostrare, popup.inputEl);
           }
           notaRipiego(bubble.text, m.keyFallback);
           notaInterrotta(bubble.text, m.finishReason, () => continuaRisposta(popup));

@@ -917,7 +917,11 @@
     tetto: 'Tetto dei regali', giornaliera: 'Quota del giorno', inviti: 'Ingressi con invito', scarto: 'Registro d’uso',
   });
 
-  const alPercento = (p) => (/^(1|8|11|8\d)$/.test(String(p)) ? `all'${p}%` : `al ${p}%`);
+  // L'articolo davanti alla percentuale: la regola sta in src/shared/sistema.js.
+  const alPercento = (p) => {
+    if (!global.SN_SISTEMA && typeof require === 'function') require('./sistema.js');
+    return global.SN_SISTEMA.alPercento(p);
+  };
   function elencoBreve(nomi) {
     const altri = nomi.length - PSEUDONIMI_DETTI;
     const primi = nomi.slice(0, PSEUDONIMI_DETTI).join(', ');

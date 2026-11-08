@@ -96,12 +96,14 @@
     if (r.aperta && prima && prima.n !== v.n) riempi(r).catch(() => {});
   }
 
-  function messaggio(m) {
+  // `chat` e `i`: il posto del messaggio nel filo, che Rispondi cita nel campo della home (#2096).
+  function messaggio(m, chat, i) {
     const div = document.createElement('div');
-    div.className = `dash-riga-app-msg dash-riga-app-msg-${m.role === 'user' ? 'user' : 'filo'}`;
+    div.className = `dash-riga-app-msg dash-riga-app-msg-${m.role === 'user' ? 'user' : 'filo'} sn-con-azioni-msg`;
+    const testo = String(m.text || '');
+    div._citabile = { chat, i, ts: m.ts || '', role: m.role === 'user' ? 'user' : 'filo', scritto: testo };
     // Le risposte di Filo con la formattazione leggera della home (come nell'app dove sono nate): il renderer escapa
     // l'HTML e filtra i link. Le domande dell'utente restano letterali.
-    const testo = String(m.text || '');
     if (m.role !== 'user' && global.SN_MARKDOWN) {
       div.innerHTML = global.SN_MARKDOWN.render(testo);
       div.classList.add('dash-bubble-md');
@@ -123,7 +125,8 @@
       }));
       return;
     }
-    const parti = (chat.messages || []).filter((m) => m && String(m.text || '').trim()).map(messaggio);
+    const parti = (chat.messages || []).map((m, i) => [m, i]).filter(([m]) => m && String(m.text || '').trim())
+      .map(([m, i]) => messaggio(m, chat.id || r.vista.id, i));
     const v = r.vista;
     if (v.dove && vai(v.app)) {
       const b = document.createElement('button');
@@ -190,7 +193,9 @@
   function vociMenu(target) {
     const r = rigaDi(target);
     if (!r) return [];
+    const delMessaggio = azioni.flatMap((a) => a.vociMenu(target));
     const voci = [
+      ...delMessaggio,
       { type: 'item', icon: icona('caretDown', 16), label: r.aperta ? 'Chiudi lo scambio' : 'Mostra lo scambio', onClick: () => alterna(r).catch(() => {}) },
     ];
     if (r.vista.dove && vai(r.vista.app)) voci.push({ type: 'item', icon: icona(r.vista.icona, 16), label: vai(r.vista.app), onClick: () => apri(r) });
@@ -262,8 +267,29 @@
     if (r && !r.aperta) alterna(r, true).catch(() => {});
   }
 
+  // Copia e Rispondi sotto ogni messaggio dello scambio aperto (#2096): Rispondi lo cita nel campo della home, col suo
+  // posto nel filo, come una risposta della home.
+  const azioni = [];
+  function attaccaAzioni(el) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (!A || !el) return;
+    const Md = global.SN_MARKDOWN;
+    azioni.push(A.attacca(el, {
+      messaggio: '.dash-riga-app-msg',
+      testo: (m) => {
+        const c = m._citabile;
+        if (!c) return m.textContent;
+        return c.role === 'filo' && Md && Md.testo ? Md.testo(c.scritto) : c.scritto;
+      },
+      ruolo: (m) => (m.classList.contains('dash-riga-app-msg-user') ? 'user' : 'filo'),
+      rispondi: (m, testo) => { global.SN_DASH_RISPONDI.cita({ ...m._citabile, testo }); },
+    }));
+  }
+
   function init(deps) {
     d = deps;
+    attaccaAzioni(d.bubblesEl);
+    if (d.homeEl && d.homeEl !== d.bubblesEl) attaccaAzioni(d.homeEl);
     global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
     if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     try {

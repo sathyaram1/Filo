@@ -402,8 +402,27 @@
     await runTurnAndContinue({ userMessage: last.text });
   }
 
+  // #2096 — «Riprendi dopo»: l'intervista resta a metà (non si chiude, il segno «già accolto» non si scrive) e la
+  // scheda torna alla home; riparte nella prossima scheda nuova, o da «Riprendiamola». Qui non si riapre da sola.
+  let rimandata = false;
+  function riprendiDopo() {
+    if (!onboardingActive) return;
+    rimandata = true;
+    onboardingDoneNow(null);
+  }
+
+  // Il tasto destro sull'intervista che si sta facendo (letto da src/content/content.js): saltarla o lasciarla a dopo.
+  function vociMenu(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    if (!onboardingActive || !el || !threadView || !threadView.contains(el)) return [];
+    return [
+      { type: 'item', label: 'Salta l’accoglienza', onClick: () => { skipOnboarding().catch(() => {}); } },
+      { type: 'item', label: 'Riprendi dopo', onClick: () => riprendiDopo() },
+    ];
+  }
+
   async function maybeOpenOnboardingLater() {
-    if (onboardingActive || isSending() || !nienteDaInterrompere()) return;
+    if (rimandata || onboardingActive || isSending() || !nienteDaInterrompere()) return;
     const state = await fetchOnboarding();
     if (!state || onboardingActive || isSending() || !nienteDaInterrompere()) return;
     await openOnboarding(state);
@@ -589,6 +608,8 @@
     setSuggestions = deps.setSuggestions;
     loadDashboard = deps.loadDashboard;
     rispondi = deps.rispondi || null;
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
   }
 
   global.SN_DASH_ONBOARDING = {

@@ -1433,6 +1433,37 @@
     await salvaCartelle([...(cartelleSalvate || []), r.percorso]);
   }
 
+  // ── Dispositivi Bluetooth preferiti (#2096) ────────────────────────────────
+  // Si mettono dal tasto destro sul dispositivo nella home o chiedendolo a Filo; qui si vedono tutti e si tolgono. Il
+  // nome lo dice l'elenco dei dispositivi abbinati, letto solo se ce n'è almeno uno; senza, resta l'indirizzo.
+  let preferitiBtSalvati = null;
+  const nomiBt = new Map();
+  let nomiBtLetti = false;
+  function disegnaPreferitiBt(elenco) {
+    const box = $('bluetoothPreferiti');
+    if (!box) return;
+    preferitiBtSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x) : [];
+    righeConCrocetta(box, preferitiBtSalvati, {
+      vuoto: 'Nessuno. Li metti col tasto destro su un dispositivo, dal Bluetooth della home, o chiedendolo a Filo.',
+      chiave: 'indirizzo',
+      testo: (ind) => (nomiBt.has(ind) ? `${nomiBt.get(ind)} · ${ind}` : ind),
+      aria: (t) => `Togli ${t} dai preferiti`,
+      togli: (ind) => salvaPreferitiBt((preferitiBtSalvati || []).filter((x) => x !== ind)),
+    });
+    if (preferitiBtSalvati.length && !nomiBtLetti) {
+      nomiBtLetti = true;
+      chrome.runtime.sendMessage({ type: MSG.SISTEMA_COMANDA, richiesta: { cosa: 'bluetooth', elenca: true } }).then((r) => {
+        for (const d of (r && r.ok && Array.isArray(r.elenco) ? r.elenco : [])) if (d && d.indirizzo) nomiBt.set(d.indirizzo, String(d.nome || ''));
+        if (nomiBt.size) disegnaPreferitiBt(preferitiBtSalvati);
+      }).catch(() => {});
+    }
+  }
+  async function salvaPreferitiBt(nuovo) {
+    disegnaPreferitiBt(nuovo);
+    await chrome.runtime.sendMessage({ type: MSG.UPDATE_SETTINGS, settings: { bluetoothPreferiti: nuovo } });
+    flashSaved('bluetoothPreferitiHint');
+  }
+
   // ── Siti dove il tasto destro apre il loro menu (#975) ───────────────────
   // Si aggiungono dal tasto destro sul sito o chiedendolo a Filo; qui si vedono tutti e si tolgono.
   let sitiMenuSalvati = null;
@@ -1441,30 +1472,43 @@
     const box = $('menuDelSitoSiti');
     if (!box) return;
     sitiMenuSalvati = Array.isArray(elenco) ? elenco.filter((x) => typeof x === 'string' && x.trim()) : [];
-    box.textContent = '';
     const tasto = $('menuDelSitoTasto');
     if (tasto) tasto.textContent = window.SN_TASTI ? window.SN_TASTI.etichetta('Shift') : 'Shift';
-    if (!sitiMenuSalvati.length) {
+    righeConCrocetta(box, sitiMenuSalvati, {
+      vuoto: 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.',
+      chiave: 'sito',
+      testo: (sito) => (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito,
+      titolo: 'Torna al menu di Filo',
+      aria: (t) => `Su ${t} torna al menu di Filo`,
+      togli: (sito) => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)),
+    });
+  }
+
+  // Un elenco salvato che qui si vede tutto e si toglie voce per voce con la crocetta.
+  function righeConCrocetta(box, voci, o) {
+    box.textContent = '';
+    if (!voci.length) {
       const p = document.createElement('p');
       p.className = 'sn-muted';
-      p.textContent = 'Nessun sito. Lo aggiungi da «Menu di …» in cima al menu di Filo, o chiedendolo a Filo.';
+      p.textContent = o.vuoto;
       box.appendChild(p);
+      return;
     }
-    for (const sito of sitiMenuSalvati) {
+    for (const v of voci) {
       const row = document.createElement('div');
       row.className = 'mem-riga';
-      row.dataset.sito = sito;
+      row.dataset[o.chiave] = v;
       const t = document.createElement('span');
       t.className = 'mem-testo';
-      t.textContent = (window.SN_NOMI_SITO && window.SN_NOMI_SITO.leggibile(sito)) || sito;
+      t.textContent = o.testo(v);
       row.appendChild(t);
       const b = document.createElement('button');
       b.type = 'button';
       b.className = 'mem-via';
       b.textContent = '×';
-      b.title = 'Torna al menu di Filo';
-      b.setAttribute('aria-label', `Su ${t.textContent} torna al menu di Filo`);
-      b.addEventListener('click', () => salvaSitiMenu((sitiMenuSalvati || []).filter((x) => x !== sito)));
+      if (o.titolo) b.title = o.titolo;
+      b.setAttribute('aria-label', o.aria(t.textContent));
+      b.addEventListener('click', () => o.togli(v));
       row.appendChild(b);
       box.appendChild(row);
     }
@@ -1776,6 +1820,7 @@
     disegnaCartelle(settings.documenti && settings.documenti.cartelle);
     caricaStatoDocumenti();
     disegnaSitiMenu(settings.menuDelSito && settings.menuDelSito.siti);
+    disegnaPreferitiBt(settings.bluetoothPreferiti);
     disegnaScorciatoie(settings.scorciatoie);
 
     Bootstrap.applyTheme(settings.theme);
@@ -1813,6 +1858,7 @@
     }
     const sitiMenu = settings.menuDelSito && settings.menuDelSito.siti;
     if (JSON.stringify(sitiMenu || []) !== JSON.stringify(sitiMenuSalvati || [])) disegnaSitiMenu(sitiMenu);
+    if (JSON.stringify(settings.bluetoothPreferiti || []) !== JSON.stringify(preferitiBtSalvati || [])) disegnaPreferitiBt(settings.bluetoothPreferiti);
     if (JSON.stringify(settings.scorciatoie || {}) !== JSON.stringify(scorciatoieSalvate)) disegnaScorciatoie(settings.scorciatoie);
   }
 

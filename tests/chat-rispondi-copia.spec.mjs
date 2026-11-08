@@ -4,6 +4,9 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
+import { cartellaTemporanea } from './helpers/percorsi.mjs';
+import { writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 const RISPOSTA = '**Tre idee** per cena:\n\n1. Pasta al pomodoro\n2. Risotto ai funghi\n3. Zuppa di lenticchie';
 const COME_SI_LEGGE = 'Tre idee per cena:\n\n1. Pasta al pomodoro\n2. Risotto ai funghi\n3. Zuppa di lenticchie';
@@ -233,4 +236,187 @@ test('tolta la conversazione della risposta citata, la citazione dice che non c\
   await home.reload();
   await expect(mia.locator('.dash-citata')).toHaveClass(/dash-citata-manca/, { timeout: 15_000 });
   await expect(mia.locator('.dash-citata')).toHaveAttribute('data-testo', 'Messaggio non più nel filo');
+});
+
+// #2096 — la geometria di tutte le bolle e lo scorrimento, al pixel.
+const geometria = (home) => home.evaluate(() => {
+  const el = document.getElementById('bubbles');
+  return {
+    scrollTop: el.scrollTop,
+    largo: el.clientWidth,
+    bolle: [...el.querySelectorAll(':scope > .dash-bubble')].map((b) => { const r = b.getBoundingClientRect(); return [r.top, r.height, r.width]; }),
+  };
+});
+
+test('#2096: passando da un messaggio all\'altro niente si muove, nemmeno con una risposta che finisce con un paragrafo', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const LUNGA = 'Ecco come fare.\n\nPrima scaldi il forno.\n\nPoi inforni per **venti minuti**.';
+  await preparaModello(app, [{ text: LUNGA }, { text: 'Un altro paragrafo.\n\nE l\'ultimo, in fondo.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'come cuocio la torta?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'venti minuti' })).toBeVisible({ timeout: 20_000 });
+  await scrivi(home, 'e dopo?');
+  const ultima = home.locator('#bubbles > .dash-bubble-filo', { hasText: 'in fondo' });
+  await expect(ultima).toBeVisible({ timeout: 20_000 });
+  await home.mouse.move(2, 2);
+  const ferma = await geometria(home);
+  const bolle = home.locator('#bubbles > .dash-bubble');
+  const n = await bolle.count();
+  expect(n).toBeGreaterThanOrEqual(4);
+  for (let k = 0; k < n; k++) {
+    await bolle.nth(k).hover();
+    await expect(bolle.nth(k).locator('.dash-msg-azioni')).toBeVisible();
+    expect(await geometria(home), `passando sulla bolla ${k}`).toEqual(ferma);
+  }
+  // L'ultima risposta in fondo: i tasti stanno nello spazio tenuto, e la chat non scorre.
+  await ultima.hover();
+  const dentro = await home.evaluate(() => { const el = document.getElementById('bubbles'); return el.scrollHeight - el.clientHeight - el.scrollTop; });
+  expect(dentro).toBeLessThanOrEqual(1);
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-copia-ultima.png' });
+});
+
+test('#2096: sotto il proprio messaggio Copia, Modifica e Cita, anche dal tasto destro', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  await preparaModello(app, [{ text: 'Domani c\'è il sole.' }, { text: 'Va bene.' }]);
+  const home = await apriHome(openTab);
+  await scrivi(home, 'che tempo fa domani a Torino?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'il sole' })).toBeVisible({ timeout: 20_000 });
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'che tempo fa domani a Torino?' });
+
+  await home.mouse.move(2, 2);
+  const ferma = await geometria(home);
+  await mia.hover();
+  const barra = mia.locator('.dash-msg-azioni');
+  await expect(barra).toBeVisible();
+  expect(await geometria(home)).toEqual(ferma);
+  const tasti = await barra.locator('.dash-msg-azione').evaluateAll((ts) => ts.map((t) => t.getAttribute('aria-label')));
+  expect(tasti).toEqual(['Copia', 'Modifica', 'Cita']);
+  // Sotto il messaggio, allineata a destra.
+  const b = await mia.boundingBox();
+  const r = await barra.boundingBox();
+  expect(r.y).toBeGreaterThanOrEqual(b.y + b.height - 1);
+  expect(Math.abs((r.x + r.width) - (b.x + b.width))).toBeLessThanOrEqual(6);
+  await home.screenshot({ path: 'tests/.shots/chat-rispondi-copia-utente.png' });
+
+  await barra.getByRole('button', { name: 'Copia' }).click();
+  await expect(barra.getByRole('button', { name: 'Copiato' })).toBeVisible();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('che tempo fa domani a Torino?');
+
+  await mia.hover();
+  await barra.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+  await expect(home.locator('#input')).toBeFocused();
+  // Un secondo clic (o un doppio clic) non lo rimette una seconda volta.
+  await mia.hover();
+  await barra.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+  await home.locator('#input').fill('');
+
+  await mia.hover();
+  await barra.getByRole('button', { name: 'Cita' }).click();
+  await expect(home.locator('#citazione')).toContainText('Tu');
+  await expect(home.locator('#citazione')).toContainText('che tempo fa domani a Torino?');
+  await home.locator('#input').fill('e a Milano?');
+  await home.locator('#input').press('Enter');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Va bene.' })).toBeVisible({ timeout: 20_000 });
+  const citante = home.locator('#bubbles > .dash-bubble-user', { hasText: 'e a Milano?' });
+  await expect(citante.locator('.dash-citata')).toHaveAttribute('data-chi', 'Tu');
+  expect(await ultimaDomanda(app)).toContain("(l'utente risponde a un suo messaggio");
+
+  // Il tasto destro ha le stesse voci, e fanno la stessa cosa.
+  await app.evaluate(({ clipboard }) => clipboard.writeText(''));
+  await mia.click({ button: 'right' });
+  const menu = menuDi(home);
+  await expect(menu.voce('Cita').first()).toBeVisible();
+  await expect(menu.voce('Modifica').first()).toBeVisible();
+  await menu.voce('Copia il messaggio').first().click();
+  await expect.poll(() => app.evaluate(({ clipboard }) => clipboard.readText())).toBe('che tempo fa domani a Torino?');
+  await mia.click({ button: 'right' });
+  await menuDi(home).voce('Modifica').first().click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+
+  // Riaprendo la home il messaggio, riletto dal filo, si rimette nel campo lo stesso.
+  await home.reload();
+  const riletta = home.locator('#bubbles > .dash-bubble-user', { hasText: 'che tempo fa domani a Torino?' });
+  await expect(riletta).toBeVisible({ timeout: 15_000 });
+  await home.locator('#input').fill('');
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('che tempo fa domani a Torino?');
+});
+
+// L'invio scrive i documenti in coda al messaggio come righe «File: …», e Modifica li rilegge da lì dopo la riapertura:
+// le due metà dello stesso formato si provano insieme.
+test('#2096: Modifica rimette nel campo anche il documento allegato, subito e riaprendo la home', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const dir = cartellaTemporanea('filo-2096-');
+  const percorso = join(dir, 'preventivo cucina.txt');
+  writeFileSync(percorso, 'Preventivo: 1200 euro.');
+  await preparaModello(app, [{ text: 'Letto.' }]);
+  const home = await apriHome(openTab);
+  await app.evaluate(({ webContents }, p) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://newtab'));
+    wc.mainFrame.send('filo:broadcast', { type: globalThis.SN_MSG.MSG.CHAT_ALLEGA, dove: 'casa', immagini: [], file: [p] });
+  }, percorso);
+  const chip = home.locator('.dash-file-chip', { hasText: 'preventivo cucina.txt' });
+  await expect(chip).toBeVisible({ timeout: 10_000 });
+  await scrivi(home, 'quanto costa?');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Letto.' })).toBeVisible({ timeout: 20_000 });
+  await expect(chip).toHaveCount(0);
+
+  const mia = home.locator('#bubbles > .dash-bubble-user', { hasText: 'quanto costa?' });
+  await mia.hover();
+  await mia.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('quanto costa?');
+  await expect(chip).toHaveCount(1);
+
+  await home.reload();
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await expect(chip).toHaveCount(0);
+  const riletta = home.locator('#bubbles > .dash-bubble-user', { hasText: 'quanto costa?' });
+  await expect(riletta).toBeVisible({ timeout: 15_000 });
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(home.locator('#input')).toHaveValue('quanto costa?');
+  await expect(chip).toHaveCount(1);
+});
+
+// Una foto mandata da sola: Modifica la rimette una volta, come foto e non anche come documento, e il campo resta vuoto
+// invece di mostrare la domanda che l'invio scrive al suo posto. Subito e riaprendo la home.
+test('#2096: Modifica su un messaggio con la sola foto la rimette una volta, col campo vuoto', async ({ app, openTab }) => {
+  test.setTimeout(120_000);
+  const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const dir = cartellaTemporanea('filo-2096-foto-');
+  const percorso = join(dir, 'scontrino.png');
+  writeFileSync(percorso, Buffer.from(PNG.split(',')[1], 'base64'));
+  await preparaModello(app, [{ text: 'Vedo uno scontrino.' }]);
+  const home = await apriHome(openTab);
+  await app.evaluate(({ webContents }, a) => {
+    const wc = webContents.getAllWebContents().find((w) => w.getURL().startsWith('filo://newtab'));
+    wc.mainFrame.send('filo:broadcast', { type: globalThis.SN_MSG.MSG.CHAT_ALLEGA, dove: 'casa', immagini: [{ dataUrl: a.PNG, percorso: a.percorso }], file: [] });
+  }, { PNG, percorso });
+  const foto = home.locator('.dash-img-preview');
+  const chip = home.locator('.dash-file-chip');
+  await expect(foto).toHaveCount(1, { timeout: 10_000 });
+  await home.locator('#input').press('Enter');
+  await expect(home.locator('#bubbles > .dash-bubble-filo', { hasText: 'Vedo uno scontrino.' })).toBeVisible({ timeout: 20_000 });
+  await expect(foto).toHaveCount(0);
+
+  const mia = home.locator('#bubbles > .dash-bubble-user').last();
+  await mia.hover();
+  await mia.getByRole('button', { name: 'Modifica' }).click();
+  await expect(foto).toHaveCount(1);
+  await expect(chip).toHaveCount(0);
+  await expect(home.locator('#input')).toHaveValue('');
+
+  await home.reload();
+  await expect(home.locator('#input')).toBeEditable({ timeout: 15_000 });
+  await expect(foto).toHaveCount(0);
+  const riletta = home.locator('#bubbles > .dash-bubble-user').last();
+  await expect(riletta.locator('.dash-bubble-img')).toHaveCount(1, { timeout: 15_000 });
+  await riletta.hover();
+  await riletta.getByRole('button', { name: 'Modifica' }).click();
+  await expect(foto).toHaveCount(1);
+  await expect(chip).toHaveCount(0);
+  await expect(home.locator('#input')).toHaveValue('');
 });

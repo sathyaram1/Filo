@@ -14,6 +14,11 @@
   // un pezzo suo: il popup lo chiude in un riquadro, e nessun carattere del testo
   // può chiuderlo prima (#592.7). Sentinella in tests/unit/actionLevels.test.mjs.
   const cit = (testo, nuda) => (nuda ? { citazione: String(testo), nuda: true } : { citazione: String(testo) });
+  // L'articolo davanti alla percentuale: la regola sta in src/shared/sistema.js.
+  const alPercento = (p) => {
+    if (!global.SN_SISTEMA && typeof require === 'function') require('./sistema.js');
+    return global.SN_SISTEMA.alPercento(p);
+  };
 
   // Dove va un'icona chiesta a parole: la barra, il suo «Altro…», la fila del tasto destro di un contesto (#1434).
   function doveDellIcona(a) {
@@ -1320,7 +1325,7 @@
       campo: null,
       describe: (a) => {
         const r = (a && a._richiestaSistema) || {};
-        if (r.livello != null) return `Portare il volume del computer al ${r.livello}%`;
+        if (r.livello != null) return `Portare il volume del computer ${alPercento(r.livello)}`;
         if (r.passo != null) return r.passo > 0 ? 'Alzare il volume del computer' : 'Abbassare il volume del computer';
         if (r.muto === true) return 'Mettere muto il computer';
         if (r.muto === false) return 'Togliere il muto al computer';
@@ -1332,6 +1337,9 @@
       costo: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
+        // Dimenticato, torna solo riabbinandolo col dispositivo in mano (#2096). I preferiti sono solo un ordine.
+        if (r.dimentica) return 3;
+        if (r.preferito != null) return 1;
         if (r.gia === true) return 1;
         return r.acceso === false || (r.nome && r.collega === false) ? 2 : 1;
       },
@@ -1340,6 +1348,10 @@
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere i dispositivi Bluetooth abbinati';
+        if (r.nome && r.dimentica) {
+          return ['Dimenticare il dispositivo Bluetooth ', cit(nome), '\n\nPer usarlo di nuovo andrà riabbinato dalle impostazioni del sistema, col dispositivo pronto ad abbinarsi.'];
+        }
+        if (r.nome && r.preferito != null) return r.preferito ? ['Mettere fra i preferiti ', cit(nome)] : ['Togliere dai preferiti ', cit(nome)];
         if (r.nome && r.collega === false) {
           return ['Scollegare dal Bluetooth ', cit(nome), '\n\nSe è una tastiera, un mouse o le cuffie che stai usando, smette di funzionare finché non lo ricolleghi.'];
         }
@@ -1355,6 +1367,8 @@
       describeDone: (a) => {
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome && r.dimentica) return `Dimenticato «${nome}»`;
+        if (r.nome && r.preferito != null) return r.preferito ? `«${nome}» fra i preferiti` : `«${nome}» tolto dai preferiti`;
         if (r.nome) return r.collega === false ? `Scollegato «${nome}» dal Bluetooth` : `Collegato «${nome}» col Bluetooth`;
         return r.acceso === false ? 'Bluetooth spento' : r.acceso === true ? 'Bluetooth acceso' : 'Bluetooth cambiato';
       },
@@ -1364,6 +1378,8 @@
       costo: (a) => {
         const r = a && a._richiestaSistema;
         if (!r || r.errore) return 2;
+        // Dimenticata, ci si ricollega solo con la password (#2096).
+        if (r.dimentica) return 3;
         if (r.gia === true) return 1;
         return r.acceso === false || !!r.nome ? 2 : 1;
       },
@@ -1372,6 +1388,9 @@
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
         if (r.elenca) return 'Leggere le reti Wi-Fi che il computer conosce';
+        if (r.nome && r.dimentica) {
+          return ['Dimenticare la rete Wi-Fi ', cit(nome), '\n\nPer ricollegarsi servirà di nuovo la password.'];
+        }
         if (r.nome) {
           return ['Collegare il computer alla rete Wi-Fi ', cit(nome), '\n\nPer qualche secondo la connessione di adesso cade: scaricamenti e chiamate in corso possono interrompersi.'];
         }
@@ -1384,6 +1403,7 @@
       describeDone: (a) => {
         const r = (a && a._richiestaSistema) || {};
         const nome = (a && a._nomeSistema) || r.nome;
+        if (r.nome && r.dimentica) return `Dimenticata la rete Wi-Fi «${nome}»`;
         if (r.nome) return `Collegato il computer alla rete Wi-Fi «${nome}»`;
         return r.acceso === false ? 'Wi-Fi spento' : r.acceso === true ? 'Wi-Fi acceso' : 'Wi-Fi cambiato';
       },
@@ -1433,7 +1453,7 @@
       describe: (a) => {
         const Z = global.SN_ZOOM;
         const perc = Z ? Z.leggiPercentuale(a && (a.percentuale ?? a.percent ?? a.valore)) : null;
-        if (perc != null) return `Portare lo zoom della pagina al ${Math.round(perc)}%`;
+        if (perc != null) return `Portare lo zoom della pagina ${alPercento(Math.round(perc))}`;
         const verso = String((a && (a.verso ?? a.direzione ?? a.direction)) || '').trim().toLowerCase();
         if (verso === 'in') return 'Ingrandire la pagina di un passo';
         if (verso === 'out') return 'Rimpicciolire la pagina di un passo';

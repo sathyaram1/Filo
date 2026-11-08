@@ -1150,7 +1150,8 @@
   }
 
   function chatBubbleHtml(m, isLast) {
-    if (m.who === 'user') return `<div class="dk-msg dk-msg-user">${esc(m.text)}</div>`;
+    // `sn-con-azioni-msg`: lo spazio sotto per Copia e Rispondi (#2096), tenuto sempre, così comparendo non spostano niente.
+    if (m.who === 'user') return `<div class="dk-msg dk-msg-user sn-con-azioni-msg">${esc(m.text)}</div>`;
     if (m.pending) return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${cotHtml(m)}${progressHtml(m.progress)}</div>`;
     // Solo l'ultima bolla si riprova: rifarne una in mezzo metterebbe la risposta fuori posto.
     const retry = isLast ? '<button class="dk-retry" data-retry="1" title="Rimanda la stessa domanda">↻ Riprova</button>' : '';
@@ -1202,7 +1203,7 @@
     } else if (!m.reply) {
       parts.push('<p class="dk-msg-text dk-msg-pending">Nessun risultato.</p>');
     }
-    return `<div class="dk-msg dk-msg-bot" data-msg-i="${m._i}">${parts.join('')}</div>`;
+    return `<div class="dk-msg dk-msg-bot${testo ? ' sn-con-azioni-msg' : ''}" data-msg-i="${m._i}">${parts.join('')}</div>`;
   }
 
   // `stickBottom` = "porta comunque la vista in fondo" (nuovo turno dell'utente:
@@ -2550,6 +2551,19 @@
       const span = e.target.closest('.dk-prose-card');
       if (span) resolveProseCard(span);
     });
+    // #2096 — Copia e Rispondi al passaggio del mouse sotto domande e risposte, come nella home; anche dal tasto destro.
+    const A = window.SN_AZIONI_MESSAGGIO;
+    if (A) {
+      const azioniChat = A.attacca(log, {
+        messaggio: '.dk-msg-user, .dk-msg-bot',
+        testo: (el) => (el.classList.contains('dk-msg-user') ? el.textContent : (el.querySelector('.dk-msg-text:not(.dk-msg-pending)')?.textContent || '')),
+        ruolo: (el) => (el.classList.contains('dk-msg-user') ? 'user' : 'filo'),
+        rispondi: (_el, testo) => A.citaNelCampo($('chatInput'), testo),
+      });
+      const vociMessaggio = azioniChat.vociMenu;
+      window.SN_VOCI_PAGINA = Array.isArray(window.SN_VOCI_PAGINA) ? window.SN_VOCI_PAGINA : [];
+      if (!window.SN_VOCI_PAGINA.includes(vociMessaggio)) window.SN_VOCI_PAGINA.push(vociMessaggio);
+    }
     // Tasto destro su un risultato o su un nome citato (§8.3): le stesse azioni della carta, compreso il commander.
     log.addEventListener('contextmenu', async (e) => {
       const sum = e.target.closest('[data-toggle-list]');

@@ -195,6 +195,7 @@ function loadContentScripts() {
   try { require(path.join(CONTENT_DIR, 'extractContext.js')); } catch (e) { console.error('[Filo riquadri] extractContext.js', e); }
   try { require(path.join(CONTENT_DIR, 'gesto.js')); } catch (e) { console.error('[Filo riquadri] gesto.js', e); }
   try { require(path.join(SHARED_DIR, 'avvisiTempo.js')); } catch (e) { console.error('[Filo riquadri] avvisiTempo.js', e); }
+  try { require(path.join(SHARED_DIR, 'azioniMessaggio.js')); } catch (e) { console.error('[Filo riquadri] azioniMessaggio.js', e); }
   try { require(path.join(CONTENT_DIR, 'popup.js')); } catch (e) { console.error('[Filo riquadri] popup.js', e); }
   try { require(path.join(CONTENT_DIR, 'vistoDavvero.js')); } catch (e) { console.error('[Filo riquadri] vistoDavvero.js', e); }
   try { require(path.join(CONTENT_DIR, 'menu.js')); } catch (e) { console.error('[Filo riquadri] menu.js', e); }

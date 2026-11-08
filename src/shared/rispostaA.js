@@ -32,20 +32,22 @@
       return { chat, i, ...(ts ? { ts } : {}) };
     }
     const testo = taglia(r.testo, PER_IL_MODELLO);
-    return testo ? { testo } : null;
+    return testo ? { testo, ...(r.role === 'user' ? { role: 'user' } : {}) } : null;
   }
 
-  // Il posto nella chat della risposta citata: quello che la pagina conosce se il testo è ancora quello, se no l'ultima
-  // risposta di Filo con lo stesso testo (la bolla appena scritta non ha ancora il suo posto). -1 se non c'è.
-  function posto(chat, { i = null, testo = '' } = {}) {
+  // Il posto nella chat del messaggio citato: quello che la pagina conosce se il testo è ancora quello, se no l'ultimo
+  // dello stesso autore con lo stesso testo (la bolla appena scritta non ha ancora il suo posto). -1 se non c'è.
+  // `role: 'user'` cerca fra i messaggi dell'utente, che si citano da sé (#2096).
+  function posto(chat, { i = null, testo = '', role = 'filo' } = {}) {
     const msgs = chat && Array.isArray(chat.messages) ? chat.messages : [];
     const t = piano(testo);
     const valido = Number.isInteger(i) && i >= 0 && i < msgs.length && !!msgs[i];
     if (valido && (!t || piano(msgs[i].text) === t)) return i;
+    const suo = (m) => (role === 'user' ? m.role === 'user' : m.role !== 'user');
     if (t) {
       for (let k = msgs.length - 1; k >= 0; k--) {
         const m = msgs[k];
-        if (m && m.role !== 'user' && piano(m.text) === t) return k;
+        if (m && suo(m) && piano(m.text) === t) return k;
       }
     }
     return valido ? i : -1;
@@ -56,7 +58,7 @@
   function risolvi(ref, trovaChat, { max = ANTEPRIMA } = {}) {
     const r = riferimento(ref);
     if (!r) return null;
-    if (r.testo != null) return { role: 'filo', testo: taglia(r.testo, max) };
+    if (r.testo != null) return { role: r.role === 'user' ? 'user' : 'filo', testo: taglia(r.testo, max) };
     let c = null;
     try { c = typeof trovaChat === 'function' ? trovaChat(r.chat) : null; } catch (_) { c = null; }
     const m = c && Array.isArray(c.messages) ? c.messages[r.i] : null;
@@ -76,7 +78,7 @@
     const i = Number.isInteger(r.i) && r.i >= 0 ? r.i : null;
     const testo = testoDi(r.testo).slice(0, PER_CERCARE);
     if (!chat && !testo.trim()) return null;
-    return { ...(chat ? { chat } : {}), ...(i != null ? { i } : {}), testo };
+    return { ...(chat ? { chat } : {}), ...(i != null ? { i } : {}), testo, ...(r.role === 'user' ? { role: 'user' } : {}) };
   }
 
   global.SN_RISPOSTA_A = { ANTEPRIMA, PER_IL_MODELLO, PER_CERCARE, riferimento, posto, risolvi, daPagina, taglia };

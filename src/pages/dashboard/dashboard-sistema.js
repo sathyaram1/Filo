@@ -35,6 +35,8 @@
     MSG = deps.MSG;
     host = deps.host;
     ICONS = deps.ICONS || {};
+    global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
+    if (!global.SN_VOCI_PAGINA.includes(vociMenu)) global.SN_VOCI_PAGINA.push(vociMenu);
     // L'ora sopra, grande; sotto la riga delle icone, che in una colonna stretta va a capo da sola.
     riga = document.createElement('div');
     riga.className = 'dash-sis-icone';
@@ -64,6 +66,7 @@
     if (!segue()) return;
     let r = null;
     try { r = await send({ type: MSG.SISTEMA_STATO, subito }); } catch (_) {}
+    if (r && Array.isArray(r.pannelli)) pannelli = r.pannelli;
     if (r && r.ok && r.stato) aggiornato(r.stato);
   }
 
@@ -112,7 +115,11 @@
   }
 
   function applicaImpostazioni(settings) {
+    const prima = JSON.stringify(preferiti);
+    preferiti = Array.isArray(settings && settings.bluetoothPreferiti) ? settings.bluetoothPreferiti.filter((p) => typeof p === 'string' && p) : [];
     cambiaVisibili(Sis().vociVisibili(settings));
+    // Un preferito messo o tolto mentre l'elenco è aperto: l'ordine si rilegge.
+    if (box && box.voce === 'bluetooth' && box.elenco && prima !== JSON.stringify(preferiti)) caricaElenco(box);
   }
 
   // I gesti sul riquadro (#1471): per voce, come la si apre o la si trascina, e i comandi dati da qui.
@@ -213,7 +220,13 @@
     window.removeEventListener('scroll', scorre, true);
     window.removeEventListener('resize', chiudiBox);
   }
-  function fuori(e) { if (box && !box.el.contains(e.target)) chiudiBox(); }
+  // Il menu del tasto destro aperto su una riga del riquadro, e la conferma che chiede, non lo chiudono: la loro azione
+  // ha bisogno della riga per dire com'è andata.
+  function fuori(e) {
+    if (!box || box.el.contains(e.target)) return;
+    if (e.target && e.target.closest && e.target.closest('.sn-menu, .sn-confirm-host')) return;
+    chiudiBox();
+  }
   // Si chiude se scorre la pagina sotto, non se scorre il suo elenco (reti e dispositivi possono superare lo schermo).
   function scorre(e) { if (box && !(e.target instanceof Node && box.el.contains(e.target))) chiudiBox(); }
   function tasto(e) {
@@ -377,6 +390,7 @@
     lista.appendChild(attesa);
     const r = await comanda({ cosa, elenca: true });
     if (box !== questo || questo.letture !== giro) return;
+    if (r.ok && cosa === 'bluetooth' && Array.isArray(r.elenco)) r.elenco = inCimaIPreferiti(r.elenco);
     lista.replaceChildren();
     if (!r.ok) {
       const err = document.createElement('div');
@@ -400,10 +414,12 @@
       if (v.attiva && !(questo.ultimo && questo.ultimo.wifi === false)) {
         const opt = creaOpzione(`Collegato a ${v.nome}`, () => {}, 'dash-sis-attuale');
         opt.setAttribute('aria-disabled', 'true');
+        opt._riga = { cosa, v, questo, collegato: true };
         return opt;
       }
       const opt = creaOpzione(`Collegati a ${v.nome}`, (o) => esegui(o, { cosa: 'wifi', rete: v.nome }, () => caricaElenco(questo)));
       opt.title = v.nome;
+      opt._riga = { cosa, v, questo, collegato: false };
       return opt;
     }
     // Col Bluetooth spento niente è collegato, anche se la lettura è arrivata un attimo prima che si spegnesse.
@@ -411,7 +427,125 @@
     const opt = creaOpzione(`${collegato ? 'Scollega' : 'Collega'} ${v.nome}`, (o) => esegui(o, { cosa: 'bluetooth', dispositivo: v.nome, collega: !collegato }, () => caricaElenco(questo)));
     opt.title = v.nome;
     if (collegato) opt.classList.add('dash-sis-attuale');
+    if (preferito(v)) opt.classList.add('dash-sis-preferito');
+    opt._riga = { cosa, v, questo, collegato };
     return opt;
+  }
+
+  // ── I preferiti e il tasto destro sulle righe del riquadro (#2096) ──
+  // I preferiti sono un'impostazione (bluetoothPreferiti, scritta dal main): la pagina li legge per metterli in cima.
+  let preferiti = [];
+  let pannelli = [];
+  const preferito = (v) => !!v && preferiti.includes(v.indirizzo);
+  function inCimaIPreferiti(elenco) {
+    const posto = (v) => { const i = preferiti.indexOf(v.indirizzo); return i < 0 ? Infinity : i; };
+    return elenco.map((v, i) => [v, i]).sort((a, b) => (posto(a[0]) - posto(b[0])) || (a[1] - b[1])).map(([v]) => v);
+  }
+  const iconaMenu = (nome) => (typeof ICONS[nome] === 'function' ? ICONS[nome](16) : '');
+  const voceMenu = (label, nomeIcona, fai) => ({ type: 'item', icon: iconaMenu(nomeIcona), label, onClick: () => { Promise.resolve(fai()).catch(() => {}); } });
+  const apriPannello = (pannello) => send({ type: MSG.SISTEMA_APRI_IMPOSTAZIONI, pannello }).catch(() => {});
+
+  async function copiaNome(nome) {
+    try { await navigator.clipboard.writeText(nome); } catch (_) {}
+  }
+  // Un comando dato dal menu di una riga: la riga mostra l'attesa, il riquadro l'errore, e l'elenco si rilegge.
+  async function dallaRiga(opt, richiesta) {
+    const q = opt._riga && opt._riga.questo;
+    if (q && box === q && opt.isConnected) return esegui(opt, richiesta, () => caricaElenco(q));
+    const r = await comanda(richiesta);
+    if (!r.ok && box && box.errore) mostraErrore(box.errore, r);
+    return r;
+  }
+  async function dimentica(opt) {
+    const { cosa, v } = opt._riga;
+    const C = global.SN_CONFIRM_UI;
+    const bt = cosa === 'bluetooth';
+    const ok = C ? await C.confirm({
+      title: bt ? 'Dimenticare il dispositivo?' : 'Dimenticare la rete?',
+      parti: [bt ? 'Il computer dimentica' : 'Il computer dimentica la rete', { citazione: v.nome },
+        bt ? 'Per usarlo di nuovo andrà riabbinato dalle impostazioni del sistema.' : 'Per ricollegarti servirà di nuovo la password.'],
+      text: bt ? `Il computer dimentica «${v.nome}». Per usarlo di nuovo andrà riabbinato dalle impostazioni del sistema.`
+        : `Il computer dimentica la rete «${v.nome}». Per ricollegarti servirà di nuovo la password.`,
+      okLabel: 'Dimentica',
+    }) : false;
+    if (!ok) return null;
+    return dallaRiga(opt, bt ? { cosa, dispositivo: v.nome, dimentica: true } : { cosa, rete: v.nome, dimentica: true });
+  }
+
+  function vociRiga(opt) {
+    const { cosa, v, collegato } = opt._riga;
+    const out = [];
+    if (cosa === 'bluetooth') {
+      out.push(voceMenu(collegato ? 'Scollega' : 'Collega', 'bluetooth', () => dallaRiga(opt, { cosa, dispositivo: v.nome, collega: !collegato })));
+      const fra = preferito(v);
+      out.push(voceMenu(fra ? 'Togli dai preferiti' : 'Metti fra i preferiti', 'pin',
+        () => dallaRiga(opt, { cosa, dispositivo: v.nome, indirizzo: v.indirizzo, preferito: !fra })));
+      out.push(voceMenu('Dimentica…', 'trash', () => dimentica(opt)));
+      out.push(voceMenu('Copia il nome', 'copy', () => copiaNome(v.nome)));
+      if (pannelli.includes('bluetooth')) out.push(voceMenu('Impostazioni Bluetooth del sistema', 'options', () => apriPannello('bluetooth')));
+      return out;
+    }
+    if (!collegato) out.push(voceMenu('Collegati', 'wifi', () => dallaRiga(opt, { cosa, rete: v.nome })));
+    out.push(voceMenu('Dimentica la rete…', 'trash', () => dimentica(opt)));
+    out.push(voceMenu('Copia il nome', 'copy', () => copiaNome(v.nome)));
+    if (pannelli.includes('wifi')) out.push(voceMenu('Impostazioni Wi-Fi del sistema', 'options', () => apriPannello('wifi')));
+    return out;
+  }
+
+  // Il volume e gli interruttori del riquadro: valori pronti, muto, e il pannello del sistema.
+  function vociComandi(q, el) {
+    if (q.voce === 'volume') {
+      const muto = !!(q.ultimo && q.ultimo.muto);
+      const out = [0, 25, 50, 100].map((n) => voceMenu(`Volume ${Sis().alPercento(n)}`, n ? 'volume' : 'volumeMute', () => chiediVolume(n)));
+      out.push(voceMenu(muto ? 'Togli il muto' : 'Metti muto', muto ? 'volume' : 'volumeMute', () => esegui(q.muto, { cosa: 'volume', muto: !muto })));
+      if (pannelli.includes('audio')) out.push(voceMenu('Impostazioni audio del sistema', 'options', () => apriPannello('audio')));
+      return out;
+    }
+    if (!q.radio || !q.radio.contains(el)) return [];
+    const wifi = q.voce === 'rete';
+    const out = [];
+    if (!q.radio.hidden && q.radio.textContent) out.push(voceMenu(q.radio.textContent, wifi ? 'wifi' : 'bluetooth', () => q.radio.click()));
+    if (pannelli.includes(wifi ? 'wifi' : 'bluetooth')) {
+      out.push(voceMenu(wifi ? 'Impostazioni Wi-Fi del sistema' : 'Impostazioni Bluetooth del sistema', 'options', () => apriPannello(wifi ? 'wifi' : 'bluetooth')));
+    }
+    return out;
+  }
+
+  // Letto da src/content/content.js: le voci del tasto destro sulle righe del riquadro aperto.
+  // Una riga di sistema nella chat (dashboard-attivita.js, segnaSistema): il riquadro della sua voce, e il comando che
+  // la disfa dove c'è. I preferiti no: sono un'impostazione, e il filo ha già il suo Annulla per quel cambio.
+  const FRASI_ANNULLA = (a) => (a.livello != null ? `Rimetti il volume ${Sis().alPercento(a.livello)}`
+    : a.collega != null ? (a.collega ? 'Ricollega' : 'Scollega')
+        : a.acceso != null ? `${a.acceso ? 'Riaccendi' : 'Rispegni'} ${a.cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth'}` : 'Annulla');
+  function vociRigaChat(riga) {
+    const s = riga._sistema;
+    const out = [voceMenu('Apri il riquadro di sistema', s.voce === 'rete' ? 'wifi' : s.voce, () => apri(s.voce))];
+    if (s.annulla) {
+      out.push(voceMenu(`Annulla · ${FRASI_ANNULLA(s.annulla)}`, 'undo', async () => {
+        const r = await comanda(s.annulla);
+        if (r.ok) s.annulla = null;
+        else apri(s.voce, r);
+      }));
+    }
+    return out;
+  }
+  // Il riquadro di una voce aperto da fuori (una riga della chat); `errore`, se c'è, lo dice subito.
+  function apri(v, errore = null) {
+    const x = voci[v];
+    if (!x) return;
+    apriBox(v, x.el);
+    if (errore && box && box.errore) mostraErrore(box.errore, errore);
+  }
+
+  function vociMenu(target) {
+    const el = target && target.nodeType === 1 ? target : (target && target.parentElement) || null;
+    const rigaChat = el && el.closest('.dash-activity-row');
+    if (rigaChat && rigaChat._sistema) return vociRigaChat(rigaChat);
+    if (!el || !box || !box.el.contains(el)) return [];
+    const opt = el.closest('.sn-select-option');
+    if (opt && opt._riga) return vociRiga(opt);
+    if (box.comandi && box.comandi.contains(el)) return vociComandi(box, el);
+    return [];
   }
 
   function creaComandi(questo, x) {
@@ -562,5 +696,5 @@
     el.style.top = `${Math.max(4, Math.min(y, vh - h - 4))}px`;
   }
 
-  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive };
+  global.SN_DASH_SISTEMA = { init, aggiornato, applicaImpostazioni, chiudiBox, scrive, apri };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

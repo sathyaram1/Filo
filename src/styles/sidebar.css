@@ -108,7 +108,9 @@
    fra i blocchi, e stessa resa delle altre superfici. */
 .sn-sidebar-msg-assistant { white-space: normal; }
 .sn-sidebar-msg-assistant p { margin: 0 0 8px 0; }
-.sn-sidebar-msg-assistant p:last-child { margin-bottom: 0; }
+/* La barra di Copia e Rispondi sta in fondo al messaggio, fuori dal testo: l'ultimo paragrafo resta l'ultimo (#2096). */
+.sn-sidebar-msg-assistant p:last-child,
+.sn-sidebar-msg-assistant p:has(+ .sn-azioni-msg:last-child) { margin-bottom: 0; }
 .sn-sidebar-msg-assistant h3, .sn-sidebar-msg-assistant h4,
 .sn-sidebar-msg-assistant h5, .sn-sidebar-msg-assistant h6 {
   margin: 8px 0 4px 0; font-weight: 600; font-size: 1em;

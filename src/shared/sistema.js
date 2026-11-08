@@ -14,6 +14,13 @@
   const MESI = ['gennaio', 'febbraio', 'marzo', 'aprile', 'maggio', 'giugno', 'luglio', 'agosto',
     'settembre', 'ottobre', 'novembre', 'dicembre'];
 
+  // «al 25%», ma «allo 0%» e «all'8%», «all'11%», «all'80%»: l'articolo si legge col numero detto a voce.
+  function alPercento(n) {
+    const s = String(n);
+    if (s === '0') return 'allo 0%';
+    return /^(1|8|11|8\d)$/.test(s) ? `all'${s}%` : `al ${s}%`;
+  }
+
   // Il nome di una rete o di un dispositivo lo sceglie chi la gestisce: niente caratteri invisibili né a capo.
   function pulisciNome(v) {
     if (typeof v !== 'string') return null;
@@ -113,8 +120,8 @@
       icona: b.inCarica ? 'batteryCharging' : b.collegata ? 'batteryPlugged' : 'battery',
       livello: b.livello,
       bassa: !b.collegata && b.livello <= 15,
-      dettaglio: [`Batteria al ${b.livello}%`, `${frase.charAt(0).toUpperCase()}${frase.slice(1)}`],
-      copia: `Batteria al ${b.livello}%, ${frase}`,
+      dettaglio: [`Batteria ${alPercento(b.livello)}`, `${frase.charAt(0).toUpperCase()}${frase.slice(1)}`],
+      copia: `Batteria ${alPercento(b.livello)}, ${frase}`,
     };
   }
 
@@ -165,8 +172,8 @@
       livello: v.livello,
       muto: v.muto,
       spento: v.muto,
-      dettaglio: v.muto ? [`Volume al ${v.livello}%`, 'Muto'] : [`Volume al ${v.livello}%`],
-      copia: v.muto ? `Volume al ${v.livello}%, muto` : `Volume al ${v.livello}%`,
+      dettaglio: v.muto ? [`Volume ${alPercento(v.livello)}`, 'Muto'] : [`Volume ${alPercento(v.livello)}`],
+      copia: v.muto ? `Volume ${alPercento(v.livello)}, muto` : `Volume ${alPercento(v.livello)}`,
     };
   }
 
@@ -256,5 +263,5 @@
     return out;
   }
 
-  global.SN_SISTEMA = { VOCI, NOME_MAX, normalizza, descrivi, righePrompt, vociVisibili, pulisciNome };
+  global.SN_SISTEMA = { VOCI, NOME_MAX, normalizza, descrivi, righePrompt, vociVisibili, pulisciNome, alPercento };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

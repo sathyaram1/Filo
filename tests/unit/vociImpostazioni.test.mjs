@@ -188,8 +188,7 @@ const FUORI_DALLA_CHAT = {
   'security.cookies.bozza': 'è il testo a metà nella casella dei siti fidati: diventa una scelta quando entra nell\'elenco',
   'security.siteBlock.righeScartate': 'le righe scartate dalla blacklist sono un avviso sulla casella, non una scelta',
   'security.downloads.righeScartate': 'le righe scartate dai siti fidati sono un avviso sulla casella, non una scelta',
-  'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',
-  'proxy.': 'il proxy si usa dalla chat con le sue azioni (PROXY_TAB, REGOLA_PROXY_DOMINIO); indirizzi con le credenziali e paese vengono dalla configurazione e dalla scheda',
+  'security.pagineDelicate.righeScartate': 'le righe scartate dai siti delicati sono un avviso sulla casella, non una scelta',  'proxy.': 'il proxy si usa dalla chat con le sue azioni (PROXY_TAB, REGOLA_PROXY_DOMINIO); indirizzi con le credenziali e paese vengono dalla configurazione e dalla scheda',
 };
 function foglieDiSerie(o, base = '', out = []) {
   for (const k of Object.keys(o || {})) {

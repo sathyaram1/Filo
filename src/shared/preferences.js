@@ -2007,6 +2007,37 @@
       }),
       costo: 1,
     },
+    // #2096 — i dispositivi Bluetooth in cima all'elenco della home, per indirizzo. Metterne uno detto per nome lo fa
+    // BLUETOOTH con `preferito`, che trova l'indirizzo vero: qui si tolgono, si svuotano o si scrivono gli indirizzi.
+    {
+      keys: ['bluetooth_preferiti', 'dispositivi bluetooth preferiti', 'preferiti bluetooth'],
+      scrive: ['bluetoothPreferiti'],
+      aiuto: '"togli <indirizzi>" | "aggiungi <indirizzi>" | "solo <indirizzi>" | "svuota" (indirizzi Bluetooth in qualunque forma, '
+        + 'con o senza separatori, separati da virgole; per metterne uno detto per nome usa BLUETOOTH con dispositivo e preferito)',
+      costo: 1,
+      risk: 'Cambia quali dispositivi Bluetooth stanno in cima all\'elenco della home.',
+      build(v) {
+        // Si salva nella forma dell'elenco dei dispositivi di questo sistema, l'unica che i preferiti confrontano: la regola
+        // la tiene src/main/services/comandiSistema.js (normalizzaIndirizzo).
+        if (!global.SN_COMANDI_SISTEMA && typeof require === 'function') {
+          try { require('../main/services/comandiSistema.js'); } catch (_) {}
+        }
+        const N = global.SN_COMANDI_SISTEMA && global.SN_COMANDI_SISTEMA.normalizzaIndirizzo;
+        const indirizzo = (p) => (N ? N(String(p).trim()) : null);
+        const s = String(v == null ? '' : v).trim();
+        const pezzi = s.replace(/^(aggiungi|togli|solo)\s+/i, '').split(/\s*,\s*|\s+e\s+/).filter(Boolean);
+        if (!SVUOTA.test(s) && pezzi.some((p) => !indirizzo(p))) {
+          return { rifiuto: 'qui vanno gli indirizzi Bluetooth (come 00:11:22:33:44:55): un dispositivo detto per nome si mette fra i preferiti con BLUETOOTH' };
+        }
+        const o = opElenco(v, null, indirizzo);
+        if (!o || o.rifiuto) return o;
+        const nome = 'Dispositivi Bluetooth preferiti';
+        const lista = o.voci.join(', ');
+        const label = o.op === 'aggiungi' ? `${nome} → aggiungi ${lista}` : o.op === 'togli' ? `${nome} → togli ${lista}`
+          : (o.voci.length ? `${nome} → solo ${lista}` : `${nome} → svuota l'elenco`);
+        return { partial: { bluetoothPreferiti: o.voci }, label, elenco: { percorso: 'bluetoothPreferiti', op: o.op, voci: o.voci, nome } };
+      },
+    },
 
     // ── Microfono delle chat — reversibile, innocuo → costo 1 ──
     {

@@ -397,10 +397,11 @@ html, body {
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  transition: background calc(0.12s * var(--sn-motion, 1)) ease, padding-left calc(0.12s * var(--sn-motion, 1)) ease;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease;
 }
+/* All'hover cambia solo il fondo: il testo che scivola fa sembrare la voce un'altra (#2096). */
 .dash-menu-voce:hover,
-.dash-menu-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-menu-voce:focus-visible { background: var(--dash-line); outline: none; }
 .dash-menu-sep { height: 1px; margin: 4px 6px; background: var(--dash-line); }
 
 .dash-flash {
@@ -519,9 +520,9 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex; align-items: center; gap: 10px; width: 100%; text-align: left;
   padding: 7px 10px; border: none; border-radius: 10px; background: transparent; color: var(--dash-ink);
   font: inherit; cursor: pointer;
-  transition: background calc(0.14s * var(--sn-motion, 1)) ease, padding-left calc(0.14s * var(--sn-motion, 1)) ease;
+  transition: background calc(0.14s * var(--sn-motion, 1)) ease;
 }
-.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); padding-left: 14px; outline: none; }
+.dash-cerca-voce:hover, .dash-cerca-voce.scelta, .dash-cerca-voce:focus-visible { background: var(--dash-line); outline: none; }
 .dash-cerca-ico { display: inline-flex; flex: none; color: var(--dash-accent); }
 .dash-cerca-corpo { display: flex; flex-direction: column; min-width: 0; flex: 1; }
 .dash-cerca-titolo { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -635,8 +636,11 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   display: flex;
   flex-direction: column;
   gap: var(--dash-filo-gap);
-  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. */
-  padding: 40px 8px calc(8px + var(--dash-vuoto, 0px));
+  /* Il vuoto sotto l'ultimo messaggio di una home appena aperta (#1487): lo misura dashboard-coda.js. Il margine
+     dell'ultima bolla più questo fondo tengono i suoi tasti (27px): nemmeno lì compare la barra di scorrimento. */
+  padding: 40px 8px calc(14px + var(--dash-vuoto, 0px));
+  /* Il posto della barra di scorrimento è tenuto: comparendo non stringe la chat (#2096). */
+  scrollbar-gutter: stable;
 }
 
 .dash-bubble {
@@ -732,7 +736,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
    pre-wrap, che renderebbe letterali gli a-capo fra i blocchi. */
 .dash-bubble-md { white-space: normal; }
 .dash-bubble-md p { margin: 0 0 8px 0; }
-.dash-bubble-md p:last-child { margin-bottom: 0; }
+/* I tasti del messaggio stanno in fondo alla bolla ma fuori dal testo: l'ultimo paragrafo resta l'ultimo (#2096). */
+.dash-bubble-md p:last-child, .dash-bubble-md p:has(+ :is(.dash-msg-azioni, .sn-azioni-msg):last-child) { margin-bottom: 0; }
 .dash-bubble-md h3, .dash-bubble-md h4, .dash-bubble-md h5, .dash-bubble-md h6 {
   margin: 10px 0 4px 0; font-weight: 600; font-size: 1em;
 }
@@ -778,6 +783,15 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   margin-bottom: 14px;
 }
 .dash-bubbles > .dash-bubble-filo:not(.dash-bubble-streaming):not(.dash-bubble-pending):not(.dash-bubble-actions-only) + .dash-altrove-filo { margin-top: -2px; }
+/* #2096 — anche il messaggio dell'utente ha i suoi tasti, sotto e allineati a destra, nello spazio tenuto come sopra. */
+.dash-bubbles > .dash-bubble-user:not(.dash-bubble-attesa) {
+  position: relative;
+  margin-bottom: 14px;
+}
+.dash-bubble-user > .dash-msg-azioni { left: auto; right: 4px; }
+/* Il segno dei cambi sta sul bordo in basso a destra: i tasti gli lasciano il posto. */
+.dash-bubble-cambi:not(.dash-cambi-vuoto) > .dash-msg-azioni { right: 34px; }
+.dash-bubble-user > .dash-msg-azioni .dash-msg-azione::after { left: auto; right: calc(100% + 4px); }
 .dash-msg-azioni {
   position: absolute; left: 4px; top: 100%;
   display: flex; align-items: center; gap: 2px;
@@ -788,6 +802,7 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s linear calc(0.14s * var(--sn-motion, 1));
 }
 .dash-bubble-filo:hover > .dash-msg-azioni,
+.dash-bubble-user:hover > .dash-msg-azioni,
 .dash-msg-azioni:focus-within {
   opacity: 1; visibility: visible;
   transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s;
@@ -797,11 +812,12 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
   width: 26px; height: 24px; padding: 0;
   border: none; border-radius: 7px; background: transparent;
   color: var(--dash-ink-mute); cursor: pointer;
-  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease, transform calc(0.1s * var(--sn-motion, 1)) ease;
+  transition: background calc(0.15s * var(--sn-motion, 1)) ease, color calc(0.15s * var(--sn-motion, 1)) ease;
 }
 .dash-msg-azione:hover, .dash-msg-azione:focus-visible { background: var(--dash-line); color: var(--dash-ink); outline: none; }
-.dash-msg-azione:active { transform: scale(0.9); }
-.dash-msg-azione svg { display: block; }
+/* Si scala l'icona, non il tasto: un tasto trasformato si porterebbe dietro l'etichetta, che salta (#2096). */
+.dash-msg-azione svg { display: block; transition: transform calc(0.1s * var(--sn-motion, 1)) ease; }
+.dash-msg-azione:active svg { transform: scale(0.9); }
 .dash-msg-azione.dash-copiato { color: var(--dash-green); }
 .dash-msg-azione.dash-non-copiato { color: var(--dash-accent); }
 /* L'etichetta compare dopo i tasti, nella stessa riga: due tasti vicini non si coprono il nome a vicenda. */
@@ -1671,6 +1687,8 @@ body[data-state="thread"] .dash-onb-notice[data-tipo="aperta"] { display: none; 
 }
 .dash-sis-errore[hidden] { display: none; }
 .dash-sis-errore .dash-sis-come { margin-top: 2px; color: var(--sn-muted); }
+/* #2096 — un dispositivo fra i preferiti: in cima all'elenco, con la sua stellina dopo il nome. */
+.dash-sis-box .sn-select-option.dash-sis-preferito::after { content: '★'; margin-left: 6px; color: var(--dash-accent); font-size: 0.85em; }
 .dash-sis-apri {
   margin-top: 6px;
   padding: 4px 10px;

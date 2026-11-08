@@ -1955,9 +1955,10 @@ function esitoSistemaPerModello(o) {
     return `Non fatto: ${s.frase}${s.dove ? ` ${s.dove}` : ''}${acceso}${apri} Riporta all'utente queste parole; non riprovare uguale.${quale}${nomi}`;
   }
   if (o.cosa === 'volume') {
-    const prima = typeof o.prima === 'number' ? ` (prima era al ${o.prima}%)` : '';
+    const al = (n) => global.SN_SISTEMA.alPercento(n);
+    const prima = typeof o.prima === 'number' ? ` (prima era ${al(o.prima)})` : '';
     const limite = o.limitato ? ' Il numero chiesto era fuori da 0-100: si è fermato al limite, dillo all\'utente.' : '';
-    return `Volume del computer ora al ${o.volume}%${o.muto ? ', in muto' : ''}${prima}.${limite}`;
+    return `Volume del computer ora ${al(o.volume)}${o.muto ? ', in muto' : ''}${prima}.${limite}`;
   }
   const radio = o.cosa === 'wifi' ? 'Wi-Fi' : 'Bluetooth';
   if (Array.isArray(o.elenco)) {
@@ -1969,6 +1970,9 @@ function esitoSistemaPerModello(o) {
   if (typeof o.acceso === 'boolean') return `${radio} ${o.acceso ? 'acceso' : 'spento'}.`;
   const nome = o.dispositivo || o.rete;
   const acceso = o.accesoPrima ? ` ${radio} era spento: acceso prima.` : '';
+  if (o.dimenticato) return `Dimenticato: per riusarlo va riabbinato dalle impostazioni del sistema.\n${busta([nome])}`;
+  if (typeof o.preferito === 'boolean') return `${o.preferito ? 'Messo fra i preferiti (in cima all\'elenco nella home)' : 'Tolto dai preferiti'}:\n${busta([nome])}`;
+  if (o.dimenticata) return `Rete dimenticata: per ricollegarsi servirà di nuovo la password.\n${busta([nome])}`;
   if (o.gia) return `Era già così, niente da cambiare:\n${busta([nome])}`;
   if (o.cosa === 'bluetooth') {
     if (o.collegato === null) return `Collegamento chiesto, ma Windows non l'ha ancora confermato: lo vedi nella home fra poco.${acceso}\n${busta([nome])}`;
@@ -5914,7 +5918,7 @@ function toolResultText({ action, res, rendered }, giro = null) {
       const tagliato = o.limitato
         ? ` Il ${o.richiesto}% chiesto non era raggiungibile${limiti}: si è fermato qui. Dillo all'utente.`
         : '';
-      return `Zoom della pagina ora al ${o.percentuale}%.${tagliato}`;
+      return `Zoom della pagina ora ${global.SN_SISTEMA.alPercento(o.percentuale)}.${tagliato}`;
     }
   }
   if (type === 'ZOOM_PAGINA' && !res.executed && res.output && res.output.zoom === 'no-tab') {
@@ -6651,7 +6655,7 @@ async function turnoFiloChat({ userMessage, threadHistory, image, images, reason
     // La risposta citata, come la pagina l'ha davanti: qui arrivano solo i messaggi che il filo non ha (#1620).
     const citataQui = role === 'user' && m.rispostaA && RispostaA ? RispostaA.daPagina(m.rispostaA) : null;
     if (citataQui && citataQui.testo.trim()) {
-      content = `${FCx.notaRisposta({ role: 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
+      content = `${FCx.notaRisposta({ role: citataQui.role === 'user' ? 'user' : 'filo', testo: RispostaA.taglia(citataQui.testo, RispostaA.PER_IL_MODELLO) })}\n${content}`;
     }
     const msg = { role, content };
     if (role === 'assistant') {
@@ -8265,10 +8269,10 @@ async function citazioneDelMessaggio(rispostaA, chatId) {
   try { chat = id && FiloChats ? await FiloChats.get(id) : null; } catch (_) { chat = null; }
   // La sua conversazione è stata cancellata mentre si scriveva: il testo se n'è andato con lei, e qui non rinasce.
   if (p.chat && !chat) return { ref: null, citata: { manca: true } };
-  const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo }) : -1;
+  const i = chat ? RispostaA.posto(chat, { i: p.i, testo: p.testo, role: p.role }) : -1;
   const ref = i >= 0
     ? RispostaA.riferimento({ chat: chat.id, i, ts: chat.messages[i].ts })
-    : RispostaA.riferimento({ testo: p.testo });
+    : RispostaA.riferimento({ testo: p.testo, role: p.role });
   return { ref, citata: ref ? RispostaA.risolvi(ref, () => chat, { max: RispostaA.PER_IL_MODELLO }) : null };
 }
 

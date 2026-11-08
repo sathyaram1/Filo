@@ -404,6 +404,7 @@
         const gia = contaAzione(type, a, failed);
         const seg = registra({ tipo: type, testo: text, esito: esitoDi(a, failed, type) }, a);
         const riga = makeActivityRow(rowIcon, text, cambi, title);
+        segnaSistema(riga, a);
         // La proposta finita col bottone diventa il suo esito nella stessa riga: due frasi che si contraddicono no.
         if (gia && gia.prima === global.SN_ESITO.PROPOSTO && gia.voce.riga && gia.voce.riga.isConnected) gia.voce.riga.replaceWith(riga);
         else aggiungiEsito(seg, riga);
@@ -666,6 +667,22 @@
   // e non deve sembrarlo.
   // `cambi`: gli id degli eventi del filo che la riga racconta; il tasto destro e lo stato
   // «annullato» li leggono da lì (dashboard-cambi.js).
+  // #2096 — una riga di volume, Bluetooth o Wi-Fi sa quale voce del riquadro di sistema riguarda e, dove si può, il
+  // comando che la disfa: il tasto destro della riga li offre (src/pages/dashboard/dashboard-sistema.js).
+  function segnaSistema(riga, a) {
+    const tipo = a && String(a.type || '').toUpperCase();
+    if (!riga || !['VOLUME', 'BLUETOOTH', 'WIFI'].includes(tipo)) return;
+    const o = a._output || {};
+    const cosa = tipo === 'VOLUME' ? 'volume' : tipo === 'WIFI' ? 'wifi' : 'bluetooth';
+    let annulla = null;
+    if (o.ok !== false && !o.gia && !Array.isArray(o.elenco)) {
+      if (cosa === 'volume' && typeof o.prima === 'number' && o.prima !== o.volume) annulla = { cosa, livello: o.prima };
+      else if (typeof o.acceso === 'boolean') annulla = { cosa, acceso: !o.acceso };
+      else if (cosa === 'bluetooth' && o.dispositivo && typeof o.collegato === 'boolean') annulla = { cosa, dispositivo: o.dispositivo, collega: !o.collegato };
+    }
+    riga._sistema = { voce: cosa === 'wifi' ? 'rete' : cosa, annulla };
+  }
+
   function makeActivityRow(rowIcon, text, cambi = null, title = '') {
     const el = document.createElement('div');
     el.className = 'dash-action-step dash-activity-row';
@@ -950,12 +967,13 @@
     },
     ZOOM_PAGINA: (a) => {
       const p = Number(a._output && a._output.percentuale);
-      return { icon: '🔍', text: Number.isFinite(p) && p > 0 ? `Zoom al ${p}%` : 'Zoom cambiato' };
+      return { icon: '🔍', text: Number.isFinite(p) && p > 0 ? `Zoom ${globalThis.SN_SISTEMA.alPercento(p)}` : 'Zoom cambiato' };
     },
     // #874 — il numero e i nomi veri, quelli che il sistema ha confermato.
     VOLUME: (a) => {
       const o = a._output || {};
-      return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume al ${o.volume}%${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
+      const al = globalThis.SN_SISTEMA.alPercento(o.volume);
+      return { icon: '🔊', text: typeof o.volume === 'number' ? `Volume ${al}${o.muto ? ' · muto' : ''}` : 'Volume cambiato' };
     },
     BLUETOOTH: (a) => rigaRadio(a, 'Bluetooth'),
     WIFI: (a) => rigaRadio(a, 'Wi-Fi'),
@@ -1099,6 +1117,8 @@
     if (Array.isArray(o.elenco)) return { icon, text: radio === 'Wi-Fi' ? 'Letto le reti conosciute' : 'Letto i dispositivi abbinati' };
     if (typeof o.acceso === 'boolean') return { icon, text: `${radio} ${o.acceso ? 'acceso' : 'spento'}` };
     const nome = o.dispositivo || o.rete || '';
+    if (o.dimenticato || o.dimenticata) return { icon, text: `${o.dimenticata ? 'Rete dimenticata' : 'Dimenticato'} · ${nome}` };
+    if (typeof o.preferito === 'boolean') return { icon, text: `${o.preferito ? 'Fra i preferiti' : 'Tolto dai preferiti'} · ${nome}` };
     if (o.gia) return { icon, text: `Già così · ${nome}` };
     // Il sistema ha preso la richiesta ma non ha ancora confermato: la riga non promette di più.
     if (radio === 'Wi-Fi') return { icon, text: `${o.confermato === false ? 'Collegamento chiesto' : 'Collegato al Wi-Fi'} · ${nome}` };
@@ -1478,7 +1498,9 @@
       } else {
         const row = activityRowFor(a);
         if (row) {
-          wrap.appendChild(makeActivityRow(row.icon, row.text, row.cambi, row.title || ''));
+          const riga = makeActivityRow(row.icon, row.text, row.cambi, row.title || '');
+          segnaSistema(riga, a);
+          wrap.appendChild(riga);
           if (!anche) continue;
         }
       }

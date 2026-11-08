@@ -1,17 +1,14 @@
-// Copia e Rispondi sotto una risposta di Filo (#1620): i tasti al passaggio del mouse, la citazione sopra il campo e in
+// Le azioni sui messaggi della home (#1620, #2096): quali tasti ha ogni bolla, la citazione sopra il campo e in
 // testa alla bolla che parte, il salto alla risposta citata. Non tocca il DOM al caricamento. Cosa si salva della
 // citazione e come la legge il modello: src/shared/rispostaA.js.
 (function (global) {
   'use strict';
 
-  const { MSG } = global.SN_MSG;
   let d = null;
   // Il testo come l'ha scritto Filo, bolla per bolla: a schermo è già formattato, e il posto nel filo si ritrova da lui.
   const scritti = new WeakMap();
-  let barra = null;
   let anteprima = null;
   let citata = null;
-  const COPIATO_MS = 1600;
 
   const icona = (nome, size = 16) => (global.SN_ICONS && typeof global.SN_ICONS[nome] === 'function' ? global.SN_ICONS[nome](size) : '');
   const elDi = (t) => (t && t.nodeType === 1 ? t : (t && t.parentElement) || null);
@@ -34,84 +31,37 @@
     return String(copia.textContent || '').trim();
   }
 
-  // Una risposta di Filo nel filo, finita e con qualcosa da leggere: le bolle dentro il blocco di attività sono passi.
+  const diUtente = (b) => b.classList.contains('dash-bubble-user');
+  const modificabile = (b) => diUtente(b) && !!d.modificabile && d.modificabile(b);
+  // Un messaggio nel filo, finito e con qualcosa da leggere (o, dell'utente, da rimettere nel campo): le bolle dentro il
+  // blocco di attività sono passi, il seguito in attesa ha il suo menu.
   function rispondibile(b) {
-    return !!b && !!d && b.parentElement === d.bubblesEl && !b.hidden && b.classList.contains('dash-bubble-filo')
+    if (!b || !d || b.parentElement !== d.bubblesEl || b.hidden) return false;
+    if (diUtente(b)) return !b.classList.contains('dash-bubble-attesa') && (!!testoDi(b) || modificabile(b));
+    return b.classList.contains('dash-bubble-filo')
       && !b.classList.contains('dash-bubble-streaming') && !b.classList.contains('dash-bubble-pending')
       && !!testoDi(b);
   }
-  function bollaDi(target) {
-    const el = elDi(target);
-    const b = el && el.closest ? el.closest('.dash-bubble-filo') : null;
-    return rispondibile(b) ? b : null;
+  // Le azioni di una bolla, le stesse per i tasti e per il tasto destro: Copia e Rispondi sotto una risposta, Copia,
+  // Modifica e Cita sotto un messaggio dell'utente. La barra è quella di tutte le chat (src/shared/azioniMessaggio.js);
+  // le sue etichette sono attributi: nella bolla non entra testo, e chi la confronta col filo la ritrova.
+  function azioniDi(b) {
+    const a = [];
+    if (testoDi(b)) a.push('copia');
+    if (diUtente(b)) {
+      if (modificabile(b)) a.push('modifica');
+      if (testoDi(b)) a.push('cita');
+    } else a.push('rispondi');
+    return a;
   }
+  let tasti = null;
 
-  // ── I tasti sotto la risposta ─────────────────────────────────────────────
-  // Uno solo, che va sulla bolla sotto il mouse: lo spazio sotto ogni risposta lo tiene il CSS, così comparendo non
-  // sposta niente. Le etichette sono attributi: nella bolla non entra testo, e chi la confronta col filo la ritrova.
-  function tasto(azione, nome, etichetta) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.className = 'dash-msg-azione';
-    b.dataset.azione = azione;
-    b.dataset.etichetta = etichetta;
-    b.setAttribute('aria-label', etichetta);
-    b.innerHTML = icona(nome, 15);
-    return b;
-  }
-  function creaBarra() {
-    const el = document.createElement('div');
-    el.className = 'dash-msg-azioni';
-    el.setAttribute('role', 'toolbar');
-    el.setAttribute('aria-label', 'Azioni sul messaggio');
-    el.append(tasto('copia', 'copy', 'Copia'), tasto('rispondi', 'reply', 'Rispondi'));
-    // Il fuoco resta nel campo: chi copia o cita sta per scrivere.
-    el.addEventListener('mousedown', (e) => { if (e.target.closest('.dash-msg-azione')) e.preventDefault(); });
-    el.addEventListener('click', (e) => {
-      const t = e.target.closest('.dash-msg-azione');
-      const b = el.parentElement;
-      if (!t || !rispondibile(b)) return;
-      e.stopPropagation();
-      if (t.dataset.azione === 'copia') copia(b, t).catch(() => {});
-      else rispondi(b);
-    });
-    return el;
-  }
-  function mettiBarra(b) {
-    if (!barra) barra = creaBarra();
-    if (barra.parentElement === b) return;
-    for (const t of barra.querySelectorAll('.dash-msg-azione')) esito(t, null);
-    b.appendChild(barra);
-  }
-
-  function esito(t, ok) {
-    clearTimeout(t._timer);
-    const copiaTasto = t.dataset.azione === 'copia';
-    t.classList.toggle('dash-copiato', ok === true);
-    t.classList.toggle('dash-non-copiato', ok === false);
-    if (!copiaTasto) return;
-    const etichetta = ok === true ? 'Copiato' : ok === false ? 'Non copiato' : 'Copia';
-    t.dataset.etichetta = etichetta;
-    t.setAttribute('aria-label', etichetta);
-    t.innerHTML = icona(ok === true ? 'check' : 'copy', 15);
-    if (ok != null) t._timer = setTimeout(() => esito(t, null), COPIATO_MS);
-  }
-
-  // Gli appunti li scrive il main, che mette il testo anche nella cronologia degli appunti come il Copia del tasto
-  // destro; se dice no, ci prova la pagina.
-  async function copia(b, t = null) {
+  // Copia il testo come si legge; la copia conta come le altre della home.
+  async function copia(b) {
     const testo = testoDi(b);
     if (!testo) return false;
-    let ok = false;
-    try {
-      const r = await d.send({ type: MSG.COPY_TEXT_TO_CLIPBOARD, text: testo });
-      ok = !!(r && r.ok);
-    } catch (_) { ok = false; }
-    if (!ok) {
-      try { await navigator.clipboard.writeText(testo); ok = true; } catch (_) { ok = false; }
-    }
+    const ok = await global.SN_AZIONI_MESSAGGIO.copiaTesto(testo);
     if (ok) d.contaCopia(b);
-    if (t) esito(t, ok);
     return ok;
   }
 
@@ -125,12 +75,21 @@
       chat: k ? k[1] : '',
       i: k ? Number(k[2]) : null,
       ts: b.dataset.ts || '',
-      role: 'filo',
+      role: diUtente(b) ? 'user' : 'filo',
       scritto: scritto(b) ?? testoDi(b),
       testo: testoDi(b),
     };
     disegnaAnteprima();
     d.inputEl.focus();
+  }
+
+  // Un messaggio del filo che non è una bolla della home (uno scambio di un'altra app, #2096): si cita col suo posto.
+  function cita({ chat = '', i = null, ts = '', role = 'filo', scritto = '', testo = '' } = {}) {
+    if (!d || !String(testo || '').trim()) return false;
+    citata = { bolla: null, chat, i: Number.isInteger(i) ? i : null, ts, role: role === 'user' ? 'user' : 'filo', scritto: scritto || testo, testo: String(testo).trim() };
+    disegnaAnteprima();
+    d.inputEl.focus();
+    return true;
   }
 
   function disegnaAnteprima() {
@@ -189,7 +148,7 @@
   function perIlMain(c) {
     const R = global.SN_RISPOSTA_A;
     if (!c || !R) return null;
-    return R.daPagina({ chat: c.chat, i: c.i, testo: c.scritto });
+    return R.daPagina({ chat: c.chat, i: c.i, testo: c.scritto, role: c.role });
   }
   // Quello che resta nello storico della scheda: al main serve solo se il filo non si legge, e ne basta l'inizio.
   function perLoStorico(c) {
@@ -271,23 +230,27 @@
     if (anteprima && anteprima.contains(el) && citata) {
       return [{ type: 'item', icon: icona('close', 16), label: 'Non rispondere', onClick: () => { annulla(); d.inputEl.focus(); } }];
     }
-    const b = d.bubblesEl.contains(el) ? bollaDi(el) : null;
-    if (!b) return [];
-    return [
-      { type: 'item', icon: icona('reply', 16), label: 'Rispondi', onClick: () => rispondi(b) },
-      { type: 'item', icon: icona('copy', 16), label: 'Copia il messaggio', onClick: () => { copia(b).catch(() => {}); } },
-    ];
+    if (!tasti || !d.bubblesEl.contains(el)) return [];
+    return tasti.vociMenu(el);
   }
 
   function init(deps) {
     d = deps;
     creaAnteprima(d.anteprimaEl);
-    const sopra = (e) => {
-      const b = bollaDi(e.target);
-      if (b) mettiBarra(b);
-    };
-    d.bubblesEl.addEventListener('mouseover', sopra);
-    d.bubblesEl.addEventListener('focusin', sopra);
+    tasti = global.SN_AZIONI_MESSAGGIO.attacca(d.bubblesEl, {
+      messaggio: '.dash-bubble-filo, .dash-bubble-user',
+      pronto: rispondibile,
+      testo: testoDi,
+      ruolo: (b) => (diUtente(b) ? 'user' : 'filo'),
+      azioni: azioniDi,
+      copia: (_testo, b) => copia(b),
+      classi: { barra: 'dash-msg-azioni', tasto: 'dash-msg-azione', ok: 'dash-copiato', no: 'dash-non-copiato', destra: '' },
+      extra: {
+        rispondi: { ...global.SN_AZIONI_MESSAGGIO.AZIONI.rispondi, fai: (b) => rispondi(b) },
+        modifica: { icona: 'pencil', etichetta: 'Modifica', voce: 'Modifica', fai: (b) => { if (d.modifica) d.modifica(b); } },
+        cita: { icona: 'reply', etichetta: 'Cita', voce: 'Cita', fai: (b) => rispondi(b) },
+      },
+    });
     d.bubblesEl.addEventListener('click', (e) => {
       const q = elDi(e.target) && elDi(e.target).closest('.dash-citata');
       if (q && d.bubblesEl.contains(q)) { e.stopPropagation(); vaiDallaCitazione(q).catch(() => {}); }
@@ -308,7 +271,7 @@
   }
 
   global.SN_DASH_RISPONDI = {
-    init, ricorda, scritto, testoDi, prendi, rimetti, annulla, citaIn, dalFilo, perIlMain, perLoStorico, rispondi, copia,
+    init, ricorda, scritto, testoDi, prendi, rimetti, annulla, citaIn, dalFilo, perIlMain, perLoStorico, rispondi, copia, cita,
     inCorso: () => !!citata,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);

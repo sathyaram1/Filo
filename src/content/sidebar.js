@@ -1057,6 +1057,42 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
 
   function convEl() { return root && root.querySelector('.sn-sidebar-conv'); }
 
+  // #2096 — una domanda scritta dal tasto destro di una pagina di Filo (una voce delle impostazioni): «Spiega cosa fa»
+  // la manda, «Chiedi a Filo» la lascia nella casella da finire. Sui siti l'Aiuto sta nello strato: lì non serve.
+  function chiediDaPagina(testo, { invia = false } = {}) {
+    const t = String(testo || '').trim();
+    if (!t || nelloStrato) return false;
+    apri({ source: 'menu' });
+    const ta = root && root.querySelector('.sn-sidebar-input textarea');
+    if (!ta) return false;
+    if (invia) { submit({ userMessage: t }); return true; }
+    ta.value = `${t} `;
+    try { ta.dispatchEvent(new Event('input', { bubbles: true })); } catch (_) {}
+    ta.focus();
+    try { ta.setSelectionRange(ta.value.length, ta.value.length); } catch (_) {}
+    return true;
+  }
+
+  // I tasti dei messaggi, una volta per conversazione a schermo: Rispondi cita nella casella dell'Aiuto.
+  const azioniConv = new WeakMap();
+  function azioniSu(conv) {
+    const A = global.SN_AZIONI_MESSAGGIO;
+    if (!conv || !A || azioniConv.has(conv)) return;
+    const Md = global.SN_MARKDOWN;
+    azioniConv.set(conv, A.attacca(conv, {
+      messaggio: '.sn-sidebar-msg-user, .sn-sidebar-msg-assistant',
+      testo: (el) => (el.classList.contains('sn-sidebar-msg-assistant') && Md && Md.testo ? Md.testo(el._scritto || '') : el._scritto || ''),
+      ruolo: (el) => (el.classList.contains('sn-sidebar-msg-user') ? 'user' : 'filo'),
+      rispondi: (_el, testo) => A.citaNelCampo(root && root.querySelector('.sn-sidebar-input textarea'), testo),
+    }));
+  }
+  // Le stesse azioni dal tasto destro, sulle pagine di Filo (sui siti il menu non legge le voci della pagina).
+  function vociMessaggio(target) {
+    const conv = convEl();
+    const a = conv && azioniConv.get(conv);
+    return a ? a.vociMenu(target) : [];
+  }
+
   // Ogni messaggio mostrato entra nel filo come parte della riga ripiegata di questa conversazione (#974): una
   // strada nuova che risponde ci passa da sé. Errori e note dell'interfaccia no (`nelFilo: false`).
   function nelFiloAiuto(role, text, schede = []) {
@@ -1086,6 +1122,9 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     if (role === 'assistant') { rispostaArrivata(); spegniSeguito(); }
     const msg = document.createElement('div');
     msg.className = `sn-sidebar-msg sn-sidebar-msg-${role}`;
+    // #2096 — Copia e Rispondi al passaggio del mouse, come nella home: il testo come l'ha scritto chi parla.
+    if (String(text || '').trim()) { msg.classList.add('sn-con-azioni-msg'); msg._scritto = String(text); }
+    azioniSu(conv);
     // #418 — le risposte di Filo hanno la formattazione leggera di popup e chat della home;
     // il testo dell'utente resta letterale.
     if (role === 'assistant' && global.SN_MARKDOWN) {
@@ -2106,6 +2145,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
   }
   global.SN_VOCI_PAGINA = Array.isArray(global.SN_VOCI_PAGINA) ? global.SN_VOCI_PAGINA : [];
   if (!global.SN_VOCI_PAGINA.includes(vociAttesa)) global.SN_VOCI_PAGINA.push(vociAttesa);
+  if (!global.SN_VOCI_PAGINA.includes(vociMessaggio)) global.SN_VOCI_PAGINA.push(vociMessaggio);
   try {
     chrome.runtime.onMessage.addListener((msg) => {
       if (!msg || msg.type !== MSG.AIUTO_RAGIONAMENTO || !msg.turno) return;
@@ -2714,7 +2754,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     accoglieRilascio: () => chiuso() !== 'sito',
     contiene: (n) => !!(root && n && root.contains(n)),
     suChiusura: (fn) => { if (typeof fn === 'function') chiusoPerche = fn; },
-    dalloStrato, dallaPagina,
+    dalloStrato, dallaPagina, chiediDaPagina,
   };
   // Hook di test: esercita il ponte azioni-Filo (popup di conferma + dispatch)
   // senza dover passare dal modello. Stesso pattern di window.__filoDashActions.

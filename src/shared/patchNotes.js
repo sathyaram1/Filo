@@ -9,6 +9,18 @@
     // In cima il blocco della prossima versione (package.json + 1 patch, o il suo `prossimaVersione`); uscito quel
     // numero, sopra se ne apre uno nuovo. Una riga nata da una segnalazione ne porta il numero: CLAUDE.md § Consegna.
     {
+      version: '0.2.273', date: '2026-11-08',
+      features: [
+        { testo: 'Sotto i tuoi messaggi nella home trovi Copia, Modifica e Cita. Modifica rimette nel campo il testo e gli allegati, Cita lo riprende in testa al messaggio dopo.', segnalazione: 2096 },
+        { testo: 'Copia e Rispondi ci sono anche nell\'Aiuto, nel riquadro di Spiega e Traduci, nella chat dei Mazzi e negli scambi delle app aperti nella home.', segnalazione: 2096 },
+        { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
+        { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
+      ],
+      fixes: [
+        { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
+      ],
+    },
+    {
       version: '0.2.272', date: '2026-11-07',
       features: [
         { testo: 'Le schede si trascinano come ti aspetti: seguono il mouse, e puoi lasciarle in un campo di testo per incollare il link.', segnalazione: 2084 },

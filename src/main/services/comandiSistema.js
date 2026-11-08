@@ -206,6 +206,7 @@ namespace FiloWlan {
     [DllImport("wlanapi.dll")] static extern int WlanConnect(IntPtr maniglia, ref Guid interfaccia, ref Parametri parametri, IntPtr riservato);
     [DllImport("wlanapi.dll")] static extern int WlanQueryInterface(IntPtr maniglia, ref Guid interfaccia, int codice, IntPtr riservato, out int dimensione, out IntPtr dati, IntPtr tipo);
     [DllImport("wlanapi.dll")] static extern void WlanFreeMemory(IntPtr memoria);
+    [DllImport("wlanapi.dll", CharSet = CharSet.Unicode)] static extern int WlanDeleteProfile(IntPtr maniglia, ref Guid interfaccia, string profilo, IntPtr riservato);
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     struct Parametri {
@@ -323,6 +324,33 @@ namespace FiloWlan {
           if (attuale == profilo) { e.Attuale = attuale; e.Confermato = true; return e; }
         }
         e.Codice = -1;
+      } finally { WlanCloseHandle(h, IntPtr.Zero); }
+      return e;
+    }
+
+    // #2096 — il profilo si toglie da ogni interfaccia che lo conosce; Confermato se almeno una l'ha tolto.
+    public static EsitoWlan Dimentica(string profilo) {
+      EsitoWlan e = new EsitoWlan();
+      IntPtr h;
+      int negoziata;
+      e.Codice = WlanOpenHandle(2, IntPtr.Zero, out negoziata, out h);
+      if (e.Codice != 0) return e;
+      try {
+        int c;
+        List<Guid> ids = Interfacce(h, out c);
+        if (c != 0) { e.Codice = c; return e; }
+        e.Interfacce = ids.Count;
+        int negati = 0;
+        foreach (Guid id in ids) {
+          List<string> nomi = Profili(h, id, out c);
+          if (c == 5) negati++;
+          if (c != 0 || !nomi.Contains(profilo)) continue;
+          Guid scelta = id;
+          int d = WlanDeleteProfile(h, ref scelta, profilo, IntPtr.Zero);
+          if (d == 0) e.Confermato = true; else e.Codice = d;
+        }
+        if (e.Confermato) e.Codice = 0;
+        else if (e.Codice == 0) e.Codice = negati > 0 ? 5 : 1168;
       } finally { WlanCloseHandle(h, IntPtr.Zero); }
       return e;
     }
@@ -467,6 +495,31 @@ try {
   Dice 'confermato' ([int]$e.Confermato)
 } catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
 `,
+    // #2096 — dimenticare un dispositivo abbinato: Pairing.UnpairAsync di WinRT; lo stato che torna dice com'è andata.
+    'bt-dimentica': PS_INIZIO + String.raw`$indirizzo = [string]$env:FILO_SIS_INDIRIZZO
+if ($indirizzo -notmatch '^[0-9a-f]{12}$') { Dice 'errore' 'indirizzo'; exit 0 }
+try {
+` + PS_ATTESA + String.raw`  $null = [Windows.Devices.Bluetooth.BluetoothDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Bluetooth.BluetoothLEDevice,Windows.Devices.Bluetooth,ContentType=WindowsRuntime]
+  $null = [Windows.Devices.Enumeration.DeviceUnpairingResult,Windows.Devices.Enumeration,ContentType=WindowsRuntime]
+} catch { Dice 'errore' 'winrt'; Dice 'dettaglio' $_.Exception.Message; exit 0 }
+try {
+  $numero = [Convert]::ToUInt64($indirizzo, 16)
+  $dev = $null
+  try { $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothDevice]::FromBluetoothAddressAsync($numero)) ([Windows.Devices.Bluetooth.BluetoothDevice]) } catch {}
+  if ($null -eq $dev) { try { $dev = Attendi ([Windows.Devices.Bluetooth.BluetoothLEDevice]::FromBluetoothAddressAsync($numero)) ([Windows.Devices.Bluetooth.BluetoothLEDevice]) } catch {} }
+  if ($null -eq $dev) { Dice 'errore' 'nessun-dispositivo'; exit 0 }
+  $esito = Attendi ($dev.DeviceInformation.Pairing.UnpairAsync()) ([Windows.Devices.Enumeration.DeviceUnpairingResult])
+  Dice 'stato' ([string]$esito.Status)
+} catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
+`,
+    'wifi-dimentica': PS_INIZIO + psCompila(CS_WLAN) + String.raw`try {
+  $e = [FiloWlan.Wlan]::Dimentica([string]$env:FILO_SIS_RETE)
+  Dice 'codice' $e.Codice
+  Dice 'interfacce' $e.Interfacce
+  Dice 'confermato' ([int]$e.Confermato)
+} catch { Dice 'errore' 'eccezione'; Dice 'dettaglio' $_.Exception.Message }
+`,
   },
 
   linux: {
@@ -587,6 +640,18 @@ command -v nmcli >/dev/null 2>&1 || { dice errore manca-nmcli; exit 0; }
 nmcli --wait 25 connection up uuid "$U" 2>&1 | grezzo
 dice uscita "$(nmcli -t -f UUID connection show --active 2>/dev/null | grep -qix "$U" && echo 0 || echo 1)"
 `,
+    'bt-dimentica': SH_INIZIO + String.raw`I="$FILO_SIS_INDIRIZZO"
+case "$I" in [0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]:[0-9A-F][0-9A-F]) ;; *) dice errore indirizzo; exit 0 ;; esac
+command -v bluetoothctl >/dev/null 2>&1 || { dice errore manca-bluetoothctl; exit 0; }
+timeout 15 bluetoothctl remove "$I" 2>&1 | grezzo
+if timeout 5 bluetoothctl info "$I" 2>/dev/null | grep -q 'Paired: yes'; then dice dimenticato 0; else dice dimenticato 1; fi
+`,
+    'wifi-dimentica': SH_INIZIO + String.raw`U="$FILO_SIS_UUID"
+case "$U" in *[!0-9a-fA-F-]*|'') dice errore parametro; exit 0 ;; esac
+command -v nmcli >/dev/null 2>&1 || { dice errore manca-nmcli; exit 0; }
+nmcli connection delete uuid "$U" 2>&1 | grezzo
+dice uscita "$(nmcli -t -f UUID connection show 2>/dev/null | grep -qix "$U" && echo 1 || echo 0)"
+`,
   },
 
   darwin: {
@@ -683,6 +748,23 @@ networksetup -setairportnetwork "$D" "$FILO_SIS_RETE" 2>&1 | grezzo
 dice blocco attuale
 networksetup -getairportnetwork "$D" 2>&1 | grezzo
 `,
+    'bt-dimentica': SH_INIZIO + String.raw`I="$FILO_SIS_INDIRIZZO"
+case "$I" in [0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]-[0-9a-f][0-9a-f]) ;; *) dice errore indirizzo; exit 0 ;; esac
+B=
+for c in "$(command -v blueutil 2>/dev/null)" /opt/homebrew/bin/blueutil /usr/local/bin/blueutil; do
+  if [ -n "$c" ] && [ -x "$c" ]; then B=$c; break; fi
+done
+[ -n "$B" ] || { dice errore manca-blueutil; exit 0; }
+OUT=$("$B" --unpair "$I" 2>&1); RC=$?
+printf '%s\n' "$OUT" | grezzo
+dice uscita "$RC"
+if "$B" --paired --format json 2>/dev/null | grep -qi "$I"; then dice dimenticato 0; else dice dimenticato 1; fi
+`,
+    'wifi-dimentica': SH_INIZIO + String.raw`D=$(networksetup -listallhardwareports 2>/dev/null | awk '/^Hardware Port: (Wi-Fi|AirPort)$/ { getline; print $2; exit }')
+[ -n "$D" ] || { dice errore nessuna-radio; exit 0; }
+networksetup -removepreferredwirelessnetwork "$D" "$FILO_SIS_RETE" 2>&1 | grezzo
+if networksetup -listpreferredwirelessnetworks "$D" 2>/dev/null | sed 's/^[[:space:]]*//' | grep -qxF -- "$FILO_SIS_RETE"; then dice uscita 1; else dice uscita 0; fi
+`,
   },
 };
 
@@ -695,6 +777,8 @@ const AMBIENTE = {
   'bt-collega': ['INDIRIZZO', 'COLLEGA'],
   'wifi-elenco': [],
   'wifi-collega': ['RETE', 'UUID'],
+  'bt-dimentica': ['INDIRIZZO'],
+  'wifi-dimentica': ['RETE', 'UUID'],
 };
 
 const INDIRIZZO = {
@@ -702,6 +786,17 @@ const INDIRIZZO = {
   linux: /^[0-9A-F]{2}(:[0-9A-F]{2}){5}$/,
   darwin: /^[0-9a-f]{2}(-[0-9a-f]{2}){5}$/,
 };
+
+// Un indirizzo scritto a mano («00:11:22:33:44:55», «00-11-…», dodici cifre, maiuscole o no) nella forma che il sistema
+// dà nell'elenco dei dispositivi: è quella che i preferiti confrontano. null se non sono sei byte.
+function normalizzaIndirizzo(v, piattaforma = process.platform) {
+  const cifre = String(v == null ? '' : v).trim().replace(/[\s:.-]/g, '');
+  if (!/^[0-9A-Fa-f]{12}$/.test(cifre)) return null;
+  const coppie = cifre.match(/../g);
+  if (piattaforma === 'win32') return cifre.toLowerCase();
+  if (piattaforma === 'darwin') return coppie.join('-').toLowerCase();
+  return coppie.join(':').toUpperCase();
+}
 
 // Un nome che arriva al sistema: niente caratteri di controllo (un a capo non sta in nessun nome di rete) e un tetto.
 function nomeValido(v) {
@@ -742,7 +837,11 @@ function parametri(comando, p, piattaforma) {
     if (typeof q.collega !== 'boolean') throw new Error('collega dev\'essere sì o no');
     fuori.INDIRIZZO = ind;
     fuori.COLLEGA = q.collega ? '1' : '0';
-  } else if (comando === 'wifi-collega') {
+  } else if (comando === 'bt-dimentica') {
+    const ind = String(q.indirizzo || '');
+    if (!INDIRIZZO[piattaforma].test(ind)) throw new Error('indirizzo Bluetooth non valido');
+    fuori.INDIRIZZO = ind;
+  } else if (comando === 'wifi-collega' || comando === 'wifi-dimentica') {
     if (piattaforma === 'linux') {
       const u = String(q.uuid || '');
       if (!/^[0-9a-fA-F-]{8,64}$/.test(u)) throw new Error('rete senza identificativo');
@@ -876,13 +975,6 @@ function interpretaBtElenco(u, piattaforma) {
   return { ok: true, acceso: bit(u.primo('acceso')), dispositivi: valide };
 }
 
-function normalizzaIndirizzo(ind, piattaforma) {
-  const s = String(ind || '').trim();
-  if (piattaforma === 'linux') return s.toUpperCase();
-  if (piattaforma === 'darwin') return s.toLowerCase().replace(/:/g, '-');
-  return s.toLowerCase();
-}
-
 function interpretaBtCollega(u, piattaforma, collega) {
   const errore = u.primo('errore');
   if (errore) return { ok: false, errore };
@@ -891,6 +983,35 @@ function interpretaBtCollega(u, piattaforma, collega) {
   if (collegato === null) return piattaforma === 'win32' ? { ok: true, collegato: null } : { ok: false, errore: 'sconosciuto' };
   if (collegato !== collega) return { ok: false, errore: collega ? 'bt-non-collegato' : 'bt-non-scollegato' };
   return { ok: true, collegato };
+}
+
+// #2096 — dimenticato: su Windows lo dice lo stato di UnpairAsync, altrove la rilettura dopo il comando.
+function interpretaBtDimentica(u, piattaforma) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') {
+    const stato = String(u.primo('stato') || '');
+    if (stato === 'Unpaired' || stato === 'AlreadyUnpaired') return { ok: true };
+    if (stato === 'AccessDenied') return { ok: false, errore: 'bt-negato' };
+    return { ok: false, errore: 'bt-non-dimenticato' };
+  }
+  if (piattaforma === 'darwin' && intero(u.primo('uscita')) > 128) return { ok: false, errore: 'permesso-bluetooth' };
+  return bit(u.primo('dimenticato')) === true ? { ok: true } : { ok: false, errore: 'bt-non-dimenticato' };
+}
+
+function interpretaWifiDimentica(u, piattaforma) {
+  const errore = u.primo('errore');
+  if (errore) return { ok: false, errore };
+  if (piattaforma === 'win32') {
+    const codice = intero(u.primo('codice'));
+    if (codice) return { ok: false, errore: codice === 1168 ? 'nessuna-rete' : erroreWlan(codice) };
+    if (intero(u.primo('interfacce')) === 0) return { ok: false, errore: 'nessuna-radio' };
+    return bit(u.primo('confermato')) === true ? { ok: true } : { ok: false, errore: 'non-dimenticata' };
+  }
+  const testo = u.grezze.join('\n');
+  if (piattaforma === 'linux' && /not authorized|non autorizzat/i.test(testo)) return { ok: false, errore: 'polkit' };
+  if (piattaforma === 'darwin' && /admin|privileg|authoriz/i.test(testo)) return { ok: false, errore: 'admin-wifi-dimentica' };
+  return intero(u.primo('uscita')) === 0 ? { ok: true } : { ok: false, errore: 'non-dimenticata' };
 }
 
 // nmcli -t: i campi sono separati da «:», e «:» e «\» dentro un valore arrivano come «\:» e «\\».
@@ -982,7 +1103,24 @@ const IMPOSTAZIONI = {
   'mac-wifi': 'x-apple.systempreferences:com.apple.wifi-settings-extension',
   'mac-registrazione-schermo': 'x-apple.systempreferences:com.apple.preference.security?Privacy_ScreenCapture',
   'mac-automazione': 'x-apple.systempreferences:com.apple.preference.security?Privacy_Automation',
+  'win-wifi': 'ms-settings:network-wifi',
+  'win-audio': 'ms-settings:sound',
+  'mac-bluetooth-dispositivi': 'x-apple.systempreferences:com.apple.BluetoothSettings',
+  'mac-audio': 'x-apple.systempreferences:com.apple.Sound-Settings.extension',
 };
+
+// #2096 — il pannello delle impostazioni del sistema per Bluetooth, Wi-Fi e audio. Linux non ha un indirizzo comune a
+// tutti i desktop: lì la voce non c'è (chi la mostra chiede pannelliImpostazioni).
+const PANNELLI = {
+  win32: { bluetooth: 'win-bluetooth', wifi: 'win-wifi', audio: 'win-audio' },
+  darwin: { bluetooth: 'mac-bluetooth-dispositivi', wifi: 'mac-wifi', audio: 'mac-audio' },
+  linux: {},
+};
+// Le prove su Linux fingono Windows o Mac per attraversare la strada vera dalla voce del menu all'indirizzo aperto.
+let piattaformaPannelli = null;
+function pannelliImpostazioni(piattaforma = piattaformaPannelli || process.platform) {
+  return { ...(PANNELLI[piattaforma] || {}) };
+}
 
 function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}) {
   const radio = cosa === 'wifi' ? 'il Wi-Fi' : 'il Bluetooth';
@@ -1066,6 +1204,19 @@ function spiega(errore, { cosa, piattaforma = process.platform, nome = '' } = {}
     rifiutato: { frase: `${chi[0].toUpperCase()}${chi.slice(1)} non ha accettato il collegamento: dev'essere acceso e vicino.` },
     'bt-non-collegato': { frase: `${chi[0].toUpperCase()}${chi.slice(1)} non si è collegato: dev'essere acceso, vicino e non già collegato a un altro telefono o computer.` },
     'bt-non-scollegato': { frase: `${chi[0].toUpperCase()}${chi.slice(1)} risulta ancora collegato.` },
+    'bt-non-dimenticato': { frase: `${chi[0].toUpperCase()}${chi.slice(1)} risulta ancora abbinato: il sistema non l'ha dimenticato.` },
+    'bt-negato': {
+      frase: `Windows non lascia dimenticare ${chi} da qui.`,
+      dove: 'Si toglie da Impostazioni → Bluetooth e dispositivi → Dispositivi, con «Rimuovi dispositivo».',
+      apri: 'win-bluetooth',
+    },
+    'non-dimenticata': { frase: `${nome ? `La rete «${nome}»` : 'Quella rete'} risulta ancora fra quelle conosciute: il sistema non l'ha dimenticata.` },
+    'admin-wifi-dimentica': {
+      frase: 'macOS chiede un amministratore per dimenticare una rete.',
+      dove: 'Si toglie in Impostazioni di Sistema → Wi-Fi → Reti conosciute.',
+      apri: 'mac-wifi',
+    },
+    parametro: { frase: `Filo non sa passare al sistema un nome come ${nome ? `«${nome}»` : 'questo'}: si fa dalle impostazioni del sistema.` },
     'nessun-dispositivo': { frase: nome ? `Fra i dispositivi abbinati non ce n'è uno che si chiami «${nome}».` : 'Non ci sono dispositivi Bluetooth abbinati.' },
     'nessuna-rete': { frase: nome ? `Fra le reti conosciute non ce n'è una che si chiami «${nome}».` : 'Il computer non conosce nessuna rete Wi-Fi.' },
     ambiguo: { frase: `Più di un nome somiglia a «${nome}»: quale?` },
@@ -1192,6 +1343,8 @@ const COMPUTER = {
   async btCollega(p) { return interpretaBtCollega(await eseguiScript('bt-collega', p), process.platform, p.collega); },
   async wifiElenco() { return interpretaWifiElenco(await eseguiScript('wifi-elenco', {}), process.platform); },
   async wifiCollega(p) { return interpretaWifiCollega(await eseguiScript('wifi-collega', p), process.platform, p.rete); },
+  async btDimentica(p) { return interpretaBtDimentica(await eseguiScript('bt-dimentica', p), process.platform); },
+  async wifiDimentica(p) { return interpretaWifiDimentica(await eseguiScript('wifi-dimentica', p), process.platform); },
 };
 const computer = () => computerFinto || COMPUTER;
 
@@ -1251,6 +1404,16 @@ function normalizzaRichiesta(r) {
       const errore = nomeValido(nome);
       if (errore) return { errore: `nome ${errore}` };
       out.nome = nome;
+      // #2096 — dimenticare il dispositivo abbinato o la rete conosciuta: chi la chiede la conferma prima.
+      if (vero(q.dimentica)) { out.dimentica = true; return out; }
+      // #2096 — fra i preferiti (in cima all'elenco della home) o fuori: l'indirizzo, se c'è, sceglie fra due nomi uguali.
+      if (cosa === 'bluetooth' && q.preferito != null && q.preferito !== '') {
+        const b = booleano(q.preferito);
+        if (b === null) return { errore: 'preferito non capito: true o false' };
+        out.preferito = b;
+        if (typeof q.indirizzo === 'string' && /^[0-9A-Fa-f:-]{12,17}$/.test(q.indirizzo)) out.indirizzo = q.indirizzo;
+        return out;
+      }
       if (cosa === 'bluetooth') {
         // «Spegni le cuffie» arriva come acceso:false col nome: vuol dire scollegarle, non collegarle.
         const c = q.collega == null || q.collega === '' ? booleano(q.acceso) !== false : booleano(q.collega);
@@ -1284,6 +1447,19 @@ async function radio(q) {
   return { ok: true, cosa: q.cosa, acceso: r.acceso };
 }
 
+// #2096 — i preferiti sono un'impostazione (bluetoothPreferiti): si scrive dalla porta di tutte le impostazioni, che la
+// fa diventare un cambio del filo. Un dispositivo dimenticato ci resta: toglierlo da qui darebbe al filo un Annulla che
+// rimette fra i preferiti un dispositivo che il computer non conosce più; riabbinato, torna in cima da sé.
+const preferitiDi = (s) => (Array.isArray(s && s.bluetoothPreferiti)
+  ? s.bluetoothPreferiti.filter((x) => typeof x === 'string' && x) : []);
+async function segnaPreferito(d, si) {
+  const prima = preferitiDi(await globalThis.SN_STORAGE.getSettings());
+  const senza = prima.filter((x) => x !== d.indirizzo);
+  if (!si && senza.length === prima.length) return;
+  const dopo = si ? [...senza, d.indirizzo] : senza;
+  await require('./handlers').applySettingsUpdate({ bluetoothPreferiti: dopo });
+}
+
 async function bluetooth(q) {
   if (q.acceso != null) return radio(q);
   const elenco = await computer().btElenco();
@@ -1295,7 +1471,18 @@ async function bluetooth(q) {
     const f = fallito(s.candidati ? 'ambiguo' : 'nessun-dispositivo', { ...q, nome: q.nome });
     return { ...f, candidati: s.candidati || nomi };
   }
-  const d = elenco.dispositivi.find((x) => x.nome === s.scelto);
+  const d = (q.indirizzo && elenco.dispositivi.find((x) => x.indirizzo === q.indirizzo && x.nome === s.scelto))
+    || elenco.dispositivi.find((x) => x.nome === s.scelto);
+  if (q.preferito != null) {
+    await segnaPreferito(d, q.preferito);
+    return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, preferito: q.preferito };
+  }
+  if (q.dimentica) {
+    const r = await computer().btDimentica({ indirizzo: d.indirizzo });
+    if (!r.ok) return { ...fallito(r.errore, { ...q, nome: d.nome }), dispositivo: d.nome };
+    annunciaCambio({ bluetooth: {} });
+    return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, indirizzo: d.indirizzo, dimenticato: true };
+  }
   if (d.collegato === q.collega) return { ok: true, cosa: 'bluetooth', dispositivo: d.nome, collegato: q.collega, gia: true };
   // Per collegare serve il Bluetooth acceso: chi chiede le cuffie lo vuole acceso, e lo si accende prima.
   let acceso = false;
@@ -1323,6 +1510,11 @@ async function wifi(q) {
     return { ...f, candidati: s.candidati || nomi };
   }
   const rete = elenco.reti.find((x) => x.nome === s.scelto);
+  if (q.dimentica) {
+    const r = await computer().wifiDimentica({ rete: rete.nome, uuid: rete.id });
+    if (!r.ok) return { ...fallito(r.errore, { ...q, nome: rete.nome }), rete: rete.nome };
+    return { ok: true, cosa: 'wifi', rete: rete.nome, dimenticata: true };
+  }
   if (rete.attiva) return { ok: true, cosa: 'wifi', rete: rete.nome, confermato: true, gia: true };
   let acceso = false;
   // Windows non dice la radio nell'elenco delle reti: la sa il lettore della home.
@@ -1386,7 +1578,9 @@ async function risolviNome(richiesta) {
   const s = scegliNome(q.nome, nomi);
   if (s.scelto) {
     const x = r.elenco.find((v) => v.nome === s.scelto) || {};
-    const gia = q.cosa === 'wifi' ? x.attiva === true : typeof x.collegato === 'boolean' && x.collegato === q.collega;
+    // Dimenticare non è mai «già fatto»: quello che si legge nell'elenco è ancora abbinato o conosciuto.
+    const gia = q.dimentica ? false
+      : q.cosa === 'wifi' ? x.attiva === true : typeof x.collegato === 'boolean' && x.collegato === q.collega;
     return { nome: s.scelto, gia };
   }
   const errore = s.candidati ? 'ambiguo' : q.cosa === 'wifi' ? 'nessuna-rete' : 'nessun-dispositivo';
@@ -1400,9 +1594,10 @@ function uriImpostazioni(chiave) {
 const _perProve = {
   // Un computer finto con la forma di COMPUTER: le prove vedono chat, tasti e home veri sopra un sistema inventato.
   usaComputer(finto) { computerFinto = finto && typeof finto === 'object' ? finto : null; },
+  usaPiattaformaPannelli(p) { piattaformaPannelli = p || null; },
 };
 
-const api = { comanda, normalizzaRichiesta, risolviNome, uriImpostazioni, _perProve };
+const api = { comanda, normalizzaRichiesta, risolviNome, uriImpostazioni, pannelliImpostazioni, normalizzaIndirizzo, _perProve };
 globalThis.SN_COMANDI_SISTEMA = api;
 
 module.exports = {
@@ -1410,6 +1605,7 @@ module.exports = {
   PIATTAFORME, PASSO_VOLUME, NOME_MAX, SCRIPT, AMBIENTE, IMPOSTAZIONI, INDIRIZZO,
   costruisci, parametri, nomeValido, leggiUscita, decodifica, spiega, scegliNome, piega,
   interpretaVolume, interpretaRadio, interpretaBtElenco, interpretaBtCollega, interpretaWifiElenco, interpretaWifiCollega,
+  interpretaBtDimentica, interpretaWifiDimentica, PANNELLI,
   campiNmcli, erroreWlan,
   _interni: { CS_VOLUME, CS_CUFFIE, CS_WLAN, PS_INIZIO, PS_ATTESA, PS_RADIO_TIPI, SH_INIZIO, psCompila },
 };

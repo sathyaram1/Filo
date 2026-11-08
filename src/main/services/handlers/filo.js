@@ -240,7 +240,8 @@ module.exports = function register(on, ctx) {
     Sistema.richiedi({ davanti, chi: sender && sender.wc, segue });
     // La pagina che ha visto cadere o tornare la rete non aspetta il giro: la lettura nuova arriva con l'annuncio.
     if (davanti && segue && msg && msg.subito === true) Sistema.leggiUnaVolta();
-    return { ok: true, stato: Sistema.stato() };
+    // #2096 — quali pannelli del sistema si aprono da qui: il tasto destro della home mostra solo quelli.
+    return { ok: true, stato: Sistema.stato(), pannelli: Object.keys(require('../comandiSistema').pannelliImpostazioni()) };
   }));
 
   // #874 — i tasti della home comandano volume, Bluetooth e Wi-Fi dalla stessa porta dell'azione della chat. È un
@@ -250,7 +251,10 @@ module.exports = function register(on, ctx) {
     return require('../registroCambi').con({ via: 'interfaccia', dove: 'home' }, () => Comandi.comanda(msg && msg.richiesta));
   }));
   on(MSG.SISTEMA_APRI_IMPOSTAZIONI, require('./origine').soloFilo(async (msg) => {
-    const uri = require('../comandiSistema').uriImpostazioni(String((msg && msg.chiave) || ''));
+    const C = require('../comandiSistema');
+    // `pannello` (bluetooth, wifi, audio) lo traduce il main per la piattaforma; `chiave` è già una voce dell'elenco.
+    const chiave = msg && msg.pannello ? C.pannelliImpostazioni()[String(msg.pannello)] : (msg && msg.chiave);
+    const uri = C.uriImpostazioni(String(chiave || ''));
     if (!uri) return { ok: false, error: 'impostazione sconosciuta' };
     try {
       await require('electron').shell.openExternal(uri);

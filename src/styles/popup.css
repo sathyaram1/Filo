@@ -134,13 +134,15 @@
 .sn-risposta-interrotta .sn-msg-rimedio { font-style: normal; }
 
 /* Comandi di una risposta finita: piccoli e quieti, l'icona allineata al bordo del testo. */
+/* L'etichetta di un tasto sta dopo tutta la riga (Copia, Rispondi): non copre il tasto vicino (#2096). */
 .sn-msg-azioni {
+  position: relative;
   display: flex;
+  gap: 2px;
   margin: 2px 0 0 -4px;
 }
-.sn-msg-copia {
+.sn-msg-tasto {
   all: unset;
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -151,14 +153,15 @@
   cursor: pointer;
   transition: background calc(120ms * var(--sn-motion, 1)) ease, color calc(120ms * var(--sn-motion, 1)) ease;
 }
-.sn-msg-copia:hover { background: var(--sn-hover); color: var(--sn-fg); }
-.sn-msg-copia:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
-.sn-msg-copia:active { transform: scale(0.92); }
-.sn-msg-copia.sn-copiato { color: var(--sn-success); }
-.sn-msg-copia.sn-non-copiato { color: var(--sn-error); }
-.sn-msg-copia svg { display: block; }
+.sn-msg-tasto:hover { background: var(--sn-hover); color: var(--sn-fg); }
+.sn-msg-tasto:focus-visible { box-shadow: 0 0 0 2px var(--sn-accent); }
+.sn-msg-tasto:active svg { transform: scale(0.92); }
+.sn-msg-tasto.sn-copiato { color: var(--sn-success); }
+.sn-msg-tasto.sn-non-copiato { color: var(--sn-error); }
+.sn-msg-tasto svg { display: block; }
+.sn-msg-azioni:has(.sn-copiato, .sn-non-copiato) .sn-msg-tasto:not(.sn-copiato):not(.sn-non-copiato)::after { opacity: 0; visibility: hidden; }
 /* L'etichetta sta a destra, fuori dal flusso: comparendo non sposta niente, e il corpo che scorre non la taglia. */
-.sn-msg-copia::after {
+.sn-msg-tasto::after {
   content: attr(data-etichetta);
   position: absolute;
   left: calc(100% + 4px);
@@ -177,21 +180,66 @@
   visibility: hidden;
   transition: opacity calc(100ms * var(--sn-motion, 1)) ease, visibility 0s linear calc(100ms * var(--sn-motion, 1));
 }
-.sn-msg-copia:hover::after,
-.sn-msg-copia:focus-visible::after {
+.sn-msg-tasto:hover::after,
+.sn-msg-tasto:focus-visible::after {
   opacity: 1;
   visibility: visible;
   transition-delay: calc(250ms * var(--sn-motion, 1));
 }
 /* L'esito si legge subito, senza aspettare il passaggio del mouse. */
-.sn-msg-copia.sn-copiato::after,
-.sn-msg-copia.sn-non-copiato::after {
+.sn-msg-tasto.sn-copiato::after,
+.sn-msg-tasto.sn-non-copiato::after {
   opacity: 1;
   visibility: visible;
   transition-delay: 0s;
 }
-.sn-msg-copia.sn-copiato::after { color: var(--sn-success); }
-.sn-msg-copia.sn-non-copiato::after { color: var(--sn-error); }
+.sn-msg-tasto.sn-copiato::after { color: var(--sn-success); }
+.sn-msg-tasto.sn-non-copiato::after { color: var(--sn-error); }
+
+/* #2096 — Copia e Rispondi sotto i messaggi delle chat (src/shared/azioniMessaggio.js): la barra è assoluta e lo spazio
+   lo tiene `.sn-con-azioni-msg` sul messaggio, così comparendo non sposta niente. */
+.sn-con-azioni-msg, .sn-msg.sn-con-azioni-msg { position: relative; margin-bottom: 26px; }
+.sn-azioni-msg {
+  position: absolute; left: 0; top: 100%;
+  display: flex; align-items: center; gap: 2px;
+  padding-top: 2px;
+  white-space: nowrap; font-style: normal; user-select: none;
+  opacity: 0; visibility: hidden;
+  transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s linear calc(0.14s * var(--sn-motion, 1));
+}
+.sn-azioni-msg.sn-azioni-msg-destra { left: auto; right: 0; }
+:hover > .sn-azioni-msg,
+.sn-azioni-msg:focus-within {
+  opacity: 1; visibility: visible;
+  transition: opacity calc(0.14s * var(--sn-motion, 1)) ease, visibility 0s;
+}
+.sn-azioni-msg-tasto {
+  all: unset;
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 24px; height: 22px; border-radius: 6px;
+  color: var(--sn-muted); cursor: pointer;
+  transition: background calc(0.12s * var(--sn-motion, 1)) ease, color calc(0.12s * var(--sn-motion, 1)) ease;
+}
+.sn-azioni-msg-tasto:hover, .sn-azioni-msg-tasto:focus-visible {
+  background: color-mix(in srgb, var(--sn-fg) 9%, transparent); color: var(--sn-fg);
+}
+.sn-azioni-msg-tasto svg { display: block; transition: transform calc(0.1s * var(--sn-motion, 1)) ease; }
+.sn-azioni-msg-tasto:active svg { transform: scale(0.9); }
+.sn-azioni-msg-tasto.sn-azioni-msg-ok { color: var(--sn-success); }
+.sn-azioni-msg-tasto.sn-azioni-msg-no { color: var(--sn-error); }
+/* L'etichetta dopo i tasti (prima, se stanno a destra), nella stessa riga: non copre il tasto vicino. */
+.sn-azioni-msg-tasto::after {
+  content: attr(data-etichetta);
+  position: absolute; left: calc(100% + 4px); top: calc(50% + 1px); transform: translateY(-50%);
+  font-size: 11px; line-height: 1; color: var(--sn-muted); pointer-events: none;
+  opacity: 0; transition: opacity calc(0.1s * var(--sn-motion, 1)) ease;
+}
+.sn-azioni-msg-destra .sn-azioni-msg-tasto::after { left: auto; right: calc(100% + 4px); }
+.sn-azioni-msg-tasto:hover::after, .sn-azioni-msg-tasto:focus-visible::after { opacity: 1; transition-delay: calc(0.25s * var(--sn-motion, 1)); }
+.sn-azioni-msg-tasto.sn-azioni-msg-ok::after, .sn-azioni-msg-tasto.sn-azioni-msg-no::after { opacity: 1; transition-delay: 0s; }
+.sn-azioni-msg-tasto.sn-azioni-msg-ok::after { color: var(--sn-success); }
+.sn-azioni-msg-tasto.sn-azioni-msg-no::after { color: var(--sn-error); }
+.sn-azioni-msg:has(.sn-azioni-msg-ok, .sn-azioni-msg-no) .sn-azioni-msg-tasto:not(.sn-azioni-msg-ok):not(.sn-azioni-msg-no)::after { opacity: 0; }
 
 .sn-msg-text p,
 .sn-menu-inline p { margin: 0 0 8px 0; }

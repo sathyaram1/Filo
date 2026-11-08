@@ -166,12 +166,15 @@
     // Le righe stanno sempre nel filo al centro (#869).
     send, bubblesEl, homeEl: $('righeApp'), inThread: () => true, chatId: () => chatId,
   });
-  // Copia e Rispondi sotto le risposte di Filo, e la citazione nel campo e nella bolla che parte (#1620).
+  // Copia e Rispondi sotto le risposte di Filo, Copia, Modifica e Cita sotto i messaggi dell'utente, e la citazione nel
+  // campo e nella bolla che parte (#1620, #2096).
   const Rispondi = self.SN_DASH_RISPONDI;
   Rispondi.init({
     send, bubblesEl, inputEl, formEl: inputForm, anteprimaEl: $('citazione'),
     contaCopia: (n) => contaCopia(n),
     vaiA: (o) => Coda.vaiA(o),
+    modificabile: (b) => composizioni.has(b),
+    modifica: (b) => modificaMessaggio(b),
   });
   // La coda del filo al centro (#869) e il campo per cercarci dentro.
   const Coda = self.SN_DASH_CODA;
@@ -517,6 +520,7 @@
           b.insertBefore(img, b.childNodes[i] || null);
         });
         if (isUser && m.rispostaA) Rispondi.citaIn(b, Rispondi.dalFilo(m.rispostaA));
+        if (isUser) composizioni.set(b, composizioneDalFilo(m, fotoViste));
         metti(b);
         if (isUser) bollaUtente = b;
       }
@@ -1390,7 +1394,37 @@
       userBubble.insertBefore(img, userBubble.childNodes[i] || null);
     });
     if (c.citata) Rispondi.citaIn(userBubble, c.citata);
+    composizioni.set(userBubble, c);
     return userBubble;
+  }
+  // Quello che un messaggio dell'utente aveva nel campo quando è partito: «Modifica» lo rimette lì (#2096).
+  const composizioni = new WeakMap();
+  // Un messaggio riletto dal filo: i file stanno nel testo come righe «File: …» in coda, le foto ancora in memoria a parte.
+  function composizioneDalFilo(m, foto) {
+    const righe = String(m.text || '').split('\n');
+    const file = [];
+    while (righe.length && /^File: \S/.test(righe[righe.length - 1])) {
+      const p = righe.pop().slice(6).trim();
+      // Il percorso di una foto che torna già come immagine non diventa anche un documento.
+      if (!(foto.length && /\.(png|jpe?g|gif|webp|bmp)$/i.test(p))) file.unshift({ percorso: p, nome: nomeDaPercorso(p) });
+    }
+    let scritto = righe.join('\n');
+    if (foto.length && scritto.trim() === DOMANDA_SOLO_IMMAGINI) scritto = '';
+    const c = Rispondi.dalFilo(m.rispostaA);
+    const citata = c && !c.manca ? { ...c, scritto: c.testo } : null;
+    return { scritto, incollato: false, immagini: foto.slice(), percorsi: new Map(), file, citata };
+  }
+  // Il messaggio già nel campo (un secondo clic, un doppio clic) non si rimette una seconda volta: ci si torna sopra.
+  let rimesso = null;
+  function modificaMessaggio(b) {
+    const c = composizioni.get(b);
+    if (!c) return false;
+    const testo = String(c.scritto || '').trim();
+    const gia = (rimesso && rimesso.bolla === b && inputEl.value === rimesso.valore) || (!!testo && inputEl.value.includes(testo));
+    if (gia) { inputEl.focus(); return true; }
+    rimettiNellaCasella([c]);
+    rimesso = { bolla: b, valore: inputEl.value };
+    return true;
   }
   // `bolla`: quella del seguito che era in attesa, che diventa la bolla del messaggio.
   async function inviaComposto(c, { daModello = false, bolla = null } = {}) {
