@@ -1239,7 +1239,8 @@
     },
     win32: {
       nome: 'Windows',
-      shell: 'PowerShell (o cmd): comandi come `dir`, `Get-ChildItem`, `start`',
+      // In cmd la cartella di lavoro è fuori dalla ricerca dei programmi (#2312): senza `.\` un `gradlew` fallisce dopo la conferma.
+      shell: 'PowerShell (o cmd): comandi come `dir`, `Get-ChildItem`, `start`; un programma o uno script della cartella di lavoro si chiama con `.\\` davanti (`.\\gradlew build`), anche in cmd',
       percorsi: 'percorsi in stile Windows, con la lettera di unità e le barre rovesciate: `C:\\Users\\anna\\Downloads\\estratto-conto.pdf`',
       esempioPercorso: 'C:\\\\Users\\\\anna\\\\Downloads\\\\estratto-conto.pdf',
       shellPref: '"powershell" | "cmd" | "bash"',
