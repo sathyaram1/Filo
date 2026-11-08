@@ -315,7 +315,7 @@ test('in un campo su più righe il segno sta sotto la parola, sulla sua riga', a
     range.setStart(n, i);
     range.setEnd(n, i + 6);
     const p = range.getBoundingClientRect();
-    const s = document.querySelector('.sn-spell-overlay .sn-errore').getBoundingClientRect();
+    const s = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay .sn-errore').getBoundingClientRect();
     return { parola: { left: p.left, top: p.top, bottom: p.bottom, right: p.right }, segno: { left: s.left, top: s.top, bottom: s.bottom, right: s.right } };
   });
   expect(Math.abs(r.segno.left - r.parola.left)).toBeLessThan(3);
