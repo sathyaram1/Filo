@@ -1501,21 +1501,33 @@
     return nuovo;
   }
 
-  // Su un sito il codice controlla una casella solo dopo un gesto vero dell'utente lì dentro (#2299): il testo che lo
-  // script del sito scrive in un campo suo non riceve segni, e dalla loro assenza non si sa niente del dizionario.
-  // `input` e `focus` non bastano: sono fidati anche quando li causa uno script (gesto.js).
-  function toccato(state) {
-    if (state.toccato) return true;
-    if (PAGINA_DI_FILO || radiceDi(state.el)) return (state.toccato = true);
+  // Su un sito un testo nuovo si controlla solo dopo un gesto vero dell'utente in quella casella, uno per gesto, o dopo
+  // una scrittura di Filo (#2299): il sito non legge il dizionario né dai segni né da quanto dura il controllo del testo
+  // che scrive lui. Senza, i segni di prima seguono il testo e quello nuovo resta senza. Prova: correttore-segni-fuori-dalla-pagina.
+  function puoRicalcolare(state) {
+    if (PAGINA_DI_FILO || radiceDi(state.el)) return true;
     const G = global.SN_GESTO;
-    if (G && G.prendi('toccato', undefined, G.dentro(state.el))) state.toccato = true;
-    return state.toccato;
+    const finestra = (G && G.FINESTRA_MS) || 1500;
+    if (state.permesso && Date.now() - state.permesso <= finestra) { state.permesso = 0; return true; }
+    // Il gesto che entra nella casella per la prima volta cade prima che ci sia chi la ascolta.
+    return state.testoCalcolato == null && !!G && G.prendi('codice', undefined, G.dentro(state.el));
+  }
+  function scriveFilo(el) {
+    const state = monitored.get(el);
+    if (state) state.permesso = Date.now();
   }
 
   function calcolaCodice(state) {
     const d = testoDaControllare(state.el);
     const Rg = R();
-    if (!Rg || !toccato(state)) { state.codice = []; state.codiceT2 = []; state.codiceTesto = null; return false; }
+    if (!Rg) { state.codice = []; state.codiceT2 = []; state.codiceTesto = null; return false; }
+    if (d.testo !== state.testoCalcolato && !puoRicalcolare(state)) {
+      state.codiceT2 = state.codiceTesto == null ? [] : riallineaIssues(state.codiceT2, state.codiceTesto, d.testo).issues;
+      state.codiceTesto = d.testo;
+      state.codice = d.riporta(state.codiceT2);
+      return false;
+    }
+    state.testoCalcolato = d.testo;
     // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
     const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
