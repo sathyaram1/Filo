@@ -856,6 +856,8 @@ const PAROLE_PARTE = {
   presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
   rete: 'rete', 'rete locale': 'rete', 'rete di casa': 'rete', lan: 'rete',
   file: 'file', cartella: 'file', cartelle: 'file', 'modifica dei file': 'file', 'modificare i file': 'file', scrittura: 'file',
+  scaricamenti: SCARICAMENTI, download: SCARICAMENTI, 'download automatici': SCARICAMENTI, 'scaricamenti automatici': SCARICAMENTI,
+  'scaricare più file': SCARICAMENTI, 'più file': SCARICAMENTI,
 };
 function nomeParte(parte) {
   const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
