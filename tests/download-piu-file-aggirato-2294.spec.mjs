@@ -144,6 +144,27 @@ test('una pagina che salta da sola fra siti di domini diversi, senza clic: arriv
   }
 });
 
+test('con i cookie in Privacy, dove ogni sito fa rinascere la scheda, i salti fra siti non ripartono da capo; il sì li fa arrivare tutti', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  await shell.evaluate(() => window.filoShell.message({ type: 'update_settings', settings: { security: { cookies: { mode: 'privacy', trustedSites: [] } } } }));
+  await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()
+    .some((w) => w._filoTabs && w._filoTabs.cookieMode === 'privacy')), { timeout: 5000 }).toBe(true);
+  const srv = await apriServer();
+  try {
+    const dir = await cartella(app);
+    await openTab(`http://${SITI[0]}:${srv.porta}/altrove?n=0&fino=5`);
+    await expect.poll(() => inAttesa(shell, 'altrove'), { timeout: 40_000 }).toBe(5);
+    expect(arrivati(dir, 'altrove'), 'senza clic arriva solo il primo').toEqual(['file-altrove-0.bin']);
+    const barra = shell.locator('#permesso-bar');
+    await expect(barra).toContainText('vuole scaricare più file', { timeout: 10_000 });
+    await expect(barra.locator('.permesso-si')).toBeEnabled({ timeout: 5_000 });
+    await barra.locator('.permesso-si').click();
+    await expect.poll(() => arrivati(dir, 'altrove').length, { timeout: 20_000 }).toBe(6);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('il no dato sulla scheda vale anche per i siti dove la pagina salta dopo: niente file e niente domanda', async ({ app, shell, openTab }) => {
   test.setTimeout(120_000);
   const srv = await apriServer();
