@@ -305,7 +305,7 @@ test('in un campo su più righe il segno sta sotto la parola, sulla sua riga', a
   await page.keyboard.type('seconda riga con quseta dentro ');
   const segno = errore(page, 'quseta');
   await expect(segno).not.toHaveClass(/sn-dubbio/, { timeout: 6000 });
-  const r = await page.evaluate(() => {
+  const r = await nelMondoDelFrame(page, null, () => {
     const ce = document.getElementById('ce');
     const w = document.createTreeWalker(ce, NodeFilter.SHOW_TEXT);
     let n;
