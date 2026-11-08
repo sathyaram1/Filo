@@ -911,6 +911,7 @@
       && getEditableText(state.el) === state.codiceTesto && getEditableText(state.el) === state.testo) return;
     const storia = !!evento && (evento.inputType === 'historyUndo' || evento.inputType === 'historyRedo');
     seguiIlTesto(state, ammessoDa(state, evento), { storia });
+    if (evento && evento.isTrusted) state.intento = null;
     if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
     fineParolaBattuta(state, evento);
     state.ultimoTasto = Date.now();
