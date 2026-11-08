@@ -137,6 +137,74 @@ test('il cammino della decisione: a livello Normale e compito contaminato questi
   }
 });
 
+// I sottocomandi di lettura di git, con le loro forme che scrivono (2) o eseguono (3). `--output` vale per tutti.
+const FORME_GIT = {
+  diff: [['git diff --no-index --output=Documenti/tesi.txt Documenti Documenti', 2], ['git diff --output tesi.txt', 2]],
+  log: [['git log -1 --format=format:x --output=.bashrc', 2], ['git log --output Documenti/tesi.txt', 2],
+    ['git log -1 --format=format:x --output=.git/config && git status', 2]],
+  show: [['git show --output=Documenti/tesi.txt', 2]],
+  whatchanged: [['git whatchanged --output=Documenti/tesi.txt', 2]],
+  shortlog: [['git shortlog --output=Documenti/tesi.txt', 2]],
+  grep: [['git grep -O"sh -c id" foo', 3], ['git grep -nOvim foo', 3], ['git grep --open-files-in-pager="sh -c id" foo', 3],
+    ['git grep --open-files=true foo', 3]],
+  reflog: [['git reflog expire --expire=now --all', 3], ['git reflog delete HEAD@{0}', 3]],
+  'symbolic-ref': [['git symbolic-ref HEAD refs/heads/altro', 2]],
+};
+// Stampano e basta, a parte `--output` che vale per tutti.
+const INERTI_GIT = ['status', 'rev-parse', 'describe', 'blame', 'ls-files', 'ls-tree', 'name-rev', 'cat-file', 'version', 'help',
+  'count-objects'];
+
+test('sentinella: ogni lettura di git sta nella tabella delle forme che scrivono o eseguono', () => {
+  for (const nome of C.nomiDiLettura().git) {
+    assert.ok(FORME_GIT[nome] || INERTI_GIT.includes(nome), `«git ${nome}» è nuovo fra le letture: scrivi qui le sue forme che scrivono o eseguono`);
+  }
+  const pulito = (ctx) => ctx && { ...ctx, gitLancia: () => '' };
+  for (const [nome, forme] of Object.entries(FORME_GIT)) {
+    for (const [comando, minimo] of forme) {
+      for (const ctx of CONTESTI.map(pulito)) {
+        assert.ok(C.classify(comando, ctx) >= minimo, `git ${nome}: «${comando}» deve essere almeno ${minimo}`);
+        if (!ctx) continue;
+        const costo = AL.costoFor({ type: 'ESEGUI_COMANDO', comando, _perimetro: ctx });
+        const d = A.decideDettaglio({ livello: 'default', stato: 'contaminato', costo, campo: 'terminale' });
+        assert.notEqual(d.risposta, 'si', `«${comando}» partirebbe senza domanda`);
+      }
+    }
+  }
+  for (const cmd of ['git diff', 'git log -1 --format=format:%s', 'git show HEAD', 'git reflog', 'git reflog show',
+    'git symbolic-ref HEAD', 'git grep -n foo', 'git diff --output-indicator-new=+ HEAD']) {
+    assert.equal(C.classify(cmd, pulito(LINUX)), 1, cmd);
+  }
+  // Su un file che c'è già, `--output` lo sostituisce: 3, come uniq e tree.
+  const esiste = (p) => (/tesi\.txt$/.test(p) ? 'file' : null);
+  const d = C.classifyDetail('git log --output=Documenti/tesi.txt', { ...pulito(LINUX), esiste });
+  assert.equal(d.level, 3);
+  assert.match(d.motivo, /sovrascrive/);
+});
+
+test('su Windows i comandi partono con cmd che non cerca i programmi nella cartella corrente', () => {
+  const prima = Object.getOwnPropertyDescriptor(process, 'platform');
+  const comeWindows = (fn) => {
+    Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
+    try { return fn(); } finally { Object.defineProperty(process, 'platform', prima); }
+  };
+  const env = comeWindows(() => T.ambienteComandi({ PATH: 'C:\\Windows\\System32', nodefaultcurrentdirectoryinexepath: '' }));
+  assert.equal(env.NoDefaultCurrentDirectoryInExePath, '1');
+  assert.equal(Object.keys(env).filter((k) => k.toLowerCase() === 'nodefaultcurrentdirectoryinexepath').length, 1);
+  if (process.platform !== 'win32') assert.equal('NoDefaultCurrentDirectoryInExePath' in T.ambienteComandi({ PATH: '/bin' }), false);
+});
+
+test('quale where è lo decide un posto solo: livello e controllo della rete dicono lo stesso', () => {
+  const RETE = { ...PS, cwd: '\\\\server\\condivisa' };
+  for (const shell of ['powershell', 'cmd', 'bash', undefined]) {
+    const ctx = { ...RETE, shell };
+    const lettura = C.classify('where git', { ...PS, shell }) === 1;
+    // Dove where è il filtro, in rete non cerca nomi; dove è la ricerca di cmd, li cerca e chiede.
+    assert.equal(C.classify('where git', ctx), shell === 'powershell' ? 1 : 2, String(shell));
+    assert.equal(lettura, true, String(shell));
+  }
+  assert.equal(C.classify('where.exe git', RETE), 2);
+});
+
 test('git: un repository con impostazioni che avviano programmi fa chiedere anche le letture', () => {
   const lancia = { ...LINUX, gitLancia: () => 'si' };
   const pulito = { ...LINUX, gitLancia: () => '' };
