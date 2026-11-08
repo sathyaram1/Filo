@@ -1526,18 +1526,29 @@
     return base === 1 ? perimetroDi(raw, c) : { level: base, motivo: '' };
   }
 
-  // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce.
+  // Dopo un `cd` la cartella è quella nuova, o la vecchia se il `cd` fallisce. Dove la shell la risolve in un modo
+  // che qui non si ripete (`cd -P` oltre un collegamento, `cd a b` di zsh) la cartella diventa ignota (#2292).
   function spostati(raw, c) {
     const prog = programOf(dequote(raw));
     const args = argomenti(raw, c).slice(1);
     if (prog === 'popd' || args.some((a) => a.variabile || a.ignoto)) return { ...c, cwd: null };
+    const cmd = stileDi(c) === 'cmd';
+    const posix = shellPosix(c);
     let dest = null;
     for (let i = 0; i < args.length; i++) {
       const t = args[i].testo;
       if (/^-(literalpath|path|lp)$/i.test(t)) { dest = args[i + 1] ? args[i + 1].testo : null; break; }
       if (t === '-' || t === '') break;
-      if (t.startsWith('-') || /^\/[A-Za-z]$/.test(t)) continue;
-      dest = t;
+      if (/^\/[A-Za-z]$/.test(t) && !posix) continue;
+      if (t.startsWith('-') && !cmd) {
+        if (posix && /^-[A-Za-z@]*P/.test(t)) return { ...c, cwd: null };
+        continue;
+      }
+      // cmd prende tutto il resto della riga come nome, spazi compresi; altrove un secondo operando non si segue.
+      const resto = args.slice(i + 1).map((a) => a.testo).filter(Boolean);
+      if (resto.length && !cmd) return { ...c, cwd: null };
+      if (resto.length && prog !== 'cd' && prog !== 'chdir') return { ...c, cwd: null };
+      dest = [t, ...resto].join(' ');
       break;
     }
     if (dest === null) return { ...c, cwd: null };
