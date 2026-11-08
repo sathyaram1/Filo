@@ -133,12 +133,13 @@ function dimenticaSeCambia(ses, chiave) {
 
 // La partition proxata con regole e credenziali di `resolved` (quello di resolve()). Torna la promessa da aspettare
 // prima di caricare quando le credenziali vecchie vanno dimenticate, altrimenti null.
-function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null } = {}) {
+function registraRete(partition, ses, { proxyRules = '', bypassRules = '', auth = null, country = '', tier = '' } = {}) {
   const conAuth = auth && auth.username ? auth : null;
   const rete = proxyRules ? { proxyRules, ...(bypassRules ? { proxyBypassRules: bypassRules } : {}) } : null;
   const dimentica = dimenticaSeCambia(ses, JSON.stringify([proxyRules, bypassRules, conAuth && conAuth.username, conAuth && conAuth.password]));
   if (!conAuth && !rete) { authBySession.delete(partition); return dimentica; }
-  authBySession.set(partition, { ses, auth: conAuth, rete });
+  const paese = normalizeCountry(country) ? { country: normalizeCountry(country), tier: normalizeTier(tier) } : null;
+  authBySession.set(partition, { ses, auth: conAuth, rete, paese });
   if (conAuth) wireLoginHandler();
   return dimentica;
 }
