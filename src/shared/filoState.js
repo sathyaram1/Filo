@@ -498,14 +498,18 @@
     }
     if (state.conversazioni && !perChat) aggiungi('CONVERSAZIONI RECENTI', [testoConversazioni(state.conversazioni, salvati)]);
     // Il messaggio della home è un turno di Filo nel filo (#869): qui restano i suggerimenti.
+    // Li scrive un modello che ha letto i titoli delle schede e delle pagine salvate: testo dei siti per le uscite (#2293).
     {
       const righe = ['SUGGERIMENTI DELLA HOME'];
+      const daSiti = [];
       if (state.dashboard && state.dashboard.suggestions?.length) {
-        righe.push(salvati(state.dashboard.suggestions.slice(0, 8).map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`)));
+        const voci = state.dashboard.suggestions.slice(0, 8);
+        righe.push(salvati(voci.map((s, i) => `${i + 1}. ${s.icon || '·'} | ${s.text || ''} (imp ${s.importance ?? '?'})`)));
+        for (const s of voci) if (typeof s.text === 'string' && s.text.trim()) daSiti.push(s.text);
       } else {
         righe.push('(nessuno)');
       }
-      aggiungi('SUGGERIMENTI DELLA HOME', righe);
+      aggiungi('SUGGERIMENTI DELLA HOME', righe, null, daSiti.length ? { daSiti } : null);
     }
     return out;
   }
