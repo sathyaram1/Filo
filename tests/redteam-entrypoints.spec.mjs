@@ -58,9 +58,7 @@ test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con
   await expect(attack).toBeVisible();
   await expect(desc).toBeVisible();
 
-  // Il bottone d'invio mostra il costo (50 cr) — sia da loggato ("· 50 cr") sia,
-  // se non loggato, l'invito ad accedere (in entrambi i casi il costo è esposto
-  // dall'etichetta dell'azione di invio).
+  // Il bottone d'invio: «Invia attacco» da loggato, l'invito ad accedere se no.
   const send = page.locator('.sn-rt-overlay .sn-rt-send');
   await expect(send).toBeVisible();
 
