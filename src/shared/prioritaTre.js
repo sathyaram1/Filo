@@ -29,9 +29,13 @@
     return { ok: true, valore: v };
   }
 
-  /** L'archiviazione di un feedback a priorità `attuale`: senza `owner`, né una 3 né una priorità ignota. */
+  /**
+   * L'archiviazione di un feedback a priorità `attuale`: senza `owner`, né una 3 né una priorità ignota. `continuaA` è la
+   * priorità del feedback dove il lavoro continua (il figlio di un'unione): a 3 la 3 non si toglie, si sposta.
+   */
   function archiviazione(attuale, opts) {
     if (opts && opts.owner) return { ok: true };
+    if (opts && leggi(opts.continuaA) === 3) return { ok: true };
     const a = leggi(attuale);
     if (a === 3) return no('tre', 'un feedback a priorità 3 non si archivia: lo toglie solo l\'owner');
     if (a === null) return no('ignota', 'non so la priorità di adesso, e potrebbe essere una 3: un feedback a priorità 3 lo toglie solo l\'owner');
