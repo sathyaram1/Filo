@@ -1877,8 +1877,18 @@
     if (seq && seq.length) {
       let cands = [c];
       let det = UNO;
+      const ultimi = [];
       for (const part of seq) {
-        for (const cc of cands) det = peggiore(det, classifyOneDet(part, cc));
+        let forme = [part];
+        if (usaUltimoArg(part, c)) {
+          const valori = [...new Set(ultimi.flat())];
+          if (!ultimi.length || ultimi.includes(null) || valori.length > ULTIMI_MAX) return TRE;
+          forme = valori.map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
+        }
+        for (const f of forme) {
+          for (const cc of cands) det = peggiore(det, classifyOneDet(f, cc));
+          ultimi.push(ultimiArgomenti(f, c));
+        }
         if (!SPOSTAMENTI.has(programOf(dequote(part)))) continue;
         const visti = new Map();
         for (const cc of cands.concat(cands.map((x) => spostati(part, x)))) visti.set(chiaveCwd(cc), cc);
