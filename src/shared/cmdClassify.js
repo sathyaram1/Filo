@@ -323,8 +323,8 @@
     if (CURL_SEND_SHORT_RE.test(cmd)) return true;
     for (const m of cmd.matchAll(/(?:^|\s)--([a-z][a-z-]*)/g)) {
       const w = m[1];
-      if (w.startsWith('data') || CURL_SEND_LONG.some((n) => n.startsWith(w))) return true;
-      if (w !== 'request' && 'request'.startsWith(w) && w.length >= 3) return true;
+      if (w.startsWith('data') || CURL_SEND_LONG.some((n) => opzioneLunga(`--${w}`, n, 1) != null)) return true;
+      if (w !== 'request' && opzioneLunga(`--${w}`, 'request', 3) != null) return true;
     }
     for (const m of cmd.matchAll(CURL_METHOD_RE)) if (!/^(GET|HEAD)$/i.test(m[1])) return true;
     return false;
