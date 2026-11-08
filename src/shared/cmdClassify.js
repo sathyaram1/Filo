@@ -1428,6 +1428,21 @@
       }
       case 'unzip':
         return opzione(/^-[A-Za-z]*o/) ? PUO_SOVRASCRIVERE : '';
+      case 'uniq': {
+        const uscita = uniqUscita(testi);
+        return uscita ? copiaSovrascrive([], uscita, c, { maiDentro: true }) : '';
+      }
+      case 'tree': {
+        if (opzione(/^-[A-Za-z]*R/)) return PUO_SOVRASCRIVERE;
+        const i = testi.findIndex((t) => /^-[A-Za-z]*o$/.test(t));
+        return i >= 0 && testi[i + 1] ? copiaSovrascrive([], testi[i + 1], c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
+      }
+      case 'file': {
+        const i = testi.findIndex((t) => /^(-m|--magic-file)$/.test(t));
+        const lungo = testi.find((t) => /^--magic-file=/.test(t));
+        const magia = lungo ? lungo.slice(13) : i >= 0 ? testi[i + 1] : 'magic';
+        return magia ? copiaSovrascrive([], `${nomeDi(magia)}.mgc`, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
+      }
       case 'gzip': case 'gunzip':
         return opzione(/^-[A-Za-z]*f|^--force$/) ? PUO_SOVRASCRIVERE : '';
       case 'rename':
