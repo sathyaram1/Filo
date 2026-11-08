@@ -3137,8 +3137,11 @@ async function eseguiAzioneFilo(action, {
   }
   let decisione = decisioneAutonomia(ing, { sender, contesto, fontiLette, assistente, origine, dentroPerimetro: dentroPerimetro && ing.dentroPerimetro, impostazioni });
   // L'indirizzo scritto dal modello si conferma con un OK (decisione su D-20): aprire o leggere una pagina si disfa,
-  // e il riquadro da digitare direbbe il contrario.
-  if (action._nonCompare && decisione.digita) decisione = { ...decisione, digita: false };
+  // e il riquadro da digitare direbbe il contrario. Così un comando che costerebbe meno di 3 senza l'indirizzo (#2293).
+  if (action._nonCompare && decisione.digita
+    && (type !== 'ESEGUI_COMANDO' || Levels.costoFor({ ...action, _nonCompare: false, _exfil: false }) < 3)) {
+    decisione = { ...decisione, digita: false };
+  }
   const perimetroDentro = dentroPerimetro && ing.dentroPerimetro;
   const contati = ingressiContati(ing, decisione, { origine, dentroPerimetro: perimetroDentro });
   if (decisione.risposta === 'no') {
