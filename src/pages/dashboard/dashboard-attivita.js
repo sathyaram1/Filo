@@ -2230,6 +2230,17 @@
         wrap.appendChild(bottoneFile({ type: 'APRI_FILE', percorso: v.file.percorso, etichetta: v.file.etichetta || '', _executed: true }));
         continue;
       }
+      // Gli altri bottoni che la risposta lasciava da cliccare tornano come in diretta (#1294): pagina, appunto, salvate.
+      const giaFatta = v.esito !== E.FALLITO && v.esito !== E.CHIESTO;
+      const ridato = !giaFatta ? null
+        : v.type === 'NAVIGA' && v.link ? renderActionButton({ type: 'NAVIGA', url: v.link.url, label: v.link.etichetta || '', _executed: true }, { chat })
+          : v.type === 'SALVA_APPUNTO' ? renderActionButton({ type: 'SALVA_APPUNTO', _executed: true }, { chat })
+            : v.type === 'CERCA_SALVATE' && v.salvate ? bottoniSalvate({ type: 'CERCA_SALVATE', _output: { pagine: v.salvate, nominate: v.salvate.map((p) => p.id) } })
+              : null;
+      if (ridato) {
+        wrap.appendChild(ridato);
+        continue;
+      }
       // L'evento ancora da aggiungere ritrova il suo bottone, come nella risposta in diretta (#1685).
       if (v.type === 'EVENTO_CALENDARIO' && v.esito === E.PROPOSTO && v.evento) {
         const btn = renderActionButton({ type: 'EVENTO_CALENDARIO', _output: { proposta: true, evento: v.evento } }, { chat });
