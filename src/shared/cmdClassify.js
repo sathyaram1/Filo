@@ -608,7 +608,7 @@
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
-      return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
+      return DANGEROUS_FLAG_RE.test(trimmed) || lungaPericolosa(trimmed, LUNGHE_PERICOLOSE) ? 3 : 2;
     }
 
     // Cmdlet PowerShell di lettura: 1 solo se superano anche i controlli strutturali.
