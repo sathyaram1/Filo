@@ -987,6 +987,7 @@
       case 'avvisoCrediti.percento': return sogliaCrediti('percento', s.avvisoCrediti && s.avvisoCrediti.percento);
       case 'spiegaAnticipata.enabled': return !(s.spiegaAnticipata && s.spiegaAnticipata.enabled === false);
       case 'traduzionePagina.nascoste': return nascosteDellaTraduzione(s);
+      case 'filoParla.downloadOgniMin': return minutiFraDownload(s.filoParla);
       case 'descriviImmagini.enabled': return !(s.descriviImmagini && s.descriviImmagini.enabled === false);
       case 'contatori.attivi': return !(s.contatori && s.contatori.attivi === false);
       case 'correttore.modelloErrori': return !(s.correttore && s.correttore.modelloErrori === false);
