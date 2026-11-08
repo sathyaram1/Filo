@@ -64,6 +64,7 @@
         { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
         { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
         { testo: 'Un sito che scarica più file da solo, senza un tuo clic, dal secondo ti chiede il permesso: i file aspettano fuori dalla cartella Download finché non rispondi, e la risposta vale per quel sito.', segnalazione: 2294 },
+        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
@@ -84,9 +85,7 @@
     },
     {
       version: '0.2.271', date: '2026-11-07',
-      features: [
-        'Scegli quanto Filo manda ai modelli dalle pagine che visiti: tutto in anticipo, chiedi prima sulle pagine delicate come posta, banca e sanità, o chiedi sempre. Di serie prepara tutto in anticipo e sulla sanità chiede prima. Dove chiede, il tasto destro mostra «Descrivi» o «Spiega» e parte al tuo clic, e il correttore aspetta «Controlla». Lo scegli nell\'intervista di benvenuto, in Impostazioni → Sicurezza o chiedendolo a Filo. Password, carte e codici non arrivano a nessun modello, a nessun livello.',
-      ],
+      features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
       ],
