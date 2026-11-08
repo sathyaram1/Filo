@@ -321,6 +321,33 @@ test('«il il» è un errore sicuro del codice, «quasi quasi» no; spenta la pa
   assert.equal(c.rapide().length, 0);
 });
 
+// #2299: dalla mancanza di un segno il sito saprebbe cosa c'è nel dizionario personale.
+test('su un sito il testo scritto da script in una casella che l\'utente non ha toccato non riceve segni; il primo tasto vero sì', async () => {
+  const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
+  c.sb.SN_GESTO.prendi = () => false;
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'oggi il il quseta ');
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+  el.fire('keydown', { isTrusted: false });
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore'), [], 'un tasto fabbricato dalla pagina non vale');
+  el.fire('keydown', { isTrusted: true });
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['il', 'quseta']);
+});
+
+test('nelle pagine di Filo il campo si controlla anche senza gesto: lì non c\'è uno script del sito', async () => {
+  const c = correttore({ impostazioni: { correttore: { modelloErrori: false } }, protocollo: 'filo:' });
+  c.sb.SN_GESTO.prendi = () => false;
+  const el = c.campo();
+  c.entra(el);
+  c.scrive(el, 'oggi il il cane ');
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), [{ testo: 'il', dubbio: false }]);
+});
+
 // #1580, D5: errori fissi, ripetizioni e date impossibili non aspettano il modello e non gli si chiedono.
 test('«qual\'è», «il il» e una data impossibile hanno il segno pieno subito, e non partono come candidati', async () => {
   const c = correttore();
