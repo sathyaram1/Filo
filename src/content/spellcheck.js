@@ -1591,8 +1591,10 @@
   }
 
   // Chi possedeva ogni testo già visto nella casella: un annulla o un rifai, di chiunque, lo riporta coi suoi
-  // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. Si ricorda per impronta.
+  // proprietari, così la pila dell'annulla preparata dal sito non diventa dell'utente. L'impronta trova, il testo
+  // intero conferma: un'impronta corta il sito la falsificherebbe. Un testo dimenticato torna come del sito.
   const PROPRIETARI_MAX = 2000;
+  const PROPRIETARI_CARATTERI = 4_000_000;
   function improntaDi(t) {
     let a = 0x811c9dc5;
     let b = 0x9747b28c;
