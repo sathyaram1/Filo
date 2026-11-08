@@ -39,4 +39,4 @@ function crea({ adesso = () => Date.now() } = {}) {
   };
 }
 
-module.exports = { crea, DURATA_MS, MASSIMO, CARATTERI_MAX, COSE };
+module.exports = { crea, DURATA_MS, MASSIMO, CARATTERI_MAX };
