@@ -842,22 +842,31 @@
     const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^`]/g, '');
     const out = [];
     const metti = (u) => { if (out.length < MAX_INDIRIZZI_COMANDO && !out.includes(u)) out.push(u); };
+    // Ogni schema porta a un altro computer (ftp, ws, git, smb…) salvo quello dei file: si giudica come la sua forma web,
+    // con sito, nome utente e percorso, perché le regole degli indirizzi conoscono solo quella (#2293).
+    const conSchema = (u) => {
+      const s = /^([a-z][a-z0-9+.-]*):\/\//i.exec(u);
+      if (!s || s[1].length < 2 || /^file$/i.test(s[1])) return;
+      metti(/^https?$/i.test(s[1]) ? u : `http://${u.slice(s[0].length)}`);
+    };
     // Fra virgolette un indirizzo tiene anche gli spazi.
-    const resto = cmd.replace(/(["'])\s*(https?:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { metti(u); return ' '; })
+    const resto = cmd.replace(/(["'])\s*([a-z][a-z0-9+.-]*:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { conSchema(u); return ' '; })
       .replace(/["']/g, '')
-      .replace(/\bhttps?:\/\/[^\s<>()|;]+/gi, (m) => { metti(m); return ' '; });
+      .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s<>()|;]+/gi, (m) => { conSchema(m); return ' '; });
     const C = global.SN_CMD_CLASSIFY;
     if (C && C.PROGRAMMI_RETE && !C.PROGRAMMI_RETE.test(resto)) return out;
     const tld = global.SN_STESSO_SITO && global.SN_STESSO_SITO.dominioDiPrimoLivello;
     for (const pezzo of resto.split(/[\s<>()|;&,]+/)) {
       const tok = pezzo.replace(/^-{1,2}[a-z-]*=/i, '').replace(/^@/, '');
-      if (!tok || tok.startsWith('-') || /^[a-z][a-z0-9+.-]*:\/\//i.test(tok)) continue;
-      if (IP.test(tok)) { metti(`http://${tok}`); continue; }
-      const m = /^((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63}))(:\d{1,5})?([/?#].*)?$/i.exec(tok);
+      if (!tok || tok.startsWith('-')) continue;
+      // Un nome utente davanti al sito (`dati@evil.example`) esce con lui: il sito è quello dopo la chiocciola.
+      const sito = tok.replace(/^[^\s@/]+@/, '');
+      if (IP.test(sito)) { metti(`http://${tok}`); continue; }
+      const m = /^((?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+([a-z]{2,63}))\.?(:\d{1,5})?([/?#].*)?$/i.exec(sito);
       if (!m) continue;
       // Senza percorso né porta, un nome di due parti è un sito se finisce con un dominio vero, non con un'estensione.
       const due = m[1].split('.').length < 3;
-      if (!m[3] && !m[4] && (ESTENSIONI.test(m[2]) || (due && tld && !tld(m[2])))) continue;
+      if (!m[3] && !m[4] && sito === tok && (ESTENSIONI.test(m[2]) || (due && tld && !tld(m[2])))) continue;
       metti(`http://${tok}`);
     }
     return out;
