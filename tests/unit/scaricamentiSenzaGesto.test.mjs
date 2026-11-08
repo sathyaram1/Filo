@@ -117,6 +117,32 @@ test('Blocca vale per il sito: i file dopo si fermano senza domanda e la scheda 
   assert.equal(esito(wc, false, ADESSO + 2), 'chiedi', 'tolto il no, il file dopo quello del clic torna a chiedere');
 });
 
+test('la risposta vale per tutto il sito come il conto: il no dato a un sottodominio ferma gli altri, chiude le loro domande e si toglie da ognuno', () => {
+  const ses = sessione();
+  const c = pagina(ses, 'https://c.salta.example/');
+  const attese = [];
+  P.chiediScaricamenti(c, (si, _f, decisa) => attese.push([si, decisa]));
+  bloccato(ses, 'https://b.salta.example/');
+  assert.deepEqual(attese, [[false, true]], 'la domanda aperta su un altro sottodominio si chiude col no');
+  const d = pagina(ses, 'https://d.salta.example/');
+  assert.equal(esito(d, false, ADESSO), 'no', 'un sottodominio nuovo non torna a chiedere');
+  const subito = [];
+  P.chiediScaricamenti(d, (si, _f, decisa) => subito.push([si, decisa]));
+  assert.deepEqual(subito, [[false, true]]);
+  assert.equal(esito(pagina(ses, 'https://altro.example/'), false, ADESSO), 'via', 'un altro sito non ne risente');
+  assert.equal(P.dimentica(d).tolte, 1, 'il menu della scheda sul sottodominio nuovo toglie il no del sito');
+  assert.notEqual(esito(d, false, ADESSO + 1), 'no');
+
+  // Il sì vale per il sito allo stesso modo.
+  const ses2 = sessione();
+  const a = pagina(ses2, 'https://a.consenti.example/');
+  P.chiediScaricamenti(a, () => {});
+  P.rispondi(ses2.avvisi.findLast((x) => x.evento === 'chiedi').dati.id, true);
+  const e = pagina(ses2, 'https://e.consenti.example/');
+  assert.equal(esito(e, false, ADESSO), 'via');
+  assert.equal(esito(e, false, ADESSO + 1), 'via');
+});
+
 test('la chat toglie il no ai download automatici di un sito, con le parole che annuncia', () => {
   P._usaDisco({ get: async () => ({}), set: async () => {} });
   const ses = sessione();
