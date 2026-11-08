@@ -388,7 +388,7 @@ test('l\'annulla dell\'utente riporta il suo testo coi suoi segni', async ({ app
   await page.keyboard.type('oggi quseta ', { delay: 30 });
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
   await page.keyboard.press('Control+a');
-  await page.keyboard.type('poi ', { delay: 30 });
+  await page.keyboard.press('Delete');
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0, { timeout: 5000 });
   await page.keyboard.press('Control+z');
   await expect(page.locator('#ta')).toHaveValue('oggi quseta ');
