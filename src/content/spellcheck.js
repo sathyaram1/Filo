@@ -840,7 +840,8 @@
           const vivo = monitored.get(el);
           if (!vivo || !e.isTrusted) return;
           if (tipo === 'keydown') {
-            vivo.tasto = { key: String(e.key || ''), mod: !!(e.ctrlKey || e.metaKey), morto: vivo.tastoPrima === 'Dead' };
+            // Su Windows AltGr arriva come Ctrl+Alt, e scrive @ # [ ] €: è un carattere, non un comando.
+            vivo.tasto = { key: String(e.key || ''), mod: !!(e.metaKey || (e.ctrlKey && !e.altKey)), morto: vivo.tastoPrima === 'Dead' };
             vivo.tastoPrima = vivo.tasto.key;
             return;
           }
