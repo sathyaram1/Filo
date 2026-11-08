@@ -2,7 +2,7 @@
 // processo, stdout/stderr troncati se enormi perché la chat non esploda.
 // La classificazione di sicurezza la fa prima il gate dei livelli, non questo file.
 
-const { spawn, execFile } = require('node:child_process');
+const { spawn, execFile, execFileSync } = require('node:child_process');
 
 // Su Windows `child.kill()` lascia vivi i figli: le pipe restano aperte, `close` non scatta
 // e il timeout non libererebbe mai. Su POSIX basta SIGKILL sul processo.
