@@ -328,7 +328,7 @@ test('su un sito il testo scritto da script in una casella che l\'utente non ha 
   c.sb.SN_GESTO.prendi = () => false;
   const el = c.campo();
   c.entra(el);
-  c.scrive(el, 'oggi il il quseta ');
+  c.scriveDaScript(el, 'oggi il il quseta ');
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore'), []);
   el.fire('keydown', { isTrusted: false });
