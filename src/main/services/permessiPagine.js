@@ -883,14 +883,10 @@ function scelteDi(wc) {
 // La pagina già aperta tiene quello che ha ottenuto, e un no alle notifiche lo legge finché non si ricarica.
 function dimentica(wc) {
   const { origine, scelte } = scelteDi(wc);
-  const fermaScheda = Boolean(wc && wc._filoScaricamentiNoAlle && dopoUltimoGesto(wc, wc._filoScaricamentiNoAlle));
-  if (wc) wc._filoScaricamentiNoAlle = 0;
-  if (!scelte.length) {
-    if (fermaScheda && wc._filoSegni && wc._filoSegni.negati.delete(SCARICAMENTI)) { try { aggiornaScheda(wc); } catch (_) {} }
-    return { tolte: fermaScheda ? 1 : 0, ricarica: false };
-  }
+  if (!scelte.length) return { tolte: 0, ricarica: false };
+  wc._filoScaricamentiNoAlle = 0;
   const mappa = sceltePer(wc.session);
-  for (const s of scelte) mappa.delete(s.chiave || `${origine}|${s.parte}`);
+  for (const s of scelte) if (!s.scheda) mappa.delete(s.chiave || `${origine}|${s.parte}`);
   if (mappa === sceltePersistenti) salva();
   if (wc._filoSegni && wc._filoSegni.negati.size) { wc._filoSegni.negati.clear(); try { aggiornaScheda(wc); } catch (_) {} }
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
