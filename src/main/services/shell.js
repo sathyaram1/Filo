@@ -23,6 +23,7 @@
 // dell'assistente con cmd (terminal.js), che arriva già passato dal gate dei livelli.
 
 const { spawn } = require('node:child_process');
+const { programmaIntero } = require('./programmaIntero');
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
