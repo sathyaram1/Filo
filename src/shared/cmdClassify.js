@@ -1542,9 +1542,15 @@
       }
       case 'file': {
         let magia = 'magic';
+        // Come la legge file: `--mag=x`, `-Cm x`, `-Cmx`; dopo `-e`, `-f`, `-F` o `-P` il resto del gruppo è il loro valore.
         testi.forEach((t, i) => {
-          const m = /^(?:-m|--magic-file=?)(.*)$/.exec(t);
-          if (m) magia = m[1] || testi[i + 1] || '';
+          const lunga = opzioneLunga(t, 'magic-file', 2);
+          if (lunga != null) { magia = lunga || testi[i + 1] || ''; return; }
+          if (!/^-[^-]/.test(t)) return;
+          for (let k = 1; k < t.length; k++) {
+            if (t[k] === 'm') { magia = t.slice(k + 1) || testi[i + 1] || ''; return; }
+            if ('efFP'.includes(t[k])) return;
+          }
         });
         return magia && !magia.includes(':') ? copiaSovrascrive([], `${nomeDi(magia)}.mgc`, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
       }
