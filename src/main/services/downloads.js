@@ -632,9 +632,8 @@ function chiediNellaFinestra(webContents, rec) {
   } catch (_) {}
 }
 
-// #2294 — una pagina che scarica più file senza un clic: la domanda è sul sito, nella cornice della sua scheda, e la
-// risposta vale per tutti i suoi file in attesa. Ritirata senza risposta (la pagina se n'è andata), la riga resta da
-// decidere nel pannello. Un no li toglie: non li aveva chiesti l'utente.
+// #2294 — la domanda sul sito che scarica da solo sta nella sua cornice e vale per tutti i suoi file in attesa; ritirata
+// senza risposta, la riga resta da decidere nel pannello. Un no li toglie: non li aveva chiesti l'utente.
 const PIU_FILE_IN_ATTESA = 100;
 function chiediPiuFile(webContents, rec) {
   const scope = scopeOf(rec);
