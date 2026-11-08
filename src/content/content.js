@@ -1458,6 +1458,7 @@
     try {
       const sel = window.getSelection && window.getSelection();
       const selected = sel ? String(sel) : '';
+      if (word && selected.trim() === String(word).trim()) SpellCheck?.scriveFilo?.(document.activeElement, suggestion);
       if (word && selected.trim() === String(word).trim()
           && document.execCommand('insertText', false, suggestion)) return;
     } catch (_) {}
