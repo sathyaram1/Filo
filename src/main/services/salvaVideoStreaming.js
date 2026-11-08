@@ -99,13 +99,13 @@ function fermaAlbero(figlio, { subito = false } = {}) {
   }
 }
 
-function eseguiYtdlp(comando, argomenti, { suEvento, fermato, cartella }) {
+function eseguiYtdlp(comando, argomenti, { suEvento, fermato, cartella, proxy = '' }) {
   return new Promise((risolvi) => {
     let figlio;
     try {
       figlio = spawn(comando[0], [...comando.slice(1), ...argomenti], {
         // L'Electron di Filo fa da runtime JavaScript per le sfide di YouTube: nessun Node o Deno da installare.
-        env: { ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' },
+        env: Y.ambiente({ ...process.env, ELECTRON_RUN_AS_NODE: '1', PYTHONIOENCODING: 'utf-8', PYTHONUTF8: '1' }, proxy),
         windowsHide: true,
         detached: process.platform !== 'win32',
         stdio: ['ignore', 'pipe', 'pipe'],
