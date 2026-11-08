@@ -732,13 +732,11 @@
   let gettoni = null;
   let togliRilascioScheda = () => {};
   // Un elemento di Filo trascinato in chat (#1331, filo_design): titolo in grassetto, contenuto in hover e per il
-  // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js).
-  const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
+  // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js), e il contenuto lo dà il main (#2300).
+  const conTipoRiferimento = (dt) => !!global.SN_TRASCINO_INTERNO?.porta(dt, 'riferimento');
   // Il riferimento è testo che l'utente porta lui, come uno incollato: oltre il tetto il taglio si scrive.
   const RIFERIMENTO_MAX = 30000;
-  function leggiRiferimento(dt) {
-    let v = null;
-    try { v = JSON.parse(dt.getData(TIPO_RIFERIMENTO) || 'null'); } catch (_) { v = null; }
+  function formaRiferimento(v) {
     const titolo = v && typeof v.titolo === 'string' ? v.titolo.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
     let testo = v && typeof v.testo === 'string' ? v.testo : '';
     if (!titolo && !testo.trim()) return null;
