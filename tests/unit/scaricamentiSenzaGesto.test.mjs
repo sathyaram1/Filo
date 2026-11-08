@@ -165,7 +165,9 @@ test('il file fatto ripartire confermando l\'avviso di sicurezza conta come scar
   P.gestoSulloStrato(wc);
   assert.equal(esito(wc, false, Date.now()), 'via', 'la conferma sull\'avviso vale come un clic');
   const sb = readFileSync(new URL('../../src/main/tabs/tabSafebrowse.js', import.meta.url), 'utf8');
-  for (const tratto of sb.split('segna(tab);').slice(1).filter((t) => t.slice(0, 400).includes('downloadURL'))) {
+  const ripartenze = sb.split('segna(tab);').slice(1).filter((t) => t.slice(0, 400).includes('downloadURL'));
+  assert.ok(ripartenze.length >= 2, 'le due ripartenze da avviso (link e file costruito) ci sono ancora');
+  for (const tratto of ripartenze) {
     assert.match(tratto.slice(0, tratto.indexOf('downloadURL')), /Permessi\.gestoSulloStrato\(wc\)/, 'ogni ripartenza da avviso segna il clic prima di riscaricare');
   }
 });
