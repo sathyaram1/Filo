@@ -10,6 +10,7 @@ import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { GESTIONE, ricaricaSu } from './helpers/gestione.mjs';
 import { barraPage, comandaBarra, menuAperto, premiNellaBarra } from './helpers/barra.mjs';
 import { EDITOR, aggiungiStrumento, strumento } from './helpers/strumentiEditor.mjs';
+import { batti } from './helpers/tastiera.mjs';
 
 const SHOTS = 'tests/.shots';
 
