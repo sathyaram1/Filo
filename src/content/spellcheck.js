@@ -710,7 +710,9 @@
   // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
   // Su un sito gli strati stanno in un'ombra chiusa (#2299): un segno che manca dice che la parola è nel dizionario
   // personale, fra i nomi noti o fra le imparate, e dal documento lo script del sito lo leggerebbe.
-  const PAGINA_DI_FILO = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  // Senza SN_FILO_UI c'è solo la prova di logica, che dice da sé dove gira.
+  const PAGINA_DI_FILO = global.SN_FILO_UI ? global.SN_FILO_UI.paginaDiFilo
+    : (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
   // `filoScrive` mentre Filo annulla col tasto: quello che il browser riporta è comunque dell'utente.
   const TUTTO = {};
   let ombraDegliStrati = null;
@@ -721,29 +723,17 @@
     if (PAGINA_DI_FILO || !padre) return padre || document.documentElement;
     if (!ombraDegliStrati) {
       const UI = global.SN_FILO_UI;
-      const host = document.createElement('div');
-      UI?.mark(host);
-      host.style.cssText = 'all:initial!important;display:contents!important;';
-      const radice = UI?.ombra ? UI.ombra(host) : host.attachShadow({ mode: 'closed' });
-      try { radice.adoptedStyleSheets = fogliDegliStrati(); } catch (_) {}
-      ombraDegliStrati = { host, radice };
+      const stile = 'all:initial!important;display:contents!important;';
+      // Lo specchio tiene il font del campo, che ripete il testo del sito: generici solo i valori sopra le x.
+      if (UI?.stratoChiuso) ombraDegliStrati = UI.stratoChiuso(stile, UI.fogliChiusi(['spellcheck.css'], { ambito: '.sn-spell-valori' }));
+      else {
+        const host = document.createElement('div');
+        host.style.cssText = stile;
+        ombraDegliStrati = { host, radice: host.attachShadow({ mode: 'closed' }) };
+      }
     }
     if (ombraDegliStrati.host.parentNode !== padre) padre.appendChild(ombraDegliStrati.host);
     return ombraDegliStrati.radice;
-  }
-  // I fogli della pagina non passano l'ombra. Un font chiamato per nome il sito lo ridefinisce, e dai pezzi che il
-  // browser carica sa quali caratteri ha disegnato un valore: lì solo famiglie generiche. Lo specchio tiene il font del
-  // campo, che ripete il testo del sito.
-  let fogliStrati = null;
-  function fogliDegliStrati() {
-    if (fogliStrati) return fogliStrati;
-    let testo = '';
-    try { testo = require('node:fs').readFileSync(require('node:path').join(__dirname, '..', 'styles', 'spellcheck.css'), 'utf8'); } catch (_) {}
-    testo += '\n.sn-spell-valori, .sn-spell-valori * { font-family: system-ui, sans-serif !important; }';
-    const foglio = new CSSStyleSheet();
-    try { foglio.replaceSync(testo); } catch (_) {}
-    fogliStrati = [foglio];
-    return fogliStrati;
   }
 
   // ============================================================================
