@@ -815,26 +815,53 @@
     }
     return out;
   }
-  function apriGraffa(parola) {
-    let w = parola;
-    for (let j = w.indexOf('}'); j >= 0; j = w.indexOf('}', j + 1)) {
-      const i = w.lastIndexOf('{', j);
-      if (i < 0) continue;
-      const dentro = w.slice(i + 1, j);
-      const prima = w.slice(0, i);
-      const dopo = w.slice(j + 1);
-      if (dentro.includes(',')) return dentro.split(',').map((x) => prima + x + dopo);
-      const r = /^(-?\d+|[A-Za-z])\.\.(-?\d+|[A-Za-z])(?:\.\.-?\d+)?$/.exec(dentro);
+  // Una passata sola con una pila: rifare la parola a ogni coppia di graffe inerte costava il quadrato della lunghezza,
+  // e il conto gira nel processo principale (#1994).
+  function apriGraffa(w) {
+    const pila = [];
+    const inerti = new Set();
+    const segnata = () => {
+      const s = [];
+      for (let k = 0; k < w.length; k++) s.push(!inerti.has(k) ? w[k] : w[k] === '{' ? '' : '');
+      return s.join('');
+    };
+    for (let j = 0; j < w.length; j++) {
+      const ch = w[j];
+      if (ch === '{') { pila.push({ i: j, virgola: false, dentroGraffe: false }); continue; }
+      if (ch === ',') { if (pila.length) pila[pila.length - 1].virgola = true; continue; }
+      if (ch !== '}' || !pila.length) continue;
+      const { i, virgola, dentroGraffe } = pila.pop();
+      if (virgola) {
+        const s = segnata();
+        const prima = s.slice(0, i);
+        const dopo = s.slice(j + 1);
+        return s.slice(i + 1, j).split(',').map((x) => prima + x + dopo);
+      }
+      // Un intervallo non contiene graffe: solo lì serve leggere il contenuto.
+      const r = dentroGraffe ? null : /^(-?\d+|[A-Za-z])\.\.(-?\d+|[A-Za-z])(?:\.\.-?\d+)?$/.exec(w.slice(i + 1, j));
       const numeri = r && /\d/.test(r[1]) && /\d/.test(r[2]);
       if (r && (numeri || (!/\d/.test(r[1]) && !/\d/.test(r[2])))) {
         const a = numeri ? Number(r[1]) : r[1].charCodeAt(0);
         const b = numeri ? Number(r[2]) : r[2].charCodeAt(0);
         if (Math.abs(b - a) >= GRAFFE_MAX) return Array(GRAFFE_MAX + 1).fill('');
+        const s = segnata();
+        const prima = s.slice(0, i);
+        const dopo = s.slice(j + 1);
         const passo = a <= b ? 1 : -1;
         const voci = [];
         for (let v = a; v !== b + passo; v += passo) voci.push(prima + (numeri ? String(v) : String.fromCharCode(v)) + dopo);
         return voci;
       }
+      inerti.add(i);
+      inerti.add(j);
+      if (pila.length) pila[pila.length - 1].dentroGraffe = true;
+    }
+    return inerti.size ? [segnata()] : null;
+  }
+  function vecchiaDaTogliere() {
+    let w; let i; let j; let prima; let dentro; let dopo;
+    {
+      {
       w = `${prima}${dentro}${dopo}`;
       j = i;
     }
