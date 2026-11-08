@@ -875,7 +875,10 @@ function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '')
   // file non cambia di una virgola: l'attrito va solo dove serve.
   let finale = '';
   try { finale = ESE().sito(url); } catch (_) {}
-  const attesa = exe && chiedeConferma(sito, incerto, finale);
+  const attesaExe = exe && chiedeConferma(sito, incerto, finale);
+  // Un programma ha già la sua domanda, più precisa: quella sul sito che scarica da solo non si aggiunge.
+  const perPiuFile = !attesaExe && piuFile ? piuFile : '';
+  const attesa = attesaExe || !!perPiuFile;
 
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
