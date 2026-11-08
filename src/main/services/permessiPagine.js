@@ -848,9 +848,14 @@ function scelteDi(wc) {
   const ses = wc && wc.session;
   if (!origine || !ses) return { origine, scelte: [] };
   const scelte = [];
+  const sito = sitoDegliScaricamenti(origine);
   for (const [chiave, si] of sceltePer(ses)) {
     const i = chiave.lastIndexOf('|');
-    if (chiave.slice(0, i) === origine) scelte.push({ parte: chiave.slice(i + 1), si });
+    const da = chiave.slice(0, i);
+    const parte = chiave.slice(i + 1);
+    // La risposta sui file senza clic vale per tutto il sito (sceltaScaricamenti): si vede e si toglie da ogni suo indirizzo.
+    const delSito = parte === SCARICAMENTI && da !== origine && sitoDegliScaricamenti(da) === sito;
+    if (da === origine || delSito) scelte.push({ parte, si, chiave });
   }
   return { origine, scelte };
 }
