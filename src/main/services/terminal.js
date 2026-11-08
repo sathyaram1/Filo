@@ -102,6 +102,11 @@ function gitLanciaIn(dir, visti = { n: 0 }) {
     return e && e.status === 128 ? '' : 'ignoto';
   }
   if (!radice) return '';
+  // Oltre alle impostazioni, git fa partire a una lettura anche un programma d'avvio (hook) che il repository
+  // si porta dietro: lo cerca nella cartella degli hook EFFETTIVA (--git-path la sposta con core.hooksPath).
+  let hooks = '';
+  try { hooks = git(['rev-parse', '--git-path', 'hooks'], dir).trim(); } catch (_) { return 'ignoto'; }
+  if (hooks && hookDiLetturaAttivo(path.isAbsolute(hooks) ? hooks : path.join(dir, hooks))) return 'si';
   let voci = '';
   try { voci = git(['ls-files', '--stage', '-z'], radice); } catch (_) { return 'ignoto'; }
   for (const voce of voci.split('\u0000')) {
