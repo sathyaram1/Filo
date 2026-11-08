@@ -80,8 +80,6 @@ function gitLanciaIn(dir, visti = { n: 0 }) {
   if (!radice) return '';
   let voci = '';
   try { voci = git(['ls-files', '--stage', '-z'], radice); } catch (_) { return 'ignoto'; }
-  const fs = require('node:fs');
-  const path = require('node:path');
   for (const voce of voci.split('\u0000')) {
     if (!voce.startsWith('160000 ')) continue;
     const sotto = path.join(radice, voce.slice(voce.indexOf('\t') + 1));
