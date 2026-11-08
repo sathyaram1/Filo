@@ -486,9 +486,8 @@
     },
   };
 
-  // Opzioni prima del sotto-comando che non cambiano configurazione né programmi: le altre (`--config-env=
-  // core.pager=SHELL` fa eseguire alla shell quello che git stampa, `--exec-path=`) valgono 3 (#1994). Il
-  // repository scelto con `--git-dir=`/`--work-tree=` lo misura il perimetro, come una cartella data a `cd`.
+  // Le altre opzioni prima del sotto-comando valgono 3 (`--config-env=core.pager=SHELL` esegue ciò che git stampa, #1994);
+  // il repository di `--git-dir=`/`--work-tree=` lo misura il perimetro, come la cartella di `cd`.
   const GIT_GLOBALI_INNOCUE = new Set([
     '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks',
     '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--bare',
