@@ -34,6 +34,7 @@ const DIFFERENZE = {
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
+    'src/shared/trascinoInterno.js': 'i trascinamenti interni partono e si accettano solo sulle pagine di Filo: sui siti il riferimento entra come testo',
   },
 };
 
@@ -43,6 +44,7 @@ const FUORI_DALLO_STRATO = {
   'src/shared/tabColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
   'src/content/pageColor.js': 'il colore della scheda: lo strato parla come la pagina ma non la descrive',
   'tests/fixtures/testModels.js': 'modelli di prova delle pagine interne',
+  'src/shared/trascinoInterno.js': 'l’Aiuto nello strato serve un sito: lì un riferimento trascinato entra come testo',
 };
 const SOLO_NELLO_STRATO = ['src/content/stratoRiquadri.js'];
 

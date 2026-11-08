@@ -1984,13 +1984,32 @@
   }
   // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
   // dal disco. Torna se c'erano file.
+  // I content script delle pagine di Filo arrivano dopo questo file: il modulo si chiede al momento.
+  const daChat = (dt) => !!self.SN_TRASCINO_INTERNO?.porta(dt, 'file');
   function fileNelCampo(dt) {
-    const daChat = dt?.getData('application/x-filo-file') || '';
-    if (daChat) addPendingFile(daChat);
-    else if (dt?.files && dt.files.length) for (const f of dt.files) handleDroppedFile(f);
-    else return false;
+    if (daChat(dt)) {
+      const { aVista, dati } = self.SN_TRASCINO_INTERNO.arriva(dt, 'file');
+      // Un percorso che il main non riconosce l'ha scritto altri (una pagina web): entra come testo, a vista.
+      dati.then((p) => { if (typeof p === 'string' && p) { addPendingFile(p); inputEl.focus(); } else testoNelCampo(aVista); });
+      return true;
+    }
+    if (!dt?.files || !dt.files.length) return false;
+    for (const f of dt.files) handleDroppedFile(f);
     inputEl.focus();
     return true;
+  }
+  function testoNelCampo(testo) {
+    if (!testo) return;
+    testoDaFuori = true;
+    const prima = inputEl.value.slice(0, inputEl.selectionStart);
+    const dopo = inputEl.value.slice(inputEl.selectionEnd);
+    const spazioDopo = dopo && !/^\s/.test(dopo) ? ' ' : '';
+    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${spazioDopo}`;
+    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
+    inputEl.focus();
+    autoGrowInput();
+    Comandi.updateInputClass();
+    Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
   }
   // Da dove veniva e se è servito, per i contatori (#1471): mai cosa porta. Sul campo e fuori conta uguale.
   const contaNellaChat = (dt, usato) => {
@@ -1999,7 +2018,7 @@
   };
   // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
   // si vede dove andrà a finire.
-  const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
+  const portaFile = (dt) => Array.from(dt?.types || []).includes('Files') || daChat(dt);
   const spegniBersaglio = () => inputForm.classList.remove('dash-input-bersaglio');
   document.addEventListener('dragover', (e) => {
     if (!portaFile(e.dataTransfer)) return;
@@ -2025,17 +2044,7 @@
     if (fileNelCampo(e.dataTransfer)) { contaNellaChat(e.dataTransfer, true); return; }
     const testo = e.dataTransfer?.getData('text/plain') || '';
     contaNellaChat(e.dataTransfer, !!testo);
-    if (!testo) return;
-    testoDaFuori = true;
-    const prima = inputEl.value.slice(0, inputEl.selectionStart);
-    const dopo = inputEl.value.slice(inputEl.selectionEnd);
-    const spazioDopo = dopo && !/^\s/.test(dopo) ? ' ' : '';
-    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${spazioDopo}`;
-    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
-    inputEl.focus();
-    autoGrowInput();
-    Comandi.updateInputClass();
-    Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
+    testoNelCampo(testo);
   });
 
   // Lightbox: click su un'immagine per ingrandirla

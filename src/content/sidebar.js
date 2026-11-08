@@ -339,7 +339,7 @@
       allega([e.detail.blob]);
     });
     const conImmagini = (e) => Array.from(e.dataTransfer?.items || []).some((it) => it.kind === 'file' && /^image\//i.test(it.type || ''));
-    const conRiferimento = (e) => riferimentiAmmessi() && Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO);
+    const conRiferimento = (e) => riferimentiAmmessi() && conTipoRiferimento(e.dataTransfer);
     for (const tipo of ['dragenter', 'dragover']) {
       root.addEventListener(tipo, (e) => {
         if (!e.isTrusted || !(conImmagini(e) || conRiferimento(e))) return;
@@ -732,13 +732,11 @@
   let gettoni = null;
   let togliRilascioScheda = () => {};
   // Un elemento di Filo trascinato in chat (#1331, filo_design): titolo in grassetto, contenuto in hover e per il
-  // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js).
-  const TIPO_RIFERIMENTO = 'application/x-filo-riferimento';
+  // modello. Lo scrive chi trascina (src/pages/manage/manageDomande.js), e il contenuto lo dà il main (#2300).
+  const conTipoRiferimento = (dt) => !!global.SN_TRASCINO_INTERNO?.porta(dt, 'riferimento');
   // Il riferimento è testo che l'utente porta lui, come uno incollato: oltre il tetto il taglio si scrive.
   const RIFERIMENTO_MAX = 30000;
-  function leggiRiferimento(dt) {
-    let v = null;
-    try { v = JSON.parse(dt.getData(TIPO_RIFERIMENTO) || 'null'); } catch (_) { v = null; }
+  function formaRiferimento(v) {
     const titolo = v && typeof v.titolo === 'string' ? v.titolo.replace(/\s+/g, ' ').trim().slice(0, 200) : '';
     let testo = v && typeof v.testo === 'string' ? v.testo : '';
     if (!titolo && !testo.trim()) return null;
@@ -761,7 +759,7 @@
     if (!e || !e.isTrusted) return false;
     // Su un sito il riferimento si ignora: chi lo trascina potrebbe essere il sito, e un testo nascosto dietro un titolo
     // arriverebbe al modello come parola dell'utente. Lì entra il suo testo, a vista nella casella.
-    if (!riferimentiAmmessi() || !Array.from(e.dataTransfer?.types || []).includes(TIPO_RIFERIMENTO)) {
+    if (!riferimentiAmmessi() || !conTipoRiferimento(e.dataTransfer)) {
       // Un testo lasciato nella casella lo scrive il browser: qui si conta solo da dove veniva (#1471).
       if (conta && e.target?.matches?.('.sn-sidebar-input textarea')) {
         let testo = '';
@@ -771,10 +769,29 @@
       return false;
     }
     e.preventDefault();
-    const r = leggiRiferimento(e.dataTransfer);
-    if (r) aggiungiRiferimento(r);
-    if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(e.dataTransfer, 'chat_aiuto', !!r)); } catch (_) {} }
+    let origine = '';
+    try { origine = global.SN_GESTI?.origineDi(e.dataTransfer) || ''; } catch (_) { origine = ''; }
+    const { aVista, dati } = global.SN_TRASCINO_INTERNO.arriva(e.dataTransfer, 'riferimento');
+    // Un riferimento che il main non conosce l'ha scritto altri (una pagina web, un'altra app): il suo testo entra
+    // nella casella a vista, come un testo qualunque, e non arriva al modello dietro un titolo.
+    dati.then((v) => {
+      const r = formaRiferimento(v);
+      if (r) aggiungiRiferimento(r);
+      else versaNellaCasella(aVista);
+      if (conta) { try { global.SN_POPUP?.conta?.(global.SN_GESTI?.rilascio(origine, 'chat_aiuto', !!(r || aVista))); } catch (_) {} }
+    });
     return true;
+  }
+  function versaNellaCasella(testo) {
+    const ta = root?.querySelector('.sn-sidebar-input textarea');
+    if (!ta || !testo || pannelloPerAllegati() !== true) return;
+    ta.focus();
+    let scritto = false;
+    try { scritto = document.execCommand('insertText', false, testo); } catch (_) { scritto = false; }
+    if (!scritto) {
+      ta.setRangeText(testo, ta.selectionStart, ta.selectionEnd, 'end');
+      ta.dispatchEvent(new Event('input', { bubbles: true }));
+    }
   }
   function testoRiferimenti(riferimenti) {
     return riferimenti.map((r) => `Riferimento «${r.titolo}», trascinato dall'utente nella chat:\n${r.testo}`).join('\n\n');

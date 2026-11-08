@@ -8029,6 +8029,7 @@ require('./handlers/inPausa')(on, handlerCtx); // #1592 — Bacheca e Mazzi in p
 require('./handlers/parolaOwner')(on, handlerCtx); // #2070 — la parola d'ordine che «Discutiamone» copia
 require('./handlers/misc')(on, handlerCtx);
 require('./handlers/file')(on, handlerCtx);       // #950 — nome sensato ai file dell'utente
+require('./handlers/trascini')(on, handlerCtx);   // #2300 — il contenuto dei trascinamenti interni, dietro un gettone
 
 async function handleMessage(msg, sender = {}) {
   const origin = origineDi(sender);
