@@ -8,6 +8,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
 import { riquadroDelSegno, stileDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { nelMondoDelFrame } from './helpers/riquadri.mjs';
+import { batti } from './helpers/tastiera.mjs';
 
 const PAGINA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:20px;font:16px sans-serif">
