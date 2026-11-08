@@ -765,14 +765,34 @@ function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
   const chi = wc ? origineDi(wc) : {};
   if (!ses || chi.filo || !chi.origine) return { esito: 'via', origine: null };
   const origine = chi.origine;
+  // Il conto è del sito, non dell'indirizzo: una pagina che salta da a.sito a b.sito non riparte da capo.
+  const sito = sitoDegliScaricamenti(origine);
   if (!ses._filoSenzaGesto) ses._filoSenzaGesto = new Map();
-  if (gesto) { ses._filoSenzaGesto.delete(origine); return { esito: 'via', origine }; }
+  if (gestoPerUnoScaricamento(wc, gesto, adesso)) { ses._filoSenzaGesto.set(sito, adesso); return { esito: 'via', origine }; }
   const scelta = sceltePer(ses).get(`${origine}|${SCARICAMENTI}`);
   if (scelta === true) return { esito: 'via', origine };
   if (scelta === false) { segnaNegati(wc, origine, [SCARICAMENTI]); return { esito: 'no', origine }; }
-  const prima = ses._filoSenzaGesto.get(origine);
-  ses._filoSenzaGesto.set(origine, adesso);
+  const prima = ses._filoSenzaGesto.get(sito);
+  ses._filoSenzaGesto.set(sito, adesso);
   return { esito: prima != null && adesso - prima < SCARICAMENTI_FINESTRA_MS ? 'chiedi' : 'via', origine };
+}
+
+// Come in Chrome un clic o un tasto vale per un download solo: quelli che la pagina fa partire dopo, nella stessa
+// raffica, contano come senza clic. `gesto` è il parere di Chromium, per un gesto che qui non si vede (un riquadro di
+// un altro sito): vale se nessun download ha usato un gesto in questa scheda negli ultimi secondi.
+function gestoPerUnoScaricamento(wc, gesto, adesso) {
+  const t = Math.max(wc._filoGestoVeroAlle || 0, wc._filoGestoUiAlle || 0);
+  const speso = wc._filoGestoScaricatoAlle || 0;
+  if (!(t > speso) && !(gesto && adesso - speso >= GESTO_MS)) return false;
+  wc._filoGestoScaricatoAlle = Math.max(adesso, t);
+  return true;
+}
+
+function sitoDegliScaricamenti(origine) {
+  try {
+    const u = new URL(origine);
+    return `${u.protocol}//${nomeDaMostrare(origine).dominio.replace(/:\d+$/, '')}`;
+  } catch (_) { return origine; }
 }
 
 // `callback(si, fonte, decisa)`: con `decisa` falso la domanda si è ritirata (la pagina se n'è andata) e nessuno ha scelto.
