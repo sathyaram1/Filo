@@ -516,7 +516,7 @@ test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK
   // Gli stessi comandi in una cartella del disco restano liberi.
   for (const cmd of ['Get-Command .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto', 'where node',
     'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log']) {
-    assert.equal(lvl(cmd, WIN), 1, cmd);
+    assert.equal(lvl(cmd, { ...WIN, shell: 'cmd' }), 1, cmd);
   }
 });
 
