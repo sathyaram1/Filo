@@ -72,6 +72,38 @@ test('saltare da un sottodominio all\'altro dello stesso sito non azzera il cont
   assert.equal(esito(pagina(ses, 'https://altro.example/'), false, ADESSO + 3500), 'via');
 });
 
+test('la scheda che salta da sola su siti di domini diversi non riparte da capo; un clic dell\'utente sulla scheda sì', () => {
+  const ses = sessione();
+  let url = 'https://primo.example/';
+  const wc = pagina(ses, url);
+  wc.getURL = () => url;
+  assert.equal(esito(wc, false, ADESSO), 'via');
+  for (const [i, dove] of ['https://secondo.example/', 'https://a.github.io/', 'https://b.github.io/', 'http://203.0.113.7/'].entries()) {
+    url = dove;
+    assert.equal(esito(wc, false, ADESSO + (i + 1) * 1500), 'chiedi', dove);
+  }
+  wc._filoGestoVeroAlle = ADESSO + 9000;
+  url = 'https://cliccato.example/';
+  assert.equal(esito(wc, false, ADESSO + 10_000), 'via', 'il sito raggiunto dopo un clic dell\'utente ha il suo primo');
+});
+
+test('il no dato sulla scheda ferma i salti dopo su altri siti, senza domanda; il menu della scheda lo toglie', () => {
+  const ses = sessione();
+  let url = 'https://uno.example/';
+  const wc = pagina(ses, url);
+  wc.getURL = () => url;
+  P.chiediScaricamenti(wc, () => {});
+  P.rispondi(ses.avvisi.findLast((a) => a.evento === 'chiedi').dati.id, false);
+  url = 'https://due.example/';
+  const prima = ses.avvisi.filter((a) => a.evento === 'chiedi').length;
+  assert.equal(esito(wc, false, Date.now()), 'no');
+  assert.equal(ses.avvisi.filter((a) => a.evento === 'chiedi').length, prima, 'nessuna domanda nuova');
+  assert.deepEqual(P.scelteDi(wc).scelte.map((s) => [s.parte, s.si]), [['scaricamenti', false]], 'il menu della scheda lo mostra');
+  assert.equal(P.dimentica(wc).tolte, 1);
+  assert.notEqual(esito(wc, false, Date.now() + 1), 'no', 'tolto dal menu, la scheda non è più ferma');
+  assert.equal(esito(pagina(ses, 'https://uno.example/'), false, Date.now()), 'no', 'il no al primo sito resta');
+});
+
 test('la domanda sta nella cornice col sito; Consenti vale per il sito, e le domande ritirate non sono una scelta', () => {
   const ses = sessione();
   const wc = pagina(ses, 'https://scarica.example/pagina');
