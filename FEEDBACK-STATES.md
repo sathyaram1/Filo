@@ -294,7 +294,7 @@ all'owner, il freno.
   errore in una riga, cosa è successo dopo) e le attese sopra 30 s (`attese`: cosa, secondi), sul biglietto.
 - **Account.** Il manutentore spegne e riaccende A e B e sceglie il primo (di norma B); le esclusioni dell'owner
   restano sue e si sommano. Niente riserva del 10% su A.
-- **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 55 minuti,
+- **Ritmo.** Decisione del mattino col contesto intero, poi accensioni col contesto piccolo: battito ogni 2 ore,
   segnali del server (guasto, deploy rosso, suite rossa, nata morta, domanda di processo, owner), sveglia chiesta
   (minimo 5 minuti), con un tetto di accensioni al giorno suo. Il fermo su un guasto suo (quali accensioni
   restano) e il controllo sulle sessioni chiuse bene, con la soglia e lo stato, stanno in SPEC-MANUTENTORE.md § 7.
