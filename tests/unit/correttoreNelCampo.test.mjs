@@ -338,26 +338,28 @@ test('«il il» è un errore sicuro del codice, «quasi quasi» no; spenta la pa
 });
 
 // #2299: dalla mancanza di un segno il sito saprebbe cosa c'è nel dizionario personale.
-test('su un sito il testo scritto da script in una casella che l\'utente non ha toccato non riceve segni; il primo tasto vero sì', async () => {
+test('su un sito il testo scritto da script non riceve segni; li riceve quando l\'utente entra nella casella col clic', async () => {
   const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
-  c.sb.SN_GESTO.prendi = () => false;
+  let gesto = false;
+  c.sb.SN_GESTO.prendi = () => gesto;
   const el = c.campo();
   c.entra(el);
   c.scriveDaScript(el, 'oggi il il quseta ');
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore'), []);
-  el.fire('keydown', { isTrusted: false });
+  el.fire('pointerdown', { isTrusted: false });
+  el.fire('keydown', { isTrusted: true, key: 'ArrowLeft' });
   await c.passa(10);
-  assert.deepEqual(c.segni('sn-errore'), [], 'un tasto fabbricato dalla pagina non vale');
-  el.fire('keydown', { isTrusted: true });
+  assert.deepEqual(c.segni('sn-errore'), [], 'né un clic fabbricato dalla pagina né un tasto che non scrive');
+  gesto = true;
+  c.clic(el);
   await c.passa(10);
   assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['il', 'quseta']);
 });
 
-// #2299: dopo il primo gesto il sito riscriveva la casella e misurava quanto durava il controllo del suo testo.
-test('il testo che il sito rimette in una casella già scritta dall\'utente aspetta il suo tasto: un controllo per gesto', async () => {
-  const c = correttore({ sbagliate: ['quseta', 'cavolo'], impostazioni: { correttore: { modelloErrori: false } } });
-  c.sb.SN_GESTO.prendi = () => false;
+// #2299: a ogni gesto vero il sito riscriveva la casella e misurava quanto durava il controllo del suo testo.
+test('il testo che il sito mette in una casella già scritta dall\'utente non si controlla, nemmeno ai gesti dopo', async () => {
+  const c = correttore({ sbagliate: ['quseta', 'cavolo', 'pomodro'], impostazioni: { correttore: { modelloErrori: false } } });
   const el = c.campo();
   c.entra(el);
   c.scrive(el, 'oggi quseta e il il ');
@@ -366,9 +368,44 @@ test('il testo che il sito rimette in una casella già scritta dall\'utente aspe
   c.scriveDaScript(el, 'ieri cavolo oggi quseta e il il ');
   await c.passa(5000);
   assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il'], 'i segni di prima seguono il testo, quello nuovo non si controlla');
-  el.fire('keydown', { isTrusted: true });
+  c.clic(el);
+  el.fire('keydown', { isTrusted: true, key: 'End' });
+  for (const x of 'pomodro ') c.batte(el, x);
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'il', 'pomodro'], 'il secondo clic e i tasti non aprono il testo del sito');
+});
+
+test('il sito che riscrive la casella dentro il tasto dell\'utente non fa controllare il suo testo', async () => {
+  const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  for (const x of 'ciao ') c.batte(el, x);
+  c.batte(el, 'c', () => 'quseta '.repeat(50));
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+  // Un execCommand del sito è `isTrusted` anche lui, ma nessun tasto vero lo spiega.
+  el.value += 'quseta ';
+  el.fire('input', { isTrusted: true, inputType: 'insertText', data: 'quseta ' });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+});
+
+test('quello che c\'era entrando si controlla, una parola ripetuta una volta; quello che scrive Filo come quello dell\'utente', async () => {
+  const c = correttore({ sbagliate: ['quseta', 'cavolo'], impostazioni: { correttore: { modelloErrori: false } } });
+  let gesto = false;
+  c.sb.SN_GESTO.prendi = () => gesto;
+  const el = c.campo();
+  c.entra(el);
+  c.scriveDaScript(el, 'quseta quseta quseta e ');
+  gesto = true;
+  c.clic(el);
   await c.passa(10);
-  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['cavolo', 'quseta', 'il'], 'il tasto vero controlla tutto');
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta']);
+  gesto = false;
+  c.sb.SN_SPELLCHECK.scriveFilo(el, 'cavolo ');
+  c.scriveDaScript(el, 'quseta quseta quseta e cavolo ');
+  await c.passa(10);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['quseta', 'cavolo']);
 });
 
 test('nelle pagine di Filo il campo si controlla anche senza gesto: lì non c\'è uno script del sito', async () => {
