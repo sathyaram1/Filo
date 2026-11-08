@@ -443,3 +443,100 @@ test('git: un programma d\'avvio di lettura in un sottomodulo fa chiedere come n
     togliCartella(base);
   }
 });
+
+const nuovoRepo = (d) => {
+  mkdirSync(d, { recursive: true });
+  execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+  writeFileSync(join(d, 'f'), 'a\n');
+  execFileSync('git', ['add', 'f'], { cwd: d, stdio: 'ignore' });
+  execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', 'commit', '-q', '-m', 'i'], { cwd: d, stdio: 'ignore' });
+  return d;
+};
+
+test('git: su Windows conta anche l\'hook col nome .exe, che git per Windows prova dopo il nome nudo', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2292-exe-');
+  const piattaforma = Object.getOwnPropertyDescriptor(process, 'platform');
+  const P = require(join(ROOT, 'src', 'main', 'services', 'programmaIntero.js'));
+  const trova = P.programmaIntero;
+  try {
+    const repo = nuovoRepo(join(base, 'progetto'));
+    writeFileSync(join(repo, '.git', 'hooks', 'post-index-change.exe'), 'MZ');
+    assert.equal(T.gitLanciaIn(repo), '', 'fuori da Windows git il .exe non lo prova');
+    // Windows simulato: la piattaforma e git trovato per nome (qui non c'è git.exe).
+    Object.defineProperty(process, 'platform', { ...piattaforma, value: 'win32' });
+    P.programmaIntero = (n) => n;
+    assert.equal(T.gitLanciaIn(repo), 'si');
+  } finally {
+    Object.defineProperty(process, 'platform', piattaforma);
+    P.programmaIntero = trova;
+    togliCartella(base);
+  }
+});
+
+test('git config coi verbi di git 2.46: set, unset, list e get valgono come le forme con le opzioni', () => {
+  const pulito = { ...LINUX, gitLancia: () => '' };
+  for (const [cmd, livello] of [['git config set remote.origin.url https://altrove.test/x.git', 3],
+    ['git config set --append url.https://x.insteadof y', 3], ['git config unset user.email', 3],
+    ['git config remove-section alias', 3], ['git config set user.email a@b', 2], ['git config list', 2],
+    ['git config list --show-origin', 2], ['git config get remote.origin.url', 2], ['git config get --regexp user', 2],
+    ['git config edit', 2], ['git config rename-section a b', 2], ['git config get user.email', 1], ['git config user.email', 1]]) {
+    assert.equal(C.classify(cmd, pulito), livello, cmd);
+  }
+});
+
+test('git: le chiavi che scrivono VS Code, GitHub CLI e husky non fanno chiedere una lettura', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2292-chiavi-');
+  try {
+    const repo = nuovoRepo(join(base, 'sito'));
+    const g = (...a) => execFileSync('git', a, { cwd: repo, stdio: 'ignore' });
+    g('remote', 'add', 'origin', 'https://example.test/sito.git');
+    g('config', 'branch.master.vscode-merge-base', 'origin/master');
+    g('config', 'remote.origin.gh-resolved', 'base');
+    g('config', 'core.hooksPath', '.husky/_');
+    assert.equal(T.gitLanciaIn(repo), '');
+    assert.equal(C.classify('git status', { cwd: repo, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 1);
+    // La cartella spostata si segue: un hook di lettura lì dentro fa chiedere, anche da una sottocartella.
+    mkdirSync(join(repo, '.husky', '_'), { recursive: true });
+    mkdirSync(join(repo, 'src'));
+    scriviHook(join(repo, '.husky', '_'), 'post-index-change', join(base, 'SEGNO'));
+    assert.equal(T.gitLanciaIn(join(repo, 'src')), 'si');
+    // Un «=» nel nome di un remoto non nasconde la chiave che segue.
+    const altro = nuovoRepo(join(base, 'altro'));
+    execFileSync('git', ['config', 'remote.a.url=x.promisor', 'true'], { cwd: altro, stdio: 'ignore' });
+    assert.equal(T.gitLanciaIn(altro), 'si');
+  } finally {
+    togliCartella(base);
+  }
+});
+
+test('git: la sonda si ricorda un repository senza rischi finché i suoi file non cambiano', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2292-ricordo-');
+  const P = require(join(ROOT, 'src', 'main', 'services', 'programmaIntero.js'));
+  const trova = P.programmaIntero;
+  // Un «git» che non risponde: se la sonda lo lancia, l'esito è 'ignoto'; se si ricorda, resta ''.
+  const gitRotto = () => { P.programmaIntero = () => process.execPath; };
+  try {
+    const repo = nuovoRepo(join(base, 'r'));
+    assert.equal(T.gitLanciaIn(repo), '');
+    gitRotto();
+    assert.equal(T.gitLanciaIn(repo), '', 'la seconda volta non rilancia git');
+    P.programmaIntero = trova;
+    // Ogni cambio che conta rifà la sonda: impostazioni, hook, un .git nuovo fra la cartella e la radice.
+    execFileSync('git', ['config', 'core.fsmonitor', 'programma'], { cwd: repo, stdio: 'ignore' });
+    assert.equal(T.gitLanciaIn(repo), 'si');
+    const r2 = nuovoRepo(join(base, 'r2'));
+    assert.equal(T.gitLanciaIn(r2), '');
+    scriviHook(join(r2, '.git', 'hooks'), 'post-index-change', join(base, 'SEGNO'));
+    assert.equal(T.gitLanciaIn(r2), 'si');
+    const r3 = nuovoRepo(join(base, 'r3'));
+    const dentro = join(r3, 'a', 'b');
+    mkdirSync(dentro, { recursive: true });
+    assert.equal(T.gitLanciaIn(dentro), '');
+    nuovoRepo(join(r3, 'a'));
+    execFileSync('git', ['config', 'core.fsmonitor', 'programma'], { cwd: join(r3, 'a'), stdio: 'ignore' });
+    assert.equal(T.gitLanciaIn(dentro), 'si', 'un repository estratto più vicino prende il posto di quello ricordato');
+  } finally {
+    P.programmaIntero = trova;
+    togliCartella(base);
+  }
+});
