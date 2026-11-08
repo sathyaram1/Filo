@@ -482,8 +482,10 @@ function chiudi(id, si, { ricorda, utente = false, fonte, decisa = utente } = {}
   try { p.avvisa('fine', { id }); } catch (_) {}
   if (ricorda) {
     for (const [altro, q] of [...inAttesa]) {
-      if (q.ses !== p.ses || q.origine !== p.origine || q.tipo === 'schermo') continue;
-      const decise = q.parti.map((parte) => sceltePer(q.ses).get(`${q.origine}|${parte}`));
+      if (q.ses !== p.ses || q.tipo === 'schermo') continue;
+      const piuFile = q.tipo === SCARICAMENTI && p.tipo === SCARICAMENTI;
+      if (piuFile ? sitoDegliScaricamenti(q.origine) !== sitoDegliScaricamenti(p.origine) : q.origine !== p.origine) continue;
+      const decise = q.parti.map((parte) => (parte === SCARICAMENTI ? sceltaScaricamenti(q.ses, q.origine) : sceltePer(q.ses).get(`${q.origine}|${parte}`)));
       if (decise.every((x) => x === true)) chiudi(altro, true, { ricorda: false, decisa: true });
       else if (decise.some((x) => x === false)) chiudi(altro, false, { ricorda: false, utente: true });
     }
