@@ -104,7 +104,7 @@ const PAGINA_SPAZIO = `<!doctype html><meta charset="utf-8">
         document.execCommand('delete');
       }
       ta.setSelectionRange(ta.value.length, ta.value.length);
-      setTimeout(() => window.letto.push(ta.value), 50);
+      setTimeout(() => window.letto.push(ta.value.trimEnd()), 50);
     }
   }, true);
 </script>
