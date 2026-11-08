@@ -2739,10 +2739,10 @@ class TabManager {
     // Sulla scheda appena caduta la vista rinasce verso l'indirizzo chiesto: la rimessa in piedi la lascia stare (#1868).
     let caduta = false;
     try { caduta = tab.view.webContents.isCrashed(); } catch (_) {}
+    Permessi.navigazioneDiFilo(tab.view.webContents);
     if (caduta || this._needsRecreate(tab, target)) {
       this._recreateView(tab, target, { nuova: true });
     } else {
-      Permessi.navigazioneDiFilo(tab.view.webContents);
       tab.view.webContents.loadURL(target);
     }
     AzioniContate.scheda(tab.view.webContents);
