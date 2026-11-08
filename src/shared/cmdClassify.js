@@ -1159,6 +1159,9 @@
     const reteNome = !!(c.cwd && c.cwd.rete);
     const percorsi = [];
     args.forEach((a, i) => {
+      // `git blame --contents <file>` stampa riga per riga un file qualsiasi: è una lettura di quel file.
+      if (sub === 'blame' && /^--contents=/.test(a)) { percorsi.push(a.slice('--contents='.length)); return; }
+      if (sub === 'blame' && i > 0 && args[i - 1] === '--contents') { percorsi.push(a); return; }
       if (a.startsWith('-')) return;
       if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
