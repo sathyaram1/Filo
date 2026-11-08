@@ -213,10 +213,10 @@ test('su Windows i comandi partono con cmd che non cerca i programmi nella carte
     Object.defineProperty(process, 'platform', { value: 'win32', configurable: true });
     try { return fn(); } finally { Object.defineProperty(process, 'platform', prima); }
   };
-  const env = comeWindows(() => T.ambienteComandi({ PATH: 'C:\\Windows\\System32', nodefaultcurrentdirectoryinexepath: '' }));
+  const env = comeWindows(() => T.ambienteDelModello({ PATH: 'C:\\Windows\\System32', nodefaultcurrentdirectoryinexepath: '' }));
   assert.equal(env.NoDefaultCurrentDirectoryInExePath, '1');
   assert.equal(Object.keys(env).filter((k) => k.toLowerCase() === 'nodefaultcurrentdirectoryinexepath').length, 1);
-  if (process.platform !== 'win32') assert.equal('NoDefaultCurrentDirectoryInExePath' in T.ambienteComandi({ PATH: '/bin' }), false);
+  if (process.platform !== 'win32') assert.equal('NoDefaultCurrentDirectoryInExePath' in T.ambienteDelModello({ PATH: '/bin' }), false);
 });
 
 test('quale where è lo decide un posto solo: livello e controllo della rete dicono lo stesso', () => {
