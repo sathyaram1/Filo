@@ -1383,7 +1383,10 @@ function riprova(id, scope = '') {
     if (!rifaiStreaming || !/^https?:/i.test(String(rec.url || ''))) {
       return { ok: false, error: 'Questo video non ha un indirizzo da cui salvarlo di nuovo', items: listRecords(scope) };
     }
-    rifaiStreaming({ id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '' });
+    rifaiStreaming({
+      id: rec.state === 'completed' ? '' : rec.id, url: rec.url, filename: rec.filename, scope: rec._scope || scope || '',
+      sessione: rec._sessione || null, paese: rec.paese || null,
+    });
     return { ok: true, items: listRecords(scope) };
   }
   if (rec.state !== 'interrupted' && rec.state !== 'cancelled') {
