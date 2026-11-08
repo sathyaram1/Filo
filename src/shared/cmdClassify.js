@@ -858,11 +858,8 @@
     }
     return inerti.size ? [segnata()] : null;
   }
-  function vecchiaDaTogliere() {
-    let w; let i; let j; let prima; let dentro; let dopo;
-    {
-      {
-      w = `${prima}${dentro}${dopo}`;
+  // Le graffe inerti, segnate così mentre si aprono le altre e rimesse com'erano alla fine.
+  const SEGNI_INERTI = '${dentro}${dopo}`;
       j = i;
     }
     return w === parola ? null : [w];
