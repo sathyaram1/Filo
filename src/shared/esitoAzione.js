@@ -182,6 +182,8 @@
     if (v.riga) out.riga = v.riga;
     if (v.motivo) out.motivo = v.motivo;
     if (v.file) out.file = v.file;
+    if (v.link) out.link = v.link;
+    if (v.salvate) out.salvate = v.salvate;
     if (v.proposta) out.proposta = v.proposta;
     if (v.evento) out.evento = v.evento;
     if (v.partita) out.partita = true;
