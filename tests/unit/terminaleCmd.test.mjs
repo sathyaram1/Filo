@@ -100,6 +100,15 @@ function esegui(riga) {
     else fs.writeFileSync(path.resolve(testo.slice(i + 1).trim()), testo.slice(0, i) + '\\r\\n');
     livello = 0; return;
   }
+  // Un programma per nome: prima la cartella di lavoro, salvo NoDefaultCurrentDirectoryInExePath, poi il PATH.
+  // Qui il «programma» è un .bat che stampa il suo testo.
+  const nome = r.split(/\\s/)[0] + '.bat';
+  const cartelle = (process.env.NoDefaultCurrentDirectoryInExePath === undefined ? [process.cwd()] : [])
+    .concat(String(process.env.PATH || '').split(path.delimiter).filter(Boolean));
+  for (const d of cartelle) {
+    const p = path.join(d, nome);
+    if (fs.existsSync(p)) { process.stdout.write(fs.readFileSync(p, 'utf8')); livello = 0; return; }
+  }
   process.stderr.write("'" + r.split(/\\s/)[0] + "' non è riconosciuto come comando interno o esterno.\\r\\n");
   livello = 9009;
 }
