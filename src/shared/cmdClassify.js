@@ -539,11 +539,20 @@
     },
   };
 
-<<<<<<< origin/main
-  // Le opzioni globali che non cambiano repository né impostazioni: le altre (`--git-dir`, `--config-env`, …)
-  // portano git dove la sonda delle impostazioni non ha guardato (#2292).
-  const GIT_GLOBALI_INNOCUE = new Set(['--no-pager', '-p', '--paginate', '-P', '--no-optional-locks', '--no-replace-objects',
-    '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--no-advice']);
+  // Le opzioni globali che non cambiano repository né impostazioni: le altre (`--git-dir`, `--bare`, `--config-env`, …)
+  // portano git dove la sonda delle impostazioni non ha guardato (#2292); `--config-env=core.pager=SHELL` esegue (#1994).
+  const GIT_GLOBALI_INNOCUE = new Set([
+    '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks',
+    '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs',
+    '-v', '--version', '-h', '--help', '--exec-path', '--html-path', '--man-path', '--info-path',
+  ]);
+  // Il repository di `--git-dir=`/`--work-tree=` lo misura anche il perimetro, come la cartella di `cd`.
+  const GIT_GLOBALE_CARTELLA = /^--(git-dir|work-tree)=/;
+  // `--output` (e le sue abbreviazioni) scrive l'uscita in un file scelto dal comando, col testo che sceglie
+  // `--format`: con log, show, diff, shortlog… una lettura diventa la scrittura di un file qualsiasi (#1994).
+  function gitScriveFile(cmd) {
+    return tokens(cmd).slice(1).some((t) => opzioneLunga(t, 'output', 2) != null);
+  }
   // Il file su cui scrive una lettura di git con `--output` ('' se non si sa quale), o null se stampa e basta (#2292).
   function gitUscita(args) {
     for (let i = 0; i < args.length; i++) {
