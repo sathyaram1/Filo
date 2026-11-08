@@ -281,7 +281,10 @@
   }
 
   // Flag che alzano a 3 un comando altrimenti ≤2.
-  const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
+  const DANGEROUS_FLAG_RE = /(^|\s)(-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
+  // Le lunghe valgono anche accorciate, come le leggono getopt e git (`--forc`, `--de`): una lista sola per tutti.
+  const LUNGHE_PERICOLOSE = ['force', 'hard', 'delete', 'prune', 'no-preserve-root'];
+  const lungaPericolosa = (cmd, nomi) => tokens(cmd).slice(1).some((t) => nomi.some((n) => opzioneLunga(t, n, 2) != null));
 
   // robocopy usa lo slash, che DANGEROUS_FLAG_RE non vede: `/MIR` e `/PURGE` cancellano la
   // destinazione, `/MOVE` la sorgente. Check a sé e case-insensitive, o falsi positivi Unix.
