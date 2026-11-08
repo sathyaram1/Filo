@@ -68,10 +68,15 @@
       }
       return '';
     };
-    // Il nome del motore dev'essere il sito, non un sottodominio di un altro: google.inganno.com è di inganno.com (#2293).
+    // Il motore è il sito col suo nome su .com, .org o un dominio di paese: non google.inganno.com, che è di inganno.com,
+    // né google.xyz o google.blogspot.com, che chiunque può prendere (#2293). Il sito lo dà la regola dei domini ospitati.
     const SS = global.SN_STESSO_SITO;
-    const sito = SS && typeof SS.sitoDi === 'function' ? SS.sitoDi(host) : null;
-    const motore = MOTORI.find((m) => m.host.test(host) && (!sito || sito.split('.')[0] === m.nome.toLowerCase()));
+    const sito = SS && typeof SS.sitoDi === 'function' ? SS.sitoDi(host) : host;
+    const delMotore = (m) => {
+      const nome = m.nome.toLowerCase();
+      return !!sito && sito.startsWith(`${nome}.`) && SUFFISSO_DEL_MARCHIO.test(sito.slice(nome.length + 1));
+    };
+    const motore = MOTORI.find((m) => m.host.test(host) && delMotore(m));
     if (motore) {
       if (!motore.percorso.test(u.pathname)) return null;
       const testo = leggi(motore.chiavi);
