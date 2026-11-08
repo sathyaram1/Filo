@@ -37,9 +37,9 @@ for (const modo of ['clic-subito', 'scorso-47']) {
     await menuDi(page).valuta(() => {
       document.querySelector('.sn-menu:not(.sn-menu-sub) .sn-menu-inline').style.minHeight = `${window.innerHeight + 600}px`;
     });
-    if (modo === 'menu-scorso-a-mano') {
+    if (modo === 'scorso-47') {
       await page.waitForTimeout(400);
-      await menuDi(page).valuta(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 4; });
+      await menuDi(page).valuta(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 30; });
       await page.waitForTimeout(200);
     }
     const f = menu.locator('.sn-menu-split-arrow').first();
