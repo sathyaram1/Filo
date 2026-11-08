@@ -12,7 +12,9 @@ import { cartellaTemporanea } from './helpers/percorsi.mjs';
 
 const APP_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const HOST = ['a', 'b', 'c', 'd'].map((x) => `${x}.scarica.test`);
-test.use({ hostInPiu: [...HOST, '*.salta.test'] });
+// Domini registrati diversi, come i siti gratuiti di un servizio di pagine o gli indirizzi IP.
+const SITI = [0, 1, 2, 3, 4, 5, 6, 7].map((i) => `sito${i}.test`);
+test.use({ hostInPiu: [...HOST, '*.salta.test', ...SITI] });
 
 const DATI = Buffer.from('dati di prova '.repeat(50));
 
