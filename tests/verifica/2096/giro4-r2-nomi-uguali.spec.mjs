@@ -77,7 +77,6 @@ test('r2 Dimentica sulla seconda riga dimentica il secondo controller, non il pr
     await righe(page).nth(k).click({ button: 'right' });
     const voci = await menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
     if (voci.includes('Scollega')) { riga = k; break; }
-    await page.keyboard.press('Escape');
   }
   expect(riga).not.toBeNull();
   await menuDi(page).voce('Dimentica…').first().click();
