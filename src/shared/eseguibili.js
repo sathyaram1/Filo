@@ -256,6 +256,14 @@
     return ['Il file', { citazione: nomeVisibile(nome) }, cosa];
   }
 
+  // Un file che una pagina fa partire da sola dopo un altro (#2294): la domanda sul sito sta nella cornice della scheda,
+  // la riga chiede del singolo file. `fermati`: quelli arrivati oltre il tetto dell'attesa, che non sono scesi.
+  function partiPiuFile(nome, fermati) {
+    const n = Math.max(0, Math.floor(Number(fermati) || 0));
+    const altri = n ? `Altri ${n} ${n === 1 ? 'l\'ho fermato' : 'li ho fermati'} prima che scendessero. ` : '';
+    return ['La pagina sta scaricando più file da sola, senza un tuo clic:', { citazione: nomeVisibile(nome) }, `${altri}Scaricarlo?`];
+  }
+
   const TITOLO_APRI = 'Aprire un programma?';
 
   function titoloApri(nome) {
