@@ -244,7 +244,7 @@ function seguiGesti(wc) {
     wc.on('before-input-event', (e, input) => {
       if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
       queueMicrotask(() => {
-        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = Date.now(); }
+        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = wc._filoGestoVeroAlle = Date.now(); }
       });
     });
     wc.on('did-start-navigation', (e, url, isInPlace, isMainFrame) => {
