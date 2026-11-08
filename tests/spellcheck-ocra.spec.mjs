@@ -348,10 +348,10 @@ const scorre = {
     await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
     await page.waitForTimeout(300);
   },
-  misure: (page, sel) => page.evaluate((sel) => {
+  misure: (page, sel) => nelMondoDelFrame(page, null, (sel) => {
     const f = document.querySelector(sel);
-    const o = document.querySelector('.sn-spell-overlay');
-    const s = document.querySelector('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect();
+    const o = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay');
+    const s = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect();
     const fr = f.getBoundingClientRect();
     const or = o.getBoundingClientRect();
     let parola = null;
