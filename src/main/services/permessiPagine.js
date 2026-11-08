@@ -963,6 +963,8 @@ const PAROLE_PARTE = {
   scaricamenti: SCARICAMENTI, download: SCARICAMENTI, 'download automatici': SCARICAMENTI, 'scaricamenti automatici': SCARICAMENTI,
   'scaricare più file': SCARICAMENTI, 'più file': SCARICAMENTI,
 };
+// I nomi che la chat riconosce, come li legge il modello nello strumento: una sentinella li confronta.
+const PERMESSI_DA_CHAT = Object.freeze(['microfono', 'fotocamera', 'appunti', 'posizione', 'notifiche', 'schermi', 'presenza', 'strumenti', 'rete', 'file', 'scaricamenti']);
 function nomeParte(parte) {
   const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
   const t = S[`options_site_perms_part_${parte}`];
