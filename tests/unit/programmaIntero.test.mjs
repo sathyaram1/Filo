@@ -42,6 +42,12 @@ test('nel controllo di git, nei comandi di Filo e nel terminale nessun programma
   try {
     const estratta = resolve(join(base, 'Downloads', 'progetto'));
     mkdirSync(estratta, { recursive: true });
+    // Un PATH come quello di Windows, coi programmi veri fuori dalla cartella estratta.
+    const bin = join(base, 'bin');
+    mkdirSync(bin);
+    for (const f of ['git.exe', 'where.exe', 'powershell.exe']) writeFileSync(join(bin, f), '');
+    const vecchioPath = process.env.PATH;
+    process.env.PATH = [bin, vecchioPath].join(delimiter);
     const chiamate = await avviiSuWindows(async (T, S) => {
       T.gitLanciaIn(estratta);
       await T.runCommand('Get-ChildItem', { cwd: estratta, shell: 'powershell' });
