@@ -633,29 +633,31 @@ function chiediNellaFinestra(webContents, rec) {
 }
 
 // #2294 — la domanda sul sito che scarica da solo sta nella sua cornice e vale per tutti i file in attesa del sito, anche
-// quelli dei suoi altri sottodomini; ritirata senza risposta, la riga resta da decidere nel pannello. Un no li toglie:
-// non li aveva chiesti l'utente. Il tetto conta il sito come il freno.
+// quelli dei suoi altri sottodomini, e per quelli della stessa scheda, anche presi su altri siti prima di saltare qui;
+// ritirata senza risposta, la riga resta da decidere nel pannello. Un no li toglie: non li aveva chiesti l'utente. Il
+// tetto conta tutti i file in attesa, di qualunque sito: una pagina che salta fra mille siti non lo moltiplica.
 const PIU_FILE_IN_ATTESA = 100;
 function chiediPiuFile(webContents, rec) {
   const scope = scopeOf(rec);
   try {
     require('./permessiPagine').chiediScaricamenti(webContents, (si, _fonte, decisa) => {
       if (!decisa) return;
-      for (const r of inAttesaPiuFile(scope, rec._piuFile)) {
+      for (const r of inAttesaPiuFile(scope, rec._piuFile, rec._piuFileScheda)) {
         if (si) confirmDownload(r.id, true, scope);
         else remove(r.id, scope);
       }
     });
   } catch (_) {}
 }
-function inAttesaPiuFile(scope, origine) {
+function inAttesaPiuFile(scope, origine, scheda) {
   const sito = (o) => { try { return require('./permessiPagine').sitoDegliScaricamenti(o); } catch (_) { return o; } };
-  const suo = sito(origine);
-  return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile && scopeOf(r) === scope && sito(r._piuFile) === suo);
+  const suo = origine ? sito(origine) : null;
+  return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile && scopeOf(r) === scope
+    && (!origine || sito(r._piuFile) === suo || (scheda != null && r._piuFileScheda === scheda)));
 }
 // Oltre il tetto il file non scende, e la riga più nuova lo dice: chi risponde sa quanti ne mancano.
-function postoPerPiuFile(scope, origine) {
-  const attese = inAttesaPiuFile(scope, origine);
+function postoPerPiuFile(scope) {
+  const attese = inAttesaPiuFile(scope);
   if (attese.length < PIU_FILE_IN_ATTESA) return true;
   const ultima = attese.reduce((a, b) => (String(b.startedAt) > String(a.startedAt) ? b : a));
   ultima._fermati = (ultima._fermati || 0) + 1;
