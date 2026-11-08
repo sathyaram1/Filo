@@ -1457,18 +1457,13 @@
     if (!z) return null;
     vecchio = String(vecchio ?? '');
     nuovo = String(nuovo ?? '');
-    const corto = Math.min(vecchio.length, nuovo.length);
-    let p = 0;
-    while (p < corto && vecchio[p] === nuovo[p]) p++;
-    let s = 0;
-    while (s < corto - p && vecchio[vecchio.length - 1 - s] === nuovo[nuovo.length - 1 - s]) s++;
-    const fineVecchio = vecchio.length - s;
+    const { p, fineVecchio, fineNuovo } = cambio(vecchio, nuovo);
     const delta = nuovo.length - vecchio.length;
     let a;
     let b;
     if (z.end <= p) { a = z.start; b = z.end; } else if (z.start >= fineVecchio) { a = z.start + delta; b = z.end + delta; } else {
       a = Math.min(z.start, p);
-      b = Math.max(z.end + delta, nuovo.length - s);
+      b = Math.max(z.end + delta, fineNuovo);
     }
     a = Math.max(0, Math.min(nuovo.length, a));
     b = Math.max(a, Math.min(nuovo.length, b));
