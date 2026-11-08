@@ -867,7 +867,8 @@ test('#1294 riaperta, la pagina aperta da Filo ha ancora il suo collegamento, ch
     const s = await shell.evaluate(() => window.filoShell.tabs.snapshot());
     return (s.tabs.find((t) => t.id === s.activeId) || {}).url || '';
   };
-  expect(await attiva()).not.toBe(url);
+  await shell.locator('.tab').first().click();
+  await expect.poll(attiva, { timeout: 5_000 }).not.toBe(url);
   await link.click();
   await expect.poll(attiva, { timeout: 10_000, message: 'il collegamento porta alla pagina' }).toBe(url);
   await ripristina(app);
