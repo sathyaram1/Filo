@@ -1204,6 +1204,12 @@ function beginManual({ url, filename, totalBytes, scope, servedFrom, webContents
       rec.exe = marca(() => ESE().eEseguibile(n), rec.exe);
       broadcast('progress', rec);
     },
+    // Il paese da cui il lavoro è uscito (#2301): «Riprova» esce di nuovo da lì, anche a scheda chiusa o dopo un riavvio.
+    paese(p) {
+      if (p && p.country) rec.paese = { country: String(p.country), tier: String(p.tier || '') };
+      else delete rec.paese;
+      persist();
+    },
     // `perche`: la frase che resta sulla riga chiusa, per chi non ha visto l'avviso.
     fail(perche = '', { riprovabile = true } = {}) {
       rec.nota = String(perche || '');
