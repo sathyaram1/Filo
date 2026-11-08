@@ -52,23 +52,58 @@ const GIT_SOTTOMODULI_MAX = 200;
 // git diff a ogni rinfresco dell'indice. Gli hook di scrittura (pre-commit, pre-push…) non partono a una lettura,
 // e sono comuni nei repository dell'utente: chiedere per loro sarebbe solo attrito (#2292).
 const HOOK_DI_LETTURA = ['post-index-change'];
+// I file che git prova per un hook: git per Windows, se manca il nome nudo, prova il nome con .exe.
+function fileDiHook(dirHooks, nome) {
+  const path = require('node:path');
+  const p = path.join(dirHooks, nome);
+  return process.platform === 'win32' ? [p, `${p}.exe`] : [p];
+}
 // 'si' se nella cartella degli hook c'è un programma d'avvio che una lettura farebbe partire. Su Windows git
 // esegue l'hook se il file c'è; su POSIX serve il bit d'esecuzione.
 function hookDiLetturaAttivo(dirHooks) {
   const fs = require('node:fs');
-  const path = require('node:path');
   for (const nome of HOOK_DI_LETTURA) {
-    try {
-      const st = fs.statSync(path.join(dirHooks, nome));
-      if (st.isFile() && (process.platform === 'win32' || (st.mode & 0o111))) return true;
-    } catch (_) {}
+    for (const p of fileDiHook(dirHooks, nome)) {
+      try {
+        const st = fs.statSync(p);
+        if (st.isFile() && (process.platform === 'win32' || (st.mode & 0o111))) return true;
+      } catch (_) {}
+    }
   }
   return false;
 }
 
+// Un esito '' resta buono finché nessuno dei file da cui dipende cambia: la sonda lancia git più volte per ogni
+// sottomodulo, a processo fermo, e rifarla a ogni comando bloccava Filo per secondi nei repository grandi.
+const GIT_RICORDATI_MAX = 500;
+const gitRicordati = new Map();
+function firmaFile(p) {
+  try {
+    const s = require('node:fs').statSync(p);
+    return `${s.mtimeMs}:${s.size}:${s.mode}:${s.ino}`;
+  } catch (_) { return '-'; }
+}
+function ricordoValido(dir) {
+  const r = gitRicordati.get(dir);
+  return !!r && r.firme.every(([p, f]) => firmaFile(p) === f);
+}
+
 // 'si' se il repository di `dir`, o un suo sottomodulo, ha impostazioni che avviano programmi (#2292), '' se no,
 // 'ignoto' se git non risponde. Le impostazioni di un sottomodulo si guardano prima di lanciarci dentro altro.
-function gitLanciaIn(dir, visti = { n: 0 }) {
+function gitLanciaIn(dir, visti) {
+  if (visti) return sondaGit(dir, visti);
+  if (ricordoValido(dir)) return '';
+  const nuovi = { n: 0, file: [] };
+  const esito = sondaGit(dir, nuovi);
+  gitRicordati.delete(dir);
+  if (esito === '' && nuovi.dentro) {
+    if (gitRicordati.size >= GIT_RICORDATI_MAX) gitRicordati.delete(gitRicordati.keys().next().value);
+    gitRicordati.set(dir, { firme: nuovi.file.map((p) => [p, firmaFile(p)]) });
+  }
+  return esito;
+}
+
+function sondaGit(dir, visti) {
   const fs = require('node:fs');
   const path = require('node:path');
   // Una cartella che non c'è non la apre nessun git, a meno che il nome lo sciolga la shell (`cd Downloads/*/`):
