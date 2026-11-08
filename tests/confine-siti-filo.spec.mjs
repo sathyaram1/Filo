@@ -199,7 +199,9 @@ test('un rinvio del server verso la home la apre come home vera di Filo', async 
         new Promise((r) => setTimeout(() => r('nessuna risposta'), 1000)),
       ]);
     } catch (_) {}
-    return { vista: wc.getURL(), interna: t.isInternal, servizi };
+    let vista = '';
+    try { vista = wc.getURL(); } catch (_) {}
+    return { vista, interna: t.isInternal, servizi };
   });
   await expect.poll(ultima, { message: 'la home è una scheda di Filo, coi suoi servizi', timeout: 15000 })
     .toEqual({ vista: HOME, interna: true, servizi: 'function' });
