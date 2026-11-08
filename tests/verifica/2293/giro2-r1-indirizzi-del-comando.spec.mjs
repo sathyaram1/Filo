@@ -63,7 +63,7 @@ for (const [come, COMANDO] of COMANDI) {
   });
 }
 
-test('di controllo: lo stesso curl con http e un percorso chiede, e la regola lo riconosce', async ({ app }) => {
+test('r1 di controllo: lo stesso curl con http e un percorso chiede, e la regola lo riconosce', async ({ app }) => {
   test.setTimeout(60_000);
   await primaScheda(app);
   await app.evaluate((_e, titolo) => globalThis.SN_IL_FILO.registraVisita({ url: 'https://inganno.example/articolo', titolo }), TITOLO);
