@@ -795,7 +795,7 @@
     let state = monitored.get(el);
     if (state) return state;
     state = {
-      el, overlay: null, ro: null, attivo: false, riquadro: null,
+      el, overlay: null, ro: null, attivo: false, riquadro: null, toccato: false,
       // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
       testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
