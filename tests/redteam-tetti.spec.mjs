@@ -67,6 +67,7 @@ test.beforeAll(async () => {
         return json(res, 200, { name: doc, fields: {} });
       }
       if (url === '/redteamLimiti') {
+        if (limitiGiu) return json(res, 500, { error: { status: 'INTERNAL', message: 'Tetti del Red Team non raggiungibili.' } });
         const d = body.data || {};
         if (d.op === 'imposta') {
           scritture.push(d);
