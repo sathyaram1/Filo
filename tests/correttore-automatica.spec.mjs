@@ -254,7 +254,7 @@ test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole 
     expect(await valore(page)).toBe('qual\'è ');
   }
   await svuota(page);
-  await page.keyboard.type('qual\'è ');
+  await batti(page, 'qual\'è ');
   expect(await valore(page)).toBe('qual\'è ');
   await expect(errore(page, 'qual')).toHaveCount(1, { timeout: 4000 });
 
