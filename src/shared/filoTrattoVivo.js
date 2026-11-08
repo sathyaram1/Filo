@@ -362,19 +362,25 @@
         return;
       }
       const r = rigaDi(ev);
-      if (r) righe.push(`- ${oraDi(ev.ts, rif)} ${r}`);
+      // Il nome di un file scaricato lo sceglie il sito.
+      const sito = ev.tipo === 'download' && stringa(ev.file || ev.scaricamento) ? [campo(ev.file || ev.scaricamento)] : [];
+      if (r) righe.push({ riga: `- ${oraDi(ev.ts, rif)} ${r}`, sito });
     });
     if (schede.aperte || schede.chiuse) {
       const pezzi = [schede.aperte ? `${schede.aperte} apert${schede.aperte === 1 ? 'a' : 'e'}` : '', schede.chiuse ? `${schede.chiuse} chius${schede.chiuse === 1 ? 'a' : 'e'}` : ''].filter(Boolean);
-      righe.push(`- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`);
+      righe.push({ riga: `- schede dei siti: ${pezzi.join(', ')} (quelle aperte adesso le dice TAB APERTE)`, sito: [] });
     }
-    const visite = rendiPagine(pagine, { rif });
-    if (!righe.length) return { testo: visite, ids };
+    const visite = pagineResa(pagine, { rif });
+    if (!righe.length) return { testo: visite.testo, ids, daSiti: visite.daSiti };
     const tenute = righe.slice(-MAX_RIGHE_EVENTI);
     const fuori = righe.length - tenute.length;
     const testa = fuori ? [`- (prima di queste, altre ${fuori} cose successe dal messaggio prima: qui non ci sono)`] : [];
-    const busta = E().imbusta({ tipo: 'FILO_ACCADUTI', conIntestazione: true, testo: [...testa, ...tenute].join('\n') });
-    return { testo: [`Successo dal messaggio prima:\n${busta}`, visite].filter(Boolean).join('\n\n'), ids };
+    const busta = E().imbusta({ tipo: 'FILO_ACCADUTI', conIntestazione: true, testo: [...testa, ...tenute.map((x) => x.riga)].join('\n') });
+    return {
+      testo: [`Successo dal messaggio prima:\n${busta}`, visite.testo].filter(Boolean).join('\n\n'),
+      ids,
+      daSiti: [...tenute.flatMap((x) => x.sito), ...visite.daSiti],
+    };
   }
 
   // Il blocco che Filo scrive in un messaggio dell'utente, dopo l'ora e la chat: vuoto se non c'è niente da dire.
