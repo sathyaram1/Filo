@@ -175,12 +175,15 @@
     const dove = ambito ? `${ambito}, ${ambito} *, ${ambito} ::before, ${ambito} ::after, ${ambito} ::placeholder` : '*, ::before, ::after, ::placeholder';
     return `\n${dove} { font-family: system-ui, sans-serif !important; }\n`;
   }
+  // Scritti qui per nome: il preload impacchettato porta solo i fogli che il file che li legge nomina.
+  const FOGLI_DEGLI_STRATI = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css', 'spellcheck.css'];
   function fogliChiusi(nomi, { ambito = '' } = {}) {
     let testo = '';
     try {
       const fs = require('node:fs');
       const path = require('node:path');
-      testo = nomi.map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
+      testo = nomi.filter((f) => FOGLI_DEGLI_STRATI.includes(f))
+        .map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
     } catch (_) {}
     if (!paginaDiFilo) testo += fontSoloGenerico(ambito);
     const foglio = new CSSStyleSheet();
