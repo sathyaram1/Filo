@@ -2044,17 +2044,7 @@
     if (fileNelCampo(e.dataTransfer)) { contaNellaChat(e.dataTransfer, true); return; }
     const testo = e.dataTransfer?.getData('text/plain') || '';
     contaNellaChat(e.dataTransfer, !!testo);
-    if (!testo) return;
-    testoDaFuori = true;
-    const prima = inputEl.value.slice(0, inputEl.selectionStart);
-    const dopo = inputEl.value.slice(inputEl.selectionEnd);
-    const spazioDopo = dopo && !/^\s/.test(dopo) ? ' ' : '';
-    const pezzo = `${prima && !/\s$/.test(prima) ? ' ' : ''}${testo}${spazioDopo}`;
-    inputEl.setRangeText(pezzo, inputEl.selectionStart, inputEl.selectionEnd, 'end');
-    inputEl.focus();
-    autoGrowInput();
-    Comandi.updateInputClass();
-    Term.virgoletteSuInserito(testo, inputEl.selectionEnd - spazioDopo.length);
+    testoNelCampo(testo);
   });
 
   // Lightbox: click su un'immagine per ingrandirla
