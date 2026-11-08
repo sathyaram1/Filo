@@ -477,9 +477,22 @@
       const verbs = argVariants(raw).map((v) => v.toLowerCase());
       return verbs.some((v) => v === 'drop' || v === 'clear') ? 3 : 2;
     },
+    // Da git 2.46 il primo operando può essere un verbo (`git config set remote.origin.url …`): una chiave ha
+    // sempre un punto, quindi un verbo senza punto non si confonde. Tolto il verbo, vale la forma di prima.
     config: (cmd) => {
       const args = gitArgsAfterSub(cmd);
-      const low = args.map((a) => a.toLowerCase());
+      const i = args.findIndex((a) => !a.startsWith('-'));
+      const verbo = i < 0 ? '' : args[i].toLowerCase();
+      if (!/^(list|get|set|unset|edit|rename-section|remove-section|get-color|get-colorbool)$/.test(verbo)) return gitConfigForma(args);
+      const resto = args.filter((_, k) => k !== i);
+      const low = resto.map((a) => a.toLowerCase());
+      if (verbo === 'unset' || verbo === 'remove-section') return 3;
+      if (verbo === 'list' || verbo === 'edit' || verbo === 'rename-section') return 2;
+      if (verbo === 'set') return Math.max(2, gitConfigForma(low.includes('--append') ? resto.concat('--add') : resto));
+      if (low.some((a) => /^--(regexp|url)(=|$)/.test(a))) return 2;
+      return gitConfigForma(resto);
+    },
+    remote: (cmd) => {
       if (low.some((a) => a === '--unset' || a === '--unset-all' || a === '--remove-section')) return 3;
       const ops = args.filter((a) => !a.startsWith('-'));
       // Riscrivere l'indirizzo di un remoto è `git remote set-url` per un'altra strada (#530).
