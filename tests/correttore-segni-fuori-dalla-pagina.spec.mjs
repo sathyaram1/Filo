@@ -86,7 +86,7 @@ test('chi scrive vede i suoi segni, e il sito no', async ({ app, openTab, testSe
   // Il segno va sulla «quseta» battuta adesso, in fondo: quella del sito resta senza.
   await page.keyboard.type('poi quseta ');
   await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
-  expect((await riquadroDelSegno(errore)).x).toBeGreaterThan(b.x + 200);
+  expect((await riquadroDelSegno(errore)).x).toBeGreaterThan(ta.x + 300);
   expect((await page.evaluate(() => window.visto())).segni).toBe(0);
 });
 
