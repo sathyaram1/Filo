@@ -60,9 +60,7 @@ test('r2 Scollega sulla riga del controller collegato scollega quello, non l’a
   test.setTimeout(90_000);
   await computerFinto(app);
   const page = await apriElenco(app);
-  const collegato = righe(page).filter({ hasText: /collegat/i }).first();
-  const bersaglio = (await collegato.count()) ? collegato : righe(page).nth(1);
-  await bersaglio.click({ button: 'right' });
+  await rigaCollegata(page);
   await menuDi(page).voce('Scollega').first().click();
   await expect.poll(() => chiamate(app), { timeout: 8_000 }).toEqual([['btCollega', { indirizzo: SECONDO, collega: false }]]);
 });
