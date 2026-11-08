@@ -107,7 +107,7 @@ test('i minuti si leggono solo fra le scelte della pagina; la chat li cambia con
   assert.equal(C.minutiFraDownload({ downloadOgniMin: 7 }), 5);
   assert.equal(C.minutiFraDownload({ downloadOgniMin: 1000 }), 60);
   for (const n of C.FILO_PARLA_DOWNLOAD_MIN) assert.equal(C.minutiFraDownload({ downloadOgniMin: String(n) }), n);
-  const P = globalThis.SN_PREFERENCES;
+  const P = globalThis.SN_PREF;
   assert.deepEqual(P.buildPreferencePartial('messaggi sui download', '30').partial, { filoParla: { downloadOgniMin: 30 } });
   assert.deepEqual(P.buildPreferencePartial('messaggi_download', 'un\'ora').partial, { filoParla: { downloadOgniMin: 60 } });
   assert.equal(P.buildPreferencePartial('messaggi_download', 'boh'), null);
