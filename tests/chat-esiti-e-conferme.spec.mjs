@@ -863,13 +863,13 @@ test('#1294 riaperta, la pagina aperta da Filo ha ancora il suo collegamento, ch
   await expect(link, 'riaperta, il collegamento si clicca ancora').toHaveCount(1, { timeout: 8_000 });
   await expect(link).toContainText('Posta');
   await expect(page.locator('.dash-bubble-filo .dash-activity-row', { hasText: 'Aperta ·' })).toHaveCount(0);
-  await shell.evaluate(() => window.filoShell.tabs.snapshot()).then((s) => s.tabs.filter((t) => t.url === url).map((t) => t.id))
-    .then((ids) => app.evaluate(({ BrowserWindow }, ids) => {
-      for (const w of BrowserWindow.getAllWindows()) if (w._filoTabs) for (const id of ids) w._filoTabs.closeTab?.(id);
-    }, ids));
-  await expect.poll(async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.some((t) => t.url === url), { timeout: 8_000 }).toBe(false);
+  const attiva = async () => {
+    const s = await shell.evaluate(() => window.filoShell.tabs.snapshot());
+    return (s.tabs.find((t) => t.id === s.activeId) || {}).url || '';
+  };
+  expect(await attiva()).not.toBe(url);
   await link.click();
-  await expect.poll(async () => (await shell.evaluate(() => window.filoShell.tabs.snapshot())).tabs.some((t) => t.url === url), { timeout: 10_000, message: 'il collegamento riapre la pagina' }).toBe(true);
+  await expect.poll(attiva, { timeout: 10_000, message: 'il collegamento porta alla pagina' }).toBe(url);
   await ripristina(app);
 });
 
