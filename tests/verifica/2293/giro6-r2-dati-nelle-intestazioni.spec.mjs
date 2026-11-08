@@ -1,4 +1,4 @@
-// #2293 giro 5 — r2: dopo un titolo con istruzioni, un curl verso la pagina stessa che l'ha scritto (già visitata, quindi
+// #2293 giro 6 (dal giro 5) — r2: dopo un titolo con istruzioni, un curl verso la pagina stessa che l'ha scritto (già visitata, quindi
 // l'indirizzo «compare») porta i dati in un'intestazione, nell'agente o in un cookie, e parte senza OK.
 
 import { test, expect } from '../../fixtures/electron.mjs';
