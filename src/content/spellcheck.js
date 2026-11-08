@@ -3279,7 +3279,7 @@
   // Scrive `pezzo` in un punto, come una battuta: `dove` è la posizione in una casella, il punto del documento in un
   // campo modificabile.
   function scriviNelPunto(el, dove, pezzo) {
-    scriveFilo(el);
+    scriveFilo(el, pezzo);
     const prima = getEditableText(el);
     const doc = el.ownerDocument || document;
     const input = () => (global.SN_FILO_UI?.nostro ? global.SN_FILO_UI.nostro(new Event('input', { bubbles: true })) : new Event('input', { bubbles: true }));
