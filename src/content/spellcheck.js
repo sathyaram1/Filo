@@ -1355,19 +1355,26 @@
   // Chi cambia il testo perde i segni del modello che il cambio tocca: gli altri restano dov'erano finché un controllo
   // non li rinnova (#1111), sugli offset giusti per «Correggi».
   // `ammesso(pezzo)`: il pezzo nuovo l'ha scritto l'utente (ammessoDa). Un cambio che né lui né Filo spiegano è del sito.
-  function seguiIlTesto(state, ammesso = null) {
+  function seguiIlTesto(state, ammesso = null, { storia = false } = {}) {
     const ora = getEditableText(state.el);
     if (ora === state.testo) return;
     const prima = state.testo;
     state.testo = ora;
     if (!PAGINA_DI_FILO && !radiceDi(state.el)) {
-      const c = cambio(prima, ora);
-      state.diSito = scorriPezzi(state.diSito, c);
-      state.visti = scorriPezzi(state.visti, c);
-      const nuovo = ora.slice(c.p, c.fineNuovo);
-      const f = state.filoScrive;
-      const daFilo = f === TUTTO || (typeof f === 'string' && senzaSpazi(f).includes(senzaSpazi(nuovo)));
-      if (senzaSpazi(nuovo) && !daFilo && !(ammesso && ammesso(nuovo))) state.diSito = unisciPezzi([...state.diSito, { start: c.p, end: c.fineNuovo }]);
+      const riportato = storia ? proprietariDi(state, ora) : null;
+      if (riportato) {
+        state.diSito = riportato.diSito;
+        state.visti = riportato.visti;
+      } else {
+        const c = cambio(prima, ora);
+        state.diSito = scorriPezzi(state.diSito, c);
+        state.visti = scorriPezzi(state.visti, c);
+        const nuovo = ora.slice(c.p, c.fineNuovo);
+        const f = state.filoScrive;
+        const daFilo = f === TUTTO || (typeof f === 'string' && senzaSpazi(f).includes(senzaSpazi(nuovo)));
+        if (senzaSpazi(nuovo) && !daFilo && !(ammesso && ammesso(nuovo))) state.diSito = unisciPezzi([...state.diSito, { start: c.p, end: c.fineNuovo }]);
+      }
+      ricordaProprietari(state);
     }
     // La casella svuotata (il messaggio è partito) chiude il testo a cui valevano gli «Ignora», e dice come si scrive
     // in questa pagina.
