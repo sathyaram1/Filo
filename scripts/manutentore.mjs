@@ -723,12 +723,13 @@ export function controlloPriorita(attuale, nuova) {
   return c.ok ? c : { ok: false, motivo: c.motivo };
 }
 
-/** La priorità di adesso del feedback `num` fra le schede del server; null se non si legge o non c'è. */
-async function prioritaAttuale(cred, num) {
+/** Le priorità di adesso dei feedback `nums` fra le schede del server, nello stesso ordine; null se non si legge o non c'è. */
+async function prioritaAttuali(cred, ...nums) {
   const sc = await tutteLeSchede(cred);
-  if (sc.ok === false) return null;
-  const s = sc.schede.find((x) => String(x.num) === String(num));
-  return s ? s.priorita : null;
+  return nums.map((num) => {
+    const s = sc.ok === false ? null : sc.schede.find((x) => String(x.num) === String(num));
+    return s ? s.priorita : null;
+  });
 }
 
 /** Il giorno in Italia (YYYY-MM-DD), quello che il server scrive accanto a un'indicazione. PURA. */
