@@ -73,7 +73,7 @@ test('una pagina di risultati è una ricerca, con le parole cercate; una pagina 
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.google.com/search?q=orche+assassine&sca_esv=1&source=hp'), { testo: 'orche assassine', sito: 'Google' });
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.youtube.com/results?search_query=jazz'), { testo: 'jazz', sito: 'YouTube' });
   assert.deepEqual(A.ricercaNellIndirizzo('https://www.amazon.it/s?k=zaino&ref=nb'), { testo: 'zaino', sito: 'Amazon' });
-  assert.deepEqual(A.ricercaNellIndirizzo('https://negozio.example/search?q=scarpe%20rosse'), { testo: 'scarpe rosse', sito: 'negozio.example' });
+  assert.equal(A.ricercaNellIndirizzo('https://negozio.example/search?q=scarpe%20rosse'), null, 'un sito qualunque non è un motore (#2293)');
   assert.equal(A.ricercaNellIndirizzo('https://www.google.com/maps/place/Roma'), null);
   assert.equal(A.ricercaNellIndirizzo('https://www.google.com/search?q=%20%20'), null, 'una ricerca vuota non è una ricerca');
   assert.equal(A.ricercaNellIndirizzo('https://it.wikipedia.org/wiki/Orca'), null);
