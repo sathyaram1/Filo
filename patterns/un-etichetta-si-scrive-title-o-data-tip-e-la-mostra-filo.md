@@ -15,8 +15,14 @@ copre anche il `title` scritto domani da chi non conosce questa regola.
 **Come funziona.**
 - Il modulo toglie il `title` quando arriva il puntatore (prima che Chromium lo legga: il nativo legge il titolo dopo
   che la pagina ha visto il movimento), lo rimette all'uscita e alla pressione di un tasto del mouse: chi legge il
-  `title` al clic, al tasto destro o in una prova lo trova. Un `title` riscritto dal codice durante il passaggio
+  `title` al clic o al tasto destro lo trova. Un `title` riscritto dal codice durante il passaggio
   diventa il valore da rimettere.
+- **Nelle prove**: dopo un clic il puntatore resta fermo lì, e il pezzo che gli nasce sotto (una riga rifatta, un
+  dettaglio aperto da codice) perde il `title` come se ci fosse passato sopra. Una prova che legge quel `title`
+  sposta prima il puntatore (`page.mouse.move(0, 0)`), o chiede a `SN_SUGGERIMENTO.testoPer(el)` cosa dice il
+  fumetto (#2310).
+- La carta di una scheda e il fumetto di un suo controllo hanno la stessa attesa: la carta si chiude nell'istante in
+  cui il fumetto parte, non con un'attesa sua che corre insieme all'altra (#2310).
 - Ritardo (token `fumetto.ritardo`), colori (`fumetto.sfondo`, `fumetto.testo`, `fumetto.bordo`), forma e
   larghezza (320 px) sono gli stessi del fumetto della barra: il main li passa alla sua finestra
   (`src/main/movimento.js`). Si cambiano in Preferenze → Avanzate o a parole, come gli altri token.
