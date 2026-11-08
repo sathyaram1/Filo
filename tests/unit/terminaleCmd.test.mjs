@@ -170,6 +170,58 @@ test('con l\'eco spento cmd non mostra il prompt: il terminale della dashboard r
   assert.equal(uscita.testo.trim(), 'ciao');
 });
 
+// ─────────── la cartella di lavoro non entra nella ricerca dei programmi (#2312) ───────────
+// Dopo un `cd` in un archivio estratto, il `whoami` del modello deve essere quello del sistema, non quello dell'archivio.
+
+test('con cmd il `whoami` del modello in una cartella con un whoami suo avvia quello del sistema', SOLO_FUORI, async () => {
+  const archivio = join(TMP, 'archivio-estratto');
+  mkdirSync(archivio, { recursive: true });
+  writeFileSync(join(archivio, 'whoami.bat'), 'ARCHIVIO\n');
+  mkdirSync(join(TMP, 'cmd-finto'), { recursive: true });
+  writeFileSync(join(TMP, 'cmd-finto', 'whoami.bat'), 'utente-vero\n');
+  const out = await conCmdFinto(() => T.runCommand('whoami', { shell: 'cmd', cwd: archivio, trackCwd: true, timeoutMs: ATTESA }));
+  assert.equal(out.code, 0, out.stderr);
+  assert.equal(out.stdout.trim(), 'utente-vero', 'è partito il programma dell\'archivio');
+  assert.equal(out.cwd, archivio, 'il comando deve restare nella cartella dove il modello è entrato');
+});
+
+test('la cartella di lavoro esce dalla ricerca per ogni comando del modello su Windows, e la variabile vince sulle sue copie', async () => {
+  await suWindowsConSessioneFinta((cb) => cb.onExit({ code: 0, cwd: TMP }), async (visto) => {
+    await T.runCommand('where git', { shell: 'cmd', cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
+    assert.equal(visto.opzioni.env.NoDefaultCurrentDirectoryInExePath, '1');
+    const env = T.ambienteDelModello({ PATH: 'p', nodefaultcurrentdirectoryinexepath: '', FILO_DEFAULT_OPENROUTER_KEY: 'x' });
+    assert.deepEqual(env, { PATH: 'p', NoDefaultCurrentDirectoryInExePath: '1' });
+  });
+});
+
+test('il terminale dove scrive l\'utente resta il cmd di sempre: un programma della cartella parte per nome', SOLO_FUORI, async () => {
+  const qui = join(TMP, 'cartella-utente');
+  mkdirSync(qui, { recursive: true });
+  writeFileSync(join(qui, 'avvia.bat'), 'suo\n');
+  const uscita = await conCmdFinto(() => new Promise((resolve, reject) => {
+    const sessione = S.createSession({ shell: 'cmd', cwd: qui });
+    let testo = '';
+    const scade = setTimeout(() => { sessione.kill(); reject(new Error('il terminale con cmd non ha mai risposto')); }, ATTESA);
+    sessione.exec('avvia', {
+      onData: ({ chunk }) => { testo += chunk; },
+      onExit: ({ code }) => { clearTimeout(scade); sessione.kill(); resolve({ testo, code }); },
+      onError: ({ message }) => { clearTimeout(scade); reject(new Error(message)); },
+    });
+  }));
+  assert.equal(uscita.code, 0);
+  assert.equal(uscita.testo.trim(), 'suo');
+});
+
+test('con cmd vero un whoami.bat nella cartella non prende il posto di whoami', { skip: process.platform !== 'win32' && 'cmd esiste solo su Windows' }, async () => {
+  const archivio = join(TMP, 'archivio-vero');
+  mkdirSync(archivio, { recursive: true });
+  writeFileSync(join(archivio, 'whoami.bat'), '@echo ARCHIVIO\r\n');
+  const out = await T.runCommand('whoami', { shell: 'cmd', cwd: archivio, trackCwd: true, timeoutMs: ATTESA });
+  assert.equal(out.code, 0, out.stderr);
+  assert.doesNotMatch(out.stdout, /ARCHIVIO/);
+  assert.ok(out.stdout.trim(), 'whoami del sistema non ha risposto');
+});
+
 // ─────────── il giro vero: cmd su Windows, la stessa sessione con sh altrove ───────────
 
 const WIN = process.platform === 'win32';
