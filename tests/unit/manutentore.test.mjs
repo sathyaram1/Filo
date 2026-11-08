@@ -149,13 +149,13 @@ function catturaConsole(t) {
 
 test('incroci fra i rami: due rami del server sullo stesso file si incrociano coi file, su file diversi no (#2340)', () => {
   const s = (ramo, file, feedback = []) => ({ ramo, repo: 'server', file, feedback });
-  assert.deepEqual(M.incrociFraRami([s('claude/a', ['functions/src/x.js', 'functions/src/y.js'], ['10']), s('claude/b', ['functions/src/x.js'], ['11'])]),
+  assert.deepEqual(incrociFraRami([s('claude/a', ['functions/src/x.js', 'functions/src/y.js'], ['10']), s('claude/b', ['functions/src/x.js'], ['11'])]),
     [{ a: { ramo: 'claude/a', feedback: ['10'], repo: 'server' }, b: { ramo: 'claude/b', feedback: ['11'], repo: 'server' }, comuni: ['filo-security:functions/src/x.js'] }]);
-  assert.deepEqual(M.incrociFraRami([s('claude/a', ['functions/src/x.js']), s('claude/b', ['functions/src/y.js'])]), []);
+  assert.deepEqual(incrociFraRami([s('claude/a', ['functions/src/x.js']), s('claude/b', ['functions/src/y.js'])]), []);
   // Lo stesso percorso in due repo è due file diversi.
-  assert.deepEqual(M.incrociFraRami([{ ramo: 'claude/app', file: ['package.json'] }, s('claude/b', ['package.json'])]), []);
+  assert.deepEqual(incrociFraRami([{ ramo: 'claude/app', file: ['package.json'] }, s('claude/b', ['package.json'])]), []);
   // Un lavoro dell'app col gemello sul server incrocia un lavoro solo del server sui file del server.
-  const coppie = M.incrociFraRami([{ ramo: 'worker/A-1', file: ['scripts/x.mjs'], feedback: ['20'] }, s('worker/A-1', ['functions/src/z.js']), s('claude/b', ['functions/src/z.js'], ['21'])]);
+  const coppie = incrociFraRami([{ ramo: 'worker/A-1', file: ['scripts/x.mjs'], feedback: ['20'] }, s('worker/A-1', ['functions/src/z.js']), s('claude/b', ['functions/src/z.js'], ['21'])]);
   assert.equal(coppie.length, 1);
   assert.equal(M.rigaLavoro(coppie[0].a), 'worker/A-1 (app e server) (#20)');
   assert.equal(M.rigaLavoro(coppie[0].b), 'claude/b sul server (#21)');
