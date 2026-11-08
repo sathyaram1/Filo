@@ -711,9 +711,7 @@
   // (l'editor di un riquadro) gli strati stanno fuori dal corpo (#1808.2).
   // Su un sito gli strati stanno in un'ombra chiusa (#2299): un segno che manca dice che la parola è nel dizionario
   // personale, fra i nomi noti o fra le imparate, e dal documento lo script del sito lo leggerebbe.
-  // Senza SN_FILO_UI c'è solo la prova di logica, che dice da sé dove gira.
-  const PAGINA_DI_FILO = global.SN_FILO_UI ? global.SN_FILO_UI.paginaDiFilo
-    : (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  const PAGINA_DI_FILO = !!global.SN_FILO_UI?.paginaDiFilo;
   // `filoScrive` mentre Filo annulla col tasto: quello che il browser riporta è comunque dell'utente.
   const TUTTO = {};
   let ombraDegliStrati = null;
