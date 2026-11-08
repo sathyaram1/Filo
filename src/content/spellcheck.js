@@ -1531,40 +1531,143 @@
     return nuovo;
   }
 
-  // Su un sito un testo nuovo si controlla una volta per gesto vero in quella casella, o dopo una scrittura di Filo
-  // (#2299): né i segni né la durata del controllo del testo scritto dal sito gli dicono cosa c'è nel dizionario.
-  function puoRicalcolare(state) {
-    if (PAGINA_DI_FILO || radiceDi(state.el)) return true;
-    const G = global.SN_GESTO;
-    const finestra = (G && G.FINESTRA_MS) || 1500;
-    if (state.permesso && Date.now() - state.permesso <= finestra) { state.permesso = 0; return true; }
-    // Il gesto che entra nella casella per la prima volta cade prima che ci sia chi la ascolta.
-    return state.testoCalcolato == null && !!G && G.prendi('codice', undefined, G.dentro(state.el));
+  // Su un sito si controlla solo il testo dell'utente (#2299): quello che scrive coi suoi tasti o tramite Filo, e quello
+  // che c'era quando è entrato nella casella. Il resto lo ha scritto il sito, e i segni, la correzione da sé o la durata
+  // del controllo gli direbbero cosa c'è nel dizionario personale. Regola: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md.
+  const TUTTO = {};
+  function cambio(prima, ora) {
+    const corto = Math.min(prima.length, ora.length);
+    let p = 0;
+    while (p < corto && prima[p] === ora[p]) p++;
+    let s = 0;
+    while (s < corto - p && prima[prima.length - 1 - s] === ora[ora.length - 1 - s]) s++;
+    return { p, fineVecchio: prima.length - s, fineNuovo: ora.length - s };
   }
-  function scriveFilo(el) {
+  // Un pezzo che il cambio tocca perde solo la parte cambiata: quello che resta ai lati resta di chi era.
+  function scorriPezzi(lista, { p, fineVecchio, fineNuovo }) {
+    const delta = fineNuovo - fineVecchio;
+    const out = [];
+    for (const z of lista) {
+      if (z.end <= p) out.push(z);
+      else if (z.start >= fineVecchio) out.push({ start: z.start + delta, end: z.end + delta });
+      else {
+        if (z.start < p) out.push({ start: z.start, end: p });
+        if (z.end > fineVecchio) out.push({ start: fineNuovo, end: z.end + delta });
+      }
+    }
+    return unisciPezzi(out);
+  }
+  function unisciPezzi(lista) {
+    const out = [];
+    for (const z of [...lista].filter((x) => x.end > x.start).sort((a, b) => a.start - b.start)) {
+      const u = out[out.length - 1];
+      if (u && z.start <= u.end) u.end = Math.max(u.end, z.end); else out.push({ start: z.start, end: z.end });
+    }
+    return out;
+  }
+  const toccaPezzi = (lista, a, b) => lista.some((z) => a < z.end && b > z.start);
+
+  // Cosa può aver scritto l'utente con questo `input`: un tasto il suo carattere, un incolla o un trascinamento il loro
+  // testo, la composizione il suo, l'annulla da tastiera quello che riporta. Uno script ha `isTrusted` anche con
+  // execCommand: senza il tasto vero che lo spiega, il testo è del sito.
+  function ammessoDa(state, e) {
+    if (!e) return null;
+    if (!e.isTrusted) return global.SN_FILO_UI?.veroONostro?.(e) ? () => true : null;
+    const tipo = e.inputType || '';
+    const dentro = (fonte) => (pezzo) => String(fonte).replace(/\r\n?/g, '\n').includes(pezzo);
+    const k = state.tasto;
+    if (tipo === 'insertText') {
+      state.tasto = null;
+      if (!k || k.mod || typeof e.data !== 'string') return null;
+      const libero = k.morto || k.key === 'Unidentified' || k.key === 'Process';
+      const suo = [...k.key].length === 1 && e.data === k.key;
+      return suo || (libero && [...e.data].length <= 3) ? dentro(e.data) : null;
+    }
+    if (tipo === 'insertLineBreak' || tipo === 'insertParagraph') return (pezzo) => pezzo === '\n';
+    if (tipo === 'insertCompositionText' || tipo === 'insertFromComposition') return typeof e.data === 'string' ? dentro(e.data) : () => true;
+    if (tipo === 'insertFromPaste' || tipo === 'insertFromDrop' || tipo === 'insertFromPasteAsQuotation') {
+      const fonte = typeof e.data === 'string' ? e.data : e.dataTransfer?.getData?.('text/plain');
+      return typeof fonte === 'string' && fonte ? dentro(fonte) : () => true;
+    }
+    if (tipo === 'historyUndo' || tipo === 'historyRedo') return k && k.mod ? () => true : null;
+    return null;
+  }
+
+  // Il gesto vero che porta l'utente nella casella (il clic, il rilascio di Tab) fa suo il testo che c'è: una volta per
+  // ingresso, non a ogni clic, perché ogni misura in più è una parola letta.
+  function entra(state) {
+    if (state.entrato || PAGINA_DI_FILO || radiceDi(state.el)) return;
+    const G = global.SN_GESTO;
+    if (!G || !G.prendi('codice', undefined, G.dentro(state.el))) return;
+    state.entrato = true;
+    seguiIlTesto(state);
+    if (!state.diSito.length) return;
+    state.visti = unisciPezzi([...state.visti, ...state.diSito]);
+    state.diSito = [];
+    if (state.attivo) aggiornaCodice(state);
+  }
+
+  // Filo scrive `testo` nella casella (una correzione, l'Incolla del menu, la dettatura): vale come scritto dall'utente.
+  // Gli editor che rifanno il testo dopo l'evento lo mostrano al giro dopo: lì si guarda ancora, poi si chiude.
+  function scriveFilo(el, testo) {
     const state = monitored.get(el);
-    if (state) state.permesso = Date.now();
+    if (!state) return;
+    const t = String(testo ?? '');
+    state.filoScrive = t;
+    setTimeout(() => {
+      if (state.filoScrive !== t) return;
+      seguiIlTesto(state);
+      state.filoScrive = null;
+      if (state.attivo) aggiornaCodice(state);
+    }, 0);
+  }
+
+  // Il testo da controllare con le parole del sito spente (spazi, gli a capo restano): fuori dai controlli, e uguali
+  // nel costo qualunque cosa dica il dizionario. Fra quelle trovate entrando, una parola ripetuta conta una volta.
+  function soloDellUtente(state, d) {
+    if (PAGINA_DI_FILO || radiceDi(state.el) || (!state.diSito.length && !state.visti.length)) return d.testo;
+    const n = d.testo.length;
+    const sito = new Uint8Array(n);
+    const visto = new Uint8Array(n);
+    for (const [lista, segna] of [[state.diSito, sito], [state.visti, visto]]) {
+      for (const z of lista) {
+        const a = Math.max(0, d.verso(z.start));
+        const b = Math.min(n, z.end >= state.testo.length ? n : d.verso(z.end));
+        for (let i = a; i < b; i++) segna[i] = 1;
+      }
+    }
+    const out = d.testo.split('');
+    const giaViste = new Set();
+    for (const m of d.testo.matchAll(/[\p{L}\p{N}\p{M}'’_-]+/gu)) {
+      const a = m.index;
+      const b = a + m[0].length;
+      let delSito = false;
+      let vista = false;
+      for (let i = a; i < b; i++) { if (sito[i]) delSito = true; if (visto[i]) vista = true; }
+      if (!delSito && vista) {
+        const chiave = m[0].toLowerCase();
+        if (giaViste.has(chiave)) delSito = true; else giaViste.add(chiave);
+      }
+      if (delSito) for (let i = a; i < b; i++) out[i] = ' ';
+    }
+    for (let i = 0; i < n; i++) if (sito[i] && out[i] !== '\n') out[i] = ' ';
+    return out.join('');
   }
 
   function calcolaCodice(state) {
+    seguiIlTesto(state);
     const d = testoDaControllare(state.el);
     const Rg = R();
     if (!Rg) { state.codice = []; state.codiceT2 = []; state.codiceTesto = null; return false; }
-    if (d.testo !== state.testoCalcolato && !puoRicalcolare(state)) {
-      state.codiceT2 = state.codiceTesto == null ? [] : riallineaIssues(state.codiceT2, state.codiceTesto, d.testo).issues;
-      state.codiceTesto = d.testo;
-      state.codice = d.riporta(state.codiceT2);
-      return false;
-    }
-    state.testoCalcolato = d.testo;
+    const testo = soloDellUtente(state, d);
     // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
-    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
+    const segnaposti = segnapostiAttivi() ? Rg.segnaposti(testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
-    const pareri = erroriAttivi() ? pareriDelTesto(d.testo) : null;
+    const pareri = erroriAttivi() ? pareriDelTesto(testo) : null;
     const errori = pareri ? Rg.senzaSovrapposti([
-      ...Rg.erroriFissi(d.testo),
-      ...(ripetizioniAttive() ? Rg.ripetizioni(d.testo) : []),
-      ...Rg.candidatiDizionario(d.testo, {
+      ...Rg.erroriFissi(testo),
+      ...(ripetizioniAttive() ? Rg.ripetizioni(testo) : []),
+      ...Rg.candidatiDizionario(testo, {
         sbagliata: (p) => (pareri.has(p) ? pareri.get(p) : sbagliataPerIlBrowser(p)),
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
