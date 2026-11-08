@@ -446,12 +446,15 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     state.annullando = u;
-    try { document.execCommand('undo'); } catch (_) {}
-    const ora = getEditableText(el);
-    if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
-    state.annullando = null;
-    if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
-    if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+    state.filoScrive = TUTTO;
+    try {
+      try { document.execCommand('undo'); } catch (_) {}
+      const ora = getEditableText(el);
+      if (ora === u.testoPrima) { if (state.annullando) dopoLAnnulla(state); return; }
+      state.annullando = null;
+      if (ora !== u.testo) { try { document.execCommand('redo'); } catch (_) {} }
+      if (getEditableText(el) === u.testo) annullaAutomatica(el, u.voce);
+    } finally { seguiIlTesto(state); state.filoScrive = null; }
   }
 
   // L'annulla subito dopo una correzione automatica (Ctrl/Cmd+Z, e «Annulla» della barra del Mac, che arriva come lo
