@@ -279,7 +279,8 @@ npm run manutentore -- pacchetto <P> <N,M,…> [--server]   # P unisce le segnal
 npm run manutentore -- nota <N> -                  # testo da stdin; su un lavoro fermo è la risposta che lo sblocca
 npm run manutentore -- sblocca <N> [nota]          # un lavoro fermo per guasto riparte
 npm run manutentore -- archivia <N> <originale>    # un doppione non iniziato
-npm run manutentore -- taccuino | taccuino scrivi - --versione <V>
+npm run manutentore -- taccuino | taccuino sezione <nome> - --versione <V>   # una sezione da stdin, il resto com'è
+npm run manutentore -- taccuino scrivi - --versione <V>   # intero, solo per dargli le sezioni o riordinarlo
 npm run manutentore -- indicazione "<testo>"       # nel taccuino, con la data
 npm run manutentore -- sveglia-tra <minuti> [--perche "…"] | sveglia-togli   # minimo 5
 npm run manutentore -- segnali-letti               # quelli che hai già visto non ti risvegliano
