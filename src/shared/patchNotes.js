@@ -57,6 +57,9 @@
         { testo: 'Un video salvato da un sito che apri da un altro paese scende dalla stessa connessione della scheda, anche con «Riprova»: il sito non vede più la tua.', segnalazione: 2301 },
         { testo: 'Con il Prompt dei comandi scelto nelle Preferenze, i comandi che chiedi a Filo usano i programmi installati sul computer anche dentro una cartella che ne contiene uno con lo stesso nome.', segnalazione: 2312 },
       ],
+      fixes: [
+        { testo: 'Un comando del terminale che contatta un indirizzo scritto da Filo ti chiede l\'OK prima di partire, come già succede quando Filo apre quell\'indirizzo.', segnalazione: 2293 },
+      ],
     },
     {
       version: '0.2.271', date: '2026-11-07',
