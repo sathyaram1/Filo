@@ -355,9 +355,10 @@
     const pos = cursoreNelCampo(el);
     const fine = A().fineDellaParola(testo, pos);
     if (fine < 0) return;
-    // Una parola messa dal sito non si corregge né si conta: rimessa con la maiuscola gli direbbe che è nel dizionario.
+    // Si corregge e si conta solo una parola battuta dall'utente: una messa dal sito, anche prima che l'utente entrasse,
+    // rimessa con la maiuscola gli direbbe che è nel dizionario.
     const chiusa = A().parolaPrima(testo, fine);
-    if (chiusa && toccaPezzi(state.diSito, chiusa.start, fine)) return;
+    if (chiusa && (toccaPezzi(state.diSito, chiusa.start, fine) || toccaPezzi(state.visti, chiusa.start, fine))) return;
     seguiIlTesto(state);
     if (automaticaAttiva() && !state.rifiutateQui.some((x) => x.end === fine && testo.slice(x.start, x.end) === x.segment)) {
       const c = A().correzioneAFineParola(testo, fine, {
