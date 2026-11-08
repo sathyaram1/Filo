@@ -443,7 +443,7 @@ test('git: un programma d\'avvio di lettura in un sottomodulo fa chiedere come n
     assert.equal(T.gitLanciaIn(parent), 'si');
     assert.equal(T.gitLanciaIn(join(parent, 'sub')), 'si', 'anche da dentro il sottomodulo');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
-    assert.equal(C.classify('git status', { cwd: parent, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2);
+    assert.equal(C.classify('git status', sondaVera(parent, base)), 2);
     segnoVero(parent, segno);
   } finally {
     togliCartella(base);
