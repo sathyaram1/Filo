@@ -176,6 +176,9 @@ test('il segno dei trascinamenti: l’origine di Filo, o la classe di quello che
   const ev = G.rilascio(dt({ 'text/plain': 'ciao Mario' }), 'chat_home');
   assert.deepEqual(ev, { misura: 'gesto', gesto: 'trascinamento', da: 'testo_pagina', a: 'chat_home', esito: 'posato' });
   assert.equal(G.rilascio(dt({ 'text/plain': 'x' }), 'griglia_editor', false).esito, 'annullato');
+  // Chi sa l'esito solo dopo l'evento (il riferimento chiesto al main, #2300) passa l'origine letta durante.
+  assert.deepEqual(G.rilascio('file_da_chat', 'chat_aiuto', false),
+    { misura: 'gesto', gesto: 'trascinamento', da: 'file_da_chat', a: 'chat_aiuto', esito: 'annullato' });
   assert.deepEqual(G.fine({ dataTransfer: { dropEffect: 'none' } }, 'voce_sistema'),
     { misura: 'gesto', gesto: 'trascinamento', da: 'voce_sistema', a: 'nessuna', esito: 'annullato' });
   assert.equal(G.fine({ dataTransfer: { dropEffect: 'copy' } }, 'voce_sistema'), null, 'il rilascio preso lo conta chi lo prende');
