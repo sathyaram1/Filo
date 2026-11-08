@@ -120,6 +120,15 @@ test('#1994 — uniq, tree -o e file -C sopra un file che c\'è già valgono 3; 
   for (const cmd of ['uniq bozza.txt nuova.txt', 'tree -o nuova.txt', 'file -C -m altra']) assert.equal(C.classify(cmd, ctx), 2, cmd);
 });
 
+test('#1994 — il file magic e l\'opzione che forza valgono anche accorciati o raggruppati', () => {
+  const { ctx } = linux({ ...SUO, [`${casa}/Documenti/magia.mgc`]: 'file' });
+  for (const cmd of ['file -C --magic=magia', 'file -C --magic-file magia', 'file -Cm magia', 'file -Cmmagia', 'gzip --forc bozza.txt',
+    'ln -s --forc bozza.txt lettera.txt']) {
+    assert.equal(C.classify(cmd, ctx), 3, cmd);
+  }
+  for (const cmd of ['file -Cm altra', 'file -C --mag=altra', 'gzip --fast bozza.txt', 'ln -s bozza.txt lettera.txt']) assert.equal(C.classify(cmd, ctx), 2, cmd);
+});
+
 test('il main dà al classificatore la sonda del disco, per i comandi scritti a mano e per quelli di Filo', () => {
   const h = readFileSync(join(ROOT, 'src', 'main', 'services', 'handlers.js'), 'utf8');
   const i = h.indexOf('function perimetroLettura(');
