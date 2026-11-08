@@ -41,6 +41,12 @@ test('r1 un comando git che scrive un file non parte senza domanda a compito con
   }
 });
 
+test('r1 git grep che apre i risultati con un programma scelto nel comando è un\'esecuzione', () => {
+  for (const comando of ['git grep -O"sh -c id" foo', 'git grep --open-files-in-pager="sh -c id" foo']) {
+    expect(C.classify(comando, LINUX), comando).toBe(3);
+  }
+});
+
 test('r1 la stessa lettura senza file d\'uscita resta libera', () => {
   for (const comando of ['git diff', 'git log -1 --format=format:%s', 'git show HEAD', 'git reflog']) {
     expect(C.classify(comando, LINUX), comando).toBe(1);
