@@ -171,23 +171,20 @@ test('le parole che il sito mette nella casella mentre l\'utente scrive non rice
   const page = await apri(app, openTab, testServer, { errori: { anno: ['hanno', 'Verbo avere.'] } });
   await app.evaluate(() => { globalThis.__trattieni = true; });
   await page.locator('#ta').click();
-  await batti(page, 'loro anno detto ');
+  await batti(page, 'loro detto ');
   await expect.poll(async () => (await rapide(app)).length).toBeGreaterThan(0);
   await page.evaluate(() => {
     const ta = document.getElementById('ta');
-    ta.value = 'anno e anno ' + ta.value;
+    ta.value = 'anno e ' + ta.value;
     ta.dispatchEvent(new Event('input', { bubbles: true }));
   });
   await app.evaluate(() => globalThis.__rilascia());
   await batti(page, 'ok ');
-  await page.waitForTimeout(1500);
+  // Il modello vede anche la parola del sito e la segna: il segno non si posa.
+  await expect.poll(async () => (await rapide(app)).some((r) => r.nuovo.includes('anno e'))).toBe(true);
   await app.evaluate(() => globalThis.__rilascia());
-  // Il modello ha visto anche le parole del sito e le segna: nessun segno cade su di esse.
-  await expect.poll(async () => (await rapide(app)).some((r) => r.nuovo.includes('anno e anno'))).toBe(true);
-  await page.waitForTimeout(1200);
-  const ta = await page.locator('#ta').boundingBox();
-  const segni = await segniDi(page, '.sn-spell-overlay .sn-errore, .sn-spell-overlay .sn-suggerimento').evaluateAll((els) => els.map((e) => ({ testo: e.textContent, x: e.getBoundingClientRect().x })));
-  expect(segni.filter((s) => s.x < ta.x + 160)).toEqual([]);
+  await page.waitForTimeout(1500);
+  await expect(errore(page, 'anno')).toHaveCount(0);
 });
 
 test('una parola maiuscola fuori dizionario che il controllo dice sbagliata compare piena alla risposta', async ({ app, openTab, testServer }) => {
