@@ -188,6 +188,14 @@ test('la chat toglie il no ai download automatici di un sito, con le parole che 
     assert.match(r.tolte[0], /spam-chat\.example/);
     assert.notEqual(esito(wc, false, ADESSO + 1), 'no', `«${parole}»: tolto il no, il sito non è più bloccato`);
   }
+  // Il no dato su a.salta-chat.example si toglie anche chiedendolo per b.salta-chat.example, come dal menu della scheda.
+  const a = bloccato(ses, 'https://a.salta-chat.example/');
+  const b = pagina(ses, 'https://b.salta-chat.example/');
+  assert.equal(esito(b, false, ADESSO), 'no');
+  const r = P.togliPerChat('b.salta-chat.example', 'download automatici');
+  assert.equal(r.tolte.length, 1, JSON.stringify(r));
+  assert.notEqual(esito(b, false, ADESSO + 1), 'no');
+  assert.ok(a);
 });
 
 test('il file fatto ripartire confermando l\'avviso di sicurezza conta come scaricato con un clic: non riapre la domanda', () => {
