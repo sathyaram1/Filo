@@ -1438,10 +1438,12 @@
         return i >= 0 && testi[i + 1] ? copiaSovrascrive([], testi[i + 1], c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
       }
       case 'file': {
-        const i = testi.findIndex((t) => /^(-m|--magic-file)$/.test(t));
-        const lungo = testi.find((t) => /^--magic-file=/.test(t));
-        const magia = lungo ? lungo.slice(13) : i >= 0 ? testi[i + 1] : 'magic';
-        return magia ? copiaSovrascrive([], `${nomeDi(magia)}.mgc`, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
+        let magia = 'magic';
+        testi.forEach((t, i) => {
+          const m = /^(?:-m|--magic-file=?)(.*)$/.exec(t);
+          if (m) magia = m[1] || testi[i + 1] || '';
+        });
+        return magia && !magia.includes(':') ? copiaSovrascrive([], `${nomeDi(magia)}.mgc`, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
       }
       case 'gzip': case 'gunzip':
         return opzione(/^-[A-Za-z]*f|^--force$/) ? PUO_SOVRASCRIVERE : '';
