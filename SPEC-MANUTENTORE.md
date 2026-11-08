@@ -124,12 +124,12 @@ rimaste ferme per quattordici ore circa.
 
 Fermo su un guasto suo, invece, valgono solo le accensioni del § 7.
 
-**Cache.** Il manutentore vuole la cache a **un'ora**: il battito ogni 55
-minuti la tiene calda a costo di una rilettura. Se le sessioni cloud non
-permettono di sceglierla (oggi i worker girano a cinque minuti, e in locale la
-decide l'app), il contesto piccolo delle sveglie tiene comunque il costo basso:
-è la lettura intera che non si ripete. Misurato il 05/11/2026 (§ 6): nemmeno
-per lui l'ora conviene.
+**Cache e battito.** Il battito era a 55 minuti per tenere calda una cache a
+un'ora, ma in cloud le scritture in cache durano cinque minuti: fra due
+battiti la cache è sempre fredda. Dall'08/11/2026 (#2340) il battito è ogni
+2 ore; gli eventi non lo aspettano, perché i segnali del server svegliano il
+manutentore da sé. Il costo basso lo tiene il contesto piccolo per
+differenze. Misurato il 05/11/2026 (§ 6): nemmeno per lui l'ora conviene.
 
 **Domande di processo dei worker.** Un worker che si ferma su un dubbio di
 processo (quale strumento, quale ordine, cosa fare di un rilievo) lo scrive nel
