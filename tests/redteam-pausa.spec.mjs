@@ -256,7 +256,7 @@ test('#896 — l’owner, in pausa, vede tutto come prima', async ({ app, openTa
   await expect(rt.locator('#rtPausa')).toHaveCount(0);
 
   const invio = await rt.evaluate(() => chrome.runtime.sendMessage({ type: 'redteam_submit', attackText: 'prova', description: '' }));
-  expect(invio.status).toBe('insufficient_credits');
+  expect(invio.status).toBe('limit_user');
   expect(chiamate).toContain('/redteamSubmit');
 });
 
