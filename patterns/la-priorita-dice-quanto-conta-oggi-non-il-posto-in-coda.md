@@ -18,9 +18,10 @@ non può sapere quali siano i più importanti fra tutti.
 
 - **I giudici assegnano 3 o lasciano 1.** Il giudice di priorità gira sul server
   (`functions/src/priority/judge.js` di filo-security; l'app ne sceglie solo il
-  modello, slot `judge-priority`): critico → 3, tutto il resto → 1, qualunque
-  numero dica il modello. Una priorità scritta dal manutentore non la riscrive
-  a un rientro in coda.
+  modello, slot `judge-priority`): critico, o sicurezza con un rischio reale
+  oggi → 3, tutto il resto → 1, qualunque numero dica il modello. La soglia di
+  realismo per la sicurezza vive solo nel prompt di quel giudice (#2332). Una
+  priorità scritta dal manutentore non la riscrive a un rientro in coda.
 - **Niente tetti per priorità.** Le 3 partono sempre; il resto fino al
   parallelismo N del manutentore, sotto il freno d'emergenza dell'owner (il
   massimo di sessioni insieme, Gestione → Automazioni, predefinito 20).
