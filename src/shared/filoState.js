@@ -414,6 +414,8 @@
           if (t.url) riservate.visibili.push(pagina(t.url));
           const grezzo = (t.title || '').slice(0, 80) || '(senza titolo)';
           const title = E.neutralizza(grezzo, { unaRiga: true });
+          // Il titolo di una pagina di Filo lo scrive Filo.
+          if (t.title && /^(https?|file|ftp):/i.test(String(t.url || ''))) daSiti.push(title);
           elenco.push(`${i + 1}. ${focus}${title}${rel}`);
         });
         if (state.tabs.length > quante) elenco.push(`...altre ${state.tabs.length - quante} tab`);
