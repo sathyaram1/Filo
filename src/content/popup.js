@@ -168,8 +168,7 @@
 
   // In un sito i riquadri che portano parole dell'utente o dei modelli stanno in uno shadow root chiuso, chiusi ai gesti
   // finti: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md. L'host non genera un box.
-  // Lo strato chiuso e i suoi fogli, coi soli caratteri generici sui siti, li fa SN_FILO_UI.stratoChiuso.
-  const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css', 'spellcheck.css'];
+  // Lo strato chiuso e i suoi fogli (tutti quelli degli strati), coi soli caratteri generici sui siti, li fa SN_FILO_UI.
   let fogliRiquadro = null;
   function riquadro(contenuto) {
     if (inPaginaDiFilo) return contenuto;
