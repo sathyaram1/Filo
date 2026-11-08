@@ -1948,6 +1948,9 @@
       const parole = graffe(args.map((a) => a.testo));
       if (!parole || !parole.length) return null;
       out.push(parole[parole.length - 1]);
+      // bash toglie le parole vuote nate da graffe o da "$@" (`echo --output=x {,}` lascia `--output=x` in `$_`).
+      const piene = parole.filter(Boolean);
+      if (piene.length) out.push(piene[piene.length - 1]);
     }
     return out;
   }
