@@ -61,8 +61,14 @@
   // L'utente che chiede di mandare una segnalazione la nomina: chi non la nomina non l'ha chiesta.
   const CHIESTA_SEGNALAZIONE = /\b(?:segnal\w*|feedback|sviluppator\w*|report\w*|bug)\b|\bdi['’]\s+al\s+team\b|\bal\s+team\s+di\s+filo\b/i;
 
-  // Un comando che scarica dal web porta nel compito testo di autore ignoto, non un file del computer.
-  const SCARICA = /\b(?:curl|wget|iwr|irm|invoke-webrequest|invoke-restmethod|http|https|aria2c|lynx|w3m)\b|https?:\/\//i;
+  // Un comando che si collega a un altro computer porta nel compito testo di autore ignoto, non un file del computer.
+  // L'elenco dei programmi sta in cmdClassify; senza, ogni comando conta come uno di rete.
+  const SCARICA = {
+    test: (cmd) => {
+      const re = global.SN_CMD_CLASSIFY && global.SN_CMD_CLASSIFY.PROGRAMMI_RETE;
+      return /https?:\/\//i.test(cmd) || !re || re.test(cmd);
+    },
+  };
 
   // I nomi delle reti conosciute e dei dispositivi abbinati li sceglie chi li gestisce, non l'utente: autori a cui
   // si è già collegato, classe 3 come i mittenti fidati.
