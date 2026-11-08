@@ -1936,7 +1936,7 @@
   const ULTIMO_ARG_RE = /\$_(?!\w)/g;
   const ULTIMI_MAX = 16;
   function usaUltimoArg(s, c) {
-    return (shellPosix(c) || c.sistemaIgnoto) && /\$_(?!\w)/.test(s);
+    return shellPosix(c) && /\$_(?!\w)/.test(s);
   }
   function ultimiArgomenti(raw, c) {
     const out = [];
