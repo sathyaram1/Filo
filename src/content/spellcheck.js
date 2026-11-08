@@ -1599,7 +1599,7 @@
   // testo, la composizione il suo. Mai un cambio intero: un gesto vero senza testo (un'immagine incollata) non spiega
   // quello che il sito ci mette nello stesso evento. Uno script ha `isTrusted` anche con execCommand. L'annulla e il
   // rifai non scrivono niente di nuovo: riportano un testo già visto, coi suoi proprietari (proprietariDi).
-  function ammessoDa(state, e) {
+  function ammessoDa(state, e, { consuma = true } = {}) {
     if (!e) return null;
     if (!e.isTrusted) return global.SN_FILO_UI?.veroONostro?.(e) ? () => true : null;
     const tipo = e.inputType || '';
@@ -1607,8 +1607,16 @@
       ? (pezzo) => senzaSpazi(fonte).includes(senzaSpazi(pezzo))
       : (pezzo) => !senzaSpazi(pezzo));
     const k = state.tasto;
+    // Cancella l'utente col suo tasto o col suo taglia; una cancellatura che non spiegano è del sito (cambioDelSito).
+    if (tipo.startsWith('delete')) {
+      const tasto = !!k && (k.key === 'Backspace' || k.key === 'Delete');
+      const taglio = tipo === 'deleteByCut' && Date.now() - state.taglio < INTENTO_MS;
+      if (!tasto && !taglio) return null;
+      if (consuma) { if (tasto) state.tasto = null; else state.taglio = 0; }
+      return dentro(null);
+    }
     if (tipo === 'insertText') {
-      state.tasto = null;
+      if (consuma) state.tasto = null;
       if (!k || k.mod || typeof e.data !== 'string') return null;
       const libero = k.morto || k.key === 'Unidentified' || k.key === 'Process';
       const suo = [...k.key].length === 1 && e.data === k.key;
