@@ -47,7 +47,10 @@
     const sezStato = Array.isArray(statoSezioni) ? statoSezioni : (stato ? [{ chiave: 'STATO', testo: stato }] : []);
     for (const x of sezStato) {
       if (x && stringa(x.chiave)) {
-        metti(`STATO:${x.chiave}`, x.testo, { stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}) });
+        metti(`STATO:${x.chiave}`, x.testo, {
+          stato: true, ...(x.confronto != null ? { confronto: x.confronto } : {}), ...(x.riservate ? { riservate: x.riservate } : {}),
+          ...(Array.isArray(x.daSiti) && x.daSiti.length ? { daSiti: x.daSiti } : {}),
+        });
       }
     }
     metti('CAMBI', P().filoChatCambiValute(cambi));
