@@ -2104,6 +2104,7 @@
   // clic; e i lampi. Sta fuori dallo specchio, che taglia ai bordi del campo e lascia passare il mouse.
   function strato(state) {
     if (state.valori && state.valori.isConnected) return state.valori;
+    if (state.valori) state.valori.remove();
     const v = document.createElement('div');
     v.className = 'sn-spell-valori';
     global.SN_FILO_UI?.mark(v);
