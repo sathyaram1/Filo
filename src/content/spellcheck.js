@@ -1651,7 +1651,7 @@
       let delSito = false;
       let vista = false;
       for (let i = a; i < b; i++) { if (sito[i]) delSito = true; if (visto[i]) vista = true; }
-      if (!delSito && vista) {
+      if (!delSito && vista && !ripetute) {
         const chiave = m[0].toLowerCase();
         if (giaViste.has(chiave)) delSito = true; else giaViste.add(chiave);
       }
