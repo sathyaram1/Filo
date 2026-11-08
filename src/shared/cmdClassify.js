@@ -1285,18 +1285,12 @@
       return /^--git-dir=/.test(a) ? p.replace(/(^|[\\/])\.git[\\/]*$/i, (m, s) => s || '.') : p;
     });
     args.forEach((a, i) => {
-<<<<<<< origin/main
-      // `git blame --contents <file>` stampa riga per riga un file qualsiasi: è una lettura di quel file.
-      if (sub === 'blame' && /^--contents=/.test(a)) { percorsi.push(a.slice('--contents='.length)); return; }
-      if (sub === 'blame' && i > 0 && args[i - 1] === '--contents') { percorsi.push(a); return; }
-=======
-      // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994).
+      // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994, #2292).
       const contenuto = opzioneLunga(a, 'contents', 3);
       if (contenuto != null) {
         percorsi.push(a.includes('=') ? contenuto : args[i + 1] || '');
         return;
       }
->>>>>>> ORIG_HEAD
       if (a.startsWith('-')) return;
       if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
