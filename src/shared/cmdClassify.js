@@ -1672,10 +1672,6 @@
     }
   }
 
-<<<<<<< origin/main
-  function classifyOneDet(raw, c) {
-    const base = classifyOne(raw, c.shell);
-=======
   // Il programma riceve il comando dopo la shell: escape tolti, `$'…'` e `$"…"` decodificati, le espansioni che possono
   // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte, gli elenchi di PowerShell spezzati.
   // Le opzioni si cercano anche lì, e vale la lettura peggiore (#1994). Ciò che non si sa riprodurre (una variabile di
