@@ -174,6 +174,13 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     return { ok: false, motivo, frase: frase(motivo), annunciato: true };
   };
 
+  // La pagina esce da un proxy (la scheda, o la regola del sito): il programma esce dallo stesso, o non parte (#2301).
+  let rete;
+  try { rete = await uscita({ ses, url, paese }); } catch (_) { rete = { rifiuto: true, paese }; }
+  voce.paese(rete && rete.paese);
+  if (!rete || rete.rifiuto) return fallisci('proxy');
+  if (voce.cancelled()) return { ok: false, cancelled: true };
+
   let programmi;
   const prendi = async (forza) => {
     const prova = comandoDiProva();
