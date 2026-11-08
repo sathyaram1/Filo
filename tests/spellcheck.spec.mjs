@@ -2,9 +2,9 @@
 // restano. Una sola app per il file, riportata com'era appena aperta prima di ogni prova (tests/helpers/appCondivisa.mjs).
 
 import { appCondivisa } from './helpers/appCondivisa.mjs';
-import { statoDi, clicca, nelMondoDiFilo } from './helpers/riquadri.mjs';
+import { statoDi, clicca, nelMondoDiFilo, nelMondoDelFrame } from './helpers/riquadri.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 
 const { test, expect } = appCondivisa();
 
