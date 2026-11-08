@@ -770,7 +770,7 @@ test('Ctrl+Z conta l’annullo di una correzione di Filo, non quello di ciò che
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   // Scrive ancora dopo la correzione, e disfa la sua frase: la correzione resta, e non è un annullo di Filo.
   await page.locator('#t').click();
-  await page.keyboard.type('perchè ', { delay: 30 });
+  await batti(page, 'perchè ', { delay: 30 });
   await expect.poll(() => page.locator('#t').inputValue(), { timeout: 8_000 }).toBe('perché ');
   await page.waitForTimeout(600);
   await page.keyboard.type('scrivo ancora una frase mia', { delay: 20 });
@@ -781,7 +781,7 @@ test('Ctrl+Z conta l’annullo di una correzione di Filo, non quello di ciò che
   expect(await annullatiOggi(app)).toEqual({});
   // Disfa la correzione appena fatta: questo sì.
   await page.locator('#u').click();
-  await page.keyboard.type('perchè ', { delay: 30 });
+  await batti(page, 'perchè ', { delay: 30 });
   await expect.poll(() => page.locator('#u').inputValue(), { timeout: 8_000 }).toBe('perché ');
   await page.keyboard.press('Control+Z');
   await expect.poll(() => page.locator('#u').inputValue()).not.toBe('perché ');
