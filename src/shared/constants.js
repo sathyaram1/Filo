@@ -3354,6 +3354,8 @@
     opzioniPannelloDestro,
     AVVISO_SCHERMO_PIENO_LIMITI,
     opzioniAvvisoSchermoPieno,
+    FILO_PARLA_DOWNLOAD_MIN,
+    minutiFraDownload,
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,
