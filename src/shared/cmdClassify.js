@@ -1261,9 +1261,8 @@
   function statoDi(p, c) {
     const r = dove(String(p || ''), c);
     if (!r || typeof r !== 'object') return 'ignoto';
-    const assoluto = c.win ? `${r.radice}\\${r.segs.join('\\')}` : `/${r.segs.join('/')}`;
     let s = null;
-    try { s = c.esiste(assoluto); } catch (_) { s = 'ignoto'; }
+    try { s = c.esiste(assolutoDi(r, c)); } catch (_) { s = 'ignoto'; }
     return s === 'file' || s === 'cartella' || s === null ? s : 'ignoto';
   }
   const nomeDi = (p) => pezzi(p).pop() || '';
