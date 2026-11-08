@@ -204,6 +204,14 @@ test('la cartella di lavoro esce dalla ricerca per ogni comando del modello su W
   });
 }));
 
+// Senza saperlo il modello scrive `gradlew build` come si fa in cmd: l'utente conferma, fallisce, e conferma di nuovo.
+test('il modello su Windows sa che un programma della cartella di lavoro si chiama con .\\, anche in cmd', () => {
+  require(join(ROOT, 'src', 'shared', 'constants.js'));
+  const computer = globalThis.SN_CONST.PROMPTS.filoChatComputer('win32');
+  assert.match(computer, /`\.\\[^`]*`[^.]*cmd/);
+  assert.doesNotMatch(globalThis.SN_CONST.PROMPTS.filoChatComputer('darwin'), /\.\\/);
+});
+
 test('il terminale dove scrive l\'utente resta il cmd di sempre: un programma della cartella parte per nome', SOLO_FUORI, async () => {
   const qui = join(TMP, 'cartella-utente');
   mkdirSync(qui, { recursive: true });
