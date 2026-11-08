@@ -700,6 +700,8 @@
   // imposta con -OutVariable (#1994). Senza `env:` è nota solo un'automatica; `@nome` passa la variabile a pezzi.
   const PS_AUTOMATICHE = new Set(['home', 'pwd', 'null', 'true', 'false', '_', 'psitem']);
   const PS_VARIABILE_RE = /\$(env:)?([A-Za-z_]\w*)|^@[A-Za-z_]/gi;
+  // Lo stesso parametro può riscrivere un'automatica che qui si crede nota (`-OutVariable _`): quella riga non si legge.
+  const PS_IMPOSTA_AUTOMATICA_RE = /(?:^|[\s;|])-(?:[oewip]v|outv\w*|errorv\w*|warningv\w*|informationv\w*|pipelinev\w*)(?::|\s+)['"]?\+?(?:_|psitem|pwd|home)['"]?(?=$|[\s;|,)])/i;
   function variabilePowerShell(t) {
     for (const m of String(t).matchAll(PS_VARIABILE_RE)) if (!m[1] && !PS_AUTOMATICHE.has(String(m[2]).toLowerCase())) return true;
     return false;
