@@ -1205,7 +1205,13 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       const r = await chiama(cred, cmd, { numero: numeroDi(arg), testo });
       return esito(r, (x) => `#${x.numero}: nota scritta${x.sbloccato ? `, il lavoro fermo (${x.sbloccato}) riparte con chi lo prende dopo` : ''}.`);
     }
-    case 'archivia': { const r = await chiama(cred, 'archivia', { numero: numeroDi(arg), doppioneDi: numeroDi(argv[2]) }); return esito(r, (x) => `#${x.numero} archiviato, doppione di #${x.doppioneDi}.`); }
+    case 'archivia': {
+      const num = numeroDi(arg);
+      const c = PRIORITA_TRE.archiviazione(await prioritaAttuale(cred, num));
+      if (!c.ok) { console.error(`RIFIUTATO: #${num}: ${c.motivo}. Non ho scritto niente.`); return 1; }
+      const r = await chiama(cred, 'archivia', { numero: num, doppioneDi: numeroDi(argv[2]) });
+      return esito(r, (x) => `#${x.numero} archiviato, doppione di #${x.doppioneDi}.`);
+    }
     case 'taccuino': {
       if (arg === 'scrivi') {
         const testo = await leggiStdin();
