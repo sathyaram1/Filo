@@ -182,8 +182,10 @@ setTimeout(function(){ window.open(${JSON.stringify(ERRORE)}); }, 400);</script>
 
 // La home nuda è l'unica pagina di Filo che un sito può chiedere: arriva come home vera, anche da un rinvio del server.
 test('un rinvio del server verso la home la apre come home vera di Filo', async ({ app, openTab, testServer }) => {
-  const sito = testServer.html(`<title>Va a casa</title><script>setTimeout(function(){ location.href = ${JSON.stringify(rinvio('home'))}; }, 200)</script>`);
-  await openTab(sito);
+  // Il salto parte dopo che openTab ha visto la scheda sul sito: con un timer della pagina, su una macchina lenta la
+  // scheda era già sulla home e openTab aspettava il sito fino al timeout (#2333).
+  const page = await openTab(testServer.html('<title>Va a casa</title><h1>Va a casa</h1>'));
+  await page.evaluate((u) => { setTimeout(() => { location.href = u; }, 0); }, rinvio('home'));
   const ultima = () => app.evaluate(async ({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     const t = tm.tabs[tm.tabs.length - 1];
