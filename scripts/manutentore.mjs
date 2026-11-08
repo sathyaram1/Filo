@@ -142,6 +142,28 @@ export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSyn
   return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
 }
 
+/** Un lavoro in un incrocio: il ramo, dove sta e il primo feedback. PURA. */
+export function rigaLavoro(l) {
+  const dove = l.repo === 'server' ? ' sul server' : l.repo === 'app e server' ? ' (app e server)' : '';
+  return `${l.ramo}${dove}${l.feedback && l.feedback.length ? ` (#${l.feedback[0]})` : ''}`;
+}
+
+/**
+ * Aggiorna i rami del clone del server. Con un biglietto passa da git-server, l'unica strada verso filo-security delle
+ * routine; senza (sessione locale) col git dell'owner. Se non riesce lo dice e si legge il clone com'è.
+ */
+async function aggiornaCloneServer(dir, { root, ticket = '' }) {
+  const { readTicket } = await import('./lib/routine-ticket.mjs');
+  const biglietto = ticket || readTicket(root);
+  const { spawnSync } = await import('node:child_process');
+  const r = biglietto
+    ? spawnSync(process.execPath, [join(ROOT, 'scripts', 'routine-channel.mjs'), 'git-server', 'fetch', dir, '--ticket', biglietto], { encoding: 'utf8', timeout: 120_000 })
+    : spawnSync('git', ['-C', dir, 'fetch', 'origin', '--prune', '--quiet'], { encoding: 'utf8', timeout: 120_000 });
+  if (r.status === 0) return;
+  const riga = String(r.stderr || (r.error && r.error.message) || '').trim().split('\n').filter(Boolean).pop() || `uscito con ${r.status}`;
+  console.error(`AVVISO: i rami del server non si sono aggiornati (${riga}): sono quelli dell'ultimo aggiornamento del clone ${dir}.`);
+}
+
 /** La riga che dice che i rami del server mancano, e perché: senza, un elenco senza di loro sembrerebbe completo. PURA. */
 export function rigaServerAssente(cercati) {
   return `Rami del server NON letti: nessun clone di filo-security in ${(cercati || []).join(' né in ')}. Gli incroci coi lavori del server non si vedono: passa la cartella con --clone-server <dir> o FILO_SERVER_CLONE.`;
