@@ -1308,3 +1308,23 @@ test('#1994 — un\'opzione scritta con gli escape della shell vale quanto la gr
   // Un nome con lo spazio protetto dal backslash resta una lettura.
   for (const x of ['cat my\\ file.txt', 'cat my\\ file.txt | grep x', 'git log --oneline -- src\\ x']) assert.equal(C.classify(x, bash), 1, x);
 });
+
+// Un'espansione che vale niente (`$1`, `$@`, `$!`, `$pwd` non impostata, `$null`) o le graffe di bash compongono l'opzione
+// che il programma riceve: `--out$1put=x` e `--{output=x,}` scrivono il file come `--output=x`.
+test('#1994 — un\'opzione composta da espansioni o graffe della shell vale quanto la grafia piana', () => {
+  const bash = SHELL_1994[0];
+  for (const cmd of [
+    'git log -1 --format=x%n --out$1put=/home/u/.bashrc', 'git log --out$@put=x', 'git log --out$*put=x', 'git log --out"$1"put=x',
+    'git log --out$!put=x', 'git log --output$pwd=x', 'git diff --no-index a b --out$1put=x', 'git log --out$1put=x | cat',
+    'git log -1 --format=x%n --{output=/home/u/.bashrc,}', 'git log --o{u,}tput=x', 'git log --outpu{s..u}=x',
+    'git log $"--output=x"', 'git push --forc$1e', 'git push --forc{e,}',
+  ]) assert.equal(C.classify(cmd, bash), 3, cmd);
+  for (const cmd of ['tree -$1o x', 'file -$1C', 'date -$1s 1', 'tree -{o,} x']) assert.ok(C.classify(cmd, bash) >= 2, cmd);
+  const ps = SHELL_1994[1];
+  for (const cmd of ['git log -1 --output$null=C:\\Users\\u\\a.bat', 'git log --output$env:zz=x']) assert.equal(C.classify(cmd, ps), 3, cmd);
+  // Le letture con variabili e graffe di tutti i giorni restano libere.
+  for (const cmd of ['cat $HOME/a.txt', 'echo {a,b}', 'git log --format=%H{x}', 'git log --oneline -- src/{a,b}.js']) {
+    assert.equal(C.classify(cmd, bash), 1, cmd);
+  }
+  assert.equal(C.classify('Get-ChildItem | ForEach-Object { $_.Name }', ps), 1);
+});
