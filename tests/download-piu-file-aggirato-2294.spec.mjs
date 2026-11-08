@@ -29,7 +29,16 @@ async function apriServer() {
     const porta = srv.address().port;
     const scarica = (nome) => `const a = document.createElement('a'); a.href = '/${nome}'; a.download = ''; document.body.appendChild(a); a.click();`;
     let corpo;
-    if (u.pathname === '/salta') {
+    if (u.pathname === '/lontano') {
+      // Come `/salta`, ma su s0.salta.test, s1.salta.test… fino a `fino`, un salto ogni `passo` ms.
+      const fino = Number(u.searchParams.get('fino') || 0);
+      const passo = Number(u.searchParams.get('passo') || 1200);
+      const dopo = n < fino ? `http://s${n + 1}.salta.test:${porta}/lontano?n=${n + 1}&fino=${fino}&passo=${passo}` : '';
+      corpo = `<h1>Pagina ${n}</h1><script>
+        setTimeout(() => { ${scarica(`file-lontano-${n}.bin`)} }, 150);
+        ${dopo ? `setTimeout(() => { location.href = ${JSON.stringify(dopo)}; }, ${passo});` : ''}
+      </script>`;
+    } else if (u.pathname === '/salta') {
       const dopo = n + 1 < HOST.length ? `http://${HOST[n + 1]}:${porta}/salta?n=${n + 1}` : '';
       corpo = `<h1>Pagina ${n}</h1><script>
         setTimeout(() => { ${scarica(`file-salto-${n}.bin`)} }, 300);
