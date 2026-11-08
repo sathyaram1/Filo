@@ -1429,7 +1429,7 @@
   }
 
   function classifyOneDet(raw, c) {
-    const base = classifyOne(raw);
+    const base = classifyOne(raw, c.shell);
     if (base === 2) {
       const motivo = sovrascrive(raw, c);
       if (motivo) return { level: 3, motivo };
