@@ -123,8 +123,11 @@ test('mappa pura status→messaggio (spec §8.1)', async ({ app, openTab }) => {
   });
 
   expect(results.ok).toBe(true);
-  expect(results.insufficient.ok).toBe(false);
-  expect(results.insufficient.text.toLowerCase()).toContain('insufficient'.slice(0, 4)); // "insufficienti"
+  // #2296: il rifiuto del server arriva col suo numero, e dice quando riprovare.
+  expect(results.lungo).toEqual({ ok: false, campo: 'attackText', text: 'Il testo dell’attacco è lungo 25.000 caratteri: il massimo è 20.000. Accorcialo e rinvia.' });
+  expect(results.descLunga).toMatchObject({ ok: false, campo: 'description', text: 'La descrizione è lunga 2.100 caratteri: il massimo è 2.000. Accorcialo e rinvia.' });
+  expect(results.perAccount).toEqual({ ok: false, text: 'Hai già fatto 20 tentativi nelle ultime 24 ore, il massimo per account. Il prossimo si libera alle 14:00.' });
+  expect(results.perTutti).toEqual({ ok: false, text: 'Il Red Team ha ricevuto tutti i tentativi che può giudicare in un giorno. Riprova domani alle 9:05.' });
   expect(results.dormant.toLowerCase()).toContain('attivo');
   expect(results.notSignedIn.ok).toBe(false);
   expect(results.notSignedIn.needLogin).toBe(true);
