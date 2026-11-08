@@ -326,6 +326,7 @@
       const cercati = ultimiDistinti(g.cercati);
       if (cercati.length) pezzi.push(`cercato ${cercati.map((c) => `«${c}»`).join(', ')}`);
       const titoli = ultimiDistinti(g.titoli);
+      daSiti.push(...cercati, ...titoli);
       // «fra cui» solo se resta fuori qualcosa: un titolo oltre i tre, o una pagina senza titolo.
       const diversi = new Set(g.titoli.map((t) => campo(t, 120).toLowerCase())).size;
       const senzaTitolo = g.n - g.delicate - g.cercati.length - g.titoli.length;
