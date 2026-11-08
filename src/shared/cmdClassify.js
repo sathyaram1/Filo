@@ -797,6 +797,7 @@
       if (q) {
         if (ch === q) { q = ''; continue; }
         if (posix && q === '"' && ch === '\\' && /[$`"\\]/.test(s[i + 1] || '')) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
+        if (c.vuote && q === '"' && ch === '$' && espansione(s, i + 1)) { i += espansione(s, i + 1); continue; }
         cur += ch;
         if (q === '"') espande += ch;
         continue;
