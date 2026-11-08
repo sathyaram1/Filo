@@ -171,17 +171,23 @@ test('git: la sonda vera legge il repository della cartella, senza eseguire nien
     for (const d of [sano, ostile]) {
       mkdirSync(d);
       execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+      execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', 'commit', '-q', '--allow-empty', '-m', 'i'], { cwd: d, stdio: 'ignore' });
     }
-    // Il valore è un nome che non esiste: la prova guarda solo cosa dice la sonda, e la sonda non lo lancia.
-    const segno = join(ostile, 'SEGNO');
-    appendFileSync(join(ostile, '.git', 'config'), `[core]\n\tfsmonitor = programma-inesistente-filo-2292 ${segno}\n`);
+    // Un programma vero, che il segno lo crea: se la sonda lo lanciasse, la prova lo vedrebbe.
+    const segno = join(base, 'SEGNO');
+    execFileSync('git', ['config', 'core.fsmonitor', programmaSegno(segno)], { cwd: ostile, stdio: 'ignore' });
     assert.equal(T.gitLanciaIn(sano), '');
     assert.equal(T.gitLanciaIn(ostile), 'si');
     assert.equal(T.gitLanciaIn(join(ostile, '.git')), 'si', 'anche da dentro la cartella .git');
-    assert.equal(existsSync(segno), false);
+    assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
     const ctx = { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn };
     assert.equal(C.classify('git status', ctx), 2);
     assert.equal(C.classify('git status', { ...ctx, cwd: sano }), 1);
+    // La shell che scioglie un asterisco porta in una cartella che la sonda non vede: si chiede.
+    assert.equal(C.classify('cd ostil*/ && git status', { ...ctx, cwd: base }), 2);
+    assert.equal(C.classify('cd ost?le && git diff', { ...ctx, cwd: base }), 2);
+    assert.equal(T.gitLanciaIn(join(base, 'non-c-e')), '', 'dove la cartella non c\'è, git non parte');
+    segnoVero(ostile, segno);
   } finally {
     togliCartella(base);
   }
