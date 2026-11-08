@@ -2257,7 +2257,7 @@
     nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ], git: [...GIT_READ] }),
     // Per la sentinella che prova ogni segno interno scritto a mano.
     segniInterni,
-    cancellaPerSempre,
+    cancellaPerSempre, PROGRAMMI_RETE,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
 })(typeof globalThis !== 'undefined' ? globalThis : self);
