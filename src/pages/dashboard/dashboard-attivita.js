@@ -1754,7 +1754,7 @@
     btn.addEventListener('dragstart', (e) => {
       const p = String(a.percorso || a.path || '');
       if (!e.dataTransfer || !p) return;
-      e.dataTransfer.setData('application/x-filo-file', p);
+      global.SN_TRASCINO_INTERNO?.parte(e.dataTransfer, 'file', p);
       e.dataTransfer.setData('text/plain', p);
       e.dataTransfer.effectAllowed = 'copy';
       global.SN_GESTI?.marca(e.dataTransfer, 'file_da_chat');
