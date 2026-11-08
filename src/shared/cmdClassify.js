@@ -545,7 +545,8 @@
     // e uno nuovo di git nasce già fra questi. Un altro nome nudo può essere un ramo o un verbo nuovo: chiede.
     reflog: (args) => {
       const primo = args.find((a) => !a.startsWith('-')) || '';
-      if (!primo || /^(show|list|exists)$/i.test(primo) || /^HEAD$|[@/~^]/.test(primo)) return 0;
+      // Un numero è il valore di un'opzione (`-n 5`), non un verbo.
+      if (!primo || /^(show|list|exists)$/i.test(primo) || /^HEAD$|[@/~^]|^\d+$/.test(primo)) return 0;
       return /^(expire|delete|drop|write)$/i.test(primo) ? 3 : 2;
     },
     // Con due operandi `symbolic-ref` sposta HEAD: cambia il ramo corrente.
