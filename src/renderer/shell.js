@@ -2663,7 +2663,10 @@
     // Le domande sui programmi a pezzi: il nome lo sceglie il sito, e fra le parole di Filo potrebbe chiudere le
     // virgolette e continuare con la sua voce. Sta in un riquadro suo, come nei popup di conferma (#592.7).
     function partiScarica(r) {
-      try { return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
+      try {
+        if (r.chiede === 'piuFile') return window.SN_ESEGUIBILI.partiPiuFile(r.filename, r.fermati);
+        return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy);
+      } catch (_) {}
       return ['Il file', { citazione: String(r.filename || '') }, 'è un programma. Scaricarlo?'];
     }
 
