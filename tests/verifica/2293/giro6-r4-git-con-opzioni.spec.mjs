@@ -1,4 +1,4 @@
-// #2293 giro 5 (dal giro 4) — r4: «git -c … clone» o «git -C cartella pull» contattano un altro computer, ma quello che
+// #2293 giro 6 (dal giro 4) — r4: «git -c … clone» o «git -C cartella pull» contattano un altro computer, ma quello che
 // stampano conta come uscita del computer, non come testo arrivato dalla rete.
 
 import { test, expect } from '../../fixtures/electron.mjs';
