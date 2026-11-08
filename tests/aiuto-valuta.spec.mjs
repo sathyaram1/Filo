@@ -285,7 +285,7 @@ test('sul suggerimento del correttore «Valuta» c’è una volta sola e apre l�
   const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
   await page.locator('#ta').click();
   await page.keyboard.type('Ci vediamo alle 18. ');
-  const segno = page.locator('.sn-spell-overlay .sn-suggerimento', { hasText: 'alle 18' });
+  const segno = segniDi(page, '.sn-spell-overlay .sn-suggerimento', { hasText: 'alle 18' });
   await expect(segno).toHaveCount(1, { timeout: 10_000 });
   const b = await riquadroDelSegno(segno);
   await page.mouse.click(b.x + b.width / 2, b.y + b.height / 2, { button: 'right' });
