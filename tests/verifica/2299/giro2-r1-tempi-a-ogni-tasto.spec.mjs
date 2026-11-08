@@ -26,7 +26,7 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 </script>
 </body>`;
 
-test('r1 a ogni tasto dell\\'utente lo script del sito non distingue dai tempi le parole del dizionario personale', async ({ app, openTab, testServer }) => {
+test("r1 a ogni tasto dell'utente lo script del sito non distingue dai tempi le parole del dizionario personale",async ({ app, openTab, testServer }) => {
   await app.evaluate(async () => {
     await globalThis.SN_STORAGE.updateSettings({
       featureFlags: { spellcheck: true, spellcheckContext: false },
