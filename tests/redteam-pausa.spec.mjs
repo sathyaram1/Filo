@@ -88,7 +88,7 @@ test.beforeAll(async () => {
         if (url === '/redteamSubmit' && invioLento) {
           return setTimeout(() => json(res, 200, { result: { status: 'ok', attemptId: 'tentativo-lento' } }), invioLento);
         }
-        if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'insufficient_credits', have: 0, needed: 50 } });
+        if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'limit_user', limit: 20, riprovaDopo: Date.now() + 3600000 } });
         // La voce del tasto destro c'è solo per chi ha riscattato un codice (#991): qui l'hanno fatto tutti.
         if (url === '/redteamState') return json(res, 200, { result: { verified: true } });
         if (url === '/redteamLeaderboard') return json(res, 200, { result: { entries: [] } });
