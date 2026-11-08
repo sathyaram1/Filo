@@ -1086,28 +1086,49 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
   const cartella = resolve(opzione(argv, '--cartella') || CARTELLA_PREDEFINITA);
   const g = opzione(argv, '--giorni');
   const giorni = g !== undefined && Number.isFinite(Number(g)) && Number(g) >= 0 ? Number(g) : 30;
-  const rami = () => {
-    if (!argv.includes('--senza-fetch')) {
+  const senzaFetch = argv.includes('--senza-fetch');
+  // I rami vivi dell'app e di filo-security insieme (#2340): i lavori del server si incrociano come gli altri.
+  const leggiRami = async (indice) => {
+    if (!senzaFetch) {
       try { execFileSync('git', ['-C', root, 'fetch', 'origin', '--prune', '--quiet'], { stdio: 'ignore', timeout: 120_000 }); } catch (e) {
         console.error(`AVVISO: git fetch non è riuscito (${String(e.message).split('\n')[0]}): i rami sono quelli dell'ultima volta.`);
       }
     }
-    return { fuori: {} };
+    const fuori = {};
+    const app = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori }), indice), indice, fuori);
+    const c = cloneDelServer({ root, env, scelta: opzione(argv, '--clone-server') });
+    if (!c.dir) return { lista: app, fuori, server: { avviso: rigaServerAssente(c.cercati) } };
+    if (!senzaFetch) await aggiornaCloneServer(c.dir, { root, ticket: opzione(argv, '--ticket') });
+    const fuoriServer = {};
+    try {
+      const delServer = senzaChiusi(conNumeri(ramiInCorso(c.dir, { giorni, fuori: fuoriServer }), indice), indice, fuoriServer);
+      const resto = rigaFuori(fuoriServer, giorni);
+      return { lista: [...app, ...delServer.map((r) => ({ ...r, repo: 'server' }))], fuori, server: { avviso: resto ? `Sul server. ${resto}` : '' } };
+    } catch (e) {
+      return { lista: app, fuori, server: { avviso: `Rami del server NON letti dal clone ${c.dir}: ${String(e.message).split('\n')[0]}` } };
+    }
   };
   // Rami e incroci vengono da git e dalle schede locali: non serve il server.
   if (cmd === 'rami' || cmd === 'incroci') {
-    const r = rami();
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
-    const lista = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori: r.fuori, numeri: numeriDellIndice(indice) }), indice), indice, r.fuori);
-    if (cmd === 'rami') { console.log([lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni)].filter(Boolean).join('\n')); return 0; }
+    const r = await leggiRami(indice);
+    const coda = [rigaFuori(r.fuori, giorni), r.server.avviso].filter(Boolean);
+    if (cmd === 'rami') { console.log([r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', ...coda].join('\n')); return 0; }
+    if (!arg || String(arg).startsWith('--')) {
+      const coppie = incrociFraRami(r.lista);
+      console.log([coppie.length
+        ? coppie.map((c) => `${rigaLavoro(c.a)} e ${rigaLavoro(c.b)}: ${c.comuni.join(', ')}`).join('\n')
+        : `Nessun file in comune fra i rami in corso (${r.lista.length}).`, ...coda].join('\n'));
+      return 0;
+    }
     const num = String(arg).replace(/^#/, '');
     const s = leggiSchede(cartella).find((x) => String(x.numero).replace(/^#/, '') === num);
     if (!s) { console.error(`Nessuna scheda per #${num} in ${cartella}: npm run feedback:schede -- scrivi --solo ${num}.`); return 1; }
-    const comuni = incroci(lista, s.file_probabili);
-    console.log(comuni.length
-      ? comuni.map((c) => `${c.ramo}${c.feedback.length ? ` (#${c.feedback[0]})` : ''}: ${c.comuni.join(', ')}`).join('\n')
-      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`);
+    const comuni = incroci(r.lista, s.file_probabili);
+    console.log([comuni.length
+      ? comuni.map((c) => `${rigaLavoro(c)}: ${c.comuni.map((f) => fileConRepo(c, f)).join(', ')}`).join('\n')
+      : `Nessun ramo in corso tocca i file probabili di #${num} (${(s.file_probabili || []).join(', ') || 'nessuno indicato'}).`, ...coda].join('\n'));
     return 0;
   }
   // Il controllo sui numeri prima della credenziale: un comando storto si dice anche senza chiave.
