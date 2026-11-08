@@ -841,13 +841,17 @@
   // Il sito che un argomento contatta, letto come lo legge il programma (#2293): l'URL del web normalizza le forme di un
   // IPv4 (`0313.0.0161.5`, `203.0.29445`, `0xcb007105`) e i domini internazionali. `null` se non è un sito.
   function sitoDellArgomento(arg, tld) {
-    // Lo schema con quante barre vuole (`http:/sito`, `TCP:sito:80`) e la forma di git e scp (`sito:percorso`).
-    let s = String(arg).replace(/^([a-z][a-z0-9+.-]+):\/*/i, (m, schema) => (/^file$/i.test(schema) ? m : ''));
+    // Lo schema con quante barre vuole (`http:/sito`), e la forma di git e scp (`sito:percorso`) quando l'URL non regge.
+    let s = String(arg).replace(/^([a-z][a-z0-9+-]+):\/+/i, (m, schema) => (/^file$/i.test(schema) ? m : ''));
     if (/^file:/i.test(s)) return null;
-    const scp = /^((?:[^\s@/:]+@)?[^\s@/:[\]]+):(?!\d{1,5}(?:[/?#]|$))(.*)$/.exec(s);
-    if (scp) s = `${scp[1]}/${scp[2]}`;
-    let u;
-    try { u = new URL(`http://${s}`); } catch (_) { return null; }
+    let u = null;
+    let scp = null;
+    try { u = new URL(`http://${s}`); } catch (_) {
+      scp = /^((?:[^\s@/:]+@)?[^\s@/:[\]]+):(.*)$/.exec(s);
+      if (scp) s = `${scp[1]}/${scp[2]}`;
+      try { u = scp ? new URL(`http://${s}`) : null; } catch (_) { u = null; }
+    }
+    if (!u) return null;
     const host = u.hostname;
     const nome = s.replace(/^[^@/?#]*@/, '');
     const conAltro = !!scp || /[/?#]/.test(nome) || !!u.port || nome.includes('@') || s !== nome;
