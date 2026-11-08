@@ -1984,11 +1984,11 @@
   }
   // Un file lasciato sul campo o in qualunque altro punto della home: un file trovato da Filo in chat entra come quelli
   // dal disco. Torna se c'erano file.
-  const Trascino = self.SN_TRASCINO_INTERNO;
-  const daChat = (dt) => !!Trascino && Trascino.porta(dt, 'file');
+  // I content script delle pagine di Filo arrivano dopo questo file: il modulo si chiede al momento.
+  const daChat = (dt) => !!self.SN_TRASCINO_INTERNO?.porta(dt, 'file');
   function fileNelCampo(dt) {
     if (daChat(dt)) {
-      const { aVista, dati } = Trascino.arriva(dt, 'file');
+      const { aVista, dati } = self.SN_TRASCINO_INTERNO.arriva(dt, 'file');
       // Un percorso che il main non riconosce l'ha scritto altri (una pagina web): entra come testo, a vista.
       dati.then((p) => { if (typeof p === 'string' && p) { addPendingFile(p); inputEl.focus(); } else testoNelCampo(aVista); });
       return true;
