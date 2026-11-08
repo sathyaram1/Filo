@@ -5,7 +5,7 @@
 
 import { test, expect } from './fixtures/electron.mjs';
 import { menuDi } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 import { voceOggi } from './helpers/riquadriOggi.mjs';
 import { paginaDellAiuto } from './helpers/riquadri.mjs';
 

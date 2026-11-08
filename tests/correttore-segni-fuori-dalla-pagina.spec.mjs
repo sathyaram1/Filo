@@ -52,7 +52,7 @@ test('lo script del sito che scrive da sé parole nei suoi campi non vede quali 
   const page = await apri(app, openTab, testServer);
   await page.evaluate(() => window.sonda());
   await page.waitForTimeout(1200);
-  expect(await page.evaluate(() => window.visto())).toEqual({ segni: 0, ombreAperte: 0, testoNuovo: '' });
+  expect(await page.evaluate(() => window.visto())).toEqual({ segni: 0, ombreAperte: 0, testoDiFilo: '' });
   // Nemmeno dentro l'ombra: un testo che l'utente non ha scritto non si controlla.
   expect(await segniDi(page, '.sn-errore, .sn-suggerimento').count()).toBe(0);
 });
@@ -67,7 +67,7 @@ test('chi scrive vede i suoi segni, e il sito no', async ({ app, openTab, testSe
   const ta = await page.locator('#ta').boundingBox();
   expect(b.x).toBeGreaterThan(ta.x);
   expect(b.y + b.height).toBeLessThan(ta.y + ta.height);
-  expect(await page.evaluate(() => window.visto())).toEqual({ segni: 0, ombreAperte: 0, testoNuovo: '' });
+  expect(await page.evaluate(() => window.visto())).toEqual({ segni: 0, ombreAperte: 0, testoDiFilo: '' });
   await page.screenshot({ path: 'tests/.shots/correttore-segni-fuori-dalla-pagina.png', clip: { x: 0, y: 0, width: 660, height: 320 } });
 
   // Dopo i tasti dell'utente la casella è sua: il testo che il sito ci rimette si controlla, ma resta nell'ombra.
