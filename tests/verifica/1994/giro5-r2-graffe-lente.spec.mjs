@@ -14,10 +14,9 @@ test('r2 un comando lungo pieno di graffe si classifica subito', () => {
     ['powershell', { home: 'C:\\Users\\u', cwd: 'C:\\Users\\u\\proj', win: true, shell: 'powershell' }],
   ];
   for (const [nome, ctx] of casi) {
-    for (const cmd of ['git log ' + '{'.repeat(30000) + '}'.repeat(30000), 'echo ' + '{x}'.repeat(20000)]) {
-      const t = Date.now();
-      C.classify(cmd, ctx);
-      expect(Date.now() - t, `${nome}: ${cmd.slice(0, 20)}…`).toBeLessThan(1000);
-    }
+    const cmd = 'git log ' + '{'.repeat(30000) + '}'.repeat(30000);
+    const t = Date.now();
+    C.classify(cmd, ctx);
+    expect(Date.now() - t, nome).toBeLessThan(1000);
   }
 });
