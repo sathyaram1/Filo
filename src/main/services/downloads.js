@@ -1285,7 +1285,7 @@ function attachSession(ses, { scope = '' } = {}) {
       let piu = { esito: 'via', origine: null };
       try { piu = require('./permessiPagine').scaricamentoSenzaGesto(webContents, gestoDi(item, webContents)); } catch (_) {}
       if (piu.esito === 'no') { e.preventDefault(); return; }
-      if (piu.esito === 'chiedi' && !postoPerPiuFile(scope, piu.origine)) { e.preventDefault(); return; }
+      if (piu.esito === 'chiedi' && !postoPerPiuFile(scope)) { e.preventDefault(); return; }
       onWillDownload(item, webContents, scope, ses, piu.esito === 'chiedi' ? piu.origine : '');
     });
   } catch (_) {}
