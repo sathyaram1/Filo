@@ -462,7 +462,7 @@ test('nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la p
   const page = await apriEditore(app, openTab, testServer, editore('prosemirror', 'avviaPM'));
   const testo = () => page.evaluate(() => window.pmView.state.doc.textContent.replace(/ /g, ' '));
   await page.locator('#m .ProseMirror').click();
-  await page.keyboard.type('Domani vedo marco perchè ');
+  await batti(page, 'Domani vedo marco perchè ');
   await expect.poll(testo).toBe('Domani vedo Marco perché ');
   await page.keyboard.press('Control+z');
   await expect.poll(testo).toBe('Domani vedo Marco perchè ');
