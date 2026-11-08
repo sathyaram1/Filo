@@ -125,6 +125,46 @@ test('il no alla domanda vale per tutto il sito: toglie i file in attesa di ogni
   }
 });
 
+test('una pagina che salta da sola fra siti di domini diversi, senza clic: arriva il primo file, gli altri aspettano una domanda sola', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartella(app);
+    await openTab(`http://${SITI[0]}:${srv.porta}/altrove?n=0&fino=5`);
+    await expect.poll(() => inAttesa(shell, 'altrove'), { timeout: 40_000 }).toBe(5);
+    expect(arrivati(dir, 'altrove')).toEqual(['file-altrove-0.bin']);
+    // La domanda è dell'ultimo sito, e il sì fa arrivare tutti i file presi dalla scheda nei salti.
+    const barra = shell.locator('#permesso-bar');
+    await expect(barra).toContainText('vuole scaricare più file', { timeout: 10_000 });
+    await barra.locator('.permesso-si').click();
+    await expect.poll(() => arrivati(dir, 'altrove').length, { timeout: 20_000 }).toBe(6);
+  } finally {
+    await srv.close();
+  }
+});
+
+test('il no dato sulla scheda vale anche per i siti dove la pagina salta dopo: niente file e niente domanda', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await cartella(app);
+    const page = await openTab(`http://${SITI[0]}:${srv.porta}/altrove?n=0&fino=2`);
+    await expect.poll(() => inAttesa(shell, 'altrove'), { timeout: 30_000 }).toBe(2);
+    const barra = shell.locator('#permesso-bar');
+    await expect(barra).toContainText('vuole scaricare più file', { timeout: 10_000 });
+    await barra.locator('.permesso-no').click();
+    await expect.poll(() => inAttesa(shell, 'altrove'), { timeout: 10_000 }).toBe(0);
+    await page.evaluate((u) => { location.href = u; }, `http://${SITI[3]}:${srv.porta}/altrove?n=3&fino=5`);
+    await expect(shell.locator('#tabs .segno.negato[data-parte="scaricamenti"]')).toHaveCount(1, { timeout: 10_000 });
+    await page.waitForTimeout(4_000);
+    expect(await inAttesa(shell, 'altrove')).toBe(0);
+    await expect(barra).toBeHidden();
+    expect(arrivati(dir, 'altrove')).toEqual(['file-altrove-0.bin']);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('il tetto dei cento file in attesa è del sito: una pagina che salta fra 110 sottodomini non lo supera', async ({ shell, openTab }) => {
   test.setTimeout(180_000);
   const srv = await apriServer();
