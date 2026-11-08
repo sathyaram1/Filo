@@ -854,6 +854,9 @@
             // Su Windows AltGr arriva come Ctrl+Alt, e scrive @ # [ ] €: è un carattere, non un comando.
             vivo.tasto = { key: String(e.key || ''), mod: !!(e.metaKey || (e.ctrlKey && !e.altKey)), morto: vivo.tastoPrima === 'Dead' };
             vivo.tastoPrima = vivo.tasto.key;
+            // Anche il primo tasto battuto nella casella è un ingresso: chi ci arriva col fuoco già dentro (Modifica, una
+            // bozza ripristinata) e scrive solo con la tastiera ritrova i segni sul testo che c'era.
+            entra(vivo);
             return;
           }
           if (tipo === 'keyup') {
