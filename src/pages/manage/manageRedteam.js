@@ -152,6 +152,8 @@
       const regole = r.regole && r.regole[chiave];
       if (!regole || !t.input) continue;
       t.input.disabled = false;
+      const etichetta = t.blocco.querySelector('label');
+      if (etichetta && regole.etichetta) etichetta.textContent = regole.etichetta;
       if (!t.campo && window.SN_CAMPO_NUMERO) {
         t.campo = window.SN_CAMPO_NUMERO.collega({
           input: t.input,
