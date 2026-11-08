@@ -630,6 +630,38 @@ function chiediNellaFinestra(webContents, rec) {
   } catch (_) {}
 }
 
+// #2294 — una pagina che scarica più file senza un clic: la domanda è sul sito, nella cornice della sua scheda, e la
+// risposta vale per tutti i suoi file in attesa. Ritirata senza risposta (la pagina se n'è andata), la riga resta da
+// decidere nel pannello. Un no li toglie: non li aveva chiesti l'utente.
+const PIU_FILE_IN_ATTESA = 100;
+function chiediPiuFile(webContents, rec) {
+  const scope = scopeOf(rec);
+  try {
+    require('./permessiPagine').chiediScaricamenti(webContents, (si, _fonte, decisa) => {
+      const r = recordIn(rec.id, scope);
+      if (!decisa || !r || r.state !== 'pending') return;
+      if (si) confirmDownload(rec.id, true, scope);
+      else remove(rec.id, scope);
+    });
+  } catch (_) {}
+}
+function inAttesaPiuFile(scope, origine) {
+  return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile === origine && scopeOf(r) === scope);
+}
+// Oltre il tetto il file non scende, e la riga più nuova lo dice: chi risponde sa quanti ne mancano.
+function postoPerPiuFile(scope, origine) {
+  const attese = inAttesaPiuFile(scope, origine);
+  if (attese.length < PIU_FILE_IN_ATTESA) return true;
+  const ultima = attese.reduce((a, b) => (String(b.startedAt) > String(a.startedAt) ? b : a));
+  ultima._fermati = (ultima._fermati || 0) + 1;
+  broadcast('progress', ultima);
+  return false;
+}
+function gestoDi(item, webContents) {
+  try { if (item.hasUserGesture() === true) return true; } catch (_) {}
+  try { return require('./permessiPagine').gestoDellUtente(webContents); } catch (_) { return false; }
+}
+
 function finestraDi(webContents, rec) {
   const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
   const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
