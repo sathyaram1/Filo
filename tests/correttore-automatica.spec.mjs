@@ -106,7 +106,7 @@ test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subit
   await page.keyboard.type(' ');
   expect(await valore(page)).toBe('ok perché ');
   expect(await cursore(page)).toBe(10);
-  const lampo = page.locator('.sn-spell-lampo');
+  const lampo = segniDi(page, '.sn-spell-lampo');
   await expect(lampo.first()).toBeVisible();
   const colore = await lampo.first().evaluate((el) => getComputedStyle(el).backgroundColor);
   expect(colore).not.toBe('rgba(0, 0, 0, 0)');
