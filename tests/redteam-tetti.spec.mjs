@@ -22,6 +22,7 @@ let tetti = { perUserDay: 20, globalDay: 150 };
 const scritture = [];
 const invii = [];
 let rispostaInvio = null;
+let limitiGiu = false;
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
 function jwt(uid, extra = {}) {
