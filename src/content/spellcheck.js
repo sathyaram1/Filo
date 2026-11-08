@@ -795,7 +795,9 @@
     let state = monitored.get(el);
     if (state) return state;
     state = {
-      el, overlay: null, ro: null, attivo: false, riquadro: null, permesso: 0, testoCalcolato: null,
+      el, overlay: null, ro: null, attivo: false, riquadro: null,
+      // Da dove viene il testo (#2299): i pezzi scritti dal sito, quelli trovati entrando, l'ultimo tasto premuto qui.
+      diSito: [], visti: [], entrato: false, tasto: null, tastoPrima: '', filoScrive: null,
       // I segni del modello, sulle posizioni di `testo` (il testo del campo); quelli del codice si ricalcolano.
       testo: '', modello: [], codice: [], codiceT2: [], codiceTesto: null,
       // Il testo già giudicato da ciascun controllo, senza le parti ancora da giudicare (correttoreRegole.daGiudicare).
