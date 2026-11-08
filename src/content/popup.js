@@ -168,31 +168,21 @@
 
   // In un sito i riquadri che portano parole dell'utente o dei modelli stanno in uno shadow root chiuso, chiusi ai gesti
   // finti: patterns/un-pezzo-di-filo-in-un-sito-ubbidisce-solo-all-utente.md. L'host non genera un box.
+  // Lo strato chiuso e i suoi fogli, coi soli caratteri generici sui siti, li fa SN_FILO_UI.stratoChiuso.
   const FOGLI_RIQUADRO = ['theme.css', 'menu.css', 'popup.css', 'feedback.css', 'redteam-attack.css', 'spellcheck.css'];
-  const FONT_SOLO_GENERICO = '*, ::before, ::after, ::placeholder { font-family: system-ui, sans-serif !important; }';
   let fogliRiquadro = null;
-  function fogliDelRiquadro() {
-    if (fogliRiquadro) return fogliRiquadro;
-    let testo = '';
-    try {
-      const fs = require('node:fs');
-      const path = require('node:path');
-      testo = FOGLI_RIQUADRO.map((f) => fs.readFileSync(path.join(__dirname, '..', 'styles', f), 'utf8')).join('\n');
-    } catch (_) {}
-    testo += '\n' + FONT_SOLO_GENERICO;
-    const foglio = new CSSStyleSheet();
-    try { foglio.replaceSync(testo); } catch (_) {}
-    fogliRiquadro = [foglio];
-    return fogliRiquadro;
-  }
   function riquadro(contenuto) {
     if (inPaginaDiFilo) return contenuto;
     const UI = global.SN_FILO_UI;
-    const host = document.createElement('div');
-    UI?.mark(host);
-    host.style.cssText = 'all:initial!important;display:contents!important;';
-    const radice = UI?.ombra ? UI.ombra(host) : host.attachShadow({ mode: 'closed' });
-    try { radice.adoptedStyleSheets = fogliDelRiquadro(); } catch (_) {}
+    const stile = 'all:initial!important;display:contents!important;';
+    let strato;
+    if (UI?.stratoChiuso) strato = UI.stratoChiuso(stile, fogliRiquadro = fogliRiquadro || UI.fogliChiusi(FOGLI_RIQUADRO));
+    else {
+      const host = document.createElement('div');
+      host.style.cssText = stile;
+      strato = { host, radice: host.attachShadow({ mode: 'closed' }) };
+    }
+    const { host, radice } = strato;
     // I tasti scritti qui dentro il sito non li vede: SN_FILO_UI.tastoNelRiquadro.
     UI?.soloGestiVeri(contenuto);
     radice.appendChild(contenuto);
