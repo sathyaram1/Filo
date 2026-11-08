@@ -312,7 +312,7 @@ test('git: la sonda vera legge il repository della cartella, senza eseguire nien
     assert.equal(T.gitLanciaIn(ostile), 'si');
     assert.equal(T.gitLanciaIn(join(ostile, '.git')), 'si', 'anche da dentro la cartella .git');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
-    const ctx = { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn };
+    const ctx = sondaVera(ostile, base);
     assert.equal(C.classify('git status', ctx), 2);
     assert.equal(C.classify('git status', { ...ctx, cwd: sano }), 1);
     // La shell che scioglie un asterisco porta in una cartella che la sonda non vede: si chiede.
