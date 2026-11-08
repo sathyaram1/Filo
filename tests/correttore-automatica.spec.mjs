@@ -554,7 +554,7 @@ test('nell\'editor col corpo modificabile di un riquadro il lampo della correzio
   await page.keyboard.type('ok perchè');
   await page.keyboard.type(' ');
   await expect(corpo).toHaveText('ok perché');
-  const lampo = page.frameLocator('#ifr').locator('.sn-spell-lampo');
+  const lampo = segniDi(page, '.sn-spell-lampo', { iframe: '#ifr' });
   await expect(lampo.first()).toBeAttached({ timeout: 1000 });
   expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-lampo'))).toBe(null);
   expect(await corpo.evaluate((b) => b.innerHTML.replace(/&nbsp;/g, ' ').trim())).toBe('ok perché');
