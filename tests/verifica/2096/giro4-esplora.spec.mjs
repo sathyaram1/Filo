@@ -1,33 +1,35 @@
 // Esplorazione del giro 4: si cancella prima del verdetto.
 import { test, expect } from '../../fixtures/electron.mjs';
+import { menuDi } from '../../helpers/menuContestuale.mjs';
 
-for (const [pagina, url] of [['preferences', 'filo://preferences/preferences.html'], ['options', 'filo://options/options.html'], ['altro', 'filo://altro/altro.html'], ['security', 'filo://security/security.html']]) {
-  test(`nomi ${pagina}`, async ({ openTab }) => {
+const leggi = (app, perc) => app.evaluate(async (_e, perc) => perc.split('.').reduce((x, k) => (x == null ? x : x[k]), await globalThis.SN_STORAGE.getSettings()), perc);
+
+for (const caso of [
+  { pagina: 'filo://preferences/preferences.html', id: 'dictationSilence', perc: 'dictation.silenceSec', set: { dictation: { silenceSec: 5 } } },
+  { pagina: 'filo://preferences/preferences.html', id: 'ttsRate', perc: 'tts.rate', set: { tts: { rate: 1.6 } } },
+  { pagina: 'filo://preferences/preferences.html', id: 'notifDuration', perc: 'notifications.durationSec', set: {} },
+  { pagina: 'filo://options/options.html', id: 'monthlyLimit', perc: 'monthlyLimit', set: { monthlyLimit: 7 } },
+  { pagina: 'filo://security/security.html', id: 'sec-adblock', perc: 'security.adblock.enabled', set: {} },
+]) {
+  test(`rimetti ${caso.id}`, async ({ app, openTab }) => {
     test.setTimeout(90_000);
-    const page = await openTab(url);
-    await page.waitForTimeout(4000);
-    const out = await page.evaluate(async (pag) => {
-      const M = globalThis.SN_MENU_IMPOSTAZIONI;
-      const V = globalThis.SN_VOCI_IMPOSTAZIONI;
-      if (!M || !V) return [`manca ${!!M} ${!!V}`];
-      const S = globalThis.SN_SIDEBAR;
-      let preso = '';
-      if (S) S.chiediDaPagina = (t) => { preso = t; };
-      const righe = [];
-      for (const [id, perc] of Object.entries(V.campi(pag))) {
-        const el = document.getElementById(id);
-        if (!el) { righe.push(`${id}\t(assente)`); continue; }
-        const btn = el.parentElement && el.parentElement.querySelector('.sn-select-button');
-        const target = (el.tagName === 'SELECT' && btn) ? btn : el;
-        const voci = M.vociMenu(target);
-        preso = '';
-        const c = voci.find((v) => v.label === 'Chiedi a Filo');
-        if (c) c.onClick();
-        righe.push(`${id}\t${perc}\t${voci.map((v) => v.label).join('|')}\t${preso}`);
-      }
-      return righe;
-    }, pagina);
-    console.log(`\n=== ${pagina}\n${out.join('\n')}`);
-    expect(out.length).toBeGreaterThan(0);
+    if (Object.keys(caso.set).length) await app.evaluate((_e, s) => globalThis.SN_STORAGE.updateSettings(s), caso.set);
+    const page = await openTab(caso.pagina);
+    const el = page.locator(`#${caso.id}`);
+    await expect(el).toBeAttached({ timeout: 10_000 });
+    await page.waitForTimeout(1500);
+    const perc = await page.evaluate((id) => globalThis.SN_VOCI_IMPOSTAZIONI.campi(globalThis.SN_MENU_IMPOSTAZIONI.paginaDi())[id], caso.id);
+    const prima = await leggi(app, perc);
+    const uiPrima = await el.evaluate((x) => (x.type === 'checkbox' ? x.checked : x.value));
+    const lab = await page.evaluate((id) => (document.getElementById(`${id}Val`) || {}).textContent || '', caso.id);
+    await el.scrollIntoViewIfNeeded();
+    const bersaglio = (await el.isVisible()) ? el : page.locator(`label:has(#${caso.id}), label[for="${caso.id}"]`).first();
+    await bersaglio.click({ button: 'right' });
+    await menuDi(page).voce('Rimetti di serie').first().click();
+    await page.waitForTimeout(1500);
+    const dopo = await leggi(app, perc);
+    const uiDopo = await el.evaluate((x) => (x.type === 'checkbox' ? x.checked : x.value));
+    const labDopo = await page.evaluate((id) => (document.getElementById(`${id}Val`) || {}).textContent || '', caso.id);
+    console.log(`\n=== ${caso.id} ${perc}: salvato ${JSON.stringify(prima)} -> ${JSON.stringify(dopo)}; campo ${uiPrima} -> ${uiDopo}; etichetta «${lab}» -> «${labDopo}»`);
   });
 }
