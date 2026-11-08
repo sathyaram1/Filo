@@ -1995,7 +1995,18 @@
     /^submodule\.[^=]+\.(url|active|branch)$/,
     /^user\.(name|email|signingkey)$/,
     /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
-    /^(extensions\.(objectformat|refstorage)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
+    /^(extensions\.(objectformat|refstorage|worktreeconfig)|lfs\.repositoryformatversion|gui\.[^=]+|color\.[^=]+)$/,
+    // Sezioni intere che una lettura non usa per avviare niente: valgono per comandi che non sono letture (commit,
+    // merge, gc, maintenance…), o sono dati (alias di un nome che una lettura non usa, git-flow, blame, status).
+    /^(commit|tag|merge|rebase|pull|push|fetch|gc|maintenance|rerere|init|gitflow|alias|blame|status|index|feature|advice|format|pretty|i18n|column|checkout|clone)\.[^=]+$/,
+    /^(remote|branch|submodule)\.[^.=]+$/,
+    // diff.external avvia un programma; i driver (`diff.<nome>.*`) restano fuori.
+    /^diff\.(?!external$)[^.=]+$/,
+    // log.showSignature fa partire gpg a ogni git log.
+    /^log\.(?!showsignature$)[^.=]+$/,
+    // git-lfs, per indirizzo: come si autentica e il controllo dei lucchetti. Le estensioni di lfs avviano programmi.
+    /^lfs\.[^=]+\.(access|locksverify)$/,
+    /^core\.(splitindex|multipackindex|commitgraph|fsyncmethod|packedgitlimit|packedgitwindowsize|deltabasecachelimit|bigfilethreshold)$/,
   ];
   // Le righe di `git config --list --show-scope --includes`: true se una chiave locale o del worktree non è inerte.
   // `core.fsmonitor` con un valore sì/no accende il demone di git, non un programma scelto dal repository.
