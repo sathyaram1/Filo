@@ -162,6 +162,13 @@ test('git: le righe della configurazione, chiave per chiave', () => {
 });
 
 const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignore' }); return true; } catch (_) { return false; } })();
+// git lancia fsmonitor con la sua shell, anche su Windows: touch c'è ovunque ci sia git.
+const programmaSegno = (segno) => `touch "${segno.replace(/\\/g, '/')}"`;
+// La prova vale solo se il programma del repository parte davvero quando lo lancia git.
+function segnoVero(cartella, segno) {
+  execFileSync('git', ['status'], { cwd: cartella, stdio: 'ignore' });
+  assert.equal(existsSync(segno), true, 'il programma della prova deve creare il segno quando git lo lancia');
+}
 
 test('git: la sonda vera legge il repository della cartella, senza eseguire niente', { skip: conGit ? false : 'git non installato' }, () => {
   const base = cartellaTemporanea('filo-2292-');
