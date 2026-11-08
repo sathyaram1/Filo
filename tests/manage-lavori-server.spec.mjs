@@ -149,19 +149,50 @@ test('#2036: un lavoro server che nessuna routine prende sta fermo sulla scheda,
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.filo);
   await page.evaluate(() => window.__mgTest.whenReady());
-  await stubAutomazioni(page);
+  await stubAutomazioni(page, { lavoriServer: true });
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
   const fermo = fb({ _id: 'srv-6', seq: 1903, status: 'revision_security', branch: 'worker/srv-6-20261101T090000Z',
     restaLocale: { motivi: ['ramo non pulito', '<b>ramo del server non pulito</b>'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z') } });
   const sanato = fb({ _id: 'srv-7', seq: 1904, status: 'revision_security', branch: 'worker/srv-7-20261101T090000Z', restaLocale: null });
-  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [fermo, sanato]);
+  const sporco = fb({ _id: 'srv-8', seq: 1905, status: 'todo', branch: 'worker/srv-8-20261101T090000Z',
+    restaLocale: { motivi: ['contenuto scritto da un biglietto sporco'], ruolo: 'new-work', atMs: Date.parse('2026-11-01T12:00:00Z') } });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [fermo, sanato, sporco]);
   await page.evaluate(() => window.__mgTest.setTab('queue'));
   const riga = page.locator('.mg-item[data-id="srv-6"] .mg-attesa-server');
   await expect(riga).toHaveText('Fermo: resta locale');
   await expect(riga).toHaveAttribute('title', /biglietto nascerebbe non fidato \(ramo non pulito, <b>ramo del server non pulito<\/b>\)/);
+  // Nessun motivo passa da solo (#2036.1): la scheda dice il gesto che sblocca, non promette una ripartenza.
+  const spiega = (await riga.getAttribute('title')) || '';
+  expect(spiega).not.toMatch(/riparte da solo/i);
+  expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z;');
+  expect(spiega).toContain('npm run fiducia:sana -- worker/srv-6-20261101T090000Z --server');
+  const rigaSporca = page.locator('.mg-item[data-id="srv-8"] .mg-attesa-server');
+  await expect(rigaSporca).toHaveText('Fermo: resta locale');
+  await expect(rigaSporca).toHaveAttribute('title', /non torna pulito: lo porta avanti una sessione locale/);
+  await expect(rigaSporca).not.toHaveAttribute('title', /riparte da solo|sanatoria/i);
   await expect(page.locator('.mg-item[data-id="srv-6"] b')).toHaveCount(0);
   await expect(page.locator('.mg-item[data-id="srv-7"]')).toBeVisible();
   await expect(page.locator('.mg-item[data-id="srv-7"] .mg-attesa-server')).toHaveCount(0);
   await page.locator('.mg-item[data-id="srv-6"]').screenshot({ path: 'tests/.shots/manage-resta-locale-2036.png' });
+});
+
+test('#2036.1: coi lavori server spenti il segno di fermo rimasto non copre la sessione locale', async ({ openTab }) => {
+  const page = await openTab(MANAGE);
+  await page.waitForLoadState('domcontentloaded');
+  await page.waitForFunction(() => window.__mgTest && window.filo);
+  await page.evaluate(() => window.__mgTest.whenReady());
+  await stubAutomazioni(page, { lavoriServer: true });
+  await page.evaluate(() => window.__mgTest.loadAutoMode());
+  const fermo = fb({ _id: 'srv-9', seq: 1906, status: 'revision_security', branch: 'worker/srv-9-20261101T090000Z',
+    restaLocale: { motivi: ['ramo non pulito'], ruolo: 'secaudit', atMs: Date.parse('2026-11-01T12:00:00Z') } });
+  await page.evaluate((l) => { window.__mgTest.setAdmin(true); window.__mgTest.setData(l); }, [fermo]);
+  await page.evaluate(() => window.__mgTest.setTab('queue'));
+  const scheda = page.locator('.mg-item[data-id="srv-9"]');
+  await expect(scheda.locator('.mg-attesa-server')).toHaveText('Fermo: resta locale');
+  // L'owner spegne i lavori server: il lavoro torna in mano locale e la scheda lo dice subito.
+  await page.evaluate(() => { window.__auto.lavoriServer = false; return window.__mgTest.loadAutoMode(); });
+  await expect(scheda.locator('.mg-attesa-server')).toHaveCount(0);
+  await expect(scheda).toContainText('In verifica in una sessione locale');
 });
 
 test('#1222: la scheda dice quando il server aspetta la suite; un segno di attesa che non esiste non si mostra', async ({ openTab }) => {
