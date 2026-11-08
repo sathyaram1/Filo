@@ -327,6 +327,8 @@ const safebrowseMethods = {
     if (!wc || wc.isDestroyed()) return false;
     return this._sbPrimaDelClic(tab, url, (segna) => {
       segna(tab);
+      // La conferma è un clic dell'utente: il file ripartito non conta fra quelli scaricati senza clic (#2294).
+      Permessi.gestoSulloStrato(wc);
       this._sbRifaiDallaPagina(tab, 'SN_RISCARICA', url, () => { try { if (!wc.isDestroyed()) wc.downloadURL(url); } catch (_) {} });
     }, { nome });
   },
