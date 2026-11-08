@@ -1747,7 +1747,8 @@
       ...delModello.filter((m) => m.tipo === 'segnaposto' && valido(m)),
     ] : [];
     const sulleX = (x) => x.segno === 'errore' && xVolute.some((s) => x.start < s.end && x.end > s.start);
-    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo)
+    // Nemmeno il modello segna il testo del sito (soloDellUtente).
+    const tieni = (x) => valido(x) && !sulleX(x) && !ignorato(state, x, testo) && !toccaPezzi(state.diSito, x.start, x.end)
       && !(x.segno === 'errore' && !/\s/.test(x.segment.trim()) && (isInDictionary(x.segment) || nomeNoto(x.segment)))
       && !(scrive && x.start < scrive.end && x.end > scrive.start);
     const ordina = (k) => [
