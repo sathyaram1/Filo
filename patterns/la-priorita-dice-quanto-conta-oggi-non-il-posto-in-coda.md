@@ -11,7 +11,7 @@ non può sapere quali siano i più importanti fra tutti.
 
 | | cosa | chi la mette | come si lavora |
 |---|---|---|---|
-| **3** | urgentissimo: sicurezza, dati dell'utente, Filo inutilizzabile, una funzione che l'owner vuole subito | owner, giudici, manutentore (crearne sì, toglierne mai) | parte subito, sempre in parallelo, fuori da ogni ordine |
+| **3** | urgentissimo: sicurezza attaccabile oggi (non un irrobustimento), dati dell'utente, Filo inutilizzabile, una funzione che l'owner vuole subito | owner, giudici, manutentore (crearne sì, toglierne mai) | parte subito, sempre in parallelo, fuori da ogni ordine |
 | **2** | la rosa del giorno | solo il manutentore, ogni mattina, leggendo tutte le schede | nel suo contesto; ordine, pacchetti e quanti insieme li decide lui |
 | **1** | da fare, non oggi | giudici (il valore che lasciano), manutentore, owner | aspetta una prossima rosa |
 | **0** | rimandato a lungo: difetti minori che oggi non valgono lo sforzo | manutentore, owner | non si lavora |
