@@ -1275,7 +1275,13 @@ test('#1994 — le opzioni di git prima del sotto-comando che cambiano configura
   ]) assert.equal(lvl(cmd), 3, cmd);
   // Il repository scelto da fuori lo misura il perimetro, come `cd`: fuori dalla cartella personale chiede.
   const casa = { cwd: '/home/u', home: '/home/u', win: false };
-  for (const cmd of ['git --git-dir=/srv/x/.git log', 'git --work-tree=/ status']) assert.equal(C.classify(cmd, casa), 2, cmd);
+  for (const cmd of ['git --git-dir=/srv/x/.git log', 'git --work-tree=/ status', 'git --git-dir=/home/u/.config/x/.git log']) {
+    assert.equal(C.classify(cmd, casa), 2, cmd);
+  }
+  // Di `--git-dir` conta il repository, non la sua `.git` nascosta: dentro la cartella personale è una lettura.
+  for (const cmd of ['git --git-dir=/home/u/proj/.git log', 'git --git-dir=proj/.git log', 'git --git-dir=.git status']) {
+    assert.equal(C.classify(cmd, casa), 1, cmd);
+  }
   for (const cmd of ['git --version', 'git --help', 'git --exec-path', 'git --no-pager show', 'git --no-optional-locks status']) {
     assert.equal(lvl(cmd), 1, cmd);
   }
