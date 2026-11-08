@@ -1502,9 +1502,8 @@
     return nuovo;
   }
 
-  // Su un sito un testo nuovo si controlla solo dopo un gesto vero dell'utente in quella casella, uno per gesto, o dopo
-  // una scrittura di Filo (#2299): il sito non legge il dizionario né dai segni né da quanto dura il controllo del testo
-  // che scrive lui. Senza, i segni di prima seguono il testo e quello nuovo resta senza. Prova: correttore-segni-fuori-dalla-pagina.
+  // Su un sito un testo nuovo si controlla una volta per gesto vero in quella casella, o dopo una scrittura di Filo
+  // (#2299): né i segni né la durata del controllo del testo scritto dal sito gli dicono cosa c'è nel dizionario.
   function puoRicalcolare(state) {
     if (PAGINA_DI_FILO || radiceDi(state.el)) return true;
     const G = global.SN_GESTO;
