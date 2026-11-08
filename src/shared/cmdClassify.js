@@ -822,7 +822,7 @@
     const inerti = new Set();
     const segnata = () => {
       const s = [];
-      for (let k = 0; k < w.length; k++) s.push(!inerti.has(k) ? w[k] : w[k] === '{' ? '' : '');
+      for (let k = 0; k < w.length; k++) s.push(!inerti.has(k) ? w[k] : SEGNI_INERTI[w[k] === '{' ? 0 : 1]);
       return s.join('');
     };
     for (let j = 0; j < w.length; j++) {
