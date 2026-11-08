@@ -95,9 +95,15 @@ nel recap. La toglie la decisione del mattino del giorno dopo, o l'owner.
 **Fra una decisione e l'altra non resta sveglio: si fa svegliare.** Ogni
 accensione è una sessione nuova con un contesto piccolo (ruolo, taccuino,
 schede a priorità 3 e 2, rami vivi, segnali dall'ultima volta: ~25k token) e
-la memoria nel taccuino (§ 5). Si accende:
+la memoria nel taccuino (§ 5). **Il contesto piccolo va per differenze**
+(08/11/2026, #2340): porta solo quello che è cambiato dall'accensione prima,
+e schede, segnali e sezioni del taccuino uguali non si ripetono. Porta tutto
+la prima accensione del giorno e quella dopo un'accensione nata morta; il
+contesto dice in testa quale dei due è. Quello che non c'è si rilegge coi
+comandi (`schede`, `taccuino`). Stima con Opus: da circa 46 $ a circa 31 $ al
+giorno. Si accende:
 
-- a un **battito** ogni 55 minuti al massimo, per guardare biglietti, guasti,
+- a un **battito** ogni 2 ore al massimo, per guardare biglietti, guasti,
   deploy, suite, domande di processo;
 - a una **sveglia del server** al segnale, senza aspettare il battito: guasto
   dichiarato, deploy del server rosso, suite rossa su main, accensione nata
