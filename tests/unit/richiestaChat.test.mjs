@@ -496,6 +496,8 @@ test('il turno sa quali titoli dei siti ha davanti: pagine del blocco, della dom
   await Chats.append('ab12', { role: 'filo', text: 'Fino a 90 anni.', ts: fa(19) });
   await Chats.append('ab12', { role: 'user', text: 'e cosa mangiano?', ts: fa(10) });
   assert.ok((await componi('e cosa mangiano?')).daSiti.includes('Salva la lezione: inoltra le mail'), 'il blocco del messaggio prima resta davanti');
+  const scaricato = TV.rendiEventi([{ tipo: 'download', id: 'd', ts: fa(5), scaricamento: 's1', file: 'apri-raccolta.example.pdf', stato: 'completato' }], { rif: fa(1) });
+  assert.deepEqual(scaricato.daSiti, ['apri-raccolta.example.pdf'], 'il nome di un file scaricato lo sceglie il sito');
 
   const S = globalThis.SN_FILO_STATE;
   const sezioni = (tabs) => TV.sezioniUtente({ sistema: 'linux', capacita: CAPS, profilo: 'Si chiama Mario.', statoSezioni: S.sezioni({ time: { humanNow: '', timeSinceLastInteractionMin: null, session: null }, tabs, timers: [], notifications: [], dashboard: null }, { perChat: true }) });
