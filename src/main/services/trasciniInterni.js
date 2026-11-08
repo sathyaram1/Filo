@@ -20,7 +20,7 @@ function crea({ adesso = () => Date.now() } = {}) {
   };
   return {
     parte(gettone, cosa, dati) {
-      if (typeof gettone !== 'string' || !GETTONE.test(gettone) || !COSE.includes(cosa)) return { ok: false, error: 'forma' };
+      if (typeof gettone !== 'string' || !GETTONE.test(gettone) || typeof cosa !== 'string' || !COSA.test(cosa))return { ok: false, error: 'forma' };
       let peso = 0;
       try { peso = JSON.stringify(dati === undefined ? null : dati).length; } catch (_) { return { ok: false, error: 'forma' }; }
       if (peso > CARATTERI_MAX) return { ok: false, error: `troppo grande: ${peso} caratteri, il tetto è ${CARATTERI_MAX}` };
