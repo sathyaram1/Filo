@@ -26,6 +26,19 @@ function ambienteComandi(base = process.env) {
   return out;
 }
 
+// cmd cerca un programma prima nella cartella di lavoro: dopo un `cd` in un archivio estratto, il `whoami` o il
+// `where git` del modello avvierebbero quelli dell'archivio (#2312). Questa variabile toglie la cartella dalla ricerca,
+// come in PowerShell: lì un programma della cartella si chiama con `.\`. Fuori da Windows la cartella non c'è già.
+const SENZA_CARTELLA_NELLA_RICERCA = 'NoDefaultCurrentDirectoryInExePath';
+function ambienteDelModello(base) {
+  const out = ambienteComandi(base || undefined);
+  if (process.platform !== 'win32') return out;
+  // Su Windows i nomi delle variabili non distinguono le maiuscole: una seconda copia potrebbe vincere su questa.
+  for (const k of Object.keys(out)) if (k.toLowerCase() === SENZA_CARTELLA_NELLA_RICERCA.toLowerCase()) delete out[k];
+  out[SENZA_CARTELLA_NELLA_RICERCA] = '1';
+  return out;
+}
+
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
 // Fuori da Windows è la shell di SISTEMA, non bash: dev'essere lo stesso
@@ -318,7 +331,7 @@ function extractCwdMark(rawStdout, mark) {
 // esito da mostrare. `tettoUscita`: chi legge l'uscita col codice (un elenco intero) non ha il tetto del modello.
 function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: chiesto, trackCwd = false, tettoUscita = MAX_OUTPUT_CHARS } = {}) {
   const cmd = String(command || '').trim();
-  const env = ambienteComandi(chiesto || process.env);
+  const env = ambienteDelModello(chiesto);
   const startedAt = Date.now();
   const usedShell = shell || defaultShell();
   return new Promise((resolve) => {
@@ -528,7 +541,7 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
 }
 
 module.exports = {
-  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS, ambienteComandi,
+  runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS, ambienteComandi, ambienteDelModello,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
   encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
