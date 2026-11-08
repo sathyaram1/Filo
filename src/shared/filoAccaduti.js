@@ -54,9 +54,8 @@
     { host: /(^|\.)ebay\.[a-z.]+$/, percorso: /^\/sch\//, chiavi: ['_nkw'], nome: 'eBay' },
     { host: /(^|\.)wikipedia\.org$/, percorso: /^\/w\/index\.php$/, chiavi: ['search'], nome: 'Wikipedia' },
   ];
-  const PERCORSO_CERCA = /(^|\/)(search|cerca|ricerca|results|risultati|find|suche|recherche|buscar)(\/|$|\.)/i;
-  const CHIAVI_CERCA = ['q', 'query', 'search', 'search_query', 's', 'k', 'term', 'keyword', 'keywords', 'text'];
-
+  // Solo motori e siti riconosciuti: un qualunque sito può portare a un suo «/search?q=…» con le parole che vuole, e
+  // quelle non sono una ricerca dell'utente (#2293). Della pagina resta il titolo, come delle altre.
   function ricercaNellIndirizzo(url) {
     let u;
     try { u = new URL(String(url || '')); } catch (_) { return null; }
