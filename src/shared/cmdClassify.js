@@ -144,35 +144,22 @@
   // Alcuni LEVEL1 leggono finché non ricevono gli argomenti che ne cambiano il senso: `date`
   // legge, `date -s` IMPOSTA. Il predicato riceve il comando intero e torna true se MODIFICA.
   const LEVEL1_MUTATES = {
-    // `date -s`/`--set` imposta l'orologio; `+%F`, `-u`, `-d` sono letture.
-    date: (cmd) => /(^|\s)(-s|--set)(=|\s|$)/i.test(cmd),
+    // `date -s`/`--set` imposta l'orologio, anche in un gruppo (`-us`) o col valore attaccato (`-s1`); `+%F`, `-u`,
+    // `-d` sono letture. `-d`, `-f`, `-r`, `-I` prendono un valore: la `s` dopo di loro è quel valore.
+    date: (cmd) => tokens(cmd).slice(1).map(unquote).some((t) => /^-[uR]*s/.test(t) || opzioneLunga(t, 'set', 1) != null),
     // `hostname <nome>` o `-F file` imposta il nome host; i flag di lettura no.
     // Attenzione: qui `-s` è «short», non «set».
     hostname: (cmd) => {
       const rest = tokens(cmd).slice(1);
       // `-F`/`--file` è case-sensitive: `-f` = fqdn è lettura e non deve combaciare.
-      return rest.some((t) => /^(-F|--file)$/.test(t) || !t.startsWith('-'));
+      return rest.some((t) => /^-[A-Za-z]*F/.test(t) || opzioneLunga(t, 'file', 2) != null || !t.startsWith('-'));
     },
-    // Il secondo operando di `uniq` è il file d'uscita (#2292).
+    // Lettori con un'uscita su file (#1994, #2292): `uniq IN OUT`, `tree -o FILE` (e `-R`, che scrive 00Tree.html in
+    // ogni cartella), `file -C` (compila `<nome>.mgc` nella cartella di lavoro).
     uniq: (cmd) => uniqUscita(tokens(cmd).slice(1)) != null,
-    // `tree -o` scrive l'elenco su un file, `-R` lo rifà con `-o 00Tree.html` in ogni cartella.
     tree: (cmd) => treeUscita(tokens(cmd).slice(1)) != null,
-    // `file -C` compila un file di magia e lo scrive accanto.
-    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || t === '--compile'),
+    file: (cmd) => tokens(cmd).slice(1).some((t) => /^-[A-Za-z]*C/.test(t) || opzioneLunga(t, 'compile', 2) != null),
   };
-
-  // Il file che `uniq` scriverà, o null. `-f`, `-s`, `-w` si portano dietro un numero.
-  function uniqUscita(args) {
-    const ops = [];
-    let fine = false;
-    for (let i = 0; i < args.length; i++) {
-      const t = args[i];
-      if (fine || t === '-' || !t.startsWith('-')) { ops.push(t); continue; }
-      if (t === '--') { fine = true; continue; }
-      if (/^-[fsw]$/.test(t) || /^--(skip-fields|skip-chars|check-chars)$/.test(t)) i += 1;
-    }
-    return ops.length >= 2 ? ops[1] : null;
-  }
 
   // Il file che `tree` scriverà ('' se non si sa quale), o null se stampa e basta.
   function treeUscita(args) {
@@ -186,6 +173,31 @@
       if (t.includes('R')) return '';
     }
     return null;
+  }
+
+  // getopt e git accettano un'opzione lunga abbreviata a ogni prefisso non ambiguo (`--comp` è `--compile`, `--outp=x`
+  // è `--output=x`): l'opzione si riconosce come la legge il programma. Il valore dopo `=`, o '' senza; null se non è lei.
+  function opzioneLunga(t, nome, min) {
+    const m = /^--([A-Za-z][A-Za-z-]*)(?:=([\s\S]*))?$/.exec(String(t || ''));
+    if (!m || m[1].length < min || !nome.startsWith(m[1].toLowerCase())) return null;
+    return m[2] != null ? m[2] : '';
+  }
+
+  // Il secondo operando di uniq è il file in cui scrive (`-` è il terminale): null se non c'è.
+  function uniqUscita(testi) {
+    const ops = [];
+    let fine = false;
+    for (let i = 0; i < testi.length; i++) {
+      const t = testi[i];
+      if (fine || t === '-' || !t.startsWith('-')) { if (fine || !/^\+\d+$/.test(t)) ops.push(t); continue; }
+      if (t === '--') { fine = true; continue; }
+      if (/^--(skip-fields|skip-chars|check-chars)$/.test(t)) { i += 1; continue; }
+      if (t.startsWith('--')) continue;
+      // `-f N`, `-s N`, `-w N`, anche in coda a un gruppo (`-cf 1`); `-f1` porta il valore attaccato.
+      const k = t.slice(1).search(/[fsw]/);
+      if (k >= 0 && k === t.length - 2) i += 1;
+    }
+    return ops.length >= 2 && ops[1] !== '-' ? ops[1] : null;
   }
 
   // Modifica lo stato ma in modo recuperabile: livello 2.
@@ -245,7 +257,7 @@
 
   // Stessa funzione per il cmdlet isolato e per ogni pezzo di pipeline, così i due cammini
   // non divergono. Riceve il segmento GREZZO: i letterali quotati vanno visti prima.
-  function segmentIsRead(seg, inPipeline) {
+  function segmentIsRead(seg, inPipeline, c = SENZA_CONTESTO) {
     // `%{...}` e `?{...}` senza spazio sono PowerShell normale: le graffe si isolano come
     // token a sé prima di guardare programma e blocco.
     const norm = String(seg).replace(/\{/g, ' { ').replace(/\}/g, ' } ');
@@ -278,7 +290,7 @@
     if (PS_READ.has(prog)) return true;
     // In pipeline vale come lettura anche ciò che è già livello 1: `cat file | grep errore`
     // non compie niente di più di `cat file`.
-    return inPipeline && classifyOne(seg) === 1;
+    return inPipeline && classifyOneLetto(seg, c) === 1;
   }
 
   // Pura pipeline (solo `|`), senza sequenze, background, redirezioni o sostituzioni:
@@ -292,7 +304,10 @@
   }
 
   // Flag che alzano a 3 un comando altrimenti ≤2.
-  const DANGEROUS_FLAG_RE = /(^|\s)(--force|--hard|--delete|--prune|--no-preserve-root|-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
+  const DANGEROUS_FLAG_RE = /(^|\s)(-[a-z]*f[a-z]*r[a-z]*|-[a-z]*r[a-z]*f[a-z]*)(\s|$)/i;
+  // Le lunghe valgono anche accorciate, come le leggono getopt e git (`--forc`, `--de`): una lista sola per tutti.
+  const LUNGHE_PERICOLOSE = ['force', 'hard', 'delete', 'prune', 'no-preserve-root'];
+  const lungaPericolosa = (cmd, nomi) => tokens(cmd).slice(1).some((t) => nomi.some((n) => opzioneLunga(t, n, 2) != null));
 
   // robocopy usa lo slash, che DANGEROUS_FLAG_RE non vede: `/MIR` e `/PURGE` cancellano la
   // destinazione, `/MOVE` la sorgente. Check a sé e case-insensitive, o falsi positivi Unix.
@@ -334,8 +349,8 @@
     if (CURL_SEND_SHORT_RE.test(cmd)) return true;
     for (const m of cmd.matchAll(/(?:^|\s)--([a-z][a-z-]*)/g)) {
       const w = m[1];
-      if (w.startsWith('data') || CURL_SEND_LONG.some((n) => n.startsWith(w))) return true;
-      if (w !== 'request' && 'request'.startsWith(w) && w.length >= 3) return true;
+      if (w.startsWith('data') || CURL_SEND_LONG.some((n) => opzioneLunga(`--${w}`, n, 1) != null)) return true;
+      if (w !== 'request' && opzioneLunga(`--${w}`, 'request', 3) != null) return true;
     }
     for (const m of cmd.matchAll(CURL_METHOD_RE)) if (!/^(GET|HEAD)$/i.test(m[1])) return true;
     return false;
@@ -415,7 +430,9 @@
 
   // In git i flag distruttivi sono più ricchi: anche `-f`, `-d`/`-D`, `--delete`, `--prune`.
   // Check git-specifico, perché su `tar -f` quelle lettere vogliono dire altro.
-  const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|--discard-changes|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
+  const GIT_DANGER_RE = /(^|\s)(-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
+  const GIT_DANGER_LUNGHE = [...LUNGHE_PERICOLOSE, 'force-with-lease', 'discard-changes'];
+  const gitPericolosa = (cmd) => GIT_DANGER_RE.test(cmd) || lungaPericolosa(cmd, GIT_DANGER_LUNGHE);
 
   // Argomenti dopo il sotto-comando: `git tag v1.0` → ['v1.0'], `git branch` → [].
   function gitArgsAfterSub(cmd) {
@@ -468,7 +485,7 @@
   // Sotto-comandi il cui livello dipende dagli argomenti: i duali ELENCANO (1) da nudi e
   // CREANO (2) con un operando; `checkout` e `stash` hanno anche forme distruttive (3).
   const GIT_DUAL = {
-    tag: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
+    tag:(cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
     branch: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
     // `git checkout` è distruttivo quando prende di mira un pathspec: ripristina i file dal ref
     // buttando via le modifiche locali → 3. Cambio o creazione di ramo restano 2.
@@ -522,10 +539,20 @@
     },
   };
 
-  // Le opzioni globali che non cambiano repository né impostazioni: le altre (`--git-dir`, `--config-env`, …)
-  // portano git dove la sonda delle impostazioni non ha guardato (#2292).
-  const GIT_GLOBALI_INNOCUE = new Set(['--no-pager', '-p', '--paginate', '-P', '--no-optional-locks', '--no-replace-objects',
-    '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--no-advice']);
+  // Le opzioni globali che non cambiano repository né impostazioni: le altre (`--git-dir`, `--bare`, `--config-env`, …)
+  // portano git dove la sonda delle impostazioni non ha guardato (#2292); `--config-env=core.pager=SHELL` esegue (#1994).
+  const GIT_GLOBALI_INNOCUE = new Set([
+    '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks',
+    '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs',
+    '-v', '--version', '-h', '--help', '--exec-path', '--html-path', '--man-path', '--info-path',
+  ]);
+  // Il repository di `--git-dir=`/`--work-tree=` lo misura anche il perimetro, come la cartella di `cd`.
+  const GIT_GLOBALE_CARTELLA = /^--(git-dir|work-tree)=/;
+  // `--output` (e le sue abbreviazioni) scrive l'uscita in un file scelto dal comando, col testo che sceglie
+  // `--format`: con log, show, diff, shortlog… una lettura diventa la scrittura di un file qualsiasi (#1994).
+  function gitScriveFile(cmd) {
+    return tokens(cmd).slice(1).some((t) => opzioneLunga(t, 'output', 2) != null);
+  }
   // Il file su cui scrive una lettura di git con `--output` ('' se non si sa quale), o null se stampa e basta (#2292).
   function gitUscita(args) {
     for (let i = 0; i < args.length; i++) {
@@ -552,6 +579,7 @@
     // Con due operandi `symbolic-ref` sposta HEAD: cambia il ramo corrente.
     'symbolic-ref': (args) => (args.filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 0),
   };
+
   function classifyGit(cmd) {
     const sub = subcommandOf(cmd);
     const globali = tokens(cmd).slice(1).map(unquote);
@@ -559,7 +587,10 @@
     if (sub && globali.slice(0, k).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !VERSION_TOKENS.has(x.toLowerCase()))) return 3;
     if (!sub) return 1; // `git` da solo stampa l'help → lettura
     if (GIT_DESTROY.has(sub)) return 3;
-    if (GIT_DANGER_RE.test(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
+    if (gitPericolosa(cmd)) return 3; // es. push --force, checkout -f, branch -D, tag -d
+    const t = tokens(cmd).slice(1);
+    if (t.slice(0, t.findIndex((x) => !x.startsWith('-'))).some((x) => !GIT_GLOBALI_INNOCUE.has(x) && !GIT_GLOBALE_CARTELLA.test(x))) return 3;
+    if (gitScriveFile(cmd)) return 3;
     const dual = GIT_DUAL[sub];
     if (dual) return dual(cmd); // tag/branch/config/remote: dipende dagli argomenti
     if (GIT_READ.has(sub)) {
@@ -656,7 +687,7 @@
       // robocopy /MIR /PURGE (cancellano la destinazione) / /MOVE /MOV
       // (cancellano la sorgente): distruzione permanente → 3.
       if (prog === 'robocopy' && ROBOCOPY_DESTRUCTIVE_RE.test(trimmed)) return 3;
-      return DANGEROUS_FLAG_RE.test(trimmed) ? 3 : 2;
+      return DANGEROUS_FLAG_RE.test(trimmed) || lungaPericolosa(trimmed, LUNGHE_PERICOLOSE) ? 3 : 2;
     }
 
     // Cmdlet PowerShell di lettura: 1 solo se superano anche i controlli strutturali.
@@ -744,12 +775,25 @@
     'computername', 'hostname', 'pwd', 'oldpwd', 'path', 'shell', 'lang', '_', 'psitem', 'true', 'false', 'null',
   ]);
   const DOLLARO_RE = /\$(?:env:)?([A-Za-z_]\w*)/gi;
-  const PERCENTO_RE = /%([A-Za-z_][\w()]*)(?::[^%]*)?%/gi;
+  // In PowerShell `$temp` non è `$env:TEMP`: è una variabile qualsiasi, che un comando di lettura della stessa riga
+  // imposta con -OutVariable (#1994). Senza `env:` è nota solo un'automatica; `@nome` passa la variabile a pezzi.
+  const PS_AUTOMATICHE = new Set(['home', 'pwd', 'null', 'true', 'false', '_', 'psitem']);
+  const PS_VARIABILE_RE = /\$(env:)?([A-Za-z_]\w*)|^@[A-Za-z_]/gi;
+  // Lo stesso parametro può riscrivere un'automatica che qui si crede nota (`-OutVariable _`): quella riga non si legge.
+  const PS_IMPOSTA_AUTOMATICA_RE = /(?:^|[\s;|])-(?:[oewip]v|outv\w*|errorv\w*|warningv\w*|informationv\w*|pipelinev\w*)(?::|\s+)['"]?\+?(?:_|psitem|pwd|home)['"]?(?=$|[\s;|,)])/i;
+  function variabilePowerShell(t) {
+    for (const m of String(t).matchAll(PS_VARIABILE_RE)) if (!m[1] && !PS_AUTOMATICHE.has(String(m[2]).toLowerCase())) return true;
+    return false;
+  }
+  // cmd ha anche variabili col nome che comincia per `=` (`%=ExitCode%`, `%=C:%`), tagliabili come le altre.
+  const PERCENTO_RE = /%(=?[A-Za-z_][\w()]*)(:[^%]*)?%/gi;
 
+  // Una variabile di cmd tagliata o sostituita (`%PATH:~0,0%` vale niente) non è più il valore innocuo: il suo nome
+  // esce col `:` e nessuna lista la riconosce (#1994).
   function nomiVariabili(t, { dollaro = true, percento = true } = {}) {
     const out = [];
     if (dollaro) for (const m of String(t).matchAll(DOLLARO_RE)) out.push(m[1].toLowerCase());
-    if (percento) for (const m of String(t).matchAll(PERCENTO_RE)) out.push(m[1].toLowerCase());
+    if (percento) for (const m of String(t).matchAll(PERCENTO_RE)) out.push(m[1].toLowerCase() + (m[2] ? ':' : ''));
     return out;
   }
 
@@ -758,6 +802,11 @@
   function shellPosix(c) {
     if (c.sistemaIgnoto) return false;
     return c.win ? c.shell === 'sh' || c.shell === 'bash' : c.shell !== 'powershell' && c.shell !== 'cmd';
+  }
+
+  // PowerShell, o una shell che può esserlo.
+  function forsePowerShell(c) {
+    return !!c.sistemaIgnoto || (!shellPosix(c) && c.shell !== 'cmd');
   }
 
   // /bin/sh su Debian e Ubuntu è dash, che non conosce `$'…'`: lì `\'` chiude la stringa e il resto diventa
@@ -832,6 +881,73 @@
     return { testo, fine: i, ignoto };
   }
 
+  // Lunghezza del nome dopo un `$` che la shell può espandere a niente: `$1`, `$@`, `$!`, una variabile non impostata
+  // (bash distingue le maiuscole: `$pwd` è vuota), `$null` e `$env:x` di PowerShell. 0 se non è un'espansione.
+  function espansione(s, k) {
+    const m = /^(?:[A-Za-z_]\w*(?::[A-Za-z_]\w*)?|[0-9@*#?!$^-])/.exec(s.slice(k));
+    return m ? m[0].length : 0;
+  }
+
+  // Le graffe di bash aperte come le apre lei (`--{output=x,}` è `--output=x --`, `{s..u}` è `s t u`); null oltre un
+  // tetto di parole, che nessun comando di lettura raggiunge. Una graffa senza virgola né intervallo resta testo.
+  const GRAFFE_MAX = 256;
+  function graffe(parole) {
+    const out = [];
+    const coda = parole.slice();
+    while (coda.length) {
+      const w = coda.shift();
+      const e = apriGraffa(w);
+      if (e) coda.unshift(...e); else out.push(w.replace(//g, '{').replace(//g, '}'));
+      if (out.length + coda.length > GRAFFE_MAX) return null;
+    }
+    return out;
+  }
+  // Una passata sola con una pila: rifare la parola a ogni coppia di graffe inerte costava il quadrato della lunghezza,
+  // e il conto gira nel processo principale (#1994).
+  function apriGraffa(w) {
+    const pila = [];
+    const inerti = new Set();
+    const segnata = () => {
+      const s = [];
+      for (let k = 0; k < w.length; k++) s.push(!inerti.has(k) ? w[k] : SEGNI_INERTI[w[k] === '{' ? 0 : 1]);
+      return s.join('');
+    };
+    for (let j = 0; j < w.length; j++) {
+      const ch = w[j];
+      if (ch === '{') { pila.push({ i: j, virgola: false, dentroGraffe: false }); continue; }
+      if (ch === ',') { if (pila.length) pila[pila.length - 1].virgola = true; continue; }
+      if (ch !== '}' || !pila.length) continue;
+      const { i, virgola, dentroGraffe } = pila.pop();
+      if (virgola) {
+        const s = segnata();
+        const prima = s.slice(0, i);
+        const dopo = s.slice(j + 1);
+        return s.slice(i + 1, j).split(',').map((x) => prima + x + dopo);
+      }
+      // Un intervallo non contiene graffe: solo lì serve leggere il contenuto.
+      const r = dentroGraffe ? null : /^(-?\d+|[A-Za-z])\.\.(-?\d+|[A-Za-z])(?:\.\.-?\d+)?$/.exec(w.slice(i + 1, j));
+      const numeri = r && /\d/.test(r[1]) && /\d/.test(r[2]);
+      if (r && (numeri || (!/\d/.test(r[1]) && !/\d/.test(r[2])))) {
+        const a = numeri ? Number(r[1]) : r[1].charCodeAt(0);
+        const b = numeri ? Number(r[2]) : r[2].charCodeAt(0);
+        if (Math.abs(b - a) >= GRAFFE_MAX) return Array(GRAFFE_MAX + 1).fill('');
+        const s = segnata();
+        const prima = s.slice(0, i);
+        const dopo = s.slice(j + 1);
+        const passo = a <= b ? 1 : -1;
+        const voci = [];
+        for (let v = a; v !== b + passo; v += passo) voci.push(prima + (numeri ? String(v) : String.fromCharCode(v)) + dopo);
+        return voci;
+      }
+      inerti.add(i);
+      inerti.add(j);
+      if (pila.length) pila[pila.length - 1].dentroGraffe = true;
+    }
+    return inerti.size ? [segnata()] : null;
+  }
+  // I segni delle graffe inerti mentre si aprono le altre: `graffe` li rimette come erano.
+  const SEGNI_INERTI = '';
+
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
@@ -839,6 +955,7 @@
   function argomenti(raw, c) {
     const win = c.win;
     const posix = shellPosix(c);
+    const powershell = forsePowerShell(c);
     const out = [];
     const s = String(raw);
     let cur = '';
@@ -851,7 +968,8 @@
         // `%NOME%` si espande in cmd anche fra virgolette; `+%H:%M` è il formato di `date`.
         const nomi = nomiVariabili(espande, { percento: false })
           .concat(cur.startsWith('+') ? [] : nomiVariabili(cur, { dollaro: false }));
-        out.push({ testo: cur, variabile: nomi.some((n) => !VAR_INNOCUE.has(n)), ignoto });
+        const variabile = nomi.some((n) => !VAR_INNOCUE.has(n)) || (powershell && variabilePowerShell(espande));
+        out.push({ testo: cur, variabile, ignoto });
       }
       cur = ''; espande = ''; aperto = false; ignoto = false;
     };
@@ -860,6 +978,7 @@
       if (q) {
         if (ch === q) { q = ''; continue; }
         if (posix && q === '"' && ch === '\\' && /[$`"\\]/.test(s[i + 1] || '')) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
+        if (c.vuote && q === '"' && ch === '$' && espansione(s, i + 1)) { i += espansione(s, i + 1); continue; }
         cur += ch;
         if (q === '"') espande += ch;
         continue;
@@ -874,10 +993,13 @@
         continue;
       }
       if (ch === '$' && (s[i + 1] === '\'' || s[i + 1] === '"')) { aperto = true; continue; }
+      if (c.vuote && ch === '$' && espansione(s, i + 1)) { i += espansione(s, i + 1); continue; }
       if (ch === '"' || ch === '\'') { q = ch; aperto = true; espande += ' '; continue; }
       if (posix && ch === '\\' && i + 1 < s.length) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
       if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
+      // PowerShell passa a un programma un elenco `a,'--output=x'` come argomenti separati.
+      if (c.elenchi && ch === ',') { chiudi(); continue; }
       cur += ch;
       espande += ch;
     }
@@ -1157,11 +1279,18 @@
     // In una cwd di rete ogni nome dato a git va al remoto: come file della cartella
     // o come riferimento (`.git/refs/<nome>`). Lo si misura come un percorso, come `ls` (#1072.4).
     const reteNome = !!(c.cwd && c.cwd.rete);
-    const percorsi = [];
+    // Di `--git-dir=<x>/.git` conta il repository `<x>`: la sua cartella `.git` è nascosta per costruzione.
+    const percorsi = testi.slice(0, Math.max(k, 0)).filter((a) => GIT_GLOBALE_CARTELLA.test(a)).map((a) => {
+      const p = a.slice(a.indexOf('=') + 1);
+      return /^--git-dir=/.test(a) ? p.replace(/(^|[\\/])\.git[\\/]*$/i, (m, s) => s || '.') : p;
+    });
     args.forEach((a, i) => {
-      // `git blame --contents <file>` stampa riga per riga un file qualsiasi: è una lettura di quel file.
-      if (sub === 'blame' && /^--contents=/.test(a)) { percorsi.push(a.slice('--contents='.length)); return; }
-      if (sub === 'blame' && i > 0 && args[i - 1] === '--contents') { percorsi.push(a); return; }
+      // `git blame --contents <file>` stampa un file qualsiasi come se fosse quello del repository (#1994, #2292).
+      const contenuto = opzioneLunga(a, 'contents', 3);
+      if (contenuto != null) {
+        percorsi.push(a.includes('=') ? contenuto : args[i + 1] || '');
+        return;
+      }
       if (a.startsWith('-')) return;
       if (libero || (sep >= 0 && i > sep) || (reteNome && (sep < 0 || i < sep))) { percorsi.push(a); return; }
       const m = /^[^:\\/]*:(.+)$/.exec(a);
@@ -1376,7 +1505,7 @@
         if (nome === '--target-directory') target = v.length ? v.join('=') : testi[++i];
         else if (nome === '--no-clobber' || (nome === '--update' && /^none/.test(v.join('=')))) noClobber = true;
         else if (nome === '--no-target-directory') maiDentro = true;
-        else if (nome === '--force') forzato = true;
+        else if (opzioneLunga(nome, 'force', 2) != null) forzato = true;
         else if (nome === '--suffix' && !v.length) i += 1;
         continue;
       }
@@ -1510,8 +1639,22 @@
       }
       case 'unzip':
         return opzione(/^-[A-Za-z]*o/) ? PUO_SOVRASCRIVERE : '';
+      case 'file': {
+        let magia = 'magic';
+        // Come la legge file: `--mag=x`, `-Cm x`, `-Cmx`; dopo `-e`, `-f`, `-F` o `-P` il resto del gruppo è il loro valore.
+        testi.forEach((t, i) => {
+          const lunga = opzioneLunga(t, 'magic-file', 2);
+          if (lunga != null) { magia = lunga || testi[i + 1] || ''; return; }
+          if (!/^-[^-]/.test(t)) return;
+          for (let k = 1; k < t.length; k++) {
+            if (t[k] === 'm') { magia = t.slice(k + 1) || testi[i + 1] || ''; return; }
+            if ('efFP'.includes(t[k])) return;
+          }
+        });
+        return magia && !magia.includes(':') ? copiaSovrascrive([], `${nomeDi(magia)}.mgc`, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
+      }
       case 'gzip': case 'gunzip':
-        return opzione(/^-[A-Za-z]*f|^--force$/) ? PUO_SOVRASCRIVERE : '';
+        return opzione(/^-[A-Za-z]*f/) || testi.some((t) => opzioneLunga(t, 'force', 2) != null) ? PUO_SOVRASCRIVERE : '';
       case 'rename':
         // Il `rename` di Linux sostituisce un file che c'è già; `ren` di Windows no, e lì `rename` è lui.
         return stile === 'posix' && !opzione(/^-[A-Za-z]*[no]|^--(no-act|no-overwrite)$/) ? PUO_SOVRASCRIVERE : '';
@@ -1520,9 +1663,29 @@
     }
   }
 
-  function classifyOneDet(raw, c) {
+  // Il programma riceve il comando dopo la shell: escape tolti, `$'…'` e `$"…"` decodificati, le espansioni che possono
+  // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte, gli elenchi di PowerShell spezzati.
+  // Le opzioni si cercano anche lì, e vale la lettura peggiore (#1994). Ciò che non si sa riprodurre (una variabile di
+  // cmd tagliata) è ignoto e chiede (`nomiVariabili`). cmd toglie i suoi `^` prima, in `comeLaShell`.
+  function classifyOneLetto(raw, c) {
     const base = classifyOne(raw, c.shell);
-    if (base === 2) {
+    if (base === 3 || c.shell === 'cmd' || !/[\\${,]/.test(raw)) return base;
+    const elenchi = forsePowerShell(c);
+    let det = base;
+    for (const vuote of [false, true]) {
+      const parole = argomenti(raw, { ...c, vuote, elenchi }).map((a) => a.testo);
+      const aperte = shellPosix(c) || c.sistemaIgnoto ? graffe(parole) : parole;
+      if (!aperte) return 3;
+      det = Math.max(det, classifyOne(aperte.join(' '), c.shell));
+    }
+    return det;
+  }
+
+  function classifyOneDet(raw, c) {
+    const base = classifyOneLetto(raw, c);
+    // Git con `--output` vale 3 comunque (#1994); sopra un file che c'è già si dice anche perché (#2292).
+    const gitOutput = base === 3 && programOf(dequote(raw)) === 'git' && gitScriveFile(dequote(raw));
+    if (base === 2 || gitOutput) {
       const motivo = sovrascrive(raw, c);
       if (motivo) return { level: 3, motivo };
     }
@@ -1831,7 +1994,7 @@
   // Per cmd `'` è testo (`' \\host\x '` sono tre argomenti), per i programmi C anche `\"` (findstr); i programmi
   // MSYS (cat, ls di Git) leggono `'` come virgolette. Vale la lettura peggiore, a pari livello la prima (#1072.5).
   function comeLaShell(cmd, c) {
-    if (!c.win) return [cmd];
+    if (!c.win && c.shell !== 'cmd') return [cmd];
     if (c.shell === 'cmd') {
       const l = comeCmd(cmd);
       if (l == null) return null;
@@ -1847,6 +2010,7 @@
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
+    if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
     const letture = comeLaShell(cmd, c);
     if (letture == null) return TRE;
     const contesti = forseDash(c) && APICE_CHE_DASH_CHIUDE.test(cmd) ? [c, { ...c, senzaAnsi: true }] : [c];
@@ -1863,8 +2027,18 @@
     if (seq && seq.length) {
       let cands = [c];
       let det = UNO;
+      const ultimi = [];
       for (const part of seq) {
-        for (const cc of cands) det = peggiore(det, classifyOneDet(part, cc));
+        let forme = [part];
+        if (usaUltimoArg(part, c)) {
+          const valori = [...new Set(ultimi.flat())];
+          if (!ultimi.length || ultimi.includes(null) || valori.length > ULTIMI_MAX) return TRE;
+          forme = valori.map((v) => part.replace(ULTIMO_ARG_RE, () => comeParola(v)));
+        }
+        for (const f of forme) {
+          for (const cc of cands) det = peggiore(det, classifyOneDet(f, cc));
+          ultimi.push(ultimiArgomenti(f, c));
+        }
         if (!SPOSTAMENTI.has(programOf(dequote(part)))) continue;
         const visti = new Map();
         for (const cc of cands.concat(cands.map((x) => spostati(part, x)))) visti.set(chiaveCwd(cc), cc);
@@ -1877,7 +2051,8 @@
     // più. Basta un segmento non riconosciuto, o uno scriptblock che invochi, e si torna a 3.
     const pipe = splitSafePipeline(trimmed);
     if (pipe) {
-      if (!pipe.every((p) => segmentIsRead(p, true))) return TRE;
+      if (usaUltimoArg(trimmed, c)) return TRE;
+      if (!pipe.every((p) => segmentIsRead(p, true, c))) return TRE;
       const progs = pipe.map((p) => programOf(dequote(p)));
       const cp = progs.some((x) => SPOSTAMENTI.has(x)) ? { ...c, cwd: null } : c;
       let det = UNO;
@@ -1901,9 +2076,35 @@
 
     // Pipe / background / redirezioni / sostituzioni: non riconoscibili → 3.
     if (!seq && CHAIN_RE.test(trimmed)) return TRE;
+    if (usaUltimoArg(trimmed, c)) return TRE;
 
     return classifyOneDet(trimmed, c);
   }
+
+  // In sh e bash `$_` vale l'ultimo argomento del comando eseguito prima, che sceglie chi scrive la riga (#1994): si
+  // misura con ognuno dei valori che può prendere. In testa alla riga, in un tubo o da un valore ignoto non si sa.
+  // Senza contesto resta la lettura di PowerShell, dove `$_` è l'oggetto del tubo.
+  const ULTIMO_ARG_RE = /\$_(?!\w)/g;
+  const ULTIMI_MAX = 16;
+  function usaUltimoArg(s, c) {
+    return shellPosix(c) && /\$_(?!\w)/.test(s);
+  }
+  function ultimiArgomenti(raw, c) {
+    const out = [];
+    for (const vuote of [false, true]) {
+      const args = argomenti(raw, { ...c, vuote });
+      const ultimo = args[args.length - 1];
+      if (!ultimo || ultimo.variabile || ultimo.ignoto) return null;
+      const parole = graffe(args.map((a) => a.testo));
+      if (!parole || !parole.length) return null;
+      out.push(parole[parole.length - 1]);
+      // bash toglie le parole vuote nate da graffe o da "$@" (`echo --output=x {,}` lascia `--output=x` in `$_`).
+      const piene = parole.filter(Boolean);
+      if (piene.length) out.push(piene[piene.length - 1]);
+    }
+    return out;
+  }
+  const comeParola = (v) => (/^[\w./:=@%+,-]+$/.test(v) ? v : `'${v.replace(/'/g, "'\\''")}'`);
 
   // Livello di sicurezza del comando: 1 | 2 | 3. Mai null: l'ignoto è 3.
   function classify(cmd, ctx) {
