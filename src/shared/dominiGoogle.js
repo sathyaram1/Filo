@@ -71,7 +71,7 @@
   }
 
   const api = {
-    SITO_GOOGLE, diGoogle, sitoDelContenitore, googleNellElenco, ElencoConGoogle, sitiDeiFidati, cookieDiAccesso, NOMI_ACCESSO,
+    SITO_GOOGLE, diGoogle, delMarchio, sitoDelContenitore, googleNellElenco, ElencoConGoogle, sitiDeiFidati, cookieDiAccesso, NOMI_ACCESSO,
   };
   global.SN_DOMINI_GOOGLE = api;
   if (typeof module !== 'undefined' && module.exports) module.exports = api;
