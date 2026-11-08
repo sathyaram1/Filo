@@ -229,12 +229,13 @@ test('git: le impostazioni di un sottomodulo fanno chiedere come quelle del repo
     git(['clone', '-q', '../sub', 'sub'], nudo);
     const sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: join(nudo, 'sub'), encoding: 'utf8' }).trim();
     git(['update-index', '--add', '--cacheinfo', `160000,${sha},sub`], nudo);
-    git(['config', 'core.fsmonitor', `programma-inesistente-filo-2292 ${segno}`], join(nudo, 'sub'));
+    git(['config', 'core.fsmonitor', programmaSegno(segno)], join(nudo, 'sub'));
     assert.equal(T.gitLanciaIn(nudo), 'si');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
     for (const cmd of ['git status', 'git diff']) {
       assert.equal(C.classify(cmd, { cwd: ostile, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2, cmd);
     }
+    segnoVero(ostile, segno);
   } finally {
     togliCartella(base);
   }
