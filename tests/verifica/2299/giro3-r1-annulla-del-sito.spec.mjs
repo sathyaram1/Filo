@@ -70,6 +70,60 @@ test("r1 a ogni Ctrl+A dell'utente nella casella lo script del sito non distingu
   expect(esito.ignota).toBeLessThan(esito.conosciuta * 1.5 + 3);
 });
 
+// Un'immagine incollata in una casella modificabile: negli appunti non c'è testo, e nello stesso `input` lo script del
+// sito mette la sua sonda al posto del contenuto.
+const PAGINA_IMMAGINE = `<!doctype html><meta charset="utf-8">
+<body style="margin:0;padding:40px;font:16px sans-serif">
+  <div id="ce" contenteditable="true" lang="it" style="width:600px;min-height:120px;font:16px sans-serif;border:1px solid #999"></div>
+<script>
+  window.durate = [];
+  window.sonde = [];
+  let t0 = 0, sonda = null, vero = '';
+  window.addEventListener('input', (e) => {
+    if (!e.isTrusted || e.inputType !== 'insertFromPaste' || !window.sonde.length) return;
+    sonda = window.sonde.shift();
+    vero = e.target.innerHTML;
+    e.target.textContent = (sonda + ' ').repeat(1500);
+    t0 = performance.now();
+  }, true);
+  window.addEventListener('input', (e) => {
+    if (!sonda) return;
+    window.durate.push({ sonda, ms: performance.now() - t0 });
+    e.target.innerHTML = vero;
+    sonda = null;
+  });
+</script>
+</body>`;
+
+test("r1 a ogni immagine incollata dall'utente in una casella modificabile lo script del sito non distingue dai tempi le parole del dizionario", async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: false },
+    });
+    await globalThis.chrome.storage.local.set({ sn_personal_dict: ['Zanzottera'] });
+  });
+  const page = await testServer.openReady(openTab, PAGINA_IMMAGINE, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const w = 48, h = 32;
+    const px = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) px.set([30, 60, 200, 255], i * 4);
+    const png = nativeImage.createFromBitmap(px, { width: w, height: h }).toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
+  });
+  await page.click('#ce');
+  await page.keyboard.type('ciao ', { delay: 60 });
+  await page.evaluate(() => { for (let i = 0; i < 5; i++) window.sonde.push('zanzottera', 'quseta'); });
+  for (let i = 0; i < 10; i++) { await page.keyboard.press('Control+v'); await page.waitForTimeout(200); }
+  const durate = await page.evaluate(() => window.durate);
+  const med = (p) => { const x = durate.filter((d) => d.sonda === p).map((d) => d.ms).sort((a, b) => a - b); return x[Math.floor(x.length / 2)]; };
+  console.log('immagine', JSON.stringify({ conosciuta: med('zanzottera'), ignota: med('quseta') }));
+  expect(durate).toHaveLength(10);
+  expect(med('quseta')).toBeLessThan(med('zanzottera') * 1.5 + 3);
+});
+
 test("r1 dopo un Ctrl+clic fuori dalla casella lo script del sito, senza altri gesti, non distingue dai tempi le parole del dizionario", async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   // Ctrl+clic su un link della pagina: il Ctrl si preme nella casella, si rilascia fuori.
