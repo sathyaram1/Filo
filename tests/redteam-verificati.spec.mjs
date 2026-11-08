@@ -271,7 +271,7 @@ test('#810.15 — pannello su un sito da non connesso: il clic apre l\'accesso, 
   await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(1);
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toContain('Completa l’accesso');
   await app.evaluate(() => globalThis.__completaAccesso());
-  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('50 cr');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('Invia attacco');
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toContain('Sei dentro');
   await clicca(app, page, '.sn-rt-send');
   await expect.poll(() => chiamate.filter((u) => u === '/redteamSubmit').length).toBe(1);
