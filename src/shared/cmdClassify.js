@@ -506,10 +506,7 @@
   // `--output` (e le sue abbreviazioni) scrive l'uscita in un file scelto dal comando, col testo che sceglie
   // `--format`: con log, show, diff, shortlog… una lettura diventa la scrittura di un file qualsiasi (#1994).
   function gitScriveFile(cmd) {
-    return tokens(cmd).slice(1).some((t) => {
-      const m = /^--([a-z-]+)(=|$)/i.exec(t);
-      return !!m && m[1].length >= 2 && 'output'.startsWith(m[1].toLowerCase());
-    });
+    return tokens(cmd).slice(1).some((t) => opzioneLunga(t, 'output', 2) != null);
   }
 
   function classifyGit(cmd) {
