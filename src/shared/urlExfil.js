@@ -849,8 +849,8 @@
       if (!s || s[1].length < 2 || /^file$/i.test(s[1])) return;
       metti(/^https?$/i.test(s[1]) ? u : `http://${u.slice(s[0].length)}`);
     };
-    // Fra virgolette un indirizzo tiene anche gli spazi.
-    const resto = cmd.replace(/(["'])\s*([a-z][a-z0-9+.-]*:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { conSchema(u); return ' '; })
+    // Fra virgolette un indirizzo tiene anche gli spazi; una virgoletta a metà parola (`h"ttps://`) la shell la toglie.
+    const resto = cmd.replace(/(?<![a-z0-9+.-])(["'])\s*([a-z][a-z0-9+.-]*:\/\/[^"']*?)\s*\1/gi, (_m, _q, u) => { conSchema(u); return ' '; })
       .replace(/["']/g, '')
       .replace(/\b[a-z][a-z0-9+.-]*:\/\/[^\s<>()|;]+/gi, (m) => { conSchema(m); return ' '; });
     const C = global.SN_CMD_CLASSIFY;
