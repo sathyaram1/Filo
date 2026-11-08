@@ -771,7 +771,7 @@ function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
   const sito = sitoDegliScaricamenti(origine);
   if (!ses._filoSenzaGesto) ses._filoSenzaGesto = new Map();
   if (gestoPerUnoScaricamento(wc, gesto, adesso)) { ses._filoSenzaGesto.set(sito, adesso); return { esito: 'via', origine }; }
-  const scelta = sceltePer(ses).get(`${origine}|${SCARICAMENTI}`);
+  const scelta = sceltaScaricamenti(ses, origine);
   if (scelta === true) return { esito: 'via', origine };
   if (scelta === false) { segnaNegati(wc, origine, [SCARICAMENTI]); return { esito: 'no', origine }; }
   const prima = ses._filoSenzaGesto.get(sito);
