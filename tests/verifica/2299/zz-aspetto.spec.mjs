@@ -23,6 +23,7 @@ for (const tema of ['light', 'dark']) {
     await page.click('#ta');
     await page.keyboard.type('oggi quseta e domani la squadra ha vinto 14xx partite di fila ', { delay: 20 });
     await page.waitForTimeout(2500);
+    await page.screenshot({ path: `tests/.shots/2299-giro3-ta-${tema}.png` });
     await page.click('#ce');
     await page.keyboard.type('una frase con un erore e un altro sbaglo ', { delay: 20 });
     await page.waitForTimeout(2500);
