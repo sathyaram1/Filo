@@ -1780,14 +1780,31 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
     memoria,
     daPagina,
   });
-  if (v.blocca || !indirizzo || !provenienza) return v;
+  if (v.blocca || !provenienza) return v;
+  // Un comando che va in rete: la stessa regola per ogni indirizzo che contatta (#2293). Il peggiore decide.
+  if (tipo === 'ESEGUI_COMANDO') {
+    const lista = Array.isArray(v.indirizzi) ? v.indirizzi : [];
+    if (!lista.length || !testoDiSconosciuti(azioni)) return v;
+    const esiti = [];
+    for (const x of lista) esiti.push(await indirizzoScritto(tipo, x.url, { ...v, exfil: x.exfil, reason: x.reason }, { sender, azioni, provenienza, testoParole, memoria }));
+    const mai = esiti.find((e) => e.nonCompare);
+    const dati = esiti.find((e) => e.exfil || (e.nonCompare && e.datiReason));
+    if (mai) return { ...v, exfil: false, reason: '', nonCompare: true, insiste: esiti.some((e) => e.insiste), datiReason: dati ? (dati.datiReason || dati.reason) : '' };
+    return { ...v, exfil: !!dati, reason: dati ? dati.reason : '' };
+  }
+  if (!indirizzo) return v;
   // Si giudica l'indirizzo che partirà: senza «https://», fra virgolette o con due barre, lettura e apertura lo completano.
   const web = indirizzoCaricato(tipo, indirizzo);
   if (!/^https?:/i.test(web)) return v;
   // La regola dell'indirizzo scritto (#553, decisione su D-20) vale solo dopo che nella chat è entrato testo di
-  // sconosciuti: prima nessuno può aver dettato al modello dove portare i dati. Compare → costo 1; dall'elenco dei siti
-  // o dal modulo di ricerca di un sito → le parole come una ricerca sul web; scritto dal modello → costo 3, con un OK.
+  // sconosciuti: prima nessuno può aver dettato al modello dove portare i dati.
   if (!testoDiSconosciuti(azioni)) return v;
+  return indirizzoScritto(tipo, web, v, { sender, azioni, provenienza, testoParole, memoria });
+}
+
+// Compare → costo 1; dall'elenco dei siti o dal modulo di ricerca di un sito → le parole come una ricerca sul web;
+// scritto dal modello → costo 3, con un OK (#553).
+async function indirizzoScritto(tipo, web, v, { sender, azioni, provenienza, testoParole, memoria }) {
   const schede = schedeLeggibili(sender);
   // Una pagina che la lettura trova aperta in una scheda si legge da lì: niente esce.
   if (tipo === 'LEGGI_PAGINA' && PageRead.trovaScheda(web, schede)) return { ...v, exfil: false, reason: '' };
@@ -1798,7 +1815,7 @@ async function giudicaUscita(action, { sender = null, contesto = null, provenien
   });
   if (ver.compare) return { ...v, exfil: false, reason: '' };
   if (ver.sito) {
-    const r = Exfil.valutaRicerca(ver.sito.parole, { memoria, azioni });
+    const r = globalThis.SN_URL_EXFIL.valutaRicerca(ver.sito.parole, { memoria, azioni });
     return { ...v, exfil: r.exfil, reason: r.reason };
   }
   // Se il controllo di prima ci vede dei dati, il pannello lo dice.
