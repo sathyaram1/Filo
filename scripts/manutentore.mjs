@@ -16,6 +16,9 @@ import { impronta, leggiNote } from './release-novita.mjs';
 import { passaIlCancello, scegliUltimoVerde } from './ultima-suite-verde.mjs';
 import { CAUSE_MODIFICATO, CAUSE_NON_LETTO, famigliaPrezzo, leggiNotaRifiuti, NOTA_RIFIUTI, PREZZI, RIFIUTO_MODIFICATO, RIFIUTO_NON_LETTO, rifiutiVuoti } from './session-report.mjs';
 import '../src/shared/feedbackAttese.js';
+import '../src/shared/prioritaTre.js';
+
+const PRIORITA_TRE = globalThis.SN_PRIORITA_TRE;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 
