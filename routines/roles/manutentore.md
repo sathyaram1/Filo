@@ -193,16 +193,21 @@ tocca davvero dati degli utenti o la direzione del prodotto, portala all'owner c
 
 ## Il taccuino
 
-Un documento sul server, letto a ogni accensione e riscritto intero alla fine (`taccuino scrivi - --versione <V>`, con
-la versione che hai letto: se intanto l'owner ci ha scritto un'indicazione, il server rifiuta e lo rileggi). Sopravvive al
-PC spento, ai compattamenti e a una sessione morta. Cinque parti:
+Un documento sul server, letto a ogni accensione e aggiornato a sezioni alla fine: riscrivi solo quelle cambiate, una
+per comando (`taccuino sezione <nome> - --versione <V>`, con la versione che hai letto: se intanto l'owner ci ha scritto
+un'indicazione, il server rifiuta e lo rileggi). Le altre restano come sono, byte per byte. Sopravvive al PC spento, ai
+compattamenti e a una sessione morta. Cinque sezioni, ognuna sotto la sua intestazione `## <nome>`, in quest'ordine:
 
-- **stato**: criterio del giorno per le priorità, N e perché, account in uso;
-- **problemi che segui**, uno per riga: segnale, ipotesi, prossimo controllo e quando;
-- **esperimenti** in corso e conclusi, con la misura prima e dopo;
-- **indicazioni dell'owner**, con la data («priorità a ciò che cambia la grafica», 31/10): la decisione del mattino
-  le legge, il recap dice come le hai applicate; le togli tu, o l'owner, quando sono esaurite;
-- **misure** che tieni d'occhio: fusioni al giorno, costo per fusione, riallineamenti, guasti per famiglia.
+- `## stato`: criterio del giorno per le priorità, N e perché, account in uso;
+- `## problemi` che segui, uno per riga: segnale, ipotesi, prossimo controllo e quando;
+- `## esperimenti` in corso e conclusi, con la misura prima e dopo;
+- `## misure` che tieni d'occhio: fusioni al giorno, costo per fusione, riallineamenti, guasti per famiglia;
+- `## indicazioni` dell'owner, con la data («priorità a ciò che cambia la grafica», 31/10): la decisione del mattino
+  le legge, il recap dice come le hai applicate; le togli tu, o l'owner, quando sono esaurite. Resta l'ultima: le
+  indicazioni nuove arrivano in coda al taccuino, e così cadono dentro di lei.
+
+Un taccuino che non ha ancora queste intestazioni lo riscrivi intero una volta (`taccuino scrivi - --versione <V>`),
+tenendo ogni indicazione dell'owner; da lì in poi, a sezioni.
 
 Il registro delle decisioni (i principi delle domande chiuse) sta a parte e si legge insieme (`registro <parole>`).
 
