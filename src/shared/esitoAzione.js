@@ -234,6 +234,8 @@
       const generica = SENZA_TITOLO[type] ? SENZA_TITOLO[type][x.esito === CHIESTO ? 0 : 1] : '';
       return senzaVuoti({
         type, esito: x.esito, riga: generica || breve(x.riga, MAX_RIGA), motivo: breve(x.motivo, MAX_MOTIVO), file: f,
+        link: type === 'NAVIGA' && x.link ? linkDi(x.link) : null,
+        salvate: type === 'CERCA_SALVATE' && x.salvate ? salvateDi(x.salvate) : null,
         proposta: generica ? '' : breve(x.proposta, MAX_RIGA),
         evento: type === 'EVENTO_CALENDARIO' && x.esito === PROPOSTO && x.evento ? eventoDi(x.evento) : null,
         partita: x.esito === FALLITO && x.partita === true, riprova: x.esito === FALLITO && x.riprova === true,
