@@ -921,7 +921,8 @@ function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '')
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
-  if (attesa) chiediNellaFinestra(webContents, rec);
+  if (attesaExe) chiediNellaFinestra(webContents, rec);
+  else if (perPiuFile) chiediPiuFile(webContents, rec);
   // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
   // target=_blank. Deferito così il ciclo di vita del download (già preso in
   // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
