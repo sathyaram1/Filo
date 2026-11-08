@@ -1685,7 +1685,7 @@
       const parole = argomenti(raw, { ...c, vuote, elenchi }).map((a) => a.testo);
       const aperte = shellPosix(c) || c.sistemaIgnoto ? graffe(parole) : parole;
       if (!aperte) return 3;
-      det = Math.max(det, classifyOne(aperte.join(' ')));
+      det = Math.max(det, classifyOne(aperte.join(' '), c.shell));
     }
     return det;
   }
