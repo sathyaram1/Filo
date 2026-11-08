@@ -227,6 +227,14 @@ describe('l’esito di un’approvazione', () => {
     const pc = UI.outcomeMessage({ ok: true, result: 'server', esito: 'al_pc' });
     assert.equal(pc.kind, 'ok');
     assert.match(pc.text, /^Approvata: .*tuo PC/);
+    // #2199.2: il server non si fonde adesso, e l'app non entra da sola.
+    for (const esito of ['rimandato', 'all_owner']) {
+      const m2 = UI.outcomeMessage({ ok: true, result: 'server', esito });
+      assert.equal(m2.kind, 'warn', esito);
+      assert.match(m2.text, /^Approvata, ma .*l’app non entra da sola/, esito);
+    }
+    assert.match(UI.outcomeMessage({ ok: true, result: 'server', esito: 'rimandato' }).text, /torna alle routine/);
+    assert.match(UI.outcomeMessage({ ok: true, result: 'server', esito: 'all_owner' }).text, /torna a te/);
     assert.equal(UI.branchLabel({ branch: 'worker/x', repo: 'server' }), 'server · worker/x');
     assert.equal(UI.branchLabel({ branch: 'worker/x' }), 'worker/x');
   });
