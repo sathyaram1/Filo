@@ -502,6 +502,28 @@ test('il grezzo che resta ha un tetto in token: turni pesanti lasciano spazio so
   assert.equal(L.sogliaAnticipo({ soglia: 70000 }), 70000 * L.QUOTA_ANTICIPO);
 });
 
+test('dopo una compattazione entrano almeno tre turni come quelli di adesso prima della prossima, qualunque sia la parte fissa', () => {
+  const ora = Date.parse('2026-11-04T18:00:00Z');
+  const peso = (m) => m.peso;
+  const soglia = 70000;
+  for (const T of [3000, 5000, 6000]) {
+    for (let base = 30000; base <= 50000; base += 250) {
+      if ((soglia - base) * L.QUOTA_ANTICIPO < (L.TURNI_LIBERI + 1) * T) continue;
+      const lista = [];
+      for (let i = 0; i < 8; i++) lista.push(msg('ab', 'user', 80 - i * 5, `d${i}`, ora, { peso: T - 100 }), msg('ab', 'filo', 79 - i * 5, `r${i}`, ora, { peso: 100 }));
+      const turno = L.pesoTurno(lista, peso);
+      assert.equal(turno, T);
+      const k = L.puntoDiTaglio(lista, { ora, maxToken: L.grezzoMassimo({ soglia, base, turno }), peso });
+      const grezzo = lista.slice(k).reduce((a, m) => a + m.peso, 0);
+      let j = 1;
+      while (base + grezzo + j * T <= L.sogliaAnticipo({ soglia, base })) j++;
+      assert.ok(j > L.TURNI_LIBERI, `turni da ${T}, parte fissa ${base}: la compattazione dopo arriva al messaggio ${j}`);
+    }
+  }
+  assert.equal(Math.round(L.grezzoMassimo({ soglia, base: 38000, turno: 3000 })), Math.round(32000 / 3), 'con turni leggeri vale la quota di prima');
+  assert.equal(L.pesoTurno([], peso), 0);
+});
+
 test('la compattazione usa la parte fissa dell\'ultimo turno: con turni pesanti lascia meno grezzo', async () => {
   const { chiamate } = azzera();
   const ora = Date.now();
