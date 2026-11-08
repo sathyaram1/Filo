@@ -30,7 +30,7 @@ const patch = [];
 const chiamate = [];
 // Acceso, le funzioni del Red Team rispondono come il server in pausa.
 let serverInPausa = false;
-// Millisecondi prima che l'invio riesca (0 = crediti insufficienti, subito).
+// Millisecondi prima che l'invio riesca (0 = tetto del giorno raggiunto, subito).
 let invioLento = 0;
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
