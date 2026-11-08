@@ -287,6 +287,11 @@ const conGit = (() => { try { execFileSync('git', ['--version'], { stdio: 'ignor
 // Windows toglierebbe l'unità dal percorso, e la sonda guarderebbe una cartella che non esiste (#2334).
 const QUI = { win: process.platform === 'win32', maiuscole: process.platform === 'win32' || process.platform === 'darwin', shell: 'sh' };
 const sondaVera = (cwd, home) => ({ ...QUI, cwd, home, gitLancia: T.gitLanciaIn });
+
+test('le prove con la sonda git vera non presumono il sistema: il contesto lo dà sondaVera', () => {
+  const src = readFileSync(fileURLToPath(import.meta.url), 'utf8');
+  assert.doesNotMatch(src, /win: (?:false|true)[^\n]*gitLancia: T\.gitLanciaIn/);
+});
 // git lancia fsmonitor con la sua shell, anche su Windows: touch c'è ovunque ci sia git.
 const programmaSegno = (segno) => `touch "${segno.replace(/\\/g, '/')}"`;
 // La prova vale solo se il programma del repository parte davvero quando lo lancia git.
