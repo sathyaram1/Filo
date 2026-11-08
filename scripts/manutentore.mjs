@@ -581,6 +581,8 @@ export function rigaSchedaServer(s, locale = null) {
     Array.isArray(s.unisce) && s.unisce.length ? `pacchetto di ${numeri(s.unisce)}` : '',
     ...pezziAttese(s.aspetta, s.aspettava, s.nonFermano),
     s.ramo ? `ramo ${unaRiga(s.ramo)}` : '',
+    testoMittente(s.mittente),
+    unaRiga(s.nato) ? `nato ${unaRiga(s.nato)}` : '',
   ].filter(Boolean).join(' · ');
   const titolo = s.titolo ? unaRiga(s.titolo) : (s.riservato ? '(riservato)' : '');
   const loc = locale ? ` [${unaRiga(locale.area) || '?'}/${unaRiga(locale.tipo) || '?'}] ${unaRiga(locale.riassunto)}${
