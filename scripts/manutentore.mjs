@@ -1147,7 +1147,7 @@ const USO = `Uso: npm run manutentore -- <sottocomando> [--ticket <biglietto>]
   priorita <N> <0|1|2|3> | attesa <B> <A|C-12> [--togli] | pacchetto <P> <N,M,…> [--server]
   compito "<titolo>" - [--urgenza U] [--alle ISO] [--ambito A]   (istruzioni da stdin; risponde con l'id C-n)
   nota <N> - | sblocca <N> [nota] | archivia <N> <originale>
-  taccuino | taccuino scrivi - --versione <V> | indicazione "<testo>"
+  taccuino | taccuino scrivi - --versione <V> | taccuino sezione <nome> - --versione <V> | indicazione "<testo>"
   sveglia-tra <minuti> [--perche "…"] | sveglia-togli | segnali-letti
   account <A|B> spento|acceso | account primo <A|B|alterna> | routine spente|accese
   recap [giorno] | recap scrivi - [--giorno YYYY-MM-DD]
