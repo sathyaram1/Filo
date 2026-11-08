@@ -865,7 +865,7 @@ function dimentica(wc) {
   const { origine, scelte } = scelteDi(wc);
   if (!scelte.length) return { tolte: 0, ricarica: false };
   const mappa = sceltePer(wc.session);
-  for (const s of scelte) mappa.delete(`${origine}|${s.parte}`);
+  for (const s of scelte) mappa.delete(s.chiave || `${origine}|${s.parte}`);
   if (mappa === sceltePersistenti) salva();
   if (wc._filoSegni && wc._filoSegni.negati.size) { wc._filoSegni.negati.clear(); try { aggiornaScheda(wc); } catch (_) {} }
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
