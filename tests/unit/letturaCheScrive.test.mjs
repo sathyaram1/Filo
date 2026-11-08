@@ -335,3 +335,75 @@ test('il main dà al classificatore la sonda git, per i comandi scritti a mano e
   // Il classificatore la riceve dal perimetro: una sonda data nel contesto cambia il livello.
   assert.equal(C.classify('git status', { ...LINUX, gitLancia: () => 'si' }), 2);
 });
+
+// #2292 — git fa partire a una LETTURA anche un programma d'avvio (hook) che un repository estratto da un archivio
+// si porta dentro la cartella git, non solo le impostazioni. post-index-change lo lanciano git status e git diff a
+// ogni rinfresco dell'indice; gli hook di sola scrittura (pre-commit, pre-push) non partono a una lettura.
+const scriviHook = (cartellaHooks, nome, segno) => {
+  const h = join(cartellaHooks, nome);
+  writeFileSync(h, `#!/bin/sh\ntouch "${segno.replace(/\\/g, '/')}"\n`);
+  chmodSync(h, 0o755);
+};
+
+test('git: un programma d\'avvio che una lettura fa partire fa chiedere; quelli di sola scrittura no', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2292-hook-');
+  const segno = join(base, 'SEGNO');
+  try {
+    const repo = (nome, hook) => {
+      const d = join(base, nome);
+      mkdirSync(d);
+      execFileSync('git', ['init', '-q'], { cwd: d, stdio: 'ignore' });
+      writeFileSync(join(d, 'f'), 'a\n'); // un file tracciato: git status ne rinfresca l'indice
+      execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', 'commit', '-q', '-am', 'i'], { cwd: d, stdio: 'ignore' });
+      execFileSync('git', ['add', 'f'], { cwd: d, stdio: 'ignore' });
+      if (hook) scriviHook(join(d, '.git', 'hooks'), hook, segno);
+      return d;
+    };
+    const ostile = repo('ostile', 'post-index-change');
+    // pre-commit e pre-push sono comuni nei repository dell'utente e non partono a una lettura: non devono far chiedere.
+    const dev = repo('dev', 'pre-commit');
+    const dev2 = repo('dev2', 'pre-push');
+    assert.equal(T.gitLanciaIn(ostile), 'si');
+    for (const d of [dev, dev2]) assert.equal(T.gitLanciaIn(d), '', 'un hook di sola scrittura non fa chiedere');
+    assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
+    const ctx = (cwd) => ({ cwd, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn });
+    for (const cmd of ['git status', 'git diff']) {
+      assert.equal(C.classify(cmd, ctx(ostile)), 2, cmd);
+      const costo = AL.costoFor({ type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: ctx(ostile) });
+      assert.notEqual(A.decideDettaglio({ livello: 'default', stato: 'contaminato', costo, campo: 'terminale' }).risposta, 'si', cmd);
+    }
+    assert.equal(C.classify('git status', ctx(dev)), 1, 'un repository con un hook di commit resta una lettura libera');
+    // Il programma parte davvero a git status: senza la sonda sarebbe codice qualunque, senza domanda.
+    segnoVero(ostile, segno);
+  } finally {
+    togliCartella(base);
+  }
+});
+
+test('git: un programma d\'avvio di lettura in un sottomodulo fa chiedere come nel repository', { skip: conGit ? false : 'git non installato' }, () => {
+  const base = cartellaTemporanea('filo-2292-hook-sotto-');
+  const segno = join(base, 'SEGNO');
+  const git = (args, cwd) => execFileSync('git', ['-c', 'user.name=a', '-c', 'user.email=a@b', '-c', 'protocol.file.allow=always', ...args], { cwd, stdio: 'ignore' });
+  try {
+    const sub = join(base, 'sub');
+    mkdirSync(sub);
+    git(['init', '-q'], sub);
+    writeFileSync(join(sub, 'f'), 'a\n');
+    git(['add', 'f'], sub);
+    git(['commit', '-q', '-m', 's'], sub);
+    const parent = join(base, 'parent');
+    mkdirSync(parent);
+    git(['init', '-q'], parent);
+    git(['submodule', '-q', 'add', '../sub', 'sub'], parent);
+    git(['commit', '-q', '-m', 'i'], parent);
+    // Nell'archivio estratto l'hook sta nella cartella git del sottomodulo, dentro il repository principale.
+    scriviHook(join(parent, '.git', 'modules', 'sub', 'hooks'), 'post-index-change', segno);
+    assert.equal(T.gitLanciaIn(parent), 'si');
+    assert.equal(T.gitLanciaIn(join(parent, 'sub')), 'si', 'anche da dentro il sottomodulo');
+    assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
+    assert.equal(C.classify('git status', { cwd: parent, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 2);
+    segnoVero(parent, segno);
+  } finally {
+    togliCartella(base);
+  }
+});
