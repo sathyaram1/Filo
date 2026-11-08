@@ -136,6 +136,7 @@ test('una pagina che salta da sola fra siti di domini diversi, senza clic: arriv
     // La domanda è dell'ultimo sito, e il sì fa arrivare tutti i file presi dalla scheda nei salti.
     const barra = shell.locator('#permesso-bar');
     await expect(barra).toContainText('vuole scaricare più file', { timeout: 10_000 });
+    await expect(barra.locator('.permesso-si')).toBeEnabled({ timeout: 5_000 });
     await barra.locator('.permesso-si').click();
     await expect.poll(() => arrivati(dir, 'altrove').length, { timeout: 20_000 }).toBe(6);
   } finally {
