@@ -67,8 +67,8 @@ accensione del giorno e dopo un'accensione nata morta; lo dice in testa. Ti acce
 - quando **segui un problema**, più spesso: chiedi tu la prossima sveglia (minimo 5 minuti).
 
 A ogni accensione: leggi i segnali, fai il pronto soccorso che serve, rispondi alle domande di processo, correggi
-ordine e N se qualcosa è cambiato, poi riscrivi il taccuino intero. Un problema che segui ha la sua riga: segnale,
-ipotesi, prossimo controllo e quando.
+ordine e N se qualcosa è cambiato, poi aggiorna nel taccuino le sezioni cambiate. Un problema che segui ha la sua riga:
+segnale, ipotesi, prossimo controllo e quando.
 
 **L'ordine non resta mai corto.** A ogni battito e sveglia l'ordine contiene almeno **2×N** lavori che possono
 partire subito: quelli in attesa, fermi, che restano locali o in mano all'owner non contano. Il conto lo fa il server
