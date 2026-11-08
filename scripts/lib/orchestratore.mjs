@@ -31,7 +31,7 @@ export const OPZIONI_BASE = Object.freeze({
 });
 
 // I file del repo pubblico che il server incorpora al deploy: gli stessi di FONTI_PUBBLICHE in
-// filo-security/functions/tools/bake-shared.js (sentinella in tests/unit/orchestratore.test.mjs).
+// filo-security/functions/src/l5/fontiBake.js (il confronto gira nelle prove del server a ogni sua spinta).
 export const INCORPORATI_DAL_SERVER = Object.freeze([
   'src/shared/feedbackTransitions.js', 'src/shared/verifierRound.js', 'src/shared/domande.js', 'filo_filosofia.txt',
   'src/shared/mittenti.js', 'src/shared/politicaModelli.js', 'src/shared/ambiti.js', 'src/shared/ricorrenti.js',
