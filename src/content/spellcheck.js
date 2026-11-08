@@ -833,12 +833,13 @@
       }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
       // Il rilascio di Tab cade già sulla casella nuova; un clic in quella che aveva il fuoco da script non la rifocalizza.
-      for (const tipo of ['pointerdown', 'keydown', 'keyup']) {
+      // Anche le ripetizioni di un tasto tenuto: ognuna cambia il testo.
+      for (const tipo of ['pointerdown', 'keydown', 'keyup', 'paste', 'cut', 'drop', 'compositionend']) {
         el.addEventListener(tipo, (e) => {
           const vivo = monitored.get(el);
-          if (!vivo || vivo.toccato || !e.isTrusted) return;
-          vivo.toccato = true;
-          if (vivo.attivo) aggiornaCodice(vivo);
+          if (!vivo || !e.isTrusted) return;
+          vivo.permesso = Date.now();
+          if (vivo.attivo && testoDaControllare(el).testo !== vivo.testoCalcolato) aggiornaCodice(vivo);
         }, true);
       }
     }
