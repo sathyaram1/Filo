@@ -1501,10 +1501,21 @@
     return nuovo;
   }
 
+  // Su un sito il codice controlla una casella solo dopo un gesto vero dell'utente lì dentro (#2299): il testo che lo
+  // script del sito scrive in un campo suo non riceve segni, e dalla loro assenza non si sa niente del dizionario.
+  // `input` e `focus` non bastano: sono fidati anche quando li causa uno script (gesto.js).
+  function toccato(state) {
+    if (state.toccato) return true;
+    if (PAGINA_DI_FILO || radiceDi(state.el)) return (state.toccato = true);
+    const G = global.SN_GESTO;
+    if (G && G.prendi('toccato', undefined, G.dentro(state.el))) state.toccato = true;
+    return state.toccato;
+  }
+
   function calcolaCodice(state) {
     const d = testoDaControllare(state.el);
     const Rg = R();
-    if (!Rg) { state.codice = []; return false; }
+    if (!Rg || !toccato(state)) { state.codice = []; state.codiceT2 = []; state.codiceTesto = null; return false; }
     // Le x di un segnaposto non sono una parola sbagliata: il dizionario non le propone al controllo rapido.
     const segnaposti = segnapostiAttivi() ? Rg.segnaposti(d.testo) : [];
     const libero = (c) => !segnaposti.some((s) => c.start < s.end && c.end > s.start);
