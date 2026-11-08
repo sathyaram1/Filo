@@ -26,6 +26,19 @@ function ambienteComandi(base = process.env) {
   return out;
 }
 
+// cmd cerca un programma prima nella cartella di lavoro: dopo un `cd` in un archivio estratto, il `whoami` o il
+// `where git` del modello avvierebbero quelli dell'archivio (#2312). Questa variabile toglie la cartella dalla ricerca,
+// come in PowerShell: lì un programma della cartella si chiama con `.\`. Fuori da Windows la cartella non c'è già.
+const SENZA_CARTELLA_NELLA_RICERCA = 'NoDefaultCurrentDirectoryInExePath';
+function ambienteDelModello(base = process.env) {
+  const out = ambienteComandi(base);
+  if (process.platform !== 'win32') return out;
+  // Su Windows i nomi delle variabili non distinguono le maiuscole: una seconda copia potrebbe vincere su questa.
+  for (const k of Object.keys(out)) if (k.toLowerCase() === SENZA_CARTELLA_NELLA_RICERCA.toLowerCase()) delete out[k];
+  out[SENZA_CARTELLA_NELLA_RICERCA] = '1';
+  return out;
+}
+
 // Shell di default per piattaforma quando la preferenza non è impostata.
 //
 // Fuori da Windows è la shell di SISTEMA, non bash: dev'essere lo stesso
