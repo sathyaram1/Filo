@@ -3098,6 +3098,28 @@
     }
     return FILO_PARLA_DOWNLOAD_MIN.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
   }
+  // Il nome di una scelta, uguale nella chat e nell'elenco dei cambi.
+  function nomeRitmoDownload(min) {
+    return Number(min) === 60 ? 'al più ogni ora' : `al più ogni ${min} minuti`;
+  }
+  // I minuti detti come capita in chat: «30», «mezz'ora», «dieci minuti», «un'ora e mezza», «2 ore». NaN se non si capisce.
+  const NUMERI_A_PAROLE = { un: 1, uno: 1, una: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10,
+    quindici: 15, venti: 20, trenta: 30, quaranta: 40, cinquanta: 50, sessanta: 60 };
+  function minutiDaTesto(raw) {
+    const s = String(raw == null ? '' : raw).toLowerCase().replace(/[’`´]/g, "'").trim();
+    if (!s) return NaN;
+    const mezza = /\bmezz'?or[ae]\b|\bmezzora\b/.test(s) ? 30 : 0;
+    const ore = /\bor[ae]\b/.test(s.replace(/\bmezz'?or[ae]\b|\bmezzora\b/g, ''));
+    const cifre = s.match(/\d+(?:[.,]\d+)?/);
+    let n = cifre ? Number(cifre[0].replace(',', '.')) : NaN;
+    if (!Number.isFinite(n)) {
+      const parola = (s.match(/[a-zà-ù]+/g) || []).find((w) => NUMERI_A_PAROLE[w] != null);
+      n = parola ? NUMERI_A_PAROLE[parola] : NaN;
+    }
+    if (ore) return (Number.isFinite(n) ? n : 1) * 60 + (/\be mezz[ao]\b/.test(s) ? 30 : 0) + (mezza && !/\be mezz/.test(s) ? 0 : 0);
+    if (mezza) return Number.isFinite(n) && !/\bmezz/.test(s.slice(0, s.search(/\d|[a-z]/))) ? (cifre ? n : 30) : 30;
+    return n;
+  }
 
   // Tetto di una lezione, contato come lo stile: una regola su come comportarsi
   // ci sta larga, un testo che nessuno rilegge nel popup no (#592).
