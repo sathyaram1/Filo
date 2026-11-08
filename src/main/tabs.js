@@ -2742,6 +2742,7 @@ class TabManager {
     if (caduta || this._needsRecreate(tab, target)) {
       this._recreateView(tab, target, { nuova: true });
     } else {
+      Permessi.navigazioneDiFilo(tab.view.webContents);
       tab.view.webContents.loadURL(target);
     }
     AzioniContate.scheda(tab.view.webContents);
