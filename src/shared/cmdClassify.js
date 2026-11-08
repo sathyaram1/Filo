@@ -876,7 +876,7 @@
   function argomenti(raw, c) {
     const win = c.win;
     const posix = shellPosix(c);
-    const powershell = c.sistemaIgnoto || (!posix && c.shell !== 'cmd');
+    const powershell = forsePowerShell(c);
     const out = [];
     const s = String(raw);
     let cur = '';
