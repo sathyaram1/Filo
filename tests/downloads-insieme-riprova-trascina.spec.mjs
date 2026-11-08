@@ -94,6 +94,10 @@ test('tre scaricamenti dello stesso file avviati insieme arrivano tutti, coi nom
     // Tre clic nello stesso istante: nessuna delle tre copie è ancora sul disco quando parte la successiva.
     const page = await paginaDelServer(openTab, `${srv.base}/pagina/doppio.pdf?verso=insieme`);
     await page.evaluate(() => { for (let i = 0; i < 3; i++) document.getElementById('l0').click(); });
+    // Sono clic della pagina, non dell'utente: dal secondo file Filo chiede (#2294), e il sì li fa arrivare tutti.
+    const si = shell.locator('#permesso-bar .permesso-si');
+    await expect(si).toBeEnabled({ timeout: 15_000 });
+    await si.click();
     const finiti = async () => (await elenco(shell)).filter((r) => r.url.endsWith('/insieme/doppio.pdf') && r.state === 'completed');
     await expect.poll(async () => (await finiti()).length, { timeout: 20000 }).toBe(3);
     const nomi = (await finiti()).map((r) => r.filename).sort();
