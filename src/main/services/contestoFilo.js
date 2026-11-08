@@ -488,6 +488,9 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     },
   });
   ancore[lato] = f.ancora;
+  // I titoli e le ricerche delle pagine che i preamboli davanti al modello portano, compreso quello della domanda (#2293).
+  const conPreambolo = [...f.visti, ...(laDomanda ? [laDomanda] : [])].filter((m) => m && m.role === 'user' && !m.riga && !m.seguito);
+  const daSiti = [...new Set(conPreambolo.flatMap((m) => eventiDi(m).eventi.daSiti || []))];
   potaFoto(f.vecchi);
   pota(f.vecchi, f.visti, incognito);
   // La domanda come la vedrà il tratto dei turni dopo: le sezioni cambiate (per questa epoca), le note del turno e
