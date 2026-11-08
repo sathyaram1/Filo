@@ -614,9 +614,7 @@
     SCHEDE_CHIUSE: {
       costo: 0,
       campo: null,
-      fonte: (a, out) => (Array.isArray(out.schede) && out.schede.length
-        ? { classe: 3, campo: 'web', chiave: 'schedeChiuse:titoli', motivo: 'ho letto titoli e riassunti delle schede chiuse, scritti dai siti' }
-        : null),
+      fonte: (a, out) => fonteSchedeChiuse(Array.isArray(out.schede) ? out.schede.filter(Boolean) : []),
       describe: (a) => {
         const q = String((a && (a.cerca ?? a.query)) || '').replace(/\s+/g, ' ').trim();
         return q ? ['Cercare fra le schede chiuse ', cit(q.slice(0, 60))] : 'Guardare le schede chiuse';
