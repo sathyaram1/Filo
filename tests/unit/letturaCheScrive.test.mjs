@@ -44,10 +44,31 @@ const INERTI = ['cd', 'chdir', 'ls', 'dir', 'pwd', 'cat', 'type', 'echo', 'whoam
   'uptime', 'id', 'groups', 'whatis', 'cal', 'nproc', 'ps', 'free', 'lscpu', 'lsblk', 'lsusb', 'printenv', 'whereis',
   'who', 'w', 'vmstat', 'lsof', 'column', 'cut', 'nl', 'md5sum', 'sha1sum', 'sha256sum', 'cksum'];
 
+// Le letture di PowerShell, come quelle comuni: nome → forme che scrivono o eseguono, oltre allo scriptblock che vale per tutti.
+const FORME_PS = {};
+// Stampano, filtrano, convertono in testo o cambiano la cartella di lavoro: nessuna opzione scrive un file o avvia
+// un programma (Out-File, Export-*, Set-Content e simili non sono letture e non stanno nella lista).
+const INERTI_PS = ['get-childitem', 'gci', 'get-content', 'gc', 'get-item', 'gi', 'get-itemproperty', 'gp',
+  'get-itempropertyvalue', 'get-location', 'gl', 'get-date', 'get-process', 'gps', 'get-service', 'get-help', 'get-member',
+  'get-alias', 'get-variable', 'get-module', 'get-psdrive', 'get-host', 'get-command', 'get-history', 'get-computerinfo',
+  'get-culture', 'get-timezone', 'get-random', 'get-unique', 'select-string', 'sls', 'select-object', 'select', 'sort-object',
+  'measure-object', 'measure', 'group-object', 'group', 'compare-object', 'test-path', 'resolve-path', 'split-path', 'join-path',
+  'convert-path', 'format-table', 'ft', 'format-list', 'fl', 'format-wide', 'fw', 'out-string', 'out-host', 'out-null',
+  'write-output', 'write-host', 'convertto-json', 'convertfrom-json', 'convertto-csv', 'convertfrom-csv',
+  'convertfrom-stringdata', 'get-filehash', 'set-location', 'sl', 'pushd', 'popd'];
+
 test('sentinella: ogni nome delle liste di lettura sta nella tabella delle forme che scrivono o eseguono', () => {
   const { level1, ps } = C.nomiDiLettura();
   for (const nome of level1) {
     assert.ok(FORME[nome] || INERTI.includes(nome), `«${nome}» è nuovo fra le letture: scrivi qui le sue forme che scrivono o eseguono`);
+  }
+  for (const nome of ps) {
+    assert.ok(FORME_PS[nome] || INERTI_PS.includes(nome), `«${nome}» è nuovo fra le letture di PowerShell: scrivi qui le sue forme che scrivono o eseguono`);
+  }
+  for (const [nome, forme] of Object.entries(FORME_PS)) {
+    for (const [cmd, minimo] of forme) {
+      for (const ctx of [undefined, PS]) assert.ok(C.classify(cmd, ctx) >= minimo, `${nome}: «${cmd}» deve essere almeno ${minimo}`);
+    }
   }
   // I cmdlet di PowerShell eseguono solo uno scriptblock: qualunque blocco che invochi qualcosa deve salire a 3.
   for (const nome of ps) {
