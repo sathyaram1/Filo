@@ -754,6 +754,36 @@ function negaTutto(ses) {
   } catch (_) {}
 }
 
+// ── Più file senza un clic (#2294): una pagina lasciata aperta ne scaricava uno al secondo. Come in Chrome il primo passa,
+// dal secondo entro SCARICAMENTI_FINESTRA_MS si chiede, e la risposta resta per il sito. Non è un nome di Electron: lo
+// chiama chi prende i download (downloads.js), con `gesto` vero per un clic dell'utente sulla pagina o su Filo.
+const SCARICAMENTI = 'scaricamenti';
+const SCARICAMENTI_FINESTRA_MS = 10 * 60_000;
+function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
+  const ses = wc && wc.session;
+  const chi = wc ? origineDi(wc) : {};
+  if (!ses || chi.filo || !chi.origine) return { esito: 'via', origine: null };
+  const origine = chi.origine;
+  if (!ses._filoSenzaGesto) ses._filoSenzaGesto = new Map();
+  if (gesto) { ses._filoSenzaGesto.delete(origine); return { esito: 'via', origine }; }
+  const scelta = sceltePer(ses).get(`${origine}|${SCARICAMENTI}`);
+  if (scelta === true) return { esito: 'via', origine };
+  if (scelta === false) { segnaNegati(wc, origine, [SCARICAMENTI]); return { esito: 'no', origine }; }
+  const prima = ses._filoSenzaGesto.get(origine);
+  ses._filoSenzaGesto.set(origine, adesso);
+  return { esito: prima != null && adesso - prima < SCARICAMENTI_FINESTRA_MS ? 'chiedi' : 'via', origine };
+}
+
+// `callback(si, fonte, decisa)`: con `decisa` falso la domanda si è ritirata (la pagina se n'è andata) e nessuno ha scelto.
+function chiediScaricamenti(wc, callback) {
+  const ses = wc && wc.session;
+  const origine = wc ? origineDi(wc).origine : null;
+  if (!ses || !origine) { callback(false, undefined, false); return; }
+  const scelta = sceltePer(ses).get(`${origine}|${SCARICAMENTI}`);
+  if (typeof scelta === 'boolean') { callback(scelta, undefined, true); return; }
+  chiedi({ ses, wc, origine, tipo: SCARICAMENTI, parti: [SCARICAMENTI], callback, schedaDi: ses._filoSchedaDi || (() => null) });
+}
+
 // La pagina che vuole scrivere su ciò che ha già lo chiede da qui (preload/stato-permessi.js): Chromium non chiama più il
 // gestore delle richieste. Vale dopo un gesto vero e per il file su cui il controllo ha appena detto no; null = non chiesto.
 function chiediScrittura(wc) {
