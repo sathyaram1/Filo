@@ -64,7 +64,7 @@ test('r1 «cd -P» oltre un collegamento risale nel repository ostile: git statu
     const segno = join(base, 'SEGNO');
     ostile(join(arc, 'evil'), segno);
     mkdirSync(join(arc, 'evil', 'dentro'));
-    symlinkSync('evil/dentro', join(arc, 'l'));
+    collegaCartella(join(arc, 'evil', 'dentro'), join(arc, 'l'));
     const cmd = 'cd -P Downloads/arc/l/.. && git status';
     const perimetro = { cwd: home, home, win: false, shell: 'sh', gitLancia: T.gitLanciaIn };
     expect(C.classify(cmd, perimetro)).toBeGreaterThanOrEqual(2);
