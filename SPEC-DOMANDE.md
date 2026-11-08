@@ -670,8 +670,10 @@ Come funziona oggi (#1152):
     lettura di un'istanza che ha consegnato il rapporto (la prima volta,
     l'ultima settimana), ognuna col riassunto del manutentore (titolo,
     stato, ultimo aggiornamento) e le domande aperte o in lavorazione
-    collegate, per origine, collegamenti, azioni, fermo o perché gli
-    aggiornamenti le nominano. Il feedback intero (`feedback.leggi`) di un
+    collegate, per origine, collegamenti, azioni, fermo, perché gli
+    aggiornamenti le nominano, o perché titolo, testo o aggiornamenti del
+    lavoro nominano il feedback che la domanda ferma o da cui è nata (#2149:
+    D-266 ferma #2101, e #2105 che la attua nomina solo #2101). Il feedback intero (`feedback.leggi`) di un
     lavoro fuso porta anche gli aggiornamenti, cioè cosa ha fatto: la
     revisione decide su quello, non sulla sola richiesta, e chi li ha
     scritti da sporco sporca anche lei. La chiusura è `domande.chiudi`, col
@@ -679,7 +681,15 @@ Come funziona oggi (#1152):
     vuole fuso e collegato alla domanda; non chiude una domanda che ferma un
     altro lavoro, una risposta che si sta applicando, né una provvisoria (la
     consigliata vale finché l'owner non sceglie, anche a lavoro fuso;
-    l'elenco la segna `provvisoria`). Alla prima lettura arrivano anche i
+    l'elenco la segna `provvisoria`). Di queste due, quando la revisione la
+    dà per attuata, il server scrive nella domanda, coi soli dati, quale
+    lavoro fuso la attua e perché la scelta resta all'owner, una volta per
+    lavoro: lui risponde in un clic. Il giudizio è della revisione, quindi la
+    riga porta la fiducia del suo biglietto, come una chiusura: da sporco la
+    domanda diventa non fidata. Una risposta, per qualunque strada
+    (finestra, consiglio, principio, compito), che sceglie la provvisoria su
+    un lavoro già fuso non lo rimette in coda, e il suo esito dice «non
+    serviva» invece del pulsante scelto. Alla prima lettura arrivano anche i
     lavori fusi prima che le chiusure segnassero l'ora della fusione, datati
     dal loro ultimo aggiornamento. Le chiuse così vanno fra le «Risposte
     automatiche», con «attuata da #n», e l'owner le riapre: la riapertura
