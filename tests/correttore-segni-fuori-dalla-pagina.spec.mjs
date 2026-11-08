@@ -275,9 +275,10 @@ test('il suggerimento del dizionario del browser scelto dal tasto destro è test
   await page.mouse.dblclick(box.x + 70, box.y + 14);
   await page.mouse.click(box.x + 70, box.y + 14, { button: 'right' });
   await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
+  const corr = menuDi(page).locator('.sn-menu-correction:visible');
+  await expect(corr.first()).toBeVisible({ timeout: 4000 });
   const host = new URL(page.url()).host;
-  // Il suggerimento arriva da Electron come al tasto destro vero; qui è una parola che Filo segna, così si vede se la
-  // controlla.
+  // Dopo quello vero, un suggerimento che Filo segna: così si vede se il testo scritto si controlla.
   await app.evaluate(({ webContents }, h) => {
     for (const w of webContents.getAllWebContents()) {
       try { if (new URL(w.getURL()).host === h) w.send('filo:broadcast', { type: '_spell:native', word: 'ciiao', suggestions: ['quseta'] }); } catch (_) {}
