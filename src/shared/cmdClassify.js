@@ -1518,14 +1518,16 @@
   }
 
   // Il programma riceve il comando dopo la shell: escape tolti, `$'…'` e `$"…"` decodificati, le espansioni che possono
-  // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte. Le opzioni si cercano anche lì, e vale
-  // la lettura peggiore (#1994). cmd toglie i suoi `^` prima, in `comeLaShell`.
+  // valere niente tolte (`--out$1put=x` è `--output=x`), le graffe di bash aperte, gli elenchi di PowerShell spezzati.
+  // Le opzioni si cercano anche lì, e vale la lettura peggiore (#1994). Ciò che non si sa riprodurre (una variabile di
+  // cmd tagliata) è ignoto e chiede (`nomiVariabili`). cmd toglie i suoi `^` prima, in `comeLaShell`.
   function classifyOneLetto(raw, c) {
     const base = classifyOne(raw);
-    if (base === 3 || c.shell === 'cmd' || !/[\\${]/.test(raw)) return base;
+    if (base === 3 || c.shell === 'cmd' || !/[\\${,]/.test(raw)) return base;
+    const elenchi = c.sistemaIgnoto || (!shellPosix(c) && c.shell !== 'cmd');
     let det = base;
     for (const vuote of [false, true]) {
-      const parole = argomenti(raw, { ...c, vuote }).map((a) => a.testo);
+      const parole = argomenti(raw, { ...c, vuote, elenchi }).map((a) => a.testo);
       const aperte = shellPosix(c) || c.sistemaIgnoto ? graffe(parole) : parole;
       if (!aperte) return 3;
       det = Math.max(det, classifyOne(aperte.join(' ')));
