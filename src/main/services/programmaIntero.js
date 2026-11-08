@@ -31,7 +31,8 @@ function programmaIntero(nome, { env = process.env } = {}) {
     }
   }
   const sistema = DI_SISTEMA[n.toLowerCase()];
-  return sistema ? path.join(env.SystemRoot || env.windir || 'C:\\Windows', ...sistema, n) : null;
+  const radice = env.SystemRoot || env.windir;
+  return sistema && radice ? path.join(radice, ...sistema, n) : null;
 }
 
 module.exports = { programmaIntero };
