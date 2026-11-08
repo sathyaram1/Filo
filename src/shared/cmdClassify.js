@@ -769,6 +769,53 @@
     return { testo, fine: i, ignoto };
   }
 
+  // Lunghezza del nome dopo un `$` che la shell può espandere a niente: `$1`, `$@`, `$!`, una variabile non impostata
+  // (bash distingue le maiuscole: `$pwd` è vuota), `$null` e `$env:x` di PowerShell. 0 se non è un'espansione.
+  function espansione(s, k) {
+    const m = /^(?:[A-Za-z_]\w*(?::[A-Za-z_]\w*)?|[0-9@*#?!$^-])/.exec(s.slice(k));
+    return m ? m[0].length : 0;
+  }
+
+  // Le graffe di bash aperte come le apre lei (`--{output=x,}` è `--output=x --`, `{s..u}` è `s t u`); null oltre un
+  // tetto di parole, che nessun comando di lettura raggiunge. Una graffa senza virgola né intervallo resta testo.
+  const GRAFFE_MAX = 256;
+  function graffe(parole) {
+    const out = [];
+    const coda = parole.slice();
+    while (coda.length) {
+      const w = coda.shift();
+      const e = apriGraffa(w);
+      if (e) coda.unshift(...e); else out.push(w.replace(//g, '{').replace(//g, '}'));
+      if (out.length + coda.length > GRAFFE_MAX) return null;
+    }
+    return out;
+  }
+  function apriGraffa(parola) {
+    let w = parola;
+    for (let j = w.indexOf('}'); j >= 0; j = w.indexOf('}', j + 1)) {
+      const i = w.lastIndexOf('{', j);
+      if (i < 0) continue;
+      const dentro = w.slice(i + 1, j);
+      const prima = w.slice(0, i);
+      const dopo = w.slice(j + 1);
+      if (dentro.includes(',')) return dentro.split(',').map((x) => prima + x + dopo);
+      const r = /^(-?\d+|[A-Za-z])\.\.(-?\d+|[A-Za-z])(?:\.\.-?\d+)?$/.exec(dentro);
+      const numeri = r && /\d/.test(r[1]) && /\d/.test(r[2]);
+      if (r && (numeri || (!/\d/.test(r[1]) && !/\d/.test(r[2])))) {
+        const a = numeri ? Number(r[1]) : r[1].charCodeAt(0);
+        const b = numeri ? Number(r[2]) : r[2].charCodeAt(0);
+        if (Math.abs(b - a) >= GRAFFE_MAX) return Array(GRAFFE_MAX + 1).fill('');
+        const passo = a <= b ? 1 : -1;
+        const voci = [];
+        for (let v = a; v !== b + passo; v += passo) voci.push(prima + (numeri ? String(v) : String.fromCharCode(v)) + dopo);
+        return voci;
+      }
+      w = `${prima}${dentro}${dopo}`;
+      j = i;
+    }
+    return w === parola ? null : [w];
+  }
+
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
   // fuori da `echo` finisce comunque stampata nei messaggi d'errore.
