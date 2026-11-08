@@ -122,6 +122,91 @@ test('incroci: la riga dice quale ramo tocca i file probabili della scheda, o ch
   assert.equal(await M.main(['boh']), 1);
 });
 
+// #2340: i lavori del server si aprono in parallelo se i loro rami non si toccano, quindi rami e incroci li vedono.
+function repoConRami(rami) {
+  const repo = cartellaTemporanea('manutentore-rami');
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('init', '-q', '-b', 'main'); g('config', 'user.email', 't@t'); g('config', 'user.name', 't'); g('config', 'commit.gpgsign', 'false');
+  writeFileSync(join(repo, 'x.txt'), 'x'); g('add', '-A'); g('commit', '-qm', 'inizio');
+  g('update-ref', 'refs/remotes/origin/main', 'HEAD');
+  for (const [ramo, file, msg] of rami) {
+    g('checkout', '-q', '-B', 'tmp', 'main');
+    mkdirSync(join(repo, file, '..'), { recursive: true });
+    writeFileSync(join(repo, file), ramo); g('add', '-A'); g('commit', '-qm', msg);
+    g('update-ref', `refs/remotes/origin/${ramo}`, 'HEAD');
+  }
+  g('checkout', '-q', 'main');
+  return repo;
+}
+function catturaConsole(t) {
+  const out = [];
+  const [l, e] = [console.log, console.error];
+  console.log = (...a) => out.push(a.join(' ')); console.error = (...a) => out.push(a.join(' '));
+  t.after(() => { console.log = l; console.error = e; });
+  return () => { const s = out.join('\n'); out.length = 0; return s; };
+}
+
+test('incroci fra i rami: due rami del server sullo stesso file si incrociano coi file, su file diversi no (#2340)', () => {
+  const s = (ramo, file, feedback = []) => ({ ramo, repo: 'server', file, feedback });
+  assert.deepEqual(M.incrociFraRami([s('claude/a', ['functions/src/x.js', 'functions/src/y.js'], ['10']), s('claude/b', ['functions/src/x.js'], ['11'])]),
+    [{ a: { ramo: 'claude/a', feedback: ['10'], repo: 'server' }, b: { ramo: 'claude/b', feedback: ['11'], repo: 'server' }, comuni: ['filo-security:functions/src/x.js'] }]);
+  assert.deepEqual(M.incrociFraRami([s('claude/a', ['functions/src/x.js']), s('claude/b', ['functions/src/y.js'])]), []);
+  // Lo stesso percorso in due repo è due file diversi.
+  assert.deepEqual(M.incrociFraRami([{ ramo: 'claude/app', file: ['package.json'] }, s('claude/b', ['package.json'])]), []);
+  // Un lavoro dell'app col gemello sul server incrocia un lavoro solo del server sui file del server.
+  const coppie = M.incrociFraRami([{ ramo: 'worker/A-1', file: ['scripts/x.mjs'], feedback: ['20'] }, s('worker/A-1', ['functions/src/z.js']), s('claude/b', ['functions/src/z.js'], ['21'])]);
+  assert.equal(coppie.length, 1);
+  assert.equal(M.rigaLavoro(coppie[0].a), 'worker/A-1 (app e server) (#20)');
+  assert.equal(M.rigaLavoro(coppie[0].b), 'claude/b sul server (#21)');
+  assert.deepEqual(coppie[0].comuni, ['filo-security:functions/src/z.js']);
+});
+
+test('rami e incroci leggono anche i rami del clone di filo-security, e se il clone manca lo dicono (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  const server = repoConRami([['claude/uno', 'functions/src/x.js', '#31 uno'], ['claude/due', 'functions/src/x.js', '#32 due'], ['claude/tre', 'functions/src/y.js', '#33 tre']]);
+  const schede = cartellaTemporanea('manutentore-schede');
+  t.after(() => { togliCartella(app); togliCartella(server); togliCartella(schede); });
+  writeFileSync(join(schede, '40.json'), JSON.stringify(scheda(40, { file_probabili: ['functions/src/y.js'] })));
+  const opz = ['--cartella', schede, '--senza-fetch', '--clone-server', server];
+
+  assert.equal(await M.main(['rami', ...opz], { root: app, env: {} }), 0);
+  const rami = leggi();
+  assert.match(rami, /^claude\/app \(#30\), 1 commit, .*: src\/a\.js$/m);
+  assert.match(rami, /^claude\/uno sul server \(#31\), 1 commit, .*: filo-security:functions\/src\/x\.js$/m);
+  assert.doesNotMatch(rami, /NON letti/);
+
+  assert.equal(await M.main(['incroci', ...opz], { root: app, env: {} }), 0);
+  const fra = leggi();
+  assert.match(fra, /claude\/(uno|due) sul server \(#3[12]\) e claude\/(uno|due) sul server \(#3[12]\): filo-security:functions\/src\/x\.js/);
+  assert.doesNotMatch(fra, /claude\/tre/, 'su un file che nessun altro tocca non c\'è incrocio');
+  assert.doesNotMatch(fra, /claude\/app/);
+
+  assert.equal(await M.main(['incroci', '40', ...opz], { root: app, env: {} }), 0);
+  assert.match(leggi(), /^claude\/tre sul server \(#33\): filo-security:functions\/src\/y\.js$/m, 'una scheda che nomina un file del server trova il suo ramo');
+
+  const solo = repoConRami([['claude/uno', 'functions/src/x.js', '#31'], ['claude/tre', 'functions/src/y.js', '#33']]);
+  t.after(() => togliCartella(solo));
+  assert.equal(await M.main(['incroci', '--senza-fetch', '--clone-server', solo], { root: app, env: {} }), 0);
+  assert.match(leggi(), /Nessun file in comune fra i rami in corso \(3\)\./);
+
+  const assente = join(schede, 'filo-security');
+  assert.equal(await M.main(['rami', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
+  const senza = leggi();
+  assert.match(senza, /^claude\/app/m, 'i rami dell\'app restano');
+  assert.ok(senza.includes(`Rami del server NON letti: nessun clone di filo-security in ${assente}`), senza);
+  assert.equal(await M.main(['incroci', '--senza-fetch', '--cartella', schede], { root: app, env: { FILO_SERVER_CLONE: assente } }), 0);
+  assert.match(leggi(), /Rami del server NON letti/);
+});
+
+test('il clone del server si cerca dove lo mettono le routine e la sessione locale', () => {
+  const c = (dir) => (p) => p === join(dir, '.git');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '/srv/fs' });
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', scelta: '/a', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '', cercati: ['/a'] },
+    'la cartella scelta vale da sola');
+  assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: {}, esiste: c('/x/filo-security') }), { dir: '/x/filo-security' });
+});
+
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
   assert.deepEqual(M.leggiOrdine('812, #815,815.2 812'), { ok: true, numeri: ['812', '815', '815.2'] });
   assert.match(M.leggiOrdine('812,menu').motivo, /non sono numeri di feedback: menu/);
