@@ -860,9 +860,11 @@
       } catch (_) {}
     }
     state.attivo = true;
+    state.entrato = false;
     activeEl = el;
     ensureOverlay(state);
     seguiIlTesto(state);
+    entra(state);
     aggiornaCodice(state, { senzaDisegno: true });
     syncOverlay(state);
     // Il fuoco lo dà anche un focus() di script: il testo che c'è già si controlla solo se ci è entrato l'utente, col
