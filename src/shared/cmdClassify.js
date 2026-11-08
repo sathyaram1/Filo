@@ -1540,7 +1540,7 @@
     let dest = null;
     for (let i = 0; i < args.length; i++) {
       const t = args[i].testo;
-      if (/^-(literalpath|path|lp)$/i.test(t)) { dest = args[i + 1] ? args[i + 1].testo : null; break; }
+      if (!posix && /^-(literalpath|path|lp)$/i.test(t)) { dest = args[i + 1] ? args[i + 1].testo : null; break; }
       if (t === '-' || t === '') break;
       if (/^\/[A-Za-z]$/.test(t) && !posix) continue;
       if (t.startsWith('-') && !cmd) {
