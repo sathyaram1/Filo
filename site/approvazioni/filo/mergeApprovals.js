@@ -444,6 +444,9 @@
     if (r.result === 'discarded') return { kind: 'ok', text: 'Scartata.' };
     // Il sì a un ramo del server: la fusione la fa il server, quando i suoi controlli sono verdi.
     if (r.result === 'server' && r.esito === 'al_pc') return { kind: 'ok', text: 'Approvata: il lavoro lo porta su main il tuo PC, alla prossima fusione dei lavori del server.' };
+    // Un'app che cambia regole del server entra in main solo insieme al server (#2199.2).
+    if (r.result === 'server' && r.esito === 'rimandato') return { kind: 'warn', text: 'Approvata, ma la parte del server non si può fondere adesso e l’app non entra da sola: il lavoro torna alle routine, poi entrano in main insieme.' };
+    if (r.result === 'server' && r.esito === 'all_owner') return { kind: 'warn', text: 'Approvata, ma il server non lo fonde ancora e l’app non entra da sola: la pratica torna a te, col motivo nella conversazione.' };
     if (r.result === 'server') return { kind: 'ok', text: 'Approvata: il server riprende e porta il lavoro su main appena i suoi controlli sono verdi.' };
     return { kind: 'warn', text: 'Esito inatteso: nessuna fusione è avvenuta.' };
   }
