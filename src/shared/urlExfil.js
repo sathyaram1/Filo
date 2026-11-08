@@ -476,7 +476,12 @@
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, testo(x.fonte) || 'da fuori'); }
       }
       const type = String(a.type || '').toUpperCase();
-      if (type === 'ESEGUI_COMANDO') {
+      if (type === DAI_SITI) {
+        for (const x of Array.isArray(out.dalContesto) ? out.dalContesto : []) {
+          const t = testo(x && x.testo);
+          if (t.trim()) { nonFidato = true; daFuori(t, testo(x.fonte) || 'dalle pagine visitate'); }
+        }
+      } else if (type === 'ESEGUI_COMANDO') {
         if (out.blocked) continue;
         const t = `${testo(out.stdout)}\n${testo(out.stderr)}`;
         if (t.trim()) { nonFidato = true; pezzi.push(t); daFuori(t, "dall'output di un comando"); }
