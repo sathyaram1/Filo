@@ -955,6 +955,7 @@ function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '')
     // Il «(2)» della quarantena non è del file: uscendo, il nome si sceglie di nuovo fra quelli della cartella Download.
     ...(attesa ? { _nomeChiesto: filename } : {}),
     _piuFile: perPiuFile,
+    ...(perPiuFile ? { _piuFileScheda: schedaDiPagina(webContents) } : {}),
     _scope: scope || '',
     _sessione: ses || (webContents && !webContents.isDestroyed?.() ? webContents.session : null),
   };
