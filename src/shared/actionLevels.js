@@ -1062,7 +1062,7 @@
         if (!t.trim()) return null;
         const cmd = String((a && (a.comando ?? a.command ?? a.cmd)) || '');
         // Le shell tolgono `^` (cmd), virgolette e backtick prima di eseguire: `c^url` è curl (#1072.1).
-        return SCARICA.test(cmd) || SCARICA.test(cmd.replace(/[\^"'`]/g, ''))
+        return scaricaDallaRete(cmd) || scaricaDallaRete(cmd.replace(/[\^"'`]/g, ''))
           ? { classe: 5, campo: 'terminale', chiave: 'web:comando', motivo: 'ho scaricato una pagina dal web con un comando' }
           : { classe: 4, campo: 'terminale', chiave: 'terminale:uscita', motivo: 'ho letto l\'uscita di un comando' };
       },
