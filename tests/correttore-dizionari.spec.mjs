@@ -6,7 +6,7 @@ import { test, expect } from './fixtures/electron.mjs';
 import { readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { menuDi, nelMondoDelMenu } from './helpers/menuContestuale.mjs';
-import { riquadroDelSegno } from './helpers/segniDelCorrettore.mjs';
+import { riquadroDelSegno, segniDi } from './helpers/segniDelCorrettore.mjs';
 
 test('i dizionari inclusi si caricano dalla cartella dei dati, senza chiederli alla rete, e correggono l\'italiano', async ({ app, openTab, testServer }) => {
   const prima = await app.evaluate(({ app: a }) => ({
