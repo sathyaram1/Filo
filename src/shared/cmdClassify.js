@@ -590,7 +590,7 @@
     // Superato il backstop, la whitelist si fida solo di un nome invocato nudo: un file su
     // disco che si chiama come un comando fidato è un eseguibile arbitrario → 3.
     // where.exe senza percorso è il where di cmd, l'unico modo di chiamarlo da PowerShell: lo trova la stessa ricerca.
-    if (/^where\.exe$/i.test(unquote(tokens(trimmed)[0] || ''))) return 1;
+    if (prog === 'where' && /\.exe$/i.test(unquote(tokens(trimmed)[0] || '')) && qualeWhere(trimmed, shell) === 'cmd') return 1;
     if (!isBareName(tokens(trimmed)[0])) return 3;
     // In PowerShell Where-Object e `?` sono il filtro di `where`: esegue solo il suo blocco (#2292).
     if ((prog === 'where-object' || prog === '?') && shell !== 'cmd') return segmentIsRead(raw, false) ? 1 : 3;
