@@ -1556,7 +1556,7 @@
         return magia && !magia.includes(':') ? copiaSovrascrive([], `${nomeDi(magia)}.mgc`, c, { maiDentro: true }) : PUO_SOVRASCRIVERE;
       }
       case 'gzip': case 'gunzip':
-        return opzione(/^-[A-Za-z]*f|^--force$/) ? PUO_SOVRASCRIVERE : '';
+        return opzione(/^-[A-Za-z]*f/) || testi.some((t) => opzioneLunga(t, 'force', 2) != null) ? PUO_SOVRASCRIVERE : '';
       case 'rename':
         // Il `rename` di Linux sostituisce un file che c'è già; `ren` di Windows no, e lì `rename` è lui.
         return stile === 'posix' && !opzione(/^-[A-Za-z]*[no]|^--(no-act|no-overwrite)$/) ? PUO_SOVRASCRIVERE : '';
