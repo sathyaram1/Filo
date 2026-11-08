@@ -61,7 +61,7 @@ async function apri(app, openTab, testServer, risposta, html = PAGINA) {
   return page;
 }
 
-const ocra = (page) => page.locator('.sn-spell-overlay .sn-suggerimento');
+const ocra = (page) => segniDi(page, '.sn-spell-overlay .sn-suggerimento');
 const chiamate = (app) => app.evaluate(() => globalThis.__ocra.length);
 const contraddizione = (citazione) => JSON.stringify({ issues: [{
   tipo: 'contraddizione', testo: 'mercoledì', citazione, spiegazione: 'Prima si era detto martedì.', correzione: 'martedì',
@@ -203,8 +203,8 @@ test('aspetto: i puntini accanto all\'onda degli errori, anche sulla stessa paro
   await page.locator('#ta').click();
   await page.keyboard.type('ieri sonno stato da Marco, ciaoo, ci vediamo mercoledì e lui gli porta');
   await expect(ocra(page)).toHaveText(['mercoledì', 'lui gli'], { timeout: 12_000 });
-  await expect(page.locator('.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['sonno', 'mercoledì'], { timeout: 6000 });
-  const insieme = page.locator('.sn-spell-overlay .sn-suggerimento > .sn-errore');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['sonno', 'mercoledì'], { timeout: 6000 });
+  const insieme = segniDi(page, '.sn-spell-overlay .sn-suggerimento > .sn-errore');
   await expect(insieme).toHaveText('mercoledì');
   const segni = () => insieme.evaluate((el) => {
     const e = getComputedStyle(el);
@@ -276,7 +276,7 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
     const v = await dove(parola);
     expect({ parola, dx: Math.abs(b.x - v.x) < 3, dy: Math.abs(b.y - v.y) < 3 }).toEqual({ parola, dx: true, dy: true });
   }
-  const copia = await stileDelSegno(page.locator('.sn-spell-overlay div').first(), ['color', 'border-top-color']);
+  const copia = await stileDelSegno(segniDi(page, '.sn-spell-overlay div').first(), ['color', 'border-top-color']);
   expect(copia).toEqual({ color: 'rgba(0, 0, 0, 0)', 'border-top-color': 'rgba(0, 0, 0, 0)' });
   await page.screenshot({ path: 'tests/.shots/1115-ocra-righe.png', clip: { x: 0, y: 0, width: 820, height: 340 } }).catch(() => {});
 });
