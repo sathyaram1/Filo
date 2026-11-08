@@ -243,13 +243,13 @@ test('«ciuruglio» scritto tre volte non si segna più e compare fra le parole 
   await expect(errore(page, 'ciuruglio')).toHaveCount(0, { timeout: 4000 });
   for (let i = 0; i < 3; i++) {
     await svuota(page);
-    await page.keyboard.type('qual\'è ');
+    await batti(page, 'qual\'è ');
     expect(await valore(page), `«qual'è» scritto ${i + 1} volte`).toBe('qual è ');
   }
   // Annullata due volte non torna da sé, ma resta un errore: non si impara mai.
   for (let i = 0; i < 2; i++) {
     await svuota(page);
-    await page.keyboard.type('qual\'è ');
+    await batti(page, 'qual\'è ');
     await page.keyboard.press('Control+z');
     expect(await valore(page)).toBe('qual\'è ');
   }
