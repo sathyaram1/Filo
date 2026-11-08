@@ -14,13 +14,10 @@ const PAGINA = `<!doctype html><meta charset="utf-8">
 <script>
   // Quello che può vedere lo script del sito: i nodi del documento e le ombre che può aprire.
   window.visto = () => {
-    const tutti = [...document.querySelectorAll('*')];
     return {
       segni: document.querySelectorAll('.sn-spell-overlay, .sn-spell-valori, .sn-errore, .sn-suggerimento').length,
-      ombreAperte: tutti.filter((e) => e.shadowRoot).length,
-      testoNuovo: tutti.filter((e) => e.parentElement === document.body || e.parentElement === document.documentElement)
-        .filter((e) => !['SCRIPT', 'TEXTAREA', 'DIV', 'HEAD', 'BODY'].includes(e.tagName) || (e.tagName === 'DIV' && e.id !== 'ce'))
-        .map((e) => e.textContent).join(''),
+      ombreAperte: [...document.querySelectorAll('*')].filter((e) => e.shadowRoot).length,
+      testoDiFilo: [...document.querySelectorAll('[data-sn-ui]')].map((e) => e.textContent).join(''),
     };
   };
   // La sonda: una parola del dizionario personale e una sbagliata, scritte da script con un input finto.
