@@ -1614,7 +1614,10 @@
     let state = el ? monitored.get(el) : null;
     // Chi scrive in un editor ricco può avere in mano un nodo dentro il campo, o il campo dentro il nodo.
     if (!state && el && activeEl && (activeEl.contains(el) || (typeof el.contains === 'function' && el.contains(activeEl)))) state = monitored.get(activeEl);
+    if (!state && el) { const campo = findSupportedEditable(el); if (campo) state = statoDi(campo); }
     if (!state) return;
+    // Quello che il sito aveva cambiato prima resta suo.
+    seguiIlTesto(state);
     const t = String(testo ?? '');
     state.filoScrive = t;
     setTimeout(() => {
