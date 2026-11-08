@@ -201,20 +201,11 @@
       if (activeRoot === root) avvisoEl.hidden = verificato !== false;
     })();
 
-    async function leggiSaldo() {
-      if (!signedIn) return;
-      try {
-        const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-        if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
-      } catch (_) {}
-    }
-
-    (async function loadAuthAndBalance() {
+    (async function loadAuth() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
         signedIn = !!(a && a.signedIn);
       } catch (_) { signedIn = false; }
-      await leggiSaldo();
       if (activeRoot === root) refreshSendState();
     })();
 
