@@ -420,26 +420,19 @@ test('annulla e rifai riportano un testo coi suoi proprietari; un incolla senza 
   assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
 });
 
-test('un carattere battuto con AltGr (Ctrl+Alt su Windows) è dell\'utente', async () => {
+test('la chiocciola battuta con AltGr (Ctrl+Alt su Windows) è dell\'utente: l\'indirizzo resta un indirizzo', async () => {
   const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
   const el = c.campo();
   c.entra(el);
-  for (const x of 'quseta') c.batte(el, x);
+  for (const x of 'scrivi a quseta') c.batte(el, x);
   el.fire('keydown', { isTrusted: true, key: '@', ctrlKey: true, altKey: true });
   el.value += '@';
+  el.selectionStart = el.selectionEnd = el.value.length;
   el.fire('input', { isTrusted: true, inputType: 'insertText', data: '@' });
-  el.fire('keydown', { isTrusted: true, key: 'x', ctrlKey: true });
-  el.value += 'x';
-  el.fire('input', { isTrusted: true, inputType: 'insertText', data: 'x' });
-  for (const x of ' quseta ') c.batte(el, x);
+  el.fire('keyup', { isTrusted: true, key: '@' });
+  for (const x of 'gmail.com ') c.batte(el, x);
   await c.passa(5000);
-  const T = c.sb.SN_SPELLCHECK._test;
-  if (T && T.stato) {
-    const st = T.stato(el);
-    assert.deepEqual(st.diSito.map((z) => el.value.slice(z.start, z.end)), ['x'], 'la chiocciola è dell\'utente, la x con Ctrl no');
-  } else {
-    assert.ok(c.segni('sn-errore').some((s) => s.testo === 'quseta'));
-  }
+  assert.deepEqual(c.segni('sn-errore'), []);
 });
 
 test('quello che c\'era entrando si controlla, una parola ripetuta una volta; quello che scrive Filo come quello dell\'utente', async () => {
