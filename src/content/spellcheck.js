@@ -2981,6 +2981,7 @@
   // Falso se il campo è rimasto com'era: allora lo si riscrive.
   function sostituisciComeBattuta(el, range, testo, cursorMode) {
     testo = String(testo ?? '');
+    scriveFilo(el, testo);
     const prima = el.value;
     const caret = el.selectionEnd;
     // Una battuta rispetta maxlength e taglierebbe la correzione a metà.
