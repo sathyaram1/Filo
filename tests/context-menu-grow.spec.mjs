@@ -263,6 +263,7 @@ async function ancoraEPannello(page) {
     const sub = document.querySelector('.sn-menu-sub');
     return {
       menuTop: menu ? Math.round(menu.getBoundingClientRect().top) : null,
+      scorrimento: menu ? Math.round(menu.scrollTop) : null,
       ancoraTop: freccetta ? Math.round(freccetta.getBoundingClientRect().top) : null,
       pannelloTop: sub ? Math.round(sub.getBoundingClientRect().top) : null,
       pannelloAperto: !!sub,
