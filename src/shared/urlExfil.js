@@ -907,6 +907,16 @@
     return out;
   }
 
+  // Un comando che contatta un altro computer: un indirizzo che contatta, o un programma di rete anche senza un sito
+  // leggibile (`curl $H`). La stessa risposta per chi controlla l'uscita e per chi classifica quello che il comando stampa.
+  function comandoInRete(action) {
+    if (indirizziDelComando(action).length) return true;
+    const a = action && typeof action === 'object' ? action : {};
+    const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^`"']/g, '');
+    const C = global.SN_CMD_CLASSIFY;
+    return !C || !C.PROGRAMMI_RETE || C.PROGRAMMI_RETE.test(cmd);
+  }
+
   // Il resto del verdetto è l'anti-esfiltrazione di #587: un OK in più, non un blocco.
   function valutaAvvisi(tipo, action, { memoria, azioni, daPagina, parole = '', domanda = '' }, niente) {
     if (tipo === 'NAVIGA' || tipo === 'LEGGI_PAGINA') {
