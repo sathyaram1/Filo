@@ -1270,9 +1270,12 @@ test('#1994 — git con un\'uscita su file vale 3, qualunque sia il sotto-comand
 
 test('#1994 — le opzioni di git prima del sotto-comando che cambiano configurazione o repository valgono 3', () => {
   for (const cmd of [
-    'git --config-env=core.pager=SHELL log', 'git --config-env core.pager=SHELL log', 'git --git-dir=/tmp/x log',
-    'git --work-tree=/ status', 'git --exec-path=/tmp log', 'git -c core.pager=sh log', 'git -C /etc log',
+    'git --config-env=core.pager=SHELL log', 'git --config-env core.pager=SHELL log', 'git --exec-path=/tmp log',
+    'git -c core.pager=sh log', 'git -C /etc log', 'git --no-pager --config-env=core.pager=SHELL log',
   ]) assert.equal(lvl(cmd), 3, cmd);
+  // Il repository scelto da fuori lo misura il perimetro, come `cd`: fuori dalla cartella personale chiede.
+  const casa = { cwd: '/home/u', home: '/home/u', win: false };
+  for (const cmd of ['git --git-dir=/srv/x/.git log', 'git --work-tree=/ status']) assert.equal(C.classify(cmd, casa), 2, cmd);
   for (const cmd of ['git --version', 'git --help', 'git --exec-path', 'git --no-pager show', 'git --no-optional-locks status']) {
     assert.equal(lvl(cmd), 1, cmd);
   }
