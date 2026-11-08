@@ -16,10 +16,16 @@
         { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
         { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
         { testo: 'Un sito che scarica più file da solo, senza un tuo clic, dal secondo ti chiede il permesso: i file aspettano fuori dalla cartella Download finché non rispondi, e la risposta vale per quel sito.', segnalazione: 2294 },
+        { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
         { testo: 'Dal terminale, Filo ti chiede prima di lanciare i comandi che sembrano solo leggere ma possono scrivere file o avviare programmi.', segnalazione: 2292 },
+        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni: dei file, delle pagine aperte, degli appunti, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
+        { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
+        { testo: 'Dopo il tuo OK a un\'azione Filo fa da solo i passi che mancano, senza aspettare un tuo «vai avanti».', segnalazione: 1373 },
+        { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
+        { testo: 'Chiusa una conversazione in una scheda, un\'altra scheda che la mostrava non ci scrive più dentro: il messaggio dopo ne apre una nuova.', segnalazione: 1443 },
       ],
     },
     {
@@ -39,15 +45,8 @@
       features: [],
       fixes: [
         { testo: 'Siti e schede nuove si aprono più in fretta: Filo carica subito solo quello che serve.', segnalazione: 1093 },
-        { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni: dei file, delle pagine aperte, degli appunti, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
-        { testo: 'Una proposta che aspetta il tuo OK resta nella conversazione anche quando la riapri, e Filo si ricorda di averla fatta.', segnalazione: 1130 },
-        { testo: 'Dopo il tuo OK a un\'azione Filo fa da solo i passi che mancano, senza aspettare un tuo «vai avanti».', segnalazione: 1373 },
-        { testo: 'L\'OK dato a un bottone rimasto in una conversazione precedente resta in quella conversazione.', segnalazione: 1294 },
-        { testo: 'Chiusa una conversazione in una scheda, un\'altra scheda che la mostrava non ci scrive più dentro: il messaggio dopo ne apre una nuova.', segnalazione: 1443 },
       ],
-      features: [
-        { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
-      ],
+      features: [],
     },
     {
       version: '0.2.270', date: '2026-11-07',
