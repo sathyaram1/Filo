@@ -15,10 +15,7 @@ const LEGGI = ({ sel, filtri, indice, chiama, arg }) => {
     if (f.regex) els = els.filter((e) => new RegExp(f.regex.s, f.regex.f).test(e.textContent || ''));
   }
   if (indice != null) els = els.length ? [els[indice < 0 ? els.length + indice : indice]].filter(Boolean) : [];
-  if (chiama) {
-    const fn = (0, eval)(`(${chiama.fn})`);
-    return chiama.tutti ? fn(els, arg) : (els[0] ? { v: fn(els[0], arg) } : null);
-  }
+  if (chiama) return chiama.tutti ? chiama.fn(els, arg) : (els[0] ? { v: chiama.fn(els[0], arg) } : null);
   return els.map((e) => {
     const r = e.getBoundingClientRect();
     return {
