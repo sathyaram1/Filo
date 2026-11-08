@@ -189,9 +189,17 @@ test('un rinvio del server verso la home la apre come home vera di Filo', async 
   const ultima = () => app.evaluate(async ({ BrowserWindow }) => {
     const tm = BrowserWindow.getAllWindows().find((w) => w._filoTabs)._filoTabs;
     const t = tm.tabs[tm.tabs.length - 1];
+    const wc = t.view.webContents;
     let servizi = '';
-    try { servizi = await t.view.webContents.executeJavaScript('typeof (window.chrome && chrome.runtime && chrome.runtime.sendMessage)'); } catch (_) {}
-    return { vista: t.view.webContents.getURL(), interna: t.isInternal, servizi };
+    // Chiesto alla vista del sito mentre il rinvio la sostituisce, executeJavaScript non risponde più: senza scadenza
+    // la sonda restava appesa e il poll non riprovava (#2333).
+    try {
+      servizi = await Promise.race([
+        wc.executeJavaScript('typeof (window.chrome && chrome.runtime && chrome.runtime.sendMessage)'),
+        new Promise((r) => setTimeout(() => r('nessuna risposta'), 1000)),
+      ]);
+    } catch (_) {}
+    return { vista: wc.getURL(), interna: t.isInternal, servizi };
   });
   await expect.poll(ultima, { message: 'la home è una scheda di Filo, coi suoi servizi', timeout: 15000 })
     .toEqual({ vista: HOME, interna: true, servizi: 'function' });
