@@ -116,6 +116,9 @@ for (const campo of ['#ta', '#ce']) {
     const [segno, sopra] = [await riquadroDelSegno(ocra(page, '14xx')), await v.boundingBox()];
     expect(sopra.y + sopra.height).toBeLessThanOrEqual(segno.y + 2);
     expect(Math.abs((sopra.x + sopra.width / 2) - (segno.x + segno.width / 2))).toBeLessThan(6);
+    // Su un sito il valore ha solo famiglie generiche: da quali pezzi di un font chiamato per nome carica il browser, il
+    // sito saprebbe quali cifre ha disegnato Filo (#2299).
+    expect((await stileDelSegno(v, ['font-family']))['font-family']).toBe('system-ui, sans-serif');
     expect((await globale(app, '__ragionate'))[0].candidati).toContain('14xx (segnaposto)');
     await v.click();
     // Un campo modificabile scrive lo spazio in fondo come spazio unificatore.
