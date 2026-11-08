@@ -242,9 +242,15 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
 // un sottomenu appeso a lei (#975): il pannello che deve muoversi col menu.
 const conMenuDelSito = (html) => html.replace('<body ', '<body oncontextmenu="return false" ');
 
+// Un clic durante la comparsa del menu (sn-fade-in) fa scorrere a Playwright un menu già scorrevole: la freccetta
+// finisce in cima e lo scorrimento breve del test la porta giù invece che su (#2323). Una persona non scorre cliccando.
 async function apriSottomenu(page, menu) {
   const freccetta = menu.locator('.sn-menu-split-arrow').first();
   await expect(freccetta).toBeVisible();
+  await expect.poll(() => menuDi(page).valuta(() => {
+    const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
+    return m ? m.getAnimations().filter((a) => a.playState === 'running').length : -1;
+  }), { timeout: 3000, message: 'la comparsa del menu non finisce' }).toBe(0);
   await freccetta.click();
   await expect(menuDi(page).locator('.sn-menu-sub')).toBeVisible();
 }
