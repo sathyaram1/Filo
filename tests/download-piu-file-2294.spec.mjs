@@ -19,10 +19,11 @@ const PAGINA = `<!doctype html><meta charset="utf-8"><title>Scarica da sola</tit
   const prefisso = q.get('p') || 'pezzo';
   let fatti = 0;
   const ogni = Number(q.get('ogni') || 300);
+  const estensioni = (q.get('est') || '').split(',');
   const t = setInterval(() => {
     if (fatti++ >= n) { clearInterval(t); return; }
     const a = document.createElement('a');
-    a.href = '/' + prefisso + '-' + (i++) + '.txt';
+    a.href = '/' + prefisso + '-' + (i++) + '.' + (estensioni[fatti - 1] || 'txt');
     a.download = '';
     document.body.appendChild(a);
     a.click();
