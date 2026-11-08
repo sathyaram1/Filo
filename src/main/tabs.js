@@ -2791,8 +2791,10 @@ class TabManager {
       tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab), modo, url);
     }
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    ChiusuraConCaselle.chiudi(tab.view.webContents);
+    const vecchia = tab.view.webContents;
+    ChiusuraConCaselle.chiudi(vecchia);
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
+    Permessi.passaScheda(vecchia, view.webContents);
     tab.view = view;
     tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '', meta: { url, titolo: opts.titolo || '' } };
     tab.partition = partition;
