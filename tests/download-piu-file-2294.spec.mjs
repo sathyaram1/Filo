@@ -27,7 +27,7 @@ const PAGINA = `<!doctype html><meta charset="utf-8"><title>Scarica da sola</tit
     document.body.appendChild(a);
     a.click();
     a.remove();
-  }, 300);
+  }, ogni);
 </script></body>`;
 
 async function apriServer() {
