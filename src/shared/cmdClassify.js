@@ -404,7 +404,11 @@
 
   // In git i flag distruttivi sono più ricchi: anche `-f`, `-d`/`-D`, `--delete`, `--prune`.
   // Check git-specifico, perché su `tar -f` quelle lettere vogliono dire altro.
-  const GIT_DANGER_RE = /(^|\s)(--force(-with-lease)?|--hard|--delete|--prune|--discard-changes|-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
+  const GIT_DANGER_RE = /(^|\s)(-f|-d|-D|-[a-z]*f[a-z]*d[a-z]*|-[a-z]*d[a-z]*f[a-z]*)(\s|$)/i;
+  // Le lunghe valgono anche accorciate, come le legge git (`--forc`, `--de`): la regola è quella di `opzioneLunga`.
+  const GIT_DANGER_LUNGHE = ['force', 'force-with-lease', 'hard', 'delete', 'prune', 'discard-changes'];
+  const gitPericolosa = (cmd) => GIT_DANGER_RE.test(cmd)
+    || tokens(cmd).slice(1).some((t) => GIT_DANGER_LUNGHE.some((n) => opzioneLunga(t, n, 2) != null));
 
   // Argomenti dopo il sotto-comando: `git tag v1.0` → ['v1.0'], `git branch` → [].
   function gitArgsAfterSub(cmd) {
