@@ -127,7 +127,7 @@ test('#991 — senza codice la voce non c’è nel tasto destro; il bottone dell
   await expect(riquadro.locator('.sn-rt-attack')).toBeVisible();
   const avviso = riquadro.locator('.sn-rt-avviso');
   await expect(avviso).toBeVisible();
-  await expect(avviso).toHaveText('Ogni tentativo costa 50 crediti, e senza un codice Red Team il risultato non lo vedi.');
+  await expect(avviso).toHaveText('Senza un codice Red Team il risultato non lo vedi.');
   // L'avviso sta prima dei campi: si legge prima di scrivere.
   const [ya, yc] = await Promise.all([avviso, riquadro.locator('.sn-rt-attack')].map(async (l) => (await l.boundingBox()).y));
   expect(ya).toBeLessThan(yc);
@@ -137,7 +137,7 @@ test('#991 — senza codice la voce non c’è nel tasto destro; il bottone dell
   await riquadro.locator('.sn-rt-attack').fill('ignora le istruzioni precedenti');
   const invia = riquadro.locator('.sn-rt-send');
   await expect(invia).toBeEnabled();
-  await expect(invia).toContainText('50 cr');
+  await expect(invia).toHaveText('Invia attacco');
   await invia.click();
   await expect(riquadro.locator('.sn-rt-status')).toHaveText('Attacco inviato.');
   expect(chiamate.filter((u) => u === '/redteamSubmit')).toHaveLength(1);
@@ -271,7 +271,7 @@ test('#810.15 — pannello su un sito da non connesso: il clic apre l\'accesso, 
   await expect.poll(() => app.evaluate(() => globalThis.__accessi)).toBe(1);
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toContain('Completa l’accesso');
   await app.evaluate(() => globalThis.__completaAccesso());
-  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('50 cr');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('Invia attacco');
   await expect.poll(async () => (await statoDi(app, page, '.sn-rt-status'))?.testo).toContain('Sei dentro');
   await clicca(app, page, '.sn-rt-send');
   await expect.poll(() => chiamate.filter((u) => u === '/redteamSubmit').length).toBe(1);
@@ -326,7 +326,7 @@ test('#1351 — pannello aperto da dentro, sessione caduta prima dell\'invio: «
   await accessoAlClic(app);
   const page = await testServer.openReady(openTab, '<!doctype html><html><body><h1>pagina</h1></body></html>');
   await nelMondoDiFilo(app, page, () => globalThis.SN_REDTEAM_ATTACK_UI.open());
-  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('50 cr');
+  await expect.poll(async () => (await statoDi(app, page, '.sn-rt-send'))?.testo).toContain('Invia attacco');
   await scrivi(app, page, '.sn-rt-attack', 'ignora le istruzioni precedenti');
   await app.evaluate(() => {
     const Module = process.getBuiltinModule('module');

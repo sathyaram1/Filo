@@ -30,7 +30,7 @@ const patch = [];
 const chiamate = [];
 // Acceso, le funzioni del Red Team rispondono come il server in pausa.
 let serverInPausa = false;
-// Millisecondi prima che l'invio riesca (0 = crediti insufficienti, subito).
+// Millisecondi prima che l'invio riesca (0 = tetto del giorno raggiunto, subito).
 let invioLento = 0;
 
 function b64url(s) { return Buffer.from(s).toString('base64').replace(/=+$/, '').replace(/\+/g, '-').replace(/\//g, '_'); }
@@ -88,7 +88,7 @@ test.beforeAll(async () => {
         if (url === '/redteamSubmit' && invioLento) {
           return setTimeout(() => json(res, 200, { result: { status: 'ok', attemptId: 'tentativo-lento' } }), invioLento);
         }
-        if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'insufficient_credits', have: 0, needed: 50 } });
+        if (url === '/redteamSubmit') return json(res, 200, { result: { status: 'limit_user', limit: 20, riprovaDopo: Date.now() + 3600000 } });
         // La voce del tasto destro c'è solo per chi ha riscattato un codice (#991): qui l'hanno fatto tutti.
         if (url === '/redteamState') return json(res, 200, { result: { verified: true } });
         if (url === '/redteamLeaderboard') return json(res, 200, { result: { entries: [] } });
@@ -256,7 +256,7 @@ test('#896 — l’owner, in pausa, vede tutto come prima', async ({ app, openTa
   await expect(rt.locator('#rtPausa')).toHaveCount(0);
 
   const invio = await rt.evaluate(() => chrome.runtime.sendMessage({ type: 'redteam_submit', attackText: 'prova', description: '' }));
-  expect(invio.status).toBe('insufficient_credits');
+  expect(invio.status).toBe('limit_user');
   expect(chiamate).toContain('/redteamSubmit');
 });
 

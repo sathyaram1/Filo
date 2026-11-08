@@ -3,7 +3,7 @@
 // Assert di COMPORTAMENTO (non "non crasha"):
 //   1) la barra laterale ha un controllo Red-team che apre filo://redteam/;
 //   2) il pannello "Invia attacco" ha DUE campi separati (testo + descrizione)
-//      e un bottone d'invio che mostra il costo (50 cr);
+//      e un bottone d'invio;
 //   3) il bottone d'invio non procede con testo attacco vuoto (validazione);
 //   4) la mappa pura status→messaggio copre i casi della spec §8.1.
 //
@@ -58,9 +58,7 @@ test('il pannello "Invia attacco" ha due campi separati e il costo, e blocca con
   await expect(attack).toBeVisible();
   await expect(desc).toBeVisible();
 
-  // Il bottone d'invio mostra il costo (50 cr) — sia da loggato ("· 50 cr") sia,
-  // se non loggato, l'invito ad accedere (in entrambi i casi il costo è esposto
-  // dall'etichetta dell'azione di invio).
+  // Il bottone d'invio: «Invia attacco» da loggato, l'invito ad accedere se no.
   const send = page.locator('.sn-rt-overlay .sn-rt-send');
   await expect(send).toBeVisible();
 
@@ -111,7 +109,11 @@ test('mappa pura status→messaggio (spec §8.1)', async ({ app, openTab }) => {
     const f = window.SN_REDTEAM_ATTACK_UI.submitStatusMessage;
     return {
       ok: f({ status: 'ok', attemptId: 'x' }).ok,
-      insufficient: f({ status: 'insufficient_credits', have: 10, needed: 50 }),
+      lungo: f({ status: 'too_long', campo: 'attackText', length: 25000, max: 20000 }),
+      descLunga: f({ status: 'too_long', campo: 'description', length: 2100, max: 2000 }),
+      // Le 14:00 dello stesso giorno, e le 9:05 del giorno dopo: l'ora in cui si libera un posto.
+      perAccount: f({ status: 'limit_user', limit: 20, riprovaDopo: new Date(2026, 10, 8, 14, 0).getTime() }, new Date(2026, 10, 8, 10, 0).getTime()),
+      perTutti: f({ status: 'limit_global', limit: 150, riprovaDopo: new Date(2026, 10, 9, 9, 5).getTime() }, new Date(2026, 10, 8, 22, 0).getTime()),
       dormant: f({ status: 'dormant' }).text,
       notSignedIn: f({ status: 'not_signed_in' }),
       empty: f({ status: 'empty' }).text,
@@ -121,8 +123,11 @@ test('mappa pura status→messaggio (spec §8.1)', async ({ app, openTab }) => {
   });
 
   expect(results.ok).toBe(true);
-  expect(results.insufficient.ok).toBe(false);
-  expect(results.insufficient.text.toLowerCase()).toContain('insufficient'.slice(0, 4)); // "insufficienti"
+  // #2296: il rifiuto del server arriva col suo numero, e dice quando riprovare.
+  expect(results.lungo).toEqual({ ok: false, campo: 'attackText', text: 'Il testo dell’attacco è lungo 25.000 caratteri: il massimo è 20.000. Accorcialo e rinvia.' });
+  expect(results.descLunga).toMatchObject({ ok: false, campo: 'description', text: 'La descrizione è lunga 2.100 caratteri: il massimo è 2.000. Accorcialo e rinvia.' });
+  expect(results.perAccount).toEqual({ ok: false, text: 'Hai già fatto 20 tentativi nelle ultime 24 ore, il massimo per account. Il prossimo si libera alle 14:00.' });
+  expect(results.perTutti).toEqual({ ok: false, text: 'Il Red Team ha ricevuto tutti i tentativi che può giudicare in un giorno. Riprova domani alle 9:05.' });
   expect(results.dormant.toLowerCase()).toContain('attivo');
   expect(results.notSignedIn.ok).toBe(false);
   expect(results.notSignedIn.needLogin).toBe(true);

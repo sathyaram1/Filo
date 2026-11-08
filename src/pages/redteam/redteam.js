@@ -552,9 +552,9 @@
       return tbl;
     }));
 
-    host.appendChild(ruleBlock('Costo', () => {
+    host.appendChild(ruleBlock('Tentativi', () => {
       const p = document.createElement('p'); p.className = 'rt-rule-line';
-      p.textContent = '50 crediti per tentativo, non rimborsabili.';
+      p.textContent = 'Inviare è gratis, fino a un numero di tentativi al giorno per account.';
       return p;
     }));
 

@@ -9,7 +9,6 @@
   const Popup = global.SN_POPUP;
   const Icons = global.SN_ICONS || {};
 
-  const COST = 50; // crediti per tentativo (spec §8.1 / §11). Non rimborsabili.
   // Le bozze restano al sito dove sono nate, come quella del feedback (#1071).
   const bozza = (nome) => (global.SN_FILO_UI?.chiaveDiBozza ? global.SN_FILO_UI.chiaveDiBozza(nome) : null);
   const DRAFT_ATTACK_KEY = bozza('sn_redteam_attack_draft');
@@ -37,18 +36,32 @@
     activeRoot = null;
   }
 
-  // Pura ed esposta apposta per i test (tests/redteam-attack.spec.mjs).
-  function submitStatusMessage(res) {
+  const cifra = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
+
+  // «alle 14:00», «domani alle 9:00»: quando il server dice che si libera un posto. Senza un'ora valida, «più tardi».
+  function quando(ms, oraMs) {
+    if (!Number.isFinite(ms) || ms <= 0) return 'più tardi';
+    const d = new Date(ms);
+    const ora = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const oggi = new Date(Number.isFinite(oraMs) ? oraMs : Date.now());
+    return d.toDateString() === oggi.toDateString() ? `alle ${ora}` : `domani alle ${ora}`;
+  }
+
+  // Pura ed esposta apposta per i test (tests/redteam-attack.spec.mjs). `oraMs` solo per i test.
+  function submitStatusMessage(res, oraMs) {
     const r = res || {};
     switch (r.status) {
       case 'ok':
         return { ok: true, text: 'Attacco inviato! Apro i risultati…' };
-      case 'insufficient_credits': {
-        const have = Number.isFinite(r.have) ? r.have : null;
-        const needed = Number.isFinite(r.needed) ? r.needed : COST;
-        const detail = have != null ? ` (hai ${have}, ne servono ${needed})` : '';
-        return { ok: false, text: `Crediti insufficienti${detail}.` };
+      case 'too_long': {
+        const chi = r.campo === 'description' ? 'La descrizione è lunga' : 'Il testo dell’attacco è lungo';
+        return { ok: false, campo: r.campo === 'description' ? 'description' : 'attackText',
+          text: `${chi} ${cifra(r.length)} caratteri: il massimo è ${cifra(r.max)}. Accorcialo e rinvia.` };
       }
+      case 'limit_user':
+        return { ok: false, text: `Hai già fatto ${cifra(r.limit)} tentativi nelle ultime 24 ore, il massimo per account. Il prossimo si libera ${quando(r.riprovaDopo, oraMs)}.` };
+      case 'limit_global':
+        return { ok: false, text: `Il Red Team ha ricevuto tutti i tentativi che può giudicare in un giorno. Riprova ${quando(r.riprovaDopo, oraMs)}.` };
       case 'dormant':
         return { ok: false, text: 'Canale non ancora attivo. Riprova più tardi.' };
       case 'paused':
@@ -85,7 +98,7 @@
             <span class="sn-rt-head-icon">${icon('redteam', 18)}</span>
             <span class="sn-rt-head-title">Invia un attacco</span>
           </div>
-          <p class="sn-rt-avviso" hidden>Ogni tentativo costa ${COST} crediti, e senza un codice Red Team il risultato non lo vedi.</p>
+          <p class="sn-rt-avviso" hidden>Senza un codice Red Team il risultato non lo vedi.</p>
           <label class="sn-rt-field">
             <span class="sn-rt-label">Testo dell’attacco</span>
             <textarea class="sn-rt-attack" rows="4" placeholder="Il prompt che prova a ingannare i giudici di sicurezza."></textarea>
@@ -118,14 +131,11 @@
     const avvisoEl = root.querySelector('.sn-rt-avviso');
 
     let signedIn = false;
-    let balance = null; // null = sconosciuto (non blocchiamo finché non lo sappiamo)
-    // Chi non ha un codice (#991) legge prima il prezzo e che il risultato non lo vede. null = non ancora saputo.
+    // Chi non ha un codice (#991) legge prima che il risultato non lo vede. null = non ancora saputo.
     let verificato = null;
 
     function sendLabel() {
-      // Mostra SEMPRE il costo (spec §8.1, punto 3).
-      if (!signedIn) return 'Accedi per inviare';
-      return `Invia attacco · ${COST} cr`;
+      return signedIn ? 'Invia attacco' : 'Accedi per inviare';
     }
 
     function setStatus(text, kind) {
@@ -134,16 +144,11 @@
       statusEl.classList.toggle('sn-rt-status--ok', kind === 'ok');
     }
 
-    // Abilita/disabilita il bottone d'invio in base a stato login, saldo e testo.
+    // Abilita/disabilita il bottone d'invio in base a stato login e testo.
     // Solo chi scrive cancella un errore: un rifiuto appena arrivato (la pausa del server) deve restare leggibile.
     function refreshSendState({ daInput = false } = {}) {
       sendBtn.textContent = sendLabel();
       const hasText = !!attackEl.value.trim();
-      if (signedIn && balance != null && balance < COST) {
-        sendBtn.disabled = true;
-        setStatus(`Crediti insufficienti: hai ${balance}, ne servono ${COST}.`, 'err');
-        return;
-      }
       // Non loggato: il bottone resta cliccabile ma porta al login.
       if (!signedIn) {
         sendBtn.disabled = false;
@@ -196,20 +201,11 @@
       if (activeRoot === root) avvisoEl.hidden = verificato !== false;
     })();
 
-    async function leggiSaldo() {
-      if (!signedIn) return;
-      try {
-        const c = await chrome.runtime.sendMessage({ type: MSG.GET_CREDITS });
-        if (c && Number.isFinite(Number(c.credits))) balance = Number(c.credits);
-      } catch (_) {}
-    }
-
-    (async function loadAuthAndBalance() {
+    (async function loadAuth() {
       try {
         const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS });
         signedIn = !!(a && a.signedIn);
       } catch (_) { signedIn = false; }
-      await leggiSaldo();
       if (activeRoot === root) refreshSendState();
     })();
 
@@ -222,8 +218,6 @@
       if (activeRoot !== root) return;
       if (r && r.ok && (r.signedIn || r.profile)) {
         signedIn = true;
-        await leggiSaldo();
-        if (activeRoot !== root) return;
         setStatus('');
         refreshSendState();
         if (!statusEl.classList.contains('sn-rt-status--err')) setStatus('Sei dentro: ora puoi inviare l’attacco.', 'ok');
@@ -232,7 +226,7 @@
       setStatus((r && typeof r.error === 'string' && r.error.trim()) || 'Accesso non riuscito: riprova.', 'err');
     }
 
-    // ---- invio: costa crediti, parte solo dal clic dell'utente (#1071) ----
+    // ---- invio: parte solo dal clic dell'utente (#1071) ----
     sendBtn.addEventListener('click', async (e) => {
       if (!e.isTrusted) return;
       // Un accesso fatto altrove (menu del Profilo, un'altra scheda) col pannello aperto vale qui: si chiede adesso (#1351).
@@ -240,8 +234,6 @@
         try { const a = await chrome.runtime.sendMessage({ type: MSG.AUTH_STATUS }); signedIn = !!(a && a.signedIn); } catch (_) {}
         if (activeRoot !== root) return;
         if (!signedIn) { accedi(); return; }
-        await leggiSaldo();
-        if (activeRoot !== root) return;
         refreshSendState();
         if (sendBtn.disabled) return;
       }
@@ -294,6 +286,8 @@
         return;
       }
       refreshSendState();
+      // Il testo troppo lungo resta lì, col cursore dentro, per accorciarlo.
+      if (msg.campo) { try { (msg.campo === 'description' ? descEl : attackEl).focus(); } catch (_) {} }
     });
 
     cancelBtn.addEventListener('click', () => close());
