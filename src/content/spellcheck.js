@@ -832,7 +832,17 @@
         if (!vivo) return;
         if (vivo.attivo) seguiIlTesto(vivo);
         primaDellAnnulla(vivo, e);
+        if (e.isTrusted) siAspettaDallUtente(vivo, e, ammessoDa(vivo, e, { consuma: false }));
       }, true);
+      // Un editor ricco (Lexical) ferma l'incolla e scrive da sé il testo degli appunti, senza `beforeinput`.
+      el.addEventListener('paste', (e) => {
+        const vivo = monitored.get(el);
+        if (!vivo || !e.isTrusted) return;
+        let t = null;
+        try { t = e.clipboardData && e.clipboardData.getData('text/plain'); } catch (_) { t = null; }
+        if (t) siAspettaDallUtente(vivo, e, (pezzo) => senzaSpazi(t).includes(senzaSpazi(pezzo)));
+      }, true);
+      el.addEventListener('cut', (e) => { const vivo = monitored.get(el); if (vivo && e.isTrusted) vivo.taglio = Date.now(); }, true);
       el.addEventListener('scroll', () => { const vivo = monitored.get(el); if (vivo && vivo.attivo) syncOverlay(vivo); });
       // Il tasto spiega il carattere che l'`input` dopo scrive (ammessoDa). Si entra col clic, anche in una casella che
       // aveva il fuoco da script, o col rilascio di Tab, che cade già sulla casella nuova.
