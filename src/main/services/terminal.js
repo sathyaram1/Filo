@@ -81,7 +81,7 @@ const gitRicordati = new Map();
 function firmaFile(p) {
   try {
     const s = require('node:fs').statSync(p);
-    if (require('node:path').basename(p) === '.git') return `${s.isDirectory() ? 'd' : 'f'}:${s.ino}`;
+    if (s.isDirectory() && require('node:path').basename(p) === '.git') return `d:${s.ino}`;
     return `${s.mtimeMs}:${s.size}:${s.mode}:${s.ino}`;
   } catch (_) { return '-'; }
 }
