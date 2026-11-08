@@ -980,6 +980,7 @@ function togliPerChat(sito, permesso) {
   });
   const prese = delSito.filter((s) => tutti || s.parte === parte);
   for (const s of prese) togliScelta(s.origine, s.parte);
+  liberaSchede(new Set(prese.filter((s) => s.parte === SCARICAMENTI).map((s) => sitoDegliScaricamenti(s.origine))));
   return { tolte: prese.map(rigaScelta), restano: righeRicordate(), host, ricarica: prese.some((s) => s.si || s.parte === 'notifiche') };
 }
 
