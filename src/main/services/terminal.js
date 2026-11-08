@@ -77,9 +77,11 @@ function hookDiLetturaAttivo(dirHooks) {
 // sottomodulo, a processo fermo, e rifarla a ogni comando bloccava Filo per secondi nei repository grandi.
 const GIT_RICORDATI_MAX = 500;
 const gitRicordati = new Map();
+// Di un `.git` conta solo che ci sia e quale sia: la sua data cambia a ogni lettura (il lucchetto dell'indice).
 function firmaFile(p) {
   try {
     const s = require('node:fs').statSync(p);
+    if (require('node:path').basename(p) === '.git') return `${s.isDirectory() ? 'd' : 'f'}:${s.ino}`;
     return `${s.mtimeMs}:${s.size}:${s.mode}:${s.ino}`;
   } catch (_) { return '-'; }
 }
