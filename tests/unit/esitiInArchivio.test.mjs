@@ -84,6 +84,23 @@ test('il bottone di un file torna solo per un percorso del computer', () => {
   assert.equal(E.voceArchivio({ type: 'APRI_FILE', esito: 'fatto', file: { percorso: `${casa}\n` } }).file, undefined);
 });
 
+test('il collegamento di una pagina aperta e le pagine salvate nominate tornano coi loro dati, solo indirizzi del web', () => {
+  const v = E.voceArchivio({ type: 'NAVIGA', url: 'https://posta.example/in', label: 'Posta', _executed: true });
+  assert.deepEqual(v.link, { url: 'https://posta.example/in', etichetta: 'Posta' });
+  assert.deepEqual(E.voceArchivio(JSON.parse(JSON.stringify(v))).link, v.link, 'riletta dall\'archivio resta uguale');
+  for (const url of ['javascript:alert(1)', 'file:///etc/passwd', 'https://a.example/\nb']) {
+    assert.equal(E.voceArchivio({ type: 'NAVIGA', url, _executed: true }).link, undefined, url);
+    assert.equal(E.voceArchivio({ type: 'NAVIGA', esito: 'fatto', link: { url } }).link, undefined, url);
+  }
+  assert.equal(E.voceArchivio({ type: 'NAVIGA', url: 'https://x.example/', _executed: false, _output: { error: 'no' } }).link, undefined, 'una pagina non aperta non lascia un collegamento');
+  const s = E.voceArchivio({
+    type: 'CERCA_SALVATE', _executed: true,
+    _output: { pagine: [{ id: 'p1', url: 'https://r.example/carbonara', title: 'Carbonara' }, { id: 'p2', url: 'https://r.example/sapone' }, { id: 'p3', url: 'javascript:x' }], nominate: ['p1', 'p3'] },
+  });
+  assert.deepEqual(s.salvate, [{ id: 'p1', url: 'https://r.example/carbonara', title: 'Carbonara' }], 'solo quelle che la risposta nomina, e solo del web');
+  assert.deepEqual(E.voceArchivio(JSON.parse(JSON.stringify(s))).salvate, s.salvate);
+});
+
 test('un segreto fermato resta fermato, con la sua frase', () => {
   const v = E.voceArchivio({ type: 'NAVIGA', url: 'https://x.example/?c=1', _executed: false, _output: { blocked: 'segreto', frase: 'Fermato: portava fuori un codice' } });
   assert.deepEqual(v, { type: 'FERMATA', esito: 'fallito', riga: 'Fermato: portava fuori un codice' });
