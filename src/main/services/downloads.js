@@ -1754,4 +1754,5 @@ module.exports = {
   _daRaccontare: daRaccontare,
   _nominaDaSolo: nominaDaSolo,
   DOWNLOAD_LUNGO_MS,
+  PIU_FILE_IN_ATTESA,
 };
