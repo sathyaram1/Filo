@@ -1672,7 +1672,7 @@
         nota: (p) => isInDictionary(p) || nomeNoto(p) || verdetto(state, { fonte: 'dizionario', segment: p })?.stato === 'scartato',
       }),
     ]).filter(libero) : [];
-    const date = suggerimentiAttivi() ? Coerenza().dateDi(d.testo, new Date()).map(segnoDaData) : [];
+    const date = suggerimentiAttivi() ? Coerenza().dateDi(testo, new Date()).map(segnoDaData) : [];
     state.codiceTesto = d.testo;
     state.codiceT2 = [...errori, ...date, ...segnaposti];
     state.codice = d.riporta(state.codiceT2);
