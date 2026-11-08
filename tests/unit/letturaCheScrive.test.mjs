@@ -264,10 +264,15 @@ test('git: le righe della configurazione, chiave per chiave', () => {
   for (const riga of ['local\tcore.fsmonitor=programma', 'local\tdiff.external=programma', 'local\tdiff.x.textconv=programma',
     'local\tfilter.x.clean=programma', 'local\tcore.pager=programma', 'worktree\tcore.fsmonitor=programma',
     'local\tinclude.path=altro', 'local\tremote.origin.uploadpack=programma', 'local\textensions.partialclone=origin',
-    'local\tremote.origin.receivepack=programma', 'local\tremote.origin.vcs=programma', 'local\tremote.origin.promisor=true',
-    'local\tremote.a.url=x.uploadpack=programma']) {
+    'local\tremote.origin.receivepack=programma', 'local\tremote.origin.vcs=programma', 'local\tremote.origin.promisor=true']) {
     assert.equal(C.gitConfigLancia(`${tipico}\n${riga}`), true, riga);
   }
+  // Nella forma separata da NUL (quella della sonda) la chiave finisce al ritorno a capo: un «=» nel nome del
+  // remoto non la fa passare per un'altra (`[remote "a.url=x"] promisor`).
+  assert.equal(C.gitConfigLancia('local\u0000remote.a.url=x.promisor\ntrue\u0000'), true);
+  assert.equal(C.gitConfigLancia('local\u0000remote.origin.url\nhttps://x\u0000local\u0000core.bare\nfalse\u0000global\u0000core.pager\nless\u0000'), false);
+  assert.equal(C.gitConfigLancia('local\u0000core.fsmonitor\u0000'), false, 'una chiave senza valore vale vero');
+  assert.equal(C.gitConfigLancia('worktree\u0000diff.external\nprogramma\u0000'), true);
   // Chiavi che VS Code, GitHub CLI e husky scrivono nei repository dell'utente: a una lettura non avviano niente.
   for (const riga of ['local\tbranch.main.vscode-merge-base=origin/main', 'local\tbranch.fix/x.github-pr-owner-number=a#b#1',
     'local\tremote.origin.gh-resolved=base', 'local\tcore.hookspath=.husky/_', 'local\tcore.commentchar=;']) {
