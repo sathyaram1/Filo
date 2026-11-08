@@ -37,8 +37,12 @@ test('incolla immagine', async ({ app, openTab, testServer }) => {
   const page = await testServer.openReady(openTab, PAGINA, { pubblico: true });
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
-  await app.evaluate(({ clipboard, nativeImage }) => {
-    clipboard.writeImage(nativeImage.createFromDataURL('data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAYAAABytg0kAAAAFklEQVR4nGP8z8DAwMDAxMDAwMDAAAANHQEDasKb6QAAAABJRU5ErkJggg=='));
+  await app.evaluate(async ({ clipboard, ClipboardItem, nativeImage }) => {
+    const w = 48, h = 32;
+    const px = Buffer.alloc(w * h * 4);
+    for (let i = 0; i < w * h; i++) px.set([30, 60, 200, 255], i * 4);
+    const png = nativeImage.createFromBitmap(px, { width: w, height: h }).toPNG();
+    await clipboard.write([new ClipboardItem({ 'image/png': new Blob([png], { type: 'image/png' }) })]);
   });
   await page.click('#ce');
   await page.keyboard.type('ciao ', { delay: 60 });
