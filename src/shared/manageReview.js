@@ -97,7 +97,8 @@
     if (/ramo|registro/.test(m)) {
       const server = /server/.test(m);
       const nome = String(ramo || '').trim() || '<ramo>';
-      return `Il registro del ramo${server ? ' del server' : ''} ha un buco: lo togli con la sanatoria dal tuo PC, npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}.`;
+      return `Il ramo${server ? ' del server' : ''} non risulta pulito: se è un buco del registro lo togli con la sanatoria dal tuo PC, `
+        + `npm run fiducia:sana -- ${nome}${server ? ' --server' : ''}; se ci ha scritto un biglietto sporco, lo porta avanti una sessione locale.`;
     }
     if (/fidat/.test(m)) return 'Il feedback non è fidato: riparte quando lo segni fidato, dopo averlo letto.';
     return `«${String(motivo).trim()}» non passa da solo: lo sblocca un tuo gesto o una sessione locale.`;
