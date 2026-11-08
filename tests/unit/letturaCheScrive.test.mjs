@@ -499,7 +499,7 @@ test('git: le chiavi che scrivono VS Code, GitHub CLI e husky non fanno chiedere
     g('config', 'remote.origin.gh-resolved', 'base');
     g('config', 'core.hooksPath', '.husky/_');
     assert.equal(T.gitLanciaIn(repo), '');
-    assert.equal(C.classify('git status', { cwd: repo, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn }), 1);
+    assert.equal(C.classify('git status', sondaVera(repo, base)), 1);
     // La cartella spostata si segue: un hook di lettura lì dentro fa chiedere, anche da una sottocartella.
     mkdirSync(join(repo, '.husky', '_'), { recursive: true });
     mkdirSync(join(repo, 'src'));
