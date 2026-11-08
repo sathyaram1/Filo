@@ -50,7 +50,8 @@ test('r1 un no alla domanda del sito toglie tutti i file del sito in attesa, e l
     const barra = shell.locator('#permesso-bar');
     await expect(barra).toBeVisible({ timeout: 10_000 });
     await barra.locator('.permesso-no').click();
-    await expect.poll(() => inAttesa(shell), { timeout: 10_000, message: 'file del sito ancora in attesa dopo il no' }).toBe(0);
+    await expect.soft.poll(() => inAttesa(shell), { timeout: 10_000, message: 'file del sito ancora in attesa dopo il no' }).toBe(0);
+    const prima = await inAttesa(shell);
     // Il sito ha avuto un no: altre tre pagine dello stesso sito non scaricano e non chiedono.
     await page.goto(`http://s6.scarica.test:${srv.porta}/salta?n=6&fino=8`);
     await page.waitForTimeout(5_000);
