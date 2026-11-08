@@ -1081,7 +1081,7 @@
     if (typeof c.gitLancia === 'function' && sub) {
       if (!c.cwd || c.cwd.rete || c.cwd.provider) return due(MOTIVI.ignoto);
       let lancia = 'ignoto';
-      try { lancia = c.gitLancia(c.win ? `${c.cwd.radice}\\${c.cwd.segs.join('\\')}` : `/${c.cwd.segs.join('/')}`); } catch (_) { lancia = 'ignoto'; }
+      try { lancia = c.gitLancia(assolutoDi(c.cwd, c)); } catch (_) { lancia = 'ignoto'; }
       if (lancia) return due(MOTIVI.git);
     }
     if (sub === 'grep') return due(MOTIVI.ricorsivo);
