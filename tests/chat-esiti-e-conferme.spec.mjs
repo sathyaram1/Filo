@@ -515,6 +515,30 @@ test('#1685 un evento che nessun programma apre: il diario, la chat salvata e il
   }
 });
 
+test('#1685 un evento che nessun programma apre: chiesto subito nella stessa home, il modello non lo dice nel calendario', async ({ app }) => {
+  test.setTimeout(60_000);
+  const page = await home(app);
+  await app.evaluate(({ shell }) => {
+    globalThis.__openPathVero = shell.openPath;
+    shell.openPath = async () => 'nessuna applicazione';
+  });
+  try {
+    await modelloFinto(app, [{ text: 'Ecco l\'evento.', toolCalls: [EVENTO] }, { text: 'Ok.' }]);
+    await chiedi(page, 'metti il dentista il primo dicembre');
+    await expect(page.locator('#sendBtn')).toBeVisible({ timeout: 10_000 });
+    await page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Aggiungi al calendario' }).click();
+    await expect(page.locator('.dash-bubble-filo .dash-action-btn', { hasText: 'Evento salvato' })).toBeVisible({ timeout: 10_000 });
+    await chiedi(page, 'è in calendario?');
+    await expect.poll(async () => (await chiamateAlModello(app)).length, { timeout: 10_000 }).toBe(2);
+    const detto = JSON.stringify((await chiamateAlModello(app))[1]);
+    expect(detto, 'la scheda aperta dice al modello quello che dice il bottone').toContain('il calendario non si è aperto');
+    expect(detto).not.toContain('Evento aggiunto al calendario');
+  } finally {
+    await app.evaluate(({ shell }) => { if (globalThis.__openPathVero) shell.openPath = globalThis.__openPathVero; });
+    await ripristina(app);
+  }
+});
+
 // Una cartella sotto un file non nasce su nessun sistema: il comando parte ed esce con errore, ovunque.
 test('#1373 un comando che non riesce dopo l\'OK: il modello riceve il perché e lo dice in chat', async ({ app }) => {
   test.setTimeout(60_000);
