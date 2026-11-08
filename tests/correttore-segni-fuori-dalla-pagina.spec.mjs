@@ -70,14 +70,66 @@ test('chi scrive vede i suoi segni, e il sito no', async ({ app, openTab, testSe
   expect(await page.evaluate(() => window.visto())).toEqual({ segni: 0, ombreAperte: 0, testoDiFilo: '' });
   await page.screenshot({ path: 'tests/.shots/correttore-segni-fuori-dalla-pagina.png', clip: { x: 0, y: 0, width: 660, height: 320 } });
 
-  // Dopo i tasti dell'utente la casella è sua: il testo che il sito ci rimette si controlla, ma resta nell'ombra.
+  // Il testo che il sito ci rimette da sé aspetta il prossimo gesto dell'utente; col tasto si controlla, nell'ombra.
+  await page.waitForTimeout(1700);
   await page.evaluate(() => {
     const ta = document.getElementById('ta');
     ta.value = 'ancora quseta e zanzottera ';
     ta.dispatchEvent(new Event('input', { bubbles: true }));
   });
+  await page.waitForTimeout(600);
+  expect(await errore.count()).toBe(0);
+  await page.keyboard.press('End');
   await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
   expect((await page.evaluate(() => window.visto())).segni).toBe(0);
+});
+
+const SONDA_DEI_TEMPI = `<!doctype html><meta charset="utf-8">
+<body style="margin:0"><textarea id="t" lang="it" style="position:fixed;inset:0;width:100vw;height:100vh;opacity:0;font:20px monospace"></textarea>
+<script>
+  // Quanti giri fa un ciclo di messaggi dopo la scrittura: meno giri, più lavoro di Filo nella pagina.
+  const giri = (ms) => new Promise((ok) => {
+    const c = new MessageChannel();
+    let n = 0;
+    const fine = performance.now() + ms;
+    c.port1.onmessage = () => { n++; if (performance.now() < fine) c.port2.postMessage(0); else ok(n); };
+    c.port2.postMessage(0);
+  });
+  async function prova(parola) {
+    const t = document.getElementById('t');
+    t.value = (parola + ' ').repeat(1500);
+    const t0 = performance.now();
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+    const sincrono = performance.now() - t0;
+    const liberi = await giri(450);
+    t.value = '';
+    t.dispatchEvent(new Event('input', { bubbles: true }));
+    await giri(150);
+    return { sincrono, liberi };
+  }
+  window.sonda = async () => {
+    const a = [], b = [];
+    for (let i = 0; i < 7; i++) { a.push(await prova('zanzottera')); b.push(await prova('quseta')); }
+    const med = (x, k) => x.map((v) => v[k]).sort((p, q) => p - q)[3];
+    return { nota: { sincrono: med(a, 'sincrono'), liberi: med(a, 'liberi') }, ignota: { sincrono: med(b, 'sincrono'), liberi: med(b, 'liberi') } };
+  };
+</script></body>`;
+
+// Dopo un clic vero, anche su una casella invisibile grande quanto la pagina, lo script scriveva da sé una parola
+// ripetuta e misurava quanto lavorava la pagina: una parola segnata costava molto più di una del dizionario.
+test('dopo un clic nella pagina, lo script del sito non distingue dai tempi le parole del dizionario', async ({ app, openTab, testServer }) => {
+  await apri(app, openTab, testServer);
+  const page = await testServer.openReady(openTab, SONDA_DEI_TEMPI, { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  await page.mouse.click(300, 300);
+  await page.waitForTimeout(500);
+  const esito = await page.evaluate(() => window.sonda());
+  expect(esito.ignota.sincrono).toBeLessThan(esito.nota.sincrono * 1.5 + 3);
+  expect(esito.ignota.liberi).toBeGreaterThan(esito.nota.liberi * 0.85);
+  // Il clic che entra nella casella paga un controllo solo: la sonda non lo trasforma in segni.
+  await page.keyboard.press('End');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveCount(0);
 });
 
 test('chi rientra col clic in una casella già scritta, che aveva il fuoco da script, ritrova i segni', async ({ app, openTab, testServer }) => {
