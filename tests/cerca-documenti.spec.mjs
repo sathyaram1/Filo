@@ -150,6 +150,41 @@ test('il file trovato si trascina nel campo dove si scrive a Filo', async ({ app
   }
 });
 
+// #2300: il tipo del file trovato lo può scrivere anche una pagina web in un'altra finestra. Senza il gettone che il
+// main ha dato al trascinamento vero il percorso non diventa un allegato: entra come testo, a vista nel campo.
+test('un «file trovato da Filo» trascinato da fuori entra come testo nel campo, non come allegato', async ({ app }) => {
+  const page = await home(app);
+  const campo = page.locator('#input');
+  const a = await campo.boundingBox();
+  const lascia = async (items, x = a.x + a.width / 2, y = a.y + a.height / 2) => {
+    const cdp = await page.context().newCDPSession(page);
+    const data = { items, dragOperationsMask: 1 };
+    for (const type of ['dragEnter', 'dragOver', 'drop']) await cdp.send('Input.dispatchDragEvent', { type, x, y, data });
+    await cdp.detach().catch(() => {});
+  };
+  const segreto = join(cartellaTemporanea('filo-test-file-finto-'), 'chiavi', 'id_rsa');
+  await lascia([{ mimeType: 'application/x-filo-file', data: segreto }, { mimeType: 'text/plain', data: 'foto delle vacanze.jpg' }]);
+  await expect(campo).toHaveValue('foto delle vacanze.jpg');
+  await expect(page.locator('.dash-file-chip')).toHaveCount(0);
+  await campo.fill('');
+  // Lasciato fuori dal campo, e senza testo semplice: il percorso che portava si vede tutto.
+  await lascia([{ mimeType: 'application/x-filo-file', data: segreto }], a.x + a.width / 2, Math.max(5, a.y - 120));
+  await expect(campo).toHaveValue(segreto);
+  await expect(page.locator('.dash-file-chip')).toHaveCount(0);
+  await campo.fill('');
+  // Un gettone dato dal main vale una volta: il percorso arriva come allegato, e lo stesso gettone poi non vale più.
+  const vero = await page.evaluate(async (p) => {
+    const dt = new DataTransfer();
+    await SN_TRASCINO_INTERNO.parte(dt, 'file', p);
+    return dt.getData('application/x-filo-file');
+  }, join(cartellaTemporanea('filo-test-file-vero-'), 'contratto.pdf'));
+  await lascia([{ mimeType: 'application/x-filo-file', data: vero }]);
+  await expect(page.locator('.dash-file-chip')).toHaveText(/contratto\.pdf/);
+  await lascia([{ mimeType: 'application/x-filo-file', data: vero }, { mimeType: 'text/plain', data: 'di nuovo' }]);
+  await expect(campo).toHaveValue('di nuovo');
+  await expect(page.locator('.dash-file-chip')).toHaveCount(1);
+});
+
 test('l\'attesa dice cosa sta leggendo e quanti ne mancano, e il quadrato ferma la ricerca', async ({ app }) => {
   test.setTimeout(90_000);
   const dir = join(await cartellaScaricamenti(app), 'Tanti');
