@@ -18,6 +18,7 @@ const PAGINA = `<!doctype html><meta charset="utf-8"><title>Scarica da sola</tit
   let i = Number(q.get('da') || 1);
   const prefisso = q.get('p') || 'pezzo';
   let fatti = 0;
+  const ogni = Number(q.get('ogni') || 300);
   const t = setInterval(() => {
     if (fatti++ >= n) { clearInterval(t); return; }
     const a = document.createElement('a');
