@@ -15,6 +15,7 @@
         { testo: 'Copia e Rispondi ci sono anche nell\'Aiuto, nel riquadro di Spiega e Traduci, nella chat dei Mazzi e negli scambi delle app aperti nella home.', segnalazione: 2096 },
         { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
         { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
+        { testo: 'Un sito che scarica più file da solo, senza un tuo clic, dal secondo ti chiede il permesso: i file aspettano fuori dalla cartella Download finché non rispondi, e la risposta vale per quel sito.', segnalazione: 2294 },
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },

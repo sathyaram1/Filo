@@ -2684,6 +2684,9 @@
     textScale: 1,
     // Il commento proattivo al centro della home, per chi preferisce una home più sobria.
     showHomeMessage: true,
+    // Una pagina può far partire un download al secondo mentre l'utente non c'è (#2294): Filo ne scrive al più ogni
+    // `downloadOgniMin` minuti (valori in FILO_PARLA_DOWNLOAD_MIN). Preferenze → Avanzate e IMPOSTA_PREFERENZA.
+    filoParla: { downloadOgniMin: 10 },
     // Barra laterale (#871): apertura spingendo sul bordo, attesa sul bordo, quanto resta aperta dopo
     // che il mouse esce, striscia d'indizio. Preferenze → Avanzate, IMPOSTA_PREFERENZA, tasto destro sulla striscia.
     // `schede`: a schermo intero la fila delle schede scende col mouse sul bordo alto, con le stesse attese (#1246).
@@ -3084,6 +3087,38 @@
     return { durataMs: buono ? Math.max(min, Math.min(max, n)) : DEFAULT_SETTINGS.avvisoSchermoPieno.durataMs };
   }
 
+  // I minuti fra due messaggi di Filo sui download (#2294): solo le scelte della pagina, la più vicina per un numero
+  // qualunque; illeggibile prende il predefinito.
+  const FILO_PARLA_DOWNLOAD_MIN = Object.freeze([2, 5, 10, 30, 60]);
+  function minutiFraDownload(v) {
+    const raw = v && typeof v === 'object' ? v.downloadOgniMin : undefined;
+    const n = Number(raw);
+    if (raw === null || raw === '' || typeof raw === 'boolean' || !Number.isFinite(n) || n <= 0) {
+      return DEFAULT_SETTINGS.filoParla.downloadOgniMin;
+    }
+    return FILO_PARLA_DOWNLOAD_MIN.reduce((a, b) => (Math.abs(b - n) < Math.abs(a - n) ? b : a));
+  }
+  // Il nome di una scelta, uguale nella chat e nell'elenco dei cambi.
+  function nomeRitmoDownload(min) {
+    return Number(min) === 60 ? 'al più ogni ora' : `al più ogni ${min} minuti`;
+  }
+  // I minuti detti come capita in chat: «30», «mezz'ora», «dieci minuti», «un'ora e mezza», «2 ore». NaN se non si capisce.
+  const NUMERI_A_PAROLE = { un: 1, uno: 1, una: 1, due: 2, tre: 3, quattro: 4, cinque: 5, sei: 6, sette: 7, otto: 8, nove: 9, dieci: 10,
+    quindici: 15, venti: 20, trenta: 30, quaranta: 40, cinquanta: 50, sessanta: 60 };
+  function minutiDaTesto(raw) {
+    const s = String(raw == null ? '' : raw).toLowerCase().replace(/[’`´]/g, "'").trim();
+    if (!s) return NaN;
+    const cifre = s.match(/\d+(?:[.,]\d+)?/);
+    const parola = (s.match(/[a-zà-ù]+/g) || []).filter((w) => NUMERI_A_PAROLE[w] != null).pop();
+    const n = cifre ? Number(cifre[0].replace(',', '.')) : (parola ? NUMERI_A_PAROLE[parola] : NaN);
+    if (/\bquart[oi]\s+d'?\s*or[ae]\b/.test(s)) return (Number.isFinite(n) ? n : 1) * 15;
+    const senzaMezzora = s.replace(/\bmezz'?\s*or[ae]\b/g, ' ');
+    if (/\bor[ae]\b|\d\s*h\b/.test(senzaMezzora)) return (Number.isFinite(n) ? n : 1) * 60 + (/\be mezz[ao]\b/.test(s) ? 30 : 0);
+    if (senzaMezzora !== s) return 30;
+    if (/\d\s*s\b|\bsec(?:ond[oi])?\b/.test(s)) return Number.isFinite(n) ? n / 60 : NaN;
+    return n;
+  }
+
   // Tetto di una lezione, contato come lo stile: una regola su come comportarsi
   // ci sta larga, un testo che nessuno rilegge nel popup no (#592).
   const LESSON_MAX = 800;
@@ -3339,6 +3374,10 @@
     opzioniPannelloDestro,
     AVVISO_SCHERMO_PIENO_LIMITI,
     opzioniAvvisoSchermoPieno,
+    FILO_PARLA_DOWNLOAD_MIN,
+    minutiFraDownload,
+    nomeRitmoDownload,
+    minutiDaTesto,
     testoLeggibile,
     LESSON_MAX,
     memoriaImbustata,

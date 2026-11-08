@@ -315,7 +315,9 @@
       // solo nell'avviso che l'utente può aver già chiuso.
       let da = r.site ? ` · da ${r.site}` : '';
       try { const t = window.SN_ESEGUIBILI.provenienza(r.site, r.siteUncertain, r.servedBy, r.filename); da = t ? ` · ${t}` : ''; } catch (_) {}
-      meta.textContent = `${stateLabel(r)}${da} · ${formatDate(r.startedAt)}`;
+      const solo = r.chiede === 'piuFile' ? ' · partito da solo, senza un tuo clic' : '';
+      const fermati = r.fermati ? ` · altri ${r.fermati} fermati` : '';
+      meta.textContent = `${stateLabel(r)}${da}${solo}${fermati} · ${formatDate(r.startedAt)}`;
     } else {
       const size = fmtBytes(r.totalBytes || r.receivedBytes);
       const label = r.missing ? 'Non più sul disco' : stateLabel(r);

@@ -396,6 +396,8 @@ function publicRecord(r) {
     via: r.via || '',
     nota: r.nota || '',
     ...(r.paese ? { paese: r.paese } : {}),
+    // #2294 — aspetta perché il sito scarica più file senza un clic; `fermati`: quelli oltre il tetto, non scesi.
+    ...(r._piuFile && r.state === 'pending' ? { chiede: 'piuFile', fermati: r._fermati || 0 } : {}),
     // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
     ...velocitaDi(r),
   };
@@ -630,6 +632,56 @@ function chiediNellaFinestra(webContents, rec) {
   } catch (_) {}
 }
 
+// #2294 — la domanda sul sito che scarica da solo sta nella sua cornice e vale per tutti i file in attesa del sito, anche
+// quelli dei suoi altri sottodomini, e per quelli della stessa scheda, anche presi su altri siti prima di saltare qui;
+// ritirata senza risposta, la riga resta da decidere nel pannello. Un no li toglie: non li aveva chiesti l'utente. Il
+// tetto conta tutti i file in attesa, di qualunque sito: una pagina che salta fra mille siti non lo moltiplica.
+const PIU_FILE_IN_ATTESA = 100;
+function chiediPiuFile(webContents, rec) {
+  const scope = scopeOf(rec);
+  try {
+    require('./permessiPagine').chiediScaricamenti(webContents, (si, _fonte, decisa) => {
+      if (!decisa) return;
+      for (const r of inAttesaPiuFile(scope, rec._piuFile, rec._piuFileScheda)) {
+        if (si) confirmDownload(r.id, true, scope);
+        else remove(r.id, scope);
+      }
+    });
+  } catch (_) {}
+}
+function inAttesaPiuFile(scope, origine, scheda) {
+  const sito = (o) => { try { return require('./permessiPagine').sitoDegliScaricamenti(o); } catch (_) { return o; } };
+  const suo = origine ? sito(origine) : null;
+  return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile && scopeOf(r) === scope
+    && (!origine || sito(r._piuFile) === suo || (scheda != null && r._piuFileScheda === scheda)));
+}
+// La scheda di Filo, non la vista: in Privacy un sito nuovo fa rinascere la vista, e i file presi prima restano suoi.
+function schedaDiPagina(webContents) {
+  try {
+    if (!webContents || webContents.isDestroyed()) return null;
+  } catch (_) { return null; }
+  try {
+    for (const w of electron().BrowserWindow.getAllWindows()) {
+      const t = ((w._filoTabs && w._filoTabs.tabs) || []).find((x) => { try { return x.view.webContents === webContents; } catch (_) { return false; } });
+      if (t) return `${w.id}:${t.id}`;
+    }
+  } catch (_) {}
+  return webContents.id;
+}
+// Oltre il tetto il file non scende, e la riga più nuova lo dice: chi risponde sa quanti ne mancano.
+function postoPerPiuFile(scope) {
+  const attese = inAttesaPiuFile(scope);
+  if (attese.length < PIU_FILE_IN_ATTESA) return true;
+  const ultima = attese.reduce((a, b) => (String(b.startedAt) > String(a.startedAt) ? b : a));
+  ultima._fermati = (ultima._fermati || 0) + 1;
+  broadcast('progress', ultima);
+  return false;
+}
+function gestoDi(item, webContents) {
+  try { if (item.hasUserGesture() === true) return true; } catch (_) {}
+  try { return require('./permessiPagine').gestoDellUtente(webContents); } catch (_) { return false; }
+}
+
 function finestraDi(webContents, rec) {
   const finestre = windowsOf(scopeOf(rec)).filter((w) => w._filoTabs);
   const tiene = (w) => (w._filoTabs.tabs || []).some((t) => {
@@ -688,7 +740,8 @@ function daRaccontare(rec, davanti, adesso = Date.now()) {
 // dice "completato".
 function completa(rec) {
   if (rec._quarantena) {
-    const dest = uniquePath(downloadsDir(), rec.filename);
+    const intatto = rec._nomeChiesto && rec.filename === path.basename(String(rec.savePath || ''));
+    const dest = uniquePath(downloadsDir(), intatto ? rec._nomeChiesto : rec.filename);
     if (spostaFile(rec.savePath, dest)) {
       forgetExists(rec.savePath);
       rec.savePath = dest;
@@ -850,7 +903,8 @@ async function rimettiNome(id, scope = '') {
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
-function onWillDownload(item, webContents, scope = '', ses = null) {
+// `piuFile`: l'origine della pagina che scarica più file senza un clic, quando il file aspetta la sua risposta (#2294).
+function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '') {
   const filename = safeName(item.getFilename() || (function () {
     try { return decodeURIComponent(new URL(item.getURL()).pathname.split('/').pop() || ''); }
     catch (_) { return ''; }
@@ -874,7 +928,10 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
   // file non cambia di una virgola: l'attrito va solo dove serve.
   let finale = '';
   try { finale = ESE().sito(url); } catch (_) {}
-  const attesa = exe && chiedeConferma(sito, incerto, finale);
+  const attesaExe = exe && chiedeConferma(sito, incerto, finale);
+  // Un programma ha già la sua domanda, più precisa: quella sul sito che scarica da solo non si aggiunge.
+  const perPiuFile = !attesaExe && piuFile ? piuFile : '';
+  const attesa = attesaExe || !!perPiuFile;
 
   // Salvataggio diretto nella cartella Download (niente dialogo "Salva come":
   // vedi nota di filosofia in testa al file). setSavePath disattiva il dialogo
@@ -908,6 +965,10 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
     // L'indirizzo cliccato, prima dei rimandi: «Riprova» riparte da qui, perché quello finale può essere firmato e scaduto.
     _primo: primo,
     _quarantena: attesa,
+    // Il «(2)» della quarantena non è del file: uscendo, il nome si sceglie di nuovo fra quelli della cartella Download.
+    ...(attesa ? { _nomeChiesto: filename } : {}),
+    _piuFile: perPiuFile,
+    ...(perPiuFile ? { _piuFileScheda: schedaDiPagina(webContents) } : {}),
     _scope: scope || '',
     _sessione: ses || (webContents && !webContents.isDestroyed?.() ? webContents.session : null),
   };
@@ -916,7 +977,8 @@ function onWillDownload(item, webContents, scope = '', ses = null) {
   liveItems.set(id, item);
   persist();
   broadcast('start', rec);
-  if (attesa) chiediNellaFinestra(webContents, rec);
+  if (attesaExe) chiediNellaFinestra(webContents, rec);
+  else if (perPiuFile) chiediPiuFile(webContents, rec);
   // #412 — chiudi la scheda "vuota" aperta apposta da un link Scarica
   // target=_blank. Deferito così il ciclo di vita del download (già preso in
   // carico qui sopra) è completamente cablato prima di toccare l'albero delle view.
@@ -1234,7 +1296,11 @@ function attachSession(ses, { scope = '' } = {}) {
       try { fermo = typeof globalThis.SN_SB_SCARICAMENTO === 'function' && globalThis.SN_SB_SCARICAMENTO(item, webContents) === true; } catch (_) {}
       if (fermo) { e.preventDefault(); return; }
       if (riprovaRitirata(scope, item)) { e.preventDefault(); return; }
-      onWillDownload(item, webContents, scope, ses);
+      let piu = { esito: 'via', origine: null };
+      try { piu = require('./permessiPagine').scaricamentoSenzaGesto(webContents, gestoDi(item, webContents)); } catch (_) {}
+      if (piu.esito === 'no') { e.preventDefault(); return; }
+      if (piu.esito === 'chiedi' && !postoPerPiuFile(scope)) { e.preventDefault(); return; }
+      onWillDownload(item, webContents, scope, ses, piu.esito === 'chiedi' ? piu.origine : '');
     });
   } catch (_) {}
 }
@@ -1514,7 +1580,7 @@ function confirmDownload(id, allow, scope = '') {
   if (!rec || rec.state !== 'pending') {
     return { ok: false, error: 'Questo scaricamento non aspetta più una risposta', items: listRecords(scope) };
   }
-  contaProgramma(rec, allow ? 'scaricato' : 'rifiutato');
+  if (!rec._piuFile) contaProgramma(rec, allow ? 'scaricato' : 'rifiutato');
   // «Salva immagine come»: i byte e il file li muove chi l'ha chiesto, che aspetta questa risposta (#1311).
   const manual = liveManual.get(id);
   if (manual && manual.rispondi) { manual.rispondi(!!allow); return { ok: true, items: listRecords(scope) }; }
@@ -1566,7 +1632,7 @@ function openFile(id, opts, scope = '') {
 function apriScaricato(rec, opts) {
   if (!rec) return { ok: false, error: 'Questo scaricamento non è più nell’elenco' };
   if (rec.state === 'pending') {
-    return { ok: false, error: 'Questo programma non è ancora sul computer. Rispondi prima all’avviso' };
+    return { ok: false, error: `Questo ${rec._piuFile ? 'file' : 'programma'} non è ancora sul computer. Rispondi prima all’avviso` };
   }
   // Guarda il disco PRIMA di tentare (vedi nota su fileExists): l'esito
   // dell'apertura non è affidabile su tutte le piattaforme.
@@ -1707,4 +1773,5 @@ module.exports = {
   _daRaccontare: daRaccontare,
   _nominaDaSolo: nominaDaSolo,
   DOWNLOAD_LUNGO_MS,
+  PIU_FILE_IN_ATTESA,
 };

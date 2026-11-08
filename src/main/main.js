@@ -264,6 +264,7 @@ app.whenReady().then(async () => {
     // #588 — conferma prima di scaricare/aprire un programma: la config va
     // letta PRIMA del primo will-download, che è sincrono e non può attenderla.
     try { require('./services/downloads').configureFromSettings(s); } catch (_) {}
+    try { require('./services/filoParla').configura(s); } catch (_) {}
     // Le miniature grandi di «Aperti per dopo» (#839), qualche secondo dopo: l’avvio non le aspetta.
     setTimeout(() => { globalThis.SN_SAVED_PAGES?.rimpicciolisciMiniature?.().catch(() => {}); }, 3000);
     // Le icone delle voci rimaste senza copia (#1273), una volta sola e dopo l'avvio.

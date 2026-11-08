@@ -2739,6 +2739,7 @@ class TabManager {
     // Sulla scheda appena caduta la vista rinasce verso l'indirizzo chiesto: la rimessa in piedi la lascia stare (#1868).
     let caduta = false;
     try { caduta = tab.view.webContents.isCrashed(); } catch (_) {}
+    Permessi.navigazioneDiFilo(tab.view.webContents);
     if (caduta || this._needsRecreate(tab, target)) {
       this._recreateView(tab, target, { nuova: true });
     } else {
@@ -2790,8 +2791,10 @@ class TabManager {
       tab.storia = Storia.conserva(tab.storia, this._vociDellaVista(tab), modo, url);
     }
     try { this.win.contentView.removeChildView(tab.view); } catch (_) {}
-    ChiusuraConCaselle.chiudi(tab.view.webContents);
+    const vecchia = tab.view.webContents;
+    ChiusuraConCaselle.chiudi(vecchia);
     const view = this._makeView(url, partition, { suppressAutoplay: tab.suppressAutoplay });
+    Permessi.passaScheda(vecchia, view.webContents);
     tab.view = view;
     tab._vistaNuova = { wc: view.webContents, prima: /^(https?|filo):/i.test(prima) ? prima : '', meta: { url, titolo: opts.titolo || '' } };
     tab.partition = partition;

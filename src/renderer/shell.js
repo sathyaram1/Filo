@@ -1434,6 +1434,7 @@
     strumenti: ['readAloud', '', 'Strumenti musicali negati'],
     rete: ['wifi', '', 'Rete locale negata'],
     file: ['pencil', '', 'Modifica dei file negata'],
+    scaricamenti: ['download', '', 'Scaricamenti senza un tuo clic negati'],
   };
   // Il primo segno è il più delicato: sulla scheda più stretta del suo contenuto resta solo lui (shell.css), la frase li dice tutti.
   const PESO_SEGNO = ['schermo', 'video', 'audio', 'posizione'];
@@ -2663,7 +2664,10 @@
     // Le domande sui programmi a pezzi: il nome lo sceglie il sito, e fra le parole di Filo potrebbe chiudere le
     // virgolette e continuare con la sua voce. Sta in un riquadro suo, come nei popup di conferma (#592.7).
     function partiScarica(r) {
-      try { return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy); } catch (_) {}
+      try {
+        if (r.chiede === 'piuFile') return window.SN_ESEGUIBILI.partiPiuFile(r.filename, r.fermati);
+        return window.SN_ESEGUIBILI.partiScarica(r.filename, r.site, r.siteUncertain, r.servedBy);
+      } catch (_) {}
       return ['Il file', { citazione: String(r.filename || '') }, 'è un programma. Scaricarlo?'];
     }
 
@@ -2940,6 +2944,7 @@
       if (d.tipo === 'presenza') return { testo: 'vuole sapere quando sei al computer', icone: ['user'] };
       if (d.tipo === 'strumenti') return { testo: 'vuole comandare gli strumenti musicali collegati', icone: ['readAloud'] };
       if (d.tipo === 'rete') return { testo: 'vuole collegarsi agli apparecchi della tua rete', icone: ['wifi'] };
+      if (d.tipo === 'scaricamenti') return { testo: 'vuole scaricare più file senza un tuo clic', icone: ['download'] };
       if (d.tipo === 'file') {
         const o = d.oggetto || {};
         const nome = String(o.nome || '');

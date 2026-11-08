@@ -840,6 +840,7 @@
     options_site_perms_part_strumenti: 'Strumenti musicali',
     options_site_perms_part_rete: 'Rete locale',
     options_site_perms_part_file: 'Modifica dei file',
+    options_site_perms_part_scaricamenti: 'Più file senza un tuo clic',
     // Protezione anti-fingerprinting
     options_fp_title: 'Protezione fingerprinting',
     options_fp_desc:

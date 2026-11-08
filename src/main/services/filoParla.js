@@ -9,6 +9,9 @@ const TIPI = Object.freeze(['timer', 'download', 'avviso', 'giornata', 'accoglie
 const ATTESA_MS = 1200;
 // Il messaggio nasce leggendo nomi di file, avvisi e sveglie che scrivono altri: riletto, è una lettura (#592.4).
 const ESTERNO = 'dal messaggio con cui Filo racconta avvisi, sveglie e download, i cui nomi li scrivono altri';
+// Una pagina lasciata aperta può far partire un download al secondo mentre l'utente non c'è (#2294): i download aprono
+// un giro al più ogni `ritmoDownloadMs`, e quelli arrivati intanto si contano e si raccontano tutti nel giro dopo.
+const NOMI_RACCONTATI = 5;
 
 const app = {
   // ({ eventi, fondi, precedente }) → { message, suggestions } | null; lo dà handlers.js.
@@ -22,11 +25,60 @@ let pendenti = [];
 let attesa = null;
 let corsa = Promise.resolve();
 
+let ritmoDownloadMs = minutiDalleImpostazioni(null) * 60_000;
+let ultimoDownload = -Infinity;
+let sospesi = { n: 0, nomi: [] };
+let attesaDownload = null;
+
+// Le scelte e il predefinito stanno solo nelle costanti; senza (il modulo caricato da solo) vale il più prudente.
+function minutiDalleImpostazioni(settings) {
+  const C = globalThis.SN_CONST;
+  return C && typeof C.minutiFraDownload === 'function' ? C.minutiFraDownload(settings && settings.filoParla) : 60;
+}
+
+function configura(settings) {
+  ritmoDownloadMs = minutiDalleImpostazioni(settings) * 60_000;
+  if (sospesi.n) armaDownload();
+}
+
 function segnala({ tipo, testo = '' } = {}) {
   if (!TIPI.includes(tipo)) return;
-  pendenti.push({ tipo, testo: String(testo == null ? '' : testo).slice(0, 300) });
+  const t = String(testo == null ? '' : testo).slice(0, 300);
+  if (tipo === 'download') {
+    sospesi.n++;
+    if (sospesi.nomi.length < NOMI_RACCONTATI) sospesi.nomi.push(t);
+    armaDownload();
+    return;
+  }
+  pendenti.push({ tipo, testo: t });
+  arma();
+}
+
+function arma() {
   clearTimeout(attesa);
   attesa = setTimeout(() => { giro().catch((e) => console.warn('[Filo parla]', e?.message || e)); }, ATTESA_MS);
+}
+
+function armaDownload() {
+  clearTimeout(attesaDownload);
+  attesaDownload = null;
+  const resta = ultimoDownload + ritmoDownloadMs - Date.now();
+  if (resta <= 0) { arma(); return; }
+  attesaDownload = setTimeout(() => { attesaDownload = null; arma(); }, resta);
+  attesaDownload.unref?.();
+}
+
+// I download sospesi entrano nel giro quando il ritmo lo lascia, o quando il giro parte comunque per un altro evento.
+function prendiDownload(conAltri) {
+  if (!sospesi.n || (!conAltri && Date.now() - ultimoDownload < ritmoDownloadMs)) return [];
+  const { n, nomi } = sospesi;
+  sospesi = { n: 0, nomi: [] };
+  ultimoDownload = Date.now();
+  clearTimeout(attesaDownload);
+  attesaDownload = null;
+  if (n <= NOMI_RACCONTATI) return nomi.map((testo) => ({ tipo: 'download', testo }));
+  const visti = nomi.slice(0, NOMI_RACCONTATI - 1).map((x) => x.slice(0, 80));
+  return [{ tipo: 'download', testo: `${visti.join(', ')} e altri ${n - visti.length} file (${n} in tutto)` }];
 }
 
 // Un giro alla volta: il secondo evento arrivato mentre il primo si scriveva trova già il messaggio da fondere.
@@ -45,7 +97,8 @@ function giro({ subito = [] } = {}) {
 }
 
 async function giroOra(subito) {
-  const nuovi = [...pendenti.splice(0), ...subito];
+  const altri = [...pendenti.splice(0), ...subito];
+  const nuovi = [...altri, ...prendiDownload(altri.length > 0)];
   if (!nuovi.length) return null;
   if (!(await app.puoParlare())) return null;
   const Chats = globalThis.SN_FILO_CHATS;
@@ -84,5 +137,15 @@ async function forseGiornata() {
   } catch (_) {}
 }
 
-module.exports = { TIPI, ESTERNO, collega, segnala, giro, forseGiornata };
+function _azzera() {
+  clearTimeout(attesa);
+  clearTimeout(attesaDownload);
+  attesa = null;
+  attesaDownload = null;
+  pendenti = [];
+  sospesi = { n: 0, nomi: [] };
+  ultimoDownload = -Infinity;
+}
+
+module.exports = { TIPI, ESTERNO, collega, configura, segnala, giro, forseGiornata, _azzera, _ritmoMs: () => ritmoDownloadMs };
 globalThis.SN_FILO_PARLA = module.exports;

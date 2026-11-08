@@ -790,6 +790,21 @@
         return { partial: { showHomeMessage: b }, label: `Filo scrive per primo → ${b ? 'sì' : 'no'}` };
       },
     },
+    // #2294 — i minuti fra due messaggi sui download finiti a utente assente: un numero diventa la scelta più vicina.
+    {
+      scrive: ['filoParla.downloadOgniMin'],
+      aiuto: 'minuti 2 | 5 | 10 | 30 | 60 (quanto spesso al massimo Filo scrive da sé dei download finiti mentre l\'utente non c\'era; quelli arrivati intanto finiscono nel messaggio dopo; un\'ora = 60)',
+      costo: 1,
+      keys: ['messaggi_download', 'messaggi sui download', 'ritmo dei download', 'quanto spesso scrive dei download',
+        'filo scrive dei download', 'download finiti mentre non c\'ero', 'filoparla.downloadognimin'],
+      build(v) {
+        const C = global.SN_CONST;
+        const n = C.minutiDaTesto(v);
+        if (!Number.isFinite(n) || n <= 0) return null;
+        const min = C.minutiFraDownload({ downloadOgniMin: n });
+        return { partial: { filoParla: { downloadOgniMin: min } }, label: `Messaggi sui download → ${C.nomeRitmoDownload(min)}` };
+      },
+    },
     // Ora, batteria, rete, Bluetooth e volume nella home (#873, #874): una voce per chiave, le altre restano come sono.
     ...[
       ['ora', "l'ora", ['orologio']],

@@ -228,6 +228,8 @@ function seguiGesti(wc) {
       if (avvio) wc._filoGestoDiFilo = false;
       else if (wc._filoGestoDiFilo) return;
       wc._filoGestoAlle = Date.now();
+      // Il conto dei download senza clic (#2294) vuole l'ultimo gesto anche dopo una navigazione, che azzera quello sopra.
+      if (avvio) wc._filoGestoVeroAlle = wc._filoGestoAlle;
       // Un sito che annulla il `contextmenu` spegne il `context-menu` qui sotto, non il tasto destro vero (#589.4 giro 2).
       if (tastoDelMenu(input)) segnaMenu(wc, wc.mainFrame);
     });
@@ -242,7 +244,7 @@ function seguiGesti(wc) {
     wc.on('before-input-event', (e, input) => {
       if (!input || input.type !== 'keyDown' || !tastoPerLaPagina(input) || (e && e.daAvvisoSito)) return;
       queueMicrotask(() => {
-        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = Date.now(); }
+        if (!(e && e.defaultPrevented)) { wc._filoGestoDiFilo = false; wc._filoGestoAlle = wc._filoGestoVeroAlle = Date.now(); }
       });
     });
     wc.on('did-start-navigation', (e, url, isInPlace, isMainFrame) => {
@@ -453,21 +455,29 @@ function nomeDaMostrare(origine) {
   try { u = new URL(origine); } catch (_) { return { sotto: '', dominio: String(origine || '') }; }
   const host = u.hostname;
   const porta = u.port ? ':' + u.port : '';
-  let registrabile = host;
-  try {
-    if (!Psl.isIpAddress(host)) registrabile = (Psl.getDomainInfo(host) || {}).registrable || host;
-  } catch (_) {}
+  const registrabile = registrabileDi(host);
   const sotto = host.length > registrabile.length && host.endsWith('.' + registrabile)
     ? host.slice(0, host.length - registrabile.length - 1)
     : '';
   return { sotto, dominio: registrabile + porta };
 }
+function registrabileDi(host) {
+  try { if (!Psl.isIpAddress(host)) return (Psl.getDomainInfo(host) || {}).registrable || host; } catch (_) {}
+  return host;
+}
 
-function chiudi(id, si, { ricorda, utente = false, fonte } = {}) {
+// `decisa` (terzo argomento di chi aspetta): la risposta viene da una scelta dell'utente, non da una domanda ritirata.
+function chiudi(id, si, { ricorda, utente = false, fonte, decisa = utente } = {}) {
   const p = inAttesa.get(id);
   if (!p) return false;
   inAttesa.delete(id);
   if (utente && !si) segnaNegati(p.wc, p.origine, p.parti);
+  // Il no ferma anche la scheda: la pagina che salta da sola su un altro sito non torna a chiedere.
+  if (utente && !si && p.tipo === SCARICAMENTI && p.wc) {
+    p.wc._filoScaricamentiNoAlle = Date.now();
+    p.wc._filoScaricamentiNoSito = sitoDegliScaricamenti(p.origine);
+    schedeFerme.add(p.wc);
+  }
   // Lo schermo si sceglie ogni volta: né il sì né il no restano.
   if (p.tipo === 'schermo') ricorda = false;
   if (ricorda) {
@@ -475,13 +485,15 @@ function chiudi(id, si, { ricorda, utente = false, fonte } = {}) {
     for (const parte of p.parti) scelte.set(`${p.origine}|${parte}`, Boolean(si));
     if (scelte === sceltePersistenti) salva();
   }
-  for (const cb of p.callbacks) { try { cb(Boolean(si), fonte); } catch (_) {} }
+  for (const cb of p.callbacks) { try { cb(Boolean(si), fonte, Boolean(decisa)); } catch (_) {} }
   try { p.avvisa('fine', { id }); } catch (_) {}
   if (ricorda) {
     for (const [altro, q] of [...inAttesa]) {
-      if (q.ses !== p.ses || q.origine !== p.origine || q.tipo === 'schermo') continue;
-      const decise = q.parti.map((parte) => sceltePer(q.ses).get(`${q.origine}|${parte}`));
-      if (decise.every((x) => x === true)) chiudi(altro, true, { ricorda: false });
+      if (q.ses !== p.ses || q.tipo === 'schermo') continue;
+      const piuFile = q.tipo === SCARICAMENTI && p.tipo === SCARICAMENTI;
+      if (piuFile ? sitoDegliScaricamenti(q.origine) !== sitoDegliScaricamenti(p.origine) : q.origine !== p.origine) continue;
+      const decise = q.parti.map((parte) => (parte === SCARICAMENTI ? sceltaScaricamenti(q.ses, q.origine) : sceltePer(q.ses).get(`${q.origine}|${parte}`)));
+      if (decise.every((x) => x === true)) chiudi(altro, true, { ricorda: false, decisa: true });
       else if (decise.some((x) => x === false)) chiudi(altro, false, { ricorda: false, utente: true });
     }
   }
@@ -526,6 +538,7 @@ function chiedi({ ses, wc, origine, tipo, parti, oggetto, fonti, callback, sched
 function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
+  ses._filoSchedaDi = schedaDi;
   if (typeof aggiorna === 'function') aggiornaScheda = aggiorna;
   try {
     if (typeof ses.setDisplayMediaRequestHandler === 'function') {
@@ -752,6 +765,118 @@ function negaTutto(ses) {
   } catch (_) {}
 }
 
+// ── Più file senza un clic (#2294): come in Chrome il primo passa, dal secondo vicino si chiede e la risposta resta per
+// il sito. Non è un nome di Electron: lo chiama downloads.js, con `gesto` vero per un clic sulla pagina o su Filo.
+const SCARICAMENTI = 'scaricamenti';
+const SCARICAMENTI_FINESTRA_MS = 10 * 60_000;
+function scaricamentoSenzaGesto(wc, gesto, adesso = Date.now()) {
+  const ses = wc && wc.session;
+  const chi = wc ? origineDi(wc) : {};
+  if (!ses || chi.filo || !chi.origine) return { esito: 'via', origine: null };
+  const origine = chi.origine;
+  // Il conto sta sul sito (due schede dello stesso) e sulla scheda: una pagina che salta da sola ad altri siti, anche di
+  // domini diversi, non riparte da capo. La scheda la azzera solo un gesto dell'utente su di lei, come in Chrome.
+  const sito = sitoDegliScaricamenti(origine);
+  if (!ses._filoSenzaGesto) ses._filoSenzaGesto = new Map();
+  if (gestoPerUnoScaricamento(wc, gesto, adesso)) {
+    ses._filoSenzaGesto.set(sito, adesso);
+    wc._filoSenzaGestoAlle = adesso;
+    return { esito: 'via', origine };
+  }
+  const scelta = sceltaScaricamenti(ses, origine);
+  if (scelta === true) return { esito: 'via', origine };
+  if (scelta === false || dopoUltimoGesto(wc, wc._filoScaricamentiNoAlle)) {
+    segnaNegati(wc, origine, [SCARICAMENTI]);
+    return { esito: 'no', origine };
+  }
+  const recente = (t) => t != null && adesso - t < SCARICAMENTI_FINESTRA_MS;
+  const prima = ses._filoSenzaGesto.get(sito);
+  const primaQui = dopoUltimoGesto(wc, wc._filoSenzaGestoAlle) ? wc._filoSenzaGestoAlle : null;
+  ses._filoSenzaGesto.set(sito, adesso);
+  wc._filoSenzaGestoAlle = adesso;
+  return { esito: recente(prima) || recente(primaQui) ? 'chiedi' : 'via', origine };
+}
+
+// Le schede ferme da un no: toglierlo dalla chat, che non sa in che scheda è stato dato, le libera.
+const schedeFerme = new Set();
+function liberaSchede(siti) {
+  for (const wc of [...schedeFerme]) {
+    let morta = true;
+    try { morta = wc.isDestroyed(); } catch (_) {}
+    if (morta || !wc._filoScaricamentiNoAlle) { schedeFerme.delete(wc); continue; }
+    if (siti.has(wc._filoScaricamentiNoSito)) { wc._filoScaricamentiNoAlle = 0; schedeFerme.delete(wc); }
+  }
+}
+
+// Un segno della scheda (l'ultimo file senza clic, il no dato alla domanda) vale finché l'utente non tocca la scheda dopo.
+function dopoUltimoGesto(wc, t) {
+  if (!t) return false;
+  return Math.max(wc._filoGestoVeroAlle || 0, wc._filoGestoUiAlle || 0, wc._filoNavDiFiloAlle || 0) <= t;
+}
+
+// Un indirizzo che la scheda apre per l'utente (barra degli indirizzi, Filo che naviga per lui) azzera la scheda come un
+// suo clic: in Chrome lo fa la navigazione che non parte dalla pagina.
+function navigazioneDiFilo(wc) {
+  if (wc) wc._filoNavDiFiloAlle = Date.now();
+}
+
+// La scheda che rinasce in una vista nuova (Privacy fra siti, la scheda caduta) resta la stessa scheda: il conto dei file
+// senza clic e il no ancora validi passano alla vista nuova, o una pagina che salta da sola riparte da capo (#2294).
+function passaScheda(da, a) {
+  if (!da || !a || da === a) return;
+  for (const k of ['_filoSenzaGestoAlle', '_filoScaricamentiNoAlle']) if (dopoUltimoGesto(da, da[k])) a[k] = da[k];
+  if (da._filoGestoScaricatoAlle) a._filoGestoScaricatoAlle = da._filoGestoScaricatoAlle;
+  schedeFerme.delete(da);
+  if (a._filoScaricamentiNoAlle) { a._filoScaricamentiNoSito = da._filoScaricamentiNoSito; schedeFerme.add(a); }
+}
+
+// Come in Chrome un clic o un tasto vale per un download solo: quelli che la pagina fa partire dopo, nella stessa
+// raffica, contano come senza clic. `gesto` è il parere di Chromium, per un gesto che qui non si vede (un riquadro di
+// un altro sito): vale se nessun download ha usato un gesto in questa scheda negli ultimi secondi.
+function gestoPerUnoScaricamento(wc, gesto, adesso) {
+  const t = Math.max(wc._filoGestoVeroAlle || 0, wc._filoGestoUiAlle || 0);
+  const speso = wc._filoGestoScaricatoAlle || 0;
+  if (!(t > speso) && !(gesto && adesso - speso >= GESTO_MS)) return false;
+  wc._filoGestoScaricatoAlle = Math.max(adesso, t);
+  return true;
+}
+
+function sitoDegliScaricamenti(origine) {
+  try {
+    return `${new URL(origine).protocol}//${dominioDegliScaricamenti(origine)}`;
+  } catch (_) { return origine; }
+}
+function dominioDegliScaricamenti(origine) {
+  return nomeDaMostrare(origine).dominio.replace(/:\d+$/, '');
+}
+
+// La risposta vale per il sito come il conto: quella dell'indirizzo esatto vince, poi un no dato a un altro indirizzo
+// dello stesso sito, poi un sì. Una pagina che salta a un sottodominio nuovo non torna a chiedere.
+function sceltaScaricamenti(ses, origine) {
+  const scelte = sceltePer(ses);
+  const propria = scelte.get(`${origine}|${SCARICAMENTI}`);
+  if (typeof propria === 'boolean') return propria;
+  const sito = sitoDegliScaricamenti(origine);
+  let trovata;
+  for (const [k, si] of scelte) {
+    if (typeof si !== 'boolean' || !k.endsWith(`|${SCARICAMENTI}`)) continue;
+    if (sitoDegliScaricamenti(k.slice(0, -SCARICAMENTI.length - 1)) !== sito) continue;
+    if (si === false) return false;
+    trovata = true;
+  }
+  return trovata;
+}
+
+// `callback(si, fonte, decisa)`: con `decisa` falso la domanda si è ritirata (la pagina se n'è andata) e nessuno ha scelto.
+function chiediScaricamenti(wc, callback) {
+  const ses = wc && wc.session;
+  const origine = wc ? origineDi(wc).origine : null;
+  if (!ses || !origine) { callback(false, undefined, false); return; }
+  const scelta = sceltaScaricamenti(ses, origine);
+  if (typeof scelta === 'boolean') { callback(scelta, undefined, true); return; }
+  chiedi({ ses, wc, origine, tipo: SCARICAMENTI, parti: [SCARICAMENTI], callback, schedaDi: ses._filoSchedaDi || (() => null) });
+}
+
 // La pagina che vuole scrivere su ciò che ha già lo chiede da qui (preload/stato-permessi.js): Chromium non chiama più il
 // gestore delle richieste. Vale dopo un gesto vero e per il file su cui il controllo ha appena detto no; null = non chiesto.
 function chiediScrittura(wc) {
@@ -776,10 +901,19 @@ function scelteDi(wc) {
   const ses = wc && wc.session;
   if (!origine || !ses) return { origine, scelte: [] };
   const scelte = [];
+  const sito = sitoDegliScaricamenti(origine);
   for (const [chiave, si] of sceltePer(ses)) {
     const i = chiave.lastIndexOf('|');
-    if (chiave.slice(0, i) === origine) scelte.push({ parte: chiave.slice(i + 1), si });
+    const da = chiave.slice(0, i);
+    const parte = chiave.slice(i + 1);
+    // La risposta sui file senza clic vale per tutto il sito (sceltaScaricamenti): si vede e si toglie da ogni suo indirizzo.
+    const delSito = parte === SCARICAMENTI && da !== origine && sitoDegliScaricamenti(da) === sito;
+    if (da === origine) scelte.push({ parte, si });
+    else if (delSito) scelte.push({ parte, si, chiave });
   }
+  // Il no dato su un altro sito della stessa scheda la ferma (scaricamentoSenzaGesto): si vede e si toglie da qui.
+  const fermaScheda = wc._filoScaricamentiNoAlle && dopoUltimoGesto(wc, wc._filoScaricamentiNoAlle);
+  if (fermaScheda && !scelte.some((s) => s.parte === SCARICAMENTI)) scelte.push({ parte: SCARICAMENTI, si: false, scheda: true });
   return { origine, scelte };
 }
 
@@ -787,8 +921,10 @@ function scelteDi(wc) {
 function dimentica(wc) {
   const { origine, scelte } = scelteDi(wc);
   if (!scelte.length) return { tolte: 0, ricarica: false };
+  wc._filoScaricamentiNoAlle = 0;
+  schedeFerme.delete(wc);
   const mappa = sceltePer(wc.session);
-  for (const s of scelte) mappa.delete(`${origine}|${s.parte}`);
+  for (const s of scelte) if (!s.scheda) mappa.delete(s.chiave || `${origine}|${s.parte}`);
   if (mappa === sceltePersistenti) salva();
   if (wc._filoSegni && wc._filoSegni.negati.size) { wc._filoSegni.negati.clear(); try { aggiornaScheda(wc); } catch (_) {} }
   return { tolte: scelte.length, ricarica: scelte.some((s) => s.si || s.parte === 'notifiche') };
@@ -813,6 +949,7 @@ function scelteRicordate() {
 function togliScelta(origine, parte) {
   const ok = sceltePersistenti.delete(`${origine}|${parte}`);
   if (ok) salva();
+  if (parte === SCARICAMENTI) liberaSchede(new Set([sitoDegliScaricamenti(origine)]));
   return ok;
 }
 
@@ -824,7 +961,11 @@ const PAROLE_PARTE = {
   presenza: 'presenza', 'presenza al computer': 'presenza', strumenti: 'strumenti', 'strumenti musicali': 'strumenti', midi: 'strumenti',
   rete: 'rete', 'rete locale': 'rete', 'rete di casa': 'rete', lan: 'rete',
   file: 'file', cartella: 'file', cartelle: 'file', 'modifica dei file': 'file', 'modificare i file': 'file', scrittura: 'file',
+  scaricamenti: SCARICAMENTI, download: SCARICAMENTI, 'download automatici': SCARICAMENTI, 'scaricamenti automatici': SCARICAMENTI,
+  'scaricare più file': SCARICAMENTI, 'più file': SCARICAMENTI,
 };
+// I nomi che la chat riconosce, come li legge il modello nello strumento: una sentinella li confronta.
+const PERMESSI_DA_CHAT = Object.freeze(['microfono', 'fotocamera', 'appunti', 'posizione', 'notifiche', 'schermi', 'presenza', 'strumenti', 'rete', 'file', 'scaricamenti']);
 function nomeParte(parte) {
   const S = (globalThis.SN_I18N && globalThis.SN_I18N.STRINGS) || {};
   const t = S[`options_site_perms_part_${parte}`];
@@ -851,10 +992,13 @@ function togliPerChat(sito, permesso) {
   const p = String(permesso || '').trim().toLowerCase();
   const tutti = !p || /^(tutt[oiea]|ogni|qualsiasi|all)$/.test(p);
   const parte = tutti ? '' : (PAROLE_PARTE[p] || (TIPI[p] ? TIPI[p] : ''));
-  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (microfono, fotocamera, appunti, posizione, notifiche, schermi, presenza, strumenti, rete, file)` };
+  if (!tutti && !parte) return { errore: `«${p.slice(0, 40)}» non è un permesso che un sito chiede (${PERMESSI_DA_CHAT.join(', ')})` };
+  // La risposta sui file senza clic vale per tutto il sito (sceltaScaricamenti): si toglie da qualunque suo indirizzo.
+  const registrato = registrabileDi(host);
   const delSito = scelteRicordate().filter((s) => {
     let h = '';
     try { h = new URL(s.origine).hostname.replace(/^www\./, ''); } catch (_) { return false; }
+    if (s.parte === SCARICAMENTI && dominioDegliScaricamenti(s.origine) === registrato) return true;
     return h === host || h.endsWith(`.${host}`);
   });
   const prese = delSito.filter((s) => tutti || s.parte === parte);
@@ -879,7 +1023,7 @@ function siDato(ses, url, parte) {
 }
 
 module.exports = {
-  installa, negaTutto, rispondi, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
+  installa, negaTutto, rispondi, scaricamentoSenzaGesto, navigazioneDiFilo, passaScheda, PERMESSI_DA_CHAT, chiediScaricamenti, sitoDegliScaricamenti, SCARICAMENTI_FINESTRA_MS, seguiGesti, segniDi, gestoRecente, gestoEntro, gestoDellUtente, navigazioneDaGesto, scelteDi, dimentica, dimenticaSessione, nomeDaMostrare, statoNotifiche, siDato,
   carica, scelteRicordate, togliScelta, righeRicordate, togliPerChat, classifica, gestoDellaPagina, gestoSullaScheda, schermoVecchio, gestoPerUnaFinestra, gestoPerLaNavigazione, clicDiFilo,
   gestoDiFilo, gestoSulloStrato, gestoNelloStrato, aperturaScelta, azioneDellApertura, perUnaFinestra, sceltaDallUtente, chiediScrittura,
   TIPI, SECONDO_L_ACCESSO, INNOCUI, NON_DISPONIBILI, GESTO_MS, TASTI_SENZA_GESTO, tastoPerLaPagina, _inAttesa: inAttesa,
