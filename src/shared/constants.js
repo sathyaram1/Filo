@@ -3111,8 +3111,9 @@
     const cifre = s.match(/\d+(?:[.,]\d+)?/);
     const parola = (s.match(/[a-zà-ù]+/g) || []).filter((w) => NUMERI_A_PAROLE[w] != null).pop();
     const n = cifre ? Number(cifre[0].replace(',', '.')) : (parola ? NUMERI_A_PAROLE[parola] : NaN);
-    const senzaMezzora = s.replace(/\bmezz'?or[ae]\b|\bmezzora\b/g, ' ');
-    if (/\bor[ae]\b/.test(senzaMezzora)) return (Number.isFinite(n) ? n : 1) * 60 + (/\be mezz[ao]\b/.test(s) ? 30 : 0);
+    if (/\bquart[oi]\s+d'?\s*or[ae]\b/.test(s)) return (Number.isFinite(n) ? n : 1) * 15;
+    const senzaMezzora = s.replace(/\bmezz'?\s*or[ae]\b/g, ' ');
+    if (/\bor[ae]\b|\d\s*h\b/.test(senzaMezzora)) return (Number.isFinite(n) ? n : 1) * 60 + (/\be mezz[ao]\b/.test(s) ? 30 : 0);
     if (senzaMezzora !== s) return 30;
     if (/\d\s*s\b|\bsec(?:ond[oi])?\b/.test(s)) return Number.isFinite(n) ? n / 60 : NaN;
     return n;
