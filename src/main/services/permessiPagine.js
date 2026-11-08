@@ -842,9 +842,11 @@ function gestoPerUnoScaricamento(wc, gesto, adesso) {
 
 function sitoDegliScaricamenti(origine) {
   try {
-    const u = new URL(origine);
-    return `${u.protocol}//${nomeDaMostrare(origine).dominio.replace(/:\d+$/, '')}`;
+    return `${new URL(origine).protocol}//${dominioDegliScaricamenti(origine)}`;
   } catch (_) { return origine; }
+}
+function dominioDegliScaricamenti(origine) {
+  return nomeDaMostrare(origine).dominio.replace(/:\d+$/, '');
 }
 
 // La risposta vale per il sito come il conto: quella dell'indirizzo esatto vince, poi un no dato a un altro indirizzo
