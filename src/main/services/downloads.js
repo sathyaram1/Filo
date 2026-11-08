@@ -395,6 +395,7 @@ function publicRecord(r) {
     // #1488 — `via` dice chi rifà lo scaricamento, `nota` cosa sta facendo o perché non è riuscito.
     via: r.via || '',
     nota: r.nota || '',
+    ...(r.paese ? { paese: r.paese } : {}),
     // #1287 — byte al secondo e secondi che restano, solo mentre scende (0 e null altrimenti).
     ...velocitaDi(r),
   };
