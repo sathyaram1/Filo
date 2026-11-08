@@ -1202,6 +1202,19 @@ vale per tutti i compiti di quel tipo.
   apre il feedback della correzione o lo fa nascere dalla segnalazione per
   numero. Una richiesta di permessi la trasforma in una proposta d'ambito
   (§ 5.3), che decide l'owner.
+- **Un rosso su main già seguito diventa una nota (#2226).** Se il testo nomina
+  file di test (`tests/**/*.test.mjs`, `tests/**/*.spec.mjs`,
+  `functions/test/**/*.test.js`) e ognuno è seguito da un feedback aperto su
+  un rosso di main, la segnalazione diventa una nota sul più vecchio di quelli.
+  Segue un file: un allarme della costruzione per le sue chiavi (senza chiavi
+  di file, per un nome fra le parentesi del titolo o per il percorso intero);
+  una segnalazione per i file che ha registrato alla nascita (tutti quelli
+  nominati se la prima riga dice rosso su main, se no quelli scritti sulla
+  riga che lo dice); un altro feedback se scrive il percorso sulla riga che lo
+  dice rosso su main. La nota porta il testo intero e chi l'ha vista, e la
+  risposta porta `nota: true` col suo numero. Mai quando la nota alzerebbe la
+  fiducia di quel feedback, vi porterebbe testo riservato o ne taglierebbe la
+  storia: allora si apre come sempre.
 - **Gli esperimenti** non hanno né l'una né l'altra: scrivono tutto nell'esito
   (§ 4.6).
 
