@@ -1908,7 +1908,7 @@
 
   // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
   const GIT_CHIAVI_INERTI = [
-    /^core\.(repositoryformatversion|filemode|bare|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles)$/,
+    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles)$/,
     /^remote\.[^=]+\.(url|pushurl|fetch|push|tagopt|prune|mirror)$/,
     /^branch\.[^=]+\.(remote|merge|rebase|pushremote|description)$/,
     /^submodule\.[^=]+\.(url|active|branch)$/,
