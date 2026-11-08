@@ -426,7 +426,8 @@
         if (top.some((t) => t.suona || t.audioAt)) righe.push('[SUONA]: sta riproducendo audio adesso. [AUDIO FERMO]: ha suonato ed è ferma, «rimettimi la musica» la fa ripartire con RIPRENDI_AUDIO.');
         righe.push(E.imbusta({ tipo: 'DATI_PAGINA', testo: elenco.join('\n') }));
       }
-      aggiungi('TAB APERTE', righe, null, { riservate });
+      // `daSiti`: i titoli che il modello legge qui, testo di sconosciuti per le uscite (#2293).
+      aggiungi('TAB APERTE', righe, null, { riservate, ...(daSiti.length ? { daSiti } : {}) });
     }
     if (Array.isArray(state.sempreAperte) && state.sempreAperte.length) {
       aggiungi('SITI SEMPRE APERTI', [
