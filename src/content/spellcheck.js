@@ -1562,13 +1562,16 @@
   function senzaSpazi(s) { return String(s).replace(/[\s ]/g, ''); }
 
   // Cosa può aver scritto l'utente con questo `input`: un tasto il suo carattere, un incolla o un trascinamento il loro
-  // testo, la composizione il suo, l'annulla da tastiera quello che riporta. Uno script ha `isTrusted` anche con
-  // execCommand: senza il tasto vero che lo spiega, il testo è del sito.
+  // testo, la composizione il suo. Mai un cambio intero: un gesto vero senza testo (un'immagine incollata) non spiega
+  // quello che il sito ci mette nello stesso evento. Uno script ha `isTrusted` anche con execCommand. L'annulla e il
+  // rifai non scrivono niente di nuovo: riportano un testo già visto, coi suoi proprietari (proprietariDi).
   function ammessoDa(state, e) {
     if (!e) return null;
     if (!e.isTrusted) return global.SN_FILO_UI?.veroONostro?.(e) ? () => true : null;
     const tipo = e.inputType || '';
-    const dentro = (fonte) => (pezzo) => senzaSpazi(fonte).includes(senzaSpazi(pezzo));
+    const dentro = (fonte) => (typeof fonte === 'string' && fonte
+      ? (pezzo) => senzaSpazi(fonte).includes(senzaSpazi(pezzo))
+      : (pezzo) => !senzaSpazi(pezzo));
     const k = state.tasto;
     if (tipo === 'insertText') {
       state.tasto = null;
