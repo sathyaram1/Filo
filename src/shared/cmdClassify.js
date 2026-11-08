@@ -152,7 +152,7 @@
     hostname: (cmd) => {
       const rest = tokens(cmd).slice(1);
       // `-F`/`--file` è case-sensitive: `-f` = fqdn è lettura e non deve combaciare.
-      return rest.some((t) => /^-[A-Za-z]*F/.test(t) || opzioneLunga(t, 'file', 2) || !t.startsWith('-'));
+      return rest.some((t) => /^-[A-Za-z]*F/.test(t) || opzioneLunga(t, 'file', 2) != null || !t.startsWith('-'));
     },
     // Lettori con un'uscita su file (#1994): `uniq IN OUT`, `tree -o FILE` (e `-R`, che scrive 00Tree.html in ogni
     // cartella), `file -C` (compila `<nome>.mgc` nella cartella di lavoro).
