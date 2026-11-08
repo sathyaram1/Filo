@@ -8,6 +8,34 @@ const pagina = () => `<!doctype html><html><body oncontextmenu="return false" st
   <div style="height:300vh;padding:16px">Tanta pagina sotto, tutta scorrevole.</div>
 </body></html>`;
 
+test('quante volte riparte la comparsa', async ({ openTab, testServer }) => {
+  const page = await testServer.openReady(openTab, pagina());
+  await page.locator('#link').click({ button: 'right' });
+  const menu = menuDi(page).locator('.sn-menu');
+  await expect(menu.locator('.sn-menu-inline')).toBeVisible();
+  await menuDi(page).valuta(() => {
+    const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
+    globalThis.__avvii = [];
+    m.addEventListener('animationstart', (e) => globalThis.__avvii.push(`${e.animationName}@${performance.now() | 0}`));
+    globalThis.__par = m.parentNode && m.parentNode.nodeName;
+  });
+  await menuDi(page).valuta(() => {
+    document.querySelector('.sn-menu:not(.sn-menu-sub) .sn-menu-inline').style.minHeight = `${window.innerHeight + 600}px`;
+  });
+  await page.waitForTimeout(300);
+  const f = menu.locator('.sn-menu-split-arrow').first();
+  const b = await menuDi(page).valuta(() => { const r = document.querySelector('.sn-menu-split-arrow').getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+  await page.mouse.move(b.x, b.y);
+  await page.waitForTimeout(1200);
+  console.log('stato', JSON.stringify(await menuDi(page).valuta(() => ({
+    avvii: globalThis.__avvii, par: globalThis.__par,
+    fumetto: !!document.querySelector('[data-sn-fumetto]'), aperto: globalThis.SN_SUGGERIMENTO?.aperto?.()?.testo || null,
+    figli: [...document.documentElement.children].map((n) => n.nodeName + (n.className ? '.' + String(n.className).slice(0, 20) : '') + (n.hasAttribute && n.hasAttribute('data-sn-fumetto') ? '[fumetto]' : '')),
+    corre: document.querySelector('.sn-menu:not(.sn-menu-sub)').getAnimations().map((a) => a.playState),
+  }))));
+  void f;
+});
+
 for (const durante of [true, false]) {
   test(`clic sulla freccetta ${durante ? 'durante' : 'dopo'} la comparsa`, async ({ openTab, testServer }) => {
     const page = await testServer.openReady(openTab, pagina());
