@@ -527,6 +527,7 @@ function chiedi({ ses, wc, origine, tipo, parti, oggetto, fonti, callback, sched
 function installa(ses, { schedaDi, prima, esterno, aggiorna } = {}) {
   if (!ses || ses._filoPermessi) return;
   ses._filoPermessi = true;
+  ses._filoSchedaDi = schedaDi;
   if (typeof aggiorna === 'function') aggiornaScheda = aggiorna;
   try {
     if (typeof ses.setDisplayMediaRequestHandler === 'function') {
