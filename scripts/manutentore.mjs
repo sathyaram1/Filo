@@ -717,12 +717,18 @@ async function tutteLeSchede(cred) {
 
 // ── Priorità, taccuino, indicazioni ─────────────────────────────────────────
 
-/** Una priorità che si può scrivere: 0..3, e una 3 non si abbassa (la toglie solo l'owner). PURA. */
+/** Una priorità che il manutentore può scrivere: la regola sta in src/shared/prioritaTre.js. PURA. */
 export function controlloPriorita(attuale, nuova) {
-  const v = /^[0-3]$/.test(String(nuova ?? '').trim()) ? Number(nuova) : null;
-  if (v === null) return { ok: false, motivo: 'la priorità è 0, 1, 2 o 3' };
-  if (Number(attuale) === 3 && v < 3) return { ok: false, motivo: 'una priorità 3 non si abbassa: la toglie solo l\'owner' };
-  return { ok: true, valore: v };
+  const c = PRIORITA_TRE.scrittura(attuale, nuova);
+  return c.ok ? c : { ok: false, motivo: c.motivo };
+}
+
+/** La priorità di adesso del feedback `num` fra le schede del server; null se non si legge o non c'è. */
+async function prioritaAttuale(cred, num) {
+  const sc = await tutteLeSchede(cred);
+  if (sc.ok === false) return null;
+  const s = sc.schede.find((x) => String(x.num) === String(num));
+  return s ? s.priorita : null;
 }
 
 /** Il giorno in Italia (YYYY-MM-DD), quello che il server scrive accanto a un'indicazione. PURA. */
