@@ -850,7 +850,8 @@ async function rimettiNome(id, scope = '') {
 }
 
 // ─── intercettazione ────────────────────────────────────────────────────
-function onWillDownload(item, webContents, scope = '', ses = null) {
+// `piuFile`: l'origine della pagina che scarica più file senza un clic, quando il file aspetta la sua risposta (#2294).
+function onWillDownload(item, webContents, scope = '', ses = null, piuFile = '') {
   const filename = safeName(item.getFilename() || (function () {
     try { return decodeURIComponent(new URL(item.getURL()).pathname.split('/').pop() || ''); }
     catch (_) { return ''; }
