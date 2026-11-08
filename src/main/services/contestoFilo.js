@@ -513,6 +513,7 @@ async function componi({ chatId = null, userMessage = '', storia = [], incognito
     messaggi: f.messaggi,
     visti: f.visti,
     azioni: f.azioni,
+    daSiti,
     perUnaNuova: senzaTolti(f.perUnaNuova),
     vecchi: f.vecchi,
     coda: codaGrezza.map((m) => {
