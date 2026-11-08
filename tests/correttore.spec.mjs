@@ -279,9 +279,9 @@ test('una risposta arrivata dopo un cambio del testo si posa sul pezzo giusto, o
   await app.evaluate(() => globalThis.__rilascia());
   await expect(errore(page, 'sonno')).toHaveCount(1, { timeout: 4000 });
   // Il segno sta sotto la parola spostata, non dove stava prima.
-  const dov = await page.evaluate(() => {
+  const dov = await nelMondoDelFrame(page, null, () => {
     const t = document.getElementById('ta');
-    const s = document.querySelector('.sn-spell-overlay .sn-errore').getBoundingClientRect();
+    const s = globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay .sn-errore').getBoundingClientRect();
     return { segno: s.left - t.getBoundingClientRect().left };
   });
   expect(dov.segno, 'sei caratteri più a destra di dove stava, «oggi » finito alla posizione 5').toBeGreaterThan(120);
