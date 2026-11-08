@@ -186,14 +186,23 @@ test('con cmd il `whoami` del modello in una cartella con un whoami suo avvia qu
   assert.equal(out.cwd, archivio, 'il comando deve restare nella cartella dove il modello è entrato');
 });
 
-test('la cartella di lavoro esce dalla ricerca per ogni comando del modello su Windows, e la variabile vince sulle sue copie', async () => {
+// Chi gira le prove può averla già nel suo ambiente: lì la prova passerebbe anche senza Filo.
+async function senzaLaVariabile(fn) {
+  const prima = process.env.NoDefaultCurrentDirectoryInExePath;
+  delete process.env.NoDefaultCurrentDirectoryInExePath;
+  try { return await fn(); } finally {
+    if (prima !== undefined) process.env.NoDefaultCurrentDirectoryInExePath = prima;
+  }
+}
+
+test('la cartella di lavoro esce dalla ricerca per ogni comando del modello su Windows, e la variabile vince sulle sue copie', () => senzaLaVariabile(async () => {
   await suWindowsConSessioneFinta((cb) => cb.onExit({ code: 0, cwd: TMP }), async (visto) => {
     await T.runCommand('where git', { shell: 'cmd', cwd: TMP, trackCwd: true, timeoutMs: ATTESA });
     assert.equal(visto.opzioni.env.NoDefaultCurrentDirectoryInExePath, '1');
     const env = T.ambienteDelModello({ PATH: 'p', nodefaultcurrentdirectoryinexepath: '', FILO_DEFAULT_OPENROUTER_KEY: 'x' });
     assert.deepEqual(env, { PATH: 'p', NoDefaultCurrentDirectoryInExePath: '1' });
   });
-});
+}));
 
 test('il terminale dove scrive l\'utente resta il cmd di sempre: un programma della cartella parte per nome', SOLO_FUORI, async () => {
   const qui = join(TMP, 'cartella-utente');
