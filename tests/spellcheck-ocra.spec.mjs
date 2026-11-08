@@ -81,7 +81,7 @@ test('la contraddizione con la conversazione: ocra su «mercoledì», il tasto d
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'));
   await page.locator('#ta').click();
-  await page.keyboard.type('sì ci vediamo mercoledì');
+  await batti(page,'sì ci vediamo mercoledì');
   await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
 
   // Il modello ha visto la conversazione, prima del testo, e la data di oggi.
@@ -115,7 +115,7 @@ test('una citazione che nella pagina non c\'è: il modello la inventa e non comp
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo giovedì?'));
   await page.locator('#ta').click();
-  await page.keyboard.type('sì ci vediamo mercoledì');
+  await batti(page,'sì ci vediamo mercoledì');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(1);
   await page.waitForTimeout(800);
   await expect(ocra(page)).toHaveCount(0);
@@ -125,7 +125,7 @@ test('data e giorno che non tornano si segnano senza modello; «Ignora» li togl
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer, '{"issues":[]}');
   await page.locator('#ta').click();
-  await page.keyboard.type('allora mercoledì 9 ottobre 2026 alle 18');
+  await batti(page,'allora mercoledì 9 ottobre 2026 alle 18');
   await expect(ocra(page)).toHaveText(['mercoledì 9 ottobre 2026'], { timeout: 5000 });
 
   let menu = await tastoDestroSu(page, ocra(page).first());
@@ -139,13 +139,13 @@ test('data e giorno che non tornano si segnano senza modello; «Ignora» li togl
   await page.waitForTimeout(400);
   await page.locator('#ta').click();
   await page.keyboard.press('End');
-  await page.keyboard.type(', va bene?');
+  await batti(page,', va bene?');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBeGreaterThan(0);
   await page.waitForTimeout(2500);
   await expect(ocra(page)).toHaveCount(0);
 
   // Un altro sbaglio nello stesso testo si segna, e la correzione si applica.
-  await page.keyboard.type(' o giovedì 9 ottobre 2026');
+  await batti(page,' o giovedì 9 ottobre 2026');
   await expect(ocra(page)).toHaveText(['giovedì 9 ottobre 2026'], { timeout: 5000 });
   menu = await tastoDestroSu(page, ocra(page).first());
   await menu.locator('.sn-menu-correction-main', { hasText: 'venerdì 9 ottobre 2026' }).click();
@@ -169,7 +169,7 @@ test('i due interruttori stanno in Opzioni → Altro e ognuno spegne il suo segn
 
   await page.bringToFront();
   await page.locator('#ta').click();
-  await page.keyboard.type('mercoledì 9 ottobre 2026 ci vediamo');
+  await batti(page,'mercoledì 9 ottobre 2026 ci vediamo');
   await page.waitForTimeout(5000);
   await expect(ocra(page)).toHaveCount(0);
   expect(await chiamate(app)).toBe(0);
@@ -180,7 +180,7 @@ test('i due interruttori stanno in Opzioni → Altro e ognuno spegne il suo segn
   await expect(giallo).toBeChecked({ timeout: 4000 });
   await page.bringToFront();
   await page.locator('#ta').click();
-  await page.keyboard.type('!');
+  await batti(page,'!');
   await expect(ocra(page)).toHaveText(['mercoledì 9 ottobre 2026'], { timeout: 5000 });
 });
 
@@ -203,7 +203,7 @@ test('aspetto: i puntini accanto all\'onda degli errori, anche sulla stessa paro
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = finto;
   });
   await page.locator('#ta').click();
-  await page.keyboard.type('ieri sonno stato da Marco, ciaoo, ci vediamo mercoledì e lui gli porta');
+  await batti(page,'ieri sonno stato da Marco, ciaoo, ci vediamo mercoledì e lui gli porta');
   await expect(ocra(page)).toHaveText(['mercoledì', 'lui gli'], { timeout: 12_000 });
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore:not(.sn-dubbio)')).toHaveText(['sonno', 'mercoledì'], { timeout: 6000 });
   const insieme = segniDi(page, '.sn-spell-overlay .sn-suggerimento > .sn-errore');
@@ -230,7 +230,7 @@ test('su una pagina delicata il testo della pagina non parte: niente contraddizi
   await app.evaluate(() => globalThis.SN_STORAGE.updateSettings({ security: { pagineDelicate: { enabled: true, siti: ['sito-pubblico.test'] } } }));
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'));
   await page.locator('#ta').click();
-  await page.keyboard.type('sì ci vediamo mercoledì e poi giovedì 9 ottobre 2026');
+  await batti(page,'sì ci vediamo mercoledì e poi giovedì 9 ottobre 2026');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(1);
   const [prompt] = await app.evaluate(() => globalThis.__ocra);
   expect(prompt).not.toContain('porto io i biglietti');
@@ -254,11 +254,11 @@ test('campo modificabile su più righe: i puntini stanno sotto la parola, sulla 
     { tipo: 'poco_chiara', testo: 'lui gli', citazione: '', spiegazione: 'Non si capisce chi porta cosa.', correzione: '' },
   ] }), html);
   await page.locator('#ce').click();
-  await page.keyboard.type('ok!');
+  await batti(page,'ok!');
   await page.keyboard.press('Enter');
-  await page.keyboard.type('sì ci vediamo mercoledì');
+  await batti(page,'sì ci vediamo mercoledì');
   await page.keyboard.press('Shift+Enter');
-  await page.keyboard.type('e lui gli porta');
+  await batti(page,'e lui gli porta');
   await expect(ocra(page)).toHaveText(['mercoledì', 'lui gli'], { timeout: 12_000 });
   const dove = (parola) => page.evaluate((parola) => {
     const w = document.createTreeWalker(document.getElementById('ce'), NodeFilter.SHOW_TEXT);
@@ -315,7 +315,7 @@ for (const [nome, stile, dentro, riga] of [
     test.setTimeout(60_000);
     const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), paragrafi(stile, dentro));
     await page.locator('#ce p').nth(riga).click();
-    await page.keyboard.type('sì ci vediamo mercoledì');
+    await batti(page,'sì ci vediamo mercoledì');
     await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
     expect(await sullaParola(page, 'mercoledì')).toEqual({ dx: 0, dy: 0, largo: true });
   });
@@ -327,7 +327,7 @@ test('editor a paragrafi: una frase segnata che va a capo ha i puntini su tutte 
     tipo: 'poco_chiara', testo: 'lui gli porta quello che gli aveva detto lui', citazione: '', spiegazione: 'Non si capisce chi.', correzione: '',
   }] }), paragrafi('.ed p{margin:0}', '<p><br></p>').replace('width:420px', 'width:300px'));
   await page.locator('#ce p').click();
-  await page.keyboard.type('va bene, lui gli porta quello che gli aveva detto lui');
+  await batti(page,'va bene, lui gli porta quello che gli aveva detto lui');
   await expect.poll(() => ocra(page).count(), { timeout: 12_000 }).toBeGreaterThan(1);
   const testi = await ocra(page).allTextContents();
   expect(testi.join(' ').replace(/\s+/g, ' ')).toBe('lui gli porta quello che gli aveva detto lui');
@@ -342,10 +342,10 @@ const scorre = {
   righe: async (page, sel) => {
     await page.locator(sel).click();
     for (const r of ['uno', 'due', 'tre', 'quattro', 'cinque']) {
-      await page.keyboard.type(r);
+      await batti(page,r);
       await page.keyboard.press('Enter');
     }
-    await page.keyboard.type('allora va bene, ho sentito anche gli altri e sì ci vediamo mercoledì');
+    await batti(page,'allora va bene, ho sentito anche gli altri e sì ci vediamo mercoledì');
     await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
     await page.waitForTimeout(300);
   },
@@ -402,7 +402,7 @@ test('«Ignora» tiene anche se il modello al giro dopo segna un pezzo un po\' d
   test.setTimeout(60_000);
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'));
   await page.locator('#ta').click();
-  await page.keyboard.type('sì ci vediamo mercoledì');
+  await batti(page,'sì ci vediamo mercoledì');
   await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
   const menu = await tastoDestroSu(page, ocra(page).first());
   await menu.locator('.sn-menu-item', { hasText: 'Ignora' }).click();
@@ -414,7 +414,7 @@ test('«Ignora» tiene anche se il modello al giro dopo segna un pezzo un po\' d
   });
   await page.locator('#ta').click();
   await page.keyboard.press('End');
-  await page.keyboard.type(' alle 18');
+  await batti(page,' alle 18');
   await expect.poll(() => chiamate(app), { timeout: 12_000 }).toBe(2);
   await page.waitForTimeout(800);
   await expect(ocra(page)).toHaveCount(0);
@@ -425,7 +425,7 @@ test('«Ignora» tiene anche se il modello al giro dopo segna un pezzo un po\' d
     }] });
   });
   await page.keyboard.press('Backspace');
-  await page.keyboard.type('9');
+  await batti(page,'9');
   // Il segno sta su quello che la correzione cambia: «19» → «18».
   await expect(ocra(page)).toHaveText(['19'], { timeout: 12_000 });
 });
@@ -438,9 +438,9 @@ test('campo modificabile su più righe: i controlli leggono le righe separate, n
     '<div id="ce" contenteditable="true" style="width:760px;min-height:140px;border:1px solid #999;font:22px sans-serif"></div>');
   const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), html);
   await page.locator('#ce').click();
-  await page.keyboard.type('ci vediamo venerdì 1');
+  await batti(page,'ci vediamo venerdì 1');
   await page.keyboard.press('Enter');
-  await page.keyboard.type('2 ottobre? sì ci vediamo mercoledì');
+  await batti(page,'2 ottobre? sì ci vediamo mercoledì');
   await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
   const testo = await app.evaluate(() => globalThis.__ocra.join('\n'));
   expect(testo).toContain('ci vediamo venerdì 1\n2 ottobre?');
@@ -474,7 +474,7 @@ for (const [nome, campo] of [
     const sel = campo ? '#ce' : '#ta';
     const page = await apri(app, openTab, testServer, contraddizione('ci vediamo martedì?'), html);
     await page.locator(sel).click();
-    await page.keyboard.type('sì ci vediamo mercoledì');
+    await batti(page,'sì ci vediamo mercoledì');
     await expect(ocra(page)).toHaveText(['mercoledì'], { timeout: 12_000 });
     const distanza = () => nelMondoDelFrame(page, null, (sel) => Math.round(globalThis.SN_FILO_UI._test.trova('.sn-spell-overlay .sn-suggerimento').getBoundingClientRect().y
       - document.querySelector(sel).getBoundingClientRect().y), sel);
