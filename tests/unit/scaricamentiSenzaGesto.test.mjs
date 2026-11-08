@@ -156,3 +156,50 @@ test('la chat toglie il no ai download automatici di un sito, con le parole che 
     assert.notEqual(esito(wc, false, ADESSO + 1), 'no', `«${parole}»: tolto il no, il sito non è più bloccato`);
   }
 });
+
+test('il file fatto ripartire confermando l\'avviso di sicurezza conta come scaricato con un clic: non riapre la domanda', () => {
+  const wc = pagina(sessione(), 'https://avviso.example/');
+  assert.equal(esito(wc, false, ADESSO), 'via');
+  assert.equal(esito(wc, false, ADESSO + 1000), 'chiedi');
+  P.gestoSulloStrato(wc);
+  assert.equal(esito(wc, false, Date.now()), 'via', 'la conferma sull\'avviso vale come un clic');
+  const sb = readFileSync(new URL('../../src/main/tabs/tabSafebrowse.js', import.meta.url), 'utf8');
+  for (const tratto of sb.split('segna(tab);').slice(1).filter((t) => t.slice(0, 400).includes('downloadURL'))) {
+    assert.match(tratto.slice(0, tratto.indexOf('downloadURL')), /Permessi\.gestoSulloStrato\(wc\)/, 'ogni ripartenza da avviso segna il clic prima di riscaricare');
+  }
+});
+
+test('i file trattenuti dalla domanda sui file multipli non entrano nel conto dei programmi scaricati o rifiutati', () => {
+  const DL = require('../../src/main/services/downloads.js');
+  const eventi = [];
+  globalThis.SN_CONTATORI = { NAV: { programma: (classe, evento) => ({ classe, evento }), scaricamento: () => ({}) } };
+  globalThis.SN_CONTATORI_MAIN = { navigazione: (x) => { if (x && x.evento) eventi.push(x.evento); } };
+  try {
+    const base = { filename: 'setup.exe', url: 'https://x.example/setup.exe', state: 'pending', savePath: '', startedAt: new Date().toISOString() };
+    DL._records.set('piu', { ...base, id: 'piu', _piuFile: 'https://x.example' });
+    DL._records.set('exe', { ...base, id: 'exe', _piuFile: '' });
+    DL.confirmDownload('piu', false);
+    assert.deepEqual(eventi, [], 'un file trattenuto per i file multipli non è un programma rifiutato');
+    DL.confirmDownload('exe', false);
+    assert.deepEqual(eventi, ['rifiutato'], 'un programma vero sì');
+  } finally {
+    DL._records.delete('piu');
+    DL._records.delete('exe');
+    delete globalThis.SN_CONTATORI;
+    delete globalThis.SN_CONTATORI_MAIN;
+  }
+});
+
+// Il testo di cosa sa fare Filo nomina la finestra e il tetto del freno: cambiati qui, la frase va riscritta.
+test('il manifesto dice la finestra e il tetto che il freno usa davvero', async () => {
+  await import('../../src/shared/constants.js');
+  await import('../../src/shared/capabilities.js');
+  const DL = require('../../src/main/services/downloads.js');
+  const A_PAROLE = { 10: 'dieci', 100: 'cento' };
+  const caps = JSON.stringify(globalThis.SN_CAPABILITIES || {});
+  const minuti = P.SCARICAMENTI_FINESTRA_MS / 60_000;
+  assert.ok(A_PAROLE[minuti], `manca il nome a parole di ${minuti} minuti in questa prova`);
+  assert.ok(caps.includes(`dal secondo (entro ${A_PAROLE[minuti]} minuti)`), 'il manifesto nomina la finestra');
+  assert.ok(A_PAROLE[DL.PIU_FILE_IN_ATTESA], `manca il nome a parole di ${DL.PIU_FILE_IN_ATTESA} in questa prova`);
+  assert.ok(caps.includes(`superano ${A_PAROLE[DL.PIU_FILE_IN_ATTESA]}`), 'il manifesto nomina il tetto');
+});
