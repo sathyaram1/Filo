@@ -177,6 +177,11 @@ Il dizionario è uguale su tutti i siti, quindi faceva anche da impronta. Le reg
   sito: le sue parole non arrivano al dizionario né alla correzione da sé, e il modello non le segna. Il giro 2 ha
   mostrato perché non basta una finestra di tempo dopo il gesto: il sito riscrive la casella dentro l'evento del tasto
   stesso, prima di Filo, e misura;
+- **un gesto vero spiega solo il testo che porta, mai un cambio intero** (giro 3): un incolla o un trascinamento
+  senza testo (un'immagine) non spiega niente, e AltGr (Ctrl+Alt su Windows) è un carattere, non un comando.
+  L'annulla e il rifai non scrivono testo nuovo: riportano un testo già visto coi proprietari che aveva
+  (`proprietariDi`), chiunque li lanci. Prima un annulla con Ctrl premuto valeva tutto dell'utente, e il sito ci
+  faceva passare la pila che aveva preparato, anche con un Ctrl rimasto «premuto» dopo un Ctrl+clic fuori;
 - **fra le parole trovate entrando una ripetuta conta una volta per il dizionario**: mille copie della stessa parola
   moltiplicavano la differenza di costo fino a renderla misurabile. Resta una misura per ingresso su parole diverse,
   troppo piccola per leggerla.
