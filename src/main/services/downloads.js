@@ -725,7 +725,8 @@ function daRaccontare(rec, davanti, adesso = Date.now()) {
 // dice "completato".
 function completa(rec) {
   if (rec._quarantena) {
-    const dest = uniquePath(downloadsDir(), rec.filename);
+    const intatto = rec._nomeChiesto && rec.filename === path.basename(String(rec.savePath || ''));
+    const dest = uniquePath(downloadsDir(), intatto ? rec._nomeChiesto : rec.filename);
     if (spostaFile(rec.savePath, dest)) {
       forgetExists(rec.savePath);
       rec.savePath = dest;
