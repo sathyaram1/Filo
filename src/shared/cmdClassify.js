@@ -146,7 +146,7 @@
   const LEVEL1_MUTATES = {
     // `date -s`/`--set` imposta l'orologio, anche in un gruppo (`-us`) o col valore attaccato (`-s1`); `+%F`, `-u`,
     // `-d` sono letture. `-d`, `-f`, `-r`, `-I` prendono un valore: la `s` dopo di loro è quel valore.
-    date: (cmd) => tokens(cmd).slice(1).map(unquote).some((t) => /^-[uR]*s/.test(t) || opzioneLunga(t, 'set', 1)),
+    date: (cmd) => tokens(cmd).slice(1).map(unquote).some((t) => /^-[uR]*s/.test(t) || opzioneLunga(t, 'set', 1) != null),
     // `hostname <nome>` o `-F file` imposta il nome host; i flag di lettura no.
     // Attenzione: qui `-s` è «short», non «set».
     hostname: (cmd) => {
