@@ -34,6 +34,7 @@ const DIFFERENZE = {
   },
   soloPagineInterne: {
     'tests/fixtures/testModels.js': 'modelli di prova, caricati solo con NODE_ENV=test',
+    'src/shared/trascinoInterno.js': 'i trascinamenti interni partono e si accettano solo sulle pagine di Filo: sui siti il riferimento entra come testo',
   },
 };
 
