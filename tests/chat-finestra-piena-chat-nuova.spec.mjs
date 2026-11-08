@@ -38,9 +38,10 @@ async function incollaFoto(page, colore) {
 
 // Un documento lasciato sul campo, come un file trovato da Filo trascinato nella chat.
 async function lasciaDocumento(page, percorso) {
-  await page.evaluate((p) => {
+  await page.evaluate(async (p) => {
     const dt = new DataTransfer();
-    dt.setData('application/x-filo-file', p);
+    // Come il dragstart del file in chat: il gettone nel tipo, il percorso al main.
+    await window.SN_TRASCINO_INTERNO.parte(dt, 'file', p);
     document.getElementById('inputForm').dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));
   }, percorso);
 }
