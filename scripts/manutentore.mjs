@@ -1136,8 +1136,8 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     let indice = [];
     try { indice = JSON.parse(readFileSync(join(cartella, INDICE), 'utf8')); } catch (_) { /* senza indice niente numeri dei worker */ }
     const r = await leggiRami(indice);
-    const coda = [rigaFuori(r.fuori, giorni), r.server.avviso].filter(Boolean);
-    if (cmd === 'rami') { console.log([r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', ...coda].join('\n')); return 0; }
+    if (cmd === 'rami') { console.log([r.lista.map(rigaRamo).join('\n') || 'Nessun ramo in corso.', rigaFuori(r.fuori, giorni), r.server.avviso].filter(Boolean).join('\n')); return 0; }
+    const coda = [r.server.avviso].filter(Boolean);
     if (!arg || String(arg).startsWith('--')) {
       const coppie = incrociFraRami(r.lista);
       console.log([coppie.length
