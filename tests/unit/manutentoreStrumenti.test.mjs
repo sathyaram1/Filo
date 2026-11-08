@@ -129,6 +129,28 @@ test('un taccuino vuoto da stdin non parte: lo cancellerebbe', () => {
   assert.deepEqual(pieno.inviati, [{ op: 'taccuino.scrivi', dati: { testo: 'stato: N 4', versione: 3 }, cred: 'chiave' }]);
 });
 
+// #2340: il taccuino si aggiorna a sezioni, con la stessa guardia di versione della riscrittura intera.
+test('taccuino sezione manda la sola sezione con la versione letta; vuota, senza versione o senza nome non parte', () => {
+  const r = lancia(['taccuino', 'sezione', 'problemi', '-', '--versione', '7'], { 'taccuino.sezione': { ok: true, versione: 8, sezione: 'problemi' } }, '- #2300: guasto npm, ricontrollo alle 16\n');
+  assert.equal(r.status, 0, r.out);
+  assert.deepEqual(r.inviati, [{ op: 'taccuino.sezione', dati: { sezione: 'problemi', testo: '- #2300: guasto npm, ricontrollo alle 16\n', versione: 7 }, cred: 'chiave' }]);
+  assert.match(r.out, /Sezione «problemi» riscritta, il resto del taccuino com'era \(versione 8\)/);
+  const cambiato = lancia(['taccuino', 'sezione', 'stato', '-', '--versione', '7'], { 'taccuino.sezione': { ok: false, reason: 'taccuino_cambiato' } }, 'N 3');
+  assert.equal(cambiato.status, 4);
+  assert.match(cambiato.out, /RIFIUTATO dal server: taccuino_cambiato/);
+  for (const [argv, input, motivo] of [
+    [['taccuino', 'sezione', 'stato', '-', '--versione', '7'], ' \n', /la sezione «stato» da stdin è vuota/],
+    [['taccuino', 'sezione', 'stato', '-'], 'N 3', /taccuino sezione vuole --versione <V>/],
+    [['taccuino', 'sezione', '-', '--versione', '7'], 'N 3', /vuole il nome della sezione/],
+    [['taccuino', 'sezione', '## Stato', '-', '--versione', '7'], 'N 3', /vuole il nome della sezione/],
+  ]) {
+    const no = lancia(argv, {}, input);
+    assert.notEqual(no.status, 0, argv.join(' '));
+    assert.deepEqual(no.inviati, [], argv.join(' '));
+    assert.match(no.out, motivo);
+  }
+});
+
 test('il biglietto passato con --ticket non entra nei testi scritti', () => {
   const i = lancia(['indicazione', 'priorità', 'alla', 'grafica', '--ticket', 'SEGRETO123'], { taccuino: { ok: true, testo: '', versione: 0 } });
   const scritto = i.inviati.find((x) => x.op === 'taccuino.scrivi');
