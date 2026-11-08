@@ -874,6 +874,8 @@
       if (posix && ch === '\\' && i + 1 < s.length) { cur += s[i + 1]; espande += ch + s[i + 1]; i += 1; continue; }
       if (!win && ch === '\\' && /\s/.test(s[i + 1] || '')) { cur += s[i + 1]; i += 1; continue; }
       if (/\s/.test(ch)) { chiudi(); continue; }
+      // PowerShell passa a un programma un elenco `a,'--output=x'` come argomenti separati.
+      if (c.elenchi && ch === ',') { chiudi(); continue; }
       cur += ch;
       espande += ch;
     }
