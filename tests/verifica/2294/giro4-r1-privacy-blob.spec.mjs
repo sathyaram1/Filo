@@ -68,6 +68,8 @@ test('r1 una pagina che si porta in cima un documento senza origine leggibile, s
   try {
     const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
     await openTab(`http://${SITI[0]}:${srv.porta}/blob`);
+    await new Promise((r) => setTimeout(r, 4_000));
+    console.log('URL', await app.evaluate(({ webContents }) => webContents.getAllWebContents().map((w) => w.getURL())));
     await expect.poll(() => visti(shell, 'file-blob'), { timeout: 30_000 }).toBeGreaterThanOrEqual(5);
     await new Promise((r) => setTimeout(r, 1_500));
     expect(arrivati(dir, 'file-blob').length, 'file arrivati in Download senza nessun clic').toBeLessThanOrEqual(1);
