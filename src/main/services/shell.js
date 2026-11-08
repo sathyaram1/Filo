@@ -23,6 +23,7 @@
 // dell'assistente con cmd (terminal.js), che arriva già passato dal gate dei livelli.
 
 const { spawn } = require('node:child_process');
+const { programmaIntero } = require('./programmaIntero');
 const os = require('node:os');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -301,7 +302,9 @@ function createSession({ shell, cwd, env, autoRun } = {}) {
 
   let proc;
   try {
-    proc = spawn(cfg.file, cfg.args, cfg.options);
+    const programma = programmaIntero(cfg.file);
+    if (!programma) throw new Error(`${cfg.file} non è nel PATH`);
+    proc = spawn(programma, cfg.args, cfg.options);
   } catch (err) {
     session.dead = true;
     session._spawnError = err.message || String(err);
@@ -547,7 +550,9 @@ function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS
     try {
       // L'env dei probe: vedi existenceProbes.
       const env = ambienteComandi({ ...process.env, ...(probeEnv || {}) });
-      proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
+      const programma = programmaIntero(file);
+      if (!programma) { resolve('incerto'); return; }
+      proc = spawn(programma, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve('incerto'); return; }
     const timer = setTimeout(() => finish('incerto'), attesaMs);
     proc.on('error', () => { clearTimeout(timer); finish('incerto'); });

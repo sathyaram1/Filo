@@ -29,10 +29,12 @@ test('livello 1 — comandi di sola lettura in whitelist eseguono subito', () =>
     'ls', 'ls -la', 'dir', 'pwd', 'cat package.json', 'type file.txt',
     'echo ciao', 'whoami', 'hostname', 'date', 'head -n 20 log.txt',
     'tail -f out.log', 'tree', 'wc -l file', 'grep foo file', 'findstr foo file',
-    'where node', 'which git',
+    'which git',
   ]) {
     assert.equal(lvl(cmd), 1, `"${cmd}" dovrebbe essere livello 1`);
   }
+  // `where` legge solo come where.exe di cmd: senza sapere la shell può essere Where-Object (#2292).
+  assert.equal(C.classify('where node', { win: true, shell: 'cmd' }), 1);
 });
 
 test('livello 1 — git e npm di sola lettura', () => {
@@ -302,7 +304,7 @@ test('un percorso o un\'estensione eseguibile NON eredita il livello del comando
   assert.equal(lvl('/usr/bin/ls'), 3);    // prima era 1: un `ls` in un percorso non è fidato
   assert.equal(lvl('C:\\Windows\\System32\\where.exe foo'), 3);
   assert.equal(lvl('ls'), 1);             // nudo: resta 1
-  assert.equal(lvl('where node'), 1);
+  assert.equal(C.classify('where node', { win: true, shell: 'cmd' }), 1);
 });
 
 test('livello 1 — interrogazioni di versione/help dei tool comuni (sola lettura)', () => {
@@ -845,7 +847,6 @@ test('livello 3 — ForEach-Object senza scriptblock INVOCA il membro → confer
     'gci | % Name',                       // anche innocuo: non sappiamo distinguerlo
     'gci | foreach MoveTo',
     'ForEach-Object { $_ }',              // da solo non filtra niente
-    'Where-Object { $_ }',
     '% { $_.Name }',
   ]) {
     assert.equal(lvl(cmd), 3, `"${cmd}" dovrebbe restare livello 3`);

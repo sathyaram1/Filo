@@ -419,9 +419,11 @@ test('#1072 — il testo cercato non si apre: due barre nel modello non sono ret
     assert.doesNotMatch(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
   for (const cmd of ['grep TODO //evil/x/app.js', 'grep -f //evil/x/p a.txt', 'grep "//TODO" //evil/x/a.js', 'findstr /d:\\\\evil\\x a *.txt',
-    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'git --git-dir=\\\\evil\\x\\.git log', 'echo \\\\evil\\x | ls']) {
+    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'echo \\\\evil\\x | ls']) {
     assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
+  // Git portato su un altro repository non passa dalla sonda delle impostazioni (#2292): conferma piena.
+  assert.equal(lvl('git --git-dir=\\\\evil\\x\\.git log', WIN), 3);
 });
 
 test('#1072 — stampare un testo con due barre non apre niente; usato da un altro comando (tubo, gruppo) sì', () => {
@@ -502,7 +504,8 @@ test('#1072.4 — in una cwd di rete un nome dato a git, dal tubo o da un gruppo
 test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK', () => {
   const NOMI = ['Get-Command .\\segreto', 'Get-Command -Name .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto',
     'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log -- segreto'];
-  for (const ctx of [{ ...WIN, cwd: '\\\\host\\x' }, { ...WIN, cwd: 'Z:\\', reti: ['Z:'] }]) {
+  // `where` legge solo come where.exe di cmd (#2292).
+  for (const ctx of [{ ...WIN, shell: 'cmd', cwd: '\\\\host\\x' }, { ...WIN, shell: 'cmd', cwd: 'Z:\\', reti: ['Z:'] }]) {
     assert.equal(C.classifyDetail('ls segreto', ctx).level, 2, `ls in ${ctx.cwd}`);
     for (const cmd of NOMI) {
       const d = C.classifyDetail(cmd, ctx);
@@ -513,7 +516,7 @@ test('#1072.4 — in una cwd di rete un nome cercato nella cartella chiede un OK
   // Gli stessi comandi in una cartella del disco restano liberi.
   for (const cmd of ['Get-Command .\\segreto', 'Get-Help .\\segreto.ps1', 'where segreto', 'where node',
     'git rev-parse segreto', 'git show segreto', 'git log segreto', 'git diff segreto', 'git blame segreto', 'git log']) {
-    assert.equal(lvl(cmd, WIN), 1, cmd);
+    assert.equal(lvl(cmd, { ...WIN, shell: 'cmd' }), 1, cmd);
   }
 });
 

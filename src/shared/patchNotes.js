@@ -18,6 +18,7 @@
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
+        { testo: 'Dal terminale, Filo ti chiede prima di lanciare i comandi che sembrano solo leggere ma possono scrivere file o avviare programmi.', segnalazione: 2292 },
       ],
     },
     {

@@ -2,7 +2,7 @@
 // processo, stdout/stderr troncati se enormi perché la chat non esploda.
 // La classificazione di sicurezza la fa prima il gate dei livelli, non questo file.
 
-const { spawn, execFile } = require('node:child_process');
+const { spawn, execFile, execFileSync } = require('node:child_process');
 
 // Su Windows `child.kill()` lascia vivi i figli: le pipe restano aperte, `close` non scatta
 // e il timeout non libererebbe mai. Su POSIX basta SIGKILL sul processo.
@@ -37,6 +37,132 @@ function ambienteDelModello(base) {
   for (const k of Object.keys(out)) if (k.toLowerCase() === SENZA_CARTELLA_NELLA_RICERCA.toLowerCase()) delete out[k];
   out[SENZA_CARTELLA_NELLA_RICERCA] = '1';
   return out;
+}
+
+// Oltre questi sottomoduli la sonda non li guarda uno per uno: risponde 'ignoto', e il comando chiede.
+const GIT_SOTTOMODULI_MAX = 200;
+
+// Gli hook che git fa partire a una LETTURA, non a una scrittura: post-index-change lo lanciano git status e
+// git diff a ogni rinfresco dell'indice. Gli hook di scrittura (pre-commit, pre-push…) non partono a una lettura,
+// e sono comuni nei repository dell'utente: chiedere per loro sarebbe solo attrito (#2292).
+const HOOK_DI_LETTURA = ['post-index-change'];
+// I file che git prova per un hook: git per Windows, se manca il nome nudo, prova il nome con .exe.
+function fileDiHook(dirHooks, nome) {
+  const path = require('node:path');
+  const p = path.join(dirHooks, nome);
+  return process.platform === 'win32' ? [p, `${p}.exe`] : [p];
+}
+// 'si' se nella cartella degli hook c'è un programma d'avvio che una lettura farebbe partire. Su Windows git
+// esegue l'hook se il file c'è; su POSIX serve il bit d'esecuzione.
+function hookDiLetturaAttivo(dirHooks) {
+  const fs = require('node:fs');
+  for (const nome of HOOK_DI_LETTURA) {
+    for (const p of fileDiHook(dirHooks, nome)) {
+      try {
+        const st = fs.statSync(p);
+        if (st.isFile() && (process.platform === 'win32' || (st.mode & 0o111))) return true;
+      } catch (_) {}
+    }
+  }
+  return false;
+}
+
+// Un esito '' resta buono finché nessuno dei file da cui dipende cambia: la sonda lancia git più volte per ogni
+// sottomodulo, a processo fermo, e rifarla a ogni comando bloccava Filo per secondi nei repository grandi.
+const GIT_RICORDATI_MAX = 500;
+const gitRicordati = new Map();
+// Di un `.git` conta solo che ci sia e quale sia: la sua data cambia a ogni lettura (il lucchetto dell'indice).
+function firmaFile(p) {
+  try {
+    const s = require('node:fs').statSync(p);
+    if (s.isDirectory() && require('node:path').basename(p) === '.git') return `d:${s.ino}`;
+    return `${s.mtimeMs}:${s.size}:${s.mode}:${s.ino}`;
+  } catch (_) { return '-'; }
+}
+function ricordoValido(dir) {
+  const r = gitRicordati.get(dir);
+  return !!r && r.firme.every(([p, f]) => firmaFile(p) === f);
+}
+
+// 'si' se il repository di `dir`, o un suo sottomodulo, ha impostazioni che avviano programmi (#2292), '' se no,
+// 'ignoto' se git non risponde. Le impostazioni di un sottomodulo si guardano prima di lanciarci dentro altro.
+function gitLanciaIn(dir, visti) {
+  if (visti) return sondaGit(dir, visti);
+  if (ricordoValido(dir)) return '';
+  const nuovi = { n: 0, file: [] };
+  const esito = sondaGit(dir, nuovi);
+  gitRicordati.delete(dir);
+  if (esito === '' && nuovi.dentro) {
+    if (gitRicordati.size >= GIT_RICORDATI_MAX) gitRicordati.delete(gitRicordati.keys().next().value);
+    gitRicordati.set(dir, { firme: nuovi.file.map((p) => [p, firmaFile(p)]) });
+  }
+  return esito;
+}
+
+function sondaGit(dir, visti) {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  // Una cartella che qui non c'è vuol dire che la shell entra altrove (`cd Downloads/*/`, gli spazi di cmd): non si sa.
+  let cartella = false;
+  try { cartella = fs.statSync(dir).isDirectory(); } catch (_) {}
+  if (!cartella) return 'ignoto';
+  // Senza git nel PATH non lo trova nemmeno la shell dei comandi.
+  const programma = require('./programmaIntero').programmaIntero('git');
+  if (!programma) return '';
+  const git = (args, cwd) => execFileSync(programma, args, {
+    cwd, env: ambienteComandi(), encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
+    maxBuffer: 256 * 1024 * 1024,
+  });
+  let out = '';
+  try {
+    out = git(['config', '--list', '--show-scope', '--includes', '-z'], dir);
+  } catch (e) {
+    // Senza git installato il comando git non parte nemmeno: non c'è niente da avviare.
+    return e && e.code === 'ENOENT' ? '' : 'ignoto';
+  }
+  const C = globalThis.SN_CMD_CLASSIFY;
+  if (!C || typeof C.gitConfigLancia !== 'function') return 'ignoto';
+  if (C.gitConfigLancia(out)) return 'si';
+  // git status e git diff entrano in ogni sottomodulo presente con le sue impostazioni, anche senza .gitmodules.
+  // Oltre alle impostazioni, git fa partire a una lettura anche un programma d'avvio (hook) che il repository
+  // si porta dietro: lo cerca nella cartella degli hook EFFETTIVA (--git-path la sposta con core.hooksPath).
+  let righe = [];
+  try {
+    righe = git(['rev-parse', '--show-toplevel', '--git-path', 'hooks', '--git-path', 'index', '--git-dir', '--git-common-dir'], dir)
+      .split(/\r?\n/).map((r) => r.trim());
+  } catch (e) {
+    // 128: fuori da un repository o senza cartella di lavoro, dove nessuna lettura entra in un sottomodulo.
+    return e && e.status === 128 ? '' : 'ignoto';
+  }
+  const [radice, hooksRel, indice, gitDir, comune] = righe;
+  if (!radice) return '';
+  const hooks = hooksRel ? path.resolve(dir, hooksRel) : '';
+  if (hooks && hookDiLetturaAttivo(hooks)) return 'si';
+  // Da cosa dipende l'esito: impostazioni, hook, indice, e ogni .git fra la cartella e la radice (uno nuovo la sposta).
+  visti.dentro = true;
+  for (let a = path.resolve(dir); ; a = path.dirname(a)) {
+    visti.file.push(path.join(a, '.git'));
+    if (a === path.resolve(radice) || path.dirname(a) === a) break;
+  }
+  for (const d of [gitDir, comune].filter(Boolean).map((x) => path.resolve(dir, x))) {
+    visti.file.push(path.join(d, 'config'), path.join(d, 'config.worktree'));
+  }
+  if (hooks) visti.file.push(hooks, ...HOOK_DI_LETTURA.flatMap((n) => fileDiHook(hooks, n)));
+  if (indice) visti.file.push(path.resolve(dir, indice));
+  let voci = '';
+  try { voci = git(['ls-files', '--stage', '-z'], radice); } catch (_) { return 'ignoto'; }
+  for (const voce of voci.split('\u0000')) {
+    if (!voce.startsWith('160000 ')) continue;
+    const sotto = path.join(radice, voce.slice(voce.indexOf('\t') + 1));
+    // Un sottomodulo popolato dopo (senza toccare l'indice di sopra) cambia l'esito: anche la sua assenza conta.
+    visti.file.push(path.join(sotto, '.git'));
+    if (!fs.existsSync(path.join(sotto, '.git'))) continue;
+    visti.n += 1;
+    if (visti.n > GIT_SOTTOMODULI_MAX) return 'ignoto';
+    const r = gitLanciaIn(sotto, visti);
+    if (r) return r;
+  }
+  return '';
 }
 
 // Shell di default per piattaforma quando la preferenza non è impostata.
@@ -374,7 +500,9 @@ function runCommand(command, { shell, cwd, timeoutMs = DEFAULT_TIMEOUT_MS, env: 
     let timedOut = false;
     let child;
     try {
-      child = spawn(file, args, {
+      const programma = require('./programmaIntero').programmaIntero(file);
+      if (!programma) throw new Error(`${file} non è nel PATH`);
+      child = spawn(programma, args, {
         cwd: cartella,
         env,
         windowsHide: true,
@@ -542,6 +670,7 @@ function eseguiInSessione(cmd, { shell, cwd, env, timeoutMs = DEFAULT_TIMEOUT_MS
 
 module.exports = {
   runCommand, shellInvocation, resolveShell, defaultShell, MAX_OUTPUT_CHARS, DEFAULT_TIMEOUT_MS, ambienteComandi, ambienteDelModello,
+  gitLanciaIn,
   // esportati per gli unit test (il preludio UTF-8 e la sonda sono la parte
   // che si può verificare senza avviare una shell su ogni piattaforma).
   encodingPrelude, withCwdProbe, invocazione, PRELUDI_CODIFICA,
