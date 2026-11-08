@@ -120,6 +120,27 @@ test('Non consentire: i file in attesa se ne vanno, la scheda ne porta il segno 
   }
 });
 
+test('un programma partito da solo dopo un altro file tiene la sua domanda: Consenti ai file multipli non lo fa arrivare', async ({ app, shell, openTab }) => {
+  test.setTimeout(120_000);
+  const srv = await apriServer();
+  try {
+    const dir = await app.evaluate(() => process.env.FILO_DOWNLOAD_DIR);
+    await openTab(`${srv.base}/?n=3&p=prog&est=txt,exe,txt`);
+    await expect.poll(() => voci(shell, 'prog'), { timeout: 20_000 }).toEqual([
+      { nome: 'prog-1.txt', stato: 'completed', chiede: '' },
+      { nome: 'prog-2.exe', stato: 'pending', chiede: '' },
+      { nome: 'prog-3.txt', stato: 'pending', chiede: 'piuFile' },
+    ]);
+    await expect(barra(shell)).toContainText('vuole scaricare più file', { timeout: 10_000 });
+    await barra(shell).locator('.permesso-si').click();
+    await expect.poll(() => voci(shell, 'prog').then((v) => v.map((x) => x.stato)), { timeout: 15_000 })
+      .toEqual(['completed', 'pending', 'completed']);
+    expect(nellaCartella(dir, 'prog'), 'il programma resta fuori finché non si risponde alla sua domanda').toEqual(['prog-1.txt', 'prog-3.txt']);
+  } finally {
+    await srv.close();
+  }
+});
+
 test('una raffica oltre il tetto: cento file aspettano, gli altri non scendono e la riga lo dice; Consenti fa arrivare i cento', async ({ app, shell, openTab }) => {
   test.setTimeout(180_000);
   const srv = await apriServer();
