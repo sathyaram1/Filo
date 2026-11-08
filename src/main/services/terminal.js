@@ -108,11 +108,10 @@ function gitLanciaIn(dir, visti) {
 function sondaGit(dir, visti) {
   const fs = require('node:fs');
   const path = require('node:path');
-  // Una cartella che non c'è non la apre nessun git, a meno che il nome lo sciolga la shell (`cd Downloads/*/`):
-  // allora la cartella vera qui non si conosce.
+  // Una cartella che qui non c'è vuol dire che la shell entra altrove (`cd Downloads/*/`, gli spazi di cmd): non si sa.
   let cartella = false;
   try { cartella = fs.statSync(dir).isDirectory(); } catch (_) {}
-  if (!cartella) return /[*?[\]{}]/.test(String(dir)) ? 'ignoto' : '';
+  if (!cartella) return 'ignoto';
   // Senza git nel PATH non lo trova nemmeno la shell dei comandi.
   const programma = require('./programmaIntero').programmaIntero('git');
   if (!programma) return '';
