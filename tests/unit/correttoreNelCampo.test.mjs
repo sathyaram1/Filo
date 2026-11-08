@@ -390,6 +390,58 @@ test('il sito che riscrive la casella dentro il tasto dell\'utente non fa contro
   assert.deepEqual(c.segni('sn-errore'), []);
 });
 
+// #2299: un annulla con Ctrl premuto, o un'immagine incollata, facevano passare per dell'utente la sonda del sito.
+test('annulla e rifai riportano un testo coi suoi proprietari; un incolla senza testo non spiega quello che mette il sito', async () => {
+  const c = correttore({ sbagliate: ['quseta', 'pomodro'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  for (const x of 'pomodro ') c.batte(el, x);
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
+  // La pila dell'annulla preparata dal sito: la sua sonda, poi di nuovo il testo dell'utente.
+  c.scriveDaScript(el, 'quseta quseta ');
+  c.scriveDaScript(el, 'pomodro ');
+  for (const tipo of ['historyUndo', 'historyRedo', 'historyUndo']) {
+    el.fire('keydown', { isTrusted: true, key: 'a', ctrlKey: true });
+    el.value = tipo === 'historyRedo' ? 'pomodro ' : 'quseta quseta ';
+    el.fire('input', { isTrusted: true, inputType: tipo });
+    await c.passa(5000);
+    assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), tipo === 'historyRedo' ? ['pomodro'] : [], tipo);
+  }
+  // Un'immagine incollata: nessun testo negli appunti, e il sito riscrive la casella nello stesso evento.
+  el.value = 'quseta '.repeat(20);
+  el.fire('input', { isTrusted: true, inputType: 'insertFromPaste', data: null, dataTransfer: { getData: () => '' } });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore'), []);
+  // Il proprio annulla torna al testo dell'utente, coi suoi segni.
+  el.value = 'pomodro ';
+  el.fire('input', { isTrusted: true, inputType: 'historyUndo' });
+  await c.passa(5000);
+  assert.deepEqual(c.segni('sn-errore').map((s) => s.testo), ['pomodro']);
+});
+
+test('un carattere battuto con AltGr (Ctrl+Alt su Windows) è dell\'utente', async () => {
+  const c = correttore({ sbagliate: ['quseta'], impostazioni: { correttore: { modelloErrori: false } } });
+  const el = c.campo();
+  c.entra(el);
+  for (const x of 'quseta') c.batte(el, x);
+  el.fire('keydown', { isTrusted: true, key: '@', ctrlKey: true, altKey: true });
+  el.value += '@';
+  el.fire('input', { isTrusted: true, inputType: 'insertText', data: '@' });
+  el.fire('keydown', { isTrusted: true, key: 'x', ctrlKey: true });
+  el.value += 'x';
+  el.fire('input', { isTrusted: true, inputType: 'insertText', data: 'x' });
+  for (const x of ' quseta ') c.batte(el, x);
+  await c.passa(5000);
+  const T = c.sb.SN_SPELLCHECK._test;
+  if (T && T.stato) {
+    const st = T.stato(el);
+    assert.deepEqual(st.diSito.map((z) => el.value.slice(z.start, z.end)), ['x'], 'la chiocciola è dell\'utente, la x con Ctrl no');
+  } else {
+    assert.ok(c.segni('sn-errore').some((s) => s.testo === 'quseta'));
+  }
+});
+
 test('quello che c\'era entrando si controlla, una parola ripetuta una volta; quello che scrive Filo come quello dell\'utente', async () => {
   const c = correttore({ sbagliate: ['quseta', 'cavolo'], impostazioni: { correttore: { modelloErrori: false } } });
   let gesto = false;
