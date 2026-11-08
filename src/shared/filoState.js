@@ -391,6 +391,7 @@
       const righe = ['TAB APERTE'];
       // Le pagine col titolo e quelle delicate: una che passa dalle prime alle seconde rifà la fotografia (filoTrattoVivo.js).
       const riservate = { visibili: [], nascosti: [] };
+      const daSiti = [];
       const pagina = (u) => String(u || '').split('#')[0];
       if (!state.tabs.length) righe.push('(nessuna)');
       else {
