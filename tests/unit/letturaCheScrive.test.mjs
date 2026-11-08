@@ -80,8 +80,12 @@ test('le letture vere restano libere', () => {
 test('where in PowerShell è Where-Object: il blocco gira, quindi 3; in cmd è where.exe', () => {
   assert.equal(C.classify('where -InputObject 1 { Start-Process calc }', PS), 3);
   assert.equal(C.classify('where -InputObject 1 { Start-Process calc }'), 3);
-  assert.equal(C.classify('where node', PS), 3);
   assert.equal(C.classify('where node', CMD), 1);
+  // Senza un blocco che invoca, Where-Object filtra e basta: resta una lettura, da solo come dopo una barra.
+  for (const cmd of ['where node', 'where git', 'where -Property x -EQ 1']) assert.equal(C.classify(cmd, PS), 1, cmd);
+  assert.equal(C.classify('where -InputObject 1 { $_ -gt 0 }', PS), C.classify('echo 1 | where { $_ -gt 0 }', PS));
+  assert.equal(C.classify('where -InputObject (Start-Process calc) { $_ }', PS), 3);
+  assert.equal(C.classify('foreach -InputObject 1 { $_ }', PS), 3, 'ForEach-Object da solo resta da chiedere');
   // Le due forme già difese e quella nuova ora dicono lo stesso.
   assert.equal(C.classify('echo 1 | where { Start-Process calc }', PS), 3);
   assert.equal(C.classify('Where-Object -InputObject 1 { Start-Process calc }', PS), 3);
