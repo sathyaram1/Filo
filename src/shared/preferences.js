@@ -796,7 +796,7 @@
       aiuto: 'minuti 2 | 5 | 10 | 30 | 60 (quanto spesso al massimo Filo scrive da sé dei download finiti mentre l\'utente non c\'era; quelli arrivati intanto finiscono nel messaggio dopo; un\'ora = 60)',
       costo: 1,
       keys: ['messaggi_download', 'messaggi sui download', 'ritmo dei download', 'quanto spesso scrive dei download',
-        'filo scrive dei download', 'download finiti mentre non c\'ero', 'filoparla.downloadogniMin'.toLowerCase()],
+        'filo scrive dei download', 'download finiti mentre non c\'ero', 'filoparla.downloadognimin'],
       build(v) {
         const s = String(v == null ? '' : v).trim().toLowerCase();
         let n = /\bor[ae]\b/.test(s) ? 60 * (parseItalianNumber(s.replace(/[^0-9.,-]/g, '')) || 1) : parseItalianNumber(s.replace(/[^0-9.,-]/g, ''));
