@@ -2,7 +2,8 @@
 //
 // Cosa deve essere vero
 //   1. In Gestione l'owner vede i due tetti col numero del server e, accanto, quanto costano al tetto coi prezzi del
-//      listino; un numero nuovo cambia la cifra mentre lo scrive e, salvato, arriva al server.
+//      listino; un numero nuovo cambia la cifra mentre lo scrive e, salvato, arriva al server. Il tasto destro rimette
+//      quelli di fabbrica; col server giù i campi restano, spenti, col motivo.
 //   2. Un rifiuto del server arriva a chi invia col suo numero: testo troppo lungo (che resta lì, col cursore dentro)
 //      e tetto del giorno raggiunto, con l'ora in cui riprovare. Il testo parte intero, il client non lo taglia.
 //
@@ -158,7 +159,7 @@ test('#2296 — Gestione: i tetti del server con la stima accanto, che segue il 
   await mg.screenshot({ path: 'tests/.shots/redteam-tetti-gestione.png' }).catch(() => {});
 
   // Dal tasto destro, con la voce vera del menu, tornano i numeri di fabbrica.
-  await mg.locator('#mgRtRoot').click({ button: 'right' });
+  await mg.locator('#mgRtRoot').click({ button: 'right', position: { x: 8, y: 8 } });
   const voce = mg.locator('.mg-ctxmenu .sn-select-option', { hasText: 'Rimetti i tetti di fabbrica' });
   await expect(voce).toBeVisible();
   await voce.click();
@@ -181,7 +182,7 @@ test('#2296 — Gestione col server dei tetti giù: i campi restano, spenti, col
   }
   expect(scritture).toHaveLength(0);
   // Il menu non offre i tetti di fabbrica: non sapendo i numeri, non c'è niente da rimettere.
-  await mg.locator('#mgRtRoot').click({ button: 'right' });
+  await mg.locator('#mgRtRoot').click({ button: 'right', position: { x: 8, y: 8 } });
   await expect(mg.locator('.mg-ctxmenu')).toBeVisible();
   await expect(mg.locator('.mg-ctxmenu')).not.toContainText('Rimetti i tetti di fabbrica');
 });
