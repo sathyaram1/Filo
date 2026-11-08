@@ -36,7 +36,7 @@
     activeRoot = null;
   }
 
-  const cifra = (n) => Number(n).toLocaleString('it-IT');
+  const cifra = (n) => Number(n).toLocaleString('it-IT', { useGrouping: true });
 
   // «alle 14:00», «domani alle 9:00»: quando il server dice che si libera un posto. Senza un'ora valida, «più tardi».
   function quando(ms, oraMs) {
