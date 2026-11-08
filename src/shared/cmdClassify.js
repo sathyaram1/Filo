@@ -219,6 +219,12 @@
 
   // Valgono solo DENTRO una pipeline: da soli non ricevono niente da filtrare.
   const PS_PIPE_ONLY = new Set(['where-object', 'where', '?', 'foreach-object', 'foreach', '%']);
+  // Quale `where` è: 'cmd' il programma di ricerca (where.exe, o la shell cmd), 'filtro' il Where-Object di PowerShell,
+  // '' se la shell non si sa. L'unico posto che lo decide (#2292): il livello teme il filtro, la rete teme la ricerca.
+  function qualeWhere(raw, shell) {
+    if (/^where\.exe$/i.test(unquote(tokens(dequote(raw))[0] || '')) || shell === 'cmd') return 'cmd';
+    return shell === 'powershell' ? 'filtro' : '';
+  }
   // ForEach-Object senza scriptblock usa la forma «nome di membro», che INVOCA il metodo su
   // ogni oggetto: `gci | % Delete` cancella i file. Lo scriptblock validato è obbligatorio.
   const PS_FOREACH = new Set(['foreach-object', 'foreach', '%']);
