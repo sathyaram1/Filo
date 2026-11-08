@@ -18,6 +18,7 @@
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
+        { testo: 'Dal terminale, Filo ti chiede prima di lanciare i comandi che sembrano solo leggere ma possono scrivere file o avviare programmi.', segnalazione: 2292 },
       ],
     },
     {
@@ -30,7 +31,6 @@
       fixes: [
         { testo: 'Un video salvato da un sito che apri da un altro paese scende dalla stessa connessione della scheda, anche con «Riprova»: il sito non vede più la tua.', segnalazione: 2301 },
         { testo: 'Con il Prompt dei comandi scelto nelle Preferenze, i comandi che chiedi a Filo usano i programmi installati sul computer anche dentro una cartella che ne contiene uno con lo stesso nome.', segnalazione: 2312 },
-        { testo: 'Dal terminale, Filo ti chiede prima di lanciare i comandi che sembrano solo leggere ma possono scrivere file o avviare programmi.', segnalazione: 2292 },
       ],
     },
     {
