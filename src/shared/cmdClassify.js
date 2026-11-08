@@ -486,13 +486,15 @@
     },
   };
 
-  // Opzioni prima del sotto-comando che non cambiano repository né configurazione: le altre (`--config-env=
-  // core.pager=SHELL` fa eseguire alla shell quello che git stampa, `--git-dir=`) valgono 3 (#1994).
+  // Opzioni prima del sotto-comando che non cambiano configurazione né programmi: le altre (`--config-env=
+  // core.pager=SHELL` fa eseguire alla shell quello che git stampa, `--exec-path=`) valgono 3 (#1994). Il
+  // repository scelto con `--git-dir=`/`--work-tree=` lo misura il perimetro, come una cartella data a `cd`.
   const GIT_GLOBALI_INNOCUE = new Set([
     '-p', '--paginate', '-P', '--no-pager', '--no-replace-objects', '--no-lazy-fetch', '--no-optional-locks',
-    '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs',
+    '--no-advice', '--literal-pathspecs', '--glob-pathspecs', '--noglob-pathspecs', '--icase-pathspecs', '--bare',
     '-v', '--version', '-h', '--help', '--exec-path', '--html-path', '--man-path', '--info-path',
   ]);
+  const GIT_GLOBALE_CARTELLA = /^--(git-dir|work-tree)=/;
   // `--output` (e le sue abbreviazioni) scrive l'uscita in un file scelto dal comando, col testo che sceglie
   // `--format`: con log, show, diff, shortlog… una lettura diventa la scrittura di un file qualsiasi (#1994).
   function gitScriveFile(cmd) {
