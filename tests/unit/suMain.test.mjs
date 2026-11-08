@@ -163,8 +163,13 @@ test('i rami in corso dicono i loro file e i feedback citati, e si incrociano co
   rami.splice(rami.findIndex((r) => r.ramo.startsWith('worker/')), 1);
   assert.deepEqual(rami[0].file.sort(), ['a.js', 'src/pagina/b.js']);
   assert.deepEqual(rami[0].feedback, ['44']);
-  assert.deepEqual(incroci(rami, ['src/pagina/']), [{ ramo: 'claude/uno', feedback: ['44'], comuni: ['src/pagina/b.js'] }]);
+  assert.deepEqual(incroci(rami, ['src/pagina/']), [{ ramo: 'claude/uno', repo: 'app', feedback: ['44'], comuni: ['src/pagina/b.js'] }]);
   assert.deepEqual(incroci(rami, ['c.js']), []);
+  // #2340: un ramo del server confronta le voci nude e quelle col prefisso; uno dell'app non prende quelle del server.
+  const delServer = [{ ramo: 'claude/s', repo: 'server', file: ['functions/src/x.js', 'a.js'], feedback: [] }];
+  assert.deepEqual(incroci(delServer, ['filo-security:functions/src/x.js']).map((r) => r.comuni), [['functions/src/x.js']]);
+  assert.deepEqual(incroci(delServer, ['functions/src/']).map((r) => r.comuni), [['functions/src/x.js']]);
+  assert.deepEqual(incroci(rami, ['filo-security:a.js']), [], 'un file del server non incrocia l\'app');
   assert.deepEqual(ramiInCorso(dir, { giorni: 1, adesso: Date.now() + 5 * 86400000 }), [], 'un ramo fermo da giorni non conta');
 });
 
