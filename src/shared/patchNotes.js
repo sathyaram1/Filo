@@ -22,6 +22,7 @@
       version: '0.2.274', date: '2026-11-08',
       features: [
         { testo: '«Svuota l\'archivio» detto a Filo propone tutte le schede chiuse da togliere, senza doverle descrivere.', segnalazione: 1294 },
+        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
       fixes: [
         { testo: 'Riaprendo una conversazione vedi com\'è andata ogni cosa che Filo ha fatto: cosa è riuscito, coi numeri, cosa no e perché, anche per quello che hai confermato o rifiutato dopo. Tornano anche i bottoni: dei file, delle pagine aperte, degli appunti, quello per aggiungere un evento al calendario e quelli delle conferme che non avevi ancora dato.', segnalazione: 1294 },
@@ -39,7 +40,6 @@
         { testo: 'Col tasto destro su un dispositivo Bluetooth nella home lo colleghi, lo metti fra i preferiti in cima all\'elenco o lo dimentichi. Una rete Wi-Fi la dimentichi, e sul volume trovi i valori pronti.', segnalazione: 2096 },
         { testo: 'Col tasto destro su una voce delle impostazioni la rimetti com\'era di serie o chiedi a Filo cosa fa. Nell\'Editor il tasto destro su un documento dell\'elenco lo apre, rinomina, duplica o elimina.', segnalazione: 2096 },
         { testo: 'Un sito che scarica più file da solo, senza un tuo clic, dal secondo ti chiede il permesso: i file aspettano fuori dalla cartella Download finché non rispondi, e la risposta vale per quel sito.', segnalazione: 2294 },
-        { testo: 'Nelle conversazioni lunghe Filo riassume da sé la parte più vecchia in un diario con l\'ora: ricorda di più, risponde con richieste più leggere, e la conversazione resta intera. La soglia si cambia nelle Preferenze, con accanto quanto costa.', segnalazione: 1563 },
       ],
       fixes: [
         { testo: 'Passando il mouse sulle risposte di Filo la chat della home resta ferma: niente più salti.', segnalazione: 2096 },
