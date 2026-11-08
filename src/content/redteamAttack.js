@@ -37,18 +37,32 @@
     activeRoot = null;
   }
 
-  // Pura ed esposta apposta per i test (tests/redteam-attack.spec.mjs).
-  function submitStatusMessage(res) {
+  const cifra = (n) => Number(n).toLocaleString('it-IT');
+
+  // «alle 14:00», «domani alle 9:00»: quando il server dice che si libera un posto. Senza un'ora valida, «più tardi».
+  function quando(ms, oraMs) {
+    if (!Number.isFinite(ms) || ms <= 0) return 'più tardi';
+    const d = new Date(ms);
+    const ora = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`;
+    const oggi = new Date(Number.isFinite(oraMs) ? oraMs : Date.now());
+    return d.toDateString() === oggi.toDateString() ? `alle ${ora}` : `domani alle ${ora}`;
+  }
+
+  // Pura ed esposta apposta per i test (tests/redteam-attack.spec.mjs). `oraMs` solo per i test.
+  function submitStatusMessage(res, oraMs) {
     const r = res || {};
     switch (r.status) {
       case 'ok':
         return { ok: true, text: 'Attacco inviato! Apro i risultati…' };
-      case 'insufficient_credits': {
-        const have = Number.isFinite(r.have) ? r.have : null;
-        const needed = Number.isFinite(r.needed) ? r.needed : COST;
-        const detail = have != null ? ` (hai ${have}, ne servono ${needed})` : '';
-        return { ok: false, text: `Crediti insufficienti${detail}.` };
+      case 'too_long': {
+        const chi = r.campo === 'description' ? 'La descrizione è lunga' : 'Il testo dell’attacco è lungo';
+        return { ok: false, campo: r.campo === 'description' ? 'description' : 'attackText',
+          text: `${chi} ${cifra(r.length)} caratteri: il massimo è ${cifra(r.max)}. Accorcialo e rinvia.` };
       }
+      case 'limit_user':
+        return { ok: false, text: `Hai già fatto ${cifra(r.limit)} tentativi nelle ultime 24 ore, il massimo per account. Il prossimo si libera ${quando(r.riprovaDopo, oraMs)}.` };
+      case 'limit_global':
+        return { ok: false, text: `Il Red Team ha ricevuto tutti i tentativi che può giudicare in un giorno. Riprova ${quando(r.riprovaDopo, oraMs)}.` };
       case 'dormant':
         return { ok: false, text: 'Canale non ancora attivo. Riprova più tardi.' };
       case 'paused':
