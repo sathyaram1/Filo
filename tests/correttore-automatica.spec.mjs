@@ -102,7 +102,7 @@ async function puntoNelCampo(page, da, a) {
 test('«perchè » diventa «perché» allo spazio col lampo, e l\'annulla subito dopo lo riporta col cursore dopo lo spazio', async ({ app, openTab, testServer }) => {
   const page = await apri(app, openTab, testServer);
   await page.locator('#ta').click();
-  await page.keyboard.type('ok perchè');
+  await batti(page, 'ok perchè');
   expect(await valore(page), 'mentre si scrive la parola non cambia').toBe('ok perchè');
   await page.keyboard.type(' ');
   expect(await valore(page)).toBe('ok perché ');
@@ -552,7 +552,7 @@ test('nell\'editor col corpo modificabile di un riquadro il lampo della correzio
       srcdoc="<body contenteditable=true lang=it style='margin:8px;min-height:100px;font:22px monospace'></body>"></iframe></body>`, { pubblico: true });
   const corpo = page.frameLocator('#ifr').locator('body');
   await corpo.click();
-  await page.keyboard.type('ok perchè');
+  await batti(page, 'ok perchè');
   await page.keyboard.type(' ');
   await expect(corpo).toHaveText('ok perché');
   const lampo = segniDi(page, '.sn-spell-lampo', { iframe: '#ifr' });
