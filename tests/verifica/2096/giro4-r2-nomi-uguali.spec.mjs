@@ -56,6 +56,16 @@ async function apriElenco(app) {
   return page;
 }
 
+// Il menu aperto sulla riga del controller collegato, il secondo: è quella che offre Scollega.
+async function rigaCollegata(page) {
+  for (let k = 0; k < 2; k++) {
+    await righe(page).nth(k).click({ button: 'right' });
+    const voci = await menuDi(page).voci.evaluateAll((vs) => vs.map((v) => v.textContent.trim()));
+    if (voci.includes('Scollega')) return;
+  }
+  throw new Error('nessuna riga offre Scollega');
+}
+
 test('r2 Scollega sulla riga del controller collegato scollega quello, non l’altro con lo stesso nome', async ({ app }) => {
   test.setTimeout(90_000);
   await computerFinto(app);
