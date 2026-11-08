@@ -55,6 +55,22 @@ test('un clic dell\'utente passa sempre e vale per un file; le pagine di Filo e 
   assert.equal(esito(altro, false, ADESSO + 1500), 'via');
 });
 
+test('un clic solo non fa passare la raffica che la pagina fa partire dopo, nemmeno se Chromium la dà col gesto', () => {
+  const wc = pagina(sessione(), 'https://modulo.example/');
+  wc._filoGestoVeroAlle = ADESSO - 100;
+  assert.equal(esito(wc, true, ADESSO), 'via');
+  for (let i = 1; i <= 5; i++) assert.equal(esito(wc, true, ADESSO + i * 400), 'chiedi', `file ${i + 1} della raffica`);
+  assert.equal(esito(wc, true, ADESSO + 60_000), 'via', 'un gesto che qui non si vede, a raffica finita, vale');
+});
+
+test('saltare da un sottodominio all\'altro dello stesso sito non azzera il conto; un altro sito ha il suo primo', () => {
+  const ses = sessione();
+  assert.equal(esito(pagina(ses, 'https://a.scarica.example/'), false, ADESSO), 'via');
+  assert.equal(esito(pagina(ses, 'https://b.scarica.example/'), false, ADESSO + 1500), 'chiedi');
+  assert.equal(esito(pagina(ses, 'https://c.scarica.example:8443/'), false, ADESSO + 3000), 'chiedi');
+  assert.equal(esito(pagina(ses, 'https://altro.example/'), false, ADESSO + 3500), 'via');
+});
+
 test('la domanda sta nella cornice col sito; Consenti vale per il sito, e le domande ritirate non sono una scelta', () => {
   const ses = sessione();
   const wc = pagina(ses, 'https://scarica.example/pagina');
