@@ -45,6 +45,7 @@ for (const modo of ['clic-subito', 'scorso-47']) {
     const f = menu.locator('.sn-menu-split-arrow').first();
     await f.click();
     await expect(menuDi(page).locator('.sn-menu-sub')).toBeVisible();
+    await page.waitForTimeout(600);
     const prima = await stato(page);
     await menuDi(page).valuta(() => { document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop = 0; });
     await page.waitForTimeout(500);
