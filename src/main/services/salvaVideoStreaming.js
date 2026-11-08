@@ -231,6 +231,7 @@ async function salva({ url, titolo = '', audio = false, scope = '', webContents 
     const esito = await eseguiYtdlp(programmi.comando, Y.argomenti({
       url, cartella: lavoro, audio, ffmpeg: programmi.ffmpeg, nodo: comandoDiProva() ? '' : process.execPath,
     }), {
+      proxy: rete.proxy || '',
       cartella: lavoro,
       fermato: () => voce.cancelled() || noAlDialogo,
       suEvento: (ev, riga) => {
