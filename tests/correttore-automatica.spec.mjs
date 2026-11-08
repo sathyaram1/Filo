@@ -363,7 +363,7 @@ test('nella chat di casa e in una pagina in autofocus, scritto subito senza clic
   await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
   await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
   expect(await page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ta');
-  await page.keyboard.type('Ciao marco perchè ');
+  await batti(page, 'Ciao marco perchè ');
   await expect.poll(() => valore(page), { timeout: 4000 }).toBe('Ciao Marco perché ');
 
   // Acceso mentre il cursore è già nel campo, vale da subito.
