@@ -80,6 +80,7 @@ function correttore({ sbagliate = [], impostazioni = {}, protocollo = 'https:' }
   sb.window = sb; sb.globalThis = sb; sb.self = sb;
   sb.getComputedStyle = () => ({ borderStyle: '', direction: 'ltr', getPropertyValue: () => '' });
   sb.addEventListener = () => {};
+  sb.CSSStyleSheet = class { replaceSync() {} };
   vm.createContext(sb);
   for (const f of ['src/shared/politicaModelli.js', 'src/shared/constants.js', 'src/shared/filoUi.js', 'src/content/coerenza.js', 'src/content/correttoreRegole.js', 'src/content/spellcheck.js']) {
     vm.runInContext(src(f), sb);
