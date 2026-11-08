@@ -171,9 +171,11 @@ test('sentinella: ogni lettura di git sta nella tabella delle forme che scrivono
     }
   }
   for (const cmd of ['git diff', 'git log -1 --format=format:%s', 'git show HEAD', 'git reflog', 'git reflog show',
-    'git symbolic-ref HEAD', 'git grep -n foo', 'git diff --output-indicator-new=+ HEAD']) {
+    'git symbolic-ref HEAD', 'git diff --output-indicator-new=+ HEAD']) {
     assert.equal(C.classify(cmd, pulito(LINUX)), 1, cmd);
   }
+  // git grep chiedeva già (ricerca ricorsiva): senza il programma resta un OK, non una conferma.
+  assert.equal(C.classify('git grep -n foo', pulito(LINUX)), 2);
   // Su un file che c'è già, `--output` lo sostituisce: 3, come uniq e tree.
   const esiste = (p) => (/tesi\.txt$/.test(p) ? 'file' : null);
   const d = C.classifyDetail('git log --output=Documenti/tesi.txt', { ...pulito(LINUX), esiste });
