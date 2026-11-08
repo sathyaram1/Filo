@@ -839,7 +839,7 @@
           const vivo = monitored.get(el);
           if (!vivo || !e.isTrusted) return;
           vivo.permesso = Date.now();
-          if (vivo.attivo && testoDaControllare(el).testo !== vivo.testoCalcolato) aggiornaCodice(vivo);
+          if (vivo.attivo && vivo.codiceTesto !== vivo.testoCalcolato) aggiornaCodice(vivo);
         }, true);
       }
     }
