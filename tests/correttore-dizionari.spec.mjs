@@ -182,7 +182,7 @@ test('in un editor col corpo modificabile, dentro un riquadro, il correttore seg
   const TESTO = 'sono andatto al mare con mia sorella';
   await page.keyboard.type(TESTO);
   await expect(corpo).toHaveText(TESTO);
-  const segno = page.frameLocator('#ifr').locator('.sn-spell-overlay .sn-errore');
+  const segno = segniDi(page, '.sn-spell-overlay .sn-errore', { iframe: '#ifr' });
   await expect(segno.filter({ hasText: 'andatto' })).toHaveCount(1, { timeout: 5000 });
   expect(await corpo.evaluate((b) => b.querySelector('.sn-spell-overlay, .sn-spell-valori') === null)).toBe(true);
   // Il segno sta sotto la parola, dentro il riquadro.
