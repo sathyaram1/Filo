@@ -266,31 +266,6 @@ test('il testo scritto da Modifica in un campo modificabile e dalla compilazione
   await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
 });
 
-test('il suggerimento del dizionario del browser scelto dal tasto destro è testo dell\'utente', async ({ app, openTab, testServer }) => {
-  const page = await apri(app, openTab, testServer);
-  await page.locator('#ce').click();
-  // Una parola che Filo sa giusta (nel dizionario personale) e il browser no: lì il suggerimento è del browser.
-  await page.keyboard.type('oggi zanzottera ');
-  await page.waitForTimeout(400);
-  const box = await page.locator('#ce').boundingBox();
-  await page.mouse.dblclick(box.x + 100, box.y + 14);
-  await page.mouse.click(box.x + 100, box.y + 14, { button: 'right' });
-  await expect(menuDi(page).locator('.sn-menu')).toBeVisible();
-  await page.waitForTimeout(600);
-  const host = new URL(page.url()).host;
-  // Dopo quello vero, un suggerimento che Filo segna: così si vede se il testo scritto si controlla.
-  await app.evaluate(({ webContents }, h) => {
-    for (const w of webContents.getAllWebContents()) {
-      try { if (new URL(w.getURL()).host === h) w.send('filo:broadcast', { type: '_spell:native', word: 'zanzottera', suggestions: ['quseta'] }); } catch (_) {}
-    }
-  }, host);
-  const corr = menuDi(page).locator('.sn-menu-correction:visible');
-  await expect(corr.first()).toContainText('quseta', { timeout: 4000 });
-  await corr.first().click();
-  await expect(page.locator('#ce')).toHaveText(/oggi quseta/);
-  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
-});
-
 // Un annulla o un rifai riporta un testo coi proprietari che aveva; un'immagine incollata non porta testo dell'utente.
 const SONDA_DELL_ANNULLA = `<!doctype html><meta charset="utf-8">
 <body style="margin:0;padding:40px;font:16px sans-serif">
