@@ -892,6 +892,7 @@
   }
 
   function suInput(state, evento) {
+    seguiIlTesto(state, ammessoDa(state, evento));
     if (state.annullando && evento && evento.inputType === 'historyUndo') dopoLAnnulla(state);
     fineParolaBattuta(state, evento);
     state.ultimoTasto = Date.now();
