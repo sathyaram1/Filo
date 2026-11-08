@@ -85,6 +85,14 @@ test('la scheda che salta da sola su siti di domini diversi non riparte da capo;
   wc._filoGestoVeroAlle = ADESSO + 9000;
   url = 'https://cliccato.example/';
   assert.equal(esito(wc, false, ADESSO + 10_000), 'via', 'il sito raggiunto dopo un clic dell\'utente ha il suo primo');
+  url = 'https://dopo-il-clic.example/';
+  assert.equal(esito(wc, false, ADESSO + 11_000), 'chiedi');
+  // L'indirizzo scritto nella barra di Filo vale come un clic: il sito dove porta ha il suo primo.
+  url = 'https://scritto.example/';
+  P.navigazioneDiFilo(wc);
+  assert.equal(esito(wc, false, Date.now() + 1000), 'via');
+  const tabs = readFileSync(new URL('../../src/main/tabs.js', import.meta.url), 'utf8');
+  assert.match(tabs, /navigazioneDiFilo\(tab\.view\.webContents\);\s*tab\.view\.webContents\.loadURL\(target\)/, 'la barra degli indirizzi lo segna');
 });
 
 test('il no dato sulla scheda ferma i salti dopo su altri siti, senza domanda; il menu della scheda lo toglie', () => {
