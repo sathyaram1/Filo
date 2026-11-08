@@ -458,6 +458,29 @@ test('nell\'editor Lexical la parola dopo una correzione resta staccata, e l\'an
   await expect.poll(testo).toBe('Ciao marco come va, non so perchè ok');
 });
 
+// #2299, giro 4: Lexical ferma la prima lettera di un paragrafo e l'incolla, e li scrive da sé senza `input`: il testo
+// resta dell'utente, e la sua prima parola e quello che incolla ricevono i segni.
+test('nell\'editor Lexical la prima parola del paragrafo e il testo incollato ricevono i segni', async ({ app, openTab, testServer }) => {
+  await app.evaluate(async () => {
+    await globalThis.SN_STORAGE.updateSettings({
+      featureFlags: { spellcheck: true, spellcheckContext: false },
+      correttore: { modelloErrori: false, automatica: false },
+    });
+  });
+  const page = await testServer.openReady(openTab, editore('lexical', 'avviaLX'), { pubblico: true });
+  await page.waitForFunction(() => document.documentElement.dataset.filoContentReady === '1', null, { timeout: 8000 });
+  await expect.poll(() => nelMondoDelMenu(app, page, 'globalThis.SN_DIZIONARIO.sbagliata("quseta")'), { timeout: 20_000 }).toBe(true);
+  await page.locator('#m').click();
+  await batti(page, 'zqwerta oggi ');
+  const errori = segniDi(page, '.sn-spell-overlay .sn-errore');
+  await expect(errori).toHaveText(['zqwerta'], { timeout: 6000 });
+  await app.evaluate(({ clipboard }) => clipboard.writeText('poi qwzerta '));
+  await page.keyboard.press('Control+v');
+  await expect.poll(() => page.evaluate(() => window.lxText())).toContain('qwzerta');
+  await batti(page, 'ok ');
+  await expect(errori).toHaveText(['zqwerta', 'qwzerta'], { timeout: 6000 });
+});
+
 test('nell\'editor ProseMirror l\'annulla subito dopo la correzione riporta la parola com\'era, e quello dopo non la rimette', async ({ app, openTab, testServer }) => {
   const page = await apriEditore(app, openTab, testServer, editore('prosemirror', 'avviaPM'));
   const testo = () => page.evaluate(() => window.pmView.state.doc.textContent.replace(/ /g, ' '));
