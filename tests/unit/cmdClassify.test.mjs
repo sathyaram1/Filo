@@ -1412,4 +1412,42 @@ test('#1994 — le opzioni distruttive di git valgono anche accorciate', () => {
   for (const cmd of ['git push --forc', 'git push --fo origin main', 'git branch --del x', 'git push --de origin x', 'git reset --har',
     'git fetch --pru', 'git push --force-with-lease=origin/main', 'git switch --discard main']) assert.equal(lvl(cmd), 3, cmd);
   for (const cmd of ['git push origin main', 'git fetch --all', 'git switch main']) assert.equal(lvl(cmd), 2, cmd);
+  for (const cmd of ['cp --forc a b', 'mv --fo a b', 'gzip --forc a', 'tar --del -f x.tar a']) assert.equal(lvl(cmd), 3, cmd);
+  for (const cmd of ['cp a b', 'gzip --fast a', 'cp --preserve=mode a b']) assert.equal(lvl(cmd), 2, cmd);
+});
+
+test('#1994 — in bash $_ salta le parole vuote che la shell toglie', () => {
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { cwd: '/home/u/proj', home: '/home/u', shell };
+    for (const cmd of ['echo --output=/home/u/.bashrc {,}; git log -1 $_', 'echo {--output=x,}; git log $_', 'echo --output=x {,}{,}; git log "$_"',
+      'echo --output=x "$@"; git log $_', 'echo --force {,}; git push origin $_', 'echo . {,}; git checkout $_']) {
+      assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    }
+    for (const cmd of ['echo -o {,}; tree $_ x .', 'echo -s {,}; date $_ 1']) assert.ok(C.classify(cmd, ctx) >= 2, `${shell}: ${cmd}`);
+    assert.equal(C.classify('echo --output=x {a,}; git log $_', ctx), 1);
+  }
+});
+
+test('#1994 — in PowerShell una variabile senza env: non è un valore noto', () => {
+  const ps = { shell: 'powershell', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true };
+  for (const cmd of ["Write-Output '--output=x' -OutVariable temp; git log -1 $temp", "echo '--output=x' -ov user; git log -1 \"$path\"",
+    "Write-Output '--output=x' -OutVar username; git log -1 @username", 'git log $tmp']) {
+    assert.ok(C.classify(cmd, ps) >= 2, cmd);
+  }
+  for (const cmd of ["Write-Output '--output=x' -OutVariable _; git log -1 $_", "Write-Output x -pv psitem | Out-String; git log $psitem",
+    'echo x -OutVariable:pwd; git log $pwd']) {
+    assert.equal(C.classify(cmd, ps), 3, cmd);
+  }
+  for (const cmd of ['git log -1 $env:temp', 'git log $null', 'Get-ChildItem $home', 'git log -1 $_']) assert.equal(C.classify(cmd, ps), 1, cmd);
+});
+
+test('#1994 — le graffe si aprono in un tempo che cresce con la lunghezza, non col suo quadrato', () => {
+  const ctx = { cwd: '/home/u/proj', home: '/home/u', shell: 'bash' };
+  const t = Date.now();
+  C.classify(`git log ${'{'.repeat(30000)}${'}'.repeat(30000)}`, ctx);
+  C.classify(`echo ${'{x}'.repeat(30000)}`, ctx);
+  assert.ok(Date.now() - t < 1000, `${Date.now() - t} ms`);
+  // Come bash: `--{x,{output=y,}}` è `--x --output=y --`, `--{{out}put=x,}` è `--{out}put=x --`.
+  assert.equal(C.classify('git log --{x,{output=y,}}', ctx), 3);
+  assert.equal(C.classify('git log --{{out}put=x,}', ctx), 1);
 });
