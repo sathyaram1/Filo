@@ -1972,9 +1972,12 @@
 
   // Le chiavi di un repository che a una lettura non avviano niente; ogni altra chiave locale fa chiedere (#2292).
   const GIT_CHIAVI_INERTI = [
-    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles)$/,
-    /^remote\.[^=]+\.(url|pushurl|fetch|push|tagopt|prune|mirror)$/,
-    /^branch\.[^=]+\.(remote|merge|rebase|pushremote|description)$/,
+    // core.hooksPath sposta solo la cartella degli hook, che la sonda segue già da sé (husky la imposta).
+    /^core\.(repositoryformatversion|filemode|bare|worktree|logallrefupdates|ignorecase|precomposeunicode|symlinks|autocrlf|eol|safecrlf|quotepath|longpaths|fscache|checkstat|trustctime|untrackedcache|sparsecheckout|sparsecheckoutcone|abbrev|compression|preloadindex|protecthfs|protectntfs|hidedotfiles|hookspath|commentchar|commentstring)$/,
+    // Di un remoto avviano un programma solo i comandi di rete (uploadpack, receivepack, vcs), mai una lettura;
+    // le altre chiavi le scrivono anche VS Code e GitHub CLI (gh-resolved). I rami non avviano niente.
+    /^remote\.[^=]+\.(?!(uploadpack|receivepack|vcs)$)[^.=]+$/,
+    /^branch\.[^=]+\.[^.=]+$/,
     /^submodule\.[^=]+\.(url|active|branch)$/,
     /^user\.(name|email|signingkey)$/,
     /^(pull\.(rebase|ff)|push\.(default|autosetupremote)|fetch\.prune|init\.defaultbranch|merge\.(ff|conflictstyle)|rebase\.(autosquash|autostash))$/,
