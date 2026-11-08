@@ -1565,8 +1565,6 @@
     if (!e) return null;
     if (!e.isTrusted) return global.SN_FILO_UI?.veroONostro?.(e) ? () => true : null;
     const tipo = e.inputType || '';
-    // Gli spazi non contano: un campo modificabile scrive lo spazio in fondo come unificatore e lo riscrive al tasto dopo.
-    const senzaSpazi = (s) => String(s).replace(/[\s ]/g, '');
     const dentro = (fonte) => (pezzo) => senzaSpazi(fonte).includes(senzaSpazi(pezzo));
     const k = state.tasto;
     if (tipo === 'insertText') {
