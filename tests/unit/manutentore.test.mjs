@@ -325,6 +325,35 @@ test('una priorità 3 non si abbassa: il rifiuto arriva prima del server, che no
   assert.equal(s.corpi[0].passphrase, 'chiave-di-prova');
 });
 
+// #2291: con la priorità di adesso ignota (schede illeggibili, o il feedback non fra le schede) il controllo lasciava
+// passare l'abbassamento, e una 3 scendeva a 1 senza l'owner.
+test('priorità di adesso ignota: niente scrittura sotto la 3; alzare a 3 resta possibile', async (t) => {
+  const s = serverFinto(t, { schede: [200, { ok: true, schede: [schedaServer(812, 2)] }], priorita: (b) => [200, { ok: true, numero: b.dati.numero, da: null, a: b.dati.priorita }] });
+  assert.equal(await M.main(['priorita', '1994', '1'], CHIAVE), 1);
+  assert.match(s.err.join('\n'), /#1994: non so la priorità di adesso/);
+  assert.deepEqual(s.corpi.map((c) => c.op), ['schede']);
+  assert.equal(await M.main(['priorita', '1994', '3'], CHIAVE), 0);
+  assert.equal(await M.main(['priorita', '812', '1'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.filter((c) => c.op === 'priorita').map((c) => c.dati), [{ numero: '1994', priorita: 3 }, { numero: '812', priorita: 1 }]);
+});
+
+test('schede illeggibili: la priorità non scende alla cieca', async (t) => {
+  const s = serverFinto(t, { schede: [500, { ok: false, errore: 'interno' }], priorita: [200, { ok: true, numero: '812', da: 3, a: 1 }] });
+  assert.equal(await M.main(['priorita', '812', '1'], CHIAVE), 1);
+  assert.ok(!s.corpi.some((c) => c.op === 'priorita'));
+});
+
+test('un feedback a priorità 3 non si archiviа come doppione; uno a 1 sì', async (t) => {
+  const s = serverFinto(t, {
+    schede: [200, { ok: true, schede: [schedaServer(812, 3), schedaServer(815, 1)] }],
+    archivia: (b) => [200, { ok: true, numero: b.dati.numero, doppioneDi: b.dati.doppioneDi }],
+  });
+  assert.equal(await M.main(['archivia', '812', '700'], CHIAVE), 1);
+  assert.match(s.err.join('\n'), /#812: un feedback a priorità 3 non si archivia/);
+  assert.equal(await M.main(['archivia', '815', '700'], CHIAVE), 0);
+  assert.deepEqual(s.corpi.filter((c) => c.op === 'archivia').map((c) => c.dati), [{ numero: '815', doppioneDi: '700' }]);
+});
+
 test('i comandi scrivono le operazioni del server coi campi suoi', async (t) => {
   const s = serverFinto(t, {
     ordine: (b) => [200, { ok: true, ...b.dati, parallelismoEffettivo: 4 }],
