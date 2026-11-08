@@ -419,9 +419,11 @@ test('#1072 — il testo cercato non si apre: due barre nel modello non sono ret
     assert.doesNotMatch(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
   for (const cmd of ['grep TODO //evil/x/app.js', 'grep -f //evil/x/p a.txt', 'grep "//TODO" //evil/x/a.js', 'findstr /d:\\\\evil\\x a *.txt',
-    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'git --git-dir=\\\\evil\\x\\.git log', 'echo \\\\evil\\x | ls']) {
+    'Select-String "//x" \\\\evil\\a', 'git grep x //evil/x', 'echo \\\\evil\\x | ls']) {
     assert.match(C.classifyDetail(cmd, WIN).motivo, /rete/, cmd);
   }
+  // Git portato su un altro repository non passa dalla sonda delle impostazioni (#2292): conferma piena.
+  assert.equal(lvl('git --git-dir=\\\\evil\\x\\.git log', WIN), 3);
 });
 
 test('#1072 — stampare un testo con due barre non apre niente; usato da un altro comando (tubo, gruppo) sì', () => {
