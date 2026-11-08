@@ -299,7 +299,7 @@ all'owner, il freno.
   (minimo 5 minuti), con un tetto di accensioni al giorno suo. Il fermo su un guasto suo (quali accensioni
   restano) e il controllo sulle sessioni chiuse bene, con la soglia e lo stato, stanno in SPEC-MANUTENTORE.md § 7.
   Memoria nel **taccuino** (`manutentore/taccuino`,
-  riscritto con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
+  aggiornato a sezioni o riscritto, sempre con la versione letta); il **recap** del giorno (`manutentore-recap/<giorno>`) in Gestione →
   Automazioni; le **novità** riscritte dal redattore (`manutentore-novita/<versione>`) solo senza link nuovi.
 
 ### 3a. Il ridisegno del lavoro (SPEC-RIDISEGNO-LAVORO.md, #1680)
