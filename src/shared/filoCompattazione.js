@@ -91,13 +91,31 @@
   }
 
   // Quanto grezzo può restare dopo una compattazione: un terzo dello spazio fra la parte fissa (`base`, quello che non è
-  // tratto né domanda) e la soglia, così due turni come quelli di adesso stanno prima della prossima. Quattro turni
-  // pesanti lasciavano la richiesta appena sotto la soglia, e la chat compattava a ogni messaggio. Senza `base` nota,
-  // nessun tetto: restano ore e turni.
+  // tratto né domanda) e la soglia, e comunque tanto poco che `TURNI_LIBERI` turni del peso di quelli di adesso (`turno`)
+  // stiano sotto l'anticipo. La sola quota reggeva su una parte fissa e cadeva con 1.500 token di strumenti in più: la
+  // chat compattava ogni due messaggi. Senza `base` nota, nessun tetto: restano ore e turni.
   const QUOTA_GREZZO = 1 / 3;
-  function grezzoMassimo({ soglia, base } = {}) {
+  const TURNI_LIBERI = 3;
+  function grezzoMassimo({ soglia, base, turno = 0 } = {}) {
     const b = Number(base);
-    return Number.isFinite(b) && b > 0 ? Math.max(0, (Number(soglia) - b) * QUOTA_GREZZO) : Infinity;
+    if (!(Number.isFinite(b) && b > 0)) return Infinity;
+    const spazio = Number(soglia) - b;
+    const t = Number(turno) > 0 ? Number(turno) : 0;
+    return Math.max(0, Math.min(spazio * QUOTA_GREZZO, spazio * QUOTA_ANTICIPO - TURNI_LIBERI * t));
+  }
+
+  // Il peso medio degli ultimi `n` turni interi della lista (una domanda dell'utente con quello che la segue), o 0.
+  function pesoTurno(messaggi, peso, n = TURNI_GREZZI) {
+    const lista = Array.isArray(messaggi) ? messaggi : [];
+    if (typeof peso !== 'function') return 0;
+    const pesi = [];
+    let corrente = 0;
+    for (let i = lista.length - 1; i >= 0 && pesi.length < n; i--) {
+      const m = lista[i];
+      corrente += Number(peso(m)) || 0;
+      if (m.role === 'user' && !m.riga && !m.seguito) { pesi.push(corrente); corrente = 0; }
+    }
+    return pesi.length ? pesi.reduce((a, b) => a + b, 0) / pesi.length : 0;
   }
 
   // Oltre questa stima, dopo una risposta, si compatta in sottofondo: la quota vale sullo spazio sopra la parte fissa,
