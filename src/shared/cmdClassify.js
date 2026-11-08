@@ -485,10 +485,6 @@
   // Sotto-comandi il cui livello dipende dagli argomenti: i duali ELENCANO (1) da nudi e
   // CREANO (2) con un operando; `checkout` e `stash` hanno anche forme distruttive (3).
   const GIT_DUAL = {
-    // `reflog expire`/`delete` buttano la storia che serve a recuperare un commit perso; `symbolic-ref HEAD <ref>`
-    // sposta il ramo corrente. Da soli (o con `show`, `exists`, un solo nome) leggono.
-    reflog: (cmd) => (/^(expire|delete|drop)$/i.test(gitArgsAfterSub(cmd).find((a) => !a.startsWith('-')) || '') ? 3 : 1),
-    'symbolic-ref': (cmd) => (gitArgsAfterSub(cmd).filter((a) => !a.startsWith('-')).length >= 2 ? 2 : 1),
     tag:(cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
     branch: (cmd) => (hasOperand(gitArgsAfterSub(cmd)) ? 2 : 1),
     // `git checkout` è distruttivo quando prende di mira un pathspec: ripristina i file dal ref
