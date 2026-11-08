@@ -45,7 +45,17 @@ const GIT_SOTTOMODULI_MAX = 200;
 // 'si' se il repository di `dir`, o un suo sottomodulo, ha impostazioni che avviano programmi (#2292), '' se no,
 // 'ignoto' se git non risponde. Le impostazioni di un sottomodulo si guardano prima di lanciarci dentro altro.
 function gitLanciaIn(dir, visti = { n: 0 }) {
-  const git = (args, cwd) => execFileSync('git', args, {
+  const fs = require('node:fs');
+  const path = require('node:path');
+  // Una cartella che non c'è non la apre nessun git, a meno che il nome lo sciolga la shell (`cd Downloads/*/`):
+  // allora la cartella vera qui non si conosce.
+  let cartella = false;
+  try { cartella = fs.statSync(dir).isDirectory(); } catch (_) {}
+  if (!cartella) return /[*?[\]{}]/.test(String(dir)) ? 'ignoto' : '';
+  // Senza git nel PATH non lo trova nemmeno la shell dei comandi.
+  const programma = require('./programmaIntero').programmaIntero('git');
+  if (!programma) return '';
+  const git = (args, cwd) => execFileSync(programma, args, {
     cwd, env: ambienteComandi(), encoding: 'utf8', timeout: 5000, windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'],
     maxBuffer: 256 * 1024 * 1024,
   });
