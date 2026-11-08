@@ -226,7 +226,7 @@ test('con cmd vero un whoami.bat nella cartella non prende il posto di whoami', 
   const archivio = join(TMP, 'archivio-vero');
   mkdirSync(archivio, { recursive: true });
   writeFileSync(join(archivio, 'whoami.bat'), '@echo ARCHIVIO\r\n');
-  const out = await T.runCommand('whoami', { shell: 'cmd', cwd: archivio, trackCwd: true, timeoutMs: ATTESA });
+  const out = await senzaLaVariabile(() => T.runCommand('whoami', { shell: 'cmd', cwd: archivio, trackCwd: true, timeoutMs: ATTESA }));
   assert.equal(out.code, 0, out.stderr);
   assert.doesNotMatch(out.stdout, /ARCHIVIO/);
   assert.ok(out.stdout.trim(), 'whoami del sistema non ha risposto');
