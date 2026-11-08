@@ -54,7 +54,6 @@
     { host: /(^|\.)ebay\.[a-z.]+$/, percorso: /^\/sch\//, chiavi: ['_nkw'], nome: 'eBay', marchio: 'ebay' },
     { host: /(^|\.)wikipedia\.org$/, percorso: /^\/w\/index\.php$/, chiavi: ['search'], nome: 'Wikipedia' },
   ];
-  const SUFFISSO_DEL_MARCHIO = /^(?:com|org|[a-z]{2}|(?:co|com)\.[a-z]{2})$/;
   // Solo motori e siti riconosciuti: un qualunque sito può portare a un suo «/search?q=…» con le parole che vuole, e
   // quelle non sono una ricerca dell'utente (#2293). Della pagina resta il titolo, come delle altre.
   function ricercaNellIndirizzo(url) {
