@@ -30,8 +30,8 @@ function ambienteComandi(base = process.env) {
 // `where git` del modello avvierebbero quelli dell'archivio (#2312). Questa variabile toglie la cartella dalla ricerca,
 // come in PowerShell: lì un programma della cartella si chiama con `.\`. Fuori da Windows la cartella non c'è già.
 const SENZA_CARTELLA_NELLA_RICERCA = 'NoDefaultCurrentDirectoryInExePath';
-function ambienteDelModello(base = process.env) {
-  const out = ambienteComandi(base);
+function ambienteDelModello(base) {
+  const out = ambienteComandi(base || undefined);
   if (process.platform !== 'win32') return out;
   // Su Windows i nomi delle variabili non distinguono le maiuscole: una seconda copia potrebbe vincere su questa.
   for (const k of Object.keys(out)) if (k.toLowerCase() === SENZA_CARTELLA_NELLA_RICERCA.toLowerCase()) delete out[k];
