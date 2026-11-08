@@ -1380,3 +1380,36 @@ test('#1994 — graffe enormi o moltiplicate chiedono conferma senza bloccare il
     assert.equal(C.classify(cmd, bash), 3, cmd);
   }
 });
+
+// In sh e bash `$_` è l'ultimo argomento del comando prima, scelto da chi scrive la riga: vale quanto quel valore.
+test('#1994 — $_ porta l\'opzione del comando prima: si misura col suo valore', () => {
+  const POSIX = { cwd: '/home/u/proj', home: '/home/u' };
+  for (const shell of ['bash', 'sh']) {
+    const ctx = { ...POSIX, shell };
+    for (const cmd of [
+      'echo --output=/home/u/.bashrc; git log -1 --format=x $_', 'echo --output=x && git log -1 "$_"',
+      'cd --output=x; git log $_', 'echo {a,--output=x}; git log $_', 'echo --force; git push origin $_', 'echo .; git checkout $_',
+      'ls $_', 'echo x | cat $_', 'echo --output=x || pwd; git log $_',
+    ]) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
+    for (const cmd of ['echo -o; tree $_ /home/u/.bashrc .', 'echo -s; date $_ 1', 'echo -C; file $_ -m x']) {
+      assert.ok(C.classify(cmd, ctx) >= 2, `${shell}: ${cmd}`);
+    }
+    for (const cmd of ['cd src && ls $_', 'echo "a b"; cat $_', 'pwd; git log -1 $_']) assert.equal(C.classify(cmd, ctx), 1, `${shell}: ${cmd}`);
+  }
+  assert.equal(C.classify('echo --output=x; git log $_', { shell: 'bash', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true }), 3);
+  // In PowerShell `$_` fuori da un blocco vale niente.
+  assert.equal(C.classify('git log -1 $_', { shell: 'powershell', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true }), 1);
+});
+
+test('#1994 — in cmd le variabili col nome che comincia per = non nascondono un\'opzione', () => {
+  const cmdExe = { shell: 'cmd', cwd: 'C:\\Users\\u', home: 'C:\\Users\\u', win: true, maiuscole: true };
+  for (const cmd of ['git log --out%=ExitCode:~0,0%put=x', 'git log --output%=ExitCodeAscii:~0,0%=x', 'git log --out%=C:~0,0%put=x']) {
+    assert.ok(C.classify(cmd, cmdExe) >= 2, cmd);
+  }
+});
+
+test('#1994 — le opzioni distruttive di git valgono anche accorciate', () => {
+  for (const cmd of ['git push --forc', 'git push --fo origin main', 'git branch --del x', 'git push --de origin x', 'git reset --har',
+    'git fetch --pru', 'git push --force-with-lease=origin/main', 'git switch --discard main']) assert.equal(lvl(cmd), 3, cmd);
+  for (const cmd of ['git push origin main', 'git fetch --all', 'git switch main']) assert.equal(lvl(cmd), 2, cmd);
+});
