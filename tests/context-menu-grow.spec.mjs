@@ -297,18 +297,23 @@ test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e spar
   const page = await testServer.openReady(openTab, conMenuDelSito(paginaLunga()));
   const menu = await apriMenuSu(page, '#link');
   await rendiScorrevole(page);
-  console.log('DIAG0', JSON.stringify(await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
-    globalThis.__dl = [];
-    const desc = Object.getOwnPropertyDescriptor(Element.prototype, 'scrollTop');
-    Object.defineProperty(m, 'scrollTop', { configurable: true, get() { return desc.get.call(this); }, set(v) { globalThis.__dl.push('set ' + v + ' ' + new Error().stack); desc.set.call(this, v); } });
-    for (const k of ['scrollIntoView', 'scrollTo', 'scrollBy', 'focus', 'scrollIntoViewIfNeeded']) { const o = (k === 'focus' ? HTMLElement : Element).prototype[k]; if (!o) continue; (k === 'focus' ? HTMLElement : Element).prototype[k] = function (...a) { globalThis.__dl.push(k + ' ' + (this.className || this.tagName) + ' ' + JSON.stringify(a) + ' ' + new Error().stack); return o.apply(this, a); }; }
-    m.addEventListener('scroll', () => globalThis.__dl.push('scroll ' + m.scrollTop + ' @' + (performance.now() | 0)));
-    for (const t of ['pointerdown', 'mousedown', 'focusin', 'click', 'pointerup']) document.addEventListener(t, (e) => globalThis.__dl.push(t + ' st=' + m.scrollTop + ' @' + (performance.now() | 0) + ' ' + (e.target.className || '')), true);
-    return { st: m.scrollTop, ae: String(document.activeElement && document.activeElement.className), tip: globalThis.SN_SUGGERIMENTO?.aperto?.()?.testo || null }; })));
+  console.log('DIAG0', JSON.stringify(await menuDi(page).valuta(() => new Promise((ok) => {
+    const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
+    const f = m.querySelector('.sn-menu-split-arrow');
+    const out = [];
+    let n = 0;
+    const giro = () => {
+      const r = f.getBoundingClientRect();
+      const mr = m.getBoundingClientRect();
+      out.push([performance.now() | 0, Math.round(mr.top), Math.round(r.top), Math.round(r.height), m.scrollTop, window.innerHeight, getComputedStyle(m).transform, getComputedStyle(f).transform]);
+      if (++n < 25) requestAnimationFrame(giro); else ok(out);
+    };
+    giro();
+  }))));
   await apriSottomenu(page, menu);
 
   const prima = await ancoraEPannello(page);
-  console.log('DIAG1', JSON.stringify(await menuDi(page).valuta(() => { const m = document.querySelector('.sn-menu:not(.sn-menu-sub)'); return { dl: globalThis.__dl, st: m.scrollTop, ae: String(document.activeElement && document.activeElement.className), tip: globalThis.SN_SUGGERIMENTO?.aperto?.()?.testo || null }; })));
+  console.log('DIAG1', JSON.stringify(await menuDi(page).valuta(() => document.querySelector('.sn-menu:not(.sn-menu-sub)').scrollTop)));
 
   // Uno scorrimento breve: la freccetta è ancora lì, il pannello la segue.
   // (Lo scorrimento arriva come evento, quindi si aspetta invece di misurare
