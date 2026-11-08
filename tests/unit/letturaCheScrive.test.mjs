@@ -408,7 +408,7 @@ test('git: un programma d\'avvio che una lettura fa partire fa chiedere; quelli 
     assert.equal(T.gitLanciaIn(ostile), 'si');
     for (const d of [dev, dev2]) assert.equal(T.gitLanciaIn(d), '', 'un hook di sola scrittura non fa chiedere');
     assert.equal(existsSync(segno), false, 'la sonda non lancia niente');
-    const ctx = (cwd) => ({ cwd, home: base, win: false, shell: 'sh', gitLancia: T.gitLanciaIn });
+    const ctx = (cwd) => sondaVera(cwd, base);
     for (const cmd of ['git status', 'git diff']) {
       assert.equal(C.classify(cmd, ctx(ostile)), 2, cmd);
       const costo = AL.costoFor({ type: 'ESEGUI_COMANDO', comando: cmd, _perimetro: ctx(ostile) });
