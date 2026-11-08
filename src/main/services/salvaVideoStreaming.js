@@ -157,12 +157,15 @@ function nomeSicuro(titolo, ext) {
 }
 
 // `scegli(nome)` → { filePath } | { cancelled } | { error }: la domanda su dove salvare, come per gli altri file.
-// `sposta(da, a)`: la consegna nel posto scelto.
-async function salva({ url, titolo = '', audio = false, scope = '', webContents = null, riusa = '', scegli, sposta,
-  downloads = require('./downloads'), strumenti = () => require('./strumentiVideo').strumenti() }) {
+// `sposta(da, a)`: la consegna nel posto scelto. `sessione` e `paese`: quelli del lavoro da rifare, per «Riprova».
+async function salva({ url, titolo = '', audio = false, scope = '', webContents = null, sessione = null, paese = null,
+  riusa = '', scegli, sposta, downloads = require('./downloads'), strumenti = () => require('./strumentiVideo').strumenti(),
+  uscita = (o) => require('./proxyTab').uscitaPerProgramma(o) }) {
   const ext = audio ? '.m4a' : '.mp4';
   const proposto = nomeSicuro(Y.titoloDaPagina(titolo), ext);
   const voce = downloads.beginManual({ url, filename: proposto, totalBytes: 0, scope, webContents, via: 'streaming', riusa });
+  let ses = sessione;
+  try { if (!ses && webContents && !webContents.isDestroyed?.()) ses = webContents.session; } catch (_) {}
   const fallisci = (motivo, dettaglio) => {
     if (dettaglio) console.warn('[Filo video] salvataggio non riuscito:', motivo, String(dettaglio).slice(0, 400));
     if (voce.cancelled()) return { ok: false, cancelled: true };
