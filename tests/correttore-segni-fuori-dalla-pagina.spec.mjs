@@ -84,6 +84,34 @@ test('chi scrive vede i suoi segni, e il sito no', async ({ app, openTab, testSe
   expect((await page.evaluate(() => window.visto())).segni).toBe(0);
 });
 
+test('chi arriva col Tab in una casella che il sito ha già riempito ritrova subito i segni', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.evaluate(() => { document.getElementById('ta').value = 'la bozza di ieri con quseta '; });
+  await page.locator('#ce').click();
+  await page.keyboard.press('Tab');
+  await expect.poll(() => page.evaluate(() => document.activeElement && document.activeElement.id)).toBe('ta');
+  await expect(segniDi(page, '.sn-spell-overlay .sn-errore')).toHaveText(['quseta'], { timeout: 5000 });
+});
+
+test('il sito che rifà la pagina senza ricaricarla butta lo strato dei segni, e i segni tornano nella casella nuova', async ({ app, openTab, testServer }) => {
+  const page = await apri(app, openTab, testServer);
+  await page.locator('#ta').click();
+  await page.keyboard.type('oggi quseta ');
+  const errore = segniDi(page, '.sn-spell-overlay .sn-errore');
+  await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
+  await page.evaluate(() => {
+    document.body.innerHTML = '<textarea id="nuova" lang="it" style="display:block;width:600px;height:80px;font:20px monospace"></textarea>';
+  });
+  await expect(errore).toHaveCount(0, { timeout: 3000 });
+  await page.locator('#nuova').click();
+  await page.keyboard.type('domani quseta ');
+  await expect(errore).toHaveText(['quseta'], { timeout: 5000 });
+  const b = await riquadroDelSegno(errore);
+  const ta = await page.locator('#nuova').boundingBox();
+  expect(b.y + b.height).toBeLessThan(ta.y + ta.height);
+  expect((await page.evaluate(() => window.visto())).segni).toBe(0);
+});
+
 const SONDA_DEI_TEMPI = `<!doctype html><meta charset="utf-8">
 <body style="margin:0"><textarea id="t" lang="it" style="position:fixed;inset:0;width:100vw;height:100vh;opacity:0;font:20px monospace"></textarea>
 <script>
