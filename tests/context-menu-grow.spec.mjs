@@ -242,9 +242,15 @@ test('#500 letta la spiegazione fino in fondo, un giro di rotella in più non po
 // un sottomenu appeso a lei (#975): il pannello che deve muoversi col menu.
 const conMenuDelSito = (html) => html.replace('<body ', '<body oncontextmenu="return false" ');
 
+// Un clic durante la comparsa del menu (sn-fade-in) fa scorrere a Playwright un menu già scorrevole: la freccetta
+// finisce in cima e lo scorrimento breve del test la porta giù invece che su (#2323). Una persona non scorre cliccando.
 async function apriSottomenu(page, menu) {
   const freccetta = menu.locator('.sn-menu-split-arrow').first();
   await expect(freccetta).toBeVisible();
+  await expect.poll(() => menuDi(page).valuta(() => {
+    const m = document.querySelector('.sn-menu:not(.sn-menu-sub)');
+    return m ? m.getAnimations().filter((a) => a.playState === 'running').length : -1;
+  }), { timeout: 3000, message: 'la comparsa del menu non finisce' }).toBe(0);
   await freccetta.click();
   await expect(menuDi(page).locator('.sn-menu-sub')).toBeVisible();
 }
@@ -257,6 +263,7 @@ async function ancoraEPannello(page) {
     const sub = document.querySelector('.sn-menu-sub');
     return {
       menuTop: menu ? Math.round(menu.getBoundingClientRect().top) : null,
+      scorrimento: menu ? Math.round(menu.scrollTop) : null,
       ancoraTop: freccetta ? Math.round(freccetta.getBoundingClientRect().top) : null,
       pannelloTop: sub ? Math.round(sub.getBoundingClientRect().top) : null,
       pannelloAperto: !!sub,
@@ -300,6 +307,8 @@ test('#500 scorrendo un menu troppo alto il sottomenu segue la freccetta, e spar
   await apriSottomenu(page, menu);
 
   const prima = await ancoraEPannello(page);
+  // Lo scorrimento breve qui sotto è assoluto: vale solo se il menu parte da cima.
+  expect(prima.scorrimento).toBe(0);
 
   // Uno scorrimento breve: la freccetta è ancora lì, il pannello la segue.
   // (Lo scorrimento arriva come evento, quindi si aspetta invece di misurare
