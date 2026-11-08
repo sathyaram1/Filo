@@ -632,22 +632,26 @@ function chiediNellaFinestra(webContents, rec) {
   } catch (_) {}
 }
 
-// #2294 — la domanda sul sito che scarica da solo sta nella sua cornice e vale per tutti i suoi file in attesa; ritirata
-// senza risposta, la riga resta da decidere nel pannello. Un no li toglie: non li aveva chiesti l'utente.
+// #2294 — la domanda sul sito che scarica da solo sta nella sua cornice e vale per tutti i file in attesa del sito, anche
+// quelli dei suoi altri sottodomini; ritirata senza risposta, la riga resta da decidere nel pannello. Un no li toglie:
+// non li aveva chiesti l'utente. Il tetto conta il sito come il freno.
 const PIU_FILE_IN_ATTESA = 100;
 function chiediPiuFile(webContents, rec) {
   const scope = scopeOf(rec);
   try {
     require('./permessiPagine').chiediScaricamenti(webContents, (si, _fonte, decisa) => {
-      const r = recordIn(rec.id, scope);
-      if (!decisa || !r || r.state !== 'pending') return;
-      if (si) confirmDownload(rec.id, true, scope);
-      else remove(rec.id, scope);
+      if (!decisa) return;
+      for (const r of inAttesaPiuFile(scope, rec._piuFile)) {
+        if (si) confirmDownload(r.id, true, scope);
+        else remove(r.id, scope);
+      }
     });
   } catch (_) {}
 }
 function inAttesaPiuFile(scope, origine) {
-  return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile === origine && scopeOf(r) === scope);
+  const sito = (o) => { try { return require('./permessiPagine').sitoDegliScaricamenti(o); } catch (_) { return o; } };
+  const suo = sito(origine);
+  return Array.from(records.values()).filter((r) => r.state === 'pending' && r._piuFile && scopeOf(r) === scope && sito(r._piuFile) === suo);
 }
 // Oltre il tetto il file non scende, e la riga più nuova lo dice: chi risponde sa quanti ne mancano.
 function postoPerPiuFile(scope, origine) {
