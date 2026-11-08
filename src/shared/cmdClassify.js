@@ -1579,7 +1579,7 @@
   function classifyOneLetto(raw, c) {
     const base = classifyOne(raw);
     if (base === 3 || c.shell === 'cmd' || !/[\\${,]/.test(raw)) return base;
-    const elenchi = c.sistemaIgnoto || (!shellPosix(c) && c.shell !== 'cmd');
+    const elenchi = forsePowerShell(c);
     let det = base;
     for (const vuote of [false, true]) {
       const parole = argomenti(raw, { ...c, vuote, elenchi }).map((a) => a.testo);
