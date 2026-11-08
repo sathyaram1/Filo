@@ -272,7 +272,7 @@
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
     const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
     return senzaVuoti({
-      type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, evento,
+      type, esito, riga: breve(riga, MAX_RIGA), motivo: breve(perche, MAX_MOTIVO), file, link, salvate, evento,
       partita: esito === FALLITO && partita(x),
       // Un no della regola di autonomia: riaperta, la riga dice «Non dimenticato» come il diario in diretta.
       no: esito === FALLITO && !!(o && o.no),
