@@ -421,6 +421,8 @@ test('correggo «Ama il tè» in «Ama il caffè» e ci ripenso: la × accanto a
   await inCorrezione.locator('.qd-tasto[title="Annulla la correzione"]').click();
   await expect(campo).toHaveCount(0);
   await expect(riga(page, 'Ama il tè')).toHaveCount(1);
+  // La riga rifatta mette il suo tasto sotto il puntatore rimasto sulla ×, e lì il title lo tiene il fumetto di Filo.
+  await page.mouse.move(0, 0);
   await expect(riga(page, 'Ama il tè').locator('.qd-tasto[title="Togli dalla memoria"]')).toHaveCount(1);
   expect((await memoria(app)).PREFERENZE).toBe('Ama il tè\nVive a Lisbona');
   await expect(page.locator('#esito')).toBeHidden();
