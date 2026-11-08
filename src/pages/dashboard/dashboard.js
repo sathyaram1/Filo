@@ -2018,7 +2018,7 @@
   };
   // Fuori dal campo il rilascio va alla chat se nessun altro lo vuole (#1623), e finché si trascina il campo si accende:
   // si vede dove andrà a finire.
-  const portaFile = (dt) => { const t = Array.from(dt?.types || []); return t.includes('Files') || t.includes('application/x-filo-file'); };
+  const portaFile = (dt) => Array.from(dt?.types || []).includes('Files') || daChat(dt);
   const spegniBersaglio = () => inputForm.classList.remove('dash-input-bersaglio');
   document.addEventListener('dragover', (e) => {
     if (!portaFile(e.dataTransfer)) return;
