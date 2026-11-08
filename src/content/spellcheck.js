@@ -711,6 +711,8 @@
   // Su un sito gli strati stanno in un'ombra chiusa (#2299): un segno che manca dice che la parola è nel dizionario
   // personale, fra i nomi noti o fra le imparate, e dal documento lo script del sito lo leggerebbe.
   const PAGINA_DI_FILO = (() => { try { return location.protocol === 'filo:'; } catch (_) { return false; } })();
+  // `filoScrive` mentre Filo annulla col tasto: quello che il browser riporta è comunque dell'utente.
+  const TUTTO = {};
   let ombraDegliStrati = null;
   function casaDegliStrati(el) {
     const qui = radiceDi(el);
