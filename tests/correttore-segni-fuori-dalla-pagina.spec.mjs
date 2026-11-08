@@ -1,6 +1,6 @@
 // #2299 — i segni del correttore dicevano al sito quali parole sono nel dizionario personale: lo script scriveva da sé
 // una lista di candidati nel suo campo e guardava quali restavano senza segno. Su un sito gli strati stanno in un'ombra
-// chiusa, e un testo nuovo scritto da script si controlla solo al gesto vero dell'utente che segue, uno per gesto.
+// chiusa, e si controlla solo il testo dell'utente: quello che batte o fa scrivere a Filo, e quello trovato entrando.
 
 import { test, expect } from './fixtures/electron.mjs';
 import { nelMondoDelMenu, menuDi } from './helpers/menuContestuale.mjs';
