@@ -169,7 +169,8 @@ test('chiaveDiBozza(): la bozza porta l\'origine del sito; le pagine di Filo ten
 test('ogni foglio chiesto per uno strato chiuso sta nell\'elenco unico degli strati, e i riquadri non ne tengono una copia', async () => {
   const fs = await import('node:fs');
   const path = await import('node:path');
-  const radice = path.join(path.dirname(new URL(import.meta.url).pathname), '..', '..', 'src');
+  const { fileURLToPath } = await import('node:url');
+  const radice = fileURLToPath(new URL('../../src', import.meta.url));
   const elenco = UI.FOGLI_DEGLI_STRATI;
   assert.ok(Array.isArray(elenco) && elenco.includes('popup.css'));
   for (const f of elenco) assert.ok(fs.existsSync(path.join(radice, 'styles', f)), f);
