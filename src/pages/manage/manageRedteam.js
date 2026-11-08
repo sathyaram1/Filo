@@ -109,7 +109,7 @@
       ? `Al tetto, fino a circa ${dollari(giorno)} al giorno e ${dollari(giorno * 30)} al mese.`
       : `Un account al tetto, fino a circa ${dollari(giorno)} al giorno.`)
       + (senzaPrezzo.length ? ` Per difetto: manca il prezzo di ${senzaPrezzo.join(', ')}.` : '');
-    t.stimaEl.title = `Tentativi lunghi al massimo (${Number(limiti.maxAttackChars).toLocaleString('it-IT')} caratteri), `
+    t.stimaEl.title = `Tentativi lunghi al massimo (${Number(limiti.maxAttackChars).toLocaleString('it-IT', { useGrouping: true })} caratteri), `
       + `${(limiti.chiamate || []).length} chiamate ai modelli: circa ${dollari(usd)} a tentativo coi prezzi di OpenRouter. `
       + 'Il tetto non cambia i tempi di risposta.';
   }
