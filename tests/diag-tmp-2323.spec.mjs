@@ -3,7 +3,7 @@ import { menuDi } from './helpers/menuContestuale.mjs';
 
 const LINK = 'https://example.com/articolo-lungo';
 function pagina() {
-  return `<!doctype html><html><body style="margin:0;font:16px sans-serif">
+  return `<!doctype html><html><body oncontextmenu="return false" style="margin:0;font:16px sans-serif">
     <div style="height:40vh;padding:16px">Testo in cima alla pagina.</div>
     <a id="link" href="${LINK}" style="display:inline-block;padding:8px">un collegamento</a>
     <div style="height:300vh;padding:16px">Tanta pagina sotto, tutta scorrevole.</div>
