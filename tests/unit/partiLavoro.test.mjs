@@ -1,6 +1,6 @@
 // Un lavoro locale con app e server (#915): la pratica si chiude quando tutte le parti sono su main. Qui le regole
-// lato sessione: parte tardiva, parte del server che manca, cosa legge chi lancia finish, forma nelle regole Firestore.
-// La metà del server (ownerMerge, localWork) ha la sua prova in filo-security, test/lavori-locali-parti-915.test.js.
+// lato sessione: parte tardiva, parte del server che manca, cosa legge chi lancia finish, forma nelle regole Firestore
+// (col motore vero: partiLavoro.motore-vero.mjs). La metà del server ha la sua prova in filo-security, test/lavori-locali-*.
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
-  PARTI, FINESTRA_PARTE_TARDIVA_MS, partiDaCampi, parteTardiva, partiServerInSospeso,
+  PARTI, FINESTRA_PARTE_TARDIVA_MS, dopoLaFusione, partiDaCampi, parteTardiva, partiServerInSospeso, serverUltimaParte,
 } from '../../scripts/lib/parti-lavoro.mjs';
 import { classifyOwnerMerge, messageForOwnerMerge, askServerMerge } from '../../scripts/lib/owner-merge.mjs';
 import { newWorkBranch } from '../../scripts/lib/branch-integrity.mjs';
@@ -28,6 +28,19 @@ test('le parti fuse dai campi REST: solo app e server, solo numeri positivi', ()
   assert.deepEqual(partiDaCampi(undefined), {});
   assert.deepEqual([...PARTI], ['app', 'server']);
   assert.equal(FINESTRA_PARTE_TARDIVA_MS, 48 * ORE);
+});
+
+test('la parte del server è l’ultima solo con l’app registrata e nessun suo ramo fuori; dopo la fusione si rifà il conto', () => {
+  assert.equal(serverUltimaParte({ parti: { app: ORA }, ramiApp: [] }), true);
+  assert.equal(serverUltimaParte({ parti: { app: ORA }, ramiApp: ['claude/x'] }), false, 'un seguito dell’app è ancora fuori');
+  assert.equal(serverUltimaParte({ parti: { server: ORA }, ramiApp: [] }), false, 'l’app può ancora arrivare');
+  assert.equal(serverUltimaParte(), false);
+  // #939: chi fonde per secondo rilegge; chi la trova già chiusa non la richiude.
+  assert.equal(dopoLaFusione({ status: 'working', ultima: true }), 'chiudi');
+  assert.equal(dopoLaFusione({ status: 'todo', ultima: false }), 'aperta');
+  assert.equal(dopoLaFusione({ status: 'done', ultima: true }), 'chiusa');
+  assert.equal(dopoLaFusione({ status: 'done', ultima: false }), 'chiusa');
+  assert.equal(dopoLaFusione(), 'aperta');
 });
 
 test('parte tardiva: solo a pratica chiusa dall’altra parte da meno di 48 ore, locale, una volta per parte, dallo stesso ramo', () => {
@@ -146,10 +159,16 @@ test('regole: localMerges lo scrive solo l’admin, nella forma { app?, server?,
 
   const blocco = rules.slice(rules.indexOf('match /feedback/{'), rules.indexOf('match /feedback-public/{'));
   const rami = [...blocco.matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g)].map((x) => x[2].replace(/\s+/g, ' ').trim());
+  // Il create e l'update dell'admin, e nessun altro: nato malformato, l'update lo rifiuterebbe per sempre (#939).
   const conCampo = rami.filter((c) => c.includes('localMerges'));
-  assert.equal(conCampo.length, 1, 'un solo ramo nomina localMerges');
-  assert.match(conCampo[0], /^isAdmin\(\)/);
-  assert.match(conCampo[0], /localMergesValido\(request\.resource\.data\)/);
+  assert.equal(conCampo.length, 2, 'due rami nominano localMerges: create e update dell’admin');
+  for (const c of conCampo) {
+    assert.match(c, /^isAdmin\(\)/);
+    assert.match(c, /localMergesValido\(request\.resource\.data\)/);
+  }
+  const verbi = [...blocco.matchAll(/allow\s+([a-z,\s]+?)\s*:\s*if\s+([\s\S]*?);/g)]
+    .filter((x) => x[2].includes('localMerges')).map((x) => x[1].replace(/\s+/g, ''));
+  assert.deepEqual(verbi.sort(), ['create', 'update'].sort());
 });
 
 // Il cancello delle routine scrive nelle parti il ramo del lavoro, `worker/<id>-<ora>`: le regole controllano le parti

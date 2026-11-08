@@ -55,7 +55,11 @@ export const NOTE_FISSE = Object.freeze({
   serverFermo: ({ ramo: r, uscita }) => nota(`server:fondi si è fermato (uscita ${intero(uscita)}) su ${ramo(r)}: main del server non si è mosso.`),
   serverFineTardiva: ({ ramo: r, sha: s, daGitHub, quando: q }) => nota(`${testoFine(r, s, !!daGitHub)} Era l'ultima parte: la pratica l'aveva chiusa la fusione della parte ${NOME_PARTE.app} dello stesso lavoro (${quando(q)}), e resta chiusa.`),
   serverFineAperta: ({ ramo: r, sha: s, daGitHub, ramiApp = [], numero: n }) => nota(`${testoFine(r, s, !!daGitHub)} La pratica resta aperta: manca la parte ${NOME_PARTE.app}, non ancora su main, e ${chiudeApp({ ramiApp, numero: n })}.${rami(ramiApp).length ? '' : ` Se il lavoro stava solo sul server: ${comandoSoloServer({ ramo: r, numero: n })}.`}`),
-  serverFineChiusa: ({ ramo: r, sha: s, daGitHub, solo = false }) => nota(solo
+  // `intanto` (#939): la parte dell'app è arrivata su main mentre questa si fondeva, letta rileggendo dopo la fusione.
+  serverFineChiusaIntanto: ({ ramo: r, sha: s, daGitHub }) => nota(`${testoFine(r, s, !!daGitHub)} Era l'ultima parte: la pratica l'ha chiusa intanto la fusione della parte ${NOME_PARTE.app}, e resta chiusa.`),
+  serverFineChiusa: ({ ramo: r, sha: s, daGitHub, solo = false, intanto = false }) => nota(solo
     ? `${testoFine(r, s, !!daGitHub)} Il lavoro stava solo sul server (--solo-server).`
-    : testoFine(r, s, !!daGitHub)),
+    : intanto
+      ? `${testoFine(r, s, !!daGitHub)} La parte ${NOME_PARTE.app} è arrivata su main mentre questa si fondeva: era l'ultima.`
+      : testoFine(r, s, !!daGitHub)),
 });
