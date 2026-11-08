@@ -859,11 +859,7 @@
     return inerti.size ? [segnata()] : null;
   }
   // Le graffe inerti, segnate così mentre si aprono le altre e rimesse com'erano alla fine.
-  const SEGNI_INERTI = '${dopo}`;
-      j = i;
-    }
-    return w === parola ? null : [w];
-  }
+  const SEGNI_INERTI = '';
 
   // Argomenti come li vede la shell: le virgolette raggruppano (un percorso con
   // spazi è UNO) e `variabile` segna un'espansione che può portare un segreto:
