@@ -1809,7 +1809,7 @@
     // più. Basta un segmento non riconosciuto, o uno scriptblock che invochi, e si torna a 3.
     const pipe = splitSafePipeline(trimmed);
     if (pipe) {
-      if (!pipe.every((p) => segmentIsRead(p, true) && (PS_READ.has(programOf(dequote(p))) || PS_PIPE_ONLY.has(programOf(dequote(p))) || classifyOneLetto(p, c) === 1))) return TRE;
+      if (!pipe.every((p) => segmentIsRead(p, true, c))) return TRE;
       const progs = pipe.map((p) => programOf(dequote(p)));
       const cp = progs.some((x) => SPOSTAMENTI.has(x)) ? { ...c, cwd: null } : c;
       let det = UNO;
