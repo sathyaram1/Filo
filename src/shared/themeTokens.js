@@ -263,6 +263,32 @@
       css: '--sn-spell-lampo-durata',
       default: '1000ms',
     },
+    // Il fumetto al passaggio del mouse (#2095): lo stesso nelle pagine (src/shared/suggerimento.js) e nella barra in
+    // alto, dove il main lo passa alla sua finestra (src/main/movimento.js). Il predefinito si legge da qui, non da theme.css.
+    'fumetto.sfondo': {
+      label: 'Sfondo dei suggerimenti al passaggio del mouse',
+      type: 'color',
+      css: '--sn-fumetto-sfondo',
+      default: { light: '#fdf6ec', dark: '#1d1a16' },
+    },
+    'fumetto.testo': {
+      label: 'Testo dei suggerimenti al passaggio del mouse',
+      type: 'color',
+      css: '--sn-fumetto-testo',
+      default: { light: '#2a221a', dark: '#f1e7d6' },
+    },
+    'fumetto.bordo': {
+      label: 'Bordo dei suggerimenti al passaggio del mouse',
+      type: 'color',
+      css: '--sn-fumetto-bordo',
+      default: { light: '#e2d3b5', dark: '#3b332a' },
+    },
+    'fumetto.ritardo': {
+      label: 'Attesa prima che compaia un suggerimento al passaggio del mouse',
+      type: 'time',
+      css: '--sn-fumetto-ritardo',
+      default: '350ms',
+    },
   };
 
   // I valori di un token `linea`: quelli di text-decoration-style, nient'altro.
@@ -317,12 +343,7 @@
       case 'size': return RE_SIZE.test(v);
       case 'font': return RE_FONT.test(v);
       case 'linea': return STILI_LINEA.includes(v);
-      case 'time': {
-        const m = v.match(RE_TIME);
-        if (!m) return false;
-        const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
-        return ms >= 0 && ms <= 10000;
-      }
+      case 'time': return durataMs(v) >= 0;
       case 'factor': return RE_FACTOR.test(v) && Number(v) <= FACTOR_MAX;
       case 'pixel': {
         const m = v.match(/^(\d{1,4})px$/);
@@ -330,6 +351,15 @@
       }
       default: return false;
     }
+  }
+
+  // Una durata del registro in millisecondi, per chi la usa da JS (un'attesa, non un'animazione): NaN se non è valida.
+  // È anche la regola di validate per i token di tempo: tetto e formato stanno solo qui.
+  function durataMs(value) {
+    const m = typeof value === 'string' ? value.trim().match(RE_TIME) : null;
+    if (!m) return NaN;
+    const ms = m[1] !== undefined ? Number(m[1]) : Number(m[2]) * 1000;
+    return ms <= 10000 ? ms : NaN;
   }
 
   // L'errore puntuale per un valore rifiutato: lo mostrano le Preferenze e lo legge la chat.
@@ -471,6 +501,7 @@
   const LEGIBILITY_PAIRS = [
     ['text', 'background'],
     ['button.fg', 'button.bg'],
+    ['fumetto.testo', 'fumetto.sfondo'],
   ];
 
   // Vero se l'override rende illeggibile una coppia testo/sfondo. Calcolato sul valore
@@ -556,6 +587,7 @@
     validate,
     normalize,
     errorMessage,
+    durataMs,
     motionFactor,
     motionMs,
     scrollBehavior,

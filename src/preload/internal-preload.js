@@ -326,6 +326,7 @@ function loadContentScripts() {
   safe(path.join(SHARED, 'filoMarkdown.js'), 'SN_MARKDOWN'); // #853 — senza, le risposte del modello entrano come HTML
   safe(path.join(SHARED, 'linkSospetto.js'), 'SN_LINK_SOSPETTO'); // #725 — link sospetti: euristica e frasi, PRIMA di actions.js
   safe(path.join(SHARED, 'themeTokens.js'), 'SN_THEME_TOKENS');
+  safe(path.join(SHARED, 'suggerimento.js'), 'SN_SUGGERIMENTO'); // #2095 — il fumetto di Filo al posto del title nativo: DOPO themeTokens
   safe(path.join(SHARED, 'confirmUi.js'), 'SN_CONFIRM_UI');
   safe(path.join(SHARED, 'chatErrors.js'), 'SN_CHAT_ERRORS'); // #360 — errori tecnici → frasi per l'utente
   safe(path.join(SHARED, 'icons.js'), 'SN_ICONS_UTIL');

@@ -1317,58 +1317,18 @@
     try { campo.focus({ preventScroll: true }); campo.select(); } catch (_) {}
   }
 
-  // Suggerimento in stile menu, uno solo per pagina.
-  let tooltipEl = null;
-  let tooltipHideTimer = null;
-  function ensureTooltipEl() {
-    if (tooltipEl && document.documentElement.contains(tooltipEl)) return tooltipEl;
-    tooltipEl = document.createElement('div');
-    tooltipEl.className = 'sn-tooltip';
-    global.SN_FILO_UI?.mark(tooltipEl);
-    tooltipEl.style.display = 'none';
-    monta(tooltipEl);
-    return tooltipEl;
-  }
-  function showTooltip(target, text) {
-    if (!text || !target.isConnected) return;
-    const el = ensureTooltipEl();
-    // Sopra i pannelli aperti dopo di lei (stesso piano: vale l'ordine), sotto le sonde (#589.11).
-    const host = menuHost();
-    annullaZoom(el, host);
-    host.insertBefore(el, global.SN_VISTO?.prima(host, el) || null);
-    el.dataset.snTheme = document.documentElement.dataset.snTheme || '';
-    el.textContent = text;
-    el.style.display = '';
-    const r = target.getBoundingClientRect();
-    const tw = el.offsetWidth, th = el.offsetHeight;
-    let left = r.left + r.width / 2 - tw / 2;
-    let top = r.bottom + 6;
-    if (top + th + 8 > window.innerHeight) top = r.top - th - 6;
-    if (left + tw + 4 > window.innerWidth) left = window.innerWidth - tw - 4;
-    if (left < 4) left = 4;
-    el.style.left = `${left}px`;
-    el.style.top = `${top}px`;
-  }
-  // Toglie l'etichetta e l'attesa che sta per farla comparire: se a muoversi è il menu, comparirebbe l'etichetta di
-  // un bottone che nel frattempo è altrove.
+  // L'etichetta di un'icona la disegna il fumetto condiviso (patterns/un-etichetta-si-scrive-title-o-data-tip-e-la-mostra-filo.md).
+  // Toglierla serve quando a muoversi è il menu: resterebbe sotto un bottone che nel frattempo è altrove.
   function dismissTooltip() {
-    clearTimeout(tooltipHideTimer);
-    tooltipHideTimer = null;
-    if (tooltipEl) tooltipEl.style.display = 'none';
+    global.SN_SUGGERIMENTO?.nascondi?.();
   }
   function attachTooltip(el, text) {
-    el.addEventListener('mouseenter', () => {
-      clearTimeout(tooltipHideTimer);
-      tooltipHideTimer = setTimeout(() => {
-        showTooltip(el, text);
-        if (el.dataset.snIconId) lettura.mostrato(el.dataset.snIconId, 'menu');
-      }, 250);
+    if (!text) return;
+    el.setAttribute('data-tip', text);
+    el.addEventListener('sn-fumetto-mostrato', () => {
+      if (el.dataset.snIconId) lettura.mostrato(el.dataset.snIconId, 'menu');
     });
-    el.addEventListener('mouseleave', () => {
-      dismissTooltip();
-      lettura.via();
-    });
-    el.addEventListener('mousedown', () => dismissTooltip());
+    el.addEventListener('mouseleave', () => lettura.via());
   }
 
   // Chi apre un pannello sostando sopra durante un trascinamento: chiamato da qui, perché un clic fabbricato da codice

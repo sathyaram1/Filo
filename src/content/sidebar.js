@@ -277,7 +277,7 @@
         <span class="sn-sidebar-title">${I18n.t('menu_help')}</span>
         <div class="sn-sidebar-actions">
           <button class="sn-sidebar-collapse" type="button" title="Collassa">▾</button>
-          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}">×</button>
+          <button class="sn-sidebar-close" type="button" aria-label="${I18n.t('popup_close')}" title="${I18n.t('popup_close')}">×</button>
         </div>
       </div>
       <div class="sn-sidebar-conv"></div>
@@ -285,7 +285,7 @@
       <div class="sn-sidebar-allegati" hidden></div>
       <form class="sn-sidebar-input" autocomplete="off">
         <textarea rows="1" placeholder="${appDellaPagina()?.segnaposto || 'Dimmi cosa vuoi fare sulla pagina…'}"></textarea>
-        <button type="submit">↵</button>
+        <button type="submit" aria-label="${I18n.t('popup_send')}" title="${I18n.t('popup_send')}">↵</button>
       </form>
     `;
     document.documentElement.appendChild(root);
@@ -801,6 +801,7 @@
     let o = ombre.get(el);
     if (!o) {
       o = el.attachShadow({ mode: 'closed' });
+      global.SN_SUGGERIMENTO?.ombra?.(el, o);
       const stile = document.createElement('style');
       stile.textContent = css;
       o.appendChild(stile);
@@ -1335,6 +1336,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     const row = document.createElement('div');
     row.className = 'sn-sidebar-feedback-row';
     const bottoni = row.attachShadow({ mode: 'closed' });
+    global.SN_SUGGERIMENTO?.ombra?.(row, bottoni);
     const stile = document.createElement('style');
     stile.textContent = CSS_RISPOSTA;
     bottoni.appendChild(stile);
@@ -2074,7 +2076,7 @@ img { width: 48px; height: 48px; border-radius: 8px; object-fit: cover; display:
     }
     b.textContent = modo === 'ferma' ? '' : '↵';
     b.setAttribute('aria-label', modo === 'ferma' ? 'Ferma' : 'Invia');
-    b.title = modo === 'ferma' ? 'Ferma' : '';
+    b.title = modo === 'ferma' ? 'Ferma' : I18n.t('popup_send');
   }
   // Il tasto destro sul quadrato e sull'attesa che lavora: «Ferma», subito, come nella home (letto da content.js).
   function vociAttesa(target) {

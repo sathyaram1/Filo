@@ -573,7 +573,11 @@
   // sopra le WebContentsView delle tab. Delega globale così funziona anche per le
   // schede nate dopo.
   // Anche la carta di una scheda lo usa: cede al suggerimento di un controllo nell'istante in cui lui compare.
-  const SUGGERIMENTO_RITARDO = 350;
+  // L'attesa è il token `fumetto.ritardo`, la stessa del fumetto nelle pagine (src/shared/suggerimento.js).
+  function ritardoSuggerimento() {
+    const ms = ThemeTokens && ThemeTokens.durataMs ? ThemeTokens.durataMs(ThemeTokens.effectiveValue('fumetto.ritardo', tokenShell)) : NaN;
+    return Number.isFinite(ms) ? ms : 350;
+  }
   (() => {
     let showTimer = null;
     let currentTarget = null;
@@ -583,7 +587,8 @@
       if (currentTarget) api.tooltipHide();
       currentTarget = null;
     }
-    document.addEventListener('mouseover', (e) => {
+    // Anche `pointerover`: su un tasto disabilitato arrivano gli eventi del puntatore, non sempre quelli del mouse.
+    const sopra = (e) => {
       const t = e.target.closest('[data-tip]');
       if (t === currentTarget) return;
       // Un elemento tolto dal ridisegno non riceve mouseout: il suo suggerimento resterebbe sopra la carta.
@@ -598,13 +603,17 @@
         const x = Math.round(r.left + r.width / 2 - 60);
         const y = Math.round(r.bottom + 6);
         api.tooltipShow(text, x, y);
-      }, SUGGERIMENTO_RITARDO);
-    });
-    document.addEventListener('mouseout', (e) => {
+      }, ritardoSuggerimento());
+    };
+    const fuori = (e) => {
       const t = e.target.closest('[data-tip]');
       if (!t) return;
       if (t === currentTarget && (!e.relatedTarget || !t.contains(e.relatedTarget))) hide();
-    });
+    };
+    document.addEventListener('mouseover', sopra);
+    document.addEventListener('pointerover', sopra);
+    document.addEventListener('mouseout', fuori);
+    document.addEventListener('pointerout', fuori);
     document.addEventListener('mousedown', hide, true);
     window.addEventListener('blur', hide);
   })();
@@ -685,7 +694,7 @@
     }
     function cede() {
       if (timer) { clearTimeout(timer); timer = null; attesaDi = null; }
-      if (aperta && !vaVia) vaVia = setTimeout(nascondi, SUGGERIMENTO_RITARDO);
+      if (aperta && !vaVia) vaVia = setTimeout(nascondi, ritardoSuggerimento());
     }
     // Una scheda appena rifatta non ha ancora :hover col puntatore fermo sopra: conta dove sta il puntatore.
     function sottoIlPuntatore(id) {
@@ -2253,7 +2262,7 @@
       allBtn.type = 'button';
       allBtn.className = 'dl-panel-clear';
       allBtn.textContent = 'Vedi tutti';
-      allBtn.title = 'Apri l’elenco completo dei download';
+      allBtn.dataset.tip = 'Apri l’elenco completo dei download';
       allBtn.addEventListener('click', () => {
         api.tabs.open('filo://downloads/downloads.html');
         closePanel();
@@ -2262,7 +2271,7 @@
       clearBtn.type = 'button';
       clearBtn.className = 'dl-panel-clear';
       clearBtn.textContent = 'Svuota';
-      clearBtn.title = 'Rimuovi i download conclusi';
+      clearBtn.dataset.tip = 'Rimuovi i download conclusi';
       clearBtn.addEventListener('click', () => {
         api.downloads.clear().then((r) => { syncFromList(r && r.items); }).catch(() => {});
       });
@@ -2345,7 +2354,7 @@
         name.appendChild(tag);
       }
       name.appendChild(document.createTextNode(r.filename || 'download'));
-      name.title = r.filename || '';
+      name.dataset.tip = r.filename || '';
       row.appendChild(name);
 
       if (isActive(r)) {
@@ -2382,7 +2391,7 @@
         meta.textContent = da ? `${stateLabel(r)} · ${da}` : stateLabel(r);
       } else if (r.state === 'interrupted' && r.nota) {
         meta.textContent = `${stateLabel(r)} · ${r.nota}`;
-        meta.title = r.nota;
+        meta.dataset.tip = r.nota;
       } else {
         meta.textContent = `${stateLabel(r)} · ${fmtBytes(r.totalBytes || r.receivedBytes)}`;
       }
@@ -2611,7 +2620,7 @@
         b.className = 'dl-row-btn';
         b.textContent = etichetta;
         b.dataset.scelta = scelta;
-        b.title = nota;
+        b.dataset.tip = nota;
         b.disabled = spento;
         b.addEventListener('click', () => {
           api.downloads.chiusura(scelta).then((res) => {
@@ -3027,7 +3036,7 @@
         const s = document.createElement('span');
         s.className = 'permesso-sotto';
         s.textContent = (sotto.length > 24 ? '…' + sotto.slice(-23) : sotto) + '.';
-        s.title = d.host || '';
+        s.dataset.tip = d.host || '';
         chi.appendChild(s);
       }
       const host = document.createElement('strong');
@@ -3043,7 +3052,7 @@
         n.className = 'permesso-oggetto';
         const c = Array.from(cosa.nome);
         n.textContent = '«' + (c.length > 60 ? c.slice(0, 40).join('') + '…' + c.slice(-19).join('') : cosa.nome) + '»';
-        n.title = String(cosa.percorso || cosa.nome);
+        n.dataset.tip = String(cosa.percorso || cosa.nome);
         msg.append(' ', n);
       }
       // Lo schermo (#586): ogni cosa che si può mostrare è il suo «Consenti», e la scelta vale per questa volta.

@@ -80,8 +80,11 @@ function doShow(parentWin, text, x, y) {
   // Dimensione provvisoria: la corregge l'handler 'size' quando il renderer misura il testo.
   const px = cb.x + Math.round(x);
   const py = cb.y + Math.round(y);
-  tipWin.setBounds({ x: px, y: py, width: 200, height: 30 });
-  tipWin.webContents.send('set', { text, dark: nativeTheme.shouldUseDarkColors, giro });
+  // Larga quanto il fumetto più largo (320px): più stretta, il testo andrebbe a capo prima di essere misurato.
+  tipWin.setBounds({ x: px, y: py, width: 340, height: 30 });
+  let colori = {};
+  try { colori = require('./movimento').fumetto(nativeTheme.shouldUseDarkColors); } catch (_) {}
+  tipWin.webContents.send('set', { text, colori, giro });
 }
 
 function showTooltip(parentWin, text, x, y) {

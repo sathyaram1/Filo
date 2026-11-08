@@ -517,24 +517,6 @@ html.trascina-scheda, html.trascina-scheda * { cursor: grabbing !important; }
   align-self: stretch;
 }
 
-/* Tooltip della shell, nello stile dei menu di Filo (src/styles/menu.css): senza, l'hover su
-   nav-btn e tab-new mostrerebbe il tooltip nativo bianco e squadrato. */
-.shell-tooltip {
-  position: fixed;
-  z-index: 2147483647;
-  pointer-events: none;
-  background: var(--bg);
-  color: var(--fg);
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, calc(0.18 * var(--sn-ombra, 1)));
-  font-size: 12px;
-  line-height: 1.2;
-  padding: 4px 8px;
-  white-space: nowrap;
-  max-width: 240px;
-  backdrop-filter: blur(4px);
-}
 
 /* Incognito: la finestra carica shell.html?incognito=1 → <html data-incognito="1">. Vira tutta la
    shell verso un viola scuro, distinguibile a colpo d'occhio da una finestra normale. */

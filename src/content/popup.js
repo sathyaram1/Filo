@@ -765,7 +765,7 @@
     root.innerHTML = `
       <div class="sn-popup-header">
         <span class="sn-popup-title"></span>
-        <button class="sn-popup-close" type="button" aria-label="${I18n.t('popup_close')}">×</button>
+        <button class="sn-popup-close" type="button" aria-label="${I18n.t('popup_close')}" title="${I18n.t('popup_close')}">×</button>
       </div>
       <div class="sn-popup-body"></div>
       <div class="sn-popup-footer">
@@ -773,7 +773,7 @@
       </div>
       <div class="sn-popup-compose">
         <textarea class="sn-popup-input" rows="1" placeholder="${I18n.t('popup_followup_placeholder')}"></textarea>
-        <button class="sn-popup-send" type="button" aria-label="${I18n.t('popup_send')}">↑</button>
+        <button class="sn-popup-send" type="button" aria-label="${I18n.t('popup_send')}" title="${I18n.t('popup_send')}">↑</button>
       </div>
     `;
     root.querySelector('.sn-popup-title').textContent = title;

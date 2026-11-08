@@ -1488,7 +1488,7 @@
       sendBtn.dataset.modo = modo;
       sendBtn.innerHTML = modo === 'riprendi' ? GLIFO_RIPRENDI : GLIFO_INVIO;
       sendBtn.setAttribute('aria-label', modo === 'riprendi' ? 'Riprendi' : 'Invia');
-      sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : '';
+      sendBtn.title = modo === 'riprendi' ? 'Riprendi da dove si era fermato' : 'Invia';
     }
     sendBtn.disabled = quadrato;
     sendBtn.hidden = quadrato;
@@ -1850,6 +1850,7 @@
       rm.className = 'dash-img-remove';
       rm.textContent = '×';
       rm.setAttribute('aria-label', 'Rimuovi immagine');
+      rm.title = 'Togli';
       rm.addEventListener('click', () => {
         pendingImages.splice(idx, 1);
         percorsiImmagini.delete(dataUrl);
@@ -1859,6 +1860,7 @@
       wrap.appendChild(rm);
       if (percorsiImmagini.has(dataUrl)) {
         wrap.title = percorsiImmagini.get(dataUrl);
+        img.title = `Ingrandisci\n${percorsiImmagini.get(dataUrl)}`;
         conMenuFile(img, () => ({
           percorso: percorsiImmagini.get(dataUrl),
           togli: () => { pendingImages = pendingImages.filter((d) => d !== dataUrl); percorsiImmagini.delete(dataUrl); renderImagePreviews(); },
@@ -2063,6 +2065,7 @@
   }
   function attachImageLightbox(img, src) {
     img.style.cursor = 'zoom-in';
+    img.title = 'Ingrandisci';
     img.addEventListener('click', (e) => {
       e.stopPropagation();
       openLightbox(src);
@@ -2495,6 +2498,18 @@
     } catch (_) {}
   }
 
+  // La X dei riquadri Novità e Feedback risolto: una sola, così il suo nome e il suo fumetto non si perdono in una copia.
+  function crocettaDelRiquadro(close) {
+    const xBtn = document.createElement('button');
+    xBtn.type = 'button';
+    xBtn.className = 'dash-recap-x';
+    xBtn.setAttribute('aria-label', 'Chiudi');
+    xBtn.title = 'Chiudi';
+    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
+    xBtn.addEventListener('click', close);
+    return xBtn;
+  }
+
   function renderUpdateRecap({ lastSeen, current, notes }, onClose) {
     // notes è già ordinato dalla più recente: novità in un blocco, correzioni nell'altro.
     const features = [];
@@ -2545,13 +2560,7 @@
     header.append(title, ver);
     box.appendChild(header);
 
-    const xBtn = document.createElement('button');
-    xBtn.type = 'button';
-    xBtn.className = 'dash-recap-x';
-    xBtn.setAttribute('aria-label', 'Chiudi');
-    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
-    xBtn.addEventListener('click', close);
-    box.appendChild(xBtn);
+    box.appendChild(crocettaDelRiquadro(close));
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'dash-recap-body';
@@ -2870,13 +2879,7 @@
     }
     box.appendChild(header);
 
-    const xBtn = document.createElement('button');
-    xBtn.type = 'button';
-    xBtn.className = 'dash-recap-x';
-    xBtn.setAttribute('aria-label', 'Chiudi');
-    xBtn.innerHTML = self.SN_ICONS?.close?.(16) || '✕';
-    xBtn.addEventListener('click', close);
-    box.appendChild(xBtn);
+    box.appendChild(crocettaDelRiquadro(close));
 
     const bodyEl = document.createElement('div');
     bodyEl.className = 'dash-recap-body dash-thanks-body';
