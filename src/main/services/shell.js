@@ -549,7 +549,9 @@ function runProbe({ file, args, env: probeEnv }, cwd, attesaMs = ATTESA_PROBE_MS
     try {
       // L'env dei probe: vedi existenceProbes.
       const env = ambienteComandi({ ...process.env, ...(probeEnv || {}) });
-      proc = spawn(file, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
+      const programma = programmaIntero(file);
+      if (!programma) { resolve('incerto'); return; }
+      proc = spawn(programma, args, { cwd: cwd || undefined, env, windowsHide: true, stdio: 'ignore' });
     } catch (_) { resolve('incerto'); return; }
     const timer = setTimeout(() => finish('incerto'), attesaMs);
     proc.on('error', () => { clearTimeout(timer); finish('incerto'); });
