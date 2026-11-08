@@ -1323,7 +1323,7 @@ test('#1994 — un\'opzione composta da espansioni o graffe della shell vale qua
   const ps = SHELL_1994[1];
   for (const cmd of ['git log -1 --output$null=C:\\Users\\u\\a.bat', 'git log --output$env:zz=x']) assert.equal(C.classify(cmd, ps), 3, cmd);
   // Le letture con variabili e graffe di tutti i giorni restano libere.
-  for (const cmd of ['cat $HOME/a.txt', 'echo {a,b}', 'git log --format=%H{x}', 'git log --oneline -- src/{a,b}.js']) {
+  for (const cmd of ['cat $HOME/a.txt', 'echo {a,b}', 'git log --format=%H{x}', 'ls {src,tests}']) {
     assert.equal(C.classify(cmd, bash), 1, cmd);
   }
   assert.equal(C.classify('Get-ChildItem | ForEach-Object { $_.Name }', ps), 1);
