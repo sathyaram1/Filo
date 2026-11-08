@@ -193,8 +193,7 @@ test('un rinvio del server verso la home la apre come home vera di Filo', async 
     try { servizi = await t.view.webContents.executeJavaScript('typeof (window.chrome && chrome.runtime && chrome.runtime.sendMessage)'); } catch (_) {}
     return { vista: t.view.webContents.getURL(), interna: t.isInternal, servizi };
   });
-  await expect.poll(async () => (await ultima()).vista, { timeout: 8000 }).toBe(HOME);
-  await expect.poll(ultima, { message: 'la home è una scheda di Filo, coi suoi servizi', timeout: 8000 })
+  await expect.poll(ultima, { message: 'la home è una scheda di Filo, coi suoi servizi', timeout: 15000 })
     .toEqual({ vista: HOME, interna: true, servizi: 'function' });
 });
 
