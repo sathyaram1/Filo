@@ -304,7 +304,7 @@ test('un percorso o un\'estensione eseguibile NON eredita il livello del comando
   assert.equal(lvl('/usr/bin/ls'), 3);    // prima era 1: un `ls` in un percorso non è fidato
   assert.equal(lvl('C:\\Windows\\System32\\where.exe foo'), 3);
   assert.equal(lvl('ls'), 1);             // nudo: resta 1
-  assert.equal(lvl('where node'), 1);
+  assert.equal(C.classify('where node', { win: true, shell: 'cmd' }), 1);
 });
 
 test('livello 1 — interrogazioni di versione/help dei tool comuni (sola lettura)', () => {
