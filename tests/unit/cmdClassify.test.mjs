@@ -1443,10 +1443,12 @@ test('#1994 — in PowerShell una variabile senza env: non è un valore noto', (
 
 test('#1994 — le graffe si aprono in un tempo che cresce con la lunghezza, non col suo quadrato', () => {
   const ctx = { cwd: '/home/u/proj', home: '/home/u', shell: 'bash' };
-  const t = Date.now();
-  C.classify(`git log ${'{'.repeat(30000)}${'}'.repeat(30000)}`, ctx);
-  C.classify(`echo ${'{x}'.repeat(30000)}`, ctx);
-  assert.ok(Date.now() - t < 1000, `${Date.now() - t} ms`);
+  // Una passata lineare costa una ventina di unità; quella quadratica ne costava trecento per il solo primo comando.
+  const c = costoInUnita(() => {
+    C.classify(`git log ${'{'.repeat(30000)}${'}'.repeat(30000)}`, ctx);
+    C.classify(`echo ${'{x}'.repeat(30000)}`, ctx);
+  }, { tetto: 100 });
+  assert.ok(c.entro, c.come);
   // Come bash: `--{x,{output=y,}}` è `--x --output=y --`, `--{{out}put=x,}` è `--{out}put=x --`.
   assert.equal(C.classify('git log --{x,{output=y,}}', ctx), 3);
   assert.equal(C.classify('git log --{{out}put=x,}', ctx), 1);
