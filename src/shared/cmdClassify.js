@@ -1966,7 +1966,7 @@
   global.SN_CMD_CLASSIFY = {
     gitConfigLancia,
     // Per la sentinella che prova su ogni nome le forme che scrivono o eseguono: chi aggiunge un nome la deve aggiornare.
-    nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ] }),
+    nomiDiLettura: () => ({ level1: [...LEVEL1], ps: [...PS_READ], git: [...GIT_READ] }),
     cancellaPerSempre,
     classify, classifyDetail, fuoriPerimetro, pulisciPercorso, diRete, privato, aperteDentro, programOf, subcommandOf, comeCmd,
   };
