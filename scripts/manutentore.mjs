@@ -1183,7 +1183,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     case 'parallelo': { const r = await chiama(cred, 'ordine', { parallelismo: Number(arg) }); return esito(r, (x) => `Parallelismo ${x.parallelismo}: ne valgono ${x.parallelismoEffettivo}, sotto il freno dell'owner.`); }
     case 'priorita': {
       const num = numeroDi(arg);
-      const c = controlloPriorita(await prioritaAttuale(cred, num), argv[2]);
+      const c = controlloPriorita((await prioritaAttuali(cred, num))[0], argv[2]);
       if (!c.ok) { console.error(`RIFIUTATO: #${num}: ${c.motivo}. Non ho scritto niente.`); return 1; }
       const r = await chiama(cred, 'priorita', { numero: num, priorita: c.valore });
       return esito(r, (x) => `#${x.numero}: priorità da ${x.da ?? '?'} a ${x.a}.`);
