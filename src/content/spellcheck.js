@@ -1385,14 +1385,20 @@
       if (riportato) {
         state.diSito = riportato.diSito;
         state.visti = riportato.visti;
+        if (state.primaDelGesto) state.primaDelGesto.pezzi = [];
       } else {
         const c = cambio(prima, ora);
         state.diSito = scorriPezzi(state.diSito, c);
         state.visti = scorriPezzi(state.visti, c);
+        if (state.primaDelGesto) state.primaDelGesto.pezzi = scorriPezzi(state.primaDelGesto.pezzi, c);
         const nuovo = ora.slice(c.p, c.fineNuovo);
         const f = state.filoScrive;
         const daFilo = f === TUTTO || (typeof f === 'string' && senzaSpazi(f).includes(senzaSpazi(nuovo)));
-        if (senzaSpazi(nuovo) && !daFilo && !(ammesso && ammesso(nuovo))) state.diSito = unisciPezzi([...state.diSito, { start: c.p, end: c.fineNuovo }]);
+        // Il tasto che un editor ricco ha fermato per scriverlo da sé (siAspettaDallUtente).
+        const i = state.intento;
+        if (!ammesso && i && Date.now() - i.alle < INTENTO_MS) ammesso = i.ammesso;
+        if (i && ammesso === i.ammesso) state.intento = null;
+        if (!daFilo && !(ammesso && ammesso(nuovo))) cambioDelSito(state, prima, ora, c, nuovo);
       }
       ricordaProprietari(state);
     }
