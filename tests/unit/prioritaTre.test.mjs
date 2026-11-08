@@ -53,6 +53,13 @@ test('un feedback a priorità 3, o di priorità ignota, non si archivia senza l\
   assert.deepEqual(P.archiviazione(0), { ok: true });
 });
 
+test('archiviare una 3 dentro un lavoro che continua a 3 la sposta, non la toglie', () => {
+  assert.deepEqual(P.archiviazione(3, { continuaA: 3 }), { ok: true });
+  assert.deepEqual(P.archiviazione(null, { continuaA: '3' }), { ok: true });
+  assert.equal(P.archiviazione(3, { continuaA: 1 }).errore, 'tre');
+  assert.equal(P.archiviazione(null, { continuaA: null }).errore, 'ignota');
+});
+
 test('il manutentore non tiene una copia sua della regola', () => {
   const src = readFileSync(join(ROOT, 'scripts', 'manutentore.mjs'), 'utf8');
   assert.match(src, /import '\.\.\/src\/shared\/prioritaTre\.js'/);
