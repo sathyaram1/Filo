@@ -797,6 +797,23 @@ function sitoDegliScaricamenti(origine) {
   } catch (_) { return origine; }
 }
 
+// La risposta vale per il sito come il conto: quella dell'indirizzo esatto vince, poi un no dato a un altro indirizzo
+// dello stesso sito, poi un sì. Una pagina che salta a un sottodominio nuovo non torna a chiedere.
+function sceltaScaricamenti(ses, origine) {
+  const scelte = sceltePer(ses);
+  const propria = scelte.get(`${origine}|${SCARICAMENTI}`);
+  if (typeof propria === 'boolean') return propria;
+  const sito = sitoDegliScaricamenti(origine);
+  let trovata;
+  for (const [k, si] of scelte) {
+    if (typeof si !== 'boolean' || !k.endsWith(`|${SCARICAMENTI}`)) continue;
+    if (sitoDegliScaricamenti(k.slice(0, -SCARICAMENTI.length - 1)) !== sito) continue;
+    if (si === false) return false;
+    trovata = true;
+  }
+  return trovata;
+}
+
 // `callback(si, fonte, decisa)`: con `decisa` falso la domanda si è ritirata (la pagina se n'è andata) e nessuno ha scelto.
 function chiediScaricamenti(wc, callback) {
   const ses = wc && wc.session;
