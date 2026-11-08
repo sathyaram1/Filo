@@ -232,4 +232,6 @@ module.exports = {
   clearPartitionAuth,
   credenzialiDellaSessione,
   reteDellaSessione,
+  indirizzoPerProgramma,
+  uscitaPerProgramma,
 };
