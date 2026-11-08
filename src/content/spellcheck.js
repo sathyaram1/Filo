@@ -1557,6 +1557,9 @@
     return out;
   }
   function toccaPezzi(lista, a, b) { return lista.some((z) => a < z.end && b > z.start); }
+  // Gli spazi non dicono niente del dizionario, e un campo modificabile scrive lo spazio in fondo come unificatore e lo
+  // riscrive al tasto dopo: chi ha scritto un pezzo si giudica senza.
+  function senzaSpazi(s) { return String(s).replace(/[\s ]/g, ''); }
 
   // Cosa può aver scritto l'utente con questo `input`: un tasto il suo carattere, un incolla o un trascinamento il loro
   // testo, la composizione il suo, l'annulla da tastiera quello che riporta. Uno script ha `isTrusted` anche con
