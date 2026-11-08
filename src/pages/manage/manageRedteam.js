@@ -80,7 +80,7 @@
   let listino; // undefined = in lettura, null = non letto
 
   const dollari = (v) => (v < 0.01 ? 'meno di 0,01 $'
-    : `${v.toLocaleString('it-IT', { minimumFractionDigits: v < 10 ? 2 : 0, maximumFractionDigits: v < 10 ? 2 : 0 })} $`);
+    : `${v.toLocaleString('it-IT', { useGrouping: true, minimumFractionDigits: v < 10 ? 2 : 0, maximumFractionDigits: v < 10 ? 2 : 0 })} $`);
 
   // Un tentativo lungo al massimo: la somma delle sue chiamate ai modelli, e i modelli senza prezzo nel listino.
   function costoTentativo() {
