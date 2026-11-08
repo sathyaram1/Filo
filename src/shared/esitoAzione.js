@@ -265,7 +265,10 @@
     else riga = (diretta && primaRiga(diretta.text)) || (L ? frase(L.describeDone, x) : '');
     if (!riga && x._domanda && L) riga = frase(L.describe, x);
     if (SENZA_TITOLO[type]) riga = SENZA_TITOLO[type][esito === CHIESTO || esito === FALLITO ? 0 : 1];
-    const file = type === 'APRI_FILE' && esito !== FALLITO && esito !== CHIESTO ? fileDi(x) : null;
+    const fatta = esito !== FALLITO && esito !== CHIESTO;
+    const file = type === 'APRI_FILE' && fatta ? fileDi(x) : null;
+    const link = type === 'NAVIGA' && fatta ? linkDi(x) : null;
+    const salvate = type === 'CERCA_SALVATE' && fatta ? salvateNominate(x) : null;
     const perche = esito === FALLITO ? motivo(x) || (diretta ? diretta.text : '') : '';
     const evento = type === 'EVENTO_CALENDARIO' && esito === PROPOSTO ? eventoDi(x) : null;
     return senzaVuoti({
