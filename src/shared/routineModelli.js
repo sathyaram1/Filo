@@ -37,6 +37,14 @@
   const idScelte = (campo) => (SCELTE[campo] || []).map((s) => s.id);
   const nomeRuolo = (id) => (RUOLI.find((r) => r.id === id) || {}).nome || id;
 
+  /** Cosa vale la voce vuota di una fase, detto all'owner: la definizione dell'agente, la partenza o l'altra fase. */
+  function vuotoDi(ruolo, campo) {
+    const r = RUOLI.find((x) => x.id === ruolo) || {};
+    if (r.partenza && r.partenza[campo]) return `${r.partenza[campo]} (partenza)`;
+    if (r.come) return `Come ${nomeRuolo(r.come)}`;
+    return VUOTO;
+  }
+
   /**
    * Tutte le fasi, con '' dove vale la definizione dell'agente. Un valore fuori elenco scritto a mano resta
    * com'è: il server potrebbe usarlo, e mostrarlo come «definizione dell'agente» sarebbe una bugia.
