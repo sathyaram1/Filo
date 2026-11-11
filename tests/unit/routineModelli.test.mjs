@@ -35,6 +35,27 @@ test('la voce vuota dice cosa vale davvero: la partenza, l\'altra fase o la defi
   assert.equal(RM.percorso('verifier-riallineamento', 'effort'), 'roleModels.`verifier-riallineamento`.effort');
 });
 
+// La partenza la applica il server (functions/src/routine/modello.js di filo-security, PARTENZA): la sua prova la
+// confronta con questa, ma gira solo con le prove del server. Cambiarla qui vuol dire cambiarla anche lì.
+test('la partenza della verifica dopo un riallineamento è quella che il server applica: sforzo medium (#2344)', () => {
+  const fase = RM.RUOLI.find((r) => r.id === 'verifier-riallineamento');
+  assert.deepEqual({ ...fase.partenza }, { effort: 'medium' }, 'cambiata anche nel server, in PARTENZA di modello.js?');
+  assert.equal(fase.come, 'verifier');
+});
+
+test('lo sforzo della verifica dopo un riallineamento porta la sua stima: costo al mese e durata (#2344)', () => {
+  const partenza = RM.stimaDi('verifier-riallineamento', '');
+  assert.match(partenza.testo, /^Sforzo medium: circa \d+ \$ al mese, una verifica in circa \d+ minuti\.$/);
+  assert.equal(RM.stimaDi('verifier-riallineamento', 'medium').testo, partenza.testo);
+  const mese = (e) => Number(/circa (\d+) \$/.exec(RM.stimaDi('verifier-riallineamento', e).testo)[1]);
+  // Più sforzo costa di più; la base misurata (circa 3 $ a verifica, 50 a settimana) dà circa 650 $ ad high.
+  assert.ok(mese('low') < mese('medium') && mese('medium') < mese('high') && mese('high') < mese('xhigh') && mese('xhigh') < mese('max'));
+  assert.equal(mese('high'), 650);
+  assert.match(partenza.perche, /748 \$ su 253 verifiche/);
+  assert.equal(RM.stimaDi('verifier', 'high'), null, 'le fasi senza stima non ne inventano una');
+  assert.equal(RM.stimaDi('verifier-riallineamento', 'inventato'), null);
+});
+
 test('un documento senza roleModels vale la definizione dell\'agente per tutte le fasi', () => {
   const vuoto = RM.leggiDoc({});
   for (const r of RM.RUOLI) assert.deepEqual(vuoto[r.id], { model: '', effort: '' });
