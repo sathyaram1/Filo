@@ -132,15 +132,29 @@ export function rigaRamo(r) {
 }
 
 /**
- * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no FILO_SERVER_CLONE (le
- * routine, git-server.mjs), se no accanto al checkout di Filo (la sessione locale) o nella home. Un clone ha `.git`.
- * → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
+ * Dove sta il clone di filo-security da cui leggere i rami del server: `--clone-server`, se no quello dei lavori server
+ * (cartellaCloneServer: una ricerca sola per routine e manutentore), se no accanto al checkout di Filo (la sessione
+ * locale). Un clone ha `.git`. → { dir } | { dir: '', cercati }. PURA rispetto a `esiste`.
  */
 export function cloneDelServer({ root, env = {}, scelta = '', esiste = existsSync } = {}) {
-  const dato = String(scelta || '').trim() || String(env.FILO_SERVER_CLONE || '').trim();
-  const cercati = dato ? [resolve(dato)] : [join(dirname(resolve(root)), 'filo-security'), join(homedir(), 'filo-security')];
+  const dato = String(scelta || '').trim();
+  const cercati = dato ? [resolve(dato)] : [cartellaCloneServer(env), join(dirname(resolve(root)), 'filo-security')];
   const dir = cercati.find((d) => esiste(join(d, '.git')));
   return dir ? { dir } : { dir: '', cercati: [...new Set(cercati)] };
+}
+
+/** Quando il clone ha visto il server l'ultima volta: l'ultimo fetch, o il clone stesso. NaN se non si sa. */
+function ultimoAggiornamentoDel(dir) {
+  for (const f of ['FETCH_HEAD', 'packed-refs', 'HEAD']) {
+    try { return statSync(join(dir, '.git', f)).mtimeMs; } catch (_) { /* il prossimo */ }
+  }
+  return NaN;
+}
+
+/** La riga che dice di quando sono i rami del server letti senza aggiornare il clone. PURA. */
+export function rigaCloneComEra(dir, ms) {
+  const quando = Number.isFinite(ms) ? `${new Date(ms).toISOString().slice(0, 16).replace('T', ' ')} UTC` : 'un momento che non so';
+  return `Rami del server dal clone ${dir} com'era alle ${quando}: nelle routine il manutentore non lo aggiorna, perché il server non dà git verso filo-security al suo biglietto.`;
 }
 
 /** Un lavoro in un incrocio: il ramo, dove sta e il primo feedback. PURA. */
