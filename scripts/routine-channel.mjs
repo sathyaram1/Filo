@@ -346,7 +346,7 @@ export function argomentiImmagine(args, aMano = '') {
   if (lista.length === 2 && haFormaDiBigliettoVero(lista[0])) davanti = lista.shift();
   if (lista.length !== 1) return { errore: 'Uso: immagine <id> [--ticket <codice>], un id solo (s2, r1.3).' };
   const id = lista[0].trim();
-  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), come in «immagini».` };
+  if (!ID_IMMAGINE_RE.test(id)) return { errore: `Id d'immagine non valido: «${id.slice(0, 20)}». La forma è sN (segnalazione) o rK.j (risposta K), con uM. davanti per l'unita M di un pacchetto, come in «immagini».` };
   if (davanti && mano && davanti !== mano) return { errore: 'Due biglietti diversi: passane uno solo.' };
   return { id, ticket: davanti || mano };
 }
