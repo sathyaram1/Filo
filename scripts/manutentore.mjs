@@ -1114,6 +1114,12 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
         else console.log(righeCache(conto, r.finestra).join('\n'));
         return 0;
       }
+      if (q.rifiuti) {
+        const conto = contoRifiuti(r.rapporti, r.finestra);
+        if (q.json) stampaJson({ finestra: r.finestra || null, ...conto });
+        else console.log(righeRifiuti(conto, r.finestra).join('\n'));
+        return 0;
+      }
       if (q.dati.somma && !q.json) { console.log(righeCosto(r, leggiSchede(cartella)).join('\n')); return 0; }
       const { ok, ...resto } = r;
       stampaJson(resto);
