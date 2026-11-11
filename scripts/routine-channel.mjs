@@ -1949,7 +1949,7 @@ if (isMain) {
     const { aspettaCartella, FETTA_MS } = await import('./lib/aspetta-cartella.mjs');
     const fetta = Number(process.env.FILO_ASPETTA_FETTA_MS);
     const esito = await aspettaCartella({
-      controlla: () => lavoroVivo(ROOT, { cosa: SEGNI_RILASCIO_WORKER, altre: cartelleDelLavoro(ROOT) }),
+      controlla: await lavoroVivoDelWorker(),
       sleep: defaultSleep,
       fetta: Number.isFinite(fetta) && fetta >= 0 ? Math.min(fetta, FETTA_MS) : FETTA_MS,
     });
