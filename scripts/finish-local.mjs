@@ -200,11 +200,12 @@ export function cambiatiPerLaScelta({ base, marker, root = ROOT }) {
     const perche = arrivati.ok ? `non riesco a confrontarlo con questa punta (${risolti.errore})` : 'qui non c\'è';
     return { changed, nota: `Giro di riallineamento, ma il commit verificato ${dal.slice(0, 8)} ${perche}: scelgo gli spec solo dal ramo contro main, e i file del lavoro risolti col lato di main restano scoperti.` };
   }
-  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])];
+  const daRiprovare = [...new Set([...risolti.file, ...risolti.conflitti])].sort();
   const resto = righe(arrivati).filter((f) => !daRiprovare.includes(f)).length;
+  const lavoro = changed.filter((f) => !daRiprovare.includes(f)).length;
   return {
-    changed: [...new Set([...changed, ...daRiprovare])],
-    nota: `Giro di riallineamento: scelgo gli spec dal ramo contro main e dai file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}. Il resto del lato arrivato da main (${resto} file) l'ha già provato la suite di main.`,
+    changed: daRiprovare,
+    nota: `Giro di riallineamento: scelgo gli spec dai soli file che il riallineamento ha dovuto risolvere rispetto al lavoro verificato (${dal.slice(0, 8)}): ${daRiprovare.length}${daRiprovare.length ? '' : ', quindi corro solo gli unit'}. Il resto del lavoro (${lavoro} file) l'ha già provato la verifica, il resto del lato arrivato da main (${resto} file) la suite di main.`,
   };
 }
 
