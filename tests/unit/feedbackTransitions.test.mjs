@@ -64,8 +64,9 @@ test('i bilanci dei giri di correzione, uno per livello (feedback #561, §4): qu
   // dal 2026-09-16 nel codice non c'è un default (la verifica locale
   // ragionava con 5/2/0 mentre la dashboard diceva 10/1/0). I vecchi
   // failCap/improvableCap e il verdetto a tre valori sono aboliti. Dal
-  // 2026-09-23 il 3 ha un bilancio suo, separato da quello del 2.
-  assert.deepEqual(DATA.VERIFIER_CAP_KEYS, ['cap3', 'cap2', 'cap1', 'cap0']);
+  // 2026-09-23 il 3 ha un bilancio suo, separato da quello del 2; dal #2339
+  // i livelli sono tre e il bilancio dello 0 non c'è più.
+  assert.deepEqual(DATA.VERIFIER_CAP_KEYS, ['cap3', 'cap2', 'cap1']);
   assert.equal(DATA.VERIFIER_CAPS, undefined, 'un default numerico nel codice è un numero che nessuno applica');
 });
 
