@@ -311,7 +311,10 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   if (tracce.viste) tempi.push(tracce.ultimoMs);
   const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
-  return { mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce };
+  return {
+    mio, finito: mio && bigliettoFinito(m), tempi, processi: vivo ? vivo.segni.length : 0, comandi, processiLetti: !!(vivo && vivo.processiVisti), tracce,
+    chiusoMs: tracce.viste ? tracce.chiusoMs : NaN,
+  };
 }
 
 /**
