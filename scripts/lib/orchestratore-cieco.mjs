@@ -105,8 +105,7 @@ export function decidi(input, { sessione = "", creato = 0, adesso = Date.now(), 
   if (input.hook_event_name === "PostToolUse") {
     const r = input.tool_response;
     const oggetto = !!r && typeof r === "object" && !Array.isArray(r);
-    const stato = oggetto && typeof r.status === "string" ? r.status : "";
-    const finito = stato ? stato === "completed" : !/async_launched|background|sottofondo|outputFile/i.test(typeof r === "string" ? r : JSON.stringify(r || ""));
+    const finito = tornato(r);
     // Claude Code scarta un updatedToolOutput che non ha la forma del ritorno di Agent (una stringa, al posto di un
     // oggetto) e tiene il suo: il testo si sostituisce dentro la forma, e il lancio in sottofondo, che di testo non ne
     // porta, riceve la riga come contesto in più (#1797).
