@@ -691,10 +691,13 @@
     return groups;
   }
 
-  /** «[2i]», «[1v?]», «[2i?!]»: livello e sede di un rilievo, senza testo. PURA. */
+  /** «[2i]», «[1i?]», «[2i?!]», «[e]»: livello e sede di un rilievo, senza testo. PURA. */
   function findingTag(f) {
     const segni = f && f.decision ? `?${f.irreversibile === true ? '!' : ''}` : '';
-    return `[${Number(f && f.level) || 0}${sedeDi(f && f.sede)}${segni}]`;
+    const sede = sedeDi(f && f.sede);
+    if (sede === 'e') return `[e${segni}]`;
+    const n = Number(f && f.level);
+    return `[${LEVELS.includes(n) ? n : 1}i${segni}]`;
   }
 
   /**
