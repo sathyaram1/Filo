@@ -23,7 +23,7 @@ export function cartellaDelServer(radice, esiste = existsSync, { clone = cartell
     if (su === d) break;
     d = su;
   }
-  const delClone = clone ? join(resolve(clone), 'functions') : '';
+  const delClone = daWorker && clone ? join(resolve(clone), 'functions') : '';
   return delClone && valida(delClone) ? delClone : '';
 }
 
