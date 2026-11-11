@@ -2009,6 +2009,8 @@
 
   function classifyDetail(cmd, ctx) {
     if (typeof cmd !== 'string') return TRE;
+    // Il carattere del SEGNAPOSTO scritto da chi manda il comando farebbe passare un `$_` vero per un gruppo.
+    if (cmd.includes('')) return TRE;
     const c = { ...contesto(ctx), stampaLibera: true };
     if (forsePowerShell(c) && PS_IMPOSTA_AUTOMATICA_RE.test(cmd)) return TRE;
     const letture = comeLaShell(cmd, c);
@@ -2084,10 +2086,11 @@
   // In sh e bash `$_` vale l'ultimo argomento del comando eseguito prima, che sceglie chi scrive la riga (#1994): si
   // misura con ognuno dei valori che può prendere. In testa alla riga, in un tubo o da un valore ignoto non si sa.
   // Senza contesto resta la lettura di PowerShell, dove `$_` è l'oggetto del tubo.
-  const ULTIMO_ARG_RE = /\$_(?!\w)/g;
+  // Il SEGNAPOSTO di un gruppo comincia anch'esso con `$_`, ma non è la variabile: `(ls | wc -l)` resta una lettura (#2345).
+  const ULTIMO_ARG_RE = /\$_(?![\w])/g;
   const ULTIMI_MAX = 16;
   function usaUltimoArg(s, c) {
-    return shellPosix(c) && /\$_(?!\w)/.test(s);
+    return shellPosix(c) && String(s).search(ULTIMO_ARG_RE) >= 0;
   }
   function ultimiArgomenti(raw, c) {
     const out = [];

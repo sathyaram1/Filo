@@ -1451,3 +1451,16 @@ test('#1994 — le graffe si aprono in un tempo che cresce con la lunghezza, non
   assert.equal(C.classify('git log --{x,{output=y,}}', ctx), 3);
   assert.equal(C.classify('git log --{{out}put=x,}', ctx), 1);
 });
+
+// #2345: il segnaposto di un gruppo comincia con `$_`, e in sh e bash veniva preso per l'ultimo argomento: ogni
+// sottoshell di sole letture chiedeva la conferma forte.
+test('#2345 — in sh e bash un gruppo di sole letture resta 1; un `$_` vero dentro il gruppo resta 3', () => {
+  for (const ctx of [{ shell: '', cwd: '/home/u', home: '/home/u', win: false }, SHELL_1994[0]]) {
+    for (const cmd of ['(ls ~ | wc -l)', '(echo ciao)', '(ls) && (pwd)', 'ls ~ ; (wc -l a.txt)']) {
+      assert.equal(C.classify(cmd, ctx), 1, cmd);
+    }
+    for (const cmd of ['echo /etc/shadow; (cat $_)', 'echo a; (rm $_)', 'cat $_', '(ls) ']) {
+      assert.equal(C.classify(cmd, ctx), 3, cmd);
+    }
+  }
+});
