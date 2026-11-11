@@ -914,8 +914,8 @@ dashboard scriveva "in attesa di ripresa". Adesso:
 - **`scripts/dispatch.mjs` + ruoli**: il fixer muove `todo→working→revision_*`;
   loop 3× → `design`+`statusReason: loop`. *(Dal 2026-09-05, feedback #561: la
   critica si registra coi livelli e l'esito lo calcola il server; le regole
-  stanno in `src/shared/verifierRound.js`, incorporato dal server; i quattro
-  bilanci `cap3/cap2/cap1/cap0`, uno per livello, li scrive SOLO l'owner in `config/routines`
+  stanno in `src/shared/verifierRound.js`, incorporato dal server; i tre
+  bilanci `cap3/cap2/cap1`, uno per livello (quattro fino al #2339), li scrivono l'owner e il manutentore in `config/routines`
   (Gestione → Automazioni) — dal 2026-09-16 nel codice non c'è un default: la
   verifica locale li legge dal server e senza si ferma.)*
   *(Dal 2026-10-15, #795: alla chiusura di un lavoro, per qualunque strada, i suoi giri
