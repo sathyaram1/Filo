@@ -862,13 +862,14 @@ test('leggiBilanciDalServer: senza token, senza documento o senza uno dei tre nu
   await assert.rejects(
     () => leggiBilanci({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { integerValue: '10' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap1: l'owner li imposta in Gestione → Automazioni/,
+    'un cap0 rimasto dalla scala vecchia non sostituisce il cap1',
   );
   await assert.rejects(
     () => leggiBilanci({ fetchImpl: conCampi({ cap3: { integerValue: '5' }, cap2: { stringValue: '' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
-    /non ha cap2, cap0/,
+    /non ha cap2:/,
   );
   await assert.rejects(
-    () => leggiBilanci({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap1: { integerValue: '1' }, cap0: { integerValue: '0' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
+    () => leggiBilanci({ fetchImpl: conCampi({ cap2: { integerValue: '10' }, cap1: { integerValue: '1' } }), env: { FILO_ADMIN_ID_TOKEN: 't' } }),
     /non ha cap3/,
     'un documento di prima della separazione dei bilanci: manca il bilancio dei 3, e lo dice',
   );
