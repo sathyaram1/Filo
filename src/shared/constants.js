@@ -167,8 +167,8 @@
   // nomi dei campi stanno in `src/shared/feedbackTransitions.js`
   // (VERIFIER_CAP_KEYS).
   const AUTOMATION = {
-    // Lo 0 è un valore valido per tutti (per cap0 è il default: i casi rari da
-    // soli non si correggono mai); con cap3 a 0 il primo rilievo di livello 3
+    // Lo 0 è un valore valido per tutti (per cap1 è quello di partenza: gli 1
+    // da soli non si correggono); con cap3 a 0 il primo rilievo di livello 3
     // ferma subito la pratica.
     CAP_MIN: 0,
     CAP_MAX: 10,
