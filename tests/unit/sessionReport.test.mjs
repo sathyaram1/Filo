@@ -1073,7 +1073,7 @@ test('gli elenchi stanno nel budget e il taglio si dice coi conti interi; i sott
 // #2303: un worker fermo su un limite di frequenza del fornitore non chiama strumenti; l'attesa che Claude Code dichiara
 // prima di ritentare sta fra le attese, e arriva al biglietto come le altre.
 test('le attese dichiarate dal fornitore sopra 30 s stanno fra le attese, e arrivano al biglietto', async () => {
-  const errore = (ts, retryInMs, retryAttempt) => ({ type: 'system', subtype: 'api_error', level: 'error', timestamp: ts, retryInMs, retryAttempt, maxRetries: 10 });
+  const errore = (ts, retryInMs, retryAttempt) => JSON.stringify({ type: 'system', subtype: 'api_error', level: 'error', timestamp: ts, retryInMs, retryAttempt, maxRetries: 10 });
   const rep = await analizzaRighe([
     chiama('f1', T('00:00'), 'Bash', { command: 'ls', description: 'List files' }),
     result('f1', 'ok', T('00:01')),
