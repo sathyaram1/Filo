@@ -803,27 +803,24 @@ test('i tre bilanci dei giri di correzione e le loro istruzioni sono editabili e
   await cap1.fill('3');
   await page.locator('#mgCap1Save').click();
   await expect(page.locator('#mgCap1Msg')).toHaveText('Salvato.');
-  await cap0.fill('1');
-  await page.locator('#mgCap0Save').click();
-  await expect(page.locator('#mgCap0Msg')).toHaveText('Salvato.');
   await fix.fill('');
   await page.locator('#mgFixInstructionsSave').click();
   await expect(page.locator('#mgFixInstructionsMsg')).toHaveText('Salvato: vale il testo del server.');
 
   // I valori sono stati SCRITTI nella config (l'IPC che il server della
   // critica legge): è qui che "hanno effetto", non solo in una cache locale.
-  // Ogni salvataggio tocca SOLO il suo campo.
+  // Ogni salvataggio tocca SOLO il suo campo, e nessuno scrive un cap0.
   await expect.poll(() => page.evaluate(() => window.__capsSets))
-    .toEqual([{ cap3: 4 }, { cap2: 5 }, { cap1: 3 }, { cap0: 1 }, { fixInstructions: '' }]);
-  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap3: 4, cap2: 5, cap1: 3, cap0: 1, fixInstructions: '' });
+    .toEqual([{ cap3: 4 }, { cap2: 5 }, { cap1: 3 }, { fixInstructions: '' }]);
+  expect(await page.evaluate(() => window.__capsValue)).toEqual({ cap3: 4, cap2: 5, cap1: 3, cap0: 4, fixInstructions: '' });
 
   // Sono anche specchiati nella cache locale (display istantaneo all'avvio).
   const cached = await page.evaluate(async () => {
     const K = window.SN_CONST.STORAGE_KEYS;
-    const d = await window.chrome.storage.local.get([K.AUTOMATION_CAP2, K.AUTOMATION_CAP1, K.AUTOMATION_CAP0]);
-    return [d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], d[K.AUTOMATION_CAP0]];
+    const d = await window.chrome.storage.local.get([K.AUTOMATION_CAP3, K.AUTOMATION_CAP2, K.AUTOMATION_CAP1]);
+    return [d[K.AUTOMATION_CAP3], d[K.AUTOMATION_CAP2], d[K.AUTOMATION_CAP1], 'AUTOMATION_CAP0' in K];
   });
-  expect(cached).toEqual([5, 3, 1]);
+  expect(cached).toEqual([4, 5, 3, false]);
 });
 
 test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella config delle routine, e un guasto lo rimette dov\'era', async ({ openTab }) => {
