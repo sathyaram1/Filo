@@ -31,21 +31,23 @@ async function serverFinto(app, roleModels) {
   }, roleModels);
 }
 
-async function stimaCon(app, openTab, roleModels) {
-  await serverFinto(app, roleModels);
-  const page = await openTab('filo://manage/manage.html');
+async function stima(page) {
   await page.waitForFunction(() => window.__mgTest && window.filo && window.SN_ROUTINE_MODELLI);
   await page.evaluate(() => window.__mgTest.whenReady());
   await apriScheda(page, 'automation');
-  const stima = page.locator('.mg-role-stima[data-ruolo="verifier-riallineamento"]');
-  await expect(stima).toHaveText(/al mese/);
-  return { page, testo: await stima.textContent() };
+  const s = page.locator('.mg-role-stima[data-ruolo="verifier-riallineamento"]');
+  await expect(s).toHaveText(/al mese/);
+  return s.textContent();
 }
 
 test('r2 la stima della verifica dopo un riallineamento cambia col modello della fase', async ({ app, openTab }) => {
-  const opus = await stimaCon(app, openTab, { 'verifier-riallineamento': { model: 'opus', effort: 'medium' } });
-  await opus.page.locator('#mgRoleModels').screenshot({ path: path.join('tests', '.shots', 'verifica-2344-giro2-automazioni.png') });
-  await opus.page.close();
-  const haiku = await stimaCon(app, openTab, { 'verifier-riallineamento': { model: 'haiku', effort: 'medium' } });
-  expect(haiku.testo, `con Haiku la stima resta quella di Opus: «${haiku.testo}»`).not.toBe(opus.testo);
+  await serverFinto(app, { 'verifier-riallineamento': { model: 'opus', effort: 'medium' } });
+  const page = await openTab('filo://manage/manage.html');
+  const conOpus = await stima(page);
+  await page.locator('#mgRoleModels').screenshot({ path: path.join('tests', '.shots', 'verifica-2344-giro2-automazioni.png') });
+  await serverFinto(app, { 'verifier-riallineamento': { model: 'haiku', effort: 'medium' } });
+  await page.reload();
+  const conHaiku = await stima(page);
+  await expect(page.locator('select[data-ruolo="verifier-riallineamento"][data-campo="model"]')).toHaveValue('haiku');
+  expect(conHaiku, `con Haiku la stima resta quella di Opus: «${conHaiku}»`).not.toBe(conOpus);
 });
