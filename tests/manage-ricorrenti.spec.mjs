@@ -297,7 +297,7 @@ test('nuovo compito ricorrente: parte coi valori iniziali, rifiuta prima di mand
   const [salva] = await inviati(page, 'ricorrente_salva');
   expect(salva.ricorrente).toEqual({
     nome: 'Guarda i <b>log</b>', testo: 'Leggi i log della notte.', giorni: [0, 1, 2, 3, 4, 5, 6], ora: '06:00', ambito: 'lavoro',
-    urgenza: 45, modello: 'opus', sforzo: 'high', attivo: true, domandaFineTurno: '',
+    urgenza: 45, modello: 'opus', sforzo: 'high', tettoUsd: null, attivo: true, domandaFineTurno: '',
   });
   const nuova = riga(page, 'nuovo-1');
   await expect(nuova.locator('.mg-cp-nome')).toHaveText('Guarda i <b>log</b>');
