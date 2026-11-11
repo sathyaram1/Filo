@@ -109,6 +109,39 @@ test('un ramo che riscrive una riga già scritta e ne aggiunge una nello stesso 
   assert.deepEqual(soloRiscritta.spostate, []);
 });
 
+// Il blocco 0.2.270 dopo il rebase della segnalazione: il `features` di main prima di `fixes`, quello del ramo dopo.
+const conDoppio = (blocchi, versione, righeDelRamo) => sorgente(blocchi).replace(
+  new RegExp(`(version: '${versione.replace(/\./g, '\\.')}'[^]*?fixes: \\[\\n[^]*?      \\],\\n)`),
+  `$1      features: [\n${righeDelRamo.map((r) => `        ${scritta(r)},\n`).join('')}      ],\n`);
+
+test('un blocco con features scritto due volte: lo strumento si ferma e dice dove, invece di perdere le righe di main (#2320)', () => {
+  const main = [
+    { v: '0.2.273', fixes: ['In arrivo'] },
+    { v: '0.2.270', features: ['Di main, #1397', 'Di main, #884'], fixes: ['Correzione uscita'] },
+    { v: '0.2.269', features: ['Vecchia'] },
+  ];
+  const ramo = conDoppio(main, '0.2.270', [R1]);
+  assert.deepEqual([...registroDa(ramo)[1].features].map(globalThis.SN_PATCH_NOTES.testo), [R1.testo], 'la scena: eseguito, il blocco tiene solo il features del ramo');
+  assert.deepEqual(chiaviDoppie(ramo), [{ version: '0.2.270', chiave: 'features' }]);
+  const r = spostaInCima(ramo, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.272' }, oggi: OGGI });
+  assert.equal(r.ok, false);
+  assert.match(r.motivo, /nel blocco 0\.2\.270 «features» è scritto due volte.*Uniscili/);
+  assert.match(testoRiportaInCima({ ...r, spostate: [] })[0], /non spostate\. nel blocco 0\.2\.270/);
+  // Anche una data scritta due volte nel blocco in cima, e più blocchi insieme.
+  const due = ramo.replace("version: '0.2.273', date: '2026-11-01',", "version: '0.2.273', date: '2026-11-01', date: '2026-11-02',");
+  assert.deepEqual(chiaviDoppie(due), [{ version: '0.2.273', chiave: 'date' }, { version: '0.2.270', chiave: 'features' }]);
+  assert.deepEqual(chiaviDoppie(sorgente(main)), []);
+});
+
+test('un blocco in cima con le sole correzioni riceve il suo features prima di fixes, dove lo scrive main (#2320)', () => {
+  const main = [{ v: '0.2.273', fixes: ['In arrivo'] }, { v: '0.2.270', features: ['Uscita'] }];
+  const ramo = sorgente([main[0], { v: '0.2.270', features: ['Uscita', R1], fixes: [R2] }]);
+  const r = spostaInCima(ramo, { prima: registroDa(sorgente(main)), manifesto: { version: '0.2.272' }, oggi: OGGI });
+  assert.equal(r.ok, true, r.motivo);
+  assert.equal(r.src, sorgente([{ v: '0.2.273', features: [R1], fixes: ['In arrivo', R2] }, { v: '0.2.270', features: ['Uscita'], fixes: ['_'] }])
+    .replace("fixes: [\n        '_',\n      ],", 'fixes: [],'));
+});
+
 test('sul registro vero: una riga aggiunta sotto l\'ultima versione uscita finisce nel blocco della prossima', () => {
   const vero = readFileSync(join(REPO, FILE_NOVITA), 'utf8');
   const pkg = JSON.parse(readFileSync(join(REPO, 'package.json'), 'utf8'));
