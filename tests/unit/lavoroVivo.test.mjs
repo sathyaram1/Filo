@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import { createServer } from 'node:http';
 import { spawn, spawnSync, execFileSync } from 'node:child_process';
 import { existsSync, mkdirSync, readFileSync, utimesSync, writeFileSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
