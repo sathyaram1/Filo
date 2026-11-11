@@ -141,7 +141,13 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   await expect(tendina(page, 'verifier-riallineamento', 'effort').locator('.sn-select-value')).toHaveText('medium (partenza)');
   await expect(tendina(page, 'verifier-riallineamento', 'model').locator('.sn-select-value')).toHaveText('Come in Verifica');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('');
+  // Il costo si legge dove si sceglie, e segue la scelta (#2344).
+  const stima = page.locator('.mg-role-stima[data-ruolo="verifier-riallineamento"]');
+  await expect(stima).toHaveText(/^Sforzo medium: circa \d+ \$ al mese, una verifica in circa \d+ minuti\.$/);
+  await expect(stima).toHaveAttribute('title', /748 \$ su 253 verifiche/);
+  await expect(page.locator('.mg-role-stima')).toHaveCount(1);
   await scegli(page, 'verifier-riallineamento', 'effort', 'low');
+  await expect(stima).toHaveText(/^Sforzo low: circa \d+ \$ al mese/);
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica dopo un riallineamento: salvato.');
   expect((await sulServer(app)).roleModels['verifier-riallineamento']).toEqual({ effort: 'low' });
 
