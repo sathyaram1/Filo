@@ -39,8 +39,8 @@
   const mgRiservatiTettoSave = document.getElementById('mgRiservatiTettoSave');
   const mgRiservatiTettoMsg  = document.getElementById('mgRiservatiTettoMsg');
   // I bilanci dei giri di correzione, uno per livello (feedback #561): cap3 =
-  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1, cap0 =
-  // per i soli 0; più il testo in coda alla risposta (fixInstructions).
+  // giri per i rilievi di livello 3, cap2 = per i 2, cap1 = per gli 1; più il
+  // testo in coda alla risposta (fixInstructions).
   const mgCap3     = document.getElementById('mgCap3');
   const mgCap3Save = document.getElementById('mgCap3Save');
   const mgCap3Msg  = document.getElementById('mgCap3Msg');
@@ -50,9 +50,6 @@
   const mgCap1     = document.getElementById('mgCap1');
   const mgCap1Save = document.getElementById('mgCap1Save');
   const mgCap1Msg  = document.getElementById('mgCap1Msg');
-  const mgCap0     = document.getElementById('mgCap0');
-  const mgCap0Save = document.getElementById('mgCap0Save');
-  const mgCap0Msg  = document.getElementById('mgCap0Msg');
   const mgFixInstructions     = document.getElementById('mgFixInstructions');
   const mgFixInstructionsSave = document.getElementById('mgFixInstructionsSave');
   const mgFixInstructionsMsg  = document.getElementById('mgFixInstructionsMsg');
