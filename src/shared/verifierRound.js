@@ -586,7 +586,7 @@
     const conPriorita = (f) => Object.assign({}, f, { priority: prioritaDiNascita(f.level) });
 
     const findings = tutti.filter((f) => f.sede !== 'e');
-    const external = tutti.filter((f) => f.sede === 'e').map(conPriorita);
+    const external = tutti.filter((f) => f.sede === 'e').map((f) => Object.assign({}, f, { priority: null }));
     const blocking = [];
     const derived = [];
     const candidati = [];
@@ -594,11 +594,6 @@
     // candidati possono pagare. Chi non può pagare sta per forza sotto chi paga.
     let paga = null;
     for (const f of findings) {
-      if (f.sede === 'v') {
-        if (f.decision) derived.push(f);
-        else candidati.push(f);
-        continue;
-      }
       const level = Number(f.level);
       if (decisioneFerma(f)) {
         blocking.push(f);
