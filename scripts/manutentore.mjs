@@ -164,19 +164,18 @@ export function rigaLavoro(l) {
 }
 
 /**
- * Aggiorna i rami del clone del server. Con un biglietto passa da git-server, l'unica strada verso filo-security delle
- * routine; senza (sessione locale) col git dell'owner. Se non riesce lo dice e si legge il clone com'è.
+ * Aggiorna i rami del clone del server col git dell'owner (sessione locale). Nelle routine no: ogni git di rete verso
+ * filo-security passa da git-server, che al biglietto del manutentore (non fidato, senza ambito server) dice sempre di
+ * no; lì si legge il clone com'è e si dice di quando è. → la riga da mettere in coda, o ''.
  */
 async function aggiornaCloneServer(dir, { root, ticket = '' }) {
   const { readTicket } = await import('./lib/routine-ticket.mjs');
-  const biglietto = ticket || readTicket(root);
+  if (ticket || readTicket(root)) return rigaCloneComEra(dir, ultimoAggiornamentoDel(dir));
   const { spawnSync } = await import('node:child_process');
-  const r = biglietto
-    ? spawnSync(process.execPath, [join(ROOT, 'scripts', 'routine-channel.mjs'), 'git-server', 'fetch', dir, '--ticket', biglietto], { encoding: 'utf8', timeout: 120_000 })
-    : spawnSync('git', ['-C', dir, 'fetch', 'origin', '--prune', '--quiet'], { encoding: 'utf8', timeout: 120_000 });
-  if (r.status === 0) return;
+  const r = spawnSync('git', ['-C', dir, 'fetch', 'origin', '--prune', '--quiet'], { encoding: 'utf8', timeout: 120_000 });
+  if (r.status === 0) return '';
   const riga = String(r.stderr || (r.error && r.error.message) || '').trim().split('\n').filter(Boolean).pop() || `uscito con ${r.status}`;
-  console.error(`AVVISO: i rami del server non si sono aggiornati (${riga}): sono quelli dell'ultimo aggiornamento del clone ${dir}.`);
+  return `AVVISO: i rami del server non si sono aggiornati (${riga}): sono quelli dell'ultimo aggiornamento del clone ${dir}.`;
 }
 
 /** La riga che dice che i rami del server mancano, e perché: senza, un elenco senza di loro sembrerebbe completo. PURA. */
