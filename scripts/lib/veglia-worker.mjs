@@ -380,6 +380,8 @@ export function segniDiVita({ root, ticket, sessione = process.env.CLAUDE_CODE_S
   const dopoMs = partenze.length ? Math.min(...partenze) : -Infinity;
   const tracce = tracceSottoAgenti({ dir: cartellaSottoAgenti({ sessione, configDir }), dopoMs });
   if (tracce.viste) tempi.push(tracce.ultimoMs);
+  // Un'attesa dichiarata dal fornitore vale come un passo fino alla sua fine: il segno di vita sta nel futuro.
+  if (Number.isFinite(tracce.fornitoreFinoMs)) tempi.push(tracce.fornitoreFinoMs);
   const vivo = mio ? lavoroVivo(root, { cosa: ['processi'], altre: cartelleDelLavoro(root), ...(leggiProcessi ? { leggiProcessi } : {}) }) : null;
   const comandi = vivo ? vivo.segni.filter((x) => x.tipo === 'processo').map((x) => x.cmd) : [];
   return {
