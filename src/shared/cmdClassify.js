@@ -1946,7 +1946,7 @@
   function classifica(cmd, c, prof) {
     const trimmed = String(cmd).trim();
     if (!trimmed || prof > PROF_MAX) return TRE;
-    const sm = smonta(trimmed);
+    const sm = smonta(trimmed, c);
     if (sm === null) return classificaPiatta(trimmed, c);
     // Il testo lasciato fuori non passa dai controlli dei separatori: non ne deve avere, neanche fra virgolette.
     if (sm === TRE || /[;|&<>]/.test(sm.lasciato)) return TRE;
