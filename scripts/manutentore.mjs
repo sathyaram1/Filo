@@ -166,18 +166,18 @@ export function rigaLavoro(l) {
 }
 
 /**
- * Aggiorna i rami del clone del server col git dell'owner (sessione locale). Nelle routine no: ogni git di rete verso
- * filo-security passa da git-server, che al biglietto del manutentore (non fidato, senza ambito server) dice sempre di
- * no; lì si legge il clone com'è e si dice di quando è. → la riga da mettere in coda, o ''.
+ * Aggiorna in sola lettura tutti i rami del clone del server col git della sessione: in locale quello dell'owner, nelle
+ * routine il proxy della sessione, che filo-security lo serve già (git-server al biglietto del manutentore dice no, #2340).
+ * Il clone di partenza di una sessione cloud è poco profondo e ha solo main: si completa, o la base con main non si trova.
+ * → l'avviso da mettere in coda se non riesce, o ''.
  */
-async function aggiornaCloneServer(dir, { root, ticket = '' }) {
-  const { readTicket } = await import('./lib/routine-ticket.mjs');
-  if (ticket || readTicket(root)) return rigaCloneComEra(dir, ultimoAggiornamentoDel(dir));
-  const { spawnSync } = await import('node:child_process');
-  const r = spawnSync('git', ['-C', dir, 'fetch', 'origin', '--prune', '--quiet'], { encoding: 'utf8', timeout: 120_000 });
+function aggiornaCloneServer(dir) {
+  const corto = existsSync(join(dir, '.git', 'shallow'));
+  const r = spawnSync('git', ['-C', dir, 'fetch', '--prune', '--quiet', ...(corto ? ['--unshallow'] : []), 'origin', '+refs/heads/*:refs/remotes/origin/*'],
+    { encoding: 'utf8', timeout: 300_000, env: { ...process.env, GIT_TERMINAL_PROMPT: '0' } });
   if (r.status === 0) return '';
-  const riga = String(r.stderr || (r.error && r.error.message) || '').trim().split('\n').filter(Boolean).pop() || `uscito con ${r.status}`;
-  return `AVVISO: i rami del server non si sono aggiornati (${riga}): sono quelli dell'ultimo aggiornamento del clone ${dir}.`;
+  const motivo = String(r.stderr || (r.error && r.error.message) || '').trim().split('\n').filter(Boolean).pop() || `uscito con ${r.status}`;
+  return rigaCloneComEra(dir, ultimoAggiornamentoDel(dir), { motivo, corto });
 }
 
 /** La riga che dice che i rami del server mancano, e perché: senza, un elenco senza di loro sembrerebbe completo. PURA. */
