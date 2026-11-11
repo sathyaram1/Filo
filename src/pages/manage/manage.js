@@ -79,6 +79,7 @@
   const mgRoleModels      = document.getElementById('mgRoleModels');
   const mgRoleModelsMsg   = document.getElementById('mgRoleModelsMsg');
   const roleSelects       = new Map();
+  const roleStime         = new Map();
   const mgJudgeTimeout     = document.getElementById('mgJudgeTimeout');
   const mgJudgeTimeoutSave = document.getElementById('mgJudgeTimeoutSave');
   const mgJudgeTimeoutMsg  = document.getElementById('mgJudgeTimeoutMsg');
