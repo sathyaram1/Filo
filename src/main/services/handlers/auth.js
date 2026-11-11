@@ -1464,22 +1464,8 @@ module.exports = function register(on, ctx) {
 
   on(MSG.MERGE_APPROVAL_APPROVE, ownerOnly(async (msg) => {
     const r = await callSecurityFunction('ownerMergeApprovals', { op: 'approve', id: String(msg?.id || '') });
-    if (r && r.ok === false) return { ok: false, error: r.detail || r.reason || 'Fusione non riuscita.' };
-    // Alla pagina arriva tutto l'esito, non solo esito e sha: senza riallineamento e motivo
-    // diceva «la richiesta decade» a un riallineamento riuscito.
-    const out = { ok: true, result: (r && r.result) || '', sha: (r && r.sha) || '', headSha: (r && r.headSha) || '' };
-    if (r && r.realigned && typeof r.realigned === 'object') {
-      out.realigned = {
-        from: String(r.realigned.from || ''),
-        to: String(r.realigned.to || ''),
-        mainSha: String(r.realigned.mainSha || ''),
-      };
-    }
-    if (r && r.newRequest) out.newRequest = String(r.newRequest);
-    if (r && Array.isArray(r.newBlocks)) out.newBlocks = r.newBlocks;
-    if (r && r.realignReason) out.realignReason = String(r.realignReason);
-    if (r && r.reason) out.reason = String(r.reason);
-    return out;
+    // La stessa forma della pagina da browser: i campi che la frase dell'owner legge passano tutti.
+    return globalThis.SN_MERGE_APPROVALS.rispostaPerCard(r, 'Fusione non riuscita.');
   }));
 
   // «Salta il controllo»: l'owner ha letto la bocciatura dell'audit di
