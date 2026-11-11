@@ -556,11 +556,17 @@ export function notaDelGiro(entry, { branch, sha }) {
   const righe = [`Verifica locale, giro ${rounds.length + 1}: avviata sul ramo ${branch} (${String(sha || '').slice(0, 8)}${testoServer(entry && entry.requestedServer)}).`];
   const prima = rounds[rounds.length - 1];
   if (prima) {
-    const rilievi = ROUND.parseFindings(String(prima.critique || '')).findings;
-    righe.push(`Giro ${rounds.length}: ${prima.outcome || 'esito non registrato'}, ${rilievi.length === 1 ? '1 rilievo' : `${rilievi.length} rilievi`}.`);
-    for (const f of rilievi) {
-      righe.push(`· livello ${f.level}${f.sede === 'e' ? ', di un altro lavoro' : ''}: ${ROUND.primaFrase(f.text, 160)}`);
+    const letta = ROUND.parseFindings(String(prima.critique || ''));
+    // Una critica registrata con la scala a quattro livelli (#2339) non perde le sue righe: si riportano com'erano.
+    const vecchie = Array.isArray(letta.rifiutati) ? letta.rifiutati : [];
+    const n = letta.findings.length + vecchie.length;
+    righe.push(`Giro ${rounds.length}: ${prima.outcome || 'esito non registrato'}, ${n === 1 ? '1 rilievo' : `${n} rilievi`}.`);
+    for (const f of letta.findings) {
+      righe.push(f.sede === 'e'
+        ? `· di un altro lavoro, senza livello: ${ROUND.primaFrase(f.text, 160)}`
+        : `· livello ${f.level}: ${ROUND.primaFrase(f.text, 160)}`);
     }
+    for (const r of vecchie) righe.push(`· scritto con la scala vecchia: ${ROUND.primaFrase(r.replace(/\s*\([^)]*\)\s*$/, ''), 160)}`);
   }
   return righe.join('\n');
 }
