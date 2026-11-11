@@ -683,8 +683,8 @@
   }
 
   // ── I bilanci dei giri di correzione, uno per livello (tab Automazioni) ──
-  // Cinque campi sul doc Firestore config/routines (feedback #561, §4):
-  //   cap3/cap2/cap1/cap0  giri per i rilievi di livello 3/2/1/0 (come si
+  // Quattro campi sul doc Firestore config/routines (feedback #561, §4; #2339):
+  //   cap3/cap2/cap1  giri per i rilievi di livello 3/2/1 (come si
   //         spendono: decideRound in verifierRound.js);
   //   fixInstructions  il testo che il server aggiunge in coda alla risposta
   //         a una critica (vuoto = il testo del server).
