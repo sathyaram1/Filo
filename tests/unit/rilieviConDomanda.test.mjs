@@ -64,7 +64,7 @@ test('verifierRound: la domanda viaggia col rilievo strutturato, il campo mancan
   assert.equal(V.titoloDelDerivato(gruppi[0]), 'Bordo caldo o freddo?');
   assert.equal(V.titoloDelDerivato(V.derivedGroups([norm[1]])[0]), '', 'i rimasti hanno il loro titolo di sempre');
   // La decisione del giro porta la domanda con sé fino ai derivati.
-  const d = V.decideRound({ findings: norm.slice(0, 1), caps: { cap3: 1, cap2: 1, cap1: 1, cap0: 0 }, counts: {} });
+  const d = V.decideRound({ findings: norm.slice(0, 1), caps: { cap3: 1, cap2: 1, cap1: 1 }, counts: {} });
   assert.equal([...(d.derived || []), ...(d.external || [])][0]?.domanda?.titolo, 'Bordo caldo o freddo?');
 });
 
