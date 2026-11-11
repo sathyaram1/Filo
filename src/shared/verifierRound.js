@@ -620,7 +620,8 @@
       // Gli altri interni non si perdono con lo stop: chi riprende li trova nel
       // segnalibro, insieme a quello che ha fermato, e il giro dopo non li riscopre.
       const sospesi = findings.filter((f) => !blocking.includes(f));
-      return { stop: true, blocking, sospesi, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
+      const conDestinatario = blocking.map((f) => Object.assign({}, f, { destinatario: destinatarioDelFermo(f) }));
+      return { stop: true, blocking: conDestinatario, sospesi, fix: [], derived: [], external, consume: null, counts: Object.assign({}, counts), budgets };
     }
 
     // Ordine stabile: come nella critica. Un 2 col `?` corretto esce anche da parte:
