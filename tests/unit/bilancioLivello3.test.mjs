@@ -49,20 +49,20 @@ test('un 3 interno paga il bilancio dei 3; finiti il suo e quelli sotto ferma il
 
 // D88 (#744): un rilievo di livello X col bilancio di X finito paga col più alto
 // ancora aperto sotto X, anche se nient'altro fa partire il giro.
-test('D88: un 3 a bilancio dei 3 finito non ferma finché c\'è un bilancio sotto: paga cap2, poi cap1, poi cap0', () => {
-  const caps = { ...CAPS, cap0: 1 };
-  const due = decide([f(3, 'i', 'perde i dati')], { count3: 5 }, caps);
+test('D88: un 3 a bilancio dei 3 finito non ferma finché c\'è un bilancio sotto: paga cap2, poi cap1', () => {
+  const due = decide([f(3, 'i', 'perde i dati')], { count3: 5 });
   assert.equal(due.stop, false);
   assert.deepEqual(livelli(due.fix), ['3i']);
   assert.equal(due.consume, 'cap2');
   assert.deepEqual([due.counts.count3, due.counts.count2], [5, 1], 'cap3 resta al suo tetto');
-  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4 }, caps).consume, 'cap1');
-  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1 }, caps).consume, 'cap0');
-  const fermo = decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1, count0: 1 }, caps);
-  assert.equal(fermo.stop, true, 'finiti tutti: il 3 ferma come prima');
+  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4 }).consume, 'cap1');
+  const fermo = decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1 });
+  assert.equal(fermo.stop, true, 'finiti tutti e tre: il 3 ferma, sotto l\'1 non c\'è più un bilancio');
+  // Un cap0 rimasto nel documento dalla scala a quattro livelli non paga più niente.
+  assert.equal(decide([f(3, 'i', 'x')], { count3: 5, count2: 4, count1: 1 }, { ...CAPS, cap0: 3 }).stop, true);
 });
 
-test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1, poi cap0; finiti tutti esce a priorità 1 e il giro passa', () => {
+test('D88: un 2 da solo col bilancio dei 2 finito entra nel giro pagando cap1; finiti tutti esce a priorità 1 e il giro passa', () => {
   const d = decide([f(2, 'i', 'non salva')], { count2: 4 });
   assert.equal(d.stop, false);
   assert.deepEqual(livelli(d.fix), ['2i'], 'nessun altro rilievo fa partire il giro, si corregge lo stesso');
