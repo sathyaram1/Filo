@@ -1411,7 +1411,12 @@ test('#2392 — una sottoshell di sola lettura in bash e sh resta una lettura; $
     for (const cmd of ['(rm x)', 'echo --output=x; (pwd); git log $_', 'echo --output=x; ls (pwd); git log $_']) {
       assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${cmd}`);
     }
-    // Il segno interno scritto da chi manda il comando non si fa passare per un gruppo già misurato.
+    // Ogni segno interno scritto da chi manda il comando, presi dal modulo: non si fa passare per un gruppo già misurato.
+    const segni = [...C.segniInterni()];
+    assert.ok(segni.length >= 3);
+    for (const s of segni) {
+      for (const cmd of [`echo --output=x; git log $_${s}`, `ls ${s}x`]) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${JSON.stringify(cmd)}`);
+    }
     for (const cmd of ['echo --output=x; git log $_\uE000', 'ls \uE001x\uE002']) assert.equal(C.classify(cmd, ctx), 3, `${shell}: ${JSON.stringify(cmd)}`);
   }
 });
