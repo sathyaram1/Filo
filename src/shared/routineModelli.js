@@ -54,6 +54,23 @@
   }
 
   /**
+   * Costo al mese e durata di una fase con lo sforzo scelto ('' = la partenza): { testo, perche }, o null per una fase
+   * senza stima. Si legge dove si decide (filo_design.txt § GESTIONE DEI MODELLI).
+   */
+  function stimaDi(ruolo, effort) {
+    const r = RUOLI.find((x) => x.id === ruolo) || {};
+    const s = r.stima;
+    const sforzo = effort || (r.partenza && r.partenza.effort) || '';
+    if (!s || !s.sforzi[sforzo]) return null;
+    const mese = (k) => Math.round((s.dollariAVerifica * s.sforzi[k][0] * s.aSettimana * 52 / 12) / 10) * 10;
+    return {
+      testo: `Sforzo ${sforzo}: circa ${mese(sforzo)} $ al mese, una verifica in circa ${s.sforzi[sforzo][1]} minuti.`,
+      perche: `Stima con ${s.aSettimana} verifiche a settimana. Base: ${s.base}; gli altri sforzi in proporzione. `
+        + `Al mese: ${Object.keys(s.sforzi).map((k) => `${k} circa ${mese(k)} $`).join(', ')}.`,
+    };
+  }
+
+  /**
    * Tutte le fasi, con '' dove vale la definizione dell'agente. Un valore fuori elenco scritto a mano resta
    * com'è: il server potrebbe usarlo, e mostrarlo come «definizione dell'agente» sarebbe una bugia.
    */
