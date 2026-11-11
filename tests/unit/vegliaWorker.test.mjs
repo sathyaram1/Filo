@@ -599,6 +599,15 @@ describe('il tetto di costo di un compito', () => {
     assert.equal(e.uscita, USCITA_FERMO);
     assert.deepEqual(e.oltreTetto, { usd: 131.2, tettoUsd: 120 });
     assert.match(e.testo, /^Compito oltre il tetto di costo della corsa \(131\.2 \$ su 120 \$\): biglietto rilasciato, il compito non riparte\./);
+    // Il biglietto chiuso non ferma un worker in sottofondo: chi guida il giro deve fermarlo, e sapere come (#2303).
+    assert.match(e.testo, /fermalo adesso con lo strumento TaskStop[^.]*id che ti ha dato il suo lancio/);
+  });
+
+  test('le istruzioni di chi guida il giro dicono di fermare il worker oltre il tetto, e con cosa', async () => {
+    const { AL_POSTO_VIVO } = await import('../../scripts/lib/orchestratore-cieco.mjs');
+    const ruolo = readFileSync(join(REPO, 'routines', 'roles', '_veglia.md'), 'utf8');
+    assert.match(ruolo, /oltre\s+il tetto di costo[\s\S]{0,200}Fermalo prima di chiudere, con lo strumento TaskStop/);
+    assert.match(AL_POSTO_VIVO, /oltre il tetto di costo\): se ti dice di fermare il worker fermalo con TaskStop/);
   });
 
   test('sotto il tetto lavora: una misura per fetta, e senza tetto nessuna', async () => {
