@@ -441,7 +441,7 @@ export async function veglia({
         return {
           uscita: USCITA_FERMO,
           oltreTetto: oltre,
-          testo: `Compito oltre il tetto di costo della corsa (${oltre.usd} $ su ${oltre.tettoUsd} $): ${esito}. Chiudi il giro: non chiedere biglietti e non lanciare altri worker.`,
+          testo: `Compito oltre il tetto di costo della corsa (${oltre.usd} $ su ${oltre.tettoUsd} $): ${esito}. Ferma il worker se è ancora acceso e chiudi il giro: non chiedere biglietti e non lanciare altri worker.`,
         };
       }
     }
