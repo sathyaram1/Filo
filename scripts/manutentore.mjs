@@ -1137,7 +1137,7 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
     const app = senzaChiusi(conNumeri(ramiInCorso(root, { giorni, fuori }), indice), indice, fuori);
     const c = cloneDelServer({ root, env, scelta: opzione(argv, '--clone-server') });
     if (!c.dir) return { lista: app, fuori, server: { avviso: rigaServerAssente(c.cercati) } };
-    const aggiornato = senzaFetch ? '' : await aggiornaCloneServer(c.dir, { root, ticket: opzione(argv, '--ticket') });
+    const aggiornato = senzaFetch ? '' : aggiornaCloneServer(c.dir);
     const fuoriServer = {};
     try {
       const delServer = senzaChiusi(conNumeri(ramiInCorso(c.dir, { giorni, fuori: fuoriServer }), indice), indice, fuoriServer);
