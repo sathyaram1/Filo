@@ -89,6 +89,7 @@ import {
   cartellaDelServer, confrontaServer, statoRamoServer, testoServer, testoServerMossoDallAvvio, testoServerSporco,
 } from './lib/ramo-server.mjs';
 import { registraRamo } from './lib/biglietto-locale.mjs';
+import { refspecMain } from './lib/unit-sulla-fusione.mjs';
 import { letturaMancante, scriviRichiesta, togliRichiesta } from './lib/lettura-diff.mjs';
 
 export { PROVE_GIRO, dentroProveGiro, soloRigheTolte, soloProveTolte, vociNameStatus };
