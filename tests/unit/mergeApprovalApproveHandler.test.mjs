@@ -108,7 +108,7 @@ test('merged riallineata: alla pagina arriva che il server ha riallineato prima 
 test('merged senza riallineamento: nessun campo inventato', async () => {
   risposta = { ok: true, result: 'merged', sha: SHA_M };
   const r = await approva();
-  assert.deepEqual(r, { ok: true, result: 'merged', sha: SHA_M, headSha: '' });
+  assert.deepEqual(r, { ok: true, result: 'merged', sha: SHA_M });
 });
 
 test('conflict con tentativo fallito: alla pagina arrivano il motivo del conflitto e quello del riallineamento', async () => {
