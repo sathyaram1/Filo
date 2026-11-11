@@ -2837,8 +2837,23 @@ if (isMainModule) {
       const s = await recordVerifier(id, critica, lette.domande);
       if (s.rejected) esciRespinto(s);
       const risposta = `stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}\n${verifierReplyText(s.reply, id)}`;
+      // La critica è già registrata: un file che non si scrive non la disfa, ma chi legge deve sapere che la stampa è l'unica copia.
+      let salvata = '';
+      try { salvata = scriviRispostaCritica(ROOT, { id, ramo: ramoCorrente(ROOT), sha: s.verifierSha || headSha(ROOT) || '', testo: risposta }); } catch (e) {
+        process.stderr.write(`[dispatch] risposta non salvata su file (${e.message}): questa stampa è l'unica copia, leggila intera.\n`);
+      }
       console.log(risposta);
       console.log(rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta)));
+      // In fondo, perché sopravviva a un `| tail`, che è il filtro che l'ha persa (#2316).
+      if (salvata) console.log(`\nLa risposta intera sta anche in ${salvata}; se l'hai filtrata o persa la ristampa: node scripts/dispatch.mjs --risposta-critica ${id}`);
+      process.exit(0);
+    } else if (flag === '--risposta-critica') {
+      // Sola lettura: niente server, niente stato, niente battito. Il biglietto a mano si accetta e non serve.
+      const [, id, ...avanzo] = argv;
+      if ((id && SEMBRA_OPZIONE(id)) || avanzo.length) { console.error('Uso: --risposta-critica [<id>] [--ticket <b>]. Niente è stato toccato.'); process.exit(1); }
+      const r = leggiRispostaCritica(ROOT, { id: id || '', ramo: ramoCorrente(ROOT) });
+      if (r.errore) { console.error(r.errore); process.exit(2); }
+      console.log(r.testo);
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
