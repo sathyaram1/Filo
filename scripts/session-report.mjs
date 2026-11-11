@@ -685,6 +685,13 @@ export async function analizzaRighe(righe, { role = '', ticket = '', since = '',
         // Senza descrizione, la prima riga del comando: quaranta prove fallite non devono diventare quaranta «Bash» uguali.
         const comando = typeof input.command === 'string' ? input.command.split('\n')[0] : '';
         const info = { nome, cosa: rigaPulita(typeof input.description === 'string' && input.description.trim() ? input.description : comando, RIGA_COSA_MAX), firma };
+        const ordine = rep.tools.total;
+        if ((b.name === 'Bash' || b.name === 'PowerShell') && typeof input.command === 'string') { comandi.push(input.command); ultimaShell = ordine; }
+        const file = percorsoNorma(typeof input.file_path === 'string' ? input.file_path : input.notebook_path).join('/');
+        if (file && (b.name === 'Read' || STRUMENTI_SCRITTURA.includes(b.name))) {
+          Object.assign(info, { file, ordine });
+          if (b.name !== 'Read') info.scrittura = { causa: causaNonLetto(file, letti, comandi), shellInMezzo: ultimaShell > (tocchi.has(file) ? tocchi.get(file) : -1) };
+        }
         chiamate.set(bid, info);
         for (const f of senzaSeguito) f.voce.dopo = rigaDopo(f.chiamata, info);
         senzaSeguito = [];
