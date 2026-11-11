@@ -220,9 +220,12 @@ export function serveDeploy(p, fileApp) {
 }
 export function toccaRegole(fileApp) { return (fileApp || []).some((f) => FILE_REGOLE.includes(f)); }
 
-const chiaveRilievo = (f) => `${f.sede === 'e' ? '' : f.level}${f.sede}:${String(f.text).slice(0, 80)}`;
-// Le chiavi registrate con la scala a quattro livelli (#2339): «2e:», «1v:» erano esterni, «0i:» un 1.
-const chiaveDiOggi = (k) => String(k).replace(/^\d+[ev]:/, 'e:').replace(/^0i:/, '1i:');
+const chiaveRilievo = (f) => `${ROUND.livelloMostrato(f) ?? ''}${ROUND.sedeDi(f.sede)}:${String(f.text).slice(0, 80)}`;
+// Una chiave registrata con la scala a quattro livelli («2e:», «1v:», «0i:») si rilegge con la regola condivisa.
+const chiaveDiOggi = (k) => {
+  const m = /^(\d*)([iev]):([\s\S]*)$/.exec(String(k));
+  return m ? chiaveRilievo({ level: m[1] === '' ? null : Number(m[1]), sede: m[2], text: m[3] }) : String(k);
+};
 
 /** Come togli apre i rilievi rimasti: come li apriva l'avvia che ha guidato il lavoro. PURA. */
 export const modoDerivati = (p) => (p && p.derivati) || OPZIONI_BASE.derivati;
