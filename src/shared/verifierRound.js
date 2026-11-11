@@ -372,6 +372,34 @@
     return s === 'e' || s === 'v' ? 'e' : 'i';
   }
 
+  /**
+   * Il livello di un rilievo già scritto, anche con la scala a quattro: null per un esterno (anche un vecchio vicino),
+   * lo 0 interno vale 1; NaN se non c'è o non è un numero. L'unico posto della regola: chi mostra usa livelloMostrato. PURA.
+   */
+  function livelloLetto(f) {
+    if (sedeDi(f && f.sede) === 'e') return null;
+    const raw = f && f.level;
+    const n = raw == null || raw === '' ? NaN : Number(raw);
+    return n === 0 ? 1 : n;
+  }
+
+  /** Come livelloLetto, ma un interno fuori scala si mostra 1: per i testi, mai per i conti. PURA. */
+  function livelloMostrato(f) {
+    const n = livelloLetto(f);
+    return n === null || LEVELS.includes(n) ? n : 1;
+  }
+
+  /** Perché un rilievo strutturato è della scala vecchia (0, sede «v», esterno col livello), o ''. PURA. */
+  function motivoScalaVecchia(f) {
+    const sede = String((f && f.sede) == null ? '' : f.sede).trim().toLowerCase();
+    const raw = f && f.level;
+    const livello = raw == null || raw === '' ? null : Number(raw);
+    if (livello === 0) return SPIEGAZIONE_ZERO;
+    if (sede === 'v') return SPIEGAZIONE_VICINO;
+    if (sede === 'e' && livello !== null) return SPIEGAZIONE_ESTERNO;
+    return '';
+  }
+
   /** Il livello più alto fra gli INTERNI di un elenco (null se non ce ne sono). PURA. */
   function livelloDegliInterni(list) {
     return maxLevel((Array.isArray(list) ? list : []).filter((f) => f && sedeDi(f.sede) === 'i'));
