@@ -26,8 +26,12 @@ const soloSha = (v) => (/^[0-9a-f]{7,40}$/i.test(unaRiga(v)) ? unaRiga(v) : '');
 const soloRamo = (v) => (/^claude\/[A-Za-z0-9._-]+(\/[A-Za-z0-9._-]+)*$/.test(unaRiga(v)) ? unaRiga(v) : '');
 
 // Livello E sede, come il lettore della critica li pretende: un perimetro
-// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta.
-const formatoMinimo = (list) => list.map((f) => `- ${ROUND.findingTag(f)} ${unaRiga(f.text)}`).join('\n');
+// scritto senza sede insegnerebbe a chi verifica una forma che poi viene respinta. Il modulo condiviso si carica solo
+// qui, quando chi chiama non passa il suo: la copia degli strumenti fissati importa questo file anche senza src/.
+function formatoMinimo(list) {
+  if (!globalThis.SN_VERIFIER_ROUND) createRequire(import.meta.url)('../../src/shared/verifierRound.js');
+  return list.map((f) => `- ${globalThis.SN_VERIFIER_ROUND.findingTag(f)} ${unaRiga(f.text)}`).join('\n');
+}
 
 // La correzione passata anche dal ramo omonimo del server (#1062): il suo diff sta nel checkout di filo-security.
 function lineaServer(ramo, sha) {
