@@ -52,6 +52,26 @@ test('un indice di codice citato nei passi («righe[i]», «a[e]») non è un se
   assert.equal(R.unparsedLevelLines('Provato.\n[2i] non salva\n    poi [e] il menu altrove').length, 1);
 });
 
+test('la lettura della scala vecchia vive in un posto solo: le altre strade la chiedono al modulo condiviso', async () => {
+  assert.equal(R.livelloLetto({ level: 0, sede: 'i' }), 1);
+  assert.equal(R.livelloLetto({ level: 2, sede: 'v' }), null);
+  assert.equal(R.livelloLetto({ level: 2, sede: 'e' }), null);
+  assert.ok(Number.isNaN(R.livelloLetto({ sede: 'i' })));
+  assert.equal(R.livelloMostrato({ level: 7, sede: 'i' }), 1);
+  assert.equal(R.motivoScalaVecchia({ level: 0, sede: 'v' }), R.SPIEGAZIONE_ZERO);
+  assert.equal(R.motivoScalaVecchia({ level: 1, sede: 'v' }), R.SPIEGAZIONE_VICINO);
+  assert.equal(R.motivoScalaVecchia({ level: 2, sede: 'e' }), R.SPIEGAZIONE_ESTERNO);
+  assert.equal(R.motivoScalaVecchia({ level: null, sede: 'e' }), '');
+  const { readFileSync } = await import('node:fs');
+  for (const f of ['scripts/lib/orchestratore.mjs', 'scripts/lib/verifier-scope.mjs']) {
+    const src = readFileSync(resolve(ROOT, f), 'utf8');
+    assert.ok(!/===\s*0\s*\?\s*1|\[ev\]|\['e',\s*'v'\]/.test(src), `${f} riscrive la regola della scala vecchia invece di chiederla al modulo condiviso`);
+  }
+  const { perimetroNote } = await import(resolve(ROOT, 'scripts', 'lib', 'verifier-scope.mjs'));
+  assert.match(perimetroNote('chiusura', { rilievi: [{ level: 0, sede: 'i', text: 'a' }, { level: 1, sede: 'v', text: 'b', decision: true, irreversibile: true }] }),
+    /- \[1i\] a\n- \[e\?!\] b/);
+});
+
 test('un esterno non prende livello e diventa un feedback nuovo: niente bilancio, niente fermo', () => {
   const d = decide('Provato.\n[e] il menu altrove si chiude\n[e?] scelta su un altro lavoro');
   assert.equal(d.stop, false);
