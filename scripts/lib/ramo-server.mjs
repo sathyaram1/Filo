@@ -7,6 +7,7 @@ import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { RAMO_RE } from './parti-lavoro.mjs';
 import { cartellaCloneServer } from './git-server.mjs';
+import { MARCATORE_WORKER } from './dati-worker.mjs';
 
 /**
  * La cartella functions del checkout del server accanto al repo Filo, anche da una sua worktree; da un clone di worker,
