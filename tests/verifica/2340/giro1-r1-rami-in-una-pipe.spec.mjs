@@ -43,13 +43,14 @@ test('r1 rami in una pipe: con più di 64 KB di rami l’avviso del clone del se
 
     const env = { ...process.env };
     delete env.FILO_SERVER_CLONE;
-    // spawnSync legge l'uscita da una pipe, come `npm run manutentore -- rami | grep …`.
-    const r = spawnSync(process.execPath, [
+    // Una pipe della shell, come `npm run manutentore -- rami | grep …`: quella di spawnSync è un socket più capiente.
+    const r = spawnSync('sh', ['-c', '"$@" | cat', 'sh', process.execPath,
       '--preserve-symlinks', '--preserve-symlinks-main', join(repo, 'scripts', 'manutentore.mjs'),
       'rami', '--senza-fetch', '--clone-server', join(tmp, 'manca'),
     ], { cwd: repo, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
 
     expect(r.status, r.stderr).toBe(0);
+    expect(r.stdout.length, 'l’elenco supera i 64 KB di una pipe').toBeGreaterThan(64 * 1024);
     expect(r.stdout, 'il ramo lungo c’è').toContain(RAMO);
     expect(r.stdout.slice(-400), 'la coda dell’uscita').toContain('Rami del server NON letti');
   } finally {
