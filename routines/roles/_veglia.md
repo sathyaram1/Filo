@@ -20,7 +20,7 @@ Ogni chiamata dura al massimo due minuti, e l'esito dice il passo dopo:
   rilanciarlo e senza rilasciare niente. Esce con 3 anche un compito **oltre
   il tetto di costo** della corsa: la veglia ha già rilasciato il biglietto,
   ma il worker è ancora acceso e spende, e un worker in sottofondo sopravvive
-  al giro chiuso. Fermalo prima di chiudere, con lo strumento TaskStop
+  al giro chiuso. Ferma il worker prima di chiudere, con lo strumento TaskStop
   (caricalo con ToolSearch «select:TaskStop» se non lo vedi) e l'id che ti ha
   dato il suo lancio; poi chiudi il giro come dopo un guasto.
 - **exit 1**: il comando è scritto male. Ricopialo da qui sopra col biglietto
