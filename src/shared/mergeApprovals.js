@@ -423,10 +423,6 @@
     return out;
   }
 
-  // Il sì che il cancello del server rifiuta perché i verdetti sono stati azzerati: la richiesta resta
-  // aperta e un altro sì risponde uguale, quindi la frase dice come se ne esce (#2199.6).
-  var VERIFICA_ASSENTE_RE = /verifica[^.]*non risulta registrata/i;
-
   // L'esito di un'approvazione, detto all'owner: mai il motivo tecnico lasciato lì da
   // interpretare, sempre cosa è successo e cosa fare adesso. PURA.
   function outcomeMessage(reply, req) {
