@@ -14,7 +14,8 @@ Ogni chiamata dura al massimo due minuti, e l'esito dice il passo dopo:
 - **exit 5**: lavora ancora. Rilancia lo stesso comando, subito.
 - **exit 0**: ha rilasciato il biglietto. Vai avanti come dopo «Worker finito».
 - **exit 3**: era fermo da venti minuti senza segni di vita (di solito un
-  permesso che in cloud nessuno approva). La veglia ha già rilasciato il suo
+  permesso che in cloud nessuno approva), o ha chiuso la sessione senza
+  rilasciare il biglietto. La veglia ha già rilasciato il suo
   biglietto dichiarando il guasto: chiudi il giro come dopo un guasto, senza
   rilanciarlo e senza rilasciare niente.
 - **exit 1**: il comando è scritto male. Ricopialo da qui sopra col biglietto
