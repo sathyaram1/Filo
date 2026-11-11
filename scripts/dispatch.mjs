@@ -2828,8 +2828,9 @@ if (isMainModule) {
       if (!lette.ok) { console.error(lette.errore); process.exit(1); }
       const s = await recordVerifier(id, critica, lette.domande);
       if (s.rejected) esciRespinto(s);
-      console.log(`stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}`);
-      console.log(verifierReplyText(s.reply, id));
+      const risposta = `stato ${id}: esito=${VERIFIER_OUTCOMES.includes(s.reply?.outcome) ? s.reply.outcome : 'non comunicato'}\n${verifierReplyText(s.reply, id)}`;
+      console.log(risposta);
+      console.log(rispostaSuFile(() => scriviRispostaVerifica(ROOT, risposta)));
       process.exit(0);
     } else if (flag === '--record-fixed') {
       const ferma = opz['--ferma'] === true;
