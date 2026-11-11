@@ -206,6 +206,43 @@ test('il clone del server si cerca dove lo mettono le routine e la sessione loca
   assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', scelta: '/a', env: { FILO_SERVER_CLONE: '/srv/fs' }, esiste: c('/srv/fs') }), { dir: '', cercati: [resolve('/a')] },
     'la cartella scelta vale da sola');
   assert.deepEqual(M.cloneDelServer({ root: '/x/Filo', env: {}, esiste: c('/x/filo-security') }), { dir: resolve('/x/filo-security') });
+  // La cartella delle routine è quella dei lavori server: se si sposta il loro clone, il manutentore lo segue.
+  for (const env of [{}, { FILO_SERVER_CLONE: '/srv/fs' }]) {
+    assert.equal(M.cloneDelServer({ root: '/x/Filo', env, esiste: () => false }).cercati[0], cartellaCloneServer(env));
+  }
+});
+
+test('nelle routine il clone del server non si aggiorna: niente richiesta già rifiutata, ma da quando è (#2340)', async (t) => {
+  const leggi = catturaConsole(t);
+  const app = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  const server = repoConRami([['claude/uno', 'functions/src/x.js', '#31 uno']]);
+  t.after(() => { togliCartella(app); togliCartella(server); });
+  assert.equal(await M.main(['rami', '--ticket', 'biglietto-finto', '--clone-server', server], { root: app, env: {} }), 0);
+  const out = leggi();
+  assert.match(out, /^claude\/uno sul server/m);
+  assert.match(out, /Rami del server dal clone .* com'era alle \d{4}-\d{2}-\d{2} \d{2}:\d{2} UTC/);
+  assert.doesNotMatch(out, /non si sono aggiornati/, 'il biglietto del manutentore non chiede git-server, che gli dice sempre di no');
+});
+
+test('rami letto in una pipe: oltre 64 KB le righe in coda arrivano lo stesso (#2340)', { skip: process.platform === 'win32' && 'collegamenti e sh' }, (t) => {
+  const repo = repoConRami([['claude/app', 'src/a.js', 'auto: #30']]);
+  t.after(() => togliCartella(repo));
+  const g = (...a) => execFileSync('git', ['-C', repo, ...a], { stdio: 'ignore' });
+  g('checkout', '-q', '-B', 'lungo', 'main');
+  mkdirSync(join(repo, 'f'));
+  for (let i = 0; i < 700; i += 1) writeFileSync(join(repo, 'f', `${'un-nome-di-file-molto-lungo-'.repeat(4)}${i}.txt`), String(i));
+  g('add', '-A'); g('commit', '-qm', 'tanti file (#1)');
+  g('update-ref', 'refs/remotes/origin/claude/lungo', 'HEAD');
+  g('checkout', '-q', 'main');
+  // Il comando vero, con la radice nel repo finto: --preserve-symlinks la tiene lì.
+  for (const d of ['scripts', 'src', 'node_modules']) symlinkSync(join(RADICE, d), join(repo, d), 'dir');
+  const env = { ...process.env };
+  delete env.FILO_SERVER_CLONE;
+  const r = spawnSync('sh', ['-c', '"$@" | cat', 'sh', process.execPath, '--preserve-symlinks', '--preserve-symlinks-main',
+    join(repo, 'scripts', 'manutentore.mjs'), 'rami', '--senza-fetch', '--clone-server', join(repo, 'manca')],
+  { cwd: repo, encoding: 'utf8', env, maxBuffer: 64 * 1024 * 1024, timeout: 60_000 });
+  assert.ok(r.stdout.length > 64 * 1024, `uscita di ${r.stdout.length} byte`);
+  assert.match(r.stdout.slice(-400), /Rami del server NON letti/);
 });
 
 test('l\'ordine da accendere: numeri nell\'ordine dato, senza doppioni, col rifiuto detto', () => {
