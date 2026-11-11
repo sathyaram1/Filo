@@ -4,9 +4,6 @@
 
 import { createRequire } from 'node:module';
 
-createRequire(import.meta.url)('../../src/shared/verifierRound.js');
-const ROUND = globalThis.SN_VERIFIER_ROUND;
-
 // Un valore che non conosco vale «pieno»: mai meno verifica per un valore storto.
 export const VERIFIER_SCOPE_FILE = {
   pieno: 'verifier.md',
