@@ -1449,7 +1449,7 @@ function sealTransition(state, by) {
  * sono il riassunto). Al server arrivano i rilievi STRUTTURATI, il riassunto,
  * la critica intera e il commit su cui è stata fatta la prova: il pass vale
  * per quel commit. L'ESITO lo calcola il server e torna nella risposta, che
- * si stampa intera: non sta da nessun'altra parte.
+ * si stampa intera e resta in un file della consegna (lib/risposta-critica.mjs).
  */
 async function recordVerifier(id, critiqueText, domande = []) {
   const guard = guardIdentity(id);
