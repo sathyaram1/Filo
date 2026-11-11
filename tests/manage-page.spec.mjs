@@ -838,7 +838,7 @@ test('il giro stretto è spento di serie, si accende e si spegne scrivendo nella
   await expect(giro).toBeDisabled();
 
   // Documento senza il campo: spento. Non dipende dalle routine accese.
-  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: '' });
+  await stubCaps(page, { cap2: 5, cap1: 2, fixInstructions: '' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   await expect(giro).toBeEnabled();
