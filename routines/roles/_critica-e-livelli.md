@@ -15,9 +15,9 @@ l'avanzamento non si vede; quella intera la leggi dal file del comando in
 sottofondo. La suite intera (`npm test`)
 non la lancia nessuno: gira in GitHub a ogni fusione su main.
 
-- Un rosso **fuori dai rossi noti** è un rilievo di livello 2, interno se
-  l'ha rotto il ramo (il confronto con `main` lo dice), con l'elenco esatto
-  degli spec rotti. I rossi d'ambiente sono scritti in
+- Un rosso **fuori dai rossi noti** che ha rotto il ramo (il confronto con
+  `main` lo dice) è un rilievo interno di livello 2, con l'elenco esatto degli
+  spec rotti; uno che c'era già è esterno. I rossi d'ambiente sono scritti in
   `tests/rossi-noti.json` (`contenitore.specs` per i contenitori delle routine,
   `specs` per la macchina di chi sviluppa). Un rosso nato mentre giravano
   insieme anche le tue prove può essere solo macchina carica: rilancia quello
