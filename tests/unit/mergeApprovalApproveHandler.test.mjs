@@ -141,3 +141,52 @@ test('la frase che legge l’owner, costruita con quello che il main passa davve
   assert.doesNotMatch(msg.text, /decade/);
   assert.equal(msg.reload, true);
 });
+
+// #2199.6: il main passava esito e sha, non il dettaglio del cancello del server; la Gestione
+// diceva in verde «il server riprende» a un lavoro che tornava alle routine.
+test('il sì a un lavoro del server: la frase di Gestione dice dove va davvero il lavoro', async () => {
+  require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
+  const UI = globalThis.SN_MERGE_APPROVALS;
+  const casi = [
+    ['rimandato', 'warn', /il lavoro torna alle routine/],
+    ['all_owner', 'warn', /la pratica torna a te/],
+    ['al_pc', 'ok', /lo porta su main il tuo PC/],
+  ];
+  for (const [esito, kind, frase] of casi) {
+    risposta = { ok: true, result: 'server', esito };
+    const r = await approva();
+    assert.equal(r.esito, esito, `il main perde l’esito «${esito}»`);
+    const msg = UI.outcomeMessage(r, { origin: 'routine' });
+    assert.equal(msg.kind, kind, esito);
+    assert.match(msg.text, frase);
+    assert.doesNotMatch(msg.text, /il server riprende/);
+  }
+});
+
+test('il sì rifiutato perché la verifica non c’è più dice come se ne esce (#2199.6)', async () => {
+  require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
+  const UI = globalThis.SN_MERGE_APPROVALS;
+  risposta = {
+    ok: false, reason: 'precondizione',
+    detail: 'nessuna fusione, né dell\'app né del server: la verifica del lavoro non risulta registrata',
+  };
+  const msg = UI.outcomeMessage(await approva(), { origin: 'routine' });
+  assert.equal(msg.kind, 'err');
+  assert.match(msg.text, /Nessuna fusione è avvenuta/);
+  assert.match(msg.text, /Rimandala in lavorazione per un giro nuovo/);
+});
+
+// Ogni campo della risposta che la frase dell'owner legge deve passare dal main: un campo nuovo in
+// outcomeMessage senza la sua riga in rispostaPerCard tornerebbe a vedersi solo da browser.
+test('sentinella: rispostaPerCard lascia passare tutti i campi che outcomeMessage legge', () => {
+  require(join(ROOT, 'src', 'shared', 'mergeApprovals.js'));
+  const UI = globalThis.SN_MERGE_APPROVALS;
+  const corpo = UI.outcomeMessage.toString();
+  const letti = [...new Set([...corpo.matchAll(/\br\.([a-zA-Z_]\w*)/g)].map((m) => m[1]))]
+    .filter((k) => !['ok', 'error', 'detail'].includes(k));
+  assert.ok(letti.includes('esito') && letti.includes('result'), letti.join(','));
+  const pieno = {};
+  for (const k of letti) pieno[k] = k === 'realigned' ? { from: 'a', to: 'b', mainSha: 'c' } : 'x';
+  const out = UI.rispostaPerCard({ ok: true, ...pieno });
+  for (const k of letti) assert.ok(k in out, `rispostaPerCard perde «${k}»`);
+});
