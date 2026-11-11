@@ -441,9 +441,9 @@ test('#2215: dopo lo sblocco di un guasto la riga non dice «nota scritta»: nel
 
 import { readFileSync } from 'node:fs';
 import { dirname, resolve as risolvi } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
-const RADICE = risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
+const RADICE =risolvi(dirname(fileURLToPath(import.meta.url)), '..', '..');
 const schedaServer = (num, priorita, extra = {}) => ({
   num: String(num), stato: 'todo', motivo: '', priorita, prioritaOwner: false, titolo: `Titolo del feedback numero ${num} con qualche parola in più`,
   fiducia: 'fidato', ramo: '', aspetta: [], unisce: [], lavoroServer: false, riservato: false, inLavorazione: false, aggiornatoIl: null, ...extra,
