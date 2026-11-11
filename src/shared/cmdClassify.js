@@ -1827,7 +1827,7 @@
   // Il comando con ogni gruppo ed ogni `if` sostituiti (`testo`) e ciò che quei
   // costrutti eseguono (`pezzi`). null senza gruppi; TRE se la forma non si
   // riconosce. `mosso`: un pezzo cambia cartella, quindi dopo non la si conosce.
-  function smonta(s) {
+  function smonta(s, c) {
     let q = '';
     let gruppi = false;
     for (let k = 0; k < s.length; k++) {
