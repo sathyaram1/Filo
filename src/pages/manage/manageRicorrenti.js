@@ -262,6 +262,7 @@
       nodo('span', '', `ambito ${r.ambito || '?'}`, ambitoTitolo(a)),
       nodo('span', '', `urgenza ${r.urgenza}`, 'Più alta passa prima'),
       nodo('span', '', K.modelloTesto(r.modello, r.sforzo), 'Modello e sforzo di ogni istanza'),
+      nodo('span', 'mg-rc-tetto', tettoTesto(r.tetto), stimaTesto(r.tetto, r.giorni)),
     );
     const sotto2 = nodo('div', 'mg-cp-sotto mg-rc-quando');
     if (r.attivo === false) sotto2.append(nodo('span', '', 'spento: non parte'));
