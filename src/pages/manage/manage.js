@@ -1245,7 +1245,7 @@
         sel.dataset.ruolo = r.id;
         sel.dataset.campo = campo;
         sel.setAttribute('aria-label', `${RM.NOME_CAMPO[campo]}: ${r.nome}`);
-        sel.append(new Option(RM.VUOTO, ''));
+        sel.append(new Option(RM.vuotoDi(r.id, campo), ''));
         for (const s of RM.SCELTE[campo]) sel.append(new Option(s.nome, s.id));
         sel.disabled = !isAdmin;
         sel.addEventListener('change', () => saveRoleModel(r.id, campo, sel.value));
