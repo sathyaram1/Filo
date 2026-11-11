@@ -52,7 +52,7 @@ test('verifierRound: la domanda viaggia col rilievo strutturato, il campo mancan
   const norm = V.normalizeFindings([
     { level: 1, sede: 'i', text: 'Bordo freddo', decision: true, domanda: domanda('Bordo caldo o freddo?') },
     { level: 2, sede: 'i', text: 'Non salva', decision: false, domanda: domanda('Non serve') },
-    { level: 1, sede: 'e', text: 'Menu lento', decision: true },
+    { level: null, sede: 'e', text: 'Menu lento', decision: true },
     { level: 1, sede: 'i', text: 'Elenco storto', decision: true, domanda: [domanda('x')] },
   ]);
   assert.equal(norm[0].domanda.titolo, 'Bordo caldo o freddo?');
