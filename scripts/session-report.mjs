@@ -823,6 +823,23 @@ function righeDelFile(file) {
 }
 
 /**
+ * I dollari spesi finora nei transcript `file` da `since` (ISO), col listino del rapporto: la misura in corsa del tetto
+ * di costo di un compito (#2303). Un file illeggibile non conta e si dice in `illeggibili`.
+ */
+export async function costoDeiFile(file, { since = '' } = {}) {
+  let usd = 0;
+  let illeggibili = 0;
+  for (const f of Array.isArray(file) ? file : []) {
+    try {
+      usd += Number((await analizzaRighe(righeDelFile(f), { since })).costUsd) || 0;
+    } catch (_) {
+      illeggibili += 1;
+    }
+  }
+  return { usd: Math.round(usd * 10000) / 10000, illeggibili };
+}
+
+/**
  * I transcript dei sotto-agenti di una sessione. Claude Code li scrive in
  * `<cartella>/<nome della sessione>/subagents/*.jsonl` (verificato su file
  * veri il 16/09/2026), coi loro token. Le regole del repo dicono di delegare
