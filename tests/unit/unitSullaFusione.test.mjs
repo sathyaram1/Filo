@@ -383,7 +383,8 @@ test('prova vera (#2214): se le novità non si spostano da sole, gli unit girano
     const p = provaUnitSullaFusione({ root: r.lavoro, punta, lancia, scrivi: (s) => righe.push(s) });
     assert.equal(p.esito, 'rosso_sulla_fusione', JSON.stringify(p));
     assert.equal(p.novita, undefined, 'niente da dire al server: lo spostamento non si è fatto');
-    assert.equal(viste[0], scritto, 'gli unit girano sul registro della fusione, non su uno spostato a metà');
+    // L'albero di prova esce dal checkout di git: con core.autocrlf (Windows) le righe finiscono in CRLF.
+    assert.equal(viste[0].replace(/\r\n/g, '\n'), scritto, 'gli unit girano sul registro della fusione, non su uno spostato a metà');
     assert.ok(righe.some((s) => /non si spostano da sole/.test(s)), righe.join('\n'));
     assert.ok(!righe.some((s) => /Le sposto nel blocco/.test(s)), righe.join('\n'));
     pulita(r);
