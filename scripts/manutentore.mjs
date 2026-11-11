@@ -1239,7 +1239,15 @@ export async function main(argvIn, { root = ROOT, env = process.env } = {}) {
       if (!fatto) segnoServer(server, r);
       return fatto;
     }
-    case 'nota': case 'sblocca': {
+    case 'sblocca': {
+      const q = richiestaSblocca(argv.slice(1));
+      if (q.compito) {
+        const r = await chiama(cred, cmd, datiSblocca(q, q.testo || 'Sbloccato dal manutentore: riprendi.'));
+        return esito(r, (x) => `${x.compito}: sbloccato, riparte con chi lo prende dopo.`);
+      }
+    }
+    // falls through: un feedback si sblocca con la sua nota
+    case 'nota': {
       const testo = cmd === 'nota' ? (await leggiStdin()).trim() : richiestaSblocca(argv.slice(1)).testo;
       if (!testo && cmd === 'nota') { console.error('RIFIUTATO: la nota vuole il testo da stdin (nota 812 - <<\'FINE\' … FINE). Non ho scritto niente.'); return 1; }
       const r = await chiama(cred, cmd, { numero: numeroDi(arg), ...(testo ? { testo } : {}) });
