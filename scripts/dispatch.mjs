@@ -1722,6 +1722,9 @@ export function verifierReplyText(reply, id = '<id>') {
         ? 'La domanda è consegnata all\'owner: il lavoro aspetta la sua risposta, poi riprende da qui.'
         : VERIFIER_ROUND.RILIEVI_CHE_FERMANO,
       perSegnalazione ? null : fmt(r.blocking),
+      // Il destinatario lo calcola il server (destinatarioDelFermo, #2339): qui si dice a chi è andata la domanda.
+      !perSegnalazione && Array.isArray(r.blocking) && r.blocking.some((f) => f && f.destinatario === 'manutentore')
+        ? 'La scelta difficile da disfare va al manutentore: risponde lui con una nota, o la porta all\'owner.' : null,
       sospesi.length ? `Rilievi interni che restano davanti a chi riprende dopo la risposta:\n${fmt(sospesi)}` : null,
       derivati.length ? `Feedback derivati aperti dal server (esterni: escono comunque):\n${derivatiRighe(derivati)}` : null,
       budgets ? `Bilanci: ${budgets}` : null,
