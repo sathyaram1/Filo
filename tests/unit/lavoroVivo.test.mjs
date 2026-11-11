@@ -334,6 +334,39 @@ test('il rilascio di un worker aspetta i suoi processi nella cartella', { skip: 
   }
 });
 
+// #2237.2: il verificatore di un lavoro server aspettava a mano la suite del server, che gira nel clone di filo-security.
+test('aspetta e il rilascio di un worker vedono anche i processi nel clone del server', { skip: !LINUX && 'i processi si leggono da /proc' }, async () => {
+  const { casa, clone } = cartellaSulRamo();
+  const server = join(casa, 'filo-security');
+  mkdirSync(join(server, 'functions'), { recursive: true });
+  const { srv, chiamate, api } = await canaleFinto();
+  const suite = processoVivo(join(server, 'functions'));
+  try {
+    writeFileSync(ticketFile(clone), JSON.stringify({ ticket: T1, since: new Date().toISOString() }));
+    const attesa = spawnSync(process.execPath, [CANALE, 'aspetta', T1], { encoding: 'utf8', env: ambiente(clone, { FILO_ASPETTA_FETTA_MS: '0' }) });
+    assert.equal(attesa.status, USCITA_LAVORO_VIVO, attesa.stderr);
+    assert.match(attesa.stdout, new RegExp(`processo ${suite.pid} .* in ${server.replace(/\\/g, '/').replace(/[.*+?^${}()|[\]]/g, '\\$&')}`));
+    const r = await canale(clone, api, 'release', T1, '--role', 'verifier', '--senza-rapporto');
+    assert.equal(r.code, USCITA_LAVORO_VIVO, r.se);
+    assert.match(r.se, new RegExp(`processo ${suite.pid}`));
+    assert.ok(!chiamate.some((u) => u.endsWith('/routineRelease')));
+    ferma(suite);
+    await aspettaChe(() => { try { process.kill(suite.pid, 0); return false; } catch (_) { return true; } }, { cosa: 'il processo fermato non esce' });
+    const libera = spawnSync(process.execPath, [CANALE, 'aspetta', T1], { encoding: 'utf8', env: ambiente(clone, { FILO_ASPETTA_FETTA_MS: '0' }) });
+    assert.equal(libera.status, 0, libera.stdout + libera.stderr);
+  } finally {
+    ferma(suite);
+    srv.close();
+    togliCartella(casa);
+  }
+});
+
+test('le cartelle del lavoro: il clone del server che esiste, una volta sola; nessuna se non c\'è', () => {
+  const esiste = (p) => p.startsWith('/c/');
+  assert.deepEqual(cartelleDelLavoro('/r', { clone: '/c/filo-security', dalCheckout: '/c/filo-security/functions', esiste }), ['/c/filo-security']);
+  assert.deepEqual(cartelleDelLavoro('/r', { clone: '/x/filo-security', dalCheckout: '', esiste }), []);
+});
+
 test('un rilascio con la cartella di un altro biglietto non committa, non spedisce e non tocca il marcatore', async () => {
   const { casa, clone } = cartellaSulRamo();
   const { srv, api } = await canaleFinto();
