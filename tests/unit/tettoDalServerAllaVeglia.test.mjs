@@ -37,7 +37,8 @@ function fintoServer(lavoro) {
 /** Il giro di dispatch per un compito col `tettoUsd` dato; torna i segni che la veglia leggerebbe. */
 async function giro(tettoUsd) {
   const c = compito(tettoUsd === undefined ? {} : { tettoUsd });
-  const { srv, port } = await fintoServer({ ok: true, role: 'compito', id: 'C-12', num: 'C-12', branch: '', payload: { role: 'compito', compito: c } });
+  // La busta come la manda il server per un compito: niente feedback, niente ramo.
+  const { srv, port } = await fintoServer({ ok: true, role: 'compito', id: '', num: '', branch: '', payload: { role: 'compito', compito: c } });
   const casa = cartellaTemporanea('filo-tetto-giro-');
   try {
     mkdirSync(resolve(casa, '.claude'), { recursive: true });
