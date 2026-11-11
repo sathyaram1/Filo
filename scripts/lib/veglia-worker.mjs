@@ -288,7 +288,7 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   try { nomi = dir ? readdirSync(dir).filter((n) => n.endsWith('.jsonl')) : []; } catch (_) { nomi = []; }
   const file = nomi.map((n) => { const p = join(dir, n); try { return { p, m: statSync(p).mtimeMs }; } catch (_) { return null; } })
     .filter((f) => f && f.m >= dopoMs);
-  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN };
+  if (!file.length) return { viste: false, ultimoMs: NaN, attesa: null, elenco: [], chiusoMs: NaN, fornitoreFinoMs: NaN };
   const ultimoMs = Math.max(...file.map((f) => f.m));
   const lette = file.map((f) => ({ f, righe: codaDi(f.p) }));
   const attese = lette.map((l) => strumentoInAttesa(l.righe)).filter(Boolean);
@@ -297,7 +297,12 @@ export function tracceSottoAgenti({ dir = '', dopoMs = -Infinity } = {}) {
   // Il worker è la traccia lanciata da chi guida il giro (senza lanciatore nel meta); i suoi figli ne hanno uno.
   const worker = lette.filter(({ f }) => { const m = leggiMeta(f.p); return !(m && typeof m.parentAgentId === 'string' && m.parentAgentId.trim()); })
     .reduce((a, b) => (!a || b.f.m >= a.f.m ? b : a), null);
-  return { viste: true, ultimoMs, attesa, elenco, chiusoMs: worker ? chiusuraDi(worker.righe) : NaN };
+  const fini = elenco.map((e) => (e.attesa ? e.attesa.finoMs : NaN)).filter(Number.isFinite);
+  return {
+    viste: true, ultimoMs, attesa, elenco,
+    chiusoMs: worker ? chiusuraDi(worker.righe) : NaN,
+    fornitoreFinoMs: fini.length ? Math.max(...fini) : NaN,
+  };
 }
 
 /**
