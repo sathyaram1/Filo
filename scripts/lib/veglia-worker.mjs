@@ -203,10 +203,13 @@ export const NOTA_FERMO = 'fermo dalla veglia:';
 export const notaDelFermo = (quadro) => (String(quadro || '').trim() ? `${NOTA_FERMO} ${pulito(quadro).trim()}` : '');
 
 /** Il guasto da dichiarare per un worker fermo, col gruppo davanti e il quadro prima della coda. PURA. */
-export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '' } = {}) {
+export function testoGuasto({ fermoMs = 0, attesa = null, tracceViste = true, quadro = '', chiusoMs = NaN } = {}) {
   const minuti = Math.round(fermoMs / 60000);
   const segni = tracceViste ? 'niente commit, salvataggi, processi o passi nel suo transcript' : 'niente commit, salvataggi o processi; transcript non visibile';
   const coda = `${String(quadro || '').trim() ? `${String(quadro).trim()} ` : ''}Rilasciato dalla veglia di chi guida il giro.`;
+  if (Number.isFinite(chiusoMs)) {
+    return pulito(`guasto: strumento worker: il worker ha chiuso la sessione alle ${ora(chiusoMs)} senza rilasciare il biglietto, e da ${minuti} minuti nella cartella non lavora nessuno. ${coda}`);
+  }
   if (attesa) {
     const nome = attesa.nome === 'Bash' ? (programmaDi(attesa.comando) || 'bash') : (attesa.nome.toLowerCase().replace(/[^a-z0-9._-]/g, '') || 'worker');
     const cosa = attesa.comando ? `${attesa.nome} «${comandoLeggibile(attesa.comando)}»` : attesa.nome;
