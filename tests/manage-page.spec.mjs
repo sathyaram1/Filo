@@ -2617,7 +2617,7 @@ test('giro stretto: se la config non si legge l’interruttore resta com’era e
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
-  await stubCaps(page, { cap2: 5, cap1: 1, cap0: 0, fixInstructions: '', giroStretto: true });
+  await stubCaps(page, { cap2: 5, cap1: 1, fixInstructions: '', giroStretto: true });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const giro = page.locator('#mgGiroStretto');
