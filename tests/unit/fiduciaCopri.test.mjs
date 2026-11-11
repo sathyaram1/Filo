@@ -28,7 +28,7 @@ test('l’owner copre #1919: prima a secco, poi dal vero; quello che resta e i r
   assert.equal(righe[1], '#1919: coperte 2 note del manutentore. Il lavoro può ripartire.');
   const resta = async () => ({ ok: true, numero: '2192', coperte: 1, restano: 1, restaLocale: ['contenuto scritto da un biglietto sporco'] });
   assert.equal(await copri(['2192', '--dal-vero'], { chiama: resta, scrivi }), 0);
-  assert.equal(righe[2], '#2192: coperte una nota del manutentore; restano 1 scritture di altri, che lo sporcano ancora. Resta locale: contenuto scritto da un biglietto sporco.');
+  assert.equal(righe[2], '#2192: coperta una nota del manutentore; restano 1 scritture di altri, che lo sporcano ancora. Resta locale: contenuto scritto da un biglietto sporco.');
   assert.equal(await copri(['851'], { chiama: async () => ({ ok: true, numero: '851', coperte: 0, restano: 0, prova: true }), scrivi }), 0);
   assert.equal(righe[3], '#851: nessuna nota del manutentore da coprire.');
   assert.equal(await copri(['7', '--dal-vero'], { chiama: async () => ({ ok: false, reason: 'feedback_inesistente', detail: 'nessun feedback #7' }), scrivi }), 1);
