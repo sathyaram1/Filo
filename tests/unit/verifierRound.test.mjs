@@ -168,9 +168,10 @@ test('livello 3 con cap3 e i bilanci sotto esauriti → stop, decide l\'owner; u
   assert.deepEqual(due.derived.map((x) => x.priority), [1], 'un 2 nasce a 1: la 2 la mette solo il manutentore');
 });
 
-test('il segno ? → stop al livello 3 e su un 2 difficile da disfare, il 2 va avanti, derivato ai livelli 1 e 0 (#1202)', () => {
+test('il segno ? → stop al livello 3 e su una scelta difficile da disfare a ogni livello, il 2 va avanti, l\'1 derivato (#1202, #2339)', () => {
   assert.equal(decide([f(3, 'chiavi SSH?', true)]).stop, true);
   assert.equal(decide([{ ...f(2, 'formato su disco?', true), irreversibile: true }]).stop, true, 'anche a bilancio pieno');
+  assert.equal(decide([{ ...f(1, 'formato del registro?', true), irreversibile: true }]).stop, true, 'anche su un 1');
   const dueQ = decide([f(2, 'quale strada?', true)]);
   assert.equal(dueQ.stop, false, 'un 2 col ? non ferma più');
   assert.equal(dueQ.fix.length, 1, 'chi corregge applica l\'opzione consigliata');
