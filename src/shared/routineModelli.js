@@ -1,6 +1,6 @@
 // Modello e sforzo del worker per ogni fase di un cambio di codice (doc config/routines, campo `roleModels`).
 // Logica pura: pagina di gestione e main rifiutano gli stessi valori. Una scelta assente vale la definizione
-// dell'agente: qui non c'è nessun default.
+// dell'agente; l'unica fase con una partenza sua è la verifica dopo un riallineamento, che la prende dal server.
 
 (function (global) {
   'use strict';
@@ -10,6 +10,9 @@
   const RUOLI = Object.freeze([
     Object.freeze({ id: 'new-work', nome: 'Primo lavoro' }),
     Object.freeze({ id: 'verifier', nome: 'Verifica' }),
+    // Guarda solo i file di un conflitto risolto (#2344): vuota vale la Verifica, salvo la partenza, che il server
+    // applica (functions/src/routine/modello.js di filo-security, una prova lì le tiene uguali).
+    Object.freeze({ id: 'verifier-riallineamento', nome: 'Verifica dopo un riallineamento', come: 'verifier', partenza: Object.freeze({ effort: 'medium' }) }),
     Object.freeze({ id: 'fixer', nome: 'Correzione' }),
     Object.freeze({ id: 'secaudit', nome: 'Controllo cieco' }),
     // Non è una fase di un cambio: è la regia (SPEC-MANUTENTORE § 1), ultima perché fuori da quell'ordine.
