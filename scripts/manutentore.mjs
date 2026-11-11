@@ -529,6 +529,12 @@ export function righeRifiuti(conto, finestra = null) {
   ];
 }
 
+/** La riga dopo `nota` o `sblocca`: lo sblocco di un guasto nelle note non scrive (#2215). PURA. */
+export function rigaNotaOSblocco(x) {
+  if (x.notaScritta === false) return `#${x.numero}: sbloccato (${x.sbloccato}), nelle note non ho scritto niente: il lavoro riparte con chi lo prende dopo.`;
+  return `#${x.numero}: nota scritta${x.sbloccato ? `, il lavoro fermo (${x.sbloccato}) riparte con chi lo prende dopo` : ''}.`;
+}
+
 /** `sblocca 812 riparato il registro` → { ok, numero, testo } (testo '' = quello di default del server). PURA. */
 export function richiestaSblocca(args) {
   const [n, ...resto] = senzaOpzioni(args);
