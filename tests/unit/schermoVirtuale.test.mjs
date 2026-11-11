@@ -121,9 +121,10 @@ test('riallineamento: la scelta è dei soli file in conflitto, anche risolti col
   }
 });
 
-// #2075: un riallineamento SENZA conflitti su un ramo vecchio, con centinaia di file arrivati da main in aree che
-// hanno spec: si sceglie solo dal lavoro. Presi tutti erano 550 spec e circa sei ore, oltre il tetto di un comando.
-test('riallineamento senza conflitti: tanti file arrivati da main non allargano la scelta oltre il lavoro', () => {
+// #2075, #2237: un riallineamento SENZA conflitti su un ramo vecchio, con centinaia di file arrivati da main in aree
+// che hanno spec: la modifica del ramo è identica a quella verificata, e bastano gli unit (erano 550 spec e sei ore,
+// poi un'ora per i 110 spec del solo lavoro).
+test('riallineamento senza conflitti: nessuno spec, né del lavoro né dei file arrivati da main', () => {
   const dir = cartellaTemporanea('riallineamento-pulito-');
   const g = (...a) => execFileSync('git', a, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
   const scrivi = (f, t) => { mkdirSync(dirname(resolve(dir, f)), { recursive: true }); writeFileSync(resolve(dir, f), t); };
