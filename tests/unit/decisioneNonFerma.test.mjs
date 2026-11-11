@@ -94,7 +94,7 @@ test('[2i?] a bilanci finiti dal 2 in giù va da parte come un 2: domanda nel su
   assert.equal(d.derived.length, 1);
   assert.notEqual(d.derived[0].inCorrezione, true);
   // Con un 3 da correggere nello stesso giro, invece, entra: il giro lo paga il 3.
-  const conTre = decide('Provato.\n[3i] perde i dati\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5, count0: 5 });
+  const conTre = decide('Provato.\n[3i] perde i dati\n[2i?] A o B? Consiglio A.', { count2: 5, count1: 5 });
   assert.deepEqual(tag(conTre.fix), ['[3i]', '[2i?]']);
   assert.equal(conTre.consume, 'cap3');
   assert.equal(conTre.derived[0].inCorrezione, true);
