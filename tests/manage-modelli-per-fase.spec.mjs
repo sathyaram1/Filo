@@ -148,7 +148,7 @@ test('si sceglie un modello per una fase, si ritrova riaprendo la pagina, e si t
   await scegli(page, 'verifier', 'model', 'Sonnet');
   await expect(page.locator('#mgRoleModelsMsg')).toHaveText('Verifica: salvato.');
   // Sul server la sola foglia scelta: il resto del documento e le altre fasi non si toccano.
-  expect(await sulServer(app)).toEqual({ enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, verifier: { model: 'sonnet' } } });
+  expect(await sulServer(app)).toEqual({ enabled: true, maxSessions: 2, roleModels: { secaudit: { effort: 'high' }, 'verifier-riallineamento': { effort: 'low' }, verifier: { model: 'sonnet' } } });
 
   // Il trattino del primo lavoro arriva al server come nome, non come espressione.
   await scegli(page, 'new-work', 'effort', 'max');
