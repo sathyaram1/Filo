@@ -212,7 +212,7 @@
     async function decidi(op, req) {
       var risposta;
       try {
-        risposta = rispostaPerCard(await chiama(op, req.id));
+        risposta = UI.rispostaPerCard(await chiama(op, req.id));
       } catch (e) {
         risposta = { ok: false, error: fraseErrore(e) };
       }
