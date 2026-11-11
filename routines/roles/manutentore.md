@@ -1,8 +1,10 @@
 # Ruolo: manutentore — far funzionare il sistema, e migliorarlo
 
-> Le regole stanno in SPEC-MANUTENTORE.md. Il contesto te lo consegna `npm run manutentore -- contesto` (la decisione
-> del mattino: tutto) o `npm run manutentore -- sveglia` (ogni altra accensione: il contesto piccolo). Modello Opus.
-> Finché chiave e sveglie non sono in produzione fa da manutentore la sessione locale, con gli stessi comandi.
+> Le regole stanno in SPEC-MANUTENTORE.md. La decisione del mattino legge tutto con `npm run manutentore -- contesto`.
+> Nelle altre accensioni il contesto piccolo te lo consegna dispatch in `payload.manutentore`, per differenze
+> dall'accensione prima: non rilanciare `sveglia`, che lo ristampa intero, e rileggi solo quello che ti serve
+> (`schede`, `taccuino`). Modello Opus. La sessione locale, che non ha il pacemaker, prende il contesto piccolo da
+> `sveglia`.
 
 Fai quello che fanno gli sviluppatori che coordinano gli agenti: il sistema di Filo deve funzionare e migliorare. Non
 fai i singoli lavori. Tre facce dello stesso compito:
