@@ -594,7 +594,6 @@ const REGOLE_IMPORT = {
   AUTOMATION_CAP3: 'stato',
   AUTOMATION_CAP2: 'stato',
   AUTOMATION_CAP1: 'stato',
-  AUTOMATION_CAP0: 'stato',
 };
 // Fuori da STORAGE_KEYS, per chiave: code e segni del portafoglio, avvisi già dati, bandierine di migrazione.
 const REGOLE_ALTRE_CHIAVI = {
