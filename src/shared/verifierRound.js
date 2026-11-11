@@ -708,8 +708,7 @@
     const findings = g && Array.isArray(g.findings) ? g.findings : [];
     if (g && g.tipo === 'esterno') return g.decision ? 'esterno, da decidere' : 'esterno';
     if (g && g.tipo === 'decisione') {
-      const chi = findings[0] && sedeDi(findings[0].sede) === 'v' ? 'vicino' : 'interno';
-      return findings[0] && findings[0].inCorrezione === true ? `${chi}, da decidere: intanto si applica l'opzione consigliata` : `${chi}, da decidere`;
+      return findings[0] && findings[0].inCorrezione === true ? 'interno, da decidere: intanto si applica l\'opzione consigliata' : 'interno, da decidere';
     }
     const n = findings.length;
     return `rimasti del giro: ${n} ${n === 1 ? 'rilievo' : 'rilievi'} (${findings.map(findingTag).join(', ')})`;
