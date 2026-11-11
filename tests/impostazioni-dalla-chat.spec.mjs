@@ -43,7 +43,6 @@ async function modelloFinto(app, giri) {
     globalThis.SN_PROVIDERS.streamCompleteWithFallback = async ({ attempts, messages, onDelta, onToolCall }) => {
       const giro = g[Math.min(n, g.length - 1)];
       n += 1;
-      globalThis.__imp_giri = n;
       const ultimo = [...messages].reverse().find((m) => m.role === 'tool');
       if (ultimo) globalThis.__imp_tool.push(String(ultimo.content || ''));
       for (const m of messages) if (m.role === 'tool') globalThis.__imp_esiti[m.tool_call_id] = String(m.content || '');
