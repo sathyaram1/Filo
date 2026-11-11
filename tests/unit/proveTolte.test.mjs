@@ -82,10 +82,10 @@ test('il nome di una prova del giro dice quali rilievi riproduce', () => {
 test('il numero di un rilievo è il suo posto nella critica, interni ed esterni insieme', () => {
   const tutti = [
     { level: 2, sede: 'i', text: 'a' }, { level: 1, sede: 'i', text: 'b', decision: true },
-    { level: 1, sede: 'i', text: 'c' }, { level: 1, sede: 'e', text: 'x' }, { level: 1, sede: 'i', text: 'c' },
+    { level: 1, sede: 'i', text: 'c' }, { level: null, sede: 'e', text: 'x' }, { level: 1, sede: 'i', text: 'c' },
   ];
   const n = (parte) => numeraRilievi(tutti, parte).map((f) => f.n);
-  assert.deepEqual(n([{ level: 1, sede: 'e', text: 'x', priority: 1, num: '#9.1' }, { level: 1, sede: 'i', text: 'b', decision: true }]), [4, 2]);
+  assert.deepEqual(n([{ level: null, sede: 'e', text: 'x', priority: null, num: '#9.1' }, { level: 1, sede: 'i', text: 'b', decision: true }]), [4, 2]);
   assert.deepEqual(n([{ level: 1, sede: 'i', text: 'c' }, { level: 1, sede: 'i', text: 'c' }]), [3, 5], 'due rilievi uguali, due numeri');
   assert.deepEqual(n([{ level: 2, sede: 'i', text: 'non c\'è' }]), [null]);
 });
