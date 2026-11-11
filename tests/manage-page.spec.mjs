@@ -2562,7 +2562,7 @@ test('il testo delle istruzioni di correzione oltre il tetto non viene salvato m
   await page.waitForLoadState('domcontentloaded');
   await page.waitForFunction(() => window.__mgTest && window.SN_CONST && window.filo);
   await apriScheda(page, 'automation');
-  await stubCaps(page, { cap2: 5, cap1: 2, cap0: 0, fixInstructions: 'PRIMA' });
+  await stubCaps(page, { cap2: 5, cap1: 2, fixInstructions: 'PRIMA' });
   await page.evaluate(() => window.__mgTest.setAdmin(true));
   await page.evaluate(() => window.__mgTest.loadCaps());
   const fix = page.locator('#mgFixInstructions');
