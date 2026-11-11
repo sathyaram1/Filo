@@ -1307,6 +1307,7 @@
       }
       sel.value = v;
     }
+    aggiornaStime();
     mostraRoleMsg();
   }
 
