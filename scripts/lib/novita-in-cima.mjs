@@ -195,7 +195,7 @@ function mappaSorgente(src) {
         const e = elementi(src, p.valore);
         elenchi[p.nome] = { prop: p, apre: p.valore, chiude: e.chiude, elementi: e.elementi };
       }
-      return { ...b, chiudeOggetto: fineOggetto, props, elenchi };
+      return { ...b, elenchi };
     }),
   };
 }
