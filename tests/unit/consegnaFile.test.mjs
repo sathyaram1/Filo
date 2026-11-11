@@ -6,7 +6,8 @@ import assert from 'node:assert/strict';
 import { existsSync, readFileSync } from 'node:fs';
 import { isAbsolute, resolve } from 'node:path';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
-import { scaricaPayload, cartellaConsegna, PAYLOAD_IN_STAMPA_MAX } from '../../scripts/lib/consegna-file.mjs';
+import { scaricaPayload, cartellaConsegna, scriviRispostaVerifica, PAYLOAD_IN_STAMPA_MAX } from '../../scripts/lib/consegna-file.mjs';
+import { rispostaSuFile } from '../../scripts/dispatch.mjs';
 
 const BASE = cartellaTemporanea('filo-consegna-test-');
 const ROOT = resolve(BASE, 'progetto');
