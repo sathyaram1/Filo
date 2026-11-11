@@ -13,7 +13,7 @@ import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 import { aspettaChe } from '../helpers/attese.mjs';
 import {
   segniDiLavoroVivo, questoProcesso, comandoLeggibile, testoLavoroVivo, lavoroVivo, sottoCartella, timbroFile,
-  TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation,
+  TIMBRO_VIVO_MS, USCITA_LAVORO_VIVO, prepareBranch, writeExpectation, cartelleDelLavoro,
 } from '../../scripts/lib/branch-integrity.mjs';
 import { beatFile } from '../../scripts/lib/routine-beat.mjs';
 import { ticketFile } from '../../scripts/lib/routine-ticket.mjs';
