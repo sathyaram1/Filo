@@ -377,7 +377,7 @@ export function provaUnitSullaFusione({
 }
 
 function mainDiOrigin({ git, gitStoria }) {
-  const f = gitStoria(['fetch', '--quiet', 'origin', `+refs/heads/${MAIN}:refs/remotes/origin/${MAIN}`]);
+  const f = gitStoria(['fetch', '--quiet', 'origin', refspecMain()]);
   if (!f.ok) return { errore: `non riesco a scaricare main da origin (${primaRiga(f.out)})` };
   const m = git(['rev-parse', '--verify', `refs/remotes/origin/${MAIN}^{commit}`]);
   const mainSha = m.ok ? m.out.trim() : '';
