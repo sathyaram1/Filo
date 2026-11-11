@@ -163,7 +163,7 @@ test('le prove scritte dalla verifica sono quelle aggiunte o rinominate dopo l\'
   assert.deepEqual(proveScritteDa(avvio, casa).sort(), ['tests/verifica/901/giro2-r1-nuova.spec.mjs', 'tests/verifica/901/giro2-r2-rinominata.spec.mjs']);
 });
 
-function fintoServer(reply = { outcome: 'pass', derived: [{ level: 1, sede: 'e', text: 'esterno', num: '#901.1' }] }) {
+function fintoServer(reply = { outcome: 'pass', derived: [{ level: null, sede: 'e', text: 'esterno', priority: null, num: '#901.1' }] }) {
   const ricevuti = [];
   const srv = createServer((req, res) => {
     let body = '';
