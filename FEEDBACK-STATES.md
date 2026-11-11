@@ -148,8 +148,9 @@ anche un lavoro dell'iter (`manageTabFor` con `opts.fusioni`), e lì «→ In co
   (esauriti il bilancio dei 3 e quelli sotto)→ `design` (`statusReason: loop`); un 2
   nello stesso caso NON ferma: entra nel feedback derivato dei rimasti e il lavoro passa
   se non c'è altro (dal 2026-09-23, bilanci separati per livello); —rilievo interno che chiede una
-  decisione, di livello 3 o su una scelta difficile da disfare (`[2i?!]`: dati degli
-  utenti, sicurezza, formati su disco)→ `design` (`statusReason: decisione`); un `[2i?]`
+  decisione, di livello 3 o su una scelta difficile da disfare (`?!` a ogni livello:
+  dati degli utenti, formati su disco; dal #2339 va al manutentore, non all'owner)→
+  `design` (`statusReason: decisione`); un `[2i?]`
   NON ferma: si corregge con l'opzione consigliata dal verificatore ed esce anche in un
   feedback derivato con la domanda (dal 2026-10-12, #1202), che aspetta il lavoro e si
   chiude con la sua fusione (§4c); `blocca` sulla domanda di un rilievo si respinge: la
