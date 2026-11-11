@@ -481,7 +481,7 @@
   // e nei campi della dashboard: una sentinella li confronta.
   const CAP_MIN = 0;
   const CAP_MAX = 10;
-  const CAP_KEYS = ['cap3', 'cap2', 'cap1', 'cap0'];
+  const CAP_KEYS = ['cap3', 'cap2', 'cap1'];
 
   /** I bilanci che mancano (né in `caps` né in `defaults`): [] se ci sono tutti. PURA. */
   function missingCaps(caps, defaults) {
