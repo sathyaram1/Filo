@@ -3,13 +3,16 @@
 
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { execFileSync, spawnSync } from 'node:child_process';
+import { mkdirSync, symlinkSync, writeFileSync } from 'node:fs';
+import { dirname as cartellaDi, join, resolve } from 'node:path';
+import { fileURLToPath as percorsoDi } from 'node:url';
 import { cartellaTemporanea, togliCartella } from '../helpers/percorsi.mjs';
 
 const M = await import('../../scripts/manutentore.mjs');
 const { incrociFraRami } = await import('../../scripts/lib/su-main.mjs');
+const { cartellaCloneServer } = await import('../../scripts/lib/git-server.mjs');
+const RADICE = resolve(cartellaDi(percorsoDi(import.meta.url)), '..', '..');
 const scheda = (num, extra = {}) => ({
   numero: String(num), titolo_breve: 'Menu immagini', riassunto: 'Il menu\nnon si apre.', tipo: 'bug', area: 'browser-schede',
   file_probabili: ['src/content/menu.js'], urgente: false, valido: 'si', prova: 'Letto il gestore.', risolto_su_main: null, parole_chiave: [],
