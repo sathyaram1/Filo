@@ -58,6 +58,34 @@ test('i campi: nome e testo obbligatori, tetti rifiutati col numero, cadenza rip
   assert.equal(R.validaCampi(Object.assign({}, base, { attivo: false })).campi.attivo, false);
 });
 
+// #2303: il tetto di costo di una corsa. Vuoto è automatico, il doppio della mediana delle ultime corse.
+test('il tetto scritto: dollari con la virgola o col punto, vuoto è automatico, il resto si rifiuta col numero', () => {
+  const base = { nome: 'Audit', testo: 'fai', giorni: [1], ora: '01:00' };
+  const tetto = (v) => R.validaCampi(Object.assign({}, base, { tettoUsd: v }));
+  assert.equal(tetto('90,5').campi.tettoUsd, 90.5);
+  assert.equal(tetto(' 120 ').campi.tettoUsd, 120);
+  assert.equal(tetto(12.345).campi.tettoUsd, 12.35);
+  for (const v of ['', '  ', null, undefined]) assert.equal(tetto(v).campi.tettoUsd, null, `«${v}» vale automatico`);
+  for (const v of ['0', '-3', 'tanti', 10001, '1e9', true]) {
+    const r = tetto(v);
+    assert.equal(r.errore, 'tetto_non_valido', `«${v}»`);
+    assert.match(r.dettaglio, /da 0,01 a 10000/);
+  }
+});
+
+test('il tetto che vale: quello dell’owner, o il doppio della mediana delle ultime dieci corse, o nessuno', () => {
+  // Le corse dell'audit settimanale di novembre: 45,7 (guasto), 61,7, 74.
+  assert.deepEqual(R.tettoDi({ costiCorse: [45.7, 61.7, 74] }), { usd: 124, da: 'corse', mediana: 61.7, corse: 3 });
+  assert.deepEqual(R.tettoDi({ costiCorse: [10, 20] }), { usd: 30, da: 'corse', mediana: 15, corse: 2 });
+  assert.deepEqual(R.tettoDi({ tettoUsd: 90.5, costiCorse: [45.7, 61.7, 74] }), { usd: 90.5, da: 'owner', mediana: 61.7, corse: 3 });
+  assert.deepEqual(R.tettoDi({ tettoUsd: null, costiCorse: [] }), { usd: 0, da: '', mediana: 0, corse: 0 });
+  assert.deepEqual(R.tettoDi(null), { usd: 0, da: '', mediana: 0, corse: 0 });
+  // Solo le ultime dieci, senza costi nulli o storti: una corsa vecchia carissima non tiene il tetto alto per sempre.
+  const corse = [1000, 0, -5, 'x', ...Array.from({ length: 10 }, () => 10)];
+  assert.deepEqual(R.corseValide(corse), Array.from({ length: 10 }, () => 10));
+  assert.equal(R.tettoAutomatico(corse), 20);
+});
+
 test('quando: giorno, data e ora italiana', () => {
   assert.equal(R.quandoTesto(Date.parse('2026-10-26T00:00:00Z')), 'lun 26/10 01:00');
   assert.equal(R.quandoTesto(0), '');
